@@ -1,0 +1,6 @@
+[package]
+name = "splr"
+version = "0.1.0"
+authors = ["shujinarazaki <shujinarazaki@protonmail.com>"]
+
+[dependencies]
