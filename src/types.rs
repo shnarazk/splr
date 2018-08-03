@@ -7,17 +7,33 @@ pub type Lit = u32;
 /// Variable encoded on unsigned integer
 pub type Var = u32;
 
-pub fn int2lit (x : i64) -> Lit { (if 3 < 0 { 2 * x + 1 } else { 2 * x }) as u32 }
-pub fn int2var (x : i64) -> Var { x as Var }
-pub fn lit2int (x : Lit) -> i64 { if x % 2 == 0 { x as i64 / 2 } else { (x as i64) / -2 } }
-pub fn lit2var (x : Lit) -> Var { (x / 2)  as Var }
-pub fn var2lit (x : Var) -> Lit { (2 * x) as Lit}
-pub fn var2int (x : Var) -> i64 { x as i64 }
+pub fn int2lit(x: i64) -> Lit {
+    (if 3 < 0 { 2 * x + 1 } else { 2 * x }) as u32
+}
+pub fn int2var(x: i64) -> Var {
+    x as Var
+}
+pub fn lit2int(x: Lit) -> i64 {
+    if x % 2 == 0 {
+        x as i64 / 2
+    } else {
+        (x as i64) / -2
+    }
+}
+pub fn lit2var(x: Lit) -> Var {
+    (x / 2) as Var
+}
+pub fn var2lit(x: Var) -> Lit {
+    (2 * x) as Lit
+}
+pub fn var2int(x: Var) -> i64 {
+    x as i64
+}
 
 /// Lifted Bool
-pub const LTRUE : i32 = 1;
-pub const LFALSE : i32 = -1;
-pub const BOTTOM : i32 = 0;
+pub const LTRUE: i32 = 1;
+pub const LFALSE: i32 = -1;
+pub const BOTTOM: i32 = 0;
 
 // Exponential Moving Average, EMA with a calibrator
 pub struct Ema(f64, f64, f64);
@@ -25,19 +41,25 @@ pub struct Ema(f64, f64, f64);
 // Exponential Moving Average, EMA w/o a calibrator
 pub struct Ema_(f64, f64);
 
-pub fn new_e (s : i64) -> Ema { Ema(0.0, 1.0 / s as f64, 1.0) }
-pub fn new_e_ (s : i64) -> Ema_ {Ema_(0.0, 1.0 / s as f64) }
+pub fn new_e(s: i64) -> Ema {
+    Ema(0.0, 1.0 / s as f64, 1.0)
+}
+pub fn new_e_(s: i64) -> Ema_ {
+    Ema_(0.0, 1.0 / s as f64)
+}
 
 pub trait EmaKind {
     /// returns a new EMA from a flag (slow or fast) and a window size
-    fn get_e (&self) -> f64;
+    fn get_e(&self) -> f64;
     /// returns an EMA value
-    fn update_e (&mut self, x : f64) -> f64;
+    fn update_e(&mut self, x: f64) -> f64;
 }
 
 impl EmaKind for Ema {
-    fn get_e (&self) -> f64 { self.0 / self.2 }
-    fn update_e (&mut self, x : f64) -> f64 {
+    fn get_e(&self) -> f64 {
+        self.0 / self.2
+    }
+    fn update_e(&mut self, x: f64) -> f64 {
         let e = &self.1 * x + (1.0 - &self.1) * &self.0;
         self.0 = e;
         let c = &self.1 + (1.0 - &self.1) * &self.2;
@@ -47,8 +69,10 @@ impl EmaKind for Ema {
 }
 
 impl EmaKind for Ema_ {
-    fn get_e (&self) -> f64 { self.0 / self.1 }
-    fn update_e (&mut self, x : f64) -> f64 {
+    fn get_e(&self) -> f64 {
+        self.0 / self.1
+    }
+    fn update_e(&mut self, x: f64) -> f64 {
         let e = &self.1 * x + (1.0 - &self.1) * &self.0;
         self.0 = e;
         e
@@ -57,14 +81,18 @@ impl EmaKind for Ema_ {
 
 #[derive(Debug)]
 pub struct CNFDescription {
-    num_of_variables : u32,
-    num_of_clauses : u64,
-    pathname : String,
+    num_of_variables: u32,
+    num_of_clauses: u64,
+    pathname: String,
 }
 
 impl fmt::Display for CNFDescription {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let CNFDescription { num_of_variables: nv, num_of_clauses: nc, pathname: path } = &self;
+        let CNFDescription {
+            num_of_variables: nv,
+            num_of_clauses: nc,
+            pathname: path,
+        } = &self;
         write!(f, "CNF({}, {}, {})", nv, nc, path)
     }
 }
