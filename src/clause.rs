@@ -2,60 +2,45 @@ use std::fmt;
 use types::*;
 
 /// Clause
-pub enum ClauseKind {
-    /// Normal clause
-    Clause {
-        activity: f64,
-        rank: i32,
-        lits: Vec<Lit>,
-    },
-    /// Binary clause
-    BiClause(Lit, Lit),
+pub struct Clause {
+        pub activity: f64,
+        pub rank: i32,
+        pub lits: Vec<Lit>,
 }
 
 /// Clause should be placed on heap anytime.
 /// And `Box` provides Eq for 'clause pointer'.
-pub type Clause = Box<ClauseKind>;
+pub type ClauseRef = Box<Clause>;
 
-impl ClauseKind {
-    pub fn new(v: Vec<Lit>) -> Clause {
-        Box::new(ClauseKind::Clause {
+impl Clause {
+    pub fn new(v: Vec<Lit>) -> ClauseRef {
+        Box::new(Clause {
             activity: 0.0,
-            rank: 0,
+            rank: v.len() as i32,
             lits: v,
         })
     }
-    pub fn new2(l1: Lit, l2: Lit) -> Clause {
-        Box::new(ClauseKind::BiClause(l1, l2))
-    }
-    pub fn null_clause() -> Clause {
-        Box::new(ClauseKind::BiClause(0, 0))
-    }
-}
-
-impl PartialEq for ClauseKind {
-    fn eq(&self, other: &ClauseKind) -> bool {
-        match &self {
-            ClauseKind::Clause { lits: p, .. } => match &other {
-                ClauseKind::Clause { lits: q, .. } => p == q,
-                ClauseKind::BiClause(_, _) => false,
-            },
-            ClauseKind::BiClause(l1, l2) => match &other {
-                ClauseKind::Clause { .. } => false,
-                ClauseKind::BiClause(l3, l4) => l1 == l3 && l2 == l4,
-            },
-        }
+    pub fn null() -> ClauseRef {
+        Box::new(Clause {
+            activity: 0.0,
+            rank: 0,
+            lits: vec![],
+        })
     }
 }
 
-impl Eq for ClauseKind {}
+impl PartialEq for Clause {
+    fn eq(&self, other: &Clause) -> bool { self.lits == other.lits }
+}
 
-impl fmt::Display for ClauseKind {
+impl Eq for Clause {}
+
+impl fmt::Display for Clause {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match &self {
-            ClauseKind::Clause { lits: _, .. } => write!(f, "a clause"),
-            ClauseKind::BiClause(0, 0) => write!(f, "null_clause"),
-            ClauseKind::BiClause(_, _) => write!(f, "a biclause"),
+        match self.lits.len() {
+            0 => write!(f, "null_clause"),
+            2 => write!(f, "a biclause"),
+            _ => write!(f, "a clause"),
         }
     }
 }
