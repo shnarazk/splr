@@ -5,8 +5,8 @@ use splr::types::*;
 fn main() {
     let x: Lit = int2lit(4);
     let null = Clause::null();
-    let mut c2 : ClauseRef = Clause::new(vec![int2lit(-1), int2lit(4)]);
-    let mut e = Ema::new(10);
+    let mut c2: ClauseRef = Clause::new(vec![int2lit(-1), int2lit(4)]);
+    let mut e = Ema::new(1000);
     for _ in 1..20 {
         e.update(0.2);
     }

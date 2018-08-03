@@ -3,9 +3,9 @@ use types::*;
 
 /// Clause
 pub struct Clause {
-        pub activity: f64,
-        pub rank: i32,
-        pub lits: Vec<Lit>,
+    pub activity: f64,
+    pub rank: i32,
+    pub lits: Vec<Lit>,
 }
 
 /// Clause should be placed on heap anytime.
@@ -30,7 +30,9 @@ impl Clause {
 }
 
 impl PartialEq for Clause {
-    fn eq(&self, other: &Clause) -> bool { self.lits == other.lits }
+    fn eq(&self, other: &Clause) -> bool {
+        self.lits == other.lits
+    }
 }
 
 impl Eq for Clause {}
