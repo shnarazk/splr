@@ -13,21 +13,25 @@ pub enum ClauseKind {
     BiClause(Lit, Lit),
 }
 
+/// Clause should be placed on heap anytime.
+/// And `Box` provides Eq for 'clause pointer'.
+pub type Clause = Box<ClauseKind>;
+
 impl ClauseKind {
-    /// Clause should be placed on heap anytime.
-    pub fn new(v: Vec<Lit>) -> Box<ClauseKind> {
+    pub fn new(v: Vec<Lit>) -> Clause {
         Box::new(ClauseKind::Clause {
             activity: 0.0,
             rank: 0,
             lits: v,
         })
     }
-    pub fn new2(l1: Lit, l2: Lit) -> Box<ClauseKind> {
+    pub fn new2(l1: Lit, l2: Lit) -> Clause {
         Box::new(ClauseKind::BiClause(l1, l2))
     }
+    pub fn null_clause() -> Clause {
+        Box::new(ClauseKind::BiClause(0, 0))
+    }
 }
-
-pub const CLAUSE0: ClauseKind = ClauseKind::BiClause(0, 0);
 
 impl PartialEq for ClauseKind {
     fn eq(&self, other: &ClauseKind) -> bool {

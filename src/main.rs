@@ -4,7 +4,7 @@ use splr::types::*;
 
 fn main() {
     let x: Lit = int2lit(4);
-    let null = Box::new(CLAUSE0);
+    let null = ClauseKind::null_clause();
     let c2 = ClauseKind::new2(int2lit(-1), int2lit(4));
     let mut e = Ema::new(10);
     for _ in 1..20 {
