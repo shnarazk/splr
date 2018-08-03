@@ -40,7 +40,7 @@ pub struct Ema(f64, f64, f64);
 
 impl Ema {
     pub fn new(s: i64) -> Ema {
-        Ema(0.0, 1.0 / s as f64, 1.0)
+        Ema(0.0, 1.0 / s as f64, 0.0)
     }
 }
 
