@@ -68,3 +68,20 @@ impl fmt::Display for CNFDescription {
         write!(f, "CNF({}, {}, {})", nv, nc, path)
     }
 }
+
+#[derive(Debug)]
+/// `Solver`'s parameters; random decision rate was dropped.
+pub struct SolverConfiguration {
+    /// decay rate for variable activity
+    variable_decay_rate: f64,
+    /// decay rate for clause activity
+    clause_decay_rate: f64,
+    /// dump stats data during solving
+    dump_solver_stat_mode: i64,
+    /// the coefficients for restarts
+    ema_coeffs: (i64, i64),
+    /// restart expansion factor
+    restart_expansion: f64,
+    /// static steps between restarts
+    restart_step: f64,
+}
