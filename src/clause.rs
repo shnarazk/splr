@@ -11,21 +11,41 @@ pub enum ClauseKind {
         rank: i32,
         lits: Vec<Lit>,
     },
-    // Binary clause
-    // BiClause(Lit, Lit),
+    /// Binary clause
+    BiClause(Lit, Lit),
+}
+
+impl ClauseKind {
+    pub fn new(v: Vec<Lit>) -> ClauseKind {
+        ClauseKind::Clause {
+            activity: 0.0,
+            rank: 0,
+            lits: v,
+        }
+    }
+    pub fn new2(l1: Lit, l2: Lit) -> ClauseKind {
+        ClauseKind::BiClause(l1, l2)
+    }
 }
 
 impl PartialEq for ClauseKind {
-    fn eq(&self, ref other : &ClauseKind) -> bool {
+    fn eq(&self, other: &ClauseKind) -> bool {
         match &self {
-            ClauseKind::NullClause => match other {
+            ClauseKind::NullClause => match &other {
                 ClauseKind::NullClause => true,
-                _                      => false,
-            }
-            ClauseKind::Clause { lits: v1, .. } => match &other {
+                ClauseKind::Clause { .. } => false,
+                ClauseKind::BiClause(_, _) => false,
+            },
+            ClauseKind::Clause { lits: p, .. } => match &other {
                 ClauseKind::NullClause => false,
-                ClauseKind::Clause { lits: v2, .. } => v1 == v2,
-            }
+                ClauseKind::Clause { lits: q, .. } => p == q,
+                ClauseKind::BiClause(_, _) => false,
+            },
+            ClauseKind::BiClause(l1, l2) => match &other {
+                ClauseKind::NullClause => false,
+                ClauseKind::Clause { .. } => false,
+                ClauseKind::BiClause(l3, l4) => l1 == l3 && l2 == l4,
+            },
         }
     }
 }
@@ -37,7 +57,7 @@ impl fmt::Display for ClauseKind {
         match &self {
             ClauseKind::NullClause => write!(f, "Null"),
             ClauseKind::Clause { .. } => write!(f, "a clause"),
-//            ClauseKind::BiClause(_, _) => write!(f, "a biclause"),
+            ClauseKind::BiClause(_, _) => write!(f, "a biclause"),
         }
     }
 }

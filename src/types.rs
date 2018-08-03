@@ -38,28 +38,33 @@ pub const BOTTOM: i32 = 0;
 // Exponential Moving Average, EMA with a calibrator
 pub struct Ema(f64, f64, f64);
 
+impl Ema {
+    pub fn new(s: i64) -> Ema {
+        Ema(0.0, 1.0 / s as f64, 1.0)
+    }
+}
+
 // Exponential Moving Average, EMA w/o a calibrator
 pub struct Ema_(f64, f64);
 
-pub fn new_e(s: i64) -> Ema {
-    Ema(0.0, 1.0 / s as f64, 1.0)
-}
-pub fn new_e_(s: i64) -> Ema_ {
-    Ema_(0.0, 1.0 / s as f64)
+impl Ema_ {
+    pub fn new(s: i64) -> Ema_ {
+        Ema_(0.0, 1.0 / s as f64)
+    }
 }
 
 pub trait EmaKind {
     /// returns a new EMA from a flag (slow or fast) and a window size
-    fn get_e(&self) -> f64;
+    fn get(&self) -> f64;
     /// returns an EMA value
-    fn update_e(&mut self, x: f64) -> f64;
+    fn update(&mut self, x: f64) -> f64;
 }
 
 impl EmaKind for Ema {
-    fn get_e(&self) -> f64 {
+    fn get(&self) -> f64 {
         self.0 / self.2
     }
-    fn update_e(&mut self, x: f64) -> f64 {
+    fn update(&mut self, x: f64) -> f64 {
         let e = &self.1 * x + (1.0 - &self.1) * &self.0;
         self.0 = e;
         let c = &self.1 + (1.0 - &self.1) * &self.2;
@@ -69,10 +74,10 @@ impl EmaKind for Ema {
 }
 
 impl EmaKind for Ema_ {
-    fn get_e(&self) -> f64 {
+    fn get(&self) -> f64 {
         self.0 / self.1
     }
-    fn update_e(&mut self, x: f64) -> f64 {
+    fn update(&mut self, x: f64) -> f64 {
         let e = &self.1 * x + (1.0 - &self.1) * &self.0;
         self.0 = e;
         e
