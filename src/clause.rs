@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
 use std::fmt;
 use types::*;
 
@@ -48,8 +50,19 @@ impl fmt::Display for Clause {
 }
 
 pub struct ClauseExtManager {
-    _nActives: i64,                  // number of active clause
-    _purged: bool,                   // -- whether it needs gc
-    _clauseVector: Vec<Box<Clause>>, // -- clause list
-    _keyVector: Vec<i64>,            // Int list
+    num_actives: i32,          // number of active clause
+    purged: bool,              // -- whether it needs gc
+    clauses: Vec<Box<Clause>>, // -- clause list
+    keys: Vec<i32>,            // Int list
+}
+
+impl ClauseExtManager {
+    fn new() -> ClauseExtManager {
+        ClauseExtManager {
+            num_actives: 0,
+            purged: false,
+            clauses: vec![],
+            keys: vec![],
+        }
+    }
 }

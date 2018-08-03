@@ -6,10 +6,10 @@ use std::fmt;
 ///
 /// ```
 /// use splr::types::*;
-/// assert_eq!(2, int2lit( 1) as i64);
-/// assert_eq!(3, int2lit(-1) as i64);
-/// assert_eq!(4, int2lit( 2) as i64);
-/// assert_eq!(5, int2lit(-2) as i64);
+/// assert_eq!(2, int2lit( 1) as i32);
+/// assert_eq!(3, int2lit(-1) as i32);
+/// assert_eq!(4, int2lit( 2) as i32);
+/// assert_eq!(5, int2lit(-2) as i32);
 /// assert_eq!( 1, lit2int(int2lit( 1)));
 /// assert_eq!(-1, lit2int(int2lit(-1)));
 /// assert_eq!( 2, lit2int(int2lit( 2)));
@@ -17,14 +17,14 @@ use std::fmt;
 /// ```
 pub type Lit = u32;
 
-pub fn int2lit(x: i64) -> Lit {
+pub fn int2lit(x: i32) -> Lit {
     (if x < 0 { -2 * x + 1 } else { 2 * x }) as u32
 }
-pub fn lit2int(x: Lit) -> i64 {
+pub fn lit2int(x: Lit) -> i32 {
     if x % 2 == 0 {
-        x as i64 / 2
+        x as i32 / 2
     } else {
-        (x as i64) / -2
+        (x as i32) / -2
     }
 }
 
@@ -33,18 +33,18 @@ pub fn lit2int(x: Lit) -> i64 {
 ///
 /// ```
 /// use splr::types::*;
-/// assert_eq!(1, int2var(1) as i64);
-/// assert_eq!(2, int2var(2) as i64);
+/// assert_eq!(1, int2var(1) as i32);
+/// assert_eq!(2, int2var(2) as i32);
 /// assert_eq!( 1, var2int(int2var(1)));
 /// assert_eq!( 2, var2int(int2var(2)));
 /// ```
 pub type Var = u32;
 
-pub fn int2var(x: i64) -> Var {
+pub fn int2var(x: i32) -> Var {
     x as Var
 }
-pub fn var2int(x: Var) -> i64 {
-    x as i64
+pub fn var2int(x: Var) -> i32 {
+    x as i32
 }
 
 /// Converters
@@ -83,7 +83,7 @@ pub trait EmaKind {
 pub struct Ema(f64, f64, f64);
 
 impl Ema {
-    pub fn new(s: i64) -> Ema {
+    pub fn new(s: i32) -> Ema {
         Ema(0.0, 1.0 / s as f64, 0.0)
     }
 }
@@ -105,7 +105,7 @@ impl EmaKind for Ema {
 pub struct Ema_(f64, f64);
 
 impl Ema_ {
-    pub fn new(s: i64) -> Ema_ {
+    pub fn new(s: i32) -> Ema_ {
         Ema_(0.0, 1.0 / s as f64)
     }
 }
@@ -147,9 +147,9 @@ pub struct SolverConfiguration {
     /// decay rate for clause activity
     clause_decay_rate: f64,
     /// dump stats data during solving
-    dump_solver_stat_mode: i64,
+    dump_solver_stat_mode: i32,
     /// the coefficients for restarts
-    ema_coeffs: (i64, i64),
+    ema_coeffs: (i32, i32),
     /// restart expansion factor
     restart_expansion: f64,
     /// static steps between restarts

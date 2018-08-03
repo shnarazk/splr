@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+
 extern crate splr;
 use splr::clause::*;
 use splr::solver::*;
