@@ -13,19 +13,19 @@ pub struct Clause {
 pub type BoxClause = Box<Clause>;
 
 impl Clause {
-    pub fn new(v: Vec<Lit>) -> BoxClause {
-        Box::new(Clause {
+    pub fn new(v: Vec<Lit>) -> Clause {
+        Clause {
             activity: 0.0,
             rank: v.len() as i32,
             lits: v,
-        })
+        }
     }
-    pub fn null() -> BoxClause {
-        Box::new(Clause {
+    pub fn null() -> Clause {
+        Clause {
             activity: 0.0,
             rank: 0,
             lits: vec![],
-        })
+        }
     }
 }
 
@@ -45,4 +45,11 @@ impl fmt::Display for Clause {
             _ => write!(f, "a clause"),
         }
     }
+}
+
+pub struct ClauseExtManager {
+    _nActives: i64,                  // number of active clause
+    _purged: bool,                   // -- whether it needs gc
+    _clauseVector: Vec<Box<Clause>>, // -- clause list
+    _keyVector: Vec<i64>,            // Int list
 }
