@@ -10,17 +10,17 @@ pub struct Clause {
 
 /// Clause should be placed on heap anytime.
 /// And `Box` provides Eq for 'clause pointer'.
-pub type ClauseRef = Box<Clause>;
+pub type BoxClause = Box<Clause>;
 
 impl Clause {
-    pub fn new(v: Vec<Lit>) -> ClauseRef {
+    pub fn new(v: Vec<Lit>) -> BoxClause {
         Box::new(Clause {
             activity: 0.0,
             rank: v.len() as i32,
             lits: v,
         })
     }
-    pub fn null() -> ClauseRef {
+    pub fn null() -> BoxClause {
         Box::new(Clause {
             activity: 0.0,
             rank: 0,
