@@ -8,7 +8,7 @@ use types::*;
 /// And `Box` provides Eq for 'clause pointer'.
 pub struct Clause {
     pub activity: f64,
-    pub rank: i32,
+    pub rank: usize,
     pub lits: Vec<Lit>,
 }
 
@@ -16,7 +16,7 @@ impl Clause {
     pub fn new(v: Vec<Lit>) -> Clause {
         Clause {
             activity: 0.0,
-            rank: v.len() as i32,
+            rank: v.len(),
             lits: v,
         }
     }
@@ -26,6 +26,15 @@ impl Clause {
             rank: 0,
             lits: vec![],
         }
+    }
+    pub fn len(&self) -> usize {
+        self.lits.len()
+    }
+    pub fn watch0(&self) -> Lit {
+        self.lits[0]
+    }
+    pub fn watch1(&self) -> Lit {
+        self.lits[1]
     }
 }
 
@@ -50,17 +59,15 @@ impl fmt::Display for Clause {
 /// ClauseExtManager is only the owner of clauses.
 /// Other functions should borrow a mutual reference from it.
 pub struct ClauseManager {
-    num_actives: usize, // the number of active clause
-    purged: bool,       // whether it needs gc
-    clauses: Vec<Box<Clause>>,
-    keys: Vec<i32>,
+    pub num_actives: usize, // the number of active clause
+    pub clauses: Vec<Clause>,
+    pub keys: Vec<i32>,
 }
 
 impl ClauseManager {
     pub fn new() -> ClauseManager {
         ClauseManager {
             num_actives: 0,
-            purged: false,
             clauses: vec![],
             keys: vec![],
         }
@@ -68,14 +75,14 @@ impl ClauseManager {
     pub fn shrink(&mut self, k: usize) -> () {
         self.num_actives -= k
     }
-    pub fn push(&mut self, c: Box<Clause>) -> () {
+    pub fn push(&mut self, c: Clause) -> () {
         self.clauses.push(c);
         self.keys.push(0);
     }
     pub fn pop(&mut self) -> () {
         self.num_actives -= 1
     }
-    pub fn last(&mut self) -> &mut Box<Clause> {
-        &mut (self.clauses[self.num_actives - 1])
+    pub fn last(&mut self) -> &Clause {
+        &self.clauses[self.num_actives - 1]
     }
 }

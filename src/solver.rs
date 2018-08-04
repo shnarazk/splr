@@ -7,22 +7,22 @@ use types::*;
 /// It's just a mutable vector referring immutable Clause.
 /// Because, during propagate, all clauses are immutable.
 pub struct Watcher<'a> {
-    other: Lit,
-    by: &'a Clause,
+    pub other: Lit,
+    pub by: &'a Clause,
 }
 
 pub struct Solver<'a> {
-    null_clause: Clause,
-    clauses: ClauseManager,
-    learnts: ClauseManager,
-    watches: Vec<Vec<Watcher<'a>>>,
-    assigns: Vec<LBool>,
-    phases: Vec<i8>,
-    config: &'a SolverConfiguration,
+    pub null_clause: Clause,
+    pub clauses: ClauseManager,
+    pub learnts: ClauseManager,
+    pub watches: Vec<Vec<Watcher<'a>>>,
+    pub assigns: Vec<LBool>,
+    pub phases: Vec<i8>,
+    pub config: &'a SolverConfiguration,
 }
 
 impl<'a> Solver<'a> {
-    fn new(cfg: &'a SolverConfiguration) -> Solver<'a> {
+    pub fn new(cfg: &'a SolverConfiguration) -> Solver<'a> {
         Solver {
             null_clause: Clause::null(),
             clauses: ClauseManager::new(),
@@ -33,7 +33,7 @@ impl<'a> Solver<'a> {
             config: cfg,
         }
     }
-    fn value_of(&self, l: Lit) -> LBool {
+    pub fn value_of(&self, l: Lit) -> LBool {
         let x = self.assigns[lit2var(l) as usize];
         if x == BOTTOM {
             BOTTOM
@@ -43,7 +43,7 @@ impl<'a> Solver<'a> {
             negate(x)
         }
     }
-    fn satisfies(&self, c: Clause) -> bool {
+    pub fn satisfies(&self, c: Clause) -> bool {
         for l in c.lits {
             if self.value_of(l) == LTRUE {
                 return true;
@@ -51,4 +51,9 @@ impl<'a> Solver<'a> {
         }
         return false;
     }
+    pub fn inject(&mut self, c: Clause) -> () {
+        self.clauses.push(c);
+    }
 }
+
+pub fn cancel_until(_s: &mut Solver, _l: Lit) -> () {}
