@@ -14,7 +14,6 @@ fn main() {
         pathname: "".to_string(),
     };
     let mut s: Solver = Solver::new(DEFAULT_CONFIGURATION, &cnf);
-    s.init();
     let x: Lit = int2lit(4);
     let c1 = Clause::new(1, vec![int2lit(1), int2lit(2)]);
     let mut c2 = Clause::new(2, vec![int2lit(-1), int2lit(4)]);

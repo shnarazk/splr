@@ -12,7 +12,7 @@ pub enum Certificate {
 
 /// abnormal termination flags
 pub enum SolverException {
-    StateUNSAT,           // 0
+    StateUNSAT = 0,
     StateSAT,             // 1
     OutOfMemory,          // 2
     TimeOut,              // 3
@@ -68,6 +68,14 @@ pub fn negate_lit(l: Lit) -> Lit {
     l ^ 1
 }
 
+pub fn lit2lbool(l: Lit) -> LBool {
+    if positive_lit(l) {
+        LTRUE
+    } else {
+        LFALSE
+    }
+}
+
 /// Variable encoded on unsigned integer
 /// # Examples
 ///
@@ -78,7 +86,7 @@ pub fn negate_lit(l: Lit) -> Lit {
 /// assert_eq!( 1, var2int(int2var(1)));
 /// assert_eq!( 2, var2int(int2var(2)));
 /// ```
-pub type Var = u32;
+pub type Var = usize;
 
 pub fn int2var(x: i32) -> Var {
     x as Var
@@ -215,8 +223,9 @@ pub const DEFAULT_CONFIGURATION: SolverConfiguration = SolverConfiguration {
 };
 
 /// stat index
+#[derive(Copy, Clone)]
 pub enum StatIndex {
-    NumOfBackjump,     // the number of backjump
+    NumOfBackjump = 0, // the number of backjump
     NumOfRestart,      // the number of restart
     NumOfBlockRestart, // the number of blacking start
     NumOfPropagation,  // the number of propagation
@@ -230,7 +239,7 @@ pub enum StatIndex {
 
 /// formats of state dump
 pub enum DumpMode {
-    NoDump,
+    NoDump = 0,
     DumpCSVHeader,
     DumpCSV,
     DumpJSON,

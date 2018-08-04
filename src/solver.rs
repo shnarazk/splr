@@ -34,8 +34,8 @@ pub struct Solver {
     pub trail: Vec<Lit>,
     pub trail_lim: Vec<usize>,
     pub q_head: usize,
-    pub reason: Vec<CID>,
-    pub level: Vec<i32>,
+    pub reasons: Vec<CID>,
+    pub levels: Vec<i32>,
     pub conflicts: Vec<Lit>,
     /// Variable Order
     activities: Vec<f64>,
@@ -55,7 +55,7 @@ pub struct Solver {
     an_stack: Vec<Lit>,
     an_last_dl: Vec<Lit>,
     an_learnt_lits: Vec<Lit>,
-    stats: Vec<usize>,
+    stats: Vec<i64>,
     lbd_seen: Vec<u64>,
     lbd_key: u64,
     /// restart heuristics
@@ -84,8 +84,8 @@ impl Solver {
             trail: Vec::new(),
             trail_lim: Vec::new(),
             q_head: 0,
-            reason: vec![],
-            level: vec![-1; nv],
+            reasons: vec![0; 10],
+            levels: vec![-1; nv],
             conflicts: vec![],
             activities: vec![0.0; nv],
             order: vec![],
@@ -116,11 +116,8 @@ impl Solver {
         };
         s
     }
-    pub fn init(&mut self) -> () {
-        self.reason = vec![0; 10];
-    }
     pub fn value_of(&self, l: Lit) -> LBool {
-        let x = self.assigns[lit2var(l) as usize];
+        let x = self.assigns[lit2var(l)];
         if x == BOTTOM {
             BOTTOM
         } else if positive_lit(l) {
@@ -149,12 +146,74 @@ impl Solver {
     fn propagate_by_assign(&mut self, _l: Lit, _c: &mut Clause) -> Lit {
         0
     }
+    pub fn num_assigns(&self) -> usize {
+        self.trail.len()
+    }
     pub fn num_clauses(&self) -> usize {
         self.clauses.vec.len()
     }
     pub fn num_learnts(&self) -> usize {
         self.learnts.vec.len()
     }
+    pub fn decision_level(&self) -> usize {
+        self.trail_lim.len()
+    }
+    pub fn var2asg(&self, v: Var) -> LBool {
+        self.assigns[v]
+    }
+    pub fn lit2asg(&self, l: Lit) -> LBool {
+        let a = self.assigns[lit2var(l)];
+        if positive_lit(l) {
+            a
+        } else {
+            negate_bool(a)
+        }
+    }
+    pub fn locked(&self, c: &Clause) -> bool {
+        c.cid == self.reasons[lit2var(c.lits[0])]
+    }
+    pub fn get_stat(&self, i: &StatIndex) -> i64 {
+        self.stats[*i as usize]
+    }
+    pub fn set_asg(&mut self, v: Var, b: LBool) -> () {
+        self.assigns[v] = b
+    }
+    pub fn enqueue(&mut self, l: Lit, cid: usize) -> bool {
+        let sig = lit2lbool(l);
+        let v = lit2var(l);
+        let val = self.var2asg(v);
+        if val != BOTTOM {
+            val == sig
+        } else {
+            let i = v;
+            self.assigns[i] = sig;
+            self.levels[i] = self.decision_level() as i32;
+            self.reasons[i] = cid;
+            self.trail.push(l);
+            true
+        }
+    }
+    pub fn assume(&mut self, l: Lit) -> bool {
+        self.trail_lim.push(self.trail.len());
+        self.enqueue(l, NULLID)
+    }
+    pub fn cancel_until(&mut self, lv: usize) -> () {
+        let dl = self.decision_level();
+        if lv < dl {
+            let lim = self.trail_lim[lv + 1];
+            let ts = self.trail.len();
+            let mut c = ts;
+            while lim < c {
+                let x = lit2var(self.trail[c]);
+                self.phases[x] = self.assigns[x];
+                self.assigns[x] = BOTTOM;
+                self.reasons[x] = NULLID;
+                // self.undoVO(x);
+                c -= 1;
+            }
+            self.trail.truncate(lim);
+            self.trail_lim.truncate(lv);
+            self.q_head = lim;
+        }
+    }
 }
-
-pub fn cancel_until(_s: &mut Solver, _l: Lit) -> () {}

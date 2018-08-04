@@ -6,6 +6,8 @@ use types::*;
 /// Clause Id
 pub type CID = usize;
 
+pub const NULLID: CID = 0;
+
 /// Clause
 /// Clause should be placed on heap anytime.
 /// And `Box` provides Eq for 'clause pointer'.
