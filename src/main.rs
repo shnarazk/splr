@@ -27,5 +27,5 @@ fn main() {
     );
     s.inject(c2);
     s.solve();
-    println!("nclauses = {}", s.clauses.clauses.len())
+    println!("nclauses = {}", s.clauses.len())
 }

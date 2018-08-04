@@ -58,31 +58,4 @@ impl fmt::Display for Clause {
 
 /// ClauseExtManager is only the owner of clauses.
 /// Other functions should borrow a mutual reference from it.
-pub struct ClauseManager {
-    pub num_actives: usize, // the number of active clause
-    pub clauses: Vec<Clause>,
-    pub keys: Vec<i32>,
-}
-
-impl ClauseManager {
-    pub fn new() -> ClauseManager {
-        ClauseManager {
-            num_actives: 0,
-            clauses: vec![],
-            keys: vec![],
-        }
-    }
-    pub fn shrink(&mut self, k: usize) -> () {
-        self.num_actives -= k
-    }
-    pub fn push(&mut self, c: Clause) -> () {
-        self.clauses.push(c);
-        self.keys.push(0);
-    }
-    pub fn pop(&mut self) -> () {
-        self.num_actives -= 1
-    }
-    pub fn last(&mut self) -> &Clause {
-        &self.clauses[self.num_actives - 1]
-    }
-}
+pub type ClauseManager = Vec<(i32, Clause)>;

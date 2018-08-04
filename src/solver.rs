@@ -52,7 +52,7 @@ impl<'a> Solver<'a> {
         return false;
     }
     pub fn inject(&mut self, c: Clause) -> () {
-        self.clauses.push(c);
+        self.clauses.push((0, c));
     }
 }
 
