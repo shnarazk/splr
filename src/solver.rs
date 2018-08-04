@@ -5,9 +5,9 @@ use types::*;
 
 pub struct Solver {
     null_clause: Clause,
-    clauses: Vec<BoxClause>,
-    learnts: Vec<BoxClause>,
-    watches: Vec<ClauseExtManager>,
+    clauses: ClauseManager,
+    learnts: ClauseManager,
+    watches: Vec<ClauseManager>,
     assigns: Vec<i8>,
     phases: Vec<i8>,
 }
@@ -16,8 +16,8 @@ impl Solver {
     fn new() -> Solver {
         Solver {
             null_clause: Clause::null(),
-            clauses: vec![Box::new(Clause::new(vec![]))],
-            learnts: vec![Box::new(Clause::new(vec![]))],
+            clauses: ClauseManager::new(),
+            learnts: ClauseManager::new(),
             watches: vec![],
             assigns: vec![0; 10],
             phases: vec![0; 10],

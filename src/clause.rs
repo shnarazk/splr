@@ -4,15 +4,13 @@ use std::fmt;
 use types::*;
 
 /// Clause
+/// Clause should be placed on heap anytime.
+/// And `Box` provides Eq for 'clause pointer'.
 pub struct Clause {
     pub activity: f64,
     pub rank: i32,
     pub lits: Vec<Lit>,
 }
-
-/// Clause should be placed on heap anytime.
-/// And `Box` provides Eq for 'clause pointer'.
-pub type BoxClause = Box<Clause>;
 
 impl Clause {
     pub fn new(v: Vec<Lit>) -> Clause {
@@ -54,12 +52,12 @@ impl fmt::Display for Clause {
 pub struct ClauseManager {
     num_actives: usize, // the number of active clause
     purged: bool,       // whether it needs gc
-    clauses: Vec<Clause>,
+    clauses: Vec<Box<Clause>>,
     keys: Vec<i32>,
 }
 
 impl ClauseManager {
-    fn new() -> ClauseManager {
+    pub fn new() -> ClauseManager {
         ClauseManager {
             num_actives: 0,
             purged: false,
@@ -67,17 +65,17 @@ impl ClauseManager {
             keys: vec![],
         }
     }
-    fn shrink(&mut self, k: usize) -> () {
+    pub fn shrink(&mut self, k: usize) -> () {
         self.num_actives -= k
     }
-    fn push(&mut self, c: Clause) -> () {
+    pub fn push(&mut self, c: Box<Clause>) -> () {
         self.clauses.push(c);
         self.keys.push(0);
     }
-    fn pop(&mut self) -> () {
+    pub fn pop(&mut self) -> () {
         self.num_actives -= 1
     }
-    fn last(&mut self) -> &mut Clause {
+    pub fn last(&mut self) -> &mut Box<Clause> {
         &mut (self.clauses[self.num_actives - 1])
     }
 }
