@@ -1,5 +1,31 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+
 //! Basic types
 use std::fmt;
+
+/// normal results returned by Solver
+pub enum Certificate {
+    SAT(Vec<i32>),
+    UNSAT(Vec<i32>), // FIXME: replace with DRAT
+}
+
+/// abnormal termination flags
+pub enum SolverException {
+    StateUNSAT,           // 0
+    StateSAT,             // 1
+    OutOfMemory,          // 2
+    TimeOut,              // 3
+    InternalInconsistent, // 4
+    UndescribedError,     // 5
+}
+
+/// The type that `Solver` returns
+/// This captures the following three cases:
+/// * solved with a satisfiable assigment,
+/// * proved that it's an unsatisfiable problem, and
+/// * aborted due to Mios specification or an internal error
+type SolverResult = Result<Certificate, SolverException>;
 
 /// Literal encoded on unsigned integer
 /// # Examples
