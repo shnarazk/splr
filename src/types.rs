@@ -28,6 +28,10 @@ pub fn lit2int(x: Lit) -> i32 {
     }
 }
 
+pub fn positive_lit(l: Lit) -> bool {
+    l % 2 == 0
+}
+
 /// Variable encoded on unsigned integer
 /// # Examples
 ///
@@ -67,9 +71,18 @@ pub fn var2lit(x: Var) -> Lit {
 }
 
 /// Lifted Bool
+pub type LBool = i32;
 pub const LTRUE: i32 = 1;
 pub const LFALSE: i32 = -1;
 pub const BOTTOM: i32 = 0;
+
+pub fn negate(b: i32) -> i32 {
+    match b {
+        LTRUE => LFALSE,
+        LFALSE => LTRUE,
+        _ => BOTTOM,
+    }
+}
 
 /// trait on Ema
 pub trait EmaKind {
