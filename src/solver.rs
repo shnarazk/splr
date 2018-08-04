@@ -11,23 +11,34 @@ pub struct Watcher<'a> {
     pub by: &'a Clause,
 }
 
+/// WatcherVec
+pub type WatcherVec<'a> = Vec<Vec<Watcher<'a>>>;
+
+pub fn new_watcher_vec<'a>(n: u32) -> WatcherVec<'a> {
+    let mut vec = Vec::new();
+    for _i in 0..n {
+        vec.push(Vec::new());
+    }
+    vec
+}
+
 pub struct Solver<'a> {
     pub null_clause: Clause,
     pub clauses: ClauseManager,
     pub learnts: ClauseManager,
-    pub watches: Vec<Vec<Watcher<'a>>>,
+    pub watches: WatcherVec<'a>,
     pub assigns: Vec<LBool>,
     pub phases: Vec<i8>,
     pub config: &'a SolverConfiguration,
 }
 
 impl<'a> Solver<'a> {
-    pub fn new(cfg: &'a SolverConfiguration) -> Solver<'a> {
+    pub fn new(cfg: &'a SolverConfiguration, cnf: &CNFDescription) -> Solver<'a> {
         Solver {
             null_clause: Clause::null(),
             clauses: ClauseManager::new(),
             learnts: ClauseManager::new(),
-            watches: vec![],
+            watches: new_watcher_vec(cnf.num_of_variables * 2),
             assigns: vec![0; 10],
             phases: vec![0; 10],
             config: cfg,

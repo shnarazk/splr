@@ -162,9 +162,9 @@ impl EmaKind for Ema_ {
 
 #[derive(Debug)]
 pub struct CNFDescription {
-    num_of_variables: u32,
-    num_of_clauses: u64,
-    pathname: String,
+    pub num_of_variables: u32,
+    pub num_of_clauses: u64,
+    pub pathname: String,
 }
 
 impl fmt::Display for CNFDescription {

@@ -8,7 +8,12 @@ use splr::solver::*;
 use splr::types::*;
 
 fn main() {
-    let mut s: Solver = Solver::new(&DEFAULT_CONFIGURATION);
+    let cnf = CNFDescription {
+        num_of_variables: 8,
+        num_of_clauses: 10,
+        pathname: "".to_string(),
+    };
+    let mut s: Solver = Solver::new(&DEFAULT_CONFIGURATION, &cnf);
     let x: Lit = int2lit(4);
     let null: Clause = Clause::null();
     let mut c2 = Clause::new(vec![int2lit(-1), int2lit(4)]);
