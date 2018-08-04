@@ -4,7 +4,7 @@ use clause::*;
 use solver::*;
 use types::*;
 
-impl<'a> Solver<'a> {
+impl Solver {
     pub fn solve(&mut self) -> () {
         propagate(self, 0);
     }
@@ -12,12 +12,12 @@ impl<'a> Solver<'a> {
 
 fn search(_s: &mut Solver) -> () {}
 
-fn propagate<'a>(_s: &'a mut Solver, _l: Lit) -> Option<&'a Clause> {
+fn propagate(_s: &mut Solver, _l: Lit) -> Option<&Clause> {
     None
 }
 
 fn analyze(_s: &mut Solver, _l: Lit) -> (u32, Clause) {
-    (0, Clause::new(vec![]))
+    (0, Clause::new(1, vec![]))
 }
 
 fn simplify(_s: &mut Solver) -> () {}

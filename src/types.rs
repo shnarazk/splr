@@ -58,6 +58,16 @@ pub fn positive_lit(l: Lit) -> bool {
     l % 2 == 0
 }
 
+/// ```
+/// asert_eq!(int2lit( 1), negate_lit(int2lit(-1)));
+/// asert_eq!(int2lit(-1), negate_lit(int2lit( 1)));
+/// asert_eq!(int2lit( 2), negate_lit(int2lit(-2)));
+/// asert_eq!(int2lit(-2), negate_lit(int2lit( 2)));
+/// ```
+pub fn negate_lit(l: Lit) -> Lit {
+    l ^ 1
+}
+
 /// Variable encoded on unsigned integer
 /// # Examples
 ///
@@ -97,12 +107,12 @@ pub fn var2lit(x: Var) -> Lit {
 }
 
 /// Lifted Bool
-pub type LBool = i32;
-pub const LTRUE: i32 = 1;
-pub const LFALSE: i32 = -1;
-pub const BOTTOM: i32 = 0;
+pub type LBool = i8;
+pub const LTRUE: i8 = 1;
+pub const LFALSE: i8 = -1;
+pub const BOTTOM: i8 = 0;
 
-pub fn negate(b: i32) -> i32 {
+pub fn negate_bool(b: LBool) -> LBool {
     match b {
         LTRUE => LFALSE,
         LFALSE => LTRUE,
@@ -162,8 +172,8 @@ impl EmaKind for Ema_ {
 
 #[derive(Debug)]
 pub struct CNFDescription {
-    pub num_of_variables: u32,
-    pub num_of_clauses: u64,
+    pub num_of_variables: usize,
+    pub num_of_clauses: usize,
     pub pathname: String,
 }
 
@@ -182,17 +192,17 @@ impl fmt::Display for CNFDescription {
 /// `Solver`'s parameters; random decision rate was dropped.
 pub struct SolverConfiguration {
     /// decay rate for variable activity
-    variable_decay_rate: f64,
+    pub variable_decay_rate: f64,
     /// decay rate for clause activity
-    clause_decay_rate: f64,
+    pub clause_decay_rate: f64,
     /// dump stats data during solving
-    dump_solver_stat_mode: i32,
+    pub dump_solver_stat_mode: i32,
     /// the coefficients for restarts
-    ema_coeffs: (i32, i32),
+    pub ema_coeffs: (i32, i32),
     /// restart expansion factor
-    restart_expansion: f64,
+    pub restart_expansion: f64,
     /// static steps between restarts
-    restart_step: f64,
+    pub restart_step: f64,
 }
 
 pub const DEFAULT_CONFIGURATION: SolverConfiguration = SolverConfiguration {
