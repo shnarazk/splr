@@ -17,7 +17,7 @@ fn propagate(_s: &mut Solver, _l: Lit) -> Option<&Clause> {
 }
 
 fn analyze(_s: &mut Solver, _l: Lit) -> (u32, Clause) {
-    (0, Clause::new(1, vec![]))
+    (0, Clause::new(vec![]))
 }
 
 fn simplify(_s: &mut Solver) -> () {}

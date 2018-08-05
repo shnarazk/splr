@@ -8,7 +8,7 @@ use types::*;
 /// Because, during propagate, all clauses are immutable.
 pub struct Watch {
     pub other: Lit,
-    pub by: CID,
+    pub by: ClauseIndex,
     pub to: Lit,
 }
 
@@ -24,21 +24,25 @@ pub fn new_watcher_vec(n: usize) -> WatcherVec {
     vec
 }
 
+pub struct Var {
+    pub assign: LBool,
+    pub phase: LBool,
+    pub reason: ClauseIndex,
+    pub level: i32,
+    pub activity: f64,
+}
+
 pub struct Solver {
     /// Assignment Management
+    pub vars: Vec<Var>,
     pub clauses: ClauseManager,
     pub learnts: ClauseManager,
     pub watches: WatcherVec,
-    pub assigns: Vec<LBool>,
-    pub phases: Vec<i8>,
     pub trail: Vec<Lit>,
     pub trail_lim: Vec<usize>,
     pub q_head: usize,
-    pub reasons: Vec<CID>,
-    pub levels: Vec<i32>,
     pub conflicts: Vec<Lit>,
     /// Variable Order
-    activities: Vec<f64>,
     order: Vec<Var>,
     /// Configuration
     pub config: SolverConfiguration,
@@ -76,18 +80,14 @@ impl Solver {
         let (fe, se) = cfg.ema_coeffs;
         let re = cfg.restart_expansion;
         let s = Solver {
-            clauses: ClauseManager::new(cnf.num_of_clauses),
-            learnts: ClauseManager::new(cnf.num_of_clauses),
+            clauses: ClauseManager::new(),
+            learnts: ClauseManager::new(),
             watches: new_watcher_vec(nv * 2),
-            assigns: vec![BOTTOM; nv],
-            phases: vec![BOTTOM; nv],
+            vars: vec![],
             trail: Vec::new(),
             trail_lim: Vec::new(),
             q_head: 0,
-            reasons: vec![0; 10],
-            levels: vec![-1; nv],
             conflicts: vec![],
-            activities: vec![0.0; nv],
             order: vec![],
             config: cfg,
             num_vars: nv,
@@ -117,10 +117,10 @@ impl Solver {
         s
     }
     pub fn value_of(&self, l: Lit) -> LBool {
-        let x = self.assigns[lit2var(l)];
+        let x = self.vars[l.vi()].assign;
         if x == BOTTOM {
             BOTTOM
-        } else if positive_lit(l) {
+        } else if l.positive() {
             x
         } else {
             negate_bool(x)
@@ -134,14 +134,28 @@ impl Solver {
         }
         return false;
     }
-    pub fn inject(&mut self, c: Clause) -> () {
-        println!("inject {}", self.watches.len());
-        self.watches[1].push(Watch {
-            other: 1,
-            by: c.cid,
+    pub fn inject(&mut self, learnt: bool, c: Clause) -> () {
+        println!("inject {}", c);
+        let w0 = c.lits[0];
+        let w1 = c.lits[1];
+        let ci: isize = if learnt {
+            self.learnts.push((0, Box::new(c)));
+            0 - (self.learnts.len() as isize)
+        } else {
+            self.clauses.push((0, Box::new(c)));
+            self.clauses.len() as isize
+        };
+        println!("- the clause index is {}.", ci);
+        self.watches[w0.negate() as usize].push(Watch {
+            other: w1,
+            by: ci,
             to: 0,
         });
-        self.clauses.push(0, c);
+        self.watches[w1.negate() as usize].push(Watch {
+            other: w0,
+            by: ci,
+            to: 0,
+        });
     }
     fn propagate_by_assign(&mut self, _l: Lit, _c: &mut Clause) -> Lit {
         0
@@ -150,52 +164,51 @@ impl Solver {
         self.trail.len()
     }
     pub fn num_clauses(&self) -> usize {
-        self.clauses.vec.len()
+        self.clauses.len()
     }
     pub fn num_learnts(&self) -> usize {
-        self.learnts.vec.len()
+        self.learnts.len()
     }
     pub fn decision_level(&self) -> usize {
         self.trail_lim.len()
     }
-    pub fn var2asg(&self, v: Var) -> LBool {
-        self.assigns[v]
+    pub fn var2asg(&self, v: VarIndex) -> LBool {
+        self.vars[v].assign
     }
     pub fn lit2asg(&self, l: Lit) -> LBool {
-        let a = self.assigns[lit2var(l)];
-        if positive_lit(l) {
+        let a = self.vars[l.vi()].assign;
+        if l.positive() {
             a
         } else {
             negate_bool(a)
         }
     }
-    pub fn locked(&self, c: &Clause) -> bool {
-        c.cid == self.reasons[lit2var(c.lits[0])]
-    }
     pub fn get_stat(&self, i: &StatIndex) -> i64 {
         self.stats[*i as usize]
     }
-    pub fn set_asg(&mut self, v: Var, b: LBool) -> () {
-        self.assigns[v] = b
+    pub fn set_asg(&mut self, v: VarIndex, b: LBool) -> () {
+        self.vars[v].assign = b
     }
-    pub fn enqueue(&mut self, l: Lit, cid: usize) -> bool {
-        let sig = lit2lbool(l);
-        let v = lit2var(l);
-        let val = self.var2asg(v);
-        if val != BOTTOM {
-            val == sig
-        } else {
-            let i = v;
-            self.assigns[i] = sig;
-            self.levels[i] = self.decision_level() as i32;
-            self.reasons[i] = cid;
+    pub fn enqueue(&mut self, l: Lit, cid: ClauseIndex) -> bool {
+        let sig = l.lbool();
+        let val = self.vars[l.vi()].assign;
+        if val == BOTTOM {
+            {
+                let dl = self.decision_level() as i32;
+                let v = &mut self.vars[l.vi()];
+                v.assign = sig;
+                v.level = dl;
+                v.reason = cid;
+            }
             self.trail.push(l);
             true
+        } else {
+            val == sig
         }
     }
     pub fn assume(&mut self, l: Lit) -> bool {
         self.trail_lim.push(self.trail.len());
-        self.enqueue(l, NULLID)
+        self.enqueue(l, NULL_CLAUSE)
     }
     pub fn cancel_until(&mut self, lv: usize) -> () {
         let dl = self.decision_level();
@@ -204,10 +217,10 @@ impl Solver {
             let ts = self.trail.len();
             let mut c = ts;
             while lim < c {
-                let x = lit2var(self.trail[c]);
-                self.phases[x] = self.assigns[x];
-                self.assigns[x] = BOTTOM;
-                self.reasons[x] = NULLID;
+                let v = &mut self.vars[self.trail[c].vi()];
+                v.phase = v.assign;
+                v.assign = BOTTOM;
+                v.reason = NULL_CLAUSE;
                 // self.undoVO(x);
                 c -= 1;
             }

@@ -27,6 +27,9 @@ pub enum SolverException {
 /// * aborted due to Mios specification or an internal error
 type SolverResult = Result<Certificate, SolverException>;
 
+/// Variable as Index is `usize`
+pub type VarIndex = usize;
+
 /// Literal encoded on unsigned integer
 /// # Examples
 ///
@@ -36,81 +39,72 @@ type SolverResult = Result<Certificate, SolverException>;
 /// assert_eq!(3, int2lit(-1) as i32);
 /// assert_eq!(4, int2lit( 2) as i32);
 /// assert_eq!(5, int2lit(-2) as i32);
-/// assert_eq!( 1, lit2int(int2lit( 1)));
-/// assert_eq!(-1, lit2int(int2lit(-1)));
-/// assert_eq!( 2, lit2int(int2lit( 2)));
-/// assert_eq!(-2, lit2int(int2lit(-2)));
+/// assert_eq!( 1, int2lit( 1).int());
+/// assert_eq!(-1, int2lit(-1).int());
+/// assert_eq!( 2, int2lit( 2).int());
+/// assert_eq!(-2, int2lit(-2).int());
 /// ```
 pub type Lit = u32;
 
 pub fn int2lit(x: i32) -> Lit {
     (if x < 0 { -2 * x + 1 } else { 2 * x }) as u32
 }
-pub fn lit2int(x: Lit) -> i32 {
-    if x % 2 == 0 {
-        x as i32 / 2
-    } else {
-        (x as i32) / -2
-    }
-}
 
-pub fn positive_lit(l: Lit) -> bool {
-    l % 2 == 0
-}
-
-/// ```
-/// asert_eq!(int2lit( 1), negate_lit(int2lit(-1)));
-/// asert_eq!(int2lit(-1), negate_lit(int2lit( 1)));
-/// asert_eq!(int2lit( 2), negate_lit(int2lit(-2)));
-/// asert_eq!(int2lit(-2), negate_lit(int2lit( 2)));
-/// ```
-pub fn negate_lit(l: Lit) -> Lit {
-    l ^ 1
-}
-
-pub fn lit2lbool(l: Lit) -> LBool {
-    if positive_lit(l) {
-        LTRUE
-    } else {
-        LFALSE
-    }
-}
-
-/// Variable encoded on unsigned integer
-/// # Examples
-///
 /// ```
 /// use splr::types::*;
-/// assert_eq!(1, int2var(1) as i32);
-/// assert_eq!(2, int2var(2) as i32);
-/// assert_eq!( 1, var2int(int2var(1)));
-/// assert_eq!( 2, var2int(int2var(2)));
+/// assert_eq!(int2lit( 1), int2lit(-1).negate());
+/// assert_eq!(int2lit(-1), int2lit( 1).negate());
+/// assert_eq!(int2lit( 2), int2lit(-2).negate());
+/// assert_eq!(int2lit(-2), int2lit( 2).negate());
 /// ```
-pub type Var = usize;
-
-pub fn int2var(x: i32) -> Var {
-    x as Var
-}
-pub fn var2int(x: Var) -> i32 {
-    x as i32
-}
 
 /// Converters
 /// # Examples
 ///
 /// ```
 /// use splr::types::*;
-/// assert_eq!(int2lit(1), var2lit(1));
-/// assert_eq!(int2lit(2), var2lit(2));
-/// assert_eq!(int2var(1), lit2var(int2lit( 1)));
-/// assert_eq!(int2var(1), lit2var(int2lit(-1)));
-/// assert_eq!(int2var(2), lit2var(int2lit( 2)));
-/// assert_eq!(int2var(2), lit2var(int2lit(-2)));
+/// assert_eq!(int2lit(1), vi2lit(1));
+/// assert_eq!(int2lit(2), vi2lit(2));
+/// assert_eq!(1, int2lit( 1).vi());
+/// assert_eq!(1, int2lit(-1).vi());
+/// assert_eq!(2, int2lit( 2).vi());
+/// assert_eq!(2, int2lit(-2).vi());
 /// ```
-pub fn lit2var(x: Lit) -> Var {
-    (x / 2) as Var
+pub trait LiteralEncoding {
+    fn vi(&self) -> VarIndex;
+    fn int(&self) -> i32;
+    fn lbool(&self) -> LBool;
+    fn positive(&self) -> bool;
+    fn negate(&self) -> Lit;
 }
-pub fn var2lit(x: Var) -> Lit {
+
+impl LiteralEncoding for Lit {
+    fn vi(&self) -> VarIndex {
+        (self / 2) as VarIndex
+    }
+    fn int(&self) -> i32 {
+        if self % 2 == 0 {
+            (*self / 2) as i32
+        } else {
+            (*self as i32) / -2
+        }
+    }
+    fn lbool(&self) -> LBool {
+        if self.positive() {
+            LTRUE
+        } else {
+            LFALSE
+        }
+    }
+    fn positive(&self) -> bool {
+        self % 2 == 0
+    }
+    fn negate(&self) -> Lit {
+        self ^ 1
+    }
+}
+
+pub fn vi2lit(x: VarIndex) -> Lit {
     (2 * x) as Lit
 }
 

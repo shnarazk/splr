@@ -3,36 +3,40 @@
 use std::fmt;
 use types::*;
 
-/// Clause Id
-pub type CID = usize;
+/// Clause Index, not ID because it changes after database reduction.
+/// # Range
+/// * `< 0` for given clauses
+/// * 0 for a null clause
+/// * '0 <' for learnt clauses
+pub type ClauseIndex = isize;
 
-pub const NULLID: CID = 0;
+pub const NULL_CLAUSE: ClauseIndex = 0;
 
 /// Clause
 /// Clause should be placed on heap anytime.
 /// And `Box` provides Eq for 'clause pointer'.
 pub struct Clause {
-    pub cid: CID,
     pub activity: f64,
     pub rank: usize,
     pub lits: Vec<Lit>,
+    pub index: isize,
 }
 
 impl Clause {
-    pub fn new(k: usize, v: Vec<Lit>) -> Clause {
+    pub fn new(v: Vec<Lit>) -> Clause {
         Clause {
-            cid: k,
             activity: 0.0,
             rank: v.len(),
             lits: v,
+            index: 0,
         }
     }
     pub fn null() -> Clause {
         Clause {
-            cid: 0,
             activity: 0.0,
             rank: 0,
             lits: vec![],
+            index: 0,
         }
     }
     pub fn len(&self) -> usize {
@@ -66,34 +70,4 @@ impl fmt::Display for Clause {
 
 /// Only ClauseExtManager is the owner of clauses.
 /// Other functions should borrow a mutual reference from it.
-pub struct ClauseManager {
-    pub id2index: Vec<usize>,
-    pub vec: Vec<(i32, Box<Clause>)>,
-}
-
-impl ClauseManager {
-    pub fn new(n: usize) -> ClauseManager {
-        let mut t = Vec::new();
-        t.reserve(n);
-        let mut v = Vec::new();
-        v.reserve(n);
-        ClauseManager {
-            id2index: t,
-            vec: v,
-        }
-    }
-    pub fn push(&mut self, k: i32, c: Clause) -> () {
-        let v = &mut self.vec;
-        let cid = c.cid;
-        v.push((k, Box::new(c)));
-        let index = v.len() - 1;
-        let t = &mut self.id2index;
-        if t.len() <= cid {
-            t.resize(cid + 10, 0)
-        };
-        t[cid] = index;
-    }
-    pub fn from_id(&self, i: usize) -> &(i32, Box<Clause>) {
-        &self.vec[self.id2index[i]]
-    }
-}
+pub type ClauseManager = Vec<(i32, Box<Clause>)>;
