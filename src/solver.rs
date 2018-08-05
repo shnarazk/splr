@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
+#![allow(unused_variables)]
 use clause::*;
 use types::*;
 
@@ -32,6 +33,56 @@ pub struct Var {
     pub activity: f64,
 }
 
+/// heap of VarIndex
+/// # Note
+/// - both fields has a fixed length. Don't use push and pop.
+/// - heap[0] contains the number of alive elements
+struct VarHeap {
+    heap: Vec<VarIndex>, // order : usize -> VarIndex
+    idxs: Vec<usize>,    // VarIndex : -> order : usize
+}
+
+impl VarHeap {
+    fn new(n: usize) -> VarHeap {
+        let mut v1 = Vec::new();
+        v1.resize(n + 1, 0);
+        let mut v2 = Vec::new();
+        v2.resize(n + 1, 0);
+        for i in 0..n + 1 {
+            v1[i] = i;
+            v2[i] = i;
+        }
+        VarHeap { heap: v1, idxs: v2 }
+    }
+    /// renamed form numElementsInHeap
+    fn len(&self) -> usize {
+        self.heap[0]
+    }
+    /// renamed from inHeap
+    fn contains(&self, v: VarIndex) -> bool {
+        self.idxs[v] != 0
+    }
+    fn percolate_up(&self, i: usize) -> () {}
+    fn percolate_down(&self, i: usize) -> () {}
+    /// renamed from incrementHeap
+    fn update(&self, v: VarIndex) -> () {
+        if self.contains(v) {
+            self.percolate_up(self.idxs[v])
+        }
+    }
+    /// renamed from insertHeap
+    fn insert(&mut self, v: VarIndex) -> () {
+        let n = self.heap[0] + 1;
+        self.heap[n] = v;
+        self.idxs[v] = n;
+        self.heap[0] = n;
+        self.percolate_up(n);
+    }
+    fn root(&self) -> VarIndex {
+        self.heap[1]
+    }
+}
+
 pub struct Solver {
     /// Assignment Management
     pub vars: Vec<Var>,
@@ -43,7 +94,7 @@ pub struct Solver {
     pub q_head: usize,
     pub conflicts: Vec<Lit>,
     /// Variable Order
-    order: Vec<Var>,
+    var_order: VarHeap,
     /// Configuration
     pub config: SolverConfiguration,
     pub num_vars: usize,
@@ -88,7 +139,7 @@ impl Solver {
             trail_lim: Vec::new(),
             q_head: 0,
             conflicts: vec![],
-            order: vec![],
+            var_order: VarHeap::new(nv),
             config: cfg,
             num_vars: nv,
             root_level: 0,
@@ -227,6 +278,20 @@ impl Solver {
             self.trail.truncate(lim);
             self.trail_lim.truncate(lv);
             self.q_head = lim;
+        }
+    }
+    /// Heap operations
+    fn select_var(&self) -> VarIndex {
+        loop {
+            let n = self.var_order.len();
+            if n == 0 {
+                return 0;
+            }
+            let v = self.var_order.root();
+            let x = self.vars[v].assign;
+            if x == BOTTOM {
+                return v;
+            }
         }
     }
 }
