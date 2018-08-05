@@ -71,4 +71,4 @@ impl fmt::Display for Clause {
 
 /// Only ClauseExtManager is the owner of clauses.
 /// Other functions should borrow a mutual reference from it.
-pub type ClauseManager = Vec<(i32, Box<Clause>)>;
+pub type ClauseManager = Vec<(i32, Clause)>;

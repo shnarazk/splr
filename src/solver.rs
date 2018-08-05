@@ -37,7 +37,7 @@ pub struct Var {
 /// # Note
 /// - both fields has a fixed length. Don't use push and pop.
 /// - heap[0] contains the number of alive elements
-struct VarIndexHeap {
+pub struct VarIndexHeap {
     heap: Vec<VarIndex>, // order : usize -> VarIndex
     idxs: Vec<usize>,    // VarIndex : -> order : usize
 }
@@ -122,11 +122,17 @@ impl VarIndexHeap {
             }
         }
     }
-    /// renamed from incrementHeap
-    fn update(&mut self, vec: &Vec<Var>, v: VarIndex) -> () {
+    /// renamed from incrementHeap, updateVO
+    pub fn update(&mut self, vec: &Vec<Var>, v: VarIndex) -> () {
         let start = self.idxs[v];
         if self.contains(v) {
             self.percolate_up(vec, start)
+        }
+    }
+    /// renamed from undoVO
+    pub fn check_insert(&mut self, vec: &Vec<Var>, v: VarIndex) -> () {
+        if ! self.contains(v) {
+            self.insert(vec, v);
         }
     }
     /// renamed from insertHeap
@@ -163,10 +169,12 @@ pub struct Solver {
     pub q_head: usize,
     pub conflicts: Vec<Lit>,
     /// Variable Order
-    var_order: VarIndexHeap,
+    pub var_order: VarIndexHeap,
     /// Configuration
     pub config: SolverConfiguration,
     pub num_vars: usize,
+    pub cla_inc: f64,
+    pub var_inc: f64,
     pub root_level: usize,
     /// Database Size Adjustment
     learnt_size_adj: f64,
@@ -199,6 +207,8 @@ impl Solver {
         let nv = cnf.num_of_variables as usize;
         let (fe, se) = cfg.ema_coeffs;
         let re = cfg.restart_expansion;
+        let cdr = cfg.clause_decay_rate;
+        let vdr = cfg.variable_decay_rate;
         let s = Solver {
             clauses: ClauseManager::new(),
             learnts: ClauseManager::new(),
@@ -211,6 +221,8 @@ impl Solver {
             var_order: VarIndexHeap::new(nv),
             config: cfg,
             num_vars: nv,
+            cla_inc: cdr,
+            var_inc: vdr,
             root_level: 0,
             learnt_size_adj: 100.0,
             learnt_size_cnt: 100,
@@ -259,10 +271,10 @@ impl Solver {
         let w0 = c.lits[0];
         let w1 = c.lits[1];
         let ci: isize = if learnt {
-            self.learnts.push((0, Box::new(c)));
+            self.learnts.push((0, c));
             0 - (self.learnts.len() as isize)
         } else {
-            self.clauses.push((0, Box::new(c)));
+            self.clauses.push((0, c));
             self.clauses.len() as isize
         };
         println!("- the clause index is {}.", ci);
@@ -337,11 +349,15 @@ impl Solver {
             let ts = self.trail.len();
             let mut c = ts;
             while lim < c {
-                let v = &mut self.vars[self.trail[c].vi()];
-                v.phase = v.assign;
-                v.assign = BOTTOM;
-                v.reason = NULL_CLAUSE;
-                // self.undoVO(x);
+                let vi = self.trail[c].vi();
+                let vars = &mut self.vars;
+                {
+                    let v = &mut vars[vi];
+                    v.phase = v.assign;
+                    v.assign = BOTTOM;
+                    v.reason = NULL_CLAUSE;
+                }
+                self.var_order.check_insert(vars, vi);
                 c -= 1;
             }
             self.trail.truncate(lim);
