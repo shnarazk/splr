@@ -9,9 +9,10 @@ const VAR_ACTIVITY_THRESHOLD: f64 = 1e100;
 const CLAUSE_ACTIVITY_THRESHOLD: f64 = 1e20;
 
 impl Solver {
-    pub fn add_clause(&self, c: Clause) -> () {}
     pub fn bump_ci(&mut self, ci: ClauseIndex) -> () {
-        if ci <= 0 { return }
+        if ci <= 0 {
+            return;
+        }
         let a = self.learnts[ci as usize].1.activity + self.cla_inc;
         self.learnts[ci as usize].1.activity = a;
         if CLAUSE_ACTIVITY_THRESHOLD < a {
@@ -44,5 +45,38 @@ impl Solver {
             self.vars[i].activity = self.vars[i].activity / VAR_ACTIVITY_THRESHOLD;
         }
         self.var_inc /= VAR_ACTIVITY_THRESHOLD;
+    }
+    fn clause_new(&mut self, learnt: bool, v: &mut Vec<Lit>) -> Result<ClauseIndex, bool> {
+        v.sort_unstable();
+        let mut j = 0;
+        let mut l_ = NULL_LIT; // last literal; [x, x.negate()] means totology.
+        let mut result = false;
+        for i in 0..v.len() {
+            let li = v[i];
+            let sat = self.lit2asg(li);
+            if sat == LTRUE || li.negate() == l_ {
+                v.clear();
+                result = true;
+                break;
+            } else if sat != LFALSE && li != l_ {
+                v[j] = li;
+                j += 1;
+                l_ = li;
+            }
+        }
+        if result != true {
+            v.truncate(j)
+        }
+        match v.len() {
+            0 => Err(result),
+            1 => Err(self.enqueue(v[0], NULL_CLAUSE)),
+            _ => Ok(self.inject(learnt, Clause::new(v.to_vec()))),
+        }
+    }
+    pub fn add_clause(&mut self, learnt: bool, v: &mut Vec<Lit>) -> bool {
+        match self.clause_new(learnt, v) {
+            Err(b) => b,
+            Ok(c) => true,
+        }
     }
 }

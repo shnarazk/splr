@@ -46,6 +46,8 @@ pub type VarIndex = usize;
 /// ```
 pub type Lit = u32;
 
+pub const NULL_LIT: Lit = 0;
+
 pub fn int2lit(x: i32) -> Lit {
     (if x < 0 { -2 * x + 1 } else { 2 * x }) as u32
 }

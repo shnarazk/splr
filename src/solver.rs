@@ -131,7 +131,7 @@ impl VarIndexHeap {
     }
     /// renamed from undoVO
     pub fn check_insert(&mut self, vec: &Vec<Var>, v: VarIndex) -> () {
-        if ! self.contains(v) {
+        if !self.contains(v) {
             self.insert(vec, v);
         }
     }
@@ -266,7 +266,7 @@ impl Solver {
         }
         return false;
     }
-    pub fn inject(&mut self, learnt: bool, c: Clause) -> () {
+    pub fn inject(&mut self, learnt: bool, c: Clause) -> ClauseIndex {
         println!("inject {}", c);
         let w0 = c.lits[0];
         let w1 = c.lits[1];
@@ -288,6 +288,7 @@ impl Solver {
             by: ci,
             to: 0,
         });
+        ci
     }
     fn propagate_by_assign(&mut self, _l: Lit, _c: &mut Clause) -> Lit {
         0
