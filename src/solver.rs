@@ -29,7 +29,7 @@ pub struct Var {
     pub assign: LBool,
     pub phase: LBool,
     pub reason: ClauseIndex,
-    pub level: i32,
+    pub level: usize,
     pub activity: f64,
 }
 
@@ -188,18 +188,18 @@ pub struct Solver {
     an_last_dl: Vec<Lit>,
     an_learnt_lits: Vec<Lit>,
     stats: Vec<i64>,
-    lbd_seen: Vec<u64>,
-    lbd_key: u64,
+    pub lbd_seen: Vec<u64>,
+    pub lbd_key: u64,
     /// restart heuristics
-    asg_f: Ema_,
-    asg_s: Ema,
-    b_lvl: Ema,
-    c_lvl: Ema,
-    lbd_f: Ema_,
-    lbd_s: Ema,
-    next_restart: u32,
-    restart_exp: f64,
-    rbias: Ema_,
+    pub asg_f: Ema_,
+    pub asg_s: Ema,
+    pub b_lvl: Ema,
+    pub c_lvl: Ema,
+    pub lbd_f: Ema_,
+    pub lbd_s: Ema,
+    pub next_restart: u64,
+    pub restart_exp: f64,
+    pub rbias: Ema_,
 }
 
 impl Solver {
@@ -327,7 +327,7 @@ impl Solver {
         let val = self.vars[l.vi()].assign;
         if val == BOTTOM {
             {
-                let dl = self.decision_level() as i32;
+                let dl = self.decision_level();
                 let v = &mut self.vars[l.vi()];
                 v.assign = sig;
                 v.level = dl;
