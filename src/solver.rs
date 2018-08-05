@@ -37,13 +37,13 @@ pub struct Var {
 /// # Note
 /// - both fields has a fixed length. Don't use push and pop.
 /// - heap[0] contains the number of alive elements
-struct VarHeap {
+struct VarIndexHeap {
     heap: Vec<VarIndex>, // order : usize -> VarIndex
     idxs: Vec<usize>,    // VarIndex : -> order : usize
 }
 
-impl VarHeap {
-    fn new(n: usize) -> VarHeap {
+impl VarIndexHeap {
+    fn new(n: usize) -> VarIndexHeap {
         let mut v1 = Vec::new();
         v1.resize(n + 1, 0);
         let mut v2 = Vec::new();
@@ -52,34 +52,103 @@ impl VarHeap {
             v1[i] = i;
             v2[i] = i;
         }
-        VarHeap { heap: v1, idxs: v2 }
+        VarIndexHeap { heap: v1, idxs: v2 }
     }
     /// renamed form numElementsInHeap
     fn len(&self) -> usize {
-        self.heap[0]
+        self.idxs[0]
     }
     /// renamed from inHeap
     fn contains(&self, v: VarIndex) -> bool {
         self.idxs[v] != 0
     }
-    fn percolate_up(&self, i: usize) -> () {}
-    fn percolate_down(&self, i: usize) -> () {}
+    fn percolate_up(&mut self, vec: &Vec<Var>, start: usize) -> () {
+        let mut q = start;
+        let vq = self.heap[q];
+        let aq = vec[vq].activity;
+        loop {
+            let p = q / 2;
+            if p == 0 {
+                self.heap[q] = vq;
+                self.idxs[vq] = q;
+                return;
+            } else {
+                let vp = self.heap[p];
+                let ap = vec[vp].activity;
+                if ap < aq {
+                    // move down the current parent, and make it empty
+                    self.heap[q] = vp;
+                    self.idxs[vp] = q;
+                    q = p;
+                } else {
+                    self.heap[q] = vq;
+                    self.idxs[vq] = q;
+                    return;
+                }
+            }
+        }
+    }
+    fn percolate_down(&mut self, vec: &Vec<Var>, start: usize) -> () {
+        let n = self.idxs[0];
+        let mut i = start;
+        let vi = self.heap[i];
+        let ai = vec[vi].activity;
+        loop {
+            let l = 2 * i; // left
+            if l <= n {
+                let r = l + 1; // right
+                let vl = self.heap[l];
+                let vr = self.heap[r];
+                let al = vec[vl].activity;
+                let ar = vec[vr].activity;
+                let (c, vc, ac) = if r <= n && al < ar {
+                    (r, vr, ar)
+                } else {
+                    (l, vr, al)
+                };
+                if ai < ac {
+                    self.heap[i] = vc;
+                    self.idxs[vc] = i;
+                    i = c;
+                } else {
+                    self.heap[i] = vi;
+                    self.idxs[vi] = i;
+                    return;
+                }
+            } else {
+                self.heap[i] = vi;
+                self.idxs[vi] = i;
+                return;
+            }
+        }
+    }
     /// renamed from incrementHeap
-    fn update(&self, v: VarIndex) -> () {
+    fn update(&mut self, vec: &Vec<Var>, v: VarIndex) -> () {
+        let start = self.idxs[v];
         if self.contains(v) {
-            self.percolate_up(self.idxs[v])
+            self.percolate_up(vec, start)
         }
     }
     /// renamed from insertHeap
-    fn insert(&mut self, v: VarIndex) -> () {
-        let n = self.heap[0] + 1;
+    fn insert(&mut self, vec: &Vec<Var>, v: VarIndex) -> () {
+        let n = self.idxs[0] + 1;
         self.heap[n] = v;
         self.idxs[v] = n;
-        self.heap[0] = n;
-        self.percolate_up(n);
+        self.idxs[0] = n;
+        self.percolate_up(vec, n);
     }
-    fn root(&self) -> VarIndex {
-        self.heap[1]
+    /// renamed from getHeapDown
+    fn root(&mut self, vec: &Vec<Var>) -> VarIndex {
+        let v1 = self.heap[1];
+        let vl = self.heap[self.idxs[0]];
+        self.heap[1] = vl;
+        self.idxs[vl] = 1;
+        self.idxs[v1] = 0;
+        self.idxs[0] -= 1;
+        if 1 < self.idxs[0] {
+            self.percolate_down(vec, 1);
+        }
+        v1
     }
 }
 
@@ -94,7 +163,7 @@ pub struct Solver {
     pub q_head: usize,
     pub conflicts: Vec<Lit>,
     /// Variable Order
-    var_order: VarHeap,
+    var_order: VarIndexHeap,
     /// Configuration
     pub config: SolverConfiguration,
     pub num_vars: usize,
@@ -139,7 +208,7 @@ impl Solver {
             trail_lim: Vec::new(),
             q_head: 0,
             conflicts: vec![],
-            var_order: VarHeap::new(nv),
+            var_order: VarIndexHeap::new(nv),
             config: cfg,
             num_vars: nv,
             root_level: 0,
@@ -281,13 +350,13 @@ impl Solver {
         }
     }
     /// Heap operations
-    fn select_var(&self) -> VarIndex {
+    fn select_var(&mut self) -> VarIndex {
         loop {
             let n = self.var_order.len();
             if n == 0 {
                 return 0;
             }
-            let v = self.var_order.root();
+            let v = self.var_order.root(&self.vars);
             let x = self.vars[v].assign;
             if x == BOTTOM {
                 return v;
