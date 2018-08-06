@@ -4,3 +4,4 @@ version = "0.1.0"
 authors = ["shujinarazaki <shujinarazaki@protonmail.com>"]
 
 [dependencies]
+combine = "3.4.0"

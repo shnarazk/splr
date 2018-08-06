@@ -1,14 +1,43 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
 
+extern crate combine;
 extern crate splr;
 use splr::clause::*;
 use splr::search::*;
 use splr::solver::*;
 use splr::types::*;
+use combine::{many1, Parser, sep_by};
+use combine::parser::byte::{letter, space, digit};
+
+fn to_num(v: Vec<u8>) -> i32 {
+    let mut a : i32 = 0;
+    for d in v {
+        a *= 10;
+        a += (d as i32) - 48;
+    }
+    a
+}
 
 fn main() {
     println!("Hello, world!");
+
+//    let stdin = std::io::stdin();
+//    let stdin = stdin.lock();
+//    let stdin_stream = BufferedStream::new(from_read(stdin), 10);
+//    let stdin_stream = stdin_stream.as_stream();
+
+    let mut pint1 = many1::<Vec<_>, _>(combine::parser::byte::digit());
+    let mut pint2 = many1::<Vec<_>, _>(combine::parser::byte::digit()).map(to_num);
+    let mut parser = many1::<Vec<_>, _>(combine::parser::byte::digit().or(combine::parser::byte::space()));
+//    println!("{:?}", parser.parse(stdin_stream));
+
+    println!("{:?}", pint1.parse(&b"123 333 0"[..]));
+    println!("{:?}", pint2.parse(&b"123 333 0"[..]));
+//    println!("{:?}", parser.parse("123 333 0"));
+//    println!("{:?}", parser.parse("123ABC"));
+    println!("{:?}", parser.parse(&b"ABC123"[..]));
+
     let cnf = CNFDescription {
         num_of_variables: 8,
         num_of_clauses: 10,
