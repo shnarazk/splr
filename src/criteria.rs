@@ -80,7 +80,7 @@ impl Solver {
             Ok(c) => true,
         }
     }
-    pub fn ldb_of(&mut self, v: &Vec<Lit>) -> usize {
+    pub fn lbd_of(&mut self, v: &Vec<Lit>) -> usize {
         let k = 1 + self.lbd_key;
         if 1000_000 < k {
             self.lbd_key = 0;

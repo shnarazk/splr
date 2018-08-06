@@ -7,6 +7,37 @@ use std::cmp::max;
 use types::*;
 
 impl Solver {
+    /// renamed from newLearntClause
+    pub fn new_learnt(&mut self, v: Vec<Lit>) -> usize {
+        let k = v.len();
+        if k == 0 {
+            self.unsafe_enqueue(v[0], NULL_CLAUSE);
+            return 1;
+        }
+        let mut c = Clause::new(v);
+        let mut j = 0;
+        let mut lvm = 0; // level max
+                         // seek a literal with max level
+        for i in 0..c.lits.len() {
+            let vi = c.lits[i].vi();
+            let lv = self.vars[vi].level;
+            if self.vars[vi].assign != BOTTOM && lvm < lv {
+                j = i;
+                lvm = lv;
+            }
+        }
+        let l0 = c.lits[0];
+        let l1 = c.lits[1];
+        let lj = c.lits[j];
+        let lbd = self.lbd_of(&c.lits);
+        c.rank = lbd;
+        c.lits[j] = l1;
+        c.lits[1] = lj;
+        let ci = self.inject(true, c);
+        self.bump_ci(ci);
+        self.unsafe_enqueue(l0, ci);
+        lbd
+    }
     pub fn reduce_database(&mut self) -> () {
         let keep = self.sort_learnts();
         self.rebuild_reason();
@@ -58,6 +89,7 @@ impl Solver {
     pub fn solve(&mut self) -> () {
         self.propagate(0);
     }
+    fn unsafe_enqueue(&mut self, l: Lit, ci: ClauseIndex) -> () {}
 }
 
 fn analyze(_s: &mut Solver, _l: Lit) -> (u32, Clause) {
