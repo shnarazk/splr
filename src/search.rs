@@ -38,6 +38,19 @@ impl Solver {
         self.unsafe_enqueue(l0, ci);
         lbd
     }
+    /// renamed from simplfy
+    fn removable(&self, ci: ClauseIndex) -> bool {
+        let c = self.iref_clause(ci);
+        if self.lit2asg(c.lits[0]) == LTRUE {
+            return true;
+        }
+        //        for l in &c.lits {
+        //            if self.lit2asg(*l) == LTRUE {
+        //                return true
+        //            }
+        //        }
+        false
+    }
     pub fn reduce_database(&mut self) -> () {
         let keep = self.sort_learnts();
         self.rebuild_reason();
@@ -52,7 +65,7 @@ impl Solver {
         for c in &self.learnts {
             requires += c.set_sort_key();
         }
-        self.learnts.sort_by_key(|c| c.key);
+        self.learnts.sort_by_key(|c| c.tmp);
         for i in 1..nc {
             let old = self.learnts[i].index as usize;
             self.learnt_permutation[old] = i as ClauseIndex;
@@ -82,12 +95,9 @@ impl Solver {
             register_to_watches(&mut self.watches, c.index, c.lits[0], c.lits[1]);
         }
     }
-    fn propagate(&mut self, _l: Lit) -> Option<&Clause> {
-        None
-    }
     fn search(&mut self) -> () {}
     pub fn solve(&mut self) -> () {
-        self.propagate(0);
+        //     propagate(self, 0);
     }
     fn unsafe_enqueue(&mut self, l: Lit, ci: ClauseIndex) -> () {}
 }
@@ -97,3 +107,79 @@ fn analyze(_s: &mut Solver, _l: Lit) -> (u32, Clause) {
 }
 
 fn simplify(_s: &mut Solver) -> () {}
+
+// adapt delayed update of watches
+fn propagate(s: &mut Solver, _l: Lit) -> Option<ClauseIndex> {
+    loop {
+        let p = s.trail[1 + s.q_head];
+        s.q_head += 1;
+        s.stats[StatIndex::NumOfPropagation as usize] += 1;
+        {
+            let wl = s.watches[p as usize].len();
+            let false_lit = p.negate();
+            'next_clause: for mut wi in 0..wl {
+                let Watch {
+                    other: blocker,
+                    by: ci,
+                    ..
+                } = s.watches[p as usize][wi];
+                // We need a storage to keep a literal which is the destination of propagation.
+                // * candidate 1, Watch.to, better about reference locality if other is satisfied.
+                // * candidate 2. Clause.tmp
+                let bv = if blocker == 0 {
+                    LFALSE
+                } else {
+                    s.lit2asg(blocker)
+                };
+                if bv == LTRUE {
+                    s.watches[p as usize][wi].to = p;
+                    continue 'next_clause;
+                }
+                let mut first = 0;
+                let mut clen = 0;
+                let mut c = 0 as *mut Clause;
+                let mut cid = NULL_CLAUSE;
+                unsafe {
+                    c = s.mref_clause(ci) as *mut Clause;
+                    cid = (*c).index;
+                    let l0 = (*c).lits[0];
+                    first = if false_lit == l0 {
+                        let l1 = (*c).lits[1];
+                        (*c).lits[0] = l1;
+                        (*c).lits[1] = l0;
+                        l1
+                    } else {
+                        l0
+                    };
+                    clen = (*c).lits.len();
+                }
+                if s.lit2asg(first) == LTRUE {
+                    s.watches[p as usize][wi].to = p;
+                    continue 'next_clause;
+                }
+                for k in 2..clen {
+                    unsafe {
+                        let lk = (*c).lits[k];
+                        if s.lit2asg(lk) != LFALSE {
+                            (*c).lits[1] = lk;
+                            s.watches[p as usize][wi].to = lk.negate();
+                            break 'next_clause;
+                        }
+                    }
+                }
+                // conflict!
+                return Some(cid);
+            }
+            // No conflict: so let's move them!
+            // use watches[0] to keep watches that don't move anywhere, temporally.
+            for mut w in &mut s.watches[p as usize] {
+                // TODO
+                // let ci = w.by;
+                // let to = w.to;
+            }
+        }
+        if s.trail.len() <= s.q_head {
+            return None;
+        }
+    }
+}

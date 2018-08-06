@@ -208,7 +208,7 @@ pub struct Solver {
     an_stack: Vec<Lit>,
     an_last_dl: Vec<Lit>,
     an_learnt_lits: Vec<Lit>,
-    stats: Vec<i64>,
+    pub stats: Vec<i64>,
     pub lbd_seen: Vec<u64>,
     pub lbd_key: u64,
     /// restart heuristics
@@ -280,6 +280,20 @@ impl Solver {
             negate_bool(x)
         }
     }
+    pub fn iref_clause(&self, ci: ClauseIndex) -> &Clause {
+        if 0 < ci {
+            &self.learnts[ci as usize]
+        } else {
+            &self.clauses[(-ci) as usize]
+        }
+    }
+    pub fn mref_clause(&mut self, ci: ClauseIndex) -> &mut Clause {
+        if 0 < ci {
+            &mut self.learnts[ci as usize]
+        } else {
+            &mut self.clauses[(-ci) as usize]
+        }
+    }
     pub fn satisfies(&self, c: &Clause) -> bool {
         for l in &c.lits {
             if self.value_of(*l) == LTRUE {
@@ -331,12 +345,6 @@ impl Solver {
         } else {
             negate_bool(a)
         }
-    }
-    pub fn get_stat(&self, i: &StatIndex) -> i64 {
-        self.stats[*i as usize]
-    }
-    pub fn set_asg(&mut self, v: VarIndex, b: LBool) -> () {
-        self.vars[v].assign = b
     }
     pub fn enqueue(&mut self, l: Lit, cid: ClauseIndex) -> bool {
         let sig = l.lbool();

@@ -30,7 +30,7 @@ impl Solver {
         self.cla_inc /= CLAUSE_ACTIVITY_THRESHOLD;
     }
     pub fn bump_vi(&mut self, vi: VarIndex) -> () {
-        let d = self.get_stat(&StatIndex::NumOfBackjump) as f64;
+        let d = self.stats[StatIndex::NumOfBackjump as usize] as f64;
         let a = (self.vars[vi].activity + d) / 2.0;
         self.vars[vi].activity = a;
         if VAR_ACTIVITY_THRESHOLD < a {
@@ -100,7 +100,7 @@ impl Solver {
     /// renamed from checkRestartCondition
     pub fn should_restart(&mut self, lbd: usize, c_l: usize) -> bool {
         let next = self.next_restart;
-        let count = self.get_stat(&StatIndex::NumOfBackjump) as u64;
+        let count = self.stats[StatIndex::NumOfBackjump as usize] as u64;
         let nas = self.num_assigns() as f64;
         let b_l = self.decision_level() as f64;
         let d_f = self.lbd_f.update(lbd as f64);
@@ -108,8 +108,8 @@ impl Solver {
         let a_f = self.asg_f.update(nas);
         let a_s = self.asg_s.update(nas);
         self.c_lvl.update(c_l as f64);
-        let n_b = self.get_stat(&StatIndex::NumOfBlockRestart);
-        let n_f = self.get_stat(&StatIndex::NumOfRestart);
+        let n_b = self.stats[StatIndex::NumOfBlockRestart as usize];
+        let n_f = self.stats[StatIndex::NumOfRestart as usize];
         let bias = if 5 < n_b && 5 < n_f {
             0.10 * self.rbias.get()
         } else {

@@ -27,8 +27,8 @@ pub struct Clause {
     pub rank: usize,
     /// the literals
     pub lits: Vec<Lit>,
-    /// temporal field for sort
-    pub key: i64,
+    /// temporal field for `sort_clause` and `propagate`
+    pub tmp: i64,
 }
 
 impl Drop for Clause {
@@ -48,7 +48,7 @@ impl Clause {
             rank: v.len(),
             lits: v,
             index: 0,
-            key: 0,
+            tmp: 0,
         }
     }
     pub fn null() -> Clause {
@@ -57,7 +57,7 @@ impl Clause {
             rank: 0,
             lits: vec![],
             index: 0,
-            key: 0,
+            tmp: 0,
         }
     }
     pub fn len(&self) -> usize {
