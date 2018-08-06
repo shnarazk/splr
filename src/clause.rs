@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
 #![allow(unused_variables)]
+use std::cmp::Ordering;
 use std::fmt;
 use types::*;
 
@@ -26,6 +27,8 @@ pub struct Clause {
     pub rank: usize,
     /// the literals
     pub lits: Vec<Lit>,
+    /// temporal field for sort
+    pub key: i64,
 }
 
 impl Drop for Clause {
@@ -45,6 +48,7 @@ impl Clause {
             rank: v.len(),
             lits: v,
             index: 0,
+            key: 0,
         }
     }
     pub fn null() -> Clause {
@@ -53,6 +57,7 @@ impl Clause {
             rank: 0,
             lits: vec![],
             index: 0,
+            key: 0,
         }
     }
     pub fn len(&self) -> usize {
@@ -63,6 +68,10 @@ impl Clause {
     }
     pub fn watch1(&self) -> Lit {
         self.lits[1]
+    }
+    /// returns 1 if this is required, or locked
+    pub fn set_sort_key(&self) -> usize {
+        1
     }
 }
 
