@@ -14,8 +14,8 @@ impl Solver {
         if ci <= 0 {
             return;
         }
-        let a = self.learnts[ci as usize].1.activity + self.cla_inc;
-        self.learnts[ci as usize].1.activity = a;
+        let a = self.learnts[ci as usize].activity + self.cla_inc;
+        self.learnts[ci as usize].activity = a;
         if CLAUSE_ACTIVITY_THRESHOLD < a {
             self.rescale_clause_activity()
         }
@@ -25,7 +25,7 @@ impl Solver {
     }
     pub fn rescale_clause_activity(&mut self) -> () {
         for i in 1..self.learnts.len() {
-            self.learnts[i].1.activity = self.learnts[i].1.activity / CLAUSE_ACTIVITY_THRESHOLD;
+            self.learnts[i].activity = self.learnts[i].activity / CLAUSE_ACTIVITY_THRESHOLD;
         }
         self.cla_inc /= CLAUSE_ACTIVITY_THRESHOLD;
     }

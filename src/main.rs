@@ -33,5 +33,7 @@ fn main() {
     s.inject(false, c1);
     s.inject(true, c2);
     s.solve();
-    println!("nclauses = {}", s.num_clauses())
+    println!("nclauses = {}", s.num_clauses());
+    s.learnts.pop();
+    println!("End of program");
 }

@@ -6,6 +6,7 @@ use solver::*;
 use types::*;
 
 impl Solver {
+    pub fn rebuild_reason(&self, permutation: &Vec<ClauseIndex>) -> () {}
     pub fn solve(&mut self) -> () {
         propagate(self, 0);
     }

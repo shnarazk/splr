@@ -210,8 +210,8 @@ impl Solver {
         let cdr = cfg.clause_decay_rate;
         let vdr = cfg.variable_decay_rate;
         let s = Solver {
-            clauses: ClauseManager::new(),
-            learnts: ClauseManager::new(),
+            clauses: new_clause_maanager(),
+            learnts: new_clause_maanager(),
             watches: new_watcher_vec(nv * 2),
             vars: vec![],
             trail: Vec::new(),
@@ -258,26 +258,30 @@ impl Solver {
             negate_bool(x)
         }
     }
-    pub fn satisfies(&self, c: Clause) -> bool {
-        for l in c.lits {
-            if self.value_of(l) == LTRUE {
+    pub fn satisfies(&self, c: &Clause) -> bool {
+        for l in &c.lits {
+            if self.value_of(*l) == LTRUE {
                 return true;
             }
         }
         return false;
     }
-    pub fn inject(&mut self, learnt: bool, c: Clause) -> ClauseIndex {
+    pub fn inject(&mut self, learnt: bool, mut c: Clause) -> ClauseIndex {
         println!("inject {}", c);
         let w0 = c.lits[0];
         let w1 = c.lits[1];
-        let ci: isize = if learnt {
-            self.learnts.push((0, c));
-            0 - (self.learnts.len() as isize)
+        let ci = if learnt {
+            self.learnts.len() as isize
         } else {
-            self.clauses.push((0, c));
-            self.clauses.len() as isize
+            0 - (self.clauses.len() as isize)
         };
+        c.index = ci;
         println!("- the clause index is {}.", ci);
+        if learnt {
+            self.learnts.push(c);
+        } else {
+            self.clauses.push(c);
+        }
         self.watches[w0.negate() as usize].push(Watch {
             other: w1,
             by: ci,
