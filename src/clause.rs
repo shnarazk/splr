@@ -16,6 +16,7 @@ pub const NULL_CLAUSE: ClauseIndex = 0;
 /// Clause
 /// Clause should be placed on heap anytime.
 /// And `Box` provides Eq for 'clause pointer'.
+#[derive(Debug)]
 pub struct Clause {
     /// a temporal index which is equal to the index for `clauses` or `learnts`
     pub index: ClauseIndex,
@@ -75,10 +76,10 @@ impl Eq for Clause {}
 
 impl fmt::Display for Clause {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self.lits.len() {
-            0 => write!(f, "null_clause"),
-            2 => write!(f, "a biclause"),
-            _ => write!(f, "a clause"),
+        match self.index {
+            x if x < 0 => write!(f, "a given clause"),
+            x if 0 < x => write!(f, "a learnt clause"),
+            _ => write!(f, "null_clause"),
         }
     }
 }

@@ -7,6 +7,7 @@ use types::*;
 /// In splr, `watchers` is reseted at the beginning of simplify phase.
 /// It's just a mutable vector referring immutable Clause.
 /// Because, during propagate, all clauses are immutable.
+#[derive(Debug)]
 pub struct Watch {
     pub other: Lit,
     pub by: ClauseIndex,
@@ -18,13 +19,29 @@ pub type WatcherVec = Vec<Vec<Watch>>;
 
 pub fn new_watcher_vec(n: usize) -> WatcherVec {
     let mut vec = Vec::new();
-    for _i in 0..n {
+    for _i in 0..n + 1 {
         vec.push(Vec::new());
     }
-    println!("new_watcher_vec: {} => {}", n, vec.len());
     vec
 }
 
+pub fn register_to_watches(w: &mut WatcherVec, ci: ClauseIndex, w0: Lit, w1: Lit) -> () {
+    if ci == NULL_CLAUSE {
+        return;
+    }
+    w[w0.negate() as usize].push(Watch {
+        other: w1,
+        by: ci,
+        to: 0,
+    });
+    w[w1.negate() as usize].push(Watch {
+        other: w0,
+        by: ci,
+        to: 0,
+    });
+}
+
+#[derive(Debug)]
 pub struct Var {
     pub assign: LBool,
     pub phase: LBool,
@@ -37,6 +54,7 @@ pub struct Var {
 /// # Note
 /// - both fields has a fixed length. Don't use push and pop.
 /// - heap[0] contains the number of alive elements
+#[derive(Debug)]
 pub struct VarIndexHeap {
     heap: Vec<VarIndex>, // order : usize -> VarIndex
     idxs: Vec<usize>,    // VarIndex : -> order : usize
@@ -158,6 +176,7 @@ impl VarIndexHeap {
     }
 }
 
+#[derive(Debug)]
 pub struct Solver {
     /// Assignment Management
     pub vars: Vec<Var>,
@@ -267,7 +286,6 @@ impl Solver {
         return false;
     }
     pub fn inject(&mut self, learnt: bool, mut c: Clause) -> ClauseIndex {
-        println!("inject {}", c);
         let w0 = c.lits[0];
         let w1 = c.lits[1];
         let ci = if learnt {
@@ -276,22 +294,13 @@ impl Solver {
             0 - (self.clauses.len() as isize)
         };
         c.index = ci;
-        println!("- the clause index is {}.", ci);
+        println!("Inject {}-nth clause.", ci);
         if learnt {
             self.learnts.push(c);
         } else {
             self.clauses.push(c);
         }
-        self.watches[w0.negate() as usize].push(Watch {
-            other: w1,
-            by: ci,
-            to: 0,
-        });
-        self.watches[w1.negate() as usize].push(Watch {
-            other: w0,
-            by: ci,
-            to: 0,
-        });
+        register_to_watches(&mut self.watches, ci, w0, w1);
         ci
     }
     fn propagate_by_assign(&mut self, _l: Lit, _c: &mut Clause) -> Lit {
@@ -301,10 +310,10 @@ impl Solver {
         self.trail.len()
     }
     pub fn num_clauses(&self) -> usize {
-        self.clauses.len()
+        self.clauses.len() - 1 // 0 is NULL_CLAUSE
     }
     pub fn num_learnts(&self) -> usize {
-        self.learnts.len()
+        self.learnts.len() - 1 // 0 is NULL_CLAUSE
     }
     pub fn decision_level(&self) -> usize {
         self.trail_lim.len()

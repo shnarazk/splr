@@ -133,6 +133,7 @@ pub trait EmaKind {
 }
 
 /// Exponential Moving Average, EMA with a calibrator
+#[derive(Debug)]
 pub struct Ema(f64, f64, f64);
 
 impl Ema {
@@ -155,6 +156,7 @@ impl EmaKind for Ema {
 }
 
 // Exponential Moving Average, EMA w/o a calibrator
+#[derive(Debug)]
 pub struct Ema_(f64, f64);
 
 impl Ema_ {

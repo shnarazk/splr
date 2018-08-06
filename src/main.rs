@@ -8,6 +8,7 @@ use splr::solver::*;
 use splr::types::*;
 
 fn main() {
+    println!("Hello, world!");
     let cnf = CNFDescription {
         num_of_variables: 8,
         num_of_clauses: 10,
@@ -22,18 +23,18 @@ fn main() {
         e.update(0.2);
     }
     c2.activity = e.get();
+    println!("# Literal: L{} -> I{}", x, x.int());
     println!(
-        "Hello, world! L{} -> I{}, {}, {:?}, {}",
-        x,
-        x.int(),
+        "# Clause: {}, {:?}, {}",
         c1,
         [c1 == c1, c2 == c2, c1 == c2],
         c2.activity
     );
     s.inject(false, c1);
     s.inject(true, c2);
+    println!("# Solver: {:?}", s.watches);
     s.solve();
     println!("nclauses = {}", s.num_clauses());
     s.learnts.pop();
-    println!("End of program");
+    println!("# End of program");
 }
