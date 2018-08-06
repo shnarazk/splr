@@ -53,7 +53,8 @@ pub struct Var {
 /// heap of VarIndex
 /// # Note
 /// - both fields has a fixed length. Don't use push and pop.
-/// - heap[0] contains the number of alive elements
+/// - idxs[0] contains the number of alive elements
+///   `indx` holds positions. So the unused field 0 can hold the last position as a special case.
 #[derive(Debug)]
 pub struct VarIndexHeap {
     heap: Vec<VarIndex>, // order : usize -> VarIndex
