@@ -226,8 +226,7 @@ impl Solver {
         {
             // self.simplify();
             self.num_clauses()
-        }
-        else {
+        } else {
             self.num_clauses()
         }
     }
