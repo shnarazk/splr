@@ -131,14 +131,94 @@ impl Solver {
             }
         }
     }
+    fn analyze(&mut self, confl: ClauseIndex) -> (u32, Clause) {
+        self.an_learnt_lits.clear();
+        self.an_learnt_lits.push(0);
+        let dl = self.decision_level();
+        let mut ci = confl;
+        let mut c = 0 as *mut Clause;
+        let mut p = BOTTOM;
+        let mut ti = self.trail.len() - 1; // trail index
+        let mut b = 0; // backtrack level
+        let mut path_cnt = 0;
+        loop {
+            unsafe {
+                c = self.mref_clause(ci);
+                let d = (*c).rank;
+                if 0 != d {
+                    self.bump_ci(ci);
+                }
+                let sc = (*c).lits.len();
+                let nblevel = self.lbd_of(&(*c).lits);
+                if 2 < d && nblevel + 1 < d {
+                    (*c).rank = nblevel;
+                }
+                for j in (if p == BOTTOM { 0 } else { 1 })..sc {
+                    let q = (*c).lits[j];
+                    let vi = q.vi();
+                    let l = self.vars[vi].level;
+                    if self.an_seen[vi] == 0 && 0 < l {
+                        self.bump_vi(vi);
+                        self.an_seen[vi] = 1;
+                        if dl <= l {
+                            let ri: ClauseIndex = self.vars[vi].reason;
+                            if ri != NULL_CLAUSE && self.iref_clause(ri).rank != 0 {
+                                self.an_last_dl.push(q);
+                            }
+                            path_cnt += 1;
+                        } else {
+                            self.an_learnt_lits.push(q);
+                            b = max(b, l);
+                        }
+                    }
+                }
+                // set the index of the next literal to ti
+                loop {
+                    if self.an_seen[self.trail[ti].vi()] == 0 {
+                        ti -= 1;
+                    } else {
+                        break;
+                    }
+                }
+                let next_p: Lit = self.trail[ti];
+                let next_vi: VarIndex = next_p.vi();
+                ci = self.vars[next_vi].reason;
+                self.an_seen[next_vi] = 0;
+                if 1 < path_cnt {
+                    ti -= 1;
+                    path_cnt -= 1;
+                } else {
+                    self.an_learnt_lits[0] = next_p.negate();
+                    break;
+                }
+            }
+        }
+        let level_to_return = b;
+        // simlpify phase
+        let n = self.an_learnt_lits.len();
+        let l0 = self.an_learnt_lits[0];
+        self.an_stack.clear();
+        self.an_to_clear.clear();
+        self.an_to_clear.push(l0);
+        let mut levels = 0;
+        for i in 1..n {
+            let l = self.an_learnt_lits[i];
+            self.an_to_clear.push(l);
+            levels |= 63 & self.vars[l.vi()].level;
+        }
+        (
+            level_to_return as u32,
+            Clause::new(self.an_learnt_lits.clone()),
+        )
+    }
     pub fn reduce_database(&mut self) -> () {
         let keep = self.sort_learnts();
         self.rebuild_reason();
-        self.rebuild_watches(); // O(n)?
-                                // self.check_clause_index_consistency();
+        self.rebuild_watches();
+        // self.check_clause_index_consistency();
         self.learnts.truncate(keep);
     }
-    // Note: this function changes self.learnt_permutation.
+    /// Note: this function changes self.learnt_permutation.
     fn sort_learnts(&mut self) -> usize {
         let nc = self.learnts.len();
         let mut requires = 0;
@@ -177,13 +257,9 @@ impl Solver {
     }
     fn search(&mut self) -> () {}
     pub fn solve(&mut self) -> () {
-        //     propagate(self, 0);
+        self.propagate(0);
     }
     fn unsafe_enqueue(&mut self, l: Lit, ci: ClauseIndex) -> () {}
-}
-
-fn analyze(_s: &mut Solver, _l: Lit) -> (u32, Clause) {
-    (0, Clause::new(vec![]))
 }
 
 fn simplify(_s: &mut Solver) -> () {}
