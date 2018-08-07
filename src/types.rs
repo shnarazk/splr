@@ -231,6 +231,7 @@ pub enum StatIndex {
     NumOfClause,       // the number of 'alive' given clauses
     NumOfLearnt,       // the number of 'alive' learnt clauses
     NumOfVariable,     // the number of 'alive' variables
+    NumOfGroundVar,    // the number os assined variables at level 0
     NumOfAssigned,     // the number of assigned variables
     EndOfStatIndex,    // Don't use this dummy.
 }

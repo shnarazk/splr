@@ -212,11 +212,24 @@ impl Solver {
         )
     }
     pub fn reduce_database(&mut self) -> () {
-        let keep = self.sort_learnts();
+        let keep_c = self.sort_clauses();
+        let keep_l = self.sort_learnts();
         self.rebuild_reason();
         self.rebuild_watches();
         // self.check_clause_index_consistency();
-        self.learnts.truncate(keep);
+        self.clauses.truncate(keep_c);
+        self.learnts.truncate(keep_l);
+    }
+    fn sort_clauses(&mut self) -> usize {
+        if self.decision_level() == 0
+            && self.stats[StatIndex::NumOfGroundVar as usize] < self.num_assigns() as i64
+        {
+            // self.simplify();
+            self.num_clauses()
+        }
+        else {
+            self.num_clauses()
+        }
     }
     /// Note: this function changes self.learnt_permutation.
     fn sort_learnts(&mut self) -> usize {
