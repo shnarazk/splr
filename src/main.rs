@@ -31,7 +31,10 @@ fn to_mnum(v: Vec<u8>) -> i32 {
 
 fn main() {
     println!("Hello, world!");
-    let mut rs = BufReader::new(fs::File::open("uf8.cnf").unwrap());
+    println!("CARGO_MANIFEST_DIR = {}", env!("CARGO_MANIFEST_DIR"));
+    let mut rs = BufReader::new(
+        fs::File::open(env!("CARGO_MANIFEST_DIR").to_string() + "/uf8.cnf").unwrap(),
+    );
     let mut buf = String::new();
     let mut nv: usize = 0;
     let mut nc: usize = 0;
