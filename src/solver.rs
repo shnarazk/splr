@@ -384,8 +384,8 @@ impl Solver {
     pub fn cancel_until(&mut self, lv: usize) -> () {
         let dl = self.decision_level();
         if lv < dl {
-            let lim = self.trail_lim[lv + 1];
-            let ts = self.trail.len();
+            let lim = self.trail_lim[lv];
+            let ts = self.trail.len() - 1;
             let mut c = ts;
             while lim < c {
                 let vi = self.trail[c].vi();
@@ -405,7 +405,7 @@ impl Solver {
         }
     }
     /// Heap operations
-    fn select_var(&mut self) -> VarIndex {
+    pub fn select_var(&mut self) -> VarIndex {
         loop {
             let n = self.var_order.len();
             if n == 0 {

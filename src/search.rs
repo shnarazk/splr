@@ -50,13 +50,13 @@ impl Solver {
         false
     }
     // adapt delayed update of watches
-    fn propagate(&mut self, _l: Lit) -> Option<ClauseIndex> {
+    fn propagate(&mut self) -> Option<ClauseIndex> {
         loop {
             if self.trail.len() <= self.q_head {
                 return None;
             }
-            self.q_head += 1;
             let p = self.trail[self.q_head];
+            self.q_head += 1;
             self.stats[StatIndex::NumOfPropagation as usize] += 1;
             {
                 let wl = self.watches[p as usize].len();
@@ -132,7 +132,7 @@ impl Solver {
             }
         }
     }
-    fn analyze(&mut self, confl: ClauseIndex) -> (u32, Clause) {
+    fn analyze(&mut self, confl: ClauseIndex) -> (u32, Vec<Lit>) {
         self.an_learnt_lits.clear();
         self.an_learnt_lits.push(0);
         let dl = self.decision_level();
@@ -207,10 +207,7 @@ impl Solver {
             self.an_to_clear.push(l);
             levels |= 63 & self.vars[l.vi()].level;
         }
-        (
-            level_to_return as u32,
-            Clause::new(self.an_learnt_lits.clone()),
-        )
+        (level_to_return as u32, self.an_learnt_lits.clone())
     }
     pub fn reduce_database(&mut self) -> () {
         let keep_c = self.sort_clauses();
@@ -288,6 +285,59 @@ impl Solver {
         }
     }
     fn search(&mut self) -> bool {
+        let delta = (self.num_vars as f64).sqrt();
+        let root_lv = self.root_level;
+        let mut to_restart = false;
+        loop {
+            let ret = self.propagate();
+            let d = self.decision_level();
+            match ret {
+                Some(ci) => {
+                    self.stats[StatIndex::NumOfBackjump as usize] += 1;
+                    if d == self.root_level {
+                        // TODO: self.analyze_final(ci, false);
+                        return false;
+                    } else {
+                        let (backtrack_level, v) = self.analyze(ci);
+
+                        self.cancel_until(max(backtrack_level as usize, root_lv));
+                        let lbd = self.new_learnt(v);
+                        let k = self.an_learnt_lits.len();
+                        if k == 1 {
+                            self.vars[self.an_learnt_lits[0].vi()].level = 0;
+                        }
+                        self.decay_var_activity();
+                        self.decay_cla_activity();
+                        self.learnt_size_cnt -= 1;
+                        if self.learnt_size_cnt == 0 {
+                            let t_ = 1.5 * self.learnt_size_adj;
+                            self.learnt_size_adj = t_;
+                            self.learnt_size_cnt = t_ as u64;
+                            self.max_learnts += delta;
+                            to_restart = self.should_restart(lbd, d);
+                            continue;
+                        }
+                    }
+                }
+                None => {
+                    // if d == 0 { simplify_db() };
+                    let na = self.num_assigns();
+                    if self.max_learnts as usize + na < self.learnts.len() {
+                        self.reduce_database();
+                    }
+                    if na == self.num_vars {
+                        return true;
+                    } else if to_restart {
+                        self.cancel_until(root_lv);
+                        to_restart = false;
+                    } else {
+                        let vi = self.select_var();
+                        let p = self.vars[vi].phase;
+                        self.unsafe_assume(vi.lit(p));
+                    }
+                }
+            }
+        }
         false
     }
     pub fn solve(&mut self) -> Result<Certificate, SolverException> {

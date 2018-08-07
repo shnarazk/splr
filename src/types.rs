@@ -106,8 +106,14 @@ impl LiteralEncoding for Lit {
     }
 }
 
-pub fn vi2lit(x: VarIndex) -> Lit {
-    (2 * x) as Lit
+pub trait VarIndexEncoding {
+    fn lit(&self, p: Lbool) -> Lit;
+}
+
+impl VarIndexEncoding for VarIndex {
+    fn lit(&self, p: Lbool) -> Lit {
+        (if p == LFALSE { 2 * self + 1 } else { 2 * self }) as Lit
+    }
 }
 
 /// Lifted Bool

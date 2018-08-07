@@ -11,24 +11,6 @@ use std::io::{BufReader, Read};
 use std::result::Result;
 use std::{fs, mem};
 
-fn to_pnum(v: Vec<u8>) -> i32 {
-    let mut a: i32 = 0;
-    for d in v {
-        a *= 10;
-        a += (d as i32) - 48;
-    }
-    a
-}
-
-fn to_mnum(v: Vec<u8>) -> i32 {
-    let mut a: i32 = 0;
-    for d in v {
-        a *= 10;
-        a += (d as i32) - 48;
-    }
-    0 - a
-}
-
 fn main() {
     println!("Hello, world!");
     println!("CARGO_MANIFEST_DIR = {}", env!("CARGO_MANIFEST_DIR"));
@@ -42,7 +24,7 @@ fn main() {
         buf.clear();
         match rs.read_line(&mut buf) {
             Ok(0) => break,
-            Ok(k) => {
+            Ok(_k) => {
                 let mut iter = buf.split_whitespace();
                 if iter.next() == Some("p") && iter.next() == Some("cnf") {
                     if let Some(v) = iter.next().map(|s| s.parse::<usize>().ok().unwrap()) {
@@ -84,7 +66,7 @@ fn main() {
         buf.clear();
         match rs.read_line(&mut buf) {
             Ok(0) => break,
-            Ok(k) => {
+            Ok(_k) => {
                 let mut iter = buf.split_whitespace();
                 let mut v: Vec<Lit> = Vec::new();
                 for s in iter {
