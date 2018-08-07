@@ -43,11 +43,25 @@ pub fn register_to_watches(w: &mut WatcherVec, ci: ClauseIndex, w0: Lit, w1: Lit
 
 #[derive(Debug)]
 pub struct Var {
-    pub assign: LBool,
-    pub phase: LBool,
+    pub assign: Lbool,
+    pub phase: Lbool,
     pub reason: ClauseIndex,
     pub level: usize,
     pub activity: f64,
+}
+
+fn new_vars(n: usize) -> Vec<Var> {
+    let mut v = Vec::new();
+    for i in 0..n + 1 {
+        v.push(Var {
+            assign: BOTTOM,
+            phase: BOTTOM,
+            reason: NULL_CLAUSE,
+            level: 0,
+            activity: 0.0,
+        })
+    }
+    v
 }
 
 /// heap of VarIndex
@@ -202,7 +216,7 @@ pub struct Solver {
     pub learnt_size_cnt: u64,
     pub max_learnts: f64,
     /// Working memory
-    pub ok: bool,
+    pub ok: Lbool,
     pub an_seen: Vec<Lit>,
     pub an_to_clear: Vec<Lit>,
     pub an_stack: Vec<Lit>,
@@ -231,10 +245,10 @@ impl Solver {
         let cdr = cfg.clause_decay_rate;
         let vdr = cfg.variable_decay_rate;
         let s = Solver {
+            vars: new_vars(nv),
             clauses: new_clause_maanager(),
             learnts: new_clause_maanager(),
             watches: new_watcher_vec(nv * 2),
-            vars: vec![],
             trail: Vec::new(),
             trail_lim: Vec::new(),
             q_head: 0,
@@ -249,7 +263,7 @@ impl Solver {
             learnt_size_adj: 100.0,
             learnt_size_cnt: 100,
             max_learnts: 2000.0,
-            ok: true,
+            ok: LTRUE,
             an_seen: vec![],
             an_to_clear: vec![],
             an_stack: vec![],
@@ -270,7 +284,7 @@ impl Solver {
         };
         s
     }
-    pub fn value_of(&self, l: Lit) -> LBool {
+    pub fn value_of(&self, l: Lit) -> Lbool {
         let x = self.vars[l.vi()].assign;
         if x == BOTTOM {
             BOTTOM
@@ -335,10 +349,10 @@ impl Solver {
     pub fn decision_level(&self) -> usize {
         self.trail_lim.len()
     }
-    pub fn var2asg(&self, v: VarIndex) -> LBool {
+    pub fn var2asg(&self, v: VarIndex) -> Lbool {
         self.vars[v].assign
     }
-    pub fn lit2asg(&self, l: Lit) -> LBool {
+    pub fn lit2asg(&self, l: Lit) -> Lbool {
         let a = self.vars[l.vi()].assign;
         if l.positive() {
             a

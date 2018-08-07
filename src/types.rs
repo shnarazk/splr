@@ -75,7 +75,7 @@ pub fn int2lit(x: i32) -> Lit {
 pub trait LiteralEncoding {
     fn vi(&self) -> VarIndex;
     fn int(&self) -> i32;
-    fn lbool(&self) -> LBool;
+    fn lbool(&self) -> Lbool;
     fn positive(&self) -> bool;
     fn negate(&self) -> Lit;
 }
@@ -91,7 +91,7 @@ impl LiteralEncoding for Lit {
             (*self as i32) / -2
         }
     }
-    fn lbool(&self) -> LBool {
+    fn lbool(&self) -> Lbool {
         if self.positive() {
             LTRUE
         } else {
@@ -111,12 +111,12 @@ pub fn vi2lit(x: VarIndex) -> Lit {
 }
 
 /// Lifted Bool
-pub type LBool = i8;
+pub type Lbool = i8;
 pub const LTRUE: i8 = 1;
 pub const LFALSE: i8 = -1;
 pub const BOTTOM: i8 = 0;
 
-pub fn negate_bool(b: LBool) -> LBool {
+pub fn negate_bool(b: Lbool) -> Lbool {
     match b {
         LTRUE => LFALSE,
         LFALSE => LTRUE,

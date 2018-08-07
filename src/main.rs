@@ -62,7 +62,9 @@ fn main() {
     );
     s.inject(false, c1);
     s.inject(true, c2);
-    println!("# Solver: {:?}", s.watches);
+    println!("# Solver");
+    println!(" - vars:  {:?}", s.vars);
+    println!(" - watches: {:?}", s.watches);
     s.solve();
     println!("nclauses = {}", s.num_clauses());
     s.learnts.pop();

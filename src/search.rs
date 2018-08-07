@@ -267,9 +267,30 @@ impl Solver {
             register_to_watches(&mut self.watches, c.index, c.lits[0], c.lits[1]);
         }
     }
-    fn search(&mut self) -> () {}
-    pub fn solve(&mut self) -> () {
-        self.propagate(1);
+    fn search(&mut self) -> bool {
+        false
+    }
+    pub fn solve(&mut self) -> Result<Certificate, SolverException> {
+        // TODO remove tautologies
+        // TODO deal with assumptons
+        // s.root_level = 0;
+        let status = self.search();
+        let mut result = Vec::new();
+        for vi in 1..self.num_vars + 1 {
+            if self.vars[vi].assign == LTRUE {
+                result.push(vi as i32);
+            } else if self.vars[vi].assign == LFALSE {
+                result.push(0 - vi as i32);
+            }
+        }
+        self.cancel_until(0);
+        if status && self.ok == LTRUE {
+            Ok(Certificate::SAT(result))
+        } else if !status && self.ok == LFALSE {
+            Ok(Certificate::UNSAT(Vec::new()))
+        } else {
+            Err(SolverException::InternalInconsistent)
+        }
     }
     fn unsafe_enqueue(&mut self, l: Lit, ci: ClauseIndex) -> () {
         let vi = l.vi();
