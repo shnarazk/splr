@@ -41,14 +41,11 @@ impl Solver {
     /// renamed from simplfy
     fn removable(&self, ci: ClauseIndex) -> bool {
         let c = self.iref_clause(ci);
-        if self.lit2asg(c.lits[0]) == LTRUE {
-            return true;
+        for l in &c.lits {
+            if self.lit2asg(*l) == LTRUE {
+                return true;
+            }
         }
-        //        for l in &c.lits {
-        //            if self.lit2asg(*l) == LTRUE {
-        //                return true
-        //            }
-        //        }
         false
     }
     pub fn reduce_database(&mut self) -> () {
@@ -172,10 +169,18 @@ fn propagate(s: &mut Solver, _l: Lit) -> Option<ClauseIndex> {
             }
             // No conflict: so let's move them!
             // use watches[0] to keep watches that don't move anywhere, temporally.
-            for mut w in &mut s.watches[p as usize] {
-                // TODO
-                // let ci = w.by;
-                // let to = w.to;
+            s.watches[0].clear();
+            loop {
+                match s.watches[p as usize].pop() {
+                    Some(w) => s.watches[w.to as usize].push(w),
+                    None => break,
+                }
+            }
+            loop {
+                match s.watches[0].pop() {
+                    Some(w) => s.watches[p as usize].push(w),
+                    None => break,
+                }
             }
         }
         if s.trail.len() <= s.q_head {
