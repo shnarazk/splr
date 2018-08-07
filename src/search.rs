@@ -138,7 +138,7 @@ impl Solver {
         let dl = self.decision_level();
         let mut ci = confl;
         let mut c = 0 as *mut Clause;
-        let mut p = BOTTOM;
+        let mut p = NULL_LIT;
         let mut ti = self.trail.len() - 1; // trail index
         let mut b = 0; // backtrack level
         let mut path_cnt = 0;
@@ -154,7 +154,7 @@ impl Solver {
                 if 2 < d && nblevel + 1 < d {
                     (*c).rank = nblevel;
                 }
-                for j in (if p == BOTTOM { 0 } else { 1 })..sc {
+                for j in (if p == NULL_LIT { 0 } else { 1 })..sc {
                     let q = (*c).lits[j];
                     let vi = q.vi();
                     let l = self.vars[vi].level;
@@ -181,15 +181,15 @@ impl Solver {
                         break;
                     }
                 }
-                let next_p: Lit = self.trail[ti];
-                let next_vi: VarIndex = next_p.vi();
+                p = self.trail[ti];
+                let next_vi: VarIndex = p.vi();
                 ci = self.vars[next_vi].reason;
                 self.an_seen[next_vi] = 0;
                 if 1 < path_cnt {
                     ti -= 1;
                     path_cnt -= 1;
                 } else {
-                    self.an_learnt_lits[0] = next_p.negate();
+                    self.an_learnt_lits[0] = p.negate();
                     break;
                 }
             }
@@ -208,6 +208,38 @@ impl Solver {
             levels |= 63 & self.vars[l.vi()].level;
         }
         (level_to_return as u32, self.an_learnt_lits.clone())
+    }
+    fn analzye_removable(&mut self, l: Lit, min_level: i64) -> bool {
+        self.an_stack.clear();
+        self.an_stack.push(l);
+        let top1 = self.an_to_clear.len();
+        loop {
+            if self.an_stack.len() == 0 {
+                return true;
+            }
+            let sl = self.an_stack.pop().unwrap();
+            let ci = self.vars[sl.vi()].reason;
+            let c = self.iref_clause(ci) as *const Clause;
+            unsafe {
+                for i in 1..(*c).lits.len() {
+                    let q = (*c).lits[i];
+                    let vi = q.vi();
+                    let lv = self.vars[vi].level as i64;
+                    if self.an_seen[vi] != 1 && lv != 0 {
+                        if self.vars[vi].reason != NULL_CLAUSE && 0 != lv & min_level {
+                            self.an_seen[vi] = 1;
+                            self.an_stack.push(q);
+                            self.an_to_clear.push(q);
+                        } else {
+                            let top2 = self.an_to_clear.len();
+                            for i in top1..top2 {
+                                self.an_seen[self.an_to_clear.pop().unwrap().vi()] = 0;
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
     fn analyze_final(&mut self, ci: ClauseIndex, skip_first: bool) -> () {
         self.conflicts.clear();
