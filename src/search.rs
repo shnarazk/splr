@@ -272,7 +272,18 @@ impl Solver {
     pub fn solve(&mut self) -> () {
         self.propagate(0);
     }
-    fn unsafe_enqueue(&mut self, l: Lit, ci: ClauseIndex) -> () {}
+    fn unsafe_enqueue(&mut self, l: Lit, ci: ClauseIndex) -> () {
+        let vi = l.vi();
+        let dl = self.decision_level();
+        let v = &mut self.vars[vi];
+        v.assign = l.lbool();
+        v.level = dl;
+        v.reason = ci;
+        self.trail.push(l)
+    }
+    fn unsafe_assume(&mut self, l: Lit) -> () {
+        let len = self.trail.len();
+        self.trail_lim.push(len);
+        self.unsafe_enqueue(l, NULL_CLAUSE);
+    }
 }
-
-fn simplify(_s: &mut Solver) -> () {}
