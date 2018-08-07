@@ -1,17 +1,17 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
 
-extern crate combine;
 extern crate splr;
-use combine::parser::byte::{digit, letter, space};
-use combine::{many1, sep_by, Parser};
 use splr::clause::*;
 use splr::search::*;
 use splr::solver::*;
 use splr::types::*;
+use std::io::*;
+use std::io::{BufReader, Read};
 use std::result::Result;
+use std::{fs, mem};
 
-fn to_num(v: Vec<u8>) -> i32 {
+fn to_pnum(v: Vec<u8>) -> i32 {
     let mut a: i32 = 0;
     for d in v {
         a *= 10;
@@ -20,29 +20,45 @@ fn to_num(v: Vec<u8>) -> i32 {
     a
 }
 
+fn to_mnum(v: Vec<u8>) -> i32 {
+    let mut a: i32 = 0;
+    for d in v {
+        a *= 10;
+        a += (d as i32) - 48;
+    }
+    0 - a
+}
+
 fn main() {
     println!("Hello, world!");
-
-    //    let stdin = std::io::stdin();
-    //    let stdin = stdin.lock();
-    //    let stdin_stream = BufferedStream::new(from_read(stdin), 10);
-    //    let stdin_stream = stdin_stream.as_stream();
-
-    let mut pint1 = many1::<Vec<_>, _>(combine::parser::byte::digit());
-    let mut pint2 = many1::<Vec<_>, _>(combine::parser::byte::digit()).map(to_num);
-    let mut parser =
-        many1::<Vec<_>, _>(combine::parser::byte::digit().or(combine::parser::byte::space()));
-    //    println!("{:?}", parser.parse(stdin_stream));
-
-    println!("{:?}", pint1.parse(&b"123 333 0"[..]));
-    println!("{:?}", pint2.parse(&b"123 333 0"[..]));
-    //    println!("{:?}", parser.parse("123 333 0"));
-    //    println!("{:?}", parser.parse("123ABC"));
-    println!("{:?}", parser.parse(&b"ABC123"[..]));
-
+    let mut rs = BufReader::new(fs::File::open("uf8.cnf").unwrap());
+    let mut buf = String::new();
+    let mut nv: usize = 0;
+    let mut nc: usize = 0;
+    loop {
+        buf.clear();
+        match rs.read_line(&mut buf) {
+            Ok(0) => break,
+            Ok(k) => {
+                let mut iter = buf.split_whitespace();
+                if iter.next() == Some("p") && iter.next() == Some("cnf") {
+                    if let Some(v) = iter.next().map(|s| s.parse::<usize>().ok().unwrap()) {
+                        if let Some(c) = iter.next().map(|s| s.parse::<usize>().ok().unwrap()) {
+                            nv = v;
+                            nc = c;
+                            break;
+                        }
+                    }
+                }
+                continue;
+            }
+            Err(e) => panic!("{}", e),
+        }
+    }
+    println!("nv = {}, nc = {}", nv, nc);
     let cnf = CNFDescription {
-        num_of_variables: 8,
-        num_of_clauses: 10,
+        num_of_variables: nv,
+        num_of_clauses: nc,
         pathname: "".to_string(),
     };
     let mut s: Solver = Solver::new(DEFAULT_CONFIGURATION, &cnf);
@@ -61,8 +77,29 @@ fn main() {
         [c1 == c1, c2 == c2, c1 == c2],
         c2.activity
     );
-    s.inject(false, c1);
-    s.inject(true, c2);
+    loop {
+        buf.clear();
+        match rs.read_line(&mut buf) {
+            Ok(0) => break,
+            Ok(k) => {
+                let mut iter = buf.split_whitespace();
+                let mut v: Vec<Lit> = Vec::new();
+                for s in iter {
+                    if let Ok(val) = s.parse::<i32>() {
+                        if val == 0 {
+                            continue;
+                        } else {
+                            v.push(int2lit(val));
+                        }
+                    }
+                }
+                println!("a new clause: {:?}", v);
+                s.inject(false, Clause::new(v));
+            }
+            Err(e) => panic!("{}", e),
+        }
+    }
+
     println!("# Solver");
     println!(" - vars:  {:?}", s.vars);
     println!(" - watches: {:?}", s.watches);

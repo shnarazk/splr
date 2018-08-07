@@ -17,9 +17,9 @@ pub struct Watch {
 /// WatcherVec
 pub type WatcherVec = Vec<Vec<Watch>>;
 
-pub fn new_watcher_vec(n: usize) -> WatcherVec {
+pub fn new_watcher_vec(nv: usize) -> WatcherVec {
     let mut vec = Vec::new();
-    for _i in 0..n + 1 {
+    for _i in 0..2 * nv + 1 {
         vec.push(Vec::new());
     }
     vec
