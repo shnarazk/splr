@@ -48,6 +48,89 @@ impl Solver {
         }
         false
     }
+    // adapt delayed update of watches
+    fn propagate(&mut self, _l: Lit) -> Option<ClauseIndex> {
+        loop {
+            let p = self.trail[1 + self.q_head];
+            self.q_head += 1;
+            self.stats[StatIndex::NumOfPropagation as usize] += 1;
+            {
+                let wl = self.watches[p as usize].len();
+                let false_lit = p.negate();
+                'next_clause: for mut wi in 0..wl {
+                    let Watch {
+                        other: blocker,
+                        by: ci,
+                        ..
+                    } = self.watches[p as usize][wi];
+                    // We need a storage to keep a literal which is the destination of propagation.
+                    // * candidate 1, Watch.to, better about reference locality if other is satisfied.
+                    // * candidate 2. Clause.tmp
+                    let bv = if blocker == 0 {
+                        LFALSE
+                    } else {
+                        self.lit2asg(blocker)
+                    };
+                    if bv == LTRUE {
+                        self.watches[p as usize][wi].to = p;
+                        continue 'next_clause;
+                    }
+                    let mut first = 0;
+                    let mut clen = 0;
+                    let mut c = 0 as *mut Clause;
+                    let mut cid = NULL_CLAUSE;
+                    unsafe {
+                        c = self.mref_clause(ci) as *mut Clause;
+                        cid = (*c).index;
+                        let l0 = (*c).lits[0];
+                        first = if false_lit == l0 {
+                            let l1 = (*c).lits[1];
+                            (*c).lits[0] = l1;
+                            (*c).lits[1] = l0;
+                            l1
+                        } else {
+                            l0
+                        };
+                        clen = (*c).lits.len();
+                    }
+                    if self.lit2asg(first) == LTRUE {
+                        self.watches[p as usize][wi].to = p;
+                        continue 'next_clause;
+                    }
+                    for k in 2..clen {
+                        unsafe {
+                            let lk = (*c).lits[k];
+                            if self.lit2asg(lk) != LFALSE {
+                                (*c).lits[1] = lk;
+                                self.watches[p as usize][wi].to = lk.negate();
+                                break 'next_clause;
+                            }
+                        }
+                    }
+                    // conflict!
+                    return Some(cid);
+                }
+                // No conflict: so let's move them!
+                // use watches[0] to keep watches that don't move anywhere, temporally.
+                self.watches[0].clear();
+                loop {
+                    match self.watches[p as usize].pop() {
+                        Some(w) => self.watches[w.to as usize].push(w),
+                        None => break,
+                    }
+                }
+                loop {
+                    match self.watches[0].pop() {
+                        Some(w) => self.watches[p as usize].push(w),
+                        None => break,
+                    }
+                }
+            }
+            if self.trail.len() <= self.q_head {
+                return None;
+            }
+        }
+    }
     pub fn reduce_database(&mut self) -> () {
         let keep = self.sort_learnts();
         self.rebuild_reason();
@@ -104,87 +187,3 @@ fn analyze(_s: &mut Solver, _l: Lit) -> (u32, Clause) {
 }
 
 fn simplify(_s: &mut Solver) -> () {}
-
-// adapt delayed update of watches
-fn propagate(s: &mut Solver, _l: Lit) -> Option<ClauseIndex> {
-    loop {
-        let p = s.trail[1 + s.q_head];
-        s.q_head += 1;
-        s.stats[StatIndex::NumOfPropagation as usize] += 1;
-        {
-            let wl = s.watches[p as usize].len();
-            let false_lit = p.negate();
-            'next_clause: for mut wi in 0..wl {
-                let Watch {
-                    other: blocker,
-                    by: ci,
-                    ..
-                } = s.watches[p as usize][wi];
-                // We need a storage to keep a literal which is the destination of propagation.
-                // * candidate 1, Watch.to, better about reference locality if other is satisfied.
-                // * candidate 2. Clause.tmp
-                let bv = if blocker == 0 {
-                    LFALSE
-                } else {
-                    s.lit2asg(blocker)
-                };
-                if bv == LTRUE {
-                    s.watches[p as usize][wi].to = p;
-                    continue 'next_clause;
-                }
-                let mut first = 0;
-                let mut clen = 0;
-                let mut c = 0 as *mut Clause;
-                let mut cid = NULL_CLAUSE;
-                unsafe {
-                    c = s.mref_clause(ci) as *mut Clause;
-                    cid = (*c).index;
-                    let l0 = (*c).lits[0];
-                    first = if false_lit == l0 {
-                        let l1 = (*c).lits[1];
-                        (*c).lits[0] = l1;
-                        (*c).lits[1] = l0;
-                        l1
-                    } else {
-                        l0
-                    };
-                    clen = (*c).lits.len();
-                }
-                if s.lit2asg(first) == LTRUE {
-                    s.watches[p as usize][wi].to = p;
-                    continue 'next_clause;
-                }
-                for k in 2..clen {
-                    unsafe {
-                        let lk = (*c).lits[k];
-                        if s.lit2asg(lk) != LFALSE {
-                            (*c).lits[1] = lk;
-                            s.watches[p as usize][wi].to = lk.negate();
-                            break 'next_clause;
-                        }
-                    }
-                }
-                // conflict!
-                return Some(cid);
-            }
-            // No conflict: so let's move them!
-            // use watches[0] to keep watches that don't move anywhere, temporally.
-            s.watches[0].clear();
-            loop {
-                match s.watches[p as usize].pop() {
-                    Some(w) => s.watches[w.to as usize].push(w),
-                    None => break,
-                }
-            }
-            loop {
-                match s.watches[0].pop() {
-                    Some(w) => s.watches[p as usize].push(w),
-                    None => break,
-                }
-            }
-        }
-        if s.trail.len() <= s.q_head {
-            return None;
-        }
-    }
-}
