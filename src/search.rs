@@ -209,6 +209,46 @@ impl Solver {
         }
         (level_to_return as u32, self.an_learnt_lits.clone())
     }
+    fn analyze_final(&mut self, ci: ClauseIndex, skip_first: bool) -> () {
+        self.conflicts.clear();
+        if self.root_level != 0 {
+            unsafe {
+                let c = self.iref_clause(ci) as *const Clause;
+                for i in (if skip_first { 1 } else { 0 })..(*c).lits.len() {
+                    let vi = (*c).lits[i].vi();
+                    if 0 < self.vars[vi].level {
+                        self.an_seen[vi] = 1;
+                    }
+                }
+            }
+            let tl0 = self.trail_lim[0];
+            let start = if self.trail_lim.len() <= self.root_level {
+                self.trail.len()
+            } else {
+                self.trail_lim[self.root_level]
+            };
+            for i in (tl0..start).rev() {
+                let l: Lit = self.trail[i];
+                let vi = l.vi();
+                if self.an_seen[vi] == 1 {
+                    if self.vars[vi].reason == NULL_CLAUSE {
+                        self.conflicts.push(l.negate());
+                    } else {
+                        let c = self.iref_clause(ci) as *const Clause;
+                        unsafe {
+                            for i in 1..(*c).lits.len() {
+                                let vi = (*c).lits[i].vi();
+                                if 0 < self.vars[vi].level {
+                                    self.an_seen[vi] = 1;
+                                }
+                            }
+                        }
+                    }
+                }
+                self.an_seen[vi] = 0;
+            }
+        }
+    }
     pub fn reduce_database(&mut self) -> () {
         let keep_c = self.sort_clauses();
         let keep_l = self.sort_learnts();
