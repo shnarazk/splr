@@ -51,8 +51,11 @@ impl Solver {
     // adapt delayed update of watches
     fn propagate(&mut self, _l: Lit) -> Option<ClauseIndex> {
         loop {
-            let p = self.trail[1 + self.q_head];
+            if self.trail.len() <= self.q_head {
+                return None;
+            }
             self.q_head += 1;
+            let p = self.trail[self.q_head];
             self.stats[StatIndex::NumOfPropagation as usize] += 1;
             {
                 let wl = self.watches[p as usize].len();
@@ -125,9 +128,6 @@ impl Solver {
                         None => break,
                     }
                 }
-            }
-            if self.trail.len() <= self.q_head {
-                return None;
             }
         }
     }
@@ -270,7 +270,7 @@ impl Solver {
     }
     fn search(&mut self) -> () {}
     pub fn solve(&mut self) -> () {
-        self.propagate(0);
+        self.propagate(1);
     }
     fn unsafe_enqueue(&mut self, l: Lit, ci: ClauseIndex) -> () {
         let vi = l.vi();
