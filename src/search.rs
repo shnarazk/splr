@@ -4,6 +4,7 @@
 use clause::*;
 use solver::*;
 use std::cmp::max;
+use std::result::Result;
 use types::*;
 
 impl Solver {
@@ -232,10 +233,29 @@ impl Solver {
     }
     /// Note: this function changes self.learnt_permutation.
     fn sort_learnts(&mut self) -> usize {
-        let nc = self.learnts.len();
         let mut requires = 0;
-        for c in &self.learnts {
-            requires += c.set_sort_key();
+        let nc = self.learnts.len();
+        {
+            // set key
+
+            let ac = 0.1 * self.cla_inc / (nc as f64);
+            for c in &mut self.learnts {
+                requires += c.set_sort_key(ac);
+            }
+        }
+        {
+            // check locked
+            let nv = self.vars.len();
+            for vi in 1..nv + 1 {
+                let ci = self.vars[vi].reason;
+                if 0 < ci {
+                    let val = self.learnts[ci as usize].tmp;
+                    if 0 < val {
+                        self.learnts[ci as usize].tmp = 0;
+                        requires += 1;
+                    }
+                }
+            }
         }
         self.learnts.sort_by_key(|c| c.tmp);
         for i in 1..nc {

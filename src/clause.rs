@@ -1,9 +1,16 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
 #![allow(unused_variables)]
+use std::cmp::min;
 use std::cmp::Ordering;
+use std::f64;
 use std::fmt;
 use types::*;
+
+const RANK_WIDTH: i64 = 11;
+const ACTIVITY_WIDTH: i64 = 51;
+const RANK_MAX: i64 = 2000;
+const ACTIVITY_MAX: i64 = 2 ^ ACTIVITY_WIDTH - 1;
 
 /// Clause Index, not ID because it changes after database reduction.
 /// # Range
@@ -69,9 +76,30 @@ impl Clause {
     pub fn watch1(&self) -> Lit {
         self.lits[1]
     }
-    /// returns 1 if this is required, or locked
-    pub fn set_sort_key(&self) -> usize {
-        1
+    /// returns 1 if this is good enough.
+    pub fn set_sort_key(&mut self, at: f64) -> usize {
+        let k = self.lits.len();
+        if k == 2 {
+            self.tmp = 0;
+            1
+        } else {
+            let ac = self.activity;
+            let d = if ac < at {
+                RANK_MAX // bigger is worse
+            } else {
+                min(RANK_MAX, self.rank as i64)
+            };
+            self.tmp = d << ACTIVITY_WIDTH + scale_activity(ac);
+            0
+        }
+    }
+}
+
+fn scale_activity(x: f64) -> i64 {
+    if x < 1e-20 {
+        ACTIVITY_MAX
+    } else {
+        (ACTIVITY_MAX * ((1.0 - (x * 1e20).log10() / 40.0) as i64))
     }
 }
 

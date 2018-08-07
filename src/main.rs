@@ -9,6 +9,7 @@ use splr::clause::*;
 use splr::search::*;
 use splr::solver::*;
 use splr::types::*;
+use std::result::Result;
 
 fn to_num(v: Vec<u8>) -> i32 {
     let mut a: i32 = 0;
@@ -65,7 +66,10 @@ fn main() {
     println!("# Solver");
     println!(" - vars:  {:?}", s.vars);
     println!(" - watches: {:?}", s.watches);
-    s.solve();
+    match s.solve() {
+        Ok(_) => println!("OK"),
+        Err(_) => println!("Failed"),
+    }
     println!("nclauses = {}", s.num_clauses());
     s.learnts.pop();
     println!("# End of program");
