@@ -73,16 +73,20 @@ impl VarIndexHeap {
     }
     /// renamed from inHeap
     fn contains(&self, v: VarIndex) -> bool {
-        self.idxs[v] != 0 && self.idxs[v] <= self.idxs[0]
+        self.idxs[v] <= self.idxs[0]
     }
     fn percolate_up(&mut self, vec: &Vec<Var>, start: usize) -> () {
         let mut q = start;
         let vq = self.heap[q];
+        if vq == 0 {
+            println!("percolate: vq {} q {}, start {}", vq, q, start);
+        }
         let aq = vec[vq].activity;
         loop {
             let p = q / 2;
             if p == 0 {
                 self.heap[q] = vq;
+                assert_ne!(vq, 0);
                 self.idxs[vq] = q;
                 return;
             } else {
@@ -91,10 +95,12 @@ impl VarIndexHeap {
                 if ap < aq {
                     // move down the current parent, and make it empty
                     self.heap[q] = vp;
+                    assert_ne!(vp, 0);
                     self.idxs[vp] = q;
                     q = p;
                 } else {
                     self.heap[q] = vq;
+                    assert_ne!(vq, 0);
                     self.idxs[vq] = q;
                     return;
                 }
@@ -117,7 +123,7 @@ impl VarIndexHeap {
                 let (c, vc, ac) = if r <= n && al < ar {
                     (r, vr, ar)
                 } else {
-                    (l, vr, al)
+                    (l, vl, al)
                 };
                 if ai < ac {
                     self.heap[i] = vc;
@@ -125,11 +131,13 @@ impl VarIndexHeap {
                     i = c;
                 } else {
                     self.heap[i] = vi;
+                    assert_ne!(vi, 0);
                     self.idxs[vi] = i;
                     return;
                 }
             } else {
                 self.heap[i] = vi;
+                assert_ne!(vi, 0);
                 self.idxs[vi] = i;
                 return;
             }
@@ -137,6 +145,7 @@ impl VarIndexHeap {
     }
     /// renamed from incrementHeap, updateVO
     pub fn update(&mut self, vec: &Vec<Var>, v: VarIndex) -> () {
+        assert_ne!(v, 0);
         let start = self.idxs[v];
         if self.contains(v) {
             self.percolate_up(vec, start)
@@ -144,33 +153,62 @@ impl VarIndexHeap {
     }
     /// renamed from undoVO
     pub fn check_insert(&mut self, vec: &Vec<Var>, vi: VarIndex) -> () {
+        // self.check_var_order("check insert 1");
         if !self.contains(vi) {
             // println!("check_insert (unassign) {}", vi);
-            // println!(" before ins {:?}", self);
-            self.insert(vec, vi);
-            // println!(" percolate  {:?}", self);
+            let i = self.idxs[vi];
+            let n = self.idxs[0] + 1;
+            let vn = self.heap[n];
+            // swap them
+            self.heap[i] = vn;
+            self.heap[n] = vi;
+            self.idxs[vi] = n;
+            self.idxs[vn] = i;
+            self.idxs[0] = n;
+            self.percolate_up(vec, n);
+        // println!(" before ins {:?}", self);
+        // self.insert(vec, vi);
+        // println!(" percolate  {:?}", self);
+        } else {
+            // println!("check_insert (already inserted) {}", vi);
         }
+        // self.check_var_order("check insert 2");
     }
     /// renamed from insertHeap
-    fn insert(&mut self, vec: &Vec<Var>, v: VarIndex) -> () {
+    fn insert(&mut self, vec: &Vec<Var>, vi: VarIndex) -> () {
         let n = self.idxs[0] + 1;
-        self.heap[n] = v;
-        self.idxs[v] = n;
+        self.heap[n] = vi;
+        self.idxs[vi] = n;
+        assert_ne!(n, 0);
         self.idxs[0] = n;
+        assert_ne!(n, 0);
         self.percolate_up(vec, n);
     }
     /// renamed from getHeapDown
     fn root(&mut self, vec: &Vec<Var>) -> VarIndex {
-        let v1 = self.heap[1];
-        let vl = self.heap[self.idxs[0]];
-        self.heap[1] = vl;
-        self.idxs[vl] = 1;
-        self.idxs[v1] = 0;
+        let s = 1;
+        let vs = self.heap[s];
+        let n = self.idxs[0];
+        let vn = self.heap[n];
+        // self.check_var_order(&format!("root 1 :[({}, {}) ({}, {})]", s, vs, n, vn));
+        assert_ne!(vn, 0);
+        self.heap[s] = vn;
+        self.idxs[vn] = s;
+        assert_ne!(vs, 0);
+        self.heap[n] = vs;
+        self.idxs[vs] = n;
+        // self.check_var_order("root 2");
         self.idxs[0] -= 1;
         if 1 < self.idxs[0] {
             self.percolate_down(vec, 1);
         }
-        v1
+        // self.check_var_order("root 3");
+        vs
+    }
+    pub fn check_var_order(&self, s: &str) -> () {
+        check_heap(self.heap.clone());
+        check_idxs(self.idxs.clone());
+        println!(" - {} pass", s);
     }
 }
 
@@ -376,6 +414,9 @@ impl Solver {
         //     self.trail.iter().map(|l| l.int()).collect::<Vec<i32>>()
         // );
         // println!(" trail lim {:?}", self.trail_lim);
+        // println!(" var_order heap{:?}", self.var_order.heap);
+        // println!(" var_order idxs{:?}", self.var_order.idxs);
+        // self.check_var_order("cancel_until 1");
         let dl = self.decision_level();
         if lv < dl {
             let lim = self.trail_lim[lv];
@@ -390,6 +431,7 @@ impl Solver {
                     v.assign = BOTTOM;
                     v.reason = NULL_CLAUSE;
                 }
+                // println!("rollback vi:{}  at {} in trail", vi, c);
                 self.var_order.check_insert(vars, vi);
                 // println!("lv = {}, lim = {}, c = {}", lv, lim, c);
                 if lim == c {
@@ -398,30 +440,70 @@ impl Solver {
                     c -= 1;
                 }
             }
-            self.trail.truncate(lim);
+            self.trail.truncate(lim + 1);
             self.trail_lim.truncate(lv);
-            self.q_head = lim;
+            self.q_head = lim + 1;
         }
         // println!(
         //     " trail     {:?}",
         //     self.trail.iter().map(|l| l.int()).collect::<Vec<i32>>()
         // );
         // println!(" trail lim {:?}", self.trail_lim);
+        // println!(" var_order heap{:?}", self.var_order.heap);
+        // println!(" var_order idxs{:?}", self.var_order.idxs);
+        // println!("< cancel_until");
+        // self.check_var_order("cancel_until 2");
     }
-    /// Heap operations
+    /// Heap operations; renamed from selectVO
     pub fn select_var(&mut self) -> VarIndex {
         loop {
-            let n = self.var_order.idxs[0];
-            if n == 0 {
+            // self.check_var_order("select_var 1");
+            if self.var_order.idxs[0] == 0 {
                 // println!("> select_var returns 0");
                 return 0;
             }
-            let v = self.var_order.root(&self.vars);
-            let x = self.vars[v].assign;
+            let vi = self.var_order.root(&self.vars);
+            // self.check_var_order("select_var 2");
+            let x = self.vars[vi].assign;
             if x == BOTTOM {
-                // println!("> select_var returns {}", v);
-                return v;
+                // println!(
+                //     "> select_var returns {} at {} remaining {}, assigned {}",
+                //     vi,
+                //     self.decision_level(),
+                //     self.var_order.idxs[0],
+                //     self.trail.len()
+                // );
+                // assert_eq!(
+                //     self.num_vars <= self.trail.len() + self.var_order.idxs[0] + 1,
+                //     true
+                // );
+                return vi;
             }
+        }
+    }
+    pub fn check_var_order(&self, s: &str) -> () {
+        check_heap(self.var_order.heap.clone());
+        check_idxs(self.var_order.idxs.clone());
+        println!(" - {} pass", s);
+    }
+}
+
+fn check_heap(mut v: Vec<usize>) -> () {
+    v = v[1..].to_vec();
+    v.sort();
+    for i in 0..v.len() {
+        if v[i] != i + 1 {
+            panic!("heap {} {} {:?}", i, v[i], v);
+        }
+    }
+}
+
+fn check_idxs(mut v: Vec<usize>) -> () {
+    v = v[1..].to_vec();
+    v.sort();
+    for i in 0..v.len() {
+        if v[i] != i + 1 {
+            panic!("idxs {} {} {:?}", i, v[i - 1], v);
         }
     }
 }

@@ -51,10 +51,10 @@ impl Solver {
     }
     // adapt delayed update of watches
     fn propagate(&mut self) -> Option<ClauseIndex> {
-        println!("> propagate");
+        // println!("> propagate at {}", self.decision_level());
         loop {
             if self.trail.len() <= self.q_head {
-                // println!("  propagate done");
+                // println!("<  propagate done");
                 return None;
             }
             // println!(
@@ -116,20 +116,21 @@ impl Solver {
                         }
                         if fv == LFALSE {
                             // conflict
-                            println!("  found a conflict by {}", (*c));
-                            println!(
-                                "  under the assigment {:?}",
-                                self.trail.iter().map(|l| l.int()).collect::<Vec<i32>>()
-                            );
-                            println!("  during propagating {}", p.int());
+                            // println!("  found a conflict by {}", (*c));
+                            // println!(
+                            //     "  under the assigment {:?}",
+                            //     self.trail.iter().map(|l| l.int()).collect::<Vec<i32>>()
+                            // );
+                            // println!("  during propagating {}", p.int());
+                            // println!("< propagate");
                             return Some((*c).index); // TODO why don't you return `*c` itself?
                         } else {
                             // unit propagation
-                            println!("  unit propagation {} by {}", first.int(), (*c));
-                            println!(
-                                "  under the assigment {:?}",
-                                self.trail.iter().map(|l| l.int()).collect::<Vec<i32>>()
-                            );
+                            // println!("  unit propagation {} by {}", first.int(), (*c));
+                            // println!(
+                            //     "  under the assigment {:?}",
+                            //     self.trail.iter().map(|l| l.int()).collect::<Vec<i32>>()
+                            // );
                             self.watches[p as usize][wi].to = p;
                             self.unsafe_enqueue(first, ci);
                         }
@@ -180,6 +181,7 @@ impl Solver {
         loop {
             unsafe {
                 let c = self.mref_clause(ci) as *mut Clause;
+                // println!("  analyze.loop {}", (*c));
                 let d = (*c).rank;
                 if 0 != d {
                     self.bump_ci(ci);
@@ -208,20 +210,26 @@ impl Solver {
                         }
                     }
                 }
+                // println!("  analyze.loop 2");
                 // set the index of the next literal to ti
                 loop {
                     if self.an_seen[self.trail[ti].vi()] == 0 {
+                        if ti == 0 {
+                            panic!("aaaa");
+                        };
                         ti -= 1;
                     } else {
+                        ti -= 1;
                         break;
                     }
                 }
+                // println!("  analzye.loop 3");
                 p = self.trail[ti];
                 let next_vi: VarIndex = p.vi();
                 ci = self.vars[next_vi].reason;
                 self.an_seen[next_vi] = 0;
                 if 1 < path_cnt {
-                    ti -= 1;
+                    // ti -= 1;
                     path_cnt -= 1;
                 } else {
                     self.an_learnt_lits[0] = p.negate();
@@ -229,6 +237,7 @@ impl Solver {
                 }
             }
         }
+        // println!("  analyze.loop terminated");
         let level_to_return = b;
         // simlpify phase
         let n = self.an_learnt_lits.len();
@@ -242,11 +251,13 @@ impl Solver {
             self.an_to_clear.push(l);
             levels |= 63 & (self.vars[l.vi()].level as u64);
         }
+        // println!("  analyze.loop 4 n = {}", n);
         let mut i = 1;
         let mut j = 1;
         loop {
+            println!("  analyze.loop for simplify {} {}", i, n);
             if i == n {
-                self.an_learnt_lits.truncate(j);
+                self.an_learnt_lits.truncate(j + 1);
                 break;
             }
             let l = self.an_learnt_lits[i];
@@ -260,6 +271,7 @@ impl Solver {
             i += 1;
         }
         // glucose heuristics
+        // println!("  analyze.loop 5");
         let r = self.an_learnt_lits.len();
         for i in 0..self.an_last_dl.len() {
             let l = self.an_last_dl[i];
@@ -281,6 +293,7 @@ impl Solver {
                 .map(|l| l.int())
                 .collect::<Vec<i32>>()
         );
+        // println!("  analyze terminated");
         (level_to_return as u32, self.an_learnt_lits.clone())
     }
     fn analyze_removable(&mut self, l: Lit, min_level: u64) -> bool {
@@ -288,7 +301,8 @@ impl Solver {
         self.an_stack.push(l);
         let top1 = self.an_to_clear.len();
         loop {
-            if self.an_stack.len() == 0 {
+            // println!("analyze_removable.loop {:?}", self.an_stack);
+            if self.an_stack.is_empty() {
                 return true;
             }
             let sl = self.an_stack.pop().unwrap();
@@ -308,6 +322,7 @@ impl Solver {
                             for _ in top1..top2 {
                                 self.an_seen[self.an_to_clear.pop().unwrap().vi()] = 0;
                             }
+                            return false;
                         }
                     }
                 }
@@ -442,16 +457,22 @@ impl Solver {
         loop {
             let ret = self.propagate();
             let d = self.decision_level();
+            println!("search called propagate and it returned {:?} at {}", ret, d);
             match ret {
                 Some(ci) => {
                     self.stats[StatIndex::NumOfBackjump as usize] += 1;
                     if d == self.root_level {
+                        println!("  it's UNSAT");
                         self.analyze_final(ci, false);
                         return false;
                     } else {
                         let (backtrack_level, v) = self.analyze(ci);
-
+                        println!(
+                            " conflict analyzed {:?}",
+                            v.iter().map(|l| l.int()).collect::<Vec<i32>>()
+                        );
                         self.cancel_until(max(backtrack_level as usize, root_lv));
+                        println!(" backtracked to {}", backtrack_level);
                         let lbd = self.new_learnt(v);
                         let k = self.an_learnt_lits.len();
                         if k == 1 {
@@ -469,8 +490,10 @@ impl Solver {
                             continue;
                         }
                     }
+                    // println!(" search loop conflict terminated");
                 }
                 None => {
+                    // println!(" search loop enter a new level");
                     // if d == 0 { simplify_db() };
                     let na = self.num_assigns();
                     if self.max_learnts as usize + na < self.learnts.len() {
@@ -488,7 +511,9 @@ impl Solver {
                         // );
                         // println!(" trail lim {:?}", self.trail_lim);
                         // println!(" {:?}", self.var_order);
+                        // println!("  num_assigns = {}", na);
                         let vi = self.select_var();
+                        // println!(" search loop find a new decision var");
                         assert_ne!(vi, 0);
                         // println!(" {:?}", self.var_order);
                         if vi != 0 {
@@ -498,6 +523,7 @@ impl Solver {
                     }
                 }
             }
+            // println!(" search loop terminate");
         }
     }
     pub fn solve(&mut self) -> Result<Certificate, SolverException> {

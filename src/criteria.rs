@@ -37,7 +37,9 @@ impl Solver {
         if VAR_ACTIVITY_THRESHOLD < a {
             self.rescale_var_activity();
         }
+        // self.check_var_order("bump_vi 1");
         self.var_order.update(&self.vars, vi);
+        // self.check_var_order("bump_vi 2");
     }
     pub fn decay_var_activity(&mut self) -> () {
         self.var_inc = self.var_inc / VAR_ACTIVITY_THRESHOLD;
