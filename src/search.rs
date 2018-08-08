@@ -192,15 +192,47 @@ impl Solver {
         self.an_stack.clear();
         self.an_to_clear.clear();
         self.an_to_clear.push(l0);
-        let mut levels = 0;
+        let mut levels: u64 = 0;
         for i in 1..n {
             let l = self.an_learnt_lits[i];
             self.an_to_clear.push(l);
-            levels |= 63 & self.vars[l.vi()].level;
+            levels |= 63 & (self.vars[l.vi()].level as u64);
+        }
+        let mut i = 1;
+        let mut j = 1;
+        loop {
+            if i == n {
+                self.an_learnt_lits.truncate(j);
+                break;
+            }
+            let l = self.an_learnt_lits[i];
+            if self.vars[l.vi()].reason == NULL_CLAUSE {
+                self.an_learnt_lits[j] = l;
+                j += 1;
+            } else if !self.analyze_removable(l, levels) {
+                self.an_learnt_lits[j] = l;
+                j += 1;
+            }
+            i += 1;
+        }
+        // glucose heuristics
+        let r = self.an_learnt_lits.len();
+        for i in 0..self.an_last_dl.len() {
+            let l = self.an_last_dl[i];
+            let vi = l.vi();
+            let ci = self.vars[vi].reason;
+            let len = self.iref_clause(ci).lits.len();
+            if r < len {
+                self.bump_vi(vi);
+            }
+        }
+        self.an_last_dl.clear();
+        for l in &self.an_to_clear {
+            self.an_seen[l.vi()] = 0;
         }
         (level_to_return as u32, self.an_learnt_lits.clone())
     }
-    fn analzye_removable(&mut self, l: Lit, min_level: i64) -> bool {
+    fn analyze_removable(&mut self, l: Lit, min_level: u64) -> bool {
         self.an_stack.clear();
         self.an_stack.push(l);
         let top1 = self.an_to_clear.len();
@@ -212,18 +244,17 @@ impl Solver {
             let ci = self.vars[sl.vi()].reason;
             let c = self.iref_clause(ci) as *const Clause;
             unsafe {
-                for i in 1..(*c).lits.len() {
-                    let q = (*c).lits[i];
+                for q in &(*c).lits {
                     let vi = q.vi();
-                    let lv = self.vars[vi].level as i64;
+                    let lv = self.vars[vi].level as u64;
                     if self.an_seen[vi] != 1 && lv != 0 {
                         if self.vars[vi].reason != NULL_CLAUSE && 0 != lv & min_level {
                             self.an_seen[vi] = 1;
-                            self.an_stack.push(q);
-                            self.an_to_clear.push(q);
+                            self.an_stack.push(*q);
+                            self.an_to_clear.push(*q);
                         } else {
                             let top2 = self.an_to_clear.len();
-                            for i in top1..top2 {
+                            for _ in top1..top2 {
                                 self.an_seen[self.an_to_clear.pop().unwrap().vi()] = 0;
                             }
                         }
@@ -237,8 +268,8 @@ impl Solver {
         if self.root_level != 0 {
             unsafe {
                 let c = self.iref_clause(ci) as *const Clause;
-                for i in (if skip_first { 1 } else { 0 })..(*c).lits.len() {
-                    let vi = (*c).lits[i].vi();
+                for l in &(*c).lits[(if skip_first { 1 } else { 0 })..] {
+                    let vi = l.vi();
                     if 0 < self.vars[vi].level {
                         self.an_seen[vi] = 1;
                     }
@@ -281,11 +312,15 @@ impl Solver {
         self.clauses.truncate(keep_c);
         self.learnts.truncate(keep_l);
     }
+    /// Note: this function changes self.clause_permutation.
     fn sort_clauses(&mut self) -> usize {
         if self.decision_level() == 0
             && self.stats[StatIndex::NumOfGroundVar as usize] < self.num_assigns() as i64
         {
-            // self.simplify();
+            // TODO
+            // 1. run tautology checker
+            // 2. purge some out of clauses
+            // 3. renumber remains
             self.num_clauses()
         } else {
             self.num_clauses()
@@ -297,7 +332,6 @@ impl Solver {
         let nc = self.learnts.len();
         {
             // set key
-
             let ac = 0.1 * self.cla_inc / (nc as f64);
             for c in &mut self.learnts {
                 requires += c.set_sort_key(ac);

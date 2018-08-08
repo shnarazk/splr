@@ -211,6 +211,7 @@ pub struct Solver {
     pub var_inc: f64,
     pub root_level: usize,
     /// Database Management
+    pub clause_permutation: Vec<ClauseIndex>,
     pub learnt_permutation: Vec<ClauseIndex>,
     pub learnt_size_adj: f64,
     pub learnt_size_cnt: u64,
@@ -259,6 +260,7 @@ impl Solver {
             cla_inc: cdr,
             var_inc: vdr,
             root_level: 0,
+            clause_permutation: Vec::new(),
             learnt_permutation: Vec::new(),
             learnt_size_adj: 100.0,
             learnt_size_cnt: 100,
