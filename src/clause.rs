@@ -38,11 +38,12 @@ pub struct Clause {
     pub tmp: i64,
 }
 
+#[cfg(debug_assertions)]
 impl Drop for Clause {
     fn drop(&mut self) {
         match self.index {
-            x if x < 0 => println!("Drop a given clause!!"),
-            x if 0 < x => println!("Drop a learnt clause!!"),
+            x if x < 0 => println!("Drop a given clause {}", self),
+            x if 0 < x => println!("Drop a learnt clause!! {}", self),
             _ => println!("Null is removed."),
         }
     }
@@ -131,8 +132,40 @@ impl fmt::Display for Clause {
 /// Other functions should borrow a mutual reference from it.
 pub type ClauseManager = Vec<Clause>;
 
-pub fn new_clause_maanager() -> ClauseManager {
+pub fn new_clause_manager() -> ClauseManager {
     let mut m = Vec::new();
     m.push(Clause::null());
     m
+}
+
+#[derive(Debug)]
+pub struct Var {
+    pub index: usize,
+    pub assign: Lbool,
+    pub phase: Lbool,
+    pub reason: ClauseIndex,
+    pub level: usize,
+    pub activity: f64,
+}
+
+pub const NULL_VAR: VarIndex = 0;
+
+impl Var {
+    pub fn new(i: usize) -> Var {
+        Var {
+            index: i,
+            assign: BOTTOM,
+            phase: BOTTOM,
+            reason: NULL_CLAUSE,
+            level: 0,
+            activity: 0.0,
+        }
+    }
+    pub fn new_vars(n: usize) -> Vec<Var> {
+        let mut v = Vec::new();
+        for i in 0..n + 1 {
+            v.push(Var::new(i));
+        }
+        v
+    }
 }

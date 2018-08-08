@@ -14,6 +14,16 @@ pub struct Watch {
     pub to: Lit,
 }
 
+impl Watch {
+    pub fn new(o: Lit, b: ClauseIndex) -> Watch {
+        Watch {
+            other: o,
+            by: b,
+            to: NULL_LIT,
+        }
+    }
+}
+
 /// WatcherVec
 pub type WatcherVec = Vec<Vec<Watch>>;
 
@@ -29,39 +39,8 @@ pub fn register_to_watches(w: &mut WatcherVec, ci: ClauseIndex, w0: Lit, w1: Lit
     if ci == NULL_CLAUSE {
         return;
     }
-    w[w0.negate() as usize].push(Watch {
-        other: w1,
-        by: ci,
-        to: 0,
-    });
-    w[w1.negate() as usize].push(Watch {
-        other: w0,
-        by: ci,
-        to: 0,
-    });
-}
-
-#[derive(Debug)]
-pub struct Var {
-    pub assign: Lbool,
-    pub phase: Lbool,
-    pub reason: ClauseIndex,
-    pub level: usize,
-    pub activity: f64,
-}
-
-fn new_vars(n: usize) -> Vec<Var> {
-    let mut v = Vec::new();
-    for i in 0..n + 1 {
-        v.push(Var {
-            assign: BOTTOM,
-            phase: BOTTOM,
-            reason: NULL_CLAUSE,
-            level: 0,
-            activity: 0.0,
-        })
-    }
-    v
+    w[w0.negate() as usize].push(Watch::new(w1, ci));
+    w[w1.negate() as usize].push(Watch::new(w0, ci));
 }
 
 /// heap of VarIndex
@@ -241,14 +220,15 @@ pub struct Solver {
 impl Solver {
     pub fn new(cfg: SolverConfiguration, cnf: &CNFDescription) -> Solver {
         let nv = cnf.num_of_variables as usize;
+        let nc = cnf.num_of_clauses as usize;
         let (fe, se) = cfg.ema_coeffs;
         let re = cfg.restart_expansion;
         let cdr = cfg.clause_decay_rate;
         let vdr = cfg.variable_decay_rate;
         let s = Solver {
-            vars: new_vars(nv),
-            clauses: new_clause_maanager(),
-            learnts: new_clause_maanager(),
+            vars: Var::new_vars(nv),
+            clauses: new_clause_manager(),
+            learnts: new_clause_manager(),
             watches: new_watcher_vec(nv * 2),
             trail: Vec::new(),
             trail_lim: Vec::new(),
@@ -260,7 +240,9 @@ impl Solver {
             cla_inc: cdr,
             var_inc: vdr,
             root_level: 0,
-            clause_permutation: Vec::new(),
+            clause_permutation: (0..nc)
+                .map(|x| x as ClauseIndex)
+                .collect::<Vec<ClauseIndex>>(),
             learnt_permutation: Vec::new(),
             learnt_size_adj: 100.0,
             learnt_size_cnt: 100,
@@ -327,7 +309,7 @@ impl Solver {
             0 - (self.clauses.len() as i64)
         };
         c.index = ci;
-        println!("Inject {}-nth clause {}.", ci, c);
+        // println!("Inject {}-nth clause {}.", ci, c);
         if learnt {
             self.learnts.push(c);
         } else {

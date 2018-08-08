@@ -70,14 +70,23 @@ fn build_solver(path: &str) -> (Solver, CNFDescription) {
     if nc != s.num_clauses() {
         panic!("The number of clauses is inconsistent with the header.")
     }
-    println!(" - vars:  {:?}", s.vars);
-    println!(" - watches: {:?}", s.watches);
+    // println!(" - vars:  {:?}", s.vars);
+    // println!(" - clauses: {:?}", s.clauses);
+    // println!(" - learnts: {:?}", s.learnts);
+    for (i, w) in s.watches.iter().enumerate() {
+        if !w.is_empty() {
+            println!(" - watches[{:>3}] => {:?}", (i as Lit).int(), w);
+        }
+    }
+    assert_eq!(s.vars.len() - 1, cnf.num_of_variables);
+    assert_eq!(s.clauses.len() - 1, cnf.num_of_clauses);
+    // println!(" - solver: {:?}", s);
     (s, cnf)
 }
 
 fn main() {
     println!("Hello, world!");
-    println!("CARGO_MANIFEST_DIR = {}", env!("CARGO_MANIFEST_DIR"));
+    // println!("CARGO_MANIFEST_DIR = {}", env!("CARGO_MANIFEST_DIR"));
     let target: String = env!("CARGO_MANIFEST_DIR").to_string() + "/uf8.cnf";
     let (mut s, _cnf) = build_solver(&target);
     match s.solve() {

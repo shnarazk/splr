@@ -67,12 +67,12 @@ pub fn int2lit(x: i32) -> Lit {
 ///
 /// ```
 /// use splr::types::*;
-/// assert_eq!(int2lit(1), vi2lit(1));
-/// assert_eq!(int2lit(2), vi2lit(2));
-/// assert_eq!(1, int2lit( 1).vi());
-/// assert_eq!(1, int2lit(-1).vi());
-/// assert_eq!(2, int2lit( 2).vi());
-/// assert_eq!(2, int2lit(-2).vi());
+/// assert_eq!(int2lit(1), 1.lit(LTRUE));
+/// assert_eq!(int2lit(2), 2.lit(LTRUE));
+/// assert_eq!(1, 1.lit(LTRUE).vi());
+/// assert_eq!(1, 1.lit(LFALSE).vi());
+/// assert_eq!(2, 2.lit(LTRUE).vi());
+/// assert_eq!(2, 2.lit(LFALSE).vi());
 /// ```
 pub trait LiteralEncoding {
     fn vi(&self) -> VarIndex;
