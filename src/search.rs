@@ -212,34 +212,25 @@ impl Solver {
                         }
                     }
                 }
-                // println!("  analyze.loop 2");
                 // set the index of the next literal to ti
                 loop {
                     if self.an_seen[self.trail[ti].vi()] == 0 {
-                        if ti == 0 {
-                            println!("an_seen {:?}", self.an_seen);
-                            panic!("aaaa");
-                        };
-                        ti -= 1;
-                    } else {
                         break;
                     }
+                    ti -= 1;
                 }
-                // println!("  analzye.loop 3");
-                p = self.trail[ti];
+                ti -= 1;
+                p = self.trail[ti + 1];
                 let next_vi: VarIndex = p.vi();
                 ci = self.vars[next_vi].reason;
                 self.an_seen[next_vi] = 0;
-                if 1 < path_cnt {
-                    ti -= 1;
-                    path_cnt -= 1;
-                } else {
-                    self.an_learnt_lits[0] = p.negate();
+                path_cnt -= 1;
+                if path_cnt <= 0 {
                     break;
                 }
             }
         }
-        // println!("  analyze.loop terminated");
+        self.an_learnt_lits[0] = p.negate();
         let level_to_return = b;
         // simlpify phase
         let n = self.an_learnt_lits.len();
