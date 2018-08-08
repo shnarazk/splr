@@ -108,6 +108,7 @@ impl Solver {
                             let lk = (*c).lits[k];
                             if self.lit2asg(lk) != LFALSE {
                                 (*c).lits[1] = lk;
+                                (*c).lits[k] = false_lit;
                                 // update watch
                                 self.watches[p as usize][wi].to = lk.negate();
                                 continue 'next_clause;
