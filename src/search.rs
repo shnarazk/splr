@@ -54,14 +54,14 @@ impl Solver {
         println!("> propagate");
         loop {
             if self.trail.len() <= self.q_head {
-                println!("  propagate done");
+                // println!("  propagate done");
                 return None;
             }
-            println!(
-                " self.trail.len {}, self.q_head {}",
-                self.trail.len(),
-                self.q_head
-            );
+            // println!(
+            //     "  self.trail.len {}, self.q_head {}",
+            //     self.trail.len(),
+            //     self.q_head
+            // );
             let p = self.trail[self.q_head];
             self.q_head += 1;
             self.stats[StatIndex::NumOfPropagation as usize] += 1;
@@ -69,7 +69,7 @@ impl Solver {
                 let wl = self.watches[p as usize].len();
                 let false_lit = p.negate();
                 'next_clause: for mut wi in 0..wl {
-                    println!(" next_clause: {}", wi);
+                    // println!(" next_clause: {}", wi);
                     let Watch {
                         other: blocker,
                         by: ci,
@@ -116,10 +116,10 @@ impl Solver {
                 }
                 // No conflict: so let's move them!
                 // use watches[0] to keep watches that don't move anywhere, temporally.
-                println!("  propagate");
+                // println!("  update watches");
                 self.watches[0].clear();
                 loop {
-                    println!("   remain: {}", self.watches[p as usize].len());
+                    // println!("   remain: {}", self.watches[p as usize].len());
                     match self.watches[p as usize].pop() {
                         Some(w) => {
                             if w.to == p {
@@ -140,7 +140,7 @@ impl Solver {
                         None => break,
                     }
                 }
-                println!("  propagate done");
+                // println!("  propagate done");
             }
         }
     }
@@ -451,9 +451,19 @@ impl Solver {
                         self.cancel_until(root_lv);
                         to_restart = false;
                     } else {
+                        println!(
+                            " trail     {:?}",
+                            self.trail.iter().map(|l| l.int()).collect::<Vec<i32>>()
+                        );
+                        println!(" trail lim {:?}", self.trail_lim);
+                        println!(" {:?}", self.var_order);
                         let vi = self.select_var();
-                        let p = self.vars[vi].phase;
-                        self.unsafe_assume(vi.lit(p));
+                        assert_ne(vi, 0);
+                        println!(" {:?}", self.var_order);
+                        if vi != 0 {
+                            let p = self.vars[vi].phase;
+                            self.unsafe_assume(vi.lit(p));
+                        }
                     }
                 }
             }
@@ -464,20 +474,26 @@ impl Solver {
         // TODO deal with assumptons
         // s.root_level = 0;
         let status = self.search();
-        let mut result = Vec::new();
-        for vi in 1..self.num_vars + 1 {
-            if self.vars[vi].assign == LTRUE {
-                result.push(vi as i32);
-            } else if self.vars[vi].assign == LFALSE {
-                result.push(0 - vi as i32);
-            }
-        }
-        self.cancel_until(0);
         if status && self.ok == LTRUE {
+            let mut result = Vec::new();
+            for vi in 1..self.num_vars + 1 {
+                if self.vars[vi].assign == LTRUE {
+                    result.push(vi as i32);
+                } else if self.vars[vi].assign == LFALSE {
+                    result.push(0 - vi as i32);
+                }
+            }
+            self.cancel_until(0);
             Ok(Certificate::SAT(result))
         } else if !status && self.ok == LFALSE {
-            Ok(Certificate::UNSAT(Vec::new()))
+            self.cancel_until(0);
+            let mut v = Vec::new();
+            for l in &self.conflicts {
+                v.push(l.int());
+            }
+            Ok(Certificate::UNSAT(v))
         } else {
+            self.cancel_until(0);
             Err(SolverException::InternalInconsistent)
         }
     }

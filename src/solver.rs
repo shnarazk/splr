@@ -73,7 +73,7 @@ impl VarIndexHeap {
     }
     /// renamed from inHeap
     fn contains(&self, v: VarIndex) -> bool {
-        self.idxs[v] != 0
+        self.idxs[v] != 0 && self.idxs[v] <= self.idxs[0]
     }
     fn percolate_up(&mut self, vec: &Vec<Var>, start: usize) -> () {
         let mut q = start;
@@ -143,9 +143,12 @@ impl VarIndexHeap {
         }
     }
     /// renamed from undoVO
-    pub fn check_insert(&mut self, vec: &Vec<Var>, v: VarIndex) -> () {
-        if !self.contains(v) {
-            self.insert(vec, v);
+    pub fn check_insert(&mut self, vec: &Vec<Var>, vi: VarIndex) -> () {
+        if !self.contains(vi) {
+            println!("check_insert (unassign) {}", vi);
+            println!(" before ins {:?}", self);
+            self.insert(vec, vi);
+            println!(" percolate  {:?}", self);
         }
     }
     /// renamed from insertHeap
@@ -367,12 +370,18 @@ impl Solver {
         self.enqueue(l, NULL_CLAUSE)
     }
     pub fn cancel_until(&mut self, lv: usize) -> () {
+        println!("> cancel_until {}", lv);
+        println!(
+            " trail     {:?}",
+            self.trail.iter().map(|l| l.int()).collect::<Vec<i32>>()
+        );
+        println!(" trail lim {:?}", self.trail_lim);
         let dl = self.decision_level();
         if lv < dl {
             let lim = self.trail_lim[lv];
             let ts = self.trail.len() - 1;
             let mut c = ts;
-            while lim < c {
+            loop {
                 let vi = self.trail[c].vi();
                 let vars = &mut self.vars;
                 {
@@ -382,18 +391,28 @@ impl Solver {
                     v.reason = NULL_CLAUSE;
                 }
                 self.var_order.check_insert(vars, vi);
-                c -= 1;
+                println!("lv = {}, lim = {}, c = {}", lv, lim, c);
+                if lim == c {
+                    break;
+                } else {
+                    c -= 1;
+                }
             }
             self.trail.truncate(lim);
             self.trail_lim.truncate(lv);
             self.q_head = lim;
         }
+        println!(
+            " trail     {:?}",
+            self.trail.iter().map(|l| l.int()).collect::<Vec<i32>>()
+        );
+        println!(" trail lim {:?}", self.trail_lim);
     }
     /// Heap operations
     pub fn select_var(&mut self) -> VarIndex {
         loop {
-            let n = self.var_order.len();
-            if n == 1 {
+            let n = self.var_order.idxs[0];
+            if n == 0 {
                 println!("> select_var returns 0");
                 return 0;
             }
