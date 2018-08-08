@@ -51,10 +51,17 @@ impl Solver {
     }
     // adapt delayed update of watches
     fn propagate(&mut self) -> Option<ClauseIndex> {
+        println!("> propagate");
         loop {
             if self.trail.len() <= self.q_head {
+                println!("  propagate done");
                 return None;
             }
+            println!(
+                " self.trail.len {}, self.q_head {}",
+                self.trail.len(),
+                self.q_head
+            );
             let p = self.trail[self.q_head];
             self.q_head += 1;
             self.stats[StatIndex::NumOfPropagation as usize] += 1;
@@ -62,6 +69,7 @@ impl Solver {
                 let wl = self.watches[p as usize].len();
                 let false_lit = p.negate();
                 'next_clause: for mut wi in 0..wl {
+                    println!(" next_clause: {}", wi);
                     let Watch {
                         other: blocker,
                         by: ci,
@@ -108,19 +116,31 @@ impl Solver {
                 }
                 // No conflict: so let's move them!
                 // use watches[0] to keep watches that don't move anywhere, temporally.
+                println!("  propagate");
                 self.watches[0].clear();
                 loop {
+                    println!("   remain: {}", self.watches[p as usize].len());
                     match self.watches[p as usize].pop() {
-                        Some(w) => self.watches[w.to as usize].push(w),
+                        Some(w) => {
+                            if w.to == p {
+                                self.watches[0].push(w)
+                            } else {
+                                self.watches[w.to as usize].push(w)
+                            }
+                        }
                         None => break,
                     }
                 }
                 loop {
                     match self.watches[0].pop() {
-                        Some(w) => self.watches[p as usize].push(w),
+                        Some(w) => {
+                            assert_ne!(w.to, 0);
+                            self.watches[p as usize].push(w);
+                        }
                         None => break,
                     }
                 }
+                println!("  propagate done");
             }
         }
     }
@@ -384,6 +404,7 @@ impl Solver {
         }
     }
     fn search(&mut self) -> bool {
+        println!("search");
         let delta = (self.num_vars as f64).sqrt();
         let root_lv = self.root_level;
         let mut to_restart = false;

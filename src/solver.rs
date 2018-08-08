@@ -64,6 +64,7 @@ impl VarIndexHeap {
             v1[i] = i;
             v2[i] = i;
         }
+        v2[0] = n;
         VarIndexHeap { heap: v1, idxs: v2 }
     }
     /// renamed form numElementsInHeap
@@ -248,13 +249,13 @@ impl Solver {
             learnt_size_cnt: 100,
             max_learnts: 2000.0,
             ok: LTRUE,
-            an_seen: vec![],
-            an_to_clear: vec![],
+            an_seen: vec![0; nv + 1],
+            an_to_clear: vec![0; nv + 1],
             an_stack: vec![],
             an_last_dl: vec![],
             an_learnt_lits: vec![],
-            stats: vec![0; 10],
-            lbd_seen: vec![0; nv],
+            stats: vec![0; StatIndex::EndOfStatIndex as usize],
+            lbd_seen: vec![0; nv + 1],
             lbd_key: 0,
             asg_f: Ema_::new(fe),
             asg_s: Ema::new(se),
@@ -392,12 +393,14 @@ impl Solver {
     pub fn select_var(&mut self) -> VarIndex {
         loop {
             let n = self.var_order.len();
-            if n == 0 {
+            if n == 1 {
+                println!("> select_var returns 0");
                 return 0;
             }
             let v = self.var_order.root(&self.vars);
             let x = self.vars[v].assign;
             if x == BOTTOM {
+                println!("> select_var returns {}", v);
                 return v;
             }
         }

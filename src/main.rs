@@ -73,11 +73,16 @@ fn build_solver(path: &str) -> (Solver, CNFDescription) {
     // println!(" - vars:  {:?}", s.vars);
     // println!(" - clauses: {:?}", s.clauses);
     // println!(" - learnts: {:?}", s.learnts);
-    for (i, w) in s.watches.iter().enumerate() {
-        if !w.is_empty() {
-            println!(" - watches[{:>3}] => {:?}", (i as Lit).int(), w);
-        }
-    }
+    println!(" - var_order: {:?}", s.var_order);
+    println!(
+        " - assign: {:?}",
+        s.vars.iter().map(|v| v.assign).collect::<Vec<Lbool>>()
+    );
+    //for (i, w) in s.watches.iter().enumerate() {
+    //    if !w.is_empty() {
+    //        println!(" - watches[{:>3}] => {:?}", (i as Lit).int(), w);
+    //    }
+    //}
     assert_eq!(s.vars.len() - 1, cnf.num_of_variables);
     assert_eq!(s.clauses.len() - 1, cnf.num_of_clauses);
     // println!(" - solver: {:?}", s);
