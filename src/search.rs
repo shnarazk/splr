@@ -79,15 +79,10 @@ impl Solver {
                         self.watches[p as usize][wi].to = p;
                         continue 'next_clause;
                     }
-                    let mut first = 0;
-                    let mut clen = 0;
-                    let mut c = 0 as *mut Clause;
-                    let mut cid = NULL_CLAUSE;
                     unsafe {
-                        c = self.mref_clause(ci) as *mut Clause;
-                        cid = (*c).index;
+                        let c = self.mref_clause(ci) as *mut Clause;
                         let l0 = (*c).lits[0];
-                        first = if false_lit == l0 {
+                        let first = if false_lit == l0 {
                             let l1 = (*c).lits[1];
                             (*c).lits[0] = l1;
                             (*c).lits[1] = l0;
@@ -95,14 +90,11 @@ impl Solver {
                         } else {
                             l0
                         };
-                        clen = (*c).lits.len();
-                    }
-                    if self.lit2asg(first) == LTRUE {
-                        self.watches[p as usize][wi].to = p;
-                        continue 'next_clause;
-                    }
-                    for k in 2..clen {
-                        unsafe {
+                        if self.lit2asg(first) == LTRUE {
+                            self.watches[p as usize][wi].to = p;
+                            continue 'next_clause;
+                        }
+                        for k in 2..(*c).lits.len() {
                             let lk = (*c).lits[k];
                             if self.lit2asg(lk) != LFALSE {
                                 (*c).lits[1] = lk;
@@ -110,9 +102,9 @@ impl Solver {
                                 break 'next_clause;
                             }
                         }
+                        // conflict!
+                        return Some((*c).index);
                     }
-                    // conflict!
-                    return Some(cid);
                 }
                 // No conflict: so let's move them!
                 // use watches[0] to keep watches that don't move anywhere, temporally.
@@ -137,14 +129,13 @@ impl Solver {
         self.an_learnt_lits.push(0);
         let dl = self.decision_level();
         let mut ci = confl;
-        let mut c = 0 as *mut Clause;
         let mut p = NULL_LIT;
         let mut ti = self.trail.len() - 1; // trail index
         let mut b = 0; // backtrack level
         let mut path_cnt = 0;
         loop {
             unsafe {
-                c = self.mref_clause(ci);
+                let c = self.mref_clause(ci) as *mut Clause;
                 let d = (*c).rank;
                 if 0 != d {
                     self.bump_ci(ci);
@@ -410,7 +401,6 @@ impl Solver {
                 }
             }
         }
-        false
     }
     pub fn solve(&mut self) -> Result<Certificate, SolverException> {
         // TODO remove tautologies

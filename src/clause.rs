@@ -14,10 +14,10 @@ const ACTIVITY_MAX: i64 = 2 ^ ACTIVITY_WIDTH - 1;
 
 /// Clause Index, not ID because it changes after database reduction.
 /// # Range
-/// * `< 0` for given clauses. So we need `isize` instead of `usize`
+/// * `< 0` for given clauses. So we need `i64` instead of `usize`
 /// * 0 for a null clause
 /// * '0 <' for learnt clauses
-pub type ClauseIndex = isize;
+pub type ClauseIndex = i64;
 
 pub const NULL_CLAUSE: ClauseIndex = 0;
 

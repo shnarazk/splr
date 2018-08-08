@@ -320,9 +320,9 @@ impl Solver {
         let w0 = c.lits[0];
         let w1 = c.lits[1];
         let ci = if learnt {
-            self.learnts.len() as isize
+            self.learnts.len() as i64
         } else {
-            0 - (self.clauses.len() as isize)
+            0 - (self.clauses.len() as i64)
         };
         c.index = ci;
         println!("Inject {}-nth clause.", ci);
