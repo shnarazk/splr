@@ -5,12 +5,14 @@
 use std::fmt;
 
 /// normal results returned by Solver
+#[derive(Debug)]
 pub enum Certificate {
     SAT(Vec<i32>),
     UNSAT(Vec<i32>), // FIXME: replace with DRAT
 }
 
 /// abnormal termination flags
+#[derive(Debug)]
 pub enum SolverException {
     StateUNSAT = 0,
     StateSAT,             // 1

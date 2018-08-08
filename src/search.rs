@@ -360,8 +360,7 @@ impl Solver {
     }
     fn rebuild_reason(&mut self) -> () {
         let perm = &self.learnt_permutation;
-        for i in 1..self.vars.len() + 1 {
-            let v = &mut self.vars[i];
+        for v in &mut self.vars[1..] {
             let ci = v.reason;
             if 0 < ci {
                 v.reason = perm[ci as usize];
@@ -372,6 +371,9 @@ impl Solver {
         // Firstly, clear everything.
         for i in 1..self.watches.len() + 1 {
             let w = &mut self.watches[i];
+            w.clear();
+        }
+        for w in &mut self.watches {
             w.clear();
         }
         for c in &self.clauses {

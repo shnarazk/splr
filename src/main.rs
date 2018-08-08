@@ -72,6 +72,7 @@ fn main() {
                 for s in iter {
                     if let Ok(val) = s.parse::<i32>() {
                         if val == 0 {
+                            println!("finish reading a cnf");
                             continue;
                         } else {
                             v.push(int2lit(val));
@@ -84,15 +85,15 @@ fn main() {
             Err(e) => panic!("{}", e),
         }
     }
-
     println!("# Solver");
     println!(" - vars:  {:?}", s.vars);
     println!(" - watches: {:?}", s.watches);
     match s.solve() {
-        Ok(_) => println!("OK"),
-        Err(_) => println!("Failed"),
+        Ok(s) => println!("OK {:?}", s),
+        Err(e) => println!("Failed {:?}", e),
     }
     println!("nclauses = {}", s.num_clauses());
-    s.learnts.pop();
+    println!("nlearnts = {}", s.num_learnts());
+    s.clauses.pop();
     println!("# End of program");
 }
