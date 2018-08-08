@@ -117,14 +117,13 @@ impl fmt::Display for Clause {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self.index {
             //            x if x < 0 => write!(f, format!("a given clause {}", self.lits.map(|l| l.int()))),
-            x if x < 0 => write!(
+            0 => write!(f, "null_clause"),
+            _ => write!(
                 f,
-                "a given clause[{}] {:?}",
+                "C{}{:?}",
                 self.index,
                 &self.lits.iter().map(|l| l.int()).collect::<Vec<i32>>()
             ),
-            x if 0 < x => write!(f, "a learnt clause"),
-            _ => write!(f, "null_clause"),
         }
     }
 }

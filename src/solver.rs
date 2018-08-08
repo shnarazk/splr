@@ -351,7 +351,7 @@ impl Solver {
             0 - (self.clauses.len() as i64)
         };
         c.index = ci;
-        // println!("Inject {}-nth clause {}.", ci, c);
+        println!("Inject {}-th clause {}.", ci, c);
         if learnt {
             self.learnts.push(c);
         } else {
@@ -419,11 +419,11 @@ impl Solver {
         // self.check_var_order("cancel_until 1");
         let dl = self.decision_level();
         if lv < dl {
-            let lim = self.trail_lim[lv];
-            let ts = self.trail.len() - 1;
+            let lim = self.trail_lim[lv] as isize;
+            let ts: isize = (self.trail.len() as isize) - 1;
             let mut c = ts;
-            loop {
-                let vi = self.trail[c].vi();
+            while lim <= c {
+                let vi = self.trail[c as usize].vi();
                 let vars = &mut self.vars;
                 {
                     let v = &mut vars[vi];
@@ -434,21 +434,17 @@ impl Solver {
                 // println!("rollback vi:{}  at {} in trail", vi, c);
                 self.var_order.check_insert(vars, vi);
                 // println!("lv = {}, lim = {}, c = {}", lv, lim, c);
-                if lim == c {
-                    break;
-                } else {
-                    c -= 1;
-                }
+                c -= 1;
             }
-            self.trail.truncate(lim + 1);
+            self.trail.truncate(lim as usize);
             self.trail_lim.truncate(lv);
-            self.q_head = lim + 1;
+            self.q_head = lim as usize + 1;
         }
-        // println!(
-        //     " trail     {:?}",
-        //     self.trail.iter().map(|l| l.int()).collect::<Vec<i32>>()
-        // );
-        // println!(" trail lim {:?}", self.trail_lim);
+        println!(
+            "c:trail     {:?}",
+            self.trail.iter().map(|l| l.int()).collect::<Vec<i32>>()
+        );
+        println!("c:trail lim {:?}", self.trail_lim);
         // println!(" var_order heap{:?}", self.var_order.heap);
         // println!(" var_order idxs{:?}", self.var_order.idxs);
         // println!("< cancel_until");
@@ -485,6 +481,24 @@ impl Solver {
         check_heap(self.var_order.heap.clone());
         check_idxs(self.var_order.idxs.clone());
         println!(" - {} pass", s);
+    }
+    pub fn dump(&self) -> () {
+        println!(
+            "- trail     {:?}",
+            self.trail.iter().map(|l| l.int()).collect::<Vec<i32>>()
+        );
+        println!("- trail lim {:?}", self.trail_lim);
+        for (i, m) in self.watches.iter().enumerate() {
+            if !m.is_empty() {
+                println!(
+                    " - watches[{:>3}] => {:?}",
+                    (i as Lit).int(),
+                    m.iter().map(|w| w.by).collect::<Vec<ClauseIndex>>()
+                );
+            }
+        }
+        println!("- var_order heap{:?}", self.var_order.heap);
+        println!("- var_order idxs{:?}", self.var_order.idxs);
     }
 }
 

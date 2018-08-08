@@ -27,13 +27,14 @@ impl Solver {
                 lvm = lv;
             }
         }
-        let l0 = c.lits[0];
         let l1 = c.lits[1];
         let lj = c.lits[j];
-        let lbd = self.lbd_of(&c.lits);
-        c.rank = lbd;
         c.lits[j] = l1;
         c.lits[1] = lj;
+        let l0 = c.lits[0];
+        let lbd = self.lbd_of(&c.lits);
+        println!("new_clause{:?}[0] = {}: lbd {}", c.lits, l0.int(), lbd);
+        c.rank = lbd;
         let ci = self.inject(true, c);
         self.bump_ci(ci);
         self.unsafe_enqueue(l0, ci);
@@ -114,6 +115,7 @@ impl Solver {
                                 continue 'next_clause;
                             }
                         }
+                        self.watches[p as usize][wi].other = first;
                         if fv == LFALSE {
                             // conflict
                             // println!("  found a conflict by {}", (*c));
@@ -170,6 +172,7 @@ impl Solver {
         }
     }
     fn analyze(&mut self, confl: ClauseIndex) -> (u32, Vec<Lit>) {
+        // println!("an_seen {:?}", self.an_seen);
         self.an_learnt_lits.clear();
         self.an_learnt_lits.push(0);
         let dl = self.decision_level();
@@ -186,12 +189,11 @@ impl Solver {
                 if 0 != d {
                     self.bump_ci(ci);
                 }
-                let sc = (*c).lits.len();
                 let nblevel = self.lbd_of(&(*c).lits);
                 if 2 < d && nblevel + 1 < d {
                     (*c).rank = nblevel;
                 }
-                for j in (if p == NULL_LIT { 0 } else { 1 })..sc {
+                for j in (if p == NULL_LIT { 0 } else { 1 })..(*c).lits.len() {
                     let q = (*c).lits[j];
                     let vi = q.vi();
                     let l = self.vars[vi].level;
@@ -215,11 +217,11 @@ impl Solver {
                 loop {
                     if self.an_seen[self.trail[ti].vi()] == 0 {
                         if ti == 0 {
+                            println!("an_seen {:?}", self.an_seen);
                             panic!("aaaa");
                         };
                         ti -= 1;
                     } else {
-                        ti -= 1;
                         break;
                     }
                 }
@@ -229,7 +231,7 @@ impl Solver {
                 ci = self.vars[next_vi].reason;
                 self.an_seen[next_vi] = 0;
                 if 1 < path_cnt {
-                    // ti -= 1;
+                    ti -= 1;
                     path_cnt -= 1;
                 } else {
                     self.an_learnt_lits[0] = p.negate();
@@ -255,7 +257,7 @@ impl Solver {
         let mut i = 1;
         let mut j = 1;
         loop {
-            println!("  analyze.loop for simplify {} {}", i, n);
+            // println!("  analyze.loop for simplify {} {}", i, n);
             if i == n {
                 self.an_learnt_lits.truncate(j + 1);
                 break;
@@ -286,13 +288,13 @@ impl Solver {
         for l in &self.an_to_clear {
             self.an_seen[l.vi()] = 0;
         }
-        println!(
-            "new learnt: {:?}",
-            self.an_learnt_lits
-                .iter()
-                .map(|l| l.int())
-                .collect::<Vec<i32>>()
-        );
+        // println!(
+        //     "new learnt: {:?}",
+        //     self.an_learnt_lits
+        //         .iter()
+        //         .map(|l| l.int())
+        //         .collect::<Vec<i32>>()
+        // );
         // println!("  analyze terminated");
         (level_to_return as u32, self.an_learnt_lits.clone())
     }
@@ -455,6 +457,7 @@ impl Solver {
         let root_lv = self.root_level;
         let mut to_restart = false;
         loop {
+            self.dump();
             let ret = self.propagate();
             let d = self.decision_level();
             println!("search called propagate and it returned {:?} at {}", ret, d);
@@ -554,6 +557,7 @@ impl Solver {
         }
     }
     fn unsafe_enqueue(&mut self, l: Lit, ci: ClauseIndex) -> () {
+        println!("unsafe_enqueue: {}", l.int());
         let vi = l.vi();
         let dl = self.decision_level();
         let v = &mut self.vars[vi];

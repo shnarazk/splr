@@ -85,6 +85,7 @@ impl Solver {
     }
     pub fn lbd_of(&mut self, v: &Vec<Lit>) -> usize {
         let k = 1 + self.lbd_key;
+        self.lbd_key = k;
         if 1000_000 < k {
             self.lbd_key = 0;
         }
@@ -92,8 +93,7 @@ impl Solver {
         let mut cnt = 0;
         for i in 0..n {
             let l = self.vars[v[i].vi()].level;
-            let x = self.lbd_seen[l];
-            if x != k && l != 0 {
+            if self.lbd_seen[l] != k && l != 0 {
                 self.lbd_seen[l] = k;
                 cnt += 1;
             }
