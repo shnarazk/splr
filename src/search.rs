@@ -299,7 +299,7 @@ impl Solver {
                     let vi = q.vi();
                     let lv = self.vars[vi].level as u64;
                     if self.an_seen[vi] != 1 && lv != 0 {
-                        if self.vars[vi].reason != NULL_CLAUSE && 0 != lv & min_level {
+                        if self.vars[vi].reason != NULL_CLAUSE && 0 != (1 << lv & 63) & min_level {
                             self.an_seen[vi] = 1;
                             self.an_stack.push(*q);
                             self.an_to_clear.push(*q);
