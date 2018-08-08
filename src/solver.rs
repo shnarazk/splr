@@ -327,7 +327,7 @@ impl Solver {
             0 - (self.clauses.len() as i64)
         };
         c.index = ci;
-        println!("Inject {}-nth clause.", ci);
+        println!("Inject {}-nth clause {}.", ci, c);
         if learnt {
             self.learnts.push(c);
         } else {

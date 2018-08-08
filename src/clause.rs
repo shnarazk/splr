@@ -49,7 +49,8 @@ impl Drop for Clause {
 }
 
 impl Clause {
-    pub fn new(v: Vec<Lit>) -> Clause {
+    pub fn new(mut v: Vec<Lit>) -> Clause {
+        v.sort();
         Clause {
             activity: 0.0,
             rank: v.len(),
@@ -114,7 +115,12 @@ impl Eq for Clause {}
 impl fmt::Display for Clause {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self.index {
-            x if x < 0 => write!(f, "a given clause"),
+            //            x if x < 0 => write!(f, format!("a given clause {}", self.lits.map(|l| l.int()))),
+            x if x < 0 => write!(
+                f,
+                "a given clause {:?}",
+                &self.lits.iter().map(|l| l.int()).collect::<Vec<i32>>()
+            ),
             x if 0 < x => write!(f, "a learnt clause"),
             _ => write!(f, "null_clause"),
         }

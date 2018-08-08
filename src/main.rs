@@ -11,7 +11,86 @@ use std::io::{BufReader, Read};
 use std::result::Result;
 use std::{fs, mem};
 
+fn build_solver(path: &str) -> (Solver, CNFDescription) {
+    let mut rs = BufReader::new(fs::File::open(path).unwrap());
+    let mut buf = String::new();
+    let mut nv: usize = 0;
+    let mut nc: usize = 0;
+    loop {
+        buf.clear();
+        match rs.read_line(&mut buf) {
+            Ok(0) => break,
+            Ok(_k) => {
+                let mut iter = buf.split_whitespace();
+                if iter.next() == Some("p") && iter.next() == Some("cnf") {
+                    if let Some(v) = iter.next().map(|s| s.parse::<usize>().ok().unwrap()) {
+                        if let Some(c) = iter.next().map(|s| s.parse::<usize>().ok().unwrap()) {
+                            nv = v;
+                            nc = c;
+                            break;
+                        }
+                    }
+                }
+                continue;
+            }
+            Err(e) => panic!("{}", e),
+        }
+    }
+    let cnf = CNFDescription {
+        num_of_variables: nv,
+        num_of_clauses: nc,
+        pathname: "".to_string(),
+    };
+    println!(" - desc: {}", cnf);
+    let mut s: Solver = Solver::new(DEFAULT_CONFIGURATION, &cnf);
+    loop {
+        buf.clear();
+        match rs.read_line(&mut buf) {
+            Ok(0) => break,
+            Ok(_k) => {
+                let mut iter = buf.split_whitespace();
+                let mut v: Vec<Lit> = Vec::new();
+                for s in iter {
+                    if let Ok(val) = s.parse::<i32>() {
+                        if val == 0 {
+                            if v.is_empty() {
+                                println!("finish reading a cnf");
+                            }
+                            continue;
+                        } else {
+                            v.push(int2lit(val));
+                        }
+                    }
+                }
+                s.inject(false, Clause::new(v));
+            }
+            Err(e) => panic!("{}", e),
+        }
+    }
+    if nc != s.num_clauses() {
+        panic!("The number of clauses is inconsistent with the header.")
+    }
+    println!(" - vars:  {:?}", s.vars);
+    println!(" - watches: {:?}", s.watches);
+    (s, cnf)
+}
+
 fn main() {
+    println!("Hello, world!");
+    println!("CARGO_MANIFEST_DIR = {}", env!("CARGO_MANIFEST_DIR"));
+    let target: String = env!("CARGO_MANIFEST_DIR").to_string() + "/uf8.cnf";
+    let (mut s, _cnf) = build_solver(&target);
+    match s.solve() {
+        Ok(s) => println!("OK {:?}", s),
+        Err(e) => println!("Failed {:?}", e),
+    }
+    println!("nclauses = {}", s.num_clauses());
+    println!("nlearnts = {}", s.num_learnts());
+    s.clauses.pop();
+    println!("# End of program");
+}
+
+fn main_() {
     println!("Hello, world!");
     println!("CARGO_MANIFEST_DIR = {}", env!("CARGO_MANIFEST_DIR"));
     let mut rs = BufReader::new(
