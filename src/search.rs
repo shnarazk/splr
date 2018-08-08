@@ -146,7 +146,7 @@ impl Solver {
                             if w.to == p {
                                 self.watches[0].push(w)
                             } else {
-                                println!("  move a watch for {} to {}", w.by, w.to.int());
+                                // println!("  move a watch for {} to {}", w.by, w.to.int());
                                 self.watches[w.to as usize].push(w)
                             }
                         }
@@ -156,7 +156,7 @@ impl Solver {
                 loop {
                     match self.watches[0].pop() {
                         Some(w) => {
-                            println!("  loop back by {} to {}", w.by, w.to.int());
+                            // println!("  loop back by {} to {}", w.by, w.to.int());
                             assert_eq!(w.to, p);
                             self.watches[p as usize].push(w);
                         }
@@ -427,7 +427,7 @@ impl Solver {
         }
     }
     fn search(&mut self) -> bool {
-        println!("search");
+        // println!("search");
         let delta = (self.num_vars as f64).sqrt();
         let root_lv = self.root_level;
         let mut to_restart = false;
@@ -474,15 +474,15 @@ impl Solver {
                         self.cancel_until(root_lv);
                         to_restart = false;
                     } else {
-                        println!(
-                            " trail     {:?}",
-                            self.trail.iter().map(|l| l.int()).collect::<Vec<i32>>()
-                        );
-                        println!(" trail lim {:?}", self.trail_lim);
-                        println!(" {:?}", self.var_order);
+                        // println!(
+                        //     " trail     {:?}",
+                        //     self.trail.iter().map(|l| l.int()).collect::<Vec<i32>>()
+                        // );
+                        // println!(" trail lim {:?}", self.trail_lim);
+                        // println!(" {:?}", self.var_order);
                         let vi = self.select_var();
                         assert_ne!(vi, 0);
-                        println!(" {:?}", self.var_order);
+                        // println!(" {:?}", self.var_order);
                         if vi != 0 {
                             let p = self.vars[vi].phase;
                             self.unsafe_assume(vi.lit(p));
