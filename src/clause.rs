@@ -38,7 +38,7 @@ pub struct Clause {
     pub tmp: i64,
 }
 
-#[cfg(debug_assertions)]
+#[cfg(drop)]
 impl Drop for Clause {
     fn drop(&mut self) {
         match self.index {

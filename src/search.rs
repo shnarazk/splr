@@ -11,7 +11,7 @@ impl Solver {
     /// renamed from newLearntClause
     pub fn new_learnt(&mut self, v: Vec<Lit>) -> usize {
         let k = v.len();
-        if k == 0 {
+        if k == 1 {
             self.unsafe_enqueue(v[0], NULL_CLAUSE);
             return 1;
         }
@@ -273,6 +273,13 @@ impl Solver {
         for l in &self.an_to_clear {
             self.an_seen[l.vi()] = 0;
         }
+        println!(
+            "new learnt: {:?}",
+            self.an_learnt_lits
+                .iter()
+                .map(|l| l.int())
+                .collect::<Vec<i32>>()
+        );
         (level_to_return as u32, self.an_learnt_lits.clone())
     }
     fn analyze_removable(&mut self, l: Lit, min_level: u64) -> bool {

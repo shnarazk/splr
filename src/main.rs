@@ -62,7 +62,9 @@ fn build_solver(path: &str) -> (Solver, CNFDescription) {
                         }
                     }
                 }
-                s.inject(false, Clause::new(v));
+                if v.len() != 0 {
+                    s.inject(false, Clause::new(v));
+                }
             }
             Err(e) => panic!("{}", e),
         }
@@ -92,7 +94,7 @@ fn build_solver(path: &str) -> (Solver, CNFDescription) {
 fn main() {
     println!("Hello, world!");
     // println!("CARGO_MANIFEST_DIR = {}", env!("CARGO_MANIFEST_DIR"));
-    let target: String = env!("CARGO_MANIFEST_DIR").to_string() + "/uf8.cnf";
+    let target: String = env!("CARGO_MANIFEST_DIR").to_string() + "/uf200-020.cnf";
     let (mut s, _cnf) = build_solver(&target);
     match s.solve() {
         Ok(s) => println!("OK {:?}", s),
