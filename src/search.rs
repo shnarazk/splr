@@ -98,7 +98,9 @@ impl Solver {
                         } else {
                             l0
                         };
-                        if self.lit2asg(first) == LTRUE {
+                        let fv = self.lit2asg(first);
+                        if fv == LTRUE {
+                            // update watch by the cached literal
                             self.watches[p as usize][wi].to = p;
                             continue 'next_clause;
                         }
@@ -106,12 +108,30 @@ impl Solver {
                             let lk = (*c).lits[k];
                             if self.lit2asg(lk) != LFALSE {
                                 (*c).lits[1] = lk;
+                                // update watch
                                 self.watches[p as usize][wi].to = lk.negate();
-                                break 'next_clause;
+                                continue 'next_clause;
                             }
                         }
-                        // conflict!
-                        return Some((*c).index);
+                        if fv == LFALSE {
+                            // conflict
+                            println!("  found a conflict by {}", (*c));
+                            println!(
+                                "  under the assigment {:?}",
+                                self.trail.iter().map(|l| l.int()).collect::<Vec<i32>>()
+                            );
+                            println!("  during propagating {}", p.int());
+                            return Some((*c).index); // TODO why don't you return `*c` itself?
+                        } else {
+                            // unit propagation
+                            println!("  unit propagation {} by {}", first.int(), (*c));
+                            println!(
+                                "  under the assigment {:?}",
+                                self.trail.iter().map(|l| l.int()).collect::<Vec<i32>>()
+                            );
+                            self.watches[p as usize][wi].to = p;
+                            self.unsafe_enqueue(first, ci);
+                        }
                     }
                 }
                 // No conflict: so let's move them!
@@ -122,9 +142,11 @@ impl Solver {
                     // println!("   remain: {}", self.watches[p as usize].len());
                     match self.watches[p as usize].pop() {
                         Some(w) => {
+                            assert_ne!(w.to, 0);
                             if w.to == p {
                                 self.watches[0].push(w)
                             } else {
+                                println!("  move a watch for {} to {}", w.by, w.to.int());
                                 self.watches[w.to as usize].push(w)
                             }
                         }
@@ -134,7 +156,8 @@ impl Solver {
                 loop {
                     match self.watches[0].pop() {
                         Some(w) => {
-                            assert_ne!(w.to, 0);
+                            println!("  loop back by {} to {}", w.by, w.to.int());
+                            assert_eq!(w.to, p);
                             self.watches[p as usize].push(w);
                         }
                         None => break,

@@ -119,7 +119,8 @@ impl fmt::Display for Clause {
             //            x if x < 0 => write!(f, format!("a given clause {}", self.lits.map(|l| l.int()))),
             x if x < 0 => write!(
                 f,
-                "a given clause {:?}",
+                "a given clause[{}] {:?}",
+                self.index,
                 &self.lits.iter().map(|l| l.int()).collect::<Vec<i32>>()
             ),
             x if 0 < x => write!(f, "a learnt clause"),
