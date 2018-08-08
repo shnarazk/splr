@@ -415,7 +415,7 @@ impl Solver {
                 Some(ci) => {
                     self.stats[StatIndex::NumOfBackjump as usize] += 1;
                     if d == self.root_level {
-                        // TODO: self.analyze_final(ci, false);
+                        self.analyze_final(ci, false);
                         return false;
                     } else {
                         let (backtrack_level, v) = self.analyze(ci);
@@ -458,7 +458,7 @@ impl Solver {
                         println!(" trail lim {:?}", self.trail_lim);
                         println!(" {:?}", self.var_order);
                         let vi = self.select_var();
-                        assert_ne(vi, 0);
+                        assert_ne!(vi, 0);
                         println!(" {:?}", self.var_order);
                         if vi != 0 {
                             let p = self.vars[vi].phase;
@@ -470,7 +470,6 @@ impl Solver {
         }
     }
     pub fn solve(&mut self) -> Result<Certificate, SolverException> {
-        // TODO remove tautologies
         // TODO deal with assumptons
         // s.root_level = 0;
         let status = self.search();
