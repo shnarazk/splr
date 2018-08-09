@@ -193,7 +193,7 @@ impl Solver {
         for mut l in &mut self.an_seen {
             *l = 0;
         }
-        self.dump("analyze");
+        // self.dump("analyze");
         self.an_learnt_lits.clear();
         self.an_learnt_lits.push(0);
         let dl = self.decision_level();
@@ -215,7 +215,7 @@ impl Solver {
                 if 2 < d && nblevel + 1 < d {
                     (*c).rank = nblevel;
                 }
-                println!("{}を対応", (*c));
+                // println!("{}を対応", (*c));
                 for j in (if p == NULL_LIT { 0 } else { 1 })..(*c).lits.len() {
                     let q = (*c).lits[j];
                     let vi = q.vi();
@@ -225,30 +225,30 @@ impl Solver {
                         self.bump_vi(vi);
                         self.an_seen[vi] = 1;
                         if dl <= l {
-                            println!(
-                                "{} はレベル{}なのでフラグを立てる",
-                                q.int(),
-                                l
-                            );
+                            // println!(
+                            //     "{} はレベル{}なのでフラグを立てる",
+                            //     q.int(),
+                            //     l
+                            // );
                             path_cnt += 1;
                             if 0 < self.vars[vi].reason {
                                 self.an_last_dl.push(q);
                             }
                         } else {
-                            println!("{} はレベル{}なので採用", q.int(), l);
+                            // println!("{} はレベル{}なので採用", q.int(), l);
                             self.an_learnt_lits.push(q);
                             b = max(b, l);
                         }
                     } else {
-                        println!("{} はもうフラグが立っているかグラウンドしている{}ので無視", q.int(), l);
+                        // println!("{} はもうフラグが立っているかグラウンドしている{}ので無視", q.int(), l);
                     }
                 }
                 // set the index of the next literal to ti
                 while self.an_seen[self.trail[ti].vi()] == 0 {
-                    println!(
-                        "{} はフラグが立ってないので飛ばす",
-                        self.trail[ti].int()
-                    );
+                    // println!(
+                    //     "{} はフラグが立ってないので飛ばす",
+                    //     self.trail[ti].int()
+                    // );
                     ti -= 1;
                 }
                 p = self.trail[ti];
@@ -256,7 +256,7 @@ impl Solver {
                 {
                     let next_vi: VarIndex = p.vi();
                     ci = self.vars[next_vi].reason;
-                    println!("{} にフラグが立っている。この時path数は{}, そのreason {}を探索", next_vi, path_cnt - 1, ci);
+                    // println!("{} にフラグが立っている。この時path数は{}, そのreason {}を探索", next_vi, path_cnt - 1, ci);
                     self.an_seen[next_vi] = 0;
                 }
                 path_cnt -= 1;
@@ -266,14 +266,14 @@ impl Solver {
             }
         }
         self.an_learnt_lits[0] = p.negate();
-        println!(
-            "最後に{}を採用して{:?}",
-            p.negate().int(),
-            self.an_learnt_lits
-                .iter()
-                .map(|l| l.int())
-                .collect::<Vec<i32>>()
-        );
+        // println!(
+        //     "最後に{}を採用して{:?}",
+        //     p.negate().int(),
+        //     self.an_learnt_lits
+        //         .iter()
+        //         .map(|l| l.int())
+        //         .collect::<Vec<i32>>()
+        // );
         let level_to_return = b;
         // simlpify phase
         let n = self.an_learnt_lits.len();
@@ -486,19 +486,12 @@ impl Solver {
         for w in &mut self.watches {
             w.clear();
         }
-        println!(
-            "len of watches {}, clauses {}, learnts {}",
-            self.watches.len(),
-            &self.clauses.len(),
-            &self.learnts.len()
-        );
         // assert_eq!(self.clauses[0].index, 0);
         for c in &self.clauses[1..] {
             if 2 <= c.lits.len() {
                 register_to_watches(&mut self.watches, c.index, c.lits[0], c.lits[1]);
             }
         }
-        println!("1988 {}", self.learnts[1988].activity);
         // assert_eq!(self.learnts[0].index, 0);
         for c in &self.learnts[1..] {
             if 2 <= c.lits.len() {
@@ -526,7 +519,7 @@ impl Solver {
                     } else {
                         // self.dump(" before analyze");
                         let (backtrack_level, v) = self.analyze(ci);
-                        self.dump("analyzed");
+                        // self.dump("analyzed");
                         // println!(
                         //     " conflict analyzed {:?}",
                         //     v.iter().map(|l| l.int()).collect::<Vec<i32>>()
@@ -618,11 +611,11 @@ impl Solver {
         }
     }
     fn unsafe_enqueue(&mut self, l: Lit, ci: ClauseIndex) -> () {
-        if ci == NULL_CLAUSE {
-            println!("unsafe_enqueue decide: {}", l.int());
-        } else {
-            println!("unsafe_enqueue imply: {} by {}", l.int(), ci);
-        }
+        // if ci == NULL_CLAUSE {
+        //     println!("unsafe_enqueue decide: {}", l.int());
+        // } else {
+        //     println!("unsafe_enqueue imply: {} by {}", l.int(), ci);
+        // }
         let dl = self.decision_level();
         let v = &mut self.vars[l.vi()];
         v.assign = l.lbool();

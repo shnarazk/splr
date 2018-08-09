@@ -352,10 +352,10 @@ impl Solver {
         };
         c.index = ci;
         if learnt {
-            println!("Inject {}-th clause {}.", ci, c);
+            // println!("Inject {}-th clause {}.", ci, c);
             self.learnts.push(c);
         } else {
-            println!("Inject {}-th clause {}.", ci, c);
+            // println!("Inject {}-th clause {}.", ci, c);
             self.clauses.push(c);
         }
         register_to_watches(&mut self.watches, ci, w0, w1);
@@ -416,7 +416,7 @@ impl Solver {
         let lim = self.trail_lim[lv];
         for l in &self.trail[lim..] {
             let vi = l.vi();
-            println!("cancell assign {}", vi);
+            // println!("cancell assign {}", vi);
             {
                 let v = &mut self.vars[vi];
                 v.phase = v.assign;
