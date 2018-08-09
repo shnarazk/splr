@@ -252,7 +252,6 @@ impl Solver {
                     ti -= 1;
                 }
                 p = self.trail[ti];
-                ti -= 1;
                 {
                     let next_vi: VarIndex = p.vi();
                     ci = self.vars[next_vi].reason;
@@ -263,6 +262,7 @@ impl Solver {
                 if path_cnt <= 0 {
                     break;
                 }
+                ti -= 1;
             }
         }
         self.an_learnt_lits[0] = p.negate();
