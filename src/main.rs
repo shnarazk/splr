@@ -100,7 +100,7 @@ fn main() {
     // let target: String = env!("CARGO_MANIFEST_DIR").to_string() + "/uf10.cnf";
     // let target: String = env!("CARGO_MANIFEST_DIR").to_string() + "/uf12.cnf";
     let args: Vec<String> = env::args().skip(1).collect();
-    if 1 < args.len() {
+    if 0 < args.len() {
         target = args[0].to_string();
     }
     println!("Hello, world! {}", target);
