@@ -37,9 +37,7 @@ impl Solver {
         if VAR_ACTIVITY_THRESHOLD < a {
             self.rescale_var_activity();
         }
-        // self.check_var_order("bump_vi 1");
         self.var_order.update(&self.vars, vi);
-        // self.check_var_order("bump_vi 2");
     }
     pub fn decay_var_activity(&mut self) -> () {
         self.var_inc = self.var_inc / VAR_ACTIVITY_THRESHOLD;
@@ -57,7 +55,7 @@ impl Solver {
         let mut result = false;
         for i in 0..v.len() {
             let li = v[i];
-            let sat = self.lit2asg(li);
+            let sat = self.assigned(li);
             if sat == LTRUE || li.negate() == l_ {
                 v.clear();
                 result = true;

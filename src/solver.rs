@@ -152,30 +152,22 @@ impl VarIndexHeap {
         }
     }
     /// renamed from undoVO
-    pub fn check_insert(&mut self, vec: &Vec<Var>, vi: VarIndex) -> () {
+    fn insert(&mut self, vec: &Vec<Var>, vi: VarIndex) -> () {
         // self.check_var_order("check insert 1");
         if !self.contains(vi) {
             // println!("check_insert (unassign) {}", vi);
             let i = self.idxs[vi];
             let n = self.idxs[0] + 1;
             let vn = self.heap[n];
-            // swap them
-            self.heap[i] = vn;
-            self.heap[n] = vi;
-            self.idxs[vi] = n;
-            self.idxs[vn] = i;
+            self.heap.swap(i, n);
+            self.idxs.swap(vi, vn);
             self.idxs[0] = n;
             self.percolate_up(vec, n);
-        // println!(" before ins {:?}", self);
-        // self.insert(vec, vi);
-        // println!(" percolate  {:?}", self);
-        } else {
-            // println!("check_insert (already inserted) {}", vi);
         }
         // self.check_var_order("check insert 2");
     }
     /// renamed from insertHeap
-    fn insert(&mut self, vec: &Vec<Var>, vi: VarIndex) -> () {
+    fn push(&mut self, vec: &Vec<Var>, vi: VarIndex) -> () {
         let n = self.idxs[0] + 1;
         self.heap[n] = vi;
         self.idxs[vi] = n;
@@ -192,23 +184,30 @@ impl VarIndexHeap {
         let vn = self.heap[n];
         // self.check_var_order(&format!("root 1 :[({}, {}) ({}, {})]", s, vs, n, vn));
         assert_ne!(vn, 0);
-        self.heap[s] = vn;
-        self.idxs[vn] = s;
         assert_ne!(vs, 0);
-        self.heap[n] = vs;
-        self.idxs[vs] = n;
-        // self.check_var_order("root 2");
+        self.heap.swap(n, s);
+        self.idxs.swap(vn, vs);
         self.idxs[0] -= 1;
         if 1 < self.idxs[0] {
             self.percolate_down(vec, 1);
         }
-        // self.check_var_order("root 3");
+        // self.check_var_order("root 2");
         vs
     }
-    pub fn check_var_order(&self, s: &str) -> () {
-        check_heap(self.heap.clone());
-        check_idxs(self.idxs.clone());
-        println!(" - {} pass", s);
+    pub fn check(&self, s: &str) -> () {
+        let h = &mut self.heap.clone()[1..];
+        let d = &mut self.idxs.clone()[1..];
+        h.sort();
+        d.sort();
+        for i in 0..h.len() {
+            if h[i] != i + 1 {
+                panic!("heap {} {} {:?}", i, h[i], h);
+            }
+            if d[i] != i + 1 {
+                panic!("idxs {} {} {:?}", i, d[i], d);
+            }
+        }
+        println!(" - pass var_order test at {}", s);
     }
 }
 
@@ -310,7 +309,7 @@ impl Solver {
         };
         s
     }
-    pub fn value_of(&self, l: Lit) -> Lbool {
+    pub fn assigned(&self, l: Lit) -> Lbool {
         let x = self.vars[l.vi()].assign;
         if x == BOTTOM {
             BOTTOM
@@ -336,7 +335,7 @@ impl Solver {
     }
     pub fn satisfies(&self, c: &Clause) -> bool {
         for l in &c.lits {
-            if self.value_of(*l) == LTRUE {
+            if self.assigned(*l) == LTRUE {
                 return true;
             }
         }
@@ -355,18 +354,14 @@ impl Solver {
             0 - (self.clauses.len() as i64)
         };
         c.index = ci;
+        // println!("Inject {}-th clause {}.", ci, c);
         if learnt {
-            // println!("Inject {}-th clause {}.", ci, c);
             self.learnts.push(c);
         } else {
-            // println!("Inject {}-th clause {}.", ci, c);
             self.clauses.push(c);
         }
         register_to_watches(&mut self.watches, ci, w0, w1);
         ci
-    }
-    fn propagate_by_assign(&mut self, _l: Lit, _c: &mut Clause) -> Lit {
-        0
     }
     pub fn num_assigns(&self) -> usize {
         self.trail.len()
@@ -379,17 +374,6 @@ impl Solver {
     }
     pub fn decision_level(&self) -> usize {
         self.trail_lim.len()
-    }
-    pub fn var2asg(&self, v: VarIndex) -> Lbool {
-        self.vars[v].assign
-    }
-    pub fn lit2asg(&self, l: Lit) -> Lbool {
-        let a = self.vars[l.vi()].assign;
-        if l.positive() {
-            a
-        } else {
-            negate_bool(a)
-        }
     }
     pub fn enqueue(&mut self, l: Lit, cid: ClauseIndex) -> bool {
         // println!("enqueue: {} by {}", l.int(), cid);
@@ -409,7 +393,7 @@ impl Solver {
             val == sig
         }
     }
-    pub fn assume(&mut self, l: Lit) -> bool {
+    fn assume(&mut self, l: Lit) -> bool {
         self.trail_lim.push(self.trail.len());
         self.enqueue(l, NULL_CLAUSE)
     }
@@ -429,7 +413,7 @@ impl Solver {
                 // println!("rollback vi:{}", vi);
             }
             assert_eq!(self.vars[vi].assign, BOTTOM);
-            self.var_order.check_insert(&self.vars, vi);
+            self.var_order.insert(&self.vars, vi);
         }
         self.trail.truncate(lim); // FIXME
         self.trail_lim.truncate(lv);
@@ -448,20 +432,8 @@ impl Solver {
             // self.check_var_order("select_var 2");
             let x = self.vars[vi].assign;
             if x == BOTTOM {
-                // self.dump(true, format!("> select_var {} remaining {}", vi, self.var_order.idxs[0]))
-                // assert_eq!(
-                //     self.num_vars <= self.trail.len() + self.var_order.idxs[0] + 1,
-                //     true
-                // );
                 return vi;
             }
-        }
-    }
-    pub fn check_var_order(&self, s: &str) -> () {
-        check_heap(self.var_order.heap.clone());
-        check_idxs(self.var_order.idxs.clone());
-        if s != "" {
-            println!(" - pass var_order test at {}", s);
         }
     }
     pub fn dump(&self, str: &str) -> () {
@@ -504,27 +476,7 @@ impl Solver {
         if false {
             println!("# - heap {:?}", self.var_order.heap);
             println!("# - idxs {:?}", self.var_order.idxs);
-            self.check_var_order("");
-        }
-    }
-}
-
-fn check_heap(mut v: Vec<usize>) -> () {
-    v = v[1..].to_vec();
-    v.sort();
-    for i in 0..v.len() {
-        if v[i] != i + 1 {
-            panic!("heap {} {} {:?}", i, v[i], v);
-        }
-    }
-}
-
-fn check_idxs(mut v: Vec<usize>) -> () {
-    v = v[1..].to_vec();
-    v.sort();
-    for i in 0..v.len() {
-        if v[i] != i + 1 {
-            panic!("idxs {} {} {:?}", i, v[i - 1], v);
+            self.var_order.check("");
         }
     }
 }

@@ -41,7 +41,7 @@ impl Solver {
     fn removable(&self, ci: ClauseIndex) -> bool {
         let c = self.iref_clause(ci);
         for l in &c.lits {
-            if self.lit2asg(*l) == LTRUE {
+            if self.assigned(*l) == LTRUE {
                 return true;
             }
         }
@@ -104,7 +104,7 @@ impl Solver {
                         }
                         let first = (*c).lits[0];
                         assert_eq!(false_lit, (*c).lits[1]);
-                        let fv = self.lit2asg(first);
+                        let fv = self.assigned(first);
                         if fv == LTRUE {
                             // update watch by the cached literal; this is a satisfied, unit clause.
                             self.watches[p as usize][wi].to = p;
@@ -113,7 +113,7 @@ impl Solver {
                         self.watches[p as usize][wi].other = first;
                         for k in 2..(*c).lits.len() {
                             let lk = (*c).lits[k];
-                            if self.lit2asg(lk) != LFALSE {
+                            if self.assigned(lk) != LFALSE {
                                 (*c).tmp = k as i64;
                                 // update watch
                                 self.watches[p as usize][wi].to = lk.negate();
