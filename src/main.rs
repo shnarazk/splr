@@ -193,8 +193,5 @@ fn main_() {
         Ok(s) => println!("OK {:?}", s),
         Err(e) => println!("Failed {:?}", e),
     }
-    println!("nclauses = {}", s.num_clauses());
-    println!("nlearnts = {}", s.num_learnts());
-    s.clauses.pop();
     println!("# End of program");
 }
