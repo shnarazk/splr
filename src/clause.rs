@@ -50,7 +50,7 @@ impl Drop for Clause {
 }
 
 impl Clause {
-    pub fn new(mut v: Vec<Lit>) -> Clause {
+    pub fn new(v: Vec<Lit>) -> Clause {
         Clause {
             activity: 0.0,
             rank: v.len(),
@@ -80,9 +80,9 @@ impl Clause {
     /// returns 1 if this is good enough.
     pub fn set_sort_key(&mut self, at: f64) -> usize {
         if self.index == 0 {
-            self.tmp = -1;
-        }
-        if self.lits.len() == 2 {
+            self.tmp = -2;
+            1
+        } else if self.lits.len() == 2 {
             self.tmp = 0;
             1
         } else {

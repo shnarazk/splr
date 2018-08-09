@@ -411,10 +411,11 @@ impl Solver {
         let keep_c = self.sort_clauses();
         let keep_l = self.sort_learnts();
         self.rebuild_reason();
-        self.rebuild_watches();
         // self.check_clause_index_consistency();
         self.clauses.truncate(keep_c);
         self.learnts.truncate(keep_l);
+        self.rebuild_watches();
+        println!("< rebuild_database done");
     }
     /// Note: this function changes self.clause_permutation.
     fn sort_clauses(&mut self) -> usize {
@@ -455,21 +456,28 @@ impl Solver {
                 if 0 < ci {
                     let val = self.learnts[ci as usize].tmp;
                     if 0 < val {
-                        self.learnts[ci as usize].tmp = 0;
+                        self.learnts[ci as usize].tmp = -1;
                         requires += 1;
                     }
                 }
             }
         }
+        let n = max(requires, nc / 2);
         self.learnts.sort_by_key(|c| c.tmp);
+        // println!("sorted {:?}", self.learnts);
         for i in 1..nc {
             let old = self.learnts[i].index as usize;
-            self.learnt_permutation[old] = i as ClauseIndex;
+            self.learnt_permutation[old] = i as i64;
+            self.learnts[i].index = i as ClauseIndex;
+            self.learnts[i].tmp = 0;
         }
+        self.learnt_permutation[0] = 0;
+        // println!("done");
         max(requires, nc / 2)
     }
     fn rebuild_reason(&mut self) -> () {
         let perm = &self.learnt_permutation;
+        // println!("perm {:?}", perm);
         for v in &mut self.vars[1..] {
             let ci = v.reason;
             if 0 < ci {
@@ -495,9 +503,11 @@ impl Solver {
         // assert_eq!(self.learnts[0].index, 0);
         for c in &self.learnts[1..] {
             if 2 <= c.lits.len() {
+                // println!("register {}", c.index);
                 register_to_watches(&mut self.watches, c.index, c.lits[0], c.lits[1]);
             }
         }
+        // self.dump(&format!("rebuild {}", self.learnts.len()));
     }
     fn search(&mut self) -> bool {
         // println!("search");
@@ -550,7 +560,7 @@ impl Solver {
                     // if d == 0 { simplify_db() };
                     let na = self.num_assigns();
                     if self.max_learnts as usize + na < self.learnts.len() {
-                        // self.reduce_database();
+                        self.reduce_database();
                     }
                     if na == self.num_vars {
                         println!("  SOLVED");
