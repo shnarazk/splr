@@ -285,7 +285,7 @@ impl Solver {
         for i in 1..n {
             let l = self.an_learnt_lits[i];
             self.an_to_clear.push(l);
-            levels |= 63 & (self.vars[l.vi()].level as u64);
+            levels |= 63 & ((self.vars[l.vi()].level % 60) as u64);
         }
         // println!("  analyze.loop 4 n = {}", n);
         let mut i = 1;
@@ -348,9 +348,9 @@ impl Solver {
             unsafe {
                 for q in &(*c).lits {
                     let vi = q.vi();
-                    let lv = self.vars[vi].level as u64;
+                    let lv = self.vars[vi].level % 60;
                     if self.an_seen[vi] != 1 && lv != 0 {
-                        if self.vars[vi].reason != NULL_CLAUSE && 0 != (1 << lv & 63) & min_level {
+                        if self.vars[vi].reason != NULL_CLAUSE && 0u64 != (1u64 << lv) & min_level as u64 {
                             self.an_seen[vi] = 1;
                             self.an_stack.push(*q);
                             self.an_to_clear.push(*q);
