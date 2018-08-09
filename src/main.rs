@@ -93,6 +93,12 @@ fn build_solver(path: &str) -> (Solver, CNFDescription) {
 
 fn main() {
     println!("Hello, world!");
+    {
+        let mut v = vec![0, 1, 2, 3, 4, 5, 6];
+        println!("v {:?}", v);
+        v.truncate(2);
+        println!("v {:?}", v);
+    }
     // println!("CARGO_MANIFEST_DIR = {}", env!("CARGO_MANIFEST_DIR"));
     let target: String = env!("CARGO_MANIFEST_DIR").to_string() + "/uf100-011.cnf";
     // let target: String = env!("CARGO_MANIFEST_DIR").to_string() + "/uf200-020.cnf";

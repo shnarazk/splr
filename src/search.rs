@@ -105,6 +105,7 @@ impl Solver {
                             self.watches[p as usize][wi].to = p;
                             continue 'next_clause;
                         }
+                        self.watches[p as usize][wi].other = first;
                         for k in 2..(*c).lits.len() {
                             let lk = (*c).lits[k];
                             if self.lit2asg(lk) != LFALSE {
@@ -115,24 +116,13 @@ impl Solver {
                                 continue 'next_clause;
                             }
                         }
-                        self.watches[p as usize][wi].other = first;
                         if fv == LFALSE {
                             // conflict
                             // println!("  found a conflict by {}", (*c));
-                            // println!(
-                            //     "  under the assigment {:?}",
-                            //     self.trail.iter().map(|l| l.int()).collect::<Vec<i32>>()
-                            // );
-                            // println!("  during propagating {}", p.int());
-                            // println!("< propagate");
                             return Some((*c).index); // TODO why don't you return `*c` itself?
                         } else {
                             // unit propagation
                             // println!("  unit propagation {} by {}", first.int(), (*c));
-                            // println!(
-                            //     "  under the assigment {:?}",
-                            //     self.trail.iter().map(|l| l.int()).collect::<Vec<i32>>()
-                            // );
                             self.watches[p as usize][wi].to = p;
                             self.unsafe_enqueue(first, ci);
                         }
@@ -448,7 +438,7 @@ impl Solver {
         let root_lv = self.root_level;
         let mut to_restart = false;
         loop {
-            self.dump();
+            self.dump("search");
             let ret = self.propagate();
             let d = self.decision_level();
             println!("search called propagate and it returned {:?} at {}", ret, d);
@@ -494,6 +484,7 @@ impl Solver {
                         self.reduce_database();
                     }
                     if na == self.num_vars {
+                        println!("  SOLVED");
                         return true;
                     } else if to_restart {
                         self.cancel_until(root_lv);
@@ -548,7 +539,11 @@ impl Solver {
         }
     }
     fn unsafe_enqueue(&mut self, l: Lit, ci: ClauseIndex) -> () {
-        println!("unsafe_enqueue: {}", l.int());
+        if ci == NULL_CLAUSE {
+            println!("unsafe_enqueue decide: {}", l.int());
+        } else {
+            println!("unsafe_enqueue imply: {}", l.int());
+        }
         let vi = l.vi();
         let dl = self.decision_level();
         let v = &mut self.vars[vi];

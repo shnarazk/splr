@@ -408,47 +408,24 @@ impl Solver {
         self.enqueue(l, NULL_CLAUSE)
     }
     pub fn cancel_until(&mut self, lv: usize) -> () {
-        // println!("> cancel_until {}", lv);
-        // println!(
-        //     " trail     {:?}",
-        //     self.trail.iter().map(|l| l.int()).collect::<Vec<i32>>()
-        // );
-        // println!(" trail lim {:?}", self.trail_lim);
-        // println!(" var_order heap{:?}", self.var_order.heap);
-        // println!(" var_order idxs{:?}", self.var_order.idxs);
-        // self.check_var_order("cancel_until 1");
-        let dl = self.decision_level();
-        if lv < dl {
-            let lim = self.trail_lim[lv] as isize;
-            let ts: isize = (self.trail.len() as isize) - 1;
-            let mut c = ts;
-            while lim <= c {
-                let vi = self.trail[c as usize].vi();
-                let vars = &mut self.vars;
-                {
-                    let v = &mut vars[vi];
-                    v.phase = v.assign;
-                    v.assign = BOTTOM;
-                    v.reason = NULL_CLAUSE;
-                }
-                // println!("rollback vi:{}  at {} in trail", vi, c);
-                self.var_order.check_insert(vars, vi);
-                // println!("lv = {}, lim = {}, c = {}", lv, lim, c);
-                c -= 1;
-            }
-            self.trail.truncate(lim as usize);
-            self.trail_lim.truncate(lv);
-            self.q_head = lim as usize + 1;
+        if self.decision_level() <= lv {
+            return;
         }
-        println!(
-            "c:trail     {:?}",
-            self.trail.iter().map(|l| l.int()).collect::<Vec<i32>>()
-        );
-        println!("c:trail lim {:?}", self.trail_lim);
-        // println!(" var_order heap{:?}", self.var_order.heap);
-        // println!(" var_order idxs{:?}", self.var_order.idxs);
-        // println!("< cancel_until");
-        // self.check_var_order("cancel_until 2");
+        let lim = self.trail_lim[lv];
+        for l in &self.trail[lim..] {
+            let vi = l.vi();
+            {
+                let v = &mut self.vars[vi];
+                v.phase = v.assign;
+                v.assign = BOTTOM;
+                v.reason = NULL_CLAUSE;
+                // println!("rollback vi:{}", vi);
+            }
+        }
+        self.trail.truncate(lim); // FIXME
+        self.trail_lim.truncate(lv);
+        self.q_head = lim;
+        self.dump("cancel_until");
     }
     /// Heap operations; renamed from selectVO
     pub fn select_var(&mut self) -> VarIndex {
@@ -462,13 +439,7 @@ impl Solver {
             // self.check_var_order("select_var 2");
             let x = self.vars[vi].assign;
             if x == BOTTOM {
-                // println!(
-                //     "> select_var returns {} at {} remaining {}, assigned {}",
-                //     vi,
-                //     self.decision_level(),
-                //     self.var_order.idxs[0],
-                //     self.trail.len()
-                // );
+                // self.dump(true, format!("> select_var {} remaining {}", vi, self.var_order.idxs[0]))
                 // assert_eq!(
                 //     self.num_vars <= self.trail.len() + self.var_order.idxs[0] + 1,
                 //     true
@@ -480,25 +451,41 @@ impl Solver {
     pub fn check_var_order(&self, s: &str) -> () {
         check_heap(self.var_order.heap.clone());
         check_idxs(self.var_order.idxs.clone());
-        println!(" - {} pass", s);
+        if s != "" {
+            println!(" - pass var_order test at {}", s);
+        }
     }
-    pub fn dump(&self) -> () {
-        println!(
-            "- trail     {:?}",
-            self.trail.iter().map(|l| l.int()).collect::<Vec<i32>>()
-        );
-        println!("- trail lim {:?}", self.trail_lim);
-        for (i, m) in self.watches.iter().enumerate() {
-            if !m.is_empty() {
-                println!(
-                    " - watches[{:>3}] => {:?}",
-                    (i as Lit).int(),
-                    m.iter().map(|w| w.by).collect::<Vec<ClauseIndex>>()
+    pub fn dump(&self, str: &str) -> () {
+        println!("{} at {}", str, self.decision_level());
+        let v = self.trail.iter().map(|l| l.int()).collect::<Vec<i32>>();
+        let len = self.trail_lim.len();
+        if 0 < len {
+            print!("- trail[{}]  [", self.trail.len());
+            for i in 0..(len - 1) {
+                print!(
+                    "{}{:?}, ",
+                    i + 1,
+                    &v[self.trail_lim[i]..self.trail_lim[i + 1]]
                 );
             }
+            println!("{}{:?}]", len, &v[self.trail_lim[len - 1]..]);
+        } else {
+            println!("- trail[  0]  [0{:?}]", &v);
         }
-        println!("- var_order heap{:?}", self.var_order.heap);
-        println!("- var_order idxs{:?}", self.var_order.idxs);
+        println!("- trail_lim  {:?}", self.trail_lim);
+        // for (i, m) in self.watches.iter().enumerate() {
+        //     if !m.is_empty() {
+        //         println!(
+        //             " - watches[{:>3}] => {:?}",
+        //             (i as Lit).int(),
+        //             m.iter().map(|w| w.by).collect::<Vec<ClauseIndex>>()
+        //         );
+        //     }
+        // }
+        // println!(" trail lim {:?}", self.trail_lim);
+        // println!("- var_order heap{:?}", self.var_order.heap);
+        // println!("- var_order idxs{:?}", self.var_order.idxs);
+        // self.check_var_order("");
     }
 }
 
