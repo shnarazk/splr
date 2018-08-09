@@ -51,7 +51,6 @@ impl Drop for Clause {
 
 impl Clause {
     pub fn new(mut v: Vec<Lit>) -> Clause {
-        v.sort();
         Clause {
             activity: 0.0,
             rank: v.len(),
@@ -162,10 +161,12 @@ impl Var {
         }
     }
     pub fn new_vars(n: usize) -> Vec<Var> {
-        let mut v = Vec::new();
+        let mut vec = Vec::new();
         for i in 0..n + 1 {
-            v.push(Var::new(i));
+            let mut v = Var::new(i);
+            v.activity = (n - i) as f64;
+            vec.push(v);
         }
-        v
+        vec
     }
 }

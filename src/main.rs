@@ -63,6 +63,7 @@ fn build_solver(path: &str) -> (Solver, CNFDescription) {
                     }
                 }
                 if v.len() != 0 {
+                    v.sort();
                     s.inject(false, Clause::new(v));
                 }
             }

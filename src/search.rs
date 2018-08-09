@@ -33,7 +33,6 @@ impl Solver {
         c.lits[1] = lj;
         let l0 = c.lits[0];
         let lbd = self.lbd_of(&c.lits);
-        println!("new_clause{:?}[0] = {}: lbd {}", c.lits, l0.int(), lbd);
         c.rank = lbd;
         let ci = self.inject(true, c);
         self.bump_ci(ci);
@@ -82,7 +81,8 @@ impl Solver {
                     let bv = if blocker == 0 {
                         LFALSE
                     } else {
-                        self.lit2asg(blocker)
+                        // self.lit2asg(blocker) FIXME for debug
+                        LFALSE
                     };
                     if bv == LTRUE {
                         self.watches[p as usize][wi].to = p;
@@ -90,18 +90,28 @@ impl Solver {
                     }
                     unsafe {
                         let c = self.mref_clause(ci) as *mut Clause;
+                        assert_eq!(ci, (*c).index);
+                        if !(false_lit == (*c).lits[0] || false_lit == (*c).lits[1]) {
+                            panic!(
+                                "Watch literals error by {} ({}, {}) for propagate({})",
+                                (*c),
+                                (*c).lits[0].int(),
+                                (*c).lits[1].int(),
+                                p.int()
+                            );
+                        }
+                        // Make sure tha false literal is lits[1]; the last literal in unit clause is lits[0].
                         let l0 = (*c).lits[0];
-                        let first = if false_lit == l0 {
+                        if l0 == false_lit {
                             let l1 = (*c).lits[1];
                             (*c).lits[0] = l1;
                             (*c).lits[1] = l0;
-                            l1
-                        } else {
-                            l0
-                        };
+                        }
+                        let first = (*c).lits[0];
+                        assert_eq!(false_lit, (*c).lits[1]);
                         let fv = self.lit2asg(first);
                         if fv == LTRUE {
-                            // update watch by the cached literal
+                            // update watch by the cached literal; this is a satisfied, unit clause.
                             self.watches[p as usize][wi].to = p;
                             continue 'next_clause;
                         }
@@ -109,8 +119,16 @@ impl Solver {
                         for k in 2..(*c).lits.len() {
                             let lk = (*c).lits[k];
                             if self.lit2asg(lk) != LFALSE {
-                                (*c).lits[1] = lk;
-                                (*c).lits[k] = false_lit;
+                                (*c).tmp = k as i64;
+                                // (*c).lits[1] = lk;
+                                // (*c).lits[k] = false_lit;
+                                println!(
+                                    " -- swap literals {} and {} of {} for propagation of {}",
+                                    lk.int(),
+                                    false_lit.int(),
+                                    (*c),
+                                    p.int()
+                                );
                                 // update watch
                                 self.watches[p as usize][wi].to = lk.negate();
                                 continue 'next_clause;
@@ -118,12 +136,14 @@ impl Solver {
                         }
                         if fv == LFALSE {
                             // conflict
-                            // println!("  found a conflict by {}", (*c));
+                            // println!("  found a conflict variable {} by {}", first.vi(), (*c));
                             return Some((*c).index); // TODO why don't you return `*c` itself?
                         } else {
                             // unit propagation
                             // println!("  unit propagation {} by {}", first.int(), (*c));
+                            (*c).tmp = 1;
                             self.watches[p as usize][wi].to = p;
+                            assert_eq!(first, (*c).lits[0]);
                             self.unsafe_enqueue(first, ci);
                         }
                     }
@@ -140,13 +160,21 @@ impl Solver {
                             if w.to == p {
                                 self.watches[0].push(w)
                             } else {
-                                // println!("  move a watch for {} to {}", w.by, w.to.int());
-                                self.watches[w.to as usize].push(w)
+                                unsafe {
+                                    let c = self.mref_clause(w.by) as *mut Clause;
+                                    let k = (*c).tmp as usize;
+                                    println!("moving {} with {} to {}", (*c), k, w.to.int());
+                                    (*c).lits[1] = (*c).lits[k];
+                                    (*c).lits[k] = false_lit;
+                                }
+                                println!("move {} to {}", w.by, w.to.int());
+                                self.watches[w.to as usize].push(w);
                             }
                         }
                         None => break,
                     }
                 }
+                assert_eq!(self.watches[p as usize].is_empty(), true);
                 loop {
                     match self.watches[0].pop() {
                         Some(w) => {
@@ -162,7 +190,10 @@ impl Solver {
         }
     }
     fn analyze(&mut self, confl: ClauseIndex) -> (u32, Vec<Lit>) {
-        // println!("an_seen {:?}", self.an_seen);
+        for mut l in &mut self.an_seen {
+            *l = 0;
+        }
+        self.dump("analyze");
         self.an_learnt_lits.clear();
         self.an_learnt_lits.push(0);
         let dl = self.decision_level();
@@ -173,6 +204,7 @@ impl Solver {
         let mut path_cnt = 0;
         loop {
             unsafe {
+                assert_ne!(ci, NULL_CLAUSE);
                 let c = self.mref_clause(ci) as *mut Clause;
                 // println!("  analyze.loop {}", (*c));
                 let d = (*c).rank;
@@ -183,37 +215,50 @@ impl Solver {
                 if 2 < d && nblevel + 1 < d {
                     (*c).rank = nblevel;
                 }
+                println!("{}を対応", (*c));
                 for j in (if p == NULL_LIT { 0 } else { 1 })..(*c).lits.len() {
                     let q = (*c).lits[j];
                     let vi = q.vi();
                     let l = self.vars[vi].level;
+                    assert_ne!(self.vars[vi].assign, BOTTOM);
                     if self.an_seen[vi] == 0 && 0 < l {
                         self.bump_vi(vi);
                         self.an_seen[vi] = 1;
                         if dl <= l {
-                            let ri: ClauseIndex = self.vars[vi].reason;
-                            if ri != NULL_CLAUSE && self.iref_clause(ri).rank != 0 {
+                            println!(
+                                "{} はレベル{}なのでフラグを立てる",
+                                q.int(),
+                                l
+                            );
+                            path_cnt += 1;
+                            if 0 < self.vars[vi].reason {
                                 self.an_last_dl.push(q);
                             }
-                            path_cnt += 1;
                         } else {
+                            println!("{} はレベル{}なので採用", q.int(), l);
                             self.an_learnt_lits.push(q);
                             b = max(b, l);
                         }
+                    } else {
+                        println!("{} はもうフラグが立っているかグラウンドしている{}ので無視", q.int(), l);
                     }
                 }
                 // set the index of the next literal to ti
-                loop {
-                    if self.an_seen[self.trail[ti].vi()] == 0 {
-                        break;
-                    }
+                while self.an_seen[self.trail[ti].vi()] == 0 {
+                    println!(
+                        "{} はフラグが立ってないので飛ばす",
+                        self.trail[ti].int()
+                    );
                     ti -= 1;
                 }
+                p = self.trail[ti];
                 ti -= 1;
-                p = self.trail[ti + 1];
-                let next_vi: VarIndex = p.vi();
-                ci = self.vars[next_vi].reason;
-                self.an_seen[next_vi] = 0;
+                {
+                    let next_vi: VarIndex = p.vi();
+                    ci = self.vars[next_vi].reason;
+                    println!("{} にフラグが立っている。この時path数は{}, そのreason {}を探索", next_vi, path_cnt - 1, ci);
+                    self.an_seen[next_vi] = 0;
+                }
                 path_cnt -= 1;
                 if path_cnt <= 0 {
                     break;
@@ -221,6 +266,14 @@ impl Solver {
             }
         }
         self.an_learnt_lits[0] = p.negate();
+        println!(
+            "最後に{}を採用して{:?}",
+            p.negate().int(),
+            self.an_learnt_lits
+                .iter()
+                .map(|l| l.int())
+                .collect::<Vec<i32>>()
+        );
         let level_to_return = b;
         // simlpify phase
         let n = self.an_learnt_lits.len();
@@ -253,6 +306,7 @@ impl Solver {
             }
             i += 1;
         }
+        self.an_learnt_lits.truncate(j);
         // glucose heuristics
         // println!("  analyze.loop 5");
         let r = self.an_learnt_lits.len();
@@ -353,6 +407,7 @@ impl Solver {
         }
     }
     pub fn reduce_database(&mut self) -> () {
+        panic!("not implemented");
         let keep_c = self.sort_clauses();
         let keep_l = self.sort_learnts();
         self.rebuild_reason();
@@ -438,10 +493,10 @@ impl Solver {
         let root_lv = self.root_level;
         let mut to_restart = false;
         loop {
-            self.dump("search");
+            // self.dump("search");
             let ret = self.propagate();
             let d = self.decision_level();
-            println!("search called propagate and it returned {:?} at {}", ret, d);
+            // println!("search called propagate and it returned {:?} at {}", ret, d);
             match ret {
                 Some(ci) => {
                     self.stats[StatIndex::NumOfBackjump as usize] += 1;
@@ -450,13 +505,15 @@ impl Solver {
                         self.analyze_final(ci, false);
                         return false;
                     } else {
+                        // self.dump(" before analyze");
                         let (backtrack_level, v) = self.analyze(ci);
-                        println!(
-                            " conflict analyzed {:?}",
-                            v.iter().map(|l| l.int()).collect::<Vec<i32>>()
-                        );
+                        self.dump("analyzed");
+                        // println!(
+                        //     " conflict analyzed {:?}",
+                        //     v.iter().map(|l| l.int()).collect::<Vec<i32>>()
+                        // );
                         self.cancel_until(max(backtrack_level as usize, root_lv));
-                        println!(" backtracked to {}", backtrack_level);
+                        // println!(" backtracked to {}", backtrack_level);
                         let lbd = self.new_learnt(v);
                         let k = self.an_learnt_lits.len();
                         if k == 1 {
@@ -499,6 +556,9 @@ impl Solver {
                         // println!("  num_assigns = {}", na);
                         let vi = self.select_var();
                         // println!(" search loop find a new decision var");
+                        if vi == 0 {
+                            self.dump("no more decision canditate");
+                        }
                         assert_ne!(vi, 0);
                         // println!(" {:?}", self.var_order);
                         if vi != 0 {
@@ -542,11 +602,10 @@ impl Solver {
         if ci == NULL_CLAUSE {
             println!("unsafe_enqueue decide: {}", l.int());
         } else {
-            println!("unsafe_enqueue imply: {}", l.int());
+            println!("unsafe_enqueue imply: {} by {}", l.int(), ci);
         }
-        let vi = l.vi();
         let dl = self.decision_level();
-        let v = &mut self.vars[vi];
+        let v = &mut self.vars[l.vi()];
         v.assign = l.lbool();
         v.level = dl;
         v.reason = ci;
