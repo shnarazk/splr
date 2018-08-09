@@ -9,7 +9,7 @@ use types::*;
 
 const RANK_WIDTH: i64 = 11;
 const ACTIVITY_WIDTH: i64 = 51;
-const RANK_MAX: i64 = 2000;
+const RANK_MAX: i64 = 1000;
 const ACTIVITY_MAX: i64 = 2 ^ ACTIVITY_WIDTH - 1;
 
 /// Clause Index, not ID because it changes after database reduction.
@@ -79,8 +79,10 @@ impl Clause {
     }
     /// returns 1 if this is good enough.
     pub fn set_sort_key(&mut self, at: f64) -> usize {
-        let k = self.lits.len();
-        if k == 2 {
+        if self.index == 0 {
+            self.tmp = -1;
+        }
+        if self.lits.len() == 2 {
             self.tmp = 0;
             1
         } else {
@@ -90,7 +92,7 @@ impl Clause {
             } else {
                 min(RANK_MAX, self.rank as i64)
             };
-            self.tmp = d << ACTIVITY_WIDTH + scale_activity(ac);
+            self.tmp = (d << ACTIVITY_WIDTH) + scale_activity(ac);
             0
         }
     }

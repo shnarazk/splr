@@ -122,13 +122,13 @@ impl Solver {
                                 (*c).tmp = k as i64;
                                 // (*c).lits[1] = lk;
                                 // (*c).lits[k] = false_lit;
-                                println!(
-                                    " -- swap literals {} and {} of {} for propagation of {}",
-                                    lk.int(),
-                                    false_lit.int(),
-                                    (*c),
-                                    p.int()
-                                );
+                                // println!(
+                                //     " -- swap literals {} and {} of {} for propagation of {}",
+                                //     lk.int(),
+                                //     false_lit.int(),
+                                //     (*c),
+                                //     p.int()
+                                // );
                                 // update watch
                                 self.watches[p as usize][wi].to = lk.negate();
                                 continue 'next_clause;
@@ -163,11 +163,11 @@ impl Solver {
                                 unsafe {
                                     let c = self.mref_clause(w.by) as *mut Clause;
                                     let k = (*c).tmp as usize;
-                                    println!("moving {} with {} to {}", (*c), k, w.to.int());
+                                    // println!("moving {} with {} to {}", (*c), k, w.to.int());
                                     (*c).lits[1] = (*c).lits[k];
                                     (*c).lits[k] = false_lit;
                                 }
-                                println!("move {} to {}", w.by, w.to.int());
+                                // println!("move {} to {}", w.by, w.to.int());
                                 self.watches[w.to as usize].push(w);
                             }
                         }
@@ -407,7 +407,7 @@ impl Solver {
         }
     }
     pub fn reduce_database(&mut self) -> () {
-        panic!("not implemented");
+        // panic!("not implemented");
         let keep_c = self.sort_clauses();
         let keep_l = self.sort_learnts();
         self.rebuild_reason();
@@ -434,6 +434,12 @@ impl Solver {
     fn sort_learnts(&mut self) -> usize {
         let mut requires = 0;
         let nc = self.learnts.len();
+        if self.learnt_permutation.len() < nc {
+            unsafe {
+                self.learnt_permutation.reserve(nc + 1);
+                self.learnt_permutation.set_len(nc + 1);
+            }
+        }
         {
             // set key
             let ac = 0.1 * self.cla_inc / (nc as f64);
@@ -444,7 +450,7 @@ impl Solver {
         {
             // check locked
             let nv = self.vars.len();
-            for vi in 1..nv + 1 {
+            for vi in 1..nv {
                 let ci = self.vars[vi].reason;
                 if 0 < ci {
                     let val = self.learnts[ci as usize].tmp;
@@ -473,18 +479,31 @@ impl Solver {
     }
     fn rebuild_watches(&mut self) -> () {
         // Firstly, clear everything.
-        for i in 1..self.watches.len() + 1 {
-            let w = &mut self.watches[i];
-            w.clear();
-        }
+        // for i in 1..self.watches.len() {
+        //     let w = &mut self.watches[i];
+        //     w.clear();
+        // }
         for w in &mut self.watches {
             w.clear();
         }
-        for c in &self.clauses {
-            register_to_watches(&mut self.watches, c.index, c.lits[0], c.lits[1]);
+        println!(
+            "len of watches {}, clauses {}, learnts {}",
+            self.watches.len(),
+            &self.clauses.len(),
+            &self.learnts.len()
+        );
+        // assert_eq!(self.clauses[0].index, 0);
+        for c in &self.clauses[1..] {
+            if 2 <= c.lits.len() {
+                register_to_watches(&mut self.watches, c.index, c.lits[0], c.lits[1]);
+            }
         }
-        for c in &self.learnts {
-            register_to_watches(&mut self.watches, c.index, c.lits[0], c.lits[1]);
+        println!("1988 {}", self.learnts[1988].activity);
+        // assert_eq!(self.learnts[0].index, 0);
+        for c in &self.learnts[1..] {
+            if 2 <= c.lits.len() {
+                register_to_watches(&mut self.watches, c.index, c.lits[0], c.lits[1]);
+            }
         }
     }
     fn search(&mut self) -> bool {
@@ -538,7 +557,7 @@ impl Solver {
                     // if d == 0 { simplify_db() };
                     let na = self.num_assigns();
                     if self.max_learnts as usize + na < self.learnts.len() {
-                        self.reduce_database();
+                        // self.reduce_database();
                     }
                     if na == self.num_vars {
                         println!("  SOLVED");
