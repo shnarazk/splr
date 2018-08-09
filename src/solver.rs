@@ -343,6 +343,10 @@ impl Solver {
         return false;
     }
     pub fn inject(&mut self, learnt: bool, mut c: Clause) -> ClauseIndex {
+        if c.lits.len() == 1 {
+            self.enqueue(c.lits[0], NULL_CLAUSE);
+            return 0;
+        }
         let w0 = c.lits[0];
         let w1 = c.lits[1];
         let ci = if learnt {

@@ -72,7 +72,7 @@ fn build_solver(path: &str) -> (Solver, CNFDescription) {
         }
     }
     if nc != s.num_clauses() {
-        panic!("The number of clauses is inconsistent with the header.")
+        println!("The number of clauses is inconsistent with the header.")
     }
     // println!(" - vars:  {:?}", s.vars);
     // println!(" - clauses: {:?}", s.clauses);
@@ -88,7 +88,7 @@ fn build_solver(path: &str) -> (Solver, CNFDescription) {
     //    }
     //}
     assert_eq!(s.vars.len() - 1, cnf.num_of_variables);
-    assert_eq!(s.clauses.len() - 1, cnf.num_of_clauses);
+    // assert_eq!(s.clauses.len() - 1, cnf.num_of_clauses);
     // println!(" - solver: {:?}", s);
     (s, cnf)
 }

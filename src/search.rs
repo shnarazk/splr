@@ -412,6 +412,7 @@ impl Solver {
         let keep_l = self.sort_learnts();
         self.rebuild_reason();
         // self.check_clause_index_consistency();
+        println!("keep_c {} -> {} {}", keep_c, keep_l, self.max_learnts);
         self.clauses.truncate(keep_c);
         self.learnts.truncate(keep_l);
         self.rebuild_watches();
@@ -426,9 +427,9 @@ impl Solver {
             // 1. run tautology checker
             // 2. purge some out of clauses
             // 3. renumber remains
-            self.num_clauses()
+            self.clauses.len()
         } else {
-            self.num_clauses()
+            self.clauses.len()
         }
     }
     /// Note: this function changes self.learnt_permutation.
@@ -511,7 +512,7 @@ impl Solver {
     }
     fn search(&mut self) -> bool {
         // println!("search");
-        let delta = (self.num_vars as f64).sqrt();
+        let delta = 800.0; // (self.num_vars as f64).sqrt();
         let root_lv = self.root_level;
         let mut to_restart = false;
         loop {
