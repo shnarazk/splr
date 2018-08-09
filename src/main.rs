@@ -99,8 +99,9 @@ fn main() {
     let mut target: String = env!("CARGO_MANIFEST_DIR").to_string() + "/uf200-020.cnf";
     // let target: String = env!("CARGO_MANIFEST_DIR").to_string() + "/uf10.cnf";
     // let target: String = env!("CARGO_MANIFEST_DIR").to_string() + "/uf12.cnf";
-    if let Some(f) = env::args().last() {
-        target = f;
+    let args: Vec<String> = env::args().skip(1).collect();
+    if 1 < args.len() {
+        target = args[0].to_string();
     }
     println!("Hello, world! {}", target);
     let (mut s, _cnf) = build_solver(&target);

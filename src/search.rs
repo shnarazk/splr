@@ -17,8 +17,9 @@ impl Solver {
         }
         let mut c = Clause::new(v);
         let mut j = 0;
-        let mut lvm = 0; // level max
-                         // seek a literal with max level
+        // level max
+        let mut lvm = 0;
+        // seek a literal with max level
         for i in 0..c.lits.len() {
             let vi = c.lits[i].vi();
             let lv = self.vars[vi].level;
@@ -27,10 +28,7 @@ impl Solver {
                 lvm = lv;
             }
         }
-        let l1 = c.lits[1];
-        let lj = c.lits[j];
-        c.lits[j] = l1;
-        c.lits[1] = lj;
+        c.lits.swap(1, j);
         let l0 = c.lits[0];
         let lbd = self.lbd_of(&c.lits);
         c.rank = lbd;
@@ -101,11 +99,8 @@ impl Solver {
                             );
                         }
                         // Make sure tha false literal is lits[1]; the last literal in unit clause is lits[0].
-                        let l0 = (*c).lits[0];
-                        if l0 == false_lit {
-                            let l1 = (*c).lits[1];
-                            (*c).lits[0] = l1;
-                            (*c).lits[1] = l0;
+                        if (*c).lits[0] == false_lit {
+                            (*c).lits.swap(0, 1);
                         }
                         let first = (*c).lits[0];
                         assert_eq!(false_lit, (*c).lits[1]);
@@ -120,15 +115,6 @@ impl Solver {
                             let lk = (*c).lits[k];
                             if self.lit2asg(lk) != LFALSE {
                                 (*c).tmp = k as i64;
-                                // (*c).lits[1] = lk;
-                                // (*c).lits[k] = false_lit;
-                                // println!(
-                                //     " -- swap literals {} and {} of {} for propagation of {}",
-                                //     lk.int(),
-                                //     false_lit.int(),
-                                //     (*c),
-                                //     p.int()
-                                // );
                                 // update watch
                                 self.watches[p as usize][wi].to = lk.negate();
                                 continue 'next_clause;
@@ -164,8 +150,7 @@ impl Solver {
                                     let c = self.mref_clause(w.by) as *mut Clause;
                                     let k = (*c).tmp as usize;
                                     // println!("moving {} with {} to {}", (*c), k, w.to.int());
-                                    (*c).lits[1] = (*c).lits[k];
-                                    (*c).lits[k] = false_lit;
+                                    (*c).lits.swap(1, k);
                                 }
                                 // println!("move {} to {}", w.by, w.to.int());
                                 self.watches[w.to as usize].push(w);
