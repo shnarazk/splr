@@ -1,16 +1,11 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-
 extern crate splr;
 use splr::clause::*;
-use splr::search::*;
 use splr::solver::*;
 use splr::types::*;
 use std::env;
 use std::io::*;
-use std::io::{BufReader, Read};
-use std::result::Result;
-use std::{fs, mem};
+use std::io::BufReader;
+use std::fs;
 
 fn build_solver(path: &str) -> (Solver, CNFDescription) {
     let mut rs = BufReader::new(fs::File::open(path).unwrap());
@@ -40,7 +35,7 @@ fn build_solver(path: &str) -> (Solver, CNFDescription) {
     let cnf = CNFDescription {
         num_of_variables: nv,
         num_of_clauses: nc,
-        pathname: "".to_string(),
+        pathname: path.to_string(),
     };
     println!(" - desc: {}", cnf);
     let mut s: Solver = Solver::new(DEFAULT_CONFIGURATION, &cnf);
@@ -110,9 +105,9 @@ fn main() {
         Ok(Certificate::UNSAT(_)) => println!("UNSAT {:?}", s),
         Err(e) => println!("Failed {:?}", e),
     }
-    println!("# End of program");
 }
 
+#[allow(dead_code)]
 fn main_() {
     println!("Hello, world!");
     println!("CARGO_MANIFEST_DIR = {}", env!("CARGO_MANIFEST_DIR"));
