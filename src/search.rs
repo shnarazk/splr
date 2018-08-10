@@ -1,6 +1,7 @@
 use clause::*;
 use solver::*;
 use std::cmp::max;
+use std::ops::Neg;
 use types::*;
 
 const LEVEL_BITMAP_SIZE: usize = 256;
@@ -386,21 +387,53 @@ impl Solver {
         self.clauses.truncate(keep_c);
         self.learnts.truncate(keep_l);
         self.rebuild_watches();
+        if self.decision_level() == 0
+            && self.stats[StatIndex::NumOfGroundVar as usize] < self.num_assigns() as i64
+        {
+            for (i, x) in self.clause_permutation.iter_mut().enumerate() {
+                *x = i;
+            }
+        }
         println!("< rebuild_database {}/{}", keep_l, self.max_learnts);
     }
     /// Note: this function changes self.clause_permutation.
     fn sort_clauses(&mut self) -> usize {
-        if self.decision_level() == 0
-            && self.stats[StatIndex::NumOfGroundVar as usize] < self.num_assigns() as i64
-        {
-            // TODO
-            // 1. run tautology checker
-            // 2. purge some out of clauses
-            // 3. renumber remains
-            self.clauses.len()
-        } else {
-            self.clauses.len()
+        let nc = self.clauses.len();
+        let mut keep = 1; // for NULL_CLAUSE
+        if self.clause_permutation.len() < nc {
+            unsafe {
+                self.clause_permutation.reserve(nc + 1);
+                self.clause_permutation.set_len(nc + 1);
+            }
         }
+        if !(self.decision_level() == 0
+            && self.stats[StatIndex::NumOfGroundVar as usize] < self.num_assigns() as i64)
+        {
+            return nc;
+        }
+        // reinitialize the permutation table.
+        for (i, x) in self.clause_permutation.iter_mut().enumerate() {
+            *x = i;
+        }
+        for ci in 1..self.clauses.len() {
+            unsafe {
+                let mut c = self.mref_clause((ci as i64).neg()) as *mut Clause;
+                if self.removable((*c).index) {
+                    (*c).tmp = 2;
+                } else {
+                    (*c).tmp = 1;
+                    keep += 1;
+                }
+            }
+        }
+        self.clauses.sort_by_key(|c| c.tmp);
+        // update permutation table.
+        for i in 1..nc {
+            let old = (self.clauses[i].index.neg()) as usize;
+            self.clause_permutation[old] = i;
+            self.clauses[i].index = (i as ClauseIndex).neg();
+        }
+        keep
     }
     /// Note: this function changes self.learnt_permutation.
     fn sort_learnts(&mut self) -> usize {
@@ -412,43 +445,38 @@ impl Solver {
                 self.learnt_permutation.set_len(nc + 1);
             }
         }
-        {
-            // set key
-            let ac = 0.1 * self.cla_inc / (nc as f64);
-            for c in &mut self.learnts {
-                requires += c.set_sort_key(ac);
+        // set key
+        let ac = 0.1 * self.cla_inc / (nc as f64);
+        for c in &mut self.learnts {
+            requires += c.set_sort_key(ac);
+        }
+        // check locked
+        for v in &self.vars[1..] {
+            let ci = v.reason;
+            if 0 < ci {
+                self.learnts[ci as usize].tmp = -1;
+                requires += 1;
             }
         }
-        {
-            // check locked
-            for v in &self.vars[1..] {
-                let ci = v.reason;
-                if 0 < ci {
-                    self.learnts[ci as usize].tmp = -1;
-                    requires += 1;
-                }
-            }
-        }
-        let n = max(requires, nc / 2);
         self.learnts.sort_by_key(|c| c.tmp);
-        // println!("sorted {:?}", self.learnts);
         for i in 1..nc {
             let old = self.learnts[i].index as usize;
-            self.learnt_permutation[old] = i as i64;
+            self.learnt_permutation[old] = i;
             self.learnts[i].index = i as ClauseIndex;
-            self.learnts[i].tmp = 0;
         }
         self.learnt_permutation[0] = 0;
-        // println!("done");
-        n
+        max(requires, nc / 2)
     }
     fn rebuild_reason(&mut self) -> () {
-        let perm = &self.learnt_permutation;
+        let new_clause = &self.clause_permutation;
+        let new_learnt = &self.learnt_permutation;
         // println!("perm {:?}", perm);
         for v in &mut self.vars[1..] {
             let ci = v.reason;
             if 0 < ci {
-                v.reason = perm[ci as usize];
+                v.reason = new_learnt[ci as usize] as i64;
+            } else if ci < 0 {
+                v.reason = (new_clause[ci.neg() as usize] as i64).neg();
             }
         }
     }
