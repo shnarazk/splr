@@ -3,8 +3,6 @@ use solver::*;
 use std::cmp::max;
 use types::*;
 
-const LEVEL_BITMAP: usize = 62;
-
 impl Solver {
     /// renamed from newLearntClause
     pub fn add_learnt(&mut self, v: Vec<Lit>) -> usize {
@@ -254,11 +252,13 @@ impl Solver {
         self.an_stack.clear();
         self.an_to_clear.clear();
         self.an_to_clear.push(l0);
-        let mut levels: u64 = 0;
+        for b in &mut self.an_level_map {
+            *b = false;
+        }
         for i in 1..n {
             let l = self.an_learnt_lits[i];
             self.an_to_clear.push(l);
-            levels |= 63 & ((self.vars[l.vi()].level % LEVEL_BITMAP) as u64);
+            self.an_level_map[(self.vars[l.vi()].level as usize) % LEVEL_BITMAP_SIZE] = true;
         }
         // println!("  analyze.loop 4 n = {}", n);
         let mut i = 1;
@@ -273,7 +273,7 @@ impl Solver {
             if self.vars[l.vi()].reason == NULL_CLAUSE {
                 self.an_learnt_lits[j] = l;
                 j += 1;
-            } else if !self.analyze_removable(l, levels) {
+            } else if !self.analyze_removable(l) {
                 self.an_learnt_lits[j] = l;
                 j += 1;
             }
@@ -306,7 +306,7 @@ impl Solver {
         // println!("  analyze terminated");
         (level_to_return as u32, self.an_learnt_lits.clone())
     }
-    fn analyze_removable(&mut self, l: Lit, min_level: u64) -> bool {
+    fn analyze_removable(&mut self, l: Lit) -> bool {
         self.an_stack.clear();
         self.an_stack.push(l);
         let top1 = self.an_to_clear.len();
@@ -321,11 +321,9 @@ impl Solver {
             unsafe {
                 for q in &(*c).lits {
                     let vi = q.vi();
-                    let lv = self.vars[vi].level % LEVEL_BITMAP;
+                    let lv = self.vars[vi].level % LEVEL_BITMAP_SIZE;
                     if self.an_seen[vi] != 1 && lv != 0 {
-                        if self.vars[vi].reason != NULL_CLAUSE
-                            && 0u64 != (1u64 << lv) & min_level as u64
-                        {
+                        if self.vars[vi].reason != NULL_CLAUSE && self.an_level_map[lv] {
                             self.an_seen[vi] = 1;
                             self.an_stack.push(*q);
                             self.an_to_clear.push(*q);

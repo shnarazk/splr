@@ -1,6 +1,8 @@
 use clause::*;
 use types::*;
 
+pub const LEVEL_BITMAP_SIZE: usize = 256;
+
 /// In splr, the watch map is reseted at the beginning of every simplification phase.
 /// It's just a immutable index (with some data) referring to a Clause in a Vec.
 #[derive(Debug)]
@@ -241,6 +243,7 @@ pub struct Solver {
     pub an_stack: Vec<Lit>,
     pub an_last_dl: Vec<Lit>,
     pub an_learnt_lits: Vec<Lit>,
+    pub an_level_map: Vec<bool>,
     pub stats: Vec<i64>,
     pub lbd_seen: Vec<u64>,
     pub lbd_key: u64,
@@ -292,6 +295,7 @@ impl Solver {
             an_stack: vec![],
             an_last_dl: vec![],
             an_learnt_lits: vec![],
+            an_level_map: vec![false; LEVEL_BITMAP_SIZE],
             stats: vec![0; StatIndex::EndOfStatIndex as usize],
             lbd_seen: vec![0; nv + 1],
             lbd_key: 0,
