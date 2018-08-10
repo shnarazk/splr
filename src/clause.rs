@@ -10,11 +10,12 @@ const ACTIVITY_MAX: i64 = 2 ^ ACTIVITY_WIDTH - 1;
 
 /// Clause Index, not ID because it changes after database reduction.
 /// # Range
-/// * `< 0` for given clauses. So we need `i64` instead of `usize`
-/// * 0 for a null clause
-/// * '0 <' for learnt clauses
+/// * `< 0` for given clauses. So we need `i64` instead of `usize`.
+/// * 0 for a null clause.
+/// * '0 <' for learnt clauses.
 pub type ClauseIndex = i64;
 
+/// is a dummy clause index
 pub const NULL_CLAUSE: ClauseIndex = 0;
 
 /// Clause
@@ -129,12 +130,14 @@ impl fmt::Display for Clause {
 /// Other functions should borrow a mutual reference from it.
 pub type ClauseManager = Vec<Clause>;
 
+/// returns a new clause manager.
 pub fn new_clause_manager() -> ClauseManager {
     let mut m = Vec::new();
     m.push(Clause::null());
     m
 }
 
+/// Struct for a variable.
 #[derive(Debug)]
 pub struct Var {
     pub index: usize,
@@ -145,6 +148,7 @@ pub struct Var {
     pub activity: f64,
 }
 
+/// is the dummy var index.
 pub const NULL_VAR: VarIndex = 0;
 
 impl Var {

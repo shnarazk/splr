@@ -45,21 +45,14 @@ pub type VarIndex = usize;
 /// ```
 pub type Lit = u32;
 
+/// a dummy literal.
 pub const NULL_LIT: Lit = 0;
 
 pub fn int2lit(x: i32) -> Lit {
     (if x < 0 { -2 * x + 1 } else { 2 * x }) as u32
 }
 
-/// ```
-/// use splr::types::*;
-/// assert_eq!(int2lit( 1), int2lit(-1).negate());
-/// assert_eq!(int2lit(-1), int2lit( 1).negate());
-/// assert_eq!(int2lit( 2), int2lit(-2).negate());
-/// assert_eq!(int2lit(-2), int2lit( 2).negate());
-/// ```
-
-/// Converters
+/// Converters between 'int', [Lit](type.Lit.html) and [Var](type.Var.html).
 /// # Examples
 ///
 /// ```
@@ -70,6 +63,10 @@ pub fn int2lit(x: i32) -> Lit {
 /// assert_eq!(1, 1.lit(LFALSE).vi());
 /// assert_eq!(2, 2.lit(LTRUE).vi());
 /// assert_eq!(2, 2.lit(LFALSE).vi());
+/// assert_eq!(int2lit( 1), int2lit(-1).negate());
+/// assert_eq!(int2lit(-1), int2lit( 1).negate());
+/// assert_eq!(int2lit( 2), int2lit(-2).negate());
+/// assert_eq!(int2lit(-2), int2lit( 2).negate());
 /// ```
 pub trait LiteralEncoding {
     fn vi(&self) -> VarIndex;
@@ -105,6 +102,7 @@ impl LiteralEncoding for Lit {
     }
 }
 
+/// converter from [VarIndex](type.VarIndex.html) to [Lit](type.Lit.html).
 pub trait VarIndexEncoding {
     fn lit(&self, p: Lbool) -> Lit;
 }
@@ -115,10 +113,13 @@ impl VarIndexEncoding for VarIndex {
     }
 }
 
-/// Lifted Bool
+/// Lifted Bool type
 pub type Lbool = i8;
+/// the lifted **true**.
 pub const LTRUE: i8 = 1;
+/// the lifted **false**.
 pub const LFALSE: i8 = -1;
+/// unbound bool.
 pub const BOTTOM: i8 = 0;
 
 pub fn negate_bool(b: Lbool) -> Lbool {
@@ -137,7 +138,7 @@ pub trait EmaKind {
     fn update(&mut self, x: f64) -> f64;
 }
 
-/// Exponential Moving Average, EMA with a calibrator
+/// Exponential Moving Average with a calibrator
 #[derive(Debug)]
 pub struct Ema(f64, f64, f64);
 
@@ -160,7 +161,7 @@ impl EmaKind for Ema {
     }
 }
 
-// Exponential Moving Average, EMA w/o a calibrator
+/// Exponential Moving Average w/o a calibrator
 #[derive(Debug)]
 pub struct Ema_(f64, f64);
 
@@ -181,6 +182,7 @@ impl EmaKind for Ema_ {
     }
 }
 
+/// data about a problem.
 #[derive(Debug)]
 pub struct CNFDescription {
     pub num_of_variables: usize,
@@ -216,6 +218,7 @@ pub struct SolverConfiguration {
     pub restart_step: f64,
 }
 
+/// is a [SolverConfiguration](struct.SolverConfiguration.html).
 pub const DEFAULT_CONFIGURATION: SolverConfiguration = SolverConfiguration {
     variable_decay_rate: 0.95,
     clause_decay_rate: 0.999,

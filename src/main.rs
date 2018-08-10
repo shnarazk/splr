@@ -3,9 +3,9 @@ use splr::clause::*;
 use splr::solver::*;
 use splr::types::*;
 use std::env;
-use std::io::*;
-use std::io::BufReader;
 use std::fs;
+use std::io::BufReader;
+use std::io::*;
 
 fn build_solver(path: &str) -> (Solver, CNFDescription) {
     let mut rs = BufReader::new(fs::File::open(path).unwrap());

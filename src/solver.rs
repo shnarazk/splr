@@ -1,9 +1,8 @@
 use clause::*;
 use types::*;
 
-/// In splr, `watchers` is reseted at the beginning of simplify phase.
-/// It's just a mutable vector referring immutable Clause.
-/// Because, during propagate, all clauses are immutable.
+/// In splr, the watch map is reseted at the beginning of every simplification phase.
+/// It's just a immutable index (with some data) referring to a Clause in a Vec.
 #[derive(Debug)]
 pub struct Watch {
     pub other: Lit,
@@ -21,10 +20,11 @@ impl Watch {
     }
 }
 
-/// WatcherVec
-pub type WatcherVec = Vec<Vec<Watch>>;
+/// is a mapping from `Lit` to `Vec<Watch>`.
+pub type WatchMap = Vec<Vec<Watch>>;
 
-pub fn new_watcher_vec(nv: usize) -> WatcherVec {
+/// returns `WatchMap`, or `Vec<Vec<Watch>>`.
+pub fn new_watch_map(nv: usize) -> WatchMap {
     let mut vec = Vec::new();
     for _i in 0..2 * nv + 1 {
         vec.push(Vec::new());
@@ -32,7 +32,7 @@ pub fn new_watcher_vec(nv: usize) -> WatcherVec {
     vec
 }
 
-pub fn register_to_watches(w: &mut WatcherVec, ci: ClauseIndex, w0: Lit, w1: Lit) -> () {
+pub fn push_to_watch(w: &mut WatchMap, ci: ClauseIndex, w0: Lit, w1: Lit) -> () {
     if ci == NULL_CLAUSE {
         return;
     }
@@ -208,13 +208,14 @@ impl VarIndexHeap {
     }
 }
 
+/// is the collection of all variables.
 #[derive(Debug)]
 pub struct Solver {
     /// Assignment Management
     pub vars: Vec<Var>,
     pub clauses: ClauseManager,
     pub learnts: ClauseManager,
-    pub watches: WatcherVec,
+    pub watches: WatchMap,
     pub trail: Vec<Lit>,
     pub trail_lim: Vec<usize>,
     pub q_head: usize,
@@ -267,7 +268,7 @@ impl Solver {
             vars: Var::new_vars(nv),
             clauses: new_clause_manager(),
             learnts: new_clause_manager(),
-            watches: new_watcher_vec(nv * 2),
+            watches: new_watch_map(nv * 2),
             trail: Vec::new(),
             trail_lim: Vec::new(),
             q_head: 0,
@@ -357,7 +358,7 @@ impl Solver {
         } else {
             self.clauses.push(c);
         }
-        register_to_watches(&mut self.watches, ci, w0, w1);
+        push_to_watch(&mut self.watches, ci, w0, w1);
         ci
     }
     pub fn num_assigns(&self) -> usize {

@@ -470,14 +470,14 @@ impl Solver {
         // assert_eq!(self.clauses[0].index, 0);
         for c in &self.clauses[1..] {
             if 2 <= c.lits.len() {
-                register_to_watches(&mut self.watches, c.index, c.lits[0], c.lits[1]);
+                push_to_watch(&mut self.watches, c.index, c.lits[0], c.lits[1]);
             }
         }
         // assert_eq!(self.learnts[0].index, 0);
         for c in &self.learnts[1..] {
             if 2 <= c.lits.len() {
                 // println!("register {}", c.index);
-                register_to_watches(&mut self.watches, c.index, c.lits[0], c.lits[1]);
+                push_to_watch(&mut self.watches, c.index, c.lits[0], c.lits[1]);
             }
         }
         // self.dump(&format!("rebuild {}", self.learnts.len()));
