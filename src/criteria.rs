@@ -45,7 +45,9 @@ impl Solver {
         }
         self.var_inc /= VAR_ACTIVITY_THRESHOLD;
     }
-    fn clause_new(&mut self, learnt: bool, v: &mut Vec<Lit>) -> Result<ClauseIndex, bool> {
+    // renamed from clause_new
+    pub fn add_clause(&mut self, learnt: bool, mut v: Vec<Lit>) -> bool {
+        assert_eq!(learnt, false);
         v.sort_unstable();
         let mut j = 0;
         let mut l_ = NULL_LIT; // last literal; [x, x.negate()] means totology.
@@ -67,15 +69,12 @@ impl Solver {
             v.truncate(j)
         }
         match v.len() {
-            0 => Err(result),
-            1 => Err(self.enqueue(v[0], NULL_CLAUSE)),
-            _ => Ok(self.inject(learnt, Clause::new(v.to_vec()))),
-        }
-    }
-    pub fn add_clause(&mut self, learnt: bool, v: &mut Vec<Lit>) -> bool {
-        match self.clause_new(learnt, v) {
-            Err(b) => b,
-            Ok(_) => true,
+            0 => result,
+            1 => self.enqueue(v[0], NULL_CLAUSE),
+            _ => {
+                self.inject(false, Clause::new(v));
+                true
+            }
         }
     }
     pub fn lbd_of(&mut self, v: &Vec<Lit>) -> usize {

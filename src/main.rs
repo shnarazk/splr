@@ -37,72 +37,54 @@ fn build_solver(path: &str) -> (Solver, CNFDescription) {
         num_of_clauses: nc,
         pathname: path.to_string(),
     };
-    println!(" - desc: {}", cnf);
+    // println!(" - desc: {}", cnf);
     let mut s: Solver = Solver::new(DEFAULT_CONFIGURATION, &cnf);
     loop {
         buf.clear();
         match rs.read_line(&mut buf) {
             Ok(0) => break,
-            Ok(_k) => {
+            Ok(_) => {
+                if buf.starts_with("c") {
+                    continue;
+                }
                 let mut iter = buf.split_whitespace();
                 let mut v: Vec<Lit> = Vec::new();
                 for s in iter {
                     if let Ok(val) = s.parse::<i32>() {
                         if val == 0 {
-                            if v.is_empty() {
-                                println!("finish reading a cnf");
-                            }
-                            continue;
+                            break;
                         } else {
                             v.push(int2lit(val));
                         }
                     }
                 }
                 if v.len() != 0 {
-                    v.sort();
-                    s.inject(false, Clause::new(v));
+                    s.add_clause(false, v);
                 }
             }
             Err(e) => panic!("{}", e),
         }
     }
-    if nc != s.num_clauses() {
-        println!("The number of clauses is inconsistent with the header.")
-    }
-    // println!(" - vars:  {:?}", s.vars);
-    // println!(" - clauses: {:?}", s.clauses);
-    // println!(" - learnts: {:?}", s.learnts);
-    // println!(" - var_order: {:?}", s.var_order);
-    // println!(
-    //     " - assign: {:?}",
-    //     s.vars.iter().map(|v| v.assign).collect::<Vec<Lbool>>()
-    // );
-    //for (i, w) in s.watches.iter().enumerate() {
-    //    if !w.is_empty() {
-    //        println!(" - watches[{:>3}] => {:?}", (i as Lit).int(), w);
-    //    }
-    //}
+    // if nc != s.num_clauses() {
+    //     println!("The number of clauses is inconsistent with the header.")
+    // }
+    // s.dump("built");
     assert_eq!(s.vars.len() - 1, cnf.num_of_variables);
-    // assert_eq!(s.clauses.len() - 1, cnf.num_of_clauses);
-    // println!(" - solver: {:?}", s);
     (s, cnf)
 }
 
 fn main() {
     // println!("CARGO_MANIFEST_DIR = {}", env!("CARGO_MANIFEST_DIR"));
-    // let target: String = env!("CARGO_MANIFEST_DIR").to_string() + "/uf100-011.cnf";
     let mut target: String = env!("CARGO_MANIFEST_DIR").to_string() + "/uf200-020.cnf";
-    // let target: String = env!("CARGO_MANIFEST_DIR").to_string() + "/uf10.cnf";
-    // let target: String = env!("CARGO_MANIFEST_DIR").to_string() + "/uf12.cnf";
     let args: Vec<String> = env::args().skip(1).collect();
     if 0 < args.len() {
         target = args[0].to_string();
     }
-    println!("Hello, world! {}", target);
+    // println!("Hello, world! {}", target);
     let (mut s, _cnf) = build_solver(&target);
     match s.solve() {
         Ok(Certificate::SAT(v)) => println!("{:?}", v),
-        Ok(Certificate::UNSAT(_)) => println!("UNSAT {:?}", s),
+        Ok(Certificate::UNSAT(v)) => println!("UNSAT {:?}", v),
         Err(e) => println!("Failed {:?}", e),
     }
 }

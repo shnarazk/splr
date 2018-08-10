@@ -7,7 +7,7 @@ const LEVEL_BITMAP: usize = 62;
 
 impl Solver {
     /// renamed from newLearntClause
-    pub fn new_learnt(&mut self, v: Vec<Lit>) -> usize {
+    pub fn add_learnt(&mut self, v: Vec<Lit>) -> usize {
         let k = v.len();
         if k == 1 {
             self.unsafe_enqueue(v[0], NULL_CLAUSE);
@@ -63,8 +63,9 @@ impl Solver {
                     let Watch {
                         other: blocker,
                         by: ci,
-                        ..
+                        to,
                     } = self.watches[p as usize][wi];
+                    assert_ne!(blocker, to);
                     // We use `Watch.to` to keep the literal which is the destination of propagation.
                     let bv = if blocker == 0 {
                         LFALSE
@@ -112,11 +113,9 @@ impl Solver {
                             }
                         }
                         if fv == LFALSE {
-                            // conflict
                             // println!("  found a conflict variable {} by {}", first.vi(), (*c));
                             return Some(ci);
                         } else {
-                            // unit propagation
                             // println!("  unit propagation {} by {}", first.int(), (*c));
                             (*c).tmp = 1;
                             self.watches[p as usize][wi].to = p;
@@ -383,16 +382,13 @@ impl Solver {
         }
     }
     pub fn reduce_database(&mut self) -> () {
-        // panic!("not implemented");
         let keep_c = self.sort_clauses();
         let keep_l = self.sort_learnts();
         self.rebuild_reason();
-        // self.check_clause_index_consistency();
-        println!("keep_c {} -> {} {}", keep_c, keep_l, self.max_learnts);
         self.clauses.truncate(keep_c);
         self.learnts.truncate(keep_l);
         self.rebuild_watches();
-        println!("< rebuild_database done");
+        println!("< rebuild_database {}/{}", keep_l, self.max_learnts);
     }
     /// Note: this function changes self.clause_permutation.
     fn sort_clauses(&mut self) -> usize {
@@ -482,16 +478,21 @@ impl Solver {
         }
         // self.dump(&format!("rebuild {}", self.learnts.len()));
     }
+    /// returns:
+    /// - true for SAT
+    /// - false for UNSAT
     fn search(&mut self) -> bool {
+        // self.dump("search");
         // println!("search");
         let delta = 800.0; // (self.num_vars as f64).sqrt();
         let root_lv = self.root_level;
         let mut to_restart = false;
         loop {
-            // self.dump("search");
+            // self.dump("calling propagate");
             let ret = self.propagate();
             let d = self.decision_level();
             // println!("search called propagate and it returned {:?} at {}", ret, d);
+            // self.dump("after propagation");
             match ret {
                 Some(ci) => {
                     self.stats[StatIndex::NumOfBackjump as usize] += 1;
@@ -509,7 +510,7 @@ impl Solver {
                         // );
                         self.cancel_until(max(backtrack_level as usize, root_lv));
                         // println!(" backtracked to {}", backtrack_level);
-                        let lbd = self.new_learnt(v);
+                        let lbd = self.add_learnt(v);
                         let k = self.an_learnt_lits.len();
                         if k == 1 {
                             self.vars[self.an_learnt_lits[0].vi()].level = 0;
@@ -560,28 +561,31 @@ impl Solver {
     pub fn solve(&mut self) -> SolverResult {
         // TODO deal with assumptons
         // s.root_level = 0;
-        let status = self.search();
-        if status && self.ok == LTRUE {
-            let mut result = Vec::new();
-            for vi in 1..self.num_vars + 1 {
-                if self.vars[vi].assign == LTRUE {
-                    result.push(vi as i32);
-                } else if self.vars[vi].assign == LFALSE {
-                    result.push(0 - vi as i32);
+        match self.search() {
+            _ if self.ok == false => {
+                self.cancel_until(0);
+                Err(SolverException::InternalInconsistent)
+            }
+            true => {
+                let mut result = Vec::new();
+                for vi in 1..self.num_vars + 1 {
+                    match self.vars[vi].assign {
+                        LTRUE => result.push(vi as i32),
+                        LFALSE => result.push(0 - vi as i32),
+                        _ => (),
+                    }
                 }
+                self.cancel_until(0);
+                Ok(Certificate::SAT(result))
             }
-            self.cancel_until(0);
-            Ok(Certificate::SAT(result))
-        } else if !status && self.ok == LFALSE {
-            self.cancel_until(0);
-            let mut v = Vec::new();
-            for l in &self.conflicts {
-                v.push(l.int());
+            false => {
+                self.cancel_until(0);
+                let mut v = Vec::new();
+                for l in &self.conflicts {
+                    v.push(l.int());
+                }
+                Ok(Certificate::UNSAT(v))
             }
-            Ok(Certificate::UNSAT(v))
-        } else {
-            self.cancel_until(0);
-            Err(SolverException::InternalInconsistent)
         }
     }
     fn unsafe_enqueue(&mut self, l: Lit, ci: ClauseIndex) -> () {
