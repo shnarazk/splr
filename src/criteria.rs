@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 use clause::*;
 use solver::*;
 use std::cmp::max;
@@ -78,7 +75,7 @@ impl Solver {
     pub fn add_clause(&mut self, learnt: bool, v: &mut Vec<Lit>) -> bool {
         match self.clause_new(learnt, v) {
             Err(b) => b,
-            Ok(c) => true,
+            Ok(_) => true,
         }
     }
     pub fn lbd_of(&mut self, v: &Vec<Lit>) -> usize {

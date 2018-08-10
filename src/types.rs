@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 //! Basic types
 use std::fmt;
 
@@ -27,7 +24,7 @@ pub enum SolverException {
 /// * solved with a satisfiable assigment,
 /// * proved that it's an unsatisfiable problem, and
 /// * aborted due to Mios specification or an internal error
-type SolverResult = Result<Certificate, SolverException>;
+pub type SolverResult = Result<Certificate, SolverException>;
 
 /// Variable as Index is `usize`
 pub type VarIndex = usize;

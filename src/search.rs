@@ -1,11 +1,9 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 use clause::*;
 use solver::*;
 use std::cmp::max;
-use std::result::Result;
 use types::*;
+
+const LEVEL_BITMAP: usize = 62;
 
 impl Solver {
     /// renamed from newLearntClause
@@ -16,19 +14,18 @@ impl Solver {
             return 1;
         }
         let mut c = Clause::new(v);
-        let mut j = 0;
-        // level max
-        let mut lvm = 0;
+        let mut i_max = 0;
+        let mut lv_max = 0;
         // seek a literal with max level
-        for i in 0..c.lits.len() {
-            let vi = c.lits[i].vi();
+        for (i, l) in c.lits.iter().enumerate() {
+            let vi = l.vi();
             let lv = self.vars[vi].level;
-            if self.vars[vi].assign != BOTTOM && lvm < lv {
-                j = i;
-                lvm = lv;
+            if self.vars[vi].assign != BOTTOM && lv_max < lv {
+                i_max = i;
+                lv_max = lv;
             }
         }
-        c.lits.swap(1, j);
+        c.lits.swap(1, i_max);
         let l0 = c.lits[0];
         let lbd = self.lbd_of(&c.lits);
         c.rank = lbd;
@@ -55,11 +52,6 @@ impl Solver {
                 // println!("<  propagate done");
                 return None;
             }
-            // println!(
-            //     "  self.trail.len {}, self.q_head {}",
-            //     self.trail.len(),
-            //     self.q_head
-            // );
             let p = self.trail[self.q_head];
             self.q_head += 1;
             self.stats[StatIndex::NumOfPropagation as usize] += 1;
@@ -73,14 +65,11 @@ impl Solver {
                         by: ci,
                         ..
                     } = self.watches[p as usize][wi];
-                    // We need a storage to keep a literal which is the destination of propagation.
-                    // * candidate 1, Watch.to, better about reference locality if other is satisfied.
-                    // * candidate 2. Clause.tmp
+                    // We use `Watch.to` to keep the literal which is the destination of propagation.
                     let bv = if blocker == 0 {
                         LFALSE
                     } else {
-                        // self.lit2asg(blocker) FIXME for debug
-                        LFALSE
+                        self.assigned(blocker)
                     };
                     if bv == LTRUE {
                         self.watches[p as usize][wi].to = p;
@@ -98,7 +87,8 @@ impl Solver {
                                 p.int()
                             );
                         }
-                        // Make sure tha false literal is lits[1]; the last literal in unit clause is lits[0].
+                        // Place the false literal at lits[1].
+                        // And the last literal in unit clause will be at lits[0].
                         if (*c).lits[0] == false_lit {
                             (*c).lits.swap(0, 1);
                         }
@@ -106,7 +96,8 @@ impl Solver {
                         assert_eq!(false_lit, (*c).lits[1]);
                         let fv = self.assigned(first);
                         if fv == LTRUE {
-                            // update watch by the cached literal; this is a satisfied, unit clause.
+                            // Satisfied by the other watch.
+                            // Update watch with `other`, the cached literal
                             self.watches[p as usize][wi].to = p;
                             continue 'next_clause;
                         }
@@ -115,7 +106,7 @@ impl Solver {
                             let lk = (*c).lits[k];
                             if self.assigned(lk) != LFALSE {
                                 (*c).tmp = k as i64;
-                                // update watch
+                                // Update the watch
                                 self.watches[p as usize][wi].to = lk.negate();
                                 continue 'next_clause;
                             }
@@ -123,7 +114,7 @@ impl Solver {
                         if fv == LFALSE {
                             // conflict
                             // println!("  found a conflict variable {} by {}", first.vi(), (*c));
-                            return Some((*c).index); // TODO why don't you return `*c` itself?
+                            return Some(ci);
                         } else {
                             // unit propagation
                             // println!("  unit propagation {} by {}", first.int(), (*c));
@@ -170,7 +161,6 @@ impl Solver {
                         None => break,
                     }
                 }
-                // println!("  propagate done");
             }
         }
     }
@@ -201,8 +191,7 @@ impl Solver {
                     (*c).rank = nblevel;
                 }
                 // println!("{}を対応", (*c));
-                for j in (if p == NULL_LIT { 0 } else { 1 })..(*c).lits.len() {
-                    let q = (*c).lits[j];
+                for q in &(*c).lits[if p == NULL_LIT { 0 } else { 1 }..] {
                     let vi = q.vi();
                     let l = self.vars[vi].level;
                     assert_ne!(self.vars[vi].assign, BOTTOM);
@@ -217,11 +206,11 @@ impl Solver {
                             // );
                             path_cnt += 1;
                             if 0 < self.vars[vi].reason {
-                                self.an_last_dl.push(q);
+                                self.an_last_dl.push(*q);
                             }
                         } else {
                             // println!("{} はレベル{}なので採用", q.int(), l);
-                            self.an_learnt_lits.push(q);
+                            self.an_learnt_lits.push(*q);
                             b = max(b, l);
                         }
                     } else {
@@ -270,7 +259,7 @@ impl Solver {
         for i in 1..n {
             let l = self.an_learnt_lits[i];
             self.an_to_clear.push(l);
-            levels |= 63 & ((self.vars[l.vi()].level % 60) as u64);
+            levels |= 63 & ((self.vars[l.vi()].level % LEVEL_BITMAP) as u64);
         }
         // println!("  analyze.loop 4 n = {}", n);
         let mut i = 1;
@@ -333,7 +322,7 @@ impl Solver {
             unsafe {
                 for q in &(*c).lits {
                     let vi = q.vi();
-                    let lv = self.vars[vi].level % 60;
+                    let lv = self.vars[vi].level % LEVEL_BITMAP;
                     if self.an_seen[vi] != 1 && lv != 0 {
                         if self.vars[vi].reason != NULL_CLAUSE
                             && 0u64 != (1u64 << lv) & min_level as u64
@@ -380,8 +369,8 @@ impl Solver {
                     } else {
                         let c = self.iref_clause(ci) as *const Clause;
                         unsafe {
-                            for i in 1..(*c).lits.len() {
-                                let vi = (*c).lits[i].vi();
+                            for l in &(*c).lits[1..] {
+                                let vi = l.vi();
                                 if 0 < self.vars[vi].level {
                                     self.an_seen[vi] = 1;
                                 }
@@ -438,15 +427,11 @@ impl Solver {
         }
         {
             // check locked
-            let nv = self.vars.len();
-            for vi in 1..nv {
-                let ci = self.vars[vi].reason;
+            for v in &self.vars[1..] {
+                let ci = v.reason;
                 if 0 < ci {
-                    let val = self.learnts[ci as usize].tmp;
-                    if 0 < val {
-                        self.learnts[ci as usize].tmp = -1;
-                        requires += 1;
-                    }
+                    self.learnts[ci as usize].tmp = -1;
+                    requires += 1;
                 }
             }
         }
@@ -461,7 +446,7 @@ impl Solver {
         }
         self.learnt_permutation[0] = 0;
         // println!("done");
-        max(requires, nc / 2)
+        n
     }
     fn rebuild_reason(&mut self) -> () {
         let perm = &self.learnt_permutation;
@@ -551,19 +536,11 @@ impl Solver {
                         self.reduce_database();
                     }
                     if na == self.num_vars {
-                        println!("  SOLVED");
                         return true;
                     } else if to_restart {
                         self.cancel_until(root_lv);
                         to_restart = false;
                     } else {
-                        // println!(
-                        //     " trail     {:?}",
-                        //     self.trail.iter().map(|l| l.int()).collect::<Vec<i32>>()
-                        // );
-                        // println!(" trail lim {:?}", self.trail_lim);
-                        // println!(" {:?}", self.var_order);
-                        // println!("  num_assigns = {}", na);
                         let vi = self.select_var();
                         // println!(" search loop find a new decision var");
                         if vi == 0 {
@@ -578,10 +555,9 @@ impl Solver {
                     }
                 }
             }
-            // println!(" search loop terminate");
         }
     }
-    pub fn solve(&mut self) -> Result<Certificate, SolverException> {
+    pub fn solve(&mut self) -> SolverResult {
         // TODO deal with assumptons
         // s.root_level = 0;
         let status = self.search();
@@ -614,6 +590,7 @@ impl Solver {
         // } else {
         //     println!("unsafe_enqueue imply: {} by {}", l.int(), ci);
         // }
+        assert_ne!(l, 0);
         let dl = self.decision_level();
         let v = &mut self.vars[l.vi()];
         v.assign = l.lbool();

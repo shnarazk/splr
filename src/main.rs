@@ -106,7 +106,8 @@ fn main() {
     println!("Hello, world! {}", target);
     let (mut s, _cnf) = build_solver(&target);
     match s.solve() {
-        Ok(s) => println!("OK {:?}", s),
+        Ok(Certificate::SAT(v)) => println!("{:?}", v),
+        Ok(Certificate::UNSAT(_)) => println!("UNSAT {:?}", s),
         Err(e) => println!("Failed {:?}", e),
     }
     println!("# End of program");

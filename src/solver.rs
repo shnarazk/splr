@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 use clause::*;
 use types::*;
 
@@ -73,7 +70,7 @@ impl VarIndexHeap {
     }
     /// renamed from inHeap
     fn contains(&self, v: VarIndex) -> bool {
-        self.idxs[v] <= self.idxs[0]
+        self.idxs[v] <= self.len()
     }
     fn percolate_up(&mut self, vec: &Vec<Var>, start: usize) -> () {
         let mut q = start;
@@ -108,7 +105,7 @@ impl VarIndexHeap {
         }
     }
     fn percolate_down(&mut self, vec: &Vec<Var>, start: usize) -> () {
-        let n = self.idxs[0];
+        let n = self.len();
         let mut i = start;
         let vi = self.heap[i];
         let ai = vec[vi].activity;
@@ -167,7 +164,7 @@ impl VarIndexHeap {
         // self.check_var_order("check insert 2");
     }
     /// renamed from insertHeap
-    fn push(&mut self, vec: &Vec<Var>, vi: VarIndex) -> () {
+    pub fn push(&mut self, vec: &Vec<Var>, vi: VarIndex) -> () {
         let n = self.idxs[0] + 1;
         self.heap[n] = vi;
         self.idxs[vi] = n;
@@ -393,7 +390,7 @@ impl Solver {
             val == sig
         }
     }
-    fn assume(&mut self, l: Lit) -> bool {
+    pub fn assume(&mut self, l: Lit) -> bool {
         self.trail_lim.push(self.trail.len());
         self.enqueue(l, NULL_CLAUSE)
     }
@@ -424,7 +421,7 @@ impl Solver {
     pub fn select_var(&mut self) -> VarIndex {
         loop {
             // self.check_var_order("select_var 1");
-            if self.var_order.idxs[0] == 0 {
+            if self.var_order.len() == 0 {
                 // println!("> select_var returns 0");
                 return 0;
             }
@@ -441,7 +438,7 @@ impl Solver {
         println!(
             "# nassigns {}, decision cands {}",
             self.num_assigns(),
-            self.var_order.idxs[0]
+            self.var_order.len()
         );
         let v = self.trail.iter().map(|l| l.int()).collect::<Vec<i32>>();
         let len = self.trail_lim.len();

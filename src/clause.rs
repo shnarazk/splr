@@ -1,13 +1,9 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-#![allow(unused_variables)]
 use std::cmp::min;
-use std::cmp::Ordering;
 use std::f64;
 use std::fmt;
 use types::*;
 
-const RANK_WIDTH: i64 = 11;
+// const RANK_WIDTH: i64 = 11;
 const ACTIVITY_WIDTH: i64 = 51;
 const RANK_MAX: i64 = 1000;
 const ACTIVITY_MAX: i64 = 2 ^ ACTIVITY_WIDTH - 1;
