@@ -1,8 +1,6 @@
 use clause::*;
 use types::*;
 
-pub const LEVEL_BITMAP_SIZE: usize = 256;
-
 /// In splr, the watch map is reseted at the beginning of every simplification phase.
 /// It's just a immutable index (with some data) referring to a Clause in a Vec.
 #[derive(Debug)]
@@ -23,7 +21,7 @@ impl Watch {
 }
 
 /// is a mapping from `Lit` to `Vec<Watch>`.
-pub type WatchMap = Vec<Vec<Watch>>;
+type WatchMap = Vec<Vec<Watch>>;
 
 /// returns `WatchMap`, or `Vec<Vec<Watch>>`.
 pub fn new_watch_map(nv: usize) -> WatchMap {
@@ -34,7 +32,7 @@ pub fn new_watch_map(nv: usize) -> WatchMap {
     vec
 }
 
-pub fn push_to_watch(w: &mut WatchMap, ci: ClauseIndex, w0: Lit, w1: Lit) -> () {
+pub fn push_to_watch(w: &mut [Vec<Watch>], ci: ClauseIndex, w0: Lit, w1: Lit) -> () {
     if ci == NULL_CLAUSE {
         return;
     }
@@ -55,16 +53,15 @@ pub struct VarIndexHeap {
 
 impl VarIndexHeap {
     fn new(n: usize) -> VarIndexHeap {
-        let mut v1 = Vec::new();
-        v1.resize(n + 1, 0);
-        let mut v2 = Vec::new();
-        v2.resize(n + 1, 0);
-        for i in 0..n + 1 {
-            v1[i] = i;
-            v2[i] = i;
+        let mut heap = Vec::with_capacity(n + 1);
+        let mut idxs = Vec::with_capacity(n + 1);
+        heap.push(0);
+        idxs.push(n);
+        for i in 1..n + 1 {
+            heap.push(i);
+            idxs.push(i);
         }
-        v2[0] = n;
-        VarIndexHeap { heap: v1, idxs: v2 }
+        VarIndexHeap { heap, idxs }
     }
     /// renamed form numElementsInHeap
     fn len(&self) -> usize {
@@ -74,7 +71,7 @@ impl VarIndexHeap {
     fn contains(&self, v: VarIndex) -> bool {
         self.idxs[v] <= self.len()
     }
-    fn percolate_up(&mut self, vec: &Vec<Var>, start: usize) -> () {
+    fn percolate_up(&mut self, vec: &[Var], start: usize) -> () {
         let mut q = start;
         let vq = self.heap[q];
         if vq == 0 {
@@ -106,7 +103,7 @@ impl VarIndexHeap {
             }
         }
     }
-    fn percolate_down(&mut self, vec: &Vec<Var>, start: usize) -> () {
+    fn percolate_down(&mut self, vec: &[Var], start: usize) -> () {
         let n = self.len();
         let mut i = start;
         let vi = self.heap[i];
@@ -143,7 +140,7 @@ impl VarIndexHeap {
         }
     }
     /// renamed from incrementHeap, updateVO
-    pub fn update(&mut self, vec: &Vec<Var>, v: VarIndex) -> () {
+    pub fn update(&mut self, vec: &[Var], v: VarIndex) -> () {
         assert_ne!(v, 0);
         let start = self.idxs[v];
         if self.contains(v) {
@@ -151,7 +148,7 @@ impl VarIndexHeap {
         }
     }
     /// renamed from undoVO
-    fn insert(&mut self, vec: &Vec<Var>, vi: VarIndex) -> () {
+    fn insert(&mut self, vec: &[Var], vi: VarIndex) -> () {
         // self.check_var_order("check insert 1");
         if !self.contains(vi) {
             // println!("check_insert (unassign) {}", vi);
@@ -166,7 +163,7 @@ impl VarIndexHeap {
         // self.check_var_order("check insert 2");
     }
     /// renamed from insertHeap
-    pub fn push(&mut self, vec: &Vec<Var>, vi: VarIndex) -> () {
+    pub fn push(&mut self, vec: &[Var], vi: VarIndex) -> () {
         let n = self.idxs[0] + 1;
         self.heap[n] = vi;
         self.idxs[vi] = n;
@@ -176,7 +173,7 @@ impl VarIndexHeap {
         self.percolate_up(vec, n);
     }
     /// renamed from getHeapDown
-    fn root(&mut self, vec: &Vec<Var>) -> VarIndex {
+    fn root(&mut self, vec: &[Var]) -> VarIndex {
         let s = 1;
         let vs = self.heap[s];
         let n = self.idxs[0];
@@ -243,7 +240,6 @@ pub struct Solver {
     pub an_stack: Vec<Lit>,
     pub an_last_dl: Vec<Lit>,
     pub an_learnt_lits: Vec<Lit>,
-    pub an_level_map: Vec<bool>,
     pub stats: Vec<i64>,
     pub lbd_seen: Vec<u64>,
     pub lbd_key: u64,
@@ -269,10 +265,10 @@ impl Solver {
         let vdr = cfg.variable_decay_rate;
         let s = Solver {
             vars: Var::new_vars(nv),
-            clauses: new_clause_manager(),
-            learnts: new_clause_manager(),
+            clauses: new_clause_manager(nc),
+            learnts: new_clause_manager(100),
             watches: new_watch_map(nv * 2),
-            trail: Vec::new(),
+            trail: Vec::with_capacity(nv),
             trail_lim: Vec::new(),
             q_head: 0,
             conflicts: vec![],
@@ -295,7 +291,6 @@ impl Solver {
             an_stack: vec![],
             an_last_dl: vec![],
             an_learnt_lits: vec![],
-            an_level_map: vec![false; LEVEL_BITMAP_SIZE],
             stats: vec![0; StatIndex::EndOfStatIndex as usize],
             lbd_seen: vec![0; nv + 1],
             lbd_key: 0,

@@ -3,6 +3,8 @@ use solver::*;
 use std::cmp::max;
 use types::*;
 
+const LEVEL_BITMAP_SIZE: usize = 256;
+
 impl Solver {
     /// renamed from newLearntClause
     pub fn add_learnt(&mut self, v: Vec<Lit>) -> usize {
@@ -252,13 +254,11 @@ impl Solver {
         self.an_stack.clear();
         self.an_to_clear.clear();
         self.an_to_clear.push(l0);
-        for b in &mut self.an_level_map {
-            *b = false;
-        }
+        let mut level_map = [false; LEVEL_BITMAP_SIZE];
         for i in 1..n {
             let l = self.an_learnt_lits[i];
             self.an_to_clear.push(l);
-            self.an_level_map[(self.vars[l.vi()].level as usize) % LEVEL_BITMAP_SIZE] = true;
+            level_map[(self.vars[l.vi()].level as usize) % LEVEL_BITMAP_SIZE] = true;
         }
         // println!("  analyze.loop 4 n = {}", n);
         let mut i = 1;
@@ -273,7 +273,7 @@ impl Solver {
             if self.vars[l.vi()].reason == NULL_CLAUSE {
                 self.an_learnt_lits[j] = l;
                 j += 1;
-            } else if !self.analyze_removable(l) {
+            } else if !self.analyze_removable(l, &level_map) {
                 self.an_learnt_lits[j] = l;
                 j += 1;
             }
@@ -306,7 +306,7 @@ impl Solver {
         // println!("  analyze terminated");
         (level_to_return as u32, self.an_learnt_lits.clone())
     }
-    fn analyze_removable(&mut self, l: Lit) -> bool {
+    fn analyze_removable(&mut self, l: Lit, level_map: &[bool]) -> bool {
         self.an_stack.clear();
         self.an_stack.push(l);
         let top1 = self.an_to_clear.len();
@@ -323,7 +323,7 @@ impl Solver {
                     let vi = q.vi();
                     let lv = self.vars[vi].level % LEVEL_BITMAP_SIZE;
                     if self.an_seen[vi] != 1 && lv != 0 {
-                        if self.vars[vi].reason != NULL_CLAUSE && self.an_level_map[lv] {
+                        if self.vars[vi].reason != NULL_CLAUSE && level_map[lv] {
                             self.an_seen[vi] = 1;
                             self.an_stack.push(*q);
                             self.an_to_clear.push(*q);

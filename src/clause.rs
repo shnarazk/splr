@@ -131,8 +131,8 @@ impl fmt::Display for Clause {
 pub type ClauseManager = Vec<Clause>;
 
 /// returns a new clause manager.
-pub fn new_clause_manager() -> ClauseManager {
-    let mut m = Vec::new();
+pub fn new_clause_manager(nc: usize) -> ClauseManager {
+    let mut m = Vec::with_capacity(1 + nc);
     m.push(Clause::null());
     m
 }

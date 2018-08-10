@@ -77,7 +77,7 @@ impl Solver {
             }
         }
     }
-    pub fn lbd_of(&mut self, v: &Vec<Lit>) -> usize {
+    pub fn lbd_of(&mut self, v: &[Lit]) -> usize {
         let k = 1 + self.lbd_key;
         self.lbd_key = k;
         if 1000_000 < k {
