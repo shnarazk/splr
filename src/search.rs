@@ -381,21 +381,27 @@ impl Solver {
             }
         }
     }
-    pub fn reduce_database(&mut self) -> () {
-        let keep_c = self.sort_clauses();
-        let keep_l = self.sort_learnts();
-        self.rebuild_reason();
-        self.clauses.truncate(keep_c);
-        self.learnts.truncate(keep_l);
-        self.rebuild_watches();
-        if self.decision_level() == 0
-            && self.stats[StatIndex::NumOfGroundVar as usize] < self.num_assigns() as i64
-        {
-            for (i, x) in self.clause_permutation.iter_mut().enumerate() {
-                *x = i;
-            }
+    pub fn reduce_database(&mut self, both: bool) -> () {
+        let nc0 = self.clauses.len();
+        let nl0 = self.learnts.len();
+        let nc1 = if both {
+            self.sort_clauses()
+        } else {
+            nc0
+        };
+        let nl1 = self.sort_learnts();
+        self.rebuild_reason(both);
+        if both {
+            self.clauses.truncate(nc1);
         }
-        println!("< rebuild_database {}/{}", keep_l, self.max_learnts);
+        self.learnts.truncate(nl1);
+        self.rebuild_watches();
+        if both {
+            println!("< rebuild_database {}=>{} {}=>{}/{}", nc0, nc1, nl0, nl1, self.max_learnts);
+        } else {
+            debug_assert!(nc0 == nc1, "Clauses were reduced");
+            println!("< rebuild_database {}=>{}/{}", nl0, nl1, self.max_learnts);
+        }
     }
     /// Note: this function changes self.clause_permutation.
     fn sort_clauses(&mut self) -> usize {
@@ -406,11 +412,6 @@ impl Solver {
                 self.clause_permutation.reserve(nc + 1);
                 self.clause_permutation.set_len(nc + 1);
             }
-        }
-        if !(self.decision_level() == 0
-            && self.stats[StatIndex::NumOfGroundVar as usize] < self.num_assigns() as i64)
-        {
-            return nc;
         }
         // reinitialize the permutation table.
         for (i, x) in self.clause_permutation.iter_mut().enumerate() {
@@ -430,7 +431,7 @@ impl Solver {
         self.clauses.sort_by_key(|c| c.tmp);
         // update permutation table.
         for i in 1..nc {
-            let old = (self.clauses[i].index.neg()) as usize;
+            let old = self.clauses[i].index.neg() as usize;
             self.clause_permutation[old] = i;
             self.clauses[i].index = (i as ClauseIndex).neg();
         }
@@ -468,7 +469,7 @@ impl Solver {
         self.learnt_permutation[0] = 0;
         max(requires, nc / 2)
     }
-    fn rebuild_reason(&mut self) -> () {
+    fn rebuild_reason(&mut self, both: bool) -> () {
         let new_clause = &self.clause_permutation;
         let new_learnt = &self.learnt_permutation;
         // println!("perm {:?}", perm);
@@ -476,7 +477,7 @@ impl Solver {
             let ci = v.reason;
             if 0 < ci {
                 v.reason = new_learnt[ci as usize] as i64;
-            } else if ci < 0 {
+            } else if both && ci < 0 {
                 v.reason = (new_clause[ci.neg() as usize] as i64).neg();
             }
         }
@@ -510,27 +511,23 @@ impl Solver {
     /// - false for UNSAT
     fn search(&mut self) -> bool {
         // self.dump("search");
-        // println!("search");
-        let delta = 800.0; // (self.num_vars as f64).sqrt();
+        let delta = (self.num_vars as f64).sqrt();
         let root_lv = self.root_level;
         let mut to_restart = false;
         loop {
             // self.dump("calling propagate");
             let ret = self.propagate();
             let d = self.decision_level();
-            // println!("search called propagate and it returned {:?} at {}", ret, d);
-            // self.dump("after propagation");
+            // self.dump(format!("search called propagate and it returned {:?} at {}", ret, d));
             match ret {
                 Some(ci) => {
                     self.stats[StatIndex::NumOfBackjump as usize] += 1;
                     if d == self.root_level {
-                        println!("  it's UNSAT");
                         self.analyze_final(ci, false);
                         return false;
                     } else {
                         // self.dump(" before analyze");
                         let (backtrack_level, v) = self.analyze(ci);
-                        // self.dump("analyzed");
                         // println!(
                         //     " conflict analyzed {:?}",
                         //     v.iter().map(|l| l.int()).collect::<Vec<i32>>()
@@ -538,9 +535,10 @@ impl Solver {
                         self.cancel_until(max(backtrack_level as usize, root_lv));
                         // println!(" backtracked to {}", backtrack_level);
                         let lbd = self.add_learnt(v);
-                        let k = self.an_learnt_lits.len();
-                        if k == 1 {
+                        if lbd == 1 {
                             self.vars[self.an_learnt_lits[0].vi()].level = 0;
+                            self.reduce_database(true);
+                            continue;
                         }
                         self.decay_var_activity();
                         self.decay_cla_activity();
@@ -554,14 +552,13 @@ impl Solver {
                             continue;
                         }
                     }
-                    // println!(" search loop conflict terminated");
                 }
                 None => {
                     // println!(" search loop enter a new level");
                     // if d == 0 { simplify_db() };
                     let na = self.num_assigns();
                     if self.max_learnts as usize + na < self.learnts.len() {
-                        self.reduce_database();
+                        self.reduce_database(false);
                     }
                     if na == self.num_vars {
                         return true;
