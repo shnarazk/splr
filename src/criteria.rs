@@ -46,8 +46,7 @@ impl Solver {
         self.var_inc /= VAR_ACTIVITY_THRESHOLD;
     }
     // renamed from clause_new
-    pub fn add_clause(&mut self, learnt: bool, mut v: Vec<Lit>) -> bool {
-        assert_eq!(learnt, false);
+    pub fn add_clause(&mut self, mut v: Vec<Lit>) -> bool {
         v.sort_unstable();
         let mut j = 0;
         let mut l_ = NULL_LIT; // last literal; [x, x.negate()] means totology.

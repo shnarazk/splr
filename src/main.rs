@@ -59,7 +59,7 @@ fn build_solver(path: &str) -> (Solver, CNFDescription) {
                     }
                 }
                 if v.len() != 0 {
-                    s.add_clause(false, v);
+                    s.add_clause(v);
                 }
             }
             Err(e) => panic!("{}", e),
