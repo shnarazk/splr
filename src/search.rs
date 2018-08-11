@@ -4,7 +4,7 @@ use std::cmp::max;
 use std::usize::MAX;
 use types::*;
 
-const LEVEL_BITMAP_SIZE: usize = 256;
+const LEVEL_BITMAP_SIZE: usize = 16384;
 
 impl Solver {
     /// renamed from newLearntClause
@@ -166,6 +166,7 @@ impl Solver {
         }
     }
     fn analyze(&mut self, confl: ClauseIndex) -> (usize, Vec<Lit>) {
+        let mut history: Vec<(Lit, u32, &Clause)> = Vec::new();
         for mut l in &mut self.an_seen {
             *l = 0;
         }
@@ -180,8 +181,19 @@ impl Solver {
         let mut path_cnt = 0;
         loop {
             unsafe {
-                debug_assert!(ci != NULL_CLAUSE, "Null clause found in analzye");
+                let c = &self.clauses[ci] as *const Clause;
+                history.push((p, path_cnt, &*c));
+            }
+            unsafe {
                 let c = &mut self.clauses[ci] as *mut Clause;
+                if ci == 0 {
+                    // println!("Null clause found in analzye {:}", history);
+                    for (l, p, c) in &history {
+                        println!("{}: {} {}", l.int(), p, c);
+                    }
+                    println!("dl {}", self.decision_level());
+                    debug_assert!(ci != NULL_CLAUSE, "Null clause found in analzye");
+                }
                 // println!("  analyze.loop {}", (*c));
                 let d = (*c).rank;
                 if 0 < d {
@@ -253,7 +265,7 @@ impl Solver {
         //         .collect::<Vec<i32>>()
         // );
         let level_to_return: usize = b;
-        // simlpify phase
+        // simplify phase
         let n = self.an_learnt_lits.len();
         let l0 = self.an_learnt_lits[0];
         self.an_stack.clear();
@@ -389,11 +401,8 @@ impl Solver {
     /// - false for UNSAT
     fn search(&mut self) -> bool {
         // self.dump("search");
-        let delta: f64 = if 30000 < self.num_vars {
-            (self.num_vars as f64).sqrt()
-        } else {
-            200.0
-        };
+        let delta_init: f64 = if 1000 < self.num_vars { 100.0 } else { 500.0 };
+        let mut delta = delta_init;
         let root_lv = self.root_level;
         let mut to_restart = false;
         loop {
@@ -421,7 +430,7 @@ impl Solver {
                         self.decay_cla_activity();
                         self.learnt_size_cnt -= 1;
                         if self.learnt_size_cnt == 0 {
-                            let t_ = 1.5 * self.learnt_size_adj;
+                            let t_ = 1.25 * self.learnt_size_adj;
                             self.learnt_size_adj = t_;
                             self.learnt_size_cnt = t_ as u64;
                             self.max_learnts += delta;
@@ -433,17 +442,21 @@ impl Solver {
                 None => {
                     // println!(" search loop enter a new level");
                     let na = self.num_assigns();
-                    if (self.max_learnts as usize) + na < self.clauses.len() - self.fixed_len {
-                        self.reduce_database(false);
-                    } else if d == 0 {
-                        self.reduce_database(true);
-                    }
                     if na == self.num_vars {
                         return true;
-                    } else if to_restart {
+                    } else if (self.max_learnts as usize) < self.clauses.len() - self.fixed_len {
+                        self.reduce_database(false);
+                        self.max_learnts += 10.0;
+                    } else if d == 0 && 0 < self.trail.len() {
+                        self.reduce_database(true);
+                    }
+                    if to_restart {
                         self.cancel_until(root_lv);
+                        println!("restart");
+                        delta = delta_init;
                         to_restart = false;
-                    } else {
+                    } // else {
+                    {
                         let vi = self.select_var();
                         // println!(" search loop find a new decision var");
                         debug_assert!(vi != 0, "No more decision var");
@@ -515,10 +528,23 @@ impl Solver {
             !simplify || self.decision_level() == 0,
             "wrong invocation of reduce_database"
         );
+        // if simplify {
+        //     let mut assigned = 0;
+        //     for v in &self.vars[1..] {
+        //         if 0 < v.reason {
+        //             assigned += 1;
+        //         }
+        //     }
+        //     println!("  before simplify: {} {:?}", assigned, self.trail.iter().map(|l| &self.vars[l.vi()]).collect::<Vec<&Var>>());
+        // }
         let end = self.clauses.len();
-        let new_end = self.sort_clauses(simplify);
+        let mut new_end = self.sort_clauses(simplify);
         self.rebuild_reason();
-        self.clauses.truncate(new_end);
+        if new_end < end {
+            self.clauses.truncate(new_end);
+        } else {
+            new_end = end;
+        }
         if simplify {
             let mut fixed = 0;
             for c in &self.clauses {
@@ -526,20 +552,25 @@ impl Solver {
                     fixed += 1;
                 }
             }
+            debug_assert!(0 < fixed, "fixed_len becomes zero.");
             self.fixed_len = fixed;
         }
         self.rebuild_watches();
-        if simplify {
-            println!(
-                "< rebuild_database with simplification {} ({})  => {} / {:.1}",
-                end, self.fixed_len, new_end, self.max_learnts
-            );
-        } else {
-            println!(
-                "< rebuild_database {} ({}) => {} / {:.1}",
-                end, self.fixed_len, new_end, self.max_learnts
-            );
-        }
+        debug_assert!(self.clauses[0].index == 0, "NULL moved.");
+        let tag = if simplify { "simplify" } else { "drop 1/2" };
+        println!(
+            "# DB::{} {:>9} ({:>9}) => {:>9} / {:>9.1}",
+            tag, end, self.fixed_len, new_end, self.max_learnts
+        );
+        // if simplify {
+        //     let mut assigned = 0;
+        //     for v in &self.vars[1..] {
+        //         if 0 < v.reason {
+        //             assigned += 1;
+        //         }
+        //     }
+        //     println!("  after simplify: {} {:?}", assigned, self.trail.iter().map(|l| &self.vars[l.vi()]).collect::<Vec<&Var>>());
+        // }
     }
     /// Note: this function changes self.clause_permutation.
     fn sort_clauses(&mut self, simplify: bool) -> usize {
@@ -562,7 +593,9 @@ impl Solver {
         }
         // mark clauses that used as reasons
         for v in &self.vars[1..] {
-            self.clauses[v.reason].tmp = 0;
+            if 0 < v.reason {
+                self.clauses[v.reason].tmp = 0;
+            }
         }
         // set key
         let ac = 0.1 * self.cla_inc / (nc as f64);
@@ -595,20 +628,22 @@ impl Solver {
         }
         debug_assert!(self.clauses[0].index == 0, "NULL moved.");
         if simplify {
-            start + requires + (nc - start) / 4
+            start + requires + (nc - start) / 2
         } else {
             start + max(requires, (nc - start) / 2)
         }
     }
     fn rebuild_reason(&mut self) -> () {
-        let len = &self.clauses.len();
+        let len = self.clauses.len();
         let new_clause = &self.clause_permutation;
         // println!("perm {:?}", perm);
         for v in &mut self.vars[1..] {
             let ci = v.reason;
-            v.reason = new_clause[ci];
-            if len < &new_clause[ci] {
-                panic!("strange index for permutation {} {}", ci, len);
+            if 0 < ci {
+                v.reason = new_clause[ci];
+                if v.reason == 0 || len < v.reason {
+                    panic!("strange index for permutation {} {}", ci, len);
+                }
             }
         }
     }
