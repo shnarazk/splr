@@ -210,7 +210,7 @@ pub struct Solver {
     /// Assignment Management
     pub vars: Vec<Var>,
     pub clauses: ClauseManager,
-    pub learnts: ClauseManager,
+    pub fixed_len: usize,
     pub watches: WatchMap,
     pub trail: Vec<Lit>,
     pub trail_lim: Vec<usize>,
@@ -226,7 +226,6 @@ pub struct Solver {
     pub root_level: usize,
     /// Database Management
     pub clause_permutation: Vec<usize>,
-    pub learnt_permutation: Vec<usize>,
     pub learnt_size_adj: f64,
     pub learnt_size_cnt: u64,
     pub max_learnts: f64,
@@ -252,6 +251,10 @@ pub struct Solver {
     pub rbias: Ema_,
 }
 
+trait Dump {
+    fn dump(&self, mes: &str) -> ();
+}
+
 impl Solver {
     pub fn new(cfg: SolverConfiguration, cnf: &CNFDescription) -> Solver {
         let nv = cnf.num_of_variables as usize;
@@ -263,7 +266,7 @@ impl Solver {
         let s = Solver {
             vars: Var::new_vars(nv),
             clauses: new_clause_manager(nc),
-            learnts: new_clause_manager(100),
+            fixed_len: 1 + nc,
             watches: new_watch_map(nv * 2),
             trail: Vec::with_capacity(nv),
             trail_lim: Vec::new(),
@@ -275,8 +278,7 @@ impl Solver {
             cla_inc: cdr,
             var_inc: vdr,
             root_level: 0,
-            clause_permutation: (0..nc + 1).collect(),
-            learnt_permutation: Vec::new(),
+            clause_permutation: (0..nc * 2).collect(),
             learnt_size_adj: 100.0,
             learnt_size_cnt: 100,
             max_learnts: 2000.0,
@@ -311,58 +313,38 @@ impl Solver {
             negate_bool(x)
         }
     }
-    pub fn iref_clause(&self, ci: ClauseIndex) -> &Clause {
-        if 0 < ci {
-            &self.learnts[ci as usize]
-        } else {
-            &self.clauses[(-ci) as usize]
-        }
-    }
-    pub fn mref_clause(&mut self, ci: ClauseIndex) -> &mut Clause {
-        if 0 < ci {
-            &mut self.learnts[ci as usize]
-        } else {
-            &mut self.clauses[(-ci) as usize]
-        }
-    }
     pub fn satisfies(&self, c: &Clause) -> bool {
         for l in &c.lits {
             if self.assigned(*l) == LTRUE {
                 return true;
             }
         }
-        return false;
+        false
     }
-    pub fn inject(&mut self, learnt: bool, mut c: Clause) -> ClauseIndex {
+    pub fn inject(&mut self, mut c: Clause) -> ClauseIndex {
         if c.lits.len() == 1 {
             self.enqueue(c.lits[0], NULL_CLAUSE);
             return 0;
         }
         let w0 = c.lits[0];
         let w1 = c.lits[1];
-        let ci = if learnt {
-            self.learnts.len() as i64
-        } else {
-            0 - (self.clauses.len() as i64)
-        };
+        let ci = self.clauses.len();
         c.index = ci;
         // println!("Inject {}-th clause {}.", ci, c);
-        if learnt {
-            self.learnts.push(c);
-        } else {
-            self.clauses.push(c);
-        }
+        self.clauses.push(c);
         push_to_watch(&mut self.watches, ci, w0, w1);
         ci
     }
     pub fn num_assigns(&self) -> usize {
         self.trail.len()
     }
-    pub fn num_clauses(&self) -> usize {
-        self.clauses.len() - 1 // 0 is NULL_CLAUSE
+    /// the number of given clause
+    /// The numeber might change after simplification
+    pub fn num_givencs(&self) -> usize {
+        self.fixed_len
     }
     pub fn num_learnts(&self) -> usize {
-        self.learnts.len() - 1 // 0 is NULL_CLAUSE
+        self.clauses.len() - self.fixed_len - 1 // 1 for NULL_CLAUSE
     }
     pub fn decision_level(&self) -> usize {
         self.trail_lim.len()
@@ -425,7 +407,10 @@ impl Solver {
             }
         }
     }
-    pub fn dump(&self, str: &str) -> () {
+}
+
+impl Dump for Solver {
+    fn dump(&self, str: &str) -> () {
         println!("# {} at {}", str, self.decision_level());
         println!(
             "# nassigns {}, decision cands {}",

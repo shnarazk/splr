@@ -3,17 +3,17 @@ use std::f64;
 use std::fmt;
 use types::*;
 
-// const RANK_WIDTH: i64 = 11;
-const ACTIVITY_WIDTH: i64 = 51;
-const RANK_MAX: i64 = 1000;
-const ACTIVITY_MAX: i64 = 2 ^ ACTIVITY_WIDTH - 1;
+// const RANK_WIDTH: u64 = 11;
+const ACTIVITY_WIDTH: usize = 51;
+const RANK_MAX: usize = 1000;
+const ACTIVITY_MAX: usize = 2 ^ ACTIVITY_WIDTH - 1;
 
 /// Clause Index, not ID because it changes after database reduction.
 /// # Range
 /// * `< 0` for given clauses. So we need `i64` instead of `usize`.
 /// * 0 for a null clause.
 /// * '0 <' for learnt clauses.
-pub type ClauseIndex = i64;
+pub type ClauseIndex = usize;
 
 /// is a dummy clause index
 pub const NULL_CLAUSE: ClauseIndex = 0;
@@ -32,7 +32,7 @@ pub struct Clause {
     /// the literals
     pub lits: Vec<Lit>,
     /// temporal field for `sort_clause` and `propagate`
-    pub tmp: i64,
+    pub tmp: usize,
 }
 
 #[cfg(drop)]
@@ -47,10 +47,10 @@ impl Drop for Clause {
 }
 
 impl Clause {
-    pub fn new(v: Vec<Lit>) -> Clause {
+    pub fn new(learnt: bool, v: Vec<Lit>) -> Clause {
         Clause {
             activity: 0.0,
-            rank: v.len(),
+            rank: if learnt { v.len() } else { 0 },
             lits: v,
             index: 0,
             tmp: 0,
@@ -76,18 +76,18 @@ impl Clause {
     }
     /// returns 1 if this is good enough.
     pub fn set_sort_key(&mut self, at: f64) -> usize {
-        if self.index == 0 {
-            self.tmp = -2;
-            1
-        } else if self.lits.len() == 2 {
+        if self.index == 0 || self.rank == 0 {
             self.tmp = 0;
+            0
+        } else if self.lits.len() == 2 {
+            self.tmp = 1;
             1
         } else {
             let ac = self.activity;
             let d = if ac < at {
                 RANK_MAX // bigger is worse
             } else {
-                min(RANK_MAX, self.rank as i64)
+                min(RANK_MAX, self.rank)
             };
             self.tmp = (d << ACTIVITY_WIDTH) + scale_activity(ac);
             0
@@ -95,11 +95,11 @@ impl Clause {
     }
 }
 
-fn scale_activity(x: f64) -> i64 {
+fn scale_activity(x: f64) -> usize {
     if x < 1e-20 {
         ACTIVITY_MAX
     } else {
-        (ACTIVITY_MAX * ((1.0 - (x * 1e20).log10() / 40.0) as i64))
+        (ACTIVITY_MAX * ((1.0 - (x * 1e20).log10() / 40.0) as usize))
     }
 }
 

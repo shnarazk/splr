@@ -70,6 +70,7 @@ fn build_solver(path: &str) -> (Solver, CNFDescription) {
     // }
     // s.dump("built");
     assert_eq!(s.vars.len() - 1, cnf.num_of_variables);
+    s.fixed_len = s.clauses.len() - 1;
     (s, cnf)
 }
 
@@ -127,8 +128,8 @@ fn main_() {
     };
     let mut s: Solver = Solver::new(DEFAULT_CONFIGURATION, &cnf);
     let x: Lit = int2lit(4);
-    let c1 = Clause::new(vec![int2lit(1), int2lit(2), int2lit(3)]);
-    let mut c2 = Clause::new(vec![int2lit(-1), int2lit(4)]);
+    let c1 = Clause::new(false, vec![int2lit(1), int2lit(2), int2lit(3)]);
+    let mut c2 = Clause::new(false, vec![int2lit(-1), int2lit(4)]);
     let mut e = Ema::new(1000);
     for _ in 1..20 {
         e.update(0.2);
@@ -159,7 +160,7 @@ fn main_() {
                     }
                 }
                 println!("a new clause: {:?}", v);
-                s.inject(false, Clause::new(v));
+                s.inject(Clause::new(true, v));
             }
             Err(e) => panic!("{}", e),
         }
