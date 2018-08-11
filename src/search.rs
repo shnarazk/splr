@@ -67,7 +67,7 @@ impl Solver {
                         by: ci,
                         to,
                     } = self.watches[p as usize][wi];
-                    debug_assert!(blocker == to, "An inconsistent Watch");
+                    debug_assert!(blocker != to, "An inconsistent Watch");
                     // We use `Watch.to` to keep the literal which is the destination of propagation.
                     let bv = if blocker == 0 {
                         LFALSE
