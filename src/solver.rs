@@ -74,15 +74,13 @@ impl VarIndexHeap {
     fn percolate_up(&mut self, vec: &[Var], start: usize) -> () {
         let mut q = start;
         let vq = self.heap[q];
-        if vq == 0 {
-            println!("percolate: vq {} q {}, start {}", vq, q, start);
-        }
+        debug_assert!(0 < vq, "size of heap is too small");
         let aq = vec[vq].activity;
         loop {
             let p = q / 2;
             if p == 0 {
                 self.heap[q] = vq;
-                assert_ne!(vq, 0);
+                debug_assert!(vq != 0, "Invalid index in percolate_up");
                 self.idxs[vq] = q;
                 return;
             } else {
@@ -91,12 +89,12 @@ impl VarIndexHeap {
                 if ap < aq {
                     // move down the current parent, and make it empty
                     self.heap[q] = vp;
-                    assert_ne!(vp, 0);
+                    debug_assert!(vq != 0, "Invalid index in percolate_up");
                     self.idxs[vp] = q;
                     q = p;
                 } else {
                     self.heap[q] = vq;
-                    assert_ne!(vq, 0);
+                    debug_assert!(vq != 0, "Invalid index in percolate_up");
                     self.idxs[vq] = q;
                     return;
                 }
@@ -127,13 +125,13 @@ impl VarIndexHeap {
                     i = c;
                 } else {
                     self.heap[i] = vi;
-                    assert_ne!(vi, 0);
+                    debug_assert!(vi != 0, "invalid index");
                     self.idxs[vi] = i;
                     return;
                 }
             } else {
                 self.heap[i] = vi;
-                assert_ne!(vi, 0);
+                debug_assert!(vi != 0, "invalid index");
                 self.idxs[vi] = i;
                 return;
             }
@@ -141,7 +139,7 @@ impl VarIndexHeap {
     }
     /// renamed from incrementHeap, updateVO
     pub fn update(&mut self, vec: &[Var], v: VarIndex) -> () {
-        assert_ne!(v, 0);
+        debug_assert!(v != 0, "Invalid VarIndex");
         let start = self.idxs[v];
         if self.contains(v) {
             self.percolate_up(vec, start)
@@ -149,7 +147,7 @@ impl VarIndexHeap {
     }
     /// renamed from undoVO
     fn insert(&mut self, vec: &[Var], vi: VarIndex) -> () {
-        // self.check_var_order("check insert 1");
+        // self.var_order.check("check insert 1");
         if !self.contains(vi) {
             // println!("check_insert (unassign) {}", vi);
             let i = self.idxs[vi];
@@ -160,16 +158,15 @@ impl VarIndexHeap {
             self.idxs[0] = n;
             self.percolate_up(vec, n);
         }
-        // self.check_var_order("check insert 2");
+        // self.var_order.check("check insert 2");
     }
     /// renamed from insertHeap
     pub fn push(&mut self, vec: &[Var], vi: VarIndex) -> () {
         let n = self.idxs[0] + 1;
+        debug_assert!(n != 0, "Invalid index for heap");
         self.heap[n] = vi;
         self.idxs[vi] = n;
-        assert_ne!(n, 0);
         self.idxs[0] = n;
-        assert_ne!(n, 0);
         self.percolate_up(vec, n);
     }
     /// renamed from getHeapDown
@@ -178,16 +175,16 @@ impl VarIndexHeap {
         let vs = self.heap[s];
         let n = self.idxs[0];
         let vn = self.heap[n];
-        // self.check_var_order(&format!("root 1 :[({}, {}) ({}, {})]", s, vs, n, vn));
-        assert_ne!(vn, 0);
-        assert_ne!(vs, 0);
+        // self.var_order.check(&format!("root 1 :[({}, {}) ({}, {})]", s, vs, n, vn));
+        debug_assert!(vn != 0, "Invalid VarIndex for heap");
+        debug_assert!(vs != 0, "Invalid VarIndex for heap");
         self.heap.swap(n, s);
         self.idxs.swap(vn, vs);
         self.idxs[0] -= 1;
         if 1 < self.idxs[0] {
             self.percolate_down(vec, 1);
         }
-        // self.check_var_order("root 2");
+        // self.var_order.check("root 2");
         vs
     }
     pub fn check(&self, s: &str) -> () {
@@ -399,15 +396,12 @@ impl Solver {
         let lim = self.trail_lim[lv];
         for l in &self.trail[lim..] {
             let vi = l.vi();
-            // println!("cancell assign {}", vi);
             {
                 let v = &mut self.vars[vi];
                 v.phase = v.assign;
                 v.assign = BOTTOM;
                 v.reason = NULL_CLAUSE;
-                // println!("rollback vi:{}", vi);
             }
-            assert_eq!(self.vars[vi].assign, BOTTOM);
             self.var_order.insert(&self.vars, vi);
         }
         self.trail.truncate(lim); // FIXME
@@ -418,13 +412,13 @@ impl Solver {
     /// Heap operations; renamed from selectVO
     pub fn select_var(&mut self) -> VarIndex {
         loop {
-            // self.check_var_order("select_var 1");
+            // self.var_order.check("select_var 1");
             if self.var_order.len() == 0 {
                 // println!("> select_var returns 0");
                 return 0;
             }
             let vi = self.var_order.root(&self.vars);
-            // self.check_var_order("select_var 2");
+            // self.var_order.check("select_var 2");
             let x = self.vars[vi].assign;
             if x == BOTTOM {
                 return vi;

@@ -33,6 +33,7 @@ impl Solver {
         let ci = self.inject(true, c);
         self.bump_ci(ci);
         self.unsafe_enqueue(l0, ci);
+        debug_assert!(1 < lbd, "lbd of a new clause is too small");
         lbd
     }
     /// renamed from simplfy
@@ -66,7 +67,7 @@ impl Solver {
                         by: ci,
                         to,
                     } = self.watches[p as usize][wi];
-                    assert_ne!(blocker, to);
+                    debug_assert!(blocker == to, "An inconsistent Watch");
                     // We use `Watch.to` to keep the literal which is the destination of propagation.
                     let bv = if blocker == 0 {
                         LFALSE
@@ -79,7 +80,7 @@ impl Solver {
                     }
                     unsafe {
                         let c = self.mref_clause(ci) as *mut Clause;
-                        assert_eq!(ci, (*c).index);
+                        debug_assert!(ci == (*c).index, "A clause has an inconsistent index");
                         if !(false_lit == (*c).lits[0] || false_lit == (*c).lits[1]) {
                             panic!(
                                 "Watch literals error by {} ({}, {}) for propagate({})",
@@ -95,7 +96,7 @@ impl Solver {
                             (*c).lits.swap(0, 1);
                         }
                         let first = (*c).lits[0];
-                        assert_eq!(false_lit, (*c).lits[1]);
+                        debug_assert!(false_lit == (*c).lits[1], "Inconsisitent watch registration");
                         let fv = self.assigned(first);
                         if fv == LTRUE {
                             // Satisfied by the other watch.
@@ -120,7 +121,7 @@ impl Solver {
                             // println!("  unit propagation {} by {}", first.int(), (*c));
                             (*c).tmp = 1;
                             self.watches[p as usize][wi].to = p;
-                            assert_eq!(first, (*c).lits[0]);
+                            debug_assert!(first == (*c).lits[0], "Inconsisitent clause propagation update");
                             self.unsafe_enqueue(first, ci);
                         }
                     }
@@ -133,7 +134,7 @@ impl Solver {
                     // println!("   remain: {}", self.watches[p as usize].len());
                     match self.watches[p as usize].pop() {
                         Some(w) => {
-                            assert_ne!(w.to, 0);
+                            debug_assert!(w.to != 0, "Invalid Watch.to found");
                             if w.to == p {
                                 self.watches[0].push(w)
                             } else {
@@ -150,12 +151,12 @@ impl Solver {
                         None => break,
                     }
                 }
-                assert_eq!(self.watches[p as usize].is_empty(), true);
+                debug_assert!(self.watches[p as usize].is_empty(), "propagate failed to clear watches");
                 loop {
                     match self.watches[0].pop() {
                         Some(w) => {
                             // println!("  loop back by {} to {}", w.by, w.to.int());
-                            assert_eq!(w.to, p);
+                            debug_assert!(w.to == p, "inconsistent propagation");
                             self.watches[p as usize].push(w);
                         }
                         None => break,
@@ -179,7 +180,7 @@ impl Solver {
         let mut path_cnt = 0;
         loop {
             unsafe {
-                assert_ne!(ci, NULL_CLAUSE);
+                debug_assert!(ci != NULL_CLAUSE, "Null clause found in analzye");
                 let c = self.mref_clause(ci) as *mut Clause;
                 // println!("  analyze.loop {}", (*c));
                 let d = (*c).rank;
@@ -194,7 +195,7 @@ impl Solver {
                 for q in &(*c).lits[if p == NULL_LIT { 0 } else { 1 }..] {
                     let vi = q.vi();
                     let l = self.vars[vi].level;
-                    assert_ne!(self.vars[vi].assign, BOTTOM);
+                    debug_assert!(self.vars[vi].assign != BOTTOM, "Unbound literal found in analyze");
                     if self.an_seen[vi] == 0 && 0 < l {
                         self.bump_vi(vi);
                         self.an_seen[vi] = 1;
@@ -570,10 +571,7 @@ impl Solver {
                     } else {
                         let vi = self.select_var();
                         // println!(" search loop find a new decision var");
-                        if vi == 0 {
-                            self.dump("no more decision canditate");
-                        }
-                        assert_ne!(vi, 0);
+                        debug_assert!(vi != 0, "No more decision var");
                         // println!(" {:?}", self.var_order);
                         if vi != 0 {
                             let p = self.vars[vi].phase;
@@ -620,7 +618,7 @@ impl Solver {
         // } else {
         //     println!("unsafe_enqueue imply: {} by {}", l.int(), ci);
         // }
-        assert_ne!(l, 0);
+        debug_assert!(l != 0, "Null literal is about to be equeued");
         let dl = self.decision_level();
         let v = &mut self.vars[l.vi()];
         v.assign = l.lbool();
