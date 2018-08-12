@@ -142,7 +142,6 @@ impl Solver {
                     fixed += 1;
                 }
             }
-            debug_assert!(0 < fixed, "fixed_len becomes zero.");
             self.fixed_len = fixed;
         }
         self.rebuild_watches();
@@ -199,25 +198,13 @@ impl Solver {
             }
         }
         // sort the range
-        {
-            let vec = &mut self.clauses[start..];
-            vec.sort_by_key(|c| c.tmp);
-        }
+        self.clauses[start..].sort_by_key(|c| c.tmp);
         // update permutation table.
         for i in 1..nc {
             let old = self.clauses[i].index;
             debug_assert!(0 < old, "0 index");
             self.clause_permutation[old] = i;
             self.clauses[i].index = i;
-        }
-        let mut n_bi = 0;
-        for c in &self.clauses[start..] {
-            if c.rank == 2 {
-                n_bi += 1;
-            }
-        }
-        if n_bi == nc - start {
-            println!("all binary clauses");
         }
         debug_assert!(self.clauses[0].index == 0, "NULL moved.");
         if simplify {
@@ -230,7 +217,6 @@ impl Solver {
     fn rebuild_reason(&mut self) -> () {
         let len = self.clauses.len();
         let new_clause = &self.clause_permutation;
-        // println!("perm {:?}", perm);
         for v in &mut self.vars[1..] {
             let ci = v.reason;
             if 0 < ci {
@@ -242,18 +228,13 @@ impl Solver {
         }
     }
     fn rebuild_watches(&mut self) -> () {
-        // Firstly, clear everything.
-        // for i in 1..self.watches.len() {
-        //     let w = &mut self.watches[i];
-        //     w.clear();
-        // }
         for w in &mut self.watches {
             w.clear();
         }
-        // assert_eq!(self.clauses[0].index, 0);
+        debug_assert_eq!(self.clauses[0].index, 0);
         for c in &self.clauses[1..] {
             if 2 <= c.lits.len() {
-                push_to_watch(&mut self.watches, c.index, c.lits[0], c.lits[1]);
+                push_watch(&mut self.watches, c.index, c.lits[0], c.lits[1]);
             }
         }
         // self.dump(&format!("rebuild {}", self.learnts.len()));

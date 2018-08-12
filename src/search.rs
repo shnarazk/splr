@@ -167,7 +167,6 @@ impl Solver {
         }
     }
     fn analyze(&mut self, confl: ClauseIndex) -> (usize, Vec<Lit>) {
-        let mut history: Vec<(Lit, u32, &Clause)> = Vec::new();
         for mut l in &mut self.an_seen {
             *l = 0;
         }
@@ -182,19 +181,8 @@ impl Solver {
         let mut path_cnt = 0;
         loop {
             unsafe {
-                let c = &self.clauses[ci] as *const Clause;
-                history.push((p, path_cnt, &*c));
-            }
-            unsafe {
                 let c = &mut self.clauses[ci] as *mut Clause;
-                if ci == 0 {
-                    // println!("Null clause found in analzye {:}", history);
-                    for (l, p, c) in &history {
-                        println!("{}: {} {}", l.int(), p, c);
-                    }
-                    println!("dl {}", self.decision_level());
-                    debug_assert!(ci != NULL_CLAUSE, "Null clause found in analzye");
-                }
+                debug_assert_ne!(ci, NULL_CLAUSE);
                 // println!("  analyze.loop {}", (*c));
                 let d = (*c).rank;
                 if 0 < d {
@@ -454,15 +442,14 @@ impl Solver {
                     }
                     if to_restart {
                         self.cancel_until(root_lv);
-                        println!("restart");
+                        // println!("restart");
                         delta = delta_init;
                         to_restart = false;
                     } // else {
                     {
                         let vi = self.select_var();
                         // println!(" search loop find a new decision var");
-                        debug_assert!(vi != 0, "No more decision var");
-                        // println!(" {:?}", self.var_order);
+                        debug_assert_ne!(vi, 0);
                         if vi != 0 {
                             let p = self.vars[vi].phase;
                             self.unsafe_assume(vi.lit(p));
