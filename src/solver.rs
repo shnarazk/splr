@@ -250,7 +250,7 @@ impl Dump for Solver {
         }
         if false {
             self.var_order.dump();
-            self.var_order.check("");
+            // self.var_order.check("");
         }
     }
 }

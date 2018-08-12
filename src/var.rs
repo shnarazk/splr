@@ -187,7 +187,7 @@ impl VarIndexHeap {
         println!("# - heap {:?}", self.heap);
         println!("# - idxs {:?}", self.idxs);
     }
-    pub fn check(&self, s: &str) -> () {
+    fn check(&self, s: &str) -> () {
         let h = &mut self.heap.clone()[1..];
         let d = &mut self.idxs.clone()[1..];
         h.sort();

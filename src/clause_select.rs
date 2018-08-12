@@ -23,11 +23,11 @@ fn scale_activity(x: f64) -> usize {
 /// returns 1 if this is good enough.
 impl Clause {
     pub fn set_sort_key(&mut self, at: f64) -> usize {
-        if self.index == 0 || self.rank <= 1 {
+        if self.rank == 0 {
+            // only NULL and given
             self.tmp = 0;
-            0
-        } else if self.lits.len() == 2 {
-            self.rank = 1;
+            1
+        } else if self.rank == 1 {
             self.tmp = 1;
             1
         } else {

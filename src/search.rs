@@ -29,12 +29,17 @@ impl Solver {
         }
         c.lits.swap(1, i_max);
         let l0 = c.lits[0];
-        let lbd = self.lbd_of(&c.lits);
+        let lbd;
+        if c.lits.len() == 2 {
+            lbd = 1;
+        } else {
+            lbd = self.lbd_of(&c.lits);
+        }
         c.rank = lbd;
         let ci = self.inject(c);
         self.bump_ci(ci);
         self.unsafe_enqueue(l0, ci);
-        debug_assert!(1 < lbd, "lbd of a new clause is too small");
+        debug_assert!(0 < lbd, "lbd of a new clause is too small");
         lbd
     }
     // adapt delayed update of watches
@@ -390,7 +395,7 @@ impl Solver {
     /// - false for UNSAT
     fn search(&mut self) -> bool {
         // self.dump("search");
-        let delta_init: f64 = if 1000 < self.num_vars { 100.0 } else { 500.0 };
+        let delta_init: f64 = (self.num_vars as f64).sqrt();
         let mut delta = delta_init;
         let root_lv = self.root_level;
         let mut to_restart = false;
@@ -419,9 +424,9 @@ impl Solver {
                         self.decay_cla_activity();
                         self.learnt_size_cnt -= 1;
                         if self.learnt_size_cnt == 0 {
-                            let t_ = 1.25 * self.learnt_size_adj;
-                            self.learnt_size_adj = t_;
-                            self.learnt_size_cnt = t_ as u64;
+                            let adj = 1.25 * self.learnt_size_adj;
+                            self.learnt_size_adj = adj;
+                            self.learnt_size_cnt = adj as u64;
                             self.max_learnts += delta;
                             to_restart = self.should_restart(lbd, d);
                             continue;
