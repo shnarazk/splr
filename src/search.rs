@@ -441,11 +441,12 @@ impl Solver {
                     }
                 }
                 None => {
-                    // println!(" search loop enter a new level");
+                    // println!(" search loop enters a new level");
                     let na = self.num_assigns();
                     if na == self.num_vars {
                         return true;
-                    } else if (self.max_learnts as usize) + na + self.fixed_len < self.clauses.len() {
+                    } else if (self.max_learnts as usize) + na + self.fixed_len < self.clauses.len()
+                    {
                         self.reduce_database(false);
                     } else if d == 0 && self.num_solved_vars < na {
                         self.reduce_database(true);
@@ -540,17 +541,15 @@ impl Solver {
         //     println!("  before simplify: {} {:?}", assigned, self.trail.iter().map(|l| &self.vars[l.vi()]).collect::<Vec<&Var>>());
         // }
         let end = self.clauses.len();
-        let mut new_end = self.sort_clauses(simplify);
+        let new_end = self.sort_clauses(simplify);
         self.rebuild_reason();
         if new_end < end {
             self.clauses.truncate(new_end);
-        } else {
-            new_end = end;
         }
-        if simplify {
+        if simplify || new_end == end {
             let mut fixed = 0;
             for c in &self.clauses {
-                if c.rank == 0 {
+                if c.rank <= 1 {
                     fixed += 1;
                 }
             }
@@ -558,21 +557,12 @@ impl Solver {
             self.fixed_len = fixed;
         }
         self.rebuild_watches();
-        debug_assert!(self.clauses[0].index == 0, "NULL moved.");
+        debug_assert_eq!(self.clauses[0].index, 0);
         let tag = if simplify { "simplify" } else { "drop 1/2" };
         println!(
             "# DB::{} {:>9} ({:>9}) => {:>9} / {:>9.1}",
             tag, end, self.fixed_len, new_end, self.max_learnts
         );
-        // if simplify {
-        //     let mut assigned = 0;
-        //     for v in &self.vars[1..] {
-        //         if 0 < v.reason {
-        //             assigned += 1;
-        //         }
-        //     }
-        //     println!("  after simplify: {} {:?}", assigned, self.trail.iter().map(|l| &self.vars[l.vi()]).collect::<Vec<&Var>>());
-        // }
     }
     /// Note: this function changes self.clause_permutation.
     fn sort_clauses(&mut self, simplify: bool) -> usize {
@@ -608,6 +598,7 @@ impl Solver {
                 if (*c).tmp == 0 {
                     requires += 1;
                 } else if simplify && self.satisfies(&*c) {
+                    (*c).rank = MAX;
                     (*c).tmp = MAX;
                     purges += 1;
                 } else if (*c).rank == 0 {
@@ -630,10 +621,19 @@ impl Solver {
             self.clause_permutation[old] = i;
             self.clauses[i].index = i;
         }
+        let mut n_bi = 0;
+        for c in &self.clauses[start..] {
+            if c.rank == 2 {
+                n_bi += 1;
+            }
+        }
+        if n_bi == nc - start {
+            println!("all binary clauses");
+        }
         debug_assert!(self.clauses[0].index == 0, "NULL moved.");
         if simplify {
             min(start + max(requires, (nc - start) / 2), nc - purges)
-            //start + requires + (nc - start - purges)
+        //start + requires + (nc - start - purges)
         } else {
             start + max(requires, (nc - start) / 2)
         }

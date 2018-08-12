@@ -76,10 +76,11 @@ impl Clause {
     }
     /// returns 1 if this is good enough.
     pub fn set_sort_key(&mut self, at: f64) -> usize {
-        if self.index == 0 || self.rank == 0 {
+        if self.index == 0 || self.rank <= 1 {
             self.tmp = 0;
             0
         } else if self.lits.len() == 2 {
+            self.rank = 1;
             self.tmp = 1;
             1
         } else {
