@@ -130,19 +130,15 @@ impl Solver {
         //     println!("  before simplify: {} {:?}", assigned, self.trail.iter().map(|l| &self.vars[l.vi()]).collect::<Vec<&Var>>());
         // }
         let end = self.clauses.len();
-        let new_end = self.sort_clauses(simplify);
+        let new_end;
+        if simplify {
+            new_end = self.sort_clauses_for_simplification();
+        } else {
+            new_end = self.sort_clauses_for_reduction();
+        }
         self.rebuild_reason();
         if new_end < end {
             self.clauses.truncate(new_end);
-        }
-        if simplify || new_end == end {
-            let mut fixed = 0;
-            for c in &self.clauses {
-                if c.rank <= 1 {
-                    fixed += 1;
-                }
-            }
-            self.fixed_len = fixed;
         }
         self.rebuild_watches();
         debug_assert_eq!(self.clauses[0].index, 0);
@@ -153,11 +149,10 @@ impl Solver {
         );
     }
     /// Note: this function changes self.clause_permutation.
-    fn sort_clauses(&mut self, simplify: bool) -> usize {
-        let start = if simplify { 1 } else { self.fixed_len };
+    fn sort_clauses_for_reduction(&mut self) -> usize {
+        let start = self.fixed_len;
         let nc = self.clauses.len();
         let mut requires = 0;
-        let mut purges = 0;
         if self.clause_permutation.len() < nc {
             unsafe {
                 self.clause_permutation.reserve(nc + 1);
@@ -185,11 +180,7 @@ impl Solver {
                 let mut c = &mut self.clauses[ci] as *mut Clause;
                 if (*c).tmp == 0 {
                     requires += 1;
-                } else if simplify && self.satisfies(&*c) {
-                    (*c).rank = MAX;
-                    (*c).tmp = MAX;
-                    purges += 1;
-                } else if (*c).rank == 0 {
+                } else if (*c).rank <= 1 {
                     (*c).tmp = 0;
                     requires += 1;
                 } else {
@@ -206,13 +197,67 @@ impl Solver {
             self.clause_permutation[old] = i;
             self.clauses[i].index = i;
         }
-        debug_assert!(self.clauses[0].index == 0, "NULL moved.");
-        if simplify {
-            min(start + max(requires, (nc - start) / 2), nc - purges)
-        //start + requires + (nc - start - purges)
-        } else {
-            start + max(requires, (nc - start) / 2)
+        // check consistency
+        {
+            let mut r = 0;
+            for c in &self.clauses[start..start + requires] {
+                if c.tmp <= 0 {
+                    r += 1;
+                }
+            }
+            debug_assert_eq!(r, requires);
+            debug_assert!(self.clauses[0].index == 0, "NULL moved.");
         }
+        start + max(requires, (nc - start) / 2)
+    }
+    fn sort_clauses_for_simplification(&mut self) -> usize {
+        let start = 0;
+        let nc = self.clauses.len();
+        let mut purges = 0;
+        if self.clause_permutation.len() < nc {
+            unsafe {
+                self.clause_permutation.reserve(nc + 1);
+                self.clause_permutation.set_len(nc + 1);
+            }
+        }
+        // reinitialize the permutation table.
+        for (i, x) in self.clause_permutation.iter_mut().enumerate() {
+            *x = i;
+        }
+        // set key
+        for ci in start..self.clauses.len() {
+            unsafe {
+                let mut c = &mut self.clauses[ci] as *mut Clause;
+                if self.satisfies(&*c) {
+                    (*c).rank = MAX;
+                    (*c).tmp = MAX;
+                    purges += 1;
+                }
+            }
+        }
+        self.clauses.sort_by_key(|c| c.tmp);
+        for i in 1..nc {
+            let old = self.clauses[i].index;
+            debug_assert!(0 < old, "0 index");
+            self.clause_permutation[old] = i;
+            self.clauses[i].index = i;
+        }
+        // clear the reasons of variables satisfied at level zero.
+        for l in &self.trail {
+            self.vars[l.vi() as usize].reason = NULL_CLAUSE;
+        }
+        // check consistency
+        {
+            let mut p = 0;
+            for c in &self.clauses[nc - purges..] {
+                if c.tmp == MAX {
+                    p += 1;
+                }
+            }
+            debug_assert_eq!(p, purges);
+            debug_assert_eq!(self.clauses[0].index, 0);
+        }
+        nc - purges
     }
     fn rebuild_reason(&mut self) -> () {
         let len = self.clauses.len();
@@ -222,7 +267,12 @@ impl Solver {
             if 0 < ci {
                 v.reason = new_clause[ci];
                 if v.reason == 0 || len < v.reason {
-                    panic!("strange index for permutation {} {}", ci, len);
+                    // println!("trail{:?}", self.trail.iter().map(|l| l.int()).collect::<Vec<i32>>());
+                    println!("lim {}", self.trail_lim.len());
+                    panic!(
+                        "strange index for permutation v{:?} {} < {}",
+                        v, len, v.reason
+                    );
                 }
             }
         }
