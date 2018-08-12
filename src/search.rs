@@ -9,6 +9,7 @@ use watch::*;
 
 pub trait SolveSAT {
     fn solve(&mut self) -> SolverResult;
+    /// returns `true` for SAT, `false` for UNSAT.
     fn search(&mut self) -> bool;
     fn propagate(&mut self) -> Option<ClauseIndex>;
 }
@@ -20,127 +21,89 @@ impl SolveSAT for Solver {
     // adapt delayed update of watches
     fn propagate(&mut self) -> Option<ClauseIndex> {
         // println!("> propagate at {}", self.decision_level());
-        loop {
-            if self.trail.len() <= self.q_head {
-                // println!("<  propagate done");
-                return None;
-            }
+        while self.q_head < self.trail.len() {
             let p: Lit = self.trail[self.q_head];
             let p_usize: usize = p as usize;
             self.q_head += 1;
             self.stats[StatIndex::NumOfPropagation as usize] += 1;
-            {
-                let wl = self.watches[p_usize].len();
-                let false_lit = p.negate();
-                'next_clause: for mut wi in 0..wl {
-                    // println!(" next_clause: {}", wi);
-                    let Watch {
-                        other: blocker,
-                        by: ci,
-                        to,
-                    } = self.watches[p_usize][wi];
-                    debug_assert_ne!(blocker, to);
-                    // We use `Watch.to` to keep the literal which is the destination of propagation.
-                    let bv = if blocker == 0 {
-                        LFALSE
-                    } else {
-                        self.assigned(blocker)
-                    };
-                    if bv == LTRUE {
+            let wl = self.watches[p_usize].len();
+            let false_lit = p.negate();
+            'next_clause: for mut wi in 0..wl {
+                // println!(" next_clause: {}", wi);
+                let Watch { other, by, to, } = self.watches[p_usize][wi];
+                debug_assert_ne!(other, to);
+                // We use `Watch.to` to keep the literal which is the destination of propagation.
+                let bv = if other == 0 {
+                    LFALSE
+                } else {
+                    self.assigned(other)
+                };
+                if bv == LTRUE {
+                    self.watches[p_usize][wi].to = p;
+                    continue 'next_clause;
+                }
+                unsafe {
+                    let c = &mut self.clauses[by] as *mut Clause;
+                    debug_assert!(by == (*c).index, "A clause has an inconsistent index");
+                    debug_assert!(false_lit == (*c).lits[0] || false_lit == (*c).lits[1]);
+                    // Place the false literal at lits[1].
+                    // And the last literal in unit clause will be at lits[0].
+                    if (*c).lits[0] == false_lit {
+                        (*c).lits.swap(0, 1);
+                    }
+                    let first = (*c).lits[0];
+                    debug_assert_eq!(false_lit, (*c).lits[1]);
+                    let fv = self.assigned(first);
+                    if fv == LTRUE {
+                        // Satisfied by the other watch.
+                        // Update watch with `other`, the cached literal
                         self.watches[p_usize][wi].to = p;
                         continue 'next_clause;
                     }
-                    unsafe {
-                        let c = &mut self.clauses[ci] as *mut Clause;
-                        debug_assert!(ci == (*c).index, "A clause has an inconsistent index");
-                        if !(false_lit == (*c).lits[0] || false_lit == (*c).lits[1]) {
-                            panic!(
-                                "Watch literals error by {} ({}, {}) for propagate({})",
-                                (*c),
-                                (*c).lits[0].int(),
-                                (*c).lits[1].int(),
-                                p.int()
-                            );
-                        }
-                        // Place the false literal at lits[1].
-                        // And the last literal in unit clause will be at lits[0].
-                        if (*c).lits[0] == false_lit {
-                            (*c).lits.swap(0, 1);
-                        }
-                        let first = (*c).lits[0];
-                        debug_assert_eq!(false_lit, (*c).lits[1]);
-                        let fv = self.assigned(first);
-                        if fv == LTRUE {
-                            // Satisfied by the other watch.
-                            // Update watch with `other`, the cached literal
-                            self.watches[p_usize][wi].to = p;
+                    self.watches[p_usize][wi].other = first;
+                    for k in 2..(*c).lits.len() {
+                        let lk = (*c).lits[k];
+                        if self.assigned(lk) != LFALSE {
+                            (*c).tmp = k;
+                            // Update the watch
+                            self.watches[p_usize][wi].to = lk.negate();
                             continue 'next_clause;
                         }
-                        self.watches[p_usize][wi].other = first;
-                        for k in 2..(*c).lits.len() {
-                            let lk = (*c).lits[k];
-                            if self.assigned(lk) != LFALSE {
-                                (*c).tmp = k;
-                                // Update the watch
-                                self.watches[p_usize][wi].to = lk.negate();
-                                continue 'next_clause;
-                            }
-                        }
-                        if fv == LFALSE {
-                            // println!("  found a conflict variable {} by {}", first.vi(), (*c));
-                            return Some(ci);
-                        } else {
-                            // println!("  unit propagation {} by {}", first.int(), (*c));
-                            (*c).tmp = 1;
-                            self.watches[p_usize][wi].to = p;
-                            debug_assert_eq!(first, (*c).lits[0]);
-                            self.unsafe_enqueue(first, ci);
-                        }
                     }
-                }
-                // No conflict: so let's move them!
-                // use watches[0] to keep watches that don't move anywhere, temporally.
-                // println!("  update watches");
-                self.watches[0].clear();
-                loop {
-                    // println!("   remain: {}", self.watches[p_usize].len());
-                    match self.watches[p_usize].pop() {
-                        Some(w) => {
-                            debug_assert!(w.to != 0, "Invalid Watch.to found");
-                            if w.to == p {
-                                self.watches[0].push(w)
-                            } else {
-                                let ref mut c = &mut self.clauses[w.by];
-                                let k = c.tmp as usize;
-                                // println!("moving {} with {} to {}", (*c), k, w.to.int());
-                                c.lits.swap(1, k);
-                                // println!("move {} to {}", w.by, w.to.int());
-                                self.watches[w.to as usize].push(w);
-                            }
-                        }
-                        None => break,
-                    }
-                }
-                debug_assert!(
-                    self.watches[p_usize].is_empty(),
-                    "propagate failed to clear watches"
-                );
-                loop {
-                    match self.watches[0].pop() {
-                        Some(w) => {
-                            // println!("  loop back by {} to {}", w.by, w.to.int());
-                            debug_assert!(w.to == p, "inconsistent propagation");
-                            self.watches[p_usize].push(w);
-                        }
-                        None => break,
+                    if fv == LFALSE {
+                        // println!("  found a conflict variable {} by {}", first.vi(), (*c));
+                        return Some(by);
+                    } else {
+                        // println!("  unit propagation {} by {}", first.int(), (*c));
+                        (*c).tmp = 1;
+                        self.watches[p_usize][wi].to = p;
+                        debug_assert_eq!(first, (*c).lits[0]);
+                        self.unsafe_enqueue(first, by);
                     }
                 }
             }
+            // No conflict: so let's move them!
+            // use watches[0] to keep watches that don't move anywhere, temporally.
+            // println!("  update watches");
+            self.watches[0].clear();
+            while let Some(w) = self.watches[p_usize].pop() {
+                debug_assert!(w.to != 0, "Invalid Watch.to found");
+                if w.to == p {
+                    self.watches[0].push(w)
+                } else {
+                    let ref mut c = &mut self.clauses[w.by];
+                    c.lits.swap(1, c.tmp as usize);
+                    self.watches[w.to as usize].push(w);
+                }
+            }
+            debug_assert!(self.watches[p_usize].is_empty(), true);
+            while let Some(w) = self.watches[0].pop() {
+                debug_assert!(w.to == p, "inconsistent propagation");
+                self.watches[p_usize].push(w);
+            }
         }
+        None
     }
-    /// returns:
-    /// - true for SAT
-    /// - false for UNSAT
     fn search(&mut self) -> bool {
         // self.dump("search");
         let delta_init: f64 = (self.num_vars as f64).sqrt();
