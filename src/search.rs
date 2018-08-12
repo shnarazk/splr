@@ -1,6 +1,7 @@
 use clause::*;
 use solver::*;
 use std::cmp::max;
+use std::cmp::min;
 use std::usize::MAX;
 use types::*;
 
@@ -444,11 +445,11 @@ impl Solver {
                     let na = self.num_assigns();
                     if na == self.num_vars {
                         return true;
-                    } else if (self.max_learnts as usize) < self.clauses.len() - self.fixed_len {
+                    } else if (self.max_learnts as usize) + na + self.fixed_len < self.clauses.len() {
                         self.reduce_database(false);
-                        self.max_learnts += 10.0;
-                    } else if d == 0 && 0 < self.trail.len() {
+                    } else if d == 0 && self.num_solved_vars < na {
                         self.reduce_database(true);
+                        self.num_solved_vars = na;
                     }
                     if to_restart {
                         self.cancel_until(root_lv);
@@ -473,6 +474,7 @@ impl Solver {
     pub fn solve(&mut self) -> SolverResult {
         // TODO deal with assumptons
         // s.root_level = 0;
+        self.num_solved_vars = self.trail.len();
         match self.search() {
             _ if self.ok == false => {
                 self.cancel_until(0);
@@ -577,6 +579,7 @@ impl Solver {
         let start = if simplify { 1 } else { self.fixed_len };
         let nc = self.clauses.len();
         let mut requires = 0;
+        let mut purges = 0;
         if self.clause_permutation.len() < nc {
             unsafe {
                 self.clause_permutation.reserve(nc + 1);
@@ -606,6 +609,7 @@ impl Solver {
                     requires += 1;
                 } else if simplify && self.satisfies(&*c) {
                     (*c).tmp = MAX;
+                    purges += 1;
                 } else if (*c).rank == 0 {
                     (*c).tmp = 0;
                     requires += 1;
@@ -628,7 +632,8 @@ impl Solver {
         }
         debug_assert!(self.clauses[0].index == 0, "NULL moved.");
         if simplify {
-            start + requires + (nc - start) / 2
+            min(start + max(requires, (nc - start) / 2), nc - purges)
+            //start + requires + (nc - start - purges)
         } else {
             start + max(requires, (nc - start) / 2)
         }

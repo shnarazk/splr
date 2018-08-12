@@ -229,6 +229,7 @@ pub struct Solver {
     pub learnt_size_adj: f64,
     pub learnt_size_cnt: u64,
     pub max_learnts: f64,
+    pub num_solved_vars: usize,
     /// Working memory
     pub ok: bool,
     pub an_seen: Vec<Lit>,
@@ -282,6 +283,7 @@ impl Solver {
             learnt_size_adj: 100.0,
             learnt_size_cnt: 100,
             max_learnts: 2000.0,
+            num_solved_vars: 0,
             ok: true,
             an_seen: vec![0; nv + 1],
             an_to_clear: vec![0; nv + 1],
