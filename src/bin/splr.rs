@@ -79,8 +79,17 @@ fn main() {
     let mut target: String = env!("CARGO_MANIFEST_DIR").to_string() + "/uf200-020.cnf";
     let args: Vec<String> = env::args().skip(1).collect();
     for arg in &args {
-        if !args[0].starts_with('-') {
-            target = arg.to_string();
+        match arg {
+            _ if arg.to_string() == "--version" => {
+                println!("0.0.1");
+                return;
+            }
+            _ if (&*arg).starts_with('-') => {
+                continue;
+            }
+            _ => {
+                target = arg.to_string();
+            }
         }
     }
     // println!("Hello, world! {}", target);
