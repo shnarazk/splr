@@ -1,46 +1,22 @@
 use clause::*;
+use clause_select::ClauseElimanation;
+use search_restart::Restart;
 use solver::*;
 use std::cmp::max;
 use types::*;
+use var_select::VarSelection;
 use watch::*;
+
+pub trait SolveSAT {
+    fn solve(&mut self) -> SolverResult;
+    fn search(&mut self) -> bool;
+    fn propagate(&mut self) -> Option<ClauseIndex>;
+}
 
 /// Big problems require an enough table.
 const LEVEL_BITMAP_SIZE: usize = 16384;
 
-impl Solver {
-    /// renamed from newLearntClause
-    pub fn add_learnt(&mut self, v: Vec<Lit>) -> usize {
-        let k = v.len();
-        if k == 1 {
-            self.unsafe_enqueue(v[0], NULL_CLAUSE);
-            return 1;
-        }
-        let mut c = Clause::new(true, v);
-        let mut i_max = 0;
-        let mut lv_max = 0;
-        // seek a literal with max level
-        for (i, l) in c.lits.iter().enumerate() {
-            let vi = l.vi();
-            let lv = self.vars[vi].level;
-            if self.vars[vi].assign != BOTTOM && lv_max < lv {
-                i_max = i;
-                lv_max = lv;
-            }
-        }
-        c.lits.swap(1, i_max);
-        let l0 = c.lits[0];
-        let lbd;
-        if c.lits.len() == 2 {
-            lbd = 1;
-        } else {
-            lbd = self.lbd_of(&c.lits);
-        }
-        c.rank = lbd;
-        let ci = self.inject(c);
-        self.bump_ci(ci);
-        self.unsafe_enqueue(l0, ci);
-        lbd
-    }
+impl SolveSAT for Solver {
     // adapt delayed update of watches
     fn propagate(&mut self) -> Option<ClauseIndex> {
         // println!("> propagate at {}", self.decision_level());
@@ -161,6 +137,147 @@ impl Solver {
                 }
             }
         }
+    }
+    /// returns:
+    /// - true for SAT
+    /// - false for UNSAT
+    fn search(&mut self) -> bool {
+        // self.dump("search");
+        let delta_init: f64 = (self.num_vars as f64).sqrt();
+        let mut delta = delta_init;
+        let root_lv = self.root_level;
+        let mut to_restart = false;
+        loop {
+            // self.dump("calling propagate");
+            let ret = self.propagate();
+            let d = self.decision_level();
+            // self.dump(format!("search called propagate and it returned {:?} at {}", ret, d));
+            match ret {
+                Some(ci) => {
+                    self.stats[StatIndex::NumOfBackjump as usize] += 1;
+                    if d == self.root_level {
+                        self.analyze_final(ci, false);
+                        return false;
+                    } else {
+                        // self.dump(" before analyze");
+                        let (backtrack_level, v) = self.analyze(ci);
+                        // println!(
+                        //     " conflict analyzed {:?}",
+                        //     v.iter().map(|l| l.int()).collect::<Vec<i32>>()
+                        // );
+                        self.cancel_until(max(backtrack_level as usize, root_lv));
+                        // println!(" backtracked to {}", backtrack_level);
+                        let lbd = self.add_learnt(v);
+                        self.decay_var_activity();
+                        self.decay_cla_activity();
+                        self.learnt_size_cnt -= 1;
+                        if self.learnt_size_cnt == 0 {
+                            let adj = 1.25 * self.learnt_size_adj;
+                            self.learnt_size_adj = adj;
+                            self.learnt_size_cnt = adj as u64;
+                            self.max_learnts += delta;
+                            to_restart = self.should_restart(lbd, d);
+                            continue;
+                        }
+                    }
+                }
+                None => {
+                    // println!(" search loop enters a new level");
+                    let na = self.num_assigns();
+                    if na == self.num_vars {
+                        return true;
+                    } else if (self.max_learnts as usize) + na + self.fixed_len < self.clauses.len()
+                    {
+                        self.reduce_database(false);
+                    } else if d == 0 && self.num_solved_vars < na {
+                        self.reduce_database(true);
+                        self.num_solved_vars = na;
+                    }
+                    if to_restart {
+                        self.cancel_until(root_lv);
+                        // println!("restart");
+                        delta = delta_init;
+                        to_restart = false;
+                    } // else {
+                    {
+                        let vi = self.select_var();
+                        // println!(" search loop find a new decision var");
+                        debug_assert_ne!(vi, 0);
+                        if vi != 0 {
+                            let p = self.vars[vi].phase;
+                            self.unsafe_assume(vi.lit(p));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    fn solve(&mut self) -> SolverResult {
+        // TODO deal with assumptons
+        // s.root_level = 0;
+        self.num_solved_vars = self.trail.len();
+        match self.search() {
+            _ if self.ok == false => {
+                self.cancel_until(0);
+                Err(SolverException::InternalInconsistent)
+            }
+            true => {
+                let mut result = Vec::new();
+                for vi in 1..self.num_vars + 1 {
+                    match self.vars[vi].assign {
+                        LTRUE => result.push(vi as i32),
+                        LFALSE => result.push(0 - vi as i32),
+                        _ => (),
+                    }
+                }
+                self.cancel_until(0);
+                Ok(Certificate::SAT(result))
+            }
+            false => {
+                self.cancel_until(0);
+                let mut v = Vec::new();
+                for l in &self.conflicts {
+                    v.push(l.int());
+                }
+                Ok(Certificate::UNSAT(v))
+            }
+        }
+    }
+}
+
+impl Solver {
+    /// renamed from newLearntClause
+    pub fn add_learnt(&mut self, v: Vec<Lit>) -> usize {
+        let k = v.len();
+        if k == 1 {
+            self.unsafe_enqueue(v[0], NULL_CLAUSE);
+            return 1;
+        }
+        let mut c = Clause::new(true, v);
+        let mut i_max = 0;
+        let mut lv_max = 0;
+        // seek a literal with max level
+        for (i, l) in c.lits.iter().enumerate() {
+            let vi = l.vi();
+            let lv = self.vars[vi].level;
+            if self.vars[vi].assign != BOTTOM && lv_max < lv {
+                i_max = i;
+                lv_max = lv;
+            }
+        }
+        c.lits.swap(1, i_max);
+        let l0 = c.lits[0];
+        let lbd;
+        if c.lits.len() == 2 {
+            lbd = 1;
+        } else {
+            lbd = self.lbd_of(&c.lits);
+        }
+        c.rank = lbd;
+        let ci = self.inject(c);
+        self.bump_ci(ci);
+        self.unsafe_enqueue(l0, ci);
+        lbd
     }
     fn analyze(&mut self, confl: ClauseIndex) -> (usize, Vec<Lit>) {
         for mut l in &mut self.an_seen {
@@ -369,111 +486,6 @@ impl Solver {
                     }
                 }
                 self.an_seen[vi] = 0;
-            }
-        }
-    }
-    /// returns:
-    /// - true for SAT
-    /// - false for UNSAT
-    fn search(&mut self) -> bool {
-        // self.dump("search");
-        let delta_init: f64 = (self.num_vars as f64).sqrt();
-        let mut delta = delta_init;
-        let root_lv = self.root_level;
-        let mut to_restart = false;
-        loop {
-            // self.dump("calling propagate");
-            let ret = self.propagate();
-            let d = self.decision_level();
-            // self.dump(format!("search called propagate and it returned {:?} at {}", ret, d));
-            match ret {
-                Some(ci) => {
-                    self.stats[StatIndex::NumOfBackjump as usize] += 1;
-                    if d == self.root_level {
-                        self.analyze_final(ci, false);
-                        return false;
-                    } else {
-                        // self.dump(" before analyze");
-                        let (backtrack_level, v) = self.analyze(ci);
-                        // println!(
-                        //     " conflict analyzed {:?}",
-                        //     v.iter().map(|l| l.int()).collect::<Vec<i32>>()
-                        // );
-                        self.cancel_until(max(backtrack_level as usize, root_lv));
-                        // println!(" backtracked to {}", backtrack_level);
-                        let lbd = self.add_learnt(v);
-                        self.decay_var_activity();
-                        self.decay_cla_activity();
-                        self.learnt_size_cnt -= 1;
-                        if self.learnt_size_cnt == 0 {
-                            let adj = 1.25 * self.learnt_size_adj;
-                            self.learnt_size_adj = adj;
-                            self.learnt_size_cnt = adj as u64;
-                            self.max_learnts += delta;
-                            to_restart = self.should_restart(lbd, d);
-                            continue;
-                        }
-                    }
-                }
-                None => {
-                    // println!(" search loop enters a new level");
-                    let na = self.num_assigns();
-                    if na == self.num_vars {
-                        return true;
-                    } else if (self.max_learnts as usize) + na + self.fixed_len < self.clauses.len()
-                    {
-                        self.reduce_database(false);
-                    } else if d == 0 && self.num_solved_vars < na {
-                        self.reduce_database(true);
-                        self.num_solved_vars = na;
-                    }
-                    if to_restart {
-                        self.cancel_until(root_lv);
-                        // println!("restart");
-                        delta = delta_init;
-                        to_restart = false;
-                    } // else {
-                    {
-                        let vi = self.select_var();
-                        // println!(" search loop find a new decision var");
-                        debug_assert_ne!(vi, 0);
-                        if vi != 0 {
-                            let p = self.vars[vi].phase;
-                            self.unsafe_assume(vi.lit(p));
-                        }
-                    }
-                }
-            }
-        }
-    }
-    pub fn solve(&mut self) -> SolverResult {
-        // TODO deal with assumptons
-        // s.root_level = 0;
-        self.num_solved_vars = self.trail.len();
-        match self.search() {
-            _ if self.ok == false => {
-                self.cancel_until(0);
-                Err(SolverException::InternalInconsistent)
-            }
-            true => {
-                let mut result = Vec::new();
-                for vi in 1..self.num_vars + 1 {
-                    match self.vars[vi].assign {
-                        LTRUE => result.push(vi as i32),
-                        LFALSE => result.push(0 - vi as i32),
-                        _ => (),
-                    }
-                }
-                self.cancel_until(0);
-                Ok(Certificate::SAT(result))
-            }
-            false => {
-                self.cancel_until(0);
-                let mut v = Vec::new();
-                for l in &self.conflicts {
-                    v.push(l.int());
-                }
-                Ok(Certificate::UNSAT(v))
             }
         }
     }

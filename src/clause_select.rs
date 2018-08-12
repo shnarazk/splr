@@ -6,6 +6,12 @@ use std::usize::MAX;
 use types::*;
 use watch::push_watch;
 
+pub trait ClauseElimanation {
+    fn bump_ci(&mut self, ci: ClauseIndex) -> ();
+    fn decay_cla_activity(&mut self) -> ();
+    fn reduce_database(&mut self, simplify: bool) -> ();
+}
+
 // const RANK_WIDTH: u64 = 11;
 const ACTIVITY_WIDTH: usize = 51;
 const RANK_MAX: usize = 1000;
@@ -17,6 +23,55 @@ fn scale_activity(x: f64) -> usize {
         ACTIVITY_MAX
     } else {
         (ACTIVITY_MAX * ((1.0 - (x * 1e20).log10() / 40.0) as usize))
+    }
+}
+
+impl ClauseElimanation for Solver {
+    fn bump_ci(&mut self, ci: ClauseIndex) -> () {
+        if ci <= 0 {
+            return;
+        }
+        let a = self.clauses[ci].activity + self.cla_inc;
+        self.clauses[ci].activity = a;
+        if CLAUSE_ACTIVITY_THRESHOLD < a {
+            self.rescale_clause_activity()
+        }
+    }
+    fn decay_cla_activity(&mut self) -> () {
+        self.cla_inc = self.cla_inc / CLAUSE_ACTIVITY_THRESHOLD;
+    }
+    fn reduce_database(&mut self, simplify: bool) -> () {
+        debug_assert!(
+            !simplify || self.decision_level() == 0,
+            "wrong invocation of reduce_database"
+        );
+        // if simplify {
+        //     let mut assigned = 0;
+        //     for v in &self.vars[1..] {
+        //         if 0 < v.reason {
+        //             assigned += 1;
+        //         }
+        //     }
+        //     println!("  before simplify: {} {:?}", assigned, self.trail.iter().map(|l| &self.vars[l.vi()]).collect::<Vec<&Var>>());
+        // }
+        let end = self.clauses.len();
+        let new_end;
+        if simplify {
+            new_end = self.sort_clauses_for_simplification();
+        } else {
+            new_end = self.sort_clauses_for_reduction();
+        }
+        self.rebuild_reason();
+        if new_end < end {
+            self.clauses.truncate(new_end);
+        }
+        self.rebuild_watches();
+        debug_assert_eq!(self.clauses[0].index, 0);
+        let tag = if simplify { "simplify" } else { "drop 1/2" };
+        println!(
+            "# DB::{} {:>9} ({:>9}) => {:>9} / {:>9.1}",
+            tag, end, self.fixed_len, new_end, self.max_learnts
+        );
     }
 }
 
@@ -44,25 +99,6 @@ impl Clause {
 }
 
 impl Solver {
-    pub fn bump_ci(&mut self, ci: ClauseIndex) -> () {
-        if ci <= 0 {
-            return;
-        }
-        let a = self.clauses[ci].activity + self.cla_inc;
-        self.clauses[ci].activity = a;
-        if CLAUSE_ACTIVITY_THRESHOLD < a {
-            self.rescale_clause_activity()
-        }
-    }
-    pub fn decay_cla_activity(&mut self) -> () {
-        self.cla_inc = self.cla_inc / CLAUSE_ACTIVITY_THRESHOLD;
-    }
-    pub fn rescale_clause_activity(&mut self) -> () {
-        for i in self.fixed_len..self.clauses.len() {
-            self.clauses[i].activity = self.clauses[i].activity / CLAUSE_ACTIVITY_THRESHOLD;
-        }
-        self.cla_inc /= CLAUSE_ACTIVITY_THRESHOLD;
-    }
     // renamed from clause_new
     pub fn add_clause(&mut self, mut v: Vec<Lit>) -> bool {
         v.sort_unstable();
@@ -111,43 +147,16 @@ impl Solver {
         }
         max(1, cnt)
     }
+    fn rescale_clause_activity(&mut self) -> () {
+        for i in self.fixed_len..self.clauses.len() {
+            self.clauses[i].activity = self.clauses[i].activity / CLAUSE_ACTIVITY_THRESHOLD;
+        }
+        self.cla_inc /= CLAUSE_ACTIVITY_THRESHOLD;
+    }
 }
 
 /// reduce_database
 impl Solver {
-    pub fn reduce_database(&mut self, simplify: bool) -> () {
-        debug_assert!(
-            !simplify || self.decision_level() == 0,
-            "wrong invocation of reduce_database"
-        );
-        // if simplify {
-        //     let mut assigned = 0;
-        //     for v in &self.vars[1..] {
-        //         if 0 < v.reason {
-        //             assigned += 1;
-        //         }
-        //     }
-        //     println!("  before simplify: {} {:?}", assigned, self.trail.iter().map(|l| &self.vars[l.vi()]).collect::<Vec<&Var>>());
-        // }
-        let end = self.clauses.len();
-        let new_end;
-        if simplify {
-            new_end = self.sort_clauses_for_simplification();
-        } else {
-            new_end = self.sort_clauses_for_reduction();
-        }
-        self.rebuild_reason();
-        if new_end < end {
-            self.clauses.truncate(new_end);
-        }
-        self.rebuild_watches();
-        debug_assert_eq!(self.clauses[0].index, 0);
-        let tag = if simplify { "simplify" } else { "drop 1/2" };
-        println!(
-            "# DB::{} {:>9} ({:>9}) => {:>9} / {:>9.1}",
-            tag, end, self.fixed_len, new_end, self.max_learnts
-        );
-    }
     /// Note: this function changes self.clause_permutation.
     fn sort_clauses_for_reduction(&mut self) -> usize {
         let start = self.fixed_len;

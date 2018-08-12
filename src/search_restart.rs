@@ -2,9 +2,13 @@ use solver::*;
 use std::cmp::min;
 use types::*;
 
-impl Solver {
+pub trait Restart {
+    fn should_restart(&mut self, lbd: usize, clv: usize) -> bool;
+}
+
+impl Restart for Solver {
     /// renamed from checkRestartCondition
-    pub fn should_restart(&mut self, lbd: usize, clv: usize) -> bool {
+    fn should_restart(&mut self, lbd: usize, clv: usize) -> bool {
         let next: u64 = self.next_restart;
         let count = self.stats[StatIndex::NumOfBackjump as usize] as u64;
         let nas = self.num_assigns() as f64;

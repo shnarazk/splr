@@ -1,5 +1,6 @@
 extern crate splr;
 use splr::clause::*;
+use splr::search::SolveSAT;
 use splr::solver::*;
 use splr::types::*;
 use std::env;
