@@ -2,8 +2,10 @@
 
 /// Var and Clause
 pub mod clause;
-/// Heuristics on clause elimination and restart
+/// Heuristics on clause elimination and restart.
 pub mod criteria;
+/// Heuristics on solver restart.
+pub mod restart;
 /// Main algorithm.
 pub mod search;
 /// struct Solver
