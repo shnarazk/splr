@@ -39,7 +39,6 @@ impl Solver {
         let ci = self.inject(c);
         self.bump_ci(ci);
         self.unsafe_enqueue(l0, ci);
-        debug_assert!(0 < lbd, "lbd of a new clause is too small");
         lbd
     }
     // adapt delayed update of watches
@@ -141,12 +140,10 @@ impl Solver {
                             if w.to == p {
                                 self.watches[0].push(w)
                             } else {
-                                unsafe {
-                                    let c = &mut self.clauses[w.by] as *mut Clause;
-                                    let k = (*c).tmp as usize;
-                                    // println!("moving {} with {} to {}", (*c), k, w.to.int());
-                                    (*c).lits.swap(1, k);
-                                }
+                                let ref mut c = &mut self.clauses[w.by];
+                                let k = c.tmp as usize;
+                                // println!("moving {} with {} to {}", (*c), k, w.to.int());
+                                c.lits.swap(1, k);
                                 // println!("move {} to {}", w.by, w.to.int());
                                 self.watches[w.to as usize].push(w);
                             }
@@ -328,23 +325,21 @@ impl Solver {
             }
             let sl = self.an_stack.pop().unwrap();
             let ci = self.vars[sl.vi()].reason;
-            let c = &self.clauses[ci] as *const Clause;
-            unsafe {
-                for q in &(*c).lits {
-                    let vi = q.vi();
-                    let lv = self.vars[vi].level % LEVEL_BITMAP_SIZE;
-                    if self.an_seen[vi] != 1 && lv != 0 {
-                        if self.vars[vi].reason != NULL_CLAUSE && level_map[lv] {
-                            self.an_seen[vi] = 1;
-                            self.an_stack.push(*q);
-                            self.an_to_clear.push(*q);
-                        } else {
-                            let top2 = self.an_to_clear.len();
-                            for _ in top1..top2 {
-                                self.an_seen[self.an_to_clear.pop().unwrap().vi()] = 0;
-                            }
-                            return false;
+            let ref c = &self.clauses[ci];
+            for q in &c.lits {
+                let vi = q.vi();
+                let lv = self.vars[vi].level % LEVEL_BITMAP_SIZE;
+                if self.an_seen[vi] != 1 && lv != 0 {
+                    if self.vars[vi].reason != NULL_CLAUSE && level_map[lv] {
+                        self.an_seen[vi] = 1;
+                        self.an_stack.push(*q);
+                        self.an_to_clear.push(*q);
+                    } else {
+                        let top2 = self.an_to_clear.len();
+                        for _ in top1..top2 {
+                            self.an_seen[self.an_to_clear.pop().unwrap().vi()] = 0;
                         }
+                        return false;
                     }
                 }
             }
@@ -353,13 +348,11 @@ impl Solver {
     fn analyze_final(&mut self, ci: ClauseIndex, skip_first: bool) -> () {
         self.conflicts.clear();
         if self.root_level != 0 {
-            unsafe {
-                let c = &self.clauses[ci] as *const Clause;
-                for l in &(*c).lits[(if skip_first { 1 } else { 0 })..] {
-                    let vi = l.vi();
-                    if 0 < self.vars[vi].level {
-                        self.an_seen[vi] = 1;
-                    }
+            let ref c = &self.clauses[ci];
+            for l in &c.lits[(if skip_first { 1 } else { 0 })..] {
+                let vi = l.vi();
+                if 0 < self.vars[vi].level {
+                    self.an_seen[vi] = 1;
                 }
             }
             let tl0 = self.trail_lim[0];
@@ -375,13 +368,11 @@ impl Solver {
                     if self.vars[vi].reason == NULL_CLAUSE {
                         self.conflicts.push(l.negate());
                     } else {
-                        let c = &self.clauses[ci] as *const Clause;
-                        unsafe {
-                            for l in &(*c).lits[1..] {
-                                let vi = l.vi();
-                                if 0 < self.vars[vi].level {
-                                    self.an_seen[vi] = 1;
-                                }
+                        let ref c = &self.clauses[ci];
+                        for l in &c.lits[1..] {
+                            let vi = l.vi();
+                            if 0 < self.vars[vi].level {
+                                self.an_seen[vi] = 1;
                             }
                         }
                     }

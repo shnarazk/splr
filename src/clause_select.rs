@@ -176,16 +176,14 @@ impl Solver {
         // set key
         let ac = 0.1 * self.cla_inc / (nc as f64);
         for ci in start..self.clauses.len() {
-            unsafe {
-                let mut c = &mut self.clauses[ci] as *mut Clause;
-                if (*c).tmp == 0 {
-                    requires += 1;
-                } else if (*c).rank <= 1 {
-                    (*c).tmp = 0;
-                    requires += 1;
-                } else {
-                    requires += (*c).set_sort_key(ac);
-                }
+            let ref mut c = &mut self.clauses[ci];
+            if c.tmp == 0 {
+                requires += 1;
+            } else if c.rank <= 1 {
+                c.tmp = 0;
+                requires += 1;
+            } else {
+                requires += c.set_sort_key(ac);
             }
         }
         // sort the range
@@ -226,13 +224,11 @@ impl Solver {
         }
         // set key
         for ci in start..self.clauses.len() {
-            unsafe {
-                let mut c = &mut self.clauses[ci] as *mut Clause;
-                if self.satisfies(&*c) {
-                    (*c).rank = MAX;
-                    (*c).tmp = MAX;
-                    purges += 1;
-                }
+            if self.satisfies(&self.clauses[ci]) {
+                let ref mut d = &mut self.clauses[ci];
+                d.rank = MAX;
+                d.tmp = MAX;
+                purges += 1;
             }
         }
         self.clauses.sort_by_key(|c| c.tmp);
