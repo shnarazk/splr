@@ -2,6 +2,7 @@ use clause::*;
 use solver::*;
 use std::cmp::max;
 use types::*;
+use watch::*;
 
 /// Big problems require an enough table.
 const LEVEL_BITMAP_SIZE: usize = 16384;

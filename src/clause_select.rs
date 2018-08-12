@@ -4,6 +4,7 @@ use std::cmp::max;
 use std::cmp::min;
 use std::usize::MAX;
 use types::*;
+use watch::push_watch;
 
 // const RANK_WIDTH: u64 = 11;
 const ACTIVITY_WIDTH: usize = 51;
