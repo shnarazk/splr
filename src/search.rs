@@ -3,6 +3,7 @@ use solver::*;
 use std::cmp::max;
 use types::*;
 
+/// Big problems require an enough table.
 const LEVEL_BITMAP_SIZE: usize = 16384;
 
 impl Solver {

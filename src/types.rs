@@ -29,6 +29,16 @@ pub type SolverResult = Result<Certificate, SolverException>;
 /// Variable as Index is `usize`
 pub type VarIndex = usize;
 
+/// Clause Index, not ID because it changes after database reduction.
+/// # Range
+/// * `< 0` for given clauses. So we need `i64` instead of `usize`.
+/// * 0 for a null clause.
+/// * '0 <' for learnt clauses.
+pub type ClauseIndex = usize;
+
+/// is a dummy clause index
+pub const NULL_CLAUSE: ClauseIndex = 0;
+
 /// Literal encoded on unsigned integer
 /// # Examples
 ///

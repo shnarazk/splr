@@ -75,7 +75,7 @@ fn build_solver(path: &str) -> (Solver, CNFDescription) {
 }
 
 fn main() {
-    // println!("CARGO_MANIFEST_DIR = {}", env!("CARGO_MANIFEST_DIR"));
+    // println!("splr 0.0.1 CARGO_MANIFEST_DIR = {}", env!("CARGO_MANIFEST_DIR"));
     let mut target: String = env!("CARGO_MANIFEST_DIR").to_string() + "/uf200-020.cnf";
     let args: Vec<String> = env::args().skip(1).collect();
     if 0 < args.len() {

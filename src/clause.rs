@@ -2,16 +2,6 @@ use std::f64;
 use std::fmt;
 use types::*;
 
-/// Clause Index, not ID because it changes after database reduction.
-/// # Range
-/// * `< 0` for given clauses. So we need `i64` instead of `usize`.
-/// * 0 for a null clause.
-/// * '0 <' for learnt clauses.
-pub type ClauseIndex = usize;
-
-/// is a dummy clause index
-pub const NULL_CLAUSE: ClauseIndex = 0;
-
 /// Clause
 /// Clause should be placed on heap anytime.
 /// And `Box` provides Eq for 'clause pointer'.
@@ -102,40 +92,4 @@ pub fn new_clause_manager(nc: usize) -> ClauseManager {
     let mut m = Vec::with_capacity(1 + nc);
     m.push(Clause::null());
     m
-}
-
-/// Struct for a variable.
-#[derive(Debug)]
-pub struct Var {
-    pub index: usize,
-    pub assign: Lbool,
-    pub phase: Lbool,
-    pub reason: ClauseIndex,
-    pub level: usize,
-    pub activity: f64,
-}
-
-/// is the dummy var index.
-pub const NULL_VAR: VarIndex = 0;
-
-impl Var {
-    pub fn new(i: usize) -> Var {
-        Var {
-            index: i,
-            assign: BOTTOM,
-            phase: BOTTOM,
-            reason: NULL_CLAUSE,
-            level: 0,
-            activity: 0.0,
-        }
-    }
-    pub fn new_vars(n: usize) -> Vec<Var> {
-        let mut vec = Vec::new();
-        for i in 0..n + 1 {
-            let mut v = Var::new(i);
-            v.activity = (n - i) as f64;
-            vec.push(v);
-        }
-        vec
-    }
 }

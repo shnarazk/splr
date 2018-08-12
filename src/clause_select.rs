@@ -3,11 +3,13 @@ use solver::*;
 use std::cmp::max;
 use std::cmp::min;
 use std::usize::MAX;
+use types::*;
 
 // const RANK_WIDTH: u64 = 11;
 const ACTIVITY_WIDTH: usize = 51;
 const RANK_MAX: usize = 1000;
 const ACTIVITY_MAX: usize = 2 ^ ACTIVITY_WIDTH - 1;
+const CLAUSE_ACTIVITY_THRESHOLD: f64 = 1e20;
 
 fn scale_activity(x: f64) -> usize {
     if x < 1e-20 {
@@ -37,6 +39,76 @@ impl Clause {
             self.tmp = (d << ACTIVITY_WIDTH) + scale_activity(ac);
             0
         }
+    }
+}
+
+impl Solver {
+    pub fn bump_ci(&mut self, ci: ClauseIndex) -> () {
+        if ci <= 0 {
+            return;
+        }
+        let a = self.clauses[ci].activity + self.cla_inc;
+        self.clauses[ci].activity = a;
+        if CLAUSE_ACTIVITY_THRESHOLD < a {
+            self.rescale_clause_activity()
+        }
+    }
+    pub fn decay_cla_activity(&mut self) -> () {
+        self.cla_inc = self.cla_inc / CLAUSE_ACTIVITY_THRESHOLD;
+    }
+    pub fn rescale_clause_activity(&mut self) -> () {
+        for i in self.fixed_len..self.clauses.len() {
+            self.clauses[i].activity = self.clauses[i].activity / CLAUSE_ACTIVITY_THRESHOLD;
+        }
+        self.cla_inc /= CLAUSE_ACTIVITY_THRESHOLD;
+    }
+    // renamed from clause_new
+    pub fn add_clause(&mut self, mut v: Vec<Lit>) -> bool {
+        v.sort_unstable();
+        let mut j = 0;
+        let mut l_ = NULL_LIT; // last literal; [x, x.negate()] means totology.
+        let mut result = false;
+        for i in 0..v.len() {
+            let li = v[i];
+            let sat = self.assigned(li);
+            if sat == LTRUE || li.negate() == l_ {
+                v.clear();
+                result = true;
+                break;
+            } else if sat != LFALSE && li != l_ {
+                v[j] = li;
+                j += 1;
+                l_ = li;
+            }
+        }
+        if result != true {
+            v.truncate(j)
+        }
+        match v.len() {
+            0 => result,
+            1 => self.enqueue(v[0], NULL_CLAUSE),
+            _ => {
+                self.inject(Clause::new(false, v));
+                true
+            }
+        }
+    }
+    pub fn lbd_of(&mut self, v: &[Lit]) -> usize {
+        let k = 1 + self.lbd_key;
+        self.lbd_key = k;
+        if 1000_000 < k {
+            self.lbd_key = 0;
+        }
+        let n = v.len();
+        let mut cnt = 0;
+        for i in 0..n {
+            let l = self.vars[v[i].vi()].level;
+            if self.lbd_seen[l] != k && l != 0 {
+                self.lbd_seen[l] = k;
+                cnt += 1;
+            }
+        }
+        max(1, cnt)
     }
 }
 
