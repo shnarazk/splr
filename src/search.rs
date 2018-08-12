@@ -63,7 +63,7 @@ impl Solver {
                         by: ci,
                         to,
                     } = self.watches[p_usize][wi];
-                    debug_assert!(blocker != to, "An inconsistent Watch");
+                    debug_assert_ne!(blocker, to);
                     // We use `Watch.to` to keep the literal which is the destination of propagation.
                     let bv = if blocker == 0 {
                         LFALSE
@@ -92,10 +92,7 @@ impl Solver {
                             (*c).lits.swap(0, 1);
                         }
                         let first = (*c).lits[0];
-                        debug_assert!(
-                            false_lit == (*c).lits[1],
-                            "Inconsisitent watch registration"
-                        );
+                        debug_assert_eq!(false_lit, (*c).lits[1]);
                         let fv = self.assigned(first);
                         if fv == LTRUE {
                             // Satisfied by the other watch.
@@ -120,10 +117,7 @@ impl Solver {
                             // println!("  unit propagation {} by {}", first.int(), (*c));
                             (*c).tmp = 1;
                             self.watches[p_usize][wi].to = p;
-                            debug_assert!(
-                                first == (*c).lits[0],
-                                "Inconsisitent clause propagation update"
-                            );
+                            debug_assert_eq!(first, (*c).lits[0]);
                             self.unsafe_enqueue(first, ci);
                         }
                     }
@@ -198,10 +192,7 @@ impl Solver {
                 for q in &(*c).lits[if p == NULL_LIT { 0 } else { 1 }..] {
                     let vi = q.vi();
                     let l = self.vars[vi].level;
-                    debug_assert!(
-                        self.vars[vi].assign != BOTTOM,
-                        "Unbound literal found in analyze"
-                    );
+                    debug_assert_ne!(self.vars[vi].assign, BOTTOM);
                     if self.an_seen[vi] == 0 && 0 < l {
                         self.bump_vi(vi);
                         self.an_seen[vi] = 1;
