@@ -13,9 +13,6 @@ pub trait ClauseElimanation {
     fn simplify_database(&mut self) -> ();
 }
 
-const RANK_CONST: usize = 0;
-const RANK_NEED: usize = 1;
-
 // const RANK_WIDTH: u64 = 11;
 const ACTIVITY_WIDTH: usize = 51;
 const RANK_MAX: usize = 1000;
@@ -187,8 +184,8 @@ impl Solver {
         for ci in start..self.clauses.len() {
             let ref mut c = &mut self.clauses[ci];
             if c.rank == RANK_CONST {
-                panic!("no way");
                 c.tmp = RANK_CONST;
+                panic!("no way {}/{} {}", ci, start, self.fixed_len);
             } else if c.tmp == RANK_NEED {
                 requires += 1;
             } else {
@@ -210,17 +207,13 @@ impl Solver {
             let mut r1 = 0;
             for c in &self.clauses[start..start + requires] {
                 match c.tmp {
-                    RANK_NEED => {
-                        r0 += 1;
-                    }
+                    RANK_NEED => { r0 += 1; }
                     _ => { break; }
                 }
             }
             for c in &self.clauses[start..start + requires] {
                 match c.tmp {
-                    RANK_NEED => {
-                        r1 += 1;
-                    }
+                    RANK_NEED => { r1 += 1; }
                     _ => {}
                 }
             }
@@ -229,6 +222,10 @@ impl Solver {
             debug_assert!(self.clauses[0].index == 0, "NULL moved.");
             debug_assert_eq!(start + r0, self.fixed_len + requires);
         }
+        println!(
+            "# DB::drop 1/2 {:>9} ({:>9}) => {:>9} / {:>9.1}",
+            nc, self.fixed_len, start + max(requires, (nc - start)/2), self.max_learnts
+        );
         self.fixed_len += requires;
         start + max(requires, (nc - start) / 2)
     }
@@ -275,16 +272,25 @@ impl Solver {
             let mut c0 = 0;
             let mut c1 = 0;
             for c in &self.clauses[..] {
-                if let RANK_CONST = c.tmp { c0 += 1; }
-                else { break; }
+                match c.tmp {
+                    RANK_CONST|RANK_NEED => { c0 += 1; }
+                    _ => { break; }
+                }
             }
             for c in &self.clauses[..] {
-                if let RANK_CONST = c.tmp { c1 += 1; }
+                match c.tmp {
+                    RANK_CONST|RANK_NEED => { c1 += 1; }
+                    _ => { }
+                }
             }
             debug_assert_eq!(c0, c1);
             debug_assert!(self.clauses[0].index == 0, "NULL moved.");
             self.fixed_len = c0;
         }
+        println!(
+            "# DB::simplify {:>9} ({:>9}) => {:>9} / {:>9.1}",
+            nc, self.fixed_len, nn, self.max_learnts
+        );
         nn
     }
     fn rebuild_reason(&mut self) -> () {

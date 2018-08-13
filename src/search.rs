@@ -1,4 +1,5 @@
 use clause::*;
+use clause::RANK_NEED;
 use clause_select::ClauseElimanation;
 use search_restart::Restart;
 use solver::*;
@@ -232,9 +233,11 @@ impl Solver {
         let l0 = c.lits[0];
         let lbd;
         if c.lits.len() == 2 {
-            lbd = 1;
+            lbd = RANK_NEED;
         } else {
             lbd = self.lbd_of(&c.lits);
+            if lbd == 2 {
+            }
         }
         c.rank = lbd;
         let ci = self.inject(c);
@@ -261,11 +264,11 @@ impl Solver {
                 debug_assert_ne!(ci, NULL_CLAUSE);
                 // println!("  analyze.loop {}", (*c));
                 let d = (*c).rank;
-                if 0 < d {
+                if RANK_NEED < d {
                     self.bump_ci(ci);
                     let nblevel = self.lbd_of(&(*c).lits);
                     if 2 < d && nblevel + 1 < d {
-                        (*c).rank = nblevel;
+                        (*c).rank = max(2, nblevel);
                     }
                 }
                 // println!("{}を対応", (*c));

@@ -2,6 +2,9 @@ use std::f64;
 use std::fmt;
 use types::*;
 
+pub const RANK_CONST: usize = 0;
+pub const RANK_NEED: usize = 1;
+
 /// Clause
 /// Clause should be placed on heap anytime.
 /// And `Box` provides Eq for 'clause pointer'.
@@ -34,7 +37,7 @@ impl Clause {
     pub fn new(learnt: bool, v: Vec<Lit>) -> Clause {
         Clause {
             activity: 0.0,
-            rank: if learnt { v.len() } else { 0 },
+            rank: if learnt { v.len() } else { RANK_CONST },
             lits: v,
             index: 0,
             tmp: 0,

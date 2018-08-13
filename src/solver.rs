@@ -36,6 +36,7 @@ pub struct Solver {
     /// Assignment Management
     pub vars: Vec<Var>,
     pub clauses: ClauseManager,
+    /// fixed_len = |NULL| + |given|
     pub fixed_len: usize,
     pub watches: WatchMap,
     pub trail: Vec<Lit>,
@@ -158,7 +159,6 @@ impl Solver {
         let w1 = c.lits[1];
         let ci = self.clauses.len();
         c.index = ci;
-        // println!("Inject {}-th clause {}.", ci, c);
         self.clauses.push(c);
         push_watch(&mut self.watches, ci, w0, w1);
         ci
@@ -294,7 +294,7 @@ impl Solver {
             }
         }
         debug_assert_eq!(s.vars.len() - 1, cnf.num_of_variables);
-        s.fixed_len = s.clauses.len() - 1;
+        s.fixed_len = s.clauses.len();
         (s, cnf)
     }
 }
