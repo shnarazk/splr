@@ -1,3 +1,6 @@
+use std::fs;
+use std::io::BufReader;
+use std::io::*;
 use clause::*;
 use types::*;
 use var::*;
@@ -207,6 +210,68 @@ impl Solver {
                 return vi;
             }
         }
+    }
+    /// builds and returns a configured solver.
+    pub fn build(path: &str) -> (Solver, CNFDescription) {
+        let mut rs = BufReader::new(fs::File::open(path).unwrap());
+        let mut buf = String::new();
+        let mut nv: usize = 0;
+        let mut nc: usize = 0;
+        loop {
+            buf.clear();
+            match rs.read_line(&mut buf) {
+                Ok(0) => break,
+                Ok(_k) => {
+                    let mut iter = buf.split_whitespace();
+                    if iter.next() == Some("p") && iter.next() == Some("cnf") {
+                        if let Some(v) = iter.next().map(|s| s.parse::<usize>().ok().unwrap()) {
+                            if let Some(c) = iter.next().map(|s| s.parse::<usize>().ok().unwrap()) {
+                                nv = v;
+                                nc = c;
+                                break;
+                            }
+                        }
+                    }
+                    continue;
+                }
+                Err(e) => panic!("{}", e),
+            }
+        }
+        let cnf = CNFDescription {
+            num_of_variables: nv,
+            num_of_clauses: nc,
+            pathname: path.to_string(),
+        };
+        let mut s: Solver = Solver::new(SolverConfiguration::default(), &cnf);
+        loop {
+            buf.clear();
+            match rs.read_line(&mut buf) {
+                Ok(0) => break,
+                Ok(_) => {
+                    if buf.starts_with("c") {
+                        continue;
+                    }
+                    let mut iter = buf.split_whitespace();
+                    let mut v: Vec<Lit> = Vec::new();
+                    for s in iter {
+                        if let Ok(val) = s.parse::<i32>() {
+                            if val == 0 {
+                                break;
+                            } else {
+                                v.push(int2lit(val));
+                            }
+                        }
+                    }
+                    if v.len() != 0 {
+                        s.add_clause(v);
+                    }
+                }
+                Err(e) => panic!("{}", e),
+            }
+        }
+        debug_assert_eq!(s.vars.len() - 1, cnf.num_of_variables);
+        s.fixed_len = s.clauses.len() - 1;
+        (s, cnf)
     }
 }
 

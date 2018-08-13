@@ -60,6 +60,16 @@ impl Clause {
     }
 }
 
+///```
+///    # use splr::types::*;
+///    let c1 = splr::clause::Clause::new(false, vec![int2lit(1), int2lit(2), int2lit(3)]);
+///    let mut c2 = splr::clause::Clause::new(false, vec![int2lit(-1), int2lit(4)]);
+///    c2.activity = 2.4;
+///    assert_eq!(c1, c1);
+///    assert_eq!(c1 == c1, true);
+///    assert_ne!(c1, c2);
+///    assert_eq!(c2.activity, 2.4);
+///```
 impl PartialEq for Clause {
     fn eq(&self, other: &Clause) -> bool {
         self.lits == other.lits
