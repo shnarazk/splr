@@ -13,6 +13,9 @@ pub trait ClauseElimanation {
     fn simplify_database(&mut self) -> ();
 }
 
+const RANK_CONST: usize = 0;
+const RANK_NEED: usize = 1;
+
 // const RANK_WIDTH: u64 = 11;
 const ACTIVITY_WIDTH: usize = 51;
 const RANK_MAX: usize = 1000;
@@ -75,12 +78,12 @@ impl ClauseElimanation for Solver {
 /// returns 1 if this is good enough.
 impl Clause {
     pub fn set_sort_key(&mut self, at: f64) -> usize {
-        if self.rank == 0 {
+        if self.rank == RANK_CONST {
             // only NULL and given
             self.tmp = 0;
             1
-        } else if self.rank == 1 {
-            self.tmp = 1;
+        } else if self.rank == 2 {
+            self.tmp = RANK_NEED;
             1
         } else {
             let ac = self.activity;
@@ -171,22 +174,22 @@ impl Solver {
         }
         // reset the 'tmp' field
         for c in &mut self.clauses[start..] {
-            (*c).tmp = 100;
+            (*c).tmp = RANK_MAX;
         }
         // mark clauses that used as reasons
         for v in &self.vars[1..] {
             if 0 < v.reason {
-                self.clauses[v.reason].tmp = 0;
+                self.clauses[v.reason].tmp = RANK_NEED;
             }
         }
         // set key
         let ac = 0.1 * self.cla_inc / (nc as f64);
         for ci in start..self.clauses.len() {
             let ref mut c = &mut self.clauses[ci];
-            if c.tmp == 0 {
-                requires += 1;
-            } else if c.rank <= 1 {
-                c.tmp = 0;
+            if c.rank == RANK_CONST {
+                panic!("no way");
+                c.tmp = RANK_CONST;
+            } else if c.tmp == RANK_NEED {
                 requires += 1;
             } else {
                 requires += c.set_sort_key(ac);
@@ -201,21 +204,35 @@ impl Solver {
             self.clause_permutation[old] = i;
             self.clauses[i].index = i;
         }
-        // check consistency
+        // DEBUG: check consistency
         {
-            let mut r = 0;
+            let mut r0 = 0;
+            let mut r1 = 0;
             for c in &self.clauses[start..start + requires] {
-                if c.tmp <= 0 {
-                    r += 1;
+                match c.tmp {
+                    RANK_NEED => {
+                        r0 += 1;
+                    }
+                    _ => { break; }
                 }
             }
-            debug_assert_eq!(r, requires);
+            for c in &self.clauses[start..start + requires] {
+                match c.tmp {
+                    RANK_NEED => {
+                        r1 += 1;
+                    }
+                    _ => {}
+                }
+            }
+            debug_assert_eq!(r0, r1);
+            debug_assert_eq!(r0, requires);
             debug_assert!(self.clauses[0].index == 0, "NULL moved.");
+            debug_assert_eq!(start + r0, self.fixed_len + requires);
         }
+        self.fixed_len += requires;
         start + max(requires, (nc - start) / 2)
     }
     fn sort_clauses_for_simplification(&mut self) -> usize {
-        let start = 0;
         let nc = self.clauses.len();
         let mut purges = 0;
         if self.clause_permutation.len() < nc {
@@ -229,11 +246,15 @@ impl Solver {
             *x = i;
         }
         // set key
-        for ci in start..self.clauses.len() {
-            if self.satisfies(&self.clauses[ci]) {
-                let ref mut c = &mut self.clauses[ci];
-                c.tmp = MAX;
-                purges += 1;
+        for ci in 1..self.clauses.len() {
+            unsafe {
+                let c = &mut self.clauses[ci] as *mut Clause;
+                if self.satisfies(&self.clauses[ci]) {
+                    (*c).tmp = MAX;
+                    purges += 1;
+                } else {
+                    (*c).tmp = (*c).rank;
+                }
             }
         }
         self.clauses.retain(|ref c| c.tmp < MAX);
@@ -248,6 +269,21 @@ impl Solver {
         // clear the reasons of variables satisfied at level zero.
         for l in &self.trail {
             self.vars[l.vi() as usize].reason = NULL_CLAUSE;
+        }
+        // DEBUG: check consistency
+        {
+            let mut c0 = 0;
+            let mut c1 = 0;
+            for c in &self.clauses[..] {
+                if let RANK_CONST = c.tmp { c0 += 1; }
+                else { break; }
+            }
+            for c in &self.clauses[..] {
+                if let RANK_CONST = c.tmp { c1 += 1; }
+            }
+            debug_assert_eq!(c0, c1);
+            debug_assert!(self.clauses[0].index == 0, "NULL moved.");
+            self.fixed_len = c0;
         }
         nn
     }
