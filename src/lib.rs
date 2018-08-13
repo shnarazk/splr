@@ -9,7 +9,7 @@ pub mod clause_select;
 /// Implementation on Main algorithm.
 pub mod propagate;
 /// Implementation on solver restart.
-pub mod search_restart;
+pub mod restart;
 /// struct Solver
 pub mod solver;
 /// Plumping layer.

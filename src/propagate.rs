@@ -2,7 +2,7 @@ use analyze::*;
 use clause::RANK_NEED;
 use clause::*;
 use clause_select::ClauseElimanation;
-use search_restart::Restart;
+use restart::Restart;
 use solver::*;
 use std::cmp::max;
 use types::*;
