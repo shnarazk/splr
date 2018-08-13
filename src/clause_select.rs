@@ -236,11 +236,10 @@ impl Solver {
             if self.satisfies(&self.clauses[ci]) {
                 let ref mut d = &mut self.clauses[ci];
                 d.rank = MAX;
-                d.tmp = MAX;
                 purges += 1;
             }
         }
-        self.clauses.sort_by_key(|c| c.tmp);
+        self.clauses.sort_by_key(|c| c.rank);
         for i in 1..nc {
             let old = self.clauses[i].index;
             debug_assert!(0 < old, "0 index");
