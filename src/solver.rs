@@ -1,4 +1,5 @@
 use clause::*;
+use search::LEVEL_BITMAP_SIZE;
 use std::fs;
 use std::io::{BufRead, BufReader};
 use types::*;
@@ -80,6 +81,7 @@ pub struct Solver {
     pub an_stack: Vec<Lit>,
     pub an_last_dl: Vec<Lit>,
     pub an_learnt_lits: Vec<Lit>,
+    pub an_level_map: Vec<bool>,
     pub stats: Vec<i64>,
     pub lbd_seen: Vec<u64>,
     pub lbd_key: u64,
@@ -133,6 +135,7 @@ impl Solver {
             an_stack: vec![],
             an_last_dl: vec![],
             an_learnt_lits: vec![],
+            an_level_map: vec![false; LEVEL_BITMAP_SIZE],
             stats: vec![0; Stat::EndOfStatIndex as usize],
             lbd_seen: vec![0; nv + 1],
             lbd_key: 0,

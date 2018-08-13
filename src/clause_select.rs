@@ -299,7 +299,6 @@ impl Solver {
         nn
     }
     fn rebuild_reason(&mut self) -> () {
-        let len = self.clauses.len();
         let new_clause = &self.clause_permutation;
         for v in &mut self.vars[1..] {
             let ci = v.reason;

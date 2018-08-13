@@ -8,15 +8,15 @@ use types::*;
 use var_select::VarSelection;
 use watch::*;
 
+/// Big problems require an enough table.
+pub const LEVEL_BITMAP_SIZE: usize = 16384;
+
 pub trait SolveSAT {
     fn solve(&mut self) -> SolverResult;
     /// returns `true` for SAT, `false` for UNSAT.
     fn search(&mut self) -> bool;
     fn propagate(&mut self) -> Option<ClauseIndex>;
 }
-
-/// Big problems require an enough table.
-const LEVEL_BITMAP_SIZE: usize = 16384;
 
 impl SolveSAT for Solver {
     // adapt delayed update of watches
@@ -31,21 +31,16 @@ impl SolveSAT for Solver {
             let false_lit = p.negate();
             'next_clause: for mut wi in 0..wl {
                 // println!(" next_clause: {}", wi);
-                let Watch { other, by, to } = self.watches[p_usize][wi];
-                debug_assert_ne!(other, to);
-                // We use `Watch.to` to keep the literal which is the destination of propagation.
-                let bv = if other == 0 {
-                    LFALSE
-                } else {
-                    self.assigned(other)
-                };
-                if bv == LTRUE {
-                    self.watches[p_usize][wi].to = p;
-                    continue 'next_clause;
-                }
                 unsafe {
-                    let c = &mut self.clauses[by] as *mut Clause;
-                    debug_assert!(by == (*c).index, "A clause has an inconsistent index");
+                    let w = &mut self.watches[p_usize][wi] as *mut Watch;
+                    debug_assert_ne!((*w).other, (*w).to);
+                    // We use `Watch.to` to keep the literal which is the destination of propagation.
+                    if (*w).other != 0 && self.assigned((*w).other) == LTRUE {
+                        (*w).to = p;
+                        continue 'next_clause;
+                    }
+                    let c = &mut self.clauses[(*w).by] as *mut Clause;
+                    debug_assert!((*w).by == (*c).index, "A clause has an inconsistent index");
                     debug_assert!(false_lit == (*c).lits[0] || false_lit == (*c).lits[1]);
                     // Place the false literal at lits[1].
                     // And the last literal in unit clause will be at lits[0].
@@ -53,33 +48,33 @@ impl SolveSAT for Solver {
                         (*c).lits.swap(0, 1);
                     }
                     let first = (*c).lits[0];
-                    debug_assert_eq!(false_lit, (*c).lits[1]);
+                    // debug_assert_eq!(false_lit, (*c).lits[1]);
                     let fv = self.assigned(first);
                     if fv == LTRUE {
                         // Satisfied by the other watch.
                         // Update watch with `other`, the cached literal
-                        self.watches[p_usize][wi].to = p;
+                        (*w).to = p;
                         continue 'next_clause;
                     }
-                    self.watches[p_usize][wi].other = first;
+                    (*w).other = first;
                     for k in 2..(*c).lits.len() {
                         let lk = (*c).lits[k];
                         if self.assigned(lk) != LFALSE {
                             (*c).tmp = k;
                             // Update the watch
-                            self.watches[p_usize][wi].to = lk.negate();
+                            (*w).to = lk.negate();
                             continue 'next_clause;
                         }
                     }
                     if fv == LFALSE {
                         // println!("  found a conflict variable {} by {}", first.vi(), (*c));
-                        return Some(by);
+                        return Some((*w).by);
                     } else {
                         // println!("  unit propagation {} by {}", first.int(), (*c));
                         (*c).tmp = 1;
-                        self.watches[p_usize][wi].to = p;
+                        (*w).to = p;
                         debug_assert_eq!(first, (*c).lits[0]);
-                        self.unsafe_enqueue(first, by);
+                        self.unsafe_enqueue(first, (*w).by);
                     }
                 }
             }
@@ -88,7 +83,7 @@ impl SolveSAT for Solver {
             // println!("  update watches");
             self.watches[0].clear();
             while let Some(w) = self.watches[p_usize].pop() {
-                debug_assert!(w.to != 0, "Invalid Watch.to found");
+                // debug_assert!(w.to != 0, "Invalid Watch.to found");
                 if w.to == p {
                     self.watches[0].push(w)
                 } else {
@@ -99,7 +94,7 @@ impl SolveSAT for Solver {
             }
             debug_assert!(self.watches[p_usize].is_empty(), true);
             while let Some(w) = self.watches[0].pop() {
-                debug_assert!(w.to == p, "inconsistent propagation");
+                // debug_assert!(w.to == p, "inconsistent propagation");
                 self.watches[p_usize].push(w);
             }
         }
@@ -107,8 +102,7 @@ impl SolveSAT for Solver {
     }
     fn search(&mut self) -> bool {
         // self.dump("search");
-        let delta_init: f64 = (self.num_vars as f64).sqrt();
-        let mut delta = delta_init;
+        let delta: f64 = (self.num_vars as f64).sqrt();
         let root_lv = self.root_level;
         let mut to_restart = false;
         loop {
@@ -136,7 +130,7 @@ impl SolveSAT for Solver {
                         self.decay_cla_activity();
                         self.learnt_size_cnt -= 1;
                         if self.learnt_size_cnt == 0 {
-                            let adj = 1.25 * self.learnt_size_adj;
+                            let adj = 1.5 * self.learnt_size_adj;
                             self.learnt_size_adj = adj;
                             self.learnt_size_cnt = adj as u64;
                             self.max_learnts += delta;
@@ -159,8 +153,6 @@ impl SolveSAT for Solver {
                     }
                     if to_restart {
                         self.cancel_until(root_lv);
-                        // println!("restart");
-                        delta = delta_init;
                         to_restart = false;
                     } // else {
                     {
@@ -334,11 +326,13 @@ impl Solver {
         self.an_stack.clear();
         self.an_to_clear.clear();
         self.an_to_clear.push(l0);
-        let mut level_map = [false; LEVEL_BITMAP_SIZE];
+        for b in &mut self.an_level_map {
+            *b = false;
+        }
         for i in 1..n {
             let l = self.an_learnt_lits[i];
             self.an_to_clear.push(l);
-            level_map[(self.vars[l.vi()].level as usize) % LEVEL_BITMAP_SIZE] = true;
+            self.an_level_map[(self.vars[l.vi()].level as usize) % LEVEL_BITMAP_SIZE] = true;
         }
         // println!("  analyze.loop 4 n = {}", n);
         let mut i = 1;
@@ -353,7 +347,7 @@ impl Solver {
             if self.vars[l.vi()].reason == NULL_CLAUSE {
                 self.an_learnt_lits[j] = l;
                 j += 1;
-            } else if !self.analyze_removable(l, &level_map) {
+            } else if !self.analyze_removable(l) {
                 self.an_learnt_lits[j] = l;
                 j += 1;
             }
@@ -386,7 +380,7 @@ impl Solver {
         // println!("  analyze terminated");
         (level_to_return, self.an_learnt_lits.clone())
     }
-    fn analyze_removable(&mut self, l: Lit, level_map: &[bool]) -> bool {
+    fn analyze_removable(&mut self, l: Lit) -> bool {
         self.an_stack.clear();
         self.an_stack.push(l);
         let top1 = self.an_to_clear.len();
@@ -402,7 +396,7 @@ impl Solver {
                 let vi = q.vi();
                 let lv = self.vars[vi].level % LEVEL_BITMAP_SIZE;
                 if self.an_seen[vi] != 1 && lv != 0 {
-                    if self.vars[vi].reason != NULL_CLAUSE && level_map[lv] {
+                    if self.vars[vi].reason != NULL_CLAUSE && self.an_level_map[lv] {
                         self.an_seen[vi] = 1;
                         self.an_stack.push(*q);
                         self.an_to_clear.push(*q);
