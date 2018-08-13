@@ -15,6 +15,7 @@ pub trait SolveSAT {
     fn propagate(&mut self) -> Option<ClauseIndex>;
     fn enqueue(&mut self, l: Lit, cid: ClauseIndex) -> bool;
     fn assume(&mut self, l: Lit) -> bool;
+    fn cancel_until(&mut self, lv: usize) -> ();
 }
 
 impl SolveSAT for Solver {
@@ -166,6 +167,26 @@ impl SolveSAT for Solver {
                 }
             }
         }
+    }
+    fn cancel_until(&mut self, lv: usize) -> () {
+        if self.decision_level() <= lv {
+            return;
+        }
+        let lim = self.trail_lim[lv];
+        for l in &self.trail[lim..] {
+            let vi = l.vi();
+            {
+                let v = &mut self.vars[vi];
+                v.phase = v.assign;
+                v.assign = BOTTOM;
+                v.reason = NULL_CLAUSE;
+            }
+            self.var_order.insert(&self.vars, vi);
+        }
+        self.trail.truncate(lim); // FIXME
+        self.trail_lim.truncate(lv);
+        self.q_head = lim;
+        // self.dump("cancel_until");
     }
     fn enqueue(&mut self, l: Lit, cid: ClauseIndex) -> bool {
         // println!("enqueue: {} by {}", l.int(), cid);

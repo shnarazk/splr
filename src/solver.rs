@@ -1,6 +1,6 @@
 use analyze::LEVEL_BITMAP_SIZE;
 use clause::*;
-use propagate::SolveSAT;
+use search::SolveSAT;
 use std::fs;
 use std::io::{BufRead, BufReader};
 use types::*;
@@ -200,42 +200,6 @@ impl Solver {
     }
     pub fn decision_level(&self) -> usize {
         self.trail_lim.len()
-    }
-    pub fn cancel_until(&mut self, lv: usize) -> () {
-        if self.decision_level() <= lv {
-            return;
-        }
-        let lim = self.trail_lim[lv];
-        for l in &self.trail[lim..] {
-            let vi = l.vi();
-            {
-                let v = &mut self.vars[vi];
-                v.phase = v.assign;
-                v.assign = BOTTOM;
-                v.reason = NULL_CLAUSE;
-            }
-            self.var_order.insert(&self.vars, vi);
-        }
-        self.trail.truncate(lim); // FIXME
-        self.trail_lim.truncate(lv);
-        self.q_head = lim;
-        // self.dump("cancel_until");
-    }
-    /// Heap operations; renamed from selectVO
-    pub fn select_var(&mut self) -> VarIndex {
-        loop {
-            // self.var_order.check("select_var 1");
-            if self.var_order.len() == 0 {
-                // println!("> select_var returns 0");
-                return 0;
-            }
-            let vi = self.var_order.root(&self.vars);
-            // self.var_order.check("select_var 2");
-            let x = self.vars[vi].assign;
-            if x == BOTTOM {
-                return vi;
-            }
-        }
     }
     /// builds and returns a configured solver.
     pub fn build(path: &str) -> (Solver, CNFDescription) {

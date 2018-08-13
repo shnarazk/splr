@@ -6,10 +6,10 @@ pub mod analyze;
 pub mod clause;
 /// Implementation on clause elimination.
 pub mod clause_select;
-/// Implementation on Main algorithm.
-pub mod propagate;
 /// Implementation on solver restart.
 pub mod restart;
+/// Implementation on Main algorithm.
+pub mod search;
 /// struct Solver
 pub mod solver;
 /// Plumping layer.

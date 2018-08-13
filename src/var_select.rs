@@ -2,6 +2,7 @@ use solver::*;
 use types::*;
 
 pub trait VarSelection {
+    fn select_var(&mut self) -> VarIndex;
     fn bump_vi(&mut self, vi: VarIndex) -> ();
     fn decay_var_activity(&mut self) -> ();
 }
@@ -9,6 +10,22 @@ pub trait VarSelection {
 const VAR_ACTIVITY_THRESHOLD: f64 = 1e100;
 
 impl VarSelection for Solver {
+    /// Heap operations; renamed from selectVO
+    fn select_var(&mut self) -> VarIndex {
+        loop {
+            // self.var_order.check("select_var 1");
+            if self.var_order.len() == 0 {
+                // println!("> select_var returns 0");
+                return 0;
+            }
+            let vi = self.var_order.root(&self.vars);
+            // self.var_order.check("select_var 2");
+            let x = self.vars[vi].assign;
+            if x == BOTTOM {
+                return vi;
+            }
+        }
+    }
     fn bump_vi(&mut self, vi: VarIndex) -> () {
         let d = self.stats[Stat::NumOfBackjump as usize] as f64;
         let a = (self.vars[vi].activity + d) / 2.0;
