@@ -216,22 +216,6 @@ impl Default for SolverConfiguration {
     }
 }
 
-/// stat index
-#[derive(Copy, Clone)]
-pub enum StatIndex {
-    NumOfBackjump = 0, // the number of backjump
-    NumOfRestart,      // the number of restart
-    NumOfBlockRestart, // the number of blacking start
-    NumOfPropagation,  // the number of propagation
-    NumOfReduction,    // the number of reduction
-    NumOfClause,       // the number of 'alive' given clauses
-    NumOfLearnt,       // the number of 'alive' learnt clauses
-    NumOfVariable,     // the number of 'alive' variables
-    NumOfGroundVar,    // the number os assined variables at level 0
-    NumOfAssigned,     // the number of assigned variables
-    EndOfStatIndex,    // Don't use this dummy.
-}
-
 /// formats of state dump
 pub enum DumpMode {
     NoDump = 0,

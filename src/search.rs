@@ -26,7 +26,7 @@ impl SolveSAT for Solver {
             let p: Lit = self.trail[self.q_head];
             let p_usize: usize = p as usize;
             self.q_head += 1;
-            self.stats[StatIndex::NumOfPropagation as usize] += 1;
+            self.stats[Stat::NumOfPropagation as usize] += 1;
             let wl = self.watches[p_usize].len();
             let false_lit = p.negate();
             'next_clause: for mut wi in 0..wl {
@@ -118,7 +118,7 @@ impl SolveSAT for Solver {
             // self.dump(format!("search called propagate and it returned {:?} at {}", ret, d));
             match ret {
                 Some(ci) => {
-                    self.stats[StatIndex::NumOfBackjump as usize] += 1;
+                    self.stats[Stat::NumOfBackjump as usize] += 1;
                     if d == self.root_level {
                         self.analyze_final(ci, false);
                         return false;

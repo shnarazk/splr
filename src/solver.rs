@@ -30,6 +30,22 @@ pub enum SolverException {
 /// * aborted due to Mios specification or an internal error
 pub type SolverResult = Result<Certificate, SolverException>;
 
+/// stat index
+#[derive(Copy, Clone)]
+pub enum Stat {
+    NumOfBackjump = 0, // the number of backjump
+    NumOfRestart,      // the number of restart
+    NumOfBlockRestart, // the number of blacking start
+    NumOfPropagation,  // the number of propagation
+    NumOfReduction,    // the number of reduction
+    NumOfClause,       // the number of 'alive' given clauses
+    NumOfLearnt,       // the number of 'alive' learnt clauses
+    NumOfVariable,     // the number of 'alive' variables
+    NumOfGroundVar,    // the number os assined variables at level 0
+    NumOfAssigned,     // the number of assigned variables
+    EndOfStatIndex,    // Don't use this dummy.
+}
+
 /// is the collection of all variables.
 #[derive(Debug)]
 pub struct Solver {
@@ -117,7 +133,7 @@ impl Solver {
             an_stack: vec![],
             an_last_dl: vec![],
             an_learnt_lits: vec![],
-            stats: vec![0; StatIndex::EndOfStatIndex as usize],
+            stats: vec![0; Stat::EndOfStatIndex as usize],
             lbd_seen: vec![0; nv + 1],
             lbd_key: 0,
             asg_f: Ema_::new(fe),
