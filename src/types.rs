@@ -228,15 +228,18 @@ pub struct SolverConfiguration {
     pub restart_step: f64,
 }
 
-/// is a [SolverConfiguration](struct.SolverConfiguration.html).
-pub const DEFAULT_CONFIGURATION: SolverConfiguration = SolverConfiguration {
-    variable_decay_rate: 0.95,
-    clause_decay_rate: 0.999,
-    dump_solver_stat_mode: 0,
-    ema_coeffs: (2 ^ 5, 2 ^ 14),
-    restart_expansion: 1.15,
-    restart_step: 100.0,
-};
+impl Default for SolverConfiguration {
+    fn default() -> SolverConfiguration {
+        SolverConfiguration {
+            variable_decay_rate: 0.95,
+            clause_decay_rate: 0.999,
+            dump_solver_stat_mode: 0,
+            ema_coeffs: (2 ^ 5, 2 ^ 14),
+            restart_expansion: 1.15,
+            restart_step: 100.0,
+        }
+    }
+}
 
 /// stat index
 #[derive(Copy, Clone)]

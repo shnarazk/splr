@@ -39,7 +39,7 @@ fn build_solver(path: &str) -> (Solver, CNFDescription) {
         pathname: path.to_string(),
     };
     // println!(" - desc: {}", cnf);
-    let mut s: Solver = Solver::new(DEFAULT_CONFIGURATION, &cnf);
+    let mut s: Solver = Solver::new(SolverConfiguration::default(), &cnf);
     loop {
         buf.clear();
         match rs.read_line(&mut buf) {
@@ -138,7 +138,7 @@ fn main_() {
         num_of_clauses: nc,
         pathname: "".to_string(),
     };
-    let mut s: Solver = Solver::new(DEFAULT_CONFIGURATION, &cnf);
+    let mut s: Solver = Solver::new(SolverConfiguration::default(), &cnf);
     let x: Lit = int2lit(4);
     let c1 = Clause::new(false, vec![int2lit(1), int2lit(2), int2lit(3)]);
     let mut c2 = Clause::new(false, vec![int2lit(-1), int2lit(4)]);
