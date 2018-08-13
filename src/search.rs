@@ -151,9 +151,9 @@ impl SolveSAT for Solver {
                         return true;
                     } else if (self.max_learnts as usize) + na + self.fixed_len < self.clauses.len()
                     {
-                        self.reduce_database(false);
+                        self.reduce_database();
                     } else if d == 0 && self.num_solved_vars < na {
-                        self.reduce_database(true);
+                        self.simplify_database();
                         self.num_solved_vars = na;
                     }
                     if to_restart {

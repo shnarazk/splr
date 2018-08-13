@@ -9,7 +9,8 @@ use watch::push_watch;
 pub trait ClauseElimanation {
     fn bump_ci(&mut self, ci: ClauseIndex) -> ();
     fn decay_cla_activity(&mut self) -> ();
-    fn reduce_database(&mut self, simplify: bool) -> ();
+    fn reduce_database(&mut self) -> ();
+    fn simplify_database(&mut self) -> ();
 }
 
 // const RANK_WIDTH: u64 = 11;
@@ -40,37 +41,33 @@ impl ClauseElimanation for Solver {
     fn decay_cla_activity(&mut self) -> () {
         self.cla_inc = self.cla_inc / CLAUSE_ACTIVITY_THRESHOLD;
     }
-    fn reduce_database(&mut self, simplify: bool) -> () {
-        debug_assert!(
-            !simplify || self.decision_level() == 0,
-            "wrong invocation of reduce_database"
-        );
-        // if simplify {
-        //     let mut assigned = 0;
-        //     for v in &self.vars[1..] {
-        //         if 0 < v.reason {
-        //             assigned += 1;
-        //         }
-        //     }
-        //     println!("  before simplify: {} {:?}", assigned, self.trail.iter().map(|l| &self.vars[l.vi()]).collect::<Vec<&Var>>());
-        // }
+    fn reduce_database(&mut self) -> () {
         let end = self.clauses.len();
-        let new_end;
-        if simplify {
-            new_end = self.sort_clauses_for_simplification();
-        } else {
-            new_end = self.sort_clauses_for_reduction();
-        }
+        let new_end = self.sort_clauses_for_reduction();
         self.rebuild_reason();
         if new_end < end {
             self.clauses.truncate(new_end);
         }
         self.rebuild_watches();
         debug_assert_eq!(self.clauses[0].index, 0);
-        let tag = if simplify { "simplify" } else { "drop 1/2" };
         println!(
-            "# DB::{} {:>9} ({:>9}) => {:>9} / {:>9.1}",
-            tag, end, self.fixed_len, new_end, self.max_learnts
+            "# DB::drop 1/2 {:>9} ({:>9}) => {:>9} / {:>9.1}",
+            end, self.fixed_len, new_end, self.max_learnts
+        );
+    }
+    fn simplify_database(&mut self) -> () {
+        debug_assert_eq!(self.decision_level(), 0);
+        let end = self.clauses.len();
+        let new_end = self.sort_clauses_for_simplification();
+        self.rebuild_reason();
+        if new_end < end {
+            self.clauses.truncate(new_end);
+        }
+        self.rebuild_watches();
+        debug_assert_eq!(self.clauses[0].index, 0);
+        println!(
+            "# DB::simplify {:>9} ({:>9}) => {:>9} / {:>9.1}",
+            end, self.fixed_len, new_end, self.max_learnts
         );
     }
 }
