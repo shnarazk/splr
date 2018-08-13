@@ -222,7 +222,10 @@ impl Solver {
         // }
         println!(
             "# DB::drop 1/2 {:>9} ({:>9}) => {:>9} / {:>9.1}",
-            nc, self.fixed_len, start + max(requires, (nc - start)/2), self.max_learnts
+            nc,
+            self.fixed_len,
+            start + max(requires, (nc - start) / 2),
+            self.max_learnts
         );
         self.fixed_len += requires;
         start + max(requires, (nc - start) / 2)
@@ -268,8 +271,12 @@ impl Solver {
         let mut c0 = 0;
         for c in &self.clauses[..] {
             match c.tmp {
-                RANK_CONST|RANK_NEED => { c0 += 1; }
-                _ => { break; }
+                RANK_CONST | RANK_NEED => {
+                    c0 += 1;
+                }
+                _ => {
+                    break;
+                }
             }
         }
         self.fixed_len = c0;

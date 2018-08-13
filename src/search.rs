@@ -1,5 +1,5 @@
-use clause::*;
 use clause::RANK_NEED;
+use clause::*;
 use clause_select::ClauseElimanation;
 use search_restart::Restart;
 use solver::*;
@@ -31,7 +31,7 @@ impl SolveSAT for Solver {
             let false_lit = p.negate();
             'next_clause: for mut wi in 0..wl {
                 // println!(" next_clause: {}", wi);
-                let Watch { other, by, to, } = self.watches[p_usize][wi];
+                let Watch { other, by, to } = self.watches[p_usize][wi];
                 debug_assert_ne!(other, to);
                 // We use `Watch.to` to keep the literal which is the destination of propagation.
                 let bv = if other == 0 {
@@ -236,8 +236,6 @@ impl Solver {
             lbd = RANK_NEED;
         } else {
             lbd = self.lbd_of(&c.lits);
-            if lbd == 2 {
-            }
         }
         c.rank = lbd;
         let ci = self.inject(c);
