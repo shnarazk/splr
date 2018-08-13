@@ -1,5 +1,6 @@
+use analyze::LEVEL_BITMAP_SIZE;
 use clause::*;
-use search::LEVEL_BITMAP_SIZE;
+use propagate::SolveSAT;
 use std::fs;
 use std::io::{BufRead, BufReader};
 use types::*;
@@ -95,6 +96,10 @@ pub struct Solver {
     pub next_restart: u64,
     pub restart_exp: f64,
     pub rbias: Ema_,
+}
+
+pub trait SatSolver {
+    fn solve(&mut self) -> SolverResult;
 }
 
 trait Dump {
@@ -196,28 +201,6 @@ impl Solver {
     pub fn decision_level(&self) -> usize {
         self.trail_lim.len()
     }
-    pub fn enqueue(&mut self, l: Lit, cid: ClauseIndex) -> bool {
-        // println!("enqueue: {} by {}", l.int(), cid);
-        let sig = l.lbool();
-        let val = self.vars[l.vi()].assign;
-        if val == BOTTOM {
-            {
-                let dl = self.decision_level();
-                let v = &mut self.vars[l.vi()];
-                v.assign = sig;
-                v.level = dl;
-                v.reason = cid;
-            }
-            self.trail.push(l);
-            true
-        } else {
-            val == sig
-        }
-    }
-    pub fn assume(&mut self, l: Lit) -> bool {
-        self.trail_lim.push(self.trail.len());
-        self.enqueue(l, NULL_CLAUSE)
-    }
     pub fn cancel_until(&mut self, lv: usize) -> () {
         if self.decision_level() <= lv {
             return;
@@ -315,6 +298,40 @@ impl Solver {
         debug_assert_eq!(s.vars.len() - 1, cnf.num_of_variables);
         s.fixed_len = s.clauses.len();
         (s, cnf)
+    }
+}
+
+impl SatSolver for Solver {
+    fn solve(&mut self) -> SolverResult {
+        // TODO deal with assumptons
+        // s.root_level = 0;
+        self.num_solved_vars = self.trail.len();
+        match self.search() {
+            _ if self.ok == false => {
+                self.cancel_until(0);
+                Err(SolverException::InternalInconsistent)
+            }
+            true => {
+                let mut result = Vec::new();
+                for vi in 1..self.num_vars + 1 {
+                    match self.vars[vi].assign {
+                        LTRUE => result.push(vi as i32),
+                        LFALSE => result.push(0 - vi as i32),
+                        _ => (),
+                    }
+                }
+                self.cancel_until(0);
+                Ok(Certificate::SAT(result))
+            }
+            false => {
+                self.cancel_until(0);
+                let mut v = Vec::new();
+                for l in &self.conflicts {
+                    v.push(l.int());
+                }
+                Ok(Certificate::UNSAT(v))
+            }
+        }
     }
 }
 

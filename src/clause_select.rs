@@ -1,4 +1,5 @@
 use clause::*;
+use propagate::SolveSAT;
 use solver::*;
 use std::cmp::max;
 use std::cmp::min;

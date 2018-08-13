@@ -1,11 +1,13 @@
 //! This is a SAT solver in Rust.
 
+/// Conflict analzyer.
+pub mod analyze;
 /// Clause
 pub mod clause;
 /// Implementation on clause elimination.
 pub mod clause_select;
 /// Implementation on Main algorithm.
-pub mod search;
+pub mod propagate;
 /// Implementation on solver restart.
 pub mod search_restart;
 /// struct Solver
