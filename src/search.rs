@@ -1,5 +1,4 @@
 use analyze::*;
-use clause::RANK_NEED;
 use clause::*;
 use clause_select::ClauseElimanation;
 use restart::Restart;
