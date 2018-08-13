@@ -1,10 +1,34 @@
-use std::fs;
-use std::io::BufReader;
-use std::io::*;
 use clause::*;
+use std::fs;
+use std::io::{BufRead, BufReader};
 use types::*;
 use var::*;
 use watch::*;
+
+/// normal results returned by Solver
+#[derive(Debug)]
+pub enum Certificate {
+    SAT(Vec<i32>),
+    UNSAT(Vec<i32>), // FIXME: replace with DRAT
+}
+
+/// abnormal termination flags
+#[derive(Debug)]
+pub enum SolverException {
+    StateUNSAT = 0,
+    StateSAT,             // 1
+    OutOfMemory,          // 2
+    TimeOut,              // 3
+    InternalInconsistent, // 4
+    UndescribedError,     // 5
+}
+
+/// The type that `Solver` returns
+/// This captures the following three cases:
+/// * solved with a satisfiable assigment,
+/// * proved that it's an unsatisfiable problem, and
+/// * aborted due to Mios specification or an internal error
+pub type SolverResult = Result<Certificate, SolverException>;
 
 /// is the collection of all variables.
 #[derive(Debug)]
