@@ -298,14 +298,14 @@ impl Solver {
             let ci = v.reason;
             if 0 < ci {
                 v.reason = new_clause[ci];
-                if v.reason == 0 || len < v.reason {
-                    // println!("trail{:?}", self.trail.iter().map(|l| l.int()).collect::<Vec<i32>>());
-                    println!("lim {}", self.trail_lim.len());
-                    panic!(
-                        "strange index for permutation v{:?} {} < {}",
-                        v, len, v.reason
-                    );
-                }
+                // if v.reason == 0 || len < v.reason {
+                //     // println!("trail{:?}", self.trail.iter().map(|l| l.int()).collect::<Vec<i32>>());
+                //     println!("lim {}", self.trail_lim.len());
+                //     panic!(
+                //         "strange index for permutation v{:?} {} < {}",
+                //         v, len, v.reason
+                //     );
+                // }
             }
         }
     }
