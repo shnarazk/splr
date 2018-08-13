@@ -28,6 +28,5 @@ fn main() {
             Ok(Certificate::UNSAT(v)) => println!("UNSAT {:?}", v),
             Err(e) => println!("Failed {:?}", e),
         }
-        println!("{:?}", s);
     }
 }
