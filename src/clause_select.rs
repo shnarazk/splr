@@ -234,13 +234,15 @@ impl Solver {
         // set key
         for ci in start..self.clauses.len() {
             if self.satisfies(&self.clauses[ci]) {
-                let ref mut d = &mut self.clauses[ci];
-                d.rank = MAX;
+                let ref mut c = &mut self.clauses[ci];
+                c.tmp = MAX;
                 purges += 1;
             }
         }
-        self.clauses.sort_by_key(|c| c.rank);
-        for i in 1..nc {
+        self.clauses.retain(|ref c| c.tmp < MAX);
+        let nn = self.clauses.len();
+        debug_assert_eq!(nn, nc - purges);
+        for i in 1..nn {
             let old = self.clauses[i].index;
             debug_assert!(0 < old, "0 index");
             self.clause_permutation[old] = i;
@@ -250,18 +252,7 @@ impl Solver {
         for l in &self.trail {
             self.vars[l.vi() as usize].reason = NULL_CLAUSE;
         }
-        // check consistency
-        {
-            let mut p = 0;
-            for c in &self.clauses[nc - purges..] {
-                if c.tmp == MAX {
-                    p += 1;
-                }
-            }
-            debug_assert_eq!(p, purges);
-            debug_assert_eq!(self.clauses[0].index, 0);
-        }
-        nc - purges
+        nn
     }
     fn rebuild_reason(&mut self) -> () {
         let len = self.clauses.len();
