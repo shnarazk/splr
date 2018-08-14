@@ -1,11 +1,45 @@
 use clause::*;
 use search::SolveSAT;
 use solver::*;
+use std::cmp::Ordering;
 use std::cmp::max;
 use std::cmp::min;
 use std::usize::MAX;
 use types::*;
 use watch::push_watch;
+
+impl PartialOrd for Clause {
+    /// the key is `tmp`, not `rank`, since we want to reflect whether it's used as a reason.
+    fn partial_cmp(&self, other: &Clause) -> Option<Ordering> {
+        if self.tmp < other.tmp {
+            return Some(Ordering::Less);
+        } else if self.tmp > other.tmp {
+            return Some(Ordering::Greater);
+        } else if self.activity > other.activity {
+            return Some(Ordering::Less);
+        } else if self.activity < other.activity {
+            return Some(Ordering::Greater);
+        } else {
+            return Some(Ordering::Equal);
+        }
+    }
+}
+
+impl Ord for Clause {
+    fn cmp(&self, other: &Clause) -> Ordering {
+        if self.tmp < other.tmp {
+            return Ordering::Less;
+        } else if self.tmp > other.tmp {
+            return Ordering::Greater;
+        } else if self.activity > other.activity {
+            return Ordering::Less;
+        } else if self.activity < other.activity {
+            return Ordering::Greater;
+        } else {
+            return Ordering::Equal;
+        }
+    }
+}
 
 pub trait ClauseManagement {
     fn bump_ci(&mut self, ci: ClauseIndex) -> ();
@@ -84,8 +118,8 @@ impl ClauseManagement for Solver {
         let mut i_max = 0;
         let mut lv_max = 0;
         // seek a literal with max level
-        for (i, l) in c.lits.iter().enumerate() {
-            let vi = l.vi();
+        for i in 0..c.lits.len() {
+            let vi = c.lits[i].vi();
             let lv = self.vars[vi].level;
             if self.vars[vi].assign != BOTTOM && lv_max < lv {
                 i_max = i;
@@ -167,7 +201,6 @@ impl Solver {
         let start = self.fixed_len;
         debug_assert_ne!(start, 0);
         let nc = self.clauses.len();
-        let mut requires = 0;
         if self.clause_permutation.len() < nc {
             unsafe {
                 self.clause_permutation.reserve(nc + 1);
@@ -186,6 +219,8 @@ impl Solver {
         }
         // set key
         let ac = 0.1 * self.cla_inc / (nc as f64);
+        let mut requires = 0;
+        let mut npurge = 0;
         for ci in start..self.clauses.len() {
             let ref mut c = &mut self.clauses[ci];
             debug_assert_ne!(c.rank, RANK_NULL);
@@ -197,14 +232,16 @@ impl Solver {
                 requires += 1;
             } else if c.activity < ac {
                 c.tmp = MAX;
+                npurge += 1;
             } else {
                 c.tmp = c.rank;
             }
         }
+        let new_len = start + max(requires, min((nc - start) / 2, nc - start - npurge));
         // sort the range
         self.clauses[start..].sort();
         // update permutation table.
-        for i in 1..nc {
+        for i in 1..new_len {
             let old = self.clauses[i].index;
             debug_assert_ne!(old, 0);
             self.clause_permutation[old] = i;
@@ -239,7 +276,7 @@ impl Solver {
             self.max_learnts
         );
         self.fixed_len += requires;
-        start + max(requires, (nc - start) / 2)
+        new_len
     }
     fn sort_clauses_for_simplification(&mut self) -> usize {
         let nc = self.clauses.len();
@@ -263,7 +300,10 @@ impl Solver {
                     purges += 1;
                 } else {
                     if RANK_NEED < (*c).rank {
-                        (*c).rank = self.lbd_of(&(*c).lits);
+                        let new = self.lbd_of(&(*c).lits);
+                        if new < (*c).rank {
+                            (*c).rank = new;
+                        }
                     }
                     (*c).tmp = 0;
                 }

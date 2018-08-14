@@ -92,10 +92,11 @@ impl SolveSAT for Solver {
                 }
             }
             debug_assert!(self.watches[p_usize].is_empty(), true);
-            while let Some(w) = self.watches[0].pop() {
-                // debug_assert!(w.to == p, "inconsistent propagation");
-                self.watches[p_usize].push(w);
-            }
+            self.watches.swap(0, p_usize);
+            // while let Some(w) = self.watches[0].pop() {
+            //     // debug_assert!(w.to == p, "inconsistent propagation");
+            //     self.watches[p_usize].push(w);
+            // }
         }
         None
     }
@@ -118,10 +119,7 @@ impl SolveSAT for Solver {
                     } else {
                         // self.dump(" before analyze");
                         let (backtrack_level, v) = self.analyze(ci);
-                        // println!(
-                        //     " conflict analyzed {:?}",
-                        //     v.iter().map(|l| l.int()).collect::<Vec<i32>>()
-                        // );
+                        // println!(" conflict analyzed {:?}", vec2int(v));
                         self.cancel_until(max(backtrack_level as usize, root_lv));
                         // println!(" backtracked to {}", backtrack_level);
                         let lbd = self.add_learnt(v);
@@ -134,7 +132,6 @@ impl SolveSAT for Solver {
                             self.learnt_size_cnt = adj as u64;
                             self.max_learnts += delta;
                             to_restart = self.should_restart(lbd, d);
-                            continue;
                         }
                     }
                 }
@@ -143,17 +140,18 @@ impl SolveSAT for Solver {
                     let na = self.num_assigns();
                     if na == self.num_vars {
                         return true;
-                    } else if (self.max_learnts as usize) + na + self.fixed_len < self.clauses.len()
+                    }
+                    if to_restart {
+                        self.cancel_until(root_lv);
+                        to_restart = false;
+                    }
+                    if (self.max_learnts as usize) + na + self.fixed_len < self.clauses.len()
                     {
                         self.reduce_database();
                     } else if d == 0 && self.num_solved_vars < na {
                         self.simplify_database();
                         self.num_solved_vars = na;
                     }
-                    if to_restart {
-                        self.cancel_until(root_lv);
-                        to_restart = false;
-                    } // else {
                     {
                         let vi = self.select_var();
                         // println!(" search loop find a new decision var");

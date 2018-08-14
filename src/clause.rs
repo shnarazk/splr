@@ -1,4 +1,3 @@
-use std::cmp::Ordering;
 use std::f64;
 use std::fmt;
 use types::*;
@@ -42,39 +41,6 @@ impl PartialEq for Clause {
 }
 
 impl Eq for Clause {}
-
-impl PartialOrd for Clause {
-    /// the key is `tmp`, not `rank`, since we want to reflect whether it's used as a reason.
-    fn partial_cmp(&self, other: &Clause) -> Option<Ordering> {
-        if self.tmp < other.tmp {
-            return Some(Ordering::Less);
-        } else if self.tmp > other.tmp {
-            return Some(Ordering::Greater);
-        } else if self.activity > other.activity {
-            return Some(Ordering::Less);
-        } else if self.activity < other.activity {
-            return Some(Ordering::Greater);
-        } else {
-            return Some(Ordering::Equal);
-        }
-    }
-}
-
-impl Ord for Clause {
-    fn cmp(&self, other: &Clause) -> Ordering {
-        if self.tmp < other.tmp {
-            return Ordering::Less;
-        } else if self.tmp > other.tmp {
-            return Ordering::Greater;
-        } else if self.activity > other.activity {
-            return Ordering::Less;
-        } else if self.activity < other.activity {
-            return Ordering::Greater;
-        } else {
-            return Ordering::Equal;
-        }
-    }
-}
 
 impl Clause {
     pub fn new(rank: usize, v: Vec<Lit>) -> Clause {
