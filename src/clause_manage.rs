@@ -62,7 +62,7 @@ impl ClauseManagement for Solver {
             0 => result,
             1 => self.enqueue(v[0], NULL_CLAUSE),
             _ => {
-                self.inject(Clause::new(false, v));
+                self.inject(Clause::new(RANK_CONST, v));
                 true
             }
         }
@@ -74,7 +74,13 @@ impl ClauseManagement for Solver {
             self.unsafe_enqueue(v[0], NULL_CLAUSE);
             return 1;
         }
-        let mut c = Clause::new(true, v);
+        let lbd;
+        if v.len() == 2 {
+            lbd = RANK_NEED;
+        } else {
+            lbd = self.lbd_of(&v);
+        }
+        let mut c = Clause::new(lbd, v);
         let mut i_max = 0;
         let mut lv_max = 0;
         // seek a literal with max level
@@ -88,13 +94,6 @@ impl ClauseManagement for Solver {
         }
         c.lits.swap(1, i_max);
         let l0 = c.lits[0];
-        let lbd;
-        if c.lits.len() == 2 {
-            lbd = RANK_NEED;
-        } else {
-            lbd = self.lbd_of(&c.lits);
-        }
-        c.rank = lbd;
         let ci = self.inject(c);
         self.bump_ci(ci);
         self.unsafe_enqueue(l0, ci);
@@ -166,9 +165,7 @@ impl Solver {
     /// Note: this function changes self.clause_permutation.
     fn sort_clauses_for_reduction(&mut self) -> usize {
         let start = self.fixed_len;
-        if start == 0 {
-            panic!("{:?}", self.clauses.len());
-        }
+        debug_assert_ne!(start, 0);
         let nc = self.clauses.len();
         let mut requires = 0;
         if self.clause_permutation.len() < nc {
@@ -191,9 +188,6 @@ impl Solver {
         let ac = 0.1 * self.cla_inc / (nc as f64);
         for ci in start..self.clauses.len() {
             let ref mut c = &mut self.clauses[ci];
-            if c.rank == 0 {
-                println!("ci {}", ci);
-            }
             debug_assert_ne!(c.rank, RANK_NULL);
             debug_assert_ne!(c.rank, RANK_CONST);
             if c.tmp == RANK_NEED {
@@ -212,7 +206,7 @@ impl Solver {
         // update permutation table.
         for i in 1..nc {
             let old = self.clauses[i].index;
-            debug_assert!(0 < old, "0 index");
+            debug_assert_ne!(old, 0);
             self.clause_permutation[old] = i;
             self.clauses[i].index = i;
         }
@@ -268,9 +262,10 @@ impl Solver {
                     (*c).tmp = MAX;
                     purges += 1;
                 } else {
-                    let lbd = self.lbd_of(&(*c).lits);
-                    (*c).rank = lbd;
-                    (*c).tmp = lbd;
+                    if RANK_NEED < (*c).rank {
+                        (*c).rank = self.lbd_of(&(*c).lits);
+                    }
+                    (*c).tmp = 0;
                 }
             }
         }
@@ -354,12 +349,11 @@ impl Solver {
         if 1000_000 < k {
             self.lbd_key = 0;
         }
-        let n = v.len();
         let mut cnt = 0;
-        for i in 0..n {
-            let l = self.vars[v[i].vi()].level;
-            if self.lbd_seen[l] != k && l != 0 {
-                self.lbd_seen[l] = k;
+        for l in v {
+            let lv = self.vars[l.vi()].level;
+            if self.lbd_seen[lv] != k && lv != 0 {
+                self.lbd_seen[lv] = k;
                 cnt += 1;
             }
         }
