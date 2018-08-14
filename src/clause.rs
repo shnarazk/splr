@@ -3,9 +3,9 @@ use std::f64;
 use std::fmt;
 use types::*;
 
-pub const RANK_NULL: usize = 0;  // for NULL_CLAUSE
+pub const RANK_NULL: usize = 0; // for NULL_CLAUSE
 pub const RANK_CONST: usize = 1; // for given clauses
-pub const RANK_NEED: usize = 2;  // for newly generated bi-clauses
+pub const RANK_NEED: usize = 2; // for newly generated bi-clauses
 
 /// Clause
 /// Clause should be placed on heap anytime.
@@ -26,8 +26,9 @@ pub struct Clause {
 
 ///```
 ///    # use splr::types::*;
-///    let c1 = splr::clause::Clause::new(false, vec![int2lit(1), int2lit(2), int2lit(3)]);
-///    let mut c2 = splr::clause::Clause::new(false, vec![int2lit(-1), int2lit(4)]);
+///    let c1 = splr::clause::Clause::new(3, vec![int2lit(1), int2lit(2), int2lit(3)]);
+///    let mut c2 = splr::clause::Clause::new(2, vec![int2lit(-1), int2lit(4)]);
+///    c2.index = 2;
 ///    c2.activity = 2.4;
 ///    assert_eq!(c1, c1);
 ///    assert_eq!(c1 == c1, true);
@@ -43,7 +44,7 @@ impl PartialEq for Clause {
 impl Eq for Clause {}
 
 impl PartialOrd for Clause {
-    /// the key is `tmp`, since we want to reflect whether it's used as a reason.
+    /// the key is `tmp`, not `rank`, since we want to reflect whether it's used as a reason.
     fn partial_cmp(&self, other: &Clause) -> Option<Ordering> {
         if self.tmp < other.tmp {
             return Some(Ordering::Less);
@@ -88,7 +89,7 @@ impl Clause {
     pub fn null() -> Clause {
         Clause {
             activity: 0.0,
-            rank: 0,
+            rank: RANK_NULL,
             lits: vec![],
             index: 0,
             tmp: 0,

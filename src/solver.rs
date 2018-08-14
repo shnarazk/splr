@@ -1,12 +1,12 @@
 use clause::*;
 use clause_manage::ClauseManagement;
 use search::SolveSAT;
+use std::collections::HashSet;
 use std::fs;
 use std::io::{BufRead, BufReader};
 use types::*;
 use var::*;
 use watch::*;
-use std::collections::HashSet;
 
 /// normal results returned by Solver
 #[derive(Debug)]

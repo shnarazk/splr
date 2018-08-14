@@ -287,7 +287,7 @@ impl Solver {
             if c.rank <= RANK_NEED {
                 c0 += 1;
             } else {
-                    break;
+                break;
             }
         }
         self.fixed_len = c0;
