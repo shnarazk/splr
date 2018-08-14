@@ -20,14 +20,6 @@ const RANK_MAX: usize = 1000;
 const ACTIVITY_MAX: usize = 2 ^ ACTIVITY_WIDTH - 1;
 const CLAUSE_ACTIVITY_THRESHOLD: f64 = 1e20;
 
-fn scale_activity(x: f64) -> usize {
-    if x < 1e-20 {
-        ACTIVITY_MAX
-    } else {
-        (ACTIVITY_MAX * ((1.0 - (x * 1e20).log10() / 40.0) as usize))
-    }
-}
-
 impl ClauseElimanation for Solver {
     fn bump_ci(&mut self, ci: ClauseIndex) -> () {
         if ci <= 0 {
@@ -45,12 +37,27 @@ impl ClauseElimanation for Solver {
     fn reduce_database(&mut self) -> () {
         let end = self.clauses.len();
         let new_end = self.sort_clauses_for_reduction();
-        self.rebuild_reason();
-        if new_end < end {
-            self.clauses.truncate(new_end);
+        if new_end == end {
+            return;
         }
-        self.rebuild_watches();
+        self.clauses.truncate(new_end);
+        // rebuild reason
+        for v in &mut self.vars[1..] {
+            let ci = v.reason;
+            if 0 < ci {
+                v.reason = self.clause_permutation[ci];
+            }
+        }
+        // rebuild watches
+        for w in &mut self.watches {
+            w.clear();
+        }
         debug_assert_eq!(self.clauses[0].index, 0);
+        for c in &self.clauses[1..] {
+            if 2 <= c.lits.len() {
+                push_watch(&mut self.watches, c.index, c.lits[0], c.lits[1]);
+            }
+        }
         println!(
             "# DB::drop 1/2 {:>9} ({:>9}) => {:>9} / {:>9.1}",
             end, self.fixed_len, new_end, self.max_learnts
@@ -60,96 +67,31 @@ impl ClauseElimanation for Solver {
         debug_assert_eq!(self.decision_level(), 0);
         let end = self.clauses.len();
         let new_end = self.sort_clauses_for_simplification();
-        self.rebuild_reason();
-        if new_end < end {
-            self.clauses.truncate(new_end);
+        if new_end == end {
+            return;
         }
-        self.rebuild_watches();
-        debug_assert_eq!(self.clauses[0].index, 0);
+        self.clauses.truncate(new_end);
+        // rebuild watches
+        let (w0, wr) = self.watches.split_first_mut().unwrap();
+        w0.clear();
+        for ws in wr {
+            while let Some(mut w) = ws.pop() {
+                match self.clause_permutation[w.by] {
+                    0 => {}
+                    x => {
+                        w.by = x;
+                        w0.push(w);
+                    }
+                }
+            }
+            while let Some(w) = w0.pop() {
+                ws.push(w);
+            }
+        }
         println!(
             "# DB::simplify {:>9} ({:>9}) => {:>9} / {:>9.1}",
             end, self.fixed_len, new_end, self.max_learnts
         );
-    }
-}
-
-/// returns 1 if this is good enough.
-impl Clause {
-    pub fn set_sort_key(&mut self, at: f64) -> usize {
-        if self.rank == RANK_CONST {
-            // only NULL and given
-            self.tmp = 0;
-            1
-        } else if self.rank == 2 {
-            self.tmp = RANK_NEED;
-            1
-        } else {
-            let ac = self.activity;
-            let d = if ac < at {
-                RANK_MAX // bigger is worse
-            } else {
-                min(RANK_MAX, self.rank)
-            };
-            self.tmp = (d << ACTIVITY_WIDTH) + scale_activity(ac);
-            0
-        }
-    }
-}
-
-impl Solver {
-    // renamed from clause_new
-    pub fn add_clause(&mut self, mut v: Vec<Lit>) -> bool {
-        v.sort_unstable();
-        let mut j = 0;
-        let mut l_ = NULL_LIT; // last literal; [x, x.negate()] means totology.
-        let mut result = false;
-        for i in 0..v.len() {
-            let li = v[i];
-            let sat = self.assigned(li);
-            if sat == LTRUE || li.negate() == l_ {
-                v.clear();
-                result = true;
-                break;
-            } else if sat != LFALSE && li != l_ {
-                v[j] = li;
-                j += 1;
-                l_ = li;
-            }
-        }
-        if result != true {
-            v.truncate(j)
-        }
-        match v.len() {
-            0 => result,
-            1 => self.enqueue(v[0], NULL_CLAUSE),
-            _ => {
-                self.inject(Clause::new(false, v));
-                true
-            }
-        }
-    }
-    pub fn lbd_of(&mut self, v: &[Lit]) -> usize {
-        let k = 1 + self.lbd_key;
-        self.lbd_key = k;
-        if 1000_000 < k {
-            self.lbd_key = 0;
-        }
-        let n = v.len();
-        let mut cnt = 0;
-        for i in 0..n {
-            let l = self.vars[v[i].vi()].level;
-            if self.lbd_seen[l] != k && l != 0 {
-                self.lbd_seen[l] = k;
-                cnt += 1;
-            }
-        }
-        max(1, cnt)
-    }
-    fn rescale_clause_activity(&mut self) -> () {
-        for i in self.fixed_len..self.clauses.len() {
-            self.clauses[i].activity = self.clauses[i].activity / CLAUSE_ACTIVITY_THRESHOLD;
-        }
-        self.cla_inc /= CLAUSE_ACTIVITY_THRESHOLD;
     }
 }
 
@@ -241,8 +183,8 @@ impl Solver {
             }
         }
         // reinitialize the permutation table.
-        for (i, x) in self.clause_permutation.iter_mut().enumerate() {
-            *x = i;
+        for x in &mut self.clause_permutation {
+            *x = 0;
         }
         // set key
         for ci in 1..self.clauses.len() {
@@ -299,33 +241,92 @@ impl Solver {
         // );
         nn
     }
-    fn rebuild_reason(&mut self) -> () {
-        let new_clause = &self.clause_permutation;
-        for v in &mut self.vars[1..] {
-            let ci = v.reason;
-            if 0 < ci {
-                v.reason = new_clause[ci];
-                // if v.reason == 0 || len < v.reason {
-                //     // println!("trail{:?}", self.trail.iter().map(|l| l.int()).collect::<Vec<i32>>());
-                //     println!("lim {}", self.trail_lim.len());
-                //     panic!(
-                //         "strange index for permutation v{:?} {} < {}",
-                //         v, len, v.reason
-                //     );
-                // }
+}
+
+fn scale_activity(x: f64) -> usize {
+    if x < 1e-20 {
+        ACTIVITY_MAX
+    } else {
+        (ACTIVITY_MAX * ((1.0 - (x * 1e20).log10() / 40.0) as usize))
+    }
+}
+
+/// returns 1 if this is good enough.
+impl Clause {
+    pub fn set_sort_key(&mut self, at: f64) -> usize {
+        if self.rank == RANK_CONST {
+            // only NULL and given
+            self.tmp = 0;
+            1
+        } else if self.rank == 2 {
+            self.tmp = RANK_NEED;
+            1
+        } else {
+            let ac = self.activity;
+            let d = if ac < at {
+                RANK_MAX // bigger is worse
+            } else {
+                min(RANK_MAX, self.rank)
+            };
+            self.tmp = (d << ACTIVITY_WIDTH) + scale_activity(ac);
+            0
+        }
+    }
+}
+
+impl Solver {
+    // renamed from clause_new
+    pub fn add_clause(&mut self, mut v: Vec<Lit>) -> bool {
+        v.sort_unstable();
+        let mut j = 0;
+        let mut l_ = NULL_LIT; // last literal; [x, x.negate()] means totology.
+        let mut result = false;
+        for i in 0..v.len() {
+            let li = v[i];
+            let sat = self.assigned(li);
+            if sat == LTRUE || li.negate() == l_ {
+                v.clear();
+                result = true;
+                break;
+            } else if sat != LFALSE && li != l_ {
+                v[j] = li;
+                j += 1;
+                l_ = li;
+            }
+        }
+        if result != true {
+            v.truncate(j)
+        }
+        match v.len() {
+            0 => result,
+            1 => self.enqueue(v[0], NULL_CLAUSE),
+            _ => {
+                self.inject(Clause::new(false, v));
+                true
             }
         }
     }
-    fn rebuild_watches(&mut self) -> () {
-        for w in &mut self.watches {
-            w.clear();
+    pub fn lbd_of(&mut self, v: &[Lit]) -> usize {
+        let k = 1 + self.lbd_key;
+        self.lbd_key = k;
+        if 1000_000 < k {
+            self.lbd_key = 0;
         }
-        debug_assert_eq!(self.clauses[0].index, 0);
-        for c in &self.clauses[1..] {
-            if 2 <= c.lits.len() {
-                push_watch(&mut self.watches, c.index, c.lits[0], c.lits[1]);
+        let n = v.len();
+        let mut cnt = 0;
+        for i in 0..n {
+            let l = self.vars[v[i].vi()].level;
+            if self.lbd_seen[l] != k && l != 0 {
+                self.lbd_seen[l] = k;
+                cnt += 1;
             }
         }
-        // self.dump(&format!("rebuild {}", self.learnts.len()));
+        max(1, cnt)
+    }
+    fn rescale_clause_activity(&mut self) -> () {
+        for i in self.fixed_len..self.clauses.len() {
+            self.clauses[i].activity = self.clauses[i].activity / CLAUSE_ACTIVITY_THRESHOLD;
+        }
+        self.cla_inc /= CLAUSE_ACTIVITY_THRESHOLD;
     }
 }
