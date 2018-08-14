@@ -5,7 +5,7 @@ pub mod analyze;
 /// Clause
 pub mod clause;
 /// Implementation on clause elimination.
-pub mod clause_select;
+pub mod clause_manage;
 /// Implementation on solver restart.
 pub mod restart;
 /// Implementation on Main algorithm.

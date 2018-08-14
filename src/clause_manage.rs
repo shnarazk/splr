@@ -7,9 +7,11 @@ use std::usize::MAX;
 use types::*;
 use watch::push_watch;
 
-pub trait ClauseElimanation {
+pub trait ClauseManagement {
     fn bump_ci(&mut self, ci: ClauseIndex) -> ();
     fn decay_cla_activity(&mut self) -> ();
+    fn add_clause(&mut self, v: Vec<Lit>) -> bool;
+    fn add_learnt(&mut self, v: Vec<Lit>) -> usize;
     fn reduce_database(&mut self) -> ();
     fn simplify_database(&mut self) -> ();
 }
@@ -20,7 +22,7 @@ const RANK_MAX: usize = 1000;
 const ACTIVITY_MAX: usize = 2 ^ ACTIVITY_WIDTH - 1;
 const CLAUSE_ACTIVITY_THRESHOLD: f64 = 1e20;
 
-impl ClauseElimanation for Solver {
+impl ClauseManagement for Solver {
     fn bump_ci(&mut self, ci: ClauseIndex) -> () {
         if ci <= 0 {
             return;
@@ -33,6 +35,70 @@ impl ClauseElimanation for Solver {
     }
     fn decay_cla_activity(&mut self) -> () {
         self.cla_inc = self.cla_inc / CLAUSE_ACTIVITY_THRESHOLD;
+    }
+    // renamed from clause_new
+    fn add_clause(&mut self, mut v: Vec<Lit>) -> bool {
+        v.sort_unstable();
+        let mut j = 0;
+        let mut l_ = NULL_LIT; // last literal; [x, x.negate()] means totology.
+        let mut result = false;
+        for i in 0..v.len() {
+            let li = v[i];
+            let sat = self.assigned(li);
+            if sat == LTRUE || li.negate() == l_ {
+                v.clear();
+                result = true;
+                break;
+            } else if sat != LFALSE && li != l_ {
+                v[j] = li;
+                j += 1;
+                l_ = li;
+            }
+        }
+        if result != true {
+            v.truncate(j)
+        }
+        match v.len() {
+            0 => result,
+            1 => self.enqueue(v[0], NULL_CLAUSE),
+            _ => {
+                self.inject(Clause::new(false, v));
+                true
+            }
+        }
+    }
+    /// renamed from newLearntClause
+    fn add_learnt(&mut self, v: Vec<Lit>) -> usize {
+        let k = v.len();
+        if k == 1 {
+            self.unsafe_enqueue(v[0], NULL_CLAUSE);
+            return 1;
+        }
+        let mut c = Clause::new(true, v);
+        let mut i_max = 0;
+        let mut lv_max = 0;
+        // seek a literal with max level
+        for (i, l) in c.lits.iter().enumerate() {
+            let vi = l.vi();
+            let lv = self.vars[vi].level;
+            if self.vars[vi].assign != BOTTOM && lv_max < lv {
+                i_max = i;
+                lv_max = lv;
+            }
+        }
+        c.lits.swap(1, i_max);
+        let l0 = c.lits[0];
+        let lbd;
+        if c.lits.len() == 2 {
+            lbd = RANK_NEED;
+        } else {
+            lbd = self.lbd_of(&c.lits);
+        }
+        c.rank = lbd;
+        let ci = self.inject(c);
+        self.bump_ci(ci);
+        self.unsafe_enqueue(l0, ci);
+        lbd
     }
     fn reduce_database(&mut self) -> () {
         let end = self.clauses.len();
@@ -100,6 +166,9 @@ impl Solver {
     /// Note: this function changes self.clause_permutation.
     fn sort_clauses_for_reduction(&mut self) -> usize {
         let start = self.fixed_len;
+        if start == 0 {
+            panic!("{:?}", self.clauses.len());
+        }
         let nc = self.clauses.len();
         let mut requires = 0;
         if self.clause_permutation.len() < nc {
@@ -112,10 +181,6 @@ impl Solver {
         for (i, x) in self.clause_permutation.iter_mut().enumerate() {
             *x = i;
         }
-        // reset the 'tmp' field
-        for c in &mut self.clauses[start..] {
-            (*c).tmp = RANK_MAX;
-        }
         // mark clauses that used as reasons
         for v in &self.vars[1..] {
             if 0 < v.reason {
@@ -126,15 +191,24 @@ impl Solver {
         let ac = 0.1 * self.cla_inc / (nc as f64);
         for ci in start..self.clauses.len() {
             let ref mut c = &mut self.clauses[ci];
+            if c.rank == 0 {
+                println!("ci {}", ci);
+            }
+            debug_assert_ne!(c.rank, RANK_NULL);
             debug_assert_ne!(c.rank, RANK_CONST);
             if c.tmp == RANK_NEED {
                 requires += 1;
+            } else if c.rank <= RANK_NEED {
+                c.tmp = c.rank;
+                requires += 1;
+            } else if c.activity < ac {
+                c.tmp = MAX;
             } else {
-                requires += c.set_sort_key(ac);
+                c.tmp = c.rank;
             }
         }
         // sort the range
-        self.clauses[start..].sort_by_key(|c| c.tmp);
+        self.clauses[start..].sort();
         // update permutation table.
         for i in 1..nc {
             let old = self.clauses[i].index;
@@ -194,7 +268,9 @@ impl Solver {
                     (*c).tmp = MAX;
                     purges += 1;
                 } else {
-                    (*c).tmp = (*c).rank;
+                    let lbd = self.lbd_of(&(*c).lits);
+                    (*c).rank = lbd;
+                    (*c).tmp = lbd;
                 }
             }
         }
@@ -213,13 +289,10 @@ impl Solver {
         }
         let mut c0 = 0;
         for c in &self.clauses[..] {
-            match c.tmp {
-                RANK_CONST | RANK_NEED => {
-                    c0 += 1;
-                }
-                _ => {
+            if c.rank <= RANK_NEED {
+                c0 += 1;
+            } else {
                     break;
-                }
             }
         }
         self.fixed_len = c0;
@@ -254,9 +327,9 @@ fn scale_activity(x: f64) -> usize {
 /// returns 1 if this is good enough.
 impl Clause {
     pub fn set_sort_key(&mut self, at: f64) -> usize {
-        if self.rank == RANK_CONST {
+        if self.rank <= RANK_NEED {
             // only NULL and given
-            self.tmp = 0;
+            self.tmp = self.rank;
             1
         } else if self.rank == 2 {
             self.tmp = RANK_NEED;
@@ -275,37 +348,6 @@ impl Clause {
 }
 
 impl Solver {
-    // renamed from clause_new
-    pub fn add_clause(&mut self, mut v: Vec<Lit>) -> bool {
-        v.sort_unstable();
-        let mut j = 0;
-        let mut l_ = NULL_LIT; // last literal; [x, x.negate()] means totology.
-        let mut result = false;
-        for i in 0..v.len() {
-            let li = v[i];
-            let sat = self.assigned(li);
-            if sat == LTRUE || li.negate() == l_ {
-                v.clear();
-                result = true;
-                break;
-            } else if sat != LFALSE && li != l_ {
-                v[j] = li;
-                j += 1;
-                l_ = li;
-            }
-        }
-        if result != true {
-            v.truncate(j)
-        }
-        match v.len() {
-            0 => result,
-            1 => self.enqueue(v[0], NULL_CLAUSE),
-            _ => {
-                self.inject(Clause::new(false, v));
-                true
-            }
-        }
-    }
     pub fn lbd_of(&mut self, v: &[Lit]) -> usize {
         let k = 1 + self.lbd_key;
         self.lbd_key = k;
@@ -321,7 +363,7 @@ impl Solver {
                 cnt += 1;
             }
         }
-        max(1, cnt)
+        RANK_NEED + 1 + cnt
     }
     fn rescale_clause_activity(&mut self) -> () {
         for i in self.fixed_len..self.clauses.len() {

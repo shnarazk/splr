@@ -1,4 +1,5 @@
 use clause::*;
+use clause_manage::ClauseManagement;
 use search::SolveSAT;
 use std::fs;
 use std::io::{BufRead, BufReader};

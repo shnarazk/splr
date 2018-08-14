@@ -1,5 +1,4 @@
 use clause::*;
-use clause_select::ClauseElimanation;
 use solver::Solver;
 use std::cmp::max;
 use types::*;
@@ -29,14 +28,6 @@ impl CDCL for Solver {
                 let c = &mut self.clauses[ci] as *mut Clause;
                 debug_assert_ne!(ci, NULL_CLAUSE);
                 // println!("  analyze.loop {}", (*c));
-                let d = (*c).rank;
-                if RANK_NEED < d {
-                    self.bump_ci(ci);
-                    let nblevel = self.lbd_of(&(*c).lits);
-                    if 2 < d && nblevel + 1 < d {
-                        (*c).rank = max(2, nblevel);
-                    }
-                }
                 // println!("{}を対応", (*c));
                 for q in &(*c).lits[if p == NULL_LIT { 0 } else { 1 }..] {
                     let vi = q.vi();

@@ -1,6 +1,6 @@
 use analyze::*;
 use clause::*;
-use clause_select::ClauseElimanation;
+use clause_manage::ClauseManagement;
 use restart::Restart;
 use solver::*;
 use std::cmp::max;
@@ -212,39 +212,6 @@ impl SolveSAT for Solver {
 }
 
 impl Solver {
-    /// renamed from newLearntClause
-    pub fn add_learnt(&mut self, v: Vec<Lit>) -> usize {
-        let k = v.len();
-        if k == 1 {
-            self.unsafe_enqueue(v[0], NULL_CLAUSE);
-            return 1;
-        }
-        let mut c = Clause::new(true, v);
-        let mut i_max = 0;
-        let mut lv_max = 0;
-        // seek a literal with max level
-        for (i, l) in c.lits.iter().enumerate() {
-            let vi = l.vi();
-            let lv = self.vars[vi].level;
-            if self.vars[vi].assign != BOTTOM && lv_max < lv {
-                i_max = i;
-                lv_max = lv;
-            }
-        }
-        c.lits.swap(1, i_max);
-        let l0 = c.lits[0];
-        let lbd;
-        if c.lits.len() == 2 {
-            lbd = RANK_NEED;
-        } else {
-            lbd = self.lbd_of(&c.lits);
-        }
-        c.rank = lbd;
-        let ci = self.inject(c);
-        self.bump_ci(ci);
-        self.unsafe_enqueue(l0, ci);
-        lbd
-    }
     pub fn unsafe_enqueue(&mut self, l: Lit, ci: ClauseIndex) -> () {
         // if ci == NULL_CLAUSE {
         //     println!("unsafe_enqueue decide: {}", l.int());
