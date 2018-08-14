@@ -1,4 +1,3 @@
-use analyze::LEVEL_BITMAP_SIZE;
 use clause::*;
 use search::SolveSAT;
 use std::fs;
@@ -6,6 +5,7 @@ use std::io::{BufRead, BufReader};
 use types::*;
 use var::*;
 use watch::*;
+use std::collections::HashSet;
 
 /// normal results returned by Solver
 #[derive(Debug)]
@@ -82,7 +82,7 @@ pub struct Solver {
     pub an_stack: Vec<Lit>,
     pub an_last_dl: Vec<Lit>,
     pub an_learnt_lits: Vec<Lit>,
-    pub an_level_map: Vec<bool>,
+    pub an_level_map: HashSet<usize>,
     pub stats: Vec<i64>,
     pub lbd_seen: Vec<u64>,
     pub lbd_key: u64,
@@ -140,7 +140,7 @@ impl Solver {
             an_stack: vec![],
             an_last_dl: vec![],
             an_learnt_lits: vec![],
-            an_level_map: vec![false; LEVEL_BITMAP_SIZE],
+            an_level_map: HashSet::with_capacity(256),
             stats: vec![0; Stat::EndOfStatIndex as usize],
             lbd_seen: vec![0; nv + 1],
             lbd_key: 0,

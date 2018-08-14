@@ -106,3 +106,9 @@ pub fn new_clause_manager(nc: usize) -> ClauseManager {
     m.push(Clause::null());
     m
 }
+
+pub fn vec2int(v: Vec<Lit>) -> Vec<i32> {
+    v.iter().map(|l| l.int()).collect::<Vec<i32>>()
+}
+
+

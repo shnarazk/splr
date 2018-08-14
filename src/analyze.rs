@@ -5,9 +5,6 @@ use std::cmp::max;
 use types::*;
 use var_select::VarSelection;
 
-/// Big problems require an enough table.
-pub const LEVEL_BITMAP_SIZE: usize = 16384;
-
 pub trait CDCL {
     fn analyze(&mut self, confl: ClauseIndex) -> (usize, Vec<Lit>);
     fn analyze_final(&mut self, ci: ClauseIndex, skip_first: bool) -> ();
@@ -92,11 +89,7 @@ impl CDCL for Solver {
         self.an_learnt_lits[0] = p.negate();
         // println!(
         //     "最後に{}を採用して{:?}",
-        //     p.negate().int(),
-        //     self.an_learnt_lits
-        //         .iter()
-        //         .map(|l| l.int())
-        //         .collect::<Vec<i32>>()
+        //     p.negate().int(), vec2int(self.an_learnt_lits)
         // );
         let level_to_return: usize = b;
         // simplify phase
@@ -105,13 +98,11 @@ impl CDCL for Solver {
         self.an_stack.clear();
         self.an_to_clear.clear();
         self.an_to_clear.push(l0);
-        for b in &mut self.an_level_map {
-            *b = false;
-        }
+        self.an_level_map.clear();
         for i in 1..n {
             let l = self.an_learnt_lits[i];
             self.an_to_clear.push(l);
-            self.an_level_map[(self.vars[l.vi()].level as usize) % LEVEL_BITMAP_SIZE] = true;
+            self.an_level_map.insert(self.vars[l.vi()].level);
         }
         // println!("  analyze.loop 4 n = {}", n);
         let mut i = 1;
@@ -151,10 +142,7 @@ impl CDCL for Solver {
         }
         // println!(
         //     "new learnt: {:?}",
-        //     self.an_learnt_lits
-        //         .iter()
-        //         .map(|l| l.int())
-        //         .collect::<Vec<i32>>()
+        //     vec2int(self.an_learnt_lits)
         // );
         // println!("  analyze terminated");
         (level_to_return, self.an_learnt_lits.clone())
@@ -202,19 +190,15 @@ impl Solver {
         self.an_stack.clear();
         self.an_stack.push(l);
         let top1 = self.an_to_clear.len();
-        loop {
+        while let Some(sl) = self.an_stack.pop() {
             // println!("analyze_removable.loop {:?}", self.an_stack);
-            if self.an_stack.is_empty() {
-                return true;
-            }
-            let sl = self.an_stack.pop().unwrap();
             let ci = self.vars[sl.vi()].reason;
             let ref c = &self.clauses[ci];
             for q in &c.lits {
                 let vi = q.vi();
-                let lv = self.vars[vi].level % LEVEL_BITMAP_SIZE;
+                let lv = self.vars[vi].level;
                 if self.an_seen[vi] != 1 && lv != 0 {
-                    if self.vars[vi].reason != NULL_CLAUSE && self.an_level_map[lv] {
+                    if self.vars[vi].reason != NULL_CLAUSE && self.an_level_map.contains(&lv) {
                         self.an_seen[vi] = 1;
                         self.an_stack.push(*q);
                         self.an_to_clear.push(*q);
@@ -228,5 +212,6 @@ impl Solver {
                 }
             }
         }
+        true
     }
 }
