@@ -3,15 +3,15 @@ use clause_manage::ClauseManagement;
 use solver::Solver;
 use std::cmp::max;
 use types::*;
-use var_select::VarSelection;
+use var_select::VarSelect;
 
 pub trait CDCL {
-    fn analyze(&mut self, confl: ClauseIndex) -> (usize, Vec<Lit>);
+    fn analyze(&mut self, confl: ClauseIndex) -> usize;
     fn analyze_final(&mut self, ci: ClauseIndex, skip_first: bool) -> ();
 }
 
 impl CDCL for Solver {
-    fn analyze(&mut self, confl: ClauseIndex) -> (usize, Vec<Lit>) {
+    fn analyze(&mut self, confl: ClauseIndex) -> usize {
         for mut l in &mut self.an_seen {
             *l = 0;
         }
@@ -30,7 +30,7 @@ impl CDCL for Solver {
                 debug_assert_ne!(ci, NULL_CLAUSE);
                 // println!("  analyze.loop {}", (*c));
                 let d = (*c).rank;
-                if 4 < d {
+                if RANK_NEED < d {
                     self.bump_ci(ci);
                     let nblevel = self.lbd_of(&(*c).lits);
                     if nblevel < d {
@@ -145,7 +145,7 @@ impl CDCL for Solver {
         //     vec2int(self.an_learnt_lits)
         // );
         // println!("  analyze terminated");
-        (level_to_return, self.an_learnt_lits.clone())
+        level_to_return
     }
     fn analyze_final(&mut self, ci: ClauseIndex, skip_first: bool) -> () {
         self.conflicts.clear();

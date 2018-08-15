@@ -54,7 +54,7 @@ pub enum Stat {
 pub struct Solver {
     /// Assignment Management
     pub vars: Vec<Var>,
-    pub clauses: ClauseManager,
+    pub clauses: Vec<Clause>,
     /// fixed_len = |NULL| + |given|
     pub fixed_len: usize,
     pub watches: WatchMap,

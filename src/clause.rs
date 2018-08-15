@@ -87,12 +87,8 @@ impl fmt::Display for Clause {
     }
 }
 
-/// Only ClauseExtManager is the owner of clauses.
-/// Other functions should borrow a mutual reference from it.
-pub type ClauseManager = Vec<Clause>;
-
 /// returns a new clause manager.
-pub fn new_clause_manager(nc: usize) -> ClauseManager {
+pub fn new_clause_manager(nc: usize) -> Vec<Clause> {
     let mut m = Vec::with_capacity(1 + nc);
     m.push(Clause::null());
     m

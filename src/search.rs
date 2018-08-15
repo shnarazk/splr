@@ -5,7 +5,8 @@ use restart::Restart;
 use solver::*;
 use std::cmp::max;
 use types::*;
-use var_select::VarSelection;
+use var::VarOrdering;
+use var_select::VarSelect;
 use watch::*;
 
 pub trait SolveSAT {
@@ -118,13 +119,21 @@ impl SolveSAT for Solver {
                         return false;
                     } else {
                         // self.dump(" before analyze");
-                        let (backtrack_level, v) = self.analyze(ci);
+                        let backtrack_level = self.analyze(ci);
                         // println!(" conflict analyzed {:?}", vec2int(v));
                         self.cancel_until(max(backtrack_level as usize, root_lv));
                         // println!(" backtracked to {}", backtrack_level);
-                        let lbd = self.add_learnt(v);
-                        self.decay_var_activity();
-                        self.decay_cla_activity();
+                        let lbd;
+                        if self.an_learnt_lits.len() == 1 {
+                            let l = self.an_learnt_lits[0];
+                            self.unsafe_enqueue(l, NULL_CLAUSE);
+                            lbd = 1;
+                        } else {
+                            let v = self.an_learnt_lits.clone();
+                            lbd = self.add_learnt(v);
+                        }
+                        // self.decay_var_activity();
+                        // self.decay_cla_activity();
                         self.learnt_size_cnt -= 1;
                         if self.learnt_size_cnt == 0 {
                             let adj = 1.5 * self.learnt_size_adj;
@@ -145,12 +154,12 @@ impl SolveSAT for Solver {
                         self.cancel_until(root_lv);
                         to_restart = false;
                     }
-                    if (self.max_learnts as usize) + na + self.fixed_len < self.clauses.len()
-                    {
+                    if (self.max_learnts as usize) + na + self.fixed_len < self.clauses.len() {
                         self.reduce_database();
                     } else if d == 0 && self.num_solved_vars < na {
                         self.simplify_database();
                         self.num_solved_vars = na;
+                        self.rebuild_vh();
                     }
                     {
                         let vi = self.select_var();

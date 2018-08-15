@@ -47,6 +47,65 @@ pub struct VarIndexHeap {
     idxs: Vec<usize>,    // VarIndex : -> order : usize
 }
 
+pub trait VarOrdering {
+    fn reset(&mut self) -> ();
+    fn update(&mut self, vec: &[Var], v: VarIndex) -> ();
+    fn insert(&mut self, vec: &[Var], v: VarIndex) -> ();
+    fn root(&mut self, vec: &[Var]) -> VarIndex;
+}
+
+impl VarOrdering for VarIndexHeap {
+    fn reset(&mut self) -> () {
+        for i in 0..self.idxs.len() {
+            self.idxs[i] = i;
+            self.heap[i] = i;
+        }
+    }
+    /// renamed from incrementHeap, updateVO
+    fn update(&mut self, vec: &[Var], v: VarIndex) -> () {
+        debug_assert!(v != 0, "Invalid VarIndex");
+        let start = self.idxs[v];
+        if self.contains(v) {
+            self.percolate_up(vec, start)
+        }
+    }
+    /// renamed from undoVO
+    fn insert(&mut self, vec: &[Var], vi: VarIndex) -> () {
+        // self.var_order.check("check insert 1");
+        if self.contains(vi) {
+            let i = self.idxs[vi];
+            self.percolate_up(&vec, i);
+            return;
+        }
+        let i = self.idxs[vi];
+        let n = self.idxs[0] + 1;
+        let vn = self.heap[n];
+        self.heap.swap(i, n);
+        self.idxs.swap(vi, vn);
+        self.idxs[0] = n;
+        self.percolate_up(&vec, n);
+        // self.var_order.check("check insert 2");
+    }
+    /// renamed from getHeapDown
+    fn root(&mut self, vec: &[Var]) -> VarIndex {
+        let s = 1;
+        let vs = self.heap[s];
+        let n = self.idxs[0];
+        let vn = self.heap[n];
+        // self.var_order.check(&format!("root 1 :[({}, {}) ({}, {})]", s, vs, n, vn));
+        debug_assert!(vn != 0, "Invalid VarIndex for heap");
+        debug_assert!(vs != 0, "Invalid VarIndex for heap");
+        self.heap.swap(n, s);
+        self.idxs.swap(vn, vs);
+        self.idxs[0] -= 1;
+        if 1 < self.idxs[0] {
+            self.percolate_down(&vec, 1);
+        }
+        // self.var_order.check("root 2");
+        vs
+    }
+}
+
 impl VarIndexHeap {
     pub fn new(n: usize) -> VarIndexHeap {
         let mut heap = Vec::with_capacity(n + 1);
@@ -65,7 +124,7 @@ impl VarIndexHeap {
     }
     /// renamed from inHeap
     fn contains(&self, v: VarIndex) -> bool {
-        self.idxs[v] <= self.len()
+        self.idxs[v] <= self.idxs[0]
     }
     fn percolate_up(&mut self, vec: &[Var], start: usize) -> () {
         let mut q = start;
@@ -132,56 +191,6 @@ impl VarIndexHeap {
                 return;
             }
         }
-    }
-    /// renamed from incrementHeap, updateVO
-    pub fn update(&mut self, vec: &[Var], v: VarIndex) -> () {
-        debug_assert!(v != 0, "Invalid VarIndex");
-        let start = self.idxs[v];
-        if self.contains(v) {
-            self.percolate_up(vec, start)
-        }
-    }
-    /// renamed from undoVO
-    pub fn insert(&mut self, vec: &[Var], vi: VarIndex) -> () {
-        // self.var_order.check("check insert 1");
-        if !self.contains(vi) {
-            // println!("check_insert (unassign) {}", vi);
-            let i = self.idxs[vi];
-            let n = self.idxs[0] + 1;
-            let vn = self.heap[n];
-            self.heap.swap(i, n);
-            self.idxs.swap(vi, vn);
-            self.idxs[0] = n;
-            self.percolate_up(vec, n);
-        }
-        // self.var_order.check("check insert 2");
-    }
-    /// renamed from insertHeap
-    pub fn push(&mut self, vec: &[Var], vi: VarIndex) -> () {
-        let n = self.idxs[0] + 1;
-        debug_assert!(n != 0, "Invalid index for heap");
-        self.heap[n] = vi;
-        self.idxs[vi] = n;
-        self.idxs[0] = n;
-        self.percolate_up(vec, n);
-    }
-    /// renamed from getHeapDown
-    pub fn root(&mut self, vec: &[Var]) -> VarIndex {
-        let s = 1;
-        let vs = self.heap[s];
-        let n = self.idxs[0];
-        let vn = self.heap[n];
-        // self.var_order.check(&format!("root 1 :[({}, {}) ({}, {})]", s, vs, n, vn));
-        debug_assert!(vn != 0, "Invalid VarIndex for heap");
-        debug_assert!(vs != 0, "Invalid VarIndex for heap");
-        self.heap.swap(n, s);
-        self.idxs.swap(vn, vs);
-        self.idxs[0] -= 1;
-        if 1 < self.idxs[0] {
-            self.percolate_down(vec, 1);
-        }
-        // self.var_order.check("root 2");
-        vs
     }
     pub fn dump(&self) -> () {
         println!("# - heap {:?}", self.heap);

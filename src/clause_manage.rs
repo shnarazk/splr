@@ -8,6 +8,12 @@ use std::usize::MAX;
 use types::*;
 use watch::push_watch;
 
+// const RANK_WIDTH: u64 = 11;
+const ACTIVITY_WIDTH: usize = 51;
+const RANK_MAX: usize = 1000;
+const ACTIVITY_MAX: usize = 2 ^ ACTIVITY_WIDTH - 1;
+const CLAUSE_ACTIVITY_THRESHOLD: f64 = 1e20;
+
 impl PartialOrd for Clause {
     /// the key is `tmp`, not `rank`, since we want to reflect whether it's used as a reason.
     fn partial_cmp(&self, other: &Clause) -> Option<Ordering> {
@@ -50,12 +56,6 @@ pub trait ClauseManagement {
     fn simplify_database(&mut self) -> ();
 }
 
-// const RANK_WIDTH: u64 = 11;
-const ACTIVITY_WIDTH: usize = 51;
-const RANK_MAX: usize = 1000;
-const ACTIVITY_MAX: usize = 2 ^ ACTIVITY_WIDTH - 1;
-const CLAUSE_ACTIVITY_THRESHOLD: f64 = 1e20;
-
 impl ClauseManagement for Solver {
     fn bump_ci(&mut self, ci: ClauseIndex) -> () {
         if ci <= 0 {
@@ -68,32 +68,27 @@ impl ClauseManagement for Solver {
         }
     }
     fn decay_cla_activity(&mut self) -> () {
-        self.cla_inc = self.cla_inc / CLAUSE_ACTIVITY_THRESHOLD;
+        self.cla_inc = self.cla_inc / self.config.clause_decay_rate;
     }
     // renamed from clause_new
     fn add_clause(&mut self, mut v: Vec<Lit>) -> bool {
         v.sort_unstable();
         let mut j = 0;
         let mut l_ = NULL_LIT; // last literal; [x, x.negate()] means totology.
-        let mut result = false;
         for i in 0..v.len() {
             let li = v[i];
             let sat = self.assigned(li);
             if sat == LTRUE || li.negate() == l_ {
-                v.clear();
-                result = true;
-                break;
+                return true;
             } else if sat != LFALSE && li != l_ {
                 v[j] = li;
                 j += 1;
                 l_ = li;
             }
         }
-        if result != true {
-            v.truncate(j)
-        }
+        v.truncate(j);
         match v.len() {
-            0 => result,
+            0 => true,
             1 => self.enqueue(v[0], NULL_CLAUSE),
             _ => {
                 self.inject(Clause::new(RANK_CONST, v));
@@ -103,11 +98,6 @@ impl ClauseManagement for Solver {
     }
     /// renamed from newLearntClause
     fn add_learnt(&mut self, v: Vec<Lit>) -> usize {
-        let k = v.len();
-        if k == 1 {
-            self.unsafe_enqueue(v[0], NULL_CLAUSE);
-            return 1;
-        }
         let lbd;
         if v.len() == 2 {
             lbd = RANK_NEED;
@@ -399,6 +389,9 @@ impl Clause {
 
 impl Solver {
     pub fn lbd_of(&mut self, v: &[Lit]) -> usize {
+        if v.len() == 2 {
+            return RANK_NEED;
+        }
         let k = 1 + self.lbd_key;
         self.lbd_key = k;
         if 1000_000 < k {
