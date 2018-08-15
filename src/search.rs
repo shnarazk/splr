@@ -124,16 +124,11 @@ impl SolveSAT for Solver {
                     self.num_solved_vars = na;
                     self.rebuild_vh();
                 }
-                if self.q_head < self.trail.len() {
-                    continue;
-                } else {
+                if !(self.q_head < self.trail.len()) {
                     let vi = self.select_var();
-                    // println!(" search loop find a new decision var");
                     debug_assert_ne!(vi, 0);
-                    if vi != 0 {
-                        let p = self.vars[vi].phase;
-                        self.uncheck_assume(vi.lit(p));
-                    }
+                    let p = self.vars[vi].phase;
+                    self.uncheck_assume(vi.lit(p));
                 }
             } else {
                 self.stats[Stat::NumOfBackjump as usize] += 1;
@@ -167,7 +162,6 @@ impl SolveSAT for Solver {
                     if self.should_restart(lbd, d) {
                         self.cancel_until(root_lv);
                         println!("# Restart block: {}, force: {}", self.stats[Stat::NumOfBlockRestart as usize], self.stats[Stat::NumOfRestart as usize]);
-                        continue;
                     }
                 }
                 // Since the conflict path pushes a new literal to trail, we don't need to pick up a literal here.

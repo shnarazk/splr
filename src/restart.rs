@@ -1,5 +1,4 @@
 use solver::*;
-use std::cmp::min;
 use types::*;
 
 pub trait Restart {
@@ -18,8 +17,6 @@ impl Restart for Solver {
         let a_f = self.asg_f.update(nas);
         let a_s = self.asg_s.update(nas);
         let c_v = self.c_lvl.update(clv as f64);
-        let n_b = self.stats[Stat::NumOfBlockRestart as usize];
-        let n_f = self.stats[Stat::NumOfRestart as usize];
         let should_block = 1.20 * a_s < a_f;
         let should_force = 1.15 * d_s < d_f;
         if count < next {
