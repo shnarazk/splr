@@ -1,9 +1,9 @@
 use clause::*;
 use search::SolveSAT;
 use solver::*;
-use std::cmp::Ordering;
 use std::cmp::max;
 use std::cmp::min;
+use std::cmp::Ordering;
 use std::usize::MAX;
 use types::*;
 use watch::push_watch;
@@ -165,6 +165,21 @@ impl ClauseManagement for Solver {
     fn simplify_database(&mut self) -> () {
         debug_assert_eq!(self.decision_level(), 0);
         let end = self.clauses.len();
+        // remove new fixed literals
+        let targets: Vec<Lit> = self.trail[self.num_solved_vars..]
+            .iter()
+            .map(|l| l.negate())
+            .collect();
+        for mut c in &mut self.clauses {
+            c.lits.retain(|l| {
+                for t in &targets {
+                    if t == l {
+                        return false;
+                    }
+                }
+                true
+            });
+        }
         let new_end = self.sort_clauses_for_simplification();
         if new_end == end {
             return;
