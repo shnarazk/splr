@@ -74,7 +74,7 @@ impl SolveSAT for Solver {
                         (*c).tmp = 1;
                         (*w).to = p;
                         debug_assert_eq!(first, (*c).lits[0]);
-                        self.unsafe_enqueue(first, (*w).by);
+                        self.uncheck_enqueue(first, (*w).by);
                     }
                 }
             }
@@ -126,7 +126,7 @@ impl SolveSAT for Solver {
                         let lbd;
                         if self.an_learnt_lits.len() == 1 {
                             let l = self.an_learnt_lits[0];
-                            self.unsafe_enqueue(l, NULL_CLAUSE);
+                            self.uncheck_enqueue(l, NULL_CLAUSE);
                             lbd = 1;
                         } else {
                             let v = self.an_learnt_lits.clone();
@@ -167,7 +167,7 @@ impl SolveSAT for Solver {
                         debug_assert_ne!(vi, 0);
                         if vi != 0 {
                             let p = self.vars[vi].phase;
-                            self.unsafe_assume(vi.lit(p));
+                            self.uncheck_assume(vi.lit(p));
                         }
                     }
                 }
@@ -219,11 +219,11 @@ impl SolveSAT for Solver {
 }
 
 impl Solver {
-    pub fn unsafe_enqueue(&mut self, l: Lit, ci: ClauseIndex) -> () {
+    pub fn uncheck_enqueue(&mut self, l: Lit, ci: ClauseIndex) -> () {
         // if ci == NULL_CLAUSE {
-        //     println!("unsafe_enqueue decide: {}", l.int());
+        //     println!("uncheck_enqueue decide: {}", l.int());
         // } else {
-        //     println!("unsafe_enqueue imply: {} by {}", l.int(), ci);
+        //     println!("uncheck_enqueue imply: {} by {}", l.int(), ci);
         // }
         debug_assert!(l != 0, "Null literal is about to be equeued");
         let dl = self.decision_level();
@@ -233,9 +233,9 @@ impl Solver {
         v.reason = ci;
         self.trail.push(l)
     }
-    pub fn unsafe_assume(&mut self, l: Lit) -> () {
+    pub fn uncheck_assume(&mut self, l: Lit) -> () {
         let len = self.trail.len();
         self.trail_lim.push(len);
-        self.unsafe_enqueue(l, NULL_CLAUSE);
+        self.uncheck_enqueue(l, NULL_CLAUSE);
     }
 }

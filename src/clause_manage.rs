@@ -120,7 +120,7 @@ impl ClauseManagement for Solver {
         let l0 = c.lits[0];
         let ci = self.inject(c);
         self.bump_ci(ci);
-        self.unsafe_enqueue(l0, ci);
+        self.uncheck_enqueue(l0, ci);
         lbd
     }
     fn reduce_database(&mut self) -> () {
