@@ -60,7 +60,7 @@ impl SolveSAT for Solver {
                     for k in 2..(*c).lits.len() {
                         let lk = (*c).lits[k];
                         if self.assigned(lk) != LFALSE {
-                            (*c).tmp = k;
+                            (*w).swap = k;
                             // Update the watch
                             (*w).to = lk.negate();
                             continue 'next_clause;
@@ -71,7 +71,7 @@ impl SolveSAT for Solver {
                         return (*w).by;
                     } else {
                         // println!("  unit propagation {} by {}", first.int(), (*c));
-                        (*c).tmp = 1;
+                        (*w).swap = 1;
                         (*w).to = p;
                         debug_assert_eq!(first, (*c).lits[0]);
                         self.uncheck_enqueue(first, (*w).by);
@@ -88,7 +88,7 @@ impl SolveSAT for Solver {
                     self.watches[0].push(w)
                 } else {
                     let ref mut c = &mut self.clauses[w.by];
-                    c.lits.swap(1, c.tmp as usize);
+                    c.lits.swap(1, w.swap as usize);
                     self.watches[w.to as usize].push(w);
                 }
             }
@@ -187,6 +187,9 @@ impl SolveSAT for Solver {
                     v.phase = v.assign;
                 }
                 v.assign = BOTTOM;
+                if 0 < v.reason {
+                    self.clauses[v.reason].locked = false;
+                }
                 v.reason = NULL_CLAUSE;
             }
             self.var_order.insert(&self.vars, vi);
@@ -207,6 +210,7 @@ impl SolveSAT for Solver {
                 v.assign = sig;
                 v.level = dl;
                 v.reason = cid;
+                self.clauses[cid].locked = true;
             }
             self.trail.push(l);
             true

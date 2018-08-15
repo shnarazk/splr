@@ -7,6 +7,7 @@ pub struct Watch {
     pub other: Lit,
     pub by: ClauseIndex,
     pub to: Lit,
+    pub swap: usize,
 }
 
 impl Watch {
@@ -15,6 +16,7 @@ impl Watch {
             other: o,
             by: b,
             to: NULL_LIT,
+            swap: 0,
         }
     }
 }

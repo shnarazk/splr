@@ -7,10 +7,6 @@ use std::usize::MAX;
 use types::*;
 use watch::set_watch;
 
-// const RANK_WIDTH: u64 = 11;
-const ACTIVITY_WIDTH: usize = 51;
-const RANK_MAX: usize = 1000;
-const ACTIVITY_MAX: usize = 2 ^ ACTIVITY_WIDTH - 1;
 const CLAUSE_ACTIVITY_THRESHOLD: f64 = 1e20;
 
 pub trait ClauseManagement {
@@ -91,7 +87,78 @@ impl ClauseManagement for Solver {
     }
     fn reduce_database(&mut self) -> () {
         let end = self.clauses.len();
-        let new_end = self.sort_clauses_for_reduction();
+        let start = self.fixed_len;
+        debug_assert_ne!(start, 0);
+        let nc = self.clauses.len();
+        if self.clause_permutation.len() < nc {
+            unsafe {
+                self.clause_permutation.reserve(nc + 1);
+                self.clause_permutation.set_len(nc + 1);
+            }
+        }
+        // reinitialize the permutation table.
+        for (i, x) in self.clause_permutation.iter_mut().enumerate() {
+            *x = i;
+        }
+        // mark clauses that used as reasons
+        for v in &self.vars[1..] {
+            if 0 < v.reason {
+                self.clauses[v.reason].tmp = RANK_NEED;
+            }
+        }
+        // set key
+        let ac = 0.1 * self.cla_inc / (nc as f64);
+        let mut requires = 0;
+        let mut npurge = 0;
+        for ci in start..self.clauses.len() {
+            let ref mut c = &mut self.clauses[ci];
+            debug_assert_ne!(c.rank, RANK_NULL);
+            debug_assert_ne!(c.rank, RANK_CONST);
+            if c.tmp == RANK_NEED {
+                requires += 1;
+            } else if c.rank <= RANK_NEED {
+                c.tmp = c.rank;
+                requires += 1;
+            } else if c.activity < ac {
+                c.tmp = MAX;
+                npurge += 1;
+            } else {
+                c.tmp = c.rank;
+            }
+        }
+        let new_end = start + max(requires, min((nc - start) / 2, nc - start - npurge));
+        // sort the range
+        self.clauses[start..].sort();
+        // update permutation table.
+        for i in 1..new_end {
+            let old = self.clauses[i].index;
+            debug_assert_ne!(old, 0);
+            self.clause_permutation[old] = i;
+            self.clauses[i].index = i;
+        }
+        // DEBUG: check consistency
+        // {
+        //     let mut r0 = 0;
+        //     let mut r1 = 0;
+        //     for c in &self.clauses[start..start + requires] {
+        //         match c.tmp {
+        //             RANK_NEED => { r0 += 1; }
+        //             _ => { break; }
+        //         }
+        //     }
+        //     for c in &self.clauses[start..start + requires] {
+        //         match c.tmp {
+        //             RANK_NEED => { r1 += 1; }
+        //             _ => {}
+        //         }
+        //     }
+        //     debug_assert_eq!(r0, r1);
+        //     debug_assert_eq!(r0, requires);
+        //     debug_assert!(self.clauses[0].index == 0, "NULL moved.");
+        //     debug_assert_eq!(start + r0, self.fixed_len + requires);
+        // }
+        self.fixed_len += requires;
+        // END
         if new_end == end {
             return;
         }
@@ -218,116 +285,6 @@ impl ClauseManagement for Solver {
             "# DB::simplify {:>9} ({:>9}) => {:>9} / {:>9.1}",
             end, self.fixed_len, new_end, self.max_learnts
         );
-    }
-}
-
-/// reduce_database
-impl Solver {
-    /// Note: this function changes self.clause_permutation.
-    fn sort_clauses_for_reduction(&mut self) -> usize {
-        let start = self.fixed_len;
-        debug_assert_ne!(start, 0);
-        let nc = self.clauses.len();
-        if self.clause_permutation.len() < nc {
-            unsafe {
-                self.clause_permutation.reserve(nc + 1);
-                self.clause_permutation.set_len(nc + 1);
-            }
-        }
-        // reinitialize the permutation table.
-        for (i, x) in self.clause_permutation.iter_mut().enumerate() {
-            *x = i;
-        }
-        // mark clauses that used as reasons
-        for v in &self.vars[1..] {
-            if 0 < v.reason {
-                self.clauses[v.reason].tmp = RANK_NEED;
-            }
-        }
-        // set key
-        let ac = 0.1 * self.cla_inc / (nc as f64);
-        let mut requires = 0;
-        let mut npurge = 0;
-        for ci in start..self.clauses.len() {
-            let ref mut c = &mut self.clauses[ci];
-            debug_assert_ne!(c.rank, RANK_NULL);
-            debug_assert_ne!(c.rank, RANK_CONST);
-            if c.tmp == RANK_NEED {
-                requires += 1;
-            } else if c.rank <= RANK_NEED {
-                c.tmp = c.rank;
-                requires += 1;
-            } else if c.activity < ac {
-                c.tmp = MAX;
-                npurge += 1;
-            } else {
-                c.tmp = c.rank;
-            }
-        }
-        let new_len = start + max(requires, min((nc - start) / 2, nc - start - npurge));
-        // sort the range
-        self.clauses[start..].sort();
-        // update permutation table.
-        for i in 1..new_len {
-            let old = self.clauses[i].index;
-            debug_assert_ne!(old, 0);
-            self.clause_permutation[old] = i;
-            self.clauses[i].index = i;
-        }
-        // DEBUG: check consistency
-        // {
-        //     let mut r0 = 0;
-        //     let mut r1 = 0;
-        //     for c in &self.clauses[start..start + requires] {
-        //         match c.tmp {
-        //             RANK_NEED => { r0 += 1; }
-        //             _ => { break; }
-        //         }
-        //     }
-        //     for c in &self.clauses[start..start + requires] {
-        //         match c.tmp {
-        //             RANK_NEED => { r1 += 1; }
-        //             _ => {}
-        //         }
-        //     }
-        //     debug_assert_eq!(r0, r1);
-        //     debug_assert_eq!(r0, requires);
-        //     debug_assert!(self.clauses[0].index == 0, "NULL moved.");
-        //     debug_assert_eq!(start + r0, self.fixed_len + requires);
-        // }
-        self.fixed_len += requires;
-        new_len
-    }
-}
-
-fn scale_activity(x: f64) -> usize {
-    if x < 1e-20 {
-        ACTIVITY_MAX
-    } else {
-        (ACTIVITY_MAX * ((1.0 - (x * 1e20).log10() / 40.0) as usize))
-    }
-}
-
-/// returns 1 if this is good enough.
-impl Clause {
-    pub fn set_sort_key(&mut self, at: f64) -> usize {
-        if self.rank <= RANK_NEED {
-            // only NULL and given
-            self.tmp = self.rank;
-            1
-        } else if self.rank == 2 {
-            self.tmp = RANK_NEED;
-            1
-        } else {
-            let ac = self.activity;
-            let d = if ac < at {
-                RANK_MAX // bigger is worse
-            } else {
-                min(RANK_MAX, self.rank)
-            };
-            self.tmp = (d << ACTIVITY_WIDTH) + scale_activity(ac);
-            0
-        }
     }
 }
 

@@ -20,6 +20,8 @@ pub struct Clause {
     pub rank: usize,
     /// the literals
     pub lits: Vec<Lit>,
+    /// used for a reason of propagation
+    pub locked: bool,
     /// temporal field for `sort_clause` and `propagate`
     pub tmp: usize,
 }
@@ -83,6 +85,7 @@ impl Clause {
             rank: rank,
             lits: v,
             index: 0,
+            locked: false,
             tmp: 0,
         }
     }
@@ -92,6 +95,7 @@ impl Clause {
             rank: RANK_NULL,
             lits: vec![],
             index: 0,
+            locked: false,
             tmp: 0,
         }
     }
