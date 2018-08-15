@@ -48,9 +48,9 @@ impl Eq for Clause {}
 impl PartialOrd for Clause {
     /// the key is `tmp`, not `rank`, since we want to reflect whether it's used as a reason.
     fn partial_cmp(&self, other: &Clause) -> Option<Ordering> {
-        if self.tmp < other.tmp {
+        if self.rank < other.rank {
             return Some(Ordering::Less);
-        } else if self.tmp > other.tmp {
+        } else if self.rank > other.rank {
             return Some(Ordering::Greater);
         } else if self.activity > other.activity {
             return Some(Ordering::Less);
@@ -64,9 +64,9 @@ impl PartialOrd for Clause {
 
 impl Ord for Clause {
     fn cmp(&self, other: &Clause) -> Ordering {
-        if self.tmp < other.tmp {
+        if self.rank < other.rank {
             return Ordering::Less;
-        } else if self.tmp > other.tmp {
+        } else if self.rank > other.rank {
             return Ordering::Greater;
         } else if self.activity > other.activity {
             return Ordering::Less;

@@ -1,8 +1,6 @@
 use clause::*;
 use search::SolveSAT;
 use solver::*;
-use std::cmp::max;
-use std::cmp::min;
 use std::usize::MAX;
 use types::*;
 use watch::set_watch;
@@ -100,89 +98,57 @@ impl ClauseManagement for Solver {
         for (i, x) in self.clause_permutation.iter_mut().enumerate() {
             *x = i;
         }
-        // mark clauses that used as reasons
-        for v in &self.vars[1..] {
-            if 0 < v.reason {
-                self.clauses[v.reason].tmp = RANK_NEED;
-            }
-        }
-        // set key
-        let ac = 0.1 * self.cla_inc / (nc as f64);
-        let mut requires = 0;
-        let mut npurge = 0;
-        for ci in start..self.clauses.len() {
-            let ref mut c = &mut self.clauses[ci];
-            debug_assert_ne!(c.rank, RANK_NULL);
-            debug_assert_ne!(c.rank, RANK_CONST);
-            if c.tmp == RANK_NEED {
-                requires += 1;
-            } else if c.rank <= RANK_NEED {
-                c.tmp = c.rank;
-                requires += 1;
-            } else if c.activity < ac {
-                c.tmp = MAX;
-                npurge += 1;
-            } else {
-                c.tmp = c.rank;
-            }
-        }
-        let new_end = start + max(requires, min((nc - start) / 2, nc - start - npurge));
         // sort the range
         self.clauses[start..].sort();
+        {
+            // self.clauses.truncate(new_end);
+            let ac = 0.1 * self.cla_inc / (nc as f64);
+            let new_end = start + (nc - start) / 2;
+            let perm = &mut self.clause_permutation;
+            self.clauses.retain(|c|
+                                {
+                                    let res = c.index < new_end || c.locked || ac < c.activity;
+                                    if !res {
+                                        perm[c.index] = 0;
+                                    }
+                                    res
+                                }
+            );
+        }
         // update permutation table.
-        for i in 1..new_end {
+        for i in start..self.clauses.len() {
             let old = self.clauses[i].index;
             debug_assert_ne!(old, 0);
             self.clause_permutation[old] = i;
             self.clauses[i].index = i;
         }
-        // DEBUG: check consistency
-        // {
-        //     let mut r0 = 0;
-        //     let mut r1 = 0;
-        //     for c in &self.clauses[start..start + requires] {
-        //         match c.tmp {
-        //             RANK_NEED => { r0 += 1; }
-        //             _ => { break; }
-        //         }
-        //     }
-        //     for c in &self.clauses[start..start + requires] {
-        //         match c.tmp {
-        //             RANK_NEED => { r1 += 1; }
-        //             _ => {}
-        //         }
-        //     }
-        //     debug_assert_eq!(r0, r1);
-        //     debug_assert_eq!(r0, requires);
-        //     debug_assert!(self.clauses[0].index == 0, "NULL moved.");
-        //     debug_assert_eq!(start + r0, self.fixed_len + requires);
-        // }
-        self.fixed_len += requires;
-        // END
-        if new_end == end {
-            return;
-        }
-        self.clauses.truncate(new_end);
         // rebuild reason
         for v in &mut self.vars[1..] {
-            let ci = v.reason;
-            if 0 < ci {
-                v.reason = self.clause_permutation[ci];
+            v.reason = self.clause_permutation[v.reason];
+        }
+        {
+            // rebuild watches
+            let perm = &self.clause_permutation;
+            for v in &mut self.watches {
+                v.retain(|w| 0 < perm[w.to as usize]);
+            }
+            for v in &mut self.watches {
+                for w in &mut v[..] {
+                    w.to = perm[w.to as usize] as u32;
+                }
             }
         }
-        // rebuild watches
-        for w in &mut self.watches {
-            w.clear();
-        }
-        debug_assert_eq!(self.clauses[0].index, 0);
-        for c in &self.clauses[1..] {
-            if 2 <= c.lits.len() {
-                set_watch(&mut self.watches, c.index, c.lits[0], c.lits[1]);
-            }
-        }
+        
+        // for w in &mut self.watches {
+        //     w.clear();
+        // }
+        // for c in &self.clauses[1..] {
+        //     debug_assert!(2 <= c.lits.len());
+        //     set_watch(&mut self.watches, c.index, c.lits[0], c.lits[1]);
+        // }
         println!(
             "# DB::drop 1/2 {:>9} ({:>9}) => {:>9} / {:>9.1}",
-            end, self.fixed_len, new_end, self.max_learnts
+            end, self.fixed_len, self.clauses.len(), self.max_learnts
         );
     }
     fn simplify_database(&mut self) -> () {
