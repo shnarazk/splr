@@ -103,7 +103,6 @@ impl SolveSAT for Solver {
     }
     fn search(&mut self) -> bool {
         // self.dump("search");
-        let delta: f64 = (self.num_vars as f64).sqrt();
         let root_lv = self.root_level;
         loop {
             // self.dump("calling propagate");
@@ -117,9 +116,7 @@ impl SolveSAT for Solver {
                 if na == self.num_vars {
                     return true;
                 }
-                if (self.max_learnts as usize) + na + self.fixed_len < self.clauses.len() {
-                    self.reduce_database();
-                } else if d == 0 && self.num_solved_vars < na {
+                if d == 0 && self.num_solved_vars < na {
                     self.simplify_database();
                     self.num_solved_vars = na;
                     self.rebuild_vh();
@@ -152,16 +149,24 @@ impl SolveSAT for Solver {
                     }
                     self.decay_var_activity();
                     self.decay_cla_activity();
-                    self.learnt_size_cnt -= 1;
-                    if self.learnt_size_cnt == 0 {
-                        let adj = 1.5 * self.learnt_size_adj;
-                        self.learnt_size_adj = adj;
-                        self.learnt_size_cnt = adj as u64;
-                        self.max_learnts += delta;
+                    // glucose reduction
+                    let conflicts = self.stats[Stat::NumOfBackjump as usize] as usize;
+                    if self.cur_restart * self.nb_clauses_before_reduce <= conflicts {
+                        self.cur_restart = ((conflicts as f64)
+                            / (self.nb_clauses_before_reduce as f64))
+                            as usize + 1;
+                        self.reduce_database();
+                        self.nb_clauses_before_reduce += 300;
                     }
                     if self.should_restart(lbd, d) {
                         self.cancel_until(root_lv);
-                        println!("# Restart block: {}, force: {}", self.stats[Stat::NumOfBlockRestart as usize], self.stats[Stat::NumOfRestart as usize]);
+                        println!(
+                            "# Restart block: {}, force: {}, check {} next {}",
+                            self.stats[Stat::NumOfBlockRestart as usize],
+                            self.stats[Stat::NumOfRestart as usize],
+                            self.check_restart,
+                            self.next_restart,
+                        );
                     }
                 }
                 // Since the conflict path pushes a new literal to trail, we don't need to pick up a literal here.

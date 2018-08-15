@@ -72,8 +72,8 @@ pub struct Solver {
     pub root_level: usize,
     /// Database Management
     pub clause_permutation: Vec<usize>,
-    pub learnt_size_adj: f64,
-    pub learnt_size_cnt: u64,
+    pub cur_restart: usize,
+    pub nb_clauses_before_reduce: usize,
     pub max_learnts: f64,
     pub num_solved_vars: usize,
     /// Working memory
@@ -88,15 +88,14 @@ pub struct Solver {
     pub lbd_seen: Vec<u64>,
     pub lbd_key: u64,
     /// restart heuristics
-    pub asg_f: Ema_,
-    pub asg_s: Ema_,
-    pub b_lvl: Ema_,
-    pub c_lvl: Ema_,
-    pub lbd_f: Ema_,
-    pub lbd_s: Ema_,
+    pub ema_asg: Ema2,
+    pub ema_lbd: Ema2,
+    pub b_lvl: Ema,
+    pub c_lvl: Ema,
     pub next_restart: u64,
+    pub check_restart: u64,
     pub restart_exp: f64,
-    pub rbias: Ema_,
+    pub rbias: Ema,
 }
 
 pub trait SatSolver {
@@ -131,8 +130,8 @@ impl Solver {
             var_inc: vdr,
             root_level: 0,
             clause_permutation: (0..nc * 2).collect(),
-            learnt_size_adj: 100.0,
-            learnt_size_cnt: 100,
+            cur_restart: 1,
+            nb_clauses_before_reduce: 2000,
             max_learnts: 2000.0,
             num_solved_vars: 0,
             ok: true,
@@ -145,15 +144,14 @@ impl Solver {
             stats: vec![0; Stat::EndOfStatIndex as usize],
             lbd_seen: vec![0; nv + 1],
             lbd_key: 0,
-            asg_f: Ema_::new(fe),
-            asg_s: Ema_::new(se),
-            b_lvl: Ema_::new(fe),
-            c_lvl: Ema_::new(fe),
-            lbd_f: Ema_::new(fe),
-            lbd_s: Ema_::new(se),
+            ema_asg: Ema2::new(fe, se),
+            ema_lbd: Ema2::new(fe, se),
+            b_lvl: Ema::new(se),
+            c_lvl: Ema::new(se),
             next_restart: 100,
+            check_restart: 50,
             restart_exp: re,
-            rbias: Ema_::new(se),
+            rbias: Ema::new(se),
         };
         s
     }

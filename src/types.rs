@@ -125,6 +125,36 @@ pub trait EmaKind {
 
 /// Exponential Moving Average with a calibrator
 #[derive(Debug)]
+pub struct Ema2 {
+    fast: f64,
+    slow: f64,
+    fe: f64,
+    se: f64,
+}
+
+impl Ema2 {
+    pub fn new(f: i32, s: i32) -> Ema2 {
+        Ema2 {
+            fast: 0.0,
+            slow: 0.0,
+            fe: 1.0 / f as f64,
+            se: 1.0 / s as f64,
+        }
+    }
+}
+
+impl EmaKind for Ema2 {
+    fn get(&self) -> f64 {
+        self.fast / self.slow
+    }
+    fn update(&mut self, x: f64) -> f64 {
+        self.fast = &self.fe * x + (1.0 - &self.fe) * &self.fast;
+        self.slow = &self.se * x + (1.0 - &self.se) * &self.slow;
+        self.fast / self.slow
+    }
+}
+
+#[derive(Debug)]
 pub struct Ema(f64, f64, f64);
 
 impl Ema {
