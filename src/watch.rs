@@ -24,14 +24,15 @@ pub type WatchMap = Vec<Vec<Watch>>;
 
 /// returns `WatchMap`, or `Vec<Vec<Watch>>`.
 pub fn new_watch_map(nv: usize) -> WatchMap {
-    let mut vec = Vec::new();
-    for _i in 0..2 * nv + 1 {
-        vec.push(Vec::new());
+    let size = 2 * (nv + 1);
+    let mut vec = Vec::with_capacity(size);
+    for _i in 0..size {
+        vec.push(Vec::with_capacity(40));
     }
     vec
 }
 
-pub fn push_watch(w: &mut [Vec<Watch>], ci: ClauseIndex, w0: Lit, w1: Lit) -> () {
+pub fn set_watch(w: &mut [Vec<Watch>], ci: ClauseIndex, w0: Lit, w1: Lit) -> () {
     if ci == NULL_CLAUSE {
         return;
     }

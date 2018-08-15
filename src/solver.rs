@@ -175,7 +175,7 @@ impl Solver {
         }
         false
     }
-    pub fn inject(&mut self, mut c: Clause) -> ClauseIndex {
+    pub fn attach_clause(&mut self, mut c: Clause) -> ClauseIndex {
         if c.lits.len() == 1 {
             self.enqueue(c.lits[0], NULL_CLAUSE);
             return 0;
@@ -185,7 +185,7 @@ impl Solver {
         let ci = self.clauses.len();
         c.index = ci;
         self.clauses.push(c);
-        push_watch(&mut self.watches, ci, w0, w1);
+        set_watch(&mut self.watches, ci, w0, w1);
         ci
     }
     pub fn num_assigns(&self) -> usize {

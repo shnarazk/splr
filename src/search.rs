@@ -12,7 +12,7 @@ use watch::*;
 pub trait SolveSAT {
     /// returns `true` for SAT, `false` for UNSAT.
     fn search(&mut self) -> bool;
-    fn propagate(&mut self) -> Option<ClauseIndex>;
+    fn propagate(&mut self) -> ClauseIndex;
     fn enqueue(&mut self, l: Lit, cid: ClauseIndex) -> bool;
     fn assume(&mut self, l: Lit) -> bool;
     fn cancel_until(&mut self, lv: usize) -> ();
@@ -20,7 +20,7 @@ pub trait SolveSAT {
 
 impl SolveSAT for Solver {
     // adapt delayed update of watches
-    fn propagate(&mut self) -> Option<ClauseIndex> {
+    fn propagate(&mut self) -> ClauseIndex {
         // println!("> propagate at {}", self.decision_level());
         while self.q_head < self.trail.len() {
             let p: Lit = self.trail[self.q_head];
@@ -68,7 +68,7 @@ impl SolveSAT for Solver {
                     }
                     if fv == LFALSE {
                         // println!("  found a conflict variable {} by {}", first.vi(), (*c));
-                        return Some((*w).by);
+                        return (*w).by;
                     } else {
                         // println!("  unit propagation {} by {}", first.int(), (*c));
                         (*c).tmp = 1;
@@ -99,7 +99,7 @@ impl SolveSAT for Solver {
             //     self.watches[p_usize].push(w);
             // }
         }
-        None
+        NULL_CLAUSE
     }
     fn search(&mut self) -> bool {
         // self.dump("search");
@@ -108,74 +108,75 @@ impl SolveSAT for Solver {
         let mut to_restart = false;
         loop {
             // self.dump("calling propagate");
-            let ret = self.propagate();
+            let ci = self.propagate();
             let d = self.decision_level();
             // self.dump(format!("search called propagate and it returned {:?} at {}", ret, d));
-            match ret {
-                Some(ci) => {
-                    self.stats[Stat::NumOfBackjump as usize] += 1;
-                    if d == self.root_level {
-                        self.analyze_final(ci, false);
-                        return false;
+            if ci == NULL_CLAUSE {
+                // println!(" search loop enters a new level");
+                let na = self.num_assigns();
+                if na == self.num_vars {
+                    return true;
+                }
+                if to_restart {
+                    self.cancel_until(root_lv);
+                    to_restart = false;
+                }
+                if (self.max_learnts as usize) + na + self.fixed_len < self.clauses.len() {
+                    self.reduce_database();
+                } else if d == 0 && self.num_solved_vars < na {
+                    self.simplify_database();
+                    self.num_solved_vars = na;
+                    self.rebuild_vh();
+                }
+                if self.q_head < self.trail.len() {
+                    continue;
+                } else {
+                    let vi = self.select_var();
+                    // println!(" search loop find a new decision var");
+                    debug_assert_ne!(vi, 0);
+                    if vi != 0 {
+                        let p = self.vars[vi].phase;
+                        self.uncheck_assume(vi.lit(p));
+                    }
+                }
+            } else {
+                self.stats[Stat::NumOfBackjump as usize] += 1;
+                if d == self.root_level {
+                    self.analyze_final(ci, false);
+                    return false;
+                } else {
+                    // self.dump(" before analyze");
+                    let backtrack_level = self.analyze(ci);
+                    // println!(" conflict analyzed {:?}", vec2int(v));
+                    self.cancel_until(max(backtrack_level as usize, root_lv));
+                    // println!(" backtracked to {}", backtrack_level);
+                    let lbd;
+                    if self.an_learnt_lits.len() == 1 {
+                        let l = self.an_learnt_lits[0];
+                        self.uncheck_enqueue(l, NULL_CLAUSE);
+                        lbd = 1;
                     } else {
-                        // self.dump(" before analyze");
-                        let backtrack_level = self.analyze(ci);
-                        // println!(" conflict analyzed {:?}", vec2int(v));
-                        self.cancel_until(max(backtrack_level as usize, root_lv));
-                        // println!(" backtracked to {}", backtrack_level);
-                        let lbd;
-                        if self.an_learnt_lits.len() == 1 {
-                            let l = self.an_learnt_lits[0];
-                            self.uncheck_enqueue(l, NULL_CLAUSE);
-                            lbd = 1;
-                        } else {
-                            let v = self.an_learnt_lits.clone();
-                            lbd = self.add_learnt(v);
-                        }
-                        // self.decay_var_activity();
-                        // self.decay_cla_activity();
-                        self.learnt_size_cnt -= 1;
-                        if self.learnt_size_cnt == 0 {
-                            let adj = 1.5 * self.learnt_size_adj;
-                            self.learnt_size_adj = adj;
-                            self.learnt_size_cnt = adj as u64;
-                            self.max_learnts += delta;
-                            to_restart = self.should_restart(lbd, d);
-                        }
+                        let v = self.an_learnt_lits.clone();
+                        lbd = self.add_learnt(v);
+                    }
+                    self.decay_var_activity();
+                    self.decay_cla_activity();
+                    self.learnt_size_cnt -= 1;
+                    if self.learnt_size_cnt == 0 {
+                        let adj = 1.5 * self.learnt_size_adj;
+                        self.learnt_size_adj = adj;
+                        self.learnt_size_cnt = adj as u64;
+                        self.max_learnts += delta;
+                        to_restart = self.should_restart(lbd, d);
                     }
                 }
-                None => {
-                    // println!(" search loop enters a new level");
-                    let na = self.num_assigns();
-                    if na == self.num_vars {
-                        return true;
-                    }
-                    if to_restart {
-                        self.cancel_until(root_lv);
-                        to_restart = false;
-                    }
-                    if (self.max_learnts as usize) + na + self.fixed_len < self.clauses.len() {
-                        self.reduce_database();
-                    } else if d == 0 && self.num_solved_vars < na {
-                        self.simplify_database();
-                        self.num_solved_vars = na;
-                        self.rebuild_vh();
-                    }
-                    {
-                        let vi = self.select_var();
-                        // println!(" search loop find a new decision var");
-                        debug_assert_ne!(vi, 0);
-                        if vi != 0 {
-                            let p = self.vars[vi].phase;
-                            self.uncheck_assume(vi.lit(p));
-                        }
-                    }
-                }
+                // Since the conflict path pushes a new literal to trail, we don't need to pick up a literal here.
             }
         }
     }
     fn cancel_until(&mut self, lv: usize) -> () {
-        if self.decision_level() <= lv {
+        let dl = self.decision_level();
+        if dl <= lv {
             return;
         }
         let lim = self.trail_lim[lv];
@@ -183,7 +184,9 @@ impl SolveSAT for Solver {
             let vi = l.vi();
             {
                 let v = &mut self.vars[vi];
-                v.phase = v.assign;
+                if v.level == dl {
+                    v.phase = v.assign;
+                }
                 v.assign = BOTTOM;
                 v.reason = NULL_CLAUSE;
             }

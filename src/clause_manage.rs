@@ -3,49 +3,15 @@ use search::SolveSAT;
 use solver::*;
 use std::cmp::max;
 use std::cmp::min;
-use std::cmp::Ordering;
 use std::usize::MAX;
 use types::*;
-use watch::push_watch;
+use watch::set_watch;
 
 // const RANK_WIDTH: u64 = 11;
 const ACTIVITY_WIDTH: usize = 51;
 const RANK_MAX: usize = 1000;
 const ACTIVITY_MAX: usize = 2 ^ ACTIVITY_WIDTH - 1;
 const CLAUSE_ACTIVITY_THRESHOLD: f64 = 1e20;
-
-impl PartialOrd for Clause {
-    /// the key is `tmp`, not `rank`, since we want to reflect whether it's used as a reason.
-    fn partial_cmp(&self, other: &Clause) -> Option<Ordering> {
-        if self.tmp < other.tmp {
-            return Some(Ordering::Less);
-        } else if self.tmp > other.tmp {
-            return Some(Ordering::Greater);
-        } else if self.activity > other.activity {
-            return Some(Ordering::Less);
-        } else if self.activity < other.activity {
-            return Some(Ordering::Greater);
-        } else {
-            return Some(Ordering::Equal);
-        }
-    }
-}
-
-impl Ord for Clause {
-    fn cmp(&self, other: &Clause) -> Ordering {
-        if self.tmp < other.tmp {
-            return Ordering::Less;
-        } else if self.tmp > other.tmp {
-            return Ordering::Greater;
-        } else if self.activity > other.activity {
-            return Ordering::Less;
-        } else if self.activity < other.activity {
-            return Ordering::Greater;
-        } else {
-            return Ordering::Equal;
-        }
-    }
-}
 
 pub trait ClauseManagement {
     fn bump_ci(&mut self, ci: ClauseIndex) -> ();
@@ -91,7 +57,7 @@ impl ClauseManagement for Solver {
             0 => true,
             1 => self.enqueue(v[0], NULL_CLAUSE),
             _ => {
-                self.inject(Clause::new(RANK_CONST, v));
+                self.attach_clause(Clause::new(RANK_CONST, v));
                 true
             }
         }
@@ -118,7 +84,7 @@ impl ClauseManagement for Solver {
         }
         c.lits.swap(1, i_max);
         let l0 = c.lits[0];
-        let ci = self.inject(c);
+        let ci = self.attach_clause(c);
         self.bump_ci(ci);
         self.uncheck_enqueue(l0, ci);
         lbd
@@ -144,7 +110,7 @@ impl ClauseManagement for Solver {
         debug_assert_eq!(self.clauses[0].index, 0);
         for c in &self.clauses[1..] {
             if 2 <= c.lits.len() {
-                push_watch(&mut self.watches, c.index, c.lits[0], c.lits[1]);
+                set_watch(&mut self.watches, c.index, c.lits[0], c.lits[1]);
             }
         }
         println!(
@@ -155,7 +121,7 @@ impl ClauseManagement for Solver {
     fn simplify_database(&mut self) -> () {
         debug_assert_eq!(self.decision_level(), 0);
         let end = self.clauses.len();
-        // remove new fixed literals
+        // remove clauses containing new fixed literals
         let targets: Vec<Lit> = self.trail[self.num_solved_vars..]
             .iter()
             .map(|l| l.negate())
@@ -170,10 +136,66 @@ impl ClauseManagement for Solver {
                 true
             });
         }
-        let new_end = self.sort_clauses_for_simplification();
+        let nc = self.clauses.len();
+        let mut purges = 0;
+        if self.clause_permutation.len() < nc {
+            unsafe {
+                self.clause_permutation.reserve(nc + 1);
+                self.clause_permutation.set_len(nc + 1);
+            }
+        }
+        // reinitialize the permutation table.
+        for x in &mut self.clause_permutation {
+            *x = 0;
+        }
+        // set key
+        for ci in 1..self.clauses.len() {
+            unsafe {
+                let c = &mut self.clauses[ci] as *mut Clause;
+                if self.satisfies(&self.clauses[ci]) {
+                    (*c).tmp = MAX;
+                    purges += 1;
+                } else if (*c).lits.len() == 1 {
+                    if !self.enqueue((*c).lits[0], NULL_CLAUSE) {
+                        self.ok = false;
+                    }
+                    (*c).tmp = MAX;
+                } else {
+                    if RANK_NEED < (*c).rank {
+                        let new = self.lbd_of(&(*c).lits);
+                        if new < (*c).rank {
+                            (*c).rank = new;
+                        }
+                    }
+                    (*c).tmp = 0;
+                }
+            }
+        }
+        self.clauses.retain(|ref c| c.tmp < MAX);
+        let new_end = self.clauses.len();
+        debug_assert_eq!(new_end, nc - purges);
+        for i in 1..new_end {
+            let old = self.clauses[i].index;
+            debug_assert!(0 < old, "0 index");
+            self.clause_permutation[old] = i;
+            self.clauses[i].index = i;
+        }
+        // clear the reasons of variables satisfied at level zero.
+        for l in &self.trail {
+            self.vars[l.vi() as usize].reason = NULL_CLAUSE;
+        }
+        let mut c0 = 0;
+        for c in &self.clauses[..] {
+            if c.rank <= RANK_NEED {
+                c0 += 1;
+            } else {
+                break;
+            }
+        }
         if new_end == end {
             return;
         }
+        self.fixed_len = c0;
         self.clauses.truncate(new_end);
         // rebuild watches
         let (w0, wr) = self.watches.split_first_mut().unwrap();
@@ -273,86 +295,8 @@ impl Solver {
         //     debug_assert!(self.clauses[0].index == 0, "NULL moved.");
         //     debug_assert_eq!(start + r0, self.fixed_len + requires);
         // }
-        println!(
-            "# DB::drop 1/2 {:>9} ({:>9}) => {:>9} / {:>9.1}",
-            nc,
-            self.fixed_len,
-            start + max(requires, (nc - start) / 2),
-            self.max_learnts
-        );
         self.fixed_len += requires;
         new_len
-    }
-    fn sort_clauses_for_simplification(&mut self) -> usize {
-        let nc = self.clauses.len();
-        let mut purges = 0;
-        if self.clause_permutation.len() < nc {
-            unsafe {
-                self.clause_permutation.reserve(nc + 1);
-                self.clause_permutation.set_len(nc + 1);
-            }
-        }
-        // reinitialize the permutation table.
-        for x in &mut self.clause_permutation {
-            *x = 0;
-        }
-        // set key
-        for ci in 1..self.clauses.len() {
-            unsafe {
-                let c = &mut self.clauses[ci] as *mut Clause;
-                if self.satisfies(&self.clauses[ci]) {
-                    (*c).tmp = MAX;
-                    purges += 1;
-                } else {
-                    if RANK_NEED < (*c).rank {
-                        let new = self.lbd_of(&(*c).lits);
-                        if new < (*c).rank {
-                            (*c).rank = new;
-                        }
-                    }
-                    (*c).tmp = 0;
-                }
-            }
-        }
-        self.clauses.retain(|ref c| c.tmp < MAX);
-        let nn = self.clauses.len();
-        debug_assert_eq!(nn, nc - purges);
-        for i in 1..nn {
-            let old = self.clauses[i].index;
-            debug_assert!(0 < old, "0 index");
-            self.clause_permutation[old] = i;
-            self.clauses[i].index = i;
-        }
-        // clear the reasons of variables satisfied at level zero.
-        for l in &self.trail {
-            self.vars[l.vi() as usize].reason = NULL_CLAUSE;
-        }
-        let mut c0 = 0;
-        for c in &self.clauses[..] {
-            if c.rank <= RANK_NEED {
-                c0 += 1;
-            } else {
-                break;
-            }
-        }
-        self.fixed_len = c0;
-        // DEBUG: check consistency
-        // {
-        //     let mut c1 = 0;
-        //     for c in &self.clauses[..] {
-        //         match c.tmp {
-        //             RANK_CONST|RANK_NEED => { c1 += 1; }
-        //             _ => { }
-        //         }
-        //     }
-        //     debug_assert_eq!(c0, c1);
-        //     debug_assert!(self.clauses[0].index == 0, "NULL moved.");
-        // }
-        // println!(
-        //     "# DB::simplify {:>9} ({:>9}) => {:>9} / {:>9.1}",
-        //     nc, self.fixed_len, nn, self.max_learnts
-        // );
-        nn
     }
 }
 

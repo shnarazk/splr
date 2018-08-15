@@ -91,7 +91,6 @@ impl CDCL for Solver {
         //     "最後に{}を採用して{:?}",
         //     p.negate().int(), vec2int(self.an_learnt_lits)
         // );
-        let level_to_return: usize = b;
         // simplify phase
         let n = self.an_learnt_lits.len();
         let l0 = self.an_learnt_lits[0];
@@ -145,7 +144,23 @@ impl CDCL for Solver {
         //     vec2int(self.an_learnt_lits)
         // );
         // println!("  analyze terminated");
-        level_to_return
+        // find correct backtrack level from remaining literals
+        if self.an_learnt_lits.len() == 1 {
+            return 0;
+        } else {
+            let mut max_i = 1;
+            let mut level_to_return = self.vars[self.an_learnt_lits[max_i].vi()].level;
+            for i in 2..self.an_learnt_lits.len() {
+                let l = &self.an_learnt_lits[i];
+                let lv = self.vars[l.vi()].level;
+                if level_to_return < lv {
+                    level_to_return = lv;
+                    max_i = i;
+                }
+            }
+            self.an_learnt_lits.swap(1, max_i);
+            level_to_return
+        }
     }
     fn analyze_final(&mut self, ci: ClauseIndex, skip_first: bool) -> () {
         self.conflicts.clear();
