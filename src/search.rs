@@ -105,9 +105,9 @@ impl SolveSAT for Solver {
         // self.dump("search");
         let delta: f64 = (self.num_vars as f64).sqrt();
         let root_lv = self.root_level;
-        let mut to_restart = false;
         loop {
             // self.dump("calling propagate");
+            self.stats[Stat::NumOfPropagation as usize] += 1;
             let ci = self.propagate();
             let d = self.decision_level();
             // self.dump(format!("search called propagate and it returned {:?} at {}", ret, d));
@@ -116,10 +116,6 @@ impl SolveSAT for Solver {
                 let na = self.num_assigns();
                 if na == self.num_vars {
                     return true;
-                }
-                if to_restart {
-                    self.cancel_until(root_lv);
-                    to_restart = false;
                 }
                 if (self.max_learnts as usize) + na + self.fixed_len < self.clauses.len() {
                     self.reduce_database();
@@ -167,7 +163,11 @@ impl SolveSAT for Solver {
                         self.learnt_size_adj = adj;
                         self.learnt_size_cnt = adj as u64;
                         self.max_learnts += delta;
-                        to_restart = self.should_restart(lbd, d);
+                    }
+                    if self.should_restart(lbd, d) {
+                        self.cancel_until(root_lv);
+                        println!("# Restart block: {}, force: {}", self.stats[Stat::NumOfBlockRestart as usize], self.stats[Stat::NumOfRestart as usize]);
+                        continue;
                     }
                 }
                 // Since the conflict path pushes a new literal to trail, we don't need to pick up a literal here.

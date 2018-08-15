@@ -20,22 +20,17 @@ impl Restart for Solver {
         let c_v = self.c_lvl.update(clv as f64);
         let n_b = self.stats[Stat::NumOfBlockRestart as usize];
         let n_f = self.stats[Stat::NumOfRestart as usize];
-        let bias = if min(n_b, n_f) < 4 {
-            1.25
-        } else if n_b <= n_f {
-            1.25 + (n_f as f64 / n_b as f64).powf(2.0)
-        } else {
-            1.25 - (n_f as f64 / n_b as f64).powf(2.0)
-        };
+        let should_block = 1.20 * a_s < a_f;
+        let should_force = 1.15 * d_s < d_f;
         if count < next {
             self.b_lvl.update(b_l);
             false
-        } else if 1.25 * a_s < a_f {
+        } else if should_block && !should_force {
             self.stats[Stat::NumOfBlockRestart as usize] += 1;
             self.next_restart = count + c_v.powf(2.0) as u64;
             self.b_lvl.update(b_l);
             false
-        } else if bias * d_s < d_f {
+        } else if !should_block && should_force {
             self.stats[Stat::NumOfRestart as usize] += 1;
             self.next_restart = count + (1.5 * c_v) as u64;
             self.b_lvl.update(0.0);
