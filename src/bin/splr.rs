@@ -27,5 +27,16 @@ fn main() {
             Ok(Certificate::UNSAT(v)) => println!("UNSAT {:?}", v),
             Err(e) => println!("Failed {:?}", e),
         }
+        println!("backjump:{}, block:{}, restart:{}, clauses:{}, learnts:{}",
+                 s.stats[Stat::NumOfBackjump as usize],
+                 s.stats[Stat::NumOfBlockRestart as usize],
+                 s.stats[Stat::NumOfRestart as usize],
+                 s.fixed_len,
+                 s.clauses.len() - s.fixed_len,
+        );
+        println!("Ema_Asg:(s{}, f{}), Ema-LBD:(s{}, f{})",
+                 s.ema_asg.slow, s.ema_asg.fast,
+                 s.ema_lbd.slow, s.ema_lbd.fast,
+        );
     }
 }

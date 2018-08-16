@@ -122,8 +122,8 @@ pub trait EmaKind {
 /// Exponential Moving Average with a calibrator
 #[derive(Debug)]
 pub struct Ema2 {
-    fast: f64,
-    slow: f64,
+    pub fast: f64,
+    pub slow: f64,
     fe: f64,
     se: f64,
 }

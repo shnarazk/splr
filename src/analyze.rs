@@ -13,7 +13,8 @@ pub trait CDCL {
 impl CDCL for Solver {
     fn analyze(&mut self, confl: ClauseIndex) -> usize {
         for mut l in &mut self.an_seen {
-            debug_assert_ne!(*l, 0);
+            debug_assert_eq!(*l, 0);
+            // *l = 0;
         }
         // self.dump("analyze");
         self.an_learnt_lits.clear();
@@ -145,11 +146,10 @@ impl CDCL for Solver {
         // );
         // println!("  analyze terminated");
         // find correct backtrack level from remaining literals
-        if self.an_learnt_lits.len() == 1 {
-            return 0;
-        } else {
+        let mut level_to_return = 0;
+        if self.an_learnt_lits.len() != 1 {
             let mut max_i = 1;
-            let mut level_to_return = self.vars[self.an_learnt_lits[max_i].vi()].level;
+            level_to_return = self.vars[self.an_learnt_lits[max_i].vi()].level;
             for i in 2..self.an_learnt_lits.len() {
                 let l = &self.an_learnt_lits[i];
                 let lv = self.vars[l.vi()].level;
@@ -159,8 +159,11 @@ impl CDCL for Solver {
                 }
             }
             self.an_learnt_lits.swap(1, max_i);
-            level_to_return
         }
+        for l in &self.an_to_clear {
+            self.an_seen[l.vi()] = 0;
+        }
+        level_to_return
     }
     fn analyze_final(&mut self, ci: ClauseIndex, skip_first: bool) -> () {
         self.conflicts.clear();
@@ -199,14 +202,21 @@ impl CDCL for Solver {
 }
 
 impl Solver {
+    /// renamed from litRedundant
     fn analyze_removable(&mut self, l: Lit) -> bool {
         self.an_stack.clear();
         self.an_stack.push(l);
-        let top1 = self.an_to_clear.len();
+        let top = self.an_to_clear.len();
         while let Some(sl) = self.an_stack.pop() {
             // println!("analyze_removable.loop {:?}", self.an_stack);
             let ci = self.vars[sl.vi()].reason;
-            for q in &self.clauses[ci].lits {
+            if self.clauses[ci].lits.len() == 2 {
+                let val = self.assigned(self.clauses[ci].lits[0]);
+                if val == LFALSE {
+                    self.clauses[ci].lits.swap(0, 1);
+                }
+            }
+            for q in &self.clauses[ci].lits[1..] {
                 let vi = q.vi();
                 let lv = self.vars[vi].level;
                 if self.an_seen[vi] != 1 && lv != 0 {
@@ -215,8 +225,7 @@ impl Solver {
                         self.an_stack.push(*q);
                         self.an_to_clear.push(*q);
                     } else {
-                        let top2 = self.an_to_clear.len();
-                        for _ in top1..top2 {
+                        for _ in top..self.an_to_clear.len() {
                             self.an_seen[self.an_to_clear.pop().unwrap().vi()] = 0;
                         }
                         return false;

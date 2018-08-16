@@ -129,8 +129,10 @@ impl ClauseManagement for Solver {
             }
         }
         println!(
-            "# DB::drop 1/2 {:>9} ({:>9}) => {:>9} / {:>9.1}",
-            end, self.fixed_len, new_len, self.max_learnts
+            "# DB::drop 1/2 {:>9} ({:>9}) => {:>9} / {:>9.1}   Restart:: block {} force {}",
+            end, self.fixed_len, new_len, self.max_learnts,
+            self.stats[Stat::NumOfBlockRestart as usize],
+            self.stats[Stat::NumOfRestart as usize],
         );
     }
     fn simplify_database(&mut self) -> () {

@@ -120,6 +120,9 @@ impl SolveSAT for Solver {
                 if na == self.num_vars {
                     return true;
                 }
+                if self.should_force_restart() {
+                    self.cancel_until(root_lv);
+                }
                 if d == 0 && self.num_solved_vars < na {
                     self.simplify_database();
                     self.num_solved_vars = na;
@@ -162,16 +165,7 @@ impl SolveSAT for Solver {
                         self.reduce_database();
                         self.nb_clauses_before_reduce += 300;
                     }
-                    if self.should_restart(lbd, d) {
-                        self.cancel_until(root_lv);
-                        println!(
-                            "# Restart block: {}, force: {}, check {} next {}",
-                            self.stats[Stat::NumOfBlockRestart as usize],
-                            self.stats[Stat::NumOfRestart as usize],
-                            self.check_restart,
-                            self.next_restart,
-                        );
-                    }
+                    self.check_block_restart(lbd, d);
                 }
                 // Since the conflict path pushes a new literal to trail, we don't need to pick up a literal here.
             }
