@@ -102,9 +102,8 @@ impl ClauseManagement for Solver {
             }
             let ac = 0.1 * self.cla_inc / (nc as f64);
             let nkeep = start + (nc - start) / 2;
-            self.clauses.retain(|c| {
-                perm[c.index] < nkeep || !c.learnt || ! c.locked || ac < c.activity
-            });
+            self.clauses
+                .retain(|c| perm[c.index] < nkeep || !c.learnt || !c.locked || ac < c.activity);
         }
         let new_len = self.clauses.len();
         // update permutation table.
@@ -129,10 +128,7 @@ impl ClauseManagement for Solver {
         }
         println!(
             "# DB::drop 1/2 {:>9} ({:>9}) => {:>9} / {:>9.1}",
-            end,
-            self.fixed_len,
-            new_len,
-            self.max_learnts
+            end, self.fixed_len, new_len, self.max_learnts
         );
     }
     fn simplify_database(&mut self) -> () {
