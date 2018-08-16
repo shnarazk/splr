@@ -85,7 +85,6 @@ impl ClauseManagement for Solver {
         lbd
     }
     fn reduce_database(&mut self) -> () {
-        let end = self.clauses.len();
         let start = self.fixed_len;
         debug_assert_ne!(start, 0);
         let nc = self.clauses.len();
@@ -98,18 +97,27 @@ impl ClauseManagement for Solver {
         // sort the range
         self.clauses[start..].sort();
         {
+            let dl = self.decision_level();
             let perm = &mut self.clause_permutation;
-            for mut i in 0..end {
+            for mut i in 0..nc {
                 perm[self.clauses[i].index] = i;
             }
-            let ac = 0.1 * self.cla_inc / (nc as f64);
+            let ac = 0.1 * self.cla_inc / ((nc - start) as f64);
             let nkeep = start + (nc - start) / 2;
-            self.clauses
-                .retain(|c| perm[c.index] < nkeep || !c.learnt || !c.locked || ac < c.activity);
+            // println!("ac {}, dl {}, pased {}, index {}, locked {}, activity threshold {}",
+            //          ac,
+            //          dl,
+            //          self.clauses[start..].iter().filter(|c| c.locked || ac < c.activity).count(),
+            //          self.clauses[start..].iter().filter(|c| perm[c.index] < nkeep).count(),
+            //          self.clauses[start..].iter().filter(|c| c.locked).count(),
+            //          self.clauses[start..].iter().filter(|c| ac < c.activity).count(),
+            //          );
+            self.clauses.retain(|c| perm[c.index] < nkeep || c.locked);
+            // println!("start {}, end {}, nkeep {}, new len {}", start, nc, nkeep, self.clauses.len());
         }
         let new_len = self.clauses.len();
         // update permutation table.
-        for i in 0..end {
+        for i in 0..nc {
             self.clause_permutation[i] = 0;
         }
         for new in 0..new_len {
@@ -128,9 +136,13 @@ impl ClauseManagement for Solver {
                 w.by = perm[w.by];
             }
         }
+        self.stats[Stat::NumOfReduction as usize] += 1;
         println!(
-            "# DB::drop 1/2 {:>9} ({:>9}) => {:>9} / {:>9.1}   Restart:: block {} force {}",
-            end, self.fixed_len, new_len, self.max_learnts,
+            "# DB::drop 1/2 {:>9} => {:>9} ({:>8} +{:>8.1})   Restart:: block {} force {}",
+            nc,
+            new_len,
+            self.fixed_len,
+            self.max_learnts,
             self.stats[Stat::NumOfBlockRestart as usize],
             self.stats[Stat::NumOfRestart as usize],
         );
@@ -231,8 +243,13 @@ impl ClauseManagement for Solver {
             }
         }
         println!(
-            "# DB::simplify {:>9} ({:>9}) => {:>9} / {:>9.1}",
-            end, self.fixed_len, new_end, self.max_learnts
+            "# DB::simplify {:>9} => {:>9} ({:>8} +{:>8.1})   Restart:: block {} force {}",
+            nc,
+            self.clauses.len(),
+            self.fixed_len,
+            self.max_learnts,
+            self.stats[Stat::NumOfBlockRestart as usize],
+            self.stats[Stat::NumOfRestart as usize],
         );
     }
     fn lbd_of(&mut self, v: &[Lit]) -> usize {

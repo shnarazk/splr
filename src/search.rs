@@ -120,9 +120,7 @@ impl SolveSAT for Solver {
                 if na == self.num_vars {
                     return true;
                 }
-                if self.force_restart() {
-                    self.cancel_until(root_lv);
-                }
+                self.force_restart();
                 if d == 0 && self.num_solved_vars < na {
                     self.simplify_database();
                     self.num_solved_vars = na;
@@ -235,6 +233,9 @@ impl Solver {
         v.assign = l.lbool();
         v.level = dl;
         v.reason = ci;
+        if 0 < ci {
+            self.clauses[ci].locked = true;
+        }
         self.trail.push(l);
     }
     pub fn uncheck_assume(&mut self, l: Lit) -> () {

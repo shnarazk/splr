@@ -215,7 +215,8 @@ impl Solver {
                 let vi = q.vi();
                 let lv = self.vars[vi].level;
                 if self.an_seen[vi] != 1 && lv != 0 {
-                    if self.vars[vi].reason != NULL_CLAUSE && self.an_level_map[lv as usize] == key {
+                    if self.vars[vi].reason != NULL_CLAUSE && self.an_level_map[lv as usize] == key
+                    {
                         self.an_seen[vi] = 1;
                         self.an_stack.push(*q);
                         self.an_to_clear.push(*q);
