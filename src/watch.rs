@@ -35,9 +35,7 @@ pub fn new_watch_map(nv: usize) -> WatchMap {
 }
 
 pub fn set_watch(w: &mut [Vec<Watch>], ci: ClauseIndex, w0: Lit, w1: Lit) -> () {
-    if ci == NULL_CLAUSE {
-        return;
-    }
+    debug_assert_ne!(ci, NULL_CLAUSE);
     w[w0.negate() as usize].push(Watch::new(w1, ci));
     w[w1.negate() as usize].push(Watch::new(w0, ci));
 }

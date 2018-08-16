@@ -4,8 +4,6 @@ use solver::*;
 use std::usize::MAX;
 use types::*;
 
-const CLAUSE_ACTIVITY_THRESHOLD: f64 = 1e20;
-
 pub trait ClauseManagement {
     fn bump_ci(&mut self, ci: ClauseIndex) -> ();
     fn decay_cla_activity(&mut self) -> ();
@@ -13,17 +11,21 @@ pub trait ClauseManagement {
     fn add_learnt(&mut self, v: Vec<Lit>) -> usize;
     fn reduce_database(&mut self) -> ();
     fn simplify_database(&mut self) -> ();
+    fn lbd_of(&mut self, v: &[Lit]) -> usize;
 }
 
 impl ClauseManagement for Solver {
     fn bump_ci(&mut self, ci: ClauseIndex) -> () {
-        if ci <= 0 {
-            return;
-        }
+        debug_assert_ne!(ci, 0);
         let a = self.clauses[ci].activity + self.cla_inc;
         self.clauses[ci].activity = a;
-        if CLAUSE_ACTIVITY_THRESHOLD < a {
-            self.rescale_clause_activity()
+        if 1.0e20 < a {
+            for c in &mut self.clauses {
+                if c.learnt {
+                    c.activity *= 1.0e-20;
+                }
+            }
+            self.cla_inc *= 1.0e-20;
         }
     }
     fn decay_cla_activity(&mut self) -> () {
@@ -166,13 +168,13 @@ impl ClauseManagement for Solver {
             unsafe {
                 let c = &mut self.clauses[ci] as *mut Clause;
                 if self.satisfies(&self.clauses[ci]) {
-                    (*c).tmp = MAX;
+                    (*c).index = MAX;
                     purges += 1;
                 } else if (*c).lits.len() == 1 {
                     if !self.enqueue((*c).lits[0], NULL_CLAUSE) {
                         self.ok = false;
                     }
-                    (*c).tmp = MAX;
+                    (*c).index = MAX;
                 } else {
                     if RANK_NEED < (*c).rank {
                         let new = self.lbd_of(&(*c).lits);
@@ -180,11 +182,10 @@ impl ClauseManagement for Solver {
                             (*c).rank = new;
                         }
                     }
-                    (*c).tmp = 0;
                 }
             }
         }
-        self.clauses.retain(|ref c| c.tmp < MAX);
+        self.clauses.retain(|ref c| c.index < MAX);
         let new_end = self.clauses.len();
         debug_assert_eq!(new_end, nc - purges);
         for i in 1..new_end {
@@ -232,10 +233,7 @@ impl ClauseManagement for Solver {
             end, self.fixed_len, new_end, self.max_learnts
         );
     }
-}
-
-impl Solver {
-    pub fn lbd_of(&mut self, v: &[Lit]) -> usize {
+    fn lbd_of(&mut self, v: &[Lit]) -> usize {
         if v.len() == 2 {
             return RANK_NEED;
         }
@@ -253,11 +251,5 @@ impl Solver {
             }
         }
         RANK_NEED + 1 + cnt
-    }
-    fn rescale_clause_activity(&mut self) -> () {
-        for i in self.fixed_len..self.clauses.len() {
-            self.clauses[i].activity = self.clauses[i].activity / CLAUSE_ACTIVITY_THRESHOLD;
-        }
-        self.cla_inc /= CLAUSE_ACTIVITY_THRESHOLD;
     }
 }

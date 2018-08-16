@@ -5,10 +5,6 @@ use std::fmt;
 pub type VarIndex = usize;
 
 /// Clause Index, not ID because it changes after database reduction.
-/// # Range
-/// * `< 0` for given clauses. So we need `i64` instead of `usize`.
-/// * 0 for a null clause.
-/// * '0 <' for learnt clauses.
 pub type ClauseIndex = usize;
 
 /// is a dummy clause index

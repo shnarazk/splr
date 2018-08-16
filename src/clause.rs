@@ -24,8 +24,6 @@ pub struct Clause {
     pub locked: bool,
     /// given or learnt
     pub learnt: bool,
-    /// temporal field for `sort_clause` and `propagate`
-    pub tmp: usize,
 }
 
 ///```
@@ -89,7 +87,6 @@ impl Clause {
             index: 0,
             locked: false,
             learnt: RANK_CONST < rank,
-            tmp: 0,
         }
     }
     pub fn null() -> Clause {
@@ -100,7 +97,6 @@ impl Clause {
             index: 0,
             locked: false,
             learnt: false,
-            tmp: 0,
         }
     }
     pub fn len(&self) -> usize {
