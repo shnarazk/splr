@@ -107,14 +107,8 @@ impl CDCL for Solver {
             }
         }
         // println!("  analyze.loop 4 n = {}", n);
-        let mut i = 1;
         let mut j = 1;
-        loop {
-            // println!("  analyze.loop for simplify {} {}", i, n);
-            if i == n {
-                self.an_learnt_lits.truncate(j + 1);
-                break;
-            }
+        for i in 1..n {
             let l = self.an_learnt_lits[i];
             if self.vars[l.vi()].reason == NULL_CLAUSE {
                 self.an_learnt_lits[j] = l;
@@ -123,11 +117,9 @@ impl CDCL for Solver {
                 self.an_learnt_lits[j] = l;
                 j += 1;
             }
-            i += 1;
         }
         self.an_learnt_lits.truncate(j);
         // glucose heuristics
-        // println!("  analyze.loop 5");
         let r = self.an_learnt_lits.len();
         for i in 0..self.an_last_dl.len() {
             let l = self.an_last_dl[i];

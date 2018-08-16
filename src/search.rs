@@ -120,7 +120,7 @@ impl SolveSAT for Solver {
                 if na == self.num_vars {
                     return true;
                 }
-                if self.should_force_restart() {
+                if self.force_restart() {
                     self.cancel_until(root_lv);
                 }
                 if d == 0 && self.num_solved_vars < na {
@@ -165,7 +165,7 @@ impl SolveSAT for Solver {
                         self.reduce_database();
                         self.nb_clauses_before_reduce += 300;
                     }
-                    self.check_block_restart(lbd, d);
+                    self.block_restart(lbd, d);
                 }
                 // Since the conflict path pushes a new literal to trail, we don't need to pick up a literal here.
             }

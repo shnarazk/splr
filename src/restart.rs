@@ -3,8 +3,8 @@ use types::*;
 
 pub trait Restart {
     fn should_restart(&mut self, lbd: usize, clv: usize) -> bool;
-    fn should_force_restart(&mut self) -> bool;
-    fn check_block_restart(&mut self, lbd: usize, clv: usize) -> ();
+    fn force_restart(&mut self) -> bool;
+    fn block_restart(&mut self, lbd: usize, clv: usize) -> ();
 }
 
 impl Restart for Solver {
@@ -56,11 +56,11 @@ impl Restart for Solver {
 
         }
     }
-    fn should_force_restart(&mut self) -> bool {
+    fn force_restart(&mut self) -> bool {
         let count = self.stats[Stat::NumOfBackjump as usize] as u64;
         let e_lbd = self.ema_lbd.get();
         let _c_v = self.c_lvl.get();
-        let should_force = 1.0/0.9 < e_lbd;
+        let should_force = 1.0/0.92 < e_lbd;
         if !(count < self.check_restart) && should_force {
             self.next_restart = count + 50;
             self.check_restart = count + 50; // (1.5 * c_v) as u64;
@@ -72,7 +72,7 @@ impl Restart for Solver {
         }
     }
     /// renamed from checkRestartCondition
-    fn check_block_restart(&mut self, lbd: usize, clv: usize) -> () {
+    fn block_restart(&mut self, lbd: usize, clv: usize) -> () {
         let count = self.stats[Stat::NumOfBackjump as usize] as u64;
         let nas = self.num_assigns() as f64;
         let b_l = self.decision_level() as f64;
