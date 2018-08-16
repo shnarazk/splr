@@ -1,7 +1,6 @@
 use clause::*;
 use clause_manage::ClauseManagement;
 use solver::Solver;
-use std::cmp::max;
 use types::*;
 use var_select::VarSelect;
 
@@ -23,7 +22,6 @@ impl CDCL for Solver {
         let mut ci = confl;
         let mut p = NULL_LIT;
         let mut ti = self.trail.len() - 1; // trail index
-        let mut b: usize = 0; // backtrack level
         let mut path_cnt = 0;
         loop {
             unsafe {
@@ -59,7 +57,6 @@ impl CDCL for Solver {
                         } else {
                             // println!("{} はレベル{}なので採用", q.int(), l);
                             self.an_learnt_lits.push(*q);
-                            b = max(b, l);
                         }
                     } else {
                         // println!("{} はもうフラグが立っているかグラウンドしている{}ので無視", q.int(), l);
