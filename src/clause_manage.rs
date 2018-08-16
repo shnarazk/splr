@@ -3,7 +3,6 @@ use search::SolveSAT;
 use solver::*;
 use std::usize::MAX;
 use types::*;
-use watch::set_watch;
 
 const CLAUSE_ACTIVITY_THRESHOLD: f64 = 1e20;
 
@@ -94,61 +93,46 @@ impl ClauseManagement for Solver {
                 self.clause_permutation.set_len(nc + 1);
             }
         }
-        // reinitialize the permutation table.
-        for (i, x) in self.clause_permutation.iter_mut().enumerate() {
-            *x = i;
-        }
         // sort the range
         self.clauses[start..].sort();
         {
-            // self.clauses.truncate(new_end);
-            let ac = 0.1 * self.cla_inc / (nc as f64);
-            let new_end = start + (nc - start) / 2;
             let perm = &mut self.clause_permutation;
-            self.clauses.retain(|c|
-                                {
-                                    let res = c.index < new_end || c.locked || ac < c.activity;
-                                    if !res {
-                                        perm[c.index] = 0;
-                                    }
-                                    res
-                                }
-            );
+            for mut i in 0..end {
+                perm[self.clauses[i].index] = i;
+            }
+            let ac = 0.1 * self.cla_inc / (nc as f64);
+            let nkeep = start + (nc - start) / 2;
+            self.clauses.retain(|c| {
+                perm[c.index] < nkeep || !c.learnt || ! c.locked || ac < c.activity
+            });
         }
+        let new_len = self.clauses.len();
         // update permutation table.
-        for i in start..self.clauses.len() {
-            let old = self.clauses[i].index;
-            debug_assert_ne!(old, 0);
-            self.clause_permutation[old] = i;
-            self.clauses[i].index = i;
+        for i in 0..end {
+            self.clause_permutation[i] = 0;
+        }
+        for new in 0..new_len {
+            let c = &mut self.clauses[new];
+            self.clause_permutation[c.index] = new;
+            c.index = new;
         }
         // rebuild reason
         for v in &mut self.vars[1..] {
             v.reason = self.clause_permutation[v.reason];
         }
-        {
-            // rebuild watches
-            let perm = &self.clause_permutation;
-            for v in &mut self.watches {
-                v.retain(|w| 0 < perm[w.to as usize]);
-            }
-            for v in &mut self.watches {
-                for w in &mut v[..] {
-                    w.to = perm[w.to as usize] as u32;
-                }
+        // rebuild watches
+        let perm = &self.clause_permutation;
+        for v in &mut self.watches {
+            for w in &mut v[..] {
+                w.by = perm[w.by];
             }
         }
-        
-        // for w in &mut self.watches {
-        //     w.clear();
-        // }
-        // for c in &self.clauses[1..] {
-        //     debug_assert!(2 <= c.lits.len());
-        //     set_watch(&mut self.watches, c.index, c.lits[0], c.lits[1]);
-        // }
         println!(
             "# DB::drop 1/2 {:>9} ({:>9}) => {:>9} / {:>9.1}",
-            end, self.fixed_len, self.clauses.len(), self.max_learnts
+            end,
+            self.fixed_len,
+            new_len,
+            self.max_learnts
         );
     }
     fn simplify_database(&mut self) -> () {

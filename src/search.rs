@@ -33,6 +33,10 @@ impl SolveSAT for Solver {
                 // println!(" next_clause: {}", wi);
                 unsafe {
                     let w = &mut self.watches[p_usize][wi] as *mut Watch;
+                    if (*w).by == NULL_CLAUSE {
+                        (*w).to = NULL_LIT;
+                        continue 'next_clause;
+                    }
                     debug_assert_ne!((*w).other, (*w).to);
                     // We use `Watch.to` to keep the literal which is the destination of propagation.
                     if (*w).other != 0 && self.assigned((*w).other) == LTRUE {
@@ -84,7 +88,9 @@ impl SolveSAT for Solver {
             self.watches[0].clear();
             while let Some(w) = self.watches[p_usize].pop() {
                 // debug_assert!(w.to != 0, "Invalid Watch.to found");
-                if w.to == p {
+                if w.to == NULL_LIT {
+                    continue;
+                } else if w.to == p {
                     self.watches[0].push(w)
                 } else {
                     let ref mut c = &mut self.clauses[w.by];
