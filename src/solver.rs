@@ -86,7 +86,6 @@ pub struct Solver {
     pub an_level_map: HashSet<usize>,
     pub stats: Vec<i64>,
     pub lbd_seen: Vec<u64>,
-    pub lbd_key: u64,
     /// restart heuristics
     pub ema_asg: Ema2,
     pub ema_lbd: Ema2,
@@ -143,7 +142,6 @@ impl Solver {
             an_level_map: HashSet::with_capacity(256),
             stats: vec![0; Stat::EndOfStatIndex as usize],
             lbd_seen: vec![0; nv + 1],
-            lbd_key: 0,
             ema_asg: Ema2::new(fe, se),
             ema_lbd: Ema2::new(fe, se),
             b_lvl: Ema::new(se),

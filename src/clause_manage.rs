@@ -239,16 +239,19 @@ impl ClauseManagement for Solver {
         if v.len() == 2 {
             return RANK_NEED;
         }
-        let k = 1 + self.lbd_key;
-        self.lbd_key = k;
-        if 1000_000 < k {
-            self.lbd_key = 0;
+        let key;
+        let key_old = self.lbd_seen[0];
+        if 10_000_000 < key_old {
+            key = 1;
+        } else {
+            key = key_old + 1;
         }
+        self.lbd_seen[0] = key;
         let mut cnt = 0;
         for l in v {
             let lv = self.vars[l.vi()].level;
-            if self.lbd_seen[lv] != k && lv != 0 {
-                self.lbd_seen[lv] = k;
+            if self.lbd_seen[lv] != key && lv != 0 {
+                self.lbd_seen[lv] = key;
                 cnt += 1;
             }
         }
