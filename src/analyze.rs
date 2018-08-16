@@ -98,11 +98,16 @@ impl CDCL for Solver {
         self.an_stack.clear();
         self.an_to_clear.clear();
         self.an_to_clear.push(l0);
-        self.an_level_map.clear();
-        for i in 1..n {
-            let l = self.an_learnt_lits[i];
-            self.an_to_clear.push(l);
-            self.an_level_map.insert(self.vars[l.vi()].level);
+        {
+            self.an_level_map_key += 1;
+            if 10_000_000 < self.an_level_map_key {
+                self.an_level_map_key = 0;
+            }
+            for i in 1..n {
+                let l = self.an_learnt_lits[i];
+                self.an_to_clear.push(l);
+                self.an_level_map[self.vars[l.vi()].level] = self.an_level_map_key;
+            }
         }
         // println!("  analyze.loop 4 n = {}", n);
         let mut i = 1;
@@ -207,6 +212,7 @@ impl Solver {
         self.an_stack.clear();
         self.an_stack.push(l);
         let top = self.an_to_clear.len();
+        let key = self.an_level_map_key;
         while let Some(sl) = self.an_stack.pop() {
             // println!("analyze_removable.loop {:?}", self.an_stack);
             let ci = self.vars[sl.vi()].reason;
@@ -220,7 +226,7 @@ impl Solver {
                 let vi = q.vi();
                 let lv = self.vars[vi].level;
                 if self.an_seen[vi] != 1 && lv != 0 {
-                    if self.vars[vi].reason != NULL_CLAUSE && self.an_level_map.contains(&lv) {
+                    if self.vars[vi].reason != NULL_CLAUSE && self.an_level_map[lv as usize] == key {
                         self.an_seen[vi] = 1;
                         self.an_stack.push(*q);
                         self.an_to_clear.push(*q);
