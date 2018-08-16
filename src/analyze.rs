@@ -13,7 +13,7 @@ pub trait CDCL {
 impl CDCL for Solver {
     fn analyze(&mut self, confl: ClauseIndex) -> usize {
         for mut l in &mut self.an_seen {
-            *l = 0;
+            debug_assert_ne!(*l, 0);
         }
         // self.dump("analyze");
         self.an_learnt_lits.clear();
@@ -165,8 +165,7 @@ impl CDCL for Solver {
     fn analyze_final(&mut self, ci: ClauseIndex, skip_first: bool) -> () {
         self.conflicts.clear();
         if self.root_level != 0 {
-            let ref c = &self.clauses[ci];
-            for l in &c.lits[(if skip_first { 1 } else { 0 })..] {
+            for l in &self.clauses[ci].lits[(if skip_first { 1 } else { 0 })..] {
                 let vi = l.vi();
                 if 0 < self.vars[vi].level {
                     self.an_seen[vi] = 1;
@@ -185,8 +184,7 @@ impl CDCL for Solver {
                     if self.vars[vi].reason == NULL_CLAUSE {
                         self.conflicts.push(l.negate());
                     } else {
-                        let ref c = &self.clauses[ci];
-                        for l in &c.lits[1..] {
+                        for l in &self.clauses[ci].lits[1..] {
                             let vi = l.vi();
                             if 0 < self.vars[vi].level {
                                 self.an_seen[vi] = 1;
@@ -208,8 +206,7 @@ impl Solver {
         while let Some(sl) = self.an_stack.pop() {
             // println!("analyze_removable.loop {:?}", self.an_stack);
             let ci = self.vars[sl.vi()].reason;
-            let ref c = &self.clauses[ci];
-            for q in &c.lits {
+            for q in &self.clauses[ci].lits {
                 let vi = q.vi();
                 let lv = self.vars[vi].level;
                 if self.an_seen[vi] != 1 && lv != 0 {

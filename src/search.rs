@@ -27,9 +27,8 @@ impl SolveSAT for Solver {
             let p_usize: usize = p as usize;
             self.q_head += 1;
             self.stats[Stat::NumOfPropagation as usize] += 1;
-            let wl = self.watches[p_usize].len();
             let false_lit = p.negate();
-            'next_clause: for mut wi in 0..wl {
+            'next_clause: for mut wi in 0..self.watches[p_usize].len() {
                 // println!(" next_clause: {}", wi);
                 unsafe {
                     let w = &mut self.watches[p_usize][wi] as *mut Watch;
@@ -91,10 +90,9 @@ impl SolveSAT for Solver {
                 if w.to == NULL_LIT {
                     continue;
                 } else if w.to == p {
-                    self.watches[0].push(w)
+                    self.watches[0].push(w);
                 } else {
-                    let ref mut c = &mut self.clauses[w.by];
-                    c.lits.swap(1, w.swap as usize);
+                    self.clauses[w.by].lits.swap(1, w.swap as usize);
                     self.watches[w.to as usize].push(w);
                 }
             }
@@ -243,11 +241,10 @@ impl Solver {
         v.assign = l.lbool();
         v.level = dl;
         v.reason = ci;
-        self.trail.push(l)
+        self.trail.push(l);
     }
     pub fn uncheck_assume(&mut self, l: Lit) -> () {
-        let len = self.trail.len();
-        self.trail_lim.push(len);
+        self.trail_lim.push(self.trail.len());
         self.uncheck_enqueue(l, NULL_CLAUSE);
     }
 }
