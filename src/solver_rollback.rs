@@ -13,8 +13,7 @@ const R: f64 = 1.15; // 1.11; block restart
 
 impl Restart for Solver {
     fn cancel_until(&mut self, lv: usize) -> () {
-        let dl = self.decision_level();
-        if dl <= lv {
+        if self.decision_level() <= lv {
             return;
         }
         let lim = self.trail_lim[lv];
@@ -22,9 +21,7 @@ impl Restart for Solver {
             let vi = l.vi();
             {
                 let v = &mut self.vars[vi];
-                if v.level == dl {
-                    v.phase = v.assign;
-                }
+                v.phase = v.assign;
                 v.assign = BOTTOM;
                 if 0 < v.reason {
                     self.clauses[v.reason].locked = false;
