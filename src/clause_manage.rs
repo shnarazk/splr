@@ -136,11 +136,10 @@ impl ClauseManagement for Solver {
         }
         self.stats[Stat::NumOfReduction as usize] += 1;
         println!(
-            "# DB::drop 1/2 {:>9} => {:>9} ({:>8} +{:>8.1})   Restart:: block {} force {}",
+            "# DB::drop 1/2 {:>9}({:>8}) => {:>9}   Restart:: block {} force {}",
             nc,
-            new_len,
             self.fixed_len,
-            self.max_learnts,
+            new_len,
             self.stats[Stat::NumOfBlockRestart as usize],
             self.stats[Stat::NumOfRestart as usize],
         );
@@ -241,11 +240,10 @@ impl ClauseManagement for Solver {
             }
         }
         println!(
-            "# DB::simplify {:>9} => {:>9} ({:>8} +{:>8.1})   Restart:: block {} force {}",
+            "# DB::simplify {:>9}({:>8}) => {:>9}   Restart:: block {} force {}",
             nc,
-            self.clauses.len(),
             self.fixed_len,
-            self.max_learnts,
+            self.clauses.len(),
             self.stats[Stat::NumOfBlockRestart as usize],
             self.stats[Stat::NumOfRestart as usize],
         );

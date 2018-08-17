@@ -78,7 +78,6 @@ pub struct Solver {
     pub clause_permutation: Vec<usize>,
     pub cur_restart: usize,
     pub nb_clauses_before_reduce: usize,
-    pub max_learnts: f64,
     pub num_solved_vars: usize,
     /// Working memory
     pub ok: bool,
@@ -132,7 +131,6 @@ impl Solver {
             clause_permutation: (0..nc * 2).collect(),
             cur_restart: 1,
             nb_clauses_before_reduce: 2000,
-            max_learnts: 2000.0,
             num_solved_vars: 0,
             ok: true,
             an_seen: vec![0; nv + 1],

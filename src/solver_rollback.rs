@@ -39,7 +39,7 @@ impl Restart for Solver {
         let count = self.stats[Stat::NumOfBackjump as usize] as u64;
         let e_lbd = self.ema_lbd.get();
         let _c_v = self.c_lvl.get();
-        let should_force = 1.0 / 0.90 < e_lbd;
+        let should_force = 1.0 / 0.84 < e_lbd;
         if !(count < self.check_restart) && should_force {
             self.next_restart = count + 50;
             self.check_restart = count + 50; // (1.5 * c_v) as u64;
