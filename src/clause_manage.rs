@@ -61,11 +61,11 @@ impl ClauseManagement for Solver {
     fn add_learnt(&mut self, v: Vec<Lit>) -> usize {
         let lbd;
         if v.len() == 2 {
-            lbd = RANK_NEED;
+            lbd = 0;
         } else {
             lbd = self.lbd_of(&v);
         }
-        let mut c = Clause::new(lbd, v);
+        let mut c = Clause::new(RANK_NEED + lbd, v);
         let mut i_max = 0;
         let mut lv_max = 0;
         // seek a literal with max level
@@ -136,7 +136,7 @@ impl ClauseManagement for Solver {
         }
         self.stats[Stat::NumOfReduction as usize] += 1;
         println!(
-            "# DB::drop 1/2 {:>9}({:>8}) => {:>9}   Restart:: block {} force {}",
+            "# DB::drop 1/2 {:>9}({:>8}) => {:>9}   Restart:: block {:>4} force {:>4}",
             nc,
             self.fixed_len,
             new_len,
@@ -240,7 +240,7 @@ impl ClauseManagement for Solver {
             }
         }
         println!(
-            "# DB::simplify {:>9}({:>8}) => {:>9}   Restart:: block {} force {}",
+            "# DB::simplify {:>9}({:>8}) => {:>9}   Restart:: block {:>4} force {:>4}",
             nc,
             self.fixed_len,
             self.clauses.len(),
@@ -268,6 +268,6 @@ impl ClauseManagement for Solver {
                 cnt += 1;
             }
         }
-        RANK_NEED + 1 + cnt
+        if cnt == 0 { 1 } else { cnt }
     }
 }
