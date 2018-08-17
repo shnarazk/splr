@@ -8,8 +8,8 @@ pub trait Restart {
     fn block_restart(&mut self, lbd: usize, clv: usize) -> ();
 }
 
-const K: f64 = 0.7; // 0.83; force restart
-const R: f64 = 1.14; // 1.11; block restart
+const K: f64 = 0.87; // 0.83; force restart
+const R: f64 = 1.15; // 1.11; block restart
 
 impl Restart for Solver {
     fn cancel_until(&mut self, lv: usize) -> () {
