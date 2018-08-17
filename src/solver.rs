@@ -7,6 +7,11 @@ use std::io::{BufRead, BufReader};
 use types::*;
 use var::*;
 
+pub trait SatSolver {
+    fn solve(&mut self) -> SolverResult;
+    fn build(path: &str) -> (Solver, CNFDescription);
+}
+
 /// normal results returned by Solver
 #[derive(Debug)]
 pub enum Certificate {
@@ -95,10 +100,6 @@ pub struct Solver {
     pub check_restart: u64,
     pub restart_exp: f64,
     pub rbias: Ema,
-}
-
-pub trait SatSolver {
-    fn solve(&mut self) -> SolverResult;
 }
 
 trait Dump {
@@ -191,16 +192,50 @@ impl Solver {
     /// the number of given clause
     /// The numeber might change after simplification
     pub fn num_givencs(&self) -> usize {
-        self.fixed_len
+        self.fixed_len - 1 // 1 for NULL_CLAUSE
     }
     pub fn num_learnts(&self) -> usize {
-        self.clauses.len() - self.fixed_len - 1 // 1 for NULL_CLAUSE
+        self.clauses.len() - self.fixed_len
     }
     pub fn decision_level(&self) -> usize {
         self.trail_lim.len()
     }
+}
+
+impl SatSolver for Solver {
+    fn solve(&mut self) -> SolverResult {
+        // TODO deal with assumptons
+        // s.root_level = 0;
+        self.num_solved_vars = self.trail.len();
+        match self.search() {
+            _ if self.ok == false => {
+                self.cancel_until(0);
+                Err(SolverException::InternalInconsistent)
+            }
+            true => {
+                let mut result = Vec::new();
+                for vi in 1..self.num_vars + 1 {
+                    match self.vars[vi].assign {
+                        LTRUE => result.push(vi as i32),
+                        LFALSE => result.push(0 - vi as i32),
+                        _ => (),
+                    }
+                }
+                self.cancel_until(0);
+                Ok(Certificate::SAT(result))
+            }
+            false => {
+                self.cancel_until(0);
+                let mut v = Vec::new();
+                for l in &self.conflicts {
+                    v.push(l.int());
+                }
+                Ok(Certificate::UNSAT(v))
+            }
+        }
+    }
     /// builds and returns a configured solver.
-    pub fn build(path: &str) -> (Solver, CNFDescription) {
+    fn build(path: &str) -> (Solver, CNFDescription) {
         let mut rs = BufReader::new(fs::File::open(path).unwrap());
         let mut buf = String::new();
         let mut nv: usize = 0;
@@ -260,40 +295,6 @@ impl Solver {
         debug_assert_eq!(s.vars.len() - 1, cnf.num_of_variables);
         s.fixed_len = s.clauses.len();
         (s, cnf)
-    }
-}
-
-impl SatSolver for Solver {
-    fn solve(&mut self) -> SolverResult {
-        // TODO deal with assumptons
-        // s.root_level = 0;
-        self.num_solved_vars = self.trail.len();
-        match self.search() {
-            _ if self.ok == false => {
-                self.cancel_until(0);
-                Err(SolverException::InternalInconsistent)
-            }
-            true => {
-                let mut result = Vec::new();
-                for vi in 1..self.num_vars + 1 {
-                    match self.vars[vi].assign {
-                        LTRUE => result.push(vi as i32),
-                        LFALSE => result.push(0 - vi as i32),
-                        _ => (),
-                    }
-                }
-                self.cancel_until(0);
-                Ok(Certificate::SAT(result))
-            }
-            false => {
-                self.cancel_until(0);
-                let mut v = Vec::new();
-                for l in &self.conflicts {
-                    v.push(l.int());
-                }
-                Ok(Certificate::UNSAT(v))
-            }
-        }
     }
 }
 

@@ -1,5 +1,5 @@
 extern crate splr;
-use splr::solver::*;
+use splr::solver::{Certificate, SatSolver, Solver, Stat};
 use std::env;
 
 fn main() {

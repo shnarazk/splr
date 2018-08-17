@@ -1,4 +1,4 @@
-use solver::*;
+use solver::{Solver, Stat};
 use types::*;
 use var::VarOrdering;
 

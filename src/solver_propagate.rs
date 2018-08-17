@@ -1,6 +1,6 @@
 use clause::Clause;
 use clause_manage::ClauseManagement;
-use solver::*;
+use solver::{Solver, Stat};
 use solver_analyze::CDCL;
 use solver_rollback::Restart;
 use std::cmp::max;

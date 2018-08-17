@@ -1,5 +1,5 @@
-use clause::*;
-use solver::*;
+use clause::{Clause, RANK_CONST, RANK_NEED};
+use solver::{Solver, Stat};
 use solver_propagate::SolveSAT;
 use std::usize::MAX;
 use types::*;
