@@ -127,8 +127,14 @@ impl ClauseManagement for Solver {
         for v in &mut self.vars[1..] {
             v.reason = self.clause_permutation[v.reason];
         }
-        // rebuild watches
         let perm = &self.clause_permutation;
+        // rebuild bi_watches
+        for v in &mut self.bi_watches {
+            for w in &mut v[..] {
+                w.by = perm[w.by];
+            }
+        }
+        // rebuild watches
         for v in &mut self.watches {
             for w in &mut v[..] {
                 w.by = perm[w.by];
@@ -222,21 +228,42 @@ impl ClauseManagement for Solver {
         }
         self.fixed_len = c0;
         self.clauses.truncate(new_end);
-        // rebuild watches
-        let (w0, wr) = self.watches.split_first_mut().unwrap();
-        w0.clear();
-        for ws in wr {
-            while let Some(mut w) = ws.pop() {
-                match self.clause_permutation[w.by] {
-                    0 => {}
-                    x => {
-                        w.by = x;
-                        w0.push(w);
+        {
+            // rebuild bi_watches
+            let (w0, wr) = self.bi_watches.split_first_mut().unwrap();
+            w0.clear();
+            for ws in wr {
+                while let Some(mut w) = ws.pop() {
+                    match self.clause_permutation[w.by] {
+                        0 => {}
+                        x => {
+                            w.by = x;
+                            w0.push(w);
+                        }
                     }
                 }
+                while let Some(w) = w0.pop() {
+                    ws.push(w);
+                }
             }
-            while let Some(w) = w0.pop() {
-                ws.push(w);
+        }
+        {
+            // rebuild watches
+            let (w0, wr) = self.watches.split_first_mut().unwrap();
+            w0.clear();
+            for ws in wr {
+                while let Some(mut w) = ws.pop() {
+                    match self.clause_permutation[w.by] {
+                        0 => {}
+                        x => {
+                            w.by = x;
+                            w0.push(w);
+                        }
+                    }
+                }
+                while let Some(w) = w0.pop() {
+                    ws.push(w);
+                }
             }
         }
         println!(
@@ -268,6 +295,10 @@ impl ClauseManagement for Solver {
                 cnt += 1;
             }
         }
-        if cnt == 0 { 1 } else { cnt }
+        if cnt == 0 {
+            1
+        } else {
+            cnt
+        }
     }
 }

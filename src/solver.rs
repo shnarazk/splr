@@ -62,6 +62,7 @@ pub struct Solver {
     /// fixed_len = |NULL| + |given|
     pub fixed_len: usize,
     pub watches: WatchMap,
+    pub bi_watches: WatchMap,
     pub trail: Vec<Lit>,
     pub trail_lim: Vec<usize>,
     pub q_head: usize,
@@ -118,6 +119,7 @@ impl Solver {
             clauses: new_clause_manager(nc),
             fixed_len: 1 + nc,
             watches: new_watch_map(nv * 2),
+            bi_watches: new_watch_map(nv * 2),
             trail: Vec::with_capacity(nv),
             trail_lim: Vec::new(),
             q_head: 0,
@@ -172,7 +174,8 @@ impl Solver {
         false
     }
     pub fn attach_clause(&mut self, mut c: Clause) -> ClauseIndex {
-        if c.lits.len() == 1 {
+        let len = c.lits.len();
+        if len == 1 {
             self.enqueue(c.lits[0], NULL_CLAUSE);
             return 0;
         }
@@ -181,7 +184,11 @@ impl Solver {
         let ci = self.clauses.len();
         c.index = ci;
         self.clauses.push(c);
-        set_watch(&mut self.watches, ci, w0, w1);
+        if len == 2 {
+            set_watch(&mut self.bi_watches, ci, w0, w1);
+        } else {
+            set_watch(&mut self.watches, ci, w0, w1);
+        }
         ci
     }
     pub fn num_assigns(&self) -> usize {
@@ -324,6 +331,15 @@ impl Dump for Solver {
         }
         println!("- trail_lim  {:?}", self.trail_lim);
         if false {
+            for (i, m) in self.bi_watches.iter().enumerate() {
+                if !m.is_empty() {
+                    println!(
+                        "# - bi_watches[{:>3}] => {:?}",
+                        (i as Lit).int(),
+                        m.iter().map(|w| w.by).collect::<Vec<ClauseIndex>>()
+                    );
+                }
+            }
             for (i, m) in self.watches.iter().enumerate() {
                 if !m.is_empty() {
                     println!(

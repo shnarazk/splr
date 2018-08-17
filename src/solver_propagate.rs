@@ -25,6 +25,29 @@ impl SolveSAT for Solver {
             self.q_head += 1;
             self.stats[Stat::NumOfPropagation as usize] += 1;
             let false_lit = p.negate();
+            'next_bi_clause: for mut wi in 0..self.bi_watches[p_usize].len() {
+                // println!(" next_clause: {}", wi);
+                unsafe {
+                    let w = &mut self.bi_watches[p_usize][wi] as *mut Watch;
+                    if (*w).by == NULL_CLAUSE {
+                        (*w).to = NULL_LIT;
+                        continue 'next_bi_clause;
+                    }
+                    debug_assert_ne!((*w).by,  NULL_CLAUSE);
+                    debug_assert_ne!((*w).other, 0);
+                    // We use `Watch.to` to keep the literal which is the destination of propagation.
+                    match self.assigned((*w).other) {
+                        LTRUE => continue 'next_bi_clause,
+                        LFALSE => return (*w).by,
+                        _ =>  {
+                            if self.clauses[(*w).by].lits[0] == false_lit {
+                                self.clauses[(*w).by].lits.swap(0, 1);
+                            }
+                            self.uncheck_enqueue((*w).other, (*w).by);
+                        }
+                    }
+                }
+            }
             'next_clause: for mut wi in 0..self.watches[p_usize].len() {
                 // println!(" next_clause: {}", wi);
                 unsafe {
@@ -80,6 +103,21 @@ impl SolveSAT for Solver {
             }
             // No conflict: so let's move them!
             // use watches[0] to keep watches that don't move anywhere, temporally.
+            // println!("  update bi_watches");
+            // self.bi_watches[0].clear();
+            // while let Some(w) = self.bi_watches[p_usize].pop() {
+            //     // debug_assert!(w.to != 0, "Invalid Watch.to found");
+            //     if w.to == NULL_LIT {
+            //         continue;
+            //     } else if w.to == p {
+            //             self.bi_watches[0].push(w);
+            //     } else {
+            //         self.clauses[w.by].lits.swap(1, w.swap as usize);
+            //         self.bi_watches[w.to as usize].push(w);
+            //     }
+            // }
+            // debug_assert!(self.bi_watches[p_usize].is_empty(), true);
+            // self.bi_watches.swap(0, p_usize);
             // println!("  update watches");
             self.watches[0].clear();
             while let Some(w) = self.watches[p_usize].pop() {
