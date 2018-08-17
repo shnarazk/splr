@@ -8,6 +8,9 @@ pub trait Restart {
     fn block_restart(&mut self, lbd: usize, clv: usize) -> ();
 }
 
+const K: f64 = 0.7; // 0.83; force restart
+const R: f64 = 1.14; // 1.11; block restart
+
 impl Restart for Solver {
     fn cancel_until(&mut self, lv: usize) -> () {
         let dl = self.decision_level();
@@ -39,7 +42,7 @@ impl Restart for Solver {
         let count = self.stats[Stat::NumOfBackjump as usize] as u64;
         let e_lbd = self.ema_lbd.get();
         let _c_v = self.c_lvl.get();
-        let should_force = 1.0 / 0.84 < e_lbd;
+        let should_force = 1.0 / K < e_lbd;
         if !(count < self.check_restart) && should_force {
             self.next_restart = count + 50;
             self.check_restart = count + 50; // (1.5 * c_v) as u64;
@@ -56,7 +59,7 @@ impl Restart for Solver {
         let e_asg = self.ema_asg.update(nas);
         let _e_lbd = self.ema_lbd.update(lbd as f64);
         let _c_v = self.c_lvl.update(clv as f64);
-        let should_block = 1.1 < e_asg;
+        let should_block = R < e_asg;
         self.b_lvl.update(b_l);
         if !(count < self.check_restart) && should_block {
             self.next_restart = count + 50; // 1000 + ((c_v.powf(2.0)) as u64);
