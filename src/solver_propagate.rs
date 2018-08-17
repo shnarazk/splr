@@ -1,12 +1,11 @@
-use clause::*;
+use clause::Clause;
 use clause_manage::ClauseManagement;
 use solver::*;
 use solver_analyze::CDCL;
 use solver_rollback::Restart;
 use std::cmp::max;
 use types::*;
-use var_select::VarSelect;
-use watch::*;
+use var_manage::VarSelect;
 
 pub trait SolveSAT {
     /// returns `true` for SAT, `false` for UNSAT.

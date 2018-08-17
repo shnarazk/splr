@@ -17,6 +17,4 @@ pub mod types;
 /// Var
 pub mod var;
 /// Implementation on decision var selection.
-pub mod var_select;
-/// Watch literal structure.
-pub mod watch;
+pub mod var_manage;

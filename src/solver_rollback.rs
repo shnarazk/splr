@@ -1,6 +1,6 @@
 use solver::*;
 use types::*;
-use var::*;
+use var::VarOrdering;
 
 pub trait Restart {
     fn cancel_until(&mut self, lv: usize) -> ();

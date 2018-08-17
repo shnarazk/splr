@@ -6,7 +6,6 @@ use std::fs;
 use std::io::{BufRead, BufReader};
 use types::*;
 use var::*;
-use watch::*;
 
 /// normal results returned by Solver
 #[derive(Debug)]

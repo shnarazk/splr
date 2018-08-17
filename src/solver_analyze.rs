@@ -1,8 +1,8 @@
-use clause::*;
+use clause::{Clause, RANK_NEED};
 use clause_manage::ClauseManagement;
 use solver::Solver;
 use types::*;
-use var_select::VarSelect;
+use var_manage::VarSelect;
 
 pub trait CDCL {
     fn analyze(&mut self, confl: ClauseIndex) -> usize;
