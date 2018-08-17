@@ -139,6 +139,9 @@ impl CDCL for Solver {
         //     vec2int(self.an_learnt_lits)
         // );
         // println!("  analyze terminated");
+        if self.an_learnt_lits.len() < 30 {
+            self.minimize_with_bi_clauses();
+        }
         // find correct backtrack level from remaining literals
         let mut level_to_return = 0;
         if self.an_learnt_lits.len() != 1 {
@@ -230,5 +233,38 @@ impl Solver {
             }
         }
         true
+    }
+    fn minimize_with_bi_clauses(&mut self) -> () {
+        let len = self.an_learnt_lits.len();
+        if 30 < len {
+            return;
+        }
+        unsafe {
+            let key = self.an_level_map[0];
+            let vec = &mut self.an_learnt_lits as *mut Vec<Lit>;
+            let nblevel = self.lbd_of(&*vec);
+            if 6 < nblevel {
+                return;
+            }
+            let l0 = self.an_learnt_lits[0];
+            let p: Lit = l0.negate();
+            for i in 1..len {
+                self.mi_var_map[(*vec)[i].vi() as usize] = key;
+            }
+            let wb = &self.bi_watches[p as usize];
+            let mut nb = 0;
+            for w in wb {
+                let l: Lit = w.other;
+                let vi = l.vi();
+                if self.mi_var_map[vi] == key && self.assigned(l) == LTRUE {
+                    nb += 1;
+                    self.mi_var_map[vi] -= 1;
+                }
+            }
+            if nb == 0 {
+                return;
+            }
+            (*vec).retain(|l| *l == l0 || self.mi_var_map[l.vi()] == key);
+        }
     }
 }

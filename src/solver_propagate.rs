@@ -33,13 +33,13 @@ impl SolveSAT for Solver {
                         (*w).to = NULL_LIT;
                         continue 'next_bi_clause;
                     }
-                    debug_assert_ne!((*w).by,  NULL_CLAUSE);
+                    debug_assert_ne!((*w).by, NULL_CLAUSE);
                     debug_assert_ne!((*w).other, 0);
                     // We use `Watch.to` to keep the literal which is the destination of propagation.
                     match self.assigned((*w).other) {
                         LTRUE => continue 'next_bi_clause,
                         LFALSE => return (*w).by,
-                        _ =>  {
+                        _ => {
                             if self.clauses[(*w).by].lits[0] == false_lit {
                                 self.clauses[(*w).by].lits.swap(0, 1);
                             }

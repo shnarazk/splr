@@ -89,6 +89,7 @@ pub struct Solver {
     pub an_learnt_lits: Vec<Lit>,
     pub an_level_map: Vec<usize>,
     pub an_level_map_key: usize,
+    pub mi_var_map: Vec<usize>,
     pub stats: Vec<i64>,
     pub lbd_seen: Vec<u64>,
     /// restart heuristics
@@ -142,6 +143,7 @@ impl Solver {
             an_learnt_lits: vec![],
             an_level_map: vec![0; nv + 1],
             an_level_map_key: 0,
+            mi_var_map: vec![0; nv + 1],
             stats: vec![0; Stat::EndOfStatIndex as usize],
             lbd_seen: vec![0; nv + 1],
             ema_asg: Ema2::new(fe, se),
