@@ -10,7 +10,9 @@ fn main() {
     for arg in &args {
         match arg {
             _ if arg.to_string() == "--version" => {
-                println!("Splr 0.0.1");
+                println!(
+                    "Splr 0.0.1  -- based on MiniSAT/Glucose (Many thanks to MiniSAT/Glucose team)"
+                );
             }
             _ if (&*arg).starts_with('-') => {
                 continue;
@@ -23,22 +25,28 @@ fn main() {
     if let Some(path) = target {
         let (mut s, _cnf) = Solver::build(&path);
         match s.solve() {
-            Ok(Certificate::SAT(v)) => println!("{:?}", v),
+            Ok(Certificate::SAT(v)) => {
+                report_stat(&s);
+                println!("{:?}", v);
+            }
             Ok(Certificate::UNSAT(v)) => println!("UNSAT {:?}", v),
             Err(e) => println!("Failed {:?}", e),
         }
-        println!(
-            "backjump:{}, block:{}, restart:{}, reduction:{}, clauses:{}, learnts:{}",
-            s.stats[Stat::NumOfBackjump as usize],
-            s.stats[Stat::NumOfBlockRestart as usize],
-            s.stats[Stat::NumOfRestart as usize],
-            s.stats[Stat::NumOfReduction as usize],
-            s.fixed_len,
-            s.clauses.len() - s.fixed_len,
-        );
-        println!(
-            "Ema_Asg:(s{}, f{}), Ema-LBD:(s{}, f{})",
-            s.ema_asg.slow, s.ema_asg.fast, s.ema_lbd.slow, s.ema_lbd.fast,
-        );
     }
+}
+
+fn report_stat(s: &Solver) -> () {
+    println!(
+        "backjump:{}, block:{}, restart:{}, reduction:{}, clauses:{}, learnts:{}",
+        s.stats[Stat::NumOfBackjump as usize],
+        s.stats[Stat::NumOfBlockRestart as usize],
+        s.stats[Stat::NumOfRestart as usize],
+        s.stats[Stat::NumOfReduction as usize],
+        s.fixed_len,
+        s.clauses.len() - s.fixed_len,
+    );
+    println!(
+        "Ema_Asg:(s{}, f{}), Ema-LBD:(s{}, f{})",
+        s.ema_asg.slow, s.ema_asg.fast, s.ema_lbd.slow, s.ema_lbd.fast,
+    );
 }
