@@ -1,13 +1,40 @@
-use search::SolveSAT;
 use solver::*;
 use types::*;
+use var::*;
 
 pub trait Restart {
+    fn cancel_until(&mut self, lv: usize) -> ();
     fn force_restart(&mut self) -> ();
     fn block_restart(&mut self, lbd: usize, clv: usize) -> ();
 }
 
 impl Restart for Solver {
+    fn cancel_until(&mut self, lv: usize) -> () {
+        let dl = self.decision_level();
+        if dl <= lv {
+            return;
+        }
+        let lim = self.trail_lim[lv];
+        for l in &self.trail[lim..] {
+            let vi = l.vi();
+            {
+                let v = &mut self.vars[vi];
+                if v.level == dl {
+                    v.phase = v.assign;
+                }
+                v.assign = BOTTOM;
+                if 0 < v.reason {
+                    self.clauses[v.reason].locked = false;
+                }
+                v.reason = NULL_CLAUSE;
+            }
+            self.var_order.insert(&self.vars, vi);
+        }
+        self.trail.truncate(lim); // FIXME
+        self.trail_lim.truncate(lv);
+        self.q_head = lim;
+        // self.dump("cancel_until");
+    }
     fn force_restart(&mut self) -> () {
         let count = self.stats[Stat::NumOfBackjump as usize] as u64;
         let e_lbd = self.ema_lbd.get();

@@ -1,11 +1,10 @@
-use analyze::*;
 use clause::*;
 use clause_manage::ClauseManagement;
-use restart::Restart;
 use solver::*;
+use solver_analyze::CDCL;
+use solver_rollback::Restart;
 use std::cmp::max;
 use types::*;
-use var::VarOrdering;
 use var_select::VarSelect;
 use watch::*;
 
@@ -15,7 +14,6 @@ pub trait SolveSAT {
     fn propagate(&mut self) -> ClauseIndex;
     fn enqueue(&mut self, l: Lit, cid: ClauseIndex) -> bool;
     fn assume(&mut self, l: Lit) -> bool;
-    fn cancel_until(&mut self, lv: usize) -> ();
 }
 
 impl SolveSAT for Solver {
@@ -168,32 +166,6 @@ impl SolveSAT for Solver {
                 // Since the conflict path pushes a new literal to trail, we don't need to pick up a literal here.
             }
         }
-    }
-    fn cancel_until(&mut self, lv: usize) -> () {
-        let dl = self.decision_level();
-        if dl <= lv {
-            return;
-        }
-        let lim = self.trail_lim[lv];
-        for l in &self.trail[lim..] {
-            let vi = l.vi();
-            {
-                let v = &mut self.vars[vi];
-                if v.level == dl {
-                    v.phase = v.assign;
-                }
-                v.assign = BOTTOM;
-                if 0 < v.reason {
-                    self.clauses[v.reason].locked = false;
-                }
-                v.reason = NULL_CLAUSE;
-            }
-            self.var_order.insert(&self.vars, vi);
-        }
-        self.trail.truncate(lim); // FIXME
-        self.trail_lim.truncate(lv);
-        self.q_head = lim;
-        // self.dump("cancel_until");
     }
     fn enqueue(&mut self, l: Lit, cid: ClauseIndex) -> bool {
         // println!("enqueue: {} by {}", l.int(), cid);

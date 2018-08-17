@@ -1,6 +1,6 @@
 use clause::*;
-use search::SolveSAT;
 use solver::*;
+use solver_propagate::SolveSAT;
 use std::usize::MAX;
 use types::*;
 
@@ -97,16 +97,14 @@ impl ClauseManagement for Solver {
         // sort the range
         self.clauses[start..].sort();
         {
-            let dl = self.decision_level();
             let perm = &mut self.clause_permutation;
             for mut i in 0..nc {
                 perm[self.clauses[i].index] = i;
             }
-            let ac = 0.1 * self.cla_inc / ((nc - start) as f64);
+            let _ac = 0.1 * self.cla_inc / ((nc - start) as f64);
             let nkeep = start + (nc - start) / 2;
-            // println!("ac {}, dl {}, pased {}, index {}, locked {}, activity threshold {}",
+            // println!("ac {}, pased {}, index {}, locked {}, activity threshold {}",
             //          ac,
-            //          dl,
             //          self.clauses[start..].iter().filter(|c| c.locked || ac < c.activity).count(),
             //          self.clauses[start..].iter().filter(|c| perm[c.index] < nkeep).count(),
             //          self.clauses[start..].iter().filter(|c| c.locked).count(),

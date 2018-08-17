@@ -1,6 +1,7 @@
 use clause::*;
 use clause_manage::ClauseManagement;
-use search::SolveSAT;
+use solver_propagate::SolveSAT;
+use solver_rollback::Restart;
 use std::fs;
 use std::io::{BufRead, BufReader};
 use types::*;
