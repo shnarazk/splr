@@ -98,7 +98,7 @@ impl CDCL for Solver {
         {
             self.an_level_map_key += 1;
             if 10_000_000 < self.an_level_map_key {
-                self.an_level_map_key = 0;
+                self.an_level_map_key = 1;
             }
             for i in 1..n {
                 let l = self.an_learnt_lits[i];
@@ -240,7 +240,7 @@ impl Solver {
             return;
         }
         unsafe {
-            let key = self.an_level_map[0];
+            let key = self.an_level_map_key;
             let vec = &mut self.an_learnt_lits as *mut Vec<Lit>;
             let nblevel = self.lbd_of(&*vec);
             if 6 < nblevel {

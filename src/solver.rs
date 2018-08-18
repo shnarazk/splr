@@ -142,7 +142,7 @@ impl Solver {
             an_last_dl: vec![],
             an_learnt_lits: vec![],
             an_level_map: vec![0; nv + 1],
-            an_level_map_key: 0,
+            an_level_map_key: 1,
             mi_var_map: vec![0; nv + 1],
             stats: vec![0; Stat::EndOfStatIndex as usize],
             lbd_seen: vec![0; nv + 1],
