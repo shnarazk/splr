@@ -17,7 +17,6 @@ pub trait SolveSAT {
 }
 
 impl SolveSAT for Solver {
-    // adapt delayed update of watches
     fn propagate(&mut self) -> ClauseIndex {
         // println!("> propagate at {}", self.decision_level());
         while self.q_head < self.trail.len() {
@@ -38,8 +37,8 @@ impl SolveSAT for Solver {
                     debug_assert_ne!((*w).other, 0);
                     // We use `Watch.to` to keep the literal which is the destination of propagation.
                     match self.assigned((*w).other) {
-                        LTRUE => continue 'next_bi_clause,
                         LFALSE => return (*w).by,
+                        LTRUE => continue 'next_bi_clause,
                         _ => {
                             {
                                 let mut cl = &mut self.clauses.mref((*w).by).lits;
@@ -81,15 +80,16 @@ impl SolveSAT for Solver {
                         // Satisfied by the other watch.
                         // Update watch with `other`, the cached literal
                         (*w).to = p;
+                        (*w).other = first;
                         continue 'next_clause;
                     }
-                    (*w).other = first;
                     for k in 2..(*c).lits.len() {
                         let lk = (*c).lits[k];
                         if self.assigned(lk) != LFALSE {
                             (*w).swap = k;
                             // Update the watch
                             (*w).to = lk.negate();
+                            (*w).other = lk;
                             continue 'next_clause;
                         }
                     }
@@ -100,7 +100,9 @@ impl SolveSAT for Solver {
                         // println!("  unit propagation {} by {}", first.int(), (*c));
                         (*w).swap = 1;
                         (*w).to = p;
-                        debug_assert_eq!(first, (*c).lits[0]);
+                        if (*w).other == (*c).lits[0] {
+                            (*w).other = first;
+                        }
                         self.uncheck_enqueue(first, (*w).by);
                     }
                 }
