@@ -53,18 +53,18 @@ pub fn vec2int(v: Vec<Lit>) -> Vec<i32> {
 impl ClauseReference for ClauseMap {
     #[inline]
     fn iref(&self, cid: ClauseIndex) -> &Clause {
-        if KERNEL_CLAUSE <= cid
+        if KERNEL_CLAUSE & cid != 0
         {
-            &self.permanents[cid - KERNEL_CLAUSE]
+            &self.permanents[cid ^ KERNEL_CLAUSE]
         } else {
             &self.deletables[cid]
         }
     }
     #[inline]
     fn mref(&mut self, cid: ClauseIndex) -> &mut Clause {
-        if KERNEL_CLAUSE <= cid
+        if KERNEL_CLAUSE & cid != 0
         {
-            &mut self.permanents[cid - KERNEL_CLAUSE]
+            &mut self.permanents[cid ^ KERNEL_CLAUSE]
         } else {
             &mut self.deletables[cid]
         }
@@ -293,11 +293,11 @@ impl ClauseManagement for Solver {
         debug_assert_eq!(new_end, nc - purges);
 {
         let perm = &mut self.clauses.permutation;
-        for i in 1..new_end {
+        for i in 0..new_end {
             let old = self.clauses.permanents[i].index;
             debug_assert!(0 < old, "0 index");
-            perm[old] = i;
-            self.clauses.permanents[i].index = i;
+            perm[old ^ KERNEL_CLAUSE] = i + KERNEL_CLAUSE;
+            self.clauses.permanents[i].index = i + KERNEL_CLAUSE;
         }
 }
         // clear the reasons of variables satisfied at level zero.
@@ -319,11 +319,11 @@ impl ClauseManagement for Solver {
         {
             // rebuild bi_watches
             let perm = &mut self.clauses.permutation;
-           let (w0, wr) = self.bi_watches.split_first_mut().unwrap();
+            let (w0, wr) = self.bi_watches.split_first_mut().unwrap();
             w0.clear();
             for ws in wr {
                 while let Some(mut w) = ws.pop() {
-                    match perm[w.by] {
+                    match perm[w.by ^ KERNEL_CLAUSE] {
                         0 => {}
                         x => {
                             w.by = x;
@@ -343,11 +343,13 @@ impl ClauseManagement for Solver {
             w0.clear();
             for ws in wr {
                 while let Some(mut w) = ws.pop() {
-                    match perm[w.by] {
-                        0 => {}
-                        x => {
-                            w.by = x;
-                            w0.push(w);
+                    if KERNEL_CLAUSE & w.by != 0 {
+                        match perm[w.by ^ KERNEL_CLAUSE] {
+                            0 => {}
+                            x => {
+                                w.by = x;
+                                w0.push(w);
+                            }
                         }
                     }
                 }
