@@ -124,14 +124,3 @@ impl fmt::Display for Clause {
         }
     }
 }
-
-/// returns a new clause manager.
-pub fn new_clause_manager(nc: usize) -> Vec<Clause> {
-    let mut m = Vec::with_capacity(1 + nc);
-    m.push(Clause::null());
-    m
-}
-
-pub fn vec2int(v: Vec<Lit>) -> Vec<i32> {
-    v.iter().map(|l| l.int()).collect::<Vec<i32>>()
-}

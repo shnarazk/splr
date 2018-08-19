@@ -42,8 +42,8 @@ fn report_stat(s: &Solver) -> () {
         s.stats[Stat::NumOfBlockRestart as usize],
         s.stats[Stat::NumOfRestart as usize],
         s.stats[Stat::NumOfReduction as usize],
-        s.fixed_len,
-        s.clauses.len() - s.fixed_len,
+        s.clauses.permanents.len(),
+        s.clauses.deletables.len(),
     );
     println!(
         "Ema_Asg:(s{}, f{}), Ema-LBD:(s{}, f{})",

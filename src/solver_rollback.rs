@@ -1,3 +1,4 @@
+use clause_manage::ClauseReference;
 use solver::{Solver, Stat};
 use types::*;
 use var::VarOrdering;
@@ -24,7 +25,7 @@ impl Restart for Solver {
                 v.phase = v.assign;
                 v.assign = BOTTOM;
                 if 0 < v.reason {
-                    self.clauses[v.reason].locked = false;
+                    self.clauses.mref(v.reason).locked = false;
                 }
                 v.reason = NULL_CLAUSE;
             }

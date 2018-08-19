@@ -4,6 +4,15 @@ use solver_propagate::SolveSAT;
 use std::usize::MAX;
 use types::*;
 
+const KERNEL_CLAUSE: usize = 0xc00_0000_0000_0000;
+
+pub trait ClauseReference {
+    fn iref(&self, cid: ClauseIndex) -> &Clause;
+    fn mref(&mut self, cid: ClauseIndex) -> &mut Clause;
+    fn push(&mut self, learnt: bool, c: Clause) -> ClauseIndex;
+    fn num_learnts(&self) -> usize;
+}
+
 pub trait ClauseManagement {
     fn bump_ci(&mut self, ci: ClauseIndex) -> ();
     fn decay_cla_activity(&mut self) -> ();
@@ -14,13 +23,78 @@ pub trait ClauseManagement {
     fn lbd_of(&mut self, v: &[Lit]) -> usize;
 }
 
+#[derive(Debug)]
+pub struct ClauseMap {
+    pub init_size_of_permanents: usize,
+    pub nb_clauses_before_reduce: usize,
+    pub permanents: Vec<Clause>,
+    pub deletables: Vec<Clause>,
+    pub permutation: Vec<ClauseIndex>,
+}
+
+impl ClauseMap {
+    pub fn new(n: usize) -> ClauseMap {
+        let mut p = Vec::with_capacity(n+1);
+        p.push(Clause::null());
+        ClauseMap {
+            init_size_of_permanents: n,
+            nb_clauses_before_reduce: 2000,
+            permanents: Vec::with_capacity(n),
+            deletables: p,
+            permutation: Vec::with_capacity(n),
+        }
+    }
+}
+
+pub fn vec2int(v: Vec<Lit>) -> Vec<i32> {
+    v.iter().map(|l| l.int()).collect::<Vec<i32>>()
+}
+
+impl ClauseReference for ClauseMap {
+    #[inline]
+    fn iref(&self, cid: ClauseIndex) -> &Clause {
+        if KERNEL_CLAUSE <= cid
+        {
+            &self.permanents[cid - KERNEL_CLAUSE]
+        } else {
+            &self.deletables[cid]
+        }
+    }
+    #[inline]
+    fn mref(&mut self, cid: ClauseIndex) -> &mut Clause {
+        if KERNEL_CLAUSE <= cid
+        {
+            &mut self.permanents[cid - KERNEL_CLAUSE]
+        } else {
+            &mut self.deletables[cid]
+        }
+    }
+    fn push(&mut self, learnt: bool, mut c: Clause) -> ClauseIndex {
+        let cid: ClauseIndex;
+        if learnt && 2 < c.lits.len() {
+            cid = self.deletables.len();
+            c.index = cid;
+            self.deletables.push(c);
+        } else {
+            cid = KERNEL_CLAUSE + self.permanents.len();
+            c.index = cid;
+            self.permanents.push(c);
+        }
+        cid
+    }
+    fn num_learnts(&self) -> usize {
+        self.deletables.len()
+    }
+
+}
+
 impl ClauseManagement for Solver {
     fn bump_ci(&mut self, ci: ClauseIndex) -> () {
         debug_assert_ne!(ci, 0);
-        let a = self.clauses[ci].activity + self.cla_inc;
-        self.clauses[ci].activity = a;
+        let a = self.clauses.iref(ci).activity + self.cla_inc;
+        self.clauses.mref(ci).activity = a;
         if 1.0e20 < a {
-            for c in &mut self.clauses {
+            for c in &mut self.clauses.deletables {
                 if c.learnt {
                     c.activity *= 1.0e-20;
                 }
@@ -52,7 +126,7 @@ impl ClauseManagement for Solver {
             0 => true,
             1 => self.enqueue(v[0], NULL_CLAUSE),
             _ => {
-                self.attach_clause(Clause::new(RANK_CONST, v));
+                self.attach_clause(false, Clause::new(RANK_CONST, v));
                 true
             }
         }
@@ -79,27 +153,26 @@ impl ClauseManagement for Solver {
         }
         c.lits.swap(1, i_max);
         let l0 = c.lits[0];
-        let ci = self.attach_clause(c);
+        let ci = self.attach_clause(true, c);
         self.bump_ci(ci);
         self.uncheck_enqueue(l0, ci);
         lbd
     }
     fn reduce_database(&mut self) -> () {
-        let start = self.fixed_len;
-        debug_assert_ne!(start, 0);
-        let nc = self.clauses.len();
-        if self.clause_permutation.len() < nc {
+        let start = 1;
+        let nc = self.clauses.deletables.len();
+        let perm = &mut self.clauses.permutation;
+        if perm.len() < nc {
             unsafe {
-                self.clause_permutation.reserve(nc + 1);
-                self.clause_permutation.set_len(nc + 1);
+                perm.reserve(nc + 1);
+                perm.set_len(nc + 1);
             }
         }
         // sort the range
-        self.clauses[start..].sort();
+        self.clauses.deletables.sort();
         {
-            let perm = &mut self.clause_permutation;
             for mut i in 0..nc {
-                perm[self.clauses[i].index] = i;
+                perm[self.clauses.deletables[i].index] = i;
             }
             let _ac = 0.1 * self.cla_inc / ((nc - start) as f64);
             let nkeep = start + (nc - start) / 2;
@@ -110,41 +183,50 @@ impl ClauseManagement for Solver {
             //          self.clauses[start..].iter().filter(|c| c.locked).count(),
             //          self.clauses[start..].iter().filter(|c| ac < c.activity).count(),
             //          );
-            self.clauses.retain(|c| perm[c.index] < nkeep || c.locked);
+            self.clauses.deletables.retain(|c| perm[c.index] < nkeep || c.locked);
             // println!("start {}, end {}, nkeep {}, new len {}", start, nc, nkeep, self.clauses.len());
         }
-        let new_len = self.clauses.len();
+        let new_len = self.clauses.deletables.len();
         // update permutation table.
         for i in 0..nc {
-            self.clause_permutation[i] = 0;
+            perm[i] = 0;
         }
         for new in 0..new_len {
-            let c = &mut self.clauses[new];
-            self.clause_permutation[c.index] = new;
+            let c = &mut self.clauses.deletables[new];
+            perm[c.index] = new;
             c.index = new;
         }
         // rebuild reason
         for v in &mut self.vars[1..] {
-            v.reason = self.clause_permutation[v.reason];
+            let cid = v.reason;
+            if cid < KERNEL_CLAUSE {
+                v.reason = perm[cid];
+            }
         }
-        let perm = &self.clause_permutation;
         // rebuild bi_watches
         for v in &mut self.bi_watches {
             for w in &mut v[..] {
-                w.by = perm[w.by];
+                let cid = w.by;
+                if cid < KERNEL_CLAUSE {
+                    w.by = perm[cid];
+                }
             }
         }
         // rebuild watches
         for v in &mut self.watches {
             for w in &mut v[..] {
-                w.by = perm[w.by];
+                let cid = w.by;
+                if cid < KERNEL_CLAUSE {
+                    w.by = perm[w.by];
+                }
             }
         }
+        self.clauses.nb_clauses_before_reduce += 300;
         self.stats[Stat::NumOfReduction as usize] += 1;
         println!(
             "# DB::drop 1/2 {:>9}({:>8}) => {:>9}   Restart:: block {:>4} force {:>4}",
             nc,
-            self.fixed_len,
+            self.clauses.permanents.len(),
             new_len,
             self.stats[Stat::NumOfBlockRestart as usize],
             self.stats[Stat::NumOfRestart as usize],
@@ -152,13 +234,14 @@ impl ClauseManagement for Solver {
     }
     fn simplify_database(&mut self) -> () {
         debug_assert_eq!(self.decision_level(), 0);
-        let end = self.clauses.len();
+        // permanents
+        let end = self.clauses.permanents.len();
         // remove clauses containing new fixed literals
         let targets: Vec<Lit> = self.trail[self.num_solved_vars..]
             .iter()
             .map(|l| l.negate())
             .collect();
-        for mut c in &mut self.clauses {
+        for mut c in &mut self.clauses.permanents {
             c.lits.retain(|l| {
                 for t in &targets {
                     if t == l {
@@ -168,23 +251,26 @@ impl ClauseManagement for Solver {
                 true
             });
         }
-        let nc = self.clauses.len();
+        let nc = self.clauses.permanents.len();
         let mut purges = 0;
-        if self.clause_permutation.len() < nc {
+{
+        let perm = &mut self.clauses.permutation;
+        if perm.len() < nc {
             unsafe {
-                self.clause_permutation.reserve(nc + 1);
-                self.clause_permutation.set_len(nc + 1);
+                perm.reserve(nc + 1);
+                perm.set_len(nc + 1);
             }
         }
         // reinitialize the permutation table.
-        for x in &mut self.clause_permutation {
+        for x in perm {
             *x = 0;
         }
+}
         // set key
-        for ci in 1..self.clauses.len() {
+        for ci in 1..self.clauses.permanents.len() {
             unsafe {
-                let c = &mut self.clauses[ci] as *mut Clause;
-                if self.satisfies(&self.clauses[ci]) {
+                let c = &mut self.clauses.permanents[ci] as *mut Clause;
+                if self.satisfies(&self.clauses.permanents[ci]) {
                     (*c).index = MAX;
                     purges += 1;
                 } else if (*c).lits.len() == 1 {
@@ -202,21 +288,24 @@ impl ClauseManagement for Solver {
                 }
             }
         }
-        self.clauses.retain(|ref c| c.index < MAX);
-        let new_end = self.clauses.len();
+        self.clauses.permanents.retain(|ref c| c.index < MAX);
+        let new_end = self.clauses.permanents.len();
         debug_assert_eq!(new_end, nc - purges);
+{
+        let perm = &mut self.clauses.permutation;
         for i in 1..new_end {
-            let old = self.clauses[i].index;
+            let old = self.clauses.permanents[i].index;
             debug_assert!(0 < old, "0 index");
-            self.clause_permutation[old] = i;
-            self.clauses[i].index = i;
+            perm[old] = i;
+            self.clauses.permanents[i].index = i;
         }
+}
         // clear the reasons of variables satisfied at level zero.
         for l in &self.trail {
             self.vars[l.vi() as usize].reason = NULL_CLAUSE;
         }
         let mut c0 = 0;
-        for c in &self.clauses[..] {
+        for c in &self.clauses.permanents[..] {
             if c.rank <= RANK_NEED {
                 c0 += 1;
             } else {
@@ -226,15 +315,15 @@ impl ClauseManagement for Solver {
         if new_end == end {
             return;
         }
-        self.fixed_len = c0;
-        self.clauses.truncate(new_end);
+        self.clauses.permanents.truncate(new_end);
         {
             // rebuild bi_watches
-            let (w0, wr) = self.bi_watches.split_first_mut().unwrap();
+            let perm = &mut self.clauses.permutation;
+           let (w0, wr) = self.bi_watches.split_first_mut().unwrap();
             w0.clear();
             for ws in wr {
                 while let Some(mut w) = ws.pop() {
-                    match self.clause_permutation[w.by] {
+                    match perm[w.by] {
                         0 => {}
                         x => {
                             w.by = x;
@@ -250,10 +339,11 @@ impl ClauseManagement for Solver {
         {
             // rebuild watches
             let (w0, wr) = self.watches.split_first_mut().unwrap();
+            let perm = &mut self.clauses.permutation;
             w0.clear();
             for ws in wr {
                 while let Some(mut w) = ws.pop() {
-                    match self.clause_permutation[w.by] {
+                    match perm[w.by] {
                         0 => {}
                         x => {
                             w.by = x;
@@ -269,8 +359,8 @@ impl ClauseManagement for Solver {
         println!(
             "# DB::simplify {:>9}({:>8}) => {:>9}   Restart:: block {:>4} force {:>4}",
             nc,
-            self.fixed_len,
-            self.clauses.len(),
+            self.clauses.permanents.len(),
+            self.clauses.deletables.len(),
             self.stats[Stat::NumOfBlockRestart as usize],
             self.stats[Stat::NumOfRestart as usize],
         );

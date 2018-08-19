@@ -1,4 +1,6 @@
 use clause::*;
+use clause_manage::ClauseMap;
+use clause_manage::ClauseReference;
 use clause_manage::ClauseManagement;
 use solver_propagate::SolveSAT;
 use solver_rollback::Restart;
@@ -58,9 +60,7 @@ pub enum Stat {
 pub struct Solver {
     /// Assignment Management
     pub vars: Vec<Var>,
-    pub clauses: Vec<Clause>,
-    /// fixed_len = |NULL| + |given|
-    pub fixed_len: usize,
+    pub clauses: ClauseMap,
     pub watches: WatchMap,
     pub bi_watches: WatchMap,
     pub trail: Vec<Lit>,
@@ -76,9 +76,7 @@ pub struct Solver {
     pub var_inc: f64,
     pub root_level: usize,
     /// Database Management
-    pub clause_permutation: Vec<usize>,
     pub cur_restart: usize,
-    pub nb_clauses_before_reduce: usize,
     pub num_solved_vars: usize,
     /// Working memory
     pub ok: bool,
@@ -117,8 +115,7 @@ impl Solver {
         let vdr = cfg.variable_decay_rate;
         let s = Solver {
             vars: Var::new_vars(nv),
-            clauses: new_clause_manager(nc),
-            fixed_len: 1 + nc,
+            clauses: ClauseMap::new(nc),
             watches: new_watch_map(nv * 2),
             bi_watches: new_watch_map(nv * 2),
             trail: Vec::with_capacity(nv),
@@ -131,9 +128,7 @@ impl Solver {
             cla_inc: cdr,
             var_inc: vdr,
             root_level: 0,
-            clause_permutation: (0..nc * 2).collect(),
             cur_restart: 1,
-            nb_clauses_before_reduce: 2000,
             num_solved_vars: 0,
             ok: true,
             an_seen: vec![0; nv + 1],
@@ -175,7 +170,7 @@ impl Solver {
         }
         false
     }
-    pub fn attach_clause(&mut self, mut c: Clause) -> ClauseIndex {
+    pub fn attach_clause(&mut self, learnt: bool, c: Clause) -> ClauseIndex {
         let len = c.lits.len();
         if len == 1 {
             self.enqueue(c.lits[0], NULL_CLAUSE);
@@ -183,9 +178,7 @@ impl Solver {
         }
         let w0 = c.lits[0];
         let w1 = c.lits[1];
-        let ci = self.clauses.len();
-        c.index = ci;
-        self.clauses.push(c);
+        let ci = self.clauses.push(learnt, c);
         if len == 2 {
             set_watch(&mut self.bi_watches, ci, w0, w1);
         } else {
@@ -195,14 +188,6 @@ impl Solver {
     }
     pub fn num_assigns(&self) -> usize {
         self.trail.len()
-    }
-    /// the number of given clause
-    /// The numeber might change after simplification
-    pub fn num_givencs(&self) -> usize {
-        self.fixed_len - 1 // 1 for NULL_CLAUSE
-    }
-    pub fn num_learnts(&self) -> usize {
-        self.clauses.len() - self.fixed_len
     }
     pub fn decision_level(&self) -> usize {
         self.trail_lim.len()
@@ -300,7 +285,6 @@ impl SatSolver for Solver {
             }
         }
         debug_assert_eq!(s.vars.len() - 1, cnf.num_of_variables);
-        s.fixed_len = s.clauses.len();
         (s, cnf)
     }
 }
