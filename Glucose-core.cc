@@ -490,7 +490,6 @@ void Solver::analyze(CRef confl, vec <Lit> &out_learnt, vec <Lit> &selectors, in
             c[0] = c[1], c[1] = tmp;
         }
         if(c.learnt()) {
-            parallelImportClauseDuringConflictAnalysis(c, confl);
             claBumpActivity(c);
         } else { // original clause
             if(!c.getSeen()) {
@@ -768,91 +767,9 @@ CRef Solver::propagate() {
             NextClause:;
         }
         ws.shrink(i - j);
-        // unaryWatches "propagation"
-        if(useUnaryWatched && confl == CRef_Undef) {
-            confl = propagateUnaryWatches(p);
-        }
     }
     propagations += num_props;
     simpDB_props -= num_props;
-    return confl;
-}
-
-/*_________________________________________________________________________________________________
-|
-|  propagateUnaryWatches : [Lit]  ->  [Clause*]
-|  
-|  Description:
-|    Propagates unary watches of Lit p, return a conflict 
-|    otherwise CRef_Undef
-|  
-|________________________________________________________________________________________________@*/
-CRef Solver::propagateUnaryWatches(Lit p) {
-    CRef confl = CRef_Undef;
-    Watcher *i, *j, *end;
-    vec <Watcher> &ws = unaryWatches[p];
-    for(i = j = (Watcher *) ws, end = i + ws.size(); i != end;) {
-        // Try to avoid inspecting the clause:
-        Lit blocker = i->blocker;
-        if(value(blocker) == l_True) {
-            *j++ = *i++;
-            continue;
-        }
-        // Make sure the false literal is data[1]:
-        CRef cr = i->cref;
-        Clause &c = ca[cr];
-        assert(c.getOneWatched());
-        Lit false_lit = ~p;
-        assert(c[0] == false_lit); // this is unary watch... No other choice if "propagated"
-        //if (c[0] == false_lit)
-        //c[0] = c[1], c[1] = false_lit;
-        //assert(c[1] == false_lit);
-        i++;
-        Watcher w = Watcher(cr, c[0]);
-        for(int k = 1; k < c.size(); k++) {
-            if(value(c[k]) != l_False) {
-                c[0] = c[k];
-                c[k] = false_lit;
-                unaryWatches[~c[0]].push(w);
-                goto NextClauseUnary;
-            }
-        }
-        // Did not find watch -- clause is empty under assignment:
-        *j++ = w;
-        confl = cr;
-        qhead = trail.size();
-        // Copy the remaining watches:
-        while(i < end)
-            *j++ = *i++;
-        // We can add it now to the set of clauses when backtracking
-        //printf("*");
-        if(promoteOneWatchedClause) {
-            stats[nbPromoted]++;
-            // Let's find the two biggest decision levels in the clause s.t. it will correctly be propagated when we'll backtrack
-            int maxlevel = -1;
-            int index = -1;
-            for(int k = 1; k < c.size(); k++) {
-                assert(value(c[k]) == l_False);
-                assert(level(var(c[k])) <= level(var(c[0])));
-                if(level(var(c[k])) > maxlevel) {
-                    index = k;
-                    maxlevel = level(var(c[k]));
-                }
-            }
-            detachClausePurgatory(cr, true); // TODO: check that the cleanAll is ok (use ",true" otherwise)
-            assert(index != -1);
-            Lit tmp = c[1];
-            c[1] = c[index], c[index] = tmp;
-            attachClause(cr);
-            // TODO used in function ParallelSolver::reportProgressArrayImports
-            //Override :-(
-            //goodImportsFromThreads[ca[cr].importedFrom()]++;
-            ca[cr].setOneWatched(false);
-            ca[cr].setExported(2);
-        }
-        NextClauseUnary:;
-    }
-    ws.shrink(i - j);
     return confl;
 }
 
@@ -864,8 +781,6 @@ CRef Solver::propagateUnaryWatches(Lit p) {
 |    Remove half of the learnt clauses, minus the clauses locked by the current assignment. Locked
 |    clauses are clauses that are reason to some assignment. Binary clauses are never removed.
 |________________________________________________________________________________________________@*/
-
-
 void Solver::reduceDB() {
     int i, j;
     stats[nbReduceDB]++;
@@ -1056,16 +971,9 @@ lbool Solver::search(int nof_conflicts) {
     bool aDecisionWasMade = false;
     starts++;
     for(; ;) {
-        if(decisionLevel() == 0) { // We import clauses FIXME: ensure that we will import clauses enventually (restart after some point)
-            parallelImportUnaryClauses();
-            if(parallelImportClauses())
-                return l_False;
-        }
         CRef confl = propagate();
         if(confl != CRef_Undef) {
             newDescent = false;
-            if(parallelJobIsFinished())
-                return l_Undef;
             if(!aDecisionWasMade)
                 stats[noDecisionConflict]++;
             aDecisionWasMade = false;
@@ -1085,7 +993,6 @@ lbool Solver::search(int nof_conflicts) {
             }
             if(decisionLevel() == 0) {
                 return l_False;
-
             }
             if(adaptStrategies && conflicts == 100000) {
                 cancelUntil(0);
@@ -1113,7 +1020,6 @@ lbool Solver::search(int nof_conflicts) {
             if(learnt_clause.size() == 1) {
                 uncheckedEnqueue(learnt_clause[0]);
                 stats[nbUn]++;
-                parallelExportUnaryClause(learnt_clause[0]);
             } else {
                 CRef cr;
                 if(chanseokStrategy && nblevels <= coLBDBound) {
@@ -1131,7 +1037,6 @@ lbool Solver::search(int nof_conflicts) {
                 if(ca[cr].size() == 2) stats[nbBin]++; // stats
                 attachClause(cr);
                 lastLearntClause = cr; // Use in multithread (to hard to put inside ParallelSolver)
-                parallelExportClauseDuringSearch(ca[cr]);
                 uncheckedEnqueue(learnt_clause[0], cr);
 
             }
@@ -1158,8 +1063,6 @@ lbool Solver::search(int nof_conflicts) {
                 if(learnts.size() > 0) {
                     curRestart = (conflicts / nbclausesbeforereduce) + 1;
                     reduceDB();
-                    if(!panicModeIsEnabled())
-                        nbclausesbeforereduce += incReduceDB;
                 }
             }
             lastLearntClause = CRef_Undef;
@@ -1245,40 +1148,6 @@ lbool Solver::solve_(bool do_simp, bool turn_off_simp) // Parameters are useless
     double curTime = cpuTime();
     solves++;
     lbool status = l_Undef;
-    if(!incremental && verbosity >= 1) {
-        printf("c ========================================[ MAGIC CONSTANTS ]==============================================\n");
-        printf("c | Constants are supposed to work well together :-)                                                      |\n");
-        printf("c | however, if you find better choices, please let us known...                                           |\n");
-        printf("c |-------------------------------------------------------------------------------------------------------|\n");
-        if(adaptStrategies) {
-            printf("c | Adapt dynamically the solver after 100000 conflicts (restarts, reduction strategies...)               |\n");
-            printf("c |-------------------------------------------------------------------------------------------------------|\n");
-        }
-        printf("c |                                |                                |                                     |\n");
-        printf("c | - Restarts:                    | - Reduce Clause DB:            | - Minimize Asserting:               |\n");
-        if(chanseokStrategy) {
-            printf("c |   * LBD Queue    : %6d      |     chanseok Strategy          |    * size < %3d                     |\n", lbdQueue.maxSize(),
-                   lbSizeMinimizingClause);
-            printf("c |   * Trail  Queue : %6d      |   * learnts size     : %6d  |    * lbd  < %3d                     |\n", trailQueue.maxSize(),
-                   firstReduceDB, lbLBDMinimizingClause);
-            printf("c |   * K            : %6.2f      |   * Bound LBD   : %6d       |                                     |\n", K, coLBDBound);
-            printf("c |   * R            : %6.2f      |   * Protected :  (lbd)< %2d     |                                     |\n", R, lbLBDFrozenClause);
-        } else {
-            printf("c |   * LBD Queue    : %6d      |   * First     : %6d         |    * size < %3d                     |\n", lbdQueue.maxSize(),
-                   nbclausesbeforereduce, lbSizeMinimizingClause);
-            printf("c |   * Trail  Queue : %6d      |   * Inc       : %6d         |    * lbd  < %3d                     |\n", trailQueue.maxSize(), incReduceDB,
-                   lbLBDMinimizingClause);
-            printf("c |   * K            : %6.2f      |   * Special   : %6d         |                                     |\n", K, specialIncReduceDB);
-            printf("c |   * R            : %6.2f      |   * Protected :  (lbd)< %2d     |                                     |\n", R, lbLBDFrozenClause);
-        }
-        printf("c |                                |                                |                                     |\n");
-        printf("c ==================================[ Search Statistics (every %6d conflicts) ]=========================\n", verbEveryConflicts);
-        printf("c |                                                                                                       |\n");
-
-        printf("c |          RESTARTS           |          ORIGINAL         |              LEARNT              | Progress |\n");
-        printf("c |       NB   Blocked  Avg Cfc |    Vars  Clauses Literals |   Red   Learnts    LBD2  Removed |          |\n");
-        printf("c =========================================================================================================\n");
-    }
     // Search:
     int curr_restarts = 0;
     while(status == l_Undef) {
@@ -1287,8 +1156,6 @@ lbool Solver::solve_(bool do_simp, bool turn_off_simp) // Parameters are useless
         if(!withinBudget()) break;
         curr_restarts++;
     }
-    if(!incremental && verbosity >= 1)
-        printf("c =========================================================================================================\n");
     if(status == l_True) {
         // Extend & copy model:
         model.growTo(nVars());
@@ -1321,59 +1188,8 @@ static Var mapVar(Var x, vec <Var> &map, Var &max) {
     return map[x];
 }
 
-void Solver::toDimacs(FILE *f, Clause &c, vec <Var> &map, Var &max) {
-    if(satisfied(c)) return;
-    for(int i = 0; i < c.size(); i++)
-        if(value(c[i]) != l_False)
-            fprintf(f, "%s%d ", sign(c[i]) ? "-" : "", mapVar(var(c[i]), map, max) + 1);
-    fprintf(f, "0\n");
-}
-
-void Solver::toDimacs(const char *file, const vec <Lit> &assumps) {
-    FILE *f = fopen(file, "wr");
-    if(f == NULL)
-        fprintf(stderr, "could not open file %s\n", file), exit(1);
-    toDimacs(f, assumps);
-    fclose(f);
-}
-
-void Solver::toDimacs(FILE *f, const vec <Lit> &assumps) {
-    // Handle case when solver is in contradictory state:
-    if(!ok) {
-        fprintf(f, "p cnf 1 2\n1 0\n-1 0\n");
-        return;
-    }
-    vec <Var> map;
-    Var max = 0;
-    // Cannot use removeClauses here because it is not safe
-    // to deallocate them at this point. Could be improved.
-    int cnt = 0;
-    for(int i = 0; i < clauses.size(); i++)
-        if(!satisfied(ca[clauses[i]]))
-            cnt++;
-    for(int i = 0; i < clauses.size(); i++)
-        if(!satisfied(ca[clauses[i]])) {
-            Clause &c = ca[clauses[i]];
-            for(int j = 0; j < c.size(); j++)
-                if(value(c[j]) != l_False)
-                    mapVar(var(c[j]), map, max);
-        }
-    // Assumptions are added as unit clauses:
-    cnt += assumptions.size();
-    fprintf(f, "p cnf %d %d\n", max, cnt);
-    for(int i = 0; i < assumptions.size(); i++) {
-        assert(value(assumptions[i]) != l_False);
-        fprintf(f, "%s%d 0\n", sign(assumptions[i]) ? "-" : "", mapVar(var(assumptions[i]), map, max) + 1);
-    }
-    for(int i = 0; i < clauses.size(); i++)
-        toDimacs(f, ca[clauses[i]], map, max);
-    if(verbosity > 0)
-        printf("Wrote %d clauses with %d variables.\n", cnt, max);
-}
-
 //=================================================================================================
 // Garbage Collection methods:
-
 void Solver::relocAll(ClauseAllocator &to) {
     // All watchers:
     // for (int i = 0; i < watches.size(); i++)
@@ -1421,35 +1237,4 @@ void Solver::garbageCollect() {
         printf("|  Garbage collection:   %12d bytes => %12d bytes             |\n",
                ca.size() * ClauseAllocator::Unit_Size, to.size() * ClauseAllocator::Unit_Size);
     to.moveTo(ca);
-}
-
-//--------------------------------------------------------------
-// Functions related to MultiThread.
-// Useless in case of single core solver (aka original glucose)
-// Keep them empty if you just use core solver
-//--------------------------------------------------------------
-
-bool Solver::panicModeIsEnabled() {
-    return false;
-}
-
-void Solver::parallelImportUnaryClauses() {
-}
-
-bool Solver::parallelImportClauses() {
-    return false;
-}
-
-void Solver::parallelExportUnaryClause(Lit p) {
-}
-
-void Solver::parallelExportClauseDuringSearch(Clause &c) {
-}
-
-bool Solver::parallelJobIsFinished() {
-    // Parallel: another job has finished let's quit
-    return false;
-}
-
-void Solver::parallelImportClauseDuringConflictAnalysis(Clause &c, CRef confl) {
 }
