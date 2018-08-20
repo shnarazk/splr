@@ -209,7 +209,7 @@ impl ClauseManagement for Solver {
         self.clauses.next_reduction += DB_INC_SIZE + (self.c_lvl.0 as usize);
         self.stats[Stat::NumOfReduction as usize] += 1;
         println!(
-            "# DB::drop 1/2 {:>9}+{:>8} => {:>9}+{:>8}   Restart:: block {:>4} force {:>4}",
+            "# DB::drop 1/2 {:>9} +{:>8} => {:>9} +{:>8}   Restart:: block {:>4} force {:>4}",
             nc,
             self.clauses.permanents.len(),
             new_len,
@@ -312,6 +312,9 @@ impl ClauseManagement for Solver {
         let new_d_end = self.clauses.deletables.len();
         debug_assert_eq!(new_p_end, p_end - p_purges);
         debug_assert_eq!(new_d_end, d_end - d_purges);
+        if new_p_end == p_end && new_d_end == d_end {
+            return;
+        }
         {
             let p_perm = &mut self.clauses.permutation_per;
             for i in 0..new_p_end {
@@ -385,7 +388,7 @@ impl ClauseManagement for Solver {
             }
         }
         println!(
-            "# DB::simplify {:>9}+{:>8} => {:>9}+{:>8}   Restart:: block {:>4} force {:>4}",
+            "# DB::simplify {:>9} +{:>8} => {:>9} +{:>8}   Restart:: block {:>4} force {:>4}",
             d_end,
             p_end,
             new_d_end,

@@ -1,5 +1,6 @@
 extern crate splr;
 use splr::solver::{Certificate, SatSolver, Solver, Stat};
+use splr::types::EmaKind;
 use std::env;
 
 fn main() {
@@ -46,7 +47,8 @@ fn report_stat(s: &Solver) -> () {
         s.clauses.deletables.len(),
     );
     println!(
-        "Ema_Asg:(s{}, f{}), Ema-LBD:(s{}, f{})",
+        "EMA:: Asg (s:{:>.2}, f:{:>.2}), LBD (s:{:>.2}, f:{:>.2}), DL (conflict:{:>.2}, backjump:{:>.2})",
         s.ema_asg.slow, s.ema_asg.fast, s.ema_lbd.slow, s.ema_lbd.fast,
+        s.c_lvl.get(), s.b_lvl.get(),
     );
 }
