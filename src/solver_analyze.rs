@@ -1,5 +1,6 @@
 use clause::{Clause, RANK_NEED};
 use clause_manage::ClauseManagement;
+use clause_manage::ClauseReference;
 use solver::Solver;
 use types::*;
 use var_manage::VarSelect;
@@ -25,7 +26,7 @@ impl CDCL for Solver {
         let mut path_cnt = 0;
         loop {
             unsafe {
-                let c = &mut self.clauses[ci] as *mut Clause;
+                let c = self.clauses.mref(ci) as *mut Clause;
                 debug_assert_ne!(ci, NULL_CLAUSE);
                 // println!("  analyze.loop {}", (*c));
                 let d = (*c).rank;
@@ -98,7 +99,7 @@ impl CDCL for Solver {
         {
             self.an_level_map_key += 1;
             if 10_000_000 < self.an_level_map_key {
-                self.an_level_map_key = 0;
+                self.an_level_map_key = 1;
             }
             for i in 1..n {
                 let l = self.an_learnt_lits[i];
@@ -125,7 +126,7 @@ impl CDCL for Solver {
             let l = self.an_last_dl[i];
             let vi = l.vi();
             let ci = self.vars[vi].reason;
-            let len = self.clauses[ci].lits.len();
+            let len = self.clauses.iref(ci).lits.len();
             if r < len {
                 self.bump_vi(vi);
             }
@@ -165,7 +166,7 @@ impl CDCL for Solver {
     fn analyze_final(&mut self, ci: ClauseIndex, skip_first: bool) -> () {
         self.conflicts.clear();
         if self.root_level != 0 {
-            for l in &self.clauses[ci].lits[(if skip_first { 1 } else { 0 })..] {
+            for l in &self.clauses.iref(ci).lits[(if skip_first { 1 } else { 0 })..] {
                 let vi = l.vi();
                 if 0 < self.vars[vi].level {
                     self.an_seen[vi] = 1;
@@ -184,7 +185,7 @@ impl CDCL for Solver {
                     if self.vars[vi].reason == NULL_CLAUSE {
                         self.conflicts.push(l.negate());
                     } else {
-                        for l in &self.clauses[ci].lits[1..] {
+                        for l in &self.clauses.iref(ci).lits[1..] {
                             let vi = l.vi();
                             if 0 < self.vars[vi].level {
                                 self.an_seen[vi] = 1;
@@ -208,13 +209,17 @@ impl Solver {
         while let Some(sl) = self.an_stack.pop() {
             // println!("analyze_removable.loop {:?}", self.an_stack);
             let ci = self.vars[sl.vi()].reason;
-            if self.clauses[ci].lits.len() == 2 {
-                let val = self.assigned(self.clauses[ci].lits[0]);
-                if val == LFALSE {
-                    self.clauses[ci].lits.swap(0, 1);
-                }
+            let c0;
+            let len;
+            {
+                let cl = &self.clauses.iref(ci).lits;
+                len = cl.len();
+                c0 = cl[0];
             }
-            for q in &self.clauses[ci].lits[1..] {
+            if len == 2 && self.assigned(c0) == LFALSE {
+                self.clauses.mref(ci).lits.swap(0, 1);
+            }
+            for q in &self.clauses.iref(ci).lits[1..] {
                 let vi = q.vi();
                 let lv = self.vars[vi].level;
                 if self.an_seen[vi] != 1 && lv != 0 {
@@ -240,7 +245,7 @@ impl Solver {
             return;
         }
         unsafe {
-            let key = self.an_level_map[0];
+            let key = self.an_level_map_key;
             let vec = &mut self.an_learnt_lits as *mut Vec<Lit>;
             let nblevel = self.lbd_of(&*vec);
             if 6 < nblevel {
