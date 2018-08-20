@@ -217,7 +217,8 @@ impl ClauseManagement for Solver {
     }
     fn simplify_database(&mut self) -> () {
         debug_assert_eq!(self.decision_level(), 0);
-        let end = self.clauses.permanents.len();
+        let p_end = self.clauses.permanents.len();
+        let d_end = self.clauses.deletables.len();
         // remove unsatisfiable literals in clauses
         let targets: Vec<Lit> = self.trail[self.num_solved_vars..]
             .iter()
@@ -233,17 +234,38 @@ impl ClauseManagement for Solver {
                 true
             });
         }
-        let mut purges = 0;
+        for mut c in &mut self.clauses.deletables {
+            c.lits.retain(|l| {
+                for t in &targets {
+                    if t == l {
+                        return false;
+                    }
+                }
+                true
+            });
+        }
+        let mut p_purges = 0;
+        let mut d_purges = 0;
         {
-            let perm = &mut self.clauses.permutation_per;
-            if perm.len() < end {
+            let p_perm = &mut self.clauses.permutation_per;
+            if p_perm.len() < p_end {
                 unsafe {
-                    perm.reserve(end);
-                    perm.set_len(end);
+                    p_perm.reserve(p_end);
+                    p_perm.set_len(p_end);
+                }
+            }
+            let d_perm = &mut self.clauses.permutation_del;
+            if d_perm.len() < d_end {
+                unsafe {
+                    d_perm.reserve(d_end);
+                    d_perm.set_len(d_end);
                 }
             }
             // reinitialize the permutation table.
-            for x in perm {
+            for x in p_perm {
+                *x = 0;
+            }
+            for x in d_perm {
                 *x = 0;
             }
         }
@@ -253,87 +275,118 @@ impl ClauseManagement for Solver {
                 let c = &mut self.clauses.permanents[ci] as *mut Clause;
                 if self.satisfies(&self.clauses.permanents[ci]) {
                     (*c).index = MAX;
-                    purges += 1;
+                    p_purges += 1;
+                } else if (*c).lits.len() == 1 {
+                    if !self.enqueue((*c).lits[0], NULL_CLAUSE) {
+                        self.ok = false;
+                    }
+                    (*c).index = MAX;
+                }
+            }
+        }
+        for ci in 1..self.clauses.deletables.len() {
+            unsafe {
+                let c = &mut self.clauses.deletables[ci] as *mut Clause;
+                if self.satisfies(&self.clauses.deletables[ci]) {
+                    (*c).index = MAX;
+                    d_purges += 1;
                 } else if (*c).lits.len() == 1 {
                     if !self.enqueue((*c).lits[0], NULL_CLAUSE) {
                         self.ok = false;
                     }
                     (*c).index = MAX;
                 } else {
-                    // let new = self.lbd_of(&(*c).lits);
-                    // if new < (*c).rank {
-                    //     (*c).rank = new;
-                    // }
+                    let new = self.lbd_of(&(*c).lits);
+                    if new < (*c).rank {
+                        (*c).rank = new;
+                    }
                 }
             }
         }
         self.clauses.permanents.retain(|ref c| c.index < MAX);
-        let new_end = self.clauses.permanents.len();
-        debug_assert_eq!(new_end, end - purges);
+        self.clauses.deletables.retain(|ref c| c.index < MAX);
+        let new_p_end = self.clauses.permanents.len();
+        let new_d_end = self.clauses.deletables.len();
+        debug_assert_eq!(new_p_end, p_end - p_purges);
+        debug_assert_eq!(new_d_end, d_end - d_purges);
         {
-            let perm = &mut self.clauses.permutation_per;
-            for i in 0..new_end {
+            let p_perm = &mut self.clauses.permutation_per;
+            for i in 0..new_p_end {
                 let old = self.clauses.permanents[i].index;
-                perm[old ^ KERNEL_CLAUSE] = i + KERNEL_CLAUSE;
+                p_perm[old ^ KERNEL_CLAUSE] = i + KERNEL_CLAUSE;
                 self.clauses.permanents[i].index = i + KERNEL_CLAUSE;
+            }
+        }
+        {
+            let d_perm = &mut self.clauses.permutation_del;
+            for i in 0..new_d_end {
+                let old = self.clauses.deletables[i].index;
+                d_perm[old] = i;
+                self.clauses.deletables[i].index = i;
             }
         }
         // clear the reasons of variables satisfied at level zero.
         for l in &self.trail {
             self.vars[l.vi() as usize].reason = NULL_CLAUSE;
         }
-        if new_end == end {
-            return;
-        }
-        self.clauses.permanents.truncate(new_end);
+        self.clauses.permanents.truncate(new_p_end);
+        self.clauses.deletables.truncate(new_d_end);
         {
             // rebuild bi_watches
-            let perm = &mut self.clauses.permutation_per;
-            let (w0, wr) = self.bi_watches.split_first_mut().unwrap();
-            w0.clear();
-            for ws in wr {
-                while let Some(mut w) = ws.pop() {
-                    match perm[w.by ^ KERNEL_CLAUSE] {
-                        0 => {}
-                        x => {
-                            w.by = x;
-                            w0.push(w);
-                        }
-                    }
-                }
-                while let Some(w) = w0.pop() {
-                    ws.push(w);
-                }
-            }
-        }
-        {
-            // rebuild watches
-            let (w0, wr) = self.watches.split_first_mut().unwrap();
-            let perm = &mut self.clauses.permutation_per;
-            w0.clear();
-            for ws in wr {
-                while let Some(mut w) = ws.pop() {
-                    if KERNEL_CLAUSE & w.by != 0 {
-                        match perm[w.by ^ KERNEL_CLAUSE] {
+            let p_perm = &mut self.clauses.permutation_per;
+            let d_perm = &mut self.clauses.permutation_del;
+            for i in 2..self.bi_watches.len() {
+                {
+                    let (w0, wr) = self.bi_watches.split_first_mut().unwrap();
+                    let ws = &mut wr[i - 1];
+                    while let Some(mut w) = ws.pop() {
+                        match w.by {
                             0 => {}
-                            x => {
-                                w.by = x;
+                            b if w.by & KERNEL_CLAUSE != 0 => {
+                                w.by = p_perm[b ^ KERNEL_CLAUSE];
+                                w0.push(w);
+                            }
+                            b => {
+                                w.by = d_perm[b];
                                 w0.push(w);
                             }
                         }
                     }
                 }
-                while let Some(w) = w0.pop() {
-                    ws.push(w);
+                self.bi_watches.swap(0, i);
+            }
+        }
+        {
+            // rebuild watches
+            let p_perm = &mut self.clauses.permutation_per;
+            let d_perm = &mut self.clauses.permutation_del;
+            for i in 2..self.watches.len() {
+                {
+                    let (w0, wr) = self.watches.split_first_mut().unwrap();
+                    let ws = &mut wr[i - 1];
+                    while let Some(mut w) = ws.pop() {
+                        match w.by {
+                            0 => {}
+                            b if w.by & KERNEL_CLAUSE != 0 => {
+                                w.by = p_perm[b ^ KERNEL_CLAUSE];
+                                w0.push(w);
+                            }
+                            b => {
+                                w.by = d_perm[b];
+                                w0.push(w);
+                            }
+                        }
+                    }
                 }
+                self.watches.swap(0, i);
             }
         }
         println!(
             "# DB::simplify {:>9}+{:>8} => {:>9}+{:>8}   Restart:: block {:>4} force {:>4}",
-            self.clauses.deletables.len(),
-            end,
-            self.clauses.deletables.len(),
-            new_end,
+            d_end,
+            p_end,
+            new_d_end,
+            new_p_end,
             self.stats[Stat::NumOfBlockRestart as usize],
             self.stats[Stat::NumOfRestart as usize],
         );
