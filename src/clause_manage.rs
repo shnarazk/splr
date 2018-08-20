@@ -28,11 +28,11 @@ pub trait ClauseManagement {
 #[derive(Debug)]
 pub struct ClauseMap {
     pub init_size_of_permanents: usize,
-    pub nb_clauses_before_reduce: usize,
+    pub next_reduction: usize,
     pub permanents: Vec<Clause>,
     pub deletables: Vec<Clause>,
-    pub permutation_per: Vec<ClauseIndex>,
-    pub permutation_del: Vec<ClauseIndex>,
+    permutation_per: Vec<ClauseIndex>,
+    permutation_del: Vec<ClauseIndex>,
 }
 
 impl ClauseMap {
@@ -41,7 +41,7 @@ impl ClauseMap {
         p.push(Clause::null());
         ClauseMap {
             init_size_of_permanents: n,
-            nb_clauses_before_reduce: DB_INIT_SIZE,
+            next_reduction: DB_INIT_SIZE,
             permanents: Vec::with_capacity(n),
             deletables: p,
             permutation_per: Vec::with_capacity(n),
@@ -90,6 +90,7 @@ impl ClauseReference for ClauseMap {
 }
 
 impl ClauseManagement for Solver {
+    #[inline]
     fn bump_ci(&mut self, ci: ClauseIndex) -> () {
         debug_assert_ne!(ci, 0);
         let a = self.clauses.iref(ci).activity + self.cla_inc;
@@ -175,7 +176,9 @@ impl ClauseManagement for Solver {
             for mut i in 0..nc {
                 perm[self.clauses.deletables[i].index] = i;
             }
-            self.clauses.deletables.retain(|c| perm[c.index] < nkeep || c.locked);
+            self.clauses
+                .deletables
+                .retain(|c| perm[c.index] < nkeep || c.locked);
         }
         let new_len = self.clauses.deletables.len();
         // update permutation table.
@@ -203,7 +206,7 @@ impl ClauseManagement for Solver {
                 }
             }
         }
-        self.clauses.nb_clauses_before_reduce += DB_INC_SIZE + (self.c_lvl.0 as usize);
+        self.clauses.next_reduction += DB_INC_SIZE + (self.c_lvl.0 as usize);
         self.stats[Stat::NumOfReduction as usize] += 1;
         println!(
             "# DB::drop 1/2 {:>9}+{:>8} => {:>9}+{:>8}   Restart:: block {:>4} force {:>4}",

@@ -175,9 +175,9 @@ impl SolveSAT for Solver {
                     self.decay_cla_activity();
                     // glucose reduction
                     let conflicts = self.stats[Stat::NumOfBackjump as usize] as usize;
-                    if self.cur_restart * self.clauses.nb_clauses_before_reduce <= conflicts {
+                    if self.cur_restart * self.clauses.next_reduction <= conflicts {
                         self.cur_restart = ((conflicts as f64)
-                            / (self.clauses.nb_clauses_before_reduce as f64))
+                            / (self.clauses.next_reduction as f64))
                             as usize + 1;
                         self.reduce_database();
                     }

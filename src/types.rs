@@ -58,6 +58,7 @@ pub trait LiteralEncoding {
 }
 
 impl LiteralEncoding for Lit {
+    #[inline]
     fn vi(&self) -> VarIndex {
         (self / 2) as VarIndex
     }
@@ -68,6 +69,7 @@ impl LiteralEncoding for Lit {
             (*self as i32) / -2
         }
     }
+    #[inline]
     fn lbool(&self) -> Lbool {
         if self.positive() {
             LTRUE
@@ -75,9 +77,11 @@ impl LiteralEncoding for Lit {
             LFALSE
         }
     }
+    #[inline]
     fn positive(&self) -> bool {
         self % 2 == 0
     }
+    #[inline]
     fn negate(&self) -> Lit {
         self ^ 1
     }
@@ -89,6 +93,7 @@ pub trait VarIndexEncoding {
 }
 
 impl VarIndexEncoding for VarIndex {
+    #[inline]
     fn lit(&self, p: Lbool) -> Lit {
         (if p == LFALSE { 2 * self + 1 } else { 2 * self }) as Lit
     }
@@ -103,6 +108,7 @@ pub const LFALSE: i8 = -1;
 /// unbound bool.
 pub const BOTTOM: i8 = 0;
 
+#[inline]
 pub fn negate_bool(b: Lbool) -> Lbool {
     match b {
         LTRUE => LFALSE,
@@ -228,6 +234,7 @@ pub fn new_watch_map(nv: usize) -> WatchMap {
     vec
 }
 
+#[inline]
 pub fn set_watch(w: &mut [Vec<Watch>], ci: ClauseIndex, w0: Lit, w1: Lit) -> () {
     debug_assert_ne!(ci, NULL_CLAUSE);
     w[w0.negate() as usize].push(Watch::new(w1, ci));

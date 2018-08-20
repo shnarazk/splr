@@ -152,6 +152,7 @@ impl Solver {
         };
         s
     }
+    #[inline]
     pub fn assigned(&self, l: Lit) -> Lbool {
         let x = self.vars[l.vi()].assign;
         if x == BOTTOM {
@@ -162,6 +163,7 @@ impl Solver {
             negate_bool(x)
         }
     }
+    #[inline]
     pub fn satisfies(&self, c: &Clause) -> bool {
         for l in &c.lits {
             if self.assigned(*l) == LTRUE {
@@ -189,6 +191,7 @@ impl Solver {
     pub fn num_assigns(&self) -> usize {
         self.trail.len()
     }
+    #[inline]
     pub fn decision_level(&self) -> usize {
         self.trail_lim.len()
     }
