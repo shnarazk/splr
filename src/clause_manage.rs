@@ -6,7 +6,7 @@ use types::*;
 
 pub const KERNEL_CLAUSE: usize = 0xc00_0000_0000_0000;
 const DB_INIT_SIZE: usize = 1000;
-const DB_INC_SIZE: usize = 100;
+const DB_INC_SIZE: usize = 50;
 
 pub trait ClauseReference {
     fn iref(&self, cid: ClauseIndex) -> &Clause;
@@ -203,7 +203,7 @@ impl ClauseManagement for Solver {
                 }
             }
         }
-        self.clauses.nb_clauses_before_reduce += DB_INC_SIZE; //(DB_INC_SIZE / (1.0 + self.ema_lbd.slow)) as usize;
+        self.clauses.nb_clauses_before_reduce += DB_INC_SIZE + (self.c_lvl.0 as usize);
         self.stats[Stat::NumOfReduction as usize] += 1;
         println!(
             "# DB::drop 1/2 {:>9}+{:>8} => {:>9}+{:>8}   Restart:: block {:>4} force {:>4}",
