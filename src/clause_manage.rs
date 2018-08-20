@@ -203,6 +203,9 @@ impl ClauseManagement for Solver {
                 let cid = w.by;
                 if cid & KERNEL_CLAUSE == 0 {
                     w.by = perm[w.by];
+                    if w.by == 0 {
+                        w.to = NULL_LIT;
+                    }
                 }
             }
         }
@@ -347,7 +350,7 @@ impl ClauseManagement for Solver {
                     let ws = &mut wr[i - 1];
                     while let Some(mut w) = ws.pop() {
                         match w.by {
-                            0 => {}
+                            0 => { }
                             b if w.by & KERNEL_CLAUSE != 0 => {
                                 w.by = p_perm[b ^ KERNEL_CLAUSE];
                                 w0.push(w);
@@ -372,14 +375,18 @@ impl ClauseManagement for Solver {
                     let ws = &mut wr[i - 1];
                     while let Some(mut w) = ws.pop() {
                         match w.by {
-                            0 => {}
+                            0 => { }
                             b if w.by & KERNEL_CLAUSE != 0 => {
                                 w.by = p_perm[b ^ KERNEL_CLAUSE];
-                                w0.push(w);
+                                if w.by != 0 {
+                                    w0.push(w);
+                                }
                             }
                             b => {
                                 w.by = d_perm[b];
-                                w0.push(w);
+                                if w.by != 0 {
+                                    w0.push(w);
+                                }
                             }
                         }
                     }
@@ -387,6 +394,8 @@ impl ClauseManagement for Solver {
                 self.watches.swap(0, i);
             }
         }
+        debug_assert!(self.watches[0].is_empty());
+        debug_assert!(self.watches[1].is_empty());
         println!(
             "# DB::simplify {:>9} +{:>8} => {:>9} +{:>8}   Restart:: block {:>4} force {:>4}",
             d_end,
