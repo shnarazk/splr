@@ -145,9 +145,7 @@ impl SolveSAT for Solver {
                 } else {
                     // self.dump(" before analyze");
                     let backtrack_level = self.analyze(ci);
-                    // println!(" conflict analyzed {:?}", vec2int(v));
                     self.cancel_until(max(backtrack_level as usize, root_lv));
-                    // println!(" backtracked to {}", backtrack_level);
                     let lbd;
                     if self.an_learnt_lits.len() == 1 {
                         let l = self.an_learnt_lits[0];
