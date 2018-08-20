@@ -28,7 +28,7 @@ impl SolveSAT for Solver {
             'next_bi_clause: for mut wi in 0..self.bi_watches[p_usize].len() {
                 let Watch { other, by, .. } = self.bi_watches[p as usize][wi];
                 if by == NULL_CLAUSE {
-                    self.watches[p as usize][wi].to = NULL_LIT;
+                    self.bi_watches[p as usize][wi].to = NULL_LIT;
                     continue 'next_bi_clause;
                 }
                 debug_assert_ne!(by, NULL_CLAUSE);
