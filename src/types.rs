@@ -119,7 +119,7 @@ pub trait EmaKind {
     fn update(&mut self, x: f64) -> f64;
 }
 
-/// Exponential Moving Average with a calibrator
+/// Exponential Moving Average pair
 #[derive(Debug)]
 pub struct Ema2 {
     pub fast: f64,
@@ -147,6 +147,50 @@ impl EmaKind for Ema2 {
         self.fast = &self.fe * x + (1.0 - &self.fe) * &self.fast;
         self.slow = &self.se * x + (1.0 - &self.se) * &self.slow;
         self.fast / self.slow
+    }
+}
+
+#[derive(Debug)]
+pub struct Ema(pub f64, f64, f64);
+
+/// Exponential Moving Average w/ a calibrator
+impl Ema {
+    pub fn new(s: i32) -> Ema {
+        Ema(0.0, 1.0 / s as f64, 0.0)
+    }
+}
+
+impl EmaKind for Ema {
+    fn get(&self) -> f64 {
+        self.0 / self.2
+    }
+    fn update(&mut self, x: f64) -> f64 {
+        let e = &self.1 * x + (1.0 - &self.1) * &self.0;
+        self.0 = e;
+        let c = &self.1 + (1.0 - &self.1) * &self.2;
+        self.2 = c;
+        e / c
+    }
+}
+
+/// Exponential Moving Average w/o a calibrator
+#[derive(Debug)]
+pub struct Ema_(pub f64, f64);
+
+impl Ema_ {
+    pub fn new(s: i32) -> Ema_ {
+        Ema_(0.0, 1.0 / s as f64)
+    }
+}
+
+impl EmaKind for Ema_ {
+    fn get(&self) -> f64 {
+        self.0 / self.1
+    }
+    fn update(&mut self, x: f64) -> f64 {
+        let e = &self.1 * x + (1.0 - &self.1) * &self.0;
+        self.0 = e;
+        e
     }
 }
 
@@ -188,49 +232,6 @@ pub fn set_watch(w: &mut [Vec<Watch>], ci: ClauseIndex, w0: Lit, w1: Lit) -> () 
     debug_assert_ne!(ci, NULL_CLAUSE);
     w[w0.negate() as usize].push(Watch::new(w1, ci));
     w[w1.negate() as usize].push(Watch::new(w0, ci));
-}
-
-#[derive(Debug)]
-pub struct Ema(f64, f64, f64);
-
-impl Ema {
-    pub fn new(s: i32) -> Ema {
-        Ema(0.0, 1.0 / s as f64, 0.0)
-    }
-}
-
-impl EmaKind for Ema {
-    fn get(&self) -> f64 {
-        self.0 / self.2
-    }
-    fn update(&mut self, x: f64) -> f64 {
-        let e = &self.1 * x + (1.0 - &self.1) * &self.0;
-        self.0 = e;
-        let c = &self.1 + (1.0 - &self.1) * &self.2;
-        self.2 = c;
-        e / c
-    }
-}
-
-/// Exponential Moving Average w/o a calibrator
-#[derive(Debug)]
-pub struct Ema_(f64, f64);
-
-impl Ema_ {
-    pub fn new(s: i32) -> Ema_ {
-        Ema_(0.0, 1.0 / s as f64)
-    }
-}
-
-impl EmaKind for Ema_ {
-    fn get(&self) -> f64 {
-        self.0 / self.1
-    }
-    fn update(&mut self, x: f64) -> f64 {
-        let e = &self.1 * x + (1.0 - &self.1) * &self.0;
-        self.0 = e;
-        e
-    }
 }
 
 /// data about a problem.
