@@ -25,32 +25,23 @@ impl SolveSAT for Solver {
             let p_usize: usize = p as usize;
             self.q_head += 1;
             self.stats[Stat::NumOfPropagation as usize] += 1;
-            'next_bi_clause: for mut wi in 0..self.bi_watches[p_usize].len() {
+            'next_bi_clause: for wi in 0..self.bi_watches[p_usize].len() {
                 let Watch { other, by, .. } = self.bi_watches[p as usize][wi];
                 if by == NULL_CLAUSE {
-                    self.bi_watches[p as usize][wi].to = NULL_LIT;
+                    assert_eq!(self.bi_watches[p as usize][wi].to, NULL_LIT);
                     continue 'next_bi_clause;
                 }
-                debug_assert_ne!(by, NULL_CLAUSE);
                 debug_assert_ne!(other, 0);
                 match self.assigned(other) {
                     LFALSE => return by,
                     LTRUE => continue 'next_bi_clause,
-                    _ => {
-                        {
-                            let mut cl = &mut self.clauses.mref(by).lits;
-                            if cl[0] == false_lit {
-                                cl.swap(0, 1);
-                            }
-                        }
-                        self.uncheck_enqueue(other, by);
-                    }
+                    _ => self.uncheck_enqueue(other, by),
                 }
             }
-            'next_clause: for mut wi in 0..self.watches[p_usize].len() {
+            'next_clause: for wi in 0..self.watches[p_usize].len() {
                 let Watch { other, by, .. } = self.watches[p as usize][wi];
                 if by == NULL_CLAUSE {
-                    self.watches[p as usize][wi].to = NULL_LIT;
+                    debug_assert_eq!(self.watches[p as usize][wi].to, NULL_LIT);
                     continue 'next_clause;
                 }
                 // We use `Watch.to` to keep the destination of propagation.

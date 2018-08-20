@@ -1,7 +1,7 @@
 use clause::Clause;
-use clause_manage::KERNEL_CLAUSE;
 use clause_manage::ClauseManagement;
 use clause_manage::ClauseReference;
+use clause_manage::KERNEL_CLAUSE;
 use solver::Solver;
 use types::*;
 use var_manage::VarSelect;
@@ -39,7 +39,10 @@ impl CDCL for Solver {
                     }
                 }
                 // println!("{}を対応", (*c));
-                for q in &(*c).lits[if p == NULL_LIT { 0 } else { 1 }..] {
+                'next_literal: for q in &(*c).lits {
+                    if (*q) == p {
+                        continue 'next_literal;
+                    }
                     let vi = q.vi();
                     let l = self.vars[vi].level;
                     debug_assert_ne!(self.vars[vi].assign, BOTTOM);
