@@ -170,7 +170,7 @@ impl Solver {
         }
         false
     }
-    pub fn attach_clause(&mut self, learnt: bool, c: Clause) -> ClauseIndex {
+    pub fn attach_clause(&mut self, c: Clause) -> ClauseIndex {
         let len = c.lits.len();
         if len == 1 {
             self.enqueue(c.lits[0], NULL_CLAUSE);
@@ -178,7 +178,7 @@ impl Solver {
         }
         let w0 = c.lits[0];
         let w1 = c.lits[1];
-        let ci = self.clauses.push(learnt, c);
+        let ci = self.clauses.push(c);
         if len == 2 {
             set_watch(&mut self.bi_watches, ci, w0, w1);
         } else {

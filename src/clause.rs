@@ -68,14 +68,14 @@ impl Ord for Clause {
 }
 
 impl Clause {
-    pub fn new(rank: usize, v: Vec<Lit>) -> Clause {
+    pub fn new(learnt: bool, rank: usize, v: Vec<Lit>) -> Clause {
         Clause {
             activity: 0.0,
             rank: rank,
             lits: v,
             index: 0,
             locked: false,
-            learnt: RANK_CONST < rank,
+            learnt: learnt,
         }
     }
     pub fn null() -> Clause {

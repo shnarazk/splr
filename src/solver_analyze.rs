@@ -1,4 +1,5 @@
-use clause::{Clause, RANK_NEED};
+use clause::Clause;
+use clause_manage::KERNEL_CLAUSE;
 use clause_manage::ClauseManagement;
 use clause_manage::ClauseReference;
 use solver::Solver;
@@ -30,7 +31,7 @@ impl CDCL for Solver {
                 debug_assert_ne!(ci, NULL_CLAUSE);
                 // println!("  analyze.loop {}", (*c));
                 let d = (*c).rank;
-                if RANK_NEED < d {
+                if ci != 0 && ci & KERNEL_CLAUSE == 0 {
                     self.bump_ci(ci);
                     let nblevel = self.lbd_of(&(*c).lits);
                     if nblevel < d {

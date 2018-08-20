@@ -1,15 +1,17 @@
-use clause::{Clause, RANK_CONST, RANK_NEED};
+use clause::Clause;
 use solver::{Solver, Stat};
 use solver_propagate::SolveSAT;
 use std::usize::MAX;
 use types::*;
 
-const KERNEL_CLAUSE: usize = 0xc00_0000_0000_0000;
+pub const KERNEL_CLAUSE: usize = 0xc00_0000_0000_0000;
+const DB_INIT_SIZE: usize = 1000;
+const DB_INC_SIZE: usize = 100;
 
 pub trait ClauseReference {
     fn iref(&self, cid: ClauseIndex) -> &Clause;
     fn mref(&mut self, cid: ClauseIndex) -> &mut Clause;
-    fn push(&mut self, learnt: bool, c: Clause) -> ClauseIndex;
+    fn push(&mut self, c: Clause) -> ClauseIndex;
     fn num_learnts(&self) -> usize;
 }
 
@@ -39,7 +41,7 @@ impl ClauseMap {
         p.push(Clause::null());
         ClauseMap {
             init_size_of_permanents: n,
-            nb_clauses_before_reduce: 3000,
+            nb_clauses_before_reduce: DB_INIT_SIZE,
             permanents: Vec::with_capacity(n),
             deletables: p,
             permutation_per: Vec::with_capacity(n),
@@ -69,9 +71,9 @@ impl ClauseReference for ClauseMap {
             &mut self.deletables[cid]
         }
     }
-    fn push(&mut self, learnt: bool, mut c: Clause) -> ClauseIndex {
+    fn push(&mut self, mut c: Clause) -> ClauseIndex {
         let cid: ClauseIndex;
-        if learnt && 2 < c.lits.len() {
+        if c.learnt && 2 < c.lits.len() {
             cid = self.deletables.len();
             c.index = cid;
             self.deletables.push(c);
@@ -125,7 +127,7 @@ impl ClauseManagement for Solver {
             0 => true,
             1 => self.enqueue(v[0], NULL_CLAUSE),
             _ => {
-                self.attach_clause(false, Clause::new(RANK_CONST, v));
+                self.attach_clause(Clause::new(false, 0, v));
                 true
             }
         }
@@ -138,7 +140,7 @@ impl ClauseManagement for Solver {
         } else {
             lbd = self.lbd_of(&v);
         }
-        let mut c = Clause::new(RANK_NEED + lbd, v);
+        let mut c = Clause::new(true, lbd, v);
         let mut i_max = 0;
         let mut lv_max = 0;
         // seek a literal with max level
@@ -152,7 +154,7 @@ impl ClauseManagement for Solver {
         }
         c.lits.swap(1, i_max);
         let l0 = c.lits[0];
-        let ci = self.attach_clause(true, c);
+        let ci = self.attach_clause(c);
         self.bump_ci(ci);
         self.uncheck_enqueue(l0, ci);
         lbd
@@ -169,14 +171,11 @@ impl ClauseManagement for Solver {
         // sort the range
         self.clauses.deletables.sort();
         {
+            let nkeep = 1 + nc / 2;
             for mut i in 0..nc {
                 perm[self.clauses.deletables[i].index] = i;
             }
-            let nkeep = 1 + nc / 2;
-            self.clauses
-                .deletables
-                .retain(|c| perm[c.index] < nkeep || c.locked);
-            // println!("start {}, end {}, nkeep {}, new len {}", start, nc, nkeep, self.clauses.len());
+            self.clauses.deletables.retain(|c| perm[c.index] < nkeep || c.locked);
         }
         let new_len = self.clauses.deletables.len();
         // update permutation table.
@@ -191,7 +190,7 @@ impl ClauseManagement for Solver {
         // rebuild reason
         for v in &mut self.vars[1..] {
             let cid = v.reason;
-            if cid < KERNEL_CLAUSE {
+            if cid & KERNEL_CLAUSE == 0 {
                 v.reason = perm[cid];
             }
         }
@@ -199,12 +198,12 @@ impl ClauseManagement for Solver {
         for v in &mut self.watches {
             for w in &mut v[..] {
                 let cid = w.by;
-                if cid < KERNEL_CLAUSE {
+                if cid & KERNEL_CLAUSE == 0 {
                     w.by = perm[w.by];
                 }
             }
         }
-        self.clauses.nb_clauses_before_reduce += (800.0 / (1.0 + self.ema_lbd.slow)) as usize;
+        self.clauses.nb_clauses_before_reduce += DB_INC_SIZE; //(DB_INC_SIZE / (1.0 + self.ema_lbd.slow)) as usize;
         self.stats[Stat::NumOfReduction as usize] += 1;
         println!(
             "# DB::drop 1/2 {:>9}+{:>8} => {:>9}+{:>8}   Restart:: block {:>4} force {:>4}",
@@ -234,7 +233,6 @@ impl ClauseManagement for Solver {
                 true
             });
         }
-
         let mut purges = 0;
         {
             let perm = &mut self.clauses.permutation_per;
@@ -262,12 +260,10 @@ impl ClauseManagement for Solver {
                     }
                     (*c).index = MAX;
                 } else {
-                    if RANK_NEED < (*c).rank {
-                        let new = self.lbd_of(&(*c).lits);
-                        if new < (*c).rank {
-                            (*c).rank = new;
-                        }
-                    }
+                    // let new = self.lbd_of(&(*c).lits);
+                    // if new < (*c).rank {
+                    //     (*c).rank = new;
+                    // }
                 }
             }
         }
@@ -286,14 +282,6 @@ impl ClauseManagement for Solver {
         for l in &self.trail {
             self.vars[l.vi() as usize].reason = NULL_CLAUSE;
         }
-        // let mut c0 = 0;
-        // for c in &self.clauses.permanents[..] {
-        //     if c.rank <= RANK_NEED {
-        //         c0 += 1;
-        //     } else {
-        //         break;
-        //     }
-        // }
         if new_end == end {
             return;
         }
@@ -351,9 +339,6 @@ impl ClauseManagement for Solver {
         );
     }
     fn lbd_of(&mut self, v: &[Lit]) -> usize {
-        if v.len() == 2 {
-            return RANK_NEED;
-        }
         let key;
         let key_old = self.lbd_seen[0];
         if 10_000_000 < key_old {
