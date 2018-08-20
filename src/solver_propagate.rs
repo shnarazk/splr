@@ -26,9 +26,9 @@ impl SolveSAT for Solver {
             self.q_head += 1;
             self.stats[Stat::NumOfPropagation as usize] += 1;
             'next_bi_clause: for wi in 0..self.bi_watches[p_usize].len() {
-                let Watch { other, by, .. } = self.bi_watches[p as usize][wi];
+                let Watch { other, by, .. } = self.bi_watches[p_usize][wi];
                 if by == NULL_CLAUSE {
-                    assert_eq!(self.bi_watches[p as usize][wi].to, NULL_LIT);
+                    debug_assert_eq!(self.bi_watches[p_usize][wi].to, NULL_LIT);
                     continue 'next_bi_clause;
                 }
                 debug_assert_ne!(other, 0);
@@ -39,14 +39,14 @@ impl SolveSAT for Solver {
                 }
             }
             'next_clause: for wi in 0..self.watches[p_usize].len() {
-                let Watch { other, by, .. } = self.watches[p as usize][wi];
+                let Watch { other, by, .. } = self.watches[p_usize][wi];
                 if by == NULL_CLAUSE {
-                    debug_assert_eq!(self.watches[p as usize][wi].to, NULL_LIT);
+                    debug_assert_eq!(self.watches[p_usize][wi].to, NULL_LIT);
                     continue 'next_clause;
                 }
                 // We use `Watch.to` to keep the destination of propagation.
                 if other != 0 && self.assigned(other) == LTRUE {
-                    self.watches[p as usize][wi].to = p;
+                    self.watches[p_usize][wi].to = p;
                     continue 'next_clause;
                 }
                 {
@@ -59,18 +59,13 @@ impl SolveSAT for Solver {
                 let uni: Lit;
                 let cid: ClauseIndex;
                 {
-                    let Clause {
-                        ref index,
-                        ref lits,
-                        ..
-                    } = self.clauses.iref(by);
-                    debug_assert_eq!(by, *index);
+                    let lits = &self.clauses.iref(by).lits;
                     debug_assert!(false_lit == lits[0] || false_lit == lits[1]);
                     // And the last literal in unit clause is at lits[0].
                     let first = lits[0];
                     let fv = self.assigned(first);
                     if fv == LTRUE {
-                        let w = &mut self.watches[p as usize][wi];
+                        let w = &mut self.watches[p_usize][wi];
                         w.to = p;
                         w.other = first;
                         continue 'next_clause;
@@ -78,7 +73,7 @@ impl SolveSAT for Solver {
                     for k in 2..lits.len() {
                         let lk = lits[k];
                         if self.assigned(lk) != LFALSE {
-                            let w = &mut self.watches[p as usize][wi];
+                            let w = &mut self.watches[p_usize][wi];
                             w.swap = k;
                             w.to = lk.negate();
                             w.other = lk;
@@ -88,7 +83,7 @@ impl SolveSAT for Solver {
                     if fv == LFALSE {
                         return by;
                     }
-                    let w = &mut self.watches[p as usize][wi];
+                    let w = &mut self.watches[p_usize][wi];
                     w.swap = 1;
                     w.to = p;
                     if other == lits[0] {
