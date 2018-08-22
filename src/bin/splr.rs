@@ -1,7 +1,10 @@
 extern crate splr;
+use splr::clause_manage::ClauseKind;
 use splr::solver::{Certificate, SatSolver, Solver, Stat};
 use splr::types::EmaKind;
 use std::env;
+
+const VERSION: &str = "Splr 0.0.1 No Id, A single storage";
 
 fn main() {
     // println!("splr 0.0.1 CARGO_MANIFEST_DIR = {}", env!("CARGO_MANIFEST_DIR"));
@@ -11,9 +14,7 @@ fn main() {
     for arg in &args {
         match arg {
             _ if arg.to_string() == "--version" => {
-                println!(
-                    "Splr 0.0.1  -- based on MiniSAT/Glucose (Many thanks to MiniSAT/Glucose team)"
-                );
+                println!("{}", VERSION);
             }
             _ if (&*arg).starts_with('-') => {
                 continue;
@@ -43,8 +44,8 @@ fn report_stat(s: &Solver) -> () {
         s.stats[Stat::NumOfBlockRestart as usize],
         s.stats[Stat::NumOfRestart as usize],
         s.stats[Stat::NumOfReduction as usize],
-        s.clauses.permanents.len(),
-        s.clauses.deletables.len(),
+        s.clauses.kind[ClauseKind::Permanent as usize].len(),
+        s.clauses.kind[ClauseKind::Deletable as usize].len(),
     );
     println!(
         "EMA:: Asg (s:{:>.2}, f:{:>.2}), LBD (s:{:>.2}, f:{:>.2}), DL (conflict:{:>.2}, backjump:{:>.2})",

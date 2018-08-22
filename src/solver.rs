@@ -1,7 +1,7 @@
 use clause::*;
+use clause_manage::ClauseManagement;
 use clause_manage::ClauseMap;
 use clause_manage::ClauseReference;
-use clause_manage::ClauseManagement;
 use solver_propagate::SolveSAT;
 use solver_rollback::Restart;
 use std::fs;
@@ -61,8 +61,6 @@ pub struct Solver {
     /// Assignment Management
     pub vars: Vec<Var>,
     pub clauses: ClauseMap,
-    pub watches: WatchMap,
-    pub bi_watches: WatchMap,
     pub trail: Vec<Lit>,
     pub trail_lim: Vec<usize>,
     pub q_head: usize,
@@ -115,9 +113,7 @@ impl Solver {
         let vdr = cfg.variable_decay_rate;
         let s = Solver {
             vars: Var::new_vars(nv),
-            clauses: ClauseMap::new(nc),
-            watches: new_watch_map(nv * 2),
-            bi_watches: new_watch_map(nv * 2),
+            clauses: ClauseMap::new(nv, nc),
             trail: Vec::with_capacity(nv),
             trail_lim: Vec::new(),
             q_head: 0,
@@ -171,22 +167,6 @@ impl Solver {
             }
         }
         false
-    }
-    pub fn attach_clause(&mut self, c: Clause) -> ClauseIndex {
-        let len = c.lits.len();
-        if len == 1 {
-            self.enqueue(c.lits[0], NULL_CLAUSE);
-            return 0;
-        }
-        let w0 = c.lits[0];
-        let w1 = c.lits[1];
-        let ci = self.clauses.push(c);
-        if len == 2 {
-            set_watch(&mut self.bi_watches, ci, w0, w1);
-        } else {
-            set_watch(&mut self.watches, ci, w0, w1);
-        }
-        ci
     }
     pub fn num_assigns(&self) -> usize {
         self.trail.len()
@@ -320,24 +300,7 @@ impl Dump for Solver {
         }
         println!("- trail_lim  {:?}", self.trail_lim);
         if false {
-            for (i, m) in self.bi_watches.iter().enumerate() {
-                if !m.is_empty() {
-                    println!(
-                        "# - bi_watches[{:>3}] => {:?}",
-                        (i as Lit).int(),
-                        m.iter().map(|w| w.by).collect::<Vec<ClauseIndex>>()
-                    );
-                }
-            }
-            for (i, m) in self.watches.iter().enumerate() {
-                if !m.is_empty() {
-                    println!(
-                        "# - watches[{:>3}] => {:?}",
-                        (i as Lit).int(),
-                        m.iter().map(|w| w.by).collect::<Vec<ClauseIndex>>()
-                    );
-                }
-            }
+            // TODO: dump watches links
         }
         if false {
             self.var_order.dump();

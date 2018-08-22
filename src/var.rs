@@ -6,7 +6,7 @@ pub struct Var {
     pub index: usize,
     pub assign: Lbool,
     pub phase: Lbool,
-    pub reason: ClauseIndex,
+    pub reason: ClauseId,
     pub level: usize,
     pub activity: f64,
 }
@@ -26,7 +26,7 @@ impl Var {
         }
     }
     pub fn new_vars(n: usize) -> Vec<Var> {
-        let mut vec = Vec::with_capacity(n+1);
+        let mut vec = Vec::with_capacity(n + 1);
         for i in 0..n + 1 {
             let mut v = Var::new(i);
             v.activity = (n - i) as f64;

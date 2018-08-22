@@ -29,6 +29,7 @@ impl Restart for Solver {
                 }
                 v.reason = NULL_CLAUSE;
             }
+            println!("cancel {}", l.int());
             self.var_order.insert(&self.vars, vi);
         }
         self.trail.truncate(lim); // FIXME

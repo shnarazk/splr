@@ -1,18 +1,19 @@
 use clause::Clause;
+use clause::ClauseIdIndexEncoding;
+use clause_manage::ClauseKind;
 use clause_manage::ClauseManagement;
 use clause_manage::ClauseReference;
-use clause_manage::KERNEL_CLAUSE;
 use solver::Solver;
 use types::*;
 use var_manage::VarSelect;
 
 pub trait CDCL {
-    fn analyze(&mut self, confl: ClauseIndex) -> usize;
-    fn analyze_final(&mut self, ci: ClauseIndex, skip_first: bool) -> ();
+    fn analyze(&mut self, confl: ClauseId) -> usize;
+    fn analyze_final(&mut self, ci: ClauseId, skip_first: bool) -> ();
 }
 
 impl CDCL for Solver {
-    fn analyze(&mut self, confl: ClauseIndex) -> usize {
+    fn analyze(&mut self, confl: ClauseId) -> usize {
         for mut l in &mut self.an_seen {
             debug_assert_eq!(*l, 0);
             // *l = 0;
@@ -21,30 +22,47 @@ impl CDCL for Solver {
         self.an_learnt_lits.clear();
         self.an_learnt_lits.push(0);
         let dl = self.decision_level();
-        let mut ci = confl;
+        let mut cid: usize = confl;
         let mut p = NULL_LIT;
         let mut ti = self.trail.len() - 1; // trail index
         let mut path_cnt = 0;
         loop {
             unsafe {
-                let c = self.clauses.mref(ci) as *mut Clause;
-                debug_assert_ne!(ci, NULL_CLAUSE);
+                let c = self.clauses.mref(cid) as *mut Clause;
+                println!(
+                    "analyze({}): {} ({} :: {}) < {}",
+                    p.int(),
+                    *c,
+                    cid.to_kind(),
+                    cid.to_index(),
+                    self.clauses.kind[ClauseKind::Deletable as usize].len()
+                );
+                debug_assert_ne!(cid, NULL_CLAUSE);
                 // println!("  analyze.loop {}", (*c));
                 let d = (*c).rank;
-                if ci != 0 && ci & KERNEL_CLAUSE == 0 {
-                    self.bump_ci(ci);
+                if cid.is_learnt() {
+                    self.bump_cid(cid);
                     let nblevel = self.lbd_of(&(*c).lits);
                     if nblevel < d {
                         (*c).rank = nblevel;
                     }
                 }
                 // println!("{}を対応", (*c));
-                'next_literal: for q in &(*c).lits {
-                    if (*q) == p {
+                //                'next_literal: for q in &(*c).lits {
+                'next_literal: for i in 0..(*c).lits.len() + 2 {
+                    let q;
+                    match i {
+                        n if n < 2 => q = (*c).lit[n],
+                        n => q = (*c).lits[n - 2],
+                    }
+                    if q == p {
                         continue 'next_literal;
                     }
                     let vi = q.vi();
                     let l = self.vars[vi].level;
+                    if self.vars[vi].assign == BOTTOM {
+                        panic!(" analyze faced bottom by vi {} in {}", vi, (*c));
+                    }
                     debug_assert_ne!(self.vars[vi].assign, BOTTOM);
                     if self.an_seen[vi] == 0 && 0 < l {
                         self.bump_vi(vi);
@@ -56,12 +74,12 @@ impl CDCL for Solver {
                             //     l
                             // );
                             path_cnt += 1;
-                            if 0 < self.vars[vi].reason {
-                                self.an_last_dl.push(*q);
+                            if self.vars[vi].reason != NULL_CLAUSE {
+                                self.an_last_dl.push(q);
                             }
                         } else {
                             // println!("{} はレベル{}なので採用", q.int(), l);
-                            self.an_learnt_lits.push(*q);
+                            self.an_learnt_lits.push(q);
                         }
                     } else {
                         // println!("{} はもうフラグが立っているかグラウンドしている{}ので無視", q.int(), l);
@@ -78,8 +96,8 @@ impl CDCL for Solver {
                 p = self.trail[ti];
                 {
                     let next_vi: VarIndex = p.vi();
-                    ci = self.vars[next_vi].reason;
-                    // println!("{} にフラグが立っている。この時path数は{}, そのreason {}を探索", next_vi, path_cnt - 1, ci);
+                    cid = self.vars[next_vi].reason;
+                    // println!("{} にフラグが立っている。この時path数は{}, そのreason {}を探索", next_vi, path_cnt - 1, cid);
                     self.an_seen[next_vi] = 0;
                 }
                 path_cnt -= 1;
@@ -129,8 +147,8 @@ impl CDCL for Solver {
         for i in 0..self.an_last_dl.len() {
             let l = self.an_last_dl[i];
             let vi = l.vi();
-            let ci = self.vars[vi].reason;
-            let len = self.clauses.iref(ci).lits.len();
+            let cid = self.vars[vi].reason;
+            let len = self.clauses.iref(cid).lits.len();
             if r < len {
                 self.bump_vi(vi);
             }
@@ -167,10 +185,17 @@ impl CDCL for Solver {
         }
         level_to_return
     }
-    fn analyze_final(&mut self, ci: ClauseIndex, skip_first: bool) -> () {
+    fn analyze_final(&mut self, ci: ClauseId, skip_first: bool) -> () {
         self.conflicts.clear();
         if self.root_level != 0 {
-            for l in &self.clauses.iref(ci).lits[(if skip_first { 1 } else { 0 })..] {
+            //for i in &self.clauses.iref(ci).lits[(if skip_first { 1 } else { 0 })..] {
+            for i in (if skip_first { 1 } else { 0 })..(self.clauses.iref(ci).lits.len() + 2) {
+                let l;
+                match i {
+                    0 => l = &self.clauses.iref(ci).lit[0],
+                    1 => l = &self.clauses.iref(ci).lit[1],
+                    _ => l = &self.clauses.iref(ci).lits[i - 2],
+                }
                 let vi = l.vi();
                 if 0 < self.vars[vi].level {
                     self.an_seen[vi] = 1;
@@ -189,7 +214,13 @@ impl CDCL for Solver {
                     if self.vars[vi].reason == NULL_CLAUSE {
                         self.conflicts.push(l.negate());
                     } else {
-                        for l in &self.clauses.iref(ci).lits[1..] {
+                        for i in 1..(self.clauses.iref(ci).lits.len() + 2) {
+                            let l;
+                            match i {
+                                0 => l = &self.clauses.iref(ci).lit[1],
+                                _ => l = &self.clauses.iref(ci).lits[i - 2],
+                            }
+                            // for l in &self.clauses.iref(ci).lits[1..]
                             let vi = l.vi();
                             if 0 < self.vars[vi].level {
                                 self.an_seen[vi] = 1;
@@ -212,26 +243,31 @@ impl Solver {
         let key = self.an_level_map_key;
         while let Some(sl) = self.an_stack.pop() {
             // println!("analyze_removable.loop {:?}", self.an_stack);
-            let ci = self.vars[sl.vi()].reason;
+            let cid = self.vars[sl.vi()].reason;
             let c0;
             let len;
             {
-                let cl = &self.clauses.iref(ci).lits;
-                len = cl.len();
-                c0 = cl[0];
+                let c = &self.clauses.iref(cid);
+                c0 = c.lit[0];
+                len = c.lits.len();
             }
-            if len == 2 && self.assigned(c0) == LFALSE {
-                self.clauses.mref(ci).lits.swap(0, 1);
+            if len == 0 && self.assigned(c0) == LFALSE {
+                self.clauses.mref(cid).lit.swap(0, 1);
             }
-            for q in &self.clauses.iref(ci).lits[1..] {
+            for i in 0..self.clauses.iref(cid).lits.len() + 1 {
+                let q;
+                match i {
+                    0 => q = self.clauses.iref(cid).lit[1],
+                    n => q = self.clauses.iref(cid).lits[n - 1],
+                }
                 let vi = q.vi();
                 let lv = self.vars[vi].level;
                 if self.an_seen[vi] != 1 && lv != 0 {
                     if self.vars[vi].reason != NULL_CLAUSE && self.an_level_map[lv as usize] == key
                     {
                         self.an_seen[vi] = 1;
-                        self.an_stack.push(*q);
-                        self.an_to_clear.push(*q);
+                        self.an_stack.push(q);
+                        self.an_to_clear.push(q);
                     } else {
                         for _ in top..self.an_to_clear.len() {
                             self.an_seen[self.an_to_clear.pop().unwrap().vi()] = 0;
@@ -260,20 +296,29 @@ impl Solver {
             for i in 1..len {
                 self.mi_var_map[(*vec)[i].vi() as usize] = key;
             }
-            let wb = &self.bi_watches[p as usize];
             let mut nb = 0;
-            for w in wb {
-                let l: Lit = w.other;
-                let vi = l.vi();
-                if self.mi_var_map[vi] == key && self.assigned(l) == LTRUE {
+            let mut cix = self.clauses.watches_bi[p as usize];
+            while cix != NULL_CLAUSE {
+                let c = &self.clauses.kind[ClauseKind::Permanent as usize][cix];
+                let other = if c.lit[0] == p {
+                    c.lit[1]
+                } else {
+                    c.lit[0]
+                };
+                let vi = other.vi();
+                if self.mi_var_map[vi] == key && self.assigned(other) == LTRUE {
                     nb += 1;
                     self.mi_var_map[vi] -= 1;
                 }
+                cix = if c.lit[0] == p {
+                    c.next_watcher[0]
+                } else {
+                    c.next_watcher[1]
+                };
             }
-            if nb == 0 {
-                return;
+            if 0 < nb {
+                (*vec).retain(|l| *l == l0 || self.mi_var_map[l.vi()] == key);
             }
-            (*vec).retain(|l| *l == l0 || self.mi_var_map[l.vi()] == key);
         }
     }
 }
