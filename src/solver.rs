@@ -61,6 +61,7 @@ pub struct Solver {
     /// Assignment Management
     pub vars: Vec<Var>,
     pub clauses: ClauseMap,
+    pub cp: [ClausePack; 3],
     pub trail: Vec<Lit>,
     pub trail_lim: Vec<usize>,
     pub q_head: usize,
@@ -114,6 +115,10 @@ impl Solver {
         let s = Solver {
             vars: Var::new_vars(nv),
             clauses: ClauseMap::new(nv, nc),
+            cp: [ClausePack::build(ClauseKind::Deletable, nv, nc),
+                 ClausePack::build(ClauseKind::Permanent, nv, nc),
+                 ClausePack::build(ClauseKind::Binary, nv, nc),
+            ],
             trail: Vec::with_capacity(nv),
             trail_lim: Vec::new(),
             q_head: 0,

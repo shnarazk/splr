@@ -1,6 +1,6 @@
 use clause::Clause;
 use clause::ClauseIdIndexEncoding;
-use clause_manage::ClauseKind;
+use clause::ClauseKind;
 use clause_manage::ClauseManagement;
 use clause_manage::ClauseReference;
 use solver::Solver;

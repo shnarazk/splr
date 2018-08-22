@@ -1,5 +1,7 @@
 use clause::ClauseIdIndexEncoding;
 use clause::ClauseIndex;
+use clause::ClauseKind;
+use clause::ClausePack;
 use clause::{CID2KIND, Clause, KERNEL_CLAUSE};
 use solver::{Solver, Stat};
 use solver_propagate::SolveSAT;
@@ -8,12 +10,6 @@ use types::*;
 
 const DB_INIT_SIZE: usize = 1000;
 const DB_INC_SIZE: usize = 50;
-
-pub enum ClauseKind {
-    Deletable = 0,
-    Permanent,
-    Binary,
-}
 
 pub trait ClauseReference {
     /// returns ClauseId
@@ -38,13 +34,6 @@ pub fn cid2fmt(cid: ClauseId) -> String {
         0 => format!("[learnt:{}]", cid.to_index()),
         _ => format!("[prmnnt:{}]", cid.to_index()),
     }
-}
-
-struct ClausePack {
-    pub init_size: usize,
-    pub clause: Vec<Clause>,
-    pub perm: Vec<ClauseIndex>,
-    pub watcher: Vec<ClauseIndex>,
 }
 
 struct ClauseMap2 {

@@ -3,6 +3,71 @@ use std::f64;
 use std::fmt;
 use types::*;
 
+#[derive(Debug)]
+pub struct ClausePack {
+    pub init_size: usize,
+    pub clauses: Vec<Clause>,
+    pub perm: Vec<ClauseIndex>,
+    pub watcher: Vec<ClauseIndex>,
+    pub tag: usize,
+    pub mask: usize,
+    pub index_bits: usize,
+}
+
+#[derive(Debug)]
+pub enum ClauseKind {
+    Deletable = 0,
+    Permanent,
+    Binary,
+}
+
+const CP_TABLE: [(usize, usize); 3] = [
+    (0x0000_0000_0000_0000, 0x0FFF_FFFF_FFFF_FFFF),
+    (0x1000_0000_0000_0000, 0x0FFF_FFFF_FFFF_FFFF),
+    (0x2000_0000_0000_0000, 0x0FFF_FFFF_FFFF_FFFF),
+];
+
+const CLAUSE_INDEX_BITS: usize = 60;
+
+impl ClausePack {
+    pub fn build(i: ClauseKind, nv: usize, nc: usize) -> ClausePack {
+        let (tag, mask) = CP_TABLE[i as usize];
+        let mut clauses = Vec::with_capacity(1 + nc);
+        clauses.push(Clause::null());
+        let mut perm = Vec::with_capacity(1 + nc);
+        perm.push(0 as usize);
+        let mut watcher = Vec::with_capacity(2 * (nv + 1));
+        watcher.push(NULL_CLAUSE);
+        ClausePack {
+            init_size: nc,
+            clauses,
+            perm,
+            watcher,
+            mask,
+            tag,
+            index_bits: CLAUSE_INDEX_BITS,
+        }
+    }
+    pub fn attach(&mut self, mut c: Clause) -> ClauseId {
+        let w0 = c.lit[0].negate() as usize;
+        let w1 = c.lit[1].negate() as usize;
+        let cix = self.clauses.len();
+        c.index = cix;
+        c.next_watcher[0] = self.watcher[w0];
+        self.watcher[w0] = cix;
+        c.next_watcher[1] = self.watcher[w1];
+        self.watcher[w1] = cix;
+        self.clauses.push(c);
+        self.id_from(cix)
+    }
+    pub fn id_from(&self, cix: ClauseIndex) -> ClauseId {
+        cix | self.tag
+    }
+    pub fn index_from(&self, cid: ClauseId) -> ClauseIndex {
+        cid & self.mask
+    }
+}
+
 pub const KERNEL_CLAUSE: usize = 0x8000_0000_0000_0000;
 const INDEX_MASK: usize = 0x7FFF_FFFF_FFFF_FFFF;
 pub const CID2KIND: usize = 63;
@@ -59,7 +124,7 @@ impl ClauseIdIndexEncoding for usize {
     }
     #[inline]
     fn to_kind(&self) -> usize {
-        *self >> CID2KIND
+        *self >> CLAUSE_INDEX_BITS
     }
     fn as_permanent_id(&self) -> ClauseId {
         *self | KERNEL_CLAUSE

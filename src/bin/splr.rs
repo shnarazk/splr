@@ -1,5 +1,5 @@
 extern crate splr;
-use splr::clause_manage::ClauseKind;
+use splr::clause::ClauseKind;
 use splr::solver::{Certificate, SatSolver, Solver, Stat};
 use splr::types::EmaKind;
 use std::env;

@@ -1,7 +1,7 @@
 use clause::Clause;
+use clause::ClauseKind;
 use clause::ClauseIdIndexEncoding;
 use clause_manage::vec2int;
-use clause_manage::ClauseKind;
 use clause_manage::ClauseManagement;
 use clause_manage::ClauseReference;
 use solver::{Solver, Stat};
