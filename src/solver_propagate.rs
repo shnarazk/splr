@@ -1,7 +1,6 @@
 use clause::Clause;
 use clause::ClauseIdIndexEncoding;
 use clause::ClauseKind;
-use clause_manage::vec2int;
 use clause_manage::ClauseManagement;
 use solver::{Solver, Stat};
 use solver_analyze::CDCL;
@@ -15,7 +14,6 @@ pub trait SolveSAT {
     fn search(&mut self) -> bool;
     fn propagate(&mut self) -> ClauseId;
     fn enqueue(&mut self, l: Lit, cid: ClauseId) -> bool;
-    // fn assume(&mut self, l: Lit) -> bool;
 }
 
 impl SolveSAT for Solver {
@@ -26,227 +24,63 @@ impl SolveSAT for Solver {
             let p_usize: usize = p as usize;
             self.q_head += 1;
             self.stats[Stat::NumOfPropagation as usize] += 1;
-            // biclause
-            let mut ci = self.cp[ClauseKind::Binclause as usize].watcher[p_usize];
-            'next_bi_clauses: while ci != NULL_CLAUSE {
-                let next;
-                let other;
-                unsafe {
-                    let c = &mut self.cp[ClauseKind::Binclause as usize].clauses[ci] as *mut Clause;
-                    if (*c).lit[0] == false_lit {
-                        other = (*c).lit[1];
-                        next = (*c).next_watcher[0];
-                    } else {
-                        other = (*c).lit[0];
-                        next = (*c).next_watcher[1]
-                    };
-                    if (*c).lit[0] == false_lit {
-                        (*c).lit.swap(0, 1);
-                        (*c).next_watcher.swap(0, 1);
-                    }
-                }
-                match self.assigned(other) {
-                    LFALSE => {
-                        println!(" - confilct binclause ix {}", ci);
-                        return ClauseKind::Binclause.id_from(ci);
-                    }
-                    LTRUE => {}
-                    _ => {
-                        println!(" unit propagation {} by biclause ix {}", other.int(), ci,);
-                        //let cid = self.cp[ClauseKind::Binclause as usize].id_from(ci);
-                        //self.uncheck_enqueue(other, cid);
-                        self.uncheck_enqueue(other, ClauseKind::Binclause.id_from(ci));
-                    }
-                }
-                ci = next;
-            }
-            // permanents
-            ci = self.cp[ClauseKind::Permanent as usize].watcher[p_usize];
-            'next_permanent: while ci != NULL_CLAUSE {
-                unsafe {
-                    let c = &mut self.cp[ClauseKind::Permanent as usize].clauses[ci] as *mut Clause;
-                    let (other, next) = if (*c).lit[0] == false_lit {
-                        ((*c).lit[1], (*c).next_watcher[0])
-                    } else {
-                        ((*c).lit[0], (*c).next_watcher[1])
-                    };
-                    if false {
-                        println!(
-                            " propagate permanent: {}, false_lit {}, lit[0] {} = other {}, next {}",
-                            (*c),
-                            false_lit.int(),
-                            (*c).lit[0].int(),
-                            other.int(),
-                            next
-                        );
-                    }
-                    debug_assert_ne!(other, false_lit);
-                    debug_assert_ne!(other, NULL_LIT);
-                    debug_assert!(!((*c).learnt));
-                    (*c).swap = 0;
-                    // Place the false literal at lit[1].
-                    if (*c).lit[0] == false_lit {
-                        (*c).lit.swap(0, 1);
-                        (*c).next_watcher.swap(0, 1);
-                    }
-                    let fv = self.assigned(other);
-                    if fv == LTRUE {
-                        ci = next;
-                        continue 'next_permanent;
-                    }
-                    let uni: Lit;
-                    {
-                        for k in 0..(*c).lits.len() {
-                            let lk = (*c).lits[k];
-                            if self.assigned(lk) != LFALSE {
-                                (*c).swap = k + 1;
-                                if ci == 1 {
-                                    println!("   - found another: cix {}, false_lit {}, lit[{}, {}], lits {:?}", ci, false_lit.int(), (*c).lit[0].int(), (*c).lit[1].int(), vec2int((*c).lits.clone()));
-                                }
-                                ci = next;
-                                continue 'next_permanent;
-                            }
+            let kinds = [
+                ClauseKind::Binclause,
+                ClauseKind::Permanent,
+                ClauseKind::Removable,
+            ];
+            let mut ci;
+            for ck in &kinds {
+                ci = self.cp[*ck as usize].watcher[p_usize];
+                'next_clause: while ci != NULL_CLAUSE {
+                    unsafe {
+                        let c = &mut self.cp[*ck as usize].clauses[ci] as *mut Clause;
+                        if (*c).lit[0] == false_lit {
+                            (*c).lit.swap(0, 1);
+                            (*c).next_watcher.swap(0, 1);
                         }
-                        if fv == LFALSE {
-                            println!(" - confilct permanent ix {}", ci);
-                            return ClauseKind::Permanent.id_from(ci);
+                        let other = (*c).lit[0];
+                        let next = (*c).next_watcher[1];
+                        let fv = self.assigned(other);
+                        (*c).swap = 0;
+                        if fv == LTRUE {
+                            ci = next;
+                            continue 'next_clause;
                         }
-                        uni = (*c).lit[0];
-                        debug_assert_eq!(fv, BOTTOM);
-                        debug_assert_eq!(uni, other);
-                        debug_assert_ne!(uni, p);
-                        debug_assert_ne!(uni, false_lit);
-                    }
-                    let cid = self.cp[ClauseKind::Permanent as usize].id_from(ci);
-                    self.uncheck_enqueue(uni, cid);
-                    println!(
-                        " unit propagation of {} by permanent {} then {}",
-                        other.int(),
-                        (*c),
-                        next
-                    );
-                    ci = next;
-                }
-            }
-            // deletables
-            ci = self.cp[ClauseKind::Removable as usize].watcher[p_usize];
-            'next_deletable: while ci != NULL_CLAUSE {
-                unsafe {
-                    let c = &mut self.cp[ClauseKind::Removable as usize].clauses[ci] as *mut Clause;
-                    let (other, next) = if (*c).lit[0] == false_lit {
-                        ((*c).lit[1], (*c).next_watcher[0])
-                    } else {
-                        ((*c).lit[0], (*c).next_watcher[1])
-                    };
-                    if ci == 1 {
-                        println!(
-                            "cix {}, false_lit {} watch {} other {}, next {}",
-                            ci,
-                            false_lit.int(),
-                            (*c).lit[0].int(),
-                            other.int(),
-                            next
-                        );
-                    }
-                    debug_assert_ne!(other, NULL_LIT);
-                    (*c).swap = 0;
-                    // Place the false literal at lit[1].
-                    if (*c).lit[0] == false_lit {
-                        (*c).lit.swap(0, 1);
-                        (*c).next_watcher.swap(0, 1);
-                    }
-                    let fv = self.assigned(other);
-                    if fv == LTRUE {
-                        ci = next;
-                        continue 'next_deletable;
-                    }
-                    let uni: Lit;
-                    {
                         for k in 0..(*c).lits.len() {
                             let lk = (*c).lits[k];
                             if self.assigned(lk) != LFALSE {
                                 (*c).swap = k + 1;
                                 ci = next;
-                                continue 'next_deletable;
+                                continue 'next_clause;
                             }
                         }
                         if fv == LFALSE {
-                            println!(
-                                " - confilct ix {} = id {}",
-                                ci,
-                                self.cp[ClauseKind::Removable as usize].id_from(ci)
-                            );
-                            return ClauseKind::Removable.id_from(ci);
+                            return ck.id_from(ci);
                         }
-                        uni = (*c).lit[0];
+                        self.uncheck_enqueue(other, ck.id_from(ci));
+                        ci = next;
                     }
-                    println!(" unit propagation of {} by removable {}", other.int(), (*c),);
-                    let cid = ClauseKind::Removable.id_from(ci);
-                    self.uncheck_enqueue(uni, cid);
-                    ci = next;
                 }
             }
             let mut ci;
-            // sweep binary clauses
-            ci = self.cp[ClauseKind::Binclause as usize].watcher[p_usize];
-            self.cp[ClauseKind::Binclause as usize].watcher[p_usize] = NULL_CLAUSE;
-            while ci != NULL_CLAUSE {
-                let c = &mut self.cp[ClauseKind::Binclause as usize].clauses[ci];
-                let pivot = if (*c).lit[0] == false_lit { 0 } else { 1 };
-                debug_assert_eq!(pivot, 1);
-                let next = (*c).next_watcher[pivot];
-                if 0 < c.swap {
-                    let tmp = c.lit[pivot];
-                    c.lit[pivot] = c.lits[c.swap - 1];
-                    c.lits[c.swap - 1] = tmp;
+            for ck in &kinds {
+                ci = self.cp[*ck as usize].watcher[p_usize];
+                self.cp[*ck as usize].watcher[p_usize] = NULL_CLAUSE;
+                while ci != NULL_CLAUSE {
+                    let c = &mut self.cp[*ck as usize].clauses[ci];
+                    let pivot = if c.lit[0] == false_lit { 0 } else { 1 };
+                    let next = c.next_watcher[pivot];
+                    if 0 < c.swap {
+                        let tmp = c.lit[pivot];
+                        c.lit[pivot] = c.lits[c.swap - 1];
+                        c.lits[c.swap - 1] = tmp;
+                    }
+                    let watch = c.lit[pivot].negate() as usize;
+                    c.next_watcher[pivot] = self.cp[*ck as usize].watcher[watch];
+                    self.cp[*ck as usize].watcher[watch] = ci;
+                    ci = next;
                 }
-                let watch = (*c).lit[pivot].negate() as usize;
-                c.next_watcher[pivot] = self.cp[ClauseKind::Binclause as usize].watcher[watch];
-                self.cp[ClauseKind::Binclause as usize].watcher[watch] = ci;
-                ci = next;
-            }
-            // sweep permanent clauses
-            ci = self.cp[ClauseKind::Permanent as usize].watcher[p_usize];
-            self.cp[ClauseKind::Permanent as usize].watcher[p_usize] = NULL_CLAUSE;
-            while ci != NULL_CLAUSE {
-                let c = &mut self.cp[ClauseKind::Permanent as usize].clauses[ci];
-                let pivot = if (*c).lit[0] == false_lit { 0 } else { 1 };
-                debug_assert_eq!(pivot, 1);
-                let next = (*c).next_watcher[pivot];
-                if 0 < c.swap {
-                    let tmp = c.lit[pivot];
-                    c.lit[pivot] = c.lits[c.swap - 1];
-                    c.lits[c.swap - 1] = tmp;
-                }
-                let watch = (*c).lit[pivot].negate() as usize;
-                c.next_watcher[pivot] = self.cp[ClauseKind::Permanent as usize].watcher[watch];
-                self.cp[ClauseKind::Permanent as usize].watcher[watch] = ci;
-                if false {
-                    println!(
-                        " move {} to {} connected to {}",
-                        c,
-                        (watch as u32).int(),
-                        self.cp[ClauseKind::Permanent as usize].watcher[watch]
-                    );
-                }
-                ci = next;
-            }
-            // sweep deletable clauses
-            ci = self.cp[ClauseKind::Removable as usize].watcher[p_usize];
-            self.cp[ClauseKind::Removable as usize].watcher[p_usize] = NULL_CLAUSE;
-            while ci != NULL_CLAUSE {
-                let c = &mut self.cp[ClauseKind::Removable as usize].clauses[ci];
-                let pivot = if (*c).lit[0] == false_lit { 0 } else { 1 };
-                let next = (*c).next_watcher[pivot];
-                if c.swap != 0 {
-                    let tmp = c.lit[pivot];
-                    c.lit[pivot] = c.lits[c.swap - 1];
-                    c.lits[c.swap - 1] = tmp;
-                }
-                let watch = (*c).lit[pivot].negate() as usize;
-                c.next_watcher[pivot] = self.cp[ClauseKind::Removable as usize].watcher[watch];
-                self.cp[ClauseKind::Removable as usize].watcher[watch] = ci;
-                ci = next;
             }
         }
         NULL_CLAUSE
@@ -337,10 +171,6 @@ impl SolveSAT for Solver {
             val == sig
         }
     }
-    //    fn assume(&mut self, l: Lit) -> bool {
-    //        self.trail_lim.push(self.trail.len());
-    //        self.enqueue(l, NULL_CLAUSE)
-    //    }
 }
 
 impl Solver {
