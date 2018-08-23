@@ -59,7 +59,8 @@ impl ClauseManagement for Solver {
         debug_assert_ne!(cid, 0);
         let a;
         {
-            let c = &mut self.cp[cid.to_kind()].clauses[cid.to_index()];
+            // let c = &mut self.cp[cid.to_kind()].clauses[cid.to_index()];
+            let c = cref!(self.cp, cid);
             a = c.activity + self.cla_inc;
             c.activity = a;
         }

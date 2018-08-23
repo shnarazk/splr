@@ -322,7 +322,8 @@ impl SolveSAT for Solver {
                 v.assign = sig;
                 v.level = dl;
                 v.reason = cid;
-                self.cp[cid.to_kind()].clauses[cid.to_index()].locked = true;
+                // self.cp[cid.to_kind()].clauses[cid.to_index()].locked = true;
+                cref!(self.cp, cid).locked = true;
             }
             println!(
                 "implication {} by {} {}",

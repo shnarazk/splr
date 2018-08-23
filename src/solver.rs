@@ -7,15 +7,6 @@ use std::io::{BufRead, BufReader};
 use types::*;
 use var::*;
 
-#[macro_export]
-macro_rules! cref {
-    ($val:expr) => {{
-        match &$val {
-            cid => &self.cp[cid.to_kind()].clauses[cid.to_index()],
-        }
-    }};
-}
-
 pub trait SatSolver {
     fn solve(&mut self) -> SolverResult;
     fn build(path: &str) -> (Solver, CNFDescription);

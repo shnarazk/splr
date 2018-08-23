@@ -1,5 +1,6 @@
 //! This is a SAT solver in Rust.
-
+#[macro_use]
+mod macros;
 /// Clause
 pub mod clause;
 /// Implementation on clause elimination.
