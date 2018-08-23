@@ -7,41 +7,60 @@ use types::*;
 pub struct ClausePack {
     pub init_size: usize,
     pub clauses: Vec<Clause>,
-    pub perm: Vec<ClauseIndex>,
+    pub permutation: Vec<ClauseIndex>,
     pub watcher: Vec<ClauseIndex>,
     pub tag: usize,
     pub mask: usize,
     pub index_bits: usize,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum ClauseKind {
-    Deletable = 0,
+    Removable = 0,
     Permanent,
-    Binary,
+    Binclause,
 }
 
-const CP_TABLE: [(usize, usize); 3] = [
-    (0x0000_0000_0000_0000, 0x0FFF_FFFF_FFFF_FFFF),
-    (0x1000_0000_0000_0000, 0x0FFF_FFFF_FFFF_FFFF),
-    (0x2000_0000_0000_0000, 0x0FFF_FFFF_FFFF_FFFF),
-];
-
 const CLAUSE_INDEX_BITS: usize = 60;
+const CLAUSE_INDEX_MASK: usize = 0x0FFF_FFFF_FFFF_FFFF;
+
+impl ClauseKind {
+    pub fn tag(&self) -> usize {
+        match self {
+            ClauseKind::Removable => 0x0000_0000_0000_0000,
+            ClauseKind::Permanent => 0x1000_0000_0000_0000,
+            ClauseKind::Binclause => 0x2000_0000_0000_0000,
+        }
+    }
+    pub fn mask(&self) -> usize {
+        CLAUSE_INDEX_MASK
+    }
+    pub fn id_from(&self, cix: ClauseIndex) -> ClauseId {
+        cix | self.tag()
+    }
+    pub fn index_from(&self, cid: ClauseId) -> ClauseIndex {
+        cid & self.mask()
+    }
+}
 
 impl ClausePack {
     pub fn build(i: ClauseKind, nv: usize, nc: usize) -> ClausePack {
-        let (tag, mask) = CP_TABLE[i as usize];
+        let tag = i.tag();
+        let mask = i.mask();
         let mut clauses = Vec::with_capacity(1 + nc);
         clauses.push(Clause::null());
-        let mut perm = Vec::with_capacity(1 + nc);
-        perm.push(0 as usize);
+        let mut permutation = Vec::with_capacity(1 + nc);
+        for _i in 0..1 + nc {
+            permutation.push(NULL_CLAUSE);
+        }
         let mut watcher = Vec::with_capacity(2 * (nv + 1));
-        watcher.push(NULL_CLAUSE);
+        for _i in 0..2 * (nv + 1) {
+            watcher.push(NULL_CLAUSE);
+        }
         ClausePack {
             init_size: nc,
             clauses,
-            perm,
+            permutation,
             watcher,
             mask,
             tag,
@@ -66,11 +85,10 @@ impl ClausePack {
     pub fn index_from(&self, cid: ClauseId) -> ClauseIndex {
         cid & self.mask
     }
+    pub fn len(&self) -> usize {
+        self.clauses.len()
+    }
 }
-
-pub const KERNEL_CLAUSE: usize = 0x8000_0000_0000_0000;
-const INDEX_MASK: usize = 0x7FFF_FFFF_FFFF_FFFF;
-pub const CID2KIND: usize = 63;
 
 pub const RANK_NULL: usize = 0; // for NULL_CLAUSE
 pub const RANK_CONST: usize = 1; // for given clauses
@@ -80,17 +98,16 @@ pub const RANK_NEED: usize = 2; // for newly generated bi-clauses
 pub type ClauseIndex = usize;
 
 pub trait ClauseIdIndexEncoding {
-    fn is_learnt(&self) -> bool;
     fn to_id(&self) -> ClauseId;
     fn to_index(&self) -> ClauseIndex;
     fn to_kind(&self) -> usize;
-    fn as_permanent_id(&self) -> ClauseId;
-    fn as_deletable_id(&self) -> ClauseId;
 }
 
 /// Clause
 #[derive(Debug)]
 pub struct Clause {
+    /// kind has 3 types.
+    pub kind: ClauseKind,
     /// a temporal index which is equal to the index for `clauses` or `learnts`
     pub index: ClauseId,
     /// clause activity used by `analyze` and `reduce_db`
@@ -112,50 +129,28 @@ pub struct Clause {
 }
 
 impl ClauseIdIndexEncoding for usize {
-    fn is_learnt(&self) -> bool {
-        *self & KERNEL_CLAUSE == 0
-    }
     fn to_id(&self) -> ClauseId {
         *self
     }
     #[inline]
     fn to_index(&self) -> ClauseIndex {
-        (*self & INDEX_MASK) as usize
+        (*self & CLAUSE_INDEX_MASK) as usize
     }
     #[inline]
     fn to_kind(&self) -> usize {
         *self >> CLAUSE_INDEX_BITS
     }
-    fn as_permanent_id(&self) -> ClauseId {
-        *self | KERNEL_CLAUSE
-    }
-    fn as_deletable_id(&self) -> ClauseId {
-        *self & INDEX_MASK
-    }
 }
 
 impl ClauseIdIndexEncoding for Clause {
-    fn is_learnt(&self) -> bool {
-        self.learnt
-    }
     fn to_id(&self) -> ClauseId {
-        if self.learnt && 2 < self.lits.len() {
-            self.index + KERNEL_CLAUSE
-        } else {
-            self.index
-        }
+        self.index | self.kind.tag()
     }
     fn to_index(&self) -> ClauseIndex {
         self.index
     }
     fn to_kind(&self) -> usize {
         (!self.learnt || 2 == self.lits.len()) as usize
-    }
-    fn as_permanent_id(&self) -> ClauseId {
-        self.index | KERNEL_CLAUSE
-    }
-    fn as_deletable_id(&self) -> ClauseId {
-        self.index & INDEX_MASK
     }
 }
 
@@ -201,10 +196,12 @@ impl Ord for Clause {
 }
 
 impl Clause {
-    pub fn new(learnt: bool, rank: usize, mut v: Vec<Lit>) -> Clause {
+    pub fn new(kind: ClauseKind, learnt: bool, rank: usize, mut v: Vec<Lit>) -> Clause {
         let lit0 = v.remove(0);
         let lit1 = v.remove(0);
         Clause {
+            kind,
+            learnt,
             activity: 0.0,
             rank: rank,
             next_watcher: [NULL_CLAUSE; 2],
@@ -212,12 +209,12 @@ impl Clause {
             lits: v,
             index: 0,
             locked: false,
-            learnt: learnt,
             swap: 0,
         }
     }
     pub fn null() -> Clause {
         Clause {
+            kind: ClauseKind::Permanent,
             activity: 0.0,
             rank: RANK_NULL,
             next_watcher: [NULL_CLAUSE; 2],
@@ -249,12 +246,23 @@ impl fmt::Display for Clause {
             _ => write!(
                 f,
                 "{}{}[{},{}]{:?}",
-                if self.is_learnt() { 'L' } else { 'P' },
+                match self.kind {
+                    ClauseKind::Removable => 'L',
+                    ClauseKind::Binclause => 'B',
+                    ClauseKind::Permanent => 'P',
+                },
                 self.index,
                 self.lit[0].int(),
                 self.lit[1].int(),
                 &self.lits.iter().map(|l| l.int()).collect::<Vec<i32>>()
             ),
         }
+    }
+}
+
+pub fn cid2fmt(cid: ClauseId) -> String {
+    match cid >> CLAUSE_INDEX_BITS {
+        0 => format!("[learnt:{}]", cid.to_index()),
+        _ => format!("[prmnnt:{}]", cid.to_index()),
     }
 }

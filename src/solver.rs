@@ -1,13 +1,20 @@
 use clause::*;
 use clause_manage::ClauseManagement;
-use clause_manage::ClauseMap;
-use clause_manage::ClauseReference;
 use solver_propagate::SolveSAT;
 use solver_rollback::Restart;
 use std::fs;
 use std::io::{BufRead, BufReader};
 use types::*;
 use var::*;
+
+#[macro_export]
+macro_rules! cref {
+    ($val:expr) => {{
+        match &$val {
+            cid => &self.cp[cid.to_kind()].clauses[cid.to_index()],
+        }
+    }};
+}
 
 pub trait SatSolver {
     fn solve(&mut self) -> SolverResult;
@@ -60,7 +67,6 @@ pub enum Stat {
 pub struct Solver {
     /// Assignment Management
     pub vars: Vec<Var>,
-    pub clauses: ClauseMap,
     pub cp: [ClausePack; 3],
     pub trail: Vec<Lit>,
     pub trail_lim: Vec<usize>,
@@ -75,6 +81,7 @@ pub struct Solver {
     pub var_inc: f64,
     pub root_level: usize,
     /// Database Management
+    pub next_reduction: usize,
     pub cur_restart: usize,
     pub num_solved_vars: usize,
     /// Working memory
@@ -114,10 +121,10 @@ impl Solver {
         let vdr = cfg.variable_decay_rate;
         let s = Solver {
             vars: Var::new_vars(nv),
-            clauses: ClauseMap::new(nv, nc),
-            cp: [ClausePack::build(ClauseKind::Deletable, nv, nc),
-                 ClausePack::build(ClauseKind::Permanent, nv, nc),
-                 ClausePack::build(ClauseKind::Binary, nv, nc),
+            cp: [
+                ClausePack::build(ClauseKind::Removable, nv, nc),
+                ClausePack::build(ClauseKind::Permanent, nv, nc),
+                ClausePack::build(ClauseKind::Binclause, nv, nc),
             ],
             trail: Vec::with_capacity(nv),
             trail_lim: Vec::new(),
@@ -129,6 +136,7 @@ impl Solver {
             cla_inc: cdr,
             var_inc: vdr,
             root_level: 0,
+            next_reduction: 1000,
             cur_restart: 1,
             num_solved_vars: 0,
             ok: true,
@@ -179,6 +187,9 @@ impl Solver {
     #[inline]
     pub fn decision_level(&self) -> usize {
         self.trail_lim.len()
+    }
+    pub fn attach_clause(&mut self, c: Clause) -> ClauseId {
+        self.cp[c.kind as usize].attach(c)
     }
 }
 

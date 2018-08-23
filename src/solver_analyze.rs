@@ -2,7 +2,6 @@ use clause::Clause;
 use clause::ClauseIdIndexEncoding;
 use clause::ClauseKind;
 use clause_manage::ClauseManagement;
-use clause_manage::ClauseReference;
 use solver::Solver;
 use types::*;
 use var_manage::VarSelect;
@@ -28,19 +27,19 @@ impl CDCL for Solver {
         let mut path_cnt = 0;
         loop {
             unsafe {
-                let c = self.clauses.mref(cid) as *mut Clause;
+                let c = &mut self.cp[cid.to_kind()].clauses[cid.to_index()] as *mut Clause;
                 println!(
                     "analyze({}): {} ({} :: {}) < {}",
                     p.int(),
                     *c,
                     cid.to_kind(),
                     cid.to_index(),
-                    self.clauses.kind[ClauseKind::Deletable as usize].len()
+                    self.cp[ClauseKind::Removable as usize].clauses.len()
                 );
                 debug_assert_ne!(cid, NULL_CLAUSE);
                 // println!("  analyze.loop {}", (*c));
                 let d = (*c).rank;
-                if cid.is_learnt() {
+                if cid.to_kind() == (ClauseKind::Removable as usize) {
                     self.bump_cid(cid);
                     let nblevel = self.lbd_of(&(*c).lits);
                     if nblevel < d {
@@ -148,7 +147,7 @@ impl CDCL for Solver {
             let l = self.an_last_dl[i];
             let vi = l.vi();
             let cid = self.vars[vi].reason;
-            let len = self.clauses.iref(cid).lits.len();
+            let len = self.cp[cid.to_kind()].clauses[cid.to_index()].lits.len();
             if r < len {
                 self.bump_vi(vi);
             }
@@ -189,12 +188,14 @@ impl CDCL for Solver {
         self.conflicts.clear();
         if self.root_level != 0 {
             //for i in &self.clauses.iref(ci).lits[(if skip_first { 1 } else { 0 })..] {
-            for i in (if skip_first { 1 } else { 0 })..(self.clauses.iref(ci).lits.len() + 2) {
+            for i in (if skip_first { 1 } else { 0 })
+                ..(self.cp[ci.to_kind()].clauses[ci.to_index()].len() + 2)
+            {
                 let l;
                 match i {
-                    0 => l = &self.clauses.iref(ci).lit[0],
-                    1 => l = &self.clauses.iref(ci).lit[1],
-                    _ => l = &self.clauses.iref(ci).lits[i - 2],
+                    0 => l = &self.cp[ci.to_kind()].clauses[ci.to_index()].lit[0],
+                    1 => l = &self.cp[ci.to_kind()].clauses[ci.to_index()].lit[1],
+                    _ => l = &self.cp[ci.to_kind()].clauses[ci.to_index()].lits[i - 2],
                 }
                 let vi = l.vi();
                 if 0 < self.vars[vi].level {
@@ -214,11 +215,11 @@ impl CDCL for Solver {
                     if self.vars[vi].reason == NULL_CLAUSE {
                         self.conflicts.push(l.negate());
                     } else {
-                        for i in 1..(self.clauses.iref(ci).lits.len() + 2) {
+                        for i in 1..(self.cp[ci.to_kind()].clauses[ci.to_index()].lits.len() + 2) {
                             let l;
                             match i {
-                                0 => l = &self.clauses.iref(ci).lit[1],
-                                _ => l = &self.clauses.iref(ci).lits[i - 2],
+                                0 => l = &self.cp[ci.to_kind()].clauses[ci.to_index()].lit[1],
+                                _ => l = &self.cp[ci.to_kind()].clauses[ci.to_index()].lits[i - 2],
                             }
                             // for l in &self.clauses.iref(ci).lits[1..]
                             let vi = l.vi();
@@ -247,18 +248,20 @@ impl Solver {
             let c0;
             let len;
             {
-                let c = &self.clauses.iref(cid);
+                let c = &self.cp[cid.to_kind()].clauses[cid.to_index()];
                 c0 = c.lit[0];
                 len = c.lits.len();
             }
             if len == 0 && self.assigned(c0) == LFALSE {
-                self.clauses.mref(cid).lit.swap(0, 1);
+                self.cp[cid.to_kind()].clauses[cid.to_index()]
+                    .lit
+                    .swap(0, 1);
             }
-            for i in 0..self.clauses.iref(cid).lits.len() + 1 {
+            for i in 0..self.cp[cid.to_kind()].clauses[cid.to_index()].lits.len() + 1 {
                 let q;
                 match i {
-                    0 => q = self.clauses.iref(cid).lit[1],
-                    n => q = self.clauses.iref(cid).lits[n - 1],
+                    0 => q = self.cp[cid.to_kind()].clauses[cid.to_index()].lit[1],
+                    n => q = self.cp[cid.to_kind()].clauses[cid.to_index()].lits[n - 1],
                 }
                 let vi = q.vi();
                 let lv = self.vars[vi].level;
@@ -297,9 +300,9 @@ impl Solver {
                 self.mi_var_map[(*vec)[i].vi() as usize] = key;
             }
             let mut nb = 0;
-            let mut cix = self.clauses.watches_bi[p as usize];
+            let mut cix = self.cp[ClauseKind::Binclause as usize].watcher[p as usize];
             while cix != NULL_CLAUSE {
-                let c = &self.clauses.kind[ClauseKind::Permanent as usize][cix];
+                let c = &self.cp[ClauseKind::Binclause as usize].clauses[cix];
                 let other = if c.lit[0] == p {
                     c.lit[1]
                 } else {

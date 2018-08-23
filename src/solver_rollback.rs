@@ -1,4 +1,4 @@
-use clause_manage::ClauseReference;
+use clause::ClauseIdIndexEncoding;
 use solver::{Solver, Stat};
 use types::*;
 use var::VarOrdering;
@@ -25,11 +25,10 @@ impl Restart for Solver {
                 v.phase = v.assign;
                 v.assign = BOTTOM;
                 if 0 < v.reason {
-                    self.clauses.mref(v.reason).locked = false;
+                    self.cp[v.reason.to_kind()].clauses[v.reason.to_index()].locked = false;
                 }
                 v.reason = NULL_CLAUSE;
             }
-            println!("cancel {}", l.int());
             self.var_order.insert(&self.vars, vi);
         }
         self.trail.truncate(lim); // FIXME

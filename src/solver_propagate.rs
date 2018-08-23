@@ -1,9 +1,8 @@
 use clause::Clause;
-use clause::ClauseKind;
 use clause::ClauseIdIndexEncoding;
+use clause::ClauseKind;
 use clause_manage::vec2int;
 use clause_manage::ClauseManagement;
-use clause_manage::ClauseReference;
 use solver::{Solver, Stat};
 use solver_analyze::CDCL;
 use solver_rollback::Restart;
@@ -28,13 +27,12 @@ impl SolveSAT for Solver {
             self.q_head += 1;
             self.stats[Stat::NumOfPropagation as usize] += 1;
             // biclause
-            let mut ci = self.clauses.watches_bi[p_usize];
+            let mut ci = self.cp[ClauseKind::Binclause as usize].watcher[p_usize];
             'next_bi_clauses: while ci != NULL_CLAUSE {
                 let next;
                 let other;
                 unsafe {
-                    let c =
-                        &mut self.clauses.kind[ClauseKind::Permanent as usize][ci] as *mut Clause;
+                    let c = &mut self.cp[ClauseKind::Binclause as usize].clauses[ci] as *mut Clause;
                     if (*c).lit[0] == false_lit {
                         other = (*c).lit[1];
                         next = (*c).next_watcher[0];
@@ -46,39 +44,27 @@ impl SolveSAT for Solver {
                         (*c).lit.swap(0, 1);
                         (*c).next_watcher.swap(0, 1);
                     }
-                    println!(
-                        " propagate bi clause: cix {}, false_lit {}, lit[0] {} = other {}, next {}",
-                        ci,
-                        false_lit.int(),
-                        (*c).lit[0].int(),
-                        other.int(),
-                        next
-                    );
                 }
                 match self.assigned(other) {
                     LFALSE => {
-                        println!(" - confilct ix {} = id {}", ci, ci.as_permanent_id());
-                        return ci.as_permanent_id();
+                        println!(" - confilct binclause ix {}", ci);
+                        return ClauseKind::Binclause.id_from(ci);
                     }
                     LTRUE => {}
                     _ => {
-                        println!(
-                            " unit propagation {} by biclause ix {} = id {}",
-                            other.int(),
-                            ci,
-                            ci.as_permanent_id()
-                        );
-                        self.uncheck_enqueue(other, ci.as_permanent_id());
+                        println!(" unit propagation {} by biclause ix {}", other.int(), ci,);
+                        //let cid = self.cp[ClauseKind::Binclause as usize].id_from(ci);
+                        //self.uncheck_enqueue(other, cid);
+                        self.uncheck_enqueue(other, ClauseKind::Binclause.id_from(ci));
                     }
                 }
                 ci = next;
             }
             // permanents
-            ci = self.clauses.watches_per[p_usize];
+            ci = self.cp[ClauseKind::Permanent as usize].watcher[p_usize];
             'next_permanent: while ci != NULL_CLAUSE {
                 unsafe {
-                    let c =
-                        &mut self.clauses.kind[ClauseKind::Permanent as usize][ci] as *mut Clause;
+                    let c = &mut self.cp[ClauseKind::Permanent as usize].clauses[ci] as *mut Clause;
                     let (other, next) = if (*c).lit[0] == false_lit {
                         ((*c).lit[1], (*c).next_watcher[0])
                     } else {
@@ -108,16 +94,6 @@ impl SolveSAT for Solver {
                         ci = next;
                         continue 'next_permanent;
                     }
-                    if ci == 1 {
-                        println!(
-                            " - permanent: cix {}, false_lit {}, lit[{}, {}], lits {:?}",
-                            ci,
-                            false_lit.int(),
-                            (*c).lit[0].int(),
-                            (*c).lit[1].int(),
-                            vec2int((*c).lits.clone())
-                        );
-                    }
                     let uni: Lit;
                     {
                         for k in 0..(*c).lits.len() {
@@ -132,8 +108,8 @@ impl SolveSAT for Solver {
                             }
                         }
                         if fv == LFALSE {
-                            println!(" - confilct ix {} = id {}", ci, ci.as_permanent_id());
-                            return ci.as_permanent_id();
+                            println!(" - confilct permanent ix {}", ci);
+                            return ClauseKind::Permanent.id_from(ci);
                         }
                         uni = (*c).lit[0];
                         debug_assert_eq!(fv, BOTTOM);
@@ -141,23 +117,22 @@ impl SolveSAT for Solver {
                         debug_assert_ne!(uni, p);
                         debug_assert_ne!(uni, false_lit);
                     }
-                    self.uncheck_enqueue(uni, ci.as_permanent_id());
+                    let cid = self.cp[ClauseKind::Permanent as usize].id_from(ci);
+                    self.uncheck_enqueue(uni, cid);
                     println!(
-                        " unit propagation of {} by {} = id {} then {}",
+                        " unit propagation of {} by permanent {} then {}",
                         other.int(),
                         (*c),
-                        ci.as_permanent_id(),
                         next
                     );
                     ci = next;
                 }
             }
             // deletables
-            ci = self.clauses.watches_del[p_usize];
+            ci = self.cp[ClauseKind::Removable as usize].watcher[p_usize];
             'next_deletable: while ci != NULL_CLAUSE {
                 unsafe {
-                    let c =
-                        &mut self.clauses.kind[ClauseKind::Deletable as usize][ci] as *mut Clause;
+                    let c = &mut self.cp[ClauseKind::Removable as usize].clauses[ci] as *mut Clause;
                     let (other, next) = if (*c).lit[0] == false_lit {
                         ((*c).lit[1], (*c).next_watcher[0])
                     } else {
@@ -196,27 +171,27 @@ impl SolveSAT for Solver {
                             }
                         }
                         if fv == LFALSE {
-                            println!(" - confilct ix {} = id {}", ci, ci.as_deletable_id());
-                            return ci.as_deletable_id();
+                            println!(
+                                " - confilct ix {} = id {}",
+                                ci,
+                                self.cp[ClauseKind::Removable as usize].id_from(ci)
+                            );
+                            return ClauseKind::Removable.id_from(ci);
                         }
                         uni = (*c).lit[0];
                     }
-                    println!(
-                        " unit propagation of {} by {} = id {}",
-                        other.int(),
-                        (*c),
-                        ci.as_deletable_id()
-                    );
-                    self.uncheck_enqueue(uni, ci.as_deletable_id());
+                    println!(" unit propagation of {} by removable {}", other.int(), (*c),);
+                    let cid = ClauseKind::Removable.id_from(ci);
+                    self.uncheck_enqueue(uni, cid);
                     ci = next;
                 }
             }
             let mut ci;
             // sweep binary clauses
-            ci = self.clauses.watches_bi[p_usize];
-            self.clauses.watches_bi[p_usize] = NULL_CLAUSE;
+            ci = self.cp[ClauseKind::Binclause as usize].watcher[p_usize];
+            self.cp[ClauseKind::Binclause as usize].watcher[p_usize] = NULL_CLAUSE;
             while ci != NULL_CLAUSE {
-                let c = &mut self.clauses.kind[ClauseKind::Permanent as usize][ci];
+                let c = &mut self.cp[ClauseKind::Binclause as usize].clauses[ci];
                 let pivot = if (*c).lit[0] == false_lit { 0 } else { 1 };
                 debug_assert_eq!(pivot, 1);
                 let next = (*c).next_watcher[pivot];
@@ -226,16 +201,15 @@ impl SolveSAT for Solver {
                     c.lits[c.swap - 1] = tmp;
                 }
                 let watch = (*c).lit[pivot].negate() as usize;
-                let top = self.clauses.watches_bi[watch];
-                c.next_watcher[pivot] = top;
-                self.clauses.watches_bi[watch] = ci;
+                c.next_watcher[pivot] = self.cp[ClauseKind::Binclause as usize].watcher[watch];
+                self.cp[ClauseKind::Binclause as usize].watcher[watch] = ci;
                 ci = next;
             }
             // sweep permanent clauses
-            ci = self.clauses.watches_per[p_usize];
-            self.clauses.watches_per[p_usize] = NULL_CLAUSE;
+            ci = self.cp[ClauseKind::Permanent as usize].watcher[p_usize];
+            self.cp[ClauseKind::Permanent as usize].watcher[p_usize] = NULL_CLAUSE;
             while ci != NULL_CLAUSE {
-                let c = &mut self.clauses.kind[ClauseKind::Permanent as usize][ci];
+                let c = &mut self.cp[ClauseKind::Permanent as usize].clauses[ci];
                 let pivot = if (*c).lit[0] == false_lit { 0 } else { 1 };
                 debug_assert_eq!(pivot, 1);
                 let next = (*c).next_watcher[pivot];
@@ -245,24 +219,23 @@ impl SolveSAT for Solver {
                     c.lits[c.swap - 1] = tmp;
                 }
                 let watch = (*c).lit[pivot].negate() as usize;
-                let top = self.clauses.watches_per[watch];
-                c.next_watcher[pivot] = top;
-                self.clauses.watches_per[watch] = ci;
+                c.next_watcher[pivot] = self.cp[ClauseKind::Permanent as usize].watcher[watch];
+                self.cp[ClauseKind::Permanent as usize].watcher[watch] = ci;
                 if false {
                     println!(
                         " move {} to {} connected to {}",
                         c,
                         (watch as u32).int(),
-                        top
+                        self.cp[ClauseKind::Permanent as usize].watcher[watch]
                     );
                 }
                 ci = next;
             }
             // sweep deletable clauses
-            ci = self.clauses.watches_del[p_usize];
-            self.clauses.watches_del[p_usize] = NULL_CLAUSE;
+            ci = self.cp[ClauseKind::Removable as usize].watcher[p_usize];
+            self.cp[ClauseKind::Removable as usize].watcher[p_usize] = NULL_CLAUSE;
             while ci != NULL_CLAUSE {
-                let c = &mut self.clauses.kind[ClauseKind::Deletable as usize][ci];
+                let c = &mut self.cp[ClauseKind::Removable as usize].clauses[ci];
                 let pivot = if (*c).lit[0] == false_lit { 0 } else { 1 };
                 let next = (*c).next_watcher[pivot];
                 if c.swap != 0 {
@@ -271,9 +244,8 @@ impl SolveSAT for Solver {
                     c.lits[c.swap - 1] = tmp;
                 }
                 let watch = (*c).lit[pivot].negate() as usize;
-                let top = self.clauses.watches_del[watch];
-                c.next_watcher[pivot] = top;
-                self.clauses.watches_del[watch] = ci;
+                c.next_watcher[pivot] = self.cp[ClauseKind::Removable as usize].watcher[watch];
+                self.cp[ClauseKind::Removable as usize].watcher[watch] = ci;
                 ci = next;
             }
         }
@@ -328,10 +300,9 @@ impl SolveSAT for Solver {
                     self.decay_cla_activity();
                     // glucose reduction
                     let conflicts = self.stats[Stat::NumOfBackjump as usize] as usize;
-                    if self.cur_restart * self.clauses.next_reduction <= conflicts {
-                        self.cur_restart = ((conflicts as f64)
-                            / (self.clauses.next_reduction as f64))
-                            as usize + 1;
+                    if self.cur_restart * self.next_reduction <= conflicts {
+                        self.cur_restart =
+                            ((conflicts as f64) / (self.next_reduction as f64)) as usize + 1;
                         self.reduce_database();
                     }
                     self.block_restart(lbd, d);
@@ -351,9 +322,14 @@ impl SolveSAT for Solver {
                 v.assign = sig;
                 v.level = dl;
                 v.reason = cid;
-                self.clauses.mref(cid).locked = true;
+                self.cp[cid.to_kind()].clauses[cid.to_index()].locked = true;
             }
-            println!("implication {} by {}", l.int(), cid.as_deletable_id());
+            println!(
+                "implication {} by {} {}",
+                l.int(),
+                cid.to_kind(),
+                cid.to_index()
+            );
             self.trail.push(l);
             true
         } else {
@@ -380,18 +356,18 @@ impl Solver {
         v.level = dl;
         v.reason = cid;
         if 0 < cid {
-            self.clauses.mref(cid).locked = true;
+            println!(
+                "::uncheck_enqueue of {} by {}::{}",
+                l.int(),
+                cid.to_kind(),
+                cid.to_index(),
+            );
         }
-        println!(
-            "uncheck implication {} by {}",
-            l.int(),
-            cid.as_deletable_id()
-        );
         self.trail.push(l);
     }
     pub fn uncheck_assume(&mut self, l: Lit) -> () {
         self.trail_lim.push(self.trail.len());
-        println!("decision {}", l.int());
+        println!("::decision {}", l.int());
         self.uncheck_enqueue(l, NULL_CLAUSE);
     }
 }

@@ -44,8 +44,8 @@ fn report_stat(s: &Solver) -> () {
         s.stats[Stat::NumOfBlockRestart as usize],
         s.stats[Stat::NumOfRestart as usize],
         s.stats[Stat::NumOfReduction as usize],
-        s.clauses.kind[ClauseKind::Permanent as usize].len(),
-        s.clauses.kind[ClauseKind::Deletable as usize].len(),
+        s.cp[ClauseKind::Permanent as usize].clauses.len(),
+        s.cp[ClauseKind::Removable as usize].clauses.len(),
     );
     println!(
         "EMA:: Asg (s:{:>.2}, f:{:>.2}), LBD (s:{:>.2}, f:{:>.2}), DL (conflict:{:>.2}, backjump:{:>.2})",
