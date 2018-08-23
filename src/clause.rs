@@ -150,7 +150,7 @@ impl ClauseIdIndexEncoding for Clause {
         self.index
     }
     fn to_kind(&self) -> usize {
-        (!self.learnt || 2 == self.lits.len()) as usize
+        self.kind as usize
     }
 }
 

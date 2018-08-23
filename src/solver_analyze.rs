@@ -28,14 +28,14 @@ impl CDCL for Solver {
         loop {
             unsafe {
                 let c = &mut self.cp[cid.to_kind()].clauses[cid.to_index()] as *mut Clause;
-                println!(
-                    "analyze({}): {} ({} :: {}) < {}",
-                    p.int(),
-                    *c,
-                    cid.to_kind(),
-                    cid.to_index(),
-                    self.cp[ClauseKind::Removable as usize].clauses.len()
-                );
+                // println!(
+                //     "analyze({}): {} ({} :: {}) < {}",
+                //     p.int(),
+                //     *c,
+                //     cid.to_kind(),
+                //     cid.to_index(),
+                //     self.cp[ClauseKind::Removable as usize].clauses.len()
+                // );
                 debug_assert_ne!(cid, NULL_CLAUSE);
                 // println!("  analyze.loop {}", (*c));
                 let d = (*c).rank;

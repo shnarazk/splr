@@ -156,7 +156,6 @@ impl SolveSAT for Solver {
                 v.assign = sig;
                 v.level = dl;
                 v.reason = cid;
-                // self.cp[cid.to_kind()].clauses[cid.to_index()].locked = true;
                 cref!(self.cp, cid).locked = true;
             }
             println!(
@@ -186,19 +185,20 @@ impl Solver {
         v.assign = l.lbool();
         v.level = dl;
         v.reason = cid;
-        if 0 < cid {
-            println!(
-                "::uncheck_enqueue of {} by {}::{}",
-                l.int(),
-                cid.to_kind(),
-                cid.to_index(),
-            );
-        }
+        cref!(self.cp, cid).locked = true;
+        // if 0 < cid {
+        //     println!(
+        //         "::uncheck_enqueue of {} by {}::{}",
+        //         l.int(),
+        //         cid.to_kind(),
+        //         cid.to_index(),
+        //     );
+        // }
         self.trail.push(l);
     }
     pub fn uncheck_assume(&mut self, l: Lit) -> () {
         self.trail_lim.push(self.trail.len());
-        println!("::decision {}", l.int());
+        // println!("::decision {}", l.int());
         self.uncheck_enqueue(l, NULL_CLAUSE);
     }
 }
