@@ -4,7 +4,7 @@ use splr::solver::{Certificate, SatSolver, Solver, Stat};
 use splr::types::EmaKind;
 use std::env;
 
-const VERSION: &str = "Splr 0.0.1 No Id, A single storage";
+const VERSION: &str = "Splr-0.0.2, Technical Preview 2";
 
 fn main() {
     // println!("splr 0.0.1 CARGO_MANIFEST_DIR = {}", env!("CARGO_MANIFEST_DIR"));
