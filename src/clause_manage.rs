@@ -201,10 +201,10 @@ impl ClauseManagement for Solver {
             self.stats[Stat::NumOfReduction as usize] += 1;
         }
         println!(
-            "# DB::drop 1/2 Rem {:>9}, Per {:>9},Bin {:>9}   Restart:: block {:>4} force {:>4}",
-            self.cp[ClauseKind::Removable as usize].clauses.len(),
-            self.cp[ClauseKind::Permanent as usize].clauses.len(),
-            self.cp[ClauseKind::Binclause as usize].clauses.len(),
+            "# DB::drop 1/2 Rem{:>9}, Per{:>9}, Bin{:>9}   Restart:: block {:>4} force {:>4}",
+            self.cp[ClauseKind::Removable as usize].clauses.len() - 1,
+            self.cp[ClauseKind::Permanent as usize].clauses.len() - 1,
+            self.cp[ClauseKind::Binclause as usize].clauses.len() - 1,
             self.stats[Stat::NumOfBlockRestart as usize],
             self.stats[Stat::NumOfRestart as usize],
         );
@@ -293,10 +293,10 @@ impl ClauseManagement for Solver {
             }
         }
         println!(
-            "# DB::simplify {:>9}, {:>9}, {:>9}   Restart:: block {:>4} force {:>4}",
-            self.cp[ClauseKind::Removable as usize].clauses.len(),
-            self.cp[ClauseKind::Permanent as usize].clauses.len(),
-            self.cp[ClauseKind::Binclause as usize].clauses.len(),
+            "# DB::simplify Rem{:>9}, Per{:>9}, Bin{:>9}   Restart:: block {:>4} force {:>4}",
+            self.cp[ClauseKind::Removable as usize].clauses.len() - 1,
+            self.cp[ClauseKind::Permanent as usize].clauses.len() - 1,
+            self.cp[ClauseKind::Binclause as usize].clauses.len() - 1,
             self.stats[Stat::NumOfBlockRestart as usize],
             self.stats[Stat::NumOfRestart as usize],
         );
