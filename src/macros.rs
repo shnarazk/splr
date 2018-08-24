@@ -1,5 +1,5 @@
 /// In solver's method, use it like
-/// ```
+/// ```ignore
 /// cref!(self.cv, cid)
 /// ```
 #[macro_export]
