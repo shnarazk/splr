@@ -211,176 +211,92 @@ impl ClauseManagement for Solver {
     }
     fn simplify_database(&mut self) -> () {
         debug_assert_eq!(self.decision_level(), 0);
-        return;
-        let p_end = self.cp[ClauseKind::Permanent as usize].clauses.len();
-        let d_end = self.cp[ClauseKind::Removable as usize].clauses.len();
         // remove unsatisfiable literals in clauses
         let targets: Vec<Lit> = self.trail[self.num_solved_vars..]
             .iter()
             .map(|l| l.negate())
             .collect();
-        for mut c in &mut self.cp[ClauseKind::Permanent as usize].clauses {
-            c.lits.retain(|l| {
-                for t in &targets {
-                    if t == l {
-                        return false;
+        for ck in &KINDS {
+            for mut c in &mut self.cp[*ck as usize].clauses {
+                c.lits.retain(|l| {
+                    for t in &targets {
+                        if t == l {
+                            return false;
+                        }
                     }
-                }
-                true
-            });
+                    true
+                });
+            }
         }
-        for mut c in &mut self.cp[ClauseKind::Removable as usize].clauses {
-            c.lits.retain(|l| {
-                for t in &targets {
-                    if t == l {
-                        return false;
-                    }
-                }
-                true
-            });
-        }
-        let mut p_purges = 0;
-        let mut d_purges = 0;
-        {
-            let p_perm = &mut self.cp[ClauseKind::Permanent as usize].permutation;
-            if p_perm.len() < p_end {
+        // extend permutation table if needed
+        for ck in &KINDS {
+            let nc = self.cp[*ck as usize].clauses.len();
+            let perm = &mut self.cp[*ck as usize].permutation;
+            if perm.len() < nc {
                 unsafe {
-                    p_perm.reserve(p_end);
-                    p_perm.set_len(p_end);
+                    perm.reserve(nc);
+                    perm.set_len(nc);
                 }
             }
             // reinitialize the permutation table.
-            for x in p_perm {
+            for x in perm {
                 *x = 0;
             }
         }
-        {
-            let d_perm = &mut self.cp[ClauseKind::Removable as usize].permutation;
-            if d_perm.len() < d_end {
+        // set key FIXME check lit[2] and lits[..]
+        for ck in &KINDS {
+            for ci in 1..self.cp[*ck as usize].clauses.len() {
                 unsafe {
-                    d_perm.reserve(d_end);
-                    d_perm.set_len(d_end);
-                }
-            }
-            for x in d_perm {
-                *x = 0;
-            }
-        }
-        // set key
-        for ci in 1..self.cp[ClauseKind::Permanent as usize].clauses.len() {
-            unsafe {
-                let c = &mut self.cp[ClauseKind::Permanent as usize].clauses[ci] as *mut Clause;
-                if self.satisfies(&*c) {
-                    (*c).index = MAX;
-                    p_purges += 1;
-                } else if (*c).lits.len() == 0 && false {
-                    if !self.enqueue((*c).lits[0], NULL_CLAUSE) {
-                        self.ok = false;
-                    }
-                    (*c).index = MAX;
-                }
-            }
-        }
-        for ci in 1..self.cp[ClauseKind::Removable as usize].clauses.len() {
-            unsafe {
-                let c = &mut self.cp[ClauseKind::Removable as usize].clauses[ci] as *mut Clause;
-                if self.satisfies(&*c) {
-                    (*c).index = MAX;
-                    d_purges += 1;
-                } else if (*c).lits.len() == 0 && false {
-                    if !self.enqueue((*c).lits[0], NULL_CLAUSE) {
-                        self.ok = false;
-                    }
-                    (*c).index = MAX;
-                } else {
-                    let new = self.lbd_of(&(*c).lits);
-                    if new < (*c).rank {
-                        (*c).rank = new;
+                    let c = &mut self.cp[*ck as usize].clauses[ci] as *mut Clause;
+                    if self.satisfies(&*c) {
+                        (*c).index = MAX;
+                    } else if (*c).lits.len() == 0 && false {
+                        if !self.enqueue((*c).lits[0], NULL_CLAUSE) {
+                            self.ok = false;
+                        }
+                        (*c).index = MAX;
+                        // } else {
+                        //     let new = self.lbd_of(&(*c).lits);
+                        //     if new < (*c).rank {
+                        //         (*c).rank = new;
+                        //     }
+                        // }
                     }
                 }
-            }
-        }
-        self.cp[ClauseKind::Permanent as usize]
-            .clauses
-            .retain(|ref c| c.index < MAX);
-        self.cp[ClauseKind::Removable as usize]
-            .clauses
-            .retain(|ref c| c.index < MAX);
-        let new_p_end = self.cp[ClauseKind::Permanent as usize].clauses.len();
-        let new_d_end = self.cp[ClauseKind::Removable as usize].clauses.len();
-        debug_assert_eq!(new_p_end, p_end - p_purges);
-        debug_assert_eq!(new_d_end, d_end - d_purges);
-        if new_p_end == p_end && new_d_end == d_end {
-            return;
-        }
-        {
-            let p_perm = &mut self.cp[ClauseKind::Permanent as usize].permutation;
-            for i in 0..new_p_end {
-                let old: usize = self.cp[ClauseKind::Permanent as usize].clauses[i].index;
-                p_perm[old] = i;
-                self.cp[ClauseKind::Permanent as usize].clauses[i].index = i;
-            }
-        }
-        {
-            let d_perm = &mut self.cp[ClauseKind::Removable as usize].permutation;
-            for i in 0..new_d_end {
-                let old = self.cp[ClauseKind::Removable as usize].clauses[i].index;
-                d_perm[old] = i;
-                self.cp[ClauseKind::Removable as usize].clauses[i].index = i;
             }
         }
         // clear the reasons of variables satisfied at level zero.
         for l in &self.trail {
             self.vars[l.vi() as usize].reason = NULL_CLAUSE;
         }
-        self.cp[ClauseKind::Permanent as usize]
-            .clauses
-            .truncate(new_p_end);
-        self.cp[ClauseKind::Removable as usize]
-            .clauses
-            .truncate(new_d_end);
-        // rebuild watches for biclause and permanets
-        for mut x in &mut self.cp[ClauseKind::Binclause as usize].watcher {
-            *x = NULL_CLAUSE;
-        }
-        for mut x in &mut self.cp[ClauseKind::Permanent as usize].watcher {
-            *x = NULL_CLAUSE;
-        }
-        for mut c in &mut self.cp[ClauseKind::Permanent as usize].clauses {
-            if c.lits.len() == 0 {
+        for ck in &KINDS {
+            self.cp[*ck as usize].clauses.retain(|ref c| c.index < MAX);
+            let len = self.cp[*ck as usize].clauses.len();
+            let perm = &mut self.cp[*ck as usize].permutation;
+            for i in 0..len {
+                let old: usize = self.cp[*ck as usize].clauses[i].index;
+                perm[old] = i;
+                self.cp[*ck as usize].clauses[i].index = i;
+            }
+            self.cp[*ck as usize].clauses.truncate(len);
+            // rebuild watches for deletables
+            for mut x in &mut self.cp[*ck as usize].watcher {
+                *x = NULL_CLAUSE;
+            }
+            for mut c in &mut self.cp[*ck as usize].clauses {
                 let w0 = c.lit[0].negate() as usize;
-                c.next_watcher[0] = self.cp[ClauseKind::Binclause as usize].watcher[w0];
-                self.cp[ClauseKind::Binclause as usize].watcher[w0] = c.index;
+                c.next_watcher[0] = self.cp[*ck as usize].watcher[w0];
+                self.cp[*ck as usize].watcher[w0] = c.index;
                 let w1 = c.lit[1].negate() as usize;
-                c.next_watcher[1] = self.cp[ClauseKind::Binclause as usize].watcher[w1];
-                self.cp[ClauseKind::Binclause as usize].watcher[w1] = c.index;
-            } else {
-                let w0 = c.lit[0].negate() as usize;
-                c.next_watcher[0] = self.cp[ClauseKind::Permanent as usize].watcher[w0];
-                self.cp[ClauseKind::Permanent as usize].watcher[w0] = c.index;
-                let w1 = c.lit[1].negate() as usize;
-                c.next_watcher[1] = self.cp[ClauseKind::Permanent as usize].watcher[w1];
-                self.cp[ClauseKind::Permanent as usize].watcher[w1] = c.index;
+                c.next_watcher[1] = self.cp[*ck as usize].watcher[w1];
+                self.cp[*ck as usize].watcher[w1] = c.index;
             }
         }
-        // rebuild watches for deletables
-        for mut x in &mut self.cp[ClauseKind::Removable as usize].watcher {
-            *x = NULL_CLAUSE;
-        }
-        for mut c in &mut self.cp[ClauseKind::Removable as usize].clauses {
-            let w0 = c.lit[0].negate() as usize;
-            c.next_watcher[0] = self.cp[ClauseKind::Removable as usize].watcher[w0];
-            self.cp[ClauseKind::Removable as usize].watcher[w0] = c.index;
-            let w1 = c.lit[1].negate() as usize;
-            c.next_watcher[1] = self.cp[ClauseKind::Removable as usize].watcher[w1];
-            self.cp[ClauseKind::Removable as usize].watcher[w1] = c.index;
-        }
         println!(
-            "# DB::simplify {:>9} +{:>8} => {:>9} +{:>8}   Restart:: block {:>4} force {:>4}",
-            d_end,
-            p_end,
-            new_d_end,
-            new_p_end,
+            "# DB::simplify {:>9}, {:>9}, {:>9}   Restart:: block {:>4} force {:>4}",
+            self.cp[ClauseKind::Removable as usize].clauses.len(),
+            self.cp[ClauseKind::Permanent as usize].clauses.len(),
+            self.cp[ClauseKind::Binclause as usize].clauses.len(),
             self.stats[Stat::NumOfBlockRestart as usize],
             self.stats[Stat::NumOfRestart as usize],
         );
