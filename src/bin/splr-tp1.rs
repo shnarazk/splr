@@ -12,7 +12,7 @@ fn main() {
         match arg {
             _ if arg.to_string() == "--version" => {
                 println!(
-                    "Splr 0.0.1  -- based on MiniSAT/Glucose (Many thanks to MiniSAT/Glucose team)"
+                    "Splr-0.0.1, Technical Preview 1"
                 );
             }
             _ if (&*arg).starts_with('-') => {
