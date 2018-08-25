@@ -42,8 +42,11 @@ impl CDCL for Solver {
                 if cid.to_kind() == (ClauseKind::Removable as usize) {
                     self.bump_cid(cid);
                     let nblevel = self.lbd_of(&(*c).lits);
-                    if nblevel < d {
+                    if nblevel + 1 < d {
                         (*c).rank = nblevel;
+                        // if nblevel <= 30 {
+                        //     (*c).just_used = true;
+                        // }
                     }
                 }
                 // println!("{}を対応", (*c));

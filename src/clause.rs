@@ -124,6 +124,8 @@ pub struct Clause {
     pub locked: bool,
     /// given or learnt
     pub learnt: bool,
+    /// used in the current phase
+    pub just_used: bool,
     /// cache for propagation
     pub swap: usize,
 }
@@ -209,6 +211,7 @@ impl Clause {
             lits: v,
             index: 0,
             locked: false,
+            just_used: false,
             swap: 0,
         }
     }
@@ -223,6 +226,7 @@ impl Clause {
             index: 0,
             locked: false,
             learnt: false,
+            just_used: false,
             swap: 0,
         }
     }

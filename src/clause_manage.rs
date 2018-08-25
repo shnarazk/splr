@@ -166,7 +166,7 @@ impl ClauseManagement for Solver {
                 for mut i in 0..nc {
                     perm[cp.clauses[i].index] = i;
                 }
-                cp.clauses.retain(|c| perm[c.index] < nkeep || c.locked);
+                cp.clauses.retain(|c| perm[c.index] < nkeep || c.locked || c.just_used);
             }
             let new_len = cp.clauses.len();
             // update permutation table.
@@ -177,6 +177,7 @@ impl ClauseManagement for Solver {
                 let c = &mut cp.clauses[new];
                 perm[c.index] = new;
                 c.index = new;
+                c.just_used = false;
             }
             // rebuild reason
             for v in &mut self.vars[1..] {
