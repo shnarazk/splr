@@ -61,7 +61,7 @@ impl Restart for Solver {
         self.c_lvl.update(clv as f64);
         self.b_lvl.update(b_l);
         let should_block = R < e_asg;
-        if 100 < count && self.next_restart <= cnt && should_block {
+        if 100 < count && self.next_restart <= count && should_block {
             self.next_restart = count + 50;
             self.stats[Stat::NumOfBlockRestart as usize] += 1;
             // println!("blocking {:.2} {:.2}", e_asg, self.stats[Stat::NumOfBlockRestart as usize]);
