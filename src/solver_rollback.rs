@@ -9,8 +9,8 @@ pub trait Restart {
     fn block_restart(&mut self, lbd: usize, clv: usize) -> ();
 }
 
-const R: f64 = 1.05; // 1.40 <= 1.11; block restart by average assigment
-const K: f64 = 1.40; // 1.15 <= 0.83; force restart by average LBD
+const R: f64 = 1.30; // 1.40 <= 1.11; block restart by average assigment
+const K: f64 = 1.30; // 1.15 <= 0.83; force restart by average LBD
 
 impl Restart for Solver {
     fn cancel_until(&mut self, lv: usize) -> () {
