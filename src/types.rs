@@ -122,7 +122,7 @@ pub trait EmaKind {
     /// returns a new EMA from a flag (slow or fast) and a window size
     fn get(&self) -> f64;
     /// returns an EMA value
-    fn update(&mut self, x: f64) -> f64;
+    fn update(&mut self, x: f64) -> ();
 }
 
 /// Exponential Moving Average pair
@@ -130,29 +130,34 @@ pub trait EmaKind {
 pub struct Ema2 {
     pub fast: f64,
     pub slow: f64,
+    pub calf: f64,
+    pub cals: f64,
     fe: f64,
     se: f64,
 }
 
 impl Ema2 {
-    pub fn new(f: i32, s: i32) -> Ema2 {
+    pub fn new(f: f64, s: f64) -> Ema2 {
         Ema2 {
             fast: 0.0,
             slow: 0.0,
-            fe: 1.0 / f as f64,
-            se: 1.0 / s as f64,
+            calf: 1.0,
+            cals: 1.0,
+            fe: 1.0 / f,
+            se: 1.0 / s,
         }
     }
 }
 
 impl EmaKind for Ema2 {
     fn get(&self) -> f64 {
-        self.fast / self.slow
+        self.fast / self.slow * (self.cals / self.calf)
     }
-    fn update(&mut self, x: f64) -> f64 {
+    fn update(&mut self, x: f64) -> () {
         self.fast = &self.fe * x + (1.0 - &self.fe) * &self.fast;
         self.slow = &self.se * x + (1.0 - &self.se) * &self.slow;
-        self.fast / self.slow
+        self.calf = &self.fe + (1.0 - &self.fe) * &self.calf;
+        self.cals = &self.se + (1.0 - &self.se) * &self.cals;
     }
 }
 
@@ -170,12 +175,11 @@ impl EmaKind for Ema {
     fn get(&self) -> f64 {
         self.0 / self.2
     }
-    fn update(&mut self, x: f64) -> f64 {
+    fn update(&mut self, x: f64) -> () {
         let e = &self.1 * x + (1.0 - &self.1) * &self.0;
         self.0 = e;
         let c = &self.1 + (1.0 - &self.1) * &self.2;
         self.2 = c;
-        e / c
     }
 }
 
@@ -193,10 +197,9 @@ impl EmaKind for Ema_ {
     fn get(&self) -> f64 {
         self.0 / self.1
     }
-    fn update(&mut self, x: f64) -> f64 {
+    fn update(&mut self, x: f64) -> () {
         let e = &self.1 * x + (1.0 - &self.1) * &self.0;
         self.0 = e;
-        e
     }
 }
 

@@ -9,8 +9,8 @@ pub trait Restart {
     fn block_restart(&mut self, lbd: usize, clv: usize) -> ();
 }
 
-const K: f64 = 0.87; // 0.83; force restart
-const R: f64 = 1.15; // 1.11; block restart
+const R: f64 = 1.05; // 1.40 <= 1.11; block restart by average assigment
+const K: f64 = 1.40; // 1.15 <= 0.83; force restart by average LBD
 
 impl Restart for Solver {
     fn cancel_until(&mut self, lv: usize) -> () {
@@ -36,32 +36,33 @@ impl Restart for Solver {
         self.q_head = lim;
         // self.dump("cancel_until");
     }
+    /// called after no conflict propagation
     fn force_restart(&mut self) -> () {
         let count = self.stats[Stat::NumOfBackjump as usize] as u64;
         let e_lbd = self.ema_lbd.get();
-        let _c_v = self.c_lvl.get();
-        let should_force = 1.0 / K < e_lbd;
-        if !(count < self.check_restart) && should_force {
+        let should_force = K < e_lbd;
+        if self.next_restart < count && should_force {
             self.next_restart = count + 50;
-            self.check_restart = count + 50; // (1.5 * c_v) as u64;
             self.stats[Stat::NumOfRestart as usize] += 1;
-            // println!("forcing {:.2} {:.2}", e_lbd, self.stats[Stat::NumOfRestart as usize]);
             let rl = self.root_level;
             self.cancel_until(rl);
+            // println!(" - {:.2} {:.2}", cnt, e_lbd);
         }
     }
+    /// called after conflict resolution
     fn block_restart(&mut self, lbd: usize, clv: usize) -> () {
         let count = self.stats[Stat::NumOfBackjump as usize] as u64;
         let nas = self.num_assigns() as f64;
         let b_l = self.decision_level() as f64;
-        let e_asg = self.ema_asg.update(nas);
-        let _e_lbd = self.ema_lbd.update(lbd as f64);
-        let _c_v = self.c_lvl.update(clv as f64);
-        let should_block = R < e_asg;
+        self.ema_asg.update(nas);
+        let e_asg = self.ema_asg.get();
+        self.ema_lbd.update(lbd as f64);
+        let _e_lbd = self.ema_lbd.get();
+        self.c_lvl.update(clv as f64);
         self.b_lvl.update(b_l);
-        if !(count < self.check_restart) && should_block {
-            self.next_restart = count + 50; // 1000 + ((c_v.powf(2.0)) as u64);
-            self.check_restart = count + 50;
+        let should_block = R < e_asg;
+        if 100 < count && self.next_restart <= cnt && should_block {
+            self.next_restart = count + 50;
             self.stats[Stat::NumOfBlockRestart as usize] += 1;
             // println!("blocking {:.2} {:.2}", e_asg, self.stats[Stat::NumOfBlockRestart as usize]);
         }

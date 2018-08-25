@@ -49,7 +49,7 @@ pub enum Stat {
     NumOfLearnt,       // the number of 'alive' learnt clauses
     NumOfVariable,     // the number of 'alive' variables
     NumOfGroundVar,    // the number os assined variables at level 0
-    NumOfAssigned,     // the number of assigned variables
+    NumOfAssign,       // the number of assigned variables
     EndOfStatIndex,    // Don't use this dummy.
 }
 
@@ -93,7 +93,6 @@ pub struct Solver {
     pub b_lvl: Ema,
     pub c_lvl: Ema,
     pub next_restart: u64,
-    pub check_restart: u64,
     pub restart_exp: f64,
     pub rbias: Ema,
 }
@@ -141,12 +140,11 @@ impl Solver {
             mi_var_map: vec![0; nv + 1],
             stats: vec![0; Stat::EndOfStatIndex as usize],
             lbd_seen: vec![0; nv + 1],
-            ema_asg: Ema2::new(fe, se),
-            ema_lbd: Ema2::new(fe, se),
+            ema_asg: Ema2::new(1.0, 8192.0), // for blocking
+            ema_lbd: Ema2::new(8.0, 8192.0), // for forcing
             b_lvl: Ema::new(se),
             c_lvl: Ema::new(se),
             next_restart: 100,
-            check_restart: 50,
             restart_exp: re,
             rbias: Ema::new(se),
         };

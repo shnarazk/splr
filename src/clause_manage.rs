@@ -200,14 +200,7 @@ impl ClauseManagement for Solver {
             self.next_reduction += DB_INC_SIZE + (self.c_lvl.0 as usize);
             self.stats[Stat::NumOfReduction as usize] += 1;
         }
-        println!(
-            "# DB::drop 1/2 Rem{:>9}, Per{:>9}, Bin{:>9}   Restart:: block {:>4} force {:>4}",
-            self.cp[ClauseKind::Removable as usize].clauses.len() - 1,
-            self.cp[ClauseKind::Permanent as usize].clauses.len() - 1,
-            self.cp[ClauseKind::Binclause as usize].clauses.len() - 1,
-            self.stats[Stat::NumOfBlockRestart as usize],
-            self.stats[Stat::NumOfRestart as usize],
-        );
+        self.progress("drop 1/2");
     }
     fn simplify_database(&mut self) -> () {
         debug_assert_eq!(self.decision_level(), 0);
@@ -292,14 +285,7 @@ impl ClauseManagement for Solver {
                 self.cp[*ck as usize].watcher[w1] = c.index;
             }
         }
-        println!(
-            "# DB::simplify Rem{:>9}, Per{:>9}, Bin{:>9}   Restart:: block {:>4} force {:>4}",
-            self.cp[ClauseKind::Removable as usize].clauses.len() - 1,
-            self.cp[ClauseKind::Permanent as usize].clauses.len() - 1,
-            self.cp[ClauseKind::Binclause as usize].clauses.len() - 1,
-            self.stats[Stat::NumOfBlockRestart as usize],
-            self.stats[Stat::NumOfRestart as usize],
-        );
+        self.progress("simplify");
     }
     fn lbd_of(&mut self, v: &[Lit]) -> usize {
         let key;
@@ -324,4 +310,20 @@ impl ClauseManagement for Solver {
             cnt
         }
     }
+}
+
+impl Solver {
+        fn progress(&self, mes:&str) -> () {
+        println!(
+            "# DB::{} Rem{:>9}, Per{:>8}, Bin{:>5}   Restart::block {:>6} force {:>6}    EMA::asg {:>6.2}, lbd {:>6.2}",
+            mes,
+            self.cp[ClauseKind::Removable as usize].clauses.len() - 1,
+            self.cp[ClauseKind::Permanent as usize].clauses.len() - 1,
+            self.cp[ClauseKind::Binclause as usize].clauses.len() - 1,
+            self.stats[Stat::NumOfBlockRestart as usize],
+            self.stats[Stat::NumOfRestart as usize],
+            self.ema_asg.get(),
+            self.ema_lbd.get(),
+        );
+        }
 }
