@@ -2,7 +2,7 @@
 use std::fmt;
 
 /// Variable as Index is `usize`
-pub type VarIndex = usize;
+pub type VarId = usize;
 
 /// Clause Identifier. Note: it changes after database reduction.
 pub type ClauseId = usize;
@@ -50,7 +50,7 @@ pub fn int2lit(x: i32) -> Lit {
 /// assert_eq!(int2lit(-2), int2lit( 2).negate());
 /// ```
 pub trait LiteralEncoding {
-    fn vi(&self) -> VarIndex;
+    fn vi(&self) -> VarId;
     fn int(&self) -> i32;
     fn lbool(&self) -> Lbool;
     fn positive(&self) -> bool;
@@ -59,8 +59,8 @@ pub trait LiteralEncoding {
 
 impl LiteralEncoding for Lit {
     #[inline]
-    fn vi(&self) -> VarIndex {
-        (self / 2) as VarIndex
+    fn vi(&self) -> VarId {
+        (self / 2) as VarId
     }
     fn int(&self) -> i32 {
         if self % 2 == 0 {
@@ -87,12 +87,12 @@ impl LiteralEncoding for Lit {
     }
 }
 
-/// converter from [VarIndex](type.VarIndex.html) to [Lit](type.Lit.html).
-pub trait VarIndexEncoding {
+/// converter from [VarId](type.VarId.html) to [Lit](type.Lit.html).
+pub trait VarIdEncoding {
     fn lit(&self, p: Lbool) -> Lit;
 }
 
-impl VarIndexEncoding for VarIndex {
+impl VarIdEncoding for VarId {
     #[inline]
     fn lit(&self, p: Lbool) -> Lit {
         (if p == LFALSE { 2 * self + 1 } else { 2 * self }) as Lit

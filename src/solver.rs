@@ -65,7 +65,7 @@ pub struct Solver {
     pub q_head: usize,
     pub conflicts: Vec<Lit>,
     /// Variable Order
-    pub var_order: VarIndexHeap,
+    pub var_order: VarIdHeap,
     /// Configuration
     pub config: SolverConfiguration,
     pub num_vars: usize,
@@ -123,7 +123,7 @@ impl Solver {
             trail_lim: Vec::new(),
             q_head: 0,
             conflicts: vec![],
-            var_order: VarIndexHeap::new(nv),
+            var_order: VarIdHeap::new(nv),
             config: cfg,
             num_vars: nv,
             cla_inc: cdr,

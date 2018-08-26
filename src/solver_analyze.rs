@@ -97,7 +97,7 @@ impl CDCL for Solver {
                 }
                 p = self.trail[ti];
                 {
-                    let next_vi: VarIndex = p.vi();
+                    let next_vi = p.vi();
                     cid = self.vars[next_vi].reason;
                     // println!("{} にフラグが立っている。この時path数は{}, そのreason {}を探索", next_vi, path_cnt - 1, cid);
                     self.an_seen[next_vi] = 0;

@@ -5,7 +5,7 @@ use solver::SatSolver;
 use solver::{Solver, Stat};
 use solver_propagate::SolveSAT;
 use types::*;
-use var::VarIndexHeap;
+use var::VarIdHeap;
 use var::VarOrdering;
 use solver_rollback::Restart;
 use clause_manage::ClauseManagement;
@@ -15,8 +15,8 @@ use solver::SolverException::*;
 const VAR_ACTIVITY_THRESHOLD: f64 = 1e100;
 
 pub trait VarSelect {
-    fn select_var(&mut self) -> VarIndex;
-    fn bump_vi(&mut self, vi: VarIndex) -> ();
+    fn select_var(&mut self) -> VarId;
+    fn bump_vi(&mut self, vi: VarId) -> ();
     fn decay_var_activity(&mut self) -> ();
     fn rebuild_vh(&mut self) -> ();
 }
@@ -33,7 +33,7 @@ impl VarSelect for Solver {
             }
         }
     }
-    fn bump_vi(&mut self, vi: VarIndex) -> () {
+    fn bump_vi(&mut self, vi: VarId) -> () {
         let d = self.stats[Stat::NumOfBackjump as usize] as f64;
         let a = (self.vars[vi].activity + d) / 2.0;
         self.vars[vi].activity = a;
@@ -50,7 +50,7 @@ impl VarSelect for Solver {
         self.var_inc = self.var_inc / VAR_ACTIVITY_THRESHOLD;
     }
     /// Heap operations; renamed from selectVO
-    fn select_var(&mut self) -> VarIndex {
+    fn select_var(&mut self) -> VarId {
         loop {
             if self.var_order.len() == 0 {
                 return 0;
@@ -69,15 +69,15 @@ impl VarSelect for Solver {
 pub struct Eliminator {
     merges: usize,
     /// renamed elimHeap
-    /// FIXME: can we use VarIndexHeap here?
-    heap: VarIndexHeap,
+    /// FIXME: can we use VarIdHeap here?
+    heap: VarIdHeap,
     n_touched: usize,
     /// vector of numbers of occurences which contain a literal
     n_occ: Vec<Lit>,
     occurs: Vec<Vec<ClauseId>>,
     subsumption_queue: Vec<ClauseId>,
     // frozen: Vec<Var>,           // should be in Var
-    // eliminated: Vec<Var>,       // should be in VarIndexHeap
+    // eliminated: Vec<Var>,       // should be in VarIdHeap
     bwdsub_assigns: usize,
     bwdsub_tmpunit: ClauseId,
     // working place
@@ -89,7 +89,7 @@ impl Eliminator {
     pub fn new(nv: usize) -> Eliminator {
         Eliminator {
             merges: 0,
-            heap: VarIndexHeap::new(nv + 1),
+            heap: VarIdHeap::new(nv + 1),
             n_touched: 0,
             n_occ: vec![0; nv + 1],
             occurs: vec![Vec::new(); nv + 1],
@@ -109,7 +109,7 @@ trait LiteralEliminator {
     fn gather_touched_clauses();
     fn merge(&self) -> bool;
     fn backward_subsumption_check() -> bool;
-    fn eliminate_var(&self, vi: VarIndex) -> bool;
+    fn eliminate_var(&self, vi: VarId) -> bool;
     fn extend_model(&self) -> ();
     fn remove_clause(&self, cid: ClauseId) -> ();
     fn strengthen_clause(&self, cid: ClauseId) -> bool;
@@ -201,7 +201,7 @@ impl Solver {
     }
     /// 6. merge
     /// Returns **false** if one of the clauses is always satisfied. (merge_vec should not be used.)
-    pub fn merge(&mut self, cp: ClauseId, cq: ClauseId, v: VarIndex) -> bool {
+    pub fn merge(&mut self, cp: ClauseId, cq: ClauseId, v: VarId) -> bool {
         self.eliminator.merges += 1;
         self.eliminator.merge_vec.clear();
         let pq = &self.cp[cp.to_kind()].clauses[cp.to_index()];
@@ -234,7 +234,7 @@ impl Solver {
     }
     /// 7. merge
     /// Returns **false** if one of the clauses is always satisfied.
-    pub fn merge_(&mut self, cp: ClauseId, cq: ClauseId, v: VarIndex) -> (bool, usize) {
+    pub fn merge_(&mut self, cp: ClauseId, cq: ClauseId, v: VarId) -> (bool, usize) {
         self.eliminator.merges += 1;
         let pq = &self.cp[cp.to_kind()].clauses[cp.to_index()];
         let qp = &self.cp[cq.to_kind()].clauses[cq.to_index()];
@@ -288,11 +288,11 @@ impl Solver {
         true
     }
     /// 11. asymm
-    pub fn asymm(&self, _vi: VarIndex, _ci: ClauseId) -> bool {
+    pub fn asymm(&self, _vi: VarId, _ci: ClauseId) -> bool {
         true
     }
     /// 12. asymmVar
-    pub fn asymm_var(&self, _vi: VarIndex) -> bool {
+    pub fn asymm_var(&self, _vi: VarId) -> bool {
         true
     }
     /// 13. mkElimClause
@@ -301,15 +301,15 @@ impl Solver {
         vec.push(1);
     }
     /// 14. mkElimClause
-    pub fn make_eliminating_clause_(&self, _vec: Vec<Lit>, _vi: VarIndex, _ci: ClauseId) -> () {
+    pub fn make_eliminating_clause_(&self, _vec: Vec<Lit>, _vi: VarId, _ci: ClauseId) -> () {
         
     }
     /// 15. eliminateVar
-    pub fn eliminate_var(&self, _vi: VarIndex) -> bool {
+    pub fn eliminate_var(&self, _vi: VarId) -> bool {
         true
     }
     /// 16. substitute
-    pub fn substitute(&self, _vi: VarIndex, _x: Lit) -> bool {
+    pub fn substitute(&self, _vi: VarId, _x: Lit) -> bool {
         true
     }
     /// 17. extendModel
