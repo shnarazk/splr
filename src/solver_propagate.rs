@@ -155,7 +155,7 @@ impl SolveSAT for Solver {
                 v.assign = sig;
                 v.level = dl;
                 v.reason = cid;
-                cref!(self.cp, cid).locked = true;
+                mref!(self.cp, cid).locked = true;
             }
             println!(
                 "implication {} by {} {}",
@@ -184,7 +184,7 @@ impl Solver {
         v.assign = l.lbool();
         v.level = dl;
         v.reason = cid;
-        cref!(self.cp, cid).locked = true;
+        mref!(self.cp, cid).locked = true;
         // if 0 < cid {
         //     println!(
         //         "::uncheck_enqueue of {} by {}::{}",

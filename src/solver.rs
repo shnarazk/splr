@@ -6,6 +6,7 @@ use std::fs;
 use std::io::{BufRead, BufReader};
 use types::*;
 use var::*;
+use var_manage::Eliminator;
 
 pub trait SatSolver {
     fn solve(&mut self) -> SolverResult;
@@ -76,7 +77,7 @@ pub struct Solver {
     pub cur_restart: usize,
     pub num_solved_vars: usize,
     /// Variable Elimination
-    pub assumption: Vec<VarIndex>,
+    pub eliminator: Eliminator,
     /// Working memory
     pub ok: bool,
     pub an_seen: Vec<Lit>,
@@ -107,7 +108,7 @@ impl Solver {
     pub fn new(cfg: SolverConfiguration, cnf: &CNFDescription) -> Solver {
         let nv = cnf.num_of_variables as usize;
         let nc = cnf.num_of_clauses as usize;
-        let (fe, se) = cfg.ema_coeffs;
+        let (_fe, se) = cfg.ema_coeffs;
         let re = cfg.restart_expansion;
         let cdr = cfg.clause_decay_rate;
         let vdr = cfg.variable_decay_rate;
@@ -131,7 +132,7 @@ impl Solver {
             next_reduction: 1000,
             cur_restart: 1,
             num_solved_vars: 0,
-            assumption: vec![0; nv + 1],
+            eliminator: Eliminator::new(nv),
             ok: true,
             an_seen: vec![0; nv + 1],
             an_to_clear: vec![0; nv + 1],

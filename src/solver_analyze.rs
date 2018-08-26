@@ -192,7 +192,7 @@ impl CDCL for Solver {
         if self.root_level != 0 {
             //for i in &self.clauses.iref(ci).lits[(if skip_first { 1 } else { 0 })..] {
             for i in (if skip_first { 1 } else { 0 })
-                ..(self.cp[ci.to_kind()].clauses[ci.to_index()].len() + 2)
+                ..(self.cp[ci.to_kind()].clauses[ci.to_index()].len())
             {
                 let l;
                 match i {
@@ -218,7 +218,7 @@ impl CDCL for Solver {
                     if self.vars[vi].reason == NULL_CLAUSE {
                         self.conflicts.push(l.negate());
                     } else {
-                        for i in 1..(self.cp[ci.to_kind()].clauses[ci.to_index()].lits.len() + 2) {
+                        for i in 1..(self.cp[ci.to_kind()].clauses[ci.to_index()].lits.len()) {
                             let l;
                             match i {
                                 0 => l = &self.cp[ci.to_kind()].clauses[ci.to_index()].lit[1],

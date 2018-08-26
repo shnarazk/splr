@@ -102,8 +102,6 @@ lbool SimpSolver::solve_(bool do_simp, bool turn_off_simp) {
     }
     if (result == l_True)
         result = Solver::solve_();
-    else if (verbosity >= 1)
-        printf("===============================================================================\n");
     if (result == l_True)
         extendModel();
     if (do_simp)
@@ -121,19 +119,6 @@ bool SimpSolver::addClause_(vec<Lit>& ps) {
     int nclauses = clauses.size();
     if (!Solver::addClause_(ps))
         return false;
-    if(!parsing && certifiedUNSAT) {
-        if (vbyte) {
-            write_char('a');
-            for (int i = 0; i < ps.size(); i++)
-                write_lit(2*(var(ps[i])+1) + sign(ps[i]));
-            write_lit(0);
-        }
-        else {
-            for (int i = 0; i < ps.size(); i++)
-                fprintf(certifiedOutput, "%i " , (var(ps[i]) + 1) * (-2 * sign(ps[i]) + 1) );
-            fprintf(certifiedOutput, "0\n");
-        }
-    }
     if (use_simplification && clauses.size() == nclauses + 1){
         CRef          cr = clauses.last();
         const Clause& c  = ca[cr];
@@ -174,37 +159,10 @@ bool SimpSolver::strengthenClause(CRef cr, Lit l) {
     // FIX: this is too inefficient but would be nice to have (properly implemented)
     // if (!find(subsumption_queue, &c))
     subsumption_queue.insert(cr);
-    if (certifiedUNSAT) {
-        if (vbyte) {
-            write_char('a');
-            for (int i = 0; i < c.size(); i++)
-                if (c[i] != l) write_lit(2*(var(c[i])+1) + sign(c[i]));
-            write_lit(0);
-        }
-        else {
-            for (int i = 0; i < c.size(); i++)
-                if (c[i] != l) fprintf(certifiedOutput, "%i " , (var(c[i]) + 1) * (-2 * sign(c[i]) + 1) );
-            fprintf(certifiedOutput, "0\n");
-        }
-    }
     if (c.size() == 2){
         removeClause(cr);
         c.strengthen(l);
     }else{
-        if (certifiedUNSAT) {
-            if (vbyte) {
-                write_char('d');
-                for (int i = 0; i < c.size(); i++)
-                    write_lit(2*(var(c[i])+1) + sign(c[i]));
-                write_lit(0);
-            }
-            else {
-                fprintf(certifiedOutput, "d ");
-                for (int i = 0; i < c.size(); i++)
-                    fprintf(certifiedOutput, "%i " , (var(c[i]) + 1) * (-2 * sign(c[i]) + 1) );
-                fprintf(certifiedOutput, "0\n");
-            }
-        }
         detachClause(cr, true);
         c.strengthen(l);
         attachClause(cr);
@@ -323,8 +281,6 @@ bool SimpSolver::backwardSubsumptionCheck(bool verbose) {
         CRef    cr = subsumption_queue.peek(); subsumption_queue.pop();
         Clause& c  = ca[cr];
         if (c.mark()) continue;
-        if (verbose && verbosity >= 2 && cnt++ % 1000 == 0)
-            printf("subsumption left: %10d (%10d subsumed, %10d deleted literals)\r", subsumption_queue.size(), subsumed, deleted_literals);
         assert(c.size() > 1 || value(c[0]) == l_True);    // Unit-clauses should have been propagated before this point.
         // Find best variable to scan:
         Var best = var(c[0]);
@@ -528,8 +484,6 @@ bool SimpSolver::eliminate(bool turn_off_elim) {
             Var elim = elim_heap.removeMin();
             if (asynch_interrupt) break;
             if (isEliminated(elim) || value(elim) != l_Undef) continue;
-            if (verbosity >= 2 && cnt % 100 == 0)
-                printf("elimination left: %10d\r", elim_heap.size());
             // At this point, the variable may have been set by assymetric branching, so check it
             // again. Also, don't eliminate frozen variables:
             if (use_elim && value(elim) == l_Undef && !frozen[elim] && !eliminateVar(elim)){
@@ -557,9 +511,6 @@ bool SimpSolver::eliminate(bool turn_off_elim) {
         cleanUpClauses(); // TODO: can we make 'cleanUpClauses()' not be linear in the problem size somehow?
         checkGarbage();
     }
-    if (verbosity >= 0 && elimclauses.size() > 0)
-        printf("c |  Eliminated clauses:     %10.2f Mb                                                                |\n", 
-               double(elimclauses.size() * sizeof(uint32_t)) / (1024*1024));
     return ok;
 }
 
@@ -599,8 +550,5 @@ void SimpSolver::garbageCollect() {
     to.extra_clause_field = ca.extra_clause_field; // NOTE: this is important to keep (or lose) the extra fields.
     relocAll(to);
     Solver::relocAll(to);
-    if (verbosity >= 2)
-        printf("|  Garbage collection:   %12d bytes => %12d bytes             |\n", 
-               ca.size()*ClauseAllocator::Unit_Size, to.size()*ClauseAllocator::Unit_Size);
     to.moveTo(ca);
 }

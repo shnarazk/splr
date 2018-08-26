@@ -231,7 +231,7 @@ impl Clause {
         }
     }
     pub fn len(&self) -> usize {
-        self.lits.len()
+        self.lits.len() + 2
     }
 }
 
