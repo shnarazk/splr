@@ -19,5 +19,3 @@ pub mod types;
 pub mod var;
 /// Implementation on decision var selection.
 pub mod var_manage;
-/// Formula Simplifirer (preprocessor)
-pub mod eliminator;

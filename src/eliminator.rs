@@ -16,8 +16,8 @@ struct Eliminator {
     n_occ: Vec<Lit>,
     occurs: Vec<(Var, ClauseId, bool)>,
     subsumption_queue: Vec<ClauseId>,
-    frozen: Vec<Var>,           // should be in Var
-    eliminated: Vec<Var>,       // should be in VarIndexHeap
+    // frozen: Vec<Var>,           // should be in Var
+    // eliminated: Vec<Var>,       // should be in VarIndexHeap
     bwdsub_assigns: usize,
     bwdsub_tmpunit: ClauseId,
 }
@@ -35,4 +35,28 @@ trait LiteralEliminator {
     fn strengthen_clause(&self, cid: ClauseId) -> bool;
     fn cleaup_clauses(&self) -> ();
     fn implied(&self, vec: &[Lit]) -> bool;
+}
+
+impl Solver {
+    fn func1(&self) -> Lbool {
+        let extra = Vec::new();
+        for l in &self.assumption {
+            let v = &mut self.vars[l.vi()];
+            if !v.frozen {
+                v.frozen = true;
+                extra.push(l.vi());
+            }
+        }
+        let result = self.eliminate(false);
+        if result == LTRUE {
+            result = self.solve();
+        }
+        if result == LTRUE {
+            result = self.extend_model();
+        }
+        for vi in &extra {
+            self.vars[vi].frozen = false;
+        }
+        result
+   }
 }

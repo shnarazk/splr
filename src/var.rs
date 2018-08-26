@@ -9,6 +9,12 @@ pub struct Var {
     pub reason: ClauseId,
     pub level: usize,
     pub activity: f64,
+    /// for elimination
+    pub frozen: bool,
+    /// for elimination
+    pub touched: bool,
+    /// for elimination
+    pub eliminated: bool,
 }
 
 /// is the dummy var index.
@@ -23,6 +29,9 @@ impl Var {
             reason: NULL_CLAUSE,
             level: 0,
             activity: 0.0,
+            frozen: false,
+            touched: false,
+            eliminated: false,
         }
     }
     pub fn new_vars(n: usize) -> Vec<Var> {

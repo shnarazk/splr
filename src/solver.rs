@@ -75,6 +75,8 @@ pub struct Solver {
     pub next_reduction: usize,
     pub cur_restart: usize,
     pub num_solved_vars: usize,
+    /// Variable Elimination
+    pub assumption: Vec<VarIndex>,
     /// Working memory
     pub ok: bool,
     pub an_seen: Vec<Lit>,
@@ -129,6 +131,7 @@ impl Solver {
             next_reduction: 1000,
             cur_restart: 1,
             num_solved_vars: 0,
+            assumption: vec![0; nv + 1],
             ok: true,
             an_seen: vec![0; nv + 1],
             an_to_clear: vec![0; nv + 1],
@@ -184,7 +187,7 @@ impl Solver {
 
 impl SatSolver for Solver {
     fn solve(&mut self) -> SolverResult {
-        // TODO deal with assumptons
+        // TODO deal with assumptions
         // s.root_level = 0;
         self.num_solved_vars = self.trail.len();
         match self.search() {
