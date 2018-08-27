@@ -19,9 +19,8 @@ pub trait SolveSAT {
 impl SolveSAT for Solver {
     fn propagate(&mut self) -> ClauseId {
         while self.q_head < self.trail.len() {
-            let p: Lit = self.trail[self.q_head];
-            let false_lit = p.negate();
-            let p_usize: usize = p as usize;
+            let p: usize = self.trail[self.q_head] as usize;
+            let false_lit = (p as Lit).negate();
             self.q_head += 1;
             self.stats[Stat::NumOfPropagation as usize] += 1;
             let kinds = [
@@ -31,8 +30,8 @@ impl SolveSAT for Solver {
             ];
             let mut ci;
             for ck in &kinds {
-                ci = self.cp[*ck as usize].watcher[p_usize];
-                self.cp[*ck as usize].watcher[p_usize] = NULL_CLAUSE;
+                ci = self.cp[*ck as usize].watcher[p];
+                self.cp[*ck as usize].watcher[p] = NULL_CLAUSE;
                 let mut new_tail = 0;
                 'next_clause: while ci != NULL_CLAUSE {
                     unsafe {
@@ -45,11 +44,11 @@ impl SolveSAT for Solver {
                         let fv = self.assigned((*c).lit[0]);
                         if fv == LTRUE {
                             debug_assert_eq!((*c).lit[1], false_lit);
-                            if self.cp[*ck as usize].watcher[p_usize] == 0 {
+                            if self.cp[*ck as usize].watcher[p] == 0 {
                                 new_tail = ci;
                             }
-                            (*c).next_watcher[1] = self.cp[*ck as usize].watcher[p_usize];
-                            self.cp[*ck as usize].watcher[p_usize] = ci;
+                            (*c).next_watcher[1] = self.cp[*ck as usize].watcher[p];
+                            self.cp[*ck as usize].watcher[p] = ci;
                             ci = next;
                             continue 'next_clause;
                         }
@@ -70,18 +69,18 @@ impl SolveSAT for Solver {
                         }
                         if fv == LFALSE {
                             if new_tail == 0 {
-                                self.cp[*ck as usize].watcher[p_usize] = ci;
+                                self.cp[*ck as usize].watcher[p] = ci;
                             } else {
                                 debug_assert_eq!(self.cp[*ck as usize].clauses[new_tail].lit[1], false_lit);
                                 self.cp[*ck as usize].clauses[new_tail].next_watcher[1] = ci;
                             }
                             return ck.id_from(ci);
                         }
-                        if self.cp[*ck as usize].watcher[p_usize] == 0 {
+                        if self.cp[*ck as usize].watcher[p] == 0 {
                             new_tail = ci;
                         }
-                        (*c).next_watcher[1] = self.cp[*ck as usize].watcher[p_usize];
-                        self.cp[*ck as usize].watcher[p_usize] = ci;
+                        (*c).next_watcher[1] = self.cp[*ck as usize].watcher[p];
+                        self.cp[*ck as usize].watcher[p] = ci;
                         self.uncheck_enqueue((*c).lit[0], ck.id_from(ci));
                         ci = next;
                     }
