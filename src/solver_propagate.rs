@@ -48,8 +48,20 @@ impl SolveSAT for Solver {
                         for k in 0..(*c).lits.len() {
                             let lk = (*c).lits[k];
                             if self.assigned(lk) != LFALSE {
-                                (*c).swap = k + 1;
-                                ci = (*c).next_watcher[1];
+
+                                let pivot = if (*c).lit[0] == false_lit { 0 } else { 1 };
+                                let next = (*c).next_watcher[pivot];
+                                let tmp = (*c).lit[pivot];
+                                (*c).lit[pivot] = (*c).lits[k];
+                                (*c).lits[k] = tmp;
+
+                                let watch = (*c).lit[pivot].negate() as usize;
+                                (*c).next_watcher[pivot] = self.cp[*ck as usize].watcher[watch];
+                                self.cp[*ck as usize].watcher[watch] = ci;
+                                ci = next;
+
+                                // (*c).swap = k + 1;
+                                // ci = (*c).next_watcher[1];
                                 continue 'next_clause;
                             }
                         }
@@ -61,26 +73,26 @@ impl SolveSAT for Solver {
                     }
                 }
             }
-            let mut ci;
-            for ck in &kinds {
-                ci = self.cp[*ck as usize].watcher[p_usize];
-                let cp = &mut self.cp[*ck as usize];
-                cp.watcher[p_usize] = NULL_CLAUSE;
-                while ci != NULL_CLAUSE {
-                    let c = &mut cp.clauses[ci];
-                    let pivot = if c.lit[0] == false_lit { 0 } else { 1 };
-                    let next = c.next_watcher[pivot];
-                    if 0 < c.swap {
-                        let tmp = c.lit[pivot];
-                        c.lit[pivot] = c.lits[c.swap - 1];
-                        c.lits[c.swap - 1] = tmp;
-                    }
-                    let watch = c.lit[pivot].negate() as usize;
-                    c.next_watcher[pivot] = cp.watcher[watch];
-                    cp.watcher[watch] = ci;
-                    ci = next;
-                }
-            }
+//            let mut ci;
+//            for ck in &kinds {
+//                ci = self.cp[*ck as usize].watcher[p_usize];
+//                let cp = &mut self.cp[*ck as usize];
+//                cp.watcher[p_usize] = NULL_CLAUSE;
+//                while ci != NULL_CLAUSE {
+//                    let c = &mut cp.clauses[ci];
+//                    let pivot = if c.lit[0] == false_lit { 0 } else { 1 };
+//                    let next = c.next_watcher[pivot];
+//                    if 0 < c.swap {
+//                        let tmp = c.lit[pivot];
+//                        c.lit[pivot] = c.lits[c.swap - 1];
+//                        c.lits[c.swap - 1] = tmp;
+//                    }
+//                    let watch = c.lit[pivot].negate() as usize;
+//                    c.next_watcher[pivot] = cp.watcher[watch];
+//                    cp.watcher[watch] = ci;
+//                    ci = next;
+//                }
+//            }
         }
         NULL_CLAUSE
     }
