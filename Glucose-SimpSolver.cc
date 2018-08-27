@@ -20,7 +20,6 @@ SimpSolver::SimpSolver() :
   , merges             (0)
   , asymm_lits         (0)
   , eliminated_vars    (0)
-  , use_simplification (true)
   , elimorder          (1)
   , occurs             (ClauseDeleted(ca))
   , elim_heap          (ElimLt(n_occ))
@@ -41,7 +40,6 @@ SimpSolver::SimpSolver(const SimpSolver &s) : Solver(s)
   , merges             (s.merges)
   , asymm_lits         (s.asymm_lits)
   , eliminated_vars    (s.eliminated_vars)
-  , use_simplification (s.use_simplification)
   , elimorder          (s.elimorder)
   , occurs             (ClauseDeleted(ca))
   , elim_heap          (ElimLt(n_occ))
@@ -74,40 +72,35 @@ Var SimpSolver::newVar(bool sign, bool dvar) {
     Var v = Solver::newVar(sign, dvar);
     frozen    .push((char)false);
     eliminated.push((char)false);
-    if (use_simplification){
-        n_occ     .push(0);
-        n_occ     .push(0);
-        occurs    .init(v);
-        touched   .push(0);
-        elim_heap .insert(v);
-    }
+    n_occ     .push(0);
+    n_occ     .push(0);
+    occurs    .init(v);
+    touched   .push(0);
+    elim_heap .insert(v);
     return v; }
 
 lbool SimpSolver::solve_(bool do_simp, bool turn_off_simp) {
     vec<Var> extra_frozen;
     lbool    result = l_True;
-    do_simp &= use_simplification;
-    if (do_simp){
-        // Assumptions must be temporarily frozen to run variable elimination:
-        for (int i = 0; i < assumptions.size(); i++){
-            Var v = var(assumptions[i]);
-            // If an assumption has been eliminated, remember it.
-            assert(!isEliminated(v));
-            if (!frozen[v]){
-                // Freeze and store.
-                setFrozen(v, true);
-                extra_frozen.push(v);
-            } }
-        result = lbool(eliminate(turn_off_simp));
+    // Assumptions must be temporarily frozen to run variable elimination:
+    for (int i = 0; i < assumptions.size(); i++){
+      Var v = var(assumptions[i]);
+      // If an assumption has been eliminated, remember it.
+      assert(!isEliminated(v));
+      if (!frozen[v]){
+	// Freeze and store.
+	setFrozen(v, true);
+	extra_frozen.push(v);
+      }
     }
+    result = lbool(eliminate(turn_off_simp));
     if (result == l_True)
         result = Solver::solve_();
     if (result == l_True)
         extendModel();
-    if (do_simp)
-        // Unfreeze the assumptions that were frozen:
-        for (int i = 0; i < extra_frozen.size(); i++)
-            setFrozen(extra_frozen[i], false);
+    // Unfreeze the assumptions that were frozen:
+    for (int i = 0; i < extra_frozen.size(); i++)
+      setFrozen(extra_frozen[i], false);
     return result;
 }
 
@@ -119,7 +112,7 @@ bool SimpSolver::addClause_(vec<Lit>& ps) {
     int nclauses = clauses.size();
     if (!Solver::addClause_(ps))
         return false;
-    if (use_simplification && clauses.size() == nclauses + 1){
+    if (clauses.size() == nclauses + 1){
         CRef          cr = clauses.last();
         const Clause& c  = ca[cr];
         // NOTE: the clause is added to the queue immediately and then
@@ -143,19 +136,16 @@ bool SimpSolver::addClause_(vec<Lit>& ps) {
 
 void SimpSolver::removeClause(CRef cr,bool inPurgatory) {
     const Clause& c = ca[cr];
-    if (use_simplification)
-        for (int i = 0; i < c.size(); i++){
-            n_occ[toInt(c[i])]--;
-            updateElimHeap(var(c[i]));
-            occurs.smudge(var(c[i]));
-        }
+    for (int i = 0; i < c.size(); i++){
+      n_occ[toInt(c[i])]--;
+      updateElimHeap(var(c[i]));
+      occurs.smudge(var(c[i]));
     Solver::removeClause(cr,inPurgatory);
 }
 
 bool SimpSolver::strengthenClause(CRef cr, Lit l) {
     Clause& c = ca[cr];
     assert(decisionLevel() == 0);
-    assert(use_simplification);
     // FIX: this is too inefficient but would be nice to have (properly implemented)
     // if (!find(subsumption_queue, &c))
     subsumption_queue.insert(cr);
@@ -332,7 +322,6 @@ bool SimpSolver::asymm(Var v, CRef cr) {
 }
 
 bool SimpSolver::asymmVar(Var v) {
-    assert(use_simplification);
     const vec<CRef>& cls = occurs.lookup(v);
     if (value(v) != l_Undef || cls.size() == 0)
         return true;
@@ -372,14 +361,12 @@ bool SimpSolver::eliminateVar(Var v) {
     assert(!isEliminated(v));
     assert(value(v) == l_Undef);
     // Split the occurrences into positive and negative:
-    //
     const vec<CRef>& cls = occurs.lookup(v);
     vec<CRef>        pos, neg;
     for (int i = 0; i < cls.size(); i++)
         (find(ca[cls[i]], mkLit(v)) ? pos : neg).push(cls[i]);
     // Check wether the increase in number of clauses stays within the allowed ('grow'). Moreover, no
     // clause must exceed the limit on the maximal clause size (if it is set):
-    //
     int cnt         = 0;
     int clause_size = 0;
     for (int i = 0; i < pos.size(); i++)
@@ -458,10 +445,7 @@ bool SimpSolver::eliminate(bool turn_off_elim) {
         ok = false;
         return false;
     }
-    else if (!use_simplification)
-        return true;
     // Main simplification loop:
-    //
     int toPerform = clauses.size()<=4800000;
     if(!toPerform) {
       printf("c Too many clauses... No preprocessing\n");
@@ -525,20 +509,16 @@ void SimpSolver::cleanUpClauses() {
 
 // Garbage Collection methods:
 void SimpSolver::relocAll(ClauseAllocator& to) {
-    if (!use_simplification) return;
     // All occurs lists:
-    //
     for (int i = 0; i < nVars(); i++){
         vec<CRef>& cs = occurs[i];
         for (int j = 0; j < cs.size(); j++)
             ca.reloc(cs[j], to);
     }
     // Subsumption queue:
-    //
     for (int i = 0; i < subsumption_queue.size(); i++)
         ca.reloc(subsumption_queue[i], to);
     // Temporary clause:
-    //
     ca.reloc(bwdsub_tmpunit, to);
 }
 
