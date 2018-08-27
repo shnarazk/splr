@@ -1,4 +1,5 @@
 use types::*;
+use clause::Clause;
 
 /// Struct for a variable.
 #[derive(Debug)]
@@ -45,6 +46,34 @@ impl Var {
     }
 }
 
+pub trait Satisfiability {
+    fn assigned(&self, l: Lit) -> Lbool;
+    fn satisfies(&self, c: &Clause) -> bool;
+}
+
+impl Satisfiability for Vec<Var> {
+    fn assigned(&self, l: Lit) -> Lbool {
+        let x = self[l.vi()].assign;
+        if x == BOTTOM {
+            BOTTOM
+        } else if l.positive() {
+            x
+        } else {
+            negate_bool(x)
+        }
+    }
+    fn satisfies(&self, c: &Clause) -> bool {
+        for i in 0..c.len() {
+            let l = lindex!(c, i);
+            if self.assigned(l) == LTRUE {
+                return true;
+            }
+        }
+        false
+    }
+}
+
+
 /// heap of VarId
 /// # Note
 /// - both fields has a fixed length. Don't use push and pop.
@@ -58,6 +87,7 @@ pub struct VarIdHeap {
 
 pub trait VarOrdering {
     fn reset(&mut self) -> ();
+    fn contains(&self, v: VarId) -> bool;
     fn update(&mut self, vec: &[Var], v: VarId) -> ();
     fn insert(&mut self, vec: &[Var], v: VarId) -> ();
     fn root(&mut self, vec: &[Var]) -> VarId;
@@ -69,6 +99,10 @@ impl VarOrdering for VarIdHeap {
             self.idxs[i] = i;
             self.heap[i] = i;
         }
+    }
+    /// renamed from inHeap
+    fn contains(&self, v: VarId) -> bool {
+        self.idxs[v] <= self.idxs[0]
     }
     /// renamed from incrementHeap, updateVO
     fn update(&mut self, vec: &[Var], v: VarId) -> () {
@@ -130,10 +164,6 @@ impl VarIdHeap {
     /// renamed form numElementsInHeap
     pub fn len(&self) -> usize {
         self.idxs[0]
-    }
-    /// renamed from inHeap
-    fn contains(&self, v: VarId) -> bool {
-        self.idxs[v] <= self.idxs[0]
     }
     fn percolate_up(&mut self, vec: &[Var], start: usize) -> () {
         let mut q = start;

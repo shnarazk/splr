@@ -156,23 +156,11 @@ impl Solver {
     }
     #[inline]
     pub fn assigned(&self, l: Lit) -> Lbool {
-        let x = self.vars[l.vi()].assign;
-        if x == BOTTOM {
-            BOTTOM
-        } else if l.positive() {
-            x
-        } else {
-            negate_bool(x)
-        }
+        self.vars.assigned(l)
     }
     #[inline]
     pub fn satisfies(&self, c: &Clause) -> bool {
-        for l in &c.lits {
-            if self.assigned(*l) == LTRUE {
-                return true;
-            }
-        }
-        false
+        self.vars.satisfies(c)
     }
     pub fn num_assigns(&self) -> usize {
         self.trail.len()

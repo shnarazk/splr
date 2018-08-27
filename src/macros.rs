@@ -5,7 +5,7 @@
 #[macro_export]
 macro_rules! iref {
     ($cv:expr, $val:expr) => {{
-        match (&mut $cv, &$val) {
+        match (&$cv, &$val) {
             (v, cid) => &v[cid.to_kind()].clauses[cid.to_index()],
         }
     }};

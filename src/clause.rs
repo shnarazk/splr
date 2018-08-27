@@ -128,6 +128,8 @@ pub struct Clause {
     pub just_used: bool,
     /// cache for propagation
     pub swap: usize,
+    /// used in Subsumption Variable Eliminator
+    pub sve_mark: bool,
 }
 
 impl ClauseIdIndexEncoding for usize {
@@ -213,6 +215,7 @@ impl Clause {
             locked: false,
             just_used: false,
             swap: 0,
+            sve_mark: false,
         }
     }
     pub fn null() -> Clause {
@@ -228,6 +231,7 @@ impl Clause {
             learnt: false,
             just_used: false,
             swap: 0,
+            sve_mark: false,
         }
     }
     pub fn len(&self) -> usize {
