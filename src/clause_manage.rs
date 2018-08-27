@@ -166,7 +166,8 @@ impl ClauseManagement for Solver {
                 for mut i in 0..nc {
                     perm[cp.clauses[i].index] = i;
                 }
-                cp.clauses.retain(|c| perm[c.index] < nkeep || c.locked || c.just_used);
+                cp.clauses
+                    .retain(|c| perm[c.index] < nkeep || c.locked || c.just_used);
             }
             let new_len = cp.clauses.len();
             // update permutation table.
@@ -314,9 +315,10 @@ impl ClauseManagement for Solver {
 }
 
 impl Solver {
-        fn progress(&self, mes:&str) -> () {
+    // print a progress report
+    fn progress(&self, mes: &str) -> () {
         println!(
-            "# DB::{} Rem{:>9}, Per{:>8}, Bin{:>5}   Restart::block {:>6} force {:>6}    EMA::asg {:>6.2}, lbd {:>6.2}",
+            "#{}, DB::R|P|B, {:>9}, {:>8}, {:>5}, Restart::b|f, {:>6}, {:>6}, EMA::a|l, {:>6.2}, {:>6.2}",
             mes,
             self.cp[ClauseKind::Removable as usize].clauses.len() - 1,
             self.cp[ClauseKind::Permanent as usize].clauses.len() - 1,
@@ -326,5 +328,5 @@ impl Solver {
             self.ema_asg.get(),
             self.ema_lbd.get(),
         );
-        }
+    }
 }
