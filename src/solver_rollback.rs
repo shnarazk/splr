@@ -13,6 +13,12 @@ const R: f64 = 1.30; // 1.40 <= 1.11; block restart by average assigment
 const K: f64 = 1.30; // 1.15 <= 0.83; force restart by average LBD
 
 impl Restart for Solver {
+    /// This function touches:
+    ///  - trail
+    ///  - trail_lim
+    ///  - vars
+    ///  - q_head
+    ///  - var_order
     fn cancel_until(&mut self, lv: usize) -> () {
         if self.decision_level() <= lv {
             return;

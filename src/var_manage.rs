@@ -210,7 +210,7 @@ impl Solver {
             true
         }
     }
-    /// 6. merge
+    /// 6. merge(1)
     /// Returns **false** if one of the clauses is always satisfied. (merge_vec should not be used.)
     pub fn merge(&mut self, cp: ClauseId, cq: ClauseId, v: VarId) -> bool {
         self.eliminator.merges += 1;
@@ -243,7 +243,7 @@ impl Solver {
         }
         true
     }
-    /// 7. merge
+    /// 7. merge(2)
     /// Returns **false** if one of the clauses is always satisfied.
     pub fn merge_(&mut self, cp: ClauseId, cq: ClauseId, v: VarId) -> (bool, usize) {
         self.eliminator.merges += 1;
@@ -374,13 +374,28 @@ impl Solver {
         }
         self.backward_subsumption_check()
     }
-    /// 13. mkElimClause
+    /// 13. mkElimClause(1)
     pub fn make_eliminating_clause(&self, mut vec: Vec<Lit>, x: Lit) -> () {
         vec.push(x);
         vec.push(1);
     }
-    /// 14. mkElimClause
-    pub fn make_eliminating_clause_(&self, _vec: Vec<Lit>, _vi: VarId, _ci: ClauseId) -> () {}
+    /// 14. mkElimClause(2)
+    pub fn make_eliminating_clause_(&self, vec: &mut Vec<Lit>, vi: VarId, cid: ClauseId) -> () {
+        let first = vec.len();
+        // Copy clause to the vector. Remember the position where the varibale 'v' occurs:
+        let c = iref!(self.cp, cid);
+        for i in 0..c.len() {
+            let l = lindex!(c, i);
+            vec.push(l as u32);
+            if l.vi() == vi {
+                let index = vec.len() - 1;
+                // swap the first literal with the 'v'. So that the literal containing 'v' will occur first in the clause.
+                vec.swap(index, first);
+            }
+        }
+        // FIXME WHY? Store the length of the clause last:
+        vec.push(c.len() as u32);
+    }
     /// 15. eliminateVar
     pub fn eliminate_var(&self, _vi: VarId) -> bool {
         true
@@ -390,7 +405,43 @@ impl Solver {
         true
     }
     /// 17. extendModel
-    pub fn extend_model(&self) -> () {}
+    /// ```c
+    /// inline lbool    Solver::modelValue    (Var x) const   { return model[x]; }
+    /// inline lbool    Solver::modelValue    (Lit p) const   { return model[var(p)] ^ sign(p); }
+    /// ```
+    pub fn extend_model(&mut self) -> () {
+        if self.model.len() == 0 {
+            unsafe {
+                let nv = self.vars.len();
+                self.model.reserve(nv);
+                self.model.set_len(nv);
+            }
+        }
+        let mut i = self.eliminator.elim_clauses.len() - 1;
+        let mut j;
+        'next: loop {
+                j = self.eliminator.elim_clauses[i] as usize;
+                i -= 1;
+            loop {
+                if j <= 1 {
+                    break;
+                }
+                let model_value = match (self.eliminator.elim_clauses[i].positive(), self.vars[self.eliminator.elim_clauses[i].vi()].assign) {
+                    (true, x) => x,
+                    (false, x) => negate_bool(x),
+                };
+                if model_value != LFALSE {
+                    i -= j;
+                    continue 'next;
+                }
+                j -= 1;
+                i -= 1;
+            }
+            let l = self.eliminator.elim_clauses[i];
+            self.model[l.vi()] = if l.positive() { LFALSE } else { LTRUE };
+            i -= j;
+        }
+    }
     /// 18. eliminate
     pub fn eliminate(&mut self, _: bool) -> bool {
         let result = {

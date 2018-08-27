@@ -80,6 +80,7 @@ pub struct Solver {
     pub eliminator: Eliminator,
     /// Working memory
     pub ok: bool,
+    pub model: Vec<Lbool>,
     pub an_seen: Vec<Lit>,
     pub an_to_clear: Vec<Lit>,
     pub an_stack: Vec<Lit>,
@@ -134,6 +135,7 @@ impl Solver {
             num_solved_vars: 0,
             eliminator: Eliminator::new(nv),
             ok: true,
+            model: vec![BOTTOM; nv + 1],
             an_seen: vec![0; nv + 1],
             an_to_clear: vec![0; nv + 1],
             an_stack: vec![],

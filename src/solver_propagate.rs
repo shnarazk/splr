@@ -144,6 +144,9 @@ impl SolveSAT for Solver {
             }
         }
     }
+    /// This function touches:
+    ///  - vars
+    ///  - trail
     fn enqueue(&mut self, l: Lit, cid: ClauseId) -> bool {
         // println!("enqueue: {} by {}", l.int(), cid);
         let sig = l.lbool();
@@ -172,6 +175,10 @@ impl SolveSAT for Solver {
 }
 
 impl Solver {
+    /// This function touches:
+    ///  - vars
+    ///  - trail
+    ///  - trail_lim
     pub fn uncheck_enqueue(&mut self, l: Lit, cid: ClauseId) -> () {
         // if ci == NULL_CLAUSE {
         //     println!("uncheck_enqueue decide: {}", l.int());
