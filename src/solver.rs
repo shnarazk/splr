@@ -105,7 +105,7 @@ impl Solver {
     pub fn new(cfg: SolverConfiguration, cnf: &CNFDescription) -> Solver {
         let nv = cnf.num_of_variables as usize;
         let nc = cnf.num_of_clauses as usize;
-        let (fe, se) = cfg.ema_coeffs;
+        let (_fe, se) = cfg.ema_coeffs;
         let re = cfg.restart_expansion;
         let cdr = cfg.clause_decay_rate;
         let vdr = cfg.variable_decay_rate;

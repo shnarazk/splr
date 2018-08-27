@@ -126,8 +126,6 @@ pub struct Clause {
     pub learnt: bool,
     /// used in the current phase
     pub just_used: bool,
-    /// cache for propagation
-    pub swap: usize,
 }
 
 impl ClauseIdIndexEncoding for usize {
@@ -212,7 +210,6 @@ impl Clause {
             index: 0,
             locked: false,
             just_used: false,
-            swap: 0,
         }
     }
     pub fn null() -> Clause {
@@ -227,7 +224,6 @@ impl Clause {
             locked: false,
             learnt: false,
             just_used: false,
-            swap: 0,
         }
     }
     pub fn len(&self) -> usize {

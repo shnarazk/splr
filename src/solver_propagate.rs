@@ -41,40 +41,30 @@ impl SolveSAT for Solver {
                             (*c).lit.swap(0, 1);
                             (*c).next_watcher.swap(0, 1);
                         }
+                        let next = (*c).next_watcher[1];
                         let fv = self.assigned((*c).lit[0]);
-                        // (*c).swap = 0;
                         if fv == LTRUE {
-                            // ci = (*c).next_watcher[1];
-
-                            let pivot = 1;
                             debug_assert_eq!((*c).lit[1], false_lit);
-                            let next = (*c).next_watcher[pivot];
                             if self.cp[*ck as usize].watcher[p_usize] == 0 {
                                 new_tail = ci;
                             }
-                            (*c).next_watcher[pivot] = self.cp[*ck as usize].watcher[p_usize];
+                            (*c).next_watcher[1] = self.cp[*ck as usize].watcher[p_usize];
                             self.cp[*ck as usize].watcher[p_usize] = ci;
                             ci = next;
-
                             continue 'next_clause;
                         }
                         for k in 0..(*c).lits.len() {
                             let lk = (*c).lits[k];
                             if self.assigned(lk) != LFALSE {
-
-                                let pivot = if (*c).lit[0] == false_lit { 0 } else { 1 };
-                                let next = (*c).next_watcher[pivot];
-                                let tmp = (*c).lit[pivot];
-                                (*c).lit[pivot] = (*c).lits[k];
+                                debug_assert_eq!((*c).lit[1], false_lit);
+                                let next = (*c).next_watcher[1];
+                                let tmp = (*c).lit[1];
+                                (*c).lit[1] = (*c).lits[k];
                                 (*c).lits[k] = tmp;
-
-                                debug_assert_ne!((*c).lit[pivot], false_lit);
-                                (*c).next_watcher[pivot] = self.cp[*ck as usize].watcher[lk.negate() as usize];
+                                debug_assert_ne!((*c).lit[1], false_lit);
+                                (*c).next_watcher[1] = self.cp[*ck as usize].watcher[lk.negate() as usize];
                                 self.cp[*ck as usize].watcher[lk.negate() as usize] = ci;
                                 ci = next;
-
-                                // (*c).swap = k + 1;
-                                // ci = (*c).next_watcher[1];
                                 continue 'next_clause;
                             }
                         }
@@ -82,53 +72,21 @@ impl SolveSAT for Solver {
                             if new_tail == 0 {
                                 self.cp[*ck as usize].watcher[p_usize] = ci;
                             } else {
-                                if self.cp[*ck as usize].clauses[new_tail].lit[0] == false_lit {
-                                    self.cp[*ck as usize].clauses[new_tail].next_watcher[0] = ci;
-                                } else if self.cp[*ck as usize].clauses[new_tail].lit[1] == false_lit {
-                                    self.cp[*ck as usize].clauses[new_tail].next_watcher[1] = ci;
-                                } else {
-                                    panic!("illegal id");
-                                }
+                                debug_assert_eq!(self.cp[*ck as usize].clauses[new_tail].lit[1], false_lit);
+                                self.cp[*ck as usize].clauses[new_tail].next_watcher[1] = ci;
                             }
-                            // self.cp[*ck as usize].watcher[p_usize] = ci;
                             return ck.id_from(ci);
                         }
-                        let pivot = 1;
-                        let next = (*c).next_watcher[pivot];
-                        // let watch = (*c).lit[pivot].negate() as usize;
                         if self.cp[*ck as usize].watcher[p_usize] == 0 {
                             new_tail = ci;
                         }
-                        (*c).next_watcher[pivot] = self.cp[*ck as usize].watcher[p_usize];
+                        (*c).next_watcher[1] = self.cp[*ck as usize].watcher[p_usize];
                         self.cp[*ck as usize].watcher[p_usize] = ci;
-                        // ci = next;
-
                         self.uncheck_enqueue((*c).lit[0], ck.id_from(ci));
-                        // ci = (*c).next_watcher[1];
                         ci = next;
                     }
                 }
             }
-//            let mut ci;
-//            for ck in &kinds {
-//                ci = self.cp[*ck as usize].watcher[p_usize];
-//                let cp = &mut self.cp[*ck as usize];
-//                cp.watcher[p_usize] = NULL_CLAUSE;
-//                while ci != NULL_CLAUSE {
-//                    let c = &mut cp.clauses[ci];
-//                    let pivot = if c.lit[0] == false_lit { 0 } else { 1 };
-//                    let next = c.next_watcher[pivot];
-//                    if 0 < c.swap {
-//                        let tmp = c.lit[pivot];
-//                        c.lit[pivot] = c.lits[c.swap - 1];
-//                        c.lits[c.swap - 1] = tmp;
-//                    }
-//                    let watch = c.lit[pivot].negate() as usize;
-//                    c.next_watcher[pivot] = cp.watcher[watch];
-//                    cp.watcher[watch] = ci;
-//                    ci = next;
-//                }
-//            }
         }
         NULL_CLAUSE
     }
