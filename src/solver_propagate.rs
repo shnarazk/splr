@@ -32,6 +32,8 @@ impl SolveSAT for Solver {
             let mut ci;
             for ck in &kinds {
                 ci = self.cp[*ck as usize].watcher[p_usize];
+                self.cp[*ck as usize].watcher[p_usize] = NULL_CLAUSE;
+                let mut new_tail = 0;
                 'next_clause: while ci != NULL_CLAUSE {
                     unsafe {
                         let c = &mut self.cp[*ck as usize].clauses[ci] as *mut Clause;
@@ -40,9 +42,20 @@ impl SolveSAT for Solver {
                             (*c).next_watcher.swap(0, 1);
                         }
                         let fv = self.assigned((*c).lit[0]);
-                        (*c).swap = 0;
+                        // (*c).swap = 0;
                         if fv == LTRUE {
-                            ci = (*c).next_watcher[1];
+                            // ci = (*c).next_watcher[1];
+
+                            let pivot = 1;
+                            debug_assert_eq!((*c).lit[1], false_lit);
+                            let next = (*c).next_watcher[pivot];
+                            if self.cp[*ck as usize].watcher[p_usize] == 0 {
+                                new_tail = ci;
+                            }
+                            (*c).next_watcher[pivot] = self.cp[*ck as usize].watcher[p_usize];
+                            self.cp[*ck as usize].watcher[p_usize] = ci;
+                            ci = next;
+
                             continue 'next_clause;
                         }
                         for k in 0..(*c).lits.len() {
@@ -55,9 +68,9 @@ impl SolveSAT for Solver {
                                 (*c).lit[pivot] = (*c).lits[k];
                                 (*c).lits[k] = tmp;
 
-                                let watch = (*c).lit[pivot].negate() as usize;
-                                (*c).next_watcher[pivot] = self.cp[*ck as usize].watcher[watch];
-                                self.cp[*ck as usize].watcher[watch] = ci;
+                                debug_assert_ne!((*c).lit[pivot], false_lit);
+                                (*c).next_watcher[pivot] = self.cp[*ck as usize].watcher[lk.negate() as usize];
+                                self.cp[*ck as usize].watcher[lk.negate() as usize] = ci;
                                 ci = next;
 
                                 // (*c).swap = k + 1;
@@ -66,10 +79,33 @@ impl SolveSAT for Solver {
                             }
                         }
                         if fv == LFALSE {
+                            if new_tail == 0 {
+                                self.cp[*ck as usize].watcher[p_usize] = ci;
+                            } else {
+                                if self.cp[*ck as usize].clauses[new_tail].lit[0] == false_lit {
+                                    self.cp[*ck as usize].clauses[new_tail].next_watcher[0] = ci;
+                                } else if self.cp[*ck as usize].clauses[new_tail].lit[1] == false_lit {
+                                    self.cp[*ck as usize].clauses[new_tail].next_watcher[1] = ci;
+                                } else {
+                                    panic!("illegal id");
+                                }
+                            }
+                            // self.cp[*ck as usize].watcher[p_usize] = ci;
                             return ck.id_from(ci);
                         }
+                        let pivot = 1;
+                        let next = (*c).next_watcher[pivot];
+                        // let watch = (*c).lit[pivot].negate() as usize;
+                        if self.cp[*ck as usize].watcher[p_usize] == 0 {
+                            new_tail = ci;
+                        }
+                        (*c).next_watcher[pivot] = self.cp[*ck as usize].watcher[p_usize];
+                        self.cp[*ck as usize].watcher[p_usize] = ci;
+                        // ci = next;
+
                         self.uncheck_enqueue((*c).lit[0], ck.id_from(ci));
-                        ci = (*c).next_watcher[1];
+                        // ci = (*c).next_watcher[1];
+                        ci = next;
                     }
                 }
             }
