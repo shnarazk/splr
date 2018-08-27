@@ -100,21 +100,18 @@ impl VarIdEncoding for VarId {
 }
 
 /// Lifted Bool type
-pub type Lbool = i8;
-/// the lifted **true**.
-pub const LTRUE: i8 = 1;
+pub type Lbool = u8;
 /// the lifted **false**.
-pub const LFALSE: i8 = -1;
+pub const LFALSE: u8 = 0;
+/// the lifted **true**.
+pub const LTRUE: u8 = 1;
 /// unbound bool.
-pub const BOTTOM: i8 = 0;
+pub const BOTTOM: u8 = 2;
 
 #[inline]
+/// Note: this function doesn't work on BOTTOM.
 pub fn negate_bool(b: Lbool) -> Lbool {
-    match b {
-        LTRUE => LFALSE,
-        LFALSE => LTRUE,
-        _ => BOTTOM,
-    }
+    b ^ 1
 }
 
 /// trait on Ema

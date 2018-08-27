@@ -53,14 +53,7 @@ pub trait Satisfiability {
 
 impl Satisfiability for Vec<Var> {
     fn assigned(&self, l: Lit) -> Lbool {
-        let x = self[l.vi()].assign;
-        if x == BOTTOM {
-            BOTTOM
-        } else if l.positive() {
-            x
-        } else {
-            negate_bool(x)
-        }
+        self[l.vi()].assign ^ ((l & 1) as u8)
     }
     fn satisfies(&self, c: &Clause) -> bool {
         for i in 0..c.len() {
@@ -72,7 +65,6 @@ impl Satisfiability for Vec<Var> {
         false
     }
 }
-
 
 /// heap of VarId
 /// # Note

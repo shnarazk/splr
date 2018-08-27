@@ -126,8 +126,6 @@ pub struct Clause {
     pub learnt: bool,
     /// used in the current phase
     pub just_used: bool,
-    /// cache for propagation
-    pub swap: usize,
     /// used in Subsumption Variable Eliminator
     pub sve_mark: bool,
 }
@@ -214,7 +212,6 @@ impl Clause {
             index: 0,
             locked: false,
             just_used: false,
-            swap: 0,
             sve_mark: false,
         }
     }
@@ -230,7 +227,6 @@ impl Clause {
             locked: false,
             learnt: false,
             just_used: false,
-            swap: 0,
             sve_mark: false,
         }
     }
