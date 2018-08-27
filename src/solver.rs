@@ -157,8 +157,9 @@ impl Solver {
     }
     #[inline]
     pub fn satisfies(&self, c: &Clause) -> bool {
-        for l in &c.lits {
-            if self.assigned(*l) == LTRUE {
+        for i in 0..c.len() {
+            let l = lindex!(c, i);
+            if self.assigned(l) == LTRUE {
                 return true;
             }
         }
