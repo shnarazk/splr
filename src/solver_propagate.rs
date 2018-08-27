@@ -61,7 +61,8 @@ impl SolveSAT for Solver {
                                 (*c).lit[1] = (*c).lits[k];
                                 (*c).lits[k] = tmp;
                                 debug_assert_ne!((*c).lit[1], false_lit);
-                                (*c).next_watcher[1] = self.cp[*ck as usize].watcher[lk.negate() as usize];
+                                (*c).next_watcher[1] =
+                                    self.cp[*ck as usize].watcher[lk.negate() as usize];
                                 self.cp[*ck as usize].watcher[lk.negate() as usize] = ci;
                                 ci = next;
                                 continue 'next_clause;
@@ -71,7 +72,10 @@ impl SolveSAT for Solver {
                             if new_tail == 0 {
                                 self.cp[*ck as usize].watcher[p] = ci;
                             } else {
-                                debug_assert_eq!(self.cp[*ck as usize].clauses[new_tail].lit[1], false_lit);
+                                debug_assert_eq!(
+                                    self.cp[*ck as usize].clauses[new_tail].lit[1],
+                                    false_lit
+                                );
                                 self.cp[*ck as usize].clauses[new_tail].next_watcher[1] = ci;
                             }
                             return ck.id_from(ci);

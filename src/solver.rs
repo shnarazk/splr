@@ -141,7 +141,7 @@ impl Solver {
             stats: vec![0; Stat::EndOfStatIndex as usize],
             lbd_seen: vec![0; nv + 1],
             ema_asg: Ema2::new(4096.0, 8192.0), // for blocking
-            ema_lbd: Ema2::new(64.0, 8192.0), // for forcing
+            ema_lbd: Ema2::new(64.0, 8192.0),   // for forcing
             b_lvl: Ema::new(se),
             c_lvl: Ema::new(se),
             next_restart: 100,
@@ -150,16 +150,10 @@ impl Solver {
         };
         s
     }
+    /// NOTE: Precondition: BOTTOM must be 0b11.
     #[inline]
     pub fn assigned(&self, l: Lit) -> Lbool {
-        let x = self.vars[l.vi()].assign;
-        if x == BOTTOM {
-            BOTTOM
-        } else if l.positive() {
-            x
-        } else {
-            negate_bool(x)
-        }
+        self.vars[l.vi()].assign ^ ((l & 1) as u8)
     }
     #[inline]
     pub fn satisfies(&self, c: &Clause) -> bool {
