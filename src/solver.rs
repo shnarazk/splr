@@ -57,22 +57,21 @@ pub enum Stat {
 /// is the collection of all variables.
 #[derive(Debug)]
 pub struct Solver {
-    /// Assignment Management
-    pub vars: Vec<Var>,
-    pub cp: [ClausePack; 3],
-    pub trail: Vec<Lit>,
-    pub trail_lim: Vec<usize>,
-    pub q_head: usize,
-    pub conflicts: Vec<Lit>,
-    /// Variable Order
-    pub var_order: VarIdHeap,
     /// Configuration
     pub config: SolverConfiguration,
     pub num_vars: usize,
     pub cla_inc: f64,
     pub var_inc: f64,
     pub root_level: usize,
-    /// Database Management
+    /// Variable Assignment Management
+    pub vars: Vec<Var>,
+    pub trail: Vec<Lit>,
+    pub trail_lim: Vec<usize>,
+    pub q_head: usize,
+    /// Variable Order
+    pub var_order: VarIdHeap,
+    /// Clause Database Management
+    pub cp: [ClausePack; 3],
     pub next_reduction: usize,
     pub cur_restart: usize,
     pub num_solved_vars: usize,
@@ -81,6 +80,8 @@ pub struct Solver {
     /// Working memory
     pub ok: bool,
     pub model: Vec<Lbool>,
+    pub conflicts: Vec<Lit>,
+    pub stats: Vec<i64>,
     pub an_seen: Vec<Lit>,
     pub an_to_clear: Vec<Lit>,
     pub an_stack: Vec<Lit>,
@@ -89,7 +90,6 @@ pub struct Solver {
     pub an_level_map: Vec<usize>,
     pub an_level_map_key: usize,
     pub mi_var_map: Vec<usize>,
-    pub stats: Vec<i64>,
     pub lbd_seen: Vec<u64>,
     /// restart heuristics
     pub ema_asg: Ema2,
@@ -114,28 +114,29 @@ impl Solver {
         let cdr = cfg.clause_decay_rate;
         let vdr = cfg.variable_decay_rate;
         let s = Solver {
-            vars: Var::new_vars(nv),
-            cp: [
-                ClausePack::build(ClauseKind::Removable, nv, nc),
-                ClausePack::build(ClauseKind::Permanent, nv, nc),
-                ClausePack::build(ClauseKind::Binclause, nv, nc),
-            ],
-            trail: Vec::with_capacity(nv),
-            trail_lim: Vec::new(),
-            q_head: 0,
-            conflicts: vec![],
-            var_order: VarIdHeap::new(nv),
             config: cfg,
             num_vars: nv,
             cla_inc: cdr,
             var_inc: vdr,
             root_level: 0,
+            vars: Var::new_vars(nv),
+            trail: Vec::with_capacity(nv),
+            trail_lim: Vec::new(),
+            q_head: 0,
+            var_order: VarIdHeap::new(nv),
+            cp: [
+                ClausePack::build(ClauseKind::Removable, nv, nc),
+                ClausePack::build(ClauseKind::Permanent, nv, nc),
+                ClausePack::build(ClauseKind::Binclause, nv, nc),
+            ],
             next_reduction: 1000,
             cur_restart: 1,
             num_solved_vars: 0,
             eliminator: Eliminator::new(nv),
             ok: true,
             model: vec![BOTTOM; nv + 1],
+            conflicts: vec![],
+            stats: vec![0; Stat::EndOfStatIndex as usize],
             an_seen: vec![0; nv + 1],
             an_to_clear: vec![0; nv + 1],
             an_stack: vec![],
@@ -144,7 +145,6 @@ impl Solver {
             an_level_map: vec![0; nv + 1],
             an_level_map_key: 1,
             mi_var_map: vec![0; nv + 1],
-            stats: vec![0; Stat::EndOfStatIndex as usize],
             lbd_seen: vec![0; nv + 1],
             ema_asg: Ema2::new(4096.0, 8192.0), // for blocking
             ema_lbd: Ema2::new(64.0, 8192.0), // for forcing
