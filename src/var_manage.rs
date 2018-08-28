@@ -86,6 +86,11 @@ pub struct Eliminator {
     // working place
     merge_vec: Vec<Lit>,
     elim_clauses: Vec<Lit>,
+    /// Variables are not eliminated if it produces a resolvent with a length above this limit.
+    /// 0 means no limit.
+    clause_lim: usize,
+    eliminated_vars: usize,
+    add_tmp: Vec<Lit>,
 }
 
 impl Eliminator {
@@ -102,6 +107,9 @@ impl Eliminator {
             bwdsub_tmp_unit: 0,
             merge_vec: vec![0; nv + 1],
             elim_clauses: vec![0; 2 * (nv + 1)],
+            clause_lim: 20,
+            eliminated_vars: 0,
+            add_tmp: Vec::new(),
         }
     }
 }
@@ -137,7 +145,7 @@ impl Solver {
         }
     }
     /// 3. addClause
-    pub fn add_clause__(&mut self, _vec: &[Lit]) -> bool {
+    pub fn add_clause_(&mut self, _vec: &[Lit]) -> bool {
         let nclauses = self.cp[ClauseKind::Permanent as usize].clauses.len();
         let cid = 0;
         if false {
@@ -375,7 +383,7 @@ impl Solver {
         self.backward_subsumption_check()
     }
     /// 13. mkElimClause(1)
-    pub fn make_eliminating_clause(&self, mut vec: Vec<Lit>, x: Lit) -> () {
+    pub fn make_eliminating_clause(&self, vec: &mut Vec<Lit>, x: Lit) -> () {
         vec.push(x);
         vec.push(1);
     }
@@ -397,11 +405,119 @@ impl Solver {
         vec.push(c.len() as u32);
     }
     /// 15. eliminateVar
-    pub fn eliminate_var(&self, _vi: VarId) -> bool {
-        true
+    pub fn eliminate_var(&mut self, v: VarId) -> bool {
+        unsafe {
+        let cls = &self.eliminator.occurs[v] as *const Vec<ClauseId>;
+        let mut pos: Vec<ClauseId> = Vec::new();
+        let mut neg: Vec<ClauseId> = Vec::new();
+        // Split the occurrences into positive and negative:
+        for cid in &*cls {
+            let c = &self.cp[cid.to_kind()].clauses[cid.to_index()];
+            for i in 0..c.len() {
+                let l = lindex!(c, i);
+                if l.vi() == v {
+                    if l.positive() {
+                        pos.push(*cid);
+                    } else {
+                        neg.push(*cid);
+                    }
+                }
+            }
+        }
+        // Check wether the increase in number of clauses stays within the allowed ('grow').
+        // Moreover, no clause must exceed the limit on the maximal clause size (if it is set).
+        let mut cnt = 0;
+        for i in 0..pos.len() {
+            for j in 0..neg.len() {
+                let (res, clause_size) = self.merge_(pos[i], neg[j], v);
+                if  res {
+                    cnt += 1;
+                    if (*cls).len() < cnt || (self.eliminator.clause_lim != 0 && self.eliminator.clause_lim < clause_size) {
+                        return true;
+                    }
+                }
+            }
+        }
+        // Delete and store old clauses
+        self.vars[v].eliminated = true;
+        // setDecisionVar(v, false);
+        self.eliminator.eliminated_vars += 1;
+            {
+                let tmp = &mut self.eliminator.elim_clauses as *mut Vec<Lit>;
+                if neg.len() < pos.len() {
+                    for cid in &neg {
+                        self.make_eliminating_clause_(&mut (*tmp), v, *cid);
+                    }
+                    self.make_eliminating_clause(&mut (*tmp), v.lit(LTRUE));
+                } else {
+                    for cid in &pos {
+                        self.make_eliminating_clause_(&mut (*tmp), v, *cid);
+                    }
+                    self.make_eliminating_clause(&mut (*tmp), v.lit(LFALSE));
+                }
+            }
+        // Produce clauses in cross product via self.merge_vec:
+            {
+                let vec = &self.eliminator.merge_vec as *const Vec<Lit>;
+                for p in &pos {
+                    for n in &neg {
+                        if self.merge(*p, *n, v) && !self.add_clause_(&*vec) {
+                            return false;
+                        }
+                    }
+                }
+        }
+        for ci in &*cls {
+            self.remove_clause(*ci);
+        }
+        // Free occurs list for this variable:
+        self.eliminator.occurs[v].clear();
+        // FIXME I can't understand Glucose code!
+        // Free watches lists for this variables, if possible:
+        for ck in &[ClauseKind::Permanent, ClauseKind::Removable] {
+            let cv = &self.cp[*ck as usize];
+            if cv.watcher[v.lit(LTRUE) as usize] != 0 {
+                // watches[v.lit(true)].clear();
+            }
+            if cv.watcher[v.lit(LFALSE) as usize] != 0 {
+                // watches[v.lit(false)].clear();
+            }
+        }
+        self.backward_subsumption_check()
+        }
     }
     /// 16. substitute
-    pub fn substitute(&self, _vi: VarId, _x: Lit) -> bool {
+    pub fn substitute(&mut self, vi: VarId, x: Lit) -> bool {
+        if !self.ok {
+            return false;
+        }
+        self.vars[vi].eliminated = true;
+        // setDecisionVar(v, false);
+        unsafe {
+        let cls = &self.eliminator.occurs[vi] as *const Vec<ClauseId>;
+        let subst_clause = &mut self.eliminator.add_tmp as *mut Vec<Lit>;
+        for ci in &*cls {
+            (*subst_clause).clear();
+            let c = &self.cp[ci.to_kind()].clauses[ci.to_index()] as *const Clause;
+            for i in 0..(*c).len() {
+                let p = lindex!((*c), i);
+                if p.vi() == vi {
+                    if p.positive() {
+                        (*subst_clause).push(x);
+                    } else {
+                        (*subst_clause).push(x.negate());
+                    }
+                } else {
+                        (*subst_clause).push(p);
+                }
+            }
+            if !self.add_clause_(&*subst_clause) {
+                self.ok = false;
+                return false;
+            }
+            self.remove_clause(*ci);
+        }
+        }
         true
     }
     /// 17. extendModel
@@ -455,7 +571,10 @@ impl Solver {
         self.ok
     }
     /// 19. cleanUpClauses
-    pub fn cleanup_clauses(&self) -> () {}
+    pub fn cleanup_clauses(&self) -> () {
+        // FIXME occurs.cleanAll();
+        // FIXME self.cv.drain(|c| c.mark);
+    }
     /// 20. relocAll
     pub fn reloc_all(&self) -> () {}
     /// 21. garbageCollect
