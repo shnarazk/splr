@@ -270,3 +270,23 @@ pub fn cid2fmt(cid: ClauseId) -> String {
         _ => format!("[prmnnt:{}]", cid.to_index()),
     }
 }
+
+impl Clause {
+    pub fn subsumes(&self, other: &Clause) -> Option<Lit> {
+        Some(NULL_LIT)
+    }
+}
+
+// impl Clause {
+//     void calcAbstraction() {
+//         assert(header.extra_size > 0);
+//         uint32_t abstraction = 0;
+//         for (int i = 0; i < size(); i++)
+//             abstraction |= 1 << (var(data[i].lit) & 31);
+//         data[header.size].abs = abstraction;  }
+// }
+//  inline void Clause::strengthen(Lit p)
+//  {
+//      remove(*this, p);
+//      calcAbstraction();
+//  }
