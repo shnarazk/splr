@@ -1,4 +1,6 @@
 #![allow(dead_code)]
+#![allow(unused_variables)]
+#![allow(unused_mut)]
 use clause::Clause;
 use clause::ClauseIdIndexEncoding;
 use clause::ClauseKind;

@@ -5,6 +5,7 @@ use solver_rollback::Restart;
 use std::fs;
 use std::io::{BufRead, BufReader};
 use types::*;
+use types::Dump;
 use var::*;
 use var_manage::Eliminator;
 
@@ -99,10 +100,6 @@ pub struct Solver {
     pub next_restart: u64,
     pub restart_exp: f64,
     pub rbias: Ema,
-}
-
-trait Dump {
-    fn dump(&self, mes: &str) -> ();
 }
 
 impl Solver {

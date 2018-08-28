@@ -256,3 +256,7 @@ pub enum DumpMode {
     DumpCSV,
     DumpJSON,
 }
+
+pub trait Dump {
+    fn dump(&self, mes: &str) -> ();
+}

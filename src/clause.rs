@@ -273,7 +273,21 @@ pub fn cid2fmt(cid: ClauseId) -> String {
 
 impl Clause {
     pub fn subsumes(&self, other: &Clause) -> Option<Lit> {
-        Some(NULL_LIT)
+        let mut ret: Lit = NULL_LIT;
+        'next: for i in 0..self.len() {
+            let l = lindex!(self, i);
+            for j in 0..other.len() {
+                let lo = lindex!(other, j);
+                if l == lo {
+                    continue 'next;
+                } else if ret == NULL_LIT && l == lo.negate() {
+                    ret = l;
+                    continue 'next;
+                }
+            }
+            return None;
+        }
+        Some(ret)
     }
 }
 
@@ -290,3 +304,9 @@ impl Clause {
 //      remove(*this, p);
 //      calcAbstraction();
 //  }
+
+impl Dump for [ClausePack] {
+    fn dump(&self, str: &str) -> () {
+        println!("dumped {}", str);
+    }
+}

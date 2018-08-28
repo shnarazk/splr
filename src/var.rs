@@ -1,6 +1,5 @@
 use types::*;
 use clause::Clause;
-use var_manage::Eliminator;
 
 /// Struct for a variable.
 #[derive(Debug)]
@@ -73,11 +72,11 @@ impl Satisfiability for Vec<Var> {
     }
 }
 
-pub struct VarManager {
-    vec: Vec<Var>,
-    activity_heap: VarIdHeap,
-    eliminator: Eliminator,
-}
+// pub struct VarManager {
+//     vec: Vec<Var>,
+//     activity_heap: VarIdHeap,
+//     eliminator: Eliminator,
+// }
 
 #[derive(Debug)]
 pub enum VarOrder {

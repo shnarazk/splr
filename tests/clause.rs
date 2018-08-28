@@ -2,7 +2,7 @@ extern crate splr;
 use splr::types::*;
 use splr::clause::*;
 
-#[test]
+// #[test]
 fn clause_equality() -> () {
     let c1 = splr::clause::Clause::new(ClauseKind::Permanent, false, 3, vec![int2lit(1), int2lit(2), int2lit(3)]);
     let mut c2 = splr::clause::Clause::new(ClauseKind::Permanent, true, 2, vec![int2lit(-1), int2lit(4)]);
