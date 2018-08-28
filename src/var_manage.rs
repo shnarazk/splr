@@ -310,6 +310,9 @@ impl Solver {
             return;
         }
         for cid in &eliminator.subsumption_queue {
+            if *cid == eliminator.bwdsub_tmp_clause_id {
+                panic!("here");
+            }
             let c = &mut cp[cid.to_kind()].clauses[cid.to_index()];
             if !c.sve_mark {
                 c.sve_mark = true;
@@ -664,10 +667,12 @@ impl Solver {
     /// 18. eliminate
     // should be called at decision level 0.
     pub fn eliminate(&mut self, _: bool) -> bool {
-        if !self.simplify_database() {
-            self.ok = false;
-            return false;
-        }
+        // In Splr, this function is called from simplify_database
+        // if !self.simplify_database() {
+        //     self.ok = false;
+        //     return false;
+        // }
+        println!("eliminate start");
         unsafe {
             let target = &self.cp[ClauseKind::Removable as usize] as *const ClausePack;
             if 4_800_000 < (*target).len() {
@@ -678,7 +683,11 @@ impl Solver {
                 || self.eliminator.bwdsub_assigns < self.trail.len()
                 || 0 < self.eliminator.heap.len()
             {
-                println!("eliminate: start");
+                println!("eliminate: start {}, {}, {}",
+                         0 < self.eliminator.n_touched,
+                         self.eliminator.bwdsub_assigns < self.trail.len(),
+                         0 < self.eliminator.heap.len(),
+                );
                 self.gather_touched_clauses();
                 println!(" - queue {:?}", self.eliminator.subsumption_queue);
                 if (0 < self.eliminator.subsumption_queue.len()
@@ -726,6 +735,7 @@ impl Solver {
         } else {
             self.cleanup_clauses()
         }
+        println!("eliminate done");
         self.ok
     }
     /// 19. cleanUpClauses
