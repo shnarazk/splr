@@ -1,5 +1,6 @@
 use types::*;
 use clause::Clause;
+use var_manage::Eliminator;
 
 /// Struct for a variable.
 #[derive(Debug)]
@@ -10,6 +11,8 @@ pub struct Var {
     pub reason: ClauseId,
     pub level: usize,
     pub activity: f64,
+    /// for elimination
+    pub num_occur: usize,
     /// for elimination
     pub frozen: bool,
     /// for elimination
@@ -30,6 +33,7 @@ impl Var {
             reason: NULL_CLAUSE,
             level: 0,
             activity: 0.0,
+            num_occur: 0,
             frozen: false,
             touched: false,
             eliminated: false,
@@ -66,6 +70,18 @@ impl Satisfiability for Vec<Var> {
     }
 }
 
+pub struct VarManager {
+    vec: Vec<Var>,
+    activity_heap: VarIdHeap,
+    eliminator: Eliminator,
+}
+
+#[derive(Debug)]
+pub enum VarOrder {
+    ByActivity,
+    ByOccurence,
+}
+
 /// heap of VarId
 /// # Note
 /// - both fields has a fixed length. Don't use push and pop.
@@ -73,8 +89,17 @@ impl Satisfiability for Vec<Var> {
 ///   `indx` holds positions. So the unused field 0 can hold the last position as a special case.
 #[derive(Debug)]
 pub struct VarIdHeap {
+    order: VarOrder,
     heap: Vec<VarId>, // order : usize -> VarId
     idxs: Vec<usize>,    // VarId : -> order : usize
+}
+
+pub trait AccessHeap {
+    fn get_root(&self, heap: &mut VarIdHeap) -> VarId;
+}
+
+impl<'a> AccessHeap for Vec<Var> {
+    fn get_root(&self, _heap: &mut VarIdHeap) -> VarId { 0 }
 }
 
 pub trait VarOrdering {
@@ -84,6 +109,7 @@ pub trait VarOrdering {
     fn insert(&mut self, vec: &[Var], v: VarId) -> ();
     fn root(&mut self, vec: &[Var]) -> VarId;
     fn is_empty(&self) -> bool;
+    fn clear(&mut self) -> ();
 }
 
 impl VarOrdering for VarIdHeap {
@@ -143,10 +169,13 @@ impl VarOrdering for VarIdHeap {
     fn is_empty(&self) -> bool {
         self.idxs[0] == 0
     }
+    fn clear(&mut self) -> () {
+        self.reset()
+    }
 }
 
 impl VarIdHeap {
-    pub fn new(n: usize) -> VarIdHeap {
+    pub fn new(order: VarOrder, n: usize) -> VarIdHeap {
         let mut heap = Vec::with_capacity(n + 1);
         let mut idxs = Vec::with_capacity(n + 1);
         heap.push(0);
@@ -155,7 +184,7 @@ impl VarIdHeap {
             heap.push(i);
             idxs.push(i);
         }
-        VarIdHeap { heap, idxs }
+        VarIdHeap { order, heap, idxs }
     }
     /// renamed form numElementsInHeap
     pub fn len(&self) -> usize {
@@ -165,7 +194,10 @@ impl VarIdHeap {
         let mut q = start;
         let vq = self.heap[q];
         debug_assert!(0 < vq, "size of heap is too small");
-        let aq = vec[vq].activity;
+        let aq = match self.order {
+            VarOrder::ByActivity => vec[vq].activity,
+            VarOrder::ByOccurence => vec[vq].num_occur as f64,
+        };
         loop {
             let p = q / 2;
             if p == 0 {
@@ -175,7 +207,10 @@ impl VarIdHeap {
                 return;
             } else {
                 let vp = self.heap[p];
-                let ap = vec[vp].activity;
+                let ap = match self.order {
+                    VarOrder::ByActivity => vec[vp].activity,
+                    VarOrder::ByOccurence => vec[vp].num_occur as f64,
+                };
                 if ap < aq {
                     // move down the current parent, and make it empty
                     self.heap[q] = vp;
@@ -195,15 +230,24 @@ impl VarIdHeap {
         let n = self.len();
         let mut i = start;
         let vi = self.heap[i];
-        let ai = vec[vi].activity;
+        let ai = match self.order {
+            VarOrder::ByActivity => vec[vi].activity,
+            VarOrder::ByOccurence => vec[vi].num_occur as f64,
+        };
         loop {
             let l = 2 * i; // left
             if l <= n {
                 let r = l + 1; // right
                 let vl = self.heap[l];
                 let vr = self.heap[r];
-                let al = vec[vl].activity;
-                let ar = vec[vr].activity;
+                let al = match self.order {
+                    VarOrder::ByActivity => vec[vl].activity,
+                    VarOrder::ByOccurence => vec[vl].num_occur as f64,
+                };
+                let ar = match self.order {
+                    VarOrder::ByActivity => vec[vr].activity,
+                    VarOrder::ByOccurence => vec[vr].num_occur as f64,
+                };
                 let (c, vc, ac) = if r <= n && al < ar {
                     (r, vr, ar)
                 } else {

@@ -14,6 +14,9 @@ use var::Satisfiability;
 use var::Var;
 use var::VarIdHeap;
 use var::VarOrdering;
+use var::AccessHeap;
+use clause::ClausePack;
+use var::VarOrder;
 
 const VAR_ACTIVITY_THRESHOLD: f64 = 1e100;
 
@@ -75,8 +78,6 @@ pub struct Eliminator {
     heap: VarIdHeap,
     n_touched: usize,
     asymm_lits: usize,
-    /// vector of numbers of occurences which contain a literal
-    n_occ: Vec<Lit>,
     /// a mapping: VarIndex -> [ClauseId]
     occurs: Vec<Vec<ClauseId>>,
     subsumption_queue: Vec<ClauseId>,
@@ -101,10 +102,9 @@ impl Eliminator {
     pub fn new(nv: usize) -> Eliminator {
         Eliminator {
             merges: 0,
-            heap: VarIdHeap::new(nv + 1),
+            heap: VarIdHeap::new(VarOrder::ByOccurence, nv + 1),
             n_touched: 0,
             asymm_lits: 0,
-            n_occ: vec![0; nv + 1],
             occurs: vec![Vec::new(); nv + 1],
             subsumption_queue: Vec::new(),
             bwdsub_assigns: 0,
@@ -169,7 +169,7 @@ impl Solver {
             let l = lindex!(c, i);
             let vi = l.vi();
             self.eliminator.occurs[vi].push(cid);
-            self.eliminator.n_occ[l as usize] += 1;
+            self.vars[vi].num_occur += 1;
             self.vars[vi].touched = true;
             self.eliminator.n_touched += 1;
             self.eliminator.heap.update(&self.vars, vi);
@@ -180,15 +180,15 @@ impl Solver {
     pub fn remove_clause(&mut self, cid: ClauseId) -> () {
         let Solver {
             ref cp,
-            ref vars,
+            ref mut vars,
             ref mut eliminator,
             ..
         } = self;
         let c = iref!(cp, cid);
         for i in 0..c.lits.len() + 2 {
-            let l = lindex!(c, i);
-            eliminator.n_occ[l as usize] += 1;
-            eliminator.update_heap(vars, l.vi());
+            let vi = lindex!(c, i).vi();
+            vars[vi].num_occur -= 1;
+            eliminator.update_heap(vars, vi);
             // occurs.smudge(l.vi());
         }
         // solver::removeClause(...)
@@ -209,7 +209,7 @@ impl Solver {
                 c.strengthen(l);
                 // attachClause(cid);
                 // remove(occurs[var(l)], cid);
-                self.eliminator.n_occ[l as usize] -= 1;
+                self.vars[l.vi()].num_occur -= 1;
                 self.eliminator.update_heap(&self.vars, l.vi());
                 empty = false;
             }
@@ -572,9 +572,9 @@ impl Solver {
             self.ok = false;
             return false;
         }
-        let target = self.cp[ClauseKind::Removable as usize];
-        let toPerform = target.len() < 4_800_000;
-        if !toPerform {
+        unsafe {
+        let target = &self.cp[ClauseKind::Removable as usize] as *const ClausePack;
+        if 4_800_000 < (*target).len() {
             println!("Too many clauses to eliminate");
             return false;
         }
@@ -589,9 +589,8 @@ impl Solver {
             if true {
                 break 'perform;
             }
-            let mut cnt = 0;
             while ! self.eliminator.heap.is_empty() {
-                let elim: VarId = self.eliminator.heap.root(); // removeMin();
+                let elim: VarId = self.vars.get_root(&mut self.eliminator.heap); // removeMin();
                 // if asynch_interrupt { break }
                 if self.vars[elim].eliminated || self.vars[elim].assign != BOTTOM {
                     continue;
@@ -600,14 +599,13 @@ impl Solver {
                     self.ok = false;
                     break 'perform;
                 }
-                cnt += 1;
             }
+        }
         }
         // cleanup
         if self.eliminator.turn_off_elim {
             // self.eliminator.touched.clear(); it is embedded into Var
             self.eliminator.occurs.clear();
-            self.eliminator.n_occ.clear();
             self.eliminator.heap.clear();
             self.eliminator.subsumption_queue.clear();
             self.eliminator.use_simplification = false;
