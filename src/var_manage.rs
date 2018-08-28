@@ -78,8 +78,6 @@ pub struct Eliminator {
     heap: VarIdHeap,
     n_touched: usize,
     asymm_lits: usize,
-    /// a mapping: VarIndex -> [ClauseId]
-    occurs: Vec<Vec<ClauseId>>,
     subsumption_queue: Vec<ClauseId>,
     // eliminated: Vec<Var>,       // should be in Var?
     bwdsub_assigns: usize,
@@ -96,6 +94,7 @@ pub struct Eliminator {
     use_elim: bool,
     turn_off_elim: bool,
     use_simplification: bool,
+    subsumption_lim: usize,
 }
 
 impl Eliminator {
@@ -105,7 +104,6 @@ impl Eliminator {
             heap: VarIdHeap::new(VarOrder::ByOccurence, nv + 1),
             n_touched: 0,
             asymm_lits: 0,
-            occurs: vec![Vec::new(); nv + 1],
             subsumption_queue: Vec::new(),
             bwdsub_assigns: 0,
             bwdsub_tmp_unit: 0,
@@ -118,6 +116,7 @@ impl Eliminator {
             use_elim: true,
             turn_off_elim: false,
             use_simplification: true,
+            subsumption_lim: 0,
         }
     }
 }
@@ -168,7 +167,7 @@ impl Solver {
         for i in 0..c.len() {
             let l = lindex!(c, i);
             let vi = l.vi();
-            self.eliminator.occurs[vi].push(cid);
+            self.vars[vi].occurs.push(cid);
             self.vars[vi].num_occur += 1;
             self.vars[vi].touched = true;
             self.eliminator.n_touched += 1;
@@ -305,7 +304,7 @@ impl Solver {
         }
         for vi in 1..vars.len() {
             if vars[vi].touched {
-                let vec = &eliminator.occurs[vi];
+                let vec = &vars[vi].occurs;
                 for cid in vec {
                     let c = &mut cp[cid.to_kind()].clauses[cid.to_index()];
                     if !c.sve_mark {
@@ -343,7 +342,67 @@ impl Solver {
         ret != NULL_CLAUSE
     }
     /// 10. backwardSubsumptionCheck
-    pub fn backward_subsumption_check(&self) -> bool {
+    pub fn backward_subsumption_check(&mut self) -> bool {
+        let mut cnt = 0;
+        let mut subsumed = 0;
+        let mut deleted_literals = 0;
+        debug_assert_eq!(self.decision_level(), 0);
+        while 0 < self.eliminator.subsumption_queue.len() || self.eliminator.bwdsub_assigns < self.trail.len() {
+            // Empty subsumption queue and return immediately on user-interrupt:
+            // if computed-too-long { break; }
+            // Check top-level assigments by creating a dummy clause and placing it in the queue:
+            if self.eliminator.subsumption_queue.len() == 0 && self.eliminator.bwdsub_assigns < self.trail.len() {
+                let l: Lit = self.trail[self.eliminator.bwdsub_assigns];
+                self.eliminator.bwdsub_assigns += 1;
+                self.cp[self.eliminator.bwdsub_tmp_unit.to_kind()].clauses[self.eliminator.bwdsub_tmp_unit.to_index()].lit[0] = l;
+                // self.eliminator.bwdsub_tmp_unit.calcAbstraction();
+                self.eliminator.subsumption_queue.push(self.eliminator.bwdsub_tmp_unit);
+            }
+            let cid = self.eliminator.subsumption_queue[0];
+            self.eliminator.subsumption_queue.remove(0);
+            unsafe {
+            let c = &self.cp[cid.to_kind()].clauses[cid.to_index()] as *const Clause;
+            if (*c).sve_mark {
+                continue;
+            }
+            debug_assert!(1 < (*c).len() || self.assigned((*c).lit[0]) == LTRUE);
+            // unit clauses should have been propagated before this point.
+            // Find best variable to scan:
+            let mut best_v = (*c).lit[0].vi();
+            for i in 1..(*c).len() {
+                let l = lindex!(*c, i);
+                if self.vars[best_v].occurs.len() < self.vars[l.vi()].occurs.len() {
+                    best_v = l.vi();
+                }
+            }
+            // Search all candidates:
+            let cs = &self.vars[best_v].occurs as *const Vec<ClauseId>;
+            for ci in &*cs {
+                if (*c).sve_mark {
+                    continue;
+                }
+                let d = &self.cp[ci.to_kind()].clauses[ci.to_index()] as *const Clause;
+                if (*d).sve_mark && *ci != cid && self.eliminator.subsumption_lim == 0 || (*d).len() < self.eliminator.subsumption_lim {
+                    match (*c).subsumes(&*d) {
+                        Some(NULL_LIT) => {
+                            subsumed += 1;
+                            self.remove_clause(*ci);
+                        }
+                        Some(l) => {
+                            deleted_literals += 1;
+                            if !self.strengthen_clause(*ci, l.negate()) {
+                                return false;
+                            }
+                            // if l.vi() == best_v {
+                            //     j -= 1;
+                            // }
+                        }
+                        None => (),
+                    }
+                }
+            }
+            }
+        }
         true
     }
     /// 11. asymm
@@ -377,11 +436,11 @@ impl Solver {
     }
     /// 12. asymmVar
     pub fn asymm_var(&mut self, vi: VarId) -> bool {
-        if self.vars[vi].assign != BOTTOM || self.eliminator.occurs[vi].len() == 0 {
+        if self.vars[vi].assign != BOTTOM || self.vars[vi].occurs.len() == 0 {
             return true;
         }
         unsafe {
-            let cv = &self.eliminator.occurs[vi] as *const Vec<ClauseId>;
+            let cv = &self.vars[vi].occurs as *const Vec<ClauseId>;
             for cid in &*cv {
                 if !self.asymm(vi, *cid) {
                     return false;
@@ -415,7 +474,7 @@ impl Solver {
     /// 15. eliminateVar
     pub fn eliminate_var(&mut self, v: VarId) -> bool {
         unsafe {
-            let cls = &self.eliminator.occurs[v] as *const Vec<ClauseId>;
+            let cls = &self.vars[v].occurs as *const Vec<ClauseId>;
             let mut pos: Vec<ClauseId> = Vec::new();
             let mut neg: Vec<ClauseId> = Vec::new();
             // Split the occurrences into positive and negative:
@@ -482,7 +541,7 @@ impl Solver {
                 self.remove_clause(*ci);
             }
             // Free occurs list for this variable:
-            self.eliminator.occurs[v].clear();
+            self.vars[v].occurs.clear();
             // FIXME I can't understand Glucose code!
             // Free watches lists for this variables, if possible:
             for ck in &[ClauseKind::Permanent, ClauseKind::Removable] {
@@ -505,7 +564,7 @@ impl Solver {
         self.vars[vi].eliminated = true;
         // setDecisionVar(v, false);
         unsafe {
-            let cls = &self.eliminator.occurs[vi] as *const Vec<ClauseId>;
+            let cls = &self.vars[vi].occurs as *const Vec<ClauseId>;
             let subst_clause = &mut self.eliminator.add_tmp as *mut Vec<Lit>;
             for ci in &*cls {
                 (*subst_clause).clear();
@@ -620,7 +679,9 @@ impl Solver {
         // cleanup
         if self.eliminator.turn_off_elim {
             // self.eliminator.touched.clear(); it is embedded into Var
-            self.eliminator.occurs.clear();
+            for v in &mut self.vars {
+                v.occurs.clear();
+            }
             self.eliminator.heap.clear();
             self.eliminator.subsumption_queue.clear();
             self.eliminator.use_simplification = false;
@@ -675,3 +736,9 @@ impl Clause {
 //      remove(*this, p);
 //      calcAbstraction();
 //  }
+
+impl Clause {
+    fn subsumes(&self, other: &Clause) -> Option<Lit> {
+        Some(NULL_LIT)
+    }
+}

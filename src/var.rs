@@ -19,6 +19,8 @@ pub struct Var {
     pub touched: bool,
     /// for elimination
     pub eliminated: bool,
+    /// for elimination
+    pub occurs: Vec<ClauseId>,
 }
 
 /// is the dummy var index.
@@ -37,6 +39,7 @@ impl Var {
             frozen: false,
             touched: false,
             eliminated: false,
+            occurs: Vec::new(),
         }
     }
     pub fn new_vars(n: usize) -> Vec<Var> {
