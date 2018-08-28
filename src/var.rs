@@ -83,6 +83,7 @@ pub trait VarOrdering {
     fn update(&mut self, vec: &[Var], v: VarId) -> ();
     fn insert(&mut self, vec: &[Var], v: VarId) -> ();
     fn root(&mut self, vec: &[Var]) -> VarId;
+    fn is_empty(&self) -> bool;
 }
 
 impl VarOrdering for VarIdHeap {
@@ -138,6 +139,9 @@ impl VarOrdering for VarIdHeap {
         }
         // self.var_order.check("root 2");
         vs
+    }
+    fn is_empty(&self) -> bool {
+        self.idxs[0] == 0
     }
 }
 

@@ -83,6 +83,7 @@ pub struct Eliminator {
     // eliminated: Vec<Var>,       // should be in Var?
     bwdsub_assigns: usize,
     bwdsub_tmp_unit: ClauseId,
+    remove_satisfied: bool,
     // working place
     merge_vec: Vec<Lit>,
     elim_clauses: Vec<Lit>,
@@ -91,6 +92,9 @@ pub struct Eliminator {
     clause_lim: usize,
     eliminated_vars: usize,
     add_tmp: Vec<Lit>,
+    use_elim: bool,
+    turn_off_elim: bool,
+    use_simplification: bool,
 }
 
 impl Eliminator {
@@ -105,11 +109,15 @@ impl Eliminator {
             subsumption_queue: Vec::new(),
             bwdsub_assigns: 0,
             bwdsub_tmp_unit: 0,
+            remove_satisfied: false,
             merge_vec: vec![0; nv + 1],
             elim_clauses: vec![0; 2 * (nv + 1)],
             clause_lim: 20,
             eliminated_vars: 0,
             add_tmp: Vec::new(),
+            use_elim: true,
+            turn_off_elim: false,
+            use_simplification: true,
         }
     }
 }
@@ -560,13 +568,54 @@ impl Solver {
     }
     /// 18. eliminate
     pub fn eliminate(&mut self, _: bool) -> bool {
-        let result = {
-            self.simplify_database();
-            true
-        };
-        if !result {
+        if !self.simplify_database() {
             self.ok = false;
             return false;
+        }
+        let target = self.cp[ClauseKind::Removable as usize];
+        let toPerform = target.len() < 4_800_000;
+        if !toPerform {
+            println!("Too many clauses to eliminate");
+            return false;
+        }
+        'perform: while 0 < self.eliminator.n_touched || self.eliminator.bwdsub_assigns < self.trail.len() || 0 < self.eliminator.heap.len() {
+            self.gather_touched_clauses();
+            if (0 < self.eliminator.subsumption_queue.len() || self.eliminator.bwdsub_assigns < self.trail.len())
+                && !self.backward_subsumption_check() {
+                self.ok = false;
+                break 'perform;      // goto cleaup
+            }
+            // abort after too long computation
+            if true {
+                break 'perform;
+            }
+            let mut cnt = 0;
+            while ! self.eliminator.heap.is_empty() {
+                let elim: VarId = self.eliminator.heap.root(); // removeMin();
+                // if asynch_interrupt { break }
+                if self.vars[elim].eliminated || self.vars[elim].assign != BOTTOM {
+                    continue;
+                }
+                if self.eliminator.use_elim && self.vars[elim].assign == BOTTOM && self.vars[elim].frozen && !self.eliminate_var(elim) {
+                    self.ok = false;
+                    break 'perform;
+                }
+                cnt += 1;
+            }
+        }
+        // cleanup
+        if self.eliminator.turn_off_elim {
+            // self.eliminator.touched.clear(); it is embedded into Var
+            self.eliminator.occurs.clear();
+            self.eliminator.n_occ.clear();
+            self.eliminator.heap.clear();
+            self.eliminator.subsumption_queue.clear();
+            self.eliminator.use_simplification = false;
+            self.eliminator.remove_satisfied = true;
+            // Froce full cleaup (this is safe and desirable since it only happens once):
+            // self.rebuildOrderHeap();
+        } else {
+            self.cleanup_clauses()
         }
         self.ok
     }

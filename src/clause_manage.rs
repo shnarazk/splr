@@ -20,7 +20,7 @@ pub trait ClauseManagement {
     fn add_clause(&mut self, v: Vec<Lit>) -> bool;
     fn add_learnt(&mut self, v: Vec<Lit>) -> usize;
     fn reduce_database(&mut self) -> ();
-    fn simplify_database(&mut self) -> ();
+    fn simplify_database(&mut self) -> bool;
     fn lbd_of(&mut self, v: &[Lit]) -> usize;
 }
 
@@ -204,7 +204,7 @@ impl ClauseManagement for Solver {
         }
         self.progress("drop 1/2");
     }
-    fn simplify_database(&mut self) -> () {
+    fn simplify_database(&mut self) -> bool {
         debug_assert_eq!(self.decision_level(), 0);
         // remove unsatisfiable literals in clauses
         let targets: Vec<Lit> = self.trail[self.num_solved_vars..]
@@ -288,6 +288,7 @@ impl ClauseManagement for Solver {
             }
         }
         self.progress("simplify");
+        true
     }
     fn lbd_of(&mut self, v: &[Lit]) -> usize {
         let key;
