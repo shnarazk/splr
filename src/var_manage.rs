@@ -2,6 +2,7 @@
 use clause::Clause;
 use clause::ClauseIdIndexEncoding;
 use clause::ClauseKind;
+use clause::ClausePack;
 use clause_manage::ClauseManagement;
 use solver::SatSolver;
 use solver::SolverException::*;
@@ -10,13 +11,12 @@ use solver::{Solver, Stat};
 use solver_propagate::SolveSAT;
 use solver_rollback::Restart;
 use types::*;
+use var::AccessHeap;
 use var::Satisfiability;
 use var::Var;
 use var::VarIdHeap;
-use var::VarOrdering;
-use var::AccessHeap;
-use clause::ClausePack;
 use var::VarOrder;
+use var::VarOrdering;
 
 const VAR_ACTIVITY_THRESHOLD: f64 = 1e100;
 
@@ -415,41 +415,44 @@ impl Solver {
     /// 15. eliminateVar
     pub fn eliminate_var(&mut self, v: VarId) -> bool {
         unsafe {
-        let cls = &self.eliminator.occurs[v] as *const Vec<ClauseId>;
-        let mut pos: Vec<ClauseId> = Vec::new();
-        let mut neg: Vec<ClauseId> = Vec::new();
-        // Split the occurrences into positive and negative:
-        for cid in &*cls {
-            let c = &self.cp[cid.to_kind()].clauses[cid.to_index()];
-            for i in 0..c.len() {
-                let l = lindex!(c, i);
-                if l.vi() == v {
-                    if l.positive() {
-                        pos.push(*cid);
-                    } else {
-                        neg.push(*cid);
+            let cls = &self.eliminator.occurs[v] as *const Vec<ClauseId>;
+            let mut pos: Vec<ClauseId> = Vec::new();
+            let mut neg: Vec<ClauseId> = Vec::new();
+            // Split the occurrences into positive and negative:
+            for cid in &*cls {
+                let c = &self.cp[cid.to_kind()].clauses[cid.to_index()];
+                for i in 0..c.len() {
+                    let l = lindex!(c, i);
+                    if l.vi() == v {
+                        if l.positive() {
+                            pos.push(*cid);
+                        } else {
+                            neg.push(*cid);
+                        }
                     }
                 }
             }
-        }
-        // Check wether the increase in number of clauses stays within the allowed ('grow').
-        // Moreover, no clause must exceed the limit on the maximal clause size (if it is set).
-        let mut cnt = 0;
-        for i in 0..pos.len() {
-            for j in 0..neg.len() {
-                let (res, clause_size) = self.merge_(pos[i], neg[j], v);
-                if  res {
-                    cnt += 1;
-                    if (*cls).len() < cnt || (self.eliminator.clause_lim != 0 && self.eliminator.clause_lim < clause_size) {
-                        return true;
+            // Check wether the increase in number of clauses stays within the allowed ('grow').
+            // Moreover, no clause must exceed the limit on the maximal clause size (if it is set).
+            let mut cnt = 0;
+            for i in 0..pos.len() {
+                for j in 0..neg.len() {
+                    let (res, clause_size) = self.merge_(pos[i], neg[j], v);
+                    if res {
+                        cnt += 1;
+                        if (*cls).len() < cnt
+                            || (self.eliminator.clause_lim != 0
+                                && self.eliminator.clause_lim < clause_size)
+                        {
+                            return true;
+                        }
                     }
                 }
             }
-        }
-        // Delete and store old clauses
-        self.vars[v].eliminated = true;
-        // setDecisionVar(v, false);
-        self.eliminator.eliminated_vars += 1;
+            // Delete and store old clauses
+            self.vars[v].eliminated = true;
+            // setDecisionVar(v, false);
+            self.eliminator.eliminated_vars += 1;
             {
                 let tmp = &mut self.eliminator.elim_clauses as *mut Vec<Lit>;
                 if neg.len() < pos.len() {
@@ -464,7 +467,7 @@ impl Solver {
                     self.make_eliminating_clause(&mut (*tmp), v.lit(LFALSE));
                 }
             }
-        // Produce clauses in cross product via self.merge_vec:
+            // Produce clauses in cross product via self.merge_vec:
             {
                 let vec = &self.eliminator.merge_vec as *const Vec<Lit>;
                 for p in &pos {
@@ -474,24 +477,24 @@ impl Solver {
                         }
                     }
                 }
-        }
-        for ci in &*cls {
-            self.remove_clause(*ci);
-        }
-        // Free occurs list for this variable:
-        self.eliminator.occurs[v].clear();
-        // FIXME I can't understand Glucose code!
-        // Free watches lists for this variables, if possible:
-        for ck in &[ClauseKind::Permanent, ClauseKind::Removable] {
-            let cv = &self.cp[*ck as usize];
-            if cv.watcher[v.lit(LTRUE) as usize] != 0 {
-                // watches[v.lit(true)].clear();
             }
-            if cv.watcher[v.lit(LFALSE) as usize] != 0 {
-                // watches[v.lit(false)].clear();
+            for ci in &*cls {
+                self.remove_clause(*ci);
             }
-        }
-        self.backward_subsumption_check()
+            // Free occurs list for this variable:
+            self.eliminator.occurs[v].clear();
+            // FIXME I can't understand Glucose code!
+            // Free watches lists for this variables, if possible:
+            for ck in &[ClauseKind::Permanent, ClauseKind::Removable] {
+                let cv = &self.cp[*ck as usize];
+                if cv.watcher[v.lit(LTRUE) as usize] != 0 {
+                    // watches[v.lit(true)].clear();
+                }
+                if cv.watcher[v.lit(LFALSE) as usize] != 0 {
+                    // watches[v.lit(false)].clear();
+                }
+            }
+            self.backward_subsumption_check()
         }
     }
     /// 16. substitute
@@ -502,29 +505,29 @@ impl Solver {
         self.vars[vi].eliminated = true;
         // setDecisionVar(v, false);
         unsafe {
-        let cls = &self.eliminator.occurs[vi] as *const Vec<ClauseId>;
-        let subst_clause = &mut self.eliminator.add_tmp as *mut Vec<Lit>;
-        for ci in &*cls {
-            (*subst_clause).clear();
-            let c = &self.cp[ci.to_kind()].clauses[ci.to_index()] as *const Clause;
-            for i in 0..(*c).len() {
-                let p = lindex!((*c), i);
-                if p.vi() == vi {
-                    if p.positive() {
-                        (*subst_clause).push(x);
+            let cls = &self.eliminator.occurs[vi] as *const Vec<ClauseId>;
+            let subst_clause = &mut self.eliminator.add_tmp as *mut Vec<Lit>;
+            for ci in &*cls {
+                (*subst_clause).clear();
+                let c = &self.cp[ci.to_kind()].clauses[ci.to_index()] as *const Clause;
+                for i in 0..(*c).len() {
+                    let p = lindex!((*c), i);
+                    if p.vi() == vi {
+                        if p.positive() {
+                            (*subst_clause).push(x);
+                        } else {
+                            (*subst_clause).push(x.negate());
+                        }
                     } else {
-                        (*subst_clause).push(x.negate());
-                    }
-                } else {
                         (*subst_clause).push(p);
+                    }
                 }
+                if !self.add_clause_(&*subst_clause) {
+                    self.ok = false;
+                    return false;
+                }
+                self.remove_clause(*ci);
             }
-            if !self.add_clause_(&*subst_clause) {
-                self.ok = false;
-                return false;
-            }
-            self.remove_clause(*ci);
-        }
         }
         true
     }
@@ -544,13 +547,16 @@ impl Solver {
         let mut i = self.eliminator.elim_clauses.len() - 1;
         let mut j;
         'next: loop {
-                j = self.eliminator.elim_clauses[i] as usize;
-                i -= 1;
+            j = self.eliminator.elim_clauses[i] as usize;
+            i -= 1;
             loop {
                 if j <= 1 {
                     break;
                 }
-                let model_value = match (self.eliminator.elim_clauses[i].positive(), self.vars[self.eliminator.elim_clauses[i].vi()].assign) {
+                let model_value = match (
+                    self.eliminator.elim_clauses[i].positive(),
+                    self.vars[self.eliminator.elim_clauses[i].vi()].assign,
+                ) {
                     (true, x) => x,
                     (false, x) => negate_bool(x),
                 };
@@ -573,34 +579,43 @@ impl Solver {
             return false;
         }
         unsafe {
-        let target = &self.cp[ClauseKind::Removable as usize] as *const ClausePack;
-        if 4_800_000 < (*target).len() {
-            println!("Too many clauses to eliminate");
-            return false;
-        }
-        'perform: while 0 < self.eliminator.n_touched || self.eliminator.bwdsub_assigns < self.trail.len() || 0 < self.eliminator.heap.len() {
-            self.gather_touched_clauses();
-            if (0 < self.eliminator.subsumption_queue.len() || self.eliminator.bwdsub_assigns < self.trail.len())
-                && !self.backward_subsumption_check() {
-                self.ok = false;
-                break 'perform;      // goto cleaup
+            let target = &self.cp[ClauseKind::Removable as usize] as *const ClausePack;
+            if 4_800_000 < (*target).len() {
+                println!("Too many clauses to eliminate");
+                return false;
             }
-            // abort after too long computation
-            if true {
-                break 'perform;
-            }
-            while ! self.eliminator.heap.is_empty() {
-                let elim: VarId = self.vars.get_root(&mut self.eliminator.heap); // removeMin();
-                // if asynch_interrupt { break }
-                if self.vars[elim].eliminated || self.vars[elim].assign != BOTTOM {
-                    continue;
-                }
-                if self.eliminator.use_elim && self.vars[elim].assign == BOTTOM && self.vars[elim].frozen && !self.eliminate_var(elim) {
+            'perform: while 0 < self.eliminator.n_touched
+                || self.eliminator.bwdsub_assigns < self.trail.len()
+                || 0 < self.eliminator.heap.len()
+            {
+                self.gather_touched_clauses();
+                if (0 < self.eliminator.subsumption_queue.len()
+                    || self.eliminator.bwdsub_assigns < self.trail.len())
+                    && !self.backward_subsumption_check()
+                {
                     self.ok = false;
+                    break 'perform; // goto cleaup
+                }
+                // abort after too long computation
+                if true {
                     break 'perform;
                 }
+                while !self.eliminator.heap.is_empty() {
+                    let elim: VarId = self.vars.get_root(&mut self.eliminator.heap); // removeMin();
+                                                                                     // if asynch_interrupt { break }
+                    if self.vars[elim].eliminated || self.vars[elim].assign != BOTTOM {
+                        continue;
+                    }
+                    if self.eliminator.use_elim
+                        && self.vars[elim].assign == BOTTOM
+                        && self.vars[elim].frozen
+                        && !self.eliminate_var(elim)
+                    {
+                        self.ok = false;
+                        break 'perform;
+                    }
+                }
             }
-        }
         }
         // cleanup
         if self.eliminator.turn_off_elim {
@@ -610,17 +625,17 @@ impl Solver {
             self.eliminator.subsumption_queue.clear();
             self.eliminator.use_simplification = false;
             self.eliminator.remove_satisfied = true;
-            // Froce full cleaup (this is safe and desirable since it only happens once):
-            // self.rebuildOrderHeap();
+        // Froce full cleaup (this is safe and desirable since it only happens once):
+        // self.rebuildOrderHeap();
         } else {
             self.cleanup_clauses()
         }
         self.ok
     }
     /// 19. cleanUpClauses
-    pub fn cleanup_clauses(&self) -> () {
+    pub fn cleanup_clauses(&mut self) -> () {
         // FIXME occurs.cleanAll();
-        // FIXME self.cv.drain(|c| c.mark);
+        self.drain_unless(&|c: &Clause| !(*c).sve_mark);
     }
     /// 20. relocAll
     pub fn reloc_all(&self) -> () {}
