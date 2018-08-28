@@ -185,14 +185,15 @@ impl Solver {
         true
     }
     /// 4. removeClause
+    /// called from strengthen_clause, backward_subsumption_check, eliminate_var, substitute
     pub fn remove_clause(&mut self, cid: ClauseId) -> () {
         let Solver {
-            ref cp,
+            ref mut cp,
             ref mut vars,
             ref mut eliminator,
             ..
         } = self;
-        let c = iref!(cp, cid);
+        let mut c = &mut cp[cid.to_kind()].clauses[cid.to_index()];
         for i in 0..c.lits.len() + 2 {
             let vi = lindex!(c, i).vi();
             vars[vi].num_occur -= 1;
@@ -200,6 +201,7 @@ impl Solver {
             vars[vi].occurs.retain(|&ci| ci != cid);             // occurs.smudge(l.vi());
         }
         // solver::removeClause(...)
+        c.index = MAX;
     }
     /// 5. strengthenClause
     pub fn strengthen_clause(&mut self, cid: ClauseId, l: Lit) -> bool {
@@ -660,6 +662,7 @@ impl Solver {
         }
     }
     /// 18. eliminate
+    // should be called at decision level 0.
     pub fn eliminate(&mut self, _: bool) -> bool {
         if !self.simplify_database() {
             self.ok = false;

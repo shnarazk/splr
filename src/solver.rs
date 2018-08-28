@@ -120,7 +120,7 @@ impl Solver {
             trail: Vec::with_capacity(nv),
             trail_lim: Vec::new(),
             q_head: 0,
-            var_order: VarIdHeap::new(VarOrder::ByActivity, nv ,0),
+            var_order: VarIdHeap::new(VarOrder::ByActivity, nv , nv),
             cp: [
                 ClausePack::build(ClauseKind::Removable, nv, nc),
                 ClausePack::build(ClauseKind::Permanent, nv, nc),

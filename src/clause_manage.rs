@@ -258,6 +258,7 @@ impl ClauseManagement for Solver {
                 }
             }
         }
+        // self.eliminate(true);
         // clear the reasons of variables satisfied at level zero.
         for l in &self.trail {
             self.vars[l.vi() as usize].reason = NULL_CLAUSE;
