@@ -1,5 +1,6 @@
 use types::*;
 use clause::Clause;
+use clause::ClauseIdIndexEncoding;
 
 /// Struct for a variable.
 #[derive(Debug)]
@@ -291,5 +292,22 @@ impl VarIdHeap {
             }
         }
         println!(" - pass var_order test at {}", s);
+    }
+}
+
+impl Dump for [Var] {
+    fn dump(&self, str: &str) -> () {
+        println!("{}", str);
+        for v in self {
+            if v.occurs.is_empty() {
+                println!("V{}", v.index);
+            } else {
+                print!("V{}\n - ", v.index);
+                for cid in &v.occurs {
+                    print!("C{}[{}], ", cid.to_kind(), cid.to_index());
+                }
+                println!("");
+            }
+        }
     }
 }

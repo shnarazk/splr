@@ -260,3 +260,7 @@ pub enum DumpMode {
 pub trait Dump {
     fn dump(&self, mes: &str) -> ();
 }
+
+pub fn vec2int(v: Vec<Lit>) -> Vec<i32> {
+    v.iter().map(|l| l.int()).collect::<Vec<i32>>()
+}

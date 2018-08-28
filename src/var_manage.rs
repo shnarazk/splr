@@ -75,28 +75,27 @@ impl VarSelect for Solver {
 /// Literal eliminator
 #[derive(Debug)]
 pub struct Eliminator {
-    merges: usize,
+    pub merges: usize,
     /// renamed elimHeap. FIXME: can we use VarIdHeap here?
-    heap: VarIdHeap,
-    n_touched: usize,
-    asymm_lits: usize,
-    subsumption_queue: Vec<ClauseId>,
-    // eliminated: Vec<Var>,       // should be in Var?
-    bwdsub_assigns: usize,
-    bwdsub_tmp_unit: ClauseId,
-    remove_satisfied: bool,
+    pub heap: VarIdHeap,
+    pub n_touched: usize,
+    pub asymm_lits: usize,
+    pub subsumption_queue: Vec<ClauseId>,
+    pub bwdsub_assigns: usize,
+    pub bwdsub_tmp_unit: ClauseId,
+    pub remove_satisfied: bool,
     // working place
-    merge_vec: Vec<Lit>,
-    elim_clauses: Vec<Lit>,
+    pub merge_vec: Vec<Lit>,
+    pub elim_clauses: Vec<Lit>,
     /// Variables are not eliminated if it produces a resolvent with a length above this limit.
     /// 0 means no limit.
-    clause_lim: usize,
-    eliminated_vars: usize,
-    add_tmp: Vec<Lit>,
-    use_elim: bool,
-    turn_off_elim: bool,
-    use_simplification: bool,
-    subsumption_lim: usize,
+    pub clause_lim: usize,
+    pub eliminated_vars: usize,
+    pub add_tmp: Vec<Lit>,
+    pub use_elim: bool,
+    pub turn_off_elim: bool,
+    pub use_simplification: bool,
+    pub subsumption_lim: usize,
 }
 
 impl Eliminator {

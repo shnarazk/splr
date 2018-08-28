@@ -169,7 +169,19 @@ impl Solver {
         self.trail_lim.len()
     }
     pub fn attach_clause(&mut self, c: Clause) -> ClauseId {
-        self.cp[c.kind as usize].attach(c)
+        let cid = self.cp[c.kind as usize].attach(c);
+        let c = &self.cp[cid.to_kind()].clauses[cid.to_index()];
+        self.eliminator.subsumption_queue.push(cid);
+        for i in 0..c.len() {
+            let l = lindex!(c, i);
+            let vi = l.vi();
+            self.vars[vi].occurs.push(cid);
+            self.vars[vi].num_occur += 1;
+            self.vars[vi].touched = true;
+            self.eliminator.n_touched += 1;
+            self.eliminator.heap.update(&self.vars, vi);
+        }
+        cid
     }
 }
 

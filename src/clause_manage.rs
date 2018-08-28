@@ -56,10 +56,6 @@ impl ClauseMap {
     }
 }
 
-pub fn vec2int(v: Vec<Lit>) -> Vec<i32> {
-    v.iter().map(|l| l.int()).collect::<Vec<i32>>()
-}
-
 impl ClauseManagement for Solver {
     #[inline]
     fn bump_cid(&mut self, cid: ClauseId) -> () {

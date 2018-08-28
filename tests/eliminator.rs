@@ -1,4 +1,7 @@
 // cargo test -- --nocapture
+#![allow(unused_imports)]
+#![allow(unused_variables)]
+#![allow(dead_code)]
 extern crate splr;
 use splr::types::*;
 use splr::clause::*;
@@ -16,9 +19,10 @@ fn check_occurs() {
 
     let c1 = mk_c(1, vec![1,2,3]);
     let c2 = mk_c(2, vec![1,-2,4]);
-    let c3 = mk_c(2, vec![1,-2]);
+    let c3 = mk_c(3, vec![1,-2]);
+    let c4 = mk_c(4, vec![1,2,-3,4]);
     {
-        let vec = [&c1, &c2, &c3];
+        let vec = [&c1, &c2, &c3, &c4];
         for x in &vec {
             for y in &vec {
                 println!("{}\tsubsumes\t{}\t=>\t{:?}", x, y, x.subsumes(&y).map(|l| l.int()));
@@ -28,7 +32,8 @@ fn check_occurs() {
     s.attach_clause(c1);
     s.attach_clause(c2);
     s.attach_clause(c3);
-    s.cp.dump("added");
+    s.attach_clause(c4);
+    s.vars.dump("added");
     println!("::done");
 }
 
