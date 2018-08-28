@@ -120,7 +120,7 @@ impl Solver {
             trail: Vec::with_capacity(nv),
             trail_lim: Vec::new(),
             q_head: 0,
-            var_order: VarIdHeap::new(VarOrder::ByActivity, nv),
+            var_order: VarIdHeap::new(VarOrder::ByActivity, nv ,0),
             cp: [
                 ClausePack::build(ClauseKind::Removable, nv, nc),
                 ClausePack::build(ClauseKind::Permanent, nv, nc),
@@ -170,6 +170,7 @@ impl Solver {
     }
     pub fn attach_clause(&mut self, c: Clause) -> ClauseId {
         let cid = self.cp[c.kind as usize].attach(c);
+        debug_assert_ne!(cid, 0);
         let c = &self.cp[cid.to_kind()].clauses[cid.to_index()];
         self.eliminator.subsumption_queue.push(cid);
         for i in 0..c.len() {

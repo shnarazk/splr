@@ -102,7 +102,9 @@ pub trait AccessHeap {
 }
 
 impl<'a> AccessHeap for Vec<Var> {
-    fn get_root(&self, _heap: &mut VarIdHeap) -> VarId { 0 }
+    fn get_root(&self, heap: &mut VarIdHeap) -> VarId {
+        heap.root(self)
+    }
 }
 
 pub trait VarOrdering {
@@ -113,6 +115,7 @@ pub trait VarOrdering {
     fn root(&mut self, vec: &[Var]) -> VarId;
     fn is_empty(&self) -> bool;
     fn clear(&mut self) -> ();
+    fn len(&self) -> usize;
 }
 
 impl VarOrdering for VarIdHeap {
@@ -175,10 +178,13 @@ impl VarOrdering for VarIdHeap {
     fn clear(&mut self) -> () {
         self.reset()
     }
+    fn len(&self) -> usize {
+        self.idxs[0]
+    }
 }
 
 impl VarIdHeap {
-    pub fn new(order: VarOrder, n: usize) -> VarIdHeap {
+    pub fn new(order: VarOrder, n: usize, init: usize) -> VarIdHeap {
         let mut heap = Vec::with_capacity(n + 1);
         let mut idxs = Vec::with_capacity(n + 1);
         heap.push(0);
@@ -187,6 +193,7 @@ impl VarIdHeap {
             heap.push(i);
             idxs.push(i);
         }
+        idxs[0] = init;
         VarIdHeap { order, heap, idxs }
     }
     /// renamed form numElementsInHeap
@@ -299,10 +306,8 @@ impl Dump for [Var] {
     fn dump(&self, str: &str) -> () {
         println!("{}", str);
         for v in self {
-            if v.occurs.is_empty() {
-                println!("V{}", v.index);
-            } else {
-                print!("V{}\n - ", v.index);
+            if !v.occurs.is_empty() {
+                print!("V{:>2} - ", v.index);
                 for cid in &v.occurs {
                     print!("C{}[{}], ", cid.to_kind(), cid.to_index());
                 }

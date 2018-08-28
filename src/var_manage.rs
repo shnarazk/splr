@@ -19,6 +19,7 @@ use var::Var;
 use var::VarIdHeap;
 use var::VarOrder;
 use var::VarOrdering;
+use std::usize::MAX;
 
 const VAR_ACTIVITY_THRESHOLD: f64 = 1e100;
 
@@ -82,7 +83,9 @@ pub struct Eliminator {
     pub asymm_lits: usize,
     pub subsumption_queue: Vec<ClauseId>,
     pub bwdsub_assigns: usize,
-    pub bwdsub_tmp_unit: ClauseId,
+//    pub bwdsub_tmp_unit: ClauseId,
+    pub bwdsub_tmp_clause: Clause,
+    pub bwdsub_tmp_clause_id: ClauseId,
     pub remove_satisfied: bool,
     // working place
     pub merge_vec: Vec<Lit>,
@@ -100,14 +103,19 @@ pub struct Eliminator {
 
 impl Eliminator {
     pub fn new(nv: usize) -> Eliminator {
+        let heap = VarIdHeap::new(VarOrder::ByOccurence, nv, nv);
+        let mut bwdsub_tmp_clause = Clause::null();
+        bwdsub_tmp_clause.index = MAX;
         Eliminator {
             merges: 0,
-            heap: VarIdHeap::new(VarOrder::ByOccurence, nv + 1),
+            heap,
             n_touched: 0,
             asymm_lits: 0,
             subsumption_queue: Vec::new(),
             bwdsub_assigns: 0,
-            bwdsub_tmp_unit: 0,
+//            bwdsub_tmp_unit: 0,
+            bwdsub_tmp_clause,
+            bwdsub_tmp_clause_id: MAX,
             remove_satisfied: false,
             merge_vec: vec![0; nv + 1],
             elim_clauses: vec![0; 2 * (nv + 1)],
@@ -189,7 +197,7 @@ impl Solver {
             let vi = lindex!(c, i).vi();
             vars[vi].num_occur -= 1;
             eliminator.update_heap(vars, vi);
-            // occurs.smudge(l.vi());
+            vars[vi].occurs.retain(|&ci| ci != cid);             // occurs.smudge(l.vi());
         }
         // solver::removeClause(...)
     }
@@ -209,10 +217,12 @@ impl Solver {
                 c.strengthen(l);
                 // attachClause(cid);
                 // remove(occurs[var(l)], cid);
+                self.vars[l.vi()].occurs.retain(|&ci| ci != cid);
                 self.vars[l.vi()].num_occur -= 1;
                 self.eliminator.update_heap(&self.vars, l.vi());
                 empty = false;
             }
+            println!("strengthen_clause done {}", c);
             rank = c.rank;
             c0 = c.lit[0];
         }
@@ -344,64 +354,81 @@ impl Solver {
     }
     /// 10. backwardSubsumptionCheck
     pub fn backward_subsumption_check(&mut self) -> bool {
+        println!("backward_subsumption_check");
         let mut cnt = 0;
         let mut subsumed = 0;
         let mut deleted_literals = 0;
         debug_assert_eq!(self.decision_level(), 0);
-        while 0 < self.eliminator.subsumption_queue.len() || self.eliminator.bwdsub_assigns < self.trail.len() {
+        while 0 < self.eliminator.subsumption_queue.len()
+            || self.eliminator.bwdsub_assigns < self.trail.len()
+        {
             // Empty subsumption queue and return immediately on user-interrupt:
             // if computed-too-long { break; }
             // Check top-level assigments by creating a dummy clause and placing it in the queue:
-            if self.eliminator.subsumption_queue.len() == 0 && self.eliminator.bwdsub_assigns < self.trail.len() {
+            if self.eliminator.subsumption_queue.len() == 0
+                && self.eliminator.bwdsub_assigns < self.trail.len()
+            {
                 let l: Lit = self.trail[self.eliminator.bwdsub_assigns];
                 self.eliminator.bwdsub_assigns += 1;
-                self.cp[self.eliminator.bwdsub_tmp_unit.to_kind()].clauses[self.eliminator.bwdsub_tmp_unit.to_index()].lit[0] = l;
+                self.eliminator.bwdsub_tmp_clause.lit[0] = l;
                 // self.eliminator.bwdsub_tmp_unit.calcAbstraction();
-                self.eliminator.subsumption_queue.push(self.eliminator.bwdsub_tmp_unit);
+                self.eliminator
+                    .subsumption_queue
+                    .push(self.eliminator.bwdsub_tmp_clause_id);
             }
             let cid = self.eliminator.subsumption_queue[0];
             self.eliminator.subsumption_queue.remove(0);
             unsafe {
-            let c = &self.cp[cid.to_kind()].clauses[cid.to_index()] as *const Clause;
-            if (*c).sve_mark {
-                continue;
-            }
-            debug_assert!(1 < (*c).len() || self.assigned((*c).lit[0]) == LTRUE);
-            // unit clauses should have been propagated before this point.
-            // Find best variable to scan:
-            let mut best_v = (*c).lit[0].vi();
-            for i in 1..(*c).len() {
-                let l = lindex!(*c, i);
-                if self.vars[best_v].occurs.len() < self.vars[l.vi()].occurs.len() {
-                    best_v = l.vi();
-                }
-            }
-            // Search all candidates:
-            let cs = &self.vars[best_v].occurs as *const Vec<ClauseId>;
-            for ci in &*cs {
+                let c = if cid == self.eliminator.bwdsub_tmp_clause_id {
+                    &self.eliminator.bwdsub_tmp_clause as *const Clause
+                } else {
+                    &self.cp[cid.to_kind()].clauses[cid.to_index()] as *const Clause
+                };
                 if (*c).sve_mark {
                     continue;
                 }
-                let d = &self.cp[ci.to_kind()].clauses[ci.to_index()] as *const Clause;
-                if (*d).sve_mark && *ci != cid && self.eliminator.subsumption_lim == 0 || (*d).len() < self.eliminator.subsumption_lim {
-                    match (*c).subsumes(&*d) {
-                        Some(NULL_LIT) => {
-                            subsumed += 1;
-                            self.remove_clause(*ci);
-                        }
-                        Some(l) => {
-                            deleted_literals += 1;
-                            if !self.strengthen_clause(*ci, l.negate()) {
-                                return false;
-                            }
-                            // if l.vi() == best_v {
-                            //     j -= 1;
-                            // }
-                        }
-                        None => (),
+                println!(" - check {}", (*c));
+                debug_assert!(1 < (*c).len() || self.assigned((*c).lit[0]) == LTRUE);
+                // unit clauses should have been propagated before this point.
+                // Find best variable to scan:
+                let mut best_v = (*c).lit[0].vi();
+                for i in 1..(*c).len() {
+                    let l = lindex!(*c, i);
+                    if self.vars[best_v].occurs.len() < self.vars[l.vi()].occurs.len() {
+                        best_v = l.vi();
                     }
                 }
-            }
+                // Search all candidates:
+                let cs = &self.vars[best_v].occurs as *const Vec<ClauseId>;
+                for ci in &*cs {
+                    if (*c).sve_mark {
+                        continue;
+                    }
+                    let d = &self.cp[ci.to_kind()].clauses[ci.to_index()] as *const Clause;
+                    if !(*d).sve_mark && *ci != cid && self.eliminator.subsumption_lim == 0
+                        || (*d).len() < self.eliminator.subsumption_lim
+                    {
+                        println!(" -   with {}", (*d));
+                        match (*c).subsumes(&*d) {
+                            Some(NULL_LIT) => {
+                                println!("    => subsumed completely");
+                                subsumed += 1;
+                                self.remove_clause(*ci);
+                            }
+                            Some(l) => {
+                                println!("     => subsumed {} by {}", *d, l.int());
+                                deleted_literals += 1;
+                                if !self.strengthen_clause(*ci, l.negate()) {
+                                    return false;
+                                }
+                                // if l.vi() == best_v {
+                                //     j -= 1;
+                                // }
+                            }
+                            None => (),
+                        }
+                    }
+                }
             }
         }
         true
@@ -648,18 +675,22 @@ impl Solver {
                 || self.eliminator.bwdsub_assigns < self.trail.len()
                 || 0 < self.eliminator.heap.len()
             {
+                println!("eliminate: start");
                 self.gather_touched_clauses();
+                println!(" - queue {:?}", self.eliminator.subsumption_queue);
                 if (0 < self.eliminator.subsumption_queue.len()
                     || self.eliminator.bwdsub_assigns < self.trail.len())
                     && !self.backward_subsumption_check()
                 {
+                    println!("eliminate: break");
                     self.ok = false;
                     break 'perform; // goto cleaup
                 }
                 // abort after too long computation
-                if true {
+                if false {
                     break 'perform;
                 }
+                println!(" - heap: {:?}", self.eliminator.heap);
                 while !self.eliminator.heap.is_empty() {
                     let elim: VarId = self.vars.get_root(&mut self.eliminator.heap); // removeMin();
                                                                                      // if asynch_interrupt { break }
@@ -719,20 +750,31 @@ impl Eliminator {
 impl Clause {
     /// remove Lit `p` from Clause *self*.
     pub fn strengthen(&mut self, p: Lit) -> () {
+        println!("strengthen: remove {} from {}", p.int(), self);
         let len = self.len();
         if len == 2 {
             if self.lit[0] == p {
                 self.lit.swap(0, 1);
                 panic!("There's no unary clause in Splr");
+            }
+        } else {
+            if self.lit[0] == p {
+                self.lit[0] = self.lits.pop().unwrap();
+            } else if self.lit[1] == p {
+                self.lit[1] = self.lits.pop().unwrap();
             } else {
-                if self.lit[0] == p {
-                    self.lit[0] = self.lits.pop().unwrap();
-                } else if self.lit[1] == p {
-                    self.lit[1] = self.lits.pop().unwrap();
-                } else {
-                    self.lits.retain(|&x| x != p);
-                }
+                self.lits.retain(|&x| x != p);
             }
         }
+        println!("strengthen: done as {}", self);
+    }
+}
+
+impl Dump for Eliminator {
+    fn dump(&self, str: &str) -> () {
+        println!("{}", str);
+        println!(" - n_touched {}", self.n_touched);
+        println!(" - subsumption_queue {:?}", self.subsumption_queue);
+        println!(" - heap {:?}", self.heap);
     }
 }

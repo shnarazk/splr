@@ -18,22 +18,26 @@ fn check_occurs() {
     let mut s = Solver::new(cfg, &cnf);
 
     let c1 = mk_c(1, vec![1,2,3]);
-    let c2 = mk_c(2, vec![1,-2,4]);
-    let c3 = mk_c(3, vec![1,-2]);
-    let c4 = mk_c(4, vec![1,2,-3,4]);
+    let c2 = mk_c(2, vec![-2,3,4]);
+    let c3 = mk_c(3, vec![-2,-3]);
+    let c4 = mk_c(4, vec![1,2,-3,9]);
     {
-        let vec = [&c1, &c2, &c3, &c4];
+        let vec = [&c2, &c3]; // [&c1, &c2, &c3, &c4];
         for x in &vec {
             for y in &vec {
                 println!("{}\tsubsumes\t{}\t=>\t{:?}", x, y, x.subsumes(&y).map(|l| l.int()));
             }
         }
     }
-    s.attach_clause(c1);
+    // s.attach_clause(c1);
     s.attach_clause(c2);
     s.attach_clause(c3);
-    s.attach_clause(c4);
-    s.vars.dump("added");
+    // s.attach_clause(c4);
+    // s.vars.dump("##added");
+    s.eliminator.dump("##added");
+    s.eliminate(true);
+    // s.vars.dump("##eliminated");
+    s.eliminator.dump("##eliminated");
     println!("::done");
 }
 
