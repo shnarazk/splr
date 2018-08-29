@@ -1,6 +1,7 @@
 use clause::Clause;
 use clause::ClauseIdIndexEncoding;
 use clause::ClauseKind;
+use clause::ClausePack;
 use solver::{Solver, Stat};
 use solver_propagate::SolveSAT;
 use std::usize::MAX;
@@ -19,7 +20,7 @@ pub trait ClauseManagement {
     fn decay_cla_activity(&mut self) -> ();
     fn add_clause(&mut self, v: Vec<Lit>) -> bool;
     fn add_learnt(&mut self, v: Vec<Lit>) -> usize;
-    fn reduce_database(&mut self) -> ();
+    fn reduce_watchers(&mut self) -> ();
     fn simplify_database(&mut self) -> bool;
     fn drain_unless<F>(&mut self, f:&F) -> bool
         where F: Fn(&Clause) -> bool;
@@ -145,35 +146,43 @@ impl ClauseManagement for Solver {
         self.uncheck_enqueue(l0, cid);
         lbd
     }
-    fn reduce_database(&mut self) -> () {
+    /// 1. sort `permutation` which is a mapping: index -> ClauseIndex.
+    /// 2. rebuild watches to pick up clauses which is placed in a good place in permutation.
+    fn reduce_watchers(&mut self) -> () {
         let nc;
         {
             let cp = &mut self.cp[ClauseKind::Removable as usize];
             nc = cp.clauses.len();
-            let perm = &mut cp.permutation;
-            if perm.len() < nc {
+            {
+                let ClausePack {
+                    ref mut clauses,
+                    ref mut watcher,
+                    permutation: ref mut perm,
+                    ..
+                } = cp;
+                // let perm = &mut cp.permutation;
+                if perm.len() < nc {
                 unsafe {
                     perm.reserve(nc + 1);
                     perm.set_len(nc + 1);
                 }
             }
             // sort the range
-            cp.clauses[1..].sort();
+            perm[1..].sort_by(|&a,&b| clauses[a].cmp(&clauses[b]));
             {
                 let nkeep = 1 + nc / 2;
                 for mut i in 0..nc {
-                    perm[cp.clauses[i].index] = i;
+                    perm[clauses[i].index] = i;
                 }
-                cp.clauses
-                    .retain(|c| perm[c.index] < nkeep || c.locked || c.just_used);
+                clauses.retain(|c| perm[c.index] < nkeep || c.locked || c.just_used);
             }
-            let new_len = cp.clauses.len();
+            let new_len = clauses.len();
             // update permutation table.
             for i in 1..nc {
                 perm[i] = 0;
             }
             for new in 0..new_len {
-                let c = &mut cp.clauses[new];
+                let c = &mut clauses[new];
                 perm[c.index] = new;
                 c.index = new;
                 c.just_used = false;
@@ -186,19 +195,20 @@ impl ClauseManagement for Solver {
                 }
             }
             // rebuild watches
-            for mut x in &mut cp.watcher {
+            for mut x in &mut *watcher {
                 *x = NULL_CLAUSE;
             }
-            for mut c in &mut cp.clauses {
+            for mut c in clauses {
                 let w0 = c.lit[0].negate() as usize;
-                c.next_watcher[0] = cp.watcher[w0];
-                cp.watcher[w0] = c.index;
+                c.next_watcher[0] = watcher[w0];
+                watcher[w0] = c.index;
                 let w1 = c.lit[1].negate() as usize;
-                c.next_watcher[1] = cp.watcher[w1];
-                cp.watcher[w1] = c.index;
+                c.next_watcher[1] = watcher[w1];
+                watcher[w1] = c.index;
             }
             self.next_reduction += DB_INC_SIZE + (self.c_lvl.0 as usize);
             self.stats[Stat::NumOfReduction as usize] += 1;
+            }
         }
         self.progress("drop 1/2");
     }

@@ -145,7 +145,7 @@ impl SolveSAT for Solver {
                     if self.cur_restart * self.next_reduction <= conflicts {
                         self.cur_restart =
                             ((conflicts as f64) / (self.next_reduction as f64)) as usize + 1;
-                        self.reduce_database();
+                        self.reduce_watchers();
                     }
                     self.block_restart(lbd, d);
                 }
