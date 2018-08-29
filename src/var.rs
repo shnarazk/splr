@@ -13,14 +13,14 @@ pub struct Var {
     pub activity: f64,
     /// for elimination
     pub num_occur: usize,
-    /// for elimination
-    pub frozen: bool,
-    /// for elimination
-    pub touched: bool,
-    /// for elimination
-    pub eliminated: bool,
-    /// for elimination
-    pub occurs: Vec<ClauseId>,
+//    /// for elimination
+//    pub frozen: bool,
+//    /// for elimination
+//    pub touched: bool,
+//    /// for elimination
+//    pub eliminated: bool,
+//    /// for elimination
+//    pub occurs: Vec<ClauseId>,
 }
 
 /// is the dummy var index.
@@ -36,10 +36,10 @@ impl Var {
             level: 0,
             activity: 0.0,
             num_occur: 0,
-            frozen: false,
-            touched: false,
-            eliminated: false,
-            occurs: Vec::new(),
+//            frozen: false,
+//            touched: false,
+//            eliminated: false,
+//            occurs: Vec::new(),
         }
     }
     pub fn new_vars(n: usize) -> Vec<Var> {
@@ -299,20 +299,5 @@ impl VarIdHeap {
             }
         }
         println!(" - pass var_order test at {}", s);
-    }
-}
-
-impl Dump for [Var] {
-    fn dump(&self, str: &str) -> () {
-        println!("{}", str);
-        for v in self {
-            if !v.occurs.is_empty() {
-                print!("V{:>2} - ", v.index);
-                for cid in &v.occurs {
-                    print!("C{}[{}], ", cid.to_kind(), cid.to_index());
-                }
-                println!("");
-            }
-        }
     }
 }

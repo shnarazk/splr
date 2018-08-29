@@ -1,4 +1,6 @@
 use clause::ClauseIdIndexEncoding;
+use clause::ClauseKind;
+use clause_manage::ClauseManagement;
 use solver::{Solver, Stat};
 use types::*;
 use var::VarOrdering;
@@ -9,8 +11,8 @@ pub trait Restart {
     fn block_restart(&mut self, lbd: usize, clv: usize) -> ();
 }
 
-const R: f64 = 1.30; // 1.40 <= 1.11; block restart by average assigment
-const K: f64 = 1.30; // 1.15 <= 0.83; force restart by average LBD
+const R: f64 = 1.15; // 1.40 <= 1.11; block restart by average assigment
+const K: f64 = 1.40; // 1.15 <= 0.83; force restart by average LBD
 
 impl Restart for Solver {
     /// This function touches:
@@ -47,11 +49,15 @@ impl Restart for Solver {
         let count = self.stats[Stat::NumOfBackjump as usize] as u64;
         let e_lbd = self.ema_lbd.get();
         let should_force = K < e_lbd;
-        if self.next_restart < count && should_force {
+        let extra = (1 < self.cp[ClauseKind::Removable as usize].permutation.len()) && (10 < self.cp[ClauseKind::Removable as usize].clauses.len() / self.cp[ClauseKind::Removable as usize].permutation.len());
+        if self.next_restart < count && (should_force || extra) {
             self.next_restart = count + 50;
             self.stats[Stat::NumOfRestart as usize] += 1;
             let rl = self.root_level;
             self.cancel_until(rl);
+            if extra {
+                self.simplify_database();
+            }
             // println!(" - {:.2} {:.2}", cnt, e_lbd);
         }
     }

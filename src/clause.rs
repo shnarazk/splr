@@ -132,8 +132,8 @@ pub struct Clause {
     pub frozen: bool,
     /// used in the current phase
     pub just_used: bool,
-    /// used in Subsumption Variable Eliminator
-    pub sve_mark: bool,
+//    /// used in Subsumption Variable Eliminator
+//    pub sve_mark: bool,
 }
 
 impl ClauseIdIndexEncoding for usize {
@@ -219,7 +219,7 @@ impl Clause {
             locked: false,
             frozen: false,
             just_used: false,
-            sve_mark: false,
+//            sve_mark: false,
         }
     }
     pub fn null() -> Clause {
@@ -235,7 +235,7 @@ impl Clause {
             learnt: false,
             frozen: false,
             just_used: false,
-            sve_mark: false,
+//            sve_mark: false,
         }
     }
     pub fn len(&self) -> usize {
@@ -278,40 +278,6 @@ pub fn cid2fmt(cid: ClauseId) -> String {
         _ => format!("[prmnnt:{}]", cid.to_index()),
     }
 }
-
-impl Clause {
-    pub fn subsumes(&self, other: &Clause) -> Option<Lit> {
-        let mut ret: Lit = NULL_LIT;
-        'next: for i in 0..self.len() {
-            let l = lindex!(self, i);
-            for j in 0..other.len() {
-                let lo = lindex!(other, j);
-                if l == lo {
-                    continue 'next;
-                } else if ret == NULL_LIT && l == lo.negate() {
-                    ret = l;
-                    continue 'next;
-                }
-            }
-            return None;
-        }
-        Some(ret)
-    }
-}
-
-// impl Clause {
-//     void calcAbstraction() {
-//         assert(header.extra_size > 0);
-//         uint32_t abstraction = 0;
-//         for (int i = 0; i < size(); i++)
-//             abstraction |= 1 << (var(data[i].lit) & 31);
-//         data[header.size].abs = abstraction;  }
-// }
-//  inline void Clause::strengthen(Lit p)
-//  {
-//      remove(*this, p);
-//      calcAbstraction();
-//  }
 
 impl Dump for [ClausePack] {
     fn dump(&self, str: &str) -> () {

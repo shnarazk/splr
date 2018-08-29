@@ -22,8 +22,9 @@ pub trait ClauseManagement {
     fn add_learnt(&mut self, v: Vec<Lit>) -> usize;
     fn reduce_watchers(&mut self) -> ();
     fn simplify_database(&mut self) -> bool;
-    fn drain_unless<F>(&mut self, f:&F) -> bool
-        where F: Fn(&Clause) -> bool;
+    fn drain_unless<F>(&mut self, f: &F) -> bool
+    where
+        F: Fn(&Clause) -> bool;
     fn lbd_of(&mut self, v: &[Lit]) -> usize;
 }
 
@@ -119,67 +120,31 @@ impl ClauseManagement for Solver {
     /// 1. sort `permutation` which is a mapping: index -> ClauseIndex.
     /// 2. rebuild watches to pick up clauses which is placed in a good place in permutation.
     fn reduce_watchers(&mut self) -> () {
-        let nc;
         {
-            let cp = &mut self.cp[ClauseKind::Removable as usize];
-            nc = cp.clauses.len();
-            {
-                let ClausePack {
-                    ref mut clauses,
-                    ref mut watcher,
-                    permutation: ref mut perm,
-                    ..
-                } = cp;
-                // let perm = &mut cp.permutation;
-// TP5
-//                if perm.len() < nc {
-//                    unsafe {
-//                        perm.reserve(nc + 1);
-//                        perm.set_len(nc + 1);
-//                    }
-//                }
-                // sort the range
-                perm[1..].sort_by(|&a,&b| clauses[a].cmp(&clauses[b]));
-                //
-                let nkeep = 1 + nc / 2;
-                for i in nkeep..perm.len() {
-                    let mut c = &mut clauses[perm[i]];
-                    if nkeep < perm[i] && !c.locked && !c.just_used {
-                        c.frozen = true;
-                    }
+            let ClausePack {
+                ref mut clauses,
+                ref mut watcher,
+                ref mut permutation,
+                ..
+            } = &mut self.cp[ClauseKind::Removable as usize];
+            // sort the range of 'permutation'
+            permutation[1..].sort_by(|&a, &b| clauses[a].cmp(&clauses[b]));
+            let nc = permutation.len();
+            for i in nc / 2..nc {
+                let mut c = &mut clauses[permutation[i]];
+                if !c.locked && !c.just_used {
+                    c.frozen = true;
                 }
-                perm.retain(|&i| !clauses[i].frozen);
-// TP-5
-//            {
-//                let nkeep = 1 + nc / 2;
-//                for mut i in 0..nc {
-//                    perm[clauses[i].index] = i;
-//                }
-//                clauses.retain(|c| perm[c.index] < nkeep || c.locked || c.just_used);
-//            }
-//            let new_len = clauses.len();
-//            // update permutation table.
-//            for i in 1..nc {
-//                perm[i] = 0;
-//            }
-//            for new in 0..new_len {
-//                let c = &mut clauses[new];
-//                perm[c.index] = new;
-//                c.index = new;
-//                c.just_used = false;
-//            }
-//            // rebuild reason
-//            for v in &mut self.vars[1..] {
-//                let cid = v.reason;
-//                if 0 < cid && cid.to_kind() == ClauseKind::Removable as usize {
-//                    v.reason = perm[cid];
-//                }
-//            }
+            }
+            permutation.retain(|&i| !clauses[i].frozen);
             // rebuild watches
             for mut x in &mut *watcher {
                 *x = NULL_CLAUSE;
             }
             for mut c in clauses {
+                if c.frozen {
+                    continue;
+                }
                 let w0 = c.lit[0].negate() as usize;
                 c.next_watcher[0] = watcher[w0];
                 watcher[w0] = c.index;
@@ -189,7 +154,6 @@ impl ClauseManagement for Solver {
             }
             self.next_reduction += DB_INC_SIZE + (self.c_lvl.0 as usize);
             self.stats[Stat::NumOfReduction as usize] += 1;
-            }
         }
         self.progress("drop 1/2");
     }
@@ -200,40 +164,31 @@ impl ClauseManagement for Solver {
             .iter()
             .map(|l| l.negate())
             .collect();
+        // clear the reasons of variables satisfied at level zero.
+        for l in &self.trail {
+            self.vars[l.vi() as usize].reason = NULL_CLAUSE;
+        }
+        let thr = (self.ema_lbd.fast / 2.0) as usize;
+        println!("thr {}",  thr);
         for ck in &KINDS {
             for mut c in &mut self.cp[*ck as usize].clauses {
-                c.lits.retain(|l| {
-                    for t in &targets {
-                        if t == l {
-                            return false;
+                if !(*c).frozen {
+                    c.lits.retain(|l| {
+                        for t in &targets {
+                            if t == l {
+                                return false;
+                            }
                         }
-                    }
-                    true
-                });
+                        true
+                    });
+                }
             }
-        }
-// TP-5
-//        // extend permutation table if needed
-//        for ck in &KINDS {
-//            let nc = self.cp[*ck as usize].clauses.len();
-//            let perm = &mut self.cp[*ck as usize].permutation;
-//            if perm.len() < nc {
-//                unsafe {
-//                    perm.reserve(nc);
-//                    perm.set_len(nc);
-//                }
-//            }
-//            // reinitialize the permutation table.
-//            for x in perm {
-//                *x = 0;
-//            }
-//        }
-        // set key FIXME check lit[2] and lits[..]
-        for ck in &KINDS {
+            // set key FIXME check lit[2] and lits[..]
+            // let thr = self.cp[*ck as usize].clauses[self.cp[*ck as usize].permutation[self.cp[*ck as usize].permutation.len() -1]].len() / 2;
             for ci in 1..self.cp[*ck as usize].clauses.len() {
                 unsafe {
                     let c = &mut self.cp[*ck as usize].clauses[ci] as *mut Clause;
-                    if (*c).frozen || self.satisfies(&*c) {
+                    if ((*c).frozen && thr <= (*c).len()) || self.satisfies(&*c) {
                         (*c).index = MAX;
                     } else if (*c).lits.len() == 0 && false {
                         if !self.enqueue((*c).lits[0], NULL_CLAUSE) {
@@ -247,50 +202,47 @@ impl ClauseManagement for Solver {
                         //     }
                         // }
                     }
+                    (*c).frozen = false;
                 }
             }
-        }
-        // self.rebuild_occurs();
         // self.eliminate(true);
-        // clear the reasons of variables satisfied at level zero.
-        for l in &self.trail {
-            self.vars[l.vi() as usize].reason = NULL_CLAUSE;
-        }
-        for ck in &KINDS {
-            self.cp[*ck as usize].clauses.retain(|ref c| c.index < MAX);
-            let len = self.cp[*ck as usize].clauses.len();
-            let perm = &mut self.cp[*ck as usize].permutation;
-            perm.clear();
-            for i in 0..len {
-                self.cp[*ck as usize].clauses[i].index = i;
-                perm.push(i);
+            let ClausePack {
+                ref mut clauses,
+                ref mut watcher,
+                ref mut permutation,
+                ..
+            } = &mut self.cp[*ck as usize];
+            let n = clauses.len();
+            clauses.retain(|ref c| c.index < MAX);
+            let len = clauses.len();
+            if n == len {
+                continue;
             }
-// TP-5
-//            let perm = &mut self.cp[*ck as usize].permutation;
-//            for i in 0..len {
-//                let old: usize = self.cp[*ck as usize].clauses[i].index;
-//                perm[old] = i;
-//                self.cp[*ck as usize].clauses[i].index = i;
-//            }
-//            self.cp[*ck as usize].clauses.truncate(len);
-            // rebuild watches for deletables
-            for mut x in &mut self.cp[*ck as usize].watcher {
+            permutation.clear();
+            for i in 0..len {
+                clauses[i].index = i;
+                permutation.push(i);
+            }
+            // rebuild watches for deletabl es
+            for mut x in &mut *watcher {
                 *x = NULL_CLAUSE;
             }
-            for mut c in &mut self.cp[*ck as usize].clauses {
+            for mut c in &mut *clauses {
                 let w0 = c.lit[0].negate() as usize;
-                c.next_watcher[0] = self.cp[*ck as usize].watcher[w0];
-                self.cp[*ck as usize].watcher[w0] = c.index;
+                c.next_watcher[0] = watcher[w0];
+                watcher[w0] = c.index;
                 let w1 = c.lit[1].negate() as usize;
-                c.next_watcher[1] = self.cp[*ck as usize].watcher[w1];
-                self.cp[*ck as usize].watcher[w1] = c.index;
+                c.next_watcher[1] = watcher[w1];
+                watcher[w1] = c.index;
             }
         }
         self.progress("simplify");
         true
     }
-    fn drain_unless<F>(&mut self, cond:&F) -> bool
-        where F: Fn(&Clause) -> bool {
+    fn drain_unless<F>(&mut self, cond: &F) -> bool
+    where
+        F: Fn(&Clause) -> bool,
+    {
         // extend permutation table if needed
         for ck in &KINDS {
             let nc = self.cp[*ck as usize].clauses.len();
