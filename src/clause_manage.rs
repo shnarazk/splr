@@ -27,36 +27,6 @@ pub trait ClauseManagement {
     fn lbd_of(&mut self, v: &[Lit]) -> usize;
 }
 
-#[derive(Debug)]
-pub struct ClauseMap {
-    pub init_size_of_permanents: usize,
-    pub next_reduction: usize,
-    pub kind: [Vec<Clause>; 2],
-    pub watches_per: Vec<ClauseId>,
-    pub watches_del: Vec<ClauseId>,
-    pub watches_bi: Vec<ClauseId>,
-    permutation_per: Vec<ClauseId>,
-    permutation_del: Vec<ClauseId>,
-}
-
-impl ClauseMap {
-    pub fn new(nv: usize, nc: usize) -> ClauseMap {
-        let mut k = [Vec::with_capacity(nc + 1), Vec::with_capacity(nc + 1)];
-        k[0].push(Clause::null());
-        k[1].push(Clause::null());
-        ClauseMap {
-            init_size_of_permanents: nc,
-            next_reduction: DB_INIT_SIZE,
-            kind: k,
-            watches_bi: vec![NULL_CLAUSE; 2 * (nv + 1)],
-            watches_per: vec![NULL_CLAUSE; 2 * (nv + 1)],
-            watches_del: vec![NULL_CLAUSE; 2 * (nv + 1)],
-            permutation_per: Vec::with_capacity(nv + 1),
-            permutation_del: Vec::with_capacity(nv + 1),
-        }
-    }
-}
-
 impl ClauseManagement for Solver {
     #[inline]
     fn bump_cid(&mut self, cid: ClauseId) -> () {
