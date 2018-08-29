@@ -41,6 +41,10 @@ impl SolveSAT for Solver {
                             (*c).next_watcher.swap(0, 1);
                         }
                         let next = (*c).next_watcher[1];
+                        if (*c).frozen {
+                            ci = next;
+                            continue 'next_clause;
+                        }
                         let fv = self.assigned((*c).lit[0]);
                         if fv == LTRUE {
                             debug_assert_eq!((*c).lit[1], false_lit);
@@ -169,12 +173,12 @@ impl SolveSAT for Solver {
                 v.reason = cid;
                 mref!(self.cp, cid).locked = true;
             }
-            println!(
-                "implication {} by {} {}",
-                l.int(),
-                cid.to_kind(),
-                cid.to_index()
-            );
+            // println!(
+            //     "implication {} by {} {}",
+            //     l.int(),
+            //     cid.to_kind(),
+            //     cid.to_index()
+            // );
             self.trail.push(l);
             true
         } else {

@@ -55,10 +55,7 @@ impl ClausePack {
         let mask = i.mask();
         let mut clauses = Vec::with_capacity(1 + nc);
         clauses.push(Clause::null());
-        let mut permutation = Vec::with_capacity(1 + nc);
-        for _i in 0..1 + nc {
-            permutation.push(NULL_CLAUSE);
-        }
+        let permutation = Vec::new();
         let mut watcher = Vec::with_capacity(2 * (nv + 1));
         for _i in 0..2 * (nv + 1) {
             watcher.push(NULL_CLAUSE);
@@ -78,6 +75,7 @@ impl ClausePack {
         let w1 = c.lit[1].negate() as usize;
         let cix = self.clauses.len();
         c.index = cix;
+        self.permutation.push(cix);
         c.next_watcher[0] = self.watcher[w0];
         self.watcher[w0] = cix;
         c.next_watcher[1] = self.watcher[w1];
@@ -130,6 +128,8 @@ pub struct Clause {
     pub locked: bool,
     /// given or learnt
     pub learnt: bool,
+    /// for elimination-by-simplfication
+    pub frozen: bool,
     /// used in the current phase
     pub just_used: bool,
     /// used in Subsumption Variable Eliminator
@@ -217,6 +217,7 @@ impl Clause {
             lits: v,
             index: 0,
             locked: false,
+            frozen: false,
             just_used: false,
             sve_mark: false,
         }
@@ -232,6 +233,7 @@ impl Clause {
             index: 0,
             locked: false,
             learnt: false,
+            frozen: false,
             just_used: false,
             sve_mark: false,
         }
