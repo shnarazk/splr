@@ -21,6 +21,12 @@ pub enum ClauseKind {
     Binclause,
 }
 
+pub const CLAUSE_KINDS: [ClauseKind; 3] = [
+    ClauseKind::Removable,
+    ClauseKind::Permanent,
+    ClauseKind::Binclause,
+];
+
 const CLAUSE_INDEX_BITS: usize = 60;
 const CLAUSE_INDEX_MASK: usize = 0x0FFF_FFFF_FFFF_FFFF;
 

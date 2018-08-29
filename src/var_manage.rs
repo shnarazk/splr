@@ -4,6 +4,7 @@
 use clause::Clause;
 use clause::ClauseIdIndexEncoding;
 use clause::ClauseKind;
+use clause::CLAUSE_KINDS;
 use clause::ClausePack;
 use clause_manage::ClauseManagement;
 use solver::SatSolver;
@@ -748,6 +749,24 @@ impl Solver {
     /// 21. garbageCollect
     pub fn garbage_collect(&self) -> () {}
     // is_eliminated(vi) == self.vars[vi].eliminated
+    /// Since splr delete clauses after each reduction,
+    /// we must rebuild occurence list before elimination.
+    pub fn rebuild_occurs(&mut self) -> () {
+        for v in &mut self.vars {
+            v.occurs.clear();
+        }
+        for ck in &CLAUSE_KINDS {
+            let cp = &self.cp[*ck as usize];
+            for ix in 1..cp.len() {
+                let c = &cp.clauses[ix];
+                let cid = ck.id_from(ix);
+                for i in 0..c.len() {
+                    let l = lindex!(c, i);
+                    self.vars[l.vi()].occurs.push(cid);
+                }
+            }
+        }
+    }
 }
 
 impl Eliminator {
