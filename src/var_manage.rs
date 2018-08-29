@@ -751,6 +751,7 @@ impl Solver {
     // is_eliminated(vi) == self.vars[vi].eliminated
     /// Since splr delete clauses after each reduction,
     /// we must rebuild occurence list before elimination.
+    /// Note: this isn't enough. You need rebuild subsumption_queue too!
     pub fn rebuild_occurs(&mut self) -> () {
         for v in &mut self.vars {
             v.occurs.clear();
