@@ -7,7 +7,7 @@ use solver_propagate::SolveSAT;
 use std::usize::MAX;
 use types::*;
 
-const DB_INIT_SIZE: usize = 1000;
+// const DB_INIT_SIZE: usize = 1000;
 const DB_INC_SIZE: usize = 50;
 const KINDS: [ClauseKind; 3] = [
     ClauseKind::Binclause,
@@ -123,7 +123,6 @@ impl ClauseManagement for Solver {
         {
             let ClausePack {
                 ref mut clauses,
-                ref mut watcher,
                 ref mut permutation,
                 ..
             } = &mut self.cp[ClauseKind::Removable as usize];
@@ -134,27 +133,20 @@ impl ClauseManagement for Solver {
                 let mut c = &mut clauses[permutation[i]];
                 if !c.locked && !c.just_used {
                     c.frozen = true;
+                    c.index = MAX;
                 }
             }
             permutation.retain(|&i| !clauses[i].frozen);
-            // rebuild watches
-            for mut x in &mut *watcher {
-                *x = NULL_CLAUSE;
-            }
-            for mut c in clauses {
-                if c.frozen {
-                    continue;
-                }
-                let w0 = c.lit[0].negate() as usize;
-                c.next_watcher[0] = watcher[w0];
-                watcher[w0] = c.index;
-                let w1 = c.lit[1].negate() as usize;
-                c.next_watcher[1] = watcher[w1];
-                watcher[w1] = c.index;
-            }
-            self.next_reduction += DB_INC_SIZE + (self.c_lvl.0 as usize);
-            self.stats[Stat::NumOfReduction as usize] += 1;
         }
+        if 6 * self.cp[ClauseKind::Removable as usize].permutation.len()
+            < self.cp[ClauseKind::Removable as usize].clauses.len()
+        {
+            self.garbage_collect(ClauseKind::Removable); // too many clauses
+        } else {
+            self.rebuild_watchers(ClauseKind::Removable);
+        }
+        self.next_reduction += DB_INC_SIZE + (self.c_lvl.0 as usize);
+        self.stats[Stat::NumOfReduction as usize] += 1;
         self.progress("drop 1/2");
     }
     fn simplify_database(&mut self) -> bool {
@@ -168,9 +160,8 @@ impl ClauseManagement for Solver {
         for l in &self.trail {
             self.vars[l.vi() as usize].reason = NULL_CLAUSE;
         }
-        let thr = (self.ema_lbd.fast / 2.0) as usize;
-        println!("thr {}",  thr);
         for ck in &KINDS {
+            debug_assert_eq!(self.cp[*ck as usize].clauses[0].index, 0);
             for mut c in &mut self.cp[*ck as usize].clauses {
                 if !(*c).frozen {
                     c.lits.retain(|l| {
@@ -184,11 +175,11 @@ impl ClauseManagement for Solver {
                 }
             }
             // set key FIXME check lit[2] and lits[..]
-            // let thr = self.cp[*ck as usize].clauses[self.cp[*ck as usize].permutation[self.cp[*ck as usize].permutation.len() -1]].len() / 2;
+            let thr = (self.ema_lbd.slow / 2.0) as usize;
             for ci in 1..self.cp[*ck as usize].clauses.len() {
                 unsafe {
                     let c = &mut self.cp[*ck as usize].clauses[ci] as *mut Clause;
-                    if ((*c).frozen && thr <= (*c).len()) || self.satisfies(&*c) {
+                    if ((*c).frozen && thr < (*c).len()) || self.satisfies(&*c) {
                         (*c).index = MAX;
                     } else if (*c).lits.len() == 0 && false {
                         if !self.enqueue((*c).lits[0], NULL_CLAUSE) {
@@ -205,36 +196,8 @@ impl ClauseManagement for Solver {
                     (*c).frozen = false;
                 }
             }
-        // self.eliminate(true);
-            let ClausePack {
-                ref mut clauses,
-                ref mut watcher,
-                ref mut permutation,
-                ..
-            } = &mut self.cp[*ck as usize];
-            let n = clauses.len();
-            clauses.retain(|ref c| c.index < MAX);
-            let len = clauses.len();
-            if n == len {
-                continue;
-            }
-            permutation.clear();
-            for i in 0..len {
-                clauses[i].index = i;
-                permutation.push(i);
-            }
-            // rebuild watches for deletabl es
-            for mut x in &mut *watcher {
-                *x = NULL_CLAUSE;
-            }
-            for mut c in &mut *clauses {
-                let w0 = c.lit[0].negate() as usize;
-                c.next_watcher[0] = watcher[w0];
-                watcher[w0] = c.index;
-                let w1 = c.lit[1].negate() as usize;
-                c.next_watcher[1] = watcher[w1];
-                watcher[w1] = c.index;
-            }
+            // self.eliminate(true);
+            self.garbage_collect(*ck);
         }
         self.progress("simplify");
         true
@@ -313,10 +276,74 @@ impl ClauseManagement for Solver {
 }
 
 impl Solver {
+    // # Prerequisite
+    /// - `ClausePack.clauses` has dead clauses, and their index fields hold valid vaule.
+    /// - `Caluse.index` of all the dead clauses is MAX.
+    /// - `ClausePack.permutation` is valid and can be destoried here.
+    ///
+    /// # Result
+    /// - `ClausePack.clauses` has only active clauses, and their sorted with new index.
+    /// - `ClausePack.permutation` is sorted.
+    /// - `Var.reason` is updated with new clause ids.
+    /// - By calling `rebuild_watchers`, All `ClausePack.watcher` hold valid links.
+    fn garbage_collect(&mut self, kind: ClauseKind) -> () {
+        {
+            let ClausePack {
+                ref mut clauses,
+                ref mut permutation,
+                ..
+            } = &mut self.cp[kind as usize];
+            // set new indexes to index field of active clauses.
+            let mut ni = 0; // new index
+            for c in &mut *clauses {
+                if c.index != MAX {
+                    c.index = ni;
+                    ni += 1;
+                }
+            }
+            // rebuild reason
+            for v in &mut self.vars[1..] {
+                let cid = v.reason;
+                if 0 < cid && cid.to_kind() == kind as usize {
+                    v.reason = kind.id_from(clauses[cid].index);
+                }
+            }
+            // GC
+            clauses.retain(|ref c| c.index != MAX);
+            // rebuild permutation
+            permutation.clear();
+            for i in 0..clauses.len() {
+                debug_assert_eq!(clauses[i].index, i);
+                permutation.push(i);
+            }
+        }
+        self.rebuild_watchers(kind);
+    }
+    fn rebuild_watchers(&mut self, kind: ClauseKind) -> () {
+        let ClausePack {
+            ref mut clauses,
+            ref mut watcher,
+            ..
+        } = &mut self.cp[kind as usize];
+        for mut x in &mut *watcher {
+            *x = NULL_CLAUSE;
+        }
+        for mut c in &mut *clauses {
+            if c.frozen || c.index == MAX {
+                continue;
+            }
+            let w0 = c.lit[0].negate() as usize;
+            c.next_watcher[0] = watcher[w0];
+            watcher[w0] = c.index;
+            let w1 = c.lit[1].negate() as usize;
+            c.next_watcher[1] = watcher[w1];
+            watcher[w1] = c.index;
+        }
+    }
     // print a progress report
     fn progress(&self, mes: &str) -> () {
         println!(
-            "#{}, DB:R|P|B, {:>9}({:>9}), {:>8}, {:>5}, Restart:b|f, {:>6}, {:>6}, EMA:a|l, {:>6.2}, {:>6.2}",
+            "#{}, DB:R|P|B, {:>8}({:>8}), {:>8}, {:>5}, Restart:b|f, {:>6}, {:>6}, EMA:a|l, {:>5.2}, {:>5.2}, LBD: {:>3.2}",
             mes,
             self.cp[ClauseKind::Removable as usize].permutation.len() - 1,
             self.cp[ClauseKind::Removable as usize].clauses.len() - 1,
@@ -326,6 +353,7 @@ impl Solver {
             self.stats[Stat::NumOfRestart as usize],
             self.ema_asg.get(),
             self.ema_lbd.get(),
+            self.ema_lbd.fast,
         );
     }
 }

@@ -1,3 +1,4 @@
+#![allow(unused_imports)]
 use types::*;
 use clause::Clause;
 use clause::ClauseIdIndexEncoding;
