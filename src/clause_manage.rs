@@ -9,7 +9,7 @@ use types::*;
 
 // const DB_INIT_SIZE: usize = 1000;
 const DB_INC_SIZE: usize = 50;
-const KINDS: [ClauseKind; 3] = [
+pub const KINDS: [ClauseKind; 3] = [
     ClauseKind::Binclause,
     ClauseKind::Permanent,
     ClauseKind::Removable,
@@ -147,7 +147,7 @@ impl ClauseManagement for Solver {
         }
         self.next_reduction += DB_INC_SIZE + (self.c_lvl.0 as usize);
         self.stats[Stat::NumOfReduction as usize] += 1;
-        self.progress("drop 1/2");
+        self.progress("drop");
     }
     fn simplify_database(&mut self) -> bool {
         debug_assert_eq!(self.decision_level(), 0);
@@ -156,10 +156,6 @@ impl ClauseManagement for Solver {
             .iter()
             .map(|l| l.negate())
             .collect();
-        // clear the reasons of variables satisfied at level zero.
-        for l in &self.trail {
-            self.vars[l.vi() as usize].reason = NULL_CLAUSE;
-        }
         for ck in &KINDS {
             debug_assert_eq!(self.cp[*ck as usize].clauses[0].index, 0);
             for mut c in &mut self.cp[*ck as usize].clauses {
@@ -196,10 +192,10 @@ impl ClauseManagement for Solver {
                     (*c).frozen = false;
                 }
             }
-            // self.eliminate(true);
+            self.eliminate(true);
             self.garbage_collect(*ck);
         }
-        self.progress("simplify");
+        self.progress("simp");
         true
     }
     fn drain_unless<F>(&mut self, cond: &F) -> bool
@@ -287,6 +283,7 @@ impl Solver {
     /// - `Var.reason` is updated with new clause ids.
     /// - By calling `rebuild_watchers`, All `ClausePack.watcher` hold valid links.
     fn garbage_collect(&mut self, kind: ClauseKind) -> () {
+        let dl = self.decision_level();
         {
             let ClausePack {
                 ref mut clauses,
@@ -302,10 +299,16 @@ impl Solver {
                 }
             }
             // rebuild reason
+            if dl == 0 {
             for v in &mut self.vars[1..] {
-                let cid = v.reason;
-                if 0 < cid && cid.to_kind() == kind as usize {
-                    v.reason = kind.id_from(clauses[cid].index);
+                    v.reason = NULL_CLAUSE;
+                }
+            } else {
+                for v in &mut self.vars[1..] {
+                    let cid = v.reason;
+                    if 0 < cid && cid.to_kind() == kind as usize {
+                        v.reason = kind.id_from(clauses[cid].index);
+                    }
                 }
             }
             // GC
@@ -342,13 +345,17 @@ impl Solver {
     }
     // print a progress report
     fn progress(&self, mes: &str) -> () {
+        let nv = self.vars.len() - 1;
+        let k = if self.trail_lim.is_empty() { self.trail.len() } else { self.trail_lim[0] };
         println!(
-            "#{}, DB:R|P|B, {:>8}({:>8}), {:>8}, {:>5}, Restart:b|f, {:>6}, {:>6}, EMA:a|l, {:>5.2}, {:>5.2}, LBD: {:>3.2}",
+            "#{}, DB:R|P|B, {:>8}({:>8}), {:>8}, {:>5}, Progress: {:>6}({:>4.1}%), Restart:b|f, {:>6}, {:>6}, EMA:a|l, {:>5.2}, {:>5.2}, LBD: {:>5.2}",
             mes,
             self.cp[ClauseKind::Removable as usize].permutation.len() - 1,
             self.cp[ClauseKind::Removable as usize].clauses.len() - 1,
             self.cp[ClauseKind::Permanent as usize].clauses.len() - 1,
             self.cp[ClauseKind::Binclause as usize].clauses.len() - 1,
+            k,
+            (k as f32) / (nv as f32),
             self.stats[Stat::NumOfBlockRestart as usize],
             self.stats[Stat::NumOfRestart as usize],
             self.ema_asg.get(),

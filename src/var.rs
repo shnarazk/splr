@@ -2,6 +2,7 @@
 use types::*;
 use clause::Clause;
 use clause::ClauseIdIndexEncoding;
+use std::usize::MAX;
 
 /// Struct for a variable.
 #[derive(Debug)]
@@ -14,13 +15,13 @@ pub struct Var {
     pub activity: f64,
     /// for elimination
     pub num_occur: usize,
-//    /// for elimination
-//    pub frozen: bool,
-//    /// for elimination
-//    pub touched: bool,
-//    /// for elimination
-//    pub eliminated: bool,
-//    /// for elimination
+    /// for elimination
+    pub frozen: bool,
+    /// for elimination
+    pub touched: bool,
+    /// for elimination
+    pub eliminated: bool,
+    // for elimination
 //    pub occurs: Vec<ClauseId>,
 }
 
@@ -37,9 +38,9 @@ impl Var {
             level: 0,
             activity: 0.0,
             num_occur: 0,
-//            frozen: false,
-//            touched: false,
-//            eliminated: false,
+            frozen: false,
+            touched: false,
+            eliminated: false,
 //            occurs: Vec::new(),
         }
     }
@@ -300,5 +301,66 @@ impl VarIdHeap {
             }
         }
         println!(" - pass var_order test at {}", s);
+    }
+}
+
+/// Literal eliminator
+#[derive(Debug)]
+pub struct Eliminator {
+    pub merges: usize,
+    /// renamed elimHeap. FIXME: can we use VarIdHeap here?
+    pub heap: VarIdHeap,
+    pub n_touched: usize,
+    pub asymm_lits: usize,
+    pub subsumption_queue: Vec<ClauseId>,
+    pub bwdsub_assigns: usize,
+//    pub bwdsub_tmp_unit: ClauseId,
+    pub bwdsub_tmp_clause: Clause,
+    pub bwdsub_tmp_clause_id: ClauseId,
+    pub remove_satisfied: bool,
+    // working place
+    pub merge_vec: Vec<Lit>,
+    pub elim_clauses: Vec<Lit>,
+    /// Variables are not eliminated if it produces a resolvent with a length above this limit.
+    /// 0 means no limit.
+    pub clause_lim: usize,
+    pub eliminated_vars: usize,
+    pub add_tmp: Vec<Lit>,
+    pub use_elim: bool,
+    pub turn_off_elim: bool,
+    pub use_simplification: bool,
+    pub subsumption_lim: usize,
+    pub targets: Vec<ClauseId>,
+    pub best_v: VarId,
+}
+
+impl Eliminator {
+    pub fn new(nv: usize) -> Eliminator {
+        let heap = VarIdHeap::new(VarOrder::ByOccurence, nv, nv);
+        let mut bwdsub_tmp_clause = Clause::null();
+        bwdsub_tmp_clause.index = MAX;
+        Eliminator {
+            merges: 0,
+            heap,
+            n_touched: 0,
+            asymm_lits: 0,
+            subsumption_queue: Vec::new(),
+            bwdsub_assigns: 0,
+//            bwdsub_tmp_unit: 0,
+            bwdsub_tmp_clause,
+            bwdsub_tmp_clause_id: MAX,
+            remove_satisfied: false,
+            merge_vec: vec![0; nv + 1],
+            elim_clauses: vec![0; 2 * (nv + 1)],
+            clause_lim: 20,
+            eliminated_vars: 0,
+            add_tmp: Vec::new(),
+            use_elim: true,
+            turn_off_elim: false,
+            use_simplification: true,
+            subsumption_lim: 0,
+            targets: Vec::new(),
+            best_v: 1,
+        }
     }
 }

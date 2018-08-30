@@ -77,7 +77,7 @@ pub struct Solver {
     pub cur_restart: usize,
     pub num_solved_vars: usize,
     /// Variable Elimination
-//     pub eliminator: Eliminator,
+    pub eliminator: Eliminator,
     /// Working memory
     pub ok: bool,
     pub model: Vec<Lbool>,
@@ -129,7 +129,7 @@ impl Solver {
             next_reduction: 1000,
             cur_restart: 1,
             num_solved_vars: 0,
-//            eliminator: Eliminator::new(nv),
+            eliminator: Eliminator::new(nv),
             ok: true,
             model: vec![BOTTOM; nv + 1],
             conflicts: vec![],

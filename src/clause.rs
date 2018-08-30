@@ -132,8 +132,8 @@ pub struct Clause {
     pub frozen: bool,
     /// used in the current phase
     pub just_used: bool,
-//    /// used in Subsumption Variable Eliminator
-//    pub sve_mark: bool,
+    /// used in Subsumption Variable Eliminator
+    pub sve_mark: bool,
 }
 
 impl ClauseIdIndexEncoding for usize {
@@ -219,7 +219,7 @@ impl Clause {
             locked: false,
             frozen: false,
             just_used: false,
-//            sve_mark: false,
+            sve_mark: false,
         }
     }
     pub fn null() -> Clause {
@@ -235,7 +235,7 @@ impl Clause {
             learnt: false,
             frozen: false,
             just_used: false,
-//            sve_mark: false,
+            sve_mark: false,
         }
     }
     pub fn len(&self) -> usize {
@@ -282,5 +282,47 @@ pub fn cid2fmt(cid: ClauseId) -> String {
 impl Dump for [ClausePack] {
     fn dump(&self, str: &str) -> () {
         println!("dumped {}", str);
+    }
+}
+
+impl Clause {
+    pub fn subsumes(&self, other: &Clause) -> Option<Lit> {
+        let mut ret: Lit = NULL_LIT;
+        'next: for i in 0..self.len() {
+            let l = lindex!(self, i);
+            for j in 0..other.len() {
+                let lo = lindex!(other, j);
+                if l == lo {
+                    continue 'next;
+                } else if ret == NULL_LIT && l == lo.negate() {
+                    ret = l;
+                    continue 'next;
+                }
+            }
+            return None;
+        }
+        Some(ret)
+    }
+    /// remove Lit `p` from Clause *self*.
+    pub fn strengthen(&mut self, p: Lit) -> () {
+        if self.frozen {
+            return;
+        }
+        let len = self.len();
+        if len == 2 {
+            if self.lit[0] == p {
+                self.lit.swap(0, 1);
+                panic!("There's no unary clause in Splr");
+            }
+        } else {
+            if self.lit[0] == p {
+                self.lit[0] = self.lits.pop().unwrap();
+            } else if self.lit[1] == p {
+                self.lit[1] = self.lits.pop().unwrap();
+            } else {
+                self.lits.retain(|&x| x != p);
+            }
+        }
+        println!("strengthen: remove {} from {}", p.int(), self);
     }
 }
