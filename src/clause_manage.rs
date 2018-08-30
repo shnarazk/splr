@@ -192,7 +192,9 @@ impl ClauseManagement for Solver {
                     (*c).frozen = false;
                 }
             }
-            self.eliminate(true);
+            if self.cp[ClauseKind::Permanent as usize].clauses.len() < 1_000_000 {
+                self.eliminate(true);
+            }
             self.garbage_collect(*ck);
         }
         self.progress("simp");

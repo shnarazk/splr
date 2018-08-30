@@ -202,7 +202,7 @@ impl Solver {
             let c = &mut self.cp[cid.to_kind()].clauses[cid.to_index()];
             c.touched = true;
         }
-        for kind in &[ClauseKind::Removable, ClauseKind::Permanent] {
+        for kind in &[ClauseKind::Removable, ClauseKind::Binclause, ClauseKind::Permanent] {
             let clauses = &mut self.cp[*kind as usize].clauses;
             'next_clause: for i in 1..clauses.len() {
                 let c = &mut clauses[i];
@@ -285,7 +285,6 @@ impl Solver {
                 // Search all candidates:
                 let cs = &self.eliminator.targets as *const Vec<ClauseId>;
                 for ci in &*cs {
-                    // let d = &self.cp[ci.to_kind()].clauses[ci.to_index()] as *const Clause;
                     let d = &self.cp[ci.to_kind()].clauses[ci.to_index()] as *const Clause;
                     if (*c).sve_mark {
                         continue;
