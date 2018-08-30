@@ -336,7 +336,7 @@ pub struct Eliminator {
 
 impl Eliminator {
     pub fn new(nv: usize) -> Eliminator {
-        let heap = VarIdHeap::new(VarOrder::ByOccurence, nv, nv);
+        let heap = VarIdHeap::new(VarOrder::ByOccurence, nv, 0);
         let mut bwdsub_tmp_clause = Clause::null();
         bwdsub_tmp_clause.index = MAX;
         Eliminator {

@@ -72,7 +72,7 @@ pub struct Solver {
     /// Variable Order
     pub var_order: VarIdHeap,
     /// Clause Database Management
-    pub cp: [ClausePack; 3],
+    pub cp: [ClausePack; 4],
     pub next_reduction: usize,
     pub cur_restart: usize,
     pub num_solved_vars: usize,
@@ -123,8 +123,9 @@ impl Solver {
             var_order: VarIdHeap::new(VarOrder::ByActivity, nv , nv),
             cp: [
                 ClausePack::build(ClauseKind::Removable, nv, nc),
-                ClausePack::build(ClauseKind::Permanent, nv, nc),
-                ClausePack::build(ClauseKind::Binclause, nv, nc),
+                ClausePack::build(ClauseKind::Permanent, nv, 256),
+                ClausePack::build(ClauseKind::Binclause, nv, 256),
+                ClausePack::build(ClauseKind::Eliminate, nv, 0),
             ],
             next_reduction: 1000,
             cur_restart: 1,
@@ -179,7 +180,7 @@ impl Solver {
             let vi = l.vi();
 //            self.vars[vi].occurs.push(cid);
             self.vars[vi].num_occur += 1;
-//            self.vars[vi].touched = true;
+            self.vars[vi].touched = true;
 //            self.eliminator.n_touched += 1;
 //            self.eliminator.heap.update(&self.vars, vi);
         }
