@@ -324,7 +324,7 @@ impl Solver {
         }
         self.rebuild_watchers(kind);
     }
-    fn rebuild_watchers(&mut self, kind: ClauseKind) -> () {
+    pub fn rebuild_watchers(&mut self, kind: ClauseKind) -> () {
         let ClausePack {
             ref mut clauses,
             ref mut watcher,

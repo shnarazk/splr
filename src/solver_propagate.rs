@@ -47,6 +47,9 @@ impl SolveSAT for Solver {
 //                        }
                         let fv = self.assigned((*c).lit[0]);
                         if fv == LTRUE {
+                            if (*c).lit[1] != false_lit {
+                                println!("break {:?} for {}", (*c), p);
+                            }
                             debug_assert_eq!((*c).lit[1], false_lit);
                             if self.cp[*ck as usize].watcher[p] == 0 {
                                 new_tail = ci;

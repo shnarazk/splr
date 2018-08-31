@@ -26,6 +26,7 @@ use var::VarOrdering;
 
 const VAR_ACTIVITY_THRESHOLD: f64 = 1e100;
 const SUBSUMPTION_LIMIT: usize = 800_000;
+const SUBSUMPTION_SIZE: usize = 6;
 
 pub trait VarSelect {
     fn select_var(&mut self) -> VarId;
@@ -88,12 +89,17 @@ impl Solver {
             ..
         } = self;
         let mut c = &mut cp[cid.to_kind()].clauses[cid.to_index()];
-        for i in 0..c.lits.len() + 2 {
-            let vi = lindex!(c, i).vi();
-            vars[vi].num_occur -= 1;
-            eliminator.heap.insert(vars, vi);
+        if c.len() <= SUBSUMPTION_SIZE {
+            for i in 0..c.lits.len() + 2 {
+                let vi = lindex!(c, i).vi();
+                if 0 < vars[vi].num_occur {
+                    vars[vi].num_occur -= 1;
+                }
+                eliminator.heap.insert(vars, vi);
+            }
         }
         // solver::removeClause(...)
+        println!("     purge {} by remove_clause", cid.to_index());
         c.index = MAX;
     }
     /// 5. strengthenClause
@@ -129,6 +135,7 @@ impl Solver {
         }
         if rank == 0 {
             // rank = 0 is for unit clause
+            self.rebuild_watchers(CLAUSE_KINDS[cid.to_kind() as usize]);
             self.enqueue(c0, NULL_CLAUSE) && self.propagate() == NULL_CLAUSE
         } else {
             true
@@ -194,10 +201,41 @@ impl Solver {
         }
         (true, size)
     }
+    pub fn build_occurence_list(&mut self) -> () {
+        self.eliminator.subsumption_queue.clear(); // FIXME Is this a valid site? moved from gather_touched_clauses
+        for i in 1..self.vars.len() {
+            self.vars[i].terminal = true;
+            self.vars[i].occurs.clear();
+        }
+        for ck in &CLAUSE_KINDS[0..2] {
+            let clauses = &self.cp[*ck as usize].clauses;
+            for i in 1..clauses.len() {
+                let c = &clauses[i];
+                let len = c.len();
+                if SUBSUMPTION_SIZE < len {
+                    for j in 0..len {
+                        let l = lindex!(c, j);
+                        self.vars[l.vi()].terminal = false;
+                        self.vars[l.vi()].occurs.clear();
+                    }
+                } else {
+                    for j in 0..len {
+                        let l = lindex!(c, j);
+                        self.vars[l.vi()].occurs.push(ck.id_from(i));
+                    }
+                }
+            }
+        }
+        let cnt: usize = self.vars.iter().filter(|ref c| c.terminal).map(|ref c| 1).sum::<usize>();
+        println!("-- target variables for elimination {}", cnt);
+        // for i in 1..self.vars.len() {
+        //     if self.vars[i].terminal {
+        //         println!("-- {} {}", i, self.vars[i].occurs.len());
+        //     }
+        // }
+    }
     /// 8. gatherTouchedClauses
     pub fn gather_touched_clauses(&mut self) -> () {
-        // self.eliminator.subsumption_queue.clear();
-        self.eliminator.targets.clear();
         for cid in &self.eliminator.subsumption_queue {
             let c = &mut self.cp[cid.to_kind()].clauses[cid.to_index()];
             c.touched = true;
@@ -211,11 +249,7 @@ impl Solver {
                         let l = lindex!(c, j);
                         if self.vars[l.vi()].touched {
                             self.eliminator.subsumption_queue.push(kind.id_from(i));
-                            self.eliminator.targets.push(kind.id_from(i));
                             c.touched = true;
-                            if SUBSUMPTION_LIMIT < self.eliminator.targets.len() {
-                                break 'next_clause;
-                            }
                             continue 'next_clause;
                         }
                     }
@@ -269,24 +303,24 @@ impl Solver {
                 debug_assert!(1 < (*c).len() || self.assigned((*c).lit[0]) == LTRUE);
                 // unit clauses should have been propagated before this point.
                 // Find best variable to scan:
-                //                'next_clause: for c in &self.cp[ClauseKind::Removable as usize].clauses {
-                //                    let mut flag = false;
-                //                    for i in 0 .. c.len() {
-                //                        let l = lindex!(c, i);
-                //                        if l.vi() == best_v {
-                //                            // self.eliminator.subsumption_queue.push(ClauseKind::Removable.id_from(c.index));
-                //                            debug_assert_eq!(c.index, i);
-                //                            self.eliminator.targets.push(ClauseKind::Removable.id_from(i));
-                //                            continue 'next_clause;
-                //                        }
-                //                    }
-                //                }
-
+                let mut best = 0;
+                let mut tmp = 0;
+                'next_var: for i in 0..(*c).len() {
+                    let l = lindex!(*c, i);
+                    let v = &self.vars[l.vi()];
+                    if v.terminal && tmp < v.occurs.len() {
+                        best = l.vi();
+                        tmp = v.occurs.len();
+                    }
+                }
+                if best == 0 {
+                    return false;
+                }
                 // Search all candidates:
-                let cs = &self.eliminator.targets as *const Vec<ClauseId>;
+                let cs = &mut self.vars[best].occurs as *mut Vec<ClauseId>;
                 for ci in &*cs {
                     let d = &self.cp[ci.to_kind()].clauses[ci.to_index()] as *const Clause;
-                    if (*c).sve_mark {
+                    if (*c).sve_mark || (*d).index == MAX {
                         continue;
                     }
                     if !(*d).sve_mark && *ci != cid && self.eliminator.subsumption_lim == 0
@@ -295,12 +329,12 @@ impl Solver {
                         // println!("{} + {}", *c, *d);
                         match (*c).subsumes(&*d) {
                             Some(NULL_LIT) => {
-                                println!("    => subsumed completely");
+                                println!("    => {} subsumed completely", (*d));
                                 subsumed += 1;
                                 self.remove_clause(*ci);
                             }
                             Some(l) => {
-                                println!("     => subsumed {} by {}", *d, l.int());
+                                println!("     => subsumed {} with {}", *d, l.int());
                                 deleted_literals += 1;
                                 if !self.strengthen_clause(*ci, l.negate()) {
                                     return false;
@@ -342,6 +376,11 @@ impl Solver {
     }
     /// 15. eliminateVar
     pub fn eliminate_var(&mut self, v: VarId) -> bool {
+        println!("eliminate_var {}", v);
+        return true;
+        if !self.vars[v].terminal {
+            return true;
+        }
         let mut cls = Vec::new();
         for ck in &KINDS {
             for c in &mut self.cp[*ck as usize].clauses {
@@ -425,6 +464,7 @@ impl Solver {
                 }
             }
             for ci in &*cls {
+                println!("remove {}", *ci);
                 self.remove_clause(*ci);
             }
             // Free occurs list for this variable:
@@ -452,6 +492,7 @@ impl Solver {
         //     return false;
         // }
         // let target = &self.cp[ClauseKind::Removable as usize] as *const ClausePack;
+        self.build_occurence_list();
         'perform: while 0 < self.eliminator.n_touched
             || self.eliminator.bwdsub_assigns < self.trail.len()
             || 0 < self.eliminator.heap.len()
@@ -487,7 +528,6 @@ impl Solver {
                 || self.eliminator.bwdsub_assigns < self.trail.len())
                 && !self.backward_subsumption_check()
             {
-                println!("eliminate: break");
                 self.ok = false;
                 break 'perform; // goto cleaup
             }
