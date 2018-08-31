@@ -138,13 +138,14 @@ impl ClauseManagement for Solver {
             }
             permutation.retain(|&i| !clauses[i].frozen);
         }
-        if 6 * self.cp[ClauseKind::Removable as usize].permutation.len()
-            < self.cp[ClauseKind::Removable as usize].clauses.len()
-        {
-            self.garbage_collect(ClauseKind::Removable); // too many clauses
-        } else {
-            self.rebuild_watchers(ClauseKind::Removable);
-        }
+        self.garbage_collect(ClauseKind::Removable); // too many clauses
+        // if 6 * self.cp[ClauseKind::Removable as usize].permutation.len()
+        //     < self.cp[ClauseKind::Removable as usize].clauses.len()
+        // {
+        //     self.garbage_collect(ClauseKind::Removable); // too many clauses
+        // } else {
+        //     self.rebuild_watchers(ClauseKind::Removable);
+        // }
         self.next_reduction += DB_INC_SIZE + (self.c_lvl.0 as usize);
         self.stats[Stat::NumOfReduction as usize] += 1;
         self.progress("drop");
