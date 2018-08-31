@@ -193,6 +193,10 @@ impl SatSolver for Solver {
         // TODO deal with assumptions
         // s.root_level = 0;
         self.num_solved_vars = self.trail.len();
+        if true || self.cp[ClauseKind::Permanent as usize].clauses.len() < 1_000_000 {
+            self.eliminate(true);
+            self.simplify_database();
+        }
         match self.search() {
             _ if self.ok == false => {
                 self.cancel_until(0);

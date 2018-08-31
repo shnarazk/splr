@@ -313,6 +313,7 @@ pub struct Eliminator {
     pub merges: usize,
     /// renamed elimHeap. FIXME: can we use VarIdHeap here?
     pub heap: VarIdHeap,
+    pub heap_tmp: Vec<ClauseId>,
     pub n_touched: usize,
     pub asymm_lits: usize,
     pub subsumption_queue: Vec<ClauseId>,
@@ -345,6 +346,7 @@ impl Eliminator {
         Eliminator {
             merges: 0,
             heap,
+            heap_tmp: Vec::new(),
             n_touched: 0,
             asymm_lits: 0,
             subsumption_queue: Vec::new(),

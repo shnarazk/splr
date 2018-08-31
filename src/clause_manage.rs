@@ -22,9 +22,6 @@ pub trait ClauseManagement {
     fn add_learnt(&mut self, v: Vec<Lit>) -> usize;
     fn reduce_watchers(&mut self) -> ();
     fn simplify_database(&mut self) -> bool;
-    fn drain_unless<F>(&mut self, f: &F) -> bool
-    where
-        F: Fn(&Clause) -> bool;
     fn lbd_of(&mut self, v: &[Lit]) -> usize;
 }
 
@@ -193,60 +190,9 @@ impl ClauseManagement for Solver {
                     (*c).frozen = false;
                 }
             }
-            if self.cp[ClauseKind::Permanent as usize].clauses.len() < 1_000_000 {
-                self.eliminate(true);
-            }
             self.garbage_collect(*ck);
         }
         self.progress("simp");
-        true
-    }
-    fn drain_unless<F>(&mut self, cond: &F) -> bool
-    where
-        F: Fn(&Clause) -> bool,
-    {
-        // extend permutation table if needed
-        for ck in &KINDS {
-            let nc = self.cp[*ck as usize].clauses.len();
-            let perm = &mut self.cp[*ck as usize].permutation;
-            if perm.len() < nc {
-                unsafe {
-                    perm.reserve(nc);
-                    perm.set_len(nc);
-                }
-            }
-            // reinitialize the permutation table.
-            for x in perm {
-                *x = 0;
-            }
-        }
-        // clear the reasons of variables satisfied at level zero.
-        for l in &self.trail {
-            self.vars[l.vi() as usize].reason = NULL_CLAUSE;
-        }
-        for ck in &KINDS {
-            self.cp[*ck as usize].clauses.retain(cond);
-            let len = self.cp[*ck as usize].clauses.len();
-            let perm = &mut self.cp[*ck as usize].permutation;
-            for i in 0..len {
-                let old: usize = self.cp[*ck as usize].clauses[i].index;
-                perm[old] = i;
-                self.cp[*ck as usize].clauses[i].index = i;
-            }
-            self.cp[*ck as usize].clauses.truncate(len);
-            // rebuild watches for deletables
-            for mut x in &mut self.cp[*ck as usize].watcher {
-                *x = NULL_CLAUSE;
-            }
-            for mut c in &mut self.cp[*ck as usize].clauses {
-                let w0 = c.lit[0].negate() as usize;
-                c.next_watcher[0] = self.cp[*ck as usize].watcher[w0];
-                self.cp[*ck as usize].watcher[w0] = c.index;
-                let w1 = c.lit[1].negate() as usize;
-                c.next_watcher[1] = self.cp[*ck as usize].watcher[w1];
-                self.cp[*ck as usize].watcher[w1] = c.index;
-            }
-        }
         true
     }
     fn lbd_of(&mut self, v: &[Lit]) -> usize {

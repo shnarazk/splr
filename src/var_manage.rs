@@ -23,10 +23,13 @@ use var::Var;
 use var::VarIdHeap;
 use var::VarOrder;
 use var::VarOrdering;
+use std::cmp::Ordering;
+use std::ops::Neg;
 
 const VAR_ACTIVITY_THRESHOLD: f64 = 1e100;
-const SUBSUMPTION_LIMIT: usize = 800_000;
+const SUBSUMPTION_LIMIT: usize = 1_000_000;
 const SUBSUMPTION_SIZE: usize = 6;
+const GROW: usize = 0;
 
 pub trait VarSelect {
     fn select_var(&mut self) -> VarId;
@@ -99,7 +102,7 @@ impl Solver {
             }
         }
         // solver::removeClause(...)
-        println!("     purge {} by remove_clause", cid.to_index());
+        // println!("     purge {} by remove_clause", cid.to_index());
         c.index = DEAD_CLAUSE;
     }
     /// 5. strengthenClause
@@ -229,7 +232,13 @@ impl Solver {
             .filter(|ref c| c.terminal)
             .map(|ref c| 1)
             .sum::<usize>();
-        println!("-- target variables for elimination {}", cnt);
+        let vol: usize = self
+            .vars
+            .iter()
+            .map(|ref c| c.occurs.len())
+            .sum::<usize>();
+        println!("-- target variables for elimination {}, {}, {}, {}", cnt, vol, self.eliminator.subsumption_queue.len(),
+        self.cp[1].clauses.len());
         // for i in 1..self.vars.len() {
         //     if self.vars[i].terminal {
         //         println!("-- {} {}", i, self.vars[i].occurs.len());
@@ -238,6 +247,7 @@ impl Solver {
     }
     /// 8. gatherTouchedClauses
     pub fn gather_touched_clauses(&mut self) -> () {
+        let mut len = self.eliminator.subsumption_queue.len();
         for cid in &self.eliminator.subsumption_queue {
             let c = &mut self.cp[cid.to_kind()].clauses[cid.to_index()];
             c.touched = true;
@@ -259,6 +269,10 @@ impl Solver {
                         if self.vars[l.vi()].touched {
                             self.eliminator.subsumption_queue.push(kind.id_from(i));
                             c.touched = true;
+                            len += 1;
+                            if SUBSUMPTION_LIMIT < len {
+                                break;
+                            }
                             continue 'next_clause;
                         }
                     }
@@ -341,7 +355,7 @@ impl Solver {
                         // println!("{} + {}", *c, *d);
                         match (*c).subsumes(&*d) {
                             Some(NULL_LIT) => {
-                                println!("    => {} subsumed completely by {}", (*d), (*c));
+                                // println!("    => {} subsumed completely by {}", (*d), (*c));
                                 subsumed += 1;
                                 self.remove_clause(*di);
                             }
@@ -388,52 +402,37 @@ impl Solver {
     }
     /// 15. eliminateVar
     pub fn eliminate_var(&mut self, v: VarId) -> bool {
-        println!("eliminate_var {}", v);
-        return true;
         if !self.vars[v].terminal {
             return true;
         }
-        let mut cls = Vec::new();
-        for ck in &KINDS {
-            for c in &mut self.cp[*ck as usize].clauses {
-                for i in 0..c.len() {
-                    let l = lindex!(c, i);
-                    if l.vi() == v {
-                        cls.push(ck.id_from(i));
+        let mut pos: Vec<ClauseId> = Vec::new();
+        let mut neg: Vec<ClauseId> = Vec::new();
+        // Split the occurrences into positive and negative:
+        for cid in &self.vars[v].occurs {
+            let c = &self.cp[cid.to_kind()].clauses[cid.to_index()];
+            for i in 0..c.len() {
+                let l = lindex!(c, i);
+                if l.vi() == v {
+                    if l.positive() {
+                        pos.push(*cid);
+                    }
+                    else {
+                        neg.push(*cid);
                     }
                 }
             }
         }
         unsafe {
-            // let cls = &self.vars[v].occurs as *const Vec<ClauseId>;
-            let mut pos: Vec<ClauseId> = Vec::new();
-            let mut neg: Vec<ClauseId> = Vec::new();
-            // Split the occurrences into positive and negative:
-            for cid in &*cls {
-                let c = &self.cp[cid.to_kind()].clauses[cid.to_index()];
-                if c.index == DEAD_CLAUSE {
-                    continue;
-                }
-                for i in 0..c.len() {
-                    let l = lindex!(c, i);
-                    if l.vi() == v {
-                        if l.positive() {
-                            pos.push(*cid);
-                        } else {
-                            neg.push(*cid);
-                        }
-                    }
-                }
-            }
             // Check wether the increase in number of clauses stays within the allowed ('grow').
             // Moreover, no clause must exceed the limit on the maximal clause size (if it is set).
+            let clslen = pos.len() + neg.len();
             let mut cnt = 0;
             for i in 0..pos.len() {
                 for j in 0..neg.len() {
                     let (res, clause_size) = self.check_to_merge(pos[i], neg[j], v);
                     if res {
                         cnt += 1;
-                        if (*cls).len() < cnt
+                        if clslen + GROW < cnt 
                             || (self.eliminator.clause_lim != 0
                                 && self.eliminator.clause_lim < clause_size)
                         {
@@ -444,7 +443,7 @@ impl Solver {
             }
             // Delete and store old clauses
             self.vars[v].eliminated = true;
-            println!("var {} was eliminated!", v);
+            println!("- eliminate_var: var {} was eliminated!", v);
             // setDecisionVar(v, false);
             self.eliminator.eliminated_vars += 1;
             {
@@ -469,16 +468,18 @@ impl Solver {
                         if self.merge(*p, *n, v)
                         // && !self.add_clause_(&*vec) {
                         {
-                            self.add_learnt((*vec).clone());
+                            // self.add_learnt((*vec).clone()); FIXME: this clause should be pushed to ClauseKind::Eliminate
                             // return false;
                         }
                     }
                 }
             }
-            for ci in &*cls {
-                println!("remove {}", *ci);
+            let cis = &self.vars[v].occurs as *const Vec<ClauseId>;
+            for ci in &*cis {
+                println!("- eliminate_var: remove cid: {} form {}'s occurs", *ci, v);
                 self.remove_clause(*ci);
             }
+            self.vars[v].occurs.clear();
             // Free occurs list for this variable:
             // self.vars[v].occurs.clear();
             // FIXME I can't understand Glucose code!
@@ -505,9 +506,13 @@ impl Solver {
         // }
         // let target = &self.cp[ClauseKind::Removable as usize] as *const ClausePack;
         self.build_occurence_list();
+        let mut tmp: Vec<(VarId, usize)> = self.vars.iter().filter(|v| v.terminal ).map(|v| (v.index, v.num_occur)).collect::<Vec<_>>();
+        tmp.sort_by_key(|t| (t.1 as isize).neg());
+        self.eliminator.heap_tmp = tmp.iter().map(|v| v.0).collect::<Vec<_>>();
+        println!("ooo {}", self.eliminator.heap_tmp.len());
         'perform: while 0 < self.eliminator.n_touched
             || self.eliminator.bwdsub_assigns < self.trail.len()
-            || 0 < self.eliminator.heap.len()
+            || 0 < self.eliminator.heap_tmp.len()
         {
             let mut best_v = 1;
             for i in 2..self.vars.len() {
@@ -547,16 +552,17 @@ impl Solver {
             if false {
                 break 'perform;
             }
-            // println!(" - heap: {:?}", self.eliminator.heap.len());
-            while !self.eliminator.heap.is_empty() {
-                let elim: VarId = self.vars.get_root(&mut self.eliminator.heap); // removeMin();
-                                                                                 // if asynch_interrupt { break }
+            println!(" - heap: {:?}", self.eliminator.heap_tmp.len());
+//            while !self.eliminator.heap_tmp.is_empty() {
+            while let Some(elim) = self.eliminator.heap_tmp.pop() {
+                // let elim: VarId = self.vars.get_root(&mut self.eliminator.heap); // removeMin();
+                // if asynch_interrupt { break }
                 if self.vars[elim].eliminated || self.vars[elim].assign != BOTTOM {
                     continue;
                 }
                 if self.eliminator.use_elim
                     && self.vars[elim].assign == BOTTOM
-                    && self.vars[elim].frozen
+                    && !self.vars[elim].frozen
                     && !self.eliminate_var(elim)
                 {
                     self.ok = false;
@@ -565,4 +571,18 @@ impl Solver {
             }
         }
     }
+}
+
+fn weight(v: &[Var], c: &Clause, d: &Clause) -> Ordering {
+    let mut total_a = 0;
+    for i in 0..c.len() {
+        let l = lindex!(c, i);
+        total_a += v[l.vi()].num_occur;
+    }
+    let mut total_b = 0;
+    for i in 0..d.len() {
+        let l = lindex!(d, i);
+        total_b += v[l.vi()].num_occur;
+    }
+    total_b.cmp(&total_b)
 }
