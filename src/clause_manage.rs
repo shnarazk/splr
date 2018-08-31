@@ -2,9 +2,9 @@ use clause::Clause;
 use clause::ClauseIdIndexEncoding;
 use clause::ClauseKind;
 use clause::ClausePack;
+use clause::DEAD_CLAUSE;
 use solver::{Solver, Stat};
 use solver_propagate::SolveSAT;
-use std::usize::MAX;
 use types::*;
 
 // const DB_INIT_SIZE: usize = 1000;
@@ -133,7 +133,7 @@ impl ClauseManagement for Solver {
                 let mut c = &mut clauses[permutation[i]];
                 if !c.locked && !c.just_used {
                     c.frozen = true;
-                    c.index = MAX;
+                    c.index = DEAD_CLAUSE;
                 }
             }
             permutation.retain(|&i| !clauses[i].frozen);
@@ -176,12 +176,12 @@ impl ClauseManagement for Solver {
                 unsafe {
                     let c = &mut self.cp[*ck as usize].clauses[ci] as *mut Clause;
                     if ((*c).frozen && thr < (*c).len()) || self.satisfies(&*c) {
-                        (*c).index = MAX;
+                        (*c).index = DEAD_CLAUSE;
                     } else if (*c).lits.len() == 0 && false {
                         if !self.enqueue((*c).lits[0], NULL_CLAUSE) {
                             self.ok = false;
                         }
-                        (*c).index = MAX;
+                        (*c).index = DEAD_CLAUSE;
                         // } else {
                         //     let new = self.lbd_of(&(*c).lits);
                         //     if new < (*c).rank {
@@ -276,7 +276,7 @@ impl ClauseManagement for Solver {
 impl Solver {
     // # Prerequisite
     /// - `ClausePack.clauses` has dead clauses, and their index fields hold valid vaule.
-    /// - `Caluse.index` of all the dead clauses is MAX.
+    /// - `Caluse.index` of all the dead clauses is DEAD_CLAUSE.
     /// - `ClausePack.permutation` is valid and can be destoried here.
     ///
     /// # Result
@@ -295,7 +295,7 @@ impl Solver {
             // set new indexes to index field of active clauses.
             let mut ni = 0; // new index
             for c in &mut *clauses {
-                if c.index != MAX {
+                if c.index != DEAD_CLAUSE {
                     c.index = ni;
                     ni += 1;
                 }
@@ -314,7 +314,7 @@ impl Solver {
                 }
             }
             // GC
-            clauses.retain(|ref c| c.index != MAX);
+            clauses.retain(|ref c| c.index != DEAD_CLAUSE);
             // rebuild permutation
             permutation.clear();
             for i in 0..clauses.len() {
@@ -334,7 +334,7 @@ impl Solver {
             *x = NULL_CLAUSE;
         }
         for mut c in &mut *clauses {
-            if c.frozen || c.index == MAX {
+            if c.frozen || c.index == DEAD_CLAUSE {
                 continue;
             }
             let w0 = c.lit[0].negate() as usize;

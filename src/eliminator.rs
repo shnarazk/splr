@@ -31,7 +31,7 @@ impl Eliminator {
     pub fn new(nv: usize) -> Eliminator {
         let heap = VarIdHeap::new(VarOrder::ByOccurence, nv, nv);
         let mut bwdsub_tmp_clause = Clause::null();
-        bwdsub_tmp_clause.index = MAX;
+        bwdsub_tmp_clause.index = DEAD_CLAUSE;
         Eliminator {
             merges: 0,
             heap,
@@ -41,7 +41,7 @@ impl Eliminator {
             bwdsub_assigns: 0,
 //            bwdsub_tmp_unit: 0,
             bwdsub_tmp_clause,
-            bwdsub_tmp_clause_id: MAX,
+            bwdsub_tmp_clause_id: DEAD_CLAUSE,
             remove_satisfied: false,
             merge_vec: vec![0; nv + 1],
             elim_clauses: vec![0; 2 * (nv + 1)],
@@ -127,7 +127,7 @@ impl Solver {
             vars[vi].occurs.retain(|&ci| ci != cid);             // occurs.smudge(l.vi());
         }
         // solver::removeClause(...)
-        c.index = MAX;
+        c.index = DEAD_CLAUSE;
     }
     /// 5. strengthenClause
     pub fn strengthen_clause(&mut self, cid: ClauseId, l: Lit) -> bool {

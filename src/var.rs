@@ -2,7 +2,7 @@
 use types::*;
 use clause::Clause;
 use clause::ClauseIdIndexEncoding;
-use std::usize::MAX;
+use clause::DEAD_CLAUSE;
 
 /// Struct for a variable.
 #[derive(Debug)]
@@ -341,7 +341,7 @@ impl Eliminator {
     pub fn new(nv: usize) -> Eliminator {
         let heap = VarIdHeap::new(VarOrder::ByOccurence, nv, 0);
         let mut bwdsub_tmp_clause = Clause::null();
-        bwdsub_tmp_clause.index = MAX;
+        bwdsub_tmp_clause.index = DEAD_CLAUSE;
         Eliminator {
             merges: 0,
             heap,
@@ -351,7 +351,7 @@ impl Eliminator {
             bwdsub_assigns: 0,
 //            bwdsub_tmp_unit: 0,
             bwdsub_tmp_clause,
-            bwdsub_tmp_clause_id: MAX,
+            bwdsub_tmp_clause_id: DEAD_CLAUSE,
             remove_satisfied: false,
             merge_vec: vec![0; nv + 1],
             elim_clauses: vec![0; 2 * (nv + 1)],

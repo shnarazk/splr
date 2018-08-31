@@ -1,6 +1,7 @@
 use std::cmp::Ordering;
 use std::f64;
 use std::fmt;
+use std::usize::MAX;
 use types::*;
 
 #[derive(Debug)]
@@ -31,6 +32,7 @@ pub const CLAUSE_KINDS: [ClauseKind; 4] = [
 
 const CLAUSE_INDEX_BITS: usize = 60;
 const CLAUSE_INDEX_MASK: usize = 0x0FFF_FFFF_FFFF_FFFF;
+pub const DEAD_CLAUSE: usize = MAX;
 
 impl ClauseKind {
     pub fn tag(&self) -> usize {
@@ -255,6 +257,20 @@ impl fmt::Display for Clause {
         match self.index {
             //            x if x < 0 => write!(f, format!("a given clause {}", self.lits.map(|l| l.int()))),
             0 => write!(f, "null_clause"),
+            DEAD_CLAUSE => write!(
+                f,
+                "dead[{},{}]{:?}",
+                self.lit[0].int(),
+                self.lit[1].int(),
+                &self.lits.iter().map(|l| l.int()).collect::<Vec<i32>>()
+            ),
+            _ if self.lits.is_empty() => write!(
+                f,
+                "B{}[{},{}]",
+                self.index,
+                self.lit[0].int(),
+                self.lit[1].int(),
+            ),
             _ if self.lits.is_empty() => write!(
                 f,
                 "B{}[{},{}]",

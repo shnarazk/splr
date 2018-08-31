@@ -7,6 +7,7 @@ use clause::ClauseIdIndexEncoding;
 use clause::ClauseKind;
 use clause::ClausePack;
 use clause::CLAUSE_KINDS;
+use clause::DEAD_CLAUSE;
 use clause_manage::ClauseManagement;
 use clause_manage::KINDS;
 use solver::SatSolver;
@@ -15,7 +16,6 @@ use solver::SolverResult;
 use solver::{Solver, Stat};
 use solver_propagate::SolveSAT;
 use solver_rollback::Restart;
-use std::usize::MAX;
 use types::*;
 use var::AccessHeap;
 use var::Satisfiability;
@@ -100,7 +100,7 @@ impl Solver {
         }
         // solver::removeClause(...)
         println!("     purge {} by remove_clause", cid.to_index());
-        c.index = MAX;
+        c.index = DEAD_CLAUSE;
     }
     /// 5. strengthenClause
     pub fn strengthen_clause(&mut self, cid: ClauseId, l: Lit) -> bool {
@@ -314,13 +314,13 @@ impl Solver {
                     }
                 }
                 if best == 0 {
-                    return false;
+                    return true;
                 }
                 // Search all candidates:
                 let cs = &mut self.vars[best].occurs as *mut Vec<ClauseId>;
                 for ci in &*cs {
                     let d = &self.cp[ci.to_kind()].clauses[ci.to_index()] as *const Clause;
-                    if (*c).sve_mark || (*d).index == MAX {
+                    if (*c).sve_mark || (*d).index == DEAD_CLAUSE {
                         continue;
                     }
                     if !(*d).sve_mark && *ci != cid && self.eliminator.subsumption_lim == 0
@@ -399,7 +399,7 @@ impl Solver {
             // Split the occurrences into positive and negative:
             for cid in &*cls {
                 let c = &self.cp[cid.to_kind()].clauses[cid.to_index()];
-                if c.index == MAX {
+                if c.index == DEAD_CLAUSE {
                     continue;
                 }
                 for i in 0..c.len() {
@@ -535,7 +535,7 @@ impl Solver {
             if false {
                 break 'perform;
             }
-            println!(" - heap: {:?}", self.eliminator.heap.len());
+            // println!(" - heap: {:?}", self.eliminator.heap.len());
             while !self.eliminator.heap.is_empty() {
                 let elim: VarId = self.vars.get_root(&mut self.eliminator.heap); // removeMin();
                                                                                  // if asynch_interrupt { break }
