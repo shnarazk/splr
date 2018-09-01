@@ -73,7 +73,7 @@ pub struct Solver {
     /// Variable Order
     pub var_order: VarIdHeap,
     /// Clause Database Management
-    pub cp: [ClausePack; 4],
+    pub cp: [ClausePack; 3],
     pub next_reduction: usize,
     pub cur_restart: usize,
     pub num_solved_vars: usize,
@@ -126,7 +126,6 @@ impl Solver {
                 ClausePack::build(ClauseKind::Removable, nv, nc),
                 ClausePack::build(ClauseKind::Permanent, nv, 256),
                 ClausePack::build(ClauseKind::Binclause, nv, 256),
-                ClausePack::build(ClauseKind::Eliminate, nv, 0),
             ],
             next_reduction: 1000,
             cur_restart: 1,
@@ -182,7 +181,7 @@ impl SatSolver for Solver {
         // TODO deal with assumptions
         // s.root_level = 0;
         self.num_solved_vars = self.trail.len();
-        if true || self.cp[ClauseKind::Permanent as usize].clauses.len() < 1_000_000 {
+        if self.eliminator.use_elim {
             self.eliminate();
             self.simplify_database();
         }
@@ -200,7 +199,9 @@ impl SatSolver for Solver {
                         _ => result.push(0),
                     }
                 }
-                self.extend_model(&mut result);
+                if self.eliminator.use_elim {
+                    self.extend_model(&mut result);
+                }
                 self.cancel_until(0);
                 Ok(Certificate::SAT(result))
             }

@@ -5,6 +5,7 @@ use clause::DEAD_CLAUSE;
 use types::*;
 
 const BWDSUB_CLAUSE: ClauseId = DEAD_CLAUSE - 1;
+const SUBSUMPTION_SIZE: usize = 5;
 
 /// Struct for a variable.
 #[derive(Debug)]
@@ -15,8 +16,6 @@ pub struct Var {
     pub reason: ClauseId,
     pub level: usize,
     pub activity: f64,
-    // for elimination
-    // pub num_occur: usize,
     /// for elimination
     pub frozen: bool,
     /// for elimination
@@ -27,6 +26,9 @@ pub struct Var {
     pub terminal: bool,
     // for elimination
     pub occurs: Vec<ClauseId>,
+    // for elimination
+    pub max_clause_size: usize,
+    pub num_occurs: usize,
 }
 
 /// is the dummy var index.
@@ -41,12 +43,13 @@ impl Var {
             reason: NULL_CLAUSE,
             level: 0,
             activity: 0.0,
-            // num_occur: 0,
             frozen: false,
             touched: false,
             eliminated: false,
             terminal: false,
             occurs: Vec::new(),
+            max_clause_size: 0,
+            num_occurs: 0,
         }
     }
     pub fn new_vars(n: usize) -> Vec<Var> {
@@ -337,6 +340,7 @@ pub struct Eliminator {
     pub subsumption_lim: usize,
     pub targets: Vec<ClauseId>,
     pub best_v: VarId,
+    pub subsume_clause_size: usize,
 }
 
 impl Eliminator {
@@ -366,6 +370,7 @@ impl Eliminator {
             subsumption_lim: 0,
             targets: Vec::new(),
             best_v: 1,
+            subsume_clause_size: SUBSUMPTION_SIZE,
         }
     }
 }

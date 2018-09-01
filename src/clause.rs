@@ -20,14 +20,12 @@ pub enum ClauseKind {
     Removable = 0,
     Permanent,
     Binclause,
-    Eliminate,
 }
 
-pub const CLAUSE_KINDS: [ClauseKind; 4] = [
+pub const CLAUSE_KINDS: [ClauseKind; 3] = [
     ClauseKind::Removable,
     ClauseKind::Permanent,
     ClauseKind::Binclause,
-    ClauseKind::Eliminate,
 ];
 
 const CLAUSE_INDEX_BITS: usize = 60;
@@ -40,7 +38,6 @@ impl ClauseKind {
             ClauseKind::Removable => 0x0000_0000_0000_0000,
             ClauseKind::Permanent => 0x1000_0000_0000_0000,
             ClauseKind::Binclause => 0x2000_0000_0000_0000,
-            ClauseKind::Eliminate => 0x4000_0000_0000_0000,
         }
     }
     pub fn mask(&self) -> usize {
@@ -285,7 +282,6 @@ impl fmt::Display for Clause {
                     ClauseKind::Removable => 'L',
                     ClauseKind::Binclause => 'B',
                     ClauseKind::Permanent => 'P',
-                    ClauseKind::Eliminate => 'E',
                 },
                 self.index,
                 self.lit[0].int(),
