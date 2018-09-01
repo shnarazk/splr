@@ -4,8 +4,8 @@ use solver_propagate::SolveSAT;
 use solver_rollback::Restart;
 use std::fs;
 use std::io::{BufRead, BufReader};
-use types::*;
 use types::Dump;
+use types::*;
 use var::*;
 // use var_manage::Eliminator;
 
@@ -120,7 +120,7 @@ impl Solver {
             trail: Vec::with_capacity(nv),
             trail_lim: Vec::new(),
             q_head: 0,
-            var_order: VarIdHeap::new(VarOrder::ByActivity, nv , nv),
+            var_order: VarIdHeap::new(VarOrder::ByActivity, nv, nv),
             cp: [
                 ClausePack::build(ClauseKind::Removable, nv, nc),
                 ClausePack::build(ClauseKind::Permanent, nv, 256),
@@ -145,7 +145,7 @@ impl Solver {
             mi_var_map: vec![0; nv + 1],
             lbd_seen: vec![0; nv + 1],
             ema_asg: Ema2::new(4096.0, 8192.0), // for blocking
-            ema_lbd: Ema2::new(64.0, 8192.0), // for forcing
+            ema_lbd: Ema2::new(64.0, 8192.0),   // for forcing
             b_lvl: Ema::new(se),
             c_lvl: Ema::new(se),
             next_restart: 100,
@@ -172,17 +172,17 @@ impl Solver {
     pub fn attach_clause(&mut self, c: Clause) -> ClauseId {
         let cid = self.cp[c.kind as usize].attach(c);
         debug_assert_ne!(cid, 0);
-// TP5
+        // TP5
         let c = &self.cp[cid.to_kind()].clauses[cid.to_index()];
-//        self.eliminator.subsumption_queue.push(cid);
+        //        self.eliminator.subsumption_queue.push(cid);
         for i in 0..c.len() {
             let l = lindex!(c, i);
             let vi = l.vi();
-//            self.vars[vi].occurs.push(cid);
+            //            self.vars[vi].occurs.push(cid);
             self.vars[vi].num_occur += 1;
             self.vars[vi].touched = true;
-//            self.eliminator.n_touched += 1;
-//            self.eliminator.heap.update(&self.vars, vi);
+            //            self.eliminator.n_touched += 1;
+            //            self.eliminator.heap.update(&self.vars, vi);
         }
         cid
     }
@@ -208,9 +208,10 @@ impl SatSolver for Solver {
                     match self.vars[vi].assign {
                         LTRUE => result.push(vi as i32),
                         LFALSE => result.push(0 - vi as i32),
-                        _ => (),
+                        _ => result.push(0),
                     }
                 }
+                self.extend_model(&mut result);
                 self.cancel_until(0);
                 Ok(Certificate::SAT(result))
             }

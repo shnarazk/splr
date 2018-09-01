@@ -3,10 +3,10 @@
 #![allow(unused_variables)]
 #![allow(dead_code)]
 extern crate splr;
-use splr::types::*;
 use splr::clause::*;
 use splr::clause_manage::*;
 use splr::solver::*;
+use splr::types::*;
 
 #[test]
 fn check_occurs() {
@@ -14,18 +14,24 @@ fn check_occurs() {
     let cnf: CNFDescription = CNFDescription {
         num_of_variables: 10,
         num_of_clauses: 10,
-        pathname: "".to_string() };
+        pathname: "".to_string(),
+    };
     let mut s = Solver::new(cfg, &cnf);
 
-    let c1 = mk_c(1, vec![1,2,3]);
-    let c2 = mk_c(2, vec![-2,3,4]);
-    let c3 = mk_c(3, vec![-2,-3]);
-    let c4 = mk_c(4, vec![1,2,-3,9]);
+    let c1 = mk_c(1, vec![1, 2, 3]);
+    let c2 = mk_c(2, vec![-2, 3, 4]);
+    let c3 = mk_c(3, vec![-2, -3]);
+    let c4 = mk_c(4, vec![1, 2, -3, 9]);
     {
         let vec = [&c2, &c3]; // [&c1, &c2, &c3, &c4];
         for x in &vec {
             for y in &vec {
-                println!("{}\tsubsumes\t{}\t=>\t{:?}", x, y, x.subsumes(&y).map(|l| l.int()));
+                println!(
+                    "{}\tsubsumes\t{}\t=>\t{:?}",
+                    x,
+                    y,
+                    x.subsumes(&y).map(|l| l.int())
+                );
             }
         }
     }

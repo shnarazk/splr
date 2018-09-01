@@ -25,9 +25,8 @@ macro_rules! lindex {
             (c, i) => match i {
                 0 => c.lit[0],
                 1 => c.lit[1],
-                n => c.lits[n -2],
-            }
+                n => c.lits[n - 2],
+            },
         }
     }};
 }
-    

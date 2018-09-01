@@ -340,9 +340,13 @@ impl Clause {
                 self.lit.swap(0, 1);
                 println!("Unit clause!");
             }
-            return true
+            return true;
         }
-        println!("          Clause::strengthen: remove {} from {}", p.int(), self);
+        println!(
+            "          Clause::strengthen: remove {} from {}",
+            p.int(),
+            self
+        );
         if self.lit[0] == p {
             self.lit[0] = self.lits.pop().unwrap();
             println!("wow watcher[0] of {} broken", self);

@@ -41,10 +41,10 @@ impl SolveSAT for Solver {
                             (*c).next_watcher.swap(0, 1);
                         }
                         let next = (*c).next_watcher[1];
-//                        if (*c).frozen {
-//                            ci = next;
-//                            continue 'next_clause;
-//                        }
+                        //                        if (*c).frozen {
+                        //                            ci = next;
+                        //                            continue 'next_clause;
+                        //                        }
                         let fv = self.assigned((*c).lit[0]);
                         if fv == LTRUE {
                             if (*c).lit[1] != false_lit {

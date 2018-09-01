@@ -136,13 +136,13 @@ impl ClauseManagement for Solver {
             permutation.retain(|&i| !clauses[i].frozen);
         }
         self.garbage_collect(ClauseKind::Removable); // too many clauses
-        // if 6 * self.cp[ClauseKind::Removable as usize].permutation.len()
-        //     < self.cp[ClauseKind::Removable as usize].clauses.len()
-        // {
-        //     self.garbage_collect(ClauseKind::Removable); // too many clauses
-        // } else {
-        //     self.rebuild_watchers(ClauseKind::Removable);
-        // }
+                                                     // if 6 * self.cp[ClauseKind::Removable as usize].permutation.len()
+                                                     //     < self.cp[ClauseKind::Removable as usize].clauses.len()
+                                                     // {
+                                                     //     self.garbage_collect(ClauseKind::Removable); // too many clauses
+                                                     // } else {
+                                                     //     self.rebuild_watchers(ClauseKind::Removable);
+                                                     // }
         self.next_reduction += DB_INC_SIZE + (self.c_lvl.0 as usize);
         self.stats[Stat::NumOfReduction as usize] += 1;
         self.progress("drop");
@@ -249,7 +249,7 @@ impl Solver {
             }
             // rebuild reason
             if dl == 0 {
-            for v in &mut self.vars[1..] {
+                for v in &mut self.vars[1..] {
                     v.reason = NULL_CLAUSE;
                 }
             } else {
@@ -295,7 +295,11 @@ impl Solver {
     // print a progress report
     fn progress(&self, mes: &str) -> () {
         let nv = self.vars.len() - 1;
-        let k = if self.trail_lim.is_empty() { self.trail.len() } else { self.trail_lim[0] };
+        let k = if self.trail_lim.is_empty() {
+            self.trail.len()
+        } else {
+            self.trail_lim[0]
+        };
         println!(
             "#{}, DB:R|P|B, {:>8}({:>8}), {:>8}, {:>5}, Progress: {:>6}({:>4.1}%), Restart:b|f, {:>6}, {:>6}, EMA:a|l, {:>5.2}, {:>5.2}, LBD: {:>5.2}",
             mes,

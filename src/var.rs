@@ -1,8 +1,8 @@
 #![allow(unused_imports)]
-use types::*;
 use clause::Clause;
 use clause::ClauseIdIndexEncoding;
 use clause::DEAD_CLAUSE;
+use types::*;
 
 /// Struct for a variable.
 #[derive(Debug)]
@@ -99,7 +99,7 @@ pub enum VarOrder {
 pub struct VarIdHeap {
     order: VarOrder,
     heap: Vec<VarId>, // order : usize -> VarId
-    idxs: Vec<usize>,    // VarId : -> order : usize
+    idxs: Vec<usize>, // VarId : -> order : usize
 }
 
 pub trait AccessHeap {
@@ -318,7 +318,7 @@ pub struct Eliminator {
     pub asymm_lits: usize,
     pub subsumption_queue: Vec<ClauseId>,
     pub bwdsub_assigns: usize,
-//    pub bwdsub_tmp_unit: ClauseId,
+    //    pub bwdsub_tmp_unit: ClauseId,
     pub bwdsub_tmp_clause: Clause,
     pub bwdsub_tmp_clause_id: ClauseId,
     pub remove_satisfied: bool,
@@ -351,12 +351,12 @@ impl Eliminator {
             asymm_lits: 0,
             subsumption_queue: Vec::new(),
             bwdsub_assigns: 0,
-//            bwdsub_tmp_unit: 0,
+            //            bwdsub_tmp_unit: 0,
             bwdsub_tmp_clause,
             bwdsub_tmp_clause_id: DEAD_CLAUSE,
             remove_satisfied: false,
             merge_vec: vec![0; nv + 1],
-            elim_clauses: vec![0; 2 * (nv + 1)],
+            elim_clauses: Vec::new(),
             clause_lim: 20,
             eliminated_vars: 0,
             add_tmp: Vec::new(),
