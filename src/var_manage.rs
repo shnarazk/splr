@@ -93,17 +93,19 @@ impl Solver {
         let c = &iref!(self.cp, cid);
         // println!("cid {} {:?}", cid.to_index(), c);
         self.eliminator.subsumption_queue.push(cid);
-        if c.len() < SUBSUMPTION_SIZE {
-            for i in 0..c.len() {
-                let l = lindex!(c, i);
-                let vi = l.vi();
-                if self.vars[vi].terminal {
-                    self.vars[vi].occurs.push(cid);
-                    self.vars[vi].num_occur += 1;
-                }
-                self.vars[vi].touched = true;
-                self.eliminator.n_touched += 1;
-                self.eliminator.heap.update(&self.vars, vi);
+        let big = c.len() < SUBSUMPTION_SIZE;
+        for i in 0..c.len() {
+            let l = lindex!(c, i);
+            let mut v = &mut self.vars[l.vi()];
+            v.touched = true;
+            self.eliminator.n_touched += 1;
+            if big {
+                v.terminal = false;
+                v.occurs.clear();
+                v.num_occur = 0;
+            } else if v.terminal {
+                    v.occurs.push(cid);
+                    v.num_occur += 1;
             }
         }
         true
@@ -127,7 +129,6 @@ impl Solver {
                 eliminator.heap.insert(vars, vi);
             }
         }
-        // solver::removeClause(...)
         // println!("     purge {} by remove_clause", cid.to_index());
         c.index = DEAD_CLAUSE;
     }
@@ -481,12 +482,7 @@ impl Solver {
             }
             // Delete and store old clauses
             self.vars[v].eliminated = true;
-            println!(
-                "- eliminate_var: var {:>5} (+{:<4} -{:<4}) was eliminated.",
-                v,
-                pos.len(),
-                neg.len()
-            );
+            println!("- eliminate_var: {:>5} (+{:<4} -{:<4}).", v, pos.len(), neg.len());
             // setDecisionVar(v, false);
             self.eliminator.eliminated_vars += 1;
             {
@@ -527,10 +523,10 @@ impl Solver {
             // Free watches lists for this variables, if possible:
             for ck in &[ClauseKind::Permanent, ClauseKind::Removable] {
                 let cv = &self.cp[*ck as usize];
-                if cv.watcher[v.lit(LTRUE) as usize] != 0 {
+                if cv.watcher[v.lit(LTRUE) as usize] != NULL_CLAUSE {
                     // watches[v.lit(true)].clear();
                 }
-                if cv.watcher[v.lit(LFALSE) as usize] != 0 {
+                if cv.watcher[v.lit(LFALSE) as usize] != NULL_CLAUSE {
                     // watches[v.lit(false)].clear();
                 }
             }
@@ -587,12 +583,6 @@ impl Solver {
     /// 18. eliminate
     // should be called at decision level 0.
     pub fn eliminate(&mut self, _: bool) -> () {
-        // In Splr, this function is called from simplify_database
-        // if !self.simplify_database() {
-        //     self.ok = false;
-        //     return false;
-        // }
-        // let target = &self.cp[ClauseKind::Removable as usize] as *const ClausePack;
         self.build_occurence_list();
         for kind in &[
             ClauseKind::Removable,
@@ -660,7 +650,6 @@ impl Solver {
                 break 'perform;
             }
             // println!(" - heap: {:?}", self.eliminator.heap_tmp.len());
-            //            while !self.eliminator.heap_tmp.is_empty() {
             while let Some(elim) = self.eliminator.heap_tmp.pop() {
                 // let elim: VarId = self.vars.get_root(&mut self.eliminator.heap); // removeMin();
                 // if asynch_interrupt { break }
