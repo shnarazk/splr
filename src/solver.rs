@@ -42,17 +42,18 @@ pub type SolverResult = Result<Certificate, SolverException>;
 /// stat index
 #[derive(Copy, Clone)]
 pub enum Stat {
-    NumOfBackjump = 0, // the number of backjump
-    NumOfRestart,      // the number of restart
-    NumOfBlockRestart, // the number of blacking start
-    NumOfPropagation,  // the number of propagation
-    NumOfReduction,    // the number of reduction
-    NumOfClause,       // the number of 'alive' given clauses
-    NumOfLearnt,       // the number of 'alive' learnt clauses
-    NumOfVariable,     // the number of 'alive' variables
-    NumOfGroundVar,    // the number os assined variables at level 0
-    NumOfAssign,       // the number of assigned variables
-    EndOfStatIndex,    // Don't use this dummy.
+    NumOfBackjump = 0,   // the number of backjump
+    NumOfRestart,        // the number of restart
+    NumOfBlockRestart,   // the number of blacking start
+    NumOfPropagation,    // the number of propagation
+    NumOfReduction,      // the number of reduction
+    NumOfSimplification, // the number of simplification
+    NumOfClause,         // the number of 'alive' given clauses
+    NumOfLearnt,         // the number of 'alive' learnt clauses
+    NumOfVariable,       // the number of 'alive' variables
+    NumOfGroundVar,      // the number os assined variables at level 0
+    NumOfAssign,         // the number of assigned variables
+    EndOfStatIndex,      // Don't use this dummy.
 }
 
 /// is the collection of all variables.
@@ -172,18 +173,6 @@ impl Solver {
     pub fn attach_clause(&mut self, c: Clause) -> ClauseId {
         let cid = self.cp[c.kind as usize].attach(c);
         debug_assert_ne!(cid, 0);
-        // TP5
-        let c = &self.cp[cid.to_kind()].clauses[cid.to_index()];
-        //        self.eliminator.subsumption_queue.push(cid);
-        for i in 0..c.len() {
-            let l = lindex!(c, i);
-            let vi = l.vi();
-            //            self.vars[vi].occurs.push(cid);
-            self.vars[vi].num_occur += 1;
-            self.vars[vi].touched = true;
-            //            self.eliminator.n_touched += 1;
-            //            self.eliminator.heap.update(&self.vars, vi);
-        }
         cid
     }
 }
@@ -194,7 +183,7 @@ impl SatSolver for Solver {
         // s.root_level = 0;
         self.num_solved_vars = self.trail.len();
         if true || self.cp[ClauseKind::Permanent as usize].clauses.len() < 1_000_000 {
-            self.eliminate(true);
+            self.eliminate();
             self.simplify_database();
         }
         match self.search() {

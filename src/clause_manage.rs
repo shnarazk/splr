@@ -192,6 +192,13 @@ impl ClauseManagement for Solver {
             }
             self.garbage_collect(*ck);
         }
+        self.stats[Stat::NumOfSimplification as usize] += 1;
+        if false && self.stats[Stat::NumOfSimplification as usize] % 8 == 0 {
+            self.eliminate();
+            for ck in &KINDS {
+                self.garbage_collect(*ck);
+            }
+        }
         self.progress("simp");
         true
     }
@@ -300,15 +307,16 @@ impl Solver {
         } else {
             self.trail_lim[0]
         };
+        let sum = k + self.eliminator.eliminated_vars;
         println!(
-            "#{}, DB:R|P|B, {:>8}({:>8}), {:>8}, {:>5}, Progress: {:>6}({:>4.1}%), Restart:b|f, {:>6}, {:>6}, EMA:a|l, {:>5.2}, {:>5.2}, LBD: {:>5.2}",
+            "#{}, DB:R|P|B, {:>8}, {:>8}, {:>5}, Progress: {:>6}+{:>6}({:>4.1}%), Restart:b|f, {:>6}, {:>6}, EMA:a|l, {:>5.2}, {:>6.2}, LBD: {:>5.2}",
             mes,
-            self.cp[ClauseKind::Removable as usize].permutation.len() - 1,
             self.cp[ClauseKind::Removable as usize].clauses.len() - 1,
             self.cp[ClauseKind::Permanent as usize].clauses.len() - 1,
             self.cp[ClauseKind::Binclause as usize].clauses.len() - 1,
             k,
-            (k as f32) / (nv as f32),
+            self.eliminator.eliminated_vars,
+            (sum as f32) / (nv as f32),
             self.stats[Stat::NumOfBlockRestart as usize],
             self.stats[Stat::NumOfRestart as usize],
             self.ema_asg.get(),

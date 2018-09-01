@@ -338,18 +338,16 @@ impl Clause {
         if len == 2 {
             if self.lit[0] == p {
                 self.lit.swap(0, 1);
-                println!("Unit clause!");
             }
             return true;
         }
-        println!(
-            "          Clause::strengthen: remove {} from {}",
-            p.int(),
-            self
-        );
+        // println!(
+        //     "          Clause::strengthen: remove {} from {}",
+        //     p.int(),
+        //     self
+        // );
         if self.lit[0] == p {
             self.lit[0] = self.lits.pop().unwrap();
-            println!("wow watcher[0] of {} broken", self);
         } else if self.lit[1] == p {
             self.lit[1] = self.lits.pop().unwrap();
         } else {
