@@ -28,8 +28,8 @@ use var::VarOrdering;
 
 const VAR_ACTIVITY_THRESHOLD: f64 = 1e100;
 const GROW: usize = 0;
-const SUBSUMPTION_QUEUE_MAX: usize = 800_000;
-const SUBSUMPTION_COMBINATION_MAX: usize = 1_000_000;
+const SUBSUMPTION_QUEUE_MAX: usize = 400_000;
+const SUBSUMPTION_COMBINATION_MAX: usize = 2_000_000;
 
 pub trait VarSelect {
     fn select_var(&mut self) -> VarId;
@@ -103,7 +103,7 @@ impl Solver {
                 v.terminal = false;
                 v.occurs.clear();
             } else if v.terminal {
-                    v.occurs.push(cid);
+                v.occurs.push(cid);
             }
         }
         true
@@ -232,6 +232,7 @@ impl Solver {
             self.vars[i].num_occurs = 0;
             self.vars[i].occurs.clear();
         }
+        // investigate
         for ck in &CLAUSE_KINDS[0..3] {
             let clauses = &self.cp[*ck as usize].clauses;
             for i in 1..clauses.len() {
@@ -240,36 +241,39 @@ impl Solver {
                     continue;
                 }
                 let len = c.len();
-
-                if self.eliminator.subsume_clause_size < len {
-                    for j in 0..len {
-                        let l = lindex!(c, j);
-                        self.vars[l.vi()].terminal = false;
-                        self.vars[l.vi()].occurs.clear();
-                    }
-                } else {
-                    for j in 0..len {
-                        let l = lindex!(c, j);
-                        let v = &mut self.vars[l.vi()];
-                        v.max_clause_size = v.max_clause_size.max(len);
-                        v.num_occurs += 1;
-                    }
+                for j in 0..len {
+                    let l = lindex!(c, j);
+                    let v = &mut self.vars[l.vi()];
+                    v.max_clause_size = v.max_clause_size.max(len);
+                    v.num_occurs += 1;
                 }
             }
         }
+        // build a proxy vector<(size, num, index)> for sorting
         let mut targets: Vec<(usize, isize, usize)> = (1..self.vars.len())
-            .map(|i| (self.vars[i].max_clause_size, (self.vars[i].num_occurs as isize).neg(), i)).collect();
+            .filter(|i| !self.vars[*i].eliminated)
+            .map(|i| {
+                (
+                    self.vars[i].max_clause_size,
+                    (self.vars[i].num_occurs as isize).neg(),
+                    i,
+                )
+            })
+            .collect();
+        // sort in small-to-big order
         targets.sort();
         let mut end = 0;
         let mut total = 0;
         for k in 0..targets.len() {
             total += targets[k].1.neg() as usize;
-            if 10 < total {
+            if SUBSUMPTION_COMBINATION_MAX < total {
                 end = k;
                 break;
             }
         }
-        let targets: Vec<VarId> = targets.drain(..end).map(|c| c.2).collect();
+        let smallest = targets[0].0;
+        let nsmall = targets[0].1.neg();
+        let targets: Vec<VarId> = targets.drain(end..).map(|c| c.2).collect();
         for v in &mut self.vars {
             v.terminal = false;
             v.num_occurs = 0;
@@ -299,7 +303,10 @@ impl Solver {
         let cnt = targets.len();
         let vol = self.vars.iter().map(|ref c| c.occurs.len()).sum::<usize>();
         let total = self.cp[1].clauses.len() + self.cp[2].clauses.len() - 2;
-        println!("#elim, target:var|clause, {:>8}, {:>8}, clauses: {:>8}", cnt, vol, total);
+        println!(
+            "#elim, target:var|clause, {:>8}, {:>8}, clauses: {:>8}, smallest: {:>3}, {:>6}",
+            cnt, total, vol, smallest, nsmall
+        );
     }
     /// 8. gatherTouchedClauses
     pub fn gather_touched_clauses(&mut self) -> () {
@@ -408,18 +415,20 @@ impl Solver {
                     if (*c).sve_mark || (*d).index == DEAD_CLAUSE {
                         continue;
                     }
-                    if (!(*d).sve_mark || (*d).index != DEAD_CLAUSE) && *di != cid && self.eliminator.subsumption_lim == 0
+                    if (!(*d).sve_mark || (*d).index != DEAD_CLAUSE)
+                        && *di != cid
+                        && self.eliminator.subsumption_lim == 0
                         || (*d).len() < self.eliminator.subsumption_lim
                     {
                         // println!("{} + {}", *c, *d);
                         match (*c).subsumes(&*d) {
                             Some(NULL_LIT) => {
-                                // println!("    => {} subsumed completely by {}", (*d), (*c));
+                                println!("    => {} subsumed completely by {}", *d, *c);
                                 subsumed += 1;
                                 self.remove_clause(*di);
                             }
                             Some(l) => {
-                                // println!("     => subsumed {} from {}", l.int(), *d);
+                                println!("    => subsumed {} from {} and {}", l.int(), *c, *d);
                                 deleted_literals += 1;
                                 if !self.strengthen_clause(*di, l.negate()) {
                                     return false;
@@ -467,6 +476,7 @@ impl Solver {
         let mut pos: Vec<ClauseId> = Vec::new();
         let mut neg: Vec<ClauseId> = Vec::new();
         // Split the occurrences into positive and negative:
+        // println!("eliminate_var {} from {:?} ({})", v, self.vars[v].occurs.len(), self.vars[9].occurs.len());
         for cid in &self.vars[v].occurs {
             let c = &self.cp[cid.to_kind()].clauses[cid.to_index()];
             for i in 0..c.len() {

@@ -193,7 +193,7 @@ impl ClauseManagement for Solver {
             self.garbage_collect(*ck);
         }
         self.stats[Stat::NumOfSimplification as usize] += 1;
-        if false && self.stats[Stat::NumOfSimplification as usize] % 8 == 0 {
+        if self.eliminator.use_elim && self.stats[Stat::NumOfSimplification as usize] % 8 == 0 {
             self.eliminate();
             for ck in &KINDS {
                 self.garbage_collect(*ck);
