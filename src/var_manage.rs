@@ -647,7 +647,7 @@ impl Solver {
                     best_v = i;
                 }
             }
-            self.vars[best_v].occurs.clear();
+            // self.vars[best_v].occurs.clear();
             self.eliminator.best_v = best_v;
             self.gather_touched_clauses();
             {
