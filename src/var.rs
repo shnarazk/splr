@@ -369,3 +369,12 @@ impl Eliminator {
         }
     }
 }
+
+impl Dump for Eliminator {
+    fn dump(&self, str: &str) -> () {
+        println!("{}", str);
+        println!(" - n_touched {}", self.n_touched);
+        println!(" - subsumption_queue {:?}", self.subsumption_queue);
+        println!(" - heap {:?}", self.heap);
+    }
+}
