@@ -234,6 +234,7 @@ pub struct SolverConfiguration {
     pub restart_expansion: f64,
     /// static steps between restarts
     pub restart_step: f64,
+    pub use_sve: bool,
 }
 
 impl Default for SolverConfiguration {
@@ -245,6 +246,7 @@ impl Default for SolverConfiguration {
             ema_coeffs: (2 ^ 5, 2 ^ 14),
             restart_expansion: 1.15,
             restart_step: 100.0,
+            use_sve: false,
         }
     }
 }

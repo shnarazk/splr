@@ -69,6 +69,7 @@ pub trait Satisfiability {
 }
 
 impl Satisfiability for Vec<Var> {
+    #[inline]
     fn assigned(&self, l: Lit) -> Lbool {
         self[l.vi()].assign ^ ((l & 1) as u8)
     }
@@ -344,7 +345,7 @@ pub struct Eliminator {
 }
 
 impl Eliminator {
-    pub fn new(nv: usize) -> Eliminator {
+    pub fn new(use_elim: bool, nv: usize) -> Eliminator {
         let heap = VarIdHeap::new(VarOrder::ByOccurence, nv, 0);
         let mut bwdsub_tmp_clause = Clause::null();
         bwdsub_tmp_clause.index = BWDSUB_CLAUSE;
@@ -364,7 +365,7 @@ impl Eliminator {
             clause_lim: 20,
             eliminated_vars: 0,
             add_tmp: Vec::new(),
-            use_elim: true,
+            use_elim,
             turn_off_elim: false,
             use_simplification: true,
             subsumption_lim: 0,

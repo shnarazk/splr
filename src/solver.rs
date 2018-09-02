@@ -111,6 +111,7 @@ impl Solver {
         let re = cfg.restart_expansion;
         let cdr = cfg.clause_decay_rate;
         let vdr = cfg.variable_decay_rate;
+        let use_sve = cfg.use_sve;
         let s = Solver {
             config: cfg,
             num_vars: nv,
@@ -130,7 +131,7 @@ impl Solver {
             next_reduction: 1000,
             cur_restart: 1,
             num_solved_vars: 0,
-            eliminator: Eliminator::new(nv),
+            eliminator: Eliminator::new(use_sve, nv),
             ok: true,
             model: vec![BOTTOM; nv + 1],
             conflicts: vec![],
