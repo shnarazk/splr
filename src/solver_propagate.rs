@@ -13,6 +13,7 @@ pub trait SolveSAT {
     /// returns `true` for SAT, `false` for UNSAT.
     fn search(&mut self) -> bool;
     fn propagate(&mut self) -> ClauseId;
+    fn propagate_(&mut self) -> ClauseId;
     fn enqueue(&mut self, l: Lit, cid: ClauseId) -> bool;
 }
 
@@ -32,8 +33,68 @@ impl SolveSAT for Solver {
             for ck in &kinds {
                 ci = self.cp[*ck as usize].watcher[p];
                 self.cp[*ck as usize].watcher[p] = NULL_CLAUSE;
+                let mut new_tail = NULL_CLAUSE;
+                'next_clause: while ci != NULL_CLAUSE {
+                    unsafe {
+                        let c = &mut self.cp[*ck as usize].clauses[ci] as *mut Clause;
+                        if (*c).lit[0] == false_lit {
+                            (*c).lit.swap(0, 1); // now my index is 1, others is 0.
+                            (*c).next_watcher.swap(0, 1);
+                        }
+                        let next = (*c).next_watcher[1];
+                        let first_value = self.assigned((*c).lit[0]);
+                        if first_value != LTRUE {
+                            for k in 0..(*c).lits.len() {
+                                let lk = (*c).lits[k];
+                                if (((lk & 1) as u8) ^ self.vars[lk.vi()].assign) != 0 {  // equivalent to 'self.assigned(lk) != LFALSE'
+                                    (*c).lit[1] = lk;
+                                    (*c).lits[k] = false_lit;
+                                    (*c).next_watcher[1] = self.cp[*ck as usize].watcher[lk.negate() as usize];
+                                    self.cp[*ck as usize].watcher[lk.negate() as usize] = ci;
+                                    ci = next;
+                                    continue 'next_clause;
+                                }
+                            }
+                            if first_value == LFALSE {
+                                if new_tail == NULL_CLAUSE {
+                                    self.cp[*ck as usize].watcher[p] = ci;
+                                } else {
+                                    self.cp[*ck as usize].clauses[new_tail].next_watcher[1] = ci;
+                                }
+                                return ck.id_from(ci);
+                            } else {
+                                self.uncheck_enqueue((*c).lit[0], ck.id_from(ci));
+                            }
+                        }
+                        let watch = self.cp[*ck as usize].watcher[p];
+                        if watch == 0 {
+                            new_tail = ci;
+                        }
+                        (*c).next_watcher[1] = watch;
+                        self.cp[*ck as usize].watcher[p] = ci;
+                        ci = next;
+                    }
+                }
+            }
+        }
+        NULL_CLAUSE
+    }
+    fn propagate_(&mut self) -> ClauseId {
+        while self.q_head < self.trail.len() {
+            let p: usize = self.trail[self.q_head] as usize;
+            let false_lit = (p as Lit).negate();
+            self.q_head += 1;
+            self.stats[Stat::NumOfPropagation as usize] += 1;
+            let kinds = [
+                ClauseKind::Binclause,
+                ClauseKind::Permanent,
+                ClauseKind::Removable,
+            ];
+            let mut ci;
+            for ck in &kinds {
+                ci = self.cp[*ck as usize].watcher[p];
+                self.cp[*ck as usize].watcher[p] = NULL_CLAUSE;
                 let mut new_tail = 0;
-                let mut new_tail_index = 1;
                 'next_clause: while ci != NULL_CLAUSE {
                     unsafe {
                         let c = &mut self.cp[*ck as usize].clauses[ci] as *mut Clause;
