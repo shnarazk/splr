@@ -33,28 +33,36 @@ impl SolveSAT for Solver {
                 ci = self.cp[*ck as usize].watcher[p];
                 self.cp[*ck as usize].watcher[p] = NULL_CLAUSE;
                 let mut new_tail = 0;
+                let mut new_tail_index = 1;
                 'next_clause: while ci != NULL_CLAUSE {
                     unsafe {
                         let c = &mut self.cp[*ck as usize].clauses[ci] as *mut Clause;
-                        if (*c).lit[0] == false_lit {
-                            (*c).lit.swap(0, 1);
-                            (*c).next_watcher.swap(0, 1);
-                        }
-                        let next = (*c).next_watcher[1];
-                        //                        if (*c).frozen {
-                        //                            ci = next;
-                        //                            continue 'next_clause;
-                        //                        }
-                        let fv = self.assigned((*c).lit[0]);
+                        debug_assert!((*c).lit[0] == false_lit || (*c).lit[1] == false_lit);
+//                        if (*c).lit[0] == false_lit {
+//                            (*c).lit.swap(0, 1);
+//                            (*c).next_watcher.swap(0, 1);
+//                        }
+//                        // From here, lit[1] == false_lit == !p, and next_watcher[1] == the corresponding watch
+//                        // Therefore, lit[0] == other.
+//as                        let next = (*c).next_watcher[1];
+                        // Otherway
+                        let my_index: usize = ((*c).lit[0] ^ false_lit != 0) as usize;
+//                        assert_eq!(my_index, 1);
+                        let other_index: usize = ((*c).lit[0] ^ false_lit == 0) as usize;
+                        let next = (*c).next_watcher[my_index];
+//                        println!("0: {}, 1: {}", ((*c).lit[0] ^ false_lit != 0) as usize, ((*c).lit[0] ^ false_lit == 0) as usize);
+                        debug_assert_eq!(my_index + other_index, 1);
+//                        assert_eq!(other_index, 0);
+// as                        let fv = self.assigned((*c).lit[0]);
+                        let fv = self.assigned((*c).lit[other_index]);
                         if fv == LTRUE {
-                            if (*c).lit[1] != false_lit {
-                                println!("break {:?} for {}", (*c), p);
-                            }
-                            debug_assert_eq!((*c).lit[1], false_lit);
+// as                            debug_assert_eq!((*c).lit[1], false_lit);
                             if self.cp[*ck as usize].watcher[p] == 0 {
                                 new_tail = ci;
+                                new_tail_index = my_index;
                             }
-                            (*c).next_watcher[1] = self.cp[*ck as usize].watcher[p];
+// as                            (*c).next_watcher[1] = self.cp[*ck as usize].watcher[p];
+                            (*c).next_watcher[my_index] = self.cp[*ck as usize].watcher[p];
                             self.cp[*ck as usize].watcher[p] = ci;
                             ci = next;
                             continue 'next_clause;
@@ -62,13 +70,17 @@ impl SolveSAT for Solver {
                         for k in 0..(*c).lits.len() {
                             let lk = (*c).lits[k];
                             if self.assigned(lk) != LFALSE {
-                                debug_assert_eq!((*c).lit[1], false_lit);
-                                let next = (*c).next_watcher[1];
-                                let tmp = (*c).lit[1];
-                                (*c).lit[1] = (*c).lits[k];
-                                (*c).lits[k] = tmp;
-                                debug_assert_ne!((*c).lit[1], false_lit);
-                                (*c).next_watcher[1] =
+// as                                debug_assert_eq!((*c).lit[1], false_lit);
+// as                                let next = (*c).next_watcher[1];
+                                let next = (*c).next_watcher[my_index];
+// as                                let tmp = (*c).lit[1];
+// as                                (*c).lit[1] = (*c).lits[k];
+                                (*c).lit[my_index] = (*c).lits[k];
+//as                                (*c).lits[k] = tmp;
+                                (*c).lits[k] = false_lit;
+//                                debug_assert_ne!((*c).lit[1], false_lit);
+//as                                (*c).next_watcher[1] =
+                                (*c).next_watcher[my_index] =
                                     self.cp[*ck as usize].watcher[lk.negate() as usize];
                                 self.cp[*ck as usize].watcher[lk.negate() as usize] = ci;
                                 ci = next;
@@ -79,13 +91,22 @@ impl SolveSAT for Solver {
                             if new_tail == 0 {
                                 self.cp[*ck as usize].watcher[p] = ci;
                             } else {
-                                debug_assert_eq!(
-                                    self.cp[*ck as usize].clauses[new_tail].lit[1],
-                                    false_lit
-                                );
-                                self.cp[*ck as usize].clauses[new_tail].next_watcher[1] = ci;
+// as                                debug_assert_eq!(
+// as                                    self.cp[*ck as usize].clauses[new_tail].lit[1],
+// as                                    false_lit
+// as                                );
+// as                                self.cp[*ck as usize].clauses[new_tail].next_watcher[1] = ci;
+                                self.cp[*ck as usize].clauses[new_tail].next_watcher[new_tail_index] = ci;
+                            }
+                            if my_index == 0 {
+                                (*c).lit.swap(0, 1);
+                                (*c).next_watcher.swap(0, 1);
                             }
                             return ck.id_from(ci);
+                        }
+                        if my_index == 0 {
+                            (*c).lit.swap(0, 1);
+                            (*c).next_watcher.swap(0, 1);
                         }
                         if self.cp[*ck as usize].watcher[p] == 0 {
                             new_tail = ci;
