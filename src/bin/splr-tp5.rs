@@ -3,6 +3,8 @@ use splr::clause::ClauseKind;
 use splr::solver::{Certificate, SatSolver, Solver, Stat};
 use splr::types::EmaKind;
 use std::env;
+use std::fs::File;
+use std::io::{BufWriter, Write};
 
 const VERSION: &str = "Splr-0.0.5, Technical Preview 5";
 
@@ -26,12 +28,26 @@ fn main() {
     }
     if let Some(path) = target {
         let (mut s, _cnf) = Solver::build(&path);
+        let result = format!(".ans_{}", path);
+        report_stat(&s);
         match s.solve() {
             Ok(Certificate::SAT(v)) => {
-                report_stat(&s);
-                println!("{:?}", v);
+                if let Ok(mut file) = File::create(&result) {
+                    let mut buf = BufWriter::new(file);
+                    if let Err(why) = buf.write(format!("{:?}", v).as_bytes()) {
+                        panic!("failed to save: {:?}!", why);
+                    }
+                }
+                println!("SATISFIABLE. The answer was dumped to {}.", result);
             }
-            Ok(Certificate::UNSAT(v)) => println!("UNSAT {:?}", v),
+            Ok(Certificate::UNSAT(v)) => {
+                if let Ok(mut file) = File::create(&result) {
+                    if let Err(why) = file.write_all(format!("UNSAT {:?}", v).as_bytes()) {
+                        panic!("failed to save: {:?}!", why);
+                    }
+                }
+                println!("UNSAT, The answer was dumped to {}.", result);
+            }
             Err(e) => println!("Failed {:?}", e),
         }
     }

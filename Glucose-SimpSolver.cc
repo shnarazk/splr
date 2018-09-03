@@ -18,7 +18,6 @@ SimpSolver::SimpSolver() :
   , subsumption_lim    (opt_subsumption_lim)
   , use_elim           (opt_use_elim)
   , merges             (0)
-  , asymm_lits         (0)
   , eliminated_vars    (0)
   , elimorder          (1)
   , occurs             (ClauseDeleted(ca))
@@ -38,7 +37,6 @@ SimpSolver::SimpSolver(const SimpSolver &s) : Solver(s)
   , subsumption_lim    (s.subsumption_lim)
   , use_elim           (s.use_elim)
   , merges             (s.merges)
-  , asymm_lits         (s.asymm_lits)
   , eliminated_vars    (s.eliminated_vars)
   , elimorder          (s.elimorder)
   , occurs             (ClauseDeleted(ca))
@@ -300,36 +298,6 @@ bool SimpSolver::backwardSubsumptionCheck(bool verbose) {
     return true;
 }
 
-bool SimpSolver::asymm(Var v, CRef cr) {
-    Clause& c = ca[cr];
-    assert(decisionLevel() == 0);
-    if (c.mark() || satisfied(c)) return true;
-    trail_lim.push(trail.size());
-    Lit l = lit_Undef;
-    for (int i = 0; i < c.size(); i++)
-        if (var(c[i]) != v && value(c[i]) != l_False)
-            uncheckedEnqueue(~c[i]);
-        else
-            l = c[i];
-    if (propagate() != CRef_Undef){
-        cancelUntil(0);
-        asymm_lits++;
-        if (!strengthenClause(cr, l))
-            return false;
-    }else
-        cancelUntil(0);
-    return true;
-}
-
-bool SimpSolver::asymmVar(Var v) {
-    const vec<CRef>& cls = occurs.lookup(v);
-    if (value(v) != l_Undef || cls.size() == 0)
-        return true;
-    for (int i = 0; i < cls.size(); i++)
-        if (!asymm(v, cls[i]))
-            return false;
-    return backwardSubsumptionCheck();
-}
 
 static void mkElimClause(vec<uint32_t>& elimclauses, Lit x) {
     elimclauses.push(toInt(x));
