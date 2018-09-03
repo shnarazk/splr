@@ -318,10 +318,10 @@ impl VarIdHeap {
 pub struct Eliminator {
     pub merges: usize,
     /// renamed elimHeap. FIXME: can we use VarIdHeap here?
-    pub heap: Vec<VarId>,
+    pub var_queue: Vec<VarId>,
     pub n_touched: usize,
     pub asymm_lits: usize,
-    pub subsumption_queue: Vec<ClauseId>,
+    pub clause_queue: Vec<ClauseId>,
     pub bwdsub_assigns: usize,
     //    pub bwdsub_tmp_unit: ClauseId,
     pub bwdsub_tmp_clause: Clause,
@@ -351,10 +351,10 @@ impl Eliminator {
         bwdsub_tmp_clause.index = BWDSUB_CLAUSE;
         Eliminator {
             merges: 0,
-            heap: Vec::new(),
+            var_queue: Vec::new(),
             n_touched: 0,
             asymm_lits: 0,
-            subsumption_queue: Vec::new(),
+            clause_queue: Vec::new(),
             bwdsub_assigns: 0,
             //            bwdsub_tmp_unit: 0,
             bwdsub_tmp_clause,
@@ -380,7 +380,7 @@ impl Dump for Eliminator {
     fn dump(&self, str: &str) -> () {
         println!("{}", str);
         println!(" - n_touched {}", self.n_touched);
-        println!(" - subsumption_queue {:?}", self.subsumption_queue);
-        println!(" - heap {:?}", self.heap);
+        println!(" - clause_queue {:?}", self.clause_queue);
+        println!(" - heap {:?}", self.var_queue);
     }
 }

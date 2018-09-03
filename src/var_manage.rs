@@ -20,6 +20,7 @@ use std::cmp::Ordering;
 use std::ops::Neg;
 use types::*;
 use var::AccessHeap;
+use var::Eliminator;
 use var::Satisfiability;
 use var::Var;
 use var::VarIdHeap;
@@ -28,8 +29,9 @@ use var::VarOrdering;
 
 const VAR_ACTIVITY_THRESHOLD: f64 = 1e100;
 const GROW: usize = 0;
-const SUBSUMPTION_QUEUE_MAX: usize = 100_000;
-const SUBSUMPTION_COMBINATION_MAX: usize = 800_000;
+const SUBSUMPTION_VAR_QUEUE_MAX: usize = 50_000;
+const SUBSUMPTION_CLAUSE_QUEUE_MAX: usize = 50_000;
+const SUBSUMPTION_COMBINATION_MAX: usize = 80_000_000;
 
 pub trait VarSelect {
     fn select_var(&mut self) -> VarId;
@@ -98,7 +100,7 @@ impl Solver {
         let c = &iref!(self.cp, cid);
         let big = self.eliminator.subsume_clause_size < c.len();
         if !big {
-            self.eliminator.subsumption_queue.push(cid);
+            self.eliminator.enqueue_clause(cid);
         }
         for i in 0..c.len() {
             let l = lindex!(c, i);
@@ -133,9 +135,7 @@ impl Solver {
                 if 0 < vars[vi].occurs.len() {
                     vars[vi].occurs.retain(|&ci| ci != cid);
                 }
-                if let None = eliminator.heap.iter().find(|&v| *v == vi) {
-                    eliminator.heap.push(vi);
-                }
+                eliminator.enqueue_var(vi);
             }
         }
         // println!("     purge {} by remove_clause", cid.to_index());
@@ -148,14 +148,14 @@ impl Solver {
         {
             let c = &mut self.cp[cid.to_kind()].clauses[cid.to_index()];
             debug_assert_ne!(cid, NULL_CLAUSE);
-            self.eliminator.subsumption_queue.push(cid);
+            self.eliminator.enqueue_clause(cid);
             if c.lits.is_empty() {
                 c.strengthen(l);
                 c0 = c.lit[0];
             } else {
                 c.strengthen(l);
                 self.vars[l.vi()].occurs.retain(|&ci| ci != cid);
-                self.eliminator.heap.push(l.vi());
+                self.eliminator.enqueue_var(l.vi());
                 c0 = NULL_LIT;
             }
         }
@@ -166,7 +166,11 @@ impl Solver {
             self.rebuild_watchers(ClauseKind::Removable);
             self.rebuild_watchers(ClauseKind::Permanent);
             self.rebuild_watchers(ClauseKind::Binclause);
-            self.enqueue(c0, NULL_CLAUSE) && self.propagate() == NULL_CLAUSE
+            if !self.enqueue(c0, NULL_CLAUSE) {
+                panic!("GGGGGGGGGGGGGGGGGGGGGGGGGG");
+            }
+            self.propagate() == NULL_CLAUSE
+        // self.enqueue(c0, NULL_CLAUSE) == true && self.propagate() == NULL_CLAUSE
         } else {
             true
         }
@@ -288,10 +292,14 @@ impl Solver {
         let nsmall = targets[0].1.neg();
         targets.drain(end..);
         // println!("targets {:?}", &targets[..5]);
-        let targets: Vec<VarId> = targets.iter().filter(|k| k.0 <= self.eliminator.subsume_clause_size).map(|k| k.2).collect();
+        let targets: Vec<VarId> = targets
+            .iter()
+            .filter(|k| k.0 <= self.eliminator.subsume_clause_size)
+            .map(|k| k.2)
+            .collect();
         // println!("{:?}", targets);
         for v in &mut self.vars[1..] {
-            v.terminal = false;  // v.max_clause_size < kernel_size;
+            v.terminal = false; // v.max_clause_size < kernel_size;
             v.num_occurs = 0;
             v.occurs.clear();
         }
@@ -311,6 +319,7 @@ impl Solver {
                     if v.terminal {
                         v.num_occurs += 1;
                         v.occurs.push(ck.id_from(i));
+                        self.eliminator.enqueue_var(l.vi());
                     }
                 }
                 //
@@ -327,7 +336,10 @@ impl Solver {
         }
         let cnt = targets.len();
         //let vol = self.vars.iter().map(|ref c| c.occurs.len()).sum::<usize>();
-        let vol = targets.iter().map(|&v| self.vars[v as usize].occurs.len()).sum::<usize>();
+        let vol = targets
+            .iter()
+            .map(|&v| self.vars[v as usize].occurs.len())
+            .sum::<usize>();
         println!(
             "#elim, target:kernel size|var|clause, {:>4}, {:>8}, {:>8}, smallest: {:>3}, {:>6}",
             self.eliminator.subsume_clause_size, cnt, vol, smallest, nsmall,
@@ -335,42 +347,60 @@ impl Solver {
     }
     /// 8. gatherTouchedClauses
     pub fn gather_touched_clauses(&mut self) -> () {
+        println!(
+            "gather_touched_clauses {}",
+            self.eliminator.clause_queue.len()
+        );
         if self.eliminator.n_touched == 0 {
             return;
         }
-        let mut len = self.eliminator.subsumption_queue.len();
-        for cid in &self.eliminator.subsumption_queue {
+        let mut len = self.eliminator.clause_queue.len();
+        for cid in &self.eliminator.clause_queue {
             let c = &mut self.cp[cid.to_kind()].clauses[cid.to_index()];
             c.touched = true;
         }
-        for kind in &[
-            ClauseKind::Removable,
-            ClauseKind::Binclause,
-            ClauseKind::Permanent,
-        ] {
-            let clauses = &mut self.cp[*kind as usize].clauses;
-            'next_clause: for i in 1..clauses.len() {
-                let c = &mut clauses[i];
-                if c.index == DEAD_CLAUSE {
-                    continue 'next_clause;
-                }
-                if !c.touched {
-                    for j in 1..c.len() {
-                        let l = lindex!(c, j);
-                        if self.vars[l.vi()].touched {
-                            self.eliminator.subsumption_queue.push(kind.id_from(i));
-                            c.touched = true;
-                            len += 1;
-                            // if self.eliminator.subsume_clause_size < len {
-                            //     break;
-                            // }
-                            continue 'next_clause;
-                        }
+        for mut v in &mut self.vars[1..] {
+            if v.touched && v.terminal {
+                // println!("gtc var: {}", v.index);
+                for cid in &v.occurs {
+                    let mut c = mref!(self.cp, cid);
+                    if !c.touched {
+                        self.eliminator.enqueue_clause(*cid);
+                        c.touched = true;
                     }
                 }
+                v.touched = false;
             }
         }
-        for cid in &self.eliminator.subsumption_queue {
+        println!("queue became: {}", self.eliminator.clause_queue.len());
+        //        for kind in &[
+        //            ClauseKind::Removable,
+        //            ClauseKind::Binclause,
+        //            ClauseKind::Permanent,
+        //        ] {
+        //            let clauses = &mut self.cp[*kind as usize].clauses;
+        //            'next_clause: for i in 1..clauses.len() {
+        //                let c = &mut clauses[i];
+        //                if c.index == DEAD_CLAUSE {
+        //                    continue 'next_clause;
+        //                }
+        //                if !c.touched {
+        //                    for j in 1..c.len() {
+        //                        let l = lindex!(c, j);
+        //                        if self.vars[l.vi()].touched {
+        //                            self.eliminator.clause_queue.push(kind.id_from(i));
+        //                            c.touched = true;
+        //                            len += 1;
+        //                            // if self.eliminator.subsume_clause_size < len {
+        //                            //     break;
+        //                            // }
+        //                            continue 'next_clause;
+        //                        }
+        //                    }
+        //                }
+        //            }
+        //        }
+        for cid in &self.eliminator.clause_queue {
             let c = &mut self.cp[cid.to_kind()].clauses[cid.to_index()];
             c.touched = false;
         }
@@ -381,28 +411,32 @@ impl Solver {
     }
     /// 10. backwardSubsumptionCheck
     pub fn backward_subsumption_check(&mut self) -> bool {
+        println!(
+            "backward_subsumption_check start. {}",
+            self.eliminator.clause_queue.len()
+        );
         let mut cnt = 0;
         let mut subsumed = 0;
         let mut deleted_literals = 0;
         debug_assert_eq!(self.decision_level(), 0);
-        while 0 < self.eliminator.subsumption_queue.len()
+        while 0 < self.eliminator.clause_queue.len()
             || self.eliminator.bwdsub_assigns < self.trail.len()
         {
             // Empty subsumption queue and return immediately on user-interrupt:
             // if computed-too-long { break; }
             // Check top-level assigments by creating a dummy clause and placing it in the queue:
-            if self.eliminator.subsumption_queue.len() == 0
+            if self.eliminator.clause_queue.len() == 0
                 && self.eliminator.bwdsub_assigns < self.trail.len()
             {
                 let l: Lit = self.trail[self.eliminator.bwdsub_assigns];
                 self.eliminator.bwdsub_assigns += 1;
                 self.eliminator.bwdsub_tmp_clause.lit[0] = l;
                 self.eliminator
-                    .subsumption_queue
+                    .clause_queue
                     .push(self.eliminator.bwdsub_tmp_clause.index);
             }
-            let cid = self.eliminator.subsumption_queue[0];
-            self.eliminator.subsumption_queue.remove(0);
+            let cid = self.eliminator.clause_queue[0];
+            self.eliminator.clause_queue.remove(0);
             unsafe {
                 let mut c = if cid == self.eliminator.bwdsub_tmp_clause.index {
                     &mut self.eliminator.bwdsub_tmp_clause as *mut Clause
@@ -440,8 +474,9 @@ impl Solver {
                         && *di != cid
                         && (*c).len() <= self.eliminator.subsume_clause_size
                         && (*d).len() <= self.eliminator.subsume_clause_size
-                        && (self.eliminator.subsumption_lim == 0 || (*c).len() + (*d).len() <= self.eliminator.subsumption_lim)
-                        // && (self.eliminator.subsumption_lim == 0 || (*d).len() < self.eliminator.subsumption_lim)
+                        && (self.eliminator.subsumption_lim == 0
+                            || (*c).len() + (*d).len() <= self.eliminator.subsumption_lim)
+                    // && (self.eliminator.subsumption_lim == 0 || (*d).len() < self.eliminator.subsumption_lim)
                     {
                         // println!("{} + {}", *c, *d);
                         match (*c).subsumes(&*d) {
@@ -451,7 +486,7 @@ impl Solver {
                                 self.remove_clause(*di);
                             }
                             Some(l) => {
-                                if let Some(_) = [1,2,3 as usize].iter().find(|&v| *v == l.vi()) {
+                                if let Some(_) = [1, 2, 3 as usize].iter().find(|&v| *v == l.vi()) {
                                     println!("    => subsumed {} from {} and {}", l.int(), *c, *d);
                                 }
                                 deleted_literals += 1;
@@ -466,6 +501,7 @@ impl Solver {
                 self.eliminator.targets.clear();
             }
         }
+        println!("backward_subsumption_check done.");
         true
     }
     /// 13. mkElimClause(1)
@@ -492,10 +528,11 @@ impl Solver {
     }
     /// 15. eliminateVar
     pub fn eliminate_var(&mut self, v: VarId) -> bool {
+        println!("- eliminate_var: {}", v);
         if self.vars[v].eliminated {
             panic!("double elimination!");
         }
-        if !self.vars[v].terminal{
+        if !self.vars[v].terminal {
             return true;
         }
         let mut pos: Vec<ClauseId> = Vec::new();
@@ -539,7 +576,12 @@ impl Solver {
             }
             // Delete and store old clauses
             self.vars[v].eliminated = true;
-            // println!("- eliminate_var: {:>5} (+{:<4} -{:<4}).", v, pos.len(), neg.len());
+            println!(
+                "- eliminate_var: {:>5} (+{:<4} -{:<4}).",
+                v,
+                pos.len(),
+                neg.len()
+            );
             // setDecisionVar(v, false);
             self.eliminator.eliminated_vars += 1;
             {
@@ -640,23 +682,25 @@ impl Solver {
     /// 18. eliminate
     // should be called at decision level 0.
     pub fn eliminate(&mut self) -> () {
-        self.eliminator.subsumption_queue.clear();
+        self.eliminator.clause_queue.clear();
         self.build_occurence_list();
-        for kind in &[
-            ClauseKind::Removable,
-            ClauseKind::Binclause,
-            ClauseKind::Permanent,
-        ] {
-            let clauses = &mut self.cp[*kind as usize].clauses;
-            'next_clause: for i in 1..clauses.len() {
-                let c = &mut clauses[i];
-                if c.len() <= self.eliminator.subsume_clause_size {
-                    self.eliminator.subsumption_queue.push(kind.id_from(i));
-                }
-            }
-        }
+        println!("eliminate: phase 1");
+        // for kind in &[
+        //     ClauseKind::Removable,
+        //     ClauseKind::Binclause,
+        //     ClauseKind::Permanent,
+        // ] {
+        //     let clauses = &mut self.cp[*kind as usize].clauses;
+        //     'next_clause: for i in 1..clauses.len() {
+        //         let c = &mut clauses[i];
+        //         if c.len() <= self.eliminator.subsume_clause_size {
+        //             self.eliminator.clause_queue.push(kind.id_from(i));
+        //         }
+        //     }
+        // }
+        println!("eliminate: phase 2");
         // for i in 1..4 { println!("eliminate report: v{} => {},{}", i, self.vars[i].num_occurs, self.vars[i].occurs.len()); }
-        // println!("eliminate queue {:?} / {}", self.eliminator.subsumption_queue.len(), self.eliminator.subsume_clause_size);
+        // println!("eliminate queue {:?} / {}", self.eliminator.clause_queue.len(), self.eliminator.subsume_clause_size);
         // let mut tmp: Vec<(VarId, usize)> = self
         //     .vars[1..]
         //     .iter()
@@ -666,7 +710,7 @@ impl Solver {
         // tmp.sort_by_key(|t| (t.1 as isize).neg());
         'perform: while 0 < self.eliminator.n_touched
             || self.eliminator.bwdsub_assigns < self.trail.len()
-            || 0 < self.eliminator.heap.len()
+            || 0 < self.eliminator.var_queue.len()
         {
             let mut best_v = 1;
             for i in 2..self.vars.len() {
@@ -674,34 +718,37 @@ impl Solver {
                     best_v = i;
                 }
             }
+            println!("eliminate: phase 3");
             // self.vars[best_v].occurs.clear();
             self.eliminator.best_v = best_v;
             self.gather_touched_clauses();
+            println!("eliminate: phase 4");
             {
-                if false && SUBSUMPTION_QUEUE_MAX < self.eliminator.subsumption_queue.len() {
+                if false && SUBSUMPTION_CLAUSE_QUEUE_MAX < self.eliminator.clause_queue.len() {
                     println!("Too many clauses to eliminate");
                     // if 0 < self.eliminator.subsume_clause_size {
                     //     self.eliminator.subsume_clause_size -= 1;
                     // }
-                    self.eliminator.subsumption_queue.clear();
+                    self.eliminator.clause_queue.clear();
                     return;
                 }
             }
-            // println!(" - queue {:?}", self.eliminator.subsumption_queue);
-            if (0 < self.eliminator.subsumption_queue.len()
+            // println!(" - queue {:?}", self.eliminator.clause_queue);
+            if (0 < self.eliminator.clause_queue.len()
                 || self.eliminator.bwdsub_assigns < self.trail.len())
                 && !self.backward_subsumption_check()
             {
                 self.ok = false;
                 break 'perform; // goto cleaup
             }
-
+            println!("eliminate: phase 5");
             // abort after too long computation
             // if false { break 'perform; }
             // for i in 1..4 { println!("eliminate last while: v{}:{} => {},{}", i, self.vars[i].terminal, self.vars[i].num_occurs, self.vars[i].occurs.len()); }
-            while !self.eliminator.heap.is_empty() {
-                let elim = self.eliminator.heap.remove(0);
-                // let elim: VarId = self.vars.get_root(&mut self.eliminator.heap); // removeMin();
+            println!("queue {}", self.eliminator.var_queue.len());
+            while !self.eliminator.var_queue.is_empty() {
+                let elim = self.eliminator.var_queue.remove(0);
+                // let elim: VarId = self.vars.get_root(&mut self.eliminator.var_queue); // removeMin();
                 // if asynch_interrupt { break }
                 if self.vars[elim].eliminated || self.vars[elim].assign != BOTTOM {
                     continue;
@@ -716,6 +763,21 @@ impl Solver {
                     break 'perform;
                 }
             }
+        }
+    }
+}
+
+impl Eliminator {
+    fn enqueue_var(&mut self, vi: VarId) -> () {
+        if self.var_queue.len() < SUBSUMPTION_VAR_QUEUE_MAX {
+            if let None = self.var_queue.iter().find(|&v| *v == vi) {
+                self.var_queue.push(vi);
+            }
+        }
+    }
+    fn enqueue_clause(&mut self, ci: ClauseId) -> () {
+        if self.clause_queue.len() < SUBSUMPTION_CLAUSE_QUEUE_MAX {
+            self.clause_queue.push(ci);
         }
     }
 }

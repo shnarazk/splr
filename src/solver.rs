@@ -171,6 +171,13 @@ impl Solver {
         self.trail_lim.len()
     }
     pub fn attach_clause(&mut self, c: Clause) -> ClauseId {
+        if self.eliminator.use_elim {
+            for i in 0..c.len() {
+                let l = lindex!(c, i);
+                self.vars[l.vi()].touched = true;
+                self.eliminator.n_touched += 1;
+            }
+        }
         let cid = self.cp[c.kind as usize].attach(c);
         debug_assert_ne!(cid, 0);
         cid
