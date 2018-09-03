@@ -1,4 +1,4 @@
-SPLR -- SAT Solver for Propositional Logic in Rust
+Splr -- SAT Solver for Propositional Logic in Rust
 ----
 
 ## Features
