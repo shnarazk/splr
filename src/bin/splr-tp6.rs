@@ -39,6 +39,7 @@ fn main() {
                     }
                 }
                 println!("SATISFIABLE. The answer was dumped to {}.", result);
+                println!("{:?}", v);
             }
             Ok(Certificate::UNSAT(v)) => {
                 if let Ok(mut file) = File::create(&result) {
@@ -47,6 +48,7 @@ fn main() {
                     }
                 }
                 println!("UNSAT, The answer was dumped to {}.", result);
+                println!("[]");
             }
             Err(e) => println!("Failed {:?}", e),
         }
