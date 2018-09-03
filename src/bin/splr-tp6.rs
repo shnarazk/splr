@@ -31,7 +31,6 @@ fn main() {
         let file = Path::new(&path);
         let (mut s, _cnf) = Solver::build(&path);
         let result = format!(".ans_{}", file.file_name().unwrap().to_str().unwrap());
-        report_stat(&s);
         match s.solve() {
             Ok(Certificate::SAT(v)) => {
                 if let Ok(mut out) = File::create(&result) {
@@ -45,8 +44,9 @@ fn main() {
                         panic!("failed to save: {:?}!", why);
                     }
                 }
+                report_stat(&s);
                 println!("SATISFIABLE. The answer was dumped to {}.", result.as_str());
-                println!("{:?}", v);
+                // println!("{:?}", v);
             }
             Ok(Certificate::UNSAT(_)) => {
                 if let Ok(mut out) = File::create(&result) {
@@ -54,6 +54,7 @@ fn main() {
                         panic!("failed to save: {:?}!", why);
                     }
                 }
+                report_stat(&s);
                 println!("UNSAT, The answer was dumped to {}.", result.as_str());
                 println!("[]");
             }
