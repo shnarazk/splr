@@ -5,6 +5,7 @@ use splr::types::EmaKind;
 use std::env;
 use std::fs::File;
 use std::io::{BufWriter, Write};
+use std::path::Path;
 
 const VERSION: &str = "Splr-0.0.6, Technical Preview 6";
 
@@ -27,27 +28,28 @@ fn main() {
         }
     }
     if let Some(path) = target {
+        let file = Path::new(&path);
         let (mut s, _cnf) = Solver::build(&path);
-        let result = format!(".ans_{}", path);
+        let result = format!(".ans_{}", file.file_name().unwrap().to_str().unwrap());
         report_stat(&s);
         match s.solve() {
             Ok(Certificate::SAT(v)) => {
-                if let Ok(mut file) = File::create(&result) {
-                    let mut buf = BufWriter::new(file);
+                if let Ok(mut out) = File::create(&result) {
+                    let mut buf = BufWriter::new(out);
                     if let Err(why) = buf.write(format!("{:?}", v).as_bytes()) {
                         panic!("failed to save: {:?}!", why);
                     }
                 }
-                println!("SATISFIABLE. The answer was dumped to {}.", result);
+                println!("SATISFIABLE. The answer was dumped to {}.", result.as_str());
                 println!("{:?}", v);
             }
             Ok(Certificate::UNSAT(v)) => {
-                if let Ok(mut file) = File::create(&result) {
-                    if let Err(why) = file.write_all(format!("UNSAT {:?}", v).as_bytes()) {
+                if let Ok(mut out) = File::create(&result) {
+                    if let Err(why) = out.write_all(format!("UNSAT {:?}", v).as_bytes()) {
                         panic!("failed to save: {:?}!", why);
                     }
                 }
-                println!("UNSAT, The answer was dumped to {}.", result);
+                println!("UNSAT, The answer was dumped to {}.", result.as_str());
                 println!("[]");
             }
             Err(e) => println!("Failed {:?}", e),
