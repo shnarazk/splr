@@ -30,10 +30,9 @@ fn main() {
         // println!("read the problem.");
         s.inject_assigmnent(&read_assignment());
         // println!("read an assignment.");
-        if s.validate() {
-            println!("Valid assignment for {}.", path);
-        } else {
-            println!("Invalid assignment for {}.", path);
+        match s.validate() {
+            Some(v) => println!("Invalid assignment for {} due to {:?}.", path, v),
+            None => println!("Valid assignment for {}.", path),
         }
     }
 }
