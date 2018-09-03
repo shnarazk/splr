@@ -41,7 +41,7 @@ fn check_occurs() {
     // s.attach_clause(c4);
     // s.vars.dump("##added");
     s.eliminator.dump("##added");
-    s.eliminate(true);
+    s.eliminate();
     // s.vars.dump("##eliminated");
     s.eliminator.dump("##eliminated");
     println!("::done");
