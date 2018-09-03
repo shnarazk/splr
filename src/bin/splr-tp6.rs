@@ -36,16 +36,21 @@ fn main() {
             Ok(Certificate::SAT(v)) => {
                 if let Ok(mut out) = File::create(&result) {
                     let mut buf = BufWriter::new(out);
-                    if let Err(why) = buf.write(format!("{:?}", v).as_bytes()) {
+                    for x in &v {
+                        if let Err(why) = buf.write(format!("{} ", x).as_bytes()) {
+                            panic!("failed to save: {:?}!", why);
+                        }
+                    }
+                    if let Err(why) = buf.write(b"0\n") {
                         panic!("failed to save: {:?}!", why);
                     }
                 }
                 println!("SATISFIABLE. The answer was dumped to {}.", result.as_str());
                 println!("{:?}", v);
             }
-            Ok(Certificate::UNSAT(v)) => {
+            Ok(Certificate::UNSAT(_)) => {
                 if let Ok(mut out) = File::create(&result) {
-                    if let Err(why) = out.write_all(format!("UNSAT {:?}", v).as_bytes()) {
+                    if let Err(why) = out.write_all(b"[]\n") {
                         panic!("failed to save: {:?}!", why);
                     }
                 }
