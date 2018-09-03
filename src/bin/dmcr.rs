@@ -1,20 +1,18 @@
+// DIMACS Model Checker in Rust
 #![allow(unused_imports)]
-/// Model checker for Satisfiability in Rust
 extern crate splr;
 use splr::solver::{SatSolver, Solver};
 use std::env;
-// use std::fs::File;
 use std::io::{BufReader, BufRead, stdin};
 use splr::types::*;
 use splr::validator::*;
 use std::path::Path;
 
-const VERSION: &str = "mcsr-0.0.1";
+const VERSION: &str = "dmcr-0.0.1";
 
 fn main() {
     let mut target: Option<String> = None;
-    let args: Vec<String> = env::args().skip(1).collect();
-    for arg in &args {
+    for arg in &env::args().skip(1).collect::<Vec<String>>() {
         match arg {
             _ if arg.to_string() == "--version" => {
                 println!("{}", VERSION);
@@ -28,7 +26,6 @@ fn main() {
         }
     }
     if let Some(path) = target {
-        // let file = Path::new(&path);
         let (mut s, _cnf) = Solver::build(&path);
         // println!("read the problem.");
         s.inject_assigmnent(&read_assignment());
