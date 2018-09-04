@@ -352,3 +352,34 @@ impl Clause {
         false
     }
 }
+
+pub struct ClauseIter<'a> {
+    clause: &'a Clause,
+    end: usize,
+    index: usize,
+}
+
+impl<'a> IntoIterator for &'a Clause {
+    type Item = Lit;
+    type IntoIter = ClauseIter<'a>;
+    fn into_iter(self) -> ClauseIter<'a> {
+        ClauseIter {
+            clause: &self,
+            end: self.len(),
+            index: 0,
+        }
+    }
+}
+
+impl<'a> Iterator for ClauseIter<'a> {
+    type Item = Lit;
+    fn next(&mut self) -> Option<Lit> {
+        self.index += 1;
+        match self.index {
+            1 => Some(self.clause.lit[0]),
+            2 => Some(self.clause.lit[1]),
+            n if n <= self.end => Some(self.clause.lits[n - 3]),
+            _ => None,
+        }
+    }
+}
