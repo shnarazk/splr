@@ -5,7 +5,7 @@ use clause::DEAD_CLAUSE;
 use types::*;
 
 const BWDSUB_CLAUSE: ClauseId = DEAD_CLAUSE - 1;
-const SUBSUMPTION_SIZE: usize = 5;
+const SUBSUMPTION_SIZE: usize = 30;
 
 /// Struct for a variable.
 #[derive(Debug)]
@@ -104,7 +104,7 @@ pub enum VarOrder {
 #[derive(Debug)]
 pub struct VarIdHeap {
     order: VarOrder,
-    heap: Vec<VarId>, // order : usize -> VarId
+    pub heap: Vec<VarId>, // order : usize -> VarId
     idxs: Vec<usize>, // VarId : -> order : usize
 }
 
@@ -127,6 +127,7 @@ pub trait VarOrdering {
     fn is_empty(&self) -> bool;
     fn clear(&mut self) -> ();
     fn len(&self) -> usize;
+    fn peek(&self) -> VarId;
 }
 
 impl VarOrdering for VarIdHeap {
@@ -191,6 +192,9 @@ impl VarOrdering for VarIdHeap {
     }
     fn len(&self) -> usize {
         self.idxs[0]
+    }
+    fn peek(&self) -> VarId {
+        self.heap[1]
     }
 }
 
@@ -339,7 +343,6 @@ pub struct Eliminator {
     pub use_simplification: bool,
     pub subsumption_lim: usize,
     pub targets: Vec<ClauseId>,
-    pub best_v: VarId,
     pub subsume_clause_size: usize,
     pub last_invocatiton: usize,
 }
@@ -369,7 +372,6 @@ impl Eliminator {
             use_simplification: true,
             subsumption_lim: 0,
             targets: Vec::new(),
-            best_v: 1,
             subsume_clause_size: SUBSUMPTION_SIZE,
             last_invocatiton: 0,
         }

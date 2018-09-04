@@ -277,10 +277,8 @@ impl SatSolver for Solver {
                             }
                         }
                     }
-                    if v.len() != 0 {
-                        if !s.add_clause(v) {
-                            s.ok = false;
-                        }
+                    if v.len() != 0 && !s.add_clause(v) {
+                        s.ok = false;
                     }
                 }
                 Err(e) => panic!("{}", e),

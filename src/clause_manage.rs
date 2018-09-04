@@ -193,8 +193,9 @@ impl ClauseManagement for Solver {
             self.garbage_collect(*ck);
         }
         self.stats[Stat::NumOfSimplification as usize] += 1;
-        if self.eliminator.use_elim && self.stats[Stat::NumOfSimplification as usize] % 8 == 0
-        && self.eliminator.last_invocatiton + 4 < self.stats[Stat::NumOfReduction as usize] as usize {
+        if true || self.eliminator.use_elim && self.stats[Stat::NumOfSimplification as usize] % 8 == 0
+        //    && self.eliminator.last_invocatiton + 4 < self.stats[Stat::NumOfReduction as usize] as usize
+        {
             self.eliminate();
             self.eliminator.last_invocatiton = self.stats[Stat::NumOfReduction as usize] as usize;
             for ck in &KINDS {
