@@ -71,7 +71,7 @@ impl ClauseManagement for Solver {
             ClauseKind::Permanent
         };
         match v.len() {
-            0 => true,
+            0 => false,         // Empty clause is UNSAT.
             1 => self.enqueue(v[0], NULL_CLAUSE),
             _ => {
                 self.attach_clause(Clause::new(kind, false, 0, v));

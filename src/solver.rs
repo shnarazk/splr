@@ -186,6 +186,9 @@ impl Solver {
 
 impl SatSolver for Solver {
     fn solve(&mut self) -> SolverResult {
+        if !self.ok {
+            return Ok(Certificate::UNSAT(Vec::new()));
+        }
         // TODO deal with assumptions
         // s.root_level = 0;
         self.num_solved_vars = self.trail.len();
@@ -275,7 +278,9 @@ impl SatSolver for Solver {
                         }
                     }
                     if v.len() != 0 {
-                        s.add_clause(v);
+                        if !s.add_clause(v) {
+                            s.ok = false;
+                        }
                     }
                 }
                 Err(e) => panic!("{}", e),
