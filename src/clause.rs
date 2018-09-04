@@ -325,7 +325,6 @@ impl Clause {
     }
     /// remove Lit `p` from Clause *self*.
     /// returns true if the clause became a unit clause.
-    /// This means it returns true if  the current length is two.
     pub fn strengthen(&mut self, p: Lit) -> bool {
         if self.frozen {
             return false;
@@ -337,11 +336,6 @@ impl Clause {
             }
             return true;
         }
-        // println!(
-        //     "          Clause::strengthen: remove {} from {}",
-        //     p.int(),
-        //     self
-        // );
         if self.lit[0] == p {
             self.lit[0] = self.lits.pop().unwrap();
         } else if self.lit[1] == p {
