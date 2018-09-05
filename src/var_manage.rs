@@ -242,28 +242,11 @@ impl Solver {
             self.vars[i].num_occurs = 0;
             self.vars[i].occurs.clear();
         }
-        // investigate
-        for ck in &CLAUSE_KINDS[0..3] {
-            let clauses = &self.cp[*ck as usize].clauses;
-            for i in 1..clauses.len() {
-                let c = &clauses[i];
-                if c.index == DEAD_CLAUSE {
-                    continue;
-                }
-                let len = c.len();
-                for j in 0..len {
-                    let l = lindex!(c, j);
-                    let v = &mut self.vars[l.vi()];
-                    v.max_clause_size = v.max_clause_size.max(len);
-                    v.num_occurs += 1;
-                }
-            }
-        }
         let mut total = 0;
         let mut cnt = 0;
         let nv = self.vars.len();
         for vi in 1..nv {
-            let v = &mut self.vars[nv - vi];
+            let v = &mut self.vars[vi]; //  [nv - vi];
             if v.eliminated || v.assign != BOTTOM {
                 continue;
             }

@@ -57,7 +57,8 @@ impl ClausePack {
         let mask = i.mask();
         let mut clauses = Vec::with_capacity(1 + nc);
         clauses.push(Clause::null());
-        let permutation = Vec::new();
+        let mut permutation = Vec::new();
+        permutation.push(0); // for NULL_CLAUSE
         let mut watcher = Vec::with_capacity(2 * (nv + 1));
         for _i in 0..2 * (nv + 1) {
             watcher.push(NULL_CLAUSE);
@@ -251,43 +252,44 @@ impl Clause {
 
 impl fmt::Display for Clause {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self.index {
-            //            x if x < 0 => write!(f, format!("a given clause {}", self.lits.map(|l| l.int()))),
-            0 => write!(f, "null_clause"),
-            DEAD_CLAUSE => write!(
+        if f.alternate() {
+            write!(
                 f,
-                "dead[{},{}]{:?}",
-                self.lit[0].int(),
-                self.lit[1].int(),
-                &self.lits.iter().map(|l| l.int()).collect::<Vec<i32>>()
-            ),
-            _ if self.lits.is_empty() => write!(
-                f,
-                "B{}[{},{}]",
-                self.index,
-                self.lit[0].int(),
-                self.lit[1].int(),
-            ),
-            _ if self.lits.is_empty() => write!(
-                f,
-                "B{}[{},{}]",
-                self.index,
-                self.lit[0].int(),
-                self.lit[1].int(),
-            ),
-            _ => write!(
-                f,
-                "{}{}[{},{}]{:?}",
-                match self.kind {
-                    ClauseKind::Removable => 'L',
-                    ClauseKind::Binclause => 'B',
-                    ClauseKind::Permanent => 'P',
-                },
-                self.index,
-                self.lit[0].int(),
-                self.lit[1].int(),
-                &self.lits.iter().map(|l| l.int()).collect::<Vec<i32>>()
-            ),
+                "C{} rank:{}, activity: {}, lit:{:?}{:?}",
+                self.index, self.rank, self.activity, self.lit, self.lits,
+            )
+        } else {
+            match self.index {
+                //            x if x < 0 => write!(f, format!("a given clause {}", self.lits.map(|l| l.int()))),
+                0 => write!(f, "null_clause"),
+                DEAD_CLAUSE => write!(
+                    f,
+                    "dead[{},{}]{:?}",
+                    self.lit[0].int(),
+                    self.lit[1].int(),
+                    &self.lits.iter().map(|l| l.int()).collect::<Vec<i32>>()
+                ),
+                _ if self.lits.is_empty() => write!(
+                    f,
+                    "B{}[{},{}]",
+                    self.index,
+                    self.lit[0].int(),
+                    self.lit[1].int(),
+                ),
+                _ => write!(
+                    f,
+                    "{}{}[{},{}]{:?}",
+                    match self.kind {
+                        ClauseKind::Removable => 'L',
+                        ClauseKind::Binclause => 'B',
+                        ClauseKind::Permanent => 'P',
+                    },
+                    self.index,
+                    self.lit[0].int(),
+                    self.lit[1].int(),
+                    &self.lits.iter().map(|l| l.int()).collect::<Vec<i32>>(),
+                ),
+            }
         }
     }
 }

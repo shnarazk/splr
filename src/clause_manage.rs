@@ -123,10 +123,11 @@ impl ClauseManagement for Solver {
                 ref mut permutation,
                 ..
             } = &mut self.cp[ClauseKind::Removable as usize];
+            debug_assert_eq!(permutation.len(), clauses.len());
             // sort the range of 'permutation'
             permutation[1..].sort_by(|&a, &b| clauses[a].cmp(&clauses[b]));
             let nc = permutation.len();
-            for i in nc / 2..nc {
+            for i in nc / 2 + 1..nc {
                 let mut c = &mut clauses[permutation[i]];
                 if !c.locked && !c.just_used {
                     c.frozen = true;
@@ -193,8 +194,8 @@ impl ClauseManagement for Solver {
             self.garbage_collect(*ck);
         }
         self.stats[Stat::NumOfSimplification as usize] += 1;
-        if true || self.eliminator.use_elim && self.stats[Stat::NumOfSimplification as usize] % 8 == 0
-        //    && self.eliminator.last_invocatiton + 4 < self.stats[Stat::NumOfReduction as usize] as usize
+        if self.eliminator.use_elim && self.stats[Stat::NumOfSimplification as usize] % 8 == 0
+            || self.eliminator.last_invocatiton + 5 < self.stats[Stat::NumOfReduction as usize] as usize
         {
             self.eliminate();
             self.eliminator.last_invocatiton = self.stats[Stat::NumOfReduction as usize] as usize;

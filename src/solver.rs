@@ -194,8 +194,8 @@ impl SatSolver for Solver {
         self.num_solved_vars = self.trail.len();
         if self.eliminator.use_elim {
             self.eliminate();
-            self.simplify_database();
         }
+        self.simplify_database();
         match self.search() {
             _ if self.ok == false => {
                 self.cancel_until(0);

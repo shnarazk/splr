@@ -8,7 +8,7 @@ use splr::clause_manage::*;
 use splr::solver::*;
 use splr::types::*;
 
-#[test]
+// #[test]
 fn check_occurs() {
     let cfg: SolverConfiguration = Default::default();
     let cnf: CNFDescription = CNFDescription {
