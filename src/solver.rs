@@ -192,9 +192,9 @@ impl SatSolver for Solver {
         // TODO deal with assumptions
         // s.root_level = 0;
         self.num_solved_vars = self.trail.len();
-        if self.eliminator.use_elim {
-            self.eliminate();
-        }
+        // if self.eliminator.use_elim {
+        //     self.eliminate();
+        // }
         self.simplify_database();
         match self.search() {
             _ if self.ok == false => {

@@ -5,7 +5,7 @@ use clause::DEAD_CLAUSE;
 use types::*;
 
 const BWDSUB_CLAUSE: ClauseId = DEAD_CLAUSE - 1;
-const SUBSUMPTION_SIZE: usize = 30;
+const SUBSUMPTION_SIZE: usize = 20;
 
 /// Struct for a variable.
 #[derive(Debug)]

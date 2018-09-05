@@ -71,7 +71,7 @@ impl ClauseManagement for Solver {
             ClauseKind::Permanent
         };
         match v.len() {
-            0 => false,         // Empty clause is UNSAT.
+            0 => false, // Empty clause is UNSAT.
             1 => self.enqueue(v[0], NULL_CLAUSE),
             _ => {
                 self.attach_clause(Clause::new(kind, false, 0, v));
@@ -194,8 +194,9 @@ impl ClauseManagement for Solver {
             self.garbage_collect(*ck);
         }
         self.stats[Stat::NumOfSimplification as usize] += 1;
-        if self.eliminator.use_elim && self.stats[Stat::NumOfSimplification as usize] % 8 == 0
-            || self.eliminator.last_invocatiton + 5 < self.stats[Stat::NumOfReduction as usize] as usize
+        if self.eliminator.use_elim
+            && self.stats[Stat::NumOfSimplification as usize] % 8 == 0
+            && self.eliminator.last_invocatiton < self.stats[Stat::NumOfReduction as usize] as usize
         {
             self.eliminate();
             self.eliminator.last_invocatiton = self.stats[Stat::NumOfReduction as usize] as usize;

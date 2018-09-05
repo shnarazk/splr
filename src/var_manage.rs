@@ -28,10 +28,10 @@ use var::VarOrder;
 use var::VarOrdering;
 
 const VAR_ACTIVITY_THRESHOLD: f64 = 1e100;
-const GROW: usize = 100;
+const SUBSUMPITON_GROW_LIMIT: usize = 0;
 const SUBSUMPTION_VAR_QUEUE_MAX: usize = 10_000;
-const SUBSUMPTION_CLAUSE_QUEUE_MAX: usize = 50_000;
-const SUBSUMPTION_COMBINATION_MAX: usize = 100_000_000;
+const SUBSUMPTION_CLAUSE_QUEUE_MAX: usize = 10_000;
+const SUBSUMPTION_COMBINATION_MAX: usize = 10_000_000;
 
 pub trait VarSelect {
     fn select_var(&mut self) -> VarId;
@@ -461,7 +461,7 @@ impl Solver {
                     let (res, clause_size) = self.check_to_merge(pos[i], neg[j], v);
                     if res {
                         cnt += 1;
-                        if clslen + GROW < cnt
+                        if clslen + SUBSUMPITON_GROW_LIMIT < cnt
                             || (self.eliminator.clause_lim != 0
                                 && self.eliminator.clause_lim < clause_size)
                         {
