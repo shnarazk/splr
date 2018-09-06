@@ -12,6 +12,12 @@ pub const RANK_NULL: usize = 0; // for NULL_CLAUSE
 pub const RANK_CONST: usize = 1; // for given clauses
 pub const RANK_NEED: usize = 2; // for newly generated bi-clauses
 
+pub const CLAUSE_KINDS: [ClauseKind; 3] = [
+    ClauseKind::Removable,
+    ClauseKind::Permanent,
+    ClauseKind::Binclause,
+];
+
 /// Clause Index, not ID because it's used only within a Vec<Clause>
 pub type ClauseIndex = usize;
 
@@ -61,12 +67,6 @@ pub enum ClauseKind {
     Permanent,
     Binclause,
 }
-
-pub const CLAUSE_KINDS: [ClauseKind; 3] = [
-    ClauseKind::Removable,
-    ClauseKind::Permanent,
-    ClauseKind::Binclause,
-];
 
 pub trait ClauseIdIndexEncoding {
     fn to_id(&self) -> ClauseId;

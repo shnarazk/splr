@@ -38,16 +38,9 @@ impl CDCL for Solver {
                 // );
                 debug_assert_ne!(cid, NULL_CLAUSE);
                 // println!("  analyze.loop {}", (*c));
-                let d = (*c).rank;
                 if cid.to_kind() == (ClauseKind::Removable as usize) {
                     self.bump_cid(cid);
-                    let nblevel = self.lbd_of(&(*c).lits);
-                    if nblevel + 1 < d {
-                        (*c).rank = nblevel;
-                        // if nblevel <= 30 {
-                        //     (*c).just_used = true;
-                        // }
-                    }
+                    (*c).rank = self.lbd_of(&(*c).lits);
                 }
                 // println!("{}を対応", (*c));
                 //                'next_literal: for q in &(*c).lits {
