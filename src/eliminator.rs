@@ -637,7 +637,6 @@ impl Solver {
                     }
                     if self.eliminator.use_elim
                         && self.vars[elim].assign == BOTTOM
-                        && self.vars[elim].frozen
                         && !self.eliminate_var(elim)
                     {
                         self.ok = false;
@@ -747,7 +746,7 @@ impl Eliminator {
     // from SimpSolver.h update_elim_heap
     pub fn update_heap(&mut self, vars: &[Var], vi: VarId) -> () {
         let v = &vars[vi];
-        if self.heap.contains(vi) || (v.frozen && vars[vi].eliminated && v.assign == BOTTOM) {
+        if self.heap.contains(vi) || (vars[vi].eliminated && v.assign == BOTTOM) {
             self.heap.update(vars, vi);
         }
     }

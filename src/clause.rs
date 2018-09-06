@@ -15,7 +15,7 @@ pub struct ClausePack {
     pub index_bits: usize,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ClauseKind {
     Removable = 0,
     Permanent,
@@ -131,8 +131,6 @@ pub struct Clause {
     pub locked: bool,
     /// given or learnt
     pub learnt: bool,
-    /// for elimination-by-simplfication
-    pub frozen: bool,
     /// used in the current phase
     pub just_used: bool,
     /// used in Subsumption Variable Eliminator
@@ -176,18 +174,17 @@ impl PartialEq for Clause {
 impl Eq for Clause {}
 
 impl PartialOrd for Clause {
-    /// the key is `tmp`, not `rank`, since we want to reflect whether it's used as a reason.
     fn partial_cmp(&self, other: &Clause) -> Option<Ordering> {
         if self.rank < other.rank {
-            return Some(Ordering::Less);
+            Some(Ordering::Less)
         } else if self.rank > other.rank {
-            return Some(Ordering::Greater);
+            Some(Ordering::Greater)
         } else if self.activity > other.activity {
-            return Some(Ordering::Less);
+            Some(Ordering::Less)
         } else if self.activity < other.activity {
-            return Some(Ordering::Greater);
+            Some(Ordering::Greater)
         } else {
-            return Some(Ordering::Equal);
+            Some(Ordering::Equal)
         }
     }
 }
@@ -195,15 +192,15 @@ impl PartialOrd for Clause {
 impl Ord for Clause {
     fn cmp(&self, other: &Clause) -> Ordering {
         if self.rank < other.rank {
-            return Ordering::Less;
+            Ordering::Less
         } else if self.rank > other.rank {
-            return Ordering::Greater;
+            Ordering::Greater
         } else if self.activity > other.activity {
-            return Ordering::Less;
+            Ordering::Less
         } else if self.activity < other.activity {
-            return Ordering::Greater;
+            Ordering::Greater
         } else {
-            return Ordering::Equal;
+            Ordering::Equal
         }
     }
 }
@@ -222,7 +219,6 @@ impl Clause {
             lits: v,
             index: 0,
             locked: false,
-            frozen: false,
             just_used: false,
             sve_mark: false,
             touched: false,
@@ -239,7 +235,6 @@ impl Clause {
             index: 0,
             locked: false,
             learnt: false,
-            frozen: false,
             just_used: false,
             sve_mark: false,
             touched: false,
@@ -256,7 +251,7 @@ impl fmt::Display for Clause {
             write!(
                 f,
                 "C{} rank:{}, activity: {}, lit:{:?}{:?}",
-                self.index, self.rank, self.activity, self.lit, self.lits,
+                self.index, self.rank, self.activity, vec2int(self.lit.clone().to_vec()), vec2int(self.lits.clone().to_vec()),
             )
         } else {
             match self.index {
@@ -328,9 +323,6 @@ impl Clause {
     /// remove Lit `p` from Clause *self*.
     /// returns true if the clause became a unit clause.
     pub fn strengthen(&mut self, p: Lit) -> bool {
-        if self.frozen {
-            return false;
-        }
         let len = self.len();
         if len == 2 {
             if self.lit[0] == p {

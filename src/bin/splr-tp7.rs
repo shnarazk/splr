@@ -7,7 +7,7 @@ use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::Path;
 
-const VERSION: &str = "Splr-0.0.6, Technical Preview 6";
+const VERSION: &str = "Splr-0.0.7, Technical Preview 7";
 
 fn main() {
     // println!("splr 0.0.1 CARGO_MANIFEST_DIR = {}", env!("CARGO_MANIFEST_DIR"));

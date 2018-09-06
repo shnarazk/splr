@@ -17,18 +17,19 @@ pub struct Var {
     pub level: usize,
     pub activity: f64,
     /// for elimination
-    pub frozen: bool,
-    /// for elimination
     pub touched: bool,
     /// for elimination
     pub eliminated: bool,
-    // for elimination
-    pub terminal: bool,
-    // for elimination
-    pub occurs: Vec<ClauseId>,
-    // for elimination
-    pub max_clause_size: usize,
-    pub num_occurs: usize,
+    /// for elimination
+    pub elimination_target: bool,
+    /// for elimination
+    pub pos_occurs: Vec<ClauseId>,
+    /// for elimination
+    pub neg_occurs: Vec<ClauseId>,
+    /// for elimination
+    pub bin_pos_occurs: Vec<ClauseId>,
+    /// for elimination
+    pub bin_neg_occurs: Vec<ClauseId>,
 }
 
 /// is the dummy var index.
@@ -43,13 +44,13 @@ impl Var {
             reason: NULL_CLAUSE,
             level: 0,
             activity: 0.0,
-            frozen: false,
             touched: false,
             eliminated: false,
-            terminal: false,
-            occurs: Vec::new(),
-            max_clause_size: 0,
-            num_occurs: 0,
+            elimination_target: false,
+            pos_occurs: Vec::new(),
+            neg_occurs: Vec::new(),
+            bin_pos_occurs: Vec::new(),
+            bin_neg_occurs: Vec::new(),
         }
     }
     pub fn new_vars(n: usize) -> Vec<Var> {
@@ -221,7 +222,7 @@ impl VarIdHeap {
         debug_assert!(0 < vq, "size of heap is too small");
         let aq = match self.order {
             VarOrder::ByActivity => vec[vq].activity,
-            VarOrder::ByOccurence => vec[vq].occurs.len() as f64,
+            VarOrder::ByOccurence => (vec[vq].pos_occurs.len() + vec[vq].neg_occurs.len()) as f64,
         };
         loop {
             let p = q / 2;
@@ -234,7 +235,7 @@ impl VarIdHeap {
                 let vp = self.heap[p];
                 let ap = match self.order {
                     VarOrder::ByActivity => vec[vp].activity,
-                    VarOrder::ByOccurence => vec[vp].occurs.len() as f64,
+                    VarOrder::ByOccurence => (vec[vp].pos_occurs.len() + vec[vp].neg_occurs.len()) as f64,
                 };
                 if ap < aq {
                     // move down the current parent, and make it empty
@@ -257,7 +258,7 @@ impl VarIdHeap {
         let vi = self.heap[i];
         let ai = match self.order {
             VarOrder::ByActivity => vec[vi].activity,
-            VarOrder::ByOccurence => vec[vi].occurs.len() as f64,
+            VarOrder::ByOccurence => (vec[vi].pos_occurs.len() + vec[vi].neg_occurs.len()) as f64,
         };
         loop {
             let l = 2 * i; // left
@@ -267,11 +268,11 @@ impl VarIdHeap {
                 let vr = self.heap[r];
                 let al = match self.order {
                     VarOrder::ByActivity => vec[vl].activity,
-                    VarOrder::ByOccurence => vec[vl].occurs.len() as f64,
+                    VarOrder::ByOccurence => (vec[vi].pos_occurs.len() + vec[vi].neg_occurs.len()) as f64,
                 };
                 let ar = match self.order {
                     VarOrder::ByActivity => vec[vr].activity,
-                    VarOrder::ByOccurence => vec[vr].occurs.len() as f64,
+                    VarOrder::ByOccurence => (vec[vr].pos_occurs.len() + vec[vr].neg_occurs.len()) as f64,
                 };
                 let (c, vc, ac) = if r <= n && al < ar {
                     (r, vr, ar)
@@ -326,6 +327,7 @@ pub struct Eliminator {
     pub n_touched: usize,
     pub asymm_lits: usize,
     pub clause_queue: Vec<ClauseId>,
+    pub binclause_queue: Vec<ClauseId>,
     pub bwdsub_assigns: usize,
     //    pub bwdsub_tmp_unit: ClauseId,
     pub bwdsub_tmp_clause: Clause,
@@ -358,6 +360,7 @@ impl Eliminator {
             n_touched: 0,
             asymm_lits: 0,
             clause_queue: Vec::new(),
+            binclause_queue: Vec::new(),
             bwdsub_assigns: 0,
             //            bwdsub_tmp_unit: 0,
             bwdsub_tmp_clause,

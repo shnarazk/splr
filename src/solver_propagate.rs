@@ -26,8 +26,8 @@ impl SolveSAT for Solver {
             self.stats[Stat::NumOfPropagation as usize] += 1;
             let kinds = [
                 ClauseKind::Binclause,
-                ClauseKind::Permanent,
                 ClauseKind::Removable,
+                ClauseKind::Permanent,
             ];
             let mut ci: ClauseIndex;
             for kind in &kinds {
@@ -123,7 +123,6 @@ impl SolveSAT for Solver {
                         let v = self.an_learnt_lits.clone();
                         lbd = self.add_learnt(v);
                     }
-                    self.decay_var_activity();
                     self.decay_cla_activity();
                     // glucose reduction
                     let conflicts = self.stats[Stat::NumOfBackjump as usize] as usize;
@@ -154,12 +153,6 @@ impl SolveSAT for Solver {
                 v.reason = cid;
                 mref!(self.cp, cid).locked = true;
             }
-            // println!(
-            //     "implication {} by {} {}",
-            //     l.int(),
-            //     cid.to_kind(),
-            //     cid.to_index()
-            // );
             self.trail.push(l);
             true
         } else {
@@ -174,11 +167,6 @@ impl Solver {
     ///  - trail
     ///  - trail_lim
     pub fn uncheck_enqueue(&mut self, l: Lit, cid: ClauseId) -> () {
-        // if ci == NULL_CLAUSE {
-        //     println!("uncheck_enqueue decide: {}", l.int());
-        // } else {
-        //     println!("uncheck_enqueue imply: {} by {}", l.int(), ci);
-        // }
         debug_assert!(l != 0, "Null literal is about to be equeued");
         let dl = self.decision_level();
         let v = &mut self.vars[l.vi()];
@@ -186,19 +174,10 @@ impl Solver {
         v.level = dl;
         v.reason = cid;
         mref!(self.cp, cid).locked = true;
-        // if 0 < cid {
-        //     println!(
-        //         "::uncheck_enqueue of {} by {}::{}",
-        //         l.int(),
-        //         cid.to_kind(),
-        //         cid.to_index(),
-        //     );
-        // }
         self.trail.push(l);
     }
     pub fn uncheck_assume(&mut self, l: Lit) -> () {
         self.trail_lim.push(self.trail.len());
-        // println!("::decision {}", l.int());
         self.uncheck_enqueue(l, NULL_CLAUSE);
     }
 }

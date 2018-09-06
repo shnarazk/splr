@@ -63,7 +63,6 @@ pub struct Solver {
     pub config: SolverConfiguration,
     pub num_vars: usize,
     pub cla_inc: f64,
-    pub var_inc: f64,
     pub root_level: usize,
     /// Variable Assignment Management
     pub vars: Vec<Var>,
@@ -110,13 +109,11 @@ impl Solver {
         let (_fe, se) = cfg.ema_coeffs;
         let re = cfg.restart_expansion;
         let cdr = cfg.clause_decay_rate;
-        let vdr = cfg.variable_decay_rate;
         let use_sve = cfg.use_sve;
         let s = Solver {
             config: cfg,
             num_vars: nv,
             cla_inc: cdr,
-            var_inc: vdr,
             root_level: 0,
             vars: Var::new_vars(nv),
             trail: Vec::with_capacity(nv),
@@ -128,7 +125,7 @@ impl Solver {
                 ClausePack::build(ClauseKind::Permanent, nv, 256),
                 ClausePack::build(ClauseKind::Binclause, nv, 256),
             ],
-            next_reduction: 1000,
+            next_reduction: 2000,
             cur_restart: 1,
             num_solved_vars: 0,
             eliminator: Eliminator::new(use_sve, nv),
@@ -145,8 +142,8 @@ impl Solver {
             an_level_map_key: 1,
             mi_var_map: vec![0; nv + 1],
             lbd_seen: vec![0; nv + 1],
-            ema_asg: Ema2::new(4096.0, 8192.0), // for blocking
-            ema_lbd: Ema2::new(64.0, 8192.0),   // for forcing
+            ema_asg: Ema2::new(4000.0, 8192.0), // for blocking
+            ema_lbd: Ema2::new(100.0, 8192.0),   // for forcing
             b_lvl: Ema::new(se),
             c_lvl: Ema::new(se),
             next_restart: 100,
@@ -178,7 +175,11 @@ impl Solver {
                 self.eliminator.n_touched += 1;
             }
         }
+        let bin = c.kind == ClauseKind::Binclause;
         let cid = self.cp[c.kind as usize].attach(c);
+        if self.eliminator.use_elim && bin {
+            self.eliminator.binclause_queue.push(cid);
+        }
         debug_assert_ne!(cid, 0);
         cid
     }
@@ -190,11 +191,11 @@ impl SatSolver for Solver {
             return Ok(Certificate::UNSAT(Vec::new()));
         }
         // TODO deal with assumptions
-        // s.root_level = 0;
         self.num_solved_vars = self.trail.len();
-        // if self.eliminator.use_elim {
-        //     self.eliminate();
-        // }
+        self.eliminate_binclauses();
+        if self.eliminator.use_elim {
+            self.eliminate();
+        }
         self.simplify_database();
         match self.search() {
             _ if self.ok == false => {
@@ -291,7 +292,11 @@ impl SatSolver for Solver {
 
 impl Dump for Solver {
     fn dump(&self, str: &str) -> () {
-        println!("# {} at {}", str, self.decision_level());
+        println!("# {} at {} r:{}, p:{}, b:{}", str, self.decision_level(),
+                 self.cp[ClauseKind::Removable as usize].clauses.len(),
+                 self.cp[ClauseKind::Permanent as usize].clauses.len(),
+                 self.cp[ClauseKind::Binclause as usize].clauses.len(),
+        );
         println!(
             "# nassigns {}, decision cands {}",
             self.num_assigns(),

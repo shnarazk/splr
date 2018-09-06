@@ -29,13 +29,17 @@ macro_rules! mkl {
     };
 }
 
-trait Testing {
+trait TestingSolver {
+    fn show_clauses(&self) -> ();
+}
+
+trait TestingClause {
     fn activity(self, a: f64) -> Self;
     fn rank(self, a: usize) -> Self;
     fn dump(&self) -> String;
 }
 
-impl Testing for Clause {
+impl TestingClause for Clause {
     fn activity(mut self, a: f64) -> Clause {
         self.activity = a;
         self
@@ -52,6 +56,19 @@ impl Testing for Clause {
                 self.lit,
                 self.lits,
                 )
+    }
+}
+
+impl TestingSolver for Solver {
+    fn show_clauses(&self) -> () {
+        let target = &self.cp[ClauseKind::Removable as usize];
+        for (i, c) in target.clauses.iter().enumerate() {
+            println!("#{} {:#}", i, c);
+        }
+        println!("permutation table: {:?}", &target.permutation[1..]);
+        for i in &target.permutation[1..] {
+            println!("@{} {:#}", i, target.clauses[*i]);
+        }
     }
 }
 
@@ -84,6 +101,7 @@ fn clause_iterator() -> () {
 
 #[test]
 fn clause_sort() -> () {
+    println!("- first senario");
     let mut s = setup();
     assert_eq!(s.ok, true);
     println!(
@@ -102,32 +120,36 @@ fn clause_sort() -> () {
         for i in &permutation[1..] {
             println!("#{} {:#}", i, &clauses[*i]);
         }
-        for i in 0..permutation.len() {
-            permutation[i] = i;
-        }
+        //for i in 0..permutation.len() {
+        //    permutation[i] = i;
+        //}
     }
+    s.show_clauses();
     s.reduce_watchers();
-    println!(
-        "# reduce_watchers: {:?}",
-        &s.cp[ClauseKind::Removable as usize].permutation[1..]
-    );
-    for (i, c) in s.cp[ClauseKind::Removable as usize].clauses.iter().enumerate() {
-        println!("#{} {:#}", i, c);
-    }
-    for i in &s.cp[ClauseKind::Removable as usize].permutation[1..] {
-        println!("@{} {:#}", i, &s.cp[ClauseKind::Removable as usize].clauses[s.cp[ClauseKind::Removable as usize].permutation[*i]]);
-    }
+    s.show_clauses();
+
     s.simplify_database();
-    println!(
-        "# simplify_database: {:?}",
-        &s.cp[ClauseKind::Removable as usize].permutation[1..]
-    );
-    for (i, c) in s.cp[ClauseKind::Removable as usize].clauses.iter().enumerate() {
-        println!("#{} {:#}", i, c);
-    }
-    for i in &s.cp[ClauseKind::Removable as usize].permutation[1..] {
-        println!("@{} {:#}", i, &s.cp[ClauseKind::Removable as usize].clauses[s.cp[ClauseKind::Removable as usize].permutation[*i]]);
-    }
+    s.show_clauses();
+
+    println!("- another senario");
+    let mut s = setup();
+    println!(" - initial state");
+    s.show_clauses();
+
+    s.reduce_watchers();
+    s.simplify_database();
+    println!(" - 1st shrink");
+    s.show_clauses();
+
+    s.reduce_watchers();
+    s.simplify_database();
+    println!(" - 2nd shrink");
+    s.show_clauses();
+
+    s.reduce_watchers();
+    s.simplify_database();
+    println!(" - 3rd shrink");
+    s.show_clauses();
 }
 
 fn setup() -> Solver {
@@ -138,12 +160,14 @@ fn setup() -> Solver {
     };
     let mut s = Solver::new(Default::default(), &cnf);
     s.eliminator.use_elim = false;
-    s.attach_clause(mkl![1, 2, -3].activity(1.0));
-    s.attach_clause(mkl![1, -2, 3].activity(4.0).rank(3));
-    s.attach_clause(mkl![-1, 2, 3, 4].activity(5.0));
-    s.attach_clause(mkl![-1, 2, 3, 4].activity(2.0).rank(2));
-    s.attach_clause(mkl![-1, 2, 3, 4].activity(1.0).rank(2));
-    s.attach_clause(mkl![-1, 2, -3, 4].activity(1.0).rank(4));
-    s.attach_clause(mkl![1, 2, -3, -4].activity(3.0).rank(2));
+    s.attach_clause(mkl![1, 2, -3].activity(1.0));             // #1
+    s.attach_clause(mkl![1, -2, 3].activity(4.0).rank(3));     // #2
+    s.attach_clause(mkl![-1, 2, 3, 4].activity(5.0));          // #3
+    s.attach_clause(mkl![1, -2, 3, 4].activity(2.0).rank(2));  // #4
+    s.attach_clause(mkl![1, 2, -3, 4].activity(1.0).rank(2));  // #5
+    s.attach_clause(mkl![1, 2, 3, -4].activity(1.0).rank(4));  // #6
+    s.attach_clause(mkl![-1, 2, 3, -4].activity(3.0).rank(2)); // #7
+    s.attach_clause(mkl![-1, -2, -3].activity(3.0).rank(3));   // #8
     s
 }
+

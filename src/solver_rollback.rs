@@ -9,6 +9,7 @@ pub trait Restart {
     fn block_restart(&mut self, lbd: usize, clv: usize) -> ();
 }
 
+const RESTART_PERIOD: u64 = 60;
 /// for block restart based on average assigments: 1.40
 const R: f64 = 1.02;
 /// for force restart based on average LBD of newly generated clauses: 1.15
@@ -49,7 +50,7 @@ impl Restart for Solver {
         let e_lbd = self.ema_lbd.get();
         let should_force = K < e_lbd;
         if self.next_restart < count && should_force {
-            self.next_restart = count + 50;
+            self.next_restart = count + RESTART_PERIOD;
             self.stats[Stat::NumOfRestart as usize] += 1;
             let rl = self.root_level;
             self.cancel_until(rl);
@@ -69,7 +70,7 @@ impl Restart for Solver {
         self.b_lvl.update(b_l);
         let should_block = R < e_asg;
         if 100 < count && self.next_restart <= count && should_block {
-            self.next_restart = count + 50;
+            self.next_restart = count + RESTART_PERIOD;
             self.stats[Stat::NumOfBlockRestart as usize] += 1;
             // println!("blocking {:.2} {:.2}", e_asg, self.stats[Stat::NumOfBlockRestart as usize]);
         }

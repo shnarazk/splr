@@ -127,23 +127,20 @@ impl ClauseManagement for Solver {
             // sort the range of 'permutation'
             permutation[1..].sort_by(|&a, &b| clauses[a].cmp(&clauses[b]));
             let nc = permutation.len();
-            for i in nc / 2 + 1..nc {
+            let keep = if clauses[permutation[nc / 2]].rank <= 4 {
+                3 * nc / 4
+            } else {
+                nc / 2
+            };
+            for i in keep + 1..nc {
                 let mut c = &mut clauses[permutation[i]];
                 if !c.locked && !c.just_used {
-                    c.frozen = true;
                     c.index = DEAD_CLAUSE;
                 }
             }
-            permutation.retain(|&i| !clauses[i].frozen);
+            permutation.retain(|&i| clauses[i].index != DEAD_CLAUSE);
         }
-        self.garbage_collect(ClauseKind::Removable); // too many clauses
-                                                     // if 6 * self.cp[ClauseKind::Removable as usize].permutation.len()
-                                                     //     < self.cp[ClauseKind::Removable as usize].clauses.len()
-                                                     // {
-                                                     //     self.garbage_collect(ClauseKind::Removable); // too many clauses
-                                                     // } else {
-                                                     //     self.rebuild_watchers(ClauseKind::Removable);
-                                                     // }
+        self.garbage_collect(ClauseKind::Removable);
         self.next_reduction += DB_INC_SIZE + (self.c_lvl.0 as usize);
         self.stats[Stat::NumOfReduction as usize] += 1;
         self.progress("drop");
@@ -158,77 +155,56 @@ impl ClauseManagement for Solver {
         for ck in &KINDS {
             debug_assert_eq!(self.cp[*ck as usize].clauses[0].index, 0);
             for mut c in &mut self.cp[*ck as usize].clauses {
-                if !(*c).frozen {
-                    c.lits.retain(|l| {
-                        for t in &targets {
-                            if t == l {
-                                return false;
-                            }
-                        }
-                        true
-                    });
-                }
+                c.lits.retain(|l| !targets.iter().any(|t| t == l));
             }
             // set key FIXME check lit[2] and lits[..]
-            let thr = (self.ema_lbd.slow / 2.0) as usize;
             for ci in 1..self.cp[*ck as usize].clauses.len() {
                 unsafe {
                     let c = &mut self.cp[*ck as usize].clauses[ci] as *mut Clause;
-                    if ((*c).frozen && thr < (*c).len()) || self.satisfies(&*c) {
+                    if self.satisfies(&*c) {
+                        // There's no locked clause.
                         (*c).index = DEAD_CLAUSE;
-                    } else if (*c).lits.len() == 0 && false {
+                    } else if false {
+                        // TODO  implement Clause::is_unit_clause()
                         if !self.enqueue((*c).lits[0], NULL_CLAUSE) {
                             self.ok = false;
                         }
                         (*c).index = DEAD_CLAUSE;
-                        // } else {
-                        //     let new = self.lbd_of(&(*c).lits);
-                        //     if new < (*c).rank {
-                        //         (*c).rank = new;
-                        //     }
-                        // }
+                    } else if *ck == ClauseKind::Removable {
+                        for i in 0..(*c).len() {
+                            let l = lindex!((*c), i);
+                            if self.vars[l.vi()].eliminated {
+                                (*c).index = DEAD_CLAUSE;
+                                break;
+                            }
+                        }
                     }
-                    (*c).frozen = false;
                 }
             }
-            self.garbage_collect(*ck);
         }
         self.stats[Stat::NumOfSimplification as usize] += 1;
-        if self.eliminator.use_elim
-            && self.stats[Stat::NumOfSimplification as usize] % 8 == 0
-            && self.eliminator.last_invocatiton < self.stats[Stat::NumOfReduction as usize] as usize
-        {
+        if self.stats[Stat::NumOfSimplification as usize] % 8 == 0 {
             self.eliminate();
-            self.eliminator.last_invocatiton = self.stats[Stat::NumOfReduction as usize] as usize;
-            for ck in &KINDS {
-                self.garbage_collect(*ck);
-            }
+        }
+        for ck in &KINDS {
+            self.garbage_collect(*ck);
         }
         self.progress("simp");
         true
     }
     fn lbd_of(&mut self, v: &[Lit]) -> usize {
-        let key;
         let key_old = self.lbd_seen[0];
-        if 10_000_000 < key_old {
-            key = 1;
-        } else {
-            key = key_old + 1;
-        }
+        let key = if 10_000_000 < key_old { 1 } else { key_old + 1 };
         self.lbd_seen[0] = key;
         let mut cnt = 0;
         for l in v {
             let lv = self.vars[l.vi()].level;
-            if self.lbd_seen[lv] != key && lv != 0 {
+            if self.lbd_seen[lv] != key {
                 self.lbd_seen[lv] = key;
                 cnt += 1;
             }
         }
-        if cnt == 0 {
-            1
-        } else {
-            cnt
-        }
+        cnt
     }
 }
 
@@ -293,7 +269,7 @@ impl Solver {
             *x = NULL_CLAUSE;
         }
         for mut c in &mut *clauses {
-            if c.frozen || c.index == DEAD_CLAUSE {
+            if c.index == DEAD_CLAUSE {
                 continue;
             }
             let w0 = c.lit[0].negate() as usize;
@@ -313,10 +289,17 @@ impl Solver {
             self.trail_lim[0]
         };
         let sum = k + self.eliminator.eliminated_vars;
+        let mut cnt = 0;
+        for c in &self.cp[ClauseKind::Removable as usize].clauses {
+            if c.rank <= 2 {
+                cnt += 1;
+            }
+        }
         println!(
-            "#{}, DB:R|P|B, {:>8}, {:>8}, {:>5}, Progress: {:>6}+{:>6}({:>4.1}%), Restart:b|f, {:>6}, {:>6}, EMA:a|l, {:>5.2}, {:>6.2}, LBD: {:>5.2}",
+            "#{}, DB:R|P|B, {:>8}({:>8}), {:>8}, {:>5}, Progress: {:>6}+{:>6}({:>7.3}%), Restart:b|f, {:>6}, {:>6}, EMA:a|l, {:>5.2}, {:>6.2}, LBD: {:>6.2}",
             mes,
             self.cp[ClauseKind::Removable as usize].clauses.len() - 1,
+            cnt,
             self.cp[ClauseKind::Permanent as usize].clauses.len() - 1,
             self.cp[ClauseKind::Binclause as usize].clauses.len() - 1,
             k,
