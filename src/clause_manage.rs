@@ -10,9 +10,9 @@ use types::*;
 // const DB_INIT_SIZE: usize = 1000;
 const DB_INC_SIZE: usize = 50;
 pub const KINDS: [ClauseKind; 3] = [
-    ClauseKind::Binclause,
-    ClauseKind::Permanent,
     ClauseKind::Removable,
+    ClauseKind::Permanent,
+    ClauseKind::Binclause,
 ];
 
 pub trait ClauseManagement {
@@ -147,17 +147,7 @@ impl ClauseManagement for Solver {
     }
     fn simplify_database(&mut self) -> bool {
         debug_assert_eq!(self.decision_level(), 0);
-        // remove unsatisfiable literals in clauses
-        let targets: Vec<Lit> = self.trail[self.num_solved_vars..]
-            .iter()
-            .map(|l| l.negate())
-            .collect();
         for ck in &KINDS {
-            debug_assert_eq!(self.cp[*ck as usize].clauses[0].index, 0);
-            for mut c in &mut self.cp[*ck as usize].clauses {
-                c.lits.retain(|l| !targets.iter().any(|t| t == l));
-            }
-            // set key FIXME check lit[2] and lits[..]
             for ci in 1..self.cp[*ck as usize].clauses.len() {
                 unsafe {
                     let c = &mut self.cp[*ck as usize].clauses[ci] as *mut Clause;
@@ -170,7 +160,7 @@ impl ClauseManagement for Solver {
                             self.ok = false;
                         }
                         (*c).index = DEAD_CLAUSE;
-                    } else if *ck == ClauseKind::Removable {
+                    } else if self.eliminator.use_elim && *ck == ClauseKind::Removable {
                         for i in 0..(*c).len() {
                             let l = lindex!((*c), i);
                             if self.vars[l.vi()].eliminated {
@@ -183,7 +173,7 @@ impl ClauseManagement for Solver {
             }
         }
         self.stats[Stat::NumOfSimplification as usize] += 1;
-        if self.stats[Stat::NumOfSimplification as usize] % 8 == 0 {
+        if self.eliminator.use_elim && self.stats[Stat::NumOfSimplification as usize] % 8 == 0 {
             self.eliminate();
         }
         for ck in &KINDS {

@@ -142,8 +142,10 @@ impl Solver {
             an_level_map_key: 1,
             mi_var_map: vec![0; nv + 1],
             lbd_seen: vec![0; nv + 1],
-            ema_asg: Ema2::new(4000.0, 8192.0), // for blocking
-            ema_lbd: Ema2::new(100.0, 8192.0),   // for forcing
+            //ema_asg: Ema2::new(4000.0, 8192.0), // for blocking
+            //ema_lbd: Ema2::new(40.0, 8192.0),   // for forcing
+            ema_asg: Ema2::new(40.0, 1000.0), // for blocking
+            ema_lbd: Ema2::new(40.0, 1000.0),   // for forcing
             b_lvl: Ema::new(se),
             c_lvl: Ema::new(se),
             next_restart: 100,
@@ -192,8 +194,8 @@ impl SatSolver for Solver {
         }
         // TODO deal with assumptions
         self.num_solved_vars = self.trail.len();
-        self.eliminate_binclauses();
         if self.eliminator.use_elim {
+            self.eliminate_binclauses();
             self.eliminate();
         }
         self.simplify_database();

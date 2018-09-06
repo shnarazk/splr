@@ -24,13 +24,12 @@ impl SolveSAT for Solver {
             let false_lit = (p as Lit).negate();
             self.q_head += 1;
             self.stats[Stat::NumOfPropagation as usize] += 1;
-            let kinds = [
+            let mut ci: ClauseIndex;
+            for kind in &[
                 ClauseKind::Binclause,
                 ClauseKind::Removable,
                 ClauseKind::Permanent,
-            ];
-            let mut ci: ClauseIndex;
-            for kind in &kinds {
+            ] {
                 unsafe {
                     let ck = *kind as usize;
                     ci = self.cp[ck].watcher[p];
