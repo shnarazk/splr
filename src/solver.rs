@@ -144,8 +144,8 @@ impl Solver {
             lbd_seen: vec![0; nv + 1],
             //ema_asg: Ema2::new(4000.0, 8192.0), // for blocking
             //ema_lbd: Ema2::new(40.0, 8192.0),   // for forcing
-            ema_asg: Ema2::new(40.0, 1000.0), // for blocking
-            ema_lbd: Ema2::new(40.0, 1000.0),   // for forcing
+            ema_asg: Ema2::new(50.0, 1000.0),   // for blocking
+            ema_lbd: Ema2::new(50.0, 1000.0),   // for forcing
             b_lvl: Ema::new(se),
             c_lvl: Ema::new(se),
             next_restart: 100,

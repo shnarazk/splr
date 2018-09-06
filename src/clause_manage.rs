@@ -185,15 +185,15 @@ impl ClauseManagement for Solver {
     fn lbd_of(&mut self, v: &[Lit]) -> usize {
         let key_old = self.lbd_seen[0];
         let key = if 10_000_000 < key_old { 1 } else { key_old + 1 };
-        self.lbd_seen[0] = key;
         let mut cnt = 0;
         for l in v {
-            let lv = self.vars[l.vi()].level;
-            if self.lbd_seen[lv] != key {
-                self.lbd_seen[lv] = key;
+            let lv = &mut self.lbd_seen[self.vars[l.vi()].level];
+            if *lv != key {
+                *lv = key;
                 cnt += 1;
             }
         }
+        self.lbd_seen[0] = key;
         cnt
     }
 }
@@ -233,7 +233,7 @@ impl Solver {
             } else {
                 for v in &mut self.vars[1..] {
                     let cid = v.reason;
-                    if 0 < cid && cid.to_kind() == kind as usize {
+                    if cid.to_kind() == kind as usize {
                         v.reason = kind.id_from(clauses[cid].index);
                     }
                 }
@@ -279,12 +279,7 @@ impl Solver {
             self.trail_lim[0]
         };
         let sum = k + self.eliminator.eliminated_vars;
-        let mut cnt = 0;
-        for c in &self.cp[ClauseKind::Removable as usize].clauses {
-            if c.rank <= 2 {
-                cnt += 1;
-            }
-        }
+        let cnt = self.cp[ClauseKind::Removable as usize].clauses.iter().filter(|c| c.rank <= 2).count();
         println!(
             "#{}, DB:R|P|B, {:>8}({:>8}), {:>8}, {:>5}, Progress: {:>6}+{:>6}({:>7.3}%), Restart:b|f, {:>6}, {:>6}, EMA:a|l, {:>5.2}, {:>6.2}, LBD: {:>6.2}",
             mes,
@@ -294,7 +289,7 @@ impl Solver {
             self.cp[ClauseKind::Binclause as usize].clauses.len() - 1,
             k,
             self.eliminator.eliminated_vars,
-            (sum as f32) / (nv as f32),
+            (sum as f32) / (nv as f32) * 100.0,
             self.stats[Stat::NumOfBlockRestart as usize],
             self.stats[Stat::NumOfRestart as usize],
             self.ema_asg.get(),

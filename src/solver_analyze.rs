@@ -51,20 +51,13 @@ impl CDCL for Solver {
                 }
                 // println!("{}を対応", (*c));
                 //                'next_literal: for q in &(*c).lits {
-                'next_literal: for i in 0..(*c).lits.len() + 2 {
-                    let q;
-                    match i {
-                        n if n < 2 => q = (*c).lit[n],
-                        n => q = (*c).lits[n - 2],
-                    }
+                'next_literal: for i in 0..(*c).len() {
+                    let q = lindex!(*c, i);
                     if q == p {
                         continue 'next_literal;
                     }
                     let vi = q.vi();
                     let l = self.vars[vi].level;
-                    if self.vars[vi].assign == BOTTOM {
-                        panic!(" analyze faced bottom by vi {} in {}", vi, (*c));
-                    }
                     debug_assert_ne!(self.vars[vi].assign, BOTTOM);
                     if self.an_seen[vi] == 0 && 0 < l {
                         self.bump_vi(vi);

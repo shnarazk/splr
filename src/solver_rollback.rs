@@ -11,9 +11,9 @@ pub trait Restart {
 
 const RESTART_PERIOD: u64 = 60;
 /// for block restart based on average assigments: 1.40
-const R: f64 = 1.02;
+const R: f64 = 1.05;
 /// for force restart based on average LBD of newly generated clauses: 1.15
-const K: f64 = 1.28;
+const K: f64 = 1.28; // 1.0 / 0.8
 
 impl Restart for Solver {
     /// This function touches:
@@ -45,6 +45,12 @@ impl Restart for Solver {
         self.q_head = lim;
     }
     /// called after no conflict propagation
+   ///```C
+   ///            // Our dynamic restart, see the SAT09 competition compagnion paper
+   ///            if((luby_restart && nof_conflicts <= conflictC) ||
+   ///               (!luby_restart && (lbdQueue.isvalid() && ((lbdQueue.getavg() * K) > (sumLBD / conflictsRestarts))))) {
+   ///                lbdQueue.fastclear();
+   ///```
     fn force_restart(&mut self) -> () {
         let count = self.stats[Stat::NumOfBackjump as usize] as u64;
         let e_lbd = self.ema_lbd.get();
@@ -58,6 +64,14 @@ impl Restart for Solver {
         }
     }
     /// called after conflict resolution
+    ///```C
+    /// #define LOWER_BOUND_FOR_BLOCKING_RESTART 10000
+    ///
+    ///            // BLOCK RESTART (CP 2012 paper)
+    ///            if(conflictsRestarts > LOWER_BOUND_FOR_BLOCKING_RESTART && lbdQueue.isvalid() && trail.size() > R * trailQueue.getavg()) {
+    ///                lbdQueue.fastclear();
+    ///                cancelUntil(0);
+    ///```
     fn block_restart(&mut self, lbd: usize, clv: usize) -> () {
         let count = self.stats[Stat::NumOfBackjump as usize] as u64;
         let nas = self.num_assigns() as f64;
@@ -69,7 +83,7 @@ impl Restart for Solver {
         self.c_lvl.update(clv as f64);
         self.b_lvl.update(b_l);
         let should_block = R < e_asg;
-        if 100 < count && self.next_restart <= count && should_block {
+        if 4000 < count && self.next_restart <= count && should_block {
             self.next_restart = count + RESTART_PERIOD;
             self.stats[Stat::NumOfBlockRestart as usize] += 1;
             // println!("blocking {:.2} {:.2}", e_asg, self.stats[Stat::NumOfBlockRestart as usize]);

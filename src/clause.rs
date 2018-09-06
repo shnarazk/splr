@@ -4,6 +4,46 @@ use std::fmt;
 use std::usize::MAX;
 use types::*;
 
+const CLAUSE_INDEX_BITS: usize = 60;
+const CLAUSE_INDEX_MASK: usize = 0x0FFF_FFFF_FFFF_FFFF;
+pub const DEAD_CLAUSE: usize = MAX;
+
+pub const RANK_NULL: usize = 0; // for NULL_CLAUSE
+pub const RANK_CONST: usize = 1; // for given clauses
+pub const RANK_NEED: usize = 2; // for newly generated bi-clauses
+
+/// Clause Index, not ID because it's used only within a Vec<Clause>
+pub type ClauseIndex = usize;
+
+/// Clause
+#[derive(Debug)]
+pub struct Clause {
+    /// kind has 3 types.
+    pub kind: ClauseKind,
+    /// a temporal index which is equal to the index for `clauses` or `learnts`
+    pub index: ClauseId,
+    /// clause activity used by `analyze` and `reduce_db`
+    pub activity: f64,
+    /// LBD or NDD and so on, used by `reduce_db`
+    pub rank: usize,
+    /// ClauseIndexes of the next in the watch liss
+    pub next_watcher: [ClauseIndex; 2],
+    /// The first two literals
+    pub lit: [Lit; 2],
+    /// the literals without lit0 and lit1
+    pub lits: Vec<Lit>,
+    /// used for a reason of propagation
+    pub locked: bool,
+    /// given or learnt
+    pub learnt: bool,
+    /// used in the current phase
+    pub just_used: bool,
+    /// used in Subsumption Variable Eliminator
+    pub sve_mark: bool,
+    /// used in Subsumption Variable Eliminator
+    pub touched: bool,
+}
+
 #[derive(Debug)]
 pub struct ClausePack {
     pub init_size: usize,
@@ -28,9 +68,11 @@ pub const CLAUSE_KINDS: [ClauseKind; 3] = [
     ClauseKind::Binclause,
 ];
 
-const CLAUSE_INDEX_BITS: usize = 60;
-const CLAUSE_INDEX_MASK: usize = 0x0FFF_FFFF_FFFF_FFFF;
-pub const DEAD_CLAUSE: usize = MAX;
+pub trait ClauseIdIndexEncoding {
+    fn to_id(&self) -> ClauseId;
+    fn to_index(&self) -> ClauseIndex;
+    fn to_kind(&self) -> usize;
+}
 
 impl ClauseKind {
     pub fn tag(&self) -> usize {
@@ -95,48 +137,6 @@ impl ClausePack {
     pub fn len(&self) -> usize {
         self.clauses.len()
     }
-}
-
-pub const RANK_NULL: usize = 0; // for NULL_CLAUSE
-pub const RANK_CONST: usize = 1; // for given clauses
-pub const RANK_NEED: usize = 2; // for newly generated bi-clauses
-
-/// Clause Index, not ID because it's used only within a Vec<Clause>
-pub type ClauseIndex = usize;
-
-pub trait ClauseIdIndexEncoding {
-    fn to_id(&self) -> ClauseId;
-    fn to_index(&self) -> ClauseIndex;
-    fn to_kind(&self) -> usize;
-}
-
-/// Clause
-#[derive(Debug)]
-pub struct Clause {
-    /// kind has 3 types.
-    pub kind: ClauseKind,
-    /// a temporal index which is equal to the index for `clauses` or `learnts`
-    pub index: ClauseId,
-    /// clause activity used by `analyze` and `reduce_db`
-    pub activity: f64,
-    /// LBD or NDD and so on, used by `reduce_db`
-    pub rank: usize,
-    /// ClauseIndexes of the next in the watch liss
-    pub next_watcher: [ClauseIndex; 2],
-    /// The first two literals
-    pub lit: [Lit; 2],
-    /// the literals without lit0 and lit1
-    pub lits: Vec<Lit>,
-    /// used for a reason of propagation
-    pub locked: bool,
-    /// given or learnt
-    pub learnt: bool,
-    /// used in the current phase
-    pub just_used: bool,
-    /// used in Subsumption Variable Eliminator
-    pub sve_mark: bool,
-    /// used in Subsumption Variable Eliminator
-    pub touched: bool,
 }
 
 impl ClauseIdIndexEncoding for usize {

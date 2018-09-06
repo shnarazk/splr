@@ -6,6 +6,8 @@ use types::*;
 
 const BWDSUB_CLAUSE: ClauseId = DEAD_CLAUSE - 1;
 const SUBSUMPTION_SIZE: usize = 20;
+/// is the dummy var index.
+pub const NULL_VAR: VarId = 0;
 
 /// Struct for a variable.
 #[derive(Debug)]
@@ -31,9 +33,6 @@ pub struct Var {
     /// for elimination
     pub bin_neg_occurs: Vec<ClauseId>,
 }
-
-/// is the dummy var index.
-pub const NULL_VAR: VarId = 0;
 
 impl Var {
     pub fn new(i: usize) -> Var {
@@ -84,12 +83,6 @@ impl Satisfiability for Vec<Var> {
         false
     }
 }
-
-// pub struct VarManager {
-//     vec: Vec<Var>,
-//     activity_heap: VarIdHeap,
-//     eliminator: Eliminator,
-// }
 
 #[derive(Debug)]
 pub enum VarOrder {

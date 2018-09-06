@@ -169,11 +169,7 @@ impl Solver {
             self.rebuild_watchers(ClauseKind::Removable);
             self.rebuild_watchers(ClauseKind::Permanent);
             self.rebuild_watchers(ClauseKind::Binclause);
-            if !self.enqueue(c0, NULL_CLAUSE) {
-                panic!("GGGGGGGGGGGGGGGGGGGGGGGGGG");
-            }
-            self.propagate() == NULL_CLAUSE
-        // self.enqueue(c0, NULL_CLAUSE) == true && self.propagate() == NULL_CLAUSE
+            self.enqueue(c0, NULL_CLAUSE) && self.propagate() == NULL_CLAUSE
         } else {
             true
         }
