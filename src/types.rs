@@ -1,5 +1,6 @@
 //! Basic types
 use std::fmt;
+use std::ops::Neg;
 
 /// Variable as Index is `usize`
 pub type VarId = usize;
@@ -60,13 +61,13 @@ pub trait LiteralEncoding {
 impl LiteralEncoding for Lit {
     #[inline]
     fn vi(&self) -> VarId {
-        (self / 2) as VarId
+        (self >> 1) as VarId
     }
     fn int(&self) -> i32 {
-        if self % 2 == 0 {
-            (*self / 2) as i32
+        if self & 1 == 0 {
+            (*self >> 1) as i32
         } else {
-            (*self as i32) / -2
+            ((*self >> 1) as i32).neg()
         }
     }
     #[inline]
@@ -95,7 +96,8 @@ pub trait VarIdEncoding {
 impl VarIdEncoding for VarId {
     #[inline]
     fn lit(&self, p: Lbool) -> Lit {
-        (if p == LFALSE { 2 * self + 1 } else { 2 * self }) as Lit
+        ((*self as Lit) << 1) | ((p == LFALSE) as Lit)
+ //       (if p == LFALSE { 2 * self + 1 } else { 2 * self }) as Lit
     }
 }
 
