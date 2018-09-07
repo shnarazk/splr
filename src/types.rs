@@ -59,7 +59,6 @@ pub trait LiteralEncoding {
 }
 
 impl LiteralEncoding for Lit {
-    #[inline]
     fn vi(&self) -> VarId {
         (self >> 1) as VarId
     }
@@ -70,7 +69,6 @@ impl LiteralEncoding for Lit {
             ((*self >> 1) as i32).neg()
         }
     }
-    #[inline]
     fn lbool(&self) -> Lbool {
         if self.positive() {
             LTRUE
@@ -78,11 +76,9 @@ impl LiteralEncoding for Lit {
             LFALSE
         }
     }
-    #[inline]
     fn positive(&self) -> bool {
         self % 2 == 0
     }
-    #[inline]
     fn negate(&self) -> Lit {
         self ^ 1
     }
@@ -94,7 +90,6 @@ pub trait VarIdEncoding {
 }
 
 impl VarIdEncoding for VarId {
-    #[inline]
     fn lit(&self, p: Lbool) -> Lit {
         ((*self as Lit) << 1) | ((p == LFALSE) as Lit)
  //       (if p == LFALSE { 2 * self + 1 } else { 2 * self }) as Lit
@@ -110,7 +105,6 @@ pub const LTRUE: u8 = 1;
 /// unbound bool.
 pub const BOTTOM: u8 = 2;
 
-#[inline]
 /// Note: this function doesn't work on BOTTOM.
 pub fn negate_bool(b: Lbool) -> Lbool {
     b ^ 1

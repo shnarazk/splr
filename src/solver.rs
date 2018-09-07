@@ -154,18 +154,15 @@ impl Solver {
         };
         s
     }
-    #[inline]
     pub fn assigned(&self, l: Lit) -> Lbool {
         self.vars.assigned(l)
     }
-    #[inline]
     pub fn satisfies(&self, c: &Clause) -> bool {
         self.vars.satisfies(c)
     }
     pub fn num_assigns(&self) -> usize {
         self.trail.len()
     }
-    #[inline]
     pub fn decision_level(&self) -> usize {
         self.trail_lim.len()
     }

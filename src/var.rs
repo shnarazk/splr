@@ -69,11 +69,9 @@ pub trait Satisfiability {
 }
 
 impl Satisfiability for Vec<Var> {
-    #[inline]
     fn assigned(&self, l: Lit) -> Lbool {
         self[l.vi()].assign ^ ((l & 1) as u8)
     }
-    #[inline]
     fn satisfies(&self, c: &Clause) -> bool {
         for i in 0..c.len() {
             let l = lindex!(c, i);

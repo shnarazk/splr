@@ -143,11 +143,9 @@ impl ClauseIdIndexEncoding for usize {
     fn to_id(&self) -> ClauseId {
         *self
     }
-    #[inline]
     fn to_index(&self) -> ClauseIndex {
         (*self & CLAUSE_INDEX_MASK) as usize
     }
-    #[inline]
     fn to_kind(&self) -> usize {
         *self >> CLAUSE_INDEX_BITS
     }

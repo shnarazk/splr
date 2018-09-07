@@ -26,7 +26,6 @@ pub trait ClauseManagement {
 }
 
 impl ClauseManagement for Solver {
-    #[inline]
     fn bump_cid(&mut self, cid: ClauseId) -> () {
         debug_assert_ne!(cid, 0);
         let a;
