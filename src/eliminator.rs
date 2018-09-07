@@ -127,6 +127,7 @@ impl Solver {
             vars[vi].occurs.retain(|&ci| ci != cid);             // occurs.smudge(l.vi());
         }
         // solver::removeClause(...)
+        c.dead = true;
         c.index = DEAD_CLAUSE;
     }
     /// 5. strengthenClause

@@ -28,8 +28,6 @@ pub struct Clause {
     pub kind: ClauseKind,
     /// a temporal index which is equal to the index for `clauses` or `learnts`
     pub index: ClauseId,
-    /// clause activity used by `analyze` and `reduce_db`
-    pub activity: f64,
     /// LBD or NDD and so on, used by `reduce_db`
     pub rank: usize,
     /// ClauseIndexes of the next in the watch liss
@@ -38,6 +36,7 @@ pub struct Clause {
     pub lit: [Lit; 2],
     /// the literals without lit0 and lit1
     pub lits: Vec<Lit>,
+    pub dead: bool,
     /// used for a reason of propagation
     pub locked: bool,
     /// given or learnt
@@ -48,6 +47,8 @@ pub struct Clause {
     pub sve_mark: bool,
     /// used in Subsumption Variable Eliminator
     pub touched: bool,
+    /// clause activity used by `analyze` and `reduce_db`
+    pub activity: f64,
 }
 
 #[derive(Debug)]
@@ -118,14 +119,25 @@ impl ClausePack {
     pub fn attach(&mut self, mut c: Clause) -> ClauseId {
         let w0 = c.lit[0].negate() as usize;
         let w1 = c.lit[1].negate() as usize;
-        let cix = self.clauses.len();
-        c.index = cix;
-        self.permutation.push(cix);
-        c.next_watcher[0] = self.watcher[w0];
+        let cix;
+        if self.watcher[0] != NULL_CLAUSE {
+            cix = self.watcher[0];
+            debug_assert_eq!(self.clauses[cix].dead, false);
+            c.index = cix;
+            self.watcher[0] = self.clauses[cix].next_watcher[0];
+            c.next_watcher[0] = self.watcher[w0];
+            c.next_watcher[1] = self.watcher[w1];
+            self.clauses[cix] = c;
+        } else {
+            cix = self.clauses.len();
+            c.index = cix;
+            self.permutation.push(cix);
+            c.next_watcher[0] = self.watcher[w0];
+            c.next_watcher[1] = self.watcher[w1];
+            self.clauses.push(c);
+        };
         self.watcher[w0] = cix;
-        c.next_watcher[1] = self.watcher[w1];
         self.watcher[w1] = cix;
-        self.clauses.push(c);
         self.id_from(cix)
     }
     pub fn id_from(&self, cix: ClauseIndex) -> ClauseId {
@@ -209,33 +221,35 @@ impl Clause {
         let lit1 = v.remove(0);
         Clause {
             kind,
-            learnt,
-            activity: 0.0,
+            index: 0,
             rank: rank,
             next_watcher: [NULL_CLAUSE; 2],
             lit: [lit0, lit1],
             lits: v,
-            index: 0,
+            dead: false,
             locked: false,
+            learnt,
             just_used: false,
             sve_mark: false,
             touched: false,
+            activity: 0.0,
         }
     }
     pub fn null() -> Clause {
         Clause {
             kind: ClauseKind::Permanent,
-            activity: 0.0,
+            index: 0,
             rank: RANK_NULL,
             next_watcher: [NULL_CLAUSE; 2],
             lit: [NULL_LIT; 2],
             lits: vec![],
-            index: 0,
+            dead: false,
             locked: false,
             learnt: false,
             just_used: false,
             sve_mark: false,
             touched: false,
+            activity: 0.0,
         }
     }
     pub fn len(&self) -> usize {
@@ -255,13 +269,17 @@ impl fmt::Display for Clause {
             match self.index {
                 //            x if x < 0 => write!(f, format!("a given clause {}", self.lits.map(|l| l.int()))),
                 0 => write!(f, "null_clause"),
-                DEAD_CLAUSE => write!(
-                    f,
-                    "dead[{},{}]{:?}",
-                    self.lit[0].int(),
-                    self.lit[1].int(),
-                    &self.lits.iter().map(|l| l.int()).collect::<Vec<i32>>()
-                ),
+                DEAD_CLAUSE => {
+                    debug_assert!(self.dead);
+                    write!(
+                        f,
+                        "dead{}[{},{}]{:?}",
+                        self.index,
+                        self.lit[0].int(),
+                        self.lit[1].int(),
+                        &self.lits.iter().map(|l| l.int()).collect::<Vec<i32>>()
+                    )
+                }
                 _ if self.lits.is_empty() => write!(
                     f,
                     "B{}[{},{}]",

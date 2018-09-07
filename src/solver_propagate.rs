@@ -9,7 +9,6 @@ use solver_rollback::Restart;
 use std::cmp::max;
 use types::*;
 use var_manage::VarSelect;
-use clause::DEAD_CLAUSE;
 use solver::SatSolver;
 use var::Satisfiability;
 
@@ -45,7 +44,21 @@ impl SolveSAT for Solver {
                             (*c).next_watcher.swap(0, 1);
                         }
                         let next = (*c).next_watcher[1];
-                        let first_value = self.assigned((*c).lit[0]);
+                        if (*c).dead {
+                            debug_assert!((*c).dead);
+                            (*c).lit[1] = NULL_LIT; // we need abnormal vaule; NULL isn't suitable.
+                            if (*c).lit[0] != NULL_LIT {
+                                (*c).next_watcher[1] = self.cp[ck].watcher[1];
+                                debug_assert_eq!(ci, (*c).index);
+                                debug_assert!((*c).lit[0] == NULL_LIT || (*c).lit[1] == NULL_LIT);
+                                self.cp[ck].watcher[1] = ci;
+                            } else {
+                                (*c).next_watcher[1] = (*c).next_watcher[0]; // no need to push again, but update next_watcher
+                            }
+                            ci = next;
+                            continue;
+                        }
+                        let first_value = self.vars.assigned((*c).lit[0]);
                         if first_value != LTRUE {
                             for k in 0..(*c).lits.len() {
                                 let lk = (*c).lits[k];

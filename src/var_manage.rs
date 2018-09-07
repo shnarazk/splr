@@ -164,11 +164,12 @@ impl Solver {
         }
         if c0 != NULL_LIT {
             self.remove_clause(cid);
-            self.rebuild_watchers(CLAUSE_KINDS[cid.to_kind() as usize]);
-            // println!("STRENGTHEN_CLAUSE ENQUEUE {}", c0);
-            self.rebuild_watchers(ClauseKind::Removable);
-            self.rebuild_watchers(ClauseKind::Permanent);
-            self.rebuild_watchers(ClauseKind::Binclause);
+            // FIXME I need to call garbage_collect??
+            // self.rebuild_watchers(CLAUSE_KINDS[cid.to_kind() as usize]);
+            // // println!("STRENGTHEN_CLAUSE ENQUEUE {}", c0);
+            // self.rebuild_watchers(ClauseKind::Removable);
+            // self.rebuild_watchers(ClauseKind::Permanent);
+            // self.rebuild_watchers(ClauseKind::Binclause);
             self.enqueue(c0, NULL_CLAUSE) && self.propagate() == NULL_CLAUSE
         } else {
             true
@@ -244,6 +245,7 @@ impl Solver {
         }
         for c in &self.cp[ClauseKind::Binclause as usize].clauses[1..] {
             if c.index == DEAD_CLAUSE {
+                debug_assert!(c.dead);
                 continue;
             }
             for l in c {
