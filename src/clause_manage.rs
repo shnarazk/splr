@@ -6,6 +6,8 @@ use clause::DEAD_CLAUSE;
 use solver::{Solver, Stat};
 use solver_propagate::SolveSAT;
 use types::*;
+use solver::SatSolver;
+use var::Satisfiability;
 
 // const DB_INIT_SIZE: usize = 1000;
 const DB_INC_SIZE: usize = 50;
@@ -18,8 +20,6 @@ pub const KINDS: [ClauseKind; 3] = [
 pub trait ClauseManagement {
     fn bump_cid(&mut self, ci: ClauseId) -> ();
     fn decay_cla_activity(&mut self) -> ();
-    fn add_clause(&mut self, v: Vec<Lit>) -> bool;
-    fn add_learnt(&mut self, v: Vec<Lit>) -> usize;
     fn reduce_watchers(&mut self) -> ();
     fn simplify_database(&mut self) -> bool;
     fn lbd_of(&mut self, v: &[Lit]) -> usize;
@@ -46,72 +46,6 @@ impl ClauseManagement for Solver {
     }
     fn decay_cla_activity(&mut self) -> () {
         self.cla_inc = self.cla_inc / self.config.clause_decay_rate;
-    }
-    // renamed from clause_new
-    fn add_clause(&mut self, mut v: Vec<Lit>) -> bool {
-        v.sort_unstable();
-        let mut j = 0;
-        let mut l_ = NULL_LIT; // last literal; [x, x.negate()] means totology.
-        for i in 0..v.len() {
-            let li = v[i];
-            let sat = self.assigned(li);
-            if sat == LTRUE || li.negate() == l_ {
-                return true;
-            } else if sat != LFALSE && li != l_ {
-                v[j] = li;
-                j += 1;
-                l_ = li;
-            }
-        }
-        v.truncate(j);
-        let kind = if v.len() == 2 {
-            ClauseKind::Binclause
-        } else {
-            ClauseKind::Permanent
-        };
-        match v.len() {
-            0 => false, // Empty clause is UNSAT.
-            1 => self.enqueue(v[0], NULL_CLAUSE),
-            _ => {
-                self.attach_clause(Clause::new(kind, false, 0, v));
-                true
-            }
-        }
-    }
-    /// renamed from newLearntClause
-    fn add_learnt(&mut self, mut v: Vec<Lit>) -> usize {
-        if v.len() == 1 {
-            self.uncheck_enqueue(v[0], NULL_CLAUSE);
-            0;
-        }
-        let lbd;
-        if v.len() == 2 {
-            lbd = 0;
-        } else {
-            lbd = self.lbd_of(&v);
-        }
-        let mut i_max = 0;
-        let mut lv_max = 0;
-        // seek a literal with max level
-        for i in 0..v.len() {
-            let vi = v[i].vi();
-            let lv = self.vars[vi].level;
-            if self.vars[vi].assign != BOTTOM && lv_max < lv {
-                i_max = i;
-                lv_max = lv;
-            }
-        }
-        v.swap(1, i_max);
-        let l0 = v[0];
-        let kind = if v.len() == 2 {
-            ClauseKind::Binclause
-        } else {
-            ClauseKind::Removable
-        };
-        let cid = self.attach_clause(Clause::new(kind, true, lbd, v));
-        self.bump_cid(cid);
-        self.uncheck_enqueue(l0, cid);
-        lbd
     }
     /// 1. sort `permutation` which is a mapping: index -> ClauseIndex.
     /// 2. rebuild watches to pick up clauses which is placed in a good place in permutation.

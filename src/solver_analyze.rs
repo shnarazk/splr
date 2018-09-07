@@ -5,6 +5,8 @@ use clause_manage::ClauseManagement;
 use solver::Solver;
 use types::*;
 use var_manage::VarSelect;
+use solver::SatSolver;
+use var::Satisfiability;
 
 pub trait CDCL {
     fn analyze(&mut self, confl: ClauseId) -> usize;
@@ -241,7 +243,7 @@ impl Solver {
                 c0 = c.lit[0];
                 len = c.lits.len();
             }
-            if len == 0 && self.assigned(c0) == LFALSE {
+            if len == 0 && self.vars.assigned(c0) == LFALSE {
                 self.cp[cid.to_kind()].clauses[cid.to_index()]
                     .lit
                     .swap(0, 1);
@@ -298,7 +300,7 @@ impl Solver {
                     c.lit[0]
                 };
                 let vi = other.vi();
-                if self.mi_var_map[vi] == key && self.assigned(other) == LTRUE {
+                if self.mi_var_map[vi] == key && self.vars.assigned(other) == LTRUE {
                     nb += 1;
                     self.mi_var_map[vi] -= 1;
                 }

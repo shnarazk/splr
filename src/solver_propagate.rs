@@ -9,6 +9,9 @@ use solver_rollback::Restart;
 use std::cmp::max;
 use types::*;
 use var_manage::VarSelect;
+use clause::DEAD_CLAUSE;
+use solver::SatSolver;
+use var::Satisfiability;
 
 pub trait SolveSAT {
     /// returns `true` for SAT, `false` for UNSAT.

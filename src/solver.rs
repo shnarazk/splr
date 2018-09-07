@@ -10,8 +10,13 @@ use var::*;
 // use var_manage::Eliminator;
 
 pub trait SatSolver {
+    fn decision_level(&self) -> usize;
     fn solve(&mut self) -> SolverResult;
     fn build(path: &str) -> (Solver, CNFDescription);
+    fn add_clause(&mut self, v: Vec<Lit>) -> bool;
+    fn add_learnt(&mut self, v: Vec<Lit>) -> usize;
+    fn attach_clause(&mut self, c: Clause) -> ClauseId; // only for eliminator
+    fn num_assigns(&self) -> usize;
 }
 
 /// normal results returned by Solver
@@ -154,37 +159,12 @@ impl Solver {
         };
         s
     }
-    pub fn assigned(&self, l: Lit) -> Lbool {
-        self.vars.assigned(l)
-    }
-    pub fn satisfies(&self, c: &Clause) -> bool {
-        self.vars.satisfies(c)
-    }
-    pub fn num_assigns(&self) -> usize {
-        self.trail.len()
-    }
-    pub fn decision_level(&self) -> usize {
-        self.trail_lim.len()
-    }
-    pub fn attach_clause(&mut self, c: Clause) -> ClauseId {
-        if self.eliminator.use_elim {
-            for i in 0..c.len() {
-                let l = lindex!(c, i);
-                self.vars[l.vi()].touched = true;
-                self.eliminator.n_touched += 1;
-            }
-        }
-        let bin = c.kind == ClauseKind::Binclause;
-        let cid = self.cp[c.kind as usize].attach(c);
-        if self.eliminator.use_elim && bin {
-            self.eliminator.binclause_queue.push(cid);
-        }
-        debug_assert_ne!(cid, 0);
-        cid
-    }
 }
 
 impl SatSolver for Solver {
+    fn decision_level(&self) -> usize {
+        self.trail_lim.len()
+    }
     fn solve(&mut self) -> SolverResult {
         if !self.ok {
             return Ok(Certificate::UNSAT(Vec::new()));
@@ -286,6 +266,91 @@ impl SatSolver for Solver {
         }
         debug_assert_eq!(s.vars.len() - 1, cnf.num_of_variables);
         (s, cnf)
+    }
+    // renamed from clause_new
+    fn add_clause(&mut self, mut v: Vec<Lit>) -> bool {
+        v.sort_unstable();
+        let mut j = 0;
+        let mut l_ = NULL_LIT; // last literal; [x, x.negate()] means totology.
+        for i in 0..v.len() {
+            let li = v[i];
+            let sat = self.vars.assigned(li);
+            if sat == LTRUE || li.negate() == l_ {
+                return true;
+            } else if sat != LFALSE && li != l_ {
+                v[j] = li;
+                j += 1;
+                l_ = li;
+            }
+        }
+        v.truncate(j);
+        let kind = if v.len() == 2 {
+            ClauseKind::Binclause
+        } else {
+            ClauseKind::Permanent
+        };
+        match v.len() {
+            0 => false, // Empty clause is UNSAT.
+            1 => self.enqueue(v[0], NULL_CLAUSE),
+            _ => {
+                self.attach_clause(Clause::new(kind, false, 0, v));
+                true
+            }
+        }
+    }
+    /// renamed from newLearntClause
+    fn add_learnt(&mut self, mut v: Vec<Lit>) -> usize {
+        if v.len() == 1 {
+            self.uncheck_enqueue(v[0], NULL_CLAUSE);
+            0;
+        }
+        let lbd;
+        if v.len() == 2 {
+            lbd = 0;
+        } else {
+            lbd = self.lbd_of(&v);
+        }
+        let mut i_max = 0;
+        let mut lv_max = 0;
+        // seek a literal with max level
+        for i in 0..v.len() {
+            let vi = v[i].vi();
+            let lv = self.vars[vi].level;
+            if self.vars[vi].assign != BOTTOM && lv_max < lv {
+                i_max = i;
+                lv_max = lv;
+            }
+        }
+        v.swap(1, i_max);
+        let l0 = v[0];
+        let kind = if v.len() == 2 {
+            ClauseKind::Binclause
+        } else {
+            ClauseKind::Removable
+        };
+        let cid = self.attach_clause(Clause::new(kind, true, lbd, v));
+        self.bump_cid(cid);
+        self.uncheck_enqueue(l0, cid);
+        lbd
+    }
+    fn attach_clause(&mut self, c: Clause) -> ClauseId {
+        if self.eliminator.use_elim {
+            for i in 0..c.len() {
+                let l = lindex!(c, i);
+                self.vars[l.vi()].touched = true;
+                self.eliminator.n_touched += 1;
+            }
+        }
+        let bin = c.kind == ClauseKind::Binclause;
+        let cid = self.cp[c.kind as usize].attach(c);
+        if self.eliminator.use_elim && bin {
+            self.eliminator.binclause_queue.push(cid);
+        }
+        debug_assert_ne!(cid, 0);
+        cid
+    }
+    fn num_assigns(&self) -> usize {
+        self.trail.len()
     }
 }
 

@@ -367,7 +367,7 @@ impl Solver {
                     continue;
                 }
                 // println!("check with {} for best_v {}", *c, self.eliminator.best_v);
-                debug_assert!(1 < (*c).len() || self.assigned((*c).lit[0]) == LTRUE);
+                debug_assert!(1 < (*c).len() || self.vars.assigned((*c).lit[0]) == LTRUE);
                 // unit clauses should have been propagated before this point.
                 // Find best variable to scan:
                 let mut best = 0;

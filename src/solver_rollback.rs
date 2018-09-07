@@ -2,6 +2,7 @@ use clause::ClauseIdIndexEncoding;
 use solver::{Solver, Stat};
 use types::*;
 use var::VarOrdering;
+use solver::SatSolver;
 
 pub trait Restart {
     fn cancel_until(&mut self, lv: usize) -> ();
