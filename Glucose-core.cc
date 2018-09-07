@@ -520,8 +520,7 @@ void Solver::analyze(CRef confl, vec <Lit> &out_learnt, vec <Lit> &selectors, in
             if(!seen[var(q)]) {
                 if(level(var(q)) == 0) {
                 } else { // Here, the old case
-                    if(!isSelector(var(q)))
-                        varBumpActivity(var(q));
+		  varBumpActivity(var(q));
                     // This variable was responsible for a conflict,
                     // consider it as a UNSAT assignation for this literal
                     bumpForceUNSAT(~q); // Negation because q is false here
@@ -529,14 +528,10 @@ void Solver::analyze(CRef confl, vec <Lit> &out_learnt, vec <Lit> &selectors, in
                     if(level(var(q)) >= decisionLevel()) {
                         pathC++;
                         // UPDATEVARACTIVITY trick (see competition'09 companion paper)
-                        if(!isSelector(var(q)) && (reason(var(q)) != CRef_Undef) && ca[reason(var(q))].learnt())
+                        if((reason(var(q)) != CRef_Undef) && ca[reason(var(q))].learnt())
                             lastDecisionLevel.push(q);
                     } else {
-                        if(isSelector(var(q))) {
-                            assert(value(q) == l_False);
-                            selectors.push(q);
-                        } else
-                            out_learnt.push(q);
+		      out_learnt.push(q);
                     }
                 }
             } //else stats[sumResSeen]++;
@@ -552,8 +547,6 @@ void Solver::analyze(CRef confl, vec <Lit> &out_learnt, vec <Lit> &selectors, in
     out_learnt[0] = ~p;
     // Simplify conflict clause:
     int i, j;
-    for(int i = 0; i < selectors.size(); i++)
-        out_learnt.push(selectors[i]);
     out_learnt.copyTo(analyze_toclear);
     uint32_t abstract_level = 0;
     for(i = 1; i < out_learnt.size(); i++)
@@ -591,7 +584,7 @@ void Solver::analyze(CRef confl, vec <Lit> &out_learnt, vec <Lit> &selectors, in
     }
     szWithoutSelectors = out_learnt.size();
     // Compute LBD
-    lbd = computeLBD(out_learnt, out_learnt.size() - selectors.size());
+    lbd = computeLBD(out_learnt, out_learnt.size());
     // UPDATEVARACTIVITY trick (see competition'09 companion paper)
     if(lastDecisionLevel.size() > 0) {
         for(int i = 0; i < lastDecisionLevel.size(); i++) {
@@ -601,7 +594,6 @@ void Solver::analyze(CRef confl, vec <Lit> &out_learnt, vec <Lit> &selectors, in
         lastDecisionLevel.clear();
     }
     for(int j = 0; j < analyze_toclear.size(); j++) seen[var(analyze_toclear[j])] = 0; // ('seen[]' is now cleared)
-    for(int j = 0; j < selectors.size(); j++) seen[var(selectors[j])] = 0;
 }
 
 // Check if 'p' can be removed. 'abstract_levels' is used to abort early if the algorithm is
