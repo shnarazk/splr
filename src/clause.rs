@@ -3,6 +3,7 @@ use std::f64;
 use std::fmt;
 use std::usize::MAX;
 use types::*;
+use types::LiteralEncoding;
 
 const CLAUSE_INDEX_BITS: usize = 60;
 const CLAUSE_INDEX_MASK: usize = 0x0FFF_FFFF_FFFF_FFFF;
@@ -94,6 +95,19 @@ impl ClauseKind {
     }
 }
 
+
+impl ClauseIdIndexEncoding for ClausePack {
+    fn to_id(&self) -> ClauseId {
+        0
+    }
+    fn to_index(&self) -> ClauseIndex {
+        0
+    }
+    fn to_kind(&self) -> usize {
+        self.tag >> CLAUSE_INDEX_BITS
+    }
+}
+
 impl ClausePack {
     pub fn build(i: ClauseKind, nv: usize, nc: usize) -> ClausePack {
         let tag = i.tag();
@@ -120,13 +134,17 @@ impl ClausePack {
         let w0 = c.lit[0].negate() as usize;
         let w1 = c.lit[1].negate() as usize;
         let cix;
-        if self.watcher[0] != NULL_CLAUSE {
-            cix = self.watcher[0];
+        if self.watcher[RECYCLE_LIT.negate() as usize] != NULL_CLAUSE {
+            cix = self.watcher[RECYCLE_LIT.negate() as usize];
             debug_assert_eq!(self.clauses[cix].dead, false);
+            debug_assert_eq!(self.clauses[cix].lit[0], RECYCLE_LIT);
+            debug_assert_eq!(self.clauses[cix].lit[1], RECYCLE_LIT);
             c.index = cix;
-            self.watcher[0] = self.clauses[cix].next_watcher[0];
+            self.watcher[RECYCLE_LIT.negate() as usize] = self.clauses[cix].next_watcher[0];
             c.next_watcher[0] = self.watcher[w0];
             c.next_watcher[1] = self.watcher[w1];
+            // print!("attach use a recycle: ");
+            // self.print_watcher(GARBAGE_LIT.negate());
             self.clauses[cix] = c;
         } else {
             cix = self.clauses.len();
@@ -138,6 +156,18 @@ impl ClausePack {
         };
         self.watcher[w0] = cix;
         self.watcher[w1] = cix;
+
+        {
+            let c = &self.clauses[cix];
+            let l0 = c.lit[0];
+            if !self.seek_from(cix, l0) {
+                panic!("NOT FOUND for {} c: {:#}", l0.int(), c);
+            }
+            let l1 = c.lit[1];
+            if !self.seek_from(cix, l1) {
+                panic!("NOT FOUND for {} c: {:#}", l1.int(), c);
+            }
+        }
         self.id_from(cix)
     }
     pub fn id_from(&self, cix: ClauseIndex) -> ClauseId {
@@ -262,8 +292,14 @@ impl fmt::Display for Clause {
         if f.alternate() {
             write!(
                 f,
-                "C{} rank:{}, activity: {}, lit:{:?}{:?}",
-                self.index, self.rank, self.activity, vec2int(self.lit.clone().to_vec()), vec2int(self.lits.clone().to_vec()),
+                "{{C{}:{} lit:{:?}{:?}, watches{:?}{}{}}}",
+                self.kind as usize,
+                self.index,
+                vec2int(self.lit.clone().to_vec()),
+                vec2int(self.lits.clone().to_vec()),
+                self.next_watcher,
+                if self.dead {", dead"} else {""},
+                if self.locked {", locked"} else {""},
             )
         } else {
             match self.index {

@@ -29,6 +29,8 @@ pub type Lit = u32;
 
 /// a dummy literal.
 pub const NULL_LIT: Lit = 0;
+pub const GARBAGE_LIT: Lit = 1;
+pub const RECYCLE_LIT: Lit = 0;
 
 pub fn int2lit(x: i32) -> Lit {
     (if x < 0 { -2 * x + 1 } else { 2 * x }) as u32
@@ -56,6 +58,7 @@ pub trait LiteralEncoding {
     fn lbool(&self) -> Lbool;
     fn positive(&self) -> bool;
     fn negate(&self) -> Lit;
+    fn show(&self) -> String;
 }
 
 impl LiteralEncoding for Lit {
@@ -82,6 +85,13 @@ impl LiteralEncoding for Lit {
     fn negate(&self) -> Lit {
         self ^ 1
     }
+    fn show(&self) -> String {
+        match self {
+            0 => "⊤".to_string(),
+            1 => "⊥".to_string(),
+            x => format!("{}", x.int()),
+        }
+    }
 }
 
 /// converter from [VarId](type.VarId.html) to [Lit](type.Lit.html).
@@ -92,7 +102,7 @@ pub trait VarIdEncoding {
 impl VarIdEncoding for VarId {
     fn lit(&self, p: Lbool) -> Lit {
         ((*self as Lit) << 1) | ((p == LFALSE) as Lit)
- //       (if p == LFALSE { 2 * self + 1 } else { 2 * self }) as Lit
+        //       (if p == LFALSE { 2 * self + 1 } else { 2 * self }) as Lit
     }
 }
 
@@ -106,7 +116,7 @@ pub const LTRUE: u8 = 1;
 pub const BOTTOM: u8 = 2;
 
 /// Note: this function doesn't work on BOTTOM.
-pub fn negate_bool(b: Lbool) -> Lbool {
+pub fn negate_lbool(b: Lbool) -> Lbool {
     b ^ 1
 }
 
@@ -260,5 +270,11 @@ pub trait Dump {
 }
 
 pub fn vec2int(v: Vec<Lit>) -> Vec<i32> {
-    v.iter().map(|l| l.int()).collect::<Vec<i32>>()
+    v.iter()
+        .map(|l| match l {
+            0 => 0,
+            1 => 0,
+            x => x.int(),
+        })
+        .collect::<Vec<i32>>()
 }

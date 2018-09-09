@@ -12,6 +12,8 @@ use var_manage::VarSelect;
 use solver::SatSolver;
 use var::Satisfiability;
 
+pub const WATCHING: VarId = 2685;
+
 pub trait SolveSAT {
     /// returns `true` for SAT, `false` for UNSAT.
     fn search(&mut self) -> bool;
@@ -24,6 +26,8 @@ impl SolveSAT for Solver {
         while self.q_head < self.trail.len() {
             let p: usize = self.trail[self.q_head] as usize;
             let false_lit = (p as Lit).negate();
+            debug_assert!(1 < p);
+            self.check_lit(ClauseKind::Removable, "before propagation", p as Lit);
             self.q_head += 1;
             self.stats[Stat::NumOfPropagation as usize] += 1;
             let mut ci: ClauseIndex;
@@ -35,26 +39,23 @@ impl SolveSAT for Solver {
                 unsafe {
                     let ck = *kind as usize;
                     ci = self.cp[ck].watcher[p];
+                    // if (p as Lit).vi() == WATCHING {
+                    //     println!("start propagation {} from {}", (p as Lit).int(), ci);
+                    // }
                     let mut tail = &mut self.cp[ck].watcher[p] as *mut usize;
                     *tail = NULL_CLAUSE;
                     'next_clause: while ci != NULL_CLAUSE {
                         let c = &mut self.cp[ck].clauses[ci] as *mut Clause;
+                        self.check_clause(*kind, "before propagation", ci);
                         if (*c).lit[0] == false_lit {
                             (*c).lit.swap(0, 1); // now my index is 1, others is 0.
                             (*c).next_watcher.swap(0, 1);
                         }
                         let next = (*c).next_watcher[1];
                         if (*c).dead {
-                            debug_assert!((*c).dead);
-                            (*c).lit[1] = NULL_LIT; // we need abnormal vaule; NULL isn't suitable.
-                            if (*c).lit[0] != NULL_LIT {
-                                (*c).next_watcher[1] = self.cp[ck].watcher[1];
-                                debug_assert_eq!(ci, (*c).index);
-                                debug_assert!((*c).lit[0] == NULL_LIT || (*c).lit[1] == NULL_LIT);
-                                self.cp[ck].watcher[1] = ci;
-                            } else {
-                                (*c).next_watcher[1] = (*c).next_watcher[0]; // no need to push again, but update next_watcher
-                            }
+                            let next1 = self.cp[ck].detach_to_trash(&mut *c, 1);
+                            debug_assert_eq!(next1, next);
+                            self.check_clause(*kind, "after detach to trash", ci);
                             ci = next;
                             continue;
                         }
@@ -64,32 +65,46 @@ impl SolveSAT for Solver {
                                 let lk = (*c).lits[k];
                                 // below is equivalent to 'self.assigned(lk) != LFALSE'
                                 if (((lk & 1) as u8) ^ self.vars[lk.vi()].assign) != 0 {
+                                    debug_assert!(1 < lk);
+                                    assert_ne!(lk, (*c).lit[0]);
+                                    assert_ne!(lk, (*c).lit[1]);
                                     (*c).lit[1] = lk;
                                     (*c).lits[k] = false_lit;
-                                    (*c).next_watcher[1] =
-                                        self.cp[ck].watcher[lk.negate() as usize];
+                                    (*c).next_watcher[1] = self.cp[ck].watcher[lk.negate() as usize];
+                                    debug_assert_eq!(self.cp[ck].watcher[lk.negate() as usize], (*c).next_watcher[1]);
                                     self.cp[ck].watcher[lk.negate() as usize] = ci;
+                                    self.check_clause(*kind, &format!("after updating watches with {}", lk.int()), ci);
                                     ci = next;
                                     continue 'next_clause;
                                 }
                             }
                             if first_value == LFALSE {
                                 *tail = ci;
+                                self.check_clause(*kind, "conflict path", ci);
                                 return kind.id_from(ci);
                             } else {
                                 self.uncheck_enqueue((*c).lit[0], kind.id_from(ci));
                             }
                         }
-                        let watch = self.cp[ck].watcher[p];
-                        if watch == 0 {
-                            tail = &mut (*c).next_watcher[1];
+                        { // reconnect
+                            let watch = self.cp[ck].watcher[p];
+                            if watch == NULL_CLAUSE {
+                                tail = &mut (*c).next_watcher[1];
+                            }
+                            (*c).next_watcher[1] = watch;
+                            self.cp[ck].watcher[p] = ci;
                         }
-                        (*c).next_watcher[1] = watch;
-                        self.cp[ck].watcher[p] = ci;
+                        self.check_clause(*kind, "after reconnect for unit propagation or satisfied by myself", ci);
+                        if first_value == BOTTOM {
+                            self.check_clause(*kind, &format!("after unit propagation by {}", (*c).lit[0].int()), ci);
+                        } else {
+                            self.check_clause(*kind, &format!("after satisfaction by other{} already", (*c).lit[0].int()), ci);
+                        }
                         ci = next;
                     }
                 }
             }
+            self.check_lit(ClauseKind::Removable, "after propagation", p as Lit);
         }
         NULL_CLAUSE
     }
