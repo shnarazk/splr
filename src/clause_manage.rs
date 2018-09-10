@@ -5,11 +5,11 @@ use types::*;
 use clause::ClauseIndex;
 use var::Var;
 
-pub const DEBUG: usize = 27728;
-pub const WATCHING: VarId = 2685;
+const DEBUG: usize = 27728;
+const WATCHING: VarId = 2685;
 
 // for ClausePack
-pub trait ClausePropagation {
+pub trait ClauseReduction {
     fn check_garbage(&mut self) -> ();
     fn garbage_collect(&mut self, vars: &Vec<Var>) -> ();
     fn count(&self, target: Lit) -> usize;
@@ -20,7 +20,7 @@ pub trait ClausePropagation {
     fn check_lit(&self, vars: &Vec<Var>, mes: &str, lit: Lit) -> ();
 }
 
-impl ClausePropagation for ClausePack {
+impl ClauseReduction for ClausePack {
     fn check_garbage(&mut self) -> () {
         {
             for c in &self.clauses[1..] {
@@ -54,9 +54,7 @@ impl ClausePropagation for ClausePack {
                 let mut ci = self.watcher[l];
                 'next_clause: while ci != NULL_CLAUSE {
                     let c = &mut self.clauses[ci] as *mut Clause;
-                    if vi == WATCHING || (*c).index == DEBUG {
-                        println!("# garbage collect: traverser finds on {} : {:#}", vi, *c);
-                    }
+                    // if vi == WATCHING || (*c).index == DEBUG { println!("# garbage collect: traverser finds on {} : {:#}", vi, *c); }
                     if !(*c).dead {
                         debug_assert!(!(*c).dead);
                         if (*c).lit[0].vi() == vi {
@@ -94,9 +92,7 @@ impl ClausePropagation for ClausePack {
                     panic!("not dead {:#}", *c);
                 }
                 debug_assert!((*c).dead);
-                if (*c).index == DEBUG {
-                    // println!("garbage traverser finds: {:#} on GARBGE link", *c);
-                }
+                // if (*c).index == DEBUG { println!("garbage traverser finds: {:#} on GARBGE link", *c); }
                 if (*c).lit[0] == GARBAGE_LIT && (*c).lit[1] == GARBAGE_LIT {
                     // println!("move {} to recycler", (*c).index);
                     // if (*c).index == DEBUG { println!("here comes!"); }
@@ -223,9 +219,7 @@ impl ClausePropagation for ClausePack {
         println!("0");
     }
     fn check_clause(&self, mes: &str, ci: ClauseIndex) {
-        if ci != DEBUG {
-            return;
-        }
+        if ci != DEBUG { return; }
         let c = &self.clauses[DEBUG];
         let l0 = c.lit[0];
         let l1 = c.lit[1];

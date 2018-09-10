@@ -1,16 +1,14 @@
 use assign::Assignment;
-use clause::ClauseKind;
+use clause::{Clause, ClauseKind};
 use clause::ClauseIF;
 use clause::ClauseManagement;
-use solver::{Solver, Stat};
+use clause::ClauseIdIndexEncoding;
+use solver::{LBD, Solver, Stat};
+use solver::SatSolver;
 use solver_restart::Restart;
 use std::cmp::max;
 use types::*;
 use var::HeapManagement;
-use solver::SatSolver;
-use clause_manage::ClausePropagation;
-use clause::Clause;
-use clause::ClauseIdIndexEncoding;
 use var::Satisfiability;
 
 /// for Solver
@@ -19,9 +17,9 @@ pub trait SolveSAT {
     fn search(&mut self) -> bool;
     fn propagate(&mut self) -> ClauseId;
     fn cancel_until(&mut self, lv: usize) -> ();
-
 }
 
+/// for Solver
 trait CDCL {
     fn analyze(&mut self, confl: ClauseId) -> usize;
     fn analyze_final(&mut self, ci: ClauseId, skip_first: bool) -> ();
@@ -98,7 +96,7 @@ impl SolveSAT for Solver {
         while self.assign.q_head < self.assign.trail.len() {
             let p: usize = self.assign.trail[self.assign.q_head] as usize;
             debug_assert!(1 < p);
-            self.cp[ClauseKind::Removable as usize].check_lit(&self.vars, "before propagation", p as Lit);
+            // self.cp[ClauseKind::Removable as usize].check_lit(&self.vars, "before propagation", p as Lit);
             self.assign.q_head += 1;
             self.stats[Stat::NumOfPropagation as usize] += 1;
             for cs in &mut self.cp {
@@ -170,7 +168,8 @@ impl CDCL for Solver {
                 // println!("  analyze.loop {}", (*c));
                 if cid.to_kind() == (ClauseKind::Removable as usize) {
                     self.cdb.bump_cid(&mut self.cp, cid);
-                    (*c).rank = self.lbd_of(&*c); // FIXME! it ignores c.lit!
+                    (*c).rank = (*c).lbd(self);
+                    //(*c).rank = self.lbd_of(&*c);
                 }
                 // println!("{}を対応", (*c));
                 //                'next_literal: for q in &(*c).lits {

@@ -7,7 +7,7 @@ use types::LiteralEncoding;
 use var::Var;
 use assign::{AssignState, Assignment};
 use var::Satisfiability;
-use clause_manage::ClausePropagation;
+use clause_manage::ClauseReduction;
 
 pub trait ClauseIdIndexEncoding {
     fn to_id(&self) -> ClauseId;
@@ -216,7 +216,7 @@ impl ClauseIF for ClausePack {
                         if (*c).dead {
                             let next1 = self.detach_to_trash(&mut *c, 1);
                             debug_assert_eq!(next1, next);
-                            self.check_clause("after detach to trash", ci);
+                            // self.check_clause("after detach to trash", ci);
                             ci = next;
                             continue;
                         }
@@ -234,14 +234,14 @@ impl ClauseIF for ClausePack {
                                     (*c).next_watcher[1] = self.watcher[lk.negate() as usize];
                                     debug_assert_eq!(self.watcher[lk.negate() as usize], (*c).next_watcher[1]);
                                     self.watcher[lk.negate() as usize] = ci;
-                                    self.check_clause(&format!("after updating watches with {}", lk.int()), ci);
+                                    // self.check_clause(&format!("after updating watches with {}", lk.int()), ci);
                                     ci = next;
                                     continue 'next_clause;
                                 }
                             }
                             if first_value == LFALSE {
                                 *tail = ci;
-                                self.check_clause("conflict path", ci);
+                                // self.check_clause("conflict path", ci);
                                 return self.kind.id_from(ci);
                             } else {
                                 asg.uncheck_enqueue(&mut vars[(*c).lit[0].vi()], (*c).lit[0], self.kind.id_from(ci));
@@ -256,7 +256,7 @@ impl ClauseIF for ClausePack {
                             (*c).next_watcher[1] = watch;
                             self.watcher[p as usize] = ci;
                         }
-                        self.check_clause(&format!("after reconnect for unit propagation or satisfied by {}", (*c).lit[0].int()), ci);
+                        // self.check_clause(&format!("after reconnect for unit propagation or satisfied by {}", (*c).lit[0].int()), ci);
                         ci = next;
                     }
                 }
@@ -641,7 +641,7 @@ impl ClauseManagement for ClauseDBState {
                             // There's no locked clause.
                             (*c).dead = true;
                             *pri = cp[*ck as usize].detach_to_trash(&mut *c, index);
-                            cp[*ck as usize].check_clause("after GC", (*c).index);
+                            // cp[*ck as usize].check_clause("after GC", (*c).index);
                         } else {
                             pri = &mut (*c).next_watcher[index];
                         }
