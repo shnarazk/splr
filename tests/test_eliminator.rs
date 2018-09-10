@@ -6,7 +6,16 @@ extern crate splr;
 use splr::clause::*;
 use splr::clause_manage::*;
 use splr::solver::*;
+use splr::solver::SatSolver;
 use splr::types::*;
+
+macro_rules! i2l {
+    ($($x:expr),*) => {
+        match &[$($x),*] {
+            v => v.iter().map(|x| int2lit(*x)).collect::<Vec<Lit>>(),
+        }
+    };
+}
 
 // #[test]
 fn check_occurs() {
@@ -36,8 +45,8 @@ fn check_occurs() {
         }
     }
     // s.attach_clause(c1);
-    s.attach_clause(c2);
-    s.attach_clause(c3);
+    s.add_clause(&mut i2l![-2, 3, 4]);
+    s.add_clause(&mut i2l![-2, -3]);
     // s.attach_clause(c4);
     // s.vars.dump("##added");
     s.eliminator.dump("##added");
@@ -48,8 +57,8 @@ fn check_occurs() {
 }
 
 fn mk_c(i: usize, v: Vec<i32>) -> Clause {
-    let vec = v.iter().map(|i| int2lit(*i)).collect::<Vec<Lit>>();
-    let mut c = Clause::new(ClauseKind::Permanent, false, 0, vec);
+    let mut vec = v.iter().map(|i| int2lit(*i)).collect::<Vec<Lit>>();
+    let mut c = Clause::new(ClauseKind::Permanent, false, 0, &mut vec, false);
     c.index = i;
     c
 }

@@ -3,10 +3,19 @@
 #![allow(unused_imports)]
 extern crate splr;
 use splr::clause::*;
-use splr::clause_manage::ClauseManagement;
+use splr::clause::ClauseManagement;
 use splr::solver::*;
+use splr::solver::SatSolver;
 use splr::types::*;
-use splr::var::VarOrdering;
+use splr::var::HeapManagement;
+
+macro_rules! i2l {
+    ($($x:expr),*) => {
+        match &[$($x),*] {
+            v => v.iter().map(|x| int2lit(*x)).collect::<Vec<Lit>>(),
+        }
+    };
+}
 
 macro_rules! mkc {
     ($($x:expr),*) => {
@@ -19,7 +28,7 @@ macro_rules! mkc {
 macro_rules! mkb {
     ($($x:expr),*) => {
         match &[$($x),*] {
-            v => { Clause::new(ClauseKind::Binclause, false, 2,  v.iter().map(|x| int2lit(*x)).collect::<Vec<Lit>>()) }
+            v => Clause::new(ClauseKind::Binclause, false, 2,  &v.iter().map(|x| int2lit(*x)).collect::<Vec<Lit>>(), false)
         }
     };
 }
@@ -27,7 +36,7 @@ macro_rules! mkb {
 macro_rules! mkl {
     ($($x:expr),*) => {
         match &[$($x),*] {
-            v => { Clause::new(ClauseKind::Removable, true, v.len(),  v.iter().map(|x| int2lit(*x)).collect::<Vec<Lit>>()) }
+            v => Clause::new(ClauseKind::Removable, true, v.len(),  &v.iter().map(|x| int2lit(*x)).collect::<Vec<Lit>>(), false)
         }
     };
 }
@@ -63,9 +72,9 @@ fn var_order() -> () {
     s.vars[8].activity = 3.0;
     s.var_order.insert(&s.vars, 1);
     s.show_heap();
-    println!("remove top {}", s.var_order.root(&s.vars));
+    println!("remove top {}", s.var_order.get_root(&s.vars));
     s.show_heap();
-    println!("remove top {}", s.var_order.root(&s.vars));
+    println!("remove top {}", s.var_order.get_root(&s.vars));
     s.show_heap();
     println!("insert 1");
     s.var_order.insert(&s.vars, 1);
@@ -83,14 +92,13 @@ fn setup() -> Solver {
     };
     let mut s = Solver::new(Default::default(), &cnf);
     s.eliminator.use_elim = false;
-    s.attach_clause(mkl![1, 2, -3]);     // #1
-    s.attach_clause(mkl![1, -2, 3]);     // #2
-    s.attach_clause(mkl![-1, 2, 3, 4]);  // #3
-    s.attach_clause(mkl![1, -2, 3, 4]);  // #4
-    s.attach_clause(mkl![1, 2, -3, 4]);  // #5
-    s.attach_clause(mkl![1, 2, 3, -4]);  // #6
-    s.attach_clause(mkl![-1, 2, 3, -4]); // #7
-    s.attach_clause(mkl![-1, -2, -3]);   // #8
+    s.add_clause(&mut i2l![1, 2, -3]);     // #1
+    s.add_clause(&mut i2l![1, -2, 3]);     // #2
+    s.add_clause(&mut i2l![-1, 2, 3, 4]);  // #3
+    s.add_clause(&mut i2l![1, -2, 3, 4]);  // #4
+    s.add_clause(&mut i2l![1, 2, -3, 4]);  // #5
+    s.add_clause(&mut i2l![1, 2, 3, -4]);  // #6
+    s.add_clause(&mut i2l![-1, 2, 3, -4]); // #7
+    s.add_clause(&mut i2l![-1, -2, -3]);   // #8
     s
 }
-

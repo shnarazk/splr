@@ -1,14 +1,21 @@
 #![allow(dead_code)]
 extern crate splr;
 use splr::clause::*;
-use splr::clause_manage::ClauseManagement;
 use splr::solver::*;
 use splr::types::*;
+
+macro_rules! i2l {
+    ($($x:expr),*) => {
+        match &[$($x),*] {
+            v => v.iter().map(|x| int2lit(*x)).collect::<Vec<Lit>>(),
+        }
+    };
+}
 
 macro_rules! mkc {
     ($($x:expr),*) => {
         match &[$($x),*] {
-            v => Clause::new(ClauseKind::Permanent, false, v.len(), v.iter().map(|x| int2lit(*x)).collect::<Vec<Lit>>()),
+            v => Clause::new(ClauseKind::Permanent, false, v.len(), &v.iter().map(|x| int2lit(*x)).collect::<Vec<Lit>>(), false),
         }
     };
 }
@@ -16,7 +23,7 @@ macro_rules! mkc {
 macro_rules! mkb {
     ($($x:expr),*) => {
         match &[$($x),*] {
-            v => { Clause::new(ClauseKind::Binclause, false, 2,  v.iter().map(|x| int2lit(*x)).collect::<Vec<Lit>>()) }
+            v => Clause::new(ClauseKind::Binclause, false, 2,  &v.iter().map(|x| int2lit(*x)).collect::<Vec<Lit>>(), false),
         }
     };
 }
@@ -24,7 +31,7 @@ macro_rules! mkb {
 macro_rules! mkl {
     ($($x:expr),*) => {
         match &[$($x),*] {
-            v => { Clause::new(ClauseKind::Removable, true, v.len(),  v.iter().map(|x| int2lit(*x)).collect::<Vec<Lit>>()) }
+            v => Clause::new(ClauseKind::Removable, true, v.len(), &v.iter().map(|x| int2lit(*x)).collect::<Vec<Lit>>(), false),
         }
     };
 }
@@ -65,6 +72,7 @@ impl TestingSolver for Solver {
         for (i, c) in target.clauses.iter().enumerate() {
             println!("#{} {:#}", i, c);
         }
+        println!("permutation len: {}, clauses len: {}", &target.permutation.len(), target.clauses.len());
         println!("permutation table: {:?}", &target.permutation[1..]);
         for i in &target.permutation[1..] {
             println!("@{} {:#}", i, target.clauses[*i]);
@@ -125,10 +133,10 @@ fn clause_sort() -> () {
         //}
     }
     s.show_clauses();
-    s.reduce_watchers();
+    s.cdb.reduce_watchers(&mut s.cp[0], &s.vars);
     s.show_clauses();
 
-    s.simplify_database();
+    s.cdb.simplify(&mut s.cp, &s.vars);
     s.show_clauses();
 
     println!("- another senario");
@@ -136,18 +144,18 @@ fn clause_sort() -> () {
     println!(" - initial state");
     s.show_clauses();
 
-    s.reduce_watchers();
-    s.simplify_database();
+    s.cdb.reduce_watchers(&mut s.cp[0], &s.vars);
+    s.cdb.simplify(&mut s.cp, &s.vars);
     println!(" - 1st shrink");
     s.show_clauses();
 
-    s.reduce_watchers();
-    s.simplify_database();
+    s.cdb.reduce_watchers(&mut s.cp[0], &s.vars);
+    s.cdb.simplify(&mut s.cp, &s.vars);
     println!(" - 2nd shrink");
     s.show_clauses();
 
-    s.reduce_watchers();
-    s.simplify_database();
+    s.cdb.reduce_watchers(&mut s.cp[0], &s.vars);
+    s.cdb.simplify(&mut s.cp, &s.vars);
     println!(" - 3rd shrink");
     s.show_clauses();
 }
@@ -160,14 +168,19 @@ fn setup() -> Solver {
     };
     let mut s = Solver::new(Default::default(), &cnf);
     s.eliminator.use_elim = false;
-    s.attach_clause(mkl![1, 2, -3].activity(1.0));             // #1
-    s.attach_clause(mkl![1, -2, 3].activity(4.0).rank(3));     // #2
-    s.attach_clause(mkl![-1, 2, 3, 4].activity(5.0));          // #3
-    s.attach_clause(mkl![1, -2, 3, 4].activity(2.0).rank(2));  // #4
-    s.attach_clause(mkl![1, 2, -3, 4].activity(1.0).rank(2));  // #5
-    s.attach_clause(mkl![1, 2, 3, -4].activity(1.0).rank(4));  // #6
-    s.attach_clause(mkl![-1, 2, 3, -4].activity(3.0).rank(2)); // #7
-    s.attach_clause(mkl![-1, -2, -3].activity(3.0).rank(3));   // #8
+    s.add_learnt(&mut i2l![1, 2, -3]);             // #1
+    s.add_learnt(&mut i2l![1, 2, -3]);             // #1
+    s.add_learnt(&mut i2l![1, 2, -3]);             // #1
+    s.add_learnt(&mut i2l![1, 2, -3]);             // #1
+    s.add_learnt(&mut i2l![1, 2, -3]);             // #1
+    s.add_learnt(&mut i2l![1, 2, -3]);             // #1
+    s.add_learnt(&mut i2l![1, 2, -3]);             // #1
+//    s.add_clause(&mut mkl![1, -2, 3].activity(4.0).rank(3));     // #2
+//    s.add_clause(&mut mkl![-1, 2, 3, 4].activity(5.0));          // #3
+//    s.add_clause(&mut mkl![1, -2, 3, 4].activity(2.0).rank(2));  // #4
+//    s.add_clause(&mut mkl![1, 2, -3, 4].activity(1.0).rank(2));  // #5
+//    s.add_clause(&mut mkl![1, 2, 3, -4].activity(1.0).rank(4));  // #6
+//    s.add_clause(&mut mkl![-1, 2, 3, -4].activity(3.0).rank(2)); // #7
+//    s.add_clause(&mut mkl![-1, -2, -3].activity(3.0).rank(3));   // #8
     s
 }
-
