@@ -1,17 +1,17 @@
 use types::*;
 use var::Var;
 
+pub trait Assignment {
+    fn enqueue(&mut self, v: &mut Var, l: Lit, cid: ClauseId) -> bool;
+    fn uncheck_enqueue(&mut self, v: &mut Var, l: Lit, cid: ClauseId) -> ();
+    fn uncheck_assume(&mut self, v: &mut Var, l: Lit) -> ();
+}
+
 #[derive(Debug)]
 pub struct AssignState {
     pub trail: Vec<Lit>,
     pub trail_lim: Vec<usize>,
     pub q_head: usize,
-}
-
-pub trait Assignment {
-    fn enqueue(&mut self, v: &mut Var, l: Lit, cid: ClauseId) -> bool;
-    fn uncheck_enqueue(&mut self, v: &mut Var, l: Lit, cid: ClauseId) -> ();
-    fn uncheck_assume(&mut self, v: &mut Var, l: Lit) -> ();
 }
 
 impl Assignment for AssignState {

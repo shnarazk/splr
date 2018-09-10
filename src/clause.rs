@@ -609,6 +609,9 @@ impl ClauseManagement for ClauseDBState {
             // sort the range of 'permutation'
             permutation.sort_unstable_by(|&a, &b| clauses[a].cmp(&clauses[b]));
             let nc = permutation.len();
+            if nc == 0 {
+                return;
+            }
             let keep = if clauses[permutation[nc / 2]].rank <= 4 {
                 3 * nc / 4
             } else {

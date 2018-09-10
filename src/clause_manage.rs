@@ -8,6 +8,7 @@ use var::Var;
 pub const DEBUG: usize = 27728;
 pub const WATCHING: VarId = 2685;
 
+// for ClausePack
 pub trait ClausePropagation {
     fn check_garbage(&mut self) -> ();
     fn garbage_collect(&mut self, vars: &Vec<Var>) -> ();

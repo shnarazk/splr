@@ -6,13 +6,14 @@ use solver::{Solver, Stat};
 use solver_restart::Restart;
 use std::cmp::max;
 use types::*;
-use var::VarManagement;
+use var::HeapManagement;
 use solver::SatSolver;
 use clause_manage::ClausePropagation;
 use clause::Clause;
 use clause::ClauseIdIndexEncoding;
 use var::Satisfiability;
 
+/// for Solver
 pub trait SolveSAT {
     /// returns `true` for SAT, `false` for UNSAT.
     fn search(&mut self) -> bool;

@@ -10,8 +10,6 @@ use types::*;
 use var::*;
 // use var_manage::Eliminator;
 
-const DB_INC_SIZE: usize = 100;
-
 pub trait SatSolver {
     fn decision_level(&self) -> usize;
     fn solve(&mut self) -> SolverResult;
@@ -22,6 +20,8 @@ pub trait SatSolver {
     fn lbd_vector(&mut self, v: &[Lit]) -> usize;
     fn lbd_of(&mut self, v: &Clause) -> usize;
 }
+
+const DB_INC_SIZE: usize = 100;
 
 /// normal results returned by Solver
 #[derive(Debug)]

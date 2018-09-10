@@ -3,6 +3,7 @@ use types::*;
 use solver::SatSolver;
 use solver_propagate::SolveSAT;
 
+/// for Solver
 pub trait Restart {
     fn force_restart(&mut self) -> ();
     fn block_restart(&mut self, lbd: usize, clv: usize) -> ();

@@ -12,7 +12,7 @@ use solver::SatSolver;
 use solver::{Solver, Stat};
 use solver_propagate::SolveSAT;
 use types::*;
-use var::VarManagement;
+use var::HeapManagement;
 use var::Satisfiability;
 use var::Eliminator;
 

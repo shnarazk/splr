@@ -4,14 +4,14 @@ use clause::ClauseIdIndexEncoding;
 use clause::DEAD_CLAUSE;
 use types::*;
 
-/// by &'a[Var]
+/// for &'a[Var]
 pub trait Satisfiability {
     fn assigned(&self, l: Lit) -> Lbool;
     fn satisfies(&self, c: &Clause) -> bool;
 }
 
-/// by VarIdHeap
-pub trait VarManagement {
+/// for VarIdHeap
+pub trait HeapManagement {
     fn new(order: VarOrder, n: usize, init: usize) -> VarIdHeap;
     fn select_var(&mut self, vars: &Vec<Var>) -> VarId;
     fn bump_vi(&mut self, vars: &mut Vec<Var>, vi: VarId, d: f64) -> ();
@@ -120,7 +120,7 @@ pub struct VarIdHeap {
     idxs: Vec<usize>, // VarId : -> order : usize
 }
 
-impl VarManagement for VarIdHeap {
+impl HeapManagement for VarIdHeap {
     fn reset(&mut self) -> () {
         for i in 0..self.idxs.len() {
             self.idxs[i] = i;
