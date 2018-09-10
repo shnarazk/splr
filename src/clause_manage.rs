@@ -8,7 +8,7 @@ use var::Var;
 // for ClausePack
 pub trait ClauseReduction {
     fn garbage_collect(&mut self, vars: &Vec<Var>) -> ();
-    fn detach_to_trash(&mut self, c: &mut Clause, index: usize) -> ClauseIndex;
+    fn detach(&mut self, c: &mut Clause, index: usize) -> ClauseIndex;
 }
 
 impl ClauseReduction for ClausePack {
@@ -47,10 +47,10 @@ impl ClauseReduction for ClausePack {
                     if (*c).lit[0] == GARBAGE_LIT && (*c).lit[1] == GARBAGE_LIT {
                         panic!("not be");
                     } else if (*c).lit[0].negate() == l as Lit {
-                        *pri = self.detach_to_trash(&mut *c, 0);
+                        *pri = self.detach(&mut *c, 0);
                         ci = *pri;
                     } else if (*c).lit[1].negate() == l as Lit {
-                        *pri = self.detach_to_trash(&mut *c, 1);
+                        *pri = self.detach(&mut *c, 1);
                         ci = *pri;
                     } else {
                         panic!("xxxxx {:?}", (*c).lit);
@@ -96,18 +96,18 @@ impl ClauseReduction for ClausePack {
         }
         debug_assert_eq!(self.watcher[0], NULL_CLAUSE);
     }
-    fn detach_to_trash(&mut self, c: &mut Clause, index: usize) -> ClauseIndex {
+    fn detach(&mut self, c: &mut Clause, index: usize) -> ClauseIndex {
         let other = (index ^ 1) as usize;
-        // if c.index == DEBUG { println!("detach_to_trash before: {:#} to {} {} at {}", c, index, c.lit[other], other); }
+        // if c.index == DEBUG { println!("detach before: {:#} to {} {} at {}", c, index, c.lit[other], other); }
         debug_assert!(c.dead);
         debug_assert_ne!(c.lit[index], GARBAGE_LIT);
         debug_assert_ne!(c.lit[index], RECYCLE_LIT);
-        // print!("{}detach_to_trash: ", self.to_kind());
+        // print!("{}detach: ", self.to_kind());
         // self.print_watcher(GARBAGE_LIT.negate());
-        // print!("{}detach_to_trash: ", self.to_kind());
+        // print!("{}detach: ", self.to_kind());
         // self.print_watcher(RECYCLE_LIT.negate());
         // if c.index == DEBUG {
-        //     println!("{}detach_to_trash after: {:#} {} {}", self.to_kind(), c, GARBAGE_LIT, c.lit[index]);
+        //     println!("{}detach after: {:#} {} {}", self.to_kind(), c, GARBAGE_LIT, c.lit[index]);
         // }
         // let pre = self.count(GARBAGE_LIT);
         // let ryc = self.count(RECYCLE_LIT);
@@ -126,7 +126,7 @@ impl ClauseReduction for ClausePack {
         }
         // if c.lit[other] != GARBAGE_LIT && pre + ryc + 1 != self.count(GARBAGE_LIT) + self.count(RECYCLE_LIT) {
         //     self.print_watcher(GARBAGE_LIT);
-        //     panic!(" - detach_to_trash: inconsistency found gar {} => {}, ryc {} => {}, {:#}", pre, self.count(GARBAGE_LIT), ryc, self.count(RECYCLE_LIT), c);
+        //     panic!(" - detach: inconsistency found gar {} => {}, ryc {} => {}, {:#}", pre, self.count(GARBAGE_LIT), ryc, self.count(RECYCLE_LIT), c);
         // } else {
         //     // println!(" - success to detach {:#} #{} + #{} => #{} + #{}", c, pre, ryc, self.count(GARBAGE_LIT), self.count(RECYCLE_LIT));
         //     // print!(" - ");

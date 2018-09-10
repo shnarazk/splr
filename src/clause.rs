@@ -217,7 +217,7 @@ impl ClauseIF for ClausePack {
                         }
                         let next = (*c).next_watcher[1];
                         if (*c).dead {
-                            let next1 = self.detach_to_trash(&mut *c, 1);
+                            let next1 = self.detach(&mut *c, 1);
                             debug_assert_eq!(next1, next);
                             // self.check_clause("after detach to trash", ci);
                             ci = next;
@@ -643,7 +643,7 @@ impl ClauseManagement for ClauseDBState {
                         let index = ((*c).lit[0] != lit as Lit) as usize;
                         if (&vars[..]).satisfies(&*c) {
                             (*c).dead = true;
-                            *pri = cp.detach_to_trash(&mut *c, index);
+                            *pri = cp.detach(&mut *c, index);
                             // cp[*ck as usize].check_clause("after GC", (*c).index);
                         } else {
                             pri = &mut (*c).next_watcher[index];
