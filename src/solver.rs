@@ -227,6 +227,7 @@ impl SatSolver for Solver {
         }
         self.cdb.simplify(&mut self.cp, &self.vars);
         self.stats[Stat::NumOfSimplification as usize] += 1;
+        self.progress("");
         match self.search() {
             _ if self.ok == false => {
                 self.cancel_until(0);
