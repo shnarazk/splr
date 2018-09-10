@@ -71,28 +71,29 @@ pub struct AssignState {
 /// is the collection of all variables.
 #[derive(Debug)]
 pub struct Solver {
-    /// Configuration
-    pub config: SolverConfiguration,
-    pub num_vars: usize,
-    pub cla_inc: f64,
-    pub root_level: usize,
-    /// Variable Assignment Management
-    pub vars: Vec<Var>,
-    pub assign: AssignState,
-    /// Variable Order
-    pub var_order: VarIdHeap,
-    /// Clause Database Management
-    pub cp: [ClausePack; 3],
-    pub next_reduction: usize,
-    pub cur_restart: usize,
-    pub num_solved_vars: usize,
-    /// Variable Elimination
-    pub eliminator: Eliminator,
-    /// Working memory
+    /// state
     pub ok: bool,
     pub model: Vec<Lbool>,
     pub conflicts: Vec<Lit>,
     pub stats: Vec<i64>,
+    /// Configuration
+    pub config: SolverConfiguration,
+    pub root_level: usize,
+    /// Variable Assignment Management
+    pub num_vars: usize,
+    pub vars: Vec<Var>,
+    pub assign: AssignState,
+    /// Variable Elimination
+    pub eliminator: Eliminator,
+    /// Variable Order
+    pub var_order: VarIdHeap,
+    /// Clause Database Management
+    pub cp: [ClausePack; 3],
+    pub cla_inc: f64,
+    pub next_reduction: usize,
+    pub cur_restart: usize,
+    pub num_solved_vars: usize,
+    /// Working memory
     pub an_seen: Vec<Lit>,
     pub an_to_clear: Vec<Lit>,
     pub an_stack: Vec<Lit>,
@@ -126,26 +127,26 @@ impl Solver {
         let cdr = cfg.clause_decay_rate;
         let use_sve = cfg.use_sve;
         let s = Solver {
+            ok: true,
+            model: vec![BOTTOM; nv + 1],
+            conflicts: vec![],
+            stats: vec![0; Stat::EndOfStatIndex as usize],
             config: cfg,
-            num_vars: nv,
-            cla_inc: cdr,
             root_level: 0,
+            num_vars: nv,
             vars: Var::new_vars(nv),
             assign,
+            eliminator: Eliminator::new(use_sve, nv),
             var_order: VarIdHeap::new(VarOrder::ByActivity, nv, nv),
             cp: [
                 ClausePack::build(ClauseKind::Removable, nv, nc),
                 ClausePack::build(ClauseKind::Permanent, nv, 256),
                 ClausePack::build(ClauseKind::Binclause, nv, 256),
             ],
+            cla_inc: cdr,
             next_reduction: 2000,
             cur_restart: 1,
             num_solved_vars: 0,
-            eliminator: Eliminator::new(use_sve, nv),
-            ok: true,
-            model: vec![BOTTOM; nv + 1],
-            conflicts: vec![],
-            stats: vec![0; Stat::EndOfStatIndex as usize],
             an_seen: vec![0; nv + 1],
             an_to_clear: vec![0; nv + 1],
             an_stack: vec![],
