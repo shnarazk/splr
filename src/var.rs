@@ -4,6 +4,30 @@ use clause::ClauseIdIndexEncoding;
 use clause::DEAD_CLAUSE;
 use types::*;
 
+/// by &'a[Var]
+pub trait Satisfiability {
+    fn assigned(&self, l: Lit) -> Lbool;
+    fn satisfies(&self, c: &Clause) -> bool;
+}
+
+/// by VarIdHeap
+pub trait VarManagement {
+    fn new(order: VarOrder, n: usize, init: usize) -> VarIdHeap;
+    fn select_var(&mut self, vars: &Vec<Var>) -> VarId;
+    fn bump_vi(&mut self, vars: &mut Vec<Var>, vi: VarId, d: f64) -> ();
+    fn rebuild(&mut self, vars: &Vec<Var>) -> ();
+    fn reset(&mut self) -> ();
+    fn contains(&self, v: VarId) -> bool;
+    fn update(&mut self, vec: &[Var], v: VarId) -> ();
+    fn insert(&mut self, vec: &[Var], v: VarId) -> ();
+    fn get_root(&mut self, vec: &[Var]) -> VarId;
+    fn is_empty(&self) -> bool;
+    fn clear(&mut self) -> ();
+    fn len(&self) -> usize;
+    fn peek(&self) -> VarId;
+}
+
+const VAR_ACTIVITY_THRESHOLD: f64 = 1e100;
 const BWDSUB_CLAUSE: ClauseId = DEAD_CLAUSE - 1;
 const SUBSUMPTION_SIZE: usize = 20;
 /// is the dummy var index.
@@ -63,11 +87,6 @@ impl Var {
     }
 }
 
-pub trait Satisfiability {
-    fn assigned(&self, l: Lit) -> Lbool;
-    fn satisfies(&self, c: &Clause) -> bool;
-}
-
 impl<'a> Satisfiability for &'a[Var] {
     fn assigned(&self, l: Lit) -> Lbool {
         self[l.vi()].assign ^ ((l & 1) as u8)
@@ -101,29 +120,7 @@ pub struct VarIdHeap {
     idxs: Vec<usize>, // VarId : -> order : usize
 }
 
-pub trait AccessHeap {
-    fn get_root(&self, heap: &mut VarIdHeap) -> VarId;
-}
-
-impl<'a> AccessHeap for Vec<Var> {
-    fn get_root(&self, heap: &mut VarIdHeap) -> VarId {
-        heap.root(self)
-    }
-}
-
-pub trait VarOrdering {
-    fn reset(&mut self) -> ();
-    fn contains(&self, v: VarId) -> bool;
-    fn update(&mut self, vec: &[Var], v: VarId) -> ();
-    fn insert(&mut self, vec: &[Var], v: VarId) -> ();
-    fn root(&mut self, vec: &[Var]) -> VarId;
-    fn is_empty(&self) -> bool;
-    fn clear(&mut self) -> ();
-    fn len(&self) -> usize;
-    fn peek(&self) -> VarId;
-}
-
-impl VarOrdering for VarIdHeap {
+impl VarManagement for VarIdHeap {
     fn reset(&mut self) -> () {
         for i in 0..self.idxs.len() {
             self.idxs[i] = i;
@@ -160,7 +157,7 @@ impl VarOrdering for VarIdHeap {
         // self.var_order.check("check insert 2");
     }
     /// renamed from getHeapDown
-    fn root(&mut self, vec: &[Var]) -> VarId {
+    fn get_root(&mut self, vec: &[Var]) -> VarId {
         let s = 1;
         let vs = self.heap[s];
         let n = self.idxs[0];
@@ -189,10 +186,40 @@ impl VarOrdering for VarIdHeap {
     fn peek(&self) -> VarId {
         self.heap[1]
     }
-}
-
-impl VarIdHeap {
-    pub fn new(order: VarOrder, n: usize, init: usize) -> VarIdHeap {
+    fn rebuild(&mut self, vars: &Vec<Var>) -> () {
+        self.reset();
+        for vi in 1..vars.len() {
+            if vars[vi].assign == BOTTOM {
+                self.insert(&vars, vi);
+            }
+        }
+    }
+    fn bump_vi(&mut self, vars: &mut Vec<Var>, vi: VarId, d: f64) -> () {
+        // let d = self.stats[Stat::NumOfBackjump as usize] as f64;
+        let a = (vars[vi].activity + d) / 2.0;
+        vars[vi].activity = a;
+        if VAR_ACTIVITY_THRESHOLD < a {
+            // self.rescale_var_activity();
+            for i in 1..vars.len() {
+                vars[i].activity = vars[i].activity / VAR_ACTIVITY_THRESHOLD;
+            }
+        }
+        self.update(vars, vi);
+    }
+    /// Heap operations; renamed from selectVO
+    fn select_var(&mut self, vars: &Vec<Var>) -> VarId {
+        loop {
+            if self.len() == 0 {
+                return 0;
+            }
+            let vi = self.get_root(&vars);
+            let x = vars[vi].assign;
+            if x == BOTTOM {
+                return vi;
+            }
+        }
+    }
+    fn new(order: VarOrder, n: usize, init: usize) -> VarIdHeap {
         let mut heap = Vec::with_capacity(n + 1);
         let mut idxs = Vec::with_capacity(n + 1);
         heap.push(0);
@@ -204,10 +231,9 @@ impl VarIdHeap {
         idxs[0] = init;
         VarIdHeap { order, heap, idxs }
     }
-    /// renamed form numElementsInHeap
-    pub fn len(&self) -> usize {
-        self.idxs[0]
-    }
+}
+
+impl VarIdHeap {
     fn percolate_up(&mut self, vec: &[Var], start: usize) -> () {
         let mut q = start;
         let vq = self.heap[q];

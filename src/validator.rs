@@ -1,6 +1,6 @@
 use types::*;
 use solver::*;
-use clause_manage::KINDS;
+use clause::KINDS;
 use var::Satisfiability;
 
 impl Solver {

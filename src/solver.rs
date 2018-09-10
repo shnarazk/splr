@@ -1,7 +1,8 @@
+use assign::{AssignState, Assignment};
 use clause::*;
-use clause_manage::ClauseManagement;
+use clause::ClauseIF;
+use clause::ClauseManagement;
 use solver_propagate::SolveSAT;
-use solver_rollback::Restart;
 use std::fs;
 use std::io::{BufRead, BufReader};
 use types::Dump;
@@ -9,14 +10,17 @@ use types::*;
 use var::*;
 // use var_manage::Eliminator;
 
+const DB_INC_SIZE: usize = 100;
+
 pub trait SatSolver {
     fn decision_level(&self) -> usize;
     fn solve(&mut self) -> SolverResult;
     fn build(path: &str) -> (Solver, CNFDescription);
-    fn add_clause(&mut self, v: Vec<Lit>) -> bool;
-    fn add_learnt(&mut self, v: Vec<Lit>) -> usize;
-    fn attach_clause(&mut self, c: Clause) -> ClauseId; // only for eliminator
+    fn add_clause(&mut self, v: &mut Vec<Lit>) -> bool;
+    fn add_learnt(&mut self, v: &mut Vec<Lit>) -> usize;
     fn num_assigns(&self) -> usize;
+    fn lbd_vector(&mut self, v: &[Lit]) -> usize;
+    fn lbd_of(&mut self, v: &Clause) -> usize;
 }
 
 /// normal results returned by Solver
@@ -61,13 +65,6 @@ pub enum Stat {
     EndOfStatIndex,      // Don't use this dummy.
 }
 
-#[derive(Debug)]
-pub struct AssignState {
-    pub trail: Vec<Lit>,
-    pub trail_lim: Vec<usize>,
-    pub q_head: usize,
-}
-
 /// is the collection of all variables.
 #[derive(Debug)]
 pub struct Solver {
@@ -76,23 +73,24 @@ pub struct Solver {
     pub model: Vec<Lbool>,
     pub conflicts: Vec<Lit>,
     pub stats: Vec<i64>,
+    pub num_solved_vars: usize,
+    pub cur_restart: usize,
+    pub next_reduction: usize,
     /// Configuration
     pub config: SolverConfiguration,
     pub root_level: usize,
-    /// Variable Assignment Management
+    /// Assignment Management
+    pub assign: AssignState,
+    /// Variable Management
     pub num_vars: usize,
     pub vars: Vec<Var>,
-    pub assign: AssignState,
     /// Variable Elimination
     pub eliminator: Eliminator,
     /// Variable Order
     pub var_order: VarIdHeap,
     /// Clause Database Management
     pub cp: [ClausePack; 3],
-    pub cla_inc: f64,
-    pub next_reduction: usize,
-    pub cur_restart: usize,
-    pub num_solved_vars: usize,
+    pub cdb: ClauseDBState,
     /// Working memory
     pub an_seen: Vec<Lit>,
     pub an_to_clear: Vec<Lit>,
@@ -124,18 +122,25 @@ impl Solver {
         };
         let (_fe, se) = cfg.ema_coeffs;
         let re = cfg.restart_expansion;
-        let cdr = cfg.clause_decay_rate;
+        let cdb = ClauseDBState {
+            cla_inc: cfg.clause_decay_rate,
+            decay_rate: cfg.clause_decay_rate,
+            increment_step: DB_INC_SIZE,
+        };
         let use_sve = cfg.use_sve;
         let s = Solver {
             ok: true,
             model: vec![BOTTOM; nv + 1],
             conflicts: vec![],
             stats: vec![0; Stat::EndOfStatIndex as usize],
+            num_solved_vars: 0,
+            cur_restart: 1,
+            next_reduction: 2000,
             config: cfg,
             root_level: 0,
             num_vars: nv,
-            vars: Var::new_vars(nv),
             assign,
+            vars: Var::new_vars(nv),
             eliminator: Eliminator::new(use_sve, nv),
             var_order: VarIdHeap::new(VarOrder::ByActivity, nv, nv),
             cp: [
@@ -143,10 +148,7 @@ impl Solver {
                 ClausePack::build(ClauseKind::Permanent, nv, 256),
                 ClausePack::build(ClauseKind::Binclause, nv, 256),
             ],
-            cla_inc: cdr,
-            next_reduction: 2000,
-            cur_restart: 1,
-            num_solved_vars: 0,
+            cdb,
             an_seen: vec![0; nv + 1],
             an_to_clear: vec![0; nv + 1],
             an_stack: vec![],
@@ -221,7 +223,8 @@ impl SatSolver for Solver {
             self.eliminate_binclauses();
             self.eliminate();
         }
-        self.simplify_database();
+        self.cdb.simplify(&mut self.cp, &self.vars);
+        self.stats[Stat::NumOfSimplification as usize] += 1;
         match self.search() {
             _ if self.ok == false => {
                 self.cancel_until(0);
@@ -284,6 +287,7 @@ impl SatSolver for Solver {
             pathname: path.to_string(),
         };
         let mut s: Solver = Solver::new(SolverConfiguration::default(), &cnf);
+        let mut v: Vec<Lit> = Vec::new();
         loop {
             buf.clear();
             match rs.read_line(&mut buf) {
@@ -293,7 +297,6 @@ impl SatSolver for Solver {
                         continue;
                     }
                     let mut iter = buf.split_whitespace();
-                    let mut v: Vec<Lit> = Vec::new();
                     for s in iter {
                         if let Ok(val) = s.parse::<i32>() {
                             if val == 0 {
@@ -303,9 +306,11 @@ impl SatSolver for Solver {
                             }
                         }
                     }
-                    if v.len() != 0 && !s.add_clause(v) {
+                    if v.len() != 0 && !s.add_clause(&mut v) {
                         s.ok = false;
+                        break;
                     }
+                    v.clear();
                 }
                 Err(e) => panic!("{}", e),
             }
@@ -314,7 +319,7 @@ impl SatSolver for Solver {
         (s, cnf)
     }
     // renamed from clause_new
-    fn add_clause(&mut self, mut v: Vec<Lit>) -> bool {
+    fn add_clause(&mut self, v: &mut Vec<Lit>) -> bool {
         v.sort_unstable();
         let mut j = 0;
         let mut l_ = NULL_LIT; // last literal; [x, x.negate()] means totology.
@@ -339,13 +344,13 @@ impl SatSolver for Solver {
             0 => false, // Empty clause is UNSAT.
             1 => self.assign.enqueue(&mut self.vars[v[0].vi()], v[0], NULL_CLAUSE),
             _ => {
-                self.attach_clause(Clause::new(kind, false, 0, v, false));
+                self.cp[kind as usize].new_clause(&v, 0, false, false);
                 true
             }
         }
     }
     /// renamed from newLearntClause
-    fn add_learnt(&mut self, mut v: Vec<Lit>) -> usize {
+    fn add_learnt(&mut self, v: &mut Vec<Lit>) -> usize {
         if v.len() == 1 {
             self.assign.uncheck_enqueue(&mut self.vars[v[0].vi()], v[0], NULL_CLAUSE);
             0;
@@ -354,7 +359,7 @@ impl SatSolver for Solver {
         if v.len() == 2 {
             lbd = 0;
         } else {
-            lbd = self.lbd_of(&v);
+            lbd = self.lbd_vector(&v);
         }
         let mut i_max = 0;
         let mut lv_max = 0;
@@ -374,29 +379,42 @@ impl SatSolver for Solver {
         } else {
             ClauseKind::Removable
         };
-        let cid = self.attach_clause(Clause::new(kind, true, lbd, v, true));
-        self.bump_cid(cid);
+        let cid = self.cp[kind as usize].new_clause(&v, lbd, true, true);
+        self.cdb.bump_cid(&mut self.cp, cid);
         self.assign.uncheck_enqueue(&mut self.vars[l0.vi()], l0, cid);
         lbd
     }
-    fn attach_clause(&mut self, c: Clause) -> ClauseId {
-        if self.eliminator.use_elim {
-            for i in 0..c.len() {
-                let l = lindex!(c, i);
-                self.vars[l.vi()].touched = true;
-                self.eliminator.n_touched += 1;
-            }
-        }
-        let bin = c.kind == ClauseKind::Binclause;
-        let cid = self.cp[c.kind as usize].attach(c);
-        if self.eliminator.use_elim && bin {
-            self.eliminator.binclause_queue.push(cid);
-        }
-        debug_assert_ne!(cid, 0);
-        cid
-    }
     fn num_assigns(&self) -> usize {
         self.assign.trail.len()
+    }
+    fn lbd_vector(&mut self, v: &[Lit]) -> usize {
+        let key_old = self.lbd_seen[0];
+        let key = if 10_000_000 < key_old { 1 } else { key_old + 1 };
+        let mut cnt = 0;
+        for l in v {
+            let lv = &mut self.lbd_seen[self.vars[l.vi()].level];
+            if *lv != key {
+                *lv = key;
+                cnt += 1;
+            }
+        }
+        self.lbd_seen[0] = key;
+        cnt
+    }
+    fn lbd_of(&mut self, c: &Clause) -> usize {
+        let key_old = self.lbd_seen[0];
+        let key = if 10_000_000 < key_old { 1 } else { key_old + 1 };
+        let mut cnt = 0;
+        for i in 0..c.len() {
+            let l = lindex!(c, i);
+            let lv = &mut self.lbd_seen[self.vars[l.vi()].level];
+            if *lv != key {
+                *lv = key;
+                cnt += 1;
+            }
+        }
+        self.lbd_seen[0] = key;
+        cnt
     }
 }
 
@@ -449,49 +467,6 @@ impl Dump for Solver {
     }
 }
 
-pub trait Assignment {
-    fn enqueue(&mut self, v: &mut Var, l: Lit, cid: ClauseId) -> bool;
-    fn uncheck_enqueue(&mut self, v: &mut Var, l: Lit, cid: ClauseId) -> ();
-    fn uncheck_assume(&mut self, v: &mut Var, l: Lit) -> ();
-}
-
-impl Assignment for AssignState {
-    /// This function touches:
-    ///  - vars
-    ///  - trail
-    ///  - trail_lim
-    fn uncheck_enqueue(&mut self, v: &mut Var, l: Lit, cid: ClauseId) -> () {
-        v.assign = l.lbool();
-        v.level = self.trail_lim.len();
-        v.reason = cid;
-        // mref!(self.cp, cid).locked = true;
-        self.trail.push(l);
-    }
-
-    fn uncheck_assume(&mut self, v: &mut Var, l: Lit) -> () {
-        self.trail_lim.push(self.trail.len());
-        self.uncheck_enqueue(v, l, NULL_CLAUSE);
-    }
-    /// This function touches:
-    ///  - vars
-    ///  - trail
-    fn enqueue(&mut self, v: &mut Var, l: Lit, cid: ClauseId) -> bool {
-        // println!("enqueue: {} by {}", l.int(), cid);
-        let sig = l.lbool();
-        let val = v.assign;
-        if val == BOTTOM {
-            v.assign = sig;
-            v.level = self.trail_lim.len();
-            v.reason = cid;
-            // mref!(self.cp, cid).locked = true;
-            self.trail.push(l);
-            true
-        } else {
-            val == sig
-        }
-    }
-
-}
 //impl Solver {
 //    pub fn uncheck_enqueue_(&mut self, l: Lit, cid: ClauseId) -> () {
 //        debug_assert!(l != 0, "Null literal is about to be equeued");
@@ -503,4 +478,22 @@ impl Assignment for AssignState {
 //        mref!(self.cp, cid).locked = true;
 //        self.trail.push(l);
 //    }
+//}
+
+//fn attach_clause(&mut self, c: Clause) -> ClauseId {
+//    // FIXME move to cp
+//    if self.eliminator.use_elim {
+//        for i in 0..c.len() {
+//            let l = lindex!(c, i);
+//            self.vars[l.vi()].touched = true;
+//            self.eliminator.n_touched += 1;
+//        }
+//    }
+//    let bin = c.kind == ClauseKind::Binclause;
+//    let cid = self.cp[c.kind as usize].attach(c);
+//    if self.eliminator.use_elim && bin {
+//        self.eliminator.binclause_queue.push(cid);
+//    }
+//    debug_assert_ne!(cid, 0);
+//    cid
 //}

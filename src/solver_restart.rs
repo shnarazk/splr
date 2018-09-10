@@ -1,11 +1,9 @@
-use clause::ClauseIdIndexEncoding;
 use solver::{Solver, Stat};
 use types::*;
-use var::VarOrdering;
 use solver::SatSolver;
+use solver_propagate::SolveSAT;
 
 pub trait Restart {
-    fn cancel_until(&mut self, lv: usize) -> ();
     fn force_restart(&mut self) -> ();
     fn block_restart(&mut self, lbd: usize, clv: usize) -> ();
 }
@@ -17,34 +15,6 @@ const R: f64 = 1.1;
 const K: f64 = 1.4; // 1.0 / 0.8
 
 impl Restart for Solver {
-    /// This function touches:
-    ///  - trail
-    ///  - trail_lim
-    ///  - vars
-    ///  - q_head
-    ///  - var_order
-    fn cancel_until(&mut self, lv: usize) -> () {
-        if self.decision_level() <= lv {
-            return;
-        }
-        let lim = self.assign.trail_lim[lv];
-        for l in &self.assign.trail[lim..] {
-            let vi = l.vi();
-            {
-                let v = &mut self.vars[vi];
-                v.phase = v.assign;
-                v.assign = BOTTOM;
-                if 0 < v.reason {
-                    self.cp[v.reason.to_kind()].clauses[v.reason.to_index()].locked = false;
-                }
-                v.reason = NULL_CLAUSE;
-            }
-            self.var_order.insert(&self.vars, vi);
-        }
-        self.assign.trail.truncate(lim); // FIXME
-        self.assign.trail_lim.truncate(lv);
-        self.assign.q_head = lim;
-    }
     /// called after no conflict propagation
    ///```C
    ///            // Our dynamic restart, see the SAT09 competition compagnion paper

@@ -1,273 +1,26 @@
 #![allow(unreachable_code)]
 use clause::Clause;
-use clause::ClauseIdIndexEncoding;
-use clause::ClauseKind;
 use clause::ClausePack;
-use solver::{Solver, Stat};
 use types::*;
-use solver::SatSolver;
-use var::Satisfiability;
 use clause::ClauseIndex;
-use solver_propagate::WATCHING;
 use var::Var;
 
 pub const DEBUG: usize = 27728;
+pub const WATCHING: VarId = 2685;
 
-// const DB_INIT_SIZE: usize = 1000;
-const DB_INC_SIZE: usize = 50;
-pub const KINDS: [ClauseKind; 3] = [
-    ClauseKind::Removable,
-    ClauseKind::Permanent,
-    ClauseKind::Binclause,
-];
-
-pub trait ClauseManagement {
-    fn bump_cid(&mut self, ci: ClauseId) -> ();
-    fn decay_cla_activity(&mut self) -> ();
-    fn reduce_watchers(&mut self) -> ();
-    fn simplify_database(&mut self) -> bool;
-    fn lbd_of(&mut self, v: &[Lit]) -> usize;
+pub trait ClausePropagation {
+    fn check_garbage(&mut self) -> ();
+    fn garbage_collect(&mut self, vars: &Vec<Var>) -> ();
+    fn count(&self, target: Lit) -> usize;
+    fn detach_to_trash(&mut self, c: &mut Clause, index: usize) -> ClauseIndex;
+    fn seek_from(&self, ci: ClauseIndex, p: Lit) -> bool;
+    fn print_watcher(&self, p: Lit) -> ();
+    fn check_clause(&self, mes: &str, ci: ClauseIndex);
+    fn check_lit(&self, vars: &Vec<Var>, mes: &str, lit: Lit) -> ();
 }
 
-impl ClauseManagement for Solver {
-    fn bump_cid(&mut self, cid: ClauseId) -> () {
-        debug_assert_ne!(cid, 0);
-        let a;
-        {
-            // let c = &mut self.cp[cid.to_kind()].clauses[cid.to_index()];
-            let c = mref!(self.cp, cid);
-            a = c.activity + self.cla_inc;
-            c.activity = a;
-        }
-        if 1.0e20 < a {
-            for c in &mut self.cp[ClauseKind::Removable as usize].clauses {
-                if c.learnt {
-                    c.activity *= 1.0e-20;
-                }
-            }
-            self.cla_inc *= 1.0e-20;
-        }
-    }
-    fn decay_cla_activity(&mut self) -> () {
-        self.cla_inc = self.cla_inc / self.config.clause_decay_rate;
-    }
-    /// 1. sort `permutation` which is a mapping: index -> ClauseIndex.
-    /// 2. rebuild watches to pick up clauses which is placed in a good place in permutation.
-    fn reduce_watchers(&mut self) -> () {
-        {
-            let ClausePack {
-                ref mut clauses,
-                ..
-            } = &mut self.cp[ClauseKind::Removable as usize];
-            // debug_assert_eq!(permutation.len(), clauses.len());
-            // permutation.retain(|i| !clauses[*i as usize].dead);
-            let permutation = &mut (1..clauses.len())
-                .filter(|i| !clauses[*i].dead && !(clauses[*i].lit[0] == NULL_LIT && clauses[*i].lit[1] == NULL_LIT)) // garbage and recycled
-                .collect::<Vec<ClauseIndex>>();
-            // sort the range of 'permutation'
-            permutation.sort_unstable_by(|&a, &b| clauses[a].cmp(&clauses[b]));
-            let nc = permutation.len();
-            let keep = if clauses[permutation[nc / 2]].rank <= 4 {
-                3 * nc / 4
-            } else {
-                nc / 2
-            };
-            for i in keep + 1..nc {
-                let mut c = &mut clauses[permutation[i]];
-                if !c.locked && !c.just_used {
-                    // if c.index == DEBUG { println!("### reduce_db {:#}",  *c); }
-                    c.dead = true;
-                }
-            }
-            // permutation.retain(|&i| clauses[i].index != DEAD_CLAUSE);
-        }
-        {
-            let Solver {ref mut cp, ref vars, ..} = self;
-            for cs in &mut cp[..] {
-                cs.garbage_collect(vars);
-            }
-        }
-        self.next_reduction += DB_INC_SIZE + (self.c_lvl.0 as usize);
-        self.stats[Stat::NumOfReduction as usize] += 1;
-        self.progress("drop");
-    }
-    fn simplify_database(&mut self) -> bool {
-        debug_assert_eq!(self.decision_level(), 0);
-        // find garbages
-        for ck in &KINDS {
-            for lit in 2..self.vars.len() * 2 {
-                unsafe {
-                    let mut pri = &mut self.cp[*ck as usize].watcher[(lit as Lit).negate() as usize] as *mut ClauseId;
-                    while *pri != NULL_CLAUSE {
-                        let c = &mut self.cp[*ck as usize].clauses[*pri] as *mut Clause;
-                        let index = ((*c).lit[0] != lit as Lit) as usize;
-                        if (&self.vars[..]).satisfies(&*c) || *ck == ClauseKind::Removable {
-                            // There's no locked clause.
-                            (*c).dead = true;
-                            *pri = self.cp[*ck as usize].detach_to_trash(&mut *c, index);
-                            self.cp[*ck as usize].check_clause("after GC", (*c).index);
-                        } else {
-                            pri = &mut (*c).next_watcher[index];
-                        }
-                    }
-                }
-            }
-        }
-        self.stats[Stat::NumOfSimplification as usize] += 1;
-        if self.eliminator.use_elim && self.stats[Stat::NumOfSimplification as usize] % 8 == 0 {
-            self.eliminate();
-        }
-        {
-            let Solver {ref mut cp, ref vars, ..} = self;
-            for cs in &mut cp[..] {
-                cs.garbage_collect(vars);
-            }
-        }
-        self.progress("simp");
-        true
-    }
-    fn lbd_of(&mut self, v: &[Lit]) -> usize {
-        let key_old = self.lbd_seen[0];
-        let key = if 10_000_000 < key_old { 1 } else { key_old + 1 };
-        let mut cnt = 0;
-        for l in v {
-            let lv = &mut self.lbd_seen[self.vars[l.vi()].level];
-            if *lv != key {
-                *lv = key;
-                cnt += 1;
-            }
-        }
-        self.lbd_seen[0] = key;
-        cnt
-    }
-}
-
-impl Solver {
-    pub fn garbage_collect_(&mut self, kind: ClauseKind) -> () {
-        if self.cp[kind as usize].watcher[GARBAGE_LIT.negate() as usize] == NULL_CLAUSE {
-            return;
-        }
-        let mut ci = self.cp[kind as usize].watcher[GARBAGE_LIT.negate() as usize];
-        while ci != NULL_CLAUSE {
-            let c = &self.cp[kind as usize].clauses[ci];
-            debug_assert!(c.dead);
-            debug_assert!(c.lit[0] == GARBAGE_LIT || c.lit[1] == GARBAGE_LIT);
-            let index = (c.lit[0] != GARBAGE_LIT) as usize;
-            ci = c.next_watcher[index];
-        }
-        unsafe {
-            for l in 2..self.vars.len()*2 {
-                let vi = (l as Lit).vi();
-                let mut pri = &mut self.cp[kind as usize].watcher[l] as *mut ClauseId;
-                let mut ci = self.cp[kind as usize].watcher[l];
-                'next_clause: while ci != NULL_CLAUSE {
-                    let c = &mut self.cp[kind as usize].clauses[ci] as *mut Clause;
-                    if (vi == WATCHING || (*c).index == DEBUG) && kind == ClauseKind::Removable {
-                        println!("# garbage collect: traverser finds on {} : {:#}", vi, *c);
-                    }
-                    if !(*c).dead {
-                        debug_assert!(!(*c).dead);
-                        if (*c).lit[0].vi() == vi {
-                            pri = &mut (*c).next_watcher[0];
-                            ci = *pri;
-                        } else {
-                            pri = &mut (*c).next_watcher[1];
-                            ci = *pri;
-                        }
-                        continue;
-                    }
-                    debug_assert!((*c).dead);
-                    if (*c).lit[0] == GARBAGE_LIT && (*c).lit[1] == GARBAGE_LIT {
-                        panic!("not be");
-                    } else if (*c).lit[0].negate() == l as Lit {
-                        *pri = self.cp[kind as usize].detach_to_trash(&mut *c, 0);
-                        ci = *pri;
-                    } else if (*c).lit[1].negate() == l as Lit {
-                        *pri = self.cp[kind as usize].detach_to_trash(&mut *c, 1);
-                        ci = *pri;
-                    } else {
-                        panic!("xxxxx {:?}", (*c).lit);
-                    }
-                }
-            }
-            // recycle garbages
-            let recycled = &mut self.cp[kind as usize].watcher[RECYCLE_LIT.negate() as usize] as *mut ClauseId;
-            let mut pri = &mut self.cp[kind as usize].watcher[GARBAGE_LIT.negate() as usize] as *mut ClauseId;
-            let mut ci = self.cp[kind as usize].watcher[GARBAGE_LIT.negate() as usize];
-            while ci != NULL_CLAUSE {
-                let c = &mut self.cp[kind as usize].clauses[ci] as *mut Clause;
-                if !(*c).dead {
-                    // self.cp[kind as usize].print_watcher(0);
-                    // self.cp[kind as usize].print_watcher(1);
-                    panic!("not dead {:#}", *c);
-                }
-                debug_assert!((*c).dead);
-                if (*c).index == DEBUG {
-                    // println!("garbage traverser finds: {:#} on GARBGE link", *c);
-                }
-                if (*c).lit[0] == GARBAGE_LIT && (*c).lit[1] == GARBAGE_LIT {
-                    // println!("move {} to recycler", (*c).index);
-                    // if (*c).index == DEBUG { println!("here comes!"); }
-                    let next = (*c).next_watcher[0];
-                    *pri = (*c).next_watcher[0];
-                    (*c).lit[0] = RECYCLE_LIT;
-                    (*c).lit[1] = RECYCLE_LIT;
-                    (*c).next_watcher[0] = *recycled;
-                    (*c).next_watcher[1] = *recycled;
-                    *recycled = ci; // (*c).next_watcher[0];
-                    (*c).dead = false;
-                    ci = next;
-                    // print!("recycler: ");
-                    // self.cp[kind as usize].print_watcher(GARBAGE_LIT.negate());
-                } else if (*c).lit[0] != GARBAGE_LIT && (*c).lit[1] != GARBAGE_LIT {
-                    println!("very strange {}", *c);
-                } else {
-                    let index = ((*c).lit[0] != GARBAGE_LIT) as usize; // the other might have still active path
-                    // if (*c).index == DEBUG || true { println!("half processed! {:#}", *c); }
-                    ci = (*c).next_watcher[index];
-                    pri = &mut (*c).next_watcher[index];
-                }
-            }
-        }
-        {
-            for c in &self.cp[ClauseKind::Removable as usize].clauses[1..] {
-                if c.dead {
-                    panic!("fail to gather all garbages. An exception {:#} {}, {}",
-                           c,
-                           self.cp[kind as usize].seek_from(c.index, c.lit[0]),
-                           self.cp[kind as usize].seek_from(c.index, c.lit[1]),
-                           );
-                     continue;
-                }
-            }
-        }
-        debug_assert_eq!(self.cp[kind as usize].watcher[0], NULL_CLAUSE);
-    }
-    pub fn check_lit(&self, kind: ClauseKind, mes: &str, lit: Lit) -> () {
-        if kind != ClauseKind::Removable {
-            return;
-        }
-        let vi = lit.vi();
-        if vi == WATCHING {
-            let p = vi.lit(LTRUE);
-            let n = vi.lit(LFALSE);
-            let found_in_p = self.cp[kind as usize].seek_from(DEBUG, p);
-            let found_in_n = self.cp[kind as usize].seek_from(DEBUG, n);
-            if (p.lbool() == self.vars[vi].phase || p.lbool() == self.vars[vi].assign) && !found_in_p && !found_in_n {
-                return;
-            }
-            if found_in_p || found_in_n {
-                println!("Watcher state: {} on {}", mes, lit.int());
-                if found_in_p { print!(" - "); self.cp[kind as usize].print_watcher(n); }
-                if found_in_n { print!(" - "); self.cp[kind as usize].print_watcher(p); }
-            }
-            println!("Check lit: {} on {} not including C{}", mes, lit.int(), DEBUG);
-        }
-    }
-}
-
-impl ClausePack {
-    pub fn check_garbage(&mut self) -> () {
+impl ClausePropagation for ClausePack {
+    fn check_garbage(&mut self) -> () {
         {
             for c in &self.clauses[1..] {
                 if c.dead {
@@ -281,7 +34,7 @@ impl ClausePack {
             }
         }
     }
-    pub fn garbage_collect(&mut self, vars: &[Var]) -> () {
+    fn garbage_collect(&mut self, vars: &Vec<Var>) -> () {
         if self.watcher[GARBAGE_LIT.negate() as usize] == NULL_CLAUSE {
             return;
         }
@@ -369,7 +122,7 @@ impl ClausePack {
         }
         debug_assert_eq!(self.watcher[0], NULL_CLAUSE);
     }
-    pub fn count(&self, target: Lit) -> usize {
+    fn count(&self, target: Lit) -> usize {
         let mut ci = self.watcher[target.negate() as usize];
         let mut cnt = 0;
         while ci != NULL_CLAUSE {
@@ -388,7 +141,7 @@ impl ClausePack {
         }
         cnt
     }
-    pub fn detach_to_trash(&mut self, c: &mut Clause, index: usize) -> ClauseIndex {
+    fn detach_to_trash(&mut self, c: &mut Clause, index: usize) -> ClauseIndex {
         let other = (index ^ 1) as usize;
         // if c.index == DEBUG {
         //     println!("detach_to_trash before: {:#} to {} {} at {}", c, index, c.lit[other], other);
@@ -437,7 +190,7 @@ impl ClausePack {
         }
     }
     // returns false when error.
-    pub fn seek_from(&self, ci: ClauseIndex, p: Lit) -> bool {
+    fn seek_from(&self, ci: ClauseIndex, p: Lit) -> bool {
         let mut i = self.watcher[p.negate() as usize];
         while i != NULL_CLAUSE {
             let c = &self.clauses[i];
@@ -449,7 +202,7 @@ impl ClausePack {
         }
         false
     }
-    pub fn print_watcher(&self, p: Lit) -> () {
+    fn print_watcher(&self, p: Lit) -> () {
         match p {
             GARBAGE_LIT => print!("watcher[garbage] = "),
             RECYCLE_LIT => print!("watcher[recycle] = "),
@@ -468,7 +221,7 @@ impl ClausePack {
         }
         println!("0");
     }
-    pub fn check_clause(&self, mes: &str, ci: ClauseIndex) {
+    fn check_clause(&self, mes: &str, ci: ClauseIndex) {
         if ci != DEBUG {
             return;
         }
@@ -494,6 +247,24 @@ impl ClausePack {
             self.print_watcher(l1.negate());
             println!("{:#}", c);
             panic!("panic");
+        }
+    }
+    fn check_lit(&self, vars: &Vec<Var>, mes: &str, lit: Lit) -> () {
+        let vi = lit.vi();
+        if vi == WATCHING {
+            let p = vi.lit(LTRUE);
+            let n = vi.lit(LFALSE);
+            let found_in_p = self.seek_from(DEBUG, p);
+            let found_in_n = self.seek_from(DEBUG, n);
+            if (p.lbool() == vars[vi].phase || p.lbool() == vars[vi].assign) && !found_in_p && !found_in_n {
+                return;
+            }
+            if found_in_p || found_in_n {
+                println!("Watcher state: {} on {}", mes, lit.int());
+                if found_in_p { print!(" - "); self.print_watcher(n); }
+                if found_in_n { print!(" - "); self.print_watcher(p); }
+            }
+            println!("Check lit: {} on {} not including C{}", mes, lit.int(), DEBUG);
         }
     }
 }

@@ -269,7 +269,7 @@ pub trait Dump {
     fn dump(&self, mes: &str) -> ();
 }
 
-pub fn vec2int(v: Vec<Lit>) -> Vec<i32> {
+pub fn vec2int(v: &[Lit]) -> Vec<i32> {
     v.iter()
         .map(|l| match l {
             0 => 0,
