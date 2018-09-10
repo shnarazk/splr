@@ -11,7 +11,7 @@ pub trait Restart {
 }
 
 const RESTART_PERIOD: u64 = 60;
-/// for block restart based on average assigments: 1.40
+/// for block restart based on average assingments: 1.40
 const R: f64 = 1.1;
 /// for force restart based on average LBD of newly generated clauses: 1.15
 const K: f64 = 1.4; // 1.0 / 0.8
@@ -27,8 +27,8 @@ impl Restart for Solver {
         if self.decision_level() <= lv {
             return;
         }
-        let lim = self.trail_lim[lv];
-        for l in &self.trail[lim..] {
+        let lim = self.assign.trail_lim[lv];
+        for l in &self.assign.trail[lim..] {
             let vi = l.vi();
             {
                 let v = &mut self.vars[vi];
@@ -41,9 +41,9 @@ impl Restart for Solver {
             }
             self.var_order.insert(&self.vars, vi);
         }
-        self.trail.truncate(lim); // FIXME
-        self.trail_lim.truncate(lv);
-        self.q_head = lim;
+        self.assign.trail.truncate(lim); // FIXME
+        self.assign.trail_lim.truncate(lv);
+        self.assign.q_head = lim;
     }
     /// called after no conflict propagation
    ///```C

@@ -4,12 +4,12 @@ use clause::ClauseIdIndexEncoding;
 use clause::ClauseKind;
 use clause::ClausePack;
 use solver::{Solver, Stat};
-use solver_propagate::SolveSAT;
 use types::*;
 use solver::SatSolver;
 use var::Satisfiability;
 use clause::ClauseIndex;
 use solver_propagate::WATCHING;
+use var::Var;
 
 pub const DEBUG: usize = 27728;
 
@@ -81,7 +81,12 @@ impl ClauseManagement for Solver {
             }
             // permutation.retain(|&i| clauses[i].index != DEAD_CLAUSE);
         }
-        self.garbage_collect(ClauseKind::Removable);
+        {
+            let Solver {ref mut cp, ref vars, ..} = self;
+            for cs in &mut cp[..] {
+                cs.garbage_collect(vars);
+            }
+        }
         self.next_reduction += DB_INC_SIZE + (self.c_lvl.0 as usize);
         self.stats[Stat::NumOfReduction as usize] += 1;
         self.progress("drop");
@@ -96,11 +101,11 @@ impl ClauseManagement for Solver {
                     while *pri != NULL_CLAUSE {
                         let c = &mut self.cp[*ck as usize].clauses[*pri] as *mut Clause;
                         let index = ((*c).lit[0] != lit as Lit) as usize;
-                        if self.vars.satisfies(&*c) || *ck == ClauseKind::Removable {
+                        if (&self.vars[..]).satisfies(&*c) || *ck == ClauseKind::Removable {
                             // There's no locked clause.
                             (*c).dead = true;
                             *pri = self.cp[*ck as usize].detach_to_trash(&mut *c, index);
-                            self.check_clause(*ck, "after GC", (*c).index);
+                            self.cp[*ck as usize].check_clause("after GC", (*c).index);
                         } else {
                             pri = &mut (*c).next_watcher[index];
                         }
@@ -112,8 +117,11 @@ impl ClauseManagement for Solver {
         if self.eliminator.use_elim && self.stats[Stat::NumOfSimplification as usize] % 8 == 0 {
             self.eliminate();
         }
-        for ck in &KINDS {
-            self.garbage_collect(*ck);
+        {
+            let Solver {ref mut cp, ref vars, ..} = self;
+            for cs in &mut cp[..] {
+                cs.garbage_collect(vars);
+            }
         }
         self.progress("simp");
         true
@@ -135,7 +143,7 @@ impl ClauseManagement for Solver {
 }
 
 impl Solver {
-    fn garbage_collect(&mut self, kind: ClauseKind) -> () {
+    pub fn garbage_collect_(&mut self, kind: ClauseKind) -> () {
         if self.cp[kind as usize].watcher[GARBAGE_LIT.negate() as usize] == NULL_CLAUSE {
             return;
         }
@@ -148,7 +156,6 @@ impl Solver {
             ci = c.next_watcher[index];
         }
         unsafe {
-            let garbage = &mut self.cp[kind as usize].watcher[GARBAGE_LIT.negate() as usize] as *mut ClauseId;
             for l in 2..self.vars.len()*2 {
                 let vi = (l as Lit).vi();
                 let mut pri = &mut self.cp[kind as usize].watcher[l] as *mut ClauseId;
@@ -236,37 +243,7 @@ impl Solver {
         }
         debug_assert_eq!(self.cp[kind as usize].watcher[0], NULL_CLAUSE);
     }
-    // print a progress report
-    fn progress(&self, mes: &str) -> () {
-        let nv = self.vars.len() - 1;
-        let k = if self.trail_lim.is_empty() {
-            self.trail.len()
-        } else {
-            self.trail_lim[0]
-        };
-        let sum = k + self.eliminator.eliminated_vars;
-        let deads = self.cp[ClauseKind::Removable as usize].clauses.iter().filter(|c| c.dead).count();
-        let cnt = self.cp[ClauseKind::Removable as usize].clauses.iter().filter(|c| c.rank <= 2).count();
-        println!(
-            "#{}, DB:R|P|B,{:>7},{:>6},{:>5},{:>7},{:>5}, PROG,{:>5}+{:>5}({:>.3}%),RES:b|f,{:>5},{:>5},EMA:a|l,{:>5.2},{:>6.2},LBD,{:>6.2}",
-            mes,
-            self.cp[ClauseKind::Removable as usize].clauses.len() - 1,
-            cnt,
-            deads,
-            self.cp[ClauseKind::Permanent as usize].clauses.len() - 1,
-            self.cp[ClauseKind::Binclause as usize].clauses.len() - 1,
-            k,
-            self.eliminator.eliminated_vars,
-            (sum as f32) / (nv as f32) * 100.0,
-            self.stats[Stat::NumOfBlockRestart as usize],
-            self.stats[Stat::NumOfRestart as usize],
-            self.ema_asg.get(),
-            self.ema_lbd.get(),
-            self.ema_lbd.fast,
-        );
-    }
     pub fn check_lit(&self, kind: ClauseKind, mes: &str, lit: Lit) -> () {
-        return;
         if kind != ClauseKind::Removable {
             return;
         }
@@ -287,39 +264,111 @@ impl Solver {
             println!("Check lit: {} on {} not including C{}", mes, lit.int(), DEBUG);
         }
     }
-    pub fn check_clause(&self, kind: ClauseKind, mes: &str, ci: ClauseIndex) {
-        if kind != ClauseKind::Removable {
-            return;
-        }
-        if ci != DEBUG {
-            return;
-        }
-        let c = &self.cp[kind as usize].clauses[DEBUG];
-        let l0 = c.lit[0];
-        let l1 = c.lit[1];
-        let r0 = self.cp[kind as usize].seek_from(c.index, l0);
-        let r1 = self.cp[kind as usize].seek_from(c.index, l1);
-        if r0 || r1 {
-            println!("No problem on watchers of {} clause {} '{}'; watching {} and {}",
-                     if c.dead { "dead" } else { "" },
-                     c.index, mes, l0.show(), l1.show());
-        } else {
-            println!("Assersion failed by {} at '{}', lit0({}): {}, lit1({}): {}",
-                     c.index,
-                     mes,
-                     l0.show(),
-                     r0,
-                     l1.show(),
-                     r1,
-            );
-            self.cp[kind as usize].print_watcher(l0.negate());
-            self.cp[kind as usize].print_watcher(l1.negate());
-            println!("{:#}", c);
-            panic!("panic");
+}
+
+impl ClausePack {
+    pub fn check_garbage(&mut self) -> () {
+        {
+            for c in &self.clauses[1..] {
+                if c.dead {
+                    panic!("fail to gather all garbages. An exception {:#} {}, {}",
+                           c,
+                           self.seek_from(c.index, c.lit[0]),
+                           self.seek_from(c.index, c.lit[1]),
+                           );
+                     continue;
+                }
+            }
         }
     }
-}
-impl ClausePack {
+    pub fn garbage_collect(&mut self, vars: &[Var]) -> () {
+        if self.watcher[GARBAGE_LIT.negate() as usize] == NULL_CLAUSE {
+            return;
+        }
+        let mut ci = self.watcher[GARBAGE_LIT.negate() as usize];
+        while ci != NULL_CLAUSE {
+            let c = &self.clauses[ci];
+            debug_assert!(c.dead);
+            debug_assert!(c.lit[0] == GARBAGE_LIT || c.lit[1] == GARBAGE_LIT);
+            let index = (c.lit[0] != GARBAGE_LIT) as usize;
+            ci = c.next_watcher[index];
+        }
+        unsafe {
+            for l in 2..vars.len()*2 {
+                let vi = (l as Lit).vi();
+                let mut pri = &mut self.watcher[l] as *mut ClauseId;
+                let mut ci = self.watcher[l];
+                'next_clause: while ci != NULL_CLAUSE {
+                    let c = &mut self.clauses[ci] as *mut Clause;
+                    if vi == WATCHING || (*c).index == DEBUG {
+                        println!("# garbage collect: traverser finds on {} : {:#}", vi, *c);
+                    }
+                    if !(*c).dead {
+                        debug_assert!(!(*c).dead);
+                        if (*c).lit[0].vi() == vi {
+                            pri = &mut (*c).next_watcher[0];
+                            ci = *pri;
+                        } else {
+                            pri = &mut (*c).next_watcher[1];
+                            ci = *pri;
+                        }
+                        continue;
+                    }
+                    debug_assert!((*c).dead);
+                    if (*c).lit[0] == GARBAGE_LIT && (*c).lit[1] == GARBAGE_LIT {
+                        panic!("not be");
+                    } else if (*c).lit[0].negate() == l as Lit {
+                        *pri = self.detach_to_trash(&mut *c, 0);
+                        ci = *pri;
+                    } else if (*c).lit[1].negate() == l as Lit {
+                        *pri = self.detach_to_trash(&mut *c, 1);
+                        ci = *pri;
+                    } else {
+                        panic!("xxxxx {:?}", (*c).lit);
+                    }
+                }
+            }
+            // recycle garbages
+            let recycled = &mut self.watcher[RECYCLE_LIT.negate() as usize] as *mut ClauseId;
+            let mut pri = &mut self.watcher[GARBAGE_LIT.negate() as usize] as *mut ClauseId;
+            let mut ci = self.watcher[GARBAGE_LIT.negate() as usize];
+            while ci != NULL_CLAUSE {
+                let c = &mut self.clauses[ci] as *mut Clause;
+                if !(*c).dead {
+                    // self.print_watcher(0);
+                    // self.print_watcher(1);
+                    panic!("not dead {:#}", *c);
+                }
+                debug_assert!((*c).dead);
+                if (*c).index == DEBUG {
+                    // println!("garbage traverser finds: {:#} on GARBGE link", *c);
+                }
+                if (*c).lit[0] == GARBAGE_LIT && (*c).lit[1] == GARBAGE_LIT {
+                    // println!("move {} to recycler", (*c).index);
+                    // if (*c).index == DEBUG { println!("here comes!"); }
+                    let next = (*c).next_watcher[0];
+                    *pri = (*c).next_watcher[0];
+                    (*c).lit[0] = RECYCLE_LIT;
+                    (*c).lit[1] = RECYCLE_LIT;
+                    (*c).next_watcher[0] = *recycled;
+                    (*c).next_watcher[1] = *recycled;
+                    *recycled = ci; // (*c).next_watcher[0];
+                    (*c).dead = false;
+                    ci = next;
+                    // print!("recycler: ");
+                    // self.print_watcher(GARBAGE_LIT.negate());
+                } else if (*c).lit[0] != GARBAGE_LIT && (*c).lit[1] != GARBAGE_LIT {
+                    println!("very strange {}", *c);
+                } else {
+                    let index = ((*c).lit[0] != GARBAGE_LIT) as usize; // the other might have still active path
+                    // if (*c).index == DEBUG || true { println!("half processed! {:#}", *c); }
+                    ci = (*c).next_watcher[index];
+                    pri = &mut (*c).next_watcher[index];
+                }
+            }
+        }
+        debug_assert_eq!(self.watcher[0], NULL_CLAUSE);
+    }
     pub fn count(&self, target: Lit) -> usize {
         let mut ci = self.watcher[target.negate() as usize];
         let mut cnt = 0;
@@ -418,5 +467,33 @@ impl ClausePack {
             i = c.next_watcher[index];
         }
         println!("0");
+    }
+    pub fn check_clause(&self, mes: &str, ci: ClauseIndex) {
+        if ci != DEBUG {
+            return;
+        }
+        let c = &self.clauses[DEBUG];
+        let l0 = c.lit[0];
+        let l1 = c.lit[1];
+        let r0 = self.seek_from(c.index, l0);
+        let r1 = self.seek_from(c.index, l1);
+        if r0 || r1 {
+            println!("No problem on watchers of {} clause {} '{}'; watching {} and {}",
+                     if c.dead { "dead" } else { "" },
+                     c.index, mes, l0.show(), l1.show());
+        } else {
+            println!("Assersion failed by {} at '{}', lit0({}): {}, lit1({}): {}",
+                     c.index,
+                     mes,
+                     l0.show(),
+                     r0,
+                     l1.show(),
+                     r1,
+            );
+            self.print_watcher(l0.negate());
+            self.print_watcher(l1.negate());
+            println!("{:#}", c);
+            panic!("panic");
+        }
     }
 }

@@ -296,7 +296,7 @@ impl Solver {
         {
             // Empty subsumption queue and return immediately on user-interrupt:
             // if computed-too-long { break; }
-            // Check top-level assigments by creating a dummy clause and placing it in the queue:
+            // Check top-level assingments by creating a dummy clause and placing it in the queue:
             if self.eliminator.subsumption_queue.len() == 0
                 && self.eliminator.bwdsub_assigns < self.trail.len()
             {

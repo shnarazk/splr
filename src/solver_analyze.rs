@@ -25,7 +25,7 @@ impl CDCL for Solver {
         let dl = self.decision_level();
         let mut cid: usize = confl;
         let mut p = NULL_LIT;
-        let mut ti = self.trail.len() - 1; // trail index
+        let mut ti = self.assign.trail.len() - 1; // trail index
         let mut path_cnt = 0;
         loop {
             unsafe {
@@ -76,14 +76,14 @@ impl CDCL for Solver {
                     }
                 }
                 // set the index of the next literal to ti
-                while self.an_seen[self.trail[ti].vi()] == 0 {
+                while self.an_seen[self.assign.trail[ti].vi()] == 0 {
                     // println!(
                     //     "{} はフラグが立ってないので飛ばす",
                     //     self.trail[ti].int()
                     // );
                     ti -= 1;
                 }
-                p = self.trail[ti];
+                p = self.assign.trail[ti];
                 {
                     let next_vi = p.vi();
                     cid = self.vars[next_vi].reason;
@@ -193,14 +193,14 @@ impl CDCL for Solver {
                     self.an_seen[vi] = 1;
                 }
             }
-            let tl0 = self.trail_lim[0];
-            let start = if self.trail_lim.len() <= self.root_level {
-                self.trail.len()
+            let tl0 = self.assign.trail_lim[0];
+            let start = if self.assign.trail_lim.len() <= self.root_level {
+                self.assign.trail.len()
             } else {
-                self.trail_lim[self.root_level]
+                self.assign.trail_lim[self.root_level]
             };
             for i in (tl0..start).rev() {
-                let l: Lit = self.trail[i];
+                let l: Lit = self.assign.trail[i];
                 let vi = l.vi();
                 if self.an_seen[vi] == 1 {
                     if self.vars[vi].reason == NULL_CLAUSE {
@@ -243,7 +243,7 @@ impl Solver {
                 c0 = c.lit[0];
                 len = c.lits.len();
             }
-            if len == 0 && self.vars.assigned(c0) == LFALSE {
+            if len == 0 && (&self.vars[..]).assigned(c0) == LFALSE {
                 self.cp[cid.to_kind()].clauses[cid.to_index()]
                     .lit
                     .swap(0, 1);
@@ -300,7 +300,7 @@ impl Solver {
                     c.lit[0]
                 };
                 let vi = other.vi();
-                if self.mi_var_map[vi] == key && self.vars.assigned(other) == LTRUE {
+                if self.mi_var_map[vi] == key && (&self.vars[..]).assigned(other) == LTRUE {
                     nb += 1;
                     self.mi_var_map[vi] -= 1;
                 }
