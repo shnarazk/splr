@@ -25,13 +25,14 @@ pub trait ClauseIF {
     fn new_clause(&mut self, v: &Vec<Lit>, rank: usize, learnt: bool, locked: bool) -> ClauseId;
     fn propagate(&mut self, vars: &mut Vec<Var>, asg: &mut AssignState, p: Lit) -> ClauseId;
     fn len(&self) -> usize;
+    fn count(&self, target: Lit, limit: usize) -> usize;
 }
 
 /// for ClauseDBState
 pub trait ClauseManagement {
     fn bump_cid(&mut self, cp: &mut [ClausePack; 3], ci: ClauseId) -> ();
     fn decay_cla_activity(&mut self) -> ();
-    fn reduce_watchers(&mut self, cp: &mut ClausePack, vars: &Vec<Var>) -> ();
+    fn reduce_watchers(&mut self, cp: &mut ClausePack) -> ();
     fn simplify(&mut self, cp: &mut [ClausePack; 3], vars: &Vec<Var>) -> bool;
 }
 
@@ -265,6 +266,28 @@ impl ClauseIF for ClausePack {
                 }
         NULL_CLAUSE
     }
+    fn count(&self, target: Lit, limit: usize) -> usize {
+        let mut ci = self.watcher[target.negate() as usize];
+        let mut cnt = 0;
+        while ci != NULL_CLAUSE {
+            cnt += 1;
+            let c = &self.clauses[ci];
+            if ci == c.next_watcher[(c.lit[0] != target) as usize] {
+                panic!("{} is looping!", target);
+            }
+            if 0 < limit && limit <= cnt {
+                return limit;
+            }
+            if cnt % 10000 == 0 && false {
+                //let cc = &self.clauses[self.watcher[target.negate() as usize]];
+                // println!("#{} = {}, {:#}", target, cnt, cc);
+                // cc = &self.clauses[cc.next_watcher[(cc.lit[0] != target) as usize]];
+                // println!("#{} = {}, {:#}", target, cnt, cc);
+            }
+            ci = c.next_watcher[(c.lit[0] != target) as usize];
+        }
+        cnt
+    }
 }
 
 impl ClausePack {
@@ -295,6 +318,10 @@ impl ClausePack {
         let w0 = c.lit[0].negate() as usize;
         let w1 = c.lit[1].negate() as usize;
         let cix;
+        if self.watcher[RECYCLE_LIT.negate() as usize] == NULL_CLAUSE &&
+            self.watcher[GARBAGE_LIT.negate() as usize] != NULL_CLAUSE {
+                self.garbage_collect();
+            }
         if self.watcher[RECYCLE_LIT.negate() as usize] != NULL_CLAUSE {
             cix = self.watcher[RECYCLE_LIT.negate() as usize];
             debug_assert_eq!(self.clauses[cix].dead, false);
@@ -601,7 +628,7 @@ impl ClauseManagement for ClauseDBState {
     }
     /// 1. sort `permutation` which is a mapping: index -> ClauseIndex.
     /// 2. rebuild watches to pick up clauses which is placed in a good place in permutation.
-    fn reduce_watchers(&mut self, cp: &mut ClausePack, vars: &Vec<Var>) -> () {
+    fn reduce_watchers(&mut self, cp: &mut ClausePack) -> () {
         {
             let ClausePack { ref mut clauses, .. } = cp;
             // debug_assert_eq!(permutation.len(), clauses.len());
@@ -629,7 +656,7 @@ impl ClauseManagement for ClauseDBState {
             }
             // permutation.retain(|&i| clauses[i].index != DEAD_CLAUSE);
         }
-        cp.garbage_collect(vars);
+        cp.garbage_collect();
     }
     /// call only when decision level is zero; there's no locked clause.
     fn simplify(&mut self, cps: &mut [ClausePack; 3], vars: &Vec<Var>) -> bool {
@@ -655,16 +682,12 @@ impl ClauseManagement for ClauseDBState {
         // if self.eliminator.use_elim && self.stats[Stat::NumOfSimplification as usize] % 8 == 0 {
         //     self.eliminate();
         // }
-        for cp in &mut cps[..] {
-            cp.garbage_collect(vars);
-        }
         true
     }
 }
 
 trait CheckPropagation {
     fn check_garbage(&mut self) -> ();
-    fn count(&self, target: Lit) -> usize;
     fn seek_from(&self, ci: ClauseIndex, p: Lit) -> bool;
     fn print_watcher(&self, p: Lit) -> ();
     fn check_clause(&self, mes: &str, ci: ClauseIndex);
@@ -684,25 +707,6 @@ impl CheckPropagation for ClausePack {
                 }
             }
         }
-    }
-    fn count(&self, target: Lit) -> usize {
-        let mut ci = self.watcher[target.negate() as usize];
-        let mut cnt = 0;
-        while ci != NULL_CLAUSE {
-            cnt += 1;
-            let c = &self.clauses[ci];
-            if ci == c.next_watcher[(c.lit[0] != target) as usize] {
-                panic!("{} is looping!", target);
-            }
-            if cnt % 10000 == 0 && false {
-                //let cc = &self.clauses[self.watcher[target.negate() as usize]];
-                // println!("#{} = {}, {:#}", target, cnt, cc);
-                // cc = &self.clauses[cc.next_watcher[(cc.lit[0] != target) as usize]];
-                // println!("#{} = {}, {:#}", target, cnt, cc);
-            }
-            ci = c.next_watcher[(c.lit[0] != target) as usize];
-        }
-        cnt
     }
     // returns false when error.
     fn seek_from(&self, ci: ClauseIndex, p: Lit) -> bool {

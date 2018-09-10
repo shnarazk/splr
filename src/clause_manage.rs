@@ -3,16 +3,15 @@ use clause::Clause;
 use clause::ClausePack;
 use types::*;
 use clause::ClauseIndex;
-use var::Var;
 
 // for ClausePack
 pub trait ClauseReduction {
-    fn garbage_collect(&mut self, vars: &Vec<Var>) -> ();
+    fn garbage_collect(&mut self) -> ();
     fn detach(&mut self, c: &mut Clause, index: usize) -> ClauseIndex;
 }
 
 impl ClauseReduction for ClausePack {
-    fn garbage_collect(&mut self, vars: &Vec<Var>) -> () {
+    fn garbage_collect(&mut self) -> () {
         if self.watcher[GARBAGE_LIT.negate() as usize] == NULL_CLAUSE {
             return;
         }
@@ -25,7 +24,7 @@ impl ClauseReduction for ClausePack {
             ci = c.next_watcher[index];
         }
         unsafe {
-            for l in 2..vars.len()*2 {
+            for l in 2..self.watcher.len() {
                 let vi = (l as Lit).vi();
                 let mut pri = &mut self.watcher[l] as *mut ClauseId;
                 let mut ci = self.watcher[l];

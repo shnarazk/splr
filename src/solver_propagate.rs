@@ -81,7 +81,7 @@ impl SolveSAT for Solver {
                     if self.cur_restart * self.next_reduction <= conflicts {
                         self.cur_restart =
                             ((conflicts as f64) / (self.next_reduction as f64)) as usize + 1;
-                        self.cdb.reduce_watchers(&mut self.cp[ClauseKind::Removable as usize], &self.vars);
+                        self.cdb.reduce_watchers(&mut self.cp[ClauseKind::Removable as usize]);
                         self.next_reduction += self.cdb.increment_step + (self.c_lvl.0 as usize);
                         self.stats[Stat::NumOfReduction as usize] += 1;
                         self.progress("drop");
