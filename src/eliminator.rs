@@ -285,7 +285,7 @@ impl Solver {
         let mut _cnt = 0;
         let mut _subsumed = 0;
         let mut _deleted_literals = 0;
-        debug_assert_eq!(self.decision_level(), 0);
+        debug_assert_eq!(self.assign.decision_level(), 0);
         while 0 < self.eliminator.clause_queue.len()
             || self.eliminator.bwdsub_assigns < self.assign.trail.len()
         {
@@ -374,7 +374,7 @@ impl Solver {
     /// 10. backwardSubsumptionCheck
     /// - calls `clause_queue.pop`
     pub fn binary_subsumption_check(&mut self) -> bool {
-        debug_assert_eq!(self.decision_level(), 0);
+        debug_assert_eq!(self.assign.decision_level(), 0);
         unsafe {
             while let Some(cid) = self.eliminator.binclause_queue.pop() {
                 if cid.to_kind() != ClauseKind::Binclause as usize {

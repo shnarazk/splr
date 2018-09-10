@@ -1,7 +1,8 @@
-use solver::{Solver, Stat};
-use types::*;
+use assign::Assignment;
 use solver::SatSolver;
 use solver_propagate::SolveSAT;
+use solver::{Solver, Stat};
+use types::*;
 
 /// for Solver
 pub trait Restart {
@@ -47,7 +48,7 @@ impl Restart for Solver {
     fn block_restart(&mut self, lbd: usize, clv: usize) -> () {
         let count = self.stats[Stat::NumOfBackjump as usize] as u64;
         let nas = self.num_assigns() as f64;
-        let b_l = self.decision_level() as f64;
+        let b_l = self.assign.decision_level() as f64;
         self.ema_asg.update(nas);
         let e_asg = self.ema_asg.get();
         self.ema_lbd.update(lbd as f64);

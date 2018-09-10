@@ -2,6 +2,7 @@ use types::*;
 use var::Var;
 
 pub trait Assignment {
+    fn decision_level(&self) -> usize;
     fn enqueue(&mut self, v: &mut Var, l: Lit, cid: ClauseId) -> bool;
     fn uncheck_enqueue(&mut self, v: &mut Var, l: Lit, cid: ClauseId) -> ();
     fn uncheck_assume(&mut self, v: &mut Var, l: Lit) -> ();
@@ -15,6 +16,9 @@ pub struct AssignState {
 }
 
 impl Assignment for AssignState {
+    fn decision_level(&self) -> usize {
+        self.trail_lim.len()
+    }
     /// WARNING: you have to lock the clause by yourself.
     fn enqueue(&mut self, v: &mut Var, l: Lit, cid: ClauseId) -> bool {
         // println!("enqueue: {} by {}", l.int(), cid);

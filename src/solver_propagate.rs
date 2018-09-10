@@ -33,7 +33,7 @@ impl SolveSAT for Solver {
             // self.dump("calling propagate");
             self.stats[Stat::NumOfPropagation as usize] += 1;
             let ci = self.propagate();
-            let d = self.decision_level();
+            let d = self.assign.decision_level();
             // self.dump(format!("search called propagate and it returned {:?} at {}", ret, d));
             if ci == NULL_CLAUSE {
                 // println!(" search loop enters a new level");
@@ -116,7 +116,7 @@ impl SolveSAT for Solver {
     ///  - q_head
     ///  - var_order
     fn cancel_until(&mut self, lv: usize) -> () {
-        if self.decision_level() <= lv {
+        if self.assign.decision_level() <= lv {
             return;
         }
         let lim = self.assign.trail_lim[lv];
@@ -148,7 +148,7 @@ impl CDCL for Solver {
         // self.dump("analyze");
         self.an_learnt_lits.clear();
         self.an_learnt_lits.push(0);
-        let dl = self.decision_level();
+        let dl = self.assign.decision_level();
         let mut cid: usize = confl;
         let mut p = NULL_LIT;
         let mut ti = self.assign.trail.len() - 1; // trail index
@@ -408,7 +408,7 @@ impl Solver {
         unsafe {
             let key = self.an_level_map_key;
             let vec = &mut self.an_learnt_lits as *mut Vec<Lit>;
-            let nblevel = self.lbd_vector(&*vec);
+            let nblevel = (*vec).lbd(self);            // let nblevel = self.lbd_vector(&*vec);
             if 6 < nblevel {
                 return;
             }

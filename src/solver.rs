@@ -11,7 +11,6 @@ use var::*;
 // use var_manage::Eliminator;
 
 pub trait SatSolver {
-    fn decision_level(&self) -> usize;
     fn solve(&mut self) -> SolverResult;
     fn build(path: &str) -> (Solver, CNFDescription);
     fn add_clause(&mut self, v: &mut Vec<Lit>) -> bool;
@@ -212,9 +211,6 @@ impl Solver {
 }
 
 impl SatSolver for Solver {
-    fn decision_level(&self) -> usize {
-        self.assign.trail_lim.len()
-    }
     fn solve(&mut self) -> SolverResult {
         if !self.ok {
             return Ok(Certificate::UNSAT(Vec::new()));
@@ -397,7 +393,7 @@ impl Dump for Solver {
         println!(
             "# {} at {} r:{}, p:{}, b:{}",
             str,
-            self.decision_level(),
+            self.assign.decision_level(),
             self.cp[ClauseKind::Removable as usize].clauses.len(),
             self.cp[ClauseKind::Permanent as usize].clauses.len(),
             self.cp[ClauseKind::Binclause as usize].clauses.len(),

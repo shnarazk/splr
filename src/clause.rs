@@ -9,6 +9,9 @@ use assign::{AssignState, Assignment};
 use var::Satisfiability;
 use clause_manage::ClauseReduction;
 
+const DEBUG: usize = 27728;
+const WATCHING: VarId = 2685;
+
 pub trait ClauseIdIndexEncoding {
     fn to_id(&self) -> ClauseId;
     fn to_index(&self) -> ClauseIndex;
@@ -176,17 +179,17 @@ impl ClauseIF for ClausePack {
         };
         self.watcher[w0] = cix;
         self.watcher[w1] = cix;
-        {
-            let c = &self.clauses[cix];
-            let l0 = c.lit[0];
-            if !self.seek_from(cix, l0) {
-                panic!("NOT FOUND for {} c: {:#}", l0.int(), c);
-            }
-            let l1 = c.lit[1];
-            if !self.seek_from(cix, l1) {
-                panic!("NOT FOUND for {} c: {:#}", l1.int(), c);
-            }
-        }
+        // {
+        //     let c = &self.clauses[cix];
+        //     let l0 = c.lit[0];
+        //     if !self.seek_from(cix, l0) {
+        //         panic!("NOT FOUND for {} c: {:#}", l0.int(), c);
+        //     }
+        //     let l1 = c.lit[1];
+        //     if !self.seek_from(cix, l1) {
+        //         panic!("NOT FOUND for {} c: {:#}", l1.int(), c);
+        //     }
+        // }
         self.id_from(cix)
     }
     fn id_from(&self, cix: ClauseIndex) -> ClauseId {
@@ -315,17 +318,17 @@ impl ClausePack {
         self.watcher[w0] = cix;
         self.watcher[w1] = cix;
 
-        {
-            let c = &self.clauses[cix];
-            let l0 = c.lit[0];
-            if !self.seek_from(cix, l0) {
-                panic!("NOT FOUND for {} c: {:#}", l0.int(), c);
-            }
-            let l1 = c.lit[1];
-            if !self.seek_from(cix, l1) {
-                panic!("NOT FOUND for {} c: {:#}", l1.int(), c);
-            }
-        }
+        // {
+        //     let c = &self.clauses[cix];
+        //     let l0 = c.lit[0];
+        //     if !self.seek_from(cix, l0) {
+        //         panic!("NOT FOUND for {} c: {:#}", l0.int(), c);
+        //     }
+        //     let l1 = c.lit[1];
+        //     if !self.seek_from(cix, l1) {
+        //         panic!("NOT FOUND for {} c: {:#}", l1.int(), c);
+        //     }
+        // }
         self.id_from(cix)
     }
 }
@@ -628,19 +631,19 @@ impl ClauseManagement for ClauseDBState {
         }
         cp.garbage_collect(vars);
     }
-    fn simplify(&mut self, cp: &mut [ClausePack; 3], vars: &Vec<Var>) -> bool {
+    /// call only when decision level is zero; there's no locked clause.
+    fn simplify(&mut self, cps: &mut [ClausePack; 3], vars: &Vec<Var>) -> bool {
         // find garbages
-        for ck in &KINDS {
+        for cp in &mut cps[..] {
             for lit in 2..vars.len() * 2 {
                 unsafe {
-                    let mut pri = &mut cp[*ck as usize].watcher[(lit as Lit).negate() as usize] as *mut ClauseId;
+                    let mut pri = &mut cp.watcher[(lit as Lit).negate() as usize] as *mut ClauseId;
                     while *pri != NULL_CLAUSE {
-                        let c = &mut cp[*ck as usize].clauses[*pri] as *mut Clause;
+                        let c = &mut cp.clauses[*pri] as *mut Clause;
                         let index = ((*c).lit[0] != lit as Lit) as usize;
-                        if (&vars[..]).satisfies(&*c) || *ck == ClauseKind::Removable {
-                            // There's no locked clause.
+                        if (&vars[..]).satisfies(&*c) {
                             (*c).dead = true;
-                            *pri = cp[*ck as usize].detach_to_trash(&mut *c, index);
+                            *pri = cp.detach_to_trash(&mut *c, index);
                             // cp[*ck as usize].check_clause("after GC", (*c).index);
                         } else {
                             pri = &mut (*c).next_watcher[index];
@@ -652,11 +655,129 @@ impl ClauseManagement for ClauseDBState {
         // if self.eliminator.use_elim && self.stats[Stat::NumOfSimplification as usize] % 8 == 0 {
         //     self.eliminate();
         // }
-        {
-            for cs in &mut cp[..] {
-                cs.garbage_collect(vars);
-            }
+        for cp in &mut cps[..] {
+            cp.garbage_collect(vars);
         }
         true
+    }
+}
+
+trait CheckPropagation {
+    fn check_garbage(&mut self) -> ();
+    fn count(&self, target: Lit) -> usize;
+    fn seek_from(&self, ci: ClauseIndex, p: Lit) -> bool;
+    fn print_watcher(&self, p: Lit) -> ();
+    fn check_clause(&self, mes: &str, ci: ClauseIndex);
+    fn check_lit(&self, vars: &Vec<Var>, mes: &str, lit: Lit) -> ();
+}
+
+impl CheckPropagation for ClausePack {
+    fn check_garbage(&mut self) -> () {
+        {
+            for c in &self.clauses[1..] {
+                if c.dead {
+                    panic!("fail to gather all garbages. An exception {:#} {}, {}",
+                           c,
+                           self.seek_from(c.index, c.lit[0]),
+                           self.seek_from(c.index, c.lit[1]),
+                           );
+                }
+            }
+        }
+    }
+    fn count(&self, target: Lit) -> usize {
+        let mut ci = self.watcher[target.negate() as usize];
+        let mut cnt = 0;
+        while ci != NULL_CLAUSE {
+            cnt += 1;
+            let c = &self.clauses[ci];
+            if ci == c.next_watcher[(c.lit[0] != target) as usize] {
+                panic!("{} is looping!", target);
+            }
+            if cnt % 10000 == 0 && false {
+                //let cc = &self.clauses[self.watcher[target.negate() as usize]];
+                // println!("#{} = {}, {:#}", target, cnt, cc);
+                // cc = &self.clauses[cc.next_watcher[(cc.lit[0] != target) as usize]];
+                // println!("#{} = {}, {:#}", target, cnt, cc);
+            }
+            ci = c.next_watcher[(c.lit[0] != target) as usize];
+        }
+        cnt
+    }
+    // returns false when error.
+    fn seek_from(&self, ci: ClauseIndex, p: Lit) -> bool {
+        let mut i = self.watcher[p.negate() as usize];
+        while i != NULL_CLAUSE {
+            let c = &self.clauses[i];
+            if c.index == ci {
+                return true;
+            }
+            let index = if c.lit[0] == p { 0 } else { 1 };
+            i = c.next_watcher[index];
+        }
+        false
+    }
+    fn print_watcher(&self, p: Lit) -> () {
+        match p {
+            GARBAGE_LIT => print!("watcher[garbage] = "),
+            RECYCLE_LIT => print!("watcher[recycle] = "),
+            x => print!("watcher[{}] = ", x.int()),
+        };
+        let mut i = self.watcher[p as usize];
+        while i != NULL_CLAUSE {
+            let c = &self.clauses[i];
+            print!("{}, ", i);
+            let index = match () {
+                _ if c.lit[0].negate() == p => 0,
+                _ if c.lit[1].negate() == p => 1,
+                _ => panic!("the literal {} is not a watcher for {:#}", p, c),
+            };
+            i = c.next_watcher[index];
+        }
+        println!("0");
+    }
+    fn check_clause(&self, mes: &str, ci: ClauseIndex) {
+        if ci != DEBUG { return; }
+        let c = &self.clauses[DEBUG];
+        let l0 = c.lit[0];
+        let l1 = c.lit[1];
+        let r0 = self.seek_from(c.index, l0);
+        let r1 = self.seek_from(c.index, l1);
+        if r0 || r1 {
+            println!("No problem on watchers of {} clause {} '{}'; watching {} and {}",
+                     if c.dead { "dead" } else { "" },
+                     c.index, mes, l0.show(), l1.show());
+        } else {
+            println!("Assersion failed by {} at '{}', lit0({}): {}, lit1({}): {}",
+                     c.index,
+                     mes,
+                     l0.show(),
+                     r0,
+                     l1.show(),
+                     r1,
+            );
+            self.print_watcher(l0.negate());
+            self.print_watcher(l1.negate());
+            println!("{:#}", c);
+            panic!("panic");
+        }
+    }
+    fn check_lit(&self, vars: &Vec<Var>, mes: &str, lit: Lit) -> () {
+        let vi = lit.vi();
+        if vi == WATCHING {
+            let p = vi.lit(LTRUE);
+            let n = vi.lit(LFALSE);
+            let found_in_p = self.seek_from(DEBUG, p);
+            let found_in_n = self.seek_from(DEBUG, n);
+            if (p.lbool() == vars[vi].phase || p.lbool() == vars[vi].assign) && !found_in_p && !found_in_n {
+                return;
+            }
+            if found_in_p || found_in_n {
+                println!("Watcher state: {} on {}", mes, lit.int());
+                if found_in_p { print!(" - "); self.print_watcher(n); }
+                if found_in_n { print!(" - "); self.print_watcher(p); }
+            }
+            println!("Check lit: {} on {} not including C{}", mes, lit.int(), DEBUG);
+        }
     }
 }
