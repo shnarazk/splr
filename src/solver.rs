@@ -190,23 +190,27 @@ impl Solver {
             .iter()
             .filter(|c| c.rank <= 2)
             .count();
-        println!(
-            "#{}, DB:R|P|B,{:>7},{:>6},{:>5},{:>7},{:>5}, PROG,{:>5}+{:>5}({:>.3}%),RES:b|f,{:>5},{:>5},EMA:a|l,{:>5.2},{:>6.2},LBD,{:>6.2}",
-            mes,
-            self.cp[ClauseKind::Removable as usize].clauses.len() - 1,
-            cnt,
-            deads,
-            self.cp[ClauseKind::Permanent as usize].clauses.len() - 1,
-            self.cp[ClauseKind::Binclause as usize].clauses.len() - 1,
-            k,
-            self.eliminator.eliminated_vars,
-            (sum as f32) / (nv as f32) * 100.0,
-            self.stats[Stat::NumOfBlockRestart as usize],
-            self.stats[Stat::NumOfRestart as usize],
-            self.ema_asg.get(),
-            self.ema_lbd.get(),
-            self.ema_lbd.fast,
-        );
+        if mes == "" {
+            println!("#init, DB,  Remov,  good, dead,   Perm,  Bin, PROG, solv, elim,  rate, RES,block,force,EMA, asgn,   lbd,LBD,   avg");
+        } else {
+            println!(
+                "#{}, DB,{:>7},{:>6},{:>5},{:>7},{:>5}, PROG,{:>5},{:>5},{:>.3}%, RES,{:>5},{:>5},EMA,{:>5.2},{:>6.2},LBD,{:>6.2}",
+                mes,
+                self.cp[ClauseKind::Removable as usize].clauses.len() - 1,
+                cnt,
+                deads,
+                self.cp[ClauseKind::Permanent as usize].clauses.len() - 1,
+                self.cp[ClauseKind::Binclause as usize].clauses.len() - 1,
+                k,
+                self.eliminator.eliminated_vars,
+                (sum as f32) / (nv as f32) * 100.0,
+                self.stats[Stat::NumOfBlockRestart as usize],
+                self.stats[Stat::NumOfRestart as usize],
+                self.ema_asg.get(),
+                self.ema_lbd.get(),
+                self.ema_lbd.fast,
+            );
+        }
     }
 }
 
