@@ -1,3 +1,4 @@
+#![allow(unused_macros)]
 #![allow(dead_code)]
 extern crate splr;
 use splr::clause::*;
@@ -72,11 +73,11 @@ impl TestingSolver for Solver {
         for (i, c) in target.clauses.iter().enumerate() {
             println!("#{} {:#}", i, c);
         }
-        println!("permutation len: {}, clauses len: {}", &target.permutation.len(), target.clauses.len());
-        println!("permutation table: {:?}", &target.permutation[1..]);
-        for i in &target.permutation[1..] {
-            println!("@{} {:#}", i, target.clauses[*i]);
-        }
+        // println!("permutation len: {}, clauses len: {}", &target.permutation.len(), target.clauses.len());
+        // println!("permutation table: {:?}", &target.permutation[1..]);
+        // for i in &target.permutation[1..] {
+        //    println!("@{} {:#}", i, target.clauses[*i]);
+       // }
     }
 }
 
@@ -112,31 +113,27 @@ fn clause_sort() -> () {
     println!("- first senario");
     let mut s = setup();
     assert_eq!(s.ok, true);
-    println!(
-        "Clause permutaton: {:?}",
-        &s.cp[ClauseKind::Removable as usize].permutation
-    );
+    // println!("Clause permutaton: {:?}", &s.cp[ClauseKind::Removable as usize].permutation);
     {
         let ClausePack {
             ref clauses,
-            ref mut permutation,
             ..
         } = &mut s.cp[ClauseKind::Removable as usize];
-        println!("Before sort clauses: {:?}", &permutation[1..]);
-        permutation[1..].sort_by(|&a, &b| clauses[a].cmp(&clauses[b]));
-        println!("Sort clauses: {:?}", &permutation[1..]);
-        for i in &permutation[1..] {
-            println!("#{} {:#}", i, &clauses[*i]);
-        }
+        // println!("Before sort clauses: {:?}", &permutation[1..]);
+        // permutation[1..].sort_by(|&a, &b| clauses[a].cmp(&clauses[b]));
+        // println!("Sort clauses: {:?}", &permutation[1..]);
+        // for i in &permutation[1..] {
+        //     println!("#{} {:#}", i, &clauses[*i]);
+        // }
         //for i in 0..permutation.len() {
         //    permutation[i] = i;
         //}
     }
     s.show_clauses();
-    s.cdb.reduce_watchers(&mut s.cp[0], &s.vars);
+    s.cm.reduce_watchers(&mut s.cp[0]);
     s.show_clauses();
 
-    s.cdb.simplify(&mut s.cp, &s.vars);
+    s.cm.simplify(&mut s.cp, &s.assign);
     s.show_clauses();
 
     println!("- another senario");
@@ -144,18 +141,18 @@ fn clause_sort() -> () {
     println!(" - initial state");
     s.show_clauses();
 
-    s.cdb.reduce_watchers(&mut s.cp[0], &s.vars);
-    s.cdb.simplify(&mut s.cp, &s.vars);
+    s.cm.reduce_watchers(&mut s.cp[0]);
+    s.cm.simplify(&mut s.cp, &s.assign);
     println!(" - 1st shrink");
     s.show_clauses();
 
-    s.cdb.reduce_watchers(&mut s.cp[0], &s.vars);
-    s.cdb.simplify(&mut s.cp, &s.vars);
+    s.cm.reduce_watchers(&mut s.cp[0]);
+    s.cm.simplify(&mut s.cp, &s.assign);
     println!(" - 2nd shrink");
     s.show_clauses();
 
-    s.cdb.reduce_watchers(&mut s.cp[0], &s.vars);
-    s.cdb.simplify(&mut s.cp, &s.vars);
+    s.cm.reduce_watchers(&mut s.cp[0]);
+    s.cm.simplify(&mut s.cp, &s.assign);
     println!(" - 3rd shrink");
     s.show_clauses();
 }

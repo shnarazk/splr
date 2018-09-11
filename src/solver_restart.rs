@@ -12,9 +12,9 @@ pub trait Restart {
 
 const RESTART_PERIOD: u64 = 40;
 /// for block restart based on average assingments: 1.40
-const R: f64 = 1.25;
+const R: f64 = 1.35;
 /// for force restart based on average LBD of newly generated clauses: 1.15
-const K: f64 = 1.35; // 1.0 / 0.8
+const K: f64 = 1.26;
 
 impl Restart for Solver {
     /// called after no conflict propagation
@@ -41,6 +41,7 @@ impl Restart for Solver {
     ///```C
     /// #define LOWER_BOUND_FOR_BLOCKING_RESTART 10000
     ///
+    ///            trailQueue.push(trail.size());
     ///            // BLOCK RESTART (CP 2012 paper)
     ///            if(conflictsRestarts > LOWER_BOUND_FOR_BLOCKING_RESTART && lbdQueue.isvalid() && trail.size() > R * trailQueue.getavg()) {
     ///                lbdQueue.fastclear();

@@ -140,10 +140,10 @@ pub struct Ema2 {
 }
 
 impl Ema2 {
-    pub fn new(f: f64, s: f64) -> Ema2 {
+    pub fn new(x: f64, f: f64, s: f64) -> Ema2 {
         Ema2 {
-            fast: 0.0,
-            slow: 0.0,
+            fast: x,
+            slow: x,
             calf: 1.0,
             cals: 1.0,
             fe: 1.0 / f,
@@ -165,12 +165,13 @@ impl EmaKind for Ema2 {
 }
 
 #[derive(Debug)]
+/// (val, coefficient, calibrator)
 pub struct Ema(pub f64, f64, f64);
 
 /// Exponential Moving Average w/ a calibrator
 impl Ema {
-    pub fn new(s: i32) -> Ema {
-        Ema(0.0, 1.0 / s as f64, 0.0)
+    pub fn new(d: f64, s: f64) -> Ema {
+        Ema(d, 1.0 / s, 1.0)
     }
 }
 
@@ -191,8 +192,8 @@ impl EmaKind for Ema {
 pub struct Ema_(pub f64, f64);
 
 impl Ema_ {
-    pub fn new(s: i32) -> Ema_ {
-        Ema_(0.0, 1.0 / s as f64)
+    pub fn new(s: f64) -> Ema_ {
+        Ema_(0.0, 1.0 / s)
     }
 }
 

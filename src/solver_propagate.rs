@@ -156,20 +156,12 @@ impl CDCL for Solver {
         loop {
             unsafe {
                 let c = &mut self.cp[cid.to_kind()].clauses[cid.to_index()] as *mut Clause;
-                // println!(
-                //     "analyze({}): {} ({} :: {}) < {}",
-                //     p.int(),
-                //     *c,
-                //     cid.to_kind(),
-                //     cid.to_index(),
-                //     self.cp[ClauseKind::Removable as usize].clauses.len()
-                // );
+                // println!("analyze({}): {} < {}", p.int(), *c);
                 debug_assert_ne!(cid, NULL_CLAUSE);
-                // println!("  analyze.loop {}", (*c));
-                if cid.to_kind() == (ClauseKind::Removable as usize) {
+                if cid.to_kind() == ClauseKind::Removable as usize {
                     self.cm.bump_cid(&mut self.cp, cid);
                     (*c).rank = (*c).lbd(self);
-                    //(*c).rank = self.lbd_of(&*c);
+                    (*c).just_used = true;
                 }
                 // println!("{}を対応", (*c));
                 //                'next_literal: for q in &(*c).lits {
