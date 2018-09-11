@@ -95,7 +95,7 @@ pub struct ClausePack {
     pub kind: ClauseKind, 
     pub init_size: usize,
     pub clauses: Vec<Clause>,
-    pub permutation: Vec<ClauseIndex>,
+    // pub permutation: Vec<ClauseIndex>,
     pub watcher: Vec<ClauseIndex>,
     pub tag: usize,
     pub mask: usize,
@@ -173,7 +173,7 @@ impl ClauseIF for ClausePack {
             c.index = cix;
             w0 = c.lit[0].negate() as usize;
             w1 = c.lit[1].negate() as usize;
-            self.permutation.push(cix);
+            // self.permutation.push(cix);
             c.next_watcher[0] = self.watcher[w0];
             c.next_watcher[1] = self.watcher[w1];
             self.clauses.push(c);
@@ -307,7 +307,7 @@ impl ClausePack {
             kind,
             init_size: nc,
             clauses,
-            permutation,
+            // permutation,
             watcher,
             mask,
             tag,
@@ -337,7 +337,7 @@ impl ClausePack {
         } else {
             cix = self.clauses.len();
             c.index = cix;
-            self.permutation.push(cix);
+            // self.permutation.push(cix);
             c.next_watcher[0] = self.watcher[w0];
             c.next_watcher[1] = self.watcher[w1];
             self.clauses.push(c);
@@ -653,6 +653,7 @@ impl ClauseManagement for ClauseDBState {
                     // if c.index == DEBUG { println!("### reduce_db {:#}",  *c); }
                     c.dead = true;
                 }
+                c.just_used = false;
             }
             // permutation.retain(|&i| clauses[i].index != DEAD_CLAUSE);
         }
@@ -750,7 +751,7 @@ impl CheckPropagation for ClausePack {
         if r0 || r1 {
             println!("No problem on watchers of {} clause {} '{}'; watching {} and {}",
                      if c.dead { "dead" } else { "" },
-                     c.index, mes, l0.show(), l1.show());
+                     ci, mes, l0.show(), l1.show());
         } else {
             println!("Assersion failed by {} at '{}', lit0({}): {}, lit1({}): {}",
                      c.index,

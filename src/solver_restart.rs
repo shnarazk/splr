@@ -10,11 +10,11 @@ pub trait Restart {
     fn block_restart(&mut self, lbd: usize, clv: usize) -> ();
 }
 
-const RESTART_PERIOD: u64 = 60;
+const RESTART_PERIOD: u64 = 40;
 /// for block restart based on average assingments: 1.40
-const R: f64 = 1.1;
+const R: f64 = 1.25;
 /// for force restart based on average LBD of newly generated clauses: 1.15
-const K: f64 = 1.4; // 1.0 / 0.8
+const K: f64 = 1.35; // 1.0 / 0.8
 
 impl Restart for Solver {
     /// called after no conflict propagation
@@ -27,6 +27,7 @@ impl Restart for Solver {
     fn force_restart(&mut self) -> () {
         let count = self.stats[Stat::NumOfBackjump as usize] as u64;
         let e_lbd = self.ema_lbd.get();
+        let b_lvl = self.b_lvl.get();
         let should_force = K < e_lbd;
         if self.next_restart < count && should_force {
             self.next_restart = count + RESTART_PERIOD;
