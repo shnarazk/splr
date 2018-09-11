@@ -26,7 +26,7 @@ impl Solver {
     /// - calls `enqueue_clause`
     pub fn add_cross(&mut self, vec: Vec<Lit>) -> bool {
         if vec.len() == 1 {
-            self.assign.enqueue(&mut self.vars[vec[0].vi()], vec[0], NULL_CLAUSE);
+            self.am.enqueue(&mut self.vars[vec[0].vi()], vec[0], NULL_CLAUSE);
             return true;
         }
         let nclauses = self.cp[ClauseKind::Permanent as usize].clauses.len();
@@ -114,7 +114,7 @@ impl Solver {
             // self.rebuild_watchers(ClauseKind::Permanent);
             // self.rebuild_watchers(ClauseKind::Binclause);
             // self.enqueue(c0, NULL_CLAUSE) && self.propagate() == NULL_CLAUSE
-            self.assign.enqueue(&mut self.vars[c0.vi()], c0, NULL_CLAUSE) && self.propagate() == NULL_CLAUSE
+            self.am.enqueue(&mut self.vars[c0.vi()], c0, NULL_CLAUSE) && self.propagate() == NULL_CLAUSE
         } else {
             true
         }
@@ -285,17 +285,17 @@ impl Solver {
         let mut _cnt = 0;
         let mut _subsumed = 0;
         let mut _deleted_literals = 0;
-        debug_assert_eq!(self.assign.decision_level(), 0);
+        debug_assert_eq!(self.am.decision_level(), 0);
         while 0 < self.eliminator.clause_queue.len()
-            || self.eliminator.bwdsub_assigns < self.assign.trail.len()
+            || self.eliminator.bwdsub_assigns < self.am.trail.len()
         {
             // Empty subsumption queue and return immediately on user-interrupt:
             // if computed-too-long { break; }
             // Check top-level assingments by creating a dummy clause and placing it in the queue:
             if self.eliminator.clause_queue.len() == 0
-                && self.eliminator.bwdsub_assigns < self.assign.trail.len()
+                && self.eliminator.bwdsub_assigns < self.am.trail.len()
             {
-                let l: Lit = self.assign.trail[self.eliminator.bwdsub_assigns];
+                let l: Lit = self.am.trail[self.eliminator.bwdsub_assigns];
                 let id = self.eliminator.bwdsub_tmp_clause.index;
                 self.eliminator.bwdsub_assigns += 1;
                 self.eliminator.bwdsub_tmp_clause.lit[0] = l;
@@ -374,7 +374,7 @@ impl Solver {
     /// 10. backwardSubsumptionCheck
     /// - calls `clause_queue.pop`
     pub fn binary_subsumption_check(&mut self) -> bool {
-        debug_assert_eq!(self.assign.decision_level(), 0);
+        debug_assert_eq!(self.am.decision_level(), 0);
         unsafe {
             while let Some(cid) = self.eliminator.binclause_queue.pop() {
                 if cid.to_kind() != ClauseKind::Binclause as usize {
@@ -579,12 +579,12 @@ impl Solver {
         self.eliminate_unit_vars();
         // for i in 1..4 { println!("eliminate report: v{} => {},{}", i, self.vars[i].num_occurs, self.vars[i].occurs.len()); }
         'perform: while 0 < self.eliminator.n_touched
-            || self.eliminator.bwdsub_assigns < self.assign.trail.len()
+            || self.eliminator.bwdsub_assigns < self.am.trail.len()
             || 0 < self.eliminator.var_queue.len()
         {
             self.gather_touched_clauses();
             if (0 < self.eliminator.clause_queue.len()
-                || self.eliminator.bwdsub_assigns < self.assign.trail.len())
+                || self.eliminator.bwdsub_assigns < self.am.trail.len())
                 && !self.backward_subsumption_check()
             {
                 self.ok = false;

@@ -81,7 +81,7 @@ pub struct Solver {
     pub config: SolverConfiguration,
     pub root_level: usize,
     /// Assignment Management
-    pub assign: AssignState,
+    pub am: AssignState,
     /// Variable Management
     pub num_vars: usize,
     pub vars: Vec<Var>,
@@ -91,7 +91,7 @@ pub struct Solver {
     pub var_order: VarIdHeap,
     /// Clause Database Management
     pub cp: [ClausePack; 3],
-    pub cdb: ClauseDBState,
+    pub cm: ClauseDBState,
     /// Working memory
     pub an_seen: Vec<Lit>,
     pub an_to_clear: Vec<Lit>,
@@ -116,14 +116,14 @@ impl Solver {
     pub fn new(cfg: SolverConfiguration, cnf: &CNFDescription) -> Solver {
         let nv = cnf.num_of_variables as usize;
         let nc = cnf.num_of_clauses as usize;
-        let assign = AssignState {
+        let am = AssignState {
             trail: Vec::with_capacity(nv),
             trail_lim: Vec::new(),
             q_head: 0,
         };
         let (_fe, se) = cfg.ema_coeffs;
         let re = cfg.restart_expansion;
-        let cdb = ClauseDBState {
+        let cm = ClauseDBState {
             cla_inc: 1.0f64,
             decay_rate: cfg.clause_decay_rate,
             increment_step: DB_INC_SIZE,
@@ -140,7 +140,7 @@ impl Solver {
             config: cfg,
             root_level: 0,
             num_vars: nv,
-            assign,
+            am,
             vars: Var::new_vars(nv),
             eliminator: Eliminator::new(use_sve, nv),
             var_order: VarIdHeap::new(VarOrder::ByActivity, nv, nv),
@@ -149,7 +149,7 @@ impl Solver {
                 ClausePack::build(ClauseKind::Permanent, nv, 256),
                 ClausePack::build(ClauseKind::Binclause, nv, 256),
             ],
-            cdb,
+            cm,
             an_seen: vec![0; nv + 1],
             an_to_clear: vec![0; nv + 1],
             an_stack: vec![],
@@ -172,10 +172,10 @@ impl Solver {
     // print a progress report
     pub fn progress(&self, mes: &str) -> () {
         let nv = self.vars.len() - 1;
-        let k = if self.assign.trail_lim.is_empty() {
-            self.assign.trail.len()
+        let k = if self.am.trail_lim.is_empty() {
+            self.am.trail.len()
         } else {
-            self.assign.trail_lim[0]
+            self.am.trail_lim[0]
         };
         let sum = k + self.eliminator.eliminated_vars;
         let deads = self.cp[ClauseKind::Removable as usize].count(GARBAGE_LIT, 100);
@@ -216,12 +216,12 @@ impl SatSolver for Solver {
             return Ok(Certificate::UNSAT(Vec::new()));
         }
         // TODO deal with assumptions
-        self.num_solved_vars = self.assign.trail.len();
+        self.num_solved_vars = self.am.trail.len();
         if self.eliminator.use_elim {
             self.eliminate_binclauses();
             self.eliminate();
         }
-        self.cdb.simplify(&mut self.cp, &self.vars);
+        self.cm.simplify(&mut self.cp, &self.vars);
         self.stats[Stat::NumOfSimplification as usize] += 1;
         self.progress("");
         match self.search() {
@@ -341,7 +341,7 @@ impl SatSolver for Solver {
         };
         match v.len() {
             0 => false, // Empty clause is UNSAT.
-            1 => self.assign.enqueue(&mut self.vars[v[0].vi()], v[0], NULL_CLAUSE),
+            1 => self.am.enqueue(&mut self.vars[v[0].vi()], v[0], NULL_CLAUSE),
             _ => {
                 self.cp[kind as usize].new_clause(&v, 0, false, false);
                 true
@@ -351,7 +351,7 @@ impl SatSolver for Solver {
     /// renamed from newLearntClause
     fn add_learnt(&mut self, v: &mut Vec<Lit>) -> usize {
         if v.len() == 1 {
-            self.assign.uncheck_enqueue(&mut self.vars[v[0].vi()], v[0], NULL_CLAUSE);
+            self.am.uncheck_enqueue(&mut self.vars[v[0].vi()], v[0], NULL_CLAUSE);
             0;
         }
         let lbd;
@@ -380,12 +380,12 @@ impl SatSolver for Solver {
             ClauseKind::Removable
         };
         let cid = self.cp[kind as usize].new_clause(&v, lbd, true, true);
-        self.cdb.bump_cid(&mut self.cp, cid);
-        self.assign.uncheck_enqueue(&mut self.vars[l0.vi()], l0, cid);
+        self.cm.bump_cid(&mut self.cp, cid);
+        self.am.uncheck_enqueue(&mut self.vars[l0.vi()], l0, cid);
         lbd
     }
     fn num_assigns(&self) -> usize {
-        self.assign.trail.len()
+        self.am.trail.len()
     }
 }
 
@@ -394,7 +394,7 @@ impl Dump for Solver {
         println!(
             "# {} at {} r:{}, p:{}, b:{}",
             str,
-            self.assign.decision_level(),
+            self.am.decision_level(),
             self.cp[ClauseKind::Removable as usize].clauses.len(),
             self.cp[ClauseKind::Permanent as usize].clauses.len(),
             self.cp[ClauseKind::Binclause as usize].clauses.len(),
@@ -405,29 +405,29 @@ impl Dump for Solver {
             self.var_order.len()
         );
         let v = self
-            .assign
+            .am
             .trail
             .iter()
             .map(|l| l.int())
             .collect::<Vec<i32>>();
-        let len = self.assign.trail_lim.len();
+        let len = self.am.trail_lim.len();
         if 0 < len {
-            print!("# - trail[{}]  [", self.assign.trail.len());
-            if 0 < self.assign.trail_lim[0] {
-                print!("0{:?}, ", &self.assign.trail[0..self.assign.trail_lim[0]]);
+            print!("# - trail[{}]  [", self.am.trail.len());
+            if 0 < self.am.trail_lim[0] {
+                print!("0{:?}, ", &self.am.trail[0..self.am.trail_lim[0]]);
             }
             for i in 0..(len - 1) {
                 print!(
                     "{}{:?}, ",
                     i + 1,
-                    &v[self.assign.trail_lim[i]..self.assign.trail_lim[i + 1]]
+                    &v[self.am.trail_lim[i]..self.am.trail_lim[i + 1]]
                 );
             }
-            println!("{}{:?}]", len, &v[self.assign.trail_lim[len - 1]..]);
+            println!("{}{:?}]", len, &v[self.am.trail_lim[len - 1]..]);
         } else {
             println!("# - trail[  0]  [0{:?}]", &v);
         }
-        println!("- trail_lim  {:?}", self.assign.trail_lim);
+        println!("- trail_lim  {:?}", self.am.trail_lim);
         if false {
             // TODO: dump watches links
         }

@@ -33,7 +33,7 @@ impl SolveSAT for Solver {
             // self.dump("calling propagate");
             self.stats[Stat::NumOfPropagation as usize] += 1;
             let ci = self.propagate();
-            let d = self.assign.decision_level();
+            let d = self.am.decision_level();
             // self.dump(format!("search called propagate and it returned {:?} at {}", ret, d));
             if ci == NULL_CLAUSE {
                 // println!(" search loop enters a new level");
@@ -43,17 +43,17 @@ impl SolveSAT for Solver {
                 }
                 self.force_restart();
                 if d == 0 && self.num_solved_vars < na {
-                    self.cdb.simplify(&mut self.cp, &self.vars);
+                    self.cm.simplify(&mut self.cp, &self.vars);
                     self.stats[Stat::NumOfSimplification as usize] += 1;
                     self.progress("simp");
                     self.num_solved_vars = na;
                     self.var_order.rebuild(&self.vars);
                 }
-                if !(self.assign.q_head < self.assign.trail.len()) {
+                if !(self.am.q_head < self.am.trail.len()) {
                     let vi = self.var_order.select_var(&self.vars);
                     debug_assert_ne!(vi, 0);
                     let p = self.vars[vi].phase;
-                    self.assign.uncheck_assume(&mut self.vars[vi], vi.lit(p));
+                    self.am.uncheck_assume(&mut self.vars[vi], vi.lit(p));
                 }
             } else {
                 self.stats[Stat::NumOfBackjump as usize] += 1;
@@ -67,7 +67,7 @@ impl SolveSAT for Solver {
                     let lbd;
                     if self.an_learnt_lits.len() == 1 {
                         let l = self.an_learnt_lits[0];
-                        self.assign.uncheck_enqueue(&mut self.vars[l.vi()], l, NULL_CLAUSE);
+                        self.am.uncheck_enqueue(&mut self.vars[l.vi()], l, NULL_CLAUSE);
                         lbd = 1;
                     } else {
                         unsafe {
@@ -75,14 +75,14 @@ impl SolveSAT for Solver {
                             lbd = self.add_learnt(&mut *v);
                         }
                     }
-                    self.cdb.decay_cla_activity();
+                    self.cm.decay_cla_activity();
                     // glucose reduction
                     let conflicts = self.stats[Stat::NumOfBackjump as usize] as usize;
                     if self.cur_restart * self.next_reduction <= conflicts {
                         self.cur_restart =
                             ((conflicts as f64) / (self.next_reduction as f64)) as usize + 1;
-                        self.cdb.reduce_watchers(&mut self.cp[ClauseKind::Removable as usize]);
-                        self.next_reduction += self.cdb.increment_step + (self.c_lvl.slow as usize);
+                        self.cm.reduce_watchers(&mut self.cp[ClauseKind::Removable as usize]);
+                        self.next_reduction += self.cm.increment_step + (self.c_lvl.slow as usize);
                         self.stats[Stat::NumOfReduction as usize] += 1;
                         self.progress("drop");
                     }
@@ -93,14 +93,14 @@ impl SolveSAT for Solver {
         }
     }
     fn propagate(&mut self) -> ClauseId {
-        while self.assign.q_head < self.assign.trail.len() {
-            let p: usize = self.assign.trail[self.assign.q_head] as usize;
+        while self.am.q_head < self.am.trail.len() {
+            let p: usize = self.am.trail[self.am.q_head] as usize;
             debug_assert!(1 < p);
             // self.cp[ClauseKind::Removable as usize].check_lit(&self.vars, "before propagation", p as Lit);
-            self.assign.q_head += 1;
+            self.am.q_head += 1;
             self.stats[Stat::NumOfPropagation as usize] += 1;
             for cs in &mut self.cp {
-                let ret = cs.propagate(&mut self.vars, &mut self.assign, p as Lit);
+                let ret = cs.propagate(&mut self.vars, &mut self.am, p as Lit);
                 if ret != NULL_CLAUSE {
                     return ret;
                 }
@@ -116,11 +116,11 @@ impl SolveSAT for Solver {
     ///  - q_head
     ///  - var_order
     fn cancel_until(&mut self, lv: usize) -> () {
-        if self.assign.decision_level() <= lv {
+        if self.am.decision_level() <= lv {
             return;
         }
-        let lim = self.assign.trail_lim[lv];
-        for l in &self.assign.trail[lim..] {
+        let lim = self.am.trail_lim[lv];
+        for l in &self.am.trail[lim..] {
             let vi = l.vi();
             {
                 let v = &mut self.vars[vi];
@@ -133,9 +133,9 @@ impl SolveSAT for Solver {
             }
             self.var_order.insert(&self.vars, vi);
         }
-        self.assign.trail.truncate(lim); // FIXME
-        self.assign.trail_lim.truncate(lv);
-        self.assign.q_head = lim;
+        self.am.trail.truncate(lim); // FIXME
+        self.am.trail_lim.truncate(lv);
+        self.am.q_head = lim;
     }
 }
 
@@ -148,10 +148,10 @@ impl CDCL for Solver {
         // self.dump("analyze");
         self.an_learnt_lits.clear();
         self.an_learnt_lits.push(0);
-        let dl = self.assign.decision_level();
+        let dl = self.am.decision_level();
         let mut cid: usize = confl;
         let mut p = NULL_LIT;
-        let mut ti = self.assign.trail.len() - 1; // trail index
+        let mut ti = self.am.trail.len() - 1; // trail index
         let mut path_cnt = 0;
         loop {
             unsafe {
@@ -167,7 +167,7 @@ impl CDCL for Solver {
                 debug_assert_ne!(cid, NULL_CLAUSE);
                 // println!("  analyze.loop {}", (*c));
                 if cid.to_kind() == (ClauseKind::Removable as usize) {
-                    self.cdb.bump_cid(&mut self.cp, cid);
+                    self.cm.bump_cid(&mut self.cp, cid);
                     (*c).rank = (*c).lbd(self);
                     //(*c).rank = self.lbd_of(&*c);
                 }
@@ -203,14 +203,14 @@ impl CDCL for Solver {
                     }
                 }
                 // set the index of the next literal to ti
-                while self.an_seen[self.assign.trail[ti].vi()] == 0 {
+                while self.an_seen[self.am.trail[ti].vi()] == 0 {
                     // println!(
                     //     "{} はフラグが立ってないので飛ばす",
                     //     self.trail[ti].int()
                     // );
                     ti -= 1;
                 }
-                p = self.assign.trail[ti];
+                p = self.am.trail[ti];
                 {
                     let next_vi = p.vi();
                     cid = self.vars[next_vi].reason;
@@ -320,14 +320,14 @@ impl CDCL for Solver {
                     self.an_seen[vi] = 1;
                 }
             }
-            let tl0 = self.assign.trail_lim[0];
-            let start = if self.assign.trail_lim.len() <= self.root_level {
-                self.assign.trail.len()
+            let tl0 = self.am.trail_lim[0];
+            let start = if self.am.trail_lim.len() <= self.root_level {
+                self.am.trail.len()
             } else {
-                self.assign.trail_lim[self.root_level]
+                self.am.trail_lim[self.root_level]
             };
             for i in (tl0..start).rev() {
-                let l: Lit = self.assign.trail[i];
+                let l: Lit = self.am.trail[i];
                 let vi = l.vi();
                 if self.an_seen[vi] == 1 {
                     if self.vars[vi].reason == NULL_CLAUSE {
