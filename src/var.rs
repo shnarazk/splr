@@ -13,9 +13,9 @@ pub trait Satisfiability {
 /// for VarIdHeap
 pub trait HeapManagement {
     fn new(order: VarOrder, n: usize, init: usize) -> VarIdHeap;
-    fn select_var(&mut self, vars: &Vec<Var>) -> VarId;
+    fn select_var(&mut self, assign: &Vec<Lbool>, vars: &Vec<Var>) -> VarId;
     fn bump_vi(&mut self, vars: &mut Vec<Var>, vi: VarId, d: f64) -> ();
-    fn rebuild(&mut self, vars: &Vec<Var>) -> ();
+    fn rebuild(&mut self, assign: &Vec<Lbool>, vars: &Vec<Var>) -> ();
     fn reset(&mut self) -> ();
     fn contains(&self, v: VarId) -> bool;
     fn update(&mut self, vec: &[Var], v: VarId) -> ();
@@ -37,7 +37,6 @@ pub const NULL_VAR: VarId = 0;
 #[derive(Debug)]
 pub struct Var {
     pub index: usize,
-    pub assign: Lbool,
     pub phase: Lbool,
     pub reason: ClauseId,
     pub level: usize,
@@ -62,7 +61,6 @@ impl Var {
     pub fn new(i: usize) -> Var {
         Var {
             index: i,
-            assign: BOTTOM,
             phase: BOTTOM,
             reason: NULL_CLAUSE,
             level: 0,
@@ -87,14 +85,20 @@ impl Var {
     }
 }
 
-impl<'a> Satisfiability for &'a[Var] {
+impl<'a> Satisfiability for &'a[Lbool] {
+    #[inline(always)]
     fn assigned(&self, l: Lit) -> Lbool {
-        self[l.vi()].assign ^ ((l & 1) as u8)
+        self[l.vi()] ^ ((l & 1) as u8)
     }
+    #[inline(always)]
     fn satisfies(&self, c: &Clause) -> bool {
-        for i in 0..c.len() {
-            let l = lindex!(c, i);
-            if self.assigned(l) == LTRUE {
+        for l in &c.lit {
+            if self.assigned(*l) == LTRUE {
+                return true;
+            }
+        }
+        for l in &c.lits {
+            if self.assigned(*l) == LTRUE {
                 return true;
             }
         }
@@ -186,10 +190,10 @@ impl HeapManagement for VarIdHeap {
     fn peek(&self) -> VarId {
         self.heap[1]
     }
-    fn rebuild(&mut self, vars: &Vec<Var>) -> () {
+    fn rebuild(&mut self, assign: &Vec<Lbool>, vars: &Vec<Var>) -> () {
         self.reset();
         for vi in 1..vars.len() {
-            if vars[vi].assign == BOTTOM {
+            if assign[vi] == BOTTOM {
                 self.insert(&vars, vi);
             }
         }
@@ -207,13 +211,13 @@ impl HeapManagement for VarIdHeap {
         self.update(vars, vi);
     }
     /// Heap operations; renamed from selectVO
-    fn select_var(&mut self, vars: &Vec<Var>) -> VarId {
+    fn select_var(&mut self, assign: &Vec<Lbool>, vars: &Vec<Var>) -> VarId {
         loop {
             if self.len() == 0 {
                 return 0;
             }
             let vi = self.get_root(&vars);
-            let x = vars[vi].assign;
+            let x = assign[vi];
             if x == BOTTOM {
                 return vi;
             }

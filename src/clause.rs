@@ -23,7 +23,7 @@ pub trait ClauseIF {
     fn id_from(&self, cix: ClauseIndex) -> ClauseId;
     fn index_from(&self, cid: ClauseId) -> ClauseIndex;
     fn new_clause(&mut self, v: &Vec<Lit>, rank: usize, learnt: bool, locked: bool) -> ClauseId;
-    fn propagate(&mut self, vars: &mut Vec<Var>, asg: &mut AssignState, p: Lit) -> ClauseId;
+    fn propagate(&mut self, assign: &mut Vec<Lbool>, vars: &mut Vec<Var>, asg: &mut AssignState, p: Lit) -> ClauseId;
     fn len(&self) -> usize;
     fn count(&self, target: Lit, limit: usize) -> usize;
 }
@@ -33,7 +33,7 @@ pub trait ClauseManagement {
     fn bump_cid(&mut self, cp: &mut [ClausePack; 3], ci: ClauseId) -> ();
     fn decay_cla_activity(&mut self) -> ();
     fn reduce_watchers(&mut self, cp: &mut ClausePack) -> ();
-    fn simplify(&mut self, cp: &mut [ClausePack; 3], vars: &Vec<Var>) -> bool;
+    fn simplify(&mut self, cp: &mut [ClausePack; 3], assign: &Vec<Lbool>) -> bool;
 }
 
 const CLAUSE_INDEX_BITS: usize = 60;
@@ -202,7 +202,7 @@ impl ClauseIF for ClausePack {
     fn len(&self) -> usize {
         self.clauses.len()
     }
-    fn propagate(&mut self, vars: &mut Vec<Var>, asg: &mut AssignState, p: Lit) -> ClauseId {
+    fn propagate(&mut self, assign: &mut Vec<Lbool>, vars: &mut Vec<Var>, asg: &mut AssignState, p: Lit) -> ClauseId {
             let false_lit = (p as Lit).negate();
             let mut ci: ClauseIndex;
                 unsafe {
@@ -224,12 +224,12 @@ impl ClauseIF for ClausePack {
                             ci = next;
                             continue;
                         }
-                        let first_value = (&vars[..]).assigned((*c).lit[0]);
+                        let first_value = (&assign[..]).assigned((*c).lit[0]);
                         if first_value != LTRUE {
                             for k in 0..(*c).lits.len() {
                                 let lk = (*c).lits[k];
                                 // below is equivalent to 'self.assigned(lk) != LFALSE'
-                                if (((lk & 1) as u8) ^ vars[lk.vi()].assign) != 0 {
+                                if (((lk & 1) as u8) ^ assign[lk.vi()]) != 0 {
                                     debug_assert!(1 < lk);
                                     assert_ne!(lk, (*c).lit[0]);
                                     assert_ne!(lk, (*c).lit[1]);
@@ -248,7 +248,7 @@ impl ClauseIF for ClausePack {
                                 // self.check_clause("conflict path", ci);
                                 return self.kind.id_from(ci);
                             } else {
-                                asg.uncheck_enqueue(&mut vars[(*c).lit[0].vi()], (*c).lit[0], self.kind.id_from(ci));
+                                asg.uncheck_enqueue(assign, &mut vars[(*c).lit[0].vi()], (*c).lit[0], self.kind.id_from(ci));
                                 (*c).locked = true;
                             }
                         }
@@ -660,16 +660,16 @@ impl ClauseManagement for ClauseDBState {
         cp.garbage_collect();
     }
     /// call only when decision level is zero; there's no locked clause.
-    fn simplify(&mut self, cps: &mut [ClausePack; 3], vars: &Vec<Var>) -> bool {
+    fn simplify(&mut self, cps: &mut [ClausePack; 3], assign: &Vec<Lbool>) -> bool {
         // find garbages
         for cp in &mut cps[..] {
-            for lit in 2..vars.len() * 2 {
+            for lit in 2..cp.watcher.len() {
                 unsafe {
                     let mut pri = &mut cp.watcher[(lit as Lit).negate() as usize] as *mut ClauseId;
                     while *pri != NULL_CLAUSE {
                         let c = &mut cp.clauses[*pri] as *mut Clause;
                         let index = ((*c).lit[0] != lit as Lit) as usize;
-                        if (&vars[..]).satisfies(&*c) {
+                        if (&assign[..]).satisfies(&*c) {
                             (*c).dead = true;
                             *pri = cp.detach(&mut *c, index);
                             // cp[*ck as usize].check_clause("after GC", (*c).index);
@@ -692,7 +692,7 @@ trait CheckPropagation {
     fn seek_from(&self, ci: ClauseIndex, p: Lit) -> bool;
     fn print_watcher(&self, p: Lit) -> ();
     fn check_clause(&self, mes: &str, ci: ClauseIndex);
-    fn check_lit(&self, vars: &Vec<Var>, mes: &str, lit: Lit) -> ();
+    fn check_lit(&self, assign: &Vec<Lbool>, vars: &Vec<Var>, mes: &str, lit: Lit) -> ();
 }
 
 impl CheckPropagation for ClausePack {
@@ -767,14 +767,14 @@ impl CheckPropagation for ClausePack {
             panic!("panic");
         }
     }
-    fn check_lit(&self, vars: &Vec<Var>, mes: &str, lit: Lit) -> () {
+    fn check_lit(&self, assign: &Vec<Lbool>, vars: &Vec<Var>, mes: &str, lit: Lit) -> () {
         let vi = lit.vi();
         if vi == WATCHING {
             let p = vi.lit(LTRUE);
             let n = vi.lit(LFALSE);
             let found_in_p = self.seek_from(DEBUG, p);
             let found_in_n = self.seek_from(DEBUG, n);
-            if (p.lbool() == vars[vi].phase || p.lbool() == vars[vi].assign) && !found_in_p && !found_in_n {
+            if (p.lbool() == vars[vi].phase || p.lbool() == assign[vi]) && !found_in_p && !found_in_n {
                 return;
             }
             if found_in_p || found_in_n {

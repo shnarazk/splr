@@ -26,7 +26,7 @@ impl Solver {
     /// - calls `enqueue_clause`
     pub fn add_cross(&mut self, vec: Vec<Lit>) -> bool {
         if vec.len() == 1 {
-            self.am.enqueue(&mut self.vars[vec[0].vi()], vec[0], NULL_CLAUSE);
+            self.am.enqueue(&mut self.assign, &mut self.vars[vec[0].vi()], vec[0], NULL_CLAUSE);
             return true;
         }
         let nclauses = self.cp[ClauseKind::Permanent as usize].clauses.len();
@@ -114,7 +114,7 @@ impl Solver {
             // self.rebuild_watchers(ClauseKind::Permanent);
             // self.rebuild_watchers(ClauseKind::Binclause);
             // self.enqueue(c0, NULL_CLAUSE) && self.propagate() == NULL_CLAUSE
-            self.am.enqueue(&mut self.vars[c0.vi()], c0, NULL_CLAUSE) && self.propagate() == NULL_CLAUSE
+            self.am.enqueue(&mut self.assign, &mut self.vars[c0.vi()], c0, NULL_CLAUSE) && self.propagate() == NULL_CLAUSE
         } else {
             true
         }
@@ -205,7 +205,7 @@ impl Solver {
     /// remove all vars which have a single positive or negative occurence.
     pub fn eliminate_unit_vars(&mut self) -> () {
         for v in &mut self.vars[1..] {
-            v.elimination_target = !v.eliminated && v.assign == BOTTOM;
+            v.elimination_target = !v.eliminated && self.assign[v.index] == BOTTOM;
             v.pos_occurs.clear();
             v.neg_occurs.clear();
         }
@@ -313,7 +313,7 @@ impl Solver {
                     continue;
                 }
                 // println!("check with {} for best_v {}", *c, self.eliminator.best_v);
-                debug_assert!(1 < (*c).len() || (&self.vars[..]).assigned((*c).lit[0]) == LTRUE);
+                debug_assert!(1 < (*c).len() || (&self.assign[..]).assigned((*c).lit[0]) == LTRUE);
                 // unit clauses should have been propagated before this point.
                 // Find best variable to scan:
                 let mut best = 0;
@@ -593,7 +593,7 @@ impl Solver {
             while !self.eliminator.var_queue.is_empty() {
                 let elim = self.eliminator.var_queue.remove(0);
                 if self.vars[elim].eliminated
-                    || self.vars[elim].assign != BOTTOM
+                    || self.assign[elim] != BOTTOM
                     || !self.vars[elim].elimination_target
                 {
                     continue;

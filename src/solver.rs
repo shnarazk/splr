@@ -22,7 +22,7 @@ pub trait LBD {
     fn lbd(&self, s: &mut Solver) -> usize;
 }
 
-const DB_INC_SIZE: usize = 100;
+const DB_INC_SIZE: usize = 300;
 
 /// normal results returned by Solver
 #[derive(Debug)]
@@ -81,6 +81,7 @@ pub struct Solver {
     pub config: SolverConfiguration,
     pub root_level: usize,
     /// Assignment Management
+    pub assign: Vec<Lbool>,
     pub am: AssignState,
     /// Variable Management
     pub num_vars: usize,
@@ -116,6 +117,10 @@ impl Solver {
     pub fn new(cfg: SolverConfiguration, cnf: &CNFDescription) -> Solver {
         let nv = cnf.num_of_variables as usize;
         let nc = cnf.num_of_clauses as usize;
+        let mut assign = Vec::with_capacity(nv + 1);
+        for _ in 0..nv + 1  {
+            assign.push(BOTTOM);
+        }
         let am = AssignState {
             trail: Vec::with_capacity(nv),
             trail_lim: Vec::new(),
@@ -140,13 +145,14 @@ impl Solver {
             config: cfg,
             root_level: 0,
             num_vars: nv,
+            assign,
             am,
             vars: Var::new_vars(nv),
             eliminator: Eliminator::new(use_sve, nv),
             var_order: VarIdHeap::new(VarOrder::ByActivity, nv, nv),
             cp: [
-                ClausePack::build(ClauseKind::Removable, nv, nc),
-                ClausePack::build(ClauseKind::Permanent, nv, 256),
+                ClausePack::build(ClauseKind::Removable, nv, 200),
+                ClausePack::build(ClauseKind::Permanent, nv, nc),
                 ClausePack::build(ClauseKind::Binclause, nv, 256),
             ],
             cm,
@@ -221,7 +227,7 @@ impl SatSolver for Solver {
             self.eliminate_binclauses();
             self.eliminate();
         }
-        self.cm.simplify(&mut self.cp, &self.vars);
+        self.cm.simplify(&mut self.cp, &self.assign);
         self.stats[Stat::NumOfSimplification as usize] += 1;
         self.progress("");
         match self.search() {
@@ -232,7 +238,7 @@ impl SatSolver for Solver {
             true => {
                 let mut result = Vec::new();
                 for vi in 1..self.num_vars + 1 {
-                    match self.vars[vi].assign {
+                    match self.assign[vi] {
                         LTRUE => result.push(vi as i32),
                         LFALSE => result.push(0 - vi as i32),
                         _ => result.push(0),
@@ -324,7 +330,7 @@ impl SatSolver for Solver {
         let mut l_ = NULL_LIT; // last literal; [x, x.negate()] means totology.
         for i in 0..v.len() {
             let li = v[i];
-            let sat = (&self.vars[..]).assigned(li);
+            let sat = (&self.assign[..]).assigned(li);
             if sat == LTRUE || li.negate() == l_ {
                 return true;
             } else if sat != LFALSE && li != l_ {
@@ -341,7 +347,7 @@ impl SatSolver for Solver {
         };
         match v.len() {
             0 => false, // Empty clause is UNSAT.
-            1 => self.am.enqueue(&mut self.vars[v[0].vi()], v[0], NULL_CLAUSE),
+            1 => self.am.enqueue(&mut self.assign, &mut self.vars[v[0].vi()], v[0], NULL_CLAUSE),
             _ => {
                 self.cp[kind as usize].new_clause(&v, 0, false, false);
                 true
@@ -351,7 +357,7 @@ impl SatSolver for Solver {
     /// renamed from newLearntClause
     fn add_learnt(&mut self, v: &mut Vec<Lit>) -> usize {
         if v.len() == 1 {
-            self.am.uncheck_enqueue(&mut self.vars[v[0].vi()], v[0], NULL_CLAUSE);
+            self.am.uncheck_enqueue(&mut self.assign, &mut self.vars[v[0].vi()], v[0], NULL_CLAUSE);
             0;
         }
         let lbd;
@@ -367,7 +373,7 @@ impl SatSolver for Solver {
         for i in 0..v.len() {
             let vi = v[i].vi();
             let lv = self.vars[vi].level;
-            if self.vars[vi].assign != BOTTOM && lv_max < lv {
+            if self.assign[vi] != BOTTOM && lv_max < lv {
                 i_max = i;
                 lv_max = lv;
             }
@@ -381,7 +387,7 @@ impl SatSolver for Solver {
         };
         let cid = self.cp[kind as usize].new_clause(&v, lbd, true, true);
         self.cm.bump_cid(&mut self.cp, cid);
-        self.am.uncheck_enqueue(&mut self.vars[l0.vi()], l0, cid);
+        self.am.uncheck_enqueue(&mut self.assign, &mut self.vars[l0.vi()], l0, cid);
         lbd
     }
     fn num_assigns(&self) -> usize {

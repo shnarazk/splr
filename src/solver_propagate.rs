@@ -43,17 +43,17 @@ impl SolveSAT for Solver {
                 }
                 self.force_restart();
                 if d == 0 && self.num_solved_vars < na {
-                    self.cm.simplify(&mut self.cp, &self.vars);
+                    self.cm.simplify(&mut self.cp, &self.assign);
                     self.stats[Stat::NumOfSimplification as usize] += 1;
                     self.progress("simp");
                     self.num_solved_vars = na;
-                    self.var_order.rebuild(&self.vars);
+                    self.var_order.rebuild(&self.assign, &self.vars);
                 }
                 if !(self.am.q_head < self.am.trail.len()) {
-                    let vi = self.var_order.select_var(&self.vars);
+                    let vi = self.var_order.select_var(&self.assign, &self.vars);
                     debug_assert_ne!(vi, 0);
                     let p = self.vars[vi].phase;
-                    self.am.uncheck_assume(&mut self.vars[vi], vi.lit(p));
+                    self.am.uncheck_assume(&mut self.assign, &mut self.vars[vi], vi.lit(p));
                 }
             } else {
                 self.stats[Stat::NumOfBackjump as usize] += 1;
@@ -67,7 +67,7 @@ impl SolveSAT for Solver {
                     let lbd;
                     if self.an_learnt_lits.len() == 1 {
                         let l = self.an_learnt_lits[0];
-                        self.am.uncheck_enqueue(&mut self.vars[l.vi()], l, NULL_CLAUSE);
+                        self.am.uncheck_enqueue(&mut self.assign, &mut self.vars[l.vi()], l, NULL_CLAUSE);
                         lbd = 1;
                     } else {
                         unsafe {
@@ -100,7 +100,7 @@ impl SolveSAT for Solver {
             self.am.q_head += 1;
             self.stats[Stat::NumOfPropagation as usize] += 1;
             for cs in &mut self.cp {
-                let ret = cs.propagate(&mut self.vars, &mut self.am, p as Lit);
+                let ret = cs.propagate(&mut self.assign, &mut self.vars, &mut self.am, p as Lit);
                 if ret != NULL_CLAUSE {
                     return ret;
                 }
@@ -124,8 +124,8 @@ impl SolveSAT for Solver {
             let vi = l.vi();
             {
                 let v = &mut self.vars[vi];
-                v.phase = v.assign;
-                v.assign = BOTTOM;
+                v.phase = self.assign[vi];
+                self.assign[vi] = BOTTOM;
                 if 0 < v.reason {
                     self.cp[v.reason.to_kind()].clauses[v.reason.to_index()].locked = false;
                 }
@@ -180,7 +180,7 @@ impl CDCL for Solver {
                     }
                     let vi = q.vi();
                     let l = self.vars[vi].level;
-                    debug_assert_ne!(self.vars[vi].assign, BOTTOM);
+                    debug_assert_ne!(self.assign[vi], BOTTOM);
                     if self.an_seen[vi] == 0 && 0 < l {
                         self.var_order.bump_vi(&mut self.vars, vi, self.stats[Stat::NumOfBackjump as usize] as f64);
                         self.an_seen[vi] = 1;
@@ -370,7 +370,7 @@ impl Solver {
                 c0 = c.lit[0];
                 len = c.lits.len();
             }
-            if len == 0 && (&self.vars[..]).assigned(c0) == LFALSE {
+            if len == 0 && (&self.assign[..]).assigned(c0) == LFALSE {
                 self.cp[cid.to_kind()].clauses[cid.to_index()]
                     .lit
                     .swap(0, 1);
@@ -427,7 +427,7 @@ impl Solver {
                     c.lit[0]
                 };
                 let vi = other.vi();
-                if self.mi_var_map[vi] == key && (&self.vars[..]).assigned(other) == LTRUE {
+                if self.mi_var_map[vi] == key && (&self.assign[..]).assigned(other) == LTRUE {
                     nb += 1;
                     self.mi_var_map[vi] -= 1;
                 }
