@@ -5,8 +5,6 @@ mod macros;
 pub mod assign;
 /// Clause
 pub mod clause;
-/// Implementation on clause elimination.
-pub mod clause_manage;
 /// Subsumption based Var/Clause Elimiantor
 pub mod eliminator;
 /// struct Solver

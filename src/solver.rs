@@ -149,7 +149,7 @@ impl Solver {
             am,
             vars: Var::new_vars(nv),
             eliminator: Eliminator::new(use_sve, nv),
-            var_order: VarIdHeap::new(VarOrder::ByActivity, nv, nv),
+            var_order: VarIdHeap::new(nv, nv),
             cp: [
                 ClausePack::build(ClauseKind::Removable, nv, 200),
                 ClausePack::build(ClauseKind::Permanent, nv, nc),
@@ -165,13 +165,13 @@ impl Solver {
             an_level_map_key: 1,
             mi_var_map: vec![0; nv + 1],
             lbd_seen: vec![0; nv + 1],
-            ema_asg: Ema2::new(400.0, 10_000.0),  // for blocking
-            ema_lbd: Ema2::new(400.0, 10_000.0),   // for forcing
-            b_lvl: Ema2::new(400.0, 10_000.0),
-            c_lvl: Ema2::new(400.0, 10_000.0),
-            next_restart: 100,
+            ema_asg: Ema2::new(100.0, 4_000.0, 100_000.0),  // for blocking
+            ema_lbd: Ema2::new(10.0, 400.0, 10_000.0),   // for forcing
+            b_lvl: Ema2::new(1.0, 400.0, 10_000.0),
+            c_lvl: Ema2::new(20.0, 10_000.0, 100_000.0),
+            next_restart: 2000,
             restart_exp: re,
-            rbias: Ema::new(se),
+            rbias: Ema::new(1.0, se as f64),
         };
         s
     }
@@ -194,7 +194,7 @@ impl Solver {
             println!("#init, DB,  Remov,  good, junk,   Perm, Binary, PROG, solv, elim,   rate, RES,block,force,  asgn,   lbd, val,   lbd, b lvl, c lvl");
         } else {
             println!(
-                "#{}, DB,{:>7},{:>6},{:>5},{:>7},{:>7}, PROG,{:>5},{:>5},{:>6.3}%, RES,{:>5},{:>5}, {:>5.2},{:>6.2}, val,{:>6.2},{:>6.2},{:>6.2}",
+                "#{}, DB,{:>7},{:>6},{:>5},{:>7},{:>7}, PROG,{:>5},{:>5},{:>6.3}%, RES,{:>5},{:>5}, {:>5.2},{:>6.2}, val,{:>6.2},{:>6.2},{:>6.2},{:>6.2}",
                 mes,
                 self.cp[ClauseKind::Removable as usize].clauses.len() - 1,
                 cnt,
@@ -211,6 +211,7 @@ impl Solver {
                 self.ema_lbd.fast,
                 self.b_lvl.slow,
                 self.c_lvl.slow,
+                self.c_lvl.get(),
             );
         }
     }

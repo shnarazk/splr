@@ -1,6 +1,5 @@
 use assign::Assignment;
-use clause::{Clause, ClauseKind};
-use clause::ClauseIF;
+use clause::{Clause, ClauseKind, ClauseIF};
 use clause::ClauseManagement;
 use clause::ClauseIdIndexEncoding;
 use solver::{LBD, Solver, Stat};
@@ -81,8 +80,8 @@ impl SolveSAT for Solver {
                     if self.cur_restart * self.next_reduction <= conflicts {
                         self.cur_restart =
                             ((conflicts as f64) / (self.next_reduction as f64)) as usize + 1;
-                        self.cm.reduce_watchers(&mut self.cp[ClauseKind::Removable as usize]);
-                        self.next_reduction += self.cm.increment_step + (self.c_lvl.slow as usize);
+                        self.cm.reduce(&mut self.cp[ClauseKind::Removable as usize]);
+                        self.next_reduction += self.cm.increment_step;
                         self.stats[Stat::NumOfReduction as usize] += 1;
                         self.progress("drop");
                     }

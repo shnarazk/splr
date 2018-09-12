@@ -12,7 +12,7 @@ pub trait Satisfiability {
 
 /// for VarIdHeap
 pub trait HeapManagement {
-    fn new(order: VarOrder, n: usize, init: usize) -> VarIdHeap;
+    fn new(n: usize, init: usize) -> VarIdHeap;
     fn select_var(&mut self, assign: &Vec<Lbool>, vars: &Vec<Var>) -> VarId;
     fn bump_vi(&mut self, vars: &mut Vec<Var>, vi: VarId, d: f64) -> ();
     fn rebuild(&mut self, assign: &Vec<Lbool>, vars: &Vec<Var>) -> ();
@@ -119,7 +119,6 @@ pub enum VarOrder {
 ///   `indx` holds positions. So the unused field 0 can hold the last position as a special case.
 #[derive(Debug)]
 pub struct VarIdHeap {
-    order: VarOrder,
     pub heap: Vec<VarId>, // order : usize -> VarId
     idxs: Vec<usize>, // VarId : -> order : usize
 }
@@ -223,7 +222,7 @@ impl HeapManagement for VarIdHeap {
             }
         }
     }
-    fn new(order: VarOrder, n: usize, init: usize) -> VarIdHeap {
+    fn new(n: usize, init: usize) -> VarIdHeap {
         let mut heap = Vec::with_capacity(n + 1);
         let mut idxs = Vec::with_capacity(n + 1);
         heap.push(0);
@@ -233,7 +232,7 @@ impl HeapManagement for VarIdHeap {
             idxs.push(i);
         }
         idxs[0] = init;
-        VarIdHeap { order, heap, idxs }
+        VarIdHeap { heap, idxs }
     }
 }
 
@@ -242,10 +241,7 @@ impl VarIdHeap {
         let mut q = start;
         let vq = self.heap[q];
         debug_assert!(0 < vq, "size of heap is too small");
-        let aq = match self.order {
-            VarOrder::ByActivity => vec[vq].activity,
-            VarOrder::ByOccurence => (vec[vq].pos_occurs.len() + vec[vq].neg_occurs.len()) as f64,
-        };
+        let aq = vec[vq].activity;
         loop {
             let p = q / 2;
             if p == 0 {
@@ -255,10 +251,7 @@ impl VarIdHeap {
                 return;
             } else {
                 let vp = self.heap[p];
-                let ap = match self.order {
-                    VarOrder::ByActivity => vec[vp].activity,
-                    VarOrder::ByOccurence => (vec[vp].pos_occurs.len() + vec[vp].neg_occurs.len()) as f64,
-                };
+                let ap = vec[vp].activity;
                 if ap < aq {
                     // move down the current parent, and make it empty
                     self.heap[q] = vp;
@@ -278,24 +271,15 @@ impl VarIdHeap {
         let n = self.len();
         let mut i = start;
         let vi = self.heap[i];
-        let ai = match self.order {
-            VarOrder::ByActivity => vec[vi].activity,
-            VarOrder::ByOccurence => (vec[vi].pos_occurs.len() + vec[vi].neg_occurs.len()) as f64,
-        };
+        let ai = vec[vi].activity;
         loop {
             let l = 2 * i; // left
             if l <= n {
                 let r = l + 1; // right
                 let vl = self.heap[l];
                 let vr = self.heap[r];
-                let al = match self.order {
-                    VarOrder::ByActivity => vec[vl].activity,
-                    VarOrder::ByOccurence => (vec[vi].pos_occurs.len() + vec[vi].neg_occurs.len()) as f64,
-                };
-                let ar = match self.order {
-                    VarOrder::ByActivity => vec[vr].activity,
-                    VarOrder::ByOccurence => (vec[vr].pos_occurs.len() + vec[vr].neg_occurs.len()) as f64,
-                };
+                let al = vec[vl].activity;
+                let ar = vec[vr].activity;
                 let (c, vc, ac) = if r <= n && al < ar {
                     (r, vr, ar)
                 } else {
