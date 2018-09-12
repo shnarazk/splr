@@ -10,8 +10,8 @@ use var::Var;
 
 /// for ClauseIndex
 pub trait ClauseList {
-    fn link(&mut self, list: &mut ClauseIndex) -> ClauseIndex ;
-    fn attach(&mut self, c: &mut Clause, index: usize) -> ClauseIndex;
+    fn push(&mut self, list: &mut ClauseIndex) -> ClauseIndex ;
+    fn push_garbage(&mut self, c: &mut Clause, index: usize) -> ClauseIndex;
 }
 
 /// for usize, Clause
@@ -158,7 +158,7 @@ impl ClauseIF for ClausePack {
                 }
                 let next = (*c).next_watcher[1];
                 if (*c).dead {
-                    (*garbages).attach(&mut *c, 1);
+                    (*garbages).push_garbage(&mut *c, 1);
                     ci = next;
                     continue;
                 }
@@ -169,9 +169,6 @@ impl ClauseIF for ClausePack {
                         // below is equivalent to 'self.assigned(lk) != LFALSE'
                         if (((lk & 1) as u8) ^ assign[lk.vi()]) != 0 {
                             let lk_watcher = &mut watcher[lk.negate() as usize];
-                            debug_assert!(1 < lk);
-                            debug_assert_ne!(lk, (*c).lit[0]);
-                            debug_assert_ne!(lk, (*c).lit[1]);
                             (*c).lit[1] = lk;
                             (*c).lits[k] = false_lit;
                             (*c).next_watcher[1] = *lk_watcher;
@@ -236,10 +233,10 @@ impl ClauseIF for ClausePack {
                     debug_assert!((*c).dead);
                     debug_assert!((*c).lit[0] == GARBAGE_LIT && (*c).lit[1] == GARBAGE_LIT);
                     if (*c).lit[0].negate() == l as Lit {
-                        *pri = (*garbages).attach(&mut *c, 0);
+                        *pri = (*garbages).push_garbage(&mut *c, 0);
                         ci = *pri;
                     } else if (*c).lit[1].negate() == l as Lit {
-                        *pri = (*garbages).attach(&mut *c, 1);
+                        *pri = (*garbages).push_garbage(&mut *c, 1);
                         ci = *pri;
                     } else {
                         panic!("xxxxx {:?}", (*c).lit);
@@ -768,7 +765,7 @@ impl ClauseManagement for ClauseDBState {
                         let index = ((*c).lit[0] != lit as Lit) as usize;
                         if (&assign[..]).satisfies(&*c) {
                             (*c).dead = true;
-                            *pri = (*garbages).attach(&mut *c, index);
+                            *pri = (*garbages).push_garbage(&mut *c, index);
                             // *pri = cp.detach(&mut *c, index);
                             // cp[*ck as usize].check_clause("after GC", (*c).index);
                         } else {
@@ -909,19 +906,20 @@ impl CheckPropagation for ClausePack {
 }
 
 impl<'a> ClauseList for ClauseIndex {
-    fn link(&mut self, list: &mut ClauseIndex) -> ClauseIndex {
-        *self = *list;
-        *list = *self;
-        *self
+    fn push(&mut self, item: &mut ClauseIndex) -> ClauseIndex {
+        *item = *self;
+        *self = *item;
+        *item
     }
-    fn attach(&mut self, c: &mut Clause, index: usize) -> ClauseIndex {
+    fn push_garbage(&mut self, c: &mut Clause, index: usize) -> ClauseIndex {
         let other = (index ^ 1) as usize;
         c.lit[index] = GARBAGE_LIT;
         let next = c.next_watcher[index];
         if c.lit[other] == GARBAGE_LIT {
             c.next_watcher[index] = c.next_watcher[other];
         } else {
-            (&mut c.next_watcher[index]).link(self);
+            self.push(&mut c.next_watcher[index]);
+            //(&mut c.next_watcher[index]).skip_to(self);
         }
         next
     }
