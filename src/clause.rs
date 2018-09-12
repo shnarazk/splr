@@ -8,9 +8,6 @@ use types::*;
 use var::Satisfiability;
 use var::Var;
 
-const DEBUG: usize = 27728;
-const WATCHING: VarId = 2685;
-
 /// for ClauseIndex
 pub trait ClauseList {
     fn link(&mut self, list: &mut ClauseIndex) -> ClauseIndex ;
@@ -43,6 +40,8 @@ pub trait ClauseManagement {
     fn simplify(&mut self, cp: &mut [ClausePack; 3], assign: &Vec<Lbool>) -> bool;
 }
 
+const DEBUG: usize = 27728;
+const WATCHING: VarId = 2685;
 const CLAUSE_INDEX_BITS: usize = 60;
 const CLAUSE_INDEX_MASK: usize = 0x0FFF_FFFF_FFFF_FFFF;
 
@@ -144,25 +143,22 @@ impl ClauseKind {
 
 impl ClauseIF for ClausePack {
     fn propagate(&mut self, assign: &mut Vec<Lbool>, vars: &mut Vec<Var>, asg: &mut AssignState, p: Lit) -> ClauseId {
+        let ClausePack { ref mut clauses, ref mut watcher, kind, .. } = self;
         let false_lit = (p as Lit).negate();
-        let mut ci: ClauseIndex = self.watcher[p as usize];
+        let mut ci: ClauseIndex = watcher[p as usize];
+        let mut tail = &mut watcher[p as usize] as *mut usize;
+        let garbages = &mut watcher[GARBAGE_LIT.negate() as usize] as *mut ClauseId;
         unsafe {
-            let garbages = &mut self.watcher[GARBAGE_LIT.negate() as usize] as *mut ClauseId;
-            let mut tail = &mut self.watcher[p as usize] as *mut usize;
             *tail = NULL_CLAUSE;
             'next_clause: while ci != NULL_CLAUSE {
-                let c = &mut self.clauses[ci] as *mut Clause;
-                // self.check_clause(*kind, "before propagation", ci);
+                let c = &mut clauses[ci];
                 if (*c).lit[0] == false_lit {
                     (*c).lit.swap(0, 1); // now my index is 1, others is 0.
                     (*c).next_watcher.swap(0, 1);
                 }
                 let next = (*c).next_watcher[1];
                 if (*c).dead {
-                    let next1 = (*garbages).attach(&mut *c, 1);
-                    //let next1 = self.detach(&mut *c, 1);
-                    debug_assert_eq!(next1, next);
-                    // self.check_clause("after detach to trash", ci);
+                    (*garbages).attach(&mut *c, 1);
                     ci = next;
                     continue;
                 }
@@ -172,7 +168,7 @@ impl ClauseIF for ClausePack {
                         let lk = (*c).lits[k];
                         // below is equivalent to 'self.assigned(lk) != LFALSE'
                         if (((lk & 1) as u8) ^ assign[lk.vi()]) != 0 {
-                            let lk_watcher = &mut self.watcher[lk.negate() as usize];
+                            let lk_watcher = &mut watcher[lk.negate() as usize];
                             debug_assert!(1 < lk);
                             debug_assert_ne!(lk, (*c).lit[0]);
                             debug_assert_ne!(lk, (*c).lit[1]);
@@ -180,29 +176,26 @@ impl ClauseIF for ClausePack {
                             (*c).lits[k] = false_lit;
                             (*c).next_watcher[1] = *lk_watcher;
                             *lk_watcher = ci;
-                            // self.check_clause(&format!("after updating watches with {}", lk.int()), ci);
                             ci = next;
                             continue 'next_clause;
                         }
                     }
                     if first_value == LFALSE {
                         *tail = ci;
-                        // self.check_clause("conflict path", ci);
-                        return self.kind.id_from(ci);
+                        return kind.id_from(ci);
                     } else {
-                        asg.uncheck_enqueue(assign, &mut vars[(*c).lit[0].vi()], (*c).lit[0], self.kind.id_from(ci));
+                        asg.uncheck_enqueue(assign, &mut vars[(*c).lit[0].vi()], (*c).lit[0], kind.id_from(ci));
                         (*c).locked = true;
                     }
                 }
                 { // reconnect
-                    let watch = self.watcher[p as usize];
+                    let watch = watcher[p as usize];
                     if watch == NULL_CLAUSE {
                         tail = &mut (*c).next_watcher[1];
                     }
                     (*c).next_watcher[1] = watch;
-                    self.watcher[p as usize] = ci;
+                    watcher[p as usize] = ci;
                 }
-                // self.check_clause(&format!("after reconnect for unit propagation or satisfied by {}", (*c).lit[0].int()), ci);
                 ci = next;
             }
         }
