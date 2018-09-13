@@ -156,10 +156,17 @@ impl CDCL for Solver {
             unsafe {
                 let c = &mut self.cp[cid.to_kind()].clauses[cid.to_index()] as *mut Clause;
                 debug_assert_ne!(cid, NULL_CLAUSE);
+                // special case for binary clause
+                if p != NULL_LIT && (*c).len() == 2 && (&self.assign[..]).assigned((*c).lit[0]) == LFALSE {
+                    (*c).lit.swap(0, 1);
+                }
                 if cid.to_kind() == ClauseKind::Removable as usize {
                     self.cm.bump(&mut self.cp, cid);
-                    (*c).rank = (*c).lbd(&self.vars, &mut self.lbd_seen);
-                    (*c).just_used = true;
+                    let new_rank = (*c).lbd(&self.vars, &mut self.lbd_seen);
+                    if new_rank + 1 < (*c).rank {
+                        (*c).rank = new_rank;
+                        (*c).just_used = true;
+                    }
                 }
                 'next_literal: for i in 0..(*c).len() {
                     let q = lindex!(*c, i);
@@ -202,7 +209,6 @@ impl CDCL for Solver {
         self.an_learnt_lits[0] = p.negate();
         let n = self.an_learnt_lits.len();
         let l0 = self.an_learnt_lits[0];
-        self.an_stack.clear();
         self.an_to_clear.clear();
         self.an_to_clear.push(l0);
         {
@@ -219,10 +225,7 @@ impl CDCL for Solver {
         let mut j = 1;
         for i in 1..n {
             let l = self.an_learnt_lits[i];
-            if self.vars[l.vi()].reason == NULL_CLAUSE {
-                self.an_learnt_lits[j] = l;
-                j += 1;
-            } else if !self.analyze_removable(l) {
+            if self.vars[l.vi()].reason == NULL_CLAUSE || !self.analyze_removable(l) {
                 self.an_learnt_lits[j] = l;
                 j += 1;
             }
@@ -309,7 +312,8 @@ impl CDCL for Solver {
             let cid = self.vars[sl.vi()].reason;
             let c = &mut self.cp[cid.to_kind()].clauses[cid.to_index()];
             let len = c.len();
-            if c.len() == 1 && (&self.assign[..]).assigned(c.lit[0]) == LFALSE {
+            if c.len() == 2 && (&self.assign[..]).assigned(c.lit[0]) == LFALSE {
+                println!("o22o");
                 c.lit.swap(0, 1);
             }
             for i in 1..len {
@@ -342,10 +346,6 @@ impl CDCL for Solver {
         unsafe {
             let key = self.an_level_map_key;
             let vec = &mut self.an_learnt_lits as *mut Vec<Lit>;
-            let nblevel = (*vec).lbd(&self.vars, &mut self.lbd_seen);            // let nblevel = self.lbd_vector(&*vec);
-            if 6 < nblevel {
-                return;
-            }
             let l0 = self.an_learnt_lits[0];
             let p: Lit = l0.negate();
             for i in 1..len {
@@ -355,21 +355,13 @@ impl CDCL for Solver {
             let mut cix = self.cp[ClauseKind::Binclause as usize].watcher[p as usize];
             while cix != NULL_CLAUSE {
                 let c = &self.cp[ClauseKind::Binclause as usize].clauses[cix];
-                let other = if c.lit[0] == p {
-                    c.lit[1]
-                } else {
-                    c.lit[0]
-                };
+                let other = c.lit[(c.lit[0] == p) as usize];
                 let vi = other.vi();
                 if self.mi_var_map[vi] == key && (&self.assign[..]).assigned(other) == LTRUE {
                     nb += 1;
                     self.mi_var_map[vi] -= 1;
                 }
-                cix = if c.lit[0] == p {
-                    c.next_watcher[0]
-                } else {
-                    c.next_watcher[1]
-                };
+                cix = c.next_watcher[(c.lit[0] != p) as usize];
             }
             if 0 < nb {
                 (*vec).retain(|l| *l == l0 || self.mi_var_map[l.vi()] == key);

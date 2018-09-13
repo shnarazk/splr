@@ -161,53 +161,54 @@ impl ClauseIF for ClausePack {
         debug_assert_eq!(GARBAGE_LIT.negate() as usize, 0);
         let mut ci: ClauseIndex = watcher[p as usize];
         watcher[p as usize] = NULL_CLAUSE;
-        let mut tail = &mut watcher[p as usize] as *mut usize;
-        {
-            'next_clause: while ci != NULL_CLAUSE {
-                let c = &mut clauses[ci];
-                debug_assert!(!(*c).dead);
-                if (*c).lit[0] == false_lit {
-                    (*c).lit.swap(0, 1); // now my index is 1, others is 0.
-                    (*c).next_watcher.swap(0, 1);
-                }
-                let next = (*c).next_watcher[1];
-                let other = (*c).lit[0];
-                let first_value = (&assign[..]).assigned(other);
-                if first_value != LTRUE {
-                    for k in 0..(*c).lits.len() {
-                        let lk = (*c).lits[k];
-                        // below is equivalent to 'self.assigned(lk) != LFALSE'
-                        if (((lk & 1) as u8) ^ assign[lk.vi()]) != 0 {
-                            let lk_watcher = &mut watcher[lk.negate() as usize];
-                            (*c).lit[1] = lk;
-                            (*c).lits[k] = false_lit;
-                            (*c).next_watcher[1] = *lk_watcher;
-                            *lk_watcher = ci;
-                            ci = next;
-                            continue 'next_clause;
-                        }
-                    }
-                    if first_value == LFALSE {
-                        unsafe {
-                            *tail = ci;
-                        }
-                        return kind.id_from(ci);
-                    } else {
-                        asg.uncheck_enqueue(assign, &mut vars[other.vi()], other, kind.id_from(ci));
-                        (*c).locked = true;
-                    }
-                }
-                {
-                    // reconnect
-                    let watch = watcher[p as usize];
-                    if watch == NULL_CLAUSE {
-                        tail = &mut (*c).next_watcher[1];
-                    }
-                    (*c).next_watcher[1] = watch;
-                    watcher[p as usize] = ci;
-                }
-                ci = next;
+        let mut tail_index = NULL_CLAUSE;
+        'next_clause: while ci != NULL_CLAUSE {
+            let c = &mut clauses[ci];
+            debug_assert!(!(*c).dead);
+            if (*c).lit[0] == false_lit {
+                (*c).lit.swap(0, 1); // now my index is 1, others is 0.
+                (*c).next_watcher.swap(0, 1);
             }
+            let next = (*c).next_watcher[1];
+            let other = (*c).lit[0];
+            let first_value = (&assign[..]).assigned(other);
+            if first_value != LTRUE {
+                for k in 0..(*c).lits.len() {
+                    let lk = (*c).lits[k];
+                    // below is equivalent to 'self.assigned(lk) != LFALSE'
+                    if (((lk & 1) as u8) ^ assign[lk.vi()]) != 0 {
+                        let lk_watcher = &mut watcher[lk.negate() as usize];
+                        (*c).lit[1] = lk;
+                        (*c).lits[k] = false_lit;
+                        (*c).next_watcher[1] = *lk_watcher;
+                        *lk_watcher = ci;
+                        ci = next;
+                        continue 'next_clause;
+                    }
+                }
+                if first_value == LFALSE {
+                    break;
+                } else {
+                    asg.uncheck_enqueue(assign, &mut vars[other.vi()], other, kind.id_from(ci));
+                    (*c).locked = true;
+                }
+            }
+            // reconnect
+            let watch = watcher[p as usize];
+            if watch == NULL_CLAUSE {
+                tail_index = ci;
+            }
+            (*c).next_watcher[1] = watch;
+            watcher[p as usize] = ci;
+            ci = next;
+        }
+        if ci != NULL_CLAUSE {
+            if tail_index == NULL_CLAUSE {
+                watcher[p as usize] = ci;
+            } else {
+                clauses[tail_index].next_watcher[1] = ci;
+            }
+            return kind.id_from(ci);
         }
         NULL_CLAUSE
     }
@@ -260,15 +261,9 @@ impl ClauseIF for ClausePack {
             let mut ci = self.watcher[GARBAGE_LIT.negate() as usize];
             while ci != NULL_CLAUSE {
                 let c = &mut self.clauses[ci] as *mut Clause;
-                if !(*c).dead {
-                    // self.print_watcher(0);
-                    // self.print_watcher(1);
-                    panic!("not dead {:#}", *c);
-                }
                 debug_assert!((*c).dead);
                 // if (*c).index == DEBUG { println!("garbage traverser finds: {:#} on GARBGE link", *c); }
                 if (*c).lit[0] == GARBAGE_LIT && (*c).lit[1] == GARBAGE_LIT {
-                    // println!("move {} to recycler", (*c).index);
                     // if (*c).index == DEBUG { println!("here comes!"); }
                     let next = (*c).next_watcher[0];
                     *pri = (*c).next_watcher[0];
@@ -291,7 +286,7 @@ impl ClauseIF for ClausePack {
             }
         }
         debug_assert_eq!(self.watcher[0], NULL_CLAUSE);
-        // // ASSERITON
+        // // ASSERTION
         // {
         //     for i in 2..self.watcher.len() {
         //         let mut ci = self.watcher[i];

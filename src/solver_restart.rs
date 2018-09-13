@@ -16,7 +16,7 @@ const R: f64 = 1.40;
 /// for force restart based on average LBD of newly generated clauses: 1/0.8
 const K: f64 = 1.25;
 
-const SAMPLING_TIME: u64 = 1000;
+const SAMPLING_TIME: u64 = 10;
 
 impl Restart for Solver {
     /// called after no conflict propagation
