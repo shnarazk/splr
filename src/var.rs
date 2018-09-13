@@ -206,13 +206,11 @@ impl HeapManagement for VarIdHeap {
         }
     }
     fn bump(&mut self, vars: &mut [Var], vi: VarId, d: f64) -> () {
-        // let d = self.stats[Stat::NumOfBackjump as usize] as f64;
         let a = (vars[vi].activity + d) / 2.0;
         vars[vi].activity = a;
         if VAR_ACTIVITY_THRESHOLD < a {
-            // self.rescale_var_activity();
-            for i in 1..vars.len() {
-                vars[i].activity = vars[i].activity / VAR_ACTIVITY_THRESHOLD;
+            for v in &mut vars[1..] {
+                v.activity /= VAR_ACTIVITY_THRESHOLD;
             }
         }
         self.update(vars, vi);

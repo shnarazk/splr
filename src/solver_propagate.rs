@@ -87,7 +87,7 @@ impl SolveSAT for Solver {
                     let conflicts = self.stats[Stat::NumOfBackjump as usize] as usize;
                     if self.cur_restart * self.next_reduction <= conflicts {
                         self.cur_restart = (conflicts as f64 / self.next_reduction as f64) as usize + 1;
-                        self.cm.reduce(&mut self.cp[ClauseKind::Removable as usize], 6.0);
+                        self.cm.reduce(&mut self.cp[ClauseKind::Removable as usize]);
                         self.next_reduction += self.cm.increment_step;
                         self.stats[Stat::NumOfReduction as usize] += 1;
                         self.progress("drop");
@@ -147,8 +147,6 @@ impl SolveSAT for Solver {
 
 impl CDCL for Solver {
     fn analyze(&mut self, confl: ClauseId) -> usize {
-        // for mut l in &mut self.an_seen { debug_assert_eq!(*l, 0); }
-        // self.dump("analyze");
         self.an_learnt_lits.clear();
         self.an_learnt_lits.push(0);
         let dl = self.am.decision_level();
@@ -159,15 +157,12 @@ impl CDCL for Solver {
         loop {
             unsafe {
                 let c = &mut self.cp[cid.to_kind()].clauses[cid.to_index()] as *mut Clause;
-                // println!("analyze({}): {} < {}", p.int(), *c);
                 debug_assert_ne!(cid, NULL_CLAUSE);
                 if cid.to_kind() == ClauseKind::Removable as usize {
                     self.cm.bump(&mut self.cp, cid);
                     (*c).rank = (*c).lbd(&self.vars, &mut self.lbd_seen);
                     (*c).just_used = true;
                 }
-                // println!("{}を対応", (*c));
-                //                'next_literal: for q in &(*c).lits {
                 'next_literal: for i in 0..(*c).len() {
                     let q = lindex!(*c, i);
                     if q == p {
@@ -180,36 +175,23 @@ impl CDCL for Solver {
                         self.var_order.bump(&mut self.vars, vi, self.stats[Stat::NumOfBackjump as usize] as f64);
                         self.an_seen[vi] = 1;
                         if dl <= l {
-                            // println!(
-                            //     "{} はレベル{}なのでフラグを立てる",
-                            //     q.int(),
-                            //     l
-                            // );
                             path_cnt += 1;
                             if self.vars[vi].reason != NULL_CLAUSE {
                                 self.an_last_dl.push(q);
                             }
                         } else {
-                            // println!("{} はレベル{}なので採用", q.int(), l);
                             self.an_learnt_lits.push(q);
                         }
-                    } else {
-                        // println!("{} はもうフラグが立っているかグラウンドしている{}ので無視", q.int(), l);
                     }
                 }
                 // set the index of the next literal to ti
                 while self.an_seen[self.am.trail[ti].vi()] == 0 {
-                    // println!(
-                    //     "{} はフラグが立ってないので飛ばす",
-                    //     self.trail[ti].int()
-                    // );
                     ti -= 1;
                 }
                 p = self.am.trail[ti];
                 {
                     let next_vi = p.vi();
                     cid = self.vars[next_vi].reason;
-                    // println!("{} にフラグが立っている。この時path数は{}, そのreason {}を探索", next_vi, path_cnt - 1, cid);
                     self.an_seen[next_vi] = 0;
                 }
                 path_cnt -= 1;
@@ -220,11 +202,6 @@ impl CDCL for Solver {
             }
         }
         self.an_learnt_lits[0] = p.negate();
-        // println!(
-        //     "最後に{}を採用して{:?}",
-        //     p.negate().int(), vec2int(self.an_learnt_lits)
-        // );
-        // simplify phase
         let n = self.an_learnt_lits.len();
         let l0 = self.an_learnt_lits[0];
         self.an_stack.clear();
@@ -241,7 +218,6 @@ impl CDCL for Solver {
                 self.an_level_map[self.vars[l.vi()].level] = self.an_level_map_key;
             }
         }
-        // println!("  analyze.loop 4 n = {}", n);
         let mut j = 1;
         for i in 1..n {
             let l = self.an_learnt_lits[i];
@@ -254,11 +230,6 @@ impl CDCL for Solver {
             }
         }
         self.an_learnt_lits.truncate(j);
-        // println!(
-        //     "new learnt: {:?}",
-        //     vec2int(self.an_learnt_lits)
-        // );
-        // println!("  analyze terminated");
         if self.an_learnt_lits.len() < 30 {
             self.minimize_with_bi_clauses();
         }
@@ -294,16 +265,9 @@ impl CDCL for Solver {
     fn analyze_final(&mut self, ci: ClauseId, skip_first: bool) -> () {
         self.conflicts.clear();
         if self.root_level != 0 {
-            //for i in &self.clauses.iref(ci).lits[(if skip_first { 1 } else { 0 })..] {
-            for i in (if skip_first { 1 } else { 0 })
-                ..(self.cp[ci.to_kind()].clauses[ci.to_index()].len())
-            {
-                let l;
-                match i {
-                    0 => l = &self.cp[ci.to_kind()].clauses[ci.to_index()].lit[0],
-                    1 => l = &self.cp[ci.to_kind()].clauses[ci.to_index()].lit[1],
-                    _ => l = &self.cp[ci.to_kind()].clauses[ci.to_index()].lits[i - 2],
-                }
+            let c = &self.cp[ci.to_kind()].clauses[ci.to_index()];
+            for i in (if skip_first { 1 } else { 0 })..c.len() {
+                let l = lindex!(c, i);
                 let vi = l.vi();
                 if 0 < self.vars[vi].level {
                     self.an_seen[vi] = 1;
@@ -322,13 +286,8 @@ impl CDCL for Solver {
                     if self.vars[vi].reason == NULL_CLAUSE {
                         self.conflicts.push(l.negate());
                     } else {
-                        for i in 1..(self.cp[ci.to_kind()].clauses[ci.to_index()].lits.len()) {
-                            let l;
-                            match i {
-                                0 => l = &self.cp[ci.to_kind()].clauses[ci.to_index()].lit[1],
-                                _ => l = &self.cp[ci.to_kind()].clauses[ci.to_index()].lits[i - 2],
-                            }
-                            // for l in &self.clauses.iref(ci).lits[1..]
+                        for i in 1..c.len() {
+                            let l = lindex!(c, i);
                             let vi = l.vi();
                             if 0 < self.vars[vi].level {
                                 self.an_seen[vi] = 1;
@@ -350,26 +309,14 @@ impl Solver {
         let top = self.an_to_clear.len();
         let key = self.an_level_map_key;
         while let Some(sl) = self.an_stack.pop() {
-            // println!("analyze_removable.loop {:?}", self.an_stack);
             let cid = self.vars[sl.vi()].reason;
-            let c0;
-            let len;
-            {
-                let c = &self.cp[cid.to_kind()].clauses[cid.to_index()];
-                c0 = c.lit[0];
-                len = c.lits.len();
+            let c = &mut self.cp[cid.to_kind()].clauses[cid.to_index()];
+            let len = c.len();
+            if c.len() == 1 && (&self.assign[..]).assigned(c.lit[0]) == LFALSE {
+                c.lit.swap(0, 1);
             }
-            if len == 0 && (&self.assign[..]).assigned(c0) == LFALSE {
-                self.cp[cid.to_kind()].clauses[cid.to_index()]
-                    .lit
-                    .swap(0, 1);
-            }
-            for i in 0..self.cp[cid.to_kind()].clauses[cid.to_index()].lits.len() + 1 {
-                let q;
-                match i {
-                    0 => q = self.cp[cid.to_kind()].clauses[cid.to_index()].lit[1],
-                    n => q = self.cp[cid.to_kind()].clauses[cid.to_index()].lits[n - 1],
-                }
+            for i in 1..len {
+                let q = lindex!(c, i);
                 let vi = q.vi();
                 let lv = self.vars[vi].level;
                 if self.an_seen[vi] != 1 && lv != 0 {

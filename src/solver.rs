@@ -184,19 +184,16 @@ impl Solver {
             self.am.trail_lim[0]
         };
         let sum = k + self.eliminator.eliminated_vars;
-        let deads = self.cp[ClauseKind::Removable as usize].count(GARBAGE_LIT, 0) + self.cp[ClauseKind::Removable as usize].count(RECYCLE_LIT, 0);
-        let cnt = self.cp[ClauseKind::Removable as usize]
-            .clauses
-            .iter()
-            .filter(|c| c.rank <= 2)
-            .count();
+        let learnts = &self.cp[ClauseKind::Removable as usize];
+        let deads = learnts.count(GARBAGE_LIT, 0) + learnts.count(RECYCLE_LIT, 0);
+        let cnt = learnts.clauses.iter().filter(|c| c.rank <= 2).count();
         if mes == "" {
             println!("#init, DB,  Remov,  good, junk,   Perm, Binary, PROG, solv, elim,   rate, RES,block,force,  asgn,   lbd, val,   lbd, b lvl, c lvl");
         } else {
             println!(
                 "#{}, DB,{:>7},{:>6},{:>5},{:>7},{:>7}, PROG,{:>5},{:>5},{:>6.3}%, RES,{:>5},{:>5}, {:>5.2},{:>6.2}, val,{:>6.2},{:>6.2},{:>6.2},{:>6.2}",
                 mes,
-                self.cp[ClauseKind::Removable as usize].clauses.len() - 1 -deads,
+                learnts.clauses.len() - 1 -deads,
                 cnt,
                 deads,
                 self.cp[ClauseKind::Permanent as usize].clauses.len() - 1,
