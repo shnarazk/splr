@@ -165,7 +165,7 @@ impl Solver {
             an_level_map_key: 1,
             mi_var_map: vec![0; nv + 1],
             lbd_seen: vec![0; nv + 1],
-            ema_asg: Ema2::new(5000.0, 10_000.0),  // for blocking
+            ema_asg: Ema2::new(1.0, 5_000.0),  // for blocking
             ema_lbd: Ema2::new(50.0, 10_000.0),   // for forcing
             b_lvl: Ema2::new(50.0, 10_000.0),
             c_lvl: Ema2::new(50.0, 10_000.0),
@@ -184,7 +184,7 @@ impl Solver {
             self.am.trail_lim[0]
         };
         let sum = k + self.eliminator.eliminated_vars;
-        let deads = self.cp[ClauseKind::Removable as usize].count(GARBAGE_LIT, 100);
+        let deads = self.cp[ClauseKind::Removable as usize].count(GARBAGE_LIT, 0) + self.cp[ClauseKind::Removable as usize].count(RECYCLE_LIT, 0);
         let cnt = self.cp[ClauseKind::Removable as usize]
             .clauses
             .iter()
@@ -196,7 +196,7 @@ impl Solver {
             println!(
                 "#{}, DB,{:>7},{:>6},{:>5},{:>7},{:>7}, PROG,{:>5},{:>5},{:>6.3}%, RES,{:>5},{:>5}, {:>5.2},{:>6.2}, val,{:>6.2},{:>6.2},{:>6.2},{:>6.2}",
                 mes,
-                self.cp[ClauseKind::Removable as usize].clauses.len() - 1,
+                self.cp[ClauseKind::Removable as usize].clauses.len() - 1 -deads,
                 cnt,
                 deads,
                 self.cp[ClauseKind::Permanent as usize].clauses.len() - 1,
@@ -357,17 +357,12 @@ impl SatSolver for Solver {
     }
     /// renamed from newLearntClause
     fn add_learnt(&mut self, v: &mut Vec<Lit>) -> usize {
+        debug_assert_ne!(v.len(), 0);
         if v.len() == 1 {
             self.am.uncheck_enqueue(&mut self.assign, &mut self.vars[v[0].vi()], v[0], NULL_CLAUSE);
-            0;
+            return 0;
         }
-        let lbd;
-        if v.len() == 2 {
-            lbd = 0;
-        } else {
-            lbd = v.lbd(&self.vars, &mut self.lbd_seen);
-            // lbd = self.lbd_vector(&v);
-        }
+        let lbd = v.lbd(&self.vars, &mut self.lbd_seen);
         let mut i_max = 0;
         let mut lv_max = 0;
         // seek a literal with max level
@@ -387,7 +382,7 @@ impl SatSolver for Solver {
             ClauseKind::Removable
         };
         let cid = self.cp[kind as usize].new_clause(&v, lbd, true, true);
-        self.cm.bump_cid(&mut self.cp, cid);
+        self.cm.bump(&mut self.cp, cid);
         self.am.uncheck_enqueue(&mut self.assign, &mut self.vars[l0.vi()], l0, cid);
         lbd
     }

@@ -23,7 +23,13 @@ pub trait ClauseIdIndexEncoding {
 
 /// for ClausePack
 pub trait ClauseIF {
-    fn propagate(&mut self, assign: &mut [Lbool], vars: &mut [Var], asg: &mut AssignState, p: Lit) -> ClauseId;
+    fn propagate(
+        &mut self,
+        assign: &mut [Lbool],
+        vars: &mut [Var],
+        asg: &mut AssignState,
+        p: Lit,
+    ) -> ClauseId;
     fn garbage_collect(&mut self) -> ();
     fn id_from(&self, cix: ClauseIndex) -> ClauseId;
     fn index_from(&self, cid: ClauseId) -> ClauseIndex;
@@ -34,9 +40,9 @@ pub trait ClauseIF {
 
 /// for ClauseDBState
 pub trait ClauseManagement {
-    fn bump_cid(&mut self, cp: &mut [ClausePack; 3], ci: ClauseId) -> ();
+    fn bump(&mut self, cp: &mut [ClausePack; 3], ci: ClauseId) -> ();
     fn decay_cla_activity(&mut self) -> ();
-    fn reduce(&mut self, cp: &mut ClausePack) -> ();
+    fn reduce(&mut self, cp: &mut ClausePack, thr: f64) -> ();
     fn simplify(&mut self, cp: &mut [ClausePack; 3], assign: &Vec<Lbool>) -> bool;
 }
 
@@ -52,10 +58,6 @@ pub const KINDS: [ClauseKind; 3] = [
     ClauseKind::Binclause,
 ];
 pub const DEAD_CLAUSE: usize = MAX;
-
-pub const RANK_NULL: usize = 0; // for NULL_CLAUSE
-pub const RANK_CONST: usize = 1; // for given clauses
-pub const RANK_NEED: usize = 2; // for newly generated bi-clauses
 
 pub const CLAUSE_KINDS: [ClauseKind; 3] = [
     ClauseKind::Removable,
@@ -142,7 +144,13 @@ impl ClauseKind {
 }
 
 impl ClauseIF for ClausePack {
-    fn propagate(&mut self, assign: &mut [Lbool], vars: &mut [Var], asg: &mut AssignState, p: Lit) -> ClauseId {
+    fn propagate(
+        &mut self,
+        assign: &mut [Lbool],
+        vars: &mut [Var],
+        asg: &mut AssignState,
+        p: Lit,
+    ) -> ClauseId {
         let ClausePack {
             ref mut clauses,
             ref mut watcher,
@@ -157,16 +165,12 @@ impl ClauseIF for ClausePack {
         {
             'next_clause: while ci != NULL_CLAUSE {
                 let c = &mut clauses[ci];
+                debug_assert!(!(*c).dead);
                 if (*c).lit[0] == false_lit {
                     (*c).lit.swap(0, 1); // now my index is 1, others is 0.
                     (*c).next_watcher.swap(0, 1);
                 }
                 let next = (*c).next_watcher[1];
-                if (*c).dead {
-                    watcher[GARBAGE_LIT.negate() as usize].push_garbage(&mut *c, 1);
-                    ci = next;
-                    continue;
-                }
                 let other = (*c).lit[0];
                 let first_value = (&assign[..]).assigned(other);
                 if first_value != LTRUE {
@@ -208,9 +212,6 @@ impl ClauseIF for ClausePack {
         NULL_CLAUSE
     }
     fn garbage_collect(&mut self) -> () {
-        if self.watcher[GARBAGE_LIT.negate() as usize] == NULL_CLAUSE {
-            return;
-        }
         let mut ci = self.watcher[GARBAGE_LIT.negate() as usize];
         while ci != NULL_CLAUSE {
             let c = &self.clauses[ci];
@@ -277,20 +278,34 @@ impl ClauseIF for ClausePack {
                     (*c).next_watcher[1] = *recycled;
                     *recycled = ci; // (*c).next_watcher[0];
                     (*c).dead = false;
+                    (*c).locked = true;
                     ci = next;
-                    // print!("recycler: ");
-                    // self.print_watcher(GARBAGE_LIT.negate());
+                // print!("recycler: ");
+                // self.print_watcher(GARBAGE_LIT.negate());
                 } else if (*c).lit[0] != GARBAGE_LIT && (*c).lit[1] != GARBAGE_LIT {
                     println!("very strange {}", *c);
                 } else {
                     let index = ((*c).lit[0] != GARBAGE_LIT) as usize; // the other might have still active path
-                    // if (*c).index == DEBUG || true { println!("half processed! {:#}", *c); }
+                                                                       // if (*c).index == DEBUG || true { println!("half processed! {:#}", *c); }
                     ci = (*c).next_watcher[index];
                     pri = &mut (*c).next_watcher[index];
                 }
             }
         }
         debug_assert_eq!(self.watcher[0], NULL_CLAUSE);
+        // ASSERITON
+        {
+            for i in 2..self.watcher.len() {
+                let mut ci = self.watcher[i];
+                while ci != NULL_CLAUSE {
+                    if self.clauses[ci].dead {
+                        panic!("aeaaeamr");
+                    }
+                    let index = self.clauses[ci].lit[0].negate() != i as Lit;
+                    ci = self.clauses[ci].next_watcher[index as usize];
+                }
+            }
+        }
     }
     fn new_clause(&mut self, v: &Vec<Lit>, rank: usize, learnt: bool, locked: bool) -> ClauseId {
         let cix;
@@ -550,7 +565,7 @@ impl Clause {
         Clause {
             kind: ClauseKind::Permanent,
             index: 0,
-            rank: RANK_NULL,
+            rank: 0,
             next_watcher: [NULL_CLAUSE; 2],
             lit: [NULL_LIT; 2],
             lits: vec![],
@@ -706,7 +721,7 @@ impl<'a> Iterator for ClauseIter<'a> {
 }
 
 impl ClauseManagement for ClauseDBState {
-    fn bump_cid(&mut self, cp: &mut [ClausePack; 3], cid: ClauseId) -> () {
+    fn bump(&mut self, cp: &mut [ClausePack; 3], cid: ClauseId) -> () {
         debug_assert_ne!(cid, 0);
         let a;
         {
@@ -729,7 +744,7 @@ impl ClauseManagement for ClauseDBState {
     }
     /// 1. sort `permutation` which is a mapping: index -> ClauseIndex.
     /// 2. rebuild watches to pick up clauses which is placed in a good place in permutation.
-    fn reduce(&mut self, cp: &mut ClausePack) -> () {
+    fn reduce(&mut self, cp: &mut ClausePack, thr: f64) -> () {
         {
             let ClausePack {
                 ref mut clauses, ..
@@ -740,25 +755,19 @@ impl ClauseManagement for ClauseDBState {
                 .filter(|i| !clauses[*i].dead && 1 < clauses[*i].lit[0] && 1 < clauses[*i].lit[1]) // garbage and recycled
                 .collect::<Vec<ClauseIndex>>();
             // sort the range of 'permutation'
-            permutation.sort_unstable_by(|&a, &b| clauses[a].cmp(&clauses[b]));
             let nc = permutation.len();
             if nc == 0 {
                 return;
             }
-            let keep = if clauses[permutation[nc / 2]].rank <= 4 {
-                3 * nc / 4
-            } else {
-                nc / 2
-            };
+            permutation.sort_by(|&a, &b| clauses[a].cmp(&clauses[b]));
+            let keep = nc / 2;
             for i in keep + 1..nc {
                 let mut c = &mut clauses[permutation[i]];
-                if !c.locked && !c.just_used {
-                    // if c.index == DEBUG { println!("### reduce_db {:#}",  *c); }
+                if !c.locked && !c.just_used && thr as usize <= c.rank {
                     c.dead = true;
                 }
                 c.just_used = false;
             }
-            // permutation.retain(|&i| clauses[i].index != DEAD_CLAUSE);
         }
         cp.garbage_collect();
     }
@@ -787,6 +796,7 @@ impl ClauseManagement for ClauseDBState {
                     }
                 }
             }
+            cp.garbage_collect();
         }
         // if self.eliminator.use_elim && self.stats[Stat::NumOfSimplification as usize] % 8 == 0 {
         //     self.eliminate();

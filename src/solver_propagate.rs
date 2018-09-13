@@ -86,9 +86,8 @@ impl SolveSAT for Solver {
                     // glucose reduction
                     let conflicts = self.stats[Stat::NumOfBackjump as usize] as usize;
                     if self.cur_restart * self.next_reduction <= conflicts {
-                        self.cur_restart =
-                            ((conflicts as f64) / (self.next_reduction as f64)) as usize + 1;
-                        self.cm.reduce(&mut self.cp[ClauseKind::Removable as usize]);
+                        self.cur_restart = (conflicts as f64 / self.next_reduction as f64) as usize + 1;
+                        self.cm.reduce(&mut self.cp[ClauseKind::Removable as usize], 6.0);
                         self.next_reduction += self.cm.increment_step;
                         self.stats[Stat::NumOfReduction as usize] += 1;
                         self.progress("drop");
@@ -163,7 +162,7 @@ impl CDCL for Solver {
                 // println!("analyze({}): {} < {}", p.int(), *c);
                 debug_assert_ne!(cid, NULL_CLAUSE);
                 if cid.to_kind() == ClauseKind::Removable as usize {
-                    self.cm.bump_cid(&mut self.cp, cid);
+                    self.cm.bump(&mut self.cp, cid);
                     (*c).rank = (*c).lbd(&self.vars, &mut self.lbd_seen);
                     (*c).just_used = true;
                 }

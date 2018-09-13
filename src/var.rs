@@ -23,7 +23,6 @@ pub trait HeapManagement {
     fn delete(&mut self, vec: &[Var], vi: VarId) -> ();
     fn get_root(&mut self, vec: &[Var]) -> VarId;
     fn is_empty(&self) -> bool;
-//    fn clear(&mut self) -> ();
     fn len(&self) -> usize;
     fn peek(&self) -> VarId;
 }
@@ -192,9 +191,6 @@ impl HeapManagement for VarIdHeap {
     fn is_empty(&self) -> bool {
         self.idxs[0] == 0
     }
-//    fn clear(&mut self) -> () {
-//        self.reset()
-//    }
     fn len(&self) -> usize {
         self.idxs[0]
     }
