@@ -24,6 +24,8 @@ pub trait SolveSAT {
 trait CDCL {
     fn analyze(&mut self, confl: ClauseId) -> usize;
     fn analyze_final(&mut self, ci: ClauseId, skip_first: bool) -> ();
+    fn analyze_removable(&mut self, l: Lit) -> bool;
+    fn minimize_with_bi_clauses(&mut self) -> ();
 }
 
 impl SolveSAT for Solver {
@@ -98,6 +100,7 @@ impl SolveSAT for Solver {
             }
         }
     }
+
     fn propagate(&mut self) -> ClauseId {
         while self.am.q_head < self.am.trail.len() {
             let p: usize = self.am.trail[self.am.q_head] as usize;
@@ -115,12 +118,7 @@ impl SolveSAT for Solver {
         }
         NULL_CLAUSE
     }
-    /// This function touches:
-    ///  - trail
-    ///  - trail_lim
-    ///  - vars
-    ///  - q_head
-    ///  - var_order
+
     fn cancel_until(&mut self, lv: usize) -> () {
         if self.am.decision_level() <= lv {
             return;
@@ -262,6 +260,7 @@ impl CDCL for Solver {
         }
         level_to_return
     }
+
     fn analyze_final(&mut self, ci: ClauseId, skip_first: bool) -> () {
         self.conflicts.clear();
         if self.root_level != 0 {
@@ -299,9 +298,7 @@ impl CDCL for Solver {
             }
         }
     }
-}
 
-impl Solver {
     /// renamed from litRedundant
     fn analyze_removable(&mut self, l: Lit) -> bool {
         self.an_stack.clear();
@@ -336,6 +333,7 @@ impl Solver {
         }
         true
     }
+
     fn minimize_with_bi_clauses(&mut self) -> () {
         let len = self.an_learnt_lits.len();
         if 30 < len {
