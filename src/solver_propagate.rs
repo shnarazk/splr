@@ -30,22 +30,12 @@ trait CDCL {
 
 impl SolveSAT for Solver {
     fn search(&mut self) -> bool {
-        // self.dump("search");
         let root_lv = self.root_level;
         loop {
-            // self.dump("calling propagate");
             self.stats[Stat::NumOfPropagation as usize] += 1;
-            // for cp in &self.cp {
-            //     if !cp.assertion_soundness() {
-            //         println!("bjmp, rest, prpg, rdct, simp, {:?}", self.stats);
-            //         panic!("fail assertion");
-            //     }
-            // }
             let ci = self.propagate();
             let d = self.am.decision_level();
-            // self.dump(format!("search called propagate and it returned {:?} at {}", ret, d));
             if ci == NULL_CLAUSE {
-                // println!(" search loop enters a new level");
                 let na = self.num_assigns();
                 if na == self.num_vars {
                     return true;
@@ -70,7 +60,6 @@ impl SolveSAT for Solver {
                     self.analyze_final(ci, false);
                     return false;
                 } else {
-                    // self.dump(" before analyze");
                     let backtrack_level = self.analyze(ci);
                     self.cancel_until(max(backtrack_level as usize, root_lv));
                     let lbd;
@@ -130,10 +119,10 @@ impl SolveSAT for Solver {
                 let v = &mut self.vars[vi];
                 v.phase = self.assign[vi];
                 self.assign[vi] = BOTTOM;
-                if 0 < v.reason {
+                if v.reason != NULL_CLAUSE {
                     self.cp[v.reason.to_kind()].clauses[v.reason.to_index()].locked = false;
+                    v.reason = NULL_CLAUSE;
                 }
-                v.reason = NULL_CLAUSE;
             }
             self.var_order.insert(&self.vars, vi);
         }

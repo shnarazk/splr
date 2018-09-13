@@ -144,7 +144,6 @@ impl HeapManagement for VarIdHeap {
     }
     /// renamed from undoVO
     fn insert(&mut self, vec: &[Var], vi: VarId) -> () {
-        // self.var_order.check("check insert 1");
         if self.contains(vi) {
             let i = self.idxs[vi];
             self.percolate_up(&vec, i);
@@ -157,7 +156,6 @@ impl HeapManagement for VarIdHeap {
         self.idxs.swap(vi, vn);
         self.idxs[0] = n;
         self.percolate_up(&vec, n);
-        // self.var_order.check("check insert 2");
     }
     fn delete(&mut self, vec: &[Var], vs: VarId) -> () {
         let s = self.idxs[vs];
@@ -176,7 +174,6 @@ impl HeapManagement for VarIdHeap {
         let vs = self.heap[s];
         let n = self.idxs[0];
         let vn = self.heap[n];
-        // self.var_order.check(&format!("root 1 :[({}, {}) ({}, {})]", s, vs, n, vn));
         debug_assert!(vn != 0, "Invalid VarId for heap");
         debug_assert!(vs != 0, "Invalid VarId for heap");
         self.heap.swap(n, s);
@@ -185,7 +182,6 @@ impl HeapManagement for VarIdHeap {
         if 1 < self.idxs[0] {
             self.percolate_down(&vec, 1);
         }
-        // self.var_order.check("root 2");
         vs
     }
     fn is_empty(&self) -> bool {
@@ -231,8 +227,7 @@ impl HeapManagement for VarIdHeap {
                 return 0;
             }
             let vi = self.get_root(&vars);
-            let x = assign[vi];
-            if x == BOTTOM {
+            if assign[vi] == BOTTOM {
                 return vi;
             }
         }

@@ -213,14 +213,14 @@ impl ClauseIF for ClausePack {
         NULL_CLAUSE
     }
     fn garbage_collect(&mut self) -> () {
-        let mut ci = self.watcher[GARBAGE_LIT.negate() as usize];
-        while ci != NULL_CLAUSE {
-            let c = &self.clauses[ci];
-            debug_assert!(c.dead);
-            debug_assert!(c.lit[0] == GARBAGE_LIT || c.lit[1] == GARBAGE_LIT);
-            let index = (c.lit[0] != GARBAGE_LIT) as usize;
-            ci = c.next_watcher[index];
-        }
+        // let mut ci = self.watcher[GARBAGE_LIT.negate() as usize];
+        // while ci != NULL_CLAUSE {
+        //     let c = &self.clauses[ci];
+        //     debug_assert!(c.dead);
+        //     debug_assert!(c.lit[0] == GARBAGE_LIT || c.lit[1] == GARBAGE_LIT);
+        //     let index = (c.lit[0] != GARBAGE_LIT) as usize;
+        //     ci = c.next_watcher[index];
+        // }
         unsafe {
             for l in 2..self.watcher.len() {
                 let vi = (l as Lit).vi();
@@ -272,7 +272,6 @@ impl ClauseIF for ClausePack {
                     (*c).next_watcher[0] = *recycled;
                     (*c).next_watcher[1] = *recycled;
                     *recycled = ci; // (*c).next_watcher[0];
-                    (*c).dead = false;
                     (*c).locked = true;
                     ci = next;
                 // print!("recycler: ");
@@ -306,7 +305,7 @@ impl ClauseIF for ClausePack {
         let w1;
         if self.watcher[RECYCLE_LIT.negate() as usize] != NULL_CLAUSE {
             cix = self.watcher[RECYCLE_LIT.negate() as usize];
-            debug_assert_eq!(self.clauses[cix].dead, false);
+            debug_assert_eq!(self.clauses[cix].dead, true);
             debug_assert_eq!(self.clauses[cix].lit[0], RECYCLE_LIT);
             debug_assert_eq!(self.clauses[cix].lit[1], RECYCLE_LIT);
             debug_assert_eq!(self.clauses[cix].index, cix);
@@ -322,6 +321,7 @@ impl ClauseIF for ClausePack {
             c.rank = rank;
             c.locked = locked;
             c.learnt = learnt;
+            c.dead = false;
             c.just_used = false;
             c.sve_mark = false;
             c.touched = false;
@@ -346,17 +346,6 @@ impl ClauseIF for ClausePack {
         };
         self.watcher[w0] = cix;
         self.watcher[w1] = cix;
-        // {
-        //     let c = &self.clauses[cix];
-        //     let l0 = c.lit[0];
-        //     if !self.seek_from(cix, l0) {
-        //         panic!("NOT FOUND for {} c: {:#}", l0.int(), c);
-        //     }
-        //     let l1 = c.lit[1];
-        //     if !self.seek_from(cix, l1) {
-        //         panic!("NOT FOUND for {} c: {:#}", l1.int(), c);
-        //     }
-        // }
         self.id_from(cix)
     }
     fn id_from(&self, cix: ClauseIndex) -> ClauseId {
@@ -366,7 +355,7 @@ impl ClauseIF for ClausePack {
         cid & self.mask
     }
     fn len(&self) -> usize {
-        self.clauses.len()
+        self.clauses.iter().filter(|i| !i.dead).count()
     }
     fn count(&self, target: Lit, limit: usize) -> usize {
         let mut ci = self.watcher[target.negate() as usize];
@@ -379,12 +368,6 @@ impl ClauseIF for ClausePack {
             }
             if 0 < limit && limit <= cnt {
                 return limit;
-            }
-            if cnt % 10000 == 0 && false {
-                //let cc = &self.clauses[self.watcher[target.negate() as usize]];
-                // println!("#{} = {}, {:#}", target, cnt, cc);
-                // cc = &self.clauses[cc.next_watcher[(cc.lit[0] != target) as usize]];
-                // println!("#{} = {}, {:#}", target, cnt, cc);
             }
             ci = c.next_watcher[(c.lit[0] != target) as usize];
         }
@@ -434,8 +417,6 @@ impl ClausePack {
             self.watcher[RECYCLE_LIT.negate() as usize] = self.clauses[cix].next_watcher[0];
             c.next_watcher[0] = self.watcher[w0];
             c.next_watcher[1] = self.watcher[w1];
-            // print!("attach use a recycle: ");
-            // self.print_watcher(GARBAGE_LIT.negate());
             self.clauses[cix] = c;
         } else {
             cix = self.clauses.len();
@@ -447,18 +428,6 @@ impl ClausePack {
         };
         self.watcher[w0] = cix;
         self.watcher[w1] = cix;
-
-        // {
-        //     let c = &self.clauses[cix];
-        //     let l0 = c.lit[0];
-        //     if !self.seek_from(cix, l0) {
-        //         panic!("NOT FOUND for {} c: {:#}", l0.int(), c);
-        //     }
-        //     let l1 = c.lit[1];
-        //     if !self.seek_from(cix, l1) {
-        //         panic!("NOT FOUND for {} c: {:#}", l1.int(), c);
-        //     }
-        // }
         self.id_from(cix)
     }
 }
@@ -741,7 +710,7 @@ impl ClauseManagement for ClauseDBState {
                 ref mut clauses, ..
             } = cp;
             let permutation = &mut (1..clauses.len())
-                .filter(|i| 1 < clauses[*i].lit[0] && 1 < clauses[*i].lit[1]) // garbage and recycled
+                .filter(|i| !clauses[*i].dead) // garbage and recycled
                 .collect::<Vec<ClauseIndex>>();
             let nc = permutation.len();
             permutation.sort_by(|&a, &b| clauses[a].cmp(&clauses[b]));

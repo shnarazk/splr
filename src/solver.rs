@@ -22,7 +22,7 @@ pub trait LBD {
     fn lbd(&self, vars: &Vec<Var>, tmp: &mut Vec<Lit>) -> usize;
 }
 
-const DB_INC_SIZE: usize = 300;
+const DB_INC_SIZE: usize = 50;
 
 /// normal results returned by Solver
 #[derive(Debug)]
@@ -191,8 +191,9 @@ impl Solver {
             println!("#init, DB,  Remov,  good, junk,   Perm, Binary, PROG, solv, elim,   rate, RES,block,force,  asgn,   lbd, val,   lbd, b lvl, c lvl");
         } else {
             println!(
-                "#{}, DB,{:>7},{:>6},{:>5},{:>7},{:>7}, PROG,{:>5},{:>5},{:>6.3}%, RES,{:>5},{:>5}, {:>5.2},{:>6.2}, val,{:>6.2},{:>6.2},{:>6.2},{:>6.2}",
+                "#{}, DB({:>7}),{:>7},{:>6},{:>5},{:>7},{:>7}, PROG,{:>5},{:>5},{:>6.3}%, RES,{:>5},{:>5}, {:>5.2},{:>6.2}, val,{:>6.2},{:>6.2},{:>6.2},{:>6.2}",
                 mes,
+                self.stats[Stat::NumOfBackjump as usize],
                 learnts.clauses.len() - 1 -deads,
                 cnt,
                 deads,
