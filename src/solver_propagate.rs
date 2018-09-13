@@ -1,3 +1,4 @@
+#![allow(unused_imports)]
 use assign::Assignment;
 use clause::{Clause, ClauseKind, ClauseIF};
 use clause::ClauseManagement;
@@ -9,6 +10,7 @@ use std::cmp::max;
 use types::*;
 use var::HeapManagement;
 use var::Satisfiability;
+use clause::CheckPropagation;
 
 /// for Solver
 pub trait SolveSAT {
@@ -31,6 +33,12 @@ impl SolveSAT for Solver {
         loop {
             // self.dump("calling propagate");
             self.stats[Stat::NumOfPropagation as usize] += 1;
+            // for cp in &self.cp {
+            //     if !cp.assertion_soundness() {
+            //         println!("bjmp, rest, prpg, rdct, simp, {:?}", self.stats);
+            //         panic!("fail assertion");
+            //     }
+            // }
             let ci = self.propagate();
             let d = self.am.decision_level();
             // self.dump(format!("search called propagate and it returned {:?} at {}", ret, d));
@@ -51,8 +59,8 @@ impl SolveSAT for Solver {
                 if !(self.am.q_head < self.am.trail.len()) {
                     let vi = self.var_order.select_var(&self.assign, &self.vars);
                     debug_assert_ne!(vi, 0);
-                    let p = self.vars[vi].phase;
-                    self.am.uncheck_assume(&mut self.assign, &mut self.vars[vi], vi.lit(p));
+                    let sign = self.vars[vi].phase == LTRUE;
+                    self.am.uncheck_assume(&mut self.assign, &mut self.vars[vi], vi.lit(sign as u8));
                 }
             } else {
                 self.stats[Stat::NumOfBackjump as usize] += 1;
@@ -140,10 +148,7 @@ impl SolveSAT for Solver {
 
 impl CDCL for Solver {
     fn analyze(&mut self, confl: ClauseId) -> usize {
-        for mut l in &mut self.an_seen {
-            debug_assert_eq!(*l, 0);
-            // *l = 0;
-        }
+        // for mut l in &mut self.an_seen { debug_assert_eq!(*l, 0); }
         // self.dump("analyze");
         self.an_learnt_lits.clear();
         self.an_learnt_lits.push(0);
@@ -159,7 +164,7 @@ impl CDCL for Solver {
                 debug_assert_ne!(cid, NULL_CLAUSE);
                 if cid.to_kind() == ClauseKind::Removable as usize {
                     self.cm.bump_cid(&mut self.cp, cid);
-                    (*c).rank = (*c).lbd(self);
+                    (*c).rank = (*c).lbd(&self.vars, &mut self.lbd_seen);
                     (*c).just_used = true;
                 }
                 // println!("{}を対応", (*c));
@@ -173,7 +178,7 @@ impl CDCL for Solver {
                     let l = self.vars[vi].level;
                     debug_assert_ne!(self.assign[vi], BOTTOM);
                     if self.an_seen[vi] == 0 && 0 < l {
-                        self.var_order.bump_vi(&mut self.vars, vi, self.stats[Stat::NumOfBackjump as usize] as f64);
+                        self.var_order.bump(&mut self.vars, vi, self.stats[Stat::NumOfBackjump as usize] as f64);
                         self.an_seen[vi] = 1;
                         if dl <= l {
                             // println!(
@@ -250,21 +255,6 @@ impl CDCL for Solver {
             }
         }
         self.an_learnt_lits.truncate(j);
-        // glucose heuristics
-        let r = self.an_learnt_lits.len();
-        for i in 0..self.an_last_dl.len() {
-            let l = self.an_last_dl[i];
-            let vi = l.vi();
-            let cid = self.vars[vi].reason;
-            let len = self.cp[cid.to_kind()].clauses[cid.to_index()].lits.len();
-            if r < len {
-                self.var_order.bump_vi(&mut self.vars, vi, self.stats[Stat::NumOfBackjump as usize] as f64);
-            }
-        }
-        self.an_last_dl.clear();
-        for l in &self.an_to_clear {
-            self.an_seen[l.vi()] = 0;
-        }
         // println!(
         //     "new learnt: {:?}",
         //     vec2int(self.an_learnt_lits)
@@ -287,6 +277,15 @@ impl CDCL for Solver {
                 }
             }
             self.an_learnt_lits.swap(1, max_i);
+        }
+        // glucose heuristics
+        let lbd = self.an_learnt_lits.lbd(&self.vars, &mut self.lbd_seen);
+        while let Some(l) = self.an_last_dl.pop() {
+            let vi = l.vi();
+            let cid = self.vars[vi].reason;
+            if self.cp[cid.to_kind()].clauses[cid.to_index()].rank < lbd {
+                self.var_order.bump(&mut self.vars, vi, self.stats[Stat::NumOfBackjump as usize] as f64);
+            }
         }
         for l in &self.an_to_clear {
             self.an_seen[l.vi()] = 0;
@@ -399,7 +398,7 @@ impl Solver {
         unsafe {
             let key = self.an_level_map_key;
             let vec = &mut self.an_learnt_lits as *mut Vec<Lit>;
-            let nblevel = (*vec).lbd(self);            // let nblevel = self.lbd_vector(&*vec);
+            let nblevel = (*vec).lbd(&self.vars, &mut self.lbd_seen);            // let nblevel = self.lbd_vector(&*vec);
             if 6 < nblevel {
                 return;
             }

@@ -19,7 +19,7 @@ pub trait SatSolver {
 }
 
 pub trait LBD {
-    fn lbd(&self, s: &mut Solver) -> usize;
+    fn lbd(&self, vars: &Vec<Var>, tmp: &mut Vec<Lit>) -> usize;
 }
 
 const DB_INC_SIZE: usize = 300;
@@ -102,7 +102,7 @@ pub struct Solver {
     pub an_level_map: Vec<usize>,
     pub an_level_map_key: usize,
     pub mi_var_map: Vec<usize>,
-    pub lbd_seen: Vec<u64>,
+    pub lbd_seen: Vec<Lit>,
     /// restart heuristics
     pub ema_asg: Ema2,
     pub ema_lbd: Ema2,
@@ -165,10 +165,10 @@ impl Solver {
             an_level_map_key: 1,
             mi_var_map: vec![0; nv + 1],
             lbd_seen: vec![0; nv + 1],
-            ema_asg: Ema2::new(100.0, 4_000.0, 100_000.0),  // for blocking
-            ema_lbd: Ema2::new(10.0, 400.0, 10_000.0),   // for forcing
-            b_lvl: Ema2::new(1.0, 400.0, 10_000.0),
-            c_lvl: Ema2::new(20.0, 10_000.0, 100_000.0),
+            ema_asg: Ema2::new(5000.0, 10_000.0),  // for blocking
+            ema_lbd: Ema2::new(50.0, 10_000.0),   // for forcing
+            b_lvl: Ema2::new(50.0, 10_000.0),
+            c_lvl: Ema2::new(50.0, 10_000.0),
             next_restart: 2000,
             restart_exp: re,
             rbias: Ema::new(1.0, se as f64),
@@ -365,7 +365,7 @@ impl SatSolver for Solver {
         if v.len() == 2 {
             lbd = 0;
         } else {
-            lbd = v.lbd(self);
+            lbd = v.lbd(&self.vars, &mut self.lbd_seen);
             // lbd = self.lbd_vector(&v);
         }
         let mut i_max = 0;
@@ -446,35 +446,35 @@ impl Dump for Solver {
 }
 
 impl<'a> LBD for [Lit] {
-    fn lbd(&self, s: &mut Solver) -> usize {
-        let key_old = s.lbd_seen[0];
+    fn lbd(&self, vars: &Vec<Var>, tmp: &mut Vec<Lit>) -> usize {
+        let key_old = tmp[0];
         let key = if 10_000_000 < key_old { 1 } else { key_old + 1 };
         let mut cnt = 0;
         for l in self {
-            let lv = &mut s.lbd_seen[s.vars[l.vi()].level];
+            let lv = &mut tmp[vars[l.vi()].level];
             if *lv != key {
                 *lv = key;
                 cnt += 1;
             }
         }
-        s.lbd_seen[0] = key;
+        tmp[0] = key;
         cnt
     }
 }
 impl LBD for Clause {
-    fn lbd(&self, s: &mut Solver) -> usize {
-        let key_old = s.lbd_seen[0];
+    fn lbd(&self, vars: &Vec<Var>, tmp: &mut Vec<Lit>) -> usize {
+        let key_old = tmp[0];
         let key = if 10_000_000 < key_old { 1 } else { key_old + 1 };
         let mut cnt = 0;
         for i in 0..self.len() {
             let l = lindex!(self, i);
-            let lv = &mut s.lbd_seen[s.vars[l.vi()].level];
+            let lv = &mut tmp[vars[l.vi()].level];
             if *lv != key {
                 *lv = key;
                 cnt += 1;
             }
         }
-        s.lbd_seen[0] = key;
+        tmp[0] = key;
         cnt
     }
 }

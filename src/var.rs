@@ -13,16 +13,17 @@ pub trait Satisfiability {
 /// for VarIdHeap
 pub trait HeapManagement {
     fn new(n: usize, init: usize) -> VarIdHeap;
-    fn select_var(&mut self, assign: &Vec<Lbool>, vars: &Vec<Var>) -> VarId;
-    fn bump_vi(&mut self, vars: &mut Vec<Var>, vi: VarId, d: f64) -> ();
-    fn rebuild(&mut self, assign: &Vec<Lbool>, vars: &Vec<Var>) -> ();
+    fn select_var(&mut self, assign: &[Lbool], vars: &[Var]) -> VarId;
+    fn bump(&mut self, vars: &mut [Var], vi: VarId, d: f64) -> ();
+    fn rebuild(&mut self, assign: &[Lbool], vars: &[Var]) -> ();
     fn reset(&mut self) -> ();
     fn contains(&self, v: VarId) -> bool;
     fn update(&mut self, vec: &[Var], v: VarId) -> ();
     fn insert(&mut self, vec: &[Var], v: VarId) -> ();
+    fn delete(&mut self, vec: &[Var], vi: VarId) -> ();
     fn get_root(&mut self, vec: &[Var]) -> VarId;
     fn is_empty(&self) -> bool;
-    fn clear(&mut self) -> ();
+//    fn clear(&mut self) -> ();
     fn len(&self) -> usize;
     fn peek(&self) -> VarId;
 }
@@ -159,6 +160,17 @@ impl HeapManagement for VarIdHeap {
         self.percolate_up(&vec, n);
         // self.var_order.check("check insert 2");
     }
+    fn delete(&mut self, vec: &[Var], vs: VarId) -> () {
+        let s = self.idxs[vs];
+        let n = self.idxs[0];
+        let vn = self.heap[n];
+        self.heap.swap(n, s);
+        self.idxs.swap(vn, vs);
+        self.idxs[0] -= 1;
+        if s < self.idxs[0] {
+            self.percolate_down(&vec, s);
+        }
+    }
     /// renamed from getHeapDown
     fn get_root(&mut self, vec: &[Var]) -> VarId {
         let s = 1;
@@ -180,16 +192,16 @@ impl HeapManagement for VarIdHeap {
     fn is_empty(&self) -> bool {
         self.idxs[0] == 0
     }
-    fn clear(&mut self) -> () {
-        self.reset()
-    }
+//    fn clear(&mut self) -> () {
+//        self.reset()
+//    }
     fn len(&self) -> usize {
         self.idxs[0]
     }
     fn peek(&self) -> VarId {
         self.heap[1]
     }
-    fn rebuild(&mut self, assign: &Vec<Lbool>, vars: &Vec<Var>) -> () {
+    fn rebuild(&mut self, assign: &[Lbool], vars: &[Var]) -> () {
         self.reset();
         for vi in 1..vars.len() {
             if assign[vi] == BOTTOM {
@@ -197,7 +209,7 @@ impl HeapManagement for VarIdHeap {
             }
         }
     }
-    fn bump_vi(&mut self, vars: &mut Vec<Var>, vi: VarId, d: f64) -> () {
+    fn bump(&mut self, vars: &mut [Var], vi: VarId, d: f64) -> () {
         // let d = self.stats[Stat::NumOfBackjump as usize] as f64;
         let a = (vars[vi].activity + d) / 2.0;
         vars[vi].activity = a;
@@ -210,7 +222,16 @@ impl HeapManagement for VarIdHeap {
         self.update(vars, vi);
     }
     /// Heap operations; renamed from selectVO
-    fn select_var(&mut self, assign: &Vec<Lbool>, vars: &Vec<Var>) -> VarId {
+    fn select_var(&mut self, assign: &[Lbool], vars: &[Var]) -> VarId {
+        // let mut best = 0;
+        // let mut act = 0.0;
+        // for v in &vars[1..] {
+        //     if assign[v.index] == BOTTOM && act < v.activity {
+        //         best = v.index;
+        //         act = v.activity;
+        //     }
+        // }
+        // return best;
         loop {
             if self.len() == 0 {
                 return 0;
@@ -393,5 +414,28 @@ impl Dump for Eliminator {
         println!(" - n_touched {}", self.n_touched);
         println!(" - clause_queue {:?}", self.clause_queue);
         println!(" - heap {:?}", self.var_queue);
+    }
+}
+
+impl VarIdHeap {
+    pub fn validate(&self, assign: &[Lbool], vars: &[Var]) -> () {
+        if self.idxs[0] == 0 {
+            return;
+        }
+        let vi = self.heap[1];
+        if assign[vi] != BOTTOM {
+            panic!("top of heap are assigned!");
+        }
+        let act = vars[vi].activity;
+        let mut cnt = 0;
+        for i in 1..vars.len() {
+            if assign[i] == BOTTOM && act < vars[i].activity {
+                cnt += 1;
+            }
+        }
+        if 0 < cnt {
+            panic!("not best {} < {}", act, cnt);
+        }
+        println!("pass");
     }
 }

@@ -3,9 +3,9 @@ use var::Var;
 
 pub trait Assignment {
     fn decision_level(&self) -> usize;
-    fn enqueue(&mut self, assign: &mut Vec<Lbool>, v: &mut Var, l: Lit, cid: ClauseId) -> bool;
-    fn uncheck_enqueue(&mut self, assign: &mut Vec<Lbool>, v: &mut Var, l: Lit, cid: ClauseId) -> ();
-    fn uncheck_assume(&mut self, assign: &mut Vec<Lbool>, v: &mut Var, l: Lit) -> ();
+    fn enqueue(&mut self, assign: &mut [Lbool], v: &mut Var, l: Lit, cid: ClauseId) -> bool;
+    fn uncheck_enqueue(&mut self, assign: &mut [Lbool], v: &mut Var, l: Lit, cid: ClauseId) -> ();
+    fn uncheck_assume(&mut self, assign: &mut [Lbool], v: &mut Var, l: Lit) -> ();
 }
 
 #[derive(Debug)]
@@ -20,7 +20,7 @@ impl Assignment for AssignState {
         self.trail_lim.len()
     }
     /// WARNING: you have to lock the clause by yourself.
-    fn enqueue(&mut self, assign: &mut Vec<Lbool>, v: &mut Var, l: Lit, cid: ClauseId) -> bool {
+    fn enqueue(&mut self, assign: &mut [Lbool], v: &mut Var, l: Lit, cid: ClauseId) -> bool {
         // println!("enqueue: {} by {}", l.int(), cid);
         let sig = l.lbool();
         let val = assign[l.vi()];
@@ -34,14 +34,14 @@ impl Assignment for AssignState {
             val == sig
         }
     }
-    fn uncheck_enqueue(&mut self, assign: &mut Vec<Lbool>, v: &mut Var, l: Lit, cid: ClauseId) -> () {
+    fn uncheck_enqueue(&mut self, assign: &mut [Lbool], v: &mut Var, l: Lit, cid: ClauseId) -> () {
         assign[l.vi()] = l.lbool();
         v.level = self.trail_lim.len();
         v.reason = cid;
         // mref!(self.cp, cid).locked = true;
         self.trail.push(l);
     }
-    fn uncheck_assume(&mut self, assign: &mut Vec<Lbool>, v: &mut Var, l: Lit) -> () {
+    fn uncheck_assume(&mut self, assign: &mut [Lbool], v: &mut Var, l: Lit) -> () {
         self.trail_lim.push(self.trail.len());
         self.uncheck_enqueue(assign, v, l, NULL_CLAUSE);
     }

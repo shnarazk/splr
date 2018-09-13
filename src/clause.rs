@@ -1,4 +1,4 @@
-use assign::{Assignment, AssignState};
+use assign::{AssignState, Assignment};
 use std::cmp::Ordering;
 use std::f64;
 use std::fmt;
@@ -10,7 +10,7 @@ use var::Var;
 
 /// for ClauseIndex
 pub trait ClauseList {
-    fn push(&mut self, list: &mut ClauseIndex) -> ClauseIndex ;
+    fn push(&mut self, cix: ClauseIndex, list: &mut ClauseIndex) -> ClauseIndex;
     fn push_garbage(&mut self, c: &mut Clause, index: usize) -> ClauseIndex;
 }
 
@@ -23,7 +23,7 @@ pub trait ClauseIdIndexEncoding {
 
 /// for ClausePack
 pub trait ClauseIF {
-    fn propagate(&mut self, assign: &mut Vec<Lbool>, vars: &mut Vec<Var>, asg: &mut AssignState, p: Lit) -> ClauseId;
+    fn propagate(&mut self, assign: &mut [Lbool], vars: &mut [Var], asg: &mut AssignState, p: Lit) -> ClauseId;
     fn garbage_collect(&mut self) -> ();
     fn id_from(&self, cix: ClauseIndex) -> ClauseId;
     fn index_from(&self, cid: ClauseId) -> ClauseIndex;
@@ -142,14 +142,19 @@ impl ClauseKind {
 }
 
 impl ClauseIF for ClausePack {
-    fn propagate(&mut self, assign: &mut Vec<Lbool>, vars: &mut Vec<Var>, asg: &mut AssignState, p: Lit) -> ClauseId {
-        let ClausePack { ref mut clauses, ref mut watcher, kind, .. } = self;
+    fn propagate(&mut self, assign: &mut [Lbool], vars: &mut [Var], asg: &mut AssignState, p: Lit) -> ClauseId {
+        let ClausePack {
+            ref mut clauses,
+            ref mut watcher,
+            kind,
+            ..
+        } = self;
         let false_lit = (p as Lit).negate();
+        debug_assert_eq!(GARBAGE_LIT.negate() as usize, 0);
         let mut ci: ClauseIndex = watcher[p as usize];
+        watcher[p as usize] = NULL_CLAUSE;
         let mut tail = &mut watcher[p as usize] as *mut usize;
-        let garbages = &mut watcher[GARBAGE_LIT.negate() as usize] as *mut ClauseId;
-        unsafe {
-            *tail = NULL_CLAUSE;
+        {
             'next_clause: while ci != NULL_CLAUSE {
                 let c = &mut clauses[ci];
                 if (*c).lit[0] == false_lit {
@@ -158,11 +163,12 @@ impl ClauseIF for ClausePack {
                 }
                 let next = (*c).next_watcher[1];
                 if (*c).dead {
-                    (*garbages).push_garbage(&mut *c, 1);
+                    watcher[GARBAGE_LIT.negate() as usize].push_garbage(&mut *c, 1);
                     ci = next;
                     continue;
                 }
-                let first_value = (&assign[..]).assigned((*c).lit[0]);
+                let other = (*c).lit[0];
+                let first_value = (&assign[..]).assigned(other);
                 if first_value != LTRUE {
                     for k in 0..(*c).lits.len() {
                         let lk = (*c).lits[k];
@@ -178,14 +184,17 @@ impl ClauseIF for ClausePack {
                         }
                     }
                     if first_value == LFALSE {
-                        *tail = ci;
+                        unsafe {
+                            *tail = ci;
+                        }
                         return kind.id_from(ci);
                     } else {
-                        asg.uncheck_enqueue(assign, &mut vars[(*c).lit[0].vi()], (*c).lit[0], kind.id_from(ci));
+                        asg.uncheck_enqueue(assign, &mut vars[other.vi()], other, kind.id_from(ci));
                         (*c).locked = true;
                     }
                 }
-                { // reconnect
+                {
+                    // reconnect
                     let watch = watcher[p as usize];
                     if watch == NULL_CLAUSE {
                         tail = &mut (*c).next_watcher[1];
@@ -213,7 +222,8 @@ impl ClauseIF for ClausePack {
         unsafe {
             for l in 2..self.watcher.len() {
                 let vi = (l as Lit).vi();
-                let mut garbages = &mut self.watcher[GARBAGE_LIT.negate() as usize] as *mut ClauseId;
+                let mut garbages =
+                    &mut self.watcher[GARBAGE_LIT.negate() as usize] as *mut ClauseId;
                 let mut pri = &mut self.watcher[l] as *mut ClauseId;
                 let mut ci = self.watcher[l];
                 'next_clause: while ci != NULL_CLAUSE {
@@ -231,7 +241,7 @@ impl ClauseIF for ClausePack {
                         continue;
                     }
                     debug_assert!((*c).dead);
-                    debug_assert!((*c).lit[0] == GARBAGE_LIT && (*c).lit[1] == GARBAGE_LIT);
+                    // debug_assert!((*c).lit[0] == GARBAGE_LIT || (*c).lit[1] == GARBAGE_LIT);
                     if (*c).lit[0].negate() == l as Lit {
                         *pri = (*garbages).push_garbage(&mut *c, 0);
                         ci = *pri;
@@ -319,6 +329,8 @@ impl ClauseIF for ClausePack {
             c.index = cix;
             w0 = c.lit[0].negate() as usize;
             w1 = c.lit[1].negate() as usize;
+            debug_assert_ne!(w0, 0);
+            debug_assert_ne!(w1, 0);
             // self.permutation.push(cix);
             c.next_watcher[0] = self.watcher[w0];
             c.next_watcher[1] = self.watcher[w1];
@@ -725,7 +737,7 @@ impl ClauseManagement for ClauseDBState {
             // debug_assert_eq!(permutation.len(), clauses.len());
             // permutation.retain(|i| !clauses[*i as usize].dead);
             let permutation = &mut (1..clauses.len())
-                .filter(|i| !clauses[*i].dead && !(clauses[*i].lit[0] == NULL_LIT && clauses[*i].lit[1] == NULL_LIT)) // garbage and recycled
+                .filter(|i| !clauses[*i].dead && 1 < clauses[*i].lit[0] && 1 < clauses[*i].lit[1]) // garbage and recycled
                 .collect::<Vec<ClauseIndex>>();
             // sort the range of 'permutation'
             permutation.sort_unstable_by(|&a, &b| clauses[a].cmp(&clauses[b]));
@@ -759,15 +771,16 @@ impl ClauseManagement for ClauseDBState {
             for lit in 2..len {
                 unsafe {
                     let mut pri = &mut cp.watcher[(lit as Lit).negate() as usize] as *mut ClauseId;
-                    let mut garbages = &mut cp.watcher[(GARBAGE_LIT.negate()) as usize] as *mut ClauseId;
+                    let mut garbages =
+                        &mut cp.watcher[(GARBAGE_LIT.negate()) as usize] as *mut ClauseId;
                     while *pri != NULL_CLAUSE {
                         let c = &mut cp.clauses[*pri] as *mut Clause;
                         let index = ((*c).lit[0] != lit as Lit) as usize;
                         if (&assign[..]).satisfies(&*c) {
                             (*c).dead = true;
                             *pri = (*garbages).push_garbage(&mut *c, index);
-                            // *pri = cp.detach(&mut *c, index);
-                            // cp[*ck as usize].check_clause("after GC", (*c).index);
+                        // *pri = cp.detach(&mut *c, index);
+                        // cp[*ck as usize].check_clause("after GC", (*c).index);
                         } else {
                             pri = &mut (*c).next_watcher[index];
                         }
@@ -782,7 +795,9 @@ impl ClauseManagement for ClauseDBState {
     }
 }
 
-trait CheckPropagation {
+/// for ClausePack
+pub trait CheckPropagation {
+    fn assertion_soundness(&self) -> bool;
     fn check_garbage(&mut self) -> ();
     fn seek_from(&self, ci: ClauseIndex, p: Lit) -> bool;
     fn print_watcher(&self, p: Lit) -> ();
@@ -791,6 +806,29 @@ trait CheckPropagation {
 }
 
 impl CheckPropagation for ClausePack {
+    fn assertion_soundness(&self) -> bool {
+        for c in &self.clauses[1..] {
+            if !self.seek_from(c.index, c.lit[0]) {
+                if !(c.dead && c.lit[0] == GARBAGE_LIT && c.lit[1] == GARBAGE_LIT) {
+                    println!("0: {:#}", c);
+                    self.print_watcher(GARBAGE_LIT);
+                    return false;
+                } else if c.dead {
+                    self.print_watcher(GARBAGE_LIT);
+                }
+            }
+            if !self.seek_from(c.index, c.lit[1]) {
+                if !(c.dead && c.lit[0] == GARBAGE_LIT && c.lit[1] == GARBAGE_LIT) {
+                    println!("1: {:#}", c);
+                    self.print_watcher(GARBAGE_LIT);
+                    return false;
+                } else if c.dead {
+                    self.print_watcher(GARBAGE_LIT);
+                }
+            }
+        }
+        true
+    }
     fn check_garbage(&mut self) -> () {
         {
             for c in &self.clauses[1..] {
@@ -906,9 +944,9 @@ impl CheckPropagation for ClausePack {
 }
 
 impl<'a> ClauseList for ClauseIndex {
-    fn push(&mut self, item: &mut ClauseIndex) -> ClauseIndex {
+    fn push(&mut self, cix: ClauseIndex, item: &mut ClauseIndex) -> ClauseIndex {
         *item = *self;
-        *self = *item;
+        *self = cix;
         *item
     }
     fn push_garbage(&mut self, c: &mut Clause, index: usize) -> ClauseIndex {
@@ -918,8 +956,8 @@ impl<'a> ClauseList for ClauseIndex {
         if c.lit[other] == GARBAGE_LIT {
             c.next_watcher[index] = c.next_watcher[other];
         } else {
-            self.push(&mut c.next_watcher[index]);
-            //(&mut c.next_watcher[index]).skip_to(self);
+            self.push(c.index, &mut c.next_watcher[index]);
+            // println!(" push_garbage {:#} <= {}", c, *self);
         }
         next
     }
