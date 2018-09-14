@@ -86,11 +86,9 @@ impl Var {
 }
 
 impl<'a> Satisfiability for &'a[Lbool] {
-    #[inline(always)]
     fn assigned(&self, l: Lit) -> Lbool {
         self[l.vi()] ^ ((l & 1) as u8)
     }
-    #[inline(always)]
     fn satisfies(&self, c: &Clause) -> bool {
         for l in &c.lit {
             if self.assigned(*l) == LTRUE {

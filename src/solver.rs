@@ -19,10 +19,10 @@ pub trait SatSolver {
 }
 
 pub trait LBD {
-    fn lbd(&self, vars: &Vec<Var>, tmp: &mut Vec<Lit>) -> usize;
+    fn lbd(&self, vars: &[Var], tmp: &mut [Lit]) -> usize;
 }
 
-const DB_INC_SIZE: usize = 50;
+const DB_INC_SIZE: usize = 200;
 
 /// normal results returned by Solver
 #[derive(Debug)]
@@ -165,10 +165,10 @@ impl Solver {
             an_level_map_key: 1,
             mi_var_map: vec![0; nv + 1],
             lbd_seen: vec![0; nv + 1],
-            ema_asg: Ema2::new(1.0, 5_000.0),  // for blocking
-            ema_lbd: Ema2::new(50.0, 10_000.0),   // for forcing
-            b_lvl: Ema2::new(50.0, 10_000.0),
-            c_lvl: Ema2::new(50.0, 10_000.0),
+            ema_asg: Ema2::new(1.5, 5_000.0),  // for blocking
+            ema_lbd: Ema2::new(50.0, 5_000.0),   // for forcing
+            b_lvl: Ema2::new(50.0, 5_000.0),
+            c_lvl: Ema2::new(50.0, 5_000.0),
             next_restart: 2000,
             restart_exp: re,
             rbias: Ema::new(1.0, se as f64),
@@ -188,12 +188,11 @@ impl Solver {
         let deads = learnts.count(GARBAGE_LIT, 0) + learnts.count(RECYCLE_LIT, 0);
         let cnt = learnts.clauses.iter().filter(|c| c.rank <= 2).count();
         if mes == "" {
-            println!("#init, DB,  Remov,  good, junk,   Perm, Binary, PROG, solv, elim,   rate, RES,block,force,  asgn,   lbd, val,   lbd, b lvl, c lvl");
+            println!("#init, DB,  Remov,  good, junk,   Perm, Binary, PROG, solv, elim,   rate, RES,block,force,  asgn,   lbd, VAL,   lbd, b lvl, c lvl");
         } else {
             println!(
-                "#{}, DB({:>7}),{:>7},{:>6},{:>5},{:>7},{:>7}, PROG,{:>5},{:>5},{:>6.3}%, RES,{:>5},{:>5}, {:>5.2},{:>6.2}, val,{:>6.2},{:>6.2},{:>6.2},{:>6.2}",
+                "#{}, DB,{:>7},{:>6},{:>5},{:>7},{:>7}, PROG,{:>5},{:>5},{:>6.3}%, RES,{:>5},{:>5}, {:>5.2},{:>6.2}, VAL,{:>6.2},{:>6.2},{:>6.2},{:>6.2}",
                 mes,
-                self.stats[Stat::NumOfBackjump as usize],
                 learnts.clauses.len() - 1 -deads,
                 cnt,
                 deads,
@@ -439,7 +438,7 @@ impl Dump for Solver {
 }
 
 impl<'a> LBD for [Lit] {
-    fn lbd(&self, vars: &Vec<Var>, tmp: &mut Vec<Lit>) -> usize {
+    fn lbd(&self, vars: &[Var], tmp: &mut [Lit]) -> usize {
         let key_old = tmp[0];
         let key = if 10_000_000 < key_old { 1 } else { key_old + 1 };
         let mut cnt = 0;
@@ -455,7 +454,7 @@ impl<'a> LBD for [Lit] {
     }
 }
 impl LBD for Clause {
-    fn lbd(&self, vars: &Vec<Var>, tmp: &mut Vec<Lit>) -> usize {
+    fn lbd(&self, vars: &[Var], tmp: &mut [Lit]) -> usize {
         let key_old = tmp[0];
         let key = if 10_000_000 < key_old { 1 } else { key_old + 1 };
         let mut cnt = 0;
