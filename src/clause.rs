@@ -33,8 +33,9 @@ pub trait ClauseIF {
     fn garbage_collect(&mut self) -> ();
     fn id_from(&self, cix: ClauseIndex) -> ClauseId;
     fn index_from(&self, cid: ClauseId) -> ClauseIndex;
-    fn new_clause(&mut self, v: &Vec<Lit>, rank: usize, learnt: bool, locked: bool) -> ClauseId;
+    fn new_clause(&mut self, v: &[Lit], rank: usize, learnt: bool, locked: bool) -> ClauseId;
     fn len(&self) -> usize;
+    fn is_empty(&self) -> bool;
     fn count(&self, target: Lit, limit: usize) -> usize;
 }
 
@@ -292,7 +293,7 @@ impl ClauseIF for ClausePack {
         //     }
         // }
     }
-    fn new_clause(&mut self, v: &Vec<Lit>, rank: usize, learnt: bool, locked: bool) -> ClauseId {
+    fn new_clause(&mut self, v: &[Lit], rank: usize, learnt: bool, locked: bool) -> ClauseId {
         let cix;
         let w0;
         let w1;
@@ -348,6 +349,13 @@ impl ClauseIF for ClausePack {
     }
     fn len(&self) -> usize {
         self.clauses.iter().filter(|i| !i.dead).count()
+    }
+    fn is_empty(&self) -> bool {
+        if self.clauses.is_empty() {
+            true
+        } else {
+            self.clauses.iter().filter(|i| !i.dead).count() == 0
+        }
     }
     fn count(&self, target: Lit, limit: usize) -> usize {
         let mut ci = self.watcher[target.negate() as usize];
@@ -504,6 +512,9 @@ impl Clause {
     pub fn len(&self) -> usize {
         self.lits.len() + 2
     }
+    pub fn is_empty(&self) -> bool {
+        false
+    }
 }
 
 impl fmt::Display for Clause {
@@ -522,7 +533,7 @@ impl fmt::Display for Clause {
             )
         } else {
             match self.index {
-                //            x if x < 0 => write!(f, format!("a given clause {}", self.lits.map(|l| l.int()))),
+                // x if x < 0 => write!(f, format!("a given clause {}", self.lits.map(|l| l.int()))),
                 0 => write!(f, "null_clause"),
                 DEAD_CLAUSE => {
                     debug_assert!(self.dead);

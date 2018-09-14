@@ -193,8 +193,8 @@ impl HeapManagement for VarIdHeap {
     }
     fn rebuild(&mut self, assign: &[Lbool], vars: &[Var]) -> () {
         self.reset();
-        for vi in 1..vars.len() {
-            if assign[vi] == BOTTOM {
+        for (vi, val) in assign.iter().enumerate().skip(1) {
+            if *val == BOTTOM {
                 self.insert(&vars, vi);
             }
         }
@@ -288,7 +288,7 @@ impl VarIdHeap {
                 let vr = self.heap[r];
                 let al = vec[vl].activity;
                 let ar = vec[vr].activity;
-                let (c, vc, ac) = if r <= n && al < ar {
+                let (best, vc, ac) = if r <= n && al < ar {
                     (r, vr, ar)
                 } else {
                     (l, vl, al)
@@ -296,7 +296,7 @@ impl VarIdHeap {
                 if ai < ac {
                     self.heap[i] = vc;
                     self.idxs[vc] = i;
-                    i = c;
+                    i = best;
                 } else {
                     self.heap[i] = vi;
                     debug_assert!(vi != 0, "invalid index");

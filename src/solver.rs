@@ -187,18 +187,16 @@ impl Solver {
         let deads = learnts.count(GARBAGE_LIT, 0) + learnts.count(RECYCLE_LIT, 0);
         let cnt = learnts.clauses.iter().filter(|c| c.rank <= 2).count();
         if mes == "" {
-            println!("#init, DB,  Remov,  good, junk,   Perm, Binary, PROG, solv, elim,   rate, RES,block,force,  asgn,   lbd, VAL,   lbd, b lvl, c lvl");
+            println!("#init, DB,  Remov,  good,   Perm, Binary, PROG, solv,   rate, RES,block,force, asgn/,  lbd/, STAT,   lbd, b lvl, c lvl,c lvl/");
         } else {
             println!(
-                "#{}, DB,{:>7},{:>6},{:>5},{:>7},{:>7}, PROG,{:>5},{:>5},{:>6.3}%, RES,{:>5},{:>5}, {:>5.2},{:>6.2}, VAL,{:>6.2},{:>6.2},{:>6.2},{:>6.2}",
+                "#{}, DB,{:>7},{:>6},{:>7},{:>7}, PROG,{:>5},{:>6.3}%, RES,{:>5},{:>5}, {:>5.2},{:>6.2}, STAT,{:>6.2},{:>6.2},{:>6.2},{:>6.2}",
                 mes,
                 learnts.clauses.len() - 1 -deads,
                 cnt,
-                deads,
                 self.cp[ClauseKind::Permanent as usize].clauses.len() - 1,
                 self.cp[ClauseKind::Binclause as usize].clauses.len() - 1,
                 k,
-                self.eliminator.eliminated_vars,
                 (sum as f32) / (nv as f32) * 100.0,
                 self.stats[Stat::NumOfBlockRestart as usize],
                 self.stats[Stat::NumOfRestart as usize],
