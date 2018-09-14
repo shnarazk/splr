@@ -130,7 +130,7 @@ fn clause_sort() -> () {
         //}
     }
     s.show_clauses();
-    s.cm.reduce_watchers(&mut s.cp[0]);
+    s.cm.reduce(&mut s.cp[0]);
     s.show_clauses();
 
     s.cm.simplify(&mut s.cp, &s.assign);
@@ -141,17 +141,17 @@ fn clause_sort() -> () {
     println!(" - initial state");
     s.show_clauses();
 
-    s.cm.reduce_watchers(&mut s.cp[0]);
+    s.cm.reduce(&mut s.cp[0]);
     s.cm.simplify(&mut s.cp, &s.assign);
     println!(" - 1st shrink");
     s.show_clauses();
 
-    s.cm.reduce_watchers(&mut s.cp[0]);
+    s.cm.reduce(&mut s.cp[0]);
     s.cm.simplify(&mut s.cp, &s.assign);
     println!(" - 2nd shrink");
     s.show_clauses();
 
-    s.cm.reduce_watchers(&mut s.cp[0]);
+    s.cm.reduce(&mut s.cp[0]);
     s.cm.simplify(&mut s.cp, &s.assign);
     println!(" - 3rd shrink");
     s.show_clauses();

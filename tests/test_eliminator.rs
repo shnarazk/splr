@@ -4,7 +4,6 @@
 #![allow(dead_code)]
 extern crate splr;
 use splr::clause::*;
-use splr::clause_manage::*;
 use splr::solver::*;
 use splr::solver::SatSolver;
 use splr::types::*;
