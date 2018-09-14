@@ -48,7 +48,7 @@ impl SolveSAT for Solver {
                     self.num_solved_vars = na;
                     self.var_order.rebuild(&self.assign, &self.vars);
                 }
-                if !(self.am.q_head < self.am.trail.len()) {
+                if self.am.trail.len() <= self.am.q_head {
                     let vi = self.var_order.select_var(&self.assign, &self.vars);
                     debug_assert_ne!(vi, 0);
                     let sign = self.vars[vi].phase == LTRUE;

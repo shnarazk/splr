@@ -44,7 +44,7 @@ fn read_assignment() -> Vec<i32> {
         match rs.read_line(&mut buf) {
             Ok(0) => return Vec::new(),
             Ok(_) => {
-                if buf.starts_with("c") {
+                if buf.starts_with('c') {
                     continue;
                 }
                 let mut v: Vec<i32> = Vec::new();
