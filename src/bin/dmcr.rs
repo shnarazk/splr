@@ -14,7 +14,7 @@ fn main() {
     let mut target: Option<String> = None;
     for arg in &env::args().skip(1).collect::<Vec<String>>() {
         match arg {
-            _ if arg.to_string() == "--version" => {
+            _ if arg == "--version" => {
                 println!("{}", VERSION);
             }
             _ if (&*arg).starts_with('-') => {

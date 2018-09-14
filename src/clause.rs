@@ -462,10 +462,10 @@ impl Clause {
         kind: ClauseKind,
         learnt: bool,
         rank: usize,
-        vec: &Vec<Lit>,
+        vec: &[Lit],
         locked: bool,
     ) -> Clause {
-        let mut v = vec.clone();
+        let mut v = vec.to_owned();
         let lit0 = v.remove(0);
         let lit1 = v.remove(0);
         Clause {

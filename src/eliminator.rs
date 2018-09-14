@@ -318,7 +318,7 @@ impl Solver {
                 // Find best variable to scan:
                 let mut best = 0;
                 let mut tmp = 0;
-                'next_var: for i in 0..(*c).len() {
+                for i in 0..(*c).len() {
                     let l = lindex!(*c, i);
                     let v = &self.vars[l.vi()];
                     // println!("select var {}, {}, {}", l.vi(), v.elimination_target, v.occurs.len());
