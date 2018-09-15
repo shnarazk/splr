@@ -894,14 +894,16 @@ impl CheckPropagation for ClausePack {
     }
 }
 
-impl<'a> ClauseList for ClauseIndex {
+impl ClauseList for ClauseIndex {
     fn push(&mut self, cix: ClauseIndex, item: &mut ClauseIndex) -> ClauseIndex {
         *item = *self;
         *self = cix;
         *item
     }
     fn push_garbage(&mut self, c: &mut Clause, index: usize) -> ClauseIndex {
+        debug_assert!(index == 0 || index == 1);
         let other = (index ^ 1) as usize;
+        debug_assert!(other == 0 || other == 1);
         c.lit[index] = GARBAGE_LIT;
         let next = c.next_watcher[index];
         if c.lit[other] == GARBAGE_LIT {
