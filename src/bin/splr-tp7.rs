@@ -45,7 +45,7 @@ fn main() {
                     }
                 }
                 report_stat(&s);
-                println!("SATISFIABLE. The answer was dumped to {}.", result.as_str());
+                println!("SATISFIABLE. The answer for {} was dumped to {}.", file.file_name().unwrap().to_str().unwrap(), result.as_str());
                 // println!("{:?}", v);
             }
             Ok(Certificate::UNSAT(_)) => {
@@ -55,8 +55,7 @@ fn main() {
                     }
                 }
                 report_stat(&s);
-                println!("UNSAT, The answer was dumped to {}.", result.as_str());
-                println!("[]");
+                println!("UNSAT, The answer for {} was dumped to {}.", file.file_name().unwrap().to_str().unwrap(), result.as_str());
             }
             Err(e) => println!("Failed {:?}", e),
         }
