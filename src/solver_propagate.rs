@@ -350,7 +350,7 @@ impl CDCL for Solver {
                     nb += 1;
                     self.mi_var_map[vi] -= 1;
                 }
-                cix = c.next_watcher[(c.lit[0] != p) as usize];
+                cix = c.next_watcher[(c.lit[0] != l0) as usize];
             }
             if 0 < nb {
                 (*vec).retain(|l| *l == l0 || self.mi_var_map[l.vi()] == key);
