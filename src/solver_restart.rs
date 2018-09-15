@@ -11,11 +11,11 @@ pub trait Restart {
 }
 
 const RESTART_PERIOD: u64 = 50;
-const RESTART_PROHIBIT: u64 = 100;
+const RESTART_PROHIBIT: u64 = 200;
 /// for block restart based on average assingments: 1.40
 const R: f64 = 1.40;
 /// for force restart based on average LBD of newly generated clauses: 1/0.8
-const K: f64 = 1.30;
+const K: f64 = 1.40;
 
 impl Restart for Solver {
     /// called after no conflict propagation
