@@ -106,8 +106,8 @@ impl SolveSAT for Solver {
             let p = am.trail[am.q_head];
             am.q_head += 1;
             stats[Stat::NumOfPropagation as usize] += 1;
-            for kind in &[ClauseKind::Binclause, ClauseKind::Permanent, ClauseKind::Removable] {
-                let ret = cp[*kind as usize].propagate(assign, vars, am, p.negate());
+            for kind in &[ClauseKind::Binclause, ClauseKind::Removable, ClauseKind::Permanent] {
+                let ret = cp[*kind as usize].propagate(assign, vars, am, p);
                 if ret != NULL_CLAUSE {
                     am.q_head = am.trail.len();
                     return ret;
@@ -206,7 +206,6 @@ impl CDCL for Solver {
             }
         }
         self.an_learnt_lits[0] = p.negate();
-        println!("{:?}", vec2int(&self.an_learnt_lits));
         let n = self.an_learnt_lits.len();
         let l0 = self.an_learnt_lits[0];
         self.an_to_clear.clear();
