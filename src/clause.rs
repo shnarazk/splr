@@ -165,28 +165,31 @@ impl ClauseIF for ClausePack {
         'next_clause: while ci != NULL_CLAUSE {
             let c = &mut clauses[ci];
             debug_assert!(!c.dead);
-            if c.lit[0] == false_lit {
-                c.lit.swap(0, 1); // now my index is 1, others is 0.
-                c.next_watcher.swap(0, 1);
-            }
-            let next = c.next_watcher[1];
-            let other = c.lit[0];
-            let first_value = (&assign[..]).assigned(other);
-            if first_value != LTRUE {
+            // assert!(c.lit[0] == false_lit || c.lit[1] == false_lit);
+            let mut my_index = (c.lit[0] != false_lit) as usize;
+            let next = c.next_watcher[my_index];
+            let other = c.lit[my_index ^ 1];
+            let other_value = (&assign[..]).assigned(other);
+            if other_value != LTRUE {
                 for k in 0..c.lits.len() {
                     let lk = c.lits[k];
                     // below is equivalent to 'self.assigned(lk) != LFALSE'
                     if (((lk & 1) as u8) ^ assign[lk.vi()]) != 0 {
                         let lk_watcher = &mut watcher[lk.negate() as usize];
-                        c.lit[1] = lk;
+                        c.lit[my_index] = lk;
                         c.lits[k] = false_lit;
-                        c.next_watcher[1] = *lk_watcher;
+                        c.next_watcher[my_index] = *lk_watcher;
                         *lk_watcher = ci;
                         ci = next;
                         continue 'next_clause;
                     }
                 }
-                if first_value == LFALSE {
+                if my_index == 0 {
+                    c.lit.swap(0, 1); // now my index is 1, others is 0.
+                    c.next_watcher.swap(0, 1);
+                    my_index = 1;
+                }
+                if other_value == LFALSE {
                     break;
                 } else {
                     asg.uncheck_enqueue(assign, &mut vars[other.vi()], other, kind.id_from(ci));
@@ -198,7 +201,7 @@ impl ClauseIF for ClausePack {
             if watch == NULL_CLAUSE {
                 tail_index = ci;
             }
-            c.next_watcher[1] = watch;
+            c.next_watcher[my_index] = watch;
             watcher[p as usize] = ci;
             ci = next;
         }
@@ -208,7 +211,11 @@ impl ClauseIF for ClausePack {
             if tail_index == NULL_CLAUSE {
                 watcher[p as usize] = ci;
             } else {
-                clauses[tail_index].next_watcher[1] = ci;
+                if clauses[tail_index].lit[0] == false_lit {
+                    clauses[tail_index].next_watcher[0] = ci;
+                } else {
+                    clauses[tail_index].next_watcher[1] = ci;
+                }
             }
             kind.id_from(ci)
         }
