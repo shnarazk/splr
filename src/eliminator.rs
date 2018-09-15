@@ -6,7 +6,6 @@ use assign::{AssignState, Assignment};
 use clause::Clause;
 use clause::ClauseIF;
 use clause::ClauseKind;
-use clause::DEAD_CLAUSE;
 use clause::ClauseIdIndexEncoding;
 use solver::SatSolver;
 use solver::{Solver, Stat};
@@ -15,7 +14,9 @@ use types::*;
 use var::HeapManagement;
 use var::Satisfiability;
 use var::Eliminator;
+use std::usize::MAX;
 
+pub const DEAD_CLAUSE: usize = MAX;
 const SUBSUMPITON_GROW_LIMIT: usize = 0;
 const SUBSUMPTION_VAR_QUEUE_MAX: usize = 10_000;
 const SUBSUMPTION_CLAUSE_QUEUE_MAX: usize = 10_000;

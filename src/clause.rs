@@ -2,11 +2,11 @@ use assign::{AssignState, Assignment};
 use std::cmp::Ordering;
 use std::f64;
 use std::fmt;
-use std::usize::MAX;
 use types::LiteralEncoding;
 use types::*;
 use var::Satisfiability;
 use var::Var;
+use eliminator::DEAD_CLAUSE;
 
 /// for ClauseIndex
 pub trait ClauseList {
@@ -53,13 +53,6 @@ const CLAUSE_INDEX_BITS: usize = 60;
 const CLAUSE_INDEX_MASK: usize = 0x0FFF_FFFF_FFFF_FFFF;
 
 // const DB_INIT_SIZE: usize = 1000;
-pub const KINDS: [ClauseKind; 3] = [
-    ClauseKind::Removable,
-    ClauseKind::Permanent,
-    ClauseKind::Binclause,
-];
-pub const DEAD_CLAUSE: usize = MAX;
-
 pub const CLAUSE_KINDS: [ClauseKind; 3] = [
     ClauseKind::Removable,
     ClauseKind::Permanent,
@@ -707,19 +700,17 @@ impl ClauseManagement for ClauseDBState {
         }
         cp.garbage_collect();
     }
-    /// call only when decision level is zero; there's no locked clause.
+    /// find garbages and kill them. Please call me only when decision level is zero; there's no locked clause.
     fn simplify(&mut self, cps: &mut [ClausePack; 3], assign: &[Lbool]) -> bool {
-        // find garbages
         for cp in &mut cps[..] {
             let len = cp.watcher.len();
-            // let mut garbage = &mut cp.watcher[(GARBAGE_LIT.negate()) as usize];
+            let mut garbages = &mut cp.watcher[(GARBAGE_LIT.negate()) as usize] as *mut ClauseId;
             for lit in 2..len {
+                let mut pri = &mut cp.watcher[(lit as Lit).negate() as usize] as *mut ClauseId;
                 unsafe {
-                    let mut pri = &mut cp.watcher[(lit as Lit).negate() as usize] as *mut ClauseId;
-                    let mut garbages =
-                        &mut cp.watcher[(GARBAGE_LIT.negate()) as usize] as *mut ClauseId;
                     while *pri != NULL_CLAUSE {
-                        let c = &mut cp.clauses[*pri] as *mut Clause;
+                        let c = &mut cp.clauses[*pri];
+                        debug_assert!((*c).lit[0] == lit as Lit || (*c).lit[1] == lit as Lit);
                         let index = ((*c).lit[0] != lit as Lit) as usize;
                         if (&assign[..]).satisfies(&*c) {
                             (*c).dead = true;
@@ -732,9 +723,6 @@ impl ClauseManagement for ClauseDBState {
             }
             cp.garbage_collect();
         }
-        // if self.eliminator.use_elim && self.stats[Stat::NumOfSimplification as usize] % 8 == 0 {
-        //     self.eliminate();
-        // }
         true
     }
 }

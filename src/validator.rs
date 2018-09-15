@@ -1,6 +1,6 @@
 use types::*;
 use solver::*;
-use clause::KINDS;
+use clause::CLAUSE_KINDS;
 use var::Satisfiability;
 
 impl Solver {
@@ -10,7 +10,7 @@ impl Solver {
         }
     }
     pub fn validate(&self) -> Option<Vec<i32>> {
-        for ck in &KINDS {
+        for ck in &CLAUSE_KINDS {
             for c in &self.cp[*ck as usize].clauses[1..] {
                 if !(&self.assign[..]).satisfies(&c) {
                     let mut v = Vec::new();

@@ -1,7 +1,6 @@
 extern crate splr;
 use splr::clause::ClauseKind;
 use splr::solver::{Certificate, SatSolver, Solver, Stat};
-use splr::types::EmaKind;
 use std::env;
 use std::fs::File;
 use std::io::{BufWriter, Write};
@@ -74,8 +73,8 @@ fn report_stat(s: &Solver) -> () {
         s.cp[ClauseKind::Removable as usize].clauses.len(),
     );
     println!(
-        "EMA:: Asg (s:{:>.2}, f:{:>.2}), LBD (s:{:>.2}, f:{:>.2}), DL (conflict:{:>.2}, backjump:{:>.2})",
+        "EMA::{{Asg: (s:{:>.2}, f:{:>.2}), LBD: (s:{:>.2}, f:{:>.2})}}, Average::{{conflict:{:>.2}, backjump:{:>.2}}}",
         s.ema_asg.slow, s.ema_asg.fast, s.ema_lbd.slow, s.ema_lbd.fast,
-        s.c_lvl.get(), s.b_lvl.get(),
+        s.c_lvl.slow, s.b_lvl.slow,
     );
 }
