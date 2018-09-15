@@ -146,6 +146,7 @@ impl CDCL for Solver {
                 // special case for binary clause
                 if p != NULL_LIT && (*c).len() == 2 && (&self.assign[..]).assigned((*c).lit[0]) == LFALSE {
                     (*c).lit.swap(0, 1);
+                    (*c).next_watcher.swap(0, 1);
                 }
                 if cid.to_kind() == ClauseKind::Removable as usize {
                     self.cm.bump(&mut self.cp, cid);
