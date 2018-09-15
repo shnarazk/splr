@@ -134,7 +134,7 @@ impl Solver {
             increment_step: DB_INC_SIZE,
         };
         let use_sve = cfg.use_sve;
-        let s = Solver {
+        Solver {
             ok: true,
             model: vec![BOTTOM; nv + 1],
             conflicts: vec![],
@@ -171,9 +171,8 @@ impl Solver {
             c_lvl: Ema2::new(50.0, 5_000.0),
             next_restart: 2000,
             restart_exp: re,
-            rbias: Ema::new(1.0, se as f64),
-        };
-        s
+            rbias: Ema::new(1.0, f64::from(se)),
+        }
     }
     // print a progress report
     pub fn progress(&self, mes: &str) -> () {
@@ -229,7 +228,7 @@ impl SatSolver for Solver {
         self.stats[Stat::NumOfSimplification as usize] += 1;
         self.progress("");
         match self.search() {
-            _ if self.ok == false => {
+            _ if !self.ok => {
                 self.cancel_until(0);
                 Err(SolverException::InternalInconsistent)
             }
@@ -296,7 +295,7 @@ impl SatSolver for Solver {
             match rs.read_line(&mut buf) {
                 Ok(0) => break,
                 Ok(_) => {
-                    if buf.starts_with("c") {
+                    if buf.starts_with('c') {
                         continue;
                     }
                     let mut iter = buf.split_whitespace();
@@ -309,7 +308,7 @@ impl SatSolver for Solver {
                             }
                         }
                     }
-                    if v.len() != 0 && !s.add_clause(&mut v) {
+                    if !v.is_empty() && !s.add_clause(&mut v) {
                         s.ok = false;
                         break;
                     }
@@ -363,8 +362,8 @@ impl SatSolver for Solver {
         let mut i_max = 0;
         let mut lv_max = 0;
         // seek a literal with max level
-        for i in 0..v.len() {
-            let vi = v[i].vi();
+        for (i, l) in v.iter().enumerate() {
+            let vi = l.vi();
             let lv = self.vars[vi].level;
             if self.assign[vi] != BOTTOM && lv_max < lv {
                 i_max = i;

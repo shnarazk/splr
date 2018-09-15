@@ -133,9 +133,9 @@ impl Solver {
             let l = lindex!(q, i);
             if l.vi() != v {
                 for j in 0..p.len() {
-                    let m = lindex!(p, j);
-                    if m.vi() == l.vi() {
-                        if m.negate() == l {
+                    let lit_j = lindex!(p, j);
+                    if lit_j.vi() == l.vi() {
+                        if lit_j.negate() == l {
                             return None;
                         } else {
                             continue 'next_literal;
@@ -286,13 +286,13 @@ impl Solver {
         let mut _subsumed = 0;
         let mut _deleted_literals = 0;
         debug_assert_eq!(self.am.decision_level(), 0);
-        while 0 < self.eliminator.clause_queue.len()
+        while !self.eliminator.clause_queue.is_empty()
             || self.eliminator.bwdsub_assigns < self.am.trail.len()
         {
             // Empty subsumption queue and return immediately on user-interrupt:
             // if computed-too-long { break; }
             // Check top-level assingments by creating a dummy clause and placing it in the queue:
-            if self.eliminator.clause_queue.len() == 0
+            if self.eliminator.clause_queue.is_empty()
                 && self.eliminator.bwdsub_assigns < self.am.trail.len()
             {
                 let l: Lit = self.am.trail[self.eliminator.bwdsub_assigns];
@@ -318,7 +318,7 @@ impl Solver {
                 // Find best variable to scan:
                 let mut best = 0;
                 let mut tmp = 0;
-                'next_var: for i in 0..(*c).len() {
+                for i in 0..(*c).len() {
                     let l = lindex!(*c, i);
                     let v = &self.vars[l.vi()];
                     // println!("select var {}, {}, {}", l.vi(), v.elimination_target, v.occurs.len());
@@ -580,10 +580,10 @@ impl Solver {
         // for i in 1..4 { println!("eliminate report: v{} => {},{}", i, self.vars[i].num_occurs, self.vars[i].occurs.len()); }
         'perform: while 0 < self.eliminator.n_touched
             || self.eliminator.bwdsub_assigns < self.am.trail.len()
-            || 0 < self.eliminator.var_queue.len()
+            || !self.eliminator.var_queue.is_empty()
         {
             self.gather_touched_clauses();
-            if (0 < self.eliminator.clause_queue.len()
+            if (!self.eliminator.clause_queue.is_empty()
                 || self.eliminator.bwdsub_assigns < self.am.trail.len())
                 && !self.backward_subsumption_check()
             {

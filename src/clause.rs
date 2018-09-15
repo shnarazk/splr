@@ -43,7 +43,7 @@ pub trait ClauseManagement {
     fn bump(&mut self, cp: &mut [ClausePack; 3], ci: ClauseId) -> ();
     fn decay_cla_activity(&mut self) -> ();
     fn reduce(&mut self, cp: &mut ClausePack) -> ();
-    fn simplify(&mut self, cp: &mut [ClausePack; 3], assign: &Vec<Lbool>) -> bool;
+    fn simplify(&mut self, cp: &mut [ClausePack; 3], assign: &[Lbool]) -> bool;
 }
 
 const DEBUG: usize = 27728;
@@ -125,20 +125,20 @@ pub struct ClauseDBState {
 }
 
 impl ClauseKind {
-    pub fn tag(&self) -> usize {
+    pub fn tag(self) -> usize {
         match self {
             ClauseKind::Removable => 0x0000_0000_0000_0000,
             ClauseKind::Permanent => 0x1000_0000_0000_0000,
             ClauseKind::Binclause => 0x2000_0000_0000_0000,
         }
     }
-    pub fn mask(&self) -> usize {
+    pub fn mask(self) -> usize {
         CLAUSE_INDEX_MASK
     }
-    pub fn id_from(&self, cix: ClauseIndex) -> ClauseId {
+    pub fn id_from(self, cix: ClauseIndex) -> ClauseId {
         cix | self.tag()
     }
-    pub fn index_from(&self, cid: ClauseId) -> ClauseIndex {
+    pub fn index_from(self, cid: ClauseId) -> ClauseIndex {
         cid & self.mask()
     }
 }
@@ -235,7 +235,7 @@ impl ClauseIF for ClausePack {
                 let vi = (l as Lit).vi();
                 let mut pri = &mut self.watcher[l] as *mut ClauseId;
                 let mut ci = self.watcher[l];
-                'next_clause: while ci != NULL_CLAUSE {
+                while ci != NULL_CLAUSE {
                     let c = &mut self.clauses[ci] as *mut Clause;
                     if !(*c).dead {
                         if (*c).lit[0].vi() == vi {
@@ -469,16 +469,16 @@ impl Clause {
         kind: ClauseKind,
         learnt: bool,
         rank: usize,
-        vec: &Vec<Lit>,
+        vec: &[Lit],
         locked: bool,
     ) -> Clause {
-        let mut v = vec.clone();
+        let mut v = vec.to_owned();
         let lit0 = v.remove(0);
         let lit1 = v.remove(0);
         Clause {
             kind,
             index: 0,
-            rank: rank,
+            rank,
             next_watcher: [NULL_CLAUSE; 2],
             lit: [lit0, lit1],
             lits: v,
@@ -670,7 +670,7 @@ impl ClauseManagement for ClauseDBState {
         }
     }
     fn decay_cla_activity(&mut self) -> () {
-        self.cla_inc = self.cla_inc / self.decay_rate;
+        self.cla_inc /= self.decay_rate;
     }
     fn reduce(&mut self, cp: &mut ClausePack) -> () {
         {
@@ -713,7 +713,7 @@ impl ClauseManagement for ClauseDBState {
         cp.garbage_collect();
     }
     /// call only when decision level is zero; there's no locked clause.
-    fn simplify(&mut self, cps: &mut [ClausePack; 3], assign: &Vec<Lbool>) -> bool {
+    fn simplify(&mut self, cps: &mut [ClausePack; 3], assign: &[Lbool]) -> bool {
         // find garbages
         for cp in &mut cps[..] {
             let len = cp.watcher.len();
@@ -753,7 +753,7 @@ pub trait CheckPropagation {
     fn seek_from(&self, ci: ClauseIndex, p: Lit) -> bool;
     fn print_watcher(&self, p: Lit) -> ();
     fn check_clause(&self, mes: &str, ci: ClauseIndex);
-    fn check_lit(&self, assign: &Vec<Lbool>, vars: &Vec<Var>, mes: &str, lit: Lit) -> ();
+    fn check_lit(&self, assign: &[Lbool], vars: &[Var], mes: &str, lit: Lit) -> ();
 }
 
 impl CheckPropagation for ClausePack {
@@ -860,7 +860,7 @@ impl CheckPropagation for ClausePack {
             panic!("panic");
         }
     }
-    fn check_lit(&self, assign: &Vec<Lbool>, vars: &Vec<Var>, mes: &str, lit: Lit) -> () {
+    fn check_lit(&self, assign: &[Lbool], vars: &[Var], mes: &str, lit: Lit) -> () {
         let vi = lit.vi();
         if vi == WATCHING {
             let p = vi.lit(LTRUE);

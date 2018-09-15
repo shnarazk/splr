@@ -4,7 +4,7 @@ use clause::KINDS;
 use var::Satisfiability;
 
 impl Solver {
-    pub fn inject_assigmnent(&mut self, vec: &Vec<i32>) -> () {
+    pub fn inject_assigmnent(&mut self, vec: &[i32]) -> () {
         for val in vec {
             self.assign[val.abs() as usize] = if *val < 0 { LFALSE } else { LTRUE };
         }

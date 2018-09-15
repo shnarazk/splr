@@ -115,10 +115,6 @@ fn clause_sort() -> () {
     assert_eq!(s.ok, true);
     // println!("Clause permutaton: {:?}", &s.cp[ClauseKind::Removable as usize].permutation);
     {
-        let ClausePack {
-            ref clauses,
-            ..
-        } = &mut s.cp[ClauseKind::Removable as usize];
         // println!("Before sort clauses: {:?}", &permutation[1..]);
         // permutation[1..].sort_by(|&a, &b| clauses[a].cmp(&clauses[b]));
         // println!("Sort clauses: {:?}", &permutation[1..]);
