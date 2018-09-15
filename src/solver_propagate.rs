@@ -92,18 +92,16 @@ impl SolveSAT for Solver {
 
     fn propagate(&mut self) -> ClauseId {
         while self.am.q_head < self.am.trail.len() {
-            let p: usize = self.am.trail[self.am.q_head] as usize;
-            debug_assert!(1 < p);
-            // self.cp[ClauseKind::Removable as usize].check_lit(&self.vars, "before propagation", p as Lit);
+            let p = self.am.trail[self.am.q_head];
             self.am.q_head += 1;
             self.stats[Stat::NumOfPropagation as usize] += 1;
             for cs in &mut self.cp {
-                let ret = cs.propagate(&mut self.assign, &mut self.vars, &mut self.am, p as Lit);
+                let ret = cs.propagate(&mut self.assign, &mut self.vars, &mut self.am, p);
                 if ret != NULL_CLAUSE {
+                    self.am.q_head = self.am.trail.len();
                     return ret;
                 }
             }
-            // self.check_lit(ClauseKind::Removable, "after propagation", p as Lit);
         }
         NULL_CLAUSE
     }
@@ -157,11 +155,8 @@ impl CDCL for Solver {
                         (*c).just_used = true;
                     }
                 }
-                'next_literal: for i in 0..(*c).len() {
+                'next_literal: for i in ((p != NULL_LIT) as usize)..(*c).len() {
                     let q = lindex!(*c, i);
-                    if q == p {
-                        continue 'next_literal;
-                    }
                     let vi = q.vi();
                     let l = self.vars[vi].level;
                     debug_assert_ne!(self.assign[vi], BOTTOM);

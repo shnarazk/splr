@@ -235,26 +235,17 @@ impl ClauseIF for ClausePack {
             for l in 2..self.watcher.len() {
                 let vi = (l as Lit).vi();
                 let mut pri = &mut self.watcher[l] as *mut ClauseId;
-                let mut ci = self.watcher[l];
-                while ci != NULL_CLAUSE {
-                    let c = &mut self.clauses[ci] as *mut Clause;
+                while *pri != NULL_CLAUSE {
+                    let c = &mut self.clauses[*pri] as *mut Clause;
                     if !(*c).dead {
-                        if (*c).lit[0].vi() == vi {
-                            pri = &mut (*c).next_watcher[0];
-                            ci = *pri;
-                        } else {
-                            pri = &mut (*c).next_watcher[1];
-                            ci = *pri;
-                        }
+                        pri = &mut (*c).next_watcher[((*c).lit[0].vi() != vi) as usize];
                         continue;
                     }
                     // debug_assert!((*c).lit[0] == GARBAGE_LIT || (*c).lit[1] == GARBAGE_LIT);
                     if (*c).lit[0].negate() == l as Lit {
                         *pri = (*garbages).push_garbage(&mut *c, 0);
-                        ci = *pri;
                     } else if (*c).lit[1].negate() == l as Lit {
                         *pri = (*garbages).push_garbage(&mut *c, 1);
-                        ci = *pri;
                     } else {
                         panic!("xxxxx {:?}", (*c).lit);
                     }
@@ -263,24 +254,21 @@ impl ClauseIF for ClausePack {
             // recycle garbages
             let recycled = &mut self.watcher[RECYCLE_LIT.negate() as usize] as *mut ClauseId;
             let mut pri = &mut self.watcher[GARBAGE_LIT.negate() as usize] as *mut ClauseId;
-            let mut ci = self.watcher[GARBAGE_LIT.negate() as usize];
-            while ci != NULL_CLAUSE {
-                let c = &mut self.clauses[ci];
+            while *pri != NULL_CLAUSE {
+                let c = &mut self.clauses[*pri];
                 debug_assert!(c.dead);
                 if c.lit[0] == GARBAGE_LIT && c.lit[1] == GARBAGE_LIT {
                     let next = c.next_watcher[0];
-                    *pri = c.next_watcher[0];
                     c.lit[0] = RECYCLE_LIT;
                     c.lit[1] = RECYCLE_LIT;
                     c.next_watcher[0] = *recycled;
                     c.next_watcher[1] = *recycled;
-                    *recycled = ci;
+                    *recycled = *pri;
                     c.locked = true;
-                    ci = next;
+                    *pri = next;
                 } else {
                     debug_assert!(c.lit[0] == GARBAGE_LIT || c.lit[1] == GARBAGE_LIT);
                     let index = (c.lit[0] != GARBAGE_LIT) as usize;
-                    ci = c.next_watcher[index];
                     pri = &mut c.next_watcher[index];
                 }
             }
@@ -358,11 +346,7 @@ impl ClauseIF for ClausePack {
         self.clauses.iter().filter(|i| !i.dead).count()
     }
     fn is_empty(&self) -> bool {
-        if self.clauses.is_empty() {
-            true
-        } else {
-            self.clauses.iter().filter(|i| !i.dead).count() == 0
-        }
+        self.clauses.is_empty() || self.clauses.iter().filter(|i| !i.dead).count() == 0
     }
     fn count(&self, target: Lit, limit: usize) -> usize {
         let mut ci = self.watcher[target.negate() as usize];

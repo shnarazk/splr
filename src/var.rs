@@ -234,12 +234,11 @@ impl HeapManagement for VarIdHeap {
         let mut heap = Vec::with_capacity(n + 1);
         let mut idxs = Vec::with_capacity(n + 1);
         heap.push(0);
-        idxs.push(n);
+        idxs.push(init);
         for i in 1..n + 1 {
             heap.push(i);
             idxs.push(i);
         }
-        idxs[0] = init;
         VarIdHeap { heap, idxs }
     }
 }
