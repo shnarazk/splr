@@ -373,8 +373,8 @@ impl ClausePack {
         let mask = i.mask();
         let mut clauses = Vec::with_capacity(1 + nc);
         clauses.push(Clause::null());
-        let mut permutation = Vec::new();
-        permutation.push(0); // for NULL_CLAUSE
+        // let mut permutation = Vec::new();
+        // permutation.push(0); // for NULL_CLAUSE
         let mut watcher = Vec::with_capacity(2 * (nv + 1));
         for _i in 0..2 * (nv + 1) {
             watcher.push(NULL_CLAUSE);
@@ -724,8 +724,6 @@ impl ClauseManagement for ClauseDBState {
                         if (&assign[..]).satisfies(&*c) {
                             (*c).dead = true;
                             *pri = (*garbages).push_garbage(&mut *c, index);
-                        // *pri = cp.detach(&mut *c, index);
-                        // cp[*ck as usize].check_clause("after GC", (*c).index);
                         } else {
                             pri = &mut (*c).next_watcher[index];
                         }

@@ -451,21 +451,21 @@ impl<'a> LBD for [Lit] {
     }
 }
 impl LBD for Clause {
-    fn lbd(&self, vars: &[Var], tmp: &mut [Lit]) -> usize {
-        let key_old = tmp[0];
-        let key = if 10_000_000 < key_old { 1 } else { key_old + 1 };
-        let mut cnt = 0;
-        for i in 0..self.len() {
-            let l = lindex!(self, i);
-            let lv = &mut tmp[vars[l.vi()].level];
-            if *lv != key {
-                *lv = key;
-                cnt += 1;
-            }
-        }
-        tmp[0] = key;
-        cnt
-    }
+   fn lbd(&self, vars: &[Var], tmp: &mut [Lit]) -> usize {
+       let key_old = tmp[0];
+       let key = if 10_000_000 < key_old { 1 } else { key_old + 1 };
+       let mut cnt = 0;
+       for i in 0..self.len() {
+           let l = lindex!(self, i);
+           let lv = &mut tmp[vars[l.vi()].level];
+           if *lv != key {
+               *lv = key;
+               cnt += 1;
+           }
+       }
+       tmp[0] = key;
+       cnt
+   }
 }
 
 //impl Solver {
