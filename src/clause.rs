@@ -158,6 +158,7 @@ impl ClauseIF for ClausePack {
         let mut tail_index = NULL_CLAUSE;
         'next_clause: while ci != NULL_CLAUSE {
             let c = &mut clauses[ci];
+            println!("{:#}", c);
             debug_assert!(!c.dead);
             // assert!(c.lit[0] == false_lit || c.lit[1] == false_lit);
             let mut my_index = (c.lit[0] != false_lit) as usize;
