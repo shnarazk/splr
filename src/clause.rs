@@ -3,11 +3,46 @@ use std::f64;
 use std::fmt;
 use std::usize::MAX;
 use types::*;
+use solver::{Solver, Stat};
+use solver_propagate::SolveSAT;
+
+/// for ClauseIndex
+pub trait ClauseList {
+    fn push(&mut self, cix: ClauseIndex, list: &mut ClauseIndex) -> ClauseIndex;
+    fn push_garbage(&mut self, c: &mut Clause, index: usize) -> ClauseIndex;
+}
+
+/// for usize, Clause
+pub trait ClauseIdIndexEncoding {
+    fn to_id(&self) -> ClauseId;
+    fn to_index(&self) -> ClauseIndex;
+    fn to_kind(&self) -> usize;
+}
+
+pub trait ClauseManagement {
+    fn bump_cid(&mut self, ci: ClauseId) -> ();
+    fn decay_cla_activity(&mut self) -> ();
+    fn add_clause(&mut self, v: &mut Vec<Lit>) -> bool;
+    fn add_learnt(&mut self, v: &mut Vec<Lit>) -> usize;
+    fn reduce_watchers(&mut self) -> ();
+    fn simplify_database(&mut self) -> bool;
+    fn lbd_of(&mut self, v: &[Lit]) -> usize;
+}
+
+// const DB_INIT_SIZE: usize = 1000;
+const DB_INC_SIZE: usize = 50;
+pub const KINDS: [ClauseKind; 3] = [
+    ClauseKind::Binclause,
+    ClauseKind::Permanent,
+    ClauseKind::Removable,
+];
 
 #[derive(Debug)]
 pub struct ClausePack {
+    pub kind: ClauseKind,
     pub init_size: usize,
     pub clauses: Vec<Clause>,
+    pub touched: Vec<bool>,
     pub permutation: Vec<ClauseIndex>,
     pub watcher: Vec<ClauseIndex>,
     pub tag: usize,
@@ -52,20 +87,25 @@ impl ClauseKind {
 }
 
 impl ClausePack {
-    pub fn build(i: ClauseKind, nv: usize, nc: usize) -> ClausePack {
-        let tag = i.tag();
-        let mask = i.mask();
+    pub fn build(kind: ClauseKind, nv: usize, nc: usize) -> ClausePack {
+        let tag = kind.tag();
+        let mask = kind.mask();
         let mut clauses = Vec::with_capacity(1 + nc);
         clauses.push(Clause::null());
         let mut permutation = Vec::new();
         permutation.push(0); // for NULL_CLAUSE
         let mut watcher = Vec::with_capacity(2 * (nv + 1));
+        let mut touched = Vec::with_capacity(2 * (nv + 1));
         for _i in 0..2 * (nv + 1) {
             watcher.push(NULL_CLAUSE);
+            touched.push(false);
         }
+
         ClausePack {
+            kind,
             init_size: nc,
             clauses,
+            touched,
             permutation,
             watcher,
             mask,
@@ -104,12 +144,6 @@ pub const RANK_NEED: usize = 2; // for newly generated bi-clauses
 /// Clause Index, not ID because it's used only within a Vec<Clause>
 pub type ClauseIndex = usize;
 
-pub trait ClauseIdIndexEncoding {
-    fn to_id(&self) -> ClauseId;
-    fn to_index(&self) -> ClauseIndex;
-    fn to_kind(&self) -> usize;
-}
-
 /// Clause
 #[derive(Debug)]
 pub struct Clause {
@@ -139,6 +173,8 @@ pub struct Clause {
     pub sve_mark: bool,
     /// used in Subsumption Variable Eliminator
     pub touched: bool,
+    /// gc
+    pub dead: bool,
 }
 
 impl ClauseIdIndexEncoding for usize {
@@ -209,7 +245,8 @@ impl Ord for Clause {
 }
 
 impl Clause {
-    pub fn new(kind: ClauseKind, learnt: bool, rank: usize, mut v: Vec<Lit>) -> Clause {
+    pub fn new(kind: ClauseKind, learnt: bool, rank: usize, v: &[Lit]) -> Clause {
+        let mut v = v.to_owned();
         let lit0 = v.remove(0);
         let lit1 = v.remove(0);
         Clause {
@@ -226,6 +263,7 @@ impl Clause {
             just_used: false,
             sve_mark: false,
             touched: false,
+            dead: false,
         }
     }
     pub fn null() -> Clause {
@@ -243,6 +281,7 @@ impl Clause {
             just_used: false,
             sve_mark: false,
             touched: false,
+            dead: false,
         }
     }
     pub fn len(&self) -> usize {
@@ -377,5 +416,483 @@ impl<'a> Iterator for ClauseIter<'a> {
             n if n <= self.end => Some(self.clause.lits[n - 3]),
             _ => None,
         }
+    }
+}
+
+impl ClauseManagement for Solver {
+    #[inline]
+    fn bump_cid(&mut self, cid: ClauseId) -> () {
+        debug_assert_ne!(cid, 0);
+        let a;
+        {
+            // let c = &mut self.cp[cid.to_kind()].clauses[cid.to_index()];
+            let c = mref!(self.cp, cid);
+            a = c.activity + self.cla_inc;
+            c.activity = a;
+        }
+        if 1.0e20 < a {
+            for c in &mut self.cp[ClauseKind::Removable as usize].clauses {
+                if c.learnt {
+                    c.activity *= 1.0e-20;
+                }
+            }
+            self.cla_inc *= 1.0e-20;
+        }
+    }
+    fn decay_cla_activity(&mut self) -> () {
+        self.cla_inc = self.cla_inc / self.config.clause_decay_rate;
+    }
+    // renamed from clause_new
+    fn add_clause(&mut self, v: &mut Vec<Lit>) -> bool {
+        v.sort_unstable();
+        let mut j = 0;
+        let mut l_ = NULL_LIT; // last literal; [x, x.negate()] means totology.
+        for i in 0..v.len() {
+            let li = v[i];
+            let sat = self.assigned(li);
+            if sat == LTRUE || li.negate() == l_ {
+                return true;
+            } else if sat != LFALSE && li != l_ {
+                v[j] = li;
+                j += 1;
+                l_ = li;
+            }
+        }
+        v.truncate(j);
+        let kind = if v.len() == 2 {
+            ClauseKind::Binclause
+        } else {
+            ClauseKind::Permanent
+        };
+        match v.len() {
+            0 => false, // Empty clause is UNSAT.
+            1 => self.enqueue(v[0], NULL_CLAUSE),
+            _ => {
+                self.cp[kind as usize].new_clause(&v, 0, false, false);
+                true
+            }
+        }
+    }
+    /// renamed from newLearntClause
+    fn add_learnt(&mut self, v: &mut Vec<Lit>) -> usize {
+        debug_assert_ne!(v.len(), 0);
+        if v.len() == 1 {
+            self.uncheck_enqueue(v[0], NULL_CLAUSE);
+            return 0;
+        }
+        let lbd = self.lbd_of(&v);
+        // let lbd = v.lbd(&self.vars, &mut self.lbd_seen);
+        let mut i_max = 0;
+        let mut lv_max = 0;
+        // seek a literal with max level
+        for (i, l) in v.iter().enumerate() {
+            let vi = l.vi();
+            let lv = self.vars[vi].level;
+            if self.vars[vi].assign != BOTTOM && lv_max < lv {
+                i_max = i;
+                lv_max = lv;
+            }
+        }
+        v.swap(1, i_max);
+        let l0 = v[0];
+        let kind = if v.len() == 2 {
+            ClauseKind::Binclause
+        } else {
+            ClauseKind::Removable
+        };
+        let cid = self.cp[kind as usize].new_clause(&v, lbd, true, true);
+        self.bump_cid(cid);
+        self.uncheck_enqueue(l0, cid);
+        lbd
+    }
+    /// 1. sort `permutation` which is a mapping: index -> ClauseIndex.
+    /// 2. rebuild watches to pick up clauses which is placed in a good place in permutation.
+    fn reduce_watchers(&mut self) -> () {
+        {
+            let ClausePack {
+                ref mut clauses,
+                ref mut touched,
+                ..
+            } = &mut self.cp[ClauseKind::Removable as usize];
+            let permutation = &mut (1..clauses.len())
+                .filter(|i| !clauses[*i].dead) // garbage and recycled
+                .collect::<Vec<ClauseIndex>>();
+
+            // debug_assert_eq!(permutation.len(), clauses.len());
+            // sort the range of 'permutation'
+            permutation[1..].sort_by(|&a, &b| clauses[a].cmp(&clauses[b]));
+            let nc = permutation.len();
+            for i in nc / 2 + 1..nc {
+                let mut c = &mut clauses[permutation[i]];
+                if !c.locked && !c.just_used {
+                    c.dead = true;
+                    touched[c.lit[0].negate() as usize] = true;
+                    touched[c.lit[1].negate() as usize] = true; 
+                }
+            }
+        }
+        // self.garbage_collect(ClauseKind::Removable);
+        self.cp[ClauseKind::Removable as usize].garbage_collect();
+        self.next_reduction += DB_INC_SIZE + (self.c_lvl.0 as usize);
+        self.stats[Stat::NumOfReduction as usize] += 1;
+        self.progress("drop");
+    }
+    fn simplify_database(&mut self) -> bool {
+        debug_assert_eq!(self.decision_level(), 0);
+        if self.eliminator.use_elim
+            && self.stats[Stat::NumOfSimplification as usize] % 8 == 0
+            && self.eliminator.last_invocatiton < self.stats[Stat::NumOfReduction as usize] as usize
+        {
+            // self.eliminate();
+            self.eliminator.last_invocatiton = self.stats[Stat::NumOfReduction as usize] as usize;
+        }
+        // remove unsatisfiable literals in clauses
+        let targets: Vec<Lit> = self.trail[self.num_solved_vars..]
+            .iter()
+            .map(|l| l.negate())
+            .collect();
+        for ck in &KINDS {
+            debug_assert_eq!(self.cp[*ck as usize].clauses[0].index, 0);
+            for mut c in &mut self.cp[*ck as usize].clauses {
+                if !(*c).frozen {
+                    c.lits.retain(|l| {
+                        for t in &targets {
+                            if t == l {
+                                return false;
+                            }
+                        }
+                        true
+                    });
+                }
+            }
+            // set key FIXME check lit[2] and lits[..]
+            let thr = (self.ema_lbd.slow / 2.0) as usize;
+            for ci in 1..self.cp[*ck as usize].clauses.len() {
+                unsafe {
+                    let c = &mut self.cp[*ck as usize].clauses[ci] as *mut Clause;
+                    if ((*c).frozen && thr < (*c).len()) || self.satisfies(&*c) {
+                        // (*c).index = DEAD_CLAUSE;
+                        (*c).dead = true;
+                        self.cp[*ck as usize].touched[(*c).lit[0].negate() as usize] = true;
+                        self.cp[*ck as usize].touched[(*c).lit[1].negate() as usize] = true; 
+                    } else if (*c).lits.len() == 0 && false {
+                        if !self.enqueue((*c).lits[0], NULL_CLAUSE) {
+                            self.ok = false;
+                        }
+                        (*c).dead = true;
+                        self.cp[*ck as usize].touched[(*c).lit[0].negate() as usize] = true;
+                        self.cp[*ck as usize].touched[(*c).lit[1].negate() as usize] = true; 
+                        // (*c).index = DEAD_CLAUSE;
+                        // } else {
+                        //     let new = self.lbd_of(&(*c).lits);
+                        //     if new < (*c).rank {
+                        //         (*c).rank = new;
+                        //     }
+                        // }
+                    }
+                    (*c).frozen = false;
+                }
+            }
+            self.cp[*ck as usize].garbage_collect();
+            // self.garbage_collect(*ck);
+        }
+        self.stats[Stat::NumOfSimplification as usize] += 1;
+//        if self.eliminator.use_elim
+//            && self.stats[Stat::NumOfSimplification as usize] % 8 == 0
+//            && self.eliminator.last_invocatiton < self.stats[Stat::NumOfReduction as usize] as usize
+//        {
+//            self.eliminate();
+//            self.eliminator.last_invocatiton = self.stats[Stat::NumOfReduction as usize] as usize;
+//            for ck in &KINDS {
+//                // self.garbage_collect(*ck);
+//                self.cp[*ck as usize].garbage_collect();
+//            }
+//        }
+        self.progress("simp");
+        true
+    }
+    fn lbd_of(&mut self, v: &[Lit]) -> usize {
+        let key;
+        let key_old = self.lbd_seen[0];
+        if 10_000_000 < key_old {
+            key = 1;
+        } else {
+            key = key_old + 1;
+        }
+        self.lbd_seen[0] = key;
+        let mut cnt = 0;
+        for l in v {
+            let lv = self.vars[l.vi()].level;
+            if self.lbd_seen[lv] != key && lv != 0 {
+                self.lbd_seen[lv] = key;
+                cnt += 1;
+            }
+        }
+        if cnt == 0 {
+            1
+        } else {
+            cnt
+        }
+    }
+}
+
+impl Solver {
+    // # Prerequisite
+    /// - `ClausePack.clauses` has dead clauses, and their index fields hold valid vaule.
+    /// - `Caluse.index` of all the dead clauses is DEAD_CLAUSE.
+    /// - `ClausePack.permutation` is valid and can be destoried here.
+    ///
+    /// # Result
+    /// - `ClausePack.clauses` has only active clauses, and their sorted with new index.
+    /// - `ClausePack.permutation` is sorted.
+    /// - `Var.reason` is updated with new clause ids.
+    /// - By calling `rebuild_watchers`, All `ClausePack.watcher` hold valid links.
+    fn garbage_collect(&mut self, kind: ClauseKind) -> () {
+        let dl = self.decision_level();
+        {
+            let ClausePack {
+                ref mut clauses,
+                ref mut permutation,
+                ..
+            } = &mut self.cp[kind as usize];
+            // set new indexes to index field of active clauses.
+            let mut ni = 0; // new index
+            for c in &mut *clauses {
+                if !c.dead {
+                    c.index = ni;
+                    ni += 1;
+                }
+            }
+            // rebuild reason
+            if dl == 0 {
+                for v in &mut self.vars[1..] {
+                    v.reason = NULL_CLAUSE;
+                }
+            } else {
+                for v in &mut self.vars[1..] {
+                    let cid = v.reason;
+                    if 0 < cid && cid.to_kind() == kind as usize {
+                        v.reason = kind.id_from(clauses[cid].index);
+                    }
+                }
+            }
+            // GC
+            clauses.retain(|ref c| !c.dead);
+            // rebuild permutation
+            permutation.clear();
+            for i in 0..clauses.len() {
+                debug_assert_eq!(clauses[i].index, i);
+                permutation.push(i);
+            }
+        }
+        self.rebuild_watchers(kind);
+    }
+    pub fn rebuild_watchers(&mut self, kind: ClauseKind) -> () {
+        let ClausePack {
+            ref mut clauses,
+            ref mut watcher,
+            ..
+        } = &mut self.cp[kind as usize];
+        for mut x in &mut *watcher {
+            *x = NULL_CLAUSE;
+        }
+        for mut c in &mut *clauses {
+            if c.frozen || c.index == DEAD_CLAUSE {
+                continue;
+            }
+            let w0 = c.lit[0].negate() as usize;
+            c.next_watcher[0] = watcher[w0];
+            watcher[w0] = c.index;
+            let w1 = c.lit[1].negate() as usize;
+            c.next_watcher[1] = watcher[w1];
+            watcher[w1] = c.index;
+        }
+    }
+    // print a progress report
+    fn progress(&self, mes: &str) -> () {
+        let nv = self.vars.len() - 1;
+        let k = if self.trail_lim.is_empty() {
+            self.trail.len()
+        } else {
+            self.trail_lim[0]
+        };
+        let sum = k + self.eliminator.eliminated_vars;
+        println!(
+            "#{}, DB:R|P|B, {:>8}, {:>8}, {:>5}, Progress: {:>6}+{:>6}({:>4.1}%), Restart:b|f, {:>6}, {:>6}, EMA:a|l, {:>5.2}, {:>6.2}, LBD: {:>5.2}",
+            mes,
+            self.cp[ClauseKind::Removable as usize].clauses.len() - 1,
+            self.cp[ClauseKind::Permanent as usize].clauses.len() - 1,
+            self.cp[ClauseKind::Binclause as usize].clauses.len() - 1,
+            k,
+            self.eliminator.eliminated_vars,
+            (sum as f32) / (nv as f32),
+            self.stats[Stat::NumOfBlockRestart as usize],
+            self.stats[Stat::NumOfRestart as usize],
+            self.ema_asg.get(),
+            self.ema_lbd.get(),
+            self.ema_lbd.fast,
+        );
+    }
+}
+
+trait GC {
+    fn garbage_collect(&mut self) ->  ();
+    fn new_clause(&mut self, v: &Vec<Lit>, rank: usize, learnt: bool, locked: bool) -> ClauseId;
+}
+
+impl GC for ClausePack {
+    fn garbage_collect(&mut self) -> () {
+        // let mut ci = self.watcher[GARBAGE_LIT.negate() as usize];
+        // while ci != NULL_CLAUSE {
+        //     let c = &self.clauses[ci];
+        //     debug_assert!(c.dead);
+        //     debug_assert!(c.lit[0] == GARBAGE_LIT || c.lit[1] == GARBAGE_LIT);
+        //     let index = (c.lit[0] != GARBAGE_LIT) as usize;
+        //     ci = c.next_watcher[index];
+        // }
+        unsafe {
+            let garbages = &mut self.watcher[GARBAGE_LIT.negate() as usize] as *mut ClauseId;
+            for l in 2..self.watcher.len() {
+                if self.touched[l] {
+                    self.touched[l] = false;
+                } else {
+                    continue;
+                }
+                let vi = (l as Lit).vi();
+                let mut pri = &mut self.watcher[l] as *mut ClauseId;
+                let mut ci = self.watcher[l];
+                while ci != NULL_CLAUSE {
+                    let c = &mut self.clauses[ci] as *mut Clause;
+                    if !(*c).dead {
+                        if (*c).lit[0].vi() == vi {
+                            pri = &mut (*c).next_watcher[0];
+                            ci = *pri;
+                        } else {
+                            pri = &mut (*c).next_watcher[1];
+                            ci = *pri;
+                        }
+                        continue;
+                    }
+                    // debug_assert!((*c).lit[0] == GARBAGE_LIT || (*c).lit[1] == GARBAGE_LIT);
+                    if (*c).lit[0].negate() == l as Lit {
+                        *pri = (*garbages).push_garbage(&mut *c, 0);
+                        ci = *pri;
+                    } else if (*c).lit[1].negate() == l as Lit {
+                        *pri = (*garbages).push_garbage(&mut *c, 1);
+                        ci = *pri;
+                    } else {
+                        panic!("xxxxx {:?}", (*c).lit);
+                    }
+                }
+            }
+            // recycle garbages
+            let recycled = &mut self.watcher[RECYCLE_LIT.negate() as usize] as *mut ClauseId;
+            let mut pri = &mut self.watcher[GARBAGE_LIT.negate() as usize] as *mut ClauseId;
+            let mut ci = self.watcher[GARBAGE_LIT.negate() as usize];
+            while ci != NULL_CLAUSE {
+                let c = &mut self.clauses[ci];
+                debug_assert!(c.dead);
+                if c.lit[0] == GARBAGE_LIT && c.lit[1] == GARBAGE_LIT {
+                    let next = c.next_watcher[0];
+                    *pri = c.next_watcher[0];
+                    c.lit[0] = RECYCLE_LIT;
+                    c.lit[1] = RECYCLE_LIT;
+                    c.next_watcher[0] = *recycled;
+                    c.next_watcher[1] = *recycled;
+                    *recycled = ci;
+                    c.locked = true;
+                    ci = next;
+                } else {
+                    debug_assert!(c.lit[0] == GARBAGE_LIT || c.lit[1] == GARBAGE_LIT);
+                    let index = (c.lit[0] != GARBAGE_LIT) as usize;
+                    ci = c.next_watcher[index];
+                    pri = &mut c.next_watcher[index];
+                }
+            }
+        }
+        debug_assert_eq!(self.watcher[0], NULL_CLAUSE);
+        // // ASSERTION
+        // {
+        //     for i in 2..self.watcher.len() {
+        //         let mut ci = self.watcher[i];
+        //         while ci != NULL_CLAUSE {
+        //             if self.clauses[ci].dead {
+        //                 panic!("aeaaeamr");
+        //             }
+        //             let index = self.clauses[ci].lit[0].negate() != i as Lit;
+        //             ci = self.clauses[ci].next_watcher[index as usize];
+        //         }
+        //     }
+        // }
+    }
+    fn new_clause(&mut self, v: &Vec<Lit>, rank: usize, learnt: bool, locked: bool) -> ClauseId {
+        let cix;
+        let w0;
+        let w1;
+        if self.watcher[RECYCLE_LIT.negate() as usize] != NULL_CLAUSE {
+            cix = self.watcher[RECYCLE_LIT.negate() as usize];
+            debug_assert_eq!(self.clauses[cix].dead, true);
+            debug_assert_eq!(self.clauses[cix].lit[0], RECYCLE_LIT);
+            debug_assert_eq!(self.clauses[cix].lit[1], RECYCLE_LIT);
+            debug_assert_eq!(self.clauses[cix].index, cix);
+            self.watcher[RECYCLE_LIT.negate() as usize] = self.clauses[cix].next_watcher[0];
+            let c = &mut self.clauses[cix];
+            c.lit[0] = v[0];
+            c.lit[1] = v[1];
+            c.lits.clear();
+            for l in &v[2..] {
+                c.lits.push(*l);
+            }
+            c.rank = rank;
+            c.locked = locked;
+            c.learnt = learnt;
+            c.dead = false;
+            c.just_used = false;
+            c.sve_mark = false;
+            c.touched = false;
+            c.activity = 0.0;
+            w0 = c.lit[0].negate() as usize;
+            w1 = c.lit[1].negate() as usize;
+            c.next_watcher[0] = self.watcher[w0];
+            c.next_watcher[1] = self.watcher[w1];
+        } else {
+            cix = self.clauses.len();
+            // make a new clause as c
+            let mut c = Clause::new(self.kind, learnt, rank, &v);
+            c.index = cix;
+            w0 = c.lit[0].negate() as usize;
+            w1 = c.lit[1].negate() as usize;
+            debug_assert_ne!(w0, 0);
+            debug_assert_ne!(w1, 0);
+            // self.permutation.push(cix);
+            c.next_watcher[0] = self.watcher[w0];
+            c.next_watcher[1] = self.watcher[w1];
+            self.clauses.push(c);
+        };
+        self.watcher[w0] = cix;
+        self.watcher[w1] = cix;
+        self.id_from(cix)
+    }
+}
+
+impl ClauseList for ClauseIndex {
+    fn push(&mut self, cix: ClauseIndex, item: &mut ClauseIndex) -> ClauseIndex {
+        *item = *self;
+        *self = cix;
+        *item
+    }
+    fn push_garbage(&mut self, c: &mut Clause, index: usize) -> ClauseIndex {
+        debug_assert!(index == 0 || index == 1);
+        let other = (index ^ 1) as usize;
+        debug_assert!(other == 0 || other == 1);
+        c.lit[index] = GARBAGE_LIT;
+        let next = c.next_watcher[index];
+        if c.lit[other] == GARBAGE_LIT {
+            c.next_watcher[index] = c.next_watcher[other];
+        } else {
+            self.push(c.index, &mut c.next_watcher[index]);
+            // println!(" push_garbage {:#} <= {}", c, *self);
+        }
+        next
     }
 }

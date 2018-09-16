@@ -1,7 +1,7 @@
 use clause::Clause;
 use clause::ClauseIdIndexEncoding;
 use clause::ClauseKind;
-use clause_manage::ClauseManagement;
+use clause::ClauseManagement;
 use solver::Solver;
 use types::*;
 use var_manage::VarSelect;

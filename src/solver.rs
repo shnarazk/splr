@@ -1,5 +1,5 @@
 use clause::*;
-use clause_manage::ClauseManagement;
+use clause::ClauseManagement;
 use solver_propagate::SolveSAT;
 use solver_rollback::Restart;
 use std::fs;
@@ -277,7 +277,7 @@ impl SatSolver for Solver {
                             }
                         }
                     }
-                    if v.len() != 0 && !s.add_clause(v) {
+                    if v.len() != 0 && !s.add_clause(&mut v) {
                         s.ok = false;
                     }
                 }

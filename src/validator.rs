@@ -1,6 +1,6 @@
 use types::*;
 use solver::*;
-use clause_manage::KINDS;
+use clause::KINDS;
 
 impl Solver {
     pub fn inject_assigmnent(&mut self, vec: &Vec<i32>) -> () {

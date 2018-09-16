@@ -127,7 +127,10 @@ impl Solver {
             vars[vi].occurs.retain(|&ci| ci != cid);             // occurs.smudge(l.vi());
         }
         // solver::removeClause(...)
-        c.index = DEAD_CLAUSE;
+        c.dead = true;
+        self.cp[cid.to_kind()].touched[c.lit[0]] = true;
+        self.cp[cid.to_kind()].touched[c.lit[1]] = true;
+        // c.index = DEAD_CLAUSE;
     }
     /// 5. strengthenClause
     pub fn strengthen_clause(&mut self, cid: ClauseId, l: Lit) -> bool {

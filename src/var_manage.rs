@@ -8,8 +8,8 @@ use clause::ClauseKind;
 use clause::ClausePack;
 use clause::CLAUSE_KINDS;
 use clause::DEAD_CLAUSE;
-use clause_manage::ClauseManagement;
-use clause_manage::KINDS;
+use clause::ClauseManagement;
+use clause::KINDS;
 use solver::SatSolver;
 use solver::SolverException::*;
 use solver::SolverResult;
@@ -92,7 +92,7 @@ impl Solver {
             return true;
         }
         let nclauses = self.cp[ClauseKind::Permanent as usize].clauses.len();
-        let cid = self.attach_clause(Clause::new(ClauseKind::Permanent, false, vec.len(), vec));
+        let cid = self.attach_clause(Clause::new(ClauseKind::Permanent, false, vec.len(), &vec));
         debug_assert_ne!(nclauses, cid);
         // if nclauses == cid {
         //     return true;

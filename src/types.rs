@@ -28,6 +28,8 @@ pub type Lit = u32;
 
 /// a dummy literal.
 pub const NULL_LIT: Lit = 0;
+pub const GARBAGE_LIT: Lit = 1;
+pub const RECYCLE_LIT: Lit = 0;
 
 pub fn int2lit(x: i32) -> Lit {
     (if x < 0 { -2 * x + 1 } else { 2 * x }) as u32

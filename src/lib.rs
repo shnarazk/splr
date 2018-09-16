@@ -3,8 +3,6 @@
 mod macros;
 /// Clause
 pub mod clause;
-/// Implementation on clause elimination.
-pub mod clause_manage;
 /// struct Solver
 pub mod solver;
 /// Conflict analzyer.

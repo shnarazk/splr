@@ -2,7 +2,7 @@ use clause::Clause;
 use clause::ClauseIdIndexEncoding;
 use clause::ClauseIndex;
 use clause::ClauseKind;
-use clause_manage::ClauseManagement;
+use clause::ClauseManagement;
 use solver::{Solver, Stat};
 use solver_analyze::CDCL;
 use solver_rollback::Restart;
@@ -120,8 +120,10 @@ impl SolveSAT for Solver {
                         self.uncheck_enqueue(l, NULL_CLAUSE);
                         lbd = 1;
                     } else {
-                        let v = self.an_learnt_lits.clone();
-                        lbd = self.add_learnt(v);
+                        unsafe {
+                            let v = &mut self.an_learnt_lits as *mut Vec<Lit>;
+                            lbd = self.add_learnt(&mut *v);
+                        }
                     }
                     self.decay_var_activity();
                     self.decay_cla_activity();
