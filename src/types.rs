@@ -166,6 +166,7 @@ impl EmaKind for Ema2 {
     }
     fn reset(&mut self) -> () {
         self.slow = self.fast;
+        self.cals = self.calf;
     }
 }
 

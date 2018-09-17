@@ -32,7 +32,13 @@ impl SolveSAT for Solver {
     fn search(&mut self) -> bool {
         let root_lv = self.root_level;
         loop {
-            self.stats[Stat::NumOfPropagation as usize] += 1;
+            //self.stats[Stat::NumOfPropagation as usize] += 1;
+            //if !self.cp[ClauseKind::Removable as usize].assertion_soundness() {
+            //    panic!("here");
+            //}
+            //if ! self.cp[ClauseKind::Binclause as usize].assertion_soundness() {
+            //    panic!("there");
+            //}
             let ci = self.propagate();
             let d = self.am.decision_level();
             if ci == NULL_CLAUSE {
@@ -180,8 +186,11 @@ impl CDCL for Solver {
                         self.an_seen[vi] = 1;
                         if dl <= l {
                             path_cnt += 1;
-                            if self.vars[vi].reason != NULL_CLAUSE {
-                                self.an_last_dl.push(q);
+                            let cr = self.vars[vi].reason;
+                            if cr != NULL_CLAUSE {
+                                if iref!(self.cp, cr).learnt {
+                                    self.an_last_dl.push(q);
+                                }
                             }
                         } else {
                             self.an_learnt_lits.push(q);

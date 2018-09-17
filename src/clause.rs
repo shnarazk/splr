@@ -641,6 +641,9 @@ impl<'a> Iterator for ClauseIter<'a> {
 impl ClauseManagement for ClauseDBState {
     fn bump(&mut self, cp: &mut [ClausePack; 3], cid: ClauseId) -> () {
         debug_assert_ne!(cid, 0);
+        if cid.to_kind() != ClauseKind::Removable as usize {
+            return;
+        }
         let a;
         {
             let c = &mut cp[cid.to_kind()].clauses[cid.to_index()];
@@ -650,6 +653,7 @@ impl ClauseManagement for ClauseDBState {
         }
         if 1.0e20 < a {
             for c in &mut cp[ClauseKind::Removable as usize].clauses {
+                debug_assert!(c.learnt);
                 if c.learnt {
                     c.activity *= 1.0e-20;
                 }
@@ -739,8 +743,11 @@ pub trait CheckPropagation {
 
 impl CheckPropagation for ClausePack {
     fn assertion_soundness(&self) -> bool {
+        let mut cnt = 0;
+        let deads = self.clauses.iter().filter(|c| c.dead).count();
         for c in &self.clauses[1..] {
-            if !self.seek_from(c.index, c.lit[0]) {
+            let check0 = self.seek_from(c.index, c.lit[0]);
+            if !check0 {
                 if !(c.dead && c.lit[0] == GARBAGE_LIT && c.lit[1] == GARBAGE_LIT) {
                     println!("0: {:#}", c);
                     self.print_watcher(GARBAGE_LIT);
@@ -749,7 +756,8 @@ impl CheckPropagation for ClausePack {
                     self.print_watcher(GARBAGE_LIT);
                 }
             }
-            if !self.seek_from(c.index, c.lit[1]) {
+            let check1 = self.seek_from(c.index, c.lit[1]);
+            if !check1 {
                 if !(c.dead && c.lit[0] == GARBAGE_LIT && c.lit[1] == GARBAGE_LIT) {
                     println!("1: {:#}", c);
                     self.print_watcher(GARBAGE_LIT);
@@ -758,6 +766,12 @@ impl CheckPropagation for ClausePack {
                     self.print_watcher(GARBAGE_LIT);
                 }
             }
+            if check0 && check1 && !c.dead {
+                cnt += 1;
+            }
+        }
+        if self.clauses.len() != 1 + cnt + deads {
+            println!("len {}, checked {}", self.clauses.len(), cnt + deads);
         }
         true
     }
