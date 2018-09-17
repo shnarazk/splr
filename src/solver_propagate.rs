@@ -34,36 +34,37 @@ impl SolveSAT for Solver {
             for kind in &kinds {
                 unsafe {
                     let ck = *kind as usize;
-                    ci = self.cp[ck].watcher[p];
-                    let mut tail = &mut self.cp[ck].watcher[p] as *mut usize;
+                    let mut clauses = &mut self.cp[*kind as usize].clauses[..] as *mut [Clause];
+                    let mut watcher = &mut self.cp[*kind as usize].watcher[..] as *mut [ClauseIndex];
+                    ci = (*watcher)[p];
+                    let mut tail = &mut (*watcher)[p] as *mut usize;
                     *tail = NULL_CLAUSE;
                     'next_clause: while ci != NULL_CLAUSE {
-                        let c = &mut self.cp[ck].clauses[ci] as *mut Clause;
+                        let c = &mut (*clauses)[ci] as *mut Clause;
                         if (*c).lit[0] == false_lit {
                             (*c).lit.swap(0, 1); // now my index is 1, others is 0.
                             (*c).next_watcher.swap(0, 1);
                         }
-                        let next = (*c).next_watcher[1];
-                        let first_value = self.assigned((*c).lit[0]);
-                        if first_value != LTRUE {
+                        ci = (*c).next_watcher[1];
+                        // let next = (*c).next_watcher[1];
+                        let other_value = self.assigned((*c).lit[0]);
+                        if other_value != LTRUE {
                             for k in 0..(*c).lits.len() {
                                 let lk = (*c).lits[k];
                                 // below is equivalent to 'self.assigned(lk) != LFALSE'
                                 if (((lk & 1) as u8) ^ self.vars[lk.vi()].assign) != 0 {
                                     (*c).lit[1] = lk;
                                     (*c).lits[k] = false_lit;
-                                    (*c).next_watcher[1] =
-                                        self.cp[ck].watcher[lk.negate() as usize];
-                                    self.cp[ck].watcher[lk.negate() as usize] = ci;
-                                    ci = next;
+                                    (*c).next_watcher[1] = (*watcher)[lk.negate() as usize];
+                                    (*watcher)[lk.negate() as usize] = (*c).index;
                                     continue 'next_clause;
                                 }
                             }
-                            if first_value == LFALSE {
-                                *tail = ci;
-                                return kind.id_from(ci);
+                            if other_value == LFALSE {
+                                *tail = (*c).index;
+                                return kind.id_from((*c).index);
                             } else {
-                                self.uncheck_enqueue((*c).lit[0], kind.id_from(ci));
+                                self.uncheck_enqueue((*c).lit[0], kind.id_from((*c).index));
                             }
                         }
                         let watch = self.cp[ck].watcher[p];
@@ -71,8 +72,7 @@ impl SolveSAT for Solver {
                             tail = &mut (*c).next_watcher[1];
                         }
                         (*c).next_watcher[1] = watch;
-                        self.cp[ck].watcher[p] = ci;
-                        ci = next;
+                        (*watcher)[p] = (*c).index;
                     }
                 }
             }
