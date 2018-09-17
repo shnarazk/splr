@@ -677,7 +677,7 @@ impl Solver {
     /// - `ClausePack.permutation` is sorted.
     /// - `Var.reason` is updated with new clause ids.
     /// - By calling `rebuild_watchers`, All `ClausePack.watcher` hold valid links.
-    fn garbage_collect(&mut self, kind: ClauseKind) -> () {
+    pub fn garbage_collect_compaction(&mut self, kind: ClauseKind) -> () {
         let dl = self.decision_level();
         {
             let ClausePack {

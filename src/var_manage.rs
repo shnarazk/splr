@@ -60,7 +60,7 @@ impl VarSelect for Solver {
         if VAR_ACTIVITY_THRESHOLD < a {
             // self.rescale_var_activity();
             for i in 1..self.vars.len() {
-                self.vars[i].activity = self.vars[i].activity / VAR_ACTIVITY_THRESHOLD;
+                self.vars[i].activity /= VAR_ACTIVITY_THRESHOLD;
             }
             self.var_inc /= VAR_ACTIVITY_THRESHOLD;
         }
@@ -264,8 +264,7 @@ impl Solver {
         // println!("targets {:?}", &targets[..5]);
         for ck in &CLAUSE_KINDS[0..3] {
             let clauses = &self.cp[*ck as usize].clauses;
-            for i in 1..clauses.len() {
-                let c = &clauses[i];
+            for (i, c) in clauses.iter().enumerate().skip(1) {
                 if c.index == DEAD_CLAUSE {
                     continue;
                 }
