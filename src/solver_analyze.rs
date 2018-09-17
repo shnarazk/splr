@@ -37,7 +37,6 @@ impl CDCL for Solver {
                 //     self.cp[ClauseKind::Removable as usize].clauses.len()
                 // );
                 debug_assert_ne!(cid, NULL_CLAUSE);
-                // println!("  analyze.loop {}", (*c));
                 let d = (*c).rank;
                 if cid.to_kind() == (ClauseKind::Removable as usize) {
                     self.bump_cid(cid);
@@ -51,15 +50,15 @@ impl CDCL for Solver {
                 }
                 // println!("{}を対応", (*c));
                 //                'next_literal: for q in &(*c).lits {
-                'next_literal: for i in 0..(*c).lits.len() + 2 {
+                'next_literal: for i in ((p != NULL_LIT) as usize)..(*c).len() {
                     let q;
                     match i {
                         nth if nth < 2 => q = (*c).lit[nth],
                         nth => q = (*c).lits[nth - 2],
                     }
-                    if q == p {
-                        continue 'next_literal;
-                    }
+                    // if q == p {
+                    //     continue 'next_literal;
+                    // }
                     let vi = q.vi();
                     let lvl = self.vars[vi].level;
                     if self.vars[vi].assign == BOTTOM {
