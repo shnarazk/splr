@@ -68,20 +68,20 @@ const CLAUSE_INDEX_MASK: usize = 0x0FFF_FFFF_FFFF_FFFF;
 pub const DEAD_CLAUSE: usize = MAX;
 
 impl ClauseKind {
-    pub fn tag(&self) -> usize {
+    pub fn tag(self) -> usize {
         match self {
             ClauseKind::Removable => 0x0000_0000_0000_0000,
             ClauseKind::Permanent => 0x1000_0000_0000_0000,
             ClauseKind::Binclause => 0x2000_0000_0000_0000,
         }
     }
-    pub fn mask(&self) -> usize {
+    pub fn mask(self) -> usize {
         CLAUSE_INDEX_MASK
     }
-    pub fn id_from(&self, cix: ClauseIndex) -> ClauseId {
+    pub fn id_from(self, cix: ClauseIndex) -> ClauseId {
         cix | self.tag()
     }
-    pub fn index_from(&self, cid: ClauseId) -> ClauseIndex {
+    pub fn index_from(self, cid: ClauseId) -> ClauseIndex {
         cid & self.mask()
     }
 }
@@ -134,6 +134,9 @@ impl ClausePack {
     }
     pub fn len(&self) -> usize {
         self.clauses.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.clauses.is_empty()
     }
 }
 
@@ -201,8 +204,8 @@ pub enum ClauseFlag {
 }
 
 impl ClauseFlag {
-    fn as_bit(&self, val: bool) -> u32 {
-        (val as u32) << (*self as u32)
+    fn as_bit(self, val: bool) -> u32 {
+        (val as u32) << (self as u32)
     }
 }
 
@@ -244,15 +247,15 @@ impl PartialOrd for Clause {
     /// the key is `tmp`, not `rank`, since we want to reflect whether it's used as a reason.
     fn partial_cmp(&self, other: &Clause) -> Option<Ordering> {
         if self.rank < other.rank {
-            return Some(Ordering::Less);
+            Some(Ordering::Less)
         } else if self.rank > other.rank {
-            return Some(Ordering::Greater);
+            Some(Ordering::Greater)
         } else if self.activity > other.activity {
-            return Some(Ordering::Less);
+            Some(Ordering::Less)
         } else if self.activity < other.activity {
-            return Some(Ordering::Greater);
+            Some(Ordering::Greater)
         } else {
-            return Some(Ordering::Equal);
+            Some(Ordering::Equal)
         }
     }
 }
@@ -260,15 +263,15 @@ impl PartialOrd for Clause {
 impl Ord for Clause {
     fn cmp(&self, other: &Clause) -> Ordering {
         if self.rank < other.rank {
-            return Ordering::Less;
+            Ordering::Less
         } else if self.rank > other.rank {
-            return Ordering::Greater;
+            Ordering::Greater
         } else if self.activity > other.activity {
-            return Ordering::Less;
+            Ordering::Less
         } else if self.activity < other.activity {
-            return Ordering::Greater;
+            Ordering::Greater
         } else {
-            return Ordering::Equal;
+            Ordering::Equal
         }
     }
 }
@@ -282,7 +285,7 @@ impl Clause {
             kind,
 //            learnt,
             activity: 0.0,
-            rank: rank,
+            rank,
             next_watcher: [NULL_CLAUSE; 2],
             lit: [lit0, lit1],
             lits: v,
@@ -310,6 +313,9 @@ impl Clause {
     }
     pub fn len(&self) -> usize {
         self.lits.len() + 2
+    }
+    pub fn is_empty(&self) -> bool {
+        false
     }
 }
 
@@ -464,7 +470,7 @@ impl ClauseManagement for Solver {
         }
     }
     fn decay_cla_activity(&mut self) -> () {
-        self.cla_inc = self.cla_inc / self.config.clause_decay_rate;
+        self.cla_inc /= self.config.clause_decay_rate;
     }
     // renamed from clause_new
     fn add_clause(&mut self, v: &mut Vec<Lit>) -> bool {
@@ -599,7 +605,7 @@ impl ClauseManagement for Solver {
                         (*c).set_flag(ClauseFlag::Dead, true);
                         self.cp[*ck as usize].touched[(*c).lit[0].negate() as usize] = true;
                         self.cp[*ck as usize].touched[(*c).lit[1].negate() as usize] = true; 
-                    } else if (*c).lits.len() == 0 && false {
+                    } else if (*c).lits.is_empty() && false {
                         if !self.enqueue((*c).lits[0], NULL_CLAUSE) {
                             self.ok = false;
                         }

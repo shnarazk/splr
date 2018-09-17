@@ -100,7 +100,7 @@ impl SolveSAT for Solver {
                     self.num_solved_vars = na;
                     self.rebuild_vh();
                 }
-                if !(self.q_head < self.trail.len()) {
+                if self.trail.len() <= self.q_head {
                     let vi = self.select_var();
                     debug_assert_ne!(vi, 0);
                     let p = self.vars[vi].phase;

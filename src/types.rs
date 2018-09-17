@@ -153,10 +153,10 @@ impl EmaKind for Ema2 {
         self.fast / self.slow * (self.cals / self.calf)
     }
     fn update(&mut self, x: f64) -> () {
-        self.fast = &self.fe * x + (1.0 - &self.fe) * &self.fast;
-        self.slow = &self.se * x + (1.0 - &self.se) * &self.slow;
-        self.calf = &self.fe + (1.0 - &self.fe) * &self.calf;
-        self.cals = &self.se + (1.0 - &self.se) * &self.cals;
+        self.fast = self.fe * x + (1.0 - self.fe) * self.fast;
+        self.slow = self.se * x + (1.0 - self.se) * self.slow;
+        self.calf = self.fe + (1.0 - self.fe) * self.calf;
+        self.cals = self.se + (1.0 - self.se) * self.cals;
     }
 }
 
@@ -166,7 +166,7 @@ pub struct Ema(pub f64, f64, f64);
 /// Exponential Moving Average w/ a calibrator
 impl Ema {
     pub fn new(s: i32) -> Ema {
-        Ema(0.0, 1.0 / s as f64, 0.0)
+        Ema(0.0, 1.0 / f64::from(s), 0.0)
     }
 }
 
@@ -175,9 +175,9 @@ impl EmaKind for Ema {
         self.0 / self.2
     }
     fn update(&mut self, x: f64) -> () {
-        let e = &self.1 * x + (1.0 - &self.1) * &self.0;
+        let e = self.1 * x + (1.0 - self.1) * self.0;
         self.0 = e;
-        let c = &self.1 + (1.0 - &self.1) * &self.2;
+        let c = self.1 + (1.0 - self.1) * self.2;
         self.2 = c;
     }
 }
@@ -188,7 +188,7 @@ pub struct Ema_(pub f64, f64);
 
 impl Ema_ {
     pub fn new(s: i32) -> Ema_ {
-        Ema_(0.0, 1.0 / s as f64)
+        Ema_(0.0, 1.0 / f64::from(s))
     }
 }
 
@@ -197,7 +197,7 @@ impl EmaKind for Ema_ {
         self.0 / self.1
     }
     fn update(&mut self, x: f64) -> () {
-        let e = &self.1 * x + (1.0 - &self.1) * &self.0;
+        let e = self.1 * x + (1.0 - self.1) * self.0;
         self.0 = e;
     }
 }

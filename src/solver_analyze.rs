@@ -54,22 +54,22 @@ impl CDCL for Solver {
                 'next_literal: for i in 0..(*c).lits.len() + 2 {
                     let q;
                     match i {
-                        n if n < 2 => q = (*c).lit[n],
-                        n => q = (*c).lits[n - 2],
+                        nth if nth < 2 => q = (*c).lit[nth],
+                        nth => q = (*c).lits[nth - 2],
                     }
                     if q == p {
                         continue 'next_literal;
                     }
                     let vi = q.vi();
-                    let l = self.vars[vi].level;
+                    let lvl = self.vars[vi].level;
                     if self.vars[vi].assign == BOTTOM {
                         panic!(" analyze faced bottom by vi {} in {}", vi, (*c));
                     }
                     debug_assert_ne!(self.vars[vi].assign, BOTTOM);
-                    if self.an_seen[vi] == 0 && 0 < l {
+                    if self.an_seen[vi] == 0 && 0 < lvl {
                         self.bump_vi(vi);
                         self.an_seen[vi] = 1;
-                        if dl <= l {
+                        if dl <= lvl {
                             // println!(
                             //     "{} はレベル{}なのでフラグを立てる",
                             //     q.int(),
@@ -135,10 +135,7 @@ impl CDCL for Solver {
         let mut j = 1;
         for i in 1..n {
             let l = self.an_learnt_lits[i];
-            if self.vars[l.vi()].reason == NULL_CLAUSE {
-                self.an_learnt_lits[j] = l;
-                j += 1;
-            } else if !self.analyze_removable(l) {
+            if self.vars[l.vi()].reason == NULL_CLAUSE || !self.analyze_removable(l){
                 self.an_learnt_lits[j] = l;
                 j += 1;
             }
@@ -147,8 +144,7 @@ impl CDCL for Solver {
         // glucose heuristics
         let r = self.an_learnt_lits.len();
         for i in 0..self.an_last_dl.len() {
-            let l = self.an_last_dl[i];
-            let vi = l.vi();
+            let vi = self.an_last_dl[i].vi();
             let cid = self.vars[vi].reason;
             let len = self.cp[cid.to_kind()].clauses[cid.to_index()].lits.len();
             if r < len {
@@ -173,8 +169,7 @@ impl CDCL for Solver {
             let mut max_i = 1;
             level_to_return = self.vars[self.an_learnt_lits[max_i].vi()].level;
             for i in 2..self.an_learnt_lits.len() {
-                let l = &self.an_learnt_lits[i];
-                let lv = self.vars[l.vi()].level;
+                let lv = self.vars[self.an_learnt_lits[i].vi()].level;
                 if level_to_return < lv {
                     level_to_return = lv;
                     max_i = i;

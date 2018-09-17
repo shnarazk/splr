@@ -112,7 +112,7 @@ impl Solver {
         let cdr = cfg.clause_decay_rate;
         let vdr = cfg.variable_decay_rate;
         let use_sve = cfg.use_sve;
-        let s = Solver {
+        Solver {
             config: cfg,
             num_vars: nv,
             cla_inc: cdr,
@@ -152,8 +152,7 @@ impl Solver {
             next_restart: 100,
             restart_exp: re,
             rbias: Ema::new(se),
-        };
-        s
+        }
     }
     #[inline]
     pub fn assigned(&self, l: Lit) -> Lbool {
@@ -197,7 +196,7 @@ impl SatSolver for Solver {
         // }
         self.simplify_database();
         match self.search() {
-            _ if self.ok == false => {
+            _ if !self.ok => {
                 self.cancel_until(0);
                 Err(SolverException::InternalInconsistent)
             }
@@ -263,7 +262,7 @@ impl SatSolver for Solver {
             match rs.read_line(&mut buf) {
                 Ok(0) => break,
                 Ok(_) => {
-                    if buf.starts_with("c") {
+                    if buf.starts_with('c') {
                         continue;
                     }
                     let mut iter = buf.split_whitespace();
@@ -277,7 +276,7 @@ impl SatSolver for Solver {
                             }
                         }
                     }
-                    if v.len() != 0 && !s.add_clause(&mut v) {
+                    if !v.is_empty() && !s.add_clause(&mut v) {
                         s.ok = false;
                     }
                 }

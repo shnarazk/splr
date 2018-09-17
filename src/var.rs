@@ -124,9 +124,9 @@ pub trait VarOrdering {
     fn update(&mut self, vec: &[Var], v: VarId) -> ();
     fn insert(&mut self, vec: &[Var], v: VarId) -> ();
     fn root(&mut self, vec: &[Var]) -> VarId;
-    fn is_empty(&self) -> bool;
     fn clear(&mut self) -> ();
     fn len(&self) -> usize;
+    fn is_empty(&self) -> bool;
     fn peek(&self) -> VarId;
 }
 
@@ -184,14 +184,14 @@ impl VarOrdering for VarIdHeap {
         // self.var_order.check("root 2");
         vs
     }
-    fn is_empty(&self) -> bool {
-        self.idxs[0] == 0
-    }
     fn clear(&mut self) -> () {
         self.reset()
     }
     fn len(&self) -> usize {
         self.idxs[0]
+    }
+    fn is_empty(&self) -> bool {
+        self.idxs[0] == 0
     }
     fn peek(&self) -> VarId {
         self.heap[1]
@@ -210,10 +210,6 @@ impl VarIdHeap {
         }
         idxs[0] = init;
         VarIdHeap { order, heap, idxs }
-    }
-    /// renamed form numElementsInHeap
-    pub fn len(&self) -> usize {
-        self.idxs[0]
     }
     fn percolate_up(&mut self, vec: &[Var], start: usize) -> () {
         let mut q = start;
@@ -273,7 +269,7 @@ impl VarIdHeap {
                     VarOrder::ByActivity => vec[vr].activity,
                     VarOrder::ByOccurence => vec[vr].occurs.len() as f64,
                 };
-                let (c, vc, ac) = if r <= n && al < ar {
+                let (target, vc, ac) = if r <= n && al < ar {
                     (r, vr, ar)
                 } else {
                     (l, vl, al)
@@ -281,7 +277,7 @@ impl VarIdHeap {
                 if ai < ac {
                     self.heap[i] = vc;
                     self.idxs[vc] = i;
-                    i = c;
+                    i = target;
                 } else {
                     self.heap[i] = vi;
                     debug_assert!(vi != 0, "invalid index");

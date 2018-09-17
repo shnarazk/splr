@@ -67,7 +67,7 @@ impl VarSelect for Solver {
         self.var_order.update(&self.vars, vi);
     }
     fn decay_var_activity(&mut self) -> () {
-        self.var_inc = self.var_inc / VAR_ACTIVITY_THRESHOLD;
+        self.var_inc /= VAR_ACTIVITY_THRESHOLD;
     }
     /// Heap operations; renamed from selectVO
     fn select_var(&mut self) -> VarId {
@@ -185,9 +185,9 @@ impl Solver {
             let l = lindex!(q, i);
             if l.vi() != v {
                 for j in 0..p.len() {
-                    let m = lindex!(p, j);
-                    if m.vi() == l.vi() {
-                        if m.negate() == l {
+                    let lit_j = lindex!(p, j);
+                    if lit_j.vi() == l.vi() {
+                        if lit_j.negate() == l {
                             return None;
                         } else {
                             continue 'next_literal;
@@ -219,9 +219,9 @@ impl Solver {
             let l = lindex!(q, i);
             if l.vi() != v {
                 for j in 0..p.len() {
-                    let m = lindex!(p, j);
-                    if m.vi() == l.vi() {
-                        if m.negate() == l {
+                    let lit_j = lindex!(p, j);
+                    if lit_j.vi() == l.vi() {
+                        if lit_j.negate() == l {
                             return (false, size);
                         } else {
                             continue 'next_literal;
@@ -325,13 +325,13 @@ impl Solver {
         let mut subsumed = 0;
         let mut deleted_literals = 0;
         debug_assert_eq!(self.decision_level(), 0);
-        while 0 < self.eliminator.clause_queue.len()
+        while !self.eliminator.clause_queue.is_empty()
             || self.eliminator.bwdsub_assigns < self.trail.len()
         {
             // Empty subsumption queue and return immediately on user-interrupt:
             // if computed-too-long { break; }
             // Check top-level assigments by creating a dummy clause and placing it in the queue:
-            if self.eliminator.clause_queue.len() == 0
+            if self.eliminator.clause_queue.is_empty()
                 && self.eliminator.bwdsub_assigns < self.trail.len()
             {
                 let l: Lit = self.trail[self.eliminator.bwdsub_assigns];
@@ -571,10 +571,10 @@ impl Solver {
         // for i in 1..4 { println!("eliminate report: v{} => {},{}", i, self.vars[i].num_occurs, self.vars[i].occurs.len()); }
         'perform: while 0 < self.eliminator.n_touched
             || self.eliminator.bwdsub_assigns < self.trail.len()
-            || 0 < self.eliminator.var_queue.len()
+            || !self.eliminator.var_queue.is_empty()
         {
             self.gather_touched_clauses();
-            if (0 < self.eliminator.clause_queue.len()
+            if (!self.eliminator.clause_queue.is_empty()
                 || self.eliminator.bwdsub_assigns < self.trail.len())
                 && !self.backward_subsumption_check()
             {
