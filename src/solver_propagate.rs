@@ -2,6 +2,7 @@ use clause::Clause;
 use clause::ClauseIdIndexEncoding;
 use clause::ClauseIndex;
 use clause::ClauseKind;
+use clause::ClauseFlag;
 use clause::ClauseManagement;
 use solver::{Solver, Stat};
 use solver_analyze::CDCL;
@@ -154,7 +155,7 @@ impl SolveSAT for Solver {
                 v.assign = sig;
                 v.level = dl;
                 v.reason = cid;
-                mref!(self.cp, cid).locked = true;
+                mref!(self.cp, cid).set_flag(ClauseFlag::Locked, true);
             }
             // println!(
             //     "implication {} by {} {}",
@@ -187,7 +188,7 @@ impl Solver {
         v.assign = l.lbool();
         v.level = dl;
         v.reason = cid;
-        mref!(self.cp, cid).locked = true;
+        mref!(self.cp, cid).set_flag(ClauseFlag::Locked, true);
         // if 0 < cid {
         //     println!(
         //         "::uncheck_enqueue of {} by {}::{}",

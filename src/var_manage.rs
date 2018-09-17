@@ -5,6 +5,7 @@
 use clause::Clause;
 use clause::ClauseIdIndexEncoding;
 use clause::ClauseKind;
+use clause::ClauseFlag;
 use clause::ClausePack;
 use clause::CLAUSE_KINDS;
 use clause::DEAD_CLAUSE;
@@ -292,16 +293,16 @@ impl Solver {
         let mut len = self.eliminator.clause_queue.len();
         for cid in &self.eliminator.clause_queue {
             let c = &mut self.cp[cid.to_kind()].clauses[cid.to_index()];
-            c.touched = true;
+            c.set_flag(ClauseFlag::Touched, true);
         }
         for mut v in &mut self.vars[1..] {
             if v.touched && v.terminal {
                 // println!("gtc var: {}", v.index);
                 for cid in &v.occurs {
                     let mut c = mref!(self.cp, cid);
-                    if !c.touched {
+                    if !c.get_flag(ClauseFlag::Touched) {
                         self.eliminator.enqueue_clause(*cid);
-                        c.touched = true;
+                        c.set_flag(ClauseFlag::Touched, true);
                     }
                 }
                 v.touched = false;
@@ -310,7 +311,7 @@ impl Solver {
         // println!("gather_touched_classes: clause_queue {}", self.eliminator.clause_queue.len());
         for cid in &self.eliminator.clause_queue {
             let c = &mut self.cp[cid.to_kind()].clauses[cid.to_index()];
-            c.touched = false;
+            c.set_flag(ClauseFlag::Touched, false);
         }
         for v in &mut self.vars {
             v.touched = false;
@@ -347,7 +348,7 @@ impl Solver {
                 } else {
                     &mut self.cp[cid.to_kind()].clauses[cid.to_index()] as *mut Clause
                 };
-                if (*c).sve_mark || (*c).index == DEAD_CLAUSE {
+                if (*c).get_flag(ClauseFlag::SveMark) || (*c).index == DEAD_CLAUSE {
                     continue;
                 }
                 // println!("check with {} for best_v {}", *c, self.eliminator.best_v);
@@ -373,7 +374,7 @@ impl Solver {
                 let cs = &mut self.vars[best].occurs as *mut Vec<ClauseId>;
                 for di in &*cs {
                     let d = &self.cp[di.to_kind()].clauses[di.to_index()] as *const Clause;
-                    if (!(*d).sve_mark || (*d).index != DEAD_CLAUSE)
+                    if (!(*d).get_flag(ClauseFlag::SveMark) || (*d).index != DEAD_CLAUSE)
                         && *di != cid
                         && (*c).len() <= self.eliminator.subsume_clause_size
                         && (*d).len() <= self.eliminator.subsume_clause_size

@@ -1,4 +1,5 @@
 use clause::ClauseIdIndexEncoding;
+use clause::ClauseFlag;
 use solver::{Solver, Stat};
 use types::*;
 use var::VarOrdering;
@@ -33,7 +34,7 @@ impl Restart for Solver {
                 v.phase = v.assign;
                 v.assign = BOTTOM;
                 if 0 < v.reason {
-                    self.cp[v.reason.to_kind()].clauses[v.reason.to_index()].locked = false;
+                    self.cp[v.reason.to_kind()].clauses[v.reason.to_index()].set_flag(ClauseFlag::Locked, false);
                 }
                 v.reason = NULL_CLAUSE;
             }
