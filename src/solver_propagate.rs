@@ -33,9 +33,8 @@ impl SolveSAT for Solver {
             let mut ci: ClauseIndex;
             for kind in &kinds {
                 unsafe {
-                    let ck = *kind as usize;
-                    let mut clauses = &mut self.cp[*kind as usize].clauses[..] as *mut [Clause];
-                    let mut watcher = &mut self.cp[*kind as usize].watcher[..] as *mut [ClauseIndex];
+                    let clauses = &mut self.cp[*kind as usize].clauses[..] as *mut [Clause];
+                    let watcher = &mut self.cp[*kind as usize].watcher[..] as *mut [ClauseIndex];
                     ci = (*watcher)[p];
                     let mut tail = &mut (*watcher)[p] as *mut usize;
                     *tail = NULL_CLAUSE;
@@ -49,14 +48,14 @@ impl SolveSAT for Solver {
                         // let next = (*c).next_watcher[1];
                         let other_value = self.assigned((*c).lit[0]);
                         if other_value != LTRUE {
-                            for k in 0..(*c).lits.len() {
-                                let lk = (*c).lits[k];
+                            for (k, lk) in (*c).lits.iter().enumerate() {
                                 // below is equivalent to 'self.assigned(lk) != LFALSE'
                                 if (((lk & 1) as u8) ^ self.vars[lk.vi()].assign) != 0 {
-                                    (*c).lit[1] = lk;
-                                    (*c).lits[k] = false_lit;
-                                    (*c).next_watcher[1] = (*watcher)[lk.negate() as usize];
-                                    (*watcher)[lk.negate() as usize] = (*c).index;
+                                    let alt = &mut (*watcher)[lk.negate() as usize];
+                                    (*c).next_watcher[1] = *alt;
+                                    *alt = (*c).index;
+                                    (*c).lit[1] = *lk;
+                                    (*c).lits[k] = false_lit; // WARN: update this lastly (needed by enuremate)
                                     continue 'next_clause;
                                 }
                             }
@@ -67,7 +66,7 @@ impl SolveSAT for Solver {
                                 self.uncheck_enqueue((*c).lit[0], kind.id_from((*c).index));
                             }
                         }
-                        let watch = self.cp[ck].watcher[p];
+                        let watch = (*watcher)[p];
                         if watch == 0 {
                             tail = &mut (*c).next_watcher[1];
                         }
