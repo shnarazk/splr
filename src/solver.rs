@@ -154,6 +154,43 @@ impl Solver {
             rbias: Ema::new(se),
         }
     }
+    // print a progress report
+    pub fn progress(&self, mes: &str) -> () {
+        let nv = self.vars.len() - 1;
+        let k = if self.trail_lim.is_empty() {
+            self.trail.len()
+        } else {
+            self.trail_lim[0]
+        };
+        let sum = k + self.eliminator.eliminated_vars;
+        let learnts = &self.cp[ClauseKind::Removable as usize];
+        let deads = learnts.count(GARBAGE_LIT, 0) + learnts.count(RECYCLE_LIT, 0);
+        let cnt = learnts.clauses.iter().filter(|c| c.rank <= 2).count();
+        if mes == "" {
+            println!("#init, DB,  Remov,  good, junk,   Perm, Binary, PROG, solv, elim,   rate, RES,block,force,  asgn,   lbd, VAL,   lbd, b lvl, c lvl");
+        } else {
+            println!(
+                "#{}, DB,{:>7},{:>6},{:>5},{:>7},{:>7}, PROG,{:>5},{:>5},{:>6.3}%, RES,{:>5},{:>5}, {:>5.2},{:>6.2}, VAL,{:>6.2},{:>6.2},{:>6.2},{:>6.2}",
+                mes,
+                learnts.clauses.len() - 1 -deads,
+                cnt,
+                deads,
+                self.cp[ClauseKind::Permanent as usize].clauses.len() - 1,
+                self.cp[ClauseKind::Binclause as usize].clauses.len() - 1,
+                k,
+                self.eliminator.eliminated_vars,
+                (sum as f32) / (nv as f32) * 100.0,
+                self.stats[Stat::NumOfBlockRestart as usize],
+                self.stats[Stat::NumOfRestart as usize],
+                self.ema_asg.get(),
+                self.ema_lbd.get(),
+                self.ema_lbd.fast,
+                self.b_lvl.0,
+                self.c_lvl.0,
+                self.c_lvl.get(),
+            );
+        }
+    }
     pub fn num_assigns(&self) -> usize {
         self.trail.len()
     }
@@ -180,13 +217,16 @@ impl SatSolver for Solver {
         if !self.ok {
             return Ok(Certificate::UNSAT(Vec::new()));
         }
-        // TODO deal with assumptions
+        // TODO: deal with assumptions
         // s.root_level = 0;
         self.num_solved_vars = self.trail.len();
         // if self.eliminator.use_elim {
+        //     // self.eliminate_binclauses();
         //     self.eliminate();
         // }
+        self.progress("");
         self.simplify_database();
+        self.stats[Stat::NumOfSimplification as usize] += 1;
         match self.search() {
             _ if !self.ok => {
                 self.cancel_until(0);

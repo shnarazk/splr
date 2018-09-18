@@ -120,6 +120,8 @@ impl ClausePack {
         let w1 = c.lit[1].negate() as usize;
         let cix = self.clauses.len();
         c.index = cix;
+        c.flags &= !3;
+        c.flags |= self.kind as u32;
         self.permutation.push(cix);
         c.next_watcher[0] = self.watcher[w0];
         self.watcher[w0] = cix;
@@ -139,6 +141,22 @@ impl ClausePack {
     }
     pub fn is_empty(&self) -> bool {
         self.clauses.is_empty()
+    }
+    pub fn count(&self, target: Lit, limit: usize) -> usize {
+        let mut ci = self.watcher[target.negate() as usize];
+        let mut cnt = 0;
+        while ci != NULL_CLAUSE {
+            cnt += 1;
+            let c = &self.clauses[ci];
+            if ci == c.next_watcher[(c.lit[0] != target) as usize] {
+                panic!("{} is looping!", target);
+            }
+            if 0 < limit && limit <= cnt {
+                return limit;
+            }
+            ci = c.next_watcher[(c.lit[0] != target) as usize];
+        }
+        cnt
     }
 }
 
@@ -715,31 +733,6 @@ impl Solver {
             c.next_watcher[1] = watcher[w1];
             watcher[w1] = c.index;
         }
-    }
-    // print a progress report
-    fn progress(&self, mes: &str) -> () {
-        let nv = self.vars.len() - 1;
-        let k = if self.trail_lim.is_empty() {
-            self.trail.len()
-        } else {
-            self.trail_lim[0]
-        };
-        let sum = k + self.eliminator.eliminated_vars;
-        println!(
-            "#{}, DB:R|P|B, {:>8}, {:>8}, {:>5}, Progress: {:>6}+{:>6}({:>4.1}%), Restart:b|f, {:>6}, {:>6}, EMA:a|l, {:>5.2}, {:>6.2}, LBD: {:>5.2}",
-            mes,
-            self.cp[ClauseKind::Removable as usize].clauses.len() - 1,
-            self.cp[ClauseKind::Permanent as usize].clauses.len() - 1,
-            self.cp[ClauseKind::Binclause as usize].clauses.len() - 1,
-            k,
-            self.eliminator.eliminated_vars,
-            (sum as f32) / (nv as f32),
-            self.stats[Stat::NumOfBlockRestart as usize],
-            self.stats[Stat::NumOfRestart as usize],
-            self.ema_asg.get(),
-            self.ema_lbd.get(),
-            self.ema_lbd.fast,
-        );
     }
 }
 
