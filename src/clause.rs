@@ -711,7 +711,7 @@ impl Solver {
             clauses.retain(|ref c| !c.get_flag(ClauseFlag::Dead));
             // rebuild permutation
             permutation.clear();
-            for i in 0..clauses.len() {
+            for (i, _) in clauses.iter().enumerate() {
                 debug_assert_eq!(clauses[i].index, i);
                 permutation.push(i);
             }

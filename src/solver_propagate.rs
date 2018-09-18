@@ -98,16 +98,12 @@ impl SolveSAT for Solver {
         NULL_CLAUSE
     }
     fn search(&mut self) -> bool {
-        // self.dump("search");
         let root_lv = self.root_level;
         loop {
-            // self.dump("calling propagate");
             self.stats[Stat::NumOfPropagation as usize] += 1;
             let ci = self.propagate();
             let d = self.decision_level();
-            // self.dump(format!("search called propagate and it returned {:?} at {}", ret, d));
             if ci == NULL_CLAUSE {
-                // println!(" search loop enters a new level");
                 let na = self.num_assigns();
                 if na == self.num_vars {
                     return true;
@@ -130,7 +126,6 @@ impl SolveSAT for Solver {
                     self.analyze_final(ci, false);
                     return false;
                 } else {
-                    // self.dump(" before analyze");
                     let backtrack_level = self.analyze(ci);
                     self.cancel_until(max(backtrack_level as usize, root_lv));
                     let lbd;
@@ -159,11 +154,7 @@ impl SolveSAT for Solver {
             }
         }
     }
-    /// This function touches:
-    ///  - vars
-    ///  - trail
     fn enqueue(&mut self, l: Lit, cid: ClauseId) -> bool {
-        // println!("enqueue: {} by {}", l.int(), cid);
         let sig = l.lbool();
         let val = self.vars[l.vi()].assign;
         if val == BOTTOM {
@@ -175,12 +166,6 @@ impl SolveSAT for Solver {
                 v.reason = cid;
                 mref!(self.cp, cid).set_flag(ClauseFlag::Locked, true);
             }
-            // println!(
-            //     "implication {} by {} {}",
-            //     l.int(),
-            //     cid.to_kind(),
-            //     cid.to_index()
-            // );
             self.trail.push(l);
             true
         } else {
@@ -190,16 +175,7 @@ impl SolveSAT for Solver {
 }
 
 impl Solver {
-    /// This function touches:
-    ///  - vars
-    ///  - trail
-    ///  - trail_lim
     pub fn uncheck_enqueue(&mut self, l: Lit, cid: ClauseId) -> () {
-        // if ci == NULL_CLAUSE {
-        //     println!("uncheck_enqueue decide: {}", l.int());
-        // } else {
-        //     println!("uncheck_enqueue imply: {} by {}", l.int(), ci);
-        // }
         debug_assert!(l != 0, "Null literal is about to be equeued");
         let dl = self.decision_level();
         let v = &mut self.vars[l.vi()];
@@ -207,19 +183,10 @@ impl Solver {
         v.level = dl;
         v.reason = cid;
         mref!(self.cp, cid).set_flag(ClauseFlag::Locked, true);
-        // if 0 < cid {
-        //     println!(
-        //         "::uncheck_enqueue of {} by {}::{}",
-        //         l.int(),
-        //         cid.to_kind(),
-        //         cid.to_index(),
-        //     );
-        // }
         self.trail.push(l);
     }
     pub fn uncheck_assume(&mut self, l: Lit) -> () {
         self.trail_lim.push(self.trail.len());
-        // println!("::decision {}", l.int());
         self.uncheck_enqueue(l, NULL_CLAUSE);
     }
 }

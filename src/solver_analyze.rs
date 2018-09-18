@@ -51,15 +51,8 @@ impl CDCL for Solver {
                 }
                 // println!("{}を対応", (*c));
                 //                'next_literal: for q in &(*c).lits {
-                'next_literal: for i in ((p != NULL_LIT) as usize)..(*c).len() {
-                    let q;
-                    match i {
-                        nth if nth < 2 => q = (*c).lit[nth],
-                        nth => q = (*c).lits[nth - 2],
-                    }
-                    // if q == p {
-                    //     continue 'next_literal;
-                    // }
+                for i in ((p != NULL_LIT) as usize)..(*c).len() {
+                    let q = lindex!(*c, i);
                     let vi = q.vi();
                     let lvl = self.vars[vi].level;
                     if self.vars[vi].assign == BOTTOM {
