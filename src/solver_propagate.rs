@@ -21,11 +21,20 @@ pub trait SolveSAT {
 
 impl SolveSAT for Solver {
     fn propagate(&mut self) -> ClauseId {
-        while self.q_head < self.trail.len() {
-            let p: usize = self.trail[self.q_head] as usize;
+        let Solver {
+            ref mut vars,
+            ref mut cp,
+            ref mut trail,
+            ref trail_lim,
+            ref mut q_head,
+            ref mut stats,
+            ..
+        } = self;
+        while *q_head < trail.len() {
+            let p: usize = trail[*q_head] as usize;
             let false_lit = (p as Lit).negate();
-            self.q_head += 1;
-            self.stats[Stat::NumOfPropagation as usize] += 1;
+            *q_head += 1;
+            stats[Stat::NumOfPropagation as usize] += 1;
             let kinds = [
                 ClauseKind::Binclause,
                 ClauseKind::Permanent,
@@ -34,8 +43,8 @@ impl SolveSAT for Solver {
             let mut ci: ClauseIndex;
             for kind in &kinds {
                 unsafe {
-                    let clauses = &mut self.cp[*kind as usize].clauses[..] as *mut [Clause];
-                    let watcher = &mut self.cp[*kind as usize].watcher[..] as *mut [ClauseIndex];
+                    let clauses = &mut cp[*kind as usize].clauses[..] as *mut [Clause];
+                    let watcher = &mut cp[*kind as usize].watcher[..] as *mut [ClauseIndex];
                     ci = (*watcher)[p];
                     let mut tail = &mut (*watcher)[p] as *mut usize;
                     *tail = NULL_CLAUSE;
@@ -47,11 +56,12 @@ impl SolveSAT for Solver {
                         }
                         ci = (*c).next_watcher[1];
                         // let next = (*c).next_watcher[1];
-                        let other_value = self.assigned((*c).lit[0]);
+                        let other = (*c).lit[0];
+                        let other_value = vars.assigned(other);
                         if other_value != LTRUE {
                             for (k, lk) in (*c).lits.iter().enumerate() {
-                                // below is equivalent to 'self.assigned(lk) != LFALSE'
-                                if (((lk & 1) as u8) ^ self.vars[lk.vi()].assign) != 0 {
+                                // below is equivalent to 'assigned(lk) != LFALSE'
+                                if (((lk & 1) as u8) ^ vars[lk.vi()].assign) != 0 {
                                     let alt = &mut (*watcher)[lk.negate() as usize];
                                     (*c).next_watcher[1] = *alt;
                                     *alt = (*c).index;
@@ -64,7 +74,15 @@ impl SolveSAT for Solver {
                                 *tail = (*c).index;
                                 return kind.id_from((*c).index);
                             } else {
-                                self.uncheck_enqueue((*c).lit[0], kind.id_from((*c).index));
+                                // uncheck_enqueue(lit, kind.id_from((*c).index));
+                                // uenqueue!(vars, trail, trail_lim, lit, kind.id_from((*c).index));
+                                let dl = trail_lim.len();
+                                let v = &mut vars[other.vi()];
+                                v.assign = other.lbool();
+                                v.level = dl;
+                                v.reason = kind.id_from((*c).index);
+                                trail.push(other);
+                                (*c).set_flag(ClauseFlag::Locked, true);
                             }
                         }
                         let watch = (*watcher)[p];
