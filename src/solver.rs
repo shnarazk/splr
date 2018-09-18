@@ -225,7 +225,7 @@ impl SatSolver for Solver {
         //     self.eliminate();
         // }
         self.progress("");
-        self.simplify_database();
+        self.simplify();
         self.stats[Stat::NumOfSimplification as usize] += 1;
         match self.search() {
             _ if !self.ok => {

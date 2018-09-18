@@ -25,8 +25,8 @@ pub trait ClauseManagement {
     fn decay_cla_activity(&mut self) -> ();
     fn add_clause(&mut self, v: &mut Vec<Lit>) -> bool;
     fn add_learnt(&mut self, v: &mut Vec<Lit>) -> usize;
-    fn reduce_watchers(&mut self) -> ();
-    fn simplify_database(&mut self) -> bool;
+    fn reduce(&mut self) -> ();
+    fn simplify(&mut self) -> bool;
     fn lbd_of(&mut self, v: &[Lit]) -> usize;
 }
 
@@ -539,7 +539,7 @@ impl ClauseManagement for Solver {
     }
     /// 1. sort `permutation` which is a mapping: index -> ClauseIndex.
     /// 2. rebuild watches to pick up clauses which is placed in a good place in permutation.
-    fn reduce_watchers(&mut self) -> () {
+    fn reduce(&mut self) -> () {
         {
             let ClausePack {
                 ref mut clauses,
@@ -554,9 +554,15 @@ impl ClauseManagement for Solver {
             // sort the range of 'permutation'
             permutation[1..].sort_by(|&a, &b| clauses[a].cmp(&clauses[b]));
             let nc = permutation.len();
-            for i in nc / 2 + 1..nc {
+            let keep = if clauses[permutation[nc/2]].rank <= 3 {
+                self.next_reduction += 1000;
+                (nc * 3) / 4
+            } else {
+                nc / 2
+            };
+            for i in keep..nc {
                 let mut c = &mut clauses[permutation[i]];
-                if !c.get_flag(ClauseFlag::Locked) && !c.get_flag(ClauseFlag::JustUsed) {
+                if !c.get_flag(ClauseFlag::Locked) && !c.get_flag(ClauseFlag::JustUsed) && 4 < c.rank {
                     c.set_flag(ClauseFlag::Dead, true);
                     touched[c.lit[0].negate() as usize] = true;
                     touched[c.lit[1].negate() as usize] = true; 
@@ -569,7 +575,7 @@ impl ClauseManagement for Solver {
         self.stats[Stat::NumOfReduction as usize] += 1;
         self.progress("drop");
     }
-    fn simplify_database(&mut self) -> bool {
+    fn simplify(&mut self) -> bool {
         debug_assert_eq!(self.decision_level(), 0);
         if self.eliminator.use_elim
             && self.stats[Stat::NumOfSimplification as usize] % 8 == 0

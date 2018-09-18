@@ -110,7 +110,7 @@ impl SolveSAT for Solver {
                 }
                 self.force_restart();
                 if d == 0 && self.num_solved_vars < na {
-                    self.simplify_database();
+                    self.simplify();
                     self.num_solved_vars = na;
                     self.rebuild_vh();
                 }
@@ -146,7 +146,7 @@ impl SolveSAT for Solver {
                     if self.cur_restart * self.next_reduction <= conflicts {
                         self.cur_restart =
                             ((conflicts as f64) / (self.next_reduction as f64)) as usize + 1;
-                        self.reduce_watchers();
+                        self.reduce();
                     }
                     self.block_restart(lbd, d);
                 }

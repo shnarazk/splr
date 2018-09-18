@@ -122,6 +122,8 @@ pub trait EmaKind {
     fn get(&self) -> f64;
     /// returns an EMA value
     fn update(&mut self, x: f64) -> ();
+    /// reset (equalize) both values
+    fn reset(&mut self) -> ();
 }
 
 /// Exponential Moving Average pair
@@ -158,6 +160,10 @@ impl EmaKind for Ema2 {
         self.calf = self.fe + (1.0 - self.fe) * self.calf;
         self.cals = self.se + (1.0 - self.se) * self.cals;
     }
+    fn reset(&mut self) -> () {
+        self.slow = self.fast;
+        self.cals = self.calf;
+    }
 }
 
 #[derive(Debug)]
@@ -180,6 +186,9 @@ impl EmaKind for Ema {
         let c = self.1 + (1.0 - self.1) * self.2;
         self.2 = c;
     }
+    fn reset(&mut self) -> () {
+        self.2 = self.0;
+    }
 }
 
 /// Exponential Moving Average w/o a calibrator
@@ -199,6 +208,9 @@ impl EmaKind for Ema_ {
     fn update(&mut self, x: f64) -> () {
         let e = self.1 * x + (1.0 - self.1) * self.0;
         self.0 = e;
+    }
+    fn reset(&mut self) -> () {
+        self.0 = 1.0;
     }
 }
 
