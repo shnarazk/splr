@@ -4,6 +4,7 @@ use clause::ClauseKind;
 use clause::ClauseManagement;
 use solver::Solver;
 use types::*;
+use var::Satisfiability;
 use var_manage::VarSelect;
 
 pub trait CDCL {
@@ -249,7 +250,7 @@ impl Solver {
                 c0 = c.lit[0];
                 len = c.lits.len();
             }
-            if len == 0 && self.assigned(c0) == LFALSE {
+            if len == 0 && self.vars.assigned(c0) == LFALSE {
                 self.cp[cid.to_kind()].clauses[cid.to_index()]
                     .lit
                     .swap(0, 1);
@@ -306,7 +307,7 @@ impl Solver {
                     c.lit[0]
                 };
                 let vi = other.vi();
-                if self.mi_var_map[vi] == key && self.assigned(other) == LTRUE {
+                if self.mi_var_map[vi] == key && self.vars.assigned(other) == LTRUE {
                     nb += 1;
                     self.mi_var_map[vi] -= 1;
                 }

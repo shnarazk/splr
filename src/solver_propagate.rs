@@ -9,6 +9,7 @@ use solver_analyze::CDCL;
 use solver_rollback::Restart;
 use std::cmp::max;
 use types::*;
+use var::Satisfiability;
 use var_manage::VarSelect;
 
 pub trait SolveSAT {

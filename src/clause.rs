@@ -5,6 +5,7 @@ use std::usize::MAX;
 use types::*;
 use solver::{Solver, Stat};
 use solver_propagate::SolveSAT;
+use var::Satisfiability;
 
 /// for ClauseIndex
 pub trait ClauseList {
@@ -479,7 +480,7 @@ impl ClauseManagement for Solver {
         let mut l_ = NULL_LIT; // last literal; [x, x.negate()] means totology.
         for i in 0..v.len() {
             let li = v[i];
-            let sat = self.assigned(li);
+            let sat = self.vars.assigned(li);
             if sat == LTRUE || li.negate() == l_ {
                 return true;
             } else if sat != LFALSE && li != l_ {
@@ -600,7 +601,7 @@ impl ClauseManagement for Solver {
             for ci in 1..self.cp[*ck as usize].clauses.len() {
                 unsafe {
                     let c = &mut self.cp[*ck as usize].clauses[ci] as *mut Clause;
-                    if ((*c).get_flag(ClauseFlag::Frozen) && thr < (*c).len()) || self.satisfies(&*c) {
+                    if ((*c).get_flag(ClauseFlag::Frozen) && thr < (*c).len()) || self.vars.satisfies(&*c) {
                         // (*c).index = DEAD_CLAUSE;
                         (*c).set_flag(ClauseFlag::Dead, true);
                         self.cp[*ck as usize].touched[(*c).lit[0].negate() as usize] = true;
