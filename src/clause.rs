@@ -319,8 +319,14 @@ impl fmt::Display for Clause {
         if f.alternate() {
             write!(
                 f,
-                "C{} rank:{}, activity: {}, lit:{:?}{:?}",
-                self.index, self.rank, self.activity, self.lit, self.lits,
+                "{{C{}:{} lit:{:?}{:?}, watches{:?}{}{}}}",
+                self.flags & 3,
+                self.index,
+                vec2int(&self.lit),
+                vec2int(&self.lits),
+                self.next_watcher,
+                if self.get_flag(ClauseFlag::Dead) { ", dead" } else { "" },
+                if self.get_flag(ClauseFlag::Locked) { ", locked" } else { "" },
             )
         } else {
             match self.index {
@@ -343,12 +349,12 @@ impl fmt::Display for Clause {
                 _ => write!(
                     f,
                     "{}{}[{},{}]{:?}",
-                    "C",
-//                    match self.kind {
-//                        ClauseKind::Removable => 'L',
-//                        ClauseKind::Binclause => 'B',
-//                        ClauseKind::Permanent => 'P',
-//                    },
+                    match self.flags & 3 {
+                        0 => 'L',
+                        1 => 'P',
+                        2 => 'B',
+                        _ => '?',
+                    },
                     self.index,
                     self.lit[0].int(),
                     self.lit[1].int(),
@@ -597,7 +603,6 @@ impl ClauseManagement for Solver {
                 unsafe {
                     let c = &mut self.cp[*ck as usize].clauses[ci] as *mut Clause;
                     if ((*c).get_flag(ClauseFlag::Frozen) && thr < (*c).len()) || self.vars.satisfies(&*c) {
-                        // (*c).index = DEAD_CLAUSE;
                         (*c).set_flag(ClauseFlag::Dead, true);
                         self.cp[*ck as usize].touched[(*c).lit[0].negate() as usize] = true;
                         self.cp[*ck as usize].touched[(*c).lit[1].negate() as usize] = true; 
@@ -608,7 +613,6 @@ impl ClauseManagement for Solver {
                         (*c).set_flag(ClauseFlag::Dead, true);
                         self.cp[*ck as usize].touched[(*c).lit[0].negate() as usize] = true;
                         self.cp[*ck as usize].touched[(*c).lit[1].negate() as usize] = true; 
-                        // (*c).index = DEAD_CLAUSE;
                         // } else {
                         //     let new = self.lbd_of(&(*c).lits);
                         //     if new < (*c).rank {
@@ -845,27 +849,20 @@ impl GC for ClausePack {
                 c.lits.push(*l);
             }
             c.rank = rank;
+            c.flags = 0;        // reset Dead, JustUsed, SveMark and Touched
             c.set_flag(ClauseFlag::Locked, locked);
             c.set_flag(ClauseFlag::Learnt, learnt);
-            c.set_flag(ClauseFlag::Dead, false);
-            c.set_flag(ClauseFlag::JustUsed, false);
-            c.set_flag(ClauseFlag::SveMark, false);
-            c.set_flag(ClauseFlag::Touched, false);
             c.activity = 0.0;
             w0 = c.lit[0].negate() as usize;
             w1 = c.lit[1].negate() as usize;
             c.next_watcher[0] = self.watcher[w0];
             c.next_watcher[1] = self.watcher[w1];
         } else {
-            cix = self.clauses.len();
-            // make a new clause as c
             let mut c = Clause::new(self.kind, learnt, rank, &v);
+            cix = self.clauses.len();
             c.index = cix;
             w0 = c.lit[0].negate() as usize;
             w1 = c.lit[1].negate() as usize;
-            debug_assert_ne!(w0, 0);
-            debug_assert_ne!(w1, 0);
-            // self.permutation.push(cix);
             c.next_watcher[0] = self.watcher[w0];
             c.next_watcher[1] = self.watcher[w1];
             self.clauses.push(c);
@@ -877,6 +874,7 @@ impl GC for ClausePack {
 }
 
 impl ClauseList for ClauseIndex {
+    #[inline(always)]
     fn push(&mut self, cix: ClauseIndex, item: &mut ClauseIndex) -> ClauseIndex {
         *item = *self;
         *self = cix;
@@ -892,7 +890,6 @@ impl ClauseList for ClauseIndex {
             c.next_watcher[index] = c.next_watcher[other];
         } else {
             self.push(c.index, &mut c.next_watcher[index]);
-            // println!(" push_garbage {:#} <= {}", c, *self);
         }
         next
     }
