@@ -4,7 +4,6 @@
 #![allow(dead_code)]
 extern crate splr;
 use splr::clause::*;
-use splr::clause_manage::*;
 use splr::solver::*;
 use splr::types::*;
 
@@ -49,7 +48,7 @@ fn check_occurs() {
 
 fn mk_c(i: usize, v: Vec<i32>) -> Clause {
     let vec = v.iter().map(|i| int2lit(*i)).collect::<Vec<Lit>>();
-    let mut c = Clause::new(ClauseKind::Permanent, false, 0, vec);
+    let mut c = Clause::new(ClauseKind::Permanent, false, 0, &vec);
     c.index = i;
     c
 }
