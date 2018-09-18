@@ -1,14 +1,14 @@
 #![allow(dead_code)]
 extern crate splr;
 use splr::clause::*;
-use splr::clause_manage::ClauseManagement;
+use splr::clause::ClauseManagement;
 use splr::solver::*;
 use splr::types::*;
 
 macro_rules! mkc {
     ($($x:expr),*) => {
         match &[$($x),*] {
-            v => Clause::new(ClauseKind::Permanent, false, v.len(), v.iter().map(|x| int2lit(*x)).collect::<Vec<Lit>>()),
+            v => Clause::new(ClauseKind::Permanent, false, v.len(), &v.iter().map(|x| int2lit(*x)).collect::<Vec<Lit>>()),
         }
     };
 }
@@ -16,7 +16,7 @@ macro_rules! mkc {
 macro_rules! mkb {
     ($($x:expr),*) => {
         match &[$($x),*] {
-            v => { Clause::new(ClauseKind::Binclause, false, 2,  v.iter().map(|x| int2lit(*x)).collect::<Vec<Lit>>()) }
+            v => { Clause::new(ClauseKind::Binclause, false, 2,  &v.iter().map(|x| int2lit(*x)).collect::<Vec<Lit>>()) }
         }
     };
 }
@@ -24,7 +24,7 @@ macro_rules! mkb {
 macro_rules! mkl {
     ($($x:expr),*) => {
         match &[$($x),*] {
-            v => { Clause::new(ClauseKind::Removable, true, v.len(),  v.iter().map(|x| int2lit(*x)).collect::<Vec<Lit>>()) }
+            v => { Clause::new(ClauseKind::Removable, true, v.len(),  &v.iter().map(|x| int2lit(*x)).collect::<Vec<Lit>>()) }
         }
     };
 }
