@@ -169,7 +169,7 @@ impl Solver {
                 self.eliminator.n_touched += 1;
             }
         }
-        let cid = self.cp[c.kind as usize].attach(c);
+        let cid = self.cp[c.get_kind() as usize].attach(c);
         debug_assert_ne!(cid, 0);
         cid
     }

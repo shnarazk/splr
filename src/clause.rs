@@ -13,7 +13,7 @@ pub trait ClauseList {
     fn push_garbage(&mut self, c: &mut Clause, index: usize) -> ClauseIndex;
 }
 
-/// for usize, Clause
+/// for usize
 pub trait ClauseIdIndexEncoding {
     fn to_id(&self) -> ClauseId;
     fn to_index(&self) -> ClauseIndex;
@@ -38,6 +38,7 @@ pub const KINDS: [ClauseKind; 3] = [
     ClauseKind::Removable,
 ];
 
+/// partition of clauses
 #[derive(Debug)]
 pub struct ClausePack {
     pub kind: ClauseKind,
@@ -142,6 +143,14 @@ impl ClausePack {
 }
 
 impl Clause {
+    pub fn get_kind(&self) -> ClauseKind {
+        match self.flags & 3 {
+            0 => ClauseKind::Removable,
+            1 => ClauseKind::Permanent,
+            2 => ClauseKind::Binclause,
+            _ => panic!("impossible clause kind"),
+        }
+    }
     pub fn set_flag(&mut self, flag: ClauseFlag, val: bool) -> () {
         self.flags &= !(1 << (flag as u32));
         self.flags |= (val as u32) << (flag as u32);
@@ -162,40 +171,27 @@ pub type ClauseIndex = usize;
 /// Clause
 #[derive(Debug)]
 pub struct Clause {
-    /// kind has 3 types.
-    pub kind: ClauseKind,
-    /// a temporal index which is equal to the index for `clauses` or `learnts`
-    pub index: ClauseId,
-    /// clause activity used by `analyze` and `reduce_db`
-    pub activity: f64,
+    /// index (not id), used in a CP.
+    pub index: ClauseIndex,
     /// LBD or NDD and so on, used by `reduce_db`
-    pub rank: usize,
-    /// ClauseIndexes of the next in the watch liss
-    pub next_watcher: [ClauseIndex; 2],
-    /// The first two literals
     pub lit: [Lit; 2],
     /// the literals without lit0 and lit1
+    pub next_watcher: [ClauseIndex; 2],
+    /// The first two literals
     pub lits: Vec<Lit>,
-    pub flags: u32
-//    /// used for a reason of propagation
-//    pub locked: bool,
-//    /// given or learnt
-//    pub learnt: bool,
-//    /// for elimination-by-simplfication
-//    pub frozen: bool,
-//    /// used in the current phase
-//    pub just_used: bool,
-//    /// used in Subsumption Variable Eliminator
-//    pub sve_mark: bool,
-//    /// used in Subsumption Variable Eliminator
-//    pub touched: bool,
-//    /// gc
-//    pub dead: bool,
+    /// for `ClauseFlag`
+    pub rank: usize,
+    /// ClauseIndexes of the next in the watch liss
+    pub flags: u32,
+    /// clause activity used by `analyze` and `reduce_db`
+    pub activity: f64,
 }
 
 #[derive(Copy, Clone)]
 pub enum ClauseFlag {
-    Dead = 0,
+    Kind0 = 0,
+    Kind1,
+    Dead,
     Locked,
     Learnt,
     JustUsed,
@@ -221,18 +217,6 @@ impl ClauseIdIndexEncoding for usize {
     #[inline]
     fn to_kind(&self) -> usize {
         *self >> CLAUSE_INDEX_BITS
-    }
-}
-
-impl ClauseIdIndexEncoding for Clause {
-    fn to_id(&self) -> ClauseId {
-        self.index | self.kind.tag()
-    }
-    fn to_index(&self) -> ClauseIndex {
-        self.index
-    }
-    fn to_kind(&self) -> usize {
-        self.kind as usize
     }
 }
 
@@ -283,26 +267,18 @@ impl Clause {
         let lit0 = v.remove(0);
         let lit1 = v.remove(0);
         Clause {
-            kind,
-//            learnt,
             activity: 0.0,
             rank,
             next_watcher: [NULL_CLAUSE; 2],
             lit: [lit0, lit1],
             lits: v,
             index: 0,
-            flags: ClauseFlag::Learnt.as_bit(learnt),
-//            locked: false,
-//            frozen: false,
-//            just_used: false,
-//            sve_mark: false,
-//            touched: false,
-//            dead: false,
+            flags: (kind as u32) | ClauseFlag::Learnt.as_bit(learnt),
         }
     }
     pub fn null() -> Clause {
         Clause {
-            kind: ClauseKind::Permanent,
+//            kind: ClauseKind::Permanent,
             activity: 0.0,
             rank: RANK_NULL,
             next_watcher: [NULL_CLAUSE; 2],
@@ -349,11 +325,12 @@ impl fmt::Display for Clause {
                 _ => write!(
                     f,
                     "{}{}[{},{}]{:?}",
-                    match self.kind {
-                        ClauseKind::Removable => 'L',
-                        ClauseKind::Binclause => 'B',
-                        ClauseKind::Permanent => 'P',
-                    },
+                    "C",
+//                    match self.kind {
+//                        ClauseKind::Removable => 'L',
+//                        ClauseKind::Binclause => 'B',
+//                        ClauseKind::Permanent => 'P',
+//                    },
                     self.index,
                     self.lit[0].int(),
                     self.lit[1].int(),
