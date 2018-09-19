@@ -5,12 +5,8 @@ mod macros;
 pub mod clause;
 /// struct Solver
 pub mod solver;
-/// Conflict analzyer.
-pub mod solver_analyze;
-/// Implementation on Main algorithm.
-pub mod solver_propagate;
 /// Implementation on solver restart.
-pub mod solver_rollback;
+pub mod restart;
 /// Plumping layer.
 pub mod types;
 /// Var

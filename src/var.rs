@@ -1,6 +1,4 @@
-#![allow(unused_imports)]
 use clause::Clause;
-use clause::ClauseIdIndexEncoding;
 use clause::DEAD_CLAUSE;
 use types::*;
 

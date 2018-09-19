@@ -1,31 +1,17 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
 #![allow(unused_mut)]
-#![allow(unused_imports)]
 use clause::Clause;
 use clause::ClauseIdIndexEncoding;
 use clause::ClauseKind;
 use clause::ClauseFlag;
-use clause::ClausePack;
 use clause::CLAUSE_KINDS;
 use clause::DEAD_CLAUSE;
-use clause::ClauseManagement;
-use clause::KINDS;
-use solver::SatSolver;
-use solver::SolverException::*;
-use solver::SolverResult;
 use solver::{Solver, Stat};
-use solver_propagate::SolveSAT;
-use solver_rollback::Restart;
-use std::cmp::Ordering;
-use std::ops::Neg;
+use solver::CDCL;
 use types::*;
-use var::AccessHeap;
 use var::Eliminator;
 use var::Satisfiability;
-use var::Var;
-use var::VarIdHeap;
-use var::VarOrder;
 use var::VarOrdering;
 
 const VAR_ACTIVITY_THRESHOLD: f64 = 1e100;
