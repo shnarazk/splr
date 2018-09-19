@@ -97,7 +97,14 @@ impl SolveSAT for Solver {
             // self.cp[ClauseKind::Removable as usize].check_lit(&self.vars, "before propagation", p as Lit);
             self.am.q_head += 1;
             self.stats[Stat::NumOfPropagation as usize] += 1;
-            for cs in &mut self.cp {
+            let kinds = [
+                ClauseKind::Binclause,
+                ClauseKind::Removable,
+                ClauseKind::Permanent,
+            ];
+            for kind in &kinds {
+               let cs = &mut self.cp[*kind as usize];
+            //for cs in &mut self.cp {
                 let ret = cs.propagate(&mut self.assign, &mut self.vars, &mut self.am, p as Lit);
                 if ret != NULL_CLAUSE {
                     return ret;

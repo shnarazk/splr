@@ -288,7 +288,7 @@ impl VarIdHeap {
                 let vr = self.heap[r];
                 let al = vec[vl].activity;
                 let ar = vec[vr].activity;
-                let (c, vc, ac) = if r <= n && al < ar {
+                let (target, vc, ac) = if r <= n && al < ar {
                     (r, vr, ar)
                 } else {
                     (l, vl, al)
@@ -296,7 +296,7 @@ impl VarIdHeap {
                 if ai < ac {
                     self.heap[i] = vc;
                     self.idxs[vc] = i;
-                    i = c;
+                    i = target;
                 } else {
                     self.heap[i] = vi;
                     debug_assert!(vi != 0, "invalid index");

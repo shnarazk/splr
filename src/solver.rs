@@ -22,7 +22,7 @@ pub trait LBD {
     fn lbd(&self, vars: &[Var], tmp: &mut [Lit]) -> usize;
 }
 
-const DB_INC_SIZE: usize = 200;
+const DB_INC_SIZE: usize = 50;
 
 /// normal results returned by Solver
 #[derive(Debug)]
@@ -141,7 +141,7 @@ impl Solver {
             stats: vec![0; Stat::EndOfStatIndex as usize],
             num_solved_vars: 0,
             cur_restart: 1,
-            next_reduction: 2000,
+            next_reduction: 1000,
             config: cfg,
             root_level: 0,
             num_vars: nv,
@@ -165,11 +165,11 @@ impl Solver {
             an_level_map_key: 1,
             mi_var_map: vec![0; nv + 1],
             lbd_seen: vec![0; nv + 1],
-            ema_asg: Ema2::new(1.5, 5_000.0),  // for blocking
-            ema_lbd: Ema2::new(50.0, 5_000.0),   // for forcing
+            ema_asg: Ema2::new(4096.0, 8192.0),  // for blocking
+            ema_lbd: Ema2::new(64.0, 8192.0),   // for forcing
             b_lvl: Ema2::new(50.0, 5_000.0),
             c_lvl: Ema2::new(50.0, 5_000.0),
-            next_restart: 2000,
+            next_restart: 100,
             restart_exp: re,
             rbias: Ema::new(1.0, f64::from(se)),
         }
