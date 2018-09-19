@@ -7,11 +7,9 @@ use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::Path;
 
-const VERSION: &str = "Splr-0.0.6.5, Technical Preview 6.5";
+const VERSION: &str = "Splr-0.0.8, Technical Preview 8";
 
 fn main() {
-    // println!("splr 0.0.1 CARGO_MANIFEST_DIR = {}", env!("CARGO_MANIFEST_DIR"));
-    // Some(env!("CARGO_MANIFEST_DIR").to_string() + "/uf200-020.cnf");
     let mut target: Option<String> = None;
     let args: Vec<String> = env::args().skip(1).collect();
     for arg in &args {
