@@ -2,11 +2,11 @@ use assign::{AssignState, Assignment};
 use std::cmp::Ordering;
 use std::f64;
 use std::fmt;
-use std::usize::MAX;
 use types::LiteralEncoding;
 use types::*;
 use var::Satisfiability;
 use var::Var;
+use eliminator::DEAD_CLAUSE;
 
 /// for ClauseIndex
 pub trait ClauseList {
@@ -33,8 +33,9 @@ pub trait ClauseIF {
     fn garbage_collect(&mut self) -> ();
     fn id_from(&self, cix: ClauseIndex) -> ClauseId;
     fn index_from(&self, cid: ClauseId) -> ClauseIndex;
-    fn new_clause(&mut self, v: &Vec<Lit>, rank: usize, learnt: bool, locked: bool) -> ClauseId;
+    fn new_clause(&mut self, v: &[Lit], rank: usize, learnt: bool, locked: bool) -> ClauseId;
     fn len(&self) -> usize;
+    fn is_empty(&self) -> bool;
     fn count(&self, target: Lit, limit: usize) -> usize;
 }
 
@@ -52,13 +53,6 @@ const CLAUSE_INDEX_BITS: usize = 60;
 const CLAUSE_INDEX_MASK: usize = 0x0FFF_FFFF_FFFF_FFFF;
 
 // const DB_INIT_SIZE: usize = 1000;
-pub const KINDS: [ClauseKind; 3] = [
-    ClauseKind::Removable,
-    ClauseKind::Permanent,
-    ClauseKind::Binclause,
-];
-pub const DEAD_CLAUSE: usize = MAX;
-
 pub const CLAUSE_KINDS: [ClauseKind; 3] = [
     ClauseKind::Removable,
     ClauseKind::Permanent,
@@ -234,26 +228,17 @@ impl ClauseIF for ClausePack {
             for l in 2..self.watcher.len() {
                 let vi = (l as Lit).vi();
                 let mut pri = &mut self.watcher[l] as *mut ClauseId;
-                let mut ci = self.watcher[l];
-                while ci != NULL_CLAUSE {
-                    let c = &mut self.clauses[ci] as *mut Clause;
+                while *pri != NULL_CLAUSE {
+                    let c = &mut self.clauses[*pri] as *mut Clause;
                     if !(*c).dead {
-                        if (*c).lit[0].vi() == vi {
-                            pri = &mut (*c).next_watcher[0];
-                            ci = *pri;
-                        } else {
-                            pri = &mut (*c).next_watcher[1];
-                            ci = *pri;
-                        }
+                        pri = &mut (*c).next_watcher[((*c).lit[0].vi() != vi) as usize];
                         continue;
                     }
                     // debug_assert!((*c).lit[0] == GARBAGE_LIT || (*c).lit[1] == GARBAGE_LIT);
                     if (*c).lit[0].negate() == l as Lit {
                         *pri = (*garbages).push_garbage(&mut *c, 0);
-                        ci = *pri;
                     } else if (*c).lit[1].negate() == l as Lit {
                         *pri = (*garbages).push_garbage(&mut *c, 1);
-                        ci = *pri;
                     } else {
                         panic!("xxxxx {:?}", (*c).lit);
                     }
@@ -262,24 +247,21 @@ impl ClauseIF for ClausePack {
             // recycle garbages
             let recycled = &mut self.watcher[RECYCLE_LIT.negate() as usize] as *mut ClauseId;
             let mut pri = &mut self.watcher[GARBAGE_LIT.negate() as usize] as *mut ClauseId;
-            let mut ci = self.watcher[GARBAGE_LIT.negate() as usize];
-            while ci != NULL_CLAUSE {
-                let c = &mut self.clauses[ci];
+            while *pri != NULL_CLAUSE {
+                let c = &mut self.clauses[*pri];
                 debug_assert!(c.dead);
                 if c.lit[0] == GARBAGE_LIT && c.lit[1] == GARBAGE_LIT {
                     let next = c.next_watcher[0];
-                    *pri = c.next_watcher[0];
                     c.lit[0] = RECYCLE_LIT;
                     c.lit[1] = RECYCLE_LIT;
                     c.next_watcher[0] = *recycled;
                     c.next_watcher[1] = *recycled;
-                    *recycled = ci;
+                    *recycled = *pri;
                     c.locked = true;
-                    ci = next;
+                    *pri = next;
                 } else {
                     debug_assert!(c.lit[0] == GARBAGE_LIT || c.lit[1] == GARBAGE_LIT);
                     let index = (c.lit[0] != GARBAGE_LIT) as usize;
-                    ci = c.next_watcher[index];
                     pri = &mut c.next_watcher[index];
                 }
             }
@@ -299,7 +281,7 @@ impl ClauseIF for ClausePack {
         //     }
         // }
     }
-    fn new_clause(&mut self, v: &Vec<Lit>, rank: usize, learnt: bool, locked: bool) -> ClauseId {
+    fn new_clause(&mut self, v: &[Lit], rank: usize, learnt: bool, locked: bool) -> ClauseId {
         let cix;
         let w0;
         let w1;
@@ -356,6 +338,9 @@ impl ClauseIF for ClausePack {
     fn len(&self) -> usize {
         self.clauses.iter().filter(|i| !i.dead).count()
     }
+    fn is_empty(&self) -> bool {
+        self.clauses.is_empty() || self.clauses.iter().filter(|i| !i.dead).count() == 0
+    }
     fn count(&self, target: Lit, limit: usize) -> usize {
         let mut ci = self.watcher[target.negate() as usize];
         let mut cnt = 0;
@@ -381,8 +366,8 @@ impl ClausePack {
         let mask = i.mask();
         let mut clauses = Vec::with_capacity(1 + nc);
         clauses.push(Clause::null());
-        let mut permutation = Vec::new();
-        permutation.push(0); // for NULL_CLAUSE
+        // let mut permutation = Vec::new();
+        // permutation.push(0); // for NULL_CLAUSE
         let mut watcher = Vec::with_capacity(2 * (nv + 1));
         for _i in 0..2 * (nv + 1) {
             watcher.push(NULL_CLAUSE);
@@ -511,6 +496,9 @@ impl Clause {
     pub fn len(&self) -> usize {
         self.lits.len() + 2
     }
+    pub fn is_empty(&self) -> bool {
+        false
+    }
 }
 
 impl fmt::Display for Clause {
@@ -529,7 +517,7 @@ impl fmt::Display for Clause {
             )
         } else {
             match self.index {
-                //            x if x < 0 => write!(f, format!("a given clause {}", self.lits.map(|l| l.int()))),
+                // x if x < 0 => write!(f, format!("a given clause {}", self.lits.map(|l| l.int()))),
                 0 => write!(f, "null_clause"),
                 DEAD_CLAUSE => {
                     debug_assert!(self.dead);
@@ -653,6 +641,9 @@ impl<'a> Iterator for ClauseIter<'a> {
 impl ClauseManagement for ClauseDBState {
     fn bump(&mut self, cp: &mut [ClausePack; 3], cid: ClauseId) -> () {
         debug_assert_ne!(cid, 0);
+        if cid.to_kind() != ClauseKind::Removable as usize {
+            return;
+        }
         let a;
         {
             let c = &mut cp[cid.to_kind()].clauses[cid.to_index()];
@@ -662,6 +653,7 @@ impl ClauseManagement for ClauseDBState {
         }
         if 1.0e20 < a {
             for c in &mut cp[ClauseKind::Removable as usize].clauses {
+                debug_assert!(c.learnt);
                 if c.learnt {
                     c.activity *= 1.0e-20;
                 }
@@ -712,25 +704,21 @@ impl ClauseManagement for ClauseDBState {
         }
         cp.garbage_collect();
     }
-    /// call only when decision level is zero; there's no locked clause.
+    /// find garbages and kill them. Please call me only when decision level is zero; there's no locked clause.
     fn simplify(&mut self, cps: &mut [ClausePack; 3], assign: &[Lbool]) -> bool {
-        // find garbages
         for cp in &mut cps[..] {
             let len = cp.watcher.len();
-            // let mut garbage = &mut cp.watcher[(GARBAGE_LIT.negate()) as usize];
+            let mut garbages = &mut cp.watcher[(GARBAGE_LIT.negate()) as usize] as *mut ClauseId;
             for lit in 2..len {
+                let mut pri = &mut cp.watcher[(lit as Lit).negate() as usize] as *mut ClauseId;
                 unsafe {
-                    let mut pri = &mut cp.watcher[(lit as Lit).negate() as usize] as *mut ClauseId;
-                    let mut garbages =
-                        &mut cp.watcher[(GARBAGE_LIT.negate()) as usize] as *mut ClauseId;
                     while *pri != NULL_CLAUSE {
-                        let c = &mut cp.clauses[*pri] as *mut Clause;
+                        let c = &mut cp.clauses[*pri];
+                        debug_assert!((*c).lit[0] == lit as Lit || (*c).lit[1] == lit as Lit);
                         let index = ((*c).lit[0] != lit as Lit) as usize;
                         if (&assign[..]).satisfies(&*c) {
                             (*c).dead = true;
                             *pri = (*garbages).push_garbage(&mut *c, index);
-                        // *pri = cp.detach(&mut *c, index);
-                        // cp[*ck as usize].check_clause("after GC", (*c).index);
                         } else {
                             pri = &mut (*c).next_watcher[index];
                         }
@@ -739,9 +727,6 @@ impl ClauseManagement for ClauseDBState {
             }
             cp.garbage_collect();
         }
-        // if self.eliminator.use_elim && self.stats[Stat::NumOfSimplification as usize] % 8 == 0 {
-        //     self.eliminate();
-        // }
         true
     }
 }
@@ -758,8 +743,11 @@ pub trait CheckPropagation {
 
 impl CheckPropagation for ClausePack {
     fn assertion_soundness(&self) -> bool {
+        let mut cnt = 0;
+        let deads = self.clauses.iter().filter(|c| c.dead).count();
         for c in &self.clauses[1..] {
-            if !self.seek_from(c.index, c.lit[0]) {
+            let check0 = self.seek_from(c.index, c.lit[0]);
+            if !check0 {
                 if !(c.dead && c.lit[0] == GARBAGE_LIT && c.lit[1] == GARBAGE_LIT) {
                     println!("0: {:#}", c);
                     self.print_watcher(GARBAGE_LIT);
@@ -768,7 +756,8 @@ impl CheckPropagation for ClausePack {
                     self.print_watcher(GARBAGE_LIT);
                 }
             }
-            if !self.seek_from(c.index, c.lit[1]) {
+            let check1 = self.seek_from(c.index, c.lit[1]);
+            if !check1 {
                 if !(c.dead && c.lit[0] == GARBAGE_LIT && c.lit[1] == GARBAGE_LIT) {
                     println!("1: {:#}", c);
                     self.print_watcher(GARBAGE_LIT);
@@ -777,6 +766,12 @@ impl CheckPropagation for ClausePack {
                     self.print_watcher(GARBAGE_LIT);
                 }
             }
+            if check0 && check1 && !c.dead {
+                cnt += 1;
+            }
+        }
+        if self.clauses.len() != 1 + cnt + deads {
+            println!("len {}, checked {}", self.clauses.len(), cnt + deads);
         }
         true
     }

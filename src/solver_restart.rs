@@ -27,6 +27,8 @@ impl Restart for Solver {
    ///```
     fn force_restart(&mut self) -> () {
         let count = self.stats[Stat::NumOfBackjump as usize] as u64;
+        let nas = self.num_assigns() as f64;
+        self.ema_asg.update(nas);
         if count <= RESTART_PROHIBIT {
             if count == RESTART_PROHIBIT {
                 self.ema_asg.reset();
@@ -56,12 +58,9 @@ impl Restart for Solver {
     ///```
     fn block_restart(&mut self, lbd: usize, clv: usize) -> () {
         let count = self.stats[Stat::NumOfBackjump as usize] as u64;
-        let nas = self.num_assigns() as f64;
-        let b_l = self.am.decision_level() as f64;
-        self.ema_asg.update(nas);
-        self.ema_lbd.update(lbd as f64);
         self.c_lvl.update(clv as f64);
-        self.b_lvl.update(b_l);
+        self.b_lvl.update(self.am.decision_level() as f64);
+        self.ema_lbd.update(lbd as f64);
         if count <= RESTART_PROHIBIT {
             if count == RESTART_PROHIBIT {
                 self.ema_asg.reset();

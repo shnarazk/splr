@@ -6,7 +6,6 @@ use assign::{AssignState, Assignment};
 use clause::Clause;
 use clause::ClauseIF;
 use clause::ClauseKind;
-use clause::DEAD_CLAUSE;
 use clause::ClauseIdIndexEncoding;
 use solver::SatSolver;
 use solver::{Solver, Stat};
@@ -15,7 +14,9 @@ use types::*;
 use var::HeapManagement;
 use var::Satisfiability;
 use var::Eliminator;
+use std::usize::MAX;
 
+pub const DEAD_CLAUSE: usize = MAX;
 const SUBSUMPITON_GROW_LIMIT: usize = 0;
 const SUBSUMPTION_VAR_QUEUE_MAX: usize = 10_000;
 const SUBSUMPTION_CLAUSE_QUEUE_MAX: usize = 10_000;
@@ -24,7 +25,7 @@ const SUBSUMPTION_COMBINATION_MAX: usize = 10_000_000;
 impl Solver {
     /// 3. addClause
     /// - calls `enqueue_clause`
-    pub fn add_cross(&mut self, vec: Vec<Lit>) -> bool {
+    pub fn add_cross(&mut self, vec: &[Lit]) -> bool {
         if vec.len() == 1 {
             self.am.enqueue(&mut self.assign, &mut self.vars[vec[0].vi()], vec[0], NULL_CLAUSE);
             return true;
@@ -167,9 +168,9 @@ impl Solver {
             let l = lindex!(q, i);
             if l.vi() != v {
                 for j in 0..p.len() {
-                    let m = lindex!(p, j);
-                    if m.vi() == l.vi() {
-                        if m.negate() == l {
+                    let lit_j = lindex!(p, j);
+                    if lit_j.vi() == l.vi() {
+                        if lit_j.negate() == l {
                             return (false, size);
                         } else {
                             continue 'next_literal;
@@ -504,7 +505,7 @@ impl Solver {
                 for p in &*pos {
                     for n in &*neg {
                         if let Some(vec) = self.merge(*p, *n, v) {
-                            if !self.add_cross(vec) {
+                            if !self.add_cross(&vec) {
                                 return false;
                             }
                         }

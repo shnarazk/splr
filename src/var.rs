@@ -1,7 +1,7 @@
 #![allow(unused_imports)]
 use clause::Clause;
 use clause::ClauseIdIndexEncoding;
-use clause::DEAD_CLAUSE;
+use eliminator::DEAD_CLAUSE;
 use types::*;
 
 /// for &'a[Var]
@@ -193,8 +193,8 @@ impl HeapManagement for VarIdHeap {
     }
     fn rebuild(&mut self, assign: &[Lbool], vars: &[Var]) -> () {
         self.reset();
-        for vi in 1..vars.len() {
-            if assign[vi] == BOTTOM {
+        for (vi, val) in assign.iter().enumerate().skip(1) {
+            if *val == BOTTOM {
                 self.insert(&vars, vi);
             }
         }
@@ -234,12 +234,11 @@ impl HeapManagement for VarIdHeap {
         let mut heap = Vec::with_capacity(n + 1);
         let mut idxs = Vec::with_capacity(n + 1);
         heap.push(0);
-        idxs.push(n);
+        idxs.push(init);
         for i in 1..n + 1 {
             heap.push(i);
             idxs.push(i);
         }
-        idxs[0] = init;
         VarIdHeap { heap, idxs }
     }
 }

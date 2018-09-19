@@ -22,7 +22,7 @@ pub trait LBD {
     fn lbd(&self, vars: &[Var], tmp: &mut [Lit]) -> usize;
 }
 
-const DB_INC_SIZE: usize = 50;
+const DB_INC_SIZE: usize = 300;
 
 /// normal results returned by Solver
 #[derive(Debug)]
@@ -165,8 +165,8 @@ impl Solver {
             an_level_map_key: 1,
             mi_var_map: vec![0; nv + 1],
             lbd_seen: vec![0; nv + 1],
-            ema_asg: Ema2::new(4096.0, 8192.0),  // for blocking
-            ema_lbd: Ema2::new(64.0, 8192.0),   // for forcing
+            ema_asg: Ema2::new(40.0, 4_000.0),  // for blocking
+            ema_lbd: Ema2::new(40.0, 4_000.0),   // for forcing
             b_lvl: Ema2::new(50.0, 5_000.0),
             c_lvl: Ema2::new(50.0, 5_000.0),
             next_restart: 100,
@@ -187,18 +187,16 @@ impl Solver {
         let deads = learnts.count(GARBAGE_LIT, 0) + learnts.count(RECYCLE_LIT, 0);
         let cnt = learnts.clauses.iter().filter(|c| c.rank <= 2).count();
         if mes == "" {
-            println!("#init, DB,  Remov,  good, junk,   Perm, Binary, PROG, solv, elim,   rate, RES,block,force,  asgn,   lbd, VAL,   lbd, b lvl, c lvl");
+            println!("#init, DB,  Remov,  good,   Perm, Binary, PROG, solv, rate%, RES,block,force, asgn/,  lbd/, STAT,   lbd,bjmp lv,cnfl lv,c lvl/");
         } else {
             println!(
-                "#{}, DB,{:>7},{:>6},{:>5},{:>7},{:>7}, PROG,{:>5},{:>5},{:>6.3}%, RES,{:>5},{:>5}, {:>5.2},{:>6.2}, VAL,{:>6.2},{:>6.2},{:>6.2},{:>6.2}",
+                "#{}, DB,{:>7},{:>6},{:>7},{:>7}, PROG,{:>5},{:>6.3}, RES,{:>5},{:>5}, {:>5.2},{:>6.2}, STAT,{:>6.2},{:>7.2},{:>7.2},{:>6.2}",
                 mes,
                 learnts.clauses.len() - 1 -deads,
                 cnt,
-                deads,
                 self.cp[ClauseKind::Permanent as usize].clauses.len() - 1,
                 self.cp[ClauseKind::Binclause as usize].clauses.len() - 1,
                 k,
-                self.eliminator.eliminated_vars,
                 (sum as f32) / (nv as f32) * 100.0,
                 self.stats[Stat::NumOfBlockRestart as usize],
                 self.stats[Stat::NumOfRestart as usize],
@@ -453,21 +451,21 @@ impl<'a> LBD for [Lit] {
     }
 }
 impl LBD for Clause {
-    fn lbd(&self, vars: &[Var], tmp: &mut [Lit]) -> usize {
-        let key_old = tmp[0];
-        let key = if 10_000_000 < key_old { 1 } else { key_old + 1 };
-        let mut cnt = 0;
-        for i in 0..self.len() {
-            let l = lindex!(self, i);
-            let lv = &mut tmp[vars[l.vi()].level];
-            if *lv != key {
-                *lv = key;
-                cnt += 1;
-            }
-        }
-        tmp[0] = key;
-        cnt
-    }
+   fn lbd(&self, vars: &[Var], tmp: &mut [Lit]) -> usize {
+       let key_old = tmp[0];
+       let key = if 10_000_000 < key_old { 1 } else { key_old + 1 };
+       let mut cnt = 0;
+       for i in 0..self.len() {
+           let l = lindex!(self, i);
+           let lv = &mut tmp[vars[l.vi()].level];
+           if *lv != key {
+               *lv = key;
+               cnt += 1;
+           }
+       }
+       tmp[0] = key;
+       cnt
+   }
 }
 
 //impl Solver {

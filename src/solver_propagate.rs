@@ -32,7 +32,13 @@ impl SolveSAT for Solver {
     fn search(&mut self) -> bool {
         let root_lv = self.root_level;
         loop {
-            self.stats[Stat::NumOfPropagation as usize] += 1;
+            //self.stats[Stat::NumOfPropagation as usize] += 1;
+            //if !self.cp[ClauseKind::Removable as usize].assertion_soundness() {
+            //    panic!("here");
+            //}
+            //if ! self.cp[ClauseKind::Binclause as usize].assertion_soundness() {
+            //    panic!("there");
+            //}
             let ci = self.propagate();
             let d = self.am.decision_level();
             if ci == NULL_CLAUSE {
@@ -43,6 +49,9 @@ impl SolveSAT for Solver {
                 self.force_restart();
                 if d == 0 && self.num_solved_vars < na {
                     self.cm.simplify(&mut self.cp, &self.assign);
+                    if self.eliminator.use_elim && self.stats[Stat::NumOfSimplification as usize] % 8 == 0 {
+                        self.eliminate();
+                    }
                     self.stats[Stat::NumOfSimplification as usize] += 1;
                     self.progress("simp");
                     self.num_solved_vars = na;
@@ -91,51 +100,58 @@ impl SolveSAT for Solver {
     }
 
     fn propagate(&mut self) -> ClauseId {
-        while self.am.q_head < self.am.trail.len() {
-            let p: usize = self.am.trail[self.am.q_head] as usize;
-            debug_assert!(1 < p);
-            // self.cp[ClauseKind::Removable as usize].check_lit(&self.vars, "before propagation", p as Lit);
-            self.am.q_head += 1;
-            self.stats[Stat::NumOfPropagation as usize] += 1;
-            let kinds = [
-                ClauseKind::Binclause,
-                ClauseKind::Removable,
-                ClauseKind::Permanent,
-            ];
-            for kind in &kinds {
-               let cs = &mut self.cp[*kind as usize];
-            //for cs in &mut self.cp {
-                let ret = cs.propagate(&mut self.assign, &mut self.vars, &mut self.am, p as Lit);
+        let Solver {
+            ref mut assign,
+            ref mut am,
+            ref mut cp,
+            ref mut vars,
+            ref mut stats,
+            ..
+        } = *self;
+        while am.q_head < am.trail.len() {
+            let p = am.trail[am.q_head];
+            am.q_head += 1;
+            stats[Stat::NumOfPropagation as usize] += 1;
+            for kind in &[ClauseKind::Binclause, ClauseKind::Removable, ClauseKind::Permanent] {
+                let ret = cp[*kind as usize].propagate(assign, vars, am, p);
                 if ret != NULL_CLAUSE {
+                    am.q_head = am.trail.len();
                     return ret;
                 }
             }
-            // self.check_lit(ClauseKind::Removable, "after propagation", p as Lit);
         }
         NULL_CLAUSE
     }
 
     fn cancel_until(&mut self, lv: usize) -> () {
-        if self.am.decision_level() <= lv {
+        let Solver {
+            ref mut assign,
+            ref mut am,
+            ref mut cp,
+            ref mut vars,
+            ref mut var_order,
+            ..
+        } = *self;
+        if am.decision_level() <= lv {
             return;
         }
-        let lim = self.am.trail_lim[lv];
-        for l in &self.am.trail[lim..] {
+        let lim = am.trail_lim[lv];
+        for l in &am.trail[lim..] {
             let vi = l.vi();
             {
-                let v = &mut self.vars[vi];
-                v.phase = self.assign[vi];
-                self.assign[vi] = BOTTOM;
+                let v = &mut vars[vi];
+                v.phase = assign[vi];
+                assign[vi] = BOTTOM;
                 if v.reason != NULL_CLAUSE {
-                    self.cp[v.reason.to_kind()].clauses[v.reason.to_index()].locked = false;
+                    cp[v.reason.to_kind()].clauses[v.reason.to_index()].locked = false;
                     v.reason = NULL_CLAUSE;
                 }
             }
-            self.var_order.insert(&self.vars, vi);
+            var_order.insert(&vars, vi);
         }
-        self.am.trail.truncate(lim); // FIXME
-        self.am.trail_lim.truncate(lv);
-        self.am.q_head = lim;
+        am.trail.truncate(lim);
+        am.trail_lim.truncate(lv);
+        am.q_head = lim;
     }
 }
 
@@ -152,10 +168,6 @@ impl CDCL for Solver {
             unsafe {
                 let c = &mut self.cp[cid.to_kind()].clauses[cid.to_index()] as *mut Clause;
                 debug_assert_ne!(cid, NULL_CLAUSE);
-                // special case for binary clause
-                if p != NULL_LIT && (*c).len() == 2 && (&self.assign[..]).assigned((*c).lit[0]) == LFALSE {
-                    (*c).lit.swap(0, 1);
-                }
                 if cid.to_kind() == ClauseKind::Removable as usize {
                     self.cm.bump(&mut self.cp, cid);
                     let new_rank = (*c).lbd(&self.vars, &mut self.lbd_seen);
@@ -164,11 +176,8 @@ impl CDCL for Solver {
                         (*c).just_used = true;
                     }
                 }
-                'next_literal: for i in 0..(*c).len() {
+                'next_literal: for i in ((p != NULL_LIT) as usize)..(*c).len() {
                     let q = lindex!(*c, i);
-                    if q == p {
-                        continue 'next_literal;
-                    }
                     let vi = q.vi();
                     let l = self.vars[vi].level;
                     debug_assert_ne!(self.assign[vi], BOTTOM);
@@ -177,8 +186,11 @@ impl CDCL for Solver {
                         self.an_seen[vi] = 1;
                         if dl <= l {
                             path_cnt += 1;
-                            if self.vars[vi].reason != NULL_CLAUSE {
-                                self.an_last_dl.push(q);
+                            let cr = self.vars[vi].reason;
+                            if cr != NULL_CLAUSE {
+                                if iref!(self.cp, cr).learnt {
+                                    self.an_last_dl.push(q);
+                                }
                             }
                         } else {
                             self.an_learnt_lits.push(q);
@@ -212,9 +224,8 @@ impl CDCL for Solver {
             if 10_000_000 < self.an_level_map_key {
                 self.an_level_map_key = 1;
             }
-            for i in 1..n {
-                let l = self.an_learnt_lits[i];
-                self.an_to_clear.push(l);
+            for l in &self.an_learnt_lits {
+                self.an_to_clear.push(*l);
                 self.an_level_map[self.vars[l.vi()].level] = self.an_level_map_key;
             }
         }
