@@ -574,6 +574,7 @@ impl ClauseManagement for Solver {
         }
         // self.garbage_collect(ClauseKind::Removable);
         self.cp[ClauseKind::Removable as usize].garbage_collect();
+        self.cp[ClauseKind::Removable as usize].reset_lbd(&self.vars);
         self.next_reduction += DB_INC_SIZE;
         self.stats[Stat::NumOfReduction as usize] += 1;
         self.progress("drop");
@@ -890,6 +891,9 @@ impl GC for ClausePack {
             temp.push(0);
         }
         for c in &mut self.clauses[1..] {
+            if c.get_flag(ClauseFlag::Dead) {
+                continue;
+            }
             let key = c.index;
             let mut cnt = 0;
             for l in c.lit.iter() {

@@ -179,7 +179,7 @@ impl Solver {
         let sum = k + self.eliminator.eliminated_vars;
         let learnts = &self.cp[ClauseKind::Removable as usize];
         let deads = learnts.count(GARBAGE_LIT, 0) + learnts.count(RECYCLE_LIT, 0);
-        let cnt = learnts.clauses.iter().filter(|c| !c.get_flag(ClauseFlag::Dead) && c.rank <= 2).count();
+        let cnt = learnts.clauses.iter().filter(|c| c.index != 0 && !c.get_flag(ClauseFlag::Dead) && c.rank <= 2).count();
         if mes == "" {
             println!("#init, DB, #Remov, #good,#junk,  #Perm,#Binary, PROG,#solv,#elim, rate%, RES,block,force, asgn/,  lbd/, STAT,   lbd, b lvl, c lvl");
         } else {
