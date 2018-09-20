@@ -103,7 +103,7 @@ pub enum VarOrder {
 pub struct VarIdHeap {
     order: VarOrder,
     pub heap: Vec<VarId>, // order : usize -> VarId
-    idxs: Vec<usize>, // VarId : -> order : usize
+    idxs: Vec<usize>,     // VarId : -> order : usize
 }
 
 pub trait AccessHeap {

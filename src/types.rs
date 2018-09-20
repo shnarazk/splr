@@ -283,6 +283,5 @@ pub fn vec2int(v: &[Lit]) -> Vec<i32> {
             0 => 0,
             1 => 0,
             x => x.int(),
-        })
-        .collect::<Vec<i32>>()
+        }).collect::<Vec<i32>>()
 }

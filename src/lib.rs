@@ -3,15 +3,15 @@
 mod macros;
 /// Clause
 pub mod clause;
-/// struct Solver
-pub mod solver;
 /// Implementation on solver restart.
 pub mod restart;
+/// struct Solver
+pub mod solver;
 /// Plumping layer.
 pub mod types;
+/// validates
+pub mod validator;
 /// Var
 pub mod var;
 /// Implementation on decision var selection.
 pub mod var_manage;
-/// validates
-pub mod validator;

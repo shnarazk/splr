@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 extern crate splr;
-use splr::clause::*;
 use splr::clause::ClauseManagement;
+use splr::clause::*;
 use splr::solver::*;
 use splr::types::*;
 
@@ -45,13 +45,10 @@ impl Testing for Clause {
         self
     }
     fn dump(&self) -> String {
-        format!("C{} rank:{}, activity: {}, lit:{:?}{:?}",
-                self.index,
-                self.rank,
-                self.activity,
-                self.lit,
-                self.lits,
-                )
+        format!(
+            "C{} rank:{}, activity: {}, lit:{:?}{:?}",
+            self.index, self.rank, self.activity, self.lit, self.lits,
+        )
     }
 }
 
@@ -111,22 +108,40 @@ fn clause_sort() -> () {
         "# reduce_watchers: {:?}",
         &s.cp[ClauseKind::Removable as usize].permutation[1..]
     );
-    for (i, c) in s.cp[ClauseKind::Removable as usize].clauses.iter().enumerate() {
+    for (i, c) in s.cp[ClauseKind::Removable as usize]
+        .clauses
+        .iter()
+        .enumerate()
+    {
         println!("#{} {:#}", i, c);
     }
     for i in &s.cp[ClauseKind::Removable as usize].permutation[1..] {
-        println!("@{} {:#}", i, &s.cp[ClauseKind::Removable as usize].clauses[s.cp[ClauseKind::Removable as usize].permutation[*i]]);
+        println!(
+            "@{} {:#}",
+            i,
+            &s.cp[ClauseKind::Removable as usize].clauses
+                [s.cp[ClauseKind::Removable as usize].permutation[*i]]
+        );
     }
     s.simplify_database();
     println!(
         "# simplify_database: {:?}",
         &s.cp[ClauseKind::Removable as usize].permutation[1..]
     );
-    for (i, c) in s.cp[ClauseKind::Removable as usize].clauses.iter().enumerate() {
+    for (i, c) in s.cp[ClauseKind::Removable as usize]
+        .clauses
+        .iter()
+        .enumerate()
+    {
         println!("#{} {:#}", i, c);
     }
     for i in &s.cp[ClauseKind::Removable as usize].permutation[1..] {
-        println!("@{} {:#}", i, &s.cp[ClauseKind::Removable as usize].clauses[s.cp[ClauseKind::Removable as usize].permutation[*i]]);
+        println!(
+            "@{} {:#}",
+            i,
+            &s.cp[ClauseKind::Removable as usize].clauses
+                [s.cp[ClauseKind::Removable as usize].permutation[*i]]
+        );
     }
 }
 

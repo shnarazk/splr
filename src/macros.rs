@@ -22,7 +22,11 @@ macro_rules! mref {
 macro_rules! lindex {
     ($c:expr, $val:expr) => {{
         match (&$c, $val) {
-            (c, i) => if i < 2 { c.lit[i] } else { c.lits[i - 2] },
+            (c, i) => if i < 2 {
+                c.lit[i]
+            } else {
+                c.lits[i - 2]
+            },
         }
     }};
 }
@@ -38,6 +42,7 @@ macro_rules! uenqueue {
                 v.level = tl.len();
                 v.reason = cid;
                 tr.push(lit);
-            }}
-    }}
+            }
+        }
+    }};
 }

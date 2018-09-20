@@ -1,10 +1,10 @@
+use solver::CDCL;
+use solver::{Solver, Stat};
 use std::cmp::Ordering;
 use std::f64;
 use std::fmt;
 use std::usize::MAX;
 use types::*;
-use solver::{Solver, Stat};
-use solver::CDCL;
 use var::Satisfiability;
 use var::Var;
 
@@ -16,7 +16,7 @@ pub trait ClauseList {
 
 /// for ClausePack
 trait GC {
-    fn garbage_collect(&mut self) ->  ();
+    fn garbage_collect(&mut self) -> ();
     fn new_clause(&mut self, v: &Vec<Lit>, rank: usize, learnt: bool, locked: bool) -> ClauseId;
     fn reset_lbd(&mut self, vars: &[Var]) -> ();
 }
@@ -303,7 +303,7 @@ impl Clause {
     }
     pub fn null() -> Clause {
         Clause {
-//            kind: ClauseKind::Permanent,
+            //            kind: ClauseKind::Permanent,
             activity: 0.0,
             rank: RANK_NULL,
             next_watcher: [NULL_CLAUSE; 2],
@@ -332,8 +332,16 @@ impl fmt::Display for Clause {
                 vec2int(&self.lit),
                 vec2int(&self.lits),
                 self.next_watcher,
-                if self.get_flag(ClauseFlag::Dead) { ", dead" } else { "" },
-                if self.get_flag(ClauseFlag::Locked) { ", locked" } else { "" },
+                if self.get_flag(ClauseFlag::Dead) {
+                    ", dead"
+                } else {
+                    ""
+                },
+                if self.get_flag(ClauseFlag::Locked) {
+                    ", locked"
+                } else {
+                    ""
+                },
             )
         } else {
             match self.index {
@@ -592,9 +600,10 @@ impl ClauseManagement for Solver {
         // reset reason since decision level is zero.
         for v in &mut self.vars {
             if v.reason != NULL_CLAUSE {
-                self.cp[v.reason.to_kind()].clauses[v.reason.to_index()].set_flag(ClauseFlag::Locked, false);
+                self.cp[v.reason.to_kind()].clauses[v.reason.to_index()]
+                    .set_flag(ClauseFlag::Locked, false);
                 v.reason = NULL_CLAUSE;
-                }
+            }
         }
         for ck in &KINDS {
             for c in &mut self.cp[*ck as usize].clauses[1..] {
@@ -623,17 +632,17 @@ impl ClauseManagement for Solver {
             // self.garbage_collect(*ck);
         }
         self.stats[Stat::NumOfSimplification as usize] += 1;
-//        if self.eliminator.use_elim
-//            && self.stats[Stat::NumOfSimplification as usize] % 8 == 0
-//            && self.eliminator.last_invocatiton < self.stats[Stat::NumOfReduction as usize] as usize
-//        {
-//            self.eliminate();
-//            self.eliminator.last_invocatiton = self.stats[Stat::NumOfReduction as usize] as usize;
-//            for ck in &KINDS {
-//                // self.garbage_collect(*ck);
-//                self.cp[*ck as usize].garbage_collect();
-//            }
-//        }
+        //        if self.eliminator.use_elim
+        //            && self.stats[Stat::NumOfSimplification as usize] % 8 == 0
+        //            && self.eliminator.last_invocatiton < self.stats[Stat::NumOfReduction as usize] as usize
+        //        {
+        //            self.eliminate();
+        //            self.eliminator.last_invocatiton = self.stats[Stat::NumOfReduction as usize] as usize;
+        //            for ck in &KINDS {
+        //                // self.garbage_collect(*ck);
+        //                self.cp[*ck as usize].garbage_collect();
+        //            }
+        //        }
         self.progress("simp");
         true
     }
@@ -862,7 +871,7 @@ impl GC for ClausePack {
                 c.lits.push(*l);
             }
             c.rank = rank;
-            c.flags = 0;        // reset Dead, JustUsed, SveMark and Touched
+            c.flags = 0; // reset Dead, JustUsed, SveMark and Touched
             c.set_flag(ClauseFlag::Locked, locked);
             c.set_flag(ClauseFlag::Learnt, learnt);
             c.activity = 0.0;

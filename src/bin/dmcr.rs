@@ -2,10 +2,10 @@
 #![allow(unused_imports)]
 extern crate splr;
 use splr::solver::{SatSolver, Solver};
-use std::env;
-use std::io::{BufReader, BufRead, stdin};
 use splr::types::*;
 use splr::validator::*;
+use std::env;
+use std::io::{stdin, BufRead, BufReader};
 use std::path::Path;
 
 const VERSION: &str = "dmcr-0.0.1";

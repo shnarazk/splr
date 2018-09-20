@@ -1,6 +1,6 @@
+use solver::CDCL;
 use solver::{Solver, Stat};
 use types::*;
-use solver::CDCL;
 
 pub trait Restart {
     fn block_restart(&mut self, lbd: usize, clv: usize, blv: usize, nas: usize) -> ();
@@ -15,7 +15,6 @@ const R: f64 = 1.5;
 const K: f64 = 1.6;
 
 impl Restart for Solver {
-
     /// called after conflict resolution
     fn block_restart(&mut self, lbd: usize, clv: usize, blv: usize, nas: usize) -> () {
         let count = self.stats[Stat::NumOfBackjump as usize] as u64;

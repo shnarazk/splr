@@ -2,13 +2,13 @@
 #![allow(unused_variables)]
 #![allow(unused_mut)]
 use clause::Clause;
+use clause::ClauseFlag;
 use clause::ClauseIdIndexEncoding;
 use clause::ClauseKind;
-use clause::ClauseFlag;
 use clause::CLAUSE_KINDS;
 use clause::DEAD_CLAUSE;
-use solver::{Solver, Stat};
 use solver::CDCL;
+use solver::{Solver, Stat};
 use types::*;
 use var::Eliminator;
 use var::Satisfiability;
@@ -568,7 +568,11 @@ impl Solver {
             }
             while !self.eliminator.var_queue.is_empty() {
                 let elim = self.eliminator.var_queue.remove(0);
-                if self.vars[elim].eliminated || self.vars[elim].assign != BOTTOM || !self.vars[elim].terminal || self.vars[elim].frozen {
+                if self.vars[elim].eliminated
+                    || self.vars[elim].assign != BOTTOM
+                    || !self.vars[elim].terminal
+                    || self.vars[elim].frozen
+                {
                     continue;
                 }
                 if !self.eliminate_var(elim) {

@@ -1,5 +1,5 @@
-use clause::*;
 use clause::ClauseManagement;
+use clause::*;
 use restart::Restart;
 use std::cmp::max;
 use std::fs;
@@ -55,6 +55,7 @@ pub type SolverResult = Result<Certificate, SolverException>;
 #[derive(Copy, Clone)]
 pub enum Stat {
     NumOfBackjump = 0,   // the number of backjump
+    NumOfDecision,       // the number of decision
     NumOfRestart,        // the number of restart
     NumOfBlockRestart,   // the number of blacking start
     NumOfPropagation,    // the number of propagation
@@ -68,6 +69,12 @@ pub enum Stat {
     EndOfStatIndex,      // Don't use this dummy.
 }
 
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub enum SearchStrategy {
+    Generic,
+    ChanSeok,
+}
+
 /// is the collection of all variables.
 #[derive(Debug)]
 pub struct Solver {
@@ -77,7 +84,7 @@ pub struct Solver {
     pub cla_inc: f64,
     pub var_inc: f64,
     pub root_level: usize,
-    pub chanseok: bool,
+    pub strategy: Option<SearchStrategy>,
     /// Variable Assignment Management
     pub vars: Vec<Var>,
     pub trail: Vec<Lit>,
@@ -131,7 +138,7 @@ impl Solver {
             cla_inc: cdr,
             var_inc: vdr,
             root_level: 0,
-            chanseok: false,
+            strategy: None,
             vars: Var::new_vars(nv),
             trail: Vec::with_capacity(nv),
             trail_lim: Vec::new(),
@@ -159,8 +166,8 @@ impl Solver {
             an_level_map_key: 1,
             mi_var_map: vec![0; nv + 1],
             lbd_seen: vec![0; nv + 1],
-            ema_asg: Ema2::new(4.0, 8192.0), // for blocking
-            ema_lbd: Ema2::new(64.0, 8192.0),   // for forcing
+            ema_asg: Ema2::new(4.0, 8192.0),  // for blocking
+            ema_lbd: Ema2::new(64.0, 8192.0), // for forcing
             b_lvl: Ema::new(se),
             c_lvl: Ema::new(se),
             next_restart: 100,
@@ -179,7 +186,11 @@ impl Solver {
         let sum = k + self.eliminator.eliminated_vars;
         let learnts = &self.cp[ClauseKind::Removable as usize];
         let deads = learnts.count(GARBAGE_LIT, 0) + learnts.count(RECYCLE_LIT, 0);
-        let cnt = learnts.clauses.iter().filter(|c| c.index != 0 && !c.get_flag(ClauseFlag::Dead) && c.rank <= 2).count();
+        let cnt = learnts
+            .clauses
+            .iter()
+            .filter(|c| c.index != 0 && !c.get_flag(ClauseFlag::Dead) && c.rank <= 2)
+            .count();
         if mes == "" {
             println!("#init, DB, #Remov, #good,#junk,  #Perm,#Binary, PROG,#solv,#elim, rate%, RES,block,force, asgn/,  lbd/, STAT,   lbd, b lvl, c lvl");
         } else {
@@ -231,6 +242,18 @@ impl Solver {
         let cid = self.cp[c.get_kind() as usize].attach(c);
         debug_assert_ne!(cid, 0);
         cid
+    }
+    pub fn adapt_strategy(&mut self) -> () {
+        if self.strategy != None {
+            return;
+        }
+        let decpc = self.stats[Stat::NumOfDecision as usize] as f64
+            / self.stats[Stat::NumOfBackjump as usize] as f64;
+        if decpc <= 1.2 {
+            self.strategy = Some(SearchStrategy::ChanSeok);
+        } else {
+            self.strategy = Some(SearchStrategy::Generic);
+        }
     }
 }
 
@@ -342,9 +365,7 @@ impl SatSolver for Solver {
     }
 }
 
-
 impl CDCL for Solver {
-
     fn propagate(&mut self) -> ClauseId {
         let Solver {
             ref mut vars,
@@ -424,6 +445,7 @@ impl CDCL for Solver {
         NULL_CLAUSE
     }
 
+    /// main loop
     fn search(&mut self) -> bool {
         let root_lv = self.root_level;
         loop {
@@ -445,6 +467,7 @@ impl CDCL for Solver {
                     debug_assert_ne!(vi, 0);
                     let p = self.vars[vi].phase;
                     self.uncheck_assume(vi.lit(p));
+                    self.stats[Stat::NumOfDecision as usize] += 1;
                 }
             } else {
                 self.stats[Stat::NumOfBackjump as usize] += 1;
@@ -466,7 +489,9 @@ impl CDCL for Solver {
                         unsafe {
                             let v = &mut self.an_learnt_lits as *mut Vec<Lit>;
                             lbd = self.add_learnt(&mut *v);
-                            if 1000 < self.stats[Stat::NumOfBackjump as usize] && self.b_lvl.0 < 0.001 {
+                            if 1000 < self.stats[Stat::NumOfBackjump as usize]
+                                && self.b_lvl.0 < 0.001
+                            {
                                 panic!("aeaeae {:?} lbd {}", *v, lbd);
                             }
                         }
@@ -499,7 +524,8 @@ impl CDCL for Solver {
                 v.phase = v.assign;
                 v.assign = BOTTOM;
                 if v.reason != NULL_CLAUSE {
-                    self.cp[v.reason.to_kind()].clauses[v.reason.to_index()].set_flag(ClauseFlag::Locked, false);
+                    self.cp[v.reason.to_kind()].clauses[v.reason.to_index()]
+                        .set_flag(ClauseFlag::Locked, false);
                 }
                 v.reason = NULL_CLAUSE;
             }
@@ -632,7 +658,7 @@ impl CDCL for Solver {
         let mut j = 1;
         for i in 1..n {
             let l = self.an_learnt_lits[i];
-            if self.vars[l.vi()].reason == NULL_CLAUSE || !self.analyze_removable(l){
+            if self.vars[l.vi()].reason == NULL_CLAUSE || !self.analyze_removable(l) {
                 self.an_learnt_lits[j] = l;
                 j += 1;
             }
@@ -732,7 +758,6 @@ impl CDCL for Solver {
 }
 
 impl Solver {
-
     /// renamed from litRedundant
     fn analyze_removable(&mut self, l: Lit) -> bool {
         self.an_stack.clear();
@@ -798,15 +823,10 @@ impl Solver {
                 self.mi_var_map[(*vec)[i].vi() as usize] = key;
             }
             let mut nb = 0;
-            let mut
-                cix = self.cp[ClauseKind::Binclause as usize].watcher[p as usize];
+            let mut cix = self.cp[ClauseKind::Binclause as usize].watcher[p as usize];
             while cix != NULL_CLAUSE {
                 let c = &self.cp[ClauseKind::Binclause as usize].clauses[cix];
-                let other = if c.lit[0] == p {
-                    c.lit[1]
-                } else {
-                    c.lit[0]
-                };
+                let other = if c.lit[0] == p { c.lit[1] } else { c.lit[0] };
                 let vi = other.vi();
                 if self.mi_var_map[vi] == key && self.vars.assigned(other) == LTRUE {
                     nb += 1;
