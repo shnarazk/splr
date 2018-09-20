@@ -8,9 +8,12 @@ pub trait Restart {
 }
 
 const RESTART_PERIOD: u64 = 50;
+
 const RESET_EMA: u64 = 50;
+
 /// for block restart based on average assigments: 1.40
 const R: f64 = 1.5;
+
 /// for force restart based on average LBD of newly generated clauses: 1.15
 const K: f64 = 1.6;
 
@@ -31,9 +34,7 @@ impl Restart for Solver {
         if self.next_restart <= count && 0 < lbd && R < self.ema_asg.get() {
             self.next_restart = count + RESTART_PERIOD;
             self.stats[Stat::BlockRestart as usize] += 1;
-            // self.ema_lbd.reset();
         }
-        // println!("block_restart count {}, next {} {}", count, self.next_restart, R < self.ema_asg.get());
     }
 
     /// called after no conflict propagation
