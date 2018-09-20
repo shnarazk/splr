@@ -674,7 +674,7 @@ impl ClauseManagement for Solver {
             key = key_old + 1;
         }
         let mut cnt = 0;
-        for l in c.lit.iter() {
+        for l in &c.lit {
             let lv = self.vars[l.vi()].level;
             if self.lbd_seen[lv] != key && lv != 0 {
                 self.lbd_seen[lv] = key;
@@ -905,7 +905,7 @@ impl GC for ClausePack {
             }
             let key = c.index;
             let mut cnt = 0;
-            for l in c.lit.iter() {
+            for l in &c.lit {
                 let lv = vars[l.vi()].level;
                 if temp[lv] != key && lv != 0 {
                     temp[lv] = key;

@@ -254,6 +254,7 @@ impl Solver {
             / self.stats[Stat::Conflict as usize] as f64;
         if decpc <= 1.2 {
             self.strategy = Some(SearchStrategy::ChanSeok);
+            re_init = true;
         } else if self.stats[Stat::NoDecisionConflict as usize] < 30_000 {
             self.strategy = Some(SearchStrategy::Generic);
         } else {

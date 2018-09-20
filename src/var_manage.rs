@@ -342,7 +342,7 @@ impl Solver {
                 // Find best variable to scan:
                 let mut best = 0;
                 let mut tmp = 0;
-                'next_var: for i in 0..(*c).len() {
+                for i in 0..(*c).len() {
                     let l = lindex!(*c, i);
                     let v = &self.vars[l.vi()];
                     // println!("select var {}, {}, {}", l.vi(), v.terminal, v.occurs.len());
@@ -442,9 +442,9 @@ impl Solver {
             // Moreover, no clause must exceed the limit on the maximal clause size (if it is set).
             let clslen = pos.len() + neg.len();
             let mut cnt = 0;
-            for i in 0..pos.len() {
-                for j in 0..neg.len() {
-                    let (res, clause_size) = self.check_to_merge(pos[i], neg[j], v);
+            for lit_pos in &pos {
+                for lit_neg in &neg {
+                    let (res, clause_size) = self.check_to_merge(*lit_pos, *lit_neg, v);
                     if res {
                         cnt += 1;
                         if clslen + SUBSUMPITON_GROW_LIMIT < cnt

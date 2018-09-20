@@ -14,7 +14,7 @@ fn main() {
     let mut target: Option<String> = None;
     for arg in &env::args().skip(1).collect::<Vec<String>>() {
         match arg {
-            _ if arg.to_string() == "--version" => {
+            _ if arg == "--version" => {
                 println!("{}", VERSION);
             }
             _ if (&*arg).starts_with('-') => {
@@ -44,7 +44,7 @@ fn read_assignment() -> Vec<i32> {
         match rs.read_line(&mut buf) {
             Ok(0) => return Vec::new(),
             Ok(_) => {
-                if buf.starts_with("c") {
+                if buf.starts_with('c') {
                     continue;
                 }
                 let mut v: Vec<i32> = Vec::new();

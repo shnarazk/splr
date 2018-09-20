@@ -14,7 +14,7 @@ fn main() {
     let args: Vec<String> = env::args().skip(1).collect();
     for arg in &args {
         match arg {
-            _ if arg.to_string() == "--version" => {
+            _ if arg == "--version" => {
                 println!("{}", VERSION);
             }
             _ if (&*arg).starts_with('-') => {
