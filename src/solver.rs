@@ -195,21 +195,20 @@ impl Solver {
         let cnt = learnts
             .clauses
             .iter()
-            .filter(|c| c.index != 0 && !c.get_flag(ClauseFlag::Dead) && c.rank <= 2)
+            .filter(|c| c.index != 0 && !c.get_flag(ClauseFlag::Dead) && c.rank <= 3)
             .count();
         if mes == "" {
-            println!("#init, DB, #Remov, #good,#junk,  #Perm,#Binary, PROG,#solv,#elim, rate%, RES,block,force, asgn/,  lbd/, STAT,   lbd, b lvl, c lvl");
+            println!("#init, DB, #Remov, #good,#junk,  #Perm,#Binary, PROG,#solv, rate%, RES,block,force, asgn/,  lbd/, STAT,   lbd,  b lvl,  c lvl");
         } else {
             println!(
-                "#{}, DB,{:>7},{:>6},{:>5},{:>7},{:>7}, PROG,{:>5},{:>5},{:>6.3}, RES,{:>5},{:>5}, {:>5.2},{:>6.2}, STAT,{:>6.2},{:>6.2},{:>6.2}",
+                "#{}, DB,{:>7},{:>6},{:>5},{:>7},{:>7}, PROG,{:>5},{:>6.3}, RES,{:>5},{:>5}, {:>5.2},{:>6.2}, STAT,{:>6.2},{:>7.2},{:>7.2}",
                 mes,
                 learnts.clauses.len() - 1 -deads,
                 cnt,
                 deads,
                 self.cp[ClauseKind::Permanent as usize].clauses.iter().filter(|c| !c.get_flag(ClauseFlag::Dead)).count(),
                 self.cp[ClauseKind::Binclause as usize].clauses.iter().filter(|c| !c.get_flag(ClauseFlag::Dead)).count(),
-                k,
-                self.eliminator.eliminated_vars,
+                sum,
                 (sum as f32) / (nv as f32) * 100.0,
                 self.stats[Stat::BlockRestart as usize],
                 self.stats[Stat::Restart as usize],
@@ -220,15 +219,6 @@ impl Solver {
                 self.c_lvl.0,
             );
         }
-        // if 10000 < learnts.len() {
-        //     for c in &learnts.clauses.iter().filter(|&c| !c.get_flag(ClauseFlag::Dead) && c.rank <= 2).take(4).collect::<Vec<&Clause>>() {
-        //         println!("{:?}", *c);
-        //         for i in 0..c.len() {
-        //             let v = lindex!(*c, i).vi();
-        //             println!(" - v{} => {}", v, self.vars[v].level);
-        //         }
-        //     }
-        // }
     }
 
     pub fn num_assigns(&self) -> usize {
@@ -493,6 +483,9 @@ impl CDCL for Solver {
         loop {
             self.stats[Stat::Propagation as usize] += 1;
             let ci = self.propagate();
+            if self.stats[Stat::Propagation as usize] % 100_000 == 0 {
+                self.progress("splr");
+            }
             if ci == NULL_CLAUSE {
                 let na = self.num_assigns();
                 if na == self.num_vars {
@@ -524,7 +517,6 @@ impl CDCL for Solver {
                     let lbd;
                     if self.an_learnt_lits.len() == 1 {
                         let l = self.an_learnt_lits[0];
-                        println!("unit literal {}", l.int());
                         self.uncheck_enqueue(l, NULL_CLAUSE);
                         lbd = 0;
                     } else {
@@ -615,20 +607,17 @@ impl CDCL for Solver {
             unsafe {
                 let c = &mut self.cp[cid.to_kind()].clauses[cid.to_index()] as *mut Clause;
                 debug_assert_ne!(cid, NULL_CLAUSE);
-                let d = (*c).rank;
                 if cid.to_kind() == (ClauseKind::Removable as usize) {
                     self.bump_cid(cid);
                     // let nblevels = self.lbd_of(&(*c));
-                    // if nblevels + 1 < d {
-                    //     debug_assert!(0 < nblevels);
+                    // if nblevels + 1 < (*c).rank {
                     //     // (*c).rank = nblevels;
-                    //     // if nblevels <= 30 {
-                    //     //     (*c).set_flag(ClauseFlag::JustUsed, true);
-                    //     // }
+                    //     if nblevels <= 30 {
+                    //         (*c).set_flag(ClauseFlag::JustUsed, true);
+                    //     }
                     // }
                 }
                 // println!("{}を対応", (*c));
-                //                'next_literal: for q in &(*c).lits {
                 for i in ((p != NULL_LIT) as usize)..(*c).len() {
                     let q = lindex!(*c, i);
                     let vi = q.vi();

@@ -567,17 +567,15 @@ impl ClauseManagement for Solver {
             permutation[1..].sort_by(|&a, &b| clauses[a].cmp(&clauses[b]));
             let nc = permutation.len();
             let keep = nc / 2;
-            // if clauses[permutation[keep]].rank <= 3 {
-            //     // self.next_reduction += 1000;
-            // };
+            if clauses[permutation[keep]].rank <= 4 {
+                self.next_reduction += 1000;
+            };
             for i in keep..nc {
                 let mut c = &mut clauses[permutation[i]];
-                if !c.get_flag(ClauseFlag::Locked) {
-                    c.set_flag(ClauseFlag::Dead, true);
-                    touched[c.lit[0].negate() as usize] = true;
-                    touched[c.lit[1].negate() as usize] = true;
-                }
-                c.set_flag(ClauseFlag::JustUsed, false);
+                c.set_flag(ClauseFlag::Dead, true);
+                touched[c.lit[0].negate() as usize] = true;
+                touched[c.lit[1].negate() as usize] = true;
+                c.set_flag(ClauseFlag::JustUsed, false)
             }
         }
         // self.garbage_collect(ClauseKind::Removable);
@@ -585,7 +583,6 @@ impl ClauseManagement for Solver {
         self.cp[ClauseKind::Removable as usize].reset_lbd(&self.vars);
         self.next_reduction += DB_INC_SIZE;
         self.stats[Stat::Reduction as usize] += 1;
-        self.progress("drop");
     }
 
     fn simplify(&mut self) -> bool {
@@ -643,7 +640,6 @@ impl ClauseManagement for Solver {
         //                self.cp[*ck as usize].garbage_collect();
         //            }
         //        }
-        self.progress("simp");
         true
     }
     fn lbd_vec(&mut self, v: &[Lit]) -> usize {
@@ -945,3 +941,24 @@ impl ClauseList for ClauseIndex {
         next
     }
 }
+
+pub struct ClauseListIter<'a> {
+    vec: &'a mut Vec<Clause>,
+    target: Lit,
+    next: ClauseIndex,
+}
+
+// impl<'a> Iterator for ClauseListIter<'a> {
+//     type Item = &'a mut Clause;
+//     fn next(&mut self) -> Option<&mut Clause> {
+//         if self.next == NULL_CLAUSE {
+//             None
+//         } else {
+//             {
+//                 let c = &mut self.vec[self.next as usize];
+//                 self.next = c.next_watcher[(c.lit[0] != self.target) as usize];
+//             }
+//             Some(&mut self.vec[self.next as usize])
+//         }
+//     }
+// }
