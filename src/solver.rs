@@ -785,7 +785,7 @@ impl Solver {
         while let Some(sl) = self.an_stack.pop() {
             let cid = self.vars[sl.vi()].reason;
             let c = &mut self.cp[cid.to_kind()].clauses[cid.to_index()];
-            if c.lits.len() == 0 && self.vars.assigned(c.lit[0]) == LFALSE {
+            if c.lits.is_empty() && self.vars.assigned(c.lit[0]) == LFALSE {
                 c.lit.swap(0, 1);
             }
             for i in 1..c.len() {
