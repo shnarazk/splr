@@ -9,8 +9,6 @@ use types::*;
 use var::*;
 use var_manage::VarSelect;
 
-// use var_manage::Eliminator;
-
 pub trait SatSolver {
     fn solve(&mut self) -> SolverResult;
     fn build(path: &str) -> (Solver, CNFDescription);
@@ -26,6 +24,8 @@ pub trait CDCL {
     fn analyze_final(&mut self, ci: ClauseId, skip_first: bool) -> ();
 }
 
+const CO_LBD_BOUND: usize = 4;
+
 /// normal results returned by Solver
 #[derive(Debug)]
 pub enum Certificate {
@@ -34,7 +34,7 @@ pub enum Certificate {
 }
 
 /// abnormal termination flags
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum SolverException {
     StateUNSAT = 0,
     StateSAT,             // 1
@@ -52,7 +52,7 @@ pub enum SolverException {
 pub type SolverResult = Result<Certificate, SolverException>;
 
 /// stat index
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Eq, PartialEq)]
 pub enum Stat {
     Conflict = 0,       // the number of backjump
     Decision,           // the number of decision
@@ -74,6 +74,9 @@ pub enum Stat {
 pub enum SearchStrategy {
     Generic,
     ChanSeok,
+    HighSuccesive,
+    LowSuccesive,
+    ManyGlues,
 }
 
 /// is the collection of all variables.
@@ -95,6 +98,7 @@ pub struct Solver {
     pub var_order: VarIdHeap,
     /// Clause Database Management
     pub cp: [ClausePack; 3],
+    pub first_reduction: usize,
     pub next_reduction: usize,
     pub cur_restart: usize,
     pub num_solved_vars: usize,
@@ -150,6 +154,7 @@ impl Solver {
                 ClausePack::build(ClauseKind::Permanent, nv, 256),
                 ClausePack::build(ClauseKind::Binclause, nv, 256),
             ],
+            first_reduction: 1000,
             next_reduction: 1000,
             cur_restart: 1,
             num_solved_vars: 0,
@@ -225,13 +230,16 @@ impl Solver {
         //     }
         // }
     }
+
     pub fn num_assigns(&self) -> usize {
         self.trail.len()
     }
+
     #[inline]
     pub fn decision_level(&self) -> usize {
         self.trail_lim.len()
     }
+
     pub fn attach_clause(&mut self, c: Clause) -> ClauseId {
         if self.eliminator.use_elim {
             for i in 0..c.len() {
@@ -254,6 +262,12 @@ impl Solver {
             / self.stats[Stat::Conflict as usize] as f64;
         if decpc <= 1.2 {
             self.strategy = Some(SearchStrategy::ChanSeok);
+            let _glureduce = true;
+            self.first_reduction = 2000;
+            self.next_reduction = 2000;
+            self.cur_restart = ((self.stats[Stat::Conflict as usize] as f64 / self.next_reduction as f64) + 1.0) as usize;
+            // TODO incReduceDB = 0;
+            println!("# Adjusting for low decision levels.");
             re_init = true;
         } else if self.stats[Stat::NoDecisionConflict as usize] < 30_000 {
             self.strategy = Some(SearchStrategy::Generic);
@@ -264,9 +278,16 @@ impl Solver {
             self.ema_lbd.reset();
             // conflictsRestarts = 0;
             if self.strategy == Some(SearchStrategy::ChanSeok) {
-                // move some clauses with good lbd to Permanent
+                // TODO
+                // move some clauses with good lbd (col_lbd_bound) to Permanent
                 // 1. cp[ClausePack::Permanent]attach(clause);
                 // 2. clause.set_flag(ClauseFlag::Dead);
+                for c in &mut self.cp[ClauseKind::Removable as usize].clauses {
+                    if c.rank < CO_LBD_BOUND {
+                        // 1. cp[ClausePack::Permanent]attach(clause);
+                        // 2. clause.set_flag(ClauseFlag::Dead);
+                    }
+                }
             }
         }
         if re_init {
@@ -276,6 +297,7 @@ impl Solver {
 }
 
 impl SatSolver for Solver {
+
     fn solve(&mut self) -> SolverResult {
         if !self.ok {
             return Ok(Certificate::UNSAT(Vec::new()));
@@ -320,6 +342,7 @@ impl SatSolver for Solver {
             }
         }
     }
+
     /// builds and returns a configured solver.
     fn build(path: &str) -> (Solver, CNFDescription) {
         let mut rs = BufReader::new(fs::File::open(path).unwrap());
@@ -384,6 +407,7 @@ impl SatSolver for Solver {
 }
 
 impl CDCL for Solver {
+
     fn propagate(&mut self) -> ClauseId {
         let Solver {
             ref mut vars,
@@ -506,15 +530,21 @@ impl CDCL for Solver {
                     } else {
                         unsafe {
                             let v = &mut self.an_learnt_lits as *mut Vec<Lit>;
-                            lbd = self.add_learnt(&mut *v);
-                            if 1000 < self.stats[Stat::Conflict as usize]
-                                && self.b_lvl.0 < 0.001
-                            {
-                                panic!("aeaeae {:?} lbd {}", *v, lbd);
+                            lbd = self.lbd_vec(&*v);
+                            if self.strategy == Some(SearchStrategy::ChanSeok) && lbd <= CO_LBD_BOUND {
+                                // TODO
+                                self.add_learnt(&mut *v, lbd);
+                            } else {
+                                self.add_learnt(&mut *v, lbd);
                             }
                         }
                     }
-                    self.block_restart(lbd, dl, bl, nas);
+                    if self.stats[Stat::Conflict as usize] == 100_000 {
+                        self.cancel_until(0);
+                        self.adapt_strategy();
+                    } else {
+                        self.block_restart(lbd, dl, bl, nas);
+                    }
                     // self.decay_var_activity();
                     self.decay_cla_activity();
                     // glucose reduction
@@ -696,11 +726,6 @@ impl CDCL for Solver {
         for l in &self.an_to_clear {
             self.an_seen[l.vi()] = 0;
         }
-        // println!(
-        //     "new learnt: {:?}",
-        //     vec2int(self.an_learnt_lits)
-        // );
-        // println!("  analyze terminated");
         if self.an_learnt_lits.len() < 30 {
             self.minimize_with_bi_clauses();
         }

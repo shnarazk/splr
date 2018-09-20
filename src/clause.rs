@@ -28,11 +28,12 @@ pub trait ClauseIdIndexEncoding {
     fn to_kind(&self) -> usize;
 }
 
+/// for Solver
 pub trait ClauseManagement {
     fn bump_cid(&mut self, ci: ClauseId) -> ();
     fn decay_cla_activity(&mut self) -> ();
     fn add_clause(&mut self, v: &mut Vec<Lit>) -> bool;
-    fn add_learnt(&mut self, v: &mut Vec<Lit>) -> usize;
+    fn add_learnt(&mut self, v: &mut Vec<Lit>, lbd: usize) -> ClauseId;
     fn reduce(&mut self) -> ();
     fn simplify(&mut self) -> bool;
     fn lbd_vec(&mut self, v: &[Lit]) -> usize;
@@ -41,6 +42,7 @@ pub trait ClauseManagement {
 
 // const DB_INIT_SIZE: usize = 1000;
 const DB_INC_SIZE: usize = 200;
+
 pub const KINDS: [ClauseKind; 3] = [
     ClauseKind::Binclause,
     ClauseKind::Permanent,
@@ -111,7 +113,6 @@ impl ClausePack {
             watcher.push(NULL_CLAUSE);
             touched.push(false);
         }
-
         ClausePack {
             kind,
             init_size: nc,
@@ -521,13 +522,12 @@ impl ClauseManagement for Solver {
         }
     }
     /// renamed from newLearntClause
-    fn add_learnt(&mut self, v: &mut Vec<Lit>) -> usize {
+    fn add_learnt(&mut self, v: &mut Vec<Lit>, lbd: usize) -> ClauseId {
         debug_assert_ne!(v.len(), 0);
         if v.len() == 1 {
             self.uncheck_enqueue(v[0], NULL_CLAUSE);
             return 0;
         }
-        let lbd = self.lbd_vec(&v);
         // let lbd = v.lbd(&self.vars, &mut self.lbd_seen);
         let mut i_max = 0;
         let mut lv_max = 0;
@@ -550,7 +550,7 @@ impl ClauseManagement for Solver {
         let cid = self.cp[kind as usize].new_clause(&v, lbd, true, true);
         self.bump_cid(cid);
         self.uncheck_enqueue(l0, cid);
-        lbd
+        cid
     }
 
     fn reduce(&mut self) -> () {
