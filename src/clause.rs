@@ -153,18 +153,12 @@ impl ClausePack {
         self.clauses.is_empty()
     }
     pub fn count(&self, target: Lit, limit: usize) -> usize {
-        let mut ci = self.watcher[target.negate() as usize];
         let mut cnt = 0;
-        while ci != NULL_CLAUSE {
+        for _ in self.iter_watcher(target) {
             cnt += 1;
-            let c = &self.clauses[ci];
-            if ci == c.next_watcher[(c.lit[0] != target) as usize] {
-                panic!("{} is looping!", target);
-            }
             if 0 < limit && limit <= cnt {
                 return limit;
             }
-            ci = c.next_watcher[(c.lit[0] != target) as usize];
         }
         cnt
     }
@@ -943,22 +937,30 @@ impl ClauseList for ClauseIndex {
 }
 
 pub struct ClauseListIter<'a> {
-    vec: &'a mut Vec<Clause>,
+    vec: &'a Vec<Clause>,
     target: Lit,
-    next: ClauseIndex,
+    next_index: ClauseIndex,
 }
 
-// impl<'a> Iterator for ClauseListIter<'a> {
-//     type Item = &'a mut Clause;
-//     fn next(&mut self) -> Option<&mut Clause> {
-//         if self.next == NULL_CLAUSE {
-//             None
-//         } else {
-//             {
-//                 let c = &mut self.vec[self.next as usize];
-//                 self.next = c.next_watcher[(c.lit[0] != self.target) as usize];
-//             }
-//             Some(&mut self.vec[self.next as usize])
-//         }
-//     }
-// }
+impl ClausePack {
+    pub fn iter_watcher(&self, p: Lit) -> ClauseListIter {
+        ClauseListIter {
+            vec: &self.clauses,
+            target: p,
+            next_index: self.watcher[p.negate() as usize]
+        }
+    }
+}
+
+impl<'a> Iterator for ClauseListIter<'a> {
+    type Item = &'a Clause;
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.next_index == NULL_CLAUSE {
+            None
+        } else {
+            let c = &self.vec[self.next_index as usize];
+            self.next_index = c.next_watcher[(c.lit[0] != self.target) as usize];
+            Some(&self.vec[self.next_index as usize])
+        }
+    }
+}
