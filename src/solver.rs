@@ -24,7 +24,7 @@ pub trait CDCL {
     fn analyze_final(&mut self, ci: ClauseId, skip_first: bool) -> ();
 }
 
-const CO_LBD_BOUND: usize = 4;
+pub const CO_LBD_BOUND: usize = 4;
 
 /// normal results returned by Solver
 #[derive(Debug)]
@@ -523,12 +523,7 @@ impl CDCL for Solver {
                         unsafe {
                             let v = &mut self.an_learnt_lits as *mut Vec<Lit>;
                             lbd = self.lbd_vec(&*v);
-                            if self.strategy == Some(SearchStrategy::ChanSeok) && lbd <= CO_LBD_BOUND {
-                                // TODO
-                                self.add_learnt(&mut *v, lbd);
-                            } else {
-                                self.add_learnt(&mut *v, lbd);
-                            }
+                            self.add_learnt(&mut *v, lbd);
                         }
                     }
                     if self.stats[Stat::Conflict as usize] == 100_000 {

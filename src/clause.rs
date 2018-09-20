@@ -1,5 +1,5 @@
 use solver::CDCL;
-use solver::{Solver, Stat};
+use solver::{CO_LBD_BOUND, SearchStrategy, Solver, Stat};
 use std::cmp::Ordering;
 use std::f64;
 use std::fmt;
@@ -538,6 +538,8 @@ impl ClauseManagement for Solver {
         let l0 = v[0];
         let kind = if v.len() == 2 {
             ClauseKind::Binclause
+        } else if false && self.strategy == Some(SearchStrategy::ChanSeok) && lbd <= CO_LBD_BOUND {
+            ClauseKind::Permanent
         } else {
             ClauseKind::Removable
         };
