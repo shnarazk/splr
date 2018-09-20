@@ -17,7 +17,7 @@ pub trait ClauseList {
 /// for ClausePack
 trait GC {
     fn garbage_collect(&mut self) -> ();
-    fn new_clause(&mut self, v: &Vec<Lit>, rank: usize, learnt: bool, locked: bool) -> ClauseId;
+    fn new_clause(&mut self, v: &[Lit], rank: usize, learnt: bool, locked: bool) -> ClauseId;
     fn reset_lbd(&mut self, vars: &[Var]) -> ();
 }
 
@@ -842,7 +842,7 @@ impl GC for ClausePack {
         //     }
         // }
     }
-    fn new_clause(&mut self, v: &Vec<Lit>, rank: usize, learnt: bool, locked: bool) -> ClauseId {
+    fn new_clause(&mut self, v: &[Lit], rank: usize, learnt: bool, locked: bool) -> ClauseId {
         let cix;
         let w0;
         let w1;

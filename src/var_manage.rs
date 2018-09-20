@@ -73,7 +73,7 @@ impl VarSelect for Solver {
 impl Solver {
     /// 3. addClause
     /// - calls `enqueue_clause`
-    pub fn add_cross(&mut self, vec: Vec<Lit>) -> bool {
+    pub fn add_cross(&mut self, vec: &[Lit]) -> bool {
         if vec.len() == 1 {
             self.enqueue(vec[0], NULL_CLAUSE);
             return true;
@@ -485,7 +485,7 @@ impl Solver {
                 for p in &pos {
                     for n in &neg {
                         if let Some(vec) = self.merge(*p, *n, v) {
-                            if !self.add_cross(vec) {
+                            if !self.add_cross(&vec) {
                                 return false;
                             }
                         }
