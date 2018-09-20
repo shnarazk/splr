@@ -752,17 +752,9 @@ impl CDCL for Solver {
     fn analyze_final(&mut self, ci: ClauseId, skip_first: bool) -> () {
         self.conflicts.clear();
         if self.root_level != 0 {
-            //for i in &self.clauses.iref(ci).lits[(if skip_first { 1 } else { 0 })..] {
-            for i in (if skip_first { 1 } else { 0 })
-                ..(self.cp[ci.to_kind()].clauses[ci.to_index()].len())
-            {
-                let l;
-                match i {
-                    0 => l = &self.cp[ci.to_kind()].clauses[ci.to_index()].lit[0],
-                    1 => l = &self.cp[ci.to_kind()].clauses[ci.to_index()].lit[1],
-                    _ => l = &self.cp[ci.to_kind()].clauses[ci.to_index()].lits[i - 2],
-                }
-                let vi = l.vi();
+            let c = iref!(self.cp, ci);
+            for i in (if skip_first { 1 } else { 0 })..(c.len()) {
+                let vi = lindex!(c, i).vi();
                 if 0 < self.vars[vi].level {
                     self.an_seen[vi] = 1;
                 }
@@ -780,14 +772,8 @@ impl CDCL for Solver {
                     if self.vars[vi].reason == NULL_CLAUSE {
                         self.conflicts.push(l.negate());
                     } else {
-                        for i in 1..(self.cp[ci.to_kind()].clauses[ci.to_index()].lits.len()) {
-                            let l;
-                            match i {
-                                0 => l = &self.cp[ci.to_kind()].clauses[ci.to_index()].lit[1],
-                                _ => l = &self.cp[ci.to_kind()].clauses[ci.to_index()].lits[i - 2],
-                            }
-                            // for l in &self.clauses.iref(ci).lits[1..]
-                            let vi = l.vi();
+                        for i in 1..(c.lits.len()) {
+                            let vi = lindex!(c, i).vi();
                             if 0 < self.vars[vi].level {
                                 self.an_seen[vi] = 1;
                             }
@@ -808,26 +794,13 @@ impl Solver {
         let top = self.an_to_clear.len();
         let key = self.an_level_map_key;
         while let Some(sl) = self.an_stack.pop() {
-            // println!("analyze_removable.loop {:?}", self.an_stack);
             let cid = self.vars[sl.vi()].reason;
-            let c0;
-            let len;
-            {
-                let c = &self.cp[cid.to_kind()].clauses[cid.to_index()];
-                c0 = c.lit[0];
-                len = c.lits.len();
+            let c = &mut self.cp[cid.to_kind()].clauses[cid.to_index()];
+            if c.lits.len() == 0 && self.vars.assigned(c.lit[0]) == LFALSE {
+                c.lit.swap(0, 1);
             }
-            if len == 0 && self.vars.assigned(c0) == LFALSE {
-                self.cp[cid.to_kind()].clauses[cid.to_index()]
-                    .lit
-                    .swap(0, 1);
-            }
-            for i in 0..self.cp[cid.to_kind()].clauses[cid.to_index()].lits.len() + 1 {
-                let q;
-                match i {
-                    0 => q = self.cp[cid.to_kind()].clauses[cid.to_index()].lit[1],
-                    n => q = self.cp[cid.to_kind()].clauses[cid.to_index()].lits[n - 1],
-                }
+            for i in 1..c.len() {
+                let q = lindex!(c, i);
                 let vi = q.vi();
                 let lv = self.vars[vi].level;
                 if self.an_seen[vi] != 1 && lv != 0 {
