@@ -15,7 +15,7 @@ pub trait ClauseList {
 }
 
 /// for ClausePack
-trait GC {
+pub trait GC {
     fn garbage_collect(&mut self) -> ();
     fn new_clause(&mut self, v: &[Lit], rank: usize, learnt: bool, locked: bool) -> ClauseId;
     fn reset_lbd(&mut self, vars: &[Var]) -> ();
@@ -538,7 +538,7 @@ impl ClauseManagement for Solver {
         let l0 = v[0];
         let kind = if v.len() == 2 {
             ClauseKind::Binclause
-        } else if false && self.strategy == Some(SearchStrategy::ChanSeok) && lbd <= CO_LBD_BOUND {
+        } else if self.strategy == Some(SearchStrategy::ChanSeok) && lbd <= CO_LBD_BOUND {
             ClauseKind::Permanent
         } else {
             ClauseKind::Removable

@@ -1,5 +1,6 @@
 use clause::ClauseManagement;
 use clause::*;
+use clause::GC;
 use restart::Restart;
 use std::cmp::max;
 use std::fs;
@@ -272,11 +273,23 @@ impl Solver {
                 // move some clauses with good lbd (col_lbd_bound) to Permanent
                 // 1. cp[ClausePack::Permanent]attach(clause);
                 // 2. clause.set_flag(ClauseFlag::Dead);
-                for c in &mut self.cp[ClauseKind::Removable as usize].clauses {
-                    if c.rank < CO_LBD_BOUND {
-                        // 1. cp[ClausePack::Permanent]attach(clause);
-                        // 2. clause.set_flag(ClauseFlag::Dead);
+                unsafe {
+                    let learnts = &mut self.cp[ClauseKind::Removable as usize] as *mut ClausePack;
+                    let permanents = &mut self.cp[ClauseKind::Permanent as usize] as *mut ClausePack;
+                    for c in &mut (*learnts).clauses[1..] {
+                        if c.get_flag(ClauseFlag::Dead) {
+                            continue;
+                        }
+                        if c.rank < CO_LBD_BOUND {
+                            c.lits.insert(0, c.lit[0]);
+                            (*learnts).touched[c.lit[0].negate() as usize] = true;
+                            c.lits.insert(1, c.lit[1]);
+                            (*learnts).touched[c.lit[1].negate() as usize] = true;
+                            (*permanents).new_clause(&c.lits, c.rank, c.get_flag(ClauseFlag::Learnt), c.get_flag(ClauseFlag::Locked));
+                            c.set_flag(ClauseFlag::Dead, true);
+                        }
                     }
+                    (*learnts).garbage_collect();
                 }
             }
         }
@@ -528,7 +541,8 @@ impl CDCL for Solver {
                     }
                     if self.stats[Stat::Conflict as usize] == 100_000 {
                         self.cancel_until(0);
-                        self.adapt_strategy();
+                        self.simplify();
+                        // self.adapt_strategy();
                     } else {
                         self.block_restart(lbd, dl, bl, nas);
                     }
