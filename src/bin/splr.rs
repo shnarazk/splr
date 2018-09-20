@@ -64,10 +64,10 @@ fn main() {
 fn report_stat(s: &Solver) -> () {
     println!(
         "backjump:{}, block:{}, restart:{}, reduction:{}, clauses:{}, learnts:{}",
-        s.stats[Stat::NumOfBackjump as usize],
-        s.stats[Stat::NumOfBlockRestart as usize],
-        s.stats[Stat::NumOfRestart as usize],
-        s.stats[Stat::NumOfReduction as usize],
+        s.stats[Stat::Conflict as usize],
+        s.stats[Stat::BlockRestart as usize],
+        s.stats[Stat::Restart as usize],
+        s.stats[Stat::Reduction as usize],
         s.cp[ClauseKind::Permanent as usize].clauses.len(),
         s.cp[ClauseKind::Removable as usize].clauses.len(),
     );

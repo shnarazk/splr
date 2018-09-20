@@ -584,18 +584,18 @@ impl ClauseManagement for Solver {
         self.cp[ClauseKind::Removable as usize].garbage_collect();
         self.cp[ClauseKind::Removable as usize].reset_lbd(&self.vars);
         self.next_reduction += DB_INC_SIZE;
-        self.stats[Stat::NumOfReduction as usize] += 1;
+        self.stats[Stat::Reduction as usize] += 1;
         self.progress("drop");
     }
 
     fn simplify(&mut self) -> bool {
         debug_assert_eq!(self.decision_level(), 0);
         if self.eliminator.use_elim
-            && self.stats[Stat::NumOfSimplification as usize] % 8 == 0
-            && self.eliminator.last_invocatiton < self.stats[Stat::NumOfReduction as usize] as usize
+            && self.stats[Stat::Simplification as usize] % 8 == 0
+            && self.eliminator.last_invocatiton < self.stats[Stat::Reduction as usize] as usize
         {
             // self.eliminate();
-            self.eliminator.last_invocatiton = self.stats[Stat::NumOfReduction as usize] as usize;
+            self.eliminator.last_invocatiton = self.stats[Stat::Reduction as usize] as usize;
         }
         // reset reason since decision level is zero.
         for v in &mut self.vars {
@@ -631,13 +631,13 @@ impl ClauseManagement for Solver {
             self.cp[*ck as usize].garbage_collect();
             // self.garbage_collect(*ck);
         }
-        self.stats[Stat::NumOfSimplification as usize] += 1;
+        self.stats[Stat::Simplification as usize] += 1;
         //        if self.eliminator.use_elim
-        //            && self.stats[Stat::NumOfSimplification as usize] % 8 == 0
-        //            && self.eliminator.last_invocatiton < self.stats[Stat::NumOfReduction as usize] as usize
+        //            && self.stats[Stat::Simplification as usize] % 8 == 0
+        //            && self.eliminator.last_invocatiton < self.stats[Stat::Reduction as usize] as usize
         //        {
         //            self.eliminate();
-        //            self.eliminator.last_invocatiton = self.stats[Stat::NumOfReduction as usize] as usize;
+        //            self.eliminator.last_invocatiton = self.stats[Stat::Reduction as usize] as usize;
         //            for ck in &KINDS {
         //                // self.garbage_collect(*ck);
         //                self.cp[*ck as usize].garbage_collect();

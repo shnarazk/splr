@@ -54,19 +54,20 @@ pub type SolverResult = Result<Certificate, SolverException>;
 /// stat index
 #[derive(Copy, Clone)]
 pub enum Stat {
-    NumOfBackjump = 0,   // the number of backjump
-    NumOfDecision,       // the number of decision
-    NumOfRestart,        // the number of restart
-    NumOfBlockRestart,   // the number of blacking start
-    NumOfPropagation,    // the number of propagation
-    NumOfReduction,      // the number of reduction
-    NumOfSimplification, // the number of simplification
-    NumOfClause,         // the number of 'alive' given clauses
-    NumOfLearnt,         // the number of 'alive' learnt clauses
-    NumOfVariable,       // the number of 'alive' variables
-    NumOfGroundVar,      // the number os assined variables at level 0
-    NumOfAssign,         // the number of assigned variables
-    EndOfStatIndex,      // Don't use this dummy.
+    Conflict = 0,       // the number of backjump
+    Decision,           // the number of decision
+    Restart,            // the number of restart
+    NoDecisionConflict, // the number of 'no decision conflict'
+    BlockRestart,       // the number of blacking start
+    Propagation,        // the number of propagation
+    Reduction,          // the number of reduction
+    Simplification,     // the number of simplification
+    Clause,             // the number of 'alive' given clauses
+    Learnt,             // the number of 'alive' learnt clauses
+    Variable,           // the number of 'alive' variables
+    GroundVar,          // the number os assined variables at level 0
+    Assign,             // the number of assigned variables
+    EndOfStatIndex,     // Don't use this dummy.
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
@@ -205,8 +206,8 @@ impl Solver {
                 k,
                 self.eliminator.eliminated_vars,
                 (sum as f32) / (nv as f32) * 100.0,
-                self.stats[Stat::NumOfBlockRestart as usize],
-                self.stats[Stat::NumOfRestart as usize],
+                self.stats[Stat::BlockRestart as usize],
+                self.stats[Stat::Restart as usize],
                 self.ema_asg.get(),
                 self.ema_lbd.get(),
                 self.ema_lbd.fast,
@@ -243,16 +244,32 @@ impl Solver {
         debug_assert_ne!(cid, 0);
         cid
     }
+
     pub fn adapt_strategy(&mut self) -> () {
+        let mut re_init = false;
         if self.strategy != None {
             return;
         }
-        let decpc = self.stats[Stat::NumOfDecision as usize] as f64
-            / self.stats[Stat::NumOfBackjump as usize] as f64;
+        let decpc = self.stats[Stat::Decision as usize] as f64
+            / self.stats[Stat::Conflict as usize] as f64;
         if decpc <= 1.2 {
             self.strategy = Some(SearchStrategy::ChanSeok);
-        } else {
+        } else if self.stats[Stat::NoDecisionConflict as usize] < 30_000 {
             self.strategy = Some(SearchStrategy::Generic);
+        } else {
+        }
+        if self.strategy != None {
+            self.ema_asg.reset();
+            self.ema_lbd.reset();
+            // conflictsRestarts = 0;
+            if self.strategy == Some(SearchStrategy::ChanSeok) {
+                // move some clauses with good lbd to Permanent
+                // 1. cp[ClausePack::Permanent]attach(clause);
+                // 2. clause.set_flag(ClauseFlag::Dead);
+            }
+        }
+        if re_init {
+            // make all claueses garbage
         }
     }
 }
@@ -271,7 +288,7 @@ impl SatSolver for Solver {
         // }
         self.progress("");
         self.simplify();
-        self.stats[Stat::NumOfSimplification as usize] += 1;
+        self.stats[Stat::Simplification as usize] += 1;
         match self.search() {
             _ if !self.ok => {
                 self.cancel_until(0);
@@ -380,7 +397,7 @@ impl CDCL for Solver {
             let p: usize = trail[*q_head] as usize;
             let false_lit = (p as Lit).negate();
             *q_head += 1;
-            stats[Stat::NumOfPropagation as usize] += 1;
+            stats[Stat::Propagation as usize] += 1;
             let kinds = [
                 ClauseKind::Binclause,
                 ClauseKind::Removable,
@@ -449,7 +466,7 @@ impl CDCL for Solver {
     fn search(&mut self) -> bool {
         let root_lv = self.root_level;
         loop {
-            self.stats[Stat::NumOfPropagation as usize] += 1;
+            self.stats[Stat::Propagation as usize] += 1;
             let ci = self.propagate();
             if ci == NULL_CLAUSE {
                 let na = self.num_assigns();
@@ -467,10 +484,10 @@ impl CDCL for Solver {
                     debug_assert_ne!(vi, 0);
                     let p = self.vars[vi].phase;
                     self.uncheck_assume(vi.lit(p));
-                    self.stats[Stat::NumOfDecision as usize] += 1;
+                    self.stats[Stat::Decision as usize] += 1;
                 }
             } else {
-                self.stats[Stat::NumOfBackjump as usize] += 1;
+                self.stats[Stat::Conflict as usize] += 1;
                 let dl = self.decision_level();
                 if dl == self.root_level {
                     self.analyze_final(ci, false);
@@ -489,7 +506,7 @@ impl CDCL for Solver {
                         unsafe {
                             let v = &mut self.an_learnt_lits as *mut Vec<Lit>;
                             lbd = self.add_learnt(&mut *v);
-                            if 1000 < self.stats[Stat::NumOfBackjump as usize]
+                            if 1000 < self.stats[Stat::Conflict as usize]
                                 && self.b_lvl.0 < 0.001
                             {
                                 panic!("aeaeae {:?} lbd {}", *v, lbd);
@@ -500,7 +517,7 @@ impl CDCL for Solver {
                     // self.decay_var_activity();
                     self.decay_cla_activity();
                     // glucose reduction
-                    let conflicts = self.stats[Stat::NumOfBackjump as usize] as usize;
+                    let conflicts = self.stats[Stat::Conflict as usize] as usize;
                     if self.cur_restart * self.next_reduction <= conflicts {
                         self.cur_restart =
                             ((conflicts as f64) / (self.next_reduction as f64)) as usize + 1;

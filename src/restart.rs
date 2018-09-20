@@ -17,7 +17,7 @@ const K: f64 = 1.6;
 impl Restart for Solver {
     /// called after conflict resolution
     fn block_restart(&mut self, lbd: usize, clv: usize, blv: usize, nas: usize) -> () {
-        let count = self.stats[Stat::NumOfBackjump as usize] as u64;
+        let count = self.stats[Stat::Conflict as usize] as u64;
         self.ema_asg.update(nas as f64);
         self.ema_lbd.update(lbd as f64);
         self.c_lvl.update(clv as f64);
@@ -30,7 +30,7 @@ impl Restart for Solver {
         // }
         if self.next_restart <= count && 0 < lbd && R < self.ema_asg.get() {
             self.next_restart = count + RESTART_PERIOD;
-            self.stats[Stat::NumOfBlockRestart as usize] += 1;
+            self.stats[Stat::BlockRestart as usize] += 1;
             // self.ema_lbd.reset();
         }
         // println!("block_restart count {}, next {} {}", count, self.next_restart, R < self.ema_asg.get());
@@ -38,10 +38,10 @@ impl Restart for Solver {
 
     /// called after no conflict propagation
     fn force_restart(&mut self) -> () {
-        let count = self.stats[Stat::NumOfBackjump as usize] as u64;
+        let count = self.stats[Stat::Conflict as usize] as u64;
         if self.next_restart < count && K < self.ema_lbd.get() {
             self.next_restart = count + RESTART_PERIOD;
-            self.stats[Stat::NumOfRestart as usize] += 1;
+            self.stats[Stat::Restart as usize] += 1;
             let rl = self.root_level;
             self.cancel_until(rl);
         }

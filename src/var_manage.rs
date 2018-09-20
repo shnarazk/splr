@@ -40,7 +40,7 @@ impl VarSelect for Solver {
         }
     }
     fn bump_vi(&mut self, vi: VarId) -> () {
-        let d = self.stats[Stat::NumOfBackjump as usize] as f64;
+        let d = self.stats[Stat::Conflict as usize] as f64;
         let a = (self.vars[vi].activity + d) / 2.0;
         self.vars[vi].activity = a;
         if VAR_ACTIVITY_THRESHOLD < a {
