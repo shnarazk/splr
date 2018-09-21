@@ -14,18 +14,20 @@ use var::Eliminator;
 use var::Satisfiability;
 use var::VarOrdering;
 
-const VAR_ACTIVITY_THRESHOLD: f64 = 1e100;
-const SUBSUMPITON_GROW_LIMIT: usize = 0;
-const SUBSUMPTION_VAR_QUEUE_MAX: usize = 10_000;
-const SUBSUMPTION_CLAUSE_QUEUE_MAX: usize = 10_000;
-const SUBSUMPTION_COMBINATION_MAX: usize = 10_000_000;
-
 pub trait VarSelect {
     fn select_var(&mut self) -> VarId;
     fn bump_vi(&mut self, vi: VarId) -> ();
     fn decay_var_activity(&mut self) -> ();
     fn rebuild_vh(&mut self) -> ();
 }
+
+pub const VAR_DECAY: f64 = 0.8;
+pub const MAX_VAR_DECAY: f64 = 0.95;
+const VAR_ACTIVITY_THRESHOLD: f64 = 1e100;
+const SUBSUMPITON_GROW_LIMIT: usize = 0;
+const SUBSUMPTION_VAR_QUEUE_MAX: usize = 10_000;
+const SUBSUMPTION_CLAUSE_QUEUE_MAX: usize = 10_000;
+const SUBSUMPTION_COMBINATION_MAX: usize = 10_000_000;
 
 impl VarSelect for Solver {
     fn rebuild_vh(&mut self) -> () {
@@ -53,7 +55,7 @@ impl VarSelect for Solver {
         self.var_order.update(&self.vars, vi);
     }
     fn decay_var_activity(&mut self) -> () {
-        self.var_inc /= VAR_ACTIVITY_THRESHOLD;
+        self.var_inc /= self.var_decay;
     }
     /// Heap operations; renamed from selectVO
     fn select_var(&mut self) -> VarId {

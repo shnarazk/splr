@@ -8,7 +8,7 @@ use std::io::{BufRead, BufReader};
 use types::Dump;
 use types::*;
 use var::*;
-use var_manage::VarSelect;
+use var_manage::{VarSelect, VAR_DECAY, MAX_VAR_DECAY};
 
 pub trait SatSolver {
     fn solve(&mut self) -> SolverResult;
@@ -88,6 +88,7 @@ pub struct Solver {
     pub num_vars: usize,
     pub cla_inc: f64,
     pub var_inc: f64,
+    pub var_decay: f64,
     pub root_level: usize,
     pub strategy: Option<SearchStrategy>,
     /// Variable Assignment Management
@@ -141,8 +142,9 @@ impl Solver {
         Solver {
             config: cfg,
             num_vars: nv,
-            cla_inc: cdr,
+            cla_inc: 1.0,
             var_inc: vdr,
+            var_decay: VAR_DECAY,
             root_level: 0,
             strategy: None,
             vars: Var::new_vars(nv),
@@ -246,7 +248,7 @@ impl Solver {
 
     pub fn adapt_strategy(&mut self) -> () {
         let mut re_init = false;
-        if self.strategy != None {
+        if self.strategy == None {
             return;
         }
         let decpc = self.stats[Stat::Decision as usize] as f64
@@ -497,7 +499,15 @@ impl CDCL for Solver {
             self.stats[Stat::Propagation as usize] += 1;
             let ci = self.propagate();
             if self.stats[Stat::Propagation as usize] % 100_000 == 0 {
-                self.progress("splr");
+                self.progress(
+                    match self.strategy {
+                        None => "none",
+                        Some(SearchStrategy::Generic) => "gene",
+                        Some(SearchStrategy::ChanSeok) => "Chan",
+                        Some(SearchStrategy::HighSuccesive) => "High",
+                        Some(SearchStrategy::LowSuccesive) => "LowS",
+                        Some(SearchStrategy::ManyGlues) => "Many",
+                    });
             }
             if ci == NULL_CLAUSE {
                 let na = self.num_assigns();
@@ -523,38 +533,40 @@ impl CDCL for Solver {
                 if dl == self.root_level {
                     self.analyze_final(ci, false);
                     return false;
+                }
+                if self.stats[Stat::Conflict as usize] % 5000 == 0 && self.var_decay < MAX_VAR_DECAY {
+                    self.var_decay += 0.01;
+                }
+                let bl = self.analyze(ci);
+                let nas = self.num_assigns();
+                self.cancel_until(max(bl as usize, root_lv));
+                let lbd;
+                if self.an_learnt_lits.len() == 1 {
+                    let l = self.an_learnt_lits[0];
+                    self.uncheck_enqueue(l, NULL_CLAUSE);
+                    lbd = 0;
                 } else {
-                    let bl = self.analyze(ci);
-                    let nas = self.num_assigns();
-                    self.cancel_until(max(bl as usize, root_lv));
-                    let lbd;
-                    if self.an_learnt_lits.len() == 1 {
-                        let l = self.an_learnt_lits[0];
-                        self.uncheck_enqueue(l, NULL_CLAUSE);
-                        lbd = 0;
-                    } else {
-                        unsafe {
-                            let v = &mut self.an_learnt_lits as *mut Vec<Lit>;
-                            lbd = self.lbd_vec(&*v);
-                            self.add_learnt(&mut *v, lbd);
-                        }
+                    unsafe {
+                        let v = &mut self.an_learnt_lits as *mut Vec<Lit>;
+                        lbd = self.lbd_vec(&*v);
+                        self.add_learnt(&mut *v, lbd);
                     }
-                    if self.stats[Stat::Conflict as usize] == 100_000 {
-                        self.cancel_until(0);
-                        self.simplify();
-                        // self.adapt_strategy();
-                    } else {
-                        self.block_restart(lbd, dl, bl, nas);
-                    }
-                    // self.decay_var_activity();
-                    self.decay_cla_activity();
-                    // glucose reduction
-                    let conflicts = self.stats[Stat::Conflict as usize] as usize;
-                    if self.cur_restart * self.next_reduction <= conflicts {
-                        self.cur_restart =
-                            ((conflicts as f64) / (self.next_reduction as f64)) as usize + 1;
-                        self.reduce();
-                    }
+                }
+                if self.stats[Stat::Conflict as usize] == 100_000 {
+                    self.cancel_until(0);
+                    self.simplify();
+                    self.adapt_strategy();
+                } else {
+                    self.block_restart(lbd, dl, bl, nas);
+                }
+                // self.decay_var_activity();
+                self.decay_cla_activity();
+                // glucose reduction
+                let conflicts = self.stats[Stat::Conflict as usize] as usize;
+                if self.cur_restart * self.next_reduction <= conflicts {
+                    self.cur_restart =
+                        ((conflicts as f64) / (self.next_reduction as f64)) as usize + 1;
+                    self.reduce();
                 }
                 // Since the conflict path pushes a new literal to trail, we don't need to pick up a literal here.
             }
@@ -618,6 +630,24 @@ impl CDCL for Solver {
                 debug_assert_ne!(cid, NULL_CLAUSE);
                 if cid.to_kind() == (ClauseKind::Removable as usize) {
                     self.bump_cid(cid);
+                    if 2 < (*c).rank {
+                        let nblevels = self.lbd_of(&(*c));
+                        if nblevels + 1 < (*c).rank {
+                            if nblevels <= 30 {
+                                (*c).set_flag(ClauseFlag::JustUsed, true);
+                            }
+                            if self.strategy == Some(SearchStrategy::ChanSeok) && nblevels < CO_LBD_BOUND {
+                                // c.nolearnt()
+                                // learnts.remove(confl);
+                                // permanentLearnts(confl);
+                                (*c).rank = 0;
+                                let cnf = mref!(self.cp, confl);
+                                cnf.rank = 0;
+                            } else {
+                                (*c).rank = nblevels;
+                            }
+                        }
+                    }
                     // let nblevels = self.lbd_of(&(*c));
                     // if nblevels + 1 < (*c).rank {
                     //     // (*c).rank = nblevels;
@@ -827,8 +857,8 @@ impl Solver {
         unsafe {
             let key = self.an_level_map_key;
             let vec = &mut self.an_learnt_lits as *mut Vec<Lit>;
-            let nblevel = self.lbd_vec(&*vec);
-            if 6 < nblevel {
+            let nblevels = self.lbd_vec(&*vec);
+            if 6 < nblevels {
                 return;
             }
             let l0 = self.an_learnt_lits[0];

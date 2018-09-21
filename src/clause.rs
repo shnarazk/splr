@@ -1,5 +1,5 @@
 use solver::CDCL;
-use solver::{CO_LBD_BOUND, SearchStrategy, Solver, Stat};
+use solver::{SearchStrategy, Solver, Stat, CO_LBD_BOUND};
 use std::cmp::Ordering;
 use std::f64;
 use std::fmt;
@@ -949,7 +949,7 @@ impl ClausePack {
         ClauseListIter {
             vec: &self.clauses,
             target: p,
-            next_index: self.watcher[p.negate() as usize]
+            next_index: self.watcher[p.negate() as usize],
         }
     }
 }
