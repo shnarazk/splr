@@ -1,6 +1,5 @@
 #![allow(dead_code)]
 extern crate splr;
-use splr::clause::ClauseManagement;
 use splr::clause::*;
 use splr::solver::*;
 use splr::types::*;
@@ -103,7 +102,7 @@ fn clause_sort() -> () {
             permutation[i] = i;
         }
     }
-    s.reduce_watchers();
+    s.reduce();
     println!(
         "# reduce_watchers: {:?}",
         &s.cp[ClauseKind::Removable as usize].permutation[1..]
@@ -123,7 +122,7 @@ fn clause_sort() -> () {
                 [s.cp[ClauseKind::Removable as usize].permutation[*i]]
         );
     }
-    s.simplify_database();
+    s.simplify();
     println!(
         "# simplify_database: {:?}",
         &s.cp[ClauseKind::Removable as usize].permutation[1..]
