@@ -8,7 +8,7 @@ use std::io::{BufRead, BufReader};
 use types::Dump;
 use types::*;
 use var::*;
-use var_manage::{VarSelect, VAR_DECAY, MAX_VAR_DECAY};
+use var_manage::{VarSelect, MAX_VAR_DECAY};
 
 pub trait SatSolver {
     fn solve(&mut self) -> SolverResult;
@@ -38,11 +38,11 @@ pub enum Certificate {
 #[derive(Debug, Eq, PartialEq)]
 pub enum SolverException {
     StateUNSAT = 0,
-    StateSAT,             // 1
-    OutOfMemory,          // 2
-    TimeOut,              // 3
-    InternalInconsistent, // 4
-    UndescribedError,     // 5
+    StateSAT,
+    OutOfMemory,
+    TimeOut,
+    InternalInconsistent,
+    UndescribedError,
 }
 
 /// The type that `Solver` returns
@@ -127,7 +127,6 @@ pub struct Solver {
     pub c_lvl: Ema,
     pub next_restart: u64,
     pub restart_exp: f64,
-    pub rbias: Ema,
 }
 
 impl Solver {
@@ -144,7 +143,7 @@ impl Solver {
             num_vars: nv,
             cla_inc: 1.0,
             var_inc: vdr,
-            var_decay: VAR_DECAY,
+            var_decay: cdr,
             root_level: 0,
             strategy: None,
             vars: Var::new_vars(nv),
@@ -181,7 +180,6 @@ impl Solver {
             c_lvl: Ema::new(se),
             next_restart: 100,
             restart_exp: re,
-            rbias: Ema::new(se),
         }
     }
     // print a progress report
@@ -201,11 +199,12 @@ impl Solver {
             .filter(|c| c.index != 0 && !c.get_flag(ClauseFlag::Dead) && c.rank <= 3)
             .count();
         if mes == "" {
-            println!("#init, DB, #Remov, #good,#junk,  #Perm,#Binary, PROG,#solv, rate%, RES,block,force, asgn/,  lbd/, STAT,   lbd,  b lvl,  c lvl");
+            println!("#init, remain, DB, #Remov, #good,#junk,  #Perm,#Binary, PROG,#solv, rate%, RES,block,force, asgn/,  lbd/, STAT,   lbd,  b lvl,  c lvl");
         } else {
             println!(
-                "#{}, DB,{:>7},{:>6},{:>5},{:>7},{:>7}, PROG,{:>5},{:>6.3}, RES,{:>5},{:>5}, {:>5.2},{:>6.2}, STAT,{:>6.2},{:>7.2},{:>7.2}",
+                "#{},{:>7}, DB,{:>7},{:>6},{:>5},{:>7},{:>7}, PROG,{:>5},{:>6.3}, RES,{:>5},{:>5}, {:>5.2},{:>6.2}, STAT,{:>6.2},{:>7.2},{:>7.2}",
                 mes,
+                nv - self.trail.len(),
                 learnts.clauses.len() - 1 -deads,
                 cnt,
                 deads,
@@ -248,12 +247,9 @@ impl Solver {
 
     pub fn adapt_strategy(&mut self) -> () {
         let mut re_init = false;
-        if self.strategy == None {
-            return;
-        }
         let decpc = self.stats[Stat::Decision as usize] as f64
             / self.stats[Stat::Conflict as usize] as f64;
-        if decpc <= 1.2 {
+        if decpc <= 1.2 && false {
             self.strategy = Some(SearchStrategy::ChanSeok);
             let _glureduce = true;
             self.first_reduction = 2000;
@@ -263,8 +259,10 @@ impl Solver {
             println!("# Adjusting for low decision levels.");
             re_init = true;
         } else if self.stats[Stat::NoDecisionConflict as usize] < 30_000 {
-            self.strategy = Some(SearchStrategy::Generic);
+            self.strategy = Some(SearchStrategy::LowSuccesive);
         } else {
+            self.strategy = Some(SearchStrategy::Generic);
+            return;
         }
         if self.strategy != None {
             self.ema_asg.reset();
@@ -391,12 +389,10 @@ impl SatSolver for Solver {
                     let mut iter = buf.split_whitespace();
                     let mut v: Vec<Lit> = Vec::new();
                     for s in iter {
-                        if let Ok(val) = s.parse::<i32>() {
-                            if val == 0 {
-                                break;
-                            } else {
-                                v.push(int2lit(val));
-                            }
+                        match s.parse::<i32>() {
+                            Ok(0) => break,
+                            Ok(val) => v.push(int2lit(val)),
+                            Err(_) => (),
                         }
                     }
                     if !v.is_empty() && !s.add_clause(&mut v) {
@@ -587,8 +583,8 @@ impl CDCL for Solver {
                 if v.reason != NULL_CLAUSE {
                     self.cp[v.reason.to_kind()].clauses[v.reason.to_index()]
                         .set_flag(ClauseFlag::Locked, false);
+                    v.reason = NULL_CLAUSE;
                 }
-                v.reason = NULL_CLAUSE;
             }
             self.var_order.insert(&self.vars, vi);
         }

@@ -97,7 +97,7 @@ pub trait VarIdEncoding {
 impl VarIdEncoding for VarId {
     #[inline]
     fn lit(&self, p: Lbool) -> Lit {
-        (if p == LFALSE { 2 * self + 1 } else { 2 * self }) as Lit
+        (*self as Lit) << 1 | ((p == LFALSE) as Lit)
     }
 }
 

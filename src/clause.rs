@@ -557,7 +557,9 @@ impl ClauseManagement for Solver {
                 ..
             } = &mut self.cp[ClauseKind::Removable as usize];
             let permutation = &mut (1..clauses.len())
-                .filter(|i| !clauses[*i].get_flag(ClauseFlag::Dead) && !clauses[*i].get_flag(ClauseFlag::Locked)) // garbage and recycled
+                .filter(|i| !clauses[*i].get_flag(ClauseFlag::Dead)
+                        && !clauses[*i].get_flag(ClauseFlag::Locked)
+                ) // garbage and recycled
                 .collect::<Vec<ClauseIndex>>();
             debug_assert!(!permutation.is_empty());
             permutation[1..].sort_by(|&a, &b| clauses[a].cmp(&clauses[b]));
@@ -568,10 +570,13 @@ impl ClauseManagement for Solver {
             };
             for i in keep..nc {
                 let mut c = &mut clauses[permutation[i]];
-                c.set_flag(ClauseFlag::Dead, true);
-                touched[c.lit[0].negate() as usize] = true;
-                touched[c.lit[1].negate() as usize] = true;
-                c.set_flag(ClauseFlag::JustUsed, false)
+                if c.get_flag(ClauseFlag::JustUsed) {
+                    c.set_flag(ClauseFlag::JustUsed, false)
+                } else {
+                    c.set_flag(ClauseFlag::Dead, true);
+                    touched[c.lit[0].negate() as usize] = true;
+                    touched[c.lit[1].negate() as usize] = true;
+                }
             }
         }
         // self.garbage_collect(ClauseKind::Removable);
@@ -783,25 +788,13 @@ impl GC for ClausePack {
                 while ci != NULL_CLAUSE {
                     let c = &mut self.clauses[ci] as *mut Clause;
                     if !(*c).get_flag(ClauseFlag::Dead) {
-                        if (*c).lit[0].vi() == vi {
-                            pri = &mut (*c).next_watcher[0];
-                            ci = *pri;
-                        } else {
-                            pri = &mut (*c).next_watcher[1];
-                            ci = *pri;
-                        }
-                        continue;
-                    }
-                    // debug_assert!((*c).lit[0] == GARBAGE_LIT || (*c).lit[1] == GARBAGE_LIT);
-                    if (*c).lit[0].negate() == l as Lit {
-                        *pri = (*garbages).push_garbage(&mut *c, 0);
-                        ci = *pri;
-                    } else if (*c).lit[1].negate() == l as Lit {
-                        *pri = (*garbages).push_garbage(&mut *c, 1);
-                        ci = *pri;
+                        pri = &mut (*c).next_watcher[((*c).lit[0].vi() != vi) as usize];
                     } else {
-                        panic!("xxxxx {:?}", (*c).lit);
+                        // debug_assert!((*c).lit[0] == GARBAGE_LIT || (*c).lit[1] == GARBAGE_LIT);
+                        debug_assert!((*c).lit[0].negate() == l as Lit || (*c).lit[1].negate() == l as Lit);
+                        *pri = (*garbages).push_garbage(&mut *c, ((*c).lit[0].negate() != l as Lit) as usize);
                     }
+                    ci = *pri;
                 }
             }
             // recycle garbages
