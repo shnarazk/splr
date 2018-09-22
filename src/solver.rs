@@ -928,6 +928,5 @@ impl Solver {
         println!("- trail_lim  {:?}", self.trail_lim);
         // println!("{}", self.var_order);
         // self.var_order.check("");
-        }
     }
 }
