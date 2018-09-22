@@ -3,6 +3,7 @@
 use clause::{Clause, ClauseFlag, ClauseIdIndexEncoding, ClauseKind, CLAUSE_KINDS};
 use clause::DEAD_CLAUSE;
 use solver::{CDCL, Solver};
+use std::fmt;
 use types::*;
 use var::Satisfiability;
 
@@ -74,12 +75,15 @@ impl Eliminator {
     }
 }
 
-impl Dump for Eliminator {
-    fn dump(&self, str: &str) -> () {
-        println!("{}", str);
-        println!(" - n_touched {}", self.n_touched);
-        println!(" - clause_queue {:?}", self.clause_queue);
-        println!(" - heap {:?}", self.var_queue);
+impl fmt::Display for Eliminator {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            " - n_touched {}\n - clause_queue {:?}\n - heap {:?}",
+            self.n_touched,
+            self.clause_queue,
+            self.var_queue,
+        )
     }
 }
 

@@ -4,7 +4,7 @@ use restart::Restart;
 use std::cmp::max;
 use std::fs;
 use std::io::{BufRead, BufReader};
-use types::{*, Dump};
+use types::*;
 use var::{*, VarOrdering, MAX_VAR_DECAY};
 
 pub trait SatSolver {
@@ -899,8 +899,8 @@ impl Solver {
     }
 }
 
-impl Dump for Solver {
-    fn dump(&self, str: &str) -> () {
+impl Solver {
+    pub fn dump(&self, str: &str) -> () {
         println!("# {} at {}", str, self.decision_level());
         println!(
             "# nassigns {}, decision cands {}",
@@ -926,12 +926,8 @@ impl Dump for Solver {
             println!("# - trail[  0]  [0{:?}]", &v);
         }
         println!("- trail_lim  {:?}", self.trail_lim);
-        if false {
-            // TODO: dump watches links
-        }
-        if false {
-            self.var_order.dump();
-            // self.var_order.check("");
+        // println!("{}", self.var_order);
+        // self.var_order.check("");
         }
     }
 }

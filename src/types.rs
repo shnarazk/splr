@@ -273,10 +273,6 @@ pub enum DumpMode {
     DumpJSON,
 }
 
-pub trait Dump {
-    fn dump(&self, mes: &str) -> ();
-}
-
 pub fn vec2int(v: &[Lit]) -> Vec<i32> {
     v.iter()
         .map(|l| match l {

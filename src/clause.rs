@@ -1,12 +1,10 @@
-use solver::CDCL;
-use solver::{SearchStrategy, Solver, Stat, CO_LBD_BOUND};
+use solver::{CDCL, CO_LBD_BOUND, SearchStrategy, Solver, Stat};
 use std::cmp::Ordering;
 use std::f64;
 use std::fmt;
 use std::usize::MAX;
 use types::*;
-use var::Satisfiability;
-use var::Var;
+use var::{Satisfiability, Var};
 
 /// for ClauseIndex
 pub trait ClauseList {
@@ -43,10 +41,10 @@ pub trait ClauseManagement {
 // const DB_INIT_SIZE: usize = 1000;
 const DB_INC_SIZE: usize = 200;
 
-pub const KINDS: [ClauseKind; 3] = [
-    ClauseKind::Binclause,
-    ClauseKind::Permanent,
+pub const CLAUSE_KINDS: [ClauseKind; 3] = [
     ClauseKind::Removable,
+    ClauseKind::Permanent,
+    ClauseKind::Binclause,
 ];
 
 /// partition of clauses
@@ -69,12 +67,6 @@ pub enum ClauseKind {
     Permanent,
     Binclause,
 }
-
-pub const CLAUSE_KINDS: [ClauseKind; 3] = [
-    ClauseKind::Removable,
-    ClauseKind::Permanent,
-    ClauseKind::Binclause,
-];
 
 const CLAUSE_INDEX_BITS: usize = 60;
 const CLAUSE_INDEX_MASK: usize = 0x0FFF_FFFF_FFFF_FFFF;
@@ -382,12 +374,6 @@ pub fn cid2fmt(cid: ClauseId) -> String {
     }
 }
 
-impl Dump for [ClausePack] {
-    fn dump(&self, str: &str) -> () {
-        println!("dumped {}", str);
-    }
-}
-
 impl Clause {
     pub fn subsumes(&self, other: &Clause) -> Option<Lit> {
         let mut ret: Lit = NULL_LIT;
@@ -603,7 +589,7 @@ impl ClauseManagement for Solver {
                 v.reason = NULL_CLAUSE;
             }
         }
-        for ck in &KINDS {
+        for ck in &CLAUSE_KINDS {
             for c in &mut self.cp[*ck as usize].clauses[1..] {
                 c.rank = c.len();
                 if self.vars.satisfies(c) {

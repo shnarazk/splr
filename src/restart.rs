@@ -1,5 +1,4 @@
-use solver::CDCL;
-use solver::{Solver, Stat};
+use solver::{CDCL, Solver, Stat};
 use types::*;
 
 pub trait Restart {

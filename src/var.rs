@@ -1,5 +1,6 @@
 use clause::Clause;
 use solver::{Solver, Stat};
+use std::fmt;
 use types::*;
 
 // for Solver
@@ -319,11 +320,6 @@ impl VarIdHeap {
             }
         }
     }
-    pub fn dump(&self) -> () {
-        println!("# - seek pointer {}", self.seek);
-        println!("# - heap {:?}", self.heap);
-        println!("# - idxs {:?}", self.idxs);
-    }
     pub fn check(&self, s: &str) -> () {
         let h = &mut self.heap.clone()[1..];
         let d = &mut self.idxs.clone()[1..];
@@ -402,5 +398,17 @@ impl VarManagement for Solver {
                 return vi;
             }
         }
+    }
+}
+
+impl fmt::Display for VarIdHeap {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            " - seek pointer {}\n - clause_queue {:?}\n - heap {:?}",
+            self.seek,
+            self.heap,
+            self.idxs,
+        )
     }
 }
