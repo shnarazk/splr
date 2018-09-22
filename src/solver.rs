@@ -196,19 +196,18 @@ impl Solver {
             .filter(|c| c.index != 0 && !c.get_flag(ClauseFlag::Dead) && c.rank <= 3)
             .count();
         if mes == "" {
-            println!("#init, remain, DB, #Remov, #good,#junk,  #Perm,#Binary, PROG,#solv, rate%, RES,block,force, asgn/,  lbd/, STAT,   lbd,  b lvl,  c lvl");
+            println!("#init,#remain, #solv, rate%, DB, #remov,(good),  #perm,#binary, RES,block,force, asgn/,  lbd/, STAT,    lbd, back lv, conf lv");
         } else {
             println!(
-                "#{},{:>7}, DB,{:>7},{:>6},{:>5},{:>7},{:>7}, PROG,{:>5},{:>6.3}, RES,{:>5},{:>5}, {:>5.2},{:>6.2}, STAT,{:>6.2},{:>7.2},{:>7.2}",
+                "#{},{:>7},{:>6},{:>6.3}, DB,{:>7},{:>6},{:>7},{:>7}, RES,{:>5},{:>5}, {:>5.2},{:>6.2}, STAT,{:>7.2},{:>8.2},{:>8.2}",
                 mes,
                 nv - self.trail.len(),
-                learnts.clauses.len() - 1 -deads,
+                sum,
+                (sum as f32) / (nv as f32) * 100.0,
                 cnt,
                 deads,
                 self.cp[ClauseKind::Permanent as usize].clauses.iter().filter(|c| !c.get_flag(ClauseFlag::Dead)).count(),
                 self.cp[ClauseKind::Binclause as usize].clauses.iter().filter(|c| !c.get_flag(ClauseFlag::Dead)).count(),
-                sum,
-                (sum as f32) / (nv as f32) * 100.0,
                 self.stats[Stat::BlockRestart as usize],
                 self.stats[Stat::Restart as usize],
                 self.ema_asg.get(),
