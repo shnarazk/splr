@@ -1,12 +1,22 @@
 use clause::Clause;
-use clause::DEAD_CLAUSE;
+use solver::{Solver, Stat};
 use types::*;
 
+// for Solver
+pub trait VarManagement {
+    fn select_var(&mut self) -> VarId;
+    fn bump_vi(&mut self, vi: VarId) -> ();
+    fn decay_var_activity(&mut self) -> ();
+    fn rebuild_vh(&mut self) -> ();
+}
+
+/// for [Var]
 pub trait Satisfiability {
     fn assigned(&self, l: Lit) -> Lbool;
     fn satisfies(&self, c: &Clause) -> bool;
 }
 
+/// for VarIdHeap
 pub trait VarOrdering {
     fn get_root(&mut self, vars: &[Var]) -> VarId;
     fn reset(&mut self) -> ();
@@ -15,15 +25,14 @@ pub trait VarOrdering {
     fn insert(&mut self, vec: &[Var], v: VarId) -> ();
     fn seek_top(&mut self, vars: &[Var]) -> VarId;
     fn update_seek(&mut self, vi: VarId) -> ();
-    fn remove(&mut self, vec: &[Var], v: VarId) -> ();
     fn clear(&mut self) -> ();
     fn len(&self) -> usize;
     fn is_empty(&self) -> bool;
-    fn peek(&self) -> VarId;
 }
 
-const BWDSUB_CLAUSE: ClauseId = DEAD_CLAUSE - 1;
-const SUBSUMPTION_SIZE: usize = 20;
+pub const VAR_DECAY: f64 = 0.8;
+pub const MAX_VAR_DECAY: f64 = 0.95;
+const VAR_ACTIVITY_THRESHOLD: f64 = 1e100;
 
 /// Struct for a variable.
 #[derive(Debug)]
@@ -81,7 +90,7 @@ impl Var {
     }
 }
 
-impl Satisfiability for Vec<Var> {
+impl Satisfiability for [Var] {
     #[inline]
     fn assigned(&self, l: Lit) -> Lbool {
         self[l.vi()].assign ^ ((l & 1) as u8)
@@ -179,21 +188,6 @@ impl VarOrdering for VarIdHeap {
             self.seek = n;
         }
     }
-    /// renamed from getHeapDown
-    fn remove(&mut self, vec: &[Var], vs: VarId) -> () {
-        let s = self.idxs[vs];
-        let n = self.idxs[0];
-        if n < s {
-            return;
-        }
-        let vn = self.heap[n];
-        self.heap.swap(n, s);
-        self.idxs.swap(vn, vs);
-        self.idxs[0] -= 1;
-        if 1 < self.idxs[0] {
-            self.percolate_down(&vec, 1);
-        }
-    }
     fn clear(&mut self) -> () {
         self.reset()
     }
@@ -202,9 +196,6 @@ impl VarOrdering for VarIdHeap {
     }
     fn is_empty(&self) -> bool {
         self.idxs[0] == 0
-    }
-    fn peek(&self) -> VarId {
-        self.heap[1]
     }
 }
 
@@ -348,74 +339,68 @@ impl VarIdHeap {
         }
         println!(" - pass var_order test at {}", s);
     }
-}
-
-/// Literal eliminator
-#[derive(Debug)]
-pub struct Eliminator {
-    pub merges: usize,
-    /// renamed elimHeap. FIXME: can we use VarIdHeap here?
-    pub var_queue: Vec<VarId>,
-    pub n_touched: usize,
-    pub asymm_lits: usize,
-    pub clause_queue: Vec<ClauseId>,
-    pub bwdsub_assigns: usize,
-    //    pub bwdsub_tmp_unit: ClauseId,
-    pub bwdsub_tmp_clause: Clause,
-    pub remove_satisfied: bool,
-    // working place
-    pub merge_vec: Vec<Lit>,
-    pub elim_clauses: Vec<Lit>,
-    /// Variables are not eliminated if it produces a resolvent with a length above this limit.
-    /// 0 means no limit.
-    pub clause_lim: usize,
-    pub eliminated_vars: usize,
-    pub add_tmp: Vec<Lit>,
-    pub use_elim: bool,
-    pub turn_off_elim: bool,
-    pub use_simplification: bool,
-    pub subsumption_lim: usize,
-    pub targets: Vec<ClauseId>,
-    pub subsume_clause_size: usize,
-    pub last_invocatiton: usize,
-}
-
-impl Eliminator {
-    pub fn new(use_elim: bool, nv: usize) -> Eliminator {
-        // let heap = VarIdHeap::new(VarOrder::ByOccurence, nv, 0);
-        let mut bwdsub_tmp_clause = Clause::null();
-        bwdsub_tmp_clause.index = BWDSUB_CLAUSE;
-        Eliminator {
-            merges: 0,
-            var_queue: Vec::new(),
-            n_touched: 0,
-            asymm_lits: 0,
-            clause_queue: Vec::new(),
-            bwdsub_assigns: 0,
-            //            bwdsub_tmp_unit: 0,
-            bwdsub_tmp_clause,
-            remove_satisfied: false,
-            merge_vec: vec![0; nv + 1],
-            elim_clauses: Vec::new(),
-            clause_lim: 20,
-            eliminated_vars: 0,
-            add_tmp: Vec::new(),
-            use_elim,
-            turn_off_elim: false,
-            use_simplification: true,
-            subsumption_lim: 0,
-            targets: Vec::new(),
-            subsume_clause_size: SUBSUMPTION_SIZE,
-            last_invocatiton: 0,
+    /// renamed from getHeapDown
+    #[allow(dead_code)]
+    fn remove(&mut self, vec: &[Var], vs: VarId) -> () {
+        let s = self.idxs[vs];
+        let n = self.idxs[0];
+        if n < s {
+            return;
         }
+        let vn = self.heap[n];
+        self.heap.swap(n, s);
+        self.idxs.swap(vn, vs);
+        self.idxs[0] -= 1;
+        if 1 < self.idxs[0] {
+            self.percolate_down(&vec, 1);
+        }
+    }
+    #[allow(dead_code)]
+    fn peek(&self) -> VarId {
+        self.heap[1]
     }
 }
 
-impl Dump for Eliminator {
-    fn dump(&self, str: &str) -> () {
-        println!("{}", str);
-        println!(" - n_touched {}", self.n_touched);
-        println!(" - clause_queue {:?}", self.clause_queue);
-        println!(" - heap {:?}", self.var_queue);
+impl VarManagement for Solver {
+    fn rebuild_vh(&mut self) -> () {
+        if self.decision_level() != 0 {
+            return;
+        }
+        self.var_order.reset();
+        for vi in 1..self.vars.len() {
+            if self.vars[vi].assign == BOTTOM {
+                self.var_order.insert(&self.vars, vi);
+            }
+        }
+    }
+    fn bump_vi(&mut self, vi: VarId) -> () {
+        let d = self.stats[Stat::Conflict as usize] as f64;
+        let a = (self.vars[vi].activity + d) / 2.0;
+        self.vars[vi].activity = a;
+        if VAR_ACTIVITY_THRESHOLD < a {
+            // self.rescale_var_activity();
+            for i in 1..self.vars.len() {
+                self.vars[i].activity /= VAR_ACTIVITY_THRESHOLD;
+            }
+            self.var_inc /= VAR_ACTIVITY_THRESHOLD;
+        }
+        self.var_order.update(&self.vars, vi);
+    }
+    fn decay_var_activity(&mut self) -> () {
+        self.var_inc /= self.var_decay;
+    }
+    /// Heap operations; renamed from selectVO
+    fn select_var(&mut self) -> VarId {
+        // self.var_order.seek_top(&self.vars)
+        loop {
+            if self.var_order.len() == 0 {
+                return 0;
+            }
+            let vi = self.var_order.get_root(&self.vars);
+            let x = self.vars[vi].assign;
+            if x == BOTTOM {
+                return vi;
+            }
+        }
     }
 }

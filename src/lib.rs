@@ -1,6 +1,8 @@
 //! This is a SAT solver in Rust.
 #[macro_use]
 mod macros;
+/// Subsumption-based clause/var eliminaiton
+pub mod eliminator;
 /// Clause
 pub mod clause;
 /// Implementation on solver restart.
@@ -13,5 +15,3 @@ pub mod types;
 pub mod validator;
 /// Var
 pub mod var;
-/// Implementation on decision var selection.
-pub mod var_manage;

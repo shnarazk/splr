@@ -1,14 +1,11 @@
-use clause::ClauseManagement;
-use clause::*;
-use clause::GC;
+use clause::{*, ClauseManagement, GC};
+use eliminator::Eliminator;
 use restart::Restart;
 use std::cmp::max;
 use std::fs;
 use std::io::{BufRead, BufReader};
-use types::Dump;
-use types::*;
-use var::*;
-use var_manage::{VarSelect, MAX_VAR_DECAY};
+use types::{*, Dump};
+use var::{*, VarOrdering, MAX_VAR_DECAY};
 
 pub trait SatSolver {
     fn solve(&mut self) -> SolverResult;
