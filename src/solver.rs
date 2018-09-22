@@ -500,7 +500,7 @@ impl CDCL for Solver {
                 if self.decision_level() == 0 && self.num_solved_vars < na {
                     self.simplify();
                     self.num_solved_vars = self.num_assigns();
-                    self.rebuild_vh();
+                    // self.rebuild_vh();
                 }
                 if self.trail.len() <= self.q_head {
                     let vi = self.select_var();
@@ -584,7 +584,7 @@ impl CDCL for Solver {
                 }
             }
             self.var_order.insert(&self.vars, vi);
-            // self.var_order.update_seek(vi);
+            self.var_order.update_seek(vi); // actually no need to call; percolate_up updates 'seek'.
         }
         self.trail.truncate(lim);
         self.trail_lim.truncate(lv);
