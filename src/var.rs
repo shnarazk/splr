@@ -231,14 +231,14 @@ impl VarIdHeap {
         // self.var_order.check("root 2");
         vs
     }
-    fn percolate_up(&mut self, vec: &[Var], start: usize) -> () {
+    fn percolate_up(&mut self, vars: &[Var], start: usize) -> () {
         let mut q = start;
         let vq = self.heap[q];
         debug_assert!(0 < vq, "size of heap is too small");
-        let aq = vec[vq].activity;
+        let aq = if vars[vq].assign == BOTTOM { vars[vq].activity } else { 0.0 };
         // let aq = match self.order {
-        //     VarOrder::ByActivity => vec[vq].activity,
-        //     VarOrder::ByOccurence => vec[vq].occurs.len() as f64,
+        //     VarOrder::ByActivity => vars[vq].activity,
+        //     VarOrder::ByOccurence => vars[vq].occurs.len() as f64,
         // };
         loop {
             let p = q / 2;
@@ -250,10 +250,10 @@ impl VarIdHeap {
                 return;
             } else {
                 let vp = self.heap[p];
-                let ap = vec[vp].activity;
+                let ap = if vars[vp].assign == BOTTOM { vars[vp].activity} else { 0.0 };
                 // let ap = match self.order {
-                //     VarOrder::ByActivity => vec[vp].activity,
-                //     VarOrder::ByOccurence => vec[vp].occurs.len() as f64,
+                //     VarOrder::ByActivity => vars[vp].activity,
+                //     VarOrder::ByOccurence => vars[vp].occurs.len() as f64,
                 // };
                 if ap < aq {
                     // move down the current parent, and make it empty
@@ -273,29 +273,26 @@ impl VarIdHeap {
             }
         }
     }
-    fn percolate_down(&mut self, vec: &[Var], start: usize) -> () {
+    fn percolate_down(&mut self, vars: &[Var], start: usize) -> () {
         let n = self.len();
         let mut i = start;
         let vi = self.heap[i];
-        let ai = match self.order {
-            VarOrder::ByActivity => vec[vi].activity,
-            VarOrder::ByOccurence => vec[vi].occurs.len() as f64,
-        };
+        let ai = if vars[vi].assign == BOTTOM { vars[vi].activity } else { 0.0 };
         loop {
             let l = 2 * i; // left
             if l <= n {
                 let r = l + 1; // right
                 let vl = self.heap[l];
                 let vr = self.heap[r];
-                let al = vec[vl].activity;
+                let al = if vars[vl].assign == BOTTOM { vars[vl].activity } else { 0.0 };
                 // let al = match self.order {
-                //     VarOrder::ByActivity => vec[vl].activity,
-                //     VarOrder::ByOccurence => vec[vl].occurs.len() as f64,
+                //     VarOrder::ByActivity => vars[vl].activity,
+                //     VarOrder::ByOccurence => vars[vl].occurs.len() as f64,
                 // };
-                let ar = vec[vr].activity;
+                let ar = if vars[vr].assign == BOTTOM { vars[vr].activity } else { 0.0 };
                 // let ar = match self.order {
-                //     VarOrder::ByActivity => vec[vr].activity,
-                //     VarOrder::ByOccurence => vec[vr].occurs.len() as f64,
+                //     VarOrder::ByActivity => vars[vr].activity,
+                //     VarOrder::ByOccurence => vars[vr].occurs.len() as f64,
                 // };
                 let (target, vc, ac) = if r <= n && al < ar {
                     (r, vr, ar)
@@ -387,17 +384,17 @@ impl VarManagement for Solver {
     }
     /// Heap operations; renamed from selectVO
     fn select_var(&mut self) -> VarId {
-        // self.var_order.seek_top(&self.vars)
-        loop {
-            if self.var_order.len() == 0 {
-                return 0;
-            }
-            let vi = self.var_order.get_root(&self.vars);
-            let x = self.vars[vi].assign;
-            if x == BOTTOM {
-                return vi;
-            }
-        }
+        self.var_order.seek_top(&self.vars)
+        // loop {
+        //     if self.var_order.len() == 0 {
+        //         return 0;
+        //     }
+        //     let vi = self.var_order.get_root(&self.vars);
+        //     let x = self.vars[vi].assign;
+        //     if x == BOTTOM {
+        //         return vi;
+        //     }
+        // }
     }
 }
 
