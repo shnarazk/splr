@@ -2,6 +2,26 @@ use clause::Clause;
 use clause::DEAD_CLAUSE;
 use types::*;
 
+pub trait Satisfiability {
+    fn assigned(&self, l: Lit) -> Lbool;
+    fn satisfies(&self, c: &Clause) -> bool;
+}
+
+pub trait VarOrdering {
+    fn get_root(&mut self, vars: &[Var]) -> VarId;
+    fn reset(&mut self) -> ();
+    fn contains(&self, v: VarId) -> bool;
+    fn update(&mut self, vec: &[Var], v: VarId) -> ();
+    fn insert(&mut self, vec: &[Var], v: VarId) -> ();
+    fn seek_top(&mut self, vars: &[Var]) -> VarId;
+    fn update_seek(&mut self, vi: VarId) -> ();
+    fn remove(&mut self, vec: &[Var], v: VarId) -> ();
+    fn clear(&mut self) -> ();
+    fn len(&self) -> usize;
+    fn is_empty(&self) -> bool;
+    fn peek(&self) -> VarId;
+}
+
 const BWDSUB_CLAUSE: ClauseId = DEAD_CLAUSE - 1;
 const SUBSUMPTION_SIZE: usize = 20;
 
@@ -61,11 +81,6 @@ impl Var {
     }
 }
 
-pub trait Satisfiability {
-    fn assigned(&self, l: Lit) -> Lbool;
-    fn satisfies(&self, c: &Clause) -> bool;
-}
-
 impl Satisfiability for Vec<Var> {
     #[inline]
     fn assigned(&self, l: Lit) -> Lbool {
@@ -104,31 +119,13 @@ pub struct VarIdHeap {
     order: VarOrder,
     pub heap: Vec<VarId>, // order : usize -> VarId
     idxs: Vec<usize>,     // VarId : -> order : usize
-}
-
-pub trait AccessHeap {
-    fn get_root(&self, heap: &mut VarIdHeap) -> VarId;
-}
-
-impl<'a> AccessHeap for Vec<Var> {
-    fn get_root(&self, heap: &mut VarIdHeap) -> VarId {
-        heap.root(self)
-    }
-}
-
-pub trait VarOrdering {
-    fn reset(&mut self) -> ();
-    fn contains(&self, v: VarId) -> bool;
-    fn update(&mut self, vec: &[Var], v: VarId) -> ();
-    fn insert(&mut self, vec: &[Var], v: VarId) -> ();
-    fn root(&mut self, vec: &[Var]) -> VarId;
-    fn clear(&mut self) -> ();
-    fn len(&self) -> usize;
-    fn is_empty(&self) -> bool;
-    fn peek(&self) -> VarId;
+    seek: usize,
 }
 
 impl VarOrdering for VarIdHeap {
+    fn get_root(&mut self, vars: &[Var]) -> VarId {
+        self.root(vars)
+    }
     fn reset(&mut self) -> () {
         for i in 0..self.idxs.len() {
             self.idxs[i] = i;
@@ -164,23 +161,38 @@ impl VarOrdering for VarIdHeap {
         self.percolate_up(&vec, n);
         // self.var_order.check("check insert 2");
     }
+    fn seek_top(&mut self, vars: &[Var]) -> VarId {
+        loop {
+            if self.heap.len() <= self.seek {
+                return 0;
+            }
+            let v = self.heap[self.seek];
+            self.seek += 1;
+            if vars[v as usize].assign == BOTTOM {
+                return v;
+            }
+        }
+    }
+    fn update_seek(&mut self, vi: VarId) -> () {
+        let n = self.idxs[vi];
+        if n < self.seek {
+            self.seek = n;
+        }
+    }
     /// renamed from getHeapDown
-    fn root(&mut self, vec: &[Var]) -> VarId {
-        let s = 1;
-        let vs = self.heap[s];
+    fn remove(&mut self, vec: &[Var], vs: VarId) -> () {
+        let s = self.idxs[vs];
         let n = self.idxs[0];
+        if n < s {
+            return;
+        }
         let vn = self.heap[n];
-        // self.var_order.check(&format!("root 1 :[({}, {}) ({}, {})]", s, vs, n, vn));
-        debug_assert!(vn != 0, "Invalid VarId for heap");
-        debug_assert!(vs != 0, "Invalid VarId for heap");
         self.heap.swap(n, s);
         self.idxs.swap(vn, vs);
         self.idxs[0] -= 1;
         if 1 < self.idxs[0] {
             self.percolate_down(&vec, 1);
         }
-        // self.var_order.check("root 2");
-        vs
     }
     fn clear(&mut self) -> () {
         self.reset()
@@ -207,29 +219,50 @@ impl VarIdHeap {
             idxs.push(i);
         }
         idxs[0] = init;
-        VarIdHeap { order, heap, idxs }
+        VarIdHeap { order, heap, idxs, seek: 1 }
+    }
+    /// renamed from getHeapDown
+    fn root(&mut self, vec: &[Var]) -> VarId {
+        let s = 1;
+        let vs = self.heap[s];
+        let n = self.idxs[0];
+        let vn = self.heap[n];
+        // self.var_order.check(&format!("root 1 :[({}, {}) ({}, {})]", s, vs, n, vn));
+        debug_assert!(vn != 0, "Invalid VarId for heap");
+        debug_assert!(vs != 0, "Invalid VarId for heap");
+        self.heap.swap(n, s);
+        self.idxs.swap(vn, vs);
+        self.idxs[0] -= 1;
+        if 1 < self.idxs[0] {
+            self.percolate_down(&vec, 1);
+        }
+        // self.var_order.check("root 2");
+        vs
     }
     fn percolate_up(&mut self, vec: &[Var], start: usize) -> () {
         let mut q = start;
         let vq = self.heap[q];
         debug_assert!(0 < vq, "size of heap is too small");
-        let aq = match self.order {
-            VarOrder::ByActivity => vec[vq].activity,
-            VarOrder::ByOccurence => vec[vq].occurs.len() as f64,
-        };
+        let aq = vec[vq].activity;
+        // let aq = match self.order {
+        //     VarOrder::ByActivity => vec[vq].activity,
+        //     VarOrder::ByOccurence => vec[vq].occurs.len() as f64,
+        // };
         loop {
             let p = q / 2;
             if p == 0 {
                 self.heap[q] = vq;
                 debug_assert!(vq != 0, "Invalid index in percolate_up");
                 self.idxs[vq] = q;
+                self.seek = q;
                 return;
             } else {
                 let vp = self.heap[p];
-                let ap = match self.order {
-                    VarOrder::ByActivity => vec[vp].activity,
-                    VarOrder::ByOccurence => vec[vp].occurs.len() as f64,
-                };
+                let ap = vec[vp].activity;
+                // let ap = match self.order {
+                //     VarOrder::ByActivity => vec[vp].activity,
+                //     VarOrder::ByOccurence => vec[vp].occurs.len() as f64,
+                // };
                 if ap < aq {
                     // move down the current parent, and make it empty
                     self.heap[q] = vp;
@@ -240,6 +273,9 @@ impl VarIdHeap {
                     self.heap[q] = vq;
                     debug_assert!(vq != 0, "Invalid index in percolate_up");
                     self.idxs[vq] = q;
+                    if q < self.seek {
+                        self.seek = q;
+                    }
                     return;
                 }
             }
@@ -259,14 +295,16 @@ impl VarIdHeap {
                 let r = l + 1; // right
                 let vl = self.heap[l];
                 let vr = self.heap[r];
-                let al = match self.order {
-                    VarOrder::ByActivity => vec[vl].activity,
-                    VarOrder::ByOccurence => vec[vl].occurs.len() as f64,
-                };
-                let ar = match self.order {
-                    VarOrder::ByActivity => vec[vr].activity,
-                    VarOrder::ByOccurence => vec[vr].occurs.len() as f64,
-                };
+                let al = vec[vl].activity;
+                // let al = match self.order {
+                //     VarOrder::ByActivity => vec[vl].activity,
+                //     VarOrder::ByOccurence => vec[vl].occurs.len() as f64,
+                // };
+                let ar = vec[vr].activity;
+                // let ar = match self.order {
+                //     VarOrder::ByActivity => vec[vr].activity,
+                //     VarOrder::ByOccurence => vec[vr].occurs.len() as f64,
+                // };
                 let (target, vc, ac) = if r <= n && al < ar {
                     (r, vr, ar)
                 } else {
@@ -291,6 +329,7 @@ impl VarIdHeap {
         }
     }
     pub fn dump(&self) -> () {
+        println!("# - seek pointer {}", self.seek);
         println!("# - heap {:?}", self.heap);
         println!("# - idxs {:?}", self.idxs);
     }

@@ -59,11 +59,12 @@ impl VarSelect for Solver {
     }
     /// Heap operations; renamed from selectVO
     fn select_var(&mut self) -> VarId {
+        // self.var_order.seek_top(&self.vars)
         loop {
             if self.var_order.len() == 0 {
                 return 0;
             }
-            let vi = self.var_order.root(&self.vars);
+            let vi = self.var_order.get_root(&self.vars);
             let x = self.vars[vi].assign;
             if x == BOTTOM {
                 return vi;

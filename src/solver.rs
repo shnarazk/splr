@@ -494,17 +494,6 @@ impl CDCL for Solver {
         loop {
             self.stats[Stat::Propagation as usize] += 1;
             let ci = self.propagate();
-            if self.stats[Stat::Propagation as usize] % 100_000 == 0 {
-                self.progress(
-                    match self.strategy {
-                        None => "none",
-                        Some(SearchStrategy::Generic) => "gene",
-                        Some(SearchStrategy::ChanSeok) => "Chan",
-                        Some(SearchStrategy::HighSuccesive) => "High",
-                        Some(SearchStrategy::LowSuccesive) => "LowS",
-                        Some(SearchStrategy::ManyGlues) => "Many",
-                    });
-            }
             if ci == NULL_CLAUSE {
                 let na = self.num_assigns();
                 if na == self.num_vars {
@@ -564,6 +553,17 @@ impl CDCL for Solver {
                         ((conflicts as f64) / (self.next_reduction as f64)) as usize + 1;
                     self.reduce();
                 }
+                if self.stats[Stat::Conflict as usize] % 10_000 == 0 {
+                    self.progress(
+                        match self.strategy {
+                            None => "none",
+                            Some(SearchStrategy::Generic) => "gene",
+                            Some(SearchStrategy::ChanSeok) => "Chan",
+                            Some(SearchStrategy::HighSuccesive) => "High",
+                            Some(SearchStrategy::LowSuccesive) => "LowS",
+                            Some(SearchStrategy::ManyGlues) => "Many",
+                        });
+                }
                 // Since the conflict path pushes a new literal to trail, we don't need to pick up a literal here.
             }
         }
@@ -587,6 +587,7 @@ impl CDCL for Solver {
                 }
             }
             self.var_order.insert(&self.vars, vi);
+            // self.var_order.update_seek(vi);
         }
         self.trail.truncate(lim);
         self.trail_lim.truncate(lv);
