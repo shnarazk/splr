@@ -39,8 +39,6 @@ impl Restart for Solver {
     /// called after no conflict propagation
     fn force_restart(&mut self) -> () {
         let count = self.stats[Stat::Conflict as usize] as u64;
-        // let nas = self.trail.len();
-        // self.ema_asg.update(nas as f64 / self.c_lvl.0);
         if self.next_restart < count && K < self.ema_lbd.get() {
             self.next_restart = count + RESTART_PERIOD;
             self.stats[Stat::Restart as usize] += 1;

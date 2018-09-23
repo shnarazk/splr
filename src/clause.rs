@@ -34,7 +34,7 @@ pub trait ClauseManagement {
     fn add_learnt(&mut self, v: &mut Vec<Lit>, lbd: usize) -> ClauseId;
     fn reduce(&mut self) -> ();
     fn simplify(&mut self) -> bool;
-    fn lbd_vec(&mut self, v: &[Lit]) -> usize;
+    fn lbd_of_an_learnt_lits(&mut self) -> usize;
     fn lbd_of(&mut self, c: &Clause) -> usize;
     fn biclause_subsume(&mut self, c: &Clause) -> ();
 }
@@ -628,16 +628,16 @@ impl ClauseManagement for Solver {
         //        }
         true
     }
-    fn lbd_vec(&mut self, v: &[Lit]) -> usize {
+    fn lbd_of_an_learnt_lits(&mut self) -> usize {
         let key;
         let key_old = self.lbd_seen[0];
-        if 10_000_000 < key_old {
+        if 100_000_000 < key_old {
             key = 1;
         } else {
             key = key_old + 1;
         }
         let mut cnt = 0;
-        for l in v {
+        for l in &self.an_learnt_lits {
             let lv = self.vars[l.vi()].level;
             if self.lbd_seen[lv] != key && lv != 0 {
                 self.lbd_seen[lv] = key;
@@ -650,7 +650,7 @@ impl ClauseManagement for Solver {
     fn lbd_of(&mut self, c: &Clause) -> usize {
         let key;
         let key_old = self.lbd_seen[0];
-        if 10_000_000 < key_old {
+        if 100_000_000 < key_old {
             key = 1;
         } else {
             key = key_old + 1;

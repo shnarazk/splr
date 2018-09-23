@@ -523,8 +523,8 @@ impl CDCL for Solver {
                     lbd = 0;
                 } else {
                     unsafe {
+                        lbd = self.lbd_of_an_learnt_lits();
                         let v = &mut self.an_learnt_lits as *mut Vec<Lit>;
-                        lbd = self.lbd_vec(&*v);
                         // self.add_learnt(&mut *v, lbd);
                         let cid = self.add_learnt(&mut *v, lbd);
                         if cid.to_kind() == ClauseKind::Binclause as usize {
@@ -632,6 +632,7 @@ impl CDCL for Solver {
                     if 2 < (*c).rank {
                         let nblevels = self.lbd_of(&(*c));
                         if nblevels + 1 < (*c).rank {
+                            (*c).rank = nblevels;
                             if nblevels <= 30 {
                                 (*c).set_flag(ClauseFlag::JustUsed, true);
                             }
@@ -647,13 +648,6 @@ impl CDCL for Solver {
                             }
                         }
                     }
-                    // let nblevels = self.lbd_of(&(*c));
-                    // if nblevels + 1 < (*c).rank {
-                    //     // (*c).rank = nblevels;
-                    //     if nblevels <= 30 {
-                    //         (*c).set_flag(ClauseFlag::JustUsed, true);
-                    //     }
-                    // }
                 }
                 // println!("{}を対応", (*c));
                 for i in ((p != NULL_LIT) as usize)..(*c).len() {
@@ -694,7 +688,7 @@ impl CDCL for Solver {
                 {
                     let next_vi = p.vi();
                     cid = self.vars[next_vi].reason;
-                    // println!("{} にフラグが立っている。この時path数は{}, そのreason {}を探索", next_vi, path_cnt - 1, cid);
+                    // println!("{} にフラグが立っている。時path数は{}, そのreason{}を探索", next_vi, path_cnt - 1, cid);
                     self.an_seen[next_vi] = 0;
                 }
                 path_cnt -= 1;
@@ -704,29 +698,28 @@ impl CDCL for Solver {
                 ti -= 1;
             }
         }
+        debug_assert_eq!(self.an_learnt_lits[0], 0);
         self.an_learnt_lits[0] = p.negate();
+        debug_assert_ne!(self.an_learnt_lits[0], 0);
         // println!(
         //     "最後に{}を採用して{:?}",
         //     p.negate().int(), vec2int(self.an_learnt_lits)
         // );
         // simplify phase
-        let n = self.an_learnt_lits.len();
-        let l0 = self.an_learnt_lits[0];
         self.an_stack.clear();
         self.an_to_clear.clear();
-        self.an_to_clear.push(l0);
+        self.an_to_clear.push(p.negate());
+        let n = self.an_learnt_lits.len();
         {
             self.an_level_map_key += 1;
             if 10_000_000 < self.an_level_map_key {
                 self.an_level_map_key = 1;
             }
-            for i in 1..n {
-                let l = self.an_learnt_lits[i];
-                self.an_to_clear.push(l);
+            for l in &self.an_learnt_lits[1..] {
+                self.an_to_clear.push(*l);
                 self.an_level_map[self.vars[l.vi()].level] = self.an_level_map_key;
             }
         }
-        // println!("  analyze.loop 4 n = {}", n);
         let mut j = 1;
         for i in 1..n {
             let l = self.an_learnt_lits[i];
@@ -736,26 +729,21 @@ impl CDCL for Solver {
             }
         }
         self.an_learnt_lits.truncate(j);
-        // glucose heuristics
-        let r = self.an_learnt_lits.len();
-        for i in 0..self.an_last_dl.len() {
-            let vi = self.an_last_dl[i].vi();
-            let cid = self.vars[vi].reason;
-            let len = self.cp[cid.to_kind()].clauses[cid.to_index()].lits.len();
-            if r < len {
-                self.bump_vi(vi);
-            }
-        }
-        self.an_last_dl.clear();
-        for l in &self.an_to_clear {
-            self.an_seen[l.vi()] = 0;
-        }
         if self.an_learnt_lits.len() < 30 {
             self.minimize_with_bi_clauses();
         }
+        // glucose heuristics
+        let lbd = self.lbd_of_an_learnt_lits();
+        while let Some(l) = self.an_last_dl.pop() {
+            let vi = l.vi();
+            let cid = self.vars[vi].reason;
+            if lbd < self.cp[cid.to_kind()].clauses[cid.to_index()].rank {
+                self.bump_vi(vi);
+            }
+        }
         // find correct backtrack level from remaining literals
         let mut level_to_return = 0;
-        if self.an_learnt_lits.len() != 1 {
+        if 1 < self.an_learnt_lits.len() {
             let mut max_i = 1;
             level_to_return = self.vars[self.an_learnt_lits[max_i].vi()].level;
             for i in 2..self.an_learnt_lits.len() {
@@ -852,8 +840,8 @@ impl Solver {
         }
         unsafe {
             let key = self.an_level_map_key;
+            let nblevels = self.lbd_of_an_learnt_lits();
             let vec = &mut self.an_learnt_lits as *mut Vec<Lit>;
-            let nblevels = self.lbd_vec(&*vec);
             if 6 < nblevels {
                 return;
             }
