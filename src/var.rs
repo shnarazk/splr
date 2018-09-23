@@ -334,7 +334,7 @@ impl VarIdHeap {
     }
     /// renamed from getHeapDown
     #[allow(dead_code)]
-    fn remove(&mut self, vec: &[Var], vs: VarId) -> () {
+    pub fn remove(&mut self, vec: &[Var], vs: VarId) -> () {
         let s = self.idxs[vs];
         let n = self.idxs[0];
         if n < s {
@@ -368,15 +368,17 @@ impl VarManagement for Solver {
     }
     fn bump_vi(&mut self, vi: VarId) -> () {
         let d = self.stats[Stat::Conflict as usize] as f64;
-        let a = (self.vars[vi].activity + d) / 2.0;
-        self.vars[vi].activity = a;
-        if VAR_ACTIVITY_THRESHOLD < a {
-            // self.rescale_var_activity();
-            for i in 1..self.vars.len() {
-                self.vars[i].activity /= VAR_ACTIVITY_THRESHOLD;
-            }
-            self.var_inc /= VAR_ACTIVITY_THRESHOLD;
-        }
+        self.vars[vi].activity = (self.vars[vi].activity + d) / 2.0;
+        // let a = (self.vars[vi].activity + d) / 2.0;
+        // let a = self.vars[vi].activity +self.var_inc;
+        // self.vars[vi].activity = a;
+        // if VAR_ACTIVITY_THRESHOLD < a {
+        //     // self.rescale_var_activity();
+        //     for i in 1..self.vars.len() {
+        //         self.vars[i].activity /= VAR_ACTIVITY_THRESHOLD;
+        //     }
+        //     self.var_inc /= VAR_ACTIVITY_THRESHOLD;
+        // }
         self.var_order.update(&self.vars, vi);
     }
     fn decay_var_activity(&mut self) -> () {

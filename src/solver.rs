@@ -196,7 +196,9 @@ impl Solver {
             .filter(|c| c.index != 0 && !c.get_flag(ClauseFlag::Dead) && c.rank <= 3)
             .count();
         if mes == "" {
-            println!("#init,#remain, #solv, rate%, DB, #remov,(good),  #perm,#binary, RES,block,force, asgn/,  lbd/, STAT,    lbd, back lv, conf lv");
+            println!(
+                "#init,#remain, #solv, rate%, DB,#learnt,(good),  #perm,#binary, RES,block,force, asgn/,  lbd/, STAT,    lbd, back lv, conf lv"
+            );
         } else {
             println!(
                 "#{},{:>7},{:>6},{:>6.3}, DB,{:>7},{:>6},{:>7},{:>7}, RES,{:>5},{:>5}, {:>5.2},{:>6.2}, STAT,{:>7.2},{:>8.2},{:>8.2}",
@@ -593,14 +595,20 @@ impl CDCL for Solver {
     fn enqueue(&mut self, l: Lit, cid: ClauseId) -> bool {
         let sig = l.lbool();
         let val = self.vars[l.vi()].assign;
+        let dl = self.decision_level();
         if val == BOTTOM {
             {
-                let dl = self.decision_level();
                 let v = &mut self.vars[l.vi()];
                 v.assign = sig;
                 v.level = dl;
                 v.reason = cid;
+                if dl == 0 {
+                    v.activity = 0.0;
+                }
                 mref!(self.cp, cid).set_flag(ClauseFlag::Locked, true);
+            }
+            if dl == 0 {
+                self.var_order.remove(&self.vars, l.vi());
             }
             self.trail.push(l);
             true
@@ -654,9 +662,6 @@ impl CDCL for Solver {
                     let q = lindex!(*c, i);
                     let vi = q.vi();
                     let lvl = self.vars[vi].level;
-                    if self.vars[vi].assign == BOTTOM {
-                        panic!(" analyze faced bottom by vi {} in {}", vi, (*c));
-                    }
                     debug_assert_ne!(self.vars[vi].assign, BOTTOM);
                     if self.an_seen[vi] == 0 && 0 < lvl {
                         self.bump_vi(vi);
@@ -885,10 +890,18 @@ impl Solver {
     pub fn uncheck_enqueue(&mut self, l: Lit, cid: ClauseId) -> () {
         debug_assert!(l != 0, "Null literal is about to be equeued");
         let dl = self.decision_level();
-        let v = &mut self.vars[l.vi()];
-        v.assign = l.lbool();
-        v.level = dl;
-        v.reason = cid;
+        {
+            let v = &mut self.vars[l.vi()];
+            v.assign = l.lbool();
+            v.level = dl;
+            v.reason = cid;
+            if dl == 0 {
+                v.activity = 0.0;
+            }
+        }
+        if dl == 0 {
+            self.var_order.remove(&mut self.vars, l.vi());
+        }
         mref!(self.cp, cid).set_flag(ClauseFlag::Locked, true);
         self.trail.push(l);
     }
