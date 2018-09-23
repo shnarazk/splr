@@ -972,7 +972,7 @@ impl<'a> Iterator for ClauseListIter<'a> {
         } else {
             let c = &self.vec[self.next_index as usize];
             self.next_index = c.next_watcher[(c.lit[0] != self.target) as usize];
-            Some(&self.vec[self.next_index as usize])
+            Some(c)
         }
     }
 }
