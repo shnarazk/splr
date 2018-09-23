@@ -39,10 +39,10 @@ fn check_occurs() {
     s.attach_clause(c3);
     // s.attach_clause(c4);
     // s.vars.dump("##added");
-    s.eliminator.dump("##added");
+    println!("{:?}", s.eliminator);
     s.eliminate();
     // s.vars.dump("##eliminated");
-    s.eliminator.dump("##eliminated");
+    println!("{:?}", s.eliminator);
     println!("::done");
 }
 
