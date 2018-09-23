@@ -181,10 +181,8 @@ impl EmaKind for Ema {
         self.0 / self.2
     }
     fn update(&mut self, x: f64) -> () {
-        let e = self.1 * x + (1.0 - self.1) * self.0;
-        self.0 = e;
-        let c = self.1 + (1.0 - self.1) * self.2;
-        self.2 = c;
+        self.0 = self.1 * x + (1.0 - self.1) * self.0;
+        self.2 = self.1 + (1.0 - self.1) * self.2;
     }
     fn reset(&mut self) -> () {
         self.2 = self.0;
@@ -257,7 +255,7 @@ impl Default for SolverConfiguration {
             variable_decay_rate: 0.95,
             clause_decay_rate: 0.999,
             dump_solver_stat_mode: 0,
-            ema_coeffs: (2 ^ 5, 2 ^ 14),
+            ema_coeffs: (2 ^ 5, 2 ^ 15),
             restart_expansion: 1.15,
             restart_step: 100.0,
             use_sve: false,

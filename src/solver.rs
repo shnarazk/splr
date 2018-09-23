@@ -171,8 +171,8 @@ impl Solver {
             an_level_map_key: 1,
             mi_var_map: vec![0; nv + 1],
             lbd_seen: vec![0; nv + 1],
-            ema_asg: Ema2::new(4.0, 8192.0),  // for blocking
-            ema_lbd: Ema2::new(64.0, 8192.0), // for forcing
+            ema_asg: Ema2::new(25.0, f64::from(se)),  // for blocking
+            ema_lbd: Ema2::new(25.0, f64::from(se)),  // for forcing
             b_lvl: Ema::new(se),
             c_lvl: Ema::new(se),
             next_restart: 100,
@@ -189,8 +189,7 @@ impl Solver {
         };
         let sum = k + self.eliminator.eliminated_vars;
         let learnts = &self.cp[ClauseKind::Removable as usize];
-        let deads = learnts.count(GARBAGE_LIT, 0) + learnts.count(RECYCLE_LIT, 0);
-        let cnt = learnts
+        let good = learnts
             .clauses
             .iter()
             .filter(|c| c.index != 0 && !c.get_flag(ClauseFlag::Dead) && c.rank <= 3)
@@ -206,8 +205,8 @@ impl Solver {
                 nv - self.trail.len(),
                 sum,
                 (sum as f32) / (nv as f32) * 100.0,
-                cnt,
-                deads,
+                self.cp[ClauseKind::Removable as usize].clauses.iter().filter(|c| !c.get_flag(ClauseFlag::Dead)).count(),
+                good,
                 self.cp[ClauseKind::Permanent as usize].clauses.iter().filter(|c| !c.get_flag(ClauseFlag::Dead)).count(),
                 self.cp[ClauseKind::Binclause as usize].clauses.iter().filter(|c| !c.get_flag(ClauseFlag::Dead)).count(),
                 self.stats[Stat::BlockRestart as usize],
@@ -427,58 +426,52 @@ impl CDCL for Solver {
                 ClauseKind::Removable,
                 ClauseKind::Permanent,
             ];
-            let mut ci: ClauseIndex;
             for kind in &kinds {
                 unsafe {
                     let clauses = &mut cp[*kind as usize].clauses[..] as *mut [Clause];
                     let watcher = &mut cp[*kind as usize].watcher[..] as *mut [ClauseIndex];
-                    ci = (*watcher)[p];
-                    let mut tail = &mut (*watcher)[p] as *mut usize;
-                    *tail = NULL_CLAUSE;
-                    'next_clause: while ci != NULL_CLAUSE {
-                        let c = &mut (*clauses)[ci] as *mut Clause;
+                    let mut pre = &mut (*watcher)[p] as *mut usize;
+                    'next_clause: while *pre != NULL_CLAUSE {
+                        let c = &mut (*clauses)[*pre] as *mut Clause;
                         if (*c).lit[0] == false_lit {
                             (*c).lit.swap(0, 1); // now my index is 1, others is 0.
                             (*c).next_watcher.swap(0, 1);
                         }
-                        ci = (*c).next_watcher[1];
-                        // let next = (*c).next_watcher[1];
                         let other = (*c).lit[0];
                         let other_value = vars.assigned(other);
                         if other_value != LTRUE {
                             for (k, lk) in (*c).lits.iter().enumerate() {
                                 // below is equivalent to 'assigned(lk) != LFALSE'
                                 if (((lk & 1) as u8) ^ vars[lk.vi()].assign) != 0 {
+                                    *pre = (*c).next_watcher[1];
                                     let alt = &mut (*watcher)[lk.negate() as usize];
                                     (*c).next_watcher[1] = *alt;
                                     *alt = (*c).index;
                                     (*c).lit[1] = *lk;
-                                    (*c).lits[k] = false_lit; // WARN: update this lastly (needed by enuremate)
+                                    (*c).lits[k] = false_lit; // Don't move this above (needed by enuremate)
                                     continue 'next_clause;
                                 }
                             }
                             if other_value == LFALSE {
-                                *tail = (*c).index;
                                 *q_head = trail.len();
                                 return kind.id_from((*c).index);
                             } else {
-                                // uncheck_enqueue(lit, kind.id_from((*c).index));
-                                // uenqueue!(vars, trail, trail_lim, lit, kind.id_from((*c).index));
+                                // self.uncheck_enqueue(other, kind.id_from((*c).index));
                                 let dl = trail_lim.len();
                                 let v = &mut vars[other.vi()];
                                 v.assign = other.lbool();
                                 v.level = dl;
-                                v.reason = kind.id_from((*c).index);
+                                if dl == 0 {
+                                    v.activity = 0.0;
+                                    v.reason = NULL_CLAUSE;
+                                } else {
+                                    v.reason = kind.id_from((*c).index);
+                                }
                                 trail.push(other);
                                 (*c).set_flag(ClauseFlag::Locked, true);
                             }
                         }
-                        let watch = (*watcher)[p];
-                        if watch == 0 {
-                            tail = &mut (*c).next_watcher[1];
-                        }
-                        (*c).next_watcher[1] = watch;
-                        (*watcher)[p] = (*c).index;
+                        pre = &mut (*c).next_watcher[1];
                     }
                 }
             }
@@ -532,14 +525,19 @@ impl CDCL for Solver {
                     unsafe {
                         let v = &mut self.an_learnt_lits as *mut Vec<Lit>;
                         lbd = self.lbd_vec(&*v);
-                        self.add_learnt(&mut *v, lbd);
+                        // self.add_learnt(&mut *v, lbd);
+                        let cid = self.add_learnt(&mut *v, lbd);
+                        if cid.to_kind() == ClauseKind::Binclause as usize {
+                            let c = iref!(self.cp, cid) as *const Clause;
+                            self.biclause_subsume(&*c);
+                        }
                     }
                 }
                 if self.stats[Stat::Conflict as usize] == 100_000 {
                     self.cancel_until(0);
                     self.simplify();
                     self.adapt_strategy();
-                } else {
+                } else if 0 < lbd {
                     self.block_restart(lbd, dl, bl, nas);
                 }
                 // self.decay_var_activity();

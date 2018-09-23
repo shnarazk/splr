@@ -20,10 +20,10 @@ impl Restart for Solver {
     /// called after conflict resolution
     fn block_restart(&mut self, lbd: usize, clv: usize, blv: usize, nas: usize) -> () {
         let count = self.stats[Stat::Conflict as usize] as u64;
-        self.ema_asg.update(nas as f64);
-        self.ema_lbd.update(lbd as f64);
         self.c_lvl.update(clv as f64);
         self.b_lvl.update(blv as f64);
+        self.ema_asg.update(nas as f64 / self.c_lvl.0);
+        self.ema_lbd.update(lbd as f64 / self.b_lvl.0);
         if count == RESET_EMA {
             self.ema_asg.reset();
             self.ema_lbd.reset();
@@ -39,6 +39,8 @@ impl Restart for Solver {
     /// called after no conflict propagation
     fn force_restart(&mut self) -> () {
         let count = self.stats[Stat::Conflict as usize] as u64;
+        // let nas = self.trail.len();
+        // self.ema_asg.update(nas as f64 / self.c_lvl.0);
         if self.next_restart < count && K < self.ema_lbd.get() {
             self.next_restart = count + RESTART_PERIOD;
             self.stats[Stat::Restart as usize] += 1;

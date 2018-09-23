@@ -36,6 +36,7 @@ pub trait ClauseManagement {
     fn simplify(&mut self) -> bool;
     fn lbd_vec(&mut self, v: &[Lit]) -> usize;
     fn lbd_of(&mut self, c: &Clause) -> usize;
+    fn biclause_subsume(&mut self, c: &Clause) -> ();
 }
 
 // const DB_INIT_SIZE: usize = 1000;
@@ -535,6 +536,7 @@ impl ClauseManagement for Solver {
     }
 
     fn reduce(&mut self) -> () {
+        // self.cp[ClauseKind::Removable as usize].reset_lbd(&self.vars);
         {
             let ClausePack {
                 ref mut clauses,
@@ -550,7 +552,7 @@ impl ClauseManagement for Solver {
             permutation[1..].sort_by(|&a, &b| clauses[a].cmp(&clauses[b]));
             let nc = permutation.len();
             let keep = nc / 2;
-            if clauses[permutation[keep]].rank <= 4 {
+            if clauses[permutation[keep]].rank <= 5 {
                 self.next_reduction += 1000;
             };
             for i in keep..nc {
@@ -566,7 +568,7 @@ impl ClauseManagement for Solver {
         }
         // self.garbage_collect(ClauseKind::Removable);
         self.cp[ClauseKind::Removable as usize].garbage_collect();
-        self.cp[ClauseKind::Removable as usize].reset_lbd(&self.vars);
+        // self.cp[ClauseKind::Removable as usize].reset_lbd(&self.vars);
         self.next_reduction += DB_INC_SIZE;
         self.stats[Stat::Reduction as usize] += 1;
     }
@@ -581,7 +583,7 @@ impl ClauseManagement for Solver {
             self.eliminator.last_invocatiton = self.stats[Stat::Reduction as usize] as usize;
         }
         // reset reason since decision level is zero.
-        for v in &mut self.vars {
+        for v in &mut self.vars[1..] {
             if v.reason != NULL_CLAUSE {
                 self.cp[v.reason.to_kind()].clauses[v.reason.to_index()]
                     .set_flag(ClauseFlag::Locked, false);
@@ -590,8 +592,7 @@ impl ClauseManagement for Solver {
         }
         for ck in &CLAUSE_KINDS {
             for c in &mut self.cp[*ck as usize].clauses[1..] {
-                c.rank = c.len();
-                if self.vars.satisfies(c) {
+                if !c.get_flag(ClauseFlag::Dead) && self.vars.satisfies(c) {
                     c.set_flag(ClauseFlag::Dead, true);
                     self.cp[*ck as usize].touched[c.lit[0].negate() as usize] = true;
                     self.cp[*ck as usize].touched[c.lit[1].negate() as usize] = true;
@@ -612,7 +613,6 @@ impl ClauseManagement for Solver {
             //     }
             // }
             self.cp[*ck as usize].garbage_collect();
-            // self.garbage_collect(*ck);
         }
         self.stats[Stat::Simplification as usize] += 1;
         //        if self.eliminator.use_elim
@@ -672,6 +672,38 @@ impl ClauseManagement for Solver {
         }
         self.lbd_seen[0] = key;
         cnt
+    }
+    fn biclause_subsume(&mut self, bi: &Clause) -> () {
+        debug_assert_eq!(bi.len(), 2);
+        for cp in &mut self.cp[..ClauseKind::Binclause as usize] {
+            let mut flag = false;
+            'next_clause: for c in &mut cp.clauses[1..] {
+                if c.get_flag(ClauseFlag::Dead) {
+                    continue;
+                }
+                let mut cnt = 0;
+                for i in 0..c.len() {
+                    let l = lindex!(c, i);
+                    if l == bi.lit[0] || l == bi.lit[1] {
+                        cnt += 1;
+                        if cnt == 2 {
+                            // if c.get_flag(ClauseFlag::Locked) {
+                            //     panic!("what to do!");
+                            // }
+                            // println!("{:#} subsumes {:#}", bi, c);
+                            c.set_flag(ClauseFlag::Dead, true);
+                            cp.touched[c.lit[0].negate() as usize] = true;
+                            cp.touched[c.lit[1].negate() as usize] = true;
+                            flag = true;
+                            continue 'next_clause;
+                        }
+                    }
+                }
+            }
+            if flag {
+                cp.garbage_collect();
+            }
+        }
     }
 }
 
@@ -841,7 +873,7 @@ impl GC for ClausePack {
                 c.lits.push(*l);
             }
             c.rank = rank;
-            c.flags = 0; // reset Dead, JustUsed, SveMark and Touched
+            c.flags = self.kind as u32; // reset Dead, JustUsed, SveMark and Touched
             c.set_flag(ClauseFlag::Locked, locked);
             c.set_flag(ClauseFlag::Learnt, learnt);
             c.activity = 0.0;
