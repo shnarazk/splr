@@ -290,7 +290,6 @@ impl Clause {
     }
     pub fn null() -> Clause {
         Clause {
-            //            kind: ClauseKind::Permanent,
             activity: 0.0,
             rank: RANK_NULL,
             next_watcher: [NULL_CLAUSE; 2],
@@ -601,15 +600,26 @@ impl ClauseManagement for Solver {
             // for (lit, start) in self.cp[*ck as usize].watcher.iter().enumerate().skip(2) {
             //     let neg = (lit as Lit).negate();
             //     if self.vars.assigned(neg) == LTRUE {
-            //         self.cp[*ck as usize].touched[lit] = true;
-            //         let mut ci = *start;
-            //         while ci != NULL_CLAUSE {
-            //             let c = &mut self.cp[*ck as usize].clauses[ci];
-            //             debug_assert!(!c.get_flag(ClauseFlag::Locked));
-            //             c.set_flag(ClauseFlag::Dead, true);
-            //             self.cp[*ck as usize].touched[c.lit[(c.lit[0] == neg) as usize].negate() as usize] = true;
-            //             ci = c.next_watcher[(c.lit[0] != neg) as usize];
-            //         }
+            //         assert!(*start == NULL_CLAUSE);
+            //         // self.cp[*ck as usize].touched[lit] = true;
+            //         // let mut ci = *start;
+            //         // while ci != NULL_CLAUSE {
+            //         //     let c = &mut self.cp[*ck as usize].clauses[ci];
+            //         //     debug_assert!(!c.get_flag(ClauseFlag::Locked));
+            //         //     c.set_flag(ClauseFlag::Dead, true);
+            //         //     self.cp[*ck as usize].touched[c.lit[(c.lit[0] == neg) as usize].negate() as usize] = true;
+            //         //     ci = c.next_watcher[(c.lit[0] != neg) as usize];
+            //         // }
+            //     }
+            // }
+            // self.cp[*ck as usize].garbage_collect();
+            // for (lit, start) in self.cp[*ck as usize].watcher.iter().enumerate().skip(2) {
+            //     let neg = (lit as Lit).negate();
+            //     if self.vars.assigned(neg) == LFALSE {
+            //         assert!(*start == NULL_CLAUSE);
+            //     }
+            //     if self.vars.assigned(neg) == LTRUE {
+            //         assert!(*start == NULL_CLAUSE);
             //     }
             // }
             self.cp[*ck as usize].garbage_collect();

@@ -171,8 +171,8 @@ impl Solver {
             an_level_map_key: 1,
             mi_var_map: vec![0; nv + 1],
             lbd_seen: vec![0; nv + 1],
-            ema_asg: Ema2::new(25.0, f64::from(se)),  // for blocking
-            ema_lbd: Ema2::new(25.0, f64::from(se)),  // for forcing
+            ema_asg: Ema2::new(1.1, f64::from(se)),  // for blocking
+            ema_lbd: Ema2::new(50.0, f64::from(se)),  // for forcing
             b_lvl: Ema::new(se),
             c_lvl: Ema::new(se),
             next_restart: 100,
@@ -490,12 +490,12 @@ impl CDCL for Solver {
                 if na == self.num_vars {
                     return true;
                 }
-                self.force_restart();
-                if self.decision_level() == 0 && self.num_solved_vars < na {
+                if self.decision_level() == 0 { // && self.num_solved_vars < na
                     self.simplify();
                     self.num_solved_vars = self.num_assigns();
-                    // self.rebuild_vh();
+                    self.rebuild_vh();
                 }
+                self.force_restart();
                 if self.trail.len() <= self.q_head {
                     let vi = self.select_var();
                     debug_assert_ne!(vi, 0);
@@ -574,16 +574,15 @@ impl CDCL for Solver {
             let vi = l.vi();
             {
                 let v = &mut self.vars[vi];
-                v.phase = v.assign;
                 v.assign = BOTTOM;
                 if v.reason != NULL_CLAUSE {
-                    self.cp[v.reason.to_kind()].clauses[v.reason.to_index()]
-                        .set_flag(ClauseFlag::Locked, false);
+                    mref!(self.cp, v.reason).set_flag(ClauseFlag::Locked, false);
                     v.reason = NULL_CLAUSE;
                 }
+                v.phase = v.assign;
             }
             self.var_order.insert(&self.vars, vi);
-            self.var_order.update_seek(vi); // actually no need to call; percolate_up updates 'seek'.
+            // self.var_order.update_seek(vi); // actually no need to call; percolate_up updates 'seek'.
         }
         self.trail.truncate(lim);
         self.trail_lim.truncate(lv);
@@ -598,11 +597,11 @@ impl CDCL for Solver {
             {
                 let v = &mut self.vars[l.vi()];
                 v.assign = sig;
-                v.level = dl;
                 v.reason = cid;
                 if dl == 0 {
                     v.activity = 0.0;
                 }
+                v.level = dl;
                 mref!(self.cp, cid).set_flag(ClauseFlag::Locked, true);
             }
             if dl == 0 {
@@ -665,7 +664,8 @@ impl CDCL for Solver {
                             //     l
                             // );
                             path_cnt += 1;
-                            if self.vars[vi].reason != NULL_CLAUSE {
+                            if self.vars[vi].reason != NULL_CLAUSE
+                                && self.vars[vi].reason.to_kind() == ClauseKind::Removable as usize {
                                 self.an_last_dl.push(q);
                             }
                         } else {
@@ -720,6 +720,7 @@ impl CDCL for Solver {
                 self.an_level_map[self.vars[l.vi()].level] = self.an_level_map_key;
             }
         }
+        self.an_level_map[0] = self.an_level_map_key;
         let mut j = 1;
         for i in 1..n {
             let l = self.an_learnt_lits[i];
@@ -736,8 +737,7 @@ impl CDCL for Solver {
         let lbd = self.lbd_of_an_learnt_lits();
         while let Some(l) = self.an_last_dl.pop() {
             let vi = l.vi();
-            let cid = self.vars[vi].reason;
-            if lbd < self.cp[cid.to_kind()].clauses[cid.to_index()].rank {
+            if lbd < iref!(self.cp, self.vars[vi].reason).rank {
                 self.bump_vi(vi);
             }
         }
@@ -804,7 +804,7 @@ impl Solver {
         self.an_stack.clear();
         self.an_stack.push(l);
         let top = self.an_to_clear.len();
-        let key = self.an_level_map_key;
+        let key = self.an_level_map[0];
         while let Some(sl) = self.an_stack.pop() {
             let cid = self.vars[sl.vi()].reason;
             let c = &mut self.cp[cid.to_kind()].clauses[cid.to_index()];
@@ -815,7 +815,7 @@ impl Solver {
                 let q = lindex!(c, i);
                 let vi = q.vi();
                 let lv = self.vars[vi].level;
-                if self.an_seen[vi] != 1 && lv != 0 {
+                if self.an_seen[vi] != 1 && 0 < lv {
                     if self.vars[vi].reason != NULL_CLAUSE && self.an_level_map[lv as usize] == key
                     {
                         self.an_seen[vi] = 1;
@@ -838,38 +838,33 @@ impl Solver {
         if 30 < len {
             return;
         }
-        unsafe {
-            let key = self.an_level_map_key;
-            let nblevels = self.lbd_of_an_learnt_lits();
-            let vec = &mut self.an_learnt_lits as *mut Vec<Lit>;
-            if 6 < nblevels {
-                return;
-            }
-            let l0 = self.an_learnt_lits[0];
-            let p: Lit = l0.negate();
-            for i in 1..len {
-                self.mi_var_map[(*vec)[i].vi() as usize] = key;
-            }
-            let mut nb = 0;
-            let mut cix = self.cp[ClauseKind::Binclause as usize].watcher[p as usize];
-            while cix != NULL_CLAUSE {
-                let c = &self.cp[ClauseKind::Binclause as usize].clauses[cix];
-                let other = if c.lit[0] == p { c.lit[1] } else { c.lit[0] };
-                let vi = other.vi();
-                if self.mi_var_map[vi] == key && self.vars.assigned(other) == LTRUE {
-                    nb += 1;
-                    self.mi_var_map[vi] -= 1;
-                }
-                cix = if c.lit[0] == l0 {
-                    c.next_watcher[0]
-                } else {
-                    debug_assert_eq!(c.lit[1], l0);
-                    c.next_watcher[1]
-                };
-            }
-            if 0 < nb {
-                (*vec).retain(|l| *l == l0 || self.mi_var_map[l.vi()] == key);
-            }
+        let nblevels = self.lbd_of_an_learnt_lits();
+        if 6 < nblevels {
+            return;
+        }
+        self.an_level_map_key += 1;
+        let key = self.an_level_map_key;
+        for l in &self.an_learnt_lits[1..] {
+            self.mi_var_map[l.vi() as usize] = key;
+        }
+        let l0 = self.an_learnt_lits[0];
+        let mut nb = 0;
+        for c in self.cp[ClauseKind::Binclause as usize].iter_watcher(l0) {
+            debug_assert!(c.lit[0] == l0 || c.lit[1] == l0);
+            let other = c.lit[(c.lit[0] == l0) as usize];
+            let vi = other.vi();
+            if self.mi_var_map[vi] == key && self.vars.assigned(other) == LTRUE {
+                 nb += 1;
+                 self.mi_var_map[vi] -= 1;
+             }
+        }
+        if 0 < nb {
+            let Solver {
+                ref mut an_learnt_lits,
+                mi_var_map,
+                ..
+            } = self;
+            an_learnt_lits.retain(|l| *l == l0 || mi_var_map[l.vi()] == key);
         }
     }
 

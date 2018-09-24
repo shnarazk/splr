@@ -22,15 +22,15 @@ impl Restart for Solver {
         let count = self.stats[Stat::Conflict as usize] as u64;
         self.c_lvl.update(clv as f64);
         self.b_lvl.update(blv as f64);
-        self.ema_asg.update(nas as f64 / self.c_lvl.0);
-        self.ema_lbd.update(lbd as f64 / self.b_lvl.0);
+        self.ema_asg.update(nas as f64);
+        self.ema_lbd.update(lbd as f64);
         if count == RESET_EMA {
             self.ema_asg.reset();
             self.ema_lbd.reset();
             self.c_lvl.reset();
             self.b_lvl.reset();
         }
-        if self.next_restart <= count && 0 < lbd && R < self.ema_asg.get() {
+        if self.next_restart <= count && R < self.ema_asg.get() {
             self.next_restart = count + RESTART_PERIOD;
             self.stats[Stat::BlockRestart as usize] += 1;
         }

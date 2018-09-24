@@ -33,7 +33,7 @@ pub trait VarOrdering {
 
 pub const VAR_DECAY: f64 = 0.8;
 pub const MAX_VAR_DECAY: f64 = 0.95;
-const VAR_ACTIVITY_THRESHOLD: f64 = 1e100;
+// const VAR_ACTIVITY_THRESHOLD: f64 = 1e100;
 
 /// Struct for a variable.
 #[derive(Debug)]
