@@ -48,12 +48,56 @@ pub const CLAUSE_KINDS: [ClauseKind; 3] = [
     ClauseKind::Binclause,
 ];
 
+
+pub const RANK_NULL: usize = 0; // for NULL_CLAUSE
+pub const RANK_CONST: usize = 1; // for given clauses
+pub const RANK_NEED: usize = 2; // for newly generated bi-clauses
+
+/// Clause Index, not ID because it's used only within a Vec<Clause>
+pub type ClauseIndex = usize;
+
+#[derive(Copy, Clone, Debug)]
+pub struct ClauseHead {
+    /// The first two literals
+    pub lit: [Lit; 2],
+    /// the literals without lit0 and lit1
+    pub next_watcher: [ClauseIndex; 2],
+    /// index (not id), used in a CP.
+    pub index: ClauseIndex,
+}
+
+/// Clause
+#[derive(Debug)]
+pub struct ClauseBody {
+    /// the remaining literals
+    pub lits: Vec<Lit>,
+    /// LBD or NDD and so on, used by `reduce_db`
+    pub rank: usize,
+    /// collection of bits
+    pub flags: u32,
+    /// clause activity used by `analyze` and `reduce_db`
+    pub activity: f64,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq)]
+pub enum ClauseFlag {
+    Kind0 = 0,
+    Kind1,
+    Dead,
+    Locked,
+    Learnt,
+    JustUsed,
+    SveMark,
+    Touched,
+}
+
 /// partition of clauses
 #[derive(Debug)]
 pub struct ClausePack {
     pub kind: ClauseKind,
     pub init_size: usize,
-    pub clauses: Vec<Clause>,
+    pub body: Vec<Clause>,
+C   pub clauses: Vec<ClauseHead>,
     pub touched: Vec<bool>,
     pub permutation: Vec<ClauseIndex>,
     pub watcher: Vec<ClauseIndex>,
@@ -173,44 +217,6 @@ impl Clause {
     pub fn get_flag(&self, flag: ClauseFlag) -> bool {
         self.flags & (1 << flag as u32) != 0
     }
-}
-
-pub const RANK_NULL: usize = 0; // for NULL_CLAUSE
-pub const RANK_CONST: usize = 1; // for given clauses
-pub const RANK_NEED: usize = 2; // for newly generated bi-clauses
-
-/// Clause Index, not ID because it's used only within a Vec<Clause>
-pub type ClauseIndex = usize;
-
-/// Clause
-#[derive(Debug)]
-pub struct Clause {
-    /// index (not id), used in a CP.
-    pub index: ClauseIndex,
-    /// LBD or NDD and so on, used by `reduce_db`
-    pub lit: [Lit; 2],
-    /// the literals without lit0 and lit1
-    pub next_watcher: [ClauseIndex; 2],
-    /// The first two literals
-    pub lits: Vec<Lit>,
-    /// for `ClauseFlag`
-    pub rank: usize,
-    /// ClauseIndexes of the next in the watch liss
-    pub flags: u32,
-    /// clause activity used by `analyze` and `reduce_db`
-    pub activity: f64,
-}
-
-#[derive(Copy, Clone, PartialEq, Eq)]
-pub enum ClauseFlag {
-    Kind0 = 0,
-    Kind1,
-    Dead,
-    Locked,
-    Learnt,
-    JustUsed,
-    SveMark,
-    Touched,
 }
 
 impl ClauseFlag {
