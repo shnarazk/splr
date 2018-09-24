@@ -1,4 +1,4 @@
-use clause::Clause;
+// use clause::Clause;
 use solver::{Solver, Stat};
 use std::fmt;
 use types::*;

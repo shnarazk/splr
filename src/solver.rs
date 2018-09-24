@@ -1,5 +1,5 @@
 use clause::{*, ClauseManagement, GC};
-use eliminator::Eliminator;
+// use eliminator::Eliminator;
 use restart::Restart;
 use std::cmp::max;
 use std::fs;
@@ -102,7 +102,7 @@ pub struct Solver {
     pub cur_restart: usize,
     pub num_solved_vars: usize,
     /// Variable Elimination
-    pub eliminator: Eliminator,
+//    pub eliminator: Eliminator,
     /// Working memory
     pub ok: bool,
     pub model: Vec<Lbool>,
@@ -157,7 +157,7 @@ impl Solver {
             next_reduction: 1000,
             cur_restart: 1,
             num_solved_vars: 0,
-            eliminator: Eliminator::new(use_sve, nv),
+//            eliminator: Eliminator::new(use_sve, nv),
             ok: true,
             model: vec![BOTTOM; nv + 1],
             conflicts: vec![],

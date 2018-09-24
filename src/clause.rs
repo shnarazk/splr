@@ -6,17 +6,12 @@ use std::usize::MAX;
 use types::*;
 use var::{Satisfiability, Var};
 
-/// for ClauseIndex
-pub trait ClauseList {
-    fn push(&mut self, cix: ClauseIndex, list: &mut ClauseIndex) -> ClauseIndex;
-    fn push_garbage(&mut self, c: &mut Clause, index: usize) -> ClauseIndex;
-}
-
 /// for ClausePack
 pub trait GC {
     fn garbage_collect(&mut self) -> ();
     fn new_clause(&mut self, v: &[Lit], rank: usize, learnt: bool, locked: bool) -> ClauseId;
     fn reset_lbd(&mut self, vars: &[Var]) -> ();
+    fn move_to(&mut self, list: &mut ClauseId, ci: ClauseIndex, index: usize) -> ClauseIndex;
 }
 
 /// for usize
@@ -35,8 +30,8 @@ pub trait ClauseManagement {
     fn reduce(&mut self) -> ();
     fn simplify(&mut self) -> bool;
     fn lbd_of_an_learnt_lits(&mut self) -> usize;
-    fn lbd_of(&mut self, c: &Clause) -> usize;
-    fn biclause_subsume(&mut self, c: &Clause) -> ();
+    fn lbd_of(&mut self, c: &ClauseBody) -> usize;
+    fn biclause_subsume(&mut self, c: &ClauseHead) -> ();
 }
 
 // const DB_INIT_SIZE: usize = 1000;
@@ -69,12 +64,12 @@ pub struct ClauseHead {
 /// Clause
 #[derive(Debug)]
 pub struct ClauseBody {
+    /// collection of bits
+    pub flag: u16,
     /// the remaining literals
     pub lits: Vec<Lit>,
     /// LBD or NDD and so on, used by `reduce_db`
     pub rank: usize,
-    /// collection of bits
-    pub flags: u32,
     /// clause activity used by `analyze` and `reduce_db`
     pub activity: f64,
 }
@@ -96,8 +91,8 @@ pub enum ClauseFlag {
 pub struct ClausePack {
     pub kind: ClauseKind,
     pub init_size: usize,
-    pub body: Vec<Clause>,
-C   pub clauses: Vec<ClauseHead>,
+    pub body: Vec<ClauseBody>,
+    pub clause: Vec<ClauseHead>,
     pub touched: Vec<bool>,
     pub permutation: Vec<ClauseIndex>,
     pub watcher: Vec<ClauseIndex>,
@@ -140,8 +135,19 @@ impl ClausePack {
     pub fn build(kind: ClauseKind, nv: usize, nc: usize) -> ClausePack {
         let tag = kind.tag();
         let mask = kind.mask();
-        let mut clauses = Vec::with_capacity(1 + nc);
-        clauses.push(Clause::null());
+        let mut clause = Vec::with_capacity(1 + nc);
+        let mut body = Vec::with_capacity(1 + nc);
+        clause.push(ClauseHead {
+            next_watcher: [NULL_CLAUSE; 2],
+            lit: [NULL_LIT; 2],
+            index: 0,
+        });
+        body.push(ClauseBody {
+            flag: 0,
+            lits: vec![],
+            rank: RANK_NULL,
+            activity: 0.0,
+        });
         let mut permutation = Vec::new();
         permutation.push(0); // for NULL_CLAUSE
         let mut watcher = Vec::with_capacity(2 * (nv + 1));
@@ -153,7 +159,8 @@ impl ClausePack {
         ClausePack {
             kind,
             init_size: nc,
-            clauses,
+            clause,
+            body,
             touched,
             permutation,
             watcher,
@@ -162,21 +169,21 @@ impl ClausePack {
             index_bits: CLAUSE_INDEX_BITS,
         }
     }
-    pub fn attach(&mut self, mut c: Clause) -> ClauseId {
-        let w0 = c.lit[0].negate() as usize;
-        let w1 = c.lit[1].negate() as usize;
-        let cix = self.clauses.len();
-        c.index = cix;
-        c.flags &= !3;
-        c.flags |= self.kind as u32;
-        self.permutation.push(cix);
-        c.next_watcher[0] = self.watcher[w0];
-        self.watcher[w0] = cix;
-        c.next_watcher[1] = self.watcher[w1];
-        self.watcher[w1] = cix;
-        self.clauses.push(c);
-        self.id_from(cix)
-    }
+//    pub fn attach(&mut self, mut c: Clause) -> ClauseId {
+//        let w0 = c.lit[0].negate() as usize;
+//        let w1 = c.lit[1].negate() as usize;
+//        let cix = self.clauses.len();
+//        c.index = cix;
+//        c.flag &= !3;
+//        c.flag |= self.kind as u32;
+//        self.permutation.push(cix);
+//        c.next_watcher[0] = self.watcher[w0];
+//        self.watcher[w0] = cix;
+//        c.next_watcher[1] = self.watcher[w1];
+//        self.watcher[w1] = cix;
+//        self.clauses.push(c);
+//        self.id_from(cix)
+//    }
     pub fn id_from(&self, cix: ClauseIndex) -> ClauseId {
         cix | self.tag
     }
@@ -201,9 +208,9 @@ impl ClausePack {
     }
 }
 
-impl Clause {
+impl ClauseBody {
     pub fn get_kind(&self) -> ClauseKind {
-        match self.flags & 3 {
+        match self.flag & 3 {
             0 => ClauseKind::Removable,
             1 => ClauseKind::Permanent,
             2 => ClauseKind::Binclause,
@@ -211,11 +218,11 @@ impl Clause {
         }
     }
     pub fn set_flag(&mut self, flag: ClauseFlag, val: bool) -> () {
-        self.flags &= !(1 << (flag as u32));
-        self.flags |= (val as u32) << (flag as u32);
+        self.flag &= !(1 << (flag as u32));
+        self.flag |= (val as u32) << (flag as u32);
     }
     pub fn get_flag(&self, flag: ClauseFlag) -> bool {
-        self.flags & (1 << flag as u32) != 0
+        self.flag & (1 << flag as u32) != 0
     }
 }
 
@@ -239,15 +246,15 @@ impl ClauseIdIndexEncoding for usize {
     }
 }
 
-impl PartialEq for Clause {
-    fn eq(&self, other: &Clause) -> bool {
-        self.index == other.index
-    }
-}
+// impl PartialEq for ClauseHead {
+//     fn eq(&self, other: &ClauseHead) -> bool {
+//         self.index == other.index
+//     }
+// }
+// 
+// impl Eq for Clause {}
 
-impl Eq for Clause {}
-
-impl PartialOrd for Clause {
+impl PartialOrd for ClauseBody {
     fn partial_cmp(&self, other: &Clause) -> Option<Ordering> {
         if self.rank < other.rank {
             Some(Ordering::Less)
@@ -280,31 +287,31 @@ impl Ord for Clause {
 }
 
 impl Clause {
-    pub fn new(kind: ClauseKind, learnt: bool, rank: usize, v: &[Lit]) -> Clause {
-        let mut v = v.to_owned();
-        let lit0 = v.remove(0);
-        let lit1 = v.remove(0);
-        Clause {
-            activity: 0.0,
-            rank,
-            next_watcher: [NULL_CLAUSE; 2],
-            lit: [lit0, lit1],
-            lits: v,
-            index: 0,
-            flags: (kind as u32) | ClauseFlag::Learnt.as_bit(learnt),
-        }
-    }
-    pub fn null() -> Clause {
-        Clause {
-            activity: 0.0,
-            rank: RANK_NULL,
-            next_watcher: [NULL_CLAUSE; 2],
-            lit: [NULL_LIT; 2],
-            lits: vec![],
-            index: 0,
-            flags: 0,
-        }
-    }
+//    pub fn new(kind: ClauseKind, learnt: bool, rank: usize, v: &[Lit]) -> Clause {
+//        let mut v = v.to_owned();
+//        let lit0 = v.remove(0);
+//        let lit1 = v.remove(0);
+//        Clause {
+//            activity: 0.0,
+//            rank,
+//            next_watcher: [NULL_CLAUSE; 2],
+//            lit: [lit0, lit1],
+//            lits: v,
+//            index: 0,
+//            flag: (kind as u32) | ClauseFlag::Learnt.as_bit(learnt),
+//        }
+//    }
+//    pub fn null() -> Clause {
+//        Clause {
+//            activity: 0.0,
+//            rank: RANK_NULL,
+//            next_watcher: [NULL_CLAUSE; 2],
+//            lit: [NULL_LIT; 2],
+//            lits: vec![],
+//            index: 0,
+//            flag: 0,
+//        }
+//    }
     pub fn len(&self) -> usize {
         self.lits.len() + 2
     }
@@ -319,7 +326,7 @@ impl fmt::Display for Clause {
             write!(
                 f,
                 "{{C{}:{} lit:{:?}{:?}, watches{:?}{}{}}}",
-                self.flags & 3,
+                self.flag & 3,
                 self.index,
                 vec2int(&self.lit),
                 vec2int(&self.lits),
@@ -356,7 +363,7 @@ impl fmt::Display for Clause {
                 _ => write!(
                     f,
                     "{}{}[{},{}]{:?}",
-                    match self.flags & 3 {
+                    match self.flag & 3 {
                         0 => 'L',
                         1 => 'P',
                         2 => 'B',
@@ -663,7 +670,9 @@ impl ClauseManagement for Solver {
         self.lbd_seen[0] = key;
         cnt
     }
-    fn lbd_of(&mut self, c: &Clause) -> usize {
+    fn lbd_of(&mut self, ci: &ClauseIndex) -> usize {
+        let c = self.clause[ci];
+        let cb = self.body[ci];
         let key;
         let key_old = self.lbd_seen[0];
         if 100_000_000 < key_old {
@@ -679,7 +688,7 @@ impl ClauseManagement for Solver {
                 cnt += 1;
             }
         }
-        for l in &c.lits {
+        for l in &cb.lits {
             let lv = self.vars[l.vi()].level;
             if self.lbd_seen[lv] != key && lv != 0 {
                 self.lbd_seen[lv] = key;
@@ -689,11 +698,10 @@ impl ClauseManagement for Solver {
         self.lbd_seen[0] = key;
         cnt
     }
-    fn biclause_subsume(&mut self, bi: &Clause) -> () {
-        debug_assert_eq!(bi.len(), 2);
+    fn biclause_subsume(&mut self, bi: &ClauseHead) -> () {
         for cp in &mut self.cp[..ClauseKind::Binclause as usize] {
             let mut flag = false;
-            'next_clause: for c in &mut cp.clauses[1..] {
+            'next_clause: for c in &mut cp.clause[1..] {
                 if c.get_flag(ClauseFlag::Dead) {
                     continue;
                 }
@@ -826,6 +834,7 @@ impl GC for ClausePack {
                         // debug_assert!((*c).lit[0] == GARBAGE_LIT || (*c).lit[1] == GARBAGE_LIT);
                         debug_assert!((*c).lit[0].negate() == l as Lit || (*c).lit[1].negate() == l as Lit);
                         *pri = (*garbages).push_garbage(&mut *c, ((*c).lit[0].negate() != l as Lit) as usize);
+                        *pri = self.move_to(garbages, ci, ((*c).lit[0].negate() != l as Lit) as usize);
                     }
                     ci = *pri;
                 }
@@ -889,7 +898,7 @@ impl GC for ClausePack {
                 c.lits.push(*l);
             }
             c.rank = rank;
-            c.flags = self.kind as u32; // reset Dead, JustUsed, SveMark and Touched
+            c.flag = self.kind as u32; // reset Dead, JustUsed, SveMark and Touched
             c.set_flag(ClauseFlag::Locked, locked);
             c.set_flag(ClauseFlag::Learnt, learnt);
             c.activity = 0.0;
@@ -898,15 +907,26 @@ impl GC for ClausePack {
             c.next_watcher[0] = self.watcher[w0];
             c.next_watcher[1] = self.watcher[w1];
         } else {
-            let mut c = Clause::new(self.kind, learnt, rank, &v);
-            c.set_flag(ClauseFlag::Locked, locked);
-            cix = self.clauses.len();
-            c.index = cix;
-            w0 = c.lit[0].negate() as usize;
-            w1 = c.lit[1].negate() as usize;
-            c.next_watcher[0] = self.watcher[w0];
-            c.next_watcher[1] = self.watcher[w1];
-            self.clauses.push(c);
+            let l0 = v[0];
+            let l1 = v[1];
+            let lits = Vec::with_capacity(v.len() - 2);
+            for l in &v[2..] {
+                lits.push(*l);
+            }
+            cix = self.clause.len();
+            w0 = l0.negate() as usize;
+            w1 = l1.negate() as usize;
+            self.clause.push(ClauseHead {
+                lit: [l0, l1],
+                next_watcher: [self.watcher[w0], self.watcher[w1]],
+                index: cix,
+            });
+            self.body.push(ClauseBody {
+                flag: self.kind as u16 | ClauseFlag::Locked.as_bit(locked) | ClauseFlag::Learnt.as_bit(learnt),
+                lits,
+                rank: rank,
+                activity: 1.0,
+            });
         };
         self.watcher[w0] = cix;
         self.watcher[w1] = cix;
@@ -940,25 +960,19 @@ impl GC for ClausePack {
             c.rank = cnt;
         }
     }
-}
-
-impl ClauseList for ClauseIndex {
-    #[inline(always)]
-    fn push(&mut self, cix: ClauseIndex, item: &mut ClauseIndex) -> ClauseIndex {
-        *item = *self;
-        *self = cix;
-        *item
-    }
-    fn push_garbage(&mut self, c: &mut Clause, index: usize) -> ClauseIndex {
+    fn move_to(&mut self, list: &mut ClauseId, ci: ClauseIndex, index: usize) -> ClauseIndex {
         debug_assert!(index == 0 || index == 1);
         let other = (index ^ 1) as usize;
         debug_assert!(other == 0 || other == 1);
-        c.lit[index] = GARBAGE_LIT;
-        let next = c.next_watcher[index];
-        if c.lit[other] == GARBAGE_LIT {
-            c.next_watcher[index] = c.next_watcher[other];
+        let ch = self.clause[ci];
+        let cb = self.body[ci];
+        ch.lit[index] = GARBAGE_LIT;
+        let next = ch.next_watcher[index];
+        if ch.lit[other] == GARBAGE_LIT {
+            ch.next_watcher[index] = ch.next_watcher[other];
         } else {
-            self.push(c.index, &mut c.next_watcher[index]);
+            ch.next_watcher[index] = list;
+            list = ci;
         }
         next
     }
