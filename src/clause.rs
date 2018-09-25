@@ -1,8 +1,7 @@
-use solver::{CDCL, CO_LBD_BOUND, SearchStrategy, Solver, Stat};
+use solver::{SearchStrategy, Solver, Stat, CDCL, CO_LBD_BOUND};
 use std::cmp::Ordering;
 use std::f64;
 use std::fmt;
-use std::usize::MAX;
 use types::*;
 use var::{Satisfiability, Var};
 
@@ -35,7 +34,6 @@ pub trait ClauseManagement {
     fn num_literals(&self, cid: ClauseIndex) -> usize;
 }
 
-// const DB_INIT_SIZE: usize = 1000;
 const DB_INC_SIZE: usize = 200;
 
 pub const CLAUSE_KINDS: [ClauseKind; 3] = [
@@ -43,7 +41,6 @@ pub const CLAUSE_KINDS: [ClauseKind; 3] = [
     ClauseKind::Permanent,
     ClauseKind::Binclause,
 ];
-
 
 pub const RANK_NULL: usize = 0; // for NULL_CLAUSE
 pub const RANK_CONST: usize = 1; // for given clauses
@@ -95,11 +92,7 @@ pub struct ClausePartition {
     pub head: Vec<ClauseHead>,
     pub body: Vec<ClauseBody>,
     pub touched: Vec<bool>,
-    pub permutation: Vec<ClauseIndex>,
     pub watcher: Vec<ClauseIndex>,
-    pub tag: usize,
-    pub mask: usize,
-    pub index_bits: usize,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -111,7 +104,6 @@ pub enum ClauseKind {
 
 const CLAUSE_INDEX_BITS: usize = 60;
 const CLAUSE_INDEX_MASK: usize = 0x0FFF_FFFF_FFFF_FFFF;
-pub const DEAD_CLAUSE: usize = MAX;
 
 impl ClauseKind {
     pub fn tag(self) -> usize {
@@ -134,8 +126,6 @@ impl ClauseKind {
 
 impl ClausePartition {
     pub fn build(kind: ClauseKind, nv: usize, nc: usize) -> ClausePartition {
-        let tag = kind.tag();
-        let mask = kind.mask();
         let mut head = Vec::with_capacity(1 + nc);
         let mut body = Vec::with_capacity(1 + nc);
         head.push(ClauseHead {
@@ -149,8 +139,6 @@ impl ClausePartition {
             rank: RANK_NULL,
             activity: 0.0,
         });
-        let mut permutation = Vec::new();
-        permutation.push(0); // for NULL_CLAUSE
         let mut watcher = Vec::with_capacity(2 * (nv + 1));
         let mut touched = Vec::with_capacity(2 * (nv + 1));
         for _i in 0..2 * (nv + 1) {
@@ -163,18 +151,14 @@ impl ClausePartition {
             head,
             body,
             touched,
-            permutation,
             watcher,
-            mask,
-            tag,
-            index_bits: CLAUSE_INDEX_BITS,
         }
     }
     pub fn id_from(&self, cix: ClauseIndex) -> ClauseId {
-        cix | self.tag
+        cix | self.kind.tag()
     }
     pub fn index_from(&self, cid: ClauseId) -> ClauseIndex {
-        cid & self.mask
+        cid & self.kind.mask()
     }
     pub fn count(&self, target: Lit, limit: usize) -> usize {
         let mut cnt = 0;
@@ -236,7 +220,7 @@ impl Eq for ClauseHead {}
 
 impl PartialEq for ClauseBody {
     fn eq(&self, other: &ClauseBody) -> bool {
-        &self == &other
+        self == other
     }
 }
 
@@ -298,21 +282,21 @@ impl fmt::Display for ClauseBody {
                 2 => 'B',
                 _ => '?',
             },
-             if self.get_flag(ClauseFlag::Dead) {
-                 ", dead"
-             } else {
-                 ""
-             },
-             if self.get_flag(ClauseFlag::Locked) {
-                 ", locked"
-             } else {
-                 ""
-             },
-             if self.get_flag(ClauseFlag::Learnt) {
-                 ", learnt"
-             } else {
-                 ""
-             },
+            if self.get_flag(ClauseFlag::Dead) {
+                ", dead"
+            } else {
+                ""
+            },
+            if self.get_flag(ClauseFlag::Locked) {
+                ", locked"
+            } else {
+                ""
+            },
+            if self.get_flag(ClauseFlag::Learnt) {
+                ", learnt"
+            } else {
+                ""
+            },
         )
     }
 }
@@ -499,9 +483,11 @@ impl ClauseManagement for Solver {
         }
         for ck in &CLAUSE_KINDS {
             for ci in 1..self.cp[*ck as usize].head.len() {
-                let ch = & self.cp[*ck as usize].head[ci];
+                let ch = &self.cp[*ck as usize].head[ci];
                 let cb = &mut self.cp[*ck as usize].body[ci];
-                if !cb.get_flag(ClauseFlag::Dead) && (self.vars.satisfies(&ch.lit) || self.vars.satisfies(&cb.lits)) {
+                if !cb.get_flag(ClauseFlag::Dead)
+                    && (self.vars.satisfies(&ch.lit) || self.vars.satisfies(&cb.lits))
+                {
                     cb.set_flag(ClauseFlag::Dead, true);
                     self.cp[*ck as usize].touched[ch.lit[0].negate() as usize] = true;
                     self.cp[*ck as usize].touched[ch.lit[1].negate() as usize] = true;
@@ -569,7 +555,7 @@ impl ClauseManagement for Solver {
     }
     fn lbd_of(&mut self, cid: ClauseId) -> usize {
         let ch = clause_head!(self.cp, cid);
-        let cb =clause_body!(self.cp, cid);
+        let cb = clause_body!(self.cp, cid);
         let key;
         let key_old = self.lbd_seen[0];
         if 100_000_000 < key_old {
@@ -661,8 +647,14 @@ impl GC for ClausePartition {
                         pri = &mut (*ch).next_watcher[((*ch).lit[0].vi() != vi) as usize];
                     } else {
                         // debug_assert!((*ch).lit[0] == GARBAGE_LIT || (*ch).lit[1] == GARBAGE_LIT);
-                        debug_assert!((*ch).lit[0].negate() == l as Lit || (*ch).lit[1].negate() == l as Lit);
-                        *pri = self.move_to(&mut *garbages, ci, ((*ch).lit[0].negate() != l as Lit) as usize);
+                        debug_assert!(
+                            (*ch).lit[0].negate() == l as Lit || (*ch).lit[1].negate() == l as Lit
+                        );
+                        *pri = self.move_to(
+                            &mut *garbages,
+                            ci,
+                            ((*ch).lit[0].negate() != l as Lit) as usize,
+                        );
                     }
                     ci = *pri;
                 }
@@ -752,9 +744,11 @@ impl GC for ClausePartition {
                 index: cix,
             });
             self.body.push(ClauseBody {
-                flag: self.kind as u16 | ClauseFlag::Locked.as_bit(locked) | ClauseFlag::Learnt.as_bit(learnt),
+                flag: self.kind as u16
+                    | ClauseFlag::Locked.as_bit(locked)
+                    | ClauseFlag::Learnt.as_bit(learnt),
                 lits,
-                rank: rank,
+                rank,
                 activity: 1.0,
             });
         };

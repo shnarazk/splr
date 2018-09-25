@@ -1,4 +1,4 @@
-use solver::{CDCL, Solver, Stat};
+use solver::{Solver, Stat, CDCL};
 use types::*;
 
 pub trait Restart {
@@ -14,7 +14,7 @@ const RESET_EMA: u64 = 50;
 const R: f64 = 1.5;
 
 /// for force restart based on average LBD of newly generated clauses: 1.15
-const K: f64 = 1.6;
+const K: f64 = 1.2;
 
 impl Restart for Solver {
     /// called after conflict resolution

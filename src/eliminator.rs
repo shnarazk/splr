@@ -7,6 +7,7 @@ use std::fmt;
 use types::*;
 use var::Satisfiability;
 
+const DEAD_CLAUSE: usize = MAX;
 const BWDSUB_CLAUSE: ClauseId = DEAD_CLAUSE - 1;
 const SUBSUMPTION_SIZE: usize = 20;
 const SUBSUMPITON_GROW_LIMIT: usize = 0;

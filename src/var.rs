@@ -210,7 +210,12 @@ impl VarIdHeap {
             idxs.push(i);
         }
         idxs[0] = init;
-        VarIdHeap { order, heap, idxs, seek: 1 }
+        VarIdHeap {
+            order,
+            heap,
+            idxs,
+            seek: 1,
+        }
     }
     /// renamed from getHeapDown
     fn root(&mut self, vec: &[Var]) -> VarId {
@@ -234,7 +239,11 @@ impl VarIdHeap {
         let mut q = start;
         let vq = self.heap[q];
         debug_assert!(0 < vq, "size of heap is too small");
-        let aq = if vars[vq].assign == BOTTOM { vars[vq].activity } else { 0.0 };
+        let aq = if vars[vq].assign == BOTTOM {
+            vars[vq].activity
+        } else {
+            0.0
+        };
         // let aq = match self.order {
         //     VarOrder::ByActivity => vars[vq].activity,
         //     VarOrder::ByOccurence => vars[vq].occurs.len() as f64,
@@ -249,7 +258,11 @@ impl VarIdHeap {
                 return;
             } else {
                 let vp = self.heap[p];
-                let ap = if vars[vp].assign == BOTTOM { vars[vp].activity} else { 0.0 };
+                let ap = if vars[vp].assign == BOTTOM {
+                    vars[vp].activity
+                } else {
+                    0.0
+                };
                 // let ap = match self.order {
                 //     VarOrder::ByActivity => vars[vp].activity,
                 //     VarOrder::ByOccurence => vars[vp].occurs.len() as f64,
@@ -276,19 +289,31 @@ impl VarIdHeap {
         let n = self.len();
         let mut i = start;
         let vi = self.heap[i];
-        let ai = if vars[vi].assign == BOTTOM { vars[vi].activity } else { 0.0 };
+        let ai = if vars[vi].assign == BOTTOM {
+            vars[vi].activity
+        } else {
+            0.0
+        };
         loop {
             let l = 2 * i; // left
             if l <= n {
                 let r = l + 1; // right
                 let vl = self.heap[l];
                 let vr = self.heap[r];
-                let al = if vars[vl].assign == BOTTOM { vars[vl].activity } else { 0.0 };
+                let al = if vars[vl].assign == BOTTOM {
+                    vars[vl].activity
+                } else {
+                    0.0
+                };
                 // let al = match self.order {
                 //     VarOrder::ByActivity => vars[vl].activity,
                 //     VarOrder::ByOccurence => vars[vl].occurs.len() as f64,
                 // };
-                let ar = if vars[vr].assign == BOTTOM { vars[vr].activity } else { 0.0 };
+                let ar = if vars[vr].assign == BOTTOM {
+                    vars[vr].activity
+                } else {
+                    0.0
+                };
                 // let ar = match self.order {
                 //     VarOrder::ByActivity => vars[vr].activity,
                 //     VarOrder::ByOccurence => vars[vr].occurs.len() as f64,
@@ -404,9 +429,7 @@ impl fmt::Display for VarIdHeap {
         write!(
             f,
             " - seek pointer {}\n - clause_queue {:?}\n - heap {:?}",
-            self.seek,
-            self.heap,
-            self.idxs,
+            self.seek, self.heap, self.idxs,
         )
     }
 }
