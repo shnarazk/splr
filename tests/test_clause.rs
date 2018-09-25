@@ -39,7 +39,7 @@ impl Testing for ClauseBody {
 //     assert_ne!(c1, c2);
 //     assert_eq!(c2.activity, 2.4);
 // }
-// 
+//
 // // #[test]
 // fn clause_iterator() -> () {
 //     let c1 = mkc![1, 2, 3];
@@ -68,13 +68,21 @@ fn setup() -> Solver {
         pathname: "".to_string(),
     };
     let mut s = Solver::new(Default::default(), &cnf);
-    attach_clause(& mut s, &mkv![1, 2, -3]).activity(1.0);
-    attach_clause(& mut s, &mkv![1, -2, 3]).activity(4.0).rank(3);
-    attach_clause(& mut s, &mkv![-1, 2, 3, 4]).activity(5.0);
-    attach_clause(& mut s, &mkv![-1, 2, 3, 4]).activity(2.0).rank(2);
-    attach_clause(& mut s, &mkv![-1, 2, 3, 4]).activity(1.0).rank(2);
-    attach_clause(& mut s, &mkv![-1, 2, -3, 4]).activity(1.0).rank(4);
-    attach_clause(& mut s, &mkv![1, 2, -3, -4]).activity(3.0).rank(2);
+    attach_clause(&mut s, &mkv![1, 2, -3]).activity(1.0);
+    attach_clause(&mut s, &mkv![1, -2, 3]).activity(4.0).rank(3);
+    attach_clause(&mut s, &mkv![-1, 2, 3, 4]).activity(5.0);
+    attach_clause(&mut s, &mkv![-1, 2, 3, 4])
+        .activity(2.0)
+        .rank(2);
+    attach_clause(&mut s, &mkv![-1, 2, 3, 4])
+        .activity(1.0)
+        .rank(2);
+    attach_clause(&mut s, &mkv![-1, 2, -3, 4])
+        .activity(1.0)
+        .rank(4);
+    attach_clause(&mut s, &mkv![1, 2, -3, -4])
+        .activity(3.0)
+        .rank(2);
     s
 }
 

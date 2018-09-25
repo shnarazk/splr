@@ -157,7 +157,7 @@ impl Solver {
             next_reduction: 1000,
             cur_restart: 1,
             num_solved_vars: 0,
-            //            eliminator: Eliminator::new(use_sve, nv),
+            // eliminator: Eliminator::new(use_sve, nv),
             ok: true,
             model: vec![BOTTOM; nv + 1],
             conflicts: vec![],
@@ -171,7 +171,7 @@ impl Solver {
             an_level_map_key: 1,
             mi_var_map: vec![0; nv + 1],
             lbd_seen: vec![0; nv + 1],
-            ema_asg: Ema2::new(1.5,  40_000.0), // for blocking
+            ema_asg: Ema2::new(1.5, 40_000.0),  // for blocking
             ema_lbd: Ema2::new(50.0, 50_000.0), // for forcing
             b_lvl: Ema::new(se),
             c_lvl: Ema::new(se),

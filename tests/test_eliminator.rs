@@ -29,29 +29,29 @@ fn check_occurs() {
     let c2 = s.cp[ClauseKind::Permanent as usize].new_clause(&mkv![-2, 3, 4], 3, false, false);
     let c3 = s.cp[ClauseKind::Binclause as usize].new_clause(&mkv![-2, -3], 2, false, false);
     let c4 = s.cp[ClauseKind::Permanent as usize].new_clause(&mkv![1, 2, -3, 9], 4, false, false);
-//    {
-//        let vec = [&c2, &c3]; // [&c1, &c2, &c3, &c4];
-//        for x in &vec {
-//            for y in &vec {
-//                println!(
-//                    "{}\tsubsumes\t{}\t=>\t{:?}",
-//                    x,
-//                    y,
-//                    x.subsumes(&y).map(|l| l.int())
-//                );
-//            }
-//        }
-//    }
-//    // s.attach_clause(c1);
-//    s.attach_clause(c2);
-//    s.attach_clause(c3);
-//    // s.attach_clause(c4);
-//    // s.vars.dump("##added");
-//    println!("{:?}", s.eliminator);
-//    s.eliminate();
-//    // s.vars.dump("##eliminated");
-//    println!("{:?}", s.eliminator);
-//    println!("::done");
+    //    {
+    //        let vec = [&c2, &c3]; // [&c1, &c2, &c3, &c4];
+    //        for x in &vec {
+    //            for y in &vec {
+    //                println!(
+    //                    "{}\tsubsumes\t{}\t=>\t{:?}",
+    //                    x,
+    //                    y,
+    //                    x.subsumes(&y).map(|l| l.int())
+    //                );
+    //            }
+    //        }
+    //    }
+    //    // s.attach_clause(c1);
+    //    s.attach_clause(c2);
+    //    s.attach_clause(c3);
+    //    // s.attach_clause(c4);
+    //    // s.vars.dump("##added");
+    //    println!("{:?}", s.eliminator);
+    //    s.eliminate();
+    //    // s.vars.dump("##eliminated");
+    //    println!("{:?}", s.eliminator);
+    //    println!("::done");
 }
 
 fn mk_c(s: &mut Solver, i: usize, v: Vec<i32>) -> ClauseId {
