@@ -126,12 +126,12 @@ pub trait EmaKind {
 }
 
 /// Exponential Moving Average pair
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Ema2 {
     pub fast: f64,
     pub slow: f64,
-    pub calf: f64,
-    pub cals: f64,
+    calf: f64,
+    cals: f64,
     fe: f64,
     se: f64,
 }
@@ -165,7 +165,7 @@ impl EmaKind for Ema2 {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Ema(pub f64, f64, f64);
 
 /// Exponential Moving Average w/ a calibrator
@@ -189,7 +189,7 @@ impl EmaKind for Ema {
 }
 
 /// Exponential Moving Average w/o a calibrator
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Ema_(pub f64, f64);
 
 impl Ema_ {

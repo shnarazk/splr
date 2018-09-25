@@ -49,7 +49,7 @@ pub const RANK_NEED: usize = 2; // for newly generated bi-clauses
 /// Clause Index, not ID because it's used only within a Vec<Clause>
 pub type ClauseIndex = usize;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct ClauseHead {
     /// The first two literals
     pub lit: [Lit; 2],
@@ -72,7 +72,7 @@ pub struct ClauseBody {
     pub activity: f64,
 }
 
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub enum ClauseFlag {
     Kind0 = 0,
     Kind1,
@@ -343,7 +343,6 @@ impl ClauseManagement for Solver {
         debug_assert_ne!(cid, 0);
         let a;
         {
-            // let c = &mut self.cp[cid.to_kind()].clauses[cid.to_index()];
             let c = clause_body_mut!(self.cp, cid);
             a = c.activity + self.cla_inc;
             c.activity = a;
@@ -493,45 +492,9 @@ impl ClauseManagement for Solver {
                     self.cp[*ck as usize].touched[ch.lit[1].negate() as usize] = true;
                 }
             }
-            // for (lit, start) in self.cp[*ck as usize].watcher.iter().enumerate().skip(2) {
-            //     let neg = (lit as Lit).negate();
-            //     if self.vars.assigned(neg) == LTRUE {
-            //         assert!(*start == NULL_CLAUSE);
-            //         // self.cp[*ck as usize].touched[lit] = true;
-            //         // let mut ci = *start;
-            //         // while ci != NULL_CLAUSE {
-            //         //     let c = &mut self.cp[*ck as usize].clauses[ci];
-            //         //     debug_assert!(!c.get_flag(ClauseFlag::Locked));
-            //         //     c.set_flag(ClauseFlag::Dead, true);
-            //         //     self.cp[*ck as usize].touched[c.lit[(c.lit[0] == neg) as usize].negate() as usize] = true;
-            //         //     ci = c.next_watcher[(c.lit[0] != neg) as usize];
-            //         // }
-            //     }
-            // }
-            // self.cp[*ck as usize].garbage_collect();
-            // for (lit, start) in self.cp[*ck as usize].watcher.iter().enumerate().skip(2) {
-            //     let neg = (lit as Lit).negate();
-            //     if self.vars.assigned(neg) == LFALSE {
-            //         assert!(*start == NULL_CLAUSE);
-            //     }
-            //     if self.vars.assigned(neg) == LTRUE {
-            //         assert!(*start == NULL_CLAUSE);
-            //     }
-            // }
             self.cp[*ck as usize].garbage_collect();
         }
         self.stat[Stat::Simplification as usize] += 1;
-        //        if self.eliminator.use_elim
-        //            && self.stat[Stat::Simplification as usize] % 8 == 0
-        //            && self.eliminator.last_invocatiton < self.stat[Stat::Reduction as usize] as usize
-        //        {
-        //            self.eliminate();
-        //            self.eliminator.last_invocatiton = self.stat[Stat::Reduction as usize] as usize;
-        //            for ck in &KINDS {
-        //                // self.garbage_collect(*ck);
-        //                self.cp[*ck as usize].garbage_collect();
-        //            }
-        //        }
         true
     }
     fn lbd_of_an_learnt_lits(&mut self) -> usize {
@@ -596,10 +559,6 @@ impl ClauseManagement for Solver {
                     if l == bi.lit[0] || l == bi.lit[1] {
                         cnt += 1;
                         if cnt == 2 {
-                            // if c.get_flag(ClauseFlag::Locked) {
-                            //     panic!("what to do!");
-                            // }
-                            // println!("{:#} subsumes {:#}", bi, c);
                             cb.set_flag(ClauseFlag::Dead, true);
                             cp.touched[ch.lit[0].negate() as usize] = true;
                             cp.touched[ch.lit[1].negate() as usize] = true;
@@ -621,14 +580,6 @@ impl ClauseManagement for Solver {
 
 impl GC for ClausePartition {
     fn garbage_collect(&mut self) -> () {
-        // let mut ci = self.watcher[GARBAGE_LIT.negate() as usize];
-        // while ci != NULL_CLAUSE {
-        //     let c = &self.clauses[ci];
-        //     debug_assert!(c.dead);
-        //     debug_assert!(c.lit[0] == GARBAGE_LIT || c.lit[1] == GARBAGE_LIT);
-        //     let index = (c.lit[0] != GARBAGE_LIT) as usize;
-        //     ci = c.next_watcher[index];
-        // }
         unsafe {
             let garbages = &mut self.watcher[GARBAGE_LIT.negate() as usize] as *mut ClauseId;
             for l in 2..self.watcher.len() {
@@ -646,7 +597,6 @@ impl GC for ClausePartition {
                     if !(*cb).get_flag(ClauseFlag::Dead) {
                         pri = &mut (*ch).next_watcher[((*ch).lit[0].vi() != vi) as usize];
                     } else {
-                        // debug_assert!((*ch).lit[0] == GARBAGE_LIT || (*ch).lit[1] == GARBAGE_LIT);
                         debug_assert!(
                             (*ch).lit[0].negate() == l as Lit || (*ch).lit[1].negate() == l as Lit
                         );
@@ -686,19 +636,6 @@ impl GC for ClausePartition {
             }
         }
         debug_assert_eq!(self.watcher[GARBAGE_LIT.negate() as usize], NULL_CLAUSE);
-        // // ASSERTION
-        // {
-        //     for i in 2..self.watcher.len() {
-        //         let mut ci = self.watcher[i];
-        //         while ci != NULL_CLAUSE {
-        //             if self.clauses[ci].dead {
-        //                 panic!("aeaaeamr");
-        //             }
-        //             let index = self.clauses[ci].lit[0].negate() != i as Lit;
-        //             ci = self.clauses[ci].next_watcher[index as usize];
-        //         }
-        //     }
-        // }
     }
     fn new_clause(&mut self, v: &[Lit], rank: usize, learnt: bool, locked: bool) -> ClauseId {
         let cix;

@@ -50,7 +50,7 @@ pub enum SolverException {
 pub type SolverResult = Result<Certificate, SolverException>;
 
 /// stat index
-#[derive(Copy, Clone, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub enum Stat {
     Conflict = 0,       // the number of backjump
     Decision,           // the number of decision
@@ -68,7 +68,7 @@ pub enum Stat {
     EndOfStatIndex,     // Don't use this dummy.
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+#[derive(Clone, Copy, Eq, PartialEq, Debug)]
 pub enum SearchStrategy {
     Generic,
     ChanSeok,
@@ -108,7 +108,7 @@ pub struct Solver {
     pub model: Vec<Lbool>,
     pub conflicts: Vec<Lit>,
     pub stat: Vec<i64>,
-    pub an_seen: Vec<Lit>,
+    pub an_seen: Vec<bool>,
     pub an_to_clear: Vec<Lit>,
     pub an_stack: Vec<Lit>,
     pub an_last_dl: Vec<Lit>,
@@ -162,7 +162,7 @@ impl Solver {
             model: vec![BOTTOM; nv + 1],
             conflicts: vec![],
             stat: vec![0; Stat::EndOfStatIndex as usize],
-            an_seen: vec![0; nv + 1],
+            an_seen: vec![false; nv + 1],
             an_to_clear: vec![0; nv + 1],
             an_stack: vec![],
             an_last_dl: vec![],
@@ -171,8 +171,8 @@ impl Solver {
             an_level_map_key: 1,
             mi_var_map: vec![0; nv + 1],
             lbd_seen: vec![0; nv + 1],
-            ema_asg: Ema2::new(1.1, f64::from(se)), // for blocking
-            ema_lbd: Ema2::new(50.0, f64::from(se)), // for forcing
+            ema_asg: Ema2::new(1.5,  40_000.0), // for blocking
+            ema_lbd: Ema2::new(50.0, 50_000.0), // for forcing
             b_lvl: Ema::new(se),
             c_lvl: Ema::new(se),
             next_restart: 100,
@@ -213,7 +213,7 @@ impl Solver {
                 self.stat[Stat::Restart as usize],
                 self.ema_asg.get(),
                 self.ema_lbd.get(),
-                self.ema_lbd.fast,
+                self.ema_lbd.slow,
                 self.b_lvl.0,
                 self.c_lvl.0,
             );
@@ -228,19 +228,6 @@ impl Solver {
     pub fn decision_level(&self) -> usize {
         self.trail_lim.len()
     }
-
-    //    pub fn attach_clause(&mut self, c: Clause) -> ClauseId {
-    //        if self.eliminator.use_elim {
-    //            for i in 0..c.len() {
-    //                let l = lindex!(c, i);
-    //                self.vars[l.vi()].touched = true;
-    //                self.eliminator.n_touched += 1;
-    //            }
-    //        }
-    //        let cid = self.cp[c.get_kind() as usize].attach(c);
-    //        debug_assert_ne!(cid, 0);
-    //        cid
-    //    }
 
     pub fn adapt_strategy(&mut self) -> () {
         let mut re_init = false;
@@ -503,7 +490,6 @@ impl CDCL for Solver {
                     return true;
                 }
                 if self.decision_level() == 0 {
-                    // && self.num_solved_vars < na
                     self.simplify();
                     self.num_solved_vars = self.num_assigns();
                     self.rebuild_heap();
@@ -539,7 +525,6 @@ impl CDCL for Solver {
                     unsafe {
                         lbd = self.lbd_of_an_learnt_lits();
                         let v = &mut self.an_learnt_lits as *mut Vec<Lit>;
-                        // self.add_learnt(&mut *v, lbd);
                         let cid = self.add_learnt(&mut *v, lbd);
                         if cid.to_kind() == ClauseKind::Binclause as usize {
                             let ch = clause_head!(self.cp, cid) as *const ClauseHead;
@@ -587,12 +572,12 @@ impl CDCL for Solver {
             let vi = l.vi();
             {
                 let v = &mut self.vars[vi];
+                v.phase = v.assign;
                 v.assign = BOTTOM;
                 if v.reason != NULL_CLAUSE {
                     clause_body_mut!(self.cp, v.reason).set_flag(ClauseFlag::Locked, false);
                     v.reason = NULL_CLAUSE;
                 }
-                v.phase = v.assign;
             }
             self.var_order.insert(&self.vars, vi);
             // self.var_order.update_seek(vi); // actually no need to call; percolate_up updates 'seek'.
@@ -669,9 +654,9 @@ impl CDCL for Solver {
                     let vi = q.vi();
                     let lvl = self.vars[vi].level;
                     debug_assert_ne!(self.vars[vi].assign, BOTTOM);
-                    if self.an_seen[vi] == 0 && 0 < lvl {
-                        self.bump_vi(vi);
-                        self.an_seen[vi] = 1;
+                    self.bump_vi(vi);
+                    if !self.an_seen[vi] && 0 < lvl {
+                        self.an_seen[vi] = true;
                         if dl <= lvl {
                             // println!(
                             //     "{} はレベル{}なのでフラグを立てる",
@@ -693,7 +678,7 @@ impl CDCL for Solver {
                     }
                 }
                 // set the index of the next literal to ti
-                while self.an_seen[self.trail[ti].vi()] == 0 {
+                while !self.an_seen[self.trail[ti].vi()] {
                     // println!(
                     //     "{} はフラグが立ってないので飛ばす",
                     //     self.trail[ti].int()
@@ -705,7 +690,7 @@ impl CDCL for Solver {
                     let next_vi = p.vi();
                     cid = self.vars[next_vi].reason;
                     // println!("{} にフラグが立っている。時path数は{}, そのreason{}を探索", next_vi, path_cnt - 1, cid);
-                    self.an_seen[next_vi] = 0;
+                    self.an_seen[next_vi] = false;
                 }
                 path_cnt -= 1;
                 if path_cnt <= 0 {
@@ -736,7 +721,6 @@ impl CDCL for Solver {
                 self.an_level_map[self.vars[l.vi()].level] = self.an_level_map_key;
             }
         }
-        self.an_level_map[0] = self.an_level_map_key;
         let mut j = 1;
         for i in 1..n {
             let l = self.an_learnt_lits[i];
@@ -750,13 +734,14 @@ impl CDCL for Solver {
             self.minimize_with_bi_clauses();
         }
         // glucose heuristics
-        let lbd = self.lbd_of_an_learnt_lits();
-        while let Some(l) = self.an_last_dl.pop() {
-            let vi = l.vi();
-            if lbd < clause_body!(self.cp, self.vars[vi].reason).rank {
-                self.bump_vi(vi);
-            }
-        }
+        // let lbd = self.lbd_of_an_learnt_lits();
+        // while let Some(_) = self.an_last_dl.pop() {
+        //     let vi = l.vi();
+        //     if clause_body!(self.cp, self.vars[vi].reason).rank < lbd {
+        //         self.bump_vi(vi);
+        //     }
+        // }
+        self.an_last_dl.clear();
         // find correct backtrack level from remaining literals
         let mut level_to_return = 0;
         if 1 < self.an_learnt_lits.len() {
@@ -772,7 +757,7 @@ impl CDCL for Solver {
             self.an_learnt_lits.swap(1, max_i);
         }
         for l in &self.an_to_clear {
-            self.an_seen[l.vi()] = 0;
+            self.an_seen[l.vi()] = false;
         }
         level_to_return
     }
@@ -785,13 +770,13 @@ impl CDCL for Solver {
             for l in &ch.lit[skip_first as usize..] {
                 let vi = l.vi();
                 if 0 < self.vars[vi].level {
-                    self.an_seen[vi] = 1;
+                    self.an_seen[vi] = true;
                 }
             }
             for l in &cb.lits {
                 let vi = l.vi();
                 if 0 < self.vars[vi].level {
-                    self.an_seen[vi] = 1;
+                    self.an_seen[vi] = true;
                 }
             }
             let tl0 = self.trail_lim[0];
@@ -803,19 +788,19 @@ impl CDCL for Solver {
             for i in (tl0..start).rev() {
                 let l: Lit = self.trail[i];
                 let vi = l.vi();
-                if self.an_seen[vi] == 1 {
+                if self.an_seen[vi] {
                     if self.vars[vi].reason == NULL_CLAUSE {
                         self.conflicts.push(l.negate());
                     } else {
                         for i in 1..cb.lits.len() + 2 {
                             let vi = lindex!(ch, cb, i).vi();
                             if 0 < self.vars[vi].level {
-                                self.an_seen[vi] = 1;
+                                self.an_seen[vi] = true;
                             }
                         }
                     }
                 }
-                self.an_seen[vi] = 0;
+                self.an_seen[vi] = false;
             }
         }
     }
@@ -827,7 +812,6 @@ impl Solver {
         self.an_stack.clear();
         self.an_stack.push(l);
         let top = self.an_to_clear.len();
-        let key = self.an_level_map[0];
         while let Some(sl) = self.an_stack.pop() {
             let cid = self.vars[sl.vi()].reason;
             unsafe {
@@ -840,16 +824,16 @@ impl Solver {
                     let q = lindex!(*ch, *cb, i);
                     let vi = q.vi();
                     let lv = self.vars[vi].level;
-                    if self.an_seen[vi] != 1 && 0 < lv {
+                    if !self.an_seen[vi] && 0 < lv {
                         if self.vars[vi].reason != NULL_CLAUSE
-                            && self.an_level_map[lv as usize] == key
+                            && self.an_level_map[lv as usize] == self.an_level_map_key
                         {
-                            self.an_seen[vi] = 1;
+                            self.an_seen[vi] = true;
                             self.an_stack.push(q);
                             self.an_to_clear.push(q);
                         } else {
                             for _ in top..self.an_to_clear.len() {
-                                self.an_seen[self.an_to_clear.pop().unwrap().vi()] = 0;
+                                self.an_seen[self.an_to_clear.pop().unwrap().vi()] = false;
                             }
                             return false;
                         }
