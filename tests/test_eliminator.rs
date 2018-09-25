@@ -7,6 +7,14 @@ use splr::clause::*;
 use splr::solver::*;
 use splr::types::*;
 
+macro_rules! mkv {
+    ($($x:expr),*) => {
+        match &[$($x),*] {
+            v => v.iter().map(|x| int2lit(*x)).collect::<Vec<Lit>>(),
+        }
+    };
+}
+
 // #[test]
 fn check_occurs() {
     let cfg: SolverConfiguration = Default::default();
@@ -17,38 +25,37 @@ fn check_occurs() {
     };
     let mut s = Solver::new(cfg, &cnf);
 
-    let c1 = mk_c(1, vec![1, 2, 3]);
-    let c2 = mk_c(2, vec![-2, 3, 4]);
-    let c3 = mk_c(3, vec![-2, -3]);
-    let c4 = mk_c(4, vec![1, 2, -3, 9]);
-    {
-        let vec = [&c2, &c3]; // [&c1, &c2, &c3, &c4];
-        for x in &vec {
-            for y in &vec {
-                println!(
-                    "{}\tsubsumes\t{}\t=>\t{:?}",
-                    x,
-                    y,
-                    x.subsumes(&y).map(|l| l.int())
-                );
-            }
-        }
-    }
-    // s.attach_clause(c1);
-    s.attach_clause(c2);
-    s.attach_clause(c3);
-    // s.attach_clause(c4);
-    // s.vars.dump("##added");
-    println!("{:?}", s.eliminator);
-    s.eliminate();
-    // s.vars.dump("##eliminated");
-    println!("{:?}", s.eliminator);
-    println!("::done");
+    let c1 = s.cp[ClauseKind::Permanent as usize].new_clause(&mkv![1, 2, 3], 3, false, false);
+    let c2 = s.cp[ClauseKind::Permanent as usize].new_clause(&mkv![-2, 3, 4], 3, false, false);
+    let c3 = s.cp[ClauseKind::Binclause as usize].new_clause(&mkv![-2, -3], 2, false, false);
+    let c4 = s.cp[ClauseKind::Permanent as usize].new_clause(&mkv![1, 2, -3, 9], 4, false, false);
+//    {
+//        let vec = [&c2, &c3]; // [&c1, &c2, &c3, &c4];
+//        for x in &vec {
+//            for y in &vec {
+//                println!(
+//                    "{}\tsubsumes\t{}\t=>\t{:?}",
+//                    x,
+//                    y,
+//                    x.subsumes(&y).map(|l| l.int())
+//                );
+//            }
+//        }
+//    }
+//    // s.attach_clause(c1);
+//    s.attach_clause(c2);
+//    s.attach_clause(c3);
+//    // s.attach_clause(c4);
+//    // s.vars.dump("##added");
+//    println!("{:?}", s.eliminator);
+//    s.eliminate();
+//    // s.vars.dump("##eliminated");
+//    println!("{:?}", s.eliminator);
+//    println!("::done");
 }
 
-fn mk_c(i: usize, v: Vec<i32>) -> Clause {
+fn mk_c(s: &mut Solver, i: usize, v: Vec<i32>) -> ClauseId {
     let vec = v.iter().map(|i| int2lit(*i)).collect::<Vec<Lit>>();
-    let mut c = Clause::new(ClauseKind::Permanent, false, 0, &vec);
-    c.index = i;
-    c
+    let cid = s.cp[ClauseKind::Permanent as usize].new_clause(&vec, vec.len(), false, false);
+    cid
 }
