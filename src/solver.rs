@@ -506,7 +506,7 @@ impl CDCL for Solver {
                     // && self.num_solved_vars < na
                     self.simplify();
                     self.num_solved_vars = self.num_assigns();
-                    self.rebuild_vh();
+                    self.rebuild_heap();
                 }
                 self.force_restart();
                 if self.trail.len() <= self.q_head {

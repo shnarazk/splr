@@ -8,7 +8,7 @@ pub trait VarManagement {
     fn select_var(&mut self) -> VarId;
     fn bump_vi(&mut self, vi: VarId) -> ();
     fn decay_var_activity(&mut self) -> ();
-    fn rebuild_vh(&mut self) -> ();
+    fn rebuild_heap(&mut self) -> ();
 }
 
 /// for [Var]
@@ -379,7 +379,7 @@ impl VarIdHeap {
 }
 
 impl VarManagement for Solver {
-    fn rebuild_vh(&mut self) -> () {
+    fn rebuild_heap(&mut self) -> () {
         if self.decision_level() != 0 {
             return;
         }
@@ -410,17 +410,17 @@ impl VarManagement for Solver {
     }
     /// Heap operations; renamed from selectVO
     fn select_var(&mut self) -> VarId {
-        self.var_order.seek_top(&self.vars)
-        // loop {
-        //     if self.var_order.len() == 0 {
-        //         return 0;
-        //     }
-        //     let vi = self.var_order.get_root(&self.vars);
-        //     let x = self.vars[vi].assign;
-        //     if x == BOTTOM {
-        //         return vi;
-        //     }
-        // }
+        // self.var_order.seek_top(&self.vars)
+        loop {
+            if self.var_order.len() == 0 {
+                return 0;
+            }
+            let vi = self.var_order.get_root(&self.vars);
+            let x = self.vars[vi].assign;
+            if x == BOTTOM {
+                return vi;
+            }
+        }
     }
 }
 
@@ -428,7 +428,7 @@ impl fmt::Display for VarIdHeap {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            " - seek pointer {}\n - clause_queue {:?}\n - heap {:?}",
+            " - seek pointer {}\n - nth -> var: {:?}\n - var -> nth: {:?}",
             self.seek, self.heap, self.idxs,
         )
     }

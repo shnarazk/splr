@@ -17,7 +17,7 @@ impl Solver {
             for ci in 1..self.cp[*ck as usize].head.len() {
                 let ch = &self.cp[*ck as usize].head[ci];
                 let cb = &self.cp[*ck as usize].body[ci];
-                if !self.vars.satisfies(&ch.lit) && !self.vars.satisfies(&cb.lits) {
+                if !(self.vars.satisfies(&ch.lit) || self.vars.satisfies(&cb.lits)) {
                     let mut v = Vec::new();
                     for l in &ch.lit {
                         v.push(l.int());
