@@ -9,13 +9,20 @@ impl Solver {
             self.vars[val.abs() as usize].assign = if *val < 0 { LFALSE } else { LTRUE };
         }
     }
+
+    /// returns None if the given assignment is a model of a problem.
+    /// Otherwise returns a clause which is not satisfiable.
     pub fn validate(&self) -> Option<Vec<i32>> {
         for ck in &CLAUSE_KINDS {
-            for c in &self.cp[*ck as usize].clauses[1..] {
-                if !self.vars.satisfies(&c) {
+            for ci in 1..self.cp[*ck as usize].head.len() {
+                let ch = &self.cp[*ck as usize].head[ci];
+                let cb = &self.cp[*ck as usize].body[ci];
+                if !self.vars.satisfies(&ch.lit) && !self.vars.satisfies(&cb.lits) {
                     let mut v = Vec::new();
-                    for i in 0..c.len() {
-                        let l = lindex!(c, i);
+                    for l in &ch.lit {
+                        v.push(l.int());
+                    }
+                    for l in &cb.lits {
                         v.push(l.int());
                     }
                     return Some(v);

@@ -627,3 +627,45 @@ impl Eliminator {
         }
     }
 }
+
+impl Clause {
+    pub fn subsumes(&self, other: &Clause) -> Option<Lit> {
+        let mut ret: Lit = NULL_LIT;
+        'next: for i in 0..self.len() {
+            let l = lindex!(self, i);
+            for j in 0..other.len() {
+                let lo = lindex!(other, j);
+                if l == lo {
+                    continue 'next;
+                } else if ret == NULL_LIT && l == lo.negate() {
+                    ret = l;
+                    continue 'next;
+                }
+            }
+            return None;
+        }
+        Some(ret)
+    }
+    /// remove Lit `p` from Clause *self*.
+    /// returns true if the clause became a unit clause.
+    pub fn strengthen(&mut self, p: Lit) -> bool {
+        if self.get_flag(ClauseFlag::Dead) {
+            return false;
+        }
+        let len = self.len();
+        if len == 2 {
+            if self.lit[0] == p {
+                self.lit.swap(0, 1);
+            }
+            return true;
+        }
+        if self.lit[0] == p {
+            self.lit[0] = self.lits.pop().unwrap();
+        } else if self.lit[1] == p {
+            self.lit[1] = self.lits.pop().unwrap();
+        } else {
+            self.lits.retain(|&x| x != p);
+        }
+        false
+    }
+}

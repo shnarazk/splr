@@ -3,29 +3,45 @@
 /// cref!(self.cv, cid)
 /// ```
 #[macro_export]
-macro_rules! iref {
+macro_rules! clause_head {
     ($cv: expr, $val: expr) => {{
         match (&$cv, $val) {
-            (v, cid) => &v[cid.to_kind()].clauses[cid.to_index()],
+            (v, cid) => &v[cid.to_kind()].head[cid.to_index()],
         }
     }};
 }
 
-macro_rules! mref {
+macro_rules! clause_body {
+    ($cv: expr, $val: expr) => {{
+        match (&$cv, $val) {
+            (v, cid) => &v[cid.to_kind()].body[cid.to_index()],
+        }
+    }};
+}
+
+macro_rules! clause_head_mut {
     ($cv: expr, $val: expr) => {{
         match (&mut $cv, $val) {
-            (v, cid) => &mut v[cid.to_kind()].clauses[cid.to_index()],
+            (v, cid) => &mut v[cid.to_kind()].head[cid.to_index()],
+        }
+    }};
+}
+
+macro_rules! clause_body_mut {
+    ($cv: expr, $val: expr) => {{
+        match (&mut $cv, $val) {
+            (v, cid) => &mut v[cid.to_kind()].body[cid.to_index()],
         }
     }};
 }
 
 macro_rules! lindex {
-    ($c:expr, $val:expr) => {{
-        match (&$c, $val) {
-            (c, i) => if i < 2 {
-                c.lit[i]
+    ($h: expr, $b: expr, $val: expr) => {{
+        match (&$h, &$b, $val) {
+            (h, b, i) => if i < 2 {
+                h.lit[i]
             } else {
-                c.lits[i - 2]
+                b.lits[i - 2]
             },
         }
     }};

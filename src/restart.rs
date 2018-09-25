@@ -19,7 +19,7 @@ const K: f64 = 1.6;
 impl Restart for Solver {
     /// called after conflict resolution
     fn block_restart(&mut self, lbd: usize, clv: usize, blv: usize, nas: usize) -> () {
-        let count = self.stats[Stat::Conflict as usize] as u64;
+        let count = self.stat[Stat::Conflict as usize] as u64;
         self.c_lvl.update(clv as f64);
         self.b_lvl.update(blv as f64);
         self.ema_asg.update(nas as f64);
@@ -32,16 +32,16 @@ impl Restart for Solver {
         }
         if self.next_restart <= count && R < self.ema_asg.get() {
             self.next_restart = count + RESTART_PERIOD;
-            self.stats[Stat::BlockRestart as usize] += 1;
+            self.stat[Stat::BlockRestart as usize] += 1;
         }
     }
 
     /// called after no conflict propagation
     fn force_restart(&mut self) -> () {
-        let count = self.stats[Stat::Conflict as usize] as u64;
+        let count = self.stat[Stat::Conflict as usize] as u64;
         if self.next_restart < count && K < self.ema_lbd.get() {
             self.next_restart = count + RESTART_PERIOD;
-            self.stats[Stat::Restart as usize] += 1;
+            self.stat[Stat::Restart as usize] += 1;
             let rl = self.root_level;
             self.cancel_until(rl);
         }

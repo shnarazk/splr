@@ -96,7 +96,7 @@ pub struct Solver {
     /// Variable Order
     pub var_order: VarIdHeap,
     /// Clause Database Management
-    pub cp: [ClausePack; 3],
+    pub cp: [ClausePartition; 3],
     pub first_reduction: usize,
     pub next_reduction: usize,
     pub cur_restart: usize,
@@ -107,7 +107,7 @@ pub struct Solver {
     pub ok: bool,
     pub model: Vec<Lbool>,
     pub conflicts: Vec<Lit>,
-    pub stats: Vec<i64>,
+    pub stat: Vec<i64>,
     pub an_seen: Vec<Lit>,
     pub an_to_clear: Vec<Lit>,
     pub an_stack: Vec<Lit>,
@@ -134,7 +134,7 @@ impl Solver {
         let re = cfg.restart_expansion;
         let cdr = cfg.clause_decay_rate;
         let vdr = cfg.variable_decay_rate;
-        let use_sve = cfg.use_sve;
+        // let use_sve = cfg.use_sve;
         Solver {
             config: cfg,
             num_vars: nv,
@@ -149,9 +149,9 @@ impl Solver {
             q_head: 0,
             var_order: VarIdHeap::new(VarOrder::ByActivity, nv, nv),
             cp: [
-                ClausePack::build(ClauseKind::Removable, nv, nc),
-                ClausePack::build(ClauseKind::Permanent, nv, 256),
-                ClausePack::build(ClauseKind::Binclause, nv, 256),
+                ClausePartition::build(ClauseKind::Removable, nv, nc),
+                ClausePartition::build(ClauseKind::Permanent, nv, 256),
+                ClausePartition::build(ClauseKind::Binclause, nv, 256),
             ],
             first_reduction: 1000,
             next_reduction: 1000,
@@ -161,7 +161,7 @@ impl Solver {
             ok: true,
             model: vec![BOTTOM; nv + 1],
             conflicts: vec![],
-            stats: vec![0; Stat::EndOfStatIndex as usize],
+            stat: vec![0; Stat::EndOfStatIndex as usize],
             an_seen: vec![0; nv + 1],
             an_to_clear: vec![0; nv + 1],
             an_stack: vec![],
@@ -187,12 +187,12 @@ impl Solver {
         } else {
             self.trail_lim[0]
         };
-        let sum = k + self.eliminator.eliminated_vars;
+        // let sum = k + self.eliminator.eliminated_vars;
         let learnts = &self.cp[ClauseKind::Removable as usize];
         let good = learnts
-            .clauses
+            .body
             .iter()
-            .filter(|c| c.index != 0 && !c.get_flag(ClauseFlag::Dead) && c.rank <= 3)
+            .filter(|c| !c.get_flag(ClauseFlag::Dead) && c.rank <= 3)
             .count();
         if mes == "" {
             println!(
@@ -203,14 +203,14 @@ impl Solver {
                 "#{},{:>7},{:>6},{:>6.3}, DB,{:>7},{:>6},{:>7},{:>7}, RES,{:>5},{:>5}, {:>5.2},{:>6.2}, STAT,{:>7.2},{:>8.2},{:>8.2}",
                 mes,
                 nv - self.trail.len(),
-                sum,
-                (sum as f32) / (nv as f32) * 100.0,
-                self.cp[ClauseKind::Removable as usize].clauses.iter().filter(|c| !c.get_flag(ClauseFlag::Dead)).count(),
+                k,
+                (k as f32) / (nv as f32) * 100.0,
+                self.cp[ClauseKind::Removable as usize].body.iter().filter(|c| !c.get_flag(ClauseFlag::Dead)).count(),
                 good,
-                self.cp[ClauseKind::Permanent as usize].clauses.iter().filter(|c| !c.get_flag(ClauseFlag::Dead)).count(),
-                self.cp[ClauseKind::Binclause as usize].clauses.iter().filter(|c| !c.get_flag(ClauseFlag::Dead)).count(),
-                self.stats[Stat::BlockRestart as usize],
-                self.stats[Stat::Restart as usize],
+                self.cp[ClauseKind::Permanent as usize].body.iter().filter(|c| !c.get_flag(ClauseFlag::Dead)).count(),
+                self.cp[ClauseKind::Binclause as usize].body.iter().filter(|c| !c.get_flag(ClauseFlag::Dead)).count(),
+                self.stat[Stat::BlockRestart as usize],
+                self.stat[Stat::Restart as usize],
                 self.ema_asg.get(),
                 self.ema_lbd.get(),
                 self.ema_lbd.fast,
@@ -229,33 +229,33 @@ impl Solver {
         self.trail_lim.len()
     }
 
-    pub fn attach_clause(&mut self, c: Clause) -> ClauseId {
-        if self.eliminator.use_elim {
-            for i in 0..c.len() {
-                let l = lindex!(c, i);
-                self.vars[l.vi()].touched = true;
-                self.eliminator.n_touched += 1;
-            }
-        }
-        let cid = self.cp[c.get_kind() as usize].attach(c);
-        debug_assert_ne!(cid, 0);
-        cid
-    }
+//    pub fn attach_clause(&mut self, c: Clause) -> ClauseId {
+//        if self.eliminator.use_elim {
+//            for i in 0..c.len() {
+//                let l = lindex!(c, i);
+//                self.vars[l.vi()].touched = true;
+//                self.eliminator.n_touched += 1;
+//            }
+//        }
+//        let cid = self.cp[c.get_kind() as usize].attach(c);
+//        debug_assert_ne!(cid, 0);
+//        cid
+//    }
 
     pub fn adapt_strategy(&mut self) -> () {
         let mut re_init = false;
-        let decpc = self.stats[Stat::Decision as usize] as f64
-            / self.stats[Stat::Conflict as usize] as f64;
+        let decpc = self.stat[Stat::Decision as usize] as f64
+            / self.stat[Stat::Conflict as usize] as f64;
         if decpc <= 1.2 && false {
             self.strategy = Some(SearchStrategy::ChanSeok);
             let _glureduce = true;
             self.first_reduction = 2000;
             self.next_reduction = 2000;
-            self.cur_restart = ((self.stats[Stat::Conflict as usize] as f64 / self.next_reduction as f64) + 1.0) as usize;
+            self.cur_restart = ((self.stat[Stat::Conflict as usize] as f64 / self.next_reduction as f64) + 1.0) as usize;
             // TODO incReduceDB = 0;
             println!("# Adjusting for low decision levels.");
             re_init = true;
-        } else if self.stats[Stat::NoDecisionConflict as usize] < 30_000 {
+        } else if self.stat[Stat::NoDecisionConflict as usize] < 30_000 {
             self.strategy = Some(SearchStrategy::LowSuccesive);
         } else {
             self.strategy = Some(SearchStrategy::Generic);
@@ -268,22 +268,24 @@ impl Solver {
             if self.strategy == Some(SearchStrategy::ChanSeok) {
                 // TODO
                 // move some clauses with good lbd (col_lbd_bound) to Permanent
-                // 1. cp[ClausePack::Permanent]attach(clause);
+                // 1. cp[ClausePartition::Permanent]attach(clause);
                 // 2. clause.set_flag(ClauseFlag::Dead);
                 unsafe {
-                    let learnts = &mut self.cp[ClauseKind::Removable as usize] as *mut ClausePack;
-                    let permanents = &mut self.cp[ClauseKind::Permanent as usize] as *mut ClausePack;
-                    for c in &mut (*learnts).clauses[1..] {
-                        if c.get_flag(ClauseFlag::Dead) {
+                    let learnts = &mut self.cp[ClauseKind::Removable as usize] as *mut ClausePartition;
+                    let permanents = &mut self.cp[ClauseKind::Permanent as usize] as *mut ClausePartition;
+                    for ci in 1..(*learnts).head.len() {
+                        let ch = & (*learnts).head[ci];
+                        let cb = &mut (*learnts).body[ci];
+                        if cb.get_flag(ClauseFlag::Dead) {
                             continue;
                         }
-                        if c.rank < CO_LBD_BOUND {
-                            c.lits.insert(0, c.lit[0]);
-                            (*learnts).touched[c.lit[0].negate() as usize] = true;
-                            c.lits.insert(1, c.lit[1]);
-                            (*learnts).touched[c.lit[1].negate() as usize] = true;
-                            (*permanents).new_clause(&c.lits, c.rank, c.get_flag(ClauseFlag::Learnt), c.get_flag(ClauseFlag::Locked));
-                            c.set_flag(ClauseFlag::Dead, true);
+                        if cb.rank < CO_LBD_BOUND {
+                            cb.lits.insert(0, ch.lit[0]);
+                            (*learnts).touched[ch.lit[0].negate() as usize] = true;
+                            cb.lits.insert(1, ch.lit[1]);
+                            (*learnts).touched[ch.lit[1].negate() as usize] = true;
+                            (*permanents).new_clause(&cb.lits, cb.rank, cb.get_flag(ClauseFlag::Learnt), cb.get_flag(ClauseFlag::Locked));
+                            cb.set_flag(ClauseFlag::Dead, true);
                         }
                     }
                     (*learnts).garbage_collect();
@@ -311,7 +313,7 @@ impl SatSolver for Solver {
         // }
         self.progress("");
         self.simplify();
-        self.stats[Stat::Simplification as usize] += 1;
+        self.stat[Stat::Simplification as usize] += 1;
         match self.search() {
             _ if !self.ok => {
                 self.cancel_until(0);
@@ -326,9 +328,9 @@ impl SatSolver for Solver {
                         _ => result.push(0),
                     }
                 }
-                if self.eliminator.use_elim {
-                    self.extend_model(&mut result);
-                }
+                //if self.eliminator.use_elim {
+                //    self.extend_model(&mut result);
+                //}
                 self.cancel_until(0);
                 Ok(Certificate::SAT(result))
             }
@@ -413,14 +415,14 @@ impl CDCL for Solver {
             ref mut trail,
             ref trail_lim,
             ref mut q_head,
-            ref mut stats,
+            ref mut stat,
             ..
         } = self;
         while *q_head < trail.len() {
             let p: usize = trail[*q_head] as usize;
             let false_lit = (p as Lit).negate();
             *q_head += 1;
-            stats[Stat::Propagation as usize] += 1;
+            stat[Stat::Propagation as usize] += 1;
             let kinds = [
                 ClauseKind::Binclause,
                 ClauseKind::Removable,
@@ -428,33 +430,36 @@ impl CDCL for Solver {
             ];
             for kind in &kinds {
                 unsafe {
-                    let clauses = &mut cp[*kind as usize].clauses[..] as *mut [Clause];
+                    let head = &mut cp[*kind as usize].head[..] as *mut [ClauseHead];
+                    let body = &mut cp[*kind as usize].body[..] as *mut [ClauseBody];
                     let watcher = &mut cp[*kind as usize].watcher[..] as *mut [ClauseIndex];
                     let mut pre = &mut (*watcher)[p] as *mut usize;
                     'next_clause: while *pre != NULL_CLAUSE {
-                        let c = &mut (*clauses)[*pre] as *mut Clause;
-                        if (*c).lit[0] == false_lit {
-                            (*c).lit.swap(0, 1); // now my index is 1, others is 0.
-                            (*c).next_watcher.swap(0, 1);
+                        let ch = &mut (*head)[*pre] as *mut ClauseHead;
+                        let cb = &mut (*body)[*pre] as *mut ClauseBody;
+                        if (*ch).lit[0] == false_lit {
+                            (*ch).lit.swap(0, 1); // now my index is 1, others is 0.
+                            (*ch).next_watcher.swap(0, 1);
                         }
-                        let other = (*c).lit[0];
+                        let other = (*ch).lit[0];
                         let other_value = vars.assigned(other);
                         if other_value != LTRUE {
-                            for (k, lk) in (*c).lits.iter().enumerate() {
+                            let my_index = *pre;
+                            for (k, lk) in (*cb).lits.iter().enumerate() {
                                 // below is equivalent to 'assigned(lk) != LFALSE'
                                 if (((lk & 1) as u8) ^ vars[lk.vi()].assign) != 0 {
-                                    *pre = (*c).next_watcher[1];
+                                    *pre = (*ch).next_watcher[1];
                                     let alt = &mut (*watcher)[lk.negate() as usize];
-                                    (*c).next_watcher[1] = *alt;
-                                    *alt = (*c).index;
-                                    (*c).lit[1] = *lk;
-                                    (*c).lits[k] = false_lit; // Don't move this above (needed by enuremate)
+                                    (*ch).next_watcher[1] = *alt;
+                                    *alt = my_index;
+                                    (*ch).lit[1] = *lk;
+                                    (*cb).lits[k] = false_lit; // Don't move this above (needed by enuremate)
                                     continue 'next_clause;
                                 }
                             }
                             if other_value == LFALSE {
                                 *q_head = trail.len();
-                                return kind.id_from((*c).index);
+                                return kind.id_from(my_index);
                             } else {
                                 // self.uncheck_enqueue(other, kind.id_from((*c).index));
                                 let dl = trail_lim.len();
@@ -465,13 +470,13 @@ impl CDCL for Solver {
                                     v.activity = 0.0;
                                     v.reason = NULL_CLAUSE;
                                 } else {
-                                    v.reason = kind.id_from((*c).index);
+                                    v.reason = kind.id_from(my_index);
                                 }
                                 trail.push(other);
-                                (*c).set_flag(ClauseFlag::Locked, true);
+                                (*cb).set_flag(ClauseFlag::Locked, true);
                             }
                         }
-                        pre = &mut (*c).next_watcher[1];
+                        pre = &mut (*ch).next_watcher[1];
                     }
                 }
             }
@@ -483,7 +488,7 @@ impl CDCL for Solver {
     fn search(&mut self) -> bool {
         let root_lv = self.root_level;
         loop {
-            self.stats[Stat::Propagation as usize] += 1;
+            self.stat[Stat::Propagation as usize] += 1;
             let ci = self.propagate();
             if ci == NULL_CLAUSE {
                 let na = self.num_assigns();
@@ -501,16 +506,16 @@ impl CDCL for Solver {
                     debug_assert_ne!(vi, 0);
                     let p = self.vars[vi].phase;
                     self.uncheck_assume(vi.lit(p));
-                    self.stats[Stat::Decision as usize] += 1;
+                    self.stat[Stat::Decision as usize] += 1;
                 }
             } else {
-                self.stats[Stat::Conflict as usize] += 1;
+                self.stat[Stat::Conflict as usize] += 1;
                 let dl = self.decision_level();
                 if dl == self.root_level {
                     self.analyze_final(ci, false);
                     return false;
                 }
-                if self.stats[Stat::Conflict as usize] % 5000 == 0 && self.var_decay < MAX_VAR_DECAY {
+                if self.stat[Stat::Conflict as usize] % 5000 == 0 && self.var_decay < MAX_VAR_DECAY {
                     self.var_decay += 0.01;
                 }
                 let bl = self.analyze(ci);
@@ -528,12 +533,12 @@ impl CDCL for Solver {
                         // self.add_learnt(&mut *v, lbd);
                         let cid = self.add_learnt(&mut *v, lbd);
                         if cid.to_kind() == ClauseKind::Binclause as usize {
-                            let c = iref!(self.cp, cid) as *const Clause;
-                            self.biclause_subsume(&*c);
+                            let ch = clause_head!(self.cp, cid) as *const ClauseHead;
+                            self.biclause_subsume(&*ch);
                         }
                     }
                 }
-                if self.stats[Stat::Conflict as usize] == 100_000 {
+                if self.stat[Stat::Conflict as usize] == 100_000 {
                     self.cancel_until(0);
                     self.simplify();
                     self.adapt_strategy();
@@ -543,13 +548,13 @@ impl CDCL for Solver {
                 // self.decay_var_activity();
                 self.decay_cla_activity();
                 // glucose reduction
-                let conflicts = self.stats[Stat::Conflict as usize] as usize;
+                let conflicts = self.stat[Stat::Conflict as usize] as usize;
                 if self.cur_restart * self.next_reduction <= conflicts {
                     self.cur_restart =
                         ((conflicts as f64) / (self.next_reduction as f64)) as usize + 1;
                     self.reduce();
                 }
-                if self.stats[Stat::Conflict as usize] % 10_000 == 0 {
+                if self.stat[Stat::Conflict as usize] % 10_000 == 0 {
                     self.progress(
                         match self.strategy {
                             None => "none",
@@ -576,7 +581,7 @@ impl CDCL for Solver {
                 let v = &mut self.vars[vi];
                 v.assign = BOTTOM;
                 if v.reason != NULL_CLAUSE {
-                    mref!(self.cp, v.reason).set_flag(ClauseFlag::Locked, false);
+                    clause_body_mut!(self.cp, v.reason).set_flag(ClauseFlag::Locked, false);
                     v.reason = NULL_CLAUSE;
                 }
                 v.phase = v.assign;
@@ -602,7 +607,7 @@ impl CDCL for Solver {
                     v.activity = 0.0;
                 }
                 v.level = dl;
-                mref!(self.cp, cid).set_flag(ClauseFlag::Locked, true);
+                clause_body_mut!(self.cp, cid).set_flag(ClauseFlag::Locked, true);
             }
             if dl == 0 {
                 self.var_order.remove(&self.vars, l.vi());
@@ -624,33 +629,33 @@ impl CDCL for Solver {
         let mut path_cnt = 0;
         loop {
             unsafe {
-                let c = &mut self.cp[cid.to_kind()].clauses[cid.to_index()] as *mut Clause;
+                let ch = clause_head_mut!(self.cp, cid) as *mut ClauseHead;
+                let cb = clause_body_mut!(self.cp, cid) as *mut ClauseBody;
                 debug_assert_ne!(cid, NULL_CLAUSE);
                 if cid.to_kind() == (ClauseKind::Removable as usize) {
                     self.bump_cid(cid);
-                    if 2 < (*c).rank {
-                        let nblevels = self.lbd_of(&(*c));
-                        if nblevels + 1 < (*c).rank {
-                            (*c).rank = nblevels;
+                    if 2 < (*cb).rank {
+                        let nblevels = self.lbd_of(cid);
+                        if nblevels + 1 < (*cb).rank {
+                            (*cb).rank = nblevels;
                             if nblevels <= 30 {
-                                (*c).set_flag(ClauseFlag::JustUsed, true);
+                                (*cb).set_flag(ClauseFlag::JustUsed, true);
                             }
                             if self.strategy == Some(SearchStrategy::ChanSeok) && nblevels < CO_LBD_BOUND {
                                 // c.nolearnt()
                                 // learnts.remove(confl);
                                 // permanentLearnts(confl);
-                                (*c).rank = 0;
-                                let cnf = mref!(self.cp, confl);
-                                cnf.rank = 0;
+                                (*cb).rank = 0;
+                                clause_body_mut!(self.cp, confl).rank = 0
                             } else {
-                                (*c).rank = nblevels;
+                                (*cb).rank = nblevels;
                             }
                         }
                     }
                 }
                 // println!("{}を対応", (*c));
-                for i in ((p != NULL_LIT) as usize)..(*c).len() {
-                    let q = lindex!(*c, i);
+                for i in ((p != NULL_LIT) as usize)..(*cb).lits.len() + 2 {
+                    let q = lindex!(*ch, *cb, i);
                     let vi = q.vi();
                     let lvl = self.vars[vi].level;
                     debug_assert_ne!(self.vars[vi].assign, BOTTOM);
@@ -737,7 +742,7 @@ impl CDCL for Solver {
         let lbd = self.lbd_of_an_learnt_lits();
         while let Some(l) = self.an_last_dl.pop() {
             let vi = l.vi();
-            if lbd < iref!(self.cp, self.vars[vi].reason).rank {
+            if lbd < clause_body!(self.cp, self.vars[vi].reason).rank {
                 self.bump_vi(vi);
             }
         }
@@ -764,9 +769,16 @@ impl CDCL for Solver {
     fn analyze_final(&mut self, ci: ClauseId, skip_first: bool) -> () {
         self.conflicts.clear();
         if self.root_level != 0 {
-            let c = iref!(self.cp, ci);
-            for i in (if skip_first { 1 } else { 0 })..(c.len()) {
-                let vi = lindex!(c, i).vi();
+            let ch = clause_head!(self.cp, ci);
+            let cb = clause_body!(self.cp, ci);
+            for l in &ch.lit[skip_first as usize..] {
+                let vi = l.vi();
+                if 0 < self.vars[vi].level {
+                    self.an_seen[vi] = 1;
+                }
+            }
+            for l in &cb.lits {
+                let vi = l.vi();
                 if 0 < self.vars[vi].level {
                     self.an_seen[vi] = 1;
                 }
@@ -784,8 +796,8 @@ impl CDCL for Solver {
                     if self.vars[vi].reason == NULL_CLAUSE {
                         self.conflicts.push(l.negate());
                     } else {
-                        for i in 1..(c.lits.len()) {
-                            let vi = lindex!(c, i).vi();
+                        for i in 1..cb.lits.len() + 2 {
+                            let vi = lindex!(ch, cb, i).vi();
                             if 0 < self.vars[vi].level {
                                 self.an_seen[vi] = 1;
                             }
@@ -807,25 +819,28 @@ impl Solver {
         let key = self.an_level_map[0];
         while let Some(sl) = self.an_stack.pop() {
             let cid = self.vars[sl.vi()].reason;
-            let c = &mut self.cp[cid.to_kind()].clauses[cid.to_index()];
-            if c.lits.is_empty() && self.vars.assigned(c.lit[0]) == LFALSE {
-                c.lit.swap(0, 1);
-            }
-            for i in 1..c.len() {
-                let q = lindex!(c, i);
-                let vi = q.vi();
-                let lv = self.vars[vi].level;
-                if self.an_seen[vi] != 1 && 0 < lv {
-                    if self.vars[vi].reason != NULL_CLAUSE && self.an_level_map[lv as usize] == key
-                    {
-                        self.an_seen[vi] = 1;
-                        self.an_stack.push(q);
-                        self.an_to_clear.push(q);
-                    } else {
-                        for _ in top..self.an_to_clear.len() {
-                            self.an_seen[self.an_to_clear.pop().unwrap().vi()] = 0;
+            unsafe {
+                let ch = clause_head_mut!(self.cp, cid) as *mut ClauseHead;
+                let cb = clause_body_mut!(self.cp, cid) as *mut ClauseBody;
+                if (*cb).lits.is_empty() && self.vars.assigned((*ch).lit[0]) == LFALSE {
+                    (*ch).lit.swap(0, 1);
+                }
+                for i in 1..(*cb).lits.len() + 2 {
+                    let q = lindex!(*ch, *cb, i);
+                    let vi = q.vi();
+                    let lv = self.vars[vi].level;
+                    if self.an_seen[vi] != 1 && 0 < lv {
+                        if self.vars[vi].reason != NULL_CLAUSE && self.an_level_map[lv as usize] == key
+                        {
+                            self.an_seen[vi] = 1;
+                            self.an_stack.push(q);
+                            self.an_to_clear.push(q);
+                        } else {
+                            for _ in top..self.an_to_clear.len() {
+                                self.an_seen[self.an_to_clear.pop().unwrap().vi()] = 0;
+                            }
+                            return false;
                         }
-                        return false;
                     }
                 }
             }
@@ -849,9 +864,10 @@ impl Solver {
         }
         let l0 = self.an_learnt_lits[0];
         let mut nb = 0;
-        for c in self.cp[ClauseKind::Binclause as usize].iter_watcher(l0) {
-            debug_assert!(c.lit[0] == l0 || c.lit[1] == l0);
-            let other = c.lit[(c.lit[0] == l0) as usize];
+        for ci in self.cp[ClauseKind::Binclause as usize].iter_watcher(l0) {
+            let ch = & self.cp[ClauseKind::Binclause as usize].head[ci];
+            debug_assert!(ch.lit[0] == l0 || ch.lit[1] == l0);
+            let other = ch.lit[(ch.lit[0] == l0) as usize];
             let vi = other.vi();
             if self.mi_var_map[vi] == key && self.vars.assigned(other) == LTRUE {
                  nb += 1;
@@ -883,7 +899,7 @@ impl Solver {
         if dl == 0 {
             self.var_order.remove(&mut self.vars, l.vi());
         }
-        mref!(self.cp, cid).set_flag(ClauseFlag::Locked, true);
+        clause_body_mut!(self.cp, cid).set_flag(ClauseFlag::Locked, true);
         self.trail.push(l);
     }
     pub fn uncheck_assume(&mut self, l: Lit) -> () {

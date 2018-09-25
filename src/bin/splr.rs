@@ -64,12 +64,12 @@ fn main() {
 fn report_stat(s: &Solver) -> () {
     println!(
         "backjump:{}, block:{}, restart:{}, reduction:{}, clauses:{}, learnts:{}",
-        s.stats[Stat::Conflict as usize],
-        s.stats[Stat::BlockRestart as usize],
-        s.stats[Stat::Restart as usize],
-        s.stats[Stat::Reduction as usize],
-        s.cp[ClauseKind::Permanent as usize].clauses.len(),
-        s.cp[ClauseKind::Removable as usize].clauses.len(),
+        s.stat[Stat::Conflict as usize],
+        s.stat[Stat::BlockRestart as usize],
+        s.stat[Stat::Restart as usize],
+        s.stat[Stat::Reduction as usize],
+        s.cp[ClauseKind::Permanent as usize].head.len(),
+        s.cp[ClauseKind::Removable as usize].head.len(),
     );
     println!(
         "EMA:: Asg (s:{:>.2}, f:{:>.2}), LBD (s:{:>.2}, f:{:>.2}), DL (conflict:{:>.2}, backjump:{:>.2})",

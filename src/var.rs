@@ -14,7 +14,7 @@ pub trait VarManagement {
 /// for [Var]
 pub trait Satisfiability {
     fn assigned(&self, l: Lit) -> Lbool;
-    fn satisfies(&self, c: &Clause) -> bool;
+    fn satisfies(&self, c: &[Lit]) -> bool;
 }
 
 /// for VarIdHeap
@@ -96,10 +96,9 @@ impl Satisfiability for [Var] {
     fn assigned(&self, l: Lit) -> Lbool {
         self[l.vi()].assign ^ ((l & 1) as u8)
     }
-    fn satisfies(&self, c: &Clause) -> bool {
-        for i in 0..c.len() {
-            let l = lindex!(c, i);
-            if self.assigned(l) == LTRUE {
+    fn satisfies(&self, vec: &[Lit]) -> bool {
+        for l in vec {
+            if self.assigned(*l) == LTRUE {
                 return true;
             }
         }
@@ -367,7 +366,7 @@ impl VarManagement for Solver {
         }
     }
     fn bump_vi(&mut self, vi: VarId) -> () {
-        let d = self.stats[Stat::Conflict as usize] as f64;
+        let d = self.stat[Stat::Conflict as usize] as f64;
         self.vars[vi].activity = (self.vars[vi].activity + d) / 2.0;
         // let a = (self.vars[vi].activity + d) / 2.0;
         // let a = self.vars[vi].activity +self.var_inc;
