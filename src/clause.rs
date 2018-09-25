@@ -55,8 +55,6 @@ pub struct ClauseHead {
     pub lit: [Lit; 2],
     /// the literals without lit0 and lit1
     pub next_watcher: [usize; 2],
-    /// index (not id), used in a CP.
-    pub index: ClauseIndex,
 }
 
 /// Clause
@@ -131,7 +129,6 @@ impl ClausePartition {
         head.push(ClauseHead {
             next_watcher: [NULL_CLAUSE; 2],
             lit: [NULL_LIT; 2],
-            index: 0,
         });
         body.push(ClauseBody {
             flag: 0,
@@ -210,14 +207,6 @@ impl ClauseIdIndexEncoding for usize {
     }
 }
 
-impl PartialEq for ClauseHead {
-    fn eq(&self, other: &ClauseHead) -> bool {
-        self.index == other.index
-    }
-}
-
-impl Eq for ClauseHead {}
-
 impl PartialEq for ClauseBody {
     fn eq(&self, other: &ClauseBody) -> bool {
         self == other
@@ -262,8 +251,7 @@ impl fmt::Display for ClauseHead {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "C{} lit:{:?}, watches:{:?}",
-            self.index,
+            "C lit:{:?}, watches:{:?}",
             vec2int(&self.lit),
             self.next_watcher,
         )
@@ -589,7 +577,7 @@ impl GC for ClausePartition {
                     continue;
                 }
                 let vi = (l as Lit).vi();
-                let mut pri = &mut self.watcher[l] as *mut ClauseId;
+                let mut pri = &mut self.watcher[l] as *mut usize;
                 let mut ci = self.watcher[l];
                 while ci != NULL_CLAUSE {
                     let ch = &mut self.head[ci] as *mut ClauseHead;
@@ -611,7 +599,7 @@ impl GC for ClausePartition {
             }
             // recycle garbages
             let recycled = &mut self.watcher[RECYCLE_LIT.negate() as usize] as *mut ClauseId;
-            let mut pri = &mut self.watcher[GARBAGE_LIT.negate() as usize] as *mut ClauseId;
+            let mut pri = &mut self.watcher[GARBAGE_LIT.negate() as usize] as *mut usize;
             let mut ci = self.watcher[GARBAGE_LIT.negate() as usize];
             while ci != NULL_CLAUSE {
                 let ch = &mut self.head[ci];
@@ -646,7 +634,6 @@ impl GC for ClausePartition {
             debug_assert_eq!(self.body[cix].get_flag(ClauseFlag::Dead), true);
             debug_assert_eq!(self.head[cix].lit[0], RECYCLE_LIT);
             debug_assert_eq!(self.head[cix].lit[1], RECYCLE_LIT);
-            debug_assert_eq!(self.head[cix].index, cix);
             self.watcher[RECYCLE_LIT.negate() as usize] = self.head[cix].next_watcher[0];
             let ch = &mut self.head[cix];
             let cb = &mut self.body[cix];
@@ -678,7 +665,6 @@ impl GC for ClausePartition {
             self.head.push(ClauseHead {
                 lit: [l0, l1],
                 next_watcher: [self.watcher[w0], self.watcher[w1]],
-                index: cix,
             });
             self.body.push(ClauseBody {
                 flag: self.kind as u16
@@ -704,7 +690,7 @@ impl GC for ClausePartition {
             if cb.get_flag(ClauseFlag::Dead) {
                 continue;
             }
-            let key = ch.index;
+            let key = i;
             let mut cnt = 0;
             for l in &ch.lit {
                 let lv = vars[l.vi()].level;
