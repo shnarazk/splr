@@ -24,7 +24,7 @@ pub trait ClauseIdIndexEncoding {
 pub trait ClauseManagement {
     fn bump_cid(&mut self, ci: ClauseId) -> ();
     fn decay_cla_activity(&mut self) -> ();
-    fn add_clause(&mut self, v: &mut Vec<Lit>) -> bool;
+    fn add_clause(&mut self, v: &mut Vec<Lit>) -> Option<ClauseId>;
     fn add_learnt(&mut self, v: &mut Vec<Lit>, lbd: usize) -> ClauseId;
     fn reduce(&mut self) -> ();
     fn simplify(&mut self) -> bool;
@@ -348,7 +348,7 @@ impl ClauseManagement for Solver {
         self.cla_inc /= self.config.clause_decay_rate;
     }
     // renamed from clause_new
-    fn add_clause(&mut self, v: &mut Vec<Lit>) -> bool {
+    fn add_clause(&mut self, v: &mut Vec<Lit>) -> Option<ClauseId> {
         v.sort_unstable();
         let mut j = 0;
         let mut l_ = NULL_LIT; // last literal; [x, x.negate()] means totology.
@@ -356,7 +356,7 @@ impl ClauseManagement for Solver {
             let li = v[i];
             let sat = self.vars.assigned(li);
             if sat == LTRUE || li.negate() == l_ {
-                return true;
+                return Some(NULL_CLAUSE);
             } else if sat != LFALSE && li != l_ {
                 v[j] = li;
                 j += 1;
@@ -370,12 +370,12 @@ impl ClauseManagement for Solver {
             ClauseKind::Permanent
         };
         match v.len() {
-            0 => false, // Empty clause is UNSAT.
-            1 => self.enqueue(v[0], NULL_CLAUSE),
-            _ => {
-                self.cp[kind as usize].new_clause(&v, 0, false, false);
-                true
+            0 => None, // Empty clause is UNSAT.
+            1 => {
+                self.enqueue(v[0], NULL_CLAUSE);
+                Some(NULL_CLAUSE)
             }
+            _ => Some(self.cp[kind as usize].new_clause(&v, 0, false, false)),
         }
     }
     /// renamed from newLearntClause
@@ -398,7 +398,6 @@ impl ClauseManagement for Solver {
             }
         }
         v.swap(1, i_max);
-        let l0 = v[0];
         let kind = if v.len() == 2 {
             ClauseKind::Binclause
         } else if self.strategy == Some(SearchStrategy::ChanSeok) && lbd <= CO_LBD_BOUND {
@@ -408,7 +407,6 @@ impl ClauseManagement for Solver {
         };
         let cid = self.cp[kind as usize].new_clause(&v, lbd, true, true);
         self.bump_cid(cid);
-        self.uncheck_enqueue(l0, cid);
         cid
     }
 

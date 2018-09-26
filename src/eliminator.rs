@@ -1,14 +1,14 @@
 #![allow(unused_mut)]
 #![allow(unused_variables)]
-use clause::{Clause, ClauseFlag, ClauseIdIndexEncoding, ClauseKind, CLAUSE_KINDS};
-use clause::DEAD_CLAUSE;
+use clause::{ClauseBody, ClauseHead, ClauseFlag, ClauseIdIndexEncoding, ClauseKind, ClauseManagement, ClausePartition, CLAUSE_KINDS, GC};
 use solver::{CDCL, Solver};
+use std::usize::MAX;
 use std::fmt;
 use types::*;
-use var::Satisfiability;
+
 
 const DEAD_CLAUSE: usize = MAX;
-const BWDSUB_CLAUSE: ClauseId = DEAD_CLAUSE - 1;
+const BWDSUB_DUMMY_CLAUSE: ClauseId = DEAD_CLAUSE - 1;
 const SUBSUMPTION_SIZE: usize = 20;
 const SUBSUMPITON_GROW_LIMIT: usize = 0;
 const SUBSUMPTION_VAR_QUEUE_MAX: usize = 10_000;
@@ -26,7 +26,7 @@ pub struct Eliminator {
     pub clause_queue: Vec<ClauseId>,
     pub bwdsub_assigns: usize,
     //    pub bwdsub_tmp_unit: ClauseId,
-    pub bwdsub_tmp_clause: Clause,
+    pub bwdsub_lit: Lit,
     pub remove_satisfied: bool,
     // working place
     pub merge_vec: Vec<Lit>,
@@ -48,8 +48,6 @@ pub struct Eliminator {
 impl Eliminator {
     pub fn new(use_elim: bool, nv: usize) -> Eliminator {
         // let heap = VarIdHeap::new(VarOrder::ByOccurence, nv, 0);
-        let mut bwdsub_tmp_clause = Clause::null();
-        bwdsub_tmp_clause.index = BWDSUB_CLAUSE;
         Eliminator {
             merges: 0,
             var_queue: Vec::new(),
@@ -58,7 +56,7 @@ impl Eliminator {
             clause_queue: Vec::new(),
             bwdsub_assigns: 0,
             //            bwdsub_tmp_unit: 0,
-            bwdsub_tmp_clause,
+            bwdsub_lit: NULL_LIT,
             remove_satisfied: false,
             merge_vec: vec![0; nv + 1],
             elim_clauses: Vec::new(),
@@ -96,17 +94,14 @@ impl Solver {
             self.enqueue(vec[0], NULL_CLAUSE);
             return true;
         }
-        let nclauses = self.cp[ClauseKind::Permanent as usize].clauses.len();
-        let cid = self.attach_clause(Clause::new(ClauseKind::Permanent, false, vec.len(), &vec));
-        debug_assert_ne!(nclauses, cid);
-        // if nclauses == cid {
-        //     return true;
-        // }
+        let cid = self.add_clause(&mut vec.to_vec()).unwrap();
         // println!("add cross clause {}:{}", cid.to_kind(), cid.to_index());
-        let c = &iref!(self.cp, cid);
+        
+        let ch = clause_head!(self.cp, cid);
+        let cb = clause_body!(self.cp, cid);
         self.eliminator.enqueue_clause(cid);
-        for i in 0..c.len() {
-            let l = lindex!(c, i);
+        for i in 0..cb.lits.len() + 2 {
+            let l = lindex!(ch, cb, i);
             let mut v = &mut self.vars[l.vi()];
             v.touched = true;
             self.eliminator.n_touched += 1;
@@ -120,22 +115,25 @@ impl Solver {
     /// called from strengthen_clause, backward_subsumption_check, eliminate_var, substitute
     /// - calls `enqueue_var`
     pub fn remove_clause(&mut self, cid: ClauseId) -> () {
+        clause_body_mut!(self.cp, cid).set_flag(ClauseFlag::Dead, true);
         let Solver {
             ref mut cp,
             ref mut vars,
             ref mut eliminator,
             ..
         } = self;
-        let mut c = &mut cp[cid.to_kind()].clauses[cid.to_index()];
-        for i in 0..c.len() {
-            let vi = lindex!(c, i).vi();
-            if vars[vi].terminal {
-                vars[vi].occurs.retain(|&ci| ci != cid);
-                eliminator.enqueue_var(vi);
+        {
+            let ch = clause_head!(cp, cid);
+            let cb = clause_body!(cp, cid);
+            for i in 0..cb.lits.len() + 2 {
+                let vi = lindex!(ch, cb, i).vi();
+                if vars[vi].terminal {
+                    vars[vi].occurs.retain(|&ci| ci != cid);
+                    eliminator.enqueue_var(vi);
+                }
             }
         }
         // println!("     purge {} by remove_clause", cid.to_index());
-        c.index = DEAD_CLAUSE;
     }
     /// 5. strengthenClause
     /// - calls `enqueue_clause`
@@ -144,14 +142,13 @@ impl Solver {
         // println!("STRENGTHEN_CLAUSE {}", cid.to_index());
         let c0;
         {
-            let c = &mut self.cp[cid.to_kind()].clauses[cid.to_index()];
             debug_assert_ne!(cid, NULL_CLAUSE);
             self.eliminator.enqueue_clause(cid);
-            if c.lits.is_empty() {
-                c.strengthen(l);
-                c0 = c.lit[0];
+            if clause_body!(self.cp, cid).lits.is_empty() {
+                self.strengthen(cid, l);
+                c0 = clause_head!(self.cp, cid).lit[0];
             } else {
-                c.strengthen(l);
+                self.strengthen(cid, l);
                 self.vars[l.vi()].occurs.retain(|&ci| ci != cid);
                 if self.vars[l.vi()].terminal {
                     self.eliminator.enqueue_var(l.vi());
@@ -161,11 +158,10 @@ impl Solver {
         }
         if c0 != NULL_LIT {
             self.remove_clause(cid);
-            self.rebuild_watchers(CLAUSE_KINDS[cid.to_kind() as usize]);
+            self.cp[ClauseKind::Removable as usize].garbage_collect();
+            self.cp[ClauseKind::Permanent as usize].garbage_collect();
+            self.cp[ClauseKind::Binclause as usize].garbage_collect();
             // println!("STRENGTHEN_CLAUSE ENQUEUE {}", c0);
-            self.rebuild_watchers(ClauseKind::Removable);
-            self.rebuild_watchers(ClauseKind::Permanent);
-            self.rebuild_watchers(ClauseKind::Binclause);
             if !self.enqueue(c0, NULL_CLAUSE) {
                 panic!("GGGGGGGGGGGGGGGGGGGGGGGGGG");
             }
@@ -181,15 +177,17 @@ impl Solver {
         let mut vec: Vec<Lit> = Vec::new();
         self.eliminator.merges += 1;
         self.eliminator.merge_vec.clear();
-        let pq = &self.cp[cp.to_kind()].clauses[cp.to_index()];
-        let qp = &self.cp[cq.to_kind()].clauses[cq.to_index()];
-        let ps_smallest = pq.len() < qp.len();
-        let (p, q) = if ps_smallest { (pq, qp) } else { (qp, pq) };
-        'next_literal: for i in 0..q.len() {
-            let l = lindex!(q, i);
+        let pqh = clause_head!(self.cp, cp);
+        let pqb = clause_body!(self.cp, cp);
+        let qph = clause_head!(self.cp, cq);
+        let qpb = clause_body!(self.cp, cq);
+        let ps_smallest = pqb.lits.len() < qpb.lits.len();
+        let (ph, pb, qh, qb) = if ps_smallest { (pqh, pqb, qph, qpb) } else { (qph, qpb, pqh, pqb) };
+        'next_literal: for i in 0..qb.lits.len() + 2 {
+            let l = lindex!(qh, qb, i);
             if l.vi() != v {
-                for j in 0..p.len() {
-                    let lit_j = lindex!(p, j);
+                for j in 0..pb.lits.len() {
+                    let lit_j = lindex!(ph, pb, j);
                     if lit_j.vi() == l.vi() {
                         if lit_j.negate() == l {
                             return None;
@@ -201,8 +199,8 @@ impl Solver {
                 vec.push(l);
             }
         }
-        for i in 0..p.len() {
-            let l = lindex!(p, i);
+        for i in 0..pb.lits.len() {
+            let l = lindex!(ph, pb, i);
             if l.vi() != v {
                 vec.push(l);
             }
@@ -214,16 +212,18 @@ impl Solver {
     /// Returns **false** if one of the clauses is always satisfied.
     pub fn check_to_merge(&mut self, cp: ClauseId, cq: ClauseId, v: VarId) -> (bool, usize) {
         self.eliminator.merges += 1;
-        let pq = &self.cp[cp.to_kind()].clauses[cp.to_index()];
-        let qp = &self.cp[cq.to_kind()].clauses[cq.to_index()];
-        let ps_smallest = pq.len() < qp.len();
-        let (p, q) = if ps_smallest { (pq, qp) } else { (qp, pq) };
-        let mut size = p.len() - 1;
-        'next_literal: for i in 0..q.len() {
-            let l = lindex!(q, i);
+        let pqh = clause_head!(self.cp, cp);
+        let pqb = clause_body!(self.cp, cp);
+        let qph = clause_head!(self.cp, cq);
+        let qpb = clause_body!(self.cp, cq);
+        let ps_smallest = pqb.lits.len() < qpb.lits.len();
+        let (ph, pb, qh, qb) = if ps_smallest { (pqh, pqb, qph, qpb) } else { (qph, qpb, pqh, pqb) };
+        let mut size = pb.lits.len() + 1;
+        'next_literal: for i in 0..qb.lits.len() + 2 {
+            let l = lindex!(qh, qb, i);
             if l.vi() != v {
-                for j in 0..p.len() {
-                    let lit_j = lindex!(p, j);
+                for j in 0..pb.lits.len() {
+                    let lit_j = lindex!(ph, pb, j);
                     if lit_j.vi() == l.vi() {
                         if lit_j.negate() == l {
                             return (false, size);
@@ -267,13 +267,16 @@ impl Solver {
         }
         // println!("targets {:?}", &targets[..5]);
         for ck in &CLAUSE_KINDS[0..3] {
-            let clauses = &self.cp[*ck as usize].clauses;
-            for (i, c) in clauses.iter().enumerate().skip(1) {
-                if c.index == DEAD_CLAUSE {
+            let head = &self.cp[*ck as usize].head;
+            let body = &self.cp[*ck as usize].body;
+            for i in 1..head.len() {
+                let ch = &head[i];
+                let cb = &body[i];
+                if cb.get_flag(ClauseFlag::Dead) {
                     continue;
                 }
-                for j in 0..c.len() {
-                    let l = lindex!(c, j);
+                for j in 0..cb.lits.len() + 2 {
+                    let l = lindex!(ch, cb, j);
                     let v = &mut self.vars[l.vi()];
                     if v.terminal {
                         v.num_occurs += 1;
@@ -295,17 +298,16 @@ impl Solver {
         }
         let mut len = self.eliminator.clause_queue.len();
         for cid in &self.eliminator.clause_queue {
-            let c = &mut self.cp[cid.to_kind()].clauses[cid.to_index()];
-            c.set_flag(ClauseFlag::Touched, true);
+            clause_body_mut!(self.cp, cid).set_flag(ClauseFlag::Touched, true);
         }
         for mut v in &mut self.vars[1..] {
             if v.touched && v.terminal {
                 // println!("gtc var: {}", v.index);
                 for cid in &v.occurs {
-                    let mut c = mref!(self.cp, cid);
-                    if !c.get_flag(ClauseFlag::Touched) {
+                    let mut cb = clause_body_mut!(self.cp, cid);
+                    if !cb.get_flag(ClauseFlag::Touched) {
                         self.eliminator.enqueue_clause(*cid);
-                        c.set_flag(ClauseFlag::Touched, true);
+                        cb.set_flag(ClauseFlag::Touched, true);
                     }
                 }
                 v.touched = false;
@@ -313,8 +315,7 @@ impl Solver {
         }
         // println!("gather_touched_classes: clause_queue {}", self.eliminator.clause_queue.len());
         for cid in &self.eliminator.clause_queue {
-            let c = &mut self.cp[cid.to_kind()].clauses[cid.to_index()];
-            c.set_flag(ClauseFlag::Touched, false);
+            clause_body_mut!(self.cp, cid).set_flag(ClauseFlag::Touched, false);
         }
         for v in &mut self.vars {
             v.touched = false;
@@ -337,63 +338,26 @@ impl Solver {
             if self.eliminator.clause_queue.is_empty()
                 && self.eliminator.bwdsub_assigns < self.trail.len()
             {
-                let l: Lit = self.trail[self.eliminator.bwdsub_assigns];
-                let id = self.eliminator.bwdsub_tmp_clause.index;
+                self.eliminator.bwdsub_lit = self.trail[self.eliminator.bwdsub_assigns];
+                // self.eliminator.bwdsub_tmp_clause.lit[0] = l;
                 self.eliminator.bwdsub_assigns += 1;
-                self.eliminator.bwdsub_tmp_clause.lit[0] = l;
-                self.eliminator.enqueue_clause(id);
+                self.eliminator.enqueue_clause(BWDSUB_DUMMY_CLAUSE);
             }
             let cid = self.eliminator.clause_queue[0];
             self.eliminator.clause_queue.remove(0);
             unsafe {
-                let mut c = if cid == self.eliminator.bwdsub_tmp_clause.index {
-                    &mut self.eliminator.bwdsub_tmp_clause as *mut Clause
-                } else {
-                    &mut self.cp[cid.to_kind()].clauses[cid.to_index()] as *mut Clause
-                };
-                if (*c).get_flag(ClauseFlag::SveMark) || (*c).index == DEAD_CLAUSE {
-                    continue;
-                }
-                // println!("check with {} for best_v {}", *c, self.eliminator.best_v);
-                debug_assert!(1 < (*c).len() || self.vars.assigned((*c).lit[0]) == LTRUE);
-                // unit clauses should have been propagated before this point.
-                // Find best variable to scan:
                 let mut best = 0;
-                let mut tmp = 0;
-                for i in 0..(*c).len() {
-                    let l = lindex!(*c, i);
-                    let v = &self.vars[l.vi()];
-                    // println!("select var {}, {}, {}", l.vi(), v.terminal, v.occurs.len());
-                    if v.terminal && tmp < v.occurs.len() {
-                        best = l.vi();
-                        tmp = v.occurs.len();
-                    }
-                }
-                // println!("select var {}", best);
-                if best == 0 {
-                    continue;
-                }
-                // Search all candidates:
-                let cs = &mut self.vars[best].occurs as *mut Vec<ClauseId>;
-                for di in &*cs {
-                    let d = &self.cp[di.to_kind()].clauses[di.to_index()] as *const Clause;
-                    if (!(*d).get_flag(ClauseFlag::SveMark) || (*d).index != DEAD_CLAUSE)
-                        && *di != cid
-                        && (*c).len() <= self.eliminator.subsume_clause_size
-                        && (*d).len() <= self.eliminator.subsume_clause_size
-                        && (self.eliminator.subsumption_lim == 0
-                            || (*c).len() + (*d).len() <= self.eliminator.subsumption_lim)
-                    // && (self.eliminator.subsumption_lim == 0 || (*d).len() < self.eliminator.subsumption_lim)
-                    {
-                        // println!("{} + {}", *c, *d);
-                        match (*c).subsumes(&*d) {
+                if cid == BWDSUB_DUMMY_CLAUSE {
+                    best = self.eliminator.bwdsub_lit as usize;
+                    let cs = &mut self.vars[best].occurs as *mut Vec<ClauseId>;
+                    for di in &*cs {
+                        let db = clause_body!(self.cp, di) as *const ClauseBody;
+                        match self.subsume(cid, *di) {
                             Some(NULL_LIT) => {
-                                // println!("    => {} subsumed completely by {}", *d, *c);
                                 subsumed += 1;
                                 self.remove_clause(*di);
                             }
                             Some(l) => {
-                                // println!("    => subsumed {} from {} and {}", l.int(), *c, *d);
                                 deleted_literals += 1;
                                 if !self.strengthen_clause(*di, l.negate()) {
                                     return false;
@@ -402,8 +366,59 @@ impl Solver {
                             None => {}
                         }
                     }
+                    self.eliminator.targets.clear();
+                } else {
+                let mut tmp = 0;
+                    let ch = clause_head_mut!(self.cp, cid) as *mut ClauseHead;
+                    let cb = clause_body_mut!(self.cp, cid) as *mut ClauseBody;
+                    if (*cb).get_flag(ClauseFlag::SveMark) || (*cb).get_flag(ClauseFlag::Dead) {
+                        continue;
+                    }
+                    for i in 0..(*cb).lits.len() {
+                        let l = lindex!(*ch, *cb, i);
+                        {
+                            let v = &self.vars[l.vi()];
+                            if v.terminal && tmp < v.occurs.len() {
+                                best = l.vi();
+                                tmp = v.occurs.len();
+                            }
+                        }
+                        if best == 0 {
+                            continue;
+                        }
+                        // Search all candidates:
+                        let cs = &mut self.vars[best].occurs as *mut Vec<ClauseId>;
+                        for di in &*cs {
+                            let db = clause_body!(self.cp, di) as *const ClauseBody;
+                            if (!(*db).get_flag(ClauseFlag::SveMark) || !(*db).get_flag(ClauseFlag::Dead))
+                                && *di != cid
+                                && (*cb).lits.len() + 2 <= self.eliminator.subsume_clause_size
+                                && (*db).lits.len() + 2 <= self.eliminator.subsume_clause_size
+                                && (self.eliminator.subsumption_lim == 0
+                                    || (*cb).lits.len() + (*db).lits.len() + 4 <= self.eliminator.subsumption_lim)
+                            // && (self.eliminator.subsumption_lim == 0 || (*d).len() < self.eliminator.subsumption_lim)
+                            {
+                                // println!("{} + {}", *c, *d);
+                                match self.subsume(cid, *di) {
+                                    Some(NULL_LIT) => {
+                                        // println!("    => {} subsumed completely by {}", *d, *c);
+                                        subsumed += 1;
+                                        self.remove_clause(*di);
+                                    }
+                                    Some(l) => {
+                                        // println!("    => subsumed {} from {} and {}", l.int(), *c, *d);
+                                        deleted_literals += 1;
+                                        if !self.strengthen_clause(*di, l.negate()) {
+                                            return false;
+                                        }
+                                    }
+                                    None => {}
+                                }
+                            }
+                        }
+                    self.eliminator.targets.clear();
+                    }
                 }
-                self.eliminator.targets.clear();
             }
         }
         true
@@ -417,9 +432,10 @@ impl Solver {
     pub fn make_eliminated_clause(&self, vec: &mut Vec<Lit>, vi: VarId, cid: ClauseId) -> () {
         let first = vec.len();
         // Copy clause to the vector. Remember the position where the varibale 'v' occurs:
-        let c = iref!(self.cp, cid);
-        for i in 0..c.len() {
-            let l = lindex!(c, i);
+        let ch = clause_head!(self.cp, cid);
+        let cb = clause_body!(self.cp, cid);
+        for i in 0..cb.lits.len() + 2 {
+            let l = lindex!(ch, cb, i);
             vec.push(l as u32);
             if l.vi() == vi {
                 let index = vec.len() - 1;
@@ -428,7 +444,7 @@ impl Solver {
             }
         }
         // Store the length of the clause last:
-        vec.push(c.len() as u32);
+        vec.push((cb.lits.len() + 2) as Lit);
     }
     /// 15. eliminateVar
     pub fn eliminate_var(&mut self, v: VarId) -> bool {
@@ -440,12 +456,13 @@ impl Solver {
         let mut neg: Vec<ClauseId> = Vec::new();
         // Split the occurrences into positive and negative:
         for cid in &self.vars[v].occurs {
-            let c = &self.cp[cid.to_kind()].clauses[cid.to_index()];
-            if c.index == DEAD_CLAUSE {
+            let ch = clause_head!(self.cp, cid);
+            let cb = clause_body!(self.cp, cid);
+            if cb.get_flag(ClauseFlag::Dead) {
                 continue;
             }
-            for i in 0..c.len() {
-                let l = lindex!(c, i);
+            for i in 0..cb.lits.len() + 2 {
+                let l = lindex!(ch, cb, i);
                 if l.vi() == v {
                     if l.positive() {
                         pos.push(*cid);
@@ -629,13 +646,17 @@ impl Eliminator {
     }
 }
 
-impl Clause {
-    pub fn subsumes(&self, other: &Clause) -> Option<Lit> {
+impl Solver {
+    fn subsume(&self, cid: ClauseId, other: ClauseId) -> Option<Lit> {
         let mut ret: Lit = NULL_LIT;
-        'next: for i in 0..self.len() {
-            let l = lindex!(self, i);
-            for j in 0..other.len() {
-                let lo = lindex!(other, j);
+        let ch = clause_head!(self.cp, cid);
+        let cb = clause_body!(self.cp, cid);
+        let oh = clause_head!(self.cp, other);
+        let ob = clause_body!(self.cp, other);
+        'next: for i in 0..cb.lits.len() + 2 {
+            let l = lindex!(ch, cb, i);
+            for j in 0..ob.lits.len() + 2 {
+                let lo = lindex!(oh, ob, j);
                 if l == lo {
                     continue 'next;
                 } else if ret == NULL_LIT && l == lo.negate() {
@@ -647,25 +668,32 @@ impl Clause {
         }
         Some(ret)
     }
+
     /// remove Lit `p` from Clause *self*.
     /// returns true if the clause became a unit clause.
-    pub fn strengthen(&mut self, p: Lit) -> bool {
-        if self.get_flag(ClauseFlag::Dead) {
+    pub fn strengthen(&mut self, cid: ClauseId, p: Lit) -> bool {
+        let ClausePartition {
+            ref mut head,
+            ref mut body,
+            ..
+        } = self.cp[cid.to_kind()];
+        let ch = &mut head[cid.to_index()];
+        let cb = &mut body[cid.to_index()];
+        if cb.get_flag(ClauseFlag::Dead) {
             return false;
         }
-        let len = self.len();
-        if len == 2 {
-            if self.lit[0] == p {
-                self.lit.swap(0, 1);
+        if cb.lits.is_empty() {
+            if ch.lit[0] == p {
+                ch.lit.swap(0, 1);
             }
             return true;
         }
-        if self.lit[0] == p {
-            self.lit[0] = self.lits.pop().unwrap();
-        } else if self.lit[1] == p {
-            self.lit[1] = self.lits.pop().unwrap();
+        if ch.lit[0] == p {
+            ch.lit[0] = cb.lits.pop().unwrap();
+        } else if ch.lit[1] == p {
+            ch.lit[1] = cb.lits.pop().unwrap();
         } else {
-            self.lits.retain(|&x| x != p);
+            cb.lits.retain(|&x| x != p);
         }
         false
     }

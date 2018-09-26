@@ -1,5 +1,5 @@
 use clause::{ClauseManagement, GC, *};
-// use eliminator::Eliminator;
+use eliminator::Eliminator;
 use restart::Restart;
 use std::cmp::max;
 use std::fs;
@@ -102,7 +102,7 @@ pub struct Solver {
     pub cur_restart: usize,
     pub num_solved_vars: usize,
     /// Variable Elimination
-    //    pub eliminator: Eliminator,
+    pub eliminator: Eliminator,
     /// Working memory
     pub ok: bool,
     pub model: Vec<Lbool>,
@@ -134,7 +134,7 @@ impl Solver {
         let re = cfg.restart_expansion;
         let cdr = cfg.clause_decay_rate;
         let vdr = cfg.variable_decay_rate;
-        // let use_sve = cfg.use_sve;
+        let sve = cfg.use_sve;
         Solver {
             config: cfg,
             num_vars: nv,
@@ -157,7 +157,7 @@ impl Solver {
             next_reduction: 1000,
             cur_restart: 1,
             num_solved_vars: 0,
-            // eliminator: Eliminator::new(use_sve, nv),
+            eliminator: Eliminator::new(sve, nv),
             ok: true,
             model: vec![BOTTOM; nv + 1],
             conflicts: vec![],
@@ -171,7 +171,7 @@ impl Solver {
             an_level_map_key: 1,
             mi_var_map: vec![0; nv + 1],
             lbd_seen: vec![0; nv + 1],
-            ema_asg: Ema2::new(1.5, 40_000.0),  // for blocking
+            ema_asg: Ema2::new(3.5, 40_000.0),  // for blocking
             ema_lbd: Ema2::new(50.0, 50_000.0), // for forcing
             b_lvl: Ema::new(se),
             c_lvl: Ema::new(se),
@@ -389,7 +389,7 @@ impl SatSolver for Solver {
                             Err(_) => (),
                         }
                     }
-                    if !v.is_empty() && !s.add_clause(&mut v) {
+                    if !v.is_empty() && s.add_clause(&mut v) == None {
                         s.ok = false;
                     }
                 }
@@ -525,11 +525,13 @@ impl CDCL for Solver {
                     unsafe {
                         lbd = self.lbd_of_an_learnt_lits();
                         let v = &mut self.an_learnt_lits as *mut Vec<Lit>;
+                        let l0 = (*v)[0];
                         let cid = self.add_learnt(&mut *v, lbd);
                         if cid.to_kind() == ClauseKind::Binclause as usize {
                             let ch = clause_head!(self.cp, cid) as *const ClauseHead;
                             self.biclause_subsume(&*ch);
                         }
+                        self.uncheck_enqueue(l0, cid);
                     }
                 }
                 if self.stat[Stat::Conflict as usize] == 100_000 {
@@ -888,13 +890,10 @@ impl Solver {
             v.assign = l.lbool();
             v.level = dl;
             v.reason = cid;
-            if dl == 0 {
-                v.activity = 0.0;
-            }
         }
-        if dl == 0 {
-            self.var_order.remove(&self.vars, l.vi());
-        }
+        // if dl == 0 {
+        //     self.var_order.remove(&self.vars, l.vi());
+        // }
         clause_body_mut!(self.cp, cid).set_flag(ClauseFlag::Locked, true);
         self.trail.push(l);
     }

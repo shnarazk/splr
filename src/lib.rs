@@ -2,7 +2,7 @@
 #[macro_use]
 mod macros;
 // /// Subsumption-based clause/var eliminaiton
-// pub mod eliminator;
+pub mod eliminator;
 /// Clause
 pub mod clause;
 /// Implementation on solver restart.
