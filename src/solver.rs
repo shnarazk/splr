@@ -195,6 +195,7 @@ impl Solver {
         let good = learnts
             .body
             .iter()
+            .skip(1)
             .filter(|c| !c.get_flag(ClauseFlag::Dead) && c.rank <= 3)
             .count();
         if mes == "" {
@@ -209,10 +210,10 @@ impl Solver {
                 k,
                 self.eliminator.eliminated_vars,
                 (k as f32) / (nv as f32) * 100.0,
-                self.cp[ClauseKind::Removable as usize].body.iter().filter(|c| !c.get_flag(ClauseFlag::Dead)).count(),
+                self.cp[ClauseKind::Removable as usize].body.iter().skip(1).filter(|c| !c.get_flag(ClauseFlag::Dead)).count(),
                 good,
-                self.cp[ClauseKind::Permanent as usize].body.iter().filter(|c| !c.get_flag(ClauseFlag::Dead)).count(),
-                self.cp[ClauseKind::Binclause as usize].body.iter().filter(|c| !c.get_flag(ClauseFlag::Dead)).count(),
+                self.cp[ClauseKind::Permanent as usize].body.iter().skip(1).filter(|c| !c.get_flag(ClauseFlag::Dead)).count(),
+                self.cp[ClauseKind::Binclause as usize].body.iter().skip(1).filter(|c| !c.get_flag(ClauseFlag::Dead)).count(),
                 self.stat[Stat::BlockRestart as usize],
                 self.stat[Stat::Restart as usize],
                 self.ema_asg.get(),
@@ -308,12 +309,14 @@ impl SatSolver for Solver {
         // TODO: deal with assumptions
         // s.root_level = 0;
         self.num_solved_vars = self.trail.len();
+        self.progress("");
+        self.progress("load");
         self.eliminate_binclauses();
         // if self.eliminator.use_elim {
         //     self.eliminate();
         // }
-        self.progress("");
         self.simplify();
+        self.progress("simp");
         self.stat[Stat::Simplification as usize] += 1;
         match self.search() {
             _ if !self.ok => {
