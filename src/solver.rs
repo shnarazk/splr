@@ -124,6 +124,8 @@ pub struct Solver {
     pub c_lvl: Ema,
     pub next_restart: u64,
     pub restart_exp: f64,
+    /// subsumption
+    pub subsume_queue: Vec<ClauseId>,
 }
 
 impl Solver {
@@ -177,6 +179,7 @@ impl Solver {
             c_lvl: Ema::new(se),
             next_restart: 100,
             restart_exp: re,
+            subsume_queue: Vec::with_capacity(10000),
         }
     }
     // print a progress report
@@ -196,11 +199,11 @@ impl Solver {
             .count();
         if mes == "" {
             println!(
-                "#init,#remain, #solv, rate%, DB,#learnt,(good),  #perm,#binary, RES,block,force, asgn/,  lbd/, STAT,    lbd, back lv, conf lv"
+                "#init,#remain, #solv, rate%, DB,#learnt,(good),  #perm,#binary, RES,block,force, asgn/,  lbd/, STAT,    lbd, back lv, conf lv, SUB, queue,binary"
             );
         } else {
             println!(
-                "#{},{:>7},{:>6},{:>6.3}, DB,{:>7},{:>6},{:>7},{:>7}, RES,{:>5},{:>5}, {:>5.2},{:>6.2}, STAT,{:>7.2},{:>8.2},{:>8.2}",
+                "#{},{:>7},{:>6},{:>6.3}, DB,{:>7},{:>6},{:>7},{:>7}, RES,{:>5},{:>5}, {:>5.2},{:>6.2}, STAT,{:>7.2},{:>8.2},{:>8.2}, SUB,{:>6},{:>6}",
                 mes,
                 nv - self.trail.len(),
                 k,
@@ -216,6 +219,8 @@ impl Solver {
                 self.ema_lbd.slow,
                 self.b_lvl.0,
                 self.c_lvl.0,
+                self.subsume_queue.len(),
+                self.eliminator.binclause_queue.len(),
             );
         }
     }
@@ -302,8 +307,8 @@ impl SatSolver for Solver {
         // TODO: deal with assumptions
         // s.root_level = 0;
         self.num_solved_vars = self.trail.len();
+        self.eliminate_binclauses();
         // if self.eliminator.use_elim {
-        //     // self.eliminate_binclauses();
         //     self.eliminate();
         // }
         self.progress("");
@@ -323,9 +328,9 @@ impl SatSolver for Solver {
                         _ => result.push(0),
                     }
                 }
-                //if self.eliminator.use_elim {
-                //    self.extend_model(&mut result);
-                //}
+                if self.eliminator.use_elim {
+                    self.extend_model(&mut result);
+                }
                 self.cancel_until(0);
                 Ok(Certificate::SAT(result))
             }
@@ -389,7 +394,7 @@ impl SatSolver for Solver {
                             Err(_) => (),
                         }
                     }
-                    if !v.is_empty() && s.add_clause(&mut v) == None {
+                    if !v.is_empty() && s.add_unchecked_clause(&mut v) == None {
                         s.ok = false;
                     }
                 }
@@ -526,7 +531,7 @@ impl CDCL for Solver {
                         lbd = self.lbd_of_an_learnt_lits();
                         let v = &mut self.an_learnt_lits as *mut Vec<Lit>;
                         let l0 = (*v)[0];
-                        let cid = self.add_learnt(&mut *v, lbd);
+                        let cid = self.add_clause(&mut *v, lbd);
                         if cid.to_kind() == ClauseKind::Binclause as usize {
                             let ch = clause_head!(self.cp, cid) as *const ClauseHead;
                             self.biclause_subsume(&*ch);

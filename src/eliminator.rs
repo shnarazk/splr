@@ -6,6 +6,9 @@ use std::usize::MAX;
 use std::fmt;
 use types::*;
 
+pub trait ClauseElimination {
+    fn eliminator_enqueue(&mut self, cid: ClauseId) -> ();
+}
 
 const DEAD_CLAUSE: usize = MAX;
 const BWDSUB_DUMMY_CLAUSE: ClauseId = DEAD_CLAUSE - 1;
@@ -43,6 +46,7 @@ pub struct Eliminator {
     pub targets: Vec<ClauseId>,
     pub subsume_clause_size: usize,
     pub last_invocatiton: usize,
+    pub binclause_queue: Vec<ClauseId>,
 }
 
 impl Eliminator {
@@ -70,6 +74,7 @@ impl Eliminator {
             targets: Vec::new(),
             subsume_clause_size: SUBSUMPTION_SIZE,
             last_invocatiton: 0,
+            binclause_queue: Vec::new(),
         }
     }
 }
@@ -86,6 +91,32 @@ impl fmt::Display for Eliminator {
     }
 }
 
+impl ClauseElimination for Solver {
+    fn eliminator_enqueue(&mut self, cid: ClauseId) -> () {
+        for l in &clause_head!(self.cp, cid).lit {
+            let mut v = &mut self.vars[l.vi()];
+            v.touched = true;
+            self.eliminator.n_touched += 1;
+            if !v.eliminated && v.terminal {
+                v.occurs.push(cid);
+            }
+        }
+        let cb = clause_body_mut!(self.cp, cid);
+        for l in &cb.lits {
+            let mut v = &mut self.vars[l.vi()];
+            v.touched = true;
+            self.eliminator.n_touched += 1;
+            if !v.eliminated && v.terminal {
+                v.occurs.push(cid);
+            }
+        }
+        if !cb.get_flag(ClauseFlag::Queued) {
+            self.subsume_queue.push(cid);
+            cb.set_flag(ClauseFlag::Queued, true);
+        }
+    }
+}
+
 impl Solver {
     /// 3. addClause
     /// - calls `enqueue_clause`
@@ -94,7 +125,7 @@ impl Solver {
             self.enqueue(vec[0], NULL_CLAUSE);
             return true;
         }
-        let cid = self.add_clause(&mut vec.to_vec()).unwrap();
+        let cid = self.add_clause(&mut vec.to_vec(), 0);
         // println!("add cross clause {}:{}", cid.to_kind(), cid.to_index());
         
         let ch = clause_head!(self.cp, cid);
@@ -115,7 +146,18 @@ impl Solver {
     /// called from strengthen_clause, backward_subsumption_check, eliminate_var, substitute
     /// - calls `enqueue_var`
     pub fn remove_clause(&mut self, cid: ClauseId) -> () {
-        clause_body_mut!(self.cp, cid).set_flag(ClauseFlag::Dead, true);
+        {
+            clause_body_mut!(self.cp, cid).set_flag(ClauseFlag::Dead, true);
+            let w0;
+            let w1;
+            {
+                let ch = clause_head!(self.cp, cid);
+                w0 = ch.lit[0].negate();
+                w1 = ch.lit[1].negate();
+            }
+            self.cp[cid.to_kind()].touched[w0 as usize] = true;
+            self.cp[cid.to_kind()].touched[w1 as usize] = true;
+        }
         let Solver {
             ref mut cp,
             ref mut vars,
@@ -133,7 +175,7 @@ impl Solver {
                 }
             }
         }
-        // println!("     purge {} by remove_clause", cid.to_index());
+        // println!("     - remove_clause made {} dead", cid.to_index());
     }
     /// 5. strengthenClause
     /// - calls `enqueue_clause`
@@ -143,7 +185,6 @@ impl Solver {
         let c0;
         {
             debug_assert_ne!(cid, NULL_CLAUSE);
-            self.eliminator.enqueue_clause(cid);
             if clause_body!(self.cp, cid).lits.is_empty() {
                 self.strengthen(cid, l);
                 c0 = clause_head!(self.cp, cid).lit[0];
@@ -158,16 +199,20 @@ impl Solver {
         }
         if c0 != NULL_LIT {
             self.remove_clause(cid);
-            self.cp[ClauseKind::Removable as usize].garbage_collect();
-            self.cp[ClauseKind::Permanent as usize].garbage_collect();
-            self.cp[ClauseKind::Binclause as usize].garbage_collect();
+            // before the following propagate, we need to clean garbages.
+            self.cp[cid.to_kind()].garbage_collect();
+            // self.cp[ClauseKind::Removable as usize].garbage_collect();
+            // self.cp[ClauseKind::Permanent as usize].garbage_collect();
+            // self.cp[ClauseKind::Binclause as usize].garbage_collect();
             // println!("STRENGTHEN_CLAUSE ENQUEUE {}", c0);
             if !self.enqueue(c0, NULL_CLAUSE) {
-                panic!("GGGGGGGGGGGGGGGGGGGGGGGGGG");
+                self.ok = false;
+                return false;
             }
-            self.propagate() == NULL_CLAUSE
+            self.propagate() == NULL_CLAUSE // TODO I could remove this line logically
         // self.enqueue(c0, NULL_CLAUSE) == true && self.propagate() == NULL_CLAUSE
         } else {
+            self.eliminator.enqueue_clause(cid);
             true
         }
     }
@@ -685,6 +730,7 @@ impl Solver {
         if cb.lits.is_empty() {
             if ch.lit[0] == p {
                 ch.lit.swap(0, 1);
+                ch.next_watcher.swap(0, 1);
             }
             return true;
         }
@@ -696,5 +742,84 @@ impl Solver {
             cb.lits.retain(|&x| x != p);
         }
         false
+    }
+   pub fn eliminate_binclauses(&mut self) -> () {
+        if !self.eliminator.binclause_queue.is_empty() {
+            self.build_binary_occurrence();
+            self.binary_subsumption_check();
+        }
+    }
+    /// remove all vars which have a single positive or negative occurence.
+    pub fn build_binary_occurrence(&mut self) -> () {
+        for v in &mut self.vars[1..] {
+            v.bin_pos_occurs.clear();
+            v.bin_neg_occurs.clear();
+        }
+        for i in 1..self.cp[ClauseKind::Binclause as usize].head.len() {
+            let ch = &self.cp[ClauseKind::Binclause as usize].head[i];
+            let cb = &self.cp[ClauseKind::Binclause as usize].body[i];
+            let cid = ClauseKind::Binclause.id_from(i);
+            if cb.get_flag(ClauseFlag::Dead) {
+                continue;
+            }
+            for l in &ch.lit {
+                let v = &mut self.vars[l.vi()];
+                if l.positive() {
+                    v.bin_pos_occurs.push(cid);
+                } else {
+                    v.bin_neg_occurs.push(cid);
+                }
+            }
+            debug_assert_eq!(cb.lits.len(), 0);
+        }
+    }
+    pub fn binary_subsumption_check(&mut self) -> bool {
+        debug_assert_eq!(self.decision_level(), 0);
+        unsafe {
+            while let Some(cid) = self.eliminator.binclause_queue.pop() {
+                debug_assert_eq!(cid.to_kind(), ClauseKind::Binclause as usize);
+                let ch = clause_head!(self.cp, cid) as *const ClauseHead;
+                let cb = clause_body!(self.cp, cid) as *const ClauseBody;
+                if (*cb).get_flag(ClauseFlag::SveMark) || (*cb).get_flag(ClauseFlag::Dead) {
+                    continue;
+                }
+                for l in &(*ch).lit {
+                    if self.vars[l.vi()].eliminated {
+                        continue;
+                    }
+                    let targets = if l.positive() {
+                        &mut self.vars[l.vi()].bin_neg_occurs as *mut Vec<ClauseId>
+                    } else {
+                        &mut self.vars[l.vi()].bin_pos_occurs as *mut Vec<ClauseId>
+                    };
+                    for did in &*targets {
+                        debug_assert_eq!(did.to_kind(), ClauseKind::Binclause as usize);
+                        // println!("check with {} for best_v {}", *c, self.eliminator.best_v);
+                        // Search all candidates:
+                        let db = clause_body_mut!(self.cp, *did) as *mut ClauseBody;
+                        if (*db).get_flag(ClauseFlag::Dead) {
+                            continue;
+                        }
+                        if !(*db).get_flag(ClauseFlag::Dead) && cid != *did {
+                            // println!("{} + {}", *c, *d);
+                            match self.subsume(cid, *did) {
+                                Some(NULL_LIT) => {
+                                    println!("    => {} subsumed completely by {}", *did, cid);
+                                    self.remove_clause(*did);
+                                }
+                                Some(l) => {
+                                    println!("    => subsumed {} from {} and {}", l.int(), cid, *did);
+                                    if !self.strengthen_clause(*did, l.negate()) {
+                                        return false;
+                                    }
+                                }
+                                None => {}
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        true
     }
 }

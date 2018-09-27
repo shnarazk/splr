@@ -1,3 +1,4 @@
+use eliminator::ClauseElimination;
 use solver::{SearchStrategy, Solver, Stat, CDCL, CO_LBD_BOUND};
 use std::cmp::Ordering;
 use std::f64;
@@ -24,8 +25,8 @@ pub trait ClauseIdIndexEncoding {
 pub trait ClauseManagement {
     fn bump_cid(&mut self, ci: ClauseId) -> ();
     fn decay_cla_activity(&mut self) -> ();
-    fn add_clause(&mut self, v: &mut Vec<Lit>) -> Option<ClauseId>;
-    fn add_learnt(&mut self, v: &mut Vec<Lit>, lbd: usize) -> ClauseId;
+    fn add_unchecked_clause(&mut self, v: &mut Vec<Lit>) -> Option<ClauseId>;
+    fn add_clause(&mut self, v: &mut Vec<Lit>, lbd: usize) -> ClauseId;
     fn reduce(&mut self) -> ();
     fn simplify(&mut self) -> bool;
     fn lbd_of_an_learnt_lits(&mut self) -> usize;
@@ -78,7 +79,8 @@ pub enum ClauseFlag {
     Locked,
     Learnt,
     JustUsed,
-    SveMark,
+    SveMark,                    // TODO need?
+    Queued,                     // TODO need?
     Touched,
 }
 
@@ -348,7 +350,7 @@ impl ClauseManagement for Solver {
         self.cla_inc /= self.config.clause_decay_rate;
     }
     // renamed from clause_new
-    fn add_clause(&mut self, v: &mut Vec<Lit>) -> Option<ClauseId> {
+    fn add_unchecked_clause(&mut self, v: &mut Vec<Lit>) -> Option<ClauseId> {
         v.sort_unstable();
         let mut j = 0;
         let mut l_ = NULL_LIT; // last literal; [x, x.negate()] means totology.
@@ -375,11 +377,18 @@ impl ClauseManagement for Solver {
                 self.enqueue(v[0], NULL_CLAUSE);
                 Some(NULL_CLAUSE)
             }
-            _ => Some(self.cp[kind as usize].new_clause(&v, 0, false, false)),
+            _ => {
+                let cid = self.cp[kind as usize].new_clause(&v, 0, false, false);
+                if cid.to_kind() == ClauseKind::Binclause as usize {
+                    self.eliminator.binclause_queue.push(cid);
+                }
+                self.eliminator_enqueue(cid);
+                Some(cid)
+            }
         }
     }
     /// renamed from newLearntClause
-    fn add_learnt(&mut self, v: &mut Vec<Lit>, lbd: usize) -> ClauseId {
+    fn add_clause(&mut self, v: &mut Vec<Lit>, lbd: usize) -> ClauseId {
         debug_assert_ne!(v.len(), 0);
         if v.len() == 1 {
             self.uncheck_enqueue(v[0], NULL_CLAUSE);
@@ -402,11 +411,17 @@ impl ClauseManagement for Solver {
             ClauseKind::Binclause
         } else if self.strategy == Some(SearchStrategy::ChanSeok) && lbd <= CO_LBD_BOUND {
             ClauseKind::Permanent
+        } else if lbd == 0 {
+            ClauseKind::Permanent
         } else {
             ClauseKind::Removable
         };
         let cid = self.cp[kind as usize].new_clause(&v, lbd, true, true);
+        if kind == ClauseKind::Binclause {
+            self.eliminator.binclause_queue.push(cid);
+        }
         self.bump_cid(cid);
+        self.eliminator_enqueue(cid);
         cid
     }
 
@@ -451,6 +466,7 @@ impl ClauseManagement for Solver {
     }
 
     fn simplify(&mut self) -> bool {
+        self.eliminate_binclauses();
         debug_assert_eq!(self.decision_level(), 0);
         // if self.eliminator.use_elim
         //     && self.stat[Stat::Simplification as usize] % 8 == 0

@@ -57,6 +57,10 @@ pub struct Var {
     // for elimination
     pub max_clause_size: usize,
     pub num_occurs: usize,
+    pub pos_occurs: Vec<ClauseId>,
+    pub neg_occurs: Vec<ClauseId>,
+    pub bin_pos_occurs: Vec<ClauseId>,
+    pub bin_neg_occurs: Vec<ClauseId>,
 }
 
 /// is the dummy var index.
@@ -78,6 +82,10 @@ impl Var {
             occurs: Vec::new(),
             max_clause_size: 0,
             num_occurs: 0,
+            pos_occurs: Vec::new(),
+            neg_occurs: Vec::new(),
+            bin_pos_occurs: Vec::new(),
+            bin_neg_occurs: Vec::new(),
         }
     }
     pub fn new_vars(n: usize) -> Vec<Var> {
