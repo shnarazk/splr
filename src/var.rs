@@ -53,8 +53,6 @@ pub struct Var {
     // for elimination
     pub terminal: bool,
     // for elimination
-    pub occurs: Vec<ClauseId>,
-    // for elimination
     pub max_clause_size: usize,
     pub num_occurs: usize,
     pub pos_occurs: Vec<ClauseId>,
@@ -79,7 +77,6 @@ impl Var {
             touched: false,
             eliminated: false,
             terminal: false,
-            occurs: Vec::new(),
             max_clause_size: 0,
             num_occurs: 0,
             pos_occurs: Vec::new(),

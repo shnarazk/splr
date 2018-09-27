@@ -200,11 +200,11 @@ impl Solver {
             .count();
         if mes == "" {
             println!(
-                "#init,#remain,#solved, #elim,total%, CDB,#learnt,(good),  #perm,#binary, RES,block,force, asgn/,  lbd/, STA,    lbd, back lv, conf lv, SUB, queue,binary"
+                "#init,#remain,#solved, #elim,total%, CDB,#learnt,(good),  #perm,#binary, RES,block,force, asgn/,  lbd/, STA,    lbd, back lv, conf lv, SUB, queue,binary,   var"
             );
         } else {
             println!(
-                "#{},{:>7},{:>7},{:>6},{:>6.3}, CDB,{:>7},{:>6},{:>7},{:>7}, RES,{:>5},{:>5}, {:>5.2},{:>6.2}, STA,{:>7.2},{:>8.2},{:>8.2}, SUB,{:>6},{:>6}",
+                "#{},{:>7},{:>7},{:>6},{:>6.3}, CDB,{:>7},{:>6},{:>7},{:>7}, RES,{:>5},{:>5}, {:>5.2},{:>6.2}, STA,{:>7.2},{:>8.2},{:>8.2}, SUB,{:>6},{:>6},{:>7}",
                 mes,
                 nv - self.trail.len(),
                 k,
@@ -223,6 +223,7 @@ impl Solver {
                 self.c_lvl.0,
                 self.subsume_queue.len(),
                 self.eliminator.binclause_queue.len(),
+                self.eliminator.var_queue.len(),
             );
         }
     }
@@ -291,7 +292,7 @@ impl Solver {
                             cb.set_flag(ClauseFlag::Dead, true);
                         }
                     }
-                    (*learnts).garbage_collect();
+                    (*learnts).garbage_collect(&mut self.vars);
                 }
             }
         }
@@ -311,6 +312,9 @@ impl SatSolver for Solver {
         self.num_solved_vars = self.trail.len();
         self.progress("");
         self.progress("load");
+        for v in &self.vars[1..] {
+            self.eliminator.enqueue_var(v.index);
+        }
         self.eliminate_binclauses();
         // if self.eliminator.use_elim {
         //     self.eliminate();
@@ -557,7 +561,10 @@ impl CDCL for Solver {
                 if self.cur_restart * self.next_reduction <= conflicts {
                     self.cur_restart =
                         ((conflicts as f64) / (self.next_reduction as f64)) as usize + 1;
-                    self.reduce();
+                    unsafe {
+                        let eliminator = &mut self.eliminator as *mut Eliminator;
+                        self.reduce(&mut *eliminator);
+                    }
                 }
                 if self.stat[Stat::Conflict as usize] % 10_000 == 0 {
                     self.progress(match self.strategy {

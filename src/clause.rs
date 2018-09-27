@@ -1,4 +1,4 @@
-use eliminator::ClauseElimination;
+use eliminator::{ClauseElimination, Eliminator};
 use solver::{SearchStrategy, Solver, Stat, CDCL, CO_LBD_BOUND};
 use std::cmp::Ordering;
 use std::f64;
@@ -8,7 +8,7 @@ use var::{Satisfiability, Var};
 
 /// for ClausePartition
 pub trait GC {
-    fn garbage_collect(&mut self) -> ();
+    fn garbage_collect(&mut self, vars: &mut [Var]) -> ();
     fn new_clause(&mut self, v: &[Lit], rank: usize, learnt: bool, locked: bool) -> ClauseId;
     fn reset_lbd(&mut self, vars: &[Var]) -> ();
     fn move_to(&mut self, list: &mut ClauseId, ci: ClauseIndex, index: usize) -> ClauseIndex;
@@ -27,7 +27,7 @@ pub trait ClauseManagement {
     fn decay_cla_activity(&mut self) -> ();
     fn add_unchecked_clause(&mut self, v: &mut Vec<Lit>) -> Option<ClauseId>;
     fn add_clause(&mut self, v: &mut Vec<Lit>, lbd: usize) -> ClauseId;
-    fn reduce(&mut self) -> ();
+    fn reduce(&mut self, eliminator: &mut Eliminator) -> ();
     fn simplify(&mut self) -> bool;
     fn lbd_of_an_learnt_lits(&mut self) -> usize;
     fn lbd_of(&mut self, cid: ClauseId) -> usize;
@@ -420,12 +420,28 @@ impl ClauseManagement for Solver {
         if kind == ClauseKind::Binclause {
             self.eliminator.binclause_queue.push(cid);
         }
+        for l in &self.cp[kind as usize].head[cid.to_index()].lit {
+            let v = &mut self.vars[l.vi()];
+            if l.positive() {
+                v.bin_pos_occurs.push(cid);
+            } else {
+                v.bin_neg_occurs.push(cid);
+            }
+        }
+        for l in &self.cp[kind as usize].body[cid.to_index()].lits {
+            let v = &mut self.vars[l.vi()];
+            if l.positive() {
+                v.bin_pos_occurs.push(cid);
+            } else {
+                v.bin_neg_occurs.push(cid);
+            }
+        }
         self.bump_cid(cid);
         self.eliminator_enqueue(cid);
         cid
     }
 
-    fn reduce(&mut self) -> () {
+    fn reduce(&mut self, eliminator: &mut Eliminator) -> () {
         // self.cp[ClauseKind::Removable as usize].reset_lbd(&self.vars);
         {
             let ClausePartition {
@@ -455,11 +471,17 @@ impl ClauseManagement for Solver {
                     cb.set_flag(ClauseFlag::Dead, true);
                     touched[ch.lit[0].negate() as usize] = true;
                     touched[ch.lit[1].negate() as usize] = true;
+                    for l in &ch.lit {
+                        eliminator.enqueue_var(l.vi());
+                    }
+                    for l in &cb.lits {
+                        eliminator.enqueue_var(l.vi());
+                    }
                 }
             }
         }
         // self.garbage_collect(ClauseKind::Removable);
-        self.cp[ClauseKind::Removable as usize].garbage_collect();
+        self.cp[ClauseKind::Removable as usize].garbage_collect(&mut self.vars);
         // self.cp[ClauseKind::Removable as usize].reset_lbd(&self.vars);
         self.next_reduction += DB_INC_SIZE;
         self.stat[Stat::Reduction as usize] += 1;
@@ -492,9 +514,15 @@ impl ClauseManagement for Solver {
                     cb.set_flag(ClauseFlag::Dead, true);
                     self.cp[*ck as usize].touched[ch.lit[0].negate() as usize] = true;
                     self.cp[*ck as usize].touched[ch.lit[1].negate() as usize] = true;
+                    for l in &ch.lit {
+                        self.eliminator.enqueue_var(l.vi());
+                    }
+                    for l in &cb.lits {
+                        self.eliminator.enqueue_var(l.vi());
+                    }
                 }
             }
-            self.cp[*ck as usize].garbage_collect();
+            self.cp[*ck as usize].garbage_collect(&mut self.vars);
         }
         self.stat[Stat::Simplification as usize] += 1;
         self.subsume_queue.clear();
@@ -572,7 +600,7 @@ impl ClauseManagement for Solver {
                 }
             }
             if flag {
-                cp.garbage_collect();
+                cp.garbage_collect(&mut self.vars);
             }
         }
     }
@@ -582,7 +610,7 @@ impl ClauseManagement for Solver {
 }
 
 impl GC for ClausePartition {
-    fn garbage_collect(&mut self) -> () {
+    fn garbage_collect(&mut self, vars: &mut [Var]) -> () {
         unsafe {
             let garbages = &mut self.watcher[GARBAGE_LIT.negate() as usize] as *mut ClauseId;
             for l in 2..self.watcher.len() {
@@ -629,6 +657,21 @@ impl GC for ClausePartition {
                     ch.next_watcher[1] = *recycled;
                     *recycled = ci;
                     cb.set_flag(ClauseFlag::Locked, true);
+                    {
+                        // update eliminator
+                        for i in 0..cb.lits.len() + 2 {
+                            let l = lindex!(ch, cb, i);
+                            let vi = lindex!(ch, cb, i).vi();
+                            if vars[vi].terminal || true {
+                                if l.positive() {
+                                    vars[vi].pos_occurs.retain(|&ci| ci != ci);
+                                } else {
+                                    vars[vi].neg_occurs.retain(|&ci| ci != ci);
+                                }
+                            }
+                        }
+                    }
+
                     ci = next;
                 } else {
                     debug_assert!(ch.lit[0] == GARBAGE_LIT || ch.lit[1] == GARBAGE_LIT);
