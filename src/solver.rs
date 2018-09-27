@@ -199,14 +199,15 @@ impl Solver {
             .count();
         if mes == "" {
             println!(
-                "#init,#remain, #solv, rate%, DB,#learnt,(good),  #perm,#binary, RES,block,force, asgn/,  lbd/, STAT,    lbd, back lv, conf lv, SUB, queue,binary"
+                "#init,#remain,#solved, #elim,total%, CDB,#learnt,(good),  #perm,#binary, RES,block,force, asgn/,  lbd/, STA,    lbd, back lv, conf lv, SUB, queue,binary"
             );
         } else {
             println!(
-                "#{},{:>7},{:>6},{:>6.3}, DB,{:>7},{:>6},{:>7},{:>7}, RES,{:>5},{:>5}, {:>5.2},{:>6.2}, STAT,{:>7.2},{:>8.2},{:>8.2}, SUB,{:>6},{:>6}",
+                "#{},{:>7},{:>7},{:>6},{:>6.3}, CDB,{:>7},{:>6},{:>7},{:>7}, RES,{:>5},{:>5}, {:>5.2},{:>6.2}, STA,{:>7.2},{:>8.2},{:>8.2}, SUB,{:>6},{:>6}",
                 mes,
                 nv - self.trail.len(),
                 k,
+                self.eliminator.eliminated_vars,
                 (k as f32) / (nv as f32) * 100.0,
                 self.cp[ClauseKind::Removable as usize].body.iter().filter(|c| !c.get_flag(ClauseFlag::Dead)).count(),
                 good,
