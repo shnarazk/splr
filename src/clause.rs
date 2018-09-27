@@ -381,6 +381,30 @@ impl ClauseManagement for Solver {
                 let cid = self.cp[kind as usize].new_clause(&v, 0, false, false);
                 if cid.to_kind() == ClauseKind::Binclause as usize {
                     self.eliminator.binclause_queue.push(cid);
+                    for l in &self.cp[kind as usize].head[cid.to_index()].lit {
+                        let v = &mut self.vars[l.vi()];
+                        if l.positive() {
+                            v.bin_pos_occurs.push(cid);
+                        } else {
+                            v.bin_neg_occurs.push(cid);
+                        }
+                    }
+                }
+                for l in &self.cp[kind as usize].head[cid.to_index()].lit {
+                    let v = &mut self.vars[l.vi()];
+                    if l.positive() {
+                        v.pos_occurs.push(cid);
+                    } else {
+                        v.neg_occurs.push(cid);
+                    }
+                }
+                for l in &self.cp[kind as usize].body[cid.to_index()].lits {
+                    let v = &mut self.vars[l.vi()];
+                    if l.positive() {
+                        v.pos_occurs.push(cid);
+                    } else {
+                        v.neg_occurs.push(cid);
+                    }
                 }
                 self.eliminator_enqueue(cid);
                 Some(cid)
@@ -419,21 +443,29 @@ impl ClauseManagement for Solver {
         let cid = self.cp[kind as usize].new_clause(&v, lbd, true, true);
         if kind == ClauseKind::Binclause {
             self.eliminator.binclause_queue.push(cid);
+            for l in &self.cp[kind as usize].head[cid.to_index()].lit {
+                let v = &mut self.vars[l.vi()];
+                if l.positive() {
+                    v.bin_pos_occurs.push(cid);
+                } else {
+                    v.bin_neg_occurs.push(cid);
+                }
+            }
         }
         for l in &self.cp[kind as usize].head[cid.to_index()].lit {
             let v = &mut self.vars[l.vi()];
             if l.positive() {
-                v.bin_pos_occurs.push(cid);
+                v.pos_occurs.push(cid);
             } else {
-                v.bin_neg_occurs.push(cid);
+                v.neg_occurs.push(cid);
             }
         }
         for l in &self.cp[kind as usize].body[cid.to_index()].lits {
             let v = &mut self.vars[l.vi()];
             if l.positive() {
-                v.bin_pos_occurs.push(cid);
+                v.pos_occurs.push(cid);
             } else {
-                v.bin_neg_occurs.push(cid);
+                v.neg_occurs.push(cid);
             }
         }
         self.bump_cid(cid);
@@ -645,6 +677,7 @@ impl GC for ClausePartition {
             let mut pri = &mut self.watcher[GARBAGE_LIT.negate() as usize] as *mut usize;
             let mut ci = self.watcher[GARBAGE_LIT.negate() as usize];
             while ci != NULL_CLAUSE {
+                let cid = self.kind.id_from(ci);
                 let ch = &mut self.head[ci];
                 let cb = &mut self.body[ci];
                 debug_assert!(cb.get_flag(ClauseFlag::Dead));
@@ -659,19 +692,23 @@ impl GC for ClausePartition {
                     cb.set_flag(ClauseFlag::Locked, true);
                     {
                         // update eliminator
-                        for i in 0..cb.lits.len() + 2 {
-                            let l = lindex!(ch, cb, i);
-                            let vi = lindex!(ch, cb, i).vi();
-                            if vars[vi].terminal || true {
+                        for l in &cb.lits {
+                            let vi = l.vi();
+                            let v = &mut vars[vi];
+                            if (v.terminal || true) && !v.eliminated {
+                                let xx = v.pos_occurs.len() + v.neg_occurs.len();
                                 if l.positive() {
-                                    vars[vi].pos_occurs.retain(|&ci| ci != ci);
+                                    v.pos_occurs.retain(|&cj| cid != cj);
                                 } else {
-                                    vars[vi].neg_occurs.retain(|&ci| ci != ci);
+                                    v.neg_occurs.retain(|&cj| cid != cj);
+                                }
+                                let xy = v.pos_occurs.len() + v.neg_occurs.len();
+                                if xy + 1 != xx {
+                                    panic!("strange {} {} by {}{:?}", xx, xy, l.int(), v);
                                 }
                             }
                         }
                     }
-
                     ci = next;
                 } else {
                     debug_assert!(ch.lit[0] == GARBAGE_LIT || ch.lit[1] == GARBAGE_LIT);
@@ -772,6 +809,8 @@ impl GC for ClausePartition {
         let other = (index ^ 1) as usize;
         debug_assert!(other == 0 || other == 1);
         let ch = &mut self.head[ci];
+        let cb = &mut self.body[ci];
+        cb.lits.push(ch.lit[index]); // For valiable eliminator, we copy the literal into body.lits.
         ch.lit[index] = GARBAGE_LIT;
         let next = ch.next_watcher[index];
         if ch.lit[other] == GARBAGE_LIT {

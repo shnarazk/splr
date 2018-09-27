@@ -175,22 +175,22 @@ impl Solver {
             ref mut eliminator,
             ..
         } = self;
-        {
-            let ch = clause_head!(cp, cid);
-            let cb = clause_body!(cp, cid);
-            for i in 0..cb.lits.len() + 2 {
-                let l = lindex!(ch, cb, i);
-                let vi = l.vi();
-                if vars[vi].terminal || true {
-                    if l.positive() {
-                        vars[vi].pos_occurs.retain(|&ci| ci != cid);
-                    } else {
-                        vars[vi].neg_occurs.retain(|&ci| ci != cid);
-                    }
-                    eliminator.enqueue_var(vi);
-                }
-            }
-        }
+//        {
+//            let ch = clause_head!(cp, cid);
+//            let cb = clause_body!(cp, cid);
+//            for i in 0..cb.lits.len() + 2 {
+//                let l = lindex!(ch, cb, i);
+//                let vi = l.vi();
+//                if vars[vi].terminal || true {
+//                    if l.positive() {
+//                        vars[vi].pos_occurs.retain(|&ci| ci != cid);
+//                    } else {
+//                        vars[vi].neg_occurs.retain(|&ci| ci != cid);
+//                    }
+//                    eliminator.enqueue_var(vi);
+//                }
+//            }
+//        }
         println!("     - remove_clause made {} dead", cid.to_index());
     }
     /// 5. strengthenClause
@@ -209,12 +209,19 @@ impl Solver {
             } else {
                 let res = self.strengthen(cid, l);
                 debug_assert!(!res);
+                let v = &mut self.vars[l.vi()];
+                debug_assert!(!v.eliminated);
+                let xx = v.pos_occurs.len() + v.neg_occurs.len();
                 if l.positive() {
-                    self.vars[l.vi()].pos_occurs.retain(|&ci| ci != cid);
+                    v.pos_occurs.retain(|&ci| ci != cid);
                 } else {
-                    self.vars[l.vi()].neg_occurs.retain(|&ci| ci != cid);
+                    v.neg_occurs.retain(|&ci| ci != cid);
                 }
-                if self.vars[l.vi()].terminal || true {
+                let xy = v.pos_occurs.len() + v.neg_occurs.len();
+                if xy + 1 < xx {
+                    panic!("strange {} {}", xx, xy);
+                }
+                if v.terminal || true {
                     self.eliminator.enqueue_var(l.vi());
                 }
                 c0 = NULL_LIT;
@@ -606,12 +613,6 @@ impl Solver {
         let pos = &self.vars[v].pos_occurs as *const Vec<ClauseId>;
         let neg = &self.vars[v].neg_occurs as *const Vec<ClauseId>;
         unsafe {
-            println!(
-                "- eliminate_var: {:>5} (+{:<4} -{:<4})",
-                v,
-                (*pos).len(),
-                (*neg).len()
-            );
             // Check wether the increase in number of clauses stays within the allowed ('grow').
             // Moreover, no clause must exceed the limit on the maximal clause size (if it is set).
             let clslen = (*pos).len() + (*neg).len();
@@ -800,7 +801,12 @@ impl Eliminator {
 }
 
 impl Solver {
+    /// returns a literal if these clauses can be merged by the literal.
     fn subsume(&self, cid: ClauseId, other: ClauseId) -> Option<Lit> {
+        if cid == BWDSUB_DUMMY_CLAUSE {
+            return None;
+        }
+        println!("subsume {} = {}:{}", cid, cid.to_kind(), cid.to_index());
         let mut ret: Lit = NULL_LIT;
         let ch = clause_head!(self.cp, cid);
         let cb = clause_body!(self.cp, cid);
