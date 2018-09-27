@@ -127,7 +127,7 @@ impl Solver {
         }
         let cid = self.add_clause(&mut vec.to_vec(), 0);
         // println!("add cross clause {}:{}", cid.to_kind(), cid.to_index());
-        
+
         let ch = clause_head!(self.cp, cid);
         let cb = clause_body!(self.cp, cid);
         self.eliminator.enqueue_clause(cid);
@@ -209,7 +209,7 @@ impl Solver {
                 self.ok = false;
                 return false;
             }
-            self.propagate() == NULL_CLAUSE // TODO I could remove this line logically
+            true
         // self.enqueue(c0, NULL_CLAUSE) == true && self.propagate() == NULL_CLAUSE
         } else {
             self.eliminator.enqueue_clause(cid);
@@ -808,7 +808,7 @@ impl Solver {
                                     self.remove_clause(*did);
                                 }
                                 Some(l) => {
-                                    println!("    => subsumed {} from {} and {}", l.int(), cid, *did);
+                                    // println!("    => subsumed {} from {} and {}", l.int(), cid, *did);
                                     if !self.strengthen_clause(*did, l.negate()) {
                                         return false;
                                     }
@@ -820,6 +820,6 @@ impl Solver {
                 }
             }
         }
-        true
+        self.propagate() == NULL_CLAUSE
     }
 }

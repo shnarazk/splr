@@ -497,6 +497,7 @@ impl ClauseManagement for Solver {
             self.cp[*ck as usize].garbage_collect();
         }
         self.stat[Stat::Simplification as usize] += 1;
+        self.subsume_queue.clear();
         true
     }
     fn lbd_of_an_learnt_lits(&mut self) -> usize {
