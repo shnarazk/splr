@@ -468,13 +468,13 @@ impl ClauseManagement for Solver {
     fn simplify(&mut self) -> bool {
         self.eliminate_binclauses();
         debug_assert_eq!(self.decision_level(), 0);
-        // if self.eliminator.use_elim
-        //     && self.stat[Stat::Simplification as usize] % 8 == 0
-        //     && self.eliminator.last_invocatiton < self.stat[Stat::Reduction as usize] as usize
-        // {
-        //     // self.eliminate();
-        //     self.eliminator.last_invocatiton = self.stat[Stat::Reduction as usize] as usize;
-        // }
+        if self.eliminator.use_elim
+            // && self.stat[Stat::Simplification as usize] % 8 == 0
+            // && self.eliminator.last_invocatiton < self.stat[Stat::Reduction as usize] as usize
+        {
+            self.eliminate();
+            self.eliminator.last_invocatiton = self.stat[Stat::Reduction as usize] as usize;
+        }
         // reset reason since decision level is zero.
         for v in &mut self.vars[1..] {
             if v.reason != NULL_CLAUSE {
