@@ -11,12 +11,10 @@ pub trait ClauseElimination {
 }
 
 const DEAD_CLAUSE: usize = MAX;
-const BWDSUB_DUMMY_CLAUSE: ClauseId = DEAD_CLAUSE - 1;
-const SUBSUMPTION_SIZE: usize = 20;
+const SUBSUMPTION_SIZE: usize = 30;
 const SUBSUMPITON_GROW_LIMIT: usize = 0;
-const SUBSUMPTION_VAR_QUEUE_MAX: usize = 10_000;
-const SUBSUMPTION_CLAUSE_QUEUE_MAX: usize = 10_000;
-const SUBSUMPTION_COMBINATION_MAX: usize = 10_000_000;
+const SUBSUMPTION_VAR_QUEUE_MAX: usize = 1_000_000;
+const SUBSUMPTION_CLAUSE_QUEUE_MAX: usize = 1_000_000;
 
 /// Literal eliminator
 #[derive(Debug)]
@@ -28,8 +26,6 @@ pub struct Eliminator {
     pub asymm_lits: usize,
     pub clause_queue: Vec<ClauseId>,
     pub bwdsub_assigns: usize,
-    //    pub bwdsub_tmp_unit: ClauseId,
-    pub bwdsub_lit: Lit,
     pub remove_satisfied: bool,
     // working place
     pub merge_vec: Vec<Lit>,
@@ -49,6 +45,16 @@ pub struct Eliminator {
     pub binclause_queue: Vec<ClauseId>,
 }
 
+trait LiteralClause {
+    fn as_uniclause(self) -> ClauseId;
+}
+
+impl LiteralClause for Lit {
+    fn as_uniclause(self) -> ClauseId {
+        ClauseKind::Uniclause.id_from(self as usize)
+    }
+}
+
 impl Eliminator {
     pub fn new(use_elim: bool, nv: usize) -> Eliminator {
         // let heap = VarIdHeap::new(VarOrder::ByOccurence, nv, 0);
@@ -59,8 +65,6 @@ impl Eliminator {
             asymm_lits: 0,
             clause_queue: Vec::new(),
             bwdsub_assigns: 0,
-            //            bwdsub_tmp_unit: 0,
-            bwdsub_lit: NULL_LIT,
             remove_satisfied: false,
             merge_vec: vec![0; nv + 1],
             elim_clauses: Vec::new(),
@@ -134,7 +138,7 @@ impl Solver {
             return true;
         }
         let cid = self.add_clause(&mut vec.to_vec(), 0);
-        println!("add cross clause {}:{} {:?}", cid.to_kind(), cid.to_index(), vec2int(vec));
+        // println!("add cross clause {}:{} {:?}", cid.to_kind(), cid.to_index(), vec2int(vec));
         let ch = clause_head!(self.cp, cid);
         let cb = clause_body!(self.cp, cid);
         self.eliminator.enqueue_clause(cid);
@@ -191,7 +195,7 @@ impl Solver {
 //                }
 //            }
 //        }
-        println!("     - remove_clause made {} dead", cid.to_index());
+//        println!("     - remove_clause made {} dead", cid.to_index());
     }
     /// 5. strengthenClause
     /// - calls `enqueue_clause`
@@ -427,17 +431,16 @@ impl Solver {
             if self.eliminator.clause_queue.is_empty()
                 && self.eliminator.bwdsub_assigns < self.trail.len()
             {
-                self.eliminator.bwdsub_lit = self.trail[self.eliminator.bwdsub_assigns];
-                // self.eliminator.bwdsub_tmp_clause.lit[0] = l;
+                let c = self.trail[self.eliminator.bwdsub_assigns].as_uniclause();
+                self.eliminator.enqueue_clause(c);
                 self.eliminator.bwdsub_assigns += 1;
-                self.eliminator.enqueue_clause(BWDSUB_DUMMY_CLAUSE);
             }
             let cid = self.eliminator.clause_queue[0];
             self.eliminator.clause_queue.remove(0);
             unsafe {
                 let mut best = 0;
-                if cid == BWDSUB_DUMMY_CLAUSE {
-                    best = self.eliminator.bwdsub_lit.vi() as usize;
+                if cid.to_kind() == ClauseKind::Uniclause as usize {
+                    best = (cid.to_index() as Lit).vi();
                     let cs = &mut self.vars[best].pos_occurs as *mut Vec<ClauseId>;
                     for di in &*cs {
                         let db = clause_body!(self.cp, di) as *const ClauseBody;
@@ -803,10 +806,19 @@ impl Eliminator {
 impl Solver {
     /// returns a literal if these clauses can be merged by the literal.
     fn subsume(&self, cid: ClauseId, other: ClauseId) -> Option<Lit> {
-        if cid == BWDSUB_DUMMY_CLAUSE {
+        if cid.to_kind() == ClauseKind::Uniclause as usize {
+            let oh = clause_head!(self.cp, other);
+            let ob = clause_body!(self.cp, other);
+            let l = cid.to_index() as Lit;
+            for j in 0..ob.lits.len() + 2 {
+                let lo = lindex!(oh, ob, j);
+                if l == lo.negate() {
+                    return Some(l);
+                }
+            }
             return None;
         }
-        println!("subsume {} = {}:{}", cid, cid.to_kind(), cid.to_index());
+        // println!("subsume {} = {}:{}", cid, cid.to_kind(), cid.to_index());
         let mut ret: Lit = NULL_LIT;
         let ch = clause_head!(self.cp, cid);
         let cb = clause_body!(self.cp, cid);

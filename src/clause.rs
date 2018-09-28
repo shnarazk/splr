@@ -100,6 +100,7 @@ pub enum ClauseKind {
     Removable = 0,
     Permanent,
     Binclause,
+    Uniclause,
 }
 
 const CLAUSE_INDEX_BITS: usize = 60;
@@ -111,6 +112,7 @@ impl ClauseKind {
             ClauseKind::Removable => 0x0000_0000_0000_0000,
             ClauseKind::Permanent => 0x1000_0000_0000_0000,
             ClauseKind::Binclause => 0x2000_0000_0000_0000,
+            ClauseKind::Uniclause => 0x3000_0000_0000_0000,
         }
     }
     pub fn mask(self) -> usize {
