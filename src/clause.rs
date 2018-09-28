@@ -1,4 +1,4 @@
-use eliminator::{ClauseElimination, Eliminator};
+use eliminator::{ClauseElimination, *};
 use solver::{SearchStrategy, Solver, Stat, CDCL, CO_LBD_BOUND};
 use std::cmp::Ordering;
 use std::f64;
@@ -27,7 +27,7 @@ pub trait ClauseManagement {
     fn decay_cla_activity(&mut self) -> ();
     fn add_unchecked_clause(&mut self, v: &mut Vec<Lit>) -> Option<ClauseId>;
     fn add_clause(&mut self, v: &mut Vec<Lit>, lbd: usize) -> ClauseId;
-    fn reduce(&mut self, eliminator: &mut Eliminator) -> ();
+    fn reduce(&mut self) -> ();
     fn simplify(&mut self) -> bool;
     fn lbd_of_an_learnt_lits(&mut self) -> usize;
     fn lbd_of(&mut self, cid: ClauseId) -> usize;
@@ -80,7 +80,7 @@ pub enum ClauseFlag {
     Learnt,
     JustUsed,
     SveMark,                    // TODO need?
-    Queued,                     // TODO need?
+    Enqueued,
     Touched,
 }
 
@@ -381,17 +381,17 @@ impl ClauseManagement for Solver {
             }
             _ => {
                 let cid = self.cp[kind as usize].new_clause(&v, 0, false, false);
-                if cid.to_kind() == ClauseKind::Binclause as usize {
-                    self.eliminator.binclause_queue.push(cid);
-                    for l in &self.cp[kind as usize].head[cid.to_index()].lit {
-                        let v = &mut self.vars[l.vi()];
-                        if l.positive() {
-                            v.bin_pos_occurs.push(cid);
-                        } else {
-                            v.bin_neg_occurs.push(cid);
-                        }
-                    }
-                }
+                // if cid.to_kind() == ClauseKind::Binclause as usize {
+                //     self.eliminator.binclause_queue.push(cid);
+                //     for l in &self.cp[kind as usize].head[cid.to_index()].lit {
+                //         let v = &mut self.vars[l.vi()];
+                //         if l.positive() {
+                //             v.pos_occurs.push(cid);
+                //         } else {
+                //             v.neg_occurs.push(cid);
+                //         }
+                //     }
+                // }
                 for l in &self.cp[kind as usize].head[cid.to_index()].lit {
                     let v = &mut self.vars[l.vi()];
                     if l.positive() {
@@ -443,17 +443,17 @@ impl ClauseManagement for Solver {
             ClauseKind::Removable
         };
         let cid = self.cp[kind as usize].new_clause(&v, lbd, true, true);
-        if kind == ClauseKind::Binclause {
-            self.eliminator.binclause_queue.push(cid);
-            for l in &self.cp[kind as usize].head[cid.to_index()].lit {
-                let v = &mut self.vars[l.vi()];
-                if l.positive() {
-                    v.bin_pos_occurs.push(cid);
-                } else {
-                    v.bin_neg_occurs.push(cid);
-                }
-            }
-        }
+        // kind == ClauseKind::Binclause {
+        //  self.eliminator.binclause_queue.push(cid);
+        //  for l in &self.cp[kind as usize].head[cid.to_index()].lit {
+        //      let v = &mut self.vars[l.vi()];
+        //      if l.positive() {
+        //          v.bin_pos_occurs.push(cid);
+        //      } else {
+        //          v.bin_neg_occurs.push(cid);
+        //      }
+        //  }
+        // }
         for l in &self.cp[kind as usize].head[cid.to_index()].lit {
             let v = &mut self.vars[l.vi()];
             if l.positive() {
@@ -475,9 +475,11 @@ impl ClauseManagement for Solver {
         cid
     }
 
-    fn reduce(&mut self, eliminator: &mut Eliminator) -> () {
+    fn reduce(&mut self) -> () {
         // self.cp[ClauseKind::Removable as usize].reset_lbd(&self.vars);
-        {
+        unsafe {
+            let eliminator = &mut self.eliminator as *mut Eliminator;
+            let vars = &mut self.vars[..] as *mut [Var];
             let ClausePartition {
                 ref mut head,
                 ref mut body,
@@ -506,10 +508,16 @@ impl ClauseManagement for Solver {
                     touched[ch.lit[0].negate() as usize] = true;
                     touched[ch.lit[1].negate() as usize] = true;
                     for l in &ch.lit {
-                        eliminator.enqueue_var(l.vi());
+                        if ! (*vars)[l.vi()].enqueued {
+                            (*eliminator).var_queue.push(l.vi());
+                            (*vars)[l.vi()].enqueued = true;
+                        }
                     }
                     for l in &cb.lits {
-                        eliminator.enqueue_var(l.vi());
+                        if ! (*vars)[l.vi()].enqueued {
+                            (*eliminator).var_queue.push(l.vi());
+                            (*vars)[l.vi()].enqueued = true;
+                        }
                     }
                 }
             }
@@ -522,7 +530,7 @@ impl ClauseManagement for Solver {
     }
 
     fn simplify(&mut self) -> bool {
-        self.eliminate_binclauses();
+        // self.eliminate_binclauses();
         debug_assert_eq!(self.decision_level(), 0);
         if self.eliminator.use_elim
             // && self.stat[Stat::Simplification as usize] % 8 == 0
@@ -538,6 +546,9 @@ impl ClauseManagement for Solver {
                 v.reason = NULL_CLAUSE;
             }
         }
+        unsafe {
+            let eliminator = &mut self.eliminator as *mut Eliminator;
+            let vars = &mut self.vars[..] as *mut [Var];
         for ck in &CLAUSE_KINDS {
             for ci in 1..self.cp[*ck as usize].head.len() {
                 let ch = &self.cp[*ck as usize].head[ci];
@@ -545,18 +556,26 @@ impl ClauseManagement for Solver {
                 if !cb.get_flag(ClauseFlag::Dead)
                     && (self.vars.satisfies(&ch.lit) || self.vars.satisfies(&cb.lits))
                 {
+                    // println!("Wow satisfied {} in {:?}.", ci, ck);
                     cb.set_flag(ClauseFlag::Dead, true);
                     self.cp[*ck as usize].touched[ch.lit[0].negate() as usize] = true;
                     self.cp[*ck as usize].touched[ch.lit[1].negate() as usize] = true;
                     for l in &ch.lit {
-                        self.eliminator.enqueue_var(l.vi());
+                        if !(*vars)[l.vi()].enqueued {
+                            (*eliminator).var_queue.push(l.vi());
+                            (*vars)[l.vi()].enqueued = true;
+                        }
                     }
                     for l in &cb.lits {
-                        self.eliminator.enqueue_var(l.vi());
+                        if !(*vars)[l.vi()].enqueued {
+                            (*eliminator).var_queue.push(l.vi());
+                            (*vars)[l.vi()].enqueued = true;
+                        }
                     }
                 }
             }
             self.cp[*ck as usize].garbage_collect(&mut self.vars);
+        }
         }
         self.stat[Stat::Simplification as usize] += 1;
         self.subsume_queue.clear();

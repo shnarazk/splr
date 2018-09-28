@@ -1,5 +1,5 @@
 use clause::{ClauseManagement, GC, *};
-use eliminator::Eliminator;
+use eliminator::{ClauseElimination, Eliminator};
 use restart::Restart;
 use std::cmp::max;
 use std::fs;
@@ -200,11 +200,11 @@ impl Solver {
             .count();
         if mes == "" {
             println!(
-                "#init,#remain,#solved, #elim,total%, CDB,#learnt,(good),  #perm,#binary, RES,block,force, asgn/,  lbd/, STA,    lbd, back lv, conf lv, SUB, queue,binary,   var"
+                "#init,#remain,#solved, #elim,total%, CDB,#learnt,(good),  #perm,#binary, RES,block,force, asgn/,  lbd/, STA,    lbd, back lv, conf lv, SUB,clause,   var"
             );
         } else {
             println!(
-                "#{},{:>7},{:>7},{:>6},{:>6.3}, CDB,{:>7},{:>6},{:>7},{:>7}, RES,{:>5},{:>5}, {:>5.2},{:>6.2}, STA,{:>7.2},{:>8.2},{:>8.2}, SUB,{:>6},{:>6},{:>7}",
+                "#{},{:>7},{:>7},{:>6},{:>6.3}, CDB,{:>7},{:>6},{:>7},{:>7}, RES,{:>5},{:>5}, {:>5.2},{:>6.2}, STA,{:>7.2},{:>8.2},{:>8.2}, SUB,{:>6},{:>6}",
                 mes,
                 nv - self.trail.len(),
                 k,
@@ -222,7 +222,6 @@ impl Solver {
                 self.b_lvl.0,
                 self.c_lvl.0,
                 self.subsume_queue.len(),
-                self.eliminator.binclause_queue.len(),
                 self.eliminator.var_queue.len(),
             );
         }
@@ -313,12 +312,12 @@ impl SatSolver for Solver {
         self.progress("");
         self.progress("load");
         for v in &self.vars[1..] {
-            self.eliminator.enqueue_var(v.index);
+            self.eliminator.var_queue.push(v.index);
         }
-        self.eliminate_binclauses();
-        // if self.eliminator.use_elim {
-        //     self.eliminate();
-        // }
+        // self.eliminate_binclauses();
+        if self.eliminator.use_elim {
+            self.eliminate();
+        }
         self.simplify();
         self.progress("simp");
         self.stat[Stat::Simplification as usize] += 1;
@@ -561,10 +560,7 @@ impl CDCL for Solver {
                 if self.cur_restart * self.next_reduction <= conflicts {
                     self.cur_restart =
                         ((conflicts as f64) / (self.next_reduction as f64)) as usize + 1;
-                    unsafe {
-                        let eliminator = &mut self.eliminator as *mut Eliminator;
-                        self.reduce(&mut *eliminator);
-                    }
+                    self.reduce();
                 }
                 if self.stat[Stat::Conflict as usize] % 10_000 == 0 {
                     self.progress(match self.strategy {
@@ -615,6 +611,10 @@ impl CDCL for Solver {
                 v.assign = sig;
                 v.reason = cid;
                 if dl == 0 {
+                    if !v.enqueued {
+                        self.eliminator.var_queue.push(l.vi());
+                        v.enqueued = true;
+                    }
                     v.activity = 0.0;
                 }
                 v.level = dl;
@@ -907,9 +907,10 @@ impl Solver {
             v.level = dl;
             v.reason = cid;
         }
-        // if dl == 0 {
+        if dl == 0 {
+            self.eliminator_enqueue_var(l.vi());
         //     self.var_order.remove(&self.vars, l.vi());
-        // }
+        }
         clause_body_mut!(self.cp, cid).set_flag(ClauseFlag::Locked, true);
         self.trail.push(l);
     }
