@@ -496,6 +496,7 @@ impl Solver {
                     let mut tmp = 0;
                     let ch = clause_head_mut!(self.cp, cid) as *mut ClauseHead;
                     let cb = clause_body_mut!(self.cp, cid) as *mut ClauseBody;
+                    (*cb).set_flag(ClauseFlag::Enqueued, false);
                     if (*cb).get_flag(ClauseFlag::SveMark) || (*cb).get_flag(ClauseFlag::Dead) {
                         continue;
                     }
@@ -774,6 +775,7 @@ impl Solver {
             }
             while !self.eliminator.var_queue.is_empty() {
                 let elim = self.eliminator.var_queue.remove(0);
+                self.vars[elim].enqueued = false;
                 if self.vars[elim].eliminated
                     || self.vars[elim].assign != BOTTOM
 //                    || !self.vars[elim].terminal
