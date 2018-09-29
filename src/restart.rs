@@ -1,3 +1,4 @@
+use clause::ClauseManagement;
 use solver::{Solver, Stat, CDCL};
 use types::*;
 
@@ -7,11 +8,11 @@ pub trait Restart {
 }
 
 /// for block restart based on average assigments: 1.40
-const R: f64 = 1.60;
+const R: f64 = 1.50;
 // const RR: f64 = 0.85;
 
 /// for force restart based on average LBD of newly generated clauses: 1.15
-const K: f64 = 1.40;
+const K: f64 = 1.49;
 
 const RESTART_PERIOD: u64 = 50;
 const RESET_EMA: u64 = 50;
@@ -32,7 +33,14 @@ impl Restart for Solver {
             self.c_lvl.reset();
             self.b_lvl.reset();
         }
-        if self.next_restart <= count && R < self.ema_asg.get() {
+        // if self.next_restart <= count && 2 * self.cp[ClauseKind::Removable as usize].head.len() < self.eliminator.clause_queue.len() {
+        if self.next_restart <= count && self.num_vars < 8 * self.eliminator.var_queue.len() {
+            self.next_restart = count + RESTART_PERIOD;
+            self.stat[Stat::Restart as usize] += 1;
+            let rl = self.root_level;
+            self.cancel_until(rl);
+            self.simplify();
+        } else if self.next_restart <= count && R < self.ema_asg.get() {
             self.next_restart = count + RESTART_PERIOD;
             self.stat[Stat::BlockRestart as usize] += 1;
         }
@@ -41,7 +49,8 @@ impl Restart for Solver {
     /// called after no conflict propagation
     fn force_restart(&mut self) -> () {
         let count = self.stat[Stat::Conflict as usize] as u64;
-        if self.next_restart < count && K < self.ema_lbd.get() {
+        if self.next_restart < count && K < self.ema_lbd.get()
+        {
             self.next_restart = count + RESTART_PERIOD;
             self.stat[Stat::Restart as usize] += 1;
             let rl = self.root_level;

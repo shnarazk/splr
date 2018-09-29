@@ -96,7 +96,7 @@ pub struct Solver {
     /// Variable Order
     pub var_order: VarIdHeap,
     /// Clause Database Management
-    pub cp: [ClausePartition; 3],
+    pub cp: [ClausePartition; 4],
     pub first_reduction: usize,
     pub next_reduction: usize,
     pub cur_restart: usize,
@@ -124,8 +124,6 @@ pub struct Solver {
     pub c_lvl: Ema,
     pub next_restart: u64,
     pub restart_exp: f64,
-    /// subsumption
-    pub subsume_queue: Vec<ClauseId>,
 }
 
 impl Solver {
@@ -151,6 +149,7 @@ impl Solver {
             q_head: 0,
             var_order: VarIdHeap::new(VarOrder::ByActivity, nv, nv),
             cp: [
+                ClausePartition::build(ClauseKind::Liftedlit, nv, 0),
                 ClausePartition::build(ClauseKind::Removable, nv, nc),
                 ClausePartition::build(ClauseKind::Permanent, nv, 256),
                 ClausePartition::build(ClauseKind::Binclause, nv, 256),
@@ -179,18 +178,17 @@ impl Solver {
             c_lvl: Ema::new(se),
             next_restart: 100,
             restart_exp: re,
-            subsume_queue: Vec::with_capacity(10000),
         }
     }
     // print a progress report
     pub fn progress(&self, mes: &str) -> () {
         let nv = self.vars.len() - 1;
-        let k = if self.trail_lim.is_empty() {
+        let fixed = if self.trail_lim.is_empty() {
             self.trail.len()
         } else {
             self.trail_lim[0]
         };
-        // let sum = k + self.eliminator.eliminated_vars;
+        let sum = fixed + self.eliminator.eliminated_vars;
         let learnts = &self.cp[ClauseKind::Removable as usize];
         let good = learnts
             .body
@@ -198,18 +196,21 @@ impl Solver {
             .skip(1)
             .filter(|c| !c.get_flag(ClauseFlag::Dead) && c.rank <= 3)
             .count();
-        if mes == "" {
+        if mes.is_empty() {
             println!(
-                "#init,#remain,#solved, #elim,total%, CDB,#learnt,(good),  #perm,#binary, RES,block,force, asgn/,  lbd/, STA,    lbd, back lv, conf lv, SUB,clause,   var"
+                "#mode,      Variable Assignment     ,,  Clause Database Management  ,,   Restart Heuristicts   ,,     Misc Status         ,,  Eliminator"
+            );
+            println!(
+                "#init,#remain,#solved,  #elim,total%,,#learnt,(good),  #perm,#binary,,block,force, asgn/,  lbd/,,    lbd, back lv, conf lv,,clause,   var"
             );
         } else {
             println!(
-                "#{},{:>7},{:>7},{:>6},{:>6.3}, CDB,{:>7},{:>6},{:>7},{:>7}, RES,{:>5},{:>5}, {:>5.2},{:>6.2}, STA,{:>7.2},{:>8.2},{:>8.2}, SUB,{:>6},{:>6}",
+                "#{},{:>7},{:>7},{:>7},{:>6.3},,{:>7},{:>6},{:>7},{:>7},,{:>5},{:>5}, {:>5.2},{:>6.2},,{:>7.2},{:>8.2},{:>8.2},,{:>6},{:>6}",
                 mes,
-                nv - self.trail.len(),
-                k,
+                nv - sum,
+                fixed,
                 self.eliminator.eliminated_vars,
-                (k as f32) / (nv as f32) * 100.0,
+                (sum as f32) / (nv as f32) * 100.0,
                 self.cp[ClauseKind::Removable as usize].body.iter().skip(1).filter(|c| !c.get_flag(ClauseFlag::Dead)).count(),
                 good,
                 self.cp[ClauseKind::Permanent as usize].body.iter().skip(1).filter(|c| !c.get_flag(ClauseFlag::Dead)).count(),
@@ -221,7 +222,7 @@ impl Solver {
                 self.ema_lbd.slow,
                 self.b_lvl.0,
                 self.c_lvl.0,
-                self.subsume_queue.len(),
+                self.eliminator.clause_queue.len(),
                 self.eliminator.var_queue.len(),
             );
         }
@@ -546,6 +547,16 @@ impl CDCL for Solver {
                         self.uncheck_enqueue(l0, cid);
                     }
                 }
+                if self.stat[Stat::Conflict as usize] % 10_000 == 0 {
+                    self.progress(match self.strategy {
+                        None => "none",
+                        Some(SearchStrategy::Generic) => "gene",
+                        Some(SearchStrategy::ChanSeok) => "Chan",
+                        Some(SearchStrategy::HighSuccesive) => "High",
+                        Some(SearchStrategy::LowSuccesive) => "LowS",
+                        Some(SearchStrategy::ManyGlues) => "Many",
+                    });
+                }
                 if self.stat[Stat::Conflict as usize] == 100_000 {
                     self.cancel_until(0);
                     self.simplify();
@@ -561,16 +572,6 @@ impl CDCL for Solver {
                     self.cur_restart =
                         ((conflicts as f64) / (self.next_reduction as f64)) as usize + 1;
                     self.reduce();
-                }
-                if self.stat[Stat::Conflict as usize] % 10_000 == 0 {
-                    self.progress(match self.strategy {
-                        None => "none",
-                        Some(SearchStrategy::Generic) => "gene",
-                        Some(SearchStrategy::ChanSeok) => "Chan",
-                        Some(SearchStrategy::HighSuccesive) => "High",
-                        Some(SearchStrategy::LowSuccesive) => "LowS",
-                        Some(SearchStrategy::ManyGlues) => "Many",
-                    });
                 }
                 // Since the conflict path pushes a new literal to trail, we don't need to pick up a literal here.
             }

@@ -37,15 +37,16 @@ pub trait ClauseManagement {
 
 const DB_INC_SIZE: usize = 200;
 
-pub const CLAUSE_KINDS: [ClauseKind; 3] = [
+pub const CLAUSE_KINDS: [ClauseKind; 4] = [
+    ClauseKind::Liftedlit,
     ClauseKind::Removable,
     ClauseKind::Permanent,
     ClauseKind::Binclause,
 ];
 
-pub const RANK_NULL: usize = 0; // for NULL_CLAUSE
-pub const RANK_CONST: usize = 1; // for given clauses
-pub const RANK_NEED: usize = 2; // for newly generated bi-clauses
+// pub const RANK_NULL: usize = 0; // for NULL_CLAUSE
+// pub const RANK_CONST: usize = 1; // for given clauses
+// pub const RANK_NEED: usize = 2; // for newly generated bi-clauses
 
 /// Clause Index, not ID because it's used only within a Vec<Clause>
 pub type ClauseIndex = usize;
@@ -79,7 +80,6 @@ pub enum ClauseFlag {
     Locked,
     Learnt,
     JustUsed,
-    SveMark,                    // TODO need?
     Enqueued,
     Touched,
 }
@@ -97,7 +97,8 @@ pub struct ClausePartition {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ClauseKind {
-    Removable = 0,
+    Liftedlit,
+    Removable,
     Permanent,
     Binclause,
     Uniclause,
@@ -109,10 +110,11 @@ const CLAUSE_INDEX_MASK: usize = 0x0FFF_FFFF_FFFF_FFFF;
 impl ClauseKind {
     pub fn tag(self) -> usize {
         match self {
-            ClauseKind::Removable => 0x0000_0000_0000_0000,
-            ClauseKind::Permanent => 0x1000_0000_0000_0000,
-            ClauseKind::Binclause => 0x2000_0000_0000_0000,
-            ClauseKind::Uniclause => 0x3000_0000_0000_0000,
+            ClauseKind::Liftedlit => 0x0000_0000_0000_0000,
+            ClauseKind::Removable => 0x1000_0000_0000_0000,
+            ClauseKind::Permanent => 0x2000_0000_0000_0000,
+            ClauseKind::Binclause => 0x3000_0000_0000_0000,
+            ClauseKind::Uniclause => 0x4000_0000_0000_0000,
         }
     }
     pub fn mask(self) -> usize {
@@ -137,7 +139,7 @@ impl ClausePartition {
         body.push(ClauseBody {
             flag: 0,
             lits: vec![],
-            rank: RANK_NULL,
+            rank: 0,
             activity: 0.0,
         });
         let mut watcher = Vec::with_capacity(2 * (nv + 1));
@@ -223,11 +225,11 @@ impl PartialOrd for ClauseBody {
     fn partial_cmp(&self, other: &ClauseBody) -> Option<Ordering> {
         if self.rank < other.rank {
             Some(Ordering::Less)
-        } else if self.rank > other.rank {
+        } else if other.rank < self.rank {
             Some(Ordering::Greater)
         } else if self.activity > other.activity {
             Some(Ordering::Less)
-        } else if self.activity < other.activity {
+        } else if other.activity > self.activity {
             Some(Ordering::Greater)
         } else {
             Some(Ordering::Equal)
@@ -239,11 +241,11 @@ impl Ord for ClauseBody {
     fn cmp(&self, other: &ClauseBody) -> Ordering {
         if self.rank < other.rank {
             Ordering::Less
-        } else if self.rank > other.rank {
+        } else if other.rank > self.rank {
             Ordering::Greater
         } else if self.activity > other.activity {
             Ordering::Less
-        } else if self.activity < other.activity {
+        } else if other.activity > self.activity {
             Ordering::Greater
         } else {
             Ordering::Equal
@@ -333,10 +335,12 @@ impl ClauseManagement for Solver {
     #[inline]
     fn bump_cid(&mut self, cid: ClauseId) -> () {
         debug_assert_ne!(cid, 0);
+        let b = self.stat[Stat::Conflict as usize] as f64;
         let a;
         {
             let c = clause_body_mut!(self.cp, cid);
-            a = c.activity + self.cla_inc;
+            // a = c.activity + self.cla_inc + 2.3;
+            a = (c.activity + b) / 2.0;
             c.activity = a;
         }
         if 1.0e20 < a {
@@ -379,36 +383,9 @@ impl ClauseManagement for Solver {
                 self.enqueue(v[0], NULL_CLAUSE);
                 Some(NULL_CLAUSE)
             }
-            _ => {
+            n => {
                 let cid = self.cp[kind as usize].new_clause(&v, 0, false, false);
-                // if cid.to_kind() == ClauseKind::Binclause as usize {
-                //     self.eliminator.binclause_queue.push(cid);
-                //     for l in &self.cp[kind as usize].head[cid.to_index()].lit {
-                //         let v = &mut self.vars[l.vi()];
-                //         if l.positive() {
-                //             v.pos_occurs.push(cid);
-                //         } else {
-                //             v.neg_occurs.push(cid);
-                //         }
-                //     }
-                // }
-                for l in &self.cp[kind as usize].head[cid.to_index()].lit {
-                    let v = &mut self.vars[l.vi()];
-                    if l.positive() {
-                        v.pos_occurs.push(cid);
-                    } else {
-                        v.neg_occurs.push(cid);
-                    }
-                }
-                for l in &self.cp[kind as usize].body[cid.to_index()].lits {
-                    let v = &mut self.vars[l.vi()];
-                    if l.positive() {
-                        v.pos_occurs.push(cid);
-                    } else {
-                        v.neg_occurs.push(cid);
-                    }
-                }
-                self.eliminator_enqueue(cid);
+                self.eliminator_enqueue_clause(cid, n);
                 Some(cid)
             }
         }
@@ -443,35 +420,8 @@ impl ClauseManagement for Solver {
             ClauseKind::Removable
         };
         let cid = self.cp[kind as usize].new_clause(&v, lbd, true, true);
-        // kind == ClauseKind::Binclause {
-        //  self.eliminator.binclause_queue.push(cid);
-        //  for l in &self.cp[kind as usize].head[cid.to_index()].lit {
-        //      let v = &mut self.vars[l.vi()];
-        //      if l.positive() {
-        //          v.bin_pos_occurs.push(cid);
-        //      } else {
-        //          v.bin_neg_occurs.push(cid);
-        //      }
-        //  }
-        // }
-        for l in &self.cp[kind as usize].head[cid.to_index()].lit {
-            let v = &mut self.vars[l.vi()];
-            if l.positive() {
-                v.pos_occurs.push(cid);
-            } else {
-                v.neg_occurs.push(cid);
-            }
-        }
-        for l in &self.cp[kind as usize].body[cid.to_index()].lits {
-            let v = &mut self.vars[l.vi()];
-            if l.positive() {
-                v.pos_occurs.push(cid);
-            } else {
-                v.neg_occurs.push(cid);
-            }
-        }
         self.bump_cid(cid);
-        self.eliminator_enqueue(cid);
+        self.eliminator_enqueue_clause(cid, lbd);
         cid
     }
 
@@ -578,7 +528,6 @@ impl ClauseManagement for Solver {
         }
         }
         self.stat[Stat::Simplification as usize] += 1;
-        self.subsume_queue.clear();
         true
     }
     fn lbd_of_an_learnt_lits(&mut self) -> usize {
@@ -716,7 +665,7 @@ impl GC for ClausePartition {
                         for l in &cb.lits {
                             let vi = l.vi();
                             let v = &mut vars[vi];
-                            if (v.terminal || true) && !v.eliminated {
+                            if !v.eliminated {
                                 let xx = v.pos_occurs.len() + v.neg_occurs.len();
                                 if l.positive() {
                                     v.pos_occurs.retain(|&cj| cid != cj);
@@ -725,7 +674,7 @@ impl GC for ClausePartition {
                                 }
                                 let xy = v.pos_occurs.len() + v.neg_occurs.len();
                                 if xy + 1 != xx {
-                                    panic!("strange {} {} by {}{:?}", xx, xy, l.int(), v);
+                                    panic!("strange {} {} by {} on {:?} ci {} cid {} {:#}", xx, xy, l.int(), v, ci, cid, cb);
                                 }
                             }
                         }
@@ -760,7 +709,7 @@ impl GC for ClausePartition {
                 cb.lits.push(*l);
             }
             cb.rank = rank;
-            cb.flag = self.kind as u16; // reset Dead, JustUsed, SveMark and Touched
+            cb.flag = self.kind as u16; // reset Dead, JustUsed, and Touched
             cb.set_flag(ClauseFlag::Locked, locked);
             cb.set_flag(ClauseFlag::Learnt, learnt);
             cb.activity = 0.0;
