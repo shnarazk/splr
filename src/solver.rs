@@ -1,5 +1,5 @@
 use clause::{ClauseManagement, GC, *};
-use eliminator::{ClauseElimination, Eliminator};
+use eliminator::{ClauseElimination, Eliminator, EliminatorIF};
 use restart::Restart;
 use std::cmp::max;
 use std::fs;
@@ -198,7 +198,7 @@ impl Solver {
             .count();
         if mes.is_empty() {
             println!(
-                "#mode,      Variable Assignment     ,,  Clause Database Management  ,,   Restart Heuristicts   ,,     Misc Status         ,,  Eliminator"
+                "#mode,      Variable Assignment     ,,  Clause Database Management  ,,   Restart Strategy      ,, Misc Progress Parameters,,  Eliminator"
             );
             println!(
                 "#init,#remain,#solved,  #elim,total%,,#learnt,(good),  #perm,#binary,,block,force, asgn/,  lbd/,,    lbd, back lv, conf lv,,clause,   var"
@@ -222,8 +222,8 @@ impl Solver {
                 self.ema_lbd.slow,
                 self.b_lvl.0,
                 self.c_lvl.0,
-                self.eliminator.clause_queue.len(),
-                self.eliminator.var_queue.len(),
+                self.eliminator.clause_queue_len(),
+                self.eliminator.var_queue_len(),
             );
         }
     }
@@ -292,7 +292,7 @@ impl Solver {
                             cb.set_flag(ClauseFlag::Dead, true);
                         }
                     }
-                    (*learnts).garbage_collect(&mut self.vars);
+                    (*learnts).garbage_collect(&mut self.vars, &mut self.eliminator);
                 }
             }
         }
@@ -312,13 +312,13 @@ impl SatSolver for Solver {
         self.num_solved_vars = self.trail.len();
         self.progress("");
         self.progress("load");
-        for v in &self.vars[1..] {
-            self.eliminator.var_queue.push(v.index);
-        }
+        // for v in &self.vars[1..] {
+        //     self.eliminator.var_queue.push(v.index);
+        // }
         // self.eliminate_binclauses();
-        if self.eliminator.use_elim {
-            self.eliminate();
-        }
+        // if self.eliminator.use_elim {
+        //     self.eliminate();
+        // }
         self.simplify();
         self.progress("simp");
         self.stat[Stat::Simplification as usize] += 1;
@@ -612,10 +612,10 @@ impl CDCL for Solver {
                 v.assign = sig;
                 v.reason = cid;
                 if dl == 0 {
-                    if !v.enqueued {
-                        self.eliminator.var_queue.push(l.vi());
-                        v.enqueued = true;
-                    }
+                    // if !v.enqueued {
+                    //     self.eliminator.var_queue.push(l.vi());
+                    //     v.enqueued = true;
+                    // }
                     v.activity = 0.0;
                 }
                 v.level = dl;

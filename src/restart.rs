@@ -1,4 +1,5 @@
 use clause::ClauseManagement;
+use eliminator::EliminatorIF;
 use solver::{Solver, Stat, CDCL};
 use types::*;
 
@@ -8,11 +9,11 @@ pub trait Restart {
 }
 
 /// for block restart based on average assigments: 1.40
-const R: f64 = 1.50;
+const R: f64 = 1.30;
 // const RR: f64 = 0.85;
 
 /// for force restart based on average LBD of newly generated clauses: 1.15
-const K: f64 = 1.49;
+const K: f64 = 1.70;
 
 const RESTART_PERIOD: u64 = 50;
 const RESET_EMA: u64 = 50;
@@ -34,7 +35,7 @@ impl Restart for Solver {
             self.b_lvl.reset();
         }
         // if self.next_restart <= count && 2 * self.cp[ClauseKind::Removable as usize].head.len() < self.eliminator.clause_queue.len() {
-        if self.next_restart <= count && self.num_vars < 8 * self.eliminator.var_queue.len() {
+        if self.next_restart <= count && self.num_vars < 8 * self.eliminator.var_queue_len() {
             self.next_restart = count + RESTART_PERIOD;
             self.stat[Stat::Restart as usize] += 1;
             let rl = self.root_level;

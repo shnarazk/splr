@@ -8,7 +8,7 @@ use var::{Satisfiability, Var};
 
 /// for ClausePartition
 pub trait GC {
-    fn garbage_collect(&mut self, vars: &mut [Var]) -> ();
+    fn garbage_collect(&mut self, vars: &mut [Var], elimanator: &mut Eliminator) -> ();
     fn new_clause(&mut self, v: &[Lit], rank: usize, learnt: bool, locked: bool) -> ClauseId;
     fn reset_lbd(&mut self, vars: &[Var]) -> ();
     fn move_to(&mut self, list: &mut ClauseId, ci: ClauseIndex, index: usize) -> ClauseIndex;
@@ -385,7 +385,7 @@ impl ClauseManagement for Solver {
             }
             n => {
                 let cid = self.cp[kind as usize].new_clause(&v, 0, false, false);
-                self.eliminator_enqueue_clause(cid, n);
+                self.eliminator_register_clause(cid, n);
                 Some(cid)
             }
         }
@@ -421,15 +421,13 @@ impl ClauseManagement for Solver {
         };
         let cid = self.cp[kind as usize].new_clause(&v, lbd, true, true);
         self.bump_cid(cid);
-        self.eliminator_enqueue_clause(cid, lbd);
+        self.eliminator_register_clause(cid, lbd);
         cid
     }
 
     fn reduce(&mut self) -> () {
         // self.cp[ClauseKind::Removable as usize].reset_lbd(&self.vars);
-        unsafe {
-            let eliminator = &mut self.eliminator as *mut Eliminator;
-            let vars = &mut self.vars[..] as *mut [Var];
+        {
             let ClausePartition {
                 ref mut head,
                 ref mut body,
@@ -457,23 +455,11 @@ impl ClauseManagement for Solver {
                     cb.set_flag(ClauseFlag::Dead, true);
                     touched[ch.lit[0].negate() as usize] = true;
                     touched[ch.lit[1].negate() as usize] = true;
-                    for l in &ch.lit {
-                        if ! (*vars)[l.vi()].enqueued {
-                            (*eliminator).var_queue.push(l.vi());
-                            (*vars)[l.vi()].enqueued = true;
-                        }
-                    }
-                    for l in &cb.lits {
-                        if ! (*vars)[l.vi()].enqueued {
-                            (*eliminator).var_queue.push(l.vi());
-                            (*vars)[l.vi()].enqueued = true;
-                        }
-                    }
                 }
             }
         }
         // self.garbage_collect(ClauseKind::Removable);
-        self.cp[ClauseKind::Removable as usize].garbage_collect(&mut self.vars);
+        self.cp[ClauseKind::Removable as usize].garbage_collect(&mut self.vars, &mut self.eliminator);
         // self.cp[ClauseKind::Removable as usize].reset_lbd(&self.vars);
         self.next_reduction += DB_INC_SIZE;
         self.stat[Stat::Reduction as usize] += 1;
@@ -511,20 +497,16 @@ impl ClauseManagement for Solver {
                     self.cp[*ck as usize].touched[ch.lit[0].negate() as usize] = true;
                     self.cp[*ck as usize].touched[ch.lit[1].negate() as usize] = true;
                     for l in &ch.lit {
-                        if !(*vars)[l.vi()].enqueued {
-                            (*eliminator).var_queue.push(l.vi());
-                            (*vars)[l.vi()].enqueued = true;
-                        }
+                        let v = &mut (*vars)[l.vi()];
+                        (*eliminator).enqueue_var(v);
                     }
                     for l in &cb.lits {
-                        if !(*vars)[l.vi()].enqueued {
-                            (*eliminator).var_queue.push(l.vi());
-                            (*vars)[l.vi()].enqueued = true;
-                        }
+                        let v = &mut (*vars)[l.vi()];
+                        (*eliminator).enqueue_var(v);
                     }
                 }
             }
-            self.cp[*ck as usize].garbage_collect(&mut self.vars);
+            self.cp[*ck as usize].garbage_collect(&mut self.vars, &mut self.eliminator);
         }
         }
         self.stat[Stat::Simplification as usize] += 1;
@@ -602,7 +584,7 @@ impl ClauseManagement for Solver {
                 }
             }
             if flag {
-                cp.garbage_collect(&mut self.vars);
+                cp.garbage_collect(&mut self.vars, &mut self.eliminator);
             }
         }
     }
@@ -612,7 +594,7 @@ impl ClauseManagement for Solver {
 }
 
 impl GC for ClausePartition {
-    fn garbage_collect(&mut self, vars: &mut [Var]) -> () {
+    fn garbage_collect(&mut self, vars: &mut [Var], eliminator: &mut Eliminator) -> () {
         unsafe {
             let garbages = &mut self.watcher[GARBAGE_LIT.negate() as usize] as *mut ClauseId;
             for l in 2..self.watcher.len() {
@@ -672,6 +654,7 @@ impl GC for ClausePartition {
                                 } else {
                                     v.neg_occurs.retain(|&cj| cid != cj);
                                 }
+                                eliminator.enqueue_var(v);
                                 let xy = v.pos_occurs.len() + v.neg_occurs.len();
                                 if xy + 1 != xx {
                                     panic!("strange {} {} by {} on {:?} ci {} cid {} {:#}", xx, xy, l.int(), v, ci, cid, cb);
