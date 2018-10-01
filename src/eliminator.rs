@@ -36,7 +36,6 @@ pub struct Eliminator {
     /// 0 means no limit.
     pub clause_lim: usize,
     pub eliminated_vars: usize,
-    pub add_tmp: Vec<Lit>,
     pub use_elim: bool,
     pub use_simplification: bool,
     pub subsumption_lim: usize,
@@ -50,8 +49,8 @@ pub struct Eliminator {
 const SUBSUMPTION_SIZE: usize = 30;
 const SUBSUMPITON_GROW_LIMIT: usize = 0;
 const BACKWORD_SUBSUMPTION_THRESHOLD: usize = 10_000;
-const CLAUSE_QUEUE_THRESHOD: usize = 40_000;
-const VAR_QUEUE_THRESHOLD: usize = 1_000;
+const CLAUSE_QUEUE_THRESHOD: usize = 1_000;
+const VAR_QUEUE_THRESHOLD: usize = 3_200_000;
 
 
 trait LiteralClause {
@@ -77,7 +76,6 @@ impl EliminatorIF for Eliminator {
             elim_clauses: Vec::new(),
             clause_lim: 20,
             eliminated_vars: 0,
-            add_tmp: Vec::new(),
             use_elim,
             use_simplification: true,
             subsumption_lim: 0,
@@ -191,9 +189,11 @@ impl Solver {
         }
     }
     /// 5. strengthenClause
+    /// returns false if inconsistent
     /// - calls `enqueue_clause`
     /// - calls `enqueue_var`
     pub fn strengthen_clause(&mut self, cid: ClauseId, l: Lit) -> bool {
+        debug_assert!(!clause_body!(self.cp, cid).get_flag(ClauseFlag::Dead));
         // println!("STRENGTHEN_CLAUSE {}:{}", cid.to_kind(), cid.to_index());
         let c0;
         {
@@ -352,6 +352,7 @@ impl Solver {
 //         self.eliminator.n_touched = 0;
 //     }
     /// 10. backwardSubsumptionCheck
+    /// returns false if solver is inconsistent
     /// - calls `clause_queue.pop`
     pub fn backward_subsumption_check(&mut self) -> bool {
         let mut cnt = 0;
@@ -437,15 +438,11 @@ impl Solver {
                         let l = lindex!(*ch, *cb, i);
                         {
                             let v = &self.vars[l.vi()];
-                            if v.eliminated {
+                            if v.eliminated || v.level == 0 {
                                 continue;
                             }
-                            let nsum = if v.eliminated || v.level == 0 {
-                                0.0
-                            } else {
-                                - v.activity
-                                // v.pos_occurs.len() + v.neg_occurs.len()
-                            };
+                            let nsum = - v.activity;
+                            // v.pos_occurs.len() + v.neg_occurs.len()
                             if tmp < nsum {
                                 best = l.vi();
                                 tmp = nsum;
@@ -548,7 +545,11 @@ impl Solver {
         vec.push((cb.lits.len() + 2) as Lit);
     }
     /// 15. eliminateVar
+    /// returns false if solver is in inconsistent
     pub fn eliminate_var(&mut self, v: VarId) -> bool {
+        if self.vars[v].assign != BOTTOM {
+            return true;
+        }
         assert!(!self.vars[v].eliminated);
         let pos = &self.vars[v].pos_occurs as *const Vec<ClauseId>;
         let neg = &self.vars[v].neg_occurs as *const Vec<ClauseId>;
@@ -558,7 +559,13 @@ impl Solver {
             let clslen = (*pos).len() + (*neg).len();
             let mut cnt = 0;
             for lit_pos in &*pos {
+                if clause_body!(self.cp, lit_pos).get_flag(ClauseFlag::Dead) {
+                    continue;
+                }
                 for lit_neg in &*neg {
+                    if clause_body!(self.cp, lit_neg).get_flag(ClauseFlag::Dead) {
+                        continue;
+                }
                     let (res, clause_size) = self.check_to_merge(*lit_pos, *lit_neg, v);
                     if res {
                         cnt += 1;
@@ -580,11 +587,17 @@ impl Solver {
                 let tmp = &mut self.eliminator.elim_clauses as *mut Vec<Lit>;
                 if (*neg).len() < (*pos).len() {
                     for cid in &*neg {
+                        if clause_body!(self.cp, cid).get_flag(ClauseFlag::Dead) {
+                            continue;
+                        }
                         self.make_eliminated_clause(&mut (*tmp), v, *cid);
                     }
                     self.make_eliminating_unit_clause(&mut (*tmp), v.lit(LTRUE));
                 } else {
                     for cid in &*pos {
+                        if clause_body!(self.cp, cid).get_flag(ClauseFlag::Dead) {
+                            continue;
+                        }
                         self.make_eliminated_clause(&mut (*tmp), v, *cid);
                     }
                     self.make_eliminating_unit_clause(&mut (*tmp), v.lit(LFALSE));
@@ -593,7 +606,13 @@ impl Solver {
             // Produce clauses in cross product via self.merge_vec:
             {
                 for p in &*pos {
+                    if clause_body!(self.cp, p).get_flag(ClauseFlag::Dead) {
+                        continue;
+                    }
                     for n in &*neg {
+                        if clause_body!(self.cp, n).get_flag(ClauseFlag::Dead) {
+                            continue;
+                        }
                         if let Some(vec) = self.merge(*p, *n, v) {
                             self.add_clause(&mut vec.to_vec(), 0);
                         }
@@ -602,10 +621,16 @@ impl Solver {
             }
             for i in 0..self.vars[v].pos_occurs.len() {
                 let cid = self.vars[v].pos_occurs[i];
+                if clause_body!(self.cp, cid).get_flag(ClauseFlag::Dead) {
+                    continue;
+                }
                 self.remove_clause(cid);
             }
             for i in 0..self.vars[v].neg_occurs.len() {
                 let cid = self.vars[v].neg_occurs[i];
+                if clause_body!(self.cp, cid).get_flag(ClauseFlag::Dead) {
+                    continue;
+                }
                 self.remove_clause(cid);
             }
             self.backward_subsumption_check()
@@ -738,6 +763,7 @@ impl Solver {
     /// remove Lit `p` from Clause *self*. This is an O(n) function!
     /// returns true if the clause became a unit clause.
     pub fn strengthen(&mut self, cid: ClauseId, p: Lit) -> bool {
+        debug_assert!(!clause_body!(self.cp, cid).get_flag(ClauseFlag::Dead));
         let cix = cid.to_index();
         let mut cj;
         let mut next;

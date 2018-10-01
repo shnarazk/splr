@@ -26,7 +26,7 @@ impl Restart for Solver {
         self.c_lvl.update(clv as f64);
         self.b_lvl.update(blv as f64);
         //self.ema_asg.update((nv - nas) as f64);
-        self.ema_asg.update( nas as f64);
+        self.ema_asg.update(nas as f64);
         self.ema_lbd.update(lbd as f64);
         if count == RESET_EMA {
             self.ema_asg.reset();
@@ -34,7 +34,6 @@ impl Restart for Solver {
             self.c_lvl.reset();
             self.b_lvl.reset();
         }
-        // if self.next_restart <= count && 2 * self.cp[ClauseKind::Removable as usize].head.len() < self.eliminator.clause_queue.len() {
         if self.next_restart <= count && self.num_vars < 8 * self.eliminator.var_queue_len() {
             self.next_restart = count + RESTART_PERIOD;
             self.stat[Stat::Restart as usize] += 1;

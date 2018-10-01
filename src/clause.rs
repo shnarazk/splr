@@ -426,7 +426,7 @@ impl ClauseManagement for Solver {
     }
 
     fn reduce(&mut self) -> () {
-        // self.cp[ClauseKind::Removable as usize].reset_lbd(&self.vars);
+        self.cp[ClauseKind::Removable as usize].reset_lbd(&self.vars);
         {
             let ClausePartition {
                 ref mut head,
@@ -458,14 +458,13 @@ impl ClauseManagement for Solver {
                 }
             }
         }
-        // self.garbage_collect(ClauseKind::Removable);
         self.cp[ClauseKind::Removable as usize].garbage_collect(&mut self.vars, &mut self.eliminator);
-        // self.cp[ClauseKind::Removable as usize].reset_lbd(&self.vars);
         self.next_reduction += DB_INC_SIZE;
         self.stat[Stat::Reduction as usize] += 1;
     }
 
     fn simplify(&mut self) -> bool {
+        self.cp[ClauseKind::Removable as usize].reset_lbd(&self.vars);
         // self.eliminate_binclauses();
         debug_assert_eq!(self.decision_level(), 0);
         if self.eliminator.use_elim
@@ -624,11 +623,13 @@ impl GC for ClausePartition {
                     ci = *pri;
                 }
             }
+            // println!("gc recycle");
             // recycle garbages
             let recycled = &mut self.watcher[RECYCLE_LIT.negate() as usize] as *mut ClauseId;
             let mut pri = &mut self.watcher[GARBAGE_LIT.negate() as usize] as *mut usize;
             let mut ci = self.watcher[GARBAGE_LIT.negate() as usize];
             while ci != NULL_CLAUSE {
+                // println!(" -ci {}", ci);
                 let cid = self.kind.id_from(ci);
                 let ch = &mut self.head[ci];
                 let cb = &mut self.body[ci];
@@ -671,6 +672,7 @@ impl GC for ClausePartition {
                 }
             }
         }
+        // println!("done");
         debug_assert_eq!(self.watcher[GARBAGE_LIT.negate() as usize], NULL_CLAUSE);
     }
     fn new_clause(&mut self, v: &[Lit], rank: usize, learnt: bool, locked: bool) -> ClauseId {

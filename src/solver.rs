@@ -311,14 +311,10 @@ impl SatSolver for Solver {
         // s.root_level = 0;
         self.num_solved_vars = self.trail.len();
         self.progress("");
+        for v in &mut self.vars[1..] {
+            self.eliminator.enqueue_var(v);
+        }
         self.progress("load");
-        // for v in &self.vars[1..] {
-        //     self.eliminator.var_queue.push(v.index);
-        // }
-        // self.eliminate_binclauses();
-        // if self.eliminator.use_elim {
-        //     self.eliminate();
-        // }
         self.simplify();
         self.progress("simp");
         self.stat[Stat::Simplification as usize] += 1;
