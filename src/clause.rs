@@ -81,7 +81,6 @@ pub enum ClauseFlag {
     Learnt,
     JustUsed,
     Enqueued,
-    Touched,
 }
 
 /// partition of clauses
@@ -495,13 +494,15 @@ impl ClauseManagement for Solver {
                     cb.set_flag(ClauseFlag::Dead, true);
                     self.cp[*ck as usize].touched[ch.lit[0].negate() as usize] = true;
                     self.cp[*ck as usize].touched[ch.lit[1].negate() as usize] = true;
-                    for l in &ch.lit {
-                        let v = &mut (*vars)[l.vi()];
-                        (*eliminator).enqueue_var(v);
-                    }
-                    for l in &cb.lits {
-                        let v = &mut (*vars)[l.vi()];
-                        (*eliminator).enqueue_var(v);
+                    if (*eliminator).use_elim {
+                        for l in &ch.lit {
+                            let v = &mut (*vars)[l.vi()];
+                            (*eliminator).enqueue_var(v);
+                        }
+                        for l in &cb.lits {
+                            let v = &mut (*vars)[l.vi()];
+                            (*eliminator).enqueue_var(v);
+                        }
                     }
                 }
             }
@@ -643,12 +644,12 @@ impl GC for ClausePartition {
                     ch.next_watcher[1] = *recycled;
                     *recycled = ci;
                     cb.set_flag(ClauseFlag::Locked, true);
-                    {
+                    if eliminator.use_elim {
                         // update eliminator
                         for l in &cb.lits {
                             let vi = l.vi();
                             let v = &mut vars[vi];
-                            if !v.eliminated {
+                            if eliminator.use_elim && !v.eliminated {
                                 let xx = v.pos_occurs.len() + v.neg_occurs.len();
                                 if l.positive() {
                                     v.pos_occurs.retain(|&cj| cid != cj);

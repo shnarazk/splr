@@ -82,7 +82,7 @@ impl EliminatorIF for Eliminator {
         }
     }
     fn enqueue_var(&mut self, v: &mut Var) -> () {
-        if self.var_queue_threshold == 0 {
+        if !self.use_elim || self.var_queue_threshold == 0 {
             return;
         }
         if !v.enqueued {
@@ -113,6 +113,9 @@ impl fmt::Display for Eliminator {
 
 impl ClauseElimination for Solver {
     fn eliminator_register_clause(&mut self, cid: ClauseId, rank: usize) -> () {
+        if !self.eliminator.use_elim {
+            return;
+        }
         {
         for l in &clause_head!(self.cp, cid).lit {
             let mut v = &mut self.vars[l.vi()];
@@ -143,7 +146,7 @@ impl ClauseElimination for Solver {
         self.eliminator_enqueue_clause(cid);
     }
     fn eliminator_enqueue_clause(&mut self, cid: ClauseId) -> () {
-        if self.eliminator.clause_queue_threshold == 0 {
+        if !self.eliminator.use_elim ||  self.eliminator.clause_queue_threshold == 0 {
             return;
         }
         let cb = clause_body_mut!(self.cp, cid);
@@ -163,6 +166,9 @@ impl ClauseElimination for Solver {
         }
     }
     fn eliminator_enqueue_var(&mut self, vi: VarId) -> () {
+        if !self.eliminator.use_elim {
+            return;
+        }
         self.eliminator.enqueue_var(&mut self.vars[vi])
     }
 }
@@ -681,6 +687,9 @@ impl Solver {
     /// 18. eliminate
     // should be called at decision level 0.
     pub fn eliminate(&mut self) -> () {
+        if !self.eliminator.use_elim {
+            return;
+        }
         // println!("eliminate: clause_queue {}", self.eliminator.clause_queue.len());
         // println!("clause_queue {:?}", self.eliminator.clause_queue);
         // println!("var_queue {:?}", self.eliminator.var_queue);
