@@ -23,14 +23,12 @@ pub trait EliminatorIF {
 /// Literal eliminator
 #[derive(Debug)]
 pub struct Eliminator {
-    pub merges: usize,
+    merges: usize,
     clause_queue: Vec<ClauseId>,
     var_queue: Vec<VarId>,
     pub n_touched: usize,
-    pub bwdsub_assigns: usize,
-    pub remove_satisfied: bool,
+    bwdsub_assigns: usize,
     // working place
-    pub merge_vec: Vec<Lit>,
     pub elim_clauses: Vec<Lit>,
     /// Variables are not eliminated if it produces a resolvent with a length above this limit.
     /// 0 means no limit.
@@ -41,7 +39,6 @@ pub struct Eliminator {
     pub subsumption_lim: usize,
     pub subsume_clause_size: usize,
     pub last_invocatiton: usize,
-    // pub binclause_queue: Vec<ClauseId>,
     clause_queue_threshold: usize,
     var_queue_threshold: usize,
 }
@@ -71,8 +68,6 @@ impl EliminatorIF for Eliminator {
             n_touched: 0,
             clause_queue: Vec::new(),
             bwdsub_assigns: 0,
-            remove_satisfied: false,
-            merge_vec: vec![0; nv + 1],
             elim_clauses: Vec::new(),
             clause_lim: 20,
             eliminated_vars: 0,
@@ -244,7 +239,6 @@ impl Solver {
     pub fn merge(&mut self, cp: ClauseId, cq: ClauseId, v: VarId) -> Option<Vec<Lit>> {
         let mut vec: Vec<Lit> = Vec::new();
         self.eliminator.merges += 1;
-        self.eliminator.merge_vec.clear();
         let pqh = clause_head!(self.cp, cp);
         let pqb = clause_body!(self.cp, cp);
         let qph = clause_head!(self.cp, cq);
@@ -603,7 +597,7 @@ impl Solver {
                     self.make_eliminating_unit_clause(&mut (*tmp), v.lit(LFALSE));
                 }
             }
-            // Produce clauses in cross product via self.merge_vec:
+            // Produce clauses in cross product:
             {
                 for p in &*pos {
                     if clause_body!(self.cp, p).get_flag(ClauseFlag::Dead) {
