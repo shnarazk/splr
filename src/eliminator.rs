@@ -13,6 +13,7 @@ pub trait ClauseElimination {
     fn eliminator_enqueue_var(&mut self, vi: VarId) -> ();
 }
 
+// for Eliminator
 pub trait EliminatorIF {
     fn new(use_elim: bool, nv: usize) -> Eliminator;
     fn enqueue_var(&mut self, v: &mut Var) -> ();
@@ -23,22 +24,22 @@ pub trait EliminatorIF {
 /// Literal eliminator
 #[derive(Debug)]
 pub struct Eliminator {
-    merges: usize,
-    clause_queue: Vec<ClauseId>,
-    var_queue: Vec<VarId>,
-    pub n_touched: usize,
-    bwdsub_assigns: usize,
-    // working place
-    pub elim_clauses: Vec<Lit>,
-    /// Variables are not eliminated if it produces a resolvent with a length above this limit.
-    /// 0 means no limit.
-    pub clause_lim: usize,
     pub eliminated_vars: usize,
     pub use_elim: bool,
     pub use_simplification: bool,
-    pub subsumption_lim: usize,
-    pub subsume_clause_size: usize,
     pub last_invocatiton: usize,
+    n_touched: usize,
+    merges: usize,
+    clause_queue: Vec<ClauseId>,
+    var_queue: Vec<VarId>,
+    bwdsub_assigns: usize,
+    // working place
+    elim_clauses: Vec<Lit>,
+    /// Variables are not eliminated if it produces a resolvent with a length above this limit.
+    /// 0 means no limit.
+    clause_lim: usize,
+    subsumption_lim: usize,
+    subsume_clause_size: usize,
     clause_queue_threshold: usize,
     var_queue_threshold: usize,
 }
