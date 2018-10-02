@@ -313,7 +313,9 @@ impl SatSolver for Solver {
         self.progress("");
         if self.eliminator.use_elim {
             for v in &mut self.vars[1..] {
-                self.eliminator.enqueue_var(v);
+                if v.pos_occurs.len() <= 1 || v.neg_occurs.len() <= 1 {
+                    self.eliminator.enqueue_var(v);
+                }
             }
             self.progress("load");
             self.simplify();
@@ -541,8 +543,11 @@ impl CDCL for Solver {
                         let l0 = (*v)[0];
                         let cid = self.add_clause(&mut *v, lbd);
                         if cid.to_kind() == ClauseKind::Binclause as usize {
-                            let ch = clause_head!(self.cp, cid) as *const ClauseHead;
-                            self.biclause_subsume(&*ch);
+                            // let ch = clause_head!(self.cp, cid) as *const ClauseHead;
+                            // self.biclause_subsume(&*ch);
+                        } else {
+                            // clause_body_mut!(self.cp, cid).set_flag(ClauseFlag::JustUsed, true);
+                            // clause_body_mut!(self.cp, cid).activity = (dl as f64) / 2.0;
                         }
                         self.uncheck_enqueue(l0, cid);
                     }

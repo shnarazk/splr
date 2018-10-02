@@ -8,7 +8,7 @@ use var::Var;
 
 // for Solver
 pub trait ClauseElimination {
-    fn eliminator_register_clause(&mut self, cid: ClauseId, rank: usize) -> ();
+    fn eliminator_register_clause(&mut self, cid: ClauseId, rank: usize, ignorable: bool) -> ();
     fn eliminator_enqueue_clause(&mut self, cid: ClauseId) -> ();
     fn eliminator_enqueue_var(&mut self, vi: VarId) -> ();
 }
@@ -112,7 +112,7 @@ impl fmt::Display for Eliminator {
 }
 
 impl ClauseElimination for Solver {
-    fn eliminator_register_clause(&mut self, cid: ClauseId, rank: usize) -> () {
+    fn eliminator_register_clause(&mut self, cid: ClauseId, rank: usize, ignorable: bool) -> () {
         if !self.eliminator.use_elim {
             return;
         }
@@ -143,7 +143,9 @@ impl ClauseElimination for Solver {
             }
         }
         }
-        self.eliminator_enqueue_clause(cid);
+        if !ignorable {
+            self.eliminator_enqueue_clause(cid);
+        }
     }
     fn eliminator_enqueue_clause(&mut self, cid: ClauseId) -> () {
         if !self.eliminator.use_elim ||  self.eliminator.clause_queue_threshold == 0 {
@@ -428,7 +430,7 @@ impl Solver {
                         }
                     }
                 } else {
-                    let mut tmp = 0.0;
+                    let mut tmp = 100000;
                     let ch = clause_head_mut!(self.cp, cid) as *mut ClauseHead;
                     let cb = clause_body_mut!(self.cp, cid) as *mut ClauseBody;
                     (*cb).set_flag(ClauseFlag::Enqueued, false);
@@ -442,9 +444,9 @@ impl Solver {
                             if v.eliminated || v.level == 0 {
                                 continue;
                             }
-                            let nsum = - v.activity;
-                            // v.pos_occurs.len() + v.neg_occurs.len()
-                            if tmp < nsum {
+                            // let nsum = - v.activity;
+                            let nsum = v.pos_occurs.len().min(v.neg_occurs.len());
+                            if nsum < tmp {
                                 best = l.vi();
                                 tmp = nsum;
                             }
