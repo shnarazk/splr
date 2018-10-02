@@ -711,7 +711,6 @@ impl Solver {
                 self.vars[elim].enqueued = false;
                 if self.vars[elim].eliminated
                     || self.vars[elim].assign != BOTTOM
-                    || self.vars[elim].frozen
                 {
                     continue;
                 }

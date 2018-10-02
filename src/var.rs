@@ -45,14 +45,9 @@ pub struct Var {
     pub level: usize,
     pub activity: f64,
     /// for elimination
-    pub frozen: bool,
-    /// for elimination
     pub touched: bool,
     /// for elimination
     pub eliminated: bool,
-    // for elimination
-    pub max_clause_size: usize,
-    pub num_occurs: usize,
     pub pos_occurs: Vec<ClauseId>,
     pub neg_occurs: Vec<ClauseId>,
     pub enqueued: bool,
@@ -70,11 +65,8 @@ impl Var {
             reason: NULL_CLAUSE,
             level: 0,
             activity: 0.0,
-            frozen: false,
             touched: false,
             eliminated: false,
-            max_clause_size: 0,
-            num_occurs: 0,
             pos_occurs: Vec::new(),
             neg_occurs: Vec::new(),
             enqueued: false,
