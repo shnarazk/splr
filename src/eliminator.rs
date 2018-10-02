@@ -49,7 +49,6 @@ const BACKWORD_SUBSUMPTION_THRESHOLD: usize = 10_000;
 const CLAUSE_QUEUE_THRESHOD: usize = 1_000;
 const VAR_QUEUE_THRESHOLD: usize = 3_200_000;
 
-
 trait LiteralClause {
     fn as_uniclause(self) -> ClauseId;
 }

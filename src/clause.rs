@@ -461,7 +461,6 @@ impl ClauseManagement for Solver {
 
     fn simplify(&mut self) -> bool {
         self.cp[ClauseKind::Removable as usize].reset_lbd(&self.vars);
-        // self.eliminate_binclauses();
         debug_assert_eq!(self.decision_level(), 0);
         if self.eliminator.use_elim
             // && self.stat[Stat::Simplification as usize] % 8 == 0
@@ -555,38 +554,6 @@ impl ClauseManagement for Solver {
         self.lbd_seen[0] = key;
         cnt
     }
-//    fn biclause_subsume(&mut self, bi: &ClauseHead) -> () {
-//        for cp in &mut self.cp[..ClauseKind::Binclause as usize] {
-//            let mut flag = false;
-//            'next_clause: for i in 1..cp.head.len() {
-//                let ch = &cp.head[i];
-//                let cb = &mut cp.body[i];
-//                if cb.get_flag(ClauseFlag::Dead) {
-//                    continue;
-//                }
-//                let mut cnt = 0;
-//                for j in 0..cb.lits.len() + 2 {
-//                    let l = lindex!(ch, cb, j);
-//                    if l == bi.lit[0] || l == bi.lit[1] {
-//                        cnt += 1;
-//                        if cnt == 2 {
-//                            cb.set_flag(ClauseFlag::Dead, true);
-//                            cp.touched[ch.lit[0].negate() as usize] = true;
-//                            cp.touched[ch.lit[1].negate() as usize] = true;
-//                            flag = true;
-//                            continue 'next_clause;
-//                        }
-//                    }
-//                }
-//            }
-//            if flag {
-//                cp.garbage_collect(&mut self.vars, &mut self.eliminator);
-//            }
-//        }
-//    }
-//    fn num_literals(&self, cid: ClauseId) -> usize {
-//        clause_body!(self.cp, cid).lits.len() + 2
-//    }
 }
 
 impl GC for ClausePartition {
