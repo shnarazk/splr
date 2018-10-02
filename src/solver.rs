@@ -60,10 +60,10 @@ pub enum Stat {
     Propagation,        // the number of propagation
     Reduction,          // the number of reduction
     Simplification,     // the number of simplification
-    Clause,             // the number of 'alive' given clauses
-    Learnt,             // the number of 'alive' learnt clauses
-    Variable,           // the number of 'alive' variables
-    GroundVar,          // the number os assined variables at level 0
+//    Clause,             // the number of 'alive' given clauses
+//    Learnt,             // the number of 'alive' learnt clauses
+//    Variable,           // the number of 'alive' variables
+//    GroundVar,          // the number os assined variables at level 0
     Assign,             // the number of assigned variables
     EndOfStatIndex,     // Don't use this dummy.
 }

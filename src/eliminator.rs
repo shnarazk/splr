@@ -39,7 +39,6 @@ pub struct Eliminator {
     /// 0 means no limit.
     clause_lim: usize,
     subsumption_lim: usize,
-    subsume_clause_size: usize,
     clause_queue_threshold: usize,
     var_queue_threshold: usize,
 }
@@ -75,7 +74,6 @@ impl EliminatorIF for Eliminator {
             use_elim,
             use_simplification: true,
             subsumption_lim: 0,
-            subsume_clause_size: SUBSUMPTION_SIZE,
             last_invocatiton: 0,
             clause_queue_threshold: CLAUSE_QUEUE_THRESHOD,
             var_queue_threshold: VAR_QUEUE_THRESHOLD,
@@ -462,8 +460,8 @@ impl Solver {
                         let db = clause_body!(self.cp, di) as *const ClauseBody;
                         if !(*db).get_flag(ClauseFlag::Dead)
                             && *di != cid
-                            && (*cb).lits.len() + 2 <= self.eliminator.subsume_clause_size
-                            && (*db).lits.len() + 2 <= self.eliminator.subsume_clause_size
+                            && (*cb).lits.len() + 2 <= SUBSUMPTION_SIZE
+                            && (*db).lits.len() + 2 <= SUBSUMPTION_SIZE
                             && (self.eliminator.subsumption_lim == 0
                                 || (*cb).lits.len() + (*db).lits.len() + 4 <= self.eliminator.subsumption_lim)
                         // && (self.eliminator.subsumption_lim == 0 || (*d).len() < self.eliminator.subsumption_lim)
@@ -494,8 +492,8 @@ impl Solver {
                         let db = clause_body!(self.cp, di) as *const ClauseBody;
                         if !(*db).get_flag(ClauseFlag::Dead)
                             && *di != cid
-                            && (*cb).lits.len() + 2 <= self.eliminator.subsume_clause_size
-                            && (*db).lits.len() + 2 <= self.eliminator.subsume_clause_size
+                            && (*cb).lits.len() + 2 <= SUBSUMPTION_SIZE
+                            && (*db).lits.len() + 2 <= SUBSUMPTION_SIZE
                             && (self.eliminator.subsumption_lim == 0
                                 || (*cb).lits.len() + (*db).lits.len() + 4 <= self.eliminator.subsumption_lim)
                         // && (self.eliminator.subsumption_lim == 0 || (*d).len() < self.eliminator.subsumption_lim)
