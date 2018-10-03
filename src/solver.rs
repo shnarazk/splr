@@ -172,8 +172,8 @@ impl Solver {
             an_level_map_key: 1,
             mi_var_map: vec![0; nv + 1],
             lbd_seen: vec![0; nv + 1],
-            ema_asg: Ema2::new(3.5, 40_000.0),  // for blocking
-            ema_lbd: Ema2::new(50.0, 50_000.0), // for forcing
+            ema_asg: Ema2::new(3.8, 50_000.0),  // for blocking 4
+            ema_lbd: Ema2::new(160.0, 50_000.0), // for forcing 160
             b_lvl: Ema::new(se),
             c_lvl: Ema::new(se),
             next_restart: 100,
