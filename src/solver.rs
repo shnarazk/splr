@@ -1,6 +1,7 @@
 use clause::{ClauseManagement, GC, *};
 use eliminator::{ClauseElimination, Eliminator, EliminatorIF};
 use restart::Restart;
+use std::collections::VecDeque;
 use std::cmp::max;
 use std::fs;
 use std::io::{BufRead, BufReader};
@@ -118,8 +119,10 @@ pub struct Solver {
     pub mi_var_map: Vec<usize>,
     pub lbd_seen: Vec<u64>,
     /// restart heuristics
-    pub ema_asg: Ema2,
-    pub ema_lbd: Ema2,
+    pub lbd_queue: VecDeque<usize>,
+    pub trail_queue: VecDeque<usize>,
+    // pub ema_asg: Ema2,
+    // pub ema_lbd: Ema2,
     pub b_lvl: Ema,
     pub c_lvl: Ema,
     pub next_restart: u64,
@@ -172,8 +175,10 @@ impl Solver {
             an_level_map_key: 1,
             mi_var_map: vec![0; nv + 1],
             lbd_seen: vec![0; nv + 1],
-            ema_asg: Ema2::new(3.8, 50_000.0),  // for blocking 4
-            ema_lbd: Ema2::new(160.0, 50_000.0), // for forcing 160
+            lbd_queue: VecDeque::new(),
+            trail_queue: VecDeque::new(),
+            // ema_asg: Ema2::new(3.8, 50_000.0),  // for blocking 4
+            // ema_lbd: Ema2::new(160.0, 50_000.0), // for forcing 160
             b_lvl: Ema::new(se),
             c_lvl: Ema::new(se),
             next_restart: 100,

@@ -7,7 +7,7 @@ use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::Path;
 
-const VERSION: &str = "Splr-0.0.9 (Technical Preview 9) by shnarazk@gitlab.com";
+const VERSION: &str = "Splr-0.0.10 (Technical Preview 10) by shnarazk@gitlab.com";
 
 fn main() {
     let mut target: Option<String> = None;
