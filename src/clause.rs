@@ -31,7 +31,6 @@ pub trait ClauseManagement {
     fn simplify(&mut self) -> bool;
     fn lbd_of_an_learnt_lits(&mut self) -> usize;
     fn lbd_of(&mut self, cid: ClauseId) -> usize;
-//    fn biclause_subsume(&mut self, c: &ClauseHead) -> ();
 //    fn num_literals(&self, cid: ClauseIndex) -> usize;
 }
 
@@ -86,6 +85,7 @@ pub struct ClausePartition {
     pub init_size: usize,
     pub head: Vec<ClauseHead>,
     pub body: Vec<ClauseBody>,
+    pub perm: Vec<ClauseIndex>,
     pub touched: Vec<bool>,
     pub watcher: Vec<ClauseIndex>,
 }
@@ -126,17 +126,19 @@ impl ClauseKind {
 impl ClausePartition {
     pub fn build(kind: ClauseKind, nv: usize, nc: usize) -> ClausePartition {
         let mut head = Vec::with_capacity(1 + nc);
-        let mut body = Vec::with_capacity(1 + nc);
         head.push(ClauseHead {
             next_watcher: [NULL_CLAUSE; 2],
             lit: [NULL_LIT; 2],
         });
+        let mut body = Vec::with_capacity(1 + nc);
         body.push(ClauseBody {
             flag: 0,
             lits: vec![],
             rank: 0,
             activity: 0.0,
         });
+        let mut perm = Vec::with_capacity(1 + nc);
+        perm.push(NULL_CLAUSE);
         let mut watcher = Vec::with_capacity(2 * (nv + 1));
         let mut touched = Vec::with_capacity(2 * (nv + 1));
         for _i in 0..2 * (nv + 1) {
@@ -148,6 +150,7 @@ impl ClausePartition {
             init_size: nc,
             head,
             body,
+            perm,
             touched,
             watcher,
         }
@@ -428,23 +431,24 @@ impl ClauseManagement for Solver {
                 ref mut head,
                 ref mut body,
                 ref mut touched,
+                ref mut perm,
                 ..
             } = &mut self.cp[ClauseKind::Removable as usize];
-            let permutation = &mut (1..body.len())
-                .filter(|i| !body[*i].get_flag(ClauseFlag::Dead)
-                        && !body[*i].get_flag(ClauseFlag::Locked)
-                ) // garbage and recycled
-                .collect::<Vec<ClauseIndex>>();
-            debug_assert!(!permutation.is_empty());
-            permutation[1..].sort_by(|&a, &b| body[a].cmp(&body[b]));
-            let nc = permutation.len();
+            let mut nc = 1;
+            for i in 1..body.len() {
+                if !body[i].get_flag(ClauseFlag::Dead) && !body[i].get_flag(ClauseFlag::Locked) {
+                    perm[nc] = i;
+                    nc += 1;
+                }
+            }
+            perm[1..nc].sort_by(|&a, &b| body[a].cmp(&body[b]));
             let keep = nc / 2;
-            if body[permutation[keep]].rank <= 5 {
+            if body[perm[keep]].rank <= 5 {
                 self.next_reduction += 1000;
             };
             for i in keep..nc {
-                let ch = &mut head[permutation[i]];
-                let mut cb = &mut body[permutation[i]];
+                let ch = &mut head[perm[i]];
+                let mut cb = &mut body[perm[i]];
                 if cb.get_flag(ClauseFlag::JustUsed) {
                     cb.set_flag(ClauseFlag::JustUsed, false)
                 } else {
@@ -684,6 +688,7 @@ impl GC for ClausePartition {
                 rank,
                 activity: 1.0,
             });
+            self.perm.push(cix);
         };
         self.watcher[w0] = cix;
         self.watcher[w1] = cix;
