@@ -702,13 +702,8 @@ impl CDCL for Solver {
                             if self.strategy == Some(SearchStrategy::ChanSeok)
                                 && nblevels < CO_LBD_BOUND
                             {
-                                // c.nolearnt()
-                                // learnts.remove(confl);
-                                // permanentLearnts(confl);
                                 (*cb).rank = 0;
                                 clause_body_mut!(self.cp, confl).rank = 0
-                            } else {
-                                (*cb).rank = nblevels;
                             }
                         }
                     }
@@ -719,8 +714,8 @@ impl CDCL for Solver {
                     let vi = q.vi();
                     let lvl = self.vars[vi].level;
                     debug_assert_ne!(self.vars[vi].assign, BOTTOM);
-                    self.bump_vi(vi);
                     if !self.an_seen[vi] && 0 < lvl {
+                        self.bump_vi(vi);
                         self.an_seen[vi] = true;
                         if dl <= lvl {
                             // println!(
@@ -799,13 +794,13 @@ impl CDCL for Solver {
             self.minimize_with_bi_clauses();
         }
         // glucose heuristics
-        let lbd = self.lbd_of_an_learnt_lits();
-        while let Some(l) = self.an_last_dl.pop() {
-            let vi = l.vi();
-            if clause_body!(self.cp, self.vars[vi].reason).rank < lbd {
-                self.bump_vi(vi);
-            }
-        }
+        // let lbd = self.lbd_of_an_learnt_lits();
+        // while let Some(l) = self.an_last_dl.pop() {
+        //     let vi = l.vi();
+        //     if clause_body!(self.cp, self.vars[vi].reason).rank < lbd {
+        //         self.bump_vi(vi);
+        //     }
+        // }
         self.an_last_dl.clear();
         // find correct backtrack level from remaining literals
         let mut level_to_return = 0;

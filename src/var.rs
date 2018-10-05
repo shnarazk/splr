@@ -7,7 +7,7 @@ use types::*;
 pub trait VarManagement {
     fn select_var(&mut self) -> VarId;
     fn bump_vi(&mut self, vi: VarId) -> ();
-    fn decay_var_activity(&mut self) -> ();
+//    fn decay_var_activity(&mut self) -> ();
     fn rebuild_heap(&mut self) -> ();
 }
 
@@ -124,8 +124,24 @@ pub struct VarIdHeap {
 }
 
 impl VarOrdering for VarIdHeap {
+    /// renamed from getHeapDown
+    #[inline(always)]
     fn get_root(&mut self, vars: &[Var]) -> VarId {
-        self.root(vars)
+        let s = 1;
+        let vs = self.heap[s];
+        let n = self.idxs[0];
+        let vn = self.heap[n];
+        // self.var_order.check(&format!("root 1 :[({}, {}) ({}, {})]", s, vs, n, vn));
+        debug_assert!(vn != 0, "Invalid VarId for heap");
+        debug_assert!(vs != 0, "Invalid VarId for heap");
+        self.heap.swap(n, s);
+        self.idxs.swap(vn, vs);
+        self.idxs[0] -= 1;
+        if 1 < self.idxs[0] {
+            self.percolate_down(&vars, 1);
+        }
+        // self.var_order.check("root 2");
+        vs
     }
     fn reset(&mut self) -> () {
         for i in 0..self.idxs.len() {
@@ -208,24 +224,6 @@ impl VarIdHeap {
             idxs,
             seek: 1,
         }
-    }
-    /// renamed from getHeapDown
-    fn root(&mut self, vec: &[Var]) -> VarId {
-        let s = 1;
-        let vs = self.heap[s];
-        let n = self.idxs[0];
-        let vn = self.heap[n];
-        // self.var_order.check(&format!("root 1 :[({}, {}) ({}, {})]", s, vs, n, vn));
-        debug_assert!(vn != 0, "Invalid VarId for heap");
-        debug_assert!(vs != 0, "Invalid VarId for heap");
-        self.heap.swap(n, s);
-        self.idxs.swap(vn, vs);
-        self.idxs[0] -= 1;
-        if 1 < self.idxs[0] {
-            self.percolate_down(&vec, 1);
-        }
-        // self.var_order.check("root 2");
-        vs
     }
     fn percolate_up(&mut self, vars: &[Var], start: usize) -> () {
         let mut q = start;
@@ -372,9 +370,7 @@ impl VarIdHeap {
 
 impl VarManagement for Solver {
     fn rebuild_heap(&mut self) -> () {
-        if self.decision_level() != 0 {
-            return;
-        }
+        debug_assert_eq!(self.decision_level(), 0);
         self.var_order.reset();
         for vi in 1..self.vars.len() {
             if self.vars[vi].assign == BOTTOM {
@@ -384,32 +380,30 @@ impl VarManagement for Solver {
     }
     fn bump_vi(&mut self, vi: VarId) -> () {
         let d = self.stat[Stat::Conflict as usize] as f64;
+        // let d = self.stat[Stat::SumLBD as usize] as f64;
         self.vars[vi].activity = (self.vars[vi].activity + d) / 2.0;
-        // let a = (self.vars[vi].activity + d) / 2.0;
-        // let a = self.vars[vi].activity +self.var_inc;
-        // self.vars[vi].activity = a;
-        // if VAR_ACTIVITY_THRESHOLD < a {
-        //     // self.rescale_var_activity();
-        //     for i in 1..self.vars.len() {
-        //         self.vars[i].activity /= VAR_ACTIVITY_THRESHOLD;
-        //     }
-        //     self.var_inc /= VAR_ACTIVITY_THRESHOLD;
-        // }
         self.var_order.update(&self.vars, vi);
     }
-    fn decay_var_activity(&mut self) -> () {
-        self.var_inc /= self.var_decay;
-    }
+    // fn decay_var_activity(&mut self) -> () {
+    //     // self.var_inc /= self.var_decay;
+    // }
     /// Heap operations; renamed from selectVO
     fn select_var(&mut self) -> VarId {
         // self.var_order.seek_top(&self.vars)
         loop {
-            if self.var_order.len() == 0 {
-                return 0;
-            }
             let vi = self.var_order.get_root(&self.vars);
-            let x = self.vars[vi].assign;
-            if x == BOTTOM {
+            if self.vars[vi].assign == BOTTOM {
+//                // let mut best = vi;
+//                // let mut act = self.vars[vi].activity;
+                // for i in &self.var_order.heap[1..] {
+                //     let v = &self.vars[*i as usize];
+                //     assert_eq!(*i, v.index);
+                //     if v.assign == BOTTOM && act < v.activity {
+                //         best = v.index;
+                //         act = v.activity;
+                //     }
+                // }
+                // println!("root {} {}, best {} {}", vi, self.vars[vi].activity, best, act);
                 return vi;
             }
         }
