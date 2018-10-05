@@ -10,7 +10,7 @@ use var::{Satisfiability, Var};
 pub trait GC {
     fn garbage_collect(&mut self, vars: &mut [Var], elimanator: &mut Eliminator) -> ();
     fn new_clause(&mut self, v: &[Lit], rank: usize, learnt: bool, locked: bool) -> ClauseId;
-    fn reset_lbd(&mut self, vars: &[Var]) -> ();
+    fn reset_lbd(&mut self, vars: &[Var], temp: &mut [usize]) -> ();
     fn move_to(&mut self, list: &mut ClauseId, ci: ClauseIndex, index: usize) -> ClauseIndex;
 }
 
@@ -396,7 +396,7 @@ impl ClauseManagement for Solver {
             self.uncheck_enqueue(v[0], NULL_CLAUSE);
             return 0;
         }
-        // let lbd = v.lbd(&self.vars, &mut self.lbd_seen);
+        // let lbd = v.lbd(&self.vars, &mut self.lbd_temp);
         let mut i_max = 0;
         let mut lv_max = 0;
         // seek a literal with max level
@@ -425,7 +425,7 @@ impl ClauseManagement for Solver {
     }
 
     fn reduce(&mut self) -> () {
-        self.cp[ClauseKind::Removable as usize].reset_lbd(&self.vars);
+        self.cp[ClauseKind::Removable as usize].reset_lbd(&self.vars, &mut self.lbd_temp[..]);
         {
             let ClausePartition {
                 ref mut head,
@@ -464,7 +464,7 @@ impl ClauseManagement for Solver {
     }
 
     fn simplify(&mut self) -> bool {
-        self.cp[ClauseKind::Removable as usize].reset_lbd(&self.vars);
+        self.cp[ClauseKind::Removable as usize].reset_lbd(&self.vars, &mut self.lbd_temp[..]);
         debug_assert_eq!(self.decision_level(), 0);
         if self.eliminator.use_elim
             // && self.stat[Stat::Simplification as usize] % 8 == 0
@@ -512,50 +512,44 @@ impl ClauseManagement for Solver {
         true
     }
     fn lbd_of_an_learnt_lits(&mut self) -> usize {
-        let key;
-        let key_old = self.lbd_seen[0];
-        if 100_000_000 < key_old {
-            key = 1;
+        if 1_000_000_000 < self.lbd_key {
+            self.lbd_key = 1;
         } else {
-            key = key_old + 1;
+            self.lbd_key += 1;
         }
         let mut cnt = 0;
         for l in &self.an_learnt_lits {
             let lv = self.vars[l.vi()].level;
-            if self.lbd_seen[lv] != key && lv != 0 {
-                self.lbd_seen[lv] = key;
+            if self.lbd_temp[lv] != self.lbd_key {
+                self.lbd_temp[lv] = self.lbd_key;
                 cnt += 1;
             }
         }
-        self.lbd_seen[0] = key;
         cnt
     }
     fn lbd_of(&mut self, cid: ClauseId) -> usize {
         let ch = clause_head!(self.cp, cid);
         let cb = clause_body!(self.cp, cid);
-        let key;
-        let key_old = self.lbd_seen[0];
-        if 100_000_000 < key_old {
-            key = 1;
+        if 1_000_000_000 < self.lbd_key {
+            self.lbd_key = 1;
         } else {
-            key = key_old + 1;
+            self.lbd_key += 1;
         }
         let mut cnt = 0;
         for l in &ch.lit {
             let lv = self.vars[l.vi()].level;
-            if self.lbd_seen[lv] != key && lv != 0 {
-                self.lbd_seen[lv] = key;
+            if self.lbd_temp[lv] != self.lbd_key {
+                self.lbd_temp[lv] = self.lbd_key;
                 cnt += 1;
             }
         }
         for l in &cb.lits {
             let lv = self.vars[l.vi()].level;
-            if self.lbd_seen[lv] != key && lv != 0 {
-                self.lbd_seen[lv] = key;
+            if self.lbd_temp[lv] != self.lbd_key {
+                self.lbd_temp[lv] = self.lbd_key;
                 cnt += 1;
             }
         }
-        self.lbd_seen[0] = key;
         cnt
     }
 }
@@ -694,10 +688,9 @@ impl GC for ClausePartition {
         self.watcher[w1] = cix;
         self.id_from(cix)
     }
-    fn reset_lbd(&mut self, vars: &[Var]) -> () {
-        let mut temp = Vec::with_capacity(vars.len());
-        for _ in 0..vars.len() {
-            temp.push(0);
+    fn reset_lbd(&mut self, vars: &[Var], temp: &mut [usize]) -> () {
+        for x in &mut temp[..] {
+            *x = 0;
         }
         for i in 1..self.head.len() {
             let ch = &mut self.head[i];

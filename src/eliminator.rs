@@ -5,14 +5,6 @@ use solver::{CDCL, Solver};
 use std::fmt;
 use types::*;
 use var::Var;
-use std::collections::VecDeque;
-
-
-// for VecDeque
-pub trait QueueOperations {
-    fn average(&self) -> f64;
-    fn enqueue(&mut self, x: usize) -> bool;
-}
 
 // for Solver
 pub trait ClauseElimination {
@@ -59,19 +51,6 @@ const VAR_QUEUE_THRESHOLD: usize = 3_200_000;
 
 trait LiteralClause {
     fn as_uniclause(self) -> ClauseId;
-}
-
-impl QueueOperations for VecDeque<usize> {
-    fn average(&self) -> f64 {
-        let len = self.len() as f64;
-        let sum = self.iter().sum::<usize>() as f64;
-        sum / len
-
-    }
-    fn enqueue(&mut self, x: usize) -> bool {
-        self.push_back(x);
-        50 <= self.len()
-    }
 }
 
 impl LiteralClause for Lit {

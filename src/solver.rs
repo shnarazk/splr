@@ -1,10 +1,10 @@
 use clause::{ClauseManagement, GC, *};
 use eliminator::{ClauseElimination, Eliminator, EliminatorIF};
-use restart::Restart;
 use std::collections::VecDeque;
 use std::cmp::max;
 use std::fs;
 use std::io::{BufRead, BufReader};
+use restart::{R, K, QueueOperations};
 use types::*;
 use var::{VarOrdering, MAX_VAR_DECAY, *};
 
@@ -66,6 +66,7 @@ pub enum Stat {
 //    Variable,           // the number of 'alive' variables
 //    GroundVar,          // the number os assined variables at level 0
     Assign,             // the number of assigned variables
+    SumLBD,
     EndOfStatIndex,     // Don't use this dummy.
 }
 
@@ -108,6 +109,7 @@ pub struct Solver {
     pub ok: bool,
     pub model: Vec<Lbool>,
     pub conflicts: Vec<Lit>,
+    pub lbd_key: usize,
     pub stat: Vec<i64>,
     pub an_seen: Vec<bool>,
     pub an_to_clear: Vec<Lit>,
@@ -117,12 +119,12 @@ pub struct Solver {
     pub an_level_map: Vec<usize>,
     pub an_level_map_key: usize,
     pub mi_var_map: Vec<usize>,
-    pub lbd_seen: Vec<u64>,
+    pub lbd_temp: Vec<usize>,
     /// restart heuristics
     pub lbd_queue: VecDeque<usize>,
     pub trail_queue: VecDeque<usize>,
-    // pub ema_asg: Ema2,
-    // pub ema_lbd: Ema2,
+    pub ema_asg: Ema2,
+    pub ema_lbd: Ema2,
     pub b_lvl: Ema,
     pub c_lvl: Ema,
     pub next_restart: u64,
@@ -165,6 +167,7 @@ impl Solver {
             ok: true,
             model: vec![BOTTOM; nv + 1],
             conflicts: vec![],
+            lbd_key: 1,
             stat: vec![0; Stat::EndOfStatIndex as usize],
             an_seen: vec![false; nv + 1],
             an_to_clear: vec![0; nv + 1],
@@ -174,11 +177,11 @@ impl Solver {
             an_level_map: vec![0; nv + 1],
             an_level_map_key: 1,
             mi_var_map: vec![0; nv + 1],
-            lbd_seen: vec![0; nv + 1],
+            lbd_temp: vec![0; nv + 1],
             lbd_queue: VecDeque::new(),
             trail_queue: VecDeque::new(),
-            // ema_asg: Ema2::new(3.8, 50_000.0),  // for blocking 4
-            // ema_lbd: Ema2::new(160.0, 50_000.0), // for forcing 160
+            ema_asg: Ema2::new(3.8, 50_000.0),  // for blocking 4
+            ema_lbd: Ema2::new(160.0, 50_000.0), // for forcing 160
             b_lvl: Ema::new(se),
             c_lvl: Ema::new(se),
             next_restart: 100,
@@ -509,12 +512,30 @@ impl CDCL for Solver {
                 if na == self.num_vars {
                     return true;
                 }
+                // DYNAMIC FORCING RESTART
+                if self.lbd_queue.is_full() && false {
+                    println!("DFR queue {:>4.2}/{:>4.2} = {:4.2} < {:>4.2} => {}",
+                             (self.stat[Stat::SumLBD as usize] as f64),
+                             (self.stat[Stat::Conflict as usize] as f64),
+                             (self.stat[Stat::SumLBD as usize] as f64) / (self.stat[Stat::Conflict as usize] as f64),
+                             self.lbd_queue.average() * K,
+                             (self.stat[Stat::SumLBD as usize] as f64) / (self.stat[Stat::Conflict as usize] as f64) < self.lbd_queue.average() * K,
+                    );
+                }
+                if self.lbd_queue.is_full()
+                    && (self.stat[Stat::SumLBD as usize] as f64) / (self.stat[Stat::Conflict as usize] as f64) < self.lbd_queue.average() * K
+                {
+                    self.stat[Stat::Restart as usize] += 1;
+                    self.lbd_queue.clear();
+                    self.cancel_until(0);
+                    // return
+                }
                 if self.decision_level() == 0 {
                     self.simplify();
                     self.num_solved_vars = self.num_assigns();
                     self.rebuild_heap();
                 }
-                self.force_restart();
+                // self.force_restart();
                 if self.trail.len() <= self.q_head {
                     let vi = self.select_var();
                     debug_assert_ne!(vi, 0);
@@ -533,14 +554,25 @@ impl CDCL for Solver {
                 {
                     self.var_decay += 0.01;
                 }
+                self.trail_queue.enqueue(self.trail.len());
+                // DYNAMIC BLOCKING RESTART
+                let count = self.stat[Stat::Conflict as usize] as u64;
+                if 100 < count
+                    && self.lbd_queue.is_full()
+                    && R * self.trail_queue.average() < (self.trail.len() as f64)
+                {
+                    self.lbd_queue.clear();
+                    self.stat[Stat::BlockRestart as usize] += 1;
+                }
+                self.an_learnt_lits.clear();
                 let bl = self.analyze(ci);
-                let nas = self.num_assigns();
+                // let nas = self.num_assigns();
                 self.cancel_until(max(bl as usize, root_lv));
                 let lbd;
                 if self.an_learnt_lits.len() == 1 {
                     let l = self.an_learnt_lits[0];
                     self.uncheck_enqueue(l, NULL_CLAUSE);
-                    lbd = 0;
+                    lbd = 1;
                 } else {
                     unsafe {
                         lbd = self.lbd_of_an_learnt_lits();
@@ -557,6 +589,9 @@ impl CDCL for Solver {
                         self.uncheck_enqueue(l0, cid);
                     }
                 }
+                self.stat[Stat::SumLBD as usize] += lbd as i64;
+                self.lbd_queue.enqueue(lbd);
+                // println!("{:?}", self.lbd_queue);
                 if self.stat[Stat::Conflict as usize] % 10_000 == 0 {
                     self.progress(match self.strategy {
                         None => "none",
@@ -571,9 +606,10 @@ impl CDCL for Solver {
                     self.cancel_until(0);
                     self.simplify();
                     self.adapt_strategy();
-                } else if 0 < lbd {
-                    self.block_restart(lbd, dl, bl, nas);
+                // } else if 0 < lbd {
+                //     self.block_restart(lbd, dl, bl, nas);
                 }
+
                 // self.decay_var_activity();
                 self.decay_cla_activity();
                 // glucose reduction
@@ -763,13 +799,13 @@ impl CDCL for Solver {
             self.minimize_with_bi_clauses();
         }
         // glucose heuristics
-        // let lbd = self.lbd_of_an_learnt_lits();
-        // while let Some(_) = self.an_last_dl.pop() {
-        //     let vi = l.vi();
-        //     if clause_body!(self.cp, self.vars[vi].reason).rank < lbd {
-        //         self.bump_vi(vi);
-        //     }
-        // }
+        let lbd = self.lbd_of_an_learnt_lits();
+        while let Some(l) = self.an_last_dl.pop() {
+            let vi = l.vi();
+            if clause_body!(self.cp, self.vars[vi].reason).rank < lbd {
+                self.bump_vi(vi);
+            }
+        }
         self.an_last_dl.clear();
         // find correct backtrack level from remaining literals
         let mut level_to_return = 0;
