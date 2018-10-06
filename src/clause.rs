@@ -309,7 +309,7 @@ pub struct ClauseIter<'a> {
     index: usize,
 }
 
-pub fn clause_iter<'a>(cb: &'a ClauseBody) -> ClauseIter<'a> {
+pub fn clause_iter(cb: &ClauseBody) -> ClauseIter {
     ClauseIter {
         body: cb,
         end: cb.lits.len(),

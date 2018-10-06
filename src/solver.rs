@@ -508,15 +508,15 @@ impl CDCL for Solver {
                     return true;
                 }
                 // DYNAMIC FORCING RESTART
-                if self.lbd_queue.is_full() && false {
-                    println!("DFR queue {:>4.2}/{:>4.2} = {:4.2} < {:>4.2} => {}",
-                             (self.stat[Stat::SumLBD as usize] as f64),
-                             (self.stat[Stat::Conflict as usize] as f64),
-                             (self.stat[Stat::SumLBD as usize] as f64) / (self.stat[Stat::Conflict as usize] as f64),
-                             self.lbd_queue.average() * K,
-                             (self.stat[Stat::SumLBD as usize] as f64) / (self.stat[Stat::Conflict as usize] as f64) < self.lbd_queue.average() * K,
-                    );
-                }
+                // if self.lbd_queue.is_full() && false {
+                //     println!("DFR queue {:>4.2}/{:>4.2} = {:4.2} < {:>4.2} => {}",
+                //              (self.stat[Stat::SumLBD as usize] as f64),
+                //              (self.stat[Stat::Conflict as usize] as f64),
+                //              (self.stat[Stat::SumLBD as usize] as f64) / (self.stat[Stat::Conflict as usize] as f64),
+                //              self.lbd_queue.average() * K,
+                //              (self.stat[Stat::SumLBD as usize] as f64) / (self.stat[Stat::Conflict as usize] as f64) < self.lbd_queue.average() * K,
+                //     );
+                // }
                 if self.lbd_queue.is_full()
                     && (self.stat[Stat::SumLBD as usize] as f64) / (self.stat[Stat::Conflict as usize] as f64) < self.lbd_queue.average() * K
                 {
@@ -706,10 +706,11 @@ impl CDCL for Solver {
                 for q in &(*cb).lits[((p != NULL_LIT) as usize)..] {
                     let vi = q.vi();
                     let lvl = self.vars[vi].level;
-                    if 0 < lvl {
-                        self.bump_vi(vi);
-                    }
+                    // if lvl == 0 {
+                    //     println!("lvl {}", lvl);
+                    // }
                     debug_assert_ne!(self.vars[vi].assign, BOTTOM);
+                    self.bump_vi(vi);
                     if !self.an_seen[vi] && 0 < lvl {
                         self.an_seen[vi] = true;
                         if dl <= lvl {

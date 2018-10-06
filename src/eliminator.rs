@@ -422,7 +422,7 @@ impl Solver {
                         }
                     }
                 } else {
-                    let mut tmp = 100000;
+                    let mut tmp = 100_000;
                     let ch = clause_head_mut!(self.cp, cid) as *mut ClauseHead;
                     let cb = clause_body_mut!(self.cp, cid) as *mut ClauseBody;
                     (*cb).set_flag(ClauseFlag::Enqueued, false);

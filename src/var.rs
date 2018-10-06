@@ -378,7 +378,6 @@ impl VarManagement for Solver {
     }
     fn bump_vi(&mut self, vi: VarId) -> () {
         let d = self.stat[Stat::Conflict as usize] as f64;
-        // let d = self.stat[Stat::SumLBD as usize] as f64;
         self.vars[vi].activity = (self.vars[vi].activity + d) / 2.0;
         self.var_order.update(&self.vars, vi);
     }
