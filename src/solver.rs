@@ -240,7 +240,6 @@ impl Solver {
         self.trail.len()
     }
 
-    #[inline]
     pub fn decision_level(&self) -> usize {
         self.trail_lim.len()
     }
@@ -287,9 +286,9 @@ impl Solver {
                             continue;
                         }
                         if cb.rank < CO_LBD_BOUND {
-                            cb.lits.insert(0, ch.lit[0]);
+                            // cb.lits.insert(0, ch.lit[0]);
                             (*learnts).touched[ch.lit[0].negate() as usize] = true;
-                            cb.lits.insert(1, ch.lit[1]);
+                            // cb.lits.insert(1, ch.lit[1]);
                             (*learnts).touched[ch.lit[1].negate() as usize] = true;
                             (*permanents).new_clause(
                                 &cb.lits,
@@ -453,47 +452,43 @@ impl CDCL for Solver {
                     let mut pre = &mut (*watcher)[p] as *mut usize;
                     'next_clause: while *pre != NULL_CLAUSE {
                         let ch = &mut (*head)[*pre] as *mut ClauseHead;
-                        let cb = &mut (*body)[*pre] as *mut ClauseBody;
-                        if (*ch).lit[0] == false_lit {
-                            (*ch).lit.swap(0, 1); // now my index is 1, others is 0.
-                            (*ch).next_watcher.swap(0, 1);
-                        }
-                        let other = (*ch).lit[0];
-                        let other_value = vars.assigned(other);
+                        let my_index = ((*ch).lit[0] != false_lit) as usize;
+                        let other_value = vars.assigned((*ch).lit[(my_index == 0) as usize]);
                         if other_value != LTRUE {
-                            let my_index = *pre;
-                            for (k, lk) in (*cb).lits.iter().enumerate() {
+                            let cb = &mut (*body)[*pre] as *mut ClauseBody;
+                            if (*cb).lits[0] == false_lit {
+                                (*cb).lits.swap(0, 1); // now false_lit is lits[1].
+                            }
+                            for (k, lk) in (*cb).lits.iter().enumerate().skip(2) {
                                 // below is equivalent to 'assigned(lk) != LFALSE'
                                 if (((lk & 1) as u8) ^ vars[lk.vi()].assign) != 0 {
-                                    *pre = (*ch).next_watcher[1];
+                                    let cid = *pre;
+                                    *pre = (*ch).next_watcher[my_index];
                                     let alt = &mut (*watcher)[lk.negate() as usize];
-                                    (*ch).next_watcher[1] = *alt;
-                                    *alt = my_index;
-                                    (*ch).lit[1] = *lk;
+                                    (*ch).next_watcher[my_index] = *alt;
+                                    *alt = cid;
+                                    (*ch).lit[my_index] = *lk;
+                                    (*cb).lits[1] = *lk;
                                     (*cb).lits[k] = false_lit; // Don't move this above (needed by enuremate)
                                     continue 'next_clause;
                                 }
                             }
                             if other_value == LFALSE {
                                 *q_head = trail.len();
-                                return kind.id_from(my_index);
+                                return kind.id_from(*pre);
                             } else {
                                 // self.uncheck_enqueue(other, kind.id_from((*c).index));
                                 let dl = trail_lim.len();
+                                let other = (*cb).lits[0];
                                 let v = &mut vars[other.vi()];
                                 v.assign = other.lbool();
                                 v.level = dl;
-                                if dl == 0 {
-                                    v.activity = 0.0;
-                                    v.reason = NULL_CLAUSE;
-                                } else {
-                                    v.reason = kind.id_from(my_index);
-                                }
+                                v.reason = kind.id_from(*pre);
                                 trail.push(other);
                                 (*cb).set_flag(ClauseFlag::Locked, true);
                             }
                         }
-                        pre = &mut (*ch).next_watcher[1];
+                        pre = &mut (*ch).next_watcher[my_index];
                     }
                 }
             }
@@ -687,51 +682,47 @@ impl CDCL for Solver {
         let mut path_cnt = 0;
         loop {
             unsafe {
-                let ch = clause_head_mut!(self.cp, cid) as *mut ClauseHead;
                 let cb = clause_body_mut!(self.cp, cid) as *mut ClauseBody;
                 debug_assert_ne!(cid, NULL_CLAUSE);
                 if cid.to_kind() == (ClauseKind::Removable as usize) {
                     self.bump_cid(cid);
-                    if 2 < (*cb).rank {
-                        let nblevels = self.lbd_of(cid);
-                        if nblevels + 1 < (*cb).rank {
-                            (*cb).rank = nblevels;
-                            if nblevels <= 30 {
-                                (*cb).set_flag(ClauseFlag::JustUsed, true);
-                            }
-                            if self.strategy == Some(SearchStrategy::ChanSeok)
-                                && nblevels < CO_LBD_BOUND
-                            {
-                                (*cb).rank = 0;
-                                clause_body_mut!(self.cp, confl).rank = 0
-                            }
-                        }
-                    }
+                    // if 2 < (*cb).rank {
+                    //     let nblevels = self.lbd_of(cid);
+                    //     if nblevels + 1 < (*cb).rank {
+                    //         (*cb).rank = nblevels;
+                    //         if nblevels <= 30 {
+                    //             (*cb).set_flag(ClauseFlag::JustUsed, true);
+                    //         }
+                    //         if self.strategy == Some(SearchStrategy::ChanSeok)
+                    //             && nblevels < CO_LBD_BOUND
+                    //         {
+                    //             (*cb).rank = 0;
+                    //             clause_body_mut!(self.cp, confl).rank = 0
+                    //         }
+                    //     }
+                    // }
                 }
                 // println!("{}を対応", (*c));
-                for i in ((p != NULL_LIT) as usize)..(*cb).lits.len() + 2 {
-                    let q = lindex!(*ch, *cb, i);
+                for q in &(*cb).lits[((p != NULL_LIT) as usize)..] {
                     let vi = q.vi();
                     let lvl = self.vars[vi].level;
+                    if 0 < lvl {
+                        self.bump_vi(vi);
+                    }
                     debug_assert_ne!(self.vars[vi].assign, BOTTOM);
                     if !self.an_seen[vi] && 0 < lvl {
-                        self.bump_vi(vi);
                         self.an_seen[vi] = true;
                         if dl <= lvl {
-                            // println!(
-                            //     "{} はレベル{}なのでフラグを立てる",
-                            //     q.int(),
-                            //     l
-                            // );
+                            // println!("{} はレベル{}なのでフラグを立てる", q.int(), l);
                             path_cnt += 1;
                             if self.vars[vi].reason != NULL_CLAUSE
                                 && self.vars[vi].reason.to_kind() == ClauseKind::Removable as usize
                             {
-                                self.an_last_dl.push(q);
+                                self.an_last_dl.push(*q);
                             }
                         } else {
                             // println!("{} はレベル{}なので採用", q.int(), l);
-                            self.an_learnt_lits.push(q);
+                            self.an_learnt_lits.push(*q);
                         }
                     } else {
                         // println!("{} はもうフラグが立っているかグラウンドしている{}ので無視", q.int(), l);
@@ -825,15 +816,8 @@ impl CDCL for Solver {
     fn analyze_final(&mut self, ci: ClauseId, skip_first: bool) -> () {
         self.conflicts.clear();
         if self.root_level != 0 {
-            let ch = clause_head!(self.cp, ci);
             let cb = clause_body!(self.cp, ci);
-            for l in &ch.lit[skip_first as usize..] {
-                let vi = l.vi();
-                if 0 < self.vars[vi].level {
-                    self.an_seen[vi] = true;
-                }
-            }
-            for l in &cb.lits {
+            for l in &cb.lits[skip_first as usize..] {
                 let vi = l.vi();
                 if 0 < self.vars[vi].level {
                     self.an_seen[vi] = true;
@@ -852,8 +836,8 @@ impl CDCL for Solver {
                     if self.vars[vi].reason == NULL_CLAUSE {
                         self.conflicts.push(l.negate());
                     } else {
-                        for i in 1..cb.lits.len() + 2 {
-                            let vi = lindex!(ch, cb, i).vi();
+                        for l in &cb.lits[1..] {
+                            let vi = l.vi();
                             if 0 < self.vars[vi].level {
                                 self.an_seen[vi] = true;
                             }
@@ -875,13 +859,11 @@ impl Solver {
         while let Some(sl) = self.an_stack.pop() {
             let cid = self.vars[sl.vi()].reason;
             unsafe {
-                let ch = clause_head_mut!(self.cp, cid) as *mut ClauseHead;
                 let cb = clause_body_mut!(self.cp, cid) as *mut ClauseBody;
-                if (*cb).lits.is_empty() && self.vars.assigned((*ch).lit[0]) == LFALSE {
-                    (*ch).lit.swap(0, 1);
+                if (*cb).lits.len() == 2 && self.vars.assigned((*cb).lits[0]) == LFALSE {
+                    (*cb).lits.swap(0, 1);
                 }
-                for i in 1..(*cb).lits.len() + 2 {
-                    let q = lindex!(*ch, *cb, i);
+                for q in &(*cb).lits[1..] {
                     let vi = q.vi();
                     let lv = self.vars[vi].level;
                     if !self.an_seen[vi] && 0 < lv {
@@ -889,8 +871,8 @@ impl Solver {
                             && self.an_level_map[lv as usize] == self.an_level_map_key
                         {
                             self.an_seen[vi] = true;
-                            self.an_stack.push(q);
-                            self.an_to_clear.push(q);
+                            self.an_stack.push(*q);
+                            self.an_to_clear.push(*q);
                         } else {
                             for _ in top..self.an_to_clear.len() {
                                 self.an_seen[self.an_to_clear.pop().unwrap().vi()] = false;

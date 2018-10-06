@@ -252,26 +252,23 @@ impl Solver {
         let ps_smallest = pqb.lits.len() < qpb.lits.len();
         let (ph, pb, qh, qb) = if ps_smallest { (pqh, pqb, qph, qpb) } else { (qph, qpb, pqh, pqb) };
         // println!(" -  {:?}{:?} & {:?}{:?}", vec2int(&ph.lit),vec2int(&pb.lits),vec2int(&qh.lit),vec2int(&qb.lits));
-        'next_literal: for i in 0..qb.lits.len() + 2 {
-            let l = lindex!(qh, qb, i);
+        'next_literal: for l in &qb.lits {
             if l.vi() != v {
-                for j in 0..pb.lits.len() + 2 {
-                    let lit_j = lindex!(ph, pb, j);
-                    if lit_j.vi() == l.vi() {
-                        if lit_j.negate() == l {
+                for j in &pb.lits {
+                    if j.vi() == l.vi() {
+                        if j.negate() == *l {
                             return None;
                         } else {
                             continue 'next_literal;
                         }
                     }
                 }
-                vec.push(l);
+                vec.push(*l);
             }
         }
-        for i in 0..pb.lits.len() + 2 {
-            let l = lindex!(ph, pb, i);
+        for l in &pb.lits {
             if l.vi() != v {
-                vec.push(l);
+                vec.push(*l);
             }
         }
         // println!("merge generated {:?} from {} and {} to eliminate {}", vec2int(vec.clone()), p, q, v);
@@ -288,13 +285,11 @@ impl Solver {
         let ps_smallest = pqb.lits.len() < qpb.lits.len();
         let (ph, pb, qh, qb) = if ps_smallest { (pqh, pqb, qph, qpb) } else { (qph, qpb, pqh, pqb) };
         let mut size = pb.lits.len() + 1;
-        'next_literal: for i in 0..qb.lits.len() + 2 {
-            let l = lindex!(qh, qb, i);
+        'next_literal: for l in &qb.lits {
             if l.vi() != v {
-                for j in 0..pb.lits.len() {
-                    let lit_j = lindex!(ph, pb, j);
-                    if lit_j.vi() == l.vi() {
-                        if lit_j.negate() == l {
+                for j in &pb.lits {
+                    if j.vi() == l.vi() {
+                        if j.negate() == *l {
                             return (false, size);
                         } else {
                             continue 'next_literal;
@@ -434,19 +429,16 @@ impl Solver {
                     if (*cb).get_flag(ClauseFlag::Dead) || BACKWORD_SUBSUMPTION_THRESHOLD < cnt {
                         continue;
                     }
-                    for i in 0..(*cb).lits.len() {
-                        let l = lindex!(*ch, *cb, i);
-                        {
-                            let v = &self.vars[l.vi()];
-                            if v.eliminated || v.level == 0 {
-                                continue;
-                            }
-                            // let nsum = - v.activity;
-                            let nsum = v.pos_occurs.len().min(v.neg_occurs.len());
-                            if nsum < tmp {
-                                best = l.vi();
-                                tmp = nsum;
-                            }
+                    for l in &(*cb).lits {
+                        let v = &self.vars[l.vi()];
+                        if v.eliminated || v.level == 0 {
+                            continue;
+                        }
+                        // let nsum = - v.activity;
+                        let nsum = v.pos_occurs.len().min(v.neg_occurs.len());
+                        if nsum < tmp {
+                            best = l.vi();
+                            tmp = nsum;
                         }
                     }
                     if best == 0 {
@@ -532,9 +524,8 @@ impl Solver {
         // Copy clause to the vector. Remember the position where the varibale 'v' occurs:
         let ch = clause_head!(self.cp, cid);
         let cb = clause_body!(self.cp, cid);
-        for i in 0..cb.lits.len() + 2 {
-            let l = lindex!(ch, cb, i);
-            vec.push(l as u32);
+        for l in &cb.lits {
+            vec.push(*l as u32);
             if l.vi() == vi {
                 let index = vec.len() - 1;
                 // swap the first literal with the 'v'. So that the literal containing 'v' will occur first in the clause.
@@ -729,11 +720,10 @@ impl Solver {
    /// returns a literal if these clauses can be merged by the literal.
     fn subsume(&self, cid: ClauseId, other: ClauseId) -> Option<Lit> {
         if cid.to_kind() == ClauseKind::Uniclause as usize {
+            let l = cid.to_index() as Lit;
             let oh = clause_head!(self.cp, other);
             let ob = clause_body!(self.cp, other);
-            let l = cid.to_index() as Lit;
-            for j in 0..ob.lits.len() + 2 {
-                let lo = lindex!(oh, ob, j);
+            for lo in &ob.lits {
                 if l == lo.negate() {
                     return Some(l);
                 }
@@ -746,14 +736,12 @@ impl Solver {
         let cb = clause_body!(self.cp, cid);
         let oh = clause_head!(self.cp, other);
         let ob = clause_body!(self.cp, other);
-        'next: for i in 0..cb.lits.len() + 2 {
-            let l = lindex!(ch, cb, i);
-            for j in 0..ob.lits.len() + 2 {
-                let lo = lindex!(oh, ob, j);
-                if l == lo {
+        'next: for l in &cb.lits {
+            for lo in &ob.lits {
+                if *l == *lo {
                     continue 'next;
-                } else if ret == NULL_LIT && l == lo.negate() {
-                    ret = l;
+                } else if ret == NULL_LIT && *l == lo.negate() {
+                    ret = *l;
                     continue 'next;
                 }
             }

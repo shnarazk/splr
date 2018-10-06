@@ -201,11 +201,9 @@ impl ClauseIdIndexEncoding for usize {
     fn to_id(&self) -> ClauseId {
         *self
     }
-    #[inline]
     fn to_index(&self) -> ClauseIndex {
         (*self & CLAUSE_INDEX_MASK) as usize
     }
-    #[inline]
     fn to_kind(&self) -> usize {
         *self >> CLAUSE_INDEX_BITS
     }
@@ -295,24 +293,26 @@ impl fmt::Display for ClauseBody {
 }
 
 pub fn cid2fmt(cid: ClauseId) -> String {
-    match cid >> CLAUSE_INDEX_BITS {
-        0 => format!("[learnt:{}]", cid.to_index()),
-        _ => format!("[prmnnt:{}]", cid.to_index()),
+    match cid.to_kind() {
+        0 => format!("[lifted:{}]", cid.to_index()),
+        1 => format!("[learnt:{}]", cid.to_index()),
+        2 => format!("[perman:{}]", cid.to_index()),
+        3 => format!("[binary:{}]", cid.to_index()),
+        4 => format!("[unicls:{}]", cid.to_index()),
+        _ => format!("[ilegal:{}]", cid.to_index()),
     }
 }
 
 pub struct ClauseIter<'a> {
-    head: &'a ClauseHead,
     body: &'a ClauseBody,
     end: usize,
     index: usize,
 }
 
-pub fn clause_iter<'a>(ch: &'a ClauseHead, cb: &'a ClauseBody) -> ClauseIter<'a> {
+pub fn clause_iter<'a>(cb: &'a ClauseBody) -> ClauseIter<'a> {
     ClauseIter {
-        head: ch,
         body: cb,
-        end: cb.lits.len() + 2,
+        end: cb.lits.len(),
         index: 0,
     }
 }
@@ -320,18 +320,17 @@ pub fn clause_iter<'a>(ch: &'a ClauseHead, cb: &'a ClauseBody) -> ClauseIter<'a>
 impl<'a> Iterator for ClauseIter<'a> {
     type Item = Lit;
     fn next(&mut self) -> Option<Lit> {
-        self.index += 1;
-        match self.index {
-            1 => Some(self.head.lit[0]),
-            2 => Some(self.head.lit[1]),
-            n if n <= self.end => Some(self.body.lits[n - 3]),
-            _ => None,
+        if self.index < self.end {
+            let l = self.body.lits[self.index];
+            self.index += 1;
+            Some(l)
+        } else {
+            None
         }
     }
 }
 
 impl ClauseManagement for Solver {
-    #[inline]
     fn bump_cid(&mut self, cid: ClauseId) -> () {
         debug_assert_ne!(cid, 0);
         // let b = self.stat[Stat::Conflict as usize] as f64;
@@ -391,11 +390,7 @@ impl ClauseManagement for Solver {
     }
     /// renamed from newLearntClause
     fn add_clause(&mut self, v: &mut Vec<Lit>, lbd: usize) -> ClauseId {
-        debug_assert_ne!(v.len(), 0);
-        if v.len() == 1 {
-            self.uncheck_enqueue(v[0], NULL_CLAUSE);
-            return 0;
-        }
+        debug_assert!(1 < v.len());
         // let lbd = v.lbd(&self.vars, &mut self.lbd_temp);
         let mut i_max = 0;
         let mut lv_max = 0;
@@ -487,17 +482,12 @@ impl ClauseManagement for Solver {
             for ci in 1..self.cp[*ck as usize].head.len() {
                 let ch = &self.cp[*ck as usize].head[ci];
                 let cb = &mut self.cp[*ck as usize].body[ci];
-                if !cb.get_flag(ClauseFlag::Dead)
-                    && (self.vars.satisfies(&ch.lit) || self.vars.satisfies(&cb.lits))
+                if !cb.get_flag(ClauseFlag::Dead) && self.vars.satisfies(&cb.lits)
                 {
                     cb.set_flag(ClauseFlag::Dead, true);
                     self.cp[*ck as usize].touched[ch.lit[0].negate() as usize] = true;
                     self.cp[*ck as usize].touched[ch.lit[1].negate() as usize] = true;
                     if (*eliminator).use_elim {
-                        for l in &ch.lit {
-                            let v = &mut (*vars)[l.vi()];
-                            (*eliminator).enqueue_var(v);
-                        }
                         for l in &cb.lits {
                             let v = &mut (*vars)[l.vi()];
                             (*eliminator).enqueue_var(v);
@@ -528,7 +518,6 @@ impl ClauseManagement for Solver {
         cnt
     }
     fn lbd_of(&mut self, cid: ClauseId) -> usize {
-        let ch = clause_head!(self.cp, cid);
         let cb = clause_body!(self.cp, cid);
         if 1_000_000_000 < self.lbd_key {
             self.lbd_key = 1;
@@ -536,13 +525,6 @@ impl ClauseManagement for Solver {
             self.lbd_key += 1;
         }
         let mut cnt = 0;
-        for l in &ch.lit {
-            let lv = self.vars[l.vi()].level;
-            if self.lbd_temp[lv] != self.lbd_key {
-                self.lbd_temp[lv] = self.lbd_key;
-                cnt += 1;
-            }
-        }
         for l in &cb.lits {
             let lv = self.vars[l.vi()].level;
             if self.lbd_temp[lv] != self.lbd_key {
@@ -648,7 +630,7 @@ impl GC for ClausePartition {
             ch.lit[0] = v[0];
             ch.lit[1] = v[1];
             cb.lits.clear();
-            for l in &v[2..] {
+            for l in &v[..] {
                 cb.lits.push(*l);
             }
             cb.rank = rank;
@@ -663,8 +645,8 @@ impl GC for ClausePartition {
         } else {
             let l0 = v[0];
             let l1 = v[1];
-            let mut lits = Vec::with_capacity(v.len() - 2);
-            for l in &v[2..] {
+            let mut lits = Vec::with_capacity(v.len());
+            for l in &v[..] {
                 lits.push(*l);
             }
             cix = self.head.len();
@@ -693,20 +675,12 @@ impl GC for ClausePartition {
             *x = 0;
         }
         for i in 1..self.head.len() {
-            let ch = &mut self.head[i];
             let cb = &mut self.body[i];
             if cb.get_flag(ClauseFlag::Dead) {
                 continue;
             }
             let key = i;
             let mut cnt = 0;
-            for l in &ch.lit {
-                let lv = vars[l.vi()].level;
-                if temp[lv] != key && lv != 0 {
-                    temp[lv] = key;
-                    cnt += 1;
-                }
-            }
             for l in &cb.lits {
                 let lv = vars[l.vi()].level;
                 if temp[lv] != key && lv != 0 {

@@ -84,7 +84,6 @@ impl Var {
 }
 
 impl Satisfiability for [Var] {
-    #[inline]
     fn assigned(&self, l: Lit) -> Lbool {
         self[l.vi()].assign ^ ((l & 1) as u8)
     }
@@ -125,7 +124,6 @@ pub struct VarIdHeap {
 
 impl VarOrdering for VarIdHeap {
     /// renamed from getHeapDown
-    #[inline(always)]
     fn get_root(&mut self, vars: &[Var]) -> VarId {
         let s = 1;
         let vs = self.heap[s];
