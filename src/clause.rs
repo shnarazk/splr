@@ -31,7 +31,6 @@ pub trait ClauseManagement {
     fn simplify(&mut self) -> bool;
     fn lbd_of_an_learnt_lits(&mut self) -> usize;
     fn lbd_of(&mut self, cid: ClauseId) -> usize;
-//    fn num_literals(&self, cid: ClauseIndex) -> usize;
 }
 
 const DB_INC_SIZE: usize = 200;

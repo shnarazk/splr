@@ -35,18 +35,6 @@ macro_rules! clause_body_mut {
     }};
 }
 
-// macro_rules! lindex {
-//     ($h: expr, $b: expr, $val: expr) => {{
-//         match (&$h, &$b, $val) {
-//             (h, b, i) => if i < 2 {
-//                 h.lit[i]
-//             } else {
-//                 b.lits[i - 2]
-//             },
-//         }
-//     }};
-// }
-
 #[allow(unused_macros)]
 /// WARNING: call `set_flag(ClauseFlag::Locked)` by yourself after this function.
 macro_rules! uenqueue {

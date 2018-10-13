@@ -24,8 +24,6 @@ pub trait VarOrdering {
     fn contains(&self, v: VarId) -> bool;
     fn update(&mut self, vec: &[Var], v: VarId) -> ();
     fn insert(&mut self, vec: &[Var], v: VarId) -> ();
-    fn seek_top(&mut self, vars: &[Var]) -> VarId;
-    fn update_seek(&mut self, vi: VarId) -> ();
     fn clear(&mut self) -> ();
     fn len(&self) -> usize;
     fn is_empty(&self) -> bool;
@@ -119,7 +117,6 @@ pub struct VarIdHeap {
     order: VarOrder,
     pub heap: Vec<VarId>, // order : usize -> VarId
     idxs: Vec<usize>,     // VarId : -> order : usize
-    seek: usize,
 }
 
 impl VarOrdering for VarIdHeap {
@@ -139,6 +136,18 @@ impl VarOrdering for VarIdHeap {
             self.percolate_down(&vars, 1);
         }
         // self.var_order.check("root 2");
+        // chect the validness of the selected var
+        // let mut cnt = 0;
+        // let mut best = vs;
+        // for v in &vars[1..] {
+        //     if v.assign == BOTTOM && vars[best].activity < v.activity {
+        //         best = v.index;
+        //         cnt += 1;
+        //     }
+        // }
+        // if best != vs {
+        //     println!("best {}@{}/{} root {} ({})", best, self.idxs[best], self.idxs[0], vs, cnt);
+        // }
         vs
     }
     fn reset(&mut self) -> () {
@@ -176,24 +185,6 @@ impl VarOrdering for VarIdHeap {
         self.percolate_up(&vec, n);
         // self.var_order.check("check insert 2");
     }
-    fn seek_top(&mut self, vars: &[Var]) -> VarId {
-        loop {
-            if self.heap.len() <= self.seek {
-                return 0;
-            }
-            let v = self.heap[self.seek];
-            self.seek += 1;
-            if vars[v as usize].assign == BOTTOM {
-                return v;
-            }
-        }
-    }
-    fn update_seek(&mut self, vi: VarId) -> () {
-        let n = self.idxs[vi];
-        if n < self.seek {
-            self.seek = n;
-        }
-    }
     fn clear(&mut self) -> () {
         self.reset()
     }
@@ -220,7 +211,6 @@ impl VarIdHeap {
             order,
             heap,
             idxs,
-            seek: 1,
         }
     }
     fn percolate_up(&mut self, vars: &[Var], start: usize) -> () {
@@ -238,7 +228,6 @@ impl VarIdHeap {
                 self.heap[q] = vq;
                 debug_assert!(vq != 0, "Invalid index in percolate_up");
                 self.idxs[vq] = q;
-                self.seek = q;
                 return;
             } else {
                 let vp = self.heap[p];
@@ -257,9 +246,6 @@ impl VarIdHeap {
                     self.heap[q] = vq;
                     debug_assert!(vq != 0, "Invalid index in percolate_up");
                     self.idxs[vq] = q;
-                    if q < self.seek {
-                        self.seek = q;
-                    }
                     return;
                 }
             }
@@ -366,7 +352,6 @@ impl VarManagement for Solver {
     // }
     /// Heap operations; renamed from selectVO
     fn select_var(&mut self) -> VarId {
-        // self.var_order.seek_top(&self.vars)
         loop {
             let vi = self.var_order.get_root(&self.vars);
             if self.vars[vi].assign == BOTTOM {
@@ -391,8 +376,8 @@ impl fmt::Display for VarIdHeap {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            " - seek pointer {}\n - nth -> var: {:?}\n - var -> nth: {:?}",
-            self.seek, self.heap, self.idxs,
+            " - seek pointer - nth -> var: {:?}\n - var -> nth: {:?}",
+            self.heap, self.idxs,
         )
     }
 }
