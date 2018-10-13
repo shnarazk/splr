@@ -200,35 +200,85 @@ impl Solver {
             .skip(1)
             .filter(|c| !c.get_flag(ClauseFlag::Dead) && c.rank <= 3)
             .count();
-        if mes.is_empty() {
-            println!(
-                "#mode,      Variable Assignment     ,,  Clause Database Management  ,,   Restart Strategy      ,, Misc Progress Parameters,,  Eliminator"
-            );
-            println!(
-                "#init,#remain,#solved,  #elim,total%,,#learnt,(good),  #perm,#binary,,block,force, asgn/,  lbd/,,    lbd, back lv, conf lv,,clause,   var"
-            );
+        if true {
+            if mes.is_empty() {
+                println!("Splr progress report",);
+                println!("");
+                println!("");
+                println!("");
+                println!("");
+                println!("");
+                println!("");
+            } else {
+                print!("\x1B[6A");
+                println!(
+                    " Strategy    |#{}",
+                    mes,
+                );
+                println!(
+                    " Assignment  |#rem:{:>7}, #fix:{:>7}, #elm:{:>7}, prog% {:>7.3}",
+                    nv - sum,
+                    fixed,
+                    self.eliminator.eliminated_vars,
+                    (sum as f32) / (nv as f32) * 100.0,
+                );
+                println!(
+                    " Clause DB   |Remv:{:>7}, good:{:>7}, Perm:{:>7}, Binc:{:>7}",
+                    self.cp[ClauseKind::Removable as usize].body.iter().skip(1).filter(|c| !c.get_flag(ClauseFlag::Dead)).count(),
+                    good,
+                    self.cp[ClauseKind::Permanent as usize].body.iter().skip(1).filter(|c| !c.get_flag(ClauseFlag::Dead)).count(),
+                    self.cp[ClauseKind::Binclause as usize].body.iter().skip(1).filter(|c| !c.get_flag(ClauseFlag::Dead)).count(),
+                );
+                println!(
+                    " Restart     |#BLK:{:>7}, #RST:{:>7}, eASG:{:>7.2}, eLBD:{:>7.2}",
+                    self.stat[Stat::BlockRestart as usize],
+                    self.stat[Stat::Restart as usize],
+                    self.ema_asg.get(),
+                    self.ema_lbd.get(),
+                );
+                println!(
+                    " Decision Lv |aLBD:{:>7.2}, bjmp:{:>7.2}, cnfl:{:>7.2}",
+                    self.ema_lbd.slow,
+                    self.b_lvl.0,
+                    self.c_lvl.0,
+                );
+                println!(
+                    " Elimanator  |#cls:{:>7}, #var:{:>7}",
+                    self.eliminator.clause_queue_len(),
+                    self.eliminator.var_queue_len(),
+                );
+            }
         } else {
-            println!(
+            if mes.is_empty() {
+                println!(
+                    "#mode,      Variable Assignment     ,,  Clause Database Management  ,,   Restart Strategy      ,, Misc Progress Parameters,,  Eliminator"
+                );
+                println!(
+                    "#init,#remain,#solved,  #elim,total%,,#learnt,(good),  #perm,#binary,,block,force, asgn/,  lbd/,,    lbd, back lv, conf lv,,clause,   var"
+                );
+            } else {
+                println!(
                 "#{},{:>7},{:>7},{:>7},{:>6.3},,{:>7},{:>6},{:>7},{:>7},,{:>5},{:>5}, {:>5.2},{:>6.2},,{:>7.2},{:>8.2},{:>8.2},,{:>6},{:>6}",
-                mes,
-                nv - sum,
-                fixed,
-                self.eliminator.eliminated_vars,
-                (sum as f32) / (nv as f32) * 100.0,
-                self.cp[ClauseKind::Removable as usize].body.iter().skip(1).filter(|c| !c.get_flag(ClauseFlag::Dead)).count(),
-                good,
-                self.cp[ClauseKind::Permanent as usize].body.iter().skip(1).filter(|c| !c.get_flag(ClauseFlag::Dead)).count(),
-                self.cp[ClauseKind::Binclause as usize].body.iter().skip(1).filter(|c| !c.get_flag(ClauseFlag::Dead)).count(),
-                self.stat[Stat::BlockRestart as usize],
-                self.stat[Stat::Restart as usize],
-                self.ema_asg.get(),
-                self.ema_lbd.get(),
-                self.ema_lbd.slow,
-                self.b_lvl.0,
-                self.c_lvl.0,
-                self.eliminator.clause_queue_len(),
-                self.eliminator.var_queue_len(),
-            );
+                    mes,
+                    nv - sum,
+                    fixed,
+                    self.eliminator.eliminated_vars,
+                    (sum as f32) / (nv as f32) * 100.0,
+                    self.cp[ClauseKind::Removable as usize].body.iter().skip(1).filter(|c| !c.get_flag(ClauseFlag::Dead)).count(),
+                    good,
+                    self.cp[ClauseKind::Permanent as usize].body.iter().skip(1).filter(|c| !c.get_flag(ClauseFlag::Dead)).count(),
+                    self.cp[ClauseKind::Binclause as usize].body.iter().skip(1).filter(|c| !c.get_flag(ClauseFlag::Dead)).count(),
+                    self.stat[Stat::BlockRestart as usize],
+                    self.stat[Stat::Restart as usize],
+                    self.ema_asg.get(),
+                    self.ema_lbd.get(),
+                    self.ema_lbd.slow,
+                    self.b_lvl.0,
+                    self.c_lvl.0,
+                    self.eliminator.clause_queue_len(),
+                    self.eliminator.var_queue_len(),
+                );
+            }
         }
     }
 
