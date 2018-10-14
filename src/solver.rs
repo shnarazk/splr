@@ -212,38 +212,41 @@ impl Solver {
             } else {
                 print!("\x1B[6A");
                 println!(
-                    " Strategy    |#{}",
+                    " Strategy    |strt:{:>8}, prpg:{:>8}, dcsn:{:>8}, smpl:{:>8}",
                     mes,
+                    self.stat[Stat::Propagation as usize],
+                    self.stat[Stat::Decision as usize],
+                    self.stat[Stat::Simplification as usize],
                 );
                 println!(
-                    " Assignment  |#rem:{:>7}, #fix:{:>7}, #elm:{:>7}, prog% {:>7.3}",
+                    " Assignment  |#rem:{:>8}, #fix:{:>8}, #elm:{:>8}, prog%{:>8.3}",
                     nv - sum,
                     fixed,
                     self.eliminator.eliminated_vars,
                     (sum as f32) / (nv as f32) * 100.0,
                 );
                 println!(
-                    " Clause DB   |Remv:{:>7}, good:{:>7}, Perm:{:>7}, Binc:{:>7}",
+                    " Clause DB   |Remv:{:>8}, good:{:>8}, Perm:{:>8}, Binc:{:>8}",
                     self.cp[ClauseKind::Removable as usize].body.iter().skip(1).filter(|c| !c.get_flag(ClauseFlag::Dead)).count(),
                     good,
                     self.cp[ClauseKind::Permanent as usize].body.iter().skip(1).filter(|c| !c.get_flag(ClauseFlag::Dead)).count(),
                     self.cp[ClauseKind::Binclause as usize].body.iter().skip(1).filter(|c| !c.get_flag(ClauseFlag::Dead)).count(),
                 );
                 println!(
-                    " Restart     |#BLK:{:>7}, #RST:{:>7}, eASG:{:>7.2}, eLBD:{:>7.2}",
+                    " Restart     |#BLK:{:>8}, #RST:{:>8}, eASG:{:>8.2}, eLBD:{:>8.2}",
                     self.stat[Stat::BlockRestart as usize],
                     self.stat[Stat::Restart as usize],
                     self.ema_asg.get(),
                     self.ema_lbd.get(),
                 );
                 println!(
-                    " Decision Lv |aLBD:{:>7.2}, bjmp:{:>7.2}, cnfl:{:>7.2}",
+                    " Decision Lv |aLBD:{:>8.2}, bjmp:{:>8.2}, cnfl:{:>8.2}",
                     self.ema_lbd.slow,
                     self.b_lvl.0,
                     self.c_lvl.0,
                 );
                 println!(
-                    " Elimanator  |#cls:{:>7}, #var:{:>7}",
+                    " Elimanator  |#cls:{:>8}, #var:{:>8}",
                     self.eliminator.clause_queue_len(),
                     self.eliminator.var_queue_len(),
                 );
