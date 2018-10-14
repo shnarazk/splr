@@ -212,9 +212,9 @@ impl Solver {
             } else {
                 print!("\x1B[6A");
                 println!(
-                    " Strategy    |strt:{:>8}, prpg:{:>8}, dcsn:{:>8}, smpl:{:>8}",
+                    " Strategy    |strt:{:>8}, prpg:{:>7.2}M, dcsn:{:>8}, smpl:{:>8}",
                     mes,
-                    self.stat[Stat::Propagation as usize],
+                    (self.stat[Stat::Propagation as usize] as f64) / 1_000_000.0,
                     self.stat[Stat::Decision as usize],
                     self.stat[Stat::Simplification as usize],
                 );
@@ -246,7 +246,7 @@ impl Solver {
                     self.c_lvl.0,
                 );
                 println!(
-                    " Elimanator  |#cls:{:>8}, #var:{:>8}",
+                    " Eliminator  |#cls:{:>8}, #var:{:>8}",
                     self.eliminator.clause_queue_len(),
                     self.eliminator.var_queue_len(),
                 );
