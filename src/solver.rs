@@ -7,6 +7,7 @@ use std::io::{BufRead, BufReader};
 use restart::{R, K, QueueOperations};
 use types::*;
 use var::{VarOrdering, MAX_VAR_DECAY, *};
+use profiler::*;
 
 pub trait SatSolver {
     fn solve(&mut self) -> SolverResult;
@@ -107,6 +108,7 @@ pub struct Solver {
     pub conflicts: Vec<Lit>,
     pub lbd_key: usize,
     pub stat: Vec<i64>,
+    pub profile: Profile,
     pub an_seen: Vec<bool>,
     pub an_to_clear: Vec<Lit>,
     pub an_stack: Vec<Lit>,
@@ -131,6 +133,7 @@ impl Solver {
     pub fn new(cfg: SolverConfiguration, cnf: &CNFDescription) -> Solver {
         let nv = cnf.num_of_variables as usize;
         let nc = cnf.num_of_clauses as usize;
+        let path = &cnf.pathname;
         let (_fe, se) = cfg.ema_coeffs;
         let re = cfg.restart_expansion;
         let cdr = cfg.clause_decay_rate;
@@ -165,6 +168,7 @@ impl Solver {
             conflicts: vec![],
             lbd_key: 1,
             stat: vec![0; Stat::EndOfStatIndex as usize],
+            profile: Profile::new(path.to_string()),
             an_seen: vec![false; nv + 1],
             an_to_clear: vec![0; nv + 1],
             an_stack: vec![],
@@ -202,7 +206,7 @@ impl Solver {
             .count();
         if true {
             if mes.is_empty() {
-                println!("Splr progress report",);
+                println!("{}", self.profile);
                 println!("");
                 println!("");
                 println!("");
@@ -210,7 +214,8 @@ impl Solver {
                 println!("");
                 println!("");
             } else {
-                print!("\x1B[6A");
+                print!("\x1B[7A");
+                println!("{}", self.profile);
                 println!(
                     " Strategy    |strt:{:>8}, prpg:{:>7.2}M, dcsn:{:>8}, smpl:{:>8}",
                     mes,

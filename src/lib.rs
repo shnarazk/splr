@@ -5,6 +5,8 @@ mod macros;
 pub mod eliminator;
 /// Clause
 pub mod clause;
+/// for progress report
+pub mod profiler;
 /// Implementation on solver restart.
 pub mod restart;
 /// struct Solver
