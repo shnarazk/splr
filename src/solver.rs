@@ -217,11 +217,10 @@ impl Solver {
                 print!("\x1B[7A");
                 println!("{}", self.profile);
                 println!(
-                    " Strategy    |specialS:{:>5}, prpg:{:>8.2}M, dcsn:{:>9}, smpl:{:>9}",
+                    " State:{:>5} |#propagate:{:>19}, #decision:{:>20}",
                     mes,
-                    (self.stat[Stat::Propagation as usize] as f64) / 1_000_000.0,
+                    self.stat[Stat::Propagation as usize],
                     self.stat[Stat::Decision as usize],
-                    self.stat[Stat::Simplification as usize],
                 );
                 println!(
                     " Assignment  |#rem:{:>9}, #fix:{:>9}, #elm:{:>9}, prog%:{:>8.4}",
@@ -251,9 +250,10 @@ impl Solver {
                     self.c_lvl.0,
                 );
                 println!(
-                    " Eliminator  |#cls:{:>9}, #var:{:>9}",
+                    " Eliminator  |#cls:{:>9}, #var:{:>9}, Simplifier    | #cnt:{:>9}",
                     self.eliminator.clause_queue_len(),
                     self.eliminator.var_queue_len(),
+                    self.stat[Stat::Simplification as usize],
                 );
             }
         } else {
