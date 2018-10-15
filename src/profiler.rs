@@ -22,10 +22,9 @@ impl fmt::Display for Profile {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "{}| {}, {:?}",
+            "{:50}| {}",
             self.target,
             Utc::now() - self.start,
-            self.start,
         )
     }
 }
