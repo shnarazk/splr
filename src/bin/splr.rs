@@ -1,7 +1,5 @@
 extern crate splr;
-use splr::clause::ClauseKind;
-use splr::solver::{Certificate, SatSolver, Solver, Stat};
-use splr::types::EmaKind;
+use splr::solver::{Certificate, SatSolver, Solver};
 use std::env;
 use std::fs::File;
 use std::io::{BufWriter, Write};
@@ -47,7 +45,6 @@ fn main() {
                         panic!("failed to save: {:?}!", why);
                     }
                 }
-                report_stat(&s);
                 println!("SATISFIABLE. The answer was dumped to {}.", result.as_str());
                 // println!("{:?}", v);
             }
@@ -57,28 +54,10 @@ fn main() {
                         panic!("failed to save: {:?}!", why);
                     }
                 }
-                report_stat(&s);
                 println!("UNSAT, The answer was dumped to {}.", result.as_str());
                 println!("[]");
             }
             Err(e) => println!("Failed {:?}", e),
         }
     }
-}
-
-fn report_stat(s: &Solver) -> () {
-    println!(
-        "backjump:{}, block:{}, restart:{}, reduction:{}, clauses:{}, learnts:{}",
-        s.stat[Stat::Conflict as usize],
-        s.stat[Stat::BlockRestart as usize],
-        s.stat[Stat::Restart as usize],
-        s.stat[Stat::Reduction as usize],
-        s.cp[ClauseKind::Permanent as usize].head.len(),
-        s.cp[ClauseKind::Removable as usize].head.len(),
-    );
-    println!(
-        "EMA:: Asg (s:{:>.2}, f:{:>.2}), LBD (s:{:>.2}, f:{:>.2}), DL (conflict:{:>.2}, backjump:{:>.2})",
-        s.ema_asg.slow, s.ema_asg.fast, s.ema_lbd.slow, s.ema_lbd.fast,
-        s.c_lvl.get(), s.b_lvl.get(),
-    );
 }

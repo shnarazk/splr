@@ -215,42 +215,46 @@ impl Solver {
                 println!("");
             } else {
                 print!("\x1B[7A");
-                println!("{}", self.profile);
-                println!(
-                    " State:{:>5} |#propagate:{:>19}, #decision:{:>20}",
-                    mes,
-                    self.stat[Stat::Propagation as usize],
-                    self.stat[Stat::Decision as usize],
+                println!("{}, State:{:>6}",
+                         self.profile,
+                         mes,
                 );
                 println!(
-                    " Assignment  |#rem:{:>9}, #fix:{:>9}, #elm:{:>9}, prog%:{:>8.4}",
+                    "#propagate:{:>14}, #decision:{:>13}, #conflict: {:>13}",
+                    self.stat[Stat::Propagation as usize],
+                    self.stat[Stat::Decision as usize],
+                    self.stat[Stat::Conflict as usize],
+                );
+                println!(
+                    "   Assignment|#rem:{:>9}, #fix:{:>9}, #elm:{:>9}, prog%:{:>8.4}",
                     nv - sum,
                     fixed,
                     self.eliminator.eliminated_vars,
                     (sum as f32) / (nv as f32) * 100.0,
                 );
                 println!(
-                    " Clause DB   |Remv:{:>9}, good:{:>9}, Perm:{:>9}, Binc:{:>9}",
+                    "    Clause DB|Remv:{:>9}, good:{:>9}, Perm:{:>9}, Binc:{:>9}",
                     self.cp[ClauseKind::Removable as usize].body.iter().skip(1).filter(|c| !c.get_flag(ClauseFlag::Dead)).count(),
                     good,
                     self.cp[ClauseKind::Permanent as usize].body.iter().skip(1).filter(|c| !c.get_flag(ClauseFlag::Dead)).count(),
                     self.cp[ClauseKind::Binclause as usize].body.iter().skip(1).filter(|c| !c.get_flag(ClauseFlag::Dead)).count(),
                 );
                 println!(
-                    " Restart     |#BLK:{:>9}, #RST:{:>9}, emaASG:{:>7.2}, emaLBD:{:>7.2}",
+                    "      Restart|#BLK:{:>9}, #RST:{:>9}, emaASG:{:>7.2}, emaLBD:{:>7.2}",
                     self.stat[Stat::BlockRestart as usize],
                     self.stat[Stat::Restart as usize],
                     self.ema_asg.get(),
                     self.ema_lbd.get(),
                 );
                 println!(
-                    " Decision Lv |aLBD:{:>9.2}, bjmp:{:>9.2}, cnfl:{:>9.2}",
+                    "  Decision Lv|aLBD:{:>9.2}, bjmp:{:>9.2}, cnfl:{:>9.2} |#rdc:{:>9}",
                     self.ema_lbd.slow,
                     self.b_lvl.0,
                     self.c_lvl.0,
+                    self.stat[Stat::Reduction as usize],
                 );
                 println!(
-                    " Eliminator  |#cls:{:>9}, #var:{:>9}, Simplifier    | #cnt:{:>9}",
+                    "   Eliminator|#cls:{:>9}, #var:{:>9},   Clause DB mgr|#smp:{:>9}",
                     self.eliminator.clause_queue_len(),
                     self.eliminator.var_queue_len(),
                     self.stat[Stat::Simplification as usize],
@@ -388,9 +392,11 @@ impl SatSolver for Solver {
         match self.search() {
             _ if !self.ok => {
                 self.cancel_until(0);
+                self.progress("error");
                 Err(SolverException::InternalInconsistent)
             }
             true => {
+                self.progress("  SAT");
                 let mut result = Vec::new();
                 for vi in 1..self.num_vars + 1 {
                     match self.vars[vi].assign {
@@ -406,6 +412,7 @@ impl SatSolver for Solver {
                 Ok(Certificate::SAT(result))
             }
             false => {
+                self.progress("UNSAT");
                 self.cancel_until(0);
                 let mut v = Vec::new();
                 for l in &self.conflicts {
