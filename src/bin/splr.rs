@@ -6,6 +6,7 @@ use std::env;
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::Path;
+use std::process::exit;
 
 const VERSION: &str = "Splr-0.0.10 (Technical Preview 10) by shnarazk@gitlab.com";
 
@@ -18,6 +19,10 @@ fn main() {
                 println!("{}", VERSION);
             }
             _ if (&*arg).starts_with('-') => {
+                if arg == "--help" {
+                    println!("splr [CNF|--version|--help]");
+                    exit(0);
+                }
                 continue;
             }
             _ => {
