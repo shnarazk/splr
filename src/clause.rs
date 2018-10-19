@@ -263,7 +263,7 @@ impl fmt::Display for ClauseBody {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "{{{:?} {}{}{}{}}}",
+            "{{{:?} {}{}{}{}{}}}",
             vec2int(&self.lits),
             match self.flag & 3 {
                 0 => 'L',
@@ -287,18 +287,24 @@ impl fmt::Display for ClauseBody {
             } else {
                 ""
             },
+            if self.get_flag(ClauseFlag::Enqueued) {
+                ", enqueued"
+            } else {
+                ""
+            },
         )
     }
 }
 
 pub fn cid2fmt(cid: ClauseId) -> String {
     match cid.to_kind() {
-        0 => format!("[lifted:{}]", cid.to_index()),
-        1 => format!("[learnt:{}]", cid.to_index()),
-        2 => format!("[perman:{}]", cid.to_index()),
-        3 => format!("[binary:{}]", cid.to_index()),
-        4 => format!("[unicls:{}]", cid.to_index()),
-        _ => format!("[ilegal:{}]", cid.to_index()),
+        0 if cid == 0 => format!("NullClause"),
+        0 => format!("Lifted::{}", cid.to_index()),
+        1 => format!("Learnt::{}", cid.to_index()),
+        2 => format!("Perman::{}", cid.to_index()),
+        3 => format!("Binary::{}", cid.to_index()),
+        4 => format!("Unicls::{}", cid.to_index()),
+        _ => format!("Ilegal::{}", cid.to_index()),
     }
 }
 
@@ -447,6 +453,9 @@ impl ClauseManagement for Solver {
                     cb.set_flag(ClauseFlag::JustUsed, false)
                 } else {
                     cb.set_flag(ClauseFlag::Dead, true);
+                    if cb.get_flag(ClauseFlag::Locked) {
+                        panic!("mmmmmmmmmmmmmmmm");
+                    }
                     touched[ch.lit[0].negate() as usize] = true;
                     touched[ch.lit[1].negate() as usize] = true;
                 }
@@ -460,19 +469,34 @@ impl ClauseManagement for Solver {
     fn simplify(&mut self) -> bool {
         self.cp[ClauseKind::Removable as usize].reset_lbd(&self.vars, &mut self.lbd_temp[..]);
         debug_assert_eq!(self.decision_level(), 0);
-        if self.eliminator.use_elim
-            // && self.stat[Stat::Simplification as usize] % 8 == 0
-            // && self.eliminator.last_invocatiton < self.stat[Stat::Reduction as usize] as usize
-        {
-            self.eliminate();
-            self.eliminator.last_invocatiton = self.stat[Stat::Reduction as usize] as usize;
-        }
         // reset reason since decision level is zero.
         for v in &mut self.vars[1..] {
             if v.reason != NULL_CLAUSE {
                 clause_body_mut!(self.cp, v.reason).set_flag(ClauseFlag::Locked, false);
                 v.reason = NULL_CLAUSE;
             }
+        }
+        // for cb in &self.cp[ClauseKind::Removable as usize].body {
+        //     if cb.get_flag(ClauseFlag::Locked) {
+        //         panic!("why locked!? {:#}", cb);
+        //     }
+        // }
+        // for cb in &self.cp[ClauseKind::Permanent as usize].body {
+        //     if cb.get_flag(ClauseFlag::Locked) {
+        //         panic!("why locked!? {:#}", cb);
+        //     }
+        // }
+        // for cb in &self.cp[ClauseKind::Binclause as usize].body {
+        //     if cb.get_flag(ClauseFlag::Locked) {
+        //         panic!("why locked!? {:#}", cb);
+        //     }
+        // }
+        if self.eliminator.use_elim
+            // && self.stat[Stat::Simplification as usize] % 8 == 0
+            // && self.eliminator.last_invocatiton < self.stat[Stat::Reduction as usize] as usize
+        {
+            self.eliminate();
+            self.eliminator.last_invocatiton = self.stat[Stat::Reduction as usize] as usize;
         }
         unsafe {
             let eliminator = &mut self.eliminator as *mut Eliminator;
@@ -483,6 +507,9 @@ impl ClauseManagement for Solver {
                 let cb = &mut self.cp[*ck as usize].body[ci];
                 if !cb.get_flag(ClauseFlag::Dead) && self.vars.satisfies(&cb.lits)
                 {
+                    if cb.get_flag(ClauseFlag::Locked) {
+                        panic!("not expected path!");
+                    }
                     cb.set_flag(ClauseFlag::Dead, true);
                     self.cp[*ck as usize].touched[ch.lit[0].negate() as usize] = true;
                     self.cp[*ck as usize].touched[ch.lit[1].negate() as usize] = true;
@@ -588,18 +615,26 @@ impl GC for ClausePartition {
                         for l in &cb.lits {
                             let vi = l.vi();
                             let v = &mut vars[vi];
-                            if eliminator.use_elim && !v.eliminated {
+                            // if cid == 1152921504606847140 {
+                            //     println!("gc: cb.lits: 1152921504606847140 for {}", l.int());
+                            //     println!("before subsumption on {}\n - {:?}\n - ci {}\n - cid {}\n {:#}\n {:#}", l.int(), v, ci, cid, ch, cb);
+                            // }
+                            if !v.eliminated {
                                 let xx = v.pos_occurs.len() + v.neg_occurs.len();
                                 if l.positive() {
                                     v.pos_occurs.retain(|&cj| cid != cj);
                                 } else {
                                     v.neg_occurs.retain(|&cj| cid != cj);
                                 }
-                                eliminator.enqueue_var(v);
                                 let xy = v.pos_occurs.len() + v.neg_occurs.len();
-                                if xy + 1 != xx {
-                                    panic!("strange subsumption on {}\n - {:?}\n - ci {}\n - cid {}\n {:#}\n {:#}", l.int(), v, ci, cid, ch, cb);
-                                }
+                                // if xy + 1 != xx {
+                                //     panic!("cid {} {:#} was eliminated from {:?}",
+                                //            cid2fmt(cid),
+                                //            cb,
+                                //            l.int(),
+                                //     );
+                                // }
+                                eliminator.enqueue_var(v);
                             }
                         }
                     }
@@ -695,8 +730,8 @@ impl GC for ClausePartition {
         let other = (index ^ 1) as usize;
         debug_assert!(other == 0 || other == 1);
         let ch = &mut self.head[ci];
-        let cb = &mut self.body[ci];
-        cb.lits.push(ch.lit[index]); // For valiable eliminator, we copy the literal into body.lits.
+        // let cb = &mut self.body[ci];
+        // cb.lits.push(ch.lit[index]); // For valiable eliminator, we copy the literal into body.lits.
         ch.lit[index] = GARBAGE_LIT;
         let next = ch.next_watcher[index];
         if ch.lit[other] == GARBAGE_LIT {

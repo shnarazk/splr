@@ -204,7 +204,7 @@ impl Solver {
             .skip(1)
             .filter(|c| !c.get_flag(ClauseFlag::Dead) && c.rank <= 3)
             .count();
-        if true {
+        if false {
             if mes.is_empty() {
                 println!("{}", self.profile);
                 println!("");
@@ -270,7 +270,7 @@ impl Solver {
                 );
             } else {
                 println!(
-                "#{},{:>7},{:>7},{:>7},{:>6.3},,{:>7},{:>6},{:>7},{:>7},,{:>5},{:>5}, {:>5.2},{:>6.2},,{:>7.2},{:>8.2},{:>8.2},,{:>6},{:>6}",
+                "#{:<5},{:>7},{:>7},{:>7},{:>6.3},,{:>7},{:>6},{:>7},{:>7},,{:>5},{:>5}, {:>5.2},{:>6.2},,{:>7.2},{:>8.2},{:>8.2},,{:>6},{:>6}",
                     mes,
                     nv - sum,
                     fixed,
@@ -396,7 +396,7 @@ impl SatSolver for Solver {
                 Err(SolverException::InternalInconsistent)
             }
             true => {
-                self.progress("  SAT");
+                self.progress("SAT");
                 let mut result = Vec::new();
                 for vi in 1..self.num_vars + 1 {
                     match self.vars[vi].assign {
@@ -517,6 +517,7 @@ impl CDCL for Solver {
                         let other_value = vars.assigned((*ch).lit[(my_index == 0) as usize]);
                         if other_value != LTRUE {
                             let cb = &mut (*body)[*pre] as *mut ClauseBody;
+                            assert!(2 <= (*cb).lits.len());
                             if (*cb).lits[0] == false_lit {
                                 (*cb).lits.swap(0, 1); // now false_lit is lits[1].
                             }
@@ -544,6 +545,7 @@ impl CDCL for Solver {
                                 let v = &mut vars[other.vi()];
                                 v.assign = other.lbool();
                                 v.level = dl;
+                                assert!(*pre != NULL_CLAUSE);
                                 v.reason = kind.id_from(*pre);
                                 trail.push(other);
                                 (*cb).set_flag(ClauseFlag::Locked, true);
@@ -721,7 +723,9 @@ impl CDCL for Solver {
                     v.activity = 0.0;
                 }
                 v.level = dl;
-                clause_body_mut!(self.cp, cid).set_flag(ClauseFlag::Locked, true);
+                if cid != NULL_CLAUSE {
+                    clause_body_mut!(self.cp, cid).set_flag(ClauseFlag::Locked, true);
+                }
             }
             if dl == 0 {
                 self.var_order.remove(&self.vars, l.vi());
@@ -741,10 +745,15 @@ impl CDCL for Solver {
         let mut p = NULL_LIT;
         let mut ti = self.trail.len() - 1; // trail index
         let mut path_cnt = 0;
+        // println!("analyze start with {} at {}, reason of 503 {}", cid2fmt(confl), self.decision_level(), self.vars[503].reason);
         loop {
+            // println!("analyze {}", p.int());
             unsafe {
                 let cb = clause_body_mut!(self.cp, cid) as *mut ClauseBody;
-                debug_assert_ne!(cid, NULL_CLAUSE);
+                if cid == NULL_CLAUSE {
+                    panic!("analyze run into NULL_CLAUSE var {} at level {}", p.int(), self.decision_level());
+                }
+                // debug_assert_ne!(cid, NULL_CLAUSE);
                 if cid.to_kind() == (ClauseKind::Removable as usize) {
                     self.bump_cid(cid);
                     // if 2 < (*cb).rank {
@@ -763,19 +772,20 @@ impl CDCL for Solver {
                     //     }
                     // }
                 }
-                // println!("{}を対応", (*c));
+                // println!("{}を対応", cid2fmt(cid));
                 for q in &(*cb).lits[((p != NULL_LIT) as usize)..] {
                     let vi = q.vi();
                     let lvl = self.vars[vi].level;
                     // if lvl == 0 {
                     //     println!("lvl {}", lvl);
                     // }
+                    debug_assert_eq!(self.vars[vi].eliminated, false);
                     debug_assert_ne!(self.vars[vi].assign, BOTTOM);
                     self.bump_vi(vi);
                     if !self.an_seen[vi] && 0 < lvl {
                         self.an_seen[vi] = true;
                         if dl <= lvl {
-                            // println!("{} はレベル{}なのでフラグを立てる", q.int(), l);
+                            // println!("{} はレベル{}なのでフラグを立てる", q.int(), lvl);
                             path_cnt += 1;
                             if self.vars[vi].reason != NULL_CLAUSE
                                 && self.vars[vi].reason.to_kind() == ClauseKind::Removable as usize
@@ -783,27 +793,24 @@ impl CDCL for Solver {
                                 self.an_last_dl.push(*q);
                             }
                         } else {
-                            // println!("{} はレベル{}なので採用", q.int(), l);
+                            // println!("{} はレベル{}なので採用 {}", q.int(), lvl, dl);
                             self.an_learnt_lits.push(*q);
                         }
                     } else {
-                        // println!("{} はもうフラグが立っているかグラウンドしている{}ので無視", q.int(), l);
+                        // println!("{} はもうフラグが立っているかグラウンドしている{}ので無視", q.int(), lvl);
                     }
                 }
                 // set the index of the next literal to ti
                 while !self.an_seen[self.trail[ti].vi()] {
-                    // println!(
-                    //     "{} はフラグが立ってないので飛ばす",
-                    //     self.trail[ti].int()
-                    // );
+                    // println!("{} はフラグが立ってないので飛ばす", self.trail[ti].int());
                     ti -= 1;
                 }
                 p = self.trail[ti];
                 {
                     let next_vi = p.vi();
                     cid = self.vars[next_vi].reason;
-                    // println!("{} にフラグが立っている。時path数は{}, そのreason{}を探索", next_vi, path_cnt - 1, cid);
-                    self.an_seen[next_vi] = false;
+                    // println!("{} にフラグが立っている。時path数は{}, そのreason{}を探索", next_vi, path_cnt - 1, cid2fmt(cid));
+                    //self.an_seen[next_vi] = false;
                 }
                 path_cnt -= 1;
                 if path_cnt <= 0 {
@@ -986,6 +993,7 @@ impl Solver {
 
     pub fn uncheck_enqueue(&mut self, l: Lit, cid: ClauseId) -> () {
         debug_assert!(l != 0, "Null literal is about to be equeued");
+        debug_assert!(self.decision_level() == 0 || cid != 0, "Null CLAUSE is used for uncheck_enqueue");
         let dl = self.decision_level();
         {
             let v = &mut self.vars[l.vi()];
@@ -1002,7 +1010,20 @@ impl Solver {
     }
     pub fn uncheck_assume(&mut self, l: Lit) -> () {
         self.trail_lim.push(self.trail.len());
-        self.uncheck_enqueue(l, NULL_CLAUSE);
+        let dl = self.decision_level();
+        {
+            let v = &mut self.vars[l.vi()];
+            v.assign = l.lbool();
+            v.level = dl;
+            v.reason = NULL_CLAUSE;
+        }
+        if dl == 0 {
+            self.eliminator_enqueue_var(l.vi());
+        }
+        self.trail.push(l);
+        // if l.vi() == 503 {
+        //     println!("uncheck_assume: v {}, lv {}", l.int(), self.decision_level());
+        // }
     }
 }
 
