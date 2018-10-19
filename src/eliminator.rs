@@ -1,6 +1,7 @@
+#![allow(unreachable_code)]
 #![allow(unused_mut)]
 #![allow(unused_variables)]
-use clause::{ClauseBody, ClauseHead, ClauseFlag, ClauseIdIndexEncoding, ClauseKind, ClauseManagement, ClausePartition, GC, cid2fmt};
+use clause::{ClauseBody, ClauseHead, ClauseFlag, ClauseIdIndexEncoding, ClauseKind, ClauseManagement, ClausePartition, cid2fmt};
 use solver::{CDCL, Solver};
 use std::fmt;
 use types::*;
@@ -45,7 +46,7 @@ pub struct Eliminator {
 
 const SUBSUMPTION_SIZE: usize = 30;
 const SUBSUMPITON_GROW_LIMIT: usize = 0;
-const BACKWORD_SUBSUMPTION_THRESHOLD: usize = 1000_000; // 10_000;
+const BACKWORD_SUBSUMPTION_THRESHOLD: usize = 1_000_000; // 10_000;
 const CLAUSE_QUEUE_THRESHOD: usize = 1_000_000; // 1_000;
 const VAR_QUEUE_THRESHOLD: usize = 3_200_000;
 
@@ -369,66 +370,16 @@ impl Solver {
             // println!("bsc remain clauses {} vars {}", self.eliminator.clause_queue.len(), self.eliminator.var_queue.len());
             unsafe {
                 let mut best = 0;
+                let ch = clause_head_mut!(self.cp, cid) as *mut ClauseHead;
+                let cb = clause_body_mut!(self.cp, cid) as *mut ClauseBody;
+                if (*cb).get_flag(ClauseFlag::Dead) || BACKWORD_SUBSUMPTION_THRESHOLD < cnt {
+                    continue;
+                }
                 if cid.to_kind() == ClauseKind::Uniclause as usize {
                     best = (cid.to_index() as Lit).vi();
-                    if self.vars[best].eliminated {
-                        continue;
-                    }
-                    let cs = &mut self.vars[best].pos_occurs as *mut Vec<ClauseId>;
-                    cnt += (*cs).len();
-                    for di in &*cs {
-                        let db = clause_body!(self.cp, di) as *const ClauseBody;
-                        debug_assert!(!(*db).get_flag(ClauseFlag::Locked));
-                        if (*db).get_flag(ClauseFlag::Dead) {
-                            continue;
-                        }
-                        match self.subsume(cid, *di) {
-                            Some(NULL_LIT) => {
-                                subsumed += 1;
-                                self.remove_clause(*di);
-                            }
-                            Some(l) => {
-                                deleted_literals += 1;
-                                if !self.strengthen_clause(*di, l.negate()) {
-                                    return false;
-                                }
-                                self.eliminator_enqueue_var(l.vi());
-                            }
-                            None => {}
-                        }
-                    }
-                    let cs = &mut self.vars[best].neg_occurs as *mut Vec<ClauseId>;
-                    cnt += (*cs).len();
-                    for di in &*cs {
-                        let db = clause_body!(self.cp, di) as *const ClauseBody;
-                        assert!(!(*db).get_flag(ClauseFlag::Locked));
-                        if (*db).get_flag(ClauseFlag::Dead) {
-                            continue;
-                        }
-                        match self.subsume(cid, *di) {
-                            Some(NULL_LIT) => {
-                                subsumed += 1;
-                                self.remove_clause(*di);
-                            }
-                            Some(l) => {
-                                // println!("BackSubsC    => subsumed {} from {} and {}", l, best, cid2fmt(*di));
-                                deleted_literals += 1;
-                                if !self.strengthen_clause(*di, l.negate()) {
-                                    return false;
-                                }
-                                self.eliminator_enqueue_var(l.vi());
-                            }
-                            None => {}
-                        }
-                    }
                 } else {
                     let mut tmp = 100_000;
-                    let ch = clause_head_mut!(self.cp, cid) as *mut ClauseHead;
-                    let cb = clause_body_mut!(self.cp, cid) as *mut ClauseBody;
                     (*cb).set_flag(ClauseFlag::Enqueued, false);
-                    if (*cb).get_flag(ClauseFlag::Dead) || BACKWORD_SUBSUMPTION_THRESHOLD < cnt {
-                        continue;
-                    }
                     for l in &(*cb).lits {
                         let v = &self.vars[l.vi()];
                         if v.eliminated || v.level == 0 {
@@ -441,24 +392,27 @@ impl Solver {
                             tmp = nsum;
                         }
                     }
-                    if best == 0 {
-                        continue;
-                    }
-                    // Search all candidates:
-                    let cs = &mut self.vars[best].pos_occurs as *mut Vec<ClauseId>;
+                }
+                if best == 0 || self.vars[best].eliminated {
+                    continue;
+                }
+                for p in 0..2 {
+                    let cs = if p == 0 {
+                        &mut self.vars[best].pos_occurs as *mut Vec<ClauseId>
+                    } else {
+                        &mut self.vars[best].neg_occurs as *mut Vec<ClauseId>
+                    };
                     cnt += (*cs).len();
                     for di in &*cs {
                         let db = clause_body!(self.cp, di) as *const ClauseBody;
-                        debug_assert!(!(*db).get_flag(ClauseFlag::Locked) || (*db).get_flag(ClauseFlag::Dead));
+                        debug_assert!(!(*db).get_flag(ClauseFlag::Locked));
                         if !(*db).get_flag(ClauseFlag::Dead)
                             && *di != cid
                             && (*cb).lits.len() <= SUBSUMPTION_SIZE
                             && (*db).lits.len() <= SUBSUMPTION_SIZE
                             && (self.eliminator.subsumption_lim == 0
                                 || (*cb).lits.len() + (*db).lits.len() <= self.eliminator.subsumption_lim)
-                        // && (self.eliminator.subsumption_lim == 0 || (*d).len() < self.eliminator.subsumption_lim)
                         {
-                            // println!("{} + {}", cid, *di);
                             match self.subsume(cid, *di) {
                                 Some(NULL_LIT) => {
                                     // println!("BackSubsC    => {} subsumed completely by {}", cid2fmt(*di), cid2fmt(cid));
@@ -466,53 +420,18 @@ impl Solver {
                                     self.remove_clause(*di);
                                 }
                                 Some(l) => {
-                                    {
-                                    let xa = &clause_body!(self.cp, cid);
-                                    let xb = &clause_body!(self.cp, *di);
+                                    // let xa = &clause_body!(self.cp, cid);
+                                    // let xb = &clause_body!(self.cp, *di);
                                     // println!("BackSubsC    => subsumed {} from {:#} and {:#}", l.int(), cid2fmt(cid), cid2fmt(*di));
-                                    println!("BackSubsC    => subsumed {} from {:#} and {:#}", l.int(), xa, xb);
-                                    }
+                                    // println!("BackSubsC    => subsumed {} from {:#} and {:#}", l.int(), xa, xb);
+                                    // println!("BackSubsC    => subsumed {} from {} and {}", l, best, cid2fmt(*di));
                                     deleted_literals += 1;
                                     continue;
                                     if !self.strengthen_clause(*di, l.negate()) {
                                         return false;
                                     }
                                     self.eliminator_enqueue_var(l.vi());
-                                    self.propagate();
-                                }
-                                None => {}
-                            }
-                        }
-                    }
-                    let cs = &mut self.vars[best].neg_occurs as *mut Vec<ClauseId>;
-                    cnt += (*cs).len();
-                    for di in &*cs {
-                        let db = clause_body!(self.cp, di) as *const ClauseBody;
-                        debug_assert!(!(*db).get_flag(ClauseFlag::Locked) || (*db).get_flag(ClauseFlag::Dead));
-                        if !(*db).get_flag(ClauseFlag::Dead)
-                            && *di != cid
-                            && (*cb).lits.len() <= SUBSUMPTION_SIZE
-                            && (*db).lits.len() <= SUBSUMPTION_SIZE
-                            && (self.eliminator.subsumption_lim == 0
-                                || (*cb).lits.len() + (*db).lits.len() <= self.eliminator.subsumption_lim)
-                        // && (self.eliminator.subsumption_lim == 0 || (*d).len() < self.eliminator.subsumption_lim)
-                        {
-                            // println!("{} + {}", cid, *di);
-                            match self.subsume(cid, *di) {
-                                Some(NULL_LIT) => {
-                                    // println!("BackSubsC    => {} subsumed completely by {}", cid2fmt(*di), cid2fmt(cid));
-                                    subsumed += 1;
-                                    self.remove_clause(*di);
-                                }
-                                Some(l) => {
-                                    println!("BackSubsC    => subsumed {} from {} and {}", l.int(), cid2fmt(cid), cid2fmt(*di));
-                                    deleted_literals += 1;
-                                    continue;
-                                    if !self.strengthen_clause(*di, l.negate()) {
-                                        return false;
-                                    }
-                                    // self.eliminator_enqueue_var(l.vi());
-                                    self.propagate();
+                                    // self.propagate();
                                 }
                                 None => {}
                             }
@@ -707,6 +626,7 @@ impl Solver {
         if !self.eliminator.use_elim {
             return;
         }
+        return;
         // println!("eliminate: clause_queue {}", self.eliminator.clause_queue.len());
         // println!("clause_queue {:?}", self.eliminator.clause_queue);
         // println!("var_queue {:?}", self.eliminator.var_queue);
@@ -775,8 +695,9 @@ impl Solver {
         Some(ret)
     }
 
-    /// remove Lit `p` from Clause *self*. This is an O(n) function!
+    /// removes Lit `p` from Clause *self*. This is an O(n) function!
     /// returns true if the clause became a unit clause.
+    /// Called only from strengthen_clause
     pub fn strengthen(&mut self, cid: ClauseId, p: Lit) -> bool {
         debug_assert!(!clause_body!(self.cp, cid).get_flag(ClauseFlag::Dead));
         let cix = cid.to_index();

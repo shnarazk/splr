@@ -168,7 +168,7 @@ impl Solver {
             conflicts: vec![],
             lbd_key: 1,
             stat: vec![0; Stat::EndOfStatIndex as usize],
-            profile: Profile::new(path.to_string()),
+            profile: Profile::new(&path.to_string()),
             an_seen: vec![false; nv + 1],
             an_to_clear: vec![0; nv + 1],
             an_stack: vec![],
@@ -207,12 +207,12 @@ impl Solver {
         if false {
             if mes.is_empty() {
                 println!("{}", self.profile);
-                println!("");
-                println!("");
-                println!("");
-                println!("");
-                println!("");
-                println!("");
+                println!();
+                println!();
+                println!();
+                println!();
+                println!();
+                println!();
             } else {
                 print!("\x1B[7A");
                 println!("{}, State:{:>6}",
@@ -810,7 +810,7 @@ impl CDCL for Solver {
                     let next_vi = p.vi();
                     cid = self.vars[next_vi].reason;
                     // println!("{} にフラグが立っている。時path数は{}, そのreason{}を探索", next_vi, path_cnt - 1, cid2fmt(cid));
-                    //self.an_seen[next_vi] = false;
+                    self.an_seen[next_vi] = false;
                 }
                 path_cnt -= 1;
                 if path_cnt <= 0 {

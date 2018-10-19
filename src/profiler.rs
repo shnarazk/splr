@@ -10,7 +10,7 @@ pub struct Profile {
 }
 
 impl Profile {
-    pub fn new(fname: String) -> Profile {
+    pub fn new(fname: &str) -> Profile {
         Profile {
             start: Utc::now(),
             target: Path::new(&fname).file_name().unwrap().to_os_string().into_string().unwrap(),

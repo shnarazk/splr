@@ -298,7 +298,7 @@ impl fmt::Display for ClauseBody {
 
 pub fn cid2fmt(cid: ClauseId) -> String {
     match cid.to_kind() {
-        0 if cid == 0 => format!("NullClause"),
+        0 if cid == 0 => "NullClause".to_string(),
         0 => format!("Lifted::{}", cid.to_index()),
         1 => format!("Learnt::{}", cid.to_index()),
         2 => format!("Perman::{}", cid.to_index()),
@@ -495,7 +495,7 @@ impl ClauseManagement for Solver {
             // && self.stat[Stat::Simplification as usize] % 8 == 0
             // && self.eliminator.last_invocatiton < self.stat[Stat::Reduction as usize] as usize
         {
-            self.eliminate();
+            // self.eliminate();
             self.eliminator.last_invocatiton = self.stat[Stat::Reduction as usize] as usize;
         }
         unsafe {
@@ -619,7 +619,7 @@ impl GC for ClausePartition {
                             //     println!("gc: cb.lits: 1152921504606847140 for {}", l.int());
                             //     println!("before subsumption on {}\n - {:?}\n - ci {}\n - cid {}\n {:#}\n {:#}", l.int(), v, ci, cid, ch, cb);
                             // }
-                            if !v.eliminated {
+                            if eliminator.use_elim && !v.eliminated {
                                 let xx = v.pos_occurs.len() + v.neg_occurs.len();
                                 if l.positive() {
                                     v.pos_occurs.retain(|&cj| cid != cj);
