@@ -495,7 +495,7 @@ impl ClauseManagement for Solver {
             // && self.stat[Stat::Simplification as usize] % 8 == 0
             // && self.eliminator.last_invocatiton < self.stat[Stat::Reduction as usize] as usize
         {
-            // self.eliminate();
+            self.eliminate();
             self.eliminator.last_invocatiton = self.stat[Stat::Reduction as usize] as usize;
         }
         unsafe {
