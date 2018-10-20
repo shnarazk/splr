@@ -751,7 +751,7 @@ impl CDCL for Solver {
             unsafe {
                 let cb = clause_body_mut!(self.cp, cid) as *mut ClauseBody;
                 if cid == NULL_CLAUSE {
-                    panic!("analyze run into NULL_CLAUSE var {} at level {}", p.int(), self.decision_level());
+                    panic!("analyze ran into NULL_CLAUSE Lit {} at level {}", p.int(), self.decision_level());
                 }
                 // debug_assert_ne!(cid, NULL_CLAUSE);
                 if cid.to_kind() == (ClauseKind::Removable as usize) {

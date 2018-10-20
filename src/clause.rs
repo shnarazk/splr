@@ -1,3 +1,4 @@
+#![allow(unused_variables)]
 use eliminator::{ClauseElimination, *};
 use solver::{SearchStrategy, Solver, Stat, CDCL, CO_LBD_BOUND};
 use std::cmp::Ordering;
