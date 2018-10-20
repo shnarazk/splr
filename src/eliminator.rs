@@ -193,22 +193,13 @@ impl Solver {
         debug_assert!(!clause_body!(self.cp, cid).get_flag(ClauseFlag::Dead));
         debug_assert!(!clause_body!(self.cp, cid).get_flag(ClauseFlag::Locked));
         // println!("STRENGTHEN_CLAUSE {}:{}", cid2fmt(cid));
-        let c0;
-        {
-            debug_assert_ne!(cid, NULL_CLAUSE);
-            if clause_body!(self.cp, cid).lits.len() == 2 {
-                // println!("{} was a binclause", cid2fmt(cid));
-                let res = self.strengthen(cid, l);
-                debug_assert!(res);  // cid should be removed
-                c0 = clause_head!(self.cp, cid).lit[0];
-                println!("c0 {}, l {}", c0.int(), l.int());
-            } else {
-                let res = self.strengthen(cid, l);
-                // debug_assert!(!res); // if res is true, it means the clause is a unit clause now.
-                // self.eliminator_enqueue_var(l.vi());
-                c0 = NULL_LIT;
-            }
-        }
+        debug_assert_ne!(cid, NULL_CLAUSE);
+        let c0 = if self.strengthen(cid, l) {
+            // println!("cid {} becomse a unit clause as c0 {}, l {}", cid2fmt(cid), c0.int(), l.int());
+            clause_head!(self.cp, cid).lit[0]
+        } else {
+            NULL_LIT
+        };
 //         {
 //             // update occurs lists
 //             let v = &mut self.vars[l.vi()];
@@ -298,51 +289,6 @@ impl Solver {
         }
         (true, size)
     }
-    /// 8. gatherTouchedClauses
-    /// - calls `enqueue_clause`
-//     pub fn gather_touched_clauses(&mut self) -> () {
-//         if self.eliminator.n_touched == 0 {
-//             return;
-//         }
-//         let mut len = self.eliminator.clause_queue.len();
-//         for cid in &self.eliminator.clause_queue {
-//             clause_body_mut!(self.cp, cid).set_flag(ClauseFlag::Touched, true);
-//         }
-//         for mut v in &mut self.vars[1..] {
-//             if v.touched {
-//                 // println!("gtc var: {}", v.index);
-//                 for cid in &v.pos_occurs {
-//                     let mut cb = clause_body_mut!(self.cp, cid);
-//                     if !cb.get_flag(ClauseFlag::Touched) {
-//                         if !cb.get_flag(ClauseFlag::Enqueued) {
-//                             self.eliminator.clause_queue.push(*cid);
-//                             cb.set_flag(ClauseFlag::Enqueued, true);
-//                         }
-//                         cb.set_flag(ClauseFlag::Touched, true);
-//                     }
-//                 }
-//                 for cid in &v.neg_occurs {
-//                     let mut cb = clause_body_mut!(self.cp, cid);
-//                     if !cb.get_flag(ClauseFlag::Touched) {
-//                         if !cb.get_flag(ClauseFlag::Enqueued) {
-//                             self.eliminator.clause_queue.push(*cid);
-//                             cb.set_flag(ClauseFlag::Enqueued, true);
-//                         }
-//                         cb.set_flag(ClauseFlag::Touched, true);
-//                     }
-//                 }
-//                 v.touched = false;
-//             }
-//         }
-//         // println!("gather_touched_classes: clause_queue {}", self.eliminator.clause_queue.len());
-//         for cid in &self.eliminator.clause_queue {
-//             clause_body_mut!(self.cp, cid).set_flag(ClauseFlag::Touched, false);
-//         }
-//         for v in &mut self.vars {
-//             v.touched = false;
-//         }
-//         self.eliminator.n_touched = 0;
-//     }
     /// 10. backwardSubsumptionCheck
     /// returns false if solver is inconsistent
     /// - calls `clause_queue.pop`
@@ -384,15 +330,11 @@ impl Solver {
                     if (*cb).get_flag(ClauseFlag::Dead) || BACKWORD_SUBSUMPTION_THRESHOLD < cnt {
                         continue;
                     }
-                    let mut tmp = 100_000;
+                    let mut tmp = 1_000_000;
                     for l in &(*cb).lits {
                         let v = &self.vars[l.vi()];
-                        if v.eliminated || v.level == 0 {
-                            continue;
-                        }
-                        // let nsum = - v.activity;
                         let nsum = v.pos_occurs.len().min(v.neg_occurs.len());
-                        if nsum < tmp {
+                        if !v.eliminated && 0 < v.level && nsum < tmp {
                             best = l.vi();
                             tmp = nsum;
                         }
@@ -425,21 +367,25 @@ impl Solver {
                             && (self.eliminator.subsumption_lim == 0
                                 || lits.len() + (*db).lits.len() <= self.eliminator.subsumption_lim)
                         {
+                            // ここから先を潰すとvalid answer
                             match self.subsume(cid, *di) {
                                 Some(NULL_LIT) => {
-                                    // println!("BackSubsC    => {} subsumed completely by {}", cid2fmt(*di), cid2fmt(cid));
+                                    println!("BackSubsC    => {} subsumed completely by {}", cid2fmt(*di), cid2fmt(cid));
                                     subsumed += 1;
-                                    self.remove_clause(*di);
+                                    if di.to_kind() == ClauseKind::Permanent as usize {
+                                        println!("WOW, backward_subsumption_check tries to deleted a permanent clause {} {:#}",
+                                                 cid2fmt(*di),
+                                                 clause_body!(self.cp, *di));
+                                    } else {
+                                        // self.remove_clause(*di);
+                                    }
                                 }
                                 Some(l) => {
-                                    // let xa = &clause_body!(self.cp, cid);
                                     // let xb = &clause_body!(self.cp, *di);
-                                    // println!("BackSubsC    => subsumed {} from {:#} and {:#}", l.int(), cid2fmt(cid), cid2fmt(*di));
-                                    // println!("BackSubsC    => subsumed {} from {:#} and {:#}", l.int(), xa, xb);
-                                    // println!("BackSubsC    => subsumed {} from {} and {}", l, best, cid2fmt(*di));
+                                    // println!("BackSubsC    => subsumed {} from {} and {} {:#}", l.int(), cid2fmt(cid), cid2fmt(*di), xb);
                                     deleted_literals += 1;
                                     // println!("cancel true path");
-                                    // continue;
+                                    continue;
                                     if !self.strengthen_clause(*di, l.negate()) {
                                         return false;
                                     }
@@ -515,7 +461,7 @@ impl Solver {
             self.vars[v].eliminated = true;
             let cid = self.vars[v].reason;
             assert_eq!(cid, NULL_CLAUSE);
-            // println!("- eliminate: {:>5} (+{:<4} -{:<4})", v, (*pos).len(), (*neg).len() );
+            println!("- eliminate: {:>5} (+{:<4} -{:<4})", v, (*pos).len(), (*neg).len() );
             // setDecisionVar(v, false);
             self.eliminator.eliminated_vars += 1;
             {
@@ -580,22 +526,6 @@ impl Solver {
                     self.cp[cid.to_kind()].touched[w1 as usize] = true;
                 }
             }
-//             for i in 0..self.vars[v].pos_occurs.len() {
-//                 let cid = self.vars[v].pos_occurs[i];
-//                 if clause_body!(self.cp, cid).get_flag(ClauseFlag::Dead) {
-//                     continue;
-//                 }
-//                 println!("eliminator purges {} from pos_occurs of {}", cid2fmt(cid), v);
-//                 // self.remove_clause(cid);
-//             }
-//             for i in 0..self.vars[v].neg_occurs.len() {
-//                 let cid = self.vars[v].neg_occurs[i];
-//                 if clause_body!(self.cp, cid).get_flag(ClauseFlag::Dead) {
-//                     continue;
-//                 }
-//                 println!("eliminator purges {} from neg_occurs of {}", cid2fmt(cid), v);
-//                 // self.remove_clause(cid);
-//             }
             self.backward_subsumption_check()
         }
     }
