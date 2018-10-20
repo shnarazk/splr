@@ -779,8 +779,8 @@ impl CDCL for Solver {
                     // if lvl == 0 {
                     //     println!("lvl {}", lvl);
                     // }
-                    debug_assert_eq!(self.vars[vi].eliminated, false);
-                    debug_assert_ne!(self.vars[vi].assign, BOTTOM);
+                    debug_assert!(self.vars[vi].eliminated == false, format!("analyze assertion: an eliminated var {} occurs", vi));
+                    debug_assert!(self.vars[vi].assign != BOTTOM, format!("analyze assertion: unassigned var {:?}", self.vars[vi]));
                     self.bump_vi(vi);
                     if !self.an_seen[vi] && 0 < lvl {
                         self.an_seen[vi] = true;

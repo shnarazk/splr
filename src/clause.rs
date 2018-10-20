@@ -418,7 +418,7 @@ impl ClauseManagement for Solver {
         } else {
             ClauseKind::Removable
         };
-        let cid = self.cp[kind as usize].new_clause(&v, lbd, true, true);
+        let cid = self.cp[kind as usize].new_clause(&v, lbd, true, false);
         self.bump_cid(cid);
         self.eliminator_register_clause(cid, lbd, false);
         cid
@@ -647,7 +647,7 @@ impl GC for ClausePartition {
                 }
             }
         }
-        debug_assert_eq!(self.watcher[GARBAGE_LIT.negate() as usize], NULL_CLAUSE);
+        debug_assert!(self.watcher[GARBAGE_LIT.negate() as usize] == NULL_CLAUSE, "There's a clause in the GARBAGE list");
     }
     fn new_clause(&mut self, v: &[Lit], rank: usize, learnt: bool, locked: bool) -> ClauseId {
         let cix;
