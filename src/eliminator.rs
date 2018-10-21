@@ -194,43 +194,26 @@ impl Solver {
         debug_assert!(!clause_body!(self.cp, cid).get_flag(ClauseFlag::Locked));
         // println!("STRENGTHEN_CLAUSE {}:{}", cid2fmt(cid));
         debug_assert_ne!(cid, NULL_CLAUSE);
-        let c0 = if self.strengthen(cid, l) {
-            // println!("cid {} becomse a unit clause as c0 {}, l {}", cid2fmt(cid), c0.int(), l.int());
-            clause_head!(self.cp, cid).lit[0]
-        } else {
-            NULL_LIT
-        };
-//         {
-//             // update occurs lists
-//             let v = &mut self.vars[l.vi()];
-//             debug_assert!(!v.eliminated);
-//             let xx = (v.pos_occurs.len(), v.neg_occurs.len());
-//             if l.positive() {
-//                 v.pos_occurs.retain(|&ci| ci != cid);
-//             } else {
-//                 v.neg_occurs.retain(|&ci| ci != cid);
-//             }
-//             let xy = (v.pos_occurs.len(), v.neg_occurs.len());
-//             if (xy.0 + xy.1) + 1 != (xx.0 + xx.1) {
-//                 panic!("strange {} {:?} {:?}", l, xx, xy);
-//             }
-//         }
-        if c0 != NULL_LIT {
+        if self.strengthen(cid, l) {
+            let c0 = clause_head!(self.cp, cid).lit[0];
+            println!("cid {} became a unit clause as c0 {}, l {}", cid2fmt(cid), c0.int(), l.int());
+            debug_assert_ne!(c0, l);
             println!("{} is removed and its first literal {} is enqueued.", cid2fmt(cid), c0.int());
             self.remove_clause(cid);
             // before the following propagate, we need to clean garbages.
             // これまずくないか? self.cp[cid.to_kind()].garbage_collect(&mut self.vars, &mut self.eliminator);
             // println!("STRENGTHEN_CLAUSE ENQUEUE {}", c0);
-            if !self.enqueue(c0, NULL_CLAUSE) {
+            if !self.enqueue(c0, NULL_CLAUSE) { //  && self.propagate() == NULL_CLAUSE {
+                return true;
+            } else {
                 self.ok = false;
                 return false;
             }
-            true
-        // self.enqueue(c0, NULL_CLAUSE) == true && self.propagate() == NULL_CLAUSE
         } else {
+            println!("cid {} drops literal {}", cid2fmt(cid), l.int());
             self.eliminator_enqueue_clause(cid);
-            true
-        }
+            return true;
+        };
     }
     /// 6. merge(1)
     /// Returns **false** if one of the clauses is always satisfied. (merge_vec should not be used.)
@@ -384,7 +367,7 @@ impl Solver {
                                     // println!("BackSubsC    => subsumed {} from {} and {} {:#}", l.int(), cid2fmt(cid), cid2fmt(*di), xb);
                                     deleted_literals += 1;
                                     // println!("cancel true path");
-                                    continue;
+                                    // continue;
                                     if !self.strengthen_clause(*di, l.negate()) {
                                         return false;
                                     }
@@ -655,10 +638,10 @@ impl Solver {
     pub fn strengthen(&mut self, cid: ClauseId, p: Lit) -> bool {
         debug_assert!(!clause_body!(self.cp, cid).get_flag(ClauseFlag::Dead));
         let cix = cid.to_index();
-        let mut cj;
-        let mut next;
-        let new_watcher;
-        let update;
+//        let mut cj;
+//        let mut next;
+//        let new_watcher;
+//        let update;
         let ClausePartition {
             ref mut head,
             ref mut body,
@@ -666,49 +649,91 @@ impl Solver {
             ..
         } = self.cp[cid.to_kind()];
         unsafe {
-            let ch = &mut head[cid.to_index()] as *mut ClauseHead;
-            let cb = &mut body[cid.to_index()] as *mut ClauseBody;
+            let cix = cid.to_index();
+            let ch = &mut head[cix] as *mut ClauseHead;
+            let cb = &mut body[cix] as *mut ClauseBody;
             if (*cb).get_flag(ClauseFlag::Dead) {
                 return false;
             }
-            debug_assert!(1 < (*cb).lits.len());
-            (*cb).lits.retain(|&x| x != p);
-            if (*cb).lits.len() == 1 {
-                println!("strengthen make a clause {} unit", cid2fmt(cid));
-                if (*ch).lit[0] == p {
-                    (*ch).lit.swap(0, 1);
-                    (*ch).next_watcher.swap(0, 1);
+            if (*ch).lit[0] == p || (*ch).lit[1] == p {
+                debug_assert!((*cb).lits[0] == p || (*cb).lits[1] == p);
+                // update lit, next_watcher, and lits
+                let hi = ((*ch).lit[0] != p) as usize;
+                debug_assert!((*ch).lit[hi] == p);
+                let bi = ((*cb).lits[0] != p) as usize;
+                debug_assert!((*cb).lits[bi] == p);
+                (*cb).lits.swap(bi, (*cb).lits.len() - 1);
+                (*cb).lits.pop();
+                let new_lit = (*cb).lits[bi];
+                // pointer update
+                let mut ptr = watcher[p.negate() as usize];
+                let next_clause = (*ch).next_watcher[hi];
+                while ptr != NULL_CLAUSE {
+                    let i = (head[ptr].lit[0] != p) as usize;
+                    if head[ptr].next_watcher[i] == cix {
+                        head[ptr].next_watcher[i] = next_clause;
+                    }
+                    ptr = head[ptr].next_watcher[i];
                 }
-                let v = &mut self.vars[(*ch).lit[1].vi()];
-                assert_eq!(p.vi(), v.index);
-                assert_eq!((*ch).lit[1], p);
-                assert_ne!((*cb).lits[0], p);
-                return true;
-            }
-            if (*ch).lit[0] != p && (*ch).lit[1] != p {
+              println!("repoint");  
+                (*ch).lit[hi] = new_lit;
+                (*ch).next_watcher[hi] = watcher[new_lit.negate() as usize];
+                watcher[new_lit.negate() as usize] = cix;
+                if (*cb).lits.len() == 1 {
+                    println!("------------ unit");
+                    if (*ch).lit[1] == new_lit {
+                        panic!("aa");
+                        (*ch).lit.swap(0, 1);
+                        (*ch).next_watcher.swap(0, 1);
+                    }
+                    return true;
+                } else {
+                    return false;
+                }
+            } else {
+                (*cb).lits.retain(|&x| x != p);
                 return false;
             }
-            assert!(2 <= (*cb).lits.len());
-            debug_assert!((*ch).lit[0] == p || (*ch).lit[1] == p);
-            new_watcher = (*cb).lits[(*cb).lits.len()-1];
-            assert_ne!(p, new_watcher);
-            update = (*ch).lit[0] != p;
-            debug_assert!((*ch).lit[update as usize] == p);
-            next = (*ch).next_watcher[update as usize];
-            (*ch).lit[update as usize] = new_watcher;
-            (*ch).next_watcher[update as usize] = watcher[new_watcher.negate() as usize];
-            watcher[new_watcher.negate() as usize] = cix;
-            cj = &mut watcher[p.negate() as usize];
-            while *cj != NULL_CLAUSE {
-                if *cj == cix {
-                    *cj = next;
-                    break;
-                }
-                let h = &mut head[*cj] as *mut ClauseHead;
-                debug_assert!((*h).lit[0] == p || (*h).lit[1] == p);
-                cj = &mut (*h).next_watcher[((*h).lit[0] != p) as usize];
-            }
+//             // old code
+//             debug_assert!(1 < (*cb).lits.len());
+//             (*cb).lits.retain(|&x| x != p);
+//             if (*cb).lits.len() == 1 {
+//                 println!("strengthen make a clause {} unit", cid2fmt(cid));
+//                 if (*ch).lit[0] == p {
+//                     (*ch).lit.swap(0, 1);
+//                     (*ch).next_watcher.swap(0, 1);
+//                 }
+//                 let v = &mut self.vars[(*ch).lit[1].vi()];
+//                 assert_eq!(p.vi(), v.index);
+//                 assert_eq!((*ch).lit[1], p);
+//                 assert_ne!((*cb).lits[0], p);
+//                 return true;
+//             }
+//             if (*ch).lit[0] != p && (*ch).lit[1] != p {
+//                 return false;
+//             }
+//             assert!(2 <= (*cb).lits.len());
+//             debug_assert!((*ch).lit[0] == p || (*ch).lit[1] == p);
+//             new_watcher = (*cb).lits[(*cb).lits.len()-1];
+//             assert_ne!(p, new_watcher);
+//             update = (*ch).lit[0] != p;
+//             debug_assert!((*ch).lit[update as usize] == p);
+//             next = (*ch).next_watcher[update as usize];
+//             (*ch).lit[update as usize] = new_watcher;
+//             (*ch).next_watcher[update as usize] = watcher[new_watcher.negate() as usize];
+//             watcher[new_watcher.negate() as usize] = cix;
+//             cj = &mut watcher[p.negate() as usize];
+//             while *cj != NULL_CLAUSE {
+//                 if *cj == cix {
+//                     *cj = next;
+//                     break;
+//                 }
+//                 let h = &mut head[*cj] as *mut ClauseHead;
+//                 debug_assert!((*h).lit[0] == p || (*h).lit[1] == p);
+//                 cj = &mut (*h).next_watcher[((*h).lit[0] != p) as usize];
+//             }
+//         }
+//         false
         }
-        false
     }
 }
