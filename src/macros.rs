@@ -19,13 +19,13 @@ macro_rules! clause_body {
     }};
 }
 
-macro_rules! clause_head_mut {
-    ($cv: expr, $val: expr) => {{
-        match (&mut $cv, $val) {
-            (v, cid) => &mut v[cid.to_kind()].head[cid.to_index()],
-        }
-    }};
-}
+// macro_rules! clause_head_mut {
+//     ($cv: expr, $val: expr) => {{
+//         match (&mut $cv, $val) {
+//             (v, cid) => &mut v[cid.to_kind()].head[cid.to_index()],
+//         }
+//     }};
+// }
 
 macro_rules! clause_body_mut {
     ($cv: expr, $val: expr) => {{
