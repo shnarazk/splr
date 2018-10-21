@@ -312,7 +312,6 @@ impl Solver {
             }
             let cid = self.eliminator.clause_queue[0];
             self.eliminator.clause_queue.remove(0);
-            // continue;
             // println!("bsc remain clauses {} vars {}", self.eliminator.clause_queue.len(), self.eliminator.var_queue.len());
             unsafe {
                 let mut best = 0;
