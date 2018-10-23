@@ -367,7 +367,7 @@ impl Solver {
                                     // println!("BackSubsC    => subsumed {} from {} and {} {:#}", l.int(), cid2fmt(cid), cid2fmt(*di), xb);
                                     deleted_literals += 1;
                                     // println!("cancel true path");
-                                    // continue;
+                                    continue;
                                     if !self.strengthen_clause(*di, l.negate()) {
                                         return false;
                                     }
