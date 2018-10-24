@@ -506,14 +506,13 @@ impl CDCL for Solver {
                 ClauseKind::Permanent,
             ];
             for kind in &kinds {
-                cp[*kind as usize].check(false_lit);
+                // cp[*kind as usize].check(false_lit);
                 unsafe {
                     let head = &mut cp[*kind as usize].head[..] as *mut [ClauseHead];
                     let body = &mut cp[*kind as usize].body[..] as *mut [ClauseBody];
                     let watcher = &mut cp[*kind as usize].watcher[..] as *mut [ClauseIndex];
                     let mut pre = &mut (*watcher)[p] as *mut usize;
                     'next_clause: while *pre != NULL_CLAUSE {
-                        cp[*kind as usize].check(false_lit);
                         let ch = &mut (*head)[*pre] as *mut ClauseHead;
                         if (*ch).lit[0] != false_lit && (*ch).lit[1] != false_lit {
                             let cb = &mut (*body)[*pre] as *mut ClauseBody;
@@ -543,9 +542,9 @@ impl CDCL for Solver {
                                     if cix == 644 {
                                         println!("# new watch {} instead of {} for false_lit {} {:#} {:#}", (*lk).int(), false_lit.int(), cid2fmt(kind.id_from(cix)), *ch, *cb);
                                     }
-                                    if !cp[*kind as usize].check(false_lit) {
-                                        panic!("Before the seeking another watch: {} {} {:#} {:#}", cid2fmt(kind.id_from(cix)), (*lk).int(), *ch, *cb);
-                                    }
+                                    // if !cp[*kind as usize].check(false_lit) {
+                                    //     panic!("Before the seeking another watch: {} {} {:#} {:#}", cid2fmt(kind.id_from(cix)), (*lk).int(), *ch, *cb);
+                                    // }
                                     let alt = &mut (*watcher)[lk.negate() as usize];
                                     (*ch).next_watcher[my_index] = *alt;
                                     *alt = cix;
@@ -564,7 +563,7 @@ impl CDCL for Solver {
                                 *q_head = trail.len();
                                 if !cp[*kind as usize].check(false_lit) {
                                     println!(" conflicting at {} by propagating {} {:#} {:#}", cid2fmt(kind.id_from(*pre)), false_lit.int(), *ch, *cb);
-                                    panic!("Yay");
+                                    panic!("Yay2");
                                 }
                                 return kind.id_from(*pre);
                             } else {
