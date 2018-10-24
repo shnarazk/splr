@@ -197,17 +197,19 @@ impl Solver {
         debug_assert_ne!(cid, NULL_CLAUSE);
         if self.strengthen(cid, l) {
             let c0 = clause_head!(self.cp, cid).lit[0];
-            debug_assert!(1 < clause_body!(self.cp, cid).lits.len());
-            println!("cid {} became a unit clause as c0 {}, l {}", cid2fmt(cid), c0.int(), l.int());
-            debug_assert_ne!(c0, l);
+            assert!(1 == clause_body!(self.cp, cid).lits.len());
+            println!("cid {} {:?} became a unit clause as c0 {}, l {}", cid2fmt(cid), vec2int(&clause_body!(self.cp, cid).lits), c0.int(), l.int());
+            assert_ne!(c0, l);
             println!("{} is removed and its first literal {} is enqueued.", cid2fmt(cid), c0.int());
             self.remove_clause(cid);
             // before the following propagate, we need to clean garbages.
             // これまずくないか? self.cp[cid.to_kind()].garbage_collect(&mut self.vars, &mut self.eliminator);
             // println!("STRENGTHEN_CLAUSE ENQUEUE {}", c0);
-            if !self.enqueue(c0, NULL_CLAUSE) { //  && self.propagate() == NULL_CLAUSE {
+            if self.enqueue(c0, NULL_CLAUSE) { //  && self.propagate() == NULL_CLAUSE {
                 return true;
             } else {
+                println!("{:?}", self.vars[c0.vi()]);
+                panic!("Conflicting Enqueue:: A l {}, c0 {}, {:#} {:#}", l.int(), c0.int(), clause_head!(self.cp, cid), clause_body!(self.cp, cid));
                 self.ok = false;
                 return false;
             }
@@ -672,9 +674,13 @@ impl Solver {
                 assert!((*cb).lits[bi] == p);
                 (*cb).lits.swap_remove(bi);
                 if (*cb).lits.len() == 1 {
-                    if hi == 1 {
+                    if hi == 0 {
                         (*ch).lit.swap(0, 1);
                         (*ch).next_watcher.swap(0, 1);
+                    }
+                    if bi == 1 {
+                         // panic!("p {}, l0 {}, UNITCLAUSE {} {:#} {:#}", p.int(), (*ch).lit[0].int(), cid2fmt(cid), *ch, *cb);
+                        (*cb).lits[0] = (*ch).lit[0];
                     }
                     return true;
                     // panic!("too short clause {} {:#} {:#}", cid2fmt(cid), *ch, *cb);
