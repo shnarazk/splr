@@ -394,6 +394,9 @@ impl ClauseManagement for Solver {
             n => {
                 let cid = self.cp[kind as usize].new_clause(&v, 0, false, false);
                 self.eliminator_register_clause(cid, n, true);
+                if cid.to_index() == 7754 {
+                    println!("cix {} {:#} {:#}", cid2fmt(cid), clause_head!(self.cp, cid), clause_body!(self.cp, cid));
+                }
                 Some(cid)
             }
         }

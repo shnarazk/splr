@@ -539,9 +539,9 @@ impl CDCL for Solver {
                                 if (((lk & 1) as u8) ^ vars[lk.vi()].assign) != 0 {
                                     let cix = *pre;
                                     *pre = (*ch).next_watcher[my_index];
-                                    if cix == 644 {
-                                        println!("# new watch {} instead of {} for false_lit {} {:#} {:#}", (*lk).int(), false_lit.int(), cid2fmt(kind.id_from(cix)), *ch, *cb);
-                                    }
+                                    // if cix == 644 {
+                                    //     println!("# new watch {} instead of {} for false_lit {} {:#} {:#}", (*lk).int(), false_lit.int(), cid2fmt(kind.id_from(cix)), *ch, *cb);
+                                    // }
                                     // if !cp[*kind as usize].check(false_lit) {
                                     //     panic!("Before the seeking another watch: {} {} {:#} {:#}", cid2fmt(kind.id_from(cix)), (*lk).int(), *ch, *cb);
                                     // }
@@ -552,19 +552,19 @@ impl CDCL for Solver {
                                     assert!((*cb).lits[1] == false_lit);
                                     (*cb).lits[1] = *lk;
                                     (*cb).lits[k] = false_lit; // Don't move this above (needed by enuremate)
-                                    if !cp[*kind as usize].check(false_lit) {
-                                        println!(" (false_ilt {}) substituted {} with {} in {} {:#} {:#}", false_lit.int(), (*cb).lits[k].int(), (*cb).lits[1].int(), cid2fmt(kind.id_from(cix)), *ch, *cb);
-                                        panic!("Yay");
-                                    }
+                                    // if !cp[*kind as usize].check(false_lit) {
+                                    //     println!(" (false_ilt {}) substituted {} with {} in {} {:#} {:#}", false_lit.int(), (*cb).lits[k].int(), (*cb).lits[1].int(), cid2fmt(kind.id_from(cix)), *ch, *cb);
+                                    //     panic!("Yay");
+                                    // }
                                     continue 'next_clause;
                                 }
                             }
                             if other_value == LFALSE {
                                 *q_head = trail.len();
-                                if !cp[*kind as usize].check(false_lit) {
-                                    println!(" conflicting at {} by propagating {} {:#} {:#}", cid2fmt(kind.id_from(*pre)), false_lit.int(), *ch, *cb);
-                                    panic!("Yay2");
-                                }
+                                // if !cp[*kind as usize].check(false_lit) {
+                                //     println!(" conflicting at {} by propagating {} {:#} {:#}", cid2fmt(kind.id_from(*pre)), false_lit.int(), *ch, *cb);
+                                //     panic!("Yay2");
+                                // }
                                 return kind.id_from(*pre);
                             } else {
                                 // self.uncheck_enqueue(other, kind.id_from((*c).index));

@@ -192,10 +192,12 @@ impl Solver {
     pub fn strengthen_clause(&mut self, cid: ClauseId, l: Lit) -> bool {
         debug_assert!(!clause_body!(self.cp, cid).get_flag(ClauseFlag::Dead));
         debug_assert!(!clause_body!(self.cp, cid).get_flag(ClauseFlag::Locked));
+        debug_assert!(1 < clause_body!(self.cp, cid).lits.len());
         // println!("STRENGTHEN_CLAUSE {}:{}", cid2fmt(cid));
         debug_assert_ne!(cid, NULL_CLAUSE);
         if self.strengthen(cid, l) {
             let c0 = clause_head!(self.cp, cid).lit[0];
+            debug_assert!(1 < clause_body!(self.cp, cid).lits.len());
             println!("cid {} became a unit clause as c0 {}, l {}", cid2fmt(cid), c0.int(), l.int());
             debug_assert_ne!(c0, l);
             println!("{} is removed and its first literal {} is enqueued.", cid2fmt(cid), c0.int());
@@ -211,6 +213,7 @@ impl Solver {
             }
         } else {
             // println!("cid {} drops literal {}", cid2fmt(cid), l.int());
+            debug_assert!(1 < clause_body!(self.cp, cid).lits.len());
             self.eliminator_enqueue_clause(cid);
             return true;
         };
@@ -354,7 +357,7 @@ impl Solver {
                                 Some(NULL_LIT) => {
                                     // println!("BackSubsC    => {} subsumed completely by {}", cid2fmt(*di), cid2fmt(cid));
                                     subsumed += 1;
-                                    if di.to_kind() == ClauseKind::Permanent as usize {
+                                    if di.to_kind() == ClauseKind::Permanent as usize && di.to_index() == 7754 {
                                         println!("WOW, backward_subsumption_check tries to deleted a permanent clause {} {:#}",
                                                  cid2fmt(*di),
                                                  clause_body!(self.cp, *di));
@@ -368,6 +371,11 @@ impl Solver {
                                     deleted_literals += 1;
                                     // println!("cancel true path");
                                     // continue;
+                                    if di.to_kind() == ClauseKind::Permanent as usize && di.to_index() == 7754 {
+                                        println!("WOW, backward_subsumption_check tries to strengthen a permanent clause {} {:#}",
+                                                 cid2fmt(*di),
+                                                 clause_body!(self.cp, *di));
+                                    }
                                     if !self.strengthen_clause(*di, l.negate()) {
                                         return false;
                                     }
@@ -663,6 +671,14 @@ impl Solver {
                 let bi = ((*cb).lits[0] != p) as usize;
                 assert!((*cb).lits[bi] == p);
                 (*cb).lits.swap_remove(bi);
+                if (*cb).lits.len() == 1 {
+                    if hi == 1 {
+                        (*ch).lit.swap(0, 1);
+                        (*ch).next_watcher.swap(0, 1);
+                    }
+                    return true;
+                    // panic!("too short clause {} {:#} {:#}", cid2fmt(cid), *ch, *cb);
+               }
                 let new_lit = (*cb).lits[bi];
                 assert_ne!(new_lit, p);
                 let next_clause = (*ch).next_watcher[hi];
