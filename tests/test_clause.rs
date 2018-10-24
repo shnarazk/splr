@@ -63,18 +63,18 @@ fn clause_sort() -> () {
 
 fn setup() -> Solver {
     let cnf = CNFDescription {
-        num_of_variables: 4,
-        num_of_clauses: 5,
+        num_of_variables: 5,
+        num_of_clauses: 6,
         pathname: "".to_string(),
     };
     let mut s = Solver::new(Default::default(), &cnf);
     attach_clause(&mut s, &mkv![1, 2, -3]).activity(1.0);
     attach_clause(&mut s, &mkv![1, -2, 3]).activity(4.0).rank(3);
     attach_clause(&mut s, &mkv![-1, 2, 3, 4]).activity(5.0);
-    attach_clause(&mut s, &mkv![-1, 2, 3, 4])
+    attach_clause(&mut s, &mkv![-1, 2, 3, 5])
         .activity(2.0)
         .rank(2);
-    attach_clause(&mut s, &mkv![-1, 2, 3, 4])
+    attach_clause(&mut s, &mkv![-1, 2, -3, -4])
         .activity(1.0)
         .rank(2);
     attach_clause(&mut s, &mkv![-1, 2, -3, 4])
