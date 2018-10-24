@@ -670,12 +670,19 @@ impl Solver {
                 let next_clause = (*ch).next_watcher[hi];
                 while ptr != NULL_CLAUSE {
                     let i = (head[ptr].lit[0] != p) as usize;
+                    assert_eq!(head[ptr].lit[i], p);
                     if head[ptr].next_watcher[i] == cix {
+                        if cix == 361 {
+                            println!("wooo");
+                        }
                         head[ptr].next_watcher[i] = next_clause;
+                        break;
                     }
                     ptr = head[ptr].next_watcher[i];
                 }
-              println!("repoint");  
+                if ptr == NULL_CLAUSE {
+                    panic!("failed to seek myself in a watch list");
+                }
                 (*ch).lit[hi] = new_lit;
                 (*ch).next_watcher[hi] = watcher[new_lit.negate() as usize];
                 watcher[new_lit.negate() as usize] = cix;

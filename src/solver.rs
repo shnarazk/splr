@@ -515,36 +515,57 @@ impl CDCL for Solver {
                     'next_clause: while *pre != NULL_CLAUSE {
                         cp[*kind as usize].check(false_lit);
                         let ch = &mut (*head)[*pre] as *mut ClauseHead;
+                        if (*ch).lit[0] != false_lit && (*ch).lit[1] != false_lit {
+                            let cb = &mut (*body)[*pre] as *mut ClauseBody;
+                            println!("(false_lit {}) illegal watch literals cid: {} {} {}",
+                                     false_lit.int(),
+                                     cid2fmt(kind.id_from(*pre)),
+                                     *ch,
+                                     *cb
+                            );
+                            panic!("trap");
+                        }
+                        assert!((*ch).lit[0] == false_lit || (*ch).lit[1] == false_lit);
                         let my_index = ((*ch).lit[0] != false_lit) as usize;
                         let other_value = vars.assigned((*ch).lit[(my_index == 0) as usize]);
                         if other_value != LTRUE {
                             let cb = &mut (*body)[*pre] as *mut ClauseBody;
                             assert!(2 <= (*cb).lits.len());
+                            assert!((*cb).lits[0] == false_lit || (*cb).lits[1] == false_lit);
                             if (*cb).lits[0] == false_lit {
                                 (*cb).lits.swap(0, 1); // now false_lit is lits[1].
                             }
                             for (k, lk) in (*cb).lits.iter().enumerate().skip(2) {
                                 // below is equivalent to 'assigned(lk) != LFALSE'
                                 if (((lk & 1) as u8) ^ vars[lk.vi()].assign) != 0 {
-                                    let cid = *pre;
-                                    if cid == 635 {
-                                        println!("{} {} {:#} {:#}", cid2fmt(kind.id_from(cid)), (*lk).int(), *ch, *cb);
-                                    }
+                                    let cix = *pre;
                                     *pre = (*ch).next_watcher[my_index];
+                                    if cix == 644 {
+                                        println!("# new watch {} instead of {} for false_lit {} {:#} {:#}", (*lk).int(), false_lit.int(), cid2fmt(kind.id_from(cix)), *ch, *cb);
+                                    }
+                                    if !cp[*kind as usize].check(false_lit) {
+                                        panic!("Before the seeking another watch: {} {} {:#} {:#}", cid2fmt(kind.id_from(cix)), (*lk).int(), *ch, *cb);
+                                    }
                                     let alt = &mut (*watcher)[lk.negate() as usize];
                                     (*ch).next_watcher[my_index] = *alt;
-                                    *alt = cid;
+                                    *alt = cix;
                                     (*ch).lit[my_index] = *lk;
+                                    assert!((*cb).lits[1] == false_lit);
                                     (*cb).lits[1] = *lk;
                                     (*cb).lits[k] = false_lit; // Don't move this above (needed by enuremate)
-                                    if cid == 635 {
-                                        println!("{} {} {:#} {:#}", cid2fmt(kind.id_from(cid)), (*lk).int(), *ch, *cb);
+                                    if !cp[*kind as usize].check(false_lit) {
+                                        println!(" (false_ilt {}) substituted {} with {} in {} {:#} {:#}", false_lit.int(), (*cb).lits[k].int(), (*cb).lits[1].int(), cid2fmt(kind.id_from(cix)), *ch, *cb);
+                                        panic!("Yay");
                                     }
                                     continue 'next_clause;
                                 }
                             }
                             if other_value == LFALSE {
                                 *q_head = trail.len();
+                                if !cp[*kind as usize].check(false_lit) {
+                                    println!(" conflicting at {} by propagating {} {:#} {:#}", cid2fmt(kind.id_from(*pre)), false_lit.int(), *ch, *cb);
+                                    panic!("Yay");
+                                }
                                 return kind.id_from(*pre);
                             } else {
                                 // self.uncheck_enqueue(other, kind.id_from((*c).index));
@@ -562,7 +583,6 @@ impl CDCL for Solver {
                         pre = &mut (*ch).next_watcher[my_index];
                     }
                 }
-                cp[*kind as usize].check(false_lit);
             }
         }
         NULL_CLAUSE

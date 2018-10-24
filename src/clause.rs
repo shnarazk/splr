@@ -35,8 +35,7 @@ pub trait ClauseManagement {
 }
 
 pub trait ConsistencyCheck {
-    fn check(&mut self, lit: Lit) -> () {
-    }
+    fn check(&mut self, lit: Lit) -> bool;
 }
 
 const DB_INC_SIZE: usize = 200;
@@ -781,7 +780,7 @@ impl<'a> Iterator for ClauseListIter<'a> {
 }
 
 impl ConsistencyCheck for ClausePartition {
-    fn check(&mut self, lit: Lit) -> () {
+    fn check(&mut self, lit: Lit) -> bool {
         let max = self.head.len();
         for i in 2..self.watcher.len() {
             let mut p = self.watcher[(i as Lit).negate() as usize];
@@ -789,10 +788,12 @@ impl ConsistencyCheck for ClausePartition {
             while p != NULL_CLAUSE {
                 cnt += 1;
                 if max <= cnt {
-                    panic!("ConsistencyCheck::fail for {} during {}", (i as Lit).int(), lit.int());
+                    println!("ConsistencyCheck::fail at {} during {}", (i as Lit).int(), lit.int());
+                    return false
                 }
                 p = self.head[p].next_watcher[(self.head[p].lit[0] != (i as Lit)) as usize];
             }
         }
+        return true;
     }
 }
