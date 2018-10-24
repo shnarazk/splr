@@ -1,4 +1,4 @@
-use clause::{ClauseManagement, GC, *};
+use clause::{ClauseManagement, GC, *, ConsistencyCheck};
 use eliminator::{ClauseElimination, Eliminator, EliminatorIF};
 use std::collections::VecDeque;
 use std::cmp::max;
@@ -506,12 +506,17 @@ impl CDCL for Solver {
                 ClauseKind::Permanent,
             ];
             for kind in &kinds {
+                cp[*kind as usize].check();
                 unsafe {
                     let head = &mut cp[*kind as usize].head[..] as *mut [ClauseHead];
                     let body = &mut cp[*kind as usize].body[..] as *mut [ClauseBody];
                     let watcher = &mut cp[*kind as usize].watcher[..] as *mut [ClauseIndex];
                     let mut pre = &mut (*watcher)[p] as *mut usize;
                     'next_clause: while *pre != NULL_CLAUSE {
+                        if *pre == 635 {
+                            println!("{}", cid2fmt(kind.id_from(*pre)));
+                        }
+                        cp[*kind as usize].check();
                         let ch = &mut (*head)[*pre] as *mut ClauseHead;
                         let my_index = ((*ch).lit[0] != false_lit) as usize;
                         let other_value = vars.assigned((*ch).lit[(my_index == 0) as usize]);
@@ -525,6 +530,9 @@ impl CDCL for Solver {
                                 // below is equivalent to 'assigned(lk) != LFALSE'
                                 if (((lk & 1) as u8) ^ vars[lk.vi()].assign) != 0 {
                                     let cid = *pre;
+                                    if cid == 635 {
+                                        println!("{} {} {:#} {:#}", cid2fmt(kind.id_from(cid)), (*lk).int(), *ch, *cb);
+                                    }
                                     *pre = (*ch).next_watcher[my_index];
                                     let alt = &mut (*watcher)[lk.negate() as usize];
                                     (*ch).next_watcher[my_index] = *alt;
@@ -532,6 +540,9 @@ impl CDCL for Solver {
                                     (*ch).lit[my_index] = *lk;
                                     (*cb).lits[1] = *lk;
                                     (*cb).lits[k] = false_lit; // Don't move this above (needed by enuremate)
+                                    if cid == 635 {
+                                        println!("{} {} {:#} {:#}", cid2fmt(kind.id_from(cid)), (*lk).int(), *ch, *cb);
+                                    }
                                     continue 'next_clause;
                                 }
                             }
@@ -554,6 +565,7 @@ impl CDCL for Solver {
                         pre = &mut (*ch).next_watcher[my_index];
                     }
                 }
+                cp[*kind as usize].check();
             }
         }
         NULL_CLAUSE
