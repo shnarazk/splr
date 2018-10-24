@@ -35,7 +35,7 @@ pub trait ClauseManagement {
 }
 
 pub trait ConsistencyCheck {
-    fn check(&mut self) -> () {
+    fn check(&mut self, lit: Lit) -> () {
     }
 }
 
@@ -781,7 +781,7 @@ impl<'a> Iterator for ClauseListIter<'a> {
 }
 
 impl ConsistencyCheck for ClausePartition {
-    fn check(&mut self) -> () {
+    fn check(&mut self, lit: Lit) -> () {
         let max = self.head.len();
         for i in 2..self.watcher.len() {
             let mut p = self.watcher[(i as Lit).negate() as usize];
@@ -789,7 +789,7 @@ impl ConsistencyCheck for ClausePartition {
             while p != NULL_CLAUSE {
                 cnt += 1;
                 if max <= cnt {
-                    panic!("ConsistencyCheck::fail for {}", (i as Lit).int());
+                    panic!("ConsistencyCheck::fail for {} during {}", (i as Lit).int(), lit.int());
                 }
                 p = self.head[p].next_watcher[(self.head[p].lit[0] != (i as Lit)) as usize];
             }

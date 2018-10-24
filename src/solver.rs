@@ -506,17 +506,14 @@ impl CDCL for Solver {
                 ClauseKind::Permanent,
             ];
             for kind in &kinds {
-                cp[*kind as usize].check();
+                cp[*kind as usize].check(false_lit);
                 unsafe {
                     let head = &mut cp[*kind as usize].head[..] as *mut [ClauseHead];
                     let body = &mut cp[*kind as usize].body[..] as *mut [ClauseBody];
                     let watcher = &mut cp[*kind as usize].watcher[..] as *mut [ClauseIndex];
                     let mut pre = &mut (*watcher)[p] as *mut usize;
                     'next_clause: while *pre != NULL_CLAUSE {
-                        if *pre == 635 {
-                            println!("{}", cid2fmt(kind.id_from(*pre)));
-                        }
-                        cp[*kind as usize].check();
+                        cp[*kind as usize].check(false_lit);
                         let ch = &mut (*head)[*pre] as *mut ClauseHead;
                         let my_index = ((*ch).lit[0] != false_lit) as usize;
                         let other_value = vars.assigned((*ch).lit[(my_index == 0) as usize]);
@@ -565,7 +562,7 @@ impl CDCL for Solver {
                         pre = &mut (*ch).next_watcher[my_index];
                     }
                 }
-                cp[*kind as usize].check();
+                cp[*kind as usize].check(false_lit);
             }
         }
         NULL_CLAUSE
