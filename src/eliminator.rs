@@ -1,7 +1,7 @@
 #![allow(unreachable_code)]
 #![allow(unused_mut)]
 #![allow(unused_variables)]
-use clause::{ClauseBody, ClauseHead, ClauseFlag, ClauseIdIndexEncoding, ClauseKind, ClauseManagement, ClausePartition, cid2fmt};
+use clause::{ClauseBody, ClauseFlag, ClauseHead, ClauseIndex, ClauseIdIndexEncoding, ClauseKind, ClauseManagement, ClausePartition, cid2fmt};
 use solver::{CDCL, Solver};
 use std::fmt;
 use types::*;
@@ -210,7 +210,7 @@ impl Solver {
                 return false;
             }
         } else {
-            println!("cid {} drops literal {}", cid2fmt(cid), l.int());
+            // println!("cid {} drops literal {}", cid2fmt(cid), l.int());
             self.eliminator_enqueue_clause(cid);
             return true;
         };
@@ -352,7 +352,7 @@ impl Solver {
                             // ここから先を潰すとvalid answer
                             match self.subsume(cid, *di) {
                                 Some(NULL_LIT) => {
-                                    println!("BackSubsC    => {} subsumed completely by {}", cid2fmt(*di), cid2fmt(cid));
+                                    // println!("BackSubsC    => {} subsumed completely by {}", cid2fmt(*di), cid2fmt(cid));
                                     subsumed += 1;
                                     if di.to_kind() == ClauseKind::Permanent as usize {
                                         println!("WOW, backward_subsumption_check tries to deleted a permanent clause {} {:#}",
@@ -659,29 +659,28 @@ impl Solver {
                 debug_assert!((*cb).lits[0] == p || (*cb).lits[1] == p);
                 // update lit, next_watcher, and lits
                 let hi = ((*ch).lit[0] != p) as usize;
-                debug_assert!((*ch).lit[hi] == p);
+                assert!((*ch).lit[hi] == p);
                 let bi = ((*cb).lits[0] != p) as usize;
-                debug_assert!((*cb).lits[bi] == p);
-                (*cb).lits.swap(bi, (*cb).lits.len() - 1);
-                (*cb).lits.pop();
+                assert!((*cb).lits[bi] == p);
+                (*cb).lits.swap_remove(bi);
                 let new_lit = (*cb).lits[bi];
-                // pointer update
-                let mut ptr = watcher[p.negate() as usize];
+                assert_ne!(new_lit, p);
                 let next_clause = (*ch).next_watcher[hi];
-                while ptr != NULL_CLAUSE {
-                    let i = (head[ptr].lit[0] != p) as usize;
-                    assert_eq!(head[ptr].lit[i], p);
-                    if head[ptr].next_watcher[i] == cix {
+                // pointer update
+                {
+                    let mut ptr = &mut watcher[p.negate() as usize] as *mut ClauseIndex;
+                    while *ptr != NULL_CLAUSE {
                         if cix == 361 {
-                            println!("wooo");
+                            println!("wooo 361: {}", *ptr);
                         }
-                        head[ptr].next_watcher[i] = next_clause;
-                        break;
+                        if *ptr == cix {
+                            *ptr = next_clause;
+                            break;
+                        }
+                        let i = (head[*ptr].lit[0] != p) as usize;
+                        assert_eq!(head[*ptr].lit[i], p);
+                        ptr = &mut head[*ptr].next_watcher[i];
                     }
-                    ptr = head[ptr].next_watcher[i];
-                }
-                if ptr == NULL_CLAUSE {
-                    panic!("failed to seek myself in a watch list");
                 }
                 (*ch).lit[hi] = new_lit;
                 (*ch).next_watcher[hi] = watcher[new_lit.negate() as usize];
@@ -698,6 +697,7 @@ impl Solver {
                     return false;
                 }
             } else {
+                assert!((*ch).lit[0] != p.negate() && (*ch).lit[1] != p.negate());
                 (*cb).lits.retain(|&x| x != p);
                 return false;
             }
