@@ -193,6 +193,8 @@ impl Solver {
         debug_assert!(!clause_body!(self.cp, cid).get_flag(ClauseFlag::Dead));
         debug_assert!(!clause_body!(self.cp, cid).get_flag(ClauseFlag::Locked));
         debug_assert!(1 < clause_body!(self.cp, cid).lits.len());
+        self.cp[cid.to_kind()].touched[l as usize] = true;
+        self.cp[cid.to_kind()].touched[l.negate() as usize] = true;
         // println!("STRENGTHEN_CLAUSE {}:{}", cid2fmt(cid));
         debug_assert_ne!(cid, NULL_CLAUSE);
         if self.strengthen(cid, l) {
@@ -206,6 +208,8 @@ impl Solver {
             // これまずくないか? self.cp[cid.to_kind()].garbage_collect(&mut self.vars, &mut self.eliminator);
             // println!("STRENGTHEN_CLAUSE ENQUEUE {}", c0);
             if self.enqueue(c0, NULL_CLAUSE) { //  && self.propagate() == NULL_CLAUSE {
+                self.cp[cid.to_kind()].touched[c0 as usize] = true;
+                self.cp[cid.to_kind()].touched[c0.negate() as usize] = true;
                 return true;
             } else {
                 println!("{:?}", self.vars[c0.vi()]);
@@ -339,14 +343,14 @@ impl Solver {
                     cnt += (*cs).len();
                     for di in &*cs {
                         let db = clause_body!(self.cp, di) as *const ClauseBody;
-                        // if (*db).get_flag(ClauseFlag::Locked) {
-                        //     println!("di {} body {:#}, lits[0]vi {}",
-                        //              cid2fmt(*di),
-                        //              *db,
-                        //              self.vars[(*db).lits[0].vi()].reason,
-                        //              );
-                        // }
-                        debug_assert!(!(*db).get_flag(ClauseFlag::Locked) || (*db).get_flag(ClauseFlag::Dead));
+                        if (*db).get_flag(ClauseFlag::Locked) {
+                            println!("di {} body {:#}, lits[0]vi {}",
+                                     cid2fmt(*di),
+                                     *db,
+                                     cid2fmt(self.vars[(*db).lits[0].vi()].reason),
+                                     );
+                        }
+                        debug_assert!((!(*db).get_flag(ClauseFlag::Locked)) || (*db).get_flag(ClauseFlag::Dead));
                         if !(*db).get_flag(ClauseFlag::Dead)
                             && *di != cid
                             && lits.len() <= SUBSUMPTION_SIZE

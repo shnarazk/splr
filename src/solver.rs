@@ -574,9 +574,13 @@ impl CDCL for Solver {
                                 v.assign = other.lbool();
                                 v.level = dl;
                                 assert!(*pre != NULL_CLAUSE);
-                                v.reason = kind.id_from(*pre);
+                                if dl == 0 {
+                                    v.reason = NULL_CLAUSE;
+                                } else {
+                                    v.reason = kind.id_from(*pre);
+                                    (*cb).set_flag(ClauseFlag::Locked, true);
+                                }
                                 trail.push(other);
-                                (*cb).set_flag(ClauseFlag::Locked, true);
                             }
                         }
                         pre = &mut (*ch).next_watcher[my_index];
@@ -673,6 +677,7 @@ impl CDCL for Solver {
                             // clause_body_mut!(self.cp, cid).activity = (dl as f64) / 2.0;
                         }
                         self.uncheck_enqueue(l0, cid);
+                        clause_body_mut!(self.cp, cid).set_flag(ClauseFlag::Locked, true);
                     }
                 }
                 self.stat[Stat::SumLBD as usize] += lbd as i64;
@@ -742,12 +747,16 @@ impl CDCL for Solver {
             {
                 let v = &mut self.vars[l.vi()];
                 v.assign = sig;
+                if dl == 0 && cid != NULL_CLAUSE {
+                    println!("enqueue {}", cid2fmt(cid));
+                }
                 v.reason = cid;
                 if dl == 0 {
                     // if !v.enqueued {
                     //     self.eliminator.var_queue.push(l.vi());
                     //     v.enqueued = true;
                     // }
+                    v.reason = NULL_CLAUSE;
                     v.activity = 0.0;
                 }
                 v.level = dl;
@@ -1027,6 +1036,9 @@ impl Solver {
             let v = &mut self.vars[l.vi()];
             v.assign = l.lbool();
             v.level = dl;
+            if dl == 0 {
+                println!("zero-level uncheck_enqueue {}", cid2fmt(cid));
+            }
             v.reason = cid;
         }
         if dl == 0 {
