@@ -204,7 +204,7 @@ impl Solver {
             .skip(1)
             .filter(|c| !c.get_flag(ClauseFlag::Dead) && c.rank <= 3)
             .count();
-        if false {
+        if true {
             if mes.is_empty() {
                 println!("{}", self.profile);
                 println!();
@@ -1036,9 +1036,6 @@ impl Solver {
             let v = &mut self.vars[l.vi()];
             v.assign = l.lbool();
             v.level = dl;
-            if dl == 0 {
-                println!("zero-level uncheck_enqueue {}", cid2fmt(cid));
-            }
             v.reason = cid;
         }
         if dl == 0 {

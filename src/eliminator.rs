@@ -200,9 +200,9 @@ impl Solver {
         if self.strengthen(cid, l) {
             let c0 = clause_head!(self.cp, cid).lit[0];
             debug_assert!(1 == clause_body!(self.cp, cid).lits.len());
-            println!("cid {} {:?} became a unit clause as c0 {}, l {}", cid2fmt(cid), vec2int(&clause_body!(self.cp, cid).lits), c0.int(), l.int());
+            // println!("cid {} {:?} became a unit clause as c0 {}, l {}", cid2fmt(cid), vec2int(&clause_body!(self.cp, cid).lits), c0.int(), l.int());
             debug_assert_ne!(c0, l);
-            println!("{} is removed and its first literal {} is enqueued.", cid2fmt(cid), c0.int());
+            // println!("{} is removed and its first literal {} is enqueued.", cid2fmt(cid), c0.int());
             self.remove_clause(cid);
             // before the following propagate, we need to clean garbages.
             // これまずくないか? self.cp[cid.to_kind()].garbage_collect(&mut self.vars, &mut self.eliminator);
@@ -212,8 +212,8 @@ impl Solver {
                 self.cp[cid.to_kind()].touched[c0.negate() as usize] = true;
                 return true;
             } else {
-                println!("{:?}", self.vars[c0.vi()]);
-                panic!("Conflicting Enqueue:: A l {}, c0 {}, {:#} {:#}", l.int(), c0.int(), clause_head!(self.cp, cid), clause_body!(self.cp, cid));
+                //println!("{:?}", self.vars[c0.vi()]);
+                //panic!("Conflicting Enqueue:: A l {}, c0 {}, {:#} {:#}", l.int(), c0.int(), clause_head!(self.cp, cid), clause_body!(self.cp, cid));
                 self.ok = false;
                 return false;
             }
@@ -343,13 +343,13 @@ impl Solver {
                     cnt += (*cs).len();
                     for di in &*cs {
                         let db = clause_body!(self.cp, di) as *const ClauseBody;
-                        if (*db).get_flag(ClauseFlag::Locked) && !(*db).get_flag(ClauseFlag::Dead) {
-                            println!("di {} body {:#}, lits[0]vi {}",
-                                     cid2fmt(*di),
-                                     *db,
-                                     cid2fmt(self.vars[(*db).lits[0].vi()].reason),
-                                     );
-                        }
+                        // if (*db).get_flag(ClauseFlag::Locked) && !(*db).get_flag(ClauseFlag::Dead) {
+                        //     println!("di {} body {:#}, lits[0]vi {}",
+                        //              cid2fmt(*di),
+                        //              *db,
+                        //              cid2fmt(self.vars[(*db).lits[0].vi()].reason),
+                        //              );
+                        // }
                         debug_assert!((!(*db).get_flag(ClauseFlag::Locked)) || (*db).get_flag(ClauseFlag::Dead));
                         if !(*db).get_flag(ClauseFlag::Dead)
                             && *di != cid
@@ -363,12 +363,13 @@ impl Solver {
                                 Some(NULL_LIT) => {
                                     // println!("BackSubsC    => {} subsumed completely by {}", cid2fmt(*di), cid2fmt(cid));
                                     subsumed += 1;
-                                    if di.to_kind() == ClauseKind::Permanent as usize && di.to_index() == 7754 {
-                                        println!("WOW, backward_subsumption_check tries to deleted a permanent clause {} {:#}",
-                                                 cid2fmt(*di),
-                                                 clause_body!(self.cp, *di));
+                                    if di.to_kind() == ClauseKind::Removable as usize {
+                                        self.remove_clause(*di); // TODO: Is this OK???
                                     } else {
-                                        // self.remove_clause(*di);
+                                        // println!("backward_subsumption_check tries to delete a permanent clause {} {:#}",
+                                        //          cid2fmt(*di),
+                                        //          clause_body!(self.cp, *di));
+                                        // TODO: move the cid to Permanent
                                     }
                                 }
                                 Some(l) => {
@@ -377,11 +378,11 @@ impl Solver {
                                     deleted_literals += 1;
                                     // println!("cancel true path");
                                     // continue;
-                                    if di.to_kind() == ClauseKind::Permanent as usize && di.to_index() == 7754 {
-                                        println!("WOW, backward_subsumption_check tries to strengthen a permanent clause {} {:#}",
-                                                 cid2fmt(*di),
-                                                 clause_body!(self.cp, *di));
-                                    }
+                                    // if di.to_kind() == ClauseKind::Permanent as usize && di.to_index() == 7754 {
+                                    //     println!("WOW, backward_subsumption_check tries to strengthen a permanent clause {} {:#}",
+                                    //              cid2fmt(*di),
+                                    //              clause_body!(self.cp, *di));
+                                    // }
                                     if !self.strengthen_clause(*di, l.negate()) {
                                         return false;
                                     }
@@ -457,7 +458,7 @@ impl Solver {
             self.vars[v].eliminated = true;
             let cid = self.vars[v].reason;
             debug_assert_eq!(cid, NULL_CLAUSE);
-            println!("- eliminate: {:>5} (+{:<4} -{:<4})", v, (*pos).len(), (*neg).len() );
+            // println!("- eliminate: {:>5} (+{:<4} -{:<4})", v, (*pos).len(), (*neg).len() );
             // setDecisionVar(v, false);
             self.eliminator.eliminated_vars += 1;
             {
@@ -500,7 +501,7 @@ impl Solver {
                                     self.enqueue(vec[0], NULL_CLAUSE);
                                 }
                                 _ => {
-                                    println!("eliminate_var calls add_clause {:?}", vec2int(&vec));
+                                    // println!("eliminate_var calls add_clause {:?}", vec2int(&vec));
                                     self.add_clause(&mut vec.to_vec(), 0);
                                 }
                             }
@@ -696,9 +697,6 @@ impl Solver {
                 {
                     let mut ptr = &mut watcher[p.negate() as usize] as *mut ClauseIndex;
                     while *ptr != NULL_CLAUSE {
-                        if cix == 361 {
-                            println!("wooo 361: {}", *ptr);
-                        }
                         if *ptr == cix {
                             *ptr = next_clause;
                             break;
@@ -712,7 +710,6 @@ impl Solver {
                 (*ch).next_watcher[hi] = watcher[new_lit.negate() as usize];
                 watcher[new_lit.negate() as usize] = cix;
                 if (*cb).lits.len() == 1 {
-                    println!("------------ unit");
                     if (*ch).lit[1] == new_lit {
                         panic!("aa");
                         (*ch).lit.swap(0, 1);
