@@ -30,7 +30,6 @@ impl QueueOperations for VecDeque<usize> {
         let len = self.len() as f64;
         let sum = self.iter().sum::<usize>() as f64;
         sum / len
-
     }
     fn enqueue(&mut self, x: usize) -> bool {
         self.push_back(x);
@@ -72,8 +71,7 @@ impl Restart for Solver {
     /// called after no conflict propagation
     fn force_restart(&mut self) -> () {
         let count = self.stat[Stat::Conflict as usize] as u64;
-        if RESET_EMA < count && self.next_restart < count && K < self.ema_lbd.get()
-        {
+        if RESET_EMA < count && self.next_restart < count && K < self.ema_lbd.get() {
             self.next_restart = count + RESTART_PERIOD;
             self.stat[Stat::Restart as usize] += 1;
             let rl = self.root_level;

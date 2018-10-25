@@ -466,7 +466,8 @@ impl ClauseManagement for Solver {
                 }
             }
         }
-        self.cp[ClauseKind::Removable as usize].garbage_collect(&mut self.vars, &mut self.eliminator);
+        self.cp[ClauseKind::Removable as usize]
+            .garbage_collect(&mut self.vars, &mut self.eliminator);
         self.next_reduction += DB_INC_SIZE;
         self.stat[Stat::Reduction as usize] += 1;
     }
@@ -497,8 +498,8 @@ impl ClauseManagement for Solver {
         //     }
         // }
         if self.eliminator.use_elim
-            // && self.stat[Stat::Simplification as usize] % 8 == 0
-            // && self.eliminator.last_invocatiton < self.stat[Stat::Reduction as usize] as usize
+        // && self.stat[Stat::Simplification as usize] % 8 == 0
+        // && self.eliminator.last_invocatiton < self.stat[Stat::Reduction as usize] as usize
         {
             self.eliminate();
             self.eliminator.last_invocatiton = self.stat[Stat::Reduction as usize] as usize;
@@ -506,28 +507,27 @@ impl ClauseManagement for Solver {
         unsafe {
             let eliminator = &mut self.eliminator as *mut Eliminator;
             let vars = &mut self.vars[..] as *mut [Var];
-        for ck in &CLAUSE_KINDS {
-            for ci in 1..self.cp[*ck as usize].head.len() {
-                let ch = &self.cp[*ck as usize].head[ci];
-                let cb = &mut self.cp[*ck as usize].body[ci];
-                if !cb.get_flag(ClauseFlag::Dead) && self.vars.satisfies(&cb.lits)
-                {
-                    if cb.get_flag(ClauseFlag::Locked) {
-                        panic!("not expected path!");
-                    }
-                    cb.set_flag(ClauseFlag::Dead, true);
-                    self.cp[*ck as usize].touched[ch.lit[0].negate() as usize] = true;
-                    self.cp[*ck as usize].touched[ch.lit[1].negate() as usize] = true;
-                    if (*eliminator).use_elim {
-                        for l in &cb.lits {
-                            let v = &mut (*vars)[l.vi()];
-                            (*eliminator).enqueue_var(v);
+            for ck in &CLAUSE_KINDS {
+                for ci in 1..self.cp[*ck as usize].head.len() {
+                    let ch = &self.cp[*ck as usize].head[ci];
+                    let cb = &mut self.cp[*ck as usize].body[ci];
+                    if !cb.get_flag(ClauseFlag::Dead) && self.vars.satisfies(&cb.lits) {
+                        if cb.get_flag(ClauseFlag::Locked) {
+                            panic!("not expected path!");
+                        }
+                        cb.set_flag(ClauseFlag::Dead, true);
+                        self.cp[*ck as usize].touched[ch.lit[0].negate() as usize] = true;
+                        self.cp[*ck as usize].touched[ch.lit[1].negate() as usize] = true;
+                        if (*eliminator).use_elim {
+                            for l in &cb.lits {
+                                let v = &mut (*vars)[l.vi()];
+                                (*eliminator).enqueue_var(v);
+                            }
                         }
                     }
                 }
+                self.cp[*ck as usize].garbage_collect(&mut self.vars, &mut self.eliminator);
             }
-            self.cp[*ck as usize].garbage_collect(&mut self.vars, &mut self.eliminator);
-        }
         }
         self.stat[Stat::Simplification as usize] += 1;
         true
@@ -652,7 +652,10 @@ impl GC for ClausePartition {
                 }
             }
         }
-        debug_assert!(self.watcher[GARBAGE_LIT.negate() as usize] == NULL_CLAUSE, "There's a clause in the GARBAGE list");
+        debug_assert!(
+            self.watcher[GARBAGE_LIT.negate() as usize] == NULL_CLAUSE,
+            "There's a clause in the GARBAGE list"
+        );
     }
     fn new_clause(&mut self, v: &[Lit], rank: usize, learnt: bool, locked: bool) -> ClauseId {
         let cix;
@@ -788,8 +791,12 @@ impl ConsistencyCheck for ClausePartition {
             while p != NULL_CLAUSE {
                 cnt += 1;
                 if max <= cnt {
-                    println!("ConsistencyCheck::fail at {} during {}", (i as Lit).int(), lit.int());
-                    return false
+                    println!(
+                        "ConsistencyCheck::fail at {} during {}",
+                        (i as Lit).int(),
+                        lit.int()
+                    );
+                    return false;
                 }
                 p = self.head[p].next_watcher[(self.head[p].lit[0] != (i as Lit)) as usize];
             }

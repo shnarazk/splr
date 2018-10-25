@@ -7,7 +7,7 @@ use types::*;
 pub trait VarManagement {
     fn select_var(&mut self) -> VarId;
     fn bump_vi(&mut self, vi: VarId) -> ();
-//    fn decay_var_activity(&mut self) -> ();
+    // fn decay_var_activity(&mut self) -> ();
     fn rebuild_heap(&mut self) -> ();
 }
 
@@ -207,11 +207,7 @@ impl VarIdHeap {
             idxs.push(i);
         }
         idxs[0] = init;
-        VarIdHeap {
-            order,
-            heap,
-            idxs,
-        }
+        VarIdHeap { order, heap, idxs }
     }
     fn percolate_up(&mut self, vars: &[Var], start: usize) -> () {
         let mut q = start;
@@ -355,17 +351,6 @@ impl VarManagement for Solver {
         loop {
             let vi = self.var_order.get_root(&self.vars);
             if self.vars[vi].assign == BOTTOM {
-//                // let mut best = vi;
-//                // let mut act = self.vars[vi].activity;
-                // for i in &self.var_order.heap[1..] {
-                //     let v = &self.vars[*i as usize];
-                //     assert_eq!(*i, v.index);
-                //     if v.assign == BOTTOM && act < v.activity {
-                //         best = v.index;
-                //         act = v.activity;
-                //     }
-                // }
-                // println!("root {} {}, best {} {}", vi, self.vars[vi].activity, best, act);
                 return vi;
             }
         }

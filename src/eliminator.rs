@@ -1,8 +1,11 @@
 #![allow(unreachable_code)]
 #![allow(unused_mut)]
 #![allow(unused_variables)]
-use clause::{ClauseBody, ClauseFlag, ClauseHead, ClauseIndex, ClauseIdIndexEncoding, ClauseKind, ClauseManagement, ClausePartition, cid2fmt};
-use solver::{CDCL, Solver};
+use clause::{
+    cid2fmt, ClauseBody, ClauseFlag, ClauseHead, ClauseIdIndexEncoding, ClauseIndex, ClauseKind,
+    ClauseManagement, ClausePartition,
+};
+use solver::{Solver, CDCL};
 use std::fmt;
 use types::*;
 use var::Var;
@@ -102,9 +105,7 @@ impl fmt::Display for Eliminator {
         write!(
             f,
             " - n_touched {}\n - clause_queue {:?}\n - heap {:?}",
-            self.n_touched,
-            self.clause_queue,
-            self.var_queue,
+            self.n_touched, self.clause_queue, self.var_queue,
         )
     }
 }
@@ -135,7 +136,7 @@ impl ClauseElimination for Solver {
     }
     fn eliminator_enqueue_clause(&mut self, cid: ClauseId) -> () {
         if !self.eliminator.use_elim || self.eliminator.clause_queue_threshold == 0 {
-            println!("{} is not enqueued", cid2fmt(cid));
+            // println!("{} is not enqueued", cid2fmt(cid));
             return;
         }
         let cb = clause_body_mut!(self.cp, cid);
@@ -167,10 +168,20 @@ impl Solver {
     /// called from strengthen_clause, backward_subsumption_check, eliminate_var, substitute
     pub fn remove_clause(&mut self, cid: ClauseId) -> () {
         if clause_body!(self.cp, cid).get_flag(ClauseFlag::Dead) {
-            panic!("remove_clause Dead: {} {:#}{:#}", cid2fmt(cid), clause_head!(self.cp, cid), clause_body!(self.cp, cid));
+            panic!(
+                "remove_clause Dead: {} {:#}{:#}",
+                cid2fmt(cid),
+                clause_head!(self.cp, cid),
+                clause_body!(self.cp, cid)
+            );
         }
         if clause_body!(self.cp, cid).get_flag(ClauseFlag::Locked) {
-            panic!("remove_clause Locked: {} {:#}{:#}", cid2fmt(cid), clause_head!(self.cp, cid), clause_body!(self.cp, cid));
+            panic!(
+                "remove_clause Locked: {} {:#}{:#}",
+                cid2fmt(cid),
+                clause_head!(self.cp, cid),
+                clause_body!(self.cp, cid)
+            );
         }
         {
             clause_body_mut!(self.cp, cid).set_flag(ClauseFlag::Dead, true);
@@ -207,7 +218,8 @@ impl Solver {
             // before the following propagate, we need to clean garbages.
             // これまずくないか? self.cp[cid.to_kind()].garbage_collect(&mut self.vars, &mut self.eliminator);
             // println!("STRENGTHEN_CLAUSE ENQUEUE {}", c0);
-            if self.enqueue(c0, NULL_CLAUSE) { //  && self.propagate() == NULL_CLAUSE {
+            if self.enqueue(c0, NULL_CLAUSE) {
+                //  && self.propagate() == NULL_CLAUSE {
                 // self.cp[cid.to_kind()].touched[c0 as usize] = true;
                 self.cp[cid.to_kind()].touched[c0.negate() as usize] = true;
                 return true;
@@ -307,7 +319,7 @@ impl Solver {
             // println!("bsc remain clauses {} vars {}", self.eliminator.clause_queue.len(), self.eliminator.var_queue.len());
             unsafe {
                 let mut best = 0;
-                let unilits: [Lit;1];
+                let unilits: [Lit; 1];
                 let mut lits: &[Lit];
                 // let ch = clause_head_mut!(self.cp, cid) as *mut ClauseHead;
                 if cid.to_kind() == ClauseKind::Uniclause as usize {
@@ -350,7 +362,10 @@ impl Solver {
                         //              cid2fmt(self.vars[(*db).lits[0].vi()].reason),
                         //              );
                         // }
-                        debug_assert!((!(*db).get_flag(ClauseFlag::Locked)) || (*db).get_flag(ClauseFlag::Dead));
+                        debug_assert!(
+                            (!(*db).get_flag(ClauseFlag::Locked))
+                                || (*db).get_flag(ClauseFlag::Dead)
+                        );
                         if !(*db).get_flag(ClauseFlag::Dead)
                             && *di != cid
                             && lits.len() <= SUBSUMPTION_SIZE
@@ -441,7 +456,7 @@ impl Solver {
                 for lit_neg in &*neg {
                     if clause_body!(self.cp, lit_neg).get_flag(ClauseFlag::Dead) {
                         continue;
-                }
+                    }
                     let (res, clause_size) = self.check_to_merge(*lit_pos, *lit_neg, v);
                     if res {
                         cnt += 1;
@@ -510,7 +525,11 @@ impl Solver {
                 }
             }
             for i in 0..2 {
-                for cid in if i == 0 { &mut self.vars[v].pos_occurs } else { &mut self.vars[v].neg_occurs } {
+                for cid in if i == 0 {
+                    &mut self.vars[v].pos_occurs
+                } else {
+                    &mut self.vars[v].neg_occurs
+                } {
                     clause_body_mut!(self.cp, *cid).set_flag(ClauseFlag::Dead, true);
                     let w0;
                     let w1;
@@ -585,7 +604,8 @@ impl Solver {
         // println!("n_touched {}", self.eliminator.n_touched);
         // self.build_occurence_list();
         // for i in 1..4 { println!("eliminate report: v{} => {},{}", i, self.vars[i].num_occurs, self.vars[i].occurs.len()); }
-        'perform: while self.eliminator.bwdsub_assigns < self.trail.len() || !self.eliminator.var_queue.is_empty()
+        'perform: while self.eliminator.bwdsub_assigns < self.trail.len()
+            || !self.eliminator.var_queue.is_empty()
         {
             // self.gather_touched_clauses();
             if (!self.eliminator.clause_queue.is_empty()
@@ -598,9 +618,7 @@ impl Solver {
             while !self.eliminator.var_queue.is_empty() {
                 let elim = self.eliminator.var_queue.remove(0);
                 self.vars[elim].enqueued = false;
-                if self.vars[elim].eliminated
-                    || self.vars[elim].assign != BOTTOM
-                {
+                if self.vars[elim].eliminated || self.vars[elim].assign != BOTTOM {
                     continue;
                 }
                 // FIXME!
@@ -616,7 +634,7 @@ impl Solver {
 }
 
 impl Solver {
-   /// returns a literal if these clauses can be merged by the literal.
+    /// returns a literal if these clauses can be merged by the literal.
     fn subsume(&self, cid: ClauseId, other: ClauseId) -> Option<Lit> {
         if cid.to_kind() == ClauseKind::Uniclause as usize {
             let l = cid.to_index() as Lit;
@@ -653,10 +671,6 @@ impl Solver {
     pub fn strengthen(&mut self, cid: ClauseId, p: Lit) -> bool {
         debug_assert!(!clause_body!(self.cp, cid).get_flag(ClauseFlag::Dead));
         let cix = cid.to_index();
-//        let mut cj;
-//        let mut next;
-//        let new_watcher;
-//        let update;
         let ClausePartition {
             ref mut head,
             ref mut body,
@@ -684,12 +698,12 @@ impl Solver {
                         (*ch).next_watcher.swap(0, 1);
                     }
                     if bi == 1 {
-                         // panic!("p {}, l0 {}, UNITCLAUSE {} {:#} {:#}", p.int(), (*ch).lit[0].int(), cid2fmt(cid), *ch, *cb);
+                        // panic!("p {}, l0 {}, UNITCLAUSE {} {:#} {:#}", p.int(), (*ch).lit[0].int(), cid2fmt(cid), *ch, *cb);
                         (*cb).lits[0] = (*ch).lit[0];
                     }
                     return true;
                     // panic!("too short clause {} {:#} {:#}", cid2fmt(cid), *ch, *cb);
-               }
+                }
                 let new_lit = (*cb).lits[bi];
                 debug_assert_ne!(new_lit, p);
                 let next_clause = (*ch).next_watcher[hi];
@@ -724,46 +738,46 @@ impl Solver {
                 (*cb).lits.retain(|&x| x != p);
                 return false;
             }
-//             // old code
-//             debug_assert!(1 < (*cb).lits.len());
-//             (*cb).lits.retain(|&x| x != p);
-//             if (*cb).lits.len() == 1 {
-//                 println!("strengthen make a clause {} unit", cid2fmt(cid));
-//                 if (*ch).lit[0] == p {
-//                     (*ch).lit.swap(0, 1);
-//                     (*ch).next_watcher.swap(0, 1);
-//                 }
-//                 let v = &mut self.vars[(*ch).lit[1].vi()];
-//                 assert_eq!(p.vi(), v.index);
-//                 assert_eq!((*ch).lit[1], p);
-//                 assert_ne!((*cb).lits[0], p);
-//                 return true;
-//             }
-//             if (*ch).lit[0] != p && (*ch).lit[1] != p {
-//                 return false;
-//             }
-//             assert!(2 <= (*cb).lits.len());
-//             debug_assert!((*ch).lit[0] == p || (*ch).lit[1] == p);
-//             new_watcher = (*cb).lits[(*cb).lits.len()-1];
-//             assert_ne!(p, new_watcher);
-//             update = (*ch).lit[0] != p;
-//             debug_assert!((*ch).lit[update as usize] == p);
-//             next = (*ch).next_watcher[update as usize];
-//             (*ch).lit[update as usize] = new_watcher;
-//             (*ch).next_watcher[update as usize] = watcher[new_watcher.negate() as usize];
-//             watcher[new_watcher.negate() as usize] = cix;
-//             cj = &mut watcher[p.negate() as usize];
-//             while *cj != NULL_CLAUSE {
-//                 if *cj == cix {
-//                     *cj = next;
-//                     break;
-//                 }
-//                 let h = &mut head[*cj] as *mut ClauseHead;
-//                 debug_assert!((*h).lit[0] == p || (*h).lit[1] == p);
-//                 cj = &mut (*h).next_watcher[((*h).lit[0] != p) as usize];
-//             }
-//         }
-//         false
+            //             // old code
+            //             debug_assert!(1 < (*cb).lits.len());
+            //             (*cb).lits.retain(|&x| x != p);
+            //             if (*cb).lits.len() == 1 {
+            //                 println!("strengthen make a clause {} unit", cid2fmt(cid));
+            //                 if (*ch).lit[0] == p {
+            //                     (*ch).lit.swap(0, 1);
+            //                     (*ch).next_watcher.swap(0, 1);
+            //                 }
+            //                 let v = &mut self.vars[(*ch).lit[1].vi()];
+            //                 assert_eq!(p.vi(), v.index);
+            //                 assert_eq!((*ch).lit[1], p);
+            //                 assert_ne!((*cb).lits[0], p);
+            //                 return true;
+            //             }
+            //             if (*ch).lit[0] != p && (*ch).lit[1] != p {
+            //                 return false;
+            //             }
+            //             assert!(2 <= (*cb).lits.len());
+            //             debug_assert!((*ch).lit[0] == p || (*ch).lit[1] == p);
+            //             new_watcher = (*cb).lits[(*cb).lits.len()-1];
+            //             assert_ne!(p, new_watcher);
+            //             update = (*ch).lit[0] != p;
+            //             debug_assert!((*ch).lit[update as usize] == p);
+            //             next = (*ch).next_watcher[update as usize];
+            //             (*ch).lit[update as usize] = new_watcher;
+            //             (*ch).next_watcher[update as usize] = watcher[new_watcher.negate() as usize];
+            //             watcher[new_watcher.negate() as usize] = cix;
+            //             cj = &mut watcher[p.negate() as usize];
+            //             while *cj != NULL_CLAUSE {
+            //                 if *cj == cix {
+            //                     *cj = next;
+            //                     break;
+            //                 }
+            //                 let h = &mut head[*cj] as *mut ClauseHead;
+            //                 debug_assert!((*h).lit[0] == p || (*h).lit[1] == p);
+            //                 cj = &mut (*h).next_watcher[((*h).lit[0] != p) as usize];
+            //             }
+            //         }
+            //         false
         }
     }
 }

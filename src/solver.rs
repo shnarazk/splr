@@ -1,13 +1,13 @@
 use clause::{ClauseManagement, GC, *};
 use eliminator::{ClauseElimination, Eliminator, EliminatorIF};
-use std::collections::VecDeque;
+use profiler::*;
+use restart::{QueueOperations, K, R};
 use std::cmp::max;
+use std::collections::VecDeque;
 use std::fs;
 use std::io::{BufRead, BufReader};
-use restart::{R, K, QueueOperations};
 use types::*;
 use var::{VarOrdering, MAX_VAR_DECAY, *};
-use profiler::*;
 
 pub trait SatSolver {
     fn solve(&mut self) -> SolverResult;
@@ -64,7 +64,7 @@ pub enum Stat {
     Simplification,     // the number of simplification
     Assign,             // the number of assigned variables
     SumLBD,
-    EndOfStatIndex,     // Don't use this dummy.
+    EndOfStatIndex, // Don't use this dummy.
 }
 
 #[derive(Clone, Copy, Eq, PartialEq, Debug)]
@@ -180,7 +180,7 @@ impl Solver {
             lbd_temp: vec![0; nv + 1],
             lbd_queue: VecDeque::new(),
             trail_queue: VecDeque::new(),
-            ema_asg: Ema2::new(3.8, 50_000.0),  // for blocking 4
+            ema_asg: Ema2::new(3.8, 50_000.0),   // for blocking 4
             ema_lbd: Ema2::new(160.0, 50_000.0), // for forcing 160
             b_lvl: Ema::new(se),
             c_lvl: Ema::new(se),
@@ -215,10 +215,7 @@ impl Solver {
                 println!();
             } else {
                 print!("\x1B[7A");
-                println!("{}, State:{:>6}",
-                         self.profile,
-                         mes,
-                );
+                println!("{}, State:{:>6}", self.profile, mes,);
                 println!(
                     "#propagate:{:>14}, #decision:{:>13}, #conflict: {:>13}",
                     self.stat[Stat::Propagation as usize],
@@ -234,10 +231,25 @@ impl Solver {
                 );
                 println!(
                     "    Clause DB|Remv:{:>9}, good:{:>9}, Perm:{:>9}, Binc:{:>9}",
-                    self.cp[ClauseKind::Removable as usize].body.iter().skip(1).filter(|c| !c.get_flag(ClauseFlag::Dead)).count(),
+                    self.cp[ClauseKind::Removable as usize]
+                        .body
+                        .iter()
+                        .skip(1)
+                        .filter(|c| !c.get_flag(ClauseFlag::Dead))
+                        .count(),
                     good,
-                    self.cp[ClauseKind::Permanent as usize].body.iter().skip(1).filter(|c| !c.get_flag(ClauseFlag::Dead)).count(),
-                    self.cp[ClauseKind::Binclause as usize].body.iter().skip(1).filter(|c| !c.get_flag(ClauseFlag::Dead)).count(),
+                    self.cp[ClauseKind::Permanent as usize]
+                        .body
+                        .iter()
+                        .skip(1)
+                        .filter(|c| !c.get_flag(ClauseFlag::Dead))
+                        .count(),
+                    self.cp[ClauseKind::Binclause as usize]
+                        .body
+                        .iter()
+                        .skip(1)
+                        .filter(|c| !c.get_flag(ClauseFlag::Dead))
+                        .count(),
                 );
                 println!(
                     "      Restart|#BLK:{:>9}, #RST:{:>9}, emaASG:{:>7.2}, emaLBD:{:>7.2}",
@@ -516,11 +528,12 @@ impl CDCL for Solver {
                         let ch = &mut (*head)[*pre] as *mut ClauseHead;
                         if (*ch).lit[0] != false_lit && (*ch).lit[1] != false_lit {
                             let cb = &mut (*body)[*pre] as *mut ClauseBody;
-                            println!("(false_lit {}) illegal watch literals cid: {} {} {}",
-                                     false_lit.int(),
-                                     cid2fmt(kind.id_from(*pre)),
-                                     *ch,
-                                     *cb
+                            println!(
+                                "(false_lit {}) illegal watch literals cid: {} {} {}",
+                                false_lit.int(),
+                                cid2fmt(kind.id_from(*pre)),
+                                *ch,
+                                *cb
                             );
                             panic!("trap");
                         }
@@ -552,10 +565,6 @@ impl CDCL for Solver {
                                     debug_assert!((*cb).lits[1] == false_lit);
                                     (*cb).lits[1] = *lk;
                                     (*cb).lits[k] = false_lit; // Don't move this above (needed by enuremate)
-                                    // if !cp[*kind as usize].check(false_lit) {
-                                    //     println!(" (false_ilt {}) substituted {} with {} in {} {:#} {:#}", false_lit.int(), (*cb).lits[k].int(), (*cb).lits[1].int(), cid2fmt(kind.id_from(cix)), *ch, *cb);
-                                    //     panic!("Yay");
-                                    // }
                                     continue 'next_clause;
                                 }
                             }
@@ -613,7 +622,9 @@ impl CDCL for Solver {
                 //     );
                 // }
                 if self.lbd_queue.is_full()
-                    && (self.stat[Stat::SumLBD as usize] as f64) / (self.stat[Stat::Conflict as usize] as f64) < self.lbd_queue.average() * K
+                    && (self.stat[Stat::SumLBD as usize] as f64)
+                        / (self.stat[Stat::Conflict as usize] as f64)
+                        < self.lbd_queue.average() * K
                 {
                     self.stat[Stat::Restart as usize] += 1;
                     self.lbd_queue.clear();
@@ -697,8 +708,8 @@ impl CDCL for Solver {
                     self.cancel_until(0);
                     self.simplify();
                     self.adapt_strategy();
-                // } else if 0 < lbd {
-                //     self.block_restart(lbd, dl, bl, nas);
+                    // } else if 0 < lbd {
+                    //     self.block_restart(lbd, dl, bl, nas);
                 }
 
                 // self.decay_var_activity();
@@ -788,7 +799,11 @@ impl CDCL for Solver {
             unsafe {
                 let cb = clause_body_mut!(self.cp, cid) as *mut ClauseBody;
                 if cid == NULL_CLAUSE {
-                    panic!("analyze ran into NULL_CLAUSE Lit {} at level {}", p.int(), self.decision_level());
+                    panic!(
+                        "analyze ran into NULL_CLAUSE Lit {} at level {}",
+                        p.int(),
+                        self.decision_level()
+                    );
                 }
                 // debug_assert_ne!(cid, NULL_CLAUSE);
                 if cid.to_kind() == (ClauseKind::Removable as usize) {
@@ -816,8 +831,14 @@ impl CDCL for Solver {
                     // if lvl == 0 {
                     //     println!("lvl {}", lvl);
                     // }
-                    debug_assert!(self.vars[vi].eliminated == false, format!("analyze assertion: an eliminated var {} occurs", vi));
-                    debug_assert!(self.vars[vi].assign != BOTTOM, format!("analyze assertion: unassigned var {:?}", self.vars[vi]));
+                    debug_assert!(
+                        self.vars[vi].eliminated == false,
+                        format!("analyze assertion: an eliminated var {} occurs", vi)
+                    );
+                    debug_assert!(
+                        self.vars[vi].assign != BOTTOM,
+                        format!("analyze assertion: unassigned var {:?}", self.vars[vi])
+                    );
                     self.bump_vi(vi);
                     if !self.an_seen[vi] && 0 < lvl {
                         self.an_seen[vi] = true;
@@ -1030,7 +1051,10 @@ impl Solver {
 
     pub fn uncheck_enqueue(&mut self, l: Lit, cid: ClauseId) -> () {
         debug_assert!(l != 0, "Null literal is about to be equeued");
-        debug_assert!(self.decision_level() == 0 || cid != 0, "Null CLAUSE is used for uncheck_enqueue");
+        debug_assert!(
+            self.decision_level() == 0 || cid != 0,
+            "Null CLAUSE is used for uncheck_enqueue"
+        );
         let dl = self.decision_level();
         {
             let v = &mut self.vars[l.vi()];
@@ -1040,7 +1064,7 @@ impl Solver {
         }
         if dl == 0 {
             self.eliminator_enqueue_var(l.vi());
-        //     self.var_order.remove(&self.vars, l.vi());
+            // self.var_order.remove(&self.vars, l.vi());
         }
         clause_body_mut!(self.cp, cid).set_flag(ClauseFlag::Locked, true);
         self.trail.push(l);

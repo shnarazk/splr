@@ -2,9 +2,9 @@
 #[macro_use]
 mod macros;
 // /// Subsumption-based clause/var eliminaiton
-pub mod eliminator;
 /// Clause
 pub mod clause;
+pub mod eliminator;
 /// for progress report
 pub mod profiler;
 /// Implementation on solver restart.
