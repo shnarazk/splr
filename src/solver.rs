@@ -1,4 +1,4 @@
-use clause::{ClauseManagement, GC, *, ConsistencyCheck};
+use clause::{ClauseManagement, GC, *};
 use eliminator::{ClauseElimination, Eliminator, EliminatorIF};
 use std::collections::VecDeque;
 use std::cmp::max;
@@ -524,13 +524,13 @@ impl CDCL for Solver {
                             );
                             panic!("trap");
                         }
-                        assert!((*ch).lit[0] == false_lit || (*ch).lit[1] == false_lit);
+                        debug_assert!((*ch).lit[0] == false_lit || (*ch).lit[1] == false_lit);
                         let my_index = ((*ch).lit[0] != false_lit) as usize;
                         let other_value = vars.assigned((*ch).lit[(my_index == 0) as usize]);
                         if other_value != LTRUE {
                             let cb = &mut (*body)[*pre] as *mut ClauseBody;
-                            assert!(2 <= (*cb).lits.len());
-                            assert!((*cb).lits[0] == false_lit || (*cb).lits[1] == false_lit);
+                            debug_assert!(2 <= (*cb).lits.len());
+                            debug_assert!((*cb).lits[0] == false_lit || (*cb).lits[1] == false_lit);
                             if (*cb).lits[0] == false_lit {
                                 (*cb).lits.swap(0, 1); // now false_lit is lits[1].
                             }
@@ -549,7 +549,7 @@ impl CDCL for Solver {
                                     (*ch).next_watcher[my_index] = *alt;
                                     *alt = cix;
                                     (*ch).lit[my_index] = *lk;
-                                    assert!((*cb).lits[1] == false_lit);
+                                    debug_assert!((*cb).lits[1] == false_lit);
                                     (*cb).lits[1] = *lk;
                                     (*cb).lits[k] = false_lit; // Don't move this above (needed by enuremate)
                                     // if !cp[*kind as usize].check(false_lit) {
@@ -573,7 +573,7 @@ impl CDCL for Solver {
                                 let v = &mut vars[other.vi()];
                                 v.assign = other.lbool();
                                 v.level = dl;
-                                assert!(*pre != NULL_CLAUSE);
+                                debug_assert!(*pre != NULL_CLAUSE);
                                 if dl == 0 {
                                     v.reason = NULL_CLAUSE;
                                 } else {

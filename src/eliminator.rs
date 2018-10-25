@@ -199,9 +199,9 @@ impl Solver {
         debug_assert_ne!(cid, NULL_CLAUSE);
         if self.strengthen(cid, l) {
             let c0 = clause_head!(self.cp, cid).lit[0];
-            assert!(1 == clause_body!(self.cp, cid).lits.len());
+            debug_assert!(1 == clause_body!(self.cp, cid).lits.len());
             println!("cid {} {:?} became a unit clause as c0 {}, l {}", cid2fmt(cid), vec2int(&clause_body!(self.cp, cid).lits), c0.int(), l.int());
-            assert_ne!(c0, l);
+            debug_assert_ne!(c0, l);
             println!("{} is removed and its first literal {} is enqueued.", cid2fmt(cid), c0.int());
             self.remove_clause(cid);
             // before the following propagate, we need to clean garbages.
@@ -425,7 +425,7 @@ impl Solver {
         if self.vars[v].assign != BOTTOM {
             return true;
         }
-        assert!(!self.vars[v].eliminated);
+        debug_assert!(!self.vars[v].eliminated);
         let pos = &self.vars[v].pos_occurs as *const Vec<ClauseId>;
         let neg = &self.vars[v].neg_occurs as *const Vec<ClauseId>;
         unsafe {
@@ -456,7 +456,7 @@ impl Solver {
             // eliminate the literal and build constraints on it.
             self.vars[v].eliminated = true;
             let cid = self.vars[v].reason;
-            assert_eq!(cid, NULL_CLAUSE);
+            debug_assert_eq!(cid, NULL_CLAUSE);
             println!("- eliminate: {:>5} (+{:<4} -{:<4})", v, (*pos).len(), (*neg).len() );
             // setDecisionVar(v, false);
             self.eliminator.eliminated_vars += 1;
@@ -673,9 +673,9 @@ impl Solver {
                 debug_assert!((*cb).lits[0] == p || (*cb).lits[1] == p);
                 // update lit, next_watcher, and lits
                 let hi = ((*ch).lit[0] != p) as usize;
-                assert!((*ch).lit[hi] == p);
+                debug_assert!((*ch).lit[hi] == p);
                 let bi = ((*cb).lits[0] != p) as usize;
-                assert!((*cb).lits[bi] == p);
+                debug_assert!((*cb).lits[bi] == p);
                 (*cb).lits.swap_remove(bi);
                 if (*cb).lits.len() == 1 {
                     if hi == 0 {
@@ -690,7 +690,7 @@ impl Solver {
                     // panic!("too short clause {} {:#} {:#}", cid2fmt(cid), *ch, *cb);
                }
                 let new_lit = (*cb).lits[bi];
-                assert_ne!(new_lit, p);
+                debug_assert_ne!(new_lit, p);
                 let next_clause = (*ch).next_watcher[hi];
                 // pointer update
                 {
@@ -704,7 +704,7 @@ impl Solver {
                             break;
                         }
                         let i = (head[*ptr].lit[0] != p) as usize;
-                        assert_eq!(head[*ptr].lit[i], p);
+                        debug_assert_eq!(head[*ptr].lit[i], p);
                         ptr = &mut head[*ptr].next_watcher[i];
                     }
                 }
@@ -723,7 +723,7 @@ impl Solver {
                     return false;
                 }
             } else {
-                assert!((*ch).lit[0] != p.negate() && (*ch).lit[1] != p.negate());
+                debug_assert!((*ch).lit[0] != p.negate() && (*ch).lit[1] != p.negate());
                 (*cb).lits.retain(|&x| x != p);
                 return false;
             }
