@@ -208,7 +208,7 @@ impl Solver {
             // これまずくないか? self.cp[cid.to_kind()].garbage_collect(&mut self.vars, &mut self.eliminator);
             // println!("STRENGTHEN_CLAUSE ENQUEUE {}", c0);
             if self.enqueue(c0, NULL_CLAUSE) { //  && self.propagate() == NULL_CLAUSE {
-                self.cp[cid.to_kind()].touched[c0 as usize] = true;
+                // self.cp[cid.to_kind()].touched[c0 as usize] = true;
                 self.cp[cid.to_kind()].touched[c0.negate() as usize] = true;
                 return true;
             } else {
@@ -343,7 +343,7 @@ impl Solver {
                     cnt += (*cs).len();
                     for di in &*cs {
                         let db = clause_body!(self.cp, di) as *const ClauseBody;
-                        if (*db).get_flag(ClauseFlag::Locked) {
+                        if (*db).get_flag(ClauseFlag::Locked) && !(*db).get_flag(ClauseFlag::Dead) {
                             println!("di {} body {:#}, lits[0]vi {}",
                                      cid2fmt(*di),
                                      *db,
