@@ -633,6 +633,9 @@ impl CDCL for Solver {
                 }
                 if self.decision_level() == 0 {
                     self.simplify();
+                    if !self.ok {
+                        return false;
+                    }
                     self.num_solved_vars = self.num_assigns();
                     self.rebuild_heap();
                 }

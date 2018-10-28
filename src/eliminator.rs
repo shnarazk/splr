@@ -378,7 +378,7 @@ impl Solver {
                                 Some(NULL_LIT) => {
                                     // println!("BackSubsC    => {} subsumed completely by {}", cid2fmt(*di), cid2fmt(cid));
                                     subsumed += 1;
-                                    if di.to_kind() == ClauseKind::Removable as usize {
+                                    if cid.to_kind() == ClauseKind::Removable as usize && di.to_kind() == ClauseKind::Removable as usize {
                                         self.remove_clause(*di); // TODO: Is this OK???
                                     } else {
                                         // println!("backward_subsumption_check tries to delete a permanent clause {} {:#}",

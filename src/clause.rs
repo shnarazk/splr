@@ -503,6 +503,9 @@ impl ClauseManagement for Solver {
         {
             self.eliminate();
             self.eliminator.last_invocatiton = self.stat[Stat::Reduction as usize] as usize;
+            if !self.ok {
+                return false;
+            }
         }
         unsafe {
             let eliminator = &mut self.eliminator as *mut Eliminator;
