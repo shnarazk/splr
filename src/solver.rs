@@ -363,7 +363,6 @@ impl Solver {
                             (*permanents).new_clause(
                                 &cb.lits,
                                 cb.rank,
-                                cb.get_flag(ClauseFlag::Learnt),
                                 cb.get_flag(ClauseFlag::Locked),
                             );
                             cb.set_flag(ClauseFlag::Dead, true);
