@@ -10,7 +10,7 @@ use var::{Satisfiability, Var};
 /// for ClausePartition
 pub trait GC {
     fn garbage_collect(&mut self, vars: &mut [Var], elimanator: &mut Eliminator) -> ();
-    fn new_clause(&mut self, v: &[Lit], rank: usize, learnt: bool, locked: bool) -> ClauseId;
+    fn new_clause(&mut self, v: &[Lit], rank: usize, locked: bool) -> ClauseId;
     fn reset_lbd(&mut self, vars: &[Var], temp: &mut [usize]) -> ();
     fn move_to(&mut self, list: &mut ClauseId, ci: ClauseIndex, index: usize) -> ClauseIndex;
 }
@@ -79,7 +79,6 @@ pub enum ClauseFlag {
     Kind1,
     Dead,
     Locked,
-    Learnt,
     JustUsed,
     Enqueued,
 }
@@ -270,7 +269,7 @@ impl fmt::Display for ClauseBody {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "{{{:?} {}{}{}{}{}}}",
+            "{{{:?} {}{}{}{}}}",
             vec2int(&self.lits),
             match self.flag & 3 {
                 0 => 'L',
@@ -286,11 +285,6 @@ impl fmt::Display for ClauseBody {
             },
             if self.get_flag(ClauseFlag::Locked) {
                 ", locked"
-            } else {
-                ""
-            },
-            if self.get_flag(ClauseFlag::Learnt) {
-                ", learnt"
             } else {
                 ""
             },
@@ -355,9 +349,7 @@ impl ClauseManagement for Solver {
         }
         if 1.0e20 < a {
             for c in &mut self.cp[ClauseKind::Removable as usize].body[1..] {
-                if c.get_flag(ClauseFlag::Learnt) {
-                    c.activity *= 1.0e-20;
-                }
+                c.activity *= 1.0e-20;
             }
             self.cla_inc *= 1.0e-20;
         }
@@ -394,13 +386,14 @@ impl ClauseManagement for Solver {
                 Some(NULL_CLAUSE)
             }
             n => {
-                let cid = self.cp[kind as usize].new_clause(&v, 0, false, false);
+                let cid = self.cp[kind as usize].new_clause(&v, 0, false);
                 self.eliminator_register_clause(cid, n, true);
                 Some(cid)
             }
         }
     }
     /// renamed from newLearntClause
+    // Note: set lbd to 0 if you want to add the clause to Permanent.
     fn add_clause(&mut self, v: &mut Vec<Lit>, lbd: usize) -> ClauseId {
         debug_assert!(1 < v.len());
         // let lbd = v.lbd(&self.vars, &mut self.lbd_temp);
@@ -425,7 +418,7 @@ impl ClauseManagement for Solver {
         } else {
             ClauseKind::Removable
         };
-        let cid = self.cp[kind as usize].new_clause(&v, lbd, true, false);
+        let cid = self.cp[kind as usize].new_clause(&v, lbd, false);
         self.bump_cid(cid);
         self.eliminator_register_clause(cid, lbd, false);
         cid
@@ -465,8 +458,7 @@ impl ClauseManagement for Solver {
     }
 
     fn change_clause_kind(&mut self, cid: ClauseId, kind: ClauseKind) -> () {
-        assert_eq!(self.decision_level() == 0);
-        let learnt = kind == ClauseKind::Removable;
+        assert_eq!(self.decision_level(), 0);
         let rank;
         let locked;
         let mut vec = Vec::new();
@@ -481,7 +473,7 @@ impl ClauseManagement for Solver {
             rank = cb.rank;
             locked = cb.get_flag(ClauseFlag::Locked);
         }
-        self.cp[kind as usize].new_clause(&vec, rank, learnt, locked); 
+        self.cp[kind as usize].new_clause(&vec, rank, locked);
         self.remove_clause(cid);
         if self.decision_level() != 0 {
             self.cp[cid.to_kind()].garbage_collect(&mut self.vars, &mut self.eliminator);
@@ -719,7 +711,7 @@ impl GC for ClausePartition {
             "There's a clause in the GARBAGE list"
         );
     }
-    fn new_clause(&mut self, v: &[Lit], rank: usize, learnt: bool, locked: bool) -> ClauseId {
+    fn new_clause(&mut self, v: &[Lit], rank: usize, locked: bool) -> ClauseId {
         let cix;
         let w0;
         let w1;
@@ -740,7 +732,6 @@ impl GC for ClausePartition {
             cb.rank = rank;
             cb.flag = self.kind as u16; // reset Dead, JustUsed, and Touched
             cb.set_flag(ClauseFlag::Locked, locked);
-            cb.set_flag(ClauseFlag::Learnt, learnt);
             cb.activity = 1.0;
             w0 = ch.lit[0].negate() as usize;
             w1 = ch.lit[1].negate() as usize;
@@ -761,9 +752,7 @@ impl GC for ClausePartition {
                 next_watcher: [self.watcher[w0], self.watcher[w1]],
             });
             self.body.push(ClauseBody {
-                flag: self.kind as u16
-                    | ClauseFlag::Locked.as_bit(locked)
-                    | ClauseFlag::Learnt.as_bit(learnt),
+                flag: self.kind as u16 | ClauseFlag::Locked.as_bit(locked),
                 lits,
                 rank,
                 activity: 1.0,
