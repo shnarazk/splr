@@ -2,7 +2,7 @@
 #![allow(unused_mut)]
 #![allow(unused_variables)]
 use clause::{
-    cid2fmt, ClauseBody, ClauseFlag, ClauseHead, ClauseIdIndexEncoding, ClauseIndex, ClauseKind,
+    ClauseBody, ClauseFlag, ClauseHead, ClauseIdIndexEncoding, ClauseIndex, ClauseKind,
     ClauseManagement, ClausePartition,
 };
 use solver::{Solver, CDCL};
@@ -190,19 +190,19 @@ impl Solver {
                 //  && self.propagate() == NULL_CLAUSE {
                 // self.cp[cid.to_kind()].touched[c0 as usize] = true;
                 self.cp[cid.to_kind()].touched[c0.negate() as usize] = true;
-                return true;
+                true
             } else {
                 //println!("{:?}", self.vars[c0.vi()]);
                 //panic!("Conflicting Enqueue:: A l {}, c0 {}, {:#} {:#}", l.int(), c0.int(), clause_head!(self.cp, cid), clause_body!(self.cp, cid));
                 self.ok = false;
-                return false;
+                false
             }
         } else {
             // println!("cid {} drops literal {}", cid2fmt(cid), l.int());
             debug_assert!(1 < clause_body!(self.cp, cid).lits.len());
             self.eliminator_enqueue_clause(cid);
-            return true;
-        };
+            true
+        }
     }
     /// 6. merge(1)
     /// Returns **false** if one of the clauses is always satisfied. (merge_vec should not be used.)
@@ -269,7 +269,7 @@ impl Solver {
         let mut subsumed = 0;
         let mut deleted_literals = 0;
         debug_assert_eq!(self.decision_level(), 0);
-        'next_clause: while !self.eliminator.clause_queue.is_empty()
+        while !self.eliminator.clause_queue.is_empty()
             || self.eliminator.bwdsub_assigns < self.trail.len()
         {
             // Empty subsumption queue and return immediately on user-interrupt:
@@ -697,14 +697,14 @@ impl Solver {
                         (*ch).lit.swap(0, 1);
                         (*ch).next_watcher.swap(0, 1);
                     }
-                    return true;
+                    true
                 } else {
-                    return false;
+                    false
                 }
             } else {
                 debug_assert!((*ch).lit[0] != p.negate() && (*ch).lit[1] != p.negate());
                 (*cb).lits.retain(|&x| x != p);
-                return false;
+                false
             }
             //             // old code
             //             debug_assert!(1 < (*cb).lits.len());

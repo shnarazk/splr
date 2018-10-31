@@ -72,7 +72,7 @@ impl Var {
     }
     pub fn new_vars(n: usize) -> Vec<Var> {
         let mut vec = Vec::with_capacity(n + 1);
-        for i in 0..n + 1 {
+        for i in 0..=n {
             let mut v = Var::new(i);
             v.activity = (n - i) as f64;
             vec.push(v);
@@ -202,7 +202,7 @@ impl VarIdHeap {
         let mut idxs = Vec::with_capacity(n + 1);
         heap.push(0);
         idxs.push(n);
-        for i in 1..n + 1 {
+        for i in 1..=n {
             heap.push(i);
             idxs.push(i);
         }

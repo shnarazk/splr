@@ -409,7 +409,7 @@ impl SatSolver for Solver {
             true => {
                 self.progress("SAT");
                 let mut result = Vec::new();
-                for vi in 1..self.num_vars + 1 {
+                for vi in 1..=self.num_vars {
                     match self.vars[vi].assign {
                         LTRUE => result.push(vi as i32),
                         LFALSE => result.push(0 - vi as i32),
@@ -685,10 +685,10 @@ impl CDCL for Solver {
                         if cid.to_kind() == ClauseKind::Binclause as usize {
                             // let ch = clause_head!(self.cp, cid) as *const ClauseHead;
                             // self.biclause_subsume(&*ch);
-                        } else {
+                        } //else {
                             // clause_body_mut!(self.cp, cid).set_flag(ClauseFlag::JustUsed, true);
                             // clause_body_mut!(self.cp, cid).activity = (dl as f64) / 2.0;
-                        }
+                        //}
                         self.uncheck_enqueue(l0, cid);
                         clause_body_mut!(self.cp, cid).set_flag(ClauseFlag::Locked, true);
                     }
@@ -834,7 +834,7 @@ impl CDCL for Solver {
                     //     println!("lvl {}", lvl);
                     // }
                     debug_assert!(
-                        self.vars[vi].eliminated == false,
+                        !self.vars[vi].eliminated,
                         format!("analyze assertion: an eliminated var {} occurs", vi)
                     );
                     debug_assert!(

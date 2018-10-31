@@ -411,9 +411,7 @@ impl ClauseManagement for Solver {
         v.swap(1, i_max);
         let kind = if v.len() == 2 {
             ClauseKind::Binclause
-        } else if self.strategy == Some(SearchStrategy::ChanSeok) && lbd <= CO_LBD_BOUND {
-            ClauseKind::Permanent
-        } else if lbd == 0 {
+        } else if (self.strategy == Some(SearchStrategy::ChanSeok) && lbd <= CO_LBD_BOUND) || lbd == 0 {
             ClauseKind::Permanent
         } else {
             ClauseKind::Removable
@@ -491,8 +489,8 @@ impl ClauseManagement for Solver {
                 ..
             } = &mut self.cp[ClauseKind::Removable as usize];
             let mut nc = 1;
-            for i in 1..body.len() {
-                if !body[i].get_flag(ClauseFlag::Dead) && !body[i].get_flag(ClauseFlag::Locked) {
+            for (i, b) in body.iter().enumerate().skip(1) {
+                if !b.get_flag(ClauseFlag::Dead) && !b.get_flag(ClauseFlag::Locked) {
                     perm[nc] = i;
                     nc += 1;
                 }
@@ -852,6 +850,6 @@ impl ConsistencyCheck for ClausePartition {
                 p = self.head[p].next_watcher[(self.head[p].lit[0] != (i as Lit)) as usize];
             }
         }
-        return true;
+        true
     }
 }
