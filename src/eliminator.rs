@@ -164,38 +164,6 @@ impl ClauseElimination for Solver {
 }
 
 impl Solver {
-    /// 4. removeClause
-    /// called from strengthen_clause, backward_subsumption_check, eliminate_var, substitute
-    pub fn remove_clause(&mut self, cid: ClauseId) -> () {
-        if clause_body!(self.cp, cid).get_flag(ClauseFlag::Dead) {
-            panic!(
-                "remove_clause Dead: {} {:#}{:#}",
-                cid2fmt(cid),
-                clause_head!(self.cp, cid),
-                clause_body!(self.cp, cid)
-            );
-        }
-        if clause_body!(self.cp, cid).get_flag(ClauseFlag::Locked) {
-            panic!(
-                "remove_clause Locked: {} {:#}{:#}",
-                cid2fmt(cid),
-                clause_head!(self.cp, cid),
-                clause_body!(self.cp, cid)
-            );
-        }
-        {
-            clause_body_mut!(self.cp, cid).set_flag(ClauseFlag::Dead, true);
-            let w0;
-            let w1;
-            {
-                let ch = clause_head!(self.cp, cid);
-                w0 = ch.lit[0].negate();
-                w1 = ch.lit[1].negate();
-            }
-            self.cp[cid.to_kind()].touched[w0 as usize] = true;
-            self.cp[cid.to_kind()].touched[w1 as usize] = true;
-        }
-    }
     /// 5. strengthenClause
     /// returns false if inconsistent
     /// - calls `enqueue_clause`

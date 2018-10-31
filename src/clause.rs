@@ -28,6 +28,8 @@ pub trait ClauseManagement {
     fn decay_cla_activity(&mut self) -> ();
     fn add_unchecked_clause(&mut self, v: &mut Vec<Lit>) -> Option<ClauseId>;
     fn add_clause(&mut self, v: &mut Vec<Lit>, lbd: usize) -> ClauseId;
+    fn remove_clause(&mut self, cid: ClauseId) -> ();
+    fn change_clause_kind(&mut self, cid: ClauseId, kind: ClauseKind) -> ();
     fn reduce(&mut self) -> ();
     fn simplify(&mut self) -> bool;
     fn lbd_of_an_learnt_lits(&mut self) -> usize;
@@ -427,6 +429,63 @@ impl ClauseManagement for Solver {
         self.bump_cid(cid);
         self.eliminator_register_clause(cid, lbd, false);
         cid
+    }
+
+    /// 4. removeClause
+    /// called from strengthen_clause, backward_subsumption_check, eliminate_var, substitute
+    fn remove_clause(&mut self, cid: ClauseId) -> () {
+        if clause_body!(self.cp, cid).get_flag(ClauseFlag::Dead) {
+            panic!(
+                "remove_clause Dead: {} {:#}{:#}",
+                cid2fmt(cid),
+                clause_head!(self.cp, cid),
+                clause_body!(self.cp, cid)
+            );
+        }
+        if clause_body!(self.cp, cid).get_flag(ClauseFlag::Locked) {
+            panic!(
+                "remove_clause Locked: {} {:#}{:#}",
+                cid2fmt(cid),
+                clause_head!(self.cp, cid),
+                clause_body!(self.cp, cid)
+            );
+        }
+        {
+            clause_body_mut!(self.cp, cid).set_flag(ClauseFlag::Dead, true);
+            let w0;
+            let w1;
+            {
+                let ch = clause_head!(self.cp, cid);
+                w0 = ch.lit[0].negate();
+                w1 = ch.lit[1].negate();
+            }
+            self.cp[cid.to_kind()].touched[w0 as usize] = true;
+            self.cp[cid.to_kind()].touched[w1 as usize] = true;
+        }
+    }
+
+    fn change_clause_kind(&mut self, cid: ClauseId, kind: ClauseKind) -> () {
+        assert_eq!(self.decision_level() == 0);
+        let learnt = kind == ClauseKind::Removable;
+        let rank;
+        let locked;
+        let mut vec = Vec::new();
+        {
+            let cb = clause_body!(self.cp, cid);
+            if cb.get_flag(ClauseFlag::Dead) {
+                return;
+            }
+            for x in &cb.lits {
+                vec.push(*x);
+            }
+            rank = cb.rank;
+            locked = cb.get_flag(ClauseFlag::Locked);
+        }
+        self.cp[kind as usize].new_clause(&vec, rank, learnt, locked); 
+        self.remove_clause(cid);
+        if self.decision_level() != 0 {
+            self.cp[cid.to_kind()].garbage_collect(&mut self.vars, &mut self.eliminator);
+        }
     }
 
     fn reduce(&mut self) -> () {
