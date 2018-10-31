@@ -25,10 +25,10 @@ fn check_occurs() {
     };
     let mut s = Solver::new(cfg, &cnf);
 
-    let c1 = s.cp[ClauseKind::Permanent as usize].new_clause(&mkv![1, 2, 3], 3, false, false);
-    let c2 = s.cp[ClauseKind::Permanent as usize].new_clause(&mkv![-2, 3, 4], 3, false, false);
-    let c3 = s.cp[ClauseKind::Binclause as usize].new_clause(&mkv![-2, -3], 2, false, false);
-    let c4 = s.cp[ClauseKind::Permanent as usize].new_clause(&mkv![1, 2, -3, 9], 4, false, false);
+    let c1 = s.cp[ClauseKind::Permanent as usize].new_clause(&mkv![1, 2, 3], 3, false);
+    let c2 = s.cp[ClauseKind::Permanent as usize].new_clause(&mkv![-2, 3, 4], 3, false);
+    let c3 = s.cp[ClauseKind::Binclause as usize].new_clause(&mkv![-2, -3], 2, false);
+    let c4 = s.cp[ClauseKind::Permanent as usize].new_clause(&mkv![1, 2, -3, 9], 4, false);
     //    {
     //        let vec = [&c2, &c3]; // [&c1, &c2, &c3, &c4];
     //        for x in &vec {
@@ -56,6 +56,6 @@ fn check_occurs() {
 
 fn mk_c(s: &mut Solver, i: usize, v: Vec<i32>) -> ClauseId {
     let vec = v.iter().map(|i| int2lit(*i)).collect::<Vec<Lit>>();
-    let cid = s.cp[ClauseKind::Permanent as usize].new_clause(&vec, vec.len(), false, false);
+    let cid = s.cp[ClauseKind::Permanent as usize].new_clause(&vec, vec.len(), false);
     cid
 }

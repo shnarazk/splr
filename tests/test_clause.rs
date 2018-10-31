@@ -87,6 +87,6 @@ fn setup() -> Solver {
 }
 
 fn attach_clause<'a>(s: &'a mut Solver, vec: &[Lit]) -> &'a mut ClauseBody {
-    let cid = s.cp[ClauseKind::Permanent as usize].new_clause(vec, vec.len(), false, false);
+    let cid = s.cp[ClauseKind::Permanent as usize].new_clause(vec, vec.len(), false);
     &mut s.cp[ClauseKind::Permanent as usize].body[cid.to_index()]
 }
