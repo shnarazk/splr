@@ -450,6 +450,7 @@ impl ClauseManagement for Solver {
                 w0 = ch.lit[0].negate();
                 w1 = ch.lit[1].negate();
             }
+            assert_ne!(w0, w1);
             self.cp[cid.to_kind()].touched[w0 as usize] = true;
             self.cp[cid.to_kind()].touched[w1 as usize] = true;
         }

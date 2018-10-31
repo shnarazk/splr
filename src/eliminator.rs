@@ -344,16 +344,21 @@ impl Solver {
                             // ここから先を潰すとvalid answer
                             match self.subsume(cid, *di) {
                                 Some(NULL_LIT) => {
-                                    // println!("BackSubsC    => {} subsumed completely by {}", cid2fmt(*di), cid2fmt(cid));
                                     subsumed += 1;
                                     if cid.to_kind() == ClauseKind::Removable as usize && di.to_kind() == ClauseKind::Removable as usize {
-                                        self.remove_clause(*di); // TODO: Is this OK???
-                                    } else {
+                                        // println!("BackSubsC    => {} {:#} subsumed completely by {} {:#}",
+                                        //          cid2fmt(*di),
+                                        //          *db,
+                                        //          cid2fmt(cid),
+                                        //          *clause_body!(self.cp, cid),
+                                        // );
+                                        self.remove_clause(*di);
+                                    } //else {
                                         // println!("backward_subsumption_check tries to delete a permanent clause {} {:#}",
                                         //          cid2fmt(*di),
                                         //          clause_body!(self.cp, *di));
                                         // TODO: move the cid to Permanent
-                                    }
+                                    //}
                                 }
                                 Some(l) => {
                                     // let xb = &clause_body!(self.cp, *di);
