@@ -204,7 +204,7 @@ impl Solver {
             .skip(1)
             .filter(|c| !c.get_flag(ClauseFlag::Dead) && c.rank <= 3)
             .count();
-        if true {
+        if false {
             if mes.is_empty() {
                 println!("{}", self.profile);
                 println!();
@@ -752,6 +752,7 @@ impl CDCL for Solver {
         self.q_head = lim;
     }
 
+    /// returns `false` if an conflict occures.
     fn enqueue(&mut self, l: Lit, cid: ClauseId) -> bool {
         let sig = l.lbool();
         let val = self.vars[l.vi()].assign;

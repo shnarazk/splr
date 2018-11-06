@@ -3,7 +3,7 @@
 #![allow(unused_variables)]
 use clause::{
     ClauseBody, ClauseFlag, ClauseHead, ClauseIdIndexEncoding, ClauseIndex, ClauseKind,
-    ClauseManagement, ClausePartition,
+    ClauseManagement, ClausePartition, cid2fmt,
 };
 use solver::{Solver, CDCL};
 use std::fmt;
@@ -375,7 +375,10 @@ impl Solver {
                                         return false;
                                     }
                                     self.eliminator_enqueue_var(l.vi());
-                                    self.propagate();
+                                    if self.propagate() != NULL_CLAUSE {
+                                        self.ok = false;
+                                        panic!("@backward_subsumption_check called propagate and failed!");
+                                    }
                                 }
                                 None => {}
                             }
@@ -486,7 +489,13 @@ impl Solver {
                                     panic!("zero");
                                 }
                                 1 => {
-                                    self.enqueue(vec[0], NULL_CLAUSE);
+                                    if !self.enqueue(vec[0], NULL_CLAUSE) {
+                                        self.ok = false;
+                                        panic!("eliminate_var: failed to enqueue");
+                                    }
+                                    if [-191502, 191503, -191504].contains(&(vec[0].int())) {
+                                        panic!("eliminate_var: wrong assignment {}!", vec[0].int());
+                                    }
                                 }
                                 _ => {
                                     // println!("eliminate_var calls add_clause {:?}", vec2int(&vec));
@@ -609,6 +618,9 @@ impl Solver {
 impl Solver {
     /// returns a literal if these clauses can be merged by the literal.
     fn subsume(&self, cid: ClauseId, other: ClauseId) -> Option<Lit> {
+        if other.to_kind() == ClauseKind::Uniclause as usize {
+            panic!("unexpected path!");
+        }
         if cid.to_kind() == ClauseKind::Uniclause as usize {
             let l = cid.to_index() as Lit;
             let oh = clause_head!(self.cp, other);
@@ -624,6 +636,12 @@ impl Solver {
         let mut ret: Lit = NULL_LIT;
         let cb = clause_body!(self.cp, cid);
         let ob = clause_body!(self.cp, other);
+        if !ob.lits.contains(&clause_head!(self.cp, other).lit[0]) {
+            panic!("@subsume: the 1st literal of the other clause is ill-formed {} {:#}!", cid2fmt(other), ob);
+        }
+        if !ob.lits.contains(&clause_head!(self.cp, other).lit[1]) {
+            panic!("@subsume: the 2nd literal of the other clause is ill-formed {} {:#}!", cid2fmt(other), ob);
+        }
         'next: for l in &cb.lits {
             for lo in &ob.lits {
                 if *l == *lo {
