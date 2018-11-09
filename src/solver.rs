@@ -579,6 +579,7 @@ impl CDCL for Solver {
                                 let dl = trail_lim.len();
                                 let other = (*cb).lits[0];
                                 let v = &mut vars[other.vi()];
+                                assert!(v.assign == other.lbool() || v.assign == BOTTOM);
                                 v.assign = other.lbool();
                                 v.level = dl;
                                 debug_assert!(*pre != NULL_CLAUSE);
@@ -607,7 +608,9 @@ impl CDCL for Solver {
             let ci = self.propagate();
             if ci == NULL_CLAUSE {
                 let na = self.num_assigns();
-                if na == self.num_vars {
+                let ne = self.eliminator.eliminated_vars;
+                if na + ne == self.num_vars {
+                    println!("na {} + ne {}", na, ne);
                     return true;
                 }
                 // DYNAMIC FORCING RESTART
@@ -1061,6 +1064,7 @@ impl Solver {
         let dl = self.decision_level();
         {
             let v = &mut self.vars[l.vi()];
+            assert!(v.assign == l.lbool() || v.assign == BOTTOM);
             v.assign = l.lbool();
             v.level = dl;
             v.reason = cid;
@@ -1077,6 +1081,7 @@ impl Solver {
         let dl = self.decision_level();
         {
             let v = &mut self.vars[l.vi()];
+            assert!(v.assign == l.lbool() || v.assign == BOTTOM);
             v.assign = l.lbool();
             v.level = dl;
             v.reason = NULL_CLAUSE;

@@ -178,7 +178,8 @@ impl Solver {
         debug_assert_ne!(cid, NULL_CLAUSE);
         if self.strengthen(cid, l) {
             let c0 = clause_head!(self.cp, cid).lit[0];
-            debug_assert!(1 == clause_body!(self.cp, cid).lits.len());
+            assert!(1 == clause_body!(self.cp, cid).lits.len());
+            assert!(c0 == clause_body!(self.cp, cid).lits[0]);
             // println!("cid {} {:?} became a unit clause as c0 {}, l {}", cid2fmt(cid), vec2int(&clause_body!(self.cp, cid).lits), c0.int(), l.int());
             debug_assert_ne!(c0, l);
             // println!("{} is removed and its first literal {} is enqueued.", cid2fmt(cid), c0.int());
@@ -186,14 +187,13 @@ impl Solver {
             // before the following propagate, we need to clean garbages.
             // これまずくないか? self.cp[cid.to_kind()].garbage_collect(&mut self.vars, &mut self.eliminator);
             // println!("STRENGTHEN_CLAUSE ENQUEUE {}", c0);
-            if self.enqueue(c0, NULL_CLAUSE) {
-                //  && self.propagate() == NULL_CLAUSE {
+            if self.enqueue(c0, NULL_CLAUSE) && self.propagate() == NULL_CLAUSE {
                 // self.cp[cid.to_kind()].touched[c0 as usize] = true;
                 self.cp[cid.to_kind()].touched[c0.negate() as usize] = true;
                 true
             } else {
                 //println!("{:?}", self.vars[c0.vi()]);
-                //panic!("Conflicting Enqueue:: A l {}, c0 {}, {:#} {:#}", l.int(), c0.int(), clause_head!(self.cp, cid), clause_body!(self.cp, cid));
+                panic!("Conflicting Enqueue:: A l {}, c0 {}, {:#} {:#}", l.int(), c0.int(), clause_head!(self.cp, cid), clause_body!(self.cp, cid));
                 self.ok = false;
                 false
             }
@@ -375,10 +375,10 @@ impl Solver {
                                         return false;
                                     }
                                     self.eliminator_enqueue_var(l.vi());
-                                    if self.propagate() != NULL_CLAUSE {
-                                        self.ok = false;
-                                        panic!("@backward_subsumption_check called propagate and failed!");
-                                    }
+                                    // if self.propagate() != NULL_CLAUSE {
+                                    //     self.ok = false;
+                                    //     panic!("@backward_subsumption_check called propagate and failed!");
+                                    // }
                                 }
                                 None => {}
                             }
@@ -449,7 +449,7 @@ impl Solver {
             self.vars[v].eliminated = true;
             let cid = self.vars[v].reason;
             debug_assert_eq!(cid, NULL_CLAUSE);
-            // println!("- eliminate: {:>5} (+{:<4} -{:<4})", v, (*pos).len(), (*neg).len() );
+            println!("- eliminate var: {:>8} (+{:<4} -{:<4})", v, (*pos).len(), (*neg).len() );
             // setDecisionVar(v, false);
             self.eliminator.eliminated_vars += 1;
             {
@@ -492,9 +492,6 @@ impl Solver {
                                     if !self.enqueue(vec[0], NULL_CLAUSE) {
                                         self.ok = false;
                                         panic!("eliminate_var: failed to enqueue");
-                                    }
-                                    if [-191502, 191503, -191504].contains(&(vec[0].int())) {
-                                        panic!("eliminate_var: wrong assignment {}!", vec[0].int());
                                     }
                                 }
                                 _ => {
@@ -567,6 +564,10 @@ impl Solver {
             }
             let l = self.eliminator.elim_clauses[i];
             // println!(" - fixed {}", l.int());
+            if model[l.vi() - 1] == l.negate().int() {
+                println!("model[{}] = {}, {}", l.vi(), model[l.vi() - 1], l.int());
+            }
+            // assert!(model[l.vi() - 1] != l.negate().int());
             model[l.vi() - 1] = l.int(); // .neg();
             if i < width {
                 break;
