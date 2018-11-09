@@ -254,22 +254,21 @@ impl VarIdHeap {
         let ai = vars[vi].activity;
         loop {
             let l = 2 * i; // left
-            if l <= n {
-                let r = l + 1; // right
+            if l < n {
                 let vl = self.heap[l];
-                let vr = self.heap[r];
                 let al = vars[vl].activity;
                 // let al = match self.order {
                 //     VarOrder::ByActivity => vars[vl].activity,
                 //     VarOrder::ByOccurence => vars[vl].occurs.len() as f64,
                 // };
-                let ar = vars[vr].activity;
+                let r = l + 1; // right
                 // let ar = match self.order {
                 //     VarOrder::ByActivity => vars[vr].activity,
                 //     VarOrder::ByOccurence => vars[vr].occurs.len() as f64,
                 // };
-                let (target, vc, ac) = if r <= n && al < ar {
-                    (r, vr, ar)
+                let (target, vc, ac) = if r < n && al < vars[self.heap[r]].activity {
+                    let vr = self.heap[r];
+                    (r, vr, vars[vr].activity)
                 } else {
                     (l, vl, al)
                 };
@@ -350,7 +349,7 @@ impl VarManagement for Solver {
     fn select_var(&mut self) -> VarId {
         loop {
             let vi = self.var_order.get_root(&self.vars);
-            if self.vars[vi].assign == BOTTOM {
+            if self.vars[vi].assign == BOTTOM && !self.vars[vi].eliminated {
                 return vi;
             }
         }
