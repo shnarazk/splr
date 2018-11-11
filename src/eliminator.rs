@@ -449,7 +449,7 @@ impl Solver {
             self.vars[v].eliminated = true;
             let cid = self.vars[v].reason;
             debug_assert_eq!(cid, NULL_CLAUSE);
-            println!("- eliminate var: {:>8} (+{:<4} -{:<4})", v, (*pos).len(), (*neg).len() );
+            // println!("- eliminate var: {:>8} (+{:<4} -{:<4})", v, (*pos).len(), (*neg).len() );
             // setDecisionVar(v, false);
             self.eliminator.eliminated_vars += 1;
             {
@@ -483,15 +483,15 @@ impl Solver {
                             continue;
                         }
                         if let Some(vec) = self.merge(*p, *n, v) {
-                            // println!("eliminator add a cross product {:?}", vec2int(&vec));
+                            // println!("eliminator replaces {} with a cross product {:?}", cid2fmt(*p), vec2int(&vec));
                             match vec.len() {
                                 0 => {
                                     panic!("zero");
                                 }
                                 1 => {
-                                    if !self.enqueue(vec[0], NULL_CLAUSE) {
+                                    if !self.enqueue(vec[0], NULL_CLAUSE) || self.propagate() != NULL_CLAUSE {
                                         self.ok = false;
-                                        panic!("eliminate_var: failed to enqueue");
+                                        panic!("eliminate_var: failed to enqueue & propagate");
                                     }
                                 }
                                 _ => {
@@ -521,6 +521,19 @@ impl Solver {
                     self.cp[cid.to_kind()].touched[w1 as usize] = true;
                 }
             }
+            //{
+            //    // v should be disappeared from the problem!
+            //    let kinds = [ClauseKind::Binclause, ClauseKind::Removable, ClauseKind::Permanent];
+            //    for kind in &kinds {
+            //        for (i, b) in self.cp[*kind as usize].body.iter().enumerate().skip(1) {
+            //            if b.lits.contains(&v.lit(LTRUE)) || b.lits.contains(&v.lit(LFALSE)) {
+            //                if !b.get_flag(ClauseFlag::Dead) {
+            //                    panic!("FOUND: {:#} in {:?}{}/{:?}", v, kind, i, vec2int(&b.lits));
+            //                }
+            //            }
+            //        }
+            //    }
+            //}
             self.backward_subsumption_check()
         }
     }
