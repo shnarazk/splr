@@ -90,6 +90,7 @@ pub trait VarIdEncoding {
 }
 
 impl VarIdEncoding for VarId {
+    /// returns a positive literal if p == LTRUE.
     fn lit(&self, p: Lbool) -> Lit {
         (*self as Lit) << 1 | ((p == LFALSE) as Lit)
     }

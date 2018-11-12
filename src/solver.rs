@@ -578,6 +578,7 @@ impl CDCL for Solver {
                                 // self.uncheck_enqueue(other, kind.id_from((*c).index));
                                 let dl = trail_lim.len();
                                 let other = (*cb).lits[0];
+                                // println!("unchecked_enqueue embedded into propagate {}", other.int());
                                 let v = &mut vars[other.vi()];
                                 assert!(v.assign == other.lbool() || v.assign == BOTTOM);
                                 v.assign = other.lbool();
@@ -739,6 +740,7 @@ impl CDCL for Solver {
         for l in &self.trail[lim..] {
             let vi = l.vi();
             {
+                // println!("cancel_until {}", l.int());
                 let v = &mut self.vars[vi];
                 v.phase = v.assign;
                 v.assign = BOTTOM;
@@ -1056,6 +1058,7 @@ impl Solver {
     }
 
     pub fn uncheck_enqueue(&mut self, l: Lit, cid: ClauseId) -> () {
+        // println!("uncheck_enqueue {}", l.int());
         debug_assert!(l != 0, "Null literal is about to be equeued");
         debug_assert!(
             self.decision_level() == 0 || cid != 0,
@@ -1077,6 +1080,7 @@ impl Solver {
         self.trail.push(l);
     }
     pub fn uncheck_assume(&mut self, l: Lit) -> () {
+        // println!("uncheck_assume {}", l.int());
         self.trail_lim.push(self.trail.len());
         let dl = self.decision_level();
         {
