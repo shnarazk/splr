@@ -361,6 +361,8 @@ impl Solver {
                                     //}
                                 }
                                 Some(l) => {
+                                    self.cp[di.to_kind()].touched[l as usize] = true;
+                                    self.cp[di.to_kind()].touched[l.negate() as usize] = true;
                                     // let xb = &clause_body!(self.cp, *di);
                                     // println!("BackSubsC    => subsumed {} from {} and {} {:#}", l.int(), cid2fmt(cid), cid2fmt(*di), xb);
                                     deleted_literals += 1;
@@ -400,16 +402,24 @@ impl Solver {
         // Copy clause to the vector. Remember the position where the varibale 'v' occurs:
         let ch = clause_head!(self.cp, cid);
         let cb = clause_body!(self.cp, cid);
+        assert!(0 < cb.lits.len());
         for l in &cb.lits {
             vec.push(*l as u32);
             if l.vi() == vi {
                 let index = vec.len() - 1;
+                assert_eq!(vec[index], *l);
+                assert_eq!(vec[index].vi(), vi);
                 // swap the first literal with the 'v'. So that the literal containing 'v' will occur first in the clause.
                 vec.swap(index, first);
             }
         }
         // Store the length of the clause last:
+        if vec[first].vi() != vi {
+            panic!("ooo {:?} by {}", vec2int(&cb.lits), vi);
+        }
+        assert_eq!(vec[first].vi(), vi);
         vec.push(cb.lits.len() as Lit);
+        // println!("make_eliminated_clause: eliminate({}) clause {:?}", vi, vec2int(&cb.lits));
     }
     /// 15. eliminateVar
     /// returns false if solver is in inconsistent
@@ -418,6 +428,12 @@ impl Solver {
             return true;
         }
         debug_assert!(!self.vars[v].eliminated);
+        {
+            // count only alive clauses
+            let Solver { ref mut vars, ref cp, .. } = self;
+            vars[v].pos_occurs.retain(|&c| !clause_body!(cp, c).get_flag(ClauseFlag::Dead));
+            vars[v].pos_occurs.retain(|&c| !clause_body!(cp, c).get_flag(ClauseFlag::Dead));
+        }
         let pos = &self.vars[v].pos_occurs as *const Vec<ClauseId>;
         let neg = &self.vars[v].neg_occurs as *const Vec<ClauseId>;
         unsafe {
@@ -449,27 +465,48 @@ impl Solver {
             self.vars[v].eliminated = true;
             let cid = self.vars[v].reason;
             debug_assert_eq!(cid, NULL_CLAUSE);
-            // println!("- eliminate var: {:>8} (+{:<4} -{:<4})", v, (*pos).len(), (*neg).len() );
+            // println!("- eliminate var: {:>8} (+{:<4} -{:<4}); {:?}", v, (*pos).len(), (*neg).len(), self.vars[v]);
+            if [101, 167, 168].contains(&v) {
+                println!("- eliminate var: {:>8} (+{:<4} -{:<4})", v, (*pos).len(), (*neg).len());
+            }
             // setDecisionVar(v, false);
             self.eliminator.eliminated_vars += 1;
             {
                 let tmp = &mut self.eliminator.elim_clauses as *mut Vec<Lit>;
                 if (*neg).len() < (*pos).len() {
                     for cid in &*neg {
+                        if clause_body!(self.cp, cid).lits.contains(&v.lit(LTRUE)) {
+                            panic!("ultra panic {} {:?}.", cid2fmt(*cid), vec2int(&clause_body!(self.cp, cid).lits));
+                        }
+                        if !clause_body!(self.cp, cid).lits.contains(&v.lit(LFALSE)) {
+                            panic!("ultra panic {} {:?}.", cid2fmt(*cid), vec2int(&clause_body!(self.cp, cid).lits));
+                        }
                         if clause_body!(self.cp, cid).get_flag(ClauseFlag::Dead) {
                             continue;
                         }
                         self.make_eliminated_clause(&mut (*tmp), v, *cid);
+                        self.cp[cid.to_kind() as usize].touched[v.lit(LTRUE) as usize] = true;
+                        self.cp[cid.to_kind() as usize].touched[v.lit(LFALSE) as usize] = true;
                     }
                     self.make_eliminating_unit_clause(&mut (*tmp), v.lit(LTRUE));
+                    // println!("eliminate unit clause {}", v.lit(LFALSE).int());
                 } else {
                     for cid in &*pos {
+                        if clause_body!(self.cp, cid).lits.contains(&v.lit(LFALSE)) {
+                            panic!("ultra panic {} {:?}.", cid2fmt(*cid), vec2int(&clause_body!(self.cp, cid).lits));
+                        }
+                        if !clause_body!(self.cp, cid).lits.contains(&v.lit(LTRUE)) {
+                            panic!("ultra panic {} {:?}.", cid2fmt(*cid), vec2int(&clause_body!(self.cp, cid).lits));
+                        }
                         if clause_body!(self.cp, cid).get_flag(ClauseFlag::Dead) {
                             continue;
                         }
                         self.make_eliminated_clause(&mut (*tmp), v, *cid);
+                        self.cp[cid.to_kind() as usize].touched[v.lit(LTRUE) as usize] = true;
+                        self.cp[cid.to_kind() as usize].touched[v.lit(LFALSE) as usize] = true;
                     }
                     self.make_eliminating_unit_clause(&mut (*tmp), v.lit(LFALSE));
+                    // println!("eliminate unit clause {}", v.lit(LTRUE).int());
                 }
             }
             // Produce clauses in cross product:
@@ -482,6 +519,9 @@ impl Solver {
                         if clause_body!(self.cp, n).get_flag(ClauseFlag::Dead) {
                             continue;
                         }
+                        if (*p).to_index() == 5 || (*n).to_index() == 5 {
+                            println!("crossing");
+                        }
                         if let Some(vec) = self.merge(*p, *n, v) {
                             // println!("eliminator replaces {} with a cross product {:?}", cid2fmt(*p), vec2int(&vec));
                             match vec.len() {
@@ -489,13 +529,16 @@ impl Solver {
                                     panic!("zero");
                                 }
                                 1 => {
+                                    // println!("eliminate_var: grounds {} from {}{:?} and {}{:?}", vec[0].int(), cid2fmt(*p), vec2int(&clause_body!(self.cp, *p).lits), cid2fmt(*n), vec2int(&clause_body!(self.cp, *n).lits));
                                     if !self.enqueue(vec[0], NULL_CLAUSE) || self.propagate() != NULL_CLAUSE {
                                         self.ok = false;
                                         panic!("eliminate_var: failed to enqueue & propagate");
                                     }
                                 }
                                 _ => {
-                                    // println!("eliminate_var calls add_clause {:?}", vec2int(&vec));
+                                    if (*p).to_index() == 5 || (*n).to_index() == 5 {
+                                        println!("eliminate_var calls add_clause {:?} from {}{:?} and {}{:?}", vec2int(&vec), cid2fmt(*p), vec2int(&clause_body!(self.cp, *p).lits), cid2fmt(*n), vec2int(&clause_body!(self.cp, *n).lits));
+                                    }
                                     self.add_clause(&mut vec.to_vec(), 0);
                                 }
                             }
@@ -508,7 +551,8 @@ impl Solver {
                     &mut self.vars[v].pos_occurs
                 } else {
                     &mut self.vars[v].neg_occurs
-                } {
+                }
+                {
                     clause_body_mut!(self.cp, *cid).set_flag(ClauseFlag::Dead, true);
                     let w0;
                     let w1;
@@ -517,10 +561,15 @@ impl Solver {
                         w0 = ch.lit[0].negate();
                         w1 = ch.lit[1].negate();
                     }
+                    assert!(w0 != 0 && w1 != 0);
                     self.cp[cid.to_kind()].touched[w0 as usize] = true;
                     self.cp[cid.to_kind()].touched[w1 as usize] = true;
                 }
+                // self.cp[cid.to_kind()].touched[v.lit(LTRUE) as usize] = true;
+                // self.cp[cid.to_kind()].touched[v.lit(LFALSE) as usize] = true;
             }
+            self.vars[v].pos_occurs.clear();
+            self.vars[v].neg_occurs.clear();
             //{
             //    // v should be disappeared from the problem!
             //    let kinds = [ClauseKind::Binclause, ClauseKind::Removable, ClauseKind::Permanent];
@@ -543,7 +592,11 @@ impl Solver {
     /// inline lbool    Solver::modelValue    (Lit p) const   { return model[var(p)] ^ sign(p); }
     /// ```
     pub fn extend_model(&mut self, model: &mut Vec<i32>) -> () {
-        // println!("extend_model: from {:?}", self.eliminator.elim_clauses);
+        {
+            let cid = ClauseKind::Permanent.id_from(5);
+            println!("extend_model P5 {:#} {:#}.", clause_head!(self.cp, cid), clause_body!(self.cp, cid));
+        }
+        // println!("extend_model {:?}", &self.eliminator.elim_clauses);
         if self.eliminator.elim_clauses.is_empty() {
             return;
         }
@@ -575,10 +628,13 @@ impl Solver {
                 width -= 1;
                 i -= 1;
             }
+            assert!(width == 1);
             let l = self.eliminator.elim_clauses[i];
-            // println!(" - fixed {}", l.int());
-            if model[l.vi() - 1] == l.negate().int() {
-                println!("model[{}] = {}, {}", l.vi(), model[l.vi() - 1], l.int());
+            if [146931, 146962, 146963].contains(&l.vi()) {
+                println!(" - fixed {} at {}", l.int(), i);
+            }
+            if model[l.vi() - 1] == -(l.int()) && [146931, 146962, 146963].contains(&l.vi()) {
+                println!("reverse model[{}] = {}, {}, {:?}", l.vi(), model[l.vi() - 1], l.int(), self.vars[l.vi()]);
             }
             // assert!(model[l.vi() - 1] != l.negate().int());
             model[l.vi() - 1] = l.int(); // .neg();
@@ -600,6 +656,7 @@ impl Solver {
         // println!("n_touched {}", self.eliminator.n_touched);
         // self.build_occurence_list();
         // for i in 1..4 { println!("eliminate report: v{} => {},{}", i, self.vars[i].num_occurs, self.vars[i].occurs.len()); }
+        // self.eliminator.clause_queue.clear();
         'perform: while self.eliminator.bwdsub_assigns < self.trail.len()
             || !self.eliminator.var_queue.is_empty()
         {
@@ -674,6 +731,9 @@ impl Solver {
     /// returns true if the clause became a unit clause.
     /// Called only from strengthen_clause
     pub fn strengthen(&mut self, cid: ClauseId, p: Lit) -> bool {
+        if cid.is(ClauseKind::Permanent, 5) {
+            println!("strengthen {} {} {:?}.", p.int(), cid2fmt(cid), vec2int(&clause_body!(self.cp, cid).lits));
+        }
         debug_assert!(!clause_body!(self.cp, cid).get_flag(ClauseFlag::Dead));
         let cix = cid.to_index();
         let ClausePartition {
@@ -688,6 +748,14 @@ impl Solver {
             let cb = &mut body[cix] as *mut ClauseBody;
             if (*cb).get_flag(ClauseFlag::Dead) {
                 return false;
+            }
+            {
+                let v = &mut self.vars[p.vi()];
+                if p.positive() {
+                    v.pos_occurs.retain(|&c| c != cid);
+                } else {
+                    v.neg_occurs.retain(|&c| c != cid);
+                }
             }
             if (*ch).lit[0] == p || (*ch).lit[1] == p {
                 debug_assert!((*cb).lits[0] == p || (*cb).lits[1] == p);

@@ -20,6 +20,7 @@ pub trait ClauseIdIndexEncoding {
     fn to_id(&self) -> ClauseId;
     fn to_index(&self) -> ClauseIndex;
     fn to_kind(&self) -> usize;
+    fn is(&self, kind: ClauseKind, ix: ClauseIndex) -> bool;
 }
 
 /// for Solver
@@ -212,6 +213,9 @@ impl ClauseIdIndexEncoding for usize {
     fn to_kind(&self) -> usize {
         *self >> CLAUSE_INDEX_BITS
     }
+    fn is(&self, kind: ClauseKind, ix: ClauseIndex) -> bool {
+        (*self).to_kind() == kind as usize && (*self).to_index() == ix
+    }
 }
 
 impl PartialEq for ClauseBody {
@@ -388,6 +392,9 @@ impl ClauseManagement for Solver {
             n => {
                 let cid = self.cp[kind as usize].new_clause(&v, 0, false);
                 self.eliminator_register_clause(cid, n, true);
+                if v.contains(&int2lit(-101)) && v.contains(&int2lit(-167)) && v.contains(&int2lit(-168)) {
+                    println!("cid {} = {} {:?}", cid, cid2fmt(cid), vec2int(&v));
+                }
                 Some(cid)
             }
         }
@@ -425,6 +432,9 @@ impl ClauseManagement for Solver {
     /// 4. removeClause
     /// called from strengthen_clause, backward_subsumption_check, eliminate_var, substitute
     fn remove_clause(&mut self, cid: ClauseId) -> () {
+        if cid.is(ClauseKind::Permanent, 5) {
+            println!("remove");
+        }
         if clause_body!(self.cp, cid).get_flag(ClauseFlag::Dead) {
             panic!(
                 "remove_clause Dead: {} {:#}{:#}",
@@ -450,6 +460,7 @@ impl ClauseManagement for Solver {
                 w0 = ch.lit[0].negate();
                 w1 = ch.lit[1].negate();
             }
+            assert!(w0 != 0 && w1 != 0);
             assert_ne!(w0, w1);
             self.cp[cid.to_kind()].touched[w0 as usize] = true;
             self.cp[cid.to_kind()].touched[w1 as usize] = true;
@@ -511,6 +522,7 @@ impl ClauseManagement for Solver {
                     if cb.get_flag(ClauseFlag::Locked) {
                         panic!("mmmmmmmmmmmmmmmm");
                     }
+                    assert!(ch.lit[0] != 0 && ch.lit[1] != 0);
                     touched[ch.lit[0].negate() as usize] = true;
                     touched[ch.lit[1].negate() as usize] = true;
                 }
@@ -569,6 +581,7 @@ impl ClauseManagement for Solver {
                             panic!("not expected path!");
                         }
                         cb.set_flag(ClauseFlag::Dead, true);
+                        assert!(ch.lit[0] != 0 && ch.lit[1] != 0);
                         self.cp[*ck as usize].touched[ch.lit[0].negate() as usize] = true;
                         self.cp[*ck as usize].touched[ch.lit[1].negate() as usize] = true;
                         if (*eliminator).use_elim {
@@ -707,7 +720,11 @@ impl GC for ClausePartition {
         }
         debug_assert!(
             self.watcher[GARBAGE_LIT.negate() as usize] == NULL_CLAUSE,
-            "There's a clause in the GARBAGE list"
+            format!("There's a clause {} {:#} {:#} in the GARBAGE list",
+                    cid2fmt(self.kind.id_from(self.watcher[GARBAGE_LIT.negate() as usize])),
+                    self.head[self.watcher[GARBAGE_LIT.negate() as usize]],
+                    self.body[self.watcher[GARBAGE_LIT.negate() as usize]],
+            ),
         );
     }
     fn new_clause(&mut self, v: &[Lit], rank: usize, locked: bool) -> ClauseId {

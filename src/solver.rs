@@ -394,11 +394,13 @@ impl SatSolver for Solver {
                 }
             }
             self.progress("load");
-            self.simplify();
+            // self.simplify();
             self.progress("simp");
         } else {
             self.progress("load");
         }
+        // self.config.use_sve = false;
+        // self.eliminator.use_elim = false;
         self.stat[Stat::Simplification as usize] += 1;
         match self.search() {
             _ if !self.ok => {
@@ -538,6 +540,17 @@ impl CDCL for Solver {
                         }
                         debug_assert!((*ch).lit[0] == false_lit || (*ch).lit[1] == false_lit);
                         let my_index = ((*ch).lit[0] != false_lit) as usize;
+                        {
+                            // Handling a special case for simplify
+                            let cb = &mut (*body)[*pre] as *mut ClauseBody;
+                            if (*cb).get_flag(ClauseFlag::Dead) {
+                                if [101, 167, 168].contains(&false_lit.vi()) {
+                                    println!("propagate: found a dead {} on {}", cid2fmt(kind.id_from(*pre)), false_lit.int());
+                                }
+                                pre = &mut (*ch).next_watcher[my_index];
+                                continue 'next_clause;
+                            }
+                        }
                         let other_value = vars.assigned((*ch).lit[(my_index == 0) as usize]);
                         if other_value != LTRUE {
                             let cb = &mut (*body)[*pre] as *mut ClauseBody;
