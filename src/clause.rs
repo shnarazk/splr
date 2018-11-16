@@ -7,6 +7,10 @@ use std::fmt;
 use types::*;
 use var::{Satisfiability, Var};
 
+use std::fs::File;
+use std::io::{BufWriter, Write};
+use std::path::Path;
+
 /// for ClausePartition
 pub trait GC {
     fn garbage_collect(&mut self, vars: &mut [Var], elimanator: &mut Eliminator) -> ();
@@ -35,6 +39,7 @@ pub trait ClauseManagement {
     fn simplify(&mut self) -> bool;
     fn lbd_of_an_learnt_lits(&mut self) -> usize;
     fn lbd_of(&mut self, cid: ClauseId) -> usize;
+    fn dump_cnf(&self, fname: String) -> ();
 }
 
 pub trait ConsistencyCheck {
@@ -630,6 +635,31 @@ impl ClauseManagement for Solver {
             }
         }
         cnt
+    }
+    fn dump_cnf(&self, fname: String) -> () {
+        if let Ok(out) = File::create(&fname) {
+            let mut buf = BufWriter::new(out);
+            let nv = self.trail.len();
+            let nc: usize = self.cp.iter().map(|p| p.body.len() - 1).sum();
+            buf.write(format!("p cnf {} {}\n", self.num_vars, nc + nv).as_bytes()).unwrap();
+            let kinds = [
+                ClauseKind::Binclause,
+                ClauseKind::Removable,
+                ClauseKind::Permanent,
+            ];
+            for kind in &kinds {
+                for c in self.cp[*kind as usize].body.iter().skip(1) {
+                    for l in &c.lits {
+                        buf.write(format!("{} ", l.int()).as_bytes()).unwrap();
+                    }
+                    buf.write("0\n".as_bytes()).unwrap();
+                }
+            }
+            buf.write("c from trail\n".as_bytes()).unwrap();
+            for x in &self.trail {
+                buf.write(format!("{} 0\n", x.int()).as_bytes()).unwrap();
+            }
+        }
     }
 }
 

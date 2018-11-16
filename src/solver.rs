@@ -389,7 +389,11 @@ impl SatSolver for Solver {
         self.progress("");
         if self.eliminator.use_elim {
             for v in &mut self.vars[1..] {
-                if v.pos_occurs.len() <= 1 || v.neg_occurs.len() <= 1 {
+                if v.neg_occurs.len() == 0 {
+                    self.trail.push(v.index.lit(LTRUE));
+                } else if v.pos_occurs.len() == 0 {
+                    self.trail.push(v.index.lit(LFALSE));
+                } else if v.pos_occurs.len() == 1 || v.neg_occurs.len() == 1 {
                     self.eliminator.enqueue_var(v);
                 }
             }
@@ -399,6 +403,8 @@ impl SatSolver for Solver {
         } else {
             self.progress("load");
         }
+        // self.dump_cnf("test.cnf".to_string());
+        // panic!("aa");
         // self.config.use_sve = false;
         // self.eliminator.use_elim = false;
         self.stat[Stat::Simplification as usize] += 1;
@@ -852,6 +858,7 @@ impl CDCL for Solver {
                     // if lvl == 0 {
                     //     println!("lvl {}", lvl);
                     // }
+                    assert!(!(*cb).get_flag(ClauseFlag::Dead));
                     debug_assert!(
                         !self.vars[vi].eliminated,
                         format!("analyze assertion: an eliminated var {} occurs", vi)

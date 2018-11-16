@@ -15,6 +15,7 @@ pub trait ClauseElimination {
     fn eliminator_register_clause(&mut self, cid: ClauseId, rank: usize, ignorable: bool) -> ();
     fn eliminator_enqueue_clause(&mut self, cid: ClauseId) -> ();
     fn eliminator_enqueue_var(&mut self, vi: VarId) -> ();
+    fn eliminator_unregister_clause(&mut self, cid: ClauseId) -> ();
 }
 
 // for Eliminator
@@ -161,6 +162,24 @@ impl ClauseElimination for Solver {
         }
         self.eliminator.enqueue_var(&mut self.vars[vi])
     }
+    fn eliminator_unregister_clause(&mut self, cid: ClauseId) -> () {
+        assert!(clause_body!(self.cp, cid).get_flag(ClauseFlag::Dead));
+        if self.eliminator.use_elim {
+            for l in &clause_body!(self.cp, cid).lits {
+                let v = &mut self.vars[l.vi()];
+                if !v.eliminated {
+                    let xx = v.pos_occurs.len() + v.neg_occurs.len();
+                    if l.positive() {
+                        v.pos_occurs.retain(|&cj| cid != cj);
+                    } else {
+                        v.neg_occurs.retain(|&cj| cid != cj);
+                    }
+                    let xy = v.pos_occurs.len() + v.neg_occurs.len();
+                    self.eliminator.enqueue_var(v);
+                }
+            }
+        }
+    }
 }
 
 impl Solver {
@@ -184,6 +203,7 @@ impl Solver {
             debug_assert_ne!(c0, l);
             // println!("{} is removed and its first literal {} is enqueued.", cid2fmt(cid), c0.int());
             self.remove_clause(cid);
+            self.eliminator_unregister_clause(cid);
             // before the following propagate, we need to clean garbages.
             // これまずくないか? self.cp[cid.to_kind()].garbage_collect(&mut self.vars, &mut self.eliminator);
             // println!("STRENGTHEN_CLAUSE ENQUEUE {}", c0);
@@ -353,6 +373,7 @@ impl Solver {
                                         //          *clause_body!(self.cp, cid),
                                         // );
                                         self.remove_clause(*di);
+                                        self.eliminator_unregister_clause(*di);
                                     } //else {
                                         // println!("backward_subsumption_check tries to delete a permanent clause {} {:#}",
                                         //          cid2fmt(*di),
@@ -386,6 +407,9 @@ impl Solver {
                             }
                         }
                     }
+                }
+                if self.q_head < self.trail.len() {
+                    panic!("wwwwwwwwwwwwwww");
                 }
             }
         }
@@ -439,6 +463,26 @@ impl Solver {
         unsafe {
             // Check wether the increase in number of clauses stays within the allowed ('grow').
             // Moreover, no clause must exceed the limit on the maximal clause size (if it is set).
+            if (*pos).len() == 0 && 0 == (*neg).len() {
+                return true;
+            }
+            if (*pos).len() == 0 && 0 < (*neg).len() {
+                println!("v {} p {} n {}", v, (*pos).len(), (*neg).len());
+                if !self.enqueue(v.lit(LFALSE), NULL_CLAUSE) || self.propagate() != NULL_CLAUSE {
+                    self.ok = false;
+                    return false;
+                }
+                return true;
+            }
+            if (*neg).len() == 0 && (*pos).len() == 0 {
+                println!("v {} p {} n {}", v, (*pos).len(), (*neg).len());
+                if !self.enqueue(v.lit(LTRUE), NULL_CLAUSE) || self.propagate() != NULL_CLAUSE {
+                    self.ok = false;
+                    // panic!("eliminate_var: failed to enqueue & propagate");
+                    return false;
+                }
+                return true;
+            }
             let clslen = (*pos).len() + (*neg).len();
             let mut cnt = 0;
             for lit_pos in &*pos {
@@ -466,9 +510,6 @@ impl Solver {
             let cid = self.vars[v].reason;
             debug_assert_eq!(cid, NULL_CLAUSE);
             // println!("- eliminate var: {:>8} (+{:<4} -{:<4}); {:?}", v, (*pos).len(), (*neg).len(), self.vars[v]);
-            if [101, 167, 168].contains(&v) {
-                println!("- eliminate var: {:>8} (+{:<4} -{:<4})", v, (*pos).len(), (*neg).len());
-            }
             // setDecisionVar(v, false);
             self.eliminator.eliminated_vars += 1;
             {
@@ -518,9 +559,6 @@ impl Solver {
                     for n in &*neg {
                         if clause_body!(self.cp, n).get_flag(ClauseFlag::Dead) {
                             continue;
-                        }
-                        if (*p).to_index() == 5 || (*n).to_index() == 5 {
-                            println!("crossing");
                         }
                         if let Some(vec) = self.merge(*p, *n, v) {
                             // println!("eliminator replaces {} with a cross product {:?}", cid2fmt(*p), vec2int(&vec));
