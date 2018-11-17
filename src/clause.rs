@@ -637,6 +637,15 @@ impl ClauseManagement for Solver {
         cnt
     }
     fn dump_cnf(&self, fname: String) -> () {
+        for v in &self.vars {
+            if v.eliminated {
+                if v.assign != BOTTOM {
+                    panic!("conflicting var {} {}", v.index, v.assign);
+                } else {
+                    println!("eliminate var {}", v.index);
+                }
+            }
+        }
         if let Ok(out) = File::create(&fname) {
             let mut buf = BufWriter::new(out);
             let nv = self.trail.len();

@@ -127,6 +127,7 @@ pub struct Solver {
     pub c_lvl: Ema,
     pub next_restart: u64,
     pub restart_exp: f64,
+    pub progress_cnt: i64,
 }
 
 impl Solver {
@@ -186,10 +187,15 @@ impl Solver {
             c_lvl: Ema::new(se),
             next_restart: 100,
             restart_exp: re,
+            progress_cnt: 0,
         }
     }
     // print a progress report
-    pub fn progress(&self, mes: &str) -> () {
+    pub fn progress(&mut self, mes: &str) -> () {
+        self.progress_cnt += 1;
+        // if self.progress_cnt % 16 == 0 {
+        //     self.dump_cnf(format!("G2-p{:>3}.cnf", self.progress_cnt).to_string());
+        // }
         let nv = self.vars.len() - 1;
         let fixed = if self.trail_lim.is_empty() {
             self.trail.len()
@@ -282,7 +288,8 @@ impl Solver {
                 );
             } else {
                 println!(
-                "#{:<5},{:>7},{:>7},{:>7},{:>6.3},,{:>7},{:>6},{:>7},{:>7},,{:>5},{:>5}, {:>5.2},{:>6.2},,{:>7.2},{:>8.2},{:>8.2},,{:>6},{:>6}",
+                "{:>3}#{:<5},{:>7},{:>7},{:>7},{:>6.3},,{:>7},{:>6},{:>7},{:>7},,{:>5},{:>5}, {:>5.2},{:>6.2},,{:>7.2},{:>8.2},{:>8.2},,{:>6},{:>6}",
+                    self.progress_cnt,
                     mes,
                     nv - sum,
                     fixed,
@@ -303,6 +310,10 @@ impl Solver {
                     self.eliminator.var_queue_len(),
                 );
             }
+        }
+        if self.progress_cnt == -1 {
+            self.dump_cnf(format!("test-{}.cnf", self.progress_cnt).to_string());
+            panic!("aa");
         }
     }
 
@@ -398,7 +409,7 @@ impl SatSolver for Solver {
                 }
             }
             self.progress("load");
-            // self.simplify();
+            self.simplify();
             self.progress("simp");
         } else {
             self.progress("load");
