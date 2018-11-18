@@ -408,9 +408,9 @@ impl Solver {
                         }
                     }
                 }
-                if self.q_head < self.trail.len() {
-                    panic!("wwwwwwwwwwwwwww");
-                }
+                // if self.q_head < self.trail.len() {
+                //     panic!("wwwwwwwwwwwwwww");
+                // }
             }
         }
         true
@@ -467,7 +467,7 @@ impl Solver {
                 return true;
             }
             if (*pos).len() == 0 && 0 < (*neg).len() {
-                println!("v {} p {} n {}", v, (*pos).len(), (*neg).len());
+                // println!("v {} p {} n {}", v, (*pos).len(), (*neg).len());
                 if !self.enqueue(v.lit(LFALSE), NULL_CLAUSE) || self.propagate() != NULL_CLAUSE {
                     self.ok = false;
                     return false;
@@ -475,7 +475,7 @@ impl Solver {
                 return true;
             }
             if (*neg).len() == 0 && (*pos).len() == 0 {
-                println!("v {} p {} n {}", v, (*pos).len(), (*neg).len());
+                // println!("v {} p {} n {}", v, (*pos).len(), (*neg).len());
                 if !self.enqueue(v.lit(LTRUE), NULL_CLAUSE) || self.propagate() != NULL_CLAUSE {
                     self.ok = false;
                     // panic!("eliminate_var: failed to enqueue & propagate");
@@ -574,9 +574,6 @@ impl Solver {
                                     }
                                 }
                                 _ => {
-                                    if (*p).to_index() == 5 || (*n).to_index() == 5 {
-                                        println!("eliminate_var calls add_clause {:?} from {}{:?} and {}{:?}", vec2int(&vec), cid2fmt(*p), vec2int(&clause_body!(self.cp, *p).lits), cid2fmt(*n), vec2int(&clause_body!(self.cp, *n).lits));
-                                    }
                                     self.add_clause(&mut vec.to_vec(), 0);
                                 }
                             }
@@ -630,10 +627,10 @@ impl Solver {
     /// inline lbool    Solver::modelValue    (Lit p) const   { return model[var(p)] ^ sign(p); }
     /// ```
     pub fn extend_model(&mut self, model: &mut Vec<i32>) -> () {
-        {
-            let cid = ClauseKind::Permanent.id_from(5);
-            println!("extend_model P5 {:#} {:#}.", clause_head!(self.cp, cid), clause_body!(self.cp, cid));
-        }
+        // {
+        //     let cid = ClauseKind::Permanent.id_from(5);
+        //     println!("extend_model P5 {:#} {:#}.", clause_head!(self.cp, cid), clause_body!(self.cp, cid));
+        // }
         // println!("extend_model {:?}", &self.eliminator.elim_clauses);
         if self.eliminator.elim_clauses.is_empty() {
             return;
@@ -668,12 +665,6 @@ impl Solver {
             }
             assert!(width == 1);
             let l = self.eliminator.elim_clauses[i];
-            if [146931, 146962, 146963].contains(&l.vi()) {
-                println!(" - fixed {} at {}", l.int(), i);
-            }
-            if model[l.vi() - 1] == -(l.int()) && [146931, 146962, 146963].contains(&l.vi()) {
-                println!("reverse model[{}] = {}, {}, {:?}", l.vi(), model[l.vi() - 1], l.int(), self.vars[l.vi()]);
-            }
             // assert!(model[l.vi() - 1] != l.negate().int());
             model[l.vi() - 1] = l.int(); // .neg();
             if i < width {
@@ -769,9 +760,6 @@ impl Solver {
     /// returns true if the clause became a unit clause.
     /// Called only from strengthen_clause
     pub fn strengthen(&mut self, cid: ClauseId, p: Lit) -> bool {
-        if cid.is(ClauseKind::Permanent, 5) {
-            println!("strengthen {} {} {:?}.", p.int(), cid2fmt(cid), vec2int(&clause_body!(self.cp, cid).lits));
-        }
         debug_assert!(!clause_body!(self.cp, cid).get_flag(ClauseFlag::Dead));
         let cix = cid.to_index();
         let ClausePartition {

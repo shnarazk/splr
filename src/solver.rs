@@ -641,7 +641,7 @@ impl CDCL for Solver {
                 let na = self.num_assigns();
                 let ne = self.eliminator.eliminated_vars;
                 if na + ne == self.num_vars {
-                    println!("na {} + ne {}", na, ne);
+                    // println!("na {} + ne {}", na, ne);
                     return true;
                 }
                 // DYNAMIC FORCING RESTART
@@ -796,9 +796,9 @@ impl CDCL for Solver {
             {
                 let v = &mut self.vars[l.vi()];
                 v.assign = sig;
-                if dl == 0 && cid != NULL_CLAUSE {
-                    println!("enqueue {}", cid2fmt(cid));
-                }
+                // if dl == 0 && cid != NULL_CLAUSE {
+                //     println!("enqueue {}", cid2fmt(cid));
+                // }
                 v.reason = cid;
                 if dl == 0 {
                     // if !v.enqueued {
