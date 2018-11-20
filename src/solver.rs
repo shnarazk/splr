@@ -561,9 +561,6 @@ impl CDCL for Solver {
                             // Handling a special case for simplify
                             let cb = &mut (*body)[*pre] as *mut ClauseBody;
                             if (*cb).get_flag(ClauseFlag::Dead) {
-                                if [101, 167, 168].contains(&false_lit.vi()) {
-                                    println!("propagate: found a dead {} on {}", cid2fmt(kind.id_from(*pre)), false_lit.int());
-                                }
                                 pre = &mut (*ch).next_watcher[my_index];
                                 continue 'next_clause;
                             }
@@ -623,9 +620,6 @@ impl CDCL for Solver {
                                 assert!(!v.eliminated);
                                 // assert!(!trail.contains(&other));
                                 // assert!(!trail.contains(&other.negate()));
-                                // if dl >= 749 {
-                                //     println!("propagate:unit: v {} by {:?}, lv {}", other.int(), vec2int(&(*cb).lits), dl);
-                                // }
                                 trail.push(other);
                             }
                         }
@@ -646,8 +640,15 @@ impl CDCL for Solver {
             if ci == NULL_CLAUSE {
                 let na = self.num_assigns();
                 let ne = self.eliminator.eliminated_vars;
-                if na + ne == self.num_vars {
-                    // println!("na {} + ne {}", na, ne);
+                // println!("na {} + ne {} = {} >= {}", na, ne, na + ne, self.num_vars);
+                if self.num_vars <= na + ne {
+                    // let mut cnt = 0;
+                    // for v in &self.vars {
+                    //     if v.eliminated {
+                    //         cnt += 1;
+                    //     }
+                    // }
+                    // assert_eq!(cnt, self.eliminator.eliminated_vars);
                     return true;
                 }
                 // DYNAMIC FORCING RESTART
@@ -680,10 +681,16 @@ impl CDCL for Solver {
                 }
                 // self.force_restart();
                 if self.trail.len() <= self.q_head {
-                    let vi = self.select_var();
-                    debug_assert_ne!(vi, 0);
-                    let p = self.vars[vi].phase;
-                    self.uncheck_assume(vi.lit(p));
+                    // let na = self.num_assigns();
+                    // let ne = self.eliminator.eliminated_vars;
+                    // // println!("na {} + ne {} = {} , {}", na, ne, na + ne, self.num_vars);
+                    // if na + ne >= self.num_vars {
+                    //     panic!("na {} + ne {}", na, ne);
+                    // }
+                    // let vi = self.select_var();
+                    // debug_assert_ne!(vi, 0);
+                    // let p = self.vars[vi].phase;
+                    // self.uncheck_assume(vi.lit(p));
                     self.stat[Stat::Decision as usize] += 1;
                 }
             } else {
@@ -853,16 +860,18 @@ impl CDCL for Solver {
         let mut p = NULL_LIT;
         let mut ti = self.trail.len() - 1; // trail index
         let mut path_cnt = 0;
-        // println!("analyze start with {} at {}, reason of 503 {}", cid2fmt(confl), self.decision_level(), self.vars[503].reason);
         loop {
             // println!("analyze {}", p.int());
             unsafe {
                 let cb = clause_body_mut!(self.cp, cid) as *mut ClauseBody;
                 if cid == NULL_CLAUSE {
+                    let x = self.trail_lim[self.trail_lim.len() -1];
                     panic!(
-                        "analyze ran into NULL_CLAUSE Lit {} at level {}",
+                        "analyze ran into NULL_CLAUSE Lit {} at level {}, trail {:?}",
                         p.int(),
-                        self.decision_level()
+                        self.decision_level(),
+                        // self.vars[p.vi()],
+                        vec2int(&self.trail[x..]),
                     );
                 }
                 // debug_assert_ne!(cid, NULL_CLAUSE);
@@ -1134,9 +1143,6 @@ impl Solver {
         // assert!(!self.trail.contains(&l));
         // assert!(!self.trail.contains(&l.negate()));
         self.trail.push(l);
-        // if dl == 749 {
-        //     println!("uncheck_enqueu: v {}, lv {}", l.int(), self.decision_level());
-        // }
     }
     pub fn uncheck_assume(&mut self, l: Lit) -> () {
         // println!("uncheck_assume {}", l.int());

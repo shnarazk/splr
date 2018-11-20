@@ -395,9 +395,6 @@ impl ClauseManagement for Solver {
             n => {
                 let cid = self.cp[kind as usize].new_clause(&v, 0, false);
                 self.eliminator_register_clause(cid, n, true);
-                if v.contains(&int2lit(-101)) && v.contains(&int2lit(-167)) && v.contains(&int2lit(-168)) {
-                    println!("cid {} = {} {:?}", cid, cid2fmt(cid), vec2int(&v));
-                }
                 Some(cid)
             }
         }
@@ -435,9 +432,6 @@ impl ClauseManagement for Solver {
     /// 4. removeClause
     /// called from strengthen_clause, backward_subsumption_check, eliminate_var, substitute
     fn remove_clause(&mut self, cid: ClauseId) -> () {
-        if cid.is(ClauseKind::Permanent, 5) {
-            println!("remove");
-        }
         if clause_body!(self.cp, cid).get_flag(ClauseFlag::Dead) {
             panic!(
                 "remove_clause Dead: {} {:#}{:#}",
@@ -723,10 +717,6 @@ impl GC for ClausePartition {
                         for l in &cb.lits {
                             let vi = l.vi();
                             let v = &mut vars[vi];
-                            // if cid == 1152921504606847140 {
-                            //     println!("gc: cb.lits: 1152921504606847140 for {}", l.int());
-                            //     println!("before subsumption on {}\n - {:?}\n - ci {}\n - cid {}\n {:#}\n {:#}", l.int(), v, ci, cid, ch, cb);
-                            // }
                             if eliminator.use_elim && !v.eliminated {
                                 let xx = v.pos_occurs.len() + v.neg_occurs.len();
                                 if l.positive() {

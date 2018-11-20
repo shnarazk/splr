@@ -389,11 +389,6 @@ impl Solver {
                                     deleted_literals += 1;
                                     // println!("cancel true path");
                                     // continue;
-                                    // if di.to_kind() == ClauseKind::Permanent as usize && di.to_index() == 7754 {
-                                    //     println!("WOW, backward_subsumption_check tries to strengthen a permanent clause {} {:#}",
-                                    //              cid2fmt(*di),
-                                    //              clause_body!(self.cp, *di));
-                                    // }
                                     if !self.strengthen_clause(*di, l.negate()) {
                                         return false;
                                     }
@@ -628,10 +623,6 @@ impl Solver {
     /// inline lbool    Solver::modelValue    (Lit p) const   { return model[var(p)] ^ sign(p); }
     /// ```
     pub fn extend_model(&mut self, model: &mut Vec<i32>) -> () {
-        // {
-        //     let cid = ClauseKind::Permanent.id_from(5);
-        //     println!("extend_model P5 {:#} {:#}.", clause_head!(self.cp, cid), clause_body!(self.cp, cid));
-        // }
         // println!("extend_model {:?}", &self.eliminator.elim_clauses);
         if self.eliminator.elim_clauses.is_empty() {
             return;
