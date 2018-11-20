@@ -620,6 +620,12 @@ impl CDCL for Solver {
                                     v.reason = kind.id_from(*pre);
                                     (*cb).set_flag(ClauseFlag::Locked, true);
                                 }
+                                assert!(!v.eliminated);
+                                // assert!(!trail.contains(&other));
+                                // assert!(!trail.contains(&other.negate()));
+                                // if dl >= 749 {
+                                //     println!("propagate:unit: v {} by {:?}, lv {}", other.int(), vec2int(&(*cb).lits), dl);
+                                // }
                                 trail.push(other);
                             }
                         }
@@ -743,6 +749,7 @@ impl CDCL for Solver {
                 if self.stat[Stat::Conflict as usize] == 100_000 {
                     self.cancel_until(0);
                     self.simplify();
+                    // self.rebuild_heap();
                     self.adapt_strategy();
                     // } else if 0 < lbd {
                     //     self.block_restart(lbd, dl, bl, nas);
@@ -763,11 +770,13 @@ impl CDCL for Solver {
     }
 
     fn cancel_until(&mut self, lv: usize) -> () {
+        // let mut check: Vec<Lit> = Vec::new();
         if self.decision_level() <= lv {
             return;
         }
         let lim = self.trail_lim[lv];
         for l in &self.trail[lim..] {
+            // check.push(*l);
             let vi = l.vi();
             {
                 // println!("cancel_until {}", l.int());
@@ -784,6 +793,16 @@ impl CDCL for Solver {
         }
         self.trail.truncate(lim);
         self.trail_lim.truncate(lv);
+        // for l in &check {
+        //     if self.trail.contains(&l) {
+        //         panic!(" oeaeae {}", l.int());
+        //     }
+        // }
+        // for l in &self.trail {
+        //     if self.vars[l.vi()].assign == BOTTOM {
+        //         panic!(" !!!! {}", l.int());
+        //     }
+        // }
         self.q_head = lim;
     }
 
@@ -816,6 +835,8 @@ impl CDCL for Solver {
             if dl == 0 {
                 self.var_order.remove(&self.vars, l.vi());
             }
+            // assert!(!self.trail.contains(&l));
+            // assert!(!self.trail.contains(&l.negate()));
             self.trail.push(l);
             true
         } else {
@@ -1108,7 +1129,12 @@ impl Solver {
             // self.var_order.remove(&self.vars, l.vi());
         }
         clause_body_mut!(self.cp, cid).set_flag(ClauseFlag::Locked, true);
+        // assert!(!self.trail.contains(&l));
+        // assert!(!self.trail.contains(&l.negate()));
         self.trail.push(l);
+        // if dl == 749 {
+        //     println!("uncheck_enqueu: v {}, lv {}", l.int(), self.decision_level());
+        // }
     }
     pub fn uncheck_assume(&mut self, l: Lit) -> () {
         // println!("uncheck_assume {}", l.int());
@@ -1124,10 +1150,9 @@ impl Solver {
         if dl == 0 {
             self.eliminator_enqueue_var(l.vi());
         }
+        // assert!(!self.trail.contains(&l));
+        // assert!(!self.trail.contains(&l.negate()));
         self.trail.push(l);
-        // if l.vi() == 503 {
-        //     println!("uncheck_assume: v {}, lv {}", l.int(), self.decision_level());
-        // }
     }
 }
 

@@ -127,6 +127,10 @@ impl VarOrdering for VarIdHeap {
         let n = self.idxs[0];
         let vn = self.heap[n];
         // self.var_order.check(&format!("root 1 :[({}, {}) ({}, {})]", s, vs, n, vn));
+        // println!("n {} vn {}", n, vn);
+        // if vn == 0 {
+        //     println!("n {} vn {}", n, vn);
+        // }
         debug_assert!(vn != 0, "Invalid VarId for heap");
         debug_assert!(vs != 0, "Invalid VarId for heap");
         self.heap.swap(n, s);
@@ -350,6 +354,9 @@ impl VarManagement for Solver {
         loop {
             let vi = self.var_order.get_root(&self.vars);
             if self.vars[vi].assign == BOTTOM && !self.vars[vi].eliminated {
+                // if self.trail.contains(&vi.lit(LTRUE)) || self.trail.contains(&vi.lit(LFALSE)) {
+                //     panic!("@ level {}, select_var vi {} v {:?}", self.trail_lim.len(), vi, self.vars[vi]);
+                // }
                 return vi;
             }
         }
