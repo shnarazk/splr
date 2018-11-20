@@ -336,7 +336,7 @@ impl VarManagement for Solver {
         debug_assert_eq!(self.decision_level(), 0);
         self.var_order.reset();
         for vi in 1..self.vars.len() {
-            if self.vars[vi].assign == BOTTOM {
+            if self.vars[vi].assign == BOTTOM && !self.vars[vi].eliminated {
                 self.var_order.insert(&self.vars, vi);
             }
         }
