@@ -6,10 +6,8 @@ use std::f64;
 use std::fmt;
 use types::*;
 use var::{Satisfiability, Var};
-
 use std::fs::File;
 use std::io::{BufWriter, Write};
-use std::path::Path;
 
 /// for ClausePartition
 pub trait GC {

@@ -467,7 +467,7 @@ impl Solver {
                 return true;
             }
             if (*pos).len() == 0 && 0 < (*neg).len() {
-                // println!("v {} p {} n {}", v, (*pos).len(), (*neg).len());
+                // println!("-v {} p {} n {}", v, (*pos).len(), (*neg).len());
                 if !self.enqueue(v.lit(LFALSE), NULL_CLAUSE) || self.propagate() != NULL_CLAUSE {
                     self.ok = false;
                     return false;
@@ -475,7 +475,7 @@ impl Solver {
                 return true;
             }
             if (*neg).len() == 0 && (*pos).len() == 0 {
-                // println!("v {} p {} n {}", v, (*pos).len(), (*neg).len());
+                // println!("+v {} p {} n {}", v, (*pos).len(), (*neg).len());
                 if !self.enqueue(v.lit(LTRUE), NULL_CLAUSE) || self.propagate() != NULL_CLAUSE {
                     self.ok = false;
                     // panic!("eliminate_var: failed to enqueue & propagate");
