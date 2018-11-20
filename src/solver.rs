@@ -814,6 +814,7 @@ impl CDCL for Solver {
         if val == BOTTOM {
             {
                 let v = &mut self.vars[l.vi()];
+                assert!(!v.eliminated);
                 v.assign = sig;
                 // if dl == 0 && cid != NULL_CLAUSE {
                 //     println!("enqueue {}", cid2fmt(cid));
@@ -1119,6 +1120,7 @@ impl Solver {
         let dl = self.decision_level();
         {
             let v = &mut self.vars[l.vi()];
+            assert!(!v.eliminated);
             assert!(v.assign == l.lbool() || v.assign == BOTTOM);
             v.assign = l.lbool();
             v.level = dl;
@@ -1142,6 +1144,7 @@ impl Solver {
         let dl = self.decision_level();
         {
             let v = &mut self.vars[l.vi()];
+            assert!(!v.eliminated);
             assert!(v.assign == l.lbool() || v.assign == BOTTOM);
             v.assign = l.lbool();
             v.level = dl;

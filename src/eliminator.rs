@@ -506,6 +506,7 @@ impl Solver {
                 }
             }
             // eliminate the literal and build constraints on it.
+            assert!(!self.vars[v].eliminated);
             self.vars[v].eliminated = true;
             let cid = self.vars[v].reason;
             debug_assert_eq!(cid, NULL_CLAUSE);
