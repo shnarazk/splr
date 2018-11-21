@@ -695,10 +695,10 @@ impl CDCL for Solver {
                     // if na + ne >= self.num_vars {
                     //     panic!("na {} + ne {}", na, ne);
                     // }
-                    // let vi = self.select_var();
-                    // debug_assert_ne!(vi, 0);
-                    // let p = self.vars[vi].phase;
-                    // self.uncheck_assume(vi.lit(p));
+                    let vi = self.select_var();
+                    debug_assert_ne!(vi, 0);
+                    let p = self.vars[vi].phase;
+                    self.uncheck_assume(vi.lit(p));
                     self.stat[Stat::Decision as usize] += 1;
                 }
             } else {
