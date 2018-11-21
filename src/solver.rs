@@ -400,9 +400,17 @@ impl SatSolver for Solver {
         self.progress("");
         if self.eliminator.use_elim {
             for v in &mut self.vars[1..] {
-                if v.neg_occurs.len() == 0 {
+                if v.neg_occurs.len() == 0 && 0 < v.pos_occurs.len() && v.assign == BOTTOM {
+                    debug_assert!(!v.eliminated);
+                    debug_assert!(!self.trail.contains(&v.index.lit(LTRUE)));
+                    debug_assert!(!self.trail.contains(&v.index.lit(LFALSE)));
+                    v.assign = LTRUE;
                     self.trail.push(v.index.lit(LTRUE));
-                } else if v.pos_occurs.len() == 0 {
+                } else if v.pos_occurs.len() == 0 && 0 < v.neg_occurs.len() && v.assign == BOTTOM {
+                    debug_assert!(!v.eliminated);
+                    debug_assert!(!self.trail.contains(&v.index.lit(LTRUE)));
+                    debug_assert!(!self.trail.contains(&v.index.lit(LFALSE)));
+                    v.assign = LFALSE;
                     self.trail.push(v.index.lit(LFALSE));
                 } else if v.pos_occurs.len() == 1 || v.neg_occurs.len() == 1 {
                     self.eliminator.enqueue_var(v);
