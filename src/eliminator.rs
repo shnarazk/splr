@@ -163,7 +163,7 @@ impl ClauseElimination for Solver {
         self.eliminator.enqueue_var(&mut self.vars[vi])
     }
     fn eliminator_unregister_clause(&mut self, cid: ClauseId) -> () {
-        assert!(clause_body!(self.cp, cid).get_flag(ClauseFlag::Dead));
+        debug_assert!(clause_body!(self.cp, cid).get_flag(ClauseFlag::Dead));
         if self.eliminator.use_elim {
             for l in &clause_body!(self.cp, cid).lits {
                 let v = &mut self.vars[l.vi()];
@@ -197,8 +197,8 @@ impl Solver {
         debug_assert_ne!(cid, NULL_CLAUSE);
         if self.strengthen(cid, l) {
             let c0 = clause_head!(self.cp, cid).lit[0];
-            assert!(1 == clause_body!(self.cp, cid).lits.len());
-            assert!(c0 == clause_body!(self.cp, cid).lits[0]);
+            debug_assert!(1 == clause_body!(self.cp, cid).lits.len());
+            debug_assert!(c0 == clause_body!(self.cp, cid).lits[0]);
             // println!("cid {} {:?} became a unit clause as c0 {}, l {}", cid2fmt(cid), vec2int(&clause_body!(self.cp, cid).lits), c0.int(), l.int());
             debug_assert_ne!(c0, l);
             // println!("{} is removed and its first literal {} is enqueued.", cid2fmt(cid), c0.int());
@@ -429,13 +429,13 @@ impl Solver {
         // Copy clause to the vector. Remember the position where the varibale 'v' occurs:
         let ch = clause_head!(self.cp, cid);
         let cb = clause_body!(self.cp, cid);
-        assert!(0 < cb.lits.len());
+        debug_assert!(0 < cb.lits.len());
         for l in &cb.lits {
             vec.push(*l as u32);
             if l.vi() == vi {
                 let index = vec.len() - 1;
-                assert_eq!(vec[index], *l);
-                assert_eq!(vec[index].vi(), vi);
+                debug_assert_eq!(vec[index], *l);
+                debug_assert_eq!(vec[index].vi(), vi);
                 // swap the first literal with the 'v'. So that the literal containing 'v' will occur first in the clause.
                 vec.swap(index, first);
             }
@@ -444,7 +444,7 @@ impl Solver {
         if vec[first].vi() != vi {
             panic!("ooo {:?} by {}", vec2int(&cb.lits), vi);
         }
-        assert_eq!(vec[first].vi(), vi);
+        debug_assert_eq!(vec[first].vi(), vi);
         vec.push(cb.lits.len() as Lit);
         // println!("make_eliminated_clause: eliminate({}) clause {:?}", vi, vec2int(&cb.lits));
     }
@@ -517,7 +517,7 @@ impl Solver {
                 }
             }
             // eliminate the literal and build constraints on it.
-            assert!(!self.vars[v].eliminated);
+            debug_assert!(!self.vars[v].eliminated);
             self.vars[v].eliminated = true;
             let cid = self.vars[v].reason;
             debug_assert_eq!(cid, NULL_CLAUSE);
@@ -625,7 +625,7 @@ impl Solver {
                         w0 = ch.lit[0].negate();
                         w1 = ch.lit[1].negate();
                     }
-                    assert!(w0 != 0 && w1 != 0);
+                    debug_assert!(w0 != 0 && w1 != 0);
                     self.cp[cid.to_kind()].touched[w0 as usize] = true;
                     self.cp[cid.to_kind()].touched[w1 as usize] = true;
                 }
@@ -688,7 +688,7 @@ impl Solver {
                 width -= 1;
                 i -= 1;
             }
-            assert!(width == 1);
+            debug_assert!(width == 1);
             let l = self.eliminator.elim_clauses[i];
             // assert!(model[l.vi() - 1] != l.negate().int());
             model[l.vi() - 1] = l.int(); // .neg();

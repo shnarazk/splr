@@ -586,9 +586,6 @@ impl CDCL for Solver {
                                 if (((lk & 1) as u8) ^ vars[lk.vi()].assign) != 0 {
                                     let cix = *pre;
                                     *pre = (*ch).next_watcher[my_index];
-                                    // if cix == 644 {
-                                    //     println!("# new watch {} instead of {} for false_lit {} {:#} {:#}", (*lk).int(), false_lit.int(), cid2fmt(kind.id_from(cix)), *ch, *cb);
-                                    // }
                                     // if !cp[*kind as usize].check(false_lit) {
                                     //     panic!("Before the seeking another watch: {} {} {:#} {:#}", cid2fmt(kind.id_from(cix)), (*lk).int(), *ch, *cb);
                                     // }
@@ -615,7 +612,7 @@ impl CDCL for Solver {
                                 let other = (*cb).lits[0];
                                 // println!("unchecked_enqueue embedded into propagate {}", other.int());
                                 let v = &mut vars[other.vi()];
-                                assert!(v.assign == other.lbool() || v.assign == BOTTOM);
+                                debug_assert!(v.assign == other.lbool() || v.assign == BOTTOM);
                                 v.assign = other.lbool();
                                 v.level = dl;
                                 debug_assert!(*pre != NULL_CLAUSE);
@@ -625,7 +622,7 @@ impl CDCL for Solver {
                                     v.reason = kind.id_from(*pre);
                                     (*cb).set_flag(ClauseFlag::Locked, true);
                                 }
-                                assert!(!v.eliminated);
+                                debug_assert!(!v.eliminated);
                                 // assert!(!trail.contains(&other));
                                 // assert!(!trail.contains(&other.negate()));
                                 trail.push(other);
@@ -829,7 +826,7 @@ impl CDCL for Solver {
         if val == BOTTOM {
             {
                 let v = &mut self.vars[l.vi()];
-                assert!(!v.eliminated);
+                debug_assert!(!v.eliminated);
                 v.assign = sig;
                 // if dl == 0 && cid != NULL_CLAUSE {
                 //     println!("enqueue {}", cid2fmt(cid));
@@ -908,7 +905,7 @@ impl CDCL for Solver {
                     // if lvl == 0 {
                     //     println!("lvl {}", lvl);
                     // }
-                    assert!(!(*cb).get_flag(ClauseFlag::Dead));
+                    debug_assert!(!(*cb).get_flag(ClauseFlag::Dead));
                     debug_assert!(
                         !self.vars[vi].eliminated,
                         format!("analyze assertion: an eliminated var {} occurs", vi)
@@ -1137,8 +1134,8 @@ impl Solver {
         let dl = self.decision_level();
         {
             let v = &mut self.vars[l.vi()];
-            assert!(!v.eliminated);
-            assert!(v.assign == l.lbool() || v.assign == BOTTOM);
+            debug_assert!(!v.eliminated);
+            debug_assert!(v.assign == l.lbool() || v.assign == BOTTOM);
             v.assign = l.lbool();
             v.level = dl;
             v.reason = cid;
@@ -1158,8 +1155,8 @@ impl Solver {
         let dl = self.decision_level();
         {
             let v = &mut self.vars[l.vi()];
-            assert!(!v.eliminated);
-            assert!(v.assign == l.lbool() || v.assign == BOTTOM);
+            debug_assert!(!v.eliminated);
+            debug_assert!(v.assign == l.lbool() || v.assign == BOTTOM);
             v.assign = l.lbool();
             v.level = dl;
             v.reason = NULL_CLAUSE;

@@ -459,15 +459,15 @@ impl ClauseManagement for Solver {
                 w0 = ch.lit[0].negate();
                 w1 = ch.lit[1].negate();
             }
-            assert!(w0 != 0 && w1 != 0);
-            assert_ne!(w0, w1);
+            debug_assert!(w0 != 0 && w1 != 0);
+            debug_assert_ne!(w0, w1);
             self.cp[cid.to_kind()].touched[w0 as usize] = true;
             self.cp[cid.to_kind()].touched[w1 as usize] = true;
         }
     }
 
     fn change_clause_kind(&mut self, cid: ClauseId, kind: ClauseKind) -> () {
-        assert_eq!(self.decision_level(), 0);
+        debug_assert_eq!(self.decision_level(), 0);
         let rank;
         let locked;
         let mut vec = Vec::new();
@@ -521,7 +521,7 @@ impl ClauseManagement for Solver {
                     if cb.get_flag(ClauseFlag::Locked) {
                         panic!("mmmmmmmmmmmmmmmm");
                     }
-                    assert!(ch.lit[0] != 0 && ch.lit[1] != 0);
+                    debug_assert!(ch.lit[0] != 0 && ch.lit[1] != 0);
                     touched[ch.lit[0].negate() as usize] = true;
                     touched[ch.lit[1].negate() as usize] = true;
                 }
@@ -580,7 +580,7 @@ impl ClauseManagement for Solver {
                             panic!("not expected path!");
                         }
                         cb.set_flag(ClauseFlag::Dead, true);
-                        assert!(ch.lit[0] != 0 && ch.lit[1] != 0);
+                        debug_assert!(ch.lit[0] != 0 && ch.lit[1] != 0);
                         self.cp[*ck as usize].touched[ch.lit[0].negate() as usize] = true;
                         self.cp[*ck as usize].touched[ch.lit[1].negate() as usize] = true;
                         if (*eliminator).use_elim {
