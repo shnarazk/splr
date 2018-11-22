@@ -266,10 +266,10 @@ impl VarIdHeap {
                 //     VarOrder::ByOccurence => vars[vl].occurs.len() as f64,
                 // };
                 let r = l + 1; // right
-                // let ar = match self.order {
-                //     VarOrder::ByActivity => vars[vr].activity,
-                //     VarOrder::ByOccurence => vars[vr].occurs.len() as f64,
-                // };
+                               // let ar = match self.order {
+                               //     VarOrder::ByActivity => vars[vr].activity,
+                               //     VarOrder::ByOccurence => vars[vr].occurs.len() as f64,
+                               // };
                 let (target, vc, ac) = if r < n && al < vars[self.heap[r]].activity {
                     let vr = self.heap[r];
                     (r, vr, vars[vr].activity)

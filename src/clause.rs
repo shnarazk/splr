@@ -4,10 +4,10 @@ use solver::{SearchStrategy, Solver, Stat, CDCL, CO_LBD_BOUND};
 use std::cmp::Ordering;
 use std::f64;
 use std::fmt;
-use types::*;
-use var::{Satisfiability, Var};
 use std::fs::File;
 use std::io::{BufWriter, Write};
+use types::*;
+use var::{Satisfiability, Var};
 
 /// for ClausePartition
 pub trait GC {
@@ -418,7 +418,9 @@ impl ClauseManagement for Solver {
         v.swap(1, i_max);
         let kind = if v.len() == 2 {
             ClauseKind::Binclause
-        } else if (self.strategy == Some(SearchStrategy::ChanSeok) && lbd <= CO_LBD_BOUND) || lbd == 0 {
+        } else if (self.strategy == Some(SearchStrategy::ChanSeok) && lbd <= CO_LBD_BOUND)
+            || lbd == 0
+        {
             ClauseKind::Permanent
         } else {
             ClauseKind::Removable
@@ -642,7 +644,8 @@ impl ClauseManagement for Solver {
             let mut buf = BufWriter::new(out);
             let nv = self.trail.len();
             let nc: usize = self.cp.iter().map(|p| p.body.len() - 1).sum();
-            buf.write(format!("p cnf {} {}\n", self.num_vars, nc + nv).as_bytes()).unwrap();
+            buf.write(format!("p cnf {} {}\n", self.num_vars, nc + nv).as_bytes())
+                .unwrap();
             let kinds = [
                 ClauseKind::Binclause,
                 ClauseKind::Removable,
@@ -747,10 +750,14 @@ impl GC for ClausePartition {
         }
         debug_assert!(
             self.watcher[GARBAGE_LIT.negate() as usize] == NULL_CLAUSE,
-            format!("There's a clause {} {:#} {:#} in the GARBAGE list",
-                    cid2fmt(self.kind.id_from(self.watcher[GARBAGE_LIT.negate() as usize])),
-                    self.head[self.watcher[GARBAGE_LIT.negate() as usize]],
-                    self.body[self.watcher[GARBAGE_LIT.negate() as usize]],
+            format!(
+                "There's a clause {} {:#} {:#} in the GARBAGE list",
+                cid2fmt(
+                    self.kind
+                        .id_from(self.watcher[GARBAGE_LIT.negate() as usize])
+                ),
+                self.head[self.watcher[GARBAGE_LIT.negate() as usize]],
+                self.body[self.watcher[GARBAGE_LIT.negate() as usize]],
             ),
         );
     }

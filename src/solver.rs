@@ -741,9 +741,9 @@ impl CDCL for Solver {
                             // let ch = clause_head!(self.cp, cid) as *const ClauseHead;
                             // self.biclause_subsume(&*ch);
                         } //else {
-                            // clause_body_mut!(self.cp, cid).set_flag(ClauseFlag::JustUsed, true);
-                            // clause_body_mut!(self.cp, cid).activity = (dl as f64) / 2.0;
-                        //}
+                          // clause_body_mut!(self.cp, cid).set_flag(ClauseFlag::JustUsed, true);
+                          // clause_body_mut!(self.cp, cid).activity = (dl as f64) / 2.0;
+                          //}
                         self.uncheck_enqueue(l0, cid);
                         clause_body_mut!(self.cp, cid).set_flag(ClauseFlag::Locked, true);
                     }
@@ -873,7 +873,7 @@ impl CDCL for Solver {
             unsafe {
                 let cb = clause_body_mut!(self.cp, cid) as *mut ClauseBody;
                 if cid == NULL_CLAUSE {
-                    let x = self.trail_lim[self.trail_lim.len() -1];
+                    let x = self.trail_lim[self.trail_lim.len() - 1];
                     panic!(
                         "analyze ran into NULL_CLAUSE Lit {} at level {}, trail {:?}",
                         p.int(),
