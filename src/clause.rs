@@ -434,22 +434,22 @@ impl ClauseManagement for Solver {
     /// 4. removeClause
     /// called from strengthen_clause, backward_subsumption_check, eliminate_var, substitute
     fn remove_clause(&mut self, cid: ClauseId) -> () {
-        if clause_body!(self.cp, cid).get_flag(ClauseFlag::Dead) {
-            panic!(
-                "remove_clause Dead: {} {:#}{:#}",
-                cid2fmt(cid),
-                clause_head!(self.cp, cid),
-                clause_body!(self.cp, cid)
-            );
-        }
-        if clause_body!(self.cp, cid).get_flag(ClauseFlag::Locked) {
-            panic!(
-                "remove_clause Locked: {} {:#}{:#}",
-                cid2fmt(cid),
-                clause_head!(self.cp, cid),
-                clause_body!(self.cp, cid)
-            );
-        }
+        // if clause_body!(self.cp, cid).get_flag(ClauseFlag::Dead) {
+        //     panic!(
+        //         "remove_clause Dead: {} {:#}{:#}",
+        //         cid2fmt(cid),
+        //         clause_head!(self.cp, cid),
+        //         clause_body!(self.cp, cid)
+        //     );
+        // }
+        // if clause_body!(self.cp, cid).get_flag(ClauseFlag::Locked) {
+        //     panic!(
+        //         "remove_clause Locked: {} {:#}{:#}",
+        //         cid2fmt(cid),
+        //         clause_head!(self.cp, cid),
+        //         clause_body!(self.cp, cid)
+        //     );
+        // }
         {
             clause_body_mut!(self.cp, cid).set_flag(ClauseFlag::Dead, true);
             let w0;
@@ -518,9 +518,10 @@ impl ClauseManagement for Solver {
                     cb.set_flag(ClauseFlag::JustUsed, false)
                 } else {
                     cb.set_flag(ClauseFlag::Dead, true);
-                    if cb.get_flag(ClauseFlag::Locked) {
-                        panic!("mmmmmmmmmmmmmmmm");
-                    }
+                    debug_assert!(!cb.get_flag(ClauseFlag::Locked));
+                    // if cb.get_flag(ClauseFlag::Locked) {
+                    //     panic!("clause is locked");
+                    // }
                     debug_assert!(ch.lit[0] != 0 && ch.lit[1] != 0);
                     touched[ch.lit[0].negate() as usize] = true;
                     touched[ch.lit[1].negate() as usize] = true;
@@ -576,9 +577,7 @@ impl ClauseManagement for Solver {
                     let ch = &self.cp[*ck as usize].head[ci];
                     let cb = &mut self.cp[*ck as usize].body[ci];
                     if !cb.get_flag(ClauseFlag::Dead) && self.vars.satisfies(&cb.lits) {
-                        if cb.get_flag(ClauseFlag::Locked) {
-                            panic!("not expected path!");
-                        }
+                        debug_assert!(!cb.get_flag(ClauseFlag::Locked));
                         cb.set_flag(ClauseFlag::Dead, true);
                         debug_assert!(ch.lit[0] != 0 && ch.lit[1] != 0);
                         self.cp[*ck as usize].touched[ch.lit[0].negate() as usize] = true;

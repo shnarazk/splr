@@ -2,7 +2,7 @@
 #![allow(unused_mut)]
 #![allow(unused_variables)]
 use clause::{
-    cid2fmt, ClauseBody, ClauseFlag, ClauseHead, ClauseIdIndexEncoding, ClauseIndex, ClauseKind,
+    ClauseBody, ClauseFlag, ClauseHead, ClauseIdIndexEncoding, ClauseIndex, ClauseKind,
     ClauseManagement, ClausePartition,
 };
 use solver::{Solver, CDCL};
@@ -210,13 +210,13 @@ impl Solver {
                 true
             } else {
                 //println!("{:?}", self.vars[c0.vi()]);
-                panic!(
-                    "Conflicting Enqueue:: A l {}, c0 {}, {:#} {:#}",
-                    l.int(),
-                    c0.int(),
-                    clause_head!(self.cp, cid),
-                    clause_body!(self.cp, cid)
-                );
+                // panic!(
+                //     "Conflicting Enqueue:: A l {}, c0 {}, {:#} {:#}",
+                //     l.int(),
+                //     c0.int(),
+                //     clause_head!(self.cp, cid),
+                //     clause_body!(self.cp, cid)
+                // );
                 self.ok = false;
                 false
             }
@@ -518,20 +518,20 @@ impl Solver {
                 let tmp = &mut self.eliminator.elim_clauses as *mut Vec<Lit>;
                 if (*neg).len() < (*pos).len() {
                     for cid in &*neg {
-                        if clause_body!(self.cp, cid).lits.contains(&v.lit(LTRUE)) {
-                            panic!(
-                                "ultra panic {} {:?}.",
-                                cid2fmt(*cid),
-                                vec2int(&clause_body!(self.cp, cid).lits)
-                            );
-                        }
-                        if !clause_body!(self.cp, cid).lits.contains(&v.lit(LFALSE)) {
-                            panic!(
-                                "ultra panic {} {:?}.",
-                                cid2fmt(*cid),
-                                vec2int(&clause_body!(self.cp, cid).lits)
-                            );
-                        }
+                        // if clause_body!(self.cp, cid).lits.contains(&v.lit(LTRUE)) {
+                        //     panic!(
+                        //         "ultra panic {} {:?}.",
+                        //         cid2fmt(*cid),
+                        //         vec2int(&clause_body!(self.cp, cid).lits)
+                        //     );
+                        // }
+                        // if !clause_body!(self.cp, cid).lits.contains(&v.lit(LFALSE)) {
+                        //     panic!(
+                        //         "ultra panic {} {:?}.",
+                        //         cid2fmt(*cid),
+                        //         vec2int(&clause_body!(self.cp, cid).lits)
+                        //     );
+                        // }
                         if clause_body!(self.cp, cid).get_flag(ClauseFlag::Dead) {
                             continue;
                         }
@@ -543,20 +543,20 @@ impl Solver {
                 // println!("eliminate unit clause {}", v.lit(LFALSE).int());
                 } else {
                     for cid in &*pos {
-                        if clause_body!(self.cp, cid).lits.contains(&v.lit(LFALSE)) {
-                            panic!(
-                                "ultra panic {} {:?}.",
-                                cid2fmt(*cid),
-                                vec2int(&clause_body!(self.cp, cid).lits)
-                            );
-                        }
-                        if !clause_body!(self.cp, cid).lits.contains(&v.lit(LTRUE)) {
-                            panic!(
-                                "ultra panic {} {:?}.",
-                                cid2fmt(*cid),
-                                vec2int(&clause_body!(self.cp, cid).lits)
-                            );
-                        }
+                        // if clause_body!(self.cp, cid).lits.contains(&v.lit(LFALSE)) {
+                        //     panic!(
+                        //         "ultra panic {} {:?}.",
+                        //         cid2fmt(*cid),
+                        //         vec2int(&clause_body!(self.cp, cid).lits)
+                        //     );
+                        // }
+                        // if !clause_body!(self.cp, cid).lits.contains(&v.lit(LTRUE)) {
+                        //     panic!(
+                        //         "ultra panic {} {:?}.",
+                        //         cid2fmt(*cid),
+                        //         vec2int(&clause_body!(self.cp, cid).lits)
+                        //     );
+                        // }
                         if clause_body!(self.cp, cid).get_flag(ClauseFlag::Dead) {
                             continue;
                         }
@@ -741,9 +741,10 @@ impl Solver {
 impl Solver {
     /// returns a literal if these clauses can be merged by the literal.
     fn subsume(&self, cid: ClauseId, other: ClauseId) -> Option<Lit> {
-        if other.to_kind() == ClauseKind::Uniclause as usize {
-            panic!("unexpected path!");
-        }
+        debug_assert!(other.to_kind() != ClauseKind::Uniclause as usize);
+        // if other.to_kind() == ClauseKind::Uniclause as usize {
+        //     panic!("unexpected path!");
+        // }
         if cid.to_kind() == ClauseKind::Uniclause as usize {
             let l = cid.to_index() as Lit;
             let oh = clause_head!(self.cp, other);
@@ -759,20 +760,22 @@ impl Solver {
         let mut ret: Lit = NULL_LIT;
         let cb = clause_body!(self.cp, cid);
         let ob = clause_body!(self.cp, other);
-        if !ob.lits.contains(&clause_head!(self.cp, other).lit[0]) {
-            panic!(
-                "@subsume: the 1st literal of the other clause is ill-formed {} {:#}!",
-                cid2fmt(other),
-                ob
-            );
-        }
-        if !ob.lits.contains(&clause_head!(self.cp, other).lit[1]) {
-            panic!(
-                "@subsume: the 2nd literal of the other clause is ill-formed {} {:#}!",
-                cid2fmt(other),
-                ob
-            );
-        }
+        debug_assert!(ob.lits.contains(&clause_head!(self.cp, other).lit[0]));
+        // if !ob.lits.contains(&clause_head!(self.cp, other).lit[0]) {
+        //     panic!(
+        //         "@subsume: the 1st literal of the other clause is ill-formed {} {:#}!",
+        //         cid2fmt(other),
+        //         ob
+        //     );
+        // }
+        debug_assert!(ob.lits.contains(&clause_head!(self.cp, other).lit[1]));
+        // if !ob.lits.contains(&clause_head!(self.cp, other).lit[1]) {
+        //     panic!(
+        //         "@subsume: the 2nd literal of the other clause is ill-formed {} {:#}!",
+        //         cid2fmt(other),
+        //         ob
+        //     );
+        // }
         'next: for l in &cb.lits {
             for lo in &ob.lits {
                 if *l == *lo {
@@ -854,11 +857,12 @@ impl Solver {
                 (*ch).next_watcher[hi] = watcher[new_lit.negate() as usize];
                 watcher[new_lit.negate() as usize] = cix;
                 if (*cb).lits.len() == 1 {
-                    if (*ch).lit[1] == new_lit {
-                        panic!("aa");
-                        (*ch).lit.swap(0, 1);
-                        (*ch).next_watcher.swap(0, 1);
-                    }
+                    debug_assert!((*ch).lit[1] != new_lit);
+                    // if (*ch).lit[1] == new_lit {
+                    //     panic!("aa");
+                    //     (*ch).lit.swap(0, 1);
+                    //     (*ch).next_watcher.swap(0, 1);
+                    // }
                     true
                 } else {
                     false

@@ -332,10 +332,10 @@ impl Solver {
                 );
             }
         }
-        if self.progress_cnt == -1 {
-            self.dump_cnf(format!("test-{}.cnf", self.progress_cnt).to_string());
-            panic!("aa");
-        }
+        // if self.progress_cnt == -1 {
+        //     self.dump_cnf(format!("test-{}.cnf", self.progress_cnt).to_string());
+        //     panic!("aa");
+        // }
     }
 
     pub fn num_assigns(&self) -> usize {
@@ -573,22 +573,22 @@ impl CDCL for Solver {
                     let mut pre = &mut (*watcher)[p] as *mut usize;
                     'next_clause: while *pre != NULL_CLAUSE {
                         let ch = &mut (*head)[*pre] as *mut ClauseHead;
-                        if (*ch).lit[0] != false_lit && (*ch).lit[1] != false_lit {
-                            let cb = &mut (*body)[*pre] as *mut ClauseBody;
-                            println!(
-                                "(false_lit {}) illegal watch literals cid: {} {} {}",
-                                false_lit.int(),
-                                cid2fmt(kind.id_from(*pre)),
-                                *ch,
-                                *cb
-                            );
-                            panic!("trap");
-                        }
+                        // if (*ch).lit[0] != false_lit && (*ch).lit[1] != false_lit {
+                        //     let cb = &mut (*body)[*pre] as *mut ClauseBody;
+                        //     println!(
+                        //         "(false_lit {}) illegal watch literals cid: {} {} {}",
+                        //         false_lit.int(),
+                        //         cid2fmt(kind.id_from(*pre)),
+                        //         *ch,
+                        //         *cb
+                        //     );
+                        //     panic!("trap");
+                        // }
                         debug_assert!((*ch).lit[0] == false_lit || (*ch).lit[1] == false_lit);
                         let my_index = ((*ch).lit[0] != false_lit) as usize;
+                        let cb = &mut (*body)[*pre] as *mut ClauseBody;
                         {
                             // Handling a special case for simplify
-                            let cb = &mut (*body)[*pre] as *mut ClauseBody;
                             if (*cb).get_flag(ClauseFlag::Dead) {
                                 pre = &mut (*ch).next_watcher[my_index];
                                 continue 'next_clause;
@@ -596,7 +596,6 @@ impl CDCL for Solver {
                         }
                         let other_value = vars.assigned((*ch).lit[(my_index == 0) as usize]);
                         if other_value != LTRUE {
-                            let cb = &mut (*body)[*pre] as *mut ClauseBody;
                             debug_assert!(2 <= (*cb).lits.len());
                             debug_assert!((*cb).lits[0] == false_lit || (*cb).lits[1] == false_lit);
                             if (*cb).lits[0] == false_lit {
@@ -613,7 +612,7 @@ impl CDCL for Solver {
                                     (*ch).lit[my_index] = *lk;
                                     debug_assert!((*cb).lits[1] == false_lit);
                                     (*cb).lits[1] = *lk;
-                                    (*cb).lits[k] = false_lit; // Don't move this above (needed by enuremate)
+                                    (*cb).lits[k] = false_lit; // Don't move this above (needed by enumerate)
                                     continue 'next_clause;
                                 }
                             }
@@ -748,20 +747,16 @@ impl CDCL for Solver {
                         let v = &mut self.an_learnt_lits as *mut Vec<Lit>;
                         let l0 = (*v)[0];
                         let cid = self.add_clause(&mut *v, lbd);
-                        if cid.to_kind() == ClauseKind::Binclause as usize {
-                            // let ch = clause_head!(self.cp, cid) as *const ClauseHead;
-                            // self.biclause_subsume(&*ch);
-                        } //else {
-                          // clause_body_mut!(self.cp, cid).set_flag(ClauseFlag::JustUsed, true);
-                          // clause_body_mut!(self.cp, cid).activity = (dl as f64) / 2.0;
-                          //}
+                        if cid.to_kind() != ClauseKind::Binclause as usize {
+                            // clause_body_mut!(self.cp, cid).set_flag(ClauseFlag::JustUsed, true);
+                            clause_body_mut!(self.cp, cid).activity = (dl as f64) / 2.0;
+                        }
                         self.uncheck_enqueue(l0, cid);
                         clause_body_mut!(self.cp, cid).set_flag(ClauseFlag::Locked, true);
                     }
                 }
                 self.stat[Stat::SumLBD as usize] += lbd as i64;
                 self.lbd_queue.enqueue(lbd);
-                // println!("{:?}", self.lbd_queue);
                 if self.stat[Stat::Conflict as usize] % 10_000 == 0 {
                     self.progress(match self.strategy {
                         None => "none",
@@ -815,7 +810,6 @@ impl CDCL for Solver {
                 }
             }
             self.var_order.insert(&self.vars, vi);
-            // self.var_order.update_seek(vi); // actually no need to call; percolate_up updates 'seek'.
         }
         self.trail.truncate(lim);
         self.trail_lim.truncate(lv);
@@ -873,17 +867,17 @@ impl CDCL for Solver {
             // println!("analyze {}", p.int());
             unsafe {
                 let cb = clause_body_mut!(self.cp, cid) as *mut ClauseBody;
-                if cid == NULL_CLAUSE {
-                    let x = self.trail_lim[self.trail_lim.len() - 1];
-                    panic!(
-                        "analyze ran into NULL_CLAUSE Lit {} at level {}, trail {:?}",
-                        p.int(),
-                        self.decision_level(),
-                        // self.vars[p.vi()],
-                        vec2int(&self.trail[x..]),
-                    );
-                }
-                // debug_assert_ne!(cid, NULL_CLAUSE);
+                // if cid == NULL_CLAUSE {
+                //     let x = self.trail_lim[self.trail_lim.len() - 1];
+                //     panic!(
+                //         "analyze ran into NULL_CLAUSE Lit {} at level {}, trail {:?}",
+                //         p.int(),
+                //         self.decision_level(),
+                //         // self.vars[p.vi()],
+                //         vec2int(&self.trail[x..]),
+                //     );
+                // }
+                debug_assert_ne!(cid, NULL_CLAUSE);
                 if cid.to_kind() == (ClauseKind::Removable as usize) {
                     self.bump_cid(cid);
                     // if 2 < (*cb).rank {
@@ -946,7 +940,8 @@ impl CDCL for Solver {
                 {
                     let next_vi = p.vi();
                     cid = self.vars[next_vi].reason;
-                    // println!("{} にフラグが立っている。時path数は{}, そのreason{}を探索", next_vi, path_cnt - 1, cid2fmt(cid));
+                    // println!("{} にフラグが立っている。そのpath数は{}, \
+                    //           そのreason{}を探索", next_vi, path_cnt - 1, cid2fmt(cid));
                     self.an_seen[next_vi] = false;
                 }
                 path_cnt -= 1;
