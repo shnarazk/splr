@@ -434,9 +434,6 @@ impl Solver {
             }
         }
         // Store the length of the clause last:
-        if vec[first].vi() != vi {
-            panic!("ooo {:?} by {}", vec2int(&cb.lits), vi);
-        }
         debug_assert_eq!(vec[first].vi(), vi);
         vec.push(cb.lits.len() as Lit);
         // println!("make_eliminated_clause: eliminate({}) clause {:?}", vi, vec2int(&cb.lits));
