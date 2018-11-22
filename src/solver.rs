@@ -210,7 +210,7 @@ impl Solver {
             .skip(1)
             .filter(|c| !c.get_flag(ClauseFlag::Dead) && c.rank <= 3)
             .count();
-        if false && self.eliminator.use_elim {
+        if self.config.use_tty {
             if mes.is_empty() {
                 println!("{}", self.profile);
                 println!();

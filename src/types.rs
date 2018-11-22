@@ -241,6 +241,7 @@ pub struct SolverConfiguration {
     /// static steps between restarts
     pub restart_step: f64,
     pub use_sve: bool,
+    pub use_tty: bool,
 }
 
 impl Default for SolverConfiguration {
@@ -253,6 +254,7 @@ impl Default for SolverConfiguration {
             restart_expansion: 1.15,
             restart_step: 100.0,
             use_sve: true,
+            use_tty: true,
         }
     }
 }
