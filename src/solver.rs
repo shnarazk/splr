@@ -281,24 +281,45 @@ impl Solver {
         } else {
             if mes.is_empty() {
                 println!(
-                    "#mode,      Variable Assignment     ,,  Clause Database Management  ,,   Restart Strategy      ,, Misc Progress Parameters,,  Eliminator"
+                    "#mode,      Variable Assignment     ,,  \
+                     Clause Database Management  ,,   Restart Strategy      ,, \
+                     Misc Progress Parameters,,  Eliminator"
                 );
                 println!(
-                    "#init,#remain,#solved,  #elim,total%,,#learnt,(good),  #perm,#binary,,block,force, asgn/,  lbd/,,    lbd, back lv, conf lv,,clause,   var"
+                    "#init,#remain,#solved,  #elim,total%,,#learnt,(good),  \
+                     #perm,#binary,,block,force, asgn/,  lbd/,,    lbd, \
+                     back lv, conf lv,,clause,   var"
                 );
             } else {
                 println!(
-                "{:>3}#{:<5},{:>7},{:>7},{:>7},{:>6.3},,{:>7},{:>6},{:>7},{:>7},,{:>5},{:>5}, {:>5.2},{:>6.2},,{:>7.2},{:>8.2},{:>8.2},,{:>6},{:>6}",
+                    "{:>3}#{:<5},{:>7},{:>7},{:>7},{:>6.3},,{:>7},{:>6},{:>7},\
+                     {:>7},,{:>5},{:>5}, {:>5.2},{:>6.2},,{:>7.2},{:>8.2},{:>8.2},,\
+                     {:>6},{:>6}",
                     self.progress_cnt,
                     mes,
                     nv - sum,
                     fixed,
                     self.eliminator.eliminated_vars,
                     (sum as f32) / (nv as f32) * 100.0,
-                    self.cp[ClauseKind::Removable as usize].body.iter().skip(1).filter(|c| !c.get_flag(ClauseFlag::Dead)).count(),
+                    self.cp[ClauseKind::Removable as usize]
+                        .body
+                        .iter()
+                        .skip(1)
+                        .filter(|c| !c.get_flag(ClauseFlag::Dead))
+                        .count(),
                     good,
-                    self.cp[ClauseKind::Permanent as usize].body.iter().skip(1).filter(|c| !c.get_flag(ClauseFlag::Dead)).count(),
-                    self.cp[ClauseKind::Binclause as usize].body.iter().skip(1).filter(|c| !c.get_flag(ClauseFlag::Dead)).count(),
+                    self.cp[ClauseKind::Permanent as usize]
+                        .body
+                        .iter()
+                        .skip(1)
+                        .filter(|c| !c.get_flag(ClauseFlag::Dead))
+                        .count(),
+                    self.cp[ClauseKind::Binclause as usize]
+                        .body
+                        .iter()
+                        .skip(1)
+                        .filter(|c| !c.get_flag(ClauseFlag::Dead))
+                        .count(),
                     self.stat[Stat::BlockRestart as usize],
                     self.stat[Stat::Restart as usize],
                     self.ema_asg.get(),
@@ -586,9 +607,6 @@ impl CDCL for Solver {
                                 if (((lk & 1) as u8) ^ vars[lk.vi()].assign) != 0 {
                                     let cix = *pre;
                                     *pre = (*ch).next_watcher[my_index];
-                                    // if !cp[*kind as usize].check(false_lit) {
-                                    //     panic!("Before the seeking another watch: {} {} {:#} {:#}", cid2fmt(kind.id_from(cix)), (*lk).int(), *ch, *cb);
-                                    // }
                                     let alt = &mut (*watcher)[lk.negate() as usize];
                                     (*ch).next_watcher[my_index] = *alt;
                                     *alt = cix;
@@ -601,10 +619,6 @@ impl CDCL for Solver {
                             }
                             if other_value == LFALSE {
                                 *q_head = trail.len();
-                                // if !cp[*kind as usize].check(false_lit) {
-                                //     println!(" conflicting at {} by propagating {} {:#} {:#}", cid2fmt(kind.id_from(*pre)), false_lit.int(), *ch, *cb);
-                                //     panic!("Yay2");
-                                // }
                                 return kind.id_from(*pre);
                             } else {
                                 // self.uncheck_enqueue(other, kind.id_from((*c).index));
@@ -805,16 +819,6 @@ impl CDCL for Solver {
         }
         self.trail.truncate(lim);
         self.trail_lim.truncate(lv);
-        // for l in &check {
-        //     if self.trail.contains(&l) {
-        //         panic!(" oeaeae {}", l.int());
-        //     }
-        // }
-        // for l in &self.trail {
-        //     if self.vars[l.vi()].assign == BOTTOM {
-        //         panic!(" !!!! {}", l.int());
-        //     }
-        // }
         self.q_head = lim;
     }
 

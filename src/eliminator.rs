@@ -204,9 +204,6 @@ impl Solver {
             // println!("{} is removed and its first literal {} is enqueued.", cid2fmt(cid), c0.int());
             self.remove_clause(cid);
             self.eliminator_unregister_clause(cid);
-            // before the following propagate, we need to clean garbages.
-            // これまずくないか? self.cp[cid.to_kind()].garbage_collect(&mut self.vars, &mut self.eliminator);
-            // println!("STRENGTHEN_CLAUSE ENQUEUE {}", c0);
             if self.enqueue(c0, NULL_CLAUSE) && self.propagate() == NULL_CLAUSE {
                 // self.cp[cid.to_kind()].touched[c0 as usize] = true;
                 self.cp[cid.to_kind()].touched[c0.negate() as usize] = true;
@@ -310,7 +307,6 @@ impl Solver {
             }
             let cid = self.eliminator.clause_queue[0];
             self.eliminator.clause_queue.remove(0);
-            // println!("bsc remain clauses {} vars {}", self.eliminator.clause_queue.len(), self.eliminator.var_queue.len());
             unsafe {
                 let mut best = 0;
                 let unilits: [Lit; 1];
@@ -411,9 +407,6 @@ impl Solver {
                         }
                     }
                 }
-                // if self.q_head < self.trail.len() {
-                //     panic!("wwwwwwwwwwwwwww");
-                // }
             }
         }
         true
@@ -595,12 +588,20 @@ impl Solver {
                                     panic!("zero");
                                 }
                                 1 => {
-                                    // println!("eliminate_var: grounds {} from {}{:?} and {}{:?}", vec[0].int(), cid2fmt(*p), vec2int(&clause_body!(self.cp, *p).lits), cid2fmt(*n), vec2int(&clause_body!(self.cp, *n).lits));
+                                    // println!(
+                                    //     "eliminate_var: grounds {} from {}{:?} and {}{:?}",
+                                    //     vec[0].int(),
+                                    //     cid2fmt(*p),
+                                    //     vec2int(&clause_body!(self.cp, *p).lits),
+                                    //     cid2fmt(*n),
+                                    //     vec2int(&clause_body!(self.cp, *n).lits)
+                                    // );
                                     if !self.enqueue(vec[0], NULL_CLAUSE)
                                         || self.propagate() != NULL_CLAUSE
                                     {
                                         self.ok = false;
-                                        panic!("eliminate_var: failed to enqueue & propagate");
+                                        // panic!("eliminate_var: failed to enqueue & propagate");
+                                        return false;
                                     }
                                 }
                                 _ => {
@@ -870,46 +871,6 @@ impl Solver {
                 (*cb).lits.retain(|&x| x != p);
                 false
             }
-            //             // old code
-            //             debug_assert!(1 < (*cb).lits.len());
-            //             (*cb).lits.retain(|&x| x != p);
-            //             if (*cb).lits.len() == 1 {
-            //                 println!("strengthen make a clause {} unit", cid2fmt(cid));
-            //                 if (*ch).lit[0] == p {
-            //                     (*ch).lit.swap(0, 1);
-            //                     (*ch).next_watcher.swap(0, 1);
-            //                 }
-            //                 let v = &mut self.vars[(*ch).lit[1].vi()];
-            //                 assert_eq!(p.vi(), v.index);
-            //                 assert_eq!((*ch).lit[1], p);
-            //                 assert_ne!((*cb).lits[0], p);
-            //                 return true;
-            //             }
-            //             if (*ch).lit[0] != p && (*ch).lit[1] != p {
-            //                 return false;
-            //             }
-            //             assert!(2 <= (*cb).lits.len());
-            //             debug_assert!((*ch).lit[0] == p || (*ch).lit[1] == p);
-            //             new_watcher = (*cb).lits[(*cb).lits.len()-1];
-            //             assert_ne!(p, new_watcher);
-            //             update = (*ch).lit[0] != p;
-            //             debug_assert!((*ch).lit[update as usize] == p);
-            //             next = (*ch).next_watcher[update as usize];
-            //             (*ch).lit[update as usize] = new_watcher;
-            //             (*ch).next_watcher[update as usize] = watcher[new_watcher.negate() as usize];
-            //             watcher[new_watcher.negate() as usize] = cix;
-            //             cj = &mut watcher[p.negate() as usize];
-            //             while *cj != NULL_CLAUSE {
-            //                 if *cj == cix {
-            //                     *cj = next;
-            //                     break;
-            //                 }
-            //                 let h = &mut head[*cj] as *mut ClauseHead;
-            //                 debug_assert!((*h).lit[0] == p || (*h).lit[1] == p);
-            //                 cj = &mut (*h).next_watcher[((*h).lit[0] != p) as usize];
-            //             }
-            //         }
-            //         false
         }
     }
 }
