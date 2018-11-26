@@ -346,17 +346,47 @@ impl<'a> Iterator for ClauseIter<'a> {
 impl ClauseManagement for Solver {
     fn bump_cid(&mut self, cid: ClauseId) -> () {
         debug_assert_ne!(cid, 0);
-        // let b = self.stat[Stat::Conflict as usize] as f64;
+        let b = self.stat[Stat::Conflict as usize] as f64;
         let a;
         {
             let c = clause_body_mut!(self.cp, cid);
-            a = c.activity + self.cla_inc;
-            // a = (c.activity + b) / 2.0;
+            // a = c.activity + self.cla_inc;
+            a = (c.activity + b) / 2.0;
             c.activity = a;
         }
-        if 1.0e20 < a {
-            for c in &mut self.cp[ClauseKind::Removable as usize].body[1..] {
-                c.activity *= 1.0e-20;
+        for i in 1..self.cp[ClauseKind::Removable as usize].body.len() {
+            let c = &mut self.cp[ClauseKind::Removable as usize].body[i];
+            // if i == 121 {
+            //     println!("121 activity {} {:?}", c.activity, vec2int(&c.lits));
+            // }
+            if c.activity == 0.0 {
+                panic!(
+                    "zero activity {} {}",
+                    i,
+                    cid2fmt(ClauseKind::Removable.id_from(i))
+                );
+            }
+        }
+        if false && 1.0e20 < a {
+            // for c in &mut self.cp[ClauseKind::Removable as usize].body[1..] {
+            //     assert!(0.0 < c.activity);
+            //     c.activity *= 1.0e-20;
+            // }
+            for i in 1..self.cp[ClauseKind::Removable as usize].body.len() {
+                let c = &mut self.cp[ClauseKind::Removable as usize].body[i];
+                if i == 121 {
+                    println!("121 activity {} {:?}", c.activity, vec2int(&c.lits));
+                }
+                if c.activity == 0.0 {
+                    panic!(
+                        "zero activity {} {}",
+                        i,
+                        cid2fmt(ClauseKind::Removable.id_from(i))
+                    );
+                }
+                if 1.0e-300 < c.activity {
+                    c.activity *= 1.0e-20;
+                }
             }
             self.cla_inc *= 1.0e-20;
         }
@@ -416,7 +446,9 @@ impl ClauseManagement for Solver {
             }
         }
         v.swap(1, i_max);
-        let kind = if v.len() == 2 {
+        let kind = if lbd == 0 && self.eliminator.use_elim {
+            ClauseKind::Permanent
+        } else if v.len() == 2 {
             ClauseKind::Binclause
         } else if (self.strategy == Some(SearchStrategy::ChanSeok) && lbd <= CO_LBD_BOUND)
             || lbd == 0

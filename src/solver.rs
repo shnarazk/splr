@@ -746,10 +746,12 @@ impl CDCL for Solver {
                         lbd = self.lbd_of_an_learnt_lits();
                         let v = &mut self.an_learnt_lits as *mut Vec<Lit>;
                         let l0 = (*v)[0];
+                        assert!(0 < lbd);
                         let cid = self.add_clause(&mut *v, lbd);
-                        if cid.to_kind() != ClauseKind::Binclause as usize {
+                        if cid.to_kind() == ClauseKind::Removable as usize {
                             // clause_body_mut!(self.cp, cid).set_flag(ClauseFlag::JustUsed, true);
-                            clause_body_mut!(self.cp, cid).activity = (dl as f64) / 2.0;
+                            assert!(!clause_body_mut!(self.cp, cid).get_flag(ClauseFlag::Dead));
+                            // clause_body_mut!(self.cp, cid).activity = 1.0 + (dl as f64) / 2.0;
                         }
                         self.uncheck_enqueue(l0, cid);
                         clause_body_mut!(self.cp, cid).set_flag(ClauseFlag::Locked, true);
