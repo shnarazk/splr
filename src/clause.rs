@@ -617,7 +617,9 @@ impl ClauseManagement for Solver {
                         if (*eliminator).use_elim {
                             for l in &cb.lits {
                                 let v = &mut (*vars)[l.vi()];
-                                (*eliminator).enqueue_var(v);
+                                if !v.eliminated {
+                                    (*eliminator).enqueue_var(v);
+                                }
                             }
                         }
                     }
@@ -626,6 +628,7 @@ impl ClauseManagement for Solver {
             }
         }
         self.stat[Stat::Simplification as usize] += 1;
+        self.check_eliminator();
         true
     }
     fn lbd_of_an_learnt_lits(&mut self) -> usize {

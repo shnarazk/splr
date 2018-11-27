@@ -18,6 +18,7 @@ pub trait CDCL {
     /// returns `true` for SAT, `false` for UNSAT.
     fn search(&mut self) -> bool;
     fn propagate(&mut self) -> ClauseId;
+    fn propagate_0(&mut self) -> ClauseId;
     fn cancel_until(&mut self, lv: usize) -> ();
     fn enqueue(&mut self, l: Lit, cid: ClauseId) -> bool;
     fn analyze(&mut self, confl: ClauseId) -> usize;
@@ -589,10 +590,9 @@ impl CDCL for Solver {
                         let cb = &mut (*body)[*pre] as *mut ClauseBody;
                         {
                             // Handling a special case for simplify
-                            if (*cb).get_flag(ClauseFlag::Dead) {
-                                pre = &mut (*ch).next_watcher[my_index];
-                                continue 'next_clause;
-                            }
+                            // check other's aliveness
+                            let other = (*ch).lit[(my_index == 0) as usize];
+                            assert!(!vars[other.vi()].eliminated);
                         }
                         let other_value = vars.assigned((*ch).lit[(my_index == 0) as usize]);
                         if other_value != LTRUE {
@@ -603,6 +603,117 @@ impl CDCL for Solver {
                             }
                             for (k, lk) in (*cb).lits.iter().enumerate().skip(2) {
                                 // below is equivalent to 'assigned(lk) != LFALSE'
+                                if (((lk & 1) as u8) ^ vars[lk.vi()].assign) != 0 {
+                                    let cix = *pre;
+                                    *pre = (*ch).next_watcher[my_index];
+                                    let alt = &mut (*watcher)[lk.negate() as usize];
+                                    (*ch).next_watcher[my_index] = *alt;
+                                    *alt = cix;
+                                    (*ch).lit[my_index] = *lk;
+                                    debug_assert!((*cb).lits[1] == false_lit);
+                                    (*cb).lits[1] = *lk;
+                                    (*cb).lits[k] = false_lit; // Don't move this above (needed by enumerate)
+                                    continue 'next_clause;
+                                }
+                            }
+                            if other_value == LFALSE {
+                                *q_head = trail.len();
+                                return kind.id_from(*pre);
+                            } else {
+                                // self.uncheck_enqueue(other, kind.id_from((*c).index));
+                                let dl = trail_lim.len();
+                                let other = (*cb).lits[0];
+                                // println!("unchecked_enqueue embedded into propagate {}", other.int());
+                                let v = &mut vars[other.vi()];
+                                debug_assert!(v.assign == other.lbool() || v.assign == BOTTOM);
+                                v.assign = other.lbool();
+                                v.level = dl;
+                                debug_assert!(*pre != NULL_CLAUSE);
+                                if dl == 0 {
+                                    v.reason = NULL_CLAUSE;
+                                } else {
+                                    v.reason = kind.id_from(*pre);
+                                    (*cb).set_flag(ClauseFlag::Locked, true);
+                                }
+                                debug_assert!(!v.eliminated);
+                                // assert!(!trail.contains(&other));
+                                // assert!(!trail.contains(&other.negate()));
+                                trail.push(other);
+                            }
+                        }
+                        pre = &mut (*ch).next_watcher[my_index];
+                    }
+                }
+            }
+        }
+        NULL_CLAUSE
+    }
+
+    /// for eliminater invoked by simplify
+    fn propagate_0(&mut self) -> ClauseId {
+        let Solver {
+            ref mut vars,
+            ref mut cp,
+            ref mut trail,
+            ref trail_lim,
+            ref mut q_head,
+            ref mut stat,
+            ..
+        } = self;
+        while *q_head < trail.len() {
+            let p: usize = trail[*q_head] as usize;
+            let false_lit = (p as Lit).negate();
+            *q_head += 1;
+            stat[Stat::Propagation as usize] += 1;
+            let kinds = [
+                ClauseKind::Binclause,
+                ClauseKind::Removable,
+                ClauseKind::Permanent,
+            ];
+            for kind in &kinds {
+                // cp[*kind as usize].check(false_lit);
+                unsafe {
+                    let head = &mut cp[*kind as usize].head[..] as *mut [ClauseHead];
+                    let body = &mut cp[*kind as usize].body[..] as *mut [ClauseBody];
+                    let watcher = &mut cp[*kind as usize].watcher[..] as *mut [ClauseIndex];
+                    let mut pre = &mut (*watcher)[p] as *mut usize;
+                    'next_clause: while *pre != NULL_CLAUSE {
+                        let ch = &mut (*head)[*pre] as *mut ClauseHead;
+                        // if (*ch).lit[0] != false_lit && (*ch).lit[1] != false_lit {
+                        //     let cb = &mut (*body)[*pre] as *mut ClauseBody;
+                        //     println!(
+                        //         "(false_lit {}) illegal watch literals cid: {} {} {}",
+                        //         false_lit.int(),
+                        //         cid2fmt(kind.id_from(*pre)),
+                        //         *ch,
+                        //         *cb
+                        //     );
+                        //     panic!("trap");
+                        // }
+                        debug_assert!((*ch).lit[0] == false_lit || (*ch).lit[1] == false_lit);
+                        let my_index = ((*ch).lit[0] != false_lit) as usize;
+                        let cb = &mut (*body)[*pre] as *mut ClauseBody;
+                        {
+                            // Handling a special case for simplify
+                            if (*cb).get_flag(ClauseFlag::Dead) {
+                                pre = &mut (*ch).next_watcher[my_index];
+                                continue 'next_clause;
+                            }
+                            // check other's aliveness
+                            let other = (*ch).lit[(my_index == 0) as usize];
+                            assert!(!vars[other.vi()].eliminated);
+                        }
+                        let other_value = vars.assigned((*ch).lit[(my_index == 0) as usize]);
+                        if other_value != LTRUE {
+                            debug_assert!(2 <= (*cb).lits.len());
+                            debug_assert!((*cb).lits[0] == false_lit || (*cb).lits[1] == false_lit);
+                            if (*cb).lits[0] == false_lit {
+                                (*cb).lits.swap(0, 1); // now false_lit is lits[1].
+                            }
+                            for (k, lk) in (*cb).lits.iter().enumerate().skip(2) {
+                                // below is equivalent to 'assigned(lk) != LFALSE'
+                                assert!(1 < *lk);
+                                assert!(!vars[lk.vi()].eliminated);
                                 if (((lk & 1) as u8) ^ vars[lk.vi()].assign) != 0 {
                                     let cix = *pre;
                                     *pre = (*ch).next_watcher[my_index];
