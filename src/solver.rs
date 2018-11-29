@@ -733,6 +733,7 @@ impl CDCL for Solver {
                             } else {
                                 // self.uncheck_enqueue(other, kind.id_from((*c).index));
                                 let dl = trail_lim.len();
+                                debug_assert!(dl == 0);
                                 let other = (*cb).lits[0];
                                 // println!("unchecked_enqueue embedded into propagate {}", other.int());
                                 let v = &mut vars[other.vi()];
@@ -740,12 +741,7 @@ impl CDCL for Solver {
                                 v.assign = other.lbool();
                                 v.level = dl;
                                 debug_assert!(*pre != NULL_CLAUSE);
-                                if dl == 0 {
-                                    v.reason = NULL_CLAUSE;
-                                } else {
-                                    v.reason = kind.id_from(*pre);
-                                    (*cb).set_flag(ClauseFlag::Locked, true);
-                                }
+                                v.reason = NULL_CLAUSE;
                                 debug_assert!(!v.eliminated);
                                 // assert!(!trail.contains(&other));
                                 // assert!(!trail.contains(&other.negate()));

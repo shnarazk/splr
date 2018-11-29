@@ -182,6 +182,8 @@ impl ClauseElimination for Solver {
         }
     }
     fn check_eliminator(&self) -> bool {
+        /// clause_queue should be clear.
+        assert!(self.eliminator.clause_queue.is_empty());
         // all elements in occur_lists exist.
         for v in &self.vars {
             for c in &v.pos_occurs {
@@ -642,9 +644,7 @@ impl Solver {
                                     //     cid2fmt(*n),
                                     //     vec2int(&clause_body!(self.cp, *n).lits)
                                     // );
-                                    if !self.enqueue(vec[0], NULL_CLAUSE)
-                                        || self.propagate_0() != NULL_CLAUSE
-                                    {
+                                    if !self.enqueue(vec[0], NULL_CLAUSE) {
                                         self.ok = false;
                                         // panic!("eliminate_var: failed to enqueue & propagate");
                                         return false;
@@ -694,6 +694,10 @@ impl Solver {
             //        }
             //    }
             //}
+            if self.propagate_0() != NULL_CLAUSE {
+                self.ok = false;
+                return false;
+            }
             self.backward_subsumption_check()
         }
     }
