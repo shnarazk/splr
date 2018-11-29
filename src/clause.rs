@@ -780,6 +780,7 @@ impl GC for ClausePartition {
                     ci = ch.next_watcher[index];
                     pri = &mut ch.next_watcher[index];
                 }
+                cb.lits.clear();
             }
         }
         debug_assert!(

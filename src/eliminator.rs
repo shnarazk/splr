@@ -764,6 +764,7 @@ impl Solver {
         // self.eliminator.clause_queue.clear();
         'perform: while self.eliminator.bwdsub_assigns < self.trail.len()
             || !self.eliminator.var_queue.is_empty()
+            || !self.eliminator.clause_queue.is_empty()
         {
             // self.gather_touched_clauses();
             if (!self.eliminator.clause_queue.is_empty()
