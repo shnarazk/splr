@@ -545,7 +545,7 @@ impl ClauseManagement for Solver {
             };
             for i in keep..nc {
                 let ch = &mut head[perm[i]];
-                let mut cb = &mut body[perm[i]];
+                let cb = &mut body[perm[i]];
                 if cb.get_flag(ClauseFlag::JustUsed) {
                     cb.set_flag(ClauseFlag::JustUsed, false)
                 } else {

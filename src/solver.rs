@@ -523,7 +523,7 @@ impl SatSolver for Solver {
                     if buf.starts_with('c') {
                         continue;
                     }
-                    let mut iter = buf.split_whitespace();
+                    let iter = buf.split_whitespace();
                     let mut v: Vec<Lit> = Vec::new();
                     for s in iter {
                         match s.parse::<i32>() {

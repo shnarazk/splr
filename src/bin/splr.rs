@@ -34,7 +34,7 @@ fn main() {
         let result = format!(".ans_{}", file.file_name().unwrap().to_str().unwrap());
         match s.solve() {
             Ok(Certificate::SAT(v)) => {
-                if let Ok(mut out) = File::create(&result) {
+                if let Ok(out) = File::create(&result) {
                     let mut buf = BufWriter::new(out);
                     for x in &v {
                         if let Err(why) = buf.write(format!("{} ", x).as_bytes()) {
