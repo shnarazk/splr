@@ -625,6 +625,8 @@ impl Solver {
                     if clause_body!(self.cp, p).get_flag(ClauseFlag::Dead) {
                         continue;
                     }
+                    let act_p = clause_body!(self.cp, p).activity;
+                    let rank_p = clause_body!(self.cp, p).rank;
                     for n in &*neg {
                         if clause_body!(self.cp, n).get_flag(ClauseFlag::Dead) {
                             continue;
@@ -651,7 +653,15 @@ impl Solver {
                                     }
                                 }
                                 _ => {
-                                    self.add_clause(&mut vec.to_vec(), 0);
+                                    if p.to_kind() == ClauseKind::Removable as usize &&
+                                        n.to_kind() == ClauseKind::Removable as usize {
+                                            let act_n = clause_body!(self.cp, n).activity;
+                                            let rank_n = clause_body!(self.cp, n).rank;
+                                            let new = self.add_clause(&mut vec.to_vec(), rank_p.min(rank_n));
+                                            clause_body_mut!(self.cp, new).activity = act_p.max(act_n);
+                                        } else {
+                                            self.add_clause(&mut vec.to_vec(), 0);
+                                        }
                                 }
                             }
                         }
