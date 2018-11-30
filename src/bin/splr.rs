@@ -6,7 +6,7 @@ use std::io::{BufWriter, Write};
 use std::path::Path;
 use std::process::exit;
 
-const VERSION: &str = "Splr-0.0.10 (Technical Preview 10) by shnarazk@gitlab.com";
+const VERSION: &str = "Splr-0.0.11 (Technology Preview 11) by shnarazk@gitlab.com";
 
 fn main() {
     let mut target: Option<String> = None;
