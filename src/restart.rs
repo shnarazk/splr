@@ -1,7 +1,7 @@
 // use clause::ClauseManagement;
-use solver::{Solver, Stat, CDCL};
+use crate::solver::{Solver, Stat, CDCL};
 use std::collections::VecDeque;
-use types::*;
+use crate::types::*;
 
 // for VecDeque<usize>
 pub trait QueueOperations {

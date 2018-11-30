@@ -1,13 +1,13 @@
 #![allow(unused_variables)]
-use eliminator::{ClauseElimination, *};
-use solver::{SearchStrategy, Solver, Stat, CDCL, CO_LBD_BOUND};
+use crate::eliminator::{ClauseElimination, *};
+use crate::solver::{SearchStrategy, Solver, Stat, CDCL, CO_LBD_BOUND};
 use std::cmp::Ordering;
 use std::f64;
 use std::fmt;
 use std::fs::File;
 use std::io::{BufWriter, Write};
-use types::*;
-use var::{Satisfiability, Var};
+use crate::types::*;
+use crate::var::{Satisfiability, Var};
 
 /// for ClausePartition
 pub trait GC {

@@ -1,14 +1,14 @@
 #![allow(unreachable_code)]
 #![allow(unused_mut)]
 #![allow(unused_variables)]
-use clause::{
+use crate::clause::{
     cid2fmt, ClauseBody, ClauseFlag, ClauseHead, ClauseIdIndexEncoding, ClauseIndex, ClauseKind,
     ClauseManagement, ClausePartition,
 };
-use solver::{Solver, CDCL};
+use crate::solver::{Solver, CDCL};
 use std::fmt;
-use types::*;
-use var::Var;
+use crate::types::*;
+use crate::var::Var;
 
 // for Solver
 pub trait ClauseElimination {

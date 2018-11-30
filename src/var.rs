@@ -1,7 +1,7 @@
 // use clause::Clause;
-use solver::{Solver, Stat};
+use crate::solver::{Solver, Stat};
 use std::fmt;
-use types::*;
+use crate::types::*;
 
 // for Solver
 pub trait VarManagement {
