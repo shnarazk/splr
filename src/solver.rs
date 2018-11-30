@@ -857,7 +857,9 @@ impl CDCL for Solver {
                         let cid = self.add_clause(&mut *v, lbd);
                         if cid.to_kind() == ClauseKind::Removable as usize {
                             // clause_body_mut!(self.cp, cid).set_flag(ClauseFlag::JustUsed, true);
-                            debug_assert!(!clause_body_mut!(self.cp, cid).get_flag(ClauseFlag::Dead));
+                            debug_assert!(
+                                !clause_body_mut!(self.cp, cid).get_flag(ClauseFlag::Dead)
+                            );
                             // clause_body_mut!(self.cp, cid).activity = 1.0 + (dl as f64) / 2.0;
                             self.bump_cid(cid);
                         }

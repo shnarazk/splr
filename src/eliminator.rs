@@ -216,11 +216,21 @@ impl ClauseElimination for Solver {
                     let v = l.vi();
                     if l.positive() {
                         if !self.vars[v].pos_occurs.contains(&cid) {
-                            panic!("aaa {} {:#} {:?}", cid2fmt(cid), clause_head!(self.cp, cid), vec2int(&cb.lits));
+                            panic!(
+                                "aaa {} {:#} {:?}",
+                                cid2fmt(cid),
+                                clause_head!(self.cp, cid),
+                                vec2int(&cb.lits)
+                            );
                         }
                     } else {
                         if !self.vars[v].neg_occurs.contains(&cid) {
-                            panic!("aaa {} {:#} {:?}", cid2fmt(cid), clause_head!(self.cp, cid), vec2int(&cb.lits));
+                            panic!(
+                                "aaa {} {:#} {:?}",
+                                cid2fmt(cid),
+                                clause_head!(self.cp, cid),
+                                vec2int(&cb.lits)
+                            );
                         }
                     }
                 }
@@ -653,15 +663,17 @@ impl Solver {
                                     }
                                 }
                                 _ => {
-                                    if p.to_kind() == ClauseKind::Removable as usize &&
-                                        n.to_kind() == ClauseKind::Removable as usize {
-                                            let act_n = clause_body!(self.cp, n).activity;
-                                            let rank_n = clause_body!(self.cp, n).rank;
-                                            let new = self.add_clause(&mut vec.to_vec(), rank_p.min(rank_n));
-                                            clause_body_mut!(self.cp, new).activity = act_p.max(act_n);
-                                        } else {
-                                            self.add_clause(&mut vec.to_vec(), 0);
-                                        }
+                                    if p.to_kind() == ClauseKind::Removable as usize
+                                        && n.to_kind() == ClauseKind::Removable as usize
+                                    {
+                                        let act_n = clause_body!(self.cp, n).activity;
+                                        let rank_n = clause_body!(self.cp, n).rank;
+                                        let new =
+                                            self.add_clause(&mut vec.to_vec(), rank_p.min(rank_n));
+                                        clause_body_mut!(self.cp, new).activity = act_p.max(act_n);
+                                    } else {
+                                        self.add_clause(&mut vec.to_vec(), 0);
+                                    }
                                 }
                             }
                         }
