@@ -860,7 +860,6 @@ impl CDCL for Solver {
                             debug_assert!(
                                 !clause_body_mut!(self.cp, cid).get_flag(ClauseFlag::Dead)
                             );
-                            // clause_body_mut!(self.cp, cid).activity = 1.0 + (dl as f64) / 2.0;
                             self.bump_cid(cid);
                         }
                         self.uncheck_enqueue(l0, cid);
