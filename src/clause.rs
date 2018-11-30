@@ -628,7 +628,7 @@ impl ClauseManagement for Solver {
             }
         }
         self.stat[Stat::Simplification as usize] += 1;
-        self.check_eliminator();
+        // self.check_eliminator();
         true
     }
     fn lbd_of_an_learnt_lits(&mut self) -> usize {
