@@ -369,7 +369,7 @@ impl ClauseManagement for Solver {
         }
         if false && 1.0e20 < a {
             // for c in &mut self.cp[ClauseKind::Removable as usize].body[1..] {
-            //     assert!(0.0 < c.activity);
+            //     debug_assert!(0.0 < c.activity);
             //     c.activity *= 1.0e-20;
             // }
             for i in 1..self.cp[ClauseKind::Removable as usize].body.len() {

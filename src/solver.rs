@@ -592,7 +592,7 @@ impl CDCL for Solver {
                             // Handling a special case for simplify
                             // check other's aliveness
                             let other = (*ch).lit[(my_index == 0) as usize];
-                            assert!(!vars[other.vi()].eliminated);
+                            debug_assert!(!vars[other.vi()].eliminated);
                         }
                         let other_value = vars.assigned((*ch).lit[(my_index == 0) as usize]);
                         if other_value != LTRUE {
@@ -636,8 +636,8 @@ impl CDCL for Solver {
                                     (*cb).set_flag(ClauseFlag::Locked, true);
                                 }
                                 debug_assert!(!v.eliminated);
-                                // assert!(!trail.contains(&other));
-                                // assert!(!trail.contains(&other.negate()));
+                                // debug_assert!(!trail.contains(&other));
+                                // debug_assert!(!trail.contains(&other.negate()));
                                 trail.push(other);
                             }
                         }
@@ -701,7 +701,7 @@ impl CDCL for Solver {
                             }
                             // check other's aliveness
                             let other = (*ch).lit[(my_index == 0) as usize];
-                            assert!(!vars[other.vi()].eliminated);
+                            debug_assert!(!vars[other.vi()].eliminated);
                         }
                         let other_value = vars.assigned((*ch).lit[(my_index == 0) as usize]);
                         if other_value != LTRUE {
@@ -712,8 +712,8 @@ impl CDCL for Solver {
                             }
                             for (k, lk) in (*cb).lits.iter().enumerate().skip(2) {
                                 // below is equivalent to 'assigned(lk) != LFALSE'
-                                assert!(1 < *lk);
-                                assert!(!vars[lk.vi()].eliminated);
+                                debug_assert!(1 < *lk);
+                                debug_assert!(!vars[lk.vi()].eliminated);
                                 if (((lk & 1) as u8) ^ vars[lk.vi()].assign) != 0 {
                                     let cix = *pre;
                                     *pre = (*ch).next_watcher[my_index];
@@ -743,8 +743,8 @@ impl CDCL for Solver {
                                 debug_assert!(*pre != NULL_CLAUSE);
                                 v.reason = NULL_CLAUSE;
                                 debug_assert!(!v.eliminated);
-                                // assert!(!trail.contains(&other));
-                                // assert!(!trail.contains(&other.negate()));
+                                // debug_assert!(!trail.contains(&other));debug_
+                                // debug_assert!(!trail.contains(&other.negate()));
                                 trail.push(other);
                             }
                         }
@@ -773,7 +773,7 @@ impl CDCL for Solver {
                     //         cnt += 1;
                     //     }
                     // }
-                    // assert_eq!(cnt, self.eliminator.eliminated_vars);
+                    // debug_assert_eq!(cnt, self.eliminator.eliminated_vars);
                     return true;
                 }
                 // DYNAMIC FORCING RESTART
@@ -853,11 +853,11 @@ impl CDCL for Solver {
                         lbd = self.lbd_of_an_learnt_lits();
                         let v = &mut self.an_learnt_lits as *mut Vec<Lit>;
                         let l0 = (*v)[0];
-                        assert!(0 < lbd);
+                        debug_assert!(0 < lbd);
                         let cid = self.add_clause(&mut *v, lbd);
                         if cid.to_kind() == ClauseKind::Removable as usize {
                             // clause_body_mut!(self.cp, cid).set_flag(ClauseFlag::JustUsed, true);
-                            assert!(!clause_body_mut!(self.cp, cid).get_flag(ClauseFlag::Dead));
+                            debug_assert!(!clause_body_mut!(self.cp, cid).get_flag(ClauseFlag::Dead));
                             // clause_body_mut!(self.cp, cid).activity = 1.0 + (dl as f64) / 2.0;
                             self.bump_cid(cid);
                         }
@@ -956,8 +956,8 @@ impl CDCL for Solver {
             if dl == 0 {
                 self.var_order.remove(&self.vars, l.vi());
             }
-            // assert!(!self.trail.contains(&l));
-            // assert!(!self.trail.contains(&l.negate()));
+            // debug_assert!(!self.trail.contains(&l));
+            // debug_assert!(!self.trail.contains(&l.negate()));
             self.trail.push(l);
             true
         } else {
@@ -1254,8 +1254,8 @@ impl Solver {
             // self.var_order.remove(&self.vars, l.vi());
         }
         clause_body_mut!(self.cp, cid).set_flag(ClauseFlag::Locked, true);
-        // assert!(!self.trail.contains(&l));
-        // assert!(!self.trail.contains(&l.negate()));
+        // debug_assert!(!self.trail.contains(&l));
+        // debug_assert!(!self.trail.contains(&l.negate()));
         self.trail.push(l);
     }
     pub fn uncheck_assume(&mut self, l: Lit) -> () {
@@ -1273,8 +1273,8 @@ impl Solver {
         if dl == 0 {
             self.eliminator_enqueue_var(l.vi());
         }
-        // assert!(!self.trail.contains(&l));
-        // assert!(!self.trail.contains(&l.negate()));
+        // debug_assert!(!self.trail.contains(&l));
+        // debug_assert!(!self.trail.contains(&l.negate()));
         self.trail.push(l);
     }
 }

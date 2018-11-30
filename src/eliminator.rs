@@ -182,8 +182,8 @@ impl ClauseElimination for Solver {
         }
     }
     fn check_eliminator(&self) -> bool {
-        /// clause_queue should be clear.
-        assert!(self.eliminator.clause_queue.is_empty());
+        // clause_queue should be clear.
+        // debug_assert!(self.eliminator.clause_queue.is_empty());
         // all elements in occur_lists exist.
         for v in &self.vars {
             for c in &v.pos_occurs {
@@ -751,7 +751,7 @@ impl Solver {
             }
             debug_assert!(width == 1);
             let l = self.eliminator.elim_clauses[i];
-            // assert!(model[l.vi() - 1] != l.negate().int());
+            // debug_assert!(model[l.vi() - 1] != l.negate().int());
             model[l.vi() - 1] = l.int(); // .neg();
             if i < width {
                 break;
@@ -871,15 +871,15 @@ impl Solver {
             let cix = cid.to_index();
             let ch = &mut head[cix] as *mut ClauseHead;
             let cb = &mut body[cix] as *mut ClauseBody;
-            assert!((*cb).lits.contains(&p));
-            assert!(1 < (*cb).lits.len());
+            // debug_assert!((*cb).lits.contains(&p));
+            // debug_assert!(1 < (*cb).lits.len());
             {
                 let v = &mut self.vars[p.vi()];
                 if p.positive() {
-                    assert!(v.pos_occurs.contains(&cid));
+                    // debug_assert!(v.pos_occurs.contains(&cid));
                     v.pos_occurs.retain(|&c| c != cid);
                 } else {
-                    assert!(v.neg_occurs.contains(&cid));
+                    // debug_assert!(v.neg_occurs.contains(&cid));
                     v.neg_occurs.retain(|&c| c != cid);
                 }
             }
@@ -899,16 +899,16 @@ impl Solver {
                         (*ch).lit.swap(0, 1);
                         (*ch).next_watcher.swap(0, 1);
                     }
-                    assert!((*ch).lit[0] == p);
-                    assert!((*cb).lits[0] != p);
+                    // debug_assert!((*ch).lit[0] == p);
+                    // debug_assert!((*cb).lits[0] != p);
                     // (*cb).lits[0] = (*ch).lit[0];
                     // (*ch).lit[0] = (*cb).lits[0];
                     // (*ch).lit[1] = (*cb).lits[0].negate();
-                    // assert!((*ch).lit[0] != p);
-                    // assert!(1 < (*ch).lit[0]);
-                    // assert!((*ch).lit[1] != p);
+                    // debug_assert!((*ch).lit[0] != p);
+                    // debug_assert!(1 < (*ch).lit[0]);
+                    // debug_assert!((*ch).lit[1] != p);
                     // stores the last literal in lits, while leaving `lit` as is.
-                    assert!((*cb).lits[0] != p);
+                    debug_assert!((*cb).lits[0] != p);
                     // println!("unit {} elimanated {}", (*cb).lits[0].int(), p.int());
                     return true;
                     // panic!("too short clause {} {:#} {:#}", cid2fmt(cid), *ch, *cb);
