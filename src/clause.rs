@@ -56,17 +56,12 @@ pub const CLAUSE_KINDS: [ClauseKind; 4] = [
 /// Clause Index, not ID because it's used only within a Vec<Clause>
 pub type ClauseIndex = usize;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Debug)]
 pub struct ClauseHead {
     /// The first two literals
     pub lit: [Lit; 2],
     /// the literals without lit0 and lit1
     pub next_watcher: [usize; 2],
-}
-
-/// Clause
-#[derive(Debug)]
-pub struct ClauseBody {
     /// collection of bits
     pub flag: u16,
     /// the remaining literals
@@ -75,6 +70,19 @@ pub struct ClauseBody {
     pub rank: usize,
     /// clause activity used by `analyze` and `reduce_db`
     pub activity: f64,
+}
+
+/// Clause
+#[derive(Debug)]
+pub struct ClauseBody {
+    /// collection of bits
+    pub _flag: u16,
+    /// the remaining literals
+    pub _lits: Vec<Lit>,
+    /// LBD or NDD and so on, used by `reduce_db`
+    pub _rank: usize,
+    /// clause activity used by `analyze` and `reduce_db`
+    pub _activity: f64,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -136,15 +144,19 @@ impl ClausePartition {
     pub fn build(kind: ClauseKind, nv: usize, nc: usize) -> ClausePartition {
         let mut head = Vec::with_capacity(1 + nc);
         head.push(ClauseHead {
-            next_watcher: [NULL_CLAUSE; 2],
             lit: [NULL_LIT; 2],
-        });
-        let mut body = Vec::with_capacity(1 + nc);
-        body.push(ClauseBody {
+            next_watcher: [NULL_CLAUSE; 2],
             flag: 0,
             lits: vec![],
             rank: 0,
             activity: 0.0,
+        });
+        let mut body = Vec::with_capacity(1 + nc);
+        body.push(ClauseBody {
+            _flag: 0,
+            _lits: vec![],
+            _rank: 0,
+            _activity: 0.0,
         });
         let mut perm = Vec::with_capacity(1 + nc);
         perm.push(NULL_CLAUSE);
@@ -182,7 +194,7 @@ impl ClausePartition {
     }
 }
 
-impl ClauseBody {
+impl ClauseHead {
     pub fn get_kind(&self) -> ClauseKind {
         match self.flag & 3 {
             0 => ClauseKind::Removable,
@@ -221,16 +233,16 @@ impl ClauseIdIndexEncoding for usize {
     }
 }
 
-impl PartialEq for ClauseBody {
-    fn eq(&self, other: &ClauseBody) -> bool {
+impl PartialEq for ClauseHead {
+    fn eq(&self, other: &ClauseHead) -> bool {
         self == other
     }
 }
 
-impl Eq for ClauseBody {}
+impl Eq for ClauseHead {}
 
-impl PartialOrd for ClauseBody {
-    fn partial_cmp(&self, other: &ClauseBody) -> Option<Ordering> {
+impl PartialOrd for ClauseHead {
+    fn partial_cmp(&self, other: &ClauseHead) -> Option<Ordering> {
         if self.rank < other.rank {
             Some(Ordering::Less)
         } else if other.rank < self.rank {
@@ -245,8 +257,8 @@ impl PartialOrd for ClauseBody {
     }
 }
 
-impl Ord for ClauseBody {
-    fn cmp(&self, other: &ClauseBody) -> Ordering {
+impl Ord for ClauseHead {
+    fn cmp(&self, other: &ClauseHead) -> Ordering {
         if self.rank < other.rank {
             Ordering::Less
         } else if other.rank > self.rank {
@@ -265,18 +277,9 @@ impl fmt::Display for ClauseHead {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "C lit:{:?}, watches:{:?}",
+            "C lit:{:?}, watches:{:?} {{{:?} {}{}{}{}}}",
             vec2int(&self.lit),
             self.next_watcher,
-        )
-    }
-}
-
-impl fmt::Display for ClauseBody {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{{{:?} {}{}{}{}}}",
             vec2int(&self.lits),
             match self.flag & 3 {
                 0 => 'L',
@@ -304,6 +307,12 @@ impl fmt::Display for ClauseBody {
     }
 }
 
+impl fmt::Display for ClauseBody {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "")
+    }
+}
+
 pub fn cid2fmt(cid: ClauseId) -> String {
     match cid.to_kind() {
         0 if cid == 0 => "NullClause".to_string(),
@@ -317,12 +326,12 @@ pub fn cid2fmt(cid: ClauseId) -> String {
 }
 
 pub struct ClauseIter<'a> {
-    body: &'a ClauseBody,
+    body: &'a ClauseHead,
     end: usize,
     index: usize,
 }
 
-pub fn clause_iter(cb: &ClauseBody) -> ClauseIter {
+pub fn clause_iter(cb: &ClauseHead) -> ClauseIter {
     ClauseIter {
         body: cb,
         end: cb.lits.len(),
@@ -349,7 +358,7 @@ impl ClauseManagement for Solver {
         let b = self.stat[Stat::Conflict as usize] as f64;
         let a;
         {
-            let c = clause_body_mut!(self.cp, cid);
+            let c = clause_mut!(self.cp, cid);
             // a = c.activity + self.cla_inc;
             a = (c.activity + b) / 2.0;
             c.activity = a;
@@ -483,11 +492,11 @@ impl ClauseManagement for Solver {
         //     );
         // }
         {
-            clause_body_mut!(self.cp, cid).set_flag(ClauseFlag::Dead, true);
+            clause_mut!(self.cp, cid).set_flag(ClauseFlag::Dead, true);
             let w0;
             let w1;
             {
-                let ch = clause_head!(self.cp, cid);
+                let ch = clause!(self.cp, cid);
                 w0 = ch.lit[0].negate();
                 w1 = ch.lit[1].negate();
             }
@@ -504,7 +513,7 @@ impl ClauseManagement for Solver {
         let locked;
         let mut vec = Vec::new();
         {
-            let cb = clause_body!(self.cp, cid);
+            let cb = clause!(self.cp, cid);
             if cb.get_flag(ClauseFlag::Dead) {
                 return;
             }
@@ -572,7 +581,7 @@ impl ClauseManagement for Solver {
         // reset reason since decision level is zero.
         for v in &mut self.vars[1..] {
             if v.reason != NULL_CLAUSE {
-                clause_body_mut!(self.cp, v.reason).set_flag(ClauseFlag::Locked, false);
+                clause_mut!(self.cp, v.reason).set_flag(ClauseFlag::Locked, false);
                 v.reason = NULL_CLAUSE;
             }
         }
@@ -648,7 +657,7 @@ impl ClauseManagement for Solver {
         cnt
     }
     fn lbd_of(&mut self, cid: ClauseId) -> usize {
-        let cb = clause_body!(self.cp, cid);
+        let cb = clause!(self.cp, cid);
         if 1_000_000_000 < self.lbd_key {
             self.lbd_key = 1;
         } else {

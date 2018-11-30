@@ -3,7 +3,7 @@
 /// cref!(self.cv, cid)
 /// ```
 #[macro_export]
-macro_rules! clause_head {
+macro_rules! clause {
     ($cv: expr, $val: expr) => {{
         match (&$cv, $val) {
             (v, cid) => &v[cid.to_kind()].head[cid.to_index()],
@@ -11,26 +11,10 @@ macro_rules! clause_head {
     }};
 }
 
-macro_rules! clause_body {
-    ($cv: expr, $val: expr) => {{
-        match (&$cv, $val) {
-            (v, cid) => &v[cid.to_kind()].body[cid.to_index()],
-        }
-    }};
-}
-
-// macro_rules! clause_head_mut {
-//     ($cv: expr, $val: expr) => {{
-//         match (&mut $cv, $val) {
-//             (v, cid) => &mut v[cid.to_kind()].head[cid.to_index()],
-//         }
-//     }};
-// }
-
-macro_rules! clause_body_mut {
+macro_rules! clause_mut {
     ($cv: expr, $val: expr) => {{
         match (&mut $cv, $val) {
-            (v, cid) => &mut v[cid.to_kind()].body[cid.to_index()],
+            (v, cid) => &mut v[cid.to_kind()].head[cid.to_index()],
         }
     }};
 }
