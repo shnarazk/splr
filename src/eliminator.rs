@@ -2,7 +2,7 @@
 #![allow(unused_mut)]
 #![allow(unused_variables)]
 use crate::clause::{
-    cid2fmt, ClauseBody, ClauseFlag, ClauseHead, ClauseIdIndexEncoding, ClauseIndex, ClauseKind,
+    cid2fmt, ClauseFlag, ClauseHead, ClauseIdIndexEncoding, ClauseIndex, ClauseKind,
     ClauseManagement, ClausePartition,
 };
 use crate::solver::{Solver, CDCL};
@@ -118,7 +118,7 @@ impl ClauseElimination for Solver {
             return;
         }
         {
-            let cb = clause_body_mut!(self.cp, cid);
+            let cb = clause_mut!(self.cp, cid);
             for l in &cb.lits {
                 let mut v = &mut self.vars[l.vi()];
                 v.touched = true;
@@ -141,7 +141,7 @@ impl ClauseElimination for Solver {
             // println!("{} is not enqueued", cid2fmt(cid));
             return;
         }
-        let cb = clause_body_mut!(self.cp, cid);
+        let cb = clause_mut!(self.cp, cid);
         let rank = cb.rank as f64;
         if !cb.get_flag(ClauseFlag::Enqueued) {
             let accept = if self.eliminator.clause_queue.len() <= 256 {
@@ -164,9 +164,9 @@ impl ClauseElimination for Solver {
         self.eliminator.enqueue_var(&mut self.vars[vi])
     }
     fn eliminator_unregister_clause(&mut self, cid: ClauseId) -> () {
-        debug_assert!(clause_body!(self.cp, cid).get_flag(ClauseFlag::Dead));
+        debug_assert!(clause!(self.cp, cid).get_flag(ClauseFlag::Dead));
         if self.eliminator.use_elim {
-            for l in &clause_body!(self.cp, cid).lits {
+            for l in &clause!(self.cp, cid).lits {
                 let v = &mut self.vars[l.vi()];
                 if !v.eliminated {
                     // let xx = v.pos_occurs.len() + v.neg_occurs.len();
@@ -187,15 +187,15 @@ impl ClauseElimination for Solver {
         // all elements in occur_lists exist.
         for v in &self.vars {
             for c in &v.pos_occurs {
-                let ch = clause_head!(self.cp, c);
+                let ch = clause!(self.cp, c);
                 if ch.lit[0] <= GARBAGE_LIT || ch.lit[1] <= GARBAGE_LIT {
-                    panic!("panic {:#} {:#}", ch, clause_body!(self.cp, c));
+                    panic!("panic {:#}", ch);
                 }
             }
             for c in &v.neg_occurs {
-                let ch = clause_head!(self.cp, c);
+                let ch = clause!(self.cp, c);
                 if ch.lit[0] <= GARBAGE_LIT || ch.lit[1] <= GARBAGE_LIT {
-                    panic!("panic {:#} {:#}", ch, clause_body!(self.cp, c));
+                    panic!("panic {:#}", ch);
                 }
             }
         }
@@ -211,26 +211,15 @@ impl ClauseElimination for Solver {
                 if ch.lit[0] == RECYCLE_LIT && ch.lit[1] == RECYCLE_LIT {
                     continue;
                 }
-                let cb = clause_body!(self.cp, cid);
-                for l in &cb.lits {
+                for l in &ch.lits {
                     let v = l.vi();
                     if l.positive() {
                         if !self.vars[v].pos_occurs.contains(&cid) {
-                            panic!(
-                                "aaa {} {:#} {:?}",
-                                cid2fmt(cid),
-                                clause_head!(self.cp, cid),
-                                vec2int(&cb.lits)
-                            );
+                            panic!("aaa {} {:#}", cid2fmt(cid), ch);
                         }
                     } else {
                         if !self.vars[v].neg_occurs.contains(&cid) {
-                            panic!(
-                                "aaa {} {:#} {:?}",
-                                cid2fmt(cid),
-                                clause_head!(self.cp, cid),
-                                vec2int(&cb.lits)
-                            );
+                            panic!("aaa {} {:#}", cid2fmt(cid), ch);
                         }
                     }
                 }
@@ -246,9 +235,9 @@ impl Solver {
     /// - calls `enqueue_clause`
     /// - calls `enqueue_var`
     pub fn strengthen_clause(&mut self, cid: ClauseId, l: Lit) -> bool {
-        debug_assert!(!clause_body!(self.cp, cid).get_flag(ClauseFlag::Dead));
-        debug_assert!(!clause_body!(self.cp, cid).get_flag(ClauseFlag::Locked));
-        debug_assert!(1 < clause_body!(self.cp, cid).lits.len());
+        debug_assert!(!clause!(self.cp, cid).get_flag(ClauseFlag::Dead));
+        debug_assert!(!clause!(self.cp, cid).get_flag(ClauseFlag::Locked));
+        debug_assert!(1 < clause!(self.cp, cid).lits.len());
         self.cp[cid.to_kind()].touched[l as usize] = true;
         self.cp[cid.to_kind()].touched[l.negate() as usize] = true;
         // println!("STRENGTHEN_CLAUSE {}", cid2fmt(cid));
@@ -257,9 +246,9 @@ impl Solver {
             // since changing a literal in `lit` requires updating a next_watcher,
             // it's muth easier to hold the literal to be propagated in body.lits[0]
             // let c0 = clause_head!(self.cp, cid).lit[0];
-            let c0 = clause_body!(self.cp, cid).lits[0];
-            debug_assert!(1 == clause_body!(self.cp, cid).lits.len());
-            debug_assert!(c0 == clause_body!(self.cp, cid).lits[0]);
+            let c0 = clause!(self.cp, cid).lits[0];
+            debug_assert!(1 == clause!(self.cp, cid).lits.len());
+            debug_assert!(c0 == clause!(self.cp, cid).lits[0]);
             // println!("cid {} {:?} became a unit clause as c0 {}, l {}", cid2fmt(cid), vec2int(&clause_body!(self.cp, cid).lits), c0.int(), l.int());
             debug_assert_ne!(c0, l);
             // println!("{} is removed and its first literal {} is enqueued.", cid2fmt(cid), c0.int());
@@ -283,7 +272,7 @@ impl Solver {
             }
         } else {
             // println!("cid {} drops literal {}", cid2fmt(cid), l.int());
-            debug_assert!(1 < clause_body!(self.cp, cid).lits.len());
+            debug_assert!(1 < clause!(self.cp, cid).lits.len());
             self.eliminator_enqueue_clause(cid);
             true
         }
@@ -293,8 +282,8 @@ impl Solver {
     pub fn merge(&mut self, cp: ClauseId, cq: ClauseId, v: VarId) -> Option<Vec<Lit>> {
         let mut vec: Vec<Lit> = Vec::new();
         self.eliminator.merges += 1;
-        let pqb = clause_body!(self.cp, cp);
-        let qpb = clause_body!(self.cp, cq);
+        let pqb = clause!(self.cp, cp);
+        let qpb = clause!(self.cp, cq);
         let ps_smallest = pqb.lits.len() < qpb.lits.len();
         let (pb, qb) = if ps_smallest { (pqb, qpb) } else { (qpb, pqb) };
         // println!(" -  {:?}{:?} & {:?}{:?}", vec2int(&ph.lit),vec2int(&pb.lits),vec2int(&qh.lit),vec2int(&qb.lits));
@@ -324,8 +313,8 @@ impl Solver {
     /// Returns **false** if one of the clauses is always satisfied.
     pub fn check_to_merge(&mut self, cp: ClauseId, cq: ClauseId, v: VarId) -> (bool, usize) {
         self.eliminator.merges += 1;
-        let pqb = clause_body!(self.cp, cp);
-        let qpb = clause_body!(self.cp, cq);
+        let pqb = clause!(self.cp, cp);
+        let qpb = clause!(self.cp, cq);
         let ps_smallest = pqb.lits.len() < qpb.lits.len();
         let (pb, qb) = if ps_smallest { (pqb, qpb) } else { (qpb, pqb) };
         let mut size = pb.lits.len() + 1;
@@ -378,7 +367,7 @@ impl Solver {
                     unilits = [cid.to_index() as Lit; 1];
                     lits = &unilits;
                 } else {
-                    let cb = clause_body_mut!(self.cp, cid) as *mut ClauseBody;
+                    let cb = clause_mut!(self.cp, cid) as *mut ClauseHead;
                     (*cb).set_flag(ClauseFlag::Enqueued, false);
                     lits = &(*cb).lits;
                     if (*cb).get_flag(ClauseFlag::Dead) || BACKWORD_SUBSUMPTION_THRESHOLD < cnt {
@@ -405,7 +394,7 @@ impl Solver {
                     };
                     cnt += (*cs).len();
                     for di in &*cs {
-                        let db = clause_body!(self.cp, di) as *const ClauseBody;
+                        let db = clause!(self.cp, di) as *const ClauseHead;
                         // if (*db).get_flag(ClauseFlag::Locked) && !(*db).get_flag(ClauseFlag::Dead) {
                         //     println!("di {} body {:#}, lits[0]vi {}",
                         //              cid2fmt(*di),
@@ -481,10 +470,9 @@ impl Solver {
     pub fn make_eliminated_clause(&self, vec: &mut Vec<Lit>, vi: VarId, cid: ClauseId) -> () {
         let first = vec.len();
         // Copy clause to the vector. Remember the position where the varibale 'v' occurs:
-        let ch = clause_head!(self.cp, cid);
-        let cb = clause_body!(self.cp, cid);
-        debug_assert!(0 < cb.lits.len());
-        for l in &cb.lits {
+        let ch = clause!(self.cp, cid);
+        debug_assert!(0 < ch.lits.len());
+        for l in &ch.lits {
             vec.push(*l as u32);
             if l.vi() == vi {
                 let index = vec.len() - 1;
@@ -496,7 +484,7 @@ impl Solver {
         }
         // Store the length of the clause last:
         debug_assert_eq!(vec[first].vi(), vi);
-        vec.push(cb.lits.len() as Lit);
+        vec.push(ch.lits.len() as Lit);
         // println!("make_eliminated_clause: eliminate({}) clause {:?}", vi, vec2int(&cb.lits));
     }
     /// 15. eliminateVar
@@ -515,10 +503,10 @@ impl Solver {
             } = self;
             vars[v]
                 .pos_occurs
-                .retain(|&c| !clause_body!(cp, c).get_flag(ClauseFlag::Dead));
+                .retain(|&c| !clause!(cp, c).get_flag(ClauseFlag::Dead));
             vars[v]
                 .pos_occurs
-                .retain(|&c| !clause_body!(cp, c).get_flag(ClauseFlag::Dead));
+                .retain(|&c| !clause!(cp, c).get_flag(ClauseFlag::Dead));
         }
         let pos = &self.vars[v].pos_occurs as *const Vec<ClauseId>;
         let neg = &self.vars[v].neg_occurs as *const Vec<ClauseId>;
@@ -548,11 +536,11 @@ impl Solver {
             let clslen = (*pos).len() + (*neg).len();
             let mut cnt = 0;
             for lit_pos in &*pos {
-                if clause_body!(self.cp, lit_pos).get_flag(ClauseFlag::Dead) {
+                if clause!(self.cp, lit_pos).get_flag(ClauseFlag::Dead) {
                     continue;
                 }
                 for lit_neg in &*neg {
-                    if clause_body!(self.cp, lit_neg).get_flag(ClauseFlag::Dead) {
+                    if clause!(self.cp, lit_neg).get_flag(ClauseFlag::Dead) {
                         continue;
                     }
                     let (res, clause_size) = self.check_to_merge(*lit_pos, *lit_neg, v);
@@ -593,7 +581,7 @@ impl Solver {
                         //         vec2int(&clause_body!(self.cp, cid).lits)
                         //     );
                         // }
-                        if clause_body!(self.cp, cid).get_flag(ClauseFlag::Dead) {
+                        if clause!(self.cp, cid).get_flag(ClauseFlag::Dead) {
                             continue;
                         }
                         self.make_eliminated_clause(&mut (*tmp), v, *cid);
@@ -618,7 +606,7 @@ impl Solver {
                         //         vec2int(&clause_body!(self.cp, cid).lits)
                         //     );
                         // }
-                        if clause_body!(self.cp, cid).get_flag(ClauseFlag::Dead) {
+                        if clause!(self.cp, cid).get_flag(ClauseFlag::Dead) {
                             continue;
                         }
                         self.make_eliminated_clause(&mut (*tmp), v, *cid);
@@ -632,13 +620,13 @@ impl Solver {
             // Produce clauses in cross product:
             {
                 for p in &*pos {
-                    if clause_body!(self.cp, p).get_flag(ClauseFlag::Dead) {
+                    if clause!(self.cp, p).get_flag(ClauseFlag::Dead) {
                         continue;
                     }
-                    let act_p = clause_body!(self.cp, p).activity;
-                    let rank_p = clause_body!(self.cp, p).rank;
+                    let act_p = clause!(self.cp, p).activity;
+                    let rank_p = clause!(self.cp, p).rank;
                     for n in &*neg {
-                        if clause_body!(self.cp, n).get_flag(ClauseFlag::Dead) {
+                        if clause!(self.cp, n).get_flag(ClauseFlag::Dead) {
                             continue;
                         }
                         if let Some(vec) = self.merge(*p, *n, v) {
@@ -666,11 +654,11 @@ impl Solver {
                                     if p.to_kind() == ClauseKind::Removable as usize
                                         && n.to_kind() == ClauseKind::Removable as usize
                                     {
-                                        let act_n = clause_body!(self.cp, n).activity;
-                                        let rank_n = clause_body!(self.cp, n).rank;
+                                        let act_n = clause!(self.cp, n).activity;
+                                        let rank_n = clause!(self.cp, n).rank;
                                         let new =
                                             self.add_clause(&mut vec.to_vec(), rank_p.min(rank_n));
-                                        clause_body_mut!(self.cp, new).activity = act_p.max(act_n);
+                                        clause_mut!(self.cp, new).activity = act_p.max(act_n);
                                     } else {
                                         self.add_clause(&mut vec.to_vec(), 0);
                                     }
@@ -686,11 +674,11 @@ impl Solver {
                 } else {
                     &mut self.vars[v].neg_occurs
                 } {
-                    clause_body_mut!(self.cp, *cid).set_flag(ClauseFlag::Dead, true);
+                    clause_mut!(self.cp, *cid).set_flag(ClauseFlag::Dead, true);
                     let w0;
                     let w1;
                     {
-                        let ch = clause_head!(self.cp, *cid);
+                        let ch = clause!(self.cp, *cid);
                         w0 = ch.lit[0].negate();
                         w1 = ch.lit[1].negate();
                     }
@@ -823,9 +811,8 @@ impl Solver {
         // }
         if cid.to_kind() == ClauseKind::Uniclause as usize {
             let l = cid.to_index() as Lit;
-            let oh = clause_head!(self.cp, other);
-            let ob = clause_body!(self.cp, other);
-            for lo in &ob.lits {
+            let oh = clause!(self.cp, other);
+            for lo in &oh.lits {
                 if l == lo.negate() {
                     return Some(l);
                 }
@@ -834,9 +821,9 @@ impl Solver {
         }
         // println!("subsume {} = {}:{}", cid, cid.to_kind(), cid.to_index());
         let mut ret: Lit = NULL_LIT;
-        let cb = clause_body!(self.cp, cid);
-        let ob = clause_body!(self.cp, other);
-        debug_assert!(ob.lits.contains(&clause_head!(self.cp, other).lit[0]));
+        let cb = clause!(self.cp, cid);
+        let ob = clause!(self.cp, other);
+        debug_assert!(ob.lits.contains(&clause!(self.cp, other).lit[0]));
         // if !ob.lits.contains(&clause_head!(self.cp, other).lit[0]) {
         //     panic!(
         //         "@subsume: the 1st literal of the other clause is ill-formed {} {:#}!",
@@ -844,7 +831,7 @@ impl Solver {
         //         ob
         //     );
         // }
-        debug_assert!(ob.lits.contains(&clause_head!(self.cp, other).lit[1]));
+        debug_assert!(ob.lits.contains(&clause!(self.cp, other).lit[1]));
         // if !ob.lits.contains(&clause_head!(self.cp, other).lit[1]) {
         //     panic!(
         //         "@subsume: the 2nd literal of the other clause is ill-formed {} {:#}!",
@@ -870,19 +857,17 @@ impl Solver {
     /// returns true if the clause became a unit clause.
     /// Called only from strengthen_clause
     pub fn strengthen(&mut self, cid: ClauseId, p: Lit) -> bool {
-        debug_assert!(!clause_body!(self.cp, cid).get_flag(ClauseFlag::Dead));
-        debug_assert!(1 < clause_body!(self.cp, cid).lits.len());
+        debug_assert!(!clause!(self.cp, cid).get_flag(ClauseFlag::Dead));
+        debug_assert!(1 < clause!(self.cp, cid).lits.len());
         let cix = cid.to_index();
         let ClausePartition {
             ref mut head,
-            ref mut body,
             ref mut watcher,
             ..
         } = self.cp[cid.to_kind()];
         unsafe {
             let cix = cid.to_index();
             let ch = &mut head[cix] as *mut ClauseHead;
-            let cb = &mut body[cix] as *mut ClauseBody;
             // debug_assert!((*cb).lits.contains(&p));
             // debug_assert!(1 < (*cb).lits.len());
             {
@@ -895,37 +880,37 @@ impl Solver {
                     v.neg_occurs.retain(|&c| c != cid);
                 }
             }
-            if (*cb).get_flag(ClauseFlag::Dead) {
+            if (*ch).get_flag(ClauseFlag::Dead) {
                 return false;
             }
             if (*ch).lit[0] == p || (*ch).lit[1] == p {
-                debug_assert!((*cb).lits[0] == p || (*cb).lits[1] == p);
+                debug_assert!((*ch).lits[0] == p || (*ch).lits[1] == p);
                 // update lit, next_watcher, and lits
                 let hi = ((*ch).lit[0] != p) as usize;
                 debug_assert!((*ch).lit[hi] == p);
-                let bi = ((*cb).lits[0] != p) as usize;
-                debug_assert!((*cb).lits[bi] == p);
-                (*cb).lits.swap_remove(bi);
-                if (*cb).lits.len() == 1 {
+                let bi = ((*ch).lits[0] != p) as usize;
+                debug_assert!((*ch).lits[bi] == p);
+                (*ch).lits.swap_remove(bi);
+                if (*ch).lits.len() == 1 {
                     if hi == 1 {
                         (*ch).lit.swap(0, 1);
                         (*ch).next_watcher.swap(0, 1);
                     }
                     // debug_assert!((*ch).lit[0] == p);
-                    // debug_assert!((*cb).lits[0] != p);
-                    // (*cb).lits[0] = (*ch).lit[0];
-                    // (*ch).lit[0] = (*cb).lits[0];
-                    // (*ch).lit[1] = (*cb).lits[0].negate();
+                    // debug_assert!((*ch).lits[0] != p);
+                    // (*ch).lits[0] = (*ch).lit[0];
+                    // (*ch).lit[0] = (*ch).lits[0];
+                    // (*ch).lit[1] = (*ch).lits[0].negate();
                     // debug_assert!((*ch).lit[0] != p);
                     // debug_assert!(1 < (*ch).lit[0]);
                     // debug_assert!((*ch).lit[1] != p);
                     // stores the last literal in lits, while leaving `lit` as is.
-                    debug_assert!((*cb).lits[0] != p);
-                    // println!("unit {} elimanated {}", (*cb).lits[0].int(), p.int());
+                    debug_assert!((*ch).lits[0] != p);
+                    // println!("unit {} elimanated {}", (*ch).lits[0].int(), p.int());
                     return true;
-                    // panic!("too short clause {} {:#} {:#}", cid2fmt(cid), *ch, *cb);
+                    // panic!("too short clause {} {:#} {:#}", cid2fmt(cid), *ch, *ch);
                 }
-                let new_lit = (*cb).lits[bi];
+                let new_lit = (*ch).lits[bi];
                 debug_assert_ne!(new_lit, p);
                 let next_clause = (*ch).next_watcher[hi];
                 // pointer update
@@ -944,7 +929,7 @@ impl Solver {
                 (*ch).lit[hi] = new_lit;
                 (*ch).next_watcher[hi] = watcher[new_lit.negate() as usize];
                 watcher[new_lit.negate() as usize] = cix;
-                if (*cb).lits.len() == 1 {
+                if (*ch).lits.len() == 1 {
                     debug_assert!((*ch).lit[1] != new_lit);
                     // if (*ch).lit[1] == new_lit {
                     //     panic!("aa");
@@ -957,7 +942,7 @@ impl Solver {
                 }
             } else {
                 debug_assert!((*ch).lit[0] != p.negate() && (*ch).lit[1] != p.negate());
-                (*cb).lits.retain(|&x| x != p);
+                (*ch).lits.retain(|&x| x != p);
                 false
             }
         }

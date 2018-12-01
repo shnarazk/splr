@@ -15,10 +15,10 @@ impl Solver {
     pub fn validate(&self) -> Option<Vec<i32>> {
         for ck in &CLAUSE_KINDS {
             for ci in 1..self.cp[*ck as usize].head.len() {
-                let cb = &self.cp[*ck as usize].body[ci];
-                if !self.vars.satisfies(&cb.lits) {
+                let ch = &self.cp[*ck as usize].head[ci];
+                if !self.vars.satisfies(&ch.lits) {
                     let mut v = Vec::new();
-                    for l in &cb.lits {
+                    for l in &ch.lits {
                         v.push(l.int());
                     }
                     return Some(v);

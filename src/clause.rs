@@ -101,7 +101,6 @@ pub struct ClausePartition {
     pub kind: ClauseKind,
     pub init_size: usize,
     pub head: Vec<ClauseHead>,
-    pub body: Vec<ClauseBody>,
     pub perm: Vec<ClauseIndex>,
     pub touched: Vec<bool>,
     pub watcher: Vec<ClauseIndex>,
@@ -151,13 +150,6 @@ impl ClausePartition {
             rank: 0,
             activity: 0.0,
         });
-        let mut body = Vec::with_capacity(1 + nc);
-        body.push(ClauseBody {
-            _flag: 0,
-            _lits: vec![],
-            _rank: 0,
-            _activity: 0.0,
-        });
         let mut perm = Vec::with_capacity(1 + nc);
         perm.push(NULL_CLAUSE);
         let mut watcher = Vec::with_capacity(2 * (nv + 1));
@@ -170,7 +162,6 @@ impl ClausePartition {
             kind,
             init_size: nc,
             head,
-            body,
             perm,
             touched,
             watcher,
@@ -363,8 +354,8 @@ impl ClauseManagement for Solver {
             a = (c.activity + b) / 2.0;
             c.activity = a;
         }
-        for i in 1..self.cp[ClauseKind::Removable as usize].body.len() {
-            let c = &mut self.cp[ClauseKind::Removable as usize].body[i];
+        for i in 1..self.cp[ClauseKind::Removable as usize].head.len() {
+            let c = &mut self.cp[ClauseKind::Removable as usize].head[i];
             // if i == 121 {
             //     println!("121 activity {} {:?}", c.activity, vec2int(&c.lits));
             // }
@@ -381,8 +372,8 @@ impl ClauseManagement for Solver {
             //     debug_assert!(0.0 < c.activity);
             //     c.activity *= 1.0e-20;
             // }
-            for i in 1..self.cp[ClauseKind::Removable as usize].body.len() {
-                let c = &mut self.cp[ClauseKind::Removable as usize].body[i];
+            for i in 1..self.cp[ClauseKind::Removable as usize].head.len() {
+                let c = &mut self.cp[ClauseKind::Removable as usize].head[i];
                 if i == 121 {
                     println!("121 activity {} {:?}", c.activity, vec2int(&c.lits));
                 }
@@ -535,31 +526,29 @@ impl ClauseManagement for Solver {
         {
             let ClausePartition {
                 ref mut head,
-                ref mut body,
                 ref mut touched,
                 ref mut perm,
                 ..
             } = &mut self.cp[ClauseKind::Removable as usize];
             let mut nc = 1;
-            for (i, b) in body.iter().enumerate().skip(1) {
+            for (i, b) in head.iter().enumerate().skip(1) {
                 if !b.get_flag(ClauseFlag::Dead) && !b.get_flag(ClauseFlag::Locked) {
                     perm[nc] = i;
                     nc += 1;
                 }
             }
-            perm[1..nc].sort_by(|&a, &b| body[a].cmp(&body[b]));
+            perm[1..nc].sort_by(|&a, &b| head[a].cmp(&head[b]));
             let keep = nc / 2;
-            if body[perm[keep]].rank <= 5 {
+            if head[perm[keep]].rank <= 5 {
                 self.next_reduction += 1000;
             };
             for i in keep..nc {
                 let ch = &mut head[perm[i]];
-                let cb = &mut body[perm[i]];
-                if cb.get_flag(ClauseFlag::JustUsed) {
-                    cb.set_flag(ClauseFlag::JustUsed, false)
+                if ch.get_flag(ClauseFlag::JustUsed) {
+                    ch.set_flag(ClauseFlag::JustUsed, false)
                 } else {
-                    cb.set_flag(ClauseFlag::Dead, true);
-                    debug_assert!(!cb.get_flag(ClauseFlag::Locked));
+                    ch.set_flag(ClauseFlag::Dead, true);
+                    debug_assert!(!ch.get_flag(ClauseFlag::Locked));
                     // if cb.get_flag(ClauseFlag::Locked) {
                     //     panic!("clause is locked");
                     // }
@@ -615,16 +604,15 @@ impl ClauseManagement for Solver {
             let vars = &mut self.vars[..] as *mut [Var];
             for ck in &CLAUSE_KINDS {
                 for ci in 1..self.cp[*ck as usize].head.len() {
-                    let ch = &self.cp[*ck as usize].head[ci];
-                    let cb = &mut self.cp[*ck as usize].body[ci];
-                    if !cb.get_flag(ClauseFlag::Dead) && self.vars.satisfies(&cb.lits) {
-                        debug_assert!(!cb.get_flag(ClauseFlag::Locked));
-                        cb.set_flag(ClauseFlag::Dead, true);
+                    let ch = &mut self.cp[*ck as usize].head[ci];
+                    if !ch.get_flag(ClauseFlag::Dead) && self.vars.satisfies(&ch.lits) {
+                        debug_assert!(!ch.get_flag(ClauseFlag::Locked));
+                        ch.set_flag(ClauseFlag::Dead, true);
                         debug_assert!(ch.lit[0] != 0 && ch.lit[1] != 0);
                         self.cp[*ck as usize].touched[ch.lit[0].negate() as usize] = true;
                         self.cp[*ck as usize].touched[ch.lit[1].negate() as usize] = true;
                         if (*eliminator).use_elim {
-                            for l in &cb.lits {
+                            for l in &ch.lits {
                                 let v = &mut (*vars)[l.vi()];
                                 if !v.eliminated {
                                     (*eliminator).enqueue_var(v);
@@ -686,7 +674,7 @@ impl ClauseManagement for Solver {
         if let Ok(out) = File::create(&fname) {
             let mut buf = BufWriter::new(out);
             let nv = self.trail.len();
-            let nc: usize = self.cp.iter().map(|p| p.body.len() - 1).sum();
+            let nc: usize = self.cp.iter().map(|p| p.head.len() - 1).sum();
             buf.write(format!("p cnf {} {}\n", self.num_vars, nc + nv).as_bytes())
                 .unwrap();
             let kinds = [
@@ -695,7 +683,7 @@ impl ClauseManagement for Solver {
                 ClauseKind::Permanent,
             ];
             for kind in &kinds {
-                for c in self.cp[*kind as usize].body.iter().skip(1) {
+                for c in self.cp[*kind as usize].head.iter().skip(1) {
                     for l in &c.lits {
                         buf.write(format!("{} ", l.int()).as_bytes()).unwrap();
                     }
@@ -725,8 +713,7 @@ impl GC for ClausePartition {
                 let mut ci = self.watcher[l];
                 while ci != NULL_CLAUSE {
                     let ch = &mut self.head[ci] as *mut ClauseHead;
-                    let cb = &mut self.body[ci] as *mut ClauseBody;
-                    if !(*cb).get_flag(ClauseFlag::Dead) {
+                    if !(*ch).get_flag(ClauseFlag::Dead) {
                         pri = &mut (*ch).next_watcher[((*ch).lit[0].vi() != vi) as usize];
                     } else {
                         debug_assert!(
@@ -748,8 +735,7 @@ impl GC for ClausePartition {
             while ci != NULL_CLAUSE {
                 let cid = self.kind.id_from(ci);
                 let ch = &mut self.head[ci];
-                let cb = &mut self.body[ci];
-                debug_assert!(cb.get_flag(ClauseFlag::Dead));
+                debug_assert!(ch.get_flag(ClauseFlag::Dead));
                 if ch.lit[0] == GARBAGE_LIT && ch.lit[1] == GARBAGE_LIT {
                     let next = ch.next_watcher[0];
                     *pri = ch.next_watcher[0];
@@ -758,9 +744,9 @@ impl GC for ClausePartition {
                     ch.next_watcher[0] = *recycled;
                     ch.next_watcher[1] = *recycled;
                     *recycled = ci;
-                    cb.set_flag(ClauseFlag::Locked, true);
+                    ch.set_flag(ClauseFlag::Locked, true);
                     if eliminator.use_elim {
-                        for l in &cb.lits {
+                        for l in &ch.lits {
                             let vi = l.vi();
                             let v = &mut vars[vi];
                             if eliminator.use_elim && !v.eliminated {
@@ -789,19 +775,18 @@ impl GC for ClausePartition {
                     ci = ch.next_watcher[index];
                     pri = &mut ch.next_watcher[index];
                 }
-                cb.lits.clear();
+                ch.lits.clear();
             }
         }
         debug_assert!(
             self.watcher[GARBAGE_LIT.negate() as usize] == NULL_CLAUSE,
             format!(
-                "There's a clause {} {:#} {:#} in the GARBAGE list",
+                "There's a clause {} {:#} in the GARBAGE list",
                 cid2fmt(
                     self.kind
                         .id_from(self.watcher[GARBAGE_LIT.negate() as usize])
                 ),
                 self.head[self.watcher[GARBAGE_LIT.negate() as usize]],
-                self.body[self.watcher[GARBAGE_LIT.negate() as usize]],
             ),
         );
     }
@@ -811,22 +796,21 @@ impl GC for ClausePartition {
         let w1;
         if self.watcher[RECYCLE_LIT.negate() as usize] != NULL_CLAUSE {
             cix = self.watcher[RECYCLE_LIT.negate() as usize];
-            debug_assert_eq!(self.body[cix].get_flag(ClauseFlag::Dead), true);
+            debug_assert_eq!(self.head[cix].get_flag(ClauseFlag::Dead), true);
             debug_assert_eq!(self.head[cix].lit[0], RECYCLE_LIT);
             debug_assert_eq!(self.head[cix].lit[1], RECYCLE_LIT);
             self.watcher[RECYCLE_LIT.negate() as usize] = self.head[cix].next_watcher[0];
             let ch = &mut self.head[cix];
-            let cb = &mut self.body[cix];
             ch.lit[0] = v[0];
             ch.lit[1] = v[1];
-            cb.lits.clear();
+            ch.lits.clear();
             for l in &v[..] {
-                cb.lits.push(*l);
+                ch.lits.push(*l);
             }
-            cb.rank = rank;
-            cb.flag = self.kind as u16; // reset Dead, JustUsed, and Touched
-            cb.set_flag(ClauseFlag::Locked, locked);
-            cb.activity = 1.0;
+            ch.rank = rank;
+            ch.flag = self.kind as u16; // reset Dead, JustUsed, and Touched
+            ch.set_flag(ClauseFlag::Locked, locked);
+            ch.activity = 1.0;
             w0 = ch.lit[0].negate() as usize;
             w1 = ch.lit[1].negate() as usize;
             ch.next_watcher[0] = self.watcher[w0];
@@ -844,8 +828,6 @@ impl GC for ClausePartition {
             self.head.push(ClauseHead {
                 lit: [l0, l1],
                 next_watcher: [self.watcher[w0], self.watcher[w1]],
-            });
-            self.body.push(ClauseBody {
                 flag: self.kind as u16 | ClauseFlag::Locked.as_bit(locked),
                 lits,
                 rank,
@@ -862,20 +844,20 @@ impl GC for ClausePartition {
             *x = 0;
         }
         for i in 1..self.head.len() {
-            let cb = &mut self.body[i];
-            if cb.get_flag(ClauseFlag::Dead) {
+            let ch = &mut self.head[i];
+            if ch.get_flag(ClauseFlag::Dead) {
                 continue;
             }
             let key = i;
             let mut cnt = 0;
-            for l in &cb.lits {
+            for l in &ch.lits {
                 let lv = vars[l.vi()].level;
                 if temp[lv] != key && lv != 0 {
                     temp[lv] = key;
                     cnt += 1;
                 }
             }
-            cb.rank = cnt;
+            ch.rank = cnt;
         }
     }
     fn move_to(&mut self, list: &mut ClauseId, ci: ClauseIndex, index: usize) -> ClauseIndex {
