@@ -388,9 +388,9 @@ impl Solver {
                             continue;
                         }
                         if ch.rank < CO_LBD_BOUND {
-                            // cb.lits.insert(0, ch.lit[0]);
+                            // ch.lits.insert(0, ch.lit[0]);
                             (*learnts).touched[ch.lit[0].negate() as usize] = true;
-                            // cb.lits.insert(1, ch.lit[1]);
+                            // ch.lits.insert(1, ch.lit[1]);
                             (*learnts).touched[ch.lit[1].negate() as usize] = true;
                             (*permanents).new_clause(
                                 &ch.lits,
@@ -665,7 +665,7 @@ impl CDCL for Solver {
                         let ch = &mut (*head)[*pre] as *mut ClauseHead;
                         debug_assert!((*ch).lit[0] == false_lit || (*ch).lit[1] == false_lit);
                         let my_index = ((*ch).lit[0] != false_lit) as usize;
-                        // let cb = &mut (*body)[*pre] as *mut ClauseBody;
+                        // let ch = &mut (*body)[*pre] as *mut ClauseBody;
                         {
                             // Handling a special case for simplify
                             if (*ch).get_flag(ClauseFlag::Dead) {
@@ -954,17 +954,17 @@ impl CDCL for Solver {
                 debug_assert_ne!(cid, NULL_CLAUSE);
                 if cid.to_kind() == (ClauseKind::Removable as usize) {
                     self.bump_cid(cid);
-                    // if 2 < (*cb).rank {
+                    // if 2 < (*ch).rank {
                     //     let nblevels = self.lbd_of(cid);
-                    //     if nblevels + 1 < (*cb).rank {
-                    //         (*cb).rank = nblevels;
+                    //     if nblevels + 1 < (*ch).rank {
+                    //         (*ch).rank = nblevels;
                     //         if nblevels <= 30 {
-                    //             (*cb).set_flag(ClauseFlag::JustUsed, true);
+                    //             (*ch).set_flag(ClauseFlag::JustUsed, true);
                     //         }
                     //         if self.strategy == Some(SearchStrategy::ChanSeok)
                     //             && nblevels < CO_LBD_BOUND
                     //         {
-                    //             (*cb).rank = 0;
+                    //             (*ch).rank = 0;
                     //             clause_body_mut!(self.cp, confl).rank = 0
                     //         }
                     //     }
@@ -1091,8 +1091,8 @@ impl CDCL for Solver {
     fn analyze_final(&mut self, ci: ClauseId, skip_first: bool) -> () {
         self.conflicts.clear();
         if self.root_level != 0 {
-            let cb = clause!(self.cp, ci);
-            for l in &cb.lits[skip_first as usize..] {
+            let ch = clause!(self.cp, ci);
+            for l in &ch.lits[skip_first as usize..] {
                 let vi = l.vi();
                 if 0 < self.vars[vi].level {
                     self.an_seen[vi] = true;
@@ -1111,7 +1111,7 @@ impl CDCL for Solver {
                     if self.vars[vi].reason == NULL_CLAUSE {
                         self.conflicts.push(l.negate());
                     } else {
-                        for l in &cb.lits[1..] {
+                        for l in &ch.lits[1..] {
                             let vi = l.vi();
                             if 0 < self.vars[vi].level {
                                 self.an_seen[vi] = true;
