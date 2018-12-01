@@ -117,18 +117,15 @@ impl ClauseElimination for Solver {
         if !self.eliminator.use_elim {
             return;
         }
-        {
-            let cb = clause_mut!(self.cp, cid);
-            for l in &cb.lits {
-                let mut v = &mut self.vars[l.vi()];
-                v.touched = true;
-                self.eliminator.n_touched += 1;
-                if !v.eliminated {
-                    if l.positive() {
-                        v.pos_occurs.push(cid);
-                    } else {
-                        v.neg_occurs.push(cid);
-                    }
+        for l in &clause_mut!(self.cp, cid).lits {
+            let mut v = &mut self.vars[l.vi()];
+            v.touched = true;
+            self.eliminator.n_touched += 1;
+            if !v.eliminated {
+                if l.positive() {
+                    v.pos_occurs.push(cid);
+                } else {
+                    v.neg_occurs.push(cid);
                 }
             }
         }
@@ -141,9 +138,9 @@ impl ClauseElimination for Solver {
             // println!("{} is not enqueued", cid2fmt(cid));
             return;
         }
-        let cb = clause_mut!(self.cp, cid);
-        let rank = cb.rank as f64;
-        if !cb.get_flag(ClauseFlag::Enqueued) {
+        let ch = clause_mut!(self.cp, cid);
+        let rank = ch.rank as f64;
+        if !ch.get_flag(ClauseFlag::Enqueued) {
             let accept = if self.eliminator.clause_queue.len() <= 256 {
                 rank
             } else {
@@ -152,7 +149,7 @@ impl ClauseElimination for Solver {
             if rank <= accept {
                 self.eliminator.clause_queue.push(cid);
                 // println!("increment {}", self.eliminator.clause_queue.len());
-                cb.set_flag(ClauseFlag::Enqueued, true);
+                ch.set_flag(ClauseFlag::Enqueued, true);
                 self.eliminator.clause_queue_threshold -= 1;
             }
         }
@@ -360,14 +357,14 @@ impl Solver {
                     unilits = [cid.to_index() as Lit; 1];
                     lits = &unilits;
                 } else {
-                    let cb = clause_mut!(self.cp, cid) as *mut ClauseHead;
-                    (*cb).set_flag(ClauseFlag::Enqueued, false);
-                    lits = &(*cb).lits;
-                    if (*cb).get_flag(ClauseFlag::Dead) || BACKWORD_SUBSUMPTION_THRESHOLD < cnt {
+                    let ch = clause_mut!(self.cp, cid) as *mut ClauseHead;
+                    (*ch).set_flag(ClauseFlag::Enqueued, false);
+                    lits = &(*ch).lits;
+                    if (*ch).get_flag(ClauseFlag::Dead) || BACKWORD_SUBSUMPTION_THRESHOLD < cnt {
                         continue;
                     }
                     let mut tmp = 1_000_000;
-                    for l in &(*cb).lits {
+                    for l in &(*ch).lits {
                         let v = &self.vars[l.vi()];
                         let nsum = v.pos_occurs.len().min(v.neg_occurs.len());
                         if !v.eliminated && 0 < v.level && nsum < tmp {
@@ -466,7 +463,7 @@ impl Solver {
         // Store the length of the clause last:
         debug_assert_eq!(vec[first].vi(), vi);
         vec.push(ch.lits.len() as Lit);
-        // println!("make_eliminated_clause: eliminate({}) clause {:?}", vi, vec2int(&cb.lits));
+        // println!("make_eliminated_clause: eliminate({}) clause {:?}", vi, vec2int(&ch.lits));
     }
     /// 15. eliminateVar
     /// returns false if solver is in inconsistent
@@ -761,11 +758,11 @@ impl Solver {
         }
         // println!("subsume {} = {}:{}", cid, cid.to_kind(), cid.to_index());
         let mut ret: Lit = NULL_LIT;
-        let cb = clause!(self.cp, cid);
+        let ch = clause!(self.cp, cid);
         let ob = clause!(self.cp, other);
         debug_assert!(ob.lits.contains(&clause!(self.cp, other).lit[0]));
         debug_assert!(ob.lits.contains(&clause!(self.cp, other).lit[1]));
-        'next: for l in &cb.lits {
+        'next: for l in &ch.lits {
             for lo in &ob.lits {
                 if *l == *lo {
                     continue 'next;
@@ -794,8 +791,8 @@ impl Solver {
         unsafe {
             let cix = cid.to_index();
             let ch = &mut head[cix] as *mut ClauseHead;
-            // debug_assert!((*cb).lits.contains(&p));
-            // debug_assert!(1 < (*cb).lits.len());
+            // debug_assert!((*ch).lits.contains(&p));
+            // debug_assert!(1 < (*ch).lits.len());
             {
                 let v = &mut self.vars[p.vi()];
                 if p.positive() {
