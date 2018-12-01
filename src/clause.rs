@@ -72,19 +72,6 @@ pub struct ClauseHead {
     pub activity: f64,
 }
 
-/// Clause
-#[derive(Debug)]
-pub struct ClauseBody {
-    /// collection of bits
-    pub _flag: u16,
-    /// the remaining literals
-    pub _lits: Vec<Lit>,
-    /// LBD or NDD and so on, used by `reduce_db`
-    pub _rank: usize,
-    /// clause activity used by `analyze` and `reduce_db`
-    pub _activity: f64,
-}
-
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub enum ClauseFlag {
     Kind0 = 0,
@@ -295,12 +282,6 @@ impl fmt::Display for ClauseHead {
                 ""
             },
         )
-    }
-}
-
-impl fmt::Display for ClauseBody {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "")
     }
 }
 
