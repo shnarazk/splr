@@ -29,6 +29,9 @@ impl Profile {
 
 impl fmt::Display for Profile {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:40}| {}", self.target, Utc::now() - self.start,)
+        let mut tm = format!("{}", Utc::now() - self.start);
+        tm.drain(..2);
+        tm.pop();
+        write!(f, "{:36}|time:{:>19}", self.target, tm)
     }
 }

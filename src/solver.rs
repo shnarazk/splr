@@ -224,20 +224,20 @@ impl Solver {
                 print!("\x1B[7A");
                 println!("{}, State:{:>6}", self.profile, mes,);
                 println!(
-                    "#propagate:{:>14}, #decision:{:>13}, #conflict: {:>13}",
+                    "#propagate:{:>14}, #decision:{:>13}, #conflict: {:>12}",
                     self.stat[Stat::Propagation as usize],
                     self.stat[Stat::Decision as usize],
                     self.stat[Stat::Conflict as usize],
                 );
                 println!(
-                    "   Assignment|#rem:{:>9}, #fix:{:>9}, #elm:{:>9}, prog%:{:>8.4}",
+                    "  Assignment|#rem:{:>9}, #fix:{:>9}, #elm:{:>9}, prog%:{:>8.4}",
                     nv - sum,
                     fixed,
                     self.eliminator.eliminated_vars,
                     (sum as f32) / (nv as f32) * 100.0,
                 );
                 println!(
-                    "    Clause DB|Remv:{:>9}, good:{:>9}, Perm:{:>9}, Binc:{:>9}",
+                    "   Clause DB|Remv:{:>9}, good:{:>9}, Perm:{:>9}, Binc:{:>9}",
                     self.cp[ClauseKind::Removable as usize]
                         .head
                         .iter()
@@ -259,21 +259,21 @@ impl Solver {
                         .count(),
                 );
                 println!(
-                    "      Restart|#BLK:{:>9}, #RST:{:>9}, emaASG:{:>7.2}, emaLBD:{:>7.2}",
+                    "     Restart|#BLK:{:>9}, #RST:{:>9}, emaASG:{:>7.2}, emaLBD:{:>7.2}",
                     self.stat[Stat::BlockRestart as usize],
                     self.stat[Stat::Restart as usize],
                     self.ema_asg.get(),
                     self.ema_lbd.get(),
                 );
                 println!(
-                    "  Decision Lv|aLBD:{:>9.2}, bjmp:{:>9.2}, cnfl:{:>9.2} |#rdc:{:>9}",
+                    " Decision Lv|aLBD:{:>9.2}, bjmp:{:>9.2}, cnfl:{:>9.2} |#rdc:{:>9}",
                     self.ema_lbd.slow,
                     self.b_lvl.0,
                     self.c_lvl.0,
                     self.stat[Stat::Reduction as usize],
                 );
                 println!(
-                    "   Eliminator|#cls:{:>9}, #var:{:>9},   Clause DB mgr|#smp:{:>9}",
+                    "  Eliminator|#cls:{:>9}, #var:{:>9},   Clause DB mgr|#smp:{:>9}",
                     self.eliminator.clause_queue_len(),
                     self.eliminator.var_queue_len(),
                     self.stat[Stat::Simplification as usize],
