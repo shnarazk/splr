@@ -2,12 +2,12 @@ use crate::clause::{ClauseManagement, GC, *};
 use crate::eliminator::{ClauseElimination, Eliminator, EliminatorIF};
 use crate::profiler::*;
 use crate::restart::{QueueOperations, K, R};
+use crate::types::*;
+use crate::var::{VarOrdering, MAX_VAR_DECAY, *};
 use std::cmp::max;
 use std::collections::VecDeque;
 use std::fs;
 use std::io::{BufRead, BufReader};
-use crate::types::*;
-use crate::var::{VarOrdering, MAX_VAR_DECAY, *};
 
 pub trait SatSolver {
     fn solve(&mut self) -> SolverResult;

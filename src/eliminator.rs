@@ -6,9 +6,9 @@ use crate::clause::{
     ClauseManagement, ClausePartition,
 };
 use crate::solver::{Solver, CDCL};
-use std::fmt;
 use crate::types::*;
 use crate::var::Var;
+use std::fmt;
 
 // for Solver
 pub trait ClauseElimination {
