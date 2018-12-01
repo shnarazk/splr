@@ -260,13 +260,6 @@ impl Solver {
                 true
             } else {
                 println!("{:?}", self.vars[c0.vi()]);
-                // panic!(
-                //     "Conflicting Enqueue:: A l {}, c0 {}, {:#} {:#}",
-                //     l.int(),
-                //     c0.int(),
-                //     clause_head!(self.cp, cid),
-                //     clause_body!(self.cp, cid)
-                // );
                 self.ok = false;
                 false
             }
@@ -395,13 +388,6 @@ impl Solver {
                     cnt += (*cs).len();
                     for di in &*cs {
                         let db = clause!(self.cp, di) as *const ClauseHead;
-                        // if (*db).get_flag(ClauseFlag::Locked) && !(*db).get_flag(ClauseFlag::Dead) {
-                        //     println!("di {} body {:#}, lits[0]vi {}",
-                        //              cid2fmt(*di),
-                        //              *db,
-                        //              cid2fmt(self.vars[(*db).lits[0].vi()].reason),
-                        //              );
-                        // }
                         debug_assert!(
                             (!(*db).get_flag(ClauseFlag::Locked))
                                 || (*db).get_flag(ClauseFlag::Dead)
@@ -413,7 +399,6 @@ impl Solver {
                             && (self.eliminator.subsumption_lim == 0
                                 || lits.len() + (*db).lits.len() <= self.eliminator.subsumption_lim)
                         {
-                            // ここから先を潰すとvalid answer
                             match self.subsume(cid, *di) {
                                 Some(NULL_LIT) => {
                                     subsumed += 1;
@@ -447,10 +432,6 @@ impl Solver {
                                         return false;
                                     }
                                     self.eliminator_enqueue_var(l.vi());
-                                    // if self.propagate_0() != NULL_CLAUSE {
-                                    //     self.ok = false;
-                                    //     panic!("@backward_subsumption_check called propagate and failed!");
-                                    // }
                                 }
                                 None => {}
                             }
@@ -567,20 +548,6 @@ impl Solver {
                 let tmp = &mut self.eliminator.elim_clauses as *mut Vec<Lit>;
                 if (*neg).len() < (*pos).len() {
                     for cid in &*neg {
-                        // if clause_body!(self.cp, cid).lits.contains(&v.lit(LTRUE)) {
-                        //     panic!(
-                        //         "ultra panic {} {:?}.",
-                        //         cid2fmt(*cid),
-                        //         vec2int(&clause_body!(self.cp, cid).lits)
-                        //     );
-                        // }
-                        // if !clause_body!(self.cp, cid).lits.contains(&v.lit(LFALSE)) {
-                        //     panic!(
-                        //         "ultra panic {} {:?}.",
-                        //         cid2fmt(*cid),
-                        //         vec2int(&clause_body!(self.cp, cid).lits)
-                        //     );
-                        // }
                         if clause!(self.cp, cid).get_flag(ClauseFlag::Dead) {
                             continue;
                         }
@@ -592,20 +559,6 @@ impl Solver {
                 // println!("eliminate unit clause {}", v.lit(LFALSE).int());
                 } else {
                     for cid in &*pos {
-                        // if clause_body!(self.cp, cid).lits.contains(&v.lit(LFALSE)) {
-                        //     panic!(
-                        //         "ultra panic {} {:?}.",
-                        //         cid2fmt(*cid),
-                        //         vec2int(&clause_body!(self.cp, cid).lits)
-                        //     );
-                        // }
-                        // if !clause_body!(self.cp, cid).lits.contains(&v.lit(LTRUE)) {
-                        //     panic!(
-                        //         "ultra panic {} {:?}.",
-                        //         cid2fmt(*cid),
-                        //         vec2int(&clause_body!(self.cp, cid).lits)
-                        //     );
-                        // }
                         if clause!(self.cp, cid).get_flag(ClauseFlag::Dead) {
                             continue;
                         }
@@ -691,19 +644,6 @@ impl Solver {
             }
             self.vars[v].pos_occurs.clear();
             self.vars[v].neg_occurs.clear();
-            //{
-            //    // v should be disappeared from the problem!
-            //    let kinds = [ClauseKind::Binclause, ClauseKind::Removable, ClauseKind::Permanent];
-            //    for kind in &kinds {
-            //        for (i, b) in self.cp[*kind as usize].body.iter().enumerate().skip(1) {
-            //            if b.lits.contains(&v.lit(LTRUE)) || b.lits.contains(&v.lit(LFALSE)) {
-            //                if !b.get_flag(ClauseFlag::Dead) {
-            //                    panic!("FOUND: {:#} in {:?}{}/{:?}", v, kind, i, vec2int(&b.lits));
-            //                }
-            //            }
-            //        }
-            //    }
-            //}
             if self.propagate_0() != NULL_CLAUSE {
                 self.ok = false;
                 return false;
@@ -824,21 +764,7 @@ impl Solver {
         let cb = clause!(self.cp, cid);
         let ob = clause!(self.cp, other);
         debug_assert!(ob.lits.contains(&clause!(self.cp, other).lit[0]));
-        // if !ob.lits.contains(&clause_head!(self.cp, other).lit[0]) {
-        //     panic!(
-        //         "@subsume: the 1st literal of the other clause is ill-formed {} {:#}!",
-        //         cid2fmt(other),
-        //         ob
-        //     );
-        // }
         debug_assert!(ob.lits.contains(&clause!(self.cp, other).lit[1]));
-        // if !ob.lits.contains(&clause_head!(self.cp, other).lit[1]) {
-        //     panic!(
-        //         "@subsume: the 2nd literal of the other clause is ill-formed {} {:#}!",
-        //         cid2fmt(other),
-        //         ob
-        //     );
-        // }
         'next: for l in &cb.lits {
             for lo in &ob.lits {
                 if *l == *lo {
@@ -908,7 +834,6 @@ impl Solver {
                     debug_assert!((*ch).lits[0] != p);
                     // println!("unit {} elimanated {}", (*ch).lits[0].int(), p.int());
                     return true;
-                    // panic!("too short clause {} {:#} {:#}", cid2fmt(cid), *ch, *ch);
                 }
                 let new_lit = (*ch).lits[bi];
                 debug_assert_ne!(new_lit, p);
@@ -931,11 +856,6 @@ impl Solver {
                 watcher[new_lit.negate() as usize] = cix;
                 if (*ch).lits.len() == 1 {
                     debug_assert!((*ch).lit[1] != new_lit);
-                    // if (*ch).lit[1] == new_lit {
-                    //     panic!("aa");
-                    //     (*ch).lit.swap(0, 1);
-                    //     (*ch).next_watcher.swap(0, 1);
-                    // }
                     true
                 } else {
                     false

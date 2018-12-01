@@ -574,21 +574,6 @@ impl ClauseManagement for Solver {
                 v.reason = NULL_CLAUSE;
             }
         }
-        // for cb in &self.cp[ClauseKind::Removable as usize].body {
-        //     if cb.get_flag(ClauseFlag::Locked) {
-        //         panic!("why locked!? {:#}", cb);
-        //     }
-        // }
-        // for cb in &self.cp[ClauseKind::Permanent as usize].body {
-        //     if cb.get_flag(ClauseFlag::Locked) {
-        //         panic!("why locked!? {:#}", cb);
-        //     }
-        // }
-        // for cb in &self.cp[ClauseKind::Binclause as usize].body {
-        //     if cb.get_flag(ClauseFlag::Locked) {
-        //         panic!("why locked!? {:#}", cb);
-        //     }
-        // }
         if self.eliminator.use_elim
         // && self.stat[Stat::Simplification as usize] % 8 == 0
         // && self.eliminator.last_invocatiton < self.stat[Stat::Reduction as usize] as usize

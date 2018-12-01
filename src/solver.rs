@@ -444,7 +444,6 @@ impl SatSolver for Solver {
             self.progress("load");
         }
         // self.dump_cnf("test.cnf".to_string());
-        // panic!("aa");
         // self.config.use_sve = false;
         // self.eliminator.use_elim = false;
         self.stat[Stat::Simplification as usize] += 1;
@@ -572,17 +571,6 @@ impl CDCL for Solver {
                     let mut pre = &mut (*watcher)[p] as *mut usize;
                     'next_clause: while *pre != NULL_CLAUSE {
                         let ch = &mut (*head)[*pre] as *mut ClauseHead;
-                        // if (*ch).lit[0] != false_lit && (*ch).lit[1] != false_lit {
-                        //     let cb = &mut (*body)[*pre] as *mut ClauseBody;
-                        //     println!(
-                        //         "(false_lit {}) illegal watch literals cid: {} {} {}",
-                        //         false_lit.int(),
-                        //         cid2fmt(kind.id_from(*pre)),
-                        //         *ch,
-                        //         *cb
-                        //     );
-                        //     panic!("trap");
-                        // }
                         debug_assert!((*ch).lit[0] == false_lit || (*ch).lit[1] == false_lit);
                         let my_index = ((*ch).lit[0] != false_lit) as usize;
                         {
@@ -675,17 +663,6 @@ impl CDCL for Solver {
                     let mut pre = &mut (*watcher)[p] as *mut usize;
                     'next_clause: while *pre != NULL_CLAUSE {
                         let ch = &mut (*head)[*pre] as *mut ClauseHead;
-                        // if (*ch).lit[0] != false_lit && (*ch).lit[1] != false_lit {
-                        //     let cb = &mut (*body)[*pre] as *mut ClauseBody;
-                        //     println!(
-                        //         "(false_lit {}) illegal watch literals cid: {} {} {}",
-                        //         false_lit.int(),
-                        //         cid2fmt(kind.id_from(*pre)),
-                        //         *ch,
-                        //         *cb
-                        //     );
-                        //     panic!("trap");
-                        // }
                         debug_assert!((*ch).lit[0] == false_lit || (*ch).lit[1] == false_lit);
                         let my_index = ((*ch).lit[0] != false_lit) as usize;
                         // let cb = &mut (*body)[*pre] as *mut ClauseBody;
@@ -974,16 +951,6 @@ impl CDCL for Solver {
             // println!("analyze {}", p.int());
             unsafe {
                 let ch = clause_mut!(self.cp, cid) as *mut ClauseHead;
-                // if cid == NULL_CLAUSE {
-                //     let x = self.trail_lim[self.trail_lim.len() - 1];
-                //     panic!(
-                //         "analyze ran into NULL_CLAUSE Lit {} at level {}, trail {:?}",
-                //         p.int(),
-                //         self.decision_level(),
-                //         // self.vars[p.vi()],
-                //         vec2int(&self.trail[x..]),
-                //     );
-                // }
                 debug_assert_ne!(cid, NULL_CLAUSE);
                 if cid.to_kind() == (ClauseKind::Removable as usize) {
                     self.bump_cid(cid);
