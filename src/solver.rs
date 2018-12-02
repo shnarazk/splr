@@ -28,14 +28,12 @@ pub trait CDCL {
 pub const CO_LBD_BOUND: usize = 4;
 
 /// normal results returned by Solver
-#[derive(Debug)]
 pub enum Certificate {
     SAT(Vec<i32>),
     UNSAT(Vec<i32>), // FIXME: replace with DRAT
 }
 
 /// abnormal termination flags
-#[derive(Debug, Eq, PartialEq)]
 pub enum SolverException {
     StateUNSAT = 0,
     StateSAT,
@@ -53,7 +51,7 @@ pub enum SolverException {
 pub type SolverResult = Result<Certificate, SolverException>;
 
 /// stat index
-#[derive(Clone, Copy, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 pub enum Stat {
     Conflict = 0,       // the number of backjump
     Decision,           // the number of decision
@@ -68,7 +66,7 @@ pub enum Stat {
     EndOfStatIndex, // Don't use this dummy.
 }
 
-#[derive(Clone, Copy, Eq, PartialEq, Debug)]
+#[derive(Eq, PartialEq)]
 pub enum SearchStrategy {
     Generic,
     ChanSeok,
@@ -78,7 +76,6 @@ pub enum SearchStrategy {
 }
 
 /// is the collection of all variables.
-#[derive(Debug)]
 pub struct Solver {
     /// Configuration
     pub config: SolverConfiguration,

@@ -83,7 +83,6 @@ pub enum ClauseFlag {
 }
 
 /// partition of clauses
-#[derive(Debug)]
 pub struct ClausePartition {
     pub kind: ClauseKind,
     pub init_size: usize,
