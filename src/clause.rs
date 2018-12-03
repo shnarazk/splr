@@ -546,8 +546,7 @@ impl ClauseManagement for Solver {
             let eliminator = &mut self.eliminator as *mut Eliminator;
             let vars = &mut self.vars[..] as *mut [Var];
             for ck in ClauseKind::Liftedlit as usize ..= ClauseKind::Binclause as usize {
-                for ci in 1..self.cp[ck].head.len() {
-                    let ch = &mut self.cp[ck].head[ci];
+                for ch in &mut self.cp[ck].head[1..] {
                     if !ch.get_flag(ClauseFlag::Dead) && self.vars.satisfies(&ch.lits) {
                         debug_assert!(!ch.get_flag(ClauseFlag::Locked));
                         ch.set_flag(ClauseFlag::Dead, true);
