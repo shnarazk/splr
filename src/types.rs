@@ -61,6 +61,7 @@ pub trait LiteralEncoding {
 }
 
 impl LiteralEncoding for Lit {
+    #[inline(always)]
     fn vi(&self) -> VarId {
         (self >> 1) as VarId
     }
@@ -73,12 +74,15 @@ impl LiteralEncoding for Lit {
     }
     /// - positive Lit (= even u32) => LTRUE (= 1 as u8)
     /// - negative Lit (= odd u32)  => LFASE (= 0 as u8)
+    #[inline(always)]
     fn lbool(&self) -> Lbool {
         (self & 1 == 0) as Lbool
     }
+    #[inline(always)]
     fn positive(&self) -> bool {
         self & 1 == 0
     }
+    #[inline(always)]
     fn negate(&self) -> Lit {
         self ^ 1
     }
@@ -90,7 +94,8 @@ pub trait VarIdEncoding {
 }
 
 impl VarIdEncoding for VarId {
-    /// returns a positive literal if p == LTRUE.
+    /// returns a positive literal if p == LTRUE or BOTTOM.
+    #[inline(always)]
     fn lit(&self, p: Lbool) -> Lit {
         (*self as Lit) << 1 | ((p == LFALSE) as Lit)
     }
