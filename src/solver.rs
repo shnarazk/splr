@@ -379,8 +379,7 @@ impl Solver {
                         &mut self.cp[ClauseKind::Removable as usize] as *mut ClausePartition;
                     let permanents =
                         &mut self.cp[ClauseKind::Permanent as usize] as *mut ClausePartition;
-                    for ci in 1..(*learnts).head.len() {
-                        let ch = &mut (*learnts).head[ci];
+                    for ch in &mut (*learnts).head[1..] {
                         if ch.get_flag(ClauseFlag::Dead) {
                             continue;
                         }
