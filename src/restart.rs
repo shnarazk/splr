@@ -17,10 +17,10 @@ pub trait Restart {
 }
 
 /// for block restart based on average assigments: 1.40
-pub const R: f64 = 1.4;
+pub const R: f64 = 1.45;
 
 /// for force restart based on average LBD of newly generated clauses: 1.15
-pub const K: f64 = 0.8;
+pub const K: f64 = 0.75;
 
 const RESTART_PERIOD: u64 = 50;
 const RESET_EMA: u64 = 1000;
