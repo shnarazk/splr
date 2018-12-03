@@ -322,40 +322,26 @@ impl ClauseManagement for Solver {
         let a;
         {
             let c = clause_mut!(self.cp, cid);
-            // a = c.activity + self.cla_inc;
-            a = (c.activity + b) / 2.0;
+            a = c.activity + self.cla_inc;
+            // a = (c.activity + b) / 2.0;
             c.activity = a;
         }
-        for i in 1..self.cp[ClauseKind::Removable as usize].head.len() {
-            let c = &mut self.cp[ClauseKind::Removable as usize].head[i];
-            // if i == 121 {
-            //     println!("121 activity {} {:?}", c.activity, vec2int(&c.lits));
-            // }
-            if c.activity == 0.0 {
-                panic!(
-                    "zero activity {} {}",
-                    i,
-                    cid2fmt(ClauseKind::Removable.id_from(i))
-                );
-            }
-        }
-        if false && 1.0e20 < a {
+        // for i in 1..self.cp[ClauseKind::Removable as usize].head.len() {
+        //     let c = &mut self.cp[ClauseKind::Removable as usize].head[i];
+        //     if c.activity == 0.0 {
+        //         panic!(
+        //             "zero activity {} {}",
+        //             i,
+        //             cid2fmt(ClauseKind::Removable.id_from(i))
+        //         );
+        //     }
+        // }
+        if true && 1.0e20 < a {
             // for c in &mut self.cp[ClauseKind::Removable as usize].body[1..] {
             //     debug_assert!(0.0 < c.activity);
             //     c.activity *= 1.0e-20;
             // }
-            for i in 1..self.cp[ClauseKind::Removable as usize].head.len() {
-                let c = &mut self.cp[ClauseKind::Removable as usize].head[i];
-                if i == 121 {
-                    println!("121 activity {} {:?}", c.activity, vec2int(&c.lits));
-                }
-                if c.activity == 0.0 {
-                    panic!(
-                        "zero activity {} {}",
-                        i,
-                        cid2fmt(ClauseKind::Removable.id_from(i))
-                    );
-                }
+            for c in self.cp[ClauseKind::Removable as usize].head.iter_mut().skip(1) {
                 if 1.0e-300 < c.activity {
                     c.activity *= 1.0e-20;
                 }
