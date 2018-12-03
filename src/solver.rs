@@ -440,9 +440,8 @@ impl SatSolver for Solver {
         } else {
             self.progress("load");
         }
-        // self.dump_cnf("test.cnf".to_string());
-        // self.config.use_sve = false;
-        // self.eliminator.use_elim = false;
+        self.config.use_sve = false;
+        self.eliminator.use_elim = false;
         self.stat[Stat::Simplification as usize] += 1;
         match self.search() {
             _ if !self.ok => {

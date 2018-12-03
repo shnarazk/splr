@@ -253,7 +253,7 @@ impl Default for SolverConfiguration {
             ema_coeffs: (2 ^ 5, 2 ^ 15),
             restart_expansion: 1.15,
             restart_step: 100.0,
-            use_sve: true,
+            use_sve: false,
             use_tty: true,
         }
     }
