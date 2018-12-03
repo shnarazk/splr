@@ -34,7 +34,6 @@ pub const MAX_VAR_DECAY: f64 = 0.95;
 // const VAR_ACTIVITY_THRESHOLD: f64 = 1e100;
 
 /// Struct for a variable.
-#[derive(Debug)]
 pub struct Var {
     pub index: usize,
     pub assign: Lbool,
@@ -101,7 +100,6 @@ impl Satisfiability for [Var] {
 //     eliminator: Eliminator,
 // }
 
-#[derive(Debug)]
 pub enum VarOrder {
     ByActivity,
     ByOccurence,
@@ -112,9 +110,8 @@ pub enum VarOrder {
 /// - both fields has a fixed length. Don't use push and pop.
 /// - idxs[0] contains the number of alive elements
 ///   `indx` holds positions. So the unused field 0 can hold the last position as a special case.
-#[derive(Debug)]
 pub struct VarIdHeap {
-    order: VarOrder,
+    // order: VarOrder,
     pub heap: Vec<VarId>, // order : usize -> VarId
     idxs: Vec<usize>,     // VarId : -> order : usize
 }
@@ -201,7 +198,7 @@ impl VarOrdering for VarIdHeap {
 }
 
 impl VarIdHeap {
-    pub fn new(order: VarOrder, n: usize, init: usize) -> VarIdHeap {
+    pub fn new(n: usize, init: usize) -> VarIdHeap {
         let mut heap = Vec::with_capacity(n + 1);
         let mut idxs = Vec::with_capacity(n + 1);
         heap.push(0);
@@ -211,7 +208,7 @@ impl VarIdHeap {
             idxs.push(i);
         }
         idxs[0] = init;
-        VarIdHeap { order, heap, idxs }
+        VarIdHeap { heap, idxs }
     }
     fn percolate_up(&mut self, vars: &[Var], start: usize) -> () {
         let mut q = start;

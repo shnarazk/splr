@@ -3,7 +3,6 @@ use self::chrono::*;
 use std::fmt;
 use std::path::Path;
 
-#[derive(Debug)]
 pub struct Profile {
     pub start: self::chrono::DateTime<self::chrono::Utc>,
     pub target: String,

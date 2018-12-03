@@ -56,7 +56,6 @@ pub const CLAUSE_KINDS: [ClauseKind; 4] = [
 /// Clause Index, not ID because it's used only within a Vec<Clause>
 pub type ClauseIndex = usize;
 
-#[derive(Debug)]
 pub struct ClauseHead {
     /// The first two literals
     pub lit: [Lit; 2],
@@ -92,7 +91,7 @@ pub struct ClausePartition {
     pub watcher: Vec<ClauseIndex>,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub enum ClauseKind {
     Liftedlit,
     Removable,

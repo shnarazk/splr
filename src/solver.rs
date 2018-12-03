@@ -150,7 +150,7 @@ impl Solver {
             trail: Vec::with_capacity(nv),
             trail_lim: Vec::new(),
             q_head: 0,
-            var_order: VarIdHeap::new(VarOrder::ByActivity, nv, nv),
+            var_order: VarIdHeap::new(nv, nv),
             cp: [
                 ClausePartition::build(ClauseKind::Liftedlit, nv, 0),
                 ClausePartition::build(ClauseKind::Removable, nv, nc),
@@ -979,10 +979,10 @@ impl CDCL for Solver {
                         !self.vars[vi].eliminated,
                         format!("analyze assertion: an eliminated var {} occurs", vi)
                     );
-                    debug_assert!(
-                        self.vars[vi].assign != BOTTOM,
-                        format!("analyze assertion: unassigned var {:?}", self.vars[vi])
-                    );
+                    // debug_assert!(
+                    //     self.vars[vi].assign != BOTTOM,
+                    //     format!("analyze assertion: unassigned var {:?}", self.vars[vi])
+                    // );
                     self.bump_vi(vi);
                     if !self.an_seen[vi] && 0 < lvl {
                         self.an_seen[vi] = true;

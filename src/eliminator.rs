@@ -28,7 +28,6 @@ pub trait EliminatorIF {
 }
 
 /// Literal eliminator
-#[derive(Debug)]
 pub struct Eliminator {
     pub eliminated_vars: usize,
     pub use_elim: bool,
@@ -256,7 +255,7 @@ impl Solver {
                 self.cp[cid.to_kind()].touched[c0.negate() as usize] = true;
                 true
             } else {
-                println!("{:?}", self.vars[c0.vi()]);
+                // println!("{:?}", self.vars[c0.vi()]);
                 self.ok = false;
                 false
             }

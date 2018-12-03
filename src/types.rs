@@ -121,7 +121,6 @@ pub trait EmaKind {
 }
 
 /// Exponential Moving Average pair
-#[derive(Debug)]
 pub struct Ema2 {
     pub fast: f64,
     pub slow: f64,
@@ -160,7 +159,6 @@ impl EmaKind for Ema2 {
     }
 }
 
-#[derive(Debug)]
 pub struct Ema(pub f64, f64, f64);
 
 /// Exponential Moving Average w/ a calibrator
@@ -184,7 +182,6 @@ impl EmaKind for Ema {
 }
 
 /// Exponential Moving Average w/o a calibrator
-#[derive(Debug)]
 pub struct Ema_(pub f64, f64);
 
 impl Ema_ {
@@ -207,7 +204,6 @@ impl EmaKind for Ema_ {
 }
 
 /// data about a problem.
-#[derive(Debug)]
 pub struct CNFDescription {
     pub num_of_variables: usize,
     pub num_of_clauses: usize,
@@ -225,7 +221,6 @@ impl fmt::Display for CNFDescription {
     }
 }
 
-#[derive(Debug)]
 /// `Solver`'s parameters; random decision rate was dropped.
 pub struct SolverConfiguration {
     /// decay rate for variable activity
