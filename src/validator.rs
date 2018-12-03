@@ -1,4 +1,4 @@
-use crate::clause::CLAUSE_KINDS;
+use crate::clause::ClauseKind;
 use crate::solver::*;
 use crate::types::*;
 use crate::var::Satisfiability;
@@ -13,9 +13,9 @@ impl Solver {
     /// returns None if the given assignment is a model of a problem.
     /// Otherwise returns a clause which is not satisfiable.
     pub fn validate(&self) -> Option<Vec<i32>> {
-        for ck in &CLAUSE_KINDS {
-            for ci in 1..self.cp[*ck as usize].head.len() {
-                let ch = &self.cp[*ck as usize].head[ci];
+        for ck in ClauseKind::Liftedlit as usize ..= ClauseKind::Binclause as usize {
+            for ci in 1..self.cp[ck].head.len() {
+                let ch = &self.cp[ck].head[ci];
                 if !self.vars.satisfies(&ch.lits) {
                     let mut v = Vec::new();
                     for l in &ch.lits {

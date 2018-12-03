@@ -46,13 +46,6 @@ pub trait ConsistencyCheck {
 
 const DB_INC_SIZE: usize = 200;
 
-pub const CLAUSE_KINDS: [ClauseKind; 4] = [
-    ClauseKind::Liftedlit,
-    ClauseKind::Removable,
-    ClauseKind::Permanent,
-    ClauseKind::Binclause,
-];
-
 /// Clause Index, not ID because it's used only within a Vec<Clause>
 pub type ClauseIndex = usize;
 
@@ -566,15 +559,15 @@ impl ClauseManagement for Solver {
         unsafe {
             let eliminator = &mut self.eliminator as *mut Eliminator;
             let vars = &mut self.vars[..] as *mut [Var];
-            for ck in &CLAUSE_KINDS {
-                for ci in 1..self.cp[*ck as usize].head.len() {
-                    let ch = &mut self.cp[*ck as usize].head[ci];
+            for ck in ClauseKind::Liftedlit as usize ..= ClauseKind::Binclause as usize {
+                for ci in 1..self.cp[ck].head.len() {
+                    let ch = &mut self.cp[ck].head[ci];
                     if !ch.get_flag(ClauseFlag::Dead) && self.vars.satisfies(&ch.lits) {
                         debug_assert!(!ch.get_flag(ClauseFlag::Locked));
                         ch.set_flag(ClauseFlag::Dead, true);
                         debug_assert!(ch.lit[0] != 0 && ch.lit[1] != 0);
-                        self.cp[*ck as usize].touched[ch.lit[0].negate() as usize] = true;
-                        self.cp[*ck as usize].touched[ch.lit[1].negate() as usize] = true;
+                        self.cp[ck].touched[ch.lit[0].negate() as usize] = true;
+                        self.cp[ck].touched[ch.lit[1].negate() as usize] = true;
                         if (*eliminator).use_elim {
                             for l in &ch.lits {
                                 let v = &mut (*vars)[l.vi()];
@@ -585,7 +578,7 @@ impl ClauseManagement for Solver {
                         }
                     }
                 }
-                self.cp[*ck as usize].garbage_collect(&mut self.vars, &mut self.eliminator);
+                self.cp[ck].garbage_collect(&mut self.vars, &mut self.eliminator);
             }
         }
         self.stat[Stat::Simplification as usize] += 1;
