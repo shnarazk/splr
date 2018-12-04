@@ -14,8 +14,7 @@ impl Solver {
     /// Otherwise returns a clause which is not satisfiable.
     pub fn validate(&self) -> Option<Vec<i32>> {
         for ck in ClauseKind::Liftedlit as usize ..= ClauseKind::Binclause as usize {
-            for ci in 1..self.cp[ck].head.len() {
-                let ch = &self.cp[ck].head[ci];
+            for ch in &self.cp[ck].head[1..] {
                 if !self.vars.satisfies(&ch.lits) {
                     let mut v = Vec::new();
                     for l in &ch.lits {

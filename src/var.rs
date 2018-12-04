@@ -3,7 +3,7 @@ use crate::solver::{Solver, Stat};
 use crate::types::*;
 use std::fmt;
 
-// for Solver
+/// For Solver
 pub trait VarManagement {
     fn select_var(&mut self) -> VarId;
     fn bump_vi(&mut self, vi: VarId) -> ();
@@ -11,13 +11,13 @@ pub trait VarManagement {
     fn rebuild_heap(&mut self) -> ();
 }
 
-/// for [Var]
+/// For [Var]
 pub trait Satisfiability {
     fn assigned(&self, l: Lit) -> Lbool;
     fn satisfies(&self, c: &[Lit]) -> bool;
 }
 
-/// for VarIdHeap
+/// For VarIdHeap
 pub trait VarOrdering {
     fn get_root(&mut self, vars: &[Var]) -> VarId;
     fn reset(&mut self) -> ();
@@ -41,9 +41,9 @@ pub struct Var {
     pub reason: ClauseId,
     pub level: usize,
     pub activity: f64,
-    /// for elimination
+    /// For elimination
     pub touched: bool,
-    /// for elimination
+    /// For elimination
     pub eliminated: bool,
     pub pos_occurs: Vec<ClauseId>,
     pub neg_occurs: Vec<ClauseId>,
@@ -332,9 +332,9 @@ impl VarManagement for Solver {
     fn rebuild_heap(&mut self) -> () {
         debug_assert_eq!(self.decision_level(), 0);
         self.var_order.reset();
-        for vi in 1..self.vars.len() {
-            if self.vars[vi].assign == BOTTOM && !self.vars[vi].eliminated {
-                self.var_order.insert(&self.vars, vi);
+        for v in &self.vars[1..] {
+            if v.assign == BOTTOM && !v.eliminated {
+                self.var_order.insert(&self.vars, v.index);
             }
         }
     }

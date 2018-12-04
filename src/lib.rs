@@ -5,7 +5,7 @@ mod macros;
 /// Clause
 pub mod clause;
 pub mod eliminator;
-/// for progress report
+/// used in progress report
 pub mod profiler;
 /// Implementation on solver restart.
 pub mod restart;

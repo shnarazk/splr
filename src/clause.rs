@@ -9,7 +9,7 @@ use std::fmt;
 use std::fs::File;
 use std::io::{BufWriter, Write};
 
-/// for ClausePartition
+/// For ClausePartition
 pub trait GC {
     fn garbage_collect(&mut self, vars: &mut [Var], elimanator: &mut Eliminator) -> ();
     fn new_clause(&mut self, v: &[Lit], rank: usize, locked: bool) -> ClauseId;
@@ -17,7 +17,7 @@ pub trait GC {
     fn move_to(&mut self, list: &mut ClauseId, ci: ClauseIndex, index: usize) -> ClauseIndex;
 }
 
-/// for usize
+/// For usize
 pub trait ClauseIdIndexEncoding {
     fn to_id(&self) -> ClauseId;
     fn to_index(&self) -> ClauseIndex;
@@ -25,7 +25,7 @@ pub trait ClauseIdIndexEncoding {
     fn is(&self, kind: ClauseKind, ix: ClauseIndex) -> bool;
 }
 
-/// for Solver
+/// For Solver
 pub trait ClauseManagement {
     fn bump_cid(&mut self, ci: ClauseId) -> ();
     fn decay_cla_activity(&mut self) -> ();
@@ -319,13 +319,10 @@ impl ClauseManagement for Solver {
     fn bump_cid(&mut self, cid: ClauseId) -> () {
         debug_assert_ne!(cid, 0);
         let b = self.stat[Stat::Conflict as usize] as f64;
-        let a;
-        {
-            let c = clause_mut!(self.cp, cid);
-            a = c.activity + self.cla_inc;
-            // a = (c.activity + b) / 2.0;
-            c.activity = a;
-        }
+        let c = clause_mut!(self.cp, cid);
+        let a = c.activity + self.cla_inc;
+        // a = (c.activity + b) / 2.0;
+        c.activity = a;
         // for i in 1..self.cp[ClauseKind::Removable as usize].head.len() {
         //     let c = &mut self.cp[ClauseKind::Removable as usize].head[i];
         //     if c.activity == 0.0 {
@@ -440,20 +437,14 @@ impl ClauseManagement for Solver {
         //         clause_body!(self.cp, cid)
         //     );
         // }
-        {
-            clause_mut!(self.cp, cid).set_flag(ClauseFlag::Dead, true);
-            let w0;
-            let w1;
-            {
-                let ch = clause!(self.cp, cid);
-                w0 = ch.lit[0].negate();
-                w1 = ch.lit[1].negate();
-            }
-            debug_assert!(w0 != 0 && w1 != 0);
-            debug_assert_ne!(w0, w1);
-            self.cp[cid.to_kind()].touched[w0 as usize] = true;
-            self.cp[cid.to_kind()].touched[w1 as usize] = true;
-        }
+        clause_mut!(self.cp, cid).set_flag(ClauseFlag::Dead, true);
+        let ch = clause!(self.cp, cid);
+        let w0 = ch.lit[0].negate();
+        let w1 = ch.lit[1].negate();
+        debug_assert!(w0 != 0 && w1 != 0);
+        debug_assert_ne!(w0, w1);
+        self.cp[cid.to_kind()].touched[w0 as usize] = true;
+        self.cp[cid.to_kind()].touched[w1 as usize] = true;
     }
 
     fn change_clause_kind(&mut self, cid: ClauseId, kind: ClauseKind) -> () {
@@ -461,17 +452,15 @@ impl ClauseManagement for Solver {
         let rank;
         let locked;
         let mut vec = Vec::new();
-        {
-            let cb = clause!(self.cp, cid);
-            if cb.get_flag(ClauseFlag::Dead) {
-                return;
-            }
-            for x in &cb.lits {
-                vec.push(*x);
-            }
-            rank = cb.rank;
-            locked = cb.get_flag(ClauseFlag::Locked);
+        let cb = clause!(self.cp, cid);
+        if cb.get_flag(ClauseFlag::Dead) {
+            return;
         }
+        for x in &cb.lits {
+            vec.push(*x);
+        }
+        rank = cb.rank;
+        locked = cb.get_flag(ClauseFlag::Locked);
         self.cp[kind as usize].new_clause(&vec, rank, locked);
         self.remove_clause(cid);
         if self.decision_level() != 0 {
@@ -481,39 +470,37 @@ impl ClauseManagement for Solver {
 
     fn reduce(&mut self) -> () {
         self.cp[ClauseKind::Removable as usize].reset_lbd(&self.vars, &mut self.lbd_temp[..]);
-        {
-            let ClausePartition {
-                ref mut head,
-                ref mut touched,
-                ref mut perm,
-                ..
-            } = &mut self.cp[ClauseKind::Removable as usize];
-            let mut nc = 1;
-            for (i, b) in head.iter().enumerate().skip(1) {
-                if !b.get_flag(ClauseFlag::Dead) && !b.get_flag(ClauseFlag::Locked) {
-                    perm[nc] = i;
-                    nc += 1;
-                }
+        let ClausePartition {
+            ref mut head,
+            ref mut touched,
+            ref mut perm,
+            ..
+        } = &mut self.cp[ClauseKind::Removable as usize];
+        let mut nc = 1;
+        for (i, b) in head.iter().enumerate().skip(1) {
+            if !b.get_flag(ClauseFlag::Dead) && !b.get_flag(ClauseFlag::Locked) {
+                perm[nc] = i;
+                nc += 1;
             }
-            perm[1..nc].sort_by(|&a, &b| head[a].cmp(&head[b]));
-            let keep = nc / 2;
-            if head[perm[keep]].rank <= 5 {
-                self.next_reduction += 1000;
-            };
-            for i in keep..nc {
-                let ch = &mut head[perm[i]];
-                if ch.get_flag(ClauseFlag::JustUsed) {
-                    ch.set_flag(ClauseFlag::JustUsed, false)
-                } else {
-                    ch.set_flag(ClauseFlag::Dead, true);
-                    debug_assert!(!ch.get_flag(ClauseFlag::Locked));
-                    // if cb.get_flag(ClauseFlag::Locked) {
-                    //     panic!("clause is locked");
-                    // }
-                    debug_assert!(ch.lit[0] != 0 && ch.lit[1] != 0);
-                    touched[ch.lit[0].negate() as usize] = true;
-                    touched[ch.lit[1].negate() as usize] = true;
-                }
+        }
+        perm[1..nc].sort_by(|&a, &b| head[a].cmp(&head[b]));
+        let keep = nc / 2;
+        if head[perm[keep]].rank <= 5 {
+            self.next_reduction += 1000;
+        };
+        for i in keep..nc {
+            let ch = &mut head[perm[i]];
+            if ch.get_flag(ClauseFlag::JustUsed) {
+                ch.set_flag(ClauseFlag::JustUsed, false)
+            } else {
+                ch.set_flag(ClauseFlag::Dead, true);
+                debug_assert!(!ch.get_flag(ClauseFlag::Locked));
+                // if cb.get_flag(ClauseFlag::Locked) {
+                //     panic!("clause is locked");
+                // }
+                debug_assert!(ch.lit[0] != 0 && ch.lit[1] != 0);
+                touched[ch.lit[0].negate() as usize] = true;
+                touched[ch.lit[1].negate() as usize] = true;
             }
         }
         self.cp[ClauseKind::Removable as usize]

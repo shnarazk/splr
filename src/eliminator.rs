@@ -10,7 +10,7 @@ use crate::types::*;
 use crate::var::Var;
 use std::fmt;
 
-// for Solver
+/// For Solver
 pub trait ClauseElimination {
     fn eliminator_register_clause(&mut self, cid: ClauseId, rank: usize, ignorable: bool) -> ();
     fn eliminator_enqueue_clause(&mut self, cid: ClauseId) -> ();
@@ -19,7 +19,7 @@ pub trait ClauseElimination {
     fn check_eliminator(&self) -> bool;
 }
 
-// for Eliminator
+/// For Eliminator
 pub trait EliminatorIF {
     fn new(use_elim: bool, nv: usize) -> Eliminator;
     fn enqueue_var(&mut self, v: &mut Var) -> ();

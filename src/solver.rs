@@ -691,7 +691,7 @@ impl CDCL for Solver {
                                     (*ch).lit[my_index] = *lk;
                                     debug_assert!((*ch).lits[1] == false_lit);
                                     (*ch).lits[1] = *lk;
-                                    (*ch).lits[k] = false_lit; // Don't move this above (needed by enumerate)
+                                    (*ch).lits[k] = false_lit;
                                     continue 'next_clause;
                                 }
                             }
@@ -703,7 +703,6 @@ impl CDCL for Solver {
                                 let dl = trail_lim.len();
                                 debug_assert!(dl == 0);
                                 let other = (*ch).lits[0];
-                                // println!("unchecked_enqueue embedded into propagate {}", other.int());
                                 let v = &mut vars[other.vi()];
                                 debug_assert!(v.assign == other.lbool() || v.assign == BOTTOM);
                                 v.assign = other.lbool();
@@ -745,15 +744,6 @@ impl CDCL for Solver {
                     return true;
                 }
                 // DYNAMIC FORCING RESTART
-                // if self.lbd_queue.is_full() && false {
-                //     println!("DFR queue {:>4.2}/{:>4.2} = {:4.2} < {:>4.2} => {}",
-                //              (self.stat[Stat::SumLBD as usize] as f64),
-                //              (self.stat[Stat::Conflict as usize] as f64),
-                //              (self.stat[Stat::SumLBD as usize] as f64) / (self.stat[Stat::Conflict as usize] as f64),
-                //              self.lbd_queue.average() * K,
-                //              (self.stat[Stat::SumLBD as usize] as f64) / (self.stat[Stat::Conflict as usize] as f64) < self.lbd_queue.average() * K,
-                //     );
-                // }
                 if self.lbd_queue.is_full()
                     && (self.stat[Stat::SumLBD as usize] as f64)
                         / (self.stat[Stat::Conflict as usize] as f64)
@@ -864,7 +854,8 @@ impl CDCL for Solver {
                         ((conflicts as f64) / (self.next_reduction as f64)) as usize + 1;
                     self.reduce();
                 }
-                // Since the conflict path pushes a new literal to trail, we don't need to pick up a literal here.
+                // Since the conflict path pushes a new literal to trail,
+                // we don't need to pick up a literal here.
             }
         }
     }

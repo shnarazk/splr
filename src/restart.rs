@@ -3,23 +3,23 @@ use crate::solver::{Solver, Stat, CDCL};
 use crate::types::*;
 use std::collections::VecDeque;
 
-// for VecDeque<usize>
+/// For VecDeque<usize>
 pub trait QueueOperations {
     fn average(&self) -> f64;
     fn enqueue(&mut self, x: usize) -> bool;
     fn is_full(&self) -> bool;
 }
 
-// for Solver
+/// For Solver
 pub trait Restart {
     fn block_restart(&mut self, lbd: usize, clv: usize, blv: usize, nas: usize) -> ();
     fn force_restart(&mut self) -> ();
 }
 
-/// for block restart based on average assigments: 1.40
+/// For block restart based on average assigments: 1.40
 pub const R: f64 = 1.45;
 
-/// for force restart based on average LBD of newly generated clauses: 1.15
+/// For force restart based on average LBD of newly generated clauses: 1.15
 pub const K: f64 = 0.75;
 
 const RESTART_PERIOD: u64 = 50;
