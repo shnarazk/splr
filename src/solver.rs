@@ -98,6 +98,7 @@ pub struct Solver {
     pub next_reduction: usize,
     pub cur_restart: usize,
     pub num_solved_vars: usize,
+    pub luby_restart: bool,
     /// Variable Elimination
     pub eliminator: Eliminator,
     /// Working memory
@@ -161,6 +162,7 @@ impl Solver {
             next_reduction: 1000,
             cur_restart: 1,
             num_solved_vars: 0,
+            luby_restart: false,
             eliminator: Eliminator::new(sve, nv),
             ok: true,
             model: vec![BOTTOM; nv + 1],
@@ -369,36 +371,66 @@ impl Solver {
             self.ema_asg.reset();
             self.ema_lbd.reset();
             // conflictsRestarts = 0;
-            if self.strategy == Some(SearchStrategy::ChanSeok) {
-                // TODO
-                // move some clauses with good lbd (col_lbd_bound) to Permanent
-                // 1. cp[ClausePartition::Permanent]attach(clause);
-                // 2. clause.set_flag(ClauseFlag::Dead);
-                unsafe {
-                    let learnts =
-                        &mut self.cp[ClauseKind::Removable as usize] as *mut ClausePartition;
-                    let permanents =
-                        &mut self.cp[ClauseKind::Permanent as usize] as *mut ClausePartition;
-                    for ch in &mut (*learnts).head[1..] {
-                        if ch.get_flag(ClauseFlag::Dead) {
-                            continue;
+            match self.strategy {
+                Some(SearchStrategy::ChanSeok) => {
+                    // TODO
+                    // move some clauses with good lbd (col_lbd_bound) to Permanent
+                    // 1. cp[ClausePartition::Permanent]attach(clause);
+                    // 2. clause.set_flag(ClauseFlag::Dead);
+                    unsafe {
+                        let learnts =
+                            &mut self.cp[ClauseKind::Removable as usize] as *mut ClausePartition;
+                        let permanents =
+                            &mut self.cp[ClauseKind::Permanent as usize] as *mut ClausePartition;
+                        for ch in &mut (*learnts).head[1..] {
+                            if ch.get_flag(ClauseFlag::Dead) {
+                                continue;
+                            }
+                            if true || ch.rank <= CO_LBD_BOUND {
+                                // ch.lits.insert(0, ch.lit[0]);
+                                (*learnts).touched[ch.lit[0].negate() as usize] = true;
+                                // ch.lits.insert(1, ch.lit[1]);
+                                (*learnts).touched[ch.lit[1].negate() as usize] = true;
+                                (*permanents).new_clause(
+                                    &ch.lits,
+                                    ch.rank,
+                                    ch.get_flag(ClauseFlag::Locked),
+                                );
+                                ch.set_flag(ClauseFlag::Dead, true);
+                            }
                         }
-                        if ch.rank < CO_LBD_BOUND {
-                            // ch.lits.insert(0, ch.lit[0]);
-                            (*learnts).touched[ch.lit[0].negate() as usize] = true;
-                            // ch.lits.insert(1, ch.lit[1]);
-                            (*learnts).touched[ch.lit[1].negate() as usize] = true;
-                            (*permanents).new_clause(
-                                &ch.lits,
-                                ch.rank,
-                                ch.get_flag(ClauseFlag::Locked),
-                            );
-                            ch.set_flag(ClauseFlag::Dead, true);
-                        }
+                        (*learnts).garbage_collect(&mut self.vars, &mut self.eliminator);
                     }
-                    (*learnts).garbage_collect(&mut self.vars, &mut self.eliminator);
                 }
-            }
+                Some(SearchStrategy::HighSuccesive) => {
+                    // coLBDBound = 3;
+                    // firstReduceDB = 30000;
+                    self.var_decay = 0.99;
+                    // max_var_decay = 0.99;
+                    // randomize_on_restarts = 1;
+                    // adjusted = true;
+
+                }
+                Some(SearchStrategy::LowSuccesive) => {
+                    // This path needs Luby
+                    self.luby_restart = true;
+                    // luby_restart_factor = 100;
+                    self.var_decay = 0.999;
+                    // max_var_decay = 0.999;
+                    // adjusted = true;
+                }
+                Some(SearchStrategy::ManyGlues) => {
+                    self.var_decay = 0.91;
+                    // max_var_decay = 0.91;
+                    // adjusted = true;
+                }
+                Some(SearchStrategy::Generic) => {
+                    // ??
+                }
+                None => {
+                    //
+                }
+            }                                        
         }
         if re_init {
             // make all claueses garbage

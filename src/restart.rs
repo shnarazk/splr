@@ -79,3 +79,32 @@ impl Restart for Solver {
         }
     }
 }
+
+pub fn luby(y: f64, mut x: usize) -> f64 {
+    // Find the finite subsequence that contains index 'x', and the
+    // size of that subsequence:
+    let mut size: usize = 1;
+    let mut seq: usize = 0;
+    // for(size = 1, seq = 0; size < x + 1; seq++, size = 2 * size + 1);
+    // while(size - 1 != x) {
+    //     size = (size - 1) >> 1;
+    //     seq--;
+    //     x = x % size;
+    // }
+    // return pow(y, seq);
+    while size < x + 1 {
+        seq += 1;
+        size = 2 * size + 1;
+    }
+    // while(size - 1 != x) {
+    //     size = (size - 1) >> 1;
+    //     seq--;
+    //     x = x % size;
+    // }
+    while size -1 != x {
+        size = (size - 1) >> 1;
+        seq -= 1;
+        x %= size;
+    }
+    return y.powf(seq as f64);
+}
