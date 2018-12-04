@@ -1,4 +1,4 @@
-extern crate splr;
+// SAT solver for Propositional Logic in Rust
 use splr::solver::{Certificate, SatSolver, Solver};
 use std::env;
 use std::fs::File;

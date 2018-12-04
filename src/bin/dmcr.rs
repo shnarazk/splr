@@ -1,6 +1,5 @@
 // DIMACS Model Checker in Rust
 #![allow(unused_imports)]
-extern crate splr;
 use splr::solver::{SatSolver, Solver};
 use splr::types::*;
 use splr::validator::*;
