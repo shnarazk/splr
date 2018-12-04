@@ -350,7 +350,7 @@ impl Solver {
         let mut re_init = false;
         let decpc =
             self.stat[Stat::Decision as usize] as f64 / self.stat[Stat::Conflict as usize] as f64;
-        if decpc <= 1.2 && self.strategy == Some(SearchStrategy::ChanSeok) {
+        if decpc <= 1.2 {
             self.strategy = Some(SearchStrategy::ChanSeok);
             let _glureduce = true;
             self.first_reduction = 2000;
