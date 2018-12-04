@@ -892,26 +892,24 @@ impl CDCL for Solver {
         let val = self.vars[l.vi()].assign;
         let dl = self.decision_level();
         if val == BOTTOM {
-            {
-                let v = &mut self.vars[l.vi()];
-                debug_assert!(!v.eliminated);
-                v.assign = sig;
-                // if dl == 0 && cid != NULL_CLAUSE {
-                //     println!("enqueue {}", cid2fmt(cid));
+            let v = &mut self.vars[l.vi()];
+            debug_assert!(!v.eliminated);
+            v.assign = sig;
+            // if dl == 0 && cid != NULL_CLAUSE {
+            //     println!("enqueue {}", cid2fmt(cid));
+            // }
+            v.reason = cid;
+            if dl == 0 {
+                // if !v.enqueued {
+                //     self.eliminator.var_queue.push(l.vi());
+                //     v.enqueued = true;
                 // }
-                v.reason = cid;
-                if dl == 0 {
-                    // if !v.enqueued {
-                    //     self.eliminator.var_queue.push(l.vi());
-                    //     v.enqueued = true;
-                    // }
-                    v.reason = NULL_CLAUSE;
-                    v.activity = 0.0;
-                }
-                v.level = dl;
-                if cid != NULL_CLAUSE {
-                    clause_mut!(self.cp, cid).set_flag(ClauseFlag::Locked, true);
-                }
+                v.reason = NULL_CLAUSE;
+                v.activity = 0.0;
+            }
+            v.level = dl;
+            if cid != NULL_CLAUSE {
+                clause_mut!(self.cp, cid).set_flag(ClauseFlag::Locked, true);
             }
             if dl == 0 {
                 self.var_order.remove(&self.vars, l.vi());
@@ -997,13 +995,11 @@ impl CDCL for Solver {
                     ti -= 1;
                 }
                 p = self.trail[ti];
-                {
-                    let next_vi = p.vi();
-                    cid = self.vars[next_vi].reason;
-                    // println!("{} にフラグが立っている。そのpath数は{}, \
-                    //           そのreason{}を探索", next_vi, path_cnt - 1, cid2fmt(cid));
-                    self.an_seen[next_vi] = false;
-                }
+                let next_vi = p.vi();
+                cid = self.vars[next_vi].reason;
+                // println!("{} にフラグが立っている。そのpath数は{}, \
+                //           そのreason{}を探索", next_vi, path_cnt - 1, cid2fmt(cid));
+                self.an_seen[next_vi] = false;
                 path_cnt -= 1;
                 if path_cnt <= 0 {
                     break;
@@ -1023,15 +1019,13 @@ impl CDCL for Solver {
         self.an_to_clear.clear();
         self.an_to_clear.push(p.negate());
         let n = self.an_learnt_lits.len();
-        {
-            self.an_level_map_key += 1;
-            if 10_000_000 < self.an_level_map_key {
-                self.an_level_map_key = 1;
-            }
-            for l in &self.an_learnt_lits[1..] {
-                self.an_to_clear.push(*l);
-                self.an_level_map[self.vars[l.vi()].level] = self.an_level_map_key;
-            }
+        self.an_level_map_key += 1;
+        if 10_000_000 < self.an_level_map_key {
+            self.an_level_map_key = 1;
+        }
+        for l in &self.an_learnt_lits[1..] {
+            self.an_to_clear.push(*l);
+            self.an_level_map[self.vars[l.vi()].level] = self.an_level_map_key;
         }
         let mut j = 1;
         for i in 1..n {
@@ -1191,14 +1185,12 @@ impl Solver {
             "Null CLAUSE is used for uncheck_enqueue"
         );
         let dl = self.decision_level();
-        {
-            let v = &mut self.vars[l.vi()];
-            debug_assert!(!v.eliminated);
-            debug_assert!(v.assign == l.lbool() || v.assign == BOTTOM);
-            v.assign = l.lbool();
-            v.level = dl;
-            v.reason = cid;
-        }
+        let v = &mut self.vars[l.vi()];
+        debug_assert!(!v.eliminated);
+        debug_assert!(v.assign == l.lbool() || v.assign == BOTTOM);
+        v.assign = l.lbool();
+        v.level = dl;
+        v.reason = cid;
         if dl == 0 {
             self.eliminator_enqueue_var(l.vi());
             // self.var_order.remove(&self.vars, l.vi());
@@ -1212,14 +1204,12 @@ impl Solver {
         // println!("uncheck_assume {}", l.int());
         self.trail_lim.push(self.trail.len());
         let dl = self.decision_level();
-        {
-            let v = &mut self.vars[l.vi()];
-            debug_assert!(!v.eliminated);
-            debug_assert!(v.assign == l.lbool() || v.assign == BOTTOM);
-            v.assign = l.lbool();
-            v.level = dl;
-            v.reason = NULL_CLAUSE;
-        }
+        let v = &mut self.vars[l.vi()];
+        debug_assert!(!v.eliminated);
+        debug_assert!(v.assign == l.lbool() || v.assign == BOTTOM);
+        v.assign = l.lbool();
+        v.level = dl;
+        v.reason = NULL_CLAUSE;
         if dl == 0 {
             self.eliminator_enqueue_var(l.vi());
         }
