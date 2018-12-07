@@ -1,9 +1,9 @@
 use crate::clause::{ClauseManagement, GC, *};
 use crate::eliminator::{ClauseElimination, Eliminator, EliminatorIF};
 use crate::profiler::*;
-use crate::restart::{QueueOperations, K, R};
+use crate::restart::{QueueOperations, K, R, luby};
 use crate::types::*;
-use crate::var::{VarOrdering, MAX_VAR_DECAY, *};
+use crate::var::{VarOrdering, *};
 use std::cmp::max;
 use std::collections::VecDeque;
 use std::fs;
@@ -83,6 +83,7 @@ pub struct Solver {
     pub cla_inc: f64,
     pub var_inc: f64,
     pub var_decay: f64,
+    pub var_decay_max: f64,
     pub root_level: usize,
     pub strategy: Option<SearchStrategy>,
     /// Variable Assignment Management
@@ -99,6 +100,10 @@ pub struct Solver {
     pub cur_restart: usize,
     pub num_solved_vars: usize,
     pub luby_restart: bool,
+    pub luby_restart_num_conflict: f64,
+    pub luby_restart_inc: f64,
+    pub luby_current_restarts: usize,
+    pub luby_restart_factor: f64,
     /// Variable Elimination
     pub eliminator: Eliminator,
     /// Working memory
@@ -136,7 +141,6 @@ impl Solver {
         let path = &cnf.pathname;
         let (_fe, se) = cfg.ema_coeffs;
         let re = cfg.restart_expansion;
-        let cdr = cfg.clause_decay_rate;
         let vdr = cfg.variable_decay_rate;
         let sve = cfg.use_sve;
         Solver {
@@ -144,7 +148,8 @@ impl Solver {
             num_vars: nv,
             cla_inc: 1.0,
             var_inc: vdr,
-            var_decay: cdr,
+            var_decay: VAR_DECAY,
+            var_decay_max: MAX_VAR_DECAY,
             root_level: 0,
             strategy: None,
             vars: Var::new_vars(nv),
@@ -163,6 +168,10 @@ impl Solver {
             cur_restart: 1,
             num_solved_vars: 0,
             luby_restart: false,
+            luby_restart_num_conflict: 0.0,
+            luby_restart_inc: 2.0,
+            luby_current_restarts: 0,
+            luby_restart_factor: 100.0,
             eliminator: Eliminator::new(sve, nv),
             ok: true,
             model: vec![BOTTOM; nv + 1],
@@ -406,7 +415,7 @@ impl Solver {
                     // coLBDBound = 3;
                     // firstReduceDB = 30000;
                     self.var_decay = 0.99;
-                    // max_var_decay = 0.99;
+                    self.var_decay_max = 0.99;
                     // randomize_on_restarts = 1;
                     // adjusted = true;
 
@@ -416,12 +425,12 @@ impl Solver {
                     self.luby_restart = true;
                     // luby_restart_factor = 100;
                     self.var_decay = 0.999;
-                    // max_var_decay = 0.999;
+                    self.var_decay_max = 0.999;
                     // adjusted = true;
                 }
                 Some(SearchStrategy::ManyGlues) => {
                     self.var_decay = 0.91;
-                    // max_var_decay = 0.91;
+                    self.var_decay_max = 0.91;
                     // adjusted = true;
                 }
                 Some(SearchStrategy::Generic) => {
@@ -447,6 +456,7 @@ impl SatSolver for Solver {
         // s.root_level = 0;
         self.num_solved_vars = self.trail.len();
         self.progress("");
+        // self.eliminator.use_elim = true;
         if self.eliminator.use_elim {
             for v in &mut self.vars[1..] {
                 if v.neg_occurs.len() == 0 && 0 < v.pos_occurs.len() && v.assign == BOTTOM {
@@ -757,6 +767,10 @@ impl CDCL for Solver {
 
     /// main loop
     fn search(&mut self) -> bool {
+        let mut conflict_c = 0.0;  // for Luby restart
+        if self.luby_restart {
+            self.luby_restart_num_conflict = luby(self.luby_restart_inc, self.luby_current_restarts) * self.luby_restart_factor;
+        }
         let root_lv = self.root_level;
         loop {
             self.stat[Stat::Propagation as usize] += 1;
@@ -776,14 +790,23 @@ impl CDCL for Solver {
                     return true;
                 }
                 // DYNAMIC FORCING RESTART
-                if self.lbd_queue.is_full()
-                    && (self.stat[Stat::SumLBD as usize] as f64)
-                        / (self.stat[Stat::Conflict as usize] as f64)
-                        < self.lbd_queue.average() * K
+                if (self.luby_restart && self.luby_restart_num_conflict <= conflict_c)
+                    || (!self.luby_restart
+                        && self.lbd_queue.is_full()
+                        && ((self.stat[Stat::SumLBD as usize] as f64)
+                            / (self.stat[Stat::Conflict as usize] as f64)
+                            < self.lbd_queue.average() * K))
                 {
                     self.stat[Stat::Restart as usize] += 1;
                     self.lbd_queue.clear();
                     self.cancel_until(0);
+
+                    if self.luby_restart {
+                        conflict_c = 0.0;
+                        self.luby_current_restarts += 1;
+                        self.luby_restart_num_conflict = luby(self.luby_restart_inc, self.luby_current_restarts) * self.luby_restart_factor;
+                        // println!("luby restart {}", self.luby_restart_num_conflict);
+                    }
                     // return
                 }
                 if self.decision_level() == 0 {
@@ -809,13 +832,15 @@ impl CDCL for Solver {
                     self.stat[Stat::Decision as usize] += 1;
                 }
             } else {
+                conflict_c += 1.0;
                 self.stat[Stat::Conflict as usize] += 1;
                 let dl = self.decision_level();
                 if dl == self.root_level {
                     self.analyze_final(ci, false);
                     return false;
                 }
-                if self.stat[Stat::Conflict as usize] % 5000 == 0 && self.var_decay < MAX_VAR_DECAY
+                if self.stat[Stat::Conflict as usize] % 5000 == 0
+                    && self.var_decay < self.var_decay_max
                 {
                     self.var_decay += 0.01;
                 }

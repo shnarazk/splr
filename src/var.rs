@@ -29,7 +29,7 @@ pub trait VarOrdering {
     fn is_empty(&self) -> bool;
 }
 
-pub const VAR_DECAY: f64 = 0.8;
+pub const VAR_DECAY: f64 = 0.9;
 pub const MAX_VAR_DECAY: f64 = 0.95;
 // const VAR_ACTIVITY_THRESHOLD: f64 = 1e100;
 
@@ -341,6 +341,13 @@ impl VarManagement for Solver {
     fn bump_vi(&mut self, vi: VarId) -> () {
         let d = self.stat[Stat::Conflict as usize] as f64;
         self.vars[vi].activity = (self.vars[vi].activity + d) / 2.0;
+        // let a = d + 0.01;
+        // self.vars[vi].activity = a;
+        // if 1.0e60 < a {
+        //     for v in &mut self.vars[1..] {
+        //         v.activity *= 1.0e-60;
+        //     }
+        // }
         self.var_order.update(&self.vars, vi);
     }
     // fn decay_var_activity(&mut self) -> () {

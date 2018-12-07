@@ -247,7 +247,7 @@ pub struct SolverConfiguration {
 impl Default for SolverConfiguration {
     fn default() -> SolverConfiguration {
         SolverConfiguration {
-            variable_decay_rate: 0.95,
+            variable_decay_rate: 0.9,
             clause_decay_rate: 0.999,
             dump_solver_stat_mode: 0,
             ema_coeffs: (2 ^ 5, 2 ^ 15),
