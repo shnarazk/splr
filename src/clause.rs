@@ -97,6 +97,7 @@ const CLAUSE_INDEX_BITS: usize = 60;
 const CLAUSE_INDEX_MASK: usize = 0x0FFF_FFFF_FFFF_FFFF;
 
 impl ClauseKind {
+    #[inline(always)]
     pub fn tag(self) -> usize {
         match self {
             ClauseKind::Liftedlit => 0x0000_0000_0000_0000,
@@ -106,12 +107,15 @@ impl ClauseKind {
             ClauseKind::Uniclause => 0x4000_0000_0000_0000,
         }
     }
+    #[inline(always)]
     pub fn mask(self) -> usize {
         CLAUSE_INDEX_MASK
     }
+    #[inline(always)]
     pub fn id_from(self, cix: ClauseIndex) -> ClauseId {
         cix | self.tag()
     }
+    #[inline(always)]
     pub fn index_from(self, cid: ClauseId) -> ClauseIndex {
         cid & self.mask()
     }
@@ -164,6 +168,7 @@ impl ClausePartition {
 }
 
 impl ClauseHead {
+    #[inline(always)]
     pub fn get_kind(&self) -> ClauseKind {
         match self.flag & 3 {
             0 => ClauseKind::Removable,
@@ -172,10 +177,12 @@ impl ClauseHead {
             _ => panic!("impossible clause kind"),
         }
     }
+    #[inline(always)]
     pub fn set_flag(&mut self, flag: ClauseFlag, val: bool) -> () {
         self.flag &= !(1 << (flag as u16));
         self.flag |= (val as u16) << (flag as u16);
     }
+    #[inline(always)]
     pub fn get_flag(&self, flag: ClauseFlag) -> bool {
         self.flag & (1 << flag as u16) != 0
     }
@@ -188,15 +195,19 @@ impl ClauseFlag {
 }
 
 impl ClauseIdIndexEncoding for usize {
+    #[inline(always)]
     fn to_id(&self) -> ClauseId {
         *self
     }
+    #[inline(always)]
     fn to_index(&self) -> ClauseIndex {
         (*self & CLAUSE_INDEX_MASK) as usize
     }
+    #[inline(always)]
     fn to_kind(&self) -> usize {
         *self >> CLAUSE_INDEX_BITS
     }
+    #[inline(always)]
     fn is(&self, kind: ClauseKind, ix: ClauseIndex) -> bool {
         (*self).to_kind() == kind as usize && (*self).to_index() == ix
     }
@@ -211,6 +222,7 @@ impl PartialEq for ClauseHead {
 impl Eq for ClauseHead {}
 
 impl PartialOrd for ClauseHead {
+    #[inline(always)]
     fn partial_cmp(&self, other: &ClauseHead) -> Option<Ordering> {
         if self.rank < other.rank {
             Some(Ordering::Less)
@@ -227,6 +239,7 @@ impl PartialOrd for ClauseHead {
 }
 
 impl Ord for ClauseHead {
+    #[inline(always)]
     fn cmp(&self, other: &ClauseHead) -> Ordering {
         if self.rank < other.rank {
             Ordering::Less
