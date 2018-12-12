@@ -457,6 +457,7 @@ impl SatSolver for Solver {
         self.num_solved_vars = self.trail.len();
         self.progress("");
         // self.eliminator.use_elim = true;
+        self.eliminator.var_queue.clear();
         if self.eliminator.use_elim {
             for v in &mut self.vars[1..] {
                 if v.neg_occurs.len() == 0 && 0 < v.pos_occurs.len() && v.assign == BOTTOM {
@@ -481,8 +482,8 @@ impl SatSolver for Solver {
         } else {
             self.progress("load");
         }
-        self.config.use_sve = false;
-        self.eliminator.use_elim = false;
+        // self.config.use_sve = false;
+        // self.eliminator.use_elim = false;
         self.stat[Stat::Simplification as usize] += 1;
         match self.search() {
             _ if !self.ok => {

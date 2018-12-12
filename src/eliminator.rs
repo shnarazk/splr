@@ -33,10 +33,11 @@ pub struct Eliminator {
     pub use_elim: bool,
     pub use_simplification: bool,
     pub last_invocatiton: usize,
+    next_invocation: usize,
     n_touched: usize,
     merges: usize,
     clause_queue: Vec<ClauseId>,
-    var_queue: Vec<VarId>,
+    pub var_queue: Vec<VarId>,
     bwdsub_assigns: usize,
     // working place
     elim_clauses: Vec<Lit>,
@@ -79,6 +80,7 @@ impl EliminatorIF for Eliminator {
             use_simplification: true,
             subsumption_lim: 0,
             last_invocatiton: 0,
+            next_invocation: 19,
             clause_queue_threshold: CLAUSE_QUEUE_THRESHOD,
             var_queue_threshold: VAR_QUEUE_THRESHOLD,
         }
@@ -701,6 +703,15 @@ impl Solver {
         if !self.eliminator.use_elim {
             return;
         }
+        if self.eliminator.next_invocation < self.eliminator.var_queue.len() {
+            self.eliminator.clause_queue.clear();
+            for v in &self.eliminator.var_queue {
+                self.vars[*v].enqueued = false;
+            }
+            self.eliminator.var_queue.clear();
+            return;
+        }
+        // self.eliminator.next_invocation += 2;
         // println!("eliminate: clause_queue {}", self.eliminator.clause_queue.len());
         // println!("clause_queue {:?}", self.eliminator.clause_queue);
         // println!("var_queue {:?}", self.eliminator.var_queue);
