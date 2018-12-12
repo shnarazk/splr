@@ -80,7 +80,7 @@ impl EliminatorIF for Eliminator {
             use_simplification: true,
             subsumption_lim: 0,
             last_invocatiton: 0,
-            next_invocation: 19,
+            next_invocation: 32,
             clause_queue_threshold: CLAUSE_QUEUE_THRESHOD,
             var_queue_threshold: VAR_QUEUE_THRESHOLD,
         }
