@@ -361,17 +361,10 @@ impl Solver {
             self.stat[Stat::Decision as usize] as f64 / self.stat[Stat::Conflict as usize] as f64;
         if decpc <= 1.2 {
             self.strategy = Some(SearchStrategy::ChanSeok);
-            let _glureduce = true;
-            self.first_reduction = 2000;
-            self.next_reduction = 2000;
-            self.cur_restart = ((self.stat[Stat::Conflict as usize] as f64
-                / self.next_reduction as f64)
-                + 1.0) as usize;
-            // TODO incReduceDB = 0;
-            println!("# Adjusting for low decision levels.");
-            re_init = true;
         } else if self.stat[Stat::NoDecisionConflict as usize] < 30_000 {
             self.strategy = Some(SearchStrategy::LowSuccesive);
+        } else if self.stat[Stat::NoDecisionConflict as usize] > 54_400 {
+            self.strategy = Some(SearchStrategy::HighSuccesive);
         } else {
             self.strategy = Some(SearchStrategy::Generic);
             return;
@@ -382,10 +375,16 @@ impl Solver {
             // conflictsRestarts = 0;
             match self.strategy {
                 Some(SearchStrategy::ChanSeok) => {
-                    // TODO
+                    re_init = true;
+                    let _glureduce = true;
+                    self.first_reduction = 2000;
+                    self.next_reduction = 2000;
+                    self.cur_restart = ((self.stat[Stat::Conflict as usize] as f64
+                        / self.next_reduction as f64)
+                        + 1.0) as usize;
+                    // TODO incReduceDB = 0;
+                    // println!("# Adjusting for low decision levels.");
                     // move some clauses with good lbd (col_lbd_bound) to Permanent
-                    // 1. cp[ClausePartition::Permanent]attach(clause);
-                    // 2. clause.set_flag(ClauseFlag::Dead);
                     unsafe {
                         let learnts =
                             &mut self.cp[ClauseKind::Removable as usize] as *mut ClausePartition;
@@ -395,7 +394,7 @@ impl Solver {
                             if ch.get_flag(ClauseFlag::Dead) {
                                 continue;
                             }
-                            if true || ch.rank <= CO_LBD_BOUND {
+                            if ch.rank <= CO_LBD_BOUND {
                                 // ch.lits.insert(0, ch.lit[0]);
                                 (*learnts).touched[ch.lit[0].negate() as usize] = true;
                                 // ch.lits.insert(1, ch.lit[1]);
@@ -769,6 +768,7 @@ impl CDCL for Solver {
     /// main loop
     fn search(&mut self) -> bool {
         let mut conflict_c = 0.0;  // for Luby restart
+        let mut a_decision_was_made = false;
         if self.luby_restart {
             self.luby_restart_num_conflict = luby(self.luby_restart_inc, self.luby_current_restarts) * self.luby_restart_factor;
         }
@@ -831,10 +831,16 @@ impl CDCL for Solver {
                     let p = self.vars[vi].phase;
                     self.uncheck_assume(vi.lit(p));
                     self.stat[Stat::Decision as usize] += 1;
+                    a_decision_was_made = true;
                 }
             } else {
                 conflict_c += 1.0;
                 self.stat[Stat::Conflict as usize] += 1;
+                if a_decision_was_made {
+                    a_decision_was_made = false;
+                } else {
+                    self.stat[Stat::NoDecisionConflict as usize] += 1;
+                }
                 let dl = self.decision_level();
                 if dl == self.root_level {
                     self.analyze_final(ci, false);
