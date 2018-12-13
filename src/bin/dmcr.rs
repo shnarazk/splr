@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use std::fs::*;
 use structopt::StructOpt;
 
-#[derive(StructOpt, Debug)]
+#[derive(StructOpt)]
 #[structopt(name = "dmcr", about = "DIMACS-format Model Checker in Rust, version 0.0.2")]
 struct TargetOpts {
     #[structopt(parse(from_os_str))]
