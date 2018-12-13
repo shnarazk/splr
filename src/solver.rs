@@ -99,6 +99,8 @@ pub struct Solver {
     pub next_reduction: usize,
     pub cur_restart: usize,
     pub num_solved_vars: usize,
+    pub restart_k: f64,
+    pub restart_r: f64,
     pub luby_restart: bool,
     pub luby_restart_num_conflict: f64,
     pub luby_restart_inc: f64,
@@ -167,6 +169,8 @@ impl Solver {
             next_reduction: 1000,
             cur_restart: 1,
             num_solved_vars: 0,
+            restart_k: K,
+            restart_r: R,
             luby_restart: false,
             luby_restart_num_conflict: 0.0,
             luby_restart_inc: 2.0,
@@ -796,7 +800,7 @@ impl CDCL for Solver {
                         && self.lbd_queue.is_full()
                         && ((self.stat[Stat::SumLBD as usize] as f64)
                             / (self.stat[Stat::Conflict as usize] as f64)
-                            < self.lbd_queue.average() * K))
+                            < self.lbd_queue.average() * self.restart_k))
                 {
                     self.stat[Stat::Restart as usize] += 1;
                     self.lbd_queue.clear();
@@ -856,7 +860,7 @@ impl CDCL for Solver {
                 let count = self.stat[Stat::Conflict as usize] as u64;
                 if 100 < count
                     && self.lbd_queue.is_full()
-                    && R * self.trail_queue.average() < (self.trail.len() as f64)
+                    && self.restart_r * self.trail_queue.average() < (self.trail.len() as f64)
                 {
                     self.lbd_queue.clear();
                     self.stat[Stat::BlockRestart as usize] += 1;
