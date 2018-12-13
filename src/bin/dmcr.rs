@@ -5,39 +5,49 @@ use splr::types::*;
 use splr::validator::*;
 use std::env;
 use std::io::{stdin, BufRead, BufReader};
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::fs;
+use structopt::StructOpt;
 
-const VERSION: &str = "dmcr-0.0.1";
+const VERSION: &str = "dmcr-0.0.2";
+
+#[derive(StructOpt, Debug)]
+#[structopt(name = "dmcr", about = "DIMACS-format Model Checker in Rust")]
+struct TargetOpts {
+    #[structopt(parse(from_os_str))]
+    #[structopt(short = "a", long = "assign")]
+    answer: Option<std::path::PathBuf>,
+    #[structopt(parse(from_os_str))]
+    problem: std::path::PathBuf,
+}
 
 fn main() {
-    let mut target: Option<String> = None;
-    for arg in &env::args().skip(1).collect::<Vec<String>>() {
-        match arg {
-            _ if arg == "--version" => {
-                println!("{}", VERSION);
-            }
-            _ if (&*arg).starts_with('-') => {
-                continue;
-            }
-            _ => {
-                target = Some(arg.to_string());
-            }
-        }
+    let mut found = false;
+    let answer;
+    let args = TargetOpts::from_args();
+    let (mut s, _cnf) = Solver::build(&args.problem.to_str().unwrap());
+    if args.answer == None {
+        let p = format!(".ans_{}", args.problem.to_str().unwrap());
+        found = true;
+        answer = PathBuf::from(p);
+    } else {
+        answer = args.answer.unwrap();
     }
-    if let Some(path) = target {
-        let (mut s, _cnf) = Solver::build(&path);
-        // println!("read the problem.");
-        s.inject_assigmnent(&read_assignment());
-        // println!("read an assignment.");
-        match s.validate() {
-            Some(v) => println!("Invalid assignment for {} due to {:?}.", path, v),
-            None => println!("Valid assignment for {}.", path),
-        }
+    s.inject_assigmnent(&read_assignment(&answer));
+    match s.validate() {
+        Some(v) => println!("Invalid assignment for {} due to {:?}.", args.problem.to_str().unwrap(), v),
+        None if found => println!("Valid assignment for {} found in {}.",
+                                  &args.problem.to_str().unwrap(),
+                                  answer.to_str().unwrap(),
+        ),
+        None  =>  println!("Valid assignment for {}.",
+                           &args.problem.to_str().unwrap()),
     }
 }
 
-fn read_assignment() -> Vec<i32> {
-    let mut rs = BufReader::new(stdin());
+fn read_assignment(path: &Path) -> Vec<i32> {
+    let mut rs = BufReader::new(fs::File::open(path).unwrap());
+    // let mut rs = BufReader::new(stdin());
     let mut buf = String::new();
     loop {
         match rs.read_line(&mut buf) {
