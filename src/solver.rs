@@ -1,7 +1,7 @@
 use crate::clause::{ClauseManagement, GC, *};
 use crate::eliminator::{ClauseElimination, Eliminator, EliminatorIF};
 use crate::profiler::*;
-use crate::restart::{QueueOperations, K, R, luby};
+use crate::restart::{QueueOperations, RESTART_BLK, RESTART_THR, luby};
 use crate::types::*;
 use crate::var::{VarOrdering, *};
 use std::cmp::max;
@@ -99,8 +99,8 @@ pub struct Solver {
     pub next_reduction: usize,
     pub cur_restart: usize,
     pub num_solved_vars: usize,
-    pub restart_k: f64,
-    pub restart_r: f64,
+    pub restart_thr: f64,
+    pub restart_blk: f64,
     pub luby_restart: bool,
     pub luby_restart_num_conflict: f64,
     pub luby_restart_inc: f64,
@@ -136,6 +136,9 @@ pub struct Solver {
     pub progress_cnt: i64,
 }
 
+const LBD_QUEUE_LEN: usize = 50;
+const TRAIL_QUEUE_LEN: usize = 5000;
+
 impl Solver {
     pub fn new(cfg: SolverConfiguration, cnf: &CNFDescription) -> Solver {
         let nv = cnf.num_of_variables as usize;
@@ -169,8 +172,8 @@ impl Solver {
             next_reduction: 1000,
             cur_restart: 1,
             num_solved_vars: 0,
-            restart_k: K,
-            restart_r: R,
+            restart_thr: RESTART_THR,
+            restart_blk: RESTART_BLK,
             luby_restart: false,
             luby_restart_num_conflict: 0.0,
             luby_restart_inc: 2.0,
@@ -294,12 +297,12 @@ impl Solver {
         } else {
             if mes.is_empty() {
                 println!(
-                    "#mode,      Variable Assignment     ,,  \
+                    "   #mode,      Variable Assignment      ,,  \
                      Clause Database Management  ,,   Restart Strategy      ,, \
                      Misc Progress Parameters,,  Eliminator"
                 );
                 println!(
-                    "#init,#remain,#solved,  #elim,total%,,#learnt,(good),  \
+                    "   #init,#remain,#solved,   #elim,total%,,#learnt,(good),  \
                      #perm,#binary,,block,force, asgn/,  lbd/,,    lbd, \
                      back lv, conf lv,,clause,   var"
                 );
@@ -797,10 +800,10 @@ impl CDCL for Solver {
                 // DYNAMIC FORCING RESTART
                 if (self.luby_restart && self.luby_restart_num_conflict <= conflict_c)
                     || (!self.luby_restart
-                        && self.lbd_queue.is_full()
+                        && self.lbd_queue.is_full(LBD_QUEUE_LEN)
                         && ((self.stat[Stat::SumLBD as usize] as f64)
                             / (self.stat[Stat::Conflict as usize] as f64)
-                            < self.lbd_queue.average() * self.restart_k))
+                            < self.lbd_queue.average() * self.restart_thr))
                 {
                     self.stat[Stat::Restart as usize] += 1;
                     self.lbd_queue.clear();
@@ -855,12 +858,12 @@ impl CDCL for Solver {
                 {
                     self.var_decay += 0.01;
                 }
-                self.trail_queue.enqueue(self.trail.len());
+                self.trail_queue.enqueue(TRAIL_QUEUE_LEN, self.trail.len());
                 // DYNAMIC BLOCKING RESTART
                 let count = self.stat[Stat::Conflict as usize] as u64;
                 if 100 < count
-                    && self.lbd_queue.is_full()
-                    && self.restart_r * self.trail_queue.average() < (self.trail.len() as f64)
+                    && self.lbd_queue.is_full(LBD_QUEUE_LEN)
+                    && self.restart_blk * self.trail_queue.average() < (self.trail.len() as f64)
                 {
                     self.lbd_queue.clear();
                     self.stat[Stat::BlockRestart as usize] += 1;
@@ -893,11 +896,11 @@ impl CDCL for Solver {
                     }
                 }
                 self.stat[Stat::SumLBD as usize] += lbd as i64;
-                self.lbd_queue.enqueue(lbd);
+                self.lbd_queue.enqueue(LBD_QUEUE_LEN, lbd);
                 if self.stat[Stat::Conflict as usize] % 10_000 == 0 {
                     self.progress(match self.strategy {
                         None => "none",
-                        Some(SearchStrategy::Generic) => "gene",
+                        Some(SearchStrategy::Generic) => "defl",
                         Some(SearchStrategy::ChanSeok) => "Chan",
                         Some(SearchStrategy::HighSuccesive) => "High",
                         Some(SearchStrategy::LowSuccesive) => "LowS",

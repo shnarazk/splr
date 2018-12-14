@@ -9,10 +9,10 @@ use structopt::StructOpt;
 #[derive(StructOpt)]
 #[structopt(name = "splr", about = "SAT solver for Propositional Logic in Rust, Technology Preview 11")]
 struct CLOpts {
-    #[structopt(long = "forcing-restart", short="K", default_value = "0.75")]
-    k: f64,
-    #[structopt(long = "blocking-restart", short="R", default_value = "1.45")]
-    r: f64,
+    #[structopt(long = "rt", short="K", default_value = "1.15")]
+    restart_threshold: f64,
+    #[structopt(long = "rb", short="R", default_value = "1.40")]
+    restart_blocking: f64,
     #[structopt(long = "no-tty", short="t")]
     no_tty: bool,
     #[structopt(long = "no-elim", short="e")]
@@ -32,8 +32,8 @@ fn main() {
         if args.no_elim {
             s.eliminator.use_elim = false; 
         }
-        s.restart_k = args.k;
-        s.restart_r = args.r;
+        s.restart_thr = args.restart_threshold;
+        s.restart_blk = args.restart_blocking;
         match s.solve() {
             Ok(Certificate::SAT(v)) => {
                 if let Ok(out) = File::create(&result) {

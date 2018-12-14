@@ -6,8 +6,8 @@ use std::collections::VecDeque;
 /// For VecDeque<usize>
 pub trait QueueOperations {
     fn average(&self) -> f64;
-    fn enqueue(&mut self, x: usize) -> bool;
-    fn is_full(&self) -> bool;
+    fn enqueue(&mut self, lim: usize,  x: usize) -> bool;
+    fn is_full(&self, lim: usize) -> bool;
 }
 
 /// For Solver
@@ -16,32 +16,38 @@ pub trait Restart {
     fn force_restart(&mut self) -> ();
 }
 
-/// For block restart based on average assigments: 1.40
-pub const R: f64 = 1.45;
+/// For force restart based on average LBD of newly generated clauses: 1.15.
+/// This is called `K` in Glusoce
+pub const RESTART_THR: f64 = 1.15;
 
-/// For force restart based on average LBD of newly generated clauses: 1.15
-pub const K: f64 = 0.75;
+/// For block restart based on average assigments: 1.40.
+/// This is called `R` in Glucose
+pub const RESTART_BLK: f64 = 1.40;
 
 const RESTART_PERIOD: u64 = 50;
 const RESET_EMA: u64 = 1000;
 
 impl QueueOperations for VecDeque<usize> {
+    #[inline(always)]
     fn average(&self) -> f64 {
-        let len = self.len() as f64;
-        let sum = self.iter().sum::<usize>() as f64;
-        sum / len
+        // let len = self.len() as f64;
+        // let sum = self.iter().sum::<usize>() as f64;
+        // sum / len
+        (self.iter().sum::<usize>() as f64) / (self.len() as f64)
     }
-    fn enqueue(&mut self, x: usize) -> bool {
+    #[inline(always)]
+    fn enqueue(&mut self, lim: usize, x: usize) -> bool {
         self.push_back(x);
-        if 50 < self.len() {
+        if lim < self.len() {
             self.pop_front();
             true
         } else {
-            50 == self.len()
+            lim == self.len()
         }
     }
-    fn is_full(&self) -> bool {
-        50 <= self.len()
+    #[inline(always)]
+    fn is_full(&self, lim: usize) -> bool {
+        lim <= self.len()
     }
 }
 
@@ -62,7 +68,9 @@ impl Restart for Solver {
             }
             return;
         }
-        if self.next_restart <= count && R < self.ema_asg.get() {
+        if self.next_restart <= count
+            && self.restart_blk < self.ema_asg.get()
+        {
             self.next_restart = count + RESTART_PERIOD;
             self.stat[Stat::BlockRestart as usize] += 1;
         }
@@ -71,7 +79,10 @@ impl Restart for Solver {
     /// called after no conflict propagation
     fn force_restart(&mut self) -> () {
         let count = self.stat[Stat::Conflict as usize] as u64;
-        if RESET_EMA < count && self.next_restart < count && K < self.ema_lbd.get() {
+        if RESET_EMA < count
+            && self.next_restart < count
+            && self.restart_thr < self.ema_lbd.get()
+        {
             self.next_restart = count + RESTART_PERIOD;
             self.stat[Stat::Restart as usize] += 1;
             let rl = self.root_level;
