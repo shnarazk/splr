@@ -18,7 +18,7 @@ pub trait Restart {
 
 /// For force restart based on average LBD of newly generated clauses: 1.15.
 /// This is called `K` in Glusoce
-pub const RESTART_THR: f64 = 1.15;
+pub const RESTART_THR: f64 = 0.8;
 
 /// For block restart based on average assigments: 1.40.
 /// This is called `R` in Glucose

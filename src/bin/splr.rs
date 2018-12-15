@@ -9,8 +9,10 @@ use structopt::StructOpt;
 #[derive(StructOpt)]
 #[structopt(name = "splr", about = "SAT solver for Propositional Logic in Rust, Technology Preview 11")]
 struct CLOpts {
-    #[structopt(long = "rt", short="K", default_value = "1.15")]
+    /// K in Glucose, for restart
+    #[structopt(long = "rt", short="K", default_value = "0.8")]
     restart_threshold: f64,
+    /// R in Glucose, for blocking
     #[structopt(long = "rb", short="R", default_value = "1.40")]
     restart_blocking: f64,
     #[structopt(long = "no-tty", short="t")]
