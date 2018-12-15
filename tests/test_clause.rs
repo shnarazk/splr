@@ -1,5 +1,4 @@
 #![allow(dead_code)]
-extern crate splr;
 use splr::clause::*;
 use splr::solver::*;
 use splr::types::*;
