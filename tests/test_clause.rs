@@ -17,12 +17,12 @@ trait Testing {
     fn rank(&mut self, a: usize) -> &mut Self;
 }
 
-impl Testing for ClauseBody {
-    fn activity(&mut self, a: f64) -> &mut ClauseBody {
+impl Testing for ClauseHead {
+    fn activity(&mut self, a: f64) -> &mut ClauseHead {
         self.activity = a;
         self
     }
-    fn rank(&mut self, r: usize) -> &mut ClauseBody {
+    fn rank(&mut self, r: usize) -> &mut ClauseHead {
         self.rank = r;
         self
     }
@@ -86,7 +86,7 @@ fn setup() -> Solver {
     s
 }
 
-fn attach_clause<'a>(s: &'a mut Solver, vec: &[Lit]) -> &'a mut ClauseBody {
+fn attach_clause<'a>(s: &'a mut Solver, vec: &[Lit]) -> &'a mut ClauseHead {
     let cid = s.cp[ClauseKind::Permanent as usize].new_clause(vec, vec.len(), false);
-    &mut s.cp[ClauseKind::Permanent as usize].body[cid.to_index()]
+    &mut s.cp[ClauseKind::Permanent as usize].head[cid.to_index()]
 }
