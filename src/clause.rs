@@ -579,6 +579,7 @@ impl ClauseManagement for Solver {
         self.lbd_key
     }
     /// CAVEAT: call reset_lbd_counter before it
+    #[inline(always)]
     fn lbd_of(&mut self, vec: &[Lit]) -> usize {
         let mut cnt = 0;
         for l in vec {
