@@ -1140,6 +1140,7 @@ impl CDCL for Solver {
     }
 
     fn analyze_final(&mut self, ci: ClauseId, skip_first: bool) -> () {
+        let mut seen = vec![false; self.num_vars + 1];
         self.conflicts.clear();
         if self.root_level != 0 {
             let ch = clause!(self.cp, ci);
@@ -1158,19 +1159,19 @@ impl CDCL for Solver {
             for i in (tl0..start).rev() {
                 let l: Lit = self.trail[i];
                 let vi = l.vi();
-                if self.an_seen[vi] {
+                if seen[vi] {
                     if self.vars[vi].reason == NULL_CLAUSE {
                         self.conflicts.push(l.negate());
                     } else {
                         for l in &ch.lits[1..] {
                             let vi = l.vi();
                             if 0 < self.vars[vi].level {
-                                self.an_seen[vi] = true;
+                                seen[vi] = true;
                             }
                         }
                     }
                 }
-                self.an_seen[vi] = false;
+                seen[vi] = false;
             }
         }
     }
@@ -1179,10 +1180,10 @@ impl CDCL for Solver {
 impl Solver {
     /// renamed from litRedundant
     fn analyze_removable(&mut self, l: Lit) -> bool {
-        self.an_stack.clear();
-        self.an_stack.push(l);
+        let mut stack = Vec::new();
+        stack.push(l);
         let top = self.an_to_clear.len();
-        while let Some(sl) = self.an_stack.pop() {
+        while let Some(sl) = stack.pop() {
             let cid = self.vars[sl.vi()].reason;
             unsafe {
                 let ch = clause_mut!(self.cp, cid) as *mut ClauseHead;
@@ -1197,7 +1198,7 @@ impl Solver {
                             && self.an_level_map[lv as usize] == self.an_level_map_key
                         {
                             self.an_seen[vi] = true;
-                            self.an_stack.push(*q);
+                            stack.push(*q);
                             self.an_to_clear.push(*q);
                         } else {
                             for _ in top..self.an_to_clear.len() {
