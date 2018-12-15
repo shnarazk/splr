@@ -117,7 +117,6 @@ pub struct Solver {
     pub profile: Profile,
     pub an_seen: Vec<bool>,
     pub an_to_clear: Vec<Lit>,
-    pub an_stack: Vec<Lit>,
     pub an_last_dl: Vec<Lit>,
     pub an_level_map: Vec<usize>,
     pub an_level_map_key: usize,
@@ -186,8 +185,7 @@ impl Solver {
             stat: vec![0; Stat::EndOfStatIndex as usize],
             profile: Profile::new(&path.to_string()),
             an_seen: vec![false; nv + 1],
-            an_to_clear: vec![0; nv + 1],
-            an_stack: vec![],
+            an_to_clear: Vec::new(),
             an_last_dl: vec![],
             an_level_map: vec![0; nv + 1],
             an_level_map_key: 1,
@@ -1085,7 +1083,6 @@ impl CDCL for Solver {
         //     p.negate().int(), vec2int(learnt)
         // );
         // simplify phase
-        self.an_stack.clear();
         self.an_to_clear.clear();
         self.an_to_clear.push(p.negate());
         let n = learnt.len();
