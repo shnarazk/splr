@@ -21,7 +21,7 @@ pub trait CDCL {
     fn propagate_0(&mut self) -> ClauseId;
     fn cancel_until(&mut self, lv: usize) -> ();
     fn enqueue(&mut self, l: Lit, cid: ClauseId) -> bool;
-    fn analyze(&mut self, confl: ClauseId) -> usize;
+    fn analyze(&mut self, confl: ClauseId, learnt: &mut Vec<Lit>) -> usize;
     fn analyze_final(&mut self, ci: ClauseId, skip_first: bool) -> ();
 }
 
@@ -119,7 +119,6 @@ pub struct Solver {
     pub an_to_clear: Vec<Lit>,
     pub an_stack: Vec<Lit>,
     pub an_last_dl: Vec<Lit>,
-    pub an_learnt_lits: Vec<Lit>,
     pub an_level_map: Vec<usize>,
     pub an_level_map_key: usize,
     pub mi_var_map: Vec<usize>,
@@ -190,7 +189,6 @@ impl Solver {
             an_to_clear: vec![0; nv + 1],
             an_stack: vec![],
             an_last_dl: vec![],
-            an_learnt_lits: vec![],
             an_level_map: vec![0; nv + 1],
             an_level_map_key: 1,
             mi_var_map: vec![0; nv + 1],
@@ -868,19 +866,19 @@ impl CDCL for Solver {
                     self.lbd_queue.clear();
                     self.stat[Stat::BlockRestart as usize] += 1;
                 }
-                self.an_learnt_lits.clear();
-                let bl = self.analyze(ci);
+                let mut new_learnt: Vec<Lit> = Vec::new();
+                let bl = self.analyze(ci, &mut new_learnt);
                 // let nas = self.num_assigns();
                 self.cancel_until(max(bl as usize, root_lv));
                 let lbd;
-                if self.an_learnt_lits.len() == 1 {
-                    let l = self.an_learnt_lits[0];
+                if new_learnt.len() == 1 {
+                    let l = new_learnt[0];
                     self.uncheck_enqueue(l, NULL_CLAUSE);
                     lbd = 1;
                 } else {
                     unsafe {
-                        lbd = self.lbd_of_an_learnt_lits();
-                        let v = &mut self.an_learnt_lits as *mut Vec<Lit>;
+                        lbd = self.lbd_of_vec(&new_learnt);
+                        let v = &mut new_learnt as *mut Vec<Lit>;
                         let l0 = (*v)[0];
                         debug_assert!(0 < lbd);
                         let cid = self.add_clause(&mut *v, lbd);
@@ -994,9 +992,8 @@ impl CDCL for Solver {
         }
     }
 
-    fn analyze(&mut self, confl: ClauseId) -> usize {
-        self.an_learnt_lits.clear();
-        self.an_learnt_lits.push(0);
+    fn analyze(&mut self, confl: ClauseId, learnt: &mut Vec<Lit>) -> usize {
+        learnt.push(0);
         let dl = self.decision_level();
         let mut cid: usize = confl;
         let mut p = NULL_LIT;
@@ -1054,7 +1051,7 @@ impl CDCL for Solver {
                             }
                         } else {
                             // println!("{} はレベル{}なので採用 {}", q.int(), lvl, dl);
-                            self.an_learnt_lits.push(*q);
+                            learnt.push(*q);
                         }
                     } else {
                         // println!("{} はもうフラグが立っているかグラウンドしている{}ので無視", q.int(), lvl);
@@ -1078,37 +1075,37 @@ impl CDCL for Solver {
                 ti -= 1;
             }
         }
-        debug_assert_eq!(self.an_learnt_lits[0], 0);
-        self.an_learnt_lits[0] = p.negate();
-        debug_assert_ne!(self.an_learnt_lits[0], 0);
+        debug_assert_eq!(learnt[0], 0);
+        learnt[0] = p.negate();
+        debug_assert_ne!(learnt[0], 0);
         // println!(
         //     "最後に{}を採用して{:?}",
-        //     p.negate().int(), vec2int(self.an_learnt_lits)
+        //     p.negate().int(), vec2int(learnt)
         // );
         // simplify phase
         self.an_stack.clear();
         self.an_to_clear.clear();
         self.an_to_clear.push(p.negate());
-        let n = self.an_learnt_lits.len();
+        let n = learnt.len();
         self.an_level_map_key += 1;
         if 10_000_000 < self.an_level_map_key {
             self.an_level_map_key = 1;
         }
-        for l in &self.an_learnt_lits[1..] {
+        for l in &learnt[1..] {
             self.an_to_clear.push(*l);
             self.an_level_map[self.vars[l.vi()].level] = self.an_level_map_key;
         }
         let mut j = 1;
         for i in 1..n {
-            let l = self.an_learnt_lits[i];
+            let l = learnt[i];
             if self.vars[l.vi()].reason == NULL_CLAUSE || !self.analyze_removable(l) {
-                self.an_learnt_lits[j] = l;
+                learnt[j] = l;
                 j += 1;
             }
         }
-        self.an_learnt_lits.truncate(j);
-        if self.an_learnt_lits.len() < 30 {
-            self.minimize_with_bi_clauses();
+        learnt.truncate(j);
+        if learnt.len() < 30 {
+            self.minimize_with_bi_clauses(learnt);
         }
         // glucose heuristics
         // let lbd = self.lbd_of_an_learnt_lits();
@@ -1121,17 +1118,17 @@ impl CDCL for Solver {
         self.an_last_dl.clear();
         // find correct backtrack level from remaining literals
         let mut level_to_return = 0;
-        if 1 < self.an_learnt_lits.len() {
+        if 1 < learnt.len() {
             let mut max_i = 1;
-            level_to_return = self.vars[self.an_learnt_lits[max_i].vi()].level;
-            for i in 2..self.an_learnt_lits.len() {
-                let lv = self.vars[self.an_learnt_lits[i].vi()].level;
+            level_to_return = self.vars[learnt[max_i].vi()].level;
+            for i in 2..learnt.len() {
+                let lv = self.vars[learnt[i].vi()].level;
                 if level_to_return < lv {
                     level_to_return = lv;
                     max_i = i;
                 }
             }
-            self.an_learnt_lits.swap(1, max_i);
+            learnt.swap(1, max_i);
         }
         for l in &self.an_to_clear {
             self.an_seen[l.vi()] = false;
@@ -1212,21 +1209,21 @@ impl Solver {
         true
     }
 
-    fn minimize_with_bi_clauses(&mut self) -> () {
-        let len = self.an_learnt_lits.len();
+    fn minimize_with_bi_clauses(&mut self, vec: &mut Vec<Lit>) -> () {
+        let len = vec.len();
         if 30 < len {
             return;
         }
-        let nblevels = self.lbd_of_an_learnt_lits();
+        let nblevels = self.lbd_of_vec(vec);
         if 6 < nblevels {
             return;
         }
         self.an_level_map_key += 1;
         let key = self.an_level_map_key;
-        for l in &self.an_learnt_lits[1..] {
+        for l in &vec[1..] {
             self.mi_var_map[l.vi() as usize] = key;
         }
-        let l0 = self.an_learnt_lits[0];
+        let l0 = vec[0];
         let mut nb = 0;
         for ci in self.cp[ClauseKind::Binclause as usize].iter_watcher(l0) {
             let ch = &self.cp[ClauseKind::Binclause as usize].head[ci];
@@ -1239,12 +1236,7 @@ impl Solver {
             }
         }
         if 0 < nb {
-            let Solver {
-                ref mut an_learnt_lits,
-                mi_var_map,
-                ..
-            } = self;
-            an_learnt_lits.retain(|l| *l == l0 || mi_var_map[l.vi()] == key);
+            vec.retain(|l| *l == l0 || self.mi_var_map[l.vi()] == key);
         }
     }
 
