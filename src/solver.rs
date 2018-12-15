@@ -877,7 +877,8 @@ impl CDCL for Solver {
                     lbd = 1;
                 } else {
                     unsafe {
-                        lbd = self.lbd_of_vec(&new_learnt);
+                        self.reset_lbd_counter();
+                        lbd = self.lbd_of(&new_learnt);
                         let v = &mut new_learnt as *mut Vec<Lit>;
                         let l0 = (*v)[0];
                         debug_assert!(0 < lbd);
@@ -1007,7 +1008,8 @@ impl CDCL for Solver {
                 if cid.to_kind() == (ClauseKind::Removable as usize) {
                     self.bump_cid(cid);
                     // if 2 < (*ch).rank {
-                    //     let nblevels = self.lbd_of(cid);
+                    //     self.reset_lbd_counter();
+                    //     let nblevels = self.lbd_of(&ch.lits);
                     //     if nblevels + 1 < (*ch).rank {
                     //         (*ch).rank = nblevels;
                     //         if nblevels <= 30 {
@@ -1108,7 +1110,8 @@ impl CDCL for Solver {
             self.minimize_with_bi_clauses(learnt);
         }
         // glucose heuristics
-        // let lbd = self.lbd_of_an_learnt_lits();
+        // self.reset_lbd_counter()
+        // let lbd = self.lbd_of(learnt);
         // while let Some(l) = self.an_last_dl.pop() {
         //     let vi = l.vi();
         //     if clause_body!(self.cp, self.vars[vi].reason).rank < lbd {
@@ -1214,7 +1217,8 @@ impl Solver {
         if 30 < len {
             return;
         }
-        let nblevels = self.lbd_of_vec(vec);
+        self.reset_lbd_counter();
+        let nblevels = self.lbd_of(vec);
         if 6 < nblevels {
             return;
         }

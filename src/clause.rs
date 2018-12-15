@@ -35,8 +35,8 @@ pub trait ClauseManagement {
     fn change_clause_kind(&mut self, cid: ClauseId, kind: ClauseKind) -> ();
     fn reduce(&mut self) -> ();
     fn simplify(&mut self) -> bool;
-    fn lbd_of_vec(&mut self, vec: &[Lit]) -> usize;
-    fn lbd_of(&mut self, cid: ClauseId) -> usize;
+    fn reset_lbd_counter(&mut self) -> usize;
+    fn lbd_of(&mut self, vec: &[Lit]) -> usize;
     fn dump_cnf(&self, fname: String) -> ();
 }
 
@@ -570,31 +570,18 @@ impl ClauseManagement for Solver {
         // self.check_eliminator();
         true
     }
-    fn lbd_of_vec(&mut self, vec: &[Lit]) -> usize {
+    fn reset_lbd_counter(&mut self) -> usize {
         if 1_000_000_000 < self.lbd_key {
             self.lbd_key = 1;
         } else {
             self.lbd_key += 1;
         }
+        self.lbd_key
+    }
+    /// CAVEAT: call reset_lbd_counter before it
+    fn lbd_of(&mut self, vec: &[Lit]) -> usize {
         let mut cnt = 0;
         for l in vec {
-            let lv = self.vars[l.vi()].level;
-            if self.lbd_temp[lv] != self.lbd_key {
-                self.lbd_temp[lv] = self.lbd_key;
-                cnt += 1;
-            }
-        }
-        cnt
-    }
-    fn lbd_of(&mut self, cid: ClauseId) -> usize {
-        let cb = clause!(self.cp, cid);
-        if 1_000_000_000 < self.lbd_key {
-            self.lbd_key = 1;
-        } else {
-            self.lbd_key += 1;
-        }
-        let mut cnt = 0;
-        for l in &cb.lits {
             let lv = self.vars[l.vi()].level;
             if self.lbd_temp[lv] != self.lbd_key {
                 self.lbd_temp[lv] = self.lbd_key;
