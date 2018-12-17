@@ -1,5 +1,6 @@
 //! This is a SAT solver in Rust.
 
+#[macro_export]
 macro_rules! clause {
     ($cv: expr, $val: expr) => {{
         match (&$cv, $val) {

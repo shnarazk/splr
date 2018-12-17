@@ -149,9 +149,11 @@ impl ClausePartition {
             watcher,
         }
     }
+    #[inline(always)]
     pub fn id_from(&self, cix: ClauseIndex) -> ClauseId {
         cix | self.kind.tag()
     }
+    #[inline(always)]
     pub fn index_from(&self, cid: ClauseId) -> ClauseIndex {
         cid & self.kind.mask()
     }

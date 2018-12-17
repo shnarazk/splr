@@ -8,6 +8,7 @@ use crate::clause::{
 use crate::solver::{Solver, CDCL};
 use crate::types::*;
 use crate::var::Var;
+#[test]
 use std::fmt;
 
 /// For Solver
@@ -103,6 +104,7 @@ impl EliminatorIF for Eliminator {
     }
 }
 
+#[test]
 impl fmt::Display for Eliminator {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
