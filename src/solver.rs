@@ -1169,20 +1169,22 @@ impl CDCL for Solver {
 impl Solver {
     /// renamed from litRedundant
     fn analyze_removable(&mut self, l: Lit, to_clear: &mut Vec<Lit>) -> bool {
+        let Solver { ref vars, .. }
+         = self;
         let mut stack = Vec::new();
         stack.push(l);
         let top = to_clear.len();
         while let Some(sl) = stack.pop() {
-            let cid = self.vars[sl.vi()].reason;
+            let cid = vars[sl.vi()].reason;
             let ch = clause_mut!(self.cp, cid);
-            if (*ch).lits.len() == 2 && self.vars.assigned((*ch).lits[0]) == LFALSE {
+            if (*ch).lits.len() == 2 && vars.assigned((*ch).lits[0]) == LFALSE {
                 (*ch).lits.swap(0, 1);
             }
             for q in &(*ch).lits[1..] {
                 let vi = q.vi();
-                let lv = self.vars[vi].level;
+                let lv = vars[vi].level;
                 if !self.an_seen[vi] && 0 < lv {
-                    if self.vars[vi].reason != NULL_CLAUSE
+                    if vars[vi].reason != NULL_CLAUSE
                         && self.an_level_map[lv as usize] == self.an_level_map_key
                     {
                         self.an_seen[vi] = true;
