@@ -600,12 +600,13 @@ impl CDCL for Solver {
             ];
             for kind in &kinds {
                 // cp[*kind as usize].check(false_lit);
-                unsafe {
-                    let head = &mut cp[*kind as usize].head[..] as *mut [ClauseHead];
-                    let watcher = &mut cp[*kind as usize].watcher[..] as *mut [ClauseIndex];
+                let head = &mut cp[*kind as usize].head[..];
+                let watcher = &mut cp[*kind as usize].watcher[..];
+                unsafe
+                {
                     let mut pre = &mut (*watcher)[p] as *mut usize;
                     'next_clause: while *pre != NULL_CLAUSE {
-                        let ch = &mut (*head)[*pre] as *mut ClauseHead;
+                        let ch = &mut (*head)[*pre];
                         debug_assert!((*ch).lit[0] == false_lit || (*ch).lit[1] == false_lit);
                         let my_index = ((*ch).lit[0] != false_lit) as usize;
                         {
