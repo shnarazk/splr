@@ -388,30 +388,25 @@ impl Solver {
                     // TODO incReduceDB = 0;
                     // println!("# Adjusting for low decision levels.");
                     // move some clauses with good lbd (col_lbd_bound) to Permanent
-                    unsafe {
-                        let learnts =
-                            &mut self.cp[ClauseKind::Removable as usize] as *mut ClausePartition;
-                        let permanents =
-                            &mut self.cp[ClauseKind::Permanent as usize] as *mut ClausePartition;
-                        for ch in &mut (*learnts).head[1..] {
-                            if ch.get_flag(ClauseFlag::Dead) {
-                                continue;
-                            }
-                            if ch.rank <= CO_LBD_BOUND {
-                                // ch.lits.insert(0, ch.lit[0]);
-                                (*learnts).touched[ch.lit[0].negate() as usize] = true;
-                                // ch.lits.insert(1, ch.lit[1]);
-                                (*learnts).touched[ch.lit[1].negate() as usize] = true;
-                                (*permanents).new_clause(
-                                    &ch.lits,
-                                    ch.rank,
-                                    ch.get_flag(ClauseFlag::Locked),
-                                );
-                                ch.set_flag(ClauseFlag::Dead, true);
-                            }
+                    let [_, ref mut learnts, ref mut permanents, _] = self.cp;
+                    for ch in &mut learnts.head[1..] {
+                        if ch.get_flag(ClauseFlag::Dead) {
+                            continue;
                         }
-                        (*learnts).garbage_collect(&mut self.vars, &mut self.eliminator);
+                        if ch.rank <= CO_LBD_BOUND {
+                            // ch.lits.insert(0, ch.lit[0]);
+                            learnts.touched[ch.lit[0].negate() as usize] = true;
+                            // ch.lits.insert(1, ch.lit[1]);
+                            learnts.touched[ch.lit[1].negate() as usize] = true;
+                            permanents.new_clause(
+                                &ch.lits,
+                                ch.rank,
+                                ch.get_flag(ClauseFlag::Locked),
+                            );
+                            ch.set_flag(ClauseFlag::Dead, true);
+                        }
                     }
+                    learnts.garbage_collect(&mut self.vars, &mut self.eliminator);
                 }
                 Some(SearchStrategy::HighSuccesive) => {
                     // coLBDBound = 3;
@@ -874,23 +869,19 @@ impl CDCL for Solver {
                     self.uncheck_enqueue(l, NULL_CLAUSE);
                     lbd = 1;
                 } else {
-                    unsafe {
-                        self.reset_lbd_counter();
-                        lbd = self.lbd_of(&new_learnt);
-                        let v = &mut new_learnt as *mut Vec<Lit>;
-                        let l0 = (*v)[0];
-                        debug_assert!(0 < lbd);
-                        let cid = self.add_clause(&mut *v, lbd);
-                        if cid.to_kind() == ClauseKind::Removable as usize {
-                            // clause_body_mut!(self.cp, cid).set_flag(ClauseFlag::JustUsed, true);
-                            debug_assert!(
-                                !clause_mut!(self.cp, cid).get_flag(ClauseFlag::Dead)
-                            );
-                            self.bump_cid(cid);
-                        }
-                        self.uncheck_enqueue(l0, cid);
-                        clause_mut!(self.cp, cid).set_flag(ClauseFlag::Locked, true);
+                    self.reset_lbd_counter();
+                    lbd = self.lbd_of(&new_learnt);
+                    let v = &mut new_learnt;
+                    let l0 = v[0];
+                    debug_assert!(0 < lbd);
+                    let cid = self.add_clause(&mut *v, lbd);
+                    if cid.to_kind() == ClauseKind::Removable as usize {
+                        // clause_body_mut!(self.cp, cid).set_flag(ClauseFlag::JustUsed, true);
+                        debug_assert!(!clause_mut!(self.cp, cid).get_flag(ClauseFlag::Dead));
+                        self.bump_cid(cid);
                     }
+                    self.uncheck_enqueue(l0, cid);
+                    clause_mut!(self.cp, cid).set_flag(ClauseFlag::Locked, true);
                 }
                 self.stat[Stat::SumLBD as usize] += lbd as i64;
                 self.lbd_queue.enqueue(LBD_QUEUE_LEN, lbd);
@@ -1182,27 +1173,25 @@ impl Solver {
         let top = self.an_to_clear.len();
         while let Some(sl) = stack.pop() {
             let cid = self.vars[sl.vi()].reason;
-            unsafe {
-                let ch = clause_mut!(self.cp, cid) as *mut ClauseHead;
-                if (*ch).lits.len() == 2 && self.vars.assigned((*ch).lits[0]) == LFALSE {
-                    (*ch).lits.swap(0, 1);
-                }
-                for q in &(*ch).lits[1..] {
-                    let vi = q.vi();
-                    let lv = self.vars[vi].level;
-                    if !self.an_seen[vi] && 0 < lv {
-                        if self.vars[vi].reason != NULL_CLAUSE
-                            && self.an_level_map[lv as usize] == self.an_level_map_key
-                        {
-                            self.an_seen[vi] = true;
-                            stack.push(*q);
-                            self.an_to_clear.push(*q);
-                        } else {
-                            for _ in top..self.an_to_clear.len() {
-                                self.an_seen[self.an_to_clear.pop().unwrap().vi()] = false;
-                            }
-                            return false;
+            let ch = clause_mut!(self.cp, cid);
+            if (*ch).lits.len() == 2 && self.vars.assigned((*ch).lits[0]) == LFALSE {
+                (*ch).lits.swap(0, 1);
+            }
+            for q in &(*ch).lits[1..] {
+                let vi = q.vi();
+                let lv = self.vars[vi].level;
+                if !self.an_seen[vi] && 0 < lv {
+                    if self.vars[vi].reason != NULL_CLAUSE
+                        && self.an_level_map[lv as usize] == self.an_level_map_key
+                    {
+                        self.an_seen[vi] = true;
+                        stack.push(*q);
+                        to_clear.push(*q);
+                    } else {
+                        for _ in top..to_clear.len() {
+                            self.an_seen[to_clear.pop().unwrap().vi()] = false;
                         }
+                        return false;
                     }
                 }
             }
