@@ -571,14 +571,6 @@ impl ClauseManagement for Solver {
         // self.check_eliminator();
         true
     }
-    fn reset_lbd_counter(&mut self) -> usize {
-        if 1_000_000_000 < self.lbd_key {
-            self.lbd_key = 1;
-        } else {
-            self.lbd_key += 1;
-        }
-        self.lbd_key
-    }
     /// CAVEAT: call reset_lbd_counter before it
     #[inline(always)]
     fn lbd_of(&mut self, vec: &[Lit]) -> usize {
