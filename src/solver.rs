@@ -868,7 +868,7 @@ impl CDCL for Solver {
                     self.uncheck_enqueue(l, NULL_CLAUSE);
                     lbd = 1;
                 } else {
-                    self.reset_lbd_counter();
+                    self.lbd_key.wrapping_add(1);
                     lbd = self.lbd_of(&new_learnt);
                     let v = &mut new_learnt;
                     let l0 = v[0];
@@ -996,7 +996,7 @@ impl CDCL for Solver {
                 if cid.to_kind() == (ClauseKind::Removable as usize) {
                     self.bump_cid(cid);
                     // if 2 < (*ch).rank {
-                    //     self.reset_lbd_counter();
+                    self.lbd_key.wrapping_add(1);
                     //     let nblevels = self.lbd_of(&ch.lits);
                     //     if nblevels + 1 < (*ch).rank {
                     //         (*ch).rank = nblevels;
@@ -1098,7 +1098,7 @@ impl CDCL for Solver {
             self.minimize_with_bi_clauses(learnt);
         }
         // glucose heuristics
-        // self.reset_lbd_counter()
+        // self.lbd_key.wrapping_add(1);
         // let lbd = self.lbd_of(learnt);
         // while let Some(l) = self.an_last_dl.pop() {
         //     let vi = l.vi();
@@ -1205,7 +1205,7 @@ impl Solver {
         if 30 < len {
             return;
         }
-        self.reset_lbd_counter();
+        self.lbd_key.wrapping_add(1);
         let nblevels = self.lbd_of(vec);
         if 6 < nblevels {
             return;

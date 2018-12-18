@@ -35,7 +35,6 @@ pub trait ClauseManagement {
     fn change_clause_kind(&mut self, cid: ClauseId, kind: ClauseKind) -> ();
     fn reduce(&mut self) -> ();
     fn simplify(&mut self) -> bool;
-    fn reset_lbd_counter(&mut self) -> usize;
     fn lbd_of(&mut self, vec: &[Lit]) -> usize;
     fn dump_cnf(&self, fname: String) -> ();
 }
