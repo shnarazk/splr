@@ -116,7 +116,6 @@ pub struct Solver {
     pub stat: Vec<i64>,
     pub profile: Profile,
     pub an_seen: Vec<bool>,
-    pub an_to_clear: Vec<Lit>,
     pub an_last_dl: Vec<Lit>,
     pub an_level_map: Vec<usize>,
     pub an_level_map_key: usize,
@@ -185,7 +184,6 @@ impl Solver {
             stat: vec![0; Stat::EndOfStatIndex as usize],
             profile: Profile::new(&path.to_string()),
             an_seen: vec![false; nv + 1],
-            an_to_clear: Vec::new(),
             an_last_dl: vec![],
             an_level_map: vec![0; nv + 1],
             an_level_map_key: 1,
@@ -1076,21 +1074,21 @@ impl CDCL for Solver {
         //     p.negate().int(), vec2int(learnt)
         // );
         // simplify phase
-        self.an_to_clear.clear();
-        self.an_to_clear.push(p.negate());
+        let mut to_clear = Vec::new();
+        to_clear.push(p.negate());
         let n = learnt.len();
         self.an_level_map_key += 1;
         if 10_000_000 < self.an_level_map_key {
             self.an_level_map_key = 1;
         }
         for l in &learnt[1..] {
-            self.an_to_clear.push(*l);
+            to_clear.push(*l);
             self.an_level_map[self.vars[l.vi()].level] = self.an_level_map_key;
         }
         let mut j = 1;
         for i in 1..n {
             let l = learnt[i];
-            if self.vars[l.vi()].reason == NULL_CLAUSE || !self.analyze_removable(l) {
+            if self.vars[l.vi()].reason == NULL_CLAUSE || !self.analyze_removable(l, &mut to_clear) {
                 learnt[j] = l;
                 j += 1;
             }
@@ -1124,7 +1122,7 @@ impl CDCL for Solver {
             }
             learnt.swap(1, max_i);
         }
-        for l in &self.an_to_clear {
+        for l in &to_clear {
             self.an_seen[l.vi()] = false;
         }
         level_to_return
@@ -1170,10 +1168,10 @@ impl CDCL for Solver {
 
 impl Solver {
     /// renamed from litRedundant
-    fn analyze_removable(&mut self, l: Lit) -> bool {
+    fn analyze_removable(&mut self, l: Lit, to_clear: &mut Vec<Lit>) -> bool {
         let mut stack = Vec::new();
         stack.push(l);
-        let top = self.an_to_clear.len();
+        let top = to_clear.len();
         while let Some(sl) = stack.pop() {
             let cid = self.vars[sl.vi()].reason;
             let ch = clause_mut!(self.cp, cid);
