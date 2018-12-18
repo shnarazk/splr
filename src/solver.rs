@@ -1029,7 +1029,8 @@ impl CDCL for Solver {
                     //     self.vars[vi].assign != BOTTOM,
                     //     format!("analyze assertion: unassigned var {:?}", self.vars[vi])
                     // );
-                    self.bump_vi(vi);
+                    self.vars[vi].bump_activity(self.stat[Stat::Conflict as usize] as f64);
+                    self.var_order.update(&self.vars, vi);
                     if !self.an_seen[vi] && 0 < lvl {
                         self.an_seen[vi] = true;
                         if dl <= lvl {
@@ -1103,7 +1104,8 @@ impl CDCL for Solver {
         // while let Some(l) = self.an_last_dl.pop() {
         //     let vi = l.vi();
         //     if clause_body!(self.cp, self.vars[vi].reason).rank < lbd {
-        //         self.bump_vi(vi);
+        //         self.vars[vi].bump_activity(self.stat[Stat::Conflict as usize] as f64);
+        //         self.var_order.update(&self.vars, vi);
         //     }
         // }
         self.an_last_dl.clear();
