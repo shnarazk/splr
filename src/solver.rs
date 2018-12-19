@@ -115,10 +115,6 @@ pub struct Solver {
     pub stat: Vec<i64>,
     pub profile: Profile,
     pub an_seen: Vec<bool>,
-    // pub an_last_dl: Vec<Lit>,
-    pub an_level_map: Vec<usize>,
-    pub an_level_map_key: usize,
-    pub mi_var_map: Vec<usize>,
     pub lbd_temp: Vec<usize>,
     /// restart heuristics
     pub lbd_queue: VecDeque<usize>,
@@ -182,10 +178,6 @@ impl Solver {
             stat: vec![0; Stat::EndOfStatIndex as usize],
             profile: Profile::new(&path.to_string()),
             an_seen: vec![false; nv + 1],
-            // an_last_dl: vec![],
-            an_level_map: vec![0; nv + 1],
-            an_level_map_key: 1,
-            mi_var_map: vec![0; nv + 1],
             lbd_temp: vec![0; nv + 1],
             lbd_queue: VecDeque::new(),
             trail_queue: VecDeque::new(),
@@ -846,12 +838,17 @@ impl CDCL for Solver {
                 {
                     self.var_decay += 0.01;
                 }
-                self.trail_queue.enqueue(TRAIL_QUEUE_LEN, self.trail.len());
+                let real_len = if self.trail_lim.is_empty() {
+                    self.trail.len()
+                } else {
+                    self.trail.len() - self.trail_lim[0]
+                };
+                self.trail_queue.enqueue(TRAIL_QUEUE_LEN, real_len);
                 // DYNAMIC BLOCKING RESTART
                 let count = self.stat[Stat::Conflict as usize] as u64;
                 if 100 < count
                     && self.lbd_queue.is_full(LBD_QUEUE_LEN)
-                    && self.restart_blk * self.trail_queue.average() < (self.trail.len() as f64)
+                    && self.restart_blk * self.trail_queue.average() < (real_len as f64)
                 {
                     self.lbd_queue.clear();
                     self.stat[Stat::BlockRestart as usize] += 1;
@@ -916,29 +913,33 @@ impl CDCL for Solver {
     }
 
     fn cancel_until(&mut self, lv: usize) -> () {
-        // let mut check: Vec<Lit> = Vec::new();
-        if self.decision_level() <= lv {
+        let Solver {
+            ref mut cp,
+            ref mut vars,
+            ref mut trail, ref mut trail_lim,
+            ref mut var_order,
+            ref mut q_head,
+            ..
+        } = self;
+        if trail_lim.len() <= lv {
             return;
         }
-        let lim = self.trail_lim[lv];
-        for l in &self.trail[lim..] {
-            // check.push(*l);
+        let lim = trail_lim[lv];
+        for l in &trail[lim..] {
+            // println!("cancel_until {}", l.int());
             let vi = l.vi();
-            {
-                // println!("cancel_until {}", l.int());
-                let v = &mut self.vars[vi];
-                v.phase = v.assign;
-                v.assign = BOTTOM;
-                if v.reason != NULL_CLAUSE {
-                    clause_mut!(self.cp, v.reason).set_flag(ClauseFlag::Locked, false);
-                    v.reason = NULL_CLAUSE;
-                }
+            let v = &mut vars[vi];
+            v.phase = v.assign;
+            v.assign = BOTTOM;
+            if v.reason != NULL_CLAUSE {
+                clause_mut!(*cp, v.reason).set_flag(ClauseFlag::Locked, false);
+                v.reason = NULL_CLAUSE;
             }
-            self.var_order.insert(&self.vars, vi);
+            var_order.insert(vars, vi);
         }
-        self.trail.truncate(lim);
-        self.trail_lim.truncate(lv);
-        self.q_head = lim;
+        trail.truncate(lim);
+        trail_lim.truncate(lv);
+        *q_head = lim;
     }
 
     /// returns `false` if an conflict occures.
@@ -1074,18 +1075,16 @@ impl CDCL for Solver {
         let mut to_clear = Vec::new();
         to_clear.push(p.negate());
         let n = learnt.len();
-        self.an_level_map_key += 1;
-        if 10_000_000 < self.an_level_map_key {
-            self.an_level_map_key = 1;
-        }
+        let mut level_map = vec![false; self.decision_level()];
         for l in &learnt[1..] {
             to_clear.push(*l);
-            self.an_level_map[self.vars[l.vi()].level] = self.an_level_map_key;
+            level_map[self.vars[l.vi()].level] = true;
         }
         let mut j = 1;
         for i in 1..n {
             let l = learnt[i];
-            if self.vars[l.vi()].reason == NULL_CLAUSE || !self.analyze_removable(l, &mut to_clear) {
+            if self.vars[l.vi()].reason == NULL_CLAUSE
+                || !self.analyze_removable(l, &mut to_clear, &level_map) {
                 learnt[j] = l;
                 j += 1;
             }
@@ -1095,15 +1094,14 @@ impl CDCL for Solver {
             self.minimize_with_bi_clauses(learnt);
         }
         // glucose heuristics
-        // let lbd = compute_lbd(&self.vars, learnt, &mut self.lbd_temp);
-        // while let Some(l) = last_dl.pop() {
-        //     let vi = l.vi();
-        //     if clause_head!(self.cp, self.vars[vi].reason).rank < lbd {
-        //         self.vars[vi].bump_activity(self.stat[Stat::Conflict as usize] as f64);
-        //         self.var_order.update(&self.vars, vi);
-        //     }
-        // }
-        // last_dl.clear();
+        let lbd = self.vars.compute_lbd(learnt, &mut self.lbd_temp);
+        while let Some(l) = last_dl.pop() {
+            let vi = l.vi();
+            if clause!(self.cp, self.vars[vi].reason).rank < lbd {
+                self.vars[vi].bump_activity(self.stat[Stat::Conflict as usize] as f64);
+                self.var_order.update(&self.vars, vi);
+            }
+        }
         // find correct backtrack level from remaining literals
         let mut level_to_return = 0;
         if 1 < learnt.len() {
@@ -1164,17 +1162,14 @@ impl CDCL for Solver {
 
 impl Solver {
     /// renamed from litRedundant
-    fn analyze_removable(&mut self, l: Lit, to_clear: &mut Vec<Lit>) -> bool {
-        let Solver { ref mut cp, ref vars, ref mut an_seen,
-                     ref an_level_map, an_level_map_key, .. }
-         = self;
+    fn analyze_removable(&mut self, l: Lit, to_clear: &mut Vec<Lit>, level_map: &[bool]) -> bool {
+        let Solver { ref mut cp, ref vars, ref mut an_seen, .. } = self;
         let mut stack = Vec::new();
         stack.push(l);
         let top = to_clear.len();
         while let Some(sl) = stack.pop() {
             let cid = vars[sl.vi()].reason;
-            // let ch = clause_mut!(cp, cid);
-            let ch = &mut cp[cid.to_kind()].head[cid.to_index()];
+            let ch = clause_mut!(*cp, cid);
             if (*ch).lits.len() == 2 && vars.assigned((*ch).lits[0]) == LFALSE {
                 (*ch).lits.swap(0, 1);
             }
@@ -1182,8 +1177,7 @@ impl Solver {
                 let vi = q.vi();
                 let lv = vars[vi].level;
                 if !an_seen[vi] && 0 < lv {
-                    if vars[vi].reason != NULL_CLAUSE
-                        && an_level_map[lv as usize] == *an_level_map_key
+                    if vars[vi].reason != NULL_CLAUSE && level_map[lv as usize]
                     {
                         an_seen[vi] = true;
                         stack.push(*q);
@@ -1201,9 +1195,7 @@ impl Solver {
     }
 
     fn minimize_with_bi_clauses(&mut self, vec: &mut Vec<Lit>) -> () {
-        let Solver { ref mut cp, ref mut mi_var_map,
-                     ref vars, ref mut lbd_temp,
-                     ref mut an_level_map_key, .. } = self;
+        let Solver { ref mut cp, ref vars, ref mut lbd_temp, .. } = self;
         let len = vec.len();
         if 30 < len {
             return;
@@ -1212,10 +1204,11 @@ impl Solver {
         if 6 < nblevels {
             return;
         }
-        *an_level_map_key += 1;
-        let key = *an_level_map_key;
+        // reuse lbd_temp scretely
+        let key = lbd_temp[0] + 1;
+        lbd_temp[0] = key;
         for l in &vec[1..] {
-            mi_var_map[l.vi() as usize] = key;
+            lbd_temp[l.vi() as usize] = key;
         }
         let l0 = vec[0];
         let mut nb = 0;
@@ -1224,13 +1217,13 @@ impl Solver {
             debug_assert!(ch.lit[0] == l0 || ch.lit[1] == l0);
             let other = ch.lit[(ch.lit[0] == l0) as usize];
             let vi = other.vi();
-            if mi_var_map[vi] == key && self.vars.assigned(other) == LTRUE {
+            if lbd_temp[vi] == key && self.vars.assigned(other) == LTRUE {
                 nb += 1;
-                mi_var_map[vi] -= 1;
+                lbd_temp[vi] -= 1;
             }
         }
         if 0 < nb {
-            vec.retain(|l| *l == l0 || mi_var_map[l.vi()] == key);
+            vec.retain(|l| *l == l0 || lbd_temp[l.vi()] == key);
         }
     }
 
