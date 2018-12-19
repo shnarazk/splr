@@ -35,7 +35,6 @@ pub trait ClauseManagement {
     fn change_clause_kind(&mut self, cid: ClauseId, kind: ClauseKind) -> ();
     fn reduce(&mut self) -> ();
     fn simplify(&mut self) -> bool;
-    fn lbd_of(&mut self, vec: &[Lit]) -> usize;
     fn dump_cnf(&self, fname: String) -> ();
 }
 
@@ -570,19 +569,6 @@ impl ClauseManagement for Solver {
         self.stat[Stat::Simplification as usize] += 1;
         // self.check_eliminator();
         true
-    }
-    /// CAVEAT: call reset_lbd_counter before it
-    #[inline(always)]
-    fn lbd_of(&mut self, vec: &[Lit]) -> usize {
-        let mut cnt = 0;
-        for l in vec {
-            let lv = self.vars[l.vi()].level;
-            if self.lbd_temp[lv] != self.lbd_key {
-                self.lbd_temp[lv] = self.lbd_key;
-                cnt += 1;
-            }
-        }
-        cnt
     }
     fn dump_cnf(&self, fname: String) -> () {
         for v in &self.vars {

@@ -14,6 +14,7 @@ pub trait VarManagement {
 pub trait Satisfiability {
     fn assigned(&self, l: Lit) -> Lbool;
     fn satisfies(&self, c: &[Lit]) -> bool;
+    fn compute_lbd(&self, vec: &[Lit], keys: &mut [usize]) -> usize;
 }
 
 /// For VarIdHeap
@@ -100,6 +101,21 @@ impl Satisfiability for [Var] {
             }
         }
         false
+    }
+    /// CAVEAT: call reset_lbd_counter before it
+    #[inline(always)]
+    fn compute_lbd(&self, vec: &[Lit], keys: &mut [usize]) -> usize {
+        let key = keys[0] + 1;
+        keys[0] = key;
+        let mut cnt = 0;
+        for l in vec {
+            let lv = self[l.vi()].level;
+            if keys[lv] != key {
+                keys[lv] = key;
+                cnt += 1;
+            }
+        }
+        cnt
     }
 }
 

@@ -112,7 +112,6 @@ pub struct Solver {
     pub ok: bool,
     pub model: Vec<Lbool>,
     pub conflicts: Vec<Lit>,
-    pub lbd_key: usize,
     pub stat: Vec<i64>,
     pub profile: Profile,
     pub an_seen: Vec<bool>,
@@ -180,7 +179,6 @@ impl Solver {
             ok: true,
             model: vec![BOTTOM; nv + 1],
             conflicts: vec![],
-            lbd_key: 1,
             stat: vec![0; Stat::EndOfStatIndex as usize],
             profile: Profile::new(&path.to_string()),
             an_seen: vec![false; nv + 1],
@@ -868,8 +866,7 @@ impl CDCL for Solver {
                     self.uncheck_enqueue(l, NULL_CLAUSE);
                     lbd = 1;
                 } else {
-                    self.lbd_key.wrapping_add(1);
-                    lbd = self.lbd_of(&new_learnt);
+                    lbd = self.vars.compute_lbd(&new_learnt, &mut self.lbd_temp);
                     let v = &mut new_learnt;
                     let l0 = v[0];
                     debug_assert!(0 < lbd);
@@ -996,8 +993,7 @@ impl CDCL for Solver {
                 if cid.to_kind() == (ClauseKind::Removable as usize) {
                     self.bump_cid(cid);
                     // if 2 < (*ch).rank {
-                    self.lbd_key.wrapping_add(1);
-                    //     let nblevels = self.lbd_of(&ch.lits);
+                    //     let nblevels = compute_lbd(&self.vars, &ch.lits, &mut self.lbd_temp);
                     //     if nblevels + 1 < (*ch).rank {
                     //         (*ch).rank = nblevels;
                     //         if nblevels <= 30 {
@@ -1098,8 +1094,7 @@ impl CDCL for Solver {
             self.minimize_with_bi_clauses(learnt);
         }
         // glucose heuristics
-        // self.lbd_key.wrapping_add(1);
-        // let lbd = self.lbd_of(learnt);
+        // let lbd = compute_lbd(&self.vars, learnt, &mut self.lbd_temp);
         // while let Some(l) = self.an_last_dl.pop() {
         //     let vi = l.vi();
         //     if clause_body!(self.cp, self.vars[vi].reason).rank < lbd {
@@ -1169,30 +1164,32 @@ impl CDCL for Solver {
 impl Solver {
     /// renamed from litRedundant
     fn analyze_removable(&mut self, l: Lit, to_clear: &mut Vec<Lit>) -> bool {
-        let Solver { ref vars, .. }
+        let Solver { ref mut cp, ref vars, ref mut an_seen,
+                     ref an_level_map, an_level_map_key, .. }
          = self;
         let mut stack = Vec::new();
         stack.push(l);
         let top = to_clear.len();
         while let Some(sl) = stack.pop() {
             let cid = vars[sl.vi()].reason;
-            let ch = clause_mut!(self.cp, cid);
+            // let ch = clause_mut!(cp, cid);
+            let ch = &mut cp[cid.to_kind()].head[cid.to_index()];
             if (*ch).lits.len() == 2 && vars.assigned((*ch).lits[0]) == LFALSE {
                 (*ch).lits.swap(0, 1);
             }
             for q in &(*ch).lits[1..] {
                 let vi = q.vi();
                 let lv = vars[vi].level;
-                if !self.an_seen[vi] && 0 < lv {
+                if !an_seen[vi] && 0 < lv {
                     if vars[vi].reason != NULL_CLAUSE
-                        && self.an_level_map[lv as usize] == self.an_level_map_key
+                        && an_level_map[lv as usize] == *an_level_map_key
                     {
-                        self.an_seen[vi] = true;
+                        an_seen[vi] = true;
                         stack.push(*q);
                         to_clear.push(*q);
                     } else {
                         for _ in top..to_clear.len() {
-                            self.an_seen[to_clear.pop().unwrap().vi()] = false;
+                            an_seen[to_clear.pop().unwrap().vi()] = false;
                         }
                         return false;
                     }
@@ -1203,34 +1200,36 @@ impl Solver {
     }
 
     fn minimize_with_bi_clauses(&mut self, vec: &mut Vec<Lit>) -> () {
+        let Solver { ref mut cp, ref mut mi_var_map,
+                     ref vars, ref mut lbd_temp,
+                     ref mut an_level_map_key, .. } = self;
         let len = vec.len();
         if 30 < len {
             return;
         }
-        self.lbd_key.wrapping_add(1);
-        let nblevels = self.lbd_of(vec);
+        let nblevels = vars.compute_lbd(vec, lbd_temp);
         if 6 < nblevels {
             return;
         }
-        self.an_level_map_key += 1;
-        let key = self.an_level_map_key;
+        *an_level_map_key += 1;
+        let key = *an_level_map_key;
         for l in &vec[1..] {
-            self.mi_var_map[l.vi() as usize] = key;
+            mi_var_map[l.vi() as usize] = key;
         }
         let l0 = vec[0];
         let mut nb = 0;
-        for ci in self.cp[ClauseKind::Binclause as usize].iter_watcher(l0) {
-            let ch = &self.cp[ClauseKind::Binclause as usize].head[ci];
+        for ci in cp[ClauseKind::Binclause as usize].iter_watcher(l0) {
+            let ch = &cp[ClauseKind::Binclause as usize].head[ci];
             debug_assert!(ch.lit[0] == l0 || ch.lit[1] == l0);
             let other = ch.lit[(ch.lit[0] == l0) as usize];
             let vi = other.vi();
-            if self.mi_var_map[vi] == key && self.vars.assigned(other) == LTRUE {
+            if mi_var_map[vi] == key && self.vars.assigned(other) == LTRUE {
                 nb += 1;
-                self.mi_var_map[vi] -= 1;
+                mi_var_map[vi] -= 1;
             }
         }
         if 0 < nb {
-            vec.retain(|l| *l == l0 || self.mi_var_map[l.vi()] == key);
+            vec.retain(|l| *l == l0 || mi_var_map[l.vi()] == key);
         }
     }
 
