@@ -115,7 +115,7 @@ pub struct Solver {
     pub stat: Vec<i64>,
     pub profile: Profile,
     pub an_seen: Vec<bool>,
-    pub an_last_dl: Vec<Lit>,
+    // pub an_last_dl: Vec<Lit>,
     pub an_level_map: Vec<usize>,
     pub an_level_map_key: usize,
     pub mi_var_map: Vec<usize>,
@@ -182,7 +182,7 @@ impl Solver {
             stat: vec![0; Stat::EndOfStatIndex as usize],
             profile: Profile::new(&path.to_string()),
             an_seen: vec![false; nv + 1],
-            an_last_dl: vec![],
+            // an_last_dl: vec![],
             an_level_map: vec![0; nv + 1],
             an_level_map_key: 1,
             mi_var_map: vec![0; nv + 1],
@@ -985,6 +985,7 @@ impl CDCL for Solver {
         let mut p = NULL_LIT;
         let mut ti = self.trail.len() - 1; // trail index
         let mut path_cnt = 0;
+        let mut last_dl = Vec::new();
         loop {
             // println!("analyze {}", p.int());
             unsafe {
@@ -1034,7 +1035,7 @@ impl CDCL for Solver {
                             if self.vars[vi].reason != NULL_CLAUSE
                                 && self.vars[vi].reason.to_kind() == ClauseKind::Removable as usize
                             {
-                                self.an_last_dl.push(*q);
+                                last_dl.push(*q);
                             }
                         } else {
                             // println!("{} はレベル{}なので採用 {}", q.int(), lvl, dl);
@@ -1095,14 +1096,14 @@ impl CDCL for Solver {
         }
         // glucose heuristics
         // let lbd = compute_lbd(&self.vars, learnt, &mut self.lbd_temp);
-        // while let Some(l) = self.an_last_dl.pop() {
+        // while let Some(l) = last_dl.pop() {
         //     let vi = l.vi();
-        //     if clause_body!(self.cp, self.vars[vi].reason).rank < lbd {
+        //     if clause_head!(self.cp, self.vars[vi].reason).rank < lbd {
         //         self.vars[vi].bump_activity(self.stat[Stat::Conflict as usize] as f64);
         //         self.var_order.update(&self.vars, vi);
         //     }
         // }
-        self.an_last_dl.clear();
+        // last_dl.clear();
         // find correct backtrack level from remaining literals
         let mut level_to_return = 0;
         if 1 < learnt.len() {
