@@ -838,11 +838,12 @@ impl CDCL for Solver {
                 {
                     self.var_decay += 0.01;
                 }
-                let real_len = if self.trail_lim.is_empty() {
-                    self.trail.len()
-                } else {
-                    self.trail.len() - self.trail_lim[0]
-                };
+                // let real_len = if self.trail_lim.is_empty() {
+                //     self.trail.len()
+                // } else {
+                //     self.trail.len() - self.trail_lim[0]
+                // };
+                let real_len = self.trail.len();
                 self.trail_queue.enqueue(TRAIL_QUEUE_LEN, real_len);
                 // DYNAMIC BLOCKING RESTART
                 let count = self.stat[Stat::Conflict as usize] as u64;
@@ -986,7 +987,7 @@ impl CDCL for Solver {
         let mut p = NULL_LIT;
         let mut ti = self.trail.len() - 1; // trail index
         let mut path_cnt = 0;
-        let mut last_dl = Vec::new();
+        let mut last_dl: Vec<Lit> = Vec::new();
         loop {
             // println!("analyze {}", p.int());
             unsafe {
@@ -1033,11 +1034,11 @@ impl CDCL for Solver {
                         if dl <= lvl {
                             // println!("{} はレベル{}なのでフラグを立てる", q.int(), lvl);
                             path_cnt += 1;
-                            if self.vars[vi].reason != NULL_CLAUSE
-                                && self.vars[vi].reason.to_kind() == ClauseKind::Removable as usize
-                            {
-                                last_dl.push(*q);
-                            }
+                            // if self.vars[vi].reason != NULL_CLAUSE
+                            //     && self.vars[vi].reason.to_kind() == ClauseKind::Removable as usize
+                            // {
+                            //     last_dl.push(*q);
+                            // }
                         } else {
                             // println!("{} はレベル{}なので採用 {}", q.int(), lvl, dl);
                             learnt.push(*q);
