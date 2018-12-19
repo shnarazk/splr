@@ -7,22 +7,19 @@ use crate::clause::{
 };
 use crate::solver::{Solver, CDCL};
 use crate::types::*;
-use crate::var::Var;
+use crate::var::{Satisfiability, Var};
 #[test]
 use std::fmt;
 
 /// For Solver
 pub trait ClauseElimination {
-    fn eliminator_register_clause(&mut self, cid: ClauseId, rank: usize, ignorable: bool) -> ();
-    fn eliminator_enqueue_clause(&mut self, cid: ClauseId) -> ();
-    fn eliminator_enqueue_var(&mut self, vi: VarId) -> ();
-    fn eliminator_unregister_clause(&mut self, cid: ClauseId) -> ();
     fn check_eliminator(&self) -> bool;
 }
 
 /// For Eliminator
 pub trait EliminatorIF {
     fn new(use_elim: bool, nv: usize) -> Eliminator;
+    fn enqueue_clause(&mut self, cid: ClauseId, ch: &mut ClauseHead) -> ();
     fn enqueue_var(&mut self, v: &mut Var) -> ();
     fn clause_queue_len(&self) -> usize;
     fn var_queue_len(&self) -> usize;
@@ -35,7 +32,7 @@ pub struct Eliminator {
     pub use_simplification: bool,
     pub last_invocatiton: usize,
     next_invocation: usize,
-    n_touched: usize,
+    pub n_touched: usize,
     merges: usize,
     clause_queue: Vec<ClauseId>,
     pub var_queue: Vec<VarId>,
@@ -86,6 +83,26 @@ impl EliminatorIF for Eliminator {
             var_queue_threshold: VAR_QUEUE_THRESHOLD,
         }
     }
+    fn enqueue_clause(&mut self, cid: ClauseId, ch: &mut ClauseHead) -> () {
+        if !self.use_elim || self.clause_queue_threshold == 0 {
+            // println!("{} is not enqueued", cid2fmt(cid));
+            return;
+        }
+        let rank = ch.rank as f64;
+        if !ch.get_flag(ClauseFlag::Enqueued) {
+            let accept = if self.clause_queue.len() <= 256 {
+                rank
+            } else {
+                4.8 - ((self.clause_queue.len() as f64).log(2.0) - 8.0)
+            };
+            if rank <= accept {
+                self.clause_queue.push(cid);
+                // println!("increment {}", self.eliminator.clause_queue.len());
+                ch.set_flag(ClauseFlag::Enqueued, true);
+                self.clause_queue_threshold -= 1;
+            }
+        }
+    }
     fn enqueue_var(&mut self, v: &mut Var) -> () {
         if !self.use_elim || self.var_queue_threshold == 0 {
             return;
@@ -116,71 +133,6 @@ impl fmt::Display for Eliminator {
 }
 
 impl ClauseElimination for Solver {
-    fn eliminator_register_clause(&mut self, cid: ClauseId, rank: usize, ignorable: bool) -> () {
-        if !self.eliminator.use_elim {
-            return;
-        }
-        for l in &clause_mut!(self.cp, cid).lits {
-            let mut v = &mut self.vars[l.vi()];
-            v.touched = true;
-            self.eliminator.n_touched += 1;
-            if !v.eliminated {
-                if l.positive() {
-                    v.pos_occurs.push(cid);
-                } else {
-                    v.neg_occurs.push(cid);
-                }
-            }
-        }
-        if !ignorable {
-            self.eliminator_enqueue_clause(cid);
-        }
-    }
-    fn eliminator_enqueue_clause(&mut self, cid: ClauseId) -> () {
-        if !self.eliminator.use_elim || self.eliminator.clause_queue_threshold == 0 {
-            // println!("{} is not enqueued", cid2fmt(cid));
-            return;
-        }
-        let ch = clause_mut!(self.cp, cid);
-        let rank = ch.rank as f64;
-        if !ch.get_flag(ClauseFlag::Enqueued) {
-            let accept = if self.eliminator.clause_queue.len() <= 256 {
-                rank
-            } else {
-                4.8 - ((self.eliminator.clause_queue.len() as f64).log(2.0) - 8.0)
-            };
-            if rank <= accept {
-                self.eliminator.clause_queue.push(cid);
-                // println!("increment {}", self.eliminator.clause_queue.len());
-                ch.set_flag(ClauseFlag::Enqueued, true);
-                self.eliminator.clause_queue_threshold -= 1;
-            }
-        }
-    }
-    fn eliminator_enqueue_var(&mut self, vi: VarId) -> () {
-        if !self.eliminator.use_elim {
-            return;
-        }
-        self.eliminator.enqueue_var(&mut self.vars[vi])
-    }
-    fn eliminator_unregister_clause(&mut self, cid: ClauseId) -> () {
-        debug_assert!(clause!(self.cp, cid).get_flag(ClauseFlag::Dead));
-        if self.eliminator.use_elim {
-            for l in &clause!(self.cp, cid).lits {
-                let v = &mut self.vars[l.vi()];
-                if !v.eliminated {
-                    // let xx = v.pos_occurs.len() + v.neg_occurs.len();
-                    if l.positive() {
-                        v.pos_occurs.retain(|&cj| cid != cj);
-                    } else {
-                        v.neg_occurs.retain(|&cj| cid != cj);
-                    }
-                    // let xy = v.pos_occurs.len() + v.neg_occurs.len();
-                    self.eliminator.enqueue_var(v);
-                }
-            }
-        }
-    }
     fn check_eliminator(&self) -> bool {
         // clause_queue should be clear.
         // debug_assert!(self.eliminator.clause_queue.is_empty());
@@ -253,7 +205,7 @@ impl Solver {
             debug_assert_ne!(c0, l);
             // println!("{} is removed and its first literal {} is enqueued.", cid2fmt(cid), c0.int());
             self.remove_clause(cid);
-            self.eliminator_unregister_clause(cid);
+            self.vars[..].detach_clause(cid, clause!(self.cp, cid), &mut self.eliminator);
             if self.enqueue(c0, NULL_CLAUSE) && self.propagate_0() == NULL_CLAUSE {
                 // self.cp[cid.to_kind()].touched[c0 as usize] = true;
                 self.cp[cid.to_kind()].touched[c0.negate() as usize] = true;
@@ -266,7 +218,7 @@ impl Solver {
         } else {
             // println!("cid {} drops literal {}", cid2fmt(cid), l.int());
             debug_assert!(1 < clause!(self.cp, cid).lits.len());
-            self.eliminator_enqueue_clause(cid);
+            self.eliminator.enqueue_clause(cid, clause_mut!(self.cp, cid));
             true
         }
     }
@@ -412,7 +364,7 @@ impl Solver {
                                         //          *clause_body!(self.cp, cid),
                                         // );
                                         self.remove_clause(*di);
-                                        self.eliminator_unregister_clause(*di);
+                                        self.vars[..].detach_clause(*di, clause!(self.cp, cid), &mut self.eliminator);
                                     } //else {
                                       // println!("backward_subsumption_check tries to delete a permanent clause {} {:#}",
                                       //          cid2fmt(*di),
@@ -431,7 +383,7 @@ impl Solver {
                                     if !self.strengthen_clause(*di, l.negate()) {
                                         return false;
                                     }
-                                    self.eliminator_enqueue_var(l.vi());
+                                    self.eliminator.enqueue_var(&mut self.vars[l.vi()]);
                                 }
                                 None => {}
                             }

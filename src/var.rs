@@ -1,4 +1,6 @@
 // use clause::Clause;
+use crate::clause::{ClauseFlag, ClauseHead};
+use crate::eliminator::{Eliminator, EliminatorIF};
 use crate::solver::Solver;
 use crate::types::*;
 use std::fmt;
@@ -15,6 +17,8 @@ pub trait Satisfiability {
     fn assigned(&self, l: Lit) -> Lbool;
     fn satisfies(&self, c: &[Lit]) -> bool;
     fn compute_lbd(&self, vec: &[Lit], keys: &mut [usize]) -> usize;
+    fn attach_clause(&mut self, cid: ClauseId, ch: &mut ClauseHead, ignorable: bool, eliminator: &mut Eliminator) -> ();
+    fn detach_clause(&mut self, cid: ClauseId, ch: &ClauseHead, eliminator: &mut Eliminator) -> ();
 }
 
 /// For VarIdHeap
@@ -117,6 +121,45 @@ impl Satisfiability for [Var] {
         }
         cnt
     }
+    fn attach_clause(&mut self, cid: ClauseId, ch: &mut ClauseHead, ignorable: bool, eliminator: &mut Eliminator) -> () {
+        if !eliminator.use_elim {
+            return;
+        }
+        for l in &ch.lits {
+            let mut v = &mut self[l.vi()];
+            v.touched = true;
+            eliminator.n_touched += 1;
+            if !v.eliminated {
+                if l.positive() {
+                    v.pos_occurs.push(cid);
+                } else {
+                    v.neg_occurs.push(cid);
+                }
+            }
+        }
+        if !ignorable {
+            eliminator.enqueue_clause(cid, ch);
+        }
+    }
+    fn detach_clause(&mut self, cid: ClauseId, ch: &ClauseHead, eliminator: &mut Eliminator) -> () {
+        debug_assert!(ch.get_flag(ClauseFlag::Dead));
+        if eliminator.use_elim {
+            for l in &ch.lits {
+                let v = &mut self[l.vi()];
+                if !v.eliminated {
+                    // let xx = v.pos_occurs.len() + v.neg_occurs.len();
+                    if l.positive() {
+                        v.pos_occurs.retain(|&cj| cid != cj);
+                    } else {
+                        v.neg_occurs.retain(|&cj| cid != cj);
+                    }
+                    // let xy = v.pos_occurs.len() + v.neg_occurs.len();
+                    eliminator.enqueue_var(v);
+                }
+            }
+        }
+    }
+
 }
 
 // pub struct VarManager {

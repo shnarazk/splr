@@ -1,5 +1,5 @@
 use crate::clause::{ClauseManagement, GC, *};
-use crate::eliminator::{ClauseElimination, Eliminator, EliminatorIF};
+use crate::eliminator::{Eliminator, EliminatorIF};
 use crate::profiler::*;
 use crate::restart::{QueueOperations, RESTART_BLK, RESTART_THR, luby};
 use crate::types::*;
@@ -1228,44 +1228,56 @@ impl Solver {
     }
 
     pub fn uncheck_enqueue(&mut self, l: Lit, cid: ClauseId) -> () {
+        let Solver {
+            ref mut cp,
+            ref mut vars,
+            ref mut trail,
+            ref trail_lim,
+            ref mut eliminator,
+            .. } = self;
         // println!("uncheck_enqueue {}", l.int());
         debug_assert!(l != 0, "Null literal is about to be equeued");
-        debug_assert!(
-            self.decision_level() == 0 || cid != 0,
-            "Null CLAUSE is used for uncheck_enqueue"
+        debug_assert!(trail_lim.len() == 0 || cid != 0,
+                      "Null CLAUSE is used for uncheck_enqueue"
         );
-        let dl = self.decision_level();
-        let v = &mut self.vars[l.vi()];
+        let dl = trail_lim.len();
+        let v = &mut vars[l.vi()];
         debug_assert!(!v.eliminated);
         debug_assert!(v.assign == l.lbool() || v.assign == BOTTOM);
         v.assign = l.lbool();
         v.level = dl;
         v.reason = cid;
         if dl == 0 {
-            self.eliminator_enqueue_var(l.vi());
+            eliminator.enqueue_var(v);
             // self.var_order.remove(&self.vars, l.vi());
         }
-        clause_mut!(self.cp, cid).set_flag(ClauseFlag::Locked, true);
+        clause_mut!(*cp, cid).set_flag(ClauseFlag::Locked, true);
         // debug_assert!(!self.trail.contains(&l));
         // debug_assert!(!self.trail.contains(&l.negate()));
-        self.trail.push(l);
+        trail.push(l);
     }
     pub fn uncheck_assume(&mut self, l: Lit) -> () {
         // println!("uncheck_assume {}", l.int());
-        self.trail_lim.push(self.trail.len());
-        let dl = self.decision_level();
-        let v = &mut self.vars[l.vi()];
+        let Solver {
+            ref mut vars,
+            ref mut trail,
+            ref mut trail_lim,
+            ref mut eliminator,
+            .. } = self;
+        trail_lim.push(trail.len());
+        let dl = trail_lim.len();
+        let v = &mut vars[l.vi()];
         debug_assert!(!v.eliminated);
         debug_assert!(v.assign == l.lbool() || v.assign == BOTTOM);
         v.assign = l.lbool();
         v.level = dl;
         v.reason = NULL_CLAUSE;
         if dl == 0 {
-            self.eliminator_enqueue_var(l.vi());
+            eliminator.enqueue_var(v);
         }
-        // debug_assert!(!self.trail.contains(&l));
-        // debug_assert!(!self.trail.contains(&l.negate()));
-        self.trail.push(l);
+        // debug_assert!(!trail.contains(&l));
+        // debug_assert!(!trail.contains(&l.negate()));
+        trail.push(l);
     }
 }
 

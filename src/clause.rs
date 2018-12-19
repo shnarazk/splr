@@ -1,5 +1,5 @@
 #![allow(unused_variables)]
-use crate::eliminator::{ClauseElimination, *};
+use crate::eliminator::*;
 use crate::solver::{SearchStrategy, Solver, Stat, CDCL, CO_LBD_BOUND};
 use crate::types::*;
 use crate::var::{Satisfiability, Var};
@@ -392,7 +392,7 @@ impl ClauseManagement for Solver {
             }
             n => {
                 let cid = self.cp[kind as usize].new_clause(&v, 0, false);
-                self.eliminator_register_clause(cid, n, true);
+                self.vars[..].attach_clause(cid, clause_mut!(self.cp, cid), true, &mut self.eliminator);
                 Some(cid)
             }
         }
@@ -427,7 +427,7 @@ impl ClauseManagement for Solver {
         };
         let cid = self.cp[kind as usize].new_clause(&v, lbd, false);
         self.bump_cid(cid);
-        self.eliminator_register_clause(cid, lbd, false);
+        self.vars[..].attach_clause(cid, clause_mut!(self.cp, cid), false, &mut self.eliminator);
         cid
     }
 
