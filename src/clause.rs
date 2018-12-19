@@ -38,6 +38,7 @@ pub trait ClauseManagement {
     fn dump_cnf(&self, fname: String) -> ();
 }
 
+/// For ClausePartition
 pub trait ConsistencyCheck {
     fn check(&mut self, lit: Lit) -> bool;
 }
