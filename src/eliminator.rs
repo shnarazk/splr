@@ -1,15 +1,11 @@
-#![allow(unreachable_code)]
-#![allow(unused_mut)]
-#![allow(unused_variables)]
 use crate::clause::{
     cid2fmt, ClauseFlag, ClauseHead, ClauseIdIndexEncoding, ClauseIndex, ClauseKind,
     ClauseManagement, ClausePartition,
 };
 use crate::solver::{Solver, CDCL};
 use crate::types::*;
-use crate::var::{Satisfiability, Var};
-#[test]
-use std::fmt;
+use crate::var::{EliminationIF, Var};
+// use std::fmt;
 
 /// For Solver
 pub trait ClauseElimination {
@@ -18,7 +14,7 @@ pub trait ClauseElimination {
 
 /// For Eliminator
 pub trait EliminatorIF {
-    fn new(use_elim: bool, nv: usize) -> Eliminator;
+    fn new(use_elim: bool) -> Eliminator;
     fn enqueue_clause(&mut self, cid: ClauseId, ch: &mut ClauseHead) -> ();
     fn enqueue_var(&mut self, v: &mut Var) -> ();
     fn clause_queue_len(&self) -> usize;
@@ -64,7 +60,7 @@ impl LiteralClause for Lit {
 }
 
 impl EliminatorIF for Eliminator {
-    fn new(use_elim: bool, nv: usize) -> Eliminator {
+    fn new(use_elim: bool) -> Eliminator {
         Eliminator {
             merges: 0,
             var_queue: Vec::new(),
@@ -121,16 +117,15 @@ impl EliminatorIF for Eliminator {
     }
 }
 
-#[test]
-impl fmt::Display for Eliminator {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            " - n_touched {}\n - clause_queue {:?}\n - heap {:?}",
-            self.n_touched, self.clause_queue, self.var_queue,
-        )
-    }
-}
+// impl fmt::Display for Eliminator {
+//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+//         write!(
+//             f,
+//             " - n_touched {}\n - clause_queue {:?}\n - heap {:?}",
+//             self.n_touched, self.clause_queue, self.var_queue,
+//         )
+//     }
+// }
 
 impl ClauseElimination for Solver {
     fn check_eliminator(&self) -> bool {
@@ -205,7 +200,7 @@ impl Solver {
             debug_assert_ne!(c0, l);
             // println!("{} is removed and its first literal {} is enqueued.", cid2fmt(cid), c0.int());
             self.remove_clause(cid);
-            self.vars[..].detach_clause(cid, clause!(self.cp, cid), &mut self.eliminator);
+            self.vars.detach_clause(cid, clause!(self.cp, cid), &mut self.eliminator);
             if self.enqueue(c0, NULL_CLAUSE) && self.propagate_0() == NULL_CLAUSE {
                 // self.cp[cid.to_kind()].touched[c0 as usize] = true;
                 self.cp[cid.to_kind()].touched[c0.negate() as usize] = true;
@@ -284,8 +279,8 @@ impl Solver {
     /// - calls `clause_queue.pop`
     pub fn backward_subsumption_check(&mut self) -> bool {
         let mut cnt = 0;
-        let mut subsumed = 0;
-        let mut deleted_literals = 0;
+        let mut _subsumed = 0;
+        let mut _deleted_literals = 0;
         debug_assert_eq!(self.decision_level(), 0);
         while !self.eliminator.clause_queue.is_empty()
             || self.eliminator.bwdsub_assigns < self.trail.len()
@@ -305,7 +300,7 @@ impl Solver {
             unsafe {
                 let mut best = 0;
                 let unilits: [Lit; 1];
-                let mut lits: &[Lit];
+                let lits: &[Lit];
                 // let ch = clause_head_mut!(self.cp, cid) as *mut ClauseHead;
                 if cid.to_kind() == ClauseKind::Uniclause as usize {
                     best = (cid.to_index() as Lit).vi();
@@ -353,7 +348,7 @@ impl Solver {
                         {
                             match self.subsume(cid, *di) {
                                 Some(NULL_LIT) => {
-                                    subsumed += 1;
+                                    _subsumed += 1;
                                     if cid.to_kind() == ClauseKind::Removable as usize
                                         && di.to_kind() == ClauseKind::Removable as usize
                                     {
@@ -364,7 +359,7 @@ impl Solver {
                                         //          *clause_body!(self.cp, cid),
                                         // );
                                         self.remove_clause(*di);
-                                        self.vars[..].detach_clause(*di, clause!(self.cp, cid), &mut self.eliminator);
+                                        self.vars.detach_clause(*di, clause!(self.cp, cid), &mut self.eliminator);
                                     } //else {
                                       // println!("backward_subsumption_check tries to delete a permanent clause {} {:#}",
                                       //          cid2fmt(*di),
@@ -377,7 +372,7 @@ impl Solver {
                                     self.cp[di.to_kind()].touched[l.negate() as usize] = true;
                                     // let xb = &clause_body!(self.cp, *di);
                                     // println!("BackSubsC    => subsumed {} from {} and {} {:#}", l.int(), cid2fmt(cid), cid2fmt(*di), xb);
-                                    deleted_literals += 1;
+                                    _deleted_literals += 1;
                                     // println!("cancel true path");
                                     // continue;
                                     if !self.strengthen_clause(*di, l.negate()) {
@@ -753,7 +748,6 @@ impl Solver {
             ..
         } = self.cp[cid.to_kind()];
         unsafe {
-            let cix = cid.to_index();
             let ch = &mut head[cix] as *mut ClauseHead;
             // debug_assert!((*ch).lits.contains(&p));
             // debug_assert!(1 < (*ch).lits.len());

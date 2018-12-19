@@ -171,7 +171,7 @@ impl Solver {
             luby_restart_inc: 2.0,
             luby_current_restarts: 0,
             luby_restart_factor: 100.0,
-            eliminator: Eliminator::new(sve, nv),
+            eliminator: Eliminator::new(sve),
             ok: true,
             model: vec![BOTTOM; nv + 1],
             conflicts: vec![],

@@ -17,6 +17,10 @@ pub trait Satisfiability {
     fn assigned(&self, l: Lit) -> Lbool;
     fn satisfies(&self, c: &[Lit]) -> bool;
     fn compute_lbd(&self, vec: &[Lit], keys: &mut [usize]) -> usize;
+}
+
+/// For Vec<Var>
+pub trait EliminationIF {
     fn attach_clause(&mut self, cid: ClauseId, ch: &mut ClauseHead, ignorable: bool, eliminator: &mut Eliminator) -> ();
     fn detach_clause(&mut self, cid: ClauseId, ch: &ClauseHead, eliminator: &mut Eliminator) -> ();
 }
@@ -121,6 +125,9 @@ impl Satisfiability for [Var] {
         }
         cnt
     }
+}
+
+impl EliminationIF for Vec<Var> {
     fn attach_clause(&mut self, cid: ClauseId, ch: &mut ClauseHead, ignorable: bool, eliminator: &mut Eliminator) -> () {
         if !eliminator.use_elim {
             return;
@@ -159,7 +166,6 @@ impl Satisfiability for [Var] {
             }
         }
     }
-
 }
 
 // pub struct VarManager {
