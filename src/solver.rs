@@ -871,8 +871,13 @@ impl CDCL for Solver {
                     let cid = self.add_clause(&mut *v, lbd);
                     if cid.to_kind() == ClauseKind::Removable as usize {
                         // clause_body_mut!(self.cp, cid).set_flag(ClauseFlag::JustUsed, true);
-                        debug_assert!(!clause_mut!(self.cp, cid).get_flag(ClauseFlag::Dead));
-                        self.bump_cid(cid);
+                        // debug_assert!(!ch.get_flag(ClauseFlag::Dead));
+                        // self.bump_cid(cid);
+                        self.cp[ClauseKind::Removable as usize].bump_activity(
+                            cid.to_index(),
+                            self.stat[Stat::Conflict as usize] as f64,
+                            &mut self.cla_inc,
+                        );
                     }
                     self.uncheck_enqueue(l0, cid);
                     clause_mut!(self.cp, cid).set_flag(ClauseFlag::Locked, true);
@@ -994,7 +999,12 @@ impl CDCL for Solver {
                 let ch = clause_mut!(self.cp, cid) as *mut ClauseHead;
                 debug_assert_ne!(cid, NULL_CLAUSE);
                 if cid.to_kind() == (ClauseKind::Removable as usize) {
-                    self.bump_cid(cid);
+                    // self.bump_cid(cid);
+                    self.cp[ClauseKind::Removable as usize].bump_activity(
+                        cid.to_index(),
+                        self.stat[Stat::Conflict as usize] as f64,
+                        &mut self.cla_inc,
+                    );
                     // if 2 < (*ch).rank {
                     //     let nblevels = compute_lbd(&self.vars, &ch.lits, &mut self.lbd_temp);
                     //     if nblevels + 1 < (*ch).rank {

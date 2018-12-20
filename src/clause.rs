@@ -15,6 +15,7 @@ pub trait GC {
     fn new_clause(&mut self, v: &[Lit], rank: usize, locked: bool) -> ClauseId;
     fn reset_lbd(&mut self, vars: &[Var], temp: &mut [usize]) -> ();
     fn move_to(&mut self, list: &mut ClauseId, ci: ClauseIndex, index: usize) -> ClauseIndex;
+    fn bump_activity(&mut self, cix: ClauseIndex, val: f64, cla_inc: &mut f64) -> ();
 }
 
 /// For usize
@@ -27,7 +28,6 @@ pub trait ClauseIdIndexEncoding {
 
 /// For Solver
 pub trait ClauseManagement {
-    fn bump_cid(&mut self, ci: ClauseId) -> ();
     fn decay_cla_activity(&mut self) -> ();
     fn add_unchecked_clause(&mut self, v: &mut Vec<Lit>) -> Option<ClauseId>;
     fn add_clause(&mut self, v: &mut Vec<Lit>, lbd: usize) -> ClauseId;
@@ -330,36 +330,6 @@ impl<'a> Iterator for ClauseIter<'a> {
 }
 
 impl ClauseManagement for Solver {
-    fn bump_cid(&mut self, cid: ClauseId) -> () {
-        debug_assert_ne!(cid, 0);
-        let b = self.stat[Stat::Conflict as usize] as f64;
-        let c = clause_mut!(self.cp, cid);
-        let a = c.activity + self.cla_inc;
-        // a = (c.activity + b) / 2.0;
-        c.activity = a;
-        // for i in 1..self.cp[ClauseKind::Removable as usize].head.len() {
-        //     let c = &mut self.cp[ClauseKind::Removable as usize].head[i];
-        //     if c.activity == 0.0 {
-        //         panic!(
-        //             "zero activity {} {}",
-        //             i,
-        //             cid2fmt(ClauseKind::Removable.id_from(i))
-        //         );
-        //     }
-        // }
-        if true && 1.0e20 < a {
-            // for c in &mut self.cp[ClauseKind::Removable as usize].body[1..] {
-            //     debug_assert!(0.0 < c.activity);
-            //     c.activity *= 1.0e-20;
-            // }
-            for c in self.cp[ClauseKind::Removable as usize].head.iter_mut().skip(1) {
-                if 1.0e-300 < c.activity {
-                    c.activity *= 1.0e-20;
-                }
-            }
-            self.cla_inc *= 1.0e-20;
-        }
-    }
     fn decay_cla_activity(&mut self) -> () {
         self.cla_inc /= self.config.clause_decay_rate;
     }
@@ -427,8 +397,15 @@ impl ClauseManagement for Solver {
             ClauseKind::Removable
         };
         let cid = self.cp[kind as usize].new_clause(&v, lbd, false);
-        self.bump_cid(cid);
-        self.vars.attach_clause(cid, clause_mut!(self.cp, cid), false, &mut self.eliminator);
+        // self.bump_cid(cid);
+        if cid.to_kind() == ClauseKind::Removable as usize {
+            self.cp[ClauseKind::Removable as usize]
+                .bump_activity(cid.to_index(),
+                               self.stat[Stat::Conflict as usize] as f64,
+                               &mut self.cla_inc);
+        }
+        let ch = clause_mut!(self.cp, cid);
+        self.vars.attach_clause(cid, ch, false, &mut self.eliminator);
         cid
     }
 
@@ -786,6 +763,20 @@ impl GC for ClausePartition {
             *list = ci;
         }
         next
+    }
+    fn bump_activity(&mut self, cix: ClauseIndex, val: f64, cla_inc: &mut f64) -> () {
+        let c = &mut self.head[cix];
+        let a = c.activity + *cla_inc;
+        // a = (c.activity + val) / 2.0;
+        c.activity = a;
+        if true && 1.0e20 < a {
+            for c in self.head.iter_mut().skip(1) {
+                if 1.0e-300 < c.activity {
+                    c.activity *= 1.0e-20;
+                }
+            }
+            *cla_inc *= 1.0e-20;
+        }
     }
 }
 
