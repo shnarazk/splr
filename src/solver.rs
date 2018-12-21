@@ -996,7 +996,7 @@ impl CDCL for Solver {
         let mut p = NULL_LIT;
         let mut ti = self.trail.len() - 1; // trail index
         let mut path_cnt = 0;
-        let mut last_dl: Vec<Lit> = Vec::new();
+        // let mut last_dl: Vec<Lit> = Vec::new();
         loop {
             // println!("analyze {}", p.int());
             unsafe {
@@ -1109,14 +1109,14 @@ impl CDCL for Solver {
             self.minimize_with_bi_clauses(learnt);
         }
         // glucose heuristics
-        let lbd = self.vars.compute_lbd(learnt, &mut self.lbd_temp);
-        while let Some(l) = last_dl.pop() {
-            let vi = l.vi();
-            if clause!(self.cp, self.vars[vi].reason).rank < lbd {
-                self.vars[vi].bump_activity(self.stat[Stat::Conflict as usize] as f64);
-                self.var_order.update(&self.vars, vi);
-            }
-        }
+        // let lbd = self.vars.compute_lbd(learnt, &mut self.lbd_temp);
+        // while let Some(l) = last_dl.pop() {
+        //     let vi = l.vi();
+        //     if clause!(self.cp, self.vars[vi].reason).rank < lbd {
+        //         self.vars[vi].bump_activity(self.stat[Stat::Conflict as usize] as f64);
+        //         self.var_order.update(&self.vars, vi);
+        //     }
+        // }
         // find correct backtrack level from remaining literals
         let mut level_to_return = 0;
         if 1 < learnt.len() {
