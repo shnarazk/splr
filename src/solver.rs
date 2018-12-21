@@ -1122,8 +1122,9 @@ impl CDCL for Solver {
         if 1 < learnt.len() {
             let mut max_i = 1;
             level_to_return = self.vars[learnt[max_i].vi()].level;
-            for i in 2..learnt.len() {
-                let lv = self.vars[learnt[i].vi()].level;
+            // for i in 2..learnt.len() {
+            for (i, l) in learnt.iter().enumerate().skip(2) {
+                let lv = self.vars[l.vi()].level;
                 if level_to_return < lv {
                     level_to_return = lv;
                     max_i = i;
