@@ -7,13 +7,17 @@ use crate::var::{VarOrdering, *};
 use std::cmp::max;
 use std::collections::VecDeque;
 use std::fs;
-use std::io::{BufRead, BufReader};
+use std::fs::File;
+use std::io::{BufRead, BufReader, BufWriter, Write};
 
+/// For Solver
 pub trait SatSolver {
     fn solve(&mut self) -> SolverResult;
     fn build(path: &str) -> (Solver, CNFDescription);
 }
 
+
+/// For Solver
 pub trait CDCL {
     /// returns `true` for SAT, `false` for UNSAT.
     fn search(&mut self) -> bool;
@@ -191,7 +195,7 @@ impl Solver {
         }
     }
     // print a progress report
-    pub fn progress(&mut self, mes: &str) -> () {
+    pub fn progress(&mut self, mes: &str) {
         self.progress_cnt += 1;
         // if self.progress_cnt % 16 == 0 {
         //     self.dump_cnf(format!("G2-p{:>3}.cnf", self.progress_cnt).to_string());
@@ -278,8 +282,7 @@ impl Solver {
                     self.stat[Stat::Simplification as usize],
                 );
             }
-        } else {
-            if mes.is_empty() {
+        } else if mes.is_empty() {
                 println!(
                     "   #mode,      Variable Assignment      ,,  \
                      Clause Database Management  ,,   Restart Strategy      ,, \
@@ -331,7 +334,7 @@ impl Solver {
                     self.eliminator.var_queue_len(),
                 );
             }
-        }
+
         // if self.progress_cnt == -1 {
         //     self.dump_cnf(format!("test-{}.cnf", self.progress_cnt).to_string());
         //     panic!("aa");
@@ -346,7 +349,7 @@ impl Solver {
         self.trail_lim.len()
     }
 
-    pub fn adapt_strategy(&mut self) -> () {
+    pub fn adapt_strategy(&mut self) {
         let mut re_init = false;
         let decpc =
             self.stat[Stat::Decision as usize] as f64 / self.stat[Stat::Conflict as usize] as f64;
@@ -445,13 +448,13 @@ impl SatSolver for Solver {
         self.eliminator.var_queue.clear();
         if self.eliminator.use_elim {
             for v in &mut self.vars[1..] {
-                if v.neg_occurs.len() == 0 && 0 < v.pos_occurs.len() && v.assign == BOTTOM {
+                if v.neg_occurs.is_empty() && !v.pos_occurs.is_empty() && v.assign == BOTTOM {
                     debug_assert!(!v.eliminated);
                     debug_assert!(!self.trail.contains(&v.index.lit(LTRUE)));
                     debug_assert!(!self.trail.contains(&v.index.lit(LFALSE)));
                     v.assign = LTRUE;
                     self.trail.push(v.index.lit(LTRUE));
-                } else if v.pos_occurs.len() == 0 && 0 < v.neg_occurs.len() && v.assign == BOTTOM {
+                } else if v.pos_occurs.is_empty() && !v.neg_occurs.is_empty() && v.assign == BOTTOM {
                     debug_assert!(!v.eliminated);
                     debug_assert!(!self.trail.contains(&v.index.lit(LTRUE)));
                     debug_assert!(!self.trail.contains(&v.index.lit(LFALSE)));
@@ -904,7 +907,8 @@ impl CDCL for Solver {
                 }
 
                 // self.decay_var_activity();
-                self.decay_cla_activity();
+                // decay clause activity
+                self.cla_inc /= self.config.clause_decay_rate;
                 // glucose reduction
                 let conflicts = self.stat[Stat::Conflict as usize] as usize;
                 if self.cur_restart * self.next_reduction <= conflicts {
@@ -918,7 +922,7 @@ impl CDCL for Solver {
         }
     }
 
-    fn cancel_until(&mut self, lv: usize) -> () {
+    fn cancel_until(&mut self, lv: usize) {
         let Solver {
             ref mut cp,
             ref mut vars,
@@ -1133,7 +1137,7 @@ impl CDCL for Solver {
         level_to_return
     }
 
-    fn analyze_final(&mut self, ci: ClauseId, skip_first: bool) -> () {
+    fn analyze_final(&mut self, ci: ClauseId, skip_first: bool) {
         let mut seen = vec![false; self.num_vars + 1];
         self.conflicts.clear();
         if self.root_level != 0 {
@@ -1205,7 +1209,7 @@ impl Solver {
         true
     }
 
-    fn minimize_with_bi_clauses(&mut self, vec: &mut Vec<Lit>) -> () {
+    fn minimize_with_bi_clauses(&mut self, vec: &mut Vec<Lit>) {
         let Solver { ref mut cp, ref vars, ref mut lbd_temp, .. } = self;
         let len = vec.len();
         if 30 < len {
@@ -1238,7 +1242,7 @@ impl Solver {
         }
     }
 
-    pub fn uncheck_enqueue(&mut self, l: Lit, cid: ClauseId) -> () {
+    pub fn uncheck_enqueue(&mut self, l: Lit, cid: ClauseId) {
         let Solver {
             ref mut cp,
             ref mut vars,
@@ -1248,7 +1252,7 @@ impl Solver {
             .. } = self;
         // println!("uncheck_enqueue {}", l.int());
         debug_assert!(l != 0, "Null literal is about to be equeued");
-        debug_assert!(trail_lim.len() == 0 || cid != 0,
+        debug_assert!(trail_lim.is_empty() || cid != 0,
                       "Null CLAUSE is used for uncheck_enqueue"
         );
         let dl = trail_lim.len();
@@ -1267,7 +1271,7 @@ impl Solver {
         // debug_assert!(!self.trail.contains(&l.negate()));
         trail.push(l);
     }
-    pub fn uncheck_assume(&mut self, l: Lit) -> () {
+    pub fn uncheck_assume(&mut self, l: Lit) {
         // println!("uncheck_assume {}", l.int());
         let Solver {
             ref mut vars,
@@ -1293,7 +1297,43 @@ impl Solver {
 }
 
 impl Solver {
-    pub fn dump(&self, str: &str) -> () {
+    #[allow(dead_code)]
+    fn dump_cnf(&self, fname: &str) {
+        let Solver { ref cp, ref vars, ref trail, ref num_vars, .. } = self;
+        for v in vars {
+            if v.eliminated {
+                if v.assign != BOTTOM {
+                    panic!("conflicting var {} {}", v.index, v.assign);
+                } else {
+                    println!("eliminate var {}", v.index);
+                }
+            }
+        }
+        if let Ok(out) = File::create(&fname) {
+            let mut buf = BufWriter::new(out);
+            let nv = trail.len();
+            let nc: usize = cp.iter().map(|p| p.head.len() - 1).sum();
+            buf.write_all(format!("p cnf {} {}\n", num_vars, nc + nv).as_bytes()).unwrap();
+            let kinds = [
+                ClauseKind::Binclause,
+                ClauseKind::Removable,
+                ClauseKind::Permanent,
+            ];
+            for kind in &kinds {
+                for c in cp[*kind as usize].head.iter().skip(1) {
+                    for l in &c.lits {
+                        buf.write_all(format!("{} ", l.int()).as_bytes()).unwrap();
+                    }
+                    buf.write_all(b"0\n").unwrap();
+                }
+            }
+            buf.write_all(b"c from trail\n").unwrap();
+            for x in trail {
+                buf.write_all(format!("{} 0\n", x.int()).as_bytes()).unwrap();
+            }
+        }
+    }
+    pub fn dump(&self, str: &str) {
         println!("# {} at {}", str, self.decision_level());
         println!(
             "# nassigns {}, decision cands {}",

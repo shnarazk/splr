@@ -6,8 +6,6 @@ use crate::var::{EliminationIF, Satisfiability, Var};
 use std::cmp::Ordering;
 use std::f64;
 use std::fmt;
-use std::fs::File;
-use std::io::{BufWriter, Write};
 
 /// For ClausePartition
 pub trait GC {
@@ -28,14 +26,12 @@ pub trait ClauseIdIndexEncoding {
 
 /// For Solver
 pub trait ClauseManagement {
-    fn decay_cla_activity(&mut self) -> ();
     fn add_unchecked_clause(&mut self, v: &mut Vec<Lit>) -> Option<ClauseId>;
     fn add_clause(&mut self, v: &mut Vec<Lit>, lbd: usize) -> ClauseId;
     fn remove_clause(&mut self, cid: ClauseId) -> ();
     fn change_clause_kind(&mut self, cid: ClauseId, kind: ClauseKind) -> ();
     fn reduce(&mut self) -> ();
     fn simplify(&mut self) -> bool;
-    fn dump_cnf(&self, fname: String) -> ();
 }
 
 /// For ClausePartition
@@ -179,7 +175,7 @@ impl ClauseHead {
         }
     }
     #[inline(always)]
-    pub fn set_flag(&mut self, flag: ClauseFlag, val: bool) -> () {
+    pub fn set_flag(&mut self, flag: ClauseFlag, val: bool) {
         self.flag &= !(1 << (flag as u16));
         self.flag |= (val as u16) << (flag as u16);
     }
@@ -330,9 +326,6 @@ impl<'a> Iterator for ClauseIter<'a> {
 }
 
 impl ClauseManagement for Solver {
-    fn decay_cla_activity(&mut self) -> () {
-        self.cla_inc /= self.config.clause_decay_rate;
-    }
     // renamed from clause_new
     fn add_unchecked_clause(&mut self, v: &mut Vec<Lit>) -> Option<ClauseId> {
         v.sort_unstable();
@@ -411,7 +404,7 @@ impl ClauseManagement for Solver {
 
     /// 4. removeClause
     /// called from strengthen_clause, backward_subsumption_check, eliminate_var, substitute
-    fn remove_clause(&mut self, cid: ClauseId) -> () {
+    fn remove_clause(&mut self, cid: ClauseId) {
         // if clause_body!(self.cp, cid).get_flag(ClauseFlag::Dead) {
         //     panic!(
         //         "remove_clause Dead: {} {:#}{:#}",
@@ -438,7 +431,7 @@ impl ClauseManagement for Solver {
         self.cp[cid.to_kind()].touched[w1 as usize] = true;
     }
 
-    fn change_clause_kind(&mut self, cid: ClauseId, kind: ClauseKind) -> () {
+    fn change_clause_kind(&mut self, cid: ClauseId, kind: ClauseKind) {
         debug_assert_eq!(self.decision_level(), 0);
         let rank;
         let locked;
@@ -459,7 +452,7 @@ impl ClauseManagement for Solver {
         }
     }
 
-    fn reduce(&mut self) -> () {
+    fn reduce(&mut self) {
         self.cp[ClauseKind::Removable as usize].reset_lbd(&self.vars, &mut self.lbd_temp[..]);
         let ClausePartition {
             ref mut head,
@@ -520,12 +513,12 @@ impl ClauseManagement for Solver {
                 return false;
             }
         }
-        unsafe {
-            let eliminator = &mut self.eliminator as *mut Eliminator;
-            let vars = &mut self.vars[..] as *mut [Var];
+        {
+            let eliminator = &mut self.eliminator;
+            let vars = &mut self.vars[..];
             for ck in ClauseKind::Liftedlit as usize ..= ClauseKind::Binclause as usize {
                 for ch in &mut self.cp[ck].head[1..] {
-                    if !ch.get_flag(ClauseFlag::Dead) && self.vars.satisfies(&ch.lits) {
+                    if !ch.get_flag(ClauseFlag::Dead) && vars.satisfies(&ch.lits) {
                         debug_assert!(!ch.get_flag(ClauseFlag::Locked));
                         ch.set_flag(ClauseFlag::Dead, true);
                         debug_assert!(ch.lit[0] != 0 && ch.lit[1] != 0);
@@ -541,52 +534,17 @@ impl ClauseManagement for Solver {
                         }
                     }
                 }
-                self.cp[ck].garbage_collect(&mut self.vars, &mut self.eliminator);
+                self.cp[ck].garbage_collect(vars, eliminator);
             }
         }
         self.stat[Stat::Simplification as usize] += 1;
         // self.check_eliminator();
         true
     }
-    fn dump_cnf(&self, fname: String) -> () {
-        for v in &self.vars {
-            if v.eliminated {
-                if v.assign != BOTTOM {
-                    panic!("conflicting var {} {}", v.index, v.assign);
-                } else {
-                    println!("eliminate var {}", v.index);
-                }
-            }
-        }
-        if let Ok(out) = File::create(&fname) {
-            let mut buf = BufWriter::new(out);
-            let nv = self.trail.len();
-            let nc: usize = self.cp.iter().map(|p| p.head.len() - 1).sum();
-            buf.write(format!("p cnf {} {}\n", self.num_vars, nc + nv).as_bytes())
-                .unwrap();
-            let kinds = [
-                ClauseKind::Binclause,
-                ClauseKind::Removable,
-                ClauseKind::Permanent,
-            ];
-            for kind in &kinds {
-                for c in self.cp[*kind as usize].head.iter().skip(1) {
-                    for l in &c.lits {
-                        buf.write(format!("{} ", l.int()).as_bytes()).unwrap();
-                    }
-                    buf.write("0\n".as_bytes()).unwrap();
-                }
-            }
-            buf.write("c from trail\n".as_bytes()).unwrap();
-            for x in &self.trail {
-                buf.write(format!("{} 0\n", x.int()).as_bytes()).unwrap();
-            }
-        }
-    }
 }
 
 impl GC for ClausePartition {
-    fn garbage_collect(&mut self, vars: &mut [Var], eliminator: &mut Eliminator) -> () {
+    fn garbage_collect(&mut self, vars: &mut [Var], eliminator: &mut Eliminator) {
         unsafe {
             let garbages = &mut self.watcher[GARBAGE_LIT.negate() as usize] as *mut ClauseId;
             for l in 2..self.watcher.len() {
@@ -726,7 +684,7 @@ impl GC for ClausePartition {
         self.watcher[w1] = cix;
         self.id_from(cix)
     }
-    fn reset_lbd(&mut self, vars: &[Var], temp: &mut [usize]) -> () {
+    fn reset_lbd(&mut self, vars: &[Var], temp: &mut [usize]) {
         for x in &mut temp[..] {
             *x = 0;
         }
@@ -764,12 +722,12 @@ impl GC for ClausePartition {
         }
         next
     }
-    fn bump_activity(&mut self, cix: ClauseIndex, val: f64, cla_inc: &mut f64) -> () {
+    fn bump_activity(&mut self, cix: ClauseIndex, val: f64, cla_inc: &mut f64) {
         let c = &mut self.head[cix];
         let a = c.activity + *cla_inc;
         // a = (c.activity + val) / 2.0;
         c.activity = a;
-        if true && 1.0e20 < a {
+        if 1.0e20 < a {
             for c in self.head.iter_mut().skip(1) {
                 if 1.0e-300 < c.activity {
                     c.activity *= 1.0e-20;

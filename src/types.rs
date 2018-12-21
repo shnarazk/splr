@@ -152,13 +152,13 @@ impl EmaKind for Ema2 {
     fn get(&self) -> f64 {
         self.fast / self.slow * (self.cals / self.calf)
     }
-    fn update(&mut self, x: f64) -> () {
+    fn update(&mut self, x: f64) {
         self.fast = self.fe * x + (1.0 - self.fe) * self.fast;
         self.slow = self.se * x + (1.0 - self.se) * self.slow;
         self.calf = self.fe + (1.0 - self.fe) * self.calf;
         self.cals = self.se + (1.0 - self.se) * self.cals;
     }
-    fn reset(&mut self) -> () {
+    fn reset(&mut self) {
         self.slow = self.fast;
         self.cals = self.calf;
     }
@@ -177,11 +177,11 @@ impl EmaKind for Ema {
     fn get(&self) -> f64 {
         self.0 / self.2
     }
-    fn update(&mut self, x: f64) -> () {
+    fn update(&mut self, x: f64) {
         self.0 = self.1 * x + (1.0 - self.1) * self.0;
         self.2 = self.1 + (1.0 - self.1) * self.2;
     }
-    fn reset(&mut self) -> () {
+    fn reset(&mut self) {
         self.2 = self.0;
     }
 }
@@ -199,11 +199,11 @@ impl EmaKind for Ema_ {
     fn get(&self) -> f64 {
         self.0 / self.1
     }
-    fn update(&mut self, x: f64) -> () {
+    fn update(&mut self, x: f64) {
         let e = self.1 * x + (1.0 - self.1) * self.0;
         self.0 = e;
     }
-    fn reset(&mut self) -> () {
+    fn reset(&mut self) {
         self.0 = 1.0;
     }
 }

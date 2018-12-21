@@ -53,7 +53,7 @@ impl QueueOperations for VecDeque<usize> {
 
 impl Restart for Solver {
     /// called after conflict resolution
-    fn block_restart(&mut self, lbd: usize, clv: usize, blv: usize, nas: usize) -> () {
+    fn block_restart(&mut self, lbd: usize, clv: usize, blv: usize, nas: usize) {
         let count = self.stat[Stat::Conflict as usize] as u64;
         self.c_lvl.update(clv as f64);
         self.b_lvl.update(blv as f64);
@@ -77,7 +77,7 @@ impl Restart for Solver {
     }
 
     /// called after no conflict propagation
-    fn force_restart(&mut self) -> () {
+    fn force_restart(&mut self) {
         let count = self.stat[Stat::Conflict as usize] as u64;
         if RESET_EMA < count
             && self.next_restart < count
@@ -117,5 +117,5 @@ pub fn luby(y: f64, mut x: usize) -> f64 {
         seq -= 1;
         x %= size;
     }
-    return y.powf(seq as f64);
+    y.powf(seq as f64)
 }

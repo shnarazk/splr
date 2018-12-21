@@ -86,7 +86,7 @@ impl Var {
         }
         vec
     }
-    pub fn bump_activity(&mut self, d: f64) -> () {
+    pub fn bump_activity(&mut self, d: f64) {
         self.activity = (self.activity + d) / 2.0;
         // let a = d + 0.01;
         // self.vars[vi].activity = a;
@@ -128,7 +128,7 @@ impl Satisfiability for [Var] {
 }
 
 impl EliminationIF for Vec<Var> {
-    fn attach_clause(&mut self, cid: ClauseId, ch: &mut ClauseHead, ignorable: bool, eliminator: &mut Eliminator) -> () {
+    fn attach_clause(&mut self, cid: ClauseId, ch: &mut ClauseHead, ignorable: bool, eliminator: &mut Eliminator) {
         if !eliminator.use_elim {
             return;
         }
@@ -148,7 +148,7 @@ impl EliminationIF for Vec<Var> {
             eliminator.enqueue_clause(cid, ch);
         }
     }
-    fn detach_clause(&mut self, cid: ClauseId, ch: &ClauseHead, eliminator: &mut Eliminator) -> () {
+    fn detach_clause(&mut self, cid: ClauseId, ch: &ClauseHead, eliminator: &mut Eliminator) {
         debug_assert!(ch.get_flag(ClauseFlag::Dead));
         if eliminator.use_elim {
             for l in &ch.lits {
@@ -225,7 +225,7 @@ impl VarOrdering for VarIdHeap {
         // }
         vs
     }
-    fn reset(&mut self) -> () {
+    fn reset(&mut self) {
         for i in 0..self.idxs.len() {
             self.idxs[i] = i;
             self.heap[i] = i;
@@ -236,7 +236,7 @@ impl VarOrdering for VarIdHeap {
         self.idxs[v] <= self.idxs[0]
     }
     /// renamed from incrementHeap, updateVO
-    fn update(&mut self, vec: &[Var], v: VarId) -> () {
+    fn update(&mut self, vec: &[Var], v: VarId) {
         debug_assert!(v != 0, "Invalid VarId");
         let start = self.idxs[v];
         if self.contains(v) {
@@ -244,7 +244,7 @@ impl VarOrdering for VarIdHeap {
         }
     }
     /// renamed from undoVO
-    fn insert(&mut self, vec: &[Var], vi: VarId) -> () {
+    fn insert(&mut self, vec: &[Var], vi: VarId) {
         // self.var_order.check("check insert 1");
         if self.contains(vi) {
             let i = self.idxs[vi];
@@ -260,7 +260,7 @@ impl VarOrdering for VarIdHeap {
         self.percolate_up(&vec, n);
         // self.var_order.check("check insert 2");
     }
-    fn clear(&mut self) -> () {
+    fn clear(&mut self) {
         self.reset()
     }
     fn len(&self) -> usize {
@@ -284,7 +284,7 @@ impl VarIdHeap {
         idxs[0] = init;
         VarIdHeap { heap, idxs }
     }
-    fn percolate_up(&mut self, vars: &[Var], start: usize) -> () {
+    fn percolate_up(&mut self, vars: &[Var], start: usize) {
         let mut q = start;
         let vq = self.heap[q];
         debug_assert!(0 < vq, "size of heap is too small");
@@ -322,7 +322,7 @@ impl VarIdHeap {
             }
         }
     }
-    fn percolate_down(&mut self, vars: &[Var], start: usize) -> () {
+    fn percolate_down(&mut self, vars: &[Var], start: usize) {
         let n = self.len();
         let mut i = start;
         let vi = self.heap[i];
@@ -365,7 +365,7 @@ impl VarIdHeap {
             }
         }
     }
-    pub fn check(&self, s: &str) -> () {
+    pub fn check(&self, s: &str) {
         let h = &mut self.heap.clone()[1..];
         let d = &mut self.idxs.clone()[1..];
         h.sort();
@@ -382,7 +382,7 @@ impl VarIdHeap {
     }
     /// renamed from getHeapDown
     #[allow(dead_code)]
-    pub fn remove(&mut self, vec: &[Var], vs: VarId) -> () {
+    pub fn remove(&mut self, vec: &[Var], vs: VarId) {
         let s = self.idxs[vs];
         let n = self.idxs[0];
         if n < s {
@@ -403,7 +403,7 @@ impl VarIdHeap {
 }
 
 impl VarManagement for Solver {
-    fn rebuild_heap(&mut self) -> () {
+    fn rebuild_heap(&mut self) {
         debug_assert_eq!(self.decision_level(), 0);
         self.var_order.reset();
         for v in &self.vars[1..] {

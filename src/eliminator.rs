@@ -79,7 +79,7 @@ impl EliminatorIF for Eliminator {
             var_queue_threshold: VAR_QUEUE_THRESHOLD,
         }
     }
-    fn enqueue_clause(&mut self, cid: ClauseId, ch: &mut ClauseHead) -> () {
+    fn enqueue_clause(&mut self, cid: ClauseId, ch: &mut ClauseHead) {
         if !self.use_elim || self.clause_queue_threshold == 0 {
             // println!("{} is not enqueued", cid2fmt(cid));
             return;
@@ -99,7 +99,7 @@ impl EliminatorIF for Eliminator {
             }
         }
     }
-    fn enqueue_var(&mut self, v: &mut Var) -> () {
+    fn enqueue_var(&mut self, v: &mut Var) {
         if !self.use_elim || self.var_queue_threshold == 0 {
             return;
         }
@@ -164,15 +164,13 @@ impl ClauseElimination for Solver {
                         if !self.vars[v].pos_occurs.contains(&cid) {
                             panic!("aaa {} {:#}", cid2fmt(cid), ch);
                         }
-                    } else {
-                        if !self.vars[v].neg_occurs.contains(&cid) {
-                            panic!("aaa {} {:#}", cid2fmt(cid), ch);
-                        }
+                    } else if !self.vars[v].neg_occurs.contains(&cid) {
+                        panic!("aaa {} {:#}", cid2fmt(cid), ch);
                     }
                 }
             }
         }
-        return true;
+        true
     }
 }
 
@@ -390,16 +388,16 @@ impl Solver {
         true
     }
     /// 13. mkElimClause(1)
-    pub fn make_eliminating_unit_clause(&self, vec: &mut Vec<Lit>, x: Lit) -> () {
+    pub fn make_eliminating_unit_clause(&self, vec: &mut Vec<Lit>, x: Lit) {
         vec.push(x);
         vec.push(1);
     }
     /// 14. mkElimClause(2)
-    pub fn make_eliminated_clause(&self, vec: &mut Vec<Lit>, vi: VarId, cid: ClauseId) -> () {
+    pub fn make_eliminated_clause(&self, vec: &mut Vec<Lit>, vi: VarId, cid: ClauseId) {
         let first = vec.len();
         // Copy clause to the vector. Remember the position where the varibale 'v' occurs:
         let ch = clause!(self.cp, cid);
-        debug_assert!(0 < ch.lits.len());
+        debug_assert!(!ch.lits.is_empty());
         for l in &ch.lits {
             vec.push(*l as u32);
             if l.vi() == vi {
@@ -441,10 +439,10 @@ impl Solver {
         unsafe {
             // Check wether the increase in number of clauses stays within the allowed ('grow').
             // Moreover, no clause must exceed the limit on the maximal clause size (if it is set).
-            if (*pos).len() == 0 && 0 == (*neg).len() {
+            if (*pos).is_empty() && (*neg).is_empty() {
                 return true;
             }
-            if (*pos).len() == 0 && 0 < (*neg).len() {
+            if (*pos).is_empty() && !(*neg).is_empty() {
                 // println!("-v {} p {} n {}", v, (*pos).len(), (*neg).len());
                 if !self.enqueue(v.lit(LFALSE), NULL_CLAUSE) || self.propagate_0() != NULL_CLAUSE {
                     self.ok = false;
@@ -452,7 +450,7 @@ impl Solver {
                 }
                 return true;
             }
-            if (*neg).len() == 0 && (*pos).len() == 0 {
+            if (*neg).is_empty() && (*pos).is_empty() {
                 // println!("+v {} p {} n {}", v, (*pos).len(), (*neg).len());
                 if !self.enqueue(v.lit(LTRUE), NULL_CLAUSE) || self.propagate_0() != NULL_CLAUSE {
                     self.ok = false;
@@ -603,7 +601,7 @@ impl Solver {
     /// inline lbool    Solver::modelValue    (Var x) const   { return model[x]; }
     /// inline lbool    Solver::modelValue    (Lit p) const   { return model[var(p)] ^ sign(p); }
     /// ```
-    pub fn extend_model(&mut self, model: &mut Vec<i32>) -> () {
+    pub fn extend_model(&mut self, model: &mut Vec<i32>) {
         // println!("extend_model {:?}", &self.eliminator.elim_clauses);
         if self.eliminator.elim_clauses.is_empty() {
             return;
@@ -648,7 +646,7 @@ impl Solver {
     }
     /// 18. eliminate
     // should be called at decision level 0.
-    pub fn eliminate(&mut self) -> () {
+    pub fn eliminate(&mut self) {
         if !self.eliminator.use_elim {
             return;
         }
@@ -751,15 +749,13 @@ impl Solver {
             let ch = &mut head[cix] as *mut ClauseHead;
             // debug_assert!((*ch).lits.contains(&p));
             // debug_assert!(1 < (*ch).lits.len());
-            {
-                let v = &mut self.vars[p.vi()];
-                if p.positive() {
-                    // debug_assert!(v.pos_occurs.contains(&cid));
-                    v.pos_occurs.retain(|&c| c != cid);
-                } else {
-                    // debug_assert!(v.neg_occurs.contains(&cid));
-                    v.neg_occurs.retain(|&c| c != cid);
-                }
+            let v = &mut self.vars[p.vi()];
+            if p.positive() {
+                // debug_assert!(v.pos_occurs.contains(&cid));
+                v.pos_occurs.retain(|&c| c != cid);
+            } else {
+                // debug_assert!(v.neg_occurs.contains(&cid));
+                v.neg_occurs.retain(|&c| c != cid);
             }
             if (*ch).get_flag(ClauseFlag::Dead) {
                 return false;
@@ -794,27 +790,21 @@ impl Solver {
                 debug_assert_ne!(new_lit, p);
                 let next_clause = (*ch).next_watcher[hi];
                 // pointer update
-                {
-                    let mut ptr = &mut watcher[p.negate() as usize] as *mut ClauseIndex;
-                    while *ptr != NULL_CLAUSE {
-                        if *ptr == cix {
-                            *ptr = next_clause;
-                            break;
-                        }
-                        let i = (head[*ptr].lit[0] != p) as usize;
-                        debug_assert_eq!(head[*ptr].lit[i], p);
-                        ptr = &mut head[*ptr].next_watcher[i];
+                let mut ptr = &mut watcher[p.negate() as usize] as *mut ClauseIndex;
+                while *ptr != NULL_CLAUSE {
+                    if *ptr == cix {
+                        *ptr = next_clause;
+                        break;
                     }
+                    let i = (head[*ptr].lit[0] != p) as usize;
+                    debug_assert_eq!(head[*ptr].lit[i], p);
+                    ptr = &mut head[*ptr].next_watcher[i];
                 }
                 (*ch).lit[hi] = new_lit;
                 (*ch).next_watcher[hi] = watcher[new_lit.negate() as usize];
                 watcher[new_lit.negate() as usize] = cix;
-                if (*ch).lits.len() == 1 {
-                    debug_assert!((*ch).lit[1] != new_lit);
-                    true
-                } else {
-                    false
-                }
+                debug_assert!((*ch).lits.len() != 1 || (*ch).lit[1] != new_lit);
+                (*ch).lits.len() == 1
             } else {
                 debug_assert!((*ch).lit[0] != p.negate() && (*ch).lit[1] != p.negate());
                 (*ch).lits.retain(|&x| x != p);

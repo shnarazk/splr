@@ -4,7 +4,7 @@ use crate::types::*;
 use crate::var::Satisfiability;
 
 impl Solver {
-    pub fn inject_assigmnent(&mut self, vec: &[i32]) -> () {
+    pub fn inject_assigmnent(&mut self, vec: &[i32]) {
         for val in vec {
             self.vars[val.abs() as usize].assign = if *val < 0 { LFALSE } else { LTRUE };
         }
