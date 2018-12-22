@@ -7,7 +7,7 @@ use structopt::StructOpt;
 // const VERSION: &str = "Splr-0.0.11 (Technology Preview 11) by shnarazk@gitlab.com";
 
 #[derive(StructOpt)]
-#[structopt(name = "splr", about = "SAT solver for Propositional Logic in Rust, Technology Preview 11")]
+#[structopt(name = "splr-nwfp", about = "SAT solver for Propositional Logic in Rust, No Watch, Full Propagate")]
 struct CLOpts {
     /// K in Glucose, for restart
     #[structopt(long = "rt", short="K", default_value = "0.8")]

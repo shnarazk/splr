@@ -1,9 +1,7 @@
-/// no-watchlist
 use crate::clause::{ClauseManagement, GC, *};
 use crate::eliminator::{Eliminator, EliminatorIF};
 use crate::profiler::*;
 use crate::restart::{QueueOperations, RESTART_BLK, RESTART_THR, luby};
-use crate::solver::*;
 use crate::types::*;
 use crate::var::{VarOrdering, *};
 use std::cmp::max;
@@ -12,6 +10,74 @@ use std::fs;
 use std::fs::File;
 use std::io::{BufRead, BufReader, BufWriter, Write};
 
+/// For Solver
+pub trait SatSolver {
+    fn solve(&mut self) -> SolverResult;
+    fn build(path: &str) -> (Solver, CNFDescription);
+}
+
+
+/// For Solver
+pub trait CDCL {
+    /// returns `true` for SAT, `false` for UNSAT.
+    fn search(&mut self) -> bool;
+    fn propagate(&mut self) -> ClauseId;
+    fn propagate_0(&mut self) -> ClauseId;
+    fn cancel_until(&mut self, lv: usize) -> ();
+    fn enqueue(&mut self, l: Lit, cid: ClauseId) -> bool;
+    fn analyze(&mut self, confl: ClauseId, learnt: &mut Vec<Lit>) -> usize;
+    fn analyze_final(&mut self, ci: ClauseId, skip_first: bool) -> ();
+}
+
+pub const CO_LBD_BOUND: usize = 4;
+
+/// normal results returned by Solver
+pub enum Certificate {
+    SAT(Vec<i32>),
+    UNSAT(Vec<i32>), // FIXME: replace with DRAT
+}
+
+/// abnormal termination flags
+pub enum SolverException {
+    StateUNSAT = 0,
+    StateSAT,
+    OutOfMemory,
+    TimeOut,
+    InternalInconsistent,
+    UndescribedError,
+}
+
+/// The type that `Solver` returns
+/// This captures the following three cases:
+/// * solved with a satisfiable assigment,
+/// * proved that it's an unsatisfiable problem, and
+/// * aborted due to Mios specification or an internal error
+pub type SolverResult = Result<Certificate, SolverException>;
+
+/// stat index
+#[derive(Clone, Eq, PartialEq)]
+pub enum Stat {
+    Conflict = 0,       // the number of backjump
+    Decision,           // the number of decision
+    Restart,            // the number of restart
+    NoDecisionConflict, // the number of 'no decision conflict'
+    BlockRestart,       // the number of blacking start
+    Propagation,        // the number of propagation
+    Reduction,          // the number of reduction
+    Simplification,     // the number of simplification
+    Assign,             // the number of assigned variables
+    SumLBD,
+    EndOfStatIndex, // Don't use this dummy.
+}
+
+#[derive(Eq, PartialEq)]
+pub enum SearchStrategy {
+    Generic,
+    ChanSeok,
+    HighSuccesive,
+    LowSuccesive,
+    ManyGlues,
+}
 
 /// is the collection of all variables.
 pub struct Solver {
@@ -69,7 +135,7 @@ pub struct Solver {
 const LBD_QUEUE_LEN: usize = 50;
 const TRAIL_QUEUE_LEN: usize = 5000;
 
-impl Solver2 {
+impl Solver {
     pub fn new(cfg: SolverConfiguration, cnf: &CNFDescription) -> Solver {
         let nv = cnf.num_of_variables as usize;
         let nc = cnf.num_of_clauses as usize;
@@ -109,7 +175,7 @@ impl Solver2 {
             luby_restart_inc: 2.0,
             luby_current_restarts: 0,
             luby_restart_factor: 100.0,
-            eliminator: Eliminator::new(false),
+            eliminator: Eliminator::new(sve),
             ok: true,
             model: vec![BOTTOM; nv + 1],
             conflicts: vec![],
@@ -369,7 +435,7 @@ impl Solver2 {
     }
 }
 
-impl SatSolver for Solver2 {
+impl SatSolver for Solver {
     fn solve(&mut self) -> SolverResult {
         if !self.ok {
             return Ok(Certificate::UNSAT(Vec::new()));
@@ -502,7 +568,7 @@ impl SatSolver for Solver2 {
     }
 }
 
-impl CDCL for Solver2 {
+impl CDCL for Solver {
     fn propagate(&mut self) -> ClauseId {
         let Solver {
             ref mut vars,
@@ -513,41 +579,82 @@ impl CDCL for Solver2 {
             ref mut stat,
             ..
         } = self;
-        let dl = trail_lim.len();
         while *q_head < trail.len() {
             let p: usize = trail[*q_head] as usize;
+            let false_lit = (p as Lit).negate();
             *q_head += 1;
             stat[Stat::Propagation as usize] += 1;
-            let mut in_conflict = false;
-            let list = if p.positive() { &vars[p.vi()].neg_occurs } else { &vars[p.vi()].pos_occurs };
-            for cix in &list {
-                let mut ch = clause_mut!(cp, cix);
-                if ch.mass <= 0 { continue; }
-                ch.mass -= 1;
-                match ch.mass {
-                    0 => {
-                        *q_head = trail.len();
-                        return kind.id_from(cix); // conflict
-                    }
-                    1 if !in_conflict => {
-                        for lk in &ch.lits {
-                            let v = &mut vars[lk.vi()];
-                            // below is equivalent to 'assigned(lk) != LFALSE'
-                            if v.assign == BOTTOM && !v.eliminated {
-                                v.assign = lk.lbool();
+            let kinds = [
+                ClauseKind::Binclause,
+                ClauseKind::Removable,
+                ClauseKind::Permanent,
+            ];
+            for kind in &kinds {
+                // cp[*kind as usize].check(false_lit);
+                let head = &mut cp[*kind as usize].head[..];
+                let watcher = &mut cp[*kind as usize].watcher[..];
+                unsafe
+                {
+                    let mut pre = &mut (*watcher)[p] as *mut usize;
+                    'next_clause: while *pre != NULL_CLAUSE {
+                        let ch = &mut (*head)[*pre];
+                        debug_assert!((*ch).lit[0] == false_lit || (*ch).lit[1] == false_lit);
+                        let my_index = ((*ch).lit[0] != false_lit) as usize;
+                        {
+                            // Handling a special case for simplify
+                            // check other's aliveness
+                            let other = (*ch).lit[(my_index == 0) as usize];
+                            debug_assert!(!vars[other.vi()].eliminated);
+                        }
+                        let other_value = vars.assigned((*ch).lit[(my_index == 0) as usize]);
+                        if other_value != LTRUE {
+                            debug_assert!(2 <= (*ch).lits.len());
+                            debug_assert!((*ch).lits[0] == false_lit || (*ch).lits[1] == false_lit);
+                            if (*ch).lits[0] == false_lit {
+                                (*ch).lits.swap(0, 1); // now false_lit is lits[1].
+                            }
+                            for (k, lk) in (*ch).lits.iter().enumerate().skip(2) {
+                                // below is equivalent to 'assigned(lk) != LFALSE'
+                                if (((lk & 1) as u8) ^ vars[lk.vi()].assign) != 0 {
+                                    let cix = *pre;
+                                    *pre = (*ch).next_watcher[my_index];
+                                    let alt = &mut (*watcher)[lk.negate() as usize];
+                                    (*ch).next_watcher[my_index] = *alt;
+                                    *alt = cix;
+                                    (*ch).lit[my_index] = *lk;
+                                    debug_assert!((*ch).lits[1] == false_lit);
+                                    (*ch).lits[1] = *lk;
+                                    (*ch).lits[k] = false_lit; // Don't move this above (needed by enumerate)
+                                    continue 'next_clause;
+                                }
+                            }
+                            if other_value == LFALSE {
+                                *q_head = trail.len();
+                                return kind.id_from(*pre);
+                            } else {
+                                // self.uncheck_enqueue(other, kind.id_from((*c).index));
+                                let dl = trail_lim.len();
+                                let other = (*ch).lits[0];
+                                // println!("unchecked_enqueue embedded into propagate {}", other.int());
+                                let v = &mut vars[other.vi()];
+                                debug_assert!(v.assign == other.lbool() || v.assign == BOTTOM);
+                                v.assign = other.lbool();
                                 v.level = dl;
+                                debug_assert!(*pre != NULL_CLAUSE);
                                 if dl == 0 {
                                     v.reason = NULL_CLAUSE;
                                 } else {
-                                    v.reason = kind.id_from(cid);
-                                    ch.set_flag(ClauseFlag::Locked, true);
+                                    v.reason = kind.id_from(*pre);
+                                    (*ch).set_flag(ClauseFlag::Locked, true);
                                 }
-                                trail.push(other); // unit propagation
-                                break;
+                                debug_assert!(!v.eliminated);
+                                // debug_assert!(!trail.contains(&other));
+                                // debug_assert!(!trail.contains(&other.negate()));
+                                trail.push(other);
                             }
                         }
+                        pre = &mut (*ch).next_watcher[my_index];
                     }
-                    _ => (),
                 }
             }
         }
@@ -565,42 +672,83 @@ impl CDCL for Solver2 {
             ref mut stat,
             ..
         } = self;
-        let dl = trail_lim.len();
         while *q_head < trail.len() {
             let p: usize = trail[*q_head] as usize;
+            let false_lit = (p as Lit).negate();
             *q_head += 1;
             stat[Stat::Propagation as usize] += 1;
-            let mut in_conflict = false;
-            let list = if p.positive() { &vars[p.vi()].neg_occurs } else { &vars[p.vi()].pos_occurs };
-            for cix in &list {
-                let mut ch = clause_mut!(cp, cix);
-                // Handling a special case for simplify
-                if ch.mass <= 0 || ch.get_flag(ClauseFlag::Dead) { continue; }
-                ch.mass -= 1;
-                match ch.mass {
-                    0 => {
-                        *q_head = trail.len();
-                        return kind.id_from(cix); // conflict
-                    }
-                    1 if !in_conflict => {
-                        for lk in &ch.lits {
-                            let v = &mut vars[lk.vi()];
-                            // below is equivalent to 'assigned(lk) != LFALSE'
-                            if v.assign == BOTTOM && !v.eliminated {
-                                v.assign = lk.lbool();
-                                v.level = dl;
-                                if dl == 0 {
-                                    v.reason = NULL_CLAUSE;
-                                } else {
-                                    v.reason = kind.id_from(cid);
-                                    ch.set_flag(ClauseFlag::Locked, true);
+            let kinds = [
+                ClauseKind::Binclause,
+                ClauseKind::Removable,
+                ClauseKind::Permanent,
+            ];
+            for kind in &kinds {
+                // cp[*kind as usize].check(false_lit);
+                unsafe {
+                    let head = &mut cp[*kind as usize].head[..] as *mut [ClauseHead];
+                    let watcher = &mut cp[*kind as usize].watcher[..] as *mut [ClauseIndex];
+                    let mut pre = &mut (*watcher)[p] as *mut usize;
+                    'next_clause: while *pre != NULL_CLAUSE {
+                        let ch = &mut (*head)[*pre] as *mut ClauseHead;
+                        debug_assert!((*ch).lit[0] == false_lit || (*ch).lit[1] == false_lit);
+                        let my_index = ((*ch).lit[0] != false_lit) as usize;
+                        // let ch = &mut (*body)[*pre] as *mut ClauseBody;
+                        {
+                            // Handling a special case for simplify
+                            if (*ch).get_flag(ClauseFlag::Dead) {
+                                pre = &mut (*ch).next_watcher[my_index];
+                                continue 'next_clause;
+                            }
+                            // check other's aliveness
+                            let other = (*ch).lit[(my_index == 0) as usize];
+                            debug_assert!(!vars[other.vi()].eliminated);
+                        }
+                        let other_value = vars.assigned((*ch).lit[(my_index == 0) as usize]);
+                        if other_value != LTRUE {
+                            debug_assert!(2 <= (*ch).lits.len());
+                            debug_assert!((*ch).lits[0] == false_lit || (*ch).lits[1] == false_lit);
+                            if (*ch).lits[0] == false_lit {
+                                (*ch).lits.swap(0, 1); // now false_lit is lits[1].
+                            }
+                            for (k, lk) in (*ch).lits.iter().enumerate().skip(2) {
+                                // below is equivalent to 'assigned(lk) != LFALSE'
+                                debug_assert!(1 < *lk);
+                                debug_assert!(!vars[lk.vi()].eliminated);
+                                if (((lk & 1) as u8) ^ vars[lk.vi()].assign) != 0 {
+                                    let cix = *pre;
+                                    *pre = (*ch).next_watcher[my_index];
+                                    let alt = &mut (*watcher)[lk.negate() as usize];
+                                    (*ch).next_watcher[my_index] = *alt;
+                                    *alt = cix;
+                                    (*ch).lit[my_index] = *lk;
+                                    debug_assert!((*ch).lits[1] == false_lit);
+                                    (*ch).lits[1] = *lk;
+                                    (*ch).lits[k] = false_lit;
+                                    continue 'next_clause;
                                 }
-                                trail.push(other); // unit propagation
-                                break;
+                            }
+                            if other_value == LFALSE {
+                                *q_head = trail.len();
+                                return kind.id_from(*pre);
+                            } else {
+                                // self.uncheck_enqueue(other, kind.id_from((*c).index));
+                                let dl = trail_lim.len();
+                                debug_assert!(dl == 0);
+                                let other = (*ch).lits[0];
+                                let v = &mut vars[other.vi()];
+                                debug_assert!(v.assign == other.lbool() || v.assign == BOTTOM);
+                                v.assign = other.lbool();
+                                v.level = dl;
+                                debug_assert!(*pre != NULL_CLAUSE);
+                                v.reason = NULL_CLAUSE;
+                                debug_assert!(!v.eliminated);
+                                // debug_assert!(!trail.contains(&other));debug_
+                                // debug_assert!(!trail.contains(&other.negate()));
+                                trail.push(other);
                             }
                         }
+                        pre = &mut (*ch).next_watcher[my_index];
                     }
-                    _ => (),
                 }
             }
         }
@@ -1028,7 +1176,7 @@ impl CDCL for Solver2 {
     }
 }
 
-impl Solver2 {
+impl Solver {
     /// renamed from litRedundant
     fn analyze_removable(&mut self, l: Lit, to_clear: &mut Vec<Lit>, level_map: &[bool]) -> bool {
         let Solver { ref mut cp, ref vars, ref mut an_seen, .. } = self;
@@ -1149,7 +1297,7 @@ impl Solver2 {
     }
 }
 
-impl Solver2 {
+impl Solver {
     #[allow(dead_code)]
     fn dump_cnf(&self, fname: &str) {
         let Solver { ref cp, ref vars, ref trail, ref num_vars, .. } = self;

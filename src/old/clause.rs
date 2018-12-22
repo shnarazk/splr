@@ -45,8 +45,10 @@ const DB_INC_SIZE: usize = 200;
 pub type ClauseIndex = usize;
 
 pub struct ClauseHead {
-    /// -1: in-conflict, 0: satisfied: others: number of remaining literals
-    pub mass: usize,
+    /// The first two literals
+    pub lit: [Lit; 2],
+    /// the literals without lit0 and lit1
+    pub next_watcher: [usize; 2],
     /// collection of bits
     pub flag: u16,
     /// the remaining literals
@@ -74,6 +76,7 @@ pub struct ClausePartition {
     pub head: Vec<ClauseHead>,
     pub perm: Vec<ClauseIndex>,
     pub touched: Vec<bool>,
+    pub watcher: Vec<ClauseIndex>,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -117,7 +120,8 @@ impl ClausePartition {
     pub fn build(kind: ClauseKind, nv: usize, nc: usize) -> ClausePartition {
         let mut head = Vec::with_capacity(1 + nc);
         head.push(ClauseHead {
-            mass: 0,
+            lit: [NULL_LIT; 2],
+            next_watcher: [NULL_CLAUSE; 2],
             flag: 0,
             lits: vec![],
             rank: 0,
@@ -125,8 +129,10 @@ impl ClausePartition {
         });
         let mut perm = Vec::with_capacity(1 + nc);
         perm.push(NULL_CLAUSE);
+        let mut watcher = Vec::with_capacity(2 * (nv + 1));
         let mut touched = Vec::with_capacity(2 * (nv + 1));
         for _i in 0..2 * (nv + 1) {
+            watcher.push(NULL_CLAUSE);
             touched.push(false);
         }
         ClausePartition {
@@ -135,6 +141,7 @@ impl ClausePartition {
             head,
             perm,
             touched,
+            watcher,
         }
     }
     #[inline(always)]
@@ -147,12 +154,12 @@ impl ClausePartition {
     }
     pub fn count(&self, target: Lit, limit: usize) -> usize {
         let mut cnt = 0;
-        // for _ in self.iter_watcher(target) {
-        //     cnt += 1;
-        //     if 0 < limit && limit <= cnt {
-        //         return limit;
-        //     }
-        // }
+        for _ in self.iter_watcher(target) {
+            cnt += 1;
+            if 0 < limit && limit <= cnt {
+                return limit;
+            }
+        }
         cnt
     }
 }
@@ -249,7 +256,9 @@ impl fmt::Display for ClauseHead {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "C{{{:?} {}{}{}{}}}",
+            "C lit:{:?}, watches:{:?} {{{:?} {}{}{}{}}}",
+            vec2int(&self.lit),
+            self.next_watcher,
             vec2int(&self.lits),
             match self.flag & 3 {
                 0 => 'L',
@@ -473,9 +482,9 @@ impl ClauseManagement for Solver {
                 // if cb.get_flag(ClauseFlag::Locked) {
                 //     panic!("clause is locked");
                 // }
-                for l in *ch.lits {
-                    touched[l.negate() as usize] = true;
-                }
+                debug_assert!(ch.lit[0] != 0 && ch.lit[1] != 0);
+                touched[ch.lit[0].negate() as usize] = true;
+                touched[ch.lit[1].negate() as usize] = true;
             }
         }
         self.cp[ClauseKind::Removable as usize]
