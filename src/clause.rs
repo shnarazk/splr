@@ -594,21 +594,12 @@ impl GC for ClausePartition {
                         for l in &ch.lits {
                             let vi = l.vi();
                             let v = &mut vars[vi];
-                            if eliminator.use_elim && !v.eliminated {
-                                let xx = v.pos_occurs.len() + v.neg_occurs.len();
+                            if !v.eliminated {
                                 if l.positive() {
                                     v.pos_occurs.retain(|&cj| cid != cj);
                                 } else {
                                     v.neg_occurs.retain(|&cj| cid != cj);
                                 }
-                                let xy = v.pos_occurs.len() + v.neg_occurs.len();
-                                // if xy + 1 != xx {
-                                //     panic!("cid {} {:#} was eliminated from {:?}",
-                                //            cid2fmt(cid),
-                                //            cb,
-                                //            l.int(),
-                                //     );
-                                // }
                                 eliminator.enqueue_var(v);
                             }
                         }
@@ -623,17 +614,17 @@ impl GC for ClausePartition {
                 ch.lits.clear();
             }
         }
-        debug_assert!(
-            self.watcher[GARBAGE_LIT.negate() as usize] == NULL_CLAUSE,
-            format!(
-                "There's a clause {} {:#} in the GARBAGE list",
-                cid2fmt(
-                    self.kind
-                        .id_from(self.watcher[GARBAGE_LIT.negate() as usize])
-                ),
-                self.head[self.watcher[GARBAGE_LIT.negate() as usize]],
-            ),
-        );
+        // debug_assert!(
+        //     self.watcher[GARBAGE_LIT.negate() as usize] == NULL_CLAUSE,
+        //     format!(
+        //         "There's a clause {} {:#} in the GARBAGE list",
+        //         cid2fmt(
+        //             self.kind
+        //                 .id_from(self.watcher[GARBAGE_LIT.negate() as usize])
+        //         ),
+        //         self.head[self.watcher[GARBAGE_LIT.negate() as usize]],
+        //     ),
+        // );
     }
     fn new_clause(&mut self, v: &[Lit], rank: usize, locked: bool) -> ClauseId {
         let cix;

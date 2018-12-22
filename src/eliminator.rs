@@ -247,31 +247,6 @@ impl Solver {
         // println!("merge generated {:?} from {} and {} to eliminate {}", vec2int(vec.clone()), p, q, v);
         Some(vec)
     }
-    /// 7. merge(2)
-    /// Returns **false** if one of the clauses is always satisfied.
-    pub fn check_to_merge(&mut self, cp: ClauseId, cq: ClauseId, v: VarId) -> (bool, usize) {
-        self.eliminator.merges += 1;
-        let pqb = clause!(self.cp, cp);
-        let qpb = clause!(self.cp, cq);
-        let ps_smallest = pqb.lits.len() < qpb.lits.len();
-        let (pb, qb) = if ps_smallest { (pqb, qpb) } else { (qpb, pqb) };
-        let mut size = pb.lits.len() + 1;
-        'next_literal: for l in &qb.lits {
-            if l.vi() != v {
-                for j in &pb.lits {
-                    if j.vi() == l.vi() {
-                        if j.negate() == *l {
-                            return (false, size);
-                        } else {
-                            continue 'next_literal;
-                        }
-                    }
-                }
-                size += 1;
-            }
-        }
-        (true, size)
-    }
     /// 10. backwardSubsumptionCheck
     /// returns false if solver is inconsistent
     /// - calls `clause_queue.pop`
@@ -469,7 +444,7 @@ impl Solver {
                     if clause!(self.cp, lit_neg).get_flag(ClauseFlag::Dead) {
                         continue;
                     }
-                    let (res, clause_size) = self.check_to_merge(*lit_pos, *lit_neg, v);
+                    let (res, clause_size) = check_to_merge(&self.cp, *lit_pos, *lit_neg, v);
                     if res {
                         cnt += 1;
                         if clslen + SUBSUMPITON_GROW_LIMIT < cnt
@@ -812,4 +787,28 @@ impl Solver {
             }
         }
     }
+}
+
+/// Returns **false** if one of the clauses is always satisfied.
+pub fn check_to_merge(cpack: &[ClausePartition], cp: ClauseId, cq: ClauseId, v: VarId) -> (bool, usize) {
+    let pqb = clause!(cpack, cp);
+    let qpb = clause!(cpack, cq);
+    let ps_smallest = pqb.lits.len() < qpb.lits.len();
+    let (pb, qb) = if ps_smallest { (pqb, qpb) } else { (qpb, pqb) };
+    let mut size = pb.lits.len() + 1;
+    'next_literal: for l in &qb.lits {
+        if l.vi() != v {
+            for j in &pb.lits {
+                if j.vi() == l.vi() {
+                    if j.negate() == *l {
+                        return (false, size);
+                    } else {
+                        continue 'next_literal;
+                    }
+                }
+            }
+            size += 1;
+        }
+    }
+    (true, size)
 }
