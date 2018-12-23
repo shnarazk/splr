@@ -1,5 +1,5 @@
 use crate::clause::{
-    cid2fmt, ClauseFlag, ClauseHead, ClauseIdIndexEncoding, ClauseIndex, ClauseKind,
+    ClauseFlag, ClauseHead, ClauseIdIndexEncoding, ClauseKind,
     ClauseManagement, ClausePartition,
 };
 use crate::solver::{Solver, CDCL};
@@ -129,47 +129,6 @@ impl EliminatorIF for Eliminator {
 
 impl ClauseElimination for Solver {
     fn check_eliminator(&self) -> bool {
-        // clause_queue should be clear.
-        // debug_assert!(self.eliminator.clause_queue.is_empty());
-        // all elements in occur_lists exist.
-        for v in &self.vars {
-            for c in &v.pos_occurs {
-                let ch = clause!(self.cp, c);
-                if ch.lit[0] <= GARBAGE_LIT || ch.lit[1] <= GARBAGE_LIT {
-                    panic!("panic {:#}", ch);
-                }
-            }
-            for c in &v.neg_occurs {
-                let ch = clause!(self.cp, c);
-                if ch.lit[0] <= GARBAGE_LIT || ch.lit[1] <= GARBAGE_LIT {
-                    panic!("panic {:#}", ch);
-                }
-            }
-        }
-        // all caulses are registered in corresponding occur_lists
-        let kinds = [
-            ClauseKind::Binclause,
-            ClauseKind::Removable,
-            ClauseKind::Permanent,
-        ];
-        for kind in &kinds {
-            for (ci, ch) in self.cp[*kind as usize].head.iter().enumerate().skip(1) {
-                let cid = kind.id_from(ci);
-                if ch.lit[0] == RECYCLE_LIT && ch.lit[1] == RECYCLE_LIT {
-                    continue;
-                }
-                for l in &ch.lits {
-                    let v = l.vi();
-                    if l.positive() {
-                        if !self.vars[v].pos_occurs.contains(&cid) {
-                            panic!("aaa {} {:#}", cid2fmt(cid), ch);
-                        }
-                    } else if !self.vars[v].neg_occurs.contains(&cid) {
-                        panic!("aaa {} {:#}", cid2fmt(cid), ch);
-                    }
-                }
-            }
-        }
         true
     }
 }
@@ -547,17 +506,12 @@ impl Solver {
                 } else {
                     &mut self.vars[v].neg_occurs
                 } {
-                    clause_mut!(self.cp, *cid).set_flag(ClauseFlag::Dead, true);
-                    let w0;
-                    let w1;
-                    {
-                        let ch = clause!(self.cp, *cid);
-                        w0 = ch.lit[0].negate();
-                        w1 = ch.lit[1].negate();
+                    let ClausePartition { ref mut head, ref mut touched, .. } = self.cp[cid.to_kind()];
+                    let ch = &mut head[cid.to_index()];
+                    for l in &ch.lits {
+                        touched[l.negate() as usize] = true;
                     }
-                    debug_assert!(w0 != 0 && w1 != 0);
-                    self.cp[cid.to_kind()].touched[w0 as usize] = true;
-                    self.cp[cid.to_kind()].touched[w1 as usize] = true;
+                    ch.set_flag(ClauseFlag::Dead, true);
                 }
                 // self.cp[cid.to_kind()].touched[v.lit(LTRUE) as usize] = true;
                 // self.cp[cid.to_kind()].touched[v.lit(LFALSE) as usize] = true;
@@ -692,8 +646,8 @@ impl Solver {
         let mut ret: Lit = NULL_LIT;
         let ch = clause!(self.cp, cid);
         let ob = clause!(self.cp, other);
-        debug_assert!(ob.lits.contains(&clause!(self.cp, other).lit[0]));
-        debug_assert!(ob.lits.contains(&clause!(self.cp, other).lit[1]));
+        // debug_assert!(ob.lits.contains(&clause!(self.cp, other).lit[0]));
+        // debug_assert!(ob.lits.contains(&clause!(self.cp, other).lit[1]));
         'next: for l in &ch.lits {
             for lo in &ob.lits {
                 if *l == *lo {
@@ -717,75 +671,24 @@ impl Solver {
         let cix = cid.to_index();
         let ClausePartition {
             ref mut head,
-            ref mut watcher,
             ..
         } = self.cp[cid.to_kind()];
-        unsafe {
-            let ch = &mut head[cix] as *mut ClauseHead;
-            // debug_assert!((*ch).lits.contains(&p));
-            // debug_assert!(1 < (*ch).lits.len());
-            let v = &mut self.vars[p.vi()];
-            if p.positive() {
-                // debug_assert!(v.pos_occurs.contains(&cid));
-                v.pos_occurs.retain(|&c| c != cid);
-            } else {
-                // debug_assert!(v.neg_occurs.contains(&cid));
-                v.neg_occurs.retain(|&c| c != cid);
-            }
-            if (*ch).get_flag(ClauseFlag::Dead) {
-                return false;
-            }
-            if (*ch).lit[0] == p || (*ch).lit[1] == p {
-                debug_assert!((*ch).lits[0] == p || (*ch).lits[1] == p);
-                // update lit, next_watcher, and lits
-                let hi = ((*ch).lit[0] != p) as usize;
-                debug_assert!((*ch).lit[hi] == p);
-                let bi = ((*ch).lits[0] != p) as usize;
-                debug_assert!((*ch).lits[bi] == p);
-                (*ch).lits.swap_remove(bi);
-                if (*ch).lits.len() == 1 {
-                    if hi == 1 {
-                        (*ch).lit.swap(0, 1);
-                        (*ch).next_watcher.swap(0, 1);
-                    }
-                    // debug_assert!((*ch).lit[0] == p);
-                    // debug_assert!((*ch).lits[0] != p);
-                    // (*ch).lits[0] = (*ch).lit[0];
-                    // (*ch).lit[0] = (*ch).lits[0];
-                    // (*ch).lit[1] = (*ch).lits[0].negate();
-                    // debug_assert!((*ch).lit[0] != p);
-                    // debug_assert!(1 < (*ch).lit[0]);
-                    // debug_assert!((*ch).lit[1] != p);
-                    // stores the last literal in lits, while leaving `lit` as is.
-                    debug_assert!((*ch).lits[0] != p);
-                    // println!("unit {} elimanated {}", (*ch).lits[0].int(), p.int());
-                    return true;
-                }
-                let new_lit = (*ch).lits[bi];
-                debug_assert_ne!(new_lit, p);
-                let next_clause = (*ch).next_watcher[hi];
-                // pointer update
-                let mut ptr = &mut watcher[p.negate() as usize] as *mut ClauseIndex;
-                while *ptr != NULL_CLAUSE {
-                    if *ptr == cix {
-                        *ptr = next_clause;
-                        break;
-                    }
-                    let i = (head[*ptr].lit[0] != p) as usize;
-                    debug_assert_eq!(head[*ptr].lit[i], p);
-                    ptr = &mut head[*ptr].next_watcher[i];
-                }
-                (*ch).lit[hi] = new_lit;
-                (*ch).next_watcher[hi] = watcher[new_lit.negate() as usize];
-                watcher[new_lit.negate() as usize] = cix;
-                debug_assert!((*ch).lits.len() != 1 || (*ch).lit[1] != new_lit);
-                (*ch).lits.len() == 1
-            } else {
-                debug_assert!((*ch).lit[0] != p.negate() && (*ch).lit[1] != p.negate());
-                (*ch).lits.retain(|&x| x != p);
-                false
-            }
+        let ch = &mut head[cix];
+        // debug_assert!((*ch).lits.contains(&p));
+        // debug_assert!(1 < (*ch).lits.len());
+        let v = &mut self.vars[p.vi()];
+        if p.positive() {
+            v.pos_occurs.retain(|&c| c != cid);
+        } else {
+            v.neg_occurs.retain(|&c| c != cid);
+        } 
+        if ch.get_flag(ClauseFlag::Dead) {
+            return false;
         }
+        if v.assign == BOTTOM {
+            ch.mass -= 1;
+        }
+        ch.mass == 1
     }
 }
 

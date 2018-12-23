@@ -3,7 +3,6 @@ use crate::clause::{ClauseManagement, GC, *};
 use crate::eliminator::{Eliminator, EliminatorIF};
 use crate::profiler::*;
 use crate::restart::{QueueOperations, RESTART_BLK, RESTART_THR, luby};
-use crate::solver::*;
 use crate::types::*;
 use crate::var::{VarOrdering, *};
 use std::cmp::max;
@@ -12,6 +11,74 @@ use std::fs;
 use std::fs::File;
 use std::io::{BufRead, BufReader, BufWriter, Write};
 
+/// For Solver
+pub trait SatSolver {
+    fn solve(&mut self) -> SolverResult;
+    fn build(path: &str) -> (Solver, CNFDescription);
+}
+
+
+/// For Solver
+pub trait CDCL {
+    /// returns `true` for SAT, `false` for UNSAT.
+    fn search(&mut self) -> bool;
+    fn propagate(&mut self) -> ClauseId;
+    fn propagate_0(&mut self) -> ClauseId;
+    fn cancel_until(&mut self, lv: usize) -> ();
+    fn enqueue(&mut self, l: Lit, cid: ClauseId) -> bool;
+    fn analyze(&mut self, confl: ClauseId, learnt: &mut Vec<Lit>) -> usize;
+    fn analyze_final(&mut self, ci: ClauseId, skip_first: bool) -> ();
+}
+
+pub const CO_LBD_BOUND: usize = 4;
+
+/// normal results returned by Solver
+pub enum Certificate {
+    SAT(Vec<i32>),
+    UNSAT(Vec<i32>), // FIXME: replace with DRAT
+}
+
+/// abnormal termination flags
+pub enum SolverException {
+    StateUNSAT = 0,
+    StateSAT,
+    OutOfMemory,
+    TimeOut,
+    InternalInconsistent,
+    UndescribedError,
+}
+
+/// The type that `Solver` returns
+/// This captures the following three cases:
+/// * solved with a satisfiable assigment,
+/// * proved that it's an unsatisfiable problem, and
+/// * aborted due to Mios specification or an internal error
+pub type SolverResult = Result<Certificate, SolverException>;
+
+/// stat index
+#[derive(Clone, Eq, PartialEq)]
+pub enum Stat {
+    Conflict = 0,       // the number of backjump
+    Decision,           // the number of decision
+    Restart,            // the number of restart
+    NoDecisionConflict, // the number of 'no decision conflict'
+    BlockRestart,       // the number of blacking start
+    Propagation,        // the number of propagation
+    Reduction,          // the number of reduction
+    Simplification,     // the number of simplification
+    Assign,             // the number of assigned variables
+    SumLBD,
+    EndOfStatIndex, // Don't use this dummy.
+}
+
+#[derive(Eq, PartialEq)]
+pub enum SearchStrategy {
+    Generic,
+    ChanSeok,
+    HighSuccesive,
+    LowSuccesive,
+    ManyGlues,
+}
 
 /// is the collection of all variables.
 pub struct Solver {
@@ -69,7 +136,7 @@ pub struct Solver {
 const LBD_QUEUE_LEN: usize = 50;
 const TRAIL_QUEUE_LEN: usize = 5000;
 
-impl Solver2 {
+impl Solver {
     pub fn new(cfg: SolverConfiguration, cnf: &CNFDescription) -> Solver {
         let nv = cnf.num_of_variables as usize;
         let nc = cnf.num_of_clauses as usize;
@@ -77,7 +144,7 @@ impl Solver2 {
         let (_fe, se) = cfg.ema_coeffs;
         let re = cfg.restart_expansion;
         let vdr = cfg.variable_decay_rate;
-        let sve = cfg.use_sve;
+        let _sve = cfg.use_sve;
         Solver {
             config: cfg,
             num_vars: nv,
@@ -319,19 +386,19 @@ impl Solver2 {
                             continue;
                         }
                         if ch.rank <= CO_LBD_BOUND {
-                            // ch.lits.insert(0, ch.lit[0]);
-                            learnts.touched[ch.lit[0].negate() as usize] = true;
-                            // ch.lits.insert(1, ch.lit[1]);
-                            learnts.touched[ch.lit[1].negate() as usize] = true;
+                            for l in &ch.lits {
+                                learnts.touched[l.negate() as usize] = true;
+                            }
                             permanents.new_clause(
                                 &ch.lits,
                                 ch.rank,
+                                ch.mass,
                                 ch.get_flag(ClauseFlag::Locked),
                             );
                             ch.set_flag(ClauseFlag::Dead, true);
                         }
                     }
-                    learnts.garbage_collect(&mut self.vars, &mut self.eliminator);
+                    garbage_collect(&mut self.cp, &mut self.vars, &mut self.eliminator);
                 }
                 Some(SearchStrategy::HighSuccesive) => {
                     // coLBDBound = 3;
@@ -369,7 +436,7 @@ impl Solver2 {
     }
 }
 
-impl SatSolver for Solver2 {
+impl SatSolver for Solver {
     fn solve(&mut self) -> SolverResult {
         if !self.ok {
             return Ok(Certificate::UNSAT(Vec::new()));
@@ -404,8 +471,8 @@ impl SatSolver for Solver2 {
         } else {
             self.progress("load");
         }
-        // self.config.use_sve = false;
-        // self.eliminator.use_elim = false;
+        self.config.use_sve = false;
+        self.eliminator.use_elim = false;
         self.stat[Stat::Simplification as usize] += 1;
         match self.search() {
             _ if !self.ok => {
@@ -502,7 +569,7 @@ impl SatSolver for Solver2 {
     }
 }
 
-impl CDCL for Solver2 {
+impl CDCL for Solver {
     fn propagate(&mut self) -> ClauseId {
         let Solver {
             ref mut vars,
@@ -515,40 +582,72 @@ impl CDCL for Solver2 {
         } = self;
         let dl = trail_lim.len();
         while *q_head < trail.len() {
-            let p: usize = trail[*q_head] as usize;
+            let p: Lit = trail[*q_head];
             *q_head += 1;
             stat[Stat::Propagation as usize] += 1;
-            let mut in_conflict = false;
-            let list = if p.positive() { &vars[p.vi()].neg_occurs } else { &vars[p.vi()].pos_occurs };
-            for cix in &list {
-                let mut ch = clause_mut!(cp, cix);
-                if ch.mass <= 0 { continue; }
-                ch.mass -= 1;
-                match ch.mass {
-                    0 => {
-                        *q_head = trail.len();
-                        return kind.id_from(cix); // conflict
+            let mut in_conflict: Option<ClauseId> = None;
+            unsafe
+            {
+                let list = if p.positive() {
+                    &vars[p.vi()].neg_occurs as *const Vec<ClauseId>
+                } else {
+                    &vars[p.vi()].pos_occurs as *const Vec<ClauseId>
+                };
+                'next: for cid in &*list {
+                    let mut ch = clause_mut!(*cp, cid);
+                    if ch.mass <= 0 || ch.get_flag(ClauseFlag::Dead) { continue; }
+                    // if ch.mass <= 0 { continue; }
+                    ch.mass -= 1;
+                    if in_conflict != None {
+                        continue;
                     }
-                    1 if !in_conflict => {
-                        for lk in &ch.lits {
-                            let v = &mut vars[lk.vi()];
-                            // below is equivalent to 'assigned(lk) != LFALSE'
-                            if v.assign == BOTTOM && !v.eliminated {
-                                v.assign = lk.lbool();
+                    match ch.mass {
+                        0 => {
+                            for lk in &ch.lits {
+                                let v = &vars[lk.vi()];
+                                if v.assign == lk.lbool() {
+                                    continue 'next;
+                                }
+                            }
+                            in_conflict = Some(*cid);
+                            *q_head = trail.len();
+                        }
+                        1 => {
+                            let mut prop = 0;
+                            for lk in &ch.lits {
+                                let v = &vars[lk.vi()];
+                                if v.assign == lk.lbool() {
+                                    println!("{:?}: {} is satisfied", vec2int(&ch.lits), lk.int());
+                                    continue 'next;
+                                }
+                                if v.assign == BOTTOM && !v.eliminated {
+                                    println!("{:?}: {} is unbound", vec2int(&ch.lits), lk.int());
+                                    prop = *lk;
+                                    break;
+                                }
+                                println!("{:?}: {} is unsat", vec2int(&ch.lits), lk.int());
+                            }
+                            if prop == 0 {
+                                in_conflict = Some(*cid);
+                            } else {
+                                trail.push(prop); // unit propagation
+                                let v = &mut vars[prop.vi()];
+                                v.assign = prop.lbool();
                                 v.level = dl;
                                 if dl == 0 {
                                     v.reason = NULL_CLAUSE;
                                 } else {
-                                    v.reason = kind.id_from(cid);
-                                    ch.set_flag(ClauseFlag::Locked, true);
+                                    v.reason = *cid;
                                 }
-                                trail.push(other); // unit propagation
-                                break;
+                                ch.set_flag(ClauseFlag::Locked, true);
                             }
                         }
-                    }
-                    _ => (),
+                        _ => (),
                 }
+            }
+            if let Some(cid) = in_conflict {
+                return cid;
+            }
             }
         }
         NULL_CLAUSE
@@ -556,55 +655,7 @@ impl CDCL for Solver2 {
 
     /// for eliminater invoked by simplify
     fn propagate_0(&mut self) -> ClauseId {
-        let Solver {
-            ref mut vars,
-            ref mut cp,
-            ref mut trail,
-            ref trail_lim,
-            ref mut q_head,
-            ref mut stat,
-            ..
-        } = self;
-        let dl = trail_lim.len();
-        while *q_head < trail.len() {
-            let p: usize = trail[*q_head] as usize;
-            *q_head += 1;
-            stat[Stat::Propagation as usize] += 1;
-            let mut in_conflict = false;
-            let list = if p.positive() { &vars[p.vi()].neg_occurs } else { &vars[p.vi()].pos_occurs };
-            for cix in &list {
-                let mut ch = clause_mut!(cp, cix);
-                // Handling a special case for simplify
-                if ch.mass <= 0 || ch.get_flag(ClauseFlag::Dead) { continue; }
-                ch.mass -= 1;
-                match ch.mass {
-                    0 => {
-                        *q_head = trail.len();
-                        return kind.id_from(cix); // conflict
-                    }
-                    1 if !in_conflict => {
-                        for lk in &ch.lits {
-                            let v = &mut vars[lk.vi()];
-                            // below is equivalent to 'assigned(lk) != LFALSE'
-                            if v.assign == BOTTOM && !v.eliminated {
-                                v.assign = lk.lbool();
-                                v.level = dl;
-                                if dl == 0 {
-                                    v.reason = NULL_CLAUSE;
-                                } else {
-                                    v.reason = kind.id_from(cid);
-                                    ch.set_flag(ClauseFlag::Locked, true);
-                                }
-                                trail.push(other); // unit propagation
-                                break;
-                            }
-                        }
-                    }
-                    _ => (),
-                }
-            }
-        }
-        NULL_CLAUSE
+        self.propagate()
     }
 
     /// main loop
@@ -797,6 +848,14 @@ impl CDCL for Solver2 {
                 clause_mut!(*cp, v.reason).set_flag(ClauseFlag::Locked, false);
                 v.reason = NULL_CLAUSE;
             }
+            let list = if l.positive() {
+                &v.neg_occurs
+            } else {
+                &v.pos_occurs
+            };
+            for cid in list {
+                clause_mut!(*cp, cid).mass += 1;
+            }
             var_order.insert(vars, vi);
         }
         trail.truncate(lim);
@@ -852,8 +911,8 @@ impl CDCL for Solver2 {
         loop {
             // println!("analyze {}", p.int());
             unsafe {
-                let ch = clause_mut!(self.cp, cid) as *mut ClauseHead;
                 debug_assert_ne!(cid, NULL_CLAUSE);
+                let ch = clause_mut!(self.cp, cid) as *mut ClauseHead;
                 if cid.to_kind() == (ClauseKind::Removable as usize) {
                     // self.bump_cid(cid);
                     self.cp[ClauseKind::Removable as usize].bump_activity(
@@ -1028,7 +1087,7 @@ impl CDCL for Solver2 {
     }
 }
 
-impl Solver2 {
+impl Solver {
     /// renamed from litRedundant
     fn analyze_removable(&mut self, l: Lit, to_clear: &mut Vec<Lit>, level_map: &[bool]) -> bool {
         let Solver { ref mut cp, ref vars, ref mut an_seen, .. } = self;
@@ -1080,10 +1139,18 @@ impl Solver2 {
         }
         let l0 = vec[0];
         let mut nb = 0;
-        for ci in cp[ClauseKind::Binclause as usize].iter_watcher(l0) {
-            let ch = &cp[ClauseKind::Binclause as usize].head[ci];
-            debug_assert!(ch.lit[0] == l0 || ch.lit[1] == l0);
-            let other = ch.lit[(ch.lit[0] == l0) as usize];
+        let list = if l0.positive() {
+            &self.vars[l0.vi()].neg_occurs
+        } else {
+            &self.vars[l0.vi()].pos_occurs
+        };
+        // for ci in cp[ClauseKind::Binclause as usize].iter_watcher(l0) {
+        for cid in list {
+            if cid.to_kind() != ClauseKind::Binclause as usize {
+                continue;
+            }
+            let ch = &cp[ClauseKind::Binclause as usize].head[cid.to_index()];
+            let other = ch.lits[(ch.lits[0] == l0) as usize];
             let vi = other.vi();
             if lbd_temp[vi] == key && self.vars.assigned(other) == LTRUE {
                 nb += 1;
@@ -1149,7 +1216,7 @@ impl Solver2 {
     }
 }
 
-impl Solver2 {
+impl Solver {
     #[allow(dead_code)]
     fn dump_cnf(&self, fname: &str) {
         let Solver { ref cp, ref vars, ref trail, ref num_vars, .. } = self;
@@ -1216,3 +1283,34 @@ impl Solver2 {
         // self.var_order.check("");
     }
 }
+
+pub fn garbage_collect(cp: &mut [ClausePartition], vars: &mut [Var], eliminator: &mut Eliminator) {
+    // unlink from occurs
+    for v in vars.iter_mut() {
+        if !v.eliminated {
+            v.pos_occurs.retain(|&cid| !clause!(cp, cid).get_flag(ClauseFlag::Dead));
+            v.neg_occurs.retain(|&cid| !clause!(cp, cid).get_flag(ClauseFlag::Dead));
+        }
+    }
+    // gather to some;
+    let kinds = [
+        ClauseKind::Binclause as usize,
+        ClauseKind::Removable as usize,
+        ClauseKind::Permanent as usize,
+    ];
+    for kind in &kinds {
+        let mut garbages: Vec<ClauseIndex> = Vec::new();
+        for (i, ch) in cp[*kind].head.iter_mut().enumerate() {
+            if ch.get_flag(ClauseFlag::Dead) {
+                if eliminator.use_elim {
+                    for l in &ch.lits {
+                        eliminator.enqueue_var(&mut vars[l.vi()]);
+                    }
+                }
+                garbages.push(i.to_index());
+                ch.lits.clear();
+            }
+        }
+    }
+}
+

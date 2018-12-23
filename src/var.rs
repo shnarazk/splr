@@ -17,6 +17,7 @@ pub trait Satisfiability {
     fn assigned(&self, l: Lit) -> Lbool;
     fn satisfies(&self, c: &[Lit]) -> bool;
     fn compute_lbd(&self, vec: &[Lit], keys: &mut [usize]) -> usize;
+    fn compute_mass(&self, vec: &[Lit]) -> usize;
 }
 
 /// For Vec<Var>
@@ -125,13 +126,26 @@ impl Satisfiability for [Var] {
         }
         cnt
     }
+    #[inline(always)]
+    fn compute_mass(&self, vec: &[Lit]) -> usize {
+        let mut cnt = 0;
+        for l in vec {
+            match self[l.vi()].assign {
+                BOTTOM => cnt += 1,
+                x => if x == l.lbool() {
+                    return 0;
+                }
+            }
+        }
+        cnt
+    }
 }
 
 impl EliminationIF for Vec<Var> {
     fn attach_clause(&mut self, cid: ClauseId, ch: &mut ClauseHead, ignorable: bool, eliminator: &mut Eliminator) {
-        if !eliminator.use_elim {
-            return;
-        }
+        // if !eliminator.use_elim {
+        //     return;
+        // }
         for l in &ch.lits {
             let mut v = &mut self[l.vi()];
             v.touched = true;
@@ -150,7 +164,7 @@ impl EliminationIF for Vec<Var> {
     }
     fn detach_clause(&mut self, cid: ClauseId, ch: &ClauseHead, eliminator: &mut Eliminator) {
         debug_assert!(ch.get_flag(ClauseFlag::Dead));
-        if eliminator.use_elim {
+        if true || eliminator.use_elim {
             for l in &ch.lits {
                 let v = &mut self[l.vi()];
                 if !v.eliminated {
