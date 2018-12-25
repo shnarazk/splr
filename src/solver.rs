@@ -581,76 +581,81 @@ impl CDCL for Solver {
             ..
         } = self;
         let dl = trail_lim.len();
+        let mut in_conflict = NULL_CLAUSE;
         while *q_head < trail.len() {
             let p: Lit = trail[*q_head];
             *q_head += 1;
             stat[Stat::Propagation as usize] += 1;
-            let mut in_conflict: Option<ClauseId> = None;
             unsafe
             {
-                let list = if p.positive() {
-                    &vars[p.vi()].neg_occurs as *const Vec<ClauseId>
-                } else {
-                    &vars[p.vi()].pos_occurs as *const Vec<ClauseId>
-                };
-                'next: for cid in &*list {
+                let ps = [
+                    &vars[p.vi()].neg_occurs as *const Vec<ClauseId>,
+                    &vars[p.vi()].pos_occurs as *const Vec<ClauseId>,
+                ];
+                for list in &ps {
+                'next: for cid in &**list {
                     let mut ch = clause_mut!(*cp, cid);
                     if ch.mass <= 0 || ch.get_flag(ClauseFlag::Dead) { continue; }
-                    // if ch.mass <= 0 { continue; }
                     ch.mass -= 1;
-                    if in_conflict != None {
-                        continue;
-                    }
                     match ch.mass {
+                        _ if in_conflict != NULL_CLAUSE => continue,
                         0 => {
                             for lk in &ch.lits {
-                                let v = &vars[lk.vi()];
-                                if v.assign == lk.lbool() {
+                                if vars[lk.vi()].assign == lk.lbool() {
                                     continue 'next;
                                 }
                             }
-                            in_conflict = Some(*cid);
-                            *q_head = trail.len();
+                            in_conflict = *cid;
+                            // *q_head = trail.len();
                         }
                         1 => {
                             let mut prop = 0;
+                            print!(" - {:?}: ", vec2int(&ch.lits));
                             for lk in &ch.lits {
                                 let v = &vars[lk.vi()];
                                 if v.assign == lk.lbool() {
-                                    println!("{:?}: {} is satisfied", vec2int(&ch.lits), lk.int());
+                                    println!("{}:sat, ", lk.int());
                                     continue 'next;
-                                }
-                                if v.assign == BOTTOM && !v.eliminated {
-                                    println!("{:?}: {} is unbound", vec2int(&ch.lits), lk.int());
+                                } else if v.assign == BOTTOM && !v.eliminated {
+                                    print!("{}:unbound, ", lk.int());
                                     prop = *lk;
-                                    break;
+                                    continue;
                                 }
-                                println!("{:?}: {} is unsat", vec2int(&ch.lits), lk.int());
+                                print!("{}({}):unsat, ", lk.int(), v.assign);
                             }
+                            println!("");
                             if prop == 0 {
-                                in_conflict = Some(*cid);
+                                println!("conflict by {} at {} / {:?}", p.int(), trail_lim.len(), vec2int(trail));
+                                in_conflict = *cid;
                             } else {
                                 trail.push(prop); // unit propagation
+                                println!("uncheck_enqueue {:?} by {}{:?} @ {}",
+                                         vec2int(&trail),
+                                         cid2fmt(*cid),
+                                         vec2int(&ch.lits),
+                                         dl);
                                 let v = &mut vars[prop.vi()];
                                 v.assign = prop.lbool();
                                 v.level = dl;
+                                assert!(v.reason == NULL_CLAUSE);
                                 if dl == 0 {
                                     v.reason = NULL_CLAUSE;
                                 } else {
                                     v.reason = *cid;
+                                    ch.set_flag(ClauseFlag::Locked, true);
                                 }
-                                ch.set_flag(ClauseFlag::Locked, true);
                             }
                         }
                         _ => (),
+                    }
+                }
                 }
             }
-            if let Some(cid) = in_conflict {
-                return cid;
-            }
-            }
         }
-        NULL_CLAUSE
+        if in_conflict != NULL_CLAUSE {
+            println!("propagate is returning a conflict under trail: {:?}", vec2int(trail));
+        }
+        in_conflict
     }
 
     /// for eliminater invoked by simplify
@@ -837,29 +842,29 @@ impl CDCL for Solver {
         if trail_lim.len() <= lv {
             return;
         }
+        // println!("cancel_until: trail {:?}", vec2int(trail));
         let lim = trail_lim[lv];
         for l in &trail[lim..] {
-            // println!("cancel_until {}", l.int());
             let vi = l.vi();
             let v = &mut vars[vi];
             v.phase = v.assign;
             v.assign = BOTTOM;
+            // println!(" - {} {}", l.int(), v.assign);
             if v.reason != NULL_CLAUSE {
                 clause_mut!(*cp, v.reason).set_flag(ClauseFlag::Locked, false);
                 v.reason = NULL_CLAUSE;
             }
-            let list = if l.positive() {
-                &v.neg_occurs
-            } else {
-                &v.pos_occurs
-            };
-            for cid in list {
+            for cid in &v.pos_occurs {
+                clause_mut!(*cp, cid).mass += 1;
+            }
+            for cid in &v.neg_occurs {
                 clause_mut!(*cp, cid).mass += 1;
             }
             var_order.insert(vars, vi);
         }
         trail.truncate(lim);
         trail_lim.truncate(lv);
+        println!("cancel_until: done {:?} to {}", vec2int(trail), trail_lim.len());
         *q_head = lim;
     }
 
@@ -904,12 +909,13 @@ impl CDCL for Solver {
         learnt.push(0);
         let dl = self.decision_level();
         let mut cid: usize = confl;
-        let mut p = NULL_LIT;
+        // let mut p = NULL_LIT;
+        let mut p = (*self.trail.last().unwrap()).negate();
         let mut ti = self.trail.len() - 1; // trail index
         let mut path_cnt = 0;
         // let mut last_dl: Vec<Lit> = Vec::new();
         loop {
-            // println!("analyze {}", p.int());
+            // println!("analyze Lit {}", p.int());
             unsafe {
                 debug_assert_ne!(cid, NULL_CLAUSE);
                 let ch = clause_mut!(self.cp, cid) as *mut ClauseHead;
@@ -920,24 +926,15 @@ impl CDCL for Solver {
                         self.stat[Stat::Conflict as usize] as f64,
                         &mut self.cla_inc,
                     );
-                    // if 2 < (*ch).rank {
-                    //     let nblevels = compute_lbd(&self.vars, &ch.lits, &mut self.lbd_temp);
-                    //     if nblevels + 1 < (*ch).rank {
-                    //         (*ch).rank = nblevels;
-                    //         if nblevels <= 30 {
-                    //             (*ch).set_flag(ClauseFlag::JustUsed, true);
-                    //         }
-                    //         if self.strategy == Some(SearchStrategy::ChanSeok)
-                    //             && nblevels < CO_LBD_BOUND
-                    //         {
-                    //             (*ch).rank = 0;
-                    //             clause_body_mut!(self.cp, confl).rank = 0
-                    //         }
-                    //     }
-                    // }
                 }
-                // println!("{}を対応", cid2fmt(cid));
-                for q in &(*ch).lits[((p != NULL_LIT) as usize)..] {
+                // println!("学習節{}{:?}を対応", cid2fmt(cid), vec2int(&(*ch).lits));
+                //for q in &(*ch).lits[((p != NULL_LIT) as usize)..] {
+                for q in &(*ch).lits {
+                    if *q == p {
+                        // println!("{}は出力なので無視", q.int());
+                        continue;
+                    }
+                    // println!("{}を対応", q.int());
                     let vi = q.vi();
                     let lvl = self.vars[vi].level;
                     // if lvl == 0 {
