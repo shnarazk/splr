@@ -610,30 +610,30 @@ impl CDCL for Solver {
                         }
                         1 => {
                             let mut prop = 0;
-                            print!(" - {:?}: ", vec2int(&ch.lits));
+                            // print!(" - {:?}: ", vec2int(&ch.lits));
                             for lk in &ch.lits {
                                 let v = &vars[lk.vi()];
                                 if v.assign == lk.lbool() {
-                                    println!("{}:sat, ", lk.int());
+                                    // println!("{}:sat, ", lk.int());
                                     continue 'next;
                                 } else if v.assign == BOTTOM && !v.eliminated {
-                                    print!("{}:unbound, ", lk.int());
+                                    // print!("{}:unbound, ", lk.int());
                                     prop = *lk;
                                     continue;
                                 }
-                                print!("{}({}):unsat, ", lk.int(), v.assign);
+                                // print!("{}({}):unsat, ", lk.int(), v.assign);
                             }
-                            println!("");
+                            // println!("");
                             if prop == 0 {
-                                println!("conflict by {} at {} / {:?}", p.int(), trail_lim.len(), vec2int(trail));
+                                // println!("conflict by {:?} for {} at {:?} : {:?}", vec2int(&ch.lits), p.int(), trail_lim.len(), vec2int(trail));
                                 in_conflict = *cid;
                             } else {
                                 trail.push(prop); // unit propagation
-                                println!("uncheck_enqueue {:?} by {}{:?} @ {}",
-                                         vec2int(&trail),
-                                         cid2fmt(*cid),
-                                         vec2int(&ch.lits),
-                                         dl);
+                                // println!("uncheck_enqueue {:?} by {}{:?} @ {}",
+                                //          vec2int(&trail),
+                                //          cid2fmt(*cid),
+                                //          vec2int(&ch.lits),
+                                //          dl);
                                 let v = &mut vars[prop.vi()];
                                 v.assign = prop.lbool();
                                 v.level = dl;
@@ -651,9 +651,6 @@ impl CDCL for Solver {
                 }
                 }
             }
-        }
-        if in_conflict != NULL_CLAUSE {
-            println!("propagate is returning a conflict under trail: {:?}", vec2int(trail));
         }
         in_conflict
     }
@@ -772,6 +769,7 @@ impl CDCL for Solver {
                 let lbd;
                 if new_learnt.len() == 1 {
                     let l = new_learnt[0];
+                    // println!("analyze returned a unit clause {}", l.int());
                     self.uncheck_enqueue(l, NULL_CLAUSE);
                     lbd = 1;
                 } else {
@@ -791,6 +789,11 @@ impl CDCL for Solver {
                         );
                     }
                     self.uncheck_enqueue(l0, cid);
+                    // println!("uncheck enqueue {:?} by a new learnt {}{:?}",
+                    //          vec2int(&self.trail),
+                    //          cid2fmt(cid),
+                    //          vec2int(&clause!(self.cp, cid).lits),
+                    // );
                     clause_mut!(self.cp, cid).set_flag(ClauseFlag::Locked, true);
                 }
                 self.stat[Stat::SumLBD as usize] += lbd as i64;
@@ -864,7 +867,7 @@ impl CDCL for Solver {
         }
         trail.truncate(lim);
         trail_lim.truncate(lv);
-        println!("cancel_until: done {:?} to {}", vec2int(trail), trail_lim.len());
+        // println!("cancel_until: done {:?} to {}", vec2int(trail), trail_lim.len());
         *q_head = lim;
     }
 
@@ -909,8 +912,8 @@ impl CDCL for Solver {
         learnt.push(0);
         let dl = self.decision_level();
         let mut cid: usize = confl;
-        // let mut p = NULL_LIT;
-        let mut p = (*self.trail.last().unwrap()).negate();
+        let mut p = NULL_LIT;
+        // let mut p = (*self.trail.last().unwrap()).negate();
         let mut ti = self.trail.len() - 1; // trail index
         let mut path_cnt = 0;
         // let mut last_dl: Vec<Lit> = Vec::new();
@@ -927,20 +930,16 @@ impl CDCL for Solver {
                         &mut self.cla_inc,
                     );
                 }
-                // println!("学習節{}{:?}を対応", cid2fmt(cid), vec2int(&(*ch).lits));
+                debug_assert!(!(*ch).get_flag(ClauseFlag::Dead));
+                // println!("{}の原因節{}{:?}を逆伝搬", p.int(), cid2fmt(cid), vec2int(&(*ch).lits));
                 //for q in &(*ch).lits[((p != NULL_LIT) as usize)..] {
                 for q in &(*ch).lits {
                     if *q == p {
                         // println!("{}は出力なので無視", q.int());
                         continue;
                     }
-                    // println!("{}を対応", q.int());
                     let vi = q.vi();
                     let lvl = self.vars[vi].level;
-                    // if lvl == 0 {
-                    //     println!("lvl {}", lvl);
-                    // }
-                    debug_assert!(!(*ch).get_flag(ClauseFlag::Dead));
                     debug_assert!(
                         !self.vars[vi].eliminated,
                         format!("analyze assertion: an eliminated var {} occurs", vi)
@@ -954,19 +953,23 @@ impl CDCL for Solver {
                     if !self.an_seen[vi] && 0 < lvl {
                         self.an_seen[vi] = true;
                         if dl <= lvl {
-                            // println!("{} はレベル{}なのでフラグを立てる", q.int(), lvl);
                             path_cnt += 1;
+                            // println!("{} はレベル{}なのでフラグを立てる。path_cnt = {}", q.int(), lvl, path_cnt);
                             // if self.vars[vi].reason != NULL_CLAUSE
                             //     && self.vars[vi].reason.to_kind() == ClauseKind::Removable as usize
                             // {
                             //     last_dl.push(*q);
                             // }
                         } else {
-                            // println!("{} はレベル{}なので採用 {}", q.int(), lvl, dl);
+                            // println!("{} は割当てレベル{} != 決定レベル{}なので採用", q.int(), lvl, dl);
                             learnt.push(*q);
                         }
                     } else {
-                        // println!("{} はもうフラグが立っているかグラウンドしている{}ので無視", q.int(), lvl);
+                        // if lvl == 0 {
+                        //     println!("{} は決定レベル{}での割当てなので無視", q.int(), lvl);
+                        // } else {
+                        //     println!("{} はもうフラグが立っているので無視", q.int());
+                        // }
                     }
                 }
                 // set the index of the next literal to ti
@@ -975,6 +978,7 @@ impl CDCL for Solver {
                     ti -= 1;
                 }
                 p = self.trail[ti];
+                // println!("次の対象リテラルは{}、残りpath数は{}", p.int(), path_cnt - 1);
                 let next_vi = p.vi();
                 cid = self.vars[next_vi].reason;
                 // println!("{} にフラグが立っている。そのpath数は{}, \
@@ -990,29 +994,17 @@ impl CDCL for Solver {
         debug_assert_eq!(learnt[0], 0);
         learnt[0] = p.negate();
         debug_assert_ne!(learnt[0], 0);
-        // println!(
-        //     "最後に{}を採用して{:?}",
-        //     p.negate().int(), vec2int(learnt)
-        // );
+        // println!("最後に{}を採用して{:?}", p.negate().int(), vec2int(learnt));
         // simplify phase
         let mut to_clear = Vec::new();
         to_clear.push(p.negate());
-        let n = learnt.len();
         let mut level_map = vec![false; self.decision_level()];
         for l in &learnt[1..] {
             to_clear.push(*l);
             level_map[self.vars[l.vi()].level] = true;
         }
-        let mut j = 1;
-        for i in 1..n {
-            let l = learnt[i];
-            if self.vars[l.vi()].reason == NULL_CLAUSE
-                || !self.analyze_removable(l, &mut to_clear, &level_map) {
-                learnt[j] = l;
-                j += 1;
-            }
-        }
-        learnt.truncate(j);
+        learnt.retain(|l| self.vars[l.vi()].reason == NULL_CLAUSE || true); // || !self.analyze_removable(l, &mut to_clear, &level_map)
+        // FIXME FOR NWFP
         if learnt.len() < 30 {
             self.minimize_with_bi_clauses(learnt);
         }
@@ -1119,44 +1111,52 @@ impl Solver {
     }
 
     fn minimize_with_bi_clauses(&mut self, vec: &mut Vec<Lit>) {
-        let Solver { ref mut cp, ref vars, ref mut lbd_temp, .. } = self;
-        let len = vec.len();
-        if 30 < len {
-            return;
-        }
+        let Solver { ref cp, ref vars, ref mut lbd_temp, .. } = self;
         let nblevels = vars.compute_lbd(vec, lbd_temp);
+        let mut my_temp = vec![0; vars.len()];
         if 6 < nblevels {
             return;
         }
-        // reuse lbd_temp scretely
-        let key = lbd_temp[0] + 1;
-        lbd_temp[0] = key;
-        for l in &vec[1..] {
-            lbd_temp[l.vi() as usize] = key;
+        let key = my_temp[0] + 1;
+        my_temp[0] = key;
+        for l in &mut *my_temp {
+            *l = key - 1;
+        }
+        for l in &vec[..] {
+            // assert!(l.vi() != 0);
+            my_temp[l.vi() as usize] = key;
         }
         let l0 = vec[0];
         let mut nb = 0;
         let list = if l0.positive() {
-            &self.vars[l0.vi()].neg_occurs
-        } else {
             &self.vars[l0.vi()].pos_occurs
+        } else {
+            &self.vars[l0.vi()].neg_occurs
         };
-        // for ci in cp[ClauseKind::Binclause as usize].iter_watcher(l0) {
+        let ln = l0.negate();
         for cid in list {
             if cid.to_kind() != ClauseKind::Binclause as usize {
                 continue;
             }
             let ch = &cp[ClauseKind::Binclause as usize].head[cid.to_index()];
+            assert!(!ch.get_flag(ClauseFlag::Dead));
+            // assert!(ch.lits.len() == 2);
+            // assert!(ch.lits[0] == ln || ch.lits[1] == ln);
+            // assert!(ch.lits[0] != l0 && ch.lits[1] != l0);
+            // assert!(ch.lits[(ch.lits[0] != ln) as usize] == ln);
             let other = ch.lits[(ch.lits[0] == l0) as usize];
+            // assert!(other != l0);
             let vi = other.vi();
-            if lbd_temp[vi] == key && self.vars.assigned(other) == LTRUE {
+            if my_temp[vi] == key && vars.assigned(other) == LTRUE {
                 nb += 1;
-                lbd_temp[vi] -= 1;
+                my_temp[vi] -= 1;
             }
         }
         if 0 < nb {
-            vec.retain(|l| *l == l0 || lbd_temp[l.vi()] == key);
+            my_temp[l0.vi()] = key;
+            vec.retain(|l| my_temp[l.vi()] == key);
         }
+        my_temp[0] = key;
     }
 
     pub fn uncheck_enqueue(&mut self, l: Lit, cid: ClauseId) {
@@ -1210,6 +1210,7 @@ impl Solver {
         // debug_assert!(!trail.contains(&l));
         // debug_assert!(!trail.contains(&l.negate()));
         trail.push(l);
+        // println!("----------------- uncheck_assume {:?} to level {} ----------------", vec2int(&trail), dl);
     }
 }
 

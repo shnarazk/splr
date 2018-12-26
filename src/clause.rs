@@ -571,6 +571,7 @@ impl GC for ClausePartition {
         self.id_from(cix)
     }
     fn reset_lbd(&mut self, vars: &[Var], temp: &mut [usize]) {
+        let key = temp[0];
         for x in &mut temp[..] {
             *x = 0;
         }
@@ -590,6 +591,7 @@ impl GC for ClausePartition {
             }
             ch.rank = cnt;
         }
+        temp[0] = key + 1;
     }
     fn bump_activity(&mut self, cix: ClauseIndex, val: f64, cla_inc: &mut f64) {
         let c = &mut self.head[cix];
