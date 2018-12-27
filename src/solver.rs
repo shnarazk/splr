@@ -998,12 +998,12 @@ impl CDCL for Solver {
         // simplify phase
         let mut to_clear = Vec::new();
         to_clear.push(p.negate());
-        let mut level_map = vec![false; self.decision_level()];
+        let mut level_map = vec![false; self.decision_level()+1];
         for l in &learnt[1..] {
             to_clear.push(*l);
             level_map[self.vars[l.vi()].level] = true;
         }
-        learnt.retain(|l| self.vars[l.vi()].reason == NULL_CLAUSE || true); // || !self.analyze_removable(l, &mut to_clear, &level_map)
+        learnt.retain(|l| self.vars[l.vi()].reason == NULL_CLAUSE || !self.analyze_removable(*l, &mut to_clear, &level_map));
         // FIXME FOR NWFP
         if learnt.len() < 30 {
             self.minimize_with_bi_clauses(learnt);
@@ -1086,10 +1086,8 @@ impl Solver {
         while let Some(sl) = stack.pop() {
             let cid = vars[sl.vi()].reason;
             let ch = clause_mut!(*cp, cid);
-            if (*ch).lits.len() == 2 && vars.assigned((*ch).lits[0]) == LFALSE {
-                (*ch).lits.swap(0, 1);
-            }
-            for q in &(*ch).lits[1..] {
+            for q in &(*ch).lits {
+                if *q == sl { continue; }
                 let vi = q.vi();
                 let lv = vars[vi].level;
                 if !an_seen[vi] && 0 < lv {
@@ -1133,7 +1131,6 @@ impl Solver {
         } else {
             &self.vars[l0.vi()].neg_occurs
         };
-        let ln = l0.negate();
         for cid in list {
             if cid.to_kind() != ClauseKind::Binclause as usize {
                 continue;
@@ -1141,11 +1138,8 @@ impl Solver {
             let ch = &cp[ClauseKind::Binclause as usize].head[cid.to_index()];
             assert!(!ch.get_flag(ClauseFlag::Dead));
             // assert!(ch.lits.len() == 2);
-            // assert!(ch.lits[0] == ln || ch.lits[1] == ln);
             // assert!(ch.lits[0] != l0 && ch.lits[1] != l0);
-            // assert!(ch.lits[(ch.lits[0] != ln) as usize] == ln);
             let other = ch.lits[(ch.lits[0] == l0) as usize];
-            // assert!(other != l0);
             let vi = other.vi();
             if my_temp[vi] == key && vars.assigned(other) == LTRUE {
                 nb += 1;
