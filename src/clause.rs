@@ -1,6 +1,6 @@
 #![allow(unused_variables)]
 use crate::eliminator::*;
-use crate::solver::{SearchStrategy, Solver, Stat, CDCL, CO_LBD_BOUND};
+use crate::solver::{SearchStrategy, Solver, Stat, CDCL};
 use crate::types::*;
 use crate::var::{EliminationIF, Satisfiability, Var};
 use std::cmp::Ordering;
@@ -45,15 +45,15 @@ const DB_INC_SIZE: usize = 200;
 pub type ClauseIndex = usize;
 
 pub struct ClauseHead {
-    /// The first two literals
+    /// Watching literals
     pub lit: [Lit; 2],
-    /// the literals without lit0 and lit1
+    /// pointers to next clauses
     pub next_watcher: [usize; 2],
     /// collection of bits
     pub flag: u16,
-    /// the remaining literals
+    /// the literals
     pub lits: Vec<Lit>,
-    /// LBD or NDD and so on, used by `reduce_db`
+    /// LBD, NDD, or something, used by `reduce_db`
     pub rank: usize,
     /// clause activity used by `analyze` and `reduce_db`
     pub activity: f64,
@@ -382,7 +382,7 @@ impl ClauseManagement for Solver {
             ClauseKind::Permanent
         } else if v.len() == 2 {
             ClauseKind::Binclause
-        } else if (self.strategy == Some(SearchStrategy::ChanSeok) && lbd <= CO_LBD_BOUND)
+        } else if (self.strategy == Some(SearchStrategy::ChanSeok) && lbd <= self.co_lbd_bound)
             || lbd == 0
         {
             ClauseKind::Permanent

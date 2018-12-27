@@ -29,8 +29,6 @@ pub trait CDCL {
     fn analyze_final(&mut self, ci: ClauseId, skip_first: bool) -> ();
 }
 
-pub const CO_LBD_BOUND: usize = 4;
-
 /// normal results returned by Solver
 pub enum Certificate {
     SAT(Vec<i32>),
@@ -90,6 +88,7 @@ pub struct Solver {
     pub var_decay_max: f64,
     pub root_level: usize,
     pub strategy: Option<SearchStrategy>,
+    pub co_lbd_bound: usize,
     /// Variable Assignment Management
     pub vars: Vec<Var>,
     pub trail: Vec<Lit>,
@@ -153,6 +152,7 @@ impl Solver {
             var_decay_max: MAX_VAR_DECAY,
             root_level: 0,
             strategy: None,
+            co_lbd_bound: 4,
             vars: Var::new_vars(nv),
             trail: Vec::with_capacity(nv),
             trail_lim: Vec::new(),
@@ -384,10 +384,8 @@ impl Solver {
                         if ch.get_flag(ClauseFlag::Dead) {
                             continue;
                         }
-                        if ch.rank <= CO_LBD_BOUND {
-                            // ch.lits.insert(0, ch.lit[0]);
+                        if ch.rank <= self.co_lbd_bound {
                             learnts.touched[ch.lit[0].negate() as usize] = true;
-                            // ch.lits.insert(1, ch.lit[1]);
                             learnts.touched[ch.lit[1].negate() as usize] = true;
                             permanents.new_clause(
                                 &ch.lits,
@@ -400,8 +398,8 @@ impl Solver {
                     learnts.garbage_collect(&mut self.vars, &mut self.eliminator);
                 }
                 Some(SearchStrategy::HighSuccesive) => {
-                    // coLBDBound = 3;
                     // firstReduceDB = 30000;
+                    self.co_lbd_bound = 3;
                     self.var_decay = 0.99;
                     self.var_decay_max = 0.99;
                     // randomize_on_restarts = 1;
@@ -1017,7 +1015,7 @@ impl CDCL for Solver {
                     //             (*ch).set_flag(ClauseFlag::JustUsed, true);
                     //         }
                     //         if self.strategy == Some(SearchStrategy::ChanSeok)
-                    //             && nblevels < CO_LBD_BOUND
+                    //             && nblevels < self.co_lbd_bound
                     //         {
                     //             (*ch).rank = 0;
                     //             clause_body_mut!(self.cp, confl).rank = 0
@@ -1252,7 +1250,6 @@ impl Solver {
         v.reason = cid;
         if dl == 0 {
             eliminator.enqueue_var(v);
-            // self.var_order.remove(&self.vars, l.vi());
         }
         clause_mut!(*cp, cid).set_flag(ClauseFlag::Locked, true);
         // debug_assert!(!self.trail.contains(&l));
