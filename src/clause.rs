@@ -676,15 +676,13 @@ impl GC for ClausePartition {
         self.id_from(cix)
     }
     fn reset_lbd(&mut self, vars: &[Var], temp: &mut [usize]) {
-        for x in &mut temp[..] {
-            *x = 0;
-        }
+        let mut key = temp[0];
         for i in 1..self.head.len() {
             let ch = &mut self.head[i];
             if ch.get_flag(ClauseFlag::Dead) {
                 continue;
             }
-            let key = i;
+            key += 1;
             let mut cnt = 0;
             for l in &ch.lits {
                 let lv = vars[l.vi()].level;
@@ -695,6 +693,7 @@ impl GC for ClausePartition {
             }
             ch.rank = cnt;
         }
+        temp[0] = key + 1;
     }
     fn move_to(&mut self, list: &mut ClauseId, ci: ClauseIndex, index: usize) -> ClauseIndex {
         debug_assert!(index == 0 || index == 1);

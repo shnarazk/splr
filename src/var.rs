@@ -114,7 +114,6 @@ impl Satisfiability for [Var] {
     #[inline(always)]
     fn compute_lbd(&self, vec: &[Lit], keys: &mut [usize]) -> usize {
         let key = keys[0] + 1;
-        keys[0] = key;
         let mut cnt = 0;
         for l in vec {
             let lv = self[l.vi()].level;
@@ -123,6 +122,7 @@ impl Satisfiability for [Var] {
                 cnt += 1;
             }
         }
+        keys[0] = key;
         cnt
     }
 }

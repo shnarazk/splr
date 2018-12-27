@@ -1089,22 +1089,12 @@ impl CDCL for Solver {
         // simplify phase
         let mut to_clear = Vec::new();
         to_clear.push(p.negate());
-        let n = learnt.len();
-        let mut level_map = vec![false; self.decision_level()];
+        let mut level_map = vec![false; self.decision_level()+1];
         for l in &learnt[1..] {
             to_clear.push(*l);
             level_map[self.vars[l.vi()].level] = true;
         }
-        let mut j = 1;
-        for i in 1..n {
-            let l = learnt[i];
-            if self.vars[l.vi()].reason == NULL_CLAUSE
-                || !self.analyze_removable(l, &mut to_clear, &level_map) {
-                learnt[j] = l;
-                j += 1;
-            }
-        }
-        learnt.truncate(j);
+        learnt.retain(|l| self.vars[l.vi()].reason == NULL_CLAUSE || !self.analyze_removable(*l, &mut to_clear, &level_map));
         if learnt.len() < 30 {
             self.minimize_with_bi_clauses(learnt);
         }
@@ -1222,7 +1212,6 @@ impl Solver {
         }
         // reuse lbd_temp scretely
         let key = lbd_temp[0] + 1;
-        lbd_temp[0] = key;
         for l in &vec[1..] {
             lbd_temp[l.vi() as usize] = key;
         }
@@ -1239,8 +1228,10 @@ impl Solver {
             }
         }
         if 0 < nb {
-            vec.retain(|l| *l == l0 || lbd_temp[l.vi()] == key);
+            lbd_temp[l0.vi()] = key;
+            vec.retain(|l| lbd_temp[l.vi()] == key);
         }
+        lbd_temp[0] = key;
     }
 
     pub fn uncheck_enqueue(&mut self, l: Lit, cid: ClauseId) {
