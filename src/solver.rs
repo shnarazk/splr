@@ -1201,11 +1201,7 @@ impl Solver {
     }
 
     fn minimize_with_bi_clauses(&mut self, vec: &mut Vec<Lit>) {
-        let Solver { ref mut cp, ref vars, ref mut lbd_temp, .. } = self;
-        let len = vec.len();
-        if 30 < len {
-            return;
-        }
+        let Solver { ref cp, ref vars, ref mut lbd_temp, .. } = self;
         let nblevels = vars.compute_lbd(vec, lbd_temp);
         if 6 < nblevels {
             return;
