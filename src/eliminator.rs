@@ -332,7 +332,7 @@ impl Solver {
                                         //          *clause_body!(self.cp, cid),
                                         // );
                                         self.remove_clause(*di);
-                                        self.vars.detach_clause(*di, clause!(self.cp, cid), &mut self.eliminator);
+                                        self.vars.detach_clause(*di, clause!(self.cp, *di), &mut self.eliminator);
                                     } //else {
                                       // println!("backward_subsumption_check tries to delete a permanent clause {} {:#}",
                                       //          cid2fmt(*di),
