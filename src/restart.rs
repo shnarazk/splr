@@ -69,7 +69,7 @@ impl Restart for Solver {
             return;
         }
         if self.next_restart <= count
-            && self.restart_blk < self.ema_asg.get()
+            && self.config.restart_blk < self.ema_asg.get()
         {
             self.next_restart = count + RESTART_PERIOD;
             self.stat[Stat::BlockRestart as usize] += 1;
@@ -81,7 +81,7 @@ impl Restart for Solver {
         let count = self.stat[Stat::Conflict as usize] as u64;
         if RESET_EMA < count
             && self.next_restart < count
-            && self.restart_thr < self.ema_lbd.get()
+            && self.config.restart_thr < self.ema_lbd.get()
         {
             self.next_restart = count + RESTART_PERIOD;
             self.stat[Stat::Restart as usize] += 1;

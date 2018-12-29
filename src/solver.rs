@@ -64,17 +64,92 @@ pub enum Stat {
     Reduction,          // the number of reduction
     Simplification,     // the number of simplification
     Assign,             // the number of assigned variables
-    SumLBD,
+    SumLBD,             // the sum of generated learnts' LBD
+    NumBin,             // the number of binary clauses
+    NumLBD2,            // the number of clauses which LBD is 2
     EndOfStatIndex, // Don't use this dummy.
 }
 
 #[derive(Eq, PartialEq)]
 pub enum SearchStrategy {
+    Initial,
     Generic,
-    ChanSeok,
+    LowDecisions,
     HighSuccesive,
     LowSuccesive,
     ManyGlues,
+}
+
+impl SearchStrategy {
+    fn to_str(&self) -> &'static str {
+        match self {
+            SearchStrategy::Initial => "init",
+            SearchStrategy::Generic => "dflt",
+            SearchStrategy::LowDecisions => "LowD",
+            SearchStrategy::HighSuccesive => "High",
+            SearchStrategy::LowSuccesive => "LowS",
+            SearchStrategy::ManyGlues => "Many",
+        }
+    }
+}
+
+/// `Solver`'s parameters; random decision rate was dropped.
+pub struct SolverConfiguration {
+    pub adapt_strategy: bool,
+    pub strategy: SearchStrategy,
+    pub use_chan_seok: bool,
+    /// decay rate for variable activity
+    pub variable_decay_rate: f64,
+    /// decay rate for clause activity
+    pub clause_decay_rate: f64,
+    /// dump stats data during solving
+    pub dump_solver_stat_mode: i32,
+    /// the coefficients for restarts
+    pub ema_coeffs: (i32, i32),
+    pub restart_thr: f64,
+    pub restart_blk: f64,
+    /// restart expansion factor
+    pub restart_expansion: f64,
+    /// static steps between restarts
+    pub restart_step: f64,
+    pub luby_restart: bool,
+    pub luby_restart_num_conflict: f64,
+    pub luby_restart_inc: f64,
+    pub luby_current_restarts: usize,
+    pub luby_restart_factor: f64,
+    pub co_lbd_bound: usize,
+    pub inc_reduce_db: usize,
+    pub first_reduction: usize,
+    pub use_sve: bool,
+    pub use_tty: bool,
+}
+
+impl Default for SolverConfiguration {
+    fn default() -> SolverConfiguration {
+        SolverConfiguration {
+            adapt_strategy: true,
+            strategy: SearchStrategy::Initial,
+            use_chan_seok: false,
+            variable_decay_rate: 0.9,
+            clause_decay_rate: 0.999,
+            dump_solver_stat_mode: 0,
+            ema_coeffs: (2 ^ 5, 2 ^ 15),
+            restart_thr: RESTART_THR,
+            restart_blk: RESTART_BLK,
+            restart_expansion: 1.15,
+            restart_step: 100.0,
+            luby_restart: false,
+            luby_restart_num_conflict: 0.0,
+            luby_restart_inc: 2.0,
+            luby_current_restarts: 0,
+            luby_restart_factor: 100.0,
+            co_lbd_bound: 4,
+            inc_reduce_db: 300,
+            first_reduction: 1000,
+            use_sve: true,
+            use_tty: true,
+        }
+    }
 }
 
 /// is the collection of all variables.
@@ -87,8 +162,6 @@ pub struct Solver {
     pub var_decay: f64,
     pub var_decay_max: f64,
     pub root_level: usize,
-    pub strategy: Option<SearchStrategy>,
-    pub co_lbd_bound: usize,
     /// Variable Assignment Management
     pub vars: Vec<Var>,
     pub trail: Vec<Lit>,
@@ -98,17 +171,10 @@ pub struct Solver {
     pub var_order: VarIdHeap,
     /// Clause Database Management
     pub cp: [ClausePartition; 4],
-    pub first_reduction: usize,
+    /// renamed from `nbclausesbeforereduce`
     pub next_reduction: usize,
     pub cur_restart: usize,
     pub num_solved_vars: usize,
-    pub restart_thr: f64,
-    pub restart_blk: f64,
-    pub luby_restart: bool,
-    pub luby_restart_num_conflict: f64,
-    pub luby_restart_inc: f64,
-    pub luby_current_restarts: usize,
-    pub luby_restart_factor: f64,
     /// Variable Elimination
     pub eliminator: Eliminator,
     /// Working memory
@@ -127,7 +193,6 @@ pub struct Solver {
     pub b_lvl: Ema,
     pub c_lvl: Ema,
     pub next_restart: u64,
-    pub restart_exp: f64,
     pub progress_cnt: i64,
 }
 
@@ -140,7 +205,6 @@ impl Solver {
         let nc = cnf.num_of_clauses as usize;
         let path = &cnf.pathname;
         let (_fe, se) = cfg.ema_coeffs;
-        let re = cfg.restart_expansion;
         let vdr = cfg.variable_decay_rate;
         let sve = cfg.use_sve;
         Solver {
@@ -151,8 +215,6 @@ impl Solver {
             var_decay: VAR_DECAY,
             var_decay_max: MAX_VAR_DECAY,
             root_level: 0,
-            strategy: None,
-            co_lbd_bound: 4,
             vars: Var::new_vars(nv),
             trail: Vec::with_capacity(nv),
             trail_lim: Vec::new(),
@@ -164,17 +226,9 @@ impl Solver {
                 ClausePartition::build(ClauseKind::Permanent, nv, 256),
                 ClausePartition::build(ClauseKind::Binclause, nv, 256),
             ],
-            first_reduction: 1000,
             next_reduction: 1000,
             cur_restart: 1,
             num_solved_vars: 0,
-            restart_thr: RESTART_THR,
-            restart_blk: RESTART_BLK,
-            luby_restart: false,
-            luby_restart_num_conflict: 0.0,
-            luby_restart_inc: 2.0,
-            luby_current_restarts: 0,
-            luby_restart_factor: 100.0,
             eliminator: Eliminator::new(sve),
             ok: true,
             model: vec![BOTTOM; nv + 1],
@@ -190,7 +244,6 @@ impl Solver {
             b_lvl: Ema::new(se),
             c_lvl: Ema::new(se),
             next_restart: 100,
-            restart_exp: re,
             progress_cnt: 0,
         }
     }
@@ -350,85 +403,89 @@ impl Solver {
     }
 
     pub fn adapt_strategy(&mut self) {
+        if ! self.config.adapt_strategy {
+            return;
+        }
         let mut re_init = false;
         let decpc =
             self.stat[Stat::Decision as usize] as f64 / self.stat[Stat::Conflict as usize] as f64;
         if decpc <= 1.2 {
-            self.strategy = Some(SearchStrategy::ChanSeok);
+            self.config.strategy = SearchStrategy::LowDecisions;
+            re_init = true;
         } else if self.stat[Stat::NoDecisionConflict as usize] < 30_000 {
-            self.strategy = Some(SearchStrategy::LowSuccesive);
+            self.config.strategy = SearchStrategy::LowSuccesive;
         } else if self.stat[Stat::NoDecisionConflict as usize] > 54_400 {
-            self.strategy = Some(SearchStrategy::HighSuccesive);
+            self.config.strategy = SearchStrategy::HighSuccesive;
+        } else if self.stat[Stat::NumLBD2 as usize] - self.stat[Stat::NumBin as usize] > 20_000 {
+            self.config.strategy = SearchStrategy::ManyGlues;
         } else {
-            self.strategy = Some(SearchStrategy::Generic);
+            self.config.strategy = SearchStrategy::Generic;
             return;
         }
-        if self.strategy != None {
-            self.ema_asg.reset();
-            self.ema_lbd.reset();
-            // conflictsRestarts = 0;
-            match self.strategy {
-                Some(SearchStrategy::ChanSeok) => {
-                    re_init = true;
-                    let _glureduce = true;
-                    self.first_reduction = 2000;
-                    self.next_reduction = 2000;
-                    self.cur_restart = ((self.stat[Stat::Conflict as usize] as f64
-                        / self.next_reduction as f64)
-                        + 1.0) as usize;
-                    // TODO incReduceDB = 0;
-                    // println!("# Adjusting for low decision levels.");
-                    // move some clauses with good lbd (col_lbd_bound) to Permanent
-                    let [_, ref mut learnts, ref mut permanents, _] = self.cp;
-                    for ch in &mut learnts.head[1..] {
-                        if ch.get_flag(ClauseFlag::Dead) {
-                            continue;
-                        }
-                        if ch.rank <= self.co_lbd_bound {
-                            learnts.touched[ch.lit[0].negate() as usize] = true;
-                            learnts.touched[ch.lit[1].negate() as usize] = true;
-                            permanents.new_clause(
-                                &ch.lits,
-                                ch.rank,
-                                ch.get_flag(ClauseFlag::Locked),
-                            );
-                            ch.set_flag(ClauseFlag::Dead, true);
-                        }
-                    }
-                    learnts.garbage_collect(&mut self.vars, &mut self.eliminator);
-                }
-                Some(SearchStrategy::HighSuccesive) => {
-                    // firstReduceDB = 30000;
-                    self.co_lbd_bound = 3;
-                    self.var_decay = 0.99;
-                    self.var_decay_max = 0.99;
-                    // randomize_on_restarts = 1;
-                    // adjusted = true;
-
-                }
-                Some(SearchStrategy::LowSuccesive) => {
-                    // This path needs Luby
-                    self.luby_restart = true;
-                    // luby_restart_factor = 100;
-                    self.var_decay = 0.999;
-                    self.var_decay_max = 0.999;
-                    // adjusted = true;
-                }
-                Some(SearchStrategy::ManyGlues) => {
-                    self.var_decay = 0.91;
-                    self.var_decay_max = 0.91;
-                    // adjusted = true;
-                }
-                Some(SearchStrategy::Generic) => {
-                    // ??
-                }
-                None => {
-                    //
-                }
-            }                                        
+        match self.config.strategy {
+            SearchStrategy::LowDecisions => {
+                self.config.use_chan_seok = true;
+                self.config.co_lbd_bound = 4;
+                let _glureduce = true;
+                self.config.first_reduction = 2000;
+                self.next_reduction = 2000;
+                self.cur_restart = ((self.stat[Stat::Conflict as usize] as f64
+                    / self.next_reduction as f64)
+                    + 1.0) as usize;
+                self.config.inc_reduce_db = 0;
+            }
+            SearchStrategy::LowSuccesive => {
+                self.config.luby_restart = true;
+                self.config.luby_restart_factor = 100.0;
+                self.var_decay = 0.999;
+                self.var_decay_max = 0.999;
+            }
+            SearchStrategy::HighSuccesive => {
+                self.config.use_chan_seok = true;
+                let _glureduce = true;
+                self.config.co_lbd_bound = 3;
+                self.config.first_reduction = 30000;
+                self.var_decay = 0.99;
+                self.var_decay_max = 0.99;
+                // randomize_on_restarts = 1;
+            }
+            SearchStrategy::ManyGlues => {
+                self.var_decay = 0.91;
+                self.var_decay_max = 0.91;
+            }
+            _ => (),
         }
-        if re_init {
-            // make all claueses garbage
+        self.ema_asg.reset();
+        self.ema_lbd.reset();
+        self.lbd_queue.clear();
+        self.stat[Stat::SumLBD as usize] = 0;
+        self.stat[Stat::Conflict as usize] = 0;
+        let [_, ref mut learnts, ref mut permanents, _] = self.cp;
+        if self.config.strategy == SearchStrategy::LowDecisions
+            || self.config.strategy == SearchStrategy::HighSuccesive
+        {
+            // TODO incReduceDB = 0;
+            // println!("# Adjusting for low decision levels.");
+            // move some clauses with good lbd (col_lbd_bound) to Permanent
+            for ch in &mut learnts.head[1..] {
+                if ch.get_flag(ClauseFlag::Dead) {
+                    continue;
+                }
+                assert!(!ch.get_flag(ClauseFlag::Locked));
+                if ch.rank <= self.config.co_lbd_bound || re_init {
+                    if ch.rank <= self.config.co_lbd_bound {
+                        permanents.new_clause(
+                            &ch.lits,
+                            ch.rank,
+                            ch.get_flag(ClauseFlag::Locked),
+                        );
+                    }
+                    learnts.touched[ch.lit[0].negate() as usize] = true;
+                    learnts.touched[ch.lit[1].negate() as usize] = true;
+                    ch.set_flag(ClauseFlag::Dead, true);
+                }
+            }
+            learnts.garbage_collect(&mut self.vars, &mut self.eliminator);
         }
     }
 }
@@ -478,7 +535,7 @@ impl SatSolver for Solver {
                 Err(SolverException::InternalInconsistent)
             }
             true => {
-                self.progress("SAT");
+                self.progress(self.config.strategy.to_str());
                 let mut result = Vec::new();
                 for vi in 1..=self.num_vars {
                     match self.vars[vi].assign {
@@ -494,7 +551,7 @@ impl SatSolver for Solver {
                 Ok(Certificate::SAT(result))
             }
             false => {
-                self.progress("UNSAT");
+                self.progress(self.config.strategy.to_str());
                 self.cancel_until(0);
                 let mut v = Vec::new();
                 for l in &self.conflicts {
@@ -757,8 +814,8 @@ impl CDCL for Solver {
     fn search(&mut self) -> bool {
         let mut conflict_c = 0.0;  // for Luby restart
         let mut a_decision_was_made = false;
-        if self.luby_restart {
-            self.luby_restart_num_conflict = luby(self.luby_restart_inc, self.luby_current_restarts) * self.luby_restart_factor;
+        if self.config.luby_restart {
+            self.config.luby_restart_num_conflict = luby(self.config.luby_restart_inc, self.config.luby_current_restarts) * self.config.luby_restart_factor;
         }
         let root_lv = self.root_level;
         loop {
@@ -779,21 +836,21 @@ impl CDCL for Solver {
                     return true;
                 }
                 // DYNAMIC FORCING RESTART
-                if (self.luby_restart && self.luby_restart_num_conflict <= conflict_c)
-                    || (!self.luby_restart
+                if (self.config.luby_restart && self.config.luby_restart_num_conflict <= conflict_c)
+                    || (!self.config.luby_restart
                         && self.lbd_queue.is_full(LBD_QUEUE_LEN)
                         && ((self.stat[Stat::SumLBD as usize] as f64)
                             / (self.stat[Stat::Conflict as usize] as f64)
-                            < self.lbd_queue.average() * self.restart_thr))
+                            < self.lbd_queue.average() * self.config.restart_thr))
                 {
                     self.stat[Stat::Restart as usize] += 1;
                     self.lbd_queue.clear();
                     self.cancel_until(0);
 
-                    if self.luby_restart {
+                    if self.config.luby_restart {
                         conflict_c = 0.0;
-                        self.luby_current_restarts += 1;
-                        self.luby_restart_num_conflict = luby(self.luby_restart_inc, self.luby_current_restarts) * self.luby_restart_factor;
+                        self.config.luby_current_restarts += 1;
+                        self.config.luby_restart_num_conflict = luby(self.config.luby_restart_inc, self.config.luby_current_restarts) * self.config.luby_restart_factor;
                         // println!("luby restart {}", self.luby_restart_num_conflict);
                     }
                     // return
@@ -850,7 +907,7 @@ impl CDCL for Solver {
                 let count = self.stat[Stat::Conflict as usize] as u64;
                 if 100 < count
                     && self.lbd_queue.is_full(LBD_QUEUE_LEN)
-                    && self.restart_blk * self.trail_queue.average() < (real_len as f64)
+                    && self.config.restart_blk * self.trail_queue.average() < (real_len as f64)
                 {
                     self.lbd_queue.clear();
                     self.stat[Stat::BlockRestart as usize] += 1;
@@ -868,8 +925,15 @@ impl CDCL for Solver {
                     lbd = self.vars.compute_lbd(&new_learnt, &mut self.lbd_temp);
                     let v = &mut new_learnt;
                     let l0 = v[0];
+                    let vlen = v.len();
                     debug_assert!(0 < lbd);
                     let cid = self.add_clause(&mut *v, lbd);
+                    if lbd <= 2 {
+                        self.stat[Stat::NumLBD2 as usize] += 1;
+                    }
+                    if vlen == 2 {
+                        self.stat[Stat::NumBin as usize] += 1;
+                    }
                     if cid.to_kind() == ClauseKind::Removable as usize {
                         // clause_body_mut!(self.cp, cid).set_flag(ClauseFlag::JustUsed, true);
                         // debug_assert!(!ch.get_flag(ClauseFlag::Dead));
@@ -886,14 +950,7 @@ impl CDCL for Solver {
                 self.stat[Stat::SumLBD as usize] += lbd as i64;
                 self.lbd_queue.enqueue(LBD_QUEUE_LEN, lbd);
                 if self.stat[Stat::Conflict as usize] % 10_000 == 0 {
-                    self.progress(match self.strategy {
-                        None => "none",
-                        Some(SearchStrategy::Generic) => "defl",
-                        Some(SearchStrategy::ChanSeok) => "Chan",
-                        Some(SearchStrategy::HighSuccesive) => "High",
-                        Some(SearchStrategy::LowSuccesive) => "LowS",
-                        Some(SearchStrategy::ManyGlues) => "Many",
-                    });
+                    self.progress(self.config.strategy.to_str());
                 }
                 if self.stat[Stat::Conflict as usize] == 100_000 {
                     self.cancel_until(0);
@@ -913,6 +970,7 @@ impl CDCL for Solver {
                     self.cur_restart =
                         ((conflicts as f64) / (self.next_reduction as f64)) as usize + 1;
                     self.reduce();
+                    self.next_reduction += self.config.inc_reduce_db;
                 }
                 // Since the conflict path pushes a new literal to trail,
                 // we don't need to pick up a literal here.

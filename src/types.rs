@@ -226,38 +226,6 @@ impl fmt::Display for CNFDescription {
     }
 }
 
-/// `Solver`'s parameters; random decision rate was dropped.
-pub struct SolverConfiguration {
-    /// decay rate for variable activity
-    pub variable_decay_rate: f64,
-    /// decay rate for clause activity
-    pub clause_decay_rate: f64,
-    /// dump stats data during solving
-    pub dump_solver_stat_mode: i32,
-    /// the coefficients for restarts
-    pub ema_coeffs: (i32, i32),
-    /// restart expansion factor
-    pub restart_expansion: f64,
-    /// static steps between restarts
-    pub restart_step: f64,
-    pub use_sve: bool,
-    pub use_tty: bool,
-}
-
-impl Default for SolverConfiguration {
-    fn default() -> SolverConfiguration {
-        SolverConfiguration {
-            variable_decay_rate: 0.9,
-            clause_decay_rate: 0.999,
-            dump_solver_stat_mode: 0,
-            ema_coeffs: (2 ^ 5, 2 ^ 15),
-            restart_expansion: 1.15,
-            restart_step: 100.0,
-            use_sve: true,
-            use_tty: true,
-        }
-    }
-}
 
 /// formats of state dump
 pub enum DumpMode {

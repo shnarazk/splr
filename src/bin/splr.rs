@@ -19,6 +19,8 @@ struct CLOpts {
     no_tty: bool,
     #[structopt(long = "no-elim", short="e")]
     no_elim: bool,
+    #[structopt(long = "no-adaptation", short="a")]
+    no_adapt: bool,
     #[structopt(parse(from_os_str))]
     cnf: std::path::PathBuf,
 }
@@ -34,8 +36,9 @@ fn main() {
         if args.no_elim {
             s.eliminator.use_elim = false; 
         }
-        s.restart_thr = args.restart_threshold;
-        s.restart_blk = args.restart_blocking;
+        s.config.adapt_strategy = !args.no_adapt;
+        s.config.restart_thr = args.restart_threshold;
+        s.config.restart_blk = args.restart_blocking;
         match s.solve() {
             Ok(Certificate::SAT(v)) => {
                 if let Ok(out) = File::create(&result) {

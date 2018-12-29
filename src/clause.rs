@@ -1,6 +1,6 @@
 #![allow(unused_variables)]
 use crate::eliminator::*;
-use crate::solver::{SearchStrategy, Solver, Stat, CDCL};
+use crate::solver::{Solver, Stat, CDCL};
 use crate::types::*;
 use crate::var::{EliminationIF, Satisfiability, Var};
 use std::cmp::Ordering;
@@ -382,7 +382,7 @@ impl ClauseManagement for Solver {
             ClauseKind::Permanent
         } else if v.len() == 2 {
             ClauseKind::Binclause
-        } else if (self.strategy == Some(SearchStrategy::ChanSeok) && lbd <= self.co_lbd_bound)
+        } else if (self.config.use_chan_seok && lbd <= self.config.co_lbd_bound)
             || lbd == 0
         {
             ClauseKind::Permanent
