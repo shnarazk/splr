@@ -395,7 +395,7 @@ impl ClauseManagement for Solver {
             self.cp[ClauseKind::Removable as usize]
                 .bump_activity(cid.to_index(),
                                self.stat[Stat::Conflict as usize] as f64,
-                               &mut self.cla_inc);
+                               &mut self.config.cla_inc);
         }
         let ch = clause_mut!(self.cp, cid);
         self.vars.attach_clause(cid, ch, false, &mut self.eliminator);

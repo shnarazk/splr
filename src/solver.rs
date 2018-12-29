@@ -102,6 +102,10 @@ pub struct SolverConfiguration {
     pub variable_decay_rate: f64,
     /// decay rate for clause activity
     pub clause_decay_rate: f64,
+    pub cla_inc: f64,
+    pub var_inc: f64,
+    pub var_decay: f64,
+    pub var_decay_max: f64,
     /// dump stats data during solving
     pub dump_solver_stat_mode: i32,
     /// the coefficients for restarts
@@ -132,6 +136,10 @@ impl Default for SolverConfiguration {
             use_chan_seok: false,
             variable_decay_rate: 0.9,
             clause_decay_rate: 0.999,
+            cla_inc: 1.0,
+            var_inc: 0.9,
+            var_decay: VAR_DECAY,
+            var_decay_max: MAX_VAR_DECAY,
             dump_solver_stat_mode: 0,
             ema_coeffs: (2 ^ 5, 2 ^ 15),
             restart_thr: RESTART_THR,
@@ -157,10 +165,6 @@ pub struct Solver {
     /// Configuration
     pub config: SolverConfiguration,
     pub num_vars: usize,
-    pub cla_inc: f64,
-    pub var_inc: f64,
-    pub var_decay: f64,
-    pub var_decay_max: f64,
     pub root_level: usize,
     /// Variable Assignment Management
     pub vars: Vec<Var>,
@@ -205,15 +209,10 @@ impl Solver {
         let nc = cnf.num_of_clauses as usize;
         let path = &cnf.pathname;
         let (_fe, se) = cfg.ema_coeffs;
-        let vdr = cfg.variable_decay_rate;
         let sve = cfg.use_sve;
         Solver {
             config: cfg,
             num_vars: nv,
-            cla_inc: 1.0,
-            var_inc: vdr,
-            var_decay: VAR_DECAY,
-            var_decay_max: MAX_VAR_DECAY,
             root_level: 0,
             vars: Var::new_vars(nv),
             trail: Vec::with_capacity(nv),
@@ -437,21 +436,21 @@ impl Solver {
             SearchStrategy::LowSuccesive => {
                 self.config.luby_restart = true;
                 self.config.luby_restart_factor = 100.0;
-                self.var_decay = 0.999;
-                self.var_decay_max = 0.999;
+                self.config.var_decay = 0.999;
+                self.config.var_decay_max = 0.999;
             }
             SearchStrategy::HighSuccesive => {
                 self.config.use_chan_seok = true;
                 let _glureduce = true;
                 self.config.co_lbd_bound = 3;
                 self.config.first_reduction = 30000;
-                self.var_decay = 0.99;
-                self.var_decay_max = 0.99;
+                self.config.var_decay = 0.99;
+                self.config.var_decay_max = 0.99;
                 // randomize_on_restarts = 1;
             }
             SearchStrategy::ManyGlues => {
-                self.var_decay = 0.91;
-                self.var_decay_max = 0.91;
+                self.config.var_decay = 0.91;
+                self.config.var_decay_max = 0.91;
             }
             _ => (),
         }
@@ -892,9 +891,9 @@ impl CDCL for Solver {
                     return false;
                 }
                 if self.stat[Stat::Conflict as usize] % 5000 == 0
-                    && self.var_decay < self.var_decay_max
+                    && self.config.var_decay < self.config.var_decay_max
                 {
-                    self.var_decay += 0.01;
+                    self.config.var_decay += 0.01;
                 }
                 // let real_len = if self.trail_lim.is_empty() {
                 //     self.trail.len()
@@ -941,7 +940,7 @@ impl CDCL for Solver {
                         self.cp[ClauseKind::Removable as usize].bump_activity(
                             cid.to_index(),
                             self.stat[Stat::Conflict as usize] as f64,
-                            &mut self.cla_inc,
+                            &mut self.config.cla_inc,
                         );
                     }
                     self.uncheck_enqueue(l0, cid);
@@ -963,7 +962,7 @@ impl CDCL for Solver {
 
                 // self.decay_var_activity();
                 // decay clause activity
-                self.cla_inc /= self.config.clause_decay_rate;
+                self.config.cla_inc /= self.config.clause_decay_rate;
                 // glucose reduction
                 let conflicts = self.stat[Stat::Conflict as usize] as usize;
                 if self.cur_restart * self.next_reduction <= conflicts {
@@ -1063,7 +1062,7 @@ impl CDCL for Solver {
                     self.cp[ClauseKind::Removable as usize].bump_activity(
                         cid.to_index(),
                         self.stat[Stat::Conflict as usize] as f64,
-                        &mut self.cla_inc,
+                        &mut self.config.cla_inc,
                     );
                     // if 2 < (*ch).rank {
                     //     let nblevels = compute_lbd(&self.vars, &ch.lits, &mut self.lbd_temp);
