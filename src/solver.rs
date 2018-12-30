@@ -177,6 +177,7 @@ pub struct Solver {
     pub cp: [ClausePartition; 4],
     /// renamed from `nbclausesbeforereduce`
     pub next_reduction: usize,
+    pub next_restart: u64,
     pub cur_restart: usize,
     pub num_solved_vars: usize,
     /// Variable Elimination
@@ -189,14 +190,12 @@ pub struct Solver {
     pub profile: Profile,
     pub an_seen: Vec<bool>,
     pub lbd_temp: Vec<usize>,
-    /// restart heuristics
     pub lbd_queue: VecDeque<usize>,
     pub trail_queue: VecDeque<usize>,
     pub ema_asg: Ema2,
     pub ema_lbd: Ema2,
     pub b_lvl: Ema,
     pub c_lvl: Ema,
-    pub next_restart: u64,
     pub progress_cnt: i64,
 }
 
@@ -226,6 +225,7 @@ impl Solver {
                 ClausePartition::build(ClauseKind::Binclause, nv, 256),
             ],
             next_reduction: 1000,
+            next_restart: 100,
             cur_restart: 1,
             num_solved_vars: 0,
             eliminator: Eliminator::new(sve),
@@ -242,7 +242,6 @@ impl Solver {
             ema_lbd: Ema2::new(160.0, 50_000.0), // for forcing 160
             b_lvl: Ema::new(se),
             c_lvl: Ema::new(se),
-            next_restart: 100,
             progress_cnt: 0,
         }
     }
@@ -527,37 +526,32 @@ impl SatSolver for Solver {
         // self.config.use_sve = false;
         // self.eliminator.use_elim = false;
         self.stat[Stat::Simplification as usize] += 1;
-        match self.search() {
-            _ if !self.ok => {
+        if self.search() {
+            if !self.ok {
                 self.cancel_until(0);
                 self.progress("error");
-                Err(SolverException::InternalInconsistent)
+                return Err(SolverException::InternalInconsistent)
             }
-            true => {
-                self.progress(self.config.strategy.to_str());
-                let mut result = Vec::new();
-                for vi in 1..=self.num_vars {
-                    match self.vars[vi].assign {
-                        LTRUE => result.push(vi as i32),
-                        LFALSE => result.push(0 - vi as i32),
-                        _ => result.push(0),
-                    }
+            self.progress(self.config.strategy.to_str());
+            let mut result = Vec::new();
+            for vi in 1..=self.num_vars {
+                match self.vars[vi].assign {
+                    LTRUE => result.push(vi as i32),
+                    LFALSE => result.push(0 - vi as i32),
+                    _ => result.push(0),
                 }
-                if self.eliminator.use_elim {
-                    self.extend_model(&mut result);
-                }
-                self.cancel_until(0);
-                Ok(Certificate::SAT(result))
             }
-            false => {
-                self.progress(self.config.strategy.to_str());
-                self.cancel_until(0);
-                let mut v = Vec::new();
-                for l in &self.conflicts {
-                    v.push(l.int());
-                }
-                Ok(Certificate::UNSAT(v))
+            if self.eliminator.use_elim {
+                self.extend_model(&mut result);
             }
+            self.cancel_until(0);
+            Ok(Certificate::SAT(result))
+        } else {
+            self.progress(self.config.strategy.to_str());
+            self.cancel_until(0);
+            Ok(Certificate::UNSAT(
+                self.conflicts.iter().map(|l| l.int()).collect())
+            )
         }
     }
 
@@ -721,7 +715,6 @@ impl CDCL for Solver {
             ref mut vars,
             ref mut cp,
             ref mut trail,
-            ref trail_lim,
             ref mut q_head,
             ref mut stat,
             ..
@@ -786,13 +779,12 @@ impl CDCL for Solver {
                                 return kind.id_from(*pre);
                             } else {
                                 // self.uncheck_enqueue(other, kind.id_from((*c).index));
-                                let dl = trail_lim.len();
-                                debug_assert!(dl == 0);
+                                // debug_assert!(trail_lim.len() == 0);
                                 let other = (*ch).lits[0];
                                 let v = &mut vars[other.vi()];
                                 debug_assert!(v.assign == other.lbool() || v.assign == BOTTOM);
                                 v.assign = other.lbool();
-                                v.level = dl;
+                                v.level = 0;
                                 debug_assert!(*pre != NULL_CLAUSE);
                                 v.reason = NULL_CLAUSE;
                                 debug_assert!(!v.eliminated);
@@ -816,7 +808,6 @@ impl CDCL for Solver {
         if self.config.luby_restart {
             self.config.luby_restart_num_conflict = luby(self.config.luby_restart_inc, self.config.luby_current_restarts) * self.config.luby_restart_factor;
         }
-        let root_lv = self.root_level;
         loop {
             self.stat[Stat::Propagation as usize] += 1;
             let ci = self.propagate();
@@ -914,14 +905,12 @@ impl CDCL for Solver {
                 let mut new_learnt: Vec<Lit> = Vec::new();
                 let bl = self.analyze(ci, &mut new_learnt);
                 // let nas = self.num_assigns();
-                self.cancel_until(max(bl as usize, root_lv));
-                let lbd;
+                self.cancel_until(max(bl as usize, self.root_level));
                 if new_learnt.len() == 1 {
                     let l = new_learnt[0];
                     self.uncheck_enqueue(l, NULL_CLAUSE);
-                    lbd = 1;
                 } else {
-                    lbd = self.vars.compute_lbd(&new_learnt, &mut self.lbd_temp);
+                    let lbd = self.vars.compute_lbd(&new_learnt, &mut self.lbd_temp);
                     let v = &mut new_learnt;
                     let l0 = v[0];
                     let vlen = v.len();
@@ -945,9 +934,9 @@ impl CDCL for Solver {
                     }
                     self.uncheck_enqueue(l0, cid);
                     clause_mut!(self.cp, cid).set_flag(ClauseFlag::Locked, true);
+                    self.lbd_queue.enqueue(LBD_QUEUE_LEN, lbd);
+                    self.stat[Stat::SumLBD as usize] += lbd as i64;
                 }
-                self.stat[Stat::SumLBD as usize] += lbd as i64;
-                self.lbd_queue.enqueue(LBD_QUEUE_LEN, lbd);
                 if self.stat[Stat::Conflict as usize] % 10_000 == 0 {
                     self.progress(self.config.strategy.to_str());
                 }
