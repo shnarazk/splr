@@ -1293,9 +1293,9 @@ impl Solver {
         v.assign = l.lbool();
         v.level = dl;
         v.reason = cid;
-        if dl == 0 {
-            eliminator.enqueue_var(v);
-        }
+        // if dl == 0 {
+        //     eliminator.enqueue_var(v);
+        // }
         clause_mut!(*cp, cid).set_flag(ClauseFlag::Locked, true);
         // debug_assert!(!self.trail.contains(&l));
         // debug_assert!(!self.trail.contains(&l.negate()));
