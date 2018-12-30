@@ -1,5 +1,6 @@
 // use clause::Clause;
 use crate::clause::{ClauseFlag, ClauseHead};
+use crate::clause::ClauseIdIndexEncoding;
 use crate::eliminator::{Eliminator, EliminatorIF};
 use crate::solver::Solver;
 use crate::types::*;
@@ -15,6 +16,7 @@ pub trait VarManagement {
 /// For [Var]
 pub trait Satisfiability {
     fn assigned(&self, l: Lit) -> Lbool;
+    fn locked(&self, ch: &ClauseHead, cid: ClauseId) -> bool;
     fn satisfies(&self, c: &[Lit]) -> bool;
     fn compute_lbd(&self, vec: &[Lit], keys: &mut [usize]) -> usize;
 }
@@ -101,6 +103,21 @@ impl Var {
 impl Satisfiability for [Var] {
     fn assigned(&self, l: Lit) -> Lbool {
         self[l.vi()].assign ^ ((l & 1) as u8)
+    }
+    fn locked(&self, ch: &ClauseHead, cid: ClauseId) -> bool {
+        let lits = &ch.lits;
+        if lits.len() < 2 {
+            panic!("strange lits {} {}", cid.to_index(), ch.get_flag(ClauseFlag::Dead));
+        }
+        let l0 = lits[0];
+        if 2 < lits.len() {
+            let l0 = lits[0];
+            self.assigned(l0) == LTRUE
+                && self[l0.vi()].reason == cid
+        } else {
+            (self.assigned(l0) == LTRUE && self[l0.vi()].reason == cid)
+                || (self.assigned(l0) == LTRUE && self[l0.vi()].reason == cid)
+        }
     }
     fn satisfies(&self, vec: &[Lit]) -> bool {
         for l in vec {
