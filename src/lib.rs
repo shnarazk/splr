@@ -19,7 +19,6 @@ macro_rules! clause_mut {
 }
 
 #[allow(unused_macros)]
-/// WARNING: call `set_flag(ClauseFlag::Locked)` by yourself after this function.
 macro_rules! uenqueue {
     ($vs: expr, $tr: expr, $tl: expr, $lit: expr, $cid: expr) => {{
         match (&$vs, &mut $tr, &$tl, $lit, $cid) {

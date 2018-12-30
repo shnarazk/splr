@@ -181,7 +181,6 @@ impl Solver {
     /// - calls `enqueue_var`
     pub fn strengthen_clause(&mut self, cid: ClauseId, l: Lit) -> bool {
         debug_assert!(!clause!(self.cp, cid).get_flag(ClauseFlag::Dead));
-        debug_assert!(!clause!(self.cp, cid).get_flag(ClauseFlag::Locked));
         debug_assert!(1 < clause!(self.cp, cid).lits.len());
         self.cp[cid.to_kind()].touched[l as usize] = true;
         self.cp[cid.to_kind()].touched[l.negate() as usize] = true;
@@ -308,10 +307,6 @@ impl Solver {
                     cnt += (*cs).len();
                     for di in &*cs {
                         let db = clause!(self.cp, di) as *const ClauseHead;
-                        debug_assert!(
-                            (!(*db).get_flag(ClauseFlag::Locked))
-                                || (*db).get_flag(ClauseFlag::Dead)
-                        );
                         if !(*db).get_flag(ClauseFlag::Dead)
                             && *di != cid
                             && lits.len() <= SUBSUMPTION_SIZE

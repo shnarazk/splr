@@ -469,14 +469,9 @@ impl Solver {
                 if ch.get_flag(ClauseFlag::Dead) {
                     continue;
                 }
-                assert!(!ch.get_flag(ClauseFlag::Locked));
                 if ch.rank <= self.config.co_lbd_bound || re_init {
                     if ch.rank <= self.config.co_lbd_bound {
-                        permanents.new_clause(
-                            &ch.lits,
-                            ch.rank,
-                            ch.get_flag(ClauseFlag::Locked),
-                        );
+                        permanents.new_clause(&ch.lits, ch.rank);
                     }
                     learnts.touched[ch.lit[0].negate() as usize] = true;
                     learnts.touched[ch.lit[1].negate() as usize] = true;
@@ -693,7 +688,6 @@ impl CDCL for Solver {
                                     v.reason = NULL_CLAUSE;
                                 } else {
                                     v.reason = kind.id_from(*pre);
-                                    (*ch).set_flag(ClauseFlag::Locked, true);
                                 }
                                 debug_assert!(!v.eliminated);
                                 // debug_assert!(!trail.contains(&other));
@@ -933,7 +927,6 @@ impl CDCL for Solver {
                         );
                     }
                     self.uncheck_enqueue(l0, cid);
-                    clause_mut!(self.cp, cid).set_flag(ClauseFlag::Locked, true);
                     self.lbd_queue.enqueue(LBD_QUEUE_LEN, lbd);
                     self.stat[Stat::SumLBD as usize] += lbd as i64;
                 }
@@ -968,7 +961,6 @@ impl CDCL for Solver {
 
     fn cancel_until(&mut self, lv: usize) {
         let Solver {
-            ref mut cp,
             ref mut vars,
             ref mut trail, ref mut trail_lim,
             ref mut var_order,
@@ -986,7 +978,6 @@ impl CDCL for Solver {
             v.phase = v.assign;
             v.assign = BOTTOM;
             if v.reason != NULL_CLAUSE {
-                clause_mut!(*cp, v.reason).set_flag(ClauseFlag::Locked, false);
                 v.reason = NULL_CLAUSE;
             }
             var_order.insert(vars, vi);
@@ -1017,8 +1008,6 @@ impl CDCL for Solver {
                 // }
                 v.reason = NULL_CLAUSE;
                 v.activity = 0.0;
-            } else if cid != NULL_CLAUSE {
-                clause_mut!(self.cp, cid).set_flag(ClauseFlag::Locked, true);
             }
             // if dl == 0 {
             //     self.var_order.remove(&self.vars, l.vi());
@@ -1275,11 +1264,10 @@ impl Solver {
 
     pub fn uncheck_enqueue(&mut self, l: Lit, cid: ClauseId) {
         let Solver {
-            ref mut cp,
             ref mut vars,
             ref mut trail,
             ref trail_lim,
-            ref mut eliminator,
+            // ref mut eliminator,
             .. } = self;
         // println!("uncheck_enqueue {}", l.int());
         debug_assert!(l != 0, "Null literal is about to be equeued");
@@ -1296,7 +1284,6 @@ impl Solver {
         // if dl == 0 {
         //     eliminator.enqueue_var(v);
         // }
-        clause_mut!(*cp, cid).set_flag(ClauseFlag::Locked, true);
         // debug_assert!(!self.trail.contains(&l));
         // debug_assert!(!self.trail.contains(&l.negate()));
         trail.push(l);
@@ -1395,7 +1382,7 @@ impl Solver {
 }
 
 /// returns `false` if an conflict occures.
-pub fn enqueue(trail: &mut Vec<Lit>, v: &mut Var, sig: Lbool, ch: &mut ClauseHead, cid: ClauseId, dl: usize) -> bool {
+pub fn enqueue(trail: &mut Vec<Lit>, v: &mut Var, sig: Lbool, cid: ClauseId, dl: usize) -> bool {
     let val = v.assign;
     if val == BOTTOM {
         debug_assert!(!v.eliminated);
@@ -1412,8 +1399,6 @@ pub fn enqueue(trail: &mut Vec<Lit>, v: &mut Var, sig: Lbool, ch: &mut ClauseHea
             // }
             v.reason = NULL_CLAUSE;
             v.activity = 0.0;
-        } else if cid != NULL_CLAUSE {
-            ch.set_flag(ClauseFlag::Locked, true);
         }
         // if dl == 0 {
         //     self.var_order.remove(&self.vars, l.vi());

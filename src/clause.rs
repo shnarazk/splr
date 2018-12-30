@@ -10,7 +10,7 @@ use std::fmt;
 /// For ClausePartition
 pub trait GC {
     fn garbage_collect(&mut self, vars: &mut [Var], elimanator: &mut Eliminator) -> ();
-    fn new_clause(&mut self, v: &[Lit], rank: usize, locked: bool) -> ClauseId;
+    fn new_clause(&mut self, v: &[Lit], rank: usize) -> ClauseId;
     fn reset_lbd(&mut self, vars: &[Var], temp: &mut [usize]) -> ();
     fn move_to(&mut self, list: &mut ClauseId, ci: ClauseIndex, index: usize) -> ClauseIndex;
     fn bump_activity(&mut self, cix: ClauseIndex, val: f64, cla_inc: &mut f64) -> ();
@@ -64,7 +64,6 @@ pub enum ClauseFlag {
     Kind0 = 0,
     Kind1,
     Dead,
-    Locked,
     JustUsed,
     Enqueued,
 }
@@ -186,6 +185,7 @@ impl ClauseHead {
 }
 
 impl ClauseFlag {
+    #[allow(dead_code)]
     fn as_bit(self, val: bool) -> u16 {
         (val as u16) << (self as u16)
     }
@@ -256,7 +256,7 @@ impl fmt::Display for ClauseHead {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "C lit:{:?}, watches:{:?} {{{:?} {}{}{}{}}}",
+            "C lit:{:?}, watches:{:?} {{{:?} {}{}{}}}",
             vec2int(&self.lit),
             self.next_watcher,
             vec2int(&self.lits),
@@ -269,11 +269,6 @@ impl fmt::Display for ClauseHead {
             },
             if self.get_flag(ClauseFlag::Dead) {
                 ", dead"
-            } else {
-                ""
-            },
-            if self.get_flag(ClauseFlag::Locked) {
-                ", locked"
             } else {
                 ""
             },
@@ -360,7 +355,7 @@ impl ClauseManagement for Solver {
                 Some(NULL_CLAUSE)
             }
             n => {
-                let cid = self.cp[kind as usize].new_clause(&v, 0, false);
+                let cid = self.cp[kind as usize].new_clause(&v, 0);
                 self.vars.attach_clause(cid, clause_mut!(self.cp, cid), true, &mut self.eliminator);
                 Some(cid)
             }
@@ -394,7 +389,7 @@ impl ClauseManagement for Solver {
         } else {
             ClauseKind::Removable
         };
-        let cid = self.cp[kind as usize].new_clause(&v, lbd, false);
+        let cid = self.cp[kind as usize].new_clause(&v, lbd);
         // self.bump_cid(cid);
         if cid.to_kind() == ClauseKind::Removable as usize {
             self.cp[ClauseKind::Removable as usize]
@@ -439,7 +434,6 @@ impl ClauseManagement for Solver {
     fn change_clause_kind(&mut self, cid: ClauseId, kind: ClauseKind) {
         debug_assert_eq!(self.decision_level(), 0);
         let rank;
-        let locked;
         let mut vec = Vec::new();
         let cb = clause!(self.cp, cid);
         if cb.get_flag(ClauseFlag::Dead) {
@@ -449,8 +443,7 @@ impl ClauseManagement for Solver {
             vec.push(*x);
         }
         rank = cb.rank;
-        locked = cb.get_flag(ClauseFlag::Locked);
-        self.cp[kind as usize].new_clause(&vec, rank, locked);
+        self.cp[kind as usize].new_clause(&vec, rank);
         self.remove_clause(cid);
         if self.decision_level() != 0 {
             self.cp[cid.to_kind()].garbage_collect(&mut self.vars, &mut self.eliminator);
@@ -467,7 +460,12 @@ impl ClauseManagement for Solver {
         } = &mut self.cp[ClauseKind::Removable as usize];
         let mut nc = 1;
         for (i, b) in head.iter().enumerate().skip(1) {
-            if !b.get_flag(ClauseFlag::Dead) && !b.get_flag(ClauseFlag::Locked) {
+            // if b.get_flag(ClauseFlag::Locked) && !b.get_flag(ClauseFlag::Dead) {
+            //     assert!(self.vars.
+            //             locked(b, ClauseKind::Removable.id_from(i)));
+            // }
+            // if !b.get_flag(ClauseFlag::Dead) && !b.get_flag(ClauseFlag::Locked) {
+            if !b.get_flag(ClauseFlag::Dead) && !self.vars.locked(b, ClauseKind::Removable.id_from(i)) {
                 perm[nc] = i;
                 nc += 1;
             }
@@ -483,7 +481,6 @@ impl ClauseManagement for Solver {
                 ch.set_flag(ClauseFlag::JustUsed, false)
             } else {
                 ch.set_flag(ClauseFlag::Dead, true);
-                debug_assert!(!ch.get_flag(ClauseFlag::Locked));
                 // if cb.get_flag(ClauseFlag::Locked) {
                 //     panic!("clause is locked");
                 // }
@@ -504,7 +501,6 @@ impl ClauseManagement for Solver {
         // reset reason since decision level is zero.
         for v in &mut self.vars[1..] {
             if v.reason != NULL_CLAUSE {
-                clause_mut!(self.cp, v.reason).set_flag(ClauseFlag::Locked, false);
                 v.reason = NULL_CLAUSE;
             }
         }
@@ -524,7 +520,6 @@ impl ClauseManagement for Solver {
             for ck in ClauseKind::Liftedlit as usize ..= ClauseKind::Binclause as usize {
                 for ch in &mut self.cp[ck].head[1..] {
                     if !ch.get_flag(ClauseFlag::Dead) && vars.satisfies(&ch.lits) {
-                        debug_assert!(!ch.get_flag(ClauseFlag::Locked));
                         ch.set_flag(ClauseFlag::Dead, true);
                         debug_assert!(ch.lit[0] != 0 && ch.lit[1] != 0);
                         self.cp[ck].touched[ch.lit[0].negate() as usize] = true;
@@ -594,7 +589,6 @@ impl GC for ClausePartition {
                     ch.next_watcher[0] = *recycled;
                     ch.next_watcher[1] = *recycled;
                     *recycled = ci;
-                    ch.set_flag(ClauseFlag::Locked, true);
                     if eliminator.use_elim {
                         for l in &ch.lits {
                             let vi = l.vi();
@@ -631,7 +625,7 @@ impl GC for ClausePartition {
         //     ),
         // );
     }
-    fn new_clause(&mut self, v: &[Lit], rank: usize, locked: bool) -> ClauseId {
+    fn new_clause(&mut self, v: &[Lit], rank: usize) -> ClauseId {
         let cix;
         let w0;
         let w1;
@@ -650,7 +644,6 @@ impl GC for ClausePartition {
             }
             ch.rank = rank;
             ch.flag = self.kind as u16; // reset Dead, JustUsed, and Touched
-            ch.set_flag(ClauseFlag::Locked, locked);
             ch.activity = 1.0;
             w0 = ch.lit[0].negate() as usize;
             w1 = ch.lit[1].negate() as usize;
@@ -669,7 +662,7 @@ impl GC for ClausePartition {
             self.head.push(ClauseHead {
                 lit: [l0, l1],
                 next_watcher: [self.watcher[w0], self.watcher[w1]],
-                flag: self.kind as u16 | ClauseFlag::Locked.as_bit(locked),
+                flag: self.kind as u16,
                 lits,
                 rank,
                 activity: 1.0,
