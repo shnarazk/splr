@@ -1009,6 +1009,7 @@ impl CDCL for Solver {
             //     println!("enqueue {}", cid2fmt(cid));
             // }
             v.reason = cid;
+            v.level = dl;
             if dl == 0 {
                 // if !v.enqueued {
                 //     self.eliminator.var_queue.push(l.vi());
@@ -1016,14 +1017,12 @@ impl CDCL for Solver {
                 // }
                 v.reason = NULL_CLAUSE;
                 v.activity = 0.0;
-            }
-            v.level = dl;
-            if cid != NULL_CLAUSE {
+            } else if cid != NULL_CLAUSE {
                 clause_mut!(self.cp, cid).set_flag(ClauseFlag::Locked, true);
             }
-            if dl == 0 {
-                self.var_order.remove(&self.vars, l.vi());
-            }
+            // if dl == 0 {
+            //     self.var_order.remove(&self.vars, l.vi());
+            // }
             // debug_assert!(!self.trail.contains(&l));
             // debug_assert!(!self.trail.contains(&l.negate()));
             self.trail.push(l);
@@ -1394,3 +1393,55 @@ impl Solver {
         // self.var_order.check("");
     }
 }
+
+/// returns `false` if an conflict occures.
+pub fn enqueue(trail: &mut Vec<Lit>, v: &mut Var, sig: Lbool, ch: &mut ClauseHead, cid: ClauseId, dl: usize) -> bool {
+    let val = v.assign;
+    if val == BOTTOM {
+        debug_assert!(!v.eliminated);
+        v.assign = sig;
+        // if dl == 0 && cid != NULL_CLAUSE {
+        //     println!("enqueue {}", cid2fmt(cid));
+        // }
+        v.reason = cid;
+        v.level = dl;
+        if dl == 0 {
+            // if !v.enqueued {
+            //     self.eliminator.var_queue.push(l.vi());
+            //     v.enqueued = true;
+            // }
+            v.reason = NULL_CLAUSE;
+            v.activity = 0.0;
+        } else if cid != NULL_CLAUSE {
+            ch.set_flag(ClauseFlag::Locked, true);
+        }
+        // if dl == 0 {
+        //     self.var_order.remove(&self.vars, l.vi());
+        // }
+        // debug_assert!(!self.trail.contains(&l));
+        // debug_assert!(!self.trail.contains(&l.negate()));
+        trail.push(v.index.lit(sig));
+        true
+    } else {
+        val == sig
+    }
+}
+
+/// returns `false` if an conflict occures.
+pub fn enqueue_null(trail: &mut Vec<Lit>, v: &mut Var, sig: Lbool, dl: usize) -> bool {
+    let val = v.assign;
+    if val == BOTTOM {
+        debug_assert!(!v.eliminated);
+        v.assign = sig;
+        v.reason = NULL_CLAUSE;
+        v.level = dl;
+        if dl == 0 {
+            v.activity = 0.0;
+        }
+        trail.push(v.index.lit(sig));
+        true
+    } else {
+        val == sig
+    }
+}
+

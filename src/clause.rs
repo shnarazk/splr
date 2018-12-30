@@ -1,6 +1,6 @@
 #![allow(unused_variables)]
 use crate::eliminator::*;
-use crate::solver::{Solver, Stat, CDCL};
+use crate::solver::{Solver, Stat, enqueue_null};
 use crate::types::*;
 use crate::var::{EliminationIF, Satisfiability, Var};
 use std::cmp::Ordering;
@@ -351,7 +351,12 @@ impl ClauseManagement for Solver {
         match v.len() {
             0 => None, // Empty clause is UNSAT.
             1 => {
-                self.enqueue(v[0], NULL_CLAUSE);
+                let dl = self.decision_level();
+                enqueue_null(&mut self.trail,
+                             &mut self.vars[v[0].vi()],
+                             v[0].lbool(),
+                             dl,
+                );
                 Some(NULL_CLAUSE)
             }
             n => {
