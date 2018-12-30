@@ -475,7 +475,7 @@ impl Solver {
                     }
                     learnts.touched[ch.lit[0].negate() as usize] = true;
                     learnts.touched[ch.lit[1].negate() as usize] = true;
-                    ch.set_flag(ClauseFlag::Dead, true);
+                    ch.flag_on(ClauseFlag::Dead);
                 }
             }
             learnts.garbage_collect(&mut self.vars, &mut self.eliminator);
@@ -917,7 +917,7 @@ impl CDCL for Solver {
                         self.stat[Stat::NumBin as usize] += 1;
                     }
                     if cid.to_kind() == ClauseKind::Removable as usize {
-                        // clause_body_mut!(self.cp, cid).set_flag(ClauseFlag::JustUsed, true);
+                        // clause_body_mut!(self.cp, cid).flag_on(ClauseFlag::JustUsed);
                         // debug_assert!(!ch.get_flag(ClauseFlag::Dead));
                         // self.bump_cid(cid);
                         self.cp[ClauseKind::Removable as usize].bump_activity(
@@ -1046,7 +1046,7 @@ impl CDCL for Solver {
                     //     if nblevels + 1 < (*ch).rank {
                     //         (*ch).rank = nblevels;
                     //         if nblevels <= 30 {
-                    //             (*ch).set_flag(ClauseFlag::JustUsed, true);
+                    //             (*ch).flag_on(ClauseFlag::JustUsed);
                     //         }
                     //         if self.strategy == Some(SearchStrategy::ChanSeok)
                     //             && nblevels < self.co_lbd_bound

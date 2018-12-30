@@ -94,7 +94,7 @@ impl EliminatorIF for Eliminator {
             if rank <= accept {
                 self.clause_queue.push(cid);
                 // println!("increment {}", self.eliminator.clause_queue.len());
-                ch.set_flag(ClauseFlag::Enqueued, true);
+                ch.flag_on(ClauseFlag::Enqueued);
                 self.clause_queue_threshold -= 1;
             }
         }
@@ -280,7 +280,7 @@ impl Solver {
                     lits = &unilits;
                 } else {
                     let ch = clause_mut!(self.cp, cid) as *mut ClauseHead;
-                    (*ch).set_flag(ClauseFlag::Enqueued, false);
+                    (*ch).flag_off(ClauseFlag::Enqueued);
                     lits = &(*ch).lits;
                     if (*ch).get_flag(ClauseFlag::Dead) || BACKWORD_SUBSUMPTION_THRESHOLD < cnt {
                         continue;
@@ -542,7 +542,7 @@ impl Solver {
                 } else {
                     &mut self.vars[v].neg_occurs
                 } {
-                    clause_mut!(self.cp, *cid).set_flag(ClauseFlag::Dead, true);
+                    clause_mut!(self.cp, *cid).flag_on(ClauseFlag::Dead);
                     let w0;
                     let w1;
                     {

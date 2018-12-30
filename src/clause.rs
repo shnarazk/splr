@@ -50,7 +50,7 @@ pub struct ClauseHead {
     /// pointers to next clauses
     pub next_watcher: [usize; 2],
     /// collection of bits
-    pub flag: u16,
+    pub flags: u16,
     /// the literals
     pub lits: Vec<Lit>,
     /// LBD, NDD, or something, used by `reduce_db`
@@ -121,7 +121,7 @@ impl ClausePartition {
         head.push(ClauseHead {
             lit: [NULL_LIT; 2],
             next_watcher: [NULL_CLAUSE; 2],
-            flag: 0,
+            flags: 0,
             lits: vec![],
             rank: 0,
             activity: 0.0,
@@ -166,7 +166,7 @@ impl ClausePartition {
 impl ClauseHead {
     #[inline(always)]
     pub fn get_kind(&self) -> ClauseKind {
-        match self.flag & 3 {
+        match self.flags & 3 {
             0 => ClauseKind::Removable,
             1 => ClauseKind::Permanent,
             2 => ClauseKind::Binclause,
@@ -174,13 +174,24 @@ impl ClauseHead {
         }
     }
     #[inline(always)]
+    pub fn flag_off(&mut self, flag: ClauseFlag) {
+        self.flags &= !(1u16 << (flag as u16));
+    }
+    #[inline(always)]
+    pub fn flag_on(&mut self, flag: ClauseFlag) {
+        self.flags |= 1u16 << (flag as u16);
+    }
+    #[inline(always)]
     pub fn set_flag(&mut self, flag: ClauseFlag, val: bool) {
-        self.flag &= !(1 << (flag as u16));
-        self.flag |= (val as u16) << (flag as u16);
+        if val {
+            self.flags |= (val as u16) << (flag as u16);
+        } else {
+            self.flags &= !(1 << (flag as u16));
+        }
     }
     #[inline(always)]
     pub fn get_flag(&self, flag: ClauseFlag) -> bool {
-        self.flag & (1 << flag as u16) != 0
+        self.flags & (1 << flag as u16) != 0
     }
 }
 
@@ -260,7 +271,7 @@ impl fmt::Display for ClauseHead {
             vec2int(&self.lit),
             self.next_watcher,
             vec2int(&self.lits),
-            match self.flag & 3 {
+            match self.flags & 3 {
                 0 => 'L',
                 1 => 'R',
                 2 => 'P',
@@ -421,7 +432,7 @@ impl ClauseManagement for Solver {
         //         clause_body!(self.cp, cid)
         //     );
         // }
-        clause_mut!(self.cp, cid).set_flag(ClauseFlag::Dead, true);
+        clause_mut!(self.cp, cid).flag_on(ClauseFlag::Dead);
         let ch = clause!(self.cp, cid);
         let w0 = ch.lit[0].negate();
         let w1 = ch.lit[1].negate();
@@ -478,9 +489,9 @@ impl ClauseManagement for Solver {
         for i in keep..nc {
             let ch = &mut head[perm[i]];
             if ch.get_flag(ClauseFlag::JustUsed) {
-                ch.set_flag(ClauseFlag::JustUsed, false)
+                ch.flag_off(ClauseFlag::JustUsed)
             } else {
-                ch.set_flag(ClauseFlag::Dead, true);
+                ch.flag_on(ClauseFlag::Dead);
                 // if cb.get_flag(ClauseFlag::Locked) {
                 //     panic!("clause is locked");
                 // }
@@ -520,7 +531,7 @@ impl ClauseManagement for Solver {
             for ck in ClauseKind::Liftedlit as usize ..= ClauseKind::Binclause as usize {
                 for ch in &mut self.cp[ck].head[1..] {
                     if !ch.get_flag(ClauseFlag::Dead) && vars.satisfies(&ch.lits) {
-                        ch.set_flag(ClauseFlag::Dead, true);
+                        ch.flag_on(ClauseFlag::Dead);
                         debug_assert!(ch.lit[0] != 0 && ch.lit[1] != 0);
                         self.cp[ck].touched[ch.lit[0].negate() as usize] = true;
                         self.cp[ck].touched[ch.lit[1].negate() as usize] = true;
@@ -643,7 +654,7 @@ impl GC for ClausePartition {
                 ch.lits.push(*l);
             }
             ch.rank = rank;
-            ch.flag = self.kind as u16; // reset Dead, JustUsed, and Touched
+            ch.flags = self.kind as u16; // reset Dead, JustUsed, and Touched
             ch.activity = 1.0;
             w0 = ch.lit[0].negate() as usize;
             w1 = ch.lit[1].negate() as usize;
@@ -662,7 +673,7 @@ impl GC for ClausePartition {
             self.head.push(ClauseHead {
                 lit: [l0, l1],
                 next_watcher: [self.watcher[w0], self.watcher[w1]],
-                flag: self.kind as u16,
+                flags: self.kind as u16,
                 lits,
                 rank,
                 activity: 1.0,
