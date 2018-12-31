@@ -2,7 +2,7 @@ use crate::clause::{
     cid2fmt, ClauseFlag, ClauseHead, ClauseIdIndexEncoding, ClauseIndex, ClauseKind,
     ClauseManagement, ClausePartition,
 };
-use crate::solver::{Solver, CDCL};
+use crate::solver::{Solver, CDCL, propagate_0};
 use crate::types::*;
 use crate::var::{EliminationIF, Var};
 // use std::fmt;
@@ -198,7 +198,14 @@ impl Solver {
             // println!("{} is removed and its first literal {} is enqueued.", cid2fmt(cid), c0.int());
             self.remove_clause(cid);
             self.vars.detach_clause(cid, clause!(self.cp, cid), &mut self.eliminator);
-            if self.enqueue(c0, NULL_CLAUSE) && self.propagate_0() == NULL_CLAUSE {
+            if self.enqueue(c0, NULL_CLAUSE) &&
+                propagate_0(&mut self.cp,
+                            &mut self.stat,
+                            &mut self.vars,
+                            &mut self.trail,
+                            &mut self.q_head,
+                ) == NULL_CLAUSE
+            {
                 // self.cp[cid.to_kind()].touched[c0 as usize] = true;
                 self.cp[cid.to_kind()].touched[c0.negate() as usize] = true;
                 true
@@ -414,7 +421,14 @@ impl Solver {
             }
             if (*pos).is_empty() && !(*neg).is_empty() {
                 // println!("-v {} p {} n {}", v, (*pos).len(), (*neg).len());
-                if !self.enqueue(v.lit(LFALSE), NULL_CLAUSE) || self.propagate_0() != NULL_CLAUSE {
+                if !self.enqueue(v.lit(LFALSE), NULL_CLAUSE) ||
+                    propagate_0(&mut self.cp,
+                                &mut self.stat,
+                                &mut self.vars,
+                                &mut self.trail,
+                                &mut self.q_head,
+                    ) != NULL_CLAUSE
+                {
                     self.ok = false;
                     return false;
                 }
@@ -422,7 +436,14 @@ impl Solver {
             }
             if (*neg).is_empty() && (*pos).is_empty() {
                 // println!("+v {} p {} n {}", v, (*pos).len(), (*neg).len());
-                if !self.enqueue(v.lit(LTRUE), NULL_CLAUSE) || self.propagate_0() != NULL_CLAUSE {
+                if !self.enqueue(v.lit(LTRUE), NULL_CLAUSE) ||
+                    propagate_0(&mut self.cp,
+                                &mut self.stat,
+                                &mut self.vars,
+                                &mut self.trail,
+                                &mut self.q_head,
+                    ) != NULL_CLAUSE
+                {
                     self.ok = false;
                     // panic!("eliminate_var: failed to enqueue & propagate");
                     return false;
@@ -559,7 +580,12 @@ impl Solver {
             }
             self.vars[v].pos_occurs.clear();
             self.vars[v].neg_occurs.clear();
-            if self.propagate_0() != NULL_CLAUSE {
+            if propagate_0(&mut self.cp,
+                           &mut self.stat,
+                           &mut self.vars,
+                           &mut self.trail,
+                           &mut self.q_head,
+            ) != NULL_CLAUSE {
                 self.ok = false;
                 return false;
             }
