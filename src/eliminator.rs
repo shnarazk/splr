@@ -2,7 +2,7 @@ use crate::clause::{
     cid2fmt, ClauseFlag, ClauseHead, ClauseIdIndexEncoding, ClauseIndex, ClauseKind,
     ClauseManagement, ClausePartition,
 };
-use crate::solver::{Solver, CDCL, propagate_0};
+use crate::solver::{Solver, enqueue_null, propagate_0};
 use crate::types::*;
 use crate::var::{EliminationIF, Var};
 // use std::fmt;
@@ -198,7 +198,7 @@ impl Solver {
             // println!("{} is removed and its first literal {} is enqueued.", cid2fmt(cid), c0.int());
             self.remove_clause(cid);
             self.vars.detach_clause(cid, clause!(self.cp, cid), &mut self.eliminator);
-            if self.enqueue(c0, NULL_CLAUSE) &&
+            if enqueue_null(&mut self.trail, &mut self.vars[c0.vi()], c0.lbool(), 0) &&
                 propagate_0(&mut self.cp,
                             &mut self.stat,
                             &mut self.vars,
@@ -421,7 +421,7 @@ impl Solver {
             }
             if (*pos).is_empty() && !(*neg).is_empty() {
                 // println!("-v {} p {} n {}", v, (*pos).len(), (*neg).len());
-                if !self.enqueue(v.lit(LFALSE), NULL_CLAUSE) ||
+                if !enqueue_null(&mut self.trail, &mut self.vars[v], LFALSE, 0) ||
                     propagate_0(&mut self.cp,
                                 &mut self.stat,
                                 &mut self.vars,
@@ -436,7 +436,7 @@ impl Solver {
             }
             if (*neg).is_empty() && (*pos).is_empty() {
                 // println!("+v {} p {} n {}", v, (*pos).len(), (*neg).len());
-                if !self.enqueue(v.lit(LTRUE), NULL_CLAUSE) ||
+                if !enqueue_null(&mut self.trail, &mut self.vars[v], LTRUE, 0) ||
                     propagate_0(&mut self.cp,
                                 &mut self.stat,
                                 &mut self.vars,
@@ -533,7 +533,13 @@ impl Solver {
                                     //     cid2fmt(*n),
                                     //     vec2int(&clause_body!(self.cp, *n).lits)
                                     // );
-                                    if !self.enqueue(vec[0], NULL_CLAUSE) {
+                                    let lit = vec[0];
+                                    if !enqueue_null(&mut self.trail,
+                                                     &mut self.vars[lit.vi()],
+                                                     lit.lbool(),
+                                                     0,
+                                    )
+                                    {
                                         self.ok = false;
                                         // panic!("eliminate_var: failed to enqueue & propagate");
                                         return false;
