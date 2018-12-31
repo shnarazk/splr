@@ -161,31 +161,28 @@ impl Default for SolverConfiguration {
 
 /// is the collection of all variables.
 pub struct Solver {
-    /// Configuration
-    pub config: SolverConfiguration,
+    /// major sub modules
+    pub config: SolverConfiguration, // Configuration
+    pub cp: [ClausePartition; 4],    // Clauses
+    pub eliminator: Eliminator,      // Clause/Variable Elimination
+    pub stat: Vec<i64>,              // statistics
+    pub vars: Vec<Var>,              // Variables
     pub num_vars: usize,
     pub root_level: usize,
-    /// Variable Assignment Management
-    pub vars: Vec<Var>,
     pub trail: Vec<Lit>,
     pub trail_lim: Vec<usize>,
     pub q_head: usize,
     /// Variable Order
     pub var_order: VarIdHeap,
-    /// Clause Database Management
-    pub cp: [ClausePartition; 4],
     /// renamed from `nbclausesbeforereduce`
     pub next_reduction: usize,
     pub next_restart: u64,
     pub cur_restart: usize,
     pub num_solved_vars: usize,
-    /// Variable Elimination
-    pub eliminator: Eliminator,
     /// Working memory
     pub ok: bool,
     pub model: Vec<Lbool>,
     pub conflicts: Vec<Lit>,
-    pub stat: Vec<i64>,
     pub profile: Profile,
     pub an_seen: Vec<bool>,
     pub lbd_temp: Vec<usize>,
@@ -210,28 +207,28 @@ impl Solver {
         let sve = cfg.use_sve;
         Solver {
             config: cfg,
-            num_vars: nv,
-            root_level: 0,
-            vars: Var::new_vars(nv),
-            trail: Vec::with_capacity(nv),
-            trail_lim: Vec::new(),
-            q_head: 0,
-            var_order: VarIdHeap::new(nv, nv),
             cp: [
                 ClausePartition::build(ClauseKind::Liftedlit, nv, 0),
                 ClausePartition::build(ClauseKind::Removable, nv, nc),
                 ClausePartition::build(ClauseKind::Permanent, nv, 256),
                 ClausePartition::build(ClauseKind::Binclause, nv, 256),
             ],
+            eliminator: Eliminator::new(sve),
+            stat: vec![0; Stat::EndOfStatIndex as usize],
+            vars: Var::new_vars(nv),
+            num_vars: nv,
+            root_level: 0,
+            trail: Vec::with_capacity(nv),
+            trail_lim: Vec::new(),
+            q_head: 0,
+            var_order: VarIdHeap::new(nv, nv),
             next_reduction: 1000,
             next_restart: 100,
             cur_restart: 1,
             num_solved_vars: 0,
-            eliminator: Eliminator::new(sve),
             ok: true,
             model: vec![BOTTOM; nv + 1],
             conflicts: vec![],
-            stat: vec![0; Stat::EndOfStatIndex as usize],
             profile: Profile::new(&path.to_string()),
             an_seen: vec![false; nv + 1],
             lbd_temp: vec![0; nv + 1],
