@@ -164,25 +164,36 @@ impl Solver {
     /// returns false if solver is inconsistent
     /// - calls `clause_queue.pop`
     pub fn backward_subsumption_check(&mut self) -> bool {
+        let Solver {
+            ref mut cp,
+            ref mut eliminator,
+            ref mut stat,
+            ref mut vars,
+            ref mut trail,
+            ref trail_lim,
+            ref mut q_head,
+            ref mut ok,
+            ..
+        } = self;
         let mut cnt = 0;
         let mut _subsumed = 0;
         let mut _deleted_literals = 0;
-        debug_assert_eq!(self.decision_level(), 0);
-        while !self.eliminator.clause_queue.is_empty()
-            || self.eliminator.bwdsub_assigns < self.trail.len()
+        debug_assert_eq!(trail_lim.len(), 0);
+        while !eliminator.clause_queue.is_empty()
+            || eliminator.bwdsub_assigns < trail.len()
         {
             // Empty subsumption queue and return immediately on user-interrupt:
             // if computed-too-long { break; }
             // Check top-level assigments by creating a dummy clause and placing it in the queue:
-            if self.eliminator.clause_queue.is_empty()
-                && self.eliminator.bwdsub_assigns < self.trail.len()
+            if eliminator.clause_queue.is_empty()
+                && eliminator.bwdsub_assigns < trail.len()
             {
-                let c = self.trail[self.eliminator.bwdsub_assigns].as_uniclause();
-                self.eliminator.clause_queue.push(c);
-                self.eliminator.bwdsub_assigns += 1;
+                let c = trail[eliminator.bwdsub_assigns].as_uniclause();
+                eliminator.clause_queue.push(c);
+                eliminator.bwdsub_assigns += 1;
             }
-            let cid = self.eliminator.clause_queue[0];
-            self.eliminator.clause_queue.remove(0);
+            let cid = eliminator.clause_queue[0];
+            eliminator.clause_queue.remove(0);
             unsafe {
                 let mut best = 0;
                 let unilits: [Lit; 1];
@@ -193,7 +204,7 @@ impl Solver {
                     unilits = [cid.to_index() as Lit; 1];
                     lits = &unilits;
                 } else {
-                    let ch = clause_mut!(self.cp, cid) as *mut ClauseHead;
+                    let ch = clause_mut!(*cp, cid) as *mut ClauseHead;
                     (*ch).flag_off(ClauseFlag::Enqueued);
                     lits = &(*ch).lits;
                     if (*ch).get_flag(ClauseFlag::Dead) || BACKWORD_SUBSUMPTION_THRESHOLD < cnt {
@@ -201,7 +212,7 @@ impl Solver {
                     }
                     let mut tmp = 1_000_000;
                     for l in &(*ch).lits {
-                        let v = &self.vars[l.vi()];
+                        let v = &vars[l.vi()];
                         let nsum = v.pos_occurs.len().min(v.neg_occurs.len());
                         if !v.eliminated && 0 < v.level && nsum < tmp {
                             best = l.vi();
@@ -209,26 +220,26 @@ impl Solver {
                         }
                     }
                 }
-                if best == 0 || self.vars[best].eliminated {
+                if best == 0 || vars[best].eliminated {
                     continue;
                 }
                 for p in 0..2 {
                     let cs = if p == 0 {
-                        &mut self.vars[best].pos_occurs as *mut Vec<ClauseId>
+                        &mut vars[best].pos_occurs as *mut Vec<ClauseId>
                     } else {
-                        &mut self.vars[best].neg_occurs as *mut Vec<ClauseId>
+                        &mut vars[best].neg_occurs as *mut Vec<ClauseId>
                     };
                     cnt += (*cs).len();
                     for di in &*cs {
-                        let db = clause!(self.cp, di) as *const ClauseHead;
+                        let db = clause!(*cp, di) as *const ClauseHead;
                         if !(*db).get_flag(ClauseFlag::Dead)
                             && *di != cid
                             && lits.len() <= SUBSUMPTION_SIZE
                             && (*db).lits.len() <= SUBSUMPTION_SIZE
-                            && (self.eliminator.subsumption_lim == 0
-                                || lits.len() + (*db).lits.len() <= self.eliminator.subsumption_lim)
+                            && (eliminator.subsumption_lim == 0
+                                || lits.len() + (*db).lits.len() <= eliminator.subsumption_lim)
                         {
-                            match subsume(&mut self.cp, cid, *di) {
+                            match subsume(cp, cid, *di) {
                                 Some(NULL_LIT) => {
                                     _subsumed += 1;
                                     if cid.to_kind() == ClauseKind::Removable as usize
@@ -240,12 +251,8 @@ impl Solver {
                                         //          cid2fmt(cid),
                                         //          *clause_body!(self.cp, cid),
                                         // );
-                                        self.cp.remove_clause(*di);
-                                        self.vars.detach_clause(
-                                            *di,
-                                            clause!(self.cp, *di),
-                                            &mut self.eliminator,
-                                        );
+                                        cp.remove_clause(*di);
+                                        vars.detach_clause(*di, clause!(*cp, *di), eliminator);
                                     } //else {
                                       // println!("backward_subsumption_check tries to delete a permanent clause {} {:#}",
                                       //          cid2fmt(*di),
@@ -254,27 +261,27 @@ impl Solver {
                                       //}
                                 }
                                 Some(l) => {
-                                    self.cp[di.to_kind()].touched[l as usize] = true;
-                                    self.cp[di.to_kind()].touched[l.negate() as usize] = true;
+                                    cp[di.to_kind()].touched[l as usize] = true;
+                                    cp[di.to_kind()].touched[l.negate() as usize] = true;
                                     // let xb = &clause_body!(self.cp, *di);
                                     // println!("BackSubsC    => subsumed {} from {} and {} {:#}", l.int(), cid2fmt(cid), cid2fmt(*di), xb);
                                     _deleted_literals += 1;
                                     // println!("cancel true path");
                                     // continue;
                                     if !strengthen_clause(
-                                        &mut self.cp,
-                                        &mut self.eliminator,
-                                        &mut self.stat,
-                                        &mut self.vars,
-                                        &mut self.trail,
-                                        &mut self.q_head,
-                                        &mut self.ok,
+                                        cp,
+                                        eliminator,
+                                        stat,
+                                        vars,
+                                        trail,
+                                        q_head,
+                                        ok,
                                         *di,
                                         l.negate(),
                                     ) {
                                         return false;
                                     }
-                                    self.eliminator.enqueue_var(&mut self.vars[l.vi()]);
+                                    eliminator.enqueue_var(&mut vars[l.vi()]);
                                 }
                                 None => {}
                             }
