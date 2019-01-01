@@ -1,29 +1,23 @@
 // use clause::Clause;
-use crate::clause::{ClauseFlag, ClauseHead};
 use crate::clause::ClauseIdIndexEncoding;
+use crate::clause::{ClauseFlag, ClauseHead};
 use crate::eliminator::{Eliminator, EliminatorIF};
-use crate::solver::Solver;
 use crate::types::*;
 use std::fmt;
 
-/// For Solver
-pub trait VarManagement {
-    fn select_var(&mut self) -> VarId;
-    // fn decay_var_activity(&mut self) -> ();
-    fn rebuild_heap(&mut self) -> ();
-}
-
 /// For [Var]
-pub trait Satisfiability {
+pub trait VarManagement {
     fn assigned(&self, l: Lit) -> Lbool;
     fn locked(&self, ch: &ClauseHead, cid: ClauseId) -> bool;
     fn satisfies(&self, c: &[Lit]) -> bool;
     fn compute_lbd(&self, vec: &[Lit], keys: &mut [usize]) -> usize;
-}
-
-/// For Vec<Var>
-pub trait EliminationIF {
-    fn attach_clause(&mut self, cid: ClauseId, ch: &mut ClauseHead, ignorable: bool, eliminator: &mut Eliminator) -> ();
+    fn attach_clause(
+        &mut self,
+        cid: ClauseId,
+        ch: &mut ClauseHead,
+        ignorable: bool,
+        eliminator: &mut Eliminator,
+    ) -> ();
     fn detach_clause(&mut self, cid: ClauseId, ch: &ClauseHead, eliminator: &mut Eliminator) -> ();
 }
 
@@ -37,6 +31,8 @@ pub trait VarOrdering {
     fn clear(&mut self) -> ();
     fn len(&self) -> usize;
     fn is_empty(&self) -> bool;
+    fn select_var(&mut self, vars: &[Var]) -> VarId;
+    fn rebuild(&mut self, vars: &[Var]) -> ();
 }
 
 pub const VAR_DECAY: f64 = 0.9;
@@ -100,20 +96,23 @@ impl Var {
     }
 }
 
-impl Satisfiability for [Var] {
+impl VarManagement for [Var] {
     fn assigned(&self, l: Lit) -> Lbool {
         self[l.vi()].assign ^ ((l & 1) as u8)
     }
     fn locked(&self, ch: &ClauseHead, cid: ClauseId) -> bool {
         let lits = &ch.lits;
         if lits.len() < 2 {
-            panic!("strange lits {} {}", cid.to_index(), ch.get_flag(ClauseFlag::Dead));
+            panic!(
+                "strange lits {} {}",
+                cid.to_index(),
+                ch.get_flag(ClauseFlag::Dead)
+            );
         }
         let l0 = lits[0];
         if 2 < lits.len() {
             let l0 = lits[0];
-            self.assigned(l0) == LTRUE
-                && self[l0.vi()].reason == cid
+            self.assigned(l0) == LTRUE && self[l0.vi()].reason == cid
         } else {
             (self.assigned(l0) == LTRUE && self[l0.vi()].reason == cid)
                 || (self.assigned(l0) == LTRUE && self[l0.vi()].reason == cid)
@@ -142,10 +141,14 @@ impl Satisfiability for [Var] {
         keys[0] = key;
         cnt
     }
-}
 
-impl EliminationIF for Vec<Var> {
-    fn attach_clause(&mut self, cid: ClauseId, ch: &mut ClauseHead, ignorable: bool, eliminator: &mut Eliminator) {
+    fn attach_clause(
+        &mut self,
+        cid: ClauseId,
+        ch: &mut ClauseHead,
+        ignorable: bool,
+        eliminator: &mut Eliminator,
+    ) {
         if !eliminator.use_elim {
             return;
         }
@@ -286,6 +289,27 @@ impl VarOrdering for VarIdHeap {
     fn is_empty(&self) -> bool {
         self.idxs[0] == 0
     }
+    /// Heap operations; renamed from selectVO
+    fn select_var(&mut self, vars: &[Var]) -> VarId {
+        loop {
+            let vi = self.get_root(vars);
+            if vars[vi].assign == BOTTOM && !vars[vi].eliminated {
+                // if self.trail.contains(&vi.lit(LTRUE)) || self.trail.contains(&vi.lit(LFALSE)) {
+                //     panic!("@ level {}, select_var vi {} v {:?}", self.trail_lim.len(), vi, self.vars[vi]);
+                // }
+                return vi;
+            }
+        }
+    }
+    fn rebuild(&mut self, vars: &[Var]) {
+        // debug_assert_eq!(self.decision_level(), 0);
+        self.reset();
+        for v in &vars[1..] {
+            if v.assign == BOTTOM && !v.eliminated {
+                self.insert(vars, v.index);
+            }
+        }
+    }
 }
 
 impl VarIdHeap {
@@ -416,33 +440,6 @@ impl VarIdHeap {
     #[allow(dead_code)]
     fn peek(&self) -> VarId {
         self.heap[1]
-    }
-}
-
-impl VarManagement for Solver {
-    fn rebuild_heap(&mut self) {
-        debug_assert_eq!(self.decision_level(), 0);
-        self.var_order.reset();
-        for v in &self.vars[1..] {
-            if v.assign == BOTTOM && !v.eliminated {
-                self.var_order.insert(&self.vars, v.index);
-            }
-        }
-    }
-    // fn decay_var_activity(&mut self) -> () {
-    //     // self.var_inc /= self.var_decay;
-    // }
-    /// Heap operations; renamed from selectVO
-    fn select_var(&mut self) -> VarId {
-        loop {
-            let vi = self.var_order.get_root(&self.vars);
-            if self.vars[vi].assign == BOTTOM && !self.vars[vi].eliminated {
-                // if self.trail.contains(&vi.lit(LTRUE)) || self.trail.contains(&vi.lit(LFALSE)) {
-                //     panic!("@ level {}, select_var vi {} v {:?}", self.trail_lim.len(), vi, self.vars[vi]);
-                // }
-                return vi;
-            }
-        }
     }
 }
 

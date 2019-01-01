@@ -7,19 +7,22 @@ use structopt::StructOpt;
 // const VERSION: &str = "Splr-0.0.11 (Technology Preview 11) by shnarazk@gitlab.com";
 
 #[derive(StructOpt)]
-#[structopt(name = "splr", about = "SAT solver for Propositional Logic in Rust, Technology Preview 11")]
+#[structopt(
+    name = "splr",
+    about = "SAT solver for Propositional Logic in Rust, Technology Preview 11"
+)]
 struct CLOpts {
     /// K in Glucose, for restart
-    #[structopt(long = "rt", short="K", default_value = "0.8")]
+    #[structopt(long = "rt", short = "K", default_value = "0.8")]
     restart_threshold: f64,
     /// R in Glucose, for blocking
-    #[structopt(long = "rb", short="R", default_value = "1.40")]
+    #[structopt(long = "rb", short = "R", default_value = "1.40")]
     restart_blocking: f64,
-    #[structopt(long = "no-tty", short="t")]
+    #[structopt(long = "no-tty", short = "t")]
     no_tty: bool,
-    #[structopt(long = "no-elim", short="e")]
+    #[structopt(long = "no-elim", short = "e")]
     no_elim: bool,
-    #[structopt(long = "no-adaptation", short="a")]
+    #[structopt(long = "no-adaptation", short = "a")]
     no_adapt: bool,
     #[structopt(parse(from_os_str))]
     cnf: std::path::PathBuf,
@@ -34,7 +37,7 @@ fn main() {
             s.config.use_tty = false;
         }
         if args.no_elim {
-            s.eliminator.use_elim = false; 
+            s.eliminator.use_elim = false;
         }
         s.config.adapt_strategy = !args.no_adapt;
         s.config.restart_thr = args.restart_threshold;
@@ -67,6 +70,9 @@ fn main() {
             Err(_) => println!("Failed"),
         }
     } else {
-        println!("{} does not exist.", args.cnf.file_name().unwrap().to_str().unwrap());
+        println!(
+            "{} does not exist.",
+            args.cnf.file_name().unwrap().to_str().unwrap()
+        );
     }
 }

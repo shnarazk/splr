@@ -1,8 +1,8 @@
 #![allow(unused_variables)]
 use crate::eliminator::*;
-use crate::solver::{Solver, Stat, enqueue_null};
+use crate::solver::{Solver, SolverConfiguration, Stat};
 use crate::types::*;
-use crate::var::{EliminationIF, Satisfiability, Var};
+use crate::var::{Var, VarManagement};
 use std::cmp::Ordering;
 use std::f64;
 use std::fmt;
@@ -25,12 +25,7 @@ pub trait ClauseIdIndexEncoding {
 }
 
 /// For Solver
-pub trait ClauseManagement {
-    fn add_unchecked_clause(&mut self, v: &mut Vec<Lit>) -> Option<ClauseId>;
-    fn add_clause(&mut self, v: &mut Vec<Lit>, lbd: usize) -> ClauseId;
-    fn remove_clause(&mut self, cid: ClauseId) -> ();
-    fn change_clause_kind(&mut self, cid: ClauseId, kind: ClauseKind) -> ();
-    fn reduce(&mut self) -> ();
+pub trait ClauseManagementSolverTemp {
     fn simplify(&mut self) -> bool;
 }
 
@@ -331,200 +326,7 @@ impl<'a> Iterator for ClauseIter<'a> {
     }
 }
 
-impl ClauseManagement for Solver {
-    // renamed from clause_new
-    fn add_unchecked_clause(&mut self, v: &mut Vec<Lit>) -> Option<ClauseId> {
-        let Solver {
-            ref mut cp,
-            ref mut eliminator,
-            ref mut vars,
-            ref mut trail,
-            ref trail_lim,
-            ..
-        } = self;
-        v.sort_unstable();
-        let mut j = 0;
-        let mut l_ = NULL_LIT; // last literal; [x, x.negate()] means totology.
-        for i in 0..v.len() {
-            let li = v[i];
-            let sat = vars.assigned(li);
-            if sat == LTRUE || li.negate() == l_ {
-                return Some(NULL_CLAUSE);
-            } else if sat != LFALSE && li != l_ {
-                v[j] = li;
-                j += 1;
-                l_ = li;
-            }
-        }
-        v.truncate(j);
-        let kind = if v.len() == 2 {
-            ClauseKind::Binclause
-        } else {
-            ClauseKind::Permanent
-        };
-        match v.len() {
-            0 => None, // Empty clause is UNSAT.
-            1 => {
-                let dl = trail_lim.len();
-                enqueue_null(trail,
-                             &mut vars[v[0].vi()],
-                             v[0].lbool(),
-                             dl,
-                );
-                Some(NULL_CLAUSE)
-            }
-            n => {
-                let cid = cp[kind as usize].new_clause(&v, 0);
-                vars.attach_clause(cid, clause_mut!(*cp, cid), true, eliminator);
-                Some(cid)
-            }
-        }
-    }
-    /// renamed from newLearntClause
-    // Note: set lbd to 0 if you want to add the clause to Permanent.
-    fn add_clause(&mut self, v: &mut Vec<Lit>, lbd: usize) -> ClauseId {
-        let Solver {
-            ref mut config,
-            ref mut cp,
-            ref mut eliminator,
-            ref mut vars,
-            ref mut stat,
-            ..
-        } = self;
-        debug_assert!(1 < v.len());
-        // let lbd = v.lbd(&self.vars, &mut self.lbd_temp);
-        let mut i_max = 0;
-        let mut lv_max = 0;
-        // seek a literal with max level
-        for (i, l) in v.iter().enumerate() {
-            let vi = l.vi();
-            let lv = vars[vi].level;
-            if vars[vi].assign != BOTTOM && lv_max < lv {
-                i_max = i;
-                lv_max = lv;
-            }
-        }
-        v.swap(1, i_max);
-        let kind = if lbd == 0 && eliminator.use_elim {
-            ClauseKind::Permanent
-        } else if v.len() == 2 {
-            ClauseKind::Binclause
-        } else if (config.use_chan_seok && lbd <= config.co_lbd_bound)
-            || lbd == 0
-        {
-            ClauseKind::Permanent
-        } else {
-            ClauseKind::Removable
-        };
-        let cid = cp[kind as usize].new_clause(&v, lbd);
-        // self.bump_cid(cid);
-        if cid.to_kind() == ClauseKind::Removable as usize {
-            cp[ClauseKind::Removable as usize]
-                .bump_activity(cid.to_index(),
-                               stat[Stat::Conflict as usize] as f64,
-                               &mut config.cla_inc);
-        }
-        let ch = clause_mut!(*cp, cid);
-        vars.attach_clause(cid, ch, false, eliminator);
-        cid
-    }
-
-    /// 4. removeClause
-    /// called from strengthen_clause, backward_subsumption_check, eliminate_var, substitute
-    fn remove_clause(&mut self, cid: ClauseId) {
-        let Solver { ref mut cp, .. } = self;
-        // if clause_body!(self.cp, cid).get_flag(ClauseFlag::Dead) {
-        //     panic!(
-        //         "remove_clause Dead: {} {:#}{:#}",
-        //         cid2fmt(cid),
-        //         clause_head!(self.cp, cid),
-        //         clause_body!(self.cp, cid)
-        //     );
-        // }
-        clause_mut!(*cp, cid).flag_on(ClauseFlag::Dead);
-        let ch = clause!(*cp, cid);
-        let w0 = ch.lit[0].negate();
-        let w1 = ch.lit[1].negate();
-        debug_assert!(w0 != 0 && w1 != 0);
-        debug_assert_ne!(w0, w1);
-        cp[cid.to_kind()].touched[w0 as usize] = true;
-        cp[cid.to_kind()].touched[w1 as usize] = true;
-    }
-
-    fn change_clause_kind(&mut self, cid: ClauseId, kind: ClauseKind) {
-        let dl = self.decision_level();
-        debug_assert_eq!(dl, 0);
-        let Solver {
-            ref mut cp,
-            ref mut eliminator,
-            ref mut vars,
-            ..
-        } = self;
-        let ch = clause_mut!(*cp, cid);
-        if ch.get_flag(ClauseFlag::Dead) {
-            return;
-        }
-        ch.flag_on(ClauseFlag::Dead);
-        let mut vec = Vec::new();
-        for x in &ch.lits {
-            vec.push(*x);
-        }
-        let rank = ch.rank;
-        let w0 = ch.lit[0].negate();
-        let w1 = ch.lit[1].negate();
-        cp[kind as usize].new_clause(&vec, rank);
-        cp[cid.to_kind()].touched[w0 as usize] = true;
-        cp[cid.to_kind()].touched[w1 as usize] = true;
-        if dl != 0 {
-            cp[cid.to_kind()].garbage_collect(vars, eliminator);
-        }
-    }
-
-    fn reduce(&mut self) {
-        let Solver {
-            ref mut cp,
-            ref mut eliminator,
-            ref mut stat,
-            ref mut vars,
-            ref mut next_reduction,
-            ref mut lbd_temp,
-            ..
-        } = self;
-        cp[ClauseKind::Removable as usize].reset_lbd(vars, &mut lbd_temp[..]);
-        let ClausePartition {
-            ref mut head,
-            ref mut touched,
-            ref mut perm,
-            ..
-        } = &mut cp[ClauseKind::Removable as usize];
-        let mut nc = 1;
-        for (i, b) in head.iter().enumerate().skip(1) {
-            if !b.get_flag(ClauseFlag::Dead) && !vars.locked(b, ClauseKind::Removable.id_from(i)) {
-                perm[nc] = i;
-                nc += 1;
-            }
-        }
-        perm[1..nc].sort_by(|&a, &b| head[a].cmp(&head[b]));
-        let keep = nc / 2;
-        if head[perm[keep]].rank <= 5 {
-            *next_reduction += 1000;
-        };
-        for i in keep..nc {
-            let ch = &mut head[perm[i]];
-            if ch.get_flag(ClauseFlag::JustUsed) {
-                ch.flag_off(ClauseFlag::JustUsed)
-            } else {
-                ch.flag_on(ClauseFlag::Dead);
-                debug_assert!(ch.lit[0] != 0 && ch.lit[1] != 0);
-                touched[ch.lit[0].negate() as usize] = true;
-                touched[ch.lit[1].negate() as usize] = true;
-            }
-        }
-        cp[ClauseKind::Removable as usize].garbage_collect(vars, eliminator);
-        *next_reduction += DB_INC_SIZE;
-        stat[Stat::Reduction as usize] += 1;
-    }
-
+impl ClauseManagementSolverTemp for Solver {
     fn simplify(&mut self) -> bool {
         self.cp[ClauseKind::Removable as usize].reset_lbd(&self.vars, &mut self.lbd_temp[..]);
         debug_assert_eq!(self.decision_level(), 0);
@@ -547,7 +349,7 @@ impl ClauseManagement for Solver {
         {
             let eliminator = &mut self.eliminator;
             let vars = &mut self.vars[..];
-            for ck in ClauseKind::Liftedlit as usize ..= ClauseKind::Binclause as usize {
+            for ck in ClauseKind::Liftedlit as usize..=ClauseKind::Binclause as usize {
                 for ch in &mut self.cp[ck].head[1..] {
                     if !ch.get_flag(ClauseFlag::Dead) && vars.satisfies(&ch.lits) {
                         ch.flag_on(ClauseFlag::Dead);
@@ -806,5 +608,171 @@ impl ConsistencyCheck for ClausePartition {
             }
         }
         true
+    }
+}
+
+pub trait ClauseManagement {
+    fn add_clause(
+        &mut self,
+        config: &mut SolverConfiguration,
+        eliminator: &mut Eliminator,
+        vars: &mut [Var],
+        v: &mut Vec<Lit>,
+        lbd: usize,
+        act: f64,
+    ) -> ClauseId;
+    fn remove_clause(&mut self, cid: ClauseId);
+    fn change_clause_kind(
+        &mut self,
+        eliminator: &mut Eliminator,
+        vars: &mut [Var],
+        cid: ClauseId,
+        kind: ClauseKind,
+    );
+    fn reduce(
+        &mut self,
+        eliminator: &mut Eliminator,
+        stat: &mut [i64],
+        vars: &mut [Var],
+        next_reduction: &mut usize,
+        lbd_temp: &mut [usize],
+    );
+}
+
+impl ClauseManagement for [ClausePartition] {
+    /// renamed from newLearntClause
+    // Note: set lbd to 0 if you want to add the clause to Permanent.
+    fn add_clause(
+        &mut self,
+        config: &mut SolverConfiguration,
+        eliminator: &mut Eliminator,
+        vars: &mut [Var],
+        v: &mut Vec<Lit>,
+        lbd: usize,
+        act: f64,
+    ) -> ClauseId {
+        debug_assert!(1 < v.len());
+        // let lbd = v.lbd(&self.vars, &mut self.lbd_temp);
+        let mut i_max = 0;
+        let mut lv_max = 0;
+        // seek a literal with max level
+        for (i, l) in v.iter().enumerate() {
+            let vi = l.vi();
+            let lv = vars[vi].level;
+            if vars[vi].assign != BOTTOM && lv_max < lv {
+                i_max = i;
+                lv_max = lv;
+            }
+        }
+        v.swap(1, i_max);
+        let kind = if lbd == 0 && eliminator.use_elim {
+            ClauseKind::Permanent
+        } else if v.len() == 2 {
+            ClauseKind::Binclause
+        } else if (config.use_chan_seok && lbd <= config.co_lbd_bound) || lbd == 0 {
+            ClauseKind::Permanent
+        } else {
+            ClauseKind::Removable
+        };
+        let cid = self[kind as usize].new_clause(&v, lbd);
+        // self.bump_cid(cid);
+        if cid.to_kind() == ClauseKind::Removable as usize {
+            self[ClauseKind::Removable as usize].bump_activity(
+                cid.to_index(),
+                act,
+                &mut config.cla_inc,
+            );
+        }
+        let ch = clause_mut!(*self, cid);
+        vars.attach_clause(cid, ch, false, eliminator);
+        cid
+    }
+    /// 4. removeClause
+    /// called from strengthen_clause, backward_subsumption_check, eliminate_var, substitute
+    fn remove_clause(&mut self, cid: ClauseId) {
+        // if clause_body!(self.cp, cid).get_flag(ClauseFlag::Dead) {
+        //     panic!(
+        //         "remove_clause Dead: {} {:#}{:#}",
+        //         cid2fmt(cid),
+        //         clause_head!(self.cp, cid),
+        //         clause_body!(self.cp, cid)
+        //     );
+        // }
+        clause_mut!(*self, cid).flag_on(ClauseFlag::Dead);
+        let ch = clause!(*self, cid);
+        let w0 = ch.lit[0].negate();
+        let w1 = ch.lit[1].negate();
+        debug_assert!(w0 != 0 && w1 != 0);
+        debug_assert_ne!(w0, w1);
+        self[cid.to_kind()].touched[w0 as usize] = true;
+        self[cid.to_kind()].touched[w1 as usize] = true;
+    }
+    // This should be called at DL == 0.
+    fn change_clause_kind(
+        &mut self,
+        eliminator: &mut Eliminator,
+        vars: &mut [Var],
+        cid: ClauseId,
+        kind: ClauseKind,
+    ) {
+        // let dl = self.decision_level();
+        // debug_assert_eq!(dl, 0);
+        let ch = clause_mut!(*self, cid);
+        if ch.get_flag(ClauseFlag::Dead) {
+            return;
+        }
+        ch.flag_on(ClauseFlag::Dead);
+        let mut vec = Vec::new();
+        for x in &ch.lits {
+            vec.push(*x);
+        }
+        let rank = ch.rank;
+        let w0 = ch.lit[0].negate();
+        let w1 = ch.lit[1].negate();
+        self[kind as usize].new_clause(&vec, rank);
+        self[cid.to_kind()].touched[w0 as usize] = true;
+        self[cid.to_kind()].touched[w1 as usize] = true;
+    }
+    fn reduce(
+        &mut self,
+        eliminator: &mut Eliminator,
+        stat: &mut [i64],
+        vars: &mut [Var],
+        next_reduction: &mut usize,
+        lbd_temp: &mut [usize],
+    ) {
+        self[ClauseKind::Removable as usize].reset_lbd(vars, &mut lbd_temp[..]);
+        let ClausePartition {
+            ref mut head,
+            ref mut touched,
+            ref mut perm,
+            ..
+        } = &mut self[ClauseKind::Removable as usize];
+        let mut nc = 1;
+        for (i, b) in head.iter().enumerate().skip(1) {
+            if !b.get_flag(ClauseFlag::Dead) && !vars.locked(b, ClauseKind::Removable.id_from(i)) {
+                perm[nc] = i;
+                nc += 1;
+            }
+        }
+        perm[1..nc].sort_by(|&a, &b| head[a].cmp(&head[b]));
+        let keep = nc / 2;
+        if head[perm[keep]].rank <= 5 {
+            *next_reduction += 1000;
+        };
+        for i in keep..nc {
+            let ch = &mut head[perm[i]];
+            if ch.get_flag(ClauseFlag::JustUsed) {
+                ch.flag_off(ClauseFlag::JustUsed)
+            } else {
+                ch.flag_on(ClauseFlag::Dead);
+                debug_assert!(ch.lit[0] != 0 && ch.lit[1] != 0);
+                touched[ch.lit[0].negate() as usize] = true;
+                touched[ch.lit[1].negate() as usize] = true;
+            }
+        }
+        self[ClauseKind::Removable as usize].garbage_collect(vars, eliminator);
+        *next_reduction += DB_INC_SIZE;
+        stat[Stat::Reduction as usize] += 1;
     }
 }

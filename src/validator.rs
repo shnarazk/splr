@@ -1,7 +1,7 @@
 use crate::clause::ClauseKind;
 use crate::solver::*;
 use crate::types::*;
-use crate::var::Satisfiability;
+use crate::var::VarManagement;
 
 impl Solver {
     pub fn inject_assigmnent(&mut self, vec: &[i32]) {
@@ -13,7 +13,7 @@ impl Solver {
     /// returns None if the given assignment is a model of a problem.
     /// Otherwise returns a clause which is not satisfiable.
     pub fn validate(&self) -> Option<Vec<i32>> {
-        for ck in ClauseKind::Liftedlit as usize ..= ClauseKind::Binclause as usize {
+        for ck in ClauseKind::Liftedlit as usize..=ClauseKind::Binclause as usize {
             for ch in &self.cp[ck].head[1..] {
                 if !self.vars.satisfies(&ch.lits) {
                     let mut v = Vec::new();

@@ -6,7 +6,7 @@ use std::collections::VecDeque;
 /// For VecDeque<usize>
 pub trait QueueOperations {
     fn average(&self) -> f64;
-    fn enqueue(&mut self, lim: usize,  x: usize) -> bool;
+    fn enqueue(&mut self, lim: usize, x: usize) -> bool;
     fn is_full(&self, lim: usize) -> bool;
 }
 
@@ -68,9 +68,7 @@ impl Restart for Solver {
             }
             return;
         }
-        if self.next_restart <= count
-            && self.config.restart_blk < self.ema_asg.get()
-        {
+        if self.next_restart <= count && self.config.restart_blk < self.ema_asg.get() {
             self.next_restart = count + RESTART_PERIOD;
             self.stat[Stat::BlockRestart as usize] += 1;
         }
@@ -112,7 +110,7 @@ pub fn luby(y: f64, mut x: usize) -> f64 {
     //     seq--;
     //     x = x % size;
     // }
-    while size -1 != x {
+    while size - 1 != x {
         size = (size - 1) >> 1;
         seq -= 1;
         x %= size;

@@ -4,13 +4,16 @@ use splr::solver::{SatSolver, Solver};
 use splr::types::*;
 use splr::validator::*;
 use std::env;
+use std::fs::*;
 use std::io::{stdin, BufRead, BufReader};
 use std::path::{Path, PathBuf};
-use std::fs::*;
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
-#[structopt(name = "dmcr", about = "DIMACS-format Model Checker in Rust, version 0.0.2")]
+#[structopt(
+    name = "dmcr",
+    about = "DIMACS-format Model Checker in Rust, version 0.0.2"
+)]
 struct TargetOpts {
     #[structopt(parse(from_os_str))]
     #[structopt(short = "a", long = "assign")]
@@ -24,7 +27,10 @@ fn main() {
     let mut args = TargetOpts::from_args();
     let (mut s, _cnf) = Solver::build(&args.problem.to_str().unwrap());
     if args.assign == None {
-        args.assign = Some(PathBuf::from(format!(".ans_{}", args.problem.to_str().unwrap())));
+        args.assign = Some(PathBuf::from(format!(
+            ".ans_{}",
+            args.problem.to_str().unwrap()
+        )));
     }
     if let Some(f) = &args.assign {
         if let Ok(d) = File::open(f.as_path()) {
@@ -36,13 +42,17 @@ fn main() {
         s.inject_assigmnent(&read_assignment(&mut BufReader::new(stdin())));
     }
     match s.validate() {
-        Some(v) => println!("Invalid assignment for {} due to {:?}.", args.problem.to_str().unwrap(), v),
-        None if found => println!("Valid assignment for {} found in {}.",
-                                  &args.problem.to_str().unwrap(),
-                                  &args.assign.unwrap().to_str().unwrap(),
+        Some(v) => println!(
+            "Invalid assignment for {} due to {:?}.",
+            args.problem.to_str().unwrap(),
+            v
         ),
-        None  =>  println!("Valid assignment for {}.",
-                           &args.problem.to_str().unwrap()),
+        None if found => println!(
+            "Valid assignment for {} found in {}.",
+            &args.problem.to_str().unwrap(),
+            &args.assign.unwrap().to_str().unwrap(),
+        ),
+        None => println!("Valid assignment for {}.", &args.problem.to_str().unwrap()),
     }
 }
 
