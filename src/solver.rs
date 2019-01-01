@@ -22,7 +22,6 @@ pub trait SatSolver {
 pub trait CDCL {
     /// returns `true` for SAT, `false` for UNSAT.
     fn search(&mut self) -> bool;
-    fn propagate(&mut self) -> ClauseId;
     fn enqueue(&mut self, l: Lit, cid: ClauseId) -> bool;
     fn analyze(&mut self, confl: ClauseId, learnt: &mut Vec<Lit>) -> usize;
     fn analyze_final(&mut self, ci: ClauseId, skip_first: bool) -> ();
@@ -498,7 +497,15 @@ impl SatSolver for Solver {
                 }
             }
             self.progress("load");
-            self.simplify();
+            self.cp.simplify(
+                &mut self.asgs,
+                &mut self.config,
+                &mut self.eliminator,
+                &mut self.stat,
+                &mut self.vars,
+                &mut self.lbd_temp,
+                &mut self.ok,
+            );
             self.progress("simp");
         } else {
             self.progress("load");
@@ -523,7 +530,7 @@ impl SatSolver for Solver {
                 }
             }
             if self.eliminator.use_elim {
-                self.extend_model(&mut result);
+                self.eliminator.extend_model(&mut result);
             }
             self.asgs
                 .cancel_until(&mut self.vars, &mut self.var_order, 0);
@@ -643,93 +650,6 @@ impl SatSolver for Solver {
 }
 
 impl CDCL for Solver {
-    fn propagate(&mut self) -> ClauseId {
-        let Solver {
-            ref mut vars,
-            ref mut cp,
-            ref mut asgs,
-            ref mut stat,
-            ..
-        } = self;
-        while asgs.remains() {
-            let p: usize = asgs.sweep() as usize;
-            let false_lit = (p as Lit).negate();
-            stat[Stat::Propagation as usize] += 1;
-            let kinds = [
-                ClauseKind::Binclause,
-                ClauseKind::Removable,
-                ClauseKind::Permanent,
-            ];
-            for kind in &kinds {
-                // cp[*kind as usize].check(false_lit);
-                let head = &mut cp[*kind as usize].head[..];
-                let watcher = &mut cp[*kind as usize].watcher[..];
-                unsafe {
-                    let mut pre = &mut (*watcher)[p] as *mut usize;
-                    'next_clause: while *pre != NULL_CLAUSE {
-                        let ch = &mut (*head)[*pre];
-                        debug_assert!((*ch).lit[0] == false_lit || (*ch).lit[1] == false_lit);
-                        let my_index = ((*ch).lit[0] != false_lit) as usize;
-                        {
-                            // Handling a special case for simplify
-                            // check other's aliveness
-                            let other = (*ch).lit[(my_index == 0) as usize];
-                            debug_assert!(!vars[other.vi()].eliminated);
-                        }
-                        let other_value = vars.assigned((*ch).lit[(my_index == 0) as usize]);
-                        if other_value != LTRUE {
-                            debug_assert!(2 <= (*ch).lits.len());
-                            debug_assert!((*ch).lits[0] == false_lit || (*ch).lits[1] == false_lit);
-                            if (*ch).lits[0] == false_lit {
-                                (*ch).lits.swap(0, 1); // now false_lit is lits[1].
-                            }
-                            for (k, lk) in (*ch).lits.iter().enumerate().skip(2) {
-                                // below is equivalent to 'assigned(lk) != LFALSE'
-                                if (((lk & 1) as u8) ^ vars[lk.vi()].assign) != 0 {
-                                    let cix = *pre;
-                                    *pre = (*ch).next_watcher[my_index];
-                                    let alt = &mut (*watcher)[lk.negate() as usize];
-                                    (*ch).next_watcher[my_index] = *alt;
-                                    *alt = cix;
-                                    (*ch).lit[my_index] = *lk;
-                                    debug_assert!((*ch).lits[1] == false_lit);
-                                    (*ch).lits[1] = *lk;
-                                    (*ch).lits[k] = false_lit; // Don't move this above (needed by enumerate)
-                                    continue 'next_clause;
-                                }
-                            }
-                            if other_value == LFALSE {
-                                asgs.catchup();
-                                return kind.id_from(*pre);
-                            } else {
-                                // self.uncheck_enqueue(other, kind.id_from((*c).index));
-                                let dl = asgs.level();
-                                let other = (*ch).lits[0];
-                                // println!("unchecked_enqueue embedded into propagate {}", other.int());
-                                let v = &mut vars[other.vi()];
-                                debug_assert!(v.assign == other.lbool() || v.assign == BOTTOM);
-                                v.assign = other.lbool();
-                                v.level = dl;
-                                debug_assert!(*pre != NULL_CLAUSE);
-                                if dl == 0 {
-                                    v.reason = NULL_CLAUSE;
-                                } else {
-                                    v.reason = kind.id_from(*pre);
-                                }
-                                debug_assert!(!v.eliminated);
-                                // debug_assert!(!trail.contains(&other));
-                                // debug_assert!(!trail.contains(&other.negate()));
-                                asgs.push(other);
-                            }
-                        }
-                        pre = &mut (*ch).next_watcher[my_index];
-                    }
-                }
-            }
-        }
-        NULL_CLAUSE
-    }
-
     /// main loop
     fn search(&mut self) -> bool {
         let mut conflict_c = 0.0; // for Luby restart
@@ -742,7 +662,7 @@ impl CDCL for Solver {
         }
         loop {
             self.stat[Stat::Propagation as usize] += 1;
-            let ci = self.propagate();
+            let ci = propagate(&mut self.asgs, &mut self.cp, &mut self.vars, &mut self.stat);
             if ci == NULL_CLAUSE {
                 let na = self.asgs.len();
                 let ne = self.eliminator.eliminated_vars;
@@ -782,7 +702,15 @@ impl CDCL for Solver {
                     // return
                 }
                 if self.asgs.level() == 0 {
-                    self.simplify();
+                    self.cp.simplify(
+                        &mut self.asgs,
+                        &mut self.config,
+                        &mut self.eliminator,
+                        &mut self.stat,
+                        &mut self.vars,
+                        &mut self.lbd_temp,
+                        &mut self.ok,
+                    );
                     if !self.ok {
                         return false;
                     }
@@ -890,7 +818,15 @@ impl CDCL for Solver {
                 if self.stat[Stat::Conflict as usize] == 100_000 {
                     self.asgs
                         .cancel_until(&mut self.vars, &mut self.var_order, 0);
-                    self.simplify();
+                    self.cp.simplify(
+                        &mut self.asgs,
+                        &mut self.config,
+                        &mut self.eliminator,
+                        &mut self.stat,
+                        &mut self.vars,
+                        &mut self.lbd_temp,
+                        &mut self.ok,
+                    );
                     // self.rebuild_heap();
                     self.adapt_strategy();
                     // } else if 0 < lbd {
@@ -1285,6 +1221,91 @@ impl Solver {
         // println!("{}", self.var_order);
         // self.var_order.check("");
     }
+}
+
+fn propagate(
+    asgs: &mut AssignStack,
+    cp: &mut [ClausePartition],
+    vars: &mut [Var],
+    stat: &mut [i64],
+) -> ClauseId {
+    while asgs.remains() {
+        let p: usize = asgs.sweep() as usize;
+        let false_lit = (p as Lit).negate();
+        stat[Stat::Propagation as usize] += 1;
+        let kinds = [
+            ClauseKind::Binclause,
+            ClauseKind::Removable,
+            ClauseKind::Permanent,
+        ];
+        for kind in &kinds {
+            // cp[*kind as usize].check(false_lit);
+            let head = &mut cp[*kind as usize].head[..];
+            let watcher = &mut cp[*kind as usize].watcher[..];
+            unsafe {
+                let mut pre = &mut (*watcher)[p] as *mut usize;
+                'next_clause: while *pre != NULL_CLAUSE {
+                    let ch = &mut (*head)[*pre];
+                    debug_assert!((*ch).lit[0] == false_lit || (*ch).lit[1] == false_lit);
+                    let my_index = ((*ch).lit[0] != false_lit) as usize;
+                    {
+                        // Handling a special case for simplify
+                        // check other's aliveness
+                        let other = (*ch).lit[(my_index == 0) as usize];
+                        debug_assert!(!vars[other.vi()].eliminated);
+                    }
+                    let other_value = vars.assigned((*ch).lit[(my_index == 0) as usize]);
+                    if other_value != LTRUE {
+                        debug_assert!(2 <= (*ch).lits.len());
+                        debug_assert!((*ch).lits[0] == false_lit || (*ch).lits[1] == false_lit);
+                        if (*ch).lits[0] == false_lit {
+                            (*ch).lits.swap(0, 1); // now false_lit is lits[1].
+                        }
+                        for (k, lk) in (*ch).lits.iter().enumerate().skip(2) {
+                            // below is equivalent to 'assigned(lk) != LFALSE'
+                            if (((lk & 1) as u8) ^ vars[lk.vi()].assign) != 0 {
+                                let cix = *pre;
+                                *pre = (*ch).next_watcher[my_index];
+                                let alt = &mut (*watcher)[lk.negate() as usize];
+                                (*ch).next_watcher[my_index] = *alt;
+                                *alt = cix;
+                                (*ch).lit[my_index] = *lk;
+                                debug_assert!((*ch).lits[1] == false_lit);
+                                (*ch).lits[1] = *lk;
+                                (*ch).lits[k] = false_lit; // Don't move this above (needed by enumerate)
+                                continue 'next_clause;
+                            }
+                        }
+                        if other_value == LFALSE {
+                            asgs.catchup();
+                            return kind.id_from(*pre);
+                        } else {
+                            // self.uncheck_enqueue(other, kind.id_from((*c).index));
+                            let dl = asgs.level();
+                            let other = (*ch).lits[0];
+                            // println!("unchecked_enqueue embedded into propagate {}", other.int());
+                            let v = &mut vars[other.vi()];
+                            debug_assert!(v.assign == other.lbool() || v.assign == BOTTOM);
+                            v.assign = other.lbool();
+                            v.level = dl;
+                            debug_assert!(*pre != NULL_CLAUSE);
+                            if dl == 0 {
+                                v.reason = NULL_CLAUSE;
+                            } else {
+                                v.reason = kind.id_from(*pre);
+                            }
+                            debug_assert!(!v.eliminated);
+                            // debug_assert!(!trail.contains(&other));
+                            // debug_assert!(!trail.contains(&other.negate()));
+                            asgs.push(other);
+                        }
+                    }
+                    pre = &mut (*ch).next_watcher[my_index];
+                }
+            }
+        }
+    }
+    NULL_CLAUSE
 }
 
 /// for eliminater invoked by simplify

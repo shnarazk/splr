@@ -1,11 +1,51 @@
 #![allow(unused_variables)]
+use crate::assign::*;
 use crate::eliminator::*;
-use crate::solver::{Solver, SolverConfiguration, Stat};
+use crate::solver::{SolverConfiguration, Stat};
 use crate::types::*;
 use crate::var::{Var, VarManagement};
 use std::cmp::Ordering;
 use std::f64;
 use std::fmt;
+
+/// For [ClausePartition]
+pub trait ClauseManagement {
+    fn add_clause(
+        &mut self,
+        config: &mut SolverConfiguration,
+        eliminator: &mut Eliminator,
+        vars: &mut [Var],
+        v: &mut Vec<Lit>,
+        lbd: usize,
+        act: f64,
+    ) -> ClauseId;
+    fn remove_clause(&mut self, cid: ClauseId);
+    fn change_clause_kind(
+        &mut self,
+        eliminator: &mut Eliminator,
+        vars: &mut [Var],
+        cid: ClauseId,
+        kind: ClauseKind,
+    );
+    fn reduce(
+        &mut self,
+        eliminator: &mut Eliminator,
+        stat: &mut [i64],
+        vars: &mut [Var],
+        next_reduction: &mut usize,
+        lbd_temp: &mut [usize],
+    );
+    fn simplify(
+        &mut self,
+        asgs: &mut AssignStack,
+        config: &mut SolverConfiguration,
+        eliminator: &mut Eliminator,
+        stat: &mut [i64],
+        vars: &mut [Var],
+        lbd_temp: &mut [usize],
+        ok: &mut bool,
+    ) -> bool;
+}
 
 /// For ClausePartition
 pub trait GC {
@@ -22,11 +62,6 @@ pub trait ClauseIdIndexEncoding {
     fn to_index(&self) -> ClauseIndex;
     fn to_kind(&self) -> usize;
     fn is(&self, kind: ClauseKind, ix: ClauseIndex) -> bool;
-}
-
-/// For Solver
-pub trait ClauseManagementSolverTemp {
-    fn simplify(&mut self) -> bool;
 }
 
 /// For ClausePartition
@@ -326,55 +361,6 @@ impl<'a> Iterator for ClauseIter<'a> {
     }
 }
 
-impl ClauseManagementSolverTemp for Solver {
-    fn simplify(&mut self) -> bool {
-        self.cp[ClauseKind::Removable as usize].reset_lbd(&self.vars, &mut self.lbd_temp[..]);
-        debug_assert_eq!(self.asgs.level(), 0);
-        // reset reason since decision level is zero.
-        for v in &mut self.vars[1..] {
-            if v.reason != NULL_CLAUSE {
-                v.reason = NULL_CLAUSE;
-            }
-        }
-        if self.eliminator.use_elim
-        // && self.stat[Stat::Simplification as usize] % 8 == 0
-        // && self.eliminator.last_invocatiton < self.stat[Stat::Reduction as usize] as usize
-        {
-            self.eliminate();
-            self.eliminator.last_invocatiton = self.stat[Stat::Reduction as usize] as usize;
-            if !self.ok {
-                return false;
-            }
-        }
-        {
-            let eliminator = &mut self.eliminator;
-            let vars = &mut self.vars[..];
-            for ck in ClauseKind::Liftedlit as usize..=ClauseKind::Binclause as usize {
-                for ch in &mut self.cp[ck].head[1..] {
-                    if !ch.get_flag(ClauseFlag::Dead) && vars.satisfies(&ch.lits) {
-                        ch.flag_on(ClauseFlag::Dead);
-                        debug_assert!(ch.lit[0] != 0 && ch.lit[1] != 0);
-                        self.cp[ck].touched[ch.lit[0].negate() as usize] = true;
-                        self.cp[ck].touched[ch.lit[1].negate() as usize] = true;
-                        if (*eliminator).use_elim {
-                            for l in &ch.lits {
-                                let v = &mut (*vars)[l.vi()];
-                                if !v.eliminated {
-                                    (*eliminator).enqueue_var(v);
-                                }
-                            }
-                        }
-                    }
-                }
-                self.cp[ck].garbage_collect(vars, eliminator);
-            }
-        }
-        self.stat[Stat::Simplification as usize] += 1;
-        // self.check_eliminator();
-        true
-    }
-}
-
 impl GC for ClausePartition {
     fn garbage_collect(&mut self, vars: &mut [Var], eliminator: &mut Eliminator) {
         unsafe {
@@ -611,34 +597,6 @@ impl ConsistencyCheck for ClausePartition {
     }
 }
 
-pub trait ClauseManagement {
-    fn add_clause(
-        &mut self,
-        config: &mut SolverConfiguration,
-        eliminator: &mut Eliminator,
-        vars: &mut [Var],
-        v: &mut Vec<Lit>,
-        lbd: usize,
-        act: f64,
-    ) -> ClauseId;
-    fn remove_clause(&mut self, cid: ClauseId);
-    fn change_clause_kind(
-        &mut self,
-        eliminator: &mut Eliminator,
-        vars: &mut [Var],
-        cid: ClauseId,
-        kind: ClauseKind,
-    );
-    fn reduce(
-        &mut self,
-        eliminator: &mut Eliminator,
-        stat: &mut [i64],
-        vars: &mut [Var],
-        next_reduction: &mut usize,
-        lbd_temp: &mut [usize],
-    );
-}
-
 impl ClauseManagement for [ClausePartition] {
     /// renamed from newLearntClause
     // Note: set lbd to 0 if you want to add the clause to Permanent.
@@ -774,5 +732,58 @@ impl ClauseManagement for [ClausePartition] {
         self[ClauseKind::Removable as usize].garbage_collect(vars, eliminator);
         *next_reduction += DB_INC_SIZE;
         stat[Stat::Reduction as usize] += 1;
+    }
+    fn simplify(
+        &mut self,
+        asgs: &mut AssignStack,
+        config: &mut SolverConfiguration,
+        eliminator: &mut Eliminator,
+        stat: &mut [i64],
+        vars: &mut [Var],
+        lbd_temp: &mut [usize],
+        ok: &mut bool,
+    ) -> bool {
+        self[ClauseKind::Removable as usize].reset_lbd(vars, lbd_temp);
+        debug_assert_eq!(asgs.level(), 0);
+        // reset reason since decision level is zero.
+        for v in &mut vars[1..] {
+            if v.reason != NULL_CLAUSE {
+                v.reason = NULL_CLAUSE;
+            }
+        }
+        if eliminator.use_elim
+        // && self.stat[Stat::Simplification as usize] % 8 == 0
+        // && self.eliminator.last_invocatiton < self.stat[Stat::Reduction as usize] as usize
+        {
+            eliminator.eliminate(asgs, config, self, stat, vars, ok);
+            eliminator.last_invocatiton = stat[Stat::Reduction as usize] as usize;
+            if !*ok {
+                return false;
+            }
+        }
+        {
+            for ck in ClauseKind::Liftedlit as usize..=ClauseKind::Binclause as usize {
+                for ch in &mut self[ck].head[1..] {
+                    if !ch.get_flag(ClauseFlag::Dead) && vars.satisfies(&ch.lits) {
+                        ch.flag_on(ClauseFlag::Dead);
+                        debug_assert!(ch.lit[0] != 0 && ch.lit[1] != 0);
+                        self[ck].touched[ch.lit[0].negate() as usize] = true;
+                        self[ck].touched[ch.lit[1].negate() as usize] = true;
+                        if eliminator.use_elim {
+                            for l in &ch.lits {
+                                let v = &mut (*vars)[l.vi()];
+                                if !v.eliminated {
+                                    eliminator.enqueue_var(v);
+                                }
+                            }
+                        }
+                    }
+                }
+                self[ck].garbage_collect(vars, eliminator);
+            }
+        }
+        stat[Stat::Simplification as usize] += 1;
+        // self.check_eliminator();
+        true
     }
 }
