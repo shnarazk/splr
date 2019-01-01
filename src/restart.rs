@@ -1,5 +1,5 @@
 // use clause::ClauseManagement;
-use crate::solver::{Solver, Stat, CDCL};
+use crate::solver::{Solver, Stat};
 use crate::types::*;
 use std::collections::VecDeque;
 
@@ -83,8 +83,8 @@ impl Restart for Solver {
         {
             self.next_restart = count + RESTART_PERIOD;
             self.stat[Stat::Restart as usize] += 1;
-            let rl = self.root_level;
-            self.cancel_until(rl);
+            self.asgs
+                .cancel_until(&mut self.vars, &mut self.var_order, self.root_level);
         }
     }
 }

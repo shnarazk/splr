@@ -1,3 +1,4 @@
+use crate::assign::AssignStack;
 use crate::clause::{ClauseManagement, GC, *};
 use crate::eliminator::{Eliminator, EliminatorIF};
 use crate::profiler::*;
@@ -22,7 +23,6 @@ pub trait CDCL {
     /// returns `true` for SAT, `false` for UNSAT.
     fn search(&mut self) -> bool;
     fn propagate(&mut self) -> ClauseId;
-    fn cancel_until(&mut self, lv: usize) -> ();
     fn enqueue(&mut self, l: Lit, cid: ClauseId) -> bool;
     fn analyze(&mut self, confl: ClauseId, learnt: &mut Vec<Lit>) -> usize;
     fn analyze_final(&mut self, ci: ClauseId, skip_first: bool) -> ();
@@ -163,15 +163,13 @@ impl Default for SolverConfiguration {
 pub struct Solver {
     /// major sub modules
     pub config: SolverConfiguration, // Configuration
+    pub asgs: AssignStack,
     pub cp: [ClausePartition; 4], // Clauses
     pub eliminator: Eliminator,   // Clause/Variable Elimination
     pub stat: Vec<i64>,           // statistics
     pub vars: Vec<Var>,           // Variables
     pub num_vars: usize,
     pub root_level: usize,
-    pub trail: Vec<Lit>,
-    pub trail_lim: Vec<usize>,
-    pub q_head: usize,
     /// Variable Order
     pub var_order: VarIdHeap,
     /// renamed from `nbclausesbeforereduce`
@@ -207,6 +205,7 @@ impl Solver {
         let sve = cfg.use_sve;
         Solver {
             config: cfg,
+            asgs: AssignStack::new(nv),
             cp: [
                 ClausePartition::build(ClauseKind::Liftedlit, nv, 0),
                 ClausePartition::build(ClauseKind::Removable, nv, nc),
@@ -218,9 +217,6 @@ impl Solver {
             vars: Var::new_vars(nv),
             num_vars: nv,
             root_level: 0,
-            trail: Vec::with_capacity(nv),
-            trail_lim: Vec::new(),
-            q_head: 0,
             var_order: VarIdHeap::new(nv, nv),
             next_reduction: 1000,
             next_restart: 100,
@@ -248,10 +244,10 @@ impl Solver {
         //     self.dump_cnf(format!("G2-p{:>3}.cnf", self.progress_cnt).to_string());
         // }
         let nv = self.vars.len() - 1;
-        let fixed = if self.trail_lim.is_empty() {
-            self.trail.len()
+        let fixed = if self.asgs.is_zero() {
+            self.asgs.len()
         } else {
-            self.trail_lim[0]
+            self.asgs.num_at(0)
         };
         let sum = fixed + self.eliminator.eliminated_vars;
         let learnts = &self.cp[ClauseKind::Removable as usize];
@@ -388,14 +384,6 @@ impl Solver {
         // }
     }
 
-    pub fn num_assigns(&self) -> usize {
-        self.trail.len()
-    }
-
-    pub fn decision_level(&self) -> usize {
-        self.trail_lim.len()
-    }
-
     pub fn adapt_strategy(&mut self) {
         if !self.config.adapt_strategy {
             return;
@@ -486,7 +474,7 @@ impl SatSolver for Solver {
         }
         // TODO: deal with assumptions
         // s.root_level = 0;
-        self.num_solved_vars = self.trail.len();
+        self.num_solved_vars = self.asgs.len();
         self.progress("");
         // self.eliminator.use_elim = true;
         self.eliminator.var_queue.clear();
@@ -494,17 +482,17 @@ impl SatSolver for Solver {
             for v in &mut self.vars[1..] {
                 if v.neg_occurs.is_empty() && !v.pos_occurs.is_empty() && v.assign == BOTTOM {
                     debug_assert!(!v.eliminated);
-                    debug_assert!(!self.trail.contains(&v.index.lit(LTRUE)));
-                    debug_assert!(!self.trail.contains(&v.index.lit(LFALSE)));
+                    debug_assert!(!self.asgs.trail.contains(&v.index.lit(LTRUE)));
+                    debug_assert!(!self.asgs.trail.contains(&v.index.lit(LFALSE)));
                     v.assign = LTRUE;
-                    self.trail.push(v.index.lit(LTRUE));
+                    self.asgs.push(v.index.lit(LTRUE));
                 } else if v.pos_occurs.is_empty() && !v.neg_occurs.is_empty() && v.assign == BOTTOM
                 {
                     debug_assert!(!v.eliminated);
-                    debug_assert!(!self.trail.contains(&v.index.lit(LTRUE)));
-                    debug_assert!(!self.trail.contains(&v.index.lit(LFALSE)));
+                    debug_assert!(!self.asgs.trail.contains(&v.index.lit(LTRUE)));
+                    debug_assert!(!self.asgs.trail.contains(&v.index.lit(LFALSE)));
                     v.assign = LFALSE;
-                    self.trail.push(v.index.lit(LFALSE));
+                    self.asgs.push(v.index.lit(LFALSE));
                 } else if v.pos_occurs.len() == 1 || v.neg_occurs.len() == 1 {
                     self.eliminator.enqueue_var(v);
                 }
@@ -520,7 +508,8 @@ impl SatSolver for Solver {
         self.stat[Stat::Simplification as usize] += 1;
         if self.search() {
             if !self.ok {
-                self.cancel_until(0);
+                self.asgs
+                    .cancel_until(&mut self.vars, &mut self.var_order, 0);
                 self.progress("error");
                 return Err(SolverException::InternalInconsistent);
             }
@@ -536,11 +525,13 @@ impl SatSolver for Solver {
             if self.eliminator.use_elim {
                 self.extend_model(&mut result);
             }
-            self.cancel_until(0);
+            self.asgs
+                .cancel_until(&mut self.vars, &mut self.var_order, 0);
             Ok(Certificate::SAT(result))
         } else {
             self.progress(self.config.strategy.to_str());
-            self.cancel_until(0);
+            self.asgs
+                .cancel_until(&mut self.vars, &mut self.var_order, 0);
             Ok(Certificate::UNSAT(
                 self.conflicts.iter().map(|l| l.int()).collect(),
             ))
@@ -612,8 +603,7 @@ impl SatSolver for Solver {
             ref mut cp,
             ref mut eliminator,
             ref mut vars,
-            ref mut trail,
-            ref trail_lim,
+            ref mut asgs,
             ..
         } = self;
         v.sort_unstable();
@@ -639,8 +629,8 @@ impl SatSolver for Solver {
         match v.len() {
             0 => None, // Empty clause is UNSAT.
             1 => {
-                let dl = trail_lim.len();
-                enqueue_null(trail, &mut vars[v[0].vi()], v[0].lbool(), dl);
+                let dl = asgs.level();
+                asgs.enqueue_null(&mut vars[v[0].vi()], v[0].lbool(), dl);
                 Some(NULL_CLAUSE)
             }
             _ => {
@@ -657,16 +647,13 @@ impl CDCL for Solver {
         let Solver {
             ref mut vars,
             ref mut cp,
-            ref mut trail,
-            ref trail_lim,
-            ref mut q_head,
+            ref mut asgs,
             ref mut stat,
             ..
         } = self;
-        while *q_head < trail.len() {
-            let p: usize = trail[*q_head] as usize;
+        while asgs.remains() {
+            let p: usize = asgs.sweep() as usize;
             let false_lit = (p as Lit).negate();
-            *q_head += 1;
             stat[Stat::Propagation as usize] += 1;
             let kinds = [
                 ClauseKind::Binclause,
@@ -712,11 +699,11 @@ impl CDCL for Solver {
                                 }
                             }
                             if other_value == LFALSE {
-                                *q_head = trail.len();
+                                asgs.catchup();
                                 return kind.id_from(*pre);
                             } else {
                                 // self.uncheck_enqueue(other, kind.id_from((*c).index));
-                                let dl = trail_lim.len();
+                                let dl = asgs.level();
                                 let other = (*ch).lits[0];
                                 // println!("unchecked_enqueue embedded into propagate {}", other.int());
                                 let v = &mut vars[other.vi()];
@@ -732,7 +719,7 @@ impl CDCL for Solver {
                                 debug_assert!(!v.eliminated);
                                 // debug_assert!(!trail.contains(&other));
                                 // debug_assert!(!trail.contains(&other.negate()));
-                                trail.push(other);
+                                asgs.push(other);
                             }
                         }
                         pre = &mut (*ch).next_watcher[my_index];
@@ -757,7 +744,7 @@ impl CDCL for Solver {
             self.stat[Stat::Propagation as usize] += 1;
             let ci = self.propagate();
             if ci == NULL_CLAUSE {
-                let na = self.num_assigns();
+                let na = self.asgs.len();
                 let ne = self.eliminator.eliminated_vars;
                 // println!("na {} + ne {} = {} >= {}", na, ne, na + ne, self.num_vars);
                 if self.num_vars <= na + ne {
@@ -780,7 +767,8 @@ impl CDCL for Solver {
                 {
                     self.stat[Stat::Restart as usize] += 1;
                     self.lbd_queue.clear();
-                    self.cancel_until(0);
+                    self.asgs
+                        .cancel_until(&mut self.vars, &mut self.var_order, 0);
 
                     if self.config.luby_restart {
                         conflict_c = 0.0;
@@ -793,16 +781,16 @@ impl CDCL for Solver {
                     }
                     // return
                 }
-                if self.decision_level() == 0 {
+                if self.asgs.level() == 0 {
                     self.simplify();
                     if !self.ok {
                         return false;
                     }
-                    self.num_solved_vars = self.num_assigns();
+                    self.num_solved_vars = self.asgs.len();
                     self.var_order.rebuild(&self.vars);
                 }
                 // self.force_restart();
-                if self.trail.len() <= self.q_head {
+                if !self.asgs.remains() {
                     // let na = self.num_assigns();
                     // let ne = self.eliminator.eliminated_vars;
                     // // println!("na {} + ne {} = {} , {}", na, ne, na + ne, self.num_vars);
@@ -812,7 +800,8 @@ impl CDCL for Solver {
                     let vi = self.var_order.select_var(&self.vars);
                     debug_assert_ne!(vi, 0);
                     let p = self.vars[vi].phase;
-                    self.uncheck_assume(vi.lit(p));
+                    self.asgs
+                        .uncheck_assume(&mut self.vars, &mut self.eliminator, vi.lit(p));
                     self.stat[Stat::Decision as usize] += 1;
                     a_decision_was_made = true;
                 }
@@ -824,7 +813,7 @@ impl CDCL for Solver {
                 } else {
                     self.stat[Stat::NoDecisionConflict as usize] += 1;
                 }
-                let dl = self.decision_level();
+                let dl = self.asgs.level();
                 if dl == self.root_level {
                     self.analyze_final(ci, false);
                     return false;
@@ -839,7 +828,7 @@ impl CDCL for Solver {
                 // } else {
                 //     self.trail.len() - self.trail_lim[0]
                 // };
-                let real_len = self.trail.len();
+                let real_len = self.asgs.len();
                 self.trail_queue.enqueue(TRAIL_QUEUE_LEN, real_len);
                 // DYNAMIC BLOCKING RESTART
                 let count = self.stat[Stat::Conflict as usize] as u64;
@@ -853,10 +842,14 @@ impl CDCL for Solver {
                 let mut new_learnt: Vec<Lit> = Vec::new();
                 let bl = self.analyze(ci, &mut new_learnt);
                 // let nas = self.num_assigns();
-                self.cancel_until(max(bl as usize, self.root_level));
+                self.asgs.cancel_until(
+                    &mut self.vars,
+                    &mut self.var_order,
+                    max(bl as usize, self.root_level),
+                );
                 if new_learnt.len() == 1 {
                     let l = new_learnt[0];
-                    self.uncheck_enqueue(l, NULL_CLAUSE);
+                    self.asgs.uncheck_enqueue(&mut self.vars, l, NULL_CLAUSE);
                 } else {
                     let lbd = self.vars.compute_lbd(&new_learnt, &mut self.lbd_temp);
                     let v = &mut new_learnt;
@@ -887,7 +880,7 @@ impl CDCL for Solver {
                             &mut self.config.cla_inc,
                         );
                     }
-                    self.uncheck_enqueue(l0, cid);
+                    self.asgs.uncheck_enqueue(&mut self.vars, l0, cid);
                     self.lbd_queue.enqueue(LBD_QUEUE_LEN, lbd);
                     self.stat[Stat::SumLBD as usize] += lbd as i64;
                 }
@@ -895,7 +888,8 @@ impl CDCL for Solver {
                     self.progress(self.config.strategy.to_str());
                 }
                 if self.stat[Stat::Conflict as usize] == 100_000 {
-                    self.cancel_until(0);
+                    self.asgs
+                        .cancel_until(&mut self.vars, &mut self.var_order, 0);
                     self.simplify();
                     // self.rebuild_heap();
                     self.adapt_strategy();
@@ -925,41 +919,11 @@ impl CDCL for Solver {
             }
         }
     }
-
-    fn cancel_until(&mut self, lv: usize) {
-        let Solver {
-            ref mut vars,
-            ref mut trail,
-            ref mut trail_lim,
-            ref mut var_order,
-            ref mut q_head,
-            ..
-        } = self;
-        if trail_lim.len() <= lv {
-            return;
-        }
-        let lim = trail_lim[lv];
-        for l in &trail[lim..] {
-            // println!("cancel_until {}", l.int());
-            let vi = l.vi();
-            let v = &mut vars[vi];
-            v.phase = v.assign;
-            v.assign = BOTTOM;
-            if v.reason != NULL_CLAUSE {
-                v.reason = NULL_CLAUSE;
-            }
-            var_order.insert(vars, vi);
-        }
-        trail.truncate(lim);
-        trail_lim.truncate(lv);
-        *q_head = lim;
-    }
-
     /// returns `false` if an conflict occures.
     fn enqueue(&mut self, l: Lit, cid: ClauseId) -> bool {
         let sig = l.lbool();
         let val = self.vars[l.vi()].assign;
-        let dl = self.decision_level();
+        let dl = self.asgs.level();
         if val == BOTTOM {
             let v = &mut self.vars[l.vi()];
             debug_assert!(!v.eliminated);
@@ -982,7 +946,7 @@ impl CDCL for Solver {
             // }
             // debug_assert!(!self.trail.contains(&l));
             // debug_assert!(!self.trail.contains(&l.negate()));
-            self.trail.push(l);
+            self.asgs.push(l);
             true
         } else {
             val == sig
@@ -991,10 +955,10 @@ impl CDCL for Solver {
 
     fn analyze(&mut self, confl: ClauseId, learnt: &mut Vec<Lit>) -> usize {
         learnt.push(0);
-        let dl = self.decision_level();
+        let dl = self.asgs.level();
         let mut cid: usize = confl;
         let mut p = NULL_LIT;
-        let mut ti = self.trail.len() - 1; // trail index
+        let mut ti = self.asgs.len() - 1; // trail index
         let mut path_cnt = 0;
         // let mut last_dl: Vec<Lit> = Vec::new();
         loop {
@@ -1062,11 +1026,11 @@ impl CDCL for Solver {
                     }
                 }
                 // set the index of the next literal to ti
-                while !self.an_seen[self.trail[ti].vi()] {
+                while !self.an_seen[self.asgs.trail[ti].vi()] {
                     // println!("{} はフラグが立ってないので飛ばす", self.trail[ti].int());
                     ti -= 1;
                 }
-                p = self.trail[ti];
+                p = self.asgs.trail[ti];
                 let next_vi = p.vi();
                 cid = self.vars[next_vi].reason;
                 // println!("{} にフラグが立っている。そのpath数は{}, \
@@ -1089,7 +1053,7 @@ impl CDCL for Solver {
         // simplify phase
         let mut to_clear = Vec::new();
         to_clear.push(p.negate());
-        let mut level_map = vec![false; self.decision_level() + 1];
+        let mut level_map = vec![false; self.asgs.level() + 1];
         for l in &learnt[1..] {
             to_clear.push(*l);
             level_map[self.vars[l.vi()].level] = true;
@@ -1142,14 +1106,14 @@ impl CDCL for Solver {
                     self.an_seen[vi] = true;
                 }
             }
-            let tl0 = self.trail_lim[0];
-            let start = if self.trail_lim.len() <= self.root_level {
-                self.trail.len()
+            let tl0 = self.asgs.num_at(0);
+            let start = if self.asgs.level() <= self.root_level {
+                self.asgs.len()
             } else {
-                self.trail_lim[self.root_level]
+                self.asgs.num_at(self.root_level)
             };
             for i in (tl0..start).rev() {
-                let l: Lit = self.trail[i];
+                let l: Lit = self.asgs.trail[i];
                 let vi = l.vi();
                 if seen[vi] {
                     if self.vars[vi].reason == NULL_CLAUSE {
@@ -1241,59 +1205,6 @@ impl Solver {
         }
         lbd_temp[0] = key;
     }
-
-    pub fn uncheck_enqueue(&mut self, l: Lit, cid: ClauseId) {
-        let Solver {
-            ref mut vars,
-            ref mut trail,
-            ref trail_lim,
-            // ref mut eliminator,
-            ..
-        } = self;
-        // println!("uncheck_enqueue {}", l.int());
-        debug_assert!(l != 0, "Null literal is about to be equeued");
-        debug_assert!(
-            trail_lim.is_empty() || cid != 0,
-            "Null CLAUSE is used for uncheck_enqueue"
-        );
-        let dl = trail_lim.len();
-        let v = &mut vars[l.vi()];
-        debug_assert!(!v.eliminated);
-        debug_assert!(v.assign == l.lbool() || v.assign == BOTTOM);
-        v.assign = l.lbool();
-        v.level = dl;
-        v.reason = cid;
-        // if dl == 0 {
-        //     eliminator.enqueue_var(v);
-        // }
-        // debug_assert!(!self.trail.contains(&l));
-        // debug_assert!(!self.trail.contains(&l.negate()));
-        trail.push(l);
-    }
-    pub fn uncheck_assume(&mut self, l: Lit) {
-        // println!("uncheck_assume {}", l.int());
-        let Solver {
-            ref mut vars,
-            ref mut trail,
-            ref mut trail_lim,
-            ref mut eliminator,
-            ..
-        } = self;
-        trail_lim.push(trail.len());
-        let dl = trail_lim.len();
-        let v = &mut vars[l.vi()];
-        debug_assert!(!v.eliminated);
-        debug_assert!(v.assign == l.lbool() || v.assign == BOTTOM);
-        v.assign = l.lbool();
-        v.level = dl;
-        v.reason = NULL_CLAUSE;
-        if dl == 0 {
-            eliminator.enqueue_var(v);
-        }
-        // debug_assert!(!trail.contains(&l));
-        // debug_assert!(!trail.contains(&l.negate()));
-        trail.push(l);
-    }
 }
 
 impl Solver {
@@ -1302,7 +1213,7 @@ impl Solver {
         let Solver {
             ref cp,
             ref vars,
-            ref trail,
+            ref asgs,
             ref num_vars,
             ..
         } = self;
@@ -1317,7 +1228,7 @@ impl Solver {
         }
         if let Ok(out) = File::create(&fname) {
             let mut buf = BufWriter::new(out);
-            let nv = trail.len();
+            let nv = asgs.len();
             let nc: usize = cp.iter().map(|p| p.head.len() - 1).sum();
             buf.write_all(format!("p cnf {} {}\n", num_vars, nc + nv).as_bytes())
                 .unwrap();
@@ -1335,89 +1246,44 @@ impl Solver {
                 }
             }
             buf.write_all(b"c from trail\n").unwrap();
-            for x in trail {
+            for x in &asgs.trail {
                 buf.write_all(format!("{} 0\n", x.int()).as_bytes())
                     .unwrap();
             }
         }
     }
     pub fn dump(&self, str: &str) {
-        println!("# {} at {}", str, self.decision_level());
+        println!("# {} at {}", str, self.asgs.level());
         println!(
             "# nassigns {}, decision cands {}",
-            self.num_assigns(),
+            self.asgs.len(),
             self.var_order.len()
         );
-        let v = self.trail.iter().map(|l| l.int()).collect::<Vec<i32>>();
-        let len = self.trail_lim.len();
+        let v = self
+            .asgs
+            .trail
+            .iter()
+            .map(|l| l.int())
+            .collect::<Vec<i32>>();
+        let len = self.asgs.level();
         if 0 < len {
-            print!("# - trail[{}]  [", self.trail.len());
-            if 0 < self.trail_lim[0] {
-                print!("0{:?}, ", &self.trail[0..self.trail_lim[0]]);
+            print!("# - trail[{}]  [", self.asgs.len());
+            let lv0 = self.asgs.num_at(0);
+            if 0 < lv0 {
+                print!("0{:?}, ", &self.asgs.trail[0..lv0]);
             }
             for i in 0..(len - 1) {
-                print!(
-                    "{}{:?}, ",
-                    i + 1,
-                    &v[self.trail_lim[i]..self.trail_lim[i + 1]]
-                );
+                let a = self.asgs.num_at(i);
+                let b = self.asgs.num_at(i + 1);
+                print!("{}{:?}, ", i + 1, &v[a..b]);
             }
-            println!("{}{:?}]", len, &v[self.trail_lim[len - 1]..]);
+            println!("{}{:?}]", len, &v[self.asgs.num_at(len - 1)..]);
         } else {
             println!("# - trail[  0]  [0{:?}]", &v);
         }
-        println!("- trail_lim  {:?}", self.trail_lim);
+        println!("- trail_lim  {:?}", self.asgs.trail_lim);
         // println!("{}", self.var_order);
         // self.var_order.check("");
-    }
-}
-
-/// returns `false` if an conflict occures.
-pub fn enqueue(trail: &mut Vec<Lit>, v: &mut Var, sig: Lbool, cid: ClauseId, dl: usize) -> bool {
-    let val = v.assign;
-    if val == BOTTOM {
-        debug_assert!(!v.eliminated);
-        v.assign = sig;
-        // if dl == 0 && cid != NULL_CLAUSE {
-        //     println!("enqueue {}", cid2fmt(cid));
-        // }
-        v.reason = cid;
-        v.level = dl;
-        if dl == 0 {
-            // if !v.enqueued {
-            //     self.eliminator.var_queue.push(l.vi());
-            //     v.enqueued = true;
-            // }
-            v.reason = NULL_CLAUSE;
-            v.activity = 0.0;
-        }
-        // if dl == 0 {
-        //     self.var_order.remove(&self.vars, l.vi());
-        // }
-        // debug_assert!(!self.trail.contains(&l));
-        // debug_assert!(!self.trail.contains(&l.negate()));
-        trail.push(v.index.lit(sig));
-        true
-    } else {
-        val == sig
-    }
-}
-
-/// returns `false` if an conflict occures.
-pub fn enqueue_null(trail: &mut Vec<Lit>, v: &mut Var, sig: Lbool, dl: usize) -> bool {
-    let val = v.assign;
-    if val == BOTTOM {
-        debug_assert!(!v.eliminated);
-        v.assign = sig;
-        v.reason = NULL_CLAUSE;
-        v.level = dl;
-        if dl == 0 {
-            v.activity = 0.0;
-        }
-        trail.push(v.index.lit(sig));
-        true
-    } else {
-        val == sig
     }
 }
 
@@ -1426,13 +1292,11 @@ pub fn propagate_0(
     cp: &mut [ClausePartition],
     stat: &mut [i64],
     vars: &mut [Var],
-    trail: &mut Vec<Lit>,
-    q_head: &mut usize,
+    asgs: &mut AssignStack,
 ) -> ClauseId {
-    while *q_head < trail.len() {
-        let p: usize = trail[*q_head] as usize;
+    while asgs.remains() {
+        let p: usize = asgs.sweep() as usize;
         let false_lit = (p as Lit).negate();
-        *q_head += 1;
         stat[Stat::Propagation as usize] += 1;
         let kinds = [
             ClauseKind::Binclause,
@@ -1485,7 +1349,7 @@ pub fn propagate_0(
                             }
                         }
                         if other_value == LFALSE {
-                            *q_head = trail.len();
+                            asgs.catchup();
                             return kind.id_from(*pre);
                         } else {
                             // self.uncheck_enqueue(other, kind.id_from((*c).index));
@@ -1500,7 +1364,7 @@ pub fn propagate_0(
                             debug_assert!(!v.eliminated);
                             // debug_assert!(!trail.contains(&other));debug_
                             // debug_assert!(!trail.contains(&other.negate()));
-                            trail.push(other);
+                            asgs.push(other);
                         }
                     }
                     pre = &mut (*ch).next_watcher[my_index];

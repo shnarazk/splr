@@ -34,8 +34,11 @@ macro_rules! uenqueue {
 }
 
 // /// Subsumption-based clause/var eliminaiton
+/// Assignment management
+pub mod assign;
 /// Clause
 pub mod clause;
+/// In-process elimination
 pub mod eliminator;
 /// used in progress report
 pub mod profiler;

@@ -1,8 +1,9 @@
+use crate::assign::AssignStack;
 use crate::clause::{
     cid2fmt, ClauseFlag, ClauseHead, ClauseIdIndexEncoding, ClauseIndex, ClauseKind,
     ClauseManagement, ClausePartition,
 };
-use crate::solver::{enqueue_null, propagate_0, Solver};
+use crate::solver::{propagate_0, Solver};
 use crate::types::*;
 use crate::var::{Var, VarManagement};
 // use std::fmt;
@@ -169,26 +170,20 @@ impl Solver {
             ref mut eliminator,
             ref mut stat,
             ref mut vars,
-            ref mut trail,
-            ref trail_lim,
-            ref mut q_head,
+            ref mut asgs,
             ref mut ok,
             ..
         } = self;
         let mut cnt = 0;
         let mut _subsumed = 0;
         let mut _deleted_literals = 0;
-        debug_assert_eq!(trail_lim.len(), 0);
-        while !eliminator.clause_queue.is_empty()
-            || eliminator.bwdsub_assigns < trail.len()
-        {
+        debug_assert_eq!(asgs.level(), 0);
+        while !eliminator.clause_queue.is_empty() || eliminator.bwdsub_assigns < asgs.len() {
             // Empty subsumption queue and return immediately on user-interrupt:
             // if computed-too-long { break; }
             // Check top-level assigments by creating a dummy clause and placing it in the queue:
-            if eliminator.clause_queue.is_empty()
-                && eliminator.bwdsub_assigns < trail.len()
-            {
-                let c = trail[eliminator.bwdsub_assigns].as_uniclause();
+            if eliminator.clause_queue.is_empty() && eliminator.bwdsub_assigns < asgs.len() {
+                let c = asgs.trail[eliminator.bwdsub_assigns].as_uniclause();
                 eliminator.clause_queue.push(c);
                 eliminator.bwdsub_assigns += 1;
             }
@@ -273,12 +268,11 @@ impl Solver {
                                         eliminator,
                                         stat,
                                         vars,
-                                        trail,
-                                        q_head,
-                                        ok,
+                                        asgs,
                                         *di,
                                         l.negate(),
                                     ) {
+                                        *ok = false;
                                         return false;
                                     }
                                     eliminator.enqueue_var(&mut vars[l.vi()]);
@@ -344,14 +338,9 @@ impl Solver {
             }
             if (*pos).is_empty() && !(*neg).is_empty() {
                 // println!("-v {} p {} n {}", v, (*pos).len(), (*neg).len());
-                if !enqueue_null(&mut self.trail, &mut self.vars[v], LFALSE, 0)
-                    || propagate_0(
-                        &mut self.cp,
-                        &mut self.stat,
-                        &mut self.vars,
-                        &mut self.trail,
-                        &mut self.q_head,
-                    ) != NULL_CLAUSE
+                if !self.asgs.enqueue_null(&mut self.vars[v], LFALSE, 0)
+                    || propagate_0(&mut self.cp, &mut self.stat, &mut self.vars, &mut self.asgs)
+                        != NULL_CLAUSE
                 {
                     self.ok = false;
                     return false;
@@ -360,14 +349,9 @@ impl Solver {
             }
             if (*neg).is_empty() && (*pos).is_empty() {
                 // println!("+v {} p {} n {}", v, (*pos).len(), (*neg).len());
-                if !enqueue_null(&mut self.trail, &mut self.vars[v], LTRUE, 0)
-                    || propagate_0(
-                        &mut self.cp,
-                        &mut self.stat,
-                        &mut self.vars,
-                        &mut self.trail,
-                        &mut self.q_head,
-                    ) != NULL_CLAUSE
+                if !self.asgs.enqueue_null(&mut self.vars[v], LTRUE, 0)
+                    || propagate_0(&mut self.cp, &mut self.stat, &mut self.vars, &mut self.asgs)
+                        != NULL_CLAUSE
                 {
                     self.ok = false;
                     // panic!("eliminate_var: failed to enqueue & propagate");
@@ -459,8 +443,7 @@ impl Solver {
                                     //     vec2int(&clause_body!(self.cp, *n).lits)
                                     // );
                                     let lit = vec[0];
-                                    if !enqueue_null(
-                                        &mut self.trail,
+                                    if !self.asgs.enqueue_null(
                                         &mut self.vars[lit.vi()],
                                         lit.lbool(),
                                         0,
@@ -524,13 +507,8 @@ impl Solver {
             }
             self.vars[v].pos_occurs.clear();
             self.vars[v].neg_occurs.clear();
-            if propagate_0(
-                &mut self.cp,
-                &mut self.stat,
-                &mut self.vars,
-                &mut self.trail,
-                &mut self.q_head,
-            ) != NULL_CLAUSE
+            if propagate_0(&mut self.cp, &mut self.stat, &mut self.vars, &mut self.asgs)
+                != NULL_CLAUSE
             {
                 self.ok = false;
                 return false;
@@ -608,13 +586,13 @@ impl Solver {
         // self.build_occurence_list();
         // for i in 1..4 { println!("eliminate report: v{} => {},{}", i, self.vars[i].num_occurs, self.vars[i].occurs.len()); }
         // self.eliminator.clause_queue.clear();
-        'perform: while self.eliminator.bwdsub_assigns < self.trail.len()
+        'perform: while self.eliminator.bwdsub_assigns < self.asgs.len()
             || !self.eliminator.var_queue.is_empty()
             || !self.eliminator.clause_queue.is_empty()
         {
             // self.gather_touched_clauses();
             if (!self.eliminator.clause_queue.is_empty()
-                || self.eliminator.bwdsub_assigns < self.trail.len())
+                || self.eliminator.bwdsub_assigns < self.asgs.len())
                 && !self.backward_subsumption_check()
             {
                 self.ok = false;
@@ -843,9 +821,7 @@ pub fn strengthen_clause(
     eliminator: &mut Eliminator,
     stat: &mut [i64],
     vars: &mut [Var],
-    trail: &mut Vec<Lit>,
-    q_head: &mut usize,
-    ok: &mut bool,
+    asgs: &mut AssignStack,
     cid: ClauseId,
     l: Lit,
 ) -> bool {
@@ -867,13 +843,12 @@ pub fn strengthen_clause(
         // println!("{} is removed and its first literal {} is enqueued.", cid2fmt(cid), c0.int());
         cp.remove_clause(cid);
         vars.detach_clause(cid, clause!(*cp, cid), eliminator);
-        if enqueue_null(trail, &mut vars[c0.vi()], c0.lbool(), 0)
-            && propagate_0(cp, stat, vars, trail, q_head) == NULL_CLAUSE
+        if asgs.enqueue_null(&mut vars[c0.vi()], c0.lbool(), 0)
+            && propagate_0(cp, stat, vars, asgs) == NULL_CLAUSE
         {
             cp[cid.to_kind()].touched[c0.negate() as usize] = true;
             true
         } else {
-            *ok = false;
             false
         }
     } else {

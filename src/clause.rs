@@ -329,7 +329,7 @@ impl<'a> Iterator for ClauseIter<'a> {
 impl ClauseManagementSolverTemp for Solver {
     fn simplify(&mut self) -> bool {
         self.cp[ClauseKind::Removable as usize].reset_lbd(&self.vars, &mut self.lbd_temp[..]);
-        debug_assert_eq!(self.decision_level(), 0);
+        debug_assert_eq!(self.asgs.level(), 0);
         // reset reason since decision level is zero.
         for v in &mut self.vars[1..] {
             if v.reason != NULL_CLAUSE {
