@@ -167,6 +167,27 @@ impl Default for SolverConfiguration {
     }
 }
 
+pub struct MetaParameters {
+    /// renamed from `nbclausesbeforereduce`
+    pub next_reduction: usize,
+    pub next_restart: u64,
+    pub cur_restart: usize,
+    pub lbd_queue: VecDeque<usize>,
+    pub trail_queue: VecDeque<usize>,
+}
+
+impl Default for MetaParameters {
+    fn default() -> MetaParameters {
+        MetaParameters {
+            next_reduction: 1000,
+            next_restart: 100,
+            cur_restart: 1,
+            lbd_queue: VecDeque::new(),
+            trail_queue: VecDeque::new(),
+        }
+    }
+}
+
 /// is the collection of all variables.
 pub struct Solver {
     /// major sub modules
@@ -178,21 +199,11 @@ pub struct Solver {
     pub vars: Vec<Var>,           // Variables
     /// Variable Order
     pub var_order: VarIdHeap,
-    /// renamed from `nbclausesbeforereduce`
-    pub next_reduction: usize,
-    pub next_restart: u64,
-    pub cur_restart: usize,
-    pub lbd_queue: VecDeque<usize>,
-    pub trail_queue: VecDeque<usize>,
+    pub meta: MetaParameters,
     /// Working memory
     pub profile: Profile,
-    pub progress_cnt: i64,
     pub model: Vec<Lbool>,
     pub conflicts: Vec<Lit>,
-    pub ema_asg: Ema2,
-    pub ema_lbd: Ema2,
-    pub b_lvl: Ema,
-    pub c_lvl: Ema,
 }
 
 const LBD_QUEUE_LEN: usize = 50;
@@ -218,166 +229,11 @@ impl Solver {
             stat: vec![0; Stat::EndOfStatIndex as usize],
             vars: Var::new_vars(nv),
             var_order: VarIdHeap::new(nv, nv),
-            next_reduction: 1000,
-            next_restart: 100,
-            cur_restart: 1,
+            meta: MetaParameters::default(),
             model: vec![BOTTOM; nv + 1],
             conflicts: vec![],
-            profile: Profile::new(&path.to_string()),
-            lbd_queue: VecDeque::new(),
-            trail_queue: VecDeque::new(),
-            ema_asg: Ema2::new(3.8, 50_000.0),   // for blocking 4
-            ema_lbd: Ema2::new(160.0, 50_000.0), // for forcing 160
-            b_lvl: Ema::new(se),
-            c_lvl: Ema::new(se),
-            progress_cnt: 0,
+            profile: Profile::new(se, &path.to_string()),
         }
-    }
-    // print a progress report
-    pub fn progress(&mut self, mes: &str) {
-        self.progress_cnt += 1;
-        // if self.progress_cnt % 16 == 0 {
-        //     self.dump_cnf(format!("G2-p{:>3}.cnf", self.progress_cnt).to_string());
-        // }
-        let nv = self.vars.len() - 1;
-        let fixed = if self.asgs.is_zero() {
-            self.asgs.len()
-        } else {
-            self.asgs.num_at(0)
-        };
-        let sum = fixed + self.eliminator.eliminated_vars;
-        let learnts = &self.cp[ClauseKind::Removable as usize];
-        let good = learnts
-            .head
-            .iter()
-            .skip(1)
-            .filter(|c| !c.get_flag(ClauseFlag::Dead) && c.rank <= 3)
-            .count();
-        if self.config.use_tty {
-            if mes.is_empty() {
-                println!("{}", self.profile);
-                println!();
-                println!();
-                println!();
-                println!();
-                println!();
-                println!();
-            } else {
-                print!("\x1B[7A");
-                println!("{}, State:{:>6}", self.profile, mes,);
-                println!(
-                    "#propagate:{:>14}, #decision:{:>13}, #conflict: {:>12}",
-                    self.stat[Stat::Propagation as usize],
-                    self.stat[Stat::Decision as usize],
-                    self.stat[Stat::Conflict as usize],
-                );
-                println!(
-                    "  Assignment|#rem:{:>9}, #fix:{:>9}, #elm:{:>9}, prog%:{:>8.4}",
-                    nv - sum,
-                    fixed,
-                    self.eliminator.eliminated_vars,
-                    (sum as f32) / (nv as f32) * 100.0,
-                );
-                println!(
-                    "   Clause DB|Remv:{:>9}, good:{:>9}, Perm:{:>9}, Binc:{:>9}",
-                    self.cp[ClauseKind::Removable as usize]
-                        .head
-                        .iter()
-                        .skip(1)
-                        .filter(|c| !c.get_flag(ClauseFlag::Dead))
-                        .count(),
-                    good,
-                    self.cp[ClauseKind::Permanent as usize]
-                        .head
-                        .iter()
-                        .skip(1)
-                        .filter(|c| !c.get_flag(ClauseFlag::Dead))
-                        .count(),
-                    self.cp[ClauseKind::Binclause as usize]
-                        .head
-                        .iter()
-                        .skip(1)
-                        .filter(|c| !c.get_flag(ClauseFlag::Dead))
-                        .count(),
-                );
-                println!(
-                    "     Restart|#BLK:{:>9}, #RST:{:>9}, emaASG:{:>7.2}, emaLBD:{:>7.2}",
-                    self.stat[Stat::BlockRestart as usize],
-                    self.stat[Stat::Restart as usize],
-                    self.ema_asg.get(),
-                    self.ema_lbd.get(),
-                );
-                println!(
-                    " Decision Lv|aLBD:{:>9.2}, bjmp:{:>9.2}, cnfl:{:>9.2} |#rdc:{:>9}",
-                    self.ema_lbd.slow,
-                    self.b_lvl.0,
-                    self.c_lvl.0,
-                    self.stat[Stat::Reduction as usize],
-                );
-                println!(
-                    "  Eliminator|#cls:{:>9}, #var:{:>9},   Clause DB mgr|#smp:{:>9}",
-                    self.eliminator.clause_queue_len(),
-                    self.eliminator.var_queue_len(),
-                    self.stat[Stat::Simplification as usize],
-                );
-            }
-        } else if mes.is_empty() {
-            println!(
-                "   #mode,      Variable Assignment      ,,  \
-                 Clause Database Management  ,,   Restart Strategy      ,, \
-                 Misc Progress Parameters,,  Eliminator"
-            );
-            println!(
-                "   #init,#remain,#solved,   #elim,total%,,#learnt,(good),  \
-                 #perm,#binary,,block,force, asgn/,  lbd/,,    lbd, \
-                 back lv, conf lv,,clause,   var"
-            );
-        } else {
-            println!(
-                "{:>3}#{:<5},{:>7},{:>7},{:>7},{:>6.3},,{:>7},{:>6},{:>7},\
-                 {:>7},,{:>5},{:>5}, {:>5.2},{:>6.2},,{:>7.2},{:>8.2},{:>8.2},,\
-                 {:>6},{:>6}",
-                self.progress_cnt,
-                mes,
-                nv - sum,
-                fixed,
-                self.eliminator.eliminated_vars,
-                (sum as f32) / (nv as f32) * 100.0,
-                self.cp[ClauseKind::Removable as usize]
-                    .head
-                    .iter()
-                    .skip(1)
-                    .filter(|c| !c.get_flag(ClauseFlag::Dead))
-                    .count(),
-                good,
-                self.cp[ClauseKind::Permanent as usize]
-                    .head
-                    .iter()
-                    .skip(1)
-                    .filter(|c| !c.get_flag(ClauseFlag::Dead))
-                    .count(),
-                self.cp[ClauseKind::Binclause as usize]
-                    .head
-                    .iter()
-                    .skip(1)
-                    .filter(|c| !c.get_flag(ClauseFlag::Dead))
-                    .count(),
-                self.stat[Stat::BlockRestart as usize],
-                self.stat[Stat::Restart as usize],
-                self.ema_asg.get(),
-                self.ema_lbd.get(),
-                self.ema_lbd.slow,
-                self.b_lvl.0,
-                self.c_lvl.0,
-                self.eliminator.clause_queue_len(),
-                self.eliminator.var_queue_len(),
-            );
-        }
-
-        // if self.progress_cnt == -1 {
-        //     self.dump_cnf(format!("test-{}.cnf", self.progress_cnt).to_string());
-        //     panic!("aa");
-        // }
     }
 
     pub fn adapt_strategy(&mut self) {
@@ -406,9 +262,9 @@ impl Solver {
                 self.config.co_lbd_bound = 4;
                 let _glureduce = true;
                 self.config.first_reduction = 2000;
-                self.next_reduction = 2000;
-                self.cur_restart = ((self.stat[Stat::Conflict as usize] as f64
-                    / self.next_reduction as f64)
+                self.meta.next_reduction = 2000;
+                self.meta.cur_restart = ((self.stat[Stat::Conflict as usize] as f64
+                    / self.meta.next_reduction as f64)
                     + 1.0) as usize;
                 self.config.inc_reduce_db = 0;
             }
@@ -433,9 +289,9 @@ impl Solver {
             }
             _ => (),
         }
-        self.ema_asg.reset();
-        self.ema_lbd.reset();
-        self.lbd_queue.clear();
+        self.profile.ema_asg.reset();
+        self.profile.ema_lbd.reset();
+        self.meta.lbd_queue.clear();
         self.stat[Stat::SumLBD as usize] = 0;
         self.stat[Stat::Conflict as usize] = 0;
         let [_, ref mut learnts, ref mut permanents, _] = self.cp;
@@ -471,7 +327,16 @@ impl SatSolver for Solver {
         // TODO: deal with assumptions
         // s.root_level = 0;
         self.config.num_solved_vars = self.asgs.len();
-        self.progress("");
+        progress(
+            &self.asgs,
+            &mut self.config,
+            &self.cp,
+            &self.eliminator,
+            &self.vars,
+            &mut self.profile,
+            &self.stat,
+            Some(""),
+        );
         // self.eliminator.use_elim = true;
         self.eliminator.var_queue.clear();
         if self.eliminator.use_elim {
@@ -493,7 +358,16 @@ impl SatSolver for Solver {
                     self.eliminator.enqueue_var(v);
                 }
             }
-            self.progress("load");
+            progress(
+                &self.asgs,
+                &mut self.config,
+                &self.cp,
+                &self.eliminator,
+                &self.vars,
+                &mut self.profile,
+                &self.stat,
+                Some("load"),
+            );
             self.cp.simplify(
                 &mut self.asgs,
                 &mut self.config,
@@ -501,9 +375,27 @@ impl SatSolver for Solver {
                 &mut self.stat,
                 &mut self.vars,
             );
-            self.progress("simp");
+            progress(
+                &self.asgs,
+                &mut self.config,
+                &self.cp,
+                &self.eliminator,
+                &self.vars,
+                &mut self.profile,
+                &self.stat,
+                Some("simp"),
+            );
         } else {
-            self.progress("load");
+            progress(
+                &self.asgs,
+                &mut self.config,
+                &self.cp,
+                &self.eliminator,
+                &self.vars,
+                &mut self.profile,
+                &self.stat,
+                Some("load"),
+            );
         }
         // self.config.use_sve = false;
         // self.eliminator.use_elim = false;
@@ -512,10 +404,28 @@ impl SatSolver for Solver {
             if !self.config.ok {
                 self.asgs
                     .cancel_until(&mut self.vars, &mut self.var_order, 0);
-                self.progress("error");
+                progress(
+                    &self.asgs,
+                    &mut self.config,
+                    &self.cp,
+                    &self.eliminator,
+                    &self.vars,
+                    &mut self.profile,
+                    &self.stat,
+                    Some("error"),
+                );
                 return Err(SolverException::InternalInconsistent);
             }
-            self.progress(self.config.strategy.to_str());
+            progress(
+                &self.asgs,
+                &mut self.config,
+                &self.cp,
+                &self.eliminator,
+                &self.vars,
+                &mut self.profile,
+                &self.stat,
+                None,
+            );
             let mut result = Vec::new();
             for vi in 1..=self.config.num_vars {
                 match self.vars[vi].assign {
@@ -531,7 +441,16 @@ impl SatSolver for Solver {
                 .cancel_until(&mut self.vars, &mut self.var_order, 0);
             Ok(Certificate::SAT(result))
         } else {
-            self.progress(self.config.strategy.to_str());
+            progress(
+                &self.asgs,
+                &mut self.config,
+                &self.cp,
+                &self.eliminator,
+                &self.vars,
+                &mut self.profile,
+                &self.stat,
+                None,
+            );
             self.asgs
                 .cancel_until(&mut self.vars, &mut self.var_order, 0);
             Ok(Certificate::UNSAT(
@@ -691,13 +610,13 @@ impl CDCL for Solver {
                 // DYNAMIC FORCING RESTART
                 if (self.config.luby_restart && self.config.luby_restart_num_conflict <= conflict_c)
                     || (!self.config.luby_restart
-                        && self.lbd_queue.is_full(LBD_QUEUE_LEN)
+                        && self.meta.lbd_queue.is_full(LBD_QUEUE_LEN)
                         && ((self.stat[Stat::SumLBD as usize] as f64)
                             / (self.stat[Stat::Conflict as usize] as f64)
-                            < self.lbd_queue.average() * self.config.restart_thr))
+                            < self.meta.lbd_queue.average() * self.config.restart_thr))
                 {
                     self.stat[Stat::Restart as usize] += 1;
-                    self.lbd_queue.clear();
+                    self.meta.lbd_queue.clear();
                     self.asgs
                         .cancel_until(&mut self.vars, &mut self.var_order, 0);
 
@@ -752,13 +671,15 @@ impl CDCL for Solver {
                 }
                 let dl = self.asgs.level();
                 if dl == self.config.root_level {
-                    analyze_final(&self.asgs,
-                                  &self.cp,
-                                  &self.vars,
-                                  &mut self.conflicts,
-                                  &mut self.config,
-                                  ci,
-                                  false);
+                    analyze_final(
+                        &self.asgs,
+                        &self.cp,
+                        &self.vars,
+                        &mut self.conflicts,
+                        &mut self.config,
+                        ci,
+                        false,
+                    );
                     return false;
                 }
                 if self.stat[Stat::Conflict as usize] % 5000 == 0
@@ -772,14 +693,14 @@ impl CDCL for Solver {
                 //     self.trail.len() - self.trail_lim[0]
                 // };
                 let real_len = self.asgs.len();
-                self.trail_queue.enqueue(TRAIL_QUEUE_LEN, real_len);
+                self.meta.trail_queue.enqueue(TRAIL_QUEUE_LEN, real_len);
                 // DYNAMIC BLOCKING RESTART
                 let count = self.stat[Stat::Conflict as usize] as u64;
                 if 100 < count
-                    && self.lbd_queue.is_full(LBD_QUEUE_LEN)
-                    && self.config.restart_blk * self.trail_queue.average() < (real_len as f64)
+                    && self.meta.lbd_queue.is_full(LBD_QUEUE_LEN)
+                    && self.config.restart_blk * self.meta.trail_queue.average() < (real_len as f64)
                 {
-                    self.lbd_queue.clear();
+                    self.meta.lbd_queue.clear();
                     self.stat[Stat::BlockRestart as usize] += 1;
                 }
                 let mut new_learnt: Vec<Lit> = Vec::new();
@@ -803,7 +724,9 @@ impl CDCL for Solver {
                     let l = new_learnt[0];
                     self.asgs.uncheck_enqueue(&mut self.vars, l, NULL_CLAUSE);
                 } else {
-                    let lbd = self.vars.compute_lbd(&new_learnt, &mut self.config.lbd_temp);
+                    let lbd = self
+                        .vars
+                        .compute_lbd(&new_learnt, &mut self.config.lbd_temp);
                     let v = &mut new_learnt;
                     let l0 = v[0];
                     let vlen = v.len();
@@ -833,11 +756,20 @@ impl CDCL for Solver {
                         );
                     }
                     self.asgs.uncheck_enqueue(&mut self.vars, l0, cid);
-                    self.lbd_queue.enqueue(LBD_QUEUE_LEN, lbd);
+                    self.meta.lbd_queue.enqueue(LBD_QUEUE_LEN, lbd);
                     self.stat[Stat::SumLBD as usize] += lbd as i64;
                 }
                 if self.stat[Stat::Conflict as usize] % 10_000 == 0 {
-                    self.progress(self.config.strategy.to_str());
+                    progress(
+                        &self.asgs,
+                        &mut self.config,
+                        &self.cp,
+                        &self.eliminator,
+                        &self.vars,
+                        &mut self.profile,
+                        &self.stat,
+                        None,
+                    );
                 }
                 if self.stat[Stat::Conflict as usize] == 100_000 {
                     self.asgs
@@ -860,34 +792,35 @@ impl CDCL for Solver {
                 self.config.cla_inc /= self.config.clause_decay_rate;
                 // glucose reduction
                 let conflicts = self.stat[Stat::Conflict as usize] as usize;
-                if self.cur_restart * self.next_reduction <= conflicts {
-                    self.cur_restart =
-                        ((conflicts as f64) / (self.next_reduction as f64)) as usize + 1;
+                if self.meta.cur_restart * self.meta.next_reduction <= conflicts {
+                    self.meta.cur_restart =
+                        ((conflicts as f64) / (self.meta.next_reduction as f64)) as usize + 1;
                     self.cp.reduce(
                         &mut self.eliminator,
                         &mut self.stat,
                         &mut self.vars,
-                        &mut self.next_reduction,
+                        &mut self.meta.next_reduction,
                         &mut self.config.lbd_temp,
                     );
-                    self.next_reduction += self.config.inc_reduce_db;
+                    self.meta.next_reduction += self.config.inc_reduce_db;
                 }
                 // Since the conflict path pushes a new literal to trail,
                 // we don't need to pick up a literal here.
             }
         }
     }
-
 }
 
-fn analyze(asgs: &mut AssignStack,
-           config: &mut SolverConfiguration,
-           cp: &mut [ClausePartition],
-           stat: &mut [i64],
-           vars: &mut [Var],
-           var_order: &mut VarIdHeap,
-           confl: ClauseId,
-           learnt: &mut Vec<Lit>) -> usize {
+fn analyze(
+    asgs: &mut AssignStack,
+    config: &mut SolverConfiguration,
+    cp: &mut [ClausePartition],
+    stat: &mut [i64],
+    vars: &mut [Var],
+    var_order: &mut VarIdHeap,
+    confl: ClauseId,
+    learnt: &mut Vec<Lit>,
+) -> usize {
     learnt.push(0);
     let dl = asgs.level();
     let mut cid: usize = confl;
@@ -1030,12 +963,14 @@ fn analyze(asgs: &mut AssignStack,
 }
 
 /// renamed from litRedundant
-fn analyze_removable(cp: &mut [ClausePartition],
-                     vars: &[Var],
-                     an_seen: &mut [bool],
-                     l: Lit,
-                     to_clear: &mut Vec<Lit>,
-                     level_map: &[bool]) -> bool {
+fn analyze_removable(
+    cp: &mut [ClausePartition],
+    vars: &[Var],
+    an_seen: &mut [bool],
+    l: Lit,
+    to_clear: &mut Vec<Lit>,
+    level_map: &[bool],
+) -> bool {
     let mut stack = Vec::new();
     stack.push(l);
     let top = to_clear.len();
@@ -1318,13 +1253,15 @@ pub fn propagate_0(
     NULL_CLAUSE
 }
 
-fn analyze_final(asgs: &AssignStack,
-                 cp: &[ClausePartition],
-                 vars: &[Var],
-                 conflicts: &mut Vec<Lit>,
-                 config: &mut SolverConfiguration,
-                 ci: ClauseId,
-                 skip_first: bool) {
+fn analyze_final(
+    asgs: &AssignStack,
+    cp: &[ClausePartition],
+    vars: &[Var],
+    conflicts: &mut Vec<Lit>,
+    config: &mut SolverConfiguration,
+    ci: ClauseId,
+    skip_first: bool,
+) {
     let mut seen = vec![false; config.num_vars + 1];
     conflicts.clear();
     if config.root_level != 0 {
@@ -1361,10 +1298,12 @@ fn analyze_final(asgs: &AssignStack,
     }
 }
 
-fn minimize_with_bi_clauses(cp: &[ClausePartition],
-                            vars: &[Var],
-                            lbd_temp: &mut [usize],
-                            vec: &mut Vec<Lit>) {
+fn minimize_with_bi_clauses(
+    cp: &[ClausePartition],
+    vars: &[Var],
+    lbd_temp: &mut [usize],
+    vec: &mut Vec<Lit>,
+) {
     let nblevels = vars.compute_lbd(vec, lbd_temp);
     if 6 < nblevels {
         return;
@@ -1391,4 +1330,168 @@ fn minimize_with_bi_clauses(cp: &[ClausePartition],
         vec.retain(|l| lbd_temp[l.vi()] == key);
     }
     lbd_temp[0] = key;
+}
+
+// print a progress report
+fn progress(
+    asgs: &AssignStack,
+    config: &mut SolverConfiguration,
+    cp: &[ClausePartition],
+    eliminator: &Eliminator,
+    vars: &[Var],
+    profile: &mut Profile,
+    stat: &[i64],
+    mes: Option<&str>,
+) {
+    profile.progress_cnt += 1;
+    // if self.progress_cnt % 16 == 0 {
+    //     self.dump_cnf(format!("G2-p{:>3}.cnf", self.progress_cnt).to_string());
+    // }
+    let nv = vars.len() - 1;
+    let fixed = if asgs.is_zero() {
+        asgs.len()
+    } else {
+        asgs.num_at(0)
+    };
+    let sum = fixed + eliminator.eliminated_vars;
+    let learnts = &cp[ClauseKind::Removable as usize];
+    let good = learnts
+        .head
+        .iter()
+        .skip(1)
+        .filter(|c| !c.get_flag(ClauseFlag::Dead) && c.rank <= 3)
+        .count();
+    if config.use_tty {
+        if mes == Some("") {
+            println!("{}", profile);
+            println!();
+            println!();
+            println!();
+            println!();
+            println!();
+            println!();
+        } else {
+            print!("\x1B[7A");
+            let msg = match mes {
+                None => config.strategy.to_str(),
+                Some(x) => x,
+            };
+            println!("{}, State:{:>6}", profile, msg,);
+            println!(
+                "#propagate:{:>14}, #decision:{:>13}, #conflict: {:>12}",
+                stat[Stat::Propagation as usize],
+                stat[Stat::Decision as usize],
+                stat[Stat::Conflict as usize],
+            );
+            println!(
+                "  Assignment|#rem:{:>9}, #fix:{:>9}, #elm:{:>9}, prog%:{:>8.4}",
+                nv - sum,
+                fixed,
+                eliminator.eliminated_vars,
+                (sum as f32) / (nv as f32) * 100.0,
+            );
+            println!(
+                "   Clause DB|Remv:{:>9}, good:{:>9}, Perm:{:>9}, Binc:{:>9}",
+                cp[ClauseKind::Removable as usize]
+                    .head
+                    .iter()
+                    .skip(1)
+                    .filter(|c| !c.get_flag(ClauseFlag::Dead))
+                    .count(),
+                good,
+                cp[ClauseKind::Permanent as usize]
+                    .head
+                    .iter()
+                    .skip(1)
+                    .filter(|c| !c.get_flag(ClauseFlag::Dead))
+                    .count(),
+                cp[ClauseKind::Binclause as usize]
+                    .head
+                    .iter()
+                    .skip(1)
+                    .filter(|c| !c.get_flag(ClauseFlag::Dead))
+                    .count(),
+            );
+            println!(
+                "     Restart|#BLK:{:>9}, #RST:{:>9}, emaASG:{:>7.2}, emaLBD:{:>7.2}",
+                stat[Stat::BlockRestart as usize],
+                stat[Stat::Restart as usize],
+                profile.ema_asg.get(),
+                profile.ema_lbd.get(),
+            );
+            println!(
+                " Decision Lv|aLBD:{:>9.2}, bjmp:{:>9.2}, cnfl:{:>9.2} |#rdc:{:>9}",
+                profile.ema_lbd.slow,
+                profile.b_lvl.0,
+                profile.c_lvl.0,
+                stat[Stat::Reduction as usize],
+            );
+            println!(
+                "  Eliminator|#cls:{:>9}, #var:{:>9},   Clause DB mgr|#smp:{:>9}",
+                eliminator.clause_queue_len(),
+                eliminator.var_queue_len(),
+                stat[Stat::Simplification as usize],
+            );
+        }
+    } else if mes == Some("") {
+        println!(
+            "   #mode,      Variable Assignment      ,,  \
+             Clause Database Management  ,,   Restart Strategy      ,, \
+             Misc Progress Parameters,,  Eliminator"
+        );
+        println!(
+            "   #init,#remain,#solved,   #elim,total%,,#learnt,(good),  \
+             #perm,#binary,,block,force, asgn/,  lbd/,,    lbd, \
+             back lv, conf lv,,clause,   var"
+        );
+    } else {
+        let msg = match mes {
+            None => config.strategy.to_str(),
+            Some(x) => x,
+        };
+        println!(
+            "{:>3}#{:<5},{:>7},{:>7},{:>7},{:>6.3},,{:>7},{:>6},{:>7},\
+             {:>7},,{:>5},{:>5}, {:>5.2},{:>6.2},,{:>7.2},{:>8.2},{:>8.2},,\
+             {:>6},{:>6}",
+            profile.progress_cnt,
+            msg,
+            nv - sum,
+            fixed,
+            eliminator.eliminated_vars,
+            (sum as f32) / (nv as f32) * 100.0,
+            cp[ClauseKind::Removable as usize]
+                .head
+                .iter()
+                .skip(1)
+                .filter(|c| !c.get_flag(ClauseFlag::Dead))
+                .count(),
+            good,
+            cp[ClauseKind::Permanent as usize]
+                .head
+                .iter()
+                .skip(1)
+                .filter(|c| !c.get_flag(ClauseFlag::Dead))
+                .count(),
+            cp[ClauseKind::Binclause as usize]
+                .head
+                .iter()
+                .skip(1)
+                .filter(|c| !c.get_flag(ClauseFlag::Dead))
+                .count(),
+            stat[Stat::BlockRestart as usize],
+            stat[Stat::Restart as usize],
+            profile.ema_asg.get(),
+            profile.ema_lbd.get(),
+            profile.ema_lbd.slow,
+            profile.b_lvl.0,
+            profile.c_lvl.0,
+            eliminator.clause_queue_len(),
+            eliminator.var_queue_len(),
+        );
+
+        // if self.profile.progress_cnt == -1 {
+        //     self.dump_cnf(format!("test-{}.cnf", self.profile.progress_cnt).to_string());
+        //     panic!("aa");
+        // }
+    }
 }

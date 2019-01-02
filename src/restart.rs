@@ -55,21 +55,21 @@ impl Restart for Solver {
     /// called after conflict resolution
     fn block_restart(&mut self, lbd: usize, clv: usize, blv: usize, nas: usize) {
         let count = self.stat[Stat::Conflict as usize] as u64;
-        self.c_lvl.update(clv as f64);
-        self.b_lvl.update(blv as f64);
-        self.ema_asg.update(nas as f64);
-        self.ema_lbd.update(lbd as f64);
+        self.profile.c_lvl.update(clv as f64);
+        self.profile.b_lvl.update(blv as f64);
+        self.profile.ema_asg.update(nas as f64);
+        self.profile.ema_lbd.update(lbd as f64);
         if count <= RESET_EMA {
             if count == RESET_EMA {
-                self.ema_asg.reset();
-                self.ema_lbd.reset();
-                self.c_lvl.reset();
-                self.b_lvl.reset();
+                self.profile.ema_asg.reset();
+                self.profile.ema_lbd.reset();
+                self.profile.c_lvl.reset();
+                self.profile.b_lvl.reset();
             }
             return;
         }
-        if self.next_restart <= count && self.config.restart_blk < self.ema_asg.get() {
-            self.next_restart = count + RESTART_PERIOD;
+        if self.meta.next_restart <= count && self.config.restart_blk < self.profile.ema_asg.get() {
+            self.meta.next_restart = count + RESTART_PERIOD;
             self.stat[Stat::BlockRestart as usize] += 1;
         }
     }
@@ -78,10 +78,10 @@ impl Restart for Solver {
     fn force_restart(&mut self) {
         let count = self.stat[Stat::Conflict as usize] as u64;
         if RESET_EMA < count
-            && self.next_restart < count
-            && self.config.restart_thr < self.ema_lbd.get()
+            && self.meta.next_restart < count
+            && self.config.restart_thr < self.profile.ema_lbd.get()
         {
-            self.next_restart = count + RESTART_PERIOD;
+            self.meta.next_restart = count + RESTART_PERIOD;
             self.stat[Stat::Restart as usize] += 1;
             self.asgs
                 .cancel_until(&mut self.vars, &mut self.var_order, self.config.root_level);
