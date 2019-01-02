@@ -1051,7 +1051,7 @@ pub fn propagate_0(
                         ref flags,
                         ..
                     } = &mut (*head)[*pre];
-                    debug_assert!(lit[0] == false_lit || lit[1] == false_lit);
+                    // debug_assert!(lit[0] == false_lit || lit[1] == false_lit);
                     let my_index = (lit[0] != false_lit) as usize;
                     // Handling a special case for simplify
                     if flags & (1 << ClauseFlag::Dead as u16) != 0 {
@@ -1059,18 +1059,17 @@ pub fn propagate_0(
                         continue 'next_clause;
                     }
                     // check other's aliveness
-                    debug_assert!(!vars[lit[(my_index == 0) as usize].vi()].eliminated);
+                    // debug_assert!(!vars[lit[(my_index == 0) as usize].vi()].eliminated);
                     let other_value = vars.assigned(lit[(my_index == 0) as usize]);
                     if other_value != LTRUE {
-                        debug_assert!(2 <= lits.len());
-                        debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
+                        // debug_assert!(2 <= lits.len());
+                        // debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
                         if lits[0] == false_lit {
                             lits.swap(0, 1); // now false_lit is lits[1].
                         }
                         for (k, lk) in lits.iter().enumerate().skip(2) {
+                            // debug_assert!(!vars[lk.vi()].eliminated);
                             // below is equivalent to 'assigned(lk) != LFALSE'
-                            debug_assert!(1 < *lk);
-                            debug_assert!(!vars[lk.vi()].eliminated);
                             if (((lk & 1) as u8) ^ vars[lk.vi()].assign) != 0 {
                                 let cix = *pre;
                                 *pre = next_watcher[my_index];
