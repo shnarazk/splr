@@ -235,88 +235,6 @@ impl Solver {
             profile: Profile::new(se, &path.to_string()),
         }
     }
-
-    pub fn adapt_strategy(&mut self) {
-        if !self.config.adapt_strategy {
-            return;
-        }
-        let mut re_init = false;
-        let decpc =
-            self.stat[Stat::Decision as usize] as f64 / self.stat[Stat::Conflict as usize] as f64;
-        if decpc <= 1.2 {
-            self.config.strategy = SearchStrategy::LowDecisions;
-            re_init = true;
-        } else if self.stat[Stat::NoDecisionConflict as usize] < 30_000 {
-            self.config.strategy = SearchStrategy::LowSuccesive;
-        } else if self.stat[Stat::NoDecisionConflict as usize] > 54_400 {
-            self.config.strategy = SearchStrategy::HighSuccesive;
-        } else if self.stat[Stat::NumLBD2 as usize] - self.stat[Stat::NumBin as usize] > 20_000 {
-            self.config.strategy = SearchStrategy::ManyGlues;
-        } else {
-            self.config.strategy = SearchStrategy::Generic;
-            return;
-        }
-        match self.config.strategy {
-            SearchStrategy::LowDecisions => {
-                self.config.use_chan_seok = true;
-                self.config.co_lbd_bound = 4;
-                let _glureduce = true;
-                self.config.first_reduction = 2000;
-                self.meta.next_reduction = 2000;
-                self.meta.cur_restart = ((self.stat[Stat::Conflict as usize] as f64
-                    / self.meta.next_reduction as f64)
-                    + 1.0) as usize;
-                self.config.inc_reduce_db = 0;
-            }
-            SearchStrategy::LowSuccesive => {
-                self.config.luby_restart = true;
-                self.config.luby_restart_factor = 100.0;
-                self.config.var_decay = 0.999;
-                self.config.var_decay_max = 0.999;
-            }
-            SearchStrategy::HighSuccesive => {
-                self.config.use_chan_seok = true;
-                let _glureduce = true;
-                self.config.co_lbd_bound = 3;
-                self.config.first_reduction = 30000;
-                self.config.var_decay = 0.99;
-                self.config.var_decay_max = 0.99;
-                // randomize_on_restarts = 1;
-            }
-            SearchStrategy::ManyGlues => {
-                self.config.var_decay = 0.91;
-                self.config.var_decay_max = 0.91;
-            }
-            _ => (),
-        }
-        self.profile.ema_asg.reset();
-        self.profile.ema_lbd.reset();
-        self.meta.lbd_queue.clear();
-        self.stat[Stat::SumLBD as usize] = 0;
-        self.stat[Stat::Conflict as usize] = 0;
-        let [_, ref mut learnts, ref mut permanents, _] = self.cp;
-        if self.config.strategy == SearchStrategy::LowDecisions
-            || self.config.strategy == SearchStrategy::HighSuccesive
-        {
-            // TODO incReduceDB = 0;
-            // println!("# Adjusting for low decision levels.");
-            // move some clauses with good lbd (col_lbd_bound) to Permanent
-            for ch in &mut learnts.head[1..] {
-                if ch.get_flag(ClauseFlag::Dead) {
-                    continue;
-                }
-                if ch.rank <= self.config.co_lbd_bound || re_init {
-                    if ch.rank <= self.config.co_lbd_bound {
-                        permanents.new_clause(&ch.lits, ch.rank);
-                    }
-                    learnts.touched[ch.lit[0].negate() as usize] = true;
-                    learnts.touched[ch.lit[1].negate() as usize] = true;
-                    ch.flag_on(ClauseFlag::Dead);
-                }
-            }
-            learnts.garbage_collect(&mut self.vars, &mut self.eliminator);
-        }
-    }
 }
 
 impl SatSolver for Solver {
@@ -782,7 +700,15 @@ impl CDCL for Solver {
                         &mut self.vars,
                     );
                     // self.rebuild_heap();
-                    self.adapt_strategy();
+                    adapt_strategy(
+                        &mut self.config,
+                        &mut self.cp,
+                        &mut self.eliminator,
+                        &mut self.vars,
+                        &mut self.meta,
+                        &mut self.profile,
+                        &mut self.stat,
+                    );
                     // } else if 0 < lbd {
                     //     self.block_restart(lbd, dl, bl, nas);
                 }
@@ -1330,6 +1256,96 @@ fn minimize_with_bi_clauses(
         vec.retain(|l| lbd_temp[l.vi()] == key);
     }
     lbd_temp[0] = key;
+}
+
+fn adapt_strategy(
+    config: &mut SolverConfiguration,
+    cp: &mut [ClausePartition; 4],
+    eliminator: &mut Eliminator,
+    vars: &mut [Var],
+    meta: &mut MetaParameters,
+    profile: &mut Profile,
+    stat: &mut [i64])
+{
+    if !config.adapt_strategy {
+        return;
+    }
+    let mut re_init = false;
+    let decpc =
+        stat[Stat::Decision as usize] as f64 / stat[Stat::Conflict as usize] as f64;
+    if decpc <= 1.2 {
+        config.strategy = SearchStrategy::LowDecisions;
+        re_init = true;
+    } else if stat[Stat::NoDecisionConflict as usize] < 30_000 {
+        config.strategy = SearchStrategy::LowSuccesive;
+    } else if stat[Stat::NoDecisionConflict as usize] > 54_400 {
+        config.strategy = SearchStrategy::HighSuccesive;
+    } else if stat[Stat::NumLBD2 as usize] - stat[Stat::NumBin as usize] > 20_000 {
+        config.strategy = SearchStrategy::ManyGlues;
+    } else {
+        config.strategy = SearchStrategy::Generic;
+        return;
+    }
+    match config.strategy {
+        SearchStrategy::LowDecisions => {
+            config.use_chan_seok = true;
+            config.co_lbd_bound = 4;
+            let _glureduce = true;
+            config.first_reduction = 2000;
+            meta.next_reduction = 2000;
+            meta.cur_restart = ((stat[Stat::Conflict as usize] as f64
+                / meta.next_reduction as f64)
+                + 1.0) as usize;
+            config.inc_reduce_db = 0;
+        }
+        SearchStrategy::LowSuccesive => {
+            config.luby_restart = true;
+            config.luby_restart_factor = 100.0;
+            config.var_decay = 0.999;
+            config.var_decay_max = 0.999;
+        }
+        SearchStrategy::HighSuccesive => {
+            config.use_chan_seok = true;
+            let _glureduce = true;
+            config.co_lbd_bound = 3;
+            config.first_reduction = 30000;
+            config.var_decay = 0.99;
+            config.var_decay_max = 0.99;
+            // randomize_on_restarts = 1;
+        }
+        SearchStrategy::ManyGlues => {
+            config.var_decay = 0.91;
+            config.var_decay_max = 0.91;
+        }
+        _ => (),
+    }
+    profile.ema_asg.reset();
+    profile.ema_lbd.reset();
+    meta.lbd_queue.clear();
+    stat[Stat::SumLBD as usize] = 0;
+    stat[Stat::Conflict as usize] = 0;
+    let [_, learnts, permanents, _] = cp;
+    if config.strategy == SearchStrategy::LowDecisions
+        || config.strategy == SearchStrategy::HighSuccesive
+    {
+        // TODO incReduceDB = 0;
+        // println!("# Adjusting for low decision levels.");
+        // move some clauses with good lbd (col_lbd_bound) to Permanent
+        for ch in &mut learnts.head[1..] {
+            if ch.get_flag(ClauseFlag::Dead) {
+                continue;
+            }
+            if ch.rank <= config.co_lbd_bound || re_init {
+                if ch.rank <= config.co_lbd_bound {
+                    permanents.new_clause(&ch.lits, ch.rank);
+                }
+                learnts.touched[ch.lit[0].negate() as usize] = true;
+                learnts.touched[ch.lit[1].negate() as usize] = true;
+                ch.flag_on(ClauseFlag::Dead);
+            }
+        }
+        learnts.garbage_collect(vars, eliminator);
+    }
 }
 
 // print a progress report
