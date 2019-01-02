@@ -4,12 +4,12 @@ use std::fs::File;
 use std::io::{BufWriter, Write};
 use structopt::StructOpt;
 
-// const VERSION: &str = "Splr-0.0.11 (Technology Preview 11) by shnarazk@gitlab.com";
+// const VERSION: &str = "Splr-0.0.11 (Technology Preview 12) by shnarazk@gitlab.com";
 
 #[derive(StructOpt)]
 #[structopt(
     name = "splr",
-    about = "SAT solver for Propositional Logic in Rust, Technology Preview 11"
+    about = "SAT solver for Propositional Logic in Rust, Technology Preview 12"
 )]
 struct CLOpts {
     /// K in Glucose, for restart

@@ -102,7 +102,7 @@ dependencies = [
 
 [[package]]
 name = "splr"
-version = "0.0.11"
+version = "0.0.12"
 dependencies = [
  "chrono 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "structopt 0.2.14 (registry+https://github.com/rust-lang/crates.io-index)",
