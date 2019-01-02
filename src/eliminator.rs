@@ -27,7 +27,6 @@ pub trait EliminatorIF {
         cp: &mut [ClausePartition],
         stat: &mut [i64],
         vars: &mut [Var],
-        ok: &mut bool,
     );
     fn extend_model(&mut self, model: &mut Vec<i32>);
 }
@@ -262,7 +261,6 @@ impl EliminatorIF for Eliminator {
         cp: &mut [ClausePartition],
         stat: &mut [i64],
         vars: &mut [Var],
-        ok: &mut bool,
     ) {
         if !self.use_elim {
             return;
@@ -289,9 +287,9 @@ impl EliminatorIF for Eliminator {
         {
             // self.gather_touched_clauses();
             if (!self.clause_queue.is_empty() || self.bwdsub_assigns < asgs.len())
-                && !self.backward_subsumption_check(asgs, cp, stat, vars, ok)
+                && !self.backward_subsumption_check(asgs, cp, stat, vars, &mut config.ok)
             {
-                *ok = false;
+                config.ok = false;
                 break 'perform;
             }
             while !self.var_queue.is_empty() {
@@ -301,8 +299,8 @@ impl EliminatorIF for Eliminator {
                     continue;
                 }
                 // FIXME!
-                if !eliminate_var(asgs, config, cp, self, stat, vars, ok, elim) {
-                    *ok = false;
+                if !eliminate_var(asgs, config, cp, self, stat, vars, elim) {
+                    config.ok = false;
                     break 'perform;
                 }
             }
@@ -688,7 +686,6 @@ pub fn eliminate_var(
     eliminator: &mut Eliminator,
     stat: &mut [i64],
     vars: &mut [Var],
-    ok: &mut bool,
     v: VarId,
 ) -> bool {
     if vars[v].assign != BOTTOM {
@@ -717,7 +714,7 @@ pub fn eliminate_var(
             if !asgs.enqueue_null(&mut vars[v], LFALSE, 0)
                 || propagate_0(cp, stat, vars, asgs) != NULL_CLAUSE
             {
-                *ok = false;
+                config.ok = false;
                 return false;
             }
             return true;
@@ -727,7 +724,7 @@ pub fn eliminate_var(
             if !asgs.enqueue_null(&mut vars[v], LTRUE, 0)
                 || propagate_0(cp, stat, vars, asgs) != NULL_CLAUSE
             {
-                *ok = false;
+                config.ok = false;
                 // panic!("eliminate_var: failed to enqueue & propagate");
                 return false;
             }
@@ -817,7 +814,7 @@ pub fn eliminate_var(
                                 // );
                                 let lit = vec[0];
                                 if !asgs.enqueue_null(&mut vars[lit.vi()], lit.lbool(), 0) {
-                                    *ok = false;
+                                    config.ok = false;
                                     // panic!("eliminate_var: failed to enqueue & propagate");
                                     return false;
                                 }
@@ -877,9 +874,9 @@ pub fn eliminate_var(
         vars[v].pos_occurs.clear();
         vars[v].neg_occurs.clear();
         if propagate_0(cp, stat, vars, asgs) != NULL_CLAUSE {
-            *ok = false;
+            config.ok = false;
             return false;
         }
-        eliminator.backward_subsumption_check(asgs, cp, stat, vars, ok)
+        eliminator.backward_subsumption_check(asgs, cp, stat, vars, &mut config.ok)
     }
 }

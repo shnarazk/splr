@@ -84,7 +84,7 @@ impl Restart for Solver {
             self.next_restart = count + RESTART_PERIOD;
             self.stat[Stat::Restart as usize] += 1;
             self.asgs
-                .cancel_until(&mut self.vars, &mut self.var_order, self.root_level);
+                .cancel_until(&mut self.vars, &mut self.var_order, self.config.root_level);
         }
     }
 }

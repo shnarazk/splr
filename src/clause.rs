@@ -42,8 +42,6 @@ pub trait ClauseManagement {
         eliminator: &mut Eliminator,
         stat: &mut [i64],
         vars: &mut [Var],
-        lbd_temp: &mut [usize],
-        ok: &mut bool,
     ) -> bool;
 }
 
@@ -740,10 +738,8 @@ impl ClauseManagement for [ClausePartition] {
         eliminator: &mut Eliminator,
         stat: &mut [i64],
         vars: &mut [Var],
-        lbd_temp: &mut [usize],
-        ok: &mut bool,
     ) -> bool {
-        self[ClauseKind::Removable as usize].reset_lbd(vars, lbd_temp);
+        self[ClauseKind::Removable as usize].reset_lbd(vars, &mut config.lbd_temp);
         debug_assert_eq!(asgs.level(), 0);
         // reset reason since decision level is zero.
         for v in &mut vars[1..] {
@@ -755,9 +751,9 @@ impl ClauseManagement for [ClausePartition] {
         // && self.stat[Stat::Simplification as usize] % 8 == 0
         // && self.eliminator.last_invocatiton < self.stat[Stat::Reduction as usize] as usize
         {
-            eliminator.eliminate(asgs, config, self, stat, vars, ok);
+            eliminator.eliminate(asgs, config, self, stat, vars);
             eliminator.last_invocatiton = stat[Stat::Reduction as usize] as usize;
-            if !*ok {
+            if !config.ok {
                 return false;
             }
         }
