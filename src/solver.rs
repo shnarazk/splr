@@ -171,16 +171,14 @@ impl Default for MetaParameters {
 /// is the collection of all variables.
 pub struct Solver {
     /// major sub modules
-    pub config: SolverConfiguration, // Configuration
     pub asgs: AssignStack,
-    pub cp: ClauseDB,           // Clauses
-    pub eliminator: Eliminator, // Clause/Variable Elimination
-    pub vars: Vec<Var>,         // Variables
-    /// Variable Order
-    pub var_order: VarIdHeap,
+    pub config: SolverConfiguration, // Configuration
+    pub cp: ClauseDB,                // Clauses
+    pub eliminator: Eliminator,      // Clause/Variable Elimination
     pub meta: MetaParameters,
     /// Working memory
     pub profile: Profile,
+    pub vars: Vec<Var>, // Variables
 }
 
 const LBD_QUEUE_LEN: usize = 50;
@@ -194,8 +192,8 @@ impl Solver {
         let (_fe, se) = cfg.ema_coeffs;
         let sve = cfg.use_sve;
         Solver {
-            config: cfg,
             asgs: AssignStack::new(nv),
+            config: cfg,
             cp: [
                 ClausePartition::build(ClauseKind::Liftedlit, nv, 0),
                 ClausePartition::build(ClauseKind::Removable, nv, nc),
@@ -203,10 +201,9 @@ impl Solver {
                 ClausePartition::build(ClauseKind::Binclause, nv, 256),
             ],
             eliminator: Eliminator::new(sve),
-            vars: Var::new_vars(nv),
-            var_order: VarIdHeap::new(nv, nv),
             meta: MetaParameters::default(),
-            profile: Profile::new(se, &path.to_string()),
+            profile: Profile::new(nv, se, &path.to_string()),
+            vars: Var::new_vars(nv),
         }
     }
 }
@@ -221,7 +218,6 @@ impl SatSolver for Solver {
             ref mut meta,
             ref mut profile,
             ref mut vars,
-            ref mut var_order,
         } = self;
         if !config.ok {
             return Ok(Certificate::UNSAT(Vec::new()));
@@ -260,16 +256,21 @@ impl SatSolver for Solver {
         // self.config.use_sve = false;
         // self.eliminator.use_elim = false;
         profile.stat[Stat::Simplification as usize] += 1;
-        if search(asgs, config, cp, eliminator, meta, profile, vars, var_order) {
+        if search(asgs, config, cp, eliminator, meta, profile, vars) {
             if !config.ok {
-                asgs.cancel_until(vars, var_order, 0);
+                asgs.cancel_until(vars, &mut profile.var_order, 0);
                 progress(asgs, config, cp, eliminator, profile, vars, Some("error"));
                 return Err(SolverException::InternalInconsistent);
             }
             progress(asgs, config, cp, eliminator, profile, vars, None);
             let mut result = Vec::new();
-            for vi in 1..=self.config.num_vars {
-                match vars[vi].assign {
+            for (vi, v) in vars
+                .iter()
+                .enumerate()
+                .take(self.config.num_vars + 1)
+                .skip(1)
+            {
+                match v.assign {
                     LTRUE => result.push(vi as i32),
                     LFALSE => result.push(0 - vi as i32),
                     _ => result.push(0),
@@ -278,11 +279,11 @@ impl SatSolver for Solver {
             if eliminator.use_elim {
                 eliminator.extend_model(&mut result);
             }
-            asgs.cancel_until(vars, var_order, 0);
+            asgs.cancel_until(vars, &mut profile.var_order, 0);
             Ok(Certificate::SAT(result))
         } else {
             progress(asgs, config, cp, eliminator, profile, vars, None);
-            self.asgs.cancel_until(vars, var_order, 0);
+            self.asgs.cancel_until(vars, &mut profile.var_order, 0);
             Ok(Certificate::UNSAT(
                 config.conflicts.iter().map(|l| l.int()).collect(),
             ))
@@ -408,7 +409,6 @@ fn search(
     meta: &mut MetaParameters,
     profile: &mut Profile,
     vars: &mut [Var],
-    var_order: &mut VarIdHeap,
 ) -> bool {
     let mut conflict_c = 0.0; // for Luby restart
     let mut a_decision_was_made = false;
@@ -444,7 +444,7 @@ fn search(
             {
                 profile.stat[Stat::Restart as usize] += 1;
                 meta.lbd_queue.clear();
-                asgs.cancel_until(vars, var_order, 0);
+                asgs.cancel_until(vars, &mut profile.var_order, 0);
                 if config.luby_restart {
                     conflict_c = 0.0;
                     config.luby_current_restarts += 1;
@@ -461,7 +461,7 @@ fn search(
                     return false;
                 }
                 config.num_solved_vars = asgs.len();
-                var_order.rebuild(&vars);
+                profile.var_order.rebuild(&vars);
             }
             // force_restart();
             if !asgs.remains() {
@@ -471,7 +471,7 @@ fn search(
                 // if na + ne >= num_vars {
                 //     panic!("na {} + ne {}", na, ne);
                 // }
-                let vi = var_order.select_var(&vars);
+                let vi = profile.var_order.select_var(&vars);
                 debug_assert_ne!(vi, 0);
                 let p = vars[vi].phase;
                 asgs.uncheck_assume(vars, eliminator, vi.lit(p));
@@ -513,18 +513,13 @@ fn search(
                 profile.stat[Stat::BlockRestart as usize] += 1;
             }
             let mut new_learnt: Vec<Lit> = Vec::new();
-            let bl = analyze(
-                asgs,
-                config,
-                cp,
-                profile,
-                vars,
-                var_order,
-                ci,
-                &mut new_learnt,
-            );
+            let bl = analyze(asgs, config, cp, profile, vars, ci, &mut new_learnt);
             // let nas = num_assigns();
-            asgs.cancel_until(vars, var_order, max(bl as usize, config.root_level));
+            asgs.cancel_until(
+                vars,
+                &mut profile.var_order,
+                max(bl as usize, config.root_level),
+            );
             if new_learnt.len() == 1 {
                 let l = new_learnt[0];
                 asgs.uncheck_enqueue(vars, l, NULL_CLAUSE);
@@ -566,7 +561,7 @@ fn search(
                 progress(asgs, config, cp, eliminator, profile, vars, None);
             }
             if profile.stat[Stat::Conflict as usize] == 100_000 {
-                asgs.cancel_until(vars, var_order, 0);
+                asgs.cancel_until(vars, &mut profile.var_order, 0);
                 cp.simplify(asgs, config, eliminator, profile, vars);
                 // rebuild_heap();
                 adapt_strategy(config, cp, eliminator, meta, profile, vars);
@@ -601,7 +596,6 @@ fn analyze(
     cp: &mut [ClausePartition],
     profile: &mut Profile,
     vars: &mut [Var],
-    var_order: &mut VarIdHeap,
     confl: ClauseId,
     learnt: &mut Vec<Lit>,
 ) -> usize {
@@ -657,7 +651,7 @@ fn analyze(
                 //     format!("analyze assertion: unassigned var {:?}", vars[vi])
                 // );
                 vars[vi].bump_activity(profile.stat[Stat::Conflict as usize] as f64);
-                var_order.update(vars, vi);
+                profile.var_order.update(vars, vi);
                 if !config.an_seen[vi] && 0 < lvl {
                     config.an_seen[vi] = true;
                     if dl <= lvl {
@@ -834,7 +828,7 @@ impl Solver {
         println!(
             "# nassigns {}, decision cands {}",
             self.asgs.len(),
-            self.var_order.len()
+            self.profile.var_order.len()
         );
         let v = self
             .asgs

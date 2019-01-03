@@ -77,15 +77,22 @@ impl Restart for Solver {
 
     /// called after no conflict propagation
     fn force_restart(&mut self) {
-        let count = self.profile.stat[Stat::Conflict as usize] as u64;
+        let Solver {
+            ref mut asgs,
+            ref mut config,
+            ref mut meta,
+            ref mut profile,
+            ref mut vars,
+            ..
+        } = self;
+        let count = profile.stat[Stat::Conflict as usize] as u64;
         if RESET_EMA < count
-            && self.meta.next_restart < count
-            && self.config.restart_thr < self.profile.ema_lbd.get()
+            && meta.next_restart < count
+            && config.restart_thr < profile.ema_lbd.get()
         {
-            self.meta.next_restart = count + RESTART_PERIOD;
-            self.profile.stat[Stat::Restart as usize] += 1;
-            self.asgs
-                .cancel_until(&mut self.vars, &mut self.var_order, self.config.root_level);
+            meta.next_restart = count + RESTART_PERIOD;
+            profile.stat[Stat::Restart as usize] += 1;
+            asgs.cancel_until(vars, &mut profile.var_order, config.root_level);
         }
     }
 }

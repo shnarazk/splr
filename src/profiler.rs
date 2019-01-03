@@ -1,4 +1,5 @@
 use crate::types::*;
+use crate::var::VarIdHeap;
 use chrono::*;
 use std::fmt;
 use std::path::Path;
@@ -22,7 +23,8 @@ pub enum Stat {
 }
 
 pub struct Profile {
-    pub stat: Vec<i64>, // statistics
+    pub var_order: VarIdHeap, // Variable Order
+    pub stat: Vec<i64>,       // statistics
     pub ema_asg: Ema2,
     pub ema_lbd: Ema2,
     pub b_lvl: Ema,
@@ -33,8 +35,9 @@ pub struct Profile {
 }
 
 impl Profile {
-    pub fn new(se: i32, fname: &str) -> Profile {
+    pub fn new(nv: usize, se: i32, fname: &str) -> Profile {
         Profile {
+            var_order: VarIdHeap::new(nv, nv),
             stat: vec![0; Stat::EndOfStatIndex as usize],
             ema_asg: Ema2::new(3.8, 50_000.0),   // for blocking 4
             ema_lbd: Ema2::new(160.0, 50_000.0), // for forcing 160
