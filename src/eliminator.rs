@@ -606,7 +606,7 @@ pub fn strengthen_clause(
         cp.remove_clause(cid);
         vars.detach_clause(cid, clause!(*cp, cid), eliminator);
         if asgs.enqueue_null(&mut vars[c0.vi()], c0.lbool(), 0)
-            && propagate_0(asgs, cp, vars, profile) == NULL_CLAUSE
+            && propagate_0(asgs, cp, profile, vars) == NULL_CLAUSE
         {
             cp[cid.to_kind()].touched[c0.negate() as usize] = true;
             true
@@ -683,7 +683,7 @@ pub fn eliminate_var(
         if (*pos).is_empty() && !(*neg).is_empty() {
             // println!("-v {} p {} n {}", v, (*pos).len(), (*neg).len());
             if !asgs.enqueue_null(&mut vars[v], LFALSE, 0)
-                || propagate_0(asgs, cp, vars, profile) != NULL_CLAUSE
+                || propagate_0(asgs, cp, profile, vars) != NULL_CLAUSE
             {
                 config.ok = false;
                 return false;
@@ -693,7 +693,7 @@ pub fn eliminate_var(
         if (*neg).is_empty() && (*pos).is_empty() {
             // println!("+v {} p {} n {}", v, (*pos).len(), (*neg).len());
             if !asgs.enqueue_null(&mut vars[v], LTRUE, 0)
-                || propagate_0(asgs, cp, vars, profile) != NULL_CLAUSE
+                || propagate_0(asgs, cp, profile, vars) != NULL_CLAUSE
             {
                 config.ok = false;
                 // panic!("eliminate_var: failed to enqueue & propagate");
@@ -838,7 +838,7 @@ pub fn eliminate_var(
         }
         vars[v].pos_occurs.clear();
         vars[v].neg_occurs.clear();
-        if propagate_0(asgs, cp, vars, profile) != NULL_CLAUSE {
+        if propagate_0(asgs, cp, profile, vars) != NULL_CLAUSE {
             config.ok = false;
             return false;
         }

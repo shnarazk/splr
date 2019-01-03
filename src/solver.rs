@@ -229,7 +229,7 @@ impl SatSolver for Solver {
         // TODO: deal with assumptions
         // s.root_level = 0;
         config.num_solved_vars = asgs.len();
-        progress(asgs, config, cp, eliminator, vars, profile, Some(""));
+        progress(asgs, config, cp, eliminator, profile, vars, Some(""));
         // eliminator.use_elim = true;
         eliminator.var_queue.clear();
         if eliminator.use_elim {
@@ -251,11 +251,11 @@ impl SatSolver for Solver {
                     eliminator.enqueue_var(v);
                 }
             }
-            progress(asgs, config, cp, eliminator, vars, profile, Some("load"));
+            progress(asgs, config, cp, eliminator, profile, vars, Some("load"));
             cp.simplify(asgs, config, eliminator, profile, vars);
-            progress(asgs, config, cp, eliminator, vars, profile, Some("simp"));
+            progress(asgs, config, cp, eliminator, profile, vars, Some("simp"));
         } else {
-            progress(asgs, config, cp, eliminator, vars, profile, Some("load"));
+            progress(asgs, config, cp, eliminator, profile, vars, Some("load"));
         }
         // self.config.use_sve = false;
         // self.eliminator.use_elim = false;
@@ -263,10 +263,10 @@ impl SatSolver for Solver {
         if search(asgs, config, cp, eliminator, meta, profile, vars, var_order) {
             if !config.ok {
                 asgs.cancel_until(vars, var_order, 0);
-                progress(asgs, config, cp, eliminator, vars, profile, Some("error"));
+                progress(asgs, config, cp, eliminator, profile, vars, Some("error"));
                 return Err(SolverException::InternalInconsistent);
             }
-            progress(asgs, config, cp, eliminator, vars, profile, None);
+            progress(asgs, config, cp, eliminator, profile, vars, None);
             let mut result = Vec::new();
             for vi in 1..=self.config.num_vars {
                 match vars[vi].assign {
@@ -281,7 +281,7 @@ impl SatSolver for Solver {
             asgs.cancel_until(vars, var_order, 0);
             Ok(Certificate::SAT(result))
         } else {
-            progress(asgs, config, cp, eliminator, vars, profile, None);
+            progress(asgs, config, cp, eliminator, profile, vars, None);
             self.asgs.cancel_until(vars, var_order, 0);
             Ok(Certificate::UNSAT(
                 config.conflicts.iter().map(|l| l.int()).collect(),
@@ -419,7 +419,7 @@ fn search(
     }
     loop {
         profile.stat[Stat::Propagation as usize] += 1;
-        let ci = propagate(asgs, cp, vars, profile);
+        let ci = propagate(asgs, cp, profile, vars);
         if ci == NULL_CLAUSE {
             let na = asgs.len();
             let ne = eliminator.eliminated_vars;
@@ -488,7 +488,7 @@ fn search(
             }
             let dl = asgs.level();
             if dl == config.root_level {
-                analyze_final(asgs, cp, vars, config, ci, false);
+                analyze_final(asgs, config, cp, vars, ci, false);
                 return false;
             }
             if profile.stat[Stat::Conflict as usize] % 5000 == 0
@@ -563,13 +563,13 @@ fn search(
                 profile.stat[Stat::SumLBD as usize] += lbd as i64;
             }
             if profile.stat[Stat::Conflict as usize] % 10_000 == 0 {
-                progress(asgs, config, cp, eliminator, vars, profile, None);
+                progress(asgs, config, cp, eliminator, profile, vars, None);
             }
             if profile.stat[Stat::Conflict as usize] == 100_000 {
                 asgs.cancel_until(vars, var_order, 0);
                 cp.simplify(asgs, config, eliminator, profile, vars);
                 // rebuild_heap();
-                adapt_strategy(config, cp, eliminator, vars, meta, profile);
+                adapt_strategy(config, cp, eliminator, meta, profile, vars);
                 // } else if 0 < lbd {
                 //     block_restart(lbd, dl, bl, nas);
             }
@@ -868,8 +868,8 @@ impl Solver {
 fn propagate(
     asgs: &mut AssignStack,
     cp: &mut ClauseDB,
-    vars: &mut [Var],
     profile: &mut Profile,
+    vars: &mut [Var],
 ) -> ClauseId {
     while asgs.remains() {
         let p: usize = asgs.sweep() as usize;
@@ -939,8 +939,8 @@ fn propagate(
 pub fn propagate_0(
     asgs: &mut AssignStack,
     cp: &mut ClauseDB,
-    vars: &mut [Var],
     profile: &mut Profile,
+    vars: &mut [Var],
 ) -> ClauseId {
     while asgs.remains() {
         let p: usize = asgs.sweep() as usize;
@@ -1010,9 +1010,9 @@ pub fn propagate_0(
 
 fn analyze_final(
     asgs: &AssignStack,
+    config: &mut SolverConfiguration,
     cp: &[ClausePartition],
     vars: &[Var],
-    config: &mut SolverConfiguration,
     ci: ClauseId,
     skip_first: bool,
 ) {
@@ -1090,9 +1090,9 @@ fn adapt_strategy(
     config: &mut SolverConfiguration,
     cp: &mut ClauseDB,
     eliminator: &mut Eliminator,
-    vars: &mut [Var],
     meta: &mut MetaParameters,
     profile: &mut Profile,
+    vars: &mut [Var],
 ) {
     if !config.adapt_strategy {
         return;
@@ -1181,8 +1181,8 @@ fn progress(
     config: &mut SolverConfiguration,
     cp: &[ClausePartition],
     eliminator: &Eliminator,
-    vars: &[Var],
     profile: &mut Profile,
+    vars: &[Var],
     mes: Option<&str>,
 ) {
     if mes != Some("") {
