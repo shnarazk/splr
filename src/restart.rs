@@ -1,5 +1,5 @@
 // use clause::ClauseManagement;
-use crate::profiler::*;
+use crate::profile::*;
 use crate::solver::Solver;
 use crate::types::*;
 use std::collections::VecDeque;

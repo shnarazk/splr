@@ -41,7 +41,7 @@ pub mod clause;
 /// In-process elimination
 pub mod eliminator;
 /// used in progress report
-pub mod profiler;
+pub mod profile;
 /// Implementation on solver restart.
 pub mod restart;
 /// struct Solver

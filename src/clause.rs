@@ -1,7 +1,7 @@
 #![allow(unused_variables)]
 use crate::assign::*;
 use crate::eliminator::*;
-use crate::profiler::*;
+use crate::profile::*;
 use crate::solver::SolverConfiguration;
 use crate::types::*;
 use crate::var::{Var, VarManagement};

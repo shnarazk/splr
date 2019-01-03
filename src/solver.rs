@@ -1,7 +1,7 @@
 use crate::assign::AssignStack;
 use crate::clause::{ClauseManagement, GC, *};
 use crate::eliminator::{Eliminator, EliminatorIF};
-use crate::profiler::*;
+use crate::profile::*;
 use crate::restart::{luby, QueueOperations, RESTART_BLK, RESTART_THR};
 use crate::types::*;
 use crate::var::{VarOrdering, *};
