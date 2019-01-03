@@ -213,142 +213,78 @@ impl Solver {
 
 impl SatSolver for Solver {
     fn solve(&mut self) -> SolverResult {
-        if !self.config.ok {
+        let Solver {
+            ref mut asgs,
+            ref mut config,
+            ref mut cp,
+            ref mut eliminator,
+            ref mut meta,
+            ref mut profile,
+            ref mut vars,
+            ref mut var_order,
+        } = self;
+        if !config.ok {
             return Ok(Certificate::UNSAT(Vec::new()));
         }
         // TODO: deal with assumptions
         // s.root_level = 0;
-        self.config.num_solved_vars = self.asgs.len();
-        progress(
-            &self.asgs,
-            &mut self.config,
-            &self.cp,
-            &self.eliminator,
-            &self.vars,
-            &mut self.profile,
-            Some(""),
-        );
-        // self.eliminator.use_elim = true;
-        self.eliminator.var_queue.clear();
-        if self.eliminator.use_elim {
-            for v in &mut self.vars[1..] {
+        config.num_solved_vars = asgs.len();
+        progress(asgs, config, cp, eliminator, vars, profile, Some(""));
+        // eliminator.use_elim = true;
+        eliminator.var_queue.clear();
+        if eliminator.use_elim {
+            for v in &mut vars[1..] {
                 if v.neg_occurs.is_empty() && !v.pos_occurs.is_empty() && v.assign == BOTTOM {
                     debug_assert!(!v.eliminated);
-                    debug_assert!(!self.asgs.trail.contains(&v.index.lit(LTRUE)));
-                    debug_assert!(!self.asgs.trail.contains(&v.index.lit(LFALSE)));
+                    debug_assert!(!asgs.trail.contains(&v.index.lit(LTRUE)));
+                    debug_assert!(!asgs.trail.contains(&v.index.lit(LFALSE)));
                     v.assign = LTRUE;
-                    self.asgs.push(v.index.lit(LTRUE));
+                    asgs.push(v.index.lit(LTRUE));
                 } else if v.pos_occurs.is_empty() && !v.neg_occurs.is_empty() && v.assign == BOTTOM
                 {
                     debug_assert!(!v.eliminated);
-                    debug_assert!(!self.asgs.trail.contains(&v.index.lit(LTRUE)));
-                    debug_assert!(!self.asgs.trail.contains(&v.index.lit(LFALSE)));
+                    debug_assert!(!asgs.trail.contains(&v.index.lit(LTRUE)));
+                    debug_assert!(!asgs.trail.contains(&v.index.lit(LFALSE)));
                     v.assign = LFALSE;
-                    self.asgs.push(v.index.lit(LFALSE));
+                    asgs.push(v.index.lit(LFALSE));
                 } else if v.pos_occurs.len() == 1 || v.neg_occurs.len() == 1 {
-                    self.eliminator.enqueue_var(v);
+                    eliminator.enqueue_var(v);
                 }
             }
-            progress(
-                &self.asgs,
-                &mut self.config,
-                &self.cp,
-                &self.eliminator,
-                &self.vars,
-                &mut self.profile,
-                Some("load"),
-            );
-            self.cp.simplify(
-                &mut self.asgs,
-                &mut self.config,
-                &mut self.eliminator,
-                &mut self.profile,
-                &mut self.vars,
-            );
-            progress(
-                &self.asgs,
-                &mut self.config,
-                &self.cp,
-                &self.eliminator,
-                &self.vars,
-                &mut self.profile,
-                Some("simp"),
-            );
+            progress(asgs, config, cp, eliminator, vars, profile, Some("load"));
+            cp.simplify(asgs, config, eliminator, profile, vars);
+            progress(asgs, config, cp, eliminator, vars, profile, Some("simp"));
         } else {
-            progress(
-                &self.asgs,
-                &mut self.config,
-                &self.cp,
-                &self.eliminator,
-                &self.vars,
-                &mut self.profile,
-                Some("load"),
-            );
+            progress(asgs, config, cp, eliminator, vars, profile, Some("load"));
         }
         // self.config.use_sve = false;
         // self.eliminator.use_elim = false;
-        self.profile.stat[Stat::Simplification as usize] += 1;
-        if search(
-            &mut self.asgs,
-            &mut self.config,
-            &mut self.cp,
-            &mut self.eliminator,
-            &mut self.meta,
-            &mut self.profile,
-            &mut self.vars,
-            &mut self.var_order,
-        ) {
-            if !self.config.ok {
-                self.asgs
-                    .cancel_until(&mut self.vars, &mut self.var_order, 0);
-                progress(
-                    &self.asgs,
-                    &mut self.config,
-                    &self.cp,
-                    &self.eliminator,
-                    &self.vars,
-                    &mut self.profile,
-                    Some("error"),
-                );
+        profile.stat[Stat::Simplification as usize] += 1;
+        if search(asgs, config, cp, eliminator, meta, profile, vars, var_order) {
+            if !config.ok {
+                asgs.cancel_until(vars, var_order, 0);
+                progress(asgs, config, cp, eliminator, vars, profile, Some("error"));
                 return Err(SolverException::InternalInconsistent);
             }
-            progress(
-                &self.asgs,
-                &mut self.config,
-                &self.cp,
-                &self.eliminator,
-                &self.vars,
-                &mut self.profile,
-                None,
-            );
+            progress(asgs, config, cp, eliminator, vars, profile, None);
             let mut result = Vec::new();
             for vi in 1..=self.config.num_vars {
-                match self.vars[vi].assign {
+                match vars[vi].assign {
                     LTRUE => result.push(vi as i32),
                     LFALSE => result.push(0 - vi as i32),
                     _ => result.push(0),
                 }
             }
-            if self.eliminator.use_elim {
-                self.eliminator.extend_model(&mut result);
+            if eliminator.use_elim {
+                eliminator.extend_model(&mut result);
             }
-            self.asgs
-                .cancel_until(&mut self.vars, &mut self.var_order, 0);
+            asgs.cancel_until(vars, var_order, 0);
             Ok(Certificate::SAT(result))
         } else {
-            progress(
-                &self.asgs,
-                &mut self.config,
-                &self.cp,
-                &self.eliminator,
-                &self.vars,
-                &mut self.profile,
-                None,
-            );
-            self.asgs
-                .cancel_until(&mut self.vars, &mut self.var_order, 0);
+            progress(asgs, config, cp, eliminator, vars, profile, None);
+            self.asgs.cancel_until(vars, var_order, 0);
             Ok(Certificate::UNSAT(
-                self.config.conflicts.iter().map(|l| l.int()).collect(),
+                config.conflicts.iter().map(|l| l.int()).collect(),
             ))
         }
     }
@@ -420,10 +356,10 @@ impl SatSolver for Solver {
     // renamed from clause_new
     fn add_unchecked_clause(&mut self, v: &mut Vec<Lit>) -> Option<ClauseId> {
         let Solver {
+            ref mut asgs,
             ref mut cp,
             ref mut eliminator,
             ref mut vars,
-            ref mut asgs,
             ..
         } = self;
         v.sort_unstable();
