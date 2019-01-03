@@ -57,7 +57,7 @@ impl Testing for ClauseHead {
 #[test]
 fn clause_sort() -> () {
     let s = setup();
-    assert_eq!(s.ok, true);
+    assert_eq!(s.config.ok, true);
 }
 
 fn setup() -> Solver {
