@@ -634,13 +634,13 @@ impl ClauseManagement for ClauseDB {
             }
         }
         {
-            for ck in ClauseKind::Liftedlit as usize..=ClauseKind::Binclause as usize {
-                for ch in &mut self[ck].head[1..] {
+            for ck in &mut self[ClauseKind::Liftedlit as usize..=ClauseKind::Binclause as usize] {
+                for ch in &mut ck.head[1..] {
                     if !ch.get_flag(ClauseFlag::Dead) && vars.satisfies(&ch.lits) {
                         ch.flag_on(ClauseFlag::Dead);
                         debug_assert!(ch.lits[0] != 0 && ch.lits[1] != 0);
-                        self[ck].touched[ch.lits[0].negate() as usize] = true;
-                        self[ck].touched[ch.lits[1].negate() as usize] = true;
+                        ck.touched[ch.lits[0].negate() as usize] = true;
+                        ck.touched[ch.lits[1].negate() as usize] = true;
                         if eliminator.use_elim {
                             for l in &ch.lits {
                                 let v = &mut (*vars)[l.vi()];
@@ -651,7 +651,7 @@ impl ClauseManagement for ClauseDB {
                         }
                     }
                 }
-                self[ck].garbage_collect(vars, eliminator);
+                ck.garbage_collect(vars, eliminator);
             }
         }
         stat[Stat::Simplification as usize] += 1;

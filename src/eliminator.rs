@@ -433,14 +433,13 @@ pub fn strengthen(cp: &mut [ClausePartition], vars: &mut [Var], cid: ClauseId, p
         }
         watcher[p.negate() as usize].retain(|w| w.c != cix);
         if (*ch).lits[0] == p || (*ch).lits[1] == p {
-            let qx;
-            if (*ch).lits[0] == p {
+            let qx = if (*ch).lits[0] == p {
                 (*ch).lits.swap_remove(0);
-                qx = 0;
+                0
             } else {
                 (*ch).lits.swap_remove(1);
-                qx = 1;
-            }
+                1
+            };
             if (*ch).lits.len() == 1 {
                 debug_assert!((*ch).lits[0] != p);
                 // println!("unit {} elimanated {}", (*ch).lits[0].int(), p.int());

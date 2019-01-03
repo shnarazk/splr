@@ -1114,11 +1114,8 @@ pub fn propagate_00(
                 let watcher = &mut cp[*kind as usize].watcher[..] as *mut [Vec<Watch>];
                 let vec = &mut (*watcher)[p] as *mut Vec<Watch>;
                 (*vec).retain(|w| {
-                    let mut ret = true;
-                    if (*head)[w.c].get_flag(ClauseFlag::Dead) {
-                        ret = false;
-                    }
-                    if None == exit && ret == true {
+                    let mut ret = !(*head)[w.c].get_flag(ClauseFlag::Dead);
+                    if None == exit && ret {
                         let ClauseHead { ref mut lits, .. } = &mut (*head)[w.c];
                         // debug_assert!(2 <= lits.len());
                         // debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
