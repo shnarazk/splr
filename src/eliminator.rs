@@ -1,5 +1,6 @@
 use crate::assign::AssignStack;
 use crate::clause::*;
+use crate::profiler::*;
 use crate::solver::{propagate_0, SolverConfiguration};
 use crate::types::*;
 use crate::var::{Var, VarManagement};
@@ -16,7 +17,7 @@ pub trait EliminatorIF {
         &mut self,
         asgs: &mut AssignStack,
         cp: &mut ClauseDB,
-        stat: &mut [i64],
+        profile: &mut Profile,
         vars: &mut [Var],
         ok: &mut bool,
     ) -> bool;
@@ -25,7 +26,7 @@ pub trait EliminatorIF {
         asgs: &mut AssignStack,
         config: &mut SolverConfiguration,
         cp: &mut ClauseDB,
-        stat: &mut [i64],
+        profile: &mut Profile,
         vars: &mut [Var],
     );
     fn extend_model(&mut self, model: &mut Vec<i32>);
@@ -132,7 +133,7 @@ impl EliminatorIF for Eliminator {
         &mut self,
         asgs: &mut AssignStack,
         cp: &mut ClauseDB,
-        stat: &mut [i64],
+        profile: &mut Profile,
         vars: &mut [Var],
         ok: &mut bool,
     ) -> bool {
@@ -231,7 +232,7 @@ impl EliminatorIF for Eliminator {
                                     if !strengthen_clause(
                                         cp,
                                         self,
-                                        stat,
+                                        profile,
                                         vars,
                                         asgs,
                                         *di,
@@ -259,7 +260,7 @@ impl EliminatorIF for Eliminator {
         asgs: &mut AssignStack,
         config: &mut SolverConfiguration,
         cp: &mut ClauseDB,
-        stat: &mut [i64],
+        profile: &mut Profile,
         vars: &mut [Var],
     ) {
         if !self.use_elim {
@@ -287,7 +288,7 @@ impl EliminatorIF for Eliminator {
         {
             // self.gather_touched_clauses();
             if (!self.clause_queue.is_empty() || self.bwdsub_assigns < asgs.len())
-                && !self.backward_subsumption_check(asgs, cp, stat, vars, &mut config.ok)
+                && !self.backward_subsumption_check(asgs, cp, profile, vars, &mut config.ok)
             {
                 config.ok = false;
                 break 'perform;
@@ -299,7 +300,7 @@ impl EliminatorIF for Eliminator {
                     continue;
                 }
                 // FIXME!
-                if !eliminate_var(asgs, config, cp, self, stat, vars, elim) {
+                if !eliminate_var(asgs, config, cp, self, profile, vars, elim) {
                     config.ok = false;
                     break 'perform;
                 }
@@ -580,7 +581,7 @@ pub fn merge(
 pub fn strengthen_clause(
     cp: &mut ClauseDB,
     eliminator: &mut Eliminator,
-    stat: &mut [i64],
+    profile: &mut Profile,
     vars: &mut [Var],
     asgs: &mut AssignStack,
     cid: ClauseId,
@@ -605,7 +606,7 @@ pub fn strengthen_clause(
         cp.remove_clause(cid);
         vars.detach_clause(cid, clause!(*cp, cid), eliminator);
         if asgs.enqueue_null(&mut vars[c0.vi()], c0.lbool(), 0)
-            && propagate_0(asgs, cp, vars, stat) == NULL_CLAUSE
+            && propagate_0(asgs, cp, vars, profile) == NULL_CLAUSE
         {
             cp[cid.to_kind()].touched[c0.negate() as usize] = true;
             true
@@ -654,7 +655,7 @@ pub fn eliminate_var(
     config: &mut SolverConfiguration,
     cp: &mut ClauseDB,
     eliminator: &mut Eliminator,
-    stat: &mut [i64],
+    profile: &mut Profile,
     vars: &mut [Var],
     v: VarId,
 ) -> bool {
@@ -682,7 +683,7 @@ pub fn eliminate_var(
         if (*pos).is_empty() && !(*neg).is_empty() {
             // println!("-v {} p {} n {}", v, (*pos).len(), (*neg).len());
             if !asgs.enqueue_null(&mut vars[v], LFALSE, 0)
-                || propagate_0(asgs, cp, vars, stat) != NULL_CLAUSE
+                || propagate_0(asgs, cp, vars, profile) != NULL_CLAUSE
             {
                 config.ok = false;
                 return false;
@@ -692,7 +693,7 @@ pub fn eliminate_var(
         if (*neg).is_empty() && (*pos).is_empty() {
             // println!("+v {} p {} n {}", v, (*pos).len(), (*neg).len());
             if !asgs.enqueue_null(&mut vars[v], LTRUE, 0)
-                || propagate_0(asgs, cp, vars, stat) != NULL_CLAUSE
+                || propagate_0(asgs, cp, vars, profile) != NULL_CLAUSE
             {
                 config.ok = false;
                 // panic!("eliminate_var: failed to enqueue & propagate");
@@ -837,10 +838,10 @@ pub fn eliminate_var(
         }
         vars[v].pos_occurs.clear();
         vars[v].neg_occurs.clear();
-        if propagate_0(asgs, cp, vars, stat) != NULL_CLAUSE {
+        if propagate_0(asgs, cp, vars, profile) != NULL_CLAUSE {
             config.ok = false;
             return false;
         }
-        eliminator.backward_subsumption_check(asgs, cp, stat, vars, &mut config.ok)
+        eliminator.backward_subsumption_check(asgs, cp, profile, vars, &mut config.ok)
     }
 }

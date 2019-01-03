@@ -1,7 +1,8 @@
 #![allow(unused_variables)]
 use crate::assign::*;
 use crate::eliminator::*;
-use crate::solver::{SolverConfiguration, Stat};
+use crate::profiler::*;
+use crate::solver::SolverConfiguration;
 use crate::types::*;
 use crate::var::{Var, VarManagement};
 use std::cmp::Ordering;
@@ -30,7 +31,7 @@ pub trait ClauseManagement {
     fn reduce(
         &mut self,
         eliminator: &mut Eliminator,
-        stat: &mut [i64],
+        profile: &mut Profile,
         vars: &mut [Var],
         next_reduction: &mut usize,
         lbd_temp: &mut [usize],
@@ -40,7 +41,7 @@ pub trait ClauseManagement {
         asgs: &mut AssignStack,
         config: &mut SolverConfiguration,
         eliminator: &mut Eliminator,
-        stat: &mut [i64],
+        profile: &mut Profile,
         vars: &mut [Var],
     ) -> bool;
 }
@@ -568,7 +569,7 @@ impl ClauseManagement for ClauseDB {
     fn reduce(
         &mut self,
         eliminator: &mut Eliminator,
-        stat: &mut [i64],
+        profile: &mut Profile,
         vars: &mut [Var],
         next_reduction: &mut usize,
         lbd_temp: &mut [usize],
@@ -605,14 +606,14 @@ impl ClauseManagement for ClauseDB {
         }
         self[ClauseKind::Removable as usize].garbage_collect(vars, eliminator);
         *next_reduction += DB_INC_SIZE;
-        stat[Stat::Reduction as usize] += 1;
+        profile.stat[Stat::Reduction as usize] += 1;
     }
     fn simplify(
         &mut self,
         asgs: &mut AssignStack,
         config: &mut SolverConfiguration,
         eliminator: &mut Eliminator,
-        stat: &mut [i64],
+        profile: &mut Profile,
         vars: &mut [Var],
     ) -> bool {
         self[ClauseKind::Removable as usize].reset_lbd(vars, &mut config.lbd_temp);
@@ -624,11 +625,11 @@ impl ClauseManagement for ClauseDB {
             }
         }
         if eliminator.use_elim
-        // && self.stat[Stat::Simplification as usize] % 8 == 0
-        // && self.eliminator.last_invocatiton < self.stat[Stat::Reduction as usize] as usize
+        // && profile.stat[Stat::Simplification as usize] % 8 == 0
+        // && profile.eliminator.last_invocatiton < self.stat[Stat::Reduction as usize] as usize
         {
-            eliminator.eliminate(asgs, config, self, stat, vars);
-            eliminator.last_invocatiton = stat[Stat::Reduction as usize] as usize;
+            eliminator.eliminate(asgs, config, self, profile, vars);
+            eliminator.last_invocatiton = profile.stat[Stat::Reduction as usize] as usize;
             if !config.ok {
                 return false;
             }
@@ -654,7 +655,7 @@ impl ClauseManagement for ClauseDB {
                 ck.garbage_collect(vars, eliminator);
             }
         }
-        stat[Stat::Simplification as usize] += 1;
+        profile.stat[Stat::Simplification as usize] += 1;
         // self.check_eliminator();
         true
     }
