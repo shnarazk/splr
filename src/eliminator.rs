@@ -15,7 +15,7 @@ pub trait EliminatorIF {
     fn backward_subsumption_check(
         &mut self,
         asgs: &mut AssignStack,
-        cp: &mut [ClausePartition],
+        cp: &mut ClauseDB,
         stat: &mut [i64],
         vars: &mut [Var],
         ok: &mut bool,
@@ -24,7 +24,7 @@ pub trait EliminatorIF {
         &mut self,
         asgs: &mut AssignStack,
         config: &mut SolverConfiguration,
-        cp: &mut [ClausePartition],
+        cp: &mut ClauseDB,
         stat: &mut [i64],
         vars: &mut [Var],
     );
@@ -131,7 +131,7 @@ impl EliminatorIF for Eliminator {
     fn backward_subsumption_check(
         &mut self,
         asgs: &mut AssignStack,
-        cp: &mut [ClausePartition],
+        cp: &mut ClauseDB,
         stat: &mut [i64],
         vars: &mut [Var],
         ok: &mut bool,
@@ -258,7 +258,7 @@ impl EliminatorIF for Eliminator {
         &mut self,
         asgs: &mut AssignStack,
         config: &mut SolverConfiguration,
-        cp: &mut [ClausePartition],
+        cp: &mut ClauseDB,
         stat: &mut [i64],
         vars: &mut [Var],
     ) {
@@ -388,8 +388,8 @@ fn subsume(cp: &mut [ClausePartition], cid: ClauseId, other: ClauseId) -> Option
     let mut ret: Lit = NULL_LIT;
     let ch = clause!(*cp, cid);
     let ob = clause!(*cp, other);
-    debug_assert!(ob.lits.contains(&clause!(*cp, other).lit[0]));
-    debug_assert!(ob.lits.contains(&clause!(*cp, other).lit[1]));
+    debug_assert!(ob.lits.contains(&clause!(*cp, other).lits[0]));
+    debug_assert!(ob.lits.contains(&clause!(*cp, other).lits[1]));
     'next: for l in &ch.lits {
         for lo in &ob.lits {
             if *l == *lo {
@@ -431,56 +431,27 @@ pub fn strengthen(cp: &mut [ClausePartition], vars: &mut [Var], cid: ClauseId, p
         if (*ch).get_flag(ClauseFlag::Dead) {
             return false;
         }
-        if (*ch).lit[0] == p || (*ch).lit[1] == p {
-            debug_assert!((*ch).lits[0] == p || (*ch).lits[1] == p);
-            // update lit, next_watcher, and lits
-            let hi = ((*ch).lit[0] != p) as usize;
-            debug_assert!((*ch).lit[hi] == p);
-            let bi = ((*ch).lits[0] != p) as usize;
-            debug_assert!((*ch).lits[bi] == p);
-            (*ch).lits.swap_remove(bi);
+        watcher[p.negate() as usize].retain(|w| w.c != cix);
+        if (*ch).lits[0] == p || (*ch).lits[1] == p {
+            let qx;
+            if (*ch).lits[0] == p {
+                (*ch).lits.swap_remove(0);
+                qx = 0;
+            } else {
+                (*ch).lits.swap_remove(1);
+                qx = 1;
+            }
             if (*ch).lits.len() == 1 {
-                if hi == 1 {
-                    (*ch).lit.swap(0, 1);
-                    (*ch).next_watcher.swap(0, 1);
-                }
-                // debug_assert!((*ch).lit[0] == p);
-                // debug_assert!((*ch).lits[0] != p);
-                // (*ch).lits[0] = (*ch).lit[0];
-                // (*ch).lit[0] = (*ch).lits[0];
-                // (*ch).lit[1] = (*ch).lits[0].negate();
-                // debug_assert!((*ch).lit[0] != p);
-                // debug_assert!(1 < (*ch).lit[0]);
-                // debug_assert!((*ch).lit[1] != p);
-                // stores the last literal in lits, while leaving `lit` as is.
                 debug_assert!((*ch).lits[0] != p);
                 // println!("unit {} elimanated {}", (*ch).lits[0].int(), p.int());
                 return true;
             }
-            let new_lit = (*ch).lits[bi];
-            debug_assert_ne!(new_lit, p);
-            let next_clause = (*ch).next_watcher[hi];
-            // pointer update
-            let mut ptr = &mut watcher[p.negate() as usize] as *mut ClauseIndex;
-            while *ptr != NULL_CLAUSE {
-                if *ptr == cix {
-                    *ptr = next_clause;
-                    break;
-                }
-                let i = (head[*ptr].lit[0] != p) as usize;
-                debug_assert_eq!(head[*ptr].lit[i], p);
-                ptr = &mut head[*ptr].next_watcher[i];
-            }
-            (*ch).lit[hi] = new_lit;
-            (*ch).next_watcher[hi] = watcher[new_lit.negate() as usize];
-            watcher[new_lit.negate() as usize] = cix;
-            debug_assert!((*ch).lits.len() != 1 || (*ch).lit[1] != new_lit);
-            (*ch).lits.len() == 1
+            let q = (*ch).lits[qx];
+            watcher[q.negate() as usize].push(Watch::new(q, cix));
         } else {
-            debug_assert!((*ch).lit[0] != p.negate() && (*ch).lit[1] != p.negate());
             (*ch).lits.retain(|&x| x != p);
-            false
         }
+        false
     }
 }
 
@@ -523,20 +494,20 @@ pub fn check_eliminator(cp: &[ClausePartition], vars: &[Var]) -> bool {
     // clause_queue should be clear.
     // debug_assert!(self.eliminator.clause_queue.is_empty());
     // all elements in occur_lists exist.
-    for v in vars {
-        for c in &v.pos_occurs {
-            let ch = clause!(cp, c);
-            if ch.lit[0] <= GARBAGE_LIT || ch.lit[1] <= GARBAGE_LIT {
-                panic!("panic {:#}", ch);
-            }
-        }
-        for c in &v.neg_occurs {
-            let ch = clause!(cp, c);
-            if ch.lit[0] <= GARBAGE_LIT || ch.lit[1] <= GARBAGE_LIT {
-                panic!("panic {:#}", ch);
-            }
-        }
-    }
+    // for v in vars {
+    //     for c in &v.pos_occurs {
+    //         let ch = clause!(cp, c);
+    //         if ch.lits[0] <= GARBAGE_LIT || ch.lits[1] <= GARBAGE_LIT {
+    //             panic!("panic {:#}", ch);
+    //         }
+    //     }
+    //     for c in &v.neg_occurs {
+    //         let ch = clause!(cp, c);
+    //         if ch.lits[0] <= GARBAGE_LIT || ch.lits[1] <= GARBAGE_LIT {
+    //             panic!("panic {:#}", ch);
+    //         }
+    //     }
+    // }
     // all caulses are registered in corresponding occur_lists
     let kinds = [
         ClauseKind::Binclause,
@@ -546,7 +517,7 @@ pub fn check_eliminator(cp: &[ClausePartition], vars: &[Var]) -> bool {
     for kind in &kinds {
         for (ci, ch) in cp[*kind as usize].head.iter().enumerate().skip(1) {
             let cid = kind.id_from(ci);
-            if ch.lit[0] == RECYCLE_LIT && ch.lit[1] == RECYCLE_LIT {
+            if ch.get_flag(ClauseFlag::Dead) {
                 continue;
             }
             for l in &ch.lits {
@@ -608,7 +579,7 @@ pub fn merge(
 /// - calls `enqueue_clause`
 /// - calls `enqueue_var`
 pub fn strengthen_clause(
-    cp: &mut [ClausePartition],
+    cp: &mut ClauseDB,
     eliminator: &mut Eliminator,
     stat: &mut [i64],
     vars: &mut [Var],
@@ -635,7 +606,7 @@ pub fn strengthen_clause(
         cp.remove_clause(cid);
         vars.detach_clause(cid, clause!(*cp, cid), eliminator);
         if asgs.enqueue_null(&mut vars[c0.vi()], c0.lbool(), 0)
-            && propagate_0(cp, stat, vars, asgs) == NULL_CLAUSE
+            && propagate_0(asgs, cp, vars, stat) == NULL_CLAUSE
         {
             cp[cid.to_kind()].touched[c0.negate() as usize] = true;
             true
@@ -682,7 +653,7 @@ pub fn make_eliminated_clause(
 pub fn eliminate_var(
     asgs: &mut AssignStack,
     config: &mut SolverConfiguration,
-    cp: &mut [ClausePartition],
+    cp: &mut ClauseDB,
     eliminator: &mut Eliminator,
     stat: &mut [i64],
     vars: &mut [Var],
@@ -712,7 +683,7 @@ pub fn eliminate_var(
         if (*pos).is_empty() && !(*neg).is_empty() {
             // println!("-v {} p {} n {}", v, (*pos).len(), (*neg).len());
             if !asgs.enqueue_null(&mut vars[v], LFALSE, 0)
-                || propagate_0(cp, stat, vars, asgs) != NULL_CLAUSE
+                || propagate_0(asgs, cp, vars, stat) != NULL_CLAUSE
             {
                 config.ok = false;
                 return false;
@@ -722,7 +693,7 @@ pub fn eliminate_var(
         if (*neg).is_empty() && (*pos).is_empty() {
             // println!("+v {} p {} n {}", v, (*pos).len(), (*neg).len());
             if !asgs.enqueue_null(&mut vars[v], LTRUE, 0)
-                || propagate_0(cp, stat, vars, asgs) != NULL_CLAUSE
+                || propagate_0(asgs, cp, vars, stat) != NULL_CLAUSE
             {
                 config.ok = false;
                 // panic!("eliminate_var: failed to enqueue & propagate");
@@ -857,23 +828,17 @@ pub fn eliminate_var(
                 &mut vars[v].neg_occurs
             } {
                 clause_mut!(*cp, *cid).flag_on(ClauseFlag::Dead);
-                let w0;
-                let w1;
-                {
-                    let ch = clause!(*cp, *cid);
-                    w0 = ch.lit[0].negate();
-                    w1 = ch.lit[1].negate();
-                }
+                let ch = clause!(*cp, *cid);
+                let w0 = ch.lits[0].negate();
+                let w1 = ch.lits[1].negate();
                 debug_assert!(w0 != 0 && w1 != 0);
                 cp[cid.to_kind()].touched[w0 as usize] = true;
                 cp[cid.to_kind()].touched[w1 as usize] = true;
             }
-            // cp[cid.to_kind()].touched[v.lit(LTRUE) as usize] = true;
-            // cp[cid.to_kind()].touched[v.lit(LFALSE) as usize] = true;
         }
         vars[v].pos_occurs.clear();
         vars[v].neg_occurs.clear();
-        if propagate_0(cp, stat, vars, asgs) != NULL_CLAUSE {
+        if propagate_0(asgs, cp, vars, stat) != NULL_CLAUSE {
             config.ok = false;
             return false;
         }
