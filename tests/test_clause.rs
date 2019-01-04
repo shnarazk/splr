@@ -57,7 +57,7 @@ impl Testing for ClauseHead {
 #[test]
 fn clause_sort() -> () {
     let s = setup();
-    assert_eq!(s.config.ok, true);
+    assert_eq!(s.state.ok, true);
 }
 
 fn setup() -> Solver {
@@ -86,6 +86,6 @@ fn setup() -> Solver {
 }
 
 fn attach_clause<'a>(s: &'a mut Solver, vec: &[Lit]) -> &'a mut ClauseHead {
-    let cid = s.cp[ClauseKind::Permanent as usize].new_clause(vec, vec.len());
-    &mut s.cp[ClauseKind::Permanent as usize].head[cid.to_index()]
+    let cid = s.cps[ClauseKind::Permanent as usize].new_clause(vec, vec.len());
+    &mut s.cps[ClauseKind::Permanent as usize].head[cid.to_index()]
 }
