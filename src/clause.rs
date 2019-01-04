@@ -556,8 +556,8 @@ impl ClauseManagement for ClauseDB {
         //         clause_head!(self.cp, cid),
         //     );
         // }
-        clause_mut!(*self, cid).flag_on(ClauseFlag::Dead);
-        let ch = clause!(*self, cid);
+        let ch = clause_mut!(*self, cid);
+        ch.flag_on(ClauseFlag::Dead);
         if ch.lits.is_empty() {
             return;
         }
