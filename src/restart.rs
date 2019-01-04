@@ -1,6 +1,5 @@
-// use clause::ClauseManagement;
-use crate::profile::*;
 use crate::solver::Solver;
+use crate::state::*;
 use crate::types::*;
 use std::collections::VecDeque;
 
@@ -55,23 +54,23 @@ impl QueueOperations for VecDeque<usize> {
 impl Restart for Solver {
     /// called after conflict resolution
     fn block_restart(&mut self, lbd: usize, clv: usize, blv: usize, nas: usize) {
-        let count = self.profile.stat[Stat::Conflict as usize] as u64;
-        self.profile.c_lvl.update(clv as f64);
-        self.profile.b_lvl.update(blv as f64);
-        self.profile.ema_asg.update(nas as f64);
-        self.profile.ema_lbd.update(lbd as f64);
+        let count = self.state.stat[Stat::Conflict as usize] as u64;
+        self.state.c_lvl.update(clv as f64);
+        self.state.b_lvl.update(blv as f64);
+        self.state.ema_asg.update(nas as f64);
+        self.state.ema_lbd.update(lbd as f64);
         if count <= RESET_EMA {
             if count == RESET_EMA {
-                self.profile.ema_asg.reset();
-                self.profile.ema_lbd.reset();
-                self.profile.c_lvl.reset();
-                self.profile.b_lvl.reset();
+                self.state.ema_asg.reset();
+                self.state.ema_lbd.reset();
+                self.state.c_lvl.reset();
+                self.state.b_lvl.reset();
             }
             return;
         }
-        if self.meta.next_restart <= count && self.config.restart_blk < self.profile.ema_asg.get() {
-            self.meta.next_restart = count + RESTART_PERIOD;
-            self.profile.stat[Stat::BlockRestart as usize] += 1;
+        if self.state.next_restart <= count && self.config.restart_blk < self.state.ema_asg.get() {
+            self.state.next_restart = count + RESTART_PERIOD;
+            self.state.stat[Stat::BlockRestart as usize] += 1;
         }
     }
 
@@ -80,19 +79,18 @@ impl Restart for Solver {
         let Solver {
             ref mut asgs,
             ref mut config,
-            ref mut meta,
-            ref mut profile,
+            ref mut state,
             ref mut vars,
             ..
         } = self;
-        let count = profile.stat[Stat::Conflict as usize] as u64;
+        let count = state.stat[Stat::Conflict as usize] as u64;
         if RESET_EMA < count
-            && meta.next_restart < count
-            && config.restart_thr < profile.ema_lbd.get()
+            && state.next_restart < count
+            && config.restart_thr < state.ema_lbd.get()
         {
-            meta.next_restart = count + RESTART_PERIOD;
-            profile.stat[Stat::Restart as usize] += 1;
-            asgs.cancel_until(vars, &mut profile.var_order, config.root_level);
+            state.next_restart = count + RESTART_PERIOD;
+            state.stat[Stat::Restart as usize] += 1;
+            asgs.cancel_until(vars, &mut state.var_order, config.root_level);
         }
     }
 }

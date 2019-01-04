@@ -40,12 +40,12 @@ pub mod assign;
 pub mod clause;
 /// In-process elimination
 pub mod eliminator;
-/// used in progress report
-pub mod profile;
 /// Implementation on solver restart.
 pub mod restart;
 /// struct Solver
 pub mod solver;
+/// various data for SAT solving
+pub mod state;
 /// Plumping layer.
 pub mod types;
 /// validates

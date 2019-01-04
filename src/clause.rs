@@ -1,8 +1,8 @@
 #![allow(unused_variables)]
 use crate::assign::*;
 use crate::eliminator::*;
-use crate::profile::*;
 use crate::solver::SolverConfiguration;
+use crate::state::*;
 use crate::types::*;
 use crate::var::{Var, VarManagement};
 use std::cmp::Ordering;
@@ -28,20 +28,13 @@ pub trait ClauseManagement {
         cid: ClauseId,
         kind: ClauseKind,
     );
-    fn reduce(
-        &mut self,
-        eliminator: &mut Eliminator,
-        profile: &mut Profile,
-        vars: &mut [Var],
-        next_reduction: &mut usize,
-        lbd_temp: &mut [usize],
-    );
+    fn reduce(&mut self, eliminator: &mut Eliminator, state: &mut SolverState, vars: &mut [Var]);
     fn simplify(
         &mut self,
         asgs: &mut AssignStack,
         config: &mut SolverConfiguration,
         eliminator: &mut Eliminator,
-        profile: &mut Profile,
+        state: &mut SolverState,
         vars: &mut [Var],
     ) -> bool;
 }
@@ -60,11 +53,6 @@ pub trait ClauseIdIndexEncoding {
     fn to_index(&self) -> ClauseIndex;
     fn to_kind(&self) -> usize;
     fn is(&self, kind: ClauseKind, ix: ClauseIndex) -> bool;
-}
-
-/// For ClausePartition
-pub trait ConsistencyCheck {
-    fn check(&mut self, lit: Lit) -> bool;
 }
 
 pub type ClauseDB = [ClausePartition; 4];
@@ -250,6 +238,7 @@ impl ClauseIdIndexEncoding for usize {
 }
 
 impl PartialEq for ClauseHead {
+    #[inline(always)]
     fn eq(&self, other: &ClauseHead) -> bool {
         self == other
     }
@@ -367,7 +356,7 @@ impl GC for ClausePartition {
         for ws in watcher.iter_mut() {
             ws.retain(|w| !head[w.c].get_flag(ClauseFlag::Dead));
         }
-        let recycled = &mut watcher[RECYCLE_LIT.negate() as usize];
+        let recycled = &mut watcher[NULL_LIT.negate() as usize];
         recycled.clear();
         for (ci, ch) in self.head.iter_mut().enumerate().skip(1) {
             if ch.get_flag(ClauseFlag::Dead) {
@@ -394,7 +383,7 @@ impl GC for ClausePartition {
         let cix;
         let w0;
         let w1;
-        if let Some(w) = self.watcher[RECYCLE_LIT.negate() as usize].pop() {
+        if let Some(w) = self.watcher[NULL_LIT.negate() as usize].pop() {
             cix = w.c;
             debug_assert_eq!(self.head[cix].get_flag(ClauseFlag::Dead), true);
             let ch = &mut self.head[cix];
@@ -462,12 +451,6 @@ impl GC for ClausePartition {
             }
             *cla_inc *= 1.0e-20;
         }
-    }
-}
-
-impl ConsistencyCheck for ClausePartition {
-    fn check(&mut self, lit: Lit) -> bool {
-        true
     }
 }
 
@@ -568,15 +551,8 @@ impl ClauseManagement for ClauseDB {
         self[cid.to_kind()].touched[w0] = true;
         self[cid.to_kind()].touched[w1] = true;
     }
-    fn reduce(
-        &mut self,
-        eliminator: &mut Eliminator,
-        profile: &mut Profile,
-        vars: &mut [Var],
-        next_reduction: &mut usize,
-        lbd_temp: &mut [usize],
-    ) {
-        self[ClauseKind::Removable as usize].reset_lbd(vars, &mut lbd_temp[..]);
+    fn reduce(&mut self, eliminator: &mut Eliminator, state: &mut SolverState, vars: &mut [Var]) {
+        self[ClauseKind::Removable as usize].reset_lbd(vars, &mut state.lbd_temp[..]);
         let ClausePartition {
             ref mut head,
             ref mut touched,
@@ -593,7 +569,7 @@ impl ClauseManagement for ClauseDB {
         perm[1..nc].sort_by(|&a, &b| head[a].cmp(&head[b]));
         let keep = nc / 2;
         if head[perm[keep]].rank <= 5 {
-            *next_reduction += 1000;
+            state.next_reduction += 1000;
         };
         for i in keep..nc {
             let ch = &mut head[perm[i]];
@@ -607,18 +583,18 @@ impl ClauseManagement for ClauseDB {
             }
         }
         self[ClauseKind::Removable as usize].garbage_collect(vars, eliminator);
-        *next_reduction += DB_INC_SIZE;
-        profile.stat[Stat::Reduction as usize] += 1;
+        state.next_reduction += DB_INC_SIZE;
+        state.stat[Stat::Reduction as usize] += 1;
     }
     fn simplify(
         &mut self,
         asgs: &mut AssignStack,
         config: &mut SolverConfiguration,
         eliminator: &mut Eliminator,
-        profile: &mut Profile,
+        state: &mut SolverState,
         vars: &mut [Var],
     ) -> bool {
-        self[ClauseKind::Removable as usize].reset_lbd(vars, &mut config.lbd_temp);
+        self[ClauseKind::Removable as usize].reset_lbd(vars, &mut state.lbd_temp);
         debug_assert_eq!(asgs.level(), 0);
         // reset reason since decision level is zero.
         for v in &mut vars[1..] {
@@ -627,12 +603,12 @@ impl ClauseManagement for ClauseDB {
             }
         }
         if eliminator.use_elim
-        // && profile.stat[Stat::Simplification as usize] % 8 == 0
-        // && profile.eliminator.last_invocatiton < self.stat[Stat::Reduction as usize] as usize
+        // && state.stat[Stat::Simplification as usize] % 8 == 0
+        // && state.eliminator.last_invocatiton < self.stat[Stat::Reduction as usize] as usize
         {
-            eliminator.eliminate(asgs, config, self, profile, vars);
-            eliminator.last_invocatiton = profile.stat[Stat::Reduction as usize] as usize;
-            if !config.ok {
+            eliminator.eliminate(asgs, config, self, state, vars);
+            eliminator.last_invocatiton = state.stat[Stat::Reduction as usize] as usize;
+            if !state.ok {
                 return false;
             }
         }
@@ -657,7 +633,7 @@ impl ClauseManagement for ClauseDB {
                 ck.garbage_collect(vars, eliminator);
             }
         }
-        profile.stat[Stat::Simplification as usize] += 1;
+        state.stat[Stat::Simplification as usize] += 1;
         // self.check_eliminator();
         true
     }
