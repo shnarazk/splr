@@ -662,7 +662,6 @@ fn search(
                     state.stat[Stat::NumBin as usize] += 1;
                 }
                 if cid.to_kind() == ClauseKind::Removable as usize {
-                    // clause_body_mut!(cp, cid).flag_on(ClauseFlag::JustUsed);
                     // debug_assert!(!ch.get_flag(ClauseFlag::Dead));
                     // bump_cid(cid);
                     cp[ClauseKind::Removable as usize].bump_activity(
@@ -707,7 +706,7 @@ fn search(
 fn analyze(
     asgs: &mut AssignStack,
     config: &mut SolverConfiguration,
-    cp: &mut [ClausePartition],
+    cp: &mut ClauseDB,
     state: &mut SolverState,
     vars: &mut [Var],
     confl: ClauseId,
@@ -743,7 +742,7 @@ fn analyze(
                 //             && nblevels < self.co_lbd_bound
                 //         {
                 //             (*ch).rank = 0;
-                //             clause_body_mut!(*cp, confl).rank = 0
+                //             clause_mut!(*cp, confl).rank = 0
                 //         }
                 //     }
                 // }
@@ -857,7 +856,7 @@ fn analyze(
 /// renamed from litRedundant
 #[inline(always)]
 fn analyze_removable(
-    cp: &mut [ClausePartition],
+    cp: &mut ClauseDB,
     vars: &[Var],
     an_seen: &mut [bool],
     l: Lit,
@@ -897,7 +896,7 @@ fn analyze_removable(
 fn analyze_final(
     asgs: &AssignStack,
     config: &mut SolverConfiguration,
-    cp: &[ClausePartition],
+    cps: &ClauseDB,
     state: &mut SolverState,
     vars: &[Var],
     ci: ClauseId,
@@ -906,7 +905,7 @@ fn analyze_final(
     let mut seen = vec![false; config.num_vars + 1];
     state.conflicts.clear();
     if config.root_level != 0 {
-        let ch = clause!(*cp, ci);
+        let ch = clause!(*cps, ci);
         for l in &ch.lits[skip_first as usize..] {
             let vi = l.vi();
             if 0 < vars[vi].level {
@@ -941,7 +940,7 @@ fn analyze_final(
 
 #[inline(always)]
 fn minimize_with_bi_clauses(
-    cp: &[ClausePartition],
+    cps: &ClauseDB,
     vars: &[Var],
     lbd_temp: &mut [usize],
     vec: &mut Vec<Lit>,
@@ -957,8 +956,8 @@ fn minimize_with_bi_clauses(
     }
     let l0 = vec[0];
     let mut nb = 0;
-    for w in &cp[ClauseKind::Binclause as usize].watcher[l0.negate() as usize] {
-        let ch = &cp[ClauseKind::Binclause as usize].head[w.c];
+    for w in &cps[ClauseKind::Binclause as usize].watcher[l0.negate() as usize] {
+        let ch = &cps[ClauseKind::Binclause as usize].head[w.c];
         debug_assert!(ch.lits[0] == l0 || ch.lits[1] == l0);
         let other = ch.lits[(ch.lits[0] == l0) as usize];
         let vi = other.vi();
@@ -977,7 +976,7 @@ fn minimize_with_bi_clauses(
 #[inline(always)]
 fn adapt_strategy(
     config: &mut SolverConfiguration,
-    cp: &mut ClauseDB,
+    cps: &mut ClauseDB,
     eliminator: &mut Eliminator,
     state: &mut SolverState,
     vars: &mut [Var],
@@ -1039,7 +1038,7 @@ fn adapt_strategy(
     state.lbd_queue.clear();
     state.stat[Stat::SumLBD as usize] = 0;
     state.stat[Stat::Conflict as usize] = 0;
-    let [_, learnts, permanents, _] = cp;
+    let [_, learnts, permanents, _] = cps;
     if config.strategy == SearchStrategy::LowDecisions
         || config.strategy == SearchStrategy::HighSuccesive
     {
@@ -1067,7 +1066,7 @@ fn adapt_strategy(
 fn progress(
     asgs: &AssignStack,
     config: &mut SolverConfiguration,
-    cp: &[ClausePartition],
+    cp: &ClauseDB,
     eliminator: &Eliminator,
     state: &mut SolverState,
     vars: &[Var],

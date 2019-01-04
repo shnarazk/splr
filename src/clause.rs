@@ -9,7 +9,7 @@ use std::cmp::Ordering;
 use std::f64;
 use std::fmt;
 
-/// For [ClausePartition]
+/// For ClauseDB
 pub trait ClauseManagement {
     fn add_clause(
         &mut self,

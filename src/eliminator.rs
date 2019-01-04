@@ -16,7 +16,7 @@ pub trait EliminatorIF {
     fn backward_subsumption_check(
         &mut self,
         asgs: &mut AssignStack,
-        cp: &mut ClauseDB,
+        cps: &mut ClauseDB,
         state: &mut SolverState,
         vars: &mut [Var],
     ) -> bool;
@@ -24,7 +24,7 @@ pub trait EliminatorIF {
         &mut self,
         asgs: &mut AssignStack,
         config: &mut SolverConfiguration,
-        cp: &mut ClauseDB,
+        cps: &mut ClauseDB,
         state: &mut SolverState,
         vars: &mut [Var],
     );
@@ -131,7 +131,7 @@ impl EliminatorIF for Eliminator {
     fn backward_subsumption_check(
         &mut self,
         asgs: &mut AssignStack,
-        cp: &mut ClauseDB,
+        cps: &mut ClauseDB,
         state: &mut SolverState,
         vars: &mut [Var],
     ) -> bool {
@@ -163,7 +163,7 @@ impl EliminatorIF for Eliminator {
                     unilits = [cid.to_index() as Lit; 1];
                     lits = &unilits;
                 } else {
-                    let ch = clause_mut!(*cp, cid) as *mut ClauseHead;
+                    let ch = clause_mut!(*cps, cid) as *mut ClauseHead;
                     (*ch).flag_off(ClauseFlag::Enqueued);
                     lits = &(*ch).lits;
                     if (*ch).get_flag(ClauseFlag::Dead) || BACKWORD_SUBSUMPTION_THRESHOLD < cnt {
@@ -190,7 +190,7 @@ impl EliminatorIF for Eliminator {
                     };
                     cnt += (*cs).len();
                     for di in &*cs {
-                        let db = clause!(*cp, di) as *const ClauseHead;
+                        let db = clause!(*cps, di) as *const ClauseHead;
                         if !(*db).get_flag(ClauseFlag::Dead)
                             && *di != cid
                             && lits.len() <= SUBSUMPTION_SIZE
@@ -198,7 +198,7 @@ impl EliminatorIF for Eliminator {
                             && (self.subsumption_lim == 0
                                 || lits.len() + (*db).lits.len() <= self.subsumption_lim)
                         {
-                            match subsume(cp, cid, *di) {
+                            match subsume(cps, cid, *di) {
                                 Some(NULL_LIT) => {
                                     _subsumed += 1;
                                     if cid.to_kind() == ClauseKind::Removable as usize
@@ -210,8 +210,8 @@ impl EliminatorIF for Eliminator {
                                         //          cid2fmt(cid),
                                         //          *clause_body!(self.cp, cid),
                                         // );
-                                        cp.remove_clause(*di);
-                                        vars.detach_clause(*di, clause!(*cp, *di), self);
+                                        cps.remove_clause(*di);
+                                        vars.detach_clause(*di, clause!(*cps, *di), self);
                                     } //else {
                                       // println!("backward_subsumption_check tries to delete a permanent clause {} {:#}",
                                       //          cid2fmt(*di),
@@ -220,15 +220,15 @@ impl EliminatorIF for Eliminator {
                                       //}
                                 }
                                 Some(l) => {
-                                    cp[di.to_kind()].touched[l as usize] = true;
-                                    cp[di.to_kind()].touched[l.negate() as usize] = true;
+                                    cps[di.to_kind()].touched[l as usize] = true;
+                                    cps[di.to_kind()].touched[l.negate() as usize] = true;
                                     // let xb = &clause_body!(self.cp, *di);
                                     // println!("BackSubsC    => subsumed {} from {} and {} {:#}", l.int(), cid2fmt(cid), cid2fmt(*di), xb);
                                     _deleted_literals += 1;
                                     // println!("cancel true path");
                                     // continue;
                                     if !strengthen_clause(
-                                        cp,
+                                        cps,
                                         self,
                                         state,
                                         vars,
@@ -257,7 +257,7 @@ impl EliminatorIF for Eliminator {
         &mut self,
         asgs: &mut AssignStack,
         config: &mut SolverConfiguration,
-        cp: &mut ClauseDB,
+        cps: &mut ClauseDB,
         state: &mut SolverState,
         vars: &mut [Var],
     ) {
@@ -286,7 +286,7 @@ impl EliminatorIF for Eliminator {
         {
             // self.gather_touched_clauses();
             if (!self.clause_queue.is_empty() || self.bwdsub_assigns < asgs.len())
-                && !self.backward_subsumption_check(asgs, cp, state, vars)
+                && !self.backward_subsumption_check(asgs, cps, state, vars)
             {
                 state.ok = false;
                 break 'perform;
@@ -298,7 +298,7 @@ impl EliminatorIF for Eliminator {
                     continue;
                 }
                 // FIXME!
-                if !eliminate_var(asgs, config, cp, self, state, vars, elim) {
+                if !eliminate_var(asgs, config, cps, self, state, vars, elim) {
                     state.ok = false;
                     break 'perform;
                 }
@@ -368,14 +368,14 @@ impl EliminatorIF for Eliminator {
 // }
 
 /// returns a literal if these clauses can be merged by the literal.
-fn subsume(cp: &mut [ClausePartition], cid: ClauseId, other: ClauseId) -> Option<Lit> {
+fn subsume(cps: &mut ClauseDB, cid: ClauseId, other: ClauseId) -> Option<Lit> {
     debug_assert!(other.to_kind() != ClauseKind::Uniclause as usize);
     // if other.to_kind() == ClauseKind::Uniclause as usize {
     //     panic!("unexpected path!");
     // }
     if cid.to_kind() == ClauseKind::Uniclause as usize {
         let l = cid.to_index() as Lit;
-        let oh = clause!(*cp, other);
+        let oh = clause!(*cps, other);
         for lo in &oh.lits {
             if l == lo.negate() {
                 return Some(l);
@@ -385,10 +385,10 @@ fn subsume(cp: &mut [ClausePartition], cid: ClauseId, other: ClauseId) -> Option
     }
     // println!("subsume {} = {}:{}", cid, cid.to_kind(), cid.to_index());
     let mut ret: Lit = NULL_LIT;
-    let ch = clause!(*cp, cid);
-    let ob = clause!(*cp, other);
-    debug_assert!(ob.lits.contains(&clause!(*cp, other).lits[0]));
-    debug_assert!(ob.lits.contains(&clause!(*cp, other).lits[1]));
+    let ch = clause!(*cps, cid);
+    let ob = clause!(*cps, other);
+    debug_assert!(ob.lits.contains(&clause!(*cps, other).lits[0]));
+    debug_assert!(ob.lits.contains(&clause!(*cps, other).lits[1]));
     'next: for l in &ch.lits {
         for lo in &ob.lits {
             if *l == *lo {
@@ -406,15 +406,15 @@ fn subsume(cp: &mut [ClausePartition], cid: ClauseId, other: ClauseId) -> Option
 /// removes Lit `p` from Clause *self*. This is an O(n) function!
 /// returns true if the clause became a unit clause.
 /// Called only from strengthen_clause
-pub fn strengthen(cp: &mut [ClausePartition], vars: &mut [Var], cid: ClauseId, p: Lit) -> bool {
-    debug_assert!(!clause!(cp, cid).get_flag(ClauseFlag::Dead));
-    debug_assert!(1 < clause!(cp, cid).lits.len());
+pub fn strengthen(cps: &mut ClauseDB, vars: &mut [Var], cid: ClauseId, p: Lit) -> bool {
+    debug_assert!(!clause!(cps, cid).get_flag(ClauseFlag::Dead));
+    debug_assert!(1 < clause!(cps, cid).lits.len());
     let cix = cid.to_index();
     let ClausePartition {
         ref mut head,
         ref mut watcher,
         ..
-    } = cp[cid.to_kind()];
+    } = cps[cid.to_kind()];
     unsafe {
         let ch = &mut head[cix] as *mut ClauseHead;
         // debug_assert!((*ch).lits.contains(&p));
@@ -455,7 +455,7 @@ pub fn strengthen(cp: &mut [ClausePartition], vars: &mut [Var], cid: ClauseId, p
 
 /// Returns **false** if one of the clauses is always satisfied.
 pub fn check_to_merge(
-    cpack: &[ClausePartition],
+    cpack: &ClauseDB,
     cp: ClauseId,
     cq: ClauseId,
     v: VarId,
@@ -488,7 +488,7 @@ fn make_eliminating_unit_clause(vec: &mut Vec<Lit>, x: Lit) {
     vec.push(1);
 }
 
-pub fn check_eliminator(cp: &[ClausePartition], vars: &[Var]) -> bool {
+pub fn check_eliminator(cps: &ClauseDB, vars: &[Var]) -> bool {
     // clause_queue should be clear.
     // debug_assert!(self.eliminator.clause_queue.is_empty());
     // all elements in occur_lists exist.
@@ -513,7 +513,7 @@ pub fn check_eliminator(cp: &[ClausePartition], vars: &[Var]) -> bool {
         ClauseKind::Permanent,
     ];
     for kind in &kinds {
-        for (ci, ch) in cp[*kind as usize].head.iter().enumerate().skip(1) {
+        for (ci, ch) in cps[*kind as usize].head.iter().enumerate().skip(1) {
             let cid = kind.id_from(ci);
             if ch.get_flag(ClauseFlag::Dead) {
                 continue;
@@ -536,7 +536,7 @@ pub fn check_eliminator(cp: &[ClausePartition], vars: &[Var]) -> bool {
 /// 6. merge(1)
 /// Returns **false** if one of the clauses is always satisfied. (merge_vec should not be used.)
 pub fn merge(
-    cp: &mut [ClausePartition],
+    cps: &mut ClauseDB,
     eliminator: &mut Eliminator,
     cip: ClauseId,
     ciq: ClauseId,
@@ -544,8 +544,8 @@ pub fn merge(
 ) -> Option<Vec<Lit>> {
     let mut vec: Vec<Lit> = Vec::new();
     eliminator.merges += 1;
-    let pqb = clause!(*cp, cip);
-    let qpb = clause!(*cp, ciq);
+    let pqb = clause!(*cps, cip);
+    let qpb = clause!(*cps, ciq);
     let ps_smallest = pqb.lits.len() < qpb.lits.len();
     let (pb, qb) = if ps_smallest { (pqb, qpb) } else { (qpb, pqb) };
     // println!(" -  {:?}{:?} & {:?}{:?}", vec2int(&ph.lit),vec2int(&pb.lits),vec2int(&qh.lit),vec2int(&qb.lits));
@@ -577,7 +577,7 @@ pub fn merge(
 /// - calls `enqueue_clause`
 /// - calls `enqueue_var`
 pub fn strengthen_clause(
-    cp: &mut ClauseDB,
+    cps: &mut ClauseDB,
     eliminator: &mut Eliminator,
     state: &mut SolverState,
     vars: &mut [Var],
@@ -585,50 +585,50 @@ pub fn strengthen_clause(
     cid: ClauseId,
     l: Lit,
 ) -> bool {
-    debug_assert!(!clause!(*cp, cid).get_flag(ClauseFlag::Dead));
-    debug_assert!(1 < clause!(*cp, cid).lits.len());
-    cp[cid.to_kind()].touched[l as usize] = true;
-    cp[cid.to_kind()].touched[l.negate() as usize] = true;
+    debug_assert!(!clause!(*cps, cid).get_flag(ClauseFlag::Dead));
+    debug_assert!(1 < clause!(*cps, cid).lits.len());
+    cps[cid.to_kind()].touched[l as usize] = true;
+    cps[cid.to_kind()].touched[l.negate() as usize] = true;
     // println!("STRENGTHEN_CLAUSE {}", cid2fmt(cid));
     debug_assert_ne!(cid, NULL_CLAUSE);
-    if strengthen(cp, vars, cid, l) {
+    if strengthen(cps, vars, cid, l) {
         // since changing a literal in `lit` requires updating a next_watcher,
         // it's muth easier to hold the literal to be propagated in body.lits[0]
         // let c0 = clause_head!(self.cp, cid).lit[0];
-        let c0 = clause!(*cp, cid).lits[0];
-        debug_assert!(1 == clause!(*cp, cid).lits.len());
-        debug_assert!(c0 == clause!(*cp, cid).lits[0]);
+        let c0 = clause!(*cps, cid).lits[0];
+        debug_assert!(1 == clause!(*cps, cid).lits.len());
+        debug_assert!(c0 == clause!(*cps, cid).lits[0]);
         // println!("cid {} {:?} became a unit clause as c0 {}, l {}", cid2fmt(cid), vec2int(&clause_body!(*cp, cid).lits), c0.int(), l.int());
         debug_assert_ne!(c0, l);
         // println!("{} is removed and its first literal {} is enqueued.", cid2fmt(cid), c0.int());
-        cp.remove_clause(cid);
-        vars.detach_clause(cid, clause!(*cp, cid), eliminator);
+        cps.remove_clause(cid);
+        vars.detach_clause(cid, clause!(*cps, cid), eliminator);
         if asgs.enqueue_null(&mut vars[c0.vi()], c0.lbool(), 0)
-            && propagate(asgs, cp, state, vars) == NULL_CLAUSE
+            && propagate(asgs, cps, state, vars) == NULL_CLAUSE
         {
-            cp[cid.to_kind()].touched[c0.negate() as usize] = true;
+            cps[cid.to_kind()].touched[c0.negate() as usize] = true;
             true
         } else {
             false
         }
     } else {
         // println!("cid {} drops literal {}", cid2fmt(cid), l.int());
-        debug_assert!(1 < clause!(*cp, cid).lits.len());
-        eliminator.enqueue_clause(cid, clause_mut!(*cp, cid));
+        debug_assert!(1 < clause!(*cps, cid).lits.len());
+        eliminator.enqueue_clause(cid, clause_mut!(*cps, cid));
         true
     }
 }
 
 /// 14. mkElimClause(2)
 pub fn make_eliminated_clause(
-    cp: &mut [ClausePartition],
+    cps: &mut ClauseDB,
     vec: &mut Vec<Lit>,
     vi: VarId,
     cid: ClauseId,
 ) {
     let first = vec.len();
     // Copy clause to the vector. Remember the position where the varibale 'v' occurs:
-    let ch = clause!(cp, cid);
+    let ch = clause!(cps, cid);
     debug_assert!(!ch.lits.is_empty());
     for l in &ch.lits {
         vec.push(*l as u32);
@@ -651,7 +651,7 @@ pub fn make_eliminated_clause(
 pub fn eliminate_var(
     asgs: &mut AssignStack,
     config: &mut SolverConfiguration,
-    cp: &mut ClauseDB,
+    cps: &mut ClauseDB,
     eliminator: &mut Eliminator,
     state: &mut SolverState,
     vars: &mut [Var],
@@ -665,10 +665,10 @@ pub fn eliminate_var(
         // count only alive clauses
         vars[v]
             .pos_occurs
-            .retain(|&c| !clause!(cp, c).get_flag(ClauseFlag::Dead));
+            .retain(|&c| !clause!(cps, c).get_flag(ClauseFlag::Dead));
         vars[v]
             .pos_occurs
-            .retain(|&c| !clause!(cp, c).get_flag(ClauseFlag::Dead));
+            .retain(|&c| !clause!(cps, c).get_flag(ClauseFlag::Dead));
     }
     let pos = &vars[v].pos_occurs as *const Vec<ClauseId>;
     let neg = &vars[v].neg_occurs as *const Vec<ClauseId>;
@@ -681,7 +681,7 @@ pub fn eliminate_var(
         if (*pos).is_empty() && !(*neg).is_empty() {
             // println!("-v {} p {} n {}", v, (*pos).len(), (*neg).len());
             if !asgs.enqueue_null(&mut vars[v], LFALSE, 0)
-                || propagate(asgs, cp, state, vars) != NULL_CLAUSE
+                || propagate(asgs, cps, state, vars) != NULL_CLAUSE
             {
                 state.ok = false;
                 return false;
@@ -691,7 +691,7 @@ pub fn eliminate_var(
         if (*neg).is_empty() && (*pos).is_empty() {
             // println!("+v {} p {} n {}", v, (*pos).len(), (*neg).len());
             if !asgs.enqueue_null(&mut vars[v], LTRUE, 0)
-                || propagate(asgs, cp, state, vars) != NULL_CLAUSE
+                || propagate(asgs, cps, state, vars) != NULL_CLAUSE
             {
                 state.ok = false;
                 // panic!("eliminate_var: failed to enqueue & propagate");
@@ -702,14 +702,14 @@ pub fn eliminate_var(
         let clslen = (*pos).len() + (*neg).len();
         let mut cnt = 0;
         for lit_pos in &*pos {
-            if clause!(*cp, lit_pos).get_flag(ClauseFlag::Dead) {
+            if clause!(*cps, lit_pos).get_flag(ClauseFlag::Dead) {
                 continue;
             }
             for lit_neg in &*neg {
-                if clause!(*cp, lit_neg).get_flag(ClauseFlag::Dead) {
+                if clause!(*cps, lit_neg).get_flag(ClauseFlag::Dead) {
                     continue;
                 }
-                let (res, clause_size) = check_to_merge(cp, *lit_pos, *lit_neg, v);
+                let (res, clause_size) = check_to_merge(cps, *lit_pos, *lit_neg, v);
                 if res {
                     cnt += 1;
                     if clslen + SUBSUMPITON_GROW_LIMIT < cnt
@@ -732,23 +732,23 @@ pub fn eliminate_var(
             let tmp = &mut eliminator.elim_clauses as *mut Vec<Lit>;
             if (*neg).len() < (*pos).len() {
                 for cid in &*neg {
-                    if clause!(*cp, cid).get_flag(ClauseFlag::Dead) {
+                    if clause!(*cps, cid).get_flag(ClauseFlag::Dead) {
                         continue;
                     }
-                    make_eliminated_clause(cp, &mut (*tmp), v, *cid);
-                    cp[cid.to_kind() as usize].touched[v.lit(LTRUE) as usize] = true;
-                    cp[cid.to_kind() as usize].touched[v.lit(LFALSE) as usize] = true;
+                    make_eliminated_clause(cps, &mut (*tmp), v, *cid);
+                    cps[cid.to_kind() as usize].touched[v.lit(LTRUE) as usize] = true;
+                    cps[cid.to_kind() as usize].touched[v.lit(LFALSE) as usize] = true;
                 }
                 make_eliminating_unit_clause(&mut (*tmp), v.lit(LTRUE));
             // println!("eliminate unit clause {}", v.lit(LFALSE).int());
             } else {
                 for cid in &*pos {
-                    if clause!(*cp, cid).get_flag(ClauseFlag::Dead) {
+                    if clause!(*cps, cid).get_flag(ClauseFlag::Dead) {
                         continue;
                     }
-                    make_eliminated_clause(cp, &mut (*tmp), v, *cid);
-                    cp[cid.to_kind() as usize].touched[v.lit(LTRUE) as usize] = true;
-                    cp[cid.to_kind() as usize].touched[v.lit(LFALSE) as usize] = true;
+                    make_eliminated_clause(cps, &mut (*tmp), v, *cid);
+                    cps[cid.to_kind() as usize].touched[v.lit(LTRUE) as usize] = true;
+                    cps[cid.to_kind() as usize].touched[v.lit(LFALSE) as usize] = true;
                 }
                 make_eliminating_unit_clause(&mut (*tmp), v.lit(LFALSE));
                 // println!("eliminate unit clause {}", v.lit(LTRUE).int());
@@ -757,16 +757,16 @@ pub fn eliminate_var(
         // Produce clauses in cross product:
         {
             for p in &*pos {
-                if clause!(*cp, p).get_flag(ClauseFlag::Dead) {
+                if clause!(*cps, p).get_flag(ClauseFlag::Dead) {
                     continue;
                 }
-                let act_p = clause!(*cp, p).activity;
-                let rank_p = clause!(*cp, p).rank;
+                let act_p = clause!(*cps, p).activity;
+                let rank_p = clause!(*cps, p).rank;
                 for n in &*neg {
-                    if clause!(*cp, n).get_flag(ClauseFlag::Dead) {
+                    if clause!(*cps, n).get_flag(ClauseFlag::Dead) {
                         continue;
                     }
-                    if let Some(vec) = merge(cp, eliminator, *p, *n, v) {
+                    if let Some(vec) = merge(cps, eliminator, *p, *n, v) {
                         // println!("eliminator replaces {} with a cross product {:?}", cid2fmt(*p), vec2int(&vec));
                         debug_assert!(!vec.is_empty());
                         match vec.len() {
@@ -791,11 +791,11 @@ pub fn eliminate_var(
                                 if p.to_kind() == ClauseKind::Removable as usize
                                     && n.to_kind() == ClauseKind::Removable as usize
                                 {
-                                    let act = act_p.max(clause!(*cp, n).activity);
-                                    let rank = rank_p.min(clause!(*cp, n).rank);
-                                    cp.add_clause(config, eliminator, vars, v, rank, act);
+                                    let act = act_p.max(clause!(*cps, n).activity);
+                                    let rank = rank_p.min(clause!(*cps, n).rank);
+                                    cps.add_clause(config, eliminator, vars, v, rank, act);
                                 } else {
-                                    cp.add_clause(config, eliminator, vars, v, 0, 0.0);
+                                    cps.add_clause(config, eliminator, vars, v, 0, 0.0);
                                 }
                             }
                         }
@@ -804,17 +804,17 @@ pub fn eliminate_var(
             }
         }
         for cid in &vars[v].pos_occurs {
-            cp.remove_clause(*cid);
+            cps.remove_clause(*cid);
         }
         vars[v].pos_occurs.clear();
         for cid in &vars[v].neg_occurs {
-            cp.remove_clause(*cid);
+            cps.remove_clause(*cid);
         }
         vars[v].neg_occurs.clear();
-        if propagate(asgs, cp, state, vars) != NULL_CLAUSE {
+        if propagate(asgs, cps, state, vars) != NULL_CLAUSE {
             state.ok = false;
             return false;
         }
-        eliminator.backward_subsumption_check(asgs, cp, state, vars)
+        eliminator.backward_subsumption_check(asgs, cps, state, vars)
     }
 }
