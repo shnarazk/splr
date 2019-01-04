@@ -46,6 +46,7 @@ pub trait GC {
     fn reset_lbd(&mut self, vars: &[Var], temp: &mut [usize]) -> ();
     fn bump_activity(&mut self, cix: ClauseIndex, val: f64, cla_inc: &mut f64) -> ();
     fn count(&self, alive: bool) -> usize;
+    fn check(&self);
 }
 
 /// For usize
@@ -351,13 +352,28 @@ impl GC for ClausePartition {
             ref mut head,
             ..
         } = self;
+        // unsafe {
+        //     let recycled = &mut watcher[NULL_LIT.negate() as usize] as *mut Vec<Watch>;
+        //     for ws in &mut watcher[2..] {
+        //         let mut i = 0;
+        //         while i < ws.len() {
+        //             let w = &ws[i];
+        //             if head[w.c].get_flag(ClauseFlag::Dead) {
+        //                 let w: Watch = ws.swap_remove(i);
+        //                 (*recycled).push(w);
+        //             } else {
+        //                 i += 1;
+        //             }
+        //         }
+        //     }
+        // }
         for ws in &mut watcher[2..] {
             ws.retain(|w| !head[w.c].get_flag(ClauseFlag::Dead));
         }
         let recycled = &mut watcher[NULL_LIT.negate() as usize];
-        recycled.clear();
         for (ci, ch) in self.head.iter_mut().enumerate().skip(1) {
-            if ch.get_flag(ClauseFlag::Dead) {
+            // the recycled clause is DEAD and EMPTY
+            if ch.get_flag(ClauseFlag::Dead) && !ch.lits.is_empty() {
                 recycled.push(Watch::new(NULL_LIT, ci));
                 if eliminator.use_elim {
                     for l in &ch.lits {
@@ -376,16 +392,22 @@ impl GC for ClausePartition {
                 ch.lits.clear();
             }
         }
+        // self.check();
     }
     fn new_clause(&mut self, v: &[Lit], rank: usize) -> ClauseId {
         let cix;
         let w0;
         let w1;
-        if let Some(w) = self.watcher[NULL_LIT.negate() as usize].pop() {
-            cix = w.c;
-            debug_assert_eq!(self.head[cix].get_flag(ClauseFlag::Dead), true);
+        if let Some(mut w0) = self.watcher[NULL_LIT.negate() as usize].pop() {
+            cix = w0.c;
+            // debug_assert!(self.head[cix].get_flag(ClauseFlag::Dead));
             let ch = &mut self.head[cix];
-            self.watcher[v[0].negate() as usize].push(Watch::new(v[1], cix));
+            w0.blocker = v[1];
+            self.watcher[v[0].negate() as usize].push(w0);
+            // let mut w1 = self.watcher[NULL_LIT.negate() as usize].pop().unwrap();
+            // w1.c = cix;
+            // w1.blocker = v[0];
+            // self.watcher[v[1].negate() as usize].push(w1);
             self.watcher[v[1].negate() as usize].push(Watch::new(v[0], cix));
             ch.lits.clear();
             for l in &v[..] {
@@ -458,7 +480,20 @@ impl GC for ClausePartition {
                 .filter(|c| !c.get_flag(ClauseFlag::Dead))
                 .count()
         } else {
-            self.head.len()
+            self.head.len() - 1
+        }
+    }
+    fn check(&self) {
+        let total = self.count(false);
+        let nc = self.count(true);
+        let nc2 = self.watcher.iter().skip(2).map(|v| v.len()).sum();
+        if 2 * nc != nc2 {
+            panic!("2 * {} != {}; total {}; alive {}", nc, nc2, total, nc);
+        }
+        let nd = total - nc;
+        let nd2 = self.watcher[NULL_LIT.negate() as usize].len();
+        if nd != nd2 {
+            panic!("dead {} != {}; total {}; alive {}", nd, nd2, total, nc);
         }
     }
 }
