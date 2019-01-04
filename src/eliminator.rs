@@ -403,56 +403,6 @@ fn subsume(cps: &mut ClauseDB, cid: ClauseId, other: ClauseId) -> Option<Lit> {
     Some(ret)
 }
 
-/// removes Lit `p` from Clause *self*. This is an O(n) function!
-/// returns true if the clause became a unit clause.
-/// Called only from strengthen_clause
-pub fn strengthen(cps: &mut ClauseDB, vars: &mut [Var], cid: ClauseId, p: Lit) -> bool {
-    debug_assert!(!clause!(cps, cid).get_flag(ClauseFlag::Dead));
-    debug_assert!(1 < clause!(cps, cid).lits.len());
-    let cix = cid.to_index();
-    let ClausePartition {
-        ref mut head,
-        ref mut watcher,
-        ..
-    } = cps[cid.to_kind()];
-    unsafe {
-        let ch = &mut head[cix] as *mut ClauseHead;
-        // debug_assert!((*ch).lits.contains(&p));
-        // debug_assert!(1 < (*ch).lits.len());
-        let v = &mut vars[p.vi()];
-        if p.positive() {
-            // debug_assert!(v.pos_occurs.contains(&cid));
-            v.pos_occurs.retain(|&c| c != cid);
-        } else {
-            // debug_assert!(v.neg_occurs.contains(&cid));
-            v.neg_occurs.retain(|&c| c != cid);
-        }
-        if (*ch).get_flag(ClauseFlag::Dead) {
-            return false;
-        }
-        watcher[p.negate() as usize].retain(|w| w.c != cix);
-        if (*ch).lits[0] == p || (*ch).lits[1] == p {
-            let qx = if (*ch).lits[0] == p {
-                (*ch).lits.swap_remove(0);
-                0
-            } else {
-                (*ch).lits.swap_remove(1);
-                1
-            };
-            if (*ch).lits.len() == 1 {
-                debug_assert!((*ch).lits[0] != p);
-                // println!("unit {} elimanated {}", (*ch).lits[0].int(), p.int());
-                return true;
-            }
-            let q = (*ch).lits[qx];
-            watcher[q.negate() as usize].push(Watch::new(q, cix));
-        } else {
-            (*ch).lits.retain(|&x| x != p);
-        }
-        false
-    }
-}
-
 /// Returns **false** if one of the clauses is always satisfied.
 pub fn check_to_merge(
     cpack: &ClauseDB,
@@ -595,10 +545,9 @@ pub fn strengthen_clause(
         // since changing a literal in `lit` requires updating a next_watcher,
         // it's muth easier to hold the literal to be propagated in body.lits[0]
         // let c0 = clause_head!(self.cp, cid).lit[0];
+        debug_assert!(2 == clause!(*cps, cid).lits.len());
         let c0 = clause!(*cps, cid).lits[0];
-        debug_assert!(1 == clause!(*cps, cid).lits.len());
-        debug_assert!(c0 == clause!(*cps, cid).lits[0]);
-        // println!("cid {} {:?} became a unit clause as c0 {}, l {}", cid2fmt(cid), vec2int(&clause_body!(*cp, cid).lits), c0.int(), l.int());
+        // println!("{} {:?} became a uniclause as c0 {}, l {}", cid2fmt(cid), vec2int(&clause!(*cp, cid).lits), c0.int(), l.int());
         debug_assert_ne!(c0, l);
         // println!("{} is removed and its first literal {} is enqueued.", cid2fmt(cid), c0.int());
         cps.remove_clause(cid);
@@ -616,6 +565,60 @@ pub fn strengthen_clause(
         debug_assert!(1 < clause!(*cps, cid).lits.len());
         eliminator.enqueue_clause(cid, clause_mut!(*cps, cid));
         true
+    }
+}
+
+
+/// removes Lit `p` from Clause *self*. This is an O(n) function!
+/// returns true if the clause became a unit clause.
+/// Called only from strengthen_clause
+pub fn strengthen(cps: &mut ClauseDB, vars: &mut [Var], cid: ClauseId, p: Lit) -> bool {
+    debug_assert!(!clause!(cps, cid).get_flag(ClauseFlag::Dead));
+    debug_assert!(1 < clause!(cps, cid).lits.len());
+    let cix = cid.to_index();
+    let ClausePartition {
+        ref mut head,
+        ref mut watcher,
+        ..
+    } = cps[cid.to_kind()];
+    unsafe {
+        let ch = &mut head[cix] as *mut ClauseHead;
+        // debug_assert!((*ch).lits.contains(&p));
+        // debug_assert!(1 < (*ch).lits.len());
+        let v = &mut vars[p.vi()];
+        if p.positive() {
+            // debug_assert!(v.pos_occurs.contains(&cid));
+            v.pos_occurs.retain(|&c| c != cid);
+        } else {
+            // debug_assert!(v.neg_occurs.contains(&cid));
+            v.neg_occurs.retain(|&c| c != cid);
+        }
+        if (*ch).get_flag(ClauseFlag::Dead) {
+            return false;
+        }
+        watcher[p.negate() as usize].retain(|w| w.c != cix);
+        let lits = &mut (*ch).lits;
+        if lits.len() == 2 {
+            // remove it
+            if lits[0] == p {
+                lits.swap(0, 1);
+            }
+            watcher[lits[0].negate() as usize].retain(|w| w.c != cix);
+            return true;
+        }
+        if (*ch).lits[0] == p || (*ch).lits[1] == p {
+            let q = if lits[0] == p {
+                lits.swap_remove(0);
+                lits[0]
+            } else {
+                lits.swap_remove(1);
+                lits[1]
+            };
+            watcher[q.negate() as usize].push(Watch::new(q, cix));
+        } else {
+            (*ch).lits.retain(|&x| x != p);
+        }
+        false
     }
 }
 
