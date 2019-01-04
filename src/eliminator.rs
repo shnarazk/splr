@@ -791,29 +791,15 @@ pub fn eliminate_var(
                                 }
                             }
                             _ => {
+                                let v = &mut vec.to_vec();
                                 if p.to_kind() == ClauseKind::Removable as usize
                                     && n.to_kind() == ClauseKind::Removable as usize
                                 {
-                                    let act_n = clause!(*cp, n).activity;
-                                    let rank_n = clause!(*cp, n).rank;
-                                    let new = cp.add_clause(
-                                        config,
-                                        eliminator,
-                                        vars,
-                                        &mut vec.to_vec(),
-                                        rank_p.min(rank_n),
-                                        act_p.max(act_n),
-                                    );
-                                    clause_mut!(*cp, new).activity = act_p.max(act_n);
+                                    let act = act_p.max(clause!(*cp, n).activity);
+                                    let rank = rank_p.min(clause!(*cp, n).rank);
+                                    cp.add_clause(config, eliminator, vars, v, rank, act);
                                 } else {
-                                    cp.add_clause(
-                                        config,
-                                        eliminator,
-                                        vars,
-                                        &mut vec.to_vec(),
-                                        0,
-                                        0.0,
-                                    );
+                                    cp.add_clause(config, eliminator, vars, v, 0, 0.0);
                                 }
                             }
                         }
