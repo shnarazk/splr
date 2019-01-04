@@ -45,6 +45,7 @@ pub trait GC {
     fn new_clause(&mut self, v: &[Lit], rank: usize) -> ClauseId;
     fn reset_lbd(&mut self, vars: &[Var], temp: &mut [usize]) -> ();
     fn bump_activity(&mut self, cix: ClauseIndex, val: f64, cla_inc: &mut f64) -> ();
+    fn count(&self, alive: bool) -> usize;
 }
 
 /// For usize
@@ -173,9 +174,6 @@ impl ClausePartition {
     #[inline(always)]
     pub fn index_from(&self, cid: ClauseId) -> ClauseIndex {
         cid & self.kind.mask()
-    }
-    pub fn count(&self, target: Lit, _limit: usize) -> usize {
-        self.watcher[target.negate() as usize].len()
     }
 }
 
@@ -450,6 +448,17 @@ impl GC for ClausePartition {
                 }
             }
             *cla_inc *= 1.0e-20;
+        }
+    }
+    fn count(&self, alive: bool) -> usize {
+        if alive {
+            self.head
+                .iter()
+                .skip(1)
+                .filter(|c| !c.get_flag(ClauseFlag::Dead))
+                .count()
+        } else {
+            self.head.len()
         }
     }
 }

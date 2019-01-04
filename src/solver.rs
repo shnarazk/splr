@@ -1124,25 +1124,10 @@ fn progress(
             );
             println!(
                 "   Clause DB|Remv:{:>9}, good:{:>9}, Perm:{:>9}, Binc:{:>9} ",
-                cp[ClauseKind::Removable as usize]
-                    .head
-                    .iter()
-                    .skip(1)
-                    .filter(|c| !c.get_flag(ClauseFlag::Dead))
-                    .count(),
+                cp[ClauseKind::Removable as usize].count(true),
                 good,
-                cp[ClauseKind::Permanent as usize]
-                    .head
-                    .iter()
-                    .skip(1)
-                    .filter(|c| !c.get_flag(ClauseFlag::Dead))
-                    .count(),
-                cp[ClauseKind::Binclause as usize]
-                    .head
-                    .iter()
-                    .skip(1)
-                    .filter(|c| !c.get_flag(ClauseFlag::Dead))
-                    .count(),
+                cp[ClauseKind::Permanent as usize].count(true),
+                cp[ClauseKind::Binclause as usize].count(true),
             );
             println!(
                 "     Restart|#BLK:{:>9}, #RST:{:>9}, emaASG:{:>7.2}, emaLBD:{:>7.2} ",
@@ -1191,25 +1176,10 @@ fn progress(
             fixed,
             eliminator.eliminated_vars,
             (sum as f32) / (nv as f32) * 100.0,
-            cp[ClauseKind::Removable as usize]
-                .head
-                .iter()
-                .skip(1)
-                .filter(|c| !c.get_flag(ClauseFlag::Dead))
-                .count(),
+            cp[ClauseKind::Removable as usize].count(true),
             good,
-            cp[ClauseKind::Permanent as usize]
-                .head
-                .iter()
-                .skip(1)
-                .filter(|c| !c.get_flag(ClauseFlag::Dead))
-                .count(),
-            cp[ClauseKind::Binclause as usize]
-                .head
-                .iter()
-                .skip(1)
-                .filter(|c| !c.get_flag(ClauseFlag::Dead))
-                .count(),
+            cp[ClauseKind::Permanent as usize].count(true),
+            cp[ClauseKind::Binclause as usize].count(true),
             state.stat[Stat::BlockRestart as usize],
             state.stat[Stat::Restart as usize],
             state.ema_asg.get(),
