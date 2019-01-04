@@ -353,7 +353,7 @@ impl GC for ClausePartition {
             ref mut head,
             ..
         } = self;
-        for ws in watcher.iter_mut() {
+        for ws in &mut watcher[2..] {
             ws.retain(|w| !head[w.c].get_flag(ClauseFlag::Dead));
         }
         let recycled = &mut watcher[NULL_LIT.negate() as usize];
