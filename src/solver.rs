@@ -425,7 +425,9 @@ pub fn propagate(
                     }
                     sink.push(w);
                 }
-                (*watcher).swap(NULL_LIT as usize, p);
+                if !sink.is_empty() {
+                    (*watcher).swap(NULL_LIT as usize, p);
+                }
             }
             if let Some(cid) = exit {
                 return cid;
@@ -504,7 +506,9 @@ fn propagate_fast(
                     }
                     sink.push(w);
                 }
-                (*watcher).swap(NULL_LIT as usize, p);
+                if !sink.is_empty() {
+                    (*watcher).swap(NULL_LIT as usize, p);
+                }
             }
             if let Some(cid) = exit {
                 return cid;
