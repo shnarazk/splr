@@ -524,14 +524,16 @@ impl ClauseManagement for ClauseDB {
     fn remove_clause(&mut self, cid: ClauseId) {
         // if clause_body!(self.cp, cid).get_flag(ClauseFlag::Dead) {
         //     panic!(
-        //         "remove_clause Dead: {} {:#}{:#}",
+        //         "remove_clause Dead:{} {:#}",
         //         cid2fmt(cid),
         //         clause_head!(self.cp, cid),
-        //         clause_body!(self.cp, cid)
         //     );
         // }
         clause_mut!(*self, cid).flag_on(ClauseFlag::Dead);
         let ch = clause!(*self, cid);
+        if ch.lits.is_empty() {
+            return;
+        }
         let w0 = ch.lits[0].negate();
         if 1 < ch.lits.len() {
             let w1 = ch.lits[1].negate();

@@ -821,22 +821,13 @@ pub fn eliminate_var(
                 }
             }
         }
-        for i in 0..2 {
-            for cid in if i == 0 {
-                &mut vars[v].pos_occurs
-            } else {
-                &mut vars[v].neg_occurs
-            } {
-                clause_mut!(*cp, *cid).flag_on(ClauseFlag::Dead);
-                let ch = clause!(*cp, *cid);
-                let w0 = ch.lits[0].negate();
-                let w1 = ch.lits[1].negate();
-                debug_assert!(w0 != 0 && w1 != 0);
-                cp[cid.to_kind()].touched[w0 as usize] = true;
-                cp[cid.to_kind()].touched[w1 as usize] = true;
-            }
+        for cid in &vars[v].pos_occurs {
+            cp.remove_clause(*cid);
         }
         vars[v].pos_occurs.clear();
+        for cid in &vars[v].neg_occurs {
+            cp.remove_clause(*cid);
+        }
         vars[v].neg_occurs.clear();
         if propagate_0(asgs, cp, profile, vars) != NULL_CLAUSE {
             config.ok = false;
