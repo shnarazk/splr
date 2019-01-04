@@ -770,10 +770,8 @@ pub fn eliminate_var(
                     }
                     if let Some(vec) = merge(cp, eliminator, *p, *n, v) {
                         // println!("eliminator replaces {} with a cross product {:?}", cid2fmt(*p), vec2int(&vec));
+                        debug_assert!(!vec.is_empty());
                         match vec.len() {
-                            0 => {
-                                panic!("zero");
-                            }
                             1 => {
                                 // println!(
                                 //     "eliminate_var: grounds {} from {}{:?} and {}{:?}",
