@@ -542,9 +542,6 @@ pub fn strengthen_clause(
     // println!("STRENGTHEN_CLAUSE {}", cid2fmt(cid));
     debug_assert_ne!(cid, NULL_CLAUSE);
     if strengthen(cps, vars, cid, l) {
-        // since changing a literal in `lit` requires updating a next_watcher,
-        // it's muth easier to hold the literal to be propagated in body.lits[0]
-        // let c0 = clause_head!(self.cp, cid).lit[0];
         debug_assert!(2 == clause!(*cps, cid).lits.len());
         let c0 = clause!(*cps, cid).lits[0];
         // println!("{} {:?} became a uniclause as c0 {}, l {}", cid2fmt(cid), vec2int(&clause!(*cp, cid).lits), c0.int(), l.int());
@@ -567,7 +564,6 @@ pub fn strengthen_clause(
         true
     }
 }
-
 
 /// removes Lit `p` from Clause *self*. This is an O(n) function!
 /// returns true if the clause became a unit clause.
