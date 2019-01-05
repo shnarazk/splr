@@ -379,20 +379,18 @@ pub fn propagate(
             unsafe {
                 let watcher = &mut cp[*kind as usize].watcher[..] as *mut [Vec<Watch>];
                 let source = &mut (*watcher)[p];
-                let sink = &mut (*watcher)[NULL_LIT as usize];
-                // (*watcher).swap(NULL_LIT as usize, p);
-                // let source = &mut (*watcher)[NULL_LIT as usize];
-                // let sink = &mut (*watcher)[p];
-                debug_assert!(sink.is_empty());
-                'next_clause: while let Some(mut w) = source.pop() {
+                let mut n = 1;
+                'next_clause: while n <= source.count() {
+                    let w = &mut source[n];
                     if (*head)[w.c].get_flag(ClauseFlag::Dead) {
+                        source.detach(n);
                         continue 'next_clause;
                     }
                     if None == exit {
-                        let ClauseHead { ref mut lits, .. } = &mut (*head)[w.c];
-                        debug_assert!(2 <= lits.len());
-                        debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
                         if vars.assigned(w.blocker) != LTRUE {
+                            let ClauseHead { ref mut lits, .. } = &mut (*head)[w.c];
+                            debug_assert!(2 <= lits.len());
+                            debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
                             if lits[0] == false_lit {
                                 lits.swap(0, 1); // now false_lit is lits[1].
                             }
@@ -401,14 +399,14 @@ pub fn propagate(
                             // If 0th watch is true, then clause is already satisfied.
                             if first != w.blocker && first_value == LTRUE {
                                 w.blocker = first;
-                                sink.push(w);
+                                n += 1;
                                 continue 'next_clause;
                             }
-                            w.blocker = first;
                             for (k, lk) in lits.iter().enumerate().skip(2) {
                                 // below is equivalent to 'assigned(lk) != LFALSE'
                                 if (((lk & 1) as u8) ^ vars[lk.vi()].assign) != 0 {
-                                    (*watcher)[lk.negate() as usize].push(w);
+                                    (*watcher)[lk.negate() as usize].attach(first, w.c);
+                                    source.detach(n);
                                     lits[1] = *lk;
                                     lits[k] = false_lit;
                                     continue 'next_clause;
@@ -423,10 +421,7 @@ pub fn propagate(
                             }
                         }
                     }
-                    sink.push(w);
-                }
-                if !sink.is_empty() {
-                    (*watcher).swap(NULL_LIT as usize, p);
+                    n += 1;
                 }
             }
             if let Some(cid) = exit {
@@ -459,21 +454,18 @@ fn propagate_fast(
             unsafe {
                 let watcher = &mut cp[*kind as usize].watcher[..] as *mut [Vec<Watch>];
                 let source = &mut (*watcher)[p];
-                let sink = &mut (*watcher)[NULL_LIT as usize];
-                // (*watcher).swap(NULL_LIT as usize, p);
-                // let source = &mut (*watcher)[NULL_LIT as usize];
-                // let sink = &mut (*watcher)[p];
-                debug_assert!(sink.is_empty());
-                'next_clause: while let Some(mut w) = source.pop() {
+                let mut n = 1;
+                'next_clause: while n <= source.count() {
+                    let w = &mut source[n];
                     // if (*head)[w.c].get_flag(ClauseFlag::Dead) {
                     //     continue 'next_clause;
                     // }
                     if None == exit {
-                        let ClauseHead { ref mut lits, .. } = &mut (*head)[w.c];
-                        debug_assert!(2 <= lits.len());
-                        debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
                         // debug_assert!(!vars[w.blocker.vi()].eliminated); it doesn't hold in TP12
                         if vars.assigned(w.blocker) != LTRUE {
+                            let ClauseHead { ref mut lits, .. } = &mut (*head)[w.c];
+                            debug_assert!(2 <= lits.len());
+                            debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
                             if lits[0] == false_lit {
                                 lits.swap(0, 1); // now false_lit is lits[1].
                             }
@@ -482,14 +474,14 @@ fn propagate_fast(
                             // If 0th watch is true, then clause is already satisfied.
                             if first != w.blocker && first_value == LTRUE {
                                 w.blocker = first;
-                                sink.push(w);
+                                n += 1;
                                 continue 'next_clause;
                             }
-                            w.blocker = first;
                             for (k, lk) in lits.iter().enumerate().skip(2) {
                                 // below is equivalent to 'assigned(lk) != LFALSE'
                                 if (((lk & 1) as u8) ^ vars[lk.vi()].assign) != 0 {
-                                    (*watcher)[lk.negate() as usize].push(w);
+                                    (*watcher)[lk.negate() as usize].attach(first, w.c);
+                                    source.detach(n);
                                     lits[1] = *lk;
                                     lits[k] = false_lit;
                                     continue 'next_clause;
@@ -504,10 +496,7 @@ fn propagate_fast(
                             }
                         }
                     }
-                    sink.push(w);
-                }
-                if !sink.is_empty() {
-                    (*watcher).swap(NULL_LIT as usize, p);
+                    n += 1;
                 }
             }
             if let Some(cid) = exit {
@@ -956,7 +945,11 @@ fn minimize_with_bi_clauses(
     }
     let l0 = vec[0];
     let mut nb = 0;
-    for w in &cps[ClauseKind::Binclause as usize].watcher[l0.negate() as usize] {
+    let len = cps[ClauseKind::Binclause as usize].watcher[l0.negate() as usize].count();
+    if len == 0 {
+        return;
+    }
+    for w in &cps[ClauseKind::Binclause as usize].watcher[l0.negate() as usize][1..len] {
         let ch = &cps[ClauseKind::Binclause as usize].head[w.c];
         debug_assert!(ch.lits[0] == l0 || ch.lits[1] == l0);
         let other = ch.lits[(ch.lits[0] == l0) as usize];

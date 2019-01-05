@@ -245,15 +245,19 @@ pub fn vec2int(v: &[Lit]) -> Vec<i32> {
 
 pub trait Delete<T> {
     fn delete<F>(&mut self, filter: F)
-        where F: FnMut(&T) -> bool;
+    where
+        F: FnMut(&T) -> bool;
     fn delete_unstable<F>(&mut self, filter: F)
-        where F: FnMut(&T) -> bool;
+    where
+        F: FnMut(&T) -> bool;
 }
 
 impl<T> Delete<T> for Vec<T> {
     #[inline(always)]
     fn delete<F>(&mut self, mut filter: F)
-        where F: FnMut(&T) -> bool {
+    where
+        F: FnMut(&T) -> bool,
+    {
         let mut i = 0;
         while i != self.len() {
             if filter(&mut self[i]) {
@@ -266,7 +270,9 @@ impl<T> Delete<T> for Vec<T> {
     }
     #[inline(always)]
     fn delete_unstable<F>(&mut self, mut filter: F)
-        where F: FnMut(&T) -> bool {
+    where
+        F: FnMut(&T) -> bool,
+    {
         let mut i = 0;
         while i != self.len() {
             if filter(&mut self[i]) {

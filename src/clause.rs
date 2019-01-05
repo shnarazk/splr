@@ -49,6 +49,15 @@ pub trait GC {
     fn check(&self);
 }
 
+/// For Vec<Watch>
+pub trait WatchManagement {
+    fn initialize(self, n: usize) -> Self;
+    fn count(&self) -> usize;
+    fn attach(&mut self, blocker: Lit, c: usize);
+    fn detach(&mut self, n: usize);
+    fn detach_with(&mut self, cix: usize);
+}
+
 /// For usize
 pub trait ClauseIdIndexEncoding {
     fn to_id(&self) -> ClauseId;
@@ -155,8 +164,8 @@ impl ClausePartition {
         perm.push(NULL_CLAUSE);
         let mut watcher = Vec::with_capacity(2 * (nv + 1));
         let mut touched = Vec::with_capacity(2 * (nv + 1));
-        for _i in 0..2 * (nv + 1) {
-            watcher.push(Vec::new());
+        for i in 0..2 * (nv + 1) {
+            watcher.push(Vec::new().initialize(i));
             touched.push(false);
         }
         ClausePartition {
@@ -352,23 +361,16 @@ impl GC for ClausePartition {
             ref mut head,
             ..
         } = self;
-        // unsafe {
-        //     let recycled = &mut watcher[NULL_LIT.negate() as usize] as *mut Vec<Watch>;
-        //     for ws in &mut watcher[2..] {
-        //         let mut i = 0;
-        //         while i < ws.len() {
-        //             let w = &ws[i];
-        //             if head[w.c].get_flag(ClauseFlag::Dead) {
-        //                 let w: Watch = ws.swap_remove(i);
-        //                 (*recycled).push(w);
-        //             } else {
-        //                 i += 1;
-        //             }
-        //         }
-        //     }
-        // }
         for ws in &mut watcher[2..] {
-            ws.retain(|w| !head[w.c].get_flag(ClauseFlag::Dead));
+            let mut n = 1;
+            let n_max = ws.count();
+            while n <= n_max {
+                if head[ws[n].c].get_flag(ClauseFlag::Dead) {
+                    ws.detach(n);
+                } else {
+                    n += 1;
+                }
+            }
         }
         let recycled = &mut watcher[NULL_LIT.negate() as usize];
         for (ci, ch) in self.head.iter_mut().enumerate().skip(1) {
@@ -398,17 +400,12 @@ impl GC for ClausePartition {
         let cix;
         let w0;
         let w1;
-        if let Some(mut w0) = self.watcher[NULL_LIT.negate() as usize].pop() {
-            cix = w0.c;
+        if let Some(w) = self.watcher[NULL_LIT.negate() as usize].pop() {
+            cix = w.c;
             // debug_assert!(self.head[cix].get_flag(ClauseFlag::Dead));
             let ch = &mut self.head[cix];
-            w0.blocker = v[1];
-            self.watcher[v[0].negate() as usize].push(w0);
-            // let mut w1 = self.watcher[NULL_LIT.negate() as usize].pop().unwrap();
-            // w1.c = cix;
-            // w1.blocker = v[0];
-            // self.watcher[v[1].negate() as usize].push(w1);
-            self.watcher[v[1].negate() as usize].push(Watch::new(v[0], cix));
+            self.watcher[v[0].negate() as usize].attach(v[1], cix);
+            self.watcher[v[1].negate() as usize].attach(v[0], cix);
             ch.lits.clear();
             for l in &v[..] {
                 ch.lits.push(*l);
@@ -433,8 +430,8 @@ impl GC for ClausePartition {
                 activity: 1.0,
             });
             self.perm.push(cix);
-            self.watcher[w0].push(Watch::new(l1, cix));
-            self.watcher[w1].push(Watch::new(l0, cix));
+            self.watcher[w0].attach(l1, cix);
+            self.watcher[w1].attach(l0, cix);
         };
         self.id_from(cix)
     }
@@ -486,7 +483,7 @@ impl GC for ClausePartition {
     fn check(&self) {
         let total = self.count(false);
         let nc = self.count(true);
-        let nc2 = self.watcher.iter().skip(2).map(|v| v.len()).sum();
+        let nc2 = self.watcher.iter().skip(2).map(|v| v.count()).sum();
         if 2 * nc != nc2 {
             panic!("2 * {} != {}; total {}; alive {}", nc, nc2, total, nc);
         }
@@ -680,5 +677,52 @@ impl ClauseManagement for ClauseDB {
         state.stat[Stat::Simplification as usize] += 1;
         // self.check_eliminator();
         true
+    }
+}
+
+impl WatchManagement for Vec<Watch> {
+    fn initialize(mut self, n: usize) -> Self {
+        if 2 <= n {
+            self.push(Watch {
+                blocker: NULL_LIT,
+                c: 0,
+            });
+        }
+        self
+    }
+    #[inline(always)]
+    fn count(&self) -> usize {
+        self[0].c
+    }
+    #[inline(always)]
+    fn attach(&mut self, blocker: Lit, c: usize) {
+        let next = self[0].c + 1;
+        if next == self.len() {
+            self.push(Watch { blocker, c });
+        } else {
+            self[next].blocker = blocker;
+            self[next].c = c;
+        }
+        self[0].c = next;
+    }
+    #[inline(always)]
+    fn detach(&mut self, n: usize) {
+        let last = self[0].c;
+        debug_assert!(0 < last);
+        self.swap(n, last);
+        self[last].c = NULL_CLAUSE;
+        self[0].c -= 1;
+    }
+    #[inline(always)]
+    fn detach_with(&mut self, cix: usize) {
+        let mut n = 1;
+        let n_max = self[0].c;
+        while n <= n_max {
+            if self[n].c == cix {
+                self.detach(n);
+                return;
+            }
+            n += 1;
+        }
     }
 }
