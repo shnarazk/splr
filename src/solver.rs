@@ -515,13 +515,6 @@ fn search(
             let ne = elim.eliminated_vars;
             // println!("na {} + ne {} = {} >= {}", na, ne, na + ne, num_vars);
             if config.num_vars <= na + ne {
-                // let mut cnt = 0;
-                // for v in &vars {
-                //     if v.eliminated {
-                //         cnt += 1;
-                //     }
-                // }
-                // debug_assert_eq!(cnt, elim.eliminated_vars);
                 return true;
             }
             // DYNAMIC FORCING RESTART
@@ -555,12 +548,6 @@ fn search(
             }
             // force_restart();
             if !asgs.remains() {
-                // let na = num_assigns();
-                // let ne = elim.eliminated_vars;
-                // // println!("na {} + ne {} = {} , {}", na, ne, na + ne, num_vars);
-                // if na + ne >= num_vars {
-                //     panic!("na {} + ne {}", na, ne);
-                // }
                 let vi = state.var_order.select_var(&vars);
                 debug_assert_ne!(vi, 0);
                 let p = vars[vi].phase;
@@ -571,19 +558,17 @@ fn search(
         } else {
             conflict_c += 1.0;
             state.stat[Stat::Conflict as usize] += 1;
+            let tn_confl = state.stat[Stat::Conflict as usize] as usize; // total number
             if a_decision_was_made {
                 a_decision_was_made = false;
             } else {
                 state.stat[Stat::NoDecisionConflict as usize] += 1;
             }
-            let dl = asgs.level();
-            if dl == config.root_level {
+            if asgs.level() == config.root_level {
                 analyze_final(asgs, config, cp, state, vars, ci, false);
                 return false;
             }
-            if state.stat[Stat::Conflict as usize] % 5000 == 0
-                && config.var_decay < config.var_decay_max
-            {
+            if tn_confl % 5000 == 0 && config.var_decay < config.var_decay_max {
                 config.var_decay += 0.01;
             }
             // let real_len = if trail_lim.is_empty() {
@@ -594,8 +579,7 @@ fn search(
             let real_len = asgs.len();
             state.trail_queue.enqueue(TRAIL_QUEUE_LEN, real_len);
             // DYNAMIC BLOCKING RESTART
-            let count = state.stat[Stat::Conflict as usize] as u64;
-            if 100 < count
+            if 100 < tn_confl
                 && state.lbd_queue.is_full(LBD_QUEUE_LEN)
                 && config.restart_blk * state.trail_queue.average() < (real_len as f64)
             {
@@ -611,22 +595,14 @@ fn search(
                 max(bl as usize, config.root_level),
             );
             if new_learnt.len() == 1 {
-                let l = new_learnt[0];
-                asgs.uncheck_enqueue(vars, l, NULL_CLAUSE);
+                asgs.uncheck_enqueue(vars, new_learnt[0], NULL_CLAUSE);
             } else {
                 let lbd = vars.compute_lbd(&new_learnt, &mut state.lbd_temp);
                 let v = &mut new_learnt;
                 let l0 = v[0];
                 let vlen = v.len();
                 debug_assert!(0 < lbd);
-                let cid = cp.add_clause(
-                    config,
-                    elim,
-                    vars,
-                    &mut *v,
-                    lbd,
-                    state.stat[Stat::Conflict as usize] as f64,
-                );
+                let cid = cp.add_clause(config, elim, vars, &mut *v, lbd, tn_confl as f64);
                 if lbd <= 2 {
                     state.stat[Stat::NumLBD2 as usize] += 1;
                 }
@@ -638,7 +614,7 @@ fn search(
                     // bump_cid(cid);
                     cp[ClauseKind::Removable as usize].bump_activity(
                         cid.to_index(),
-                        state.stat[Stat::Conflict as usize] as f64,
+                        tn_confl as f64,
                         &mut config.cla_inc,
                     );
                 }
@@ -646,13 +622,12 @@ fn search(
                 state.lbd_queue.enqueue(LBD_QUEUE_LEN, lbd);
                 state.stat[Stat::SumLBD as usize] += lbd as i64;
             }
-            if state.stat[Stat::Conflict as usize] % 10_000 == 0 {
+            if tn_confl % 10_000 == 0 {
                 progress(asgs, config, cp, elim, state, vars, None);
             }
-            if state.stat[Stat::Conflict as usize] == 100_000 {
+            if tn_confl == 100_000 {
                 asgs.cancel_until(vars, &mut state.var_order, 0);
                 cp.simplify(asgs, config, elim, state, vars);
-                // rebuild_heap();
                 adapt_strategy(config, cp, elim, state, vars);
                 // } else if 0 < lbd {
                 //     block_restart(lbd, dl, bl, nas);
@@ -662,12 +637,11 @@ fn search(
             // decay clause activity
             config.cla_inc /= config.cla_decay;
             // glucose reduction
-            let conflicts = state.stat[Stat::Conflict as usize] as usize;
-            if state.cur_restart * state.next_reduction <= conflicts
-                || config.glureduce && conflicts >= state.cur_restart * state.next_reduction
+            if state.cur_restart * state.next_reduction <= tn_confl
+                || config.glureduce && tn_confl >= state.cur_restart * state.next_reduction
             {
                 state.cur_restart =
-                    ((conflicts as f64) / (state.next_reduction as f64)) as usize + 1;
+                    ((tn_confl as f64) / (state.next_reduction as f64)) as usize + 1;
                 cp.reduce(elim, state, vars);
                 state.next_reduction += config.inc_reduce_db;
             }
@@ -856,9 +830,10 @@ fn analyze_removable(
                     stack.push(*q);
                     to_clear.push(*q);
                 } else {
-                    for _ in top..to_clear.len() {
-                        an_seen[to_clear.pop().unwrap().vi()] = false;
+                    for v in &to_clear[top..] {
+                        an_seen[v.vi()] = false;
                     }
+                    to_clear.truncate(top);
                     return false;
                 }
             }
@@ -893,8 +868,7 @@ fn analyze_final(
         } else {
             asgs.num_at(config.root_level)
         };
-        for i in (tl0..start).rev() {
-            let l: Lit = asgs.trail[i];
+        for l in &asgs.trail[tl0..start] {
             let vi = l.vi();
             if seen[vi] {
                 if vars[vi].reason == NULL_CLAUSE {
