@@ -73,12 +73,11 @@ pub struct SolverConfiguration {
     pub use_chan_seok: bool,
     pub co_lbd_bound: usize,
     /// CLAUSE/VARIABLE ACTIVITY
-    pub cla_decay_rate: f64,
+    pub cla_decay: f64,
     pub cla_inc: f64,
-    pub var_inc: f64,
     pub var_decay: f64,
     pub var_decay_max: f64,
-    pub var_decay_rate: f64,
+    pub var_inc: f64,
     /// CLAUSE REDUCTION
     pub first_reduction: usize,
     pub glureduce: bool,
@@ -111,12 +110,11 @@ impl Default for SolverConfiguration {
             strategy: SearchStrategy::Initial,
             use_chan_seok: false,
             co_lbd_bound: 5,
-            cla_decay_rate: 0.999,
+            cla_decay: 0.999,
             cla_inc: 1.0,
-            var_inc: 0.9,
-            var_decay: 0.8,
+            var_decay: 0.9,
             var_decay_max: 0.95,
-            var_decay_rate: 0.9,
+            var_inc: 0.9,
             first_reduction: 1000,
             glureduce: false,
             inc_reduce_db: 300,
@@ -660,11 +658,14 @@ fn search(
                 //     block_restart(lbd, dl, bl, nas);
             }
             // decay_var_activity();
+            config.var_inc /= config.var_decay;
             // decay clause activity
-            config.cla_inc /= config.cla_decay_rate;
+            config.cla_inc /= config.cla_decay;
             // glucose reduction
             let conflicts = state.stat[Stat::Conflict as usize] as usize;
-            if state.cur_restart * state.next_reduction <= conflicts {
+            if state.cur_restart * state.next_reduction <= conflicts
+                || config.glureduce && conflicts >= state.cur_restart * state.next_reduction
+            {
                 state.cur_restart =
                     ((conflicts as f64) / (state.next_reduction as f64)) as usize + 1;
                 cp.reduce(elim, state, vars);

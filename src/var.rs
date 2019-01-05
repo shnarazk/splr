@@ -16,9 +16,9 @@ pub trait VarManagement {
         cid: ClauseId,
         ch: &mut ClauseHead,
         ignorable: bool,
-        eliminator: &mut Eliminator,
+        elim: &mut Eliminator,
     ) -> ();
-    fn detach_clause(&mut self, cid: ClauseId, ch: &ClauseHead, eliminator: &mut Eliminator) -> ();
+    fn detach_clause(&mut self, cid: ClauseId, ch: &ClauseHead, elim: &mut Eliminator) -> ();
 }
 
 /// For VarIdHeap
@@ -145,15 +145,15 @@ impl VarManagement for [Var] {
         cid: ClauseId,
         ch: &mut ClauseHead,
         ignorable: bool,
-        eliminator: &mut Eliminator,
+        elim: &mut Eliminator,
     ) {
-        if !eliminator.use_elim {
+        if !elim.use_elim {
             return;
         }
         for l in &ch.lits {
             let mut v = &mut self[l.vi()];
             v.touched = true;
-            eliminator.n_touched += 1;
+            elim.n_touched += 1;
             if !v.eliminated {
                 if l.positive() {
                     v.pos_occurs.push(cid);
@@ -163,12 +163,12 @@ impl VarManagement for [Var] {
             }
         }
         if !ignorable {
-            eliminator.enqueue_clause(cid, ch);
+            elim.enqueue_clause(cid, ch);
         }
     }
-    fn detach_clause(&mut self, cid: ClauseId, ch: &ClauseHead, eliminator: &mut Eliminator) {
+    fn detach_clause(&mut self, cid: ClauseId, ch: &ClauseHead, elim: &mut Eliminator) {
         debug_assert!(ch.get_flag(ClauseFlag::Dead));
-        if eliminator.use_elim {
+        if elim.use_elim {
             for l in &ch.lits {
                 let v = &mut self[l.vi()];
                 if !v.eliminated {
@@ -179,7 +179,7 @@ impl VarManagement for [Var] {
                         v.neg_occurs.retain(|&cj| cid != cj);
                     }
                     // let xy = v.pos_occurs.len() + v.neg_occurs.len();
-                    eliminator.enqueue_var(v);
+                    elim.enqueue_var(v);
                 }
             }
         }
@@ -189,7 +189,7 @@ impl VarManagement for [Var] {
 // pub struct VarManager {
 //     vec: Vec<Var>,
 //     activity_heap: VarIdHeap,
-//     eliminator: Eliminator,
+//     elim: Eliminator,
 // }
 
 pub enum VarOrder {
