@@ -67,37 +67,39 @@ impl SearchStrategy {
 pub struct SolverConfiguration {
     pub root_level: usize,
     pub num_vars: usize,
+    /// STARATEGY
     pub adapt_strategy: bool,
     pub strategy: SearchStrategy,
     pub use_chan_seok: bool,
-    /// decay rate for variable activity
-    pub variable_decay_rate: f64,
-    /// decay rate for clause activity
-    pub clause_decay_rate: f64,
+    pub co_lbd_bound: usize,
+    /// CLAUSE/VARIABLE ACTIVITY
+    pub cla_decay_rate: f64,
     pub cla_inc: f64,
     pub var_inc: f64,
     pub var_decay: f64,
     pub var_decay_max: f64,
-    /// dump stats data during solving
-    pub dump_solver_stat_mode: i32,
-    /// the coefficients for restarts
+    pub var_decay_rate: f64,
+    /// CLAUSE REDUCTION
+    pub first_reduction: usize,
+    pub glureduce: bool,
+    pub inc_reduce_db: usize,
+    pub inc_reduce_db_extra: usize,
     pub ema_coeffs: (i32, i32),
+    /// RESTART
     pub restart_thr: f64,
     pub restart_blk: f64,
-    /// restart expansion factor
     pub restart_expansion: f64,
-    /// static steps between restarts
     pub restart_step: f64,
     pub luby_restart: bool,
     pub luby_restart_num_conflict: f64,
     pub luby_restart_inc: f64,
     pub luby_current_restarts: usize,
     pub luby_restart_factor: f64,
-    pub co_lbd_bound: usize,
-    pub inc_reduce_db: usize,
-    pub first_reduction: usize,
+    /// MISC
     pub use_sve: bool,
     pub use_tty: bool,
+    /// dump stats data during solving
+    pub dump_solver_stat_mode: i32,
 }
 
 impl Default for SolverConfiguration {
@@ -108,14 +110,17 @@ impl Default for SolverConfiguration {
             adapt_strategy: true,
             strategy: SearchStrategy::Initial,
             use_chan_seok: false,
-            variable_decay_rate: 0.9,
-            clause_decay_rate: 0.999,
+            co_lbd_bound: 5,
+            cla_decay_rate: 0.999,
             cla_inc: 1.0,
             var_inc: 0.9,
-            var_decay: VAR_DECAY,
-            var_decay_max: MAX_VAR_DECAY,
-            dump_solver_stat_mode: 0,
-            ema_coeffs: (2 ^ 5, 2 ^ 15),
+            var_decay: 0.8,
+            var_decay_max: 0.95,
+            var_decay_rate: 0.9,
+            first_reduction: 1000,
+            glureduce: false,
+            inc_reduce_db: 300,
+            inc_reduce_db_extra: 1000,
             restart_thr: RESTART_THR,
             restart_blk: RESTART_BLK,
             restart_expansion: 1.15,
@@ -125,11 +130,10 @@ impl Default for SolverConfiguration {
             luby_restart_inc: 2.0,
             luby_current_restarts: 0,
             luby_restart_factor: 100.0,
-            co_lbd_bound: 4,
-            inc_reduce_db: 300,
-            first_reduction: 1000,
+            ema_coeffs: (2 ^ 5, 2 ^ 15),
             use_sve: true,
             use_tty: true,
+            dump_solver_stat_mode: 0,
         }
     }
 }
@@ -149,15 +153,15 @@ const LBD_QUEUE_LEN: usize = 50;
 const TRAIL_QUEUE_LEN: usize = 5000;
 
 impl Solver {
-    pub fn new(cfg: SolverConfiguration, cnf: &CNFDescription) -> Solver {
+    pub fn new(config: SolverConfiguration, cnf: &CNFDescription) -> Solver {
         let nv = cnf.num_of_variables as usize;
         let nc = cnf.num_of_clauses as usize;
         let path = &cnf.pathname;
-        let (_fe, se) = cfg.ema_coeffs;
-        let sve = cfg.use_sve;
+        let (_fe, se) = config.ema_coeffs;
+        let sve = config.use_sve;
         Solver {
             asgs: AssignStack::new(nv),
-            config: cfg,
+            config,
             cps: [
                 ClausePartition::build(ClauseKind::Liftedlit, nv, 0),
                 ClausePartition::build(ClauseKind::Removable, nv, nc),
@@ -340,8 +344,7 @@ impl SatSolver for Solver {
         match v.len() {
             0 => None, // Empty clause is UNSAT.
             1 => {
-                let dl = asgs.level();
-                asgs.enqueue_null(&mut vars[v[0].vi()], v[0].lbool(), dl);
+                asgs.enqueue_null(&mut vars[v[0].vi()], v[0].lbool(), asgs.level());
                 Some(NULL_CLAUSE)
             }
             _ => {
@@ -363,13 +366,11 @@ pub fn propagate(
         let p: usize = asgs.sweep() as usize;
         let false_lit = (p as Lit).negate();
         state.stat[Stat::Propagation as usize] += 1;
-        let kinds = [
+        for kind in &[
             ClauseKind::Binclause,
             ClauseKind::Removable,
             ClauseKind::Permanent,
-        ];
-        for kind in &kinds {
-            let mut exit: Option<ClauseId> = None;
+        ] {
             let head = &mut cp[*kind as usize].head[..];
             unsafe {
                 let watcher = &mut cp[*kind as usize].watcher[..] as *mut [Vec<Watch>];
@@ -381,46 +382,41 @@ pub fn propagate(
                         source.detach(n);
                         continue 'next_clause;
                     }
-                    if None == exit {
-                        if vars.assigned(w.blocker) != LTRUE {
-                            let ClauseHead { ref mut lits, .. } = &mut (*head)[w.c];
-                            debug_assert!(2 <= lits.len());
-                            debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
-                            if lits[0] == false_lit {
-                                lits.swap(0, 1); // now false_lit is lits[1].
-                            }
-                            let first = lits[0];
-                            let first_value = vars.assigned(first);
-                            // If 0th watch is true, then clause is already satisfied.
-                            if first != w.blocker && first_value == LTRUE {
-                                w.blocker = first;
-                                n += 1;
+                    if vars.assigned(w.blocker) != LTRUE {
+                        let ClauseHead { ref mut lits, .. } = &mut (*head)[w.c];
+                        debug_assert!(2 <= lits.len());
+                        debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
+                        if lits[0] == false_lit {
+                            lits.swap(0, 1); // now false_lit is lits[1].
+                        }
+                        let first = lits[0];
+                        let first_value = vars.assigned(first);
+                        // If 0th watch is true, then clause is already satisfied.
+                        if first != w.blocker && first_value == LTRUE {
+                            w.blocker = first;
+                            n += 1;
+                            continue 'next_clause;
+                        }
+                        for (k, lk) in lits.iter().enumerate().skip(2) {
+                            // below is equivalent to 'assigned(lk) != LFALSE'
+                            if (((lk & 1) as u8) ^ vars[lk.vi()].assign) != 0 {
+                                (*watcher)[lk.negate() as usize].attach(first, w.c);
+                                source.detach(n);
+                                lits[1] = *lk;
+                                lits[k] = false_lit;
                                 continue 'next_clause;
                             }
-                            for (k, lk) in lits.iter().enumerate().skip(2) {
-                                // below is equivalent to 'assigned(lk) != LFALSE'
-                                if (((lk & 1) as u8) ^ vars[lk.vi()].assign) != 0 {
-                                    (*watcher)[lk.negate() as usize].attach(first, w.c);
-                                    source.detach(n);
-                                    lits[1] = *lk;
-                                    lits[k] = false_lit;
-                                    continue 'next_clause;
-                                }
-                            }
-                            if first_value == LFALSE {
-                                asgs.catchup();
-                                // println!("conflict by {} {:?}", cid2fmt(kind.id_from(w.c)), vec2int(&lits));
-                                exit = Some(kind.id_from(w.c));
-                            } else {
-                                asgs.uncheck_enqueue(vars, first, kind.id_from(w.c));
-                            }
+                        }
+                        if first_value == LFALSE {
+                            asgs.catchup();
+                            // println!("conflict by {} {:?}", cid2fmt(kind.id_from(w.c)), vec2int(&lits));
+                            return kind.id_from(w.c);
+                        } else {
+                            asgs.uncheck_enqueue(vars, first, kind.id_from(w.c));
                         }
                     }
                     n += 1;
                 }
-            }
-            if let Some(cid) = exit {
-                return cid;
             }
         }
     }
@@ -438,13 +434,11 @@ fn propagate_fast(
         let p: usize = asgs.sweep() as usize;
         let false_lit = (p as Lit).negate();
         state.stat[Stat::Propagation as usize] += 1;
-        let kinds = [
+        for kind in &[
             ClauseKind::Binclause,
             ClauseKind::Removable,
             ClauseKind::Permanent,
-        ];
-        for kind in &kinds {
-            let mut exit: Option<ClauseId> = None;
+        ] {
             let head = &mut cp[*kind as usize].head[..];
             unsafe {
                 let watcher = &mut cp[*kind as usize].watcher[..] as *mut [Vec<Watch>];
@@ -453,49 +447,45 @@ fn propagate_fast(
                 'next_clause: while n <= source.count() {
                     let w = &mut source[n];
                     // if (*head)[w.c].get_flag(ClauseFlag::Dead) {
+                    //     source.detach(n);
                     //     continue 'next_clause;
                     // }
-                    if None == exit {
-                        // debug_assert!(!vars[w.blocker.vi()].eliminated); it doesn't hold in TP12
-                        if vars.assigned(w.blocker) != LTRUE {
-                            let ClauseHead { ref mut lits, .. } = &mut (*head)[w.c];
-                            debug_assert!(2 <= lits.len());
-                            debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
-                            if lits[0] == false_lit {
-                                lits.swap(0, 1); // now false_lit is lits[1].
-                            }
-                            let first = lits[0];
-                            let first_value = vars.assigned(first);
-                            // If 0th watch is true, then clause is already satisfied.
-                            if first != w.blocker && first_value == LTRUE {
-                                w.blocker = first;
-                                n += 1;
+                    // debug_assert!(!vars[w.blocker.vi()].eliminated); it doesn't hold in TP12
+                    if vars.assigned(w.blocker) != LTRUE {
+                        let ClauseHead { ref mut lits, .. } = &mut (*head)[w.c];
+                        debug_assert!(2 <= lits.len());
+                        debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
+                        if lits[0] == false_lit {
+                            lits.swap(0, 1); // now false_lit is lits[1].
+                        }
+                        let first = lits[0];
+                        let first_value = vars.assigned(first);
+                        // If 0th watch is true, then clause is already satisfied.
+                        if first != w.blocker && first_value == LTRUE {
+                            w.blocker = first;
+                            n += 1;
+                            continue 'next_clause;
+                        }
+                        for (k, lk) in lits.iter().enumerate().skip(2) {
+                            // below is equivalent to 'assigned(lk) != LFALSE'
+                            if (((lk & 1) as u8) ^ vars[lk.vi()].assign) != 0 {
+                                (*watcher)[lk.negate() as usize].attach(first, w.c);
+                                source.detach(n);
+                                lits[1] = *lk;
+                                lits[k] = false_lit;
                                 continue 'next_clause;
                             }
-                            for (k, lk) in lits.iter().enumerate().skip(2) {
-                                // below is equivalent to 'assigned(lk) != LFALSE'
-                                if (((lk & 1) as u8) ^ vars[lk.vi()].assign) != 0 {
-                                    (*watcher)[lk.negate() as usize].attach(first, w.c);
-                                    source.detach(n);
-                                    lits[1] = *lk;
-                                    lits[k] = false_lit;
-                                    continue 'next_clause;
-                                }
-                            }
-                            if first_value == LFALSE {
-                                asgs.catchup();
-                                // println!("conflict by {} {:?}", cid2fmt(kind.id_from(w.c)), vec2int(&lits));
-                                exit = Some(kind.id_from(w.c));
-                            } else {
-                                asgs.uncheck_enqueue(vars, first, kind.id_from(w.c));
-                            }
+                        }
+                        if first_value == LFALSE {
+                            asgs.catchup();
+                            // println!("conflict by {} {:?}", cid2fmt(kind.id_from(w.c)), vec2int(&lits));
+                            return kind.id_from(w.c);
+                        } else {
+                            asgs.uncheck_enqueue(vars, first, kind.id_from(w.c));
                         }
                     }
                     n += 1;
                 }
-            }
-            if let Some(cid) = exit {
-                return cid;
             }
         }
     }
@@ -671,7 +661,7 @@ fn search(
             }
             // decay_var_activity();
             // decay clause activity
-            config.cla_inc /= config.clause_decay_rate;
+            config.cla_inc /= config.cla_decay_rate;
             // glucose reduction
             let conflicts = state.stat[Stat::Conflict as usize] as usize;
             if state.cur_restart * state.next_reduction <= conflicts {
@@ -992,7 +982,7 @@ fn adapt_strategy(
         SearchStrategy::LowDecisions => {
             config.use_chan_seok = true;
             config.co_lbd_bound = 4;
-            let _glureduce = true;
+            config.glureduce = true;
             config.first_reduction = 2000;
             state.next_reduction = 2000;
             state.cur_restart = ((state.stat[Stat::Conflict as usize] as f64
@@ -1008,7 +998,7 @@ fn adapt_strategy(
         }
         SearchStrategy::HighSuccesive => {
             config.use_chan_seok = true;
-            let _glureduce = true;
+            config.glureduce = true;
             config.co_lbd_bound = 3;
             config.first_reduction = 30000;
             config.var_decay = 0.99;
