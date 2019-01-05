@@ -37,7 +37,7 @@ fn main() {
             s.config.use_tty = false;
         }
         if args.no_elim {
-            s.eliminator.use_elim = false;
+            s.elim.use_elim = false;
         }
         s.config.adapt_strategy = !args.no_adapt;
         s.config.restart_thr = args.restart_threshold;

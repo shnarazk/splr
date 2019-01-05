@@ -103,7 +103,7 @@ impl EliminatorIF for Eliminator {
             };
             if rank <= accept {
                 self.clause_queue.push(cid);
-                // println!("increment {}", self.eliminator.clause_queue.len());
+                // println!("increment {}", self.clause_queue.len());
                 ch.flag_on(ClauseFlag::Enqueued);
                 self.clause_queue_threshold -= 1;
             }
@@ -292,13 +292,13 @@ impl EliminatorIF for Eliminator {
                 break 'perform;
             }
             while !self.var_queue.is_empty() {
-                let elim = self.var_queue.remove(0);
-                vars[elim].enqueued = false;
-                if vars[elim].eliminated || vars[elim].assign != BOTTOM {
+                let vi = self.var_queue.remove(0);
+                vars[vi].enqueued = false;
+                if vars[vi].eliminated || vars[vi].assign != BOTTOM {
                     continue;
                 }
                 // FIXME!
-                if !eliminate_var(asgs, config, cps, self, state, vars, elim) {
+                if !eliminate_var(asgs, config, cps, self, state, vars, vi) {
                     state.ok = false;
                     break 'perform;
                 }
@@ -435,7 +435,6 @@ fn make_eliminating_unit_clause(vec: &mut Vec<Lit>, x: Lit) {
 
 pub fn check_eliminator(cps: &ClauseDB, vars: &[Var]) -> bool {
     // clause_queue should be clear.
-    // debug_assert!(self.eliminator.clause_queue.is_empty());
     // all elements in occur_lists exist.
     // for v in vars {
     //     for c in &v.pos_occurs {
@@ -482,13 +481,13 @@ pub fn check_eliminator(cps: &ClauseDB, vars: &[Var]) -> bool {
 /// Returns **false** if one of the clauses is always satisfied. (merge_vec should not be used.)
 pub fn merge(
     cps: &mut ClauseDB,
-    eliminator: &mut Eliminator,
+    elim: &mut Eliminator,
     cip: ClauseId,
     ciq: ClauseId,
     v: VarId,
 ) -> Option<Vec<Lit>> {
     let mut vec: Vec<Lit> = Vec::new();
-    eliminator.merges += 1;
+    elim.merges += 1;
     let pqb = clause!(*cps, cip);
     let qpb = clause!(*cps, ciq);
     let ps_smallest = pqb.lits.len() < qpb.lits.len();
@@ -523,7 +522,7 @@ pub fn merge(
 /// - calls `enqueue_var`
 pub fn strengthen_clause(
     cps: &mut ClauseDB,
-    eliminator: &mut Eliminator,
+    elim: &mut Eliminator,
     state: &mut SolverState,
     vars: &mut [Var],
     asgs: &mut AssignStack,
@@ -543,7 +542,7 @@ pub fn strengthen_clause(
         debug_assert_ne!(c0, l);
         // println!("{} is removed and its first literal {} is enqueued.", cid2fmt(cid), c0.int());
         cps.remove_clause(cid);
-        vars.detach_clause(cid, clause!(*cps, cid), eliminator);
+        vars.detach_clause(cid, clause!(*cps, cid), elim);
         if asgs.enqueue_null(&mut vars[c0.vi()], c0.lbool(), 0)
             && propagate(asgs, cps, state, vars) == NULL_CLAUSE
         {
@@ -555,7 +554,7 @@ pub fn strengthen_clause(
     } else {
         // println!("cid {} drops literal {}", cid2fmt(cid), l.int());
         debug_assert!(1 < clause!(*cps, cid).lits.len());
-        eliminator.enqueue_clause(cid, clause_mut!(*cps, cid));
+        elim.enqueue_clause(cid, clause_mut!(*cps, cid));
         true
     }
 }
@@ -641,7 +640,7 @@ pub fn eliminate_var(
     asgs: &mut AssignStack,
     config: &mut SolverConfiguration,
     cps: &mut ClauseDB,
-    eliminator: &mut Eliminator,
+    elim: &mut Eliminator,
     state: &mut SolverState,
     vars: &mut [Var],
     v: VarId,
@@ -702,7 +701,7 @@ pub fn eliminate_var(
                 if res {
                     cnt += 1;
                     if clslen + SUBSUMPITON_GROW_LIMIT < cnt
-                        || (eliminator.clause_lim != 0 && eliminator.clause_lim < clause_size)
+                        || (elim.clause_lim != 0 && elim.clause_lim < clause_size)
                     {
                         return true;
                     }
@@ -716,9 +715,9 @@ pub fn eliminate_var(
         debug_assert_eq!(cid, NULL_CLAUSE);
         // println!("- eliminate var: {:>8} (+{:<4} -{:<4}); {:?}", v, (*pos).len(), (*neg).len(), vars[v]);
         // setDecisionVar(v, false);
-        eliminator.eliminated_vars += 1;
+        elim.eliminated_vars += 1;
         {
-            let tmp = &mut eliminator.elim_clauses as *mut Vec<Lit>;
+            let tmp = &mut elim.elim_clauses as *mut Vec<Lit>;
             if (*neg).len() < (*pos).len() {
                 for cid in &*neg {
                     if clause!(*cps, cid).get_flag(ClauseFlag::Dead) {
@@ -755,7 +754,7 @@ pub fn eliminate_var(
                     if clause!(*cps, n).get_flag(ClauseFlag::Dead) {
                         continue;
                     }
-                    if let Some(vec) = merge(cps, eliminator, *p, *n, v) {
+                    if let Some(vec) = merge(cps, elim, *p, *n, v) {
                         // println!("eliminator replaces {} with a cross product {:?}", cid2fmt(*p), vec2int(&vec));
                         debug_assert!(!vec.is_empty());
                         match vec.len() {
@@ -782,9 +781,9 @@ pub fn eliminate_var(
                                 {
                                     let act = act_p.max(clause!(*cps, n).activity);
                                     let rank = rank_p.min(clause!(*cps, n).rank);
-                                    cps.add_clause(config, eliminator, vars, v, rank, act);
+                                    cps.add_clause(config, elim, vars, v, rank, act);
                                 } else {
-                                    cps.add_clause(config, eliminator, vars, v, 0, 0.0);
+                                    cps.add_clause(config, elim, vars, v, 0, 0.0);
                                 }
                             }
                         }
@@ -804,6 +803,6 @@ pub fn eliminate_var(
             state.ok = false;
             return false;
         }
-        eliminator.backward_subsumption_check(asgs, cps, state, vars)
+        elim.backward_subsumption_check(asgs, cps, state, vars)
     }
 }

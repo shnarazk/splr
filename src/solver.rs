@@ -140,7 +140,7 @@ pub struct Solver {
     pub asgs: AssignStack,
     pub config: SolverConfiguration, // Configuration
     pub cps: ClauseDB,               // Clauses
-    pub eliminator: Eliminator,      // Clause/Variable Elimination
+    pub elim: Eliminator,            // Clause/Variable Elimination
     pub state: SolverState,
     pub vars: Vec<Var>, // Variables
 }
@@ -164,7 +164,7 @@ impl Solver {
                 ClausePartition::build(ClauseKind::Permanent, nv, 256),
                 ClausePartition::build(ClauseKind::Binclause, nv, 256),
             ],
-            eliminator: Eliminator::new(sve),
+            elim: Eliminator::new(sve),
             state: SolverState::new(nv, se, &path.to_string()),
             vars: Var::new_vars(nv),
         }
@@ -177,7 +177,7 @@ impl SatSolver for Solver {
             ref mut asgs,
             ref mut config,
             ref mut cps,
-            ref mut eliminator,
+            ref mut elim,
             ref mut state,
             ref mut vars,
         } = self;
@@ -187,10 +187,10 @@ impl SatSolver for Solver {
         // TODO: deal with assumptions
         // s.root_level = 0;
         state.num_solved_vars = asgs.len();
-        progress(asgs, config, cps, eliminator, state, vars, Some(""));
-        // eliminator.use_elim = true;
-        eliminator.var_queue.clear();
-        if eliminator.use_elim {
+        progress(asgs, config, cps, elim, state, vars, Some(""));
+        // elim.use_elim = true;
+        elim.var_queue.clear();
+        if elim.use_elim {
             for v in &mut vars[1..] {
                 if v.neg_occurs.is_empty() && !v.pos_occurs.is_empty() && v.assign == BOTTOM {
                     debug_assert!(!v.eliminated);
@@ -206,46 +206,41 @@ impl SatSolver for Solver {
                     v.assign = LFALSE;
                     asgs.push(v.index.lit(LFALSE));
                 } else if v.pos_occurs.len() == 1 || v.neg_occurs.len() == 1 {
-                    eliminator.enqueue_var(v);
+                    elim.enqueue_var(v);
                 }
             }
-            progress(asgs, config, cps, eliminator, state, vars, Some("load"));
-            cps.simplify(asgs, config, eliminator, state, vars);
-            progress(asgs, config, cps, eliminator, state, vars, Some("simp"));
+            progress(asgs, config, cps, elim, state, vars, Some("load"));
+            cps.simplify(asgs, config, elim, state, vars);
+            progress(asgs, config, cps, elim, state, vars, Some("simp"));
         } else {
-            progress(asgs, config, cps, eliminator, state, vars, Some("load"));
+            progress(asgs, config, cps, elim, state, vars, Some("load"));
         }
-        // self.config.use_sve = false;
-        // self.eliminator.use_elim = false;
+        // config.use_sve = false;
+        // elim.use_elim = false;
         state.stat[Stat::Simplification as usize] += 1;
-        if search(asgs, config, cps, eliminator, state, vars) {
+        if search(asgs, config, cps, elim, state, vars) {
             if !state.ok {
                 asgs.cancel_until(vars, &mut state.var_order, 0);
-                progress(asgs, config, cps, eliminator, state, vars, Some("error"));
+                progress(asgs, config, cps, elim, state, vars, Some("error"));
                 return Err(SolverException::InternalInconsistent);
             }
-            progress(asgs, config, cps, eliminator, state, vars, None);
+            progress(asgs, config, cps, elim, state, vars, None);
             let mut result = Vec::new();
-            for (vi, v) in vars
-                .iter()
-                .enumerate()
-                .take(self.config.num_vars + 1)
-                .skip(1)
-            {
+            for (vi, v) in vars.iter().enumerate().take(config.num_vars + 1).skip(1) {
                 match v.assign {
                     LTRUE => result.push(vi as i32),
                     LFALSE => result.push(0 - vi as i32),
                     _ => result.push(0),
                 }
             }
-            if eliminator.use_elim {
-                eliminator.extend_model(&mut result);
+            if elim.use_elim {
+                elim.extend_model(&mut result);
             }
             asgs.cancel_until(vars, &mut state.var_order, 0);
             Ok(Certificate::SAT(result))
         } else {
-            progress(asgs, config, cps, eliminator, state, vars, None);
-            self.asgs.cancel_until(vars, &mut state.var_order, 0);
+            progress(asgs, config, cps, elim, state, vars, None);
+            asgs.cancel_until(vars, &mut state.var_order, 0);
             Ok(Certificate::UNSAT(
                 state.conflicts.iter().map(|l| l.int()).collect(),
             ))
@@ -318,7 +313,7 @@ impl SatSolver for Solver {
         let Solver {
             ref mut asgs,
             ref mut cps,
-            ref mut eliminator,
+            ref mut elim,
             ref mut vars,
             ..
         } = self;
@@ -351,7 +346,7 @@ impl SatSolver for Solver {
             }
             _ => {
                 let cid = cps[kind as usize].new_clause(&v, 0);
-                vars.attach_clause(cid, clause_mut!(*cps, cid), true, eliminator);
+                vars.attach_clause(cid, clause_mut!(*cps, cid), true, elim);
                 Some(cid)
             }
         }
@@ -513,7 +508,7 @@ fn search(
     asgs: &mut AssignStack,
     config: &mut SolverConfiguration,
     cp: &mut ClauseDB,
-    eliminator: &mut Eliminator,
+    elim: &mut Eliminator,
     state: &mut SolverState,
     vars: &mut [Var],
 ) -> bool {
@@ -529,7 +524,7 @@ fn search(
         let ci = propagate_fast(asgs, cp, state, vars);
         if ci == NULL_CLAUSE {
             let na = asgs.len();
-            let ne = eliminator.eliminated_vars;
+            let ne = elim.eliminated_vars;
             // println!("na {} + ne {} = {} >= {}", na, ne, na + ne, num_vars);
             if config.num_vars <= na + ne {
                 // let mut cnt = 0;
@@ -538,7 +533,7 @@ fn search(
                 //         cnt += 1;
                 //     }
                 // }
-                // debug_assert_eq!(cnt, eliminator.eliminated_vars);
+                // debug_assert_eq!(cnt, elim.eliminated_vars);
                 return true;
             }
             // DYNAMIC FORCING RESTART
@@ -563,7 +558,7 @@ fn search(
                 // return
             }
             if asgs.level() == 0 {
-                cp.simplify(asgs, config, eliminator, state, vars);
+                cp.simplify(asgs, config, elim, state, vars);
                 if !state.ok {
                     return false;
                 }
@@ -573,7 +568,7 @@ fn search(
             // force_restart();
             if !asgs.remains() {
                 // let na = num_assigns();
-                // let ne = eliminator.eliminated_vars;
+                // let ne = elim.eliminated_vars;
                 // // println!("na {} + ne {} = {} , {}", na, ne, na + ne, num_vars);
                 // if na + ne >= num_vars {
                 //     panic!("na {} + ne {}", na, ne);
@@ -581,7 +576,7 @@ fn search(
                 let vi = state.var_order.select_var(&vars);
                 debug_assert_ne!(vi, 0);
                 let p = vars[vi].phase;
-                asgs.uncheck_assume(vars, eliminator, vi.lit(p));
+                asgs.uncheck_assume(vars, elim, vi.lit(p));
                 state.stat[Stat::Decision as usize] += 1;
                 a_decision_was_made = true;
             }
@@ -638,7 +633,7 @@ fn search(
                 debug_assert!(0 < lbd);
                 let cid = cp.add_clause(
                     config,
-                    eliminator,
+                    elim,
                     vars,
                     &mut *v,
                     lbd,
@@ -664,13 +659,13 @@ fn search(
                 state.stat[Stat::SumLBD as usize] += lbd as i64;
             }
             if state.stat[Stat::Conflict as usize] % 10_000 == 0 {
-                progress(asgs, config, cp, eliminator, state, vars, None);
+                progress(asgs, config, cp, elim, state, vars, None);
             }
             if state.stat[Stat::Conflict as usize] == 100_000 {
                 asgs.cancel_until(vars, &mut state.var_order, 0);
-                cp.simplify(asgs, config, eliminator, state, vars);
+                cp.simplify(asgs, config, elim, state, vars);
                 // rebuild_heap();
-                adapt_strategy(config, cp, eliminator, state, vars);
+                adapt_strategy(config, cp, elim, state, vars);
                 // } else if 0 < lbd {
                 //     block_restart(lbd, dl, bl, nas);
             }
@@ -682,7 +677,7 @@ fn search(
             if state.cur_restart * state.next_reduction <= conflicts {
                 state.cur_restart =
                     ((conflicts as f64) / (state.next_reduction as f64)) as usize + 1;
-                cp.reduce(eliminator, state, vars);
+                cp.reduce(elim, state, vars);
                 state.next_reduction += config.inc_reduce_db;
             }
             // Since the conflict path pushes a new literal to trail,
@@ -970,7 +965,7 @@ fn minimize_with_bi_clauses(
 fn adapt_strategy(
     config: &mut SolverConfiguration,
     cps: &mut ClauseDB,
-    eliminator: &mut Eliminator,
+    elim: &mut Eliminator,
     state: &mut SolverState,
     vars: &mut [Var],
 ) {
@@ -1051,7 +1046,7 @@ fn adapt_strategy(
                 ch.flag_on(ClauseFlag::Dead);
             }
         }
-        learnts.garbage_collect(vars, eliminator);
+        learnts.garbage_collect(vars, elim);
     }
 }
 
@@ -1060,7 +1055,7 @@ fn progress(
     asgs: &AssignStack,
     config: &mut SolverConfiguration,
     cp: &ClauseDB,
-    eliminator: &Eliminator,
+    elim: &Eliminator,
     state: &mut SolverState,
     vars: &[Var],
     mes: Option<&str>,
@@ -1077,7 +1072,7 @@ fn progress(
     } else {
         asgs.num_at(0)
     };
-    let sum = fixed + eliminator.eliminated_vars;
+    let sum = fixed + elim.eliminated_vars;
     let learnts = &cp[ClauseKind::Removable as usize];
     let good = learnts
         .head
@@ -1111,7 +1106,7 @@ fn progress(
                 "  Assignment|#rem:{:>9}, #fix:{:>9}, #elm:{:>9}, prog%:{:>8.4} ",
                 nv - sum,
                 fixed,
-                eliminator.eliminated_vars,
+                elim.eliminated_vars,
                 (sum as f32) / (nv as f32) * 100.0,
             );
             println!(
@@ -1137,8 +1132,8 @@ fn progress(
             );
             println!(
                 "  Eliminator|#cls:{:>9}, #var:{:>9},   Clause DB mgr|#smp:{:>9} ",
-                eliminator.clause_queue_len(),
-                eliminator.var_queue_len(),
+                elim.clause_queue_len(),
+                elim.var_queue_len(),
                 state.stat[Stat::Simplification as usize],
             );
         }
@@ -1166,7 +1161,7 @@ fn progress(
             msg,
             nv - sum,
             fixed,
-            eliminator.eliminated_vars,
+            elim.eliminated_vars,
             (sum as f32) / (nv as f32) * 100.0,
             cp[ClauseKind::Removable as usize].count(true),
             good,
@@ -1179,8 +1174,8 @@ fn progress(
             state.ema_lbd.slow,
             state.b_lvl.0,
             state.c_lvl.0,
-            eliminator.clause_queue_len(),
-            eliminator.var_queue_len(),
+            elim.clause_queue_len(),
+            elim.var_queue_len(),
         );
 
         // if self.state.progress_cnt == -1 {
