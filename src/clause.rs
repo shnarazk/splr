@@ -381,9 +381,9 @@ impl GC for ClausePartition {
                         let v = &mut vars[vi];
                         if !v.eliminated {
                             if l.positive() {
-                                v.pos_occurs.retain(|&cj| ci != cj);
+                                v.pos_occurs.delete_unstable(|&cj| ci == cj);
                             } else {
-                                v.neg_occurs.retain(|&cj| ci != cj);
+                                v.neg_occurs.delete_unstable(|&cj| ci == cj);
                             }
                             eliminator.enqueue_var(v);
                         }

@@ -584,22 +584,22 @@ pub fn strengthen(cps: &mut ClauseDB, vars: &mut [Var], cid: ClauseId, p: Lit) -
         let v = &mut vars[p.vi()];
         if p.positive() {
             // debug_assert!(v.pos_occurs.contains(&cid));
-            v.pos_occurs.retain(|&c| c != cid);
+            v.pos_occurs.delete_unstable(|&c| c == cid);
         } else {
             // debug_assert!(v.neg_occurs.contains(&cid));
-            v.neg_occurs.retain(|&c| c != cid);
+            v.neg_occurs.delete_unstable(|&c| c == cid);
         }
         if (*ch).get_flag(ClauseFlag::Dead) {
             return false;
         }
-        watcher[p.negate() as usize].retain(|w| w.c != cix);
+        watcher[p.negate() as usize].delete_unstable(|w| w.c == cix);
         let lits = &mut (*ch).lits;
         if lits.len() == 2 {
             // remove it
             if lits[0] == p {
                 lits.swap(0, 1);
             }
-            watcher[lits[0].negate() as usize].retain(|w| w.c != cix);
+            watcher[lits[0].negate() as usize].delete_unstable(|w| w.c == cix);
             return true;
         }
         if (*ch).lits[0] == p || (*ch).lits[1] == p {
@@ -612,7 +612,7 @@ pub fn strengthen(cps: &mut ClauseDB, vars: &mut [Var], cid: ClauseId, p: Lit) -
             };
             watcher[q.negate() as usize].push(Watch::new(q, cix));
         } else {
-            (*ch).lits.retain(|&x| x != p);
+            (*ch).lits.delete_unstable(|&x| x == p);
         }
         false
     }
