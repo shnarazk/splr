@@ -5,7 +5,6 @@ use crate::restart::{luby, QueueOperations, RESTART_BLK, RESTART_THR};
 use crate::state::*;
 use crate::types::*;
 use crate::var::{VarOrdering, *};
-use std::cmp::max;
 use std::fs;
 use std::fs::File;
 use std::io::{BufRead, BufReader, BufWriter, Write};
@@ -116,7 +115,7 @@ impl Default for SolverConfiguration {
             var_decay_max: 0.95,
             var_inc: 0.9,
             first_reduction: 1000,
-            glureduce: false,
+            glureduce: true,
             inc_reduce_db: 300,
             inc_reduce_db_extra: 1000,
             restart_thr: RESTART_THR,
@@ -537,9 +536,10 @@ fn search(
                     // println!("luby restart {}", luby_restart_num_conflict);
                 }
                 // return
+            } else if asgs.level() == 0 {
+                cp.simplify(asgs, config, elim, state, vars);
             }
             if asgs.level() == 0 {
-                cp.simplify(asgs, config, elim, state, vars);
                 if !state.ok {
                     return false;
                 }
@@ -589,24 +589,19 @@ fn search(
             let mut new_learnt: Vec<Lit> = Vec::new();
             let bl = analyze(asgs, config, cp, state, vars, ci, &mut new_learnt);
             // let nas = num_assigns();
-            asgs.cancel_until(
-                vars,
-                &mut state.var_order,
-                max(bl as usize, config.root_level),
-            );
-            if new_learnt.len() == 1 {
+            asgs.cancel_until(vars, &mut state.var_order, bl.max(config.root_level));
+            let learnt_len = new_learnt.len();
+            if learnt_len == 1 {
                 asgs.uncheck_enqueue(vars, new_learnt[0], NULL_CLAUSE);
             } else {
                 let lbd = vars.compute_lbd(&new_learnt, &mut state.lbd_temp);
-                let v = &mut new_learnt;
-                let l0 = v[0];
-                let vlen = v.len();
+                let l0 = new_learnt[0];
                 debug_assert!(0 < lbd);
-                let cid = cp.add_clause(config, elim, vars, &mut *v, lbd, tn_confl as f64);
+                let cid = cp.add_clause(config, elim, vars, &mut new_learnt, lbd, tn_confl as f64);
                 if lbd <= 2 {
                     state.stat[Stat::NumLBD2 as usize] += 1;
                 }
-                if vlen == 2 {
+                if learnt_len == 2 {
                     state.stat[Stat::NumBin as usize] += 1;
                 }
                 if cid.to_kind() == ClauseKind::Removable as usize {
@@ -627,7 +622,6 @@ fn search(
             }
             if tn_confl == 100_000 {
                 asgs.cancel_until(vars, &mut state.var_order, 0);
-                cp.simplify(asgs, config, elim, state, vars);
                 adapt_strategy(config, cp, elim, state, vars);
                 // } else if 0 < lbd {
                 //     block_restart(lbd, dl, bl, nas);
@@ -637,8 +631,10 @@ fn search(
             // decay clause activity
             config.cla_inc /= config.cla_decay;
             // glucose reduction
-            if state.cur_restart * state.next_reduction <= tn_confl
-                || config.glureduce && tn_confl >= state.cur_restart * state.next_reduction
+            let nlearnts = cp[ClauseKind::Removable as usize].count(true);
+            if 0 < nlearnts &&
+                ((config.use_chan_seok && !config.glureduce && config.first_reduction < nlearnts)
+                 || (config.glureduce && state.cur_restart * state.next_reduction <= tn_confl))
             {
                 state.cur_restart =
                     ((tn_confl as f64) / (state.next_reduction as f64)) as usize + 1;
@@ -673,7 +669,7 @@ fn analyze(
         unsafe {
             let ch = clause_mut!(*cp, cid) as *mut ClauseHead;
             debug_assert_ne!(cid, NULL_CLAUSE);
-            if cid.to_kind() == (ClauseKind::Removable as usize) {
+            if cid.to_kind() == ClauseKind::Removable as usize {
                 // self.bump_cid(cid);
                 cp[ClauseKind::Removable as usize].bump_activity(
                     cid.to_index(),
@@ -714,7 +710,7 @@ fn analyze(
                 // );
                 vars[vi].bump_activity(state.stat[Stat::Conflict as usize] as f64);
                 state.var_order.update(vars, vi);
-                if !state.an_seen[vi] && 0 < lvl {
+                if 0 < lvl && !state.an_seen[vi] {
                     state.an_seen[vi] = true;
                     if dl <= lvl {
                         // println!("{} はレベル{}なのでフラグを立てる", q.int(), lvl);
@@ -824,7 +820,7 @@ fn analyze_removable(
         for q in &(*ch).lits[1..] {
             let vi = q.vi();
             let lv = vars[vi].level;
-            if !an_seen[vi] && 0 < lv {
+            if 0 < lv && !an_seen[vi] {
                 if vars[vi].reason != NULL_CLAUSE && level_map[lv as usize] {
                     an_seen[vi] = true;
                     stack.push(*q);
@@ -907,6 +903,7 @@ fn minimize_with_bi_clauses(
     let mut nb = 0;
     let len = cps[ClauseKind::Binclause as usize].watcher[l0.negate() as usize].count();
     if len == 0 {
+        lbd_temp[0] = key;
         return;
     }
     for w in &cps[ClauseKind::Binclause as usize].watcher[l0.negate() as usize][1..len] {
@@ -934,7 +931,7 @@ fn adapt_strategy(
     state: &mut SolverState,
     vars: &mut [Var],
 ) {
-    if !config.adapt_strategy {
+    if !config.adapt_strategy || config.strategy != SearchStrategy::Initial {
         return;
     }
     let mut re_init = false;
@@ -942,49 +939,42 @@ fn adapt_strategy(
         state.stat[Stat::Decision as usize] as f64 / state.stat[Stat::Conflict as usize] as f64;
     if decpc <= 1.2 {
         config.strategy = SearchStrategy::LowDecisions;
+        config.use_chan_seok = true;
+        config.co_lbd_bound = 4;
+        config.glureduce = true;
+        config.first_reduction = 2000;
+        state.next_reduction = 2000;
+        state.cur_restart = ((state.stat[Stat::Conflict as usize] as f64
+                              / state.next_reduction as f64)
+                             + 1.0) as usize;
+        config.inc_reduce_db = 0;
         re_init = true;
-    } else if state.stat[Stat::NoDecisionConflict as usize] < 30_000 {
+    }
+    if state.stat[Stat::NoDecisionConflict as usize] < 30_000 {
         config.strategy = SearchStrategy::LowSuccesive;
-    } else if state.stat[Stat::NoDecisionConflict as usize] > 54_400 {
+        config.luby_restart = true;
+        config.luby_restart_factor = 100.0;
+        config.var_decay = 0.999;
+        config.var_decay_max = 0.999;
+    }
+    if state.stat[Stat::NoDecisionConflict as usize] > 54_400 {
         config.strategy = SearchStrategy::HighSuccesive;
-    } else if state.stat[Stat::NumLBD2 as usize] - state.stat[Stat::NumBin as usize] > 20_000 {
+        config.use_chan_seok = true;
+        config.glureduce = true;
+        config.co_lbd_bound = 3;
+        config.first_reduction = 30000;
+        config.var_decay = 0.99;
+        config.var_decay_max = 0.99;
+        // randomize_on_restarts = 1;
+    }
+    if state.stat[Stat::NumLBD2 as usize] - state.stat[Stat::NumBin as usize] > 20_000 {
         config.strategy = SearchStrategy::ManyGlues;
-    } else {
+        config.var_decay = 0.91;
+        config.var_decay_max = 0.91;
+    }
+    if config.strategy == SearchStrategy::Initial {
         config.strategy = SearchStrategy::Generic;
         return;
-    }
-    match config.strategy {
-        SearchStrategy::LowDecisions => {
-            config.use_chan_seok = true;
-            config.co_lbd_bound = 4;
-            config.glureduce = true;
-            config.first_reduction = 2000;
-            state.next_reduction = 2000;
-            state.cur_restart = ((state.stat[Stat::Conflict as usize] as f64
-                / state.next_reduction as f64)
-                + 1.0) as usize;
-            config.inc_reduce_db = 0;
-        }
-        SearchStrategy::LowSuccesive => {
-            config.luby_restart = true;
-            config.luby_restart_factor = 100.0;
-            config.var_decay = 0.999;
-            config.var_decay_max = 0.999;
-        }
-        SearchStrategy::HighSuccesive => {
-            config.use_chan_seok = true;
-            config.glureduce = true;
-            config.co_lbd_bound = 3;
-            config.first_reduction = 30000;
-            config.var_decay = 0.99;
-            config.var_decay_max = 0.99;
-            // randomize_on_restarts = 1;
-        }
-        SearchStrategy::ManyGlues => {
-            config.var_decay = 0.91;
-            config.var_decay_max = 0.91;
-        }
-        _ => (),
     }
     state.ema_asg.reset();
     state.ema_lbd.reset();
@@ -992,10 +982,7 @@ fn adapt_strategy(
     state.stat[Stat::SumLBD as usize] = 0;
     state.stat[Stat::Conflict as usize] = 0;
     let [_, learnts, permanents, _] = cps;
-    if config.strategy == SearchStrategy::LowDecisions
-        || config.strategy == SearchStrategy::HighSuccesive
-    {
-        // TODO incReduceDB = 0;
+    if config.use_chan_seok {
         // println!("# Adjusting for low decision levels.");
         // move some clauses with good lbd (col_lbd_bound) to Permanent
         for ch in &mut learnts.head[1..] {

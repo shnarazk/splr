@@ -359,9 +359,15 @@ impl GC for ClausePartition {
         let ClausePartition {
             ref mut watcher,
             ref mut head,
+            ref mut touched,
             ..
         } = self;
-        for ws in &mut watcher[2..] {
+        for (i, ws) in &mut watcher.iter_mut().enumerate().skip(2) {
+            if touched[i] {
+                touched[i] = false;
+            } else {
+                continue;
+            }
             let mut n = 1;
             let n_max = ws.count();
             while n <= n_max {

@@ -124,7 +124,6 @@ impl VarManagement for [Var] {
         }
         false
     }
-    /// CAVEAT: call reset_lbd_counter before it
     #[inline(always)]
     fn compute_lbd(&self, vec: &[Lit], keys: &mut [usize]) -> usize {
         let key = keys[0] + 1;
