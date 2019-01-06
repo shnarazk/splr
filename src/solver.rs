@@ -1,13 +1,13 @@
 use crate::assign::AssignStack;
-use crate::clause::{ClauseManagement, GC, *};
+use crate::clause::*;
+use crate::config::SolverConfiguration;
 use crate::eliminator::{Eliminator, EliminatorIF};
-use crate::restart::{luby, QueueOperations, RESTART_BLK, RESTART_THR};
-use crate::state::*;
+use crate::restart::{luby, QueueOperations};
+use crate::state::{SolverState, Stat};
 use crate::types::*;
-use crate::var::{VarOrdering, *};
+use crate::var::{Var, VarManagement, VarOrdering};
 use std::fs;
-use std::fs::File;
-use std::io::{BufRead, BufReader, BufWriter, Write};
+use std::io::{BufRead, BufReader};
 
 /// For Solver
 pub trait SatSolver {
@@ -38,102 +38,6 @@ pub enum SolverException {
 /// * proved that it's an unsatisfiable problem, and
 /// * aborted due to Mios specification or an internal error
 pub type SolverResult = Result<Certificate, SolverException>;
-
-#[derive(Eq, PartialEq)]
-pub enum SearchStrategy {
-    Initial,
-    Generic,
-    LowDecisions,
-    HighSuccesive,
-    LowSuccesive,
-    ManyGlues,
-}
-
-impl SearchStrategy {
-    fn to_str(&self) -> &'static str {
-        match self {
-            SearchStrategy::Initial => "init",
-            SearchStrategy::Generic => "dflt",
-            SearchStrategy::LowDecisions => "LowD",
-            SearchStrategy::HighSuccesive => "High",
-            SearchStrategy::LowSuccesive => "LowS",
-            SearchStrategy::ManyGlues => "Many",
-        }
-    }
-}
-
-/// `Solver`'s parameters; random decision rate was dropped.
-pub struct SolverConfiguration {
-    pub root_level: usize,
-    pub num_vars: usize,
-    /// STARATEGY
-    pub adapt_strategy: bool,
-    pub strategy: SearchStrategy,
-    pub use_chan_seok: bool,
-    pub co_lbd_bound: usize,
-    /// CLAUSE/VARIABLE ACTIVITY
-    pub cla_decay: f64,
-    pub cla_inc: f64,
-    pub var_decay: f64,
-    pub var_decay_max: f64,
-    pub var_inc: f64,
-    /// CLAUSE REDUCTION
-    pub first_reduction: usize,
-    pub glureduce: bool,
-    pub inc_reduce_db: usize,
-    pub inc_reduce_db_extra: usize,
-    pub ema_coeffs: (i32, i32),
-    /// RESTART
-    pub restart_thr: f64,
-    pub restart_blk: f64,
-    pub restart_expansion: f64,
-    pub restart_step: f64,
-    pub luby_restart: bool,
-    pub luby_restart_num_conflict: f64,
-    pub luby_restart_inc: f64,
-    pub luby_current_restarts: usize,
-    pub luby_restart_factor: f64,
-    /// MISC
-    pub use_sve: bool,
-    pub use_tty: bool,
-    /// dump stats data during solving
-    pub dump_solver_stat_mode: i32,
-}
-
-impl Default for SolverConfiguration {
-    fn default() -> SolverConfiguration {
-        SolverConfiguration {
-            root_level: 0,
-            num_vars: 0,
-            adapt_strategy: true,
-            strategy: SearchStrategy::Initial,
-            use_chan_seok: false,
-            co_lbd_bound: 5,
-            cla_decay: 0.999,
-            cla_inc: 1.0,
-            var_decay: 0.9,
-            var_decay_max: 0.95,
-            var_inc: 0.9,
-            first_reduction: 1000,
-            glureduce: true,
-            inc_reduce_db: 300,
-            inc_reduce_db_extra: 1000,
-            restart_thr: RESTART_THR,
-            restart_blk: RESTART_BLK,
-            restart_expansion: 1.15,
-            restart_step: 100.0,
-            luby_restart: false,
-            luby_restart_num_conflict: 0.0,
-            luby_restart_inc: 2.0,
-            luby_current_restarts: 0,
-            luby_restart_factor: 100.0,
-            ema_coeffs: (2 ^ 5, 2 ^ 15),
-            use_sve: true,
-            use_tty: true,
-            dump_solver_stat_mode: 0,
-        }
-    }
-}
 
 /// is the collection of all variables.
 pub struct Solver {
@@ -188,7 +92,7 @@ impl SatSolver for Solver {
         // TODO: deal with assumptions
         // s.root_level = 0;
         state.num_solved_vars = asgs.len();
-        progress(asgs, config, cps, elim, state, vars, Some(""));
+        state.progress(asgs, config, cps, elim, vars, Some(""));
         // elim.use_elim = true;
         elim.var_queue.clear();
         if elim.use_elim {
@@ -210,11 +114,11 @@ impl SatSolver for Solver {
                     elim.enqueue_var(v);
                 }
             }
-            progress(asgs, config, cps, elim, state, vars, Some("load"));
+            state.progress(asgs, config, cps, elim, vars, Some("load"));
             cps.simplify(asgs, config, elim, state, vars);
-            progress(asgs, config, cps, elim, state, vars, Some("simp"));
+            state.progress(asgs, config, cps, elim, vars, Some("simp"));
         } else {
-            progress(asgs, config, cps, elim, state, vars, Some("load"));
+            state.progress(asgs, config, cps, elim, vars, Some("load"));
         }
         // config.use_sve = false;
         // elim.use_elim = false;
@@ -222,10 +126,10 @@ impl SatSolver for Solver {
         if search(asgs, config, cps, elim, state, vars) {
             if !state.ok {
                 asgs.cancel_until(vars, &mut state.var_order, 0);
-                progress(asgs, config, cps, elim, state, vars, Some("error"));
+                state.progress(asgs, config, cps, elim, vars, Some("error"));
                 return Err(SolverException::InternalInconsistent);
             }
-            progress(asgs, config, cps, elim, state, vars, None);
+            state.progress(asgs, config, cps, elim, vars, None);
             let mut result = Vec::new();
             for (vi, v) in vars.iter().enumerate().take(config.num_vars + 1).skip(1) {
                 match v.assign {
@@ -240,7 +144,7 @@ impl SatSolver for Solver {
             asgs.cancel_until(vars, &mut state.var_order, 0);
             Ok(Certificate::SAT(result))
         } else {
-            progress(asgs, config, cps, elim, state, vars, None);
+            state.progress(asgs, config, cps, elim, vars, None);
             asgs.cancel_until(vars, &mut state.var_order, 0);
             Ok(Certificate::UNSAT(
                 state.conflicts.iter().map(|l| l.int()).collect(),
@@ -618,11 +522,11 @@ fn search(
                 state.stat[Stat::SumLBD as usize] += lbd as i64;
             }
             if tn_confl % 10_000 == 0 {
-                progress(asgs, config, cp, elim, state, vars, None);
+                state.progress(asgs, config, cp, elim, vars, None);
             }
             if tn_confl == 100_000 {
                 asgs.cancel_until(vars, &mut state.var_order, 0);
-                adapt_strategy(config, cp, elim, state, vars);
+                config.adapt_strategy(cp, elim, state, vars);
                 // } else if 0 < lbd {
                 //     block_restart(lbd, dl, bl, nas);
             }
@@ -921,292 +825,4 @@ fn minimize_with_bi_clauses(
         vec.retain(|l| lbd_temp[l.vi()] == key);
     }
     lbd_temp[0] = key;
-}
-
-#[inline(always)]
-fn adapt_strategy(
-    config: &mut SolverConfiguration,
-    cps: &mut ClauseDB,
-    elim: &mut Eliminator,
-    state: &mut SolverState,
-    vars: &mut [Var],
-) {
-    if !config.adapt_strategy || config.strategy != SearchStrategy::Initial {
-        return;
-    }
-    let mut re_init = false;
-    let decpc =
-        state.stat[Stat::Decision as usize] as f64 / state.stat[Stat::Conflict as usize] as f64;
-    if decpc <= 1.2 {
-        config.strategy = SearchStrategy::LowDecisions;
-        config.use_chan_seok = true;
-        config.co_lbd_bound = 4;
-        config.glureduce = true;
-        config.first_reduction = 2000;
-        state.next_reduction = 2000;
-        state.cur_restart = (state.stat[Stat::Conflict as usize] as f64
-            / state.next_reduction as f64
-            + 1.0) as usize;
-        config.inc_reduce_db = 0;
-        re_init = true;
-    }
-    if state.stat[Stat::NoDecisionConflict as usize] < 30_000 {
-        config.strategy = SearchStrategy::LowSuccesive;
-        config.luby_restart = true;
-        config.luby_restart_factor = 100.0;
-        config.var_decay = 0.999;
-        config.var_decay_max = 0.999;
-    }
-    if state.stat[Stat::NoDecisionConflict as usize] > 54_400 {
-        config.strategy = SearchStrategy::HighSuccesive;
-        config.use_chan_seok = true;
-        config.glureduce = true;
-        config.co_lbd_bound = 3;
-        config.first_reduction = 30000;
-        config.var_decay = 0.99;
-        config.var_decay_max = 0.99;
-        // randomize_on_restarts = 1;
-    }
-    if state.stat[Stat::NumLBD2 as usize] - state.stat[Stat::NumBin as usize] > 20_000 {
-        config.strategy = SearchStrategy::ManyGlues;
-        config.var_decay = 0.91;
-        config.var_decay_max = 0.91;
-    }
-    if config.strategy == SearchStrategy::Initial {
-        config.strategy = SearchStrategy::Generic;
-        return;
-    }
-    state.ema_asg.reset();
-    state.ema_lbd.reset();
-    state.lbd_queue.clear();
-    state.stat[Stat::SumLBD as usize] = 0;
-    state.stat[Stat::Conflict as usize] = 0;
-    let [_, learnts, permanents, _] = cps;
-    if config.use_chan_seok {
-        // println!("# Adjusting for low decision levels.");
-        // move some clauses with good lbd (col_lbd_bound) to Permanent
-        for ch in &mut learnts.head[1..] {
-            if ch.get_flag(ClauseFlag::Dead) {
-                continue;
-            }
-            if ch.rank <= config.co_lbd_bound || re_init {
-                if ch.rank <= config.co_lbd_bound {
-                    permanents.new_clause(&ch.lits, ch.rank);
-                }
-                learnts.touched[ch.lits[0].negate() as usize] = true;
-                learnts.touched[ch.lits[1].negate() as usize] = true;
-                ch.flag_on(ClauseFlag::Dead);
-            }
-        }
-        learnts.garbage_collect(vars, elim);
-    }
-}
-
-// print a progress report
-fn progress(
-    asgs: &AssignStack,
-    config: &mut SolverConfiguration,
-    cp: &ClauseDB,
-    elim: &Eliminator,
-    state: &mut SolverState,
-    vars: &[Var],
-    mes: Option<&str>,
-) {
-    if mes != Some("") {
-        state.progress_cnt += 1;
-    }
-    // if self.progress_cnt % 16 == 0 {
-    //     self.dump_cnf(format!("G2-p{:>3}.cnf", self.progress_cnt).to_string());
-    // }
-    let nv = vars.len() - 1;
-    let fixed = if asgs.is_zero() {
-        asgs.len()
-    } else {
-        asgs.num_at(0)
-    };
-    let sum = fixed + elim.eliminated_vars;
-    let learnts = &cp[ClauseKind::Removable as usize];
-    let good = learnts
-        .head
-        .iter()
-        .skip(1)
-        .filter(|c| !c.get_flag(ClauseFlag::Dead) && c.rank <= 3)
-        .count();
-    if config.use_tty {
-        if mes == Some("") {
-            println!("{}", state);
-            println!();
-            println!();
-            println!();
-            println!();
-            println!();
-            println!();
-        } else {
-            print!("\x1B[7A");
-            let msg = match mes {
-                None => config.strategy.to_str(),
-                Some(x) => x,
-            };
-            println!("{}, State:{:>6}", state, msg,);
-            println!(
-                "#propagate:{:>14}, #decision:{:>13}, #conflict: {:>12} ",
-                state.stat[Stat::Propagation as usize],
-                state.stat[Stat::Decision as usize],
-                state.stat[Stat::Conflict as usize],
-            );
-            println!(
-                "  Assignment|#rem:{:>9}, #fix:{:>9}, #elm:{:>9}, prog%:{:>8.4} ",
-                nv - sum,
-                fixed,
-                elim.eliminated_vars,
-                (sum as f32) / (nv as f32) * 100.0,
-            );
-            println!(
-                "   Clause DB|Remv:{:>9}, good:{:>9}, Perm:{:>9}, Binc:{:>9} ",
-                cp[ClauseKind::Removable as usize].count(true),
-                good,
-                cp[ClauseKind::Permanent as usize].count(true),
-                cp[ClauseKind::Binclause as usize].count(true),
-            );
-            println!(
-                "     Restart|#BLK:{:>9}, #RST:{:>9}, emaASG:{:>7.2}, emaLBD:{:>7.2} ",
-                state.stat[Stat::BlockRestart as usize],
-                state.stat[Stat::Restart as usize],
-                state.ema_asg.get(),
-                state.ema_lbd.get(),
-            );
-            println!(
-                " Decision Lv|aLBD:{:>9.2}, bjmp:{:>9.2}, cnfl:{:>9.2} |#rdc:{:>9} ",
-                state.ema_lbd.slow,
-                state.b_lvl.0,
-                state.c_lvl.0,
-                state.stat[Stat::Reduction as usize],
-            );
-            println!(
-                "  Eliminator|#cls:{:>9}, #var:{:>9},   Clause DB mgr|#smp:{:>9} ",
-                elim.clause_queue_len(),
-                elim.var_queue_len(),
-                state.stat[Stat::Simplification as usize],
-            );
-        }
-    } else if mes == Some("") {
-        println!(
-            "   #mode,      Variable Assignment      ,,  \
-             Clause Database Management  ,,   Restart Strategy      ,, \
-             Misc Progress Parameters,,  Eliminator"
-        );
-        println!(
-            "   #init,#remain,#solved,   #elim,total%,,#learnt,(good),  \
-             #perm,#binary,,block,force, asgn/,  lbd/,,    lbd, \
-             back lv, conf lv,,clause,   var"
-        );
-    } else {
-        let msg = match mes {
-            None => config.strategy.to_str(),
-            Some(x) => x,
-        };
-        println!(
-            "{:>3}#{:<5},{:>7},{:>7},{:>7},{:>6.3},,{:>7},{:>6},{:>7},\
-             {:>7},,{:>5},{:>5}, {:>5.2},{:>6.2},,{:>7.2},{:>8.2},{:>8.2},,\
-             {:>6},{:>6}",
-            state.progress_cnt,
-            msg,
-            nv - sum,
-            fixed,
-            elim.eliminated_vars,
-            (sum as f32) / (nv as f32) * 100.0,
-            cp[ClauseKind::Removable as usize].count(true),
-            good,
-            cp[ClauseKind::Permanent as usize].count(true),
-            cp[ClauseKind::Binclause as usize].count(true),
-            state.stat[Stat::BlockRestart as usize],
-            state.stat[Stat::Restart as usize],
-            state.ema_asg.get(),
-            state.ema_lbd.get(),
-            state.ema_lbd.slow,
-            state.b_lvl.0,
-            state.c_lvl.0,
-            elim.clause_queue_len(),
-            elim.var_queue_len(),
-        );
-
-        // if self.state.progress_cnt == -1 {
-        //     self.dump_cnf(format!("test-{}.cnf", self.state.progress_cnt).to_string());
-        //     panic!("aa");
-        // }
-    }
-}
-
-#[allow(dead_code)]
-fn dump(asgs: &AssignStack, state: &SolverState, str: &str) {
-    println!("# {} at {}", str, asgs.level());
-    println!(
-        "# nassigns {}, decision cands {}",
-        asgs.len(),
-        state.var_order.len()
-    );
-    let v = asgs.trail.iter().map(|l| l.int()).collect::<Vec<i32>>();
-    let len = asgs.level();
-    if 0 < len {
-        print!("# - trail[{}]  [", asgs.len());
-        let lv0 = asgs.num_at(0);
-        if 0 < lv0 {
-            print!("0{:?}, ", &asgs.trail[0..lv0]);
-        }
-        for i in 0..(len - 1) {
-            let a = asgs.num_at(i);
-            let b = asgs.num_at(i + 1);
-            print!("{}{:?}, ", i + 1, &v[a..b]);
-        }
-        println!("{}{:?}]", len, &v[asgs.num_at(len - 1)..]);
-    } else {
-        println!("# - trail[  0]  [0{:?}]", &v);
-    }
-    println!("- trail_lim  {:?}", asgs.trail_lim);
-    // println!("{}", self.var_order);
-    // self.var_order.check("");
-}
-
-#[allow(dead_code)]
-fn dump_cnf(
-    asgs: &AssignStack,
-    config: &SolverConfiguration,
-    cps: &ClauseDB,
-    vars: &[Var],
-    fname: &str,
-) {
-    for v in vars {
-        if v.eliminated {
-            if v.assign != BOTTOM {
-                panic!("conflicting var {} {}", v.index, v.assign);
-            } else {
-                println!("eliminate var {}", v.index);
-            }
-        }
-    }
-    if let Ok(out) = File::create(&fname) {
-        let mut buf = BufWriter::new(out);
-        let nv = asgs.len();
-        let nc: usize = cps.iter().map(|p| p.head.len() - 1).sum();
-        buf.write_all(format!("p cnf {} {}\n", config.num_vars, nc + nv).as_bytes())
-            .unwrap();
-        let kinds = [
-            ClauseKind::Binclause,
-            ClauseKind::Removable,
-            ClauseKind::Permanent,
-        ];
-        for kind in &kinds {
-            for c in cps[*kind as usize].head.iter().skip(1) {
-                for l in &c.lits {
-                    buf.write_all(format!("{} ", l.int()).as_bytes()).unwrap();
-                }
-                buf.write_all(b"0\n").unwrap();
-            }
-        }
-        buf.write_all(b"c from trail\n").unwrap();
-        for x in &asgs.trail {
-            buf.write_all(format!("{} 0\n", x.int()).as_bytes())
-                .unwrap();
-        }
-    }
 }

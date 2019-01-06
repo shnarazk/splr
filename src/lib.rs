@@ -38,6 +38,8 @@ macro_rules! uenqueue {
 pub mod assign;
 /// Clause
 pub mod clause;
+/// Configuration
+pub mod config;
 /// In-process elimination
 pub mod eliminator;
 /// Implementation on solver restart.

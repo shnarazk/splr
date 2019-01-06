@@ -1,5 +1,9 @@
+use crate::assign::AssignStack;
+use crate::clause::{ClauseDB, ClauseFlag, ClauseKind, GC};
+use crate::config::SolverConfiguration;
+use crate::eliminator::{Eliminator, EliminatorIF};
 use crate::types::*;
-use crate::var::VarIdHeap;
+use crate::var::{Var, VarIdHeap, VarOrdering};
 use chrono::*;
 use std::collections::VecDeque;
 use std::fmt;
@@ -88,5 +92,167 @@ impl fmt::Display for SolverState {
         tm.drain(..2);
         tm.pop();
         write!(f, "{:36}|time:{:>19}", self.target, tm)
+    }
+}
+
+// print a progress report
+impl SolverState {
+    pub fn progress(
+        &mut self,
+        asgs: &AssignStack,
+        config: &mut SolverConfiguration,
+        cp: &ClauseDB,
+        elim: &Eliminator,
+        vars: &[Var],
+        mes: Option<&str>,
+    ) {
+        if mes != Some("") {
+            self.progress_cnt += 1;
+        }
+        // if self.progress_cnt % 16 == 0 {
+        //     self.dump_cnf(format!("G2-p{:>3}.cnf", self.progress_cnt).to_string());
+        // }
+        let nv = vars.len() - 1;
+        let fixed = if asgs.is_zero() {
+            asgs.len()
+        } else {
+            asgs.num_at(0)
+        };
+        let sum = fixed + elim.eliminated_vars;
+        let learnts = &cp[ClauseKind::Removable as usize];
+        let good = learnts
+            .head
+            .iter()
+            .skip(1)
+            .filter(|c| !c.get_flag(ClauseFlag::Dead) && c.rank <= 3)
+            .count();
+        if config.use_tty {
+            if mes == Some("") {
+                println!("{}", self);
+                println!();
+                println!();
+                println!();
+                println!();
+                println!();
+                println!();
+            } else {
+                print!("\x1B[7A");
+                let msg = match mes {
+                    None => config.strategy.to_str(),
+                    Some(x) => x,
+                };
+                println!("{}, State:{:>6}", self, msg,);
+                println!(
+                    "#propagate:{:>14}, #decision:{:>13}, #conflict: {:>12} ",
+                    self.stat[Stat::Propagation as usize],
+                    self.stat[Stat::Decision as usize],
+                    self.stat[Stat::Conflict as usize],
+                );
+                println!(
+                    "  Assignment|#rem:{:>9}, #fix:{:>9}, #elm:{:>9}, prog%:{:>8.4} ",
+                    nv - sum,
+                    fixed,
+                    elim.eliminated_vars,
+                    (sum as f32) / (nv as f32) * 100.0,
+                );
+                println!(
+                    "   Clause DB|Remv:{:>9}, good:{:>9}, Perm:{:>9}, Binc:{:>9} ",
+                    cp[ClauseKind::Removable as usize].count(true),
+                    good,
+                    cp[ClauseKind::Permanent as usize].count(true),
+                    cp[ClauseKind::Binclause as usize].count(true),
+                );
+                println!(
+                    "     Restart|#BLK:{:>9}, #RST:{:>9}, emaASG:{:>7.2}, emaLBD:{:>7.2} ",
+                    self.stat[Stat::BlockRestart as usize],
+                    self.stat[Stat::Restart as usize],
+                    self.ema_asg.get(),
+                    self.ema_lbd.get(),
+                );
+                println!(
+                    " Decision Lv|aLBD:{:>9.2}, bjmp:{:>9.2}, cnfl:{:>9.2} |#rdc:{:>9} ",
+                    self.ema_lbd.slow,
+                    self.b_lvl.0,
+                    self.c_lvl.0,
+                    self.stat[Stat::Reduction as usize],
+                );
+                println!(
+                    "  Eliminator|#cls:{:>9}, #var:{:>9},   Clause DB mgr|#smp:{:>9} ",
+                    elim.clause_queue_len(),
+                    elim.var_queue_len(),
+                    self.stat[Stat::Simplification as usize],
+                );
+            }
+        } else if mes == Some("") {
+            println!(
+                "   #mode,      Variable Assignment      ,,  \
+                 Clause Database Management  ,,   Restart Strategy      ,, \
+                 Misc Progress Parameters,,  Eliminator"
+            );
+            println!(
+                "   #init,#remain,#solved,   #elim,total%,,#learnt,(good),  \
+                 #perm,#binary,,block,force, asgn/,  lbd/,,    lbd, \
+                 back lv, conf lv,,clause,   var"
+            );
+        } else {
+            let msg = match mes {
+                None => config.strategy.to_str(),
+                Some(x) => x,
+            };
+            println!(
+                "{:>3}#{:<5},{:>7},{:>7},{:>7},{:>6.3},,{:>7},{:>6},{:>7},\
+                 {:>7},,{:>5},{:>5}, {:>5.2},{:>6.2},,{:>7.2},{:>8.2},{:>8.2},,\
+                 {:>6},{:>6}",
+                self.progress_cnt,
+                msg,
+                nv - sum,
+                fixed,
+                elim.eliminated_vars,
+                (sum as f32) / (nv as f32) * 100.0,
+                cp[ClauseKind::Removable as usize].count(true),
+                good,
+                cp[ClauseKind::Permanent as usize].count(true),
+                cp[ClauseKind::Binclause as usize].count(true),
+                self.stat[Stat::BlockRestart as usize],
+                self.stat[Stat::Restart as usize],
+                self.ema_asg.get(),
+                self.ema_lbd.get(),
+                self.ema_lbd.slow,
+                self.b_lvl.0,
+                self.c_lvl.0,
+                elim.clause_queue_len(),
+                elim.var_queue_len(),
+            );
+        }
+    }
+
+    #[allow(dead_code)]
+    fn dump(&self, asgs: &AssignStack, str: &str) {
+        println!("# {} at {}", str, asgs.level());
+        println!(
+            "# nassigns {}, decision cands {}",
+            asgs.len(),
+            self.var_order.len()
+        );
+        let v = asgs.trail.iter().map(|l| l.int()).collect::<Vec<i32>>();
+        let len = asgs.level();
+        if 0 < len {
+            print!("# - trail[{}]  [", asgs.len());
+            let lv0 = asgs.num_at(0);
+            if 0 < lv0 {
+                print!("0{:?}, ", &asgs.trail[0..lv0]);
+            }
+            for i in 0..(len - 1) {
+                let a = asgs.num_at(i);
+                let b = asgs.num_at(i + 1);
+                print!("{}{:?}, ", i + 1, &v[a..b]);
+            }
+            println!("{}{:?}]", len, &v[asgs.num_at(len - 1)..]);
+        } else {
+            println!("# - trail[  0]  [0{:?}]", &v);
+        }
+        println!("- trail_lim  {:?}", asgs.trail_lim);
+        // println!("{}", self.var_order);
+        // self.var_order.check("");
     }
 }

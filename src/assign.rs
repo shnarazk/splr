@@ -1,6 +1,10 @@
+use crate::clause::{ClauseDB, ClauseKind};
+use crate::config::SolverConfiguration;
 use crate::eliminator::{Eliminator, EliminatorIF};
 use crate::types::*;
 use crate::var::{Var, VarIdHeap, VarOrdering};
+use std::fs::File;
+use std::io::{BufWriter, Write};
 
 pub struct AssignStack {
     pub trail: Vec<Lit>,
@@ -163,5 +167,48 @@ impl AssignStack {
         // debug_assert!(!trail.contains(&l));
         // debug_assert!(!trail.contains(&l.negate()));
         self.trail.push(l);
+    }
+    #[allow(dead_code)]
+    fn dump_cnf(
+        &mut self,
+        config: &SolverConfiguration,
+        cps: &ClauseDB,
+        vars: &[Var],
+        fname: &str,
+    ) {
+        for v in vars {
+            if v.eliminated {
+                if v.assign != BOTTOM {
+                    panic!("conflicting var {} {}", v.index, v.assign);
+                } else {
+                    println!("eliminate var {}", v.index);
+                }
+            }
+        }
+        if let Ok(out) = File::create(&fname) {
+            let mut buf = BufWriter::new(out);
+            let nv = self.len();
+            let nc: usize = cps.iter().map(|p| p.head.len() - 1).sum();
+            buf.write_all(format!("p cnf {} {}\n", config.num_vars, nc + nv).as_bytes())
+                .unwrap();
+            let kinds = [
+                ClauseKind::Binclause,
+                ClauseKind::Removable,
+                ClauseKind::Permanent,
+            ];
+            for kind in &kinds {
+                for c in cps[*kind as usize].head.iter().skip(1) {
+                    for l in &c.lits {
+                        buf.write_all(format!("{} ", l.int()).as_bytes()).unwrap();
+                    }
+                    buf.write_all(b"0\n").unwrap();
+                }
+            }
+            buf.write_all(b"c from trail\n").unwrap();
+            for x in &self.trail {
+                buf.write_all(format!("{} 0\n", x.int()).as_bytes())
+                    .unwrap();
+            }
+        }
     }
 }

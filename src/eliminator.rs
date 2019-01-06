@@ -1,6 +1,7 @@
 use crate::assign::AssignStack;
 use crate::clause::*;
-use crate::solver::{propagate, SolverConfiguration};
+use crate::config::SolverConfiguration;
+use crate::solver::propagate;
 use crate::state::*;
 use crate::types::*;
 use crate::var::{Var, VarManagement};
