@@ -39,16 +39,6 @@ pub trait ClauseManagement {
     ) -> bool;
 }
 
-/// For ClausePartition
-pub trait GC {
-    fn garbage_collect(&mut self, vars: &mut [Var], elimanator: &mut Eliminator) -> ();
-    fn new_clause(&mut self, v: &[Lit], rank: usize) -> ClauseId;
-    fn reset_lbd(&mut self, vars: &[Var], temp: &mut [usize]) -> ();
-    fn bump_activity(&mut self, cix: ClauseIndex, val: f64, cla_inc: &mut f64) -> ();
-    fn count(&self, alive: bool) -> usize;
-    fn check(&self);
-}
-
 /// For Vec<Watch>
 pub trait WatchManagement {
     fn initialize(self, n: usize) -> Self;
@@ -354,8 +344,8 @@ impl<'a> Iterator for ClauseIter<'a> {
     }
 }
 
-impl GC for ClausePartition {
-    fn garbage_collect(&mut self, vars: &mut [Var], eliminator: &mut Eliminator) {
+impl ClausePartition {
+    pub fn garbage_collect(&mut self, vars: &mut [Var], eliminator: &mut Eliminator) {
         let ClausePartition {
             ref mut watcher,
             ref mut head,
@@ -402,7 +392,7 @@ impl GC for ClausePartition {
         }
         // self.check();
     }
-    fn new_clause(&mut self, v: &[Lit], rank: usize) -> ClauseId {
+    pub fn new_clause(&mut self, v: &[Lit], rank: usize) -> ClauseId {
         let cix;
         let w0;
         let w1;
@@ -461,7 +451,7 @@ impl GC for ClausePartition {
         }
         temp[0] = key + 1;
     }
-    fn bump_activity(&mut self, cix: ClauseIndex, val: f64, cla_inc: &mut f64) {
+    pub fn bump_activity(&mut self, cix: ClauseIndex, val: f64, cla_inc: &mut f64) {
         let c = &mut self.head[cix];
         let a = c.activity + *cla_inc;
         // a = (c.activity + val) / 2.0;
@@ -475,13 +465,14 @@ impl GC for ClausePartition {
             *cla_inc *= 1.0e-20;
         }
     }
-    fn count(&self, alive: bool) -> usize {
+    pub fn count(&self, alive: bool) -> usize {
         if alive {
             self.head.len() - self.watcher[NULL_LIT.negate() as usize].len() - 1
         } else {
             self.head.len() - 1
         }
     }
+    #[allow(dead_code)]
     fn check(&self) {
         let total = self.count(false);
         let nc = self.count(true);
@@ -627,7 +618,7 @@ impl ClauseManagement for ClauseDB {
         }
         self[ClauseKind::Removable as usize].garbage_collect(vars, eliminator);
         state.next_reduction += DB_INC_SIZE;
-        state.stat[Stat::Reduction as usize] += 1;
+        state.stats[Stat::Reduction as usize] += 1;
     }
     fn simplify(
         &mut self,
@@ -646,11 +637,11 @@ impl ClauseManagement for ClauseDB {
             }
         }
         if eliminator.use_elim
-        // && state.stat[Stat::Simplification as usize] % 8 == 0
-        // && state.eliminator.last_invocatiton < self.stat[Stat::Reduction as usize] as usize
+        // && state.stats[Stat::Simplification as usize] % 8 == 0
+        // && state.eliminator.last_invocatiton < self.stats[Stat::Reduction as usize] as usize
         {
             eliminator.eliminate(asgs, config, self, state, vars);
-            eliminator.last_invocatiton = state.stat[Stat::Reduction as usize] as usize;
+            eliminator.last_invocatiton = state.stats[Stat::Reduction as usize] as usize;
             if !state.ok {
                 return false;
             }
@@ -676,7 +667,7 @@ impl ClauseManagement for ClauseDB {
                 ck.garbage_collect(vars, eliminator);
             }
         }
-        state.stat[Stat::Simplification as usize] += 1;
+        state.stats[Stat::Simplification as usize] += 1;
         // self.check_eliminator();
         true
     }

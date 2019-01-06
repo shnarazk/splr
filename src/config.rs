@@ -1,4 +1,4 @@
-use crate::clause::{ClauseDB, ClauseFlag, GC};
+use crate::clause::{ClauseDB, ClauseFlag};
 use crate::eliminator::Eliminator;
 use crate::restart::{RESTART_BLK, RESTART_THR};
 use crate::state::{SolverState, Stat};
@@ -114,8 +114,8 @@ impl SolverConfiguration {
             return;
         }
         let mut re_init = false;
-        let decpc =
-            state.stat[Stat::Decision as usize] as f64 / state.stat[Stat::Conflict as usize] as f64;
+        let decpc = state.stats[Stat::Decision as usize] as f64
+            / state.stats[Stat::Conflict as usize] as f64;
         if decpc <= 1.2 {
             self.strategy = SearchStrategy::LowDecisions;
             self.use_chan_seok = true;
@@ -123,20 +123,20 @@ impl SolverConfiguration {
             self.glureduce = true;
             self.first_reduction = 2000;
             state.next_reduction = 2000;
-            state.cur_restart = (state.stat[Stat::Conflict as usize] as f64
+            state.cur_restart = (state.stats[Stat::Conflict as usize] as f64
                 / state.next_reduction as f64
                 + 1.0) as usize;
             self.inc_reduce_db = 0;
             re_init = true;
         }
-        if state.stat[Stat::NoDecisionConflict as usize] < 30_000 {
+        if state.stats[Stat::NoDecisionConflict as usize] < 30_000 {
             self.strategy = SearchStrategy::LowSuccesive;
             self.luby_restart = true;
             self.luby_restart_factor = 100.0;
             self.var_decay = 0.999;
             self.var_decay_max = 0.999;
         }
-        if state.stat[Stat::NoDecisionConflict as usize] > 54_400 {
+        if state.stats[Stat::NoDecisionConflict as usize] > 54_400 {
             self.strategy = SearchStrategy::HighSuccesive;
             self.use_chan_seok = true;
             self.glureduce = true;
@@ -146,7 +146,7 @@ impl SolverConfiguration {
             self.var_decay_max = 0.99;
             // randomize_on_restarts = 1;
         }
-        if state.stat[Stat::NumLBD2 as usize] - state.stat[Stat::NumBin as usize] > 20_000 {
+        if state.stats[Stat::NumLBD2 as usize] - state.stats[Stat::NumBin as usize] > 20_000 {
             self.strategy = SearchStrategy::ManyGlues;
             self.var_decay = 0.91;
             self.var_decay_max = 0.91;
@@ -158,8 +158,8 @@ impl SolverConfiguration {
         state.ema_asg.reset();
         state.ema_lbd.reset();
         state.lbd_queue.clear();
-        state.stat[Stat::SumLBD as usize] = 0;
-        state.stat[Stat::Conflict as usize] = 0;
+        state.stats[Stat::SumLBD as usize] = 0;
+        state.stats[Stat::Conflict as usize] = 0;
         let [_, learnts, permanents, _] = cps;
         if self.use_chan_seok {
             // println!("# Adjusting for low decision levels.");

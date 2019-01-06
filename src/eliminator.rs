@@ -7,31 +7,6 @@ use crate::types::*;
 use crate::var::{Var, VarManagement};
 // use std::fmt;
 
-/// For Eliminator
-pub trait EliminatorIF {
-    fn new(use_elim: bool) -> Eliminator;
-    fn enqueue_clause(&mut self, cid: ClauseId, ch: &mut ClauseHead) -> ();
-    fn enqueue_var(&mut self, v: &mut Var) -> ();
-    fn clause_queue_len(&self) -> usize;
-    fn var_queue_len(&self) -> usize;
-    fn backward_subsumption_check(
-        &mut self,
-        asgs: &mut AssignStack,
-        cps: &mut ClauseDB,
-        state: &mut SolverState,
-        vars: &mut [Var],
-    ) -> bool;
-    fn eliminate(
-        &mut self,
-        asgs: &mut AssignStack,
-        config: &mut SolverConfiguration,
-        cps: &mut ClauseDB,
-        state: &mut SolverState,
-        vars: &mut [Var],
-    );
-    fn extend_model(&mut self, model: &mut Vec<i32>);
-}
-
 /// Literal eliminator
 pub struct Eliminator {
     pub eliminated_vars: usize,
@@ -70,8 +45,8 @@ impl LiteralClause for Lit {
     }
 }
 
-impl EliminatorIF for Eliminator {
-    fn new(use_elim: bool) -> Eliminator {
+impl Eliminator {
+    pub fn new(use_elim: bool) -> Eliminator {
         Eliminator {
             merges: 0,
             var_queue: Vec::new(),
@@ -90,7 +65,7 @@ impl EliminatorIF for Eliminator {
             var_queue_threshold: VAR_QUEUE_THRESHOLD,
         }
     }
-    fn enqueue_clause(&mut self, cid: ClauseId, ch: &mut ClauseHead) {
+    pub fn enqueue_clause(&mut self, cid: ClauseId, ch: &mut ClauseHead) {
         if !self.use_elim || self.clause_queue_threshold == 0 {
             // println!("{} is not enqueued", cid2fmt(cid));
             return;
@@ -110,7 +85,7 @@ impl EliminatorIF for Eliminator {
             }
         }
     }
-    fn enqueue_var(&mut self, v: &mut Var) {
+    pub fn enqueue_var(&mut self, v: &mut Var) {
         if !self.use_elim || self.var_queue_threshold == 0 {
             return;
         }
@@ -120,10 +95,10 @@ impl EliminatorIF for Eliminator {
             self.var_queue_threshold -= 1;
         }
     }
-    fn clause_queue_len(&self) -> usize {
+    pub fn clause_queue_len(&self) -> usize {
         self.clause_queue.len()
     }
-    fn var_queue_len(&self) -> usize {
+    pub fn var_queue_len(&self) -> usize {
         self.var_queue.len()
     }
     /// 10. backwardSubsumptionCheck
@@ -254,7 +229,7 @@ impl EliminatorIF for Eliminator {
 
     /// 18. eliminate
     // should be called at decision level 0.
-    fn eliminate(
+    pub fn eliminate(
         &mut self,
         asgs: &mut AssignStack,
         config: &mut SolverConfiguration,
@@ -313,7 +288,7 @@ impl EliminatorIF for Eliminator {
     /// inline lbool    Solver::modelValue    (Var x) const   { return model[x]; }
     /// inline lbool    Solver::modelValue    (Lit p) const   { return model[var(p)] ^ sign(p); }
     /// ```
-    fn extend_model(&mut self, model: &mut Vec<i32>) {
+    pub fn extend_model(&mut self, model: &mut Vec<i32>) {
         // println!("extend_model {:?}", &self.elim_clauses);
         if self.elim_clauses.is_empty() {
             return;

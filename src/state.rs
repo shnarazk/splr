@@ -1,9 +1,9 @@
 use crate::assign::AssignStack;
-use crate::clause::{ClauseDB, ClauseFlag, ClauseKind, GC};
+use crate::clause::{ClauseDB, ClauseKind};
 use crate::config::SolverConfiguration;
-use crate::eliminator::{Eliminator, EliminatorIF};
+use crate::eliminator::Eliminator;
 use crate::types::*;
-use crate::var::{Var, VarIdHeap, VarOrdering};
+use crate::var::{Var, VarIdHeap};
 use chrono::*;
 use std::collections::VecDeque;
 use std::fmt;
@@ -35,7 +35,7 @@ pub struct SolverState {
     pub lbd_queue: VecDeque<usize>,
     pub trail_queue: VecDeque<usize>,
     pub var_order: VarIdHeap, // Variable Order
-    pub stat: Vec<i64>,       // statistics
+    pub stats: Vec<i64>,      // statistics
     pub ema_asg: Ema2,
     pub ema_lbd: Ema2,
     pub b_lvl: Ema,
@@ -60,7 +60,7 @@ impl SolverState {
             lbd_queue: VecDeque::new(),
             trail_queue: VecDeque::new(),
             var_order: VarIdHeap::new(nv, nv),
-            stat: vec![0; Stat::EndOfStatIndex as usize],
+            stats: vec![0; Stat::EndOfStatIndex as usize],
             ema_asg: Ema2::new(3.8, 50_000.0),   // for blocking 4
             ema_lbd: Ema2::new(160.0, 50_000.0), // for forcing 160
             b_lvl: Ema::new(se),
@@ -119,13 +119,14 @@ impl SolverState {
             asgs.num_at(0)
         };
         let sum = fixed + elim.eliminated_vars;
-        let learnts = &cp[ClauseKind::Removable as usize];
-        let good = learnts
-            .head
-            .iter()
-            .skip(1)
-            .filter(|c| !c.get_flag(ClauseFlag::Dead) && c.rank <= 3)
-            .count();
+        let good = -1;
+        //let learnts = &cp[ClauseKind::Removable as usize];
+        // let good = learnts
+        //     .head
+        //     .iter()
+        //     .skip(1)
+        //     .filter(|c| !c.get_flag(ClauseFlag::Dead) && c.rank <= 3)
+        //     .count();
         if config.use_tty {
             if mes == Some("") {
                 println!("{}", self);
@@ -144,9 +145,9 @@ impl SolverState {
                 println!("{}, State:{:>6}", self, msg,);
                 println!(
                     "#propagate:{:>14}, #decision:{:>13}, #conflict: {:>12} ",
-                    self.stat[Stat::Propagation as usize],
-                    self.stat[Stat::Decision as usize],
-                    self.stat[Stat::Conflict as usize],
+                    self.stats[Stat::Propagation as usize],
+                    self.stats[Stat::Decision as usize],
+                    self.stats[Stat::Conflict as usize],
                 );
                 println!(
                     "  Assignment|#rem:{:>9}, #fix:{:>9}, #elm:{:>9}, prog%:{:>8.4} ",
@@ -164,8 +165,8 @@ impl SolverState {
                 );
                 println!(
                     "     Restart|#BLK:{:>9}, #RST:{:>9}, emaASG:{:>7.2}, emaLBD:{:>7.2} ",
-                    self.stat[Stat::BlockRestart as usize],
-                    self.stat[Stat::Restart as usize],
+                    self.stats[Stat::BlockRestart as usize],
+                    self.stats[Stat::Restart as usize],
                     self.ema_asg.get(),
                     self.ema_lbd.get(),
                 );
@@ -174,13 +175,13 @@ impl SolverState {
                     self.ema_lbd.slow,
                     self.b_lvl.0,
                     self.c_lvl.0,
-                    self.stat[Stat::Reduction as usize],
+                    self.stats[Stat::Reduction as usize],
                 );
                 println!(
                     "  Eliminator|#cls:{:>9}, #var:{:>9},   Clause DB mgr|#smp:{:>9} ",
                     elim.clause_queue_len(),
                     elim.var_queue_len(),
-                    self.stat[Stat::Simplification as usize],
+                    self.stats[Stat::Simplification as usize],
                 );
             }
         } else if mes == Some("") {
@@ -213,8 +214,8 @@ impl SolverState {
                 good,
                 cp[ClauseKind::Permanent as usize].count(true),
                 cp[ClauseKind::Binclause as usize].count(true),
-                self.stat[Stat::BlockRestart as usize],
-                self.stat[Stat::Restart as usize],
+                self.stats[Stat::BlockRestart as usize],
+                self.stats[Stat::Restart as usize],
                 self.ema_asg.get(),
                 self.ema_lbd.get(),
                 self.ema_lbd.slow,

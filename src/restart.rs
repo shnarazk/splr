@@ -1,5 +1,5 @@
 use crate::solver::Solver;
-use crate::state::*;
+use crate::state::Stat;
 use crate::types::*;
 use std::collections::VecDeque;
 
@@ -54,7 +54,7 @@ impl QueueOperations for VecDeque<usize> {
 impl Restart for Solver {
     /// called after conflict resolution
     fn block_restart(&mut self, lbd: usize, clv: usize, blv: usize, nas: usize) {
-        let count = self.state.stat[Stat::Conflict as usize] as u64;
+        let count = self.state.stats[Stat::Conflict as usize] as u64;
         self.state.c_lvl.update(clv as f64);
         self.state.b_lvl.update(blv as f64);
         self.state.ema_asg.update(nas as f64);
@@ -70,7 +70,7 @@ impl Restart for Solver {
         }
         if self.state.next_restart <= count && self.config.restart_blk < self.state.ema_asg.get() {
             self.state.next_restart = count + RESTART_PERIOD;
-            self.state.stat[Stat::BlockRestart as usize] += 1;
+            self.state.stats[Stat::BlockRestart as usize] += 1;
         }
     }
 
@@ -83,13 +83,13 @@ impl Restart for Solver {
             ref mut vars,
             ..
         } = self;
-        let count = state.stat[Stat::Conflict as usize] as u64;
+        let count = state.stats[Stat::Conflict as usize] as u64;
         if RESET_EMA < count
             && state.next_restart < count
             && config.restart_thr < state.ema_lbd.get()
         {
             state.next_restart = count + RESTART_PERIOD;
-            state.stat[Stat::Restart as usize] += 1;
+            state.stats[Stat::Restart as usize] += 1;
             asgs.cancel_until(vars, &mut state.var_order, config.root_level);
         }
     }

@@ -1,11 +1,11 @@
 use crate::assign::AssignStack;
 use crate::clause::*;
 use crate::config::SolverConfiguration;
-use crate::eliminator::{Eliminator, EliminatorIF};
+use crate::eliminator::Eliminator;
 use crate::restart::{luby, QueueOperations};
 use crate::state::{SolverState, Stat};
 use crate::types::*;
-use crate::var::{Var, VarManagement, VarOrdering};
+use crate::var::{Var, VarManagement};
 use std::fs;
 use std::io::{BufRead, BufReader};
 
@@ -122,7 +122,7 @@ impl SatSolver for Solver {
         }
         // config.use_sve = false;
         // elim.use_elim = false;
-        state.stat[Stat::Simplification as usize] += 1;
+        state.stats[Stat::Simplification as usize] += 1;
         if search(asgs, config, cps, elim, state, vars) {
             if !state.ok {
                 asgs.cancel_until(vars, &mut state.var_order, 0);
@@ -266,7 +266,7 @@ pub fn propagate(
     while asgs.remains() {
         let p: usize = asgs.sweep() as usize;
         let false_lit = (p as Lit).negate();
-        state.stat[Stat::Propagation as usize] += 1;
+        state.stats[Stat::Propagation as usize] += 1;
         for kind in &[
             ClauseKind::Binclause,
             ClauseKind::Removable,
@@ -334,7 +334,7 @@ fn propagate_fast(
     while asgs.remains() {
         let p: usize = asgs.sweep() as usize;
         let false_lit = (p as Lit).negate();
-        state.stat[Stat::Propagation as usize] += 1;
+        state.stats[Stat::Propagation as usize] += 1;
         for kind in &[
             ClauseKind::Binclause,
             ClauseKind::Removable,
@@ -411,7 +411,7 @@ fn search(
                 * config.luby_restart_factor;
     }
     loop {
-        state.stat[Stat::Propagation as usize] += 1;
+        state.stats[Stat::Propagation as usize] += 1;
         let ci = propagate_fast(asgs, cp, state, vars);
         if ci == NULL_CLAUSE {
             let na = asgs.len();
@@ -424,11 +424,11 @@ fn search(
             if (config.luby_restart && config.luby_restart_num_conflict <= conflict_c)
                 || (!config.luby_restart
                     && state.lbd_queue.is_full(LBD_QUEUE_LEN)
-                    && ((state.stat[Stat::SumLBD as usize] as f64)
-                        / (state.stat[Stat::Conflict as usize] as f64)
+                    && ((state.stats[Stat::SumLBD as usize] as f64)
+                        / (state.stats[Stat::Conflict as usize] as f64)
                         < state.lbd_queue.average() * config.restart_thr))
             {
-                state.stat[Stat::Restart as usize] += 1;
+                state.stats[Stat::Restart as usize] += 1;
                 state.lbd_queue.clear();
                 asgs.cancel_until(vars, &mut state.var_order, 0);
                 if config.luby_restart {
@@ -456,17 +456,17 @@ fn search(
                 debug_assert_ne!(vi, 0);
                 let p = vars[vi].phase;
                 asgs.uncheck_assume(vars, elim, vi.lit(p));
-                state.stat[Stat::Decision as usize] += 1;
+                state.stats[Stat::Decision as usize] += 1;
                 a_decision_was_made = true;
             }
         } else {
             conflict_c += 1.0;
-            state.stat[Stat::Conflict as usize] += 1;
-            let tn_confl = state.stat[Stat::Conflict as usize] as usize; // total number
+            state.stats[Stat::Conflict as usize] += 1;
+            let tn_confl = state.stats[Stat::Conflict as usize] as usize; // total number
             if a_decision_was_made {
                 a_decision_was_made = false;
             } else {
-                state.stat[Stat::NoDecisionConflict as usize] += 1;
+                state.stats[Stat::NoDecisionConflict as usize] += 1;
             }
             if asgs.level() == config.root_level {
                 analyze_final(asgs, config, cp, state, vars, ci, false);
@@ -488,7 +488,7 @@ fn search(
                 && config.restart_blk * state.trail_queue.average() < (real_len as f64)
             {
                 state.lbd_queue.clear();
-                state.stat[Stat::BlockRestart as usize] += 1;
+                state.stats[Stat::BlockRestart as usize] += 1;
             }
             let mut new_learnt: Vec<Lit> = Vec::new();
             let bl = analyze(asgs, config, cp, state, vars, ci, &mut new_learnt);
@@ -503,10 +503,10 @@ fn search(
                 debug_assert!(0 < lbd);
                 let cid = cp.add_clause(config, elim, vars, &mut new_learnt, lbd, tn_confl as f64);
                 if lbd <= 2 {
-                    state.stat[Stat::NumLBD2 as usize] += 1;
+                    state.stats[Stat::NumLBD2 as usize] += 1;
                 }
                 if learnt_len == 2 {
-                    state.stat[Stat::NumBin as usize] += 1;
+                    state.stats[Stat::NumBin as usize] += 1;
                 }
                 if cid.to_kind() == ClauseKind::Removable as usize {
                     // debug_assert!(!ch.get_flag(ClauseFlag::Dead));
@@ -519,7 +519,7 @@ fn search(
                 }
                 asgs.uncheck_enqueue(vars, l0, cid);
                 state.lbd_queue.enqueue(LBD_QUEUE_LEN, lbd);
-                state.stat[Stat::SumLBD as usize] += lbd as i64;
+                state.stats[Stat::SumLBD as usize] += lbd as i64;
             }
             if tn_confl % 10_000 == 0 {
                 state.progress(asgs, config, cp, elim, vars, None);
@@ -577,7 +577,7 @@ fn analyze(
                 // self.bump_cid(cid);
                 cp[ClauseKind::Removable as usize].bump_activity(
                     cid.to_index(),
-                    state.stat[Stat::Conflict as usize] as f64,
+                    state.stats[Stat::Conflict as usize] as f64,
                     &mut config.cla_inc,
                 );
                 // if 2 < (*ch).rank {
@@ -612,7 +612,7 @@ fn analyze(
                 //     vars[vi].assign != BOTTOM,
                 //     format!("analyze assertion: unassigned var {:?}", vars[vi])
                 // );
-                vars[vi].bump_activity(state.stat[Stat::Conflict as usize] as f64);
+                vars[vi].bump_activity(state.stats[Stat::Conflict as usize] as f64);
                 state.var_order.update(vars, vi);
                 if 0 < lvl && !state.an_seen[vi] {
                     state.an_seen[vi] = true;
@@ -677,7 +677,7 @@ fn analyze(
     // while let Some(l) = last_dl.pop() {
     //     let vi = l.vi();
     //     if clause!(*cp, vars[vi].reason).rank < lbd {
-    //         vars[vi].bump_activity(state.stat[Stat::Conflict as usize] as f64);
+    //         vars[vi].bump_activity(state.stats[Stat::Conflict as usize] as f64);
     //         var_order.update(vars, vi);
     //     }
     // }

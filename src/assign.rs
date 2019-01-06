@@ -1,8 +1,8 @@
 use crate::clause::{ClauseDB, ClauseKind};
 use crate::config::SolverConfiguration;
-use crate::eliminator::{Eliminator, EliminatorIF};
+use crate::eliminator::Eliminator;
 use crate::types::*;
-use crate::var::{Var, VarIdHeap, VarOrdering};
+use crate::var::{Var, VarIdHeap};
 use std::fs::File;
 use std::io::{BufWriter, Write};
 

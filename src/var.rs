@@ -1,7 +1,7 @@
 // use clause::Clause;
 use crate::clause::ClauseIdIndexEncoding;
 use crate::clause::{ClauseFlag, ClauseHead};
-use crate::eliminator::{Eliminator, EliminatorIF};
+use crate::eliminator::Eliminator;
 use crate::types::*;
 use std::fmt;
 
@@ -19,20 +19,6 @@ pub trait VarManagement {
         elim: &mut Eliminator,
     ) -> ();
     fn detach_clause(&mut self, cid: ClauseId, ch: &ClauseHead, elim: &mut Eliminator) -> ();
-}
-
-/// For VarIdHeap
-pub trait VarOrdering {
-    fn get_root(&mut self, vars: &[Var]) -> VarId;
-    fn reset(&mut self) -> ();
-    fn contains(&self, v: VarId) -> bool;
-    fn update(&mut self, vec: &[Var], v: VarId) -> ();
-    fn insert(&mut self, vec: &[Var], v: VarId) -> ();
-    fn clear(&mut self) -> ();
-    fn len(&self) -> usize;
-    fn is_empty(&self) -> bool;
-    fn select_var(&mut self, vars: &[Var]) -> VarId;
-    fn rebuild(&mut self, vars: &[Var]) -> ();
 }
 
 // const VAR_ACTIVITY_THRESHOLD: f64 = 1e100;
@@ -207,7 +193,7 @@ pub struct VarIdHeap {
     idxs: Vec<usize>,     // VarId : -> order : usize
 }
 
-impl VarOrdering for VarIdHeap {
+impl VarIdHeap {
     /// renamed from getHeapDown
     fn get_root(&mut self, vars: &[Var]) -> VarId {
         let s = 1;
@@ -253,7 +239,7 @@ impl VarOrdering for VarIdHeap {
         self.idxs[v] <= self.idxs[0]
     }
     /// renamed from incrementHeap, updateVO
-    fn update(&mut self, vec: &[Var], v: VarId) {
+    pub fn update(&mut self, vec: &[Var], v: VarId) {
         debug_assert!(v != 0, "Invalid VarId");
         let start = self.idxs[v];
         if self.contains(v) {
@@ -261,7 +247,7 @@ impl VarOrdering for VarIdHeap {
         }
     }
     /// renamed from undoVO
-    fn insert(&mut self, vec: &[Var], vi: VarId) {
+    pub fn insert(&mut self, vec: &[Var], vi: VarId) {
         // self.var_order.check("check insert 1");
         if self.contains(vi) {
             let i = self.idxs[vi];
@@ -277,17 +263,17 @@ impl VarOrdering for VarIdHeap {
         self.percolate_up(&vec, n);
         // self.var_order.check("check insert 2");
     }
-    fn clear(&mut self) {
+    pub fn clear(&mut self) {
         self.reset()
     }
-    fn len(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.idxs[0]
     }
-    fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.idxs[0] == 0
     }
     /// Heap operations; renamed from selectVO
-    fn select_var(&mut self, vars: &[Var]) -> VarId {
+    pub fn select_var(&mut self, vars: &[Var]) -> VarId {
         loop {
             let vi = self.get_root(vars);
             if vars[vi].assign == BOTTOM && !vars[vi].eliminated {
@@ -298,7 +284,7 @@ impl VarOrdering for VarIdHeap {
             }
         }
     }
-    fn rebuild(&mut self, vars: &[Var]) {
+    pub fn rebuild(&mut self, vars: &[Var]) {
         // debug_assert_eq!(self.decision_level(), 0);
         self.reset();
         for v in &vars[1..] {
@@ -307,9 +293,6 @@ impl VarOrdering for VarIdHeap {
             }
         }
     }
-}
-
-impl VarIdHeap {
     pub fn new(n: usize, init: usize) -> VarIdHeap {
         let mut heap = Vec::with_capacity(n + 1);
         let mut idxs = Vec::with_capacity(n + 1);
