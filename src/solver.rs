@@ -97,17 +97,14 @@ impl SatSolver for Solver {
         elim.var_queue.clear();
         if elim.use_elim {
             for v in &mut vars[1..] {
+                debug_assert!(!v.eliminated);
+                debug_assert!(!asgs.trail.contains(&v.index.lit(LTRUE)));
+                debug_assert!(!asgs.trail.contains(&v.index.lit(LFALSE)));
                 if v.neg_occurs.is_empty() && !v.pos_occurs.is_empty() && v.assign == BOTTOM {
-                    debug_assert!(!v.eliminated);
-                    debug_assert!(!asgs.trail.contains(&v.index.lit(LTRUE)));
-                    debug_assert!(!asgs.trail.contains(&v.index.lit(LFALSE)));
                     v.assign = LTRUE;
                     asgs.push(v.index.lit(LTRUE));
                 } else if v.pos_occurs.is_empty() && !v.neg_occurs.is_empty() && v.assign == BOTTOM
                 {
-                    debug_assert!(!v.eliminated);
-                    debug_assert!(!asgs.trail.contains(&v.index.lit(LTRUE)));
-                    debug_assert!(!asgs.trail.contains(&v.index.lit(LFALSE)));
                     v.assign = LFALSE;
                     asgs.push(v.index.lit(LFALSE));
                 } else if v.pos_occurs.len() == 1 || v.neg_occurs.len() == 1 {
@@ -414,10 +411,7 @@ fn search(
         state.stats[Stat::Propagation as usize] += 1;
         let ci = propagate_fast(asgs, cp, state, vars);
         if ci == NULL_CLAUSE {
-            let na = asgs.len();
-            let ne = elim.eliminated_vars;
-            // println!("na {} + ne {} = {} >= {}", na, ne, na + ne, num_vars);
-            if config.num_vars <= na + ne {
+            if config.num_vars <= asgs.len() + elim.eliminated_vars {
                 return true;
             }
             // DYNAMIC FORCING RESTART
@@ -475,11 +469,6 @@ fn search(
             if tn_confl % 5000 == 0 && config.var_decay < config.var_decay_max {
                 config.var_decay += 0.01;
             }
-            // let real_len = if trail_lim.is_empty() {
-            //     trail.len()
-            // } else {
-            //     trail.len() - trail_lim[0]
-            // };
             let real_len = asgs.len();
             state.trail_queue.enqueue(TRAIL_QUEUE_LEN, real_len);
             // DYNAMIC BLOCKING RESTART
@@ -492,7 +481,6 @@ fn search(
             }
             let mut new_learnt: Vec<Lit> = Vec::new();
             let bl = analyze(asgs, config, cp, state, vars, ci, &mut new_learnt);
-            // let nas = num_assigns();
             asgs.cancel_until(vars, &mut state.var_order, bl.max(config.root_level));
             let learnt_len = new_learnt.len();
             if learnt_len == 1 {
@@ -509,8 +497,6 @@ fn search(
                     state.stats[Stat::NumBin as usize] += 1;
                 }
                 if cid.to_kind() == ClauseKind::Removable as usize {
-                    // debug_assert!(!ch.get_flag(ClauseFlag::Dead));
-                    // bump_cid(cid);
                     cp[ClauseKind::Removable as usize].bump_activity(
                         cid.to_index(),
                         tn_confl as f64,
@@ -530,7 +516,7 @@ fn search(
                 // } else if 0 < lbd {
                 //     block_restart(lbd, dl, bl, nas);
             }
-            // decay_var_activity();
+            // decay var activity
             config.var_inc /= config.var_decay;
             // decay clause activity
             config.cla_inc /= config.cla_decay;
