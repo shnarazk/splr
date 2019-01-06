@@ -1,6 +1,5 @@
 use crate::clause::{ClauseDB, ClauseFlag};
 use crate::eliminator::Eliminator;
-use crate::restart::{RESTART_BLK, RESTART_THR};
 use crate::state::{SolverState, Stat};
 use crate::types::{EmaKind, LiteralEncoding};
 use crate::var::Var;
@@ -50,7 +49,11 @@ pub struct SolverConfiguration {
     pub inc_reduce_db_extra: usize,
     pub ema_coeffs: (i32, i32),
     /// RESTART
+    /// For force restart based on average LBD of newly generated clauses: 1.15.
+    /// This is called `K` in Glusoce
     pub restart_thr: f64,
+    /// For block restart based on average assigments: 1.40.
+    /// This is called `R` in Glucose
     pub restart_blk: f64,
     pub restart_expansion: f64,
     pub restart_step: f64,
@@ -62,8 +65,8 @@ pub struct SolverConfiguration {
     /// MISC
     pub use_sve: bool,
     pub use_tty: bool,
-    /// dump stats data during solving
-    pub dump_solver_stat_mode: i32,
+    // dump stats data during solving
+    // pub dump_solver_stat_mode: i32,
 }
 
 impl Default for SolverConfiguration {
@@ -84,8 +87,8 @@ impl Default for SolverConfiguration {
             glureduce: true,
             inc_reduce_db: 300,
             inc_reduce_db_extra: 1000,
-            restart_thr: RESTART_THR,
-            restart_blk: RESTART_BLK,
+            restart_thr: 0.80,
+            restart_blk: 1.40,
             restart_expansion: 1.15,
             restart_step: 100.0,
             luby_restart: false,
@@ -96,7 +99,7 @@ impl Default for SolverConfiguration {
             ema_coeffs: (2 ^ 5, 2 ^ 15),
             use_sve: true,
             use_tty: true,
-            dump_solver_stat_mode: 0,
+            // dump_solver_stat_mode: 0,
         }
     }
 }

@@ -16,14 +16,6 @@ pub trait Restart {
     fn force_restart(&mut self) -> ();
 }
 
-/// For force restart based on average LBD of newly generated clauses: 1.15.
-/// This is called `K` in Glusoce
-pub const RESTART_THR: f64 = 0.8;
-
-/// For block restart based on average assigments: 1.40.
-/// This is called `R` in Glucose
-pub const RESTART_BLK: f64 = 1.40;
-
 const RESTART_PERIOD: u64 = 50;
 const RESET_EMA: u64 = 1000;
 

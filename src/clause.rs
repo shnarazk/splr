@@ -97,6 +97,7 @@ pub enum ClauseFlag {
 /// partition of clauses
 pub struct ClausePartition {
     pub kind: ClauseKind,
+    pub tag: usize,
     pub init_size: usize,
     pub head: Vec<ClauseHead>,
     pub perm: Vec<ClauseIndex>,
@@ -137,7 +138,7 @@ impl ClauseKind {
     }
     #[inline(always)]
     pub fn index_from(self, cid: ClauseId) -> ClauseIndex {
-        cid & self.mask()
+        cid & CLAUSE_INDEX_MASK
     }
 }
 
@@ -160,6 +161,7 @@ impl ClausePartition {
         }
         ClausePartition {
             kind,
+            tag: kind.tag(),
             init_size: nc,
             head,
             perm,
@@ -169,11 +171,11 @@ impl ClausePartition {
     }
     #[inline(always)]
     pub fn id_from(&self, cix: ClauseIndex) -> ClauseId {
-        cix | self.kind.tag()
+        cix | self.tag
     }
     #[inline(always)]
     pub fn index_from(&self, cid: ClauseId) -> ClauseIndex {
-        cid & self.kind.mask()
+        cid & CLAUSE_INDEX_MASK
     }
 }
 
@@ -223,7 +225,7 @@ impl ClauseIdIndexEncoding for usize {
     }
     #[inline(always)]
     fn to_index(&self) -> ClauseIndex {
-        (*self & CLAUSE_INDEX_MASK) as usize
+        *self & CLAUSE_INDEX_MASK
     }
     #[inline(always)]
     fn to_kind(&self) -> usize {
