@@ -477,11 +477,7 @@ impl GC for ClausePartition {
     }
     fn count(&self, alive: bool) -> usize {
         if alive {
-            self.head
-                .iter()
-                .skip(1)
-                .filter(|c| !c.get_flag(ClauseFlag::Dead))
-                .count()
+            self.head.len() - self.watcher[NULL_LIT.negate() as usize].len() - 1
         } else {
             self.head.len() - 1
         }

@@ -534,8 +534,8 @@ fn search(
                         luby(config.luby_restart_inc, config.luby_current_restarts)
                             * config.luby_restart_factor;
                     // println!("luby restart {}", luby_restart_num_conflict);
+                    // return
                 }
-                // return
             } else if asgs.level() == 0 {
                 cp.simplify(asgs, config, elim, state, vars);
             }
@@ -631,10 +631,10 @@ fn search(
             // decay clause activity
             config.cla_inc /= config.cla_decay;
             // glucose reduction
-            let nlearnts = cp[ClauseKind::Removable as usize].count(true);
-            if 0 < nlearnts &&
-                ((config.use_chan_seok && !config.glureduce && config.first_reduction < nlearnts)
-                 || (config.glureduce && state.cur_restart * state.next_reduction <= tn_confl))
+            if (config.use_chan_seok
+                && !config.glureduce
+                && config.first_reduction < cp[ClauseKind::Removable as usize].count(true))
+                || (config.glureduce && state.cur_restart * state.next_reduction <= tn_confl)
             {
                 state.cur_restart =
                     ((tn_confl as f64) / (state.next_reduction as f64)) as usize + 1;
@@ -944,9 +944,9 @@ fn adapt_strategy(
         config.glureduce = true;
         config.first_reduction = 2000;
         state.next_reduction = 2000;
-        state.cur_restart = ((state.stat[Stat::Conflict as usize] as f64
-                              / state.next_reduction as f64)
-                             + 1.0) as usize;
+        state.cur_restart = (state.stat[Stat::Conflict as usize] as f64
+            / state.next_reduction as f64
+            + 1.0) as usize;
         config.inc_reduce_db = 0;
         re_init = true;
     }
