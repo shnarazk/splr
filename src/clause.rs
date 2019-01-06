@@ -537,14 +537,8 @@ impl ClauseManagement for ClauseDB {
     /// 4. removeClause
     /// called from strengthen_clause, backward_subsumption_check, eliminate_var, substitute
     fn remove_clause(&mut self, cid: ClauseId) {
-        // if clause_body!(self.cp, cid).get_flag(ClauseFlag::Dead) {
-        //     panic!(
-        //         "remove_clause Dead:{} {:#}",
-        //         cid2fmt(cid),
-        //         clause_head!(self.cp, cid),
-        //     );
-        // }
         let ch = clause_mut!(*self, cid);
+        debug_assert!(!ch.get_flag(ClauseFlag::Dead));
         ch.flag_on(ClauseFlag::Dead);
         if ch.lits.is_empty() {
             return;
