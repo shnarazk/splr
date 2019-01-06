@@ -394,8 +394,6 @@ impl ClausePartition {
     }
     pub fn new_clause(&mut self, v: &[Lit], rank: usize) -> ClauseId {
         let cix;
-        let w0;
-        let w1;
         if let Some(w) = self.watcher[NULL_LIT.negate() as usize].pop() {
             cix = w.c;
             // debug_assert!(self.head[cix].get_flag(ClauseFlag::Dead));
@@ -417,8 +415,8 @@ impl ClausePartition {
                 lits.push(*l);
             }
             cix = self.head.len();
-            w0 = l0.negate() as usize;
-            w1 = l1.negate() as usize;
+            let w0 = l0.negate() as usize;
+            let w1 = l1.negate() as usize;
             self.head.push(ClauseHead {
                 flags: self.kind as u16,
                 lits,
@@ -580,7 +578,7 @@ impl ClauseManagement for ClauseDB {
         }
         let r = ch.rank;
         let w0 = ch.lits[0].negate() as usize;
-        let w1 = ch.lits[0].negate() as usize;
+        let w1 = ch.lits[1].negate() as usize;
         self[kind as usize].new_clause(&vec, r);
         self[cid.to_kind()].touched[w0] = true;
         self[cid.to_kind()].touched[w1] = true;

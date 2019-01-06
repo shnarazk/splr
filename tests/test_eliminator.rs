@@ -3,6 +3,7 @@
 #![allow(unused_variables)]
 #![allow(dead_code)]
 use splr::clause::*;
+use splr::config::SolverConfiguration;
 use splr::solver::*;
 use splr::types::*;
 
