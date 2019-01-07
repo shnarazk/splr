@@ -516,20 +516,18 @@ impl ClauseDBIF for ClauseDB {
             ..
         } = &mut self[ClauseKind::Removable as usize];
         let mut perm = Vec::with_capacity(head.len());
-        let mut nc = 1;
         for (i, b) in head.iter().enumerate().skip(1) {
             if !b.get_flag(ClauseFlag::Dead) && !vars.locked(b, ClauseKind::Removable.id_from(i)) {
                 perm.push(i);
-                nc += 1;
             }
         }
         perm.sort_by(|&a, &b| head[a].cmp(&head[b]));
-        let keep = nc / 2;
+        let keep = perm.len() / 2;
         if head[perm[keep]].rank <= 5 {
             state.next_reduction += 1000;
         };
-        for i in keep..nc {
-            let ch = &mut head[perm[i]];
+        for i in &perm[keep..] {
+            let ch = &mut head[*i];
             if ch.get_flag(ClauseFlag::JustUsed) {
                 ch.flag_off(ClauseFlag::JustUsed)
             } else {
