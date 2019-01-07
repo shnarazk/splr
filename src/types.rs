@@ -150,6 +150,7 @@ pub struct Ema(pub f64, f64, f64);
 
 /// Exponential Moving Average w/ a calibrator
 impl Ema {
+    /// returns a new EMA from a flag (slow or fast) and a window size
     pub fn new(s: i32) -> Ema {
         Ema(0.0, 1.0 / f64::from(s), 0.0)
     }

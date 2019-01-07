@@ -89,9 +89,8 @@ pub trait Delete<T> {
 }
 
 pub trait EmaIF {
-    /// returns a new EMA from a flag (slow or fast) and a window size
-    fn get(&self) -> f64;
     /// returns an EMA value
+    fn get(&self) -> f64;
     fn update(&mut self, x: f64) -> ();
     /// reset (equalize) both values
     fn reset(&mut self) -> ();
