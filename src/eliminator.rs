@@ -3,8 +3,9 @@ use crate::clause::*;
 use crate::config::SolverConfiguration;
 use crate::solver::propagate;
 use crate::state::*;
+use crate::traits::*;
 use crate::types::*;
-use crate::var::{Var, VarManagement};
+use crate::var::Var;
 // use std::fmt;
 
 /// Literal eliminator
@@ -35,16 +36,6 @@ const BACKWORD_SUBSUMPTION_THRESHOLD: usize = 1_000_000; // 10_000;
 const CLAUSE_QUEUE_THRESHOD: usize = 1_000_000; // 1_000;
 const VAR_QUEUE_THRESHOLD: usize = 3_200_000;
 
-trait LiteralClause {
-    fn as_uniclause(self) -> ClauseId;
-}
-
-impl LiteralClause for Lit {
-    fn as_uniclause(self) -> ClauseId {
-        ClauseKind::Uniclause.id_from(self as usize)
-    }
-}
-
 impl Eliminator {
     pub fn new(use_elim: bool) -> Eliminator {
         Eliminator {
@@ -67,7 +58,7 @@ impl Eliminator {
     }
     pub fn enqueue_clause(&mut self, cid: ClauseId, ch: &mut ClauseHead) {
         if !self.use_elim || self.clause_queue_threshold == 0 {
-            // println!("{} is not enqueued", cid2fmt(cid));
+            // println!("{} is not enqueued", cid.fmt());
             return;
         }
         let rank = ch.rank as f64;
@@ -181,16 +172,16 @@ impl Eliminator {
                                         && di.to_kind() == ClauseKind::Removable as usize
                                     {
                                         // println!("BackSubsC    => {} {:#} subsumed completely by {} {:#}",
-                                        //          cid2fmt(*di),
+                                        //          di.fmt(),
                                         //          *db,
-                                        //          cid2fmt(cid),
+                                        //          cid.fmt(),
                                         //          *clause_body!(self.cp, cid),
                                         // );
                                         cps.remove_clause(*di);
                                         vars.detach_clause(*di, clause!(*cps, *di), self);
                                     } //else {
                                       // println!("backward_subsumption_check tries to delete a permanent clause {} {:#}",
-                                      //          cid2fmt(*di),
+                                      //          di.fmt(),
                                       //          clause_body!(self.cp, *di));
                                       // TODO: move the cid to Permanent
                                       //}
@@ -199,7 +190,7 @@ impl Eliminator {
                                     cps[di.to_kind()].touched[l as usize] = true;
                                     cps[di.to_kind()].touched[l.negate() as usize] = true;
                                     // let xb = &clause_body!(self.cp, *di);
-                                    // println!("BackSubsC    => subsumed {} from {} and {} {:#}", l.int(), cid2fmt(cid), cid2fmt(*di), xb);
+                                    // println!("BackSubsC    => subsumed {} from {} and {} {:#}", l.int(), cid.fmt(), di.fmt(), xb);
                                     _deleted_literals += 1;
                                     // println!("cancel true path");
                                     // continue;
@@ -442,10 +433,10 @@ pub fn check_eliminator(cps: &ClauseDB, vars: &[Var]) -> bool {
                 let v = l.vi();
                 if l.positive() {
                     if !vars[v].pos_occurs.contains(&cid) {
-                        panic!("aaa {} {:#}", cid2fmt(cid), ch);
+                        panic!("aaa {} {:#}", cid.fmt(), ch);
                     }
                 } else if !vars[v].neg_occurs.contains(&cid) {
-                    panic!("aaa {} {:#}", cid2fmt(cid), ch);
+                    panic!("aaa {} {:#}", cid.fmt(), ch);
                 }
             }
         }
@@ -509,14 +500,14 @@ pub fn strengthen_clause(
     debug_assert!(1 < clause!(*cps, cid).lits.len());
     cps[cid.to_kind()].touched[l as usize] = true;
     cps[cid.to_kind()].touched[l.negate() as usize] = true;
-    // println!("STRENGTHEN_CLAUSE {}", cid2fmt(cid));
+    // println!("STRENGTHEN_CLAUSE {}", cid.fmt());
     debug_assert_ne!(cid, NULL_CLAUSE);
     if strengthen(cps, vars, cid, l) {
         debug_assert!(2 == clause!(*cps, cid).lits.len());
         let c0 = clause!(*cps, cid).lits[0];
-        // println!("{} {:?} became a uniclause as c0 {}, l {}", cid2fmt(cid), vec2int(&clause!(*cp, cid).lits), c0.int(), l.int());
+        // println!("{} {:?} became a uniclause as c0 {}, l {}", cid.fmt(), vec2int(&clause!(*cp, cid).lits), c0.int(), l.int());
         debug_assert_ne!(c0, l);
-        // println!("{} is removed and its first literal {} is enqueued.", cid2fmt(cid), c0.int());
+        // println!("{} is removed and its first literal {} is enqueued.", cid.fmt(), c0.int());
         cps.remove_clause(cid);
         vars.detach_clause(cid, clause!(*cps, cid), elim);
         if asgs.enqueue_null(&mut vars[c0.vi()], c0.lbool(), 0)
@@ -528,7 +519,7 @@ pub fn strengthen_clause(
             false
         }
     } else {
-        // println!("cid {} drops literal {}", cid2fmt(cid), l.int());
+        // println!("cid {} drops literal {}", cid.fmt(), l.int());
         debug_assert!(1 < clause!(*cps, cid).lits.len());
         elim.enqueue_clause(cid, clause_mut!(*cps, cid));
         true
@@ -731,16 +722,16 @@ pub fn eliminate_var(
                         continue;
                     }
                     if let Some(vec) = merge(cps, elim, *p, *n, v) {
-                        // println!("eliminator replaces {} with a cross product {:?}", cid2fmt(*p), vec2int(&vec));
+                        // println!("eliminator replaces {} with a cross product {:?}", p.fmt(), vec2int(&vec));
                         debug_assert!(!vec.is_empty());
                         match vec.len() {
                             1 => {
                                 // println!(
                                 //     "eliminate_var: grounds {} from {}{:?} and {}{:?}",
                                 //     vec[0].int(),
-                                //     cid2fmt(*p),
+                                //     p.fmt(),
                                 //     vec2int(&clause_body!(*cp, *p).lits),
-                                //     cid2fmt(*n),
+                                //     n.fmt(),
                                 //     vec2int(&clause_body!(*cp, *n).lits)
                                 // );
                                 let lit = vec[0];

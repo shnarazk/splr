@@ -1,6 +1,7 @@
 use crate::clause::{ClauseDB, ClauseKind};
 use crate::config::SolverConfiguration;
 use crate::eliminator::Eliminator;
+use crate::traits::*;
 use crate::types::*;
 use crate::var::{Var, VarIdHeap};
 use std::fs::File;
@@ -69,7 +70,7 @@ impl AssignStack {
             debug_assert!(!v.eliminated);
             v.assign = sig;
             // if dl == 0 && cid != NULL_CLAUSE {
-            //     println!("enqueue {}", cid2fmt(cid));
+            //     println!("enqueue {}", cid.fmt());
             // }
             v.reason = cid;
             v.level = dl;

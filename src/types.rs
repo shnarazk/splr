@@ -1,4 +1,6 @@
 //! Basic types
+use crate::clause::ClauseKind;
+use crate::traits::*;
 use std::fmt;
 use std::ops::Neg;
 
@@ -15,6 +17,7 @@ pub const NULL_CLAUSE: ClauseId = 0;
 /// # Examples
 ///
 /// ```
+/// use splr::traits::{LitIF, VarIdIF};
 /// use splr::types::*;
 /// assert_eq!(2, int2lit( 1) as i32);
 /// assert_eq!(3, int2lit(-1) as i32);
@@ -35,13 +38,13 @@ pub fn int2lit(x: i32) -> Lit {
     (if x < 0 { -2 * x + 1 } else { 2 * x }) as u32
 }
 
-/// Converters between 'int', [Lit](type.Lit.html) and [Var](type.Var.html).
 /// # Examples
 ///
 /// ```
+/// use splr::traits::{LitIF, VarIdIF};
 /// use splr::types::*;
-/// assert_eq!(int2lit(1), 1.lit(LTRUE));
-/// assert_eq!(int2lit(2), 2.lit(LTRUE));
+/// assert_eq!(int2lit(1), (1 as VarId).lit(LTRUE));
+/// assert_eq!(int2lit(2), (2 as VarId).lit(LTRUE));
 /// assert_eq!(1, 1.lit(LTRUE).vi());
 /// assert_eq!(1, 1.lit(LFALSE).vi());
 /// assert_eq!(2, 2.lit(LTRUE).vi());
@@ -51,15 +54,8 @@ pub fn int2lit(x: i32) -> Lit {
 /// assert_eq!(int2lit( 2), int2lit(-2).negate());
 /// assert_eq!(int2lit(-2), int2lit( 2).negate());
 /// ```
-pub trait LiteralEncoding {
-    fn vi(&self) -> VarId;
-    fn int(&self) -> i32;
-    fn lbool(&self) -> Lbool;
-    fn positive(&self) -> bool;
-    fn negate(&self) -> Lit;
-}
 
-impl LiteralEncoding for Lit {
+impl LitIF for Lit {
     #[inline(always)]
     fn vi(&self) -> VarId {
         (self >> 1) as VarId
@@ -85,15 +81,12 @@ impl LiteralEncoding for Lit {
     fn negate(&self) -> Lit {
         self ^ 1
     }
+    fn as_uniclause(self) -> ClauseId {
+        ClauseKind::Uniclause.id_from(self as usize)
+    }
 }
 
-/// converter from [VarId](type.VarId.html) to [Lit](type.Lit.html).
-pub trait VarIdEncoding {
-    fn lit(&self, p: Lbool) -> Lit;
-}
-
-impl VarIdEncoding for VarId {
-    /// returns a positive literal if p == LTRUE or BOTTOM.
+impl VarIdIF for VarId {
     #[inline(always)]
     fn lit(&self, p: Lbool) -> Lit {
         (*self as Lit) << 1 | ((p == LFALSE) as Lit)
@@ -112,16 +105,6 @@ pub const BOTTOM: u8 = 2;
 /// Note: this function doesn't work on BOTTOM.
 pub fn negate_bool(b: Lbool) -> Lbool {
     b ^ 1
-}
-
-/// trait on Ema
-pub trait EmaKind {
-    /// returns a new EMA from a flag (slow or fast) and a window size
-    fn get(&self) -> f64;
-    /// returns an EMA value
-    fn update(&mut self, x: f64) -> ();
-    /// reset (equalize) both values
-    fn reset(&mut self) -> ();
 }
 
 /// Exponential Moving Average pair
@@ -147,7 +130,7 @@ impl Ema2 {
     }
 }
 
-impl EmaKind for Ema2 {
+impl EmaIF for Ema2 {
     fn get(&self) -> f64 {
         self.fast / self.slow * (self.cals / self.calf)
     }
@@ -172,7 +155,7 @@ impl Ema {
     }
 }
 
-impl EmaKind for Ema {
+impl EmaIF for Ema {
     fn get(&self) -> f64 {
         self.0 / self.2
     }
@@ -194,7 +177,7 @@ impl Ema_ {
     }
 }
 
-impl EmaKind for Ema_ {
+impl EmaIF for Ema_ {
     fn get(&self) -> f64 {
         self.0 / self.1
     }
@@ -241,15 +224,6 @@ pub fn vec2int(v: &[Lit]) -> Vec<i32> {
             x => x.int(),
         })
         .collect::<Vec<i32>>()
-}
-
-pub trait Delete<T> {
-    fn delete<F>(&mut self, filter: F)
-    where
-        F: FnMut(&T) -> bool;
-    fn delete_unstable<F>(&mut self, filter: F)
-    where
-        F: FnMut(&T) -> bool;
 }
 
 impl<T> Delete<T> for Vec<T> {

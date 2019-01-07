@@ -1,7 +1,7 @@
 use crate::clause::{ClauseDB, ClauseFlag};
 use crate::eliminator::Eliminator;
 use crate::state::{SolverState, Stat};
-use crate::types::{EmaKind, LiteralEncoding};
+use crate::traits::*;
 use crate::var::Var;
 
 #[derive(Eq, PartialEq)]

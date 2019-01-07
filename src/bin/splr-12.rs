@@ -1,5 +1,6 @@
 // SAT solver for Propositional Logic in Rust
-use splr::solver::{Certificate, SatSolver, Solver};
+use splr::solver::{Certificate, Solver};
+use splr::traits::SatSolver;
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use structopt::StructOpt;

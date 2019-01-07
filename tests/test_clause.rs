@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 use splr::clause::*;
 use splr::solver::*;
+use splr::traits::*;
 use splr::types::*;
 
 macro_rules! mkv {

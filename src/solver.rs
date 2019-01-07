@@ -2,19 +2,13 @@ use crate::assign::AssignStack;
 use crate::clause::*;
 use crate::config::SolverConfiguration;
 use crate::eliminator::Eliminator;
-use crate::restart::{luby, QueueOperations};
+use crate::restart::luby;
 use crate::state::{SolverState, Stat};
+use crate::traits::*;
 use crate::types::*;
-use crate::var::{Var, VarManagement};
+use crate::var::Var;
 use std::fs;
 use std::io::{BufRead, BufReader};
-
-/// For Solver
-pub trait SatSolver {
-    fn solve(&mut self) -> SolverResult;
-    fn build(path: &str) -> (Solver, CNFDescription);
-    fn add_unchecked_clause(&mut self, v: &mut Vec<Lit>) -> Option<ClauseId>;
-}
 
 /// normal results returned by Solver
 pub enum Certificate {
@@ -307,7 +301,7 @@ pub fn propagate(
                         }
                         if first_value == LFALSE {
                             asgs.catchup();
-                            // println!("conflict by {} {:?}", cid2fmt(kind.id_from(w.c)), vec2int(&lits));
+                            // println!("conflict by {} {:?}", kind.id_from(w.c).fmt(), vec2int(&lits));
                             return kind.id_from(w.c);
                         } else {
                             asgs.uncheck_enqueue(vars, first, kind.id_from(w.c));
@@ -376,7 +370,7 @@ fn propagate_fast(
                         }
                         if first_value == LFALSE {
                             asgs.catchup();
-                            // println!("conflict by {} {:?}", cid2fmt(kind.id_from(w.c)), vec2int(&lits));
+                            // println!("conflict by {} {:?}", kind.id_from(w.c).fmt(), vec2int(&lits));
                             return kind.id_from(w.c);
                         } else {
                             asgs.uncheck_enqueue(vars, first, kind.id_from(w.c));
@@ -582,7 +576,7 @@ fn analyze(
                 //     }
                 // }
             }
-            // println!("{}を対応", cid2fmt(cid));
+            // println!("{}を対応", cid.fmt());
             for q in &(*ch).lits[((p != NULL_LIT) as usize)..] {
                 let vi = q.vi();
                 let lvl = vars[vi].level;
@@ -630,7 +624,7 @@ fn analyze(
             p = asgs.trail[ti];
             let next_vi = p.vi();
             cid = vars[next_vi].reason;
-            // println!("{} にフラグが立っている。path数は{}, そのreasonは{}", next_vi, path_cnt - 1, cid2fmt(cid));
+            // println!("{} にフラグが立っている。path数は{}, そのreasonは{}", next_vi, path_cnt - 1, cid.fmt());
             state.an_seen[next_vi] = false;
             path_cnt -= 1;
             if path_cnt <= 0 {

@@ -48,6 +48,8 @@ pub mod restart;
 pub mod solver;
 /// various data for SAT solving
 pub mod state;
+/// Traits
+pub mod traits;
 /// Plumping layer.
 pub mod types;
 /// validates

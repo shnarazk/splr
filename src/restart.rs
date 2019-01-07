@@ -1,20 +1,7 @@
 use crate::solver::Solver;
 use crate::state::Stat;
-use crate::types::*;
+use crate::traits::*;
 use std::collections::VecDeque;
-
-/// For VecDeque<usize>
-pub trait QueueOperations {
-    fn average(&self) -> f64;
-    fn enqueue(&mut self, lim: usize, x: usize) -> bool;
-    fn is_full(&self, lim: usize) -> bool;
-}
-
-/// For Solver
-pub trait Restart {
-    fn block_restart(&mut self, lbd: usize, clv: usize, blv: usize, nas: usize) -> ();
-    fn force_restart(&mut self) -> ();
-}
 
 const RESTART_PERIOD: u64 = 50;
 const RESET_EMA: u64 = 1000;

@@ -1,7 +1,7 @@
 use crate::clause::ClauseKind;
 use crate::solver::*;
+use crate::traits::*;
 use crate::types::*;
-use crate::var::VarManagement;
 
 impl Solver {
     pub fn inject_assigmnent(&mut self, vec: &[i32]) {

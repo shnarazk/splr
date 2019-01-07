@@ -2,6 +2,7 @@ use crate::assign::AssignStack;
 use crate::clause::{ClauseDB, ClauseKind};
 use crate::config::SolverConfiguration;
 use crate::eliminator::Eliminator;
+use crate::traits::*;
 use crate::types::*;
 use crate::var::{Var, VarIdHeap};
 use chrono::*;
@@ -50,8 +51,8 @@ pub struct SolverState {
     pub target: String,
 }
 
-impl SolverState {
-    pub fn new(nv: usize, se: i32, fname: &str) -> SolverState {
+impl SolverStateIF for SolverState {
+    fn new(nv: usize, se: i32, fname: &str) -> SolverState {
         SolverState {
             ok: true,
             next_reduction: 1000,
@@ -84,20 +85,8 @@ impl SolverState {
             },
         }
     }
-}
 
-impl fmt::Display for SolverState {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut tm = format!("{}", Utc::now() - self.start);
-        tm.drain(..2);
-        tm.pop();
-        write!(f, "{:36}|time:{:>19}", self.target, tm)
-    }
-}
-
-// print a progress report
-impl SolverState {
-    pub fn progress(
+    fn progress(
         &mut self,
         asgs: &AssignStack,
         config: &mut SolverConfiguration,
@@ -255,5 +244,14 @@ impl SolverState {
         println!("- trail_lim  {:?}", asgs.trail_lim);
         // println!("{}", self.var_order);
         // self.var_order.check("");
+    }
+}
+
+impl fmt::Display for SolverState {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut tm = format!("{}", Utc::now() - self.start);
+        tm.drain(..2);
+        tm.pop();
+        write!(f, "{:36}|time:{:>19}", self.target, tm)
     }
 }
