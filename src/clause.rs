@@ -12,6 +12,8 @@ use std::fmt;
 const CLAUSE_INDEX_BITS: usize = 60;
 const CLAUSE_INDEX_MASK: usize = 0x0FFF_FFFF_FFFF_FFFF;
 const DB_INC_SIZE: usize = 200;
+const CLA_ACTIVITY_MAX: f64 = 1e240;
+const CLA_ACTIVITY_MAX_R: f64 = 1.0 / CLA_ACTIVITY_MAX;
 
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub enum ClauseKind {
@@ -384,18 +386,18 @@ impl ClausePartitionIF for ClausePartition {
         }
         temp[0] = key + 1;
     }
-    fn bump_activity(&mut self, cix: ClauseIndex, val: f64, cla_inc: &mut f64) {
+    fn bump_activity(&mut self, inc: &mut f64, cix: ClauseIndex, _d: f64) {
         let c = &mut self.head[cix];
-        let a = c.activity + *cla_inc;
-        // a = (c.activity + val) / 2.0;
+        let a = c.activity + *inc;
+        // a = (c.activity + d) / 2.0;
         c.activity = a;
-        if 1.0e20 < a {
+        if CLA_ACTIVITY_MAX < a {
             for c in self.head.iter_mut().skip(1) {
-                if 1.0e-300 < c.activity {
-                    c.activity *= 1.0e-20;
+                if CLA_ACTIVITY_MAX_R < c.activity {
+                    c.activity *= CLA_ACTIVITY_MAX_R;
                 }
             }
-            *cla_inc *= 1.0e-20;
+            *inc *= CLA_ACTIVITY_MAX_R;
         }
     }
     fn count(&self, alive: bool) -> usize {
@@ -470,9 +472,9 @@ impl ClauseDBIF for ClauseDB {
         // self.bump_cid(cid);
         if cid.to_kind() == ClauseKind::Removable as usize {
             self[ClauseKind::Removable as usize].bump_activity(
+                &mut config.cla_inc,
                 cid.to_index(),
                 act,
-                &mut config.cla_inc,
             );
         }
         let ch = clause_mut!(*self, cid);

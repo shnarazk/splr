@@ -73,7 +73,7 @@ pub trait ClausePartitionIF {
     fn garbage_collect(&mut self, vars: &mut [Var], elim: &mut Eliminator);
     fn new_clause(&mut self, v: &[Lit], rank: usize) -> ClauseId;
     fn reset_lbd(&mut self, vars: &[Var], temp: &mut [usize]);
-    fn bump_activity(&mut self, cix: ClauseIndex, val: f64, cla_inc: &mut f64);
+    fn bump_activity(&mut self, inc: &mut f64, cix: ClauseIndex, _d: f64);
     fn count(&self, alive: bool) -> usize;
     fn check(&self);
 }
@@ -157,7 +157,6 @@ pub trait SolverStateIF {
 pub trait VarIF {
     fn new(i: usize) -> Var;
     fn new_vars(n: usize) -> Vec<Var>;
-    fn bump_activity(&mut self, d: f64);
 }
 
 pub trait VarIdIF {
@@ -180,6 +179,7 @@ pub trait VarManagement {
         ignorable: bool,
     );
     fn detach_clause(&mut self, elim: &mut Eliminator, cid: ClauseId, ch: &Clause);
+    fn bump_activity(&mut self, inc: &mut f64, vi: VarId, _d: f64);
 }
 
 pub trait VarOrderIF {

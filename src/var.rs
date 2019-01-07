@@ -4,7 +4,10 @@ use crate::traits::*;
 use crate::types::*;
 use std::fmt;
 
-// const VAR_ACTIVITY_THRESHOLD: f64 = 1e100;
+#[allow(dead_code)]
+const VAR_ACTIVITY_MAX: f64 = 1e240;
+#[allow(dead_code)]
+const VAR_ACTIVITY_MAX_R: f64 = 1.0 / VAR_ACTIVITY_MAX;
 
 /// Struct for a variable.
 pub struct Var {
@@ -51,9 +54,6 @@ impl VarIF for Var {
         }
         vec
     }
-    fn bump_activity(&mut self, d: f64) {
-        self.activity = (self.activity + d) / 2.0;
-    }
 }
 
 impl VarManagement for [Var] {
@@ -94,7 +94,6 @@ impl VarManagement for [Var] {
         keys[0] = key;
         cnt
     }
-
     fn attach_clause(
         &mut self,
         elim: &mut Eliminator,
@@ -137,6 +136,20 @@ impl VarManagement for [Var] {
                     elim.enqueue_var(v);
                 }
             }
+        }
+    }
+    fn bump_activity(&mut self, inc: &mut f64, vi: VarId, _d: f64) {
+        let v = &mut self[vi];
+        // v.activity = (v.activity + d) / 2.0;
+        let a = v.activity + *inc;
+        v.activity = a;
+        if VAR_ACTIVITY_MAX < a {
+            for v in &mut self[1..] {
+                if VAR_ACTIVITY_MAX_R < v.activity {
+                    v.activity *= VAR_ACTIVITY_MAX_R;
+                }
+            }
+            *inc *= VAR_ACTIVITY_MAX_R;
         }
     }
 }

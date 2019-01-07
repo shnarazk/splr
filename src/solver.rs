@@ -487,9 +487,9 @@ fn search(
                 }
                 if cid.to_kind() == ClauseKind::Removable as usize {
                     cp[ClauseKind::Removable as usize].bump_activity(
+                        &mut config.cla_inc,
                         cid.to_index(),
                         tn_confl as f64,
-                        &mut config.cla_inc,
                     );
                 }
                 asgs.uncheck_enqueue(vars, l0, cid);
@@ -551,9 +551,9 @@ fn analyze(
             if cid.to_kind() == ClauseKind::Removable as usize {
                 // self.bump_cid(cid);
                 cp[ClauseKind::Removable as usize].bump_activity(
+                    &mut config.cla_inc,
                     cid.to_index(),
                     state.stats[Stat::Conflict as usize] as f64,
-                    &mut config.cla_inc,
                 );
                 // if 2 < (*ch).rank {
                 //     let nblevels = compute_lbd(vars, &ch.lits, lbd_temp);
@@ -587,7 +587,11 @@ fn analyze(
                 //     vars[vi].assign != BOTTOM,
                 //     format!("analyze assertion: unassigned var {:?}", vars[vi])
                 // );
-                vars[vi].bump_activity(state.stats[Stat::Conflict as usize] as f64);
+                vars.bump_activity(
+                    &mut config.var_inc,
+                    vi,
+                    state.stats[Stat::Conflict as usize] as f64,
+                );
                 state.var_order.update(vars, vi);
                 if 0 < lvl && !state.an_seen[vi] {
                     state.an_seen[vi] = true;
@@ -652,7 +656,7 @@ fn analyze(
     // while let Some(l) = last_dl.pop() {
     //     let vi = l.vi();
     //     if clause!(*cp, vars[vi].reason).rank < lbd {
-    //         vars[vi].bump_activity(state.stats[Stat::Conflict as usize] as f64);
+    //         vars.bump_activity(vi, &mut config.var_inc, state.stats[Stat::Conflict as usize] as f64);
     //         var_order.update(vars, vi);
     //     }
     // }
