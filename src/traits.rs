@@ -1,5 +1,5 @@
 use crate::assign::AssignStack;
-use crate::clause::{ClauseDB, ClauseFlag, ClauseHead, ClauseIndex, ClauseKind, ClausePartition};
+use crate::clause::{Clause, ClauseDB, ClauseFlag, ClauseIndex, ClauseKind, ClausePartition};
 use crate::config::SolverConfig;
 use crate::eliminator::Eliminator;
 use crate::solver::{Solver, SolverResult};
@@ -170,17 +170,17 @@ pub trait VarIdIF {
 /// For [Var]
 pub trait VarManagement {
     fn assigned(&self, l: Lit) -> Lbool;
-    fn locked(&self, ch: &ClauseHead, cid: ClauseId) -> bool;
+    fn locked(&self, ch: &Clause, cid: ClauseId) -> bool;
     fn satisfies(&self, c: &[Lit]) -> bool;
     fn compute_lbd(&self, vec: &[Lit], keys: &mut [usize]) -> usize;
     fn attach_clause(
         &mut self,
         elim: &mut Eliminator,
         cid: ClauseId,
-        ch: &mut ClauseHead,
+        ch: &mut Clause,
         ignorable: bool,
     ) -> ();
-    fn detach_clause(&mut self, elim: &mut Eliminator, cid: ClauseId, ch: &ClauseHead);
+    fn detach_clause(&mut self, elim: &mut Eliminator, cid: ClauseId, ch: &Clause);
 }
 
 pub trait VarOrderIF {

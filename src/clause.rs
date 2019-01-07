@@ -145,7 +145,7 @@ impl ClauseFlag {
     }
 }
 
-pub struct ClauseHead {
+pub struct Clause {
     /// collection of bits
     pub flags: u16,
     /// the literals
@@ -156,7 +156,7 @@ pub struct ClauseHead {
     pub activity: f64,
 }
 
-impl ClauseIF for ClauseHead {
+impl ClauseIF for Clause {
     #[inline(always)]
     fn get_kind(&self) -> ClauseKind {
         match self.flags & 3 {
@@ -180,7 +180,7 @@ impl ClauseIF for ClauseHead {
     }
 }
 
-impl ClauseHead {
+impl Clause {
     #[allow(dead_code)]
     fn set_flag(&mut self, flag: ClauseFlag, val: bool) {
         if val {
@@ -198,18 +198,18 @@ impl ClauseHead {
     }
 }
 
-impl PartialEq for ClauseHead {
+impl PartialEq for Clause {
     #[inline(always)]
-    fn eq(&self, other: &ClauseHead) -> bool {
+    fn eq(&self, other: &Clause) -> bool {
         self == other
     }
 }
 
-impl Eq for ClauseHead {}
+impl Eq for Clause {}
 
-impl PartialOrd for ClauseHead {
+impl PartialOrd for Clause {
     #[inline(always)]
-    fn partial_cmp(&self, other: &ClauseHead) -> Option<Ordering> {
+    fn partial_cmp(&self, other: &Clause) -> Option<Ordering> {
         if self.rank < other.rank {
             Some(Ordering::Less)
         } else if other.rank < self.rank {
@@ -224,9 +224,9 @@ impl PartialOrd for ClauseHead {
     }
 }
 
-impl Ord for ClauseHead {
+impl Ord for Clause {
     #[inline(always)]
-    fn cmp(&self, other: &ClauseHead) -> Ordering {
+    fn cmp(&self, other: &Clause) -> Ordering {
         if self.rank < other.rank {
             Ordering::Less
         } else if other.rank > self.rank {
@@ -241,7 +241,7 @@ impl Ord for ClauseHead {
     }
 }
 
-impl fmt::Display for ClauseHead {
+impl fmt::Display for Clause {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
@@ -265,7 +265,7 @@ pub struct ClausePartition {
     pub kind: ClauseKind,
     pub tag: usize,
     pub init_size: usize,
-    pub head: Vec<ClauseHead>,
+    pub head: Vec<Clause>,
     pub touched: Vec<bool>,
     pub watcher: Vec<Vec<Watch>>,
 }
@@ -273,7 +273,7 @@ pub struct ClausePartition {
 impl ClausePartitionIF for ClausePartition {
     fn build(kind: ClauseKind, nv: usize, nc: usize) -> ClausePartition {
         let mut head = Vec::with_capacity(1 + nc);
-        head.push(ClauseHead {
+        head.push(Clause {
             flags: 0,
             lits: vec![],
             rank: 0,
@@ -366,7 +366,7 @@ impl ClausePartitionIF for ClausePartition {
             cix = self.head.len();
             let w0 = l0.negate() as usize;
             let w1 = l1.negate() as usize;
-            self.head.push(ClauseHead {
+            self.head.push(Clause {
                 flags: self.kind as u16,
                 lits,
                 rank,

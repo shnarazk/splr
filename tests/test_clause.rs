@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-use splr::clause::{ClauseHead, ClauseKind};
+use splr::clause::{Clause, ClauseKind};
 use splr::solver::Solver;
 use splr::traits::*;
 use splr::types::*;
@@ -17,12 +17,12 @@ trait Testing {
     fn rank(&mut self, a: usize) -> &mut Self;
 }
 
-impl Testing for ClauseHead {
-    fn activity(&mut self, a: f64) -> &mut ClauseHead {
+impl Testing for Clause {
+    fn activity(&mut self, a: f64) -> &mut Clause {
         self.activity = a;
         self
     }
-    fn rank(&mut self, r: usize) -> &mut ClauseHead {
+    fn rank(&mut self, r: usize) -> &mut Clause {
         self.rank = r;
         self
     }
@@ -86,7 +86,7 @@ fn setup() -> Solver {
     s
 }
 
-fn attach_clause<'a>(s: &'a mut Solver, vec: &[Lit]) -> &'a mut ClauseHead {
+fn attach_clause<'a>(s: &'a mut Solver, vec: &[Lit]) -> &'a mut Clause {
     let cid = s.cps[ClauseKind::Permanent as usize].new_clause(vec, vec.len());
     &mut s.cps[ClauseKind::Permanent as usize].head[cid.to_index()]
 }

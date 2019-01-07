@@ -1,4 +1,4 @@
-use crate::clause::{ClauseFlag, ClauseHead};
+use crate::clause::{Clause, ClauseFlag};
 use crate::eliminator::Eliminator;
 use crate::traits::*;
 use crate::types::*;
@@ -67,7 +67,7 @@ impl VarManagement for [Var] {
     fn assigned(&self, l: Lit) -> Lbool {
         self[l.vi()].assign ^ ((l & 1) as u8)
     }
-    fn locked(&self, ch: &ClauseHead, cid: ClauseId) -> bool {
+    fn locked(&self, ch: &Clause, cid: ClauseId) -> bool {
         let lits = &ch.lits;
         if lits.len() < 2 {
             panic!(
@@ -112,7 +112,7 @@ impl VarManagement for [Var] {
         &mut self,
         elim: &mut Eliminator,
         cid: ClauseId,
-        ch: &mut ClauseHead,
+        ch: &mut Clause,
         ignorable: bool,
     ) {
         if !elim.use_elim {
@@ -134,7 +134,7 @@ impl VarManagement for [Var] {
             elim.enqueue_clause(cid, ch);
         }
     }
-    fn detach_clause(&mut self, elim: &mut Eliminator, cid: ClauseId, ch: &ClauseHead) {
+    fn detach_clause(&mut self, elim: &mut Eliminator, cid: ClauseId, ch: &Clause) {
         debug_assert!(ch.get_flag(ClauseFlag::Dead));
         if elim.use_elim {
             for l in &ch.lits {

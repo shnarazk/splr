@@ -1,5 +1,5 @@
 use crate::assign::AssignStack;
-use crate::clause::{ClauseDB, ClauseFlag, ClauseHead, ClauseKind, Watch};
+use crate::clause::{Clause, ClauseDB, ClauseFlag, ClauseKind, Watch};
 use crate::config::SolverConfig;
 use crate::eliminator::Eliminator;
 use crate::restart::luby;
@@ -271,7 +271,7 @@ impl Propagate for AssignStack {
                             continue 'next_clause;
                         }
                         if vars.assigned(w.blocker) != LTRUE {
-                            let ClauseHead { ref mut lits, .. } = &mut (*head)[w.c];
+                            let Clause { ref mut lits, .. } = &mut (*head)[w.c];
                             debug_assert!(2 <= lits.len());
                             debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
                             if lits[0] == false_lit {
@@ -341,7 +341,7 @@ fn propagate_fast(
                     // }
                     // debug_assert!(!vars[w.blocker.vi()].eliminated); it doesn't hold in TP12
                     if vars.assigned(w.blocker) != LTRUE {
-                        let ClauseHead { ref mut lits, .. } = &mut (*head)[w.c];
+                        let Clause { ref mut lits, .. } = &mut (*head)[w.c];
                         debug_assert!(2 <= lits.len());
                         debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
                         if lits[0] == false_lit {
@@ -548,7 +548,7 @@ fn analyze(
     loop {
         // println!("analyze {}", p.int());
         unsafe {
-            let ch = clause_mut!(*cp, cid) as *mut ClauseHead;
+            let ch = clause_mut!(*cp, cid) as *mut Clause;
             debug_assert_ne!(cid, NULL_CLAUSE);
             if cid.to_kind() == ClauseKind::Removable as usize {
                 // self.bump_cid(cid);

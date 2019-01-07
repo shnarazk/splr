@@ -1,5 +1,5 @@
 use crate::assign::AssignStack;
-use crate::clause::{ClauseDB, ClauseFlag, ClauseHead, ClauseKind, ClausePartition};
+use crate::clause::{Clause, ClauseDB, ClauseFlag, ClauseKind, ClausePartition};
 use crate::config::SolverConfig;
 use crate::state::SolverState;
 use crate::traits::*;
@@ -55,7 +55,7 @@ impl Eliminator {
             var_queue_threshold: VAR_QUEUE_THRESHOLD,
         }
     }
-    pub fn enqueue_clause(&mut self, cid: ClauseId, ch: &mut ClauseHead) {
+    pub fn enqueue_clause(&mut self, cid: ClauseId, ch: &mut Clause) {
         if !self.use_elim || self.clause_queue_threshold == 0 {
             // println!("{} is not enqueued", cid.fmt());
             return;
@@ -123,13 +123,13 @@ impl Eliminator {
                 let mut best = 0;
                 let unilits: [Lit; 1];
                 let lits: &[Lit];
-                // let ch = clause_head_mut!(self.cp, cid) as *mut ClauseHead;
+                // let ch = clause_head_mut!(self.cp, cid) as *mut Clause;
                 if cid.to_kind() == ClauseKind::Uniclause as usize {
                     best = (cid.to_index() as Lit).vi();
                     unilits = [cid.to_index() as Lit; 1];
                     lits = &unilits;
                 } else {
-                    let ch = clause_mut!(*cps, cid) as *mut ClauseHead;
+                    let ch = clause_mut!(*cps, cid) as *mut Clause;
                     (*ch).flag_off(ClauseFlag::Enqueued);
                     lits = &(*ch).lits;
                     if (*ch).get_flag(ClauseFlag::Dead) || BACKWORD_SUBSUMPTION_THRESHOLD < cnt {
@@ -156,7 +156,7 @@ impl Eliminator {
                     };
                     cnt += (*cs).len();
                     for di in &*cs {
-                        let db = clause!(*cps, di) as *const ClauseHead;
+                        let db = clause!(*cps, di) as *const Clause;
                         if !(*db).get_flag(ClauseFlag::Dead)
                             && *di != cid
                             && lits.len() <= SUBSUMPTION_SIZE
@@ -537,7 +537,7 @@ pub fn strengthen(cps: &mut ClauseDB, vars: &mut [Var], cid: ClauseId, p: Lit) -
         ..
     } = cps[cid.to_kind()];
     unsafe {
-        let ch = &mut head[cix] as *mut ClauseHead;
+        let ch = &mut head[cix] as *mut Clause;
         // debug_assert!((*ch).lits.contains(&p));
         // debug_assert!(1 < (*ch).lits.len());
         let v = &mut vars[p.vi()];
