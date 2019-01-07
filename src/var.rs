@@ -69,13 +69,7 @@ impl VarManagement for [Var] {
     }
     fn locked(&self, ch: &Clause, cid: ClauseId) -> bool {
         let lits = &ch.lits;
-        if lits.len() < 2 {
-            panic!(
-                "strange lits {} {}",
-                cid.to_index(),
-                ch.get_flag(ClauseFlag::Dead)
-            );
-        }
+        debug_assert!(1 < lits.len());
         let l0 = lits[0];
         if 2 < lits.len() {
             let l0 = lits[0];
@@ -165,9 +159,8 @@ pub enum VarOrder {
 /// - idxs[0] contains the number of alive elements
 ///   `indx` holds positions. So the unused field 0 can hold the last position as a special case.
 pub struct VarIdHeap {
-    // order: VarOrder,
-    pub heap: Vec<VarId>, // order : usize -> VarId
-    idxs: Vec<usize>,     // VarId : -> order : usize
+    heap: Vec<VarId>, // order : usize -> VarId
+    idxs: Vec<usize>, // VarId : -> order : usize
 }
 
 impl VarOrderIF for VarIdHeap {
@@ -193,7 +186,6 @@ impl VarOrderIF for VarIdHeap {
     }
     /// renamed from undoVO
     fn insert(&mut self, vec: &[Var], vi: VarId) {
-        // self.var_order.check("check insert 1");
         if self.contains(vi) {
             let i = self.idxs[vi];
             self.percolate_up(&vec, i);
@@ -206,7 +198,6 @@ impl VarOrderIF for VarIdHeap {
         self.idxs.swap(vi, vn);
         self.idxs[0] = n;
         self.percolate_up(&vec, n);
-        // self.var_order.check("check insert 2");
     }
     fn clear(&mut self) {
         self.reset()
@@ -273,6 +264,7 @@ impl VarOrderIF for VarIdHeap {
 
 impl VarIdHeap {
     /// renamed from inHeap
+    #[inline(always)]
     fn contains(&self, v: VarId) -> bool {
         self.idxs[v] <= self.idxs[0]
     }
@@ -321,10 +313,6 @@ impl VarIdHeap {
         let vq = self.heap[q];
         debug_assert!(0 < vq, "size of heap is too small");
         let aq = vars[vq].activity;
-        // let aq = match self.order {
-        //     VarOrder::ByActivity => vars[vq].activity,
-        //     VarOrder::ByOccurence => vars[vq].occurs.len() as f64,
-        // };
         loop {
             let p = q / 2;
             if p == 0 {
@@ -335,10 +323,6 @@ impl VarIdHeap {
             } else {
                 let vp = self.heap[p];
                 let ap = vars[vp].activity;
-                // let ap = match self.order {
-                //     VarOrder::ByActivity => vars[vp].activity,
-                //     VarOrder::ByOccurence => vars[vp].occurs.len() as f64,
-                // };
                 if ap < aq {
                     // move down the current parent, and make it empty
                     self.heap[q] = vp;
@@ -364,15 +348,7 @@ impl VarIdHeap {
             if l < n {
                 let vl = self.heap[l];
                 let al = vars[vl].activity;
-                // let al = match self.order {
-                //     VarOrder::ByActivity => vars[vl].activity,
-                //     VarOrder::ByOccurence => vars[vl].occurs.len() as f64,
-                // };
                 let r = l + 1; // right
-                               // let ar = match self.order {
-                               //     VarOrder::ByActivity => vars[vr].activity,
-                               //     VarOrder::ByOccurence => vars[vr].occurs.len() as f64,
-                               // };
                 let (target, vc, ac) = if r < n && al < vars[self.heap[r]].activity {
                     let vr = self.heap[r];
                     (r, vr, vars[vr].activity)

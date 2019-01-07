@@ -90,12 +90,10 @@ impl SatSolver for Solver {
                 debug_assert!(!asgs.trail.contains(&v.index.lit(LTRUE)));
                 debug_assert!(!asgs.trail.contains(&v.index.lit(LFALSE)));
                 if v.neg_occurs.is_empty() && !v.pos_occurs.is_empty() && v.assign == BOTTOM {
-                    v.assign = LTRUE;
-                    asgs.push(v.index.lit(LTRUE));
+                    asgs.enqueue_null(v, LTRUE, 0);
                 } else if v.pos_occurs.is_empty() && !v.neg_occurs.is_empty() && v.assign == BOTTOM
                 {
-                    v.assign = LFALSE;
-                    asgs.push(v.index.lit(LFALSE));
+                    asgs.enqueue_null(v, LFALSE, 0);
                 } else if v.pos_occurs.len() == 1 || v.neg_occurs.len() == 1 {
                     elim.enqueue_var(v);
                 }

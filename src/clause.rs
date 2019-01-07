@@ -264,7 +264,6 @@ impl fmt::Display for Clause {
 pub struct ClausePartition {
     pub kind: ClauseKind,
     pub tag: usize,
-    pub init_size: usize,
     pub head: Vec<Clause>,
     pub touched: Vec<bool>,
     pub watcher: Vec<Vec<Watch>>,
@@ -288,7 +287,6 @@ impl ClausePartitionIF for ClausePartition {
         ClausePartition {
             kind,
             tag: kind.tag(),
-            init_size: nc,
             head,
             touched,
             watcher,

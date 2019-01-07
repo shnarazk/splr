@@ -4,12 +4,11 @@ use crate::config::SolverConfig;
 use crate::eliminator::Eliminator;
 use crate::solver::{Solver, SolverResult};
 use crate::state::SolverState;
-use crate::types::{ClauseId, CNFDescription, Lbool, Lit, VarId};
+use crate::types::{CNFDescription, ClauseId, Lbool, Lit, VarId};
 use crate::var::{Var, VarIdHeap};
 
 pub trait AssignIF {
     fn new(n: usize) -> AssignStack;
-    fn push(&mut self, l: Lit);
     fn len(&self) -> usize;
     fn is_empty(&self) -> bool;
     fn level(&self) -> usize;
@@ -62,6 +61,13 @@ pub trait ClauseKindIF {
     fn id_from(self, cix: ClauseIndex) -> ClauseId;
 }
 
+pub trait ClauseIdIF {
+    fn to_index(&self) -> ClauseIndex;
+    fn to_kind(&self) -> usize;
+    fn is(&self, kind: ClauseKind, ix: ClauseIndex) -> bool;
+    fn fmt(&self) -> String;
+}
+
 pub trait ClausePartitionIF {
     fn build(kind: ClauseKind, nv: usize, nc: usize) -> ClausePartition;
     fn garbage_collect(&mut self, vars: &mut [Var], elim: &mut Eliminator);
@@ -70,13 +76,6 @@ pub trait ClausePartitionIF {
     fn bump_activity(&mut self, cix: ClauseIndex, val: f64, cla_inc: &mut f64);
     fn count(&self, alive: bool) -> usize;
     fn check(&self);
-}
-
-pub trait ClauseIdIF {
-    fn to_index(&self) -> ClauseIndex;
-    fn to_kind(&self) -> usize;
-    fn is(&self, kind: ClauseKind, ix: ClauseIndex) -> bool;
-    fn fmt(&self) -> String;
 }
 
 pub trait Delete<T> {
