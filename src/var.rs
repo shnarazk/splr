@@ -53,13 +53,6 @@ impl VarIF for Var {
     }
     fn bump_activity(&mut self, d: f64) {
         self.activity = (self.activity + d) / 2.0;
-        // let a = d + 0.01;
-        // self.vars[vi].activity = a;
-        // if 1.0e60 < a {
-        //     for v in &mut self.vars[1..] {
-        //         v.activity *= 1.0e-60;
-        //     }
-        // }
     }
 }
 

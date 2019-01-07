@@ -117,14 +117,11 @@ impl WatchManagement for Vec<Watch> {
     }
     #[inline(always)]
     fn detach_with(&mut self, cix: usize) {
-        let mut n = 1;
-        let n_max = self[0].c;
-        while n <= n_max {
+        for n in 1..=self[0].c {
             if self[n].c == cix {
                 self.detach(n);
                 return;
             }
-            n += 1;
         }
     }
 }
@@ -136,13 +133,6 @@ pub enum ClauseFlag {
     Dead,
     JustUsed,
     Enqueued,
-}
-
-impl ClauseFlag {
-    #[allow(dead_code)]
-    fn as_bit(self, val: bool) -> u16 {
-        (val as u16) << (self as u16)
-    }
 }
 
 pub struct Clause {

@@ -87,9 +87,6 @@ impl AssignIF for AssignStack {
             v.assign = sig;
             v.reason = NULL_CLAUSE;
             v.level = dl;
-            if dl == 0 {
-                v.activity = 0.0;
-            }
             self.trail.push(v.index.lit(sig));
             true
         } else {
@@ -108,9 +105,7 @@ impl AssignIF for AssignStack {
             let v = &mut vars[vi];
             v.phase = v.assign;
             v.assign = BOTTOM;
-            if v.reason != NULL_CLAUSE {
-                v.reason = NULL_CLAUSE;
-            }
+            v.reason = NULL_CLAUSE;
             var_order.insert(vars, vi);
         }
         self.trail.truncate(lim);
@@ -172,12 +167,11 @@ impl AssignIF for AssignStack {
             let nc: usize = cps.iter().map(|p| p.head.len() - 1).sum();
             buf.write_all(format!("p cnf {} {}\n", config.num_vars, nc + nv).as_bytes())
                 .unwrap();
-            let kinds = [
+            for kind in &[
                 ClauseKind::Binclause,
                 ClauseKind::Removable,
                 ClauseKind::Permanent,
-            ];
-            for kind in &kinds {
+            ] {
                 for c in cps[*kind as usize].head.iter().skip(1) {
                     for l in &c.lits {
                         buf.write_all(format!("{} ", l.int()).as_bytes()).unwrap();
