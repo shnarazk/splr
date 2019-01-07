@@ -23,7 +23,7 @@ pub trait AssignIF {
     fn enqueue_null(&mut self, v: &mut Var, sig: Lbool, dl: usize) -> bool;
     fn cancel_until(&mut self, vars: &mut [Var], var_order: &mut VarIdHeap, lv: usize);
     fn uncheck_enqueue(&mut self, vars: &mut [Var], l: Lit, cid: ClauseId);
-    fn uncheck_assume(&mut self, vars: &mut [Var], eliminator: &mut Eliminator, l: Lit);
+    fn uncheck_assume(&mut self, vars: &mut [Var], elim: &mut Eliminator, l: Lit);
     fn dump_cnf(&mut self, config: &SolverConfiguration, cps: &ClauseDB, vars: &[Var], fname: &str);
 }
 
@@ -47,13 +47,6 @@ pub trait ClauseDBIF {
         act: f64,
     ) -> ClauseId;
     fn remove_clause(&mut self, cid: ClauseId);
-    fn change_clause_kind(
-        &mut self,
-        elim: &mut Eliminator,
-        vars: &mut [Var],
-        cid: ClauseId,
-        kind: ClauseKind,
-    );
     fn reduce(&mut self, elim: &mut Eliminator, state: &mut SolverState, vars: &mut [Var]);
     fn simplify(
         &mut self,
@@ -69,13 +62,10 @@ pub trait ClauseKindIF {
     fn tag(self) -> usize;
     fn mask(self) -> usize;
     fn id_from(self, cix: ClauseIndex) -> ClauseId;
-    fn index_from(self, cid: ClauseId) -> ClauseIndex;
 }
 
 pub trait ClausePartitionIF {
     fn build(kind: ClauseKind, nv: usize, nc: usize) -> ClausePartition;
-    fn id_from(&self, cix: ClauseIndex) -> ClauseId;
-    fn index_from(&self, cid: ClauseId) -> ClauseIndex;
     fn garbage_collect(&mut self, vars: &mut [Var], elim: &mut Eliminator);
     fn new_clause(&mut self, v: &[Lit], rank: usize) -> ClauseId;
     fn reset_lbd(&mut self, vars: &[Var], temp: &mut [usize]);
@@ -84,9 +74,7 @@ pub trait ClausePartitionIF {
     fn check(&self);
 }
 
-/// For usize
 pub trait ClauseIdIF {
-    fn to_id(&self) -> ClauseId;
     fn to_index(&self) -> ClauseIndex;
     fn to_kind(&self) -> usize;
     fn is(&self, kind: ClauseKind, ix: ClauseIndex) -> bool;
@@ -128,10 +116,16 @@ pub trait QueueOperations {
     fn is_full(&self, lim: usize) -> bool;
 }
 
-/// For Solver
 pub trait Restart {
-    fn block_restart(&mut self, lbd: usize, clv: usize, blv: usize, nas: usize) -> ();
-    fn force_restart(&mut self) -> ();
+    fn block_restart(
+        &mut self,
+        state: &mut SolverState,
+        lbd: usize,
+        clv: usize,
+        blv: usize,
+        nas: usize,
+    );
+    fn force_restart(&mut self, asgs: &mut AssignStack, state: &mut SolverState, vars: &mut [Var]);
 }
 
 pub trait SatSolver {
@@ -175,12 +169,12 @@ pub trait VarManagement {
     fn compute_lbd(&self, vec: &[Lit], keys: &mut [usize]) -> usize;
     fn attach_clause(
         &mut self,
+        elim: &mut Eliminator,
         cid: ClauseId,
         ch: &mut ClauseHead,
         ignorable: bool,
-        elim: &mut Eliminator,
     ) -> ();
-    fn detach_clause(&mut self, cid: ClauseId, ch: &ClauseHead, elim: &mut Eliminator) -> ();
+    fn detach_clause(&mut self, elim: &mut Eliminator, cid: ClauseId, ch: &ClauseHead) -> ();
 }
 
 pub trait VarOrderIF {

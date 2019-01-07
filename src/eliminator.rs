@@ -178,7 +178,7 @@ impl Eliminator {
                                         //          *clause_body!(self.cp, cid),
                                         // );
                                         cps.remove_clause(*di);
-                                        vars.detach_clause(*di, clause!(*cps, *di), self);
+                                        vars.detach_clause(self, *di, clause!(*cps, *di));
                                     } //else {
                                       // println!("backward_subsumption_check tries to delete a permanent clause {} {:#}",
                                       //          di.fmt(),
@@ -509,7 +509,7 @@ pub fn strengthen_clause(
         debug_assert_ne!(c0, l);
         // println!("{} is removed and its first literal {} is enqueued.", cid.fmt(), c0.int());
         cps.remove_clause(cid);
-        vars.detach_clause(cid, clause!(*cps, cid), elim);
+        vars.detach_clause(elim, cid, clause!(*cps, cid));
         if asgs.enqueue_null(&mut vars[c0.vi()], c0.lbool(), 0)
             && propagate(asgs, cps, state, vars) == NULL_CLAUSE
         {

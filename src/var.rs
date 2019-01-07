@@ -111,10 +111,10 @@ impl VarManagement for [Var] {
 
     fn attach_clause(
         &mut self,
+        elim: &mut Eliminator,
         cid: ClauseId,
         ch: &mut ClauseHead,
         ignorable: bool,
-        elim: &mut Eliminator,
     ) {
         if !elim.use_elim {
             return;
@@ -135,7 +135,7 @@ impl VarManagement for [Var] {
             elim.enqueue_clause(cid, ch);
         }
     }
-    fn detach_clause(&mut self, cid: ClauseId, ch: &ClauseHead, elim: &mut Eliminator) {
+    fn detach_clause(&mut self, elim: &mut Eliminator, cid: ClauseId, ch: &ClauseHead) {
         debug_assert!(ch.get_flag(ClauseFlag::Dead));
         if elim.use_elim {
             for l in &ch.lits {
@@ -154,12 +154,6 @@ impl VarManagement for [Var] {
         }
     }
 }
-
-// pub struct VarManager {
-//     vec: Vec<Var>,
-//     activity_heap: VarIdHeap,
-//     elim: Eliminator,
-// }
 
 pub enum VarOrder {
     ByActivity,

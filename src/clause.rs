@@ -42,20 +42,12 @@ impl ClauseKindIF for ClauseKind {
     fn id_from(self, cix: ClauseIndex) -> ClauseId {
         cix | self.tag()
     }
-    #[inline(always)]
-    fn index_from(self, cid: ClauseId) -> ClauseIndex {
-        cid & CLAUSE_INDEX_MASK
-    }
 }
 
 /// Clause Index, not ID because it's used only within a Vec<Clause>
 pub type ClauseIndex = usize;
 
 impl ClauseIdIF for ClauseId {
-    #[inline(always)]
-    fn to_id(&self) -> ClauseId {
-        *self
-    }
     #[inline(always)]
     fn to_index(&self) -> ClauseIndex {
         *self & CLAUSE_INDEX_MASK
@@ -333,14 +325,6 @@ impl ClausePartitionIF for ClausePartition {
             watcher,
         }
     }
-    #[inline(always)]
-    fn id_from(&self, cix: ClauseIndex) -> ClauseId {
-        cix | self.tag
-    }
-    #[inline(always)]
-    fn index_from(&self, cid: ClauseId) -> ClauseIndex {
-        cid & CLAUSE_INDEX_MASK
-    }
     fn garbage_collect(&mut self, vars: &mut [Var], elim: &mut Eliminator) {
         let ClausePartition {
             ref mut watcher,
@@ -423,7 +407,7 @@ impl ClausePartitionIF for ClausePartition {
             self.watcher[w0].attach(l1, cix);
             self.watcher[w1].attach(l0, cix);
         };
-        self.id_from(cix)
+        self.kind.id_from(cix)
     }
     fn reset_lbd(&mut self, vars: &[Var], temp: &mut [usize]) {
         let mut key = temp[0];
@@ -529,7 +513,7 @@ impl ClauseDBIF for ClauseDB {
             );
         }
         let ch = clause_mut!(*self, cid);
-        vars.attach_clause(cid, ch, false, elim);
+        vars.attach_clause(elim, cid, ch, false);
         cid
     }
     /// 4. removeClause
@@ -548,32 +532,6 @@ impl ClauseDBIF for ClauseDB {
             self[cid.to_kind()].touched[w1 as usize] = true;
         }
         self[cid.to_kind()].touched[w0 as usize] = true;
-    }
-    // This should be called at DL == 0.
-    fn change_clause_kind(
-        &mut self,
-        elim: &mut Eliminator,
-        vars: &mut [Var],
-        cid: ClauseId,
-        kind: ClauseKind,
-    ) {
-        // let dl = self.decision_level();
-        // debug_assert_eq!(dl, 0);
-        let ch = clause_mut!(*self, cid);
-        if ch.get_flag(ClauseFlag::Dead) {
-            return;
-        }
-        ch.flag_on(ClauseFlag::Dead);
-        let mut vec = Vec::new();
-        for x in &ch.lits {
-            vec.push(*x);
-        }
-        let r = ch.rank;
-        let w0 = ch.lits[0].negate() as usize;
-        let w1 = ch.lits[1].negate() as usize;
-        self[kind as usize].new_clause(&vec, r);
-        self[cid.to_kind()].touched[w0] = true;
-        self[cid.to_kind()].touched[w1] = true;
     }
     fn reduce(&mut self, elim: &mut Eliminator, state: &mut SolverState, vars: &mut [Var]) {
         self[ClauseKind::Removable as usize].reset_lbd(vars, &mut state.lbd_temp[..]);

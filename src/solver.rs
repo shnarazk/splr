@@ -241,7 +241,7 @@ impl SatSolver for Solver {
             }
             _ => {
                 let cid = cps[kind as usize].new_clause(&v, 0);
-                vars.attach_clause(cid, clause_mut!(*cps, cid), true, elim);
+                vars.attach_clause(elim, cid, clause_mut!(*cps, cid), true);
                 Some(cid)
             }
         }
@@ -438,7 +438,7 @@ fn search(
                 state.num_solved_vars = asgs.len();
                 state.var_order.rebuild(&vars);
             }
-            // force_restart();
+            // config.force_restart(asgs, state, vars);
             if !asgs.remains() {
                 let vi = state.var_order.select_var(&vars);
                 debug_assert_ne!(vi, 0);
@@ -508,7 +508,7 @@ fn search(
                 asgs.cancel_until(vars, &mut state.var_order, 0);
                 config.adapt_strategy(cp, elim, state, vars);
                 // } else if 0 < lbd {
-                //     block_restart(lbd, dl, bl, nas);
+                //     config.block_restart(state, lbd, dl, bl, nas);
             }
             // decay var activity
             config.var_inc /= config.var_decay;

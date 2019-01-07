@@ -152,7 +152,7 @@ impl AssignStack {
         // debug_assert!(!self.trail.contains(&l.negate()));
         self.trail.push(l);
     }
-    pub fn uncheck_assume(&mut self, vars: &mut [Var], eliminator: &mut Eliminator, l: Lit) {
+    pub fn uncheck_assume(&mut self, vars: &mut [Var], elim: &mut Eliminator, l: Lit) {
         // println!("uncheck_assume {}", l.int());
         self.trail_lim.push(self.trail.len());
         let dl = self.trail_lim.len();
@@ -163,7 +163,7 @@ impl AssignStack {
         v.level = dl;
         v.reason = NULL_CLAUSE;
         if dl == 0 {
-            eliminator.enqueue_var(v);
+            elim.enqueue_var(v);
         }
         // debug_assert!(!trail.contains(&l));
         // debug_assert!(!trail.contains(&l.negate()));
