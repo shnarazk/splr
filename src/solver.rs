@@ -266,12 +266,12 @@ impl Propagate for AssignStack {
                     let mut n = 1;
                     'next_clause: while n <= source.count() {
                         let w = &mut source[n];
-                        if (*head)[w.c].get_flag(ClauseFlag::Dead) {
+                        if head[w.c].get_flag(ClauseFlag::Dead) {
                             source.detach(n);
                             continue 'next_clause;
                         }
                         if vars.assigned(w.blocker) != LTRUE {
-                            let Clause { ref mut lits, .. } = &mut (*head)[w.c];
+                            let Clause { ref mut lits, .. } = &mut head[w.c];
                             debug_assert!(2 <= lits.len());
                             debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
                             if lits[0] == false_lit {
@@ -335,13 +335,13 @@ fn propagate_fast(
                 let mut n = 1;
                 'next_clause: while n <= source.count() {
                     let w = &mut source[n];
-                    // if (*head)[w.c].get_flag(ClauseFlag::Dead) {
+                    // if head[w.c].get_flag(ClauseFlag::Dead) {
                     //     source.detach(n);
                     //     continue 'next_clause;
                     // }
                     // debug_assert!(!vars[w.blocker.vi()].eliminated); it doesn't hold in TP12
                     if vars.assigned(w.blocker) != LTRUE {
-                        let Clause { ref mut lits, .. } = &mut (*head)[w.c];
+                        let Clause { ref mut lits, .. } = &mut head[w.c];
                         debug_assert!(2 <= lits.len());
                         debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
                         if lits[0] == false_lit {
