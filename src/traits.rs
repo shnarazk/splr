@@ -4,7 +4,7 @@ use crate::config::SolverConfig;
 use crate::eliminator::Eliminator;
 use crate::solver::{Solver, SolverResult};
 use crate::state::SolverState;
-use crate::types::*;
+use crate::types::{ClauseId, CNFDescription, Lbool, Lit, VarId};
 use crate::var::{Var, VarIdHeap};
 
 pub trait AssignIF {
@@ -91,9 +91,9 @@ pub trait Delete<T> {
 pub trait EmaIF {
     /// returns an EMA value
     fn get(&self) -> f64;
-    fn update(&mut self, x: f64) -> ();
+    fn update(&mut self, x: f64);
     /// reset (equalize) both values
-    fn reset(&mut self) -> ();
+    fn reset(&mut self);
 }
 
 pub trait LitIF {
@@ -179,7 +179,7 @@ pub trait VarManagement {
         cid: ClauseId,
         ch: &mut Clause,
         ignorable: bool,
-    ) -> ();
+    );
     fn detach_clause(&mut self, elim: &mut Eliminator, cid: ClauseId, ch: &Clause);
 }
 

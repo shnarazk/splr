@@ -1,8 +1,7 @@
 // DIMACS Model Checker in Rust
 #![allow(unused_imports)]
 use splr::solver::Solver;
-use splr::traits::*;
-use splr::types::*;
+use splr::traits::SatSolver;
 use std::env;
 use std::fs::File;
 use std::io::{stdin, BufRead, BufReader};
