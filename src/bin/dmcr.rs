@@ -3,9 +3,8 @@
 use splr::solver::Solver;
 use splr::traits::*;
 use splr::types::*;
-use splr::validator::*;
 use std::env;
-use std::fs::*;
+use std::fs::File;
 use std::io::{stdin, BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use structopt::StructOpt;

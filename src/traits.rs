@@ -1,6 +1,6 @@
 use crate::assign::AssignStack;
-use crate::clause::*;
-use crate::config::SolverConfiguration;
+use crate::clause::{ClauseDB, ClauseFlag, ClauseHead, ClauseIndex, ClauseKind, ClausePartition};
+use crate::config::SolverConfig;
 use crate::eliminator::Eliminator;
 use crate::solver::{Solver, SolverResult};
 use crate::state::SolverState;
@@ -24,22 +24,22 @@ pub trait AssignIF {
     fn cancel_until(&mut self, vars: &mut [Var], var_order: &mut VarIdHeap, lv: usize);
     fn uncheck_enqueue(&mut self, vars: &mut [Var], l: Lit, cid: ClauseId);
     fn uncheck_assume(&mut self, vars: &mut [Var], elim: &mut Eliminator, l: Lit);
-    fn dump_cnf(&mut self, config: &SolverConfiguration, cps: &ClauseDB, vars: &[Var], fname: &str);
+    fn dump_cnf(&mut self, config: &SolverConfig, cps: &ClauseDB, vars: &[Var], fname: &str);
 }
 
 pub trait ClauseIF {
     fn get_kind(&self) -> ClauseKind;
+    fn get_flag(&self, flag: ClauseFlag) -> bool;
     fn flag_off(&mut self, flag: ClauseFlag);
     fn flag_on(&mut self, flag: ClauseFlag);
-    fn set_flag(&mut self, flag: ClauseFlag, val: bool);
-    fn get_flag(&self, flag: ClauseFlag) -> bool;
 }
 
 /// For ClauseDB
 pub trait ClauseDBIF {
+    fn new(nv: usize, nc: usize) -> Self;
     fn add_clause(
         &mut self,
-        config: &mut SolverConfiguration,
+        config: &mut SolverConfig,
         elim: &mut Eliminator,
         vars: &mut [Var],
         v: &mut Vec<Lit>,
@@ -51,7 +51,7 @@ pub trait ClauseDBIF {
     fn simplify(
         &mut self,
         asgs: &mut AssignStack,
-        config: &mut SolverConfiguration,
+        config: &mut SolverConfig,
         elim: &mut Eliminator,
         state: &mut SolverState,
         vars: &mut [Var],
@@ -59,8 +59,6 @@ pub trait ClauseDBIF {
 }
 
 pub trait ClauseKindIF {
-    fn tag(self) -> usize;
-    fn mask(self) -> usize;
     fn id_from(self, cix: ClauseIndex) -> ClauseId;
 }
 
@@ -109,6 +107,15 @@ pub trait LitIF {
     fn as_uniclause(self) -> ClauseId;
 }
 
+pub trait Propagate {
+    fn propagate(
+        &mut self,
+        cp: &mut ClauseDB,
+        state: &mut SolverState,
+        vars: &mut [Var],
+    ) -> ClauseId;
+}
+
 /// For VecDeque<usize>
 pub trait QueueOperations {
     fn average(&self) -> f64;
@@ -129,8 +136,8 @@ pub trait Restart {
 }
 
 pub trait SatSolver {
-    fn solve(&mut self) -> SolverResult;
     fn build(path: &str) -> (Solver, CNFDescription);
+    fn solve(&mut self) -> SolverResult;
     fn add_unchecked_clause(&mut self, v: &mut Vec<Lit>) -> Option<ClauseId>;
 }
 
@@ -140,7 +147,7 @@ pub trait SolverStateIF {
     fn progress(
         &mut self,
         asgs: &AssignStack,
-        config: &mut SolverConfiguration,
+        config: &mut SolverConfig,
         cp: &ClauseDB,
         elim: &Eliminator,
         vars: &[Var],
@@ -174,10 +181,11 @@ pub trait VarManagement {
         ch: &mut ClauseHead,
         ignorable: bool,
     ) -> ();
-    fn detach_clause(&mut self, elim: &mut Eliminator, cid: ClauseId, ch: &ClauseHead) -> ();
+    fn detach_clause(&mut self, elim: &mut Eliminator, cid: ClauseId, ch: &ClauseHead);
 }
 
 pub trait VarOrderIF {
+    fn new(n: usize, init: usize) -> VarIdHeap;
     /// renamed from incrementHeap, updateVO
     fn update(&mut self, vec: &[Var], v: VarId);
     /// renamed from undoVO
@@ -188,10 +196,9 @@ pub trait VarOrderIF {
     /// Heap operations; renamed from selectVO
     fn select_var(&mut self, vars: &[Var]) -> VarId;
     fn rebuild(&mut self, vars: &[Var]);
-    fn new(n: usize, init: usize) -> VarIdHeap;
-    fn check(&self, s: &str);
     /// renamed from getHeapDown
     fn remove(&mut self, vec: &[Var], vs: VarId);
+    fn check(&self, s: &str);
 }
 
 /// For Vec<Watch>

@@ -1,5 +1,5 @@
 use crate::clause::ClauseKind;
-use crate::solver::*;
+use crate::solver::Solver;
 use crate::traits::*;
 use crate::types::*;
 

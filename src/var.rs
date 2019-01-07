@@ -1,4 +1,3 @@
-// use clause::Clause;
 use crate::clause::{ClauseFlag, ClauseHead};
 use crate::eliminator::Eliminator;
 use crate::traits::*;
@@ -172,6 +171,18 @@ pub struct VarIdHeap {
 }
 
 impl VarOrderIF for VarIdHeap {
+    fn new(n: usize, init: usize) -> VarIdHeap {
+        let mut heap = Vec::with_capacity(n + 1);
+        let mut idxs = Vec::with_capacity(n + 1);
+        heap.push(0);
+        idxs.push(n);
+        for i in 1..=n {
+            heap.push(i);
+            idxs.push(i);
+        }
+        idxs[0] = init;
+        VarIdHeap { heap, idxs }
+    }
     /// renamed from incrementHeap, updateVO
     fn update(&mut self, vec: &[Var], v: VarId) {
         debug_assert!(v != 0, "Invalid VarId");
@@ -226,18 +237,6 @@ impl VarOrderIF for VarIdHeap {
                 self.insert(vars, v.index);
             }
         }
-    }
-    fn new(n: usize, init: usize) -> VarIdHeap {
-        let mut heap = Vec::with_capacity(n + 1);
-        let mut idxs = Vec::with_capacity(n + 1);
-        heap.push(0);
-        idxs.push(n);
-        for i in 1..=n {
-            heap.push(i);
-            idxs.push(i);
-        }
-        idxs[0] = init;
-        VarIdHeap { heap, idxs }
     }
     fn check(&self, s: &str) {
         let h = &mut self.heap.clone()[1..];

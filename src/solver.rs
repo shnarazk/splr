@@ -1,6 +1,6 @@
 use crate::assign::AssignStack;
-use crate::clause::*;
-use crate::config::SolverConfiguration;
+use crate::clause::{ClauseDB, ClauseFlag, ClauseHead, ClauseKind, Watch};
+use crate::config::SolverConfig;
 use crate::eliminator::Eliminator;
 use crate::restart::luby;
 use crate::state::{SolverState, Stat};
@@ -37,18 +37,18 @@ pub type SolverResult = Result<Certificate, SolverException>;
 pub struct Solver {
     /// major sub modules
     pub asgs: AssignStack,
-    pub config: SolverConfiguration, // Configuration
-    pub cps: ClauseDB,               // Clauses
-    pub elim: Eliminator,            // Clause/Variable Elimination
-    pub state: SolverState,
-    pub vars: Vec<Var>, // Variables
+    pub config: SolverConfig, // Configuration
+    pub cps: ClauseDB,        // Clauses
+    pub elim: Eliminator,     // Clause/Variable Elimination
+    pub state: SolverState,   // misc vars.
+    pub vars: Vec<Var>,       // Variables
 }
 
 const LBD_QUEUE_LEN: usize = 50;
 const TRAIL_QUEUE_LEN: usize = 5000;
 
 impl Solver {
-    pub fn new(config: SolverConfiguration, cnf: &CNFDescription) -> Solver {
+    pub fn new(config: SolverConfig, cnf: &CNFDescription) -> Solver {
         let nv = cnf.num_of_variables as usize;
         let nc = cnf.num_of_clauses as usize;
         let path = &cnf.pathname;
@@ -57,12 +57,7 @@ impl Solver {
         Solver {
             asgs: AssignStack::new(nv),
             config,
-            cps: [
-                ClausePartition::build(ClauseKind::Liftedlit, nv, 0),
-                ClausePartition::build(ClauseKind::Removable, nv, nc),
-                ClausePartition::build(ClauseKind::Permanent, nv, 256),
-                ClausePartition::build(ClauseKind::Binclause, nv, 256),
-            ],
+            cps: ClauseDB::new(nv, nc),
             elim: Eliminator::new(sve),
             state: SolverState::new(nv, se, &path.to_string()),
             vars: Var::new_vars(nv),
@@ -174,7 +169,7 @@ impl SatSolver for Solver {
             num_of_clauses: nc,
             pathname: path.to_string(),
         };
-        let mut cfg = SolverConfiguration::default();
+        let mut cfg = SolverConfig::default();
         cfg.num_vars = nv;
         let mut s: Solver = Solver::new(cfg, &cnf);
         loop {
@@ -248,71 +243,73 @@ impl SatSolver for Solver {
     }
 }
 
-pub fn propagate(
-    asgs: &mut AssignStack,
-    cp: &mut ClauseDB,
-    state: &mut SolverState,
-    vars: &mut [Var],
-) -> ClauseId {
-    while asgs.remains() {
-        let p: usize = asgs.sweep() as usize;
-        let false_lit = (p as Lit).negate();
-        state.stats[Stat::Propagation as usize] += 1;
-        for kind in &[
-            ClauseKind::Binclause,
-            ClauseKind::Removable,
-            ClauseKind::Permanent,
-        ] {
-            let head = &mut cp[*kind as usize].head[..];
-            unsafe {
-                let watcher = &mut cp[*kind as usize].watcher[..] as *mut [Vec<Watch>];
-                let source = &mut (*watcher)[p];
-                let mut n = 1;
-                'next_clause: while n <= source.count() {
-                    let w = &mut source[n];
-                    if (*head)[w.c].get_flag(ClauseFlag::Dead) {
-                        source.detach(n);
-                        continue 'next_clause;
-                    }
-                    if vars.assigned(w.blocker) != LTRUE {
-                        let ClauseHead { ref mut lits, .. } = &mut (*head)[w.c];
-                        debug_assert!(2 <= lits.len());
-                        debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
-                        if lits[0] == false_lit {
-                            lits.swap(0, 1); // now false_lit is lits[1].
-                        }
-                        let first = lits[0];
-                        let first_value = vars.assigned(first);
-                        // If 0th watch is true, then clause is already satisfied.
-                        if first != w.blocker && first_value == LTRUE {
-                            w.blocker = first;
-                            n += 1;
+impl Propagate for AssignStack {
+    fn propagate(
+        &mut self,
+        cp: &mut ClauseDB,
+        state: &mut SolverState,
+        vars: &mut [Var],
+    ) -> ClauseId {
+        while self.remains() {
+            let p: usize = self.sweep() as usize;
+            let false_lit = (p as Lit).negate();
+            state.stats[Stat::Propagation as usize] += 1;
+            for kind in &[
+                ClauseKind::Binclause,
+                ClauseKind::Removable,
+                ClauseKind::Permanent,
+            ] {
+                let head = &mut cp[*kind as usize].head[..];
+                unsafe {
+                    let watcher = &mut cp[*kind as usize].watcher[..] as *mut [Vec<Watch>];
+                    let source = &mut (*watcher)[p];
+                    let mut n = 1;
+                    'next_clause: while n <= source.count() {
+                        let w = &mut source[n];
+                        if (*head)[w.c].get_flag(ClauseFlag::Dead) {
+                            source.detach(n);
                             continue 'next_clause;
                         }
-                        for (k, lk) in lits.iter().enumerate().skip(2) {
-                            // below is equivalent to 'assigned(lk) != LFALSE'
-                            if (((lk & 1) as u8) ^ vars[lk.vi()].assign) != 0 {
-                                (*watcher)[lk.negate() as usize].attach(first, w.c);
-                                source.detach(n);
-                                lits[1] = *lk;
-                                lits[k] = false_lit;
+                        if vars.assigned(w.blocker) != LTRUE {
+                            let ClauseHead { ref mut lits, .. } = &mut (*head)[w.c];
+                            debug_assert!(2 <= lits.len());
+                            debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
+                            if lits[0] == false_lit {
+                                lits.swap(0, 1); // now false_lit is lits[1].
+                            }
+                            let first = lits[0];
+                            let first_value = vars.assigned(first);
+                            // If 0th watch is true, then clause is already satisfied.
+                            if first != w.blocker && first_value == LTRUE {
+                                w.blocker = first;
+                                n += 1;
                                 continue 'next_clause;
                             }
+                            for (k, lk) in lits.iter().enumerate().skip(2) {
+                                // below is equivalent to 'assigned(lk) != LFALSE'
+                                if (((lk & 1) as u8) ^ vars[lk.vi()].assign) != 0 {
+                                    (*watcher)[lk.negate() as usize].attach(first, w.c);
+                                    source.detach(n);
+                                    lits[1] = *lk;
+                                    lits[k] = false_lit;
+                                    continue 'next_clause;
+                                }
+                            }
+                            if first_value == LFALSE {
+                                self.catchup();
+                                // println!("conflict by {} {:?}", kind.id_from(w.c).fmt(), vec2int(&lits));
+                                return kind.id_from(w.c);
+                            } else {
+                                self.uncheck_enqueue(vars, first, kind.id_from(w.c));
+                            }
                         }
-                        if first_value == LFALSE {
-                            asgs.catchup();
-                            // println!("conflict by {} {:?}", kind.id_from(w.c).fmt(), vec2int(&lits));
-                            return kind.id_from(w.c);
-                        } else {
-                            asgs.uncheck_enqueue(vars, first, kind.id_from(w.c));
-                        }
+                        n += 1;
                     }
-                    n += 1;
                 }
             }
         }
+        NULL_CLAUSE
     }
-    NULL_CLAUSE
 }
 
 #[inline(always)]
@@ -388,7 +385,7 @@ fn propagate_fast(
 #[inline(always)]
 fn search(
     asgs: &mut AssignStack,
-    config: &mut SolverConfiguration,
+    config: &mut SolverConfig,
     cp: &mut ClauseDB,
     elim: &mut Eliminator,
     state: &mut SolverState,
@@ -534,7 +531,7 @@ fn search(
 #[inline(always)]
 fn analyze(
     asgs: &mut AssignStack,
-    config: &mut SolverConfiguration,
+    config: &mut SolverConfig,
     cp: &mut ClauseDB,
     state: &mut SolverState,
     vars: &mut [Var],
@@ -725,7 +722,7 @@ fn analyze_removable(
 #[inline(always)]
 fn analyze_final(
     asgs: &AssignStack,
-    config: &mut SolverConfiguration,
+    config: &mut SolverConfig,
     cps: &ClauseDB,
     state: &mut SolverState,
     vars: &[Var],

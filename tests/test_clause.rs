@@ -1,6 +1,6 @@
 #![allow(dead_code)]
-use splr::clause::*;
-use splr::solver::*;
+use splr::clause::{ClauseHead, ClauseKind};
+use splr::solver::Solver;
 use splr::traits::*;
 use splr::types::*;
 

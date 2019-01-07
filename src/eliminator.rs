@@ -1,8 +1,7 @@
 use crate::assign::AssignStack;
-use crate::clause::*;
-use crate::config::SolverConfiguration;
-use crate::solver::propagate;
-use crate::state::*;
+use crate::clause::{ClauseDB, ClauseFlag, ClauseHead, ClauseKind, ClausePartition};
+use crate::config::SolverConfig;
+use crate::state::SolverState;
 use crate::traits::*;
 use crate::types::*;
 use crate::var::Var;
@@ -223,7 +222,7 @@ impl Eliminator {
     pub fn eliminate(
         &mut self,
         asgs: &mut AssignStack,
-        config: &mut SolverConfiguration,
+        config: &mut SolverConfig,
         cps: &mut ClauseDB,
         state: &mut SolverState,
         vars: &mut [Var],
@@ -418,12 +417,11 @@ pub fn check_eliminator(cps: &ClauseDB, vars: &[Var]) -> bool {
     //     }
     // }
     // all caulses are registered in corresponding occur_lists
-    let kinds = [
+    for kind in &[
         ClauseKind::Binclause,
         ClauseKind::Removable,
         ClauseKind::Permanent,
-    ];
-    for kind in &kinds {
+    ] {
         for (ci, ch) in cps[*kind as usize].head.iter().enumerate().skip(1) {
             let cid = kind.id_from(ci);
             if ch.get_flag(ClauseFlag::Dead) {
@@ -511,7 +509,7 @@ pub fn strengthen_clause(
         cps.remove_clause(cid);
         vars.detach_clause(elim, cid, clause!(*cps, cid));
         if asgs.enqueue_null(&mut vars[c0.vi()], c0.lbool(), 0)
-            && propagate(asgs, cps, state, vars) == NULL_CLAUSE
+            && asgs.propagate(cps, state, vars) == NULL_CLAUSE
         {
             cps[cid.to_kind()].touched[c0.negate() as usize] = true;
             true
@@ -603,9 +601,10 @@ pub fn make_eliminated_clause(cps: &mut ClauseDB, vec: &mut Vec<Lit>, vi: VarId,
 
 /// 15. eliminateVar
 /// returns false if solver is in inconsistent
+#[allow(clippy::cyclomatic_complexity)]
 pub fn eliminate_var(
     asgs: &mut AssignStack,
-    config: &mut SolverConfiguration,
+    config: &mut SolverConfig,
     cps: &mut ClauseDB,
     elim: &mut Eliminator,
     state: &mut SolverState,
@@ -636,7 +635,7 @@ pub fn eliminate_var(
         if (*pos).is_empty() && !(*neg).is_empty() {
             // println!("-v {} p {} n {}", v, (*pos).len(), (*neg).len());
             if !asgs.enqueue_null(&mut vars[v], LFALSE, 0)
-                || propagate(asgs, cps, state, vars) != NULL_CLAUSE
+                || asgs.propagate(cps, state, vars) != NULL_CLAUSE
             {
                 state.ok = false;
                 return false;
@@ -646,7 +645,7 @@ pub fn eliminate_var(
         if (*neg).is_empty() && (*pos).is_empty() {
             // println!("+v {} p {} n {}", v, (*pos).len(), (*neg).len());
             if !asgs.enqueue_null(&mut vars[v], LTRUE, 0)
-                || propagate(asgs, cps, state, vars) != NULL_CLAUSE
+                || asgs.propagate(cps, state, vars) != NULL_CLAUSE
             {
                 state.ok = false;
                 // panic!("eliminate_var: failed to enqueue & propagate");
@@ -766,7 +765,7 @@ pub fn eliminate_var(
             cps.remove_clause(*cid);
         }
         vars[v].neg_occurs.clear();
-        if propagate(asgs, cps, state, vars) != NULL_CLAUSE {
+        if asgs.propagate(cps, state, vars) != NULL_CLAUSE {
             state.ok = false;
             return false;
         }

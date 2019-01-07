@@ -1,13 +1,12 @@
 #![allow(unused_variables)]
-use crate::assign::*;
-use crate::config::SolverConfiguration;
-use crate::eliminator::*;
-use crate::state::*;
+use crate::assign::AssignStack;
+use crate::config::SolverConfig;
+use crate::eliminator::Eliminator;
+use crate::state::{SolverState, Stat};
 use crate::traits::*;
 use crate::types::*;
 use crate::var::Var;
 use std::cmp::Ordering;
-use std::f64;
 use std::fmt;
 
 const CLAUSE_INDEX_BITS: usize = 60;
@@ -23,7 +22,7 @@ pub enum ClauseKind {
     Uniclause,
 }
 
-impl ClauseKindIF for ClauseKind {
+impl ClauseKind {
     #[inline(always)]
     fn tag(self) -> usize {
         match self {
@@ -34,10 +33,9 @@ impl ClauseKindIF for ClauseKind {
             ClauseKind::Uniclause => 0x4000_0000_0000_0000,
         }
     }
-    #[inline(always)]
-    fn mask(self) -> usize {
-        CLAUSE_INDEX_MASK
-    }
+}
+
+impl ClauseKindIF for ClauseKind {
     #[inline(always)]
     fn id_from(self, cix: ClauseIndex) -> ClauseId {
         cix | self.tag()
@@ -58,7 +56,7 @@ impl ClauseIdIF for ClauseId {
     }
     #[inline(always)]
     fn is(&self, kind: ClauseKind, ix: ClauseIndex) -> bool {
-        (*self).to_kind() == kind as usize && (*self).to_index() == ix
+        self.to_kind() == kind as usize && self.to_index() == ix
     }
     fn fmt(&self) -> String {
         match self.to_kind() {
@@ -79,7 +77,7 @@ pub struct Watch {
 }
 
 impl Watch {
-    pub fn new(blocker: Lit, c: ClauseId) -> Watch {
+    fn new(blocker: Lit, c: ClauseId) -> Watch {
         Watch { blocker, c }
     }
 }
@@ -169,6 +167,10 @@ impl ClauseIF for ClauseHead {
         }
     }
     #[inline(always)]
+    fn get_flag(&self, flag: ClauseFlag) -> bool {
+        self.flags & (1 << flag as u16) != 0
+    }
+    #[inline(always)]
     fn flag_off(&mut self, flag: ClauseFlag) {
         self.flags &= !(1u16 << (flag as u16));
     }
@@ -176,7 +178,10 @@ impl ClauseIF for ClauseHead {
     fn flag_on(&mut self, flag: ClauseFlag) {
         self.flags |= 1u16 << (flag as u16);
     }
-    #[inline(always)]
+}
+
+impl ClauseHead {
+    #[allow(dead_code)]
     fn set_flag(&mut self, flag: ClauseFlag, val: bool) {
         if val {
             self.flags |= (val as u16) << (flag as u16);
@@ -184,9 +189,12 @@ impl ClauseIF for ClauseHead {
             self.flags &= !(1 << (flag as u16));
         }
     }
-    #[inline(always)]
-    fn get_flag(&self, flag: ClauseFlag) -> bool {
-        self.flags & (1 << flag as u16) != 0
+    fn map_flag<T>(&self, flag: ClauseFlag, a: T, b: T) -> T {
+        if self.get_flag(flag) {
+            a
+        } else {
+            b
+        }
     }
 }
 
@@ -246,44 +254,9 @@ impl fmt::Display for ClauseHead {
                 3 => 'B',
                 _ => '?',
             },
-            if self.get_flag(ClauseFlag::Dead) {
-                ", dead"
-            } else {
-                ""
-            },
-            if self.get_flag(ClauseFlag::Enqueued) {
-                ", enqueued"
-            } else {
-                ""
-            },
+            self.map_flag(ClauseFlag::Dead, ", dead", ""),
+            self.map_flag(ClauseFlag::Enqueued, ", enqueued", ""),
         )
-    }
-}
-
-pub struct ClauseIter<'a> {
-    body: &'a ClauseHead,
-    end: usize,
-    index: usize,
-}
-
-pub fn clause_iter(cb: &ClauseHead) -> ClauseIter {
-    ClauseIter {
-        body: cb,
-        end: cb.lits.len(),
-        index: 0,
-    }
-}
-
-impl<'a> Iterator for ClauseIter<'a> {
-    type Item = Lit;
-    fn next(&mut self) -> Option<Lit> {
-        if self.index < self.end {
-            let l = self.body.lits[self.index];
-            self.index += 1;
-            Some(l)
-        } else {
-            None
-        }
     }
 }
 
@@ -293,7 +266,6 @@ pub struct ClausePartition {
     pub tag: usize,
     pub init_size: usize,
     pub head: Vec<ClauseHead>,
-    pub perm: Vec<ClauseIndex>,
     pub touched: Vec<bool>,
     pub watcher: Vec<Vec<Watch>>,
 }
@@ -307,8 +279,6 @@ impl ClausePartitionIF for ClausePartition {
             rank: 0,
             activity: 0.0,
         });
-        let mut perm = Vec::with_capacity(1 + nc);
-        perm.push(NULL_CLAUSE);
         let mut watcher = Vec::with_capacity(2 * (nv + 1));
         let mut touched = Vec::with_capacity(2 * (nv + 1));
         for i in 0..2 * (nv + 1) {
@@ -320,7 +290,6 @@ impl ClausePartitionIF for ClausePartition {
             tag: kind.tag(),
             init_size: nc,
             head,
-            perm,
             touched,
             watcher,
         }
@@ -403,7 +372,6 @@ impl ClausePartitionIF for ClausePartition {
                 rank,
                 activity: 1.0,
             });
-            self.perm.push(cix);
             self.watcher[w0].attach(l1, cix);
             self.watcher[w1].attach(l0, cix);
         };
@@ -411,8 +379,7 @@ impl ClausePartitionIF for ClausePartition {
     }
     fn reset_lbd(&mut self, vars: &[Var], temp: &mut [usize]) {
         let mut key = temp[0];
-        for i in 1..self.head.len() {
-            let ch = &mut self.head[i];
+        for ch in &mut self.head[1..] {
             if ch.get_flag(ClauseFlag::Dead) {
                 continue;
             }
@@ -469,11 +436,19 @@ impl ClausePartitionIF for ClausePartition {
 pub type ClauseDB = [ClausePartition; 4];
 
 impl ClauseDBIF for ClauseDB {
+    fn new(nv: usize, nc: usize) -> ClauseDB {
+        [
+            ClausePartition::build(ClauseKind::Liftedlit, nv, 0),
+            ClausePartition::build(ClauseKind::Removable, nv, nc),
+            ClausePartition::build(ClauseKind::Permanent, nv, 256),
+            ClausePartition::build(ClauseKind::Binclause, nv, 256),
+        ]
+    }
     /// renamed from newLearntClause
     // Note: set lbd to 0 if you want to add the clause to Permanent.
     fn add_clause(
         &mut self,
-        config: &mut SolverConfiguration,
+        config: &mut SolverConfig,
         elim: &mut Eliminator,
         vars: &mut [Var],
         v: &mut Vec<Lit>,
@@ -538,17 +513,17 @@ impl ClauseDBIF for ClauseDB {
         let ClausePartition {
             ref mut head,
             ref mut touched,
-            ref mut perm,
             ..
         } = &mut self[ClauseKind::Removable as usize];
+        let mut perm = Vec::with_capacity(head.len());
         let mut nc = 1;
         for (i, b) in head.iter().enumerate().skip(1) {
             if !b.get_flag(ClauseFlag::Dead) && !vars.locked(b, ClauseKind::Removable.id_from(i)) {
-                perm[nc] = i;
+                perm.push(i);
                 nc += 1;
             }
         }
-        perm[1..nc].sort_by(|&a, &b| head[a].cmp(&head[b]));
+        perm.sort_by(|&a, &b| head[a].cmp(&head[b]));
         let keep = nc / 2;
         if head[perm[keep]].rank <= 5 {
             state.next_reduction += 1000;
@@ -571,7 +546,7 @@ impl ClauseDBIF for ClauseDB {
     fn simplify(
         &mut self,
         asgs: &mut AssignStack,
-        config: &mut SolverConfiguration,
+        config: &mut SolverConfig,
         elim: &mut Eliminator,
         state: &mut SolverState,
         vars: &mut [Var],

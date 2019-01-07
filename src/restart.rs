@@ -1,5 +1,5 @@
 use crate::assign::AssignStack;
-use crate::config::SolverConfiguration;
+use crate::config::SolverConfig;
 use crate::state::{SolverState, Stat};
 use crate::traits::*;
 use crate::var::Var;
@@ -32,7 +32,7 @@ impl QueueOperations for VecDeque<usize> {
     }
 }
 
-impl Restart for SolverConfiguration {
+impl Restart for SolverConfig {
     /// called after conflict resolution
     fn block_restart(
         &mut self,

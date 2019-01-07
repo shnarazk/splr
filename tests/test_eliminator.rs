@@ -2,9 +2,9 @@
 #![allow(unused_imports)]
 #![allow(unused_variables)]
 #![allow(dead_code)]
-use splr::clause::*;
-use splr::config::SolverConfiguration;
-use splr::solver::*;
+use splr::clause::ClauseKind;
+use splr::config::SolverConfig;
+use splr::solver::Solver;
 use splr::traits::*;
 use splr::types::*;
 
@@ -18,7 +18,7 @@ macro_rules! mkv {
 
 // #[test]
 fn check_occurs() {
-    let cfg: SolverConfiguration = Default::default();
+    let cfg: SolverConfig = Default::default();
     let cnf: CNFDescription = CNFDescription {
         num_of_variables: 10,
         num_of_clauses: 10,

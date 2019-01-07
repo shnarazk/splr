@@ -1,11 +1,11 @@
 use crate::assign::AssignStack;
 use crate::clause::{ClauseDB, ClauseKind};
-use crate::config::SolverConfiguration;
+use crate::config::SolverConfig;
 use crate::eliminator::Eliminator;
 use crate::traits::*;
 use crate::types::*;
 use crate::var::{Var, VarIdHeap};
-use chrono::*;
+use chrono::Utc;
 use std::collections::VecDeque;
 use std::fmt;
 use std::path::Path;
@@ -89,7 +89,7 @@ impl SolverStateIF for SolverState {
     fn progress(
         &mut self,
         asgs: &AssignStack,
-        config: &mut SolverConfiguration,
+        config: &mut SolverConfig,
         cp: &ClauseDB,
         elim: &Eliminator,
         vars: &[Var],

@@ -28,7 +28,7 @@ impl SearchStrategy {
 }
 
 /// `Solver`'s parameters; random decision rate was dropped.
-pub struct SolverConfiguration {
+pub struct SolverConfig {
     pub root_level: usize,
     pub num_vars: usize,
     /// STARATEGY
@@ -69,9 +69,9 @@ pub struct SolverConfiguration {
     // pub dump_solver_stat_mode: i32,
 }
 
-impl Default for SolverConfiguration {
-    fn default() -> SolverConfiguration {
-        SolverConfiguration {
+impl Default for SolverConfig {
+    fn default() -> SolverConfig {
+        SolverConfig {
             root_level: 0,
             num_vars: 0,
             adapt_strategy: true,
@@ -104,7 +104,7 @@ impl Default for SolverConfiguration {
     }
 }
 
-impl SolverConfiguration {
+impl SolverConfig {
     #[inline(always)]
     pub fn adapt_strategy(
         &mut self,
