@@ -66,7 +66,6 @@ fn main() {
                     }
                 }
                 println!("UNSAT, The answer was dumped to {}.", result.as_str());
-                println!("[]");
             }
             Err(_) => println!("Failed"),
         }
