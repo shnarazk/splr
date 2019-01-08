@@ -275,11 +275,10 @@ impl ClausePartitionIF for ClausePartition {
             ..
         } = self;
         for (i, ws) in &mut watcher.iter_mut().enumerate().skip(2) {
-            if touched[i] {
-                touched[i] = false;
-            } else {
+            if !touched[i] {
                 continue;
             }
+            touched[i] = false;
             let mut n = 1;
             let n_max = ws.count();
             while n <= n_max {
