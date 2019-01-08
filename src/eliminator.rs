@@ -5,7 +5,6 @@ use crate::state::SolverState;
 use crate::traits::*;
 use crate::types::*;
 use crate::var::Var;
-// use std::fmt;
 
 /// Literal eliminator
 pub struct Eliminator {
@@ -35,8 +34,8 @@ const BACKWORD_SUBSUMPTION_THRESHOLD: usize = 1_000_000; // 10_000;
 const CLAUSE_QUEUE_THRESHOD: usize = 1_000_000; // 1_000;
 const VAR_QUEUE_THRESHOLD: usize = 3_200_000;
 
-impl Eliminator {
-    pub fn new(use_elim: bool) -> Eliminator {
+impl EliminatorIF for Eliminator {
+    fn new(use_elim: bool) -> Eliminator {
         Eliminator {
             merges: 0,
             var_queue: Vec::new(),
@@ -55,7 +54,7 @@ impl Eliminator {
             var_queue_threshold: VAR_QUEUE_THRESHOLD,
         }
     }
-    pub fn enqueue_clause(&mut self, cid: ClauseId, ch: &mut Clause) {
+    fn enqueue_clause(&mut self, cid: ClauseId, ch: &mut Clause) {
         if !self.use_elim || self.clause_queue_threshold == 0 {
             // println!("{} is not enqueued", cid.fmt());
             return;
@@ -75,23 +74,127 @@ impl Eliminator {
             }
         }
     }
-    pub fn enqueue_var(&mut self, v: &mut Var) {
-        if !self.use_elim || self.var_queue_threshold == 0 {
-            return;
-        }
-        if !v.enqueued {
+    fn enqueue_var(&mut self, v: &mut Var) {
+        if self.use_elim && 0 < self.var_queue_threshold && !v.enqueued {
             self.var_queue.push(v.index);
             v.enqueued = true;
             self.var_queue_threshold -= 1;
         }
     }
-    pub fn clause_queue_len(&self) -> usize {
+    fn clause_queue_len(&self) -> usize {
         self.clause_queue.len()
     }
-    pub fn var_queue_len(&self) -> usize {
+    fn var_queue_len(&self) -> usize {
         self.var_queue.len()
     }
-    /// 10. backwardSubsumptionCheck
+    /// 18. eliminate
+    // should be called at decision level 0.
+    fn eliminate(
+        &mut self,
+        asgs: &mut AssignStack,
+        config: &mut SolverConfig,
+        cps: &mut ClauseDB,
+        state: &mut SolverState,
+        vars: &mut [Var],
+    ) {
+        if !self.use_elim {
+            return;
+        }
+        if self.next_invocation < self.var_queue.len() {
+            self.clause_queue.clear();
+            for v in &self.var_queue {
+                vars[*v].enqueued = false;
+            }
+            self.var_queue.clear();
+            return;
+        }
+        // self.next_invocation += 2;
+        // println!("eliminate: clause_queue {}", self.clause_queue.len());
+        // println!("clause_queue {:?}", self.clause_queue);
+        // println!("var_queue {:?}", self.var_queue);
+        // println!("n_touched {}", self.n_touched);
+        // self.build_occurence_list();
+        // for i in 1..4 { println!("eliminate report: v{} => {},{}", i, vars[i].num_occurs, vars[i].occurs.len()); }
+        // self.clause_queue.clear();
+        'perform: while self.bwdsub_assigns < asgs.len()
+            || !self.var_queue.is_empty()
+            || !self.clause_queue.is_empty()
+        {
+            // self.gather_touched_clauses();
+            if (!self.clause_queue.is_empty() || self.bwdsub_assigns < asgs.len())
+                && !self.backward_subsumption_check(asgs, cps, state, vars)
+            {
+                state.ok = false;
+                break 'perform;
+            }
+            while !self.var_queue.is_empty() {
+                let vi = self.var_queue.remove(0);
+                vars[vi].enqueued = false;
+                if vars[vi].eliminated || vars[vi].assign != BOTTOM {
+                    continue;
+                }
+                // FIXME!
+                if !eliminate_var(asgs, config, cps, self, state, vars, vi) {
+                    state.ok = false;
+                    break 'perform;
+                }
+            }
+        }
+        self.clause_queue_threshold = CLAUSE_QUEUE_THRESHOD;
+        self.var_queue_threshold = VAR_QUEUE_THRESHOLD;
+    }
+    /// 17. extendModel
+    /// ```c
+    /// inline lbool    Solver::modelValue    (Var x) const   { return model[x]; }
+    /// inline lbool    Solver::modelValue    (Lit p) const   { return model[var(p)] ^ sign(p); }
+    /// ```
+    fn extend_model(&mut self, model: &mut Vec<i32>) {
+        // println!("extend_model {:?}", &self.elim_clauses);
+        if self.elim_clauses.is_empty() {
+            return;
+        }
+        let mut i = self.elim_clauses.len() - 1;
+        let mut width;
+        'next: loop {
+            width = self.elim_clauses[i] as usize;
+            if width == 0 && i == 0 {
+                break;
+            }
+            i -= 1;
+            loop {
+                if width <= 1 {
+                    break;
+                }
+                let l = self.elim_clauses[i];
+                let model_value = match model[l.vi() - 1] {
+                    x if x == l.int() => LTRUE,
+                    x if -x == l.int() => LFALSE,
+                    _ => BOTTOM,
+                };
+                if model_value != LFALSE {
+                    if i < width {
+                        break 'next;
+                    }
+                    i -= width;
+                    continue 'next;
+                }
+                width -= 1;
+                i -= 1;
+            }
+            debug_assert!(width == 1);
+            let l = self.elim_clauses[i];
+            // debug_assert!(model[l.vi() - 1] != l.negate().int());
+            model[l.vi() - 1] = l.int(); // .neg();
+            if i < width {
+                break;
+            }
+            i -= width;
+        }
+    }
+}
+
+impl Eliminator {
+        /// 10. backwardSubsumptionCheck
     /// returns false if solver is inconsistent
     /// - calls `clause_queue.pop`
     fn backward_subsumption_check(
@@ -216,129 +319,11 @@ impl Eliminator {
         }
         true
     }
-
-    /// 18. eliminate
-    // should be called at decision level 0.
-    pub fn eliminate(
-        &mut self,
-        asgs: &mut AssignStack,
-        config: &mut SolverConfig,
-        cps: &mut ClauseDB,
-        state: &mut SolverState,
-        vars: &mut [Var],
-    ) {
-        if !self.use_elim {
-            return;
-        }
-        if self.next_invocation < self.var_queue.len() {
-            self.clause_queue.clear();
-            for v in &self.var_queue {
-                vars[*v].enqueued = false;
-            }
-            self.var_queue.clear();
-            return;
-        }
-        // self.next_invocation += 2;
-        // println!("eliminate: clause_queue {}", self.clause_queue.len());
-        // println!("clause_queue {:?}", self.clause_queue);
-        // println!("var_queue {:?}", self.var_queue);
-        // println!("n_touched {}", self.n_touched);
-        // self.build_occurence_list();
-        // for i in 1..4 { println!("eliminate report: v{} => {},{}", i, vars[i].num_occurs, vars[i].occurs.len()); }
-        // self.clause_queue.clear();
-        'perform: while self.bwdsub_assigns < asgs.len()
-            || !self.var_queue.is_empty()
-            || !self.clause_queue.is_empty()
-        {
-            // self.gather_touched_clauses();
-            if (!self.clause_queue.is_empty() || self.bwdsub_assigns < asgs.len())
-                && !self.backward_subsumption_check(asgs, cps, state, vars)
-            {
-                state.ok = false;
-                break 'perform;
-            }
-            while !self.var_queue.is_empty() {
-                let vi = self.var_queue.remove(0);
-                vars[vi].enqueued = false;
-                if vars[vi].eliminated || vars[vi].assign != BOTTOM {
-                    continue;
-                }
-                // FIXME!
-                if !eliminate_var(asgs, config, cps, self, state, vars, vi) {
-                    state.ok = false;
-                    break 'perform;
-                }
-            }
-        }
-        self.clause_queue_threshold = CLAUSE_QUEUE_THRESHOD;
-        self.var_queue_threshold = VAR_QUEUE_THRESHOLD;
-    }
-    /// 17. extendModel
-    /// ```c
-    /// inline lbool    Solver::modelValue    (Var x) const   { return model[x]; }
-    /// inline lbool    Solver::modelValue    (Lit p) const   { return model[var(p)] ^ sign(p); }
-    /// ```
-    pub fn extend_model(&mut self, model: &mut Vec<i32>) {
-        // println!("extend_model {:?}", &self.elim_clauses);
-        if self.elim_clauses.is_empty() {
-            return;
-        }
-        let mut i = self.elim_clauses.len() - 1;
-        let mut width;
-        'next: loop {
-            width = self.elim_clauses[i] as usize;
-            if width == 0 && i == 0 {
-                break;
-            }
-            i -= 1;
-            loop {
-                if width <= 1 {
-                    break;
-                }
-                let l = self.elim_clauses[i];
-                let model_value = match model[l.vi() - 1] {
-                    x if x == l.int() => LTRUE,
-                    x if -x == l.int() => LFALSE,
-                    _ => BOTTOM,
-                };
-                if model_value != LFALSE {
-                    if i < width {
-                        break 'next;
-                    }
-                    i -= width;
-                    continue 'next;
-                }
-                width -= 1;
-                i -= 1;
-            }
-            debug_assert!(width == 1);
-            let l = self.elim_clauses[i];
-            // debug_assert!(model[l.vi() - 1] != l.negate().int());
-            model[l.vi() - 1] = l.int(); // .neg();
-            if i < width {
-                break;
-            }
-            i -= width;
-        }
-    }
 }
-
-// impl fmt::Display for Eliminator {
-//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-//         write!(
-//             f,
-//             " - n_touched {}\n - clause_queue {:?}\n - heap {:?}",
-//             self.n_touched, self.clause_queue, self.var_queue,
-//         )
-//     }
-// }
 
 /// returns a literal if these clauses can be merged by the literal.
 fn subsume(cps: &mut ClauseDB, cid: ClauseId, other: ClauseId) -> Option<Lit> {
     debug_assert!(other.to_kind() != ClauseKind::Uniclause as usize);
-    // if other.to_kind() == ClauseKind::Uniclause as usize {
-    //     panic!("unexpected path!");
-    // }
     if cid.to_kind() == ClauseKind::Uniclause as usize {
         let l = cid.to_index() as Lit;
         let oh = clause!(*cps, other);
@@ -370,7 +355,7 @@ fn subsume(cps: &mut ClauseDB, cid: ClauseId, other: ClauseId) -> Option<Lit> {
 }
 
 /// Returns **false** if one of the clauses is always satisfied.
-pub fn check_to_merge(cpack: &ClauseDB, cp: ClauseId, cq: ClauseId, v: VarId) -> (bool, usize) {
+fn check_to_merge(cpack: &ClauseDB, cp: ClauseId, cq: ClauseId, v: VarId) -> (bool, usize) {
     let pqb = clause!(cpack, cp);
     let qpb = clause!(cpack, cq);
     let ps_smallest = pqb.lits.len() < qpb.lits.len();
@@ -399,7 +384,8 @@ fn make_eliminating_unit_clause(vec: &mut Vec<Lit>, x: Lit) {
     vec.push(1);
 }
 
-pub fn check_eliminator(cps: &ClauseDB, vars: &[Var]) -> bool {
+#[allow(dead_code)]
+fn check_eliminator(cps: &ClauseDB, vars: &[Var]) -> bool {
     // clause_queue should be clear.
     // all elements in occur_lists exist.
     // for v in vars {
@@ -444,7 +430,7 @@ pub fn check_eliminator(cps: &ClauseDB, vars: &[Var]) -> bool {
 
 /// 6. merge(1)
 /// Returns **false** if one of the clauses is always satisfied. (merge_vec should not be used.)
-pub fn merge(
+fn merge(
     cps: &mut ClauseDB,
     elim: &mut Eliminator,
     cip: ClauseId,
@@ -485,7 +471,7 @@ pub fn merge(
 /// returns false if inconsistent
 /// - calls `enqueue_clause`
 /// - calls `enqueue_var`
-pub fn strengthen_clause(
+fn strengthen_clause(
     cps: &mut ClauseDB,
     elim: &mut Eliminator,
     state: &mut SolverState,
@@ -527,7 +513,7 @@ pub fn strengthen_clause(
 /// removes Lit `p` from Clause *self*. This is an O(n) function!
 /// returns true if the clause became a unit clause.
 /// Called only from strengthen_clause
-pub fn strengthen(cps: &mut ClauseDB, vars: &mut [Var], cid: ClauseId, p: Lit) -> bool {
+fn strengthen(cps: &mut ClauseDB, vars: &mut [Var], cid: ClauseId, p: Lit) -> bool {
     debug_assert!(!clause!(cps, cid).get_flag(ClauseFlag::Dead));
     debug_assert!(1 < clause!(cps, cid).lits.len());
     let cix = cid.to_index();
@@ -578,7 +564,7 @@ pub fn strengthen(cps: &mut ClauseDB, vars: &mut [Var], cid: ClauseId, p: Lit) -
 }
 
 /// 14. mkElimClause(2)
-pub fn make_eliminated_clause(cps: &mut ClauseDB, vec: &mut Vec<Lit>, vi: VarId, cid: ClauseId) {
+fn make_eliminated_clause(cps: &mut ClauseDB, vec: &mut Vec<Lit>, vi: VarId, cid: ClauseId) {
     let first = vec.len();
     // Copy clause to the vector. Remember the position where the varibale 'v' occurs:
     let ch = clause!(cps, cid);
@@ -602,7 +588,7 @@ pub fn make_eliminated_clause(cps: &mut ClauseDB, vec: &mut Vec<Lit>, vi: VarId,
 /// 15. eliminateVar
 /// returns false if solver is in inconsistent
 #[allow(clippy::cyclomatic_complexity)]
-pub fn eliminate_var(
+fn eliminate_var(
     asgs: &mut AssignStack,
     config: &mut SolverConfig,
     cps: &mut ClauseDB,

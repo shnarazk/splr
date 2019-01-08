@@ -87,6 +87,23 @@ pub trait Delete<T> {
         F: FnMut(&T) -> bool;
 }
 
+pub trait EliminatorIF {
+    fn new(use_elim: bool) -> Eliminator;
+    fn enqueue_clause(&mut self, cid: ClauseId, ch: &mut Clause);
+    fn enqueue_var(&mut self, v: &mut Var);
+    fn clause_queue_len(&self) -> usize;
+    fn var_queue_len(&self) -> usize;
+    fn eliminate(
+        &mut self,
+        asgs: &mut AssignStack,
+        config: &mut SolverConfig,
+        cps: &mut ClauseDB,
+        state: &mut SolverState,
+        vars: &mut [Var],
+    );
+    fn extend_model(&mut self, model: &mut Vec<i32>);
+}
+
 pub trait EmaIF {
     /// returns an EMA value
     fn get(&self) -> f64;
