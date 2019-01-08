@@ -562,7 +562,6 @@ impl ClauseDBIF for ClauseDB {
             }
         }
         state.stats[Stat::Simplification as usize] += 1;
-        // self.check_eliminator();
         true
     }
 }

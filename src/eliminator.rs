@@ -54,7 +54,6 @@ impl EliminatorIF for Eliminator {
     }
     fn enqueue_clause(&mut self, cid: ClauseId, ch: &mut Clause) {
         if !self.use_elim || self.clause_queue_threshold == 0 {
-            // println!("{} is not enqueued", cid.fmt());
             return;
         }
         let rank = ch.rank as f64;
@@ -66,7 +65,6 @@ impl EliminatorIF for Eliminator {
             };
             if rank <= accept {
                 self.clause_queue.push(cid);
-                // println!("increment {}", self.clause_queue.len());
                 ch.flag_on(ClauseFlag::Enqueued);
                 self.clause_queue_threshold -= 1;
             }
@@ -105,18 +103,10 @@ impl EliminatorIF for Eliminator {
             self.var_queue.clear();
             return;
         }
-        // self.next_invocation += 2;
-        // println!("eliminate: clause_queue {}", self.clause_queue.len());
-        // println!("clause_queue {:?}", self.clause_queue);
-        // println!("var_queue {:?}", self.var_queue);
-        // self.build_occurence_list();
-        // for i in 1..4 { println!("eliminate report: v{} => {},{}", i, vars[i].num_occurs, vars[i].occurs.len()); }
-        // self.clause_queue.clear();
         'perform: while self.bwdsub_assigns < asgs.len()
             || !self.var_queue.is_empty()
             || !self.clause_queue.is_empty()
         {
-            // self.gather_touched_clauses();
             if (!self.clause_queue.is_empty() || self.bwdsub_assigns < asgs.len())
                 && !self.backward_subsumption_check(asgs, cps, state, vars)
             {
@@ -193,9 +183,6 @@ impl Eliminator {
         state: &mut SolverState,
         vars: &mut [Var],
     ) -> bool {
-        // let Eliminator {
-        //     ..
-        // } = self;
         let mut cnt = 0;
         let mut _subsumed = 0;
         let mut _deleted_literals = 0;
@@ -215,7 +202,6 @@ impl Eliminator {
                 let mut best = 0;
                 let unilits: [Lit; 1];
                 let lits: &[Lit];
-                // let ch = clause_head_mut!(self.cp, cid) as *mut Clause;
                 if cid.to_kind() == ClauseKind::Uniclause as usize {
                     best = (cid.to_index() as Lit).vi();
                     unilits = [cid.to_index() as Lit; 1];
@@ -678,47 +664,45 @@ fn eliminate_var(
             }
         }
         // Produce clauses in cross product:
-        {
-            for p in &*pos {
-                if clause!(*cps, p).get_flag(ClauseFlag::Dead) {
+        for p in &*pos {
+            if clause!(*cps, p).get_flag(ClauseFlag::Dead) {
+                continue;
+            }
+            let act_p = clause!(*cps, p).activity;
+            let rank_p = clause!(*cps, p).rank;
+            for n in &*neg {
+                if clause!(*cps, n).get_flag(ClauseFlag::Dead) {
                     continue;
                 }
-                let act_p = clause!(*cps, p).activity;
-                let rank_p = clause!(*cps, p).rank;
-                for n in &*neg {
-                    if clause!(*cps, n).get_flag(ClauseFlag::Dead) {
-                        continue;
-                    }
-                    if let Some(vec) = merge(cps, elim, *p, *n, v) {
-                        // println!("eliminator replaces {} with a cross product {:?}", p.fmt(), vec2int(&vec));
-                        debug_assert!(!vec.is_empty());
-                        match vec.len() {
-                            1 => {
-                                // println!(
-                                //     "eliminate_var: grounds {} from {}{:?} and {}{:?}",
-                                //     vec[0].int(),
-                                //     p.fmt(),
-                                //     vec2int(&clause_body!(*cp, *p).lits),
-                                //     n.fmt(),
-                                //     vec2int(&clause_body!(*cp, *n).lits)
-                                // );
-                                let lit = vec[0];
-                                if !asgs.enqueue_null(&mut vars[lit.vi()], lit.lbool(), 0) {
-                                    state.ok = false;
-                                    return false;
-                                }
+                if let Some(vec) = merge(cps, elim, *p, *n, v) {
+                    // println!("eliminator replaces {} with a cross product {:?}", p.fmt(), vec2int(&vec));
+                    debug_assert!(!vec.is_empty());
+                    match vec.len() {
+                        1 => {
+                            // println!(
+                            //     "eliminate_var: grounds {} from {}{:?} and {}{:?}",
+                            //     vec[0].int(),
+                            //     p.fmt(),
+                            //     vec2int(&clause_body!(*cp, *p).lits),
+                            //     n.fmt(),
+                            //     vec2int(&clause_body!(*cp, *n).lits)
+                            // );
+                            let lit = vec[0];
+                            if !asgs.enqueue_null(&mut vars[lit.vi()], lit.lbool(), 0) {
+                                state.ok = false;
+                                return false;
                             }
-                            _ => {
-                                let v = &mut vec.to_vec();
-                                if p.to_kind() == ClauseKind::Removable as usize
-                                    && n.to_kind() == ClauseKind::Removable as usize
-                                {
-                                    let act = act_p.max(clause!(*cps, n).activity);
-                                    let rank = rank_p.min(clause!(*cps, n).rank);
-                                    cps.add_clause(config, elim, vars, v, rank, act);
-                                } else {
-                                    cps.add_clause(config, elim, vars, v, 0, 0.0);
-                                }
+                        }
+                        _ => {
+                            let v = &mut vec.to_vec();
+                            if p.to_kind() == ClauseKind::Removable as usize
+                                && n.to_kind() == ClauseKind::Removable as usize
+                            {
+                                let act = act_p.max(clause!(*cps, n).activity);
+                                let rank = rank_p.min(clause!(*cps, n).rank);
+                                cps.add_clause(config, elim, vars, v, rank, act);
+                            } else {
+                                cps.add_clause(config, elim, vars, v, 0, 0.0);
                             }
                         }
                     }

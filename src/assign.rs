@@ -100,7 +100,6 @@ impl AssignIF for AssignStack {
         }
         let lim = self.trail_lim[lv];
         for l in &self.trail[lim..] {
-            // println!("cancel_until {}", l.int());
             let vi = l.vi();
             let v = &mut vars[vi];
             v.phase = v.assign;

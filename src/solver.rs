@@ -502,8 +502,6 @@ fn search(
             if tn_confl == 100_000 {
                 asgs.cancel_until(vars, &mut state.var_order, 0);
                 config.adapt_strategy(cp, elim, state, vars);
-                // } else if 0 < lbd {
-                //     config.block_restart(state, lbd, dl, bl, nas);
             }
             // decay var activity
             config.var_inc /= config.var_decay;
@@ -542,7 +540,6 @@ fn analyze(
     let mut p = NULL_LIT;
     let mut ti = asgs.len() - 1; // trail index
     let mut path_cnt = 0;
-    // let mut last_dl: Vec<Lit> = Vec::new();
     loop {
         // println!("analyze {}", p.int());
         unsafe {
@@ -575,9 +572,6 @@ fn analyze(
             for q in &(*ch).lits[((p != NULL_LIT) as usize)..] {
                 let vi = q.vi();
                 let lvl = vars[vi].level;
-                // if lvl == 0 {
-                //     println!("lvl {}", lvl);
-                // }
                 debug_assert!(!(*ch).get_flag(ClauseFlag::Dead));
                 debug_assert!(
                     !vars[vi].eliminated,
@@ -585,7 +579,7 @@ fn analyze(
                 );
                 // debug_assert!(
                 //     vars[vi].assign != BOTTOM,
-                //     format!("analyze assertion: unassigned var {:?}", vars[vi])
+                //     format!("{:?} was assigned", vars[vi])
                 // );
                 vars.bump_activity(
                     &mut config.var_inc,
