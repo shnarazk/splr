@@ -13,7 +13,8 @@ const CLAUSE_INDEX_BITS: usize = 60;
 const CLAUSE_INDEX_MASK: usize = 0x0FFF_FFFF_FFFF_FFFF;
 const DB_INC_SIZE: usize = 200;
 const CLA_ACTIVITY_MAX: f64 = 1e240;
-const CLA_ACTIVITY_MAX_R: f64 = 1.0 / CLA_ACTIVITY_MAX;
+const CLA_ACTIVITY_SCALE1: f64 = 1e-80;
+const CLA_ACTIVITY_SCALE2: f64 = 1e-10;
 
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub enum ClauseKind {
@@ -392,12 +393,10 @@ impl ClausePartitionIF for ClausePartition {
         // a = (c.activity + d) / 2.0;
         c.activity = a;
         if CLA_ACTIVITY_MAX < a {
-            for c in self.head.iter_mut().skip(1) {
-                if CLA_ACTIVITY_MAX_R < c.activity {
-                    c.activity *= CLA_ACTIVITY_MAX_R;
-                }
+            for c in &mut self.head[1..] {
+                c.activity *= CLA_ACTIVITY_SCALE1;
             }
-            *inc *= CLA_ACTIVITY_MAX_R;
+            *inc *= CLA_ACTIVITY_SCALE2;
         }
     }
     fn count(&self, alive: bool) -> usize {

@@ -4,10 +4,9 @@ use crate::traits::*;
 use crate::types::*;
 use std::fmt;
 
-#[allow(dead_code)]
 const VAR_ACTIVITY_MAX: f64 = 1e240;
-#[allow(dead_code)]
-const VAR_ACTIVITY_MAX_R: f64 = 1.0 / VAR_ACTIVITY_MAX;
+const VAR_ACTIVITY_SCALE1: f64 = 1e-80;
+const VAR_ACTIVITY_SCALE2: f64 = 1e-10;
 
 /// Struct for a variable.
 pub struct Var {
@@ -145,11 +144,9 @@ impl VarManagement for [Var] {
         v.activity = a;
         if VAR_ACTIVITY_MAX < a {
             for v in &mut self[1..] {
-                if VAR_ACTIVITY_MAX_R < v.activity {
-                    v.activity *= VAR_ACTIVITY_MAX_R;
-                }
+                v.activity *= VAR_ACTIVITY_SCALE1;
             }
-            *inc *= VAR_ACTIVITY_MAX_R;
+            *inc *= VAR_ACTIVITY_SCALE2;
         }
     }
 }
