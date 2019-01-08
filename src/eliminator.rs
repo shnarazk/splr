@@ -194,7 +194,7 @@ impl EliminatorIF for Eliminator {
 }
 
 impl Eliminator {
-        /// 10. backwardSubsumptionCheck
+    /// 10. backwardSubsumptionCheck
     /// returns false if solver is inconsistent
     /// - calls `clause_queue.pop`
     fn backward_subsumption_check(

@@ -141,18 +141,12 @@ pub trait QueueOperations {
 pub trait Restart {
     fn block_restart(
         &mut self,
+        asgs: &AssignStack,
         state: &mut SolverState,
         lbd: usize,
-        clv: usize,
         blv: usize,
-        nas: usize,
     ) -> bool;
-    fn force_restart(
-        &mut self,
-        asgs: &mut AssignStack,
-        state: &mut SolverState,
-        vars: &mut [Var],
-    ) -> bool;
+    fn force_restart(&mut self, state: &mut SolverState) -> bool;
 }
 
 pub trait SatSolver {
