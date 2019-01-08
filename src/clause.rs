@@ -322,7 +322,7 @@ impl ClausePartitionIF for ClausePartition {
             self.watcher[v[0].negate() as usize].attach(v[1], cix);
             self.watcher[v[1].negate() as usize].attach(v[0], cix);
             ch.lits.clear();
-            for l in &v[..] {
+            for l in v {
                 ch.lits.push(*l);
             }
             ch.rank = rank;
@@ -332,7 +332,7 @@ impl ClausePartitionIF for ClausePartition {
             let l0 = v[0];
             let l1 = v[1];
             let mut lits = Vec::with_capacity(v.len());
-            for l in &v[..] {
+            for l in v {
                 lits.push(*l);
             }
             cix = self.head.len();
@@ -482,7 +482,7 @@ impl ClauseDBIF for ClauseDB {
         self[cid.to_kind()].touched[w0 as usize] = true;
     }
     fn reduce(&mut self, elim: &mut Eliminator, state: &mut SolverState, vars: &mut [Var]) {
-        self[ClauseKind::Removable as usize].reset_lbd(vars, &mut state.lbd_temp[..]);
+        self[ClauseKind::Removable as usize].reset_lbd(vars, &mut state.lbd_temp);
         let ClausePartition {
             ref mut head,
             ref mut touched,

@@ -257,7 +257,7 @@ impl Propagate for AssignStack {
                 ClauseKind::Removable,
                 ClauseKind::Permanent,
             ] {
-                let head = &mut cp[*kind as usize].head[..];
+                let head = &mut cp[*kind as usize].head;
                 unsafe {
                     let watcher = &mut cp[*kind as usize].watcher[..] as *mut [Vec<Watch>];
                     let source = &mut (*watcher)[p];
@@ -326,7 +326,7 @@ fn propagate_fast(
             ClauseKind::Removable,
             ClauseKind::Permanent,
         ] {
-            let head = &mut cp[*kind as usize].head[..];
+            let head = &mut cp[*kind as usize].head;
             unsafe {
                 let watcher = &mut cp[*kind as usize].watcher[..] as *mut [Vec<Watch>];
                 let source = &mut (*watcher)[p];
