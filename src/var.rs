@@ -106,7 +106,6 @@ impl VarManagement for [Var] {
         for l in &ch.lits {
             let mut v = &mut self[l.vi()];
             v.touched = true;
-            elim.n_touched += 1;
             if !v.eliminated {
                 if l.positive() {
                     v.pos_occurs.push(cid);

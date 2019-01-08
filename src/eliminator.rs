@@ -13,14 +13,13 @@ pub struct Eliminator {
     pub use_simplification: bool,
     pub last_invocatiton: usize,
     next_invocation: usize,
-    pub n_touched: usize,
     merges: usize,
     clause_queue: Vec<ClauseId>,
     pub var_queue: Vec<VarId>,
     bwdsub_assigns: usize,
     // working place
     elim_clauses: Vec<Lit>,
-    /// Variables are not eliminated if it produces a resolvent with a length above this limit.
+    /// Variables aren't eliminated if they produce a resolvent with a length above this
     /// 0 means no limit.
     clause_lim: usize,
     subsumption_lim: usize,
@@ -39,7 +38,6 @@ impl EliminatorIF for Eliminator {
         Eliminator {
             merges: 0,
             var_queue: Vec::new(),
-            n_touched: 0,
             clause_queue: Vec::new(),
             bwdsub_assigns: 0,
             elim_clauses: Vec::new(),
@@ -87,7 +85,6 @@ impl EliminatorIF for Eliminator {
     fn var_queue_len(&self) -> usize {
         self.var_queue.len()
     }
-    /// 18. eliminate
     // should be called at decision level 0.
     fn eliminate(
         &mut self,
@@ -112,7 +109,6 @@ impl EliminatorIF for Eliminator {
         // println!("eliminate: clause_queue {}", self.clause_queue.len());
         // println!("clause_queue {:?}", self.clause_queue);
         // println!("var_queue {:?}", self.var_queue);
-        // println!("n_touched {}", self.n_touched);
         // self.build_occurence_list();
         // for i in 1..4 { println!("eliminate report: v{} => {},{}", i, vars[i].num_occurs, vars[i].occurs.len()); }
         // self.clause_queue.clear();
@@ -142,11 +138,6 @@ impl EliminatorIF for Eliminator {
         self.clause_queue_threshold = CLAUSE_QUEUE_THRESHOD;
         self.var_queue_threshold = VAR_QUEUE_THRESHOLD;
     }
-    /// 17. extendModel
-    /// ```c
-    /// inline lbool    Solver::modelValue    (Var x) const   { return model[x]; }
-    /// inline lbool    Solver::modelValue    (Lit p) const   { return model[var(p)] ^ sign(p); }
-    /// ```
     fn extend_model(&mut self, model: &mut Vec<i32>) {
         // println!("extend_model {:?}", &self.elim_clauses);
         if self.elim_clauses.is_empty() {
@@ -193,7 +184,6 @@ impl EliminatorIF for Eliminator {
 }
 
 impl Eliminator {
-    /// 10. backwardSubsumptionCheck
     /// returns false if solver is inconsistent
     /// - calls `clause_queue.pop`
     fn backward_subsumption_check(
@@ -377,7 +367,6 @@ fn check_to_merge(cpack: &ClauseDB, cp: ClauseId, cq: ClauseId, v: VarId) -> (bo
     (true, size)
 }
 
-/// 13. mkElimClause(1)
 fn make_eliminating_unit_clause(vec: &mut Vec<Lit>, x: Lit) {
     vec.push(x);
     vec.push(1);
@@ -427,7 +416,6 @@ fn check_eliminator(cps: &ClauseDB, vars: &[Var]) -> bool {
     true
 }
 
-/// 6. merge(1)
 /// Returns **false** if one of the clauses is always satisfied. (merge_vec should not be used.)
 fn merge(
     cps: &mut ClauseDB,
@@ -466,7 +454,6 @@ fn merge(
     Some(vec)
 }
 
-/// 5. strengthenClause
 /// returns false if inconsistent
 /// - calls `enqueue_clause`
 /// - calls `enqueue_var`
@@ -562,7 +549,6 @@ fn strengthen(cps: &mut ClauseDB, vars: &mut [Var], cid: ClauseId, p: Lit) -> bo
     }
 }
 
-/// 14. mkElimClause(2)
 fn make_eliminated_clause(cps: &mut ClauseDB, vec: &mut Vec<Lit>, vi: VarId, cid: ClauseId) {
     let first = vec.len();
     // Copy clause to the vector. Remember the position where the varibale 'v' occurs:
@@ -584,7 +570,6 @@ fn make_eliminated_clause(cps: &mut ClauseDB, vec: &mut Vec<Lit>, vi: VarId, cid
     // println!("make_eliminated_clause: eliminate({}) clause {:?}", vi, vec2int(&ch.lits));
 }
 
-/// 15. eliminateVar
 /// returns false if solver is in inconsistent
 #[allow(clippy::cyclomatic_complexity)]
 fn eliminate_var(
@@ -633,7 +618,6 @@ fn eliminate_var(
                 || asgs.propagate(cps, state, vars) != NULL_CLAUSE
             {
                 state.ok = false;
-                // panic!("eliminate_var: failed to enqueue & propagate");
                 return false;
             }
             return true;
@@ -721,7 +705,6 @@ fn eliminate_var(
                                 let lit = vec[0];
                                 if !asgs.enqueue_null(&mut vars[lit.vi()], lit.lbool(), 0) {
                                     state.ok = false;
-                                    // panic!("eliminate_var: failed to enqueue & propagate");
                                     return false;
                                 }
                             }
