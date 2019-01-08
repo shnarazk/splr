@@ -129,8 +129,13 @@ pub trait Restart {
         clv: usize,
         blv: usize,
         nas: usize,
-    );
-    fn force_restart(&mut self, asgs: &mut AssignStack, state: &mut SolverState, vars: &mut [Var]);
+    ) -> bool;
+    fn force_restart(
+        &mut self,
+        asgs: &mut AssignStack,
+        state: &mut SolverState,
+        vars: &mut [Var],
+    ) -> bool;
 }
 
 pub trait SatSolver {

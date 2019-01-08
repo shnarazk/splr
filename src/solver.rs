@@ -404,6 +404,7 @@ fn search(
                 return true;
             }
             // DYNAMIC FORCING RESTART
+            // config.force_restart(asg, state, conflict_c)
             if (config.luby_restart && config.luby_restart_num_conflict <= conflict_c)
                 || (!config.luby_restart
                     && state.lbd_queue.is_full(LBD_QUEUE_LEN)
@@ -433,7 +434,6 @@ fn search(
                 state.num_solved_vars = asgs.len();
                 state.var_order.rebuild(&vars);
             }
-            // config.force_restart(asgs, state, vars);
             if !asgs.remains() {
                 let vi = state.var_order.select_var(&vars);
                 debug_assert_ne!(vi, 0);
@@ -461,6 +461,7 @@ fn search(
             let real_len = asgs.len();
             state.trail_queue.enqueue(TRAIL_QUEUE_LEN, real_len);
             // DYNAMIC BLOCKING RESTART
+            // config.block_restart(asgs, state, real_len as f64)
             if 100 < tn_confl
                 && state.lbd_queue.is_full(LBD_QUEUE_LEN)
                 && config.restart_blk * state.trail_queue.average() < (real_len as f64)
