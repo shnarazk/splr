@@ -571,7 +571,7 @@ fn analyze(
                 //     }
                 // }
             }
-            // println!("{}を対応", cid.fmt());
+            // println!("- handle {}", cid.fmt());
             for q in &(*ch).lits[((p != NULL_LIT) as usize)..] {
                 let vi = q.vi();
                 let lvl = vars[vi].level;
@@ -596,7 +596,7 @@ fn analyze(
                 if 0 < lvl && !state.an_seen[vi] {
                     state.an_seen[vi] = true;
                     if dl <= lvl {
-                        // println!("{} はレベル{}なのでフラグを立てる", q.int(), lvl);
+                        // println!("- flag for {} which level is {}", q.int(), lvl);
                         path_cnt += 1;
                     // if vars[vi].reason != NULL_CLAUSE
                     //     && vars[vi].reason.to_kind() == ClauseKind::Removable as usize
@@ -604,26 +604,27 @@ fn analyze(
                     //     last_dl.push(*q);
                     // }
                     } else {
-                        // println!("{} はレベル{}なので採用", q.int(), lvl);
+                        // println!("- push {} to learnt, which level is {}", q.int(), lvl);
                         learnt.push(*q);
                     }
                 } else {
                     // if !config.an_seen[vi] {
-                    //     println!("{} はもうフラグが立っているので無視", q.int());
+                    //     println!("- ignore {} because it was flagged", q.int());
                     // } else {
-                    //     println!("{} は{}でグラウンドしているので無視", q.int(), lvl);
+                    //     println!("- ignore {} because its level is {}", q.int(), lvl);
                     // }
                 }
             }
             // set the index of the next literal to ti
             while !state.an_seen[asgs.trail[ti].vi()] {
-                // println!("{} はフラグが立ってないので飛ばす", asgs.trail[ti].int());
+                // println!("- skip {} because it isn't flagged", asgs.trail[ti].int());
                 ti -= 1;
             }
             p = asgs.trail[ti];
             let next_vi = p.vi();
             cid = vars[next_vi].reason;
-            // println!("{} にフラグが立っている。path数は{}, そのreasonは{}", next_vi, path_cnt - 1, cid.fmt());
+            // println!("- move to flagged {}, which reason is {}; num path: {}",
+            //          next_vi, path_cnt - 1, cid.fmt());
             state.an_seen[next_vi] = false;
             path_cnt -= 1;
             if path_cnt <= 0 {
@@ -635,7 +636,7 @@ fn analyze(
     debug_assert_eq!(learnt[0], 0);
     learnt[0] = p.negate();
     debug_assert_ne!(learnt[0], 0);
-    // println!("最後に{}を採用して{:?}", p.negate().int(), vec2int(learnt));
+    // println!("- append {}; the result is {:?}", p.negate().int(), vec2int(learnt));
     // simplify phase
     let mut to_clear = Vec::new();
     to_clear.push(p.negate());
