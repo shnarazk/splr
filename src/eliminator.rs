@@ -133,7 +133,6 @@ impl EliminatorIF for Eliminator {
                 if vars[vi].eliminated || vars[vi].assign != BOTTOM {
                     continue;
                 }
-                // FIXME!
                 if !eliminate_var(asgs, config, cps, self, state, vars, vi) {
                     state.ok = false;
                     break 'perform;
