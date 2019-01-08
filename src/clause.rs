@@ -131,34 +131,23 @@ impl WatchManagement for Vec<Watch> {
 
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub enum ClauseFlag {
-    Kind0 = 0,
-    Kind1,
-    Dead,
+    Dead = 0,
     JustUsed,
     Enqueued,
 }
 
 pub struct Clause {
-    /// collection of bits
-    pub flags: u16,
     /// the literals
     pub lits: Vec<Lit>,
     /// LBD, NDD, or something, used by `reduce_db`
     pub rank: usize,
     /// clause activity used by `analyze` and `reduce_db`
     pub activity: f64,
+    /// collection of bits
+    flags: u16,
 }
 
 impl ClauseIF for Clause {
-    #[inline(always)]
-    fn get_kind(&self) -> ClauseKind {
-        match self.flags & 3 {
-            0 => ClauseKind::Removable,
-            1 => ClauseKind::Permanent,
-            2 => ClauseKind::Binclause,
-            _ => panic!("impossible clause kind"),
-        }
-    }
     #[inline(always)]
     fn get_flag(&self, flag: ClauseFlag) -> bool {
         self.flags & (1 << flag as u16) != 0
@@ -238,15 +227,8 @@ impl fmt::Display for Clause {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "C{{{:?} {}{}{}}}",
+            "C{{{:?} {}{}}}",
             vec2int(&self.lits),
-            match self.flags & 3 {
-                0 => 'L',
-                1 => 'R',
-                2 => 'P',
-                3 => 'B',
-                _ => '?',
-            },
             self.map_flag(ClauseFlag::Dead, ", dead", ""),
             self.map_flag(ClauseFlag::Enqueued, ", enqueued", ""),
         )
@@ -345,7 +327,7 @@ impl ClausePartitionIF for ClausePartition {
                 ch.lits.push(*l);
             }
             ch.rank = rank;
-            ch.flags = self.kind as u16; // reset Dead, JustUsed, and Touched
+            ch.flags = 0;
             ch.activity = 1.0;
         } else {
             let l0 = v[0];
@@ -358,7 +340,7 @@ impl ClausePartitionIF for ClausePartition {
             let w0 = l0.negate() as usize;
             let w1 = l1.negate() as usize;
             self.head.push(Clause {
-                flags: self.kind as u16,
+                flags: 0,
                 lits,
                 rank,
                 activity: 1.0,
