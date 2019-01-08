@@ -5,7 +5,7 @@ use crate::traits::*;
 use std::collections::VecDeque;
 
 const RESTART_PERIOD: u64 = 50;
-const RESET_EMA: u64 = 1000;
+const RESET_EMA: u64 = 400;
 
 impl QueueOperations for VecDeque<usize> {
     #[inline(always)]
@@ -63,7 +63,9 @@ impl Restart for SolverConfig {
     /// called after no conflict propagation
     fn force_restart(&mut self, state: &mut SolverState) -> bool {
         let count = state.stats[Stat::Conflict as usize] as u64;
-        if RESET_EMA < count && state.next_restart < count && self.restart_thr < state.ema_lbd.get()
+        if RESET_EMA < count
+            && state.next_restart < count
+            && 1.0 / state.ema_lbd.get() < self.restart_thr
         {
             state.next_restart = count + RESTART_PERIOD;
             return true;

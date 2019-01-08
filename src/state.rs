@@ -6,7 +6,7 @@ use crate::traits::*;
 use crate::types::*;
 use crate::var::{Var, VarIdHeap};
 use chrono::Utc;
-use std::collections::VecDeque;
+// use std::collections::VecDeque;
 use std::fmt;
 use std::path::Path;
 
@@ -22,7 +22,7 @@ pub enum Stat {
     Reduction,          // the number of reduction
     Simplification,     // the number of simplification
     Assign,             // the number of assigned variables
-    SumLBD,             // the sum of generated learnts' LBD
+    //    SumLBD,             // the sum of generated learnts' LBD
     NumBin,             // the number of binary clauses
     NumLBD2,            // the number of clauses which LBD is 2
     EndOfStatIndex,     // Don't use this dummy.
@@ -33,8 +33,8 @@ pub struct SolverState {
     pub next_reduction: usize, // renamed from `nbclausesbeforereduce`
     pub next_restart: u64,
     pub cur_restart: usize,
-    pub lbd_queue: VecDeque<usize>,
-    pub trail_queue: VecDeque<usize>,
+    // pub lbd_queue: VecDeque<usize>,
+    // pub trail_queue: VecDeque<usize>,
     pub var_order: VarIdHeap, // Variable Order
     pub stats: Vec<i64>,      // statistics
     pub ema_asg: Ema2,
@@ -58,12 +58,12 @@ impl SolverStateIF for SolverState {
             next_reduction: 1000,
             next_restart: 100,
             cur_restart: 1,
-            lbd_queue: VecDeque::new(),
-            trail_queue: VecDeque::new(),
+            // lbd_queue: VecDeque::new(),
+            // trail_queue: VecDeque::new(),
             var_order: VarIdHeap::new(nv, nv),
             stats: vec![0; Stat::EndOfStatIndex as usize],
-            ema_asg: Ema2::new(3.8, 50_000.0),   // for blocking 4
-            ema_lbd: Ema2::new(160.0, 50_000.0), // for forcing 160
+            ema_asg: Ema2::new(5000.0, 50_000.0),
+            ema_lbd: Ema2::new(1.0, 100.0),
             b_lvl: Ema::new(se),
             c_lvl: Ema::new(se),
             num_solved_vars: 0,
