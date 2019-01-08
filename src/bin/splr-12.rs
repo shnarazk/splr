@@ -9,7 +9,7 @@ use structopt::StructOpt;
 
 #[derive(StructOpt)]
 #[structopt(
-    name = "splr-12",
+    name = "splr",
     about = "SAT solver for Propositional Logic in Rust, Technology Preview 12"
 )]
 struct CLOpts {
