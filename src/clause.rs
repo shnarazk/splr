@@ -387,6 +387,9 @@ impl ClausePartitionIF for ClausePartition {
             self.head.len() - 1
         }
     }
+}
+
+impl ClausePartition {
     #[allow(dead_code)]
     fn check(&self) {
         let total = self.count(false);
