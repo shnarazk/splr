@@ -31,8 +31,9 @@ pub enum Stat {
 pub struct SolverState {
     pub ok: bool,
     pub next_reduction: usize, // renamed from `nbclausesbeforereduce`
-    pub next_restart: u64,
+    pub next_restart: usize,
     pub cur_restart: usize,
+    pub after_restart: usize,
     pub lbd_queue: VecDeque<usize>,
     pub trail_queue: VecDeque<usize>,
     pub var_order: VarIdHeap, // Variable Order
@@ -58,6 +59,7 @@ impl SolverStateIF for SolverState {
             next_reduction: 1000,
             next_restart: 100,
             cur_restart: 1,
+            after_restart: 0,
             lbd_queue: VecDeque::new(),
             trail_queue: VecDeque::new(),
             var_order: VarIdHeap::new(nv, nv),

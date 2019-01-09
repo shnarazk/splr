@@ -4,8 +4,8 @@ use crate::state::{SolverState, Stat};
 use crate::traits::*;
 use std::collections::VecDeque;
 
-const RESTART_PERIOD: u64 = 50;
-const RESET_EMA: u64 = 400;
+const RESTART_PERIOD: usize = 50;
+const RESET_EMA: usize = 400;
 const LBD_QUEUE_LEN: usize = 50;
 const TRAIL_QUEUE_LEN: usize = 5000;
 
@@ -38,17 +38,19 @@ impl QueueOperations for VecDeque<usize> {
 
 impl RestartIF for SolverState {
     fn block_restart(&mut self, asgs: &AssignStack, config: &SolverConfig, ncnfl: usize) -> bool {
-        let count = self.stats[Stat::Conflict as usize] as u64;
+        // let count = self.stats[Stat::Conflict as usize] as usize;
         let nas = asgs.len();
         if 100 < ncnfl
             // Queue-based implementation
-            && self.lbd_queue.is_full(LBD_QUEUE_LEN)
+            // && self.lbd_queue.is_full(LBD_QUEUE_LEN)
+            && RESTART_PERIOD <= self.after_restart
             && config.restart_blk * self.trail_queue.average() < nas as f64
             // EMA-based implementation // && self.next_restart <= count
             // && config.restart_blk * self.ema_asg.fast < nas as f64
         {
-            self.lbd_queue.clear();
-            self.next_restart = count + RESTART_PERIOD;
+            // self.lbd_queue.clear();
+            self.after_restart = 0;
+            // self.next_restart = count + RESTART_PERIOD;
             self.stats[Stat::BlockRestart as usize] += 1;
             return true;
         }
@@ -56,10 +58,10 @@ impl RestartIF for SolverState {
     }
     /// called after no conflict propagation
     fn force_restart(&mut self, config: &mut SolverConfig, ncnfl: &mut f64) -> bool {
-        let count = self.stats[Stat::Conflict as usize] as u64;
+        let count = self.stats[Stat::Conflict as usize] as usize;
         if count <= RESET_EMA {
             if count == RESET_EMA {
-                // self.ema_asg.reset();
+                self.ema_asg.reset();
                 self.ema_lbd.reset();
             }
             return false;
@@ -70,7 +72,8 @@ impl RestartIF for SolverState {
         // }
         if (config.luby_restart && config.luby_restart_num_conflict <= *ncnfl)
             || (!config.luby_restart
-                && self.lbd_queue.is_full(LBD_QUEUE_LEN)
+                // && self.lbd_queue.is_full(LBD_QUEUE_LEN)
+                && RESTART_PERIOD <= self.after_restart
                 // Queue-based implementation
                 //&& ave < self.lbd_queue.average() * config.restart_thr
                 // EMA-based implementation && self.next_restart < count
@@ -78,8 +81,9 @@ impl RestartIF for SolverState {
             )
         {
             self.stats[Stat::Restart as usize] += 1;
-            self.lbd_queue.clear();
-            self.next_restart = count + RESTART_PERIOD;
+            // self.lbd_queue.clear();
+            self.after_restart = 0;
+            // self.next_restart = count + RESTART_PERIOD;
             if config.luby_restart {
                 *ncnfl = 0.0;
                 config.luby_current_restarts += 1;
@@ -95,11 +99,12 @@ impl RestartIF for SolverState {
     #[inline(always)]
     fn restart_update_lbd(&mut self, lbd: usize) {
         self.ema_lbd.update(lbd as f64);
-        self.lbd_queue.enqueue(LBD_QUEUE_LEN, lbd);
+        // self.lbd_queue.enqueue(LBD_QUEUE_LEN, lbd);
+        self.after_restart += 1;
     }
     #[inline(always)]
     fn restart_update_asg(&mut self, n: usize) {
-        // self.ema_asg.update(n as f64);
+        self.ema_asg.update(n as f64);
         self.trail_queue.enqueue(TRAIL_QUEUE_LEN, n);
     }
     #[inline(always)]
