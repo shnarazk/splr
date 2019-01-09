@@ -35,10 +35,10 @@ pub struct SolverState {
     pub after_restart: usize,
     pub var_order: VarIdHeap, // Variable Order
     pub stats: Vec<i64>,      // statistics
-    pub ema_asg: Ema2,
-    pub ema_lbd: Ema2,
-    pub b_lvl: Ema,
-    pub c_lvl: Ema,
+    pub ema_asg: Ema_,
+    pub ema_lbd: Ema_,
+    pub b_lvl: Ema_,
+    pub c_lvl: Ema_,
     pub num_solved_vars: usize,
     pub model: Vec<Lbool>,
     pub conflicts: Vec<Lit>,
@@ -59,10 +59,10 @@ impl SolverStateIF for SolverState {
             after_restart: 0,
             var_order: VarIdHeap::new(nv, nv),
             stats: vec![0; Stat::EndOfStatIndex as usize],
-            ema_asg: Ema2::new(80.0, 50_000.0),
-            ema_lbd: Ema2::new(50.0, 50_000.0),
-            b_lvl: Ema::new(50_000),
-            c_lvl: Ema::new(50_000),
+            ema_asg: Ema_::new(100),
+            ema_lbd: Ema_::new(50),
+            b_lvl: Ema_::new(50_000),
+            c_lvl: Ema_::new(50_000),
             num_solved_vars: 0,
             model: vec![BOTTOM; nv + 1],
             conflicts: vec![],
@@ -125,6 +125,8 @@ impl SolverStateIF for SolverState {
                     None => config.strategy.to_str(),
                     Some(x) => x,
                 };
+                let count = self.stats[Stat::Conflict as usize] as usize;
+                let ave = self.stats[Stat::SumLBD as usize] as f64 / count as f64;
                 println!("{}, State:{:>6}", self, msg,);
                 println!(
                     "#propagate:{:>14}, #decision:{:>13}, #conflict: {:>12} ",
@@ -150,14 +152,16 @@ impl SolverStateIF for SolverState {
                     "     Restart|#BLK:{:>9}, #RST:{:>9}, emaASG:{:>7.2}, emaLBD:{:>7.2} ",
                     self.stats[Stat::BlockRestart as usize],
                     self.stats[Stat::Restart as usize],
-                    self.ema_asg.get(),
-                    self.ema_lbd.get(),
+                    //self.ema_asg.get(),
+                    asgs.len() as f64 / self.ema_asg.get(),
+                    // self.ema_lbd.get(),
+                    ave / self.ema_lbd.get(),
                 );
                 println!(
                     " Decision Lv|aLBD:{:>9.2}, bjmp:{:>9.2}, cnfl:{:>9.2} |#rdc:{:>9} ",
-                    self.ema_lbd.slow,
-                    self.b_lvl.0,
-                    self.c_lvl.0,
+                    self.ema_lbd.get(),
+                    self.b_lvl.get(),
+                    self.c_lvl.get(),
                     self.stats[Stat::Reduction as usize],
                 );
                 println!(
@@ -201,9 +205,9 @@ impl SolverStateIF for SolverState {
                 self.stats[Stat::Restart as usize],
                 self.ema_asg.get(),
                 self.ema_lbd.get(),
-                self.ema_lbd.slow,
-                self.b_lvl.0,
-                self.c_lvl.0,
+                self.ema_lbd.get(),
+                self.b_lvl.get(),
+                self.c_lvl.get(),
                 elim.clause_queue_len(),
                 elim.var_queue_len(),
             );

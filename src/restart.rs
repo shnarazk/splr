@@ -11,7 +11,7 @@ impl RestartIF for SolverState {
         let nas = asgs.len();
         if 100 < ncnfl
             && RESTART_PERIOD <= self.after_restart
-            && config.restart_blk * self.ema_asg.fast < nas as f64
+            && config.restart_blk * self.ema_asg.get() < nas as f64
         {
             self.after_restart = 0;
             self.stats[Stat::BlockRestart as usize] += 1;
@@ -32,7 +32,7 @@ impl RestartIF for SolverState {
         if (config.luby_restart && config.luby_restart_num_conflict <= *ncnfl)
             || (!config.luby_restart
                 && RESTART_PERIOD <= self.after_restart
-                && ave < self.ema_lbd.fast * config.restart_thr
+                && ave < self.ema_lbd.get() * config.restart_thr
             )
         {
             self.stats[Stat::Restart as usize] += 1;

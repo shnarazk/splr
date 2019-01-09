@@ -150,7 +150,7 @@ pub struct Ema(pub f64, f64, f64);
 
 /// Exponential Moving Average w/ a calibrator
 impl Ema {
-    /// returns a new EMA from a flag (slow or fast) and a window size
+    /// returns a new EMA
     pub fn new(s: i32) -> Ema {
         Ema(0.0, 1.0 / f64::from(s), 0.0)
     }
@@ -164,13 +164,11 @@ impl EmaIF for Ema {
         self.0 = self.1 * x + (1.0 - self.1) * self.0;
         self.2 = self.1 + (1.0 - self.1) * self.2;
     }
-    fn reset(&mut self) {
-        self.2 = self.0;
-    }
+    fn reset(&mut self) { }
 }
 
 /// Exponential Moving Average w/o a calibrator
-pub struct Ema_(pub f64, f64);
+pub struct Ema_(f64, f64);
 
 impl Ema_ {
     pub fn new(s: i32) -> Ema_ {
@@ -180,15 +178,12 @@ impl Ema_ {
 
 impl EmaIF for Ema_ {
     fn get(&self) -> f64 {
-        self.0 / self.1
+        self.0
     }
     fn update(&mut self, x: f64) {
-        let e = self.1 * x + (1.0 - self.1) * self.0;
-        self.0 = e;
+        self.0 = self.1 * x + (1.0 - self.1) * self.0;
     }
-    fn reset(&mut self) {
-        self.0 = 1.0;
-    }
+    fn reset(&mut self) { }
 }
 
 /// data about a problem.
