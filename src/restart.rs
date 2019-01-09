@@ -34,42 +34,46 @@ impl RestartIF for SolverState {
     fn block_restart(&mut self, asgs: &AssignStack, config: &SolverConfig, ncnfl: usize) -> bool {
         let count = self.stats[Stat::Conflict as usize] as u64;
         let nas = asgs.len();
-        let clv = asgs.level();
-        if count <= RESET_EMA {
-            if count == RESET_EMA {
-                self.ema_asg.reset();
-                self.ema_lbd.reset();
-            }
-            return false;
-        }
         if 100 < ncnfl
+            // Queue-based implementation
             && self.lbd_queue.is_full(LBD_QUEUE_LEN)
-            && config.restart_blk * self.trail_queue.average() < (nas as f64)
-        // if self.next_restart <= count && self.restart_blk < self.ema_asg.get() {
-        // if self.next_restart <= count && config.restart_blk * self.ema_asg.fast < nas as f64 {
+            && config.restart_blk * self.trail_queue.average() < nas as f64
+            // EMA-based implementation // && self.next_restart <= count
+            // && config.restart_blk * self.ema_asg.fast < nas as f64
         {
             self.lbd_queue.clear();
             self.next_restart = count + RESTART_PERIOD;
             self.stats[Stat::BlockRestart as usize] += 1;
             return true;
-        } else {
-            return false;
         }
         false
     }
     /// called after no conflict propagation
     fn force_restart(&mut self, config: &mut SolverConfig, ncnfl: &mut f64) -> bool {
         let count = self.stats[Stat::Conflict as usize] as u64;
+        if count <= RESET_EMA {
+            if count == RESET_EMA {
+                // self.ema_asg.reset();
+                self.ema_lbd.reset();
+            }
+            return false;
+        }
         let ave = self.stats[Stat::SumLBD as usize] as f64 / count as f64;
+        // if count % 100 == 0 {
+        //     println!("{}, {}", self.lbd_queue.average(), self.ema_lbd.fast);
+        // }
         if (config.luby_restart && config.luby_restart_num_conflict <= *ncnfl)
             || (!config.luby_restart
                 && self.lbd_queue.is_full(LBD_QUEUE_LEN)
-                && ((self.stats[Stat::SumLBD as usize] as f64)
-                    / (self.stats[Stat::Conflict as usize] as f64)
-                    < self.lbd_queue.average() * config.restart_thr))
+                // Queue-based implementation
+                //&& ave < self.lbd_queue.average() * config.restart_thr
+                // EMA-based implementation && self.next_restart < count
+                && ave < self.ema_lbd.fast * config.restart_thr
+            )
         {
             self.stats[Stat::Restart as usize] += 1;
             self.lbd_queue.clear();
+            self.next_restart = count + RESTART_PERIOD;
             if config.luby_restart {
                 *ncnfl = 0.0;
                 config.luby_current_restarts += 1;
@@ -77,18 +81,7 @@ impl RestartIF for SolverState {
                     luby(config.luby_restart_inc, config.luby_current_restarts)
                         * config.luby_restart_factor;
                 // println!("luby restart {}", luby_restart_num_conflict);
-                // return
             }
-            return true;
-        } else {
-            return false;
-        }
-        if RESET_EMA < count
-            && self.next_restart < count
-            && ave < self.ema_lbd.fast * config.restart_thr
-        // && 1.0 / self.ema_lbd.get() < config.restart_thr
-        {
-            self.next_restart = count + RESTART_PERIOD;
             return true;
         }
         false
@@ -100,7 +93,7 @@ impl RestartIF for SolverState {
     }
     #[inline(always)]
     fn restart_update_asg(&mut self, n: usize) {
-        self.ema_asg.update(n as f64);
+        // self.ema_asg.update(n as f64);
         self.trail_queue.enqueue(TRAIL_QUEUE_LEN, n);
     }
     #[inline(always)]
