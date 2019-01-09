@@ -31,7 +31,6 @@ impl QueueOperations for VecDeque<usize> {
 }
 
 impl RestartIF for SolverState {
-    /// called after conflict resolution
     fn block_restart(&mut self, asgs: &AssignStack, config: &SolverConfig, ncnfl: usize) -> bool {
         let count = self.stats[Stat::Conflict as usize] as u64;
         let nas = asgs.len();
@@ -46,17 +45,15 @@ impl RestartIF for SolverState {
         if 100 < ncnfl
             && self.lbd_queue.is_full(LBD_QUEUE_LEN)
             && config.restart_blk * self.trail_queue.average() < (nas as f64)
+        // if self.next_restart <= count && self.restart_blk < self.ema_asg.get() {
+        // if self.next_restart <= count && config.restart_blk * self.ema_asg.fast < nas as f64 {
         {
             self.lbd_queue.clear();
+            self.next_restart = count + RESTART_PERIOD;
             self.stats[Stat::BlockRestart as usize] += 1;
             return true;
         } else {
             return false;
-        }
-        // if self.next_restart <= count && self.restart_blk < self.ema_asg.get() {
-        if self.next_restart <= count && config.restart_blk * self.ema_asg.fast < nas as f64 {
-            self.next_restart = count + RESTART_PERIOD;
-            return true;
         }
         false
     }
