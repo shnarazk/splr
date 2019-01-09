@@ -5,7 +5,7 @@ Splr -- SAT Solver for Propositional Logic in Rust
 
 - This is based on Glucose 4.1, and uses many ideas in modern SAT solvers like:
   - CDCL
-  - Glucose-like dynamic blockling/forcing restart based on EMAs
+  - Glucose-like dynamic blocking/forcing restart based on EMAs
   - Chan Seok heuristics
 
 - Adapts some implementation ideas:
