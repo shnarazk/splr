@@ -6,7 +6,6 @@ use crate::traits::*;
 use crate::types::*;
 use crate::var::{Var, VarIdHeap};
 use chrono::Utc;
-use std::collections::VecDeque;
 use std::fmt;
 use std::path::Path;
 
@@ -34,8 +33,6 @@ pub struct SolverState {
     pub next_restart: usize,
     pub cur_restart: usize,
     pub after_restart: usize,
-    pub lbd_queue: VecDeque<usize>,
-    pub trail_queue: VecDeque<usize>,
     pub var_order: VarIdHeap, // Variable Order
     pub stats: Vec<i64>,      // statistics
     pub ema_asg: Ema2,
@@ -60,8 +57,6 @@ impl SolverStateIF for SolverState {
             next_restart: 100,
             cur_restart: 1,
             after_restart: 0,
-            lbd_queue: VecDeque::new(),
-            trail_queue: VecDeque::new(),
             var_order: VarIdHeap::new(nv, nv),
             stats: vec![0; Stat::EndOfStatIndex as usize],
             ema_asg: Ema2::new(80.0, 50_000.0),
@@ -100,9 +95,6 @@ impl SolverStateIF for SolverState {
         if mes != Some("") {
             self.progress_cnt += 1;
         }
-        // if self.progress_cnt % 16 == 0 {
-        //     self.dump_cnf(format!("G2-p{:>3}.cnf", self.progress_cnt).to_string());
-        // }
         let nv = vars.len() - 1;
         let fixed = if asgs.is_zero() {
             asgs.len()
