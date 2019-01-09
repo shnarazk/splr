@@ -449,15 +449,8 @@ impl ClauseDBIF for ClauseDB {
             ClauseKind::Removable
         };
         let cid = self[kind as usize].new_clause(&v, lbd);
-        // self.bump_cid(cid);
-        if cid.to_kind() == ClauseKind::Removable as usize {
-            self[ClauseKind::Removable as usize].bump_activity(
-                &mut config.cla_inc,
-                cid.to_index(),
-                act,
-            );
-        }
         let ch = clause_mut!(*self, cid);
+        ch.activity = config.var_inc;
         vars.attach_clause(elim, cid, ch, false);
         cid
     }

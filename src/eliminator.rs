@@ -653,7 +653,6 @@ fn eliminate_var(
             if clause!(*cps, p).get_flag(ClauseFlag::Dead) {
                 continue;
             }
-            let act_p = clause!(*cps, p).activity;
             let rank_p = clause!(*cps, p).rank;
             for n in &*neg {
                 if clause!(*cps, n).get_flag(ClauseFlag::Dead) {
@@ -683,11 +682,10 @@ fn eliminate_var(
                             if p.to_kind() == ClauseKind::Removable as usize
                                 && n.to_kind() == ClauseKind::Removable as usize
                             {
-                                let act = act_p.max(clause!(*cps, n).activity);
                                 let rank = rank_p.min(clause!(*cps, n).rank);
-                                cps.add_clause(config, elim, vars, v, rank, act);
+                                cps.add_clause(config, elim, vars, v, rank);
                             } else {
-                                cps.add_clause(config, elim, vars, v, 0, 0.0);
+                                cps.add_clause(config, elim, vars, v, 0);
                             }
                         }
                     }

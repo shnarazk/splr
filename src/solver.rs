@@ -458,8 +458,7 @@ fn handle_conflict_path(
     } else {
         let lbd = vars.compute_lbd(&new_learnt, &mut state.lbd_temp);
         let l0 = new_learnt[0];
-        debug_assert!(0 < lbd);
-        let cid = cp.add_clause(config, elim, vars, &mut new_learnt, lbd, tn_confl as f64);
+        let cid = cp.add_clause(config, elim, vars, &mut new_learnt, lbd);
         state.c_lvl.update(bl as f64);
         state.b_lvl.update(lbd as f64);
         if lbd <= 2 {
@@ -467,13 +466,6 @@ fn handle_conflict_path(
         }
         if learnt_len == 2 {
             state.stats[Stat::NumBin as usize] += 1;
-        }
-        if cid.to_kind() == ClauseKind::Removable as usize {
-            cp[ClauseKind::Removable as usize].bump_activity(
-                &mut config.cla_inc,
-                cid.to_index(),
-                tn_confl as f64,
-            );
         }
         asgs.uncheck_enqueue(vars, l0, cid);
         state.restart_update_lbd(lbd);
