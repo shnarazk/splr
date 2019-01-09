@@ -161,7 +161,7 @@ impl SolverConfig {
         state.ema_asg.reset();
         state.ema_lbd.reset();
         // state.lbd_queue.clear();
-        // state.stats[Stat::SumLBD as usize] = 0;
+        state.stats[Stat::SumLBD as usize] = 0;
         state.stats[Stat::Conflict as usize] = 0;
         let [_, learnts, permanents, _] = cps;
         if self.use_chan_seok {

@@ -53,7 +53,8 @@ impl Restart for SolverConfig {
             }
             return false;
         }
-        if state.next_restart <= count && self.restart_blk < state.ema_asg.get() {
+        // if state.next_restart <= count && self.restart_blk < state.ema_asg.get() {
+        if state.next_restart <= count && self.restart_blk * state.ema_asg.fast < nas as f64 {
             state.next_restart = count + RESTART_PERIOD;
             return true;
         }
@@ -63,9 +64,11 @@ impl Restart for SolverConfig {
     /// called after no conflict propagation
     fn force_restart(&mut self, state: &mut SolverState) -> bool {
         let count = state.stats[Stat::Conflict as usize] as u64;
+        let ave = state.stats[Stat::SumLBD as usize] as f64 / count as f64;
         if RESET_EMA < count
             && state.next_restart < count
-            && 1.0 / state.ema_lbd.get() < self.restart_thr
+            && ave < state.ema_lbd.fast * self.restart_thr
+            // && 1.0 / state.ema_lbd.get() < self.restart_thr
         {
             state.next_restart = count + RESTART_PERIOD;
             return true;

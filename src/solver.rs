@@ -44,8 +44,8 @@ pub struct Solver {
     pub vars: Vec<Var>,       // Variables
 }
 
-// const LBD_QUEUE_LEN: usize = 50;
-// const TRAIL_QUEUE_LEN: usize = 5000;
+const LBD_QUEUE_LEN: usize = 50;
+const TRAIL_QUEUE_LEN: usize = 5000;
 
 impl Solver {
     pub fn new(config: SolverConfig, cnf: &CNFDescription) -> Solver {
@@ -405,15 +405,15 @@ fn search(
             }
             // DYNAMIC FORCING RESTART
             if (config.luby_restart && config.luby_restart_num_conflict <= conflict_c)
-                || (!config.luby_restart && config.force_restart(state))
-                    // && state.lbd_queue.is_full(LBD_QUEUE_LEN)
-                    // && ((state.stats[Stat::SumLBD as usize] as f64)
-                    //     / (state.stats[Stat::Conflict as usize] as f64)
-                    //     < state.lbd_queue.average() * config.restart_thr))
+                || (!config.luby_restart // (config.force_restart(state))
+                    && state.lbd_queue.is_full(LBD_QUEUE_LEN)
+                    && ((state.stats[Stat::SumLBD as usize] as f64)
+                        / (state.stats[Stat::Conflict as usize] as f64)
+                        < state.lbd_queue.average() * config.restart_thr))
             {
                 state.stats[Stat::Restart as usize] += 1;
-                // state.lbd_queue.clear();
-                asgs.cancel_until(vars, &mut state.var_order, 0);
+                state.lbd_queue.clear();
+                asgs.cancel_until(vars, &mut state.var_order, config.root_level);
                 if config.luby_restart {
                     conflict_c = 0.0;
                     config.luby_current_restarts += 1;
@@ -457,25 +457,24 @@ fn search(
             if tn_confl % 5000 == 0 && config.var_decay < config.var_decay_max {
                 config.var_decay += 0.01;
             }
-            // let real_len = asgs.len();
-            // state.trail_queue.enqueue(TRAIL_QUEUE_LEN, real_len);
-            let mut new_learnt: Vec<Lit> = Vec::new();
-            let bl = analyze(asgs, config, cp, state, vars, ci, &mut new_learnt);
-            let lbd = vars.compute_lbd(&new_learnt, &mut state.lbd_temp);
+            let real_len = asgs.len();
+            state.trail_queue.enqueue(TRAIL_QUEUE_LEN, real_len);
             // DYNAMIC BLOCKING RESTART
-            if config.block_restart(asgs, state, lbd, bl)
-                // 100 < tn_confl
-                // && state.lbd_queue.is_full(LBD_QUEUE_LEN)
-                // && config.restart_blk * state.trail_queue.average() < (real_len as f64)
+            if 100 < tn_confl //config.block_restart(asgs, state, lbd, bl)
+                && state.lbd_queue.is_full(LBD_QUEUE_LEN)
+                && config.restart_blk * state.trail_queue.average() < (real_len as f64)
             {
-                // state.lbd_queue.clear();
+                state.lbd_queue.clear();
                 state.stats[Stat::BlockRestart as usize] += 1;
             }
+            let mut new_learnt: Vec<Lit> = Vec::new();
+            let bl = analyze(asgs, config, cp, state, vars, ci, &mut new_learnt);
             asgs.cancel_until(vars, &mut state.var_order, bl.max(config.root_level));
             let learnt_len = new_learnt.len();
             if learnt_len == 1 {
                 asgs.uncheck_enqueue(vars, new_learnt[0], NULL_CLAUSE);
             } else {
+                let lbd = vars.compute_lbd(&new_learnt, &mut state.lbd_temp);
                 let l0 = new_learnt[0];
                 debug_assert!(0 < lbd);
                 let cid = cp.add_clause(config, elim, vars, &mut new_learnt, lbd, tn_confl as f64);
@@ -494,7 +493,7 @@ fn search(
                 }
                 asgs.uncheck_enqueue(vars, l0, cid);
                 // state.lbd_queue.enqueue(LBD_QUEUE_LEN, lbd);
-                // state.stats[Stat::SumLBD as usize] += lbd as i64;
+                state.stats[Stat::SumLBD as usize] += lbd as i64;
             }
             if tn_confl % 10_000 == 0 {
                 state.progress(asgs, config, cp, elim, vars, None);
