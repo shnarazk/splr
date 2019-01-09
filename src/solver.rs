@@ -2,7 +2,6 @@ use crate::assign::AssignStack;
 use crate::clause::{Clause, ClauseDB, ClauseFlag, ClauseKind, Watch};
 use crate::config::SolverConfig;
 use crate::eliminator::Eliminator;
-use crate::restart::luby;
 use crate::state::{SolverState, Stat};
 use crate::traits::*;
 use crate::types::*;
@@ -43,9 +42,6 @@ pub struct Solver {
     pub state: SolverState,   // misc vars.
     pub vars: Vec<Var>,       // Variables
 }
-
-const LBD_QUEUE_LEN: usize = 50;
-const TRAIL_QUEUE_LEN: usize = 5000;
 
 impl Solver {
     pub fn new(config: SolverConfig, cnf: &CNFDescription) -> Solver {
@@ -391,51 +387,29 @@ fn search(
 ) -> bool {
     let mut conflict_c = 0.0; // for Luby restart
     let mut a_decision_was_made = false;
-    if config.luby_restart {
-        config.luby_restart_num_conflict =
-            luby(config.luby_restart_inc, config.luby_current_restarts)
-                * config.luby_restart_factor;
-    }
+    state.restart_update_luby(config);
     loop {
-        state.stats[Stat::Propagation as usize] += 1;
         let ci = propagate_fast(asgs, cp, state, vars);
+        state.stats[Stat::Propagation as usize] += 1;
         if ci == NULL_CLAUSE {
             if config.num_vars <= asgs.len() + elim.eliminated_vars {
                 return true;
             }
             // DYNAMIC FORCING RESTART
-            if (config.luby_restart && config.luby_restart_num_conflict <= conflict_c)
-                || (!config.luby_restart // (config.force_restart(state))
-                    && state.lbd_queue.is_full(LBD_QUEUE_LEN)
-                    && ((state.stats[Stat::SumLBD as usize] as f64)
-                        / (state.stats[Stat::Conflict as usize] as f64)
-                        < state.lbd_queue.average() * config.restart_thr))
-            {
-                state.stats[Stat::Restart as usize] += 1;
-                state.lbd_queue.clear();
+            if state.force_restart(config, &mut conflict_c) {
                 asgs.cancel_until(vars, &mut state.var_order, config.root_level);
-                if config.luby_restart {
-                    conflict_c = 0.0;
-                    config.luby_current_restarts += 1;
-                    config.luby_restart_num_conflict =
-                        luby(config.luby_restart_inc, config.luby_current_restarts)
-                            * config.luby_restart_factor;
-                    // println!("luby restart {}", luby_restart_num_conflict);
-                    // return
-                }
             } else if asgs.level() == 0 {
                 cp.simplify(asgs, config, elim, state, vars);
+                state.var_order.rebuild(&vars);
             }
             if asgs.level() == 0 {
                 if !state.ok {
                     return false;
                 }
                 state.num_solved_vars = asgs.len();
-                state.var_order.rebuild(&vars);
             }
             if !asgs.remains() {
                 let vi = state.var_order.select_var(&vars);
-                debug_assert_ne!(vi, 0);
                 let p = vars[vi].phase;
                 asgs.uncheck_assume(vars, elim, vi.lit(p));
                 state.stats[Stat::Decision as usize] += 1;
@@ -443,83 +417,87 @@ fn search(
             }
         } else {
             conflict_c += 1.0;
-            state.stats[Stat::Conflict as usize] += 1;
-            let tn_confl = state.stats[Stat::Conflict as usize] as usize; // total number
             if a_decision_was_made {
                 a_decision_was_made = false;
             } else {
                 state.stats[Stat::NoDecisionConflict as usize] += 1;
             }
+            state.stats[Stat::Conflict as usize] += 1;
             if asgs.level() == config.root_level {
                 analyze_final(asgs, config, cp, state, vars, ci, false);
                 return false;
             }
-            if tn_confl % 5000 == 0 && config.var_decay < config.var_decay_max {
-                config.var_decay += 0.01;
-            }
-            let real_len = asgs.len();
-            state.trail_queue.enqueue(TRAIL_QUEUE_LEN, real_len);
-            // DYNAMIC BLOCKING RESTART
-            if 100 < tn_confl //config.block_restart(asgs, state, lbd, bl)
-                && state.lbd_queue.is_full(LBD_QUEUE_LEN)
-                && config.restart_blk * state.trail_queue.average() < (real_len as f64)
-            {
-                state.lbd_queue.clear();
-                state.stats[Stat::BlockRestart as usize] += 1;
-            }
-            let mut new_learnt: Vec<Lit> = Vec::new();
-            let bl = analyze(asgs, config, cp, state, vars, ci, &mut new_learnt);
-            asgs.cancel_until(vars, &mut state.var_order, bl.max(config.root_level));
-            let learnt_len = new_learnt.len();
-            if learnt_len == 1 {
-                asgs.uncheck_enqueue(vars, new_learnt[0], NULL_CLAUSE);
-            } else {
-                let lbd = vars.compute_lbd(&new_learnt, &mut state.lbd_temp);
-                let l0 = new_learnt[0];
-                debug_assert!(0 < lbd);
-                let cid = cp.add_clause(config, elim, vars, &mut new_learnt, lbd, tn_confl as f64);
-                if lbd <= 2 {
-                    state.stats[Stat::NumLBD2 as usize] += 1;
-                }
-                if learnt_len == 2 {
-                    state.stats[Stat::NumBin as usize] += 1;
-                }
-                if cid.to_kind() == ClauseKind::Removable as usize {
-                    cp[ClauseKind::Removable as usize].bump_activity(
-                        &mut config.cla_inc,
-                        cid.to_index(),
-                        tn_confl as f64,
-                    );
-                }
-                asgs.uncheck_enqueue(vars, l0, cid);
-                // state.lbd_queue.enqueue(LBD_QUEUE_LEN, lbd);
-                state.stats[Stat::SumLBD as usize] += lbd as i64;
-            }
-            if tn_confl % 10_000 == 0 {
-                state.progress(asgs, config, cp, elim, vars, None);
-            }
-            if tn_confl == 100_000 {
-                asgs.cancel_until(vars, &mut state.var_order, 0);
-                config.adapt_strategy(cp, elim, state, vars);
-            }
-            // decay var activity
-            config.var_inc /= config.var_decay;
-            // decay clause activity
-            config.cla_inc /= config.cla_decay;
-            // glucose reduction
-            if (config.use_chan_seok
-                && !config.glureduce
-                && config.first_reduction < cp[ClauseKind::Removable as usize].count(true))
-                || (config.glureduce && state.cur_restart * state.next_reduction <= tn_confl)
-            {
-                state.cur_restart =
-                    ((tn_confl as f64) / (state.next_reduction as f64)) as usize + 1;
-                cp.reduce(elim, state, vars);
-                state.next_reduction += config.inc_reduce_db;
-            }
-            // Since the conflict path pushes a new literal to trail,
-            // we don't need to pick up a literal here.
+            handle_conflict_path(asgs, config, cp, elim, state, vars, ci);
         }
+    }
+}
+
+#[inline]
+fn handle_conflict_path(
+    asgs: &mut AssignStack,
+    config: &mut SolverConfig,
+    cp: &mut ClauseDB,
+    elim: &mut Eliminator,
+    state: &mut SolverState,
+    vars: &mut [Var],
+    ci: ClauseId,
+) {
+    let tn_confl = state.stats[Stat::Conflict as usize] as usize; // total number
+    if tn_confl % 5000 == 0 && config.var_decay < config.var_decay_max {
+        config.var_decay += 0.01;
+    }
+    state.restart_update_asg(asgs.len());
+    // DYNAMIC BLOCKING RESTART
+    state.block_restart(asgs, config, tn_confl);
+    let mut new_learnt: Vec<Lit> = Vec::new();
+    let bl = analyze(asgs, config, cp, state, vars, ci, &mut new_learnt);
+    asgs.cancel_until(vars, &mut state.var_order, bl.max(config.root_level));
+    let learnt_len = new_learnt.len();
+    if learnt_len == 1 {
+        asgs.uncheck_enqueue(vars, new_learnt[0], NULL_CLAUSE);
+    } else {
+        let lbd = vars.compute_lbd(&new_learnt, &mut state.lbd_temp);
+        let l0 = new_learnt[0];
+        debug_assert!(0 < lbd);
+        let cid = cp.add_clause(config, elim, vars, &mut new_learnt, lbd, tn_confl as f64);
+        state.c_lvl.update(bl as f64);
+        state.b_lvl.update(lbd as f64);
+        if lbd <= 2 {
+            state.stats[Stat::NumLBD2 as usize] += 1;
+        }
+        if learnt_len == 2 {
+            state.stats[Stat::NumBin as usize] += 1;
+        }
+        if cid.to_kind() == ClauseKind::Removable as usize {
+            cp[ClauseKind::Removable as usize].bump_activity(
+                &mut config.cla_inc,
+                cid.to_index(),
+                tn_confl as f64,
+            );
+        }
+        asgs.uncheck_enqueue(vars, l0, cid);
+        state.restart_update_lbd(lbd);
+        state.stats[Stat::SumLBD as usize] += lbd as i64;
+    }
+    if tn_confl % 10_000 == 0 {
+        state.progress(asgs, config, cp, elim, vars, None);
+    }
+    if tn_confl == 100_000 {
+        asgs.cancel_until(vars, &mut state.var_order, 0);
+        config.adapt_strategy(cp, elim, state, vars);
+    }
+    // decay activities
+    config.var_inc /= config.var_decay;
+    config.cla_inc /= config.cla_decay;
+    // glucose reduction
+    if (config.use_chan_seok
+        && !config.glureduce
+        && config.first_reduction < cp[ClauseKind::Removable as usize].count(true))
+        || (config.glureduce && state.cur_restart * state.next_reduction <= tn_confl)
+    {
+        state.cur_restart = ((tn_confl as f64) / (state.next_reduction as f64)) as usize + 1;
+        cp.reduce(elim, state, vars);
+        state.next_reduction += config.inc_reduce_db;
     }
 }
 
