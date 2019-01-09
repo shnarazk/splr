@@ -311,7 +311,6 @@ impl ClausePartitionIF for ClausePartition {
                 ch.lits.clear();
             }
         }
-        // self.check();
     }
     fn new_clause(&mut self, v: &[Lit], rank: usize) -> ClauseId {
         let cix;
@@ -426,10 +425,8 @@ impl ClauseDBIF for ClauseDB {
         vars: &mut [Var],
         v: &mut Vec<Lit>,
         lbd: usize,
-        act: f64,
     ) -> ClauseId {
         debug_assert!(1 < v.len());
-        // let lbd = v.lbd(&self.vars, &mut self.lbd_temp);
         let mut i_max = 0;
         let mut lv_max = 0;
         // seek a literal with max level

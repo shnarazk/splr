@@ -112,7 +112,6 @@ impl AssignIF for AssignStack {
         self.q_head = lim;
     }
     fn uncheck_enqueue(&mut self, vars: &mut [Var], l: Lit, cid: ClauseId) {
-        // println!("uncheck_enqueue {}", l.int());
         debug_assert!(l != 0, "Null literal is about to be equeued");
         debug_assert!(
             self.trail_lim.is_empty() || cid != 0,
@@ -133,7 +132,6 @@ impl AssignIF for AssignStack {
         self.trail.push(l);
     }
     fn uncheck_assume(&mut self, vars: &mut [Var], elim: &mut Eliminator, l: Lit) {
-        // println!("uncheck_assume {}", l.int());
         self.trail_lim.push(self.trail.len());
         let dl = self.trail_lim.len();
         let v = &mut vars[l.vi()];

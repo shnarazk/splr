@@ -17,7 +17,6 @@ pub struct Eliminator {
     clause_queue: Vec<ClauseId>,
     pub var_queue: Vec<VarId>,
     bwdsub_assigns: usize,
-    // working place
     elim_clauses: Vec<Lit>,
     /// Variables aren't eliminated if they produce a resolvent with a length above this
     /// 0 means no limit.
@@ -184,8 +183,6 @@ impl Eliminator {
         vars: &mut [Var],
     ) -> bool {
         let mut cnt = 0;
-        let mut _subsumed = 0;
-        let mut _deleted_literals = 0;
         debug_assert_eq!(asgs.level(), 0);
         while !self.clause_queue.is_empty() || self.bwdsub_assigns < asgs.len() {
             // Empty subsumption queue and return immediately on user-interrupt:
@@ -244,7 +241,6 @@ impl Eliminator {
                         {
                             match subsume(cps, cid, *di) {
                                 Some(NULL_LIT) => {
-                                    _subsumed += 1;
                                     if cid.to_kind() == ClauseKind::Removable as usize
                                         && di.to_kind() == ClauseKind::Removable as usize
                                     {
@@ -264,13 +260,7 @@ impl Eliminator {
                                       //}
                                 }
                                 Some(l) => {
-                                    cps[di.to_kind()].touched[l as usize] = true;
-                                    cps[di.to_kind()].touched[l.negate() as usize] = true;
-                                    // let xb = &clause_body!(self.cp, *di);
-                                    // println!("BackSubsC    => subsumed {} from {} and {} {:#}", l.int(), cid.fmt(), di.fmt(), xb);
-                                    _deleted_literals += 1;
-                                    // println!("cancel true path");
-                                    // continue;
+                                    // println!("BackSubsC    => subsumed {} from {} and {} {:#}", l.int(), cid.fmt(), di.fmt());
                                     if !strengthen_clause(
                                         cps,
                                         self,
@@ -456,12 +446,10 @@ fn strengthen_clause(
     debug_assert!(1 < clause!(*cps, cid).lits.len());
     cps[cid.to_kind()].touched[l as usize] = true;
     cps[cid.to_kind()].touched[l.negate() as usize] = true;
-    // println!("STRENGTHEN_CLAUSE {}", cid.fmt());
     debug_assert_ne!(cid, NULL_CLAUSE);
     if strengthen(cps, vars, cid, l) {
         debug_assert!(2 == clause!(*cps, cid).lits.len());
         let c0 = clause!(*cps, cid).lits[0];
-        // println!("{} {:?} became a uniclause as c0 {}, l {}", cid.fmt(), vec2int(&clause!(*cp, cid).lits), c0.int(), l.int());
         debug_assert_ne!(c0, l);
         // println!("{} is removed and its first literal {} is enqueued.", cid.fmt(), c0.int());
         cps.remove_clause(cid);
@@ -635,7 +623,6 @@ fn eliminate_var(
         let cid = vars[v].reason;
         debug_assert_eq!(cid, NULL_CLAUSE);
         // println!("- eliminate var: {:>8} (+{:<4} -{:<4}); {:?}", v, (*pos).len(), (*neg).len(), vars[v]);
-        // setDecisionVar(v, false);
         elim.eliminated_vars += 1;
         {
             let tmp = &mut elim.elim_clauses as *mut Vec<Lit>;
@@ -649,7 +636,6 @@ fn eliminate_var(
                     cps[cid.to_kind() as usize].touched[v.lit(LFALSE) as usize] = true;
                 }
                 make_eliminating_unit_clause(&mut (*tmp), v.lit(LTRUE));
-            // println!("eliminate unit clause {}", v.lit(LFALSE).int());
             } else {
                 for cid in &*pos {
                     if clause!(*cps, cid).get_flag(ClauseFlag::Dead) {
@@ -660,7 +646,6 @@ fn eliminate_var(
                     cps[cid.to_kind() as usize].touched[v.lit(LFALSE) as usize] = true;
                 }
                 make_eliminating_unit_clause(&mut (*tmp), v.lit(LFALSE));
-                // println!("eliminate unit clause {}", v.lit(LTRUE).int());
             }
         }
         // Produce clauses in cross product:

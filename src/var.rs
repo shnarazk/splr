@@ -26,7 +26,8 @@ pub struct Var {
 }
 
 /// is the dummy var index.
-pub const NULL_VAR: VarId = 0;
+#[allow(dead_code)]
+const NULL_VAR: VarId = 0;
 
 impl VarIF for Var {
     fn new(i: usize) -> Var {
@@ -148,11 +149,6 @@ impl VarManagement for [Var] {
             *inc *= VAR_ACTIVITY_SCALE2;
         }
     }
-}
-
-pub enum VarOrder {
-    ByActivity,
-    ByOccurence,
 }
 
 /// heap of VarId
