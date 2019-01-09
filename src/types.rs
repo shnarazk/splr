@@ -1,4 +1,5 @@
 //! Basic types
+#![allow(dead_code)]
 use crate::clause::ClauseKind;
 use crate::traits::*;
 use std::fmt;
@@ -108,7 +109,7 @@ pub fn negate_bool(b: Lbool) -> Lbool {
 }
 
 /// Exponential Moving Average pair
-pub struct Ema2 {
+struct Ema2 {
     pub fast: f64,
     pub slow: f64,
     calf: f64,
@@ -146,7 +147,7 @@ impl EmaIF for Ema2 {
     }
 }
 
-pub struct Ema(pub f64, f64, f64);
+struct Ema(pub f64, f64, f64);
 
 /// Exponential Moving Average w/ a calibrator
 impl Ema {
@@ -205,7 +206,7 @@ impl fmt::Display for CNFDescription {
 }
 
 /// formats of state dump
-pub enum DumpMode {
+enum DumpMode {
     NoDump = 0,
     DumpCSVHeader,
     DumpCSV,
