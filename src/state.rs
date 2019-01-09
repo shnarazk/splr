@@ -2,6 +2,7 @@ use crate::assign::AssignStack;
 use crate::clause::{ClauseDB, ClauseKind};
 use crate::config::SolverConfig;
 use crate::eliminator::Eliminator;
+use crate::restart::Ema;
 use crate::traits::*;
 use crate::types::*;
 use crate::var::{Var, VarIdHeap};
@@ -35,10 +36,10 @@ pub struct SolverState {
     pub after_restart: usize,
     pub var_order: VarIdHeap, // Variable Order
     pub stats: Vec<i64>,      // statistics
-    pub ema_asg: Ema_,
-    pub ema_lbd: Ema_,
-    pub b_lvl: Ema_,
-    pub c_lvl: Ema_,
+    pub ema_asg: Ema,
+    pub ema_lbd: Ema,
+    pub b_lvl: Ema,
+    pub c_lvl: Ema,
     pub num_solved_vars: usize,
     pub model: Vec<Lbool>,
     pub conflicts: Vec<Lit>,
@@ -59,10 +60,10 @@ impl SolverStateIF for SolverState {
             after_restart: 0,
             var_order: VarIdHeap::new(nv, nv),
             stats: vec![0; Stat::EndOfStatIndex as usize],
-            ema_asg: Ema_::new(100),
-            ema_lbd: Ema_::new(50),
-            b_lvl: Ema_::new(50_000),
-            c_lvl: Ema_::new(50_000),
+            ema_asg: Ema::new(3500),
+            ema_lbd: Ema::new(50),
+            b_lvl: Ema::new(50_000),
+            c_lvl: Ema::new(50_000),
             num_solved_vars: 0,
             model: vec![BOTTOM; nv + 1],
             conflicts: vec![],

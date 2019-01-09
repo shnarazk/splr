@@ -102,10 +102,12 @@ pub trait EliminatorIF {
 }
 
 pub trait EmaIF {
-    /// returns an EMA value
+    fn new(f: usize) -> Self;
     fn get(&self) -> f64;
+    fn rate(&self) -> f64 {
+        0.0
+    }
     fn update(&mut self, x: f64);
-    /// reset (equalize) both values
     fn reset(&mut self);
 }
 
