@@ -129,13 +129,6 @@ pub trait Propagate {
     ) -> ClauseId;
 }
 
-/// For VecDeque<usize>
-pub trait QueueOperations {
-    fn average(&self) -> f64;
-    fn enqueue(&mut self, lim: usize, x: usize) -> bool;
-    fn is_full(&self, lim: usize) -> bool;
-}
-
 pub trait RestartIF {
     fn block_restart(&mut self, asgs: &AssignStack, config: &SolverConfig, ncnfl: usize) -> bool;
     fn force_restart(&mut self, config: &mut SolverConfig, ncnfl: &mut f64) -> bool;
@@ -152,7 +145,6 @@ pub trait SatSolver {
 
 pub trait SolverStateIF {
     fn new(nv: usize, se: i32, fname: &str) -> SolverState;
-    // print a progress report
     fn progress(
         &mut self,
         asgs: &AssignStack,

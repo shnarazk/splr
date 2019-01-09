@@ -9,6 +9,12 @@ const RESET_EMA: u64 = 400;
 const LBD_QUEUE_LEN: usize = 50;
 const TRAIL_QUEUE_LEN: usize = 5000;
 
+trait QueueOperations {
+    fn average(&self) -> f64;
+    fn enqueue(&mut self, lim: usize, x: usize) -> bool;
+    fn is_full(&self, lim: usize) -> bool;
+}
+
 impl QueueOperations for VecDeque<usize> {
     #[inline(always)]
     fn average(&self) -> f64 {
