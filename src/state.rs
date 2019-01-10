@@ -62,8 +62,8 @@ impl SolverStateIF for SolverState {
             stats: vec![0; Stat::EndOfStatIndex as usize],
             ema_asg: Ema::new(config.restart_asg_len),
             ema_lbd: Ema::new(config.restart_lbd_len),
-            b_lvl: Ema::new(50_000),
-            c_lvl: Ema::new(50_000),
+            b_lvl: Ema::new(5_000),
+            c_lvl: Ema::new(5_000),
             num_solved_vars: 0,
             model: vec![BOTTOM; nv + 1],
             conflicts: vec![],
@@ -103,8 +103,9 @@ impl SolverStateIF for SolverState {
             asgs.num_at(0)
         };
         let sum = fixed + elim.eliminated_vars;
-        let good = -1;
         //let learnts = &cp[ClauseKind::Removable as usize];
+        let good = self.stats[Stat::NumLBD2 as usize] as f64
+            / self.stats[Stat::Conflict as usize] as f64;
         // let good = learnts
         //     .head
         //     .iter()
@@ -143,7 +144,7 @@ impl SolverStateIF for SolverState {
                     (sum as f32) / (nv as f32) * 100.0,
                 );
                 println!(
-                    "   Clause DB|Remv:{:>9}, good:{:>9}, Perm:{:>9}, Binc:{:>9} ",
+                    " Clause Kind|Remv:{:>9}, good:{:>9.4}, Perm:{:>9}, Binc:{:>9} ",
                     cp[ClauseKind::Removable as usize].count(true),
                     good,
                     cp[ClauseKind::Permanent as usize].count(true),
@@ -157,17 +158,17 @@ impl SolverStateIF for SolverState {
                     self.ema_lbd.get() / ave,
                 );
                 println!(
-                    " Decision Lv|aLBD:{:>9.2}, bjmp:{:>9.2}, cnfl:{:>9.2} |#rdc:{:>9} ",
+                    "   Conflicts|aLBD:{:>9.2}, bjmp:{:>9.2}, cnfl:{:>9.2} |#cls:{:>9} ",
                     self.ema_lbd.get(),
                     self.b_lvl.get(),
                     self.c_lvl.get(),
-                    self.stats[Stat::Reduction as usize],
+                    elim.clause_queue_len(),
                 );
                 println!(
-                    "  Eliminator|#cls:{:>9}, #var:{:>9},   Clause DB mgr|#smp:{:>9} ",
-                    elim.clause_queue_len(),
-                    elim.var_queue_len(),
+                    "   Clause DB|#smp:{:>9}, #smp:{:>9},      Eliminator|#var:{:>9} ",
+                    self.stats[Stat::Reduction as usize],
                     self.stats[Stat::Simplification as usize],
+                    elim.var_queue_len(),
                 );
             }
         } else if mes == Some("") {
