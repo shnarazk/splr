@@ -25,9 +25,12 @@ impl EmaIF for Ema {
 impl RestartIF for SolverState {
     fn block_restart(&mut self, asgs: &AssignStack, config: &SolverConfig, ncnfl: usize) -> bool {
         let nas = asgs.len();
+        // let _count = self.stats[Stat::Conflict as usize] as usize;
+        // let _ave = self.sum_asg / count as f64 * config.num_vars as f64;
         if 100 < ncnfl
             && RESTART_PERIOD <= self.after_restart
             && config.restart_blk * self.ema_asg.get() < nas as f64
+        //    || config.restart_blk * ave < nas as f64
         {
             self.after_restart = 0;
             self.stats[Stat::BlockRestart as usize] += 1;
@@ -69,8 +72,9 @@ impl RestartIF for SolverState {
         self.after_restart += 1;
     }
     #[inline(always)]
-    fn restart_update_asg(&mut self, n: usize) {
+    fn restart_update_asg(&mut self, _config: &SolverConfig, n: usize) {
         self.ema_asg.update(n as f64);
+        // self.sum_asg += n as f64 / config.num_vars as f64;
     }
     #[inline(always)]
     fn restart_update_luby(&mut self, config: &mut SolverConfig) {

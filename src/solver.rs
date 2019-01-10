@@ -447,7 +447,7 @@ fn handle_conflict_path(
     if tn_confl % 5000 == 0 && config.var_decay < config.var_decay_max {
         config.var_decay += 0.01;
     }
-    state.restart_update_asg(asgs.len());
+    state.restart_update_asg(config, asgs.len());
     // DYNAMIC BLOCKING RESTART
     state.block_restart(asgs, config, tn_confl);
     let mut new_learnt: Vec<Lit> = Vec::new();

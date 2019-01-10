@@ -128,7 +128,7 @@ pub trait RestartIF {
     fn block_restart(&mut self, asgs: &AssignStack, config: &SolverConfig, ncnfl: usize) -> bool;
     fn force_restart(&mut self, config: &mut SolverConfig, ncnfl: &mut f64) -> bool;
     fn restart_update_lbd(&mut self, lbd: usize);
-    fn restart_update_asg(&mut self, n: usize);
+    fn restart_update_asg(&mut self, config: &SolverConfig, n: usize);
     fn restart_update_luby(&mut self, config: &mut SolverConfig);
 }
 
