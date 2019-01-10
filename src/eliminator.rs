@@ -210,7 +210,7 @@ impl Eliminator {
                     if (*ch).get_flag(ClauseFlag::Dead) || BACKWORD_SUBSUMPTION_THRESHOLD < cnt {
                         continue;
                     }
-                    let mut tmp = 1_000_000;
+                    let mut tmp = 40;
                     for l in &(*ch).lits {
                         let v = &vars[l.vi()];
                         let nsum = v.pos_occurs.len().min(v.neg_occurs.len());
