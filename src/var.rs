@@ -101,7 +101,7 @@ impl VarManagement for [Var] {
         ch: &mut Clause,
         ignorable: bool,
     ) {
-        if !elim.use_elim {
+        if !elim.in_use {
             return;
         }
         for l in &ch.lits {
@@ -121,17 +121,15 @@ impl VarManagement for [Var] {
     }
     fn detach_clause(&mut self, elim: &mut Eliminator, cid: ClauseId, ch: &Clause) {
         debug_assert!(ch.get_flag(ClauseFlag::Dead));
-        if elim.use_elim {
+        if elim.in_use {
             for l in &ch.lits {
                 let v = &mut self[l.vi()];
                 if !v.eliminated {
-                    // let xx = v.pos_occurs.len() + v.neg_occurs.len();
                     if l.positive() {
                         v.pos_occurs.retain(|&cj| cid != cj);
                     } else {
                         v.neg_occurs.retain(|&cj| cid != cj);
                     }
-                    // let xy = v.pos_occurs.len() + v.neg_occurs.len();
                     elim.enqueue_var(v);
                 }
             }

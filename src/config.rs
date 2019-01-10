@@ -55,6 +55,8 @@ pub struct SolverConfig {
     /// For block restart based on average assigments: 1.40.
     /// This is called `R` in Glucose
     pub restart_blk: f64,
+    pub restart_asg_len: usize,
+    pub restart_lbd_len: usize,
     pub restart_expansion: f64,
     pub restart_step: f64,
     pub luby_restart: bool,
@@ -87,8 +89,10 @@ impl Default for SolverConfig {
             glureduce: true,
             inc_reduce_db: 300,
             inc_reduce_db_extra: 1000,
-            restart_thr: 0.80,
+            restart_thr: 0.75,
             restart_blk: 1.40,
+            restart_asg_len: 3500,
+            restart_lbd_len: 50,
             restart_expansion: 1.15,
             restart_step: 100.0,
             luby_restart: false,

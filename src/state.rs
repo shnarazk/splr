@@ -51,7 +51,7 @@ pub struct SolverState {
 }
 
 impl SolverStateIF for SolverState {
-    fn new(nv: usize, _se: i32, fname: &str) -> SolverState {
+    fn new(config: &SolverConfig, nv: usize, _se: i32, fname: &str) -> SolverState {
         SolverState {
             ok: true,
             next_reduction: 1000,
@@ -60,8 +60,8 @@ impl SolverStateIF for SolverState {
             after_restart: 0,
             var_order: VarIdHeap::new(nv, nv),
             stats: vec![0; Stat::EndOfStatIndex as usize],
-            ema_asg: Ema::new(3500),
-            ema_lbd: Ema::new(50),
+            ema_asg: Ema::new(config.restart_asg_len),
+            ema_lbd: Ema::new(config.restart_lbd_len),
             b_lvl: Ema::new(50_000),
             c_lvl: Ema::new(50_000),
             num_solved_vars: 0,

@@ -9,7 +9,7 @@ use crate::var::Var;
 /// Literal eliminator
 pub struct Eliminator {
     pub eliminated_vars: usize,
-    pub use_elim: bool,
+    pub in_use: bool,
     pub use_simplification: bool,
     pub last_invocatiton: usize,
     next_invocation: usize,
@@ -33,7 +33,7 @@ const CLAUSE_QUEUE_THRESHOD: usize = 1_000_000; // 1_000;
 const VAR_QUEUE_THRESHOLD: usize = 3_200_000;
 
 impl EliminatorIF for Eliminator {
-    fn new(use_elim: bool) -> Eliminator {
+    fn new(in_use: bool) -> Eliminator {
         Eliminator {
             merges: 0,
             var_queue: Vec::new(),
@@ -42,7 +42,7 @@ impl EliminatorIF for Eliminator {
             elim_clauses: Vec::new(),
             clause_lim: 20,
             eliminated_vars: 0,
-            use_elim,
+            in_use,
             use_simplification: true,
             subsumption_lim: 0,
             last_invocatiton: 0,
@@ -52,7 +52,7 @@ impl EliminatorIF for Eliminator {
         }
     }
     fn enqueue_clause(&mut self, cid: ClauseId, ch: &mut Clause) {
-        if !self.use_elim || self.clause_queue_threshold == 0 {
+        if !self.in_use || self.clause_queue_threshold == 0 {
             return;
         }
         let rank = ch.rank as f64;
@@ -70,7 +70,7 @@ impl EliminatorIF for Eliminator {
         }
     }
     fn enqueue_var(&mut self, v: &mut Var) {
-        if self.use_elim && 0 < self.var_queue_threshold && !v.enqueued {
+        if self.in_use && 0 < self.var_queue_threshold && !v.enqueued {
             self.var_queue.push(v.index);
             v.enqueued = true;
             self.var_queue_threshold -= 1;
@@ -91,7 +91,7 @@ impl EliminatorIF for Eliminator {
         state: &mut SolverState,
         vars: &mut [Var],
     ) {
-        if !self.use_elim {
+        if !self.in_use {
             return;
         }
         if self.next_invocation < self.var_queue.len() {
@@ -373,7 +373,7 @@ fn check_eliminator(cps: &ClauseDB, vars: &[Var]) -> bool {
         ClauseKind::Permanent,
     ] {
         for (ci, ch) in cps[*kind as usize].head.iter().enumerate().skip(1) {
-            let cid = kind.id_from(ci);
+            let cid = ClauseId::from_(*kind, ci);
             if ch.get_flag(ClauseFlag::Dead) {
                 continue;
             }

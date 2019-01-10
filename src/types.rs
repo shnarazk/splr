@@ -83,7 +83,7 @@ impl LitIF for Lit {
         self ^ 1
     }
     fn as_uniclause(self) -> ClauseId {
-        ClauseKind::Uniclause.id_from(self as usize)
+        ClauseId::from_(ClauseKind::Uniclause, self as usize)
     }
 }
 

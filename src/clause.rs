@@ -38,17 +38,14 @@ impl ClauseKind {
     }
 }
 
-impl ClauseKindIF for ClauseKind {
-    #[inline(always)]
-    fn id_from(self, cix: ClauseIndex) -> ClauseId {
-        cix | self.tag()
-    }
-}
-
 /// Clause Index, not ID because it's used only within a Vec<Clause>
 pub type ClauseIndex = usize;
 
 impl ClauseIdIF for ClauseId {
+    #[inline(always)]
+    fn from_(kind: ClauseKind, cix: ClauseIndex) -> ClauseId {
+        kind.tag() | cix
+    }
     #[inline(always)]
     fn to_index(&self) -> ClauseIndex {
         *self & CLAUSE_INDEX_MASK
@@ -294,7 +291,7 @@ impl ClausePartitionIF for ClausePartition {
             // the recycled clause is DEAD and EMPTY
             if ch.get_flag(ClauseFlag::Dead) && !ch.lits.is_empty() {
                 recycled.push(Watch::new(NULL_LIT, ci));
-                if elim.use_elim {
+                if elim.in_use {
                     for l in &ch.lits {
                         let vi = l.vi();
                         let v = &mut vars[vi];
@@ -346,7 +343,7 @@ impl ClausePartitionIF for ClausePartition {
             self.watcher[w0].attach(l1, cix);
             self.watcher[w1].attach(l0, cix);
         };
-        self.kind.id_from(cix)
+        ClauseId::from_(self.kind, cix)
     }
     fn reset_lbd(&mut self, vars: &[Var], temp: &mut [usize]) {
         let mut key = temp[0];
@@ -439,7 +436,7 @@ impl ClauseDBIF for ClauseDB {
             }
         }
         v.swap(1, i_max);
-        let kind = if lbd == 0 && elim.use_elim {
+        let kind = if lbd == 0 && elim.in_use {
             ClauseKind::Permanent
         } else if v.len() == 2 {
             ClauseKind::Binclause
@@ -480,7 +477,7 @@ impl ClauseDBIF for ClauseDB {
         } = &mut self[ClauseKind::Removable as usize];
         let mut perm = Vec::with_capacity(head.len());
         for (i, b) in head.iter().enumerate().skip(1) {
-            if !b.get_flag(ClauseFlag::Dead) && !vars.locked(b, ClauseKind::Removable.id_from(i)) {
+            if !b.get_flag(ClauseFlag::Dead) && !vars.locked(b, ClauseId::from_(ClauseKind::Removable,i)) {
                 perm.push(i);
             }
         }
@@ -520,7 +517,7 @@ impl ClauseDBIF for ClauseDB {
                 v.reason = NULL_CLAUSE;
             }
         }
-        if elim.use_elim
+        if elim.in_use
         // && state.stats[Stat::Simplification as usize] % 8 == 0
         // && state.elim.last_invocatiton < self.stats[Stat::Reduction as usize] as usize
         {
@@ -538,7 +535,7 @@ impl ClauseDBIF for ClauseDB {
                         debug_assert!(ch.lits[0] != 0 && ch.lits[1] != 0);
                         ck.touched[ch.lits[0].negate() as usize] = true;
                         ck.touched[ch.lits[1].negate() as usize] = true;
-                        if elim.use_elim {
+                        if elim.in_use {
                             for l in &ch.lits {
                                 let v = &mut (*vars)[l.vi()];
                                 if !v.eliminated {

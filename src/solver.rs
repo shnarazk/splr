@@ -50,12 +50,13 @@ impl Solver {
         let path = &cnf.pathname;
         let (_fe, se) = config.ema_coeffs;
         let sve = config.use_sve;
+        let state = SolverState::new(&config, nv, se, &path.to_string());
         Solver {
             asgs: AssignStack::new(nv),
             config,
             cps: ClauseDB::new(nv, nc),
             elim: Eliminator::new(sve),
-            state: SolverState::new(nv, se, &path.to_string()),
+            state,
             vars: Var::new_vars(nv),
         }
     }
@@ -78,9 +79,9 @@ impl SatSolver for Solver {
         // s.root_level = 0;
         state.num_solved_vars = asgs.len();
         state.progress(asgs, config, cps, elim, vars, Some(""));
-        // elim.use_elim = true;
+        // elim.in_use = true;
         elim.var_queue.clear();
-        if elim.use_elim {
+        if elim.in_use {
             for v in &mut vars[1..] {
                 debug_assert!(!v.eliminated);
                 debug_assert!(!asgs.trail.contains(&v.index.lit(LTRUE)));
@@ -101,7 +102,7 @@ impl SatSolver for Solver {
             state.progress(asgs, config, cps, elim, vars, Some("load"));
         }
         // config.use_sve = false;
-        // elim.use_elim = false;
+        // elim.in_use = false;
         state.stats[Stat::Simplification as usize] += 1;
         if search(asgs, config, cps, elim, state, vars) {
             if !state.ok {
@@ -118,7 +119,7 @@ impl SatSolver for Solver {
                     _ => result.push(0),
                 }
             }
-            if elim.use_elim {
+            if elim.in_use {
                 elim.extend_model(&mut result);
             }
             asgs.cancel_until(vars, &mut state.var_order, 0);
@@ -133,7 +134,7 @@ impl SatSolver for Solver {
     }
 
     /// builds and returns a configured solver.
-    fn build(path: &str) -> (Solver, CNFDescription) {
+    fn build(mut cfg: SolverConfig, path: &str) -> (Solver, CNFDescription) {
         let mut rs = BufReader::new(fs::File::open(path).unwrap());
         let mut buf = String::new();
         let mut nv: usize = 0;
@@ -163,7 +164,7 @@ impl SatSolver for Solver {
             num_of_clauses: nc,
             pathname: path.to_string(),
         };
-        let mut cfg = SolverConfig::default();
+        //let mut cfg = SolverConfig::default();
         cfg.num_vars = nv;
         let mut s: Solver = Solver::new(cfg, &cnf);
         loop {
@@ -292,9 +293,9 @@ impl Propagate for AssignStack {
                             if first_value == LFALSE {
                                 self.catchup();
                                 // println!("conflict by {} {:?}", kind.id_from(w.c).fmt(), vec2int(&lits));
-                                return kind.id_from(w.c);
+                                return ClauseId::from_(*kind, w.c);
                             } else {
-                                self.uncheck_enqueue(vars, first, kind.id_from(w.c));
+                                self.uncheck_enqueue(vars, first, ClauseId::from_(*kind, w.c));
                             }
                         }
                         n += 1;
@@ -362,9 +363,9 @@ fn propagate_fast(
                         if first_value == LFALSE {
                             asgs.catchup();
                             // println!("conflict by {} {:?}", kind.id_from(w.c).fmt(), vec2int(&lits));
-                            return kind.id_from(w.c);
+                            return ClauseId::from_(*kind, w.c);
                         } else {
-                            asgs.uncheck_enqueue(vars, first, kind.id_from(w.c));
+                            asgs.uncheck_enqueue(vars, first, ClauseId::from_(*kind, w.c));
                         }
                     }
                     n += 1;

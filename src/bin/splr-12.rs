@@ -1,4 +1,5 @@
 // SAT solver for Propositional Logic in Rust
+use splr::config::SolverConfig;
 use splr::solver::{Certificate, Solver};
 use splr::traits::SatSolver;
 use std::fs::File;
@@ -13,18 +14,28 @@ use structopt::StructOpt;
     about = "SAT solver for Propositional Logic in Rust, Technology Preview 12"
 )]
 struct CLOpts {
+    /// EMA coefficient for number of assignments
+    #[structopt(long = "ra", default_value = "3500")]
+    restart_asg_samples: usize,
+    /// EMA coefficient for learnt clause LBD
+    #[structopt(long = "rl", default_value = "50")]
+    restart_lbd_samples: usize,
     /// K in Glucose, for restart
-    #[structopt(long = "rt", short = "K", default_value = "0.8")]
+    #[structopt(long = "rt", default_value = "0.75")]
     restart_threshold: f64,
     /// R in Glucose, for blocking
-    #[structopt(long = "rb", short = "R", default_value = "1.40")]
+    #[structopt(long = "rb", default_value = "1.40")]
     restart_blocking: f64,
+    /// Dump progress report in another format
     #[structopt(long = "no-tty", short = "t")]
     no_tty: bool,
+    /// Don't use clause/variable eliminator
     #[structopt(long = "no-elim", short = "e")]
     no_elim: bool,
+    /// Don't use dynamic strategy adaptation
     #[structopt(long = "no-adaptation", short = "a")]
     no_adapt: bool,
+    /// a CNF file to solve
     #[structopt(parse(from_os_str))]
     cnf: std::path::PathBuf,
 }
@@ -32,17 +43,20 @@ struct CLOpts {
 fn main() {
     let args = CLOpts::from_args();
     if args.cnf.exists() {
-        let (mut s, _cnf) = Solver::build(&args.cnf.to_str().unwrap());
-        let result = format!(".ans_{}", args.cnf.file_name().unwrap().to_str().unwrap());
+        let mut config = SolverConfig::default();
+        config.adapt_strategy = !args.no_adapt;
+        config.restart_thr = args.restart_threshold;
+        config.restart_blk = args.restart_blocking;
+        config.restart_asg_len = args.restart_asg_samples;
+        config.restart_lbd_len = args.restart_lbd_samples;
         if args.no_tty {
-            s.config.use_tty = false;
+            config.use_tty = false;
         }
         if args.no_elim {
-            s.elim.use_elim = false;
+            config.use_sve = false;
         }
-        s.config.adapt_strategy = !args.no_adapt;
-        s.config.restart_thr = args.restart_threshold;
-        s.config.restart_blk = args.restart_blocking;
+        let (mut s, _cnf) = Solver::build(config, &args.cnf.to_str().unwrap());
+        let result = format!(".ans_{}", args.cnf.file_name().unwrap().to_str().unwrap());
         match s.solve() {
             Ok(Certificate::SAT(v)) => {
                 if let Ok(out) = File::create(&result) {

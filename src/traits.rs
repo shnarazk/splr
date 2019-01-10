@@ -55,11 +55,8 @@ pub trait ClauseDBIF {
     ) -> bool;
 }
 
-pub trait ClauseKindIF {
-    fn id_from(self, cix: ClauseIndex) -> ClauseId;
-}
-
 pub trait ClauseIdIF {
+    fn from_(kind: ClauseKind, cix: ClauseIndex) -> Self;
     fn to_index(&self) -> ClauseIndex;
     fn to_kind(&self) -> usize;
     fn is(&self, kind: ClauseKind, ix: ClauseIndex) -> bool;
@@ -136,13 +133,13 @@ pub trait RestartIF {
 }
 
 pub trait SatSolver {
-    fn build(path: &str) -> (Solver, CNFDescription);
+    fn build(config: SolverConfig, path: &str) -> (Solver, CNFDescription);
     fn solve(&mut self) -> SolverResult;
     fn add_unchecked_clause(&mut self, v: &mut Vec<Lit>) -> Option<ClauseId>;
 }
 
 pub trait SolverStateIF {
-    fn new(nv: usize, se: i32, fname: &str) -> SolverState;
+    fn new(config: &SolverConfig, nv: usize, se: i32, fname: &str) -> SolverState;
     fn progress(
         &mut self,
         asgs: &AssignStack,
