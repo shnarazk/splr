@@ -153,10 +153,8 @@ impl SolverStateIF for SolverState {
                     "     Restart|#BLK:{:>9}, #RST:{:>9}, emaASG:{:>7.2}, emaLBD:{:>7.2} ",
                     self.stats[Stat::BlockRestart as usize],
                     self.stats[Stat::Restart as usize],
-                    //self.ema_asg.get(),
-                    asgs.len() as f64 / self.ema_asg.get(),
-                    // self.ema_lbd.get(),
-                    ave / self.ema_lbd.get(),
+                    self.ema_asg.get() / asgs.len() as f64,
+                    self.ema_lbd.get() / ave,
                 );
                 println!(
                     " Decision Lv|aLBD:{:>9.2}, bjmp:{:>9.2}, cnfl:{:>9.2} |#rdc:{:>9} ",
