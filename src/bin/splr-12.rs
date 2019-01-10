@@ -27,8 +27,8 @@ struct CLOpts {
     #[structopt(long = "rb", default_value = "1.40")]
     restart_blocking: f64,
     /// Dump progress report in another format
-    #[structopt(long = "no-tty", short = "t")]
-    no_tty: bool,
+    #[structopt(long = "--log", short = "l")]
+    use_log: bool,
     /// Don't use clause/variable eliminator
     #[structopt(long = "no-elim", short = "e")]
     no_elim: bool,
@@ -49,9 +49,7 @@ fn main() {
         config.restart_blk = args.restart_blocking;
         config.restart_asg_len = args.restart_asg_samples;
         config.restart_lbd_len = args.restart_lbd_samples;
-        if args.no_tty {
-            config.use_tty = false;
-        }
+        config.progress_log = args.use_log;
         if args.no_elim {
             config.use_sve = false;
         }

@@ -112,7 +112,7 @@ impl SolverStateIF for SolverState {
         //     .skip(1)
         //     .filter(|c| !c.get_flag(ClauseFlag::Dead) && c.rank <= 3)
         //     .count();
-        if config.use_tty {
+        if !config.progress_log {
             if mes == Some("") {
                 println!("{}", self);
                 println!();

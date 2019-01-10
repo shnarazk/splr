@@ -66,7 +66,7 @@ pub struct SolverConfig {
     pub luby_restart_factor: f64,
     /// MISC
     pub use_sve: bool,
-    pub use_tty: bool,
+    pub progress_log: bool,
     // dump stats data during solving
     // pub dump_solver_stat_mode: i32,
 }
@@ -102,7 +102,7 @@ impl Default for SolverConfig {
             luby_restart_factor: 100.0,
             ema_coeffs: (2 ^ 5, 2 ^ 15),
             use_sve: true,
-            use_tty: true,
+            progress_log: false,
             // dump_solver_stat_mode: 0,
         }
     }
