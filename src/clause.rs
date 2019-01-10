@@ -350,7 +350,7 @@ impl ClausePartitionIF for ClausePartition {
                 flags: 0,
                 lits,
                 rank,
-                activity: 1.0,
+                activity: 0.0,
             });
             self.watcher[w0].attach(l1, cix);
             self.watcher[w1].attach(l0, cix);
