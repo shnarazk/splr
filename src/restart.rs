@@ -13,14 +13,13 @@ impl EmaIF for Ema {
     fn new(s: usize) -> Ema {
         Ema(0.0, 1.0 / (s as f64), 0.0)
     }
-    fn get(&self) -> f64 {
-        self.0 / self.2
-    }
     fn update(&mut self, x: f64) {
         self.0 = self.1 * x + (1.0 - self.1) * self.0;
         self.2 = self.1 + (1.0 - self.1) * self.2;
     }
-    fn reset(&mut self) { }
+    fn get(&self) -> f64 {
+        self.0 / self.2
+    }
 }
 
 impl RestartIF for SolverState {
@@ -132,9 +131,6 @@ impl EmaIF for Ema2 {
     fn get(&self) -> f64 {
         self.fast / self.calf
     }
-    fn rate(&self) -> f64 {
-        self.fast / self.slow * (self.cals / self.calf)
-    }
     fn update(&mut self, x: f64) {
         self.fast = self.fe * x + (1.0 - self.fe) * self.fast;
         self.slow = self.se * x + (1.0 - self.se) * self.slow;
@@ -148,6 +144,10 @@ impl EmaIF for Ema2 {
 }
 
 impl Ema2 {
+    #[allow(dead_code)]
+    fn rate(&self) -> f64 {
+        self.fast / self.slow * (self.cals / self.calf)
+    }
     #[allow(dead_code)]
     fn with_slow(mut self, s: u64) -> Ema2 {
         self.se = 1.0 / (s as f64);

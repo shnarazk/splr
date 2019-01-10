@@ -104,11 +104,8 @@ pub trait EliminatorIF {
 pub trait EmaIF {
     fn new(f: usize) -> Self;
     fn get(&self) -> f64;
-    fn rate(&self) -> f64 {
-        0.0
-    }
+    fn reset(&mut self) { }
     fn update(&mut self, x: f64);
-    fn reset(&mut self);
 }
 
 pub trait LitIF {
