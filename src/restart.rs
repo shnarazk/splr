@@ -86,9 +86,9 @@ impl RestartIF for SolverState {
     }
 }
 
+/// Find the finite subsequence that contains index 'x', and the
+/// size of that subsequence:
 fn luby(y: f64, mut x: usize) -> f64 {
-    // Find the finite subsequence that contains index 'x', and the
-    // size of that subsequence:
     let mut size: usize = 1;
     let mut seq: usize = 0;
     // for(size = 1, seq = 0; size < x + 1; seq++, size = 2 * size + 1);
