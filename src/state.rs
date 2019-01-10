@@ -104,8 +104,8 @@ impl SolverStateIF for SolverState {
         };
         let sum = fixed + elim.eliminated_vars;
         //let learnts = &cp[ClauseKind::Removable as usize];
-        let good = self.stats[Stat::NumLBD2 as usize] as f64
-            / self.stats[Stat::Conflict as usize] as f64;
+        let good =
+            self.stats[Stat::NumLBD2 as usize] as f64 / self.stats[Stat::Conflict as usize] as f64;
         // let good = learnts
         //     .head
         //     .iter()

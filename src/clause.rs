@@ -489,7 +489,9 @@ impl ClauseDBIF for ClauseDB {
         } = &mut self[ClauseKind::Removable as usize];
         let mut perm = Vec::with_capacity(head.len());
         for (i, b) in head.iter().enumerate().skip(1) {
-            if !b.get_flag(ClauseFlag::Dead) && !vars.locked(b, ClauseId::from_(ClauseKind::Removable,i)) {
+            if !b.get_flag(ClauseFlag::Dead)
+                && !vars.locked(b, ClauseId::from_(ClauseKind::Removable, i))
+            {
                 perm.push(i);
             }
         }

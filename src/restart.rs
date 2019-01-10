@@ -48,8 +48,7 @@ impl RestartIF for SolverState {
         if (config.luby_restart && config.luby_restart_num_conflict <= *ncnfl)
             || (!config.luby_restart
                 && RESTART_PERIOD <= self.after_restart
-                && ave < self.ema_lbd.get() * config.restart_thr
-            )
+                && ave < self.ema_lbd.get() * config.restart_thr)
         {
             self.stats[Stat::Restart as usize] += 1;
             self.after_restart = 0;

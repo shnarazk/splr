@@ -49,7 +49,7 @@ pub struct SolverConfig {
     pub inc_reduce_db_extra: usize,
     pub ema_coeffs: (i32, i32),
     /// RESTART
-    /// For force restart based on average LBD of newly generated clauses: 1.15.
+    /// For force restart based on average LBD of newly generated clauses: 0.80.
     /// This is called `K` in Glusoce
     pub restart_thr: f64,
     /// For block restart based on average assigments: 1.40.
