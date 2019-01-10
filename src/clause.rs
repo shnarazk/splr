@@ -76,6 +76,15 @@ pub struct Watch {
     pub c: ClauseId,
 }
 
+impl Default for Watch {
+    fn default() -> Watch {
+        Watch {
+            blocker: NULL_LIT,
+            c: NULL_CLAUSE,
+        }
+    }
+}
+
 impl Watch {
     fn new(blocker: Lit, c: ClauseId) -> Watch {
         Watch { blocker, c }
@@ -85,10 +94,7 @@ impl Watch {
 impl WatchManagement for Vec<Watch> {
     fn initialize(mut self, n: usize) -> Self {
         if 2 <= n {
-            self.push(Watch {
-                blocker: NULL_LIT,
-                c: 0,
-            });
+            self.push(Watch::default());
         }
         self
     }
@@ -142,6 +148,17 @@ pub struct Clause {
     pub activity: f64,
     /// collection of bits
     flags: u16,
+}
+
+impl Default for Clause {
+    fn default() -> Clause {
+        Clause {
+            flags: 0,
+            lits: vec![],
+            rank: 0,
+            activity: 0.0,
+        }
+    }
 }
 
 impl ClauseIF for Clause {
@@ -244,12 +261,7 @@ pub struct ClausePartition {
 impl ClausePartitionIF for ClausePartition {
     fn build(kind: ClauseKind, nv: usize, nc: usize) -> ClausePartition {
         let mut head = Vec::with_capacity(1 + nc);
-        head.push(Clause {
-            flags: 0,
-            lits: vec![],
-            rank: 0,
-            activity: 0.0,
-        });
+        head.push(Clause::default());
         let mut watcher = Vec::with_capacity(2 * (nv + 1));
         let mut touched = Vec::with_capacity(2 * (nv + 1));
         for i in 0..2 * (nv + 1) {
