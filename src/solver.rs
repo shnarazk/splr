@@ -327,20 +327,21 @@ fn propagate_fast(
                 let source = &mut (*watcher)[p];
                 let mut n = 1;
                 'next_clause: while n <= source.count() {
-                    let w = &mut source[n];
+                    let w = source.get_unchecked_mut(n);
                     // if head[w.c].get_flag(ClauseFlag::Dead) {
                     //     source.detach(n);
                     //     continue 'next_clause;
                     // }
                     // debug_assert!(!vars[w.blocker.vi()].eliminated); it doesn't hold in TP12
                     if vars.assigned(w.blocker) != LTRUE {
-                        let Clause { ref mut lits, .. } = &mut head[w.c];
+                        let Clause { ref mut lits, .. } = head.get_unchecked_mut(w.c);
                         debug_assert!(2 <= lits.len());
                         debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
-                        if lits[0] == false_lit {
+                        let mut first = *lits.get_unchecked(0);
+                        if first == false_lit {
                             lits.swap(0, 1); // now false_lit is lits[1].
+                            first = *lits.get_unchecked(0);
                         }
-                        let first = lits[0];
                         let first_value = vars.assigned(first);
                         // If 0th watch is true, then clause is already satisfied.
                         if first != w.blocker && first_value == LTRUE {
@@ -350,7 +351,7 @@ fn propagate_fast(
                         }
                         for (k, lk) in lits.iter().enumerate().skip(2) {
                             // below is equivalent to 'assigned(lk) != LFALSE'
-                            if (((lk & 1) as u8) ^ vars[lk.vi()].assign) != 0 {
+                            if (((lk & 1) as u8) ^ vars.get_unchecked(lk.vi()).assign) != 0 {
                                 (*watcher)[lk.negate() as usize].attach(first, w.c);
                                 source.detach(n);
                                 lits[1] = *lk;
@@ -358,12 +359,12 @@ fn propagate_fast(
                                 continue 'next_clause;
                             }
                         }
+                        let cid = ClauseId::from_(*kind, w.c);
                         if first_value == LFALSE {
                             asgs.catchup();
-                            // println!("conflict by {} {:?}", kind.id_from(w.c).fmt(), vec2int(&lits));
-                            return ClauseId::from_(*kind, w.c);
+                            return cid;
                         } else {
-                            asgs.uncheck_enqueue(vars, first, ClauseId::from_(*kind, w.c));
+                            asgs.uncheck_enqueue(vars, first, cid);
                         }
                     }
                     n += 1;

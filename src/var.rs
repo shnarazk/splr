@@ -60,7 +60,7 @@ impl VarIF for Var {
 
 impl VarManagement for [Var] {
     fn assigned(&self, l: Lit) -> Lbool {
-        self[l.vi()].assign ^ ((l & 1) as u8)
+        unsafe { self.get_unchecked(l.vi()).assign ^ ((l & 1) as u8) }
     }
     fn locked(&self, ch: &Clause, cid: ClauseId) -> bool {
         let lits = &ch.lits;

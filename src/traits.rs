@@ -8,7 +8,7 @@ use crate::types::{CNFDescription, ClauseId, Lbool, Lit, VarId};
 use crate::var::{Var, VarIdHeap};
 
 pub trait AssignIF {
-    fn new(n: usize) -> AssignStack;
+    fn new(n: usize) -> Self;
     fn len(&self) -> usize;
     fn is_empty(&self) -> bool;
     fn level(&self) -> usize;

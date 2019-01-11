@@ -549,7 +549,7 @@ fn make_eliminated_clause(cps: &mut ClauseDB, vec: &mut Vec<Lit>, vi: VarId, cid
     let ch = clause!(cps, cid);
     debug_assert!(!ch.lits.is_empty());
     for l in &ch.lits {
-        vec.push(*l as u32);
+        vec.push(*l as Lit);
         if l.vi() == vi {
             let index = vec.len() - 1;
             debug_assert_eq!(vec[index], *l);
