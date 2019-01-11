@@ -49,13 +49,14 @@ impl Solver {
         let nc = cnf.num_of_clauses as usize;
         let path = &cnf.pathname;
         let (_fe, se) = config.ema_coeffs;
-        let sve = config.use_sve;
+        let mut elim = Eliminator::default();
+        elim.in_use = config.use_sve;
         let state = SolverState::new(&config, nv, se, &path.to_string());
         Solver {
             asgs: AssignStack::new(nv),
             config,
             cps: ClauseDB::new(nv, nc),
-            elim: Eliminator::new(sve),
+            elim,
             state,
             vars: Var::new_vars(nv),
         }
@@ -79,8 +80,6 @@ impl SatSolver for Solver {
         // s.root_level = 0;
         state.num_solved_vars = asgs.len();
         state.progress(asgs, config, cps, elim, vars, Some(""));
-        // elim.in_use = true;
-        elim.var_queue.clear();
         if elim.in_use {
             for v in &mut vars[1..] {
                 debug_assert!(!v.eliminated);
@@ -95,15 +94,16 @@ impl SatSolver for Solver {
                     elim.enqueue_var(v);
                 }
             }
-            state.progress(asgs, config, cps, elim, vars, Some("load"));
-            cps.simplify(asgs, config, elim, state, vars);
-            state.progress(asgs, config, cps, elim, vars, Some("simp"));
+            if elim.active {
+                cps.simplify(asgs, config, elim, state, vars);
+                state.progress(asgs, config, cps, elim, vars, Some("simplify"));
+            } else {
+                elim.stop(cps,vars, false);
+                state.progress(asgs, config, cps, elim, vars, Some("loaded"));
+            }
         } else {
-            state.progress(asgs, config, cps, elim, vars, Some("load"));
+            state.progress(asgs, config, cps, elim, vars, Some("loaded"));
         }
-        // config.use_sve = false;
-        // elim.in_use = false;
-        state.stats[Stat::Simplification as usize] += 1;
         if search(asgs, config, cps, elim, state, vars) {
             if !state.ok {
                 asgs.cancel_until(vars, &mut state.var_order, 0);
@@ -119,9 +119,7 @@ impl SatSolver for Solver {
                     _ => result.push(0),
                 }
             }
-            if elim.in_use {
-                elim.extend_model(&mut result);
-            }
+            elim.extend_model(&mut result);
             asgs.cancel_until(vars, &mut state.var_order, 0);
             Ok(Certificate::SAT(result))
         } else {

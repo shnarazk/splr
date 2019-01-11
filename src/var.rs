@@ -20,6 +20,7 @@ pub struct Var {
     pub touched: bool,
     /// For elimination
     pub eliminated: bool,
+    pub check_sve_at: usize,
     pub pos_occurs: Vec<ClauseId>,
     pub neg_occurs: Vec<ClauseId>,
     pub enqueued: bool,
@@ -40,6 +41,7 @@ impl VarIF for Var {
             activity: 0.0,
             touched: false,
             eliminated: false,
+            check_sve_at: 0,
             pos_occurs: Vec::new(),
             neg_occurs: Vec::new(),
             enqueued: false,

@@ -83,9 +83,12 @@ pub trait Delete<T> {
 
 pub trait EliminatorIF {
     fn new(use_elim: bool) -> Eliminator;
+    fn stop(&mut self, cps: &mut ClauseDB, vars: &mut [Var], force: bool);
     fn enqueue_clause(&mut self, cid: ClauseId, ch: &mut Clause);
-    fn enqueue_var(&mut self, v: &mut Var);
+    fn clear_clause_queue(&mut self, cps: &mut ClauseDB);
     fn clause_queue_len(&self) -> usize;
+    fn enqueue_var(&mut self, v: &mut Var);
+    fn clear_var_queue(&mut self, vars: &mut [Var]);
     fn var_queue_len(&self) -> usize;
     fn eliminate(
         &mut self,

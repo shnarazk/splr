@@ -8,11 +8,11 @@ use crate::var::Var;
 
 /// Literal eliminator
 pub struct Eliminator {
-    pub eliminated_vars: usize,
+    // to make occur lists
     pub in_use: bool,
-    pub use_simplification: bool,
-    pub last_invocatiton: usize,
-    next_invocation: usize,
+    // to run eliminate
+    pub active: bool,
+    pub eliminated_vars: usize,
     merges: usize,
     clause_queue: Vec<ClauseId>,
     pub var_queue: Vec<VarId>,
@@ -32,49 +32,77 @@ const BACKWORD_SUBSUMPTION_THRESHOLD: usize = 1_000_000; // 10_000;
 const CLAUSE_QUEUE_THRESHOD: usize = 1_000_000; // 1_000;
 const VAR_QUEUE_THRESHOLD: usize = 3_200_000;
 
-impl EliminatorIF for Eliminator {
-    fn new(in_use: bool) -> Eliminator {
+impl Default for Eliminator {
+    fn default() -> Eliminator {
         Eliminator {
+            in_use: true,
+            active: true,
+            eliminated_vars: 0,
+            // last_invocatiton: 0,
             merges: 0,
             var_queue: Vec::new(),
             clause_queue: Vec::new(),
             bwdsub_assigns: 0,
             elim_clauses: Vec::new(),
             clause_lim: 20,
-            eliminated_vars: 0,
-            in_use,
-            use_simplification: true,
             subsumption_lim: 0,
-            last_invocatiton: 0,
-            next_invocation: 32,
+            // next_invocation: 32,
             clause_queue_threshold: CLAUSE_QUEUE_THRESHOD,
             var_queue_threshold: VAR_QUEUE_THRESHOLD,
         }
     }
-    fn enqueue_clause(&mut self, cid: ClauseId, ch: &mut Clause) {
-        if !self.in_use || self.clause_queue_threshold == 0 {
-            return;
-        }
-        let rank = ch.rank as f64;
-        if !ch.get_flag(ClauseFlag::Enqueued) {
-            let accept = if self.clause_queue.len() <= 256 {
-                rank
-            } else {
-                4.8 - ((self.clause_queue.len() as f64).log(2.0) - 8.0)
-            };
-            if rank <= accept {
-                self.clause_queue.push(cid);
-                ch.flag_on(ClauseFlag::Enqueued);
-                self.clause_queue_threshold -= 1;
+}
+
+impl EliminatorIF for Eliminator {
+    fn new(in_use: bool) -> Eliminator {
+        let mut e = Eliminator::default();
+        e.in_use = in_use;
+        e
+    }
+    fn stop(&mut self, cps: &mut ClauseDB, vars: &mut [Var], force: bool) {
+        self.clear_clause_queue(cps);
+        self.clear_var_queue(vars);
+        if force {
+            for v in &mut vars[1..] {
+                v.pos_occurs.clear();
+                v.neg_occurs.clear();
             }
         }
+        self.in_use = false;
+        self.active = false;
+    }
+    fn enqueue_clause(&mut self, cid: ClauseId, ch: &mut Clause) {
+        if !self.in_use || !self.active || ch.get_flag(ClauseFlag::Enqueued) {
+            return;
+        }
+        let len = ch.lits.len();
+        if self.clause_queue.is_empty() || len <= self.clause_queue_threshold {
+            self.clause_queue.push(cid);
+            ch.flag_on(ClauseFlag::Enqueued);
+            self.clause_queue_threshold = len;
+        }
+    }
+    fn clear_clause_queue(&mut self, cps: &mut ClauseDB) {
+        for cid in &self.clause_queue {
+             clause_mut!(*cps, cid).flag_off(ClauseFlag::Enqueued);
+        }
+        self.clause_queue.clear();
     }
     fn enqueue_var(&mut self, v: &mut Var) {
-        if self.in_use && 0 < self.var_queue_threshold && !v.enqueued {
+        if !self.in_use || !self.active || v.enqueued {
+            return;
+        }
+        if self.var_queue.is_empty() || v.check_sve_at <= self.var_queue_threshold {
             self.var_queue.push(v.index);
             v.enqueued = true;
-            self.var_queue_threshold -= 1;
+            self.var_queue_threshold = v.check_sve_at;
         }
+    }
+    fn clear_var_queue(&mut self, vars: &mut [Var]) {
+        for v in &self.var_queue {
+            vars[*v].enqueued = false;
+        }
+        self.var_queue.clear();
     }
     fn clause_queue_len(&self) -> usize {
         self.clause_queue.len()
@@ -91,15 +119,7 @@ impl EliminatorIF for Eliminator {
         state: &mut SolverState,
         vars: &mut [Var],
     ) {
-        if !self.in_use {
-            return;
-        }
-        if self.next_invocation < self.var_queue.len() {
-            self.clause_queue.clear();
-            for v in &self.var_queue {
-                vars[*v].enqueued = false;
-            }
-            self.var_queue.clear();
+        if !self.in_use || !self.active {
             return;
         }
         'perform: while self.bwdsub_assigns < asgs.len()
@@ -112,20 +132,20 @@ impl EliminatorIF for Eliminator {
                 state.ok = false;
                 break 'perform;
             }
-            while !self.var_queue.is_empty() {
-                let vi = self.var_queue.remove(0);
-                vars[vi].enqueued = false;
-                if vars[vi].eliminated || vars[vi].assign != BOTTOM {
+            while let Some(vi) = self.var_queue.pop() {
+                let v = &mut vars[vi];
+                v.enqueued = false;
+                if v.eliminated || v.assign != BOTTOM {
                     continue;
                 }
+                v.check_sve_at += 1;
                 if !eliminate_var(asgs, config, cps, self, state, vars, vi) {
                     state.ok = false;
-                    break 'perform;
+                    return;
                 }
             }
         }
         self.clause_queue_threshold = CLAUSE_QUEUE_THRESHOD;
-        self.var_queue_threshold = VAR_QUEUE_THRESHOLD;
     }
     fn extend_model(&mut self, model: &mut Vec<i32>) {
         // println!("extend_model {:?}", &self.elim_clauses);
@@ -210,7 +230,7 @@ impl Eliminator {
                     if (*ch).get_flag(ClauseFlag::Dead) || BACKWORD_SUBSUMPTION_THRESHOLD < cnt {
                         continue;
                     }
-                    let mut tmp = 40;
+                    let mut tmp = 6;
                     for l in &(*ch).lits {
                         let v = &vars[l.vi()];
                         let nsum = v.pos_occurs.len().min(v.neg_occurs.len());

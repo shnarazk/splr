@@ -131,7 +131,7 @@ impl SolverStateIF for SolverState {
                 };
                 let count = self.stats[Stat::Conflict as usize] as usize;
                 let ave = self.stats[Stat::SumLBD as usize] as f64 / count as f64;
-                println!("{}, State:{:>6}", self, msg,);
+                println!("{}, Str:{:>8}", self, msg);
                 println!(
                     "#propagate:{:>14}, #decision:{:>13}, #conflict: {:>12} ",
                     self.stats[Stat::Propagation as usize],
@@ -167,7 +167,7 @@ impl SolverStateIF for SolverState {
                     elim.clause_queue_len(),
                 );
                 println!(
-                    "   Clause DB|#smp:{:>9}, #smp:{:>9},      Eliminator|#var:{:>9} ",
+                    "   Clause DB|#rdc:{:>9}, #smp:{:>9},      Eliminator|#var:{:>9} ",
                     self.stats[Stat::Reduction as usize],
                     self.stats[Stat::Simplification as usize],
                     elim.var_queue_len(),

@@ -536,10 +536,10 @@ impl ClauseDBIF for ClauseDB {
         // && state.elim.last_invocatiton < self.stats[Stat::Reduction as usize] as usize
         {
             elim.eliminate(asgs, config, self, state, vars);
-            elim.last_invocatiton = state.stats[Stat::Reduction as usize] as usize;
             if !state.ok {
                 return false;
             }
+            // elim.clear(self, vars, true);
         }
         {
             for ck in &mut self[ClauseKind::Liftedlit as usize..=ClauseKind::Binclause as usize] {
