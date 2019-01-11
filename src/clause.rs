@@ -344,16 +344,14 @@ impl ClausePartitionIF for ClausePartition {
                 lits.push(*l);
             }
             cix = self.head.len();
-            let w0 = l0.negate() as usize;
-            let w1 = l1.negate() as usize;
             self.head.push(Clause {
                 flags: 0,
                 lits,
                 rank,
                 activity: 0.0,
             });
-            self.watcher[w0].attach(l1, cix);
-            self.watcher[w1].attach(l0, cix);
+            self.watcher[l0.negate() as usize].attach(l1, cix);
+            self.watcher[l1.negate() as usize].attach(l0, cix);
         };
         ClauseId::from_(self.kind, cix)
     }
@@ -527,40 +525,32 @@ impl ClauseDBIF for ClauseDB {
         debug_assert_eq!(asgs.level(), 0);
         // reset reason since decision level is zero.
         for v in &mut vars[1..] {
-            if v.reason != NULL_CLAUSE {
-                v.reason = NULL_CLAUSE;
-            }
+            v.reason = NULL_CLAUSE;
         }
-        if elim.in_use
-        // && state.stats[Stat::Simplification as usize] % 8 == 0
-        // && state.elim.last_invocatiton < self.stats[Stat::Reduction as usize] as usize
-        {
+        if elim.in_use {
             elim.eliminate(asgs, config, self, state, vars);
             if !state.ok {
                 return false;
             }
-            // elim.clear(self, vars, true);
         }
-        {
-            for ck in &mut self[ClauseKind::Liftedlit as usize..=ClauseKind::Binclause as usize] {
-                for ch in &mut ck.head[1..] {
-                    if !ch.get_flag(ClauseFlag::Dead) && vars.satisfies(&ch.lits) {
-                        ch.flag_on(ClauseFlag::Dead);
-                        debug_assert!(ch.lits[0] != 0 && ch.lits[1] != 0);
-                        ck.touched[ch.lits[0].negate() as usize] = true;
-                        ck.touched[ch.lits[1].negate() as usize] = true;
-                        if elim.in_use {
-                            for l in &ch.lits {
-                                let v = &mut (*vars)[l.vi()];
-                                if !v.eliminated {
-                                    elim.enqueue_var(v);
-                                }
+        for ck in &mut self[ClauseKind::Liftedlit as usize..=ClauseKind::Binclause as usize] {
+            for ch in &mut ck.head[1..] {
+                if !ch.get_flag(ClauseFlag::Dead) && vars.satisfies(&ch.lits) {
+                    debug_assert!(ch.lits[0] != 0 && ch.lits[1] != 0);
+                    ch.flag_on(ClauseFlag::Dead);
+                    ck.touched[ch.lits[0].negate() as usize] = true;
+                    ck.touched[ch.lits[1].negate() as usize] = true;
+                    if elim.in_use {
+                        for l in &ch.lits {
+                            let v = &mut vars[l.vi()];
+                            if !v.eliminated {
+                                elim.enqueue_var(v);
                             }
                         }
                     }
                 }
-                ck.garbage_collect(vars, elim);
             }
+            ck.garbage_collect(vars, elim);
         }
         state.stats[Stat::Simplification as usize] += 1;
         true

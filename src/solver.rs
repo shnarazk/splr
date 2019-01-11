@@ -35,11 +35,11 @@ pub type SolverResult = Result<Certificate, SolverException>;
 /// is the collection of all variables.
 pub struct Solver {
     /// major sub modules
-    pub asgs: AssignStack,
+    pub asgs: AssignStack,    // Assignment
     pub config: SolverConfig, // Configuration
     pub cps: ClauseDB,        // Clauses
     pub elim: Eliminator,     // Clause/Variable Elimination
-    pub state: SolverState,   // misc vars.
+    pub state: SolverState,   // misc data
     pub vars: Vec<Var>,       // Variables
 }
 
@@ -267,10 +267,11 @@ impl Propagate for AssignStack {
                             let Clause { ref mut lits, .. } = &mut head[w.c];
                             debug_assert!(2 <= lits.len());
                             debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
-                            if lits[0] == false_lit {
+                            let mut first = *lits.get_unchecked(0);
+                            if first == false_lit {
                                 lits.swap(0, 1); // now false_lit is lits[1].
+                                first = *lits.get_unchecked(0);
                             }
-                            let first = lits[0];
                             let first_value = vars.assigned(first);
                             // If 0th watch is true, then clause is already satisfied.
                             if first != w.blocker && first_value == LTRUE {
@@ -288,12 +289,12 @@ impl Propagate for AssignStack {
                                     continue 'next_clause;
                                 }
                             }
+                        let cid = ClauseId::from_(*kind, w.c);
                             if first_value == LFALSE {
                                 self.catchup();
-                                // println!("conflict by {} {:?}", kind.id_from(w.c).fmt(), vec2int(&lits));
-                                return ClauseId::from_(*kind, w.c);
+                                return cid;
                             } else {
-                                self.uncheck_enqueue(vars, first, ClauseId::from_(*kind, w.c));
+                                self.uncheck_enqueue(vars, first, cid);
                             }
                         }
                         n += 1;

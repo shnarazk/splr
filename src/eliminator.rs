@@ -28,9 +28,7 @@ pub struct Eliminator {
 
 const SUBSUMPTION_SIZE: usize = 30;
 const SUBSUMPITON_GROW_LIMIT: usize = 0;
-const BACKWORD_SUBSUMPTION_THRESHOLD: usize = 1_000_000; // 10_000;
-const CLAUSE_QUEUE_THRESHOD: usize = 1_000_000; // 1_000;
-const VAR_QUEUE_THRESHOLD: usize = 3_200_000;
+const BACKWORD_SUBSUMPTION_THRESHOLD: usize = 10_000;
 
 impl Default for Eliminator {
     fn default() -> Eliminator {
@@ -38,7 +36,6 @@ impl Default for Eliminator {
             in_use: true,
             active: true,
             eliminated_vars: 0,
-            // last_invocatiton: 0,
             merges: 0,
             var_queue: Vec::new(),
             clause_queue: Vec::new(),
@@ -46,9 +43,8 @@ impl Default for Eliminator {
             elim_clauses: Vec::new(),
             clause_lim: 20,
             subsumption_lim: 0,
-            // next_invocation: 32,
-            clause_queue_threshold: CLAUSE_QUEUE_THRESHOD,
-            var_queue_threshold: VAR_QUEUE_THRESHOLD,
+            clause_queue_threshold: 0,
+            var_queue_threshold: 0,
         }
     }
 }
@@ -145,7 +141,6 @@ impl EliminatorIF for Eliminator {
                 }
             }
         }
-        self.clause_queue_threshold = CLAUSE_QUEUE_THRESHOD;
     }
     fn extend_model(&mut self, model: &mut Vec<i32>) {
         // println!("extend_model {:?}", &self.elim_clauses);

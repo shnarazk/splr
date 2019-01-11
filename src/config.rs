@@ -135,7 +135,6 @@ impl SolverConfig {
                 + 1.0) as usize;
             self.inc_reduce_db = 0;
             re_init = true;
-            elim.stop(cps, vars, true);
         }
         if state.stats[Stat::NoDecisionConflict as usize] < 30_000 {
             self.strategy = SearchStrategy::LowSuccesive;
@@ -143,7 +142,6 @@ impl SolverConfig {
             self.luby_restart_factor = 100.0;
             self.var_decay = 0.999;
             self.var_decay_max = 0.999;
-            elim.stop(cps, vars, true);
         }
         if state.stats[Stat::NoDecisionConflict as usize] > 54_400 {
             self.strategy = SearchStrategy::HighSuccesive;
