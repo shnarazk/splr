@@ -25,7 +25,7 @@ impl EmaIF for Ema {
         self.val = self.sca * x + (1.0 - self.sca) * self.val;
         self.cal = self.sca + (1.0 - self.sca) * self.cal;
     }
-    fn get(&mut self) -> f64 {
+    fn get(&self) -> f64 {
         self.val / self.cal
     }
 }
