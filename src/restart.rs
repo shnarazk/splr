@@ -7,18 +7,26 @@ const RESTART_PERIOD: usize = 50;
 const RESET_EMA: usize = 400;
 
 /// Exponential Moving Average w/ a calibrator
-pub struct Ema(f64, f64, f64);
+pub struct Ema {
+    val: f64,
+    cal: f64,
+    sca: f64,
+}
 
 impl EmaIF for Ema {
     fn new(s: usize) -> Ema {
-        Ema(0.0, 1.0 / (s as f64), 0.0)
+        Ema {
+            val: 0.0,
+            cal: 0.0,
+            sca: 1.0 / (s as f64),
+        }
     }
     fn update(&mut self, x: f64) {
-        self.0 = self.1 * x + (1.0 - self.1) * self.0;
-        self.2 = self.1 + (1.0 - self.1) * self.2;
+        self.val = self.sca * x + (1.0 - self.sca) * self.val;
+        self.cal = self.sca + (1.0 - self.sca) * self.cal;
     }
-    fn get(&self) -> f64 {
-        self.0 / self.2
+    fn get(&mut self) -> f64 {
+        self.val / self.cal
     }
 }
 
