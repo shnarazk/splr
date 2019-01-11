@@ -50,7 +50,7 @@ impl Solver {
         let path = &cnf.pathname;
         let (_fe, se) = config.ema_coeffs;
         let mut elim = Eliminator::default();
-        elim.in_use = config.use_sve;
+        elim.in_use = config.use_sve && nc < 800_000 && 1000 < nv;
         let state = SolverState::new(&config, nv, se, &path.to_string());
         Solver {
             asgs: AssignStack::new(nv),
