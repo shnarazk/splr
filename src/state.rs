@@ -88,7 +88,6 @@ impl SolverStateIF for SolverState {
 
     fn progress(
         &mut self,
-        asgs: &AssignStack,
         config: &mut SolverConfig,
         cp: &ClauseDB,
         elim: &Eliminator,
@@ -99,11 +98,7 @@ impl SolverStateIF for SolverState {
             self.progress_cnt += 1;
         }
         let nv = vars.len() - 1;
-        let fixed = if asgs.is_zero() {
-            asgs.len()
-        } else {
-            asgs.num_at(0)
-        };
+        let fixed = self.num_solved_vars;
         let sum = fixed + elim.eliminated_vars;
         //let learnts = &cp[ClauseKind::Removable as usize];
         let good =

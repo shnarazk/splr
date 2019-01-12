@@ -145,7 +145,6 @@ pub trait SolverStateIF {
     fn new(config: &SolverConfig, nv: usize, se: i32, fname: &str) -> SolverState;
     fn progress(
         &mut self,
-        asgs: &AssignStack,
         config: &mut SolverConfig,
         cp: &ClauseDB,
         elim: &Eliminator,
