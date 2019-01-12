@@ -3,7 +3,6 @@ use crate::config::SolverConfig;
 use crate::state::{SolverState, Stat};
 use crate::traits::*;
 
-const RESTART_PERIOD: usize = 50;
 const RESET_EMA: usize = 400;
 
 /// Exponential Moving Average w/ a calibrator
@@ -36,7 +35,7 @@ impl RestartIF for SolverState {
         // let _count = self.stats[Stat::Conflict as usize] as usize;
         // let _ave = self.sum_asg / count as f64 * config.num_vars as f64;
         if 100 < ncnfl
-            && RESTART_PERIOD <= self.after_restart
+            && config.restart_step <= self.after_restart
             && config.restart_blk * self.ema_asg.get() < nas as f64
         //    || config.restart_blk * ave < nas as f64
         {

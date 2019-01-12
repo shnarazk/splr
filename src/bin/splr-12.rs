@@ -26,6 +26,9 @@ struct CLOpts {
     /// R in Glucose, for blocking
     #[structopt(long = "rb", default_value = "1.40")]
     restart_blocking: f64,
+    /// Minimal stpes between restart
+    #[structopt(long = "rs", default_value = "50")]
+    restart_step: usize,
     /// Dump progress report in another format
     #[structopt(long = "--log", short = "l")]
     use_log: bool,
@@ -49,6 +52,7 @@ fn main() {
         config.restart_blk = args.restart_blocking;
         config.restart_asg_len = args.restart_asg_samples;
         config.restart_lbd_len = args.restart_lbd_samples;
+        config.restart_step = args.restart_step;
         config.progress_log = args.use_log;
         if args.no_elim {
             config.use_sve = false;
