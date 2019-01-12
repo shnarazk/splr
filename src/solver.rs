@@ -35,7 +35,7 @@ pub type SolverResult = Result<Certificate, SolverException>;
 /// is the collection of all variables.
 pub struct Solver {
     /// major sub modules
-    pub asgs: AssignStack,    // Assignment
+    pub asgs: AssignStack, // Assignment
     pub config: SolverConfig, // Configuration
     pub cps: ClauseDB,        // Clauses
     pub elim: Eliminator,     // Clause/Variable Elimination
@@ -98,7 +98,7 @@ impl SatSolver for Solver {
                 cps.simplify(asgs, config, elim, state, vars);
                 state.progress(config, cps, elim, vars, Some("simplify"));
             } else {
-                elim.stop(cps,vars, false);
+                elim.stop(cps, vars, false);
                 state.progress(config, cps, elim, vars, Some("loaded"));
             }
         } else {
@@ -289,7 +289,7 @@ impl Propagate for AssignStack {
                                     continue 'next_clause;
                                 }
                             }
-                        let cid = ClauseId::from_(*kind, w.c);
+                            let cid = ClauseId::from_(*kind, w.c);
                             if first_value == LFALSE {
                                 self.catchup();
                                 return cid;

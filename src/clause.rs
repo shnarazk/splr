@@ -493,6 +493,9 @@ impl ClauseDBIF for ClauseDB {
                 perm.push(i);
             }
         }
+        if perm.is_empty() {
+            return;
+        }
         perm.sort_by(|&a, &b| head[a].cmp(&head[b]));
         let keep = perm.len() / 2;
         if head[perm[keep]].rank <= 5 {

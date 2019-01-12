@@ -61,9 +61,9 @@ impl AssignIF for AssignStack {
     }
     /// returns `false` if an conflict occures.
     fn enqueue(&mut self, v: &mut Var, sig: Lbool, cid: ClauseId, dl: usize) -> bool {
+        debug_assert!(!v.eliminated);
         let val = v.assign;
         if val == BOTTOM {
-            debug_assert!(!v.eliminated);
             v.assign = sig;
             v.reason = cid;
             v.level = dl;
@@ -81,9 +81,10 @@ impl AssignIF for AssignStack {
     }
     /// returns `false` if an conflict occures.
     fn enqueue_null(&mut self, v: &mut Var, sig: Lbool, dl: usize) -> bool {
+        debug_assert!(!v.eliminated);
+        debug_assert!(sig != BOTTOM);
         let val = v.assign;
         if val == BOTTOM {
-            debug_assert!(!v.eliminated);
             v.assign = sig;
             v.reason = NULL_CLAUSE;
             v.level = dl;
@@ -132,6 +133,8 @@ impl AssignIF for AssignStack {
         self.trail.push(l);
     }
     fn uncheck_assume(&mut self, vars: &mut [Var], elim: &mut Eliminator, l: Lit) {
+        debug_assert!(!self.trail.contains(&l));
+        debug_assert!(!self.trail.contains(&l.negate()));
         self.trail_lim.push(self.trail.len());
         let dl = self.trail_lim.len();
         let v = &mut vars[l.vi()];
@@ -143,8 +146,6 @@ impl AssignIF for AssignStack {
         if dl == 0 {
             elim.enqueue_var(v);
         }
-        // debug_assert!(!trail.contains(&l));
-        // debug_assert!(!trail.contains(&l.negate()));
         self.trail.push(l);
     }
     #[allow(dead_code)]

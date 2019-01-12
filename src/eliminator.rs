@@ -79,7 +79,7 @@ impl EliminatorIF for Eliminator {
     }
     fn clear_clause_queue(&mut self, cps: &mut ClauseDB) {
         for cid in &self.clause_queue {
-             clause_mut!(*cps, cid).flag_off(ClauseFlag::Enqueued);
+            clause_mut!(*cps, cid).flag_off(ClauseFlag::Enqueued);
         }
         self.clause_queue.clear();
     }
@@ -395,10 +395,10 @@ fn check_eliminator(cps: &ClauseDB, vars: &[Var]) -> bool {
                 let v = l.vi();
                 if l.positive() {
                     if !vars[v].pos_occurs.contains(&cid) {
-                        panic!("aaa {} {:#}", cid.fmt(), ch);
+                        panic!("failed to check {} {:#}", cid.format(), ch);
                     }
                 } else if !vars[v].neg_occurs.contains(&cid) {
-                    panic!("aaa {} {:#}", cid.fmt(), ch);
+                    panic!("failed to check {} {:#}", cid.format(), ch);
                 }
             }
         }
