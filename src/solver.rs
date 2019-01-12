@@ -418,12 +418,12 @@ fn search(
             }
         } else {
             conflict_c += 1.0;
+            state.stats[Stat::Conflict as usize] += 1;
             if a_decision_was_made {
                 a_decision_was_made = false;
             } else {
                 state.stats[Stat::NoDecisionConflict as usize] += 1;
             }
-            state.stats[Stat::Conflict as usize] += 1;
             if asgs.level() == config.root_level {
                 analyze_final(asgs, config, cps, state, vars, ci, false);
                 return false;
