@@ -60,7 +60,7 @@ pub trait ClauseIdIF {
     fn to_index(&self) -> ClauseIndex;
     fn to_kind(&self) -> usize;
     fn is(&self, kind: ClauseKind, ix: ClauseIndex) -> bool;
-    fn fmt(&self) -> String;
+    fn format(&self) -> String;
 }
 
 pub trait ClausePartitionIF {

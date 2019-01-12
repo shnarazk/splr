@@ -58,7 +58,7 @@ impl ClauseIdIF for ClauseId {
     fn is(&self, kind: ClauseKind, ix: ClauseIndex) -> bool {
         self.to_kind() == kind as usize && self.to_index() == ix
     }
-    fn fmt(&self) -> String {
+    fn format(&self) -> String {
         match self.to_kind() {
             _ if *self == 0 => "NullClause".to_string(),
             0 => format!("Lifted::{}", self.to_index()),

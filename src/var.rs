@@ -378,6 +378,22 @@ impl VarIdHeap {
     }
 }
 
+impl fmt::Display for Var {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let st = |flag, mes| if flag { mes } else { "" };
+        write!(
+            f,
+            "V{}({} at {} by {} {}{})",
+            self.index,
+            self.assign,
+            self.level,
+            self.reason.format(),
+            st(self.touched, ", touched"),
+            st(self.touched, ", eliminated"),
+        )
+    }
+}
+
 impl fmt::Display for VarIdHeap {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(

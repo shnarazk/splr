@@ -19,9 +19,9 @@ impl SearchStrategy {
         match self {
             SearchStrategy::Initial => "Initial",
             SearchStrategy::Generic => "Default",
-            SearchStrategy::LowDecisions => "Low Decs",
+            SearchStrategy::LowDecisions => "LowDecs",
             SearchStrategy::HighSuccesive => "HighSucc",
-            SearchStrategy::LowSuccesive => "Low Succ",
+            SearchStrategy::LowSuccesive => "LowSucc",
             SearchStrategy::ManyGlues => "ManyGlue",
         }
     }
