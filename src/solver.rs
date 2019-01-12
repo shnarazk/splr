@@ -239,7 +239,7 @@ impl SatSolver for Solver {
 impl Propagate for AssignStack {
     fn propagate(
         &mut self,
-        cp: &mut ClauseDB,
+        cps: &mut ClauseDB,
         state: &mut SolverState,
         vars: &mut [Var],
     ) -> ClauseId {
@@ -252,9 +252,9 @@ impl Propagate for AssignStack {
                 ClauseKind::Removable,
                 ClauseKind::Permanent,
             ] {
-                let head = &mut cp[*kind as usize].head;
+                let head = &mut cps[*kind as usize].head;
                 unsafe {
-                    let watcher = &mut cp[*kind as usize].watcher[..] as *mut [Vec<Watch>];
+                    let watcher = &mut cps[*kind as usize].watcher[..] as *mut [Vec<Watch>];
                     let source = &mut (*watcher)[p];
                     let mut n = 1;
                     'next_clause: while n <= source.count() {
@@ -309,7 +309,7 @@ impl Propagate for AssignStack {
 #[inline(always)]
 fn propagate_fast(
     asgs: &mut AssignStack,
-    cp: &mut ClauseDB,
+    cps: &mut ClauseDB,
     state: &mut SolverState,
     vars: &mut [Var],
 ) -> ClauseId {
@@ -322,9 +322,9 @@ fn propagate_fast(
             ClauseKind::Removable,
             ClauseKind::Permanent,
         ] {
-            let head = &mut cp[*kind as usize].head;
+            let head = &mut cps[*kind as usize].head;
             unsafe {
-                let watcher = &mut cp[*kind as usize].watcher[..] as *mut [Vec<Watch>];
+                let watcher = &mut cps[*kind as usize].watcher[..] as *mut [Vec<Watch>];
                 let source = &mut (*watcher)[p];
                 let mut n = 1;
                 'next_clause: while n <= source.count() {
@@ -381,7 +381,7 @@ fn propagate_fast(
 fn search(
     asgs: &mut AssignStack,
     config: &mut SolverConfig,
-    cp: &mut ClauseDB,
+    cps: &mut ClauseDB,
     elim: &mut Eliminator,
     state: &mut SolverState,
     vars: &mut [Var],
@@ -390,7 +390,7 @@ fn search(
     let mut a_decision_was_made = false;
     state.restart_update_luby(config);
     loop {
-        let ci = propagate_fast(asgs, cp, state, vars);
+        let ci = propagate_fast(asgs, cps, state, vars);
         state.stats[Stat::Propagation as usize] += 1;
         if ci == NULL_CLAUSE {
             if config.num_vars <= asgs.len() + elim.eliminated_vars {
@@ -400,7 +400,7 @@ fn search(
             if state.force_restart(config, &mut conflict_c) {
                 asgs.cancel_until(vars, &mut state.var_order, config.root_level);
             } else if asgs.level() == 0 {
-                cp.simplify(asgs, config, elim, state, vars);
+                cps.simplify(asgs, config, elim, state, vars);
                 state.var_order.rebuild(&vars);
             }
             if asgs.level() == 0 {
@@ -425,10 +425,13 @@ fn search(
             }
             state.stats[Stat::Conflict as usize] += 1;
             if asgs.level() == config.root_level {
-                analyze_final(asgs, config, cp, state, vars, ci, false);
+                analyze_final(asgs, config, cps, state, vars, ci, false);
                 return false;
             }
-            handle_conflict_path(asgs, config, cp, elim, state, vars, ci);
+            handle_conflict_path(asgs, config, cps, elim, state, vars, ci);
+            if !state.ok {
+                return false;
+            }
         }
     }
 }
@@ -437,7 +440,7 @@ fn search(
 fn handle_conflict_path(
     asgs: &mut AssignStack,
     config: &mut SolverConfig,
-    cp: &mut ClauseDB,
+    cps: &mut ClauseDB,
     elim: &mut Eliminator,
     state: &mut SolverState,
     vars: &mut [Var],
@@ -447,11 +450,11 @@ fn handle_conflict_path(
     if tn_confl % 5000 == 0 && config.var_decay < config.var_decay_max {
         config.var_decay += 0.01;
     }
-    state.restart_update_asg(config, asgs.len());
+    state.restart_update_asg(config, asgs.len() + elim.eliminated_vars);
     // DYNAMIC BLOCKING RESTART
     state.block_restart(asgs, config, tn_confl);
     let mut new_learnt: Vec<Lit> = Vec::new();
-    let bl = analyze(asgs, config, cp, state, vars, ci, &mut new_learnt);
+    let bl = analyze(asgs, config, cps, state, vars, ci, &mut new_learnt);
     asgs.cancel_until(vars, &mut state.var_order, bl.max(config.root_level));
     let learnt_len = new_learnt.len();
     if learnt_len == 1 {
@@ -459,7 +462,7 @@ fn handle_conflict_path(
     } else {
         let lbd = vars.compute_lbd(&new_learnt, &mut state.lbd_temp);
         let l0 = new_learnt[0];
-        let cid = cp.add_clause(config, elim, vars, &mut new_learnt, lbd);
+        let cid = cps.add_clause(config, elim, vars, &mut new_learnt, lbd);
         state.c_lvl.update(bl as f64);
         state.b_lvl.update(lbd as f64);
         if lbd <= 2 {
@@ -473,11 +476,11 @@ fn handle_conflict_path(
         state.stats[Stat::SumLBD as usize] += lbd as i64;
     }
     if tn_confl % 10_000 == 0 {
-        state.progress(asgs, config, cp, elim, vars, None);
+        state.progress(asgs, config, cps, elim, vars, None);
     }
     if tn_confl == 100_000 {
         asgs.cancel_until(vars, &mut state.var_order, 0);
-        config.adapt_strategy(cp, elim, state, vars);
+        config.adapt_strategy(cps, elim, state, vars);
     }
     // decay activities
     config.var_inc /= config.var_decay;
@@ -485,11 +488,11 @@ fn handle_conflict_path(
     // glucose reduction
     if (config.use_chan_seok
         && !config.glureduce
-        && config.first_reduction < cp[ClauseKind::Removable as usize].count(true))
+        && config.first_reduction < cps[ClauseKind::Removable as usize].count(true))
         || (config.glureduce && state.cur_restart * state.next_reduction <= tn_confl)
     {
         state.cur_restart = ((tn_confl as f64) / (state.next_reduction as f64)) as usize + 1;
-        cp.reduce(elim, state, vars);
+        cps.reduce(elim, state, vars);
         state.next_reduction += config.inc_reduce_db;
     }
 }
@@ -498,7 +501,7 @@ fn handle_conflict_path(
 fn analyze(
     asgs: &mut AssignStack,
     config: &mut SolverConfig,
-    cp: &mut ClauseDB,
+    cps: &mut ClauseDB,
     state: &mut SolverState,
     vars: &mut [Var],
     confl: ClauseId,
@@ -513,11 +516,11 @@ fn analyze(
     loop {
         // println!("analyze {}", p.int());
         unsafe {
-            let ch = clause_mut!(*cp, cid) as *mut Clause;
+            let ch = clause_mut!(*cps, cid) as *mut Clause;
             debug_assert_ne!(cid, NULL_CLAUSE);
             if cid.to_kind() == ClauseKind::Removable as usize {
                 // self.bump_cid(cid);
-                cp[ClauseKind::Removable as usize].bump_activity(
+                cps[ClauseKind::Removable as usize].bump_activity(
                     &mut config.cla_inc,
                     cid.to_index(),
                     state.stats[Stat::Conflict as usize] as f64,
@@ -533,7 +536,7 @@ fn analyze(
                 //             && nblevels < self.co_lbd_bound
                 //         {
                 //             (*ch).rank = 0;
-                //             clause_mut!(*cp, confl).rank = 0
+                //             clause_mut!(*cps, confl).rank = 0
                 //         }
                 //     }
                 // }
@@ -611,16 +614,16 @@ fn analyze(
     }
     learnt.retain(|l| {
         vars[l.vi()].reason == NULL_CLAUSE
-            || !analyze_removable(cp, vars, &mut state.an_seen, *l, &mut to_clear, &level_map)
+            || !analyze_removable(cps, vars, &mut state.an_seen, *l, &mut to_clear, &level_map)
     });
     if learnt.len() < 30 {
-        minimize_with_bi_clauses(cp, vars, &mut state.lbd_temp, learnt);
+        minimize_with_bi_clauses(cps, vars, &mut state.lbd_temp, learnt);
     }
     // glucose heuristics
     // let lbd = vars.compute_lbd(learnt, lbd_temp);
     // while let Some(l) = last_dl.pop() {
     //     let vi = l.vi();
-    //     if clause!(*cp, vars[vi].reason).rank < lbd {
+    //     if clause!(*cps, vars[vi].reason).rank < lbd {
     //         vars.bump_activity(vi, &mut config.var_inc, state.stats[Stat::Conflict as usize] as f64);
     //         var_order.update(vars, vi);
     //     }
@@ -649,7 +652,7 @@ fn analyze(
 /// renamed from litRedundant
 #[inline(always)]
 fn analyze_removable(
-    cp: &mut ClauseDB,
+    cps: &mut ClauseDB,
     vars: &[Var],
     an_seen: &mut [bool],
     l: Lit,
@@ -661,7 +664,7 @@ fn analyze_removable(
     let top = to_clear.len();
     while let Some(sl) = stack.pop() {
         let cid = vars[sl.vi()].reason;
-        let ch = clause_mut!(*cp, cid);
+        let ch = clause_mut!(*cps, cid);
         if (*ch).lits.len() == 2 && vars.assigned((*ch).lits[0]) == LFALSE {
             (*ch).lits.swap(0, 1);
         }

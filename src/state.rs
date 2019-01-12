@@ -139,7 +139,7 @@ impl SolverStateIF for SolverState {
                     self.stats[Stat::Conflict as usize],
                 );
                 println!(
-                    "  Assignment|#rem:{:>9}, #fix:{:>9}, #elm:{:>9}, prog%:{:>8.4} ",
+                    "  Assignment|#rem:{:>9}, #fix:{:>9}, #elm:{:>9}, prg%:{:>9.4} ",
                     nv - sum,
                     fixed,
                     elim.eliminated_vars,
@@ -153,7 +153,7 @@ impl SolverStateIF for SolverState {
                     cp[ClauseKind::Binclause as usize].count(true),
                 );
                 println!(
-                    "     Restart|#BLK:{:>9}, #RST:{:>9}, emaASG:{:>7.2}, emaLBD:{:>7.2} ",
+                    "     Restart|#BLK:{:>9}, #RST:{:>9}, eASG:{:>9.4}, eLBD:{:>9.4} ",
                     self.stats[Stat::BlockRestart as usize],
                     self.stats[Stat::Restart as usize],
                     self.ema_asg.get() / nv as f64,
