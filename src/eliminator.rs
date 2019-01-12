@@ -574,15 +574,13 @@ fn eliminate_var(
         return true;
     }
     debug_assert!(!vars[v].eliminated);
-    {
-        // count only alive clauses
-        vars[v]
-            .pos_occurs
-            .retain(|&c| !clause!(cps, c).get_flag(ClauseFlag::Dead));
-        vars[v]
-            .pos_occurs
-            .retain(|&c| !clause!(cps, c).get_flag(ClauseFlag::Dead));
-    }
+    // count only alive clauses
+    vars[v]
+        .pos_occurs
+        .retain(|&c| !clause!(cps, c).get_flag(ClauseFlag::Dead));
+    vars[v]
+        .neg_occurs
+        .retain(|&c| !clause!(cps, c).get_flag(ClauseFlag::Dead));
     let pos = &vars[v].pos_occurs as *const Vec<ClauseId>;
     let neg = &vars[v].neg_occurs as *const Vec<ClauseId>;
     unsafe {
@@ -613,15 +611,15 @@ fn eliminate_var(
         }
         let clslen = (*pos).len() + (*neg).len();
         let mut cnt = 0;
-        for lit_pos in &*pos {
-            if clause!(*cps, lit_pos).get_flag(ClauseFlag::Dead) {
-                continue;
-            }
-            for lit_neg in &*neg {
-                if clause!(*cps, lit_neg).get_flag(ClauseFlag::Dead) {
-                    continue;
-                }
-                let (res, clause_size) = check_to_merge(cps, *lit_pos, *lit_neg, v);
+        for c_pos in &*pos {
+            // if clause!(*cps, c_pos).get_flag(ClauseFlag::Dead) {
+            //     continue;
+            // }
+            for c_neg in &*neg {
+                // if clause!(*cps, c_neg).get_flag(ClauseFlag::Dead) {
+                //     continue;
+                // }
+                let (res, clause_size) = check_to_merge(cps, *c_pos, *c_neg, v);
                 if res {
                     cnt += 1;
                     if clslen + SUBSUMPITON_GROW_LIMIT < cnt
@@ -643,9 +641,7 @@ fn eliminate_var(
             let tmp = &mut elim.elim_clauses as *mut Vec<Lit>;
             if (*neg).len() < (*pos).len() {
                 for cid in &*neg {
-                    if clause!(*cps, cid).get_flag(ClauseFlag::Dead) {
-                        continue;
-                    }
+                    debug_assert!(!clause!(*cps, cid).get_flag(ClauseFlag::Dead));
                     make_eliminated_clause(cps, &mut (*tmp), v, *cid);
                     cps[cid.to_kind() as usize].touched[v.lit(LTRUE) as usize] = true;
                     cps[cid.to_kind() as usize].touched[v.lit(LFALSE) as usize] = true;
@@ -653,9 +649,7 @@ fn eliminate_var(
                 make_eliminating_unit_clause(&mut (*tmp), v.lit(LTRUE));
             } else {
                 for cid in &*pos {
-                    if clause!(*cps, cid).get_flag(ClauseFlag::Dead) {
-                        continue;
-                    }
+                    debug_assert!(!clause!(*cps, cid).get_flag(ClauseFlag::Dead));
                     make_eliminated_clause(cps, &mut (*tmp), v, *cid);
                     cps[cid.to_kind() as usize].touched[v.lit(LTRUE) as usize] = true;
                     cps[cid.to_kind() as usize].touched[v.lit(LFALSE) as usize] = true;
@@ -665,14 +659,10 @@ fn eliminate_var(
         }
         // Produce clauses in cross product:
         for p in &*pos {
-            if clause!(*cps, p).get_flag(ClauseFlag::Dead) {
-                continue;
-            }
+            debug_assert!(!clause!(*cps, p).get_flag(ClauseFlag::Dead));
             let rank_p = clause!(*cps, p).rank;
             for n in &*neg {
-                if clause!(*cps, n).get_flag(ClauseFlag::Dead) {
-                    continue;
-                }
+                debug_assert!(!clause!(*cps, n).get_flag(ClauseFlag::Dead));
                 if let Some(vec) = merge(cps, elim, *p, *n, v) {
                     // println!("eliminator replaces {} with a cross product {:?}", p.fmt(), vec2int(&vec));
                     debug_assert!(!vec.is_empty());
@@ -707,13 +697,13 @@ fn eliminate_var(
                 }
             }
         }
-        for cid in &vars[v].pos_occurs {
+        for cid in &*pos {
+            cps.remove_clause(*cid);
+        }
+        for cid in &*neg {
             cps.remove_clause(*cid);
         }
         vars[v].pos_occurs.clear();
-        for cid in &vars[v].neg_occurs {
-            cps.remove_clause(*cid);
-        }
         vars[v].neg_occurs.clear();
         if asgs.propagate(cps, state, vars) != NULL_CLAUSE {
             state.ok = false;
