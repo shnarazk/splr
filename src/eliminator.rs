@@ -12,7 +12,7 @@ pub struct Eliminator {
     pub in_use: bool,
     // to run eliminate
     pub active: bool,
-    pub eliminated_vars: usize,
+
     merges: usize,
     clause_queue: Vec<ClauseId>,
     pub var_queue: Vec<VarId>,
@@ -35,7 +35,6 @@ impl Default for Eliminator {
         Eliminator {
             in_use: true,
             active: true,
-            eliminated_vars: 0,
             merges: 0,
             var_queue: Vec::new(),
             clause_queue: Vec::new(),
@@ -636,7 +635,7 @@ fn eliminate_var(
         let cid = vars[v].reason;
         debug_assert_eq!(cid, NULL_CLAUSE);
         // println!("- eliminate var: {:>8} (+{:<4} -{:<4}); {:?}", v, (*pos).len(), (*neg).len(), vars[v]);
-        elim.eliminated_vars += 1;
+        state.num_eliminated_vars += 1;
         {
             let tmp = &mut elim.elim_clauses as *mut Vec<Lit>;
             if (*neg).len() < (*pos).len() {

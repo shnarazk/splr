@@ -393,7 +393,7 @@ fn search(
         let ci = propagate_fast(asgs, cps, state, vars);
         state.stats[Stat::Propagation as usize] += 1;
         if ci == NULL_CLAUSE {
-            if config.num_vars <= asgs.len() + elim.eliminated_vars {
+            if config.num_vars <= asgs.len() + state.num_eliminated_vars {
                 return true;
             }
             // DYNAMIC FORCING RESTART
@@ -450,7 +450,7 @@ fn handle_conflict_path(
     if tn_confl % 5000 == 0 && config.var_decay < config.var_decay_max {
         config.var_decay += 0.01;
     }
-    state.restart_update_asg(config, asgs.len() + elim.eliminated_vars);
+    state.restart_update_asg(config, asgs.len());
     // DYNAMIC BLOCKING RESTART
     state.block_restart(asgs, config, tn_confl);
     let mut new_learnt: Vec<Lit> = Vec::new();
@@ -460,6 +460,7 @@ fn handle_conflict_path(
     if learnt_len == 1 {
         asgs.uncheck_enqueue(vars, new_learnt[0], NULL_CLAUSE);
     } else {
+        state.stats[Stat::Learnt as usize] += 1;
         let lbd = vars.compute_lbd(&new_learnt, &mut state.lbd_temp);
         let l0 = new_learnt[0];
         let cid = cps.add_clause(config, elim, vars, &mut new_learnt, lbd);
@@ -470,6 +471,7 @@ fn handle_conflict_path(
         }
         if learnt_len == 2 {
             state.stats[Stat::NumBin as usize] += 1;
+            state.stats[Stat::NumBinLearnt as usize] += 1;
         }
         asgs.uncheck_enqueue(vars, l0, cid);
         state.restart_update_lbd(lbd);
@@ -489,7 +491,10 @@ fn handle_conflict_path(
     if (config.use_chan_seok
         && !config.glureduce
         && config.first_reduction < cps[ClauseKind::Removable as usize].count(true))
-        || (config.glureduce && state.cur_restart * state.next_reduction <= tn_confl)
+        || (config.glureduce
+            && state.cur_restart * state.next_reduction
+                <= (state.stats[Stat::Learnt as usize] - state.stats[Stat::NumBinLearnt as usize])
+                    as usize)
     {
         state.cur_restart = ((tn_confl as f64) / (state.next_reduction as f64)) as usize + 1;
         cps.reduce(elim, state, vars);

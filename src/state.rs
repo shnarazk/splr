@@ -16,6 +16,7 @@ pub enum Stat {
     Conflict = 0,       // the number of backjump
     Decision,           // the number of decision
     Restart,            // the number of restart
+    Learnt,             // the number of learnt clauses (< Conflict)
     NoDecisionConflict, // the number of 'no decision conflict'
     BlockRestart,       // the number of blacking start
     Propagation,        // the number of propagation
@@ -24,6 +25,7 @@ pub enum Stat {
     Assign,             // the number of assigned variables
     SumLBD,             // the sum of generated learnts' LBD
     NumBin,             // the number of binary clauses
+    NumBinLearnt,       // the number of binary learnt clauses
     NumLBD2,            // the number of clauses which LBD is 2
     EndOfStatIndex,     // Don't use this dummy.
 }
@@ -42,6 +44,7 @@ pub struct SolverState {
     pub c_lvl: Ema,
     pub sum_asg: f64,
     pub num_solved_vars: usize,
+    pub num_eliminated_vars: usize,
     pub model: Vec<Lbool>,
     pub conflicts: Vec<Lit>,
     pub an_seen: Vec<bool>,
@@ -67,6 +70,7 @@ impl SolverStateIF for SolverState {
             c_lvl: Ema::new(5_000),
             sum_asg: 0.0,
             num_solved_vars: 0,
+            num_eliminated_vars: 0,
             model: vec![BOTTOM; nv + 1],
             conflicts: vec![],
             an_seen: vec![false; nv + 1],
@@ -99,7 +103,7 @@ impl SolverStateIF for SolverState {
         }
         let nv = vars.len() - 1;
         let fixed = self.num_solved_vars;
-        let sum = fixed + elim.eliminated_vars;
+        let sum = fixed + self.num_eliminated_vars;
         //let learnts = &cp[ClauseKind::Removable as usize];
         let good =
             self.stats[Stat::NumLBD2 as usize] as f64 / self.stats[Stat::Conflict as usize] as f64;
@@ -137,7 +141,7 @@ impl SolverStateIF for SolverState {
                     "  Assignment|#rem:{:>9}, #fix:{:>9}, #elm:{:>9}, prg%:{:>9.4} ",
                     nv - sum,
                     fixed,
-                    elim.eliminated_vars,
+                    self.num_eliminated_vars,
                     (sum as f32) / (nv as f32) * 100.0,
                 );
                 println!(
@@ -192,7 +196,7 @@ impl SolverStateIF for SolverState {
                 msg,
                 nv - sum,
                 fixed,
-                elim.eliminated_vars,
+                self.num_eliminated_vars,
                 (sum as f32) / (nv as f32) * 100.0,
                 cp[ClauseKind::Removable as usize].count(true),
                 good,

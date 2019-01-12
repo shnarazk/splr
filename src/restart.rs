@@ -31,7 +31,7 @@ impl EmaIF for Ema {
 
 impl RestartIF for SolverState {
     fn block_restart(&mut self, asgs: &AssignStack, config: &SolverConfig, ncnfl: usize) -> bool {
-        let nas = asgs.len();
+        let nas = asgs.len() + self.num_eliminated_vars;
         // let _count = self.stats[Stat::Conflict as usize] as usize;
         // let _ave = self.sum_asg / count as f64 * config.num_vars as f64;
         if 100 < ncnfl
@@ -57,7 +57,7 @@ impl RestartIF for SolverState {
         let ave = self.stats[Stat::SumLBD as usize] as f64 / count as f64;
         if (config.luby_restart && config.luby_restart_num_conflict <= *ncnfl)
             || (!config.luby_restart
-                && RESTART_PERIOD <= self.after_restart
+                && config.restart_step <= self.after_restart
                 && ave < self.ema_lbd.get() * config.restart_thr)
         {
             self.stats[Stat::Restart as usize] += 1;
@@ -80,7 +80,7 @@ impl RestartIF for SolverState {
     }
     #[inline(always)]
     fn restart_update_asg(&mut self, _config: &SolverConfig, n: usize) {
-        self.ema_asg.update(n as f64);
+        self.ema_asg.update((self.num_eliminated_vars + n) as f64);
         // self.sum_asg += n as f64 / config.num_vars as f64;
     }
     #[inline(always)]
