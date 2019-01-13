@@ -1,54 +1,93 @@
-extern crate splr;
-use splr::solver::{Certificate, SatSolver, Solver, Stat};
-use splr::types::EmaKind;
-use std::env;
+// SAT solver for Propositional Logic in Rust
+use splr::config::SolverConfig;
+use splr::solver::{Certificate, Solver};
+use splr::traits::SatSolver;
+use std::fs::File;
+use std::io::{BufWriter, Write};
+use structopt::StructOpt;
+// const VERSION: &str = "Splr-0.0.12 (Technology Preview 12) by shnarazk@gitlab.com";
 
-fn main() {
-    // println!("splr 0.0.1 CARGO_MANIFEST_DIR = {}", env!("CARGO_MANIFEST_DIR"));
-    // Some(env!("CARGO_MANIFEST_DIR").to_string() + "/uf200-020.cnf");
-    let mut target: Option<String> = None;
-    let args: Vec<String> = env::args().skip(1).collect();
-    for arg in &args {
-        match arg {
-            _ if arg.to_string() == "--version" => {
-                println!(
-                    "Splr 0.0.1  -- based on MiniSAT/Glucose (Many thanks to MiniSAT/Glucose team)"
-                );
-            }
-            _ if (&*arg).starts_with('-') => {
-                continue;
-            }
-            _ => {
-                target = Some(arg.to_string());
-            }
-        }
-    }
-    if let Some(path) = target {
-        let (mut s, _cnf) = Solver::build(&path);
-        match s.solve() {
-            Ok(Certificate::SAT(v)) => {
-                report_stat(&s);
-                println!("{:?}", v);
-            }
-            Ok(Certificate::UNSAT(v)) => println!("UNSAT {:?}", v),
-            Err(e) => println!("Failed {:?}", e),
-        }
-    }
+#[derive(StructOpt)]
+#[structopt(
+    name = "splr",
+    about = "SAT solver for Propositional Logic in Rust, Technology Preview 12"
+)]
+struct CLOpts {
+    /// EMA coefficient for number of assignments
+    #[structopt(long = "ra", default_value = "3500")]
+    restart_asg_samples: usize,
+    /// EMA coefficient for learnt clause LBD
+    #[structopt(long = "rl", default_value = "50")]
+    restart_lbd_samples: usize,
+    /// K in Glucose, for restart
+    #[structopt(long = "rt", default_value = "0.75")]
+    restart_threshold: f64,
+    /// R in Glucose, for blocking
+    #[structopt(long = "rb", default_value = "1.40")]
+    restart_blocking: f64,
+    /// Minimal stpes between restart
+    #[structopt(long = "rs", default_value = "50")]
+    restart_step: usize,
+    /// Dump progress report in another format
+    #[structopt(long = "--log", short = "l")]
+    use_log: bool,
+    /// Don't use clause/variable eliminator
+    #[structopt(long = "no-elim", short = "e")]
+    no_elim: bool,
+    /// Don't use dynamic strategy adaptation
+    #[structopt(long = "no-adaptation", short = "a")]
+    no_adapt: bool,
+    /// a CNF file to solve
+    #[structopt(parse(from_os_str))]
+    cnf: std::path::PathBuf,
 }
 
-fn report_stat(s: &Solver) -> () {
-    println!(
-        "backjump:{}, block:{}, restart:{}, reduction:{}, clauses:{}, learnts:{}",
-        s.stats[Stat::NumOfBackjump as usize],
-        s.stats[Stat::NumOfBlockRestart as usize],
-        s.stats[Stat::NumOfRestart as usize],
-        s.stats[Stat::NumOfReduction as usize],
-        s.clauses.permanents.len(),
-        s.clauses.deletables.len(),
-    );
-    println!(
-        "EMA:: Asg (s:{:>.2}, f:{:>.2}), LBD (s:{:>.2}, f:{:>.2}), DL (conflict:{:>.2}, backjump:{:>.2})",
-        s.ema_asg.slow, s.ema_asg.fast, s.ema_lbd.slow, s.ema_lbd.fast,
-        s.c_lvl.get(), s.b_lvl.get(),
-    );
+fn main() {
+    let args = CLOpts::from_args();
+    if args.cnf.exists() {
+        let mut config = SolverConfig::default();
+        config.adapt_strategy = !args.no_adapt;
+        config.restart_thr = args.restart_threshold;
+        config.restart_blk = args.restart_blocking;
+        config.restart_asg_len = args.restart_asg_samples;
+        config.restart_lbd_len = args.restart_lbd_samples;
+        config.restart_step = args.restart_step;
+        config.progress_log = args.use_log;
+        if args.no_elim {
+            config.use_sve = false;
+        }
+        let (mut s, _cnf) = Solver::build(config, &args.cnf.to_str().unwrap());
+        let result = format!(".ans_{}", args.cnf.file_name().unwrap().to_str().unwrap());
+        match s.solve() {
+            Ok(Certificate::SAT(v)) => {
+                if let Ok(out) = File::create(&result) {
+                    let mut buf = BufWriter::new(out);
+                    for x in &v {
+                        if let Err(why) = buf.write(format!("{} ", x).as_bytes()) {
+                            panic!("failed to save: {:?}!", why);
+                        }
+                    }
+                    if let Err(why) = buf.write(b"0\n") {
+                        panic!("failed to save: {:?}!", why);
+                    }
+                }
+                println!("SATISFIABLE. The answer was dumped to {}.", result.as_str());
+                // println!("{:?}", v);
+            }
+            Ok(Certificate::UNSAT(_)) => {
+                if let Ok(mut out) = File::create(&result) {
+                    if let Err(why) = out.write_all(b"[]\n") {
+                        panic!("failed to save: {:?}!", why);
+                    }
+                }
+                println!("UNSAT, The answer was dumped to {}.", result.as_str());
+            }
+            Err(_) => println!("Failed"),
+        }
+    } else {
+        println!(
+            "{} does not exist.",
+            args.cnf.file_name().unwrap().to_str().unwrap()
+        );
+    }
 }

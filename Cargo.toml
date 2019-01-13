@@ -1,7 +1,14 @@
 [package]
 name = "splr"
-version = "0.0.1"
-authors = ["shujinarazaki <shujinarazaki@protonmail.com>"]
+version = "0.0.12"
+authors = ["Shuji Narazaki <shujinarazaki@protonmail.com>"]
+edition = "2018"
 
 [dependencies]
+chrono = "0.4.6"
+structopt = "0.2.10"
 
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
