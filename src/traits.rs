@@ -59,6 +59,8 @@ pub trait ClauseIdIF {
     fn from_(kind: ClauseKind, cix: ClauseIndex) -> Self;
     fn to_index(&self) -> ClauseIndex;
     fn to_kind(&self) -> usize;
+    fn to_lit(self) -> Lit;
+    fn is_lifted_lit(self) -> bool;
     fn is(&self, kind: ClauseKind, ix: ClauseIndex) -> bool;
     fn format(&self) -> String;
 }
@@ -115,7 +117,7 @@ pub trait LitIF {
     fn lbool(&self) -> Lbool;
     fn positive(&self) -> bool;
     fn negate(&self) -> Lit;
-    fn as_uniclause(self) -> ClauseId;
+    fn to_cid(self) -> ClauseId;
 }
 
 pub trait Propagate {

@@ -203,7 +203,7 @@ impl Eliminator {
             // if computed-too-long { break; }
             // Check top-level assigments by creating a dummy clause and placing it in the queue:
             if self.clause_queue.is_empty() && self.bwdsub_assigns < asgs.len() {
-                let c = asgs.trail[self.bwdsub_assigns].as_uniclause();
+                let c = asgs.trail[self.bwdsub_assigns].to_cid();
                 self.clause_queue.push(c);
                 self.bwdsub_assigns += 1;
             }
@@ -213,9 +213,9 @@ impl Eliminator {
                 let mut best = 0;
                 let unilits: [Lit; 1];
                 let lits: &[Lit];
-                if cid.to_kind() == ClauseKind::Liftedlit as usize {
-                    best = (cid.to_index() as Lit).vi();
-                    unilits = [cid.to_index() as Lit; 1];
+                if cid.is_lifted_lit() {
+                    best = cid.to_lit().vi();
+                    unilits = [cid.to_lit(); 1];
                     lits = &unilits;
                 } else {
                     let ch = clause_mut!(*cps, cid) as *mut Clause;
@@ -302,8 +302,8 @@ impl Eliminator {
 
 /// returns a literal if these clauses can be merged by the literal.
 fn subsume(cps: &mut ClauseDB, cid: ClauseId, other: ClauseId) -> Option<Lit> {
-    debug_assert!(other.to_kind() != ClauseKind::Liftedlit as usize);
-    if cid.to_kind() == ClauseKind::Liftedlit as usize {
+    debug_assert!(!other.is_lifted_lit());
+    if cid.is_lifted_lit() {
         let l = cid.to_index() as Lit;
         let oh = clause!(*cps, other);
         for lo in &oh.lits {
@@ -313,7 +313,7 @@ fn subsume(cps: &mut ClauseDB, cid: ClauseId, other: ClauseId) -> Option<Lit> {
         }
         return None;
     }
-    // println!("subsume {} = {}:{}", cid, cid.to_kind(), cid.to_index());
+    // println!("subsume {}", cid.format());
     let mut ret: Lit = NULL_LIT;
     let ch = clause!(*cps, cid);
     let ob = clause!(*cps, other);

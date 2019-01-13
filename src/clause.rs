@@ -53,6 +53,14 @@ impl ClauseIdIF for ClauseId {
         *self >> CLAUSE_INDEX_BITS
     }
     #[inline(always)]
+    fn to_lit(self) -> Lit {
+        (self & 0x0000_0000_FFFF_FFFF) as Lit
+    }
+    #[inline(always)]
+    fn is_lifted_lit(self) -> bool {
+        0x8000_0000_0000_0000 <= self
+    }
+    #[inline(always)]
     fn is(&self, kind: ClauseKind, ix: ClauseIndex) -> bool {
         self.to_kind() == kind as usize && self.to_index() == ix
     }

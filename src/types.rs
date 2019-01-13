@@ -82,7 +82,7 @@ impl LitIF for Lit {
     fn negate(&self) -> Lit {
         self ^ 1
     }
-    fn as_uniclause(self) -> ClauseId {
+    fn to_cid(self) -> ClauseId {
         ClauseId::from_(ClauseKind::Liftedlit, self as usize)
     }
 }
