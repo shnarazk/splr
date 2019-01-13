@@ -140,6 +140,7 @@ impl WatchManagement for Vec<Watch> {
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub enum ClauseFlag {
     Dead = 0,
+    Learnt,
     JustUsed,
     Enqueued,
 }
