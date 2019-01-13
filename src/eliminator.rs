@@ -256,7 +256,7 @@ impl Eliminator {
                             match subsume(cps, cid, *di) {
                                 Some(NULL_LIT) => {
                                     if cid.to_kind() == ClauseKind::Removable as usize
-                                        && di.to_kind() == ClauseKind::Removable as usize
+                                        && (*db).get_flag(ClauseFlag::Learnt)
                                     {
                                         // println!("BackSubsC    => {} {:#} subsumed completely by {} {:#}",
                                         //          di.fmt(),

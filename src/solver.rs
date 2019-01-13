@@ -527,7 +527,7 @@ fn analyze(
         unsafe {
             let ch = clause_mut!(*cps, cid) as *mut Clause;
             debug_assert_ne!(cid, NULL_CLAUSE);
-            if cid.to_kind() == ClauseKind::Removable as usize {
+            if (*ch).get_flag(ClauseFlag::Learnt) {
                 // self.bump_cid(cid);
                 cps[ClauseKind::Removable as usize].bump_activity(
                     &mut config.cla_inc,
@@ -574,11 +574,12 @@ fn analyze(
                     if dl <= lvl {
                         // println!("- flag for {} which level is {}", q.int(), lvl);
                         path_cnt += 1;
-                    // if vars[vi].reason != NULL_CLAUSE
-                    //     && vars[vi].reason.to_kind() == ClauseKind::Removable as usize
-                    // {
-                    //     last_dl.push(*q);
-                    // }
+                        // if vars[vi].reason != NULL_CLAUSE
+                        //     && clause!(*cps, vars[vi].reason).get_flag(ClauseFlag::Learnt)
+                        //     && vars[vi].reason.to_kind() == ClauseKind::Removable as usize
+                        // {
+                        //     last_dl.push(*q);
+                        // }
                     } else {
                         // println!("- push {} to learnt, which level is {}", q.int(), lvl);
                         learnt.push(*q);
