@@ -255,7 +255,8 @@ impl Eliminator {
                         {
                             match subsume(cps, cid, *di) {
                                 Some(NULL_LIT) => {
-                                    if cid.to_kind() == ClauseKind::Removable as usize
+                                    if !cid.is_lifted_lit()
+                                        && clause!(*cps, cid).get_flag(ClauseFlag::Learnt)
                                         && (*db).get_flag(ClauseFlag::Learnt)
                                     {
                                         // println!("BackSubsC    => {} {:#} subsumed completely by {} {:#}",
@@ -683,8 +684,8 @@ fn eliminate_var(
                         }
                         _ => {
                             let v = &mut vec.to_vec();
-                            if p.to_kind() == ClauseKind::Removable as usize
-                                && n.to_kind() == ClauseKind::Removable as usize
+                            if clause!(*cps, p).get_flag(ClauseFlag::Learnt)
+                                && clause!(*cps, n).get_flag(ClauseFlag::Learnt)
                             {
                                 let rank = rank_p.min(clause!(*cps, n).rank);
                                 cps.add_clause(config, elim, vars, v, rank);

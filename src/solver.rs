@@ -576,7 +576,6 @@ fn analyze(
                         path_cnt += 1;
                         // if vars[vi].reason != NULL_CLAUSE
                         //     && clause!(*cps, vars[vi].reason).get_flag(ClauseFlag::Learnt)
-                        //     && vars[vi].reason.to_kind() == ClauseKind::Removable as usize
                         // {
                         //     last_dl.push(*q);
                         // }
