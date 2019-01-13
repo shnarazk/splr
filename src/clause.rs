@@ -22,7 +22,6 @@ pub enum ClauseKind {
     Removable,
     Permanent,
     Binclause,
-    Uniclause,
 }
 
 impl ClauseKind {
@@ -33,7 +32,6 @@ impl ClauseKind {
             ClauseKind::Removable => 0x1000_0000_0000_0000,
             ClauseKind::Permanent => 0x2000_0000_0000_0000,
             ClauseKind::Binclause => 0x3000_0000_0000_0000,
-            ClauseKind::Uniclause => 0x4000_0000_0000_0000,
         }
     }
 }
@@ -65,7 +63,6 @@ impl ClauseIdIF for ClauseId {
             1 => format!("Learnt::{}", self.to_index()),
             2 => format!("Perman::{}", self.to_index()),
             3 => format!("Binary::{}", self.to_index()),
-            4 => format!("Unicls::{}", self.to_index()),
             _ => format!("Ilegal::{}", self.to_index()),
         }
     }
@@ -536,7 +533,7 @@ impl ClauseDBIF for ClauseDB {
                 return false;
             }
         }
-        for ck in &mut self[ClauseKind::Liftedlit as usize..=ClauseKind::Binclause as usize] {
+        for ck in &mut self[ClauseKind::Removable as usize..=ClauseKind::Binclause as usize] {
             for ch in &mut ck.head[1..] {
                 if !ch.get_flag(ClauseFlag::Dead) && vars.satisfies(&ch.lits) {
                     debug_assert!(ch.lits[0] != 0 && ch.lits[1] != 0);

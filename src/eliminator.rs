@@ -213,7 +213,7 @@ impl Eliminator {
                 let mut best = 0;
                 let unilits: [Lit; 1];
                 let lits: &[Lit];
-                if cid.to_kind() == ClauseKind::Uniclause as usize {
+                if cid.to_kind() == ClauseKind::Liftedlit as usize {
                     best = (cid.to_index() as Lit).vi();
                     unilits = [cid.to_index() as Lit; 1];
                     lits = &unilits;
@@ -302,8 +302,8 @@ impl Eliminator {
 
 /// returns a literal if these clauses can be merged by the literal.
 fn subsume(cps: &mut ClauseDB, cid: ClauseId, other: ClauseId) -> Option<Lit> {
-    debug_assert!(other.to_kind() != ClauseKind::Uniclause as usize);
-    if cid.to_kind() == ClauseKind::Uniclause as usize {
+    debug_assert!(other.to_kind() != ClauseKind::Liftedlit as usize);
+    if cid.to_kind() == ClauseKind::Liftedlit as usize {
         let l = cid.to_index() as Lit;
         let oh = clause!(*cps, other);
         for lo in &oh.lits {
