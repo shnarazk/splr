@@ -167,7 +167,7 @@ impl SolverConfig {
         // state.lbd_queue.clear();
         state.stats[Stat::SumLBD as usize] = 0;
         state.stats[Stat::Conflict as usize] = 0;
-        let [_, learnts, permanents, _] = cps;
+        let [learnts, permanents, _] = cps;
         if self.use_chan_seok {
             // println!("# Adjusting for low decision levels.");
             // move some clauses with good lbd (col_lbd_bound) to Permanent

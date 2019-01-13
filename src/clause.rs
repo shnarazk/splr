@@ -18,20 +18,20 @@ const CLA_ACTIVITY_SCALE2: f64 = 1e-10;
 
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub enum ClauseKind {
-    Liftedlit,
     Removable,
     Permanent,
     Binclause,
+    Liftedlit,
 }
 
 impl ClauseKind {
     #[inline(always)]
     fn tag(self) -> usize {
         match self {
-            ClauseKind::Liftedlit => 0x0000_0000_0000_0000,
-            ClauseKind::Removable => 0x1000_0000_0000_0000,
-            ClauseKind::Permanent => 0x2000_0000_0000_0000,
-            ClauseKind::Binclause => 0x3000_0000_0000_0000,
+            ClauseKind::Removable => 0x0000_0000_0000_0000,
+            ClauseKind::Permanent => 0x1000_0000_0000_0000,
+            ClauseKind::Binclause => 0x2000_0000_0000_0000,
+            ClauseKind::Liftedlit => 0x3000_0000_0000_0000,
         }
     }
 }
@@ -59,10 +59,10 @@ impl ClauseIdIF for ClauseId {
     fn format(&self) -> String {
         match self.to_kind() {
             _ if *self == 0 => "NullClause".to_string(),
-            0 => format!("Lifted::{}", self.to_index()),
-            1 => format!("Learnt::{}", self.to_index()),
-            2 => format!("Perman::{}", self.to_index()),
-            3 => format!("Binary::{}", self.to_index()),
+            0 => format!("Learnt::{}", self.to_index()),
+            1 => format!("Perman::{}", self.to_index()),
+            2 => format!("Binary::{}", self.to_index()),
+            3 => format!("Lifted::{}", self.to_index()),
             _ => format!("Ilegal::{}", self.to_index()),
         }
     }
@@ -409,12 +409,11 @@ impl ClausePartition {
     }
 }
 
-pub type ClauseDB = [ClausePartition; 4];
+pub type ClauseDB = [ClausePartition; 3];
 
 impl ClauseDBIF for ClauseDB {
     fn new(nv: usize, nc: usize) -> ClauseDB {
         [
-            ClausePartition::build(ClauseKind::Liftedlit, nv, 0),
             ClausePartition::build(ClauseKind::Removable, nv, nc),
             ClausePartition::build(ClauseKind::Permanent, nv, 256),
             ClausePartition::build(ClauseKind::Binclause, nv, 256),
