@@ -31,7 +31,7 @@ impl ClauseKind {
             ClauseKind::Removable => 0x0000_0000_0000_0000,
             ClauseKind::Permanent => 0x1000_0000_0000_0000,
             ClauseKind::Binclause => 0x2000_0000_0000_0000,
-            ClauseKind::Liftedlit => 0x3000_0000_0000_0000,
+            ClauseKind::Liftedlit => 0x8000_0000_0000_0000,
         }
     }
 }
