@@ -1,20 +1,5 @@
 //! This is a SAT solver in Rust.
 
-#[allow(unused_macros)]
-macro_rules! uenqueue {
-    ($vs: expr, $tr: expr, $tl: expr, $lit: expr, $cid: expr) => {{
-        match (&$vs, &mut $tr, &$tl, $lit, $cid) {
-            (vs, tr, tl, lit, cid) => {
-                let mut v = &mut vs[lit.vi()];
-                v.assign = lit.lbool();
-                v.level = tl.len();
-                v.reason = cid;
-                tr.push(lit);
-            }
-        }
-    }};
-}
-
 // /// Subsumption-based clause/var eliminaiton
 /// Assignment management
 pub mod assign;
