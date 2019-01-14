@@ -57,7 +57,7 @@ impl Default for Watch {
     }
 }
 
-impl WatchManagement for Vec<Watch> {
+impl WatchDBIF for Vec<Watch> {
     fn initialize(mut self, n: usize) -> Self {
         if 2 <= n {
             self.push(Watch::default());
@@ -88,9 +88,9 @@ impl WatchManagement for Vec<Watch> {
         self[0].c -= 1;
     }
     #[inline(always)]
-    fn detach_with(&mut self, cix: usize) {
+    fn detach_with(&mut self, cid: usize) {
         for n in 1..=self[0].c {
-            if self[n].c == cix {
+            if self[n].c == cid {
                 self.detach(n);
                 return;
             }
@@ -299,7 +299,7 @@ impl ClauseDBIF for ClauseDB {
         let cid;
         if let Some(w) = self.watcher[NULL_LIT.negate() as usize].pop() {
             cid = w.c;
-            // debug_assert!(self.head[cix].get_flag(ClauseFlag::Dead));
+            // debug_assert!(self.head[cid].get_flag(ClauseFlag::Dead));
             let ch = &mut self.clause[cid];
             self.watcher[v[0].negate() as usize].attach(v[1], cid);
             self.watcher[v[1].negate() as usize].attach(v[0], cid);
@@ -358,14 +358,16 @@ impl ClauseDBIF for ClauseDB {
         }
         temp[0] = key + 1;
     }
-    fn bump_activity(&mut self, inc: &mut f64, cix: ClauseIndex, _d: f64) {
-        let c = &mut self.clause[cix];
+    fn bump_activity(&mut self, inc: &mut f64, cid: ClauseIndex, _d: f64) {
+        let c = &mut self.clause[cid];
         let a = c.activity + *inc;
         // a = (c.activity + d) / 2.0;
         c.activity = a;
         if CLA_ACTIVITY_MAX < a {
             for c in &mut self.clause[1..] {
-                c.activity *= CLA_ACTIVITY_SCALE1;
+                if c.get_flag(ClauseFlag::Learnt) {
+                    c.activity *= CLA_ACTIVITY_SCALE1;
+                }
             }
             *inc *= CLA_ACTIVITY_SCALE2;
         }
@@ -412,7 +414,7 @@ impl ClauseDBIF for ClauseDB {
         let cid = self.new_clause(&v, lbd, kind == ClauseKind::Removable);
         let ch = &mut self.clause[cid];
         ch.activity = config.var_inc;
-        vars.attach_clause(elim, cid, ch, false);
+        vars.attach_clause(elim, cid, ch, true);
         cid
     }
     /// 4. removeClause

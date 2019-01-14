@@ -67,8 +67,6 @@ pub struct SolverConfig {
     /// MISC
     pub use_sve: bool,
     pub progress_log: bool,
-    // dump stats data during solving
-    // pub dump_solver_stat_mode: i32,
 }
 
 impl Default for SolverConfig {
@@ -103,7 +101,6 @@ impl Default for SolverConfig {
             ema_coeffs: (2 ^ 5, 2 ^ 15),
             use_sve: true,
             progress_log: false,
-            // dump_solver_stat_mode: 0,
         }
     }
 }

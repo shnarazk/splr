@@ -228,7 +228,7 @@ impl SatSolver for Solver {
             }
             _ => {
                 let cid = cdb.new_clause(&v, 0, false);
-                vars.attach_clause(elim, cid, &mut cdb.clause[cid], true);
+                vars.attach_clause(elim, cid, &mut cdb.clause[cid], false);
                 Some(cid)
             }
         }

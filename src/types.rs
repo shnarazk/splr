@@ -1,5 +1,4 @@
 //! Basic types
-#![allow(dead_code)]
 use crate::traits::*;
 use std::fmt;
 use std::ops::Neg;
@@ -32,7 +31,6 @@ pub type Lit = u32;
 
 /// a dummy literal.
 pub const NULL_LIT: Lit = 0;
-pub const RECYCLE_LIT: Lit = 0;
 
 pub fn int2lit(x: i32) -> Lit {
     (if x < 0 { -2 * x + 1 } else { 2 * x }) as Lit
@@ -87,6 +85,8 @@ impl LitIF for Lit {
 }
 
 impl VarIdIF for VarId {
+    /// converter from [VarId](type.VarId.html) to [Lit](type.Lit.html).
+    /// returns a positive literal if p == LTRUE or BOTTOM.
     #[inline(always)]
     fn lit(&self, p: Lbool) -> Lit {
         (*self as Lit) << 1 | ((p == LFALSE) as Lit)
@@ -125,14 +125,6 @@ impl fmt::Display for CNFDescription {
     }
 }
 
-/// formats of state dump
-enum DumpMode {
-    NoDump = 0,
-    DumpCSVHeader,
-    DumpCSV,
-    DumpJSON,
-}
-
 pub fn vec2int(v: &[Lit]) -> Vec<i32> {
     v.iter()
         .map(|l| match l {
@@ -144,8 +136,7 @@ pub fn vec2int(v: &[Lit]) -> Vec<i32> {
 }
 
 impl<T> Delete<T> for Vec<T> {
-    #[inline(always)]
-    fn delete<F>(&mut self, mut filter: F)
+    fn delete_stable<F>(&mut self, mut filter: F)
     where
         F: FnMut(&T) -> bool,
     {

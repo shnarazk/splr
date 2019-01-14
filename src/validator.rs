@@ -1,5 +1,5 @@
 use crate::solver::Solver;
-use crate::traits::{LitIF, VarManagement};
+use crate::traits::{LitIF, VarDBIF};
 use crate::types::{LFALSE, LTRUE};
 
 impl Solver {

@@ -12,8 +12,6 @@ pub struct Eliminator {
     pub in_use: bool,
     // to run eliminate
     pub active: bool,
-
-    merges: usize,
     clause_queue: Vec<ClauseId>,
     pub var_queue: Vec<VarId>,
     bwdsub_assigns: usize,
@@ -35,7 +33,6 @@ impl Default for Eliminator {
         Eliminator {
             in_use: true,
             active: true,
-            merges: 0,
             var_queue: Vec::new(),
             clause_queue: Vec::new(),
             bwdsub_assigns: 0,
@@ -401,15 +398,8 @@ fn check_eliminator(cdb: &ClauseDB, vars: &[Var]) -> bool {
 }
 
 /// Returns **false** if one of the clauses is always satisfied. (merge_vec should not be used.)
-fn merge(
-    cdb: &mut ClauseDB,
-    elim: &mut Eliminator,
-    cip: ClauseId,
-    ciq: ClauseId,
-    v: VarId,
-) -> Option<Vec<Lit>> {
+fn merge(cdb: &mut ClauseDB, cip: ClauseId, ciq: ClauseId, v: VarId) -> Option<Vec<Lit>> {
     let mut vec: Vec<Lit> = Vec::new();
-    elim.merges += 1;
     let pqb = &cdb.clause[cip];
     let qpb = &cdb.clause[ciq];
     let ps_smallest = pqb.lits.len() < qpb.lits.len();
@@ -655,7 +645,7 @@ fn eliminate_var(
             let rank_p = cdb.clause[*p].rank;
             for n in &*neg {
                 debug_assert!(!cdb.clause[*n].get_flag(ClauseFlag::Dead));
-                if let Some(vec) = merge(cdb, elim, *p, *n, v) {
+                if let Some(vec) = merge(cdb, *p, *n, v) {
                     // println!("eliminator replaces {} with a cross product {:?}", p.fmt(), vec2int(&vec));
                     debug_assert!(!vec.is_empty());
                     match vec.len() {

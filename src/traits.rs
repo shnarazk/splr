@@ -56,7 +56,7 @@ pub trait ClauseDBIF {
     fn garbage_collect(&mut self, vars: &mut [Var], elim: &mut Eliminator);
     fn new_clause(&mut self, v: &[Lit], rank: usize, learnt: bool) -> ClauseId;
     fn reset_lbd(&mut self, vars: &[Var], temp: &mut [usize]);
-    fn bump_activity(&mut self, inc: &mut f64, cix: ClauseIndex, _d: f64);
+    fn bump_activity(&mut self, inc: &mut f64, cid: ClauseIndex, _d: f64);
     fn count(&self, alive: bool) -> usize;
 }
 
@@ -67,7 +67,7 @@ pub trait ClauseIdIF {
 }
 
 pub trait Delete<T> {
-    fn delete<F>(&mut self, filter: F)
+    fn delete_stable<F>(&mut self, filter: F)
     where
         F: FnMut(&T) -> bool;
     fn delete_unstable<F>(&mut self, filter: F)
@@ -154,13 +154,10 @@ pub trait VarIF {
 }
 
 pub trait VarIdIF {
-    /// converter from [VarId](type.VarId.html) to [Lit](type.Lit.html).
-    /// returns a positive literal if p == LTRUE or BOTTOM.
     fn lit(&self, p: Lbool) -> Lit;
 }
 
-/// For [Var]
-pub trait VarManagement {
+pub trait VarDBIF {
     fn assigned(&self, l: Lit) -> Lbool;
     fn locked(&self, ch: &Clause, cid: ClauseId) -> bool;
     fn satisfies(&self, c: &[Lit]) -> bool;
@@ -170,7 +167,7 @@ pub trait VarManagement {
         elim: &mut Eliminator,
         cid: ClauseId,
         ch: &mut Clause,
-        ignorable: bool,
+        enqueue: bool,
     );
     fn detach_clause(&mut self, elim: &mut Eliminator, cid: ClauseId, ch: &Clause);
     fn bump_activity(&mut self, inc: &mut f64, vi: VarId, _d: f64);
@@ -187,11 +184,10 @@ pub trait VarOrderIF {
     fn rebuild(&mut self, vars: &[Var]);
 }
 
-/// For Vec<Watch>
-pub trait WatchManagement {
+pub trait WatchDBIF {
     fn initialize(self, n: usize) -> Self;
     fn count(&self) -> usize;
     fn attach(&mut self, blocker: Lit, c: usize);
     fn detach(&mut self, n: usize);
-    fn detach_with(&mut self, cix: usize);
+    fn detach_with(&mut self, cid: usize);
 }

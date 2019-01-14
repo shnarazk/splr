@@ -71,8 +71,8 @@ impl AssignIF for AssignStack {
                 v.reason = NULL_CLAUSE;
                 v.activity = 0.0;
             }
-            // debug_assert!(!self.trail.contains(&l));
-            // debug_assert!(!self.trail.contains(&l.negate()));
+            debug_assert!(!self.trail.contains(&v.index.lit(LTRUE)));
+            debug_assert!(!self.trail.contains(&v.index.lit(LFALSE)));
             self.trail.push(v.index.lit(sig));
             true
         } else {
@@ -128,8 +128,8 @@ impl AssignIF for AssignStack {
         // if dl == 0 {
         //     eliminator.enqueue_var(v);
         // }
-        // debug_assert!(!self.trail.contains(&l));
-        // debug_assert!(!self.trail.contains(&l.negate()));
+        debug_assert!(!self.trail.contains(&l));
+        debug_assert!(!self.trail.contains(&l.negate()));
         self.trail.push(l);
     }
     fn uncheck_assume(&mut self, vars: &mut [Var], elim: &mut Eliminator, l: Lit) {

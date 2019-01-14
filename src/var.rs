@@ -58,7 +58,7 @@ impl VarIF for Var {
     }
 }
 
-impl VarManagement for [Var] {
+impl VarDBIF for [Var] {
     fn assigned(&self, l: Lit) -> Lbool {
         unsafe { self.get_unchecked(l.vi()).assign ^ ((l & 1) as u8) }
     }
@@ -101,7 +101,7 @@ impl VarManagement for [Var] {
         elim: &mut Eliminator,
         cid: ClauseId,
         ch: &mut Clause,
-        ignorable: bool,
+        enqueue: bool,
     ) {
         if !elim.in_use {
             return;
@@ -117,7 +117,7 @@ impl VarManagement for [Var] {
                 }
             }
         }
-        if !ignorable {
+        if enqueue {
             elim.enqueue_clause(cid, ch);
         }
     }
