@@ -1,4 +1,3 @@
-#![allow(unused_variables)]
 use crate::assign::AssignStack;
 use crate::config::SolverConfig;
 use crate::eliminator::Eliminator;
@@ -21,9 +20,6 @@ pub enum ClauseKind {
     Binclause,
     Liftedlit,
 }
-
-/// Clause Index, not ID because it's used only within a Vec<Clause>
-pub type ClauseIndex = usize;
 
 impl ClauseIdIF for ClauseId {
     #[inline(always)]
@@ -358,7 +354,7 @@ impl ClauseDBIF for ClauseDB {
         }
         temp[0] = key + 1;
     }
-    fn bump_activity(&mut self, inc: &mut f64, cid: ClauseIndex, _d: f64) {
+    fn bump_activity(&mut self, inc: &mut f64, cid: ClauseId, _d: f64) {
         let c = &mut self.clause[cid];
         let a = c.activity + *inc;
         // a = (c.activity + d) / 2.0;
