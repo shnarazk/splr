@@ -1,5 +1,5 @@
 use crate::assign::AssignStack;
-use crate::clause::{Clause, ClauseDB, ClauseFlag, ClauseKind, Watch};
+use crate::clause::{Clause, ClauseDB, ClauseFlag, Watch};
 use crate::config::SolverConfig;
 use crate::eliminator::Eliminator;
 use crate::state::{SolverState, Stat};
@@ -220,11 +220,6 @@ impl SatSolver for Solver {
             }
         }
         v.truncate(j);
-        let kind = if v.len() == 2 {
-            ClauseKind::Binclause
-        } else {
-            ClauseKind::Permanent
-        };
         match v.len() {
             0 => None, // Empty clause is UNSAT.
             1 => {
@@ -232,7 +227,7 @@ impl SatSolver for Solver {
                 Some(NULL_CLAUSE)
             }
             _ => {
-                let cid = cps[kind as usize].new_clause(&v, 0);
+                let cid = cps.new_clause(&v, 0, false);
                 vars.attach_clause(elim, cid, clause_mut!(*cps, cid), true);
                 Some(cid)
             }
@@ -251,95 +246,19 @@ impl Propagate for AssignStack {
             let p: usize = self.sweep() as usize;
             let false_lit = (p as Lit).negate();
             state.stats[Stat::Propagation as usize] += 1;
-            for kind in &[
-                ClauseKind::Binclause,
-                ClauseKind::Removable,
-                ClauseKind::Permanent,
-            ] {
-                let head = &mut cps[*kind as usize].head;
-                unsafe {
-                    let watcher = &mut cps[*kind as usize].watcher[..] as *mut [Vec<Watch>];
-                    let source = &mut (*watcher)[p];
-                    let mut n = 1;
-                    'next_clause: while n <= source.count() {
-                        let w = &mut source[n];
-                        if head[w.c].get_flag(ClauseFlag::Dead) {
-                            source.detach(n);
-                            continue 'next_clause;
-                        }
-                        if vars.assigned(w.blocker) != LTRUE {
-                            let Clause { ref mut lits, .. } = &mut head[w.c];
-                            debug_assert!(2 <= lits.len());
-                            debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
-                            let mut first = *lits.get_unchecked(0);
-                            if first == false_lit {
-                                lits.swap(0, 1); // now false_lit is lits[1].
-                                first = *lits.get_unchecked(0);
-                            }
-                            let first_value = vars.assigned(first);
-                            // If 0th watch is true, then clause is already satisfied.
-                            if first != w.blocker && first_value == LTRUE {
-                                w.blocker = first;
-                                n += 1;
-                                continue 'next_clause;
-                            }
-                            for (k, lk) in lits.iter().enumerate().skip(2) {
-                                // below is equivalent to 'assigned(lk) != LFALSE'
-                                if (((lk & 1) as u8) ^ vars[lk.vi()].assign) != 0 {
-                                    (*watcher)[lk.negate() as usize].attach(first, w.c);
-                                    source.detach(n);
-                                    lits[1] = *lk;
-                                    lits[k] = false_lit;
-                                    continue 'next_clause;
-                                }
-                            }
-                            let cid = ClauseId::from_(*kind, w.c);
-                            if first_value == LFALSE {
-                                self.catchup();
-                                return cid;
-                            } else {
-                                self.uncheck_enqueue(vars, first, cid);
-                            }
-                        }
-                        n += 1;
-                    }
-                }
-            }
-        }
-        NULL_CLAUSE
-    }
-}
-
-#[inline(always)]
-fn propagate_fast(
-    asgs: &mut AssignStack,
-    cps: &mut ClauseDB,
-    state: &mut SolverState,
-    vars: &mut [Var],
-) -> ClauseId {
-    while asgs.remains() {
-        let p: usize = asgs.sweep() as usize;
-        let false_lit = (p as Lit).negate();
-        state.stats[Stat::Propagation as usize] += 1;
-        for kind in &[
-            ClauseKind::Binclause,
-            ClauseKind::Removable,
-            ClauseKind::Permanent,
-        ] {
-            let head = &mut cps[*kind as usize].head;
+            let head = &mut cps.head;
             unsafe {
-                let watcher = &mut cps[*kind as usize].watcher[..] as *mut [Vec<Watch>];
+                let watcher = &mut cps.watcher[..] as *mut [Vec<Watch>];
                 let source = &mut (*watcher)[p];
                 let mut n = 1;
                 'next_clause: while n <= source.count() {
-                    let w = source.get_unchecked_mut(n);
-                    // if head[w.c].get_flag(ClauseFlag::Dead) {
-                    //     source.detach(n);
-                    //     continue 'next_clause;
-                    // }
-                    // debug_assert!(!vars[w.blocker.vi()].eliminated); it doesn't hold in TP12
+                    let w = &mut source[n];
+                    if head[w.c].get_flag(ClauseFlag::Dead) {
+                        source.detach(n);
+                        continue 'next_clause;
+                    }
                     if vars.assigned(w.blocker) != LTRUE {
-                        let Clause { ref mut lits, .. } = head.get_unchecked_mut(w.c);
+                        let Clause { ref mut lits, .. } = &mut head[w.c];
                         debug_assert!(2 <= lits.len());
                         debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
                         let mut first = *lits.get_unchecked(0);
@@ -364,16 +283,78 @@ fn propagate_fast(
                                 continue 'next_clause;
                             }
                         }
-                        let cid = ClauseId::from_(*kind, w.c);
                         if first_value == LFALSE {
-                            asgs.catchup();
-                            return cid;
+                            self.catchup();
+                            return w.c;
                         } else {
-                            asgs.uncheck_enqueue(vars, first, cid);
+                            self.uncheck_enqueue(vars, first, w.c);
                         }
                     }
                     n += 1;
                 }
+            }
+        }
+        NULL_CLAUSE
+    }
+}
+
+#[inline(always)]
+fn propagate_fast(
+    asgs: &mut AssignStack,
+    cps: &mut ClauseDB,
+    state: &mut SolverState,
+    vars: &mut [Var],
+) -> ClauseId {
+    while asgs.remains() {
+        let p: usize = asgs.sweep() as usize;
+        let false_lit = (p as Lit).negate();
+        state.stats[Stat::Propagation as usize] += 1;
+        let head = &mut cps.head;
+        unsafe {
+            let watcher = &mut cps.watcher[..] as *mut [Vec<Watch>];
+            let source = &mut (*watcher)[p];
+            let mut n = 1;
+            'next_clause: while n <= source.count() {
+                let w = source.get_unchecked_mut(n);
+                // if head[w.c].get_flag(ClauseFlag::Dead) {
+                //     source.detach(n);
+                //     continue 'next_clause;
+                // }
+                // debug_assert!(!vars[w.blocker.vi()].eliminated); it doesn't hold in TP12
+                if vars.assigned(w.blocker) != LTRUE {
+                    let Clause { ref mut lits, .. } = head.get_unchecked_mut(w.c);
+                    debug_assert!(2 <= lits.len());
+                    debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
+                    let mut first = *lits.get_unchecked(0);
+                    if first == false_lit {
+                        lits.swap(0, 1); // now false_lit is lits[1].
+                        first = *lits.get_unchecked(0);
+                    }
+                    let first_value = vars.assigned(first);
+                    // If 0th watch is true, then clause is already satisfied.
+                    if first != w.blocker && first_value == LTRUE {
+                        w.blocker = first;
+                        n += 1;
+                        continue 'next_clause;
+                    }
+                    for (k, lk) in lits.iter().enumerate().skip(2) {
+                        // below is equivalent to 'assigned(lk) != LFALSE'
+                        if (((lk & 1) as u8) ^ vars.get_unchecked(lk.vi()).assign) != 0 {
+                            (*watcher)[lk.negate() as usize].attach(first, w.c);
+                            source.detach(n);
+                            lits[1] = *lk;
+                            lits[k] = false_lit;
+                            continue 'next_clause;
+                        }
+                    }
+                    if first_value == LFALSE {
+                        asgs.catchup();
+                        return w.c;
+                    } else {
+                        asgs.uncheck_enqueue(vars, first, w.c);
+                    }
+                }
+                n += 1;
             }
         }
     }
@@ -494,7 +475,7 @@ fn handle_conflict_path(
     // glucose reduction
     if (config.use_chan_seok
         && !config.glureduce
-        && config.first_reduction < cps[ClauseKind::Removable as usize].count(true))
+        && config.first_reduction < cps.num_learnt)
         || (config.glureduce
             && state.cur_restart * state.next_reduction
                 <= (state.stats[Stat::Learnt as usize] - state.stats[Stat::NumBinLearnt as usize])
@@ -529,9 +510,9 @@ fn analyze(
             debug_assert_ne!(cid, NULL_CLAUSE);
             if (*ch).get_flag(ClauseFlag::Learnt) {
                 // self.bump_cid(cid);
-                cps[ClauseKind::Removable as usize].bump_activity(
+                cps.bump_activity(
                     &mut config.cla_inc,
-                    cid.to_index(),
+                    cid,
                     state.stats[Stat::Conflict as usize] as f64,
                 );
                 // if 2 < (*ch).rank {
@@ -761,13 +742,11 @@ fn minimize_with_bi_clauses(
     }
     let l0 = vec[0];
     let mut nb = 0;
-    let len = cps[ClauseKind::Binclause as usize].watcher[l0.negate() as usize].count();
-    if len == 0 {
-        lbd_temp[0] = key;
-        return;
-    }
-    for w in &cps[ClauseKind::Binclause as usize].watcher[l0.negate() as usize][1..len] {
-        let ch = &cps[ClauseKind::Binclause as usize].head[w.c];
+    for w in &cps.watcher[l0.negate() as usize][1..] {
+        let ch = &cps.head[w.c];
+        if ch.lits.len() != 2 {
+            continue;
+        }
         debug_assert!(ch.lits[0] == l0 || ch.lits[1] == l0);
         let other = ch.lits[(ch.lits[0] == l0) as usize];
         let vi = other.vi();

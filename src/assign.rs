@@ -1,4 +1,4 @@
-use crate::clause::{ClauseDB, ClauseKind};
+use crate::clause::ClauseDB;
 use crate::config::SolverConfig;
 use crate::eliminator::Eliminator;
 use crate::traits::*;
@@ -162,20 +162,14 @@ impl AssignIF for AssignStack {
         if let Ok(out) = File::create(&fname) {
             let mut buf = BufWriter::new(out);
             let nv = self.len();
-            let nc: usize = cps.iter().map(|p| p.head.len() - 1).sum();
+            let nc: usize = cps.head.len() - 1;
             buf.write_all(format!("p cnf {} {}\n", config.num_vars, nc + nv).as_bytes())
                 .unwrap();
-            for kind in &[
-                ClauseKind::Binclause,
-                ClauseKind::Removable,
-                ClauseKind::Permanent,
-            ] {
-                for c in cps[*kind as usize].head.iter().skip(1) {
-                    for l in &c.lits {
-                        buf.write_all(format!("{} ", l.int()).as_bytes()).unwrap();
-                    }
-                    buf.write_all(b"0\n").unwrap();
+            for c in &cps.head[1..] {
+                for l in &c.lits {
+                    buf.write_all(format!("{} ", l.int()).as_bytes()).unwrap();
                 }
+                buf.write_all(b"0\n").unwrap();
             }
             buf.write_all(b"c from trail\n").unwrap();
             for x in &self.trail {

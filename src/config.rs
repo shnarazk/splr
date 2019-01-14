@@ -167,24 +167,20 @@ impl SolverConfig {
         // state.lbd_queue.clear();
         state.stats[Stat::SumLBD as usize] = 0;
         state.stats[Stat::Conflict as usize] = 0;
-        let [learnts, permanents, _] = cps;
         if self.use_chan_seok {
             // println!("# Adjusting for low decision levels.");
             // move some clauses with good lbd (col_lbd_bound) to Permanent
-            for ch in &mut learnts.head[1..] {
+            for ch in &mut cps.head[1..] {
                 if ch.get_flag(ClauseFlag::Dead) {
                     continue;
                 }
-                if ch.rank <= self.co_lbd_bound || re_init {
-                    if ch.rank <= self.co_lbd_bound {
-                        permanents.new_clause(&ch.lits, ch.rank);
-                    }
-                    learnts.touched[ch.lits[0].negate() as usize] = true;
-                    learnts.touched[ch.lits[1].negate() as usize] = true;
+                if ch.rank <= self.co_lbd_bound {
+                        ch.flag_off(ClauseFlag::Learnt);
+                } else if re_init {
                     ch.flag_on(ClauseFlag::Dead);
                 }
             }
-            learnts.garbage_collect(vars, elim);
+            cps.garbage_collect(vars, elim);
         }
     }
 }

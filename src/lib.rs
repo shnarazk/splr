@@ -4,7 +4,7 @@
 macro_rules! clause {
     ($cv: expr, $val: expr) => {{
         match (&$cv, $val) {
-            (v, cid) => &v[cid.to_kind()].head[cid.to_index()],
+            (v, cid) => &v.head[cid],
         }
     }};
 }
@@ -13,7 +13,7 @@ macro_rules! clause {
 macro_rules! clause_mut {
     ($cv: expr, $val: expr) => {{
         match (&mut $cv, $val) {
-            (v, cid) => &mut v[cid.to_kind()].head[cid.to_index()],
+            (v, cid) => &mut v.head[cid],
         }
     }};
 }

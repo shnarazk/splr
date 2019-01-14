@@ -1,5 +1,5 @@
 use crate::assign::AssignStack;
-use crate::clause::{ClauseDB, ClauseKind};
+use crate::clause::ClauseDB;
 use crate::config::SolverConfig;
 use crate::eliminator::Eliminator;
 use crate::restart::Ema;
@@ -93,7 +93,7 @@ impl SolverStateIF for SolverState {
     fn progress(
         &mut self,
         config: &mut SolverConfig,
-        cp: &ClauseDB,
+        cps: &ClauseDB,
         elim: &Eliminator,
         vars: &[Var],
         mes: Option<&str>,
@@ -104,7 +104,7 @@ impl SolverStateIF for SolverState {
         let nv = vars.len() - 1;
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
-        //let learnts = &cp[ClauseKind::Removable as usize];
+        //let learnts = &cps[ClauseKind::Removable as usize];
         let good =
             self.stats[Stat::NumLBD2 as usize] as f64 / self.stats[Stat::Conflict as usize] as f64;
         // let good = learnts
@@ -146,10 +146,10 @@ impl SolverStateIF for SolverState {
                 );
                 println!(
                     " Clause Kind|Remv:{:>9}, good:{:>9.4}, Perm:{:>9}, Binc:{:>9} ",
-                    cp[ClauseKind::Removable as usize].count(true),
+                    cps.num_learnt,
                     good,
-                    cp[ClauseKind::Permanent as usize].count(true),
-                    cp[ClauseKind::Binclause as usize].count(true),
+                    cps.num_active - cps.num_learnt,
+                    0,
                 );
                 println!(
                     "     Restart|#BLK:{:>9}, #RST:{:>9}, eASG:{:>9.4}, eLBD:{:>9.4} ",
@@ -198,10 +198,10 @@ impl SolverStateIF for SolverState {
                 fixed,
                 self.num_eliminated_vars,
                 (sum as f32) / (nv as f32) * 100.0,
-                cp[ClauseKind::Removable as usize].count(true),
+                cps.num_learnt,
                 good,
-                cp[ClauseKind::Permanent as usize].count(true),
-                cp[ClauseKind::Binclause as usize].count(true),
+                cps.num_active,
+                0,
                 self.stats[Stat::BlockRestart as usize],
                 self.stats[Stat::Restart as usize],
                 self.ema_asg.get(),

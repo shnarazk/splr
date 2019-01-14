@@ -1,6 +1,5 @@
 //! Basic types
 #![allow(dead_code)]
-use crate::clause::ClauseKind;
 use crate::traits::*;
 use std::fmt;
 use std::ops::Neg;
@@ -83,7 +82,7 @@ impl LitIF for Lit {
         self ^ 1
     }
     fn to_cid(self) -> ClauseId {
-        ClauseId::from_(ClauseKind::Liftedlit, self as usize)
+        (self as usize) | 0x8000_0000_0000_0000
     }
 }
 

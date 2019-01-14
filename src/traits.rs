@@ -1,5 +1,5 @@
 use crate::assign::AssignStack;
-use crate::clause::{Clause, ClauseDB, ClauseFlag, ClauseIndex, ClauseKind, ClausePartition};
+use crate::clause::{Clause, ClauseDB, ClauseFlag, ClauseIndex, ClausePartition};
 use crate::config::SolverConfig;
 use crate::eliminator::Eliminator;
 use crate::solver::{Solver, SolverResult};
@@ -56,19 +56,15 @@ pub trait ClauseDBIF {
 }
 
 pub trait ClauseIdIF {
-    fn from_(kind: ClauseKind, cix: ClauseIndex) -> Self;
-    fn to_index(&self) -> ClauseIndex;
-    fn to_kind(&self) -> usize;
     fn to_lit(self) -> Lit;
     fn is_lifted_lit(self) -> bool;
-    fn is(&self, kind: ClauseKind, ix: ClauseIndex) -> bool;
-    fn format(&self) -> String;
+    fn format(self) -> String;
 }
 
 pub trait ClausePartitionIF {
-    fn build(kind: ClauseKind, nv: usize, nc: usize) -> ClausePartition;
+    fn build(nv: usize, nc: usize) -> ClausePartition;
     fn garbage_collect(&mut self, vars: &mut [Var], elim: &mut Eliminator);
-    fn new_clause(&mut self, v: &[Lit], rank: usize) -> ClauseId;
+    fn new_clause(&mut self, v: &[Lit], rank: usize, learnt: bool) -> ClauseId;
     fn reset_lbd(&mut self, vars: &[Var], temp: &mut [usize]);
     fn bump_activity(&mut self, inc: &mut f64, cix: ClauseIndex, _d: f64);
     fn count(&self, alive: bool) -> usize;
