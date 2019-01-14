@@ -162,10 +162,10 @@ impl AssignIF for AssignStack {
         if let Ok(out) = File::create(&fname) {
             let mut buf = BufWriter::new(out);
             let nv = self.len();
-            let nc: usize = cps.head.len() - 1;
+            let nc: usize = cps.clause.len() - 1;
             buf.write_all(format!("p cnf {} {}\n", config.num_vars, nc + nv).as_bytes())
                 .unwrap();
-            for c in &cps.head[1..] {
+            for c in &cps.clause[1..] {
                 for l in &c.lits {
                     buf.write_all(format!("{} ", l.int()).as_bytes()).unwrap();
                 }

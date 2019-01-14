@@ -235,26 +235,26 @@ impl fmt::Display for Clause {
 }
 
 /// partition of clauses
-pub struct ClausePartition {
-    pub head: Vec<Clause>,
+pub struct ClauseDB {
+    pub clause: Vec<Clause>,
     pub touched: Vec<bool>,
     pub watcher: Vec<Vec<Watch>>,
     pub num_active: usize,
     pub num_learnt: usize,
 }
 
-impl ClausePartitionIF for ClausePartition {
-    fn build(nv: usize, nc: usize) -> ClausePartition {
-        let mut head = Vec::with_capacity(1 + nc);
-        head.push(Clause::default());
+impl ClauseDBIF for ClauseDB {
+    fn build(nv: usize, nc: usize) -> ClauseDB {
+        let mut clause = Vec::with_capacity(1 + nc);
+        clause.push(Clause::default());
         let mut watcher = Vec::with_capacity(2 * (nv + 1));
         let mut touched = Vec::with_capacity(2 * (nv + 1));
         for i in 0..2 * (nv + 1) {
             watcher.push(Vec::new().initialize(i));
             touched.push(false);
         }
-        ClausePartition {
-            head,
+        ClauseDB {
+            clause,
             touched,
             watcher,
             num_active: 0,
@@ -262,9 +262,9 @@ impl ClausePartitionIF for ClausePartition {
         }
     }
     fn garbage_collect(&mut self, vars: &mut [Var], elim: &mut Eliminator) {
-        let ClausePartition {
+        let ClauseDB {
             ref mut watcher,
-            ref mut head,
+            ref mut clause,
             ref mut touched,
             ..
         } = self;
@@ -276,7 +276,7 @@ impl ClausePartitionIF for ClausePartition {
             let mut n = 1;
             let n_max = ws.count();
             while n <= n_max {
-                if head[ws[n].c].get_flag(ClauseFlag::Dead) {
+                if clause[ws[n].c].get_flag(ClauseFlag::Dead) {
                     ws.detach(n);
                 } else {
                     n += 1;
@@ -284,7 +284,7 @@ impl ClausePartitionIF for ClausePartition {
             }
         }
         let recycled = &mut watcher[NULL_LIT.negate() as usize];
-        for (ci, ch) in self.head.iter_mut().enumerate().skip(1) {
+        for (ci, ch) in self.clause.iter_mut().enumerate().skip(1) {
             // the recycled clause is DEAD and EMPTY
             if ch.get_flag(ClauseFlag::Dead) && !ch.lits.is_empty() {
                 recycled.push(Watch::new(NULL_LIT, ci));
@@ -308,14 +308,14 @@ impl ClausePartitionIF for ClausePartition {
                 ch.lits.clear();
             }
         }
-        self.num_active = self.head.len() - recycled.len();
+        self.num_active = self.clause.len() - recycled.len();
     }
     fn new_clause(&mut self, v: &[Lit], rank: usize, learnt: bool) -> ClauseId {
         let cid;
         if let Some(w) = self.watcher[NULL_LIT.negate() as usize].pop() {
             cid = w.c;
             // debug_assert!(self.head[cix].get_flag(ClauseFlag::Dead));
-            let ch = &mut self.head[cid];
+            let ch = &mut self.clause[cid];
             self.watcher[v[0].negate() as usize].attach(v[1], cid);
             self.watcher[v[1].negate() as usize].attach(v[0], cid);
             ch.lits.clear();
@@ -336,7 +336,7 @@ impl ClausePartitionIF for ClausePartition {
             for l in v {
                 lits.push(*l);
             }
-            cid = self.head.len();
+            cid = self.clause.len();
             let mut c = Clause {
                 flags: 0,
                 lits,
@@ -347,7 +347,7 @@ impl ClausePartitionIF for ClausePartition {
                 c.flag_on(ClauseFlag::Learnt);
                 self.num_learnt += 1;
             }
-            self.head.push(c);
+            self.clause.push(c);
             self.watcher[l0.negate() as usize].attach(l1, cid);
             self.watcher[l1.negate() as usize].attach(l0, cid);
         };
@@ -356,7 +356,7 @@ impl ClausePartitionIF for ClausePartition {
     }
     fn reset_lbd(&mut self, vars: &[Var], temp: &mut [usize]) {
         let mut key = temp[0];
-        for ch in &mut self.head[1..] {
+        for ch in &mut self.clause[1..] {
             if ch.get_flag(ClauseFlag::Dead) {
                 continue;
             }
@@ -374,12 +374,12 @@ impl ClausePartitionIF for ClausePartition {
         temp[0] = key + 1;
     }
     fn bump_activity(&mut self, inc: &mut f64, cix: ClauseIndex, _d: f64) {
-        let c = &mut self.head[cix];
+        let c = &mut self.clause[cix];
         let a = c.activity + *inc;
         // a = (c.activity + d) / 2.0;
         c.activity = a;
         if CLA_ACTIVITY_MAX < a {
-            for c in &mut self.head[1..] {
+            for c in &mut self.clause[1..] {
                 c.activity *= CLA_ACTIVITY_SCALE1;
             }
             *inc *= CLA_ACTIVITY_SCALE2;
@@ -387,35 +387,13 @@ impl ClausePartitionIF for ClausePartition {
     }
     fn count(&self, alive: bool) -> usize {
         if alive {
-            self.head.len() - self.watcher[NULL_LIT.negate() as usize].len() - 1
+            self.clause.len() - self.watcher[NULL_LIT.negate() as usize].len() - 1
         } else {
-            self.head.len() - 1
+            self.clause.len() - 1
         }
     }
-}
-
-impl ClausePartition {
-    #[allow(dead_code)]
-    fn check(&self) {
-        let total = self.count(false);
-        let nc = self.count(true);
-        let nc2 = self.watcher.iter().skip(2).map(|v| v.count()).sum();
-        if 2 * nc != nc2 {
-            panic!("2 * {} != {}; total {}; alive {}", nc, nc2, total, nc);
-        }
-        let nd = total - nc;
-        let nd2 = self.watcher[NULL_LIT.negate() as usize].len();
-        if nd != nd2 {
-            panic!("dead {} != {}; total {}; alive {}", nd, nd2, total, nc);
-        }
-    }
-}
-
-pub type ClauseDB = ClausePartition;
-
-impl ClauseDBIF for ClauseDB {
     fn new(nv: usize, nc: usize) -> ClauseDB {
-        ClausePartition::build(nv, nc)
+        ClauseDB::build(nv, nc)
     }
     /// renamed from newLearntClause
     // Note: set lbd to 0 if you want to add the clause to Permanent.
@@ -474,13 +452,13 @@ impl ClauseDBIF for ClauseDB {
     }
     fn reduce(&mut self, elim: &mut Eliminator, state: &mut SolverState, vars: &mut [Var]) {
         self.reset_lbd(vars, &mut state.lbd_temp);
-        let ClausePartition {
-            ref mut head,
+        let ClauseDB {
+            ref mut clause,
             ref mut touched,
             ..
         } = self;
-        let mut perm = Vec::with_capacity(head.len());
-        for (i, b) in head.iter().enumerate().skip(1) {
+        let mut perm = Vec::with_capacity(clause.len());
+        for (i, b) in clause.iter().enumerate().skip(1) {
             if b.get_flag(ClauseFlag::Learnt)
                 && !b.get_flag(ClauseFlag::Dead)
                 && !vars.locked(b, i)
@@ -491,13 +469,13 @@ impl ClauseDBIF for ClauseDB {
         if perm.is_empty() {
             return;
         }
-        perm.sort_by(|&a, &b| head[a].cmp(&head[b]));
+        perm.sort_by(|&a, &b| clause[a].cmp(&clause[b]));
         let keep = perm.len() / 2;
-        if head[perm[keep]].rank <= 5 {
+        if clause[perm[keep]].rank <= 5 {
             state.next_reduction += 1000;
         };
         for i in &perm[keep..] {
-            let ch = &mut head[*i];
+            let ch = &mut clause[*i];
             if ch.get_flag(ClauseFlag::JustUsed) {
                 ch.flag_off(ClauseFlag::JustUsed)
             } else {
@@ -531,7 +509,7 @@ impl ClauseDBIF for ClauseDB {
                 return false;
             }
         }
-        for ch in &mut self.head[1..] {
+        for ch in &mut self.clause[1..] {
             if !ch.get_flag(ClauseFlag::Dead) && vars.satisfies(&ch.lits) {
                 debug_assert!(ch.lits[0] != 0 && ch.lits[1] != 0);
                 ch.flag_on(ClauseFlag::Dead);
@@ -550,5 +528,22 @@ impl ClauseDBIF for ClauseDB {
         self.garbage_collect(vars, elim);
         state.stats[Stat::Simplification as usize] += 1;
         true
+    }
+}
+
+impl ClauseDB {
+    #[allow(dead_code)]
+    fn check(&self) {
+        let total = self.count(false);
+        let nc = self.count(true);
+        let nc2 = self.watcher.iter().skip(2).map(|v| v.count()).sum();
+        if 2 * nc != nc2 {
+            panic!("2 * {} != {}; total {}; alive {}", nc, nc2, total, nc);
+        }
+        let nd = total - nc;
+        let nd2 = self.watcher[NULL_LIT.negate() as usize].len();
+        if nd != nd2 {
+            panic!("dead {} != {}; total {}; alive {}", nd, nd2, total, nc);
+        }
     }
 }

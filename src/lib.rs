@@ -4,7 +4,7 @@
 macro_rules! clause {
     ($cv: expr, $val: expr) => {{
         match (&$cv, $val) {
-            (v, cid) => &v.head[cid],
+            (v, cid) => &v.clause[cid],
         }
     }};
 }
@@ -13,7 +13,7 @@ macro_rules! clause {
 macro_rules! clause_mut {
     ($cv: expr, $val: expr) => {{
         match (&mut $cv, $val) {
-            (v, cid) => &mut v.head[cid],
+            (v, cid) => &mut v.clause[cid],
         }
     }};
 }

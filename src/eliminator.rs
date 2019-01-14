@@ -1,5 +1,5 @@
 use crate::assign::AssignStack;
-use crate::clause::{Clause, ClauseDB, ClauseFlag, ClausePartition};
+use crate::clause::{Clause, ClauseDB, ClauseFlag};
 use crate::config::SolverConfig;
 use crate::state::SolverState;
 use crate::traits::*;
@@ -382,7 +382,7 @@ fn check_eliminator(cps: &ClauseDB, vars: &[Var]) -> bool {
     //     }
     // }
     // all caulses are registered in corresponding occur_lists
-    for (cid, ch) in cps.head.iter().enumerate().skip(1) {
+    for (cid, ch) in cps.clause.iter().enumerate().skip(1) {
         if ch.get_flag(ClauseFlag::Dead) {
             continue;
         }
@@ -484,13 +484,13 @@ fn strengthen_clause(
 fn strengthen(cps: &mut ClauseDB, vars: &mut [Var], cid: ClauseId, p: Lit) -> bool {
     debug_assert!(!clause!(cps, cid).get_flag(ClauseFlag::Dead));
     debug_assert!(1 < clause!(cps, cid).lits.len());
-    let ClausePartition {
-        ref mut head,
+    let ClauseDB {
+        ref mut clause,
         ref mut watcher,
         ..
     } = cps;
     unsafe {
-        let ch = &mut head[cid] as *mut Clause;
+        let ch = &mut clause[cid] as *mut Clause;
         // debug_assert!((*ch).lits.contains(&p));
         // debug_assert!(1 < (*ch).lits.len());
         let v = &mut vars[p.vi()];

@@ -170,7 +170,7 @@ impl SolverConfig {
         if self.use_chan_seok {
             // println!("# Adjusting for low decision levels.");
             // move some clauses with good lbd (col_lbd_bound) to Permanent
-            for ch in &mut cps.head[1..] {
+            for ch in &mut cps.clause[1..] {
                 if ch.get_flag(ClauseFlag::Dead) {
                     continue;
                 }

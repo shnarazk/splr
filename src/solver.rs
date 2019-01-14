@@ -246,7 +246,7 @@ impl Propagate for AssignStack {
             let p: usize = self.sweep() as usize;
             let false_lit = (p as Lit).negate();
             state.stats[Stat::Propagation as usize] += 1;
-            let head = &mut cps.head;
+            let head = &mut cps.clause;
             unsafe {
                 let watcher = &mut cps.watcher[..] as *mut [Vec<Watch>];
                 let source = &mut (*watcher)[p];
@@ -309,7 +309,7 @@ fn propagate_fast(
         let p: usize = asgs.sweep() as usize;
         let false_lit = (p as Lit).negate();
         state.stats[Stat::Propagation as usize] += 1;
-        let head = &mut cps.head;
+        let head = &mut cps.clause;
         unsafe {
             let watcher = &mut cps.watcher[..] as *mut [Vec<Watch>];
             let source = &mut (*watcher)[p];
@@ -743,7 +743,7 @@ fn minimize_with_bi_clauses(
     let l0 = vec[0];
     let mut nb = 0;
     for w in &cps.watcher[l0.negate() as usize][1..] {
-        let ch = &cps.head[w.c];
+        let ch = &cps.clause[w.c];
         if ch.lits.len() != 2 {
             continue;
         }

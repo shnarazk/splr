@@ -1,5 +1,5 @@
 use crate::assign::AssignStack;
-use crate::clause::{Clause, ClauseDB, ClauseFlag, ClauseIndex, ClausePartition};
+use crate::clause::{Clause, ClauseDB, ClauseFlag, ClauseIndex};
 use crate::config::SolverConfig;
 use crate::eliminator::Eliminator;
 use crate::solver::{Solver, SolverResult};
@@ -53,21 +53,18 @@ pub trait ClauseDBIF {
         state: &mut SolverState,
         vars: &mut [Var],
     ) -> bool;
+    fn build(nv: usize, nc: usize) -> Self;
+    fn garbage_collect(&mut self, vars: &mut [Var], elim: &mut Eliminator);
+    fn new_clause(&mut self, v: &[Lit], rank: usize, learnt: bool) -> ClauseId;
+    fn reset_lbd(&mut self, vars: &[Var], temp: &mut [usize]);
+    fn bump_activity(&mut self, inc: &mut f64, cix: ClauseIndex, _d: f64);
+    fn count(&self, alive: bool) -> usize;
 }
 
 pub trait ClauseIdIF {
     fn to_lit(self) -> Lit;
     fn is_lifted_lit(self) -> bool;
     fn format(self) -> String;
-}
-
-pub trait ClausePartitionIF {
-    fn build(nv: usize, nc: usize) -> ClausePartition;
-    fn garbage_collect(&mut self, vars: &mut [Var], elim: &mut Eliminator);
-    fn new_clause(&mut self, v: &[Lit], rank: usize, learnt: bool) -> ClauseId;
-    fn reset_lbd(&mut self, vars: &[Var], temp: &mut [usize]);
-    fn bump_activity(&mut self, inc: &mut f64, cix: ClauseIndex, _d: f64);
-    fn count(&self, alive: bool) -> usize;
 }
 
 pub trait Delete<T> {
