@@ -175,7 +175,7 @@ impl SolverConfig {
                     continue;
                 }
                 if ch.rank <= self.co_lbd_bound {
-                        ch.flag_off(ClauseFlag::Learnt);
+                    ch.flag_off(ClauseFlag::Learnt);
                 } else if re_init {
                     ch.flag_on(ClauseFlag::Dead);
                     cps.touched[ch.lits[0].negate() as usize] = true;

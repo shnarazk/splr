@@ -26,18 +26,6 @@ pub enum ClauseKind {
 pub type ClauseIndex = usize;
 
 impl ClauseIdIF for ClauseId {
-//    #[inline(always)]
-//    fn from_(kind: ClauseKind, cix: ClauseIndex) -> ClauseId {
-//        kind.tag() | cix
-//    }
-//    #[inline(always)]
-//    fn to_index(&self) -> ClauseIndex {
-//        *self & CLAUSE_INDEX_MASK
-//    }
-//    #[inline(always)]
-//    fn to_kind(&self) -> usize {
-//        *self >> CLAUSE_INDEX_BITS
-//    }
     #[inline(always)]
     fn to_lit(self) -> Lit {
         (self & 0x0000_0000_FFFF_FFFF) as Lit
@@ -459,9 +447,7 @@ impl ClauseDBIF for ClauseDB {
         } = self;
         let mut perm = Vec::with_capacity(clause.len());
         for (i, b) in clause.iter().enumerate().skip(1) {
-            if b.get_flag(ClauseFlag::Learnt)
-                && !b.get_flag(ClauseFlag::Dead)
-                && !vars.locked(b, i)
+            if b.get_flag(ClauseFlag::Learnt) && !b.get_flag(ClauseFlag::Dead) && !vars.locked(b, i)
             {
                 perm.push(i);
             }

@@ -473,9 +473,7 @@ fn handle_conflict_path(
     config.var_inc /= config.var_decay;
     config.cla_inc /= config.cla_decay;
     // glucose reduction
-    if (config.use_chan_seok
-        && !config.glureduce
-        && config.first_reduction < cps.num_learnt)
+    if (config.use_chan_seok && !config.glureduce && config.first_reduction < cps.num_learnt)
         || (config.glureduce
             && state.cur_restart * state.next_reduction
                 <= (state.stats[Stat::Learnt as usize] - state.stats[Stat::NumBinLearnt as usize])
@@ -555,11 +553,11 @@ fn analyze(
                     if dl <= lvl {
                         // println!("- flag for {} which level is {}", q.int(), lvl);
                         path_cnt += 1;
-                        // if vars[vi].reason != NULL_CLAUSE
-                        //     && clause!(*cps, vars[vi].reason).get_flag(ClauseFlag::Learnt)
-                        // {
-                        //     last_dl.push(*q);
-                        // }
+                    // if vars[vi].reason != NULL_CLAUSE
+                    //     && cps.clause[vars[vi].reason].get_flag(ClauseFlag::Learnt)
+                    // {
+                    //     last_dl.push(*q);
+                    // }
                     } else {
                         // println!("- push {} to learnt, which level is {}", q.int(), lvl);
                         learnt.push(*q);
