@@ -1,23 +1,5 @@
 //! This is a SAT solver in Rust.
 
-#[macro_export]
-macro_rules! clause {
-    ($cv: expr, $val: expr) => {{
-        match (&$cv, $val) {
-            (v, cid) => &v.clause[cid],
-        }
-    }};
-}
-
-#[macro_export]
-macro_rules! clause_mut {
-    ($cv: expr, $val: expr) => {{
-        match (&mut $cv, $val) {
-            (v, cid) => &mut v.clause[cid],
-        }
-    }};
-}
-
 #[allow(unused_macros)]
 macro_rules! uenqueue {
     ($vs: expr, $tr: expr, $tl: expr, $lit: expr, $cid: expr) => {{

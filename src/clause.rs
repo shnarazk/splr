@@ -428,7 +428,7 @@ impl ClauseDBIF for ClauseDB {
             ClauseKind::Removable
         };
         let cid = self.new_clause(&v, lbd, kind == ClauseKind::Removable);
-        let ch = clause_mut!(*self, cid);
+        let ch = &mut self.clause[cid];
         ch.activity = config.var_inc;
         vars.attach_clause(elim, cid, ch, false);
         cid
@@ -436,7 +436,7 @@ impl ClauseDBIF for ClauseDB {
     /// 4. removeClause
     /// called from strengthen_clause, backward_subsumption_check, eliminate_var, substitute
     fn remove_clause(&mut self, cid: ClauseId) {
-        let ch = clause_mut!(*self, cid);
+        let ch = &mut self.clause[cid];
         debug_assert!(!ch.get_flag(ClauseFlag::Dead));
         ch.flag_on(ClauseFlag::Dead);
         if ch.lits.is_empty() {

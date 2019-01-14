@@ -228,7 +228,7 @@ impl SatSolver for Solver {
             }
             _ => {
                 let cid = cps.new_clause(&v, 0, false);
-                vars.attach_clause(elim, cid, clause_mut!(*cps, cid), true);
+                vars.attach_clause(elim, cid, &mut cps.clause[cid], true);
                 Some(cid)
             }
         }
@@ -506,7 +506,7 @@ fn analyze(
     loop {
         // println!("analyze {}", p.int());
         unsafe {
-            let ch = clause_mut!(*cps, cid) as *mut Clause;
+            let ch = &mut cps.clause[cid] as *mut Clause;
             debug_assert_ne!(cid, NULL_CLAUSE);
             if (*ch).get_flag(ClauseFlag::Learnt) {
                 // self.bump_cid(cid);
@@ -654,7 +654,7 @@ fn analyze_removable(
     let top = to_clear.len();
     while let Some(sl) = stack.pop() {
         let cid = vars[sl.vi()].reason;
-        let ch = clause_mut!(*cps, cid);
+        let ch = &mut cps.clause[cid];
         if (*ch).lits.len() == 2 && vars.assigned((*ch).lits[0]) == LFALSE {
             (*ch).lits.swap(0, 1);
         }
@@ -692,7 +692,7 @@ fn analyze_final(
     let mut seen = vec![false; config.num_vars + 1];
     state.conflicts.clear();
     if config.root_level != 0 {
-        let ch = clause!(*cps, ci);
+        let ch = &cps.clause[ci];
         for l in &ch.lits[skip_first as usize..] {
             let vi = l.vi();
             if 0 < vars[vi].level {
