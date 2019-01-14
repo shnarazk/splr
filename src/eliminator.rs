@@ -102,7 +102,6 @@ impl EliminatorIF for Eliminator {
     fn var_queue_len(&self) -> usize {
         self.var_queue.len()
     }
-    // should be called at decision level 0.
     fn eliminate(
         &mut self,
         asgs: &mut AssignStack,
@@ -111,6 +110,7 @@ impl EliminatorIF for Eliminator {
         state: &mut SolverState,
         vars: &mut [Var],
     ) {
+        debug_assert!(asgs.level() == 0);
         if !self.in_use || !self.active {
             return;
         }
@@ -139,7 +139,6 @@ impl EliminatorIF for Eliminator {
         }
     }
     fn extend_model(&mut self, model: &mut Vec<i32>) {
-        // println!("extend_model {:?}", &self.elim_clauses);
         if self.elim_clauses.is_empty() {
             return;
         }
@@ -311,7 +310,6 @@ fn subsume(cdb: &mut ClauseDB, cid: ClauseId, other: ClauseId) -> Option<Lit> {
         }
         return None;
     }
-    // println!("subsume {}", cid.format());
     let mut ret: Lit = NULL_LIT;
     let ch = &cdb.clause[cid];
     let ob = &cdb.clause[other];
