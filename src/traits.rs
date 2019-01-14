@@ -23,7 +23,7 @@ pub trait AssignIF {
     fn enqueue_null(&mut self, v: &mut Var, sig: Lbool, dl: usize) -> bool;
     fn uncheck_enqueue(&mut self, vars: &mut [Var], l: Lit, cid: ClauseId);
     fn uncheck_assume(&mut self, vars: &mut [Var], elim: &mut Eliminator, l: Lit);
-    fn dump_cnf(&mut self, config: &SolverConfig, cps: &ClauseDB, vars: &[Var], fname: &str);
+    fn dump_cnf(&mut self, config: &SolverConfig, cdb: &ClauseDB, vars: &[Var], fname: &str);
 }
 
 pub trait ClauseIF {
@@ -77,9 +77,9 @@ pub trait Delete<T> {
 
 pub trait EliminatorIF {
     fn new(use_elim: bool) -> Eliminator;
-    fn stop(&mut self, cps: &mut ClauseDB, vars: &mut [Var], force: bool);
+    fn stop(&mut self, cdb: &mut ClauseDB, vars: &mut [Var], force: bool);
     fn enqueue_clause(&mut self, cid: ClauseId, ch: &mut Clause);
-    fn clear_clause_queue(&mut self, cps: &mut ClauseDB);
+    fn clear_clause_queue(&mut self, cdb: &mut ClauseDB);
     fn clause_queue_len(&self) -> usize;
     fn enqueue_var(&mut self, v: &mut Var);
     fn clear_var_queue(&mut self, vars: &mut [Var]);
@@ -88,7 +88,7 @@ pub trait EliminatorIF {
         &mut self,
         asgs: &mut AssignStack,
         config: &mut SolverConfig,
-        cps: &mut ClauseDB,
+        cdb: &mut ClauseDB,
         state: &mut SolverState,
         vars: &mut [Var],
     );
@@ -115,7 +115,7 @@ pub trait LitIF {
 pub trait Propagate {
     fn propagate(
         &mut self,
-        cp: &mut ClauseDB,
+        cdb: &mut ClauseDB,
         state: &mut SolverState,
         vars: &mut [Var],
     ) -> ClauseId;
@@ -140,7 +140,7 @@ pub trait SolverStateIF {
     fn progress(
         &mut self,
         config: &mut SolverConfig,
-        cp: &ClauseDB,
+        cdb: &ClauseDB,
         elim: &Eliminator,
         vars: &[Var],
         mes: Option<&str>,

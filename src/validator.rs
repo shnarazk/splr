@@ -12,7 +12,7 @@ impl Solver {
     /// returns None if the given assignment is a model of a problem.
     /// Otherwise returns a clause which is not satisfiable.
     pub fn validate(&self) -> Option<Vec<i32>> {
-        for ch in &self.cps.clause[1..] {
+        for ch in &self.cdb.clause[1..] {
             if !self.vars.satisfies(&ch.lits) {
                 let mut v = Vec::new();
                 for l in &ch.lits {

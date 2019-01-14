@@ -37,7 +37,7 @@ pub struct Solver {
     /// major sub modules
     pub asgs: AssignStack, // Assignment
     pub config: SolverConfig, // Configuration
-    pub cps: ClauseDB,        // Clauses
+    pub cdb: ClauseDB,        // Clauses
     pub elim: Eliminator,     // Clause/Variable Elimination
     pub state: SolverState,   // misc data
     pub vars: Vec<Var>,       // Variables
@@ -55,7 +55,7 @@ impl Solver {
         Solver {
             asgs: AssignStack::new(nv),
             config,
-            cps: ClauseDB::new(nv, nc),
+            cdb: ClauseDB::new(nv, nc),
             elim,
             state,
             vars: Var::new_vars(nv),
@@ -68,7 +68,7 @@ impl SatSolver for Solver {
         let Solver {
             ref mut asgs,
             ref mut config,
-            ref mut cps,
+            ref mut cdb,
             ref mut elim,
             ref mut state,
             ref mut vars,
@@ -79,7 +79,7 @@ impl SatSolver for Solver {
         // TODO: deal with assumptions
         // s.root_level = 0;
         state.num_solved_vars = asgs.len();
-        state.progress(config, cps, elim, vars, Some(""));
+        state.progress(config, cdb, elim, vars, Some(""));
         if elim.in_use {
             for v in &mut vars[1..] {
                 debug_assert!(!v.eliminated);
@@ -99,22 +99,22 @@ impl SatSolver for Solver {
                 }
             }
             if elim.active {
-                cps.simplify(asgs, config, elim, state, vars);
-                state.progress(config, cps, elim, vars, Some("simplify"));
+                cdb.simplify(asgs, config, elim, state, vars);
+                state.progress(config, cdb, elim, vars, Some("simplify"));
             } else {
-                elim.stop(cps, vars, false);
-                state.progress(config, cps, elim, vars, Some("loaded"));
+                elim.stop(cdb, vars, false);
+                state.progress(config, cdb, elim, vars, Some("loaded"));
             }
         } else {
-            state.progress(config, cps, elim, vars, Some("loaded"));
+            state.progress(config, cdb, elim, vars, Some("loaded"));
         }
-        if search(asgs, config, cps, elim, state, vars) {
+        if search(asgs, config, cdb, elim, state, vars) {
             if !state.ok {
                 asgs.cancel_until(vars, &mut state.var_order, 0);
-                state.progress(config, cps, elim, vars, Some("error"));
+                state.progress(config, cdb, elim, vars, Some("error"));
                 return Err(SolverException::InternalInconsistent);
             }
-            state.progress(config, cps, elim, vars, None);
+            state.progress(config, cdb, elim, vars, None);
             let mut result = Vec::new();
             for (vi, v) in vars.iter().enumerate().take(config.num_vars + 1).skip(1) {
                 match v.assign {
@@ -127,7 +127,7 @@ impl SatSolver for Solver {
             asgs.cancel_until(vars, &mut state.var_order, 0);
             Ok(Certificate::SAT(result))
         } else {
-            state.progress(config, cps, elim, vars, None);
+            state.progress(config, cdb, elim, vars, None);
             asgs.cancel_until(vars, &mut state.var_order, 0);
             Ok(Certificate::UNSAT(
                 state.conflicts.iter().map(|l| l.int()).collect(),
@@ -200,7 +200,7 @@ impl SatSolver for Solver {
     fn add_unchecked_clause(&mut self, v: &mut Vec<Lit>) -> Option<ClauseId> {
         let Solver {
             ref mut asgs,
-            ref mut cps,
+            ref mut cdb,
             ref mut elim,
             ref mut vars,
             ..
@@ -227,8 +227,8 @@ impl SatSolver for Solver {
                 Some(NULL_CLAUSE)
             }
             _ => {
-                let cid = cps.new_clause(&v, 0, false);
-                vars.attach_clause(elim, cid, &mut cps.clause[cid], true);
+                let cid = cdb.new_clause(&v, 0, false);
+                vars.attach_clause(elim, cid, &mut cdb.clause[cid], true);
                 Some(cid)
             }
         }
@@ -238,7 +238,7 @@ impl SatSolver for Solver {
 impl Propagate for AssignStack {
     fn propagate(
         &mut self,
-        cps: &mut ClauseDB,
+        cdb: &mut ClauseDB,
         state: &mut SolverState,
         vars: &mut [Var],
     ) -> ClauseId {
@@ -246,9 +246,9 @@ impl Propagate for AssignStack {
             let p: usize = self.sweep() as usize;
             let false_lit = (p as Lit).negate();
             state.stats[Stat::Propagation as usize] += 1;
-            let head = &mut cps.clause;
+            let head = &mut cdb.clause;
             unsafe {
-                let watcher = &mut cps.watcher[..] as *mut [Vec<Watch>];
+                let watcher = &mut cdb.watcher[..] as *mut [Vec<Watch>];
                 let source = &mut (*watcher)[p];
                 let mut n = 1;
                 'next_clause: while n <= source.count() {
@@ -301,7 +301,7 @@ impl Propagate for AssignStack {
 #[inline(always)]
 fn propagate_fast(
     asgs: &mut AssignStack,
-    cps: &mut ClauseDB,
+    cdb: &mut ClauseDB,
     state: &mut SolverState,
     vars: &mut [Var],
 ) -> ClauseId {
@@ -309,9 +309,9 @@ fn propagate_fast(
         let p: usize = asgs.sweep() as usize;
         let false_lit = (p as Lit).negate();
         state.stats[Stat::Propagation as usize] += 1;
-        let head = &mut cps.clause;
+        let head = &mut cdb.clause;
         unsafe {
-            let watcher = &mut cps.watcher[..] as *mut [Vec<Watch>];
+            let watcher = &mut cdb.watcher[..] as *mut [Vec<Watch>];
             let source = &mut (*watcher)[p];
             let mut n = 1;
             'next_clause: while n <= source.count() {
@@ -366,7 +366,7 @@ fn propagate_fast(
 fn search(
     asgs: &mut AssignStack,
     config: &mut SolverConfig,
-    cps: &mut ClauseDB,
+    cdb: &mut ClauseDB,
     elim: &mut Eliminator,
     state: &mut SolverState,
     vars: &mut [Var],
@@ -375,7 +375,7 @@ fn search(
     let mut a_decision_was_made = false;
     state.restart_update_luby(config);
     loop {
-        let ci = propagate_fast(asgs, cps, state, vars);
+        let ci = propagate_fast(asgs, cdb, state, vars);
         state.stats[Stat::Propagation as usize] += 1;
         if ci == NULL_CLAUSE {
             if config.num_vars <= asgs.len() + state.num_eliminated_vars {
@@ -385,7 +385,7 @@ fn search(
             if state.force_restart(config, &mut conflict_c) {
                 asgs.cancel_until(vars, &mut state.var_order, config.root_level);
             } else if asgs.level() == 0 {
-                cps.simplify(asgs, config, elim, state, vars);
+                cdb.simplify(asgs, config, elim, state, vars);
                 state.var_order.rebuild(&vars);
             }
             if asgs.level() == 0 {
@@ -410,10 +410,10 @@ fn search(
                 state.stats[Stat::NoDecisionConflict as usize] += 1;
             }
             if asgs.level() == config.root_level {
-                analyze_final(asgs, config, cps, state, vars, ci, false);
+                analyze_final(asgs, config, cdb, state, vars, ci, false);
                 return false;
             }
-            handle_conflict_path(asgs, config, cps, elim, state, vars, ci);
+            handle_conflict_path(asgs, config, cdb, elim, state, vars, ci);
             if !state.ok {
                 return false;
             }
@@ -425,7 +425,7 @@ fn search(
 fn handle_conflict_path(
     asgs: &mut AssignStack,
     config: &mut SolverConfig,
-    cps: &mut ClauseDB,
+    cdb: &mut ClauseDB,
     elim: &mut Eliminator,
     state: &mut SolverState,
     vars: &mut [Var],
@@ -439,7 +439,7 @@ fn handle_conflict_path(
     // DYNAMIC BLOCKING RESTART
     state.block_restart(asgs, config, tn_confl);
     let mut new_learnt: Vec<Lit> = Vec::new();
-    let bl = analyze(asgs, config, cps, state, vars, ci, &mut new_learnt);
+    let bl = analyze(asgs, config, cdb, state, vars, ci, &mut new_learnt);
     asgs.cancel_until(vars, &mut state.var_order, bl.max(config.root_level));
     let learnt_len = new_learnt.len();
     if learnt_len == 1 {
@@ -448,7 +448,7 @@ fn handle_conflict_path(
         state.stats[Stat::Learnt as usize] += 1;
         let lbd = vars.compute_lbd(&new_learnt, &mut state.lbd_temp);
         let l0 = new_learnt[0];
-        let cid = cps.add_clause(config, elim, vars, &mut new_learnt, lbd);
+        let cid = cdb.add_clause(config, elim, vars, &mut new_learnt, lbd);
         state.c_lvl.update(bl as f64);
         state.b_lvl.update(lbd as f64);
         if lbd <= 2 {
@@ -463,24 +463,24 @@ fn handle_conflict_path(
         state.stats[Stat::SumLBD as usize] += lbd as i64;
     }
     if tn_confl % 10_000 == 0 {
-        state.progress(config, cps, elim, vars, None);
+        state.progress(config, cdb, elim, vars, None);
     }
     if tn_confl == 100_000 {
         asgs.cancel_until(vars, &mut state.var_order, 0);
-        config.adapt_strategy(cps, elim, state, vars);
+        config.adapt_strategy(cdb, elim, state, vars);
     }
     // decay activities
     config.var_inc /= config.var_decay;
     config.cla_inc /= config.cla_decay;
     // glucose reduction
-    if (config.use_chan_seok && !config.glureduce && config.first_reduction < cps.num_learnt)
+    if (config.use_chan_seok && !config.glureduce && config.first_reduction < cdb.num_learnt)
         || (config.glureduce
             && state.cur_restart * state.next_reduction
                 <= (state.stats[Stat::Learnt as usize] - state.stats[Stat::NumBinLearnt as usize])
                     as usize)
     {
         state.cur_restart = ((tn_confl as f64) / (state.next_reduction as f64)) as usize + 1;
-        cps.reduce(elim, state, vars);
+        cdb.reduce(elim, state, vars);
         state.next_reduction += config.inc_reduce_db;
     }
 }
@@ -489,7 +489,7 @@ fn handle_conflict_path(
 fn analyze(
     asgs: &mut AssignStack,
     config: &mut SolverConfig,
-    cps: &mut ClauseDB,
+    cdb: &mut ClauseDB,
     state: &mut SolverState,
     vars: &mut [Var],
     confl: ClauseId,
@@ -504,11 +504,11 @@ fn analyze(
     loop {
         // println!("analyze {}", p.int());
         unsafe {
-            let ch = &mut cps.clause[cid] as *mut Clause;
+            let ch = &mut cdb.clause[cid] as *mut Clause;
             debug_assert_ne!(cid, NULL_CLAUSE);
             if (*ch).get_flag(ClauseFlag::Learnt) {
                 // self.bump_cid(cid);
-                cps.bump_activity(
+                cdb.bump_activity(
                     &mut config.cla_inc,
                     cid,
                     state.stats[Stat::Conflict as usize] as f64,
@@ -524,7 +524,7 @@ fn analyze(
                 //             && nblevels < self.co_lbd_bound
                 //         {
                 //             (*ch).rank = 0;
-                //             clause_mut!(*cps, confl).rank = 0
+                //             clause_mut!(*cdb, confl).rank = 0
                 //         }
                 //     }
                 // }
@@ -554,7 +554,7 @@ fn analyze(
                         // println!("- flag for {} which level is {}", q.int(), lvl);
                         path_cnt += 1;
                     // if vars[vi].reason != NULL_CLAUSE
-                    //     && cps.clause[vars[vi].reason].get_flag(ClauseFlag::Learnt)
+                    //     && cdb.clause[vars[vi].reason].get_flag(ClauseFlag::Learnt)
                     // {
                     //     last_dl.push(*q);
                     // }
@@ -602,16 +602,16 @@ fn analyze(
     }
     learnt.retain(|l| {
         vars[l.vi()].reason == NULL_CLAUSE
-            || !analyze_removable(cps, vars, &mut state.an_seen, *l, &mut to_clear, &level_map)
+            || !analyze_removable(cdb, vars, &mut state.an_seen, *l, &mut to_clear, &level_map)
     });
     if learnt.len() < 30 {
-        minimize_with_bi_clauses(cps, vars, &mut state.lbd_temp, learnt);
+        minimize_with_bi_clauses(cdb, vars, &mut state.lbd_temp, learnt);
     }
     // glucose heuristics
     // let lbd = vars.compute_lbd(learnt, lbd_temp);
     // while let Some(l) = last_dl.pop() {
     //     let vi = l.vi();
-    //     if clause!(*cps, vars[vi].reason).rank < lbd {
+    //     if clause!(*cdb, vars[vi].reason).rank < lbd {
     //         vars.bump_activity(vi, &mut config.var_inc, state.stats[Stat::Conflict as usize] as f64);
     //         var_order.update(vars, vi);
     //     }
@@ -640,7 +640,7 @@ fn analyze(
 /// renamed from litRedundant
 #[inline(always)]
 fn analyze_removable(
-    cps: &mut ClauseDB,
+    cdb: &mut ClauseDB,
     vars: &[Var],
     an_seen: &mut [bool],
     l: Lit,
@@ -652,7 +652,7 @@ fn analyze_removable(
     let top = to_clear.len();
     while let Some(sl) = stack.pop() {
         let cid = vars[sl.vi()].reason;
-        let ch = &mut cps.clause[cid];
+        let ch = &mut cdb.clause[cid];
         if (*ch).lits.len() == 2 && vars.assigned((*ch).lits[0]) == LFALSE {
             (*ch).lits.swap(0, 1);
         }
@@ -681,7 +681,7 @@ fn analyze_removable(
 fn analyze_final(
     asgs: &AssignStack,
     config: &mut SolverConfig,
-    cps: &ClauseDB,
+    cdb: &ClauseDB,
     state: &mut SolverState,
     vars: &[Var],
     ci: ClauseId,
@@ -690,7 +690,7 @@ fn analyze_final(
     let mut seen = vec![false; config.num_vars + 1];
     state.conflicts.clear();
     if config.root_level != 0 {
-        let ch = &cps.clause[ci];
+        let ch = &cdb.clause[ci];
         for l in &ch.lits[skip_first as usize..] {
             let vi = l.vi();
             if 0 < vars[vi].level {
@@ -724,7 +724,7 @@ fn analyze_final(
 
 #[inline(always)]
 fn minimize_with_bi_clauses(
-    cps: &ClauseDB,
+    cdb: &ClauseDB,
     vars: &[Var],
     lbd_temp: &mut [usize],
     vec: &mut Vec<Lit>,
@@ -740,8 +740,8 @@ fn minimize_with_bi_clauses(
     }
     let l0 = vec[0];
     let mut nb = 0;
-    for w in &cps.watcher[l0.negate() as usize][1..] {
-        let ch = &cps.clause[w.c];
+    for w in &cdb.watcher[l0.negate() as usize][1..] {
+        let ch = &cdb.clause[w.c];
         if ch.lits.len() != 2 {
             continue;
         }

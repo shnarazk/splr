@@ -112,7 +112,7 @@ impl SolverConfig {
     #[inline(always)]
     pub fn adapt_strategy(
         &mut self,
-        cps: &mut ClauseDB,
+        cdb: &mut ClauseDB,
         elim: &mut Eliminator,
         state: &mut SolverState,
         vars: &mut [Var],
@@ -170,7 +170,7 @@ impl SolverConfig {
         if self.use_chan_seok {
             // println!("# Adjusting for low decision levels.");
             // move some clauses with good lbd (col_lbd_bound) to Permanent
-            for ch in &mut cps.clause[1..] {
+            for ch in &mut cdb.clause[1..] {
                 if ch.get_flag(ClauseFlag::Dead) {
                     continue;
                 }
@@ -178,11 +178,11 @@ impl SolverConfig {
                     ch.flag_off(ClauseFlag::Learnt);
                 } else if re_init {
                     ch.flag_on(ClauseFlag::Dead);
-                    cps.touched[ch.lits[0].negate() as usize] = true;
-                    cps.touched[ch.lits[1].negate() as usize] = true;
+                    cdb.touched[ch.lits[0].negate() as usize] = true;
+                    cdb.touched[ch.lits[1].negate() as usize] = true;
                 }
             }
-            cps.garbage_collect(vars, elim);
+            cdb.garbage_collect(vars, elim);
         }
     }
 }

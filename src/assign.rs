@@ -149,7 +149,7 @@ impl AssignIF for AssignStack {
         self.trail.push(l);
     }
     #[allow(dead_code)]
-    fn dump_cnf(&mut self, config: &SolverConfig, cps: &ClauseDB, vars: &[Var], fname: &str) {
+    fn dump_cnf(&mut self, config: &SolverConfig, cdb: &ClauseDB, vars: &[Var], fname: &str) {
         for v in vars {
             if v.eliminated {
                 if v.assign != BOTTOM {
@@ -162,10 +162,10 @@ impl AssignIF for AssignStack {
         if let Ok(out) = File::create(&fname) {
             let mut buf = BufWriter::new(out);
             let nv = self.len();
-            let nc: usize = cps.clause.len() - 1;
+            let nc: usize = cdb.clause.len() - 1;
             buf.write_all(format!("p cnf {} {}\n", config.num_vars, nc + nv).as_bytes())
                 .unwrap();
-            for c in &cps.clause[1..] {
+            for c in &cdb.clause[1..] {
                 for l in &c.lits {
                     buf.write_all(format!("{} ", l.int()).as_bytes()).unwrap();
                 }

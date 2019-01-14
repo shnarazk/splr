@@ -93,7 +93,7 @@ impl SolverStateIF for SolverState {
     fn progress(
         &mut self,
         config: &mut SolverConfig,
-        cps: &ClauseDB,
+        cdb: &ClauseDB,
         elim: &Eliminator,
         vars: &[Var],
         mes: Option<&str>,
@@ -104,7 +104,7 @@ impl SolverStateIF for SolverState {
         let nv = vars.len() - 1;
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
-        //let learnts = &cps[ClauseKind::Removable as usize];
+        //let learnts = &cdb[ClauseKind::Removable as usize];
         let good =
             self.stats[Stat::NumLBD2 as usize] as f64 / self.stats[Stat::Conflict as usize] as f64;
         // let good = learnts
@@ -146,9 +146,9 @@ impl SolverStateIF for SolverState {
                 );
                 println!(
                     " Clause Kind|Remv:{:>9}, good:{:>9.4}, Perm:{:>9}, Binc:{:>9} ",
-                    cps.num_learnt,
+                    cdb.num_learnt,
                     good,
-                    cps.num_active - cps.num_learnt,
+                    cdb.num_active - cdb.num_learnt,
                     0,
                 );
                 println!(
@@ -198,9 +198,9 @@ impl SolverStateIF for SolverState {
                 fixed,
                 self.num_eliminated_vars,
                 (sum as f32) / (nv as f32) * 100.0,
-                cps.num_learnt,
+                cdb.num_learnt,
                 good,
-                cps.num_active,
+                cdb.num_active,
                 0,
                 self.stats[Stat::BlockRestart as usize],
                 self.stats[Stat::Restart as usize],
