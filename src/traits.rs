@@ -3,7 +3,7 @@ use crate::clause::{Clause, ClauseDB, ClauseFlag};
 use crate::config::SolverConfig;
 use crate::eliminator::Eliminator;
 use crate::solver::{Solver, SolverResult};
-use crate::state::SolverState;
+use crate::state::State;
 use crate::types::{CNFDescription, ClauseId, Lbool, Lit, VarId};
 use crate::var::{Var, VarIdHeap};
 
@@ -44,13 +44,13 @@ pub trait ClauseDBIF {
         lbd: usize,
     ) -> ClauseId;
     fn remove_clause(&mut self, cid: ClauseId);
-    fn reduce(&mut self, elim: &mut Eliminator, state: &mut SolverState, vars: &mut [Var]);
+    fn reduce(&mut self, elim: &mut Eliminator, state: &mut State, vars: &mut [Var]);
     fn simplify(
         &mut self,
         asgs: &mut AssignStack,
         config: &mut SolverConfig,
         elim: &mut Eliminator,
-        state: &mut SolverState,
+        state: &mut State,
         vars: &mut [Var],
     ) -> bool;
     fn garbage_collect(&mut self, vars: &mut [Var], elim: &mut Eliminator);
@@ -89,7 +89,7 @@ pub trait EliminatorIF {
         asgs: &mut AssignStack,
         config: &mut SolverConfig,
         cdb: &mut ClauseDB,
-        state: &mut SolverState,
+        state: &mut State,
         vars: &mut [Var],
     );
     fn extend_model(&mut self, model: &mut Vec<i32>);
@@ -113,12 +113,7 @@ pub trait LitIF {
 }
 
 pub trait Propagate {
-    fn propagate(
-        &mut self,
-        cdb: &mut ClauseDB,
-        state: &mut SolverState,
-        vars: &mut [Var],
-    ) -> ClauseId;
+    fn propagate(&mut self, cdb: &mut ClauseDB, state: &mut State, vars: &mut [Var]) -> ClauseId;
 }
 
 pub trait RestartIF {
@@ -135,8 +130,8 @@ pub trait SatSolver {
     fn add_unchecked_clause(&mut self, v: &mut Vec<Lit>) -> Option<ClauseId>;
 }
 
-pub trait SolverStateIF {
-    fn new(config: &SolverConfig, nv: usize, se: i32, fname: &str) -> SolverState;
+pub trait StateIF {
+    fn new(config: &SolverConfig, nv: usize, se: i32, fname: &str) -> State;
     fn progress(
         &mut self,
         config: &mut SolverConfig,

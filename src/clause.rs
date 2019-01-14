@@ -1,7 +1,7 @@
 use crate::assign::AssignStack;
 use crate::config::SolverConfig;
 use crate::eliminator::Eliminator;
-use crate::state::{SolverState, Stat};
+use crate::state::{Stat, State};
 use crate::traits::*;
 use crate::types::*;
 use crate::var::Var;
@@ -430,7 +430,7 @@ impl ClauseDBIF for ClauseDB {
         }
         self.touched[w0 as usize] = true;
     }
-    fn reduce(&mut self, elim: &mut Eliminator, state: &mut SolverState, vars: &mut [Var]) {
+    fn reduce(&mut self, elim: &mut Eliminator, state: &mut State, vars: &mut [Var]) {
         self.reset_lbd(vars, &mut state.lbd_temp);
         let ClauseDB {
             ref mut clause,
@@ -472,7 +472,7 @@ impl ClauseDBIF for ClauseDB {
         asgs: &mut AssignStack,
         config: &mut SolverConfig,
         elim: &mut Eliminator,
-        state: &mut SolverState,
+        state: &mut State,
         vars: &mut [Var],
     ) -> bool {
         self.reset_lbd(vars, &mut state.lbd_temp);

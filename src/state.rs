@@ -30,7 +30,7 @@ pub enum Stat {
     EndOfStatIndex,     // Don't use this dummy.
 }
 
-pub struct SolverState {
+pub struct State {
     pub ok: bool,
     pub next_reduction: usize, // renamed from `nbclausesbeforereduce`
     pub next_restart: usize,
@@ -54,9 +54,9 @@ pub struct SolverState {
     pub target: String,
 }
 
-impl SolverStateIF for SolverState {
-    fn new(config: &SolverConfig, nv: usize, _se: i32, fname: &str) -> SolverState {
-        SolverState {
+impl StateIF for State {
+    fn new(config: &SolverConfig, nv: usize, _se: i32, fname: &str) -> State {
+        State {
             ok: true,
             next_reduction: 1000,
             next_restart: 100,
@@ -246,7 +246,7 @@ impl SolverStateIF for SolverState {
     }
 }
 
-impl fmt::Display for SolverState {
+impl fmt::Display for State {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut tm = format!("{}", Utc::now() - self.start);
         tm.drain(..2);

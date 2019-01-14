@@ -1,7 +1,7 @@
 use crate::assign::AssignStack;
 use crate::clause::{Clause, ClauseDB, ClauseFlag};
 use crate::config::SolverConfig;
-use crate::state::SolverState;
+use crate::state::State;
 use crate::traits::*;
 use crate::types::*;
 use crate::var::Var;
@@ -107,7 +107,7 @@ impl EliminatorIF for Eliminator {
         asgs: &mut AssignStack,
         config: &mut SolverConfig,
         cdb: &mut ClauseDB,
-        state: &mut SolverState,
+        state: &mut State,
         vars: &mut [Var],
     ) {
         debug_assert!(asgs.level() == 0);
@@ -189,7 +189,7 @@ impl Eliminator {
         &mut self,
         asgs: &mut AssignStack,
         cdb: &mut ClauseDB,
-        state: &mut SolverState,
+        state: &mut State,
         vars: &mut [Var],
     ) -> bool {
         let mut cnt = 0;
@@ -432,7 +432,7 @@ fn merge(cdb: &mut ClauseDB, cip: ClauseId, ciq: ClauseId, v: VarId) -> Option<V
 fn strengthen_clause(
     cdb: &mut ClauseDB,
     elim: &mut Eliminator,
-    state: &mut SolverState,
+    state: &mut State,
     vars: &mut [Var],
     asgs: &mut AssignStack,
     cid: ClauseId,
@@ -546,7 +546,7 @@ fn eliminate_var(
     config: &mut SolverConfig,
     cdb: &mut ClauseDB,
     elim: &mut Eliminator,
-    state: &mut SolverState,
+    state: &mut State,
     vars: &mut [Var],
     v: VarId,
 ) -> bool {

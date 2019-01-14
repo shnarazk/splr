@@ -1,6 +1,6 @@
 use crate::clause::{ClauseDB, ClauseFlag};
 use crate::eliminator::Eliminator;
-use crate::state::{SolverState, Stat};
+use crate::state::{Stat, State};
 use crate::traits::*;
 use crate::var::Var;
 
@@ -111,7 +111,7 @@ impl SolverConfig {
         &mut self,
         cdb: &mut ClauseDB,
         elim: &mut Eliminator,
-        state: &mut SolverState,
+        state: &mut State,
         vars: &mut [Var],
     ) {
         if !self.adapt_strategy || self.strategy != SearchStrategy::Initial {

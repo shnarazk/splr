@@ -2,7 +2,7 @@ use crate::assign::AssignStack;
 use crate::clause::{Clause, ClauseDB, ClauseFlag, Watch};
 use crate::config::SolverConfig;
 use crate::eliminator::Eliminator;
-use crate::state::{SolverState, Stat};
+use crate::state::{Stat, State};
 use crate::traits::*;
 use crate::types::*;
 use crate::var::Var;
@@ -39,7 +39,7 @@ pub struct Solver {
     pub config: SolverConfig, // Configuration
     pub cdb: ClauseDB,        // Clauses
     pub elim: Eliminator,     // Clause/Variable Elimination
-    pub state: SolverState,   // misc data
+    pub state: State,         // misc data
     pub vars: Vec<Var>,       // Variables
 }
 
@@ -51,7 +51,7 @@ impl Solver {
         let (_fe, se) = config.ema_coeffs;
         let mut elim = Eliminator::default();
         elim.in_use = config.use_sve && nc < 800_000 && 1000 < nv;
-        let state = SolverState::new(&config, nv, se, &path.to_string());
+        let state = State::new(&config, nv, se, &path.to_string());
         Solver {
             asgs: AssignStack::new(nv),
             config,
@@ -236,12 +236,7 @@ impl SatSolver for Solver {
 }
 
 impl Propagate for AssignStack {
-    fn propagate(
-        &mut self,
-        cdb: &mut ClauseDB,
-        state: &mut SolverState,
-        vars: &mut [Var],
-    ) -> ClauseId {
+    fn propagate(&mut self, cdb: &mut ClauseDB, state: &mut State, vars: &mut [Var]) -> ClauseId {
         while self.remains() {
             let p: usize = self.sweep() as usize;
             let false_lit = (p as Lit).negate();
@@ -302,7 +297,7 @@ impl Propagate for AssignStack {
 fn propagate_fast(
     asgs: &mut AssignStack,
     cdb: &mut ClauseDB,
-    state: &mut SolverState,
+    state: &mut State,
     vars: &mut [Var],
 ) -> ClauseId {
     while asgs.remains() {
@@ -368,7 +363,7 @@ fn search(
     config: &mut SolverConfig,
     cdb: &mut ClauseDB,
     elim: &mut Eliminator,
-    state: &mut SolverState,
+    state: &mut State,
     vars: &mut [Var],
 ) -> bool {
     let mut conflict_c = 0.0; // for Luby restart
@@ -427,7 +422,7 @@ fn handle_conflict_path(
     config: &mut SolverConfig,
     cdb: &mut ClauseDB,
     elim: &mut Eliminator,
-    state: &mut SolverState,
+    state: &mut State,
     vars: &mut [Var],
     ci: ClauseId,
 ) {
@@ -490,7 +485,7 @@ fn analyze(
     asgs: &mut AssignStack,
     config: &mut SolverConfig,
     cdb: &mut ClauseDB,
-    state: &mut SolverState,
+    state: &mut State,
     vars: &mut [Var],
     confl: ClauseId,
     learnt: &mut Vec<Lit>,
@@ -682,7 +677,7 @@ fn analyze_final(
     asgs: &AssignStack,
     config: &mut SolverConfig,
     cdb: &ClauseDB,
-    state: &mut SolverState,
+    state: &mut State,
     vars: &[Var],
     ci: ClauseId,
     skip_first: bool,

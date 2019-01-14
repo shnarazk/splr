@@ -1,6 +1,6 @@
 use crate::assign::AssignStack;
 use crate::config::SolverConfig;
-use crate::state::{SolverState, Stat};
+use crate::state::{Stat, State};
 use crate::traits::*;
 
 const RESET_EMA: usize = 400;
@@ -29,7 +29,7 @@ impl EmaIF for Ema {
     }
 }
 
-impl RestartIF for SolverState {
+impl RestartIF for State {
     fn block_restart(&mut self, asgs: &AssignStack, config: &SolverConfig, ncnfl: usize) -> bool {
         let nas = asgs.len() + self.num_eliminated_vars;
         // let _count = self.stats[Stat::Conflict as usize] as usize;
