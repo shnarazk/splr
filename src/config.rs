@@ -178,6 +178,8 @@ impl SolverConfig {
                         ch.flag_off(ClauseFlag::Learnt);
                 } else if re_init {
                     ch.flag_on(ClauseFlag::Dead);
+                    cps.touched[ch.lits[0].negate() as usize] = true;
+                    cps.touched[ch.lits[1].negate() as usize] = true;
                 }
             }
             cps.garbage_collect(vars, elim);
