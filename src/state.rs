@@ -1,6 +1,6 @@
 use crate::assign::AssignStack;
 use crate::clause::ClauseDB;
-use crate::config::SolverConfig;
+use crate::config::Config;
 use crate::eliminator::Eliminator;
 use crate::restart::Ema;
 use crate::traits::*;
@@ -55,7 +55,7 @@ pub struct State {
 }
 
 impl StateIF for State {
-    fn new(config: &SolverConfig, nv: usize, _se: i32, fname: &str) -> State {
+    fn new(config: &Config, nv: usize, _se: i32, fname: &str) -> State {
         State {
             ok: true,
             next_reduction: 1000,
@@ -92,7 +92,7 @@ impl StateIF for State {
 
     fn progress(
         &mut self,
-        config: &mut SolverConfig,
+        config: &mut Config,
         cdb: &ClauseDB,
         elim: &Eliminator,
         vars: &[Var],

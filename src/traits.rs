@@ -1,6 +1,6 @@
 use crate::assign::AssignStack;
 use crate::clause::{Clause, ClauseDB, ClauseFlag};
-use crate::config::SolverConfig;
+use crate::config::Config;
 use crate::eliminator::Eliminator;
 use crate::solver::{Solver, SolverResult};
 use crate::state::State;
@@ -23,7 +23,7 @@ pub trait AssignIF {
     fn enqueue_null(&mut self, v: &mut Var, sig: Lbool, dl: usize) -> bool;
     fn uncheck_enqueue(&mut self, vars: &mut [Var], l: Lit, cid: ClauseId);
     fn uncheck_assume(&mut self, vars: &mut [Var], elim: &mut Eliminator, l: Lit);
-    fn dump_cnf(&mut self, config: &SolverConfig, cdb: &ClauseDB, vars: &[Var], fname: &str);
+    fn dump_cnf(&mut self, config: &Config, cdb: &ClauseDB, vars: &[Var], fname: &str);
 }
 
 pub trait ClauseIF {
@@ -37,7 +37,7 @@ pub trait ClauseDBIF {
     fn new(nv: usize, nc: usize) -> Self;
     fn add_clause(
         &mut self,
-        config: &mut SolverConfig,
+        config: &mut Config,
         elim: &mut Eliminator,
         vars: &mut [Var],
         v: &mut Vec<Lit>,
@@ -48,7 +48,7 @@ pub trait ClauseDBIF {
     fn simplify(
         &mut self,
         asgs: &mut AssignStack,
-        config: &mut SolverConfig,
+        config: &mut Config,
         elim: &mut Eliminator,
         state: &mut State,
         vars: &mut [Var],
@@ -87,7 +87,7 @@ pub trait EliminatorIF {
     fn eliminate(
         &mut self,
         asgs: &mut AssignStack,
-        config: &mut SolverConfig,
+        config: &mut Config,
         cdb: &mut ClauseDB,
         state: &mut State,
         vars: &mut [Var],
@@ -117,24 +117,24 @@ pub trait Propagate {
 }
 
 pub trait RestartIF {
-    fn block_restart(&mut self, asgs: &AssignStack, config: &SolverConfig, ncnfl: usize) -> bool;
-    fn force_restart(&mut self, config: &mut SolverConfig, ncnfl: &mut f64) -> bool;
+    fn block_restart(&mut self, asgs: &AssignStack, config: &Config, ncnfl: usize) -> bool;
+    fn force_restart(&mut self, config: &mut Config, ncnfl: &mut f64) -> bool;
     fn restart_update_lbd(&mut self, lbd: usize);
-    fn restart_update_asg(&mut self, config: &SolverConfig, n: usize);
-    fn restart_update_luby(&mut self, config: &mut SolverConfig);
+    fn restart_update_asg(&mut self, config: &Config, n: usize);
+    fn restart_update_luby(&mut self, config: &mut Config);
 }
 
 pub trait SatSolver {
-    fn build(config: SolverConfig, path: &str) -> (Solver, CNFDescription);
+    fn build(config: Config, path: &str) -> (Solver, CNFDescription);
     fn solve(&mut self) -> SolverResult;
     fn add_unchecked_clause(&mut self, v: &mut Vec<Lit>) -> Option<ClauseId>;
 }
 
 pub trait StateIF {
-    fn new(config: &SolverConfig, nv: usize, se: i32, fname: &str) -> State;
+    fn new(config: &Config, nv: usize, se: i32, fname: &str) -> State;
     fn progress(
         &mut self,
-        config: &mut SolverConfig,
+        config: &mut Config,
         cdb: &ClauseDB,
         elim: &Eliminator,
         vars: &[Var],

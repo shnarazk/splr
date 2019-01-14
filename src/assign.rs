@@ -1,5 +1,5 @@
 use crate::clause::ClauseDB;
-use crate::config::SolverConfig;
+use crate::config::Config;
 use crate::eliminator::Eliminator;
 use crate::traits::*;
 use crate::types::*;
@@ -149,7 +149,7 @@ impl AssignIF for AssignStack {
         self.trail.push(l);
     }
     #[allow(dead_code)]
-    fn dump_cnf(&mut self, config: &SolverConfig, cdb: &ClauseDB, vars: &[Var], fname: &str) {
+    fn dump_cnf(&mut self, config: &Config, cdb: &ClauseDB, vars: &[Var], fname: &str) {
         for v in vars {
             if v.eliminated {
                 if v.assign != BOTTOM {

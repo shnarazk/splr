@@ -1,6 +1,6 @@
 use crate::assign::AssignStack;
 use crate::clause::{Clause, ClauseDB, ClauseFlag, Watch};
-use crate::config::SolverConfig;
+use crate::config::Config;
 use crate::eliminator::Eliminator;
 use crate::state::{Stat, State};
 use crate::traits::*;
@@ -34,17 +34,16 @@ pub type SolverResult = Result<Certificate, SolverException>;
 
 /// is the collection of all variables.
 pub struct Solver {
-    /// major sub modules
     pub asgs: AssignStack, // Assignment
-    pub config: SolverConfig, // Configuration
-    pub cdb: ClauseDB,        // Clauses
-    pub elim: Eliminator,     // Clause/Variable Elimination
-    pub state: State,         // misc data
-    pub vars: Vec<Var>,       // Variables
+    pub config: Config,   // Configuration
+    pub cdb: ClauseDB,    // Clauses
+    pub elim: Eliminator, // Clause/Variable Elimination
+    pub state: State,     // misc data
+    pub vars: Vec<Var>,   // Variables
 }
 
 impl Solver {
-    pub fn new(config: SolverConfig, cnf: &CNFDescription) -> Solver {
+    pub fn new(config: Config, cnf: &CNFDescription) -> Solver {
         let nv = cnf.num_of_variables as usize;
         let nc = cnf.num_of_clauses as usize;
         let path = &cnf.pathname;
@@ -136,7 +135,7 @@ impl SatSolver for Solver {
     }
 
     /// builds and returns a configured solver.
-    fn build(mut cfg: SolverConfig, path: &str) -> (Solver, CNFDescription) {
+    fn build(mut cfg: Config, path: &str) -> (Solver, CNFDescription) {
         let mut rs = BufReader::new(fs::File::open(path).unwrap());
         let mut buf = String::new();
         let mut nv: usize = 0;
@@ -166,7 +165,6 @@ impl SatSolver for Solver {
             num_of_clauses: nc,
             pathname: path.to_string(),
         };
-        //let mut cfg = SolverConfig::default();
         cfg.num_vars = nv;
         let mut s: Solver = Solver::new(cfg, &cnf);
         loop {
@@ -360,7 +358,7 @@ fn propagate_fast(
 #[inline(always)]
 fn search(
     asgs: &mut AssignStack,
-    config: &mut SolverConfig,
+    config: &mut Config,
     cdb: &mut ClauseDB,
     elim: &mut Eliminator,
     state: &mut State,
@@ -419,7 +417,7 @@ fn search(
 #[inline]
 fn handle_conflict_path(
     asgs: &mut AssignStack,
-    config: &mut SolverConfig,
+    config: &mut Config,
     cdb: &mut ClauseDB,
     elim: &mut Eliminator,
     state: &mut State,
@@ -483,7 +481,7 @@ fn handle_conflict_path(
 #[inline(always)]
 fn analyze(
     asgs: &mut AssignStack,
-    config: &mut SolverConfig,
+    config: &mut Config,
     cdb: &mut ClauseDB,
     state: &mut State,
     vars: &mut [Var],
@@ -675,7 +673,7 @@ fn analyze_removable(
 #[inline(always)]
 fn analyze_final(
     asgs: &AssignStack,
-    config: &mut SolverConfig,
+    config: &mut Config,
     cdb: &ClauseDB,
     state: &mut State,
     vars: &[Var],

@@ -1,6 +1,6 @@
 use crate::assign::AssignStack;
 use crate::clause::{Clause, ClauseDB, ClauseFlag};
-use crate::config::SolverConfig;
+use crate::config::Config;
 use crate::state::State;
 use crate::traits::*;
 use crate::types::*;
@@ -105,7 +105,7 @@ impl EliminatorIF for Eliminator {
     fn eliminate(
         &mut self,
         asgs: &mut AssignStack,
-        config: &mut SolverConfig,
+        config: &mut Config,
         cdb: &mut ClauseDB,
         state: &mut State,
         vars: &mut [Var],
@@ -543,7 +543,7 @@ fn make_eliminated_clause(cdb: &mut ClauseDB, vec: &mut Vec<Lit>, vi: VarId, cid
 #[allow(clippy::cyclomatic_complexity)]
 fn eliminate_var(
     asgs: &mut AssignStack,
-    config: &mut SolverConfig,
+    config: &mut Config,
     cdb: &mut ClauseDB,
     elim: &mut Eliminator,
     state: &mut State,

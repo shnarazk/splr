@@ -1,5 +1,5 @@
 use crate::assign::AssignStack;
-use crate::config::SolverConfig;
+use crate::config::Config;
 use crate::state::{Stat, State};
 use crate::traits::*;
 
@@ -30,7 +30,7 @@ impl EmaIF for Ema {
 }
 
 impl RestartIF for State {
-    fn block_restart(&mut self, asgs: &AssignStack, config: &SolverConfig, ncnfl: usize) -> bool {
+    fn block_restart(&mut self, asgs: &AssignStack, config: &Config, ncnfl: usize) -> bool {
         let nas = asgs.len() + self.num_eliminated_vars;
         // let _count = self.stats[Stat::Conflict as usize] as usize;
         // let _ave = self.sum_asg / count as f64 * config.num_vars as f64;
@@ -45,7 +45,7 @@ impl RestartIF for State {
         }
         false
     }
-    fn force_restart(&mut self, config: &mut SolverConfig, ncnfl: &mut f64) -> bool {
+    fn force_restart(&mut self, config: &mut Config, ncnfl: &mut f64) -> bool {
         let count = self.stats[Stat::Conflict as usize] as usize;
         if count <= RESET_EMA {
             if count == RESET_EMA {
@@ -79,12 +79,12 @@ impl RestartIF for State {
         self.after_restart += 1;
     }
     #[inline(always)]
-    fn restart_update_asg(&mut self, _config: &SolverConfig, n: usize) {
+    fn restart_update_asg(&mut self, _config: &Config, n: usize) {
         self.ema_asg.update((self.num_eliminated_vars + n) as f64);
         // self.sum_asg += n as f64 / config.num_vars as f64;
     }
     #[inline(always)]
-    fn restart_update_luby(&mut self, config: &mut SolverConfig) {
+    fn restart_update_luby(&mut self, config: &mut Config) {
         if config.luby_restart {
             config.luby_restart_num_conflict =
                 luby(config.luby_restart_inc, config.luby_current_restarts)

@@ -1,7 +1,7 @@
 // SAT solver for Propositional Logic in Rust
 // Version 0.0.13 (Technology Preview 13) by shnarazk@gitlab.com
 
-use splr::config::SolverConfig;
+use splr::config::Config;
 use splr::solver::{Certificate, Solver};
 use splr::traits::SatSolver;
 use std::fs::File;
@@ -46,7 +46,7 @@ struct CLOpts {
 fn main() {
     let args = CLOpts::from_args();
     if args.cnf.exists() {
-        let mut config = SolverConfig::default();
+        let mut config = Config::default();
         config.adapt_strategy = !args.no_adapt;
         config.restart_thr = args.restart_threshold;
         config.restart_blk = args.restart_blocking;

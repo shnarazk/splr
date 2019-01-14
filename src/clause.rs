@@ -1,5 +1,5 @@
 use crate::assign::AssignStack;
-use crate::config::SolverConfig;
+use crate::config::Config;
 use crate::eliminator::Eliminator;
 use crate::state::{Stat, State};
 use crate::traits::*;
@@ -379,7 +379,7 @@ impl ClauseDBIF for ClauseDB {
     // Note: set lbd to 0 if you want to add the clause to Permanent.
     fn add_clause(
         &mut self,
-        config: &mut SolverConfig,
+        config: &mut Config,
         elim: &mut Eliminator,
         vars: &mut [Var],
         v: &mut Vec<Lit>,
@@ -470,7 +470,7 @@ impl ClauseDBIF for ClauseDB {
     fn simplify(
         &mut self,
         asgs: &mut AssignStack,
-        config: &mut SolverConfig,
+        config: &mut Config,
         elim: &mut Eliminator,
         state: &mut State,
         vars: &mut [Var],
