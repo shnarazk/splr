@@ -62,17 +62,11 @@ impl VarDBIF for [Var] {
     fn assigned(&self, l: Lit) -> Lbool {
         unsafe { self.get_unchecked(l.vi()).assign ^ ((l & 1) as u8) }
     }
-    fn locked(&self, ch: &Clause, cid: ClauseId) -> bool {
-        let lits = &ch.lits;
+    fn locked(&self, c: &Clause, cid: ClauseId) -> bool {
+        let lits = &c.lits;
         debug_assert!(1 < lits.len());
         let l0 = lits[0];
-        if 2 < lits.len() {
-            let l0 = lits[0];
-            self.assigned(l0) == LTRUE && self[l0.vi()].reason == cid
-        } else {
-            (self.assigned(l0) == LTRUE && self[l0.vi()].reason == cid)
-                || (self.assigned(l0) == LTRUE && self[l0.vi()].reason == cid)
-        }
+        self.assigned(l0) == LTRUE && self[l0.vi()].reason == cid
     }
     fn satisfies(&self, vec: &[Lit]) -> bool {
         for l in vec {
