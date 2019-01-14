@@ -103,7 +103,6 @@ pub trait EmaIF {
 }
 
 pub trait LitIF {
-    /// converts to var index
     fn vi(&self) -> VarId;
     fn int(&self) -> i32;
     fn lbool(&self) -> Lbool;

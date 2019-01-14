@@ -54,6 +54,7 @@ pub fn int2lit(x: i32) -> Lit {
 /// ```
 
 impl LitIF for Lit {
+    /// converts to var index
     #[inline(always)]
     fn vi(&self) -> VarId {
         (self >> 1) as VarId
