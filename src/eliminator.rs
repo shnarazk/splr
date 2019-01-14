@@ -79,7 +79,7 @@ impl EliminatorIF for Eliminator {
     }
     fn clear_clause_queue(&mut self, cps: &mut ClauseDB) {
         for cid in &self.clause_queue {
-            clause_mut!(*cps, *cid).flag_off(ClauseFlag::Enqueued);
+            cps.clause[*cid].flag_off(ClauseFlag::Enqueued);
         }
         self.clause_queue.clear();
     }
@@ -218,7 +218,7 @@ impl Eliminator {
                     unilits = [cid.to_lit(); 1];
                     lits = &unilits;
                 } else {
-                    let ch = clause_mut!(*cps, cid) as *mut Clause;
+                    let ch = &mut cps.clause[cid] as *mut Clause;
                     (*ch).flag_off(ClauseFlag::Enqueued);
                     lits = &(*ch).lits;
                     if (*ch).get_flag(ClauseFlag::Dead) || BACKWORD_SUBSUMPTION_THRESHOLD < cnt {
@@ -245,7 +245,7 @@ impl Eliminator {
                     };
                     cnt += (*cs).len();
                     for di in &*cs {
-                        let db = clause!(*cps, *di) as *const Clause;
+                        let db = &cps.clause[*di] as *const Clause;
                         if !(*db).get_flag(ClauseFlag::Dead)
                             && *di != cid
                             && lits.len() <= SUBSUMPTION_SIZE
@@ -256,7 +256,7 @@ impl Eliminator {
                             match subsume(cps, cid, *di) {
                                 Some(NULL_LIT) => {
                                     if !cid.is_lifted_lit()
-                                        && clause!(*cps, cid).get_flag(ClauseFlag::Learnt)
+                                        && cps.clause[cid].get_flag(ClauseFlag::Learnt)
                                         && (*db).get_flag(ClauseFlag::Learnt)
                                     {
                                         // println!("BackSubsC    => {} {:#} subsumed completely by {} {:#}",
@@ -266,7 +266,7 @@ impl Eliminator {
                                         //          *clause_body!(self.cp, cid),
                                         // );
                                         cps.remove_clause(*di);
-                                        vars.detach_clause(self, *di, clause!(*cps, *di));
+                                        vars.detach_clause(self, *di, &cps.clause[*di]);
                                     } //else {
                                       // println!("backward_subsumption_check tries to delete a permanent clause {} {:#}",
                                       //          di.fmt(),
@@ -306,7 +306,7 @@ fn subsume(cps: &mut ClauseDB, cid: ClauseId, other: ClauseId) -> Option<Lit> {
     debug_assert!(!other.is_lifted_lit());
     if cid.is_lifted_lit() {
         let l = cid.to_lit();
-        let oh = clause!(*cps, other);
+        let oh = &cps.clause[other];
         for lo in &oh.lits {
             if l == lo.negate() {
                 return Some(l);
@@ -316,10 +316,10 @@ fn subsume(cps: &mut ClauseDB, cid: ClauseId, other: ClauseId) -> Option<Lit> {
     }
     // println!("subsume {}", cid.format());
     let mut ret: Lit = NULL_LIT;
-    let ch = clause!(*cps, cid);
-    let ob = clause!(*cps, other);
-    debug_assert!(ob.lits.contains(&clause!(*cps, other).lits[0]));
-    debug_assert!(ob.lits.contains(&clause!(*cps, other).lits[1]));
+    let ch = &cps.clause[cid];
+    let ob = &cps.clause[other];
+    debug_assert!(ob.lits.contains(&ob.lits[0]));
+    debug_assert!(ob.lits.contains(&ob.lits[1]));
     'next: for l in &ch.lits {
         for lo in &ob.lits {
             if *l == *lo {
@@ -335,9 +335,9 @@ fn subsume(cps: &mut ClauseDB, cid: ClauseId, other: ClauseId) -> Option<Lit> {
 }
 
 /// Returns **false** if one of the clauses is always satisfied.
-fn check_to_merge(cpack: &ClauseDB, cp: ClauseId, cq: ClauseId, v: VarId) -> (bool, usize) {
-    let pqb = clause!(cpack, cp);
-    let qpb = clause!(cpack, cq);
+fn check_to_merge(cdb: &ClauseDB, cp: ClauseId, cq: ClauseId, v: VarId) -> (bool, usize) {
+    let pqb = &cdb.clause[cp];
+    let qpb = &cdb.clause[cq];
     let ps_smallest = pqb.lits.len() < qpb.lits.len();
     let (pb, qb) = if ps_smallest { (pqb, qpb) } else { (qpb, pqb) };
     let mut size = pb.lits.len() + 1;
@@ -410,8 +410,8 @@ fn merge(
 ) -> Option<Vec<Lit>> {
     let mut vec: Vec<Lit> = Vec::new();
     elim.merges += 1;
-    let pqb = clause!(*cps, cip);
-    let qpb = clause!(*cps, ciq);
+    let pqb = &cps.clause[cip];
+    let qpb = &cps.clause[ciq];
     let ps_smallest = pqb.lits.len() < qpb.lits.len();
     let (pb, qb) = if ps_smallest { (pqb, qpb) } else { (qpb, pqb) };
     // println!(" -  {:?}{:?} & {:?}{:?}", vec2int(&ph.lit),vec2int(&pb.lits),vec2int(&qh.lit),vec2int(&qb.lits));
@@ -450,18 +450,18 @@ fn strengthen_clause(
     cid: ClauseId,
     l: Lit,
 ) -> bool {
-    debug_assert!(!clause!(*cps, cid).get_flag(ClauseFlag::Dead));
-    debug_assert!(1 < clause!(*cps, cid).lits.len());
+    debug_assert!(!cps.clause[cid].get_flag(ClauseFlag::Dead));
+    debug_assert!(1 < cps.clause[cid].lits.len());
     cps.touched[l as usize] = true;
     cps.touched[l.negate() as usize] = true;
     debug_assert_ne!(cid, NULL_CLAUSE);
     if strengthen(cps, vars, cid, l) {
-        debug_assert!(2 == clause!(*cps, cid).lits.len());
-        let c0 = clause!(*cps, cid).lits[0];
+        debug_assert!(2 == cps.clause[cid].lits.len());
+        let c0 = cps.clause[cid].lits[0];
         debug_assert_ne!(c0, l);
         // println!("{} is removed and its first literal {} is enqueued.", cid.fmt(), c0.int());
         cps.remove_clause(cid);
-        vars.detach_clause(elim, cid, clause!(*cps, cid));
+        vars.detach_clause(elim, cid, &cps.clause[cid]);
         if asgs.enqueue_null(&mut vars[c0.vi()], c0.lbool(), 0)
             && asgs.propagate(cps, state, vars) == NULL_CLAUSE
         {
@@ -472,8 +472,8 @@ fn strengthen_clause(
         }
     } else {
         // println!("cid {} drops literal {}", cid.fmt(), l.int());
-        debug_assert!(1 < clause!(*cps, cid).lits.len());
-        elim.enqueue_clause(cid, clause_mut!(*cps, cid));
+        debug_assert!(1 < cps.clause[cid].lits.len());
+        elim.enqueue_clause(cid, &mut cps.clause[cid]);
         true
     }
 }
@@ -482,8 +482,8 @@ fn strengthen_clause(
 /// returns true if the clause became a unit clause.
 /// Called only from strengthen_clause
 fn strengthen(cps: &mut ClauseDB, vars: &mut [Var], cid: ClauseId, p: Lit) -> bool {
-    debug_assert!(!clause!(cps, cid).get_flag(ClauseFlag::Dead));
-    debug_assert!(1 < clause!(cps, cid).lits.len());
+    debug_assert!(!cps.clause[cid].get_flag(ClauseFlag::Dead));
+    debug_assert!(1 < cps.clause[cid].lits.len());
     let ClauseDB {
         ref mut clause,
         ref mut watcher,
@@ -533,7 +533,7 @@ fn strengthen(cps: &mut ClauseDB, vars: &mut [Var], cid: ClauseId, p: Lit) -> bo
 fn make_eliminated_clause(cps: &mut ClauseDB, vec: &mut Vec<Lit>, vi: VarId, cid: ClauseId) {
     let first = vec.len();
     // Copy clause to the vector. Remember the position where the varibale 'v' occurs:
-    let ch = clause!(cps, cid);
+    let ch = &cps.clause[cid];
     debug_assert!(!ch.lits.is_empty());
     for l in &ch.lits {
         vec.push(*l as Lit);
@@ -569,10 +569,10 @@ fn eliminate_var(
     // count only alive clauses
     vars[v]
         .pos_occurs
-        .retain(|&c| !clause!(cps, c).get_flag(ClauseFlag::Dead));
+        .retain(|&c| !cps.clause[c].get_flag(ClauseFlag::Dead));
     vars[v]
         .neg_occurs
-        .retain(|&c| !clause!(cps, c).get_flag(ClauseFlag::Dead));
+        .retain(|&c| !cps.clause[c].get_flag(ClauseFlag::Dead));
     let pos = &vars[v].pos_occurs as *const Vec<ClauseId>;
     let neg = &vars[v].neg_occurs as *const Vec<ClauseId>;
     unsafe {
@@ -633,7 +633,7 @@ fn eliminate_var(
             let tmp = &mut elim.elim_clauses as *mut Vec<Lit>;
             if (*neg).len() < (*pos).len() {
                 for cid in &*neg {
-                    debug_assert!(!clause!(*cps, *cid).get_flag(ClauseFlag::Dead));
+                    debug_assert!(!cps.clause[*cid].get_flag(ClauseFlag::Dead));
                     make_eliminated_clause(cps, &mut (*tmp), v, *cid);
                     cps.touched[v.lit(LTRUE) as usize] = true;
                     cps.touched[v.lit(LFALSE) as usize] = true;
@@ -641,7 +641,7 @@ fn eliminate_var(
                 make_eliminating_unit_clause(&mut (*tmp), v.lit(LTRUE));
             } else {
                 for cid in &*pos {
-                    debug_assert!(!clause!(*cps, *cid).get_flag(ClauseFlag::Dead));
+                    debug_assert!(!cps.clause[*cid].get_flag(ClauseFlag::Dead));
                     make_eliminated_clause(cps, &mut (*tmp), v, *cid);
                     cps.touched[v.lit(LTRUE) as usize] = true;
                     cps.touched[v.lit(LFALSE) as usize] = true;
@@ -651,10 +651,10 @@ fn eliminate_var(
         }
         // Produce clauses in cross product:
         for p in &*pos {
-            debug_assert!(!clause!(*cps, *p).get_flag(ClauseFlag::Dead));
-            let rank_p = clause!(*cps, *p).rank;
+            debug_assert!(!cps.clause[*p].get_flag(ClauseFlag::Dead));
+            let rank_p = cps.clause[*p].rank;
             for n in &*neg {
-                debug_assert!(!clause!(*cps, *n).get_flag(ClauseFlag::Dead));
+                debug_assert!(!cps.clause[*n].get_flag(ClauseFlag::Dead));
                 if let Some(vec) = merge(cps, elim, *p, *n, v) {
                     // println!("eliminator replaces {} with a cross product {:?}", p.fmt(), vec2int(&vec));
                     debug_assert!(!vec.is_empty());
@@ -676,10 +676,10 @@ fn eliminate_var(
                         }
                         _ => {
                             let v = &mut vec.to_vec();
-                            if clause!(*cps, *p).get_flag(ClauseFlag::Learnt)
-                                && clause!(*cps, *n).get_flag(ClauseFlag::Learnt)
+                            if cps.clause[*p].get_flag(ClauseFlag::Learnt)
+                                && cps.clause[*n].get_flag(ClauseFlag::Learnt)
                             {
-                                let rank = rank_p.min(clause!(*cps, *n).rank);
+                                let rank = rank_p.min(cps.clause[*n].rank);
                                 cps.add_clause(config, elim, vars, v, rank);
                             } else {
                                 cps.add_clause(config, elim, vars, v, 0);
