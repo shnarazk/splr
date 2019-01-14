@@ -32,13 +32,13 @@ impl ClauseIdIF for ClauseId {
     }
     #[inline(always)]
     fn is_lifted_lit(self) -> bool {
-        0x8000_0000_0000_0000 <= self
+        0 != 0x8000_0000_0000_0000 & self
     }
     fn format(self) -> String {
         if self == NULL_CLAUSE {
             "NullClause".to_string()
         } else {
-            format!("Learnt::{}", self)
+            format!("C::{}", self)
         }
     }
 }
@@ -54,12 +54,6 @@ impl Default for Watch {
             blocker: NULL_LIT,
             c: NULL_CLAUSE,
         }
-    }
-}
-
-impl Watch {
-    fn new(blocker: Lit, c: ClauseId) -> Watch {
-        Watch { blocker, c }
     }
 }
 
@@ -232,7 +226,7 @@ pub struct ClauseDB {
 }
 
 impl ClauseDBIF for ClauseDB {
-    fn build(nv: usize, nc: usize) -> ClauseDB {
+    fn new(nv: usize, nc: usize) -> ClauseDB {
         let mut clause = Vec::with_capacity(1 + nc);
         clause.push(Clause::default());
         let mut watcher = Vec::with_capacity(2 * (nv + 1));
@@ -275,7 +269,10 @@ impl ClauseDBIF for ClauseDB {
         for (ci, ch) in self.clause.iter_mut().enumerate().skip(1) {
             // the recycled clause is DEAD and EMPTY
             if ch.get_flag(ClauseFlag::Dead) && !ch.lits.is_empty() {
-                recycled.push(Watch::new(NULL_LIT, ci));
+                recycled.push(Watch {
+                    blocker: NULL_LIT,
+                    c: ci,
+                });
                 if ch.get_flag(ClauseFlag::Learnt) {
                     self.num_learnt -= 1;
                 }
@@ -379,9 +376,6 @@ impl ClauseDBIF for ClauseDB {
         } else {
             self.clause.len() - 1
         }
-    }
-    fn new(nv: usize, nc: usize) -> ClauseDB {
-        ClauseDB::build(nv, nc)
     }
     /// renamed from newLearntClause
     // Note: set lbd to 0 if you want to add the clause to Permanent.
