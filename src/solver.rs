@@ -35,11 +35,11 @@ pub type SolverResult = Result<Certificate, SolverException>;
 /// is the collection of all variables.
 pub struct Solver {
     pub asgs: AssignStack, // Assignment
-    pub config: Config,   // Configuration
-    pub cdb: ClauseDB,    // Clauses
-    pub elim: Eliminator, // Clause/Variable Elimination
-    pub state: State,     // misc data
-    pub vars: Vec<Var>,   // Variables
+    pub config: Config,    // Configuration
+    pub cdb: ClauseDB,     // Clauses
+    pub elim: Eliminator,  // Clause/Variable Elimination
+    pub state: State,      // misc data
+    pub vars: Vec<Var>,    // Variables
 }
 
 impl Solver {

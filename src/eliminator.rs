@@ -63,14 +63,14 @@ impl EliminatorIF for Eliminator {
         self.in_use = false;
         self.active = false;
     }
-    fn enqueue_clause(&mut self, cid: ClauseId, ch: &mut Clause) {
-        if !self.in_use || !self.active || ch.get_flag(ClauseFlag::Enqueued) {
+    fn enqueue_clause(&mut self, cid: ClauseId, c: &mut Clause) {
+        if !self.in_use || !self.active || c.get_flag(ClauseFlag::Enqueued) {
             return;
         }
-        let len = ch.lits.len();
+        let len = c.lits.len();
         if self.clause_queue.is_empty() || len <= self.clause_queue_threshold {
             self.clause_queue.push(cid);
-            ch.flag_on(ClauseFlag::Enqueued);
+            c.flag_on(ClauseFlag::Enqueued);
             self.clause_queue_threshold = len;
         }
     }

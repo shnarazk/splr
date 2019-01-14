@@ -78,7 +78,7 @@ pub trait Delete<T> {
 pub trait EliminatorIF {
     fn new(use_elim: bool) -> Eliminator;
     fn stop(&mut self, cdb: &mut ClauseDB, vars: &mut [Var], force: bool);
-    fn enqueue_clause(&mut self, cid: ClauseId, ch: &mut Clause);
+    fn enqueue_clause(&mut self, cid: ClauseId, c: &mut Clause);
     fn clear_clause_queue(&mut self, cdb: &mut ClauseDB);
     fn clause_queue_len(&self) -> usize;
     fn enqueue_var(&mut self, v: &mut Var);
@@ -153,17 +153,17 @@ pub trait VarIdIF {
 
 pub trait VarDBIF {
     fn assigned(&self, l: Lit) -> Lbool;
-    fn locked(&self, ch: &Clause, cid: ClauseId) -> bool;
+    fn locked(&self, c: &Clause, cid: ClauseId) -> bool;
     fn satisfies(&self, c: &[Lit]) -> bool;
     fn compute_lbd(&self, vec: &[Lit], keys: &mut [usize]) -> usize;
     fn attach_clause(
         &mut self,
         elim: &mut Eliminator,
         cid: ClauseId,
-        ch: &mut Clause,
+        c: &mut Clause,
         enqueue: bool,
     );
-    fn detach_clause(&mut self, elim: &mut Eliminator, cid: ClauseId, ch: &Clause);
+    fn detach_clause(&mut self, elim: &mut Eliminator, cid: ClauseId, c: &Clause);
     fn bump_activity(&mut self, inc: &mut f64, vi: VarId, _d: f64);
 }
 

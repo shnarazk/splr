@@ -94,13 +94,13 @@ impl VarDBIF for [Var] {
         &mut self,
         elim: &mut Eliminator,
         cid: ClauseId,
-        ch: &mut Clause,
+        c: &mut Clause,
         enqueue: bool,
     ) {
         if !elim.in_use {
             return;
         }
-        for l in &ch.lits {
+        for l in &c.lits {
             let mut v = &mut self[l.vi()];
             v.touched = true;
             if !v.eliminated {
@@ -112,13 +112,13 @@ impl VarDBIF for [Var] {
             }
         }
         if enqueue {
-            elim.enqueue_clause(cid, ch);
+            elim.enqueue_clause(cid, c);
         }
     }
-    fn detach_clause(&mut self, elim: &mut Eliminator, cid: ClauseId, ch: &Clause) {
-        debug_assert!(ch.get_flag(ClauseFlag::Dead));
+    fn detach_clause(&mut self, elim: &mut Eliminator, cid: ClauseId, c: &Clause) {
+        debug_assert!(c.get_flag(ClauseFlag::Dead));
         if elim.in_use {
-            for l in &ch.lits {
+            for l in &c.lits {
                 let v = &mut self[l.vi()];
                 if !v.eliminated {
                     if l.positive() {
