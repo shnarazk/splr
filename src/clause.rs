@@ -360,19 +360,19 @@ impl ClauseDBIF for ClauseDB {
         }
         temp[0] = key + 1;
     }
-    fn bump_activity(&mut self, inc: &mut f64, cid: ClauseId, _d: f64) {
+    fn bump_activity(&mut self, inc: &mut f64, cid: ClauseId, d: f64) {
         let c = &mut self.clause[cid];
-        let a = c.activity + *inc;
-        // a = (c.activity + d) / 2.0;
-        c.activity = a;
-        if CLA_ACTIVITY_MAX < a {
-            for c in &mut self.clause[1..] {
-                if c.get_flag(ClauseFlag::Learnt) {
-                    c.activity *= CLA_ACTIVITY_SCALE1;
-                }
-            }
-            *inc *= CLA_ACTIVITY_SCALE2;
-        }
+        // let a = c.activity + *inc;
+        c.activity = (c.activity + d) / 2.0;
+        // c.activity = a;
+        // if CLA_ACTIVITY_MAX < a {
+        //     for c in &mut self.clause[1..] {
+        //         if c.get_flag(ClauseFlag::Learnt) {
+        //             c.activity *= CLA_ACTIVITY_SCALE1;
+        //         }
+        //     }
+        //     *inc *= CLA_ACTIVITY_SCALE2;
+        // }
     }
     fn count(&self, alive: bool) -> usize {
         if alive {
