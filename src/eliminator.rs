@@ -472,45 +472,43 @@ fn strengthen(cdb: &mut ClauseDB, vars: &mut [Var], cid: ClauseId, p: Lit) -> bo
         ref mut watcher,
         ..
     } = cdb;
-    unsafe {
-        let ch = &mut clause[cid] as *mut Clause;
-        // debug_assert!((*ch).lits.contains(&p));
-        // debug_assert!(1 < (*ch).lits.len());
-        let v = &mut vars[p.vi()];
-        if p.positive() {
-            // debug_assert!(v.pos_occurs.contains(&cid));
-            v.pos_occurs.delete_unstable(|&c| c == cid);
-        } else {
-            // debug_assert!(v.neg_occurs.contains(&cid));
-            v.neg_occurs.delete_unstable(|&c| c == cid);
-        }
-        if (*ch).get_flag(ClauseFlag::Dead) {
-            return false;
-        }
-        watcher[p.negate() as usize].detach_with(cid);
-        let lits = &mut (*ch).lits;
-        if lits.len() == 2 {
-            // remove it
-            if lits[0] == p {
-                lits.swap(0, 1);
-            }
-            watcher[lits[0].negate() as usize].detach_with(cid);
-            return true;
-        }
-        if (*ch).lits[0] == p || (*ch).lits[1] == p {
-            let q = if lits[0] == p {
-                lits.swap_remove(0);
-                lits[0]
-            } else {
-                lits.swap_remove(1);
-                lits[1]
-            };
-            watcher[q.negate() as usize].attach(q, cid);
-        } else {
-            (*ch).lits.delete_unstable(|&x| x == p);
-        }
-        false
+    let c = &mut clause[cid];
+    // debug_assert!((*ch).lits.contains(&p));
+    // debug_assert!(1 < (*ch).lits.len());
+    let v = &mut vars[p.vi()];
+    if p.positive() {
+        // debug_assert!(v.pos_occurs.contains(&cid));
+        v.pos_occurs.delete_unstable(|&c| c == cid);
+    } else {
+        // debug_assert!(v.neg_occurs.contains(&cid));
+        v.neg_occurs.delete_unstable(|&c| c == cid);
     }
+    if (*c).get_flag(ClauseFlag::Dead) {
+        return false;
+    }
+    watcher[p.negate() as usize].detach_with(cid);
+    let lits = &mut (*c).lits;
+    if lits.len() == 2 {
+        // remove it
+        if lits[0] == p {
+            lits.swap(0, 1);
+        }
+        watcher[lits[0].negate() as usize].detach_with(cid);
+        return true;
+    }
+    if lits[0] == p || lits[1] == p {
+        let q = if lits[0] == p {
+            lits.swap_remove(0);
+            lits[0]
+        } else {
+            lits.swap_remove(1);
+            lits[1]
+        };
+        watcher[q.negate() as usize].attach(q, cid);
+    } else {
+        lits.delete_unstable(|&x| x == p);
+    }
+    false
 }
 
 fn make_eliminating_unit_clause(vec: &mut Vec<Lit>, x: Lit) {
