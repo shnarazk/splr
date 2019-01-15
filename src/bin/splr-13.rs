@@ -29,7 +29,7 @@ struct CLOpts {
     /// Minimal stpes between restart
     #[structopt(long = "rs", default_value = "50")]
     restart_step: usize,
-    /// Dump progress report in another format
+    /// Uses another format for progress report
     #[structopt(long = "--log", short = "l")]
     use_log: bool,
     /// Disable clause/variable elimination
