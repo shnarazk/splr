@@ -413,7 +413,6 @@ impl ClauseDBIF for ClauseDB {
         vars.attach_clause(elim, cid, ch, true);
         cid
     }
-    /// 4. removeClause
     /// called from strengthen_clause, backward_subsumption_check, eliminate_var, substitute
     fn remove_clause(&mut self, cid: ClauseId) {
         let ch = &mut self.clause[cid];

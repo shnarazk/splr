@@ -507,14 +507,14 @@ fn analyze(
                     state.stats[Stat::Conflict as usize] as f64,
                 );
                 // if 2 < (*ch).rank {
-                //     let nblevels = compute_lbd(vars, &ch.lits, lbd_temp);
-                //     if nblevels + 1 < (*ch).rank {
-                //         (*ch).rank = nblevels;
-                //         if nblevels <= 30 {
+                //     let nlevels = compute_lbd(vars, &ch.lits, lbd_temp);
+                //     if nlevels + 1 < (*ch).rank {
+                //         (*ch).rank = nlevels;
+                //         if nlevels <= 30 {
                 //             (*ch).flag_on(ClauseFlag::JustUsed);
                 //         }
                 //         if self.strategy == Some(SearchStrategy::ChanSeok)
-                //             && nblevels < self.co_lbd_bound
+                //             && nlevels < self.co_lbd_bound
                 //         {
                 //             (*ch).rank = 0;
                 //             clause_mut!(*cdb, confl).rank = 0
@@ -719,8 +719,8 @@ fn minimize_with_bi_clauses(
     lbd_temp: &mut [usize],
     vec: &mut Vec<Lit>,
 ) {
-    let nblevels = vars.compute_lbd(vec, lbd_temp);
-    if 6 < nblevels {
+    let nlevels = vars.compute_lbd(vec, lbd_temp);
+    if 6 < nlevels {
         return;
     }
     let key = lbd_temp[0] + 1;
@@ -728,7 +728,7 @@ fn minimize_with_bi_clauses(
         lbd_temp[l.vi() as usize] = key;
     }
     let l0 = vec[0];
-    let mut nb = 0;
+    let mut nsat = 0;
     for w in &cdb.watcher[l0.negate() as usize][1..] {
         let ch = &cdb.clause[w.c];
         if ch.lits.len() != 2 {
@@ -738,11 +738,11 @@ fn minimize_with_bi_clauses(
         let other = ch.lits[(ch.lits[0] == l0) as usize];
         let vi = other.vi();
         if lbd_temp[vi] == key && vars.assigned(other) == LTRUE {
-            nb += 1;
+            nsat += 1;
             lbd_temp[vi] -= 1;
         }
     }
-    if 0 < nb {
+    if 0 < nsat {
         lbd_temp[l0.vi()] = key;
         vec.retain(|l| lbd_temp[l.vi()] == key);
     }
