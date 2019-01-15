@@ -13,14 +13,6 @@ const CLA_ACTIVITY_MAX: f64 = 1e240;
 const CLA_ACTIVITY_SCALE1: f64 = 1e-80;
 const CLA_ACTIVITY_SCALE2: f64 = 1e-10;
 
-#[derive(Clone, Copy, Eq, PartialEq)]
-pub enum ClauseKind {
-    Removable,
-    Permanent,
-    Binclause,
-    Liftedlit,
-}
-
 impl ClauseIdIF for ClauseId {
     #[inline(always)]
     fn to_lit(self) -> Lit {
@@ -404,16 +396,8 @@ impl ClauseDBIF for ClauseDB {
             }
         }
         v.swap(1, i_max);
-        let kind = if lbd == 0 && elim.in_use {
-            ClauseKind::Permanent
-        } else if v.len() == 2 {
-            ClauseKind::Binclause
-        } else if (config.use_chan_seok && lbd <= config.co_lbd_bound) || lbd == 0 {
-            ClauseKind::Permanent
-        } else {
-            ClauseKind::Removable
-        };
-        let cid = self.new_clause(&v, lbd, kind == ClauseKind::Removable);
+        let learnt = 0 < lbd && 2 < v.len() && (!config.use_chan_seok || config.co_lbd_bound < lbd);
+        let cid = self.new_clause(&v, lbd, learnt);
         let ch = &mut self.clause[cid];
         ch.activity = config.var_inc;
         vars.attach_clause(elim, cid, ch, true);
