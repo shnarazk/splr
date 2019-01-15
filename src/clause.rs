@@ -351,19 +351,18 @@ impl ClauseDBIF for ClauseDB {
         }
         temp[0] = key + 1;
     }
-    fn bump_activity(&mut self, inc: &mut f64, cid: ClauseId, d: f64) {
+    fn bump_activity(&mut self, inc: &mut f64, cid: ClauseId) {
         let c = &mut self.clause[cid];
-        // let a = c.activity + *inc;
-        c.activity = (c.activity + d) / 2.0;
-        // c.activity = a;
-        // if CLA_ACTIVITY_MAX < a {
-        //     for c in &mut self.clause[1..] {
-        //         if c.get_flag(ClauseFlag::Learnt) {
-        //             c.activity *= CLA_ACTIVITY_SCALE1;
-        //         }
-        //     }
-        //     *inc *= CLA_ACTIVITY_SCALE2;
-        // }
+        let a = c.activity + *inc;
+        c.activity = a;
+        if CLA_ACTIVITY_MAX < a {
+            for c in &mut self.clause[1..] {
+                if c.get_flag(ClauseFlag::Learnt) {
+                    c.activity *= CLA_ACTIVITY_SCALE1;
+                }
+            }
+            *inc *= CLA_ACTIVITY_SCALE2;
+        }
     }
     fn count(&self, alive: bool) -> usize {
         if alive {
@@ -418,7 +417,13 @@ impl ClauseDBIF for ClauseDB {
         }
         self.touched[w0 as usize] = true;
     }
-    fn reduce(&mut self, config: &Config, elim: &mut Eliminator, state: &mut State, vars: &mut [Var]) {
+    fn reduce(
+        &mut self,
+        config: &Config,
+        elim: &mut Eliminator,
+        state: &mut State,
+        vars: &mut [Var],
+    ) {
         self.reset_lbd(vars, &mut state.lbd_temp);
         let ClauseDB {
             ref mut clause,

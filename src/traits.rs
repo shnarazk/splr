@@ -45,7 +45,13 @@ pub trait ClauseDBIF {
         lbd: usize,
     ) -> ClauseId;
     fn remove_clause(&mut self, cid: ClauseId);
-    fn reduce(&mut self, config: &Config, elim: &mut Eliminator, state: &mut State, vars: &mut [Var]);
+    fn reduce(
+        &mut self,
+        config: &Config,
+        elim: &mut Eliminator,
+        state: &mut State,
+        vars: &mut [Var],
+    );
     fn simplify(
         &mut self,
         asgs: &mut AssignStack,
@@ -57,7 +63,7 @@ pub trait ClauseDBIF {
     fn garbage_collect(&mut self, vars: &mut [Var], elim: &mut Eliminator);
     fn new_clause(&mut self, v: &[Lit], rank: usize, learnt: bool) -> ClauseId;
     fn reset_lbd(&mut self, vars: &[Var], temp: &mut [usize]);
-    fn bump_activity(&mut self, inc: &mut f64, cid: ClauseId, d: f64);
+    fn bump_activity(&mut self, inc: &mut f64, cid: ClauseId);
     fn count(&self, alive: bool) -> usize;
 }
 

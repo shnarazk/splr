@@ -500,12 +500,7 @@ fn analyze(
             let ch = &mut cdb.clause[cid] as *mut Clause;
             debug_assert_ne!(cid, NULL_CLAUSE);
             if (*ch).get_flag(ClauseFlag::Learnt) {
-                // self.bump_cid(cid);
-                cdb.bump_activity(
-                    &mut config.cla_inc,
-                    cid,
-                    state.stats[Stat::Conflict as usize] as f64,
-                );
+                cdb.bump_activity(&mut config.cla_inc, cid);
                 // if 2 < (*ch).rank {
                 //     let nlevels = compute_lbd(vars, &ch.lits, lbd_temp);
                 //     if nlevels + 1 < (*ch).rank {

@@ -217,7 +217,10 @@ impl Eliminator {
                     let ch = &mut cdb.clause[cid] as *mut Clause;
                     (*ch).flag_off(ClauseFlag::Enqueued);
                     lits = &(*ch).lits;
-                    if (*ch).get_flag(ClauseFlag::Dead) || BACKWORD_SUBSUMPTION_THRESHOLD < cnt || SUBSUMPTION_SIZE < lits.len() {
+                    if (*ch).get_flag(ClauseFlag::Dead)
+                        || BACKWORD_SUBSUMPTION_THRESHOLD < cnt
+                        || SUBSUMPTION_SIZE < lits.len()
+                    {
                         continue;
                     }
                     let mut tmp = 6;
