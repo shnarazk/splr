@@ -217,7 +217,7 @@ impl Eliminator {
                     let ch = &mut cdb.clause[cid] as *mut Clause;
                     (*ch).flag_off(ClauseFlag::Enqueued);
                     lits = &(*ch).lits;
-                    if (*ch).get_flag(ClauseFlag::Dead) || BACKWORD_SUBSUMPTION_THRESHOLD < cnt {
+                    if (*ch).get_flag(ClauseFlag::Dead) || BACKWORD_SUBSUMPTION_THRESHOLD < cnt || SUBSUMPTION_SIZE < lits.len() {
                         continue;
                     }
                     let mut tmp = 6;
@@ -240,54 +240,16 @@ impl Eliminator {
                         &mut vars[best].neg_occurs as *mut Vec<ClauseId>
                     };
                     cnt += (*cs).len();
-                    for di in &*cs {
-                        let db = &cdb.clause[*di] as *const Clause;
+                    for did in &*cs {
+                        let db = &cdb.clause[*did] as *const Clause;
                         if !(*db).get_flag(ClauseFlag::Dead)
-                            && *di != cid
-                            && lits.len() <= SUBSUMPTION_SIZE
+                            && *did != cid
                             && (*db).lits.len() <= SUBSUMPTION_SIZE
                             && (self.subsumption_lim == 0
                                 || lits.len() + (*db).lits.len() <= self.subsumption_lim)
+                            && !try_subsume(asgs, cdb, self, state, vars, cid, *did)
                         {
-                            match subsume(cdb, cid, *di) {
-                                Some(NULL_LIT) => {
-                                    if !cid.is_lifted_lit()
-                                        && cdb.clause[cid].get_flag(ClauseFlag::Learnt)
-                                        && (*db).get_flag(ClauseFlag::Learnt)
-                                    {
-                                        // println!("BackSubsC    => {} {:#} subsumed completely by {} {:#}",
-                                        //          di.fmt(),
-                                        //          *db,
-                                        //          cid.fmt(),
-                                        //          *clause_body!(self.cp, cid),
-                                        // );
-                                        cdb.remove_clause(*di);
-                                        vars.detach_clause(self, *di, &cdb.clause[*di]);
-                                    } //else {
-                                      // println!("backward_subsumption_check tries to delete a permanent clause {} {:#}",
-                                      //          di.fmt(),
-                                      //          clause_body!(self.cp, *di));
-                                      // TODO: move the cid to Permanent
-                                      //}
-                                }
-                                Some(l) => {
-                                    // println!("BackSubsC    => subsumed {} from {} and {} {:#}", l.int(), cid.fmt(), di.fmt());
-                                    if !strengthen_clause(
-                                        cdb,
-                                        self,
-                                        state,
-                                        vars,
-                                        asgs,
-                                        *di,
-                                        l.negate(),
-                                    ) {
-                                        state.ok = false;
-                                        return false;
-                                    }
-                                    self.enqueue_var(&mut vars[l.vi()]);
-                                }
-                                None => {}
-                            }
+                            return false;
                         }
                     }
                 }
@@ -295,6 +257,49 @@ impl Eliminator {
         }
         true
     }
+}
+
+fn try_subsume(
+    asgs: &mut AssignStack,
+    cdb: &mut ClauseDB,
+    elim: &mut Eliminator,
+    state: &mut State,
+    vars: &mut [Var],
+    cid: ClauseId,
+    did: ClauseId,
+) -> bool {
+    match subsume(cdb, cid, did) {
+        Some(NULL_LIT) => {
+            if !cid.is_lifted_lit()
+                && cdb.clause[cid].get_flag(ClauseFlag::Learnt)
+                && cdb.clause[did].get_flag(ClauseFlag::Learnt)
+            {
+                // println!("BackSubsC    => {} {:#} subsumed completely by {} {:#}",
+                //          did.fmt(),
+                //          *clause!(cdb, cid),
+                //          cid.fmt(),
+                //          *clause!(cdb, cid),
+                // );
+                cdb.remove_clause(did);
+                vars.detach_clause(elim, did, &mut cdb.clause[did]);
+            } //else {
+              // println!("BackSubsC deletes a permanent clause {} {:#}",
+              //          di.fmt(),
+              //          clause!(cdb, did));
+              // TODO: move the cid to Permanent
+              //}
+        }
+        Some(l) => {
+            // println!("BackSubsC subsumeds{} from {} and {} {:#}", l.int(), cid.fmt(), di.fmt());
+            if !strengthen_clause(cdb, elim, state, vars, asgs, did, l.negate()) {
+                state.ok = false;
+                return false;
+            }
+            elim.enqueue_var(&mut vars[l.vi()]);
+        }
+        None => {}
+    }
+    true
 }
 
 /// returns a literal if these clauses can be merged by the literal.
