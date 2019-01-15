@@ -49,7 +49,7 @@ impl Solver {
         let path = &cnf.pathname;
         let (_fe, se) = config.ema_coeffs;
         let mut elim = Eliminator::default();
-        elim.in_use = config.use_sve && nc < 800_000 && 1000 < nv;
+        elim.in_use = config.use_sve;
         let state = State::new(&config, nv, se, &path.to_string());
         Solver {
             asgs: AssignStack::new(nv),
@@ -93,7 +93,7 @@ impl SatSolver for Solver {
                     asgs.enqueue_null(v, LTRUE, 0);
                 } else if v.pos_occurs.is_empty() && !v.neg_occurs.is_empty() {
                     asgs.enqueue_null(v, LFALSE, 0);
-                } else if v.pos_occurs.len() == 1 || v.neg_occurs.len() == 1 {
+                } else if v.pos_occurs.len() < 4 || v.neg_occurs.len() < 4 {
                     elim.enqueue_var(v);
                 }
             }
@@ -103,6 +103,10 @@ impl SatSolver for Solver {
             } else {
                 elim.stop(cdb, vars, false);
                 state.progress(config, cdb, elim, vars, Some("loaded"));
+            }
+            elim.in_use = cdb.clause.len() < 800_000 && 1000 < config.num_vars;
+            if !elim.in_use {
+                elim.stop(cdb, vars, true);
             }
         } else {
             state.progress(config, cdb, elim, vars, Some("loaded"));
