@@ -80,6 +80,7 @@ impl LitIF for Lit {
     fn negate(&self) -> Lit {
         self ^ 1
     }
+    #[inline(always)]
     fn to_cid(self) -> ClauseId {
         (self as usize) | 0x8000_0000_0000_0000
     }
