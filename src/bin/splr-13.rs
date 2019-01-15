@@ -32,10 +32,10 @@ struct CLOpts {
     /// Dump progress report in another format
     #[structopt(long = "--log", short = "l")]
     use_log: bool,
-    /// Don't use clause/variable elimination
+    /// Disable clause/variable elimination
     #[structopt(long = "no-elim", short = "e")]
     no_elim: bool,
-    /// Don't use dynamic strategy adaptation
+    /// Disables dynamic strategy adaptation
     #[structopt(long = "no-adaptation", short = "a")]
     no_adapt: bool,
     /// a CNF file to solve
