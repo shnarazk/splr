@@ -281,7 +281,7 @@ fn try_subsume(
                 //          *clause!(cdb, cid),
                 // );
                 cdb.remove_clause(did);
-                vars.detach_clause(elim, did, &mut cdb.clause[did]);
+                vars.detach_clause(elim, did, &cdb.clause[did]);
             } //else {
               // println!("BackSubsC deletes a permanent clause {} {:#}",
               //          di.fmt(),
