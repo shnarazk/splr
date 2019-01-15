@@ -390,7 +390,7 @@ fn search(
             if !asgs.remains() {
                 let vi = state.var_order.select_var(&vars);
                 let p = vars[vi].phase;
-                asgs.uncheck_assume(vars, elim, vi.lit(p));
+                asgs.uncheck_assume(vars, vi.lit(p));
                 state.stats[Stat::Decision as usize] += 1;
                 a_decision_was_made = true;
             }
@@ -581,9 +581,7 @@ fn analyze(
             ti -= 1;
         }
     }
-    debug_assert_eq!(learnt[0], 0);
     learnt[0] = p.negate();
-    debug_assert_ne!(learnt[0], 0);
     // println!("- append {}; the result is {:?}", p.negate().int(), vec2int(learnt));
     // simplify phase
     let mut to_clear = Vec::new();
@@ -614,7 +612,6 @@ fn analyze(
     if 1 < learnt.len() {
         let mut max_i = 1;
         level_to_return = vars[learnt[max_i].vi()].level;
-        // for i in 2..learnt.len() {
         for (i, l) in learnt.iter().enumerate().skip(2) {
             let lv = vars[l.vi()].level;
             if level_to_return < lv {
@@ -726,7 +723,6 @@ fn minimize_with_bi_clauses(
     if 6 < nblevels {
         return;
     }
-    // reuse lbd_temp scretely
     let key = lbd_temp[0] + 1;
     for l in &vec[1..] {
         lbd_temp[l.vi() as usize] = key;

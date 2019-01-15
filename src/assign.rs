@@ -1,6 +1,5 @@
 use crate::clause::ClauseDB;
 use crate::config::Config;
-use crate::eliminator::Eliminator;
 use crate::traits::*;
 use crate::types::*;
 use crate::var::{Var, VarIdHeap};
@@ -125,14 +124,11 @@ impl AssignIF for AssignStack {
         v.assign = l.lbool();
         v.level = dl;
         v.reason = cid;
-        // if dl == 0 {
-        //     eliminator.enqueue_var(v);
-        // }
         debug_assert!(!self.trail.contains(&l));
         debug_assert!(!self.trail.contains(&l.negate()));
         self.trail.push(l);
     }
-    fn uncheck_assume(&mut self, vars: &mut [Var], elim: &mut Eliminator, l: Lit) {
+    fn uncheck_assume(&mut self, vars: &mut [Var], l: Lit) {
         debug_assert!(!self.trail.contains(&l));
         debug_assert!(!self.trail.contains(&l.negate()));
         self.trail_lim.push(self.trail.len());
@@ -143,9 +139,6 @@ impl AssignIF for AssignStack {
         v.assign = l.lbool();
         v.level = dl;
         v.reason = NULL_CLAUSE;
-        if dl == 0 {
-            elim.enqueue_var(v);
-        }
         self.trail.push(l);
     }
     #[allow(dead_code)]

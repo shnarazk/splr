@@ -22,7 +22,7 @@ pub trait AssignIF {
     fn enqueue(&mut self, v: &mut Var, sig: Lbool, cid: ClauseId, dl: usize) -> bool;
     fn enqueue_null(&mut self, v: &mut Var, sig: Lbool, dl: usize) -> bool;
     fn uncheck_enqueue(&mut self, vars: &mut [Var], l: Lit, cid: ClauseId);
-    fn uncheck_assume(&mut self, vars: &mut [Var], elim: &mut Eliminator, l: Lit);
+    fn uncheck_assume(&mut self, vars: &mut [Var], l: Lit);
     fn dump_cnf(&mut self, config: &Config, cdb: &ClauseDB, vars: &[Var], fname: &str);
 }
 
