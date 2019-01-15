@@ -440,16 +440,22 @@ impl ClauseDBIF for ClauseDB {
         if perm.is_empty() {
             return;
         }
-        perm.sort_by(|&a, &b| clause[a].cmp(&clause[b]));
         let keep = perm.len() / 2;
-        if clause[perm[keep]].rank <= 5 {
-            state.next_reduction += 1000;
-        };
+        perm.sort_by(|&a, &b| clause[a].cmp(&clause[b]));
+        if config.use_chan_seok {
+        } else {
+            if clause[perm[keep]].rank <= 3 {
+                state.next_reduction += config.cdb_inc_extra;
+            }
+            // if clause[perm[0]].rank <= 5 {
+            //     state.next_reduction += config.cdb_inc_extra;
+            // };
+        }
         for i in &perm[keep..] {
             let c = &mut clause[*i];
             if c.get_flag(ClauseFlag::JustUsed) {
                 c.flag_off(ClauseFlag::JustUsed)
-            } else {
+            } else if 2 < c.rank {
                 c.kill(touched);
             }
         }
