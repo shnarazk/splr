@@ -535,11 +535,7 @@ fn analyze(
                 //     vars[vi].assign != BOTTOM,
                 //     format!("{:?} was assigned", vars[vi])
                 // );
-                vars.bump_activity(
-                    &mut config.var_inc,
-                    vi,
-                    state.stats[Stat::Conflict as usize] as f64,
-                );
+                vars.bump_activity(&mut config.var_inc, vi);
                 state.var_order.update(vars, vi);
                 if 0 < lvl && !state.an_seen[vi] {
                     state.an_seen[vi] = true;

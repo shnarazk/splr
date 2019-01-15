@@ -131,9 +131,8 @@ impl VarDBIF for [Var] {
             }
         }
     }
-    fn bump_activity(&mut self, inc: &mut f64, vi: VarId, _d: f64) {
+    fn bump_activity(&mut self, inc: &mut f64, vi: VarId) {
         let v = &mut self[vi];
-        // v.activity = (v.activity + d) / 2.0;
         let a = v.activity + *inc;
         v.activity = a;
         if VAR_ACTIVITY_MAX < a {

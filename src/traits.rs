@@ -165,7 +165,7 @@ pub trait VarDBIF {
         enqueue: bool,
     );
     fn detach_clause(&mut self, elim: &mut Eliminator, cid: ClauseId, c: &Clause);
-    fn bump_activity(&mut self, inc: &mut f64, vi: VarId, _d: f64);
+    fn bump_activity(&mut self, inc: &mut f64, vi: VarId);
 }
 
 pub trait VarOrderIF {
