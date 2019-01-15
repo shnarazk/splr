@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-use splr::clause::{Clause, ClauseKind};
+use splr::clause::Clause;
 use splr::solver::Solver;
 use splr::traits::*;
 use splr::types::*;
@@ -87,6 +87,6 @@ fn setup() -> Solver {
 }
 
 fn attach_clause<'a>(s: &'a mut Solver, vec: &[Lit]) -> &'a mut Clause {
-    let cid = s.cps[ClauseKind::Permanent as usize].new_clause(vec, vec.len());
-    &mut s.cps[ClauseKind::Permanent as usize].head[cid.to_index()]
+    let cid = s.cdb.new_clause(vec, vec.len(), true);
+    &mut s.cdb.clause[cid]
 }
