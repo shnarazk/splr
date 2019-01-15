@@ -167,16 +167,14 @@ impl Config {
         if self.use_chan_seok {
             // println!("# Adjusting for low decision levels.");
             // move some clauses with good lbd (col_lbd_bound) to Permanent
-            for ch in &mut cdb.clause[1..] {
-                if ch.get_flag(ClauseFlag::Dead) {
+            for c in &mut cdb.clause[1..] {
+                if c.get_flag(ClauseFlag::Dead) {
                     continue;
                 }
-                if ch.rank <= self.co_lbd_bound {
-                    ch.flag_off(ClauseFlag::Learnt);
+                if c.rank <= self.co_lbd_bound {
+                    c.flag_off(ClauseFlag::Learnt);
                 } else if re_init {
-                    ch.flag_on(ClauseFlag::Dead);
-                    cdb.touched[ch.lits[0].negate() as usize] = true;
-                    cdb.touched[ch.lits[1].negate() as usize] = true;
+                    c.kill(&mut cdb.touched);
                 }
             }
             cdb.garbage_collect(vars, elim);

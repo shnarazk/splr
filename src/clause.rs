@@ -137,6 +137,12 @@ impl ClauseIF for Clause {
     fn flag_on(&mut self, flag: ClauseFlag) {
         self.flags |= 1u16 << (flag as u16);
     }
+    fn kill(&mut self, touched: &mut [bool]) {
+        self.flag_on(ClauseFlag::Dead);
+        debug_assert!(self.lits[0] != 0 && self.lits[1] != 0);
+        touched[self.lits[0].negate() as usize] = true;
+        touched[self.lits[1].negate() as usize] = true;
+    }
 }
 
 impl Clause {
@@ -452,14 +458,11 @@ impl ClauseDBIF for ClauseDB {
             state.next_reduction += 1000;
         };
         for i in &perm[keep..] {
-            let ch = &mut clause[*i];
-            if ch.get_flag(ClauseFlag::JustUsed) {
-                ch.flag_off(ClauseFlag::JustUsed)
+            let c = &mut clause[*i];
+            if c.get_flag(ClauseFlag::JustUsed) {
+                c.flag_off(ClauseFlag::JustUsed)
             } else {
-                ch.flag_on(ClauseFlag::Dead);
-                debug_assert!(ch.lits[0] != 0 && ch.lits[1] != 0);
-                touched[ch.lits[0].negate() as usize] = true;
-                touched[ch.lits[1].negate() as usize] = true;
+                c.kill(touched);
             }
         }
         self.garbage_collect(vars, elim);
@@ -486,14 +489,11 @@ impl ClauseDBIF for ClauseDB {
                 return false;
             }
         }
-        for ch in &mut self.clause[1..] {
-            if !ch.get_flag(ClauseFlag::Dead) && vars.satisfies(&ch.lits) {
-                debug_assert!(ch.lits[0] != 0 && ch.lits[1] != 0);
-                ch.flag_on(ClauseFlag::Dead);
-                self.touched[ch.lits[0].negate() as usize] = true;
-                self.touched[ch.lits[1].negate() as usize] = true;
+        for c in &mut self.clause[1..] {
+            if !c.get_flag(ClauseFlag::Dead) && vars.satisfies(&c.lits) {
+                c.kill(&mut self.touched);
                 if elim.in_use {
-                    for l in &ch.lits {
+                    for l in &c.lits {
                         let v = &mut vars[l.vi()];
                         if !v.eliminated {
                             elim.enqueue_var(v);

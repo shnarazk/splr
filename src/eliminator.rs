@@ -353,11 +353,6 @@ fn check_to_merge(cdb: &ClauseDB, cp: ClauseId, cq: ClauseId, v: VarId) -> (bool
     (true, size)
 }
 
-fn make_eliminating_unit_clause(vec: &mut Vec<Lit>, x: Lit) {
-    vec.push(x);
-    vec.push(1);
-}
-
 #[allow(dead_code)]
 fn check_eliminator(cdb: &ClauseDB, vars: &[Var]) -> bool {
     // clause_queue should be clear.
@@ -518,6 +513,11 @@ fn strengthen(cdb: &mut ClauseDB, vars: &mut [Var], cid: ClauseId, p: Lit) -> bo
     }
 }
 
+fn make_eliminating_unit_clause(vec: &mut Vec<Lit>, x: Lit) {
+    vec.push(x);
+    vec.push(1);
+}
+
 fn make_eliminated_clause(cdb: &mut ClauseDB, vec: &mut Vec<Lit>, vi: VarId, cid: ClauseId) {
     let first = vec.len();
     // Copy clause to the vector. Remember the position where the varibale 'v' occurs:
@@ -536,6 +536,8 @@ fn make_eliminated_clause(cdb: &mut ClauseDB, vec: &mut Vec<Lit>, vi: VarId, cid
     // Store the length of the clause last:
     debug_assert_eq!(vec[first].vi(), vi);
     vec.push(ch.lits.len() as Lit);
+    cdb.touched[vi.lit(LTRUE) as usize] = true;
+    cdb.touched[vi.lit(LFALSE) as usize] = true;
     // println!("make_eliminated_clause: eliminate({}) clause {:?}", vi, vec2int(&ch.lits));
 }
 
@@ -623,16 +625,12 @@ fn eliminate_var(
                 for cid in &*neg {
                     debug_assert!(!cdb.clause[*cid].get_flag(ClauseFlag::Dead));
                     make_eliminated_clause(cdb, &mut (*tmp), v, *cid);
-                    cdb.touched[v.lit(LTRUE) as usize] = true;
-                    cdb.touched[v.lit(LFALSE) as usize] = true;
                 }
                 make_eliminating_unit_clause(&mut (*tmp), v.lit(LTRUE));
             } else {
                 for cid in &*pos {
                     debug_assert!(!cdb.clause[*cid].get_flag(ClauseFlag::Dead));
                     make_eliminated_clause(cdb, &mut (*tmp), v, *cid);
-                    cdb.touched[v.lit(LTRUE) as usize] = true;
-                    cdb.touched[v.lit(LFALSE) as usize] = true;
                 }
                 make_eliminating_unit_clause(&mut (*tmp), v.lit(LFALSE));
             }

@@ -30,6 +30,7 @@ pub trait ClauseIF {
     fn get_flag(&self, flag: ClauseFlag) -> bool;
     fn flag_off(&mut self, flag: ClauseFlag);
     fn flag_on(&mut self, flag: ClauseFlag);
+    fn kill(&mut self, touched: &mut [bool]);
 }
 
 /// For ClauseDB
