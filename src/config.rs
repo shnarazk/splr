@@ -45,8 +45,8 @@ pub struct Config {
     /// CLAUSE REDUCTION
     pub first_reduction: usize,
     pub glureduce: bool,
-    pub inc_reduce_db: usize,
-    pub inc_reduce_db_extra: usize,
+    pub cdb_inc: usize,
+    pub cdb_inc_extra: usize,
     pub ema_coeffs: (i32, i32),
     /// RESTART
     /// For force restart based on average LBD of newly generated clauses: 0.80.
@@ -85,8 +85,8 @@ impl Default for Config {
             var_inc: 0.9,
             first_reduction: 1000,
             glureduce: true,
-            inc_reduce_db: 300,
-            inc_reduce_db_extra: 1000,
+            cdb_inc: 300,
+            cdb_inc_extra: 1000,
             restart_thr: 0.75,
             restart_blk: 1.40,
             restart_asg_len: 3500,
@@ -130,7 +130,7 @@ impl Config {
             state.cur_restart = (state.stats[Stat::Conflict as usize] as f64
                 / state.next_reduction as f64
                 + 1.0) as usize;
-            self.inc_reduce_db = 0;
+            self.cdb_inc = 0;
             re_init = true;
         }
         if state.stats[Stat::NoDecisionConflict as usize] < 30_000 {

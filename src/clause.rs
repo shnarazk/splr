@@ -8,7 +8,6 @@ use crate::var::Var;
 use std::cmp::Ordering;
 use std::fmt;
 
-const DB_INC_SIZE: usize = 200;
 const CLA_ACTIVITY_MAX: f64 = 1e240;
 const CLA_ACTIVITY_SCALE1: f64 = 1e-80;
 const CLA_ACTIVITY_SCALE2: f64 = 1e-10;
@@ -419,7 +418,7 @@ impl ClauseDBIF for ClauseDB {
         }
         self.touched[w0 as usize] = true;
     }
-    fn reduce(&mut self, elim: &mut Eliminator, state: &mut State, vars: &mut [Var]) {
+    fn reduce(&mut self, config: &Config, elim: &mut Eliminator, state: &mut State, vars: &mut [Var]) {
         self.reset_lbd(vars, &mut state.lbd_temp);
         let ClauseDB {
             ref mut clause,
@@ -450,7 +449,7 @@ impl ClauseDBIF for ClauseDB {
             }
         }
         self.garbage_collect(vars, elim);
-        state.next_reduction += DB_INC_SIZE;
+        state.next_reduction += config.cdb_inc;
         state.stats[Stat::Reduction as usize] += 1;
     }
     fn simplify(

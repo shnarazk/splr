@@ -45,7 +45,7 @@ pub trait ClauseDBIF {
         lbd: usize,
     ) -> ClauseId;
     fn remove_clause(&mut self, cid: ClauseId);
-    fn reduce(&mut self, elim: &mut Eliminator, state: &mut State, vars: &mut [Var]);
+    fn reduce(&mut self, config: &Config, elim: &mut Eliminator, state: &mut State, vars: &mut [Var]);
     fn simplify(
         &mut self,
         asgs: &mut AssignStack,

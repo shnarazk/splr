@@ -473,8 +473,8 @@ fn handle_conflict_path(
                     as usize)
     {
         state.cur_restart = ((tn_confl as f64) / (state.next_reduction as f64)) as usize + 1;
-        cdb.reduce(elim, state, vars);
-        state.next_reduction += config.inc_reduce_db;
+        cdb.reduce(config, elim, state, vars);
+        state.next_reduction += config.cdb_inc;
     }
 }
 
