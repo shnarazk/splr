@@ -32,7 +32,7 @@ struct CLOpts {
     /// Uses another format for progress report
     #[structopt(long = "--log", short = "l")]
     use_log: bool,
-    /// Disable clause/variable elimination
+    /// Disables clause/variable elimination
     #[structopt(long = "no-elim", short = "e")]
     no_elim: bool,
     /// Disables dynamic strategy adaptation
