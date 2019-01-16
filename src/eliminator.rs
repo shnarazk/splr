@@ -1,5 +1,5 @@
 use crate::assign::AssignStack;
-use crate::clause::{Clause, ClauseDB, ClauseFlag};
+use crate::clause::{Clause, ClauseDB};
 use crate::config::Config;
 use crate::state::State;
 use crate::traits::*;
@@ -64,35 +64,35 @@ impl EliminatorIF for Eliminator {
         self.active = false;
     }
     fn enqueue_clause(&mut self, cid: ClauseId, c: &mut Clause) {
-        if !self.in_use || !self.active || c.get_flag(ClauseFlag::Enqueued) {
+        if !self.in_use || !self.active || c.get_flag(Flag::Enqueued) {
             return;
         }
         let len = c.lits.len();
         if self.clause_queue.is_empty() || len <= self.clause_queue_threshold {
             self.clause_queue.push(cid);
-            c.flag_on(ClauseFlag::Enqueued);
+            c.flag_on(Flag::Enqueued);
             self.clause_queue_threshold = len;
         }
     }
     fn clear_clause_queue(&mut self, cdb: &mut ClauseDB) {
         for cid in &self.clause_queue {
-            cdb.clause[*cid].flag_off(ClauseFlag::Enqueued);
+            cdb.clause[*cid].flag_off(Flag::Enqueued);
         }
         self.clause_queue.clear();
     }
     fn enqueue_var(&mut self, v: &mut Var) {
-        if !self.in_use || !self.active || v.enqueued {
+        if !self.in_use || !self.active || v.get_flag(Flag::Enqueued) {
             return;
         }
         if self.var_queue.is_empty() || v.check_sve_at <= self.var_queue_threshold {
             self.var_queue.push(v.index);
-            v.enqueued = true;
+            v.flag_on(Flag::Enqueued);
             self.var_queue_threshold = v.check_sve_at;
         }
     }
     fn clear_var_queue(&mut self, vars: &mut [Var]) {
         for v in &self.var_queue {
-            vars[*v].enqueued = false;
+            vars[*v].flag_off(Flag::Enqueued);
         }
         self.var_queue.clear();
     }
@@ -126,8 +126,8 @@ impl EliminatorIF for Eliminator {
             }
             while let Some(vi) = self.var_queue.pop() {
                 let v = &mut vars[vi];
-                v.enqueued = false;
-                if v.eliminated || v.assign != BOTTOM {
+                v.flag_off(Flag::Enqueued);
+                if v.get_flag(Flag::EliminatedVar) || v.assign != BOTTOM {
                     continue;
                 }
                 v.check_sve_at += 1;
@@ -214,26 +214,26 @@ impl Eliminator {
                     unilits = [cid.to_lit(); 1];
                     lits = &unilits;
                 } else {
-                    let ch = &mut cdb.clause[cid] as *mut Clause;
-                    (*ch).flag_off(ClauseFlag::Enqueued);
-                    lits = &(*ch).lits;
-                    if (*ch).get_flag(ClauseFlag::Dead)
+                    let c = &mut cdb.clause[cid] as *mut Clause;
+                    (*c).flag_off(Flag::Enqueued);
+                    lits = &(*c).lits;
+                    if (*c).get_flag(Flag::DeadClause)
                         || BACKWORD_SUBSUMPTION_THRESHOLD < cnt
                         || SUBSUMPTION_SIZE < lits.len()
                     {
                         continue;
                     }
                     let mut tmp = 6;
-                    for l in &(*ch).lits {
+                    for l in &(*c).lits {
                         let v = &vars[l.vi()];
                         let nsum = v.pos_occurs.len().min(v.neg_occurs.len());
-                        if !v.eliminated && 0 < v.level && nsum < tmp {
+                        if !v.get_flag(Flag::EliminatedVar) && 0 < v.level && nsum < tmp {
                             best = l.vi();
                             tmp = nsum;
                         }
                     }
                 }
-                if best == 0 || vars[best].eliminated {
+                if best == 0 || vars[best].get_flag(Flag::EliminatedVar) {
                     continue;
                 }
                 for p in 0..2 {
@@ -245,7 +245,7 @@ impl Eliminator {
                     cnt += (*cs).len();
                     for did in &*cs {
                         let db = &cdb.clause[*did] as *const Clause;
-                        if !(*db).get_flag(ClauseFlag::Dead)
+                        if !(*db).get_flag(Flag::DeadClause)
                             && *did != cid
                             && (*db).lits.len() <= SUBSUMPTION_SIZE
                             && (self.subsumption_lim == 0
@@ -274,8 +274,8 @@ fn try_subsume(
     match subsume(cdb, cid, did) {
         Some(NULL_LIT) => {
             if !cid.is_lifted_lit()
-                && cdb.clause[cid].get_flag(ClauseFlag::Learnt)
-                && cdb.clause[did].get_flag(ClauseFlag::Learnt)
+                && cdb.clause[cid].get_flag(Flag::LearntClause)
+                && cdb.clause[did].get_flag(Flag::LearntClause)
             {
                 // println!("BackSubsC    => {} {:#} subsumed completely by {} {:#}",
                 //          did.fmt(),
@@ -381,7 +381,7 @@ fn check_eliminator(cdb: &ClauseDB, vars: &[Var]) -> bool {
     // }
     // all caulses are registered in corresponding occur_lists
     for (cid, ch) in cdb.clause.iter().enumerate().skip(1) {
-        if ch.get_flag(ClauseFlag::Dead) {
+        if ch.get_flag(Flag::DeadClause) {
             continue;
         }
         for l in &ch.lits {
@@ -441,7 +441,7 @@ fn strengthen_clause(
     cid: ClauseId,
     l: Lit,
 ) -> bool {
-    debug_assert!(!cdb.clause[cid].get_flag(ClauseFlag::Dead));
+    debug_assert!(!cdb.clause[cid].get_flag(Flag::DeadClause));
     debug_assert!(1 < cdb.clause[cid].lits.len());
     cdb.touched[l as usize] = true;
     cdb.touched[l.negate() as usize] = true;
@@ -473,7 +473,7 @@ fn strengthen_clause(
 /// returns true if the clause became a unit clause.
 /// Called only from strengthen_clause
 fn strengthen(cdb: &mut ClauseDB, vars: &mut [Var], cid: ClauseId, p: Lit) -> bool {
-    debug_assert!(!cdb.clause[cid].get_flag(ClauseFlag::Dead));
+    debug_assert!(!cdb.clause[cid].get_flag(Flag::DeadClause));
     debug_assert!(1 < cdb.clause[cid].lits.len());
     let ClauseDB {
         ref mut clause,
@@ -491,7 +491,7 @@ fn strengthen(cdb: &mut ClauseDB, vars: &mut [Var], cid: ClauseId, p: Lit) -> bo
         // debug_assert!(v.neg_occurs.contains(&cid));
         v.neg_occurs.delete_unstable(|&c| c == cid);
     }
-    if (*c).get_flag(ClauseFlag::Dead) {
+    if (*c).get_flag(Flag::DeadClause) {
         return false;
     }
     watcher[p.negate() as usize].detach_with(cid);
@@ -561,12 +561,12 @@ fn eliminate_var(
     if v.assign != BOTTOM {
         return true;
     }
-    debug_assert!(!v.eliminated);
+    debug_assert!(!v.get_flag(Flag::EliminatedVar));
     // count only alive clauses
     v.pos_occurs
-        .retain(|&c| !cdb.clause[c].get_flag(ClauseFlag::Dead));
+        .retain(|&c| !cdb.clause[c].get_flag(Flag::DeadClause));
     v.neg_occurs
-        .retain(|&c| !cdb.clause[c].get_flag(ClauseFlag::Dead));
+        .retain(|&c| !cdb.clause[c].get_flag(Flag::DeadClause));
     let pos = &v.pos_occurs as *const Vec<ClauseId>;
     let neg = &v.neg_occurs as *const Vec<ClauseId>;
     unsafe {
@@ -594,7 +594,7 @@ fn eliminate_var(
             return true;
         }
         // OK, eliminate the literal and build constraints on it.
-        v.eliminated = true;
+        v.flag_on(Flag::EliminatedVar);
         let cid = v.reason;
         debug_assert_eq!(cid, NULL_CLAUSE);
         // println!("- eliminate var: {:>8} (+{:<4} -{:<4}); {:?}", v, (*pos).len(), (*neg).len(), v);
@@ -625,8 +625,8 @@ fn eliminate_var(
                         }
                         _ => {
                             let v = &mut vec.to_vec();
-                            if cdb.clause[*p].get_flag(ClauseFlag::Learnt)
-                                && cdb.clause[*n].get_flag(ClauseFlag::Learnt)
+                            if cdb.clause[*p].get_flag(Flag::LearntClause)
+                                && cdb.clause[*n].get_flag(Flag::LearntClause)
                             {
                                 let rank = rank_p.min(cdb.clause[*n].rank);
                                 cdb.add_clause(config, elim, vars, v, rank);
@@ -689,13 +689,13 @@ fn make_eliminated_clauses(
     let tmp = &mut elim.elim_clauses;
     if neg.len() < pos.len() {
         for cid in neg {
-            debug_assert!(!cdb.clause[*cid].get_flag(ClauseFlag::Dead));
+            debug_assert!(!cdb.clause[*cid].get_flag(Flag::DeadClause));
             make_eliminated_clause(cdb, tmp, v, *cid);
         }
         make_eliminating_unit_clause(tmp, v.lit(LTRUE));
     } else {
         for cid in pos {
-            debug_assert!(!cdb.clause[*cid].get_flag(ClauseFlag::Dead));
+            debug_assert!(!cdb.clause[*cid].get_flag(Flag::DeadClause));
             make_eliminated_clause(cdb, tmp, v, *cid);
         }
         make_eliminating_unit_clause(tmp, v.lit(LFALSE));

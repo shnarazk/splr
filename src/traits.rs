@@ -1,10 +1,10 @@
 use crate::assign::AssignStack;
-use crate::clause::{Clause, ClauseDB, ClauseFlag};
+use crate::clause::{Clause, ClauseDB};
 use crate::config::Config;
 use crate::eliminator::Eliminator;
 use crate::solver::{Solver, SolverResult};
 use crate::state::State;
-use crate::types::{CNFDescription, ClauseId, Lbool, Lit, VarId};
+use crate::types::{CNFDescription, ClauseId, Flag, Lbool, Lit, VarId};
 use crate::var::{Var, VarIdHeap};
 
 pub trait AssignIF {
@@ -27,9 +27,6 @@ pub trait AssignIF {
 }
 
 pub trait ClauseIF {
-    fn get_flag(&self, flag: ClauseFlag) -> bool;
-    fn flag_off(&mut self, flag: ClauseFlag);
-    fn flag_on(&mut self, flag: ClauseFlag);
     fn kill(&mut self, touched: &mut [bool]);
 }
 
@@ -107,6 +104,12 @@ pub trait EmaIF {
     fn get(&self) -> f64;
     fn reset(&mut self) {}
     fn update(&mut self, x: f64);
+}
+
+pub trait FlagIF {
+    fn get_flag(&self, flag: Flag) -> bool;
+    fn flag_off(&mut self, flag: Flag);
+    fn flag_on(&mut self, flag: Flag);
 }
 
 pub trait LitIF {
