@@ -92,8 +92,8 @@ impl StateIF for State {
 
     fn progress(
         &mut self,
-        config: &mut Config,
         cdb: &ClauseDB,
+        config: &mut Config,
         elim: &Eliminator,
         vars: &[Var],
         mes: Option<&str>,

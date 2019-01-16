@@ -142,7 +142,7 @@ impl AssignIF for AssignStack {
         self.trail.push(l);
     }
     #[allow(dead_code)]
-    fn dump_cnf(&mut self, config: &Config, cdb: &ClauseDB, vars: &[Var], fname: &str) {
+    fn dump_cnf(&mut self, cdb: &ClauseDB, config: &Config, vars: &[Var], fname: &str) {
         for v in vars {
             if v.eliminated {
                 if v.assign != BOTTOM {

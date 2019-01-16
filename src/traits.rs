@@ -23,7 +23,7 @@ pub trait AssignIF {
     fn enqueue_null(&mut self, v: &mut Var, sig: Lbool, dl: usize) -> bool;
     fn uncheck_enqueue(&mut self, vars: &mut [Var], l: Lit, cid: ClauseId);
     fn uncheck_assume(&mut self, vars: &mut [Var], l: Lit);
-    fn dump_cnf(&mut self, config: &Config, cdb: &ClauseDB, vars: &[Var], fname: &str);
+    fn dump_cnf(&mut self, cdb: &ClauseDB, config: &Config, vars: &[Var], fname: &str);
 }
 
 pub trait ClauseIF {
@@ -94,8 +94,8 @@ pub trait EliminatorIF {
     fn eliminate(
         &mut self,
         asgs: &mut AssignStack,
-        config: &mut Config,
         cdb: &mut ClauseDB,
+        config: &mut Config,
         state: &mut State,
         vars: &mut [Var],
     );
@@ -110,11 +110,11 @@ pub trait EmaIF {
 }
 
 pub trait LitIF {
-    fn vi(&self) -> VarId;
-    fn int(&self) -> i32;
-    fn lbool(&self) -> Lbool;
-    fn positive(&self) -> bool;
-    fn negate(&self) -> Lit;
+    fn vi(self) -> VarId;
+    fn int(self) -> i32;
+    fn lbool(self) -> Lbool;
+    fn positive(self) -> bool;
+    fn negate(self) -> Lit;
     fn to_cid(self) -> ClauseId;
 }
 
@@ -140,8 +140,8 @@ pub trait StateIF {
     fn new(config: &Config, nv: usize, se: i32, fname: &str) -> State;
     fn progress(
         &mut self,
-        config: &mut Config,
         cdb: &ClauseDB,
+        config: &mut Config,
         elim: &Eliminator,
         vars: &[Var],
         mes: Option<&str>,
@@ -155,7 +155,7 @@ pub trait VarIF {
 }
 
 pub trait VarIdIF {
-    fn lit(&self, p: Lbool) -> Lit;
+    fn lit(self, p: Lbool) -> Lit;
 }
 
 pub trait VarDBIF {

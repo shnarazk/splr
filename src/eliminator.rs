@@ -105,8 +105,8 @@ impl EliminatorIF for Eliminator {
     fn eliminate(
         &mut self,
         asgs: &mut AssignStack,
-        config: &mut Config,
         cdb: &mut ClauseDB,
+        config: &mut Config,
         state: &mut State,
         vars: &mut [Var],
     ) {

@@ -478,7 +478,7 @@ impl ClauseDBIF for ClauseDB {
             v.reason = NULL_CLAUSE;
         }
         if elim.in_use {
-            elim.eliminate(asgs, config, self, state, vars);
+            elim.eliminate(asgs, self, config, state, vars);
             if !state.ok {
                 return false;
             }

@@ -56,28 +56,28 @@ pub fn int2lit(x: i32) -> Lit {
 impl LitIF for Lit {
     /// converts to var index
     #[inline(always)]
-    fn vi(&self) -> VarId {
+    fn vi(self) -> VarId {
         (self >> 1) as VarId
     }
-    fn int(&self) -> i32 {
+    fn int(self) -> i32 {
         if self % 2 == 0 {
-            (*self >> 1) as i32
+            (self >> 1) as i32
         } else {
-            ((*self >> 1) as i32).neg()
+            ((self >> 1) as i32).neg()
         }
     }
     /// - positive Lit (= even u32) => LTRUE (= 1 as u8)
     /// - negative Lit (= odd u32)  => LFASE (= 0 as u8)
     #[inline(always)]
-    fn lbool(&self) -> Lbool {
+    fn lbool(self) -> Lbool {
         (self & 1 == 0) as Lbool
     }
     #[inline(always)]
-    fn positive(&self) -> bool {
+    fn positive(self) -> bool {
         self & 1 == 0
     }
     #[inline(always)]
-    fn negate(&self) -> Lit {
+    fn negate(self) -> Lit {
         self ^ 1
     }
     #[inline(always)]
@@ -90,8 +90,8 @@ impl VarIdIF for VarId {
     /// converter from [VarId](type.VarId.html) to [Lit](type.Lit.html).
     /// returns a positive literal if p == LTRUE or BOTTOM.
     #[inline(always)]
-    fn lit(&self, p: Lbool) -> Lit {
-        (*self as Lit) << 1 | ((p == LFALSE) as Lit)
+    fn lit(self, p: Lbool) -> Lit {
+        (self as Lit) << 1 | ((p == LFALSE) as Lit)
     }
 }
 

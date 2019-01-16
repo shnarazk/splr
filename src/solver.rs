@@ -78,7 +78,7 @@ impl SatSolver for Solver {
         // TODO: deal with assumptions
         // s.root_level = 0;
         state.num_solved_vars = asgs.len();
-        state.progress(config, cdb, elim, vars, Some(""));
+        state.progress(cdb, config, elim, vars, Some(""));
         if elim.in_use {
             for v in &mut vars[1..] {
                 debug_assert!(!v.eliminated);
@@ -99,25 +99,25 @@ impl SatSolver for Solver {
             }
             if elim.active {
                 cdb.simplify(asgs, config, elim, state, vars);
-                state.progress(config, cdb, elim, vars, Some("simplify"));
+                state.progress(cdb, config, elim, vars, Some("simplify"));
             } else {
                 elim.stop(cdb, vars, false);
-                state.progress(config, cdb, elim, vars, Some("loaded"));
+                state.progress(cdb, config, elim, vars, Some("loaded"));
             }
             elim.in_use = cdb.clause.len() < 800_000 && 1000 < config.num_vars;
             if !elim.in_use {
                 elim.stop(cdb, vars, true);
             }
         } else {
-            state.progress(config, cdb, elim, vars, Some("loaded"));
+            state.progress(cdb, config, elim, vars, Some("loaded"));
         }
         if search(asgs, config, cdb, elim, state, vars) {
             if !state.ok {
                 asgs.cancel_until(vars, &mut state.var_order, 0);
-                state.progress(config, cdb, elim, vars, Some("error"));
+                state.progress(cdb, config, elim, vars, Some("error"));
                 return Err(SolverException::InternalInconsistent);
             }
-            state.progress(config, cdb, elim, vars, None);
+            state.progress(cdb, config, elim, vars, None);
             let mut result = Vec::new();
             for (vi, v) in vars.iter().enumerate().take(config.num_vars + 1).skip(1) {
                 match v.assign {
@@ -130,7 +130,7 @@ impl SatSolver for Solver {
             asgs.cancel_until(vars, &mut state.var_order, 0);
             Ok(Certificate::SAT(result))
         } else {
-            state.progress(config, cdb, elim, vars, None);
+            state.progress(cdb, config, elim, vars, None);
             asgs.cancel_until(vars, &mut state.var_order, 0);
             Ok(Certificate::UNSAT(
                 state.conflicts.iter().map(|l| l.int()).collect(),
@@ -460,7 +460,7 @@ fn handle_conflict_path(
         state.stats[Stat::SumLBD as usize] += lbd as i64;
     }
     if tn_confl % 10_000 == 0 {
-        state.progress(config, cdb, elim, vars, None);
+        state.progress(cdb, config, elim, vars, None);
     }
     if tn_confl == 100_000 {
         asgs.cancel_until(vars, &mut state.var_order, 0);
