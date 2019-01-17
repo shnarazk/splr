@@ -450,7 +450,7 @@ impl ClauseDBIF for ClauseDB {
         let keep = perm.len() / 2;
         if config.use_chan_seok {
             perm.sort_by(|&a, &b| clause[a].cmp(&clause[b]));
-            // perm.sort_by(|&a, &b| clause[a].cmp_activity(&clause[b]));
+        // perm.sort_by(|&a, &b| clause[a].cmp_activity(&clause[b]));
         } else {
             perm.sort_by(|&a, &b| clause[a].cmp(&clause[b]));
             if clause[perm[keep]].rank <= 3 {

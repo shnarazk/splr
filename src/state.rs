@@ -36,7 +36,7 @@ pub struct State {
     pub next_restart: usize,
     pub cur_restart: usize,
     pub after_restart: usize,
-    pub var_order: VarIdHeap, // Variable Order
+    pub var_order: VarIdHeap,                          // Variable Order
     pub stats: [usize; Stat::EndOfStatIndex as usize], // statistics
     pub ema_asg: Ema,
     pub ema_lbd: Ema,

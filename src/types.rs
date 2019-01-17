@@ -1,5 +1,5 @@
 //! Basic types
-use crate::traits::*;
+use crate::traits::{Delete, LitIF, VarIdIF};
 use std::fmt;
 use std::ops::Neg;
 
@@ -173,7 +173,7 @@ impl<T> Delete<T> for Vec<T> {
 pub enum Flag {
     DeadClause = 0,
     LearntClause,
-//    JustUsedClause,
+    // JustUsedClause,
     Enqueued,
     EliminatedVar,
     TouchedVar,

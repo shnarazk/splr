@@ -1,6 +1,6 @@
 use crate::clause::ClauseDB;
 use crate::config::Config;
-use crate::traits::*;
+use crate::traits::{AssignIF, FlagIF, LitIF, VarIdIF, VarOrderIF};
 use crate::types::*;
 use crate::var::{Var, VarIdHeap};
 use std::fs::File;
