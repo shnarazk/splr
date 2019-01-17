@@ -114,6 +114,8 @@ impl EliminatorIF for Eliminator {
         if !self.in_use || !self.active {
             return;
         }
+        let thr = config.num_vars / 2;
+        let mut cnt = 0;
         'perform: while self.bwdsub_assigns < asgs.len()
             || !self.var_queue.is_empty()
             || !self.clause_queue.is_empty()
@@ -125,9 +127,10 @@ impl EliminatorIF for Eliminator {
                 break 'perform;
             }
             while let Some(vi) = self.var_queue.pop() {
+                cnt += 1;
                 let v = &mut vars[vi];
                 v.flag_off(Flag::Enqueued);
-                if v.is(Flag::EliminatedVar) || v.assign != BOTTOM {
+                if v.is(Flag::EliminatedVar) || v.assign != BOTTOM || thr < cnt {
                     continue;
                 }
                 v.check_sve_at += 1;
