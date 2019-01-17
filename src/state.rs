@@ -104,15 +104,6 @@ impl StateIF for State {
         let nv = vars.len() - 1;
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
-        //let learnts = &cdb[ClauseKind::Removable as usize];
-        let good =
-            self.stats[Stat::NumLBD2 as usize] as f64 / self.stats[Stat::Conflict as usize] as f64;
-        // let good = learnts
-        //     .head
-        //     .iter()
-        //     .skip(1)
-        //     .filter(|c| !c.get_flag(ClauseFlag::Dead) && c.rank <= 3)
-        //     .count();
         if !config.progress_log {
             if mes == Some("") {
                 println!("{}", self);
@@ -145,11 +136,11 @@ impl StateIF for State {
                     (sum as f32) / (nv as f32) * 100.0,
                 );
                 println!(
-                    " Clause Kind|Remv:{:>9}, good:{:>9.4}, Perm:{:>9}, Binc:{:>9} ",
+                    " Clause Kind|Remv:{:>9}, LBD2:{:>9}, Binc:{:>9}, Perm:{:>9} ",
                     cdb.num_learnt,
-                    good,
+                    self.stats[Stat::NumLBD2 as usize],
+                    self.stats[Stat::NumBinLearnt as usize],
                     cdb.num_active - cdb.num_learnt,
-                    0,
                 );
                 println!(
                     "     Restart|#BLK:{:>9}, #RST:{:>9}, eASG:{:>9.4}, eLBD:{:>9.4} ",
@@ -174,13 +165,13 @@ impl StateIF for State {
             }
         } else if mes == Some("") {
             println!(
-                "   #mode,      Variable Assignment      ,,  \
-                 Clause Database Management  ,,   Restart Strategy      ,, \
-                 Misc Progress Parameters,,  Eliminator"
+                "   #mode,         Variable Assignment      ,,  \
+                 Clause Database ent  ,,  Restart Strategy       ,, \
+                 Misc Progress Parameters,,   Eliminator"
             );
             println!(
-                "   #init,#remain,#solved,   #elim,total%,,#learnt,(good),  \
-                 #perm,#binary,,block,force, asgn/,  lbd/,,    lbd, \
+                "   #init,    #remain,#solved,  #elim,total%,,#learnt,  \
+                 #perm,#binary,,block,force, #asgn,  lbd/,,    lbd, \
                  back lv, conf lv,,clause,   var"
             );
         } else {
@@ -189,8 +180,8 @@ impl StateIF for State {
                 Some(x) => x,
             };
             println!(
-                "{:>3}#{:<5},{:>7},{:>7},{:>7},{:>6.3},,{:>7},{:>6},{:>7},\
-                 {:>7},,{:>5},{:>5}, {:>5.2},{:>6.2},,{:>7.2},{:>8.2},{:>8.2},,\
+                "{:>3}#{:>8},{:>7},{:>7},{:>7},{:>6.3},,{:>7},{:>7},\
+                 {:>7},,{:>5},{:>5},{:>6.2},{:>6.2},,{:>7.2},{:>8.2},{:>8.2},,\
                  {:>6},{:>6}",
                 self.progress_cnt,
                 msg,
@@ -199,7 +190,6 @@ impl StateIF for State {
                 self.num_eliminated_vars,
                 (sum as f32) / (nv as f32) * 100.0,
                 cdb.num_learnt,
-                good,
                 cdb.num_active,
                 0,
                 self.stats[Stat::BlockRestart as usize],
