@@ -1,5 +1,5 @@
 use crate::assign::AssignStack;
-use crate::clause::{Clause, ClauseDB, ClauseFlag, Watch};
+use crate::clause::{Clause, ClauseDB, Watch};
 use crate::config::Config;
 use crate::eliminator::Eliminator;
 use crate::state::{Stat, State};
@@ -250,7 +250,7 @@ impl Propagate for AssignStack {
                 let mut n = 1;
                 'next_clause: while n <= source.count() {
                     let w = &mut source[n];
-                    if head[w.c].get_flag(ClauseFlag::Dead) {
+                    if head[w.c].dead {
                         source.detach(n);
                         continue 'next_clause;
                     }
@@ -504,7 +504,7 @@ fn analyze(
         unsafe {
             let ch = &mut cdb.clause[cid] as *mut Clause;
             debug_assert_ne!(cid, NULL_CLAUSE);
-            if (*ch).get_flag(ClauseFlag::Learnt) {
+            if (*ch).learnt {
                 cdb.bump_activity(&mut config.cla_inc, cid);
                 // if 2 < (*ch).rank {
                 //     let nlevels = compute_lbd(vars, &ch.lits, lbd_temp);
@@ -526,7 +526,7 @@ fn analyze(
             for q in &(*ch).lits[((p != NULL_LIT) as usize)..] {
                 let vi = q.vi();
                 let lvl = vars[vi].level;
-                debug_assert!(!(*ch).get_flag(ClauseFlag::Dead));
+                debug_assert!(!(*ch).dead);
                 debug_assert!(
                     !vars[vi].eliminated,
                     format!("analyze assertion: an eliminated var {} occurs", vi)

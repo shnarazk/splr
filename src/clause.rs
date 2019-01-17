@@ -85,14 +85,6 @@ impl WatchDBIF for Vec<Watch> {
     }
 }
 
-#[derive(Clone, Copy, Eq, PartialEq)]
-pub enum ClauseFlag {
-    Dead = 0,
-    Learnt,
-    JustUsed,
-    Enqueued,
-}
-
 pub struct Clause {
     /// the literals
     pub lits: Vec<Lit>,
@@ -100,59 +92,64 @@ pub struct Clause {
     pub rank: usize,
     /// clause activity used by `analyze` and `reduce_db`
     pub activity: f64,
-    /// collection of bits
-    flags: u16,
+    pub dead: bool,
+    pub learnt: bool,
+    pub enqueued: bool,
+    pub just_used: bool,
 }
 
 impl Default for Clause {
     fn default() -> Clause {
         Clause {
-            flags: 0,
             lits: vec![],
             rank: 0,
             activity: 0.0,
+            dead: false,
+            learnt: false,
+            enqueued: false,
+            just_used: false,
         }
     }
 }
 
 impl ClauseIF for Clause {
-    #[inline(always)]
-    fn get_flag(&self, flag: ClauseFlag) -> bool {
-        self.flags & (1 << flag as u16) != 0
-    }
-    #[inline(always)]
-    fn flag_off(&mut self, flag: ClauseFlag) {
-        self.flags &= !(1u16 << (flag as u16));
-    }
-    #[inline(always)]
-    fn flag_on(&mut self, flag: ClauseFlag) {
-        self.flags |= 1u16 << (flag as u16);
-    }
+//    #[inline(always)]
+//    fn get_flag(&self, flag: ClauseFlag) -> bool {
+//        self.flags & (1 << flag as u16) != 0
+//    }
+//    #[inline(always)]
+//    fn flag_off(&mut self, flag: ClauseFlag) {
+//        self.flags &= !(1u16 << (flag as u16));
+//    }
+//    #[inline(always)]
+//    fn flag_on(&mut self, flag: ClauseFlag) {
+//        self.flags |= 1u16 << (flag as u16);
+//    }
     fn kill(&mut self, touched: &mut [bool]) {
-        self.flag_on(ClauseFlag::Dead);
+        self.dead = true;
         debug_assert!(self.lits[0] != 0 && self.lits[1] != 0);
         touched[self.lits[0].negate() as usize] = true;
         touched[self.lits[1].negate() as usize] = true;
     }
 }
 
-impl Clause {
-    #[allow(dead_code)]
-    fn set_flag(&mut self, flag: ClauseFlag, val: bool) {
-        if val {
-            self.flags |= (val as u16) << (flag as u16);
-        } else {
-            self.flags &= !(1 << (flag as u16));
-        }
-    }
-    fn map_flag<T>(&self, flag: ClauseFlag, a: T, b: T) -> T {
-        if self.get_flag(flag) {
-            a
-        } else {
-            b
-        }
-    }
-}
+//impl Clause {
+//    #[allow(dead_code)]
+//    fn set_flag(&mut self, flag: ClauseFlag, val: bool) {
+//        if val {
+//            self.flags |= (val as u16) << (flag as u16);
+//        } else {
+//            self.flags &= !(1 << (flag as u16));
+//        }
+//    }
+//    fn map_flag<T>(&self, flag: ClauseFlag, a: T, b: T) -> T {
+//        if self.get_flag(flag) {
+//            a
+//        } else {
+//            b
+//        }
+//    }
+//}
 
 impl PartialEq for Clause {
     #[inline(always)]
@@ -203,8 +200,8 @@ impl fmt::Display for Clause {
             f,
             "C{{{:?} {}{}}}",
             vec2int(&self.lits),
-            self.map_flag(ClauseFlag::Dead, ", dead", ""),
-            self.map_flag(ClauseFlag::Enqueued, ", enqueued", ""),
+            if self.dead { ", dead" } else { "" },
+            if self.enqueued { ", enqueued" } else { "" },
         )
     }
 }
@@ -251,7 +248,7 @@ impl ClauseDBIF for ClauseDB {
             let mut n = 1;
             let n_max = ws.count();
             while n <= n_max {
-                if clause[ws[n].c].get_flag(ClauseFlag::Dead) {
+                if clause[ws[n].c].dead {
                     ws.detach(n);
                 } else {
                     n += 1;
@@ -261,12 +258,12 @@ impl ClauseDBIF for ClauseDB {
         let recycled = &mut watcher[NULL_LIT.negate() as usize];
         for (ci, ch) in self.clause.iter_mut().enumerate().skip(1) {
             // the recycled clause is DEAD and EMPTY
-            if ch.get_flag(ClauseFlag::Dead) && !ch.lits.is_empty() {
+            if ch.dead && !ch.lits.is_empty() {
                 recycled.push(Watch {
                     blocker: NULL_LIT,
                     c: ci,
                 });
-                if ch.get_flag(ClauseFlag::Learnt) {
+                if ch.learnt {
                     self.num_learnt -= 1;
                 }
                 if elim.in_use {
@@ -301,11 +298,10 @@ impl ClauseDBIF for ClauseDB {
                 ch.lits.push(*l);
             }
             ch.rank = rank;
-            ch.flags = 0;
-            if learnt {
-                ch.flag_on(ClauseFlag::Learnt);
-                self.num_learnt += 1;
-            }
+            ch.dead = false;
+            ch.enqueued = false;
+            ch.learnt = learnt;
+            ch.just_used = false;
             ch.activity = 1.0;
         } else {
             let l0 = v[0];
@@ -315,27 +311,29 @@ impl ClauseDBIF for ClauseDB {
                 lits.push(*l);
             }
             cid = self.clause.len();
-            let mut c = Clause {
-                flags: 0,
+            let c = Clause {
                 lits,
                 rank,
                 activity: 0.0,
+                dead: false,
+                learnt,
+                enqueued: false,
+                just_used: false,
             };
-            if learnt {
-                c.flag_on(ClauseFlag::Learnt);
-                self.num_learnt += 1;
-            }
             self.clause.push(c);
             self.watcher[l0.negate() as usize].attach(l1, cid);
             self.watcher[l1.negate() as usize].attach(l0, cid);
         };
+        if learnt {
+            self.num_learnt += 1;
+        }
         self.num_active += 1;
         cid
     }
     fn reset_lbd(&mut self, vars: &[Var], temp: &mut [usize]) {
         let mut key = temp[0];
         for ch in &mut self.clause[1..] {
-            if ch.get_flag(ClauseFlag::Dead) {
+            if ch.dead {
                 continue;
             }
             key += 1;
@@ -357,7 +355,7 @@ impl ClauseDBIF for ClauseDB {
         c.activity = a;
         if CLA_ACTIVITY_MAX < a {
             for c in &mut self.clause[1..] {
-                if c.get_flag(ClauseFlag::Learnt) {
+                if c.learnt {
                     c.activity *= CLA_ACTIVITY_SCALE1;
                 }
             }
@@ -404,8 +402,8 @@ impl ClauseDBIF for ClauseDB {
     /// called from strengthen_clause, backward_subsumption_check, eliminate_var, substitute
     fn remove_clause(&mut self, cid: ClauseId) {
         let ch = &mut self.clause[cid];
-        debug_assert!(!ch.get_flag(ClauseFlag::Dead));
-        ch.flag_on(ClauseFlag::Dead);
+        debug_assert!(!ch.dead);
+        ch.dead = true;
         if ch.lits.is_empty() {
             return;
         }
@@ -432,7 +430,7 @@ impl ClauseDBIF for ClauseDB {
         } = self;
         let mut perm = Vec::with_capacity(clause.len());
         for (i, b) in clause.iter().enumerate().skip(1) {
-            if b.get_flag(ClauseFlag::Learnt) && !b.get_flag(ClauseFlag::Dead) && !vars.locked(b, i)
+            if b.learnt && !b.dead && !vars.locked(b, i)
             {
                 perm.push(i);
             }
@@ -453,8 +451,8 @@ impl ClauseDBIF for ClauseDB {
         }
         for i in &perm[keep..] {
             let c = &mut clause[*i];
-            if c.get_flag(ClauseFlag::JustUsed) {
-                c.flag_off(ClauseFlag::JustUsed)
+            if c.just_used {
+                c.just_used = false;
             } else if 2 < c.rank {
                 c.kill(touched);
             }
@@ -484,7 +482,7 @@ impl ClauseDBIF for ClauseDB {
             }
         }
         for c in &mut self.clause[1..] {
-            if !c.get_flag(ClauseFlag::Dead) && vars.satisfies(&c.lits) {
+            if !c.dead && vars.satisfies(&c.lits) {
                 c.kill(&mut self.touched);
                 if elim.in_use {
                     for l in &c.lits {

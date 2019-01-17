@@ -1,4 +1,4 @@
-use crate::clause::{Clause, ClauseFlag};
+use crate::clause::Clause;
 use crate::eliminator::Eliminator;
 use crate::traits::*;
 use crate::types::*;
@@ -116,7 +116,7 @@ impl VarDBIF for [Var] {
         }
     }
     fn detach_clause(&mut self, elim: &mut Eliminator, cid: ClauseId, c: &Clause) {
-        debug_assert!(c.get_flag(ClauseFlag::Dead));
+        debug_assert!(c.dead);
         if elim.in_use {
             for l in &c.lits {
                 let v = &mut self[l.vi()];

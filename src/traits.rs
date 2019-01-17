@@ -1,5 +1,5 @@
 use crate::assign::AssignStack;
-use crate::clause::{Clause, ClauseDB, ClauseFlag};
+use crate::clause::{Clause, ClauseDB};
 use crate::config::Config;
 use crate::eliminator::Eliminator;
 use crate::solver::{Solver, SolverResult};
@@ -27,9 +27,6 @@ pub trait AssignIF {
 }
 
 pub trait ClauseIF {
-    fn get_flag(&self, flag: ClauseFlag) -> bool;
-    fn flag_off(&mut self, flag: ClauseFlag);
-    fn flag_on(&mut self, flag: ClauseFlag);
     fn kill(&mut self, touched: &mut [bool]);
 }
 
