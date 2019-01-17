@@ -107,7 +107,7 @@ pub trait EmaIF {
 }
 
 pub trait FlagIF {
-    fn get_flag(&self, flag: Flag) -> bool;
+    fn holds(&self, flag: Flag) -> bool;
     fn flag_off(&mut self, flag: Flag);
     fn flag_on(&mut self, flag: Flag);
 }

@@ -118,7 +118,7 @@ impl ClauseIF for Clause {
 
 impl FlagIF for Clause {
     #[inline(always)]
-    fn get_flag(&self, flag: Flag) -> bool {
+    fn holds(&self, flag: Flag) -> bool {
         self.flags & (1 << flag as u16) != 0
     }
     #[inline(always)]
@@ -141,7 +141,7 @@ impl Clause {
         }
     }
     fn map_flag<T>(&self, flag: Flag, a: T, b: T) -> T {
-        if self.get_flag(flag) {
+        if self.holds(flag) {
             a
         } else {
             b
@@ -246,7 +246,7 @@ impl ClauseDBIF for ClauseDB {
             let mut n = 1;
             let n_max = ws.count();
             while n <= n_max {
-                if clause[ws[n].c].get_flag(Flag::DeadClause) {
+                if clause[ws[n].c].holds(Flag::DeadClause) {
                     ws.detach(n);
                 } else {
                     n += 1;
@@ -256,19 +256,19 @@ impl ClauseDBIF for ClauseDB {
         let recycled = &mut watcher[NULL_LIT.negate() as usize];
         for (ci, ch) in self.clause.iter_mut().enumerate().skip(1) {
             // the recycled clause is DEAD and EMPTY
-            if ch.get_flag(Flag::DeadClause) && !ch.lits.is_empty() {
+            if ch.holds(Flag::DeadClause) && !ch.lits.is_empty() {
                 recycled.push(Watch {
                     blocker: NULL_LIT,
                     c: ci,
                 });
-                if ch.get_flag(Flag::LearntClause) {
+                if ch.holds(Flag::LearntClause) {
                     self.num_learnt -= 1;
                 }
                 if elim.in_use {
                     for l in &ch.lits {
                         let vi = l.vi();
                         let v = &mut vars[vi];
-                        if !v.get_flag(Flag::EliminatedVar) {
+                        if !v.holds(Flag::EliminatedVar) {
                             if l.positive() {
                                 v.pos_occurs.delete_unstable(|&cj| ci == cj);
                             } else {
@@ -287,7 +287,7 @@ impl ClauseDBIF for ClauseDB {
         let cid;
         if let Some(w) = self.watcher[NULL_LIT.negate() as usize].pop() {
             cid = w.c;
-            // debug_assert!(self.head[cid].get_flag(ClauseFlag::Dead));
+            // debug_assert!(self.head[cid].holds(ClauseFlag::Dead));
             let ch = &mut self.clause[cid];
             self.watcher[v[0].negate() as usize].attach(v[1], cid);
             self.watcher[v[1].negate() as usize].attach(v[0], cid);
@@ -330,7 +330,7 @@ impl ClauseDBIF for ClauseDB {
     fn reset_lbd(&mut self, vars: &[Var], temp: &mut [usize]) {
         let mut key = temp[0];
         for ch in &mut self.clause[1..] {
-            if ch.get_flag(Flag::DeadClause) {
+            if ch.holds(Flag::DeadClause) {
                 continue;
             }
             key += 1;
@@ -352,7 +352,7 @@ impl ClauseDBIF for ClauseDB {
         c.activity = a;
         if CLA_ACTIVITY_MAX < a {
             for c in &mut self.clause[1..] {
-                if c.get_flag(Flag::LearntClause) {
+                if c.holds(Flag::LearntClause) {
                     c.activity *= CLA_ACTIVITY_SCALE1;
                 }
             }
@@ -399,7 +399,7 @@ impl ClauseDBIF for ClauseDB {
     /// called from strengthen_clause, backward_subsumption_check, eliminate_var, substitute
     fn remove_clause(&mut self, cid: ClauseId) {
         let c = &mut self.clause[cid];
-        debug_assert!(!c.get_flag(Flag::DeadClause));
+        debug_assert!(!c.holds(Flag::DeadClause));
         c.flag_on(Flag::DeadClause);
         if c.lits.is_empty() {
             return;
@@ -427,8 +427,7 @@ impl ClauseDBIF for ClauseDB {
         } = self;
         let mut perm = Vec::with_capacity(clause.len());
         for (i, b) in clause.iter().enumerate().skip(1) {
-            if b.get_flag(Flag::LearntClause) && !b.get_flag(Flag::DeadClause) && !vars.locked(b, i)
-            {
+            if b.holds(Flag::LearntClause) && !b.holds(Flag::DeadClause) && !vars.locked(b, i) {
                 perm.push(i);
             }
         }
@@ -448,7 +447,7 @@ impl ClauseDBIF for ClauseDB {
         }
         for i in &perm[keep..] {
             let c = &mut clause[*i];
-            if c.get_flag(Flag::JustUsedClause) {
+            if c.holds(Flag::JustUsedClause) {
                 c.flag_off(Flag::JustUsedClause)
             } else if 2 < c.rank {
                 c.kill(touched);
@@ -479,12 +478,12 @@ impl ClauseDBIF for ClauseDB {
             }
         }
         for c in &mut self.clause[1..] {
-            if !c.get_flag(Flag::DeadClause) && vars.satisfies(&c.lits) {
+            if !c.holds(Flag::DeadClause) && vars.satisfies(&c.lits) {
                 c.kill(&mut self.touched);
                 if elim.in_use {
                     for l in &c.lits {
                         let v = &mut vars[l.vi()];
-                        if !v.get_flag(Flag::EliminatedVar) {
+                        if !v.holds(Flag::EliminatedVar) {
                             elim.enqueue_var(v);
                         }
                     }

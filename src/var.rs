@@ -54,7 +54,7 @@ impl VarIF for Var {
 
 impl FlagIF for Var {
     #[inline(always)]
-    fn get_flag(&self, flag: Flag) -> bool {
+    fn holds(&self, flag: Flag) -> bool {
         self.flags & (1 << flag as u16) != 0
     }
     #[inline(always)]
@@ -112,7 +112,7 @@ impl VarDBIF for [Var] {
         for l in &c.lits {
             let v = &mut self[l.vi()];
             v.flag_on(Flag::TouchedVar);
-            if !v.get_flag(Flag::EliminatedVar) {
+            if !v.holds(Flag::EliminatedVar) {
                 if l.positive() {
                     v.pos_occurs.push(cid);
                 } else {
@@ -125,11 +125,11 @@ impl VarDBIF for [Var] {
         }
     }
     fn detach_clause(&mut self, elim: &mut Eliminator, cid: ClauseId, c: &Clause) {
-        debug_assert!(c.get_flag(Flag::DeadClause));
+        debug_assert!(c.holds(Flag::DeadClause));
         if elim.in_use {
             for l in &c.lits {
                 let v = &mut self[l.vi()];
-                if !v.get_flag(Flag::EliminatedVar) {
+                if !v.holds(Flag::EliminatedVar) {
                     if l.positive() {
                         v.pos_occurs.retain(|&cj| cid != cj);
                     } else {
@@ -212,7 +212,7 @@ impl VarOrderIF for VarIdHeap {
     fn select_var(&mut self, vars: &[Var]) -> VarId {
         loop {
             let vi = self.get_root(vars);
-            if vars[vi].assign == BOTTOM && !vars[vi].get_flag(Flag::EliminatedVar) {
+            if vars[vi].assign == BOTTOM && !vars[vi].holds(Flag::EliminatedVar) {
                 // if self.trail.contains(&vi.lit(LTRUE)) || self.trail.contains(&vi.lit(LFALSE)) {
                 //     panic!("@ level {}, select_var vi {} v {:?}", self.trail_lim.len(), vi, self.vars[vi]);
                 // }
@@ -224,7 +224,7 @@ impl VarOrderIF for VarIdHeap {
         // debug_assert_eq!(self.decision_level(), 0);
         self.reset();
         for v in &vars[1..] {
-            if v.assign == BOTTOM && !v.get_flag(Flag::EliminatedVar) {
+            if v.assign == BOTTOM && !v.holds(Flag::EliminatedVar) {
                 self.insert(vars, v.index);
             }
         }
@@ -382,7 +382,7 @@ impl VarIdHeap {
 
 impl fmt::Display for Var {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let st = |flag, mes| if self.get_flag(flag) { mes } else { "" };
+        let st = |flag, mes| if self.holds(flag) { mes } else { "" };
         write!(
             f,
             "V{}({} at {} by {} {}{})",

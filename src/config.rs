@@ -169,7 +169,7 @@ impl Config {
             // println!("# Adjusting for low decision levels.");
             // move some clauses with good lbd (col_lbd_bound) to Permanent
             for c in &mut cdb.clause[1..] {
-                if c.get_flag(Flag::DeadClause) || !c.get_flag(Flag::LearntClause) {
+                if c.holds(Flag::DeadClause) || !c.holds(Flag::LearntClause) {
                     continue;
                 }
                 if c.rank <= self.co_lbd_bound {
