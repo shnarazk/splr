@@ -457,7 +457,7 @@ fn handle_conflict_path(
         }
         asgs.uncheck_enqueue(vars, l0, cid);
         state.restart_update_lbd(lbd);
-        state.stats[Stat::SumLBD as usize] += lbd as i64;
+        state.stats[Stat::SumLBD as usize] += lbd;
     }
     if tn_confl % 10_000 == 0 {
         state.progress(cdb, config, elim, vars, None);

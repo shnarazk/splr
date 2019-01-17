@@ -37,7 +37,7 @@ pub struct State {
     pub cur_restart: usize,
     pub after_restart: usize,
     pub var_order: VarIdHeap, // Variable Order
-    pub stats: Vec<i64>,      // statistics
+    pub stats: [usize; Stat::EndOfStatIndex as usize], // statistics
     pub ema_asg: Ema,
     pub ema_lbd: Ema,
     pub b_lvl: Ema,
@@ -63,7 +63,7 @@ impl StateIF for State {
             cur_restart: 1,
             after_restart: 0,
             var_order: VarIdHeap::new(nv, nv),
-            stats: vec![0; Stat::EndOfStatIndex as usize],
+            stats: [0; Stat::EndOfStatIndex as usize],
             ema_asg: Ema::new(config.restart_asg_len),
             ema_lbd: Ema::new(config.restart_lbd_len),
             b_lvl: Ema::new(5_000),
@@ -119,7 +119,7 @@ impl StateIF for State {
                     None => config.strategy.to_str(),
                     Some(x) => x,
                 };
-                let count = self.stats[Stat::Conflict as usize] as usize;
+                let count = self.stats[Stat::Conflict as usize];
                 let ave = self.stats[Stat::SumLBD as usize] as f64 / count as f64;
                 println!("{}, Str:{:>8}", self, msg);
                 println!(

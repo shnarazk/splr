@@ -32,7 +32,7 @@ impl EmaIF for Ema {
 impl RestartIF for State {
     fn block_restart(&mut self, asgs: &AssignStack, config: &Config, ncnfl: usize) -> bool {
         let nas = asgs.len() + self.num_eliminated_vars;
-        // let _count = self.stats[Stat::Conflict as usize] as usize;
+        // let _count = self.stats[Stat::Conflict as usize];
         // let _ave = self.sum_asg / count as f64 * config.num_vars as f64;
         if 100 < ncnfl
             && config.restart_step <= self.after_restart
@@ -46,7 +46,7 @@ impl RestartIF for State {
         false
     }
     fn force_restart(&mut self, config: &mut Config, ncnfl: &mut f64) -> bool {
-        let count = self.stats[Stat::Conflict as usize] as usize;
+        let count = self.stats[Stat::Conflict as usize];
         if count <= RESET_EMA {
             if count == RESET_EMA {
                 self.ema_asg.reset();
