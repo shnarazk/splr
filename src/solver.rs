@@ -470,16 +470,14 @@ fn handle_conflict_path(
     config.var_inc /= config.var_decay;
     config.cla_inc /= config.cla_decay;
     // glucose reduction
-    if (config.use_chan_seok && !config.glureduce && config.first_reduction < cdb.num_learnt)
+    if ((config.use_chan_seok && !config.glureduce && config.first_reduction < cdb.num_learnt)
         || (config.glureduce
-            && state.cur_restart * state.next_reduction
-                <= state.stats[Stat::Conflict as usize] as usize)
+            && state.cur_restart * state.next_reduction <= state.stats[Stat::Conflict as usize]))
+        && 0 < cdb.num_learnt
     {
-        if 0 < cdb.num_learnt {
-            state.cur_restart = ((tn_confl as f64) / (state.next_reduction as f64)) as usize + 1;
-            cdb.reduce(config, elim, state, vars);
-            state.next_reduction += config.cdb_inc;
-        }
+        state.cur_restart = ((tn_confl as f64) / (state.next_reduction as f64)) as usize + 1;
+        cdb.reduce(config, elim, state, vars);
+        state.next_reduction += config.cdb_inc;
     }
 }
 
