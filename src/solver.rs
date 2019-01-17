@@ -81,7 +81,7 @@ impl SatSolver for Solver {
         state.progress(cdb, config, elim, vars, Some(""));
         if elim.in_use {
             for v in &mut vars[1..] {
-                debug_assert!(!v.holds(Flag::EliminatedVar));
+                debug_assert!(!v.is(Flag::EliminatedVar));
                 if v.assign != BOTTOM {
                     v.pos_occurs.clear();
                     v.neg_occurs.clear();
@@ -250,7 +250,7 @@ impl Propagate for AssignStack {
                 let mut n = 1;
                 'next_clause: while n <= source.count() {
                     let w = &mut source[n];
-                    if head[w.c].holds(Flag::DeadClause) {
+                    if head[w.c].is(Flag::DeadClause) {
                         source.detach(n);
                         continue 'next_clause;
                     }
@@ -313,7 +313,7 @@ fn propagate_fast(
             let mut n = 1;
             'next_clause: while n <= source.count() {
                 let w = source.get_unchecked_mut(n);
-                // if head[w.c].holds(ClauseFlag::Dead) {
+                // if head[w.c].is(ClauseFlag::Dead) {
                 //     source.detach(n);
                 //     continue 'next_clause;
                 // }
@@ -504,7 +504,7 @@ fn analyze(
         unsafe {
             let ch = &mut cdb.clause[cid] as *mut Clause;
             debug_assert_ne!(cid, NULL_CLAUSE);
-            if (*ch).holds(Flag::LearntClause) {
+            if (*ch).is(Flag::LearntClause) {
                 cdb.bump_activity(&mut config.cla_inc, cid);
                 // if 2 < (*ch).rank {
                 //     let nlevels = compute_lbd(vars, &ch.lits, lbd_temp);
@@ -526,9 +526,9 @@ fn analyze(
             for q in &(*ch).lits[((p != NULL_LIT) as usize)..] {
                 let vi = q.vi();
                 let lvl = vars[vi].level;
-                debug_assert!(!(*ch).holds(Flag::DeadClause));
+                debug_assert!(!(*ch).is(Flag::DeadClause));
                 debug_assert!(
-                    !vars[vi].holds(Flag::EliminatedVar),
+                    !vars[vi].is(Flag::EliminatedVar),
                     format!("analyze assertion: an eliminated var {} occurs", vi)
                 );
                 // debug_assert!(
@@ -543,7 +543,7 @@ fn analyze(
                         // println!("- flag for {} which level is {}", q.int(), lvl);
                         path_cnt += 1;
                     // if vars[vi].reason != NULL_CLAUSE
-                    //     && cdb.clause[vars[vi].reason].holds(ClauseFlag::Learnt)
+                    //     && cdb.clause[vars[vi].reason].is(ClauseFlag::Learnt)
                     // {
                     //     last_dl.push(*q);
                     // }

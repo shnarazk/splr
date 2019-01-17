@@ -54,7 +54,7 @@ impl VarIF for Var {
 
 impl FlagIF for Var {
     #[inline(always)]
-    fn holds(&self, flag: Flag) -> bool {
+    fn is(&self, flag: Flag) -> bool {
         self.flags & (1 << flag as u16) != 0
     }
     #[inline(always)]
@@ -112,7 +112,7 @@ impl VarDBIF for [Var] {
         for l in &c.lits {
             let v = &mut self[l.vi()];
             v.flag_on(Flag::TouchedVar);
-            if !v.holds(Flag::EliminatedVar) {
+            if !v.is(Flag::EliminatedVar) {
                 if l.positive() {
                     v.pos_occurs.push(cid);
                 } else {
@@ -125,11 +125,11 @@ impl VarDBIF for [Var] {
         }
     }
     fn detach_clause(&mut self, elim: &mut Eliminator, cid: ClauseId, c: &Clause) {
-        debug_assert!(c.holds(Flag::DeadClause));
+        debug_assert!(c.is(Flag::DeadClause));
         if elim.in_use {
             for l in &c.lits {
                 let v = &mut self[l.vi()];
-                if !v.holds(Flag::EliminatedVar) {
+                if !v.is(Flag::EliminatedVar) {
                     if l.positive() {
                         v.pos_occurs.retain(|&cj| cid != cj);
                     } else {
@@ -157,7 +157,7 @@ impl VarDBIF for [Var] {
 /// # Note
 /// - both fields has a fixed length. Don't use push and pop.
 /// - idxs[0] contains the number of alive elements
-///   `indx` holds positions. So the unused field 0 can hold the last position as a special case.
+///   `indx` is positions. So the unused field 0 can hold the last position as a special case.
 pub struct VarIdHeap {
     heap: Vec<VarId>, // order : usize -> VarId
     idxs: Vec<usize>, // VarId : -> order : usize
@@ -212,7 +212,7 @@ impl VarOrderIF for VarIdHeap {
     fn select_var(&mut self, vars: &[Var]) -> VarId {
         loop {
             let vi = self.get_root(vars);
-            if vars[vi].assign == BOTTOM && !vars[vi].holds(Flag::EliminatedVar) {
+            if vars[vi].assign == BOTTOM && !vars[vi].is(Flag::EliminatedVar) {
                 // if self.trail.contains(&vi.lit(LTRUE)) || self.trail.contains(&vi.lit(LFALSE)) {
                 //     panic!("@ level {}, select_var vi {} v {:?}", self.trail_lim.len(), vi, self.vars[vi]);
                 // }
@@ -224,7 +224,7 @@ impl VarOrderIF for VarIdHeap {
         // debug_assert_eq!(self.decision_level(), 0);
         self.reset();
         for v in &vars[1..] {
-            if v.assign == BOTTOM && !v.holds(Flag::EliminatedVar) {
+            if v.assign == BOTTOM && !v.is(Flag::EliminatedVar) {
                 self.insert(vars, v.index);
             }
         }
@@ -382,7 +382,7 @@ impl VarIdHeap {
 
 impl fmt::Display for Var {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let st = |flag, mes| if self.holds(flag) { mes } else { "" };
+        let st = |flag, mes| if self.is(flag) { mes } else { "" };
         write!(
             f,
             "V{}({} at {} by {} {}{})",
