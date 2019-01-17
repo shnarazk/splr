@@ -60,7 +60,7 @@ impl AssignIF for AssignStack {
     }
     /// returns `false` if an conflict occures.
     fn enqueue(&mut self, v: &mut Var, sig: Lbool, cid: ClauseId, dl: usize) -> bool {
-        debug_assert!(!v.eliminated);
+        debug_assert!(!v.is(Flag::EliminatedVar));
         let val = v.assign;
         if val == BOTTOM {
             v.assign = sig;
@@ -80,7 +80,7 @@ impl AssignIF for AssignStack {
     }
     /// returns `false` if an conflict occures.
     fn enqueue_null(&mut self, v: &mut Var, sig: Lbool, dl: usize) -> bool {
-        debug_assert!(!v.eliminated);
+        debug_assert!(!v.is(Flag::EliminatedVar));
         debug_assert!(sig != BOTTOM);
         let val = v.assign;
         if val == BOTTOM {
@@ -119,7 +119,7 @@ impl AssignIF for AssignStack {
         );
         let dl = self.trail_lim.len();
         let v = &mut vars[l.vi()];
-        debug_assert!(!v.eliminated);
+        debug_assert!(!v.is(Flag::EliminatedVar));
         debug_assert!(v.assign == l.lbool() || v.assign == BOTTOM);
         v.assign = l.lbool();
         v.level = dl;
@@ -134,7 +134,7 @@ impl AssignIF for AssignStack {
         self.trail_lim.push(self.trail.len());
         let dl = self.trail_lim.len();
         let v = &mut vars[l.vi()];
-        debug_assert!(!v.eliminated);
+        debug_assert!(!v.is(Flag::EliminatedVar));
         debug_assert!(v.assign == l.lbool() || v.assign == BOTTOM);
         v.assign = l.lbool();
         v.level = dl;
@@ -144,7 +144,7 @@ impl AssignIF for AssignStack {
     #[allow(dead_code)]
     fn dump_cnf(&mut self, cdb: &ClauseDB, config: &Config, vars: &[Var], fname: &str) {
         for v in vars {
-            if v.eliminated {
+            if v.is(Flag::EliminatedVar) {
                 if v.assign != BOTTOM {
                     panic!("conflicting var {} {}", v.index, v.assign);
                 } else {

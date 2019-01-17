@@ -1,4 +1,4 @@
-use crate::clause::{Clause, ClauseFlag};
+use crate::clause::Clause;
 use crate::eliminator::Eliminator;
 use crate::traits::*;
 use crate::types::*;
@@ -16,14 +16,10 @@ pub struct Var {
     pub reason: ClauseId,
     pub level: usize,
     pub activity: f64,
-    /// For elimination
-    pub touched: bool,
-    /// For elimination
-    pub eliminated: bool,
     pub check_sve_at: usize,
     pub pos_occurs: Vec<ClauseId>,
     pub neg_occurs: Vec<ClauseId>,
-    pub enqueued: bool,
+    flags: u16,
 }
 
 /// is the dummy var index.
@@ -39,12 +35,10 @@ impl VarIF for Var {
             reason: NULL_CLAUSE,
             level: 0,
             activity: 0.0,
-            touched: false,
-            eliminated: false,
             check_sve_at: 0,
             pos_occurs: Vec::new(),
             neg_occurs: Vec::new(),
-            enqueued: false,
+            flags: 0,
         }
     }
     fn new_vars(n: usize) -> Vec<Var> {
@@ -55,6 +49,21 @@ impl VarIF for Var {
             vec.push(v);
         }
         vec
+    }
+}
+
+impl FlagIF for Var {
+    #[inline(always)]
+    fn is(&self, flag: Flag) -> bool {
+        self.flags & (1 << flag as u16) != 0
+    }
+    #[inline(always)]
+    fn flag_off(&mut self, flag: Flag) {
+        self.flags &= !(1u16 << (flag as u16));
+    }
+    #[inline(always)]
+    fn flag_on(&mut self, flag: Flag) {
+        self.flags |= 1u16 << (flag as u16);
     }
 }
 
@@ -101,9 +110,9 @@ impl VarDBIF for [Var] {
             return;
         }
         for l in &c.lits {
-            let mut v = &mut self[l.vi()];
-            v.touched = true;
-            if !v.eliminated {
+            let v = &mut self[l.vi()];
+            v.flag_on(Flag::TouchedVar);
+            if !v.is(Flag::EliminatedVar) {
                 if l.positive() {
                     v.pos_occurs.push(cid);
                 } else {
@@ -116,11 +125,11 @@ impl VarDBIF for [Var] {
         }
     }
     fn detach_clause(&mut self, elim: &mut Eliminator, cid: ClauseId, c: &Clause) {
-        debug_assert!(c.get_flag(ClauseFlag::Dead));
+        debug_assert!(c.is(Flag::DeadClause));
         if elim.in_use {
             for l in &c.lits {
                 let v = &mut self[l.vi()];
-                if !v.eliminated {
+                if !v.is(Flag::EliminatedVar) {
                     if l.positive() {
                         v.pos_occurs.retain(|&cj| cid != cj);
                     } else {
@@ -148,7 +157,7 @@ impl VarDBIF for [Var] {
 /// # Note
 /// - both fields has a fixed length. Don't use push and pop.
 /// - idxs[0] contains the number of alive elements
-///   `indx` holds positions. So the unused field 0 can hold the last position as a special case.
+///   `indx` is positions. So the unused field 0 can hold the last position as a special case.
 pub struct VarIdHeap {
     heap: Vec<VarId>, // order : usize -> VarId
     idxs: Vec<usize>, // VarId : -> order : usize
@@ -203,7 +212,7 @@ impl VarOrderIF for VarIdHeap {
     fn select_var(&mut self, vars: &[Var]) -> VarId {
         loop {
             let vi = self.get_root(vars);
-            if vars[vi].assign == BOTTOM && !vars[vi].eliminated {
+            if vars[vi].assign == BOTTOM && !vars[vi].is(Flag::EliminatedVar) {
                 // if self.trail.contains(&vi.lit(LTRUE)) || self.trail.contains(&vi.lit(LFALSE)) {
                 //     panic!("@ level {}, select_var vi {} v {:?}", self.trail_lim.len(), vi, self.vars[vi]);
                 // }
@@ -215,7 +224,7 @@ impl VarOrderIF for VarIdHeap {
         // debug_assert_eq!(self.decision_level(), 0);
         self.reset();
         for v in &vars[1..] {
-            if v.assign == BOTTOM && !v.eliminated {
+            if v.assign == BOTTOM && !v.is(Flag::EliminatedVar) {
                 self.insert(vars, v.index);
             }
         }
@@ -373,7 +382,7 @@ impl VarIdHeap {
 
 impl fmt::Display for Var {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let st = |flag, mes| if flag { mes } else { "" };
+        let st = |flag, mes| if self.is(flag) { mes } else { "" };
         write!(
             f,
             "V{}({} at {} by {} {}{})",
@@ -381,8 +390,8 @@ impl fmt::Display for Var {
             self.assign,
             self.level,
             self.reason.format(),
-            st(self.touched, ", touched"),
-            st(self.touched, ", eliminated"),
+            st(Flag::TouchedVar, ", touched"),
+            st(Flag::EliminatedVar, ", eliminated"),
         )
     }
 }

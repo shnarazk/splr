@@ -1,7 +1,8 @@
-use crate::clause::{ClauseDB, ClauseFlag};
+use crate::clause::ClauseDB;
 use crate::eliminator::Eliminator;
 use crate::state::{Stat, State};
 use crate::traits::*;
+use crate::types::Flag;
 use crate::var::Var;
 
 #[derive(Eq, PartialEq)]
@@ -168,11 +169,11 @@ impl Config {
             // println!("# Adjusting for low decision levels.");
             // move some clauses with good lbd (col_lbd_bound) to Permanent
             for c in &mut cdb.clause[1..] {
-                if c.get_flag(ClauseFlag::Dead) || !c.get_flag(ClauseFlag::Learnt) {
+                if c.is(Flag::DeadClause) || !c.is(Flag::LearntClause) {
                     continue;
                 }
                 if c.rank <= self.co_lbd_bound {
-                    c.flag_off(ClauseFlag::Learnt);
+                    c.flag_off(Flag::LearntClause);
                     cdb.num_learnt -= 1;
                 } else if re_init {
                     c.kill(&mut cdb.touched);

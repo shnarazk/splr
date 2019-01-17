@@ -168,3 +168,13 @@ impl<T> Delete<T> for Vec<T> {
         }
     }
 }
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub enum Flag {
+    DeadClause = 0,
+    LearntClause,
+    JustUsedClause,
+    Enqueued,
+    EliminatedVar,
+    TouchedVar,
+}
