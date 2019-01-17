@@ -192,6 +192,19 @@ impl Ord for Clause {
     }
 }
 
+impl Clause {
+    #[inline(always)]
+    fn cmp_activity(&self, other: &Clause) -> Ordering {
+        if self.activity > other.activity {
+            Ordering::Less
+        } else if other.activity > self.activity {
+            Ordering::Greater
+        } else {
+            Ordering::Equal
+        }
+    }
+}
+
 impl fmt::Display for Clause {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
@@ -435,9 +448,10 @@ impl ClauseDBIF for ClauseDB {
             return;
         }
         let keep = perm.len() / 2;
-        perm.sort_by(|&a, &b| clause[a].cmp(&clause[b]));
         if config.use_chan_seok {
+            perm.sort_by(|&a, &b| clause[a].cmp_activity(&clause[b]));
         } else {
+            perm.sort_by(|&a, &b| clause[a].cmp(&clause[b]));
             if clause[perm[keep]].rank <= 3 {
                 state.next_reduction += config.cdb_inc_extra;
             }
