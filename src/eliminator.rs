@@ -27,6 +27,7 @@ pub struct Eliminator {
 const SUBSUMPTION_SIZE: usize = 30;
 const SUBSUMPITON_GROW_LIMIT: usize = 0;
 const BACKWORD_SUBSUMPTION_THRESHOLD: usize = 10_000;
+const ELIMINATE_LOOP_THRESHOLD: usize = 2_500_000;
 
 impl Default for Eliminator {
     fn default() -> Eliminator {
@@ -114,6 +115,7 @@ impl EliminatorIF for Eliminator {
         if !self.in_use || !self.active {
             return;
         }
+        let mut cnt = 0;
         'perform: while self.bwdsub_assigns < asgs.len()
             || !self.var_queue.is_empty()
             || !self.clause_queue.is_empty()
@@ -127,6 +129,10 @@ impl EliminatorIF for Eliminator {
             while let Some(vi) = self.var_queue.pop() {
                 let v = &mut vars[vi];
                 v.flag_off(Flag::Enqueued);
+                cnt += 1;
+                if ELIMINATE_LOOP_THRESHOLD <= cnt {
+                    continue;
+                }
                 if v.is(Flag::EliminatedVar) || v.assign != BOTTOM {
                     continue;
                 }
