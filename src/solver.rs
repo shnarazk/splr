@@ -385,7 +385,7 @@ fn search(
                 asgs.cancel_until(vars, config.root_level);
             } else if asgs.level() == 0 {
                 cdb.simplify(asgs, config, elim, state, vars);
-                asgs.var_order.rebuild(&vars);
+                asgs.rebuild_order(&vars);
             }
             if asgs.level() == 0 {
                 if !state.ok {
@@ -394,7 +394,7 @@ fn search(
                 state.num_solved_vars = asgs.len();
             }
             if !asgs.remains() {
-                let vi = asgs.var_order.select_var(&vars);
+                let vi = asgs.select_var(&vars);
                 let p = vars[vi].phase;
                 asgs.uncheck_assume(vars, vi.lit(p));
                 state.stats[Stat::Decision as usize] += 1;
@@ -536,7 +536,7 @@ fn analyze(
                 //     format!("{:?} was assigned", vars[vi])
                 // );
                 vars.bump_activity(&mut config.var_inc, vi);
-                asgs.var_order.update(vars, vi);
+                asgs.update_order(vars, vi);
                 if 0 < lvl && !state.an_seen[vi] {
                     state.an_seen[vi] = true;
                     if dl <= lvl {

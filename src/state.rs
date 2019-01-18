@@ -206,11 +206,7 @@ impl StateIF for State {
     #[allow(dead_code)]
     fn dump(&self, asgs: &AssignStack, str: &str) {
         println!("# {} at {}", str, asgs.level());
-        println!(
-            "# nassigns {}, decision cands {}",
-            asgs.len(),
-            asgs.var_order.len()
-        );
+        println!("# nassigns {}", asgs.len());
         let v = asgs.trail.iter().map(|l| l.int()).collect::<Vec<i32>>();
         let len = asgs.level();
         if 0 < len {
@@ -228,7 +224,7 @@ impl StateIF for State {
         } else {
             println!("# - trail[  0]  [0{:?}]", &v);
         }
-        println!("- trail_lim  {:?}", asgs.trail_lim);
+        // println!("- trail_lim  {:?}", asgs.trail_lim);
         // println!("{}", self.var_order);
         // self.var_order.check("");
     }

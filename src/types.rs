@@ -51,7 +51,7 @@ pub const NULL_LIT: Lit = 0;
 
 impl LitIF for Lit {
     fn from_int(x: i32) -> Lit {
-    (if x < 0 { -2 * x + 1 } else { 2 * x }) as Lit
+        (if x < 0 { -2 * x + 1 } else { 2 * x }) as Lit
     }
     /// converts to var index
     #[inline(always)]

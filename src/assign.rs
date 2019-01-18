@@ -1,6 +1,6 @@
 use crate::clause::ClauseDB;
 use crate::config::Config;
-use crate::traits::{AssignIF, FlagIF, LitIF, VarIdIF, VarOrderIF};
+use crate::traits::{AssignIF, FlagIF, LitIF, VarIdIF};
 use crate::types::*;
 use crate::var::Var;
 use std::fmt;
@@ -9,9 +9,9 @@ use std::io::{BufWriter, Write};
 
 pub struct AssignStack {
     pub trail: Vec<Lit>,
-    pub trail_lim: Vec<usize>,
+    trail_lim: Vec<usize>,
     q_head: usize,
-    pub var_order: VarIdHeap,                          // Variable Order
+    var_order: VarIdHeap, // Variable Order
 }
 
 impl AssignIF for AssignStack {
@@ -174,8 +174,16 @@ impl AssignIF for AssignStack {
             }
         }
     }
+    fn rebuild_order(&mut self, vars: &[Var]) {
+        self.var_order.rebuild(vars)
+    }
+    fn select_var(&mut self, vars: &[Var]) -> VarId {
+        self.var_order.select_var(vars)
+    }
+    fn update_order(&mut self, vec: &[Var], v: VarId) {
+        self.var_order.update(vec, v)
+    }
 }
-
 
 /// heap of VarId
 /// # Note
@@ -185,6 +193,17 @@ impl AssignIF for AssignStack {
 pub struct VarIdHeap {
     heap: Vec<VarId>, // order : usize -> VarId
     idxs: Vec<usize>, // VarId : -> order : usize
+}
+
+trait VarOrderIF {
+    fn new(n: usize, init: usize) -> VarIdHeap;
+    fn update(&mut self, vec: &[Var], v: VarId);
+    fn insert(&mut self, vec: &[Var], vi: VarId);
+    fn clear(&mut self);
+    fn len(&self) -> usize;
+    fn is_empty(&self) -> bool;
+    fn select_var(&mut self, vars: &[Var]) -> VarId;
+    fn rebuild(&mut self, vars: &[Var]);
 }
 
 impl VarOrderIF for VarIdHeap {

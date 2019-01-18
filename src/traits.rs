@@ -1,4 +1,4 @@
-use crate::assign::{AssignStack, VarIdHeap};
+use crate::assign::AssignStack;
 use crate::clause::{Clause, ClauseDB};
 use crate::config::Config;
 use crate::eliminator::Eliminator;
@@ -24,6 +24,9 @@ pub trait AssignIF {
     fn uncheck_enqueue(&mut self, vars: &mut [Var], l: Lit, cid: ClauseId);
     fn uncheck_assume(&mut self, vars: &mut [Var], l: Lit);
     fn dump_cnf(&mut self, cdb: &ClauseDB, config: &Config, vars: &[Var], fname: &str);
+    fn rebuild_order(&mut self, vars: &[Var]);
+    fn update_order(&mut self, vec: &[Var], v: VarId);
+    fn select_var(&mut self, vars: &[Var]) -> VarId;
 }
 
 pub trait ClauseIF {
@@ -181,17 +184,6 @@ pub trait VarDBIF {
     );
     fn detach_clause(&mut self, elim: &mut Eliminator, cid: ClauseId, c: &Clause);
     fn bump_activity(&mut self, inc: &mut f64, vi: VarId);
-}
-
-pub trait VarOrderIF {
-    fn new(n: usize, init: usize) -> VarIdHeap;
-    fn update(&mut self, vec: &[Var], v: VarId);
-    fn insert(&mut self, vec: &[Var], vi: VarId);
-    fn clear(&mut self);
-    fn len(&self) -> usize;
-    fn is_empty(&self) -> bool;
-    fn select_var(&mut self, vars: &[Var]) -> VarId;
-    fn rebuild(&mut self, vars: &[Var]);
 }
 
 pub trait WatchDBIF {
