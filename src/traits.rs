@@ -1,11 +1,11 @@
-use crate::assign::AssignStack;
+use crate::assign::{AssignStack, VarIdHeap};
 use crate::clause::{Clause, ClauseDB};
 use crate::config::Config;
 use crate::eliminator::Eliminator;
 use crate::solver::{Solver, SolverResult};
 use crate::state::State;
 use crate::types::{CNFDescription, ClauseId, Flag, Lbool, Lit, VarId};
-use crate::var::{Var, VarIdHeap};
+use crate::var::Var;
 
 pub trait AssignIF {
     fn new(n: usize) -> Self;
@@ -18,7 +18,7 @@ pub trait AssignIF {
     fn catchup(&mut self);
     fn remains(&self) -> bool;
     fn level_up(&mut self);
-    fn cancel_until(&mut self, vars: &mut [Var], var_order: &mut VarIdHeap, lv: usize);
+    fn cancel_until(&mut self, vars: &mut [Var], lv: usize);
     fn enqueue(&mut self, v: &mut Var, sig: Lbool, cid: ClauseId, dl: usize) -> bool;
     fn enqueue_null(&mut self, v: &mut Var, sig: Lbool, dl: usize) -> bool;
     fn uncheck_enqueue(&mut self, vars: &mut [Var], l: Lit, cid: ClauseId);

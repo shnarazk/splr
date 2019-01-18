@@ -113,7 +113,7 @@ impl SatSolverIF for Solver {
         }
         if search(asgs, config, cdb, elim, state, vars) {
             if !state.ok {
-                asgs.cancel_until(vars, &mut state.var_order, 0);
+                asgs.cancel_until(vars, 0);
                 state.progress(cdb, config, elim, vars, Some("error"));
                 return Err(SolverException::InternalInconsistent);
             }
@@ -127,11 +127,11 @@ impl SatSolverIF for Solver {
                 }
             }
             elim.extend_model(&mut result);
-            asgs.cancel_until(vars, &mut state.var_order, 0);
+            asgs.cancel_until(vars, 0);
             Ok(Certificate::SAT(result))
         } else {
             state.progress(cdb, config, elim, vars, None);
-            asgs.cancel_until(vars, &mut state.var_order, 0);
+            asgs.cancel_until(vars, 0);
             Ok(Certificate::UNSAT(
                 state.conflicts.iter().map(|l| l.int()).collect(),
             ))
@@ -382,10 +382,10 @@ fn search(
             }
             // DYNAMIC FORCING RESTART
             if state.force_restart(config, &mut conflict_c) {
-                asgs.cancel_until(vars, &mut state.var_order, config.root_level);
+                asgs.cancel_until(vars, config.root_level);
             } else if asgs.level() == 0 {
                 cdb.simplify(asgs, config, elim, state, vars);
-                state.var_order.rebuild(&vars);
+                asgs.var_order.rebuild(&vars);
             }
             if asgs.level() == 0 {
                 if !state.ok {
@@ -394,7 +394,7 @@ fn search(
                 state.num_solved_vars = asgs.len();
             }
             if !asgs.remains() {
-                let vi = state.var_order.select_var(&vars);
+                let vi = asgs.var_order.select_var(&vars);
                 let p = vars[vi].phase;
                 asgs.uncheck_assume(vars, vi.lit(p));
                 state.stats[Stat::Decision as usize] += 1;
@@ -439,7 +439,7 @@ fn handle_conflict_path(
     state.block_restart(asgs, config, tn_confl);
     let mut new_learnt: Vec<Lit> = Vec::new();
     let bl = analyze(asgs, config, cdb, state, vars, ci, &mut new_learnt);
-    asgs.cancel_until(vars, &mut state.var_order, bl.max(config.root_level));
+    asgs.cancel_until(vars, bl.max(config.root_level));
     let learnt_len = new_learnt.len();
     if learnt_len == 1 {
         asgs.uncheck_enqueue(vars, new_learnt[0], NULL_CLAUSE);
@@ -465,7 +465,7 @@ fn handle_conflict_path(
         state.progress(cdb, config, elim, vars, None);
     }
     if tn_confl == 100_000 {
-        asgs.cancel_until(vars, &mut state.var_order, 0);
+        asgs.cancel_until(vars, 0);
         config.adapt_strategy(cdb, elim, state, vars);
     }
     // decay activities
@@ -536,7 +536,7 @@ fn analyze(
                 //     format!("{:?} was assigned", vars[vi])
                 // );
                 vars.bump_activity(&mut config.var_inc, vi);
-                state.var_order.update(vars, vi);
+                asgs.var_order.update(vars, vi);
                 if 0 < lvl && !state.an_seen[vi] {
                     state.an_seen[vi] = true;
                     if dl <= lvl {
