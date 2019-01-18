@@ -255,7 +255,7 @@ impl Propagate for AssignStack {
                         continue 'next_clause;
                     }
                     if vars.assigned(w.blocker) != LTRUE {
-                        let Clause { ref mut lits, .. } = &mut head[w.c];
+                        let Clause { ref mut lits, .. } = &mut head.get_unchecked_mut(w.c);
                         debug_assert!(2 <= lits.len());
                         debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
                         let mut first = *lits.get_unchecked(0);
@@ -273,10 +273,10 @@ impl Propagate for AssignStack {
                         for (k, lk) in lits.iter().enumerate().skip(2) {
                             // below is equivalent to 'assigned(lk) != LFALSE'
                             if (((lk & 1) as u8) ^ vars.get_unchecked(lk.vi()).assign) != 0 {
-                                (*watcher)[lk.negate() as usize].attach(first, w.c);
+                                (*watcher).get_unchecked_mut(lk.negate() as usize).attach(first, w.c);
                                 source.detach(n);
-                                lits[1] = *lk;
-                                lits[k] = false_lit;
+                                *lits.get_unchecked_mut(1) = *lk;
+                                *lits.get_unchecked_mut(k) = false_lit;
                                 continue 'next_clause;
                             }
                         }
