@@ -372,32 +372,32 @@ fn check_eliminator(cdb: &ClauseDB, vars: &[Var]) -> bool {
     // clause_queue should be clear.
     // all elements in occur_lists exist.
     // for v in vars {
-    //     for c in &v.pos_occurs {
-    //         let ch = clause!(cp, c);
-    //         if ch.lits[0] < 2 || ch.lits[1] < 2 {
-    //             panic!("panic {:#}", ch);
+    //     for ci in &v.pos_occurs {
+    //         let c = clause!(cp, ci);
+    //         if c.lits[0] < 2 || c.lits[1] < 2 {
+    //             panic!("panic {:#}", c);
     //         }
     //     }
-    //     for c in &v.neg_occurs {
-    //         let ch = clause!(cp, c);
-    //         if ch.lits[0] < 2 || ch.lits[1] < 2 {
-    //             panic!("panic {:#}", ch);
+    //     for ci in &v.neg_occurs {
+    //         let c = clause!(cp, ci);
+    //         if c.lits[0] < 2 || c.lits[1] < 2 {
+    //             panic!("panic {:#}", c);
     //         }
     //     }
     // }
     // all caulses are registered in corresponding occur_lists
-    for (cid, ch) in cdb.clause.iter().enumerate().skip(1) {
-        if ch.is(Flag::DeadClause) {
+    for (cid, c) in cdb.clause.iter().enumerate().skip(1) {
+        if c.is(Flag::DeadClause) {
             continue;
         }
-        for l in &ch.lits {
+        for l in &c.lits {
             let v = l.vi();
             if l.positive() {
                 if !vars[v].pos_occurs.contains(&cid) {
-                    panic!("failed to check {} {:#}", cid.format(), ch);
+                    panic!("failed to check {} {:#}", cid.format(), c);
                 }
             } else if !vars[v].neg_occurs.contains(&cid) {
-                panic!("failed to check {} {:#}", cid.format(), ch);
+                panic!("failed to check {} {:#}", cid.format(), c);
             }
         }
     }
@@ -533,9 +533,9 @@ fn make_eliminating_unit_clause(vec: &mut Vec<Lit>, x: Lit) {
 fn make_eliminated_clause(cdb: &mut ClauseDB, vec: &mut Vec<Lit>, vi: VarId, cid: ClauseId) {
     let first = vec.len();
     // Copy clause to the vector. Remember the position where the varibale 'v' occurs:
-    let ch = &cdb.clause[cid];
-    debug_assert!(!ch.lits.is_empty());
-    for l in &ch.lits {
+    let c = &cdb.clause[cid];
+    debug_assert!(!c.lits.is_empty());
+    for l in &c.lits {
         vec.push(*l as Lit);
         if l.vi() == vi {
             let index = vec.len() - 1;
@@ -547,7 +547,7 @@ fn make_eliminated_clause(cdb: &mut ClauseDB, vec: &mut Vec<Lit>, vi: VarId, cid
     }
     // Store the length of the clause last:
     debug_assert_eq!(vec[first].vi(), vi);
-    vec.push(ch.lits.len() as Lit);
+    vec.push(c.lits.len() as Lit);
     cdb.touched[Lit::from_var(vi, LTRUE) as usize] = true;
     cdb.touched[Lit::from_var(vi, LFALSE) as usize] = true;
     // println!("make_eliminated_clause: eliminate({}) clause {:?}", vi, vec2int(&ch.lits));

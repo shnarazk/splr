@@ -502,9 +502,9 @@ fn analyze(
     loop {
         // println!("analyze {}", p.int());
         unsafe {
-            let ch = &mut cdb.clause[cid] as *mut Clause;
+            let c = &mut cdb.clause[cid] as *mut Clause;
             debug_assert_ne!(cid, NULL_CLAUSE);
-            if (*ch).is(Flag::LearntClause) {
+            if (*c).is(Flag::LearntClause) {
                 cdb.bump_activity(&mut config.cla_inc, cid);
                 // if 2 < (*ch).rank {
                 //     let nlevels = compute_lbd(vars, &ch.lits, lbd_temp);
@@ -523,10 +523,10 @@ fn analyze(
                 // }
             }
             // println!("- handle {}", cid.fmt());
-            for q in &(*ch).lits[((p != NULL_LIT) as usize)..] {
+            for q in &(*c).lits[((p != NULL_LIT) as usize)..] {
                 let vi = q.vi();
                 let lvl = vars[vi].level;
-                debug_assert!(!(*ch).is(Flag::DeadClause));
+                debug_assert!(!(*c).is(Flag::DeadClause));
                 debug_assert!(
                     !vars[vi].is(Flag::EliminatedVar),
                     format!("analyze assertion: an eliminated var {} occurs", vi)
@@ -638,11 +638,11 @@ fn analyze_removable(
     let top = to_clear.len();
     while let Some(sl) = stack.pop() {
         let cid = vars[sl.vi()].reason;
-        let ch = &mut cdb.clause[cid];
-        if (*ch).lits.len() == 2 && vars.assigned((*ch).lits[0]) == LFALSE {
-            (*ch).lits.swap(0, 1);
+        let c = &mut cdb.clause[cid];
+        if (*c).lits.len() == 2 && vars.assigned((*c).lits[0]) == LFALSE {
+            (*c).lits.swap(0, 1);
         }
-        for q in &(*ch).lits[1..] {
+        for q in &(*c).lits[1..] {
             let vi = q.vi();
             let lv = vars[vi].level;
             if 0 < lv && !an_seen[vi] {
@@ -676,8 +676,8 @@ fn analyze_final(
     let mut seen = vec![false; config.num_vars + 1];
     state.conflicts.clear();
     if config.root_level != 0 {
-        let ch = &cdb.clause[ci];
-        for l in &ch.lits[skip_first as usize..] {
+        let c = &cdb.clause[ci];
+        for l in &c.lits[skip_first as usize..] {
             let vi = l.vi();
             if 0 < vars[vi].level {
                 state.an_seen[vi] = true;
@@ -695,7 +695,7 @@ fn analyze_final(
                 if vars[vi].reason == NULL_CLAUSE {
                     state.conflicts.push(l.negate());
                 } else {
-                    for l in &ch.lits[1..] {
+                    for l in &c.lits[1..] {
                         let vi = l.vi();
                         if 0 < vars[vi].level {
                             seen[vi] = true;
@@ -726,12 +726,12 @@ fn minimize_with_bi_clauses(
     let l0 = vec[0];
     let mut nsat = 0;
     for w in &cdb.watcher[l0.negate() as usize][1..] {
-        let ch = &cdb.clause[w.c];
-        if ch.lits.len() != 2 {
+        let c = &cdb.clause[w.c];
+        if c.lits.len() != 2 {
             continue;
         }
-        debug_assert!(ch.lits[0] == l0 || ch.lits[1] == l0);
-        let other = ch.lits[(ch.lits[0] == l0) as usize];
+        debug_assert!(c.lits[0] == l0 || c.lits[1] == l0);
+        let other = c.lits[(c.lits[0] == l0) as usize];
         let vi = other.vi();
         if lbd_temp[vi] == key && vars.assigned(other) == LTRUE {
             nsat += 1;

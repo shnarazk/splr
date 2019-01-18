@@ -267,18 +267,18 @@ impl ClauseDBIF for ClauseDB {
             }
         }
         let recycled = &mut watcher[NULL_LIT.negate() as usize];
-        for (ci, ch) in self.clause.iter_mut().enumerate().skip(1) {
+        for (ci, c) in self.clause.iter_mut().enumerate().skip(1) {
             // the recycled clause is DEAD and EMPTY
-            if ch.is(Flag::DeadClause) && !ch.lits.is_empty() {
+            if c.is(Flag::DeadClause) && !c.lits.is_empty() {
                 recycled.push(Watch {
                     blocker: NULL_LIT,
                     c: ci,
                 });
-                if ch.is(Flag::LearntClause) {
+                if c.is(Flag::LearntClause) {
                     self.num_learnt -= 1;
                 }
                 if elim.in_use {
-                    for l in &ch.lits {
+                    for l in &c.lits {
                         let vi = l.vi();
                         let v = &mut vars[vi];
                         if !v.is(Flag::EliminatedVar) {
@@ -291,7 +291,7 @@ impl ClauseDBIF for ClauseDB {
                         }
                     }
                 }
-                ch.lits.clear();
+                c.lits.clear();
             }
         }
         self.num_active = self.clause.len() - recycled.len();
@@ -301,20 +301,20 @@ impl ClauseDBIF for ClauseDB {
         if let Some(w) = self.watcher[NULL_LIT.negate() as usize].pop() {
             cid = w.c;
             // debug_assert!(self.head[cid].is(ClauseFlag::Dead));
-            let ch = &mut self.clause[cid];
+            let c = &mut self.clause[cid];
             self.watcher[v[0].negate() as usize].attach(v[1], cid);
             self.watcher[v[1].negate() as usize].attach(v[0], cid);
-            ch.lits.clear();
+            c.lits.clear();
             for l in v {
-                ch.lits.push(*l);
+                c.lits.push(*l);
             }
-            ch.rank = rank;
-            ch.flags = 0;
+            c.rank = rank;
+            c.flags = 0;
             if learnt {
-                ch.flag_on(Flag::LearntClause);
+                c.flag_on(Flag::LearntClause);
                 self.num_learnt += 1;
             }
-            ch.activity = 1.0;
+            c.activity = 1.0;
         } else {
             let l0 = v[0];
             let l1 = v[1];
@@ -342,20 +342,20 @@ impl ClauseDBIF for ClauseDB {
     }
     fn reset_lbd(&mut self, vars: &[Var], temp: &mut [usize]) {
         let mut key = temp[0];
-        for ch in &mut self.clause[1..] {
-            if ch.is(Flag::DeadClause) {
+        for c in &mut self.clause[1..] {
+            if c.is(Flag::DeadClause) {
                 continue;
             }
             key += 1;
             let mut cnt = 0;
-            for l in &ch.lits {
+            for l in &c.lits {
                 let lv = vars[l.vi()].level;
                 if temp[lv] != key && lv != 0 {
                     temp[lv] = key;
                     cnt += 1;
                 }
             }
-            ch.rank = cnt;
+            c.rank = cnt;
         }
         temp[0] = key + 1;
     }
@@ -404,9 +404,9 @@ impl ClauseDBIF for ClauseDB {
         v.swap(1, i_max);
         let learnt = 0 < lbd && 2 < v.len() && (!config.use_chan_seok || config.co_lbd_bound < lbd);
         let cid = self.new_clause(&v, lbd, learnt);
-        let ch = &mut self.clause[cid];
-        ch.activity = config.var_inc;
-        vars.attach_clause(elim, cid, ch, true);
+        let c = &mut self.clause[cid];
+        c.activity = config.var_inc;
+        vars.attach_clause(elim, cid, c, true);
         cid
     }
     /// called from strengthen_clause, backward_subsumption_check, eliminate_var, substitute
