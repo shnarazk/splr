@@ -3,7 +3,7 @@
 
 use splr::config::Config;
 use splr::solver::{Certificate, Solver};
-use splr::traits::SatSolver;
+use splr::traits::SatSolverIF;
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use structopt::StructOpt;

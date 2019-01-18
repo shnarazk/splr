@@ -62,7 +62,7 @@ impl Solver {
     }
 }
 
-impl SatSolver for Solver {
+impl SatSolverIF for Solver {
     fn solve(&mut self) -> SolverResult {
         let Solver {
             ref mut asgs,
@@ -184,7 +184,7 @@ impl SatSolver for Solver {
                     for s in iter {
                         match s.parse::<i32>() {
                             Ok(0) => break,
-                            Ok(val) => v.push(int2lit(val)),
+                            Ok(val) => v.push(Lit::from_int(val)),
                             Err(_) => (),
                         }
                     }

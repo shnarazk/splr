@@ -113,6 +113,7 @@ pub trait FlagIF {
 }
 
 pub trait LitIF {
+    fn from_int(x: i32) -> Self;
     fn vi(self) -> VarId;
     fn int(self) -> i32;
     fn lbool(self) -> Lbool;
@@ -133,7 +134,7 @@ pub trait RestartIF {
     fn restart_update_luby(&mut self, config: &mut Config);
 }
 
-pub trait SatSolver {
+pub trait SatSolverIF {
     fn build(config: Config, path: &str) -> (Solver, CNFDescription);
     fn solve(&mut self) -> SolverResult;
     fn add_unchecked_clause(&mut self, v: &mut Vec<Lit>) -> Option<ClauseId>;
@@ -150,6 +151,11 @@ pub trait StateIF {
         mes: Option<&str>,
     );
     fn dump(&self, asgs: &AssignStack, str: &str);
+}
+
+pub trait ValidatorIF {
+    fn inject_assigmnent(&mut self, vec: &[i32]);
+    fn validate(&self) -> Option<Vec<i32>>;
 }
 
 pub trait VarIF {

@@ -2,7 +2,7 @@
 #![allow(unused_imports)]
 use splr::config::Config;
 use splr::solver::Solver;
-use splr::traits::SatSolver;
+use splr::traits::{SatSolverIF, ValidatorIF};
 use std::env;
 use std::fs::File;
 use std::io::{stdin, BufRead, BufReader};

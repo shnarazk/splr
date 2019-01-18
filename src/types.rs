@@ -32,10 +32,6 @@ pub type Lit = u32;
 /// a dummy literal.
 pub const NULL_LIT: Lit = 0;
 
-pub fn int2lit(x: i32) -> Lit {
-    (if x < 0 { -2 * x + 1 } else { 2 * x }) as Lit
-}
-
 /// # Examples
 ///
 /// ```
@@ -54,6 +50,9 @@ pub fn int2lit(x: i32) -> Lit {
 /// ```
 
 impl LitIF for Lit {
+    fn from_int(x: i32) -> Lit {
+    (if x < 0 { -2 * x + 1 } else { 2 * x }) as Lit
+    }
     /// converts to var index
     #[inline(always)]
     fn vi(self) -> VarId {
@@ -105,7 +104,8 @@ pub const LTRUE: u8 = 1;
 pub const BOTTOM: u8 = 2;
 
 /// Note: this function doesn't work on BOTTOM.
-pub fn negate_bool(b: Lbool) -> Lbool {
+#[allow(dead_code)]
+fn negate_bool(b: Lbool) -> Lbool {
     b ^ 1
 }
 
