@@ -162,11 +162,10 @@ impl Config {
         }
         state.ema_asg.reset();
         state.ema_lbd.reset();
-        // state.lbd_queue.clear();
         state.stats[Stat::SumLBD as usize] = 0;
         state.stats[Stat::Conflict as usize] = 0;
         if self.use_chan_seok {
-            // println!("# Adjusting for low decision levels.");
+            // Adjusting for low decision levels.
             // move some clauses with good lbd (col_lbd_bound) to Permanent
             for c in &mut cdb.clause[1..] {
                 if c.is(Flag::DeadClause) || !c.is(Flag::LearntClause) {
