@@ -96,7 +96,6 @@ impl AssignIF for AssignStack {
             val == sig
         }
     }
-
     fn cancel_until(&mut self, vars: &mut [Var], lv: usize) {
         if self.trail_lim.len() <= lv {
             return;

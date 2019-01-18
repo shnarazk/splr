@@ -137,7 +137,6 @@ impl SatSolverIF for Solver {
             ))
         }
     }
-
     /// builds and returns a configured solver.
     fn build(mut cfg: Config, path: &str) -> (Solver, CNFDescription) {
         let mut rs = BufReader::new(fs::File::open(path).unwrap());

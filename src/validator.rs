@@ -8,7 +8,6 @@ impl ValidatorIF for Solver {
             self.vars[val.abs() as usize].assign = (0 < *val) as Lbool;
         }
     }
-
     /// returns None if the given assignment is a model of a problem.
     /// Otherwise returns a clause which is not satisfiable under a given assignment.
     fn validate(&self) -> Option<Vec<i32>> {
