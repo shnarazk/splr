@@ -1,6 +1,6 @@
 use crate::clause::ClauseDB;
 use crate::config::Config;
-use crate::traits::{AssignIF, FlagIF, LitIF, VarIdIF};
+use crate::traits::{AssignIF, FlagIF, LitIF};
 use crate::types::*;
 use crate::var::Var;
 use std::fmt;
@@ -73,9 +73,9 @@ impl AssignIF for AssignStack {
                 v.reason = NULL_CLAUSE;
                 v.activity = 0.0;
             }
-            debug_assert!(!self.trail.contains(&v.index.lit(LTRUE)));
-            debug_assert!(!self.trail.contains(&v.index.lit(LFALSE)));
-            self.trail.push(v.index.lit(sig));
+            debug_assert!(!self.trail.contains(&Lit::from_var(v.index, LTRUE)));
+            debug_assert!(!self.trail.contains(&Lit::from_var(v.index, LFALSE)));
+            self.trail.push(Lit::from_var(v.index, sig));
             true
         } else {
             val == sig
@@ -90,7 +90,7 @@ impl AssignIF for AssignStack {
             v.assign = sig;
             v.reason = NULL_CLAUSE;
             v.level = dl;
-            self.trail.push(v.index.lit(sig));
+            self.trail.push(Lit::from_var(v.index, sig));
             true
         } else {
             val == sig

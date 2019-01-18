@@ -1,5 +1,5 @@
 //! Basic types
-use crate::traits::{Delete, LitIF, VarIdIF};
+use crate::traits::{Delete, LitIF};
 use std::fmt;
 use std::ops::Neg;
 
@@ -53,6 +53,12 @@ impl LitIF for Lit {
     fn from_int(x: i32) -> Lit {
         (if x < 0 { -2 * x + 1 } else { 2 * x }) as Lit
     }
+    /// converter from [VarId](type.VarId.html) to [Lit](type.Lit.html).
+    /// returns a positive literal if p == LTRUE or BOTTOM.
+    #[inline(always)]
+    fn from_var(vi: VarId, p: Lbool) -> Lit {
+        (vi as Lit) << 1 | ((p == LFALSE) as Lit)
+    }
     /// converts to var index
     #[inline(always)]
     fn vi(self) -> VarId {
@@ -82,15 +88,6 @@ impl LitIF for Lit {
     #[inline(always)]
     fn to_cid(self) -> ClauseId {
         (self as usize) | 0x8000_0000_0000_0000
-    }
-}
-
-impl VarIdIF for VarId {
-    /// converter from [VarId](type.VarId.html) to [Lit](type.Lit.html).
-    /// returns a positive literal if p == LTRUE or BOTTOM.
-    #[inline(always)]
-    fn lit(self, p: Lbool) -> Lit {
-        (self as Lit) << 1 | ((p == LFALSE) as Lit)
     }
 }
 

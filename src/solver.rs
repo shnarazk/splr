@@ -87,8 +87,8 @@ impl SatSolverIF for Solver {
                     v.neg_occurs.clear();
                     continue;
                 }
-                debug_assert!(!asgs.trail.contains(&v.index.lit(LTRUE)));
-                debug_assert!(!asgs.trail.contains(&v.index.lit(LFALSE)));
+                debug_assert!(!asgs.trail.contains(&Lit::from_var(v.index, LTRUE)));
+                debug_assert!(!asgs.trail.contains(&Lit::from_var(v.index, LFALSE)));
                 if v.neg_occurs.is_empty() && !v.pos_occurs.is_empty() {
                     asgs.enqueue_null(v, LTRUE, 0);
                 } else if v.pos_occurs.is_empty() && !v.neg_occurs.is_empty() {
@@ -396,7 +396,7 @@ fn search(
             if !asgs.remains() {
                 let vi = asgs.select_var(&vars);
                 let p = vars[vi].phase;
-                asgs.uncheck_assume(vars, vi.lit(p));
+                asgs.uncheck_assume(vars, Lit::from_var(vi, p));
                 state.stats[Stat::Decision as usize] += 1;
                 a_decision_was_made = true;
             }

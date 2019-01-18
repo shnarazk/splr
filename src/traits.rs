@@ -117,6 +117,7 @@ pub trait FlagIF {
 
 pub trait LitIF {
     fn from_int(x: i32) -> Self;
+    fn from_var(vi: VarId, p: Lbool) -> Self;
     fn vi(self) -> VarId;
     fn int(self) -> i32;
     fn lbool(self) -> Lbool;
@@ -164,10 +165,6 @@ pub trait ValidatorIF {
 pub trait VarIF {
     fn new(i: usize) -> Var;
     fn new_vars(n: usize) -> Vec<Var>;
-}
-
-pub trait VarIdIF {
-    fn lit(self, p: Lbool) -> Lit;
 }
 
 pub trait VarDBIF {
