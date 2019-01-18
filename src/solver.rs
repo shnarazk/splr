@@ -273,7 +273,9 @@ impl Propagate for AssignStack {
                         for (k, lk) in lits.iter().enumerate().skip(2) {
                             // below is equivalent to 'assigned(lk) != LFALSE'
                             if (((lk & 1) as u8) ^ vars.get_unchecked(lk.vi()).assign) != 0 {
-                                (*watcher).get_unchecked_mut(lk.negate() as usize).attach(first, w.c);
+                                (*watcher)
+                                    .get_unchecked_mut(lk.negate() as usize)
+                                    .attach(first, w.c);
                                 source.detach(n);
                                 *lits.get_unchecked_mut(1) = *lk;
                                 *lits.get_unchecked_mut(k) = false_lit;
