@@ -16,7 +16,7 @@ pub const NULL_CLAUSE: ClauseId = 0;
 /// # Examples
 ///
 /// ```
-/// use splr::traits::{LitIF, VarIdIF};
+/// use splr::traits::LitIF;
 /// use splr::types::*;
 /// assert_eq!(2, Lit::from_int( 1) as i32);
 /// assert_eq!(3, Lit::from_int(-1) as i32);
@@ -35,14 +35,14 @@ pub const NULL_LIT: Lit = 0;
 /// # Examples
 ///
 /// ```
-/// use splr::traits::{LitIF, VarIdIF};
+/// use splr::traits::LitIF;
 /// use splr::types::*;
-/// assert_eq!(Lit::from_int(1), (1 as VarId).lit(LTRUE));
-/// assert_eq!(Lit::from_int(2), (2 as VarId).lit(LTRUE));
-/// assert_eq!(1, 1.lit(LTRUE).vi());
-/// assert_eq!(1, 1.lit(LFALSE).vi());
-/// assert_eq!(2, 2.lit(LTRUE).vi());
-/// assert_eq!(2, 2.lit(LFALSE).vi());
+/// assert_eq!(Lit::from_int(1), Lit::from_var(1 as VarId, LTRUE));
+/// assert_eq!(Lit::from_int(2), Lit::from_var(2 as VarId, LTRUE));
+/// assert_eq!(1, Lit::from_var(1, LTRUE).vi());
+/// assert_eq!(1, Lit::from_var(1, LFALSE).vi());
+/// assert_eq!(2, Lit::from_var(2, LTRUE).vi());
+/// assert_eq!(2, Lit::from_var(2, LFALSE).vi());
 /// assert_eq!(Lit::from_int( 1), Lit::from_int(-1).negate());
 /// assert_eq!(Lit::from_int(-1), Lit::from_int( 1).negate());
 /// assert_eq!(Lit::from_int( 2), Lit::from_int(-2).negate());
