@@ -6,7 +6,7 @@ edition = "2018"
 
 [dependencies]
 chrono = "0.4.6"
-structopt = "0.2.10"
+structopt = "0.2.14"
 
 [profile.release]
 lto = true
