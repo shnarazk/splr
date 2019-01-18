@@ -10,7 +10,7 @@ use splr::types::*;
 macro_rules! mkv {
     ($($x:expr),*) => {
         match &[$($x),*] {
-            v => v.iter().map(|x| int2lit(*x)).collect::<Vec<Lit>>(),
+            v => v.iter().map(|x| Lit::from_int(*x)).collect::<Vec<Lit>>(),
         }
     };
 }
@@ -55,7 +55,7 @@ fn check_occurs() {
 }
 
 fn mk_c(s: &mut Solver, i: usize, v: Vec<i32>) -> ClauseId {
-    let vec = v.iter().map(|i| int2lit(*i)).collect::<Vec<Lit>>();
+    let vec = v.iter().map(|i| Lit::from_int(*i)).collect::<Vec<Lit>>();
     let cid = s.cdb.new_clause(&vec, vec.len(), true);
     cid
 }
