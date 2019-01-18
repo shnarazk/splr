@@ -18,14 +18,14 @@ pub const NULL_CLAUSE: ClauseId = 0;
 /// ```
 /// use splr::traits::{LitIF, VarIdIF};
 /// use splr::types::*;
-/// assert_eq!(2, int2lit( 1) as i32);
-/// assert_eq!(3, int2lit(-1) as i32);
-/// assert_eq!(4, int2lit( 2) as i32);
-/// assert_eq!(5, int2lit(-2) as i32);
-/// assert_eq!( 1, int2lit( 1).int());
-/// assert_eq!(-1, int2lit(-1).int());
-/// assert_eq!( 2, int2lit( 2).int());
-/// assert_eq!(-2, int2lit(-2).int());
+/// assert_eq!(2, Lit::from_int( 1) as i32);
+/// assert_eq!(3, Lit::from_int(-1) as i32);
+/// assert_eq!(4, Lit::from_int( 2) as i32);
+/// assert_eq!(5, Lit::from_int(-2) as i32);
+/// assert_eq!( 1, Lit::from_int( 1).int());
+/// assert_eq!(-1, Lit::from_int(-1).int());
+/// assert_eq!( 2, Lit::from_int( 2).int());
+/// assert_eq!(-2, Lit::from_int(-2).int());
 /// ```
 pub type Lit = u32;
 
@@ -37,21 +37,21 @@ pub const NULL_LIT: Lit = 0;
 /// ```
 /// use splr::traits::{LitIF, VarIdIF};
 /// use splr::types::*;
-/// assert_eq!(int2lit(1), (1 as VarId).lit(LTRUE));
-/// assert_eq!(int2lit(2), (2 as VarId).lit(LTRUE));
+/// assert_eq!(Lit::from_int(1), (1 as VarId).lit(LTRUE));
+/// assert_eq!(Lit::from_int(2), (2 as VarId).lit(LTRUE));
 /// assert_eq!(1, 1.lit(LTRUE).vi());
 /// assert_eq!(1, 1.lit(LFALSE).vi());
 /// assert_eq!(2, 2.lit(LTRUE).vi());
 /// assert_eq!(2, 2.lit(LFALSE).vi());
-/// assert_eq!(int2lit( 1), int2lit(-1).negate());
-/// assert_eq!(int2lit(-1), int2lit( 1).negate());
-/// assert_eq!(int2lit( 2), int2lit(-2).negate());
-/// assert_eq!(int2lit(-2), int2lit( 2).negate());
+/// assert_eq!(Lit::from_int( 1), Lit::from_int(-1).negate());
+/// assert_eq!(Lit::from_int(-1), Lit::from_int( 1).negate());
+/// assert_eq!(Lit::from_int( 2), Lit::from_int(-2).negate());
+/// assert_eq!(Lit::from_int(-2), Lit::from_int( 2).negate());
 /// ```
 
 impl LitIF for Lit {
     fn from_int(x: i32) -> Lit {
-    (if x < 0 { -2 * x + 1 } else { 2 * x }) as Lit
+        (if x < 0 { -2 * x + 1 } else { 2 * x }) as Lit
     }
     /// converts to var index
     #[inline(always)]
