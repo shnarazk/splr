@@ -56,7 +56,7 @@ impl WatchDBIF for Vec<Watch> {
         self[0].c
     }
     #[inline(always)]
-    fn attach(&mut self, blocker: Lit, c: usize) {
+    fn register(&mut self, blocker: Lit, c: usize) {
         let next = self[0].c + 1;
         if next == self.len() {
             self.push(Watch { blocker, c });
@@ -67,7 +67,7 @@ impl WatchDBIF for Vec<Watch> {
         self[0].c = next;
     }
     #[inline(always)]
-    fn detach(&mut self, n: usize) {
+    fn remove(&mut self, n: usize) {
         let last = self[0].c;
         debug_assert!(0 < last);
         self.swap(n, last);
@@ -75,10 +75,10 @@ impl WatchDBIF for Vec<Watch> {
         self[0].c -= 1;
     }
     #[inline(always)]
-    fn detach_with(&mut self, cid: usize) {
+    fn remove_with(&mut self, cid: usize) {
         for n in 1..=self[0].c {
             if self[n].c == cid {
-                self.detach(n);
+                self.remove(n);
                 return;
             }
         }
@@ -260,7 +260,7 @@ impl ClauseDBIF for ClauseDB {
             let n_max = ws.count();
             while n <= n_max {
                 if clause[ws[n].c].is(Flag::DeadClause) {
-                    ws.detach(n);
+                    ws.remove(n);
                 } else {
                     n += 1;
                 }
@@ -302,8 +302,8 @@ impl ClauseDBIF for ClauseDB {
             cid = w.c;
             let c = &mut self.clause[cid];
             debug_assert!(c.is(Flag::DeadClause));
-            self.watcher[v[0].negate() as usize].attach(v[1], cid);
-            self.watcher[v[1].negate() as usize].attach(v[0], cid);
+            self.watcher[v[0].negate() as usize].register(v[1], cid);
+            self.watcher[v[1].negate() as usize].register(v[0], cid);
             c.lits.clear();
             for l in v {
                 c.lits.push(*l);
@@ -334,8 +334,8 @@ impl ClauseDBIF for ClauseDB {
                 self.num_learnt += 1;
             }
             self.clause.push(c);
-            self.watcher[l0.negate() as usize].attach(l1, cid);
-            self.watcher[l1.negate() as usize].attach(l0, cid);
+            self.watcher[l0.negate() as usize].register(l1, cid);
+            self.watcher[l1.negate() as usize].register(l0, cid);
         };
         self.num_active += 1;
         cid
@@ -381,7 +381,7 @@ impl ClauseDBIF for ClauseDB {
     }
     /// renamed from newLearntClause
     // Note: set lbd to 0 if you want to add the clause to Permanent.
-    fn add_clause(
+    fn register(
         &mut self,
         config: &mut Config,
         elim: &mut Eliminator,
@@ -406,11 +406,11 @@ impl ClauseDBIF for ClauseDB {
         let cid = self.new_clause(&v, lbd, learnt);
         let c = &mut self.clause[cid];
         c.activity = config.var_inc;
-        vars.attach_clause(elim, cid, c, true);
+        vars.attach(elim, cid, c, true);
         cid
     }
     /// called from strengthen_clause, backward_subsumption_check, eliminate_var, substitute
-    fn remove_clause(&mut self, cid: ClauseId) {
+    fn remove(&mut self, cid: ClauseId) {
         let c = &mut self.clause[cid];
         debug_assert!(!c.is(Flag::DeadClause));
         c.flag_on(Flag::DeadClause);
