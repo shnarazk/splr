@@ -273,6 +273,27 @@ impl VarOrderIF for VarIdHeap {
     }
 }
 
+impl fmt::Display for AssignStack {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let v = self.trail.iter().map(|l| l.int()).collect::<Vec<i32>>();
+        let len = self.level();
+        let c = |i|
+        {
+            let a = self.num_at(i);
+            match i {
+                0 => (0, &v[0..a]),
+                x if x == len - 1 => (i + 1, &v[a..]),
+                x => (x + 1, &v[a..self.num_at(x + 1)]),
+            }
+        };
+        if 0 < len {
+            write!(f, "{:?}", (0..len).map(c).collect::<Vec<(usize, &[i32])>>())
+        } else {
+            write!(f, "# - trail[  0]  [0{:?}]", &v)
+        }
+    }
+}
+
 impl VarIdHeap {
     /// renamed from inHeap
     #[inline(always)]

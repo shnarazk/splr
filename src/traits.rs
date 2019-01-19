@@ -154,7 +154,6 @@ pub trait StateIF {
         vars: &[Var],
         mes: Option<&str>,
     );
-    fn dump(&self, asgs: &AssignStack, str: &str);
 }
 
 pub trait ValidatorIF {

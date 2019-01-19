@@ -1,4 +1,3 @@
-use crate::assign::AssignStack;
 use crate::clause::ClauseDB;
 use crate::config::Config;
 use crate::eliminator::Eliminator;
@@ -201,32 +200,6 @@ impl StateIF for State {
                 elim.var_queue_len(),
             );
         }
-    }
-
-    #[allow(dead_code)]
-    fn dump(&self, asgs: &AssignStack, str: &str) {
-        println!("# {} at {}", str, asgs.level());
-        println!("# nassigns {}", asgs.len());
-        let v = asgs.trail.iter().map(|l| l.int()).collect::<Vec<i32>>();
-        let len = asgs.level();
-        if 0 < len {
-            print!("# - trail[{}]  [", asgs.len());
-            let lv0 = asgs.num_at(0);
-            if 0 < lv0 {
-                print!("0{:?}, ", &asgs.trail[0..lv0]);
-            }
-            for i in 0..(len - 1) {
-                let a = asgs.num_at(i);
-                let b = asgs.num_at(i + 1);
-                print!("{}{:?}, ", i + 1, &v[a..b]);
-            }
-            println!("{}{:?}]", len, &v[asgs.num_at(len - 1)..]);
-        } else {
-            println!("# - trail[  0]  [0{:?}]", &v);
-        }
-        // println!("- trail_lim  {:?}", asgs.trail_lim);
-        // println!("{}", self.var_order);
-        // self.var_order.check("");
     }
 }
 
