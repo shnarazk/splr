@@ -73,9 +73,6 @@ pub trait ClauseIdIF {
 }
 
 pub trait Delete<T> {
-    fn delete_stable<F>(&mut self, filter: F)
-    where
-        F: FnMut(&T) -> bool;
     fn delete_unstable<F>(&mut self, filter: F)
     where
         F: FnMut(&T) -> bool;
