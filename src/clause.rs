@@ -381,7 +381,7 @@ impl ClauseDBIF for ClauseDB {
     }
     /// renamed from newLearntClause
     // Note: set lbd to 0 if you want to add the clause to Permanent.
-    fn add_clause(
+    fn attach(
         &mut self,
         config: &mut Config,
         elim: &mut Eliminator,
@@ -406,11 +406,11 @@ impl ClauseDBIF for ClauseDB {
         let cid = self.new_clause(&v, lbd, learnt);
         let c = &mut self.clause[cid];
         c.activity = config.var_inc;
-        vars.attach_clause(elim, cid, c, true);
+        vars.attach(elim, cid, c, true);
         cid
     }
     /// called from strengthen_clause, backward_subsumption_check, eliminate_var, substitute
-    fn remove_clause(&mut self, cid: ClauseId) {
+    fn detach(&mut self, cid: ClauseId) {
         let c = &mut self.clause[cid];
         debug_assert!(!c.is(Flag::DeadClause));
         c.flag_on(Flag::DeadClause);

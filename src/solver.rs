@@ -229,7 +229,7 @@ impl SatSolverIF for Solver {
             }
             _ => {
                 let cid = cdb.new_clause(&v, 0, false);
-                vars.attach_clause(elim, cid, &mut cdb.clause[cid], false);
+                vars.attach(elim, cid, &mut cdb.clause[cid], false);
                 Some(cid)
             }
         }
@@ -441,7 +441,7 @@ fn handle_conflict_path(
         state.stats[Stat::Learnt as usize] += 1;
         let lbd = vars.compute_lbd(&new_learnt, &mut state.lbd_temp);
         let l0 = new_learnt[0];
-        let cid = cdb.add_clause(config, elim, vars, &mut new_learnt, lbd);
+        let cid = cdb.attach(config, elim, vars, &mut new_learnt, lbd);
         state.c_lvl.update(bl as f64);
         state.b_lvl.update(lbd as f64);
         if lbd <= 2 {

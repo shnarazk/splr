@@ -289,8 +289,8 @@ fn try_subsume(
                 //          cid.fmt(),
                 //          *clause!(cdb, cid),
                 // );
-                cdb.remove_clause(did);
-                vars.detach_clause(elim, did, &cdb.clause[did]);
+                cdb.detach(did);
+                vars.detach(elim, did, &cdb.clause[did]);
             } //else {
               // println!("BackSubsC deletes a permanent clause {} {:#}",
               //          di.fmt(),
@@ -457,8 +457,8 @@ fn strengthen_clause(
         let c0 = cdb.clause[cid].lits[0];
         debug_assert_ne!(c0, l);
         // println!("{} is removed and its first literal {} is enqueued.", cid.fmt(), c0.int());
-        cdb.remove_clause(cid);
-        vars.detach_clause(elim, cid, &cdb.clause[cid]);
+        cdb.detach(cid);
+        vars.detach(elim, cid, &cdb.clause[cid]);
         if asgs.enqueue_null(&mut vars[c0.vi()], c0.lbool(), 0)
             && asgs.propagate(cdb, state, vars) == NULL_CLAUSE
         {
@@ -635,9 +635,9 @@ fn eliminate_var(
                                 && cdb.clause[*n].is(Flag::LearntClause)
                             {
                                 let rank = rank_p.min(cdb.clause[*n].rank);
-                                cdb.add_clause(config, elim, vars, v, rank);
+                                cdb.attach(config, elim, vars, v, rank);
                             } else {
-                                cdb.add_clause(config, elim, vars, v, 0);
+                                cdb.attach(config, elim, vars, v, 0);
                             }
                         }
                     }
@@ -645,10 +645,10 @@ fn eliminate_var(
             }
         }
         for cid in &*pos {
-            cdb.remove_clause(*cid);
+            cdb.detach(*cid);
         }
         for cid in &*neg {
-            cdb.remove_clause(*cid);
+            cdb.detach(*cid);
         }
         vars[vi].pos_occurs.clear();
         vars[vi].neg_occurs.clear();

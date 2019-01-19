@@ -99,13 +99,7 @@ impl VarDBIF for [Var] {
         keys[0] = key;
         cnt
     }
-    fn attach_clause(
-        &mut self,
-        elim: &mut Eliminator,
-        cid: ClauseId,
-        c: &mut Clause,
-        enqueue: bool,
-    ) {
+    fn attach(&mut self, elim: &mut Eliminator, cid: ClauseId, c: &mut Clause, enqueue: bool) {
         if !elim.in_use {
             return;
         }
@@ -124,7 +118,7 @@ impl VarDBIF for [Var] {
             elim.enqueue_clause(cid, c);
         }
     }
-    fn detach_clause(&mut self, elim: &mut Eliminator, cid: ClauseId, c: &Clause) {
+    fn detach(&mut self, elim: &mut Eliminator, cid: ClauseId, c: &Clause) {
         debug_assert!(c.is(Flag::DeadClause));
         if elim.in_use {
             for l in &c.lits {
