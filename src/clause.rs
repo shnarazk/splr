@@ -449,16 +449,16 @@ impl ClauseDBIF for ClauseDB {
         }
         let keep = perm.len() / 2;
         if config.use_chan_seok {
-            perm.sort_by(|&a, &b| clause[a].cmp(&clause[b]));
-        // perm.sort_by(|&a, &b| clause[a].cmp_activity(&clause[b]));
+            // perm.sort_by(|&a, &b| clause[a].cmp(&clause[b]));
+            perm.sort_by(|&a, &b| clause[a].cmp_activity(&clause[b]));
         } else {
             perm.sort_by(|&a, &b| clause[a].cmp(&clause[b]));
             if clause[perm[keep]].rank <= 3 {
                 state.next_reduction += config.cdb_inc_extra;
             }
-            // if clause[perm[0]].rank <= 5 {
-            //     state.next_reduction += config.cdb_inc_extra;
-            // };
+            if clause[perm[0]].rank <= 5 {
+                state.next_reduction += config.cdb_inc_extra;
+            };
         }
         for i in &perm[keep..] {
             let c = &mut clause[*i];
