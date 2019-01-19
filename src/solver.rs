@@ -535,9 +535,7 @@ fn analyze(
                     if dl <= lvl {
                         // println!("- flag for {} which level is {}", q.int(), lvl);
                         path_cnt += 1;
-                        if v.reason != NULL_CLAUSE
-                            && cdb.clause[v.reason].is(Flag::LearntClause)
-                        {
+                        if v.reason != NULL_CLAUSE && cdb.clause[v.reason].is(Flag::LearntClause) {
                             last_dl.push(*q);
                         }
                     } else {

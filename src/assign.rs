@@ -271,8 +271,7 @@ impl fmt::Display for AssignStack {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let v = self.trail.iter().map(|l| l.int()).collect::<Vec<i32>>();
         let len = self.level();
-        let c = |i|
-        {
+        let c = |i| {
             let a = self.num_at(i);
             match i {
                 0 => (0, &v[0..a]),
