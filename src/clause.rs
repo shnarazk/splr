@@ -438,6 +438,7 @@ impl ClauseDBIF for ClauseDB {
             ref mut touched,
             ..
         } = self;
+        state.next_reduction += config.cdb_inc;
         let mut perm = Vec::with_capacity(clause.len());
         for (i, b) in clause.iter().enumerate().skip(1) {
             if b.is(Flag::LearntClause) && !b.is(Flag::DeadClause) && !vars.locked(b, i) {
@@ -469,9 +470,8 @@ impl ClauseDBIF for ClauseDB {
                 c.kill(touched);
             }
         }
-        self.garbage_collect(vars, elim);
-        state.next_reduction += config.cdb_inc;
         state.stats[Stat::Reduction as usize] += 1;
+        self.garbage_collect(vars, elim);
     }
     fn simplify(
         &mut self,
