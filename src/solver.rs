@@ -462,10 +462,8 @@ fn handle_conflict_path(
         asgs.cancel_until(vars, 0);
         config.adapt_strategy(cdb, elim, state, vars);
     }
-    // decay activities
     config.var_inc /= config.var_decay;
     config.cla_inc /= config.cla_decay;
-    // glucose reduction
     if ((config.use_chan_seok && !config.glureduce && config.first_reduction < cdb.num_learnt)
         || (config.glureduce
             && state.cur_restart * state.next_reduction <= state.stats[Stat::Conflict as usize]))
@@ -496,8 +494,8 @@ fn analyze(
     loop {
         // println!("analyze {}", p.int());
         unsafe {
-            let c = &mut cdb.clause[cid] as *mut Clause;
             debug_assert_ne!(cid, NULL_CLAUSE);
+            let c = &mut cdb.clause[cid] as *mut Clause;
             debug_assert!(!(*c).is(Flag::DeadClause));
             if (*c).is(Flag::LearntClause) {
                 cdb.bump_activity(&mut config.cla_inc, cid);

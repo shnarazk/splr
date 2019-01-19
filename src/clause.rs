@@ -300,8 +300,8 @@ impl ClauseDBIF for ClauseDB {
         let cid;
         if let Some(w) = self.watcher[NULL_LIT.negate() as usize].pop() {
             cid = w.c;
-            // debug_assert!(self.head[cid].is(ClauseFlag::Dead));
             let c = &mut self.clause[cid];
+            debug_assert!(c.is(Flag::DeadClause));
             self.watcher[v[0].negate() as usize].attach(v[1], cid);
             self.watcher[v[1].negate() as usize].attach(v[0], cid);
             c.lits.clear();
@@ -450,7 +450,6 @@ impl ClauseDBIF for ClauseDB {
         }
         let keep = perm.len() / 2;
         if config.use_chan_seok {
-            // perm.sort_by(|&a, &b| clause[a].cmp(&clause[b]));
             perm.sort_by(|&a, &b| clause[a].cmp_activity(&clause[b]));
         } else {
             perm.sort_by(|&a, &b| clause[a].cmp(&clause[b]));
