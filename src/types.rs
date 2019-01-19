@@ -170,7 +170,7 @@ impl<T> Delete<T> for Vec<T> {
 pub enum Flag {
     DeadClause = 0,
     LearntClause,
-    // JustUsedClause,
+    JustUsedClause,
     Enqueued,
     EliminatedVar,
     TouchedVar,

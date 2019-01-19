@@ -506,21 +506,19 @@ fn analyze(
             debug_assert_ne!(cid, NULL_CLAUSE);
             if (*c).is(Flag::LearntClause) {
                 cdb.bump_activity(&mut config.cla_inc, cid);
-                // if 2 < (*ch).rank {
-                //     let nlevels = compute_lbd(vars, &ch.lits, lbd_temp);
-                //     if nlevels + 1 < (*ch).rank {
-                //         (*ch).rank = nlevels;
-                //         if nlevels <= 30 {
-                //             (*ch).flag_on(ClauseFlag::JustUsed);
-                //         }
-                //         if self.strategy == Some(SearchStrategy::ChanSeok)
-                //             && nlevels < self.co_lbd_bound
-                //         {
-                //             (*ch).rank = 0;
-                //             clause_mut!(*cdb, confl).rank = 0
-                //         }
-                //     }
-                // }
+                if 2 < (*c).rank {
+                    let nlevels = vars.compute_lbd(&(*c).lits, &mut state.lbd_temp);
+                    if nlevels + 1 < (*c).rank {
+                        (*c).rank = nlevels;
+                        if nlevels <= 30 {
+                            (*c).flag_on(Flag::JustUsedClause);
+                        }
+                        if config.use_chan_seok && nlevels < config.co_lbd_bound {
+                            (*c).rank = 0;
+                            cdb.clause[confl].rank = 0
+                        }
+                    }
+                }
             }
             // println!("- handle {}", cid.fmt());
             for q in &(*c).lits[((p != NULL_LIT) as usize)..] {

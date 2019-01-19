@@ -462,9 +462,9 @@ impl ClauseDBIF for ClauseDB {
         }
         for i in &perm[keep..] {
             let c = &mut clause[*i];
-            // if c.is(Flag::JustUsedClause) {
-            //     c.flag_off(Flag::JustUsedClause)
-            // } else
+            if c.is(Flag::JustUsedClause) {
+                c.flag_off(Flag::JustUsedClause)
+            }
             if 2 < c.rank {
                 c.kill(touched);
             }
