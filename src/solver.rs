@@ -515,8 +515,9 @@ fn analyze(
                             (*c).flag_on(Flag::JustUsedClause);
                         }
                         if config.use_chan_seok && nlevels < config.co_lbd_bound {
-                            (*c).rank = 0;
-                            cdb.clause[confl].rank = 0
+                            (*c).flag_off(Flag::LearntClause);
+                        } else {
+                            (*c).rank = nlevels;
                         }
                     }
                 }
