@@ -494,16 +494,17 @@ fn analyze(
 ) -> usize {
     learnt.push(0);
     let dl = asgs.level();
-    let mut cid: usize = confl;
+    let mut cid = confl;
     let mut p = NULL_LIT;
     let mut ti = asgs.len() - 1; // trail index
     let mut path_cnt = 0;
-    let mut last_dl = Vec::new();
+    let mut last_dl: Vec<Lit> = Vec::new();
     loop {
         // println!("analyze {}", p.int());
         unsafe {
             let c = &mut cdb.clause[cid] as *mut Clause;
             debug_assert_ne!(cid, NULL_CLAUSE);
+            debug_assert!(!(*c).is(Flag::DeadClause));
             if (*c).is(Flag::LearntClause) {
                 cdb.bump_activity(&mut config.cla_inc, cid);
                 if 2 < (*c).rank {
@@ -523,25 +524,19 @@ fn analyze(
             // println!("- handle {}", cid.fmt());
             for q in &(*c).lits[((p != NULL_LIT) as usize)..] {
                 let vi = q.vi();
-                let lvl = vars[vi].level;
-                debug_assert!(!(*c).is(Flag::DeadClause));
-                debug_assert!(
-                    !vars[vi].is(Flag::EliminatedVar),
-                    format!("analyze assertion: an eliminated var {} occurs", vi)
-                );
-                // debug_assert!(
-                //     vars[vi].assign != BOTTOM,
-                //     format!("{:?} was assigned", vars[vi])
-                // );
                 vars.bump_activity(&mut config.var_inc, vi);
                 asgs.update_order(vars, vi);
+                let v = &mut vars[vi];
+                let lvl = v.level;
+                debug_assert!(!v.is(Flag::EliminatedVar));
+                debug_assert!(v.assign != BOTTOM);
                 if 0 < lvl && !state.an_seen[vi] {
                     state.an_seen[vi] = true;
                     if dl <= lvl {
                         // println!("- flag for {} which level is {}", q.int(), lvl);
                         path_cnt += 1;
-                        if vars[vi].reason != NULL_CLAUSE
-                            && cdb.clause[vars[vi].reason].is(Flag::LearntClause)
+                        if v.reason != NULL_CLAUSE
+                            && cdb.clause[v.reason].is(Flag::LearntClause)
                         {
                             last_dl.push(*q);
                         }
@@ -576,10 +571,21 @@ fn analyze(
         }
     }
     learnt[0] = p.negate();
-    // println!("- append {}; the result is {:?}", p.negate().int(), vec2int(learnt));
-    // simplify phase
-    let mut to_clear = Vec::new();
-    to_clear.push(p.negate());
+    // println!("- appending {}, the result is {:?}", learnt[0].int(), vec2int(learnt));
+    analyze_simplify(asgs, cdb, config, state, vars, learnt, &mut last_dl)
+}
+
+// simplify phase
+fn analyze_simplify(
+    asgs: &mut AssignStack,
+    cdb: &mut ClauseDB,
+    config: &mut Config,
+    state: &mut State,
+    vars: &mut [Var],
+    learnt: &mut Vec<Lit>,
+    last_dl: &mut Vec<Lit>,
+) -> usize {
+    let mut to_clear: Vec<Lit> = vec![learnt[0]];
     let mut level_map = vec![false; asgs.level() + 1];
     for l in &learnt[1..] {
         to_clear.push(*l);
