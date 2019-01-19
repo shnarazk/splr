@@ -309,12 +309,12 @@ impl ClauseDBIF for ClauseDB {
                 c.lits.push(*l);
             }
             c.rank = rank;
+            c.activity = 0.0;
             c.flags = 0;
             if learnt {
                 c.flag_on(Flag::LearntClause);
                 self.num_learnt += 1;
             }
-            c.activity = 1.0;
         } else {
             let l0 = v[0];
             let l1 = v[1];
