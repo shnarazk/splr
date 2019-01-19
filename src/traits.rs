@@ -33,7 +33,6 @@ pub trait ClauseIF {
     fn kill(&mut self, touched: &mut [bool]);
 }
 
-/// For ClauseDB
 pub trait ClauseDBIF {
     fn new(nv: usize, nc: usize) -> Self;
     fn add_clause(
