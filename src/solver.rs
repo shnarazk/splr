@@ -498,6 +498,7 @@ fn analyze(
     let mut p = NULL_LIT;
     let mut ti = asgs.len() - 1; // trail index
     let mut path_cnt = 0;
+    let mut last_dl = Vec::new();
     loop {
         // println!("analyze {}", p.int());
         unsafe {
@@ -541,11 +542,11 @@ fn analyze(
                     if dl <= lvl {
                         // println!("- flag for {} which level is {}", q.int(), lvl);
                         path_cnt += 1;
-                    // if vars[vi].reason != NULL_CLAUSE
-                    //     && cdb.clause[vars[vi].reason].is(ClauseFlag::Learnt)
-                    // {
-                    //     last_dl.push(*q);
-                    // }
+                        if vars[vi].reason != NULL_CLAUSE
+                            && cdb.clause[vars[vi].reason].is(Flag::LearntClause)
+                        {
+                            last_dl.push(*q);
+                        }
                     } else {
                         // println!("- push {} to learnt, which level is {}", q.int(), lvl);
                         learnt.push(*q);
@@ -594,14 +595,14 @@ fn analyze(
         minimize_with_bi_clauses(cdb, vars, &mut state.lbd_temp, learnt);
     }
     // glucose heuristics
-    // let lbd = vars.compute_lbd(learnt, lbd_temp);
-    // while let Some(l) = last_dl.pop() {
-    //     let vi = l.vi();
-    //     if clause!(*cdb, vars[vi].reason).rank < lbd {
-    //         vars.bump_activity(vi, &mut config.var_inc, state.stats[Stat::Conflict as usize] as f64);
-    //         var_order.update(vars, vi);
-    //     }
-    // }
+    let lbd = vars.compute_lbd(learnt, &mut state.lbd_temp);
+    while let Some(l) = last_dl.pop() {
+        let vi = l.vi();
+        if cdb.clause[vars[vi].reason].rank < lbd {
+            vars.bump_activity(&mut config.var_inc, vi);
+            asgs.update_order(vars, vi);
+        }
+    }
     // find correct backtrack level from remaining literals
     let mut level_to_return = 0;
     if 1 < learnt.len() {
