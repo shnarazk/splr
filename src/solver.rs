@@ -372,7 +372,7 @@ fn search(
     let mut conflict_c = 0.0; // for Luby restart
     let mut a_decision_was_made = false;
     state.restart_update_luby(config);
-    loop {
+    while state.ok {
         let ci = propagate_fast(asgs, cdb, state, vars);
         state.stats[Stat::Propagation as usize] += 1;
         if ci == NULL_CLAUSE {
@@ -387,9 +387,6 @@ fn search(
                 asgs.rebuild_order(&vars);
             }
             if asgs.level() == 0 {
-                if !state.ok {
-                    return false;
-                }
                 state.num_solved_vars = asgs.len();
             }
             if !asgs.remains() {
@@ -412,11 +409,9 @@ fn search(
                 return false;
             }
             handle_conflict_path(asgs, config, cdb, elim, state, vars, ci);
-            if !state.ok {
-                return false;
-            }
         }
     }
+    false
 }
 
 #[inline]
