@@ -229,7 +229,7 @@ impl SatSolverIF for Solver {
             }
             _ => {
                 let cid = cdb.new_clause(&v, 0, false);
-                vars.attach(elim, cid, &mut cdb.clause[cid], false);
+                vars.attach_clause(elim, cid, &mut cdb.clause[cid], false);
                 Some(cid)
             }
         }
@@ -250,7 +250,7 @@ impl Propagate for AssignStack {
                 'next_clause: while n <= source.count() {
                     let w = &mut source[n];
                     if head[w.c].is(Flag::DeadClause) {
-                        source.remove(n);
+                        source.detach(n);
                         continue 'next_clause;
                     }
                     if vars.assigned(w.blocker) != LTRUE {
@@ -274,8 +274,8 @@ impl Propagate for AssignStack {
                             if (((lk & 1) as u8) ^ vars.get_unchecked(lk.vi()).assign) != 0 {
                                 (*watcher)
                                     .get_unchecked_mut(lk.negate() as usize)
-                                    .register(first, w.c);
-                                source.remove(n);
+                                    .attach(first, w.c);
+                                source.detach(n);
                                 *lits.get_unchecked_mut(1) = *lk;
                                 *lits.get_unchecked_mut(k) = false_lit;
                                 continue 'next_clause;
@@ -338,8 +338,8 @@ fn propagate_fast(
                     for (k, lk) in lits.iter().enumerate().skip(2) {
                         // below is equivalent to 'assigned(lk) != LFALSE'
                         if (((lk & 1) as u8) ^ vars.get_unchecked(lk.vi()).assign) != 0 {
-                            (*watcher)[lk.negate() as usize].register(first, w.c);
-                            source.remove(n);
+                            (*watcher)[lk.negate() as usize].attach(first, w.c);
+                            source.detach(n);
                             lits[1] = *lk;
                             lits[k] = false_lit;
                             continue 'next_clause;
@@ -441,7 +441,7 @@ fn handle_conflict_path(
         state.stats[Stat::Learnt as usize] += 1;
         let lbd = vars.compute_lbd(&new_learnt, &mut state.lbd_temp);
         let l0 = new_learnt[0];
-        let cid = cdb.register(config, elim, vars, &mut new_learnt, lbd);
+        let cid = cdb.add_clause(config, elim, vars, &mut new_learnt, lbd);
         state.c_lvl.update(bl as f64);
         state.b_lvl.update(lbd as f64);
         if lbd <= 2 {

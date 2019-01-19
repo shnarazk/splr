@@ -35,7 +35,7 @@ pub trait ClauseIF {
 
 pub trait ClauseDBIF {
     fn new(nv: usize, nc: usize) -> Self;
-    fn register(
+    fn add_clause(
         &mut self,
         config: &mut Config,
         elim: &mut Eliminator,
@@ -43,7 +43,7 @@ pub trait ClauseDBIF {
         v: &mut Vec<Lit>,
         lbd: usize,
     ) -> ClauseId;
-    fn remove(&mut self, cid: ClauseId);
+    fn remove_clause(&mut self, cid: ClauseId);
     fn reduce(
         &mut self,
         config: &Config,
@@ -167,15 +167,21 @@ pub trait VarDBIF {
     fn locked(&self, c: &Clause, cid: ClauseId) -> bool;
     fn satisfies(&self, c: &[Lit]) -> bool;
     fn compute_lbd(&self, vec: &[Lit], keys: &mut [usize]) -> usize;
-    fn attach(&mut self, elim: &mut Eliminator, cid: ClauseId, c: &mut Clause, enqueue: bool);
-    fn detach(&mut self, elim: &mut Eliminator, cid: ClauseId, c: &Clause);
+    fn attach_clause(
+        &mut self,
+        elim: &mut Eliminator,
+        cid: ClauseId,
+        c: &mut Clause,
+        enqueue: bool,
+    );
+    fn detach_clause(&mut self, elim: &mut Eliminator, cid: ClauseId, c: &Clause);
     fn bump_activity(&mut self, inc: &mut f64, vi: VarId);
 }
 
 pub trait WatchDBIF {
     fn initialize(self, n: usize) -> Self;
     fn count(&self) -> usize;
-    fn register(&mut self, blocker: Lit, c: usize);
-    fn remove(&mut self, n: usize);
-    fn remove_with(&mut self, cid: usize);
+    fn attach(&mut self, blocker: Lit, c: usize);
+    fn detach(&mut self, n: usize);
+    fn detach_with(&mut self, cid: usize);
 }

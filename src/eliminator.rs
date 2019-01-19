@@ -289,8 +289,8 @@ fn try_subsume(
                 //          cid.fmt(),
                 //          *clause!(cdb, cid),
                 // );
-                cdb.remove(did);
-                vars.detach(elim, did, &cdb.clause[did]);
+                cdb.remove_clause(did);
+                vars.detach_clause(elim, did, &cdb.clause[did]);
             } //else {
               // println!("BackSubsC deletes a permanent clause {} {:#}",
               //          di.fmt(),
@@ -457,8 +457,8 @@ fn strengthen_clause(
         let c0 = cdb.clause[cid].lits[0];
         debug_assert_ne!(c0, l);
         // println!("{} is removed and its first literal {} is enqueued.", cid.fmt(), c0.int());
-        cdb.remove(cid);
-        vars.detach(elim, cid, &cdb.clause[cid]);
+        cdb.remove_clause(cid);
+        vars.detach_clause(elim, cid, &cdb.clause[cid]);
         if asgs.enqueue_null(&mut vars[c0.vi()], c0.lbool(), 0)
             && asgs.propagate(cdb, state, vars) == NULL_CLAUSE
         {
@@ -500,14 +500,14 @@ fn strengthen(cdb: &mut ClauseDB, vars: &mut [Var], cid: ClauseId, p: Lit) -> bo
     if (*c).is(Flag::DeadClause) {
         return false;
     }
-    watcher[p.negate() as usize].remove_with(cid);
+    watcher[p.negate() as usize].detach_with(cid);
     let lits = &mut (*c).lits;
     if lits.len() == 2 {
         // remove it
         if lits[0] == p {
             lits.swap(0, 1);
         }
-        watcher[lits[0].negate() as usize].remove_with(cid);
+        watcher[lits[0].negate() as usize].detach_with(cid);
         return true;
     }
     if lits[0] == p || lits[1] == p {
@@ -518,7 +518,7 @@ fn strengthen(cdb: &mut ClauseDB, vars: &mut [Var], cid: ClauseId, p: Lit) -> bo
             lits.swap_remove(1);
             lits[1]
         };
-        watcher[q.negate() as usize].register(q, cid);
+        watcher[q.negate() as usize].attach(q, cid);
     } else {
         lits.delete_unstable(|&x| x == p);
     }
@@ -635,9 +635,9 @@ fn eliminate_var(
                                 && cdb.clause[*n].is(Flag::LearntClause)
                             {
                                 let rank = rank_p.min(cdb.clause[*n].rank);
-                                cdb.register(config, elim, vars, v, rank);
+                                cdb.add_clause(config, elim, vars, v, rank);
                             } else {
-                                cdb.register(config, elim, vars, v, 0);
+                                cdb.add_clause(config, elim, vars, v, 0);
                             }
                         }
                     }
@@ -645,10 +645,10 @@ fn eliminate_var(
             }
         }
         for cid in &*pos {
-            cdb.remove(*cid);
+            cdb.remove_clause(*cid);
         }
         for cid in &*neg {
-            cdb.remove(*cid);
+            cdb.remove_clause(*cid);
         }
         vars[vi].pos_occurs.clear();
         vars[vi].neg_occurs.clear();
