@@ -23,7 +23,6 @@ pub struct Eliminator {
 }
 
 const SUBSUMPTION_SIZE: usize = 30;
-const SUBSUMPITON_GROW_LIMIT: usize = 2;
 const BACKWORD_SUBSUMPTION_THRESHOLD: usize = 400_000;
 const ELIMINATE_LOOP_THRESHOLD: usize = 4_000_000;
 
@@ -594,7 +593,7 @@ fn eliminate_var(
             }
             return true;
         }
-        if check_var_elimination_condition(cdb, elim, &*pos, &*neg, vi) {
+        if check_var_elimination_condition(cdb, config, elim, &*pos, &*neg, vi) {
             return true;
         }
         // OK, eliminate the literal and build constraints on it.
@@ -660,6 +659,7 @@ fn eliminate_var(
 
 fn check_var_elimination_condition(
     cdb: &ClauseDB,
+    config: &Config,
     elim: &Eliminator,
     pos: &[ClauseId],
     neg: &[ClauseId],
@@ -672,7 +672,7 @@ fn check_var_elimination_condition(
             let (res, clause_size) = check_to_merge(cdb, *c_pos, *c_neg, v);
             if res {
                 cnt += 1;
-                if clslen + SUBSUMPITON_GROW_LIMIT < cnt
+                if clslen + config.subsumption_grow_limit < cnt
                     || (elim.clause_lim != 0 && elim.clause_lim < clause_size)
                 {
                     return true;

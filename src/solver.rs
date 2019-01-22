@@ -382,9 +382,9 @@ fn search(
             // DYNAMIC FORCING RESTART
             if state.force_restart(config, &mut conflict_c) {
                 asgs.cancel_until(vars, config.root_level);
-                // if elim.in_use && 0 < elim.var_queue_len() {
-                //     cdb.simplify(asgs, config, elim, state, vars);
-                // }
+            // if elim.in_use && 0 < elim.var_queue_len() {
+            //     cdb.simplify(asgs, config, elim, state, vars);
+            // }
             } else if asgs.level() == 0 {
                 cdb.simplify(asgs, config, elim, state, vars);
                 asgs.rebuild_order(&vars);

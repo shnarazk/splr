@@ -290,7 +290,7 @@ impl ClauseDBIF for ClauseDB {
                             } else {
                                 v.neg_occurs.delete_unstable(|&cj| ci == cj);
                                 if v.neg_occurs.is_empty() {
-                                        asgs.enqueue_null(v, LTRUE, 0);
+                                    asgs.enqueue_null(v, LTRUE, 0);
                                 }
                             }
                             elim.enqueue_var(v);
@@ -516,7 +516,8 @@ impl ClauseDBIF for ClauseDB {
             }
             self.garbage_collect(asgs, vars, elim);
             if na == asgs.len()
-                && (!elim.in_use || (0 == elim.clause_queue_len() && 0 == elim.var_queue_len())) {
+                && (!elim.in_use || (0 == elim.clause_queue_len() && 0 == elim.var_queue_len()))
+            {
                 break;
             }
         }

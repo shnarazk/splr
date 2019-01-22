@@ -66,8 +66,9 @@ pub struct Config {
     pub luby_restart_inc: f64,
     pub luby_current_restarts: usize,
     pub luby_restart_factor: f64,
-    /// MISC
     pub use_sve: bool,
+    pub subsumption_grow_limit: usize,
+    /// MISC
     pub progress_log: bool,
 }
 
@@ -102,6 +103,7 @@ impl Default for Config {
             luby_restart_factor: 100.0,
             ema_coeffs: (2 ^ 5, 2 ^ 15),
             use_sve: true,
+            subsumption_grow_limit: 2,
             progress_log: false,
         }
     }
@@ -160,6 +162,11 @@ impl Config {
         }
         if self.strategy == SearchStrategy::Initial {
             self.strategy = SearchStrategy::Generic;
+            if state.stats[Stat::BlockRestart as usize] * 100 < state.stats[Stat::Restart as usize]
+            {
+                self.restart_blk = 1.08;
+            }
+            self.subsumption_grow_limit = 0;
             return;
         }
         state.ema_asg.reset();
