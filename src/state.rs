@@ -211,3 +211,161 @@ impl fmt::Display for State {
         write!(f, "{:36}|time:{:>19}", self.target, tm)
     }
 }
+
+enum LogUsizeId {
+    Propagate = 0,   //  0: propagate: usize,
+    Decision,        //  1: decision: usize,
+    Conflict,        //  2: conflict: usize,
+    Remain,          //  3: remain: usize,
+    Fixed,           //  4: fixed: usize,
+    Eliminated,      //  5: elim: usize,
+    Removable,       //  6: removable: usize,
+    LBD2,            //  7: lbd2: usize,
+    Binclause,       //  8: binclause: usize,
+    Permanent,       //  9: permanent: usize,
+    RestartBlock,    // 10: restart_block: usize,
+    Restart,         // 11: restart_count: usize,
+    Reduction,       // 12: reduction: usize,
+    Simplification,  // 13: simplification: usize,
+    ElimClauseQueue, // 14: elim_clause_queue: usize,
+    ElimVarQueue,    // 15: elim_var_queue: usize,
+}
+
+enum LogF64Id {
+    Progress = 0, //  0: progress: f64,
+    EmaAsg,       //  1: ema_asg: f64,
+    EmaLBD,       //  2: ema_lbd: f64,
+    AveLBD,       //  3: ave_lbd: f64,
+    BLevel,       //  4: backjump_level: f64,
+    CLevel,       //  5: conflict_level: f64,
+}
+
+struct ProgressRecord {
+    vali: [usize; 16],
+    valf: [f64; 6],
+    //  0: propagate: usize,
+    //  1: decision: usize,
+    //  2: conflict: usize,
+    //  3: remain: usize,
+    //  4: fixed: usize,
+    //  5: elim: usize,
+    //  0: progress: f64,
+    //  6: removable: usize,
+    //  7: lbd2: usize,
+    //  8: binclause: usize,
+    //  9: permanent: usize,
+    // 10: restart_block: usize,
+    // 11: restart_count: usize,
+    //  1: ema_asg: f64,
+    //  2: ema_lbd: f64,
+    //  3: ave_lbd: f64,
+    //  4: backjump_level: f64,
+    //  5: conflict_level: f64,
+    // 12: reduction: usize,
+    // 13: simplification: usize,
+    // 14: elim_clause_queue: usize,
+    // 15: elim_var_queue: usize,
+}
+
+impl ProgressRecord {
+    i2s(&mut self, f: LogUsizeId, x: usize) -> str {
+        if x < self.vali[f] {
+            self.vali[f] = x;
+            format!("xxxx{:>9}", self.f)
+        } else {
+            self.vali[f] = x;
+            format!("{:>9}", self.f)
+        }
+    }
+    f2s(&mut self, f: LogF64Id, x: f64) -> str {
+        if x < self.valf[f] {
+            self.valf[f] = x;
+            format!("xxxx{:>9.4}", x)
+        } else {
+            self.valf[f] = x;
+            format!("{:>9.4}", x)
+        }
+    }
+}
+
+trait Log {
+    fn pro_header(&self) -> str;
+    fn pro(
+        &mut self,
+        cdb: &ClauseDB,
+        config: &mut Config,
+        elim: &Eliminator,
+        vars: &[Var],
+        mes: Option<&str>,
+    ) -> str;
+}
+
+impl Log for ProgressRecord { 
+    fn pro_header(&self) {
+        println!("{:?}", self);
+        println!();
+        println!();
+        println!();
+        println!();
+        println!();
+        println!();
+    }
+    fn pro(
+        &mut self,
+        cdb: &ClauseDB,
+        config: &mut Config,
+        elim: &Eliminator,
+        vars: &[Var],
+        mes: Option<&str>,
+    ) {
+        self.progress_cnt += 1;
+        print!("\x1B[7A");
+        let msg = match mes {
+            None => config.strategy.to_str(),
+            Some(x) => x,
+        };
+        let count = self.stats[Stat::Conflict as usize];
+        let ave = self.stats[Stat::SumLBD as usize] as f64 / count as f64;
+        println!("{}, Str:{:>8}", self, msg);
+        println!(
+            "#propagate:{:>14}, #decision:{:>13}, #conflict: {:>12} ",
+            self.stats[Stat::Propagation as usize],
+            self.stats[Stat::Decision as usize],
+            self.stats[Stat::Conflict as usize],
+        );
+        println!(
+            "  Assignment|#rem:{:>9}, #fix:{:>9}, #elm:{:>9}, prg%:{:>9.4} ",
+            nv - sum,
+            fixed,
+            self.num_eliminated_vars,
+            (sum as f32) / (nv as f32) * 100.0,
+        );
+        println!(
+            " Clause Kind|Remv:{:>9}, LBD2:{:>9}, Binc:{:>9}, Perm:{:>9} ",
+            cdb.num_learnt,
+            self.stats[Stat::NumLBD2 as usize],
+            self.stats[Stat::NumBinLearnt as usize],
+            cdb.num_active - cdb.num_learnt,
+        );
+        println!(
+            "     Restart|#BLK:{:>9}, #RST:{:>9}, eASG:{:>9.4}, eLBD:{:>9.4} ",
+            self.stats[Stat::BlockRestart as usize],
+            self.stats[Stat::Restart as usize],
+            self.ema_asg.get() / nv as f64,
+            self.ema_lbd.get() / ave,
+        );
+        println!(
+            "   Conflicts|aLBD:{:>9.2}, bjmp:{:>9.2}, cnfl:{:>9.2} |#cls:{:>9} ",
+            self.ema_lbd.get(),
+            self.b_lvl.get(),
+            self.c_lvl.get(),
+            elim.clause_queue_len(),
+        );
+        println!(
+            "   Clause DB|#rdc:{:>9}, #smp:{:>9},      Eliminator|#var:{:>9} ",
+            self.stats[Stat::Reduction as usize],
+            self.stats[Stat::Simplification as usize],
+            elim.var_queue_len(),
+        );
+    }
+}
