@@ -104,7 +104,7 @@ impl SatSolverIF for Solver {
                 elim.stop(cdb, vars, false);
                 state.progress(cdb, config, elim, vars, Some("loaded"));
             }
-            elim.in_use = cdb.clause.len() < 800_000 && 1000 < config.num_vars;
+            elim.in_use = cdb.count(true) < 1_000_000 && 1000 < config.num_vars;
             if !elim.in_use {
                 elim.stop(cdb, vars, true);
             }
@@ -382,6 +382,9 @@ fn search(
             // DYNAMIC FORCING RESTART
             if state.force_restart(config, &mut conflict_c) {
                 asgs.cancel_until(vars, config.root_level);
+                // if elim.in_use && 0 < elim.var_queue_len() {
+                //     cdb.simplify(asgs, config, elim, state, vars);
+                // }
             } else if asgs.level() == 0 {
                 cdb.simplify(asgs, config, elim, state, vars);
                 asgs.rebuild_order(&vars);
@@ -460,7 +463,7 @@ fn handle_conflict_path(
     }
     if tn_confl == 100_000 {
         asgs.cancel_until(vars, 0);
-        config.adapt_strategy(cdb, elim, state, vars);
+        config.adapt_strategy(asgs, cdb, elim, state, vars);
     }
     config.var_inc /= config.var_decay;
     config.cla_inc /= config.cla_decay;
@@ -470,7 +473,7 @@ fn handle_conflict_path(
         && 0 < cdb.num_learnt
     {
         state.cur_restart = ((tn_confl as f64) / (state.next_reduction as f64)) as usize + 1;
-        cdb.reduce(config, elim, state, vars);
+        cdb.reduce(asgs, config, elim, state, vars);
     }
 }
 

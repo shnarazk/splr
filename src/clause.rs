@@ -244,7 +244,7 @@ impl ClauseDBIF for ClauseDB {
             num_learnt: 0,
         }
     }
-    fn garbage_collect(&mut self, vars: &mut [Var], elim: &mut Eliminator) {
+    fn garbage_collect(&mut self, asgs: &mut AssignStack, vars: &mut [Var], elim: &mut Eliminator) {
         let ClauseDB {
             ref mut watcher,
             ref mut clause,
@@ -281,11 +281,17 @@ impl ClauseDBIF for ClauseDB {
                     for l in &c.lits {
                         let vi = l.vi();
                         let v = &mut vars[vi];
-                        if !v.is(Flag::EliminatedVar) {
+                        if !v.is(Flag::EliminatedVar) && v.assign == BOTTOM {
                             if l.positive() {
                                 v.pos_occurs.delete_unstable(|&cj| ci == cj);
+                                if v.pos_occurs.is_empty() {
+                                    asgs.enqueue_null(v, LFALSE, 0);
+                                }
                             } else {
                                 v.neg_occurs.delete_unstable(|&cj| ci == cj);
+                                if v.neg_occurs.is_empty() {
+                                        asgs.enqueue_null(v, LTRUE, 0);
+                                }
                             }
                             elim.enqueue_var(v);
                         }
@@ -427,6 +433,7 @@ impl ClauseDBIF for ClauseDB {
     }
     fn reduce(
         &mut self,
+        asgs: &mut AssignStack,
         config: &Config,
         elim: &mut Eliminator,
         state: &mut State,
@@ -470,7 +477,7 @@ impl ClauseDBIF for ClauseDB {
             }
         }
         state.stats[Stat::Reduction as usize] += 1;
-        self.garbage_collect(vars, elim);
+        self.garbage_collect(asgs, vars, elim);
     }
     fn simplify(
         &mut self,
@@ -486,26 +493,33 @@ impl ClauseDBIF for ClauseDB {
         for v in &mut vars[1..] {
             v.reason = NULL_CLAUSE;
         }
-        if elim.in_use {
-            elim.eliminate(asgs, self, config, state, vars);
-            if !state.ok {
-                return false;
+        loop {
+            let na = asgs.len();
+            if elim.in_use {
+                elim.eliminate(asgs, self, config, state, vars);
+                if !state.ok {
+                    return false;
+                }
             }
-        }
-        for c in &mut self.clause[1..] {
-            if !c.is(Flag::DeadClause) && vars.satisfies(&c.lits) {
-                c.kill(&mut self.touched);
-                if elim.in_use {
-                    for l in &c.lits {
-                        let v = &mut vars[l.vi()];
-                        if !v.is(Flag::EliminatedVar) {
-                            elim.enqueue_var(v);
+            for c in &mut self.clause[1..] {
+                if !c.is(Flag::DeadClause) && vars.satisfies(&c.lits) {
+                    c.kill(&mut self.touched);
+                    if elim.in_use {
+                        for l in &c.lits {
+                            let v = &mut vars[l.vi()];
+                            if !v.is(Flag::EliminatedVar) {
+                                elim.enqueue_var(v);
+                            }
                         }
                     }
                 }
             }
+            self.garbage_collect(asgs, vars, elim);
+            if na == asgs.len()
+                && (!elim.in_use || (0 == elim.clause_queue_len() && 0 == elim.var_queue_len())) {
+                break;
+            }
         }
-        self.garbage_collect(vars, elim);
         state.stats[Stat::Simplification as usize] += 1;
         true
     }

@@ -16,7 +16,7 @@ pub struct Var {
     pub reason: ClauseId,
     pub level: usize,
     pub activity: f64,
-    pub check_sve_at: usize,
+    pub sve_activity: usize,
     pub pos_occurs: Vec<ClauseId>,
     pub neg_occurs: Vec<ClauseId>,
     flags: u16,
@@ -35,7 +35,7 @@ impl VarIF for Var {
             reason: NULL_CLAUSE,
             level: 0,
             activity: 0.0,
-            check_sve_at: 0,
+            sve_activity: 0,
             pos_occurs: Vec::new(),
             neg_occurs: Vec::new(),
             flags: 0,
@@ -112,6 +112,7 @@ impl VarDBIF for [Var] {
                 } else {
                     v.neg_occurs.push(cid);
                 }
+                elim.enqueue_var(v);
             }
         }
         if enqueue {

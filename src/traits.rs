@@ -46,6 +46,7 @@ pub trait ClauseDBIF {
     fn detach(&mut self, cid: ClauseId);
     fn reduce(
         &mut self,
+        asgs: &mut AssignStack,
         config: &Config,
         elim: &mut Eliminator,
         state: &mut State,
@@ -59,7 +60,7 @@ pub trait ClauseDBIF {
         state: &mut State,
         vars: &mut [Var],
     ) -> bool;
-    fn garbage_collect(&mut self, vars: &mut [Var], elim: &mut Eliminator);
+    fn garbage_collect(&mut self, asgs: &mut AssignStack, vars: &mut [Var], elim: &mut Eliminator);
     fn new_clause(&mut self, v: &[Lit], rank: usize, learnt: bool) -> ClauseId;
     fn reset_lbd(&mut self, vars: &[Var], temp: &mut [usize]);
     fn bump_activity(&mut self, inc: &mut f64, cid: ClauseId);

@@ -20,14 +20,12 @@ pub struct Eliminator {
     /// 0 means no limit.
     clause_lim: usize,
     subsumption_lim: usize,
-    clause_queue_threshold: usize,
-    var_queue_threshold: usize,
 }
 
 const SUBSUMPTION_SIZE: usize = 30;
-const SUBSUMPITON_GROW_LIMIT: usize = 0;
-const BACKWORD_SUBSUMPTION_THRESHOLD: usize = 10_000;
-const ELIMINATE_LOOP_THRESHOLD: usize = 2_500_000;
+const SUBSUMPITON_GROW_LIMIT: usize = 2;
+const BACKWORD_SUBSUMPTION_THRESHOLD: usize = 400_000;
+const ELIMINATE_LOOP_THRESHOLD: usize = 4_000_000;
 
 impl Default for Eliminator {
     fn default() -> Eliminator {
@@ -40,8 +38,6 @@ impl Default for Eliminator {
             elim_clauses: Vec::new(),
             clause_lim: 20,
             subsumption_lim: 0,
-            clause_queue_threshold: 0,
-            var_queue_threshold: 0,
         }
     }
 }
@@ -68,12 +64,8 @@ impl EliminatorIF for Eliminator {
         if !self.in_use || !self.active || c.is(Flag::Enqueued) {
             return;
         }
-        let len = c.lits.len();
-        if self.clause_queue.is_empty() || len <= self.clause_queue_threshold {
-            self.clause_queue.push(cid);
-            c.flag_on(Flag::Enqueued);
-            self.clause_queue_threshold = len;
-        }
+        self.clause_queue.push(cid);
+        c.flag_on(Flag::Enqueued);
     }
     fn clear_clause_queue(&mut self, cdb: &mut ClauseDB) {
         for cid in &self.clause_queue {
@@ -82,14 +74,15 @@ impl EliminatorIF for Eliminator {
         self.clause_queue.clear();
     }
     fn enqueue_var(&mut self, v: &mut Var) {
-        if !self.in_use || !self.active || v.is(Flag::Enqueued) {
+        if !self.in_use || !self.active {
             return;
         }
-        if self.var_queue.is_empty() || v.check_sve_at <= self.var_queue_threshold {
-            self.var_queue.push(v.index);
-            v.flag_on(Flag::Enqueued);
-            self.var_queue_threshold = v.check_sve_at;
+        v.sve_activity += 1;
+        if v.is(Flag::Enqueued) {
+            return;
         }
+        self.var_queue.push(v.index);
+        v.flag_on(Flag::Enqueued);
     }
     fn clear_var_queue(&mut self, vars: &mut [Var]) {
         for v in &self.var_queue {
@@ -116,6 +109,11 @@ impl EliminatorIF for Eliminator {
             return;
         }
         let mut cnt = 0;
+        self.var_queue.sort_by(|&a, &b| {
+            let va = vars[a].sve_activity;
+            let vb = vars[b].sve_activity;
+            vb.cmp(&va)
+        });
         'perform: while self.bwdsub_assigns < asgs.len()
             || !self.var_queue.is_empty()
             || !self.clause_queue.is_empty()
@@ -136,7 +134,7 @@ impl EliminatorIF for Eliminator {
                 if v.is(Flag::EliminatedVar) || v.assign != BOTTOM {
                     continue;
                 }
-                v.check_sve_at += 1;
+                v.sve_activity = 0;
                 if !eliminate_var(asgs, config, cdb, self, state, vars, vi) {
                     state.ok = false;
                     return;
@@ -229,7 +227,7 @@ impl Eliminator {
                     {
                         continue;
                     }
-                    let mut tmp = 6;
+                    let mut tmp = cdb.count(true);
                     for l in &(*c).lits {
                         let v = &vars[l.vi()];
                         let nsum = v.pos_occurs.len().min(v.neg_occurs.len());
