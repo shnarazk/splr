@@ -372,19 +372,26 @@ impl State {
         let nv = vars.len() - 1;
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
+        let nlearnts = cdb
+            .clause
+            .iter()
+            .filter(|c| c.is(Flag::LearntClause) && !c.is(Flag::DeadClause))
+            .count();
+        let ncnfl = self.stats[Stat::Conflict as usize];
+        let nrestart = self.stats[Stat::Restart as usize];
         println!(
             "c | {:>8}  {:>8} {:>8} | {:>7} {:>8} {:>8} |  {:>4}  {:>8} {:>7} {:>8} | {:>6.3} % |",
-            self.stats[Stat::Restart as usize],
-            self.stats[Stat::BlockRestart as usize],
-            0,
-            nv - fixed - self.num_eliminated_vars,
-            cdb.count(true),
-            0,
-            self.stats[Stat::Reduction as usize],
-            self.stats[Stat::Learnt as usize],
-            self.stats[Stat::NumLBD2 as usize],
-            self.stats[Stat::Conflict as usize],
-            (sum as f32) / (nv as f32) * 100.0,
+            nrestart,                                // restart
+            self.stats[Stat::BlockRestart as usize], // blocked
+            ncnfl / nrestart,                        // average cfc (Conflict / Restart)
+            nv - fixed - self.num_eliminated_vars,   // alive vars
+            cdb.count(true) - nlearnts,              // given clauses
+            0,                                       // alive literals
+            self.stats[Stat::Reduction as usize],    // clause reduction
+            nlearnts,                                // alive learnts
+            self.stats[Stat::NumLBD2 as usize],      // learnts with LBD = 2
+            ncnfl - nlearnts,                        // removed learnts
+            (sum as f32) / (nv as f32) * 100.0,      // progress
         );
     }
     #[allow(dead_code)]
