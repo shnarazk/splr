@@ -133,7 +133,7 @@ impl StateIF for State {
             self.dump_header();
             return;
         }
-        println!("{:?}", "self");
+        println!("{}", self);
         println!();
         println!();
         println!();
