@@ -78,7 +78,7 @@ impl SatSolverIF for Solver {
         // TODO: deal with assumptions
         // s.root_level = 0;
         state.num_solved_vars = asgs.len();
-        state.progress(cdb, config, elim, vars, Some(""));
+        state.progress_header(config);
         if elim.in_use {
             for v in &mut vars[1..] {
                 debug_assert!(!v.is(Flag::EliminatedVar));

@@ -48,8 +48,49 @@ pub struct State {
     pub an_seen: Vec<bool>,
     pub lbd_temp: Vec<usize>,
     pub start: chrono::DateTime<chrono::Utc>,
+    dumper: ProgressRecord,
     pub progress_cnt: usize,
     pub target: String,
+}
+
+macro_rules! i {
+    ($format: expr, $dumper: expr, $key: expr, $val: expr) => {
+        match $val {
+            v => {
+                let ptr = &mut $dumper.vali[$key as usize];
+                if v < *ptr {
+                    *ptr = v;
+                    format!("\x1B[031m{}\x1B[000m", format!($format, *ptr))
+                } else if *ptr < v {
+                    *ptr = v;
+                    format!("\x1B[001m{}\x1B[000m", format!($format, *ptr))
+                } else {
+                    *ptr = v;
+                    format!($format, *ptr)
+                }
+            }
+        }
+    };
+}
+
+macro_rules! f {
+    ($format: expr, $dumper: expr, $key: expr, $val: expr) => {
+        match $val {
+            v => {
+                let ptr = &mut $dumper.valf[$key as usize];
+                if v < *ptr {
+                    *ptr = v;
+                    format!("\x1B[031m{}\x1B[000m", format!($format, *ptr))
+                } else if *ptr < v {
+                    *ptr = v;
+                    format!("\x1B[001m{}\x1B[000m", format!($format, *ptr))
+                } else {
+                    *ptr = v;
+                    format!($format, *ptr)
+                }
+            }
+        }
+    };
 }
 
 impl StateIF for State {
@@ -74,6 +115,7 @@ impl StateIF for State {
             lbd_temp: vec![0; nv + 1],
             start: Utc::now(),
             progress_cnt: 0,
+            dumper: ProgressRecord::default(),
             target: if fname == "" {
                 "--".to_string()
             } else {
@@ -86,7 +128,310 @@ impl StateIF for State {
             },
         }
     }
+    fn progress_header(&self, config: &Config) {
+        if config.progress_log {
+            self.dump_header();
+            return;
+        }
+        println!("{:?}", "self");
+        println!();
+        println!();
+        println!();
+        println!();
+        println!();
+        println!();
+    }
+    fn progress(
+        &mut self,
+        cdb: &ClauseDB,
+        config: &mut Config,
+        elim: &Eliminator,
+        vars: &[Var],
+        mes: Option<&str>,
+    ) {
+        if config.progress_log {
+            self.dump(cdb, config, elim, vars, mes);
+            return;
+        }
+        let nv = vars.len() - 1;
+        let fixed = self.num_solved_vars;
+        let sum = fixed + self.num_eliminated_vars;
+        self.progress_cnt += 1;
+        print!("\x1B[7A");
+        let msg = match mes {
+            None => config.strategy.to_str(),
+            Some(x) => x,
+        };
+        let count = self.stats[Stat::Conflict as usize];
+        let ave = self.stats[Stat::SumLBD as usize] as f64 / count as f64;
+        println!("{}, Str:{:>8}", self, msg);
+        println!(
+            "#propagate:{}, #decision:{}, #conflict: {} ",
+            i!(
+                "{:>14}",
+                self.dumper,
+                LogUsizeId::Propagate,
+                self.stats[Stat::Propagation as usize]
+            ),
+            i!(
+                "{:>13}",
+                self.dumper,
+                LogUsizeId::Decision,
+                self.stats[Stat::Decision as usize]
+            ),
+            i!(
+                "{:>12}",
+                self.dumper,
+                LogUsizeId::Conflict,
+                self.stats[Stat::Conflict as usize]
+            ),
+        );
+        println!(
+            "  Assignment|#rem:{}, #fix:{}, #elm:{}, prg%:{} ",
+            i!("{:>9}", self.dumper, LogUsizeId::Remain, nv - sum),
+            i!("{:>9}", self.dumper, LogUsizeId::Fixed, fixed),
+            i!(
+                "{:>9}",
+                self.dumper,
+                LogUsizeId::Eliminated,
+                self.num_eliminated_vars
+            ),
+            f!(
+                "{:>9.4}",
+                self.dumper,
+                LogF64Id::Progress,
+                (sum as f64) / (nv as f64) * 100.0
+            ),
+        );
+        println!(
+            " Clause Kind|Remv:{}, LBD2:{}, Binc:{}, Perm:{} ",
+            i!("{:>9}", self.dumper, LogUsizeId::Removable, cdb.num_learnt),
+            i!(
+                "{:>9}",
+                self.dumper,
+                LogUsizeId::LBD2,
+                self.stats[Stat::NumLBD2 as usize]
+            ),
+            i!(
+                "{:>9}",
+                self.dumper,
+                LogUsizeId::Binclause,
+                self.stats[Stat::NumBinLearnt as usize]
+            ),
+            i!(
+                "{:>9}",
+                self.dumper,
+                LogUsizeId::Permanent,
+                cdb.num_active - cdb.num_learnt
+            ),
+        );
+        println!(
+            "     Restart|#BLK:{}, #RST:{}, eASG:{}, eLBD:{} ",
+            i!(
+                "{:>9}",
+                self.dumper,
+                LogUsizeId::RestartBlock,
+                self.stats[Stat::BlockRestart as usize]
+            ),
+            i!(
+                "{:>9}",
+                self.dumper,
+                LogUsizeId::Restart,
+                self.stats[Stat::Restart as usize]
+            ),
+            f!(
+                "{:>9.4}",
+                self.dumper,
+                LogF64Id::EmaAsg,
+                self.ema_asg.get() / nv as f64
+            ),
+            f!(
+                "{:>9.4}",
+                self.dumper,
+                LogF64Id::EmaLBD,
+                self.ema_lbd.get() / ave
+            ),
+        );
+        println!(
+            "   Conflicts|aLBD:{}, bjmp:{}, cnfl:{} |#cls:{} ",
+            f!("{:>9.2}", self.dumper, LogF64Id::AveLBD, self.ema_lbd.get()),
+            f!("{:>9.2}", self.dumper, LogF64Id::BLevel, self.b_lvl.get()),
+            f!("{:>9.2}", self.dumper, LogF64Id::CLevel, self.c_lvl.get()),
+            i!(
+                "{:>9}",
+                self.dumper,
+                LogUsizeId::ElimClauseQueue,
+                elim.clause_queue_len()
+            ),
+        );
+        println!(
+            "   Clause DB|#rdc:{}, #smp:{},      Eliminator|#var:{} ",
+            i!(
+                "{:>9}",
+                self.dumper,
+                LogUsizeId::Reduction,
+                self.stats[Stat::Reduction as usize]
+            ),
+            i!(
+                "{:>9}",
+                self.dumper,
+                LogUsizeId::Simplification,
+                self.stats[Stat::Simplification as usize]
+            ),
+            i!(
+                "{:>9}",
+                self.dumper,
+                LogUsizeId::ElimVarQueue,
+                elim.var_queue_len()
+            ),
+        );
+    }
+}
 
+impl fmt::Display for State {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut tm = format!("{}", Utc::now() - self.start);
+        tm.drain(..2);
+        tm.pop();
+        write!(f, "{:36}|time:{:>19}", self.target, tm)
+    }
+}
+
+enum LogUsizeId {
+    Propagate = 0,   //  0: propagate: usize,
+    Decision,        //  1: decision: usize,
+    Conflict,        //  2: conflict: usize,
+    Remain,          //  3: remain: usize,
+    Fixed,           //  4: fixed: usize,
+    Eliminated,      //  5: elim: usize,
+    Removable,       //  6: removable: usize,
+    LBD2,            //  7: lbd2: usize,
+    Binclause,       //  8: binclause: usize,
+    Permanent,       //  9: permanent: usize,
+    RestartBlock,    // 10: restart_block: usize,
+    Restart,         // 11: restart_count: usize,
+    Reduction,       // 12: reduction: usize,
+    Simplification,  // 13: simplification: usize,
+    ElimClauseQueue, // 14: elim_clause_queue: usize,
+    ElimVarQueue,    // 15: elim_var_queue: usize,
+}
+
+enum LogF64Id {
+    Progress = 0, //  0: progress: f64,
+    EmaAsg,       //  1: ema_asg: f64,
+    EmaLBD,       //  2: ema_lbd: f64,
+    AveLBD,       //  3: ave_lbd: f64,
+    BLevel,       //  4: backjump_level: f64,
+    CLevel,       //  5: conflict_level: f64,
+}
+
+struct ProgressRecord {
+    vali: [usize; 16],
+    valf: [f64; 6],
+}
+
+impl Default for ProgressRecord {
+    fn default() -> ProgressRecord {
+        ProgressRecord {
+            vali: [0; 16],
+            valf: [0.0; 6],
+        }
+    }
+}
+
+impl State {
+    #[allow(dead_code)]
+    fn dump_header_details(&self) {
+        println!(
+            "   #mode,         Variable Assignment      ,,  \
+             Clause Database ent  ,,  Restart Strategy       ,, \
+             Misc Progress Parameters,,   Eliminator"
+        );
+        println!(
+            "   #init,    #remain,#solved,  #elim,total%,,#learnt,  \
+             #perm,#binary,,block,force, #asgn,  lbd/,,    lbd, \
+             back lv, conf lv,,clause,   var"
+        );
+    }
+    fn dump_header(&self) {
+        println!(
+            "c |          RESTARTS           |          ORIGINAL         |              LEARNT              | Progress |\n\
+             c |       NB   Blocked  Avg Cfc |    Vars  Clauses Literals |   Red   Learnts    LBD2  Removed |          |\n\
+             c ========================================================================================================="
+        );
+    }
+    fn dump(
+        &mut self,
+        cdb: &ClauseDB,
+        _config: &mut Config,
+        _elim: &Eliminator,
+        vars: &[Var],
+        _mes: Option<&str>,
+    ) {
+        self.progress_cnt += 1;
+        let nv = vars.len() - 1;
+        let fixed = self.num_solved_vars;
+        let sum = fixed + self.num_eliminated_vars;
+        println!(
+            "c | {:>8}  {:>8} {:>8} | {:>7} {:>8} {:>8} |  {:>4}  {:>8} {:>7} {:>8} | {:>6.3} % |",
+            self.stats[Stat::Restart as usize],
+            self.stats[Stat::BlockRestart as usize],
+            0,
+            nv - fixed - self.num_eliminated_vars,
+            cdb.count(true),
+            0,
+            self.stats[Stat::Reduction as usize],
+            self.stats[Stat::Learnt as usize],
+            self.stats[Stat::NumLBD2 as usize],
+            self.stats[Stat::Conflict as usize],
+            (sum as f32) / (nv as f32) * 100.0,
+        );
+    }
+    #[allow(dead_code)]
+    fn dump_details(
+        &mut self,
+        cdb: &ClauseDB,
+        config: &mut Config,
+        elim: &Eliminator,
+        vars: &[Var],
+        mes: Option<&str>,
+    ) {
+        self.progress_cnt += 1;
+        let msg = match mes {
+            None => config.strategy.to_str(),
+            Some(x) => x,
+        };
+        let nv = vars.len() - 1;
+        let fixed = self.num_solved_vars;
+        let sum = fixed + self.num_eliminated_vars;
+        println!(
+            "{:>3}#{:>8},{:>7},{:>7},{:>7},{:>6.3},,{:>7},{:>7},\
+             {:>7},,{:>5},{:>5},{:>6.2},{:>6.2},,{:>7.2},{:>8.2},{:>8.2},,\
+             {:>6},{:>6}",
+            self.progress_cnt,
+            msg,
+            nv - sum,
+            fixed,
+            self.num_eliminated_vars,
+            (sum as f32) / (nv as f32) * 100.0,
+            cdb.num_learnt,
+            cdb.num_active,
+            0,
+            self.stats[Stat::BlockRestart as usize],
+            self.stats[Stat::Restart as usize],
+            self.ema_asg.get(),
+            self.ema_lbd.get(),
+            self.ema_lbd.get(),
+            self.b_lvl.get(),
+            self.c_lvl.get(),
+            elim.clause_queue_len(),
+            elim.var_queue_len(),
+        );
+    }
+}
+
+/*
+{
     fn progress(
         &mut self,
         cdb: &ClauseDB,
@@ -202,170 +547,4 @@ impl StateIF for State {
         }
     }
 }
-
-impl fmt::Display for State {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut tm = format!("{}", Utc::now() - self.start);
-        tm.drain(..2);
-        tm.pop();
-        write!(f, "{:36}|time:{:>19}", self.target, tm)
-    }
-}
-
-enum LogUsizeId {
-    Propagate = 0,   //  0: propagate: usize,
-    Decision,        //  1: decision: usize,
-    Conflict,        //  2: conflict: usize,
-    Remain,          //  3: remain: usize,
-    Fixed,           //  4: fixed: usize,
-    Eliminated,      //  5: elim: usize,
-    Removable,       //  6: removable: usize,
-    LBD2,            //  7: lbd2: usize,
-    Binclause,       //  8: binclause: usize,
-    Permanent,       //  9: permanent: usize,
-    RestartBlock,    // 10: restart_block: usize,
-    Restart,         // 11: restart_count: usize,
-    Reduction,       // 12: reduction: usize,
-    Simplification,  // 13: simplification: usize,
-    ElimClauseQueue, // 14: elim_clause_queue: usize,
-    ElimVarQueue,    // 15: elim_var_queue: usize,
-}
-
-enum LogF64Id {
-    Progress = 0, //  0: progress: f64,
-    EmaAsg,       //  1: ema_asg: f64,
-    EmaLBD,       //  2: ema_lbd: f64,
-    AveLBD,       //  3: ave_lbd: f64,
-    BLevel,       //  4: backjump_level: f64,
-    CLevel,       //  5: conflict_level: f64,
-}
-
-struct ProgressRecord {
-    vali: [usize; 16],
-    valf: [f64; 6],
-    //  0: propagate: usize,
-    //  1: decision: usize,
-    //  2: conflict: usize,
-    //  3: remain: usize,
-    //  4: fixed: usize,
-    //  5: elim: usize,
-    //  0: progress: f64,
-    //  6: removable: usize,
-    //  7: lbd2: usize,
-    //  8: binclause: usize,
-    //  9: permanent: usize,
-    // 10: restart_block: usize,
-    // 11: restart_count: usize,
-    //  1: ema_asg: f64,
-    //  2: ema_lbd: f64,
-    //  3: ave_lbd: f64,
-    //  4: backjump_level: f64,
-    //  5: conflict_level: f64,
-    // 12: reduction: usize,
-    // 13: simplification: usize,
-    // 14: elim_clause_queue: usize,
-    // 15: elim_var_queue: usize,
-}
-
-impl ProgressRecord {
-    i2s(&mut self, f: LogUsizeId, x: usize) -> str {
-        if x < self.vali[f] {
-            self.vali[f] = x;
-            format!("xxxx{:>9}", self.f)
-        } else {
-            self.vali[f] = x;
-            format!("{:>9}", self.f)
-        }
-    }
-    f2s(&mut self, f: LogF64Id, x: f64) -> str {
-        if x < self.valf[f] {
-            self.valf[f] = x;
-            format!("xxxx{:>9.4}", x)
-        } else {
-            self.valf[f] = x;
-            format!("{:>9.4}", x)
-        }
-    }
-}
-
-trait Log {
-    fn pro_header(&self) -> str;
-    fn pro(
-        &mut self,
-        cdb: &ClauseDB,
-        config: &mut Config,
-        elim: &Eliminator,
-        vars: &[Var],
-        mes: Option<&str>,
-    ) -> str;
-}
-
-impl Log for ProgressRecord { 
-    fn pro_header(&self) {
-        println!("{:?}", self);
-        println!();
-        println!();
-        println!();
-        println!();
-        println!();
-        println!();
-    }
-    fn pro(
-        &mut self,
-        cdb: &ClauseDB,
-        config: &mut Config,
-        elim: &Eliminator,
-        vars: &[Var],
-        mes: Option<&str>,
-    ) {
-        self.progress_cnt += 1;
-        print!("\x1B[7A");
-        let msg = match mes {
-            None => config.strategy.to_str(),
-            Some(x) => x,
-        };
-        let count = self.stats[Stat::Conflict as usize];
-        let ave = self.stats[Stat::SumLBD as usize] as f64 / count as f64;
-        println!("{}, Str:{:>8}", self, msg);
-        println!(
-            "#propagate:{:>14}, #decision:{:>13}, #conflict: {:>12} ",
-            self.stats[Stat::Propagation as usize],
-            self.stats[Stat::Decision as usize],
-            self.stats[Stat::Conflict as usize],
-        );
-        println!(
-            "  Assignment|#rem:{:>9}, #fix:{:>9}, #elm:{:>9}, prg%:{:>9.4} ",
-            nv - sum,
-            fixed,
-            self.num_eliminated_vars,
-            (sum as f32) / (nv as f32) * 100.0,
-        );
-        println!(
-            " Clause Kind|Remv:{:>9}, LBD2:{:>9}, Binc:{:>9}, Perm:{:>9} ",
-            cdb.num_learnt,
-            self.stats[Stat::NumLBD2 as usize],
-            self.stats[Stat::NumBinLearnt as usize],
-            cdb.num_active - cdb.num_learnt,
-        );
-        println!(
-            "     Restart|#BLK:{:>9}, #RST:{:>9}, eASG:{:>9.4}, eLBD:{:>9.4} ",
-            self.stats[Stat::BlockRestart as usize],
-            self.stats[Stat::Restart as usize],
-            self.ema_asg.get() / nv as f64,
-            self.ema_lbd.get() / ave,
-        );
-        println!(
-            "   Conflicts|aLBD:{:>9.2}, bjmp:{:>9.2}, cnfl:{:>9.2} |#cls:{:>9} ",
-            self.ema_lbd.get(),
-            self.b_lvl.get(),
-            self.c_lvl.get(),
-            elim.clause_queue_len(),
-        );
-        println!(
-            "   Clause DB|#rdc:{:>9}, #smp:{:>9},      Eliminator|#var:{:>9} ",
-            self.stats[Stat::Reduction as usize],
-            self.stats[Stat::Simplification as usize],
-            elim.var_queue_len(),
-        );
-    }
-}
+*/
