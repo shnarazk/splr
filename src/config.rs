@@ -38,6 +38,7 @@ pub struct Config {
     pub strategy: SearchStrategy,
     pub use_chan_seok: bool,
     pub co_lbd_bound: usize,
+    pub lbd_frozen_clause: usize,
     /// CLAUSE/VARIABLE ACTIVITY
     pub cla_decay: f64,
     pub cla_inc: f64,
@@ -81,6 +82,7 @@ impl Default for Config {
             strategy: SearchStrategy::Initial,
             use_chan_seok: false,
             co_lbd_bound: 5,
+            lbd_frozen_clause: 30,
             cla_decay: 0.999,
             cla_inc: 1.0,
             var_decay: 0.9,

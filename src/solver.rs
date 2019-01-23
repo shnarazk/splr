@@ -505,8 +505,7 @@ fn analyze(
                 if 2 < (*c).rank {
                     let nlevels = vars.compute_lbd(&(*c).lits, &mut state.lbd_temp);
                     if nlevels + 1 < (*c).rank {
-                        (*c).rank = nlevels;
-                        if nlevels <= 30 {
+                        if (*c).rank <= config.lbd_frozen_clause {
                             (*c).flag_on(Flag::JustUsedClause);
                         }
                         if config.use_chan_seok && nlevels < config.co_lbd_bound {
