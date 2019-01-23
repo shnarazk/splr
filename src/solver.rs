@@ -511,6 +511,7 @@ fn analyze(
                         }
                         if config.use_chan_seok && nlevels < config.co_lbd_bound {
                             (*c).flag_off(Flag::LearntClause);
+                            cdb.num_learnt -= 1;
                         } else {
                             (*c).rank = nlevels;
                         }
