@@ -383,7 +383,7 @@ impl State {
             "c | {:>8}  {:>8} {:>8} | {:>7} {:>8} {:>8} |  {:>4}  {:>8} {:>7} {:>8} | {:>6.3} % |",
             nrestart,                                // restart
             self.stats[Stat::BlockRestart as usize], // blocked
-            ncnfl / nrestart,                        // average cfc (Conflict / Restart)
+            ncnfl / nrestart.max(1),                 // average cfc (Conflict / Restart)
             nv - fixed - self.num_eliminated_vars,   // alive vars
             cdb.count(true) - nlearnts,              // given clauses
             0,                                       // alive literals
