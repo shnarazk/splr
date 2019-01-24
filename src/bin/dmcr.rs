@@ -29,7 +29,10 @@ fn main() {
     if args.assign == None {
         args.assign = Some(PathBuf::from(format!(
             ".ans_{}",
-            Path::new(&args.problem).file_name().unwrap().to_string_lossy()
+            Path::new(&args.problem)
+                .file_name()
+                .unwrap()
+                .to_string_lossy()
         )));
     }
     if let Some(f) = &args.assign {
