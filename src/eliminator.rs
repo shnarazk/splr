@@ -64,11 +64,11 @@ impl EliminatorIF for Eliminator {
             return;
         }
         self.clause_queue.push(cid);
-        c.flag_on(Flag::Enqueued);
+        c.turn_on(Flag::Enqueued);
     }
     fn clear_clause_queue(&mut self, cdb: &mut ClauseDB) {
         for cid in &self.clause_queue {
-            cdb.clause[*cid].flag_off(Flag::Enqueued);
+            cdb.clause[*cid].turn_off(Flag::Enqueued);
         }
         self.clause_queue.clear();
     }
@@ -81,11 +81,11 @@ impl EliminatorIF for Eliminator {
             return;
         }
         self.var_queue.push(v.index);
-        v.flag_on(Flag::Enqueued);
+        v.turn_on(Flag::Enqueued);
     }
     fn clear_var_queue(&mut self, vars: &mut [Var]) {
         for v in &self.var_queue {
-            vars[*v].flag_off(Flag::Enqueued);
+            vars[*v].turn_off(Flag::Enqueued);
         }
         self.var_queue.clear();
     }
@@ -125,7 +125,7 @@ impl EliminatorIF for Eliminator {
             }
             while let Some(vi) = self.var_queue.pop() {
                 let v = &mut vars[vi];
-                v.flag_off(Flag::Enqueued);
+                v.turn_off(Flag::Enqueued);
                 cnt += 1;
                 if ELIMINATE_LOOP_THRESHOLD <= cnt {
                     continue;
@@ -218,7 +218,7 @@ impl Eliminator {
                     lits = &unilits;
                 } else {
                     let c = &mut cdb.clause[cid] as *mut Clause;
-                    (*c).flag_off(Flag::Enqueued);
+                    (*c).turn_off(Flag::Enqueued);
                     lits = &(*c).lits;
                     if (*c).is(Flag::DeadClause)
                         || BACKWORD_SUBSUMPTION_THRESHOLD < cnt
@@ -597,7 +597,7 @@ fn eliminate_var(
             return true;
         }
         // OK, eliminate the literal and build constraints on it.
-        v.flag_on(Flag::EliminatedVar);
+        v.turn_on(Flag::EliminatedVar);
         let cid = v.reason;
         debug_assert_eq!(cid, NULL_CLAUSE);
         // println!("- eliminate var: {:>8} (+{:<4} -{:<4}); {:?}", v, (*pos).len(), (*neg).len(), v);

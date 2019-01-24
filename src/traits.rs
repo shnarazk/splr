@@ -108,8 +108,8 @@ pub trait EmaIF {
 
 pub trait FlagIF {
     fn is(&self, flag: Flag) -> bool;
-    fn flag_off(&mut self, flag: Flag);
-    fn flag_on(&mut self, flag: Flag);
+    fn turn_off(&mut self, flag: Flag);
+    fn turn_on(&mut self, flag: Flag);
 }
 
 pub trait LitIF {

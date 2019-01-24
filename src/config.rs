@@ -183,7 +183,7 @@ impl Config {
                     continue;
                 }
                 if c.rank <= self.co_lbd_bound {
-                    c.flag_off(Flag::LearntClause);
+                    c.turn_off(Flag::LearntClause);
                     cdb.num_learnt -= 1;
                 } else if re_init {
                     c.kill(&mut cdb.touched);

@@ -58,11 +58,11 @@ impl FlagIF for Var {
         self.flags & (1 << flag as u16) != 0
     }
     #[inline(always)]
-    fn flag_off(&mut self, flag: Flag) {
+    fn turn_off(&mut self, flag: Flag) {
         self.flags &= !(1u16 << (flag as u16));
     }
     #[inline(always)]
-    fn flag_on(&mut self, flag: Flag) {
+    fn turn_on(&mut self, flag: Flag) {
         self.flags |= 1u16 << (flag as u16);
     }
 }
@@ -105,7 +105,7 @@ impl VarDBIF for [Var] {
         }
         for l in &c.lits {
             let v = &mut self[l.vi()];
-            v.flag_on(Flag::TouchedVar);
+            v.turn_on(Flag::TouchedVar);
             if !v.is(Flag::EliminatedVar) {
                 if l.positive() {
                     v.pos_occurs.push(cid);

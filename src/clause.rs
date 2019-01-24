@@ -109,7 +109,7 @@ impl Default for Clause {
 
 impl ClauseIF for Clause {
     fn kill(&mut self, touched: &mut [bool]) {
-        self.flag_on(Flag::DeadClause);
+        self.turn_on(Flag::DeadClause);
         debug_assert!(self.lits[0] != 0 && self.lits[1] != 0);
         touched[self.lits[0].negate() as usize] = true;
         touched[self.lits[1].negate() as usize] = true;
@@ -122,11 +122,11 @@ impl FlagIF for Clause {
         self.flags & (1 << flag as u16) != 0
     }
     #[inline(always)]
-    fn flag_off(&mut self, flag: Flag) {
+    fn turn_off(&mut self, flag: Flag) {
         self.flags &= !(1u16 << (flag as u16));
     }
     #[inline(always)]
-    fn flag_on(&mut self, flag: Flag) {
+    fn turn_on(&mut self, flag: Flag) {
         self.flags |= 1u16 << (flag as u16);
     }
 }
@@ -318,7 +318,7 @@ impl ClauseDBIF for ClauseDB {
             c.activity = 0.0;
             c.flags = 0;
             if learnt {
-                c.flag_on(Flag::LearntClause);
+                c.turn_on(Flag::LearntClause);
                 self.num_learnt += 1;
             }
         } else {
@@ -336,7 +336,7 @@ impl ClauseDBIF for ClauseDB {
                 activity: 0.0,
             };
             if learnt {
-                c.flag_on(Flag::LearntClause);
+                c.turn_on(Flag::LearntClause);
                 self.num_learnt += 1;
             }
             self.clause.push(c);
@@ -419,7 +419,7 @@ impl ClauseDBIF for ClauseDB {
     fn detach(&mut self, cid: ClauseId) {
         let c = &mut self.clause[cid];
         debug_assert!(!c.is(Flag::DeadClause));
-        c.flag_on(Flag::DeadClause);
+        c.turn_on(Flag::DeadClause);
         if c.lits.is_empty() {
             return;
         }
@@ -470,7 +470,7 @@ impl ClauseDBIF for ClauseDB {
         for i in &perm[keep..] {
             let c = &mut clause[*i];
             if c.is(Flag::JustUsedClause) {
-                c.flag_off(Flag::JustUsedClause)
+                c.turn_off(Flag::JustUsedClause)
             }
             if 2 < c.rank {
                 c.kill(touched);
