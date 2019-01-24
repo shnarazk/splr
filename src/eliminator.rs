@@ -18,7 +18,6 @@ pub struct Eliminator {
     elim_clauses: Vec<Lit>,
 }
 
-const SUBSUMPTION_SIZE: usize = 30;
 const BACKWORD_SUBSUMPTION_THRESHOLD: usize = 400_000;
 const ELIMINATE_LOOP_THRESHOLD: usize = 4_000_000;
 
@@ -205,19 +204,15 @@ impl Eliminator {
             self.clause_queue.remove(0);
             unsafe {
                 let mut best = 0;
-                let unilits: [Lit; 1];
-                let lits: &[Lit];
                 if cid.is_lifted_lit() {
                     best = cid.to_lit().vi();
-                    unilits = [cid.to_lit(); 1];
-                    lits = &unilits;
                 } else {
                     let c = &mut cdb.clause[cid] as *mut Clause;
                     (*c).turn_off(Flag::Enqueued);
-                    lits = &(*c).lits;
+                    let lits = &(*c).lits;
                     if (*c).is(Flag::DeadClause)
                         || BACKWORD_SUBSUMPTION_THRESHOLD < cnt
-                        || SUBSUMPTION_SIZE < lits.len()
+                        || config.elim_subsume_literal_limit < lits.len()
                     {
                         continue;
                     }
@@ -242,13 +237,11 @@ impl Eliminator {
                     };
                     cnt += (*cs).len();
                     for did in &*cs {
+                        debug_assert_ne!(*did, cid);
                         let db = &cdb.clause[*did] as *const Clause;
                         if !(*db).is(Flag::DeadClause)
                             && *did != cid
-                            && (*db).lits.len() <= SUBSUMPTION_SIZE
-                            && (config.subsume_combination_limit == 0
-                                || lits.len() + (*db).lits.len()
-                                    <= config.subsume_combination_limit)
+                            && (*db).lits.len() <= config.elim_subsume_literal_limit
                             && !try_subsume(asgs, cdb, self, state, vars, cid, *did)
                         {
                             return false;
@@ -667,9 +660,9 @@ fn check_var_elimination_condition(
             let (res, clause_size) = check_to_merge(cdb, *c_pos, *c_neg, v);
             if res {
                 cnt += 1;
-                if clslen + config.subsume_grow_limit < cnt
-                    || (config.subsume_literal_limit != 0
-                        && config.subsume_literal_limit < clause_size)
+                if clslen + config.elim_eliminate_grow_limit < cnt
+                    || (config.elim_eliminate_combination_limit != 0
+                        && config.elim_eliminate_combination_limit < clause_size)
                 {
                     return true;
                 }

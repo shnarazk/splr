@@ -68,13 +68,15 @@ pub struct Config {
     pub luby_current_restarts: usize,
     pub luby_restart_factor: f64,
     /// Eliminator
-    pub use_sve: bool,
+    pub use_elim: bool,
     /// 0 for no limit
-    pub subsume_combination_limit: usize,
-    /// Variables aren't eliminated if they produce a resolvent with a length above this
+    /// Stop elimination if a generated resolvent is larger than this
     /// 0 means no limit.
-    pub subsume_literal_limit: usize,
-    pub subsume_grow_limit: usize,
+    pub elim_eliminate_combination_limit: usize,
+    /// Stop elimination if the increase of clauses is over this
+    pub elim_eliminate_grow_limit: usize,
+    /// Stop sumsumption if the size of a clause is over this
+    pub elim_subsume_literal_limit: usize,
     /// MISC
     pub progress_log: bool,
 }
@@ -110,10 +112,10 @@ impl Default for Config {
             luby_current_restarts: 0,
             luby_restart_factor: 100.0,
             ema_coeffs: (2 ^ 5, 2 ^ 15),
-            use_sve: true,
-            subsume_combination_limit: 0,
-            subsume_literal_limit: 20,
-            subsume_grow_limit: 2,
+            use_elim: true,
+            elim_eliminate_combination_limit: 20,
+            elim_eliminate_grow_limit: 2,
+            elim_subsume_literal_limit: 1000,
             progress_log: false,
         }
     }
@@ -176,7 +178,7 @@ impl Config {
             {
                 self.restart_blk = 1.08;
             }
-            self.subsume_grow_limit = 0;
+            self.elim_eliminate_grow_limit = 0;
             return;
         }
         state.ema_asg.reset();

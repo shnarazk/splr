@@ -55,7 +55,7 @@ fn main() {
         config.restart_step = args.restart_step;
         config.progress_log = args.use_log;
         if args.no_elim {
-            config.use_sve = false;
+            config.use_elim = false;
         }
         let (mut s, _cnf) = Solver::build(config, &args.cnf.to_str().unwrap());
         let result = format!(".ans_{}", args.cnf.file_name().unwrap().to_str().unwrap());
