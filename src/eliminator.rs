@@ -16,10 +16,6 @@ pub struct Eliminator {
     pub var_queue: Vec<VarId>,
     bwdsub_assigns: usize,
     elim_clauses: Vec<Lit>,
-    /// Variables aren't eliminated if they produce a resolvent with a length above this
-    /// 0 means no limit.
-    clause_lim: usize,
-    subsumption_lim: usize,
 }
 
 const SUBSUMPTION_SIZE: usize = 30;
@@ -35,8 +31,6 @@ impl Default for Eliminator {
             clause_queue: Vec::new(),
             bwdsub_assigns: 0,
             elim_clauses: Vec::new(),
-            clause_lim: 20,
-            subsumption_lim: 0,
         }
     }
 }
@@ -118,7 +112,7 @@ impl EliminatorIF for Eliminator {
             || !self.clause_queue.is_empty()
         {
             if (!self.clause_queue.is_empty() || self.bwdsub_assigns < asgs.len())
-                && !self.backward_subsumption_check(asgs, cdb, state, vars)
+                && !self.backward_subsumption_check(asgs, cdb, config, state, vars)
             {
                 state.ok = false;
                 break 'perform;
@@ -192,6 +186,7 @@ impl Eliminator {
         &mut self,
         asgs: &mut AssignStack,
         cdb: &mut ClauseDB,
+        config: &Config,
         state: &mut State,
         vars: &mut [Var],
     ) -> bool {
@@ -251,8 +246,9 @@ impl Eliminator {
                         if !(*db).is(Flag::DeadClause)
                             && *did != cid
                             && (*db).lits.len() <= SUBSUMPTION_SIZE
-                            && (self.subsumption_lim == 0
-                                || lits.len() + (*db).lits.len() <= self.subsumption_lim)
+                            && (config.subsume_combination_limit == 0
+                                || lits.len() + (*db).lits.len()
+                                    <= config.subsume_combination_limit)
                             && !try_subsume(asgs, cdb, self, state, vars, cid, *did)
                         {
                             return false;
@@ -593,7 +589,7 @@ fn eliminate_var(
             }
             return true;
         }
-        if check_var_elimination_condition(cdb, config, elim, &*pos, &*neg, vi) {
+        if check_var_elimination_condition(cdb, config, &*pos, &*neg, vi) {
             return true;
         }
         // OK, eliminate the literal and build constraints on it.
@@ -653,14 +649,13 @@ fn eliminate_var(
             state.ok = false;
             return false;
         }
-        elim.backward_subsumption_check(asgs, cdb, state, vars)
+        elim.backward_subsumption_check(asgs, cdb, config, state, vars)
     }
 }
 
 fn check_var_elimination_condition(
     cdb: &ClauseDB,
     config: &Config,
-    elim: &Eliminator,
     pos: &[ClauseId],
     neg: &[ClauseId],
     v: VarId,
@@ -672,8 +667,9 @@ fn check_var_elimination_condition(
             let (res, clause_size) = check_to_merge(cdb, *c_pos, *c_neg, v);
             if res {
                 cnt += 1;
-                if clslen + config.subsumption_grow_limit < cnt
-                    || (elim.clause_lim != 0 && elim.clause_lim < clause_size)
+                if clslen + config.subsume_grow_limit < cnt
+                    || (config.subsume_literal_limit != 0
+                        && config.subsume_literal_limit < clause_size)
                 {
                     return true;
                 }
