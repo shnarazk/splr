@@ -116,7 +116,7 @@ impl Default for Config {
             ema_coeffs: (2 ^ 5, 2 ^ 15),
             use_elim: true,
             elim_eliminate_combination_limit: 20,
-            elim_eliminate_grow_limit: 2,
+            elim_eliminate_grow_limit: 0,
             elim_eliminate_loop_limit: 4_000_000,
             elim_subsume_literal_limit: 1000,
             elim_subsume_loop_limit: 400_000,
@@ -183,6 +183,9 @@ impl Config {
                 self.restart_blk = 1.08;
             }
             self.elim_eliminate_grow_limit = 0;
+            self.elim_eliminate_loop_limit = 1_000_000;
+            self.elim_subsume_literal_limit = 1000;
+            self.elim_subsume_loop_limit = 40_000;
             return;
         }
         state.ema_asg.reset();

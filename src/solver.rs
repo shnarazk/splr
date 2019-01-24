@@ -104,10 +104,16 @@ impl SatSolverIF for Solver {
                 elim.stop(cdb, vars, false);
                 state.progress(cdb, config, elim, vars, Some("loaded"));
             }
-            elim.in_use = cdb.count(true) < 1_000_000 && 1000 < config.num_vars;
-            if !elim.in_use {
-                elim.stop(cdb, vars, true);
+            // elim.in_use = cdb.count(true) < 1_000_000 && 1000 < config.num_vars;
+            if 1_000_000 < cdb.count(true) {
+                // config.elim_eliminate_grow_limit = 2;
+                config.elim_eliminate_loop_limit = 10_000;
+                config.elim_subsume_literal_limit = 40;
+                config.elim_subsume_loop_limit = 10_000;
             }
+            // if !elim.in_use {
+            //     elim.stop(cdb, vars, true);
+            // }
         } else {
             state.progress(cdb, config, elim, vars, Some("loaded"));
         }
