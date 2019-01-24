@@ -2,7 +2,7 @@ use crate::assign::AssignStack;
 use crate::clause::ClauseDB;
 use crate::eliminator::Eliminator;
 use crate::state::{Stat, State};
-use crate::traits::{ClauseDBIF, ClauseIF, EmaIF, FlagIF};
+use crate::traits::{ClauseDBIF, ClauseIF, EliminatorIF, EmaIF, FlagIF};
 use crate::types::Flag;
 use crate::var::Var;
 
@@ -182,10 +182,12 @@ impl Config {
             {
                 self.restart_blk = 1.08;
             }
-            self.elim_eliminate_grow_limit = 0;
-            self.elim_eliminate_loop_limit = 1_000_000;
-            self.elim_subsume_literal_limit = 1000;
-            self.elim_subsume_loop_limit = 40_000;
+            // self.elim_eliminate_loop_limit = 800_000;
+            // self.elim_subsume_loop_limit = 400_000;
+            if 1_000_000 < cdb.count(true) {
+                elim.in_use = false;
+                elim.stop(cdb, vars, true);
+            }
             return;
         }
         state.ema_asg.reset();
