@@ -12,7 +12,7 @@ use structopt::StructOpt;
 #[derive(StructOpt)]
 #[structopt(
     name = "dmcr",
-    about = "DIMACS-format Model Checker in Rust, version 0.0.2"
+    about = "DIMACS-format Model Checker in Rust, version 0.1.0 RC1"
 )]
 struct TargetOpts {
     #[structopt(parse(from_os_str))]
@@ -29,7 +29,7 @@ fn main() {
     if args.assign == None {
         args.assign = Some(PathBuf::from(format!(
             ".ans_{}",
-            args.problem.to_str().unwrap()
+            Path::new(&args.problem).file_name().unwrap().to_string_lossy()
         )));
     }
     if let Some(f) = &args.assign {
