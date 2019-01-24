@@ -75,8 +75,10 @@ pub struct Config {
     pub elim_eliminate_combination_limit: usize,
     /// Stop elimination if the increase of clauses is over this
     pub elim_eliminate_grow_limit: usize,
+    pub elim_eliminate_loop_limit: usize,
     /// Stop sumsumption if the size of a clause is over this
     pub elim_subsume_literal_limit: usize,
+    pub elim_subsume_loop_limit: usize,
     /// MISC
     pub progress_log: bool,
 }
@@ -115,7 +117,9 @@ impl Default for Config {
             use_elim: true,
             elim_eliminate_combination_limit: 20,
             elim_eliminate_grow_limit: 2,
+            elim_eliminate_loop_limit: 4_000_000,
             elim_subsume_literal_limit: 1000,
+            elim_subsume_loop_limit: 400_000,
             progress_log: false,
         }
     }

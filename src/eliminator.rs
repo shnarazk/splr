@@ -18,9 +18,6 @@ pub struct Eliminator {
     elim_clauses: Vec<Lit>,
 }
 
-const BACKWORD_SUBSUMPTION_THRESHOLD: usize = 400_000;
-const ELIMINATE_LOOP_THRESHOLD: usize = 4_000_000;
-
 impl Default for Eliminator {
     fn default() -> Eliminator {
         Eliminator {
@@ -120,7 +117,7 @@ impl EliminatorIF for Eliminator {
                 let v = &mut vars[vi];
                 v.turn_off(Flag::Enqueued);
                 cnt += 1;
-                if ELIMINATE_LOOP_THRESHOLD <= cnt {
+                if config.elim_eliminate_loop_limit <= cnt {
                     continue;
                 }
                 if v.is(Flag::EliminatedVar) || v.assign != BOTTOM {
@@ -211,7 +208,7 @@ impl Eliminator {
                     (*c).turn_off(Flag::Enqueued);
                     let lits = &(*c).lits;
                     if (*c).is(Flag::DeadClause)
-                        || BACKWORD_SUBSUMPTION_THRESHOLD < cnt
+                        || config.elim_subsume_loop_limit < cnt
                         || config.elim_subsume_literal_limit < lits.len()
                     {
                         continue;
