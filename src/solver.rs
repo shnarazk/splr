@@ -100,18 +100,13 @@ impl SatSolverIF for Solver {
             if elim.active {
                 cdb.simplify(asgs, config, elim, state, vars);
                 state.progress(cdb, config, elim, vars, Some("simplify"));
-            } else {
+                if 600_000 < cdb.count(true) {
+                    config.elim_eliminate_loop_limit = 1_000;
+                }
+            } else {            // if 1_000_000 < cdb.count(true)
                 elim.stop(cdb, vars, false);
                 state.progress(cdb, config, elim, vars, Some("loaded"));
             }
-            // elim.in_use = 400_000 < cdb.count(true);
-            if 600_000 < cdb.count(true) {
-                config.elim_eliminate_loop_limit = 1_000;
-                // config.elim_subsume_loop_limit = 80_000;
-            }
-            // if !elim.in_use {
-            //     elim.stop(cdb, vars, true);
-            // }
         } else {
             state.progress(cdb, config, elim, vars, Some("loaded"));
         }

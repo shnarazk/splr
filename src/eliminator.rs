@@ -189,8 +189,6 @@ impl Eliminator {
         let mut cnt = 0;
         debug_assert_eq!(asgs.level(), 0);
         while !self.clause_queue.is_empty() || self.bwdsub_assigns < asgs.len() {
-            // Empty subsumption queue and return immediately on user-interrupt:
-            // if computed-too-long { break; }
             // Check top-level assigments by creating a dummy clause and placing it in the queue:
             if self.clause_queue.is_empty() && self.bwdsub_assigns < asgs.len() {
                 let c = asgs.trail[self.bwdsub_assigns].to_cid();
@@ -199,46 +197,45 @@ impl Eliminator {
             }
             let cid = self.clause_queue[0];
             self.clause_queue.remove(0);
-            unsafe {
-                let mut best = 0;
-                if cid.is_lifted_lit() {
-                    best = cid.to_lit().vi();
-                } else {
-                    let c = &mut cdb.clause[cid] as *mut Clause;
-                    (*c).turn_off(Flag::Enqueued);
-                    let lits = &(*c).lits;
-                    if (*c).is(Flag::DeadClause)
-                        || config.elim_subsume_loop_limit < cnt
-                        || config.elim_subsume_literal_limit < lits.len()
-                    {
-                        continue;
-                    }
-                    let mut tmp = cdb.count(true);
-                    for l in &(*c).lits {
-                        let v = &vars[l.vi()];
-                        let nsum = v.pos_occurs.len().min(v.neg_occurs.len());
-                        if !v.is(Flag::EliminatedVar) && 0 < v.level && nsum < tmp {
-                            best = l.vi();
-                            tmp = nsum;
-                        }
-                    }
-                }
-                if best == 0 || vars[best].is(Flag::EliminatedVar) {
+            let mut best = 0;
+            if cid.is_lifted_lit() {
+                best = cid.to_lit().vi();
+            } else {
+                let mut tmp = cdb.count(true);
+                let c = &mut cdb.clause[cid];
+                c.turn_off(Flag::Enqueued);
+                let lits = &c.lits;
+                if c.is(Flag::DeadClause)
+                    || config.elim_subsume_loop_limit < cnt
+                    || config.elim_subsume_literal_limit < lits.len()
+                {
                     continue;
                 }
-                for p in 0..2 {
-                    let cs = if p == 0 {
-                        &mut vars[best].pos_occurs as *mut Vec<ClauseId>
-                    } else {
-                        &mut vars[best].neg_occurs as *mut Vec<ClauseId>
-                    };
-                    cnt += (*cs).len();
-                    for did in &*cs {
-                        debug_assert_ne!(*did, cid);
-                        let db = &cdb.clause[*did] as *const Clause;
-                        if !(*db).is(Flag::DeadClause)
-                            && *did != cid
-                            && (*db).lits.len() <= config.elim_subsume_literal_limit
+                for l in lits {
+                    let v = &vars[l.vi()];
+                    let nsum = v.pos_occurs.len().min(v.neg_occurs.len());
+                    if !v.is(Flag::EliminatedVar) && 0 < v.level && nsum < tmp {
+                        best = l.vi();
+                        tmp = nsum;
+                    }
+                }
+            }
+            if best == 0 || vars[best].is(Flag::EliminatedVar) {
+                continue;
+            }
+            unsafe {
+                for cs in &[
+                    &mut vars[best].pos_occurs as *mut Vec<ClauseId>,
+                    &mut vars[best].neg_occurs as *mut Vec<ClauseId>,
+                ] {
+                    cnt += (**cs).len();
+                    for did in &**cs {
+                        if *did == cid {
+                            continue;
+                        }
+                        let db = &cdb.clause[*did];
+                        if !db.is(Flag::DeadClause)
+                            && db.lits.len() <= config.elim_subsume_literal_limit
                             && !try_subsume(asgs, cdb, self, state, vars, cid, *did)
                         {
                             return false;
