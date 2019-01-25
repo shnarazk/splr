@@ -142,7 +142,7 @@ impl SatSolverIF for Solver {
         }
     }
     /// builds and returns a configured solver.
-    fn build(mut cfg: Config, path: &str) -> (Solver, CNFDescription) {
+    fn build(mut config: Config, path: &str) -> (Solver, CNFDescription) {
         let mut rs = BufReader::new(fs::File::open(path).unwrap());
         let mut buf = String::new();
         let mut nv: usize = 0;
@@ -172,8 +172,8 @@ impl SatSolverIF for Solver {
             num_of_clauses: nc,
             pathname: path.to_string(),
         };
-        cfg.num_vars = nv;
-        let mut s: Solver = Solver::new(cfg, &cnf);
+        config.num_vars = nv;
+        let mut s: Solver = Solver::new(config, &cnf);
         loop {
             buf.clear();
             match rs.read_line(&mut buf) {
