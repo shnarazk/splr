@@ -97,16 +97,14 @@ impl SatSolverIF for Solver {
                     elim.enqueue_var(v);
                 }
             }
-            if elim.active {
+            if elim.active {    //  && cdb.count(false) < 4_800_000
                 cdb.simplify(asgs, config, elim, state, vars);
-                let nc = cdb.count(true);
-                if 1_200_000 < nc {
-                    elim.stop(cdb, vars, true);
-                } else if 800_000 < nc {
-                    config.elim_eliminate_loop_limit = 1_000;
-                } else if config.num_vars < 1_000 {
-                    config.elim_subsume_literal_limit = 40;
-                }
+                // config.elim_eliminate_combination_limit = 40;
+                // config.elim_eliminate_grow_limit = 0;
+                // config.elim_eliminate_loop_limit = 32;
+                // config.elim_subsume_literal_limit = 100;
+                // config.elim_subsume_loop_limit = 32;
+                elim.stop(cdb, vars, true);
                 state.progress(cdb, config, elim, vars, Some("simplify"));
             } else {
                 elim.stop(cdb, vars, true);
@@ -465,11 +463,16 @@ fn handle_conflict_path(
         state.stats[Stat::SumLBD as usize] += lbd;
     }
     if tn_confl % 10_000 == 0 {
+        if tn_confl == 100_000 {
+            asgs.cancel_until(vars, 0);
+            config.adapt_strategy(asgs, cdb, elim, state, vars);
+        }
+        // if tn_confl % 100_000 == 0 {
+        //     elim.activate(asgs, cdb, config, vars);
+        //     cdb.simplify(asgs, config, elim, state, vars);
+        //     elim.stop(cdb, vars, true);
+        // }
         state.progress(cdb, config, elim, vars, None);
-    }
-    if tn_confl == 100_000 {
-        asgs.cancel_until(vars, 0);
-        config.adapt_strategy(asgs, cdb, elim, state, vars);
     }
     config.var_inc /= config.var_decay;
     config.cla_inc /= config.cla_decay;
