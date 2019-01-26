@@ -293,7 +293,7 @@ impl fmt::Display for State {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let tm = format!("{}", Utc::now() - self.start);
         let len = tm.len();
-        write!(f, "{:36} |time:{:>16}", self.target, &tm[2..len-6])
+        write!(f, "{:36} |time:{:>16}", self.target, &tm[2..len - 6])
     }
 }
 

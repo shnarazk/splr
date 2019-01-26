@@ -94,11 +94,14 @@ impl SatSolverIF for Solver {
                     asgs.enqueue_null(v, LTRUE, 0);
                 } else if v.pos_occurs.is_empty() && !v.neg_occurs.is_empty() {
                     asgs.enqueue_null(v, LFALSE, 0);
-                } else if v.pos_occurs.len().min(v.neg_occurs.len()) <= 2 * (config.elim_eliminate_grow_limit + 1) {
+                } else if v.pos_occurs.len().min(v.neg_occurs.len())
+                    <= 2 * (config.elim_eliminate_grow_limit + 1)
+                {
                     elim.enqueue_var(v);
                 }
             }
-            if elim.active {    //  && cdb.count(false) < 4_800_000
+            if elim.active {
+                //  && cdb.count(false) < 4_800_000
                 cdb.simplify(asgs, config, elim, state, vars);
                 // config.elim_eliminate_combination_limit = 40;
                 // config.elim_eliminate_grow_limit = 0;

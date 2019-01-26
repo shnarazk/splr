@@ -49,7 +49,13 @@ impl EliminatorIF for Eliminator {
         self.in_use = false;
         self.active = false;
     }
-    fn activate(&mut self, asgs: &mut AssignStack, cdb: &mut ClauseDB, config: &Config, vars: &mut [Var]) {
+    fn activate(
+        &mut self,
+        asgs: &mut AssignStack,
+        cdb: &mut ClauseDB,
+        config: &Config,
+        vars: &mut [Var],
+    ) {
         self.in_use = true;
         self.active = true;
         for (cid, c) in &mut cdb.clause.iter_mut().enumerate().skip(1) {
@@ -66,7 +72,9 @@ impl EliminatorIF for Eliminator {
                 asgs.enqueue_null(v, LTRUE, 0);
             } else if v.pos_occurs.is_empty() && !v.neg_occurs.is_empty() {
                 asgs.enqueue_null(v, LFALSE, 0);
-            } else if v.pos_occurs.len().min(v.neg_occurs.len()) <= 2 * (config.elim_eliminate_grow_limit + 1) {
+            } else if v.pos_occurs.len().min(v.neg_occurs.len())
+                <= 2 * (config.elim_eliminate_grow_limit + 1)
+            {
                 self.enqueue_var(v);
             }
         }
@@ -232,9 +240,7 @@ impl Eliminator {
                 let c = &mut cdb.clause[cid];
                 c.turn_off(Flag::Enqueued);
                 let lits = &c.lits;
-                if c.is(Flag::DeadClause)
-                    || config.elim_subsume_literal_limit < lits.len()
-                {
+                if c.is(Flag::DeadClause) || config.elim_subsume_literal_limit < lits.len() {
                     continue;
                 }
                 let mut b = 0;
