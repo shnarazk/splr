@@ -49,6 +49,28 @@ impl EliminatorIF for Eliminator {
         self.in_use = false;
         self.active = false;
     }
+    fn activate(&mut self, asgs: &mut AssignStack, cdb: &mut ClauseDB, config: &Config, vars: &mut [Var]) {
+        self.in_use = true;
+        self.active = true;
+        for (cid, c) in &mut cdb.clause.iter_mut().enumerate().skip(1) {
+            if c.is(Flag::DeadClause) {
+                continue;
+            }
+            vars.attach(self, cid, c, c.is(Flag::LearntClause));
+        }
+        for v in &mut vars[1..] {
+            if v.is(Flag::EliminatedVar) || v.assign != BOTTOM {
+                continue;
+            }
+            if v.neg_occurs.is_empty() && !v.pos_occurs.is_empty() {
+                asgs.enqueue_null(v, LTRUE, 0);
+            } else if v.pos_occurs.is_empty() && !v.neg_occurs.is_empty() {
+                asgs.enqueue_null(v, LFALSE, 0);
+            } else if v.pos_occurs.len().min(v.neg_occurs.len()) <= 2 * (config.elim_eliminate_grow_limit + 1) {
+                self.enqueue_var(v);
+            }
+        }
+    }
     fn enqueue_clause(&mut self, cid: ClauseId, c: &mut Clause) {
         if !self.in_use || !self.active || c.is(Flag::Enqueued) {
             return;
@@ -195,8 +217,14 @@ impl Eliminator {
                 self.clause_queue.push(c);
                 self.bwdsub_assigns += 1;
             }
-            let cid = self.clause_queue[0];
-            self.clause_queue.remove(0);
+            let cid = match self.clause_queue.pop() {
+                Some(x) => x,
+                None => 0,
+            };
+            cnt += 1;
+            if config.elim_subsume_loop_limit < cnt {
+                continue;
+            }
             let best = if cid.is_lifted_lit() {
                 cid.to_lit().vi()
             } else {
@@ -205,7 +233,6 @@ impl Eliminator {
                 c.turn_off(Flag::Enqueued);
                 let lits = &c.lits;
                 if c.is(Flag::DeadClause)
-                    || config.elim_subsume_loop_limit < cnt
                     || config.elim_subsume_literal_limit < lits.len()
                 {
                     continue;
