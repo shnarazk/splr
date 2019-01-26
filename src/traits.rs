@@ -65,6 +65,7 @@ pub trait ClauseDBIF {
     fn reset_lbd(&mut self, vars: &[Var], temp: &mut [usize]);
     fn bump_activity(&mut self, inc: &mut f64, cid: ClauseId);
     fn count(&self, alive: bool) -> usize;
+    fn countf(&self, mask: u16) -> usize;
 }
 
 pub trait ClauseIdIF {

@@ -385,6 +385,9 @@ impl ClauseDBIF for ClauseDB {
             self.clause.len() - 1
         }
     }
+    fn countf(&self, mask: u16) -> usize {
+        self.clause.iter().skip(1).filter(|&c| c.flags & mask == mask).count()
+    }
     /// renamed from newLearntClause
     // Note: set lbd to 0 if you want to add the clause to Permanent.
     fn attach(

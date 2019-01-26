@@ -134,12 +134,12 @@ impl StateIF for State {
             return;
         }
         println!("{}", self);
-        println!();
-        println!();
-        println!();
-        println!();
-        println!();
-        println!();
+        println!("                                                  ");
+        println!("                                                  ");
+        println!("                                                  ");
+        println!("                                                  ");
+        println!("                                                  ");
+        println!("                                                  ");
     }
     #[allow(clippy::cyclomatic_complexity)]
     fn progress(
@@ -165,14 +165,14 @@ impl StateIF for State {
         };
         let count = self.stats[Stat::Conflict as usize];
         let ave = self.stats[Stat::SumLBD as usize] as f64 / count as f64;
-        println!("{}, Str:{:>8}", self, msg);
+        println!("{}, Mode:{:>9}", self, msg);
         println!(
-            "#propagate:{}, #decision:{}, #conflict: {} ",
+            "#conflict:{}, #decision:{}, #propagate:{} ",
             i!(
-                "{:>14}",
+                "{:>11}",
                 self.dumper,
-                LogUsizeId::Propagate,
-                self.stats[Stat::Propagation as usize]
+                LogUsizeId::Conflict,
+                self.stats[Stat::Conflict as usize]
             ),
             i!(
                 "{:>13}",
@@ -181,10 +181,10 @@ impl StateIF for State {
                 self.stats[Stat::Decision as usize]
             ),
             i!(
-                "{:>12}",
+                "{:>16}",
                 self.dumper,
-                LogUsizeId::Conflict,
-                self.stats[Stat::Conflict as usize]
+                LogUsizeId::Propagate,
+                self.stats[Stat::Propagation as usize]
             ),
         );
         println!(
@@ -291,10 +291,9 @@ impl StateIF for State {
 
 impl fmt::Display for State {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut tm = format!("{}", Utc::now() - self.start);
-        tm.drain(..2);
-        tm.pop();
-        write!(f, "{:36}|time:{:>19}", self.target, tm)
+        let tm = format!("{}", Utc::now() - self.start);
+        let len = tm.len();
+        write!(f, "{:36} |time:{:>16}", self.target, &tm[2..len-6])
     }
 }
 
@@ -373,11 +372,7 @@ impl State {
         let nv = vars.len() - 1;
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
-        let nlearnts = cdb
-            .clause
-            .iter()
-            .filter(|c| c.is(Flag::LearntClause) && !c.is(Flag::DeadClause))
-            .count();
+        let nlearnts = cdb.countf(1 << Flag::DeadClause as u16 | 1 << Flag::LearntClause as u16);
         let ncnfl = self.stats[Stat::Conflict as usize];
         let nrestart = self.stats[Stat::Restart as usize];
         println!(
