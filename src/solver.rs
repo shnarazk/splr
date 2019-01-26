@@ -93,7 +93,7 @@ impl SatSolverIF for Solver {
                     asgs.enqueue_null(v, LTRUE, 0);
                 } else if v.pos_occurs.is_empty() && !v.neg_occurs.is_empty() {
                     asgs.enqueue_null(v, LFALSE, 0);
-                } else if v.pos_occurs.len() < 4 || v.neg_occurs.len() < 4 {
+                } else if v.pos_occurs.len().min(v.neg_occurs.len()) <= 2 * (config.elim_eliminate_grow_limit + 1) {
                     elim.enqueue_var(v);
                 }
             }
@@ -233,7 +233,7 @@ impl SatSolverIF for Solver {
             }
             _ => {
                 let cid = cdb.new_clause(&v, 0, false);
-                vars.attach(elim, cid, &mut cdb.clause[cid], false);
+                vars.attach(elim, cid, &mut cdb.clause[cid], true);
                 Some(cid)
             }
         }
