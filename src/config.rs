@@ -2,7 +2,7 @@ use crate::assign::AssignStack;
 use crate::clause::ClauseDB;
 use crate::eliminator::Eliminator;
 use crate::state::{Stat, State};
-use crate::traits::{ClauseDBIF, ClauseIF, EliminatorIF, EmaIF, FlagIF};
+use crate::traits::{ClauseDBIF, ClauseIF, EmaIF, FlagIF};
 use crate::types::Flag;
 use crate::var::Var;
 
@@ -178,12 +178,12 @@ impl Config {
         }
         if self.strategy == SearchStrategy::Initial {
             self.strategy = SearchStrategy::Generic;
-            if state.stats[Stat::BlockRestart as usize] < 20 {
-                self.restart_blk = 1.10;
-            }
-            if 800_000 < cdb.count(true) || state.num_eliminated_vars < state.num_solved_vars {
-                elim.stop(cdb, vars, true);
-            }
+            // if state.stats[Stat::BlockRestart as usize] < 100 {
+            //     self.restart_blk = 1.20;
+            // }
+            // if state.stats[Stat::BlockRestart as usize] < 10 {
+            //     self.restart_blk = 1.10;
+            // }
             return;
         }
         state.ema_asg.reset();
