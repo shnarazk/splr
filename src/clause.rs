@@ -10,7 +10,7 @@ use std::fmt;
 
 const CLA_ACTIVITY_MAX: f64 = 1e240;
 const CLA_ACTIVITY_SCALE1: f64 = 1e-80;
-const CLA_ACTIVITY_SCALE2: f64 = 1e-10;
+const CLA_ACTIVITY_SCALE2: f64 = 1e-20;
 
 impl ClauseIdIF for ClauseId {
     #[inline(always)]
