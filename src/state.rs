@@ -141,6 +141,7 @@ impl StateIF for State {
         println!();
         println!();
     }
+    #[allow(clippy::cyclomatic_complexity)]
     fn progress(
         &mut self,
         cdb: &ClauseDB,
