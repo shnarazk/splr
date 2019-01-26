@@ -178,8 +178,7 @@ impl Config {
         }
         if self.strategy == SearchStrategy::Initial {
             self.strategy = SearchStrategy::Generic;
-            if state.stats[Stat::BlockRestart as usize] < 20
-            {
+            if state.stats[Stat::BlockRestart as usize] < 20 {
                 self.restart_blk = 1.10;
             }
             if 800_000 < cdb.count(true) || state.num_eliminated_vars < state.num_solved_vars {
