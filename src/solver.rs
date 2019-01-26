@@ -79,6 +79,7 @@ impl SatSolverIF for Solver {
         // s.root_level = 0;
         state.num_solved_vars = asgs.len();
         state.progress_header(config);
+        state.progress(cdb, config, elim, vars, Some("loaded"));
         if elim.in_use {
             for v in &mut vars[1..] {
                 debug_assert!(!v.is(Flag::EliminatedVar));
@@ -108,10 +109,7 @@ impl SatSolverIF for Solver {
                 state.progress(cdb, config, elim, vars, Some("simplify"));
             } else {
                 elim.stop(cdb, vars, true);
-                state.progress(cdb, config, elim, vars, Some("loaded"));
             }
-        } else {
-            state.progress(cdb, config, elim, vars, Some("loaded"));
         }
         if search(asgs, config, cdb, elim, state, vars) {
             if !state.ok {
