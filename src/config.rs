@@ -178,14 +178,11 @@ impl Config {
         }
         if self.strategy == SearchStrategy::Initial {
             self.strategy = SearchStrategy::Generic;
-            if state.stats[Stat::BlockRestart as usize] * 100 < state.stats[Stat::Restart as usize]
+            if state.stats[Stat::BlockRestart as usize] < 20
             {
-                self.restart_blk = 1.08;
+                self.restart_blk = 1.10;
             }
-            // self.elim_eliminate_loop_limit = 800_000;
-            // self.elim_subsume_loop_limit = 400_000;
-            if 1_000_000 < cdb.count(true) {
-                elim.in_use = false;
+            if 800_000 < cdb.count(true) || state.num_eliminated_vars < state.num_solved_vars {
                 elim.stop(cdb, vars, true);
             }
             return;
