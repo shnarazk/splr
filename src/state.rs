@@ -167,7 +167,7 @@ impl StateIF for State {
         let ave = self.stats[Stat::SumLBD as usize] as f64 / count as f64;
         println!("{}, Mode:{:>9}", self, msg);
         println!(
-            "#conflict:{}, #decision:{}, #propagate:{} ",
+            " #conflict:{}, #decision:{}, #propagate:{} ",
             i!(
                 "{:>11}",
                 self.dumper,
@@ -181,7 +181,7 @@ impl StateIF for State {
                 self.stats[Stat::Decision as usize]
             ),
             i!(
-                "{:>16}",
+                "{:>15}",
                 self.dumper,
                 LogUsizeId::Propagate,
                 self.stats[Stat::Propagation as usize]
