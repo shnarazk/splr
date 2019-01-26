@@ -197,9 +197,8 @@ impl Eliminator {
             }
             let cid = self.clause_queue[0];
             self.clause_queue.remove(0);
-            let mut best = 0;
-            if cid.is_lifted_lit() {
-                best = cid.to_lit().vi();
+            let best = if cid.is_lifted_lit() {
+                cid.to_lit().vi()
             } else {
                 let mut tmp = cdb.count(true);
                 let c = &mut cdb.clause[cid];
@@ -211,15 +210,17 @@ impl Eliminator {
                 {
                     continue;
                 }
+                let mut b = 0;
                 for l in lits {
                     let v = &vars[l.vi()];
                     let nsum = v.pos_occurs.len().min(v.neg_occurs.len());
                     if !v.is(Flag::EliminatedVar) && 0 < v.level && nsum < tmp {
-                        best = l.vi();
+                        b = l.vi();
                         tmp = nsum;
                     }
                 }
-            }
+                b
+            };
             if best == 0 || vars[best].is(Flag::EliminatedVar) {
                 continue;
             }
