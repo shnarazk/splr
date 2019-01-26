@@ -240,15 +240,15 @@ impl SatSolverIF for Solver {
     }
 }
 
-impl Propagate for AssignStack {
+impl PropagateIF for AssignStack {
     fn propagate(&mut self, cdb: &mut ClauseDB, state: &mut State, vars: &mut [Var]) -> ClauseId {
+        let head = &mut cdb.clause;
+        let watcher = &mut cdb.watcher[..] as *mut [Vec<Watch>];
         while self.remains() {
             let p: usize = self.sweep() as usize;
             let false_lit = (p as Lit).negate();
             state.stats[Stat::Propagation as usize] += 1;
-            let head = &mut cdb.clause;
             unsafe {
-                let watcher = &mut cdb.watcher[..] as *mut [Vec<Watch>];
                 let source = &mut (*watcher)[p];
                 let mut n = 1;
                 'next_clause: while n <= source.count() {
@@ -307,13 +307,13 @@ fn propagate_fast(
     state: &mut State,
     vars: &mut [Var],
 ) -> ClauseId {
+    let head = &mut cdb.clause;
+    let watcher = &mut cdb.watcher[..] as *mut [Vec<Watch>];
     while asgs.remains() {
         let p: usize = asgs.sweep() as usize;
         let false_lit = (p as Lit).negate();
         state.stats[Stat::Propagation as usize] += 1;
-        let head = &mut cdb.clause;
         unsafe {
-            let watcher = &mut cdb.watcher[..] as *mut [Vec<Watch>];
             let source = &mut (*watcher)[p];
             let mut n = 1;
             'next_clause: while n <= source.count() {
@@ -342,10 +342,12 @@ fn propagate_fast(
                     for (k, lk) in lits.iter().enumerate().skip(2) {
                         // below is equivalent to 'assigned(lk) != LFALSE'
                         if (((lk & 1) as u8) ^ vars.get_unchecked(lk.vi()).assign) != 0 {
-                            (*watcher)[lk.negate() as usize].attach(first, w.c);
+                            (*watcher)
+                                .get_unchecked_mut(lk.negate() as usize)
+                                .attach(first, w.c);
                             source.detach(n);
-                            lits[1] = *lk;
-                            lits[k] = false_lit;
+                            *lits.get_unchecked_mut(1) = *lk;
+                            *lits.get_unchecked_mut(k) = false_lit;
                             continue 'next_clause;
                         }
                     }

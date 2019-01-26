@@ -123,7 +123,7 @@ pub trait LitIF {
     fn to_cid(self) -> ClauseId;
 }
 
-pub trait Propagate {
+pub trait PropagateIF {
     fn propagate(&mut self, cdb: &mut ClauseDB, state: &mut State, vars: &mut [Var]) -> ClauseId;
 }
 
