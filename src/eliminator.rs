@@ -72,8 +72,7 @@ impl EliminatorIF for Eliminator {
                 asgs.enqueue_null(v, LTRUE, 0);
             } else if v.pos_occurs.is_empty() && !v.neg_occurs.is_empty() {
                 asgs.enqueue_null(v, LFALSE, 0);
-            } else if v.pos_occurs.len().min(v.neg_occurs.len())
-                <= config.elim_eliminate_grow_limit
+            } else if v.pos_occurs.len().min(v.neg_occurs.len()) <= config.elim_eliminate_grow_limit
             {
                 self.enqueue_var(v);
             }

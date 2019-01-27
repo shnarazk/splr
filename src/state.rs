@@ -5,9 +5,9 @@ use crate::restart::Ema;
 use crate::traits::*;
 use crate::types::*;
 use crate::var::Var;
-use std::time::SystemTime;
 use std::fmt;
 use std::path::Path;
+use std::time::SystemTime;
 
 /// stat index
 #[derive(Clone, Eq, PartialEq)]
