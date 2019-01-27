@@ -62,7 +62,7 @@ impl EliminatorIF for Eliminator {
             if c.is(Flag::DeadClause) {
                 continue;
             }
-            vars.attach(self, cid, c, c.is(Flag::LearntClause));
+            vars.attach(self, cid, c, true);
         }
         for v in &mut vars[1..] {
             if v.is(Flag::EliminatedVar) || v.assign != BOTTOM {
@@ -73,7 +73,7 @@ impl EliminatorIF for Eliminator {
             } else if v.pos_occurs.is_empty() && !v.neg_occurs.is_empty() {
                 asgs.enqueue_null(v, LFALSE, 0);
             } else if v.pos_occurs.len().min(v.neg_occurs.len())
-                <= 2 * (config.elim_eliminate_grow_limit + 1)
+                <= config.elim_eliminate_grow_limit
             {
                 self.enqueue_var(v);
             }
@@ -246,7 +246,7 @@ impl Eliminator {
                 let mut b = 0;
                 for l in lits {
                     let v = &vars[l.vi()];
-                    let nsum = v.pos_occurs.len().min(v.neg_occurs.len());
+                    let nsum = v.pos_occurs.len() + v.neg_occurs.len();
                     if !v.is(Flag::EliminatedVar) && 0 < v.level && nsum < tmp {
                         b = l.vi();
                         tmp = nsum;

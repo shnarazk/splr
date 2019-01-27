@@ -82,7 +82,6 @@ impl SatSolverIF for Solver {
         state.progress(cdb, config, elim, vars, Some("loaded"));
         if elim.in_use {
             for v in &mut vars[1..] {
-                debug_assert!(!v.is(Flag::EliminatedVar));
                 if v.assign != BOTTOM {
                     v.pos_occurs.clear();
                     v.neg_occurs.clear();
@@ -94,26 +93,22 @@ impl SatSolverIF for Solver {
                     asgs.enqueue_null(v, LTRUE, 0);
                 } else if v.pos_occurs.is_empty() && !v.neg_occurs.is_empty() {
                     asgs.enqueue_null(v, LFALSE, 0);
-                } else if v.pos_occurs.len().min(v.neg_occurs.len())
-                    <= 2 * (config.elim_eliminate_grow_limit + 1)
-                {
-                    elim.enqueue_var(v);
                 }
+                v.sve_activity = v.pos_occurs.len().min(v.neg_occurs.len());
+                elim.enqueue_var(v);
             }
             if elim.active {
-                //  && cdb.count(false) < 4_800_000
+                state.progress(cdb, config, elim, vars, Some("enqueued"));
                 cdb.simplify(asgs, config, elim, state, vars);
+                state.progress(cdb, config, elim, vars, Some("simplify"));
                 // config.elim_eliminate_combination_limit = 40;
                 // config.elim_eliminate_grow_limit = 0;
                 // config.elim_eliminate_loop_limit = 32;
                 // config.elim_subsume_literal_limit = 100;
                 // config.elim_subsume_loop_limit = 32;
-                elim.stop(cdb, vars, true);
-                state.progress(cdb, config, elim, vars, Some("simplify"));
-            } else {
-                elim.stop(cdb, vars, true);
             }
         }
+        elim.stop(cdb, vars, true);
         if search(asgs, config, cdb, elim, state, vars) {
             if !state.ok {
                 asgs.cancel_until(vars, 0);
