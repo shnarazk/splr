@@ -5,7 +5,7 @@ use crate::restart::Ema;
 use crate::traits::*;
 use crate::types::*;
 use crate::var::Var;
-use chrono::Utc;
+use std::time::SystemTime;
 use std::fmt;
 use std::path::Path;
 
@@ -47,7 +47,7 @@ pub struct State {
     pub conflicts: Vec<Lit>,
     pub an_seen: Vec<bool>,
     pub lbd_temp: Vec<usize>,
-    pub start: chrono::DateTime<chrono::Utc>,
+    pub start: SystemTime,
     dumper: ProgressRecord,
     pub progress_cnt: usize,
     pub target: String,
@@ -113,7 +113,7 @@ impl StateIF for State {
             conflicts: vec![],
             an_seen: vec![false; nv + 1],
             lbd_temp: vec![0; nv + 1],
-            start: Utc::now(),
+            start: SystemTime::now(),
             progress_cnt: 0,
             dumper: ProgressRecord::default(),
             target: if fname == "" {
@@ -291,9 +291,11 @@ impl StateIF for State {
 
 impl fmt::Display for State {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let tm = format!("{}", Utc::now() - self.start);
-        let len = tm.len();
-        write!(f, "{:37} |time:{:>15}", self.target, &tm[2..len - 5])
+        let tm = match self.start.elapsed() {
+            Ok(e) => e.as_secs() as f64 + e.subsec_millis() as f64 / 1000.0f64,
+            Err(_) => 0.0f64,
+        };
+        write!(f, "{:38} |elapsed:{:>11.2}", self.target, tm)
     }
 }
 
