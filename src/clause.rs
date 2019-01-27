@@ -9,8 +9,8 @@ use std::cmp::Ordering;
 use std::fmt;
 
 const CLA_ACTIVITY_MAX: f64 = 1e240;
-const CLA_ACTIVITY_SCALE1: f64 = 1e-80;
-const CLA_ACTIVITY_SCALE2: f64 = 1e-20;
+const CLA_ACTIVITY_SCALE1: f64 = 1e-30;
+const CLA_ACTIVITY_SCALE2: f64 = 1e-30;
 
 impl ClauseIdIF for ClauseId {
     #[inline(always)]

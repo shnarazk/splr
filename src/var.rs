@@ -5,8 +5,8 @@ use crate::types::*;
 use std::fmt;
 
 const VAR_ACTIVITY_MAX: f64 = 1e240;
-const VAR_ACTIVITY_SCALE1: f64 = 1e-80;
-const VAR_ACTIVITY_SCALE2: f64 = 1e-20;
+const VAR_ACTIVITY_SCALE1: f64 = 1e-30;
+const VAR_ACTIVITY_SCALE2: f64 = 1e-30;
 
 /// Struct for a variable.
 pub struct Var {
