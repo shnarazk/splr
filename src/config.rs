@@ -102,7 +102,7 @@ impl Default for Config {
             glureduce: true,
             cdb_inc: 300,
             cdb_inc_extra: 1000,
-            restart_thr: 0.75,
+            restart_thr: 0.80,
             restart_blk: 1.40,
             restart_asg_len: 3500,
             restart_lbd_len: 50,
