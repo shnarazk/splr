@@ -10,14 +10,22 @@ const VAR_ACTIVITY_SCALE2: f64 = 1e-30;
 
 /// Struct for a variable.
 pub struct Var {
-    pub index: usize,
+    /// reverse conversion to index. Note `VarId` must be `usize`.
+    pub index: VarId,
+    /// the current value.
     pub assign: Lbool,
+    /// the previous assigned value
     pub phase: Lbool,
     pub reason: ClauseId,
+    /// decision level at which this variables is assigned.
     pub level: usize,
+    /// a dynamic evaluation criterion like VSIDS or ACID.
     pub activity: f64,
+    /// a dynamic evaluation criterion for eliminator.
     pub sve_activity: usize,
+    /// list of clauses which contain this variable positively.
     pub pos_occurs: Vec<ClauseId>,
+    /// list of clauses which contain this variable negatively.
     pub neg_occurs: Vec<ClauseId>,
     flags: u16,
 }

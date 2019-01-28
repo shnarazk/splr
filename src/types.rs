@@ -12,7 +12,11 @@ pub type ClauseId = usize;
 /// is a dummy clause index
 pub const NULL_CLAUSE: ClauseId = 0;
 
-/// Literal encoded on unsigned integer
+/// Literal encoded on `u32` as:
+///
+/// - the literal corresponding to a positive occurence of *variable `n` is `2 * n` and
+/// - that for the negative one is `2 * n + 1`.
+///
 /// # Examples
 ///
 /// ```
@@ -53,7 +57,7 @@ impl LitIF for Lit {
     fn from_int(x: i32) -> Lit {
         (if x < 0 { -2 * x + 1 } else { 2 * x }) as Lit
     }
-    /// converter from [VarId](type.VarId.html) to [Lit](type.Lit.html).
+    /// converter from [VarId](../type.VarId.html) to [Lit](../type.Lit.html).
     /// returns a positive literal if p == LTRUE or BOTTOM.
     #[inline(always)]
     fn from_var(vi: VarId, p: Lbool) -> Lit {
@@ -153,12 +157,19 @@ impl<T> Delete<T> for Vec<T> {
     }
 }
 
+/// Collection of 1 bit properties for clause and var.
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub enum Flag {
+    /// a clause is stored in DB, but is a garbage.
     DeadClause = 0,
+    /// a clause is learnt clause and is removable.
     LearntClause,
+    /// a clause is used recently in conflict analyze.
     JustUsedClause,
+    /// a clause or var is equeued for eliminator.
     Enqueued,
+    /// a var is eliminated and managed by eliminator.
     EliminatedVar,
+    /// Garbage collector should be check the watch lists for corresponding literals if this is on.
     TouchedVar,
 }

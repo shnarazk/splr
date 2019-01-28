@@ -85,12 +85,13 @@ impl WatchDBIF for Vec<Watch> {
     }
 }
 
+/// A representation of *logical clauses*
 pub struct Clause {
-    /// the literals
+    /// the literals making a clause
     pub lits: Vec<Lit>,
-    /// LBD, NDD, or something, used by `reduce_db`
+    /// A static clause evaluation criterion like LBD, NDD, or something
     pub rank: usize,
-    /// clause activity used by `analyze` and `reduce_db`
+    /// A dynamic clause evaluation criterion based on the numer of references
     pub activity: f64,
     /// Flags
     flags: u16,
