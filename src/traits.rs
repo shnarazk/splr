@@ -121,7 +121,7 @@ pub trait EmaIF {
     fn update(&mut self, x: f64);
 }
 
-/// API for [object properies](../types/enum.Flag.html) like `is`, `turn_off`, `turn_on` and so on.
+/// API for [object properties](../types/enum.Flag.html) like `is`, `turn_off`, `turn_on` and so on.
 pub trait FlagIF {
     fn is(&self, flag: Flag) -> bool;
     fn turn_off(&mut self, flag: Flag);
