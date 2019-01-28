@@ -107,6 +107,7 @@ fn negate_bool(b: Lbool) -> Lbool {
 }
 
 /// data about a problem.
+#[derive(Clone)]
 pub struct CNFDescription {
     pub num_of_variables: usize,
     pub num_of_clauses: usize,

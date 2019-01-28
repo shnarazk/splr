@@ -150,7 +150,7 @@ pub trait SatSolverIF {
 }
 
 pub trait StateIF {
-    fn new(config: &Config, nv: usize, se: i32, fname: &str) -> State;
+    fn new(config: &Config, cnf: CNFDescription) -> State;
     fn progress_header(&self, config: &Config);
     fn progress(
         &mut self,

@@ -50,7 +50,7 @@ pub struct State {
     pub start: SystemTime,
     dumper: ProgressRecord,
     pub progress_cnt: usize,
-    pub target: String,
+    pub target: CNFDescription,
 }
 
 macro_rules! i {
@@ -94,7 +94,17 @@ macro_rules! f {
 }
 
 impl StateIF for State {
-    fn new(config: &Config, nv: usize, _se: i32, fname: &str) -> State {
+    fn new(config: &Config, mut cnf: CNFDescription) -> State {
+        cnf.pathname = if cnf.pathname == "" {
+            "--".to_string()
+        } else {
+            Path::new(&cnf.pathname)
+                .file_name()
+                .unwrap()
+                .to_os_string()
+                .into_string()
+                .unwrap()
+        };
         State {
             ok: true,
             next_reduction: 1000,
@@ -109,23 +119,14 @@ impl StateIF for State {
             sum_asg: 0.0,
             num_solved_vars: 0,
             num_eliminated_vars: 0,
-            model: vec![BOTTOM; nv + 1],
+            model: vec![BOTTOM; cnf.num_of_variables + 1],
             conflicts: vec![],
-            an_seen: vec![false; nv + 1],
-            lbd_temp: vec![0; nv + 1],
+            an_seen: vec![false; cnf.num_of_variables + 1],
+            lbd_temp: vec![0; cnf.num_of_variables + 1],
             start: SystemTime::now(),
             progress_cnt: 0,
             dumper: ProgressRecord::default(),
-            target: if fname == "" {
-                "--".to_string()
-            } else {
-                Path::new(&fname)
-                    .file_name()
-                    .unwrap()
-                    .to_os_string()
-                    .into_string()
-                    .unwrap()
-            },
+            target: cnf,
         }
     }
     fn progress_header(&self, config: &Config) {
@@ -295,7 +296,31 @@ impl fmt::Display for State {
             Ok(e) => e.as_secs() as f64 + e.subsec_millis() as f64 / 1000.0f64,
             Err(_) => 0.0f64,
         };
-        write!(f, "{:38} |elapsed:{:>11.2}", self.target, tm)
+        let vc = format!(
+            "{},{}",
+            self.target.num_of_variables, self.target.num_of_clauses,
+        );
+        let vclen = vc.len();
+        let fnlen = self.target.pathname.len();
+        let width = 43;
+        if width < vclen + fnlen {
+            write!(
+                f,
+                "{:<w$} |time:{:>9.2}",
+                self.target.pathname,
+                tm,
+                w = width
+            )
+        } else {
+            write!(
+                f,
+                "{}{:>w$} |time:{:>9.2}",
+                self.target.pathname,
+                &vc,
+                tm,
+                w = width - fnlen,
+            )
+        }
     }
 }
 

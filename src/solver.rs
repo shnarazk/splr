@@ -46,11 +46,9 @@ impl Solver {
     pub fn new(config: Config, cnf: &CNFDescription) -> Solver {
         let nv = cnf.num_of_variables as usize;
         let nc = cnf.num_of_clauses as usize;
-        let path = &cnf.pathname;
-        let (_fe, se) = config.ema_coeffs;
         let mut elim = Eliminator::default();
         elim.in_use = config.use_elim;
-        let state = State::new(&config, nv, se, &path.to_string());
+        let state = State::new(&config, cnf.clone());
         Solver {
             asgs: AssignStack::new(nv),
             config,
