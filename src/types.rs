@@ -170,6 +170,6 @@ pub enum Flag {
     Enqueued,
     /// a var is eliminated and managed by eliminator.
     EliminatedVar,
-    /// Garbage collector should be check the watch lists for corresponding literals if this is on.
+    /// mark to run garbage collector on the corresponding watcher lists
     TouchedVar,
 }
