@@ -72,7 +72,11 @@ fn main() {
                         panic!("failed to save: {:?}!", why);
                     }
                 }
-                println!("SATISFIABLE. The answer was dumped to {}.", result.as_str());
+                println!(
+                    "SATISFIABLE: {}. The answer was dumped to {}.",
+                    s.state.target.pathname,
+                    result.as_str()
+                );
                 // println!("{:?}", v);
             }
             Ok(Certificate::UNSAT(_)) => {
@@ -81,7 +85,11 @@ fn main() {
                         panic!("failed to save: {:?}!", why);
                     }
                 }
-                println!("UNSAT, The answer was dumped to {}.", result.as_str());
+                println!(
+                    "UNSAT: {}, The answer was dumped to {}.",
+                    s.state.target.pathname,
+                    result.as_str()
+                );
             }
             Err(_) => println!("Failed"),
         }
