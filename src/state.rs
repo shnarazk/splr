@@ -293,7 +293,7 @@ impl StateIF for State {
 impl fmt::Display for State {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let tm = match self.start.elapsed() {
-            Ok(e) => e.as_secs() as f64 + e.subsec_millis() as f64 / 1000.0f64,
+            Ok(e) => e.as_secs() as f64 + f64::from(e.subsec_millis()) / 1000.0f64,
             Err(_) => 0.0f64,
         };
         let vc = format!(

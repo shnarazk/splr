@@ -2,7 +2,7 @@ use crate::assign::AssignStack;
 use crate::clause::ClauseDB;
 use crate::eliminator::Eliminator;
 use crate::state::{Stat, State};
-use crate::traits::{ClauseDBIF, ClauseIF, EmaIF, FlagIF};
+use crate::traits::{ClauseDBIF, ClauseIF, FlagIF};
 use crate::types::Flag;
 use crate::var::Var;
 
