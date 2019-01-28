@@ -160,11 +160,11 @@ impl<T> Delete<T> for Vec<T> {
 /// Collection of 1 bit properties for clause and var.
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub enum Flag {
-    /// a clause is stored in DB, but is a garbage.
+    /// a clause is stored in DB, but is a garbage now.
     DeadClause = 0,
-    /// a clause is learnt clause and is removable.
+    /// a clause is a generated clause by conflict analysis and is removable.
     LearntClause,
-    /// a clause is used recently in conflict analyze.
+    /// a clause is used recently in conflict analysis.
     JustUsedClause,
     /// a clause or var is equeued for eliminator.
     Enqueued,
