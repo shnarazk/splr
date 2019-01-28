@@ -186,9 +186,9 @@ impl Config {
             // }
             return;
         }
-        state.ema_asg.reset();
-        state.ema_lbd.reset();
-        state.stats[Stat::SumLBD as usize] = 0;
+        // state.ema_asg.reset();
+        // state.ema_lbd.reset();
+        // state.stats[Stat::SumLBD as usize] = 0;
         // state.stats[Stat::Conflict as usize] = 0;
         if self.use_chan_seok {
             // Adjusting for low decision levels.
