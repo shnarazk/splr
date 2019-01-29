@@ -185,6 +185,7 @@ pub trait ValidatorIF {
 pub trait VarIF {
     fn new(i: usize) -> Var;
     fn new_vars(n: usize) -> Vec<Var>;
+    fn detach(&mut self, asgs: &mut AssignStack, l: Lit, cid: ClauseId);
 }
 
 /// API for var DB like `assigned`, `locked`, `compute_lbd` and so on.

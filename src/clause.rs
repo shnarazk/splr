@@ -283,17 +283,7 @@ impl ClauseDBIF for ClauseDB {
                         let vi = l.vi();
                         let v = &mut vars[vi];
                         if !v.is(Flag::EliminatedVar) && v.assign == BOTTOM {
-                            if l.positive() {
-                                v.pos_occurs.delete_unstable(|&cj| ci == cj);
-                                if v.pos_occurs.is_empty() {
-                                    asgs.enqueue_null(v, LFALSE, 0);
-                                }
-                            } else {
-                                v.neg_occurs.delete_unstable(|&cj| ci == cj);
-                                if v.neg_occurs.is_empty() {
-                                    asgs.enqueue_null(v, LTRUE, 0);
-                                }
-                            }
+                            v.detach(asgs, *l, ci);
                             elim.enqueue_var(v);
                         }
                     }

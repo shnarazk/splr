@@ -1,3 +1,4 @@
+use crate::assign::AssignStack;
 use crate::clause::Clause;
 use crate::eliminator::Eliminator;
 use crate::traits::*;
@@ -57,6 +58,19 @@ impl VarIF for Var {
             vec.push(v);
         }
         vec
+    }
+    fn detach(&mut self, asgs: &mut AssignStack, l: Lit, cid: ClauseId) {
+        if l.positive() {
+            self.pos_occurs.delete_unstable(|&c| c == cid);
+            if self.pos_occurs.is_empty() {
+                asgs.enqueue_null(self, LFALSE, 0);
+            }
+        } else {
+            self.neg_occurs.delete_unstable(|&c| c == cid);
+            if self.neg_occurs.is_empty() {
+                asgs.enqueue_null(self, LTRUE, 0);
+            }
+        }
     }
 }
 
