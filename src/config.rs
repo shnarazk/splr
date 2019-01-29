@@ -117,9 +117,9 @@ impl Default for Config {
             use_elim: true,
             elim_eliminate_combination_limit: 100,
             elim_eliminate_grow_limit: 0,
-            elim_eliminate_loop_limit: 2_000_000,
+            elim_eliminate_loop_limit: 1_000_000,
             elim_subsume_literal_limit: 1000,
-            elim_subsume_loop_limit: 1_000_000,
+            elim_subsume_loop_limit: 4_000_000,
             progress_log: false,
         }
     }
