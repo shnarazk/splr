@@ -600,6 +600,10 @@ fn eliminate_var(
         // Check wether the increase in number of clauses stays within the allowed ('grow').
         // Moreover, no clause must exceed the limit on the maximal clause size (if it is set).
         if (*pos).is_empty() && (*neg).is_empty() {
+            if !asgs.enqueue_null(v, LTRUE, 0) || asgs.propagate(cdb, state, vars) != NULL_CLAUSE {
+                state.ok = false;
+                return false;
+            }
             return true;
         }
         if (*pos).is_empty() && !(*neg).is_empty() {
