@@ -228,6 +228,7 @@ impl Eliminator {
                 Some(x) => x,
                 None => 0,
             };
+            // assert_ne!(cid, 0);
             cnt += 1;
             if config.elim_subsume_loop_limit < cnt {
                 continue;
@@ -242,11 +243,18 @@ impl Eliminator {
                 if c.is(Flag::DeadClause) || config.elim_subsume_literal_limit < lits.len() {
                     continue;
                 }
+                // if c is subsumed by c', both of c and c' are included in the occurs of all literals of c
+                // so searching the shortest occurs is most efficient.
                 let mut b = 0;
                 for l in lits {
                     let v = &vars[l.vi()];
-                    let nsum = v.pos_occurs.len() + v.neg_occurs.len();
-                    if !v.is(Flag::EliminatedVar) && 0 < v.level && nsum < tmp {
+                    let nsum = if l.positive() {
+                        v.neg_occurs.len()
+                    } else {
+                        v.pos_occurs.len()
+                    };
+                    debug_assert!(v.assign == BOTTOM);
+                    if !v.is(Flag::EliminatedVar) && nsum < tmp {
                         b = l.vi();
                         tmp = nsum;
                     }
@@ -312,7 +320,7 @@ fn try_subsume(
               //}
         }
         Some(l) => {
-            // println!("BackSubsC subsumeds{} from {} and {} {:#}", l.int(), cid.fmt(), di.fmt());
+            // println!("BackSubsC subsumeds{} from {} and {:#}", l.int(), cid.format(), did.format());
             if !strengthen_clause(cdb, elim, state, vars, asgs, did, l.negate()) {
                 state.ok = false;
                 return false;
