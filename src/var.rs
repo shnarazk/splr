@@ -21,8 +21,6 @@ pub struct Var {
     pub level: usize,
     /// a dynamic evaluation criterion like VSIDS or ACID.
     pub activity: f64,
-    /// a dynamic evaluation criterion for eliminator.
-    pub sve_activity: usize,
     /// list of clauses which contain this variable positively.
     pub pos_occurs: Vec<ClauseId>,
     /// list of clauses which contain this variable negatively.
@@ -43,7 +41,6 @@ impl VarIF for Var {
             reason: NULL_CLAUSE,
             level: 0,
             activity: 0.0,
-            sve_activity: 0,
             pos_occurs: Vec::new(),
             neg_occurs: Vec::new(),
             flags: 0,
