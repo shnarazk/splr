@@ -127,7 +127,7 @@ impl EliminatorIF for Eliminator {
             return;
         }
         let mut cnt = 0;
-        self.var_queue.sort_by(|&a, &b| {
+        self.var_queue.sort_unstable_by(|&a, &b| {
             let va = vars[a].sve_activity;
             let vb = vars[b].sve_activity;
             vb.cmp(&va)
@@ -142,6 +142,8 @@ impl EliminatorIF for Eliminator {
                 state.ok = false;
                 break 'perform;
             }
+            //while !self.var_queue.is_empty() { // queue emulation
+            //    let vi = self.var_queue.remove(0);
             while let Some(vi) = self.var_queue.pop() {
                 let v = &mut vars[vi];
                 v.turn_off(Flag::Enqueued);
@@ -152,13 +154,14 @@ impl EliminatorIF for Eliminator {
                 if v.is(Flag::EliminatedVar) || v.assign != BOTTOM {
                     continue;
                 }
-                v.sve_activity = 0;
+                v.sve_activity = v.pos_occurs.len().min(v.neg_occurs.len());
                 if !eliminate_var(asgs, config, cdb, self, state, vars, vi) {
                     state.ok = false;
                     return;
                 }
             }
         }
+        self.stop(cdb, vars, true);
     }
     fn extend_model(&mut self, model: &mut Vec<i32>) {
         if self.elim_clauses.is_empty() {
@@ -458,7 +461,7 @@ fn merge(cdb: &mut ClauseDB, cip: ClauseId, ciq: ClauseId, v: VarId) -> Option<V
     Some(vec)
 }
 
-/// returns false if inconsistent
+/// removes `l` from clause `cid`, returning `false` if inconsistent
 /// - calls `enqueue_clause`
 /// - calls `enqueue_var`
 fn strengthen_clause(
