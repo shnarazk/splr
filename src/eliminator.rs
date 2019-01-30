@@ -51,11 +51,7 @@ impl EliminatorIF for Eliminator {
         self.in_use = false;
         self.active = false;
     }
-    fn activate(
-        &mut self,
-        cdb: &mut ClauseDB,
-        vars: &mut [Var],
-    ) {
+    fn activate(&mut self, cdb: &mut ClauseDB, vars: &mut [Var]) {
         self.in_use = true;
         self.active = true;
         for (cid, c) in &mut cdb.clause.iter_mut().enumerate().skip(1) {
@@ -295,8 +291,7 @@ fn try_subsume(
                 // );
                 cdb.detach(did);
                 vars.detach(elim, did, &cdb.clause[did]);
-                if !cdb.clause[did].is(Flag::LearntClause)
-                {
+                if !cdb.clause[did].is(Flag::LearntClause) {
                     // println!("BackSubC deletes a permanent clause {} {:#}",
                     //          di.fmt(),
                     //          clause!(cdb, did));
@@ -489,7 +484,13 @@ fn strengthen_clause(
 /// removes Lit `p` from Clause *self*. This is an O(n) function!
 /// returns true if the clause became a unit clause.
 /// Called only from strengthen_clause
-fn strengthen(cdb: &mut ClauseDB, elim: &mut Eliminator, vars: &mut [Var], cid: ClauseId, p: Lit) -> bool {
+fn strengthen(
+    cdb: &mut ClauseDB,
+    elim: &mut Eliminator,
+    vars: &mut [Var],
+    cid: ClauseId,
+    p: Lit,
+) -> bool {
     debug_assert!(!cdb.clause[cid].is(Flag::DeadClause));
     debug_assert!(1 < cdb.clause[cid].lits.len());
     let ClauseDB {
