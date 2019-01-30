@@ -475,7 +475,8 @@ fn strengthen_clause(
     cdb.touched[l as usize] = true;
     cdb.touched[l.negate() as usize] = true;
     debug_assert_ne!(cid, NULL_CLAUSE);
-    if strengthen(cdb, vars, cid, l) {
+    if strengthen(cdb, elim, vars, cid, l) {
+        // Vaporize the binary clause
         debug_assert!(2 == cdb.clause[cid].lits.len());
         let c0 = cdb.clause[cid].lits[0];
         debug_assert_ne!(c0, l);
@@ -502,7 +503,7 @@ fn strengthen_clause(
 /// removes Lit `p` from Clause *self*. This is an O(n) function!
 /// returns true if the clause became a unit clause.
 /// Called only from strengthen_clause
-fn strengthen(cdb: &mut ClauseDB, vars: &mut [Var], cid: ClauseId, p: Lit) -> bool {
+fn strengthen(cdb: &mut ClauseDB, elim: &mut Eliminator, vars: &mut [Var], cid: ClauseId, p: Lit) -> bool {
     debug_assert!(!cdb.clause[cid].is(Flag::DeadClause));
     debug_assert!(1 < cdb.clause[cid].lits.len());
     let ClauseDB {

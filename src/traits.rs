@@ -49,7 +49,6 @@ pub trait ClauseDBIF {
     fn detach(&mut self, cid: ClauseId);
     fn reduce(
         &mut self,
-        asgs: &mut AssignStack,
         config: &Config,
         elim: &mut Eliminator,
         state: &mut State,
@@ -63,7 +62,7 @@ pub trait ClauseDBIF {
         state: &mut State,
         vars: &mut [Var],
     ) -> bool;
-    fn garbage_collect(&mut self, asgs: &mut AssignStack, vars: &mut [Var], elim: &mut Eliminator);
+    fn garbage_collect(&mut self, elim: &mut Eliminator, vars: &mut [Var]);
     fn new_clause(&mut self, v: &[Lit], rank: usize, learnt: bool) -> ClauseId;
     fn reset_lbd(&mut self, vars: &[Var], temp: &mut [usize]);
     fn bump_activity(&mut self, inc: &mut f64, cid: ClauseId);
@@ -185,7 +184,7 @@ pub trait ValidatorIF {
 pub trait VarIF {
     fn new(i: usize) -> Var;
     fn new_vars(n: usize) -> Vec<Var>;
-    fn detach(&mut self, asgs: &mut AssignStack, l: Lit, cid: ClauseId);
+    fn detach(&mut self, elim: &mut Eliminator, l: Lit, cid: ClauseId);
 }
 
 /// API for var DB like `assigned`, `locked`, `compute_lbd` and so on.

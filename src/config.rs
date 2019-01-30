@@ -1,4 +1,3 @@
-use crate::assign::AssignStack;
 use crate::clause::ClauseDB;
 use crate::eliminator::Eliminator;
 use crate::state::{Stat, State};
@@ -129,7 +128,6 @@ impl Config {
     #[inline(always)]
     pub fn adapt_strategy(
         &mut self,
-        asgs: &mut AssignStack,
         cdb: &mut ClauseDB,
         elim: &mut Eliminator,
         state: &mut State,
@@ -204,7 +202,7 @@ impl Config {
                     c.kill(&mut cdb.touched);
                 }
             }
-            cdb.garbage_collect(asgs, vars, elim);
+            cdb.garbage_collect(elim, vars);
         }
     }
 }

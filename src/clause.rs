@@ -245,7 +245,7 @@ impl ClauseDBIF for ClauseDB {
             num_learnt: 0,
         }
     }
-    fn garbage_collect(&mut self, asgs: &mut AssignStack, vars: &mut [Var], elim: &mut Eliminator) {
+    fn garbage_collect(&mut self, elim: &mut Eliminator, vars: &mut [Var]) {
         let ClauseDB {
             ref mut watcher,
             ref mut clause,
@@ -283,8 +283,7 @@ impl ClauseDBIF for ClauseDB {
                         let vi = l.vi();
                         let v = &mut vars[vi];
                         if !v.is(Flag::EliminatedVar) && v.assign == BOTTOM {
-                            v.detach(asgs, *l, ci);
-                            elim.enqueue_var(v);
+                            v.detach(elim, *l, ci);
                         }
                     }
                 }
@@ -431,7 +430,6 @@ impl ClauseDBIF for ClauseDB {
     }
     fn reduce(
         &mut self,
-        asgs: &mut AssignStack,
         config: &Config,
         elim: &mut Eliminator,
         state: &mut State,
@@ -475,7 +473,7 @@ impl ClauseDBIF for ClauseDB {
             }
         }
         state.stats[Stat::Reduction as usize] += 1;
-        self.garbage_collect(asgs, vars, elim);
+        self.garbage_collect(elim, vars);
     }
     fn simplify(
         &mut self,
@@ -512,7 +510,7 @@ impl ClauseDBIF for ClauseDB {
                     }
                 }
             }
-            self.garbage_collect(asgs, vars, elim);
+            self.garbage_collect(elim, vars);
             if na == asgs.len()
                 && (!elim.in_use || (0 == elim.clause_queue_len() && 0 == elim.var_queue_len()))
             {

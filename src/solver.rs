@@ -459,7 +459,7 @@ fn handle_conflict_path(
     if tn_confl % 10_000 == 0 {
         if tn_confl == 100_000 {
             asgs.cancel_until(vars, 0);
-            config.adapt_strategy(asgs, cdb, elim, state, vars);
+            config.adapt_strategy(cdb, elim, state, vars);
         }
         // if tn_confl % 100_000 == 0 {
         //     elim.activate(asgs, cdb, config, vars);
@@ -476,7 +476,8 @@ fn handle_conflict_path(
         && 0 < cdb.num_learnt
     {
         state.cur_restart = ((tn_confl as f64) / (state.next_reduction as f64)) as usize + 1;
-        cdb.reduce(asgs, config, elim, state, vars);
+        cdb.reduce(config, elim, state, vars);
+        // elim.activate(asgs, cdb, config, vars);
     }
 }
 
