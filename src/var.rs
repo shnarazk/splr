@@ -147,11 +147,7 @@ impl VarDBIF for [Var] {
             for l in &c.lits {
                 let v = &mut self[l.vi()];
                 if !v.is(Flag::EliminatedVar) {
-                    if l.positive() {
-                        v.pos_occurs.retain(|&cj| cid != cj);
-                    } else {
-                        v.neg_occurs.retain(|&cj| cid != cj);
-                    }
+                    v.detach(elim, *l, cid);
                     elim.enqueue_var(v);
                 }
             }

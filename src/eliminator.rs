@@ -300,10 +300,7 @@ fn try_subsume(
 ) -> bool {
     match subsume(cdb, cid, did) {
         Some(NULL_LIT) => {
-            if !cid.is_lifted_lit()
-                && cdb.clause[cid].is(Flag::LearntClause)
-                && cdb.clause[did].is(Flag::LearntClause)
-            {
+            if !cid.is_lifted_lit() {
                 // println!("BackSubsC    => {} {:#} subsumed completely by {} {:#}",
                 //          did.fmt(),
                 //          *clause!(cdb, cid),
@@ -312,15 +309,20 @@ fn try_subsume(
                 // );
                 cdb.detach(did);
                 vars.detach(elim, did, &cdb.clause[did]);
-            } //else {
-              // println!("BackSubsC deletes a permanent clause {} {:#}",
-              //          di.fmt(),
-              //          clause!(cdb, did));
-              // TODO: move the cid to Permanent
-              //}
+                if !cdb.clause[did].is(Flag::LearntClause)
+                {
+                    // println!("BackSubC deletes a permanent clause {} {:#}",
+                    //          di.fmt(),
+                    //          clause!(cdb, did));
+                    // TODO: move the cid to Permanent
+                    cdb.clause[cid].turn_off(Flag::LearntClause);
+                }
+            } else {
+                panic!("eaeaubr");
+            }
         }
         Some(l) => {
-            // println!("BackSubsC subsumeds{} from {} and {:#}", l.int(), cid.format(), did.format());
+            // println!("BackSubC subsumes {} from {} and {}", l.int(), cid.format(), did.format());
             if !strengthen_clause(cdb, elim, state, vars, asgs, did, l.negate()) {
                 state.ok = false;
                 return false;
@@ -492,6 +494,7 @@ fn strengthen_clause(
         // println!("cid {} drops literal {}", cid.fmt(), l.int());
         debug_assert!(1 < cdb.clause[cid].lits.len());
         elim.enqueue_clause(cid, &mut cdb.clause[cid]);
+        vars[l.vi()].detach(elim, l, cid);
         true
     }
 }
@@ -511,13 +514,7 @@ fn strengthen(cdb: &mut ClauseDB, vars: &mut [Var], cid: ClauseId, p: Lit) -> bo
     // debug_assert!((*ch).lits.contains(&p));
     // debug_assert!(1 < (*ch).lits.len());
     let v = &mut vars[p.vi()];
-    if p.positive() {
-        // debug_assert!(v.pos_occurs.contains(&cid));
-        v.pos_occurs.delete_unstable(|&c| c == cid);
-    } else {
-        // debug_assert!(v.neg_occurs.contains(&cid));
-        v.neg_occurs.delete_unstable(|&c| c == cid);
-    }
+    v.detach(elim, p, cid);
     if (*c).is(Flag::DeadClause) {
         return false;
     }
