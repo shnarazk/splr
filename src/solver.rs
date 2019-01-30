@@ -46,8 +46,7 @@ impl Solver {
     pub fn new(config: Config, cnf: &CNFDescription) -> Solver {
         let nv = cnf.num_of_variables as usize;
         let nc = cnf.num_of_clauses as usize;
-        let mut elim = Eliminator::default();
-        elim.in_use = config.use_elim;
+        let elim = Eliminator::new(config.use_elim, nv);
         let state = State::new(&config, cnf.clone());
         Solver {
             asgs: AssignStack::new(nv),
@@ -79,21 +78,16 @@ impl SatSolverIF for Solver {
         state.progress_header(config);
         state.progress(cdb, config, elim, vars, Some("loaded"));
         if elim.in_use {
-            for v in &mut vars[1..] {
+            for vi in 1..vars.len() {
+                let v = &mut vars[vi];
                 if v.assign != BOTTOM {
                     v.pos_occurs.clear();
                     v.neg_occurs.clear();
                     continue;
                 }
-                debug_assert!(!asgs.trail.contains(&Lit::from_var(v.index, LTRUE)));
-                debug_assert!(!asgs.trail.contains(&Lit::from_var(v.index, LFALSE)));
-                if v.neg_occurs.is_empty() && !v.pos_occurs.is_empty() {
-                    asgs.enqueue_null(v, LTRUE, 0);
-                } else if v.pos_occurs.is_empty() && !v.neg_occurs.is_empty() {
-                    asgs.enqueue_null(v, LFALSE, 0);
-                }
-                v.sve_activity = v.pos_occurs.len().min(v.neg_occurs.len());
-                elim.enqueue_var(v);
+                debug_assert!(!asgs.trail.contains(&Lit::from_var(vi, LTRUE)));
+                debug_assert!(!asgs.trail.contains(&Lit::from_var(vi, LFALSE)));
+                elim.enqueue_var(vars, vi);
             }
             if elim.active {
                 state.progress(cdb, config, elim, vars, Some("enqueued"));

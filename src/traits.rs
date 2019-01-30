@@ -86,19 +86,13 @@ pub trait Delete<T> {
 
 /// API for Eliminator like `activate`, `stop`, `eliminate` and so on.
 pub trait EliminatorIF {
-    fn new(use_elim: bool) -> Eliminator;
+    fn new(in_use: bool, nv: usize) -> Eliminator;
     fn stop(&mut self, cdb: &mut ClauseDB, vars: &mut [Var], force: bool);
-    fn activate(
-        &mut self,
-        asgs: &mut AssignStack,
-        cdb: &mut ClauseDB,
-        config: &Config,
-        vars: &mut [Var],
-    );
+    fn activate(&mut self, cdb: &mut ClauseDB, vars: &mut [Var]);
     fn enqueue_clause(&mut self, cid: ClauseId, c: &mut Clause);
     fn clear_clause_queue(&mut self, cdb: &mut ClauseDB);
     fn clause_queue_len(&self) -> usize;
-    fn enqueue_var(&mut self, v: &mut Var);
+    fn enqueue_var(&mut self, vars: &mut [Var], vi: VarId);
     fn clear_var_queue(&mut self, vars: &mut [Var]);
     fn var_queue_len(&self) -> usize;
     fn eliminate(
@@ -184,7 +178,7 @@ pub trait ValidatorIF {
 pub trait VarIF {
     fn new(i: usize) -> Var;
     fn new_vars(n: usize) -> Vec<Var>;
-    fn detach(&mut self, elim: &mut Eliminator, l: Lit, cid: ClauseId);
+    fn detach(&mut self, elim: &mut Eliminator, vars: &mut [Var], l: Lit, cid: ClauseId);
 }
 
 /// API for var DB like `assigned`, `locked`, `compute_lbd` and so on.
@@ -194,6 +188,7 @@ pub trait VarDBIF {
     fn satisfies(&self, c: &[Lit]) -> bool;
     fn compute_lbd(&self, vec: &[Lit], keys: &mut [usize]) -> usize;
     fn attach(&mut self, elim: &mut Eliminator, cid: ClauseId, c: &mut Clause, enqueue: bool);
+    fn detach_lit(&mut self, elim: &mut Eliminator, l: Lit, cid: ClauseId);
     fn detach(&mut self, elim: &mut Eliminator, cid: ClauseId, c: &Clause);
     fn bump_activity(&mut self, inc: &mut f64, vi: VarId);
 }

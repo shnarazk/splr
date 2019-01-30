@@ -283,7 +283,7 @@ impl ClauseDBIF for ClauseDB {
                         let vi = l.vi();
                         let v = &mut vars[vi];
                         if !v.is(Flag::EliminatedVar) && v.assign == BOTTOM {
-                            v.detach(elim, *l, ci);
+                            vars.detach_lit(elim, *l, ci);
                         }
                     }
                 }
@@ -504,7 +504,7 @@ impl ClauseDBIF for ClauseDB {
                         for l in &c.lits {
                             let v = &mut vars[l.vi()];
                             if !v.is(Flag::EliminatedVar) {
-                                elim.enqueue_var(v);
+                                elim.enqueue_var(vars, l.vi());
                             }
                         }
                     }
