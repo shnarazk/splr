@@ -21,6 +21,7 @@ pub enum Stat {
     Propagation,        // the number of propagation
     Reduction,          // the number of reduction
     Simplification,     // the number of simplification
+    Elimination,        // the number of clause subsumption and varibale elimination
     Assign,             // the number of assigned variables
     SumLBD,             // the sum of generated learnts' LBD
     NumBin,             // the number of binary clauses
@@ -255,19 +256,19 @@ impl StateIF for State {
             ),
         );
         println!(
-            "   Conflicts|aLBD:{}, bjmp:{}, cnfl:{} |#cls:{} ",
+            "   Conflicts|aLBD:{}, bjmp:{}, cnfl:{} |#var:{} ",
             f!("{:>9.2}", self.dumper, LogF64Id::AveLBD, self.ema_lbd.get()),
             f!("{:>9.2}", self.dumper, LogF64Id::BLevel, self.b_lvl.get()),
             f!("{:>9.2}", self.dumper, LogF64Id::CLevel, self.c_lvl.get()),
             i!(
                 "{:>9}",
                 self.dumper,
-                LogUsizeId::ElimClauseQueue,
-                elim.clause_queue_len()
+                LogUsizeId::ElimVarQueue,
+                elim.var_queue_len()
             ),
         );
         println!(
-            "   Clause DB|#rdc:{}, #smp:{},      Eliminator|#var:{} ",
+            "   Clause DB|#rdc:{}, #smp:{},      Eliminator|#run:{} ",
             i!(
                 "{:>9}",
                 self.dumper,
@@ -283,8 +284,8 @@ impl StateIF for State {
             i!(
                 "{:>9}",
                 self.dumper,
-                LogUsizeId::ElimVarQueue,
-                elim.var_queue_len()
+                LogUsizeId::Elimination,
+                self.stats[Stat::Elimination as usize]
             ),
         );
     }
@@ -339,8 +340,10 @@ enum LogUsizeId {
     Restart,         // 11: restart_count: usize,
     Reduction,       // 12: reduction: usize,
     Simplification,  // 13: simplification: usize,
-    ElimClauseQueue, // 14: elim_clause_queue: usize,
-    ElimVarQueue,    // 15: elim_var_queue: usize,
+    Elimination,     // 14: elimination: usize,
+    ElimClauseQueue, // 15: elim_clause_queue: usize,
+    ElimVarQueue,    // 16: elim_var_queue: usize,
+    End,
 }
 
 enum LogF64Id {
@@ -350,18 +353,19 @@ enum LogF64Id {
     AveLBD,       //  3: ave_lbd: f64,
     BLevel,       //  4: backjump_level: f64,
     CLevel,       //  5: conflict_level: f64,
+    End,
 }
 
 struct ProgressRecord {
-    vali: [usize; 16],
-    valf: [f64; 6],
+    vali: [usize; LogUsizeId::End as usize],
+    valf: [f64; LogF64Id::End as usize],
 }
 
 impl Default for ProgressRecord {
     fn default() -> ProgressRecord {
         ProgressRecord {
-            vali: [0; 16],
-            valf: [0.0; 6],
+            vali: [0; LogUsizeId::End as usize],
+            valf: [0.0; LogF64Id::End as usize],
         }
     }
 }

@@ -1,7 +1,7 @@
 use crate::assign::AssignStack;
 use crate::clause::{Clause, ClauseDB};
 use crate::config::Config;
-use crate::state::State;
+use crate::state::{State, Stat};
 use crate::traits::*;
 use crate::types::*;
 use crate::var::Var;
@@ -109,6 +109,7 @@ impl EliminatorIF for Eliminator {
         if !self.in_use || !self.active {
             return;
         }
+        state.stats[Stat::Elimination as usize] += 1;
         let mut cnt = 0;
         'perform: while self.bwdsub_assigns < asgs.len()
             || !self.var_queue.is_empty()
