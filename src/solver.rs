@@ -471,7 +471,9 @@ fn handle_conflict_path(
     {
         state.cur_restart = ((tn_confl as f64) / (state.next_reduction as f64)) as usize + 1;
         cdb.reduce(config, elim, state, vars);
-        // elim.activate(asgs, cdb, config, vars);
+        // if 2.0 * (state.ema_lbd.get().min(state.b_lvl.get())) < state.c_lvl.get() {
+        //     elim.activate(cdb, vars);
+        // }
     }
 }
 
