@@ -58,7 +58,7 @@ impl EliminatorIF for Eliminator {
             if c.is(Flag::DeadClause) {
                 continue;
             }
-            vars.attach(self, cid, c, true);
+            self.add_cid_occur(vars, cid, c, true);
         }
         for vi in 1..vars.len() {
             let v = &vars[vi];
@@ -182,6 +182,47 @@ impl EliminatorIF for Eliminator {
             i -= width;
         }
     }
+    fn add_cid_occur(&mut self, vars: &mut [Var], cid: ClauseId, c: &mut Clause, enqueue: bool) {
+        if !self.in_use {
+            return;
+        }
+        for l in &c.lits {
+            let v = &mut vars[l.vi()];
+            v.turn_on(Flag::TouchedVar);
+            if !v.is(Flag::EliminatedVar) {
+                if l.positive() {
+                    v.pos_occurs.push(cid);
+                } else {
+                    v.neg_occurs.push(cid);
+                }
+                self.enqueue_var(vars, l.vi(), false);
+            }
+        }
+        if enqueue {
+            self.enqueue_clause(cid, c);
+        }
+    }
+    fn remove_lit_occur(&mut self, vars: &mut [Var], l: Lit, cid: ClauseId) {
+        let v = &mut vars[l.vi()];
+        if l.positive() {
+            v.pos_occurs.delete_unstable(|&c| c == cid);
+        } else {
+            v.neg_occurs.delete_unstable(|&c| c == cid);
+        }
+        self.enqueue_var(vars, l.vi(), true);
+    }
+    fn remove_cid_occur(&mut self, vars: &mut [Var], cid: ClauseId, c: &Clause) {
+        debug_assert!(c.is(Flag::DeadClause));
+        if self.in_use {
+            for l in &c.lits {
+                let v = &mut vars[l.vi()];
+                if !v.is(Flag::EliminatedVar) {
+                    self.remove_lit_occur(vars, *l, cid);
+                    self.enqueue_var(vars, l.vi(), true);
+                }
+            }
+        }
+    }
 }
 
 impl Eliminator {
@@ -290,7 +331,7 @@ fn try_subsume(
                 //          *clause!(cdb, cid),
                 // );
                 cdb.detach(did);
-                vars.detach(elim, did, &cdb.clause[did]);
+                elim.remove_cid_occur(vars, did, &cdb.clause[did]);
                 if !cdb.clause[did].is(Flag::LearntClause) {
                     // println!("BackSubC deletes a permanent clause {} {:#}",
                     //          di.fmt(),
@@ -473,7 +514,7 @@ fn strengthen_clause(
         debug_assert_ne!(c0, l);
         // println!("{} is removed and its first literal {} is enqueued.", cid.fmt(), c0.int());
         cdb.detach(cid);
-        vars.detach(elim, cid, &cdb.clause[cid]);
+        elim.remove_cid_occur(vars, cid, &cdb.clause[cid]);
         if asgs.enqueue_null(&mut vars[c0.vi()], c0.lbool(), 0)
             && asgs.propagate(cdb, state, vars) == NULL_CLAUSE
         {
@@ -486,7 +527,7 @@ fn strengthen_clause(
         // println!("cid {} drops literal {}", cid.fmt(), l.int());
         debug_assert!(1 < cdb.clause[cid].lits.len());
         elim.enqueue_clause(cid, &mut cdb.clause[cid]);
-        vars.detach_lit(elim, l, cid);
+        elim.remove_lit_occur(vars, l, cid);
         true
     }
 }
@@ -511,7 +552,7 @@ fn strengthen(
     let c = &mut clause[cid];
     // debug_assert!((*ch).lits.contains(&p));
     // debug_assert!(1 < (*ch).lits.len());
-    vars.detach_lit(elim, p, cid);
+    elim.remove_lit_occur(vars, p, cid);
     if (*c).is(Flag::DeadClause) {
         return false;
     }

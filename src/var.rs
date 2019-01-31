@@ -1,5 +1,4 @@
 use crate::clause::Clause;
-use crate::eliminator::Eliminator;
 use crate::traits::*;
 use crate::types::*;
 use std::fmt;
@@ -55,14 +54,6 @@ impl VarIF for Var {
         }
         vec
     }
-    fn detach(&mut self, elim: &mut Eliminator, vars: &mut [Var], l: Lit, cid: ClauseId) {
-        if l.positive() {
-            self.pos_occurs.delete_unstable(|&c| c == cid);
-        } else {
-            self.neg_occurs.delete_unstable(|&c| c == cid);
-        }
-        elim.enqueue_var(vars, self.index, true);
-    }
 }
 
 impl FlagIF for Var {
@@ -111,47 +102,6 @@ impl VarDBIF for [Var] {
         }
         keys[0] = key;
         cnt
-    }
-    fn attach(&mut self, elim: &mut Eliminator, cid: ClauseId, c: &mut Clause, enqueue: bool) {
-        if !elim.in_use {
-            return;
-        }
-        for l in &c.lits {
-            let v = &mut self[l.vi()];
-            v.turn_on(Flag::TouchedVar);
-            if !v.is(Flag::EliminatedVar) {
-                if l.positive() {
-                    v.pos_occurs.push(cid);
-                } else {
-                    v.neg_occurs.push(cid);
-                }
-                elim.enqueue_var(self, l.vi(), false);
-            }
-        }
-        if enqueue {
-            elim.enqueue_clause(cid, c);
-        }
-    }
-    fn detach_lit(&mut self, elim: &mut Eliminator, l: Lit, cid: ClauseId) {
-        let v = &mut self[l.vi()];
-        if l.positive() {
-            v.pos_occurs.delete_unstable(|&c| c == cid);
-        } else {
-            v.neg_occurs.delete_unstable(|&c| c == cid);
-        }
-        elim.enqueue_var(self, l.vi(), true);
-    }
-    fn detach(&mut self, elim: &mut Eliminator, cid: ClauseId, c: &Clause) {
-        debug_assert!(c.is(Flag::DeadClause));
-        if elim.in_use {
-            for l in &c.lits {
-                let v = &mut self[l.vi()];
-                if !v.is(Flag::EliminatedVar) {
-                    self.detach_lit(elim, *l, cid);
-                    elim.enqueue_var(self, l.vi(), true);
-                }
-            }
-        }
     }
     fn bump_activity(&mut self, inc: &mut f64, vi: VarId) {
         let v = &mut self[vi];

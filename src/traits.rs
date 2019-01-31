@@ -104,6 +104,9 @@ pub trait EliminatorIF {
         vars: &mut [Var],
     );
     fn extend_model(&mut self, model: &mut Vec<i32>);
+    fn add_cid_occur(&mut self, vars: &mut [Var], cid: ClauseId, c: &mut Clause, enqueue: bool);
+    fn remove_lit_occur(&mut self, vars: &mut [Var], l: Lit, cid: ClauseId);
+    fn remove_cid_occur(&mut self, vars: &mut [Var], cid: ClauseId, c: &Clause);
 }
 
 /// API for Exponential Moving Average, EMA, like `get`, `reset`, `update` and so on.
@@ -178,7 +181,6 @@ pub trait ValidatorIF {
 pub trait VarIF {
     fn new(i: usize) -> Var;
     fn new_vars(n: usize) -> Vec<Var>;
-    fn detach(&mut self, elim: &mut Eliminator, vars: &mut [Var], l: Lit, cid: ClauseId);
 }
 
 /// API for var DB like `assigned`, `locked`, `compute_lbd` and so on.
@@ -187,9 +189,6 @@ pub trait VarDBIF {
     fn locked(&self, c: &Clause, cid: ClauseId) -> bool;
     fn satisfies(&self, c: &[Lit]) -> bool;
     fn compute_lbd(&self, vec: &[Lit], keys: &mut [usize]) -> usize;
-    fn attach(&mut self, elim: &mut Eliminator, cid: ClauseId, c: &mut Clause, enqueue: bool);
-    fn detach_lit(&mut self, elim: &mut Eliminator, l: Lit, cid: ClauseId);
-    fn detach(&mut self, elim: &mut Eliminator, cid: ClauseId, c: &Clause);
     fn bump_activity(&mut self, inc: &mut f64, vi: VarId);
 }
 

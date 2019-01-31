@@ -283,7 +283,7 @@ impl ClauseDBIF for ClauseDB {
                         let vi = l.vi();
                         let v = &mut vars[vi];
                         if !v.is(Flag::EliminatedVar) && v.assign == BOTTOM {
-                            vars.detach_lit(elim, *l, ci);
+                            elim.remove_lit_occur(vars, *l, ci);
                         }
                     }
                 }
@@ -409,7 +409,7 @@ impl ClauseDBIF for ClauseDB {
         let cid = self.new_clause(&v, lbd, learnt);
         let c = &mut self.clause[cid];
         c.activity = config.var_inc;
-        vars.attach(elim, cid, c, true);
+        elim.add_cid_occur(vars, cid, c, true);
         cid
     }
     /// called from strengthen_clause, backward_subsumption_check, eliminate_var, substitute
