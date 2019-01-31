@@ -87,7 +87,7 @@ impl SatSolverIF for Solver {
                 }
                 debug_assert!(!asgs.trail.contains(&Lit::from_var(vi, LTRUE)));
                 debug_assert!(!asgs.trail.contains(&Lit::from_var(vi, LFALSE)));
-                elim.enqueue_var(vars, vi);
+                elim.enqueue_var(vars, vi, true);
             }
             if elim.active {
                 state.progress(cdb, config, elim, vars, Some("enqueued"));

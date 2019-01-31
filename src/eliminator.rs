@@ -65,7 +65,7 @@ impl EliminatorIF for Eliminator {
             if v.is(Flag::EliminatedVar) || v.assign != BOTTOM {
                 continue;
             }
-            self.enqueue_var(vars, vi);
+            self.enqueue_var(vars, vi, true);
         }
     }
     fn enqueue_clause(&mut self, cid: ClauseId, c: &mut Clause) {
@@ -81,11 +81,11 @@ impl EliminatorIF for Eliminator {
         }
         self.clause_queue.clear();
     }
-    fn enqueue_var(&mut self, vars: &mut [Var], vi: VarId) {
+    fn enqueue_var(&mut self, vars: &mut [Var], vi: VarId, upward: bool) {
         if !self.in_use || !self.active {
             return;
         }
-        self.var_queue.insert(vars, vi);
+        self.var_queue.insert(vars, vi, upward);
         vars[vi].turn_on(Flag::Enqueued);
     }
     fn clear_var_queue(&mut self, vars: &mut [Var]) {
@@ -308,7 +308,7 @@ fn try_subsume(
                 state.ok = false;
                 return false;
             }
-            elim.enqueue_var(vars, l.vi());
+            elim.enqueue_var(vars, l.vi(), true);
         }
         None => {}
     }
@@ -620,7 +620,6 @@ fn eliminate_var(
                             //     vec2int(&clause!(*cp, *n).lits)
                             // );
                             let lit = vec[0];
-                            panic!("emit {}", lit.int());
                             if !asgs.enqueue_null(&mut vars[lit.vi()], lit.lbool(), 0) {
                                 state.ok = false;
                                 return false;
@@ -726,7 +725,7 @@ pub struct VarOccHeap {
 
 trait VarOrderIF {
     fn new(n: usize, init: usize) -> VarOccHeap;
-    fn insert(&mut self, vec: &[Var], vi: VarId);
+    fn insert(&mut self, vec: &[Var], vi: VarId, upword: bool);
     fn clear(&mut self, vars: &mut [Var]);
     fn len(&self) -> usize;
     fn is_empty(&self) -> bool;
@@ -747,10 +746,15 @@ impl VarOrderIF for VarOccHeap {
         idxs[0] = init;
         VarOccHeap { heap, idxs }
     }
-    fn insert(&mut self, vars: &[Var], vi: VarId) {
+    fn insert(&mut self, vars: &[Var], vi: VarId, upward: bool) {
+        debug_assert!(vi < self.heap.len());
         if self.contains(vi) {
             let i = self.idxs[vi];
-            self.percolate_up(vars, i);
+            if upward {
+                self.percolate_up(vars, i);
+            } else {
+                self.percolate_down(vars, i);
+            }
             return;
         }
         let i = self.idxs[vi];
@@ -758,6 +762,7 @@ impl VarOrderIF for VarOccHeap {
         let vn = self.heap[n];
         self.heap.swap(i, n);
         self.idxs.swap(vi, vn);
+        debug_assert!(n < self.heap.len());
         self.idxs[0] = n;
         self.percolate_up(vars, n);
     }
@@ -788,7 +793,7 @@ impl VarOrderIF for VarOccHeap {
         self.reset();
         for v in &vars[1..] {
             if v.assign == BOTTOM && !v.is(Flag::EliminatedVar) {
-                self.insert(vars, v.index);
+                self.insert(vars, v.index, true);
             }
         }
     }
@@ -809,6 +814,7 @@ impl VarOccHeap {
         let s = 1;
         let vs = self.heap[s];
         let n = self.idxs[0];
+        debug_assert!(n < self.heap.len());
         if n == 0 {
             return 0;
         }
@@ -820,11 +826,6 @@ impl VarOccHeap {
         self.idxs[0] -= 1;
         if 1 < self.idxs[0] {
             self.percolate_down(&vars, 1);
-        }
-        let m1 = vars[vs].occur_activity();
-        let m2 = vars[self.heap[1]].occur_activity();
-        if m1 != m2 && !vars[m1].is(Flag::EliminatedVar) && !vars[m2].is(Flag::EliminatedVar) {
-            println!("heap top {}, second {}", m1, m2);
         }
         vs
     }

@@ -61,7 +61,7 @@ impl VarIF for Var {
         } else {
             self.neg_occurs.delete_unstable(|&c| c == cid);
         }
-        elim.enqueue_var(vars, self.index);
+        elim.enqueue_var(vars, self.index, true);
     }
 }
 
@@ -125,7 +125,7 @@ impl VarDBIF for [Var] {
                 } else {
                     v.neg_occurs.push(cid);
                 }
-                elim.enqueue_var(self, l.vi());
+                elim.enqueue_var(self, l.vi(), false);
             }
         }
         if enqueue {
@@ -139,7 +139,7 @@ impl VarDBIF for [Var] {
         } else {
             v.neg_occurs.delete_unstable(|&c| c == cid);
         }
-        elim.enqueue_var(self, l.vi());
+        elim.enqueue_var(self, l.vi(), true);
     }
     fn detach(&mut self, elim: &mut Eliminator, cid: ClauseId, c: &Clause) {
         debug_assert!(c.is(Flag::DeadClause));
@@ -148,7 +148,7 @@ impl VarDBIF for [Var] {
                 let v = &mut self[l.vi()];
                 if !v.is(Flag::EliminatedVar) {
                     self.detach_lit(elim, *l, cid);
-                    elim.enqueue_var(self, l.vi());
+                    elim.enqueue_var(self, l.vi(), true);
                 }
             }
         }

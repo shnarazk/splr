@@ -92,7 +92,7 @@ pub trait EliminatorIF {
     fn enqueue_clause(&mut self, cid: ClauseId, c: &mut Clause);
     fn clear_clause_queue(&mut self, cdb: &mut ClauseDB);
     fn clause_queue_len(&self) -> usize;
-    fn enqueue_var(&mut self, vars: &mut [Var], vi: VarId);
+    fn enqueue_var(&mut self, vars: &mut [Var], vi: VarId, upword: bool);
     fn clear_var_queue(&mut self, vars: &mut [Var]);
     fn var_queue_len(&self) -> usize;
     fn eliminate(

@@ -504,7 +504,7 @@ impl ClauseDBIF for ClauseDB {
                         for l in &c.lits {
                             let v = &mut vars[l.vi()];
                             if !v.is(Flag::EliminatedVar) {
-                                elim.enqueue_var(vars, l.vi());
+                                elim.enqueue_var(vars, l.vi(), true);
                             }
                         }
                     }
