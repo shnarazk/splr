@@ -391,7 +391,13 @@ fn subsume(cdb: &mut ClauseDB, cid: ClauseId, other: ClauseId) -> Option<Lit> {
 /// Returns:
 /// - `(false, -)` if one of the clauses is always satisfied.
 /// - `(true, n)` if they are mergable to a n-literal clause.
-fn check_to_merge(cdb: &ClauseDB, vars: &[Var], cp: ClauseId, cq: ClauseId, v: VarId) -> (bool, usize) {
+fn check_to_merge(
+    cdb: &ClauseDB,
+    vars: &[Var],
+    cp: ClauseId,
+    cq: ClauseId,
+    v: VarId,
+) -> (bool, usize) {
     let pqb = &cdb.clause[cp];
     let qpb = &cdb.clause[cq];
     let ps_smallest = pqb.lits.len() < qpb.lits.len();
