@@ -347,16 +347,26 @@ fn subsume(cdb: &mut ClauseDB, cid: ClauseId, other: ClauseId) -> Option<Lit> {
     Some(ret)
 }
 
-/// Returns **false** if one of the clauses is always satisfied.
-fn check_to_merge(cdb: &ClauseDB, cp: ClauseId, cq: ClauseId, v: VarId) -> (bool, usize) {
+/// Returns:
+/// - `(false, -)` if one of the clauses is always satisfied.
+/// - `(true, n)` if they are mergable to a n-literal clause.
+fn check_to_merge(cdb: &ClauseDB, vars: &[Var], cp: ClauseId, cq: ClauseId, v: VarId) -> (bool, usize) {
     let pqb = &cdb.clause[cp];
     let qpb = &cdb.clause[cq];
     let ps_smallest = pqb.lits.len() < qpb.lits.len();
     let (pb, qb) = if ps_smallest { (pqb, qpb) } else { (qpb, pqb) };
     let mut size = pb.lits.len() + 1;
     'next_literal: for l in &qb.lits {
+        if vars[l.vi()].is(Flag::EliminatedVar) {
+            println!("ooo");
+            continue;
+        }
         if l.vi() != v {
             for j in &pb.lits {
+                if vars[j.vi()].is(Flag::EliminatedVar) {
+                    println!("ooo");
+                    continue;
+                }
                 if j.vi() == l.vi() {
                     if j.negate() == *l {
                         return (false, size);
@@ -581,33 +591,10 @@ fn eliminate_var(
     let pos = &v.pos_occurs as *const Vec<ClauseId>;
     let neg = &v.neg_occurs as *const Vec<ClauseId>;
     unsafe {
-        // Check wether the increase in number of clauses stays within the allowed ('grow').
-        // Moreover, no clause must exceed the limit on the maximal clause size (if it is set).
-        if (*pos).is_empty() && (*neg).is_empty() {
-            if !asgs.enqueue_null(v, LTRUE, 0) || asgs.propagate(cdb, state, vars) != NULL_CLAUSE {
-                state.ok = false;
-                return false;
-            }
+        if check_var_elimination_condition(cdb, config, vars, &*pos, &*neg, vi) {
             return true;
         }
-        if (*pos).is_empty() && !(*neg).is_empty() {
-            // println!("-v {} p {} n {}", v, (*pos).len(), (*neg).len());
-            if !asgs.enqueue_null(v, LFALSE, 0) || asgs.propagate(cdb, state, vars) != NULL_CLAUSE {
-                state.ok = false;
-                return false;
-            }
-            return true;
-        } else if (*neg).is_empty() && (*pos).is_empty() {
-            // println!("+v {} p {} n {}", v, (*pos).len(), (*neg).len());
-            if !asgs.enqueue_null(v, LTRUE, 0) || asgs.propagate(cdb, state, vars) != NULL_CLAUSE {
-                state.ok = false;
-                return false;
-            }
-            return true;
-        }
-        if check_var_elimination_condition(cdb, config, &*pos, &*neg, vi) {
-            return true;
-        }
+        let v = &mut vars[vi];
         // OK, eliminate the literal and build constraints on it.
         v.turn_on(Flag::EliminatedVar);
         let cid = v.reason;
@@ -633,6 +620,7 @@ fn eliminate_var(
                             //     vec2int(&clause!(*cp, *n).lits)
                             // );
                             let lit = vec[0];
+                            panic!("emit {}", lit.int());
                             if !asgs.enqueue_null(&mut vars[lit.vi()], lit.lbool(), 0) {
                                 state.ok = false;
                                 return false;
@@ -669,9 +657,11 @@ fn eliminate_var(
     }
 }
 
+/// returns `true` if elimination is impossible.
 fn check_var_elimination_condition(
     cdb: &ClauseDB,
     config: &Config,
+    vars: &[Var],
     pos: &[ClauseId],
     neg: &[ClauseId],
     v: VarId,
@@ -680,7 +670,7 @@ fn check_var_elimination_condition(
     let mut cnt = 0;
     for c_pos in pos {
         for c_neg in neg {
-            let (res, clause_size) = check_to_merge(cdb, *c_pos, *c_neg, v);
+            let (res, clause_size) = check_to_merge(cdb, vars, *c_pos, *c_neg, v);
             if res {
                 cnt += 1;
                 if clslen + config.elim_eliminate_grow_limit < cnt
@@ -830,6 +820,11 @@ impl VarOccHeap {
         self.idxs[0] -= 1;
         if 1 < self.idxs[0] {
             self.percolate_down(&vars, 1);
+        }
+        let m1 = vars[vs].occur_activity();
+        let m2 = vars[self.heap[1]].occur_activity();
+        if m1 != m2 && !vars[m1].is(Flag::EliminatedVar) && !vars[m2].is(Flag::EliminatedVar) {
+            println!("heap top {}, second {}", m1, m2);
         }
         vs
     }
