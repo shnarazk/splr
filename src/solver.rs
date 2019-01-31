@@ -470,10 +470,13 @@ fn handle_conflict_path(
         && 0 < cdb.num_learnt
     {
         state.cur_restart = ((tn_confl as f64) / (state.next_reduction as f64)) as usize + 1;
-        cdb.reduce(config, elim, state, vars);
-        // if 2.0 * (state.ema_lbd.get().min(state.b_lvl.get())) < state.c_lvl.get() {
+        // if 2.0 * state.b_lvl.get() < state.c_lvl.get() {
         //     elim.activate(cdb, vars);
+        //     let limit = state.c_lvl.get() as usize;
+        //     config.elim_eliminate_combination_limit = state.ema_lbd.get() as usize;
+        //     config.elim_subsume_literal_limit = limit;
         // }
+        cdb.reduce(config, elim, state, vars);
     }
 }
 

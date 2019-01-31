@@ -58,7 +58,7 @@ impl EliminatorIF for Eliminator {
             if c.is(Flag::DeadClause) {
                 continue;
             }
-            self.add_cid_occur(vars, cid, c, true);
+            self.add_cid_occur(vars, cid, c, false);
         }
         for vi in 1..vars.len() {
             let v = &vars[vi];
