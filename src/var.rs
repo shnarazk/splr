@@ -72,6 +72,7 @@ impl FlagIF for Var {
 }
 
 impl VarDBIF for [Var] {
+    #[inline(always)]
     fn assigned(&self, l: Lit) -> Lbool {
         unsafe { self.get_unchecked(l.vi()).assign ^ ((l & 1) as u8) }
     }
@@ -89,7 +90,7 @@ impl VarDBIF for [Var] {
         }
         false
     }
-    #[inline(always)]
+    #[inline]
     fn compute_lbd(&self, vec: &[Lit], keys: &mut [usize]) -> usize {
         let key = keys[0] + 1;
         let mut cnt = 0;

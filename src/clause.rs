@@ -51,30 +51,34 @@ impl WatchDBIF for Vec<Watch> {
         }
         self
     }
-    #[inline(always)]
+    // #[inline(always)]
     fn count(&self) -> usize {
-        self[0].c
+        unsafe { self.get_unchecked(0).c }
     }
-    #[inline(always)]
+    // #[inline(always)]
     fn attach(&mut self, blocker: Lit, c: usize) {
-        let next = self[0].c + 1;
-        if next == self.len() {
-            self.push(Watch { blocker, c });
-        } else {
-            self[next].blocker = blocker;
-            self[next].c = c;
+        unsafe {
+            let next = self.get_unchecked(0).c + 1;
+            if next == self.len() {
+                self.push(Watch { blocker, c });
+            } else {
+                self.get_unchecked_mut(next).blocker = blocker;
+                self.get_unchecked_mut(next).c = c;
+            }
+            self.get_unchecked_mut(0).c = next;
         }
-        self[0].c = next;
     }
-    #[inline(always)]
+    // #[inline(always)]
     fn detach(&mut self, n: usize) {
-        let last = self[0].c;
-        debug_assert!(0 < last);
-        self.swap(n, last);
-        self[last].c = NULL_CLAUSE;
-        self[0].c -= 1;
+        unsafe {
+            let last = self.get_unchecked(0).c;
+            debug_assert!(0 < last);
+            self.swap(n, last);
+            self.get_unchecked_mut(last).c = NULL_CLAUSE;
+            self.get_unchecked_mut(0).c -= 1;
+        }
     }
-    #[inline(always)]
+    // #[inline(always)]
     fn detach_with(&mut self, cid: usize) {
         for n in 1..=self[0].c {
             if self[n].c == cid {

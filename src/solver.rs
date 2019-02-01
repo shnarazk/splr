@@ -235,16 +235,16 @@ impl PropagateIF for AssignStack {
             let false_lit = (p as Lit).negate();
             state.stats[Stat::Propagation as usize] += 1;
             unsafe {
-                let source = &mut (*watcher)[p];
+                let source = (*watcher).get_unchecked_mut(p);
                 let mut n = 1;
                 'next_clause: while n <= source.count() {
-                    let w = &mut source[n];
-                    if head[w.c].is(Flag::DeadClause) {
+                    let w = source.get_unchecked_mut(n);
+                    if head.get_unchecked(w.c).is(Flag::DeadClause) {
                         source.detach(n);
                         continue 'next_clause;
                     }
                     if vars.assigned(w.blocker) != LTRUE {
-                        let Clause { ref mut lits, .. } = &mut head.get_unchecked_mut(w.c);
+                        let lits = &mut head.get_unchecked_mut(w.c).lits;
                         debug_assert!(2 <= lits.len());
                         debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
                         let mut first = *lits.get_unchecked(0);
@@ -286,7 +286,7 @@ impl PropagateIF for AssignStack {
     }
 }
 
-#[inline(always)]
+#[inline]
 fn propagate_fast(
     asgs: &mut AssignStack,
     cdb: &mut ClauseDB,
@@ -300,7 +300,7 @@ fn propagate_fast(
         let false_lit = (p as Lit).negate();
         state.stats[Stat::Propagation as usize] += 1;
         unsafe {
-            let source = &mut (*watcher)[p];
+            let source = (*watcher).get_unchecked_mut(p);
             let mut n = 1;
             'next_clause: while n <= source.count() {
                 let w = source.get_unchecked_mut(n);
@@ -310,13 +310,15 @@ fn propagate_fast(
                 // }
                 // debug_assert!(!vars[w.blocker.vi()].eliminated); it doesn't hold in TP12
                 if vars.assigned(w.blocker) != LTRUE {
-                    let Clause { ref mut lits, .. } = head.get_unchecked_mut(w.c);
+                    let lits = &mut head.get_unchecked_mut(w.c).lits;
                     debug_assert!(2 <= lits.len());
                     debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
                     let mut first = *lits.get_unchecked(0);
                     if first == false_lit {
-                        lits.swap(0, 1); // now false_lit is lits[1].
-                        first = *lits.get_unchecked(0);
+                        // lits.swap(0, 1); // now false_lit is lits[1].
+                        first = *lits.get_unchecked(1);
+                        *lits.get_unchecked_mut(0) = first;
+                        *lits.get_unchecked_mut(1) = false_lit;
                     }
                     let first_value = vars.assigned(first);
                     // If 0th watch is true, then clause is already satisfied.
@@ -352,7 +354,7 @@ fn propagate_fast(
 }
 
 /// main loop; returns `true` for SAT, `false` for UNSAT.
-#[inline(always)]
+#[inline]
 fn search(
     asgs: &mut AssignStack,
     config: &mut Config,
@@ -483,7 +485,7 @@ fn handle_conflict_path(
     }
 }
 
-#[inline(always)]
+#[inline]
 fn analyze(
     asgs: &mut AssignStack,
     config: &mut Config,
@@ -628,7 +630,7 @@ fn analyze_simplify(
 }
 
 /// renamed from litRedundant
-#[inline(always)]
+#[inline]
 fn analyze_removable(
     cdb: &mut ClauseDB,
     vars: &[Var],
@@ -667,7 +669,7 @@ fn analyze_removable(
     true
 }
 
-#[inline(always)]
+#[inline]
 fn analyze_final(
     asgs: &AssignStack,
     config: &mut Config,
@@ -712,7 +714,7 @@ fn analyze_final(
     }
 }
 
-#[inline(always)]
+#[inline]
 fn minimize_with_bi_clauses(
     cdb: &ClauseDB,
     vars: &[Var],
