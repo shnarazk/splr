@@ -87,6 +87,7 @@ impl EliminatorIF for Eliminator {
         }
         self.clause_queue.clear();
     }
+    #[inline]
     fn enqueue_var(&mut self, vars: &mut [Var], vi: VarId, upward: bool) {
         if !self.in_use || !self.active {
             return;
@@ -623,6 +624,7 @@ fn make_eliminated_clause(cdb: &mut ClauseDB, vec: &mut Vec<Lit>, vi: VarId, cid
 }
 
 /// returns false if solver is in inconsistent
+#[inline]
 fn eliminate_var(
     asgs: &mut AssignStack,
     config: &mut Config,
@@ -711,6 +713,7 @@ fn eliminate_var(
 }
 
 /// returns `true` if elimination is impossible.
+#[inline]
 fn check_var_elimination_condition(
     cdb: &ClauseDB,
     config: &Config,
