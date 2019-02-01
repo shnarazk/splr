@@ -380,6 +380,14 @@ fn search(
             } else if asgs.level() == 0 {
                 cdb.simplify(asgs, config, elim, state, vars);
                 asgs.rebuild_order(&vars);
+                if state.c_lvl.get() < 3.0 * state.b_lvl.get() {
+                    elim.stop(cdb, vars, false);
+                } else {
+                    elim.activate(cdb, vars, false);
+                    let limit = state.b_lvl.get() as usize;
+                    config.elim_eliminate_combination_limit = limit;
+                    config.elim_subsume_literal_limit = limit;
+                }
             }
             if asgs.level() == 0 {
                 state.num_solved_vars = asgs.len();
