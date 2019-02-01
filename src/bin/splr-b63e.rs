@@ -18,7 +18,7 @@ struct CLOpts {
     #[structopt(long = "ra", default_value = "3500")]
     restart_asg_samples: usize,
     /// EMA coefficient for learnt clause LBD
-    #[structopt(long = "rl", default_value = "50")]
+    #[structopt(long = "rl", default_value = "100")]
     restart_lbd_samples: usize,
     /// K in Glucose, for restart
     #[structopt(long = "rt", default_value = "0.80")]

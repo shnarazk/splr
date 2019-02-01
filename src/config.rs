@@ -101,10 +101,10 @@ impl Default for Config {
             glureduce: true,
             cdb_inc: 300,
             cdb_inc_extra: 1000,
-            restart_thr: 0.80,
-            restart_blk: 1.40,
-            restart_asg_len: 3500,
-            restart_lbd_len: 50,
+            restart_thr: 0.80,     // will be overwrited by bin/splr
+            restart_blk: 1.40,     // will be overwrited by bin/splr
+            restart_asg_len: 3500, // will be overwrited by bin/splr
+            restart_lbd_len: 100,  // will be overwrited by bin/splr
             restart_expansion: 1.15,
             restart_step: 50,
             luby_restart: false,

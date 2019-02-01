@@ -3,7 +3,7 @@ use crate::config::Config;
 use crate::state::{Stat, State};
 use crate::traits::*;
 
-const RESET_EMA: usize = 400;
+// const RESET_EMA: usize = 400;
 
 /// Exponential Moving Average w/ a calibrator
 pub struct Ema {
@@ -47,13 +47,13 @@ impl RestartIF for State {
     }
     fn force_restart(&mut self, config: &mut Config, ncnfl: &mut f64) -> bool {
         let count = self.stats[Stat::Conflict as usize];
-        if count <= RESET_EMA {
-            if count == RESET_EMA {
-                self.ema_asg.reset();
-                self.ema_lbd.reset();
-            }
-            return false;
-        }
+        // if count <= RESET_EMA {
+        //     if count == RESET_EMA {
+        //         self.ema_asg.reset();
+        //         self.ema_lbd.reset();
+        //     }
+        //     return false;
+        // }
         let ave = self.stats[Stat::SumLBD as usize] as f64 / count as f64;
         if (config.luby_restart && config.luby_restart_num_conflict <= *ncnfl)
             || (!config.luby_restart
