@@ -166,6 +166,8 @@ pub enum Flag {
     LearntClause,
     /// a clause is used recently in conflict analysis.
     JustUsedClause,
+    /// a clause is registered in vars' occurrence list.
+    OccurLinked,
     /// a clause or var is equeued for eliminator.
     Enqueued,
     /// a var is eliminated and managed by eliminator.

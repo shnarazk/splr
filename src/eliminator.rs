@@ -43,6 +43,9 @@ impl EliminatorIF for Eliminator {
         self.clear_clause_queue(cdb);
         self.clear_var_queue(vars);
         if force {
+            for c in &mut cdb.clause[1..] {
+                c.turn_off(Flag::OccurLinked);
+            }
             for v in &mut vars[1..] {
                 v.pos_occurs.clear();
                 v.neg_occurs.clear();
@@ -51,23 +54,26 @@ impl EliminatorIF for Eliminator {
         self.in_use = false;
         self.active = false;
     }
-    fn activate(&mut self, cdb: &mut ClauseDB, vars: &mut [Var]) {
+    fn activate(&mut self, cdb: &mut ClauseDB, vars: &mut [Var], force: bool) {
         self.in_use = true;
         self.active = true;
         for (cid, c) in &mut cdb.clause.iter_mut().enumerate().skip(1) {
-            if c.is(Flag::DeadClause) {
+            if c.is(Flag::DeadClause) || c.is(Flag::OccurLinked) {
                 continue;
             }
             self.add_cid_occur(vars, cid, c, false);
         }
-        for vi in 1..vars.len() {
-            let v = &vars[vi];
-            if v.is(Flag::EliminatedVar) || v.assign != BOTTOM {
-                continue;
+        if force {
+            for vi in 1..vars.len() {
+                let v = &vars[vi];
+                if v.is(Flag::EliminatedVar) || v.assign != BOTTOM {
+                    continue;
+                }
+                self.enqueue_var(vars, vi, true);
             }
-            self.enqueue_var(vars, vi, true);
         }
     }
+    #[inline]
     fn enqueue_clause(&mut self, cid: ClauseId, c: &mut Clause) {
         if !self.in_use || !self.active || c.is(Flag::Enqueued) {
             return;

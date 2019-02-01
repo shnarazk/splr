@@ -100,7 +100,7 @@ impl SatSolverIF for Solver {
                 // config.elim_subsume_loop_limit = 32;
             }
         }
-        elim.stop(cdb, vars, true);
+        elim.stop(cdb, vars, false);
         if search(asgs, config, cdb, elim, state, vars) {
             if !state.ok {
                 asgs.cancel_until(vars, 0);
@@ -455,11 +455,6 @@ fn handle_conflict_path(
             asgs.cancel_until(vars, 0);
             config.adapt_strategy(cdb, elim, state, vars);
         }
-        // if tn_confl % 100_000 == 0 {
-        //     elim.activate(asgs, cdb, config, vars);
-        //     cdb.simplify(asgs, config, elim, state, vars);
-        //     elim.stop(cdb, vars, true);
-        // }
         state.progress(cdb, config, elim, vars, None);
     }
     config.var_inc /= config.var_decay;
@@ -471,7 +466,7 @@ fn handle_conflict_path(
     {
         state.cur_restart = ((tn_confl as f64) / (state.next_reduction as f64)) as usize + 1;
         // if 2.0 * state.b_lvl.get() < state.c_lvl.get() {
-        //     elim.activate(cdb, vars);
+        //     elim.activate(cdb, vars, false);
         //     let limit = state.c_lvl.get() as usize;
         //     config.elim_eliminate_combination_limit = state.ema_lbd.get() as usize;
         //     config.elim_subsume_literal_limit = limit;
