@@ -318,7 +318,7 @@ impl ClauseDBIF for ClauseDB {
                 lits.push(*l);
             }
             cid = self.clause.len();
-            let mut c = Clause {
+            let c = Clause {
                 flags: 0,
                 lits,
                 rank,

@@ -81,26 +81,27 @@ impl SatSolverIF for Solver {
             for vi in 1..vars.len() {
                 let v = &mut vars[vi];
                 if v.assign != BOTTOM {
-                    v.pos_occurs.clear();
-                    v.neg_occurs.clear();
                     continue;
                 }
-                debug_assert!(!asgs.trail.contains(&Lit::from_var(vi, LTRUE)));
-                debug_assert!(!asgs.trail.contains(&Lit::from_var(vi, LFALSE)));
-                elim.enqueue_var(vars, vi, true);
+                match (v.pos_occurs.len(), v.neg_occurs.len()) {
+                    (_, 0) => { asgs.enqueue_null(v, LTRUE, 0); },
+                    (0, _) => { asgs.enqueue_null(v, LFALSE, 0); },
+                    _ => elim.enqueue_var(vars, vi, false),
+                };
             }
             if elim.active {
+                elim.activate(cdb, vars, true);
                 state.progress(cdb, config, elim, vars, Some("enqueued"));
                 cdb.simplify(asgs, config, elim, state, vars);
-                state.progress(cdb, config, elim, vars, Some("simplify"));
+                state.progress(cdb, config, elim, vars, Some("subsumed"));
                 // config.elim_eliminate_combination_limit = 40;
                 // config.elim_eliminate_grow_limit = 0;
                 // config.elim_eliminate_loop_limit = 32;
                 // config.elim_subsume_literal_limit = 100;
                 // config.elim_subsume_loop_limit = 32;
             }
+            elim.stop(cdb, vars, false);
         }
-        elim.stop(cdb, vars, false);
         if search(asgs, config, cdb, elim, state, vars) {
             if !state.ok {
                 asgs.cancel_until(vars, 0);

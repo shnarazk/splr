@@ -113,6 +113,7 @@ impl AssignIF for AssignStack {
         self.trail_lim.truncate(lv);
         self.q_head = lim;
     }
+    #[inline]
     fn uncheck_enqueue(&mut self, vars: &mut [Var], l: Lit, cid: ClauseId) {
         debug_assert!(l != 0, "Null literal is about to be equeued");
         debug_assert!(
