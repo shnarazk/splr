@@ -224,7 +224,7 @@ impl EliminatorIF for Eliminator {
         if self.in_use {
             for l in &c.lits {
                 let v = &mut vars[l.vi()];
-                if !v.is(Flag::EliminatedVar) {
+                if !v.is(Flag::EliminatedVar) && v.assign == BOTTOM {
                     self.remove_lit_occur(vars, *l, cid);
                     self.enqueue_var(vars, l.vi(), true);
                 }
