@@ -377,22 +377,9 @@ fn search(
             // DYNAMIC FORCING RESTART
             if state.force_restart(config, &mut conflict_c) {
                 asgs.cancel_until(vars, config.root_level);
-            // if elim.in_use && 0 < elim.var_queue_len() {
-            //     cdb.simplify(asgs, config, elim, state, vars);
-            // }
             } else if asgs.level() == 0 {
                 cdb.simplify(asgs, config, elim, state, vars);
                 asgs.rebuild_order(&vars);
-                if state.c_lvl.get() < 3.0 * state.b_lvl.get() {
-                    elim.stop(cdb, vars, false);
-                } else {
-                    elim.activate(cdb, vars, false);
-                    let limit = state.b_lvl.get() as usize;
-                    config.elim_eliminate_combination_limit = limit;
-                    config.elim_subsume_literal_limit = limit;
-                }
-            }
-            if asgs.level() == 0 {
                 state.num_solved_vars = asgs.len();
             }
             if !asgs.remains() {
@@ -464,7 +451,14 @@ fn handle_conflict_path(
     if tn_confl % 10_000 == 0 {
         if tn_confl == 100_000 {
             asgs.cancel_until(vars, 0);
-            config.adapt_strategy(cdb, elim, state, vars);
+            config.adapt_strategy(cdb, elim, state);
+        }
+        if state.stats[Stat::Elimination as usize] == 1 && state.elim_trigger == 1 {
+            state.elim_trigger = state.c_lvl.get() as usize + 10;
+        }
+        if (state.c_lvl.get() as usize) < state.elim_trigger {
+            elim.activate(cdb, vars, true);
+            state.elim_trigger /= 2;
         }
         state.progress(cdb, config, elim, vars, None);
     }

@@ -116,7 +116,6 @@ impl EliminatorIF for Eliminator {
         if !self.in_use || !self.active {
             return;
         }
-        state.stats[Stat::Elimination as usize] += 1;
         let mut cnt = 0;
         'perform: while self.bwdsub_assigns < asgs.len()
             || !self.var_queue.is_empty()
@@ -146,7 +145,6 @@ impl EliminatorIF for Eliminator {
                 }
             }
         }
-        self.stop(cdb, vars, true);
     }
     fn extend_model(&mut self, model: &mut Vec<i32>) {
         if self.elim_clauses.is_empty() {
@@ -300,7 +298,6 @@ impl Eliminator {
                     &mut vars[best].pos_occurs as *mut Vec<ClauseId>,
                     &mut vars[best].neg_occurs as *mut Vec<ClauseId>,
                 ] {
-                    cnt += (**cs).len();
                     for did in &**cs {
                         if *did == cid {
                             continue;
