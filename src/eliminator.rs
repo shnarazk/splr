@@ -1,7 +1,7 @@
 use crate::assign::AssignStack;
 use crate::clause::{Clause, ClauseDB};
 use crate::config::Config;
-use crate::state::{State, Stat};
+use crate::state::State;
 use crate::traits::*;
 use crate::types::*;
 use crate::var::Var;

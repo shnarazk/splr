@@ -249,7 +249,7 @@ impl ClauseDBIF for ClauseDB {
             num_learnt: 0,
         }
     }
-    fn garbage_collect(&mut self, elim: &mut Eliminator, vars: &mut [Var]) {
+    fn garbage_collect(&mut self, _elim: &mut Eliminator) {
         debug_assert!(self.check_liveness1());
         let ClauseDB {
             ref mut watcher,
@@ -257,16 +257,7 @@ impl ClauseDBIF for ClauseDB {
             ref mut touched,
             ..
         } = self;
-// /*
         debug_assert_eq!(NULL_LIT.negate(), 1);
-/*
-        for w in &watcher[0..1] {
-            let c = &clause[w.c];
-            if !c.is(Flag::DeadClause) || !c.lits.is_empty() {
-                panic!("ooeoae");
-            }
-        }
-*/
         let (recycles, wss) = watcher.split_at_mut(2);
         let recycled = &mut recycles[1];
         for (i, ws) in &mut wss.iter_mut().enumerate() {
@@ -288,64 +279,11 @@ impl ClauseDBIF for ClauseDB {
                     if c.is(Flag::LearntClause) {
                         self.num_learnt -= 1;
                     }
-                    // elim.remove_cid_occur(vars. cid, c);
-                    // if elim.in_use {
-                    //     for l in &c.lits {
-                    //         let vi = l.vi();
-                    //         let v = &vars[vi];
-                    //         if !v.is(Flag::EliminatedVar) && v.assign == BOTTOM {
-                    //             elim.remove_lit_occur(vars, *l, cid);
-                    //         }
-                    //     }
-                    // }
                     c.lits.clear();
                 }
                 ws.detach(n);
             }
         }
-// */
-        // //// old implementation ////
-/*
-        for (i, ws) in &mut watcher.iter_mut().enumerate().skip(2) {
-            if !touched[i] {
-                continue;
-            }
-            touched[i] = false;
-            let mut n = 1;
-            let n_max = ws.count();
-            while n <= n_max {
-                if clause[ws[n].c].is(Flag::DeadClause) {
-                    ws.detach(n);
-                } else {
-                    n += 1;
-                }
-            }
-        }
-        let recycled = &mut watcher[NULL_LIT.negate() as usize];
-        for (ci, c) in self.clause.iter_mut().enumerate().skip(1) {
-            // the recycled clause is DEAD and EMPTY
-            if c.is(Flag::DeadClause) && !c.lits.is_empty() {
-                recycled.push(Watch {
-                    blocker: NULL_LIT,
-                    c: ci,
-                });
-                if c.is(Flag::LearntClause) {
-                    self.num_learnt -= 1;
-                }
-                if elim.in_use {
-                    for l in &c.lits {
-                        let vi = l.vi();
-                        let v = &mut vars[vi];
-                        if !v.is(Flag::EliminatedVar) && v.assign == BOTTOM {
-                            elim.remove_lit_occur(vars, *l, ci);
-                        }
-                    }
-                }
-                c.lits.clear();
-            }
-        }
-*/
-        // recycled.sort_by(|a, b| a.c.cmp(&b.c));
         self.num_active = self.clause.len() - recycled.len();
         debug_assert!(self.check_liveness2());
     }
@@ -535,7 +473,7 @@ impl ClauseDBIF for ClauseDB {
             }
         }
         state.stats[Stat::Reduction as usize] += 1;
-        self.garbage_collect(elim, vars);
+        self.garbage_collect(elim);
     }
     fn simplify(
         &mut self,
@@ -572,7 +510,7 @@ impl ClauseDBIF for ClauseDB {
                     }
                 }
             }
-            self.garbage_collect(elim, vars);
+            self.garbage_collect(elim);
             if na == asgs.len()
                 && (!elim.in_use || (0 == elim.clause_queue_len() && 0 == elim.var_queue_len()))
             {

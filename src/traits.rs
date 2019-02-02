@@ -62,7 +62,7 @@ pub trait ClauseDBIF {
         state: &mut State,
         vars: &mut [Var],
     ) -> bool;
-    fn garbage_collect(&mut self, elim: &mut Eliminator, vars: &mut [Var]);
+    fn garbage_collect(&mut self, _elim: &mut Eliminator);
     fn new_clause(&mut self, v: &[Lit], rank: usize, learnt: bool) -> ClauseId;
     fn reset_lbd(&mut self, vars: &[Var], temp: &mut [usize]);
     fn bump_activity(&mut self, inc: &mut f64, cid: ClauseId);

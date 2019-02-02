@@ -3,7 +3,6 @@ use crate::eliminator::Eliminator;
 use crate::state::{Stat, State};
 use crate::traits::{ClauseDBIF, ClauseIF, FlagIF};
 use crate::types::Flag;
-use crate::var::Var;
 
 #[derive(Eq, PartialEq)]
 pub enum SearchStrategy {
@@ -131,7 +130,6 @@ impl Config {
         cdb: &mut ClauseDB,
         elim: &mut Eliminator,
         state: &mut State,
-        vars: &mut [Var],
     ) {
         if !self.adapt_strategy || self.strategy != SearchStrategy::Initial {
             return;
@@ -202,7 +200,7 @@ impl Config {
                     c.kill(&mut cdb.touched);
                 }
             }
-            cdb.garbage_collect(elim, vars);
+            cdb.garbage_collect(elim);
         }
     }
 }
