@@ -570,6 +570,7 @@ fn strengthen(
     if (*c).is(Flag::DeadClause) {
         return false;
     }
+    debug_assert!(1 < p.negate());
     watcher[p.negate() as usize].detach_with(cid);
     let lits = &mut (*c).lits;
     if lits.len() == 2 {
@@ -577,6 +578,7 @@ fn strengthen(
         if lits[0] == p {
             lits.swap(0, 1);
         }
+        debug_assert!(1 < lits[0].negate());
         watcher[lits[0].negate() as usize].detach_with(cid);
         return true;
     }
@@ -588,6 +590,7 @@ fn strengthen(
             lits.swap_remove(1);
             lits[1]
         };
+        debug_assert!(1 < p.negate());
         watcher[q.negate() as usize].attach(q, cid);
     } else {
         lits.delete_unstable(|&x| x == p);
