@@ -510,21 +510,21 @@ impl ClauseDBIF for ClauseDB {
                     }
                 }
             }
-            self.garbage_collect(elim);
             if na == asgs.len()
                 && (!elim.in_use || (0 == elim.clause_queue_len() && 0 == elim.var_queue_len()))
             {
                 break;
             }
         }
+        self.garbage_collect(elim);
         state.stats[Stat::Simplification as usize] += 1;
-        true
-    }
-}
         if elim.in_use {
             self.reset_lbd(vars, &mut state.lbd_temp);
             elim.stop(self, vars, false);
         }
+        true
+    }
+}
 
 
 impl ClauseDB {
