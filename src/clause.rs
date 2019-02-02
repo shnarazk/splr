@@ -261,10 +261,10 @@ impl ClauseDBIF for ClauseDB {
         let (recycles, wss) = watcher.split_at_mut(2);
         let recycled = &mut recycles[1];
         for (i, ws) in &mut wss.iter_mut().enumerate() {
-            if !touched[i+2] {
+            if !touched[i + 2] {
                 continue;
             }
-            touched[i+2] = false;
+            touched[i + 2] = false;
             let mut n = 1;
             while n <= ws.count() {
                 let cid = ws[n].c;
@@ -275,7 +275,10 @@ impl ClauseDBIF for ClauseDB {
                 }
                 if !c.lits.is_empty() {
                     debug_assert!(c.is(Flag::DeadClause));
-                    recycled.push(Watch {blocker: NULL_LIT, c: cid});
+                    recycled.push(Watch {
+                        blocker: NULL_LIT,
+                        c: cid,
+                    });
                     if c.is(Flag::LearntClause) {
                         self.num_learnt -= 1;
                     }
@@ -529,7 +532,6 @@ impl ClauseDBIF for ClauseDB {
     }
 }
 
-
 impl ClauseDB {
     fn check_liveness1(&self) -> bool {
         let deads = self.watcher[NULL_LIT.negate() as usize]
@@ -547,8 +549,12 @@ impl ClauseDB {
                 if lits.len() < 2 {
                     panic!("too short clause {} {:?}", cid.format(), vec2int(&lits));
                 }
-                if self.watcher[lits[0].negate() as usize].iter().all(|w| w.c != cid)
-                    || self.watcher[lits[1].negate() as usize].iter().all(|w| w.c != cid)
+                if self.watcher[lits[0].negate() as usize]
+                    .iter()
+                    .all(|w| w.c != cid)
+                    || self.watcher[lits[1].negate() as usize]
+                        .iter()
+                        .all(|w| w.c != cid)
                 {
                     panic!("watch broken");
                 }
@@ -562,9 +568,7 @@ impl ClauseDB {
             .map(|w| w.c)
             .collect::<Vec<ClauseId>>();
         for cid in 1..self.clause.len() {
-            if self.clause[cid].is(Flag::DeadClause)
-                && !deads.contains(&cid)
-            {
+            if self.clause[cid].is(Flag::DeadClause) && !deads.contains(&cid) {
                 panic!("done");
             }
             if !self.clause[cid].is(Flag::DeadClause) {
@@ -572,8 +576,12 @@ impl ClauseDB {
                 if lits.len() < 2 {
                     panic!("too short clause {} {:?}", cid.format(), vec2int(&lits));
                 }
-                if self.watcher[lits[0].negate() as usize].iter().all(|w| w.c != cid)
-                    || self.watcher[lits[1].negate() as usize].iter().all(|w| w.c != cid)
+                if self.watcher[lits[0].negate() as usize]
+                    .iter()
+                    .all(|w| w.c != cid)
+                    || self.watcher[lits[1].negate() as usize]
+                        .iter()
+                        .all(|w| w.c != cid)
                 {
                     panic!("watch broken");
                 }
@@ -581,9 +589,7 @@ impl ClauseDB {
         }
         for ws in &self.watcher[2..] {
             for w in &ws[1..] {
-                if self.clause[w.c].is(Flag::DeadClause)
-                    && !deads.contains(&w.c)
-                {
+                if self.clause[w.c].is(Flag::DeadClause) && !deads.contains(&w.c) {
                     panic!("done");
                 }
             }

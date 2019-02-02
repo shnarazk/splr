@@ -84,8 +84,12 @@ impl SatSolverIF for Solver {
                     continue;
                 }
                 match (v.pos_occurs.len(), v.neg_occurs.len()) {
-                    (_, 0) => { asgs.enqueue_null(v, LTRUE, 0); },
-                    (0, _) => { asgs.enqueue_null(v, LFALSE, 0); },
+                    (_, 0) => {
+                        asgs.enqueue_null(v, LTRUE, 0);
+                    }
+                    (0, _) => {
+                        asgs.enqueue_null(v, LFALSE, 0);
+                    }
                     _ => elim.enqueue_var(vars, vi, false),
                 };
             }
