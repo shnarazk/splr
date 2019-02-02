@@ -435,7 +435,7 @@ impl ClauseDBIF for ClauseDB {
         state: &mut State,
         vars: &mut [Var],
     ) {
-        self.reset_lbd(vars, &mut state.lbd_temp);
+        // self.reset_lbd(vars, &mut state.lbd_temp);
         let ClauseDB {
             ref mut clause,
             ref mut touched,
@@ -483,7 +483,7 @@ impl ClauseDBIF for ClauseDB {
         state: &mut State,
         vars: &mut [Var],
     ) -> bool {
-        self.reset_lbd(vars, &mut state.lbd_temp);
+        // self.reset_lbd(vars, &mut state.lbd_temp);
         debug_assert_eq!(asgs.level(), 0);
         // reset reason since decision level is zero.
         for v in &mut vars[1..] {
