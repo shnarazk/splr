@@ -521,6 +521,10 @@ impl ClauseDBIF for ClauseDB {
         true
     }
 }
+        if elim.in_use {
+            self.reset_lbd(vars, &mut state.lbd_temp);
+            elim.stop(self, vars, false);
+        }
 
 
 impl ClauseDB {
