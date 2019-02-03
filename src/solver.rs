@@ -457,6 +457,26 @@ fn handle_conflict_path(
             asgs.cancel_until(vars, 0);
             config.adapt_strategy(cdb, elim, state);
         }
+        // micro tuning of restart thresholds
+        let nr = state.stats[Stat::Restart as usize] - state.stats[Stat::RestartRecord as usize];
+        state.stats[Stat::RestartRecord as usize] = state.stats[Stat::Restart as usize];
+        if config.restart_thr <= 0.82 && nr < 4 {
+            config.restart_thr += 0.01;
+        } else if 0.44 <= config.restart_thr && 1000 < nr {
+            config.restart_thr -= 0.01;
+        } else {
+            config.restart_thr -= (config.restart_thr - 0.60) * 0.01
+        }
+        let nb = state.stats[Stat::BlockRestart as usize]
+            - state.stats[Stat::BlockRestartRecord as usize];
+        state.stats[Stat::BlockRestartRecord as usize] = state.stats[Stat::BlockRestart as usize];
+        if 1.05 <= config.restart_blk && nb < 4 {
+            config.restart_blk -= 0.01;
+        } else if config.restart_blk <= 1.8 && 1000 < nb {
+            config.restart_blk += 0.01;
+        } else {
+            config.restart_blk -= (config.restart_blk - 1.40) * 0.01
+        }
         if state.stats[Stat::Elimination as usize] == 1 && state.elim_trigger == 1 {
             state.elim_trigger = state.c_lvl.get() as usize + 10;
         }

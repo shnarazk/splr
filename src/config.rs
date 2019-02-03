@@ -100,7 +100,7 @@ impl Default for Config {
             glureduce: true,
             cdb_inc: 300,
             cdb_inc_extra: 1000,
-            restart_thr: 0.80,     // will be overwrited by bin/splr
+            restart_thr: 0.60,     // will be overwrited by bin/splr
             restart_blk: 1.40,     // will be overwrited by bin/splr
             restart_asg_len: 3500, // will be overwrited by bin/splr
             restart_lbd_len: 100,  // will be overwrited by bin/splr
@@ -167,14 +167,18 @@ impl Config {
             self.var_decay = 0.91;
             self.var_decay_max = 0.91;
         }
+        // if state.stats[Stat::Restart as usize] < 10 {
+        //     self.restart_thr = 0.80;
+        // } else if 2000 < state.stats[Stat::Restart as usize] {
+        //     self.restart_thr = 0.55;
+        // }
+        // if state.stats[Stat::BlockRestart as usize] < 10 {
+        //     self.restart_blk = 1.25;
+        // } else if 2000 < state.stats[Stat::BlockRestart as usize] {
+        //     self.restart_blk = 1.55;
+        // }
         if self.strategy == SearchStrategy::Initial {
             self.strategy = SearchStrategy::Generic;
-            // if state.stats[Stat::BlockRestart as usize] < 100 {
-            //     self.restart_blk = 1.20;
-            // }
-            // if state.stats[Stat::BlockRestart as usize] < 10 {
-            //     self.restart_blk = 1.10;
-            // }
             return;
         }
         // state.ema_asg.reset();

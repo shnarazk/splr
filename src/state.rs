@@ -15,9 +15,11 @@ pub enum Stat {
     Conflict = 0,       // the number of backjump
     Decision,           // the number of decision
     Restart,            // the number of restart
+    RestartRecord,      // the last recorded number of Restart
+    BlockRestart,       // the number of blacking start
+    BlockRestartRecord, // the last recorded number of BlockResatr
     Learnt,             // the number of learnt clauses (< Conflict)
     NoDecisionConflict, // the number of 'no decision conflict'
-    BlockRestart,       // the number of blacking start
     Propagation,        // the number of propagation
     Reduction,          // the number of reduction
     Simplification,     // the number of simplification
@@ -258,19 +260,19 @@ impl StateIF for State {
             ),
         );
         println!(
-            "   Conflicts|aLBD:{}, bjmp:{}, cnfl:{} |#var:{} ",
+            "   Conflicts|aLBD:{}, bjmp:{}, cnfl:{} |blkR:{} ",
             f!("{:>9.2}", self.dumper, LogF64Id::AveLBD, self.ema_lbd.get()),
             f!("{:>9.2}", self.dumper, LogF64Id::BLevel, self.b_lvl.get()),
             f!("{:>9.2}", self.dumper, LogF64Id::CLevel, self.c_lvl.get()),
-            i!(
-                "{:>9}",
+            f!(
+                "{:>9.4}",
                 self.dumper,
-                LogUsizeId::ElimVarQueue,
-                elim.var_queue_len()
+                LogF64Id::RestartBlkR,
+                config.restart_blk
             ),
         );
         println!(
-            "   Clause DB|#rdc:{}, #smp:{},      Eliminator|#run:{} ",
+            "   Clause DB|#rdc:{}, #smp:{}, #elm:{} |rstK:{} ",
             i!(
                 "{:>9}",
                 self.dumper,
@@ -288,6 +290,12 @@ impl StateIF for State {
                 self.dumper,
                 LogUsizeId::Elimination,
                 self.stats[Stat::Elimination as usize]
+            ),
+            f!(
+                "{:>9.4}",
+                self.dumper,
+                LogF64Id::RestartThrK,
+                config.restart_thr
             ),
         );
     }
@@ -355,6 +363,8 @@ enum LogF64Id {
     AveLBD,       //  3: ave_lbd: f64,
     BLevel,       //  4: backjump_level: f64,
     CLevel,       //  5: conflict_level: f64,
+    RestartThrK,  //  6: restart K
+    RestartBlkR,  //  7: restart R
     End,
 }
 
