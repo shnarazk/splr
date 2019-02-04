@@ -25,6 +25,8 @@ pub enum SolverException {
     UndescribedError,
 }
 
+pub type MaybeInconsistent = Result<(), SolverException>;
+
 /// The type that `Solver` returns
 /// This captures the following three cases:
 /// * solved with a satisfiable assigment,

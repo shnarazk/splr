@@ -2,7 +2,7 @@ use crate::clause::{Clause, ClauseDB};
 use crate::config::Config;
 use crate::eliminator::Eliminator;
 use crate::propagator::AssignStack;
-use crate::solver::{Solver, SolverResult};
+use crate::solver::{MaybeInconsistent, Solver, SolverResult};
 use crate::state::State;
 use crate::types::{CNFDescription, ClauseId, Flag, Lbool, Lit, VarId};
 use crate::var::Var;
@@ -73,7 +73,7 @@ pub trait EliminatorIF {
         config: &mut Config,
         state: &mut State,
         vars: &mut [Var],
-    );
+    ) -> MaybeInconsistent;
     fn extend_model(&mut self, model: &mut Vec<i32>);
     fn add_cid_occur(&mut self, vars: &mut [Var], cid: ClauseId, c: &mut Clause, enqueue: bool);
     fn remove_lit_occur(&mut self, vars: &mut [Var], l: Lit, cid: ClauseId);

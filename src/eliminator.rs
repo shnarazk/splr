@@ -1,6 +1,7 @@
 use crate::clause::{Clause, ClauseDB};
 use crate::config::Config;
 use crate::propagator::AssignStack;
+use crate::solver::{MaybeInconsistent, SolverException};
 use crate::state::State;
 use crate::traits::*;
 use crate::types::*;
@@ -111,47 +112,38 @@ impl EliminatorIF for Eliminator {
         config: &mut Config,
         state: &mut State,
         vars: &mut [Var],
-    ) {
+    ) -> MaybeInconsistent {
         debug_assert!(asgs.level() == 0);
         if !self.in_use || !self.active {
-            return;
+            return Ok(());
         }
         let mut cnt = 0;
         'perform: while self.bwdsub_assigns < asgs.len()
             || !self.var_queue.is_empty()
             || !self.clause_queue.is_empty()
         {
-            if (!self.clause_queue.is_empty() || self.bwdsub_assigns < asgs.len())
-                && !self.backward_subsumption_check(asgs, cdb, config, state, vars)
-            {
-                state.ok = false;
-                break 'perform;
+            if !self.clause_queue.is_empty() || self.bwdsub_assigns < asgs.len() {
+                self.backward_subsumption_check(asgs, cdb, config, vars)?;
             }
-            //while !self.var_queue.is_empty() { // queue emulation
-            //    let vi = self.var_queue.remove(0);
             while let Some(vi) = self.var_queue.select_var(vars) {
                 let v = &mut vars[vi];
                 v.turn_off(Flag::Enqueued);
                 cnt += 1;
-                if config.elim_eliminate_loop_limit <= cnt {
-                    continue;
-                }
-                if v.is(Flag::EliminatedVar) || v.assign != BOTTOM {
-                    continue;
-                }
-                if !eliminate_var(asgs, config, cdb, self, state, vars, vi) {
-                    state.ok = false;
-                    return;
+                if cnt < config.elim_eliminate_loop_limit
+                    && !v.is(Flag::EliminatedVar)
+                    && v.assign == BOTTOM
+                {
+                    eliminate_var(asgs, config, cdb, self, state, vars, vi)?;
                 }
             }
-            self.backward_subsumption_check(asgs, cdb, config, state, vars);
-            assert!(self.clause_queue.is_empty());
+            self.backward_subsumption_check(asgs, cdb, config, vars)?;
+            debug_assert!(self.clause_queue.is_empty());
             cdb.garbage_collect();
             if asgs.propagate(cdb, state, vars) != NULL_CLAUSE {
-                state.ok = false;
-                return;
+                return Err(SolverException::InternalInconsistent);
             }
         }
+        Ok(())
     }
     fn extend_model(&mut self, model: &mut Vec<i32>) {
         if self.elim_clauses.is_empty() {
@@ -246,9 +238,8 @@ impl Eliminator {
         asgs: &mut AssignStack,
         cdb: &mut ClauseDB,
         config: &Config,
-        state: &mut State,
         vars: &mut [Var],
-    ) -> bool {
+    ) -> MaybeInconsistent {
         let mut cnt = 0;
         debug_assert_eq!(asgs.level(), 0);
         while !self.clause_queue.is_empty() || self.bwdsub_assigns < asgs.len() {
@@ -312,15 +303,14 @@ impl Eliminator {
                         let db = &cdb.clause[*did];
                         if !db.is(Flag::DeadClause)
                             && db.lits.len() <= config.elim_subsume_literal_limit
-                            && !try_subsume(asgs, cdb, self, state, vars, cid, *did)
                         {
-                            return false;
+                            try_subsume(asgs, cdb, self, vars, cid, *did)?;
                         }
                     }
                 }
             }
         }
-        true
+        Ok(())
     }
 }
 
@@ -328,11 +318,10 @@ fn try_subsume(
     asgs: &mut AssignStack,
     cdb: &mut ClauseDB,
     elim: &mut Eliminator,
-    state: &mut State,
     vars: &mut [Var],
     cid: ClauseId,
     did: ClauseId,
-) -> bool {
+) -> MaybeInconsistent {
     match subsume(cdb, cid, did) {
         Some(NULL_LIT) => {
             if !cid.is_lifted_lit() {
@@ -357,15 +346,12 @@ fn try_subsume(
         }
         Some(l) => {
             // println!("BackSubC subsumes {} from {} and {}", l.int(), cid.format(), did.format());
-            if !strengthen_clause(cdb, elim, vars, asgs, did, l.negate()) {
-                state.ok = false;
-                return false;
-            }
+            strengthen_clause(cdb, elim, vars, asgs, did, l.negate())?;
             elim.enqueue_var(vars, l.vi(), true);
         }
         None => {}
     }
-    true
+    Ok(())
 }
 
 /// returns a literal if these clauses can be merged by the literal.
@@ -508,7 +494,7 @@ fn merge(cdb: &mut ClauseDB, cip: ClauseId, ciq: ClauseId, v: VarId) -> Option<V
     Some(vec)
 }
 
-/// removes `l` from clause `cid`, returning `false` if inconsistent
+/// removes `l` from clause `cid`
 /// - calls `enqueue_clause`
 /// - calls `enqueue_var`
 fn strengthen_clause(
@@ -518,7 +504,7 @@ fn strengthen_clause(
     asgs: &mut AssignStack,
     cid: ClauseId,
     l: Lit,
-) -> bool {
+) -> MaybeInconsistent {
     debug_assert!(!cdb.clause[cid].is(Flag::DeadClause));
     debug_assert!(1 < cdb.clause[cid].lits.len());
     cdb.touched[l as usize] = true;
@@ -533,13 +519,17 @@ fn strengthen_clause(
         cdb.detach(cid);
         elim.remove_cid_occur(vars, cid, &cdb.clause[cid]);
         cdb.touched[c0.negate() as usize] = true;
-        asgs.enqueue_null(&mut vars[c0.vi()], c0.lbool(), 0)
+        if asgs.enqueue_null(&mut vars[c0.vi()], c0.lbool(), 0) {
+            Ok(())
+        } else {
+            Err(SolverException::InternalInconsistent)
+        }
     } else {
         // println!("cid {} drops literal {}", cid.fmt(), l.int());
         debug_assert!(1 < cdb.clause[cid].lits.len());
         elim.enqueue_clause(cid, &mut cdb.clause[cid]);
         elim.remove_lit_occur(vars, l, cid);
-        true
+        Ok(())
     }
 }
 
@@ -623,7 +613,6 @@ fn make_eliminated_clause(cdb: &mut ClauseDB, vec: &mut Vec<Lit>, vi: VarId, cid
     // println!("make_eliminated_clause: eliminate({}) clause {:?}", vi, vec2int(&ch.lits));
 }
 
-/// returns false if solver is in inconsistent
 #[inline]
 fn eliminate_var(
     asgs: &mut AssignStack,
@@ -633,10 +622,10 @@ fn eliminate_var(
     state: &mut State,
     vars: &mut [Var],
     vi: VarId,
-) -> bool {
+) -> MaybeInconsistent {
     let v = &mut vars[vi];
     if v.assign != BOTTOM {
-        return true;
+        return Ok(());
     }
     debug_assert!(!v.is(Flag::EliminatedVar));
     // count only alive clauses
@@ -648,7 +637,7 @@ fn eliminate_var(
     let neg = &v.neg_occurs as *const Vec<ClauseId>;
     unsafe {
         if check_var_elimination_condition(cdb, config, vars, &*pos, &*neg, vi) {
-            return true;
+            return Ok(());
         }
         let v = &mut vars[vi];
         // OK, eliminate the literal and build constraints on it.
@@ -677,8 +666,7 @@ fn eliminate_var(
                             // );
                             let lit = vec[0];
                             if !asgs.enqueue_null(&mut vars[lit.vi()], lit.lbool(), 0) {
-                                state.ok = false;
-                                return false;
+                                return Err(SolverException::InternalInconsistent);
                             }
                         }
                         _ => {
@@ -704,15 +692,7 @@ fn eliminate_var(
         }
         vars[vi].pos_occurs.clear();
         vars[vi].neg_occurs.clear();
-        // if new_assign {
-        //     cdb.garbage_collect();
-        // }
-        // if asgs.propagate(cdb, state, vars) != NULL_CLAUSE {
-        //     state.ok = false;
-        //     return false;
-        // }
-        elim.backward_subsumption_check(asgs, cdb, config, state, vars);
-        true
+        elim.backward_subsumption_check(asgs, cdb, config, vars)
     }
 }
 

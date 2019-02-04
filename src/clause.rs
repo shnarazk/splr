@@ -495,11 +495,9 @@ impl ClauseDBIF for ClauseDB {
         }
         loop {
             let na = asgs.len();
-            if elim.in_use {
-                elim.eliminate(asgs, self, config, state, vars);
-                if !state.ok {
-                    return false;
-                }
+            if elim.in_use && elim.eliminate(asgs, self, config, state, vars).is_err() {
+                state.ok = false;
+                return false;
             }
             for c in &mut self.clause[1..] {
                 if !c.is(Flag::DeadClause) && vars.satisfies(&c.lits) {
