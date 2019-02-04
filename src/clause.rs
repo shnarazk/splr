@@ -419,7 +419,7 @@ impl ClauseDBIF for ClauseDB {
     fn detach(&mut self, cid: ClauseId) {
         let c = &mut self.clause[cid];
         if c.is(Flag::DeadClause) {
-            panic!("dead!");
+            // panic!("dead!");
             return;
         }
         c.turn_on(Flag::DeadClause);
