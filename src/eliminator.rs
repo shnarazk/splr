@@ -144,6 +144,8 @@ impl EliminatorIF for Eliminator {
                     return;
                 }
             }
+            self.backward_subsumption_check(asgs, cdb, config, state, vars);
+            assert!(self.clause_queue.is_empty());
             cdb.garbage_collect();
             if asgs.propagate(cdb, state, vars) != NULL_CLAUSE {
                 state.ok = false;
