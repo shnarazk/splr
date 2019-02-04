@@ -720,7 +720,7 @@ fn eliminate_var(
         //     state.ok = false;
         //     return false;
         // }
-        // elim.backward_subsumption_check(asgs, cdb, config, state, vars)
+        elim.backward_subsumption_check(asgs, cdb, config, state, vars);
         true
     }
 }
