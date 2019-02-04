@@ -24,12 +24,7 @@ pub trait ClauseDBIF {
         lbd: usize,
     ) -> ClauseId;
     fn detach(&mut self, cid: ClauseId);
-    fn reduce(
-        &mut self,
-        config: &Config,
-        state: &mut State,
-        vars: &mut [Var],
-    );
+    fn reduce(&mut self, config: &Config, state: &mut State, vars: &mut [Var]);
     fn simplify(
         &mut self,
         asgs: &mut AssignStack,
@@ -121,12 +116,6 @@ pub trait PropagatorIF {
     fn is_zero(&self) -> bool;
     fn num_at(&self, n: usize) -> usize;
     fn remains(&self) -> bool;
-    fn uncheck_propagate(
-        &mut self,
-        cdb: &mut ClauseDB,
-        state: &mut State,
-        vars: &mut [Var],
-    ) -> ClauseId;
     fn propagate(&mut self, cdb: &mut ClauseDB, state: &mut State, vars: &mut [Var]) -> ClauseId;
     fn cancel_until(&mut self, vars: &mut [Var], lv: usize);
     fn enqueue(&mut self, v: &mut Var, sig: Lbool, cid: ClauseId, dl: usize) -> bool;

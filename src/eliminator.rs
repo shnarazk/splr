@@ -357,7 +357,7 @@ fn try_subsume(
         }
         Some(l) => {
             // println!("BackSubC subsumes {} from {} and {}", l.int(), cid.format(), did.format());
-            if !strengthen_clause(cdb, elim, state, vars, asgs, did, l.negate()) {
+            if !strengthen_clause(cdb, elim, vars, asgs, did, l.negate()) {
                 state.ok = false;
                 return false;
             }
@@ -514,7 +514,6 @@ fn merge(cdb: &mut ClauseDB, cip: ClauseId, ciq: ClauseId, v: VarId) -> Option<V
 fn strengthen_clause(
     cdb: &mut ClauseDB,
     elim: &mut Eliminator,
-    state: &mut State,
     vars: &mut [Var],
     asgs: &mut AssignStack,
     cid: ClauseId,
@@ -534,15 +533,7 @@ fn strengthen_clause(
         cdb.detach(cid);
         elim.remove_cid_occur(vars, cid, &cdb.clause[cid]);
         cdb.touched[c0.negate() as usize] = true;
-        // cdb.garbage_collect();
-        if asgs.enqueue_null(&mut vars[c0.vi()], c0.lbool(), 0)
-            // && asgs.propagate(cdb, state, vars) == NULL_CLAUSE
-        {
-            // cdb.touched[c0.negate() as usize] = true;
-            true
-        } else {
-            false
-        }
+        asgs.enqueue_null(&mut vars[c0.vi()], c0.lbool(), 0)
     } else {
         // println!("cid {} drops literal {}", cid.fmt(), l.int());
         debug_assert!(1 < cdb.clause[cid].lits.len());

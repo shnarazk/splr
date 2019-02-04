@@ -245,7 +245,7 @@ fn search(
     let mut a_decision_was_made = false;
     state.restart_update_luby(config);
     while state.ok {
-        let ci = asgs.uncheck_propagate(cdb, state, vars);
+        let ci = asgs.propagate(cdb, state, vars);
         state.stats[Stat::Propagation as usize] += 1;
         if ci == NULL_CLAUSE {
             if config.num_vars <= asgs.len() + state.num_eliminated_vars {

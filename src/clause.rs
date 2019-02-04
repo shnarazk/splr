@@ -434,12 +434,7 @@ impl ClauseDBIF for ClauseDB {
         }
         self.touched[w0 as usize] = true;
     }
-    fn reduce(
-        &mut self,
-        config: &Config,
-        state: &mut State,
-        vars: &mut [Var],
-    ) {
+    fn reduce(&mut self, config: &Config, state: &mut State, vars: &mut [Var]) {
         // self.reset_lbd(vars, &mut state.lbd_temp);
         let ClauseDB {
             ref mut clause,
