@@ -1,14 +1,14 @@
 //! This is a SAT solver in Rust.
 
 // /// Subsumption-based clause/var eliminaiton
-/// Assignment management
-pub mod assign;
 /// Clause struct
 pub mod clause;
 /// Solver configuration
 pub mod config;
 /// Pre/In-processor for clause subsumption and variable elimination
 pub mod eliminator;
+/// Assignment management
+pub mod propagator;
 /// Solver restart implementation
 pub mod restart;
 /// The main struct

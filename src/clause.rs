@@ -1,6 +1,6 @@
-use crate::assign::AssignStack;
 use crate::config::Config;
 use crate::eliminator::Eliminator;
+use crate::propagator::AssignStack;
 use crate::state::{Stat, State};
 use crate::traits::*;
 use crate::types::*;

@@ -1,5 +1,5 @@
-use crate::assign::AssignStack;
 use crate::config::Config;
+use crate::propagator::AssignStack;
 use crate::state::{Stat, State};
 use crate::traits::*;
 

@@ -1,34 +1,11 @@
-use crate::assign::AssignStack;
 use crate::clause::{Clause, ClauseDB};
 use crate::config::Config;
 use crate::eliminator::Eliminator;
+use crate::propagator::AssignStack;
 use crate::solver::{Solver, SolverResult};
 use crate::state::State;
 use crate::types::{CNFDescription, ClauseId, Flag, Lbool, Lit, VarId};
 use crate::var::Var;
-
-/// API for assignemnet like `assume`, `enqueue`, `cancel_until`, and so on.
-pub trait AssignIF {
-    fn new(n: usize) -> Self;
-    fn len(&self) -> usize;
-    fn is_empty(&self) -> bool;
-    fn level(&self) -> usize;
-    fn is_zero(&self) -> bool;
-    fn num_at(&self, n: usize) -> usize;
-    fn sweep(&mut self) -> Lit;
-    fn catchup(&mut self);
-    fn remains(&self) -> bool;
-    fn level_up(&mut self);
-    fn cancel_until(&mut self, vars: &mut [Var], lv: usize);
-    fn enqueue(&mut self, v: &mut Var, sig: Lbool, cid: ClauseId, dl: usize) -> bool;
-    fn enqueue_null(&mut self, v: &mut Var, sig: Lbool, dl: usize) -> bool;
-    fn uncheck_enqueue(&mut self, vars: &mut [Var], l: Lit, cid: ClauseId);
-    fn uncheck_assume(&mut self, vars: &mut [Var], l: Lit);
-    fn dump_cnf(&mut self, cdb: &ClauseDB, config: &Config, vars: &[Var], fname: &str);
-    fn rebuild_order(&mut self, vars: &[Var]);
-    fn update_order(&mut self, vec: &[Var], v: VarId);
-    fn select_var(&mut self, vars: &[Var]) -> VarId;
-}
 
 /// API for Clause, providing `kill`.
 pub trait ClauseIF {
@@ -136,9 +113,31 @@ pub trait LitIF {
     fn to_cid(self) -> ClauseId;
 }
 
-/// API for executing propagatation, providing `propagate`.
-pub trait PropagateIF {
+/// API for assignemnet like `propagate`, `enqueue`, `cancel_until`, and so on.
+pub trait PropagatorIF {
+    fn new(n: usize) -> Self;
+    fn len(&self) -> usize;
+    fn is_empty(&self) -> bool;
+    fn level(&self) -> usize;
+    fn is_zero(&self) -> bool;
+    fn num_at(&self, n: usize) -> usize;
+    fn remains(&self) -> bool;
+    fn uncheck_propagate(
+        &mut self,
+        cdb: &mut ClauseDB,
+        state: &mut State,
+        vars: &mut [Var],
+    ) -> ClauseId;
     fn propagate(&mut self, cdb: &mut ClauseDB, state: &mut State, vars: &mut [Var]) -> ClauseId;
+    fn cancel_until(&mut self, vars: &mut [Var], lv: usize);
+    fn enqueue(&mut self, v: &mut Var, sig: Lbool, cid: ClauseId, dl: usize) -> bool;
+    fn enqueue_null(&mut self, v: &mut Var, sig: Lbool, dl: usize) -> bool;
+    fn uncheck_enqueue(&mut self, vars: &mut [Var], l: Lit, cid: ClauseId);
+    fn uncheck_assume(&mut self, vars: &mut [Var], l: Lit);
+    fn dump_cnf(&mut self, cdb: &ClauseDB, config: &Config, vars: &[Var], fname: &str);
+    fn rebuild_order(&mut self, vars: &[Var]);
+    fn update_order(&mut self, vec: &[Var], v: VarId);
+    fn select_var(&mut self, vars: &[Var]) -> VarId;
 }
 
 /// API for restart like `block_restart`, `force_restart` and so on.

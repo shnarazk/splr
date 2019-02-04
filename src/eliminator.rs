@@ -1,6 +1,6 @@
-use crate::assign::AssignStack;
 use crate::clause::{Clause, ClauseDB};
 use crate::config::Config;
+use crate::propagator::AssignStack;
 use crate::state::State;
 use crate::traits::*;
 use crate::types::*;

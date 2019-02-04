@@ -1,6 +1,7 @@
-use crate::clause::ClauseDB;
+use crate::clause::{ClauseDB, Watch};
 use crate::config::Config;
-use crate::traits::{AssignIF, FlagIF, LitIF};
+use crate::state::{Stat, State};
+use crate::traits::{FlagIF, LitIF, PropagatorIF, VarDBIF, WatchDBIF};
 use crate::types::*;
 use crate::var::Var;
 use std::fmt;
@@ -14,7 +15,7 @@ pub struct AssignStack {
     var_order: VarIdHeap, // Variable Order
 }
 
-impl AssignIF for AssignStack {
+impl PropagatorIF for AssignStack {
     fn new(n: usize) -> AssignStack {
         AssignStack {
             trail: Vec::with_capacity(n),
@@ -44,22 +45,8 @@ impl AssignIF for AssignStack {
         self.trail_lim[n]
     }
     #[inline(always)]
-    fn sweep(&mut self) -> Lit {
-        let lit = self.trail[self.q_head];
-        self.q_head += 1;
-        lit
-    }
-    #[inline(always)]
-    fn catchup(&mut self) {
-        self.q_head = self.trail.len();
-    }
-    #[inline(always)]
     fn remains(&self) -> bool {
         self.q_head < self.trail.len()
-    }
-    #[inline(always)]
-    fn level_up(&mut self) {
-        self.trail_lim.push(self.trail.len());
     }
     /// returns `false` if an conflict occures.
     fn enqueue(&mut self, v: &mut Var, sig: Lbool, cid: ClauseId, dl: usize) -> bool {
@@ -95,6 +82,130 @@ impl AssignIF for AssignStack {
         } else {
             val == sig
         }
+    }
+    /// propagate without checking dead clauses
+    #[inline]
+    fn uncheck_propagate(
+        &mut self,
+        cdb: &mut ClauseDB,
+        state: &mut State,
+        vars: &mut [Var],
+    ) -> ClauseId {
+        let head = &mut cdb.clause;
+        let watcher = &mut cdb.watcher[..] as *mut [Vec<Watch>];
+        while self.remains() {
+            let p: usize = self.sweep() as usize;
+            let false_lit = (p as Lit).negate();
+            state.stats[Stat::Propagation as usize] += 1;
+            unsafe {
+                let source = (*watcher).get_unchecked_mut(p);
+                let mut n = 1;
+                'next_clause: while n <= source.count() {
+                    let w = source.get_unchecked_mut(n);
+                    // if head[w.c].is(ClauseFlag::Dead) {
+                    //     source.detach(n);
+                    //     continue 'next_clause;
+                    // }
+                    // debug_assert!(!vars[w.blocker.vi()].eliminated); it doesn't hold in TP12
+                    if vars.assigned(w.blocker) != LTRUE {
+                        let lits = &mut head.get_unchecked_mut(w.c).lits;
+                        debug_assert!(2 <= lits.len());
+                        debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
+                        let mut first = *lits.get_unchecked(0);
+                        if first == false_lit {
+                            // lits.swap(0, 1); // now false_lit is lits[1].
+                            first = *lits.get_unchecked(1);
+                            *lits.get_unchecked_mut(0) = first;
+                            *lits.get_unchecked_mut(1) = false_lit;
+                        }
+                        let first_value = vars.assigned(first);
+                        // If 0th watch is true, then clause is already satisfied.
+                        if first != w.blocker && first_value == LTRUE {
+                            w.blocker = first;
+                            n += 1;
+                            continue 'next_clause;
+                        }
+                        for (k, lk) in lits.iter().enumerate().skip(2) {
+                            // below is equivalent to 'assigned(lk) != LFALSE'
+                            if (((lk & 1) as u8) ^ vars.get_unchecked(lk.vi()).assign) != 0 {
+                                (*watcher)
+                                    .get_unchecked_mut(lk.negate() as usize)
+                                    .attach(first, w.c);
+                                source.detach(n);
+                                *lits.get_unchecked_mut(1) = *lk;
+                                *lits.get_unchecked_mut(k) = false_lit;
+                                continue 'next_clause;
+                            }
+                        }
+                        if first_value == LFALSE {
+                            self.catchup();
+                            return w.c;
+                        } else {
+                            self.uncheck_enqueue(vars, first, w.c);
+                        }
+                    }
+                    n += 1;
+                }
+            }
+        }
+        NULL_CLAUSE
+    }
+    fn propagate(&mut self, cdb: &mut ClauseDB, state: &mut State, vars: &mut [Var]) -> ClauseId {
+        let head = &mut cdb.clause;
+        let watcher = &mut cdb.watcher[..] as *mut [Vec<Watch>];
+        while self.remains() {
+            let p: usize = self.sweep() as usize;
+            let false_lit = (p as Lit).negate();
+            state.stats[Stat::Propagation as usize] += 1;
+            unsafe {
+                let source = (*watcher).get_unchecked_mut(p);
+                let mut n = 1;
+                'next_clause: while n <= source.count() {
+                    let w = source.get_unchecked_mut(n);
+                    if head.get_unchecked(w.c).is(Flag::DeadClause) {
+                        source.detach(n);
+                        continue 'next_clause;
+                    }
+                    if vars.assigned(w.blocker) != LTRUE {
+                        let lits = &mut head.get_unchecked_mut(w.c).lits;
+                        debug_assert!(2 <= lits.len());
+                        debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
+                        let mut first = *lits.get_unchecked(0);
+                        if first == false_lit {
+                            lits.swap(0, 1); // now false_lit is lits[1].
+                            first = *lits.get_unchecked(0);
+                        }
+                        let first_value = vars.assigned(first);
+                        // If 0th watch is true, then clause is already satisfied.
+                        if first != w.blocker && first_value == LTRUE {
+                            w.blocker = first;
+                            n += 1;
+                            continue 'next_clause;
+                        }
+                        for (k, lk) in lits.iter().enumerate().skip(2) {
+                            // below is equivalent to 'assigned(lk) != LFALSE'
+                            if (((lk & 1) as u8) ^ vars.get_unchecked(lk.vi()).assign) != 0 {
+                                (*watcher)
+                                    .get_unchecked_mut(lk.negate() as usize)
+                                    .attach(first, w.c);
+                                source.detach(n);
+                                *lits.get_unchecked_mut(1) = *lk;
+                                *lits.get_unchecked_mut(k) = false_lit;
+                                continue 'next_clause;
+                            }
+                        }
+                        if first_value == LFALSE {
+                            self.catchup();
+                            return w.c;
+                        } else {
+                            self.uncheck_enqueue(vars, first, w.c);
+                        }
+                    }
+                    n += 1;
+                }
+            }
+        }
+        NULL_CLAUSE
     }
     fn cancel_until(&mut self, vars: &mut [Var], lv: usize) {
         if self.trail_lim.len() <= lv {
@@ -134,7 +245,7 @@ impl AssignIF for AssignStack {
     fn uncheck_assume(&mut self, vars: &mut [Var], l: Lit) {
         debug_assert!(!self.trail.contains(&l));
         debug_assert!(!self.trail.contains(&l.negate()));
-        self.trail_lim.push(self.trail.len());
+        self.level_up();
         let dl = self.trail_lim.len();
         let v = &mut vars[l.vi()];
         debug_assert!(!v.is(Flag::EliminatedVar));
@@ -183,6 +294,23 @@ impl AssignIF for AssignStack {
     }
     fn update_order(&mut self, vec: &[Var], v: VarId) {
         self.var_order.update(vec, v)
+    }
+}
+
+impl AssignStack {
+    #[inline(always)]
+    fn level_up(&mut self) {
+        self.trail_lim.push(self.trail.len());
+    }
+    #[inline(always)]
+    fn sweep(&mut self) -> Lit {
+        let lit = self.trail[self.q_head];
+        self.q_head += 1;
+        lit
+    }
+    #[inline(always)]
+    fn catchup(&mut self) {
+        self.q_head = self.trail.len();
     }
 }
 

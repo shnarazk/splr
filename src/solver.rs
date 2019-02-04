@@ -1,7 +1,7 @@
-use crate::assign::AssignStack;
-use crate::clause::{Clause, ClauseDB, Watch};
+use crate::clause::{Clause, ClauseDB};
 use crate::config::Config;
 use crate::eliminator::Eliminator;
+use crate::propagator::AssignStack;
 use crate::state::{Stat, State};
 use crate::traits::*;
 use crate::types::*;
@@ -231,133 +231,6 @@ impl SatSolverIF for Solver {
     }
 }
 
-impl PropagateIF for AssignStack {
-    fn propagate(&mut self, cdb: &mut ClauseDB, state: &mut State, vars: &mut [Var]) -> ClauseId {
-        let head = &mut cdb.clause;
-        let watcher = &mut cdb.watcher[..] as *mut [Vec<Watch>];
-        while self.remains() {
-            let p: usize = self.sweep() as usize;
-            let false_lit = (p as Lit).negate();
-            state.stats[Stat::Propagation as usize] += 1;
-            unsafe {
-                let source = (*watcher).get_unchecked_mut(p);
-                let mut n = 1;
-                'next_clause: while n <= source.count() {
-                    let w = source.get_unchecked_mut(n);
-                    if head.get_unchecked(w.c).is(Flag::DeadClause) {
-                        source.detach(n);
-                        continue 'next_clause;
-                    }
-                    if vars.assigned(w.blocker) != LTRUE {
-                        let lits = &mut head.get_unchecked_mut(w.c).lits;
-                        debug_assert!(2 <= lits.len());
-                        debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
-                        let mut first = *lits.get_unchecked(0);
-                        if first == false_lit {
-                            lits.swap(0, 1); // now false_lit is lits[1].
-                            first = *lits.get_unchecked(0);
-                        }
-                        let first_value = vars.assigned(first);
-                        // If 0th watch is true, then clause is already satisfied.
-                        if first != w.blocker && first_value == LTRUE {
-                            w.blocker = first;
-                            n += 1;
-                            continue 'next_clause;
-                        }
-                        for (k, lk) in lits.iter().enumerate().skip(2) {
-                            // below is equivalent to 'assigned(lk) != LFALSE'
-                            if (((lk & 1) as u8) ^ vars.get_unchecked(lk.vi()).assign) != 0 {
-                                (*watcher)
-                                    .get_unchecked_mut(lk.negate() as usize)
-                                    .attach(first, w.c);
-                                source.detach(n);
-                                *lits.get_unchecked_mut(1) = *lk;
-                                *lits.get_unchecked_mut(k) = false_lit;
-                                continue 'next_clause;
-                            }
-                        }
-                        if first_value == LFALSE {
-                            self.catchup();
-                            return w.c;
-                        } else {
-                            self.uncheck_enqueue(vars, first, w.c);
-                        }
-                    }
-                    n += 1;
-                }
-            }
-        }
-        NULL_CLAUSE
-    }
-}
-
-#[inline]
-fn propagate_fast(
-    asgs: &mut AssignStack,
-    cdb: &mut ClauseDB,
-    state: &mut State,
-    vars: &mut [Var],
-) -> ClauseId {
-    let head = &mut cdb.clause;
-    let watcher = &mut cdb.watcher[..] as *mut [Vec<Watch>];
-    while asgs.remains() {
-        let p: usize = asgs.sweep() as usize;
-        let false_lit = (p as Lit).negate();
-        state.stats[Stat::Propagation as usize] += 1;
-        unsafe {
-            let source = (*watcher).get_unchecked_mut(p);
-            let mut n = 1;
-            'next_clause: while n <= source.count() {
-                let w = source.get_unchecked_mut(n);
-                // if head[w.c].is(ClauseFlag::Dead) {
-                //     source.detach(n);
-                //     continue 'next_clause;
-                // }
-                // debug_assert!(!vars[w.blocker.vi()].eliminated); it doesn't hold in TP12
-                if vars.assigned(w.blocker) != LTRUE {
-                    let lits = &mut head.get_unchecked_mut(w.c).lits;
-                    debug_assert!(2 <= lits.len());
-                    debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
-                    let mut first = *lits.get_unchecked(0);
-                    if first == false_lit {
-                        // lits.swap(0, 1); // now false_lit is lits[1].
-                        first = *lits.get_unchecked(1);
-                        *lits.get_unchecked_mut(0) = first;
-                        *lits.get_unchecked_mut(1) = false_lit;
-                    }
-                    let first_value = vars.assigned(first);
-                    // If 0th watch is true, then clause is already satisfied.
-                    if first != w.blocker && first_value == LTRUE {
-                        w.blocker = first;
-                        n += 1;
-                        continue 'next_clause;
-                    }
-                    for (k, lk) in lits.iter().enumerate().skip(2) {
-                        // below is equivalent to 'assigned(lk) != LFALSE'
-                        if (((lk & 1) as u8) ^ vars.get_unchecked(lk.vi()).assign) != 0 {
-                            (*watcher)
-                                .get_unchecked_mut(lk.negate() as usize)
-                                .attach(first, w.c);
-                            source.detach(n);
-                            *lits.get_unchecked_mut(1) = *lk;
-                            *lits.get_unchecked_mut(k) = false_lit;
-                            continue 'next_clause;
-                        }
-                    }
-                    if first_value == LFALSE {
-                        asgs.catchup();
-                        return w.c;
-                    } else {
-                        asgs.uncheck_enqueue(vars, first, w.c);
-                    }
-                }
-                n += 1;
-            }
-        }
-    }
-    NULL_CLAUSE
-}
-
 /// main loop; returns `true` for SAT, `false` for UNSAT.
 #[inline]
 fn search(
@@ -372,7 +245,7 @@ fn search(
     let mut a_decision_was_made = false;
     state.restart_update_luby(config);
     while state.ok {
-        let ci = propagate_fast(asgs, cdb, state, vars);
+        let ci = asgs.uncheck_propagate(cdb, state, vars);
         state.stats[Stat::Propagation as usize] += 1;
         if ci == NULL_CLAUSE {
             if config.num_vars <= asgs.len() + state.num_eliminated_vars {
