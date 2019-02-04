@@ -418,7 +418,10 @@ impl ClauseDBIF for ClauseDB {
     /// called from strengthen_clause, backward_subsumption_check, eliminate_var, substitute
     fn detach(&mut self, cid: ClauseId) {
         let c = &mut self.clause[cid];
-        debug_assert!(!c.is(Flag::DeadClause));
+        if c.is(Flag::DeadClause) {
+            panic!("dead!");
+            return;
+        }
         c.turn_on(Flag::DeadClause);
         if c.lits.is_empty() {
             return;

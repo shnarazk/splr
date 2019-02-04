@@ -1,5 +1,4 @@
 use crate::clause::ClauseDB;
-use crate::eliminator::Eliminator;
 use crate::state::{Stat, State};
 use crate::traits::{ClauseDBIF, ClauseIF, FlagIF};
 use crate::types::Flag;

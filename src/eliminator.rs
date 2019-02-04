@@ -144,6 +144,11 @@ impl EliminatorIF for Eliminator {
                     return;
                 }
             }
+            cdb.garbage_collect();
+            if asgs.propagate(cdb, state, vars) != NULL_CLAUSE {
+                state.ok = false;
+                return;
+            }
         }
     }
     fn extend_model(&mut self, model: &mut Vec<i32>) {
@@ -526,10 +531,12 @@ fn strengthen_clause(
         // println!("{} is removed and its first literal {} is enqueued.", cid.fmt(), c0.int());
         cdb.detach(cid);
         elim.remove_cid_occur(vars, cid, &cdb.clause[cid]);
+        cdb.touched[c0.negate() as usize] = true;
+        // cdb.garbage_collect();
         if asgs.enqueue_null(&mut vars[c0.vi()], c0.lbool(), 0)
-            && asgs.propagate(cdb, state, vars) == NULL_CLAUSE
+            // && asgs.propagate(cdb, state, vars) == NULL_CLAUSE
         {
-            cdb.touched[c0.negate() as usize] = true;
+            // cdb.touched[c0.negate() as usize] = true;
             true
         } else {
             false
@@ -704,11 +711,15 @@ fn eliminate_var(
         }
         vars[vi].pos_occurs.clear();
         vars[vi].neg_occurs.clear();
-        if asgs.propagate(cdb, state, vars) != NULL_CLAUSE {
-            state.ok = false;
-            return false;
-        }
-        elim.backward_subsumption_check(asgs, cdb, config, state, vars)
+        // if new_assign {
+        //     cdb.garbage_collect();
+        // }
+        // if asgs.propagate(cdb, state, vars) != NULL_CLAUSE {
+        //     state.ok = false;
+        //     return false;
+        // }
+        // elim.backward_subsumption_check(asgs, cdb, config, state, vars)
+        true
     }
 }
 

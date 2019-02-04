@@ -106,14 +106,12 @@ impl PropagatorIF for AssignStack {
                     //     source.detach(n);
                     //     continue 'next_clause;
                     // }
-                    // debug_assert!(!vars[w.blocker.vi()].eliminated); it doesn't hold in TP12
                     if vars.assigned(w.blocker) != LTRUE {
                         let lits = &mut head.get_unchecked_mut(w.c).lits;
                         debug_assert!(2 <= lits.len());
                         debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
                         let mut first = *lits.get_unchecked(0);
                         if first == false_lit {
-                            // lits.swap(0, 1); // now false_lit is lits[1].
                             first = *lits.get_unchecked(1);
                             *lits.get_unchecked_mut(0) = first;
                             *lits.get_unchecked_mut(1) = false_lit;
@@ -163,6 +161,7 @@ impl PropagatorIF for AssignStack {
                 'next_clause: while n <= source.count() {
                     let w = source.get_unchecked_mut(n);
                     if head.get_unchecked(w.c).is(Flag::DeadClause) {
+                        panic!("dead!");
                         source.detach(n);
                         continue 'next_clause;
                     }
