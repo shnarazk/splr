@@ -249,7 +249,7 @@ impl ClauseDBIF for ClauseDB {
             num_learnt: 0,
         }
     }
-    fn garbage_collect(&mut self, _elim: &mut Eliminator) {
+    fn garbage_collect(&mut self) {
         debug_assert!(self.check_liveness1());
         let ClauseDB {
             ref mut watcher,
@@ -434,7 +434,6 @@ impl ClauseDBIF for ClauseDB {
     fn reduce(
         &mut self,
         config: &Config,
-        elim: &mut Eliminator,
         state: &mut State,
         vars: &mut [Var],
     ) {
@@ -476,7 +475,7 @@ impl ClauseDBIF for ClauseDB {
             }
         }
         state.stats[Stat::Reduction as usize] += 1;
-        self.garbage_collect(elim);
+        self.garbage_collect();
         self.reset_lbd(vars, &mut state.lbd_temp);
     }
     fn simplify(
@@ -523,7 +522,7 @@ impl ClauseDBIF for ClauseDB {
                 break;
             }
         }
-        self.garbage_collect(elim);
+        self.garbage_collect();
         state.stats[Stat::Simplification as usize] += 1;
         if elim.in_use {
             self.reset_lbd(vars, &mut state.lbd_temp);

@@ -125,7 +125,7 @@ impl Default for Config {
 
 impl Config {
     #[inline(always)]
-    pub fn adapt_strategy(&mut self, cdb: &mut ClauseDB, elim: &mut Eliminator, state: &mut State) {
+    pub fn adapt_strategy(&mut self, cdb: &mut ClauseDB, state: &mut State) {
         if !self.adapt_strategy || self.strategy != SearchStrategy::Initial {
             return;
         }
@@ -199,7 +199,7 @@ impl Config {
                     c.kill(&mut cdb.touched);
                 }
             }
-            cdb.garbage_collect(elim);
+            cdb.garbage_collect();
         }
     }
 }

@@ -328,7 +328,7 @@ fn handle_conflict_path(
     if tn_confl % 10_000 == 0 {
         if tn_confl == 100_000 {
             asgs.cancel_until(vars, 0);
-            config.adapt_strategy(cdb, elim, state);
+            config.adapt_strategy(cdb, state);
         }
         // micro tuning of restart thresholds
         let nr = state.stats[Stat::Restart as usize] - state.stats[Stat::RestartRecord as usize];
@@ -373,7 +373,7 @@ fn handle_conflict_path(
         //     config.elim_eliminate_combination_limit = state.ema_lbd.get() as usize;
         //     config.elim_subsume_literal_limit = limit;
         // }
-        cdb.reduce(config, elim, state, vars);
+        cdb.reduce(config, state, vars);
     }
 }
 
