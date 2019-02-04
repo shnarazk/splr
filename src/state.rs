@@ -352,7 +352,7 @@ enum LogUsizeId {
     Simplification, // 13: simplification: usize,
     Elimination,    // 14: elimination: usize,
     // ElimClauseQueue, // 15: elim_clause_queue: usize,
-    ElimVarQueue, // 16: elim_var_queue: usize,
+    // ElimVarQueue, // 16: elim_var_queue: usize,
     End,
 }
 
