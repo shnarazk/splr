@@ -80,7 +80,7 @@ impl PropagatorIF for AssignStack {
             v.level = 0;
             self.trail.push(Lit::from_var(v.index, sig));
         }
-        debug_assert!(val == sig);
+        debug_assert!(v.assign == sig);
     }
     /// propagate without checking dead clauses
     /// Note: this function assues there's no dead clause.

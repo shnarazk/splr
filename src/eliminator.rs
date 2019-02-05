@@ -203,7 +203,7 @@ impl EliminatorIF for Eliminator {
             v.turn_on(Flag::TouchedVar);
             if !v.is(Flag::EliminatedVar) {
                 if l.positive() {
-                    debug_assert!(!v.neg_occurs.contains(&cid));
+                    debug_assert!(!v.pos_occurs.contains(&cid));
                     v.pos_occurs.push(cid);
                 } else {
                     debug_assert!(!v.neg_occurs.contains(&cid));
