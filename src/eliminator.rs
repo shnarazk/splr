@@ -506,7 +506,7 @@ fn strengthen_clause(
     cdb.touched[l as usize] = true;
     cdb.touched[l.negate() as usize] = true;
     debug_assert_ne!(cid, NULL_CLAUSE);
-    if strengthen(cdb, elim, vars, cid, l) {
+    if strengthen(cdb, cid, l) {
         // Vaporize the binary clause
         debug_assert!(2 == cdb.clause[cid].lits.len());
         let c0 = cdb.clause[cid].lits[0];
@@ -514,7 +514,6 @@ fn strengthen_clause(
         // println!("{} is removed and its first literal {} is enqueued.", cid.fmt(), c0.int());
         cdb.detach(cid);
         elim.remove_cid_occur(vars, cid, &cdb.clause[cid]);
-        cdb.touched[c0.negate() as usize] = true;
         if asgs.enqueue_null(&mut vars[c0.vi()], c0.lbool(), 0) {
             Ok(())
         } else {
@@ -532,13 +531,7 @@ fn strengthen_clause(
 /// removes Lit `p` from Clause *self*. This is an O(n) function!
 /// returns true if the clause became a unit clause.
 /// Called only from strengthen_clause
-fn strengthen(
-    cdb: &mut ClauseDB,
-    elim: &mut Eliminator,
-    vars: &mut [Var],
-    cid: ClauseId,
-    p: Lit,
-) -> bool {
+fn strengthen(cdb: &mut ClauseDB, cid: ClauseId, p: Lit) -> bool {
     debug_assert!(!cdb.clause[cid].is(Flag::DeadClause));
     debug_assert!(1 < cdb.clause[cid].lits.len());
     let ClauseDB {
@@ -549,22 +542,19 @@ fn strengthen(
     let c = &mut clause[cid];
     // debug_assert!((*ch).lits.contains(&p));
     // debug_assert!(1 < (*ch).lits.len());
-    elim.remove_lit_occur(vars, p, cid);
     if (*c).is(Flag::DeadClause) {
         return false;
     }
     debug_assert!(1 < p.negate());
-    watcher[p.negate() as usize].detach_with(cid);
     let lits = &mut (*c).lits;
     if lits.len() == 2 {
-        // remove it
         if lits[0] == p {
             lits.swap(0, 1);
         }
         debug_assert!(1 < lits[0].negate());
-        watcher[lits[0].negate() as usize].detach_with(cid);
         return true;
     }
+    watcher[p.negate() as usize].detach_with(cid);
     if lits[0] == p || lits[1] == p {
         let q = if lits[0] == p {
             lits.swap_remove(0);
