@@ -55,11 +55,9 @@ impl EliminatorIF for Eliminator {
                 v.neg_occurs.clear();
             }
         }
-        self.in_use = false;
         self.active = false;
     }
     fn activate(&mut self, cdb: &mut ClauseDB, vars: &mut [Var], force: bool) {
-        self.in_use = true;
         self.active = true;
         for v in &mut vars[1..] {
             v.pos_occurs.clear();
