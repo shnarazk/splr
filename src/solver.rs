@@ -97,11 +97,6 @@ impl SatSolverIF for Solver {
                     panic!("internal error");
                 }
                 state.progress(cdb, config, elim, vars, Some("subsumed"));
-                // config.elim_eliminate_combination_limit = 40;
-                // config.elim_eliminate_grow_limit = 0;
-                // config.elim_eliminate_loop_limit = 32;
-                // config.elim_subsume_literal_limit = 100;
-                // config.elim_subsume_loop_limit = 32;
             }
             elim.stop(cdb, vars);
         }
@@ -370,12 +365,6 @@ fn handle_conflict_path(
         && 0 < cdb.num_learnt
     {
         state.cur_restart = ((tn_confl as f64) / (state.next_reduction as f64)) as usize + 1;
-        // if 2.0 * state.b_lvl.get() < state.c_lvl.get() {
-        //     elim.activate(cdb, vars, false);
-        //     let limit = state.c_lvl.get() as usize;
-        //     config.elim_eliminate_combination_limit = state.ema_lbd.get() as usize;
-        //     config.elim_subsume_literal_limit = limit;
-        // }
         cdb.reduce(config, state, vars);
     }
 }

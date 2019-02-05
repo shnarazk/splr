@@ -336,10 +336,6 @@ fn try_subsume(
             cdb.detach(did);
             elim.remove_cid_occur(vars, did, &cdb.clause[did]);
             if !cdb.clause[did].is(Flag::LearntClause) {
-                // println!("BackSubC deletes a permanent clause {} {:#}",
-                //          di.fmt(),
-                //          clause!(cdb, did));
-                // TODO: move the cid to Permanent
                 cdb.clause[cid].turn_off(Flag::LearntClause);
             }
         }
@@ -629,7 +625,6 @@ fn eliminate_var(
         v.turn_on(Flag::EliminatedVar);
         let cid = v.reason;
         debug_assert_eq!(cid, NULL_CLAUSE);
-        // println!("- eliminate var: {:>8} (+{:<4} -{:<4}); {:?}", v, (*pos).len(), (*neg).len(), v);
         state.num_eliminated_vars += 1;
         make_eliminated_clauses(cdb, elim, vi, &*pos, &*neg);
         // Produce clauses in cross product:
