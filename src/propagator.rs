@@ -99,7 +99,7 @@ impl PropagatorIF for AssignStack {
                 let mut n = 1;
                 'next_clause: while n <= source.count() {
                     let w = source.get_unchecked_mut(n);
-                    debug_assert!(head[w.c].is(Flag::DeadClause));
+                    debug_assert!(!head[w.c].is(Flag::DeadClause));
                     if vars.assigned(w.blocker) != TRUE {
                         let lits = &mut head.get_unchecked_mut(w.c).lits;
                         debug_assert!(2 <= lits.len());
