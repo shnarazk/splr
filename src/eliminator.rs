@@ -324,24 +324,20 @@ fn try_subsume(
 ) -> MaybeInconsistent {
     match subsume(cdb, cid, did) {
         Some(NULL_LIT) => {
-            if !cid.is_lifted_lit() {
-                // println!("BackSubsC    => {} {:#} subsumed completely by {} {:#}",
-                //          did.fmt(),
-                //          *clause!(cdb, cid),
-                //          cid.fmt(),
-                //          *clause!(cdb, cid),
-                // );
-                cdb.detach(did);
-                elim.remove_cid_occur(vars, did, &cdb.clause[did]);
-                if !cdb.clause[did].is(Flag::LearntClause) {
-                    // println!("BackSubC deletes a permanent clause {} {:#}",
-                    //          di.fmt(),
-                    //          clause!(cdb, did));
-                    // TODO: move the cid to Permanent
-                    cdb.clause[cid].turn_off(Flag::LearntClause);
-                }
-            } else {
-                panic!("eaeaubr");
+            // println!("BackSubsC    => {} {:#} subsumed completely by {} {:#}",
+            //          did.fmt(),
+            //          *clause!(cdb, cid),
+            //          cid.fmt(),
+            //          *clause!(cdb, cid),
+            // );
+            cdb.detach(did);
+            elim.remove_cid_occur(vars, did, &cdb.clause[did]);
+            if !cdb.clause[did].is(Flag::LearntClause) {
+                // println!("BackSubC deletes a permanent clause {} {:#}",
+                //          di.fmt(),
+                //          clause!(cdb, did));
+                // TODO: move the cid to Permanent
+                cdb.clause[cid].turn_off(Flag::LearntClause);
             }
         }
         Some(l) => {
