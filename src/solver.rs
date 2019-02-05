@@ -90,7 +90,6 @@ impl SatSolverIF for Solver {
                 };
             }
             elim.active = true;
-            elim.activate(cdb, vars, true);
             state.progress(cdb, config, vars, Some("enqueued"));
             if cdb.simplify(asgs, config, elim, state, vars).is_err() {
                 state.ok = false;
