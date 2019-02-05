@@ -89,16 +89,14 @@ impl SatSolverIF for Solver {
                     _ => elim.enqueue_var(vars, vi, false),
                 };
             }
-            if elim.active {
-                elim.activate(cdb, vars, true);
-                state.progress(cdb, config, vars, Some("enqueued"));
-                if cdb.simplify(asgs, config, elim, state, vars).is_err() {
-                    state.ok = false;
-                    panic!("internal error");
-                }
-                state.progress(cdb, config, vars, Some("subsumed"));
+            elim.active = true;
+            elim.activate(cdb, vars, true);
+            state.progress(cdb, config, vars, Some("enqueued"));
+            if cdb.simplify(asgs, config, elim, state, vars).is_err() {
+                state.ok = false;
+                panic!("internal error");
             }
-            elim.stop(cdb, vars);
+            state.progress(cdb, config, vars, Some("subsumed"));
         }
         if search(asgs, config, cdb, elim, state, vars) {
             if !state.ok {
@@ -348,12 +346,14 @@ fn handle_conflict_path(
         } else {
             config.restart_blk -= (config.restart_blk - 1.40) * 0.01
         }
-        if state.stats[Stat::Elimination as usize] == 1 && state.elim_trigger == 1 {
-            state.elim_trigger = state.c_lvl.get() as usize + 10;
-        }
-        if (state.c_lvl.get() as usize) < state.elim_trigger {
-            elim.active = true;
-            state.elim_trigger /= 2;
+        if config.use_elim {
+            if state.stats[Stat::Elimination as usize] == 1 && state.elim_trigger == 1 {
+                state.elim_trigger = state.c_lvl.get() as usize + 10;
+            }
+            if (state.c_lvl.get() as usize) < state.elim_trigger {
+                elim.active = true;
+                state.elim_trigger /= 2;
+            }
         }
         state.progress(cdb, config, vars, None);
     }
