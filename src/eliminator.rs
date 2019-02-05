@@ -40,7 +40,11 @@ impl EliminatorIF for Eliminator {
         e.in_use = in_use;
         e
     }
-    fn stop(&mut self, cdb: &mut ClauseDB, vars: &mut [Var], force: bool) {
+    /// FIXME: due to a potential bug of killing clauses and difficulty about
+    /// synchronization between 'garbage_collect' and clearing occur lists,
+    /// 'stop' should purge all occur lists to purge any dead clauses for now.
+    fn stop(&mut self, cdb: &mut ClauseDB, vars: &mut [Var]) {
+        let force: bool = true;
         self.clear_clause_queue(cdb);
         self.clear_var_queue(vars);
         if force {

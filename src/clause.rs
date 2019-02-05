@@ -522,7 +522,7 @@ impl ClauseDBIF for ClauseDB {
         state.stats[Stat::Simplification as usize] += 1;
         if elim.in_use {
             self.reset_lbd(vars, &mut state.lbd_temp);
-            elim.stop(self, vars, false);
+            elim.stop(self, vars);
         }
         true
     }

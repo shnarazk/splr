@@ -106,7 +106,7 @@ impl SatSolverIF for Solver {
                 // config.elim_subsume_literal_limit = 100;
                 // config.elim_subsume_loop_limit = 32;
             }
-            elim.stop(cdb, vars, false);
+            elim.stop(cdb, vars);
         }
         if search(asgs, config, cdb, elim, state, vars) {
             if !state.ok {
