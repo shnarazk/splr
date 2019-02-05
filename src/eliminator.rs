@@ -1,7 +1,6 @@
 use crate::clause::{Clause, ClauseDB};
 use crate::config::Config;
 use crate::propagator::AssignStack;
-use crate::solver::{MaybeInconsistent, SolverException};
 use crate::state::State;
 use crate::traits::*;
 use crate::types::*;
@@ -144,7 +143,7 @@ impl EliminatorIF for Eliminator {
             debug_assert!(self.clause_queue.is_empty());
             cdb.garbage_collect();
             if asgs.propagate(cdb, state, vars) != NULL_CLAUSE {
-                return Err(SolverException::InternalInconsistent);
+                return Err(SolverError::Inconsistent);
             }
         }
         Ok(())
@@ -518,11 +517,7 @@ fn strengthen_clause(
         // println!("{} is removed and its first literal {} is enqueued.", cid.fmt(), c0.int());
         cdb.detach(cid);
         elim.remove_cid_occur(vars, cid, &cdb.clause[cid]);
-        if asgs.enqueue_null(&mut vars[c0.vi()], c0.lbool(), 0) {
-            Ok(())
-        } else {
-            Err(SolverException::InternalInconsistent)
-        }
+        asgs.enqueue(&mut vars[c0.vi()], c0.lbool(), NULL_CLAUSE, 0)
     } else {
         // println!("cid {} drops literal {}", cid.fmt(), l.int());
         debug_assert!(1 < cdb.clause[cid].lits.len());
@@ -655,9 +650,7 @@ fn eliminate_var(
                             //     vec2int(&clause!(*cp, *n).lits)
                             // );
                             let lit = vec[0];
-                            if !asgs.enqueue_null(&mut vars[lit.vi()], lit.lbool(), 0) {
-                                return Err(SolverException::InternalInconsistent);
-                            }
+                            asgs.enqueue(&mut vars[lit.vi()], lit.lbool(), NULL_CLAUSE, 0)?;
                         }
                         _ => {
                             let v = &mut vec.to_vec();

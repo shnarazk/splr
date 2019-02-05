@@ -48,8 +48,7 @@ impl PropagatorIF for AssignStack {
     fn remains(&self) -> bool {
         self.q_head < self.trail.len()
     }
-    /// returns `false` if an conflict occures.
-    fn enqueue(&mut self, v: &mut Var, sig: Lbool, cid: ClauseId, dl: usize) -> bool {
+    fn enqueue(&mut self, v: &mut Var, sig: Lbool, cid: ClauseId, dl: usize) -> MaybeInconsistent {
         debug_assert!(!v.is(Flag::EliminatedVar));
         let val = v.assign;
         if val == BOTTOM {
@@ -63,25 +62,25 @@ impl PropagatorIF for AssignStack {
             debug_assert!(!self.trail.contains(&Lit::from_var(v.index, TRUE)));
             debug_assert!(!self.trail.contains(&Lit::from_var(v.index, FALSE)));
             self.trail.push(Lit::from_var(v.index, sig));
-            true
+            Ok(())
+        } else if val == sig {
+            Ok(())
         } else {
-            val == sig
+            Err(SolverError::Inconsistent)
         }
     }
-    /// returns `false` if an conflict occures.
-    fn enqueue_null(&mut self, v: &mut Var, sig: Lbool, dl: usize) -> bool {
+    /// panic if an conflict occurs.
+    fn enqueue_null(&mut self, v: &mut Var, sig: Lbool) {
         debug_assert!(!v.is(Flag::EliminatedVar));
         debug_assert!(sig != BOTTOM);
         let val = v.assign;
         if val == BOTTOM {
             v.assign = sig;
             v.reason = NULL_CLAUSE;
-            v.level = dl;
+            v.level = 0;
             self.trail.push(Lit::from_var(v.index, sig));
-            true
-        } else {
-            val == sig
         }
+        debug_assert!(val == sig);
     }
     /// propagate without checking dead clauses
     /// Note: this function assues there's no dead clause.

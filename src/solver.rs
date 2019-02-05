@@ -25,8 +25,6 @@ pub enum SolverException {
     UndescribedError,
 }
 
-pub type MaybeInconsistent = Result<(), SolverException>;
-
 /// The type that `Solver` returns
 /// This captures the following three cases:
 /// * solved with a satisfiable assigment,
@@ -86,19 +84,18 @@ impl SatSolverIF for Solver {
                     continue;
                 }
                 match (v.pos_occurs.len(), v.neg_occurs.len()) {
-                    (_, 0) => {
-                        asgs.enqueue_null(v, TRUE, 0);
-                    }
-                    (0, _) => {
-                        asgs.enqueue_null(v, FALSE, 0);
-                    }
+                    (_, 0) => asgs.enqueue_null(v, TRUE),
+                    (0, _) => asgs.enqueue_null(v, FALSE),
                     _ => elim.enqueue_var(vars, vi, false),
                 };
             }
             if elim.active {
                 elim.activate(cdb, vars, true);
                 state.progress(cdb, config, elim, vars, Some("enqueued"));
-                cdb.simplify(asgs, config, elim, state, vars);
+                if cdb.simplify(asgs, config, elim, state, vars).is_err() {
+                    state.ok = false;
+                    panic!("internal error");
+                }
                 state.progress(cdb, config, elim, vars, Some("subsumed"));
                 // config.elim_eliminate_combination_limit = 40;
                 // config.elim_eliminate_grow_limit = 0;
@@ -203,6 +200,7 @@ impl SatSolverIF for Solver {
             ref mut vars,
             ..
         } = self;
+        assert!(asgs.level() == 0);
         v.sort_unstable();
         let mut j = 0;
         let mut l_ = NULL_LIT; // last literal; [x, x.negate()] means totology.
@@ -221,7 +219,7 @@ impl SatSolverIF for Solver {
         match v.len() {
             0 => None, // Empty clause is UNSAT.
             1 => {
-                asgs.enqueue_null(&mut vars[v[0].vi()], v[0].lbool(), asgs.level());
+                asgs.enqueue_null(&mut vars[v[0].vi()], v[0].lbool());
                 Some(NULL_CLAUSE)
             }
             _ => {
@@ -257,7 +255,10 @@ fn search(
             if state.force_restart(config, &mut conflict_c) {
                 asgs.cancel_until(vars, config.root_level);
             } else if asgs.level() == 0 {
-                cdb.simplify(asgs, config, elim, state, vars);
+                if cdb.simplify(asgs, config, elim, state, vars).is_err() {
+                    state.ok = false;
+                    panic!("interal error");
+                }
                 asgs.rebuild_order(&vars);
                 state.num_solved_vars = asgs.len();
             }
