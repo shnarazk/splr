@@ -148,16 +148,9 @@ impl StateIF for State {
         println!("                                                  ");
     }
     #[allow(clippy::cyclomatic_complexity)]
-    fn progress(
-        &mut self,
-        cdb: &ClauseDB,
-        config: &mut Config,
-        elim: &Eliminator,
-        vars: &[Var],
-        mes: Option<&str>,
-    ) {
+    fn progress(&mut self, cdb: &ClauseDB, config: &mut Config, vars: &[Var], mes: Option<&str>) {
         if config.progress_log {
-            self.dump(cdb, config, elim, vars, mes);
+            self.dump(cdb, vars);
             return;
         }
         let nv = vars.len() - 1;
@@ -403,14 +396,7 @@ impl State {
              c ========================================================================================================="
         );
     }
-    fn dump(
-        &mut self,
-        cdb: &ClauseDB,
-        _config: &mut Config,
-        _elim: &Eliminator,
-        vars: &[Var],
-        _mes: Option<&str>,
-    ) {
+    fn dump(&mut self, cdb: &ClauseDB, vars: &[Var]) {
         self.progress_cnt += 1;
         let nv = vars.len() - 1;
         let fixed = self.num_solved_vars;

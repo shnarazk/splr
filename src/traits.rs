@@ -148,14 +148,7 @@ pub trait SatSolverIF {
 pub trait StateIF {
     fn new(config: &Config, cnf: CNFDescription) -> State;
     fn progress_header(&self, config: &Config);
-    fn progress(
-        &mut self,
-        cdb: &ClauseDB,
-        config: &mut Config,
-        elim: &Eliminator,
-        vars: &[Var],
-        mes: Option<&str>,
-    );
+    fn progress(&mut self, cdb: &ClauseDB, config: &mut Config, vars: &[Var], mes: Option<&str>);
 }
 
 /// API for SAT validator like `inject_assignment`, `validate` and so on.

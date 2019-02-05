@@ -76,7 +76,7 @@ impl SatSolverIF for Solver {
         // s.root_level = 0;
         state.num_solved_vars = asgs.len();
         state.progress_header(config);
-        state.progress(cdb, config, elim, vars, Some("loaded"));
+        state.progress(cdb, config, vars, Some("loaded"));
         if elim.in_use {
             for vi in 1..vars.len() {
                 let v = &mut vars[vi];
@@ -90,21 +90,21 @@ impl SatSolverIF for Solver {
                 };
             }
             elim.activate(cdb, vars, true);
-            state.progress(cdb, config, elim, vars, Some("enqueued"));
+            state.progress(cdb, config, vars, Some("enqueued"));
             if cdb.simplify(asgs, config, elim, state, vars).is_err() {
                 state.ok = false;
                 panic!("internal error");
             }
-            state.progress(cdb, config, elim, vars, Some("subsumed"));
+            state.progress(cdb, config, vars, Some("subsumed"));
             elim.stop(cdb, vars);
         }
         if search(asgs, config, cdb, elim, state, vars) {
             if !state.ok {
                 asgs.cancel_until(vars, 0);
-                state.progress(cdb, config, elim, vars, Some("error"));
+                state.progress(cdb, config, vars, Some("error"));
                 return Err(SolverException::InternalInconsistent);
             }
-            state.progress(cdb, config, elim, vars, None);
+            state.progress(cdb, config, vars, None);
             let mut result = Vec::new();
             for (vi, v) in vars.iter().enumerate().take(config.num_vars + 1).skip(1) {
                 match v.assign {
@@ -117,7 +117,7 @@ impl SatSolverIF for Solver {
             asgs.cancel_until(vars, 0);
             Ok(Certificate::SAT(result))
         } else {
-            state.progress(cdb, config, elim, vars, None);
+            state.progress(cdb, config, vars, None);
             asgs.cancel_until(vars, 0);
             Ok(Certificate::UNSAT(
                 state.conflicts.iter().map(|l| l.int()).collect(),
@@ -353,7 +353,7 @@ fn handle_conflict_path(
             elim.active = true;
             state.elim_trigger /= 2;
         }
-        state.progress(cdb, config, elim, vars, None);
+        state.progress(cdb, config, vars, None);
     }
     config.var_inc /= config.var_decay;
     config.cla_inc /= config.cla_decay;
