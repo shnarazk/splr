@@ -110,6 +110,13 @@ fn negate_bool(b: Lbool) -> Lbool {
     b ^ 1
 }
 
+// Returning `Result<(), a-singlen>` is identical to returning `bool`.
+pub enum SolverError {
+    Inconsistent,
+}
+
+pub type MaybeInconsistent = Result<(), SolverError>;
+
 /// data about a problem.
 #[derive(Clone)]
 pub struct CNFDescription {

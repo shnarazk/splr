@@ -2,9 +2,9 @@ use crate::clause::{Clause, ClauseDB};
 use crate::config::Config;
 use crate::eliminator::Eliminator;
 use crate::propagator::AssignStack;
-use crate::solver::{MaybeInconsistent, Solver, SolverResult};
+use crate::solver::{Solver, SolverResult};
 use crate::state::State;
-use crate::types::{CNFDescription, ClauseId, Flag, Lbool, Lit, VarId};
+use crate::types::{CNFDescription, ClauseId, Flag, Lbool, Lit, MaybeInconsistent, VarId};
 use crate::var::Var;
 
 /// API for Clause, providing `kill`.
@@ -32,7 +32,7 @@ pub trait ClauseDBIF {
         elim: &mut Eliminator,
         state: &mut State,
         vars: &mut [Var],
-    ) -> bool;
+    ) -> MaybeInconsistent;
     fn garbage_collect(&mut self);
     fn new_clause(&mut self, v: &[Lit], rank: usize, learnt: bool) -> ClauseId;
     fn reset_lbd(&mut self, vars: &[Var], temp: &mut [usize]);
@@ -118,8 +118,8 @@ pub trait PropagatorIF {
     fn remains(&self) -> bool;
     fn propagate(&mut self, cdb: &mut ClauseDB, state: &mut State, vars: &mut [Var]) -> ClauseId;
     fn cancel_until(&mut self, vars: &mut [Var], lv: usize);
-    fn enqueue(&mut self, v: &mut Var, sig: Lbool, cid: ClauseId, dl: usize) -> bool;
-    fn enqueue_null(&mut self, v: &mut Var, sig: Lbool, dl: usize) -> bool;
+    fn enqueue(&mut self, v: &mut Var, sig: Lbool, cid: ClauseId, dl: usize) -> MaybeInconsistent;
+    fn enqueue_null(&mut self, v: &mut Var, sig: Lbool);
     fn uncheck_enqueue(&mut self, vars: &mut [Var], l: Lit, cid: ClauseId);
     fn uncheck_assume(&mut self, vars: &mut [Var], l: Lit);
     fn dump_cnf(&mut self, cdb: &ClauseDB, config: &Config, vars: &[Var], fname: &str);

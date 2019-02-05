@@ -483,7 +483,7 @@ impl ClauseDBIF for ClauseDB {
         elim: &mut Eliminator,
         state: &mut State,
         vars: &mut [Var],
-    ) -> bool {
+    ) -> MaybeInconsistent {
         // self.reset_lbd(vars, &mut state.lbd_temp);
         debug_assert_eq!(asgs.level(), 0);
         // reset reason since decision level is zero.
@@ -496,11 +496,8 @@ impl ClauseDBIF for ClauseDB {
         }
         loop {
             let na = asgs.len();
-            if elim.in_use
-                && elim.active
-                && elim.eliminate(asgs, self, config, state, vars).is_err() {
-                state.ok = false;
-                return false;
+            if elim.in_use && elim.active {
+                elim.eliminate(asgs, self, config, state, vars)?;
             }
             for c in &mut self.clause[1..] {
                 if !c.is(Flag::DeadClause) && vars.satisfies(&c.lits) {
@@ -527,7 +524,7 @@ impl ClauseDBIF for ClauseDB {
             self.reset_lbd(vars, &mut state.lbd_temp);
             elim.stop(self, vars);
         }
-        true
+        Ok(())
     }
 }
 
