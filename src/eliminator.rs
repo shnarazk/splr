@@ -231,6 +231,8 @@ impl EliminatorIF for Eliminator {
 }
 
 impl Eliminator {
+    /// returns false if solver is inconsistent
+    /// - calls `clause_queue.pop`
     fn backward_subsumption_check(
         &mut self,
         asgs: &mut AssignStack,
@@ -320,24 +322,26 @@ fn try_subsume(
     cid: ClauseId,
     did: ClauseId,
 ) -> MaybeInconsistent {
-    debug_assert!(!cid.is_lifted_lit());
-    debug_assert!(!did.is_lifted_lit());
     match subsume(cdb, cid, did) {
         Some(NULL_LIT) => {
-            // println!("BackSubsC    => {} {:#} subsumed completely by {} {:#}",
-            //          did.fmt(),
-            //          *clause!(cdb, cid),
-            //          cid.fmt(),
-            //          *clause!(cdb, cid),
-            // );
-            cdb.detach(did);
-            elim.remove_cid_occur(vars, did, &cdb.clause[did]);
-            if !cdb.clause[did].is(Flag::LearntClause) {
-                // println!("BackSubC deletes a permanent clause {} {:#}",
-                //          di.fmt(),
-                //          clause!(cdb, did));
-                // TODO: move the cid to Permanent
-                cdb.clause[cid].turn_off(Flag::LearntClause);
+            if !cid.is_lifted_lit() {
+                // println!("BackSubsC    => {} {:#} subsumed completely by {} {:#}",
+                //          did.fmt(),
+                //          *clause!(cdb, cid),
+                //          cid.fmt(),
+                //          *clause!(cdb, cid),
+                // );
+                cdb.detach(did);
+                elim.remove_cid_occur(vars, did, &cdb.clause[did]);
+                if !cdb.clause[did].is(Flag::LearntClause) {
+                    // println!("BackSubC deletes a permanent clause {} {:#}",
+                    //          di.fmt(),
+                    //          clause!(cdb, did));
+                    // TODO: move the cid to Permanent
+                    cdb.clause[cid].turn_off(Flag::LearntClause);
+                }
+            } else {
+                panic!("eaeaubr");
             }
         }
         Some(l) => {
@@ -399,11 +403,13 @@ fn check_to_merge(
     let mut size = pb.lits.len() + 1;
     'next_literal: for l in &qb.lits {
         if vars[l.vi()].is(Flag::EliminatedVar) {
+            println!("ooo");
             continue;
         }
         if l.vi() != v {
             for j in &pb.lits {
                 if vars[j.vi()].is(Flag::EliminatedVar) {
+                    println!("ooo");
                     continue;
                 }
                 if j.vi() == l.vi() {
@@ -546,6 +552,7 @@ fn strengthen(
     } = cdb;
     let c = &mut clause[cid];
     // debug_assert!((*ch).lits.contains(&p));
+    // debug_assert!(1 < (*ch).lits.len());
     elim.remove_lit_occur(vars, p, cid);
     if (*c).is(Flag::DeadClause) {
         return false;
@@ -621,6 +628,11 @@ fn eliminate_var(
         return Ok(());
     }
     debug_assert!(!v.is(Flag::EliminatedVar));
+    // count only alive clauses
+    v.pos_occurs
+        .retain(|&c| !cdb.clause[c].is(Flag::DeadClause));
+    v.neg_occurs
+        .retain(|&c| !cdb.clause[c].is(Flag::DeadClause));
     let pos = &v.pos_occurs as *const Vec<ClauseId>;
     let neg = &v.neg_occurs as *const Vec<ClauseId>;
     unsafe {
@@ -637,14 +649,8 @@ fn eliminate_var(
         make_eliminated_clauses(cdb, elim, vi, &*pos, &*neg);
         // Produce clauses in cross product:
         for p in &*pos {
-            if cdb.clause[*p].is(Flag::DeadClause) {
-                continue;
-            }
             let rank_p = cdb.clause[*p].rank;
             for n in &*neg {
-                if cdb.clause[*n].is(Flag::DeadClause) {
-                    continue;
-                }
                 if let Some(vec) = merge(cdb, *p, *n, vi) {
                     // println!("eliminator replaces {} with a cross product {:?}", p.fmt(), vec2int(&vec));
                     debug_assert!(!vec.is_empty());
