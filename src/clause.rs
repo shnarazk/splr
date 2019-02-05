@@ -490,12 +490,15 @@ impl ClauseDBIF for ClauseDB {
         for v in &mut vars[1..] {
             v.reason = NULL_CLAUSE;
         }
-        if elim.in_use {
+        if elim.in_use && elim.active {
+            elim.activate(self, vars, true);
             state.stats[Stat::Elimination as usize] += 1;
         }
         loop {
             let na = asgs.len();
-            if elim.in_use && elim.eliminate(asgs, self, config, state, vars).is_err() {
+            if elim.in_use
+                && elim.active
+                && elim.eliminate(asgs, self, config, state, vars).is_err() {
                 state.ok = false;
                 return false;
             }
@@ -520,7 +523,7 @@ impl ClauseDBIF for ClauseDB {
         }
         self.garbage_collect();
         state.stats[Stat::Simplification as usize] += 1;
-        if elim.in_use {
+        if elim.in_use && elim.active {
             self.reset_lbd(vars, &mut state.lbd_temp);
             elim.stop(self, vars);
         }

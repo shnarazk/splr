@@ -356,7 +356,7 @@ fn handle_conflict_path(
             state.elim_trigger = state.c_lvl.get() as usize + 10;
         }
         if (state.c_lvl.get() as usize) < state.elim_trigger {
-            elim.activate(cdb, vars, true);
+            elim.active = true;
             state.elim_trigger /= 2;
         }
         state.progress(cdb, config, elim, vars, None);

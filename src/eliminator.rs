@@ -62,6 +62,10 @@ impl EliminatorIF for Eliminator {
     fn activate(&mut self, cdb: &mut ClauseDB, vars: &mut [Var], force: bool) {
         self.in_use = true;
         self.active = true;
+        for v in &mut vars[1..] {
+            v.pos_occurs.clear();
+            v.neg_occurs.clear();
+        }
         for (cid, c) in &mut cdb.clause.iter_mut().enumerate().skip(1) {
             if c.is(Flag::DeadClause) || c.is(Flag::OccurLinked) {
                 continue;
@@ -200,8 +204,10 @@ impl EliminatorIF for Eliminator {
             v.turn_on(Flag::TouchedVar);
             if !v.is(Flag::EliminatedVar) {
                 if l.positive() {
+                    debug_assert!(!v.neg_occurs.contains(&cid));
                     v.pos_occurs.push(cid);
                 } else {
+                    debug_assert!(!v.neg_occurs.contains(&cid));
                     v.neg_occurs.push(cid);
                 }
                 self.enqueue_var(vars, l.vi(), false);
@@ -214,9 +220,13 @@ impl EliminatorIF for Eliminator {
     fn remove_lit_occur(&mut self, vars: &mut [Var], l: Lit, cid: ClauseId) {
         let v = &mut vars[l.vi()];
         if l.positive() {
+            debug_assert_eq!(v.pos_occurs.iter().filter(|&c| *c == cid).count(), 1);
             v.pos_occurs.delete_unstable(|&c| c == cid);
+            debug_assert!(!v.pos_occurs.contains(&cid));
         } else {
+            debug_assert_eq!(v.neg_occurs.iter().filter(|&c| *c == cid).count(), 1);
             v.neg_occurs.delete_unstable(|&c| c == cid);
+            debug_assert!(!v.neg_occurs.contains(&cid));
         }
         self.enqueue_var(vars, l.vi(), true);
     }
