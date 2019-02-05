@@ -80,11 +80,11 @@ impl VarDBIF for [Var] {
         let lits = &c.lits;
         debug_assert!(1 < lits.len());
         let l0 = lits[0];
-        self.assigned(l0) == LTRUE && self[l0.vi()].reason == cid
+        self.assigned(l0) == TRUE && self[l0.vi()].reason == cid
     }
     fn satisfies(&self, vec: &[Lit]) -> bool {
         for l in vec {
-            if self.assigned(*l) == LTRUE {
+            if self.assigned(*l) == TRUE {
                 return true;
             }
         }

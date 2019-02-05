@@ -2,7 +2,7 @@ use crate::clause::{Clause, ClauseDB};
 use crate::config::Config;
 use crate::eliminator::Eliminator;
 use crate::propagator::AssignStack;
-use crate::solver::{Solver, SolverResult};
+use crate::solver::{MaybeInconsistent, Solver, SolverResult};
 use crate::state::State;
 use crate::types::{CNFDescription, ClauseId, Flag, Lbool, Lit, VarId};
 use crate::var::Var;
@@ -24,12 +24,7 @@ pub trait ClauseDBIF {
         lbd: usize,
     ) -> ClauseId;
     fn detach(&mut self, cid: ClauseId);
-    fn reduce(
-        &mut self,
-        config: &Config,
-        state: &mut State,
-        vars: &mut [Var],
-    );
+    fn reduce(&mut self, config: &Config, state: &mut State, vars: &mut [Var]);
     fn simplify(
         &mut self,
         asgs: &mut AssignStack,
@@ -78,7 +73,7 @@ pub trait EliminatorIF {
         config: &mut Config,
         state: &mut State,
         vars: &mut [Var],
-    );
+    ) -> MaybeInconsistent;
     fn extend_model(&mut self, model: &mut Vec<i32>);
     fn add_cid_occur(&mut self, vars: &mut [Var], cid: ClauseId, c: &mut Clause, enqueue: bool);
     fn remove_lit_occur(&mut self, vars: &mut [Var], l: Lit, cid: ClauseId);
@@ -121,12 +116,6 @@ pub trait PropagatorIF {
     fn is_zero(&self) -> bool;
     fn num_at(&self, n: usize) -> usize;
     fn remains(&self) -> bool;
-    fn uncheck_propagate(
-        &mut self,
-        cdb: &mut ClauseDB,
-        state: &mut State,
-        vars: &mut [Var],
-    ) -> ClauseId;
     fn propagate(&mut self, cdb: &mut ClauseDB, state: &mut State, vars: &mut [Var]) -> ClauseId;
     fn cancel_until(&mut self, vars: &mut [Var], lv: usize);
     fn enqueue(&mut self, v: &mut Var, sig: Lbool, cid: ClauseId, dl: usize) -> bool;

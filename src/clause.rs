@@ -418,7 +418,10 @@ impl ClauseDBIF for ClauseDB {
     /// called from strengthen_clause, backward_subsumption_check, eliminate_var, substitute
     fn detach(&mut self, cid: ClauseId) {
         let c = &mut self.clause[cid];
-        debug_assert!(!c.is(Flag::DeadClause));
+        if c.is(Flag::DeadClause) {
+            // panic!("dead!");
+            return;
+        }
         c.turn_on(Flag::DeadClause);
         if c.lits.is_empty() {
             return;
@@ -431,12 +434,7 @@ impl ClauseDBIF for ClauseDB {
         }
         self.touched[w0 as usize] = true;
     }
-    fn reduce(
-        &mut self,
-        config: &Config,
-        state: &mut State,
-        vars: &mut [Var],
-    ) {
+    fn reduce(&mut self, config: &Config, state: &mut State, vars: &mut [Var]) {
         // self.reset_lbd(vars, &mut state.lbd_temp);
         let ClauseDB {
             ref mut clause,
@@ -497,11 +495,9 @@ impl ClauseDBIF for ClauseDB {
         }
         loop {
             let na = asgs.len();
-            if elim.in_use {
-                elim.eliminate(asgs, self, config, state, vars);
-                if !state.ok {
-                    return false;
-                }
+            if elim.in_use && elim.eliminate(asgs, self, config, state, vars).is_err() {
+                state.ok = false;
+                return false;
             }
             for c in &mut self.clause[1..] {
                 if !c.is(Flag::DeadClause) && vars.satisfies(&c.lits) {
