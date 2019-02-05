@@ -87,10 +87,10 @@ impl SatSolverIF for Solver {
                 }
                 match (v.pos_occurs.len(), v.neg_occurs.len()) {
                     (_, 0) => {
-                        asgs.enqueue_null(v, LTRUE, 0);
+                        asgs.enqueue_null(v, TRUE, 0);
                     }
                     (0, _) => {
-                        asgs.enqueue_null(v, LFALSE, 0);
+                        asgs.enqueue_null(v, FALSE, 0);
                     }
                     _ => elim.enqueue_var(vars, vi, false),
                 };
@@ -118,8 +118,8 @@ impl SatSolverIF for Solver {
             let mut result = Vec::new();
             for (vi, v) in vars.iter().enumerate().take(config.num_vars + 1).skip(1) {
                 match v.assign {
-                    LTRUE => result.push(vi as i32),
-                    LFALSE => result.push(0 - vi as i32),
+                    TRUE => result.push(vi as i32),
+                    FALSE => result.push(0 - vi as i32),
                     _ => result.push(0),
                 }
             }
@@ -209,9 +209,9 @@ impl SatSolverIF for Solver {
         for i in 0..v.len() {
             let li = v[i];
             let sat = vars.assigned(li);
-            if sat == LTRUE || li.negate() == l_ {
+            if sat == TRUE || li.negate() == l_ {
                 return Some(NULL_CLAUSE);
-            } else if sat != LFALSE && li != l_ {
+            } else if sat != FALSE && li != l_ {
                 v[j] = li;
                 j += 1;
                 l_ = li;
@@ -539,7 +539,7 @@ fn analyze_removable(
     while let Some(sl) = stack.pop() {
         let cid = vars[sl.vi()].reason;
         let c = &mut cdb.clause[cid];
-        if (*c).lits.len() == 2 && vars.assigned((*c).lits[0]) == LFALSE {
+        if (*c).lits.len() == 2 && vars.assigned((*c).lits[0]) == FALSE {
             (*c).lits.swap(0, 1);
         }
         for q in &(*c).lits[1..] {
@@ -633,7 +633,7 @@ fn minimize_with_bi_clauses(
         debug_assert!(c.lits[0] == l0 || c.lits[1] == l0);
         let other = c.lits[(c.lits[0] == l0) as usize];
         let vi = other.vi();
-        if lbd_temp[vi] == key && vars.assigned(other) == LTRUE {
+        if lbd_temp[vi] == key && vars.assigned(other) == TRUE {
             nsat += 1;
             lbd_temp[vi] -= 1;
         }

@@ -60,8 +60,8 @@ impl PropagatorIF for AssignStack {
                 v.reason = NULL_CLAUSE;
                 v.activity = 0.0;
             }
-            debug_assert!(!self.trail.contains(&Lit::from_var(v.index, LTRUE)));
-            debug_assert!(!self.trail.contains(&Lit::from_var(v.index, LFALSE)));
+            debug_assert!(!self.trail.contains(&Lit::from_var(v.index, TRUE)));
+            debug_assert!(!self.trail.contains(&Lit::from_var(v.index, FALSE)));
             self.trail.push(Lit::from_var(v.index, sig));
             true
         } else {
@@ -100,7 +100,7 @@ impl PropagatorIF for AssignStack {
                 'next_clause: while n <= source.count() {
                     let w = source.get_unchecked_mut(n);
                     debug_assert!(head[w.c].is(Flag::DeadClause));
-                    if vars.assigned(w.blocker) != LTRUE {
+                    if vars.assigned(w.blocker) != TRUE {
                         let lits = &mut head.get_unchecked_mut(w.c).lits;
                         debug_assert!(2 <= lits.len());
                         debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
@@ -112,13 +112,13 @@ impl PropagatorIF for AssignStack {
                         }
                         let first_value = vars.assigned(first);
                         // If 0th watch is true, then clause is already satisfied.
-                        if first != w.blocker && first_value == LTRUE {
+                        if first != w.blocker && first_value == TRUE {
                             w.blocker = first;
                             n += 1;
                             continue 'next_clause;
                         }
                         for (k, lk) in lits.iter().enumerate().skip(2) {
-                            // below is equivalent to 'assigned(lk) != LFALSE'
+                            // below is equivalent to 'assigned(lk) != FALSE'
                             if (((lk & 1) as u8) ^ vars.get_unchecked(lk.vi()).assign) != 0 {
                                 (*watcher)
                                     .get_unchecked_mut(lk.negate() as usize)
@@ -129,7 +129,7 @@ impl PropagatorIF for AssignStack {
                                 continue 'next_clause;
                             }
                         }
-                        if first_value == LFALSE {
+                        if first_value == FALSE {
                             self.catchup();
                             return w.c;
                         } else {

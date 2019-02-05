@@ -163,11 +163,11 @@ impl EliminatorIF for Eliminator {
                 }
                 let l = self.elim_clauses[i];
                 let model_value = match model[l.vi() - 1] {
-                    x if x == l.int() => LTRUE,
-                    x if -x == l.int() => LFALSE,
+                    x if x == l.int() => TRUE,
+                    x if -x == l.int() => FALSE,
                     _ => BOTTOM,
                 };
-                if model_value != LFALSE {
+                if model_value != FALSE {
                     if i < width {
                         break 'next;
                     }
@@ -608,8 +608,8 @@ fn make_eliminated_clause(cdb: &mut ClauseDB, vec: &mut Vec<Lit>, vi: VarId, cid
     // Store the length of the clause last:
     debug_assert_eq!(vec[first].vi(), vi);
     vec.push(c.lits.len() as Lit);
-    cdb.touched[Lit::from_var(vi, LTRUE) as usize] = true;
-    cdb.touched[Lit::from_var(vi, LFALSE) as usize] = true;
+    cdb.touched[Lit::from_var(vi, TRUE) as usize] = true;
+    cdb.touched[Lit::from_var(vi, FALSE) as usize] = true;
     // println!("make_eliminated_clause: eliminate({}) clause {:?}", vi, vec2int(&ch.lits));
 }
 
@@ -738,13 +738,13 @@ fn make_eliminated_clauses(
             debug_assert!(!cdb.clause[*cid].is(Flag::DeadClause));
             make_eliminated_clause(cdb, tmp, v, *cid);
         }
-        make_eliminating_unit_clause(tmp, Lit::from_var(v, LTRUE));
+        make_eliminating_unit_clause(tmp, Lit::from_var(v, TRUE));
     } else {
         for cid in pos {
             debug_assert!(!cdb.clause[*cid].is(Flag::DeadClause));
             make_eliminated_clause(cdb, tmp, v, *cid);
         }
-        make_eliminating_unit_clause(tmp, Lit::from_var(v, LFALSE));
+        make_eliminating_unit_clause(tmp, Lit::from_var(v, FALSE));
     }
 }
 
