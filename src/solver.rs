@@ -89,13 +89,15 @@ impl SatSolverIF for Solver {
                     _ => elim.enqueue_var(vars, vi, false),
                 };
             }
-            elim.activate(cdb, vars, true);
-            state.progress(cdb, config, vars, Some("enqueued"));
-            if cdb.simplify(asgs, config, elim, state, vars).is_err() {
-                state.ok = false;
-                panic!("internal error");
+            if elim.active {
+                elim.activate(cdb, vars, true);
+                state.progress(cdb, config, vars, Some("enqueued"));
+                if cdb.simplify(asgs, config, elim, state, vars).is_err() {
+                    state.ok = false;
+                    panic!("internal error");
+                }
+                state.progress(cdb, config, vars, Some("subsumed"));
             }
-            state.progress(cdb, config, vars, Some("subsumed"));
             elim.stop(cdb, vars);
         }
         if search(asgs, config, cdb, elim, state, vars) {
