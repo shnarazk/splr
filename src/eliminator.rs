@@ -135,7 +135,7 @@ impl EliminatorIF for Eliminator {
             return Ok(());
         }
         let mut cnt = 0;
-        'perform: while self.bwdsub_assigns < asgs.len()
+        while self.bwdsub_assigns < asgs.len()
             || !self.var_queue.is_empty()
             || !self.clause_queue.is_empty()
         {
