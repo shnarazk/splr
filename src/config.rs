@@ -1,9 +1,7 @@
 use crate::clause::ClauseDB;
-use crate::eliminator::Eliminator;
 use crate::state::{Stat, State};
-use crate::traits::{ClauseDBIF, ClauseIF, EmaIF, FlagIF};
+use crate::traits::{ClauseDBIF, ClauseIF, FlagIF};
 use crate::types::Flag;
-use crate::var::Var;
 
 #[derive(Eq, PartialEq)]
 pub enum SearchStrategy {
@@ -37,6 +35,7 @@ pub struct Config {
     pub strategy: SearchStrategy,
     pub use_chan_seok: bool,
     pub co_lbd_bound: usize,
+    pub lbd_frozen_clause: usize,
     /// CLAUSE/VARIABLE ACTIVITY
     pub cla_decay: f64,
     pub cla_inc: f64,
@@ -65,8 +64,19 @@ pub struct Config {
     pub luby_restart_inc: f64,
     pub luby_current_restarts: usize,
     pub luby_restart_factor: f64,
+    /// Eliminator
+    pub use_elim: bool,
+    /// 0 for no limit
+    /// Stop elimination if a generated resolvent is larger than this
+    /// 0 means no limit.
+    pub elim_eliminate_combination_limit: usize,
+    /// Stop elimination if the increase of clauses is over this
+    pub elim_eliminate_grow_limit: usize,
+    pub elim_eliminate_loop_limit: usize,
+    /// Stop sumsumption if the size of a clause is over this
+    pub elim_subsume_literal_limit: usize,
+    pub elim_subsume_loop_limit: usize,
     /// MISC
-    pub use_sve: bool,
     pub progress_log: bool,
 }
 
@@ -79,6 +89,7 @@ impl Default for Config {
             strategy: SearchStrategy::Initial,
             use_chan_seok: false,
             co_lbd_bound: 5,
+            lbd_frozen_clause: 30,
             cla_decay: 0.999,
             cla_inc: 1.0,
             var_decay: 0.9,
@@ -88,10 +99,10 @@ impl Default for Config {
             glureduce: true,
             cdb_inc: 300,
             cdb_inc_extra: 1000,
-            restart_thr: 0.75,
-            restart_blk: 1.40,
-            restart_asg_len: 3500,
-            restart_lbd_len: 50,
+            restart_thr: 0.60,     // will be overwrited by bin/splr
+            restart_blk: 1.40,     // will be overwrited by bin/splr
+            restart_asg_len: 3500, // will be overwrited by bin/splr
+            restart_lbd_len: 100,  // will be overwrited by bin/splr
             restart_expansion: 1.15,
             restart_step: 50,
             luby_restart: false,
@@ -100,7 +111,12 @@ impl Default for Config {
             luby_current_restarts: 0,
             luby_restart_factor: 100.0,
             ema_coeffs: (2 ^ 5, 2 ^ 15),
-            use_sve: true,
+            use_elim: true,
+            elim_eliminate_combination_limit: 10,
+            elim_eliminate_grow_limit: 64,
+            elim_eliminate_loop_limit: 2_000_000,
+            elim_subsume_literal_limit: 100,
+            elim_subsume_loop_limit: 2_000_000,
             progress_log: false,
         }
     }
@@ -108,13 +124,7 @@ impl Default for Config {
 
 impl Config {
     #[inline(always)]
-    pub fn adapt_strategy(
-        &mut self,
-        cdb: &mut ClauseDB,
-        elim: &mut Eliminator,
-        state: &mut State,
-        vars: &mut [Var],
-    ) {
+    pub fn adapt_strategy(&mut self, cdb: &mut ClauseDB, state: &mut State) {
         if !self.adapt_strategy || self.strategy != SearchStrategy::Initial {
             return;
         }
@@ -156,14 +166,24 @@ impl Config {
             self.var_decay = 0.91;
             self.var_decay_max = 0.91;
         }
+        // if state.stats[Stat::Restart as usize] < 10 {
+        //     self.restart_thr = 0.80;
+        // } else if 2000 < state.stats[Stat::Restart as usize] {
+        //     self.restart_thr = 0.55;
+        // }
+        // if state.stats[Stat::BlockRestart as usize] < 10 {
+        //     self.restart_blk = 1.25;
+        // } else if 2000 < state.stats[Stat::BlockRestart as usize] {
+        //     self.restart_blk = 1.55;
+        // }
         if self.strategy == SearchStrategy::Initial {
             self.strategy = SearchStrategy::Generic;
             return;
         }
-        state.ema_asg.reset();
-        state.ema_lbd.reset();
-        state.stats[Stat::SumLBD as usize] = 0;
-        state.stats[Stat::Conflict as usize] = 0;
+        // state.ema_asg.reset();
+        // state.ema_lbd.reset();
+        // state.stats[Stat::SumLBD as usize] = 0;
+        // state.stats[Stat::Conflict as usize] = 0;
         if self.use_chan_seok {
             // Adjusting for low decision levels.
             // move some clauses with good lbd (col_lbd_bound) to Permanent
@@ -172,13 +192,13 @@ impl Config {
                     continue;
                 }
                 if c.rank <= self.co_lbd_bound {
-                    c.flag_off(Flag::LearntClause);
+                    c.turn_off(Flag::LearntClause);
                     cdb.num_learnt -= 1;
                 } else if re_init {
                     c.kill(&mut cdb.touched);
                 }
             }
-            cdb.garbage_collect(vars, elim);
+            cdb.garbage_collect();
         }
     }
 }

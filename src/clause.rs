@@ -1,6 +1,6 @@
-use crate::assign::AssignStack;
 use crate::config::Config;
 use crate::eliminator::Eliminator;
+use crate::propagator::AssignStack;
 use crate::state::{Stat, State};
 use crate::traits::*;
 use crate::types::*;
@@ -9,8 +9,8 @@ use std::cmp::Ordering;
 use std::fmt;
 
 const CLA_ACTIVITY_MAX: f64 = 1e240;
-const CLA_ACTIVITY_SCALE1: f64 = 1e-80;
-const CLA_ACTIVITY_SCALE2: f64 = 1e-10;
+const CLA_ACTIVITY_SCALE1: f64 = 1e-30;
+const CLA_ACTIVITY_SCALE2: f64 = 1e-30;
 
 impl ClauseIdIF for ClauseId {
     #[inline(always)]
@@ -51,30 +51,34 @@ impl WatchDBIF for Vec<Watch> {
         }
         self
     }
-    #[inline(always)]
+    // #[inline(always)]
     fn count(&self) -> usize {
-        self[0].c
+        unsafe { self.get_unchecked(0).c }
     }
-    #[inline(always)]
+    // #[inline(always)]
     fn attach(&mut self, blocker: Lit, c: usize) {
-        let next = self[0].c + 1;
-        if next == self.len() {
-            self.push(Watch { blocker, c });
-        } else {
-            self[next].blocker = blocker;
-            self[next].c = c;
+        unsafe {
+            let next = self.get_unchecked(0).c + 1;
+            if next == self.len() {
+                self.push(Watch { blocker, c });
+            } else {
+                self.get_unchecked_mut(next).blocker = blocker;
+                self.get_unchecked_mut(next).c = c;
+            }
+            self.get_unchecked_mut(0).c = next;
         }
-        self[0].c = next;
     }
-    #[inline(always)]
+    // #[inline(always)]
     fn detach(&mut self, n: usize) {
-        let last = self[0].c;
-        debug_assert!(0 < last);
-        self.swap(n, last);
-        self[last].c = NULL_CLAUSE;
-        self[0].c -= 1;
+        unsafe {
+            let last = self.get_unchecked(0).c;
+            debug_assert!(0 < last);
+            self.swap(n, last);
+            self.get_unchecked_mut(last).c = NULL_CLAUSE;
+            self.get_unchecked_mut(0).c -= 1;
+        }
     }
-    #[inline(always)]
+    // #[inline(always)]
     fn detach_with(&mut self, cid: usize) {
         for n in 1..=self[0].c {
             if self[n].c == cid {
@@ -85,12 +89,13 @@ impl WatchDBIF for Vec<Watch> {
     }
 }
 
+/// A representation of *logical clauses*
 pub struct Clause {
-    /// the literals
+    /// the literals making a clause
     pub lits: Vec<Lit>,
-    /// LBD, NDD, or something, used by `reduce_db`
+    /// A static clause evaluation criterion like LBD, NDD, or something
     pub rank: usize,
-    /// clause activity used by `analyze` and `reduce_db`
+    /// A dynamic clause evaluation criterion based on the numer of references
     pub activity: f64,
     /// Flags
     flags: u16,
@@ -109,8 +114,8 @@ impl Default for Clause {
 
 impl ClauseIF for Clause {
     fn kill(&mut self, touched: &mut [bool]) {
-        self.flag_on(Flag::DeadClause);
-        debug_assert!(self.lits[0] != 0 && self.lits[1] != 0);
+        self.turn_on(Flag::DeadClause);
+        debug_assert!(1 < self.lits[0] && 1 < self.lits[1]);
         touched[self.lits[0].negate() as usize] = true;
         touched[self.lits[1].negate() as usize] = true;
     }
@@ -122,11 +127,11 @@ impl FlagIF for Clause {
         self.flags & (1 << flag as u16) != 0
     }
     #[inline(always)]
-    fn flag_off(&mut self, flag: Flag) {
+    fn turn_off(&mut self, flag: Flag) {
         self.flags &= !(1u16 << (flag as u16));
     }
     #[inline(always)]
-    fn flag_on(&mut self, flag: Flag) {
+    fn turn_on(&mut self, flag: Flag) {
         self.flags |= 1u16 << (flag as u16);
     }
 }
@@ -244,99 +249,93 @@ impl ClauseDBIF for ClauseDB {
             num_learnt: 0,
         }
     }
-    fn garbage_collect(&mut self, vars: &mut [Var], elim: &mut Eliminator) {
+    fn garbage_collect(&mut self) {
+        debug_assert!(self.check_liveness1());
         let ClauseDB {
             ref mut watcher,
             ref mut clause,
             ref mut touched,
             ..
         } = self;
-        for (i, ws) in &mut watcher.iter_mut().enumerate().skip(2) {
-            if !touched[i] {
+        debug_assert_eq!(NULL_LIT.negate(), 1);
+        let (recycles, wss) = watcher.split_at_mut(2);
+        let recycled = &mut recycles[1];
+        for (i, ws) in &mut wss.iter_mut().enumerate() {
+            if !touched[i + 2] {
                 continue;
             }
-            touched[i] = false;
+            touched[i + 2] = false;
             let mut n = 1;
-            let n_max = ws.count();
-            while n <= n_max {
-                if clause[ws[n].c].is(Flag::DeadClause) {
-                    ws.detach(n);
-                } else {
+            while n <= ws.count() {
+                let cid = ws[n].c;
+                let c = &mut clause[cid];
+                if !c.is(Flag::DeadClause) {
                     n += 1;
+                    continue;
                 }
-            }
-        }
-        let recycled = &mut watcher[NULL_LIT.negate() as usize];
-        for (ci, c) in self.clause.iter_mut().enumerate().skip(1) {
-            // the recycled clause is DEAD and EMPTY
-            if c.is(Flag::DeadClause) && !c.lits.is_empty() {
-                recycled.push(Watch {
-                    blocker: NULL_LIT,
-                    c: ci,
-                });
-                if c.is(Flag::LearntClause) {
-                    self.num_learnt -= 1;
-                }
-                if elim.in_use {
-                    for l in &c.lits {
-                        let vi = l.vi();
-                        let v = &mut vars[vi];
-                        if !v.is(Flag::EliminatedVar) {
-                            if l.positive() {
-                                v.pos_occurs.delete_unstable(|&cj| ci == cj);
-                            } else {
-                                v.neg_occurs.delete_unstable(|&cj| ci == cj);
-                            }
-                            elim.enqueue_var(v);
-                        }
+                if !c.lits.is_empty() {
+                    debug_assert!(c.is(Flag::DeadClause));
+                    recycled.push(Watch {
+                        blocker: NULL_LIT,
+                        c: cid,
+                    });
+                    if c.is(Flag::LearntClause) {
+                        self.num_learnt -= 1;
                     }
+                    c.lits.clear();
                 }
-                c.lits.clear();
+                ws.detach(n);
             }
         }
         self.num_active = self.clause.len() - recycled.len();
+        debug_assert!(self.check_liveness2());
     }
     fn new_clause(&mut self, v: &[Lit], rank: usize, learnt: bool) -> ClauseId {
         let cid;
+        let l0 = v[0];
+        let l1 = v[1];
         if let Some(w) = self.watcher[NULL_LIT.negate() as usize].pop() {
             cid = w.c;
-            // debug_assert!(self.head[cid].is(ClauseFlag::Dead));
             let c = &mut self.clause[cid];
-            self.watcher[v[0].negate() as usize].attach(v[1], cid);
-            self.watcher[v[1].negate() as usize].attach(v[0], cid);
+            // if !c.is(Flag::DeadClause) {
+            //     println!("{} {:?}", cid.format(), vec2int(&c.lits));
+            //     println!("len {}", self.watcher[NULL_LIT.negate() as usize].len());
+            //     for w in &self.watcher[NULL_LIT.negate() as usize][..10] {
+            //         if !self.clause[w.c].is(Flag::DeadClause) {
+            //             println!("{}", w.c.format());
+            //         }
+            //     }
+            //     panic!("done");
+            // }
+            debug_assert!(c.is(Flag::DeadClause));
+            c.flags = 0;
             c.lits.clear();
             for l in v {
                 c.lits.push(*l);
             }
             c.rank = rank;
-            c.flags = 0;
-            if learnt {
-                c.flag_on(Flag::LearntClause);
-                self.num_learnt += 1;
-            }
-            c.activity = 1.0;
+            c.activity = 0.0;
         } else {
-            let l0 = v[0];
-            let l1 = v[1];
             let mut lits = Vec::with_capacity(v.len());
             for l in v {
                 lits.push(*l);
             }
             cid = self.clause.len();
-            let mut c = Clause {
+            let c = Clause {
                 flags: 0,
                 lits,
                 rank,
                 activity: 0.0,
             };
-            if learnt {
-                c.flag_on(Flag::LearntClause);
-                self.num_learnt += 1;
-            }
             self.clause.push(c);
-            self.watcher[l0.negate() as usize].attach(l1, cid);
-            self.watcher[l1.negate() as usize].attach(l0, cid);
         };
+        let c = &mut self.clause[cid];
+        if learnt {
+            c.turn_on(Flag::LearntClause);
+            self.num_learnt += 1;
+        }
+        self.watcher[l0.negate() as usize].attach(l1, cid);
+        self.watcher[l1.negate() as usize].attach(l0, cid);
         self.num_active += 1;
         cid
     }
@@ -379,12 +378,18 @@ impl ClauseDBIF for ClauseDB {
             self.clause.len() - 1
         }
     }
+    fn countf(&self, mask: u16) -> usize {
+        self.clause
+            .iter()
+            .skip(1)
+            .filter(|&c| c.flags & mask == mask)
+            .count()
+    }
     /// renamed from newLearntClause
     // Note: set lbd to 0 if you want to add the clause to Permanent.
-    fn add_clause(
+    fn attach(
         &mut self,
         config: &mut Config,
-        elim: &mut Eliminator,
         vars: &mut [Var],
         v: &mut Vec<Lit>,
         lbd: usize,
@@ -406,14 +411,16 @@ impl ClauseDBIF for ClauseDB {
         let cid = self.new_clause(&v, lbd, learnt);
         let c = &mut self.clause[cid];
         c.activity = config.var_inc;
-        vars.attach_clause(elim, cid, c, true);
         cid
     }
     /// called from strengthen_clause, backward_subsumption_check, eliminate_var, substitute
-    fn remove_clause(&mut self, cid: ClauseId) {
+    fn detach(&mut self, cid: ClauseId) {
         let c = &mut self.clause[cid];
-        debug_assert!(!c.is(Flag::DeadClause));
-        c.flag_on(Flag::DeadClause);
+        if c.is(Flag::DeadClause) {
+            // panic!("dead!");
+            return;
+        }
+        c.turn_on(Flag::DeadClause);
         if c.lits.is_empty() {
             return;
         }
@@ -425,19 +432,14 @@ impl ClauseDBIF for ClauseDB {
         }
         self.touched[w0 as usize] = true;
     }
-    fn reduce(
-        &mut self,
-        config: &Config,
-        elim: &mut Eliminator,
-        state: &mut State,
-        vars: &mut [Var],
-    ) {
-        self.reset_lbd(vars, &mut state.lbd_temp);
+    fn reduce(&mut self, config: &Config, state: &mut State, vars: &mut [Var]) {
+        // self.reset_lbd(vars, &mut state.lbd_temp);
         let ClauseDB {
             ref mut clause,
             ref mut touched,
             ..
         } = self;
+        state.next_reduction += config.cdb_inc;
         let mut perm = Vec::with_capacity(clause.len());
         for (i, b) in clause.iter().enumerate().skip(1) {
             if b.is(Flag::LearntClause) && !b.is(Flag::DeadClause) && !vars.locked(b, i) {
@@ -447,31 +449,30 @@ impl ClauseDBIF for ClauseDB {
         if perm.is_empty() {
             return;
         }
-        let keep = perm.len() / 2;
+        let keep = perm.len() / 2; // if elim.in_use { perm.len() / 8 } else { perm.len() / 2 };
         if config.use_chan_seok {
-            perm.sort_by(|&a, &b| clause[a].cmp(&clause[b]));
-        // perm.sort_by(|&a, &b| clause[a].cmp_activity(&clause[b]));
+            perm.sort_by(|&a, &b| clause[a].cmp_activity(&clause[b]));
         } else {
             perm.sort_by(|&a, &b| clause[a].cmp(&clause[b]));
             if clause[perm[keep]].rank <= 3 {
                 state.next_reduction += config.cdb_inc_extra;
             }
-            // if clause[perm[0]].rank <= 5 {
-            //     state.next_reduction += config.cdb_inc_extra;
-            // };
+            if clause[perm[0]].rank <= 5 {
+                state.next_reduction += config.cdb_inc_extra;
+            };
         }
         for i in &perm[keep..] {
             let c = &mut clause[*i];
-            // if c.is(Flag::JustUsedClause) {
-            //     c.flag_off(Flag::JustUsedClause)
-            // } else
+            if c.is(Flag::JustUsedClause) {
+                c.turn_off(Flag::JustUsedClause)
+            }
             if 2 < c.rank {
                 c.kill(touched);
             }
         }
-        self.garbage_collect(vars, elim);
-        state.next_reduction += config.cdb_inc;
         state.stats[Stat::Reduction as usize] += 1;
+        self.garbage_collect();
+        self.reset_lbd(vars, &mut state.lbd_temp);
     }
     fn simplify(
         &mut self,
@@ -480,39 +481,112 @@ impl ClauseDBIF for ClauseDB {
         elim: &mut Eliminator,
         state: &mut State,
         vars: &mut [Var],
-    ) -> bool {
-        self.reset_lbd(vars, &mut state.lbd_temp);
+    ) -> MaybeInconsistent {
+        // self.reset_lbd(vars, &mut state.lbd_temp);
         debug_assert_eq!(asgs.level(), 0);
         // reset reason since decision level is zero.
         for v in &mut vars[1..] {
             v.reason = NULL_CLAUSE;
         }
-        if elim.in_use {
-            elim.eliminate(asgs, self, config, state, vars);
-            if !state.ok {
-                return false;
-            }
-        }
-        for c in &mut self.clause[1..] {
-            if !c.is(Flag::DeadClause) && vars.satisfies(&c.lits) {
-                c.kill(&mut self.touched);
-                if elim.in_use {
-                    for l in &c.lits {
-                        let v = &mut vars[l.vi()];
-                        if !v.is(Flag::EliminatedVar) {
-                            elim.enqueue_var(v);
+        elim.activate(self, vars, true);
+        loop {
+            let na = asgs.len();
+            elim.eliminate(asgs, self, config, state, vars)?;
+            for c in &mut self.clause[1..] {
+                if !c.is(Flag::DeadClause) && vars.satisfies(&c.lits) {
+                    c.kill(&mut self.touched);
+                    if elim.is_running() {
+                        for l in &c.lits {
+                            let v = &mut vars[l.vi()];
+                            if !v.is(Flag::EliminatedVar) {
+                                elim.enqueue_var(vars, l.vi(), true);
+                            }
                         }
                     }
                 }
             }
+            if na == asgs.len()
+                && (!elim.is_running()
+                    || (0 == elim.clause_queue_len() && 0 == elim.var_queue_len()))
+            {
+                break;
+            }
         }
-        self.garbage_collect(vars, elim);
+        self.garbage_collect();
         state.stats[Stat::Simplification as usize] += 1;
-        true
+        if elim.is_running() {
+            state.stats[Stat::Elimination as usize] += 1;
+            self.reset_lbd(vars, &mut state.lbd_temp);
+            elim.stop(self, vars);
+        }
+        Ok(())
     }
 }
 
 impl ClauseDB {
+    fn check_liveness1(&self) -> bool {
+        let deads = self.watcher[NULL_LIT.negate() as usize]
+            .iter()
+            .map(|w| w.c)
+            .collect::<Vec<ClauseId>>();
+        for cid in deads {
+            if !self.clause[cid].is(Flag::DeadClause) {
+                panic!("done");
+            }
+        }
+        for cid in 1..self.clause.len() {
+            if !self.clause[cid].is(Flag::DeadClause) {
+                let lits = &self.clause[cid].lits;
+                if lits.len() < 2 {
+                    panic!("too short clause {} {:?}", cid.format(), vec2int(&lits));
+                }
+                if self.watcher[lits[0].negate() as usize]
+                    .iter()
+                    .all(|w| w.c != cid)
+                    || self.watcher[lits[1].negate() as usize]
+                        .iter()
+                        .all(|w| w.c != cid)
+                {
+                    panic!("watch broken");
+                }
+            }
+        }
+        true
+    }
+    fn check_liveness2(&self) -> bool {
+        let deads = self.watcher[NULL_LIT.negate() as usize]
+            .iter()
+            .map(|w| w.c)
+            .collect::<Vec<ClauseId>>();
+        for cid in 1..self.clause.len() {
+            if self.clause[cid].is(Flag::DeadClause) && !deads.contains(&cid) {
+                panic!("done");
+            }
+            if !self.clause[cid].is(Flag::DeadClause) {
+                let lits = &self.clause[cid].lits;
+                if lits.len() < 2 {
+                    panic!("too short clause {} {:?}", cid.format(), vec2int(&lits));
+                }
+                if self.watcher[lits[0].negate() as usize]
+                    .iter()
+                    .all(|w| w.c != cid)
+                    || self.watcher[lits[1].negate() as usize]
+                        .iter()
+                        .all(|w| w.c != cid)
+                {
+                    panic!("watch broken");
+                }
+            }
+        }
+        for ws in &self.watcher[2..] {
+            for w in &ws[1..] {
+                if self.clause[w.c].is(Flag::DeadClause) && !deads.contains(&w.c) {
+                    panic!("done");
+                }
+            }
+        }
+        true
+    }
     #[allow(dead_code)]
     fn check(&self) {
         let total = self.count(false);

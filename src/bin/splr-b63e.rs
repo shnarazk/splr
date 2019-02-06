@@ -21,7 +21,7 @@ struct CLOpts {
     #[structopt(long = "rl", default_value = "50")]
     restart_lbd_samples: usize,
     /// K in Glucose, for restart
-    #[structopt(long = "rt", default_value = "0.75")]
+    #[structopt(long = "rt", default_value = "0.60")]
     restart_threshold: f64,
     /// R in Glucose, for blocking
     #[structopt(long = "rb", default_value = "1.40")]
@@ -55,7 +55,7 @@ fn main() {
         config.restart_step = args.restart_step;
         config.progress_log = args.use_log;
         if args.no_elim {
-            config.use_sve = false;
+            config.use_elim = false;
         }
         let (mut s, _cnf) = Solver::build(config, &args.cnf.to_str().unwrap());
         let result = format!(".ans_{}", args.cnf.file_name().unwrap().to_str().unwrap());
@@ -72,7 +72,11 @@ fn main() {
                         panic!("failed to save: {:?}!", why);
                     }
                 }
-                println!("SATISFIABLE. The answer was dumped to {}.", result.as_str());
+                println!(
+                    "SATISFIABLE: {}. The answer was dumped to {}.",
+                    s.state.target.pathname,
+                    result.as_str()
+                );
                 // println!("{:?}", v);
             }
             Ok(Certificate::UNSAT(_)) => {
@@ -81,7 +85,11 @@ fn main() {
                         panic!("failed to save: {:?}!", why);
                     }
                 }
-                println!("UNSAT, The answer was dumped to {}.", result.as_str());
+                println!(
+                    "UNSAT: {}, The answer was dumped to {}.",
+                    s.state.target.pathname,
+                    result.as_str()
+                );
             }
             Err(_) => println!("Failed"),
         }

@@ -5,7 +5,6 @@ authors = ["Shuji Narazaki <shujinarazaki@protonmail.com>"]
 edition = "2018"
 
 [dependencies]
-chrono = "0.4.6"
 structopt = "0.2.14"
 
 [profile.release]
