@@ -488,7 +488,7 @@ impl ClauseDBIF for ClauseDB {
         for v in &mut vars[1..] {
             v.reason = NULL_CLAUSE;
         }
-        elim.activate(self, vars, true);
+        elim.prepare(self, vars, true);
         loop {
             let na = asgs.len();
             elim.eliminate(asgs, self, config, state, vars)?;

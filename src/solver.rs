@@ -78,8 +78,8 @@ impl SatSolverIF for Solver {
         state.progress_header(config);
         state.progress(cdb, config, vars, Some("loaded"));
         if config.use_elim {
-            elim.start();
-            elim.activate(cdb, vars, true);
+            elim.activate();
+            elim.prepare(cdb, vars, true);
             for vi in 1..vars.len() {
                 let v = &mut vars[vi];
                 if v.assign != BOTTOM {
@@ -352,7 +352,7 @@ fn handle_conflict_path(
                 state.elim_trigger = state.c_lvl.get() as usize + 10;
             }
             if (state.c_lvl.get() as usize) < state.elim_trigger {
-                elim.start();
+                elim.activate();
                 state.elim_trigger /= 2;
             }
         }

@@ -41,7 +41,7 @@ impl EliminatorIF for Eliminator {
         e.var_queue = VarOccHeap::new(nv, 0);
         e
     }
-    fn start(&mut self) {
+    fn activate(&mut self) {
         debug_assert!(self.mode != EliminatorMode::Running);
         self.mode = EliminatorMode::Waiting;
     }
@@ -66,9 +66,9 @@ impl EliminatorIF for Eliminator {
         }
         self.mode = EliminatorMode::Deactive;
     }
-    fn activate(&mut self, cdb: &mut ClauseDB, vars: &mut [Var], force: bool) -> bool {
+    fn prepare(&mut self, cdb: &mut ClauseDB, vars: &mut [Var], force: bool) {
         if self.mode != EliminatorMode::Waiting {
-            return false;
+            return;
         }
         self.mode = EliminatorMode::Running;
         for v in &mut vars[1..] {
@@ -90,7 +90,6 @@ impl EliminatorIF for Eliminator {
                 self.enqueue_var(vars, vi, true);
             }
         }
-        true
     }
     #[inline]
     fn enqueue_clause(&mut self, cid: ClauseId, c: &mut Clause) {
