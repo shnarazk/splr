@@ -56,9 +56,11 @@ pub trait Delete<T> {
 
 /// API for Eliminator like `activate`, `stop`, `eliminate` and so on.
 pub trait EliminatorIF {
-    fn new(in_use: bool, nv: usize) -> Eliminator;
+    fn new(nv: usize) -> Eliminator;
+    fn start(&mut self);
     fn stop(&mut self, cdb: &mut ClauseDB, vars: &mut [Var]);
-    fn activate(&mut self, cdb: &mut ClauseDB, vars: &mut [Var], force: bool);
+    fn is_running(&self) -> bool;
+    fn activate(&mut self, cdb: &mut ClauseDB, vars: &mut [Var], force: bool) -> bool;
     fn enqueue_clause(&mut self, cid: ClauseId, c: &mut Clause);
     fn clear_clause_queue(&mut self, cdb: &mut ClauseDB);
     fn clause_queue_len(&self) -> usize;

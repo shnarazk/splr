@@ -488,19 +488,14 @@ impl ClauseDBIF for ClauseDB {
         for v in &mut vars[1..] {
             v.reason = NULL_CLAUSE;
         }
-        if elim.in_use && elim.active {
-            elim.activate(self, vars, true);
-            state.stats[Stat::Elimination as usize] += 1;
-        }
+        elim.activate(self, vars, true);
         loop {
             let na = asgs.len();
-            if elim.in_use && elim.active {
-                elim.eliminate(asgs, self, config, state, vars)?;
-            }
+            elim.eliminate(asgs, self, config, state, vars)?;
             for c in &mut self.clause[1..] {
                 if !c.is(Flag::DeadClause) && vars.satisfies(&c.lits) {
                     c.kill(&mut self.touched);
-                    if elim.in_use {
+                    if elim.is_running() {
                         for l in &c.lits {
                             let v = &mut vars[l.vi()];
                             if !v.is(Flag::EliminatedVar) {
@@ -511,14 +506,16 @@ impl ClauseDBIF for ClauseDB {
                 }
             }
             if na == asgs.len()
-                && (!elim.in_use || (0 == elim.clause_queue_len() && 0 == elim.var_queue_len()))
+                && (!elim.is_running()
+                    || (0 == elim.clause_queue_len() && 0 == elim.var_queue_len()))
             {
                 break;
             }
         }
         self.garbage_collect();
         state.stats[Stat::Simplification as usize] += 1;
-        if elim.in_use && elim.active {
+        if elim.is_running() {
+            state.stats[Stat::Elimination as usize] += 1;
             self.reset_lbd(vars, &mut state.lbd_temp);
             elim.stop(self, vars);
         }

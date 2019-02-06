@@ -46,7 +46,7 @@ impl Solver {
     pub fn new(config: Config, cnf: &CNFDescription) -> Solver {
         let nv = cnf.num_of_variables as usize;
         let nc = cnf.num_of_clauses as usize;
-        let elim = Eliminator::new(config.use_elim, nv);
+        let elim = Eliminator::new(nv);
         let state = State::new(&config, cnf.clone());
         Solver {
             asgs: AssignStack::new(nv),
@@ -77,7 +77,9 @@ impl SatSolverIF for Solver {
         state.num_solved_vars = asgs.len();
         state.progress_header(config);
         state.progress(cdb, config, vars, Some("loaded"));
-        if elim.in_use {
+        if config.use_elim {
+            elim.start();
+            elim.activate(cdb, vars, true);
             for vi in 1..vars.len() {
                 let v = &mut vars[vi];
                 if v.assign != BOTTOM {
@@ -89,7 +91,6 @@ impl SatSolverIF for Solver {
                     _ => elim.enqueue_var(vars, vi, false),
                 };
             }
-            elim.active = true;
             state.progress(cdb, config, vars, Some("enqueued"));
             if cdb.simplify(asgs, config, elim, state, vars).is_err() {
                 state.ok = false;
@@ -351,7 +352,7 @@ fn handle_conflict_path(
                 state.elim_trigger = state.c_lvl.get() as usize + 10;
             }
             if (state.c_lvl.get() as usize) < state.elim_trigger {
-                elim.active = true;
+                elim.start();
                 state.elim_trigger /= 2;
             }
         }

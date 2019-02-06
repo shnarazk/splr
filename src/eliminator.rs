@@ -7,12 +7,16 @@ use crate::types::*;
 use crate::var::Var;
 use std::fmt;
 
+#[derive(PartialEq, Eq)]
+enum EliminatorMode {
+    Deactive,
+    Waiting,
+    Running,
+}
+
 /// Literal eliminator
 pub struct Eliminator {
-    // to make occur lists
-    pub in_use: bool,
-    // to run eliminate
-    pub active: bool,
+    mode: EliminatorMode,
     clause_queue: Vec<ClauseId>,
     var_queue: VarOccHeap,
     bwdsub_assigns: usize,
@@ -22,8 +26,7 @@ pub struct Eliminator {
 impl Default for Eliminator {
     fn default() -> Eliminator {
         Eliminator {
-            in_use: true,
-            active: true,
+            mode: EliminatorMode::Deactive,
             var_queue: VarOccHeap::new(0, 0),
             clause_queue: Vec::new(),
             bwdsub_assigns: 0,
@@ -33,11 +36,17 @@ impl Default for Eliminator {
 }
 
 impl EliminatorIF for Eliminator {
-    fn new(in_use: bool, nv: usize) -> Eliminator {
+    fn new(nv: usize) -> Eliminator {
         let mut e = Eliminator::default();
         e.var_queue = VarOccHeap::new(nv, 0);
-        e.in_use = in_use;
         e
+    }
+    fn start(&mut self) {
+        debug_assert!(self.mode != EliminatorMode::Running);
+        self.mode = EliminatorMode::Waiting;
+    }
+    fn is_running(&self) -> bool {
+        self.mode == EliminatorMode::Running
     }
     /// FIXME: due to a potential bug of killing clauses and difficulty about
     /// synchronization between 'garbage_collect' and clearing occur lists,
@@ -55,12 +64,13 @@ impl EliminatorIF for Eliminator {
                 v.neg_occurs.clear();
             }
         }
-        self.in_use = false;
-        self.active = false;
+        self.mode = EliminatorMode::Deactive;
     }
-    fn activate(&mut self, cdb: &mut ClauseDB, vars: &mut [Var], force: bool) {
-        self.in_use = true;
-        self.active = true;
+    fn activate(&mut self, cdb: &mut ClauseDB, vars: &mut [Var], force: bool) -> bool {
+        if self.mode != EliminatorMode::Waiting {
+            return false;
+        }
+        self.mode = EliminatorMode::Running;
         for v in &mut vars[1..] {
             v.pos_occurs.clear();
             v.neg_occurs.clear();
@@ -80,10 +90,11 @@ impl EliminatorIF for Eliminator {
                 self.enqueue_var(vars, vi, true);
             }
         }
+        true
     }
     #[inline]
     fn enqueue_clause(&mut self, cid: ClauseId, c: &mut Clause) {
-        if !self.in_use || !self.active || c.is(Flag::Enqueued) {
+        if self.mode != EliminatorMode::Running || c.is(Flag::Enqueued) {
             return;
         }
         self.clause_queue.push(cid);
@@ -97,7 +108,7 @@ impl EliminatorIF for Eliminator {
     }
     #[inline]
     fn enqueue_var(&mut self, vars: &mut [Var], vi: VarId, upward: bool) {
-        if !self.in_use || !self.active {
+        if self.mode != EliminatorMode::Running {
             return;
         }
         self.var_queue.insert(vars, vi, upward);
@@ -121,7 +132,7 @@ impl EliminatorIF for Eliminator {
         vars: &mut [Var],
     ) -> MaybeInconsistent {
         debug_assert!(asgs.level() == 0);
-        if !self.in_use || !self.active {
+        if self.mode == EliminatorMode::Deactive {
             return Ok(());
         }
         let mut cnt = 0;
@@ -195,7 +206,9 @@ impl EliminatorIF for Eliminator {
         }
     }
     fn add_cid_occur(&mut self, vars: &mut [Var], cid: ClauseId, c: &mut Clause, enqueue: bool) {
-        if !self.in_use || !self.active {
+        if self.mode != EliminatorMode::Running
+        /* || c.is(Flag::OccurLinked) */
+        {
             return;
         }
         for l in &c.lits {
@@ -203,10 +216,16 @@ impl EliminatorIF for Eliminator {
             v.turn_on(Flag::TouchedVar);
             if !v.is(Flag::EliminatedVar) {
                 if l.positive() {
-                    debug_assert!(!v.pos_occurs.contains(&cid));
+                    debug_assert!(
+                        !v.pos_occurs.contains(&cid),
+                        format!("{} {:?} {}", cid.format(), vec2int(&c.lits), v.index,)
+                    );
                     v.pos_occurs.push(cid);
                 } else {
-                    debug_assert!(!v.neg_occurs.contains(&cid));
+                    debug_assert!(
+                        !v.neg_occurs.contains(&cid),
+                        format!("{} {:?} {}", cid.format(), vec2int(&c.lits), v.index,)
+                    );
                     v.neg_occurs.push(cid);
                 }
                 self.enqueue_var(vars, l.vi(), false);
@@ -231,15 +250,17 @@ impl EliminatorIF for Eliminator {
         self.enqueue_var(vars, l.vi(), true);
     }
     fn remove_cid_occur(&mut self, vars: &mut [Var], cid: ClauseId, c: &mut Clause) {
+        debug_assert!(self.mode == EliminatorMode::Running);
+        debug_assert!(!cid.is_lifted_lit());
         c.turn_off(Flag::OccurLinked);
         debug_assert!(c.is(Flag::DeadClause));
-        if self.in_use {
-            for l in &c.lits {
-                let v = &mut vars[l.vi()];
-                if !v.is(Flag::EliminatedVar) && v.assign == BOTTOM {
-                    self.remove_lit_occur(vars, *l, cid);
-                    self.enqueue_var(vars, l.vi(), true);
-                }
+        for l in &c.lits {
+            let v = &mut vars[l.vi()];
+            if
+            /* !v.is(Flag::EliminatedVar) && */
+            v.assign == BOTTOM {
+                self.remove_lit_occur(vars, *l, cid);
+                self.enqueue_var(vars, l.vi(), true);
             }
         }
     }
@@ -522,7 +543,7 @@ fn strengthen_clause(
         debug_assert!(2 == cdb.clause[cid].lits.len());
         let c0 = cdb.clause[cid].lits[0];
         debug_assert_ne!(c0, l);
-        // println!("{} is removed and its first literal {} is enqueued.", cid.fmt(), c0.int());
+        // println!("{} {:?} is removed and its first literal {} is enqueued.", cid.format(), vec2int(&cdb.clause[cid].lits), c0.int());
         cdb.detach(cid);
         elim.remove_cid_occur(vars, cid, &mut cdb.clause[cid]);
         asgs.enqueue(&mut vars[c0.vi()], c0.lbool(), NULL_CLAUSE, 0)
@@ -554,6 +575,7 @@ fn strengthen(cdb: &mut ClauseDB, cid: ClauseId, p: Lit) -> bool {
     }
     debug_assert!(1 < p.negate());
     let lits = &mut (*c).lits;
+    debug_assert!(1 < lits.len());
     if lits.len() == 2 {
         if lits[0] == p {
             lits.swap(0, 1);
@@ -561,7 +583,6 @@ fn strengthen(cdb: &mut ClauseDB, cid: ClauseId, p: Lit) -> bool {
         debug_assert!(1 < lits[0].negate());
         return true;
     }
-    watcher[p.negate() as usize].detach_with(cid);
     if lits[0] == p || lits[1] == p {
         let q = if lits[0] == p {
             lits.swap_remove(0);
@@ -571,6 +592,7 @@ fn strengthen(cdb: &mut ClauseDB, cid: ClauseId, p: Lit) -> bool {
             lits[1]
         };
         debug_assert!(1 < p.negate());
+        watcher[p.negate() as usize].detach_with(cid);
         watcher[q.negate() as usize].attach(q, cid);
     } else {
         lits.delete_unstable(|&x| x == p);
@@ -632,10 +654,7 @@ fn eliminate_var(
         if check_var_elimination_condition(cdb, config, vars, &*pos, &*neg, vi) {
             return Ok(());
         }
-        let v = &mut vars[vi];
         // OK, eliminate the literal and build constraints on it.
-        v.turn_on(Flag::EliminatedVar);
-        debug_assert_eq!(v.reason, NULL_CLAUSE);
         state.num_eliminated_vars += 1;
         make_eliminated_clauses(cdb, elim, vi, &*pos, &*neg);
         // Produce clauses in cross product:
@@ -676,12 +695,15 @@ fn eliminate_var(
         }
         for cid in &*pos {
             cdb.detach(*cid);
+            elim.remove_cid_occur(vars, *cid, &mut cdb.clause[*cid]);
         }
         for cid in &*neg {
             cdb.detach(*cid);
+            elim.remove_cid_occur(vars, *cid, &mut cdb.clause[*cid]);
         }
         vars[vi].pos_occurs.clear();
         vars[vi].neg_occurs.clear();
+        vars[vi].turn_on(Flag::EliminatedVar);
         elim.backward_subsumption_check(asgs, cdb, config, vars)
     }
 }
