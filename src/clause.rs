@@ -390,7 +390,6 @@ impl ClauseDBIF for ClauseDB {
     fn attach(
         &mut self,
         config: &mut Config,
-        elim: &mut Eliminator,
         vars: &mut [Var],
         v: &mut Vec<Lit>,
         lbd: usize,
@@ -412,7 +411,6 @@ impl ClauseDBIF for ClauseDB {
         let cid = self.new_clause(&v, lbd, learnt);
         let c = &mut self.clause[cid];
         c.activity = config.var_inc;
-        elim.add_cid_occur(vars, cid, c, true);
         cid
     }
     /// called from strengthen_clause, backward_subsumption_check, eliminate_var, substitute

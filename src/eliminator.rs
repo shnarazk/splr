@@ -661,14 +661,15 @@ fn eliminate_var(
                         }
                         _ => {
                             let v = &mut vec.to_vec();
-                            if cdb.clause[*p].is(Flag::LearntClause)
+                            let rank = if cdb.clause[*p].is(Flag::LearntClause)
                                 && cdb.clause[*n].is(Flag::LearntClause)
                             {
-                                let rank = rank_p.min(cdb.clause[*n].rank);
-                                cdb.attach(config, elim, vars, v, rank);
+                                rank_p.min(cdb.clause[*n].rank)
                             } else {
-                                cdb.attach(config, elim, vars, v, 0);
-                            }
+                                0
+                            };
+                            let cid = cdb.attach(config, vars, v, rank);
+                            elim.add_cid_occur(vars, cid, &mut cdb.clause[cid], true);
                         }
                     }
                 }

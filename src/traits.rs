@@ -18,7 +18,6 @@ pub trait ClauseDBIF {
     fn attach(
         &mut self,
         config: &mut Config,
-        elim: &mut Eliminator,
         vars: &mut [Var],
         v: &mut Vec<Lit>,
         lbd: usize,
