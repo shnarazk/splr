@@ -635,8 +635,7 @@ fn eliminate_var(
         let v = &mut vars[vi];
         // OK, eliminate the literal and build constraints on it.
         v.turn_on(Flag::EliminatedVar);
-        let cid = v.reason;
-        debug_assert_eq!(cid, NULL_CLAUSE);
+        debug_assert_eq!(v.reason, NULL_CLAUSE);
         state.num_eliminated_vars += 1;
         make_eliminated_clauses(cdb, elim, vi, &*pos, &*neg);
         // Produce clauses in cross product:
