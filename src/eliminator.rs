@@ -427,13 +427,11 @@ fn check_to_merge(
     let mut size = pb.lits.len() + 1;
     'next_literal: for l in &qb.lits {
         if vars[l.vi()].is(Flag::EliminatedVar) {
-            println!("ooo");
             continue;
         }
         if l.vi() != v {
             for j in &pb.lits {
                 if vars[j.vi()].is(Flag::EliminatedVar) {
-                    println!("ooo");
                     continue;
                 }
                 if j.vi() == l.vi() {
