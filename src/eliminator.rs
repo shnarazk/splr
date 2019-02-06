@@ -252,10 +252,9 @@ impl EliminatorIF for Eliminator {
         c.turn_off(Flag::OccurLinked);
         debug_assert!(c.is(Flag::DeadClause));
         for l in &c.lits {
-            let v = &mut vars[l.vi()];
-            if v.assign == BOTTOM {
+            if vars[l.vi()].assign == BOTTOM {
                 self.remove_lit_occur(vars, *l, cid);
-                if !v.is(Flag::EliminatedVar) {
+                if !vars[l.vi()].is(Flag::EliminatedVar) {
                     self.enqueue_var(vars, l.vi(), true);
                 }
             }
