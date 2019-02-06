@@ -1,23 +1,28 @@
 use crate::clause::Clause;
-use crate::eliminator::Eliminator;
 use crate::traits::*;
 use crate::types::*;
 use std::fmt;
 
 const VAR_ACTIVITY_MAX: f64 = 1e240;
-const VAR_ACTIVITY_SCALE1: f64 = 1e-80;
-const VAR_ACTIVITY_SCALE2: f64 = 1e-10;
+const VAR_ACTIVITY_SCALE1: f64 = 1e-30;
+const VAR_ACTIVITY_SCALE2: f64 = 1e-30;
 
 /// Struct for a variable.
 pub struct Var {
-    pub index: usize,
+    /// reverse conversion to index. Note `VarId` must be `usize`.
+    pub index: VarId,
+    /// the current value.
     pub assign: Lbool,
+    /// the previous assigned value
     pub phase: Lbool,
     pub reason: ClauseId,
+    /// decision level at which this variables is assigned.
     pub level: usize,
+    /// a dynamic evaluation criterion like VSIDS or ACID.
     pub activity: f64,
-    pub check_sve_at: usize,
+    /// list of clauses which contain this variable positively.
     pub pos_occurs: Vec<ClauseId>,
+    /// list of clauses which contain this variable negatively.
     pub neg_occurs: Vec<ClauseId>,
     flags: u16,
 }
@@ -35,7 +40,6 @@ impl VarIF for Var {
             reason: NULL_CLAUSE,
             level: 0,
             activity: 0.0,
-            check_sve_at: 0,
             pos_occurs: Vec::new(),
             neg_occurs: Vec::new(),
             flags: 0,
@@ -58,16 +62,17 @@ impl FlagIF for Var {
         self.flags & (1 << flag as u16) != 0
     }
     #[inline(always)]
-    fn flag_off(&mut self, flag: Flag) {
+    fn turn_off(&mut self, flag: Flag) {
         self.flags &= !(1u16 << (flag as u16));
     }
     #[inline(always)]
-    fn flag_on(&mut self, flag: Flag) {
+    fn turn_on(&mut self, flag: Flag) {
         self.flags |= 1u16 << (flag as u16);
     }
 }
 
 impl VarDBIF for [Var] {
+    #[inline(always)]
     fn assigned(&self, l: Lit) -> Lbool {
         unsafe { self.get_unchecked(l.vi()).assign ^ ((l & 1) as u8) }
     }
@@ -75,17 +80,17 @@ impl VarDBIF for [Var] {
         let lits = &c.lits;
         debug_assert!(1 < lits.len());
         let l0 = lits[0];
-        self.assigned(l0) == LTRUE && self[l0.vi()].reason == cid
+        self.assigned(l0) == TRUE && self[l0.vi()].reason == cid
     }
     fn satisfies(&self, vec: &[Lit]) -> bool {
         for l in vec {
-            if self.assigned(*l) == LTRUE {
+            if self.assigned(*l) == TRUE {
                 return true;
             }
         }
         false
     }
-    #[inline(always)]
+    #[inline]
     fn compute_lbd(&self, vec: &[Lit], keys: &mut [usize]) -> usize {
         let key = keys[0] + 1;
         let mut cnt = 0;
@@ -98,47 +103,6 @@ impl VarDBIF for [Var] {
         }
         keys[0] = key;
         cnt
-    }
-    fn attach_clause(
-        &mut self,
-        elim: &mut Eliminator,
-        cid: ClauseId,
-        c: &mut Clause,
-        enqueue: bool,
-    ) {
-        if !elim.in_use {
-            return;
-        }
-        for l in &c.lits {
-            let v = &mut self[l.vi()];
-            v.flag_on(Flag::TouchedVar);
-            if !v.is(Flag::EliminatedVar) {
-                if l.positive() {
-                    v.pos_occurs.push(cid);
-                } else {
-                    v.neg_occurs.push(cid);
-                }
-            }
-        }
-        if enqueue {
-            elim.enqueue_clause(cid, c);
-        }
-    }
-    fn detach_clause(&mut self, elim: &mut Eliminator, cid: ClauseId, c: &Clause) {
-        debug_assert!(c.is(Flag::DeadClause));
-        if elim.in_use {
-            for l in &c.lits {
-                let v = &mut self[l.vi()];
-                if !v.is(Flag::EliminatedVar) {
-                    if l.positive() {
-                        v.pos_occurs.retain(|&cj| cid != cj);
-                    } else {
-                        v.neg_occurs.retain(|&cj| cid != cj);
-                    }
-                    elim.enqueue_var(v);
-                }
-            }
-        }
     }
     fn bump_activity(&mut self, inc: &mut f64, vi: VarId) {
         let v = &mut self[vi];

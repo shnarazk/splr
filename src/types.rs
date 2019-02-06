@@ -12,7 +12,11 @@ pub type ClauseId = usize;
 /// is a dummy clause index
 pub const NULL_CLAUSE: ClauseId = 0;
 
-/// Literal encoded on unsigned integer
+/// Literal encoded on `u32` as:
+///
+/// - the literal corresponding to a positive occurence of *variable `n` is `2 * n` and
+/// - that for the negative one is `2 * n + 1`.
+///
 /// # Examples
 ///
 /// ```
@@ -37,12 +41,12 @@ pub const NULL_LIT: Lit = 0;
 /// ```
 /// use splr::traits::LitIF;
 /// use splr::types::*;
-/// assert_eq!(Lit::from_int(1), Lit::from_var(1 as VarId, LTRUE));
-/// assert_eq!(Lit::from_int(2), Lit::from_var(2 as VarId, LTRUE));
-/// assert_eq!(1, Lit::from_var(1, LTRUE).vi());
-/// assert_eq!(1, Lit::from_var(1, LFALSE).vi());
-/// assert_eq!(2, Lit::from_var(2, LTRUE).vi());
-/// assert_eq!(2, Lit::from_var(2, LFALSE).vi());
+/// assert_eq!(Lit::from_int(1), Lit::from_var(1 as VarId, TRUE));
+/// assert_eq!(Lit::from_int(2), Lit::from_var(2 as VarId, TRUE));
+/// assert_eq!(1, Lit::from_var(1, TRUE).vi());
+/// assert_eq!(1, Lit::from_var(1, FALSE).vi());
+/// assert_eq!(2, Lit::from_var(2, TRUE).vi());
+/// assert_eq!(2, Lit::from_var(2, FALSE).vi());
 /// assert_eq!(Lit::from_int( 1), Lit::from_int(-1).negate());
 /// assert_eq!(Lit::from_int(-1), Lit::from_int( 1).negate());
 /// assert_eq!(Lit::from_int( 2), Lit::from_int(-2).negate());
@@ -53,11 +57,11 @@ impl LitIF for Lit {
     fn from_int(x: i32) -> Lit {
         (if x < 0 { -2 * x + 1 } else { 2 * x }) as Lit
     }
-    /// converter from [VarId](type.VarId.html) to [Lit](type.Lit.html).
-    /// returns a positive literal if p == LTRUE or BOTTOM.
+    /// converter from [VarId](../type.VarId.html) to [Lit](../type.Lit.html).
+    /// returns a positive literal if p == TRUE or BOTTOM.
     #[inline(always)]
     fn from_var(vi: VarId, p: Lbool) -> Lit {
-        (vi as Lit) << 1 | ((p == LFALSE) as Lit)
+        (vi as Lit) << 1 | ((p == FALSE) as Lit)
     }
     /// converts to var index
     #[inline(always)]
@@ -71,7 +75,7 @@ impl LitIF for Lit {
             ((self >> 1) as i32).neg()
         }
     }
-    /// - positive Lit (= even u32) => LTRUE (= 1 as u8)
+    /// - positive Lit (= even u32) => TRUE (= 1 as u8)
     /// - negative Lit (= odd u32)  => LFASE (= 0 as u8)
     #[inline(always)]
     fn lbool(self) -> Lbool {
@@ -94,9 +98,9 @@ impl LitIF for Lit {
 /// Lifted Bool type
 pub type Lbool = u8;
 /// the lifted **false**.
-pub const LFALSE: u8 = 0;
+pub const FALSE: u8 = 0;
 /// the lifted **true**.
-pub const LTRUE: u8 = 1;
+pub const TRUE: u8 = 1;
 /// unbound bool.
 pub const BOTTOM: u8 = 2;
 
@@ -106,7 +110,15 @@ fn negate_bool(b: Lbool) -> Lbool {
     b ^ 1
 }
 
+// Returning `Result<(), a-singlen>` is identical to returning `bool`.
+pub enum SolverError {
+    Inconsistent,
+}
+
+pub type MaybeInconsistent = Result<(), SolverError>;
+
 /// data about a problem.
+#[derive(Clone)]
 pub struct CNFDescription {
     pub num_of_variables: usize,
     pub num_of_clauses: usize,
@@ -135,20 +147,6 @@ pub fn vec2int(v: &[Lit]) -> Vec<i32> {
 }
 
 impl<T> Delete<T> for Vec<T> {
-    fn delete_stable<F>(&mut self, mut filter: F)
-    where
-        F: FnMut(&T) -> bool,
-    {
-        let mut i = 0;
-        while i != self.len() {
-            if filter(&mut self[i]) {
-                self.remove(i);
-                break;
-            } else {
-                i += 1;
-            }
-        }
-    }
     #[inline(always)]
     fn delete_unstable<F>(&mut self, mut filter: F)
     where
@@ -157,7 +155,7 @@ impl<T> Delete<T> for Vec<T> {
         let mut i = 0;
         while i != self.len() {
             if filter(&mut self[i]) {
-                self.swap_remove(i);
+                self.swap_remove(i); // self.remove(i) for stable deletion
                 break;
             } else {
                 i += 1;
@@ -166,12 +164,21 @@ impl<T> Delete<T> for Vec<T> {
     }
 }
 
+/// Collection of 1 bit properties for clause and var.
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub enum Flag {
+    /// a clause is stored in DB, but is a garbage now.
     DeadClause = 0,
+    /// a clause is a generated clause by conflict analysis and is removable.
     LearntClause,
-    // JustUsedClause,
+    /// a clause is used recently in conflict analysis.
+    JustUsedClause,
+    /// a clause is registered in vars' occurrence list.
+    OccurLinked,
+    /// a clause or var is equeued for eliminator.
     Enqueued,
+    /// a var is eliminated and managed by eliminator.
     EliminatedVar,
+    /// mark to run garbage collector on the corresponding watcher lists
     TouchedVar,
 }

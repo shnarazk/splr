@@ -1,9 +1,9 @@
-use crate::assign::AssignStack;
 use crate::config::Config;
+use crate::propagator::AssignStack;
 use crate::state::{Stat, State};
 use crate::traits::*;
 
-const RESET_EMA: usize = 400;
+// const RESET_EMA: usize = 400;
 
 /// Exponential Moving Average w/ a calibrator
 pub struct Ema {
@@ -31,7 +31,7 @@ impl EmaIF for Ema {
 
 impl RestartIF for State {
     fn block_restart(&mut self, asgs: &AssignStack, config: &Config, ncnfl: usize) -> bool {
-        let nas = asgs.len() + self.num_eliminated_vars;
+        let nas = asgs.len();
         // let _count = self.stats[Stat::Conflict as usize];
         // let _ave = self.sum_asg / count as f64 * config.num_vars as f64;
         if 100 < ncnfl
@@ -47,13 +47,13 @@ impl RestartIF for State {
     }
     fn force_restart(&mut self, config: &mut Config, ncnfl: &mut f64) -> bool {
         let count = self.stats[Stat::Conflict as usize];
-        if count <= RESET_EMA {
-            if count == RESET_EMA {
-                self.ema_asg.reset();
-                self.ema_lbd.reset();
-            }
-            return false;
-        }
+        // if count <= RESET_EMA {
+        //     if count == RESET_EMA {
+        //         self.ema_asg.reset();
+        //         self.ema_lbd.reset();
+        //     }
+        //     return false;
+        // }
         let ave = self.stats[Stat::SumLBD as usize] as f64 / count as f64;
         if (config.luby_restart && config.luby_restart_num_conflict <= *ncnfl)
             || (!config.luby_restart
@@ -80,7 +80,7 @@ impl RestartIF for State {
     }
     #[inline(always)]
     fn restart_update_asg(&mut self, _config: &Config, n: usize) {
-        self.ema_asg.update((self.num_eliminated_vars + n) as f64);
+        self.ema_asg.update(n as f64);
         // self.sum_asg += n as f64 / config.num_vars as f64;
     }
     #[inline(always)]

@@ -1,25 +1,25 @@
 //! This is a SAT solver in Rust.
 
 // /// Subsumption-based clause/var eliminaiton
-/// Assignment management
-pub mod assign;
-/// Clause
+/// Clause struct
 pub mod clause;
-/// Configuration
+/// Solver configuration
 pub mod config;
-/// In-process elimination
+/// Pre/In-processor for clause subsumption and variable elimination
 pub mod eliminator;
-/// Implementation on solver restart.
+/// Assignment management
+pub mod propagator;
+/// Solver restart implementation
 pub mod restart;
-/// struct Solver
+/// The main struct
 pub mod solver;
-/// various data for SAT solving
+/// Collection of various stat data for SAT solving process
 pub mod state;
-/// Traits
+/// Interfaces between submodules (version 0.1)
 pub mod traits;
-/// Plumping layer.
+/// Plumping layer
 pub mod types;
-/// validates
+/// validates a given assignment for a problem.
 pub mod validator;
-/// Var
+/// Var struct
 pub mod var;
