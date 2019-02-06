@@ -195,7 +195,7 @@ impl EliminatorIF for Eliminator {
         }
     }
     fn add_cid_occur(&mut self, vars: &mut [Var], cid: ClauseId, c: &mut Clause, enqueue: bool) {
-        if !self.in_use {
+        if !self.in_use || !self.active {
             return;
         }
         for l in &c.lits {
@@ -212,6 +212,7 @@ impl EliminatorIF for Eliminator {
                 self.enqueue_var(vars, l.vi(), false);
             }
         }
+        // c.turn_on(Flag::OccurLinked);
         if enqueue {
             self.enqueue_clause(cid, c);
         }
@@ -229,7 +230,8 @@ impl EliminatorIF for Eliminator {
         }
         self.enqueue_var(vars, l.vi(), true);
     }
-    fn remove_cid_occur(&mut self, vars: &mut [Var], cid: ClauseId, c: &Clause) {
+    fn remove_cid_occur(&mut self, vars: &mut [Var], cid: ClauseId, c: &mut Clause) {
+        c.turn_off(Flag::OccurLinked);
         debug_assert!(c.is(Flag::DeadClause));
         if self.in_use {
             for l in &c.lits {
@@ -344,7 +346,7 @@ fn try_subsume(
             //          *clause!(cdb, cid),
             // );
             cdb.detach(did);
-            elim.remove_cid_occur(vars, did, &cdb.clause[did]);
+            elim.remove_cid_occur(vars, did, &mut cdb.clause[did]);
             if !cdb.clause[did].is(Flag::LearntClause) {
                 cdb.clause[cid].turn_off(Flag::LearntClause);
             }
@@ -522,7 +524,7 @@ fn strengthen_clause(
         debug_assert_ne!(c0, l);
         // println!("{} is removed and its first literal {} is enqueued.", cid.fmt(), c0.int());
         cdb.detach(cid);
-        elim.remove_cid_occur(vars, cid, &cdb.clause[cid]);
+        elim.remove_cid_occur(vars, cid, &mut cdb.clause[cid]);
         asgs.enqueue(&mut vars[c0.vi()], c0.lbool(), NULL_CLAUSE, 0)
     } else {
         // println!("cid {} drops literal {}", cid.fmt(), l.int());

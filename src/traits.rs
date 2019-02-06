@@ -77,7 +77,7 @@ pub trait EliminatorIF {
     fn extend_model(&mut self, model: &mut Vec<i32>);
     fn add_cid_occur(&mut self, vars: &mut [Var], cid: ClauseId, c: &mut Clause, enqueue: bool);
     fn remove_lit_occur(&mut self, vars: &mut [Var], l: Lit, cid: ClauseId);
-    fn remove_cid_occur(&mut self, vars: &mut [Var], cid: ClauseId, c: &Clause);
+    fn remove_cid_occur(&mut self, vars: &mut [Var], cid: ClauseId, c: &mut Clause);
 }
 
 /// API for Exponential Moving Average, EMA, like `get`, `reset`, `update` and so on.
