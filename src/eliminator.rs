@@ -205,9 +205,7 @@ impl EliminatorIF for Eliminator {
         }
     }
     fn add_cid_occur(&mut self, vars: &mut [Var], cid: ClauseId, c: &mut Clause, enqueue: bool) {
-        if self.mode != EliminatorMode::Running
-        /* || c.is(Flag::OccurLinked) */
-        {
+        if self.mode != EliminatorMode::Running || c.is(Flag::OccurLinked) {
             return;
         }
         for l in &c.lits {
@@ -230,7 +228,7 @@ impl EliminatorIF for Eliminator {
                 self.enqueue_var(vars, l.vi(), false);
             }
         }
-        // c.turn_on(Flag::OccurLinked);
+        c.turn_on(Flag::OccurLinked);
         if enqueue {
             self.enqueue_clause(cid, c);
         }
@@ -255,11 +253,11 @@ impl EliminatorIF for Eliminator {
         debug_assert!(c.is(Flag::DeadClause));
         for l in &c.lits {
             let v = &mut vars[l.vi()];
-            if
-            /* !v.is(Flag::EliminatedVar) && */
-            v.assign == BOTTOM {
+            if v.assign == BOTTOM {
                 self.remove_lit_occur(vars, *l, cid);
-                self.enqueue_var(vars, l.vi(), true);
+                if !v.is(Flag::EliminatedVar) {
+                    self.enqueue_var(vars, l.vi(), true);
+                }
             }
         }
     }
