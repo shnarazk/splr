@@ -66,6 +66,7 @@ fn read_assignment(rs: &mut BufRead) -> Vec<i32> {
             Ok(0) => return Vec::new(),
             Ok(_) => {
                 if buf.starts_with('c') {
+                    buf.clear();
                     continue;
                 }
                 let mut v: Vec<i32> = Vec::new();
