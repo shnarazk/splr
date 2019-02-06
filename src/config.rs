@@ -1,9 +1,7 @@
 use crate::clause::ClauseDB;
-use crate::eliminator::Eliminator;
 use crate::state::{Stat, State};
 use crate::traits::{ClauseDBIF, ClauseIF, FlagIF};
 use crate::types::Flag;
-use crate::var::Var;
 
 #[derive(Eq, PartialEq)]
 pub enum SearchStrategy {
@@ -101,10 +99,10 @@ impl Default for Config {
             glureduce: true,
             cdb_inc: 300,
             cdb_inc_extra: 1000,
-            restart_thr: 0.80,
-            restart_blk: 1.40,
-            restart_asg_len: 3500,
-            restart_lbd_len: 50,
+            restart_thr: 0.60,     // will be overwrited by bin/splr
+            restart_blk: 1.40,     // will be overwrited by bin/splr
+            restart_asg_len: 3500, // will be overwrited by bin/splr
+            restart_lbd_len: 100,  // will be overwrited by bin/splr
             restart_expansion: 1.15,
             restart_step: 50,
             luby_restart: false,
@@ -114,11 +112,11 @@ impl Default for Config {
             luby_restart_factor: 100.0,
             ema_coeffs: (2 ^ 5, 2 ^ 15),
             use_elim: true,
-            elim_eliminate_combination_limit: 200,
-            elim_eliminate_grow_limit: 0,
-            elim_eliminate_loop_limit: 1_000_000,
-            elim_subsume_literal_limit: 1000,
-            elim_subsume_loop_limit: 4_000_000,
+            elim_eliminate_combination_limit: 10,
+            elim_eliminate_grow_limit: 64,
+            elim_eliminate_loop_limit: 2_000_000,
+            elim_subsume_literal_limit: 100,
+            elim_subsume_loop_limit: 2_000_000,
             progress_log: false,
         }
     }
@@ -126,13 +124,7 @@ impl Default for Config {
 
 impl Config {
     #[inline(always)]
-    pub fn adapt_strategy(
-        &mut self,
-        cdb: &mut ClauseDB,
-        elim: &mut Eliminator,
-        state: &mut State,
-        vars: &mut [Var],
-    ) {
+    pub fn adapt_strategy(&mut self, cdb: &mut ClauseDB, state: &mut State) {
         if !self.adapt_strategy || self.strategy != SearchStrategy::Initial {
             return;
         }
@@ -174,14 +166,18 @@ impl Config {
             self.var_decay = 0.91;
             self.var_decay_max = 0.91;
         }
+        // if state.stats[Stat::Restart as usize] < 10 {
+        //     self.restart_thr = 0.80;
+        // } else if 2000 < state.stats[Stat::Restart as usize] {
+        //     self.restart_thr = 0.55;
+        // }
+        // if state.stats[Stat::BlockRestart as usize] < 10 {
+        //     self.restart_blk = 1.25;
+        // } else if 2000 < state.stats[Stat::BlockRestart as usize] {
+        //     self.restart_blk = 1.55;
+        // }
         if self.strategy == SearchStrategy::Initial {
             self.strategy = SearchStrategy::Generic;
-            // if state.stats[Stat::BlockRestart as usize] < 100 {
-            //     self.restart_blk = 1.20;
-            // }
-            // if state.stats[Stat::BlockRestart as usize] < 10 {
-            //     self.restart_blk = 1.10;
-            // }
             return;
         }
         // state.ema_asg.reset();
@@ -202,7 +198,7 @@ impl Config {
                     c.kill(&mut cdb.touched);
                 }
             }
-            cdb.garbage_collect(elim, vars);
+            cdb.garbage_collect();
         }
     }
 }

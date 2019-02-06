@@ -1,7 +1,7 @@
-use crate::assign::AssignStack;
-use crate::clause::{Clause, ClauseDB, Watch};
+use crate::clause::{Clause, ClauseDB};
 use crate::config::Config;
 use crate::eliminator::Eliminator;
+use crate::propagator::AssignStack;
 use crate::state::{Stat, State};
 use crate::traits::*;
 use crate::types::*;
@@ -46,8 +46,7 @@ impl Solver {
     pub fn new(config: Config, cnf: &CNFDescription) -> Solver {
         let nv = cnf.num_of_variables as usize;
         let nc = cnf.num_of_clauses as usize;
-        let mut elim = Eliminator::default();
-        elim.in_use = config.use_elim;
+        let elim = Eliminator::new(nv);
         let state = State::new(&config, cnf.clone());
         Solver {
             asgs: AssignStack::new(nv),
@@ -77,48 +76,40 @@ impl SatSolverIF for Solver {
         // s.root_level = 0;
         state.num_solved_vars = asgs.len();
         state.progress_header(config);
-        state.progress(cdb, config, elim, vars, Some("loaded"));
-        if elim.in_use {
-            for v in &mut vars[1..] {
+        state.progress(cdb, config, vars, Some("loaded"));
+        if config.use_elim {
+            elim.start();
+            elim.activate(cdb, vars, true);
+            for vi in 1..vars.len() {
+                let v = &mut vars[vi];
                 if v.assign != BOTTOM {
-                    v.pos_occurs.clear();
-                    v.neg_occurs.clear();
                     continue;
                 }
-                debug_assert!(!asgs.trail.contains(&Lit::from_var(v.index, LTRUE)));
-                debug_assert!(!asgs.trail.contains(&Lit::from_var(v.index, LFALSE)));
-                if v.neg_occurs.is_empty() && !v.pos_occurs.is_empty() {
-                    asgs.enqueue_null(v, LTRUE, 0);
-                } else if v.pos_occurs.is_empty() && !v.neg_occurs.is_empty() {
-                    asgs.enqueue_null(v, LFALSE, 0);
-                }
-                v.sve_activity = v.pos_occurs.len().min(v.neg_occurs.len());
-                elim.enqueue_var(v);
+                match (v.pos_occurs.len(), v.neg_occurs.len()) {
+                    (_, 0) => asgs.enqueue_null(v, TRUE),
+                    (0, _) => asgs.enqueue_null(v, FALSE),
+                    _ => elim.enqueue_var(vars, vi, false),
+                };
             }
-            if elim.active {
-                state.progress(cdb, config, elim, vars, Some("enqueued"));
-                cdb.simplify(asgs, config, elim, state, vars);
-                state.progress(cdb, config, elim, vars, Some("simplify"));
-                // config.elim_eliminate_combination_limit = 40;
-                // config.elim_eliminate_grow_limit = 0;
-                // config.elim_eliminate_loop_limit = 32;
-                // config.elim_subsume_literal_limit = 100;
-                // config.elim_subsume_loop_limit = 32;
+            state.progress(cdb, config, vars, Some("enqueued"));
+            if cdb.simplify(asgs, config, elim, state, vars).is_err() {
+                state.ok = false;
+                panic!("internal error");
             }
+            state.progress(cdb, config, vars, Some("subsumed"));
         }
-        elim.stop(cdb, vars, true);
         if search(asgs, config, cdb, elim, state, vars) {
             if !state.ok {
                 asgs.cancel_until(vars, 0);
-                state.progress(cdb, config, elim, vars, Some("error"));
+                state.progress(cdb, config, vars, Some("error"));
                 return Err(SolverException::InternalInconsistent);
             }
-            state.progress(cdb, config, elim, vars, None);
+            state.progress(cdb, config, vars, None);
             let mut result = Vec::new();
             for (vi, v) in vars.iter().enumerate().take(config.num_vars + 1).skip(1) {
                 match v.assign {
-                    LTRUE => result.push(vi as i32),
-                    LFALSE => result.push(0 - vi as i32),
+                    TRUE => result.push(vi as i32),
+                    FALSE => result.push(0 - vi as i32),
                     _ => result.push(0),
                 }
             }
@@ -126,7 +117,7 @@ impl SatSolverIF for Solver {
             asgs.cancel_until(vars, 0);
             Ok(Certificate::SAT(result))
         } else {
-            state.progress(cdb, config, elim, vars, None);
+            state.progress(cdb, config, vars, None);
             asgs.cancel_until(vars, 0);
             Ok(Certificate::UNSAT(
                 state.conflicts.iter().map(|l| l.int()).collect(),
@@ -202,15 +193,16 @@ impl SatSolverIF for Solver {
             ref mut vars,
             ..
         } = self;
+        assert!(asgs.level() == 0);
         v.sort_unstable();
         let mut j = 0;
         let mut l_ = NULL_LIT; // last literal; [x, x.negate()] means totology.
         for i in 0..v.len() {
             let li = v[i];
             let sat = vars.assigned(li);
-            if sat == LTRUE || li.negate() == l_ {
+            if sat == TRUE || li.negate() == l_ {
                 return Some(NULL_CLAUSE);
-            } else if sat != LFALSE && li != l_ {
+            } else if sat != FALSE && li != l_ {
                 v[j] = li;
                 j += 1;
                 l_ = li;
@@ -220,145 +212,20 @@ impl SatSolverIF for Solver {
         match v.len() {
             0 => None, // Empty clause is UNSAT.
             1 => {
-                asgs.enqueue_null(&mut vars[v[0].vi()], v[0].lbool(), asgs.level());
+                asgs.enqueue_null(&mut vars[v[0].vi()], v[0].lbool());
                 Some(NULL_CLAUSE)
             }
             _ => {
                 let cid = cdb.new_clause(&v, 0, false);
-                vars.attach(elim, cid, &mut cdb.clause[cid], true);
+                elim.add_cid_occur(vars, cid, &mut cdb.clause[cid], true);
                 Some(cid)
             }
         }
     }
 }
 
-impl PropagateIF for AssignStack {
-    fn propagate(&mut self, cdb: &mut ClauseDB, state: &mut State, vars: &mut [Var]) -> ClauseId {
-        let head = &mut cdb.clause;
-        let watcher = &mut cdb.watcher[..] as *mut [Vec<Watch>];
-        while self.remains() {
-            let p: usize = self.sweep() as usize;
-            let false_lit = (p as Lit).negate();
-            state.stats[Stat::Propagation as usize] += 1;
-            unsafe {
-                let source = &mut (*watcher)[p];
-                let mut n = 1;
-                'next_clause: while n <= source.count() {
-                    let w = &mut source[n];
-                    if head[w.c].is(Flag::DeadClause) {
-                        source.detach(n);
-                        continue 'next_clause;
-                    }
-                    if vars.assigned(w.blocker) != LTRUE {
-                        let Clause { ref mut lits, .. } = &mut head.get_unchecked_mut(w.c);
-                        debug_assert!(2 <= lits.len());
-                        debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
-                        let mut first = *lits.get_unchecked(0);
-                        if first == false_lit {
-                            lits.swap(0, 1); // now false_lit is lits[1].
-                            first = *lits.get_unchecked(0);
-                        }
-                        let first_value = vars.assigned(first);
-                        // If 0th watch is true, then clause is already satisfied.
-                        if first != w.blocker && first_value == LTRUE {
-                            w.blocker = first;
-                            n += 1;
-                            continue 'next_clause;
-                        }
-                        for (k, lk) in lits.iter().enumerate().skip(2) {
-                            // below is equivalent to 'assigned(lk) != LFALSE'
-                            if (((lk & 1) as u8) ^ vars.get_unchecked(lk.vi()).assign) != 0 {
-                                (*watcher)
-                                    .get_unchecked_mut(lk.negate() as usize)
-                                    .attach(first, w.c);
-                                source.detach(n);
-                                *lits.get_unchecked_mut(1) = *lk;
-                                *lits.get_unchecked_mut(k) = false_lit;
-                                continue 'next_clause;
-                            }
-                        }
-                        if first_value == LFALSE {
-                            self.catchup();
-                            return w.c;
-                        } else {
-                            self.uncheck_enqueue(vars, first, w.c);
-                        }
-                    }
-                    n += 1;
-                }
-            }
-        }
-        NULL_CLAUSE
-    }
-}
-
-#[inline(always)]
-fn propagate_fast(
-    asgs: &mut AssignStack,
-    cdb: &mut ClauseDB,
-    state: &mut State,
-    vars: &mut [Var],
-) -> ClauseId {
-    let head = &mut cdb.clause;
-    let watcher = &mut cdb.watcher[..] as *mut [Vec<Watch>];
-    while asgs.remains() {
-        let p: usize = asgs.sweep() as usize;
-        let false_lit = (p as Lit).negate();
-        state.stats[Stat::Propagation as usize] += 1;
-        unsafe {
-            let source = &mut (*watcher)[p];
-            let mut n = 1;
-            'next_clause: while n <= source.count() {
-                let w = source.get_unchecked_mut(n);
-                // if head[w.c].is(ClauseFlag::Dead) {
-                //     source.detach(n);
-                //     continue 'next_clause;
-                // }
-                // debug_assert!(!vars[w.blocker.vi()].eliminated); it doesn't hold in TP12
-                if vars.assigned(w.blocker) != LTRUE {
-                    let Clause { ref mut lits, .. } = head.get_unchecked_mut(w.c);
-                    debug_assert!(2 <= lits.len());
-                    debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
-                    let mut first = *lits.get_unchecked(0);
-                    if first == false_lit {
-                        lits.swap(0, 1); // now false_lit is lits[1].
-                        first = *lits.get_unchecked(0);
-                    }
-                    let first_value = vars.assigned(first);
-                    // If 0th watch is true, then clause is already satisfied.
-                    if first != w.blocker && first_value == LTRUE {
-                        w.blocker = first;
-                        n += 1;
-                        continue 'next_clause;
-                    }
-                    for (k, lk) in lits.iter().enumerate().skip(2) {
-                        // below is equivalent to 'assigned(lk) != LFALSE'
-                        if (((lk & 1) as u8) ^ vars.get_unchecked(lk.vi()).assign) != 0 {
-                            (*watcher)
-                                .get_unchecked_mut(lk.negate() as usize)
-                                .attach(first, w.c);
-                            source.detach(n);
-                            *lits.get_unchecked_mut(1) = *lk;
-                            *lits.get_unchecked_mut(k) = false_lit;
-                            continue 'next_clause;
-                        }
-                    }
-                    if first_value == LFALSE {
-                        asgs.catchup();
-                        return w.c;
-                    } else {
-                        asgs.uncheck_enqueue(vars, first, w.c);
-                    }
-                }
-                n += 1;
-            }
-        }
-    }
-    NULL_CLAUSE
-}
-
 /// main loop; returns `true` for SAT, `false` for UNSAT.
-#[inline(always)]
+#[inline]
 fn search(
     asgs: &mut AssignStack,
     config: &mut Config,
@@ -371,7 +238,7 @@ fn search(
     let mut a_decision_was_made = false;
     state.restart_update_luby(config);
     while state.ok {
-        let ci = propagate_fast(asgs, cdb, state, vars);
+        let ci = asgs.propagate(cdb, state, vars);
         state.stats[Stat::Propagation as usize] += 1;
         if ci == NULL_CLAUSE {
             if config.num_vars <= asgs.len() + state.num_eliminated_vars {
@@ -380,14 +247,12 @@ fn search(
             // DYNAMIC FORCING RESTART
             if state.force_restart(config, &mut conflict_c) {
                 asgs.cancel_until(vars, config.root_level);
-            // if elim.in_use && 0 < elim.var_queue_len() {
-            //     cdb.simplify(asgs, config, elim, state, vars);
-            // }
             } else if asgs.level() == 0 {
-                cdb.simplify(asgs, config, elim, state, vars);
+                if cdb.simplify(asgs, config, elim, state, vars).is_err() {
+                    state.ok = false;
+                    panic!("interal error");
+                }
                 asgs.rebuild_order(&vars);
-            }
-            if asgs.level() == 0 {
                 state.num_solved_vars = asgs.len();
             }
             if !asgs.remains() {
@@ -442,7 +307,8 @@ fn handle_conflict_path(
         state.stats[Stat::Learnt as usize] += 1;
         let lbd = vars.compute_lbd(&new_learnt, &mut state.lbd_temp);
         let l0 = new_learnt[0];
-        let cid = cdb.attach(config, elim, vars, &mut new_learnt, lbd);
+        let cid = cdb.attach(config, vars, &mut new_learnt, lbd);
+        elim.add_cid_occur(vars, cid, &mut cdb.clause[cid], true);
         state.c_lvl.update(bl as f64);
         state.b_lvl.update(lbd as f64);
         if lbd <= 2 {
@@ -459,14 +325,38 @@ fn handle_conflict_path(
     if tn_confl % 10_000 == 0 {
         if tn_confl == 100_000 {
             asgs.cancel_until(vars, 0);
-            config.adapt_strategy(cdb, elim, state, vars);
+            config.adapt_strategy(cdb, state);
         }
-        // if tn_confl % 100_000 == 0 {
-        //     elim.activate(asgs, cdb, config, vars);
-        //     cdb.simplify(asgs, config, elim, state, vars);
-        //     elim.stop(cdb, vars, true);
-        // }
-        state.progress(cdb, config, elim, vars, None);
+        // micro tuning of restart thresholds
+        let nr = state.stats[Stat::Restart as usize] - state.stats[Stat::RestartRecord as usize];
+        state.stats[Stat::RestartRecord as usize] = state.stats[Stat::Restart as usize];
+        if config.restart_thr <= 0.82 && nr < 4 {
+            config.restart_thr += 0.01;
+        } else if 0.44 <= config.restart_thr && 1000 < nr {
+            config.restart_thr -= 0.01;
+        } else {
+            config.restart_thr -= (config.restart_thr - 0.60) * 0.01
+        }
+        let nb = state.stats[Stat::BlockRestart as usize]
+            - state.stats[Stat::BlockRestartRecord as usize];
+        state.stats[Stat::BlockRestartRecord as usize] = state.stats[Stat::BlockRestart as usize];
+        if 1.05 <= config.restart_blk && nb < 4 {
+            config.restart_blk -= 0.01;
+        } else if config.restart_blk <= 1.8 && 1000 < nb {
+            config.restart_blk += 0.01;
+        } else {
+            config.restart_blk -= (config.restart_blk - 1.40) * 0.01
+        }
+        if config.use_elim {
+            if state.stats[Stat::Elimination as usize] == 1 && state.elim_trigger == 1 {
+                state.elim_trigger = state.c_lvl.get() as usize + 10;
+            }
+            if (state.c_lvl.get() as usize) < state.elim_trigger {
+                elim.start();
+                state.elim_trigger /= 2;
+            }
+        }
+        state.progress(cdb, config, vars, None);
     }
     config.var_inc /= config.var_decay;
     config.cla_inc /= config.cla_decay;
@@ -476,12 +366,11 @@ fn handle_conflict_path(
         && 0 < cdb.num_learnt
     {
         state.cur_restart = ((tn_confl as f64) / (state.next_reduction as f64)) as usize + 1;
-        cdb.reduce(config, elim, state, vars);
-        // elim.activate(asgs, cdb, config, vars);
+        cdb.reduce(config, state, vars);
     }
 }
 
-#[inline(always)]
+#[inline]
 fn analyze(
     asgs: &mut AssignStack,
     config: &mut Config,
@@ -626,7 +515,7 @@ fn analyze_simplify(
 }
 
 /// renamed from litRedundant
-#[inline(always)]
+#[inline]
 fn analyze_removable(
     cdb: &mut ClauseDB,
     vars: &[Var],
@@ -641,7 +530,7 @@ fn analyze_removable(
     while let Some(sl) = stack.pop() {
         let cid = vars[sl.vi()].reason;
         let c = &mut cdb.clause[cid];
-        if (*c).lits.len() == 2 && vars.assigned((*c).lits[0]) == LFALSE {
+        if (*c).lits.len() == 2 && vars.assigned((*c).lits[0]) == FALSE {
             (*c).lits.swap(0, 1);
         }
         for q in &(*c).lits[1..] {
@@ -665,7 +554,7 @@ fn analyze_removable(
     true
 }
 
-#[inline(always)]
+#[inline]
 fn analyze_final(
     asgs: &AssignStack,
     config: &mut Config,
@@ -710,7 +599,7 @@ fn analyze_final(
     }
 }
 
-#[inline(always)]
+#[inline]
 fn minimize_with_bi_clauses(
     cdb: &ClauseDB,
     vars: &[Var],
@@ -735,7 +624,7 @@ fn minimize_with_bi_clauses(
         debug_assert!(c.lits[0] == l0 || c.lits[1] == l0);
         let other = c.lits[(c.lits[0] == l0) as usize];
         let vi = other.vi();
-        if lbd_temp[vi] == key && vars.assigned(other) == LTRUE {
+        if lbd_temp[vi] == key && vars.assigned(other) == TRUE {
             nsat += 1;
             lbd_temp[vi] -= 1;
         }

@@ -21,7 +21,7 @@ struct CLOpts {
     #[structopt(long = "rl", default_value = "50")]
     restart_lbd_samples: usize,
     /// K in Glucose, for restart
-    #[structopt(long = "rt", default_value = "0.80")]
+    #[structopt(long = "rt", default_value = "0.60")]
     restart_threshold: f64,
     /// R in Glucose, for blocking
     #[structopt(long = "rb", default_value = "1.40")]

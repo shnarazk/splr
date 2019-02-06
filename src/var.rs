@@ -1,5 +1,4 @@
 use crate::clause::Clause;
-use crate::eliminator::Eliminator;
 use crate::traits::*;
 use crate::types::*;
 use std::fmt;
@@ -21,8 +20,6 @@ pub struct Var {
     pub level: usize,
     /// a dynamic evaluation criterion like VSIDS or ACID.
     pub activity: f64,
-    /// a dynamic evaluation criterion for eliminator.
-    pub sve_activity: usize,
     /// list of clauses which contain this variable positively.
     pub pos_occurs: Vec<ClauseId>,
     /// list of clauses which contain this variable negatively.
@@ -43,7 +40,6 @@ impl VarIF for Var {
             reason: NULL_CLAUSE,
             level: 0,
             activity: 0.0,
-            sve_activity: 0,
             pos_occurs: Vec::new(),
             neg_occurs: Vec::new(),
             flags: 0,
@@ -57,14 +53,6 @@ impl VarIF for Var {
             vec.push(v);
         }
         vec
-    }
-    fn detach(&mut self, elim: &mut Eliminator, l: Lit, cid: ClauseId) {
-        if l.positive() {
-            self.pos_occurs.delete_unstable(|&c| c == cid);
-        } else {
-            self.neg_occurs.delete_unstable(|&c| c == cid);
-        }
-        elim.enqueue_var(self);
     }
 }
 
@@ -84,6 +72,7 @@ impl FlagIF for Var {
 }
 
 impl VarDBIF for [Var] {
+    #[inline(always)]
     fn assigned(&self, l: Lit) -> Lbool {
         unsafe { self.get_unchecked(l.vi()).assign ^ ((l & 1) as u8) }
     }
@@ -91,17 +80,17 @@ impl VarDBIF for [Var] {
         let lits = &c.lits;
         debug_assert!(1 < lits.len());
         let l0 = lits[0];
-        self.assigned(l0) == LTRUE && self[l0.vi()].reason == cid
+        self.assigned(l0) == TRUE && self[l0.vi()].reason == cid
     }
     fn satisfies(&self, vec: &[Lit]) -> bool {
         for l in vec {
-            if self.assigned(*l) == LTRUE {
+            if self.assigned(*l) == TRUE {
                 return true;
             }
         }
         false
     }
-    #[inline(always)]
+    #[inline]
     fn compute_lbd(&self, vec: &[Lit], keys: &mut [usize]) -> usize {
         let key = keys[0] + 1;
         let mut cnt = 0;
@@ -114,38 +103,6 @@ impl VarDBIF for [Var] {
         }
         keys[0] = key;
         cnt
-    }
-    fn attach(&mut self, elim: &mut Eliminator, cid: ClauseId, c: &mut Clause, enqueue: bool) {
-        if !elim.in_use {
-            return;
-        }
-        for l in &c.lits {
-            let v = &mut self[l.vi()];
-            v.turn_on(Flag::TouchedVar);
-            if !v.is(Flag::EliminatedVar) {
-                if l.positive() {
-                    v.pos_occurs.push(cid);
-                } else {
-                    v.neg_occurs.push(cid);
-                }
-                elim.enqueue_var(v);
-            }
-        }
-        if enqueue {
-            elim.enqueue_clause(cid, c);
-        }
-    }
-    fn detach(&mut self, elim: &mut Eliminator, cid: ClauseId, c: &Clause) {
-        debug_assert!(c.is(Flag::DeadClause));
-        if elim.in_use {
-            for l in &c.lits {
-                let v = &mut self[l.vi()];
-                if !v.is(Flag::EliminatedVar) {
-                    v.detach(elim, *l, cid);
-                    elim.enqueue_var(v);
-                }
-            }
-        }
     }
     fn bump_activity(&mut self, inc: &mut f64, vi: VarId) {
         let v = &mut self[vi];

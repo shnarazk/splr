@@ -1,34 +1,11 @@
-use crate::assign::AssignStack;
 use crate::clause::{Clause, ClauseDB};
 use crate::config::Config;
 use crate::eliminator::Eliminator;
+use crate::propagator::AssignStack;
 use crate::solver::{Solver, SolverResult};
 use crate::state::State;
-use crate::types::{CNFDescription, ClauseId, Flag, Lbool, Lit, VarId};
+use crate::types::{CNFDescription, ClauseId, Flag, Lbool, Lit, MaybeInconsistent, VarId};
 use crate::var::Var;
-
-/// API for assignemnet like `assume`, `enqueue`, `cancel_until`, and so on.
-pub trait AssignIF {
-    fn new(n: usize) -> Self;
-    fn len(&self) -> usize;
-    fn is_empty(&self) -> bool;
-    fn level(&self) -> usize;
-    fn is_zero(&self) -> bool;
-    fn num_at(&self, n: usize) -> usize;
-    fn sweep(&mut self) -> Lit;
-    fn catchup(&mut self);
-    fn remains(&self) -> bool;
-    fn level_up(&mut self);
-    fn cancel_until(&mut self, vars: &mut [Var], lv: usize);
-    fn enqueue(&mut self, v: &mut Var, sig: Lbool, cid: ClauseId, dl: usize) -> bool;
-    fn enqueue_null(&mut self, v: &mut Var, sig: Lbool, dl: usize) -> bool;
-    fn uncheck_enqueue(&mut self, vars: &mut [Var], l: Lit, cid: ClauseId);
-    fn uncheck_assume(&mut self, vars: &mut [Var], l: Lit);
-    fn dump_cnf(&mut self, cdb: &ClauseDB, config: &Config, vars: &[Var], fname: &str);
-    fn rebuild_order(&mut self, vars: &[Var]);
-    fn update_order(&mut self, vec: &[Var], v: VarId);
-    fn select_var(&mut self, vars: &[Var]) -> VarId;
-}
 
 /// API for Clause, providing `kill`.
 pub trait ClauseIF {
@@ -41,19 +18,12 @@ pub trait ClauseDBIF {
     fn attach(
         &mut self,
         config: &mut Config,
-        elim: &mut Eliminator,
         vars: &mut [Var],
         v: &mut Vec<Lit>,
         lbd: usize,
     ) -> ClauseId;
     fn detach(&mut self, cid: ClauseId);
-    fn reduce(
-        &mut self,
-        config: &Config,
-        elim: &mut Eliminator,
-        state: &mut State,
-        vars: &mut [Var],
-    );
+    fn reduce(&mut self, config: &Config, state: &mut State, vars: &mut [Var]);
     fn simplify(
         &mut self,
         asgs: &mut AssignStack,
@@ -61,8 +31,8 @@ pub trait ClauseDBIF {
         elim: &mut Eliminator,
         state: &mut State,
         vars: &mut [Var],
-    ) -> bool;
-    fn garbage_collect(&mut self, elim: &mut Eliminator, vars: &mut [Var]);
+    ) -> MaybeInconsistent;
+    fn garbage_collect(&mut self);
     fn new_clause(&mut self, v: &[Lit], rank: usize, learnt: bool) -> ClauseId;
     fn reset_lbd(&mut self, vars: &[Var], temp: &mut [usize]);
     fn bump_activity(&mut self, inc: &mut f64, cid: ClauseId);
@@ -86,19 +56,15 @@ pub trait Delete<T> {
 
 /// API for Eliminator like `activate`, `stop`, `eliminate` and so on.
 pub trait EliminatorIF {
-    fn new(use_elim: bool) -> Eliminator;
-    fn stop(&mut self, cdb: &mut ClauseDB, vars: &mut [Var], force: bool);
-    fn activate(
-        &mut self,
-        asgs: &mut AssignStack,
-        cdb: &mut ClauseDB,
-        config: &Config,
-        vars: &mut [Var],
-    );
+    fn new(nv: usize) -> Eliminator;
+    fn start(&mut self);
+    fn stop(&mut self, cdb: &mut ClauseDB, vars: &mut [Var]);
+    fn is_running(&self) -> bool;
+    fn activate(&mut self, cdb: &mut ClauseDB, vars: &mut [Var], force: bool) -> bool;
     fn enqueue_clause(&mut self, cid: ClauseId, c: &mut Clause);
     fn clear_clause_queue(&mut self, cdb: &mut ClauseDB);
     fn clause_queue_len(&self) -> usize;
-    fn enqueue_var(&mut self, v: &mut Var);
+    fn enqueue_var(&mut self, vars: &mut [Var], vi: VarId, upword: bool);
     fn clear_var_queue(&mut self, vars: &mut [Var]);
     fn var_queue_len(&self) -> usize;
     fn eliminate(
@@ -108,8 +74,11 @@ pub trait EliminatorIF {
         config: &mut Config,
         state: &mut State,
         vars: &mut [Var],
-    );
+    ) -> MaybeInconsistent;
     fn extend_model(&mut self, model: &mut Vec<i32>);
+    fn add_cid_occur(&mut self, vars: &mut [Var], cid: ClauseId, c: &mut Clause, enqueue: bool);
+    fn remove_lit_occur(&mut self, vars: &mut [Var], l: Lit, cid: ClauseId);
+    fn remove_cid_occur(&mut self, vars: &mut [Var], cid: ClauseId, c: &mut Clause);
 }
 
 /// API for Exponential Moving Average, EMA, like `get`, `reset`, `update` and so on.
@@ -139,9 +108,25 @@ pub trait LitIF {
     fn to_cid(self) -> ClauseId;
 }
 
-/// API for executing propagatation, providing `propagate`.
-pub trait PropagateIF {
+/// API for assignemnet like `propagate`, `enqueue`, `cancel_until`, and so on.
+pub trait PropagatorIF {
+    fn new(n: usize) -> Self;
+    fn len(&self) -> usize;
+    fn is_empty(&self) -> bool;
+    fn level(&self) -> usize;
+    fn is_zero(&self) -> bool;
+    fn num_at(&self, n: usize) -> usize;
+    fn remains(&self) -> bool;
     fn propagate(&mut self, cdb: &mut ClauseDB, state: &mut State, vars: &mut [Var]) -> ClauseId;
+    fn cancel_until(&mut self, vars: &mut [Var], lv: usize);
+    fn enqueue(&mut self, v: &mut Var, sig: Lbool, cid: ClauseId, dl: usize) -> MaybeInconsistent;
+    fn enqueue_null(&mut self, v: &mut Var, sig: Lbool);
+    fn uncheck_enqueue(&mut self, vars: &mut [Var], l: Lit, cid: ClauseId);
+    fn uncheck_assume(&mut self, vars: &mut [Var], l: Lit);
+    fn dump_cnf(&mut self, cdb: &ClauseDB, config: &Config, vars: &[Var], fname: &str);
+    fn rebuild_order(&mut self, vars: &[Var]);
+    fn update_order(&mut self, vec: &[Var], v: VarId);
+    fn select_var(&mut self, vars: &[Var]) -> VarId;
 }
 
 /// API for restart like `block_restart`, `force_restart` and so on.
@@ -164,14 +149,7 @@ pub trait SatSolverIF {
 pub trait StateIF {
     fn new(config: &Config, cnf: CNFDescription) -> State;
     fn progress_header(&self, config: &Config);
-    fn progress(
-        &mut self,
-        cdb: &ClauseDB,
-        config: &mut Config,
-        elim: &Eliminator,
-        vars: &[Var],
-        mes: Option<&str>,
-    );
+    fn progress(&mut self, cdb: &ClauseDB, config: &mut Config, vars: &[Var], mes: Option<&str>);
 }
 
 /// API for SAT validator like `inject_assignment`, `validate` and so on.
@@ -184,7 +162,6 @@ pub trait ValidatorIF {
 pub trait VarIF {
     fn new(i: usize) -> Var;
     fn new_vars(n: usize) -> Vec<Var>;
-    fn detach(&mut self, elim: &mut Eliminator, l: Lit, cid: ClauseId);
 }
 
 /// API for var DB like `assigned`, `locked`, `compute_lbd` and so on.
@@ -193,8 +170,6 @@ pub trait VarDBIF {
     fn locked(&self, c: &Clause, cid: ClauseId) -> bool;
     fn satisfies(&self, c: &[Lit]) -> bool;
     fn compute_lbd(&self, vec: &[Lit], keys: &mut [usize]) -> usize;
-    fn attach(&mut self, elim: &mut Eliminator, cid: ClauseId, c: &mut Clause, enqueue: bool);
-    fn detach(&mut self, elim: &mut Eliminator, cid: ClauseId, c: &Clause);
     fn bump_activity(&mut self, inc: &mut f64, vi: VarId);
 }
 

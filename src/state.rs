@@ -15,12 +15,15 @@ pub enum Stat {
     Conflict = 0,       // the number of backjump
     Decision,           // the number of decision
     Restart,            // the number of restart
+    RestartRecord,      // the last recorded number of Restart
+    BlockRestart,       // the number of blacking start
+    BlockRestartRecord, // the last recorded number of BlockResatr
     Learnt,             // the number of learnt clauses (< Conflict)
     NoDecisionConflict, // the number of 'no decision conflict'
-    BlockRestart,       // the number of blacking start
     Propagation,        // the number of propagation
     Reduction,          // the number of reduction
     Simplification,     // the number of simplification
+    Elimination,        // the number of clause subsumption and varibale elimination
     Assign,             // the number of assigned variables
     SumLBD,             // the sum of generated learnts' LBD
     NumBin,             // the number of binary clauses
@@ -35,6 +38,7 @@ pub struct State {
     pub next_restart: usize,
     pub cur_restart: usize,
     pub after_restart: usize,
+    pub elim_trigger: usize,
     pub stats: [usize; Stat::EndOfStatIndex as usize], // statistics
     pub ema_asg: Ema,
     pub ema_lbd: Ema,
@@ -111,6 +115,7 @@ impl StateIF for State {
             next_restart: 100,
             cur_restart: 1,
             after_restart: 0,
+            elim_trigger: 1,
             stats: [0; Stat::EndOfStatIndex as usize],
             ema_asg: Ema::new(config.restart_asg_len),
             ema_lbd: Ema::new(config.restart_lbd_len),
@@ -143,16 +148,9 @@ impl StateIF for State {
         println!("                                                  ");
     }
     #[allow(clippy::cyclomatic_complexity)]
-    fn progress(
-        &mut self,
-        cdb: &ClauseDB,
-        config: &mut Config,
-        elim: &Eliminator,
-        vars: &[Var],
-        mes: Option<&str>,
-    ) {
+    fn progress(&mut self, cdb: &ClauseDB, config: &mut Config, vars: &[Var], mes: Option<&str>) {
         if config.progress_log {
-            self.dump(cdb, config, elim, vars, mes);
+            self.dump(cdb, vars);
             return;
         }
         let nv = vars.len() - 1;
@@ -255,19 +253,19 @@ impl StateIF for State {
             ),
         );
         println!(
-            "   Conflicts|aLBD:{}, bjmp:{}, cnfl:{} |#cls:{} ",
+            "   Conflicts|aLBD:{}, bjmp:{}, cnfl:{} |blkR:{} ",
             f!("{:>9.2}", self.dumper, LogF64Id::AveLBD, self.ema_lbd.get()),
             f!("{:>9.2}", self.dumper, LogF64Id::BLevel, self.b_lvl.get()),
             f!("{:>9.2}", self.dumper, LogF64Id::CLevel, self.c_lvl.get()),
-            i!(
-                "{:>9}",
+            f!(
+                "{:>9.4}",
                 self.dumper,
-                LogUsizeId::ElimClauseQueue,
-                elim.clause_queue_len()
+                LogF64Id::RestartBlkR,
+                config.restart_blk
             ),
         );
         println!(
-            "   Clause DB|#rdc:{}, #smp:{},      Eliminator|#var:{} ",
+            "   Clause DB|#rdc:{}, #smp:{}, #elm:{} |rstK:{} ",
             i!(
                 "{:>9}",
                 self.dumper,
@@ -283,8 +281,14 @@ impl StateIF for State {
             i!(
                 "{:>9}",
                 self.dumper,
-                LogUsizeId::ElimVarQueue,
-                elim.var_queue_len()
+                LogUsizeId::Elimination,
+                self.stats[Stat::Elimination as usize]
+            ),
+            f!(
+                "{:>9.4}",
+                self.dumper,
+                LogF64Id::RestartThrK,
+                config.restart_thr
             ),
         );
     }
@@ -325,22 +329,24 @@ impl fmt::Display for State {
 }
 
 enum LogUsizeId {
-    Propagate = 0,   //  0: propagate: usize,
-    Decision,        //  1: decision: usize,
-    Conflict,        //  2: conflict: usize,
-    Remain,          //  3: remain: usize,
-    Fixed,           //  4: fixed: usize,
-    Eliminated,      //  5: elim: usize,
-    Removable,       //  6: removable: usize,
-    LBD2,            //  7: lbd2: usize,
-    Binclause,       //  8: binclause: usize,
-    Permanent,       //  9: permanent: usize,
-    RestartBlock,    // 10: restart_block: usize,
-    Restart,         // 11: restart_count: usize,
-    Reduction,       // 12: reduction: usize,
-    Simplification,  // 13: simplification: usize,
-    ElimClauseQueue, // 14: elim_clause_queue: usize,
-    ElimVarQueue,    // 15: elim_var_queue: usize,
+    Propagate = 0,  //  0: propagate: usize,
+    Decision,       //  1: decision: usize,
+    Conflict,       //  2: conflict: usize,
+    Remain,         //  3: remain: usize,
+    Fixed,          //  4: fixed: usize,
+    Eliminated,     //  5: elim: usize,
+    Removable,      //  6: removable: usize,
+    LBD2,           //  7: lbd2: usize,
+    Binclause,      //  8: binclause: usize,
+    Permanent,      //  9: permanent: usize,
+    RestartBlock,   // 10: restart_block: usize,
+    Restart,        // 11: restart_count: usize,
+    Reduction,      // 12: reduction: usize,
+    Simplification, // 13: simplification: usize,
+    Elimination,    // 14: elimination: usize,
+    // ElimClauseQueue, // 15: elim_clause_queue: usize,
+    // ElimVarQueue, // 16: elim_var_queue: usize,
+    End,
 }
 
 enum LogF64Id {
@@ -350,18 +356,21 @@ enum LogF64Id {
     AveLBD,       //  3: ave_lbd: f64,
     BLevel,       //  4: backjump_level: f64,
     CLevel,       //  5: conflict_level: f64,
+    RestartThrK,  //  6: restart K
+    RestartBlkR,  //  7: restart R
+    End,
 }
 
 struct ProgressRecord {
-    vali: [usize; 16],
-    valf: [f64; 6],
+    vali: [usize; LogUsizeId::End as usize],
+    valf: [f64; LogF64Id::End as usize],
 }
 
 impl Default for ProgressRecord {
     fn default() -> ProgressRecord {
         ProgressRecord {
-            vali: [0; 16],
-            valf: [0.0; 6],
+            vali: [0; LogUsizeId::End as usize],
+            valf: [0.0; LogF64Id::End as usize],
         }
     }
 }
@@ -387,14 +396,7 @@ impl State {
              c ========================================================================================================="
         );
     }
-    fn dump(
-        &mut self,
-        cdb: &ClauseDB,
-        _config: &mut Config,
-        _elim: &Eliminator,
-        vars: &[Var],
-        _mes: Option<&str>,
-    ) {
+    fn dump(&mut self, cdb: &ClauseDB, vars: &[Var]) {
         self.progress_cnt += 1;
         let nv = vars.len() - 1;
         let fixed = self.num_solved_vars;
