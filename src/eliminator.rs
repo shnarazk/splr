@@ -587,7 +587,7 @@ fn strengthen(cdb: &mut ClauseDB, cid: ClauseId, p: Lit) -> bool {
         };
         debug_assert!(1 < p.negate());
         watcher[p.negate() as usize].detach_with(cid);
-        watcher[q.negate() as usize].attach(q, cid);
+        watcher[q.negate() as usize].register(q, cid);
     } else {
         lits.delete_unstable(|&x| x == p);
     }

@@ -121,7 +121,7 @@ impl PropagatorIF for AssignStack {
                             if (((lk & 1) as u8) ^ vars.get_unchecked(lk.vi()).assign) != 0 {
                                 (*watcher)
                                     .get_unchecked_mut(lk.negate() as usize)
-                                    .attach(first, w.c);
+                                    .register(first, w.c);
                                 source.detach(n);
                                 *lits.get_unchecked_mut(1) = *lk;
                                 *lits.get_unchecked_mut(k) = false_lit;

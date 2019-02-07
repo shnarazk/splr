@@ -177,7 +177,7 @@ pub trait VarDBIF {
 pub trait WatchDBIF {
     fn initialize(self, n: usize) -> Self;
     fn count(&self) -> usize;
-    fn attach(&mut self, blocker: Lit, c: usize);
+    fn register(&mut self, blocker: Lit, c: usize);
     fn detach(&mut self, n: usize);
     fn detach_with(&mut self, cid: usize);
 }

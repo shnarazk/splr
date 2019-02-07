@@ -30,6 +30,7 @@ impl ClauseIdIF for ClauseId {
     }
 }
 
+#[derive(Clone)]
 pub struct Watch {
     pub blocker: Lit,
     pub c: ClauseId,
@@ -56,7 +57,7 @@ impl WatchDBIF for Vec<Watch> {
         unsafe { self.get_unchecked(0).c }
     }
     // #[inline(always)]
-    fn attach(&mut self, blocker: Lit, c: usize) {
+    fn register(&mut self, blocker: Lit, c: usize) {
         unsafe {
             let next = self.get_unchecked(0).c + 1;
             if next == self.len() {
@@ -73,8 +74,7 @@ impl WatchDBIF for Vec<Watch> {
         unsafe {
             let last = self.get_unchecked(0).c;
             debug_assert!(0 < last);
-            self.swap(n, last);
-            self.get_unchecked_mut(last).c = NULL_CLAUSE;
+            *self.get_unchecked_mut(n) = self.get_unchecked(last).clone();
             self.get_unchecked_mut(0).c -= 1;
         }
     }
@@ -334,8 +334,8 @@ impl ClauseDBIF for ClauseDB {
             c.turn_on(Flag::LearntClause);
             self.num_learnt += 1;
         }
-        self.watcher[l0.negate() as usize].attach(l1, cid);
-        self.watcher[l1.negate() as usize].attach(l0, cid);
+        self.watcher[l0.negate() as usize].register(l1, cid);
+        self.watcher[l1.negate() as usize].register(l0, cid);
         self.num_active += 1;
         cid
     }
