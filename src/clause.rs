@@ -250,7 +250,7 @@ impl ClauseDBIF for ClauseDB {
         }
     }
     fn garbage_collect(&mut self) {
-        debug_assert!(self.check_liveness1());
+        // debug_assert!(self.check_liveness1());
         let ClauseDB {
             ref mut watcher,
             ref mut clause,
@@ -288,7 +288,7 @@ impl ClauseDBIF for ClauseDB {
             }
         }
         self.num_active = self.clause.len() - recycled.len();
-        debug_assert!(self.check_liveness2());
+        // debug_assert!(self.check_liveness2());
     }
     fn new_clause(&mut self, v: &[Lit], rank: usize, learnt: bool) -> ClauseId {
         let cid;
@@ -521,6 +521,7 @@ impl ClauseDBIF for ClauseDB {
 }
 
 impl ClauseDB {
+    #[allow(dead_code)]
     fn check_liveness1(&self) -> bool {
         let deads = self.watcher[NULL_LIT.negate() as usize]
             .iter()
@@ -551,6 +552,7 @@ impl ClauseDB {
         }
         true
     }
+    #[allow(dead_code)]
     fn check_liveness2(&self) -> bool {
         let deads = self.watcher[NULL_LIT.negate() as usize]
             .iter()
