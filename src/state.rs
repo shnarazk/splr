@@ -54,7 +54,7 @@ pub struct State {
     pub lbd_temp: Vec<usize>,
     pub last_dl: Vec<Lit>,
     pub start: SystemTime,
-    dumper: ProgressRecord,
+    pub dumper: ProgressRecord,
     pub progress_cnt: usize,
     pub target: CNFDescription,
 }
@@ -332,7 +332,7 @@ impl fmt::Display for State {
     }
 }
 
-enum LogUsizeId {
+pub enum LogUsizeId {
     Propagate = 0,  //  0: propagate: usize,
     Decision,       //  1: decision: usize,
     Conflict,       //  2: conflict: usize,
@@ -353,7 +353,7 @@ enum LogUsizeId {
     End,
 }
 
-enum LogF64Id {
+pub enum LogF64Id {
     Progress = 0, //  0: progress: f64,
     EmaAsg,       //  1: ema_asg: f64,
     EmaLBD,       //  2: ema_lbd: f64,
@@ -365,9 +365,9 @@ enum LogF64Id {
     End,
 }
 
-struct ProgressRecord {
-    vali: [usize; LogUsizeId::End as usize],
-    valf: [f64; LogF64Id::End as usize],
+pub struct ProgressRecord {
+    pub vali: [usize; LogUsizeId::End as usize],
+    pub valf: [f64; LogF64Id::End as usize],
 }
 
 impl Default for ProgressRecord {
