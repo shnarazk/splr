@@ -302,8 +302,8 @@ fn handle_conflict_path(
     state.restart_update_asg(config, asgs.len());
     // DYNAMIC BLOCKING RESTART
     state.block_restart(asgs, config, tn_confl);
-    let mut new_learnt: Vec<Lit> = Vec::new();
-    let bl = analyze(asgs, config, cdb, state, vars, ci, &mut new_learnt);
+    let bl = analyze(asgs, config, cdb, state, vars, ci);
+    let mut new_learnt = &mut state.new_learnt;
     asgs.cancel_until(vars, bl.max(config.root_level));
     let learnt_len = new_learnt.len();
     if learnt_len == 1 {
@@ -383,8 +383,9 @@ fn analyze(
     state: &mut State,
     vars: &mut [Var],
     confl: ClauseId,
-    learnt: &mut Vec<Lit>,
 ) -> usize {
+    let learnt = &mut state.new_learnt;
+    learnt.clear();
     learnt.push(0);
     let dl = asgs.level();
     let mut cid = confl;
@@ -464,33 +465,37 @@ fn analyze(
     }
     learnt[0] = p.negate();
     // println!("- appending {}, the result is {:?}", learnt[0].int(), vec2int(learnt));
-    analyze_simplify(asgs, cdb, config, state, vars, learnt)
+    simplify_learnt(asgs, cdb, config, state, vars)
 }
 
 #[inline]
-fn analyze_simplify(
+fn simplify_learnt(
     asgs: &mut AssignStack,
     cdb: &mut ClauseDB,
     config: &mut Config,
     state: &mut State,
     vars: &mut [Var],
-    learnt: &mut Vec<Lit>,
 ) -> usize {
-    let mut to_clear: Vec<Lit> = vec![learnt[0]];
+    let State {
+        ref mut new_learnt,
+        ref mut an_seen,
+        ..
+    } = state;
+    let mut to_clear: Vec<Lit> = vec![new_learnt[0]];
     let mut levels = vec![false; asgs.level() + 1];
-    for l in &learnt[1..] {
+    for l in &new_learnt[1..] {
         to_clear.push(*l);
         levels[vars[l.vi()].level] = true;
     }
-    learnt.retain(|l| {
+    new_learnt.retain(|l| {
         vars[l.vi()].reason == NULL_CLAUSE
-            || !redundant_lit(cdb, vars, &mut state.an_seen, *l, &mut to_clear, &levels)
+            || !redundant_lit(cdb, vars, an_seen, *l, &mut to_clear, &levels)
     });
-    if learnt.len() < 30 {
-        minimize_with_bi_clauses(cdb, vars, &mut state.lbd_temp, learnt);
+    if new_learnt.len() < 30 {
+        minimize_with_bi_clauses(cdb, vars, &mut state.lbd_temp, new_learnt);
     }
     // glucose heuristics
-    let lbd = vars.compute_lbd(learnt, &mut state.lbd_temp);
+    let lbd = vars.compute_lbd(new_learnt, &mut state.lbd_temp);
     while let Some(l) = state.last_dl.pop() {
         let vi = l.vi();
         if cdb.clause[vars[vi].reason].rank < lbd {
@@ -500,20 +505,20 @@ fn analyze_simplify(
     }
     // find correct backtrack level from remaining literals
     let mut level_to_return = 0;
-    if 1 < learnt.len() {
+    if 1 < new_learnt.len() {
         let mut max_i = 1;
-        level_to_return = vars[learnt[max_i].vi()].level;
-        for (i, l) in learnt.iter().enumerate().skip(2) {
+        level_to_return = vars[new_learnt[max_i].vi()].level;
+        for (i, l) in new_learnt.iter().enumerate().skip(2) {
             let lv = vars[l.vi()].level;
             if level_to_return < lv {
                 level_to_return = lv;
                 max_i = i;
             }
         }
-        learnt.swap(1, max_i);
+        new_learnt.swap(1, max_i);
     }
     for l in &to_clear {
-        state.an_seen[l.vi()] = false;
+        an_seen[l.vi()] = false;
     }
     level_to_return
 }
