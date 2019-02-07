@@ -166,24 +166,10 @@ impl Config {
             self.var_decay = 0.91;
             self.var_decay_max = 0.91;
         }
-        // if state.stats[Stat::Restart as usize] < 10 {
-        //     self.restart_thr = 0.80;
-        // } else if 2000 < state.stats[Stat::Restart as usize] {
-        //     self.restart_thr = 0.55;
-        // }
-        // if state.stats[Stat::BlockRestart as usize] < 10 {
-        //     self.restart_blk = 1.25;
-        // } else if 2000 < state.stats[Stat::BlockRestart as usize] {
-        //     self.restart_blk = 1.55;
-        // }
         if self.strategy == SearchStrategy::Initial {
             self.strategy = SearchStrategy::Generic;
             return;
         }
-        // state.ema_asg.reset();
-        // state.ema_lbd.reset();
-        // state.stats[Stat::SumLBD as usize] = 0;
-        // state.stats[Stat::Conflict as usize] = 0;
         if self.use_chan_seok {
             // Adjusting for low decision levels.
             // move some clauses with good lbd (col_lbd_bound) to Permanent

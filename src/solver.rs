@@ -93,35 +93,41 @@ impl SatSolverIF for Solver {
             }
             state.progress(cdb, config, vars, Some("enqueued"));
             if cdb.simplify(asgs, config, elim, state, vars).is_err() {
+                state.progress(cdb, config, vars, Some("Error1"));
                 state.ok = false;
-                panic!("internal error");
+                debug_assert!(false, "internal error by simplify");
+                return Err(SolverException::InternalInconsistent);
             }
             state.progress(cdb, config, vars, Some("subsumed"));
         }
-        if search(asgs, config, cdb, elim, state, vars) {
-            if !state.ok {
+        match search(asgs, config, cdb, elim, state, vars) {
+            Ok(true) => {
+                state.progress(cdb, config, vars, None);
+                let mut result = Vec::new();
+                for (vi, v) in vars.iter().enumerate().take(config.num_vars + 1).skip(1) {
+                    match v.assign {
+                        TRUE => result.push(vi as i32),
+                        FALSE => result.push(0 - vi as i32),
+                        _ => result.push(0),
+                    }
+                }
+                elim.extend_model(&mut result);
                 asgs.cancel_until(vars, 0);
-                state.progress(cdb, config, vars, Some("error"));
+                Ok(Certificate::SAT(result))
+            }
+            Ok(false) => {
+                state.progress(cdb, config, vars, None);
+                asgs.cancel_until(vars, 0);
+                Ok(Certificate::UNSAT(
+                    state.conflicts.iter().map(|l| l.int()).collect(),
+                ))
+            }
+            Err(_) => {
+                asgs.cancel_until(vars, 0);
+                state.progress(cdb, config, vars, Some("Error2"));
+                state.ok = false;
                 return Err(SolverException::InternalInconsistent);
             }
-            state.progress(cdb, config, vars, None);
-            let mut result = Vec::new();
-            for (vi, v) in vars.iter().enumerate().take(config.num_vars + 1).skip(1) {
-                match v.assign {
-                    TRUE => result.push(vi as i32),
-                    FALSE => result.push(0 - vi as i32),
-                    _ => result.push(0),
-                }
-            }
-            elim.extend_model(&mut result);
-            asgs.cancel_until(vars, 0);
-            Ok(Certificate::SAT(result))
-        } else {
-            state.progress(cdb, config, vars, None);
-            asgs.cancel_until(vars, 0);
-            Ok(Certificate::UNSAT(
-                state.conflicts.iter().map(|l| l.int()).collect(),
-            ))
         }
     }
     /// builds and returns a configured solver.
@@ -193,7 +199,7 @@ impl SatSolverIF for Solver {
             ref mut vars,
             ..
         } = self;
-        assert!(asgs.level() == 0);
+        debug_assert!(asgs.level() == 0);
         v.sort_unstable();
         let mut j = 0;
         let mut l_ = NULL_LIT; // last literal; [x, x.negate()] means totology.
@@ -233,24 +239,24 @@ fn search(
     elim: &mut Eliminator,
     state: &mut State,
     vars: &mut [Var],
-) -> bool {
+) -> Result<bool, SolverError> {
     let mut conflict_c = 0.0; // for Luby restart
     let mut a_decision_was_made = false;
     state.restart_update_luby(config);
-    while state.ok {
+    loop {
         let ci = asgs.propagate(cdb, state, vars);
         state.stats[Stat::Propagation as usize] += 1;
         if ci == NULL_CLAUSE {
             if config.num_vars <= asgs.len() + state.num_eliminated_vars {
-                return true;
+                return Ok(true);
             }
             // DYNAMIC FORCING RESTART
             if state.force_restart(config, &mut conflict_c) {
                 asgs.cancel_until(vars, config.root_level);
             } else if asgs.level() == 0 {
                 if cdb.simplify(asgs, config, elim, state, vars).is_err() {
-                    state.ok = false;
-                    panic!("interal error");
+                    debug_assert!(false, "interal error by simplify");
+                    return Err(SolverError::Inconsistent);
                 }
                 asgs.rebuild_order(&vars);
                 state.num_solved_vars = asgs.len();
@@ -272,12 +278,11 @@ fn search(
             }
             if asgs.level() == config.root_level {
                 analyze_final(asgs, config, cdb, state, vars, ci, false);
-                return false;
+                return Ok(false);
             }
             handle_conflict_path(asgs, config, cdb, elim, state, vars, ci);
         }
     }
-    false
 }
 
 #[inline]
