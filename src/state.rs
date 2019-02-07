@@ -307,7 +307,7 @@ impl fmt::Display for State {
         let vclen = vc.len();
         let fnlen = self.target.pathname.len();
         let width = 43;
-        if width < vclen + fnlen {
+        if width < vclen + fnlen + 1 {
             write!(
                 f,
                 "{:<w$} |time:{:>9.2}",
