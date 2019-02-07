@@ -277,7 +277,7 @@ fn search(
                 state.stats[Stat::NoDecisionConflict as usize] += 1;
             }
             if asgs.level() == config.root_level {
-                analyze_final(asgs, config, cdb, state, vars, ci, false);
+                analyze_final(asgs, config, state, vars, &cdb.clause[ci]);
                 return Ok(false);
             }
             handle_conflict_path(asgs, config, cdb, elim, state, vars, ci);
@@ -391,7 +391,7 @@ fn analyze(
     let mut p = NULL_LIT;
     let mut ti = asgs.len() - 1; // trail index
     let mut path_cnt = 0;
-    let mut last_dl: Vec<Lit> = Vec::new();
+    state.last_dl.clear();
     loop {
         // println!("analyze {}", p.int());
         unsafe {
@@ -430,7 +430,7 @@ fn analyze(
                         // println!("- flag for {} which level is {}", q.int(), lvl);
                         path_cnt += 1;
                         if v.reason != NULL_CLAUSE && cdb.clause[v.reason].is(Flag::LearntClause) {
-                            last_dl.push(*q);
+                            state.last_dl.push(*q);
                         }
                     } else {
                         // println!("- push {} to learnt, which level is {}", q.int(), lvl);
@@ -464,10 +464,10 @@ fn analyze(
     }
     learnt[0] = p.negate();
     // println!("- appending {}, the result is {:?}", learnt[0].int(), vec2int(learnt));
-    analyze_simplify(asgs, cdb, config, state, vars, learnt, &mut last_dl)
+    analyze_simplify(asgs, cdb, config, state, vars, learnt)
 }
 
-// simplify phase
+#[inline]
 fn analyze_simplify(
     asgs: &mut AssignStack,
     cdb: &mut ClauseDB,
@@ -475,24 +475,23 @@ fn analyze_simplify(
     state: &mut State,
     vars: &mut [Var],
     learnt: &mut Vec<Lit>,
-    last_dl: &mut Vec<Lit>,
 ) -> usize {
     let mut to_clear: Vec<Lit> = vec![learnt[0]];
-    let mut level_map = vec![false; asgs.level() + 1];
+    let mut levels = vec![false; asgs.level() + 1];
     for l in &learnt[1..] {
         to_clear.push(*l);
-        level_map[vars[l.vi()].level] = true;
+        levels[vars[l.vi()].level] = true;
     }
     learnt.retain(|l| {
         vars[l.vi()].reason == NULL_CLAUSE
-            || !analyze_removable(cdb, vars, &mut state.an_seen, *l, &mut to_clear, &level_map)
+            || !redundant_lit(cdb, vars, &mut state.an_seen, *l, &mut to_clear, &levels)
     });
     if learnt.len() < 30 {
         minimize_with_bi_clauses(cdb, vars, &mut state.lbd_temp, learnt);
     }
     // glucose heuristics
     let lbd = vars.compute_lbd(learnt, &mut state.lbd_temp);
-    while let Some(l) = last_dl.pop() {
+    while let Some(l) = state.last_dl.pop() {
         let vi = l.vi();
         if cdb.clause[vars[vi].reason].rank < lbd {
             vars.bump_activity(&mut config.var_inc, vi);
@@ -519,19 +518,18 @@ fn analyze_simplify(
     level_to_return
 }
 
-/// renamed from litRedundant
 #[inline]
-fn analyze_removable(
+fn redundant_lit(
     cdb: &mut ClauseDB,
     vars: &[Var],
-    an_seen: &mut [bool],
+    seen: &mut [bool],
     l: Lit,
-    to_clear: &mut Vec<Lit>,
-    level_map: &[bool],
+    clear: &mut Vec<Lit>,
+    levels: &[bool],
 ) -> bool {
     let mut stack = Vec::new();
     stack.push(l);
-    let top = to_clear.len();
+    let top = clear.len();
     while let Some(sl) = stack.pop() {
         let cid = vars[sl.vi()].reason;
         let c = &mut cdb.clause[cid];
@@ -541,16 +539,16 @@ fn analyze_removable(
         for q in &(*c).lits[1..] {
             let vi = q.vi();
             let lv = vars[vi].level;
-            if 0 < lv && !an_seen[vi] {
-                if vars[vi].reason != NULL_CLAUSE && level_map[lv as usize] {
-                    an_seen[vi] = true;
+            if 0 < lv && !seen[vi] {
+                if vars[vi].reason != NULL_CLAUSE && levels[lv as usize] {
+                    seen[vi] = true;
                     stack.push(*q);
-                    to_clear.push(*q);
+                    clear.push(*q);
                 } else {
-                    for v in &to_clear[top..] {
-                        an_seen[v.vi()] = false;
+                    for v in &clear[top..] {
+                        seen[v.vi()] = false;
                     }
-                    to_clear.truncate(top);
+                    clear.truncate(top);
                     return false;
                 }
             }
@@ -560,64 +558,50 @@ fn analyze_removable(
 }
 
 #[inline]
-fn analyze_final(
-    asgs: &AssignStack,
-    config: &mut Config,
-    cdb: &ClauseDB,
-    state: &mut State,
-    vars: &[Var],
-    ci: ClauseId,
-    skip_first: bool,
-) {
+fn analyze_final(asgs: &AssignStack, config: &Config, state: &mut State, vars: &[Var], c: &Clause) {
     let mut seen = vec![false; config.num_vars + 1];
     state.conflicts.clear();
-    if config.root_level != 0 {
-        let c = &cdb.clause[ci];
-        for l in &c.lits[skip_first as usize..] {
-            let vi = l.vi();
-            if 0 < vars[vi].level {
-                state.an_seen[vi] = true;
-            }
+    if asgs.level() == 0 {
+        return;
+    }
+    for l in &c.lits {
+        let vi = l.vi();
+        if 0 < vars[vi].level {
+            state.an_seen[vi] = true;
         }
-        let tl0 = asgs.num_at(0);
-        let start = if asgs.level() <= config.root_level {
-            asgs.len()
-        } else {
-            asgs.num_at(config.root_level)
-        };
-        for l in &asgs.trail[tl0..start] {
-            let vi = l.vi();
-            if seen[vi] {
-                if vars[vi].reason == NULL_CLAUSE {
-                    state.conflicts.push(l.negate());
-                } else {
-                    for l in &c.lits[1..] {
-                        let vi = l.vi();
-                        if 0 < vars[vi].level {
-                            seen[vi] = true;
-                        }
+    }
+    let end = if asgs.level() <= config.root_level {
+        asgs.len()
+    } else {
+        asgs.num_at(config.root_level)
+    };
+    for l in &asgs.trail[asgs.num_at(0)..end] {
+        let vi = l.vi();
+        if seen[vi] {
+            if vars[vi].reason == NULL_CLAUSE {
+                state.conflicts.push(l.negate());
+            } else {
+                for l in &c.lits[(c.lits.len() != 2) as usize..] {
+                    let vi = l.vi();
+                    if 0 < vars[vi].level {
+                        seen[vi] = true;
                     }
                 }
             }
-            seen[vi] = false;
         }
+        seen[vi] = false;
     }
 }
 
 #[inline]
-fn minimize_with_bi_clauses(
-    cdb: &ClauseDB,
-    vars: &[Var],
-    lbd_temp: &mut [usize],
-    vec: &mut Vec<Lit>,
-) {
-    let nlevels = vars.compute_lbd(vec, lbd_temp);
+fn minimize_with_bi_clauses(cdb: &ClauseDB, vars: &[Var], temp: &mut [usize], vec: &mut Vec<Lit>) {
+    let nlevels = vars.compute_lbd(vec, temp);
     if 6 < nlevels {
         return;
     }
-    let key = lbd_temp[0] + 1;
+    let key = temp[0] + 1;
     for l in &vec[1..] {
-        lbd_temp[l.vi() as usize] = key;
+        temp[l.vi() as usize] = key;
     }
     let l0 = vec[0];
     let mut nsat = 0;
@@ -629,14 +613,14 @@ fn minimize_with_bi_clauses(
         debug_assert!(c.lits[0] == l0 || c.lits[1] == l0);
         let other = c.lits[(c.lits[0] == l0) as usize];
         let vi = other.vi();
-        if lbd_temp[vi] == key && vars.assigned(other) == TRUE {
+        if temp[vi] == key && vars.assigned(other) == TRUE {
             nsat += 1;
-            lbd_temp[vi] -= 1;
+            temp[vi] -= 1;
         }
     }
     if 0 < nsat {
-        lbd_temp[l0.vi()] = key;
-        vec.retain(|l| lbd_temp[l.vi()] == key);
+        temp[l0.vi()] = key;
+        vec.retain(|l| temp[l.vi()] == key);
     }
-    lbd_temp[0] = key;
+    temp[0] = key;
 }
