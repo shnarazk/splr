@@ -265,7 +265,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "   Clause DB|#rdc:{}, #smp:{}, #elm:{} |rstK:{} ",
+            "   Clause DB|#rdc:{}, #smp:{}, #elm:{} |frcK:{} ",
             i!(
                 "{:>9}",
                 self.dumper,

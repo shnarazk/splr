@@ -126,7 +126,7 @@ impl SatSolverIF for Solver {
                 asgs.cancel_until(vars, 0);
                 state.progress(cdb, config, vars, Some("Error2"));
                 state.ok = false;
-                return Err(SolverException::InternalInconsistent);
+                Err(SolverException::InternalInconsistent)
             }
         }
     }
