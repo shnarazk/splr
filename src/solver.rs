@@ -78,6 +78,9 @@ impl SatSolverIF for Solver {
         state.progress_header(config);
         state.progress(cdb, config, vars, Some("loaded"));
         if config.use_elim {
+            if 10_000_000 < state.target.num_of_clauses {
+                config.elim_eliminate_grow_limit = 0;
+            }
             elim.activate();
             elim.prepare(cdb, vars, true);
             for vi in 1..vars.len() {
@@ -610,7 +613,8 @@ fn minimize_with_bi_clauses(cdb: &ClauseDB, vars: &[Var], temp: &mut [usize], ve
     }
     let l0 = vec[0];
     let mut nsat = 0;
-    for w in &cdb.watcher[l0.negate() as usize][1..] {
+    let end = cdb.watcher[l0.negate() as usize][0].c;
+    for w in &cdb.watcher[l0.negate() as usize][1..end] {
         let c = &cdb.clause[w.c];
         if c.lits.len() != 2 {
             continue;

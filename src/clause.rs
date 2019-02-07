@@ -537,6 +537,7 @@ impl ClauseDB {
                 if lits.len() < 2 {
                     panic!("too short clause {} {:?}", cid.format(), vec2int(&lits));
                 }
+                // FIXME `watcher[watcher[0].c + 1 ..]` are garbages; Igrnore them!
                 if self.watcher[lits[0].negate() as usize]
                     .iter()
                     .all(|w| w.c != cid)
@@ -576,7 +577,11 @@ impl ClauseDB {
             }
         }
         for ws in &self.watcher[2..] {
-            for w in &ws[1..] {
+            let end = ws[0].c;
+            if end == 0 {
+                continue;
+            }
+            for w in &ws[1..end] {
                 if self.clause[w.c].is(Flag::DeadClause) && !deads.contains(&w.c) {
                     panic!("done");
                 }
