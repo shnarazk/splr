@@ -77,10 +77,10 @@ impl SatSolverIF for Solver {
         state.num_solved_vars = asgs.len();
         state.progress_header(config);
         state.progress(cdb, config, vars, Some("loaded"));
+        if 10_000_000 < state.target.num_of_clauses {
+            config.use_elim = false;
+        }
         if config.use_elim {
-            if 10_000_000 < state.target.num_of_clauses {
-                config.elim_eliminate_grow_limit = 0;
-            }
             elim.activate();
             elim.prepare(cdb, vars, true);
             for vi in 1..vars.len() {
