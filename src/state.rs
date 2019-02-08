@@ -64,12 +64,18 @@ macro_rules! i {
         match $val {
             v => {
                 let ptr = &mut $dumper.vali[$key as usize];
-                if v < *ptr {
+                if (v as f64) * 1.6 < *ptr as f64 {
+                    *ptr = v;
+                    format!("\x1B[001m\x1B[031m{}\x1B[000m", format!($format, *ptr))
+                } else if v < *ptr {
                     *ptr = v;
                     format!("\x1B[031m{}\x1B[000m", format!($format, *ptr))
+                } else if (*ptr as f64) * 1.6 < v as f64 {
+                    *ptr = v;
+                    format!("\x1B[001m\x1B[034m{}\x1B[000m", format!($format, *ptr))
                 } else if *ptr < v {
                     *ptr = v;
-                    format!("\x1B[001m{}\x1B[000m", format!($format, *ptr))
+                    format!("\x1B[034m{}\x1B[000m", format!($format, *ptr))
                 } else {
                     *ptr = v;
                     format!($format, *ptr)
@@ -84,12 +90,18 @@ macro_rules! f {
         match $val {
             v => {
                 let ptr = &mut $dumper.valf[$key as usize];
-                if v < *ptr {
+                if v * 1.6 < *ptr {
+                    *ptr = v;
+                    format!("\x1B[001m\x1B[031m{}\x1B[000m", format!($format, *ptr))
+                } else if v < *ptr {
                     *ptr = v;
                     format!("\x1B[031m{}\x1B[000m", format!($format, *ptr))
+                } else if *ptr * 1.6 < v {
+                    *ptr = v;
+                    format!("\x1B[001m\x1B[034m{}\x1B[000m", format!($format, *ptr))
                 } else if *ptr < v {
                     *ptr = v;
-                    format!("\x1B[001m{}\x1B[000m", format!($format, *ptr))
+                    format!("\x1B[034m{}\x1B[000m", format!($format, *ptr))
                 } else {
                     *ptr = v;
                     format!($format, *ptr)
