@@ -159,6 +159,19 @@ impl EliminatorIF for Eliminator {
             if asgs.propagate(cdb, state, vars) != NULL_CLAUSE {
                 return Err(SolverError::Inconsistent);
             }
+            // copied from simplify
+            for c in &mut cdb.clause[1..] {
+                if !c.is(Flag::DeadClause) && vars.satisfies(&c.lits) {
+                    c.kill(&mut cdb.touched);
+                    for l in &c.lits {
+                        let v = &mut vars[l.vi()];
+                        if !v.is(Flag::EliminatedVar) {
+                            self.enqueue_var(vars, l.vi(), true);
+                        }
+                    }
+                }
+            }
+            cdb.garbage_collect();
         }
         Ok(())
     }
