@@ -77,7 +77,7 @@ impl SatSolverIF for Solver {
         state.num_solved_vars = asgs.len();
         state.progress_header(config);
         state.progress(cdb, config, vars, Some("loaded"));
-        if 10_000_000 < state.target.num_of_clauses {
+        if 20_000_000 < state.target.num_of_clauses {
             config.use_elim = false;
         }
         if config.use_elim {
@@ -261,7 +261,7 @@ fn search(
                     debug_assert!(false, "interal error by simplify");
                     return Err(SolverError::Inconsistent);
                 }
-                asgs.rebuild_order(&vars);
+                // asgs.rebuild_order(&vars);
                 state.num_solved_vars = asgs.len();
             }
             if !asgs.remains() {
