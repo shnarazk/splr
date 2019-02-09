@@ -121,7 +121,17 @@ fn main() {
 }
 
 fn report<W: Write>(state: &State, out: &mut BufWriter<W>) -> std::io::Result<()> {
-    out.write_all(format!("c {}, Mode:{:>9}\n", state, "solved").as_bytes())?;
+    let tm = match state.start.elapsed() {
+        Ok(e) => e.as_secs() as f64 + f64::from(e.subsec_millis()) / 1000.0f64,
+        Err(_) => 0.0f64,
+    };
+    out.write_all(
+        format!(
+            "c {:<35}, v:{:8}, c:{:8}, time:{:9.2}\n",
+            state.target.pathname, state.target.num_of_variables, state.target.num_of_clauses, tm,
+        )
+        .as_bytes(),
+    )?;
     out.write_all(
         format!(
             "c  #conflict:{}, #decision:{}, #propagate:{} \n",
