@@ -660,9 +660,9 @@ fn eliminate_var(
     unsafe {
         config.elim_eliminate_grow_limit = 32;
         if 15_000_000 < cdb.count(true) {
-                config.elim_eliminate_grow_limit = 0;
+            config.elim_eliminate_grow_limit = 0;
         } else if 12_000_000 < cdb.count(true) {
-                config.elim_eliminate_grow_limit = 16;
+            config.elim_eliminate_grow_limit = 16;
         }
         if check_var_elimination_condition(cdb, config, vars, &*pos, &*neg, vi) {
             return Ok(());

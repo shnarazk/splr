@@ -261,7 +261,6 @@ fn search(
                     debug_assert!(false, "interal error by simplify");
                     return Err(SolverError::Inconsistent);
                 }
-                // asgs.rebuild_order(&vars);
                 state.num_solved_vars = asgs.len();
             }
             if !asgs.remains() {

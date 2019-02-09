@@ -124,10 +124,9 @@ pub trait PropagatorIF {
     fn enqueue_null(&mut self, v: &mut Var, sig: Lbool);
     fn uncheck_enqueue(&mut self, vars: &mut [Var], l: Lit, cid: ClauseId);
     fn uncheck_assume(&mut self, vars: &mut [Var], l: Lit);
-    fn dump_cnf(&mut self, cdb: &ClauseDB, config: &Config, vars: &[Var], fname: &str);
-    fn rebuild_order(&mut self, vars: &[Var]);
     fn update_order(&mut self, vec: &[Var], v: VarId);
     fn select_var(&mut self, vars: &[Var]) -> VarId;
+    fn dump_cnf(&mut self, cdb: &ClauseDB, config: &Config, vars: &[Var], fname: &str);
 }
 
 /// API for restart like `block_restart`, `force_restart` and so on.

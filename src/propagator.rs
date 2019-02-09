@@ -20,7 +20,7 @@ impl PropagatorIF for AssignStack {
     fn new(n: usize) -> AssignStack {
         AssignStack {
             trail: Vec::with_capacity(n),
-            assign: vec![BOTTOM; n+1],
+            assign: vec![BOTTOM; n + 1],
             trail_lim: Vec::new(),
             q_head: 0,
             var_order: VarIdHeap::new(n, n),
@@ -202,6 +202,12 @@ impl PropagatorIF for AssignStack {
         v.reason = NULL_CLAUSE;
         self.trail.push(l);
     }
+    fn select_var(&mut self, vars: &[Var]) -> VarId {
+        self.var_order.select_var(vars)
+    }
+    fn update_order(&mut self, vec: &[Var], v: VarId) {
+        self.var_order.update(vec, v)
+    }
     #[allow(dead_code)]
     fn dump_cnf(&mut self, cdb: &ClauseDB, config: &Config, vars: &[Var], fname: &str) {
         for v in vars {
@@ -231,16 +237,6 @@ impl PropagatorIF for AssignStack {
                     .unwrap();
             }
         }
-    }
-    fn rebuild_order(&mut self, vars: &[Var]) {
-        debug_assert_eq!(self.level(), 0);
-        self.var_order.rebuild(vars)
-    }
-    fn select_var(&mut self, vars: &[Var]) -> VarId {
-        self.var_order.select_var(vars)
-    }
-    fn update_order(&mut self, vec: &[Var], v: VarId) {
-        self.var_order.update(vec, v)
     }
 }
 
