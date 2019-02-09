@@ -1,7 +1,7 @@
 use crate::clause::{ClauseDB, Watch};
 use crate::config::Config;
 use crate::state::{Stat, State};
-use crate::traits::{FlagIF, LitIF, PropagatorIF, VarDBIF, WatchDBIF};
+use crate::traits::{FlagIF, LitIF, PropagatorIF, WatchDBIF};
 use crate::types::*;
 use crate::var::Var;
 use std::fmt;
@@ -10,6 +10,7 @@ use std::io::{BufWriter, Write};
 
 pub struct AssignStack {
     pub trail: Vec<Lit>,
+    pub assign: Vec<Lbool>,
     trail_lim: Vec<usize>,
     q_head: usize,
     var_order: VarIdHeap, // Variable Order
@@ -19,6 +20,7 @@ impl PropagatorIF for AssignStack {
     fn new(n: usize) -> AssignStack {
         AssignStack {
             trail: Vec::with_capacity(n),
+            assign: vec![BOTTOM; n+1],
             trail_lim: Vec::new(),
             q_head: 0,
             var_order: VarIdHeap::new(n, n),
@@ -48,10 +50,15 @@ impl PropagatorIF for AssignStack {
     fn remains(&self) -> bool {
         self.q_head < self.trail.len()
     }
+    #[inline(always)]
+    fn assigned(&self, l: Lit) -> Lbool {
+        unsafe { self.assign.get_unchecked(l.vi()) ^ ((l & 1) as u8) }
+    }
     fn enqueue(&mut self, v: &mut Var, sig: Lbool, cid: ClauseId, dl: usize) -> MaybeInconsistent {
         debug_assert!(!v.is(Flag::EliminatedVar));
-        let val = v.assign;
+        let val = self.assign[v.index];
         if val == BOTTOM {
+            self.assign[v.index] = sig;
             v.assign = sig;
             v.reason = cid;
             v.level = dl;
@@ -73,14 +80,15 @@ impl PropagatorIF for AssignStack {
     fn enqueue_null(&mut self, v: &mut Var, sig: Lbool) {
         debug_assert!(!v.is(Flag::EliminatedVar));
         debug_assert!(sig != BOTTOM);
-        let val = v.assign;
+        let val = self.assign[v.index];
         if val == BOTTOM {
+            self.assign[v.index] = sig;
             v.assign = sig;
             v.reason = NULL_CLAUSE;
             v.level = 0;
             self.trail.push(Lit::from_var(v.index, sig));
         }
-        debug_assert!(v.assign == sig);
+        debug_assert!(self.assign[v.index] == sig);
     }
     /// propagate without checking dead clauses
     /// Note: this function assues there's no dead clause.
@@ -99,7 +107,7 @@ impl PropagatorIF for AssignStack {
                 'next_clause: while n <= source.count() {
                     let w = source.get_unchecked_mut(n);
                     debug_assert!(!head[w.c].is(Flag::DeadClause));
-                    if vars.assigned(w.blocker) != TRUE {
+                    if self.assigned(w.blocker) != TRUE {
                         let lits = &mut head.get_unchecked_mut(w.c).lits;
                         debug_assert!(2 <= lits.len());
                         debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
@@ -109,7 +117,7 @@ impl PropagatorIF for AssignStack {
                             *lits.get_unchecked_mut(0) = first;
                             *lits.get_unchecked_mut(1) = false_lit;
                         }
-                        let first_value = vars.assigned(first);
+                        let first_value = self.assigned(first);
                         // If 0th watch is true, then clause is already satisfied.
                         if first != w.blocker && first_value == TRUE {
                             w.blocker = first;
@@ -118,7 +126,7 @@ impl PropagatorIF for AssignStack {
                         }
                         for (k, lk) in lits.iter().enumerate().skip(2) {
                             // below is equivalent to 'assigned(lk) != FALSE'
-                            if (((lk & 1) as u8) ^ vars.get_unchecked(lk.vi()).assign) != 0 {
+                            if (((lk & 1) as u8) ^ self.assign.get_unchecked(lk.vi())) != 0 {
                                 (*watcher)
                                     .get_unchecked_mut(lk.negate() as usize)
                                     .register(first, w.c);
@@ -149,7 +157,8 @@ impl PropagatorIF for AssignStack {
         for l in &self.trail[lim..] {
             let vi = l.vi();
             let v = &mut vars[vi];
-            v.phase = v.assign;
+            v.phase = self.assign[vi];
+            self.assign[vi] = BOTTOM;
             v.assign = BOTTOM;
             v.reason = NULL_CLAUSE;
             self.var_order.insert(vars, vi);
@@ -166,9 +175,11 @@ impl PropagatorIF for AssignStack {
             "Null CLAUSE is used for uncheck_enqueue"
         );
         let dl = self.trail_lim.len();
+        let vi = l.vi();
         let v = &mut vars[l.vi()];
         debug_assert!(!v.is(Flag::EliminatedVar));
-        debug_assert!(v.assign == l.lbool() || v.assign == BOTTOM);
+        debug_assert!(self.assign[vi] == l.lbool() || self.assign[vi] == BOTTOM);
+        self.assign[vi] = l.lbool();
         v.assign = l.lbool();
         v.level = dl;
         v.reason = cid;
@@ -181,9 +192,11 @@ impl PropagatorIF for AssignStack {
         debug_assert!(!self.trail.contains(&l.negate()));
         self.level_up();
         let dl = self.trail_lim.len();
-        let v = &mut vars[l.vi()];
+        let vi = l.vi();
+        let v = &mut vars[vi];
         debug_assert!(!v.is(Flag::EliminatedVar));
-        debug_assert!(v.assign == l.lbool() || v.assign == BOTTOM);
+        debug_assert!(self.assign[vi] == l.lbool() || self.assign[vi] == BOTTOM);
+        self.assign[vi] = l.lbool();
         v.assign = l.lbool();
         v.level = dl;
         v.reason = NULL_CLAUSE;
@@ -193,8 +206,8 @@ impl PropagatorIF for AssignStack {
     fn dump_cnf(&mut self, cdb: &ClauseDB, config: &Config, vars: &[Var], fname: &str) {
         for v in vars {
             if v.is(Flag::EliminatedVar) {
-                if v.assign != BOTTOM {
-                    panic!("conflicting var {} {}", v.index, v.assign);
+                if self.assign[v.index] != BOTTOM {
+                    panic!("conflicting var {} {}", v.index, self.assign[v.index]);
                 } else {
                     println!("eliminate var {}", v.index);
                 }

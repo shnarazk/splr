@@ -1,11 +1,13 @@
 use crate::solver::Solver;
-use crate::traits::{LitIF, ValidatorIF, VarDBIF};
-use crate::types::Lbool;
+use crate::traits::{LitIF, PropagatorIF, ValidatorIF, VarDBIF};
+use crate::types::Lit;
 
 impl ValidatorIF for Solver {
     fn inject_assigmnent(&mut self, vec: &[i32]) {
         for val in vec {
-            self.vars[val.abs() as usize].assign = (0 < *val) as Lbool;
+            let l = Lit::from_int(*val);
+            let vi = l.vi();
+            self.asgs.enqueue_null(&mut self.vars[vi], l.lbool());
         }
     }
     /// returns None if the given assignment is a model of a problem.
