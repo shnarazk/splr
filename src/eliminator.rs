@@ -160,9 +160,10 @@ impl EliminatorIF for Eliminator {
                 return Err(SolverError::Inconsistent);
             }
             // copied from simplify
-            for c in &mut cdb.clause[1..] {
+            for (cid, c) in &mut cdb.clause.iter_mut().enumerate().skip(1) {
                 if !c.is(Flag::DeadClause) && vars.satisfies(&c.lits) {
                     c.kill(&mut cdb.touched);
+                    self.remove_cid_occur(vars, cid, c);
                     for l in &c.lits {
                         let v = &mut vars[l.vi()];
                         if !v.is(Flag::EliminatedVar) {
