@@ -417,17 +417,8 @@ impl ClauseDBIF for ClauseDB {
     fn detach(&mut self, cid: ClauseId) {
         let c = &mut self.clause[cid];
         debug_assert!(!c.is(Flag::DeadClause));
-        c.turn_on(Flag::DeadClause);
-        if c.lits.is_empty() {
-            return;
-        }
-        let w0 = c.lits[0].negate();
-        if 1 < c.lits.len() {
-            let w1 = c.lits[1].negate();
-            debug_assert_ne!(w0, w1);
-            self.touched[w1 as usize] = true;
-        }
-        self.touched[w0 as usize] = true;
+        debug_assert!(1 < c.lits.len());
+        c.kill(&mut self.touched);
     }
     fn reduce(&mut self, config: &Config, state: &mut State, vars: &mut [Var]) {
         // self.reset_lbd(vars, &mut state.lbd_temp);
