@@ -1,5 +1,5 @@
 // SAT solver for Propositional Logic in Rust
-// Version 0.0.13 (Technology Preview 13, MR19)
+// Version 0.0.13 (Technology Preview 13)
 
 use splr::config::Config;
 use splr::solver::{Certificate, Solver};
@@ -12,7 +12,7 @@ use structopt::StructOpt;
 #[derive(StructOpt)]
 #[structopt(
     name = "splr",
-    about = "SAT solver for Propositional Logic in Rust, TP13 Merge Request 19"
+    about = "SAT solver for Propositional Logic in Rust, Technology Preview 13"
 )]
 struct CLOpts {
     /// EMA coefficient for number of assignments
