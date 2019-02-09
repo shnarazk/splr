@@ -173,16 +173,16 @@ impl StateIF for State {
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
         self.progress_cnt += 1;
-        print!("\x1B[7A");
+        print!("\x1B[7A\x1B[1G");
         let msg = match mes {
             None => config.strategy.to_str(),
             Some(x) => x,
         };
         let count = self.stats[Stat::Conflict as usize];
         let ave = self.stats[Stat::SumLBD as usize] as f64 / count as f64;
-        println!("{}, Mode:{:>9}", self, msg);
+        println!("\x1B[2K{}, Mode:{:>9}", self, msg);
         println!(
-            " #conflict:{}, #decision:{}, #propagate:{} ",
+            "\x1B[2K #conflict:{}, #decision:{}, #propagate:{} ",
             i!(
                 "{:>11}",
                 self.dumper,
@@ -203,7 +203,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "  Assignment|#rem:{}, #fix:{}, #elm:{}, prg%:{} ",
+            "\x1B[2K  Assignment|#rem:{}, #fix:{}, #elm:{}, prg%:{} ",
             i!("{:>9}", self.dumper, LogUsizeId::Remain, nv - sum),
             i!("{:>9}", self.dumper, LogUsizeId::Fixed, fixed),
             i!(
@@ -220,7 +220,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            " Clause Kind|Remv:{}, LBD2:{}, Binc:{}, Perm:{} ",
+            "\x1B[2K Clause Kind|Remv:{}, LBD2:{}, Binc:{}, Perm:{} ",
             i!("{:>9}", self.dumper, LogUsizeId::Removable, cdb.num_learnt),
             i!(
                 "{:>9}",
@@ -242,7 +242,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "     Restart|#BLK:{}, #RST:{}, eASG:{}, eLBD:{} ",
+            "\x1B[2K     Restart|#BLK:{}, #RST:{}, eASG:{}, eLBD:{} ",
             i!(
                 "{:>9}",
                 self.dumper,
@@ -269,7 +269,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "   Conflicts|aLBD:{}, bjmp:{}, cnfl:{} |blkR:{} ",
+            "\x1B[2K   Conflicts|aLBD:{}, bjmp:{}, cnfl:{} |blkR:{} ",
             f!("{:>9.2}", self.dumper, LogF64Id::AveLBD, self.ema_lbd.get()),
             f!("{:>9.2}", self.dumper, LogF64Id::BLevel, self.b_lvl.get()),
             f!("{:>9.2}", self.dumper, LogF64Id::CLevel, self.c_lvl.get()),
@@ -281,7 +281,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "   Clause DB|#rdc:{}, #smp:{}, #elm:{} |frcK:{} ",
+            "\x1B[2K   Clause DB|#rdc:{}, #smp:{}, #elm:{} |frcK:{} ",
             i!(
                 "{:>9}",
                 self.dumper,
