@@ -355,18 +355,12 @@ fn handle_conflict_path(
             config.restart_blk -= (config.restart_blk - 1.40) * 0.01
         }
         if config.use_elim {
-            let cl = state.c_lvl.get();
-            let lbd = state.ema_lbd.get();
-            let diff = (cl - lbd).max(0.0) as usize;
-            if state.stats[Stat::Elimination as usize] == 1 && state.elim_trigger.0 == 1 {
-                state.elim_trigger = (diff, diff);
+            if state.stats[Stat::Elimination as usize] == 1 && state.elim_trigger == 1 {
+                state.elim_trigger = state.c_lvl.get() as usize + 10;
             }
-            if 2 * diff < state.elim_trigger.0 {
-                state.elim_trigger = (diff, (state.elim_trigger.0 + state.elim_trigger.1) / 2);
+            if (state.c_lvl.get() as usize) < state.elim_trigger {
                 elim.activate();
-            } else if 2 * state.elim_trigger.1 < diff {
-                state.elim_trigger = ((state.elim_trigger.0 + state.elim_trigger.1) / 2, diff);
-                elim.activate();
+                state.elim_trigger /= 2;
             }
         }
         state.progress(cdb, config, vars, None);
