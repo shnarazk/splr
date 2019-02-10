@@ -12,7 +12,7 @@ use structopt::StructOpt;
 #[derive(StructOpt)]
 #[structopt(
     name = "splr",
-    about = "SAT solver for Propositional Logic in Rust, Technology Preview 13"
+    about = "SAT solver for Propositional Logic in Rust 0.1.0 RC"
 )]
 struct CLOpts {
     /// EMA coefficient for number of assignments
