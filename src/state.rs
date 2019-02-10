@@ -281,7 +281,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K   Clause DB|#rdc:{}, #smp:{}, #elm:{} |frcK:{} ",
+            "\x1B[2K   Clause DB|#rdc:{}, #sce:{}, #smp:{} |frcK:{} ",
             i!(
                 "{:>9}",
                 self.dumper,
