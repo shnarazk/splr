@@ -47,6 +47,7 @@ pub struct Config {
     pub glureduce: bool,
     pub cdb_inc: usize,
     pub cdb_inc_extra: usize,
+    pub cdb_soft_limit: usize,
     pub ema_coeffs: (i32, i32),
     /// RESTART
     /// For force restart based on average LBD of newly generated clauses: 0.80.
@@ -99,6 +100,7 @@ impl Default for Config {
             glureduce: true,
             cdb_inc: 300,
             cdb_inc_extra: 1000,
+            cdb_soft_limit: 16_000_000,
             restart_thr: 0.60,     // will be overwrited by bin/splr
             restart_blk: 1.40,     // will be overwrited by bin/splr
             restart_asg_len: 3500, // will be overwrited by bin/splr

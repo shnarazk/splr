@@ -134,6 +134,11 @@ impl EliminatorIF for Eliminator {
         if self.mode == EliminatorMode::Deactive {
             return Ok(());
         }
+        if 18_000_000 < cdb.count(true) {
+            config.elim_eliminate_grow_limit /= 2;
+        } else if 0 < config.elim_eliminate_grow_limit {
+            config.elim_eliminate_grow_limit += 2;
+        }
         let mut cnt = 0;
         while self.bwdsub_assigns < asgs.len()
             || !self.var_queue.is_empty()
@@ -659,12 +664,6 @@ fn eliminate_var(
     let pos = &v.pos_occurs as *const Vec<ClauseId>;
     let neg = &v.neg_occurs as *const Vec<ClauseId>;
     unsafe {
-        config.elim_eliminate_grow_limit = 32;
-        if 15_000_000 < cdb.count(true) {
-            config.elim_eliminate_grow_limit = 0;
-        } else if 12_000_000 < cdb.count(true) {
-            config.elim_eliminate_grow_limit = 16;
-        }
         if check_var_elimination_condition(cdb, config, vars, &*pos, &*neg, vi) {
             return Ok(());
         }
@@ -732,6 +731,12 @@ fn check_var_elimination_condition(
     neg: &[ClauseId],
     v: VarId,
 ) -> bool {
+    /// avoid thrashing
+    let limit = if config.cdb_soft_limit < cdb.count(true) {
+        0
+    } else {
+        config.elim_eliminate_grow_limit
+    };
     let clslen = pos.len() + neg.len();
     let mut cnt = 0;
     for c_pos in pos {
@@ -739,7 +744,7 @@ fn check_var_elimination_condition(
             let (res, clause_size) = check_to_merge(cdb, vars, *c_pos, *c_neg, v);
             if res {
                 cnt += 1;
-                if clslen + config.elim_eliminate_grow_limit < cnt
+                if clslen + limit < cnt
                     || (config.elim_eliminate_combination_limit != 0
                         && config.elim_eliminate_combination_limit < clause_size)
                 {
