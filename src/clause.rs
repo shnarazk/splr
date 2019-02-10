@@ -437,7 +437,7 @@ impl ClauseDBIF for ClauseDB {
         if perm.is_empty() {
             return;
         }
-        let keep = perm.len() / 2; // if elim.in_use { perm.len() / 8 } else { perm.len() / 2 };
+        let keep = perm.len() / 2;
         if config.use_chan_seok {
             perm.sort_by(|&a, &b| clause[a].cmp_activity(&clause[b]));
         } else {

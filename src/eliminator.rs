@@ -731,7 +731,7 @@ fn check_var_elimination_condition(
     neg: &[ClauseId],
     v: VarId,
 ) -> bool {
-    /// avoid thrashing
+    // avoid thrashing
     let limit = if config.cdb_soft_limit < cdb.count(true) {
         0
     } else {
