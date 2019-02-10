@@ -114,8 +114,8 @@ impl Default for Config {
             luby_restart_factor: 100.0,
             ema_coeffs: (2 ^ 5, 2 ^ 15),
             use_elim: true,
-            elim_eliminate_combination_limit: 10,
-            elim_eliminate_grow_limit: 64,
+            elim_eliminate_combination_limit: 80,
+            elim_eliminate_grow_limit: 0, // 64
             elim_eliminate_loop_limit: 2_000_000,
             elim_subsume_literal_limit: 100,
             elim_subsume_loop_limit: 2_000_000,

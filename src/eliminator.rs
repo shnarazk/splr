@@ -134,11 +134,6 @@ impl EliminatorIF for Eliminator {
         if self.mode == EliminatorMode::Deactive {
             return Ok(());
         }
-        if 18_000_000 < cdb.count(true) {
-            config.elim_eliminate_grow_limit /= 2;
-        } else if 0 < config.elim_eliminate_grow_limit {
-            config.elim_eliminate_grow_limit += 2;
-        }
         let mut cnt = 0;
         while self.bwdsub_assigns < asgs.len()
             || !self.var_queue.is_empty()
