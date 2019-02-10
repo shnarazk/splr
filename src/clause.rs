@@ -460,7 +460,6 @@ impl ClauseDBIF for ClauseDB {
         }
         state.stats[Stat::Reduction as usize] += 1;
         self.garbage_collect();
-        self.reset_lbd(vars, &mut state.lbd_temp);
     }
     fn simplify(
         &mut self,
