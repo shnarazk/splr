@@ -38,7 +38,7 @@ pub struct State {
     pub next_restart: usize,
     pub cur_restart: usize,
     pub after_restart: usize,
-    pub elim_trigger: usize,
+    pub elim_trigger: (usize, usize),
     pub stats: [usize; Stat::EndOfStatIndex as usize], // statistics
     pub ema_asg: Ema,
     pub ema_lbd: Ema,
@@ -129,7 +129,7 @@ impl StateIF for State {
             next_restart: 100,
             cur_restart: 1,
             after_restart: 0,
-            elim_trigger: 1,
+            elim_trigger: (1, 0),
             stats: [0; Stat::EndOfStatIndex as usize],
             ema_asg: Ema::new(config.restart_asg_len),
             ema_lbd: Ema::new(config.restart_lbd_len),
