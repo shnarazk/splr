@@ -89,7 +89,7 @@ impl WatchDBIF for Vec<Watch> {
     }
 }
 
-/// A representation of *logical clauses*
+/// A representation of 'clause'
 pub struct Clause {
     /// the literals making a clause
     pub lits: Vec<Lit>,
@@ -104,10 +104,10 @@ pub struct Clause {
 impl Default for Clause {
     fn default() -> Clause {
         Clause {
-            flags: 0,
             lits: vec![],
             rank: 0,
             activity: 0.0,
+            flags: 0,
         }
     }
 }
@@ -342,7 +342,7 @@ impl ClauseDBIF for ClauseDB {
     fn reset_lbd(&mut self, vars: &[Var], temp: &mut [usize]) {
         let mut key = temp[0];
         for c in &mut self.clause[1..] {
-            if c.is(Flag::DeadClause) {
+            if c.is(Flag::DeadClause) || c.is(Flag::LearntClause) {
                 continue;
             }
             key += 1;
@@ -385,7 +385,6 @@ impl ClauseDBIF for ClauseDB {
             .filter(|&c| c.flags & mask == mask)
             .count()
     }
-    /// renamed from newLearntClause
     // Note: set lbd to 0 if you want to add the clause to Permanent.
     fn attach(
         &mut self,
@@ -413,7 +412,6 @@ impl ClauseDBIF for ClauseDB {
         c.activity = config.var_inc;
         cid
     }
-    /// called from strengthen_clause, backward_subsumption_check, eliminate_var, substitute
     fn detach(&mut self, cid: ClauseId) {
         let c = &mut self.clause[cid];
         debug_assert!(!c.is(Flag::DeadClause));
@@ -421,7 +419,7 @@ impl ClauseDBIF for ClauseDB {
         c.kill(&mut self.touched);
     }
     fn reduce(&mut self, config: &Config, state: &mut State, vars: &mut [Var]) {
-        // self.reset_lbd(vars, &mut state.lbd_temp);
+        self.reset_lbd(vars, &mut state.lbd_temp);
         let ClauseDB {
             ref mut clause,
             ref mut touched,
@@ -469,7 +467,6 @@ impl ClauseDBIF for ClauseDB {
         state: &mut State,
         vars: &mut [Var],
     ) -> MaybeInconsistent {
-        // self.reset_lbd(vars, &mut state.lbd_temp);
         debug_assert_eq!(asgs.level(), 0);
         // reset reason since decision level is zero.
         for v in &mut vars[1..] {
