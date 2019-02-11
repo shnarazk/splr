@@ -96,10 +96,10 @@ impl SatSolverIF for Solver {
             }
             state.progress(cdb, config, vars, Some("enqueued"));
             if cdb.simplify(asgs, config, elim, state, vars).is_err() {
-                state.progress(cdb, config, vars, Some("Error1"));
+                // Why inconsistent? Because the CNF contains a conflict, not an error!
+                state.progress(cdb, config, vars, Some("conflict"));
                 state.ok = false;
-                debug_assert!(false, "internal error by simplify");
-                return Err(SolverException::InternalInconsistent);
+                return Ok(Certificate::UNSAT(Vec::new()));
             }
             state.progress(cdb, config, vars, Some("subsumed"));
         }
