@@ -186,13 +186,16 @@ fn report<W: Write>(state: &State, out: &mut BufWriter<W>) -> std::io::Result<()
     )?;
     out.write_all(
         format!(
-            "c    Clause DB|#rdc:{}, #sce:{}, #smp:{} |frcK:{} \n",
+            "c    Clause DB|#rdc:{}, #sce:{}, #exe:{} |frcK:{} \n",
             format!("{:>9}", state.dumper.vali[LogUsizeId::Reduction as usize]),
             format!(
                 "{:>9}",
-                state.dumper.vali[LogUsizeId::Simplification as usize]
+                state.dumper.vali[LogUsizeId::SatClauseElim as usize]
             ),
-            format!("{:>9}", state.dumper.vali[LogUsizeId::Elimination as usize]),
+            format!(
+                "{:>9}",
+                state.dumper.vali[LogUsizeId::ExhaustiveElim as usize]
+            ),
             format!("{:>9.4}", state.dumper.valf[LogF64Id::RestartThrK as usize]),
         )
         .as_bytes(),

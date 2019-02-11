@@ -500,9 +500,9 @@ impl ClauseDBIF for ClauseDB {
             }
         }
         self.garbage_collect();
-        state.stats[Stat::Simplification as usize] += 1;
+        state.stats[Stat::SatClauseElimination as usize] += 1;
         if elim.is_running() {
-            state.stats[Stat::Elimination as usize] += 1;
+            state.stats[Stat::ExhaustiveElimination as usize] += 1;
             self.reset_lbd(vars, &mut state.lbd_temp);
             elim.stop(self, vars);
         }

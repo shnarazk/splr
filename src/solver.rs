@@ -356,7 +356,7 @@ fn handle_conflict_path(
         }
         if config.use_elim {
             let cl = state.c_lvl.get() as usize;
-            if state.stats[Stat::Elimination as usize] == 1 && state.elim_trigger == 1 {
+            if state.stats[Stat::ExhaustiveElimination as usize] == 1 && state.elim_trigger == 1 {
                 state.elim_trigger = cl;
                 elim.activate();
             }

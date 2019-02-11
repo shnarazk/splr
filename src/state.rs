@@ -12,24 +12,24 @@ use std::time::SystemTime;
 /// stat index
 #[derive(Clone, Eq, PartialEq)]
 pub enum Stat {
-    Conflict = 0,       // the number of backjump
-    Decision,           // the number of decision
-    Restart,            // the number of restart
-    RestartRecord,      // the last recorded number of Restart
-    BlockRestart,       // the number of blacking start
-    BlockRestartRecord, // the last recorded number of BlockResatr
-    Learnt,             // the number of learnt clauses (< Conflict)
-    NoDecisionConflict, // the number of 'no decision conflict'
-    Propagation,        // the number of propagation
-    Reduction,          // the number of reduction
-    Simplification,     // the number of simplification
-    Elimination,        // the number of clause subsumption and varibale elimination
-    Assign,             // the number of assigned variables
-    SumLBD,             // the sum of generated learnts' LBD
-    NumBin,             // the number of binary clauses
-    NumBinLearnt,       // the number of binary learnt clauses
-    NumLBD2,            // the number of clauses which LBD is 2
-    EndOfStatIndex,     // Don't use this dummy.
+    Conflict = 0,          // the number of backjump
+    Decision,              // the number of decision
+    Restart,               // the number of restart
+    RestartRecord,         // the last recorded number of Restart
+    BlockRestart,          // the number of blacking start
+    BlockRestartRecord,    // the last recorded number of BlockResatr
+    Learnt,                // the number of learnt clauses (< Conflict)
+    NoDecisionConflict,    // the number of 'no decision conflict'
+    Propagation,           // the number of propagation
+    Reduction,             // the number of reduction
+    SatClauseElimination,  // the number of good old simplification
+    ExhaustiveElimination, // the number of clause subsumption and varibale elimination
+    Assign,                // the number of assigned variables
+    SumLBD,                // the sum of generated learnts' LBD
+    NumBin,                // the number of binary clauses
+    NumBinLearnt,          // the number of binary learnt clauses
+    NumLBD2,               // the number of clauses which LBD is 2
+    EndOfStatIndex,        // Don't use this dummy.
 }
 
 pub struct State {
@@ -281,7 +281,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K   Clause DB|#rdc:{}, #sce:{}, #smp:{} |frcK:{} ",
+            "\x1B[2K   Clause DB|#rdc:{}, #sce:{}, #exe:{} |frcK:{} ",
             i!(
                 "{:>9}",
                 self.dumper,
@@ -291,14 +291,14 @@ impl StateIF for State {
             i!(
                 "{:>9}",
                 self.dumper,
-                LogUsizeId::Simplification,
-                self.stats[Stat::Simplification as usize]
+                LogUsizeId::SatClauseElim,
+                self.stats[Stat::SatClauseElimination as usize]
             ),
             i!(
                 "{:>9}",
                 self.dumper,
-                LogUsizeId::Elimination,
-                self.stats[Stat::Elimination as usize]
+                LogUsizeId::ExhaustiveElim,
+                self.stats[Stat::ExhaustiveElimination as usize]
             ),
             f!(
                 "{:>9.4}",
@@ -358,8 +358,8 @@ pub enum LogUsizeId {
     RestartBlock,   // 10: restart_block: usize,
     Restart,        // 11: restart_count: usize,
     Reduction,      // 12: reduction: usize,
-    Simplification, // 13: simplification: usize,
-    Elimination,    // 14: elimination: usize,
+    SatClauseElim,  // 13: simplification: usize,
+    ExhaustiveElim, // 14: elimination: usize,
     // ElimClauseQueue, // 15: elim_clause_queue: usize,
     // ElimVarQueue, // 16: elim_var_queue: usize,
     End,
