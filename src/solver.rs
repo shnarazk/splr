@@ -94,7 +94,7 @@ impl SatSolverIF for Solver {
                     _ => elim.enqueue_var(vars, vi, false),
                 };
             }
-            state.progress(cdb, config, vars, Some("enqueued"));
+            state.progress(cdb, config, vars, Some("simplify"));
             if cdb.simplify(asgs, config, elim, state, vars).is_err() {
                 // Why inconsistent? Because the CNF contains a conflict, not an error!
                 state.progress(cdb, config, vars, Some("conflict"));
@@ -127,7 +127,7 @@ impl SatSolverIF for Solver {
             }
             Err(_) => {
                 asgs.cancel_until(vars, 0);
-                state.progress(cdb, config, vars, Some("Error2"));
+                state.progress(cdb, config, vars, Some("ERROR"));
                 state.ok = false;
                 Err(SolverException::InternalInconsistent)
             }
