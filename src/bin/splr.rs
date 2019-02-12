@@ -17,25 +17,25 @@ const VERSION: &'static str = "0.1.0";
     about = "SAT solver for Propositional Logic in Rust, version 0.1.0"
 )]
 struct CLOpts {
-    /// EMA coefficient for number of assignments
+    /// #samples for average assignment rate
     #[structopt(long = "ra", default_value = "3500")]
     restart_asg_samples: usize,
-    /// EMA coefficient for learnt clause LBD
+    /// #samples for average LBD of learnt clauses
     #[structopt(long = "rl", default_value = "50")]
     restart_lbd_samples: usize,
-    /// K in Glucose, for restart
+    /// threshold for forcing restart (K in Glucose)
     #[structopt(long = "rt", default_value = "0.60")]
     restart_threshold: f64,
-    /// R in Glucose, for blocking
+    /// threshold for blocking restart (R in Glucose)
     #[structopt(long = "rb", default_value = "1.40")]
     restart_blocking: f64,
-    /// Minimal stpes between restart
+    /// #conflicts between restarts
     #[structopt(long = "rs", default_value = "50")]
     restart_step: usize,
-    /// Uses another format for progress report
+    /// Uses Glucose format for progress report
     #[structopt(long = "--log", short = "l")]
     use_log: bool,
-    /// Disables clause/variable elimination
+    /// Disables exhaustive simplification
     #[structopt(long = "no-elim", short = "e")]
     no_elim: bool,
     /// Disables dynamic strategy adaptation
