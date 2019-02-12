@@ -17,6 +17,15 @@ const VERSION: &'static str = "0.1.0";
     about = "SAT solver for Propositional Logic in Rust, version 0.1.0"
 )]
 struct CLOpts {
+    /// solf limit of clause DB (default is about 4GB)
+    #[structopt(long = "cl", default_value = "18000000")]
+    clause_limit: usize,
+    /// grow limit of #clauses by var elimination
+    #[structopt(long = "eg", default_value = "0")]
+    elim_grow_limit: usize,
+    /// #literals in a merged clause by var elimination
+    #[structopt(long = "el", default_value = "100")]
+    elim_lit_limit: usize,
     /// #samples for average assignment rate
     #[structopt(long = "ra", default_value = "3500")]
     restart_asg_samples: usize,
@@ -32,6 +41,9 @@ struct CLOpts {
     /// #conflicts between restarts
     #[structopt(long = "rs", default_value = "50")]
     restart_step: usize,
+    /// output filiname; use default rule if it's empty.
+    #[structopt(long = "--output", short = "o", default_value = "")]
+    output_filname: String,
     /// Uses Glucose format for progress report
     #[structopt(long = "--log", short = "l")]
     use_log: bool,
@@ -51,17 +63,22 @@ fn main() {
     if args.cnf.exists() {
         let mut config = Config::default();
         config.adapt_strategy = !args.no_adapt;
+        config.cdb_soft_limit = args.clause_limit;
+        config.elim_eliminate_grow_limit = args.elim_grow_limit;
+        config.elim_subsume_literal_limit = args.elim_lit_limit;
         config.restart_thr = args.restart_threshold;
         config.restart_blk = args.restart_blocking;
         config.restart_asg_len = args.restart_asg_samples;
         config.restart_lbd_len = args.restart_lbd_samples;
         config.restart_step = args.restart_step;
         config.progress_log = args.use_log;
-        if args.no_elim {
-            config.use_elim = false;
-        }
+        config.use_elim = !args.no_elim;
         let (mut s, _cnf) = Solver::build(config, &args.cnf.to_str().unwrap());
-        let result = format!(".ans_{}", args.cnf.file_name().unwrap().to_str().unwrap());
+        let result = if args.output_filname != "" {
+            args.output_filname.to_string()
+        } else {
+            format!(".ans_{}", args.cnf.file_name().unwrap().to_str().unwrap())
+        };
         match s.solve() {
             Ok(Certificate::SAT(v)) => {
                 if let Ok(out) = File::create(&result) {
