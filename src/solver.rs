@@ -17,11 +17,11 @@ pub enum Certificate {
 
 /// abnormal termination flags
 pub enum SolverException {
-    StateUNSAT = 0,
-    StateSAT,
-    OutOfMemory,
-    TimeOut,
-    InternalInconsistent,
+    // StateUNSAT = 0,
+    // StateSAT,
+    Inconsistent,
+    // OutOfMemory,
+    // TimeOut,
     UndescribedError,
 }
 
@@ -129,7 +129,7 @@ impl SatSolverIF for Solver {
                 asgs.cancel_until(vars, 0);
                 state.progress(cdb, config, vars, Some("ERROR"));
                 state.ok = false;
-                Err(SolverException::InternalInconsistent)
+                Err(SolverException::Inconsistent)
             }
         }
     }
