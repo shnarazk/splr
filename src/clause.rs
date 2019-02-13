@@ -222,7 +222,7 @@ impl fmt::Display for Clause {
     }
 }
 
-/// partition of clauses
+/// Clause database
 pub struct ClauseDB {
     pub clause: Vec<Clause>,
     pub touched: Vec<bool>,
