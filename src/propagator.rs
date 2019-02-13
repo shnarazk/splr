@@ -91,8 +91,8 @@ impl PropagatorIF for AssignStack {
         debug_assert!(self.assign[v.index] == sig);
     }
     /// propagate without checking dead clauses
-    /// Note: this function assues there's no dead clause.
-    /// So Eliminator should execute `garbage_collect` before me.
+    /// Note: this function assumes there's no dead clause.
+    /// So Eliminator should call `garbage_collect` before me.
     #[inline]
     fn propagate(&mut self, cdb: &mut ClauseDB, state: &mut State, vars: &mut [Var]) -> ClauseId {
         let head = &mut cdb.clause;
