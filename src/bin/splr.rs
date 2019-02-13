@@ -9,7 +9,7 @@ use std::fs::File;
 use std::io::{BufWriter, Write};
 use structopt::StructOpt;
 
-const VERSION: &'static str = "0.1.0";
+const VERSION: &str = "0.1.0";
 
 #[derive(StructOpt)]
 #[structopt(
