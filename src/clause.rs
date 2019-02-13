@@ -145,13 +145,6 @@ impl Clause {
             self.flags &= !(1 << (flag as u16));
         }
     }
-    fn map_flag<T>(&self, flag: Flag, a: T, b: T) -> T {
-        if self.is(flag) {
-            a
-        } else {
-            b
-        }
-    }
 }
 
 impl PartialEq for Clause {
@@ -212,12 +205,13 @@ impl Clause {
 
 impl fmt::Display for Clause {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let st = |flag, mes| if self.is(flag) { mes } else { "" };
         write!(
             f,
             "C{{{:?} {}{}}}",
             vec2int(&self.lits),
-            self.map_flag(Flag::DeadClause, ", dead", ""),
-            self.map_flag(Flag::Enqueued, ", enqueued", ""),
+            st(Flag::DeadClause, ", dead"),
+            st(Flag::Enqueued, ", enqueued"),
         )
     }
 }
