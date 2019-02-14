@@ -1,14 +1,19 @@
 use crate::solver::Solver;
 use crate::traits::{LitIF, PropagatorIF, ValidatorIF, VarDBIF};
-use crate::types::Lit;
+use crate::types::{Lit, MaybeInconsistent, SolverError, NULL_CLAUSE};
 
 impl ValidatorIF for Solver {
-    fn inject_assigmnent(&mut self, vec: &[i32]) {
+    fn inject_assigmnent(&mut self, vec: &[i32]) -> MaybeInconsistent {
+        if vec.is_empty() {
+            return Err(SolverError::Inconsistent);
+        }
         for val in vec {
             let l = Lit::from_int(*val);
             let vi = l.vi();
-            self.asgs.enqueue_null(&mut self.vars[vi], l.lbool());
+            self.asgs
+                .enqueue(&mut self.vars[vi], l.lbool(), NULL_CLAUSE, 0)?;
         }
+        Ok(())
     }
     /// returns None if the given assignment is a model of a problem.
     /// Otherwise returns a clause which is not satisfiable under a given assignment.

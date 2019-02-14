@@ -154,7 +154,7 @@ pub trait StateIF {
 
 /// API for SAT validator like `inject_assignment`, `validate` and so on.
 pub trait ValidatorIF {
-    fn inject_assigmnent(&mut self, vec: &[i32]);
+    fn inject_assigmnent(&mut self, vec: &[i32]) -> MaybeInconsistent;
     fn validate(&self) -> Option<Vec<i32>>;
 }
 
