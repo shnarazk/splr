@@ -1,6 +1,6 @@
 // DIMACS Model Checker in Rust
 #![allow(unused_imports)]
-use splr::config::Config;
+use splr::config::ConfigOption;
 use splr::solver::Solver;
 use splr::traits::{SatSolverIF, ValidatorIF};
 use std::env;
@@ -25,7 +25,9 @@ struct TargetOpts {
 fn main() {
     let mut found = false;
     let mut args = TargetOpts::from_args();
-    let (mut s, _cnf) = Solver::build(Config::default(), &args.problem.to_str().unwrap());
+    let mut config = ConfigOption::default();
+    config.cnf = args.problem.clone();
+    let (mut s, _cnf) = Solver::build(config);
     if args.assign == None {
         args.assign = Some(PathBuf::from(format!(
             ".ans_{}",

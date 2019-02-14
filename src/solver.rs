@@ -1,4 +1,4 @@
-use crate::config::Config;
+use crate::config::ConfigOption;
 use crate::clause::{Clause, ClauseDB};
 use crate::eliminator::Eliminator;
 use crate::propagator::AssignStack;
@@ -42,7 +42,7 @@ pub struct Solver {
 }
 
 impl Solver {
-    pub fn new(config: &Config, cnf: &CNFDescription) -> Solver {
+    pub fn new(config: &ConfigOption, cnf: &CNFDescription) -> Solver {
         let nv = cnf.num_of_variables as usize;
         let nc = cnf.num_of_clauses as usize;
         let elim = Eliminator::new(nv);
@@ -131,8 +131,8 @@ impl SatSolverIF for Solver {
         }
     }
     /// builds and returns a configured solver.
-    fn build(mut config: Config, path: &str) -> (Solver, CNFDescription) {
-        let mut rs = BufReader::new(fs::File::open(path).unwrap());
+    fn build(config: ConfigOption) -> (Solver, CNFDescription) {
+        let mut rs = BufReader::new(fs::File::open(config.cnf.clone()).unwrap());
         let mut buf = String::new();
         let mut nv: usize = 0;
         let mut nc: usize = 0;
@@ -159,9 +159,8 @@ impl SatSolverIF for Solver {
         let cnf = CNFDescription {
             num_of_variables: nv,
             num_of_clauses: nc,
-            pathname: path.to_string(),
+            pathname: config.cnf.to_str().unwrap().to_string(),
         };
-        config.num_vars = nv;
         let mut s: Solver = Solver::new(&config, &cnf);
         loop {
             buf.clear();

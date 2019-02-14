@@ -1,5 +1,5 @@
 use crate::clause::{Clause, ClauseDB};
-use crate::config::Config;
+use crate::config::ConfigOption;
 use crate::eliminator::Eliminator;
 use crate::propagator::AssignStack;
 use crate::solver::{Solver, SolverResult};
@@ -137,14 +137,14 @@ pub trait RestartIF {
 
 /// API for SAT solver like `build`, `solve` and so on.
 pub trait SatSolverIF {
-    fn build(config: Config, path: &str) -> (Solver, CNFDescription);
+    fn build(config: ConfigOption) -> (Solver, CNFDescription);
     fn solve(&mut self) -> SolverResult;
     fn add_unchecked_clause(&mut self, v: &mut Vec<Lit>) -> Option<ClauseId>;
 }
 
 /// API for state/statistics management, providing `progress`.
 pub trait StateIF {
-    fn new(config: &Config, cnf: CNFDescription) -> State;
+    fn new(config: &ConfigOption, cnf: CNFDescription) -> State;
     fn adapt_strategy(&mut self, cdb: &mut ClauseDB);
     fn progress_header(&self);
     fn progress(&mut self, cdb: &ClauseDB, vars: &[Var], mes: Option<&str>);

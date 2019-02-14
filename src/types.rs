@@ -118,7 +118,7 @@ pub enum SolverError {
 pub type MaybeInconsistent = Result<(), SolverError>;
 
 /// data about a problem.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct CNFDescription {
     pub num_of_variables: usize,
     pub num_of_clauses: usize,

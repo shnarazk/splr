@@ -1,5 +1,5 @@
 use crate::clause::ClauseDB;
-use crate::config::Config;
+use crate::config::ConfigOption;
 use crate::eliminator::Eliminator;
 use crate::restart::Ema;
 use crate::traits::*;
@@ -9,7 +9,7 @@ use std::fmt;
 use std::path::Path;
 use std::time::SystemTime;
 
-#[derive(Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum SearchStrategy {
     Initial,
     Generic,
@@ -55,6 +55,7 @@ pub enum Stat {
     EndOfStatIndex,        // Don't use this dummy.
 }
 
+#[derive(Debug)]
 pub struct State {
     // CONFIGURATION PART
     pub root_level: usize,
@@ -257,7 +258,7 @@ macro_rules! f {
 }
 
 impl StateIF for State {
-    fn new(_config: &Config, mut cnf: CNFDescription) -> State {
+    fn new(config: &ConfigOption, mut cnf: CNFDescription) -> State {
         cnf.pathname = if cnf.pathname == "" {
             "--".to_string()
         } else {
@@ -269,9 +270,44 @@ impl StateIF for State {
                 .unwrap()
         };
         let mut state = State::default();
+        state.num_vars = cnf.num_of_variables;
+        state.adapt_strategy = !config.no_adapt;
+        state.use_chan_seok = config.use_chan_seok;
+        state.co_lbd_bound = config.co_lbd_bound;
+        state.lbd_frozen_clause = config.lbd_frozen_clause;
+        state.cla_decay = config.cla_decay;
+        state.cla_inc = config.cla_inc;
+        state.var_decay = config.var_decay;
+        state.var_decay_max = config.var_decay_max;
+        state.var_inc = config.var_inc;
+        state.first_reduction = config.first_reduction;
+        state.glureduce = config.glureduce;
+        state.cdb_inc = config.cdb_inc;
+        state.cdb_inc_extra = config.cdb_inc_extra;
+        state.cdb_soft_limit = config.cdb_soft_limit;
+        state.restart_thr = config.restart_thr;
+        state.restart_blk = config.restart_blk;
+        state.restart_asg_len = config.restart_asg_len;
+        state.restart_lbd_len = config.restart_lbd_len;
+        state.restart_expansion = config.restart_expansion;
+        state.restart_step = config.restart_step;
+        state.luby_restart = config.luby_restart;
+        state.luby_restart_num_conflict = config.luby_restart_num_conflict;
+        state.luby_restart_inc = config.luby_restart_inc;
+        state.luby_current_restarts = config.luby_current_restarts;
+        state.luby_restart_factor = config.luby_restart_factor;
+        state.use_elim = !config.no_elim;
+        state.elim_eliminate_combination_limit = config.elim_eliminate_combination_limit;
+        state.elim_eliminate_grow_limit = config.elim_eliminate_grow_limit;
+        state.elim_eliminate_loop_limit = config.elim_eliminate_loop_limit;
+        state.elim_subsume_literal_limit = config.elim_subsume_literal_limit;
+        state.elim_subsume_loop_limit = config.elim_subsume_loop_limit;
+        state.progress_log = config.progress_log;
         state.model = vec![BOTTOM; cnf.num_of_variables + 1];
+        state.conflicts = Vec::new();
         state.an_seen = vec![false; cnf.num_of_variables + 1];
         state.lbd_temp = vec![0; cnf.num_of_variables + 1];
+        state.target = cnf;
         state
     }
     #[inline(always)]
@@ -565,6 +601,7 @@ pub enum LogF64Id {
     End,
 }
 
+#[derive(Debug)]
 pub struct ProgressRecord {
     pub vali: [usize; LogUsizeId::End as usize],
     pub valf: [f64; LogF64Id::End as usize],

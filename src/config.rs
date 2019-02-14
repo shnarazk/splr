@@ -1,93 +1,118 @@
-use crate::clause::ClauseDB;
-use crate::state::{Stat, State};
-use crate::traits::{ClauseDBIF, ClauseIF, FlagIF};
-use crate::types::Flag;
-
-#[derive(Eq, PartialEq)]
-pub enum SearchStrategy {
-    Initial,
-    Generic,
-    LowDecisions,
-    HighSuccesive,
-    LowSuccesive,
-    ManyGlues,
-}
-
-impl SearchStrategy {
-    pub fn to_str(&self) -> &'static str {
-        match self {
-            SearchStrategy::Initial => "Initial",
-            SearchStrategy::Generic => "Default",
-            SearchStrategy::LowDecisions => "LowDecs",
-            SearchStrategy::HighSuccesive => "HighSucc",
-            SearchStrategy::LowSuccesive => "LowSucc",
-            SearchStrategy::ManyGlues => "ManyGlue",
-        }
-    }
-}
+use std::path::PathBuf;
+use structopt::StructOpt;
 
 /// `Solver`'s parameters; random decision rate was dropped.
-pub struct Config {
-    pub root_level: usize,
-    pub num_vars: usize,
-    /// STARATEGY
-    pub adapt_strategy: bool,
-    pub strategy: SearchStrategy,
+#[derive(StructOpt, Debug)]
+#[structopt(
+    name = "splr",
+    about = "SAT solver for Propositional Logic in Rust, version 0.1.0"
+)]
+pub struct ConfigOption {
+    /// output filiname; use default rule if it's empty.
+    #[structopt(long = "output", short = "o", default_value = "")]
+    pub output_filname: String,
+    /// a CNF file to solve
+    #[structopt(parse(from_os_str))]
+    pub cnf: std::path::PathBuf,
+
+    /// Disables dynamic strategy adaptation
+    #[structopt(long = "no-adaptation", short = "a")]
+    pub no_adapt: bool,
+    #[structopt(long = "use_chan_seok")]
     pub use_chan_seok: bool,
+    #[structopt(long = "co_lbd_bound", default_value = "5")]
     pub co_lbd_bound: usize,
+    #[structopt(long="lbd_frozen_clause", default_value = "30")]
     pub lbd_frozen_clause: usize,
     /// CLAUSE/VARIABLE ACTIVITY
+    #[structopt(long = "cla_decay", default_value = "0.999")]
     pub cla_decay: f64,
+    #[structopt(long = "cla_inc", default_value = "1.0")]
     pub cla_inc: f64,
+    #[structopt(long = "var_decay", default_value = "0.9")]
     pub var_decay: f64,
+    #[structopt(long = "var_decay_max", default_value = "0.95")]
     pub var_decay_max: f64,
+    #[structopt(long = "var_inc", default_value = "0.9")]
     pub var_inc: f64,
     /// CLAUSE REDUCTION
+    #[structopt(long = "first_reduction", default_value = "1000")]
     pub first_reduction: usize,
+    #[structopt(long="glureduce")]
     pub glureduce: bool,
+    #[structopt(long="cdb_inc", default_value = "300")]
     pub cdb_inc: usize,
+    #[structopt(long="cdb_inc_extra", default_value = "1000")]
     pub cdb_inc_extra: usize,
+    // clause_limit: usize,
+    /// solf limit of clause DB (default is about 4GB)
+    #[structopt(long = "cl", default_value = "18000000")]
     pub cdb_soft_limit: usize,
-    pub ema_coeffs: (i32, i32),
     /// RESTART
     /// For force restart based on average LBD of newly generated clauses: 0.80.
     /// This is called `K` in Glusoce
+    /// threshold for forcing restart (K in Glucose)
+    #[structopt(long = "rt", default_value = "0.60")]
     pub restart_thr: f64,
     /// For block restart based on average assigments: 1.40.
     /// This is called `R` in Glucose
+    /// threshold for blocking restart (R in Glucose)
+    #[structopt(long = "rb", default_value = "1.40")]
     pub restart_blk: f64,
+    /// #samples for average assignment rate
+    #[structopt(long = "ra", default_value = "3500")]
     pub restart_asg_len: usize,
+    /// #samples for average LBD of learnt clauses
+    #[structopt(long = "rl", default_value = "50")]
     pub restart_lbd_len: usize,
+    #[structopt(long = "restart_expansion", default_value = "1.15")]
     pub restart_expansion: f64,
+    /// #conflicts between restarts
+    #[structopt(long = "rs", default_value = "50")]
     pub restart_step: usize,
+    #[structopt(long = "luby_restart")]
     pub luby_restart: bool,
+    #[structopt(long = "luby_restart_num_conflict", default_value = "0.0")]
     pub luby_restart_num_conflict: f64,
+    #[structopt(long = "luby_restart_inc", default_value = "2.0")]
     pub luby_restart_inc: f64,
+    #[structopt(long = "luby_current_restarts", default_value = "0")]
     pub luby_current_restarts: usize,
+    #[structopt(long = "luby_restart_factor", default_value = "100.0")]
     pub luby_restart_factor: f64,
     /// Eliminator
-    pub use_elim: bool,
+    /// Disables exhaustive simplification
+    #[structopt(long = "no-elim", short = "e")]
+    pub no_elim: bool,
     /// 0 for no limit
     /// Stop elimination if a generated resolvent is larger than this
     /// 0 means no limit.
+    #[structopt(long = "elim_eliminate_combination_limit", default_value = "80")]
     pub elim_eliminate_combination_limit: usize,
     /// Stop elimination if the increase of clauses is over this
+    /// grow limit of #clauses by var elimination
+    #[structopt(long = "eg", default_value = "0")]
     pub elim_eliminate_grow_limit: usize,
+    #[structopt(default_value = "2000000")]
     pub elim_eliminate_loop_limit: usize,
+    /// #literals in a merged clause by var elimination
     /// Stop sumsumption if the size of a clause is over this
+    #[structopt(long = "el", default_value = "100")]
     pub elim_subsume_literal_limit: usize,
+    #[structopt(default_value = "2000000")]
     pub elim_subsume_loop_limit: usize,
     /// MISC
+    /// Uses Glucose format for progress report
+    #[structopt(long = "--log", short = "l")]
     pub progress_log: bool,
 }
 
-impl Default for Config {
-    fn default() -> Config {
-        Config {
-            root_level: 0,
-            num_vars: 0,
-            adapt_strategy: true,
-            strategy: SearchStrategy::Initial,
+impl Default for ConfigOption {
+    fn default() -> ConfigOption {
+        ConfigOption {
+            cnf: PathBuf::new(),
+            output_filname: "".to_string(),
+            no_adapt: false,
             use_chan_seok: false,
             co_lbd_bound: 5,
             lbd_frozen_clause: 30,
@@ -112,8 +137,7 @@ impl Default for Config {
             luby_restart_inc: 2.0,
             luby_current_restarts: 0,
             luby_restart_factor: 100.0,
-            ema_coeffs: (2 ^ 5, 2 ^ 15),
-            use_elim: true,
+            no_elim: false,
             elim_eliminate_combination_limit: 80,
             elim_eliminate_grow_limit: 0, // 64
             elim_eliminate_loop_limit: 2_000_000,
@@ -124,69 +148,3 @@ impl Default for Config {
     }
 }
 
-impl Config {
-    #[inline(always)]
-    pub fn adapt_strategy(&mut self, cdb: &mut ClauseDB, state: &mut State) {
-        if !self.adapt_strategy || self.strategy != SearchStrategy::Initial {
-            return;
-        }
-        let mut re_init = false;
-        let decpc = state.stats[Stat::Decision as usize] as f64
-            / state.stats[Stat::Conflict as usize] as f64;
-        if decpc <= 1.2 {
-            self.strategy = SearchStrategy::LowDecisions;
-            self.use_chan_seok = true;
-            self.co_lbd_bound = 4;
-            self.glureduce = true;
-            self.first_reduction = 2000;
-            state.next_reduction = 2000;
-            state.cur_restart = (state.stats[Stat::Conflict as usize] as f64
-                / state.next_reduction as f64
-                + 1.0) as usize;
-            self.cdb_inc = 0;
-            re_init = true;
-        }
-        if state.stats[Stat::NoDecisionConflict as usize] < 30_000 {
-            self.strategy = SearchStrategy::LowSuccesive;
-            self.luby_restart = true;
-            self.luby_restart_factor = 100.0;
-            self.var_decay = 0.999;
-            self.var_decay_max = 0.999;
-        }
-        if state.stats[Stat::NoDecisionConflict as usize] > 54_400 {
-            self.strategy = SearchStrategy::HighSuccesive;
-            self.use_chan_seok = true;
-            self.glureduce = true;
-            self.co_lbd_bound = 3;
-            self.first_reduction = 30000;
-            self.var_decay = 0.99;
-            self.var_decay_max = 0.99;
-            // randomize_on_restarts = 1;
-        }
-        if state.stats[Stat::NumLBD2 as usize] - state.stats[Stat::NumBin as usize] > 20_000 {
-            self.strategy = SearchStrategy::ManyGlues;
-            self.var_decay = 0.91;
-            self.var_decay_max = 0.91;
-        }
-        if self.strategy == SearchStrategy::Initial {
-            self.strategy = SearchStrategy::Generic;
-            return;
-        }
-        if self.use_chan_seok {
-            // Adjusting for low decision levels.
-            // move some clauses with good lbd (col_lbd_bound) to Permanent
-            for c in &mut cdb.clause[1..] {
-                if c.is(Flag::DeadClause) || !c.is(Flag::LearntClause) {
-                    continue;
-                }
-                if c.rank <= self.co_lbd_bound {
-                    c.turn_off(Flag::LearntClause);
-                    cdb.num_learnt -= 1;
-                } else if re_init {
-                    c.kill(&mut cdb.touched);
-                }
-            }
-            cdb.garbage_collect();
-        }
-    }
-}
