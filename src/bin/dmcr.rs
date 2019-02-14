@@ -12,7 +12,7 @@ use structopt::StructOpt;
 #[derive(StructOpt)]
 #[structopt(
     name = "dmcr",
-    about = "DIMACS-format Model Checker in Rust, version 0.1.0 RC"
+    about = "DIMACS-format Model Checker in Rust"
 )]
 struct TargetOpts {
     #[structopt(parse(from_os_str))]
