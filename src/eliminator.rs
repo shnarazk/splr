@@ -1,5 +1,4 @@
 use crate::clause::{Clause, ClauseDB};
-use crate::config::Config;
 use crate::propagator::AssignStack;
 use crate::state::State;
 use crate::traits::*;
@@ -126,7 +125,6 @@ impl EliminatorIF for Eliminator {
         &mut self,
         asgs: &mut AssignStack,
         cdb: &mut ClauseDB,
-        config: &mut Config,
         state: &mut State,
         vars: &mut [Var],
     ) -> MaybeInconsistent {
@@ -140,20 +138,20 @@ impl EliminatorIF for Eliminator {
             || !self.clause_queue.is_empty()
         {
             if !self.clause_queue.is_empty() || self.bwdsub_assigns < asgs.len() {
-                self.backward_subsumption_check(asgs, cdb, config, vars)?;
+                self.backward_subsumption_check(asgs, cdb, state, vars)?;
             }
             while let Some(vi) = self.var_queue.select_var(vars) {
                 let v = &mut vars[vi];
                 v.turn_off(Flag::Enqueued);
                 cnt += 1;
-                if cnt < config.elim_eliminate_loop_limit
+                if cnt < state.elim_eliminate_loop_limit
                     && !v.is(Flag::EliminatedVar)
                     && v.assign == BOTTOM
                 {
-                    eliminate_var(asgs, config, cdb, self, state, vars, vi)?;
+                    eliminate_var(asgs, cdb, self, state, vars, vi)?;
                 }
             }
-            self.backward_subsumption_check(asgs, cdb, config, vars)?;
+            self.backward_subsumption_check(asgs, cdb, state, vars)?;
             debug_assert!(self.clause_queue.is_empty());
             cdb.garbage_collect();
             if asgs.propagate(cdb, state, vars) != NULL_CLAUSE {
@@ -283,7 +281,7 @@ impl Eliminator {
         &mut self,
         asgs: &mut AssignStack,
         cdb: &mut ClauseDB,
-        config: &Config,
+        state: &State,
         vars: &mut [Var],
     ) -> MaybeInconsistent {
         let mut cnt = 0;
@@ -301,7 +299,7 @@ impl Eliminator {
             };
             // assert_ne!(cid, 0);
             cnt += 1;
-            if config.elim_subsume_loop_limit < cnt {
+            if state.elim_subsume_loop_limit < cnt {
                 continue;
             }
             let best = if cid.is_lifted_lit() {
@@ -311,7 +309,7 @@ impl Eliminator {
                 let c = &mut cdb.clause[cid];
                 c.turn_off(Flag::Enqueued);
                 let lits = &c.lits;
-                if c.is(Flag::DeadClause) || config.elim_subsume_literal_limit < lits.len() {
+                if c.is(Flag::DeadClause) || state.elim_subsume_literal_limit < lits.len() {
                     continue;
                 }
                 // if c is subsumed by c', both of c and c' are included in the occurs of all literals of c
@@ -348,7 +346,7 @@ impl Eliminator {
                         }
                         let db = &cdb.clause[*did];
                         if !db.is(Flag::DeadClause)
-                            && db.lits.len() <= config.elim_subsume_literal_limit
+                            && db.lits.len() <= state.elim_subsume_literal_limit
                         {
                             try_subsume(asgs, cdb, self, vars, cid, *did)?;
                         }
@@ -500,8 +498,9 @@ fn check_eliminator(cdb: &ClauseDB, vars: &[Var]) -> bool {
 }
 
 /// Returns **false** if one of the clauses is always satisfied. (merge_vec should not be used.)
-fn merge(cdb: &mut ClauseDB, cip: ClauseId, ciq: ClauseId, v: VarId) -> Option<Vec<Lit>> {
-    let mut vec: Vec<Lit> = Vec::new();
+fn merge(cdb: &mut ClauseDB, state: &mut State, cip: ClauseId, ciq: ClauseId, v: VarId) -> usize {
+    let vec = &mut state.new_learnt;
+    vec.clear();
     let pqb = &cdb.clause[cip];
     let qpb = &cdb.clause[ciq];
     let ps_smallest = pqb.lits.len() < qpb.lits.len();
@@ -512,7 +511,7 @@ fn merge(cdb: &mut ClauseDB, cip: ClauseId, ciq: ClauseId, v: VarId) -> Option<V
             for j in &pb.lits {
                 if j.vi() == l.vi() {
                     if j.negate() == *l {
-                        return None;
+                        return 0;
                     } else {
                         continue 'next_literal;
                     }
@@ -527,7 +526,7 @@ fn merge(cdb: &mut ClauseDB, cip: ClauseId, ciq: ClauseId, v: VarId) -> Option<V
         }
     }
     // println!("merge generated {:?} from {} and {} to eliminate {}", vec2int(vec.clone()), p, q, v);
-    Some(vec)
+    vec.len()
 }
 
 /// removes `l` from clause `cid`
@@ -639,7 +638,6 @@ fn make_eliminated_clause(cdb: &mut ClauseDB, vec: &mut Vec<Lit>, vi: VarId, cid
 #[inline]
 fn eliminate_var(
     asgs: &mut AssignStack,
-    config: &mut Config,
     cdb: &mut ClauseDB,
     elim: &mut Eliminator,
     state: &mut State,
@@ -659,7 +657,7 @@ fn eliminate_var(
     let pos = &v.pos_occurs as *const Vec<ClauseId>;
     let neg = &v.neg_occurs as *const Vec<ClauseId>;
     unsafe {
-        if check_var_elimination_condition(cdb, config, vars, &*pos, &*neg, vi) {
+        if check_var_elimination_condition(cdb, state, vars, &*pos, &*neg, vi) {
             return Ok(());
         }
         // OK, eliminate the literal and build constraints on it.
@@ -669,34 +667,31 @@ fn eliminate_var(
         for p in &*pos {
             let rank_p = cdb.clause[*p].rank;
             for n in &*neg {
-                if let Some(vec) = merge(cdb, *p, *n, vi) {
-                    // println!("eliminator replaces {} with a cross product {:?}", p.fmt(), vec2int(&vec));
-                    debug_assert!(!vec.is_empty());
-                    match vec.len() {
-                        1 => {
-                            // println!(
-                            //     "eliminate_var: grounds {} from {}{:?} and {}{:?}",
-                            //     vec[0].int(),
-                            //     p.fmt(),
-                            //     vec2int(&clause!(*cp, *p).lits),
-                            //     n.fmt(),
-                            //     vec2int(&clause!(*cp, *n).lits)
-                            // );
-                            let lit = vec[0];
-                            asgs.enqueue(&mut vars[lit.vi()], lit.lbool(), NULL_CLAUSE, 0)?;
-                        }
-                        _ => {
-                            let v = &mut vec.to_vec();
-                            let rank = if cdb.clause[*p].is(Flag::LearntClause)
-                                && cdb.clause[*n].is(Flag::LearntClause)
-                            {
-                                rank_p.min(cdb.clause[*n].rank)
-                            } else {
-                                0
-                            };
-                            let cid = cdb.attach(config, vars, v, rank);
-                            elim.add_cid_occur(vars, cid, &mut cdb.clause[cid], true);
-                        }
+                match merge(cdb, state, *p, *n, vi) {
+                    0 => (),
+                    1 => {
+                        // println!(
+                        //     "eliminate_var: grounds {} from {}{:?} and {}{:?}",
+                        //     vec[0].int(),
+                        //     p.fmt(),
+                        //     vec2int(&clause!(*cp, *p).lits),
+                        //     n.fmt(),
+                        //     vec2int(&clause!(*cp, *n).lits)
+                        // );
+                        let lit = state.new_learnt[0];
+                        asgs.enqueue(&mut vars[lit.vi()], lit.lbool(), NULL_CLAUSE, 0)?;
+                    }
+                    _ => {
+                        // println!("eliminator replaces {} with a cross product", p.fmt());
+                        let rank = if cdb.clause[*p].is(Flag::LearntClause)
+                            && cdb.clause[*n].is(Flag::LearntClause)
+                        {
+                            rank_p.min(cdb.clause[*n].rank)
+                        } else {
+                            0
+                        };
+                        let cid = cdb.attach(state, vars, rank);
+                        elim.add_cid_occur(vars, cid, &mut cdb.clause[cid], true);
                     }
                 }
             }
@@ -712,7 +707,7 @@ fn eliminate_var(
         vars[vi].pos_occurs.clear();
         vars[vi].neg_occurs.clear();
         vars[vi].turn_on(Flag::EliminatedVar);
-        elim.backward_subsumption_check(asgs, cdb, config, vars)
+        elim.backward_subsumption_check(asgs, cdb, state, vars)
     }
 }
 
@@ -720,17 +715,17 @@ fn eliminate_var(
 #[inline]
 fn check_var_elimination_condition(
     cdb: &ClauseDB,
-    config: &Config,
+    state: &State,
     vars: &[Var],
     pos: &[ClauseId],
     neg: &[ClauseId],
     v: VarId,
 ) -> bool {
     // avoid thrashing
-    let limit = if config.cdb_soft_limit < cdb.count(true) {
+    let limit = if state.cdb_soft_limit < cdb.count(true) {
         0
     } else {
-        config.elim_eliminate_grow_limit
+        state.elim_eliminate_grow_limit
     };
     let clslen = pos.len() + neg.len();
     let mut cnt = 0;
@@ -740,8 +735,8 @@ fn check_var_elimination_condition(
             if res {
                 cnt += 1;
                 if clslen + limit < cnt
-                    || (config.elim_eliminate_combination_limit != 0
-                        && config.elim_eliminate_combination_limit < clause_size)
+                    || (state.elim_eliminate_combination_limit != 0
+                        && state.elim_eliminate_combination_limit < clause_size)
                 {
                     return true;
                 }

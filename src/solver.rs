@@ -1,5 +1,5 @@
-use crate::clause::{Clause, ClauseDB};
 use crate::config::Config;
+use crate::clause::{Clause, ClauseDB};
 use crate::eliminator::Eliminator;
 use crate::propagator::AssignStack;
 use crate::state::{Stat, State};
@@ -35,7 +35,6 @@ pub type SolverResult = Result<Certificate, SolverException>;
 /// is the collection of all variables.
 pub struct Solver {
     pub asgs: AssignStack, // Assignment
-    pub config: Config,    // Configuration
     pub cdb: ClauseDB,     // Clauses
     pub elim: Eliminator,  // Clause/Variable Elimination
     pub state: State,      // misc data
@@ -43,14 +42,13 @@ pub struct Solver {
 }
 
 impl Solver {
-    pub fn new(config: Config, cnf: &CNFDescription) -> Solver {
+    pub fn new(config: &Config, cnf: &CNFDescription) -> Solver {
         let nv = cnf.num_of_variables as usize;
         let nc = cnf.num_of_clauses as usize;
         let elim = Eliminator::new(nv);
-        let state = State::new(&config, cnf.clone());
+        let state = State::new(config, cnf.clone());
         Solver {
             asgs: AssignStack::new(nv),
-            config,
             cdb: ClauseDB::new(nv, nc),
             elim,
             state,
@@ -63,7 +61,6 @@ impl SatSolverIF for Solver {
     fn solve(&mut self) -> SolverResult {
         let Solver {
             ref mut asgs,
-            ref mut config,
             ref mut cdb,
             ref mut elim,
             ref mut state,
@@ -75,12 +72,12 @@ impl SatSolverIF for Solver {
         // TODO: deal with assumptions
         // s.root_level = 0;
         state.num_solved_vars = asgs.len();
-        state.progress_header(config);
-        state.progress(cdb, config, vars, Some("loaded"));
+        state.progress_header();
+        state.progress(cdb, vars, Some("loaded"));
         if 20_000_000 < state.target.num_of_clauses {
-            config.use_elim = false;
+            state.use_elim = false;
         }
-        if config.use_elim {
+        if state.use_elim {
             elim.activate();
             elim.prepare(cdb, vars, true);
             for vi in 1..vars.len() {
@@ -94,20 +91,20 @@ impl SatSolverIF for Solver {
                     _ => elim.enqueue_var(vars, vi, false),
                 };
             }
-            state.progress(cdb, config, vars, Some("simplify"));
-            if cdb.simplify(asgs, config, elim, state, vars).is_err() {
+            state.progress(cdb, vars, Some("simplify"));
+            if cdb.simplify(asgs, elim, state, vars).is_err() {
                 // Why inconsistent? Because the CNF contains a conflict, not an error!
-                state.progress(cdb, config, vars, Some("conflict"));
+                state.progress(cdb, vars, Some("conflict"));
                 state.ok = false;
                 return Ok(Certificate::UNSAT(Vec::new()));
             }
-            state.progress(cdb, config, vars, Some("subsumed"));
+            state.progress(cdb, vars, Some("subsumed"));
         }
-        match search(asgs, config, cdb, elim, state, vars) {
+        match search(asgs, cdb, elim, state, vars) {
             Ok(true) => {
-                state.progress(cdb, config, vars, None);
+                state.progress(cdb, vars, None);
                 let mut result = Vec::new();
-                for (vi, v) in vars.iter().enumerate().take(config.num_vars + 1).skip(1) {
+                for (vi, v) in vars.iter().enumerate().take(state.num_vars + 1).skip(1) {
                     match v.assign {
                         TRUE => result.push(vi as i32),
                         FALSE => result.push(0 - vi as i32),
@@ -119,7 +116,7 @@ impl SatSolverIF for Solver {
                 Ok(Certificate::SAT(result))
             }
             Ok(false) => {
-                state.progress(cdb, config, vars, None);
+                state.progress(cdb, vars, None);
                 asgs.cancel_until(vars, 0);
                 Ok(Certificate::UNSAT(
                     state.conflicts.iter().map(|l| l.int()).collect(),
@@ -127,7 +124,7 @@ impl SatSolverIF for Solver {
             }
             Err(_) => {
                 asgs.cancel_until(vars, 0);
-                state.progress(cdb, config, vars, Some("ERROR"));
+                state.progress(cdb, vars, Some("ERROR"));
                 state.ok = false;
                 Err(SolverException::Inconsistent)
             }
@@ -165,7 +162,7 @@ impl SatSolverIF for Solver {
             pathname: path.to_string(),
         };
         config.num_vars = nv;
-        let mut s: Solver = Solver::new(config, &cnf);
+        let mut s: Solver = Solver::new(&config, &cnf);
         loop {
             buf.clear();
             match rs.read_line(&mut buf) {
@@ -237,7 +234,6 @@ impl SatSolverIF for Solver {
 #[inline]
 fn search(
     asgs: &mut AssignStack,
-    config: &mut Config,
     cdb: &mut ClauseDB,
     elim: &mut Eliminator,
     state: &mut State,
@@ -245,19 +241,19 @@ fn search(
 ) -> Result<bool, SolverError> {
     let mut conflict_c = 0.0; // for Luby restart
     let mut a_decision_was_made = false;
-    state.restart_update_luby(config);
+    state.restart_update_luby();
     loop {
         let ci = asgs.propagate(cdb, state, vars);
         state.stats[Stat::Propagation as usize] += 1;
         if ci == NULL_CLAUSE {
-            if config.num_vars <= asgs.len() + state.num_eliminated_vars {
+            if state.num_vars <= asgs.len() + state.num_eliminated_vars {
                 return Ok(true);
             }
             // DYNAMIC FORCING RESTART
-            if state.force_restart(config, &mut conflict_c) {
-                asgs.cancel_until(vars, config.root_level);
+            if state.force_restart(&mut conflict_c) {
+                asgs.cancel_until(vars, state.root_level);
             } else if asgs.level() == 0 {
-                if cdb.simplify(asgs, config, elim, state, vars).is_err() {
+                if cdb.simplify(asgs, elim, state, vars).is_err() {
                     debug_assert!(false, "interal error by simplify");
                     return Err(SolverError::Inconsistent);
                 }
@@ -278,11 +274,11 @@ fn search(
             } else {
                 state.stats[Stat::NoDecisionConflict as usize] += 1;
             }
-            if asgs.level() == config.root_level {
-                analyze_final(asgs, config, state, vars, &cdb.clause[ci]);
+            if asgs.level() == state.root_level {
+                analyze_final(asgs, state, vars, &cdb.clause[ci]);
                 return Ok(false);
             }
-            handle_conflict_path(asgs, config, cdb, elim, state, vars, ci);
+            handle_conflict_path(asgs, cdb, elim, state, vars, ci);
         }
     }
 }
@@ -290,7 +286,6 @@ fn search(
 #[inline]
 fn handle_conflict_path(
     asgs: &mut AssignStack,
-    config: &mut Config,
     cdb: &mut ClauseDB,
     elim: &mut Eliminator,
     state: &mut State,
@@ -298,15 +293,15 @@ fn handle_conflict_path(
     ci: ClauseId,
 ) {
     let tn_confl = state.stats[Stat::Conflict as usize] as usize; // total number
-    if tn_confl % 5000 == 0 && config.var_decay < config.var_decay_max {
-        config.var_decay += 0.01;
+    if tn_confl % 5000 == 0 && state.var_decay < state.var_decay_max {
+        state.var_decay += 0.01;
     }
-    state.restart_update_asg(config, asgs.len());
+    state.restart_update_asg(asgs.len());
     // DYNAMIC BLOCKING RESTART
-    state.block_restart(asgs, config, tn_confl);
-    let bl = analyze(asgs, config, cdb, state, vars, ci);
-    let mut new_learnt = &mut state.new_learnt;
-    asgs.cancel_until(vars, bl.max(config.root_level));
+    state.block_restart(asgs, tn_confl);
+    let bl = analyze(asgs, cdb, state, vars, ci);
+    let new_learnt = &mut state.new_learnt;
+    asgs.cancel_until(vars, bl.max(state.root_level));
     let learnt_len = new_learnt.len();
     if learnt_len == 1 {
         asgs.uncheck_enqueue(vars, new_learnt[0], NULL_CLAUSE);
@@ -314,7 +309,7 @@ fn handle_conflict_path(
         state.stats[Stat::Learnt as usize] += 1;
         let lbd = vars.compute_lbd(&new_learnt, &mut state.lbd_temp);
         let l0 = new_learnt[0];
-        let cid = cdb.attach(config, vars, &mut new_learnt, lbd);
+        let cid = cdb.attach(state, vars, lbd);
         elim.add_cid_occur(vars, cid, &mut cdb.clause[cid], true);
         state.c_lvl.update(bl as f64);
         state.b_lvl.update(lbd as f64);
@@ -332,29 +327,29 @@ fn handle_conflict_path(
     if tn_confl % 10_000 == 0 {
         if tn_confl == 100_000 {
             asgs.cancel_until(vars, 0);
-            config.adapt_strategy(cdb, state);
+            state.adapt_strategy(cdb);
         }
         // micro tuning of restart thresholds
         let nr = state.stats[Stat::Restart as usize] - state.stats[Stat::RestartRecord as usize];
         state.stats[Stat::RestartRecord as usize] = state.stats[Stat::Restart as usize];
-        if config.restart_thr <= 0.82 && nr < 4 {
-            config.restart_thr += 0.01;
-        } else if 0.44 <= config.restart_thr && 1000 < nr {
-            config.restart_thr -= 0.01;
+        if state.restart_thr <= 0.82 && nr < 4 {
+            state.restart_thr += 0.01;
+        } else if 0.44 <= state.restart_thr && 1000 < nr {
+            state.restart_thr -= 0.01;
         } else {
-            config.restart_thr -= (config.restart_thr - 0.60) * 0.01
+            state.restart_thr -= (state.restart_thr - 0.60) * 0.01
         }
         let nb = state.stats[Stat::BlockRestart as usize]
             - state.stats[Stat::BlockRestartRecord as usize];
         state.stats[Stat::BlockRestartRecord as usize] = state.stats[Stat::BlockRestart as usize];
-        if 1.05 <= config.restart_blk && nb < 4 {
-            config.restart_blk -= 0.01;
-        } else if config.restart_blk <= 1.8 && 1000 < nb {
-            config.restart_blk += 0.01;
+        if 1.05 <= state.restart_blk && nb < 4 {
+            state.restart_blk -= 0.01;
+        } else if state.restart_blk <= 1.8 && 1000 < nb {
+            state.restart_blk += 0.01;
         } else {
-            config.restart_blk -= (config.restart_blk - 1.40) * 0.01
+            state.restart_blk -= (state.restart_blk - 1.40) * 0.01
         }
-        if config.use_elim {
+        if state.use_elim {
             let cl = state.c_lvl.get() as usize;
             if state.stats[Stat::ExhaustiveElimination as usize] == 1 && state.elim_trigger == 1 {
                 state.elim_trigger = cl;
@@ -365,24 +360,23 @@ fn handle_conflict_path(
             //     state.elim_trigger = cl;
             // }
         }
-        state.progress(cdb, config, vars, None);
+        state.progress(cdb, vars, None);
     }
-    config.var_inc /= config.var_decay;
-    config.cla_inc /= config.cla_decay;
-    if ((config.use_chan_seok && !config.glureduce && config.first_reduction < cdb.num_learnt)
-        || (config.glureduce
+    state.var_inc /= state.var_decay;
+    state.cla_inc /= state.cla_decay;
+    if ((state.use_chan_seok && !state.glureduce && state.first_reduction < cdb.num_learnt)
+        || (state.glureduce
             && state.cur_restart * state.next_reduction <= state.stats[Stat::Conflict as usize]))
         && 0 < cdb.num_learnt
     {
         state.cur_restart = ((tn_confl as f64) / (state.next_reduction as f64)) as usize + 1;
-        cdb.reduce(config, state, vars);
+        cdb.reduce(state, vars);
     }
 }
 
 #[inline]
 fn analyze(
     asgs: &mut AssignStack,
-    config: &mut Config,
     cdb: &mut ClauseDB,
     state: &mut State,
     vars: &mut [Var],
@@ -404,14 +398,14 @@ fn analyze(
             let c = &mut cdb.clause[cid] as *mut Clause;
             debug_assert!(!(*c).is(Flag::DeadClause));
             if (*c).is(Flag::LearntClause) {
-                cdb.bump_activity(&mut config.cla_inc, cid);
+                cdb.bump_activity(&mut state.cla_inc, cid);
                 if 2 < (*c).rank {
                     let nlevels = vars.compute_lbd(&(*c).lits, &mut state.lbd_temp);
                     if nlevels + 1 < (*c).rank {
-                        if (*c).rank <= config.lbd_frozen_clause {
+                        if (*c).rank <= state.lbd_frozen_clause {
                             (*c).turn_on(Flag::JustUsedClause);
                         }
-                        if config.use_chan_seok && nlevels < config.co_lbd_bound {
+                        if state.use_chan_seok && nlevels < state.co_lbd_bound {
                             (*c).turn_off(Flag::LearntClause);
                             cdb.num_learnt -= 1;
                         } else {
@@ -423,7 +417,7 @@ fn analyze(
             // println!("- handle {}", cid.fmt());
             for q in &(*c).lits[((p != NULL_LIT) as usize)..] {
                 let vi = q.vi();
-                vars.bump_activity(&mut config.var_inc, vi);
+                vars.bump_activity(&mut state.var_inc, vi);
                 asgs.update_order(vars, vi);
                 let v = &mut vars[vi];
                 let lvl = v.level;
@@ -442,7 +436,7 @@ fn analyze(
                         learnt.push(*q);
                     }
                 } else {
-                    // if !config.an_seen[vi] {
+                    // if !state.an_seen[vi] {
                     //     println!("- ignore {} because it was flagged", q.int());
                     // } else {
                     //     println!("- ignore {} because its level is {}", q.int(), lvl);
@@ -469,14 +463,13 @@ fn analyze(
     }
     learnt[0] = p.negate();
     // println!("- appending {}, the result is {:?}", learnt[0].int(), vec2int(learnt));
-    simplify_learnt(asgs, cdb, config, state, vars)
+    simplify_learnt(asgs, cdb, state, vars)
 }
 
 #[inline]
 fn simplify_learnt(
     asgs: &mut AssignStack,
     cdb: &mut ClauseDB,
-    config: &mut Config,
     state: &mut State,
     vars: &mut [Var],
 ) -> usize {
@@ -503,7 +496,7 @@ fn simplify_learnt(
     while let Some(l) = state.last_dl.pop() {
         let vi = l.vi();
         if cdb.clause[vars[vi].reason].rank < lbd {
-            vars.bump_activity(&mut config.var_inc, vi);
+            vars.bump_activity(&mut state.var_inc, vi);
             asgs.update_order(vars, vi);
         }
     }
@@ -567,8 +560,8 @@ fn redundant_lit(
 }
 
 #[inline]
-fn analyze_final(asgs: &AssignStack, config: &Config, state: &mut State, vars: &[Var], c: &Clause) {
-    let mut seen = vec![false; config.num_vars + 1];
+fn analyze_final(asgs: &AssignStack, state: &mut State, vars: &[Var], c: &Clause) {
+    let mut seen = vec![false; state.num_vars + 1];
     state.conflicts.clear();
     if asgs.level() == 0 {
         return;
@@ -579,10 +572,10 @@ fn analyze_final(asgs: &AssignStack, config: &Config, state: &mut State, vars: &
             state.an_seen[vi] = true;
         }
     }
-    let end = if asgs.level() <= config.root_level {
+    let end = if asgs.level() <= state.root_level {
         asgs.len()
     } else {
-        asgs.num_at(config.root_level)
+        asgs.num_at(state.root_level)
     };
     for l in &asgs.trail[asgs.num_at(0)..end] {
         let vi = l.vi();

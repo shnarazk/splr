@@ -1,4 +1,3 @@
-use crate::config::Config;
 use crate::eliminator::Eliminator;
 use crate::propagator::AssignStack;
 use crate::state::{Stat, State};
@@ -382,11 +381,11 @@ impl ClauseDBIF for ClauseDB {
     // Note: set lbd to 0 if you want to add the clause to Permanent.
     fn attach(
         &mut self,
-        config: &mut Config,
+        state: &mut State,
         vars: &mut [Var],
-        v: &mut Vec<Lit>,
         lbd: usize,
     ) -> ClauseId {
+        let v = &mut state.new_learnt;
         debug_assert!(1 < v.len());
         let mut i_max = 0;
         let mut lv_max = 0;
@@ -400,10 +399,10 @@ impl ClauseDBIF for ClauseDB {
             }
         }
         v.swap(1, i_max);
-        let learnt = 0 < lbd && 2 < v.len() && (!config.use_chan_seok || config.co_lbd_bound < lbd);
+        let learnt = 0 < lbd && 2 < v.len() && (!state.use_chan_seok || state.co_lbd_bound < lbd);
         let cid = self.new_clause(&v, lbd, learnt);
         let c = &mut self.clause[cid];
-        c.activity = config.var_inc;
+        c.activity = state.var_inc;
         cid
     }
     fn detach(&mut self, cid: ClauseId) {
@@ -412,14 +411,14 @@ impl ClauseDBIF for ClauseDB {
         debug_assert!(1 < c.lits.len());
         c.kill(&mut self.touched);
     }
-    fn reduce(&mut self, config: &Config, state: &mut State, vars: &mut [Var]) {
+    fn reduce(&mut self, state: &mut State, vars: &mut [Var]) {
         self.reset_lbd(vars, &mut state.lbd_temp);
         let ClauseDB {
             ref mut clause,
             ref mut touched,
             ..
         } = self;
-        state.next_reduction += config.cdb_inc;
+        state.next_reduction += state.cdb_inc;
         let mut perm = Vec::with_capacity(clause.len());
         for (i, b) in clause.iter().enumerate().skip(1) {
             if b.is(Flag::LearntClause) && !b.is(Flag::DeadClause) && !vars.locked(b, i) {
@@ -430,15 +429,15 @@ impl ClauseDBIF for ClauseDB {
             return;
         }
         let keep = perm.len() / 2;
-        if config.use_chan_seok {
+        if state.use_chan_seok {
             perm.sort_by(|&a, &b| clause[a].cmp_activity(&clause[b]));
         } else {
             perm.sort_by(|&a, &b| clause[a].cmp(&clause[b]));
             if clause[perm[keep]].rank <= 3 {
-                state.next_reduction += config.cdb_inc_extra;
+                state.next_reduction += state.cdb_inc_extra;
             }
             if clause[perm[0]].rank <= 5 {
-                state.next_reduction += config.cdb_inc_extra;
+                state.next_reduction += state.cdb_inc_extra;
             };
         }
         for i in &perm[keep..] {
@@ -456,7 +455,6 @@ impl ClauseDBIF for ClauseDB {
     fn simplify(
         &mut self,
         asgs: &mut AssignStack,
-        config: &mut Config,
         elim: &mut Eliminator,
         state: &mut State,
         vars: &mut [Var],
@@ -469,7 +467,7 @@ impl ClauseDBIF for ClauseDB {
         elim.prepare(self, vars, true);
         loop {
             let na = asgs.len();
-            elim.eliminate(asgs, self, config, state, vars)?;
+            elim.eliminate(asgs, self, state, vars)?;
             for c in &mut self.clause[1..] {
                 if !c.is(Flag::DeadClause) && vars.satisfies(&c.lits) {
                     c.kill(&mut self.touched);

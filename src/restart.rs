@@ -1,4 +1,3 @@
-use crate::config::Config;
 use crate::propagator::AssignStack;
 use crate::state::{Stat, State};
 use crate::traits::*;
@@ -30,13 +29,13 @@ impl EmaIF for Ema {
 }
 
 impl RestartIF for State {
-    fn block_restart(&mut self, asgs: &AssignStack, config: &Config, ncnfl: usize) -> bool {
+    fn block_restart(&mut self, asgs: &AssignStack, ncnfl: usize) -> bool {
         let nas = asgs.len();
         // let _count = self.stats[Stat::Conflict as usize];
         // let _ave = self.sum_asg / count as f64 * config.num_vars as f64;
         if 100 < ncnfl
-            && config.restart_step <= self.after_restart
-            && config.restart_blk * self.ema_asg.get() < nas as f64
+            && self.restart_step <= self.after_restart
+            && self.restart_blk * self.ema_asg.get() < nas as f64
         //    || config.restart_blk * ave < nas as f64
         {
             self.after_restart = 0;
@@ -45,7 +44,7 @@ impl RestartIF for State {
         }
         false
     }
-    fn force_restart(&mut self, config: &mut Config, ncnfl: &mut f64) -> bool {
+    fn force_restart(&mut self, ncnfl: &mut f64) -> bool {
         let count = self.stats[Stat::Conflict as usize];
         // if count <= RESET_EMA {
         //     if count == RESET_EMA {
@@ -55,19 +54,19 @@ impl RestartIF for State {
         //     return false;
         // }
         let ave = self.stats[Stat::SumLBD as usize] as f64 / count as f64;
-        if (config.luby_restart && config.luby_restart_num_conflict <= *ncnfl)
-            || (!config.luby_restart
-                && config.restart_step <= self.after_restart
-                && ave < self.ema_lbd.get() * config.restart_thr)
+        if (self.luby_restart && self.luby_restart_num_conflict <= *ncnfl)
+            || (!self.luby_restart
+                && self.restart_step <= self.after_restart
+                && ave < self.ema_lbd.get() * self.restart_thr)
         {
             self.stats[Stat::Restart as usize] += 1;
             self.after_restart = 0;
-            if config.luby_restart {
+            if self.luby_restart {
                 *ncnfl = 0.0;
-                config.luby_current_restarts += 1;
-                config.luby_restart_num_conflict =
-                    luby(config.luby_restart_inc, config.luby_current_restarts)
-                        * config.luby_restart_factor;
+                self.luby_current_restarts += 1;
+                self.luby_restart_num_conflict =
+                    luby(self.luby_restart_inc, self.luby_current_restarts)
+                        * self.luby_restart_factor;
             }
             return true;
         }
@@ -79,16 +78,16 @@ impl RestartIF for State {
         self.after_restart += 1;
     }
     #[inline(always)]
-    fn restart_update_asg(&mut self, _config: &Config, n: usize) {
+    fn restart_update_asg(&mut self, n: usize) {
         self.ema_asg.update(n as f64);
         // self.sum_asg += n as f64 / config.num_vars as f64;
     }
     #[inline(always)]
-    fn restart_update_luby(&mut self, config: &mut Config) {
-        if config.luby_restart {
-            config.luby_restart_num_conflict =
-                luby(config.luby_restart_inc, config.luby_current_restarts)
-                    * config.luby_restart_factor;
+    fn restart_update_luby(&mut self) {
+        if self.luby_restart {
+            self.luby_restart_num_conflict =
+                luby(self.luby_restart_inc, self.luby_current_restarts)
+                    * self.luby_restart_factor;
         }
     }
 }
