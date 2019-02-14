@@ -22,7 +22,7 @@ Two executables will be installed:
 
 Splr is a standalone program, taking an CNF file. The result will be saved to a file.
 
-```sh
+```
 $ splr tests/sample.cnf
 #conflict:      19242, #decision:        22518, #propagate:         866681
   Assignment|#rem:      243, #fix:        1, #elm:        6, prg%:   2.8000
