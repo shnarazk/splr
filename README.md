@@ -56,5 +56,5 @@ Splr version 0.1.0 was verified with the following problems:
 
 * 100 satisfiable 3-SAT problems, containing 250 variables: passed
 * SAT Competition 2017 Main track (350 problems): with a 2000 sec timeout, splr solved:
-  * XXX satisfiable problems: xxxxx
-  * XXX unsatisfiable prbolems: xxxxx
+  * 72 satisfiable problems: all the solutions are correct (checked with dmcr).
+  * 51 unsatisfiable problems: Lingeling or Glucose completely returns the same result.
