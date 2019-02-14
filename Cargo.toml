@@ -3,6 +3,8 @@ name = "splr"
 version = "0.1.0"
 authors = ["Shuji Narazaki <shujinarazaki@protonmail.com>"]
 edition = "2018"
+description = "A pure rustic CDCL SAT solver based on Glucose"
+license-file = "LICENSE"
 
 [dependencies]
 structopt = "0.2.14"
