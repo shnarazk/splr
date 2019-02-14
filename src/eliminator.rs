@@ -500,8 +500,8 @@ fn check_eliminator(cdb: &ClauseDB, vars: &[Var]) -> bool {
 }
 
 /// Returns **false** if one of the clauses is always satisfied. (merge_vec should not be used.)
-fn merge(cdb: &mut ClauseDB, cip: ClauseId, ciq: ClauseId, v: VarId) -> Option<Vec<Lit>> {
-    let mut vec: Vec<Lit> = Vec::new();
+fn merge(cdb: &mut ClauseDB, cip: ClauseId, ciq: ClauseId, v: VarId, vec: &mut Vec<Lit>) -> usize {
+    vec.clear();
     let pqb = &cdb.clause[cip];
     let qpb = &cdb.clause[ciq];
     let ps_smallest = pqb.lits.len() < qpb.lits.len();
@@ -512,7 +512,7 @@ fn merge(cdb: &mut ClauseDB, cip: ClauseId, ciq: ClauseId, v: VarId) -> Option<V
             for j in &pb.lits {
                 if j.vi() == l.vi() {
                     if j.negate() == *l {
-                        return None;
+                        return 0;
                     } else {
                         continue 'next_literal;
                     }
@@ -527,7 +527,7 @@ fn merge(cdb: &mut ClauseDB, cip: ClauseId, ciq: ClauseId, v: VarId) -> Option<V
         }
     }
     // println!("merge generated {:?} from {} and {} to eliminate {}", vec2int(vec.clone()), p, q, v);
-    Some(vec)
+    vec.len()
 }
 
 /// removes `l` from clause `cid`
@@ -665,38 +665,36 @@ fn eliminate_var(
         // OK, eliminate the literal and build constraints on it.
         state.num_eliminated_vars += 1;
         make_eliminated_clauses(cdb, elim, vi, &*pos, &*neg);
+        let vec = &mut state.new_learnt;
         // Produce clauses in cross product:
         for p in &*pos {
             let rank_p = cdb.clause[*p].rank;
             for n in &*neg {
-                if let Some(vec) = merge(cdb, *p, *n, vi) {
-                    // println!("eliminator replaces {} with a cross product {:?}", p.fmt(), vec2int(&vec));
-                    debug_assert!(!vec.is_empty());
-                    match vec.len() {
-                        1 => {
-                            // println!(
-                            //     "eliminate_var: grounds {} from {}{:?} and {}{:?}",
-                            //     vec[0].int(),
-                            //     p.fmt(),
-                            //     vec2int(&clause!(*cp, *p).lits),
-                            //     n.fmt(),
-                            //     vec2int(&clause!(*cp, *n).lits)
-                            // );
-                            let lit = vec[0];
-                            asgs.enqueue(&mut vars[lit.vi()], lit.lbool(), NULL_CLAUSE, 0)?;
-                        }
-                        _ => {
-                            let v = &mut vec.to_vec();
-                            let rank = if cdb.clause[*p].is(Flag::LearntClause)
-                                && cdb.clause[*n].is(Flag::LearntClause)
-                            {
-                                rank_p.min(cdb.clause[*n].rank)
-                            } else {
-                                0
-                            };
-                            let cid = cdb.attach(config, vars, v, rank);
-                            elim.add_cid_occur(vars, cid, &mut cdb.clause[cid], true);
-                        }
+                // println!("eliminator replaces {} with a cross product {:?}", p.fmt(), vec2int(&vec));
+                match merge(cdb, *p, *n, vi, vec) {
+                    0 => (),
+                    1 => {
+                        // println!(
+                        //     "eliminate_var: grounds {} from {}{:?} and {}{:?}",
+                        //     vec[0].int(),
+                        //     p.fmt(),
+                        //     vec2int(&clause!(*cp, *p).lits),
+                        //     n.fmt(),
+                        //     vec2int(&clause!(*cp, *n).lits)
+                        // );
+                        let lit = vec[0];
+                        asgs.enqueue(&mut vars[lit.vi()], lit.lbool(), NULL_CLAUSE, 0)?;
+                    }
+                    _ => {
+                        let rank = if cdb.clause[*p].is(Flag::LearntClause)
+                            && cdb.clause[*n].is(Flag::LearntClause)
+                        {
+                            rank_p.min(cdb.clause[*n].rank)
+                        } else {
+                            0
+                        };
+                        let cid = cdb.attach(config, vars, vec, rank);
+                        elim.add_cid_occur(vars, cid, &mut cdb.clause[cid], true);
                     }
                 }
             }
