@@ -5,7 +5,7 @@ Splr -- SAT Solver for Propositional Logic in Rust
 
 - Splr is a pure [Rust](https://www.rust-lang.org)ic SAT solver, based on [Glucose 4.1](https://www.labri.fr/perso/lsimon/glucose/).
 - It adopts many ideas in modern SAT solvers like:
-  - Glucose-like dynamic blocking/forcing restarts based on [EMAs](http://arxiv.org/abs/1506.08905)
+  - Glucose-like dynamic blocking/forcing restarts based on [EMAs](https://arxiv.org/abs/1506.08905)
   - heuristics adaptation
   - pre/in-process simplification based on clause subsumption and variable elimination
 
@@ -22,7 +22,7 @@ Two executables will be installed:
 
 Splr is a standalone program, taking an CNF file. The result will be saved to a file.
 
-```
+```sh
 $ splr tests/sample.cnf
 #conflict:      19242, #decision:        22518, #propagate:         866681
   Assignment|#rem:      243, #fix:        1, #elm:        6, prg%:   2.8000
@@ -44,6 +44,9 @@ c    Conflicts|aLBD:     9.37, bjmp:     9.21, cnfl:    11.66 |blkR:   1.4000
 c    Clause DB|#rdc:        4, #sce:        2, #exe:        1 |frcK:   0.6100
 c
 1 2 3 4 -5 6 7 -8 -9 10 -11 -12 -13 -14 15 16 -17 18 -19 -20 -21 -22 ... 0
+
+$ dmcr tests/sample.cnf
+Valid assignment for tests/sample.cnf found in .ans_sample.cnf.
 ```
 
 ## Correctness
@@ -55,3 +58,8 @@ While Splr comes with **ABSOLUTELY NO WARRANTY**, Splr version 0.1.0 (splr-0.1.0
 * [SAT Competition 2017](https://baldur.iti.kit.edu/sat-competition-2017/index.php?cat=tracks), [Main track](https://baldur.iti.kit.edu/sat-competition-2017/benchmarks/Main.zip): with a 2000 sec timeout, Splr-0.1.0 solved:
   * 72 satisfiable problems: all the solutions are correct (checked with dmcr).
   * 51 unsatisfiable problems: Lingeling or Glucose completely returns the same result.
+
+
+----
+2019, Shuji Narazaki
+
