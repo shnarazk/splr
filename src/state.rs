@@ -1,5 +1,5 @@
 use crate::clause::ClauseDB;
-use crate::config::{Config, SearchStrategy};
+use crate::config::{Config};
 use crate::eliminator::Eliminator;
 use crate::restart::Ema;
 use crate::traits::*;
@@ -8,6 +8,29 @@ use crate::var::Var;
 use std::fmt;
 use std::path::Path;
 use std::time::SystemTime;
+
+#[derive(Eq, PartialEq)]
+pub enum SearchStrategy {
+    Initial,
+    Generic,
+    LowDecisions,
+    HighSuccesive,
+    LowSuccesive,
+    ManyGlues,
+}
+
+impl SearchStrategy {
+    pub fn to_str(&self) -> &'static str {
+        match self {
+            SearchStrategy::Initial => "Initial",
+            SearchStrategy::Generic => "Default",
+            SearchStrategy::LowDecisions => "LowDecs",
+            SearchStrategy::HighSuccesive => "HighSucc",
+            SearchStrategy::LowSuccesive => "LowSucc",
+            SearchStrategy::ManyGlues => "ManyGlue",
+        }
+    }
+}
 
 /// stat index
 #[derive(Clone, Eq, PartialEq)]
@@ -242,20 +265,20 @@ impl StateIF for State {
                 .into_string()
                 .unwrap()
         };
-        state.num_vars = config.num_vars;
-        state.adapt_strategy = config.adapt_strategy;
-        state.cdb_soft_limit = config.cdb_soft_limit;
-        state.elim_eliminate_grow_limit = config.elim_eliminate_grow_limit;
-        state.elim_subsume_literal_limit = config.elim_subsume_literal_limit;
-        state.restart_thr = config.restart_thr;
-        state.restart_blk = config.restart_blk;
-        state.restart_asg_len = config.restart_asg_len;
-        state.restart_lbd_len = config.restart_lbd_len;
+        state.num_vars = cnf.num_of_variables;
+        state.adapt_strategy = !config.no_adapt;
+        state.cdb_soft_limit = config.clause_limit;
+        state.elim_eliminate_grow_limit = config.elim_grow_limit;
+        state.elim_subsume_literal_limit = config.elim_lit_limit;
+        state.restart_thr = config.restart_threshold;
+        state.restart_blk = config.restart_blocking;
+        state.restart_asg_len = config.restart_asg_samples;
+        state.restart_lbd_len = config.restart_lbd_samples;
         state.restart_step = config.restart_step;
-        state.progress_log = config.progress_log;
-        state.use_elim = config.use_elim;
-        state.ema_asg = Ema::new(config.restart_asg_len);
-        state.ema_lbd = Ema::new(config.restart_lbd_len);
+        state.progress_log = config.use_log;
+        state.use_elim = !config.no_elim;
+        state.ema_asg = Ema::new(config.restart_asg_samples);
+        state.ema_lbd = Ema::new(config.restart_lbd_samples);
         state.model = vec![BOTTOM; cnf.num_of_variables + 1];
         state.an_seen = vec![false; cnf.num_of_variables + 1];
         state.lbd_temp = vec![0; cnf.num_of_variables + 1];
@@ -614,14 +637,13 @@ impl State {
     fn dump_details(
         &mut self,
         cdb: &ClauseDB,
-        config: &mut Config,
         elim: &Eliminator,
         vars: &[Var],
         mes: Option<&str>,
     ) {
         self.progress_cnt += 1;
         let msg = match mes {
-            None => config.strategy.to_str(),
+            None => self.strategy.to_str(),
             Some(x) => x,
         };
         let nv = vars.len() - 1;

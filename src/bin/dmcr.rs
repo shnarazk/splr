@@ -30,7 +30,9 @@ fn main() {
         println!("{} does not exist.", args.problem.to_str().unwrap(),);
         return;
     }
-    let (mut s, _cnf) = Solver::build(Config::default(), &args.problem.to_str().unwrap());
+    let mut config = Config::default();
+    config.cnf = args.problem.clone();
+    let mut s = Solver::build(config).expect("failed to load");
     if args.assign == None {
         args.assign = Some(PathBuf::from(format!(
             ".ans_{}",

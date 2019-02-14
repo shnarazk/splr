@@ -131,8 +131,9 @@ impl SatSolverIF for Solver {
         }
     }
     /// builds and returns a configured solver.
-    fn build(mut config: Config, path: &str) -> (Solver, CNFDescription) {
-        let mut rs = BufReader::new(fs::File::open(path).unwrap());
+    fn build(config: Config) -> std::io::Result<Solver> {
+        let fs = fs::File::open(&config.cnf)?;
+        let mut rs = BufReader::new(fs);
         let mut buf = String::new();
         let mut nv: usize = 0;
         let mut nc: usize = 0;
@@ -159,9 +160,8 @@ impl SatSolverIF for Solver {
         let cnf = CNFDescription {
             num_of_variables: nv,
             num_of_clauses: nc,
-            pathname: path.to_string(),
+            pathname: config.cnf.to_str().unwrap().to_string(),
         };
-        config.num_vars = nv;
         let mut s: Solver = Solver::new(config, &cnf);
         loop {
             buf.clear();
@@ -188,7 +188,7 @@ impl SatSolverIF for Solver {
             }
         }
         debug_assert_eq!(s.vars.len() - 1, cnf.num_of_variables);
-        (s, cnf)
+        Ok(s)
     }
     // renamed from clause_new
     fn add_unchecked_clause(&mut self, v: &mut Vec<Lit>) -> Option<ClauseId> {

@@ -1,5 +1,4 @@
 use crate::clause::{ClauseDB, Watch};
-use crate::config::Config;
 use crate::state::{Stat, State};
 use crate::traits::{FlagIF, LitIF, PropagatorIF, WatchDBIF};
 use crate::types::*;
@@ -209,7 +208,7 @@ impl PropagatorIF for AssignStack {
         self.var_order.update(vec, v)
     }
     #[allow(dead_code)]
-    fn dump_cnf(&mut self, cdb: &ClauseDB, config: &Config, vars: &[Var], fname: &str) {
+    fn dump_cnf(&mut self, cdb: &ClauseDB, state: &State, vars: &[Var], fname: &str) {
         for v in vars {
             if v.is(Flag::EliminatedVar) {
                 if self.assign[v.index] != BOTTOM {
@@ -223,7 +222,7 @@ impl PropagatorIF for AssignStack {
             let mut buf = BufWriter::new(out);
             let nv = self.len();
             let nc: usize = cdb.clause.len() - 1;
-            buf.write_all(format!("p cnf {} {}\n", config.num_vars, nc + nv).as_bytes())
+            buf.write_all(format!("p cnf {} {}\n", state.num_vars, nc + nv).as_bytes())
                 .unwrap();
             for c in &cdb.clause[1..] {
                 for l in &c.lits {

@@ -118,7 +118,7 @@ pub trait PropagatorIF {
     fn uncheck_assume(&mut self, vars: &mut [Var], l: Lit);
     fn update_order(&mut self, vec: &[Var], v: VarId);
     fn select_var(&mut self, vars: &[Var]) -> VarId;
-    fn dump_cnf(&mut self, cdb: &ClauseDB, config: &Config, vars: &[Var], fname: &str);
+    fn dump_cnf(&mut self, cdb: &ClauseDB, state: &State, vars: &[Var], fname: &str);
 }
 
 /// API for restart like `block_restart`, `force_restart` and so on.
@@ -132,7 +132,7 @@ pub trait RestartIF {
 
 /// API for SAT solver like `build`, `solve` and so on.
 pub trait SatSolverIF {
-    fn build(config: Config, path: &str) -> (Solver, CNFDescription);
+    fn build(config: Config) -> std::io::Result<Solver>;
     fn solve(&mut self) -> SolverResult;
     fn add_unchecked_clause(&mut self, v: &mut Vec<Lit>) -> Option<ClauseId>;
 }
