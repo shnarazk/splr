@@ -1,5 +1,5 @@
 use crate::clause::ClauseDB;
-use crate::config::{Config};
+use crate::config::Config;
 use crate::eliminator::Eliminator;
 use crate::restart::Ema;
 use crate::traits::*;
@@ -634,13 +634,7 @@ impl State {
         );
     }
     #[allow(dead_code)]
-    fn dump_details(
-        &mut self,
-        cdb: &ClauseDB,
-        elim: &Eliminator,
-        vars: &[Var],
-        mes: Option<&str>,
-    ) {
+    fn dump_details(&mut self, cdb: &ClauseDB, elim: &Eliminator, vars: &[Var], mes: Option<&str>) {
         self.progress_cnt += 1;
         let msg = match mes {
             None => self.strategy.to_str(),
