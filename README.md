@@ -24,7 +24,8 @@ Splr is a standalone program, taking an CNF file. The result will be saved to a 
 
 ```
 $ splr tests/sample.cnf
-#conflict:      19242, #decision:        22518, #propagate:         866681
+sample.cnf                         250,1065 |time:     0.35, Mode:  Initial
+ #conflict:      19242, #decision:        22518, #propagate:         866681
   Assignment|#rem:      243, #fix:        1, #elm:        6, prg%:   2.8000
  Clause Kind|Remv:    11255, LBD2:       61, Binc:        0, Perm:     1056
      Restart|#BLK:      276, #RST:        0, eASG:   0.4211, eLBD:   1.0312
@@ -62,4 +63,3 @@ While Splr comes with **ABSOLUTELY NO WARRANTY**, Splr version 0.1.0 (splr-0.1.0
 
 ----
 2019, Shuji Narazaki
-
