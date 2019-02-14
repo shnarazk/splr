@@ -192,8 +192,8 @@ impl EliminatorIF for Eliminator {
                 }
                 let l = self.elim_clauses[i];
                 let model_value = match model[l.vi() - 1] {
-                    x if x == l.int() => TRUE,
-                    x if -x == l.int() => FALSE,
+                    x if x == l.to_i32() => TRUE,
+                    x if -x == l.to_i32() => FALSE,
                     _ => BOTTOM,
                 };
                 if model_value != FALSE {
@@ -209,7 +209,7 @@ impl EliminatorIF for Eliminator {
             debug_assert!(width == 1);
             let l = self.elim_clauses[i];
             // debug_assert!(model[l.vi() - 1] != l.negate().int());
-            model[l.vi() - 1] = l.int(); // .neg();
+            model[l.vi() - 1] = l.to_i32(); // .neg();
             if i < width {
                 break;
             }
@@ -224,7 +224,7 @@ impl EliminatorIF for Eliminator {
             let v = &mut vars[l.vi()];
             v.turn_on(Flag::TouchedVar);
             if !v.is(Flag::EliminatedVar) {
-                if l.positive() {
+                if l.is_positive() {
                     debug_assert!(
                         !v.pos_occurs.contains(&cid),
                         format!("{} {:?} {}", cid.format(), vec2int(&c.lits), v.index,)
@@ -247,7 +247,7 @@ impl EliminatorIF for Eliminator {
     }
     fn remove_lit_occur(&mut self, vars: &mut [Var], l: Lit, cid: ClauseId) {
         let v = &mut vars[l.vi()];
-        if l.positive() {
+        if l.is_positive() {
             debug_assert_eq!(v.pos_occurs.iter().filter(|&c| *c == cid).count(), 1);
             v.pos_occurs.delete_unstable(|&c| c == cid);
             debug_assert!(!v.pos_occurs.contains(&cid));
@@ -320,7 +320,7 @@ impl Eliminator {
                     if v.assign != BOTTOM {
                         continue;
                     }
-                    let nsum = if l.positive() {
+                    let nsum = if l.is_positive() {
                         v.neg_occurs.len()
                     } else {
                         v.pos_occurs.len()
@@ -485,7 +485,7 @@ fn check_eliminator(cdb: &ClauseDB, vars: &[Var]) -> bool {
         }
         for l in &c.lits {
             let v = l.vi();
-            if l.positive() {
+            if l.is_positive() {
                 if !vars[v].pos_occurs.contains(&cid) {
                     panic!("failed to check {} {:#}", cid.format(), c);
                 }

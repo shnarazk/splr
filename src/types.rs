@@ -3,13 +3,14 @@ use crate::traits::{Delete, LitIF};
 use std::fmt;
 use std::ops::Neg;
 
-/// Variable as Index is `usize`
+/// 'Variable' identifier or 'variable' index, starting with one.
 pub type VarId = usize;
 
-/// Clause Identifier. Note: it changes after database reduction.
+/// 'Clause' Identifier, or 'clause' index, starting with one.
+/// Note: ids are re-used after 'garbage collection'.
 pub type ClauseId = usize;
 
-/// is a dummy clause index
+/// a dummy clause index.
 pub const NULL_CLAUSE: ClauseId = 0;
 
 /// Literal encoded on `u32` as:
@@ -57,18 +58,15 @@ impl LitIF for Lit {
     fn from_int(x: i32) -> Lit {
         (if x < 0 { -2 * x + 1 } else { 2 * x }) as Lit
     }
-    /// converter from [VarId](../type.VarId.html) to [Lit](../type.Lit.html).
-    /// returns a positive literal if p == TRUE or BOTTOM.
     #[inline(always)]
     fn from_var(vi: VarId, p: Lbool) -> Lit {
         (vi as Lit) << 1 | ((p == FALSE) as Lit)
     }
-    /// converts to var index
     #[inline(always)]
     fn vi(self) -> VarId {
         (self >> 1) as VarId
     }
-    fn int(self) -> i32 {
+    fn to_i32(self) -> i32 {
         if self % 2 == 0 {
             (self >> 1) as i32
         } else {
@@ -82,7 +80,7 @@ impl LitIF for Lit {
         (self & 1 == 0) as Lbool
     }
     #[inline(always)]
-    fn positive(self) -> bool {
+    fn is_positive(self) -> bool {
         self & 1 == 0
     }
     #[inline(always)]
@@ -157,7 +155,7 @@ pub fn vec2int(v: &[Lit]) -> Vec<i32> {
         .map(|l| match l {
             0 => 0,
             1 => 0,
-            x => x.int(),
+            x => x.to_i32(),
         })
         .collect::<Vec<i32>>()
 }

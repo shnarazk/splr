@@ -22,7 +22,7 @@ impl ValidatorIF for Solver {
             if !self.vars.satisfies(&ch.lits) {
                 let mut v = Vec::new();
                 for l in &ch.lits {
-                    v.push(l.int());
+                    v.push(l.to_i32());
                 }
                 return Some(v);
             }

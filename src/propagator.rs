@@ -227,13 +227,14 @@ impl PropagatorIF for AssignStack {
                 .unwrap();
             for c in &cdb.clause[1..] {
                 for l in &c.lits {
-                    buf.write_all(format!("{} ", l.int()).as_bytes()).unwrap();
+                    buf.write_all(format!("{} ", l.to_i32()).as_bytes())
+                        .unwrap();
                 }
                 buf.write_all(b"0\n").unwrap();
             }
             buf.write_all(b"c from trail\n").unwrap();
             for x in &self.trail {
-                buf.write_all(format!("{} 0\n", x.int()).as_bytes())
+                buf.write_all(format!("{} 0\n", x.to_i32()).as_bytes())
                     .unwrap();
             }
         }
@@ -341,7 +342,7 @@ impl VarOrderIF for VarIdHeap {
 
 impl fmt::Display for AssignStack {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let v = self.trail.iter().map(|l| l.int()).collect::<Vec<i32>>();
+        let v = self.trail.iter().map(|l| l.to_i32()).collect::<Vec<i32>>();
         let len = self.level();
         let c = |i| {
             let a = self.num_at(i);

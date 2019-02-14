@@ -42,7 +42,8 @@ pub struct Solver {
 }
 
 impl Solver {
-    pub fn new(config: Config, cnf: &CNFDescription) -> Solver {
+    /// make a solver
+    fn new(config: Config, cnf: &CNFDescription) -> Solver {
         let nv = cnf.num_of_variables as usize;
         let nc = cnf.num_of_clauses as usize;
         let elim = Eliminator::new(nv);
@@ -119,7 +120,7 @@ impl SatSolverIF for Solver {
                 state.progress(cdb, vars, None);
                 asgs.cancel_until(vars, 0);
                 Ok(Certificate::UNSAT(
-                    state.conflicts.iter().map(|l| l.int()).collect(),
+                    state.conflicts.iter().map(|l| l.to_i32()).collect(),
                 ))
             }
             Err(_) => {
@@ -130,7 +131,6 @@ impl SatSolverIF for Solver {
             }
         }
     }
-    /// builds and returns a configured solver.
     fn build(config: Config) -> std::io::Result<Solver> {
         let fs = fs::File::open(&config.cnf)?;
         let mut rs = BufReader::new(fs);
@@ -187,7 +187,7 @@ impl SatSolverIF for Solver {
                 Err(e) => panic!("{}", e),
             }
         }
-        debug_assert_eq!(s.vars.len() - 1, cnf.num_of_variables);
+        debug_assert_eq!(s.vars.len() - 1, nv);
         Ok(s)
     }
     // renamed from clause_new

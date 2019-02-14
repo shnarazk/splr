@@ -93,11 +93,11 @@ impl WatchDBIF for Vec<Watch> {
 
 /// A representation of 'clause'
 pub struct Clause {
-    /// the literals making a clause
+    /// The literals in a clause.
     pub lits: Vec<Lit>,
-    /// A static clause evaluation criterion like LBD, NDD, or something
+    /// A static clause evaluation criterion like LBD, NDD, or something.
     pub rank: usize,
-    /// A dynamic clause evaluation criterion based on the numer of references
+    /// A dynamic clause evaluation criterion based on the numer of references.
     pub activity: f64,
     /// Flags
     flags: u16,
