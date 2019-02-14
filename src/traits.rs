@@ -15,19 +15,12 @@ pub trait ClauseIF {
 /// API for clause management like `reduce`, `simplify`, `new_clause`, and so on.
 pub trait ClauseDBIF {
     fn new(nv: usize, nc: usize) -> Self;
-    fn attach(
-        &mut self,
-        config: &mut Config,
-        vars: &mut [Var],
-        v: &mut Vec<Lit>,
-        lbd: usize,
-    ) -> ClauseId;
+    fn attach(&mut self, state: &mut State, vars: &mut [Var], lbd: usize) -> ClauseId;
     fn detach(&mut self, cid: ClauseId);
-    fn reduce(&mut self, config: &Config, state: &mut State, vars: &mut [Var]);
+    fn reduce(&mut self, state: &mut State, vars: &mut [Var]);
     fn simplify(
         &mut self,
         asgs: &mut AssignStack,
-        config: &mut Config,
         elim: &mut Eliminator,
         state: &mut State,
         vars: &mut [Var],
@@ -71,7 +64,6 @@ pub trait EliminatorIF {
         &mut self,
         asgs: &mut AssignStack,
         cdb: &mut ClauseDB,
-        config: &mut Config,
         state: &mut State,
         vars: &mut [Var],
     ) -> MaybeInconsistent;
@@ -131,11 +123,11 @@ pub trait PropagatorIF {
 
 /// API for restart like `block_restart`, `force_restart` and so on.
 pub trait RestartIF {
-    fn block_restart(&mut self, asgs: &AssignStack, config: &Config, ncnfl: usize) -> bool;
-    fn force_restart(&mut self, config: &mut Config, ncnfl: &mut f64) -> bool;
+    fn block_restart(&mut self, asgs: &AssignStack, ncnfl: usize) -> bool;
+    fn force_restart(&mut self, ncnfl: &mut f64) -> bool;
     fn restart_update_lbd(&mut self, lbd: usize);
-    fn restart_update_asg(&mut self, config: &Config, n: usize);
-    fn restart_update_luby(&mut self, config: &mut Config);
+    fn restart_update_asg(&mut self, n: usize);
+    fn restart_update_luby(&mut self);
 }
 
 /// API for SAT solver like `build`, `solve` and so on.
@@ -148,8 +140,9 @@ pub trait SatSolverIF {
 /// API for state/statistics management, providing `progress`.
 pub trait StateIF {
     fn new(config: &Config, cnf: CNFDescription) -> State;
-    fn progress_header(&self, config: &Config);
-    fn progress(&mut self, cdb: &ClauseDB, config: &mut Config, vars: &[Var], mes: Option<&str>);
+    fn adapt(&mut self, cdb: &mut ClauseDB);
+    fn progress_header(&self);
+    fn progress(&mut self, cdb: &ClauseDB, vars: &[Var], mes: Option<&str>);
 }
 
 /// API for SAT validator like `inject_assignment`, `validate` and so on.

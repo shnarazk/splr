@@ -242,6 +242,18 @@ impl StateIF for State {
                 .into_string()
                 .unwrap()
         };
+        state.num_vars = config.num_vars;
+        state.adapt_strategy = config.adapt_strategy;
+        state.cdb_soft_limit = config.cdb_soft_limit;
+        state.elim_eliminate_grow_limit = config.elim_eliminate_grow_limit;
+        state.elim_subsume_literal_limit = config.elim_subsume_literal_limit;
+        state.restart_thr = config.restart_thr;
+        state.restart_blk = config.restart_blk;
+        state.restart_asg_len = config.restart_asg_len;
+        state.restart_lbd_len = config.restart_lbd_len;
+        state.restart_step = config.restart_step;
+        state.progress_log = config.progress_log;
+        state.use_elim = config.use_elim;
         state.ema_asg = Ema::new(config.restart_asg_len);
         state.ema_lbd = Ema::new(config.restart_lbd_len);
         state.model = vec![BOTTOM; cnf.num_of_variables + 1];
@@ -250,8 +262,71 @@ impl StateIF for State {
         state.target = cnf;
         state
     }
-    fn progress_header(&self, config: &Config) {
-        if config.progress_log {
+    fn adapt(&mut self, cdb: &mut ClauseDB) {
+        if !self.adapt_strategy || self.strategy != SearchStrategy::Initial {
+            return;
+        }
+        let mut re_init = false;
+        let decpc =
+            self.stats[Stat::Decision as usize] as f64 / self.stats[Stat::Conflict as usize] as f64;
+        if decpc <= 1.2 {
+            self.strategy = SearchStrategy::LowDecisions;
+            self.use_chan_seok = true;
+            self.co_lbd_bound = 4;
+            self.glureduce = true;
+            self.first_reduction = 2000;
+            self.next_reduction = 2000;
+            self.cur_restart = (self.stats[Stat::Conflict as usize] as f64
+                / self.next_reduction as f64
+                + 1.0) as usize;
+            self.cdb_inc = 0;
+            re_init = true;
+        }
+        if self.stats[Stat::NoDecisionConflict as usize] < 30_000 {
+            self.strategy = SearchStrategy::LowSuccesive;
+            self.luby_restart = true;
+            self.luby_restart_factor = 100.0;
+            self.var_decay = 0.999;
+            self.var_decay_max = 0.999;
+        }
+        if self.stats[Stat::NoDecisionConflict as usize] > 54_400 {
+            self.strategy = SearchStrategy::HighSuccesive;
+            self.use_chan_seok = true;
+            self.glureduce = true;
+            self.co_lbd_bound = 3;
+            self.first_reduction = 30000;
+            self.var_decay = 0.99;
+            self.var_decay_max = 0.99;
+            // randomize_on_restarts = 1;
+        }
+        if self.stats[Stat::NumLBD2 as usize] - self.stats[Stat::NumBin as usize] > 20_000 {
+            self.strategy = SearchStrategy::ManyGlues;
+            self.var_decay = 0.91;
+            self.var_decay_max = 0.91;
+        }
+        if self.strategy == SearchStrategy::Initial {
+            self.strategy = SearchStrategy::Generic;
+            return;
+        }
+        if self.use_chan_seok {
+            // Adjusting for low decision levels.
+            // move some clauses with good lbd (col_lbd_bound) to Permanent
+            for c in &mut cdb.clause[1..] {
+                if c.is(Flag::DeadClause) || !c.is(Flag::LearntClause) {
+                    continue;
+                }
+                if c.rank <= self.co_lbd_bound {
+                    c.turn_off(Flag::LearntClause);
+                    cdb.num_learnt -= 1;
+                } else if re_init {
+                    c.kill(&mut cdb.touched);
+                }
+            }
+            cdb.garbage_collect();
+        }
+    }
+    fn progress_header(&self) {
+        if self.progress_log {
             self.dump_header();
             return;
         }
@@ -264,8 +339,8 @@ impl StateIF for State {
         println!("                                                  ");
     }
     #[allow(clippy::cyclomatic_complexity)]
-    fn progress(&mut self, cdb: &ClauseDB, config: &mut Config, vars: &[Var], mes: Option<&str>) {
-        if config.progress_log {
+    fn progress(&mut self, cdb: &ClauseDB, vars: &[Var], mes: Option<&str>) {
+        if self.progress_log {
             self.dump(cdb, vars);
             return;
         }
@@ -275,7 +350,7 @@ impl StateIF for State {
         self.progress_cnt += 1;
         print!("\x1B[7A\x1B[1G");
         let msg = match mes {
-            None => config.strategy.to_str(),
+            None => self.strategy.to_str(),
             Some(x) => x,
         };
         let count = self.stats[Stat::Conflict as usize];
@@ -377,7 +452,7 @@ impl StateIF for State {
                 "{:>9.4}",
                 self.dumper,
                 LogF64Id::RestartBlkR,
-                config.restart_blk
+                self.restart_blk
             ),
         );
         println!(
@@ -404,7 +479,7 @@ impl StateIF for State {
                 "{:>9.4}",
                 self.dumper,
                 LogF64Id::RestartThrK,
-                config.restart_thr
+                self.restart_thr
             ),
         );
     }

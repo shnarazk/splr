@@ -1,8 +1,3 @@
-use crate::clause::ClauseDB;
-use crate::state::{Stat, State};
-use crate::traits::{ClauseDBIF, ClauseIF, FlagIF};
-use crate::types::Flag;
-
 #[derive(Eq, PartialEq)]
 pub enum SearchStrategy {
     Initial,
@@ -120,73 +115,6 @@ impl Default for Config {
             elim_subsume_literal_limit: 100,
             elim_subsume_loop_limit: 2_000_000,
             progress_log: false,
-        }
-    }
-}
-
-impl Config {
-    #[inline(always)]
-    pub fn adapt_strategy(&mut self, cdb: &mut ClauseDB, state: &mut State) {
-        if !self.adapt_strategy || self.strategy != SearchStrategy::Initial {
-            return;
-        }
-        let mut re_init = false;
-        let decpc = state.stats[Stat::Decision as usize] as f64
-            / state.stats[Stat::Conflict as usize] as f64;
-        if decpc <= 1.2 {
-            self.strategy = SearchStrategy::LowDecisions;
-            self.use_chan_seok = true;
-            self.co_lbd_bound = 4;
-            self.glureduce = true;
-            self.first_reduction = 2000;
-            state.next_reduction = 2000;
-            state.cur_restart = (state.stats[Stat::Conflict as usize] as f64
-                / state.next_reduction as f64
-                + 1.0) as usize;
-            self.cdb_inc = 0;
-            re_init = true;
-        }
-        if state.stats[Stat::NoDecisionConflict as usize] < 30_000 {
-            self.strategy = SearchStrategy::LowSuccesive;
-            self.luby_restart = true;
-            self.luby_restart_factor = 100.0;
-            self.var_decay = 0.999;
-            self.var_decay_max = 0.999;
-        }
-        if state.stats[Stat::NoDecisionConflict as usize] > 54_400 {
-            self.strategy = SearchStrategy::HighSuccesive;
-            self.use_chan_seok = true;
-            self.glureduce = true;
-            self.co_lbd_bound = 3;
-            self.first_reduction = 30000;
-            self.var_decay = 0.99;
-            self.var_decay_max = 0.99;
-            // randomize_on_restarts = 1;
-        }
-        if state.stats[Stat::NumLBD2 as usize] - state.stats[Stat::NumBin as usize] > 20_000 {
-            self.strategy = SearchStrategy::ManyGlues;
-            self.var_decay = 0.91;
-            self.var_decay_max = 0.91;
-        }
-        if self.strategy == SearchStrategy::Initial {
-            self.strategy = SearchStrategy::Generic;
-            return;
-        }
-        if self.use_chan_seok {
-            // Adjusting for low decision levels.
-            // move some clauses with good lbd (col_lbd_bound) to Permanent
-            for c in &mut cdb.clause[1..] {
-                if c.is(Flag::DeadClause) || !c.is(Flag::LearntClause) {
-                    continue;
-                }
-                if c.rank <= self.co_lbd_bound {
-                    c.turn_off(Flag::LearntClause);
-                    cdb.num_learnt -= 1;
-                } else if re_init {
-                    c.kill(&mut cdb.touched);
-                }
-            }
-            cdb.garbage_collect();
         }
     }
 }
