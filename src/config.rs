@@ -1,8 +1,7 @@
-use crate::clause::{ClauseDB, ClauseFlag};
-use crate::eliminator::Eliminator;
-use crate::state::{SolverState, Stat};
-use crate::traits::*;
-use crate::var::Var;
+use crate::clause::ClauseDB;
+use crate::state::{Stat, State};
+use crate::traits::{ClauseDBIF, ClauseIF, FlagIF};
+use crate::types::Flag;
 
 #[derive(Eq, PartialEq)]
 pub enum SearchStrategy {
@@ -28,7 +27,7 @@ impl SearchStrategy {
 }
 
 /// `Solver`'s parameters; random decision rate was dropped.
-pub struct SolverConfig {
+pub struct Config {
     pub root_level: usize,
     pub num_vars: usize,
     /// STARATEGY
@@ -36,6 +35,7 @@ pub struct SolverConfig {
     pub strategy: SearchStrategy,
     pub use_chan_seok: bool,
     pub co_lbd_bound: usize,
+    pub lbd_frozen_clause: usize,
     /// CLAUSE/VARIABLE ACTIVITY
     pub cla_decay: f64,
     pub cla_inc: f64,
@@ -45,8 +45,9 @@ pub struct SolverConfig {
     /// CLAUSE REDUCTION
     pub first_reduction: usize,
     pub glureduce: bool,
-    pub inc_reduce_db: usize,
-    pub inc_reduce_db_extra: usize,
+    pub cdb_inc: usize,
+    pub cdb_inc_extra: usize,
+    pub cdb_soft_limit: usize,
     pub ema_coeffs: (i32, i32),
     /// RESTART
     /// For force restart based on average LBD of newly generated clauses: 0.80.
@@ -64,22 +65,32 @@ pub struct SolverConfig {
     pub luby_restart_inc: f64,
     pub luby_current_restarts: usize,
     pub luby_restart_factor: f64,
+    /// Eliminator
+    pub use_elim: bool,
+    /// 0 for no limit
+    /// Stop elimination if a generated resolvent is larger than this
+    /// 0 means no limit.
+    pub elim_eliminate_combination_limit: usize,
+    /// Stop elimination if the increase of clauses is over this
+    pub elim_eliminate_grow_limit: usize,
+    pub elim_eliminate_loop_limit: usize,
+    /// Stop sumsumption if the size of a clause is over this
+    pub elim_subsume_literal_limit: usize,
+    pub elim_subsume_loop_limit: usize,
     /// MISC
-    pub use_sve: bool,
     pub progress_log: bool,
-    // dump stats data during solving
-    // pub dump_solver_stat_mode: i32,
 }
 
-impl Default for SolverConfig {
-    fn default() -> SolverConfig {
-        SolverConfig {
+impl Default for Config {
+    fn default() -> Config {
+        Config {
             root_level: 0,
             num_vars: 0,
             adapt_strategy: true,
             strategy: SearchStrategy::Initial,
             use_chan_seok: false,
             co_lbd_bound: 5,
+            lbd_frozen_clause: 30,
             cla_decay: 0.999,
             cla_inc: 1.0,
             var_decay: 0.9,
@@ -87,12 +98,13 @@ impl Default for SolverConfig {
             var_inc: 0.9,
             first_reduction: 1000,
             glureduce: true,
-            inc_reduce_db: 300,
-            inc_reduce_db_extra: 1000,
-            restart_thr: 0.75,
-            restart_blk: 1.40,
-            restart_asg_len: 3500,
-            restart_lbd_len: 50,
+            cdb_inc: 300,
+            cdb_inc_extra: 1000,
+            cdb_soft_limit: 18_000_000,
+            restart_thr: 0.60,     // will be overwrited by bin/splr
+            restart_blk: 1.40,     // will be overwrited by bin/splr
+            restart_asg_len: 3500, // will be overwrited by bin/splr
+            restart_lbd_len: 100,  // will be overwrited by bin/splr
             restart_expansion: 1.15,
             restart_step: 50,
             luby_restart: false,
@@ -101,22 +113,20 @@ impl Default for SolverConfig {
             luby_current_restarts: 0,
             luby_restart_factor: 100.0,
             ema_coeffs: (2 ^ 5, 2 ^ 15),
-            use_sve: true,
+            use_elim: true,
+            elim_eliminate_combination_limit: 80,
+            elim_eliminate_grow_limit: 0, // 64
+            elim_eliminate_loop_limit: 2_000_000,
+            elim_subsume_literal_limit: 100,
+            elim_subsume_loop_limit: 2_000_000,
             progress_log: false,
-            // dump_solver_stat_mode: 0,
         }
     }
 }
 
-impl SolverConfig {
+impl Config {
     #[inline(always)]
-    pub fn adapt_strategy(
-        &mut self,
-        cps: &mut ClauseDB,
-        elim: &mut Eliminator,
-        state: &mut SolverState,
-        vars: &mut [Var],
-    ) {
+    pub fn adapt_strategy(&mut self, cdb: &mut ClauseDB, state: &mut State) {
         if !self.adapt_strategy || self.strategy != SearchStrategy::Initial {
             return;
         }
@@ -133,7 +143,7 @@ impl SolverConfig {
             state.cur_restart = (state.stats[Stat::Conflict as usize] as f64
                 / state.next_reduction as f64
                 + 1.0) as usize;
-            self.inc_reduce_db = 0;
+            self.cdb_inc = 0;
             re_init = true;
         }
         if state.stats[Stat::NoDecisionConflict as usize] < 30_000 {
@@ -162,29 +172,21 @@ impl SolverConfig {
             self.strategy = SearchStrategy::Generic;
             return;
         }
-        state.ema_asg.reset();
-        state.ema_lbd.reset();
-        // state.lbd_queue.clear();
-        state.stats[Stat::SumLBD as usize] = 0;
-        state.stats[Stat::Conflict as usize] = 0;
-        let [_, learnts, permanents, _] = cps;
         if self.use_chan_seok {
-            // println!("# Adjusting for low decision levels.");
+            // Adjusting for low decision levels.
             // move some clauses with good lbd (col_lbd_bound) to Permanent
-            for ch in &mut learnts.head[1..] {
-                if ch.get_flag(ClauseFlag::Dead) {
+            for c in &mut cdb.clause[1..] {
+                if c.is(Flag::DeadClause) || !c.is(Flag::LearntClause) {
                     continue;
                 }
-                if ch.rank <= self.co_lbd_bound || re_init {
-                    if ch.rank <= self.co_lbd_bound {
-                        permanents.new_clause(&ch.lits, ch.rank);
-                    }
-                    learnts.touched[ch.lits[0].negate() as usize] = true;
-                    learnts.touched[ch.lits[1].negate() as usize] = true;
-                    ch.flag_on(ClauseFlag::Dead);
+                if c.rank <= self.co_lbd_bound {
+                    c.turn_off(Flag::LearntClause);
+                    cdb.num_learnt -= 1;
+                } else if re_init {
+                    c.kill(&mut cdb.touched);
                 }
             }
-            learnts.garbage_collect(vars, elim);
+            cdb.garbage_collect();
         }
     }
 }

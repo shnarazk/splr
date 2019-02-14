@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-use splr::clause::{Clause, ClauseKind};
+use splr::clause::Clause;
 use splr::solver::Solver;
 use splr::traits::*;
 use splr::types::*;
@@ -7,7 +7,7 @@ use splr::types::*;
 macro_rules! mkv {
     ($($x:expr),*) => {
         match &[$($x),*] {
-            v => v.iter().map(|x| int2lit(*x)).collect::<Vec<Lit>>(),
+            v => v.iter().map(|x| Lit::from_int(*x)).collect::<Vec<Lit>>(),
         }
     };
 }
@@ -49,9 +49,9 @@ impl Testing for Clause {
 //     }
 //     assert_eq!(total, 6);
 //     let mut iter = c1.into_iter();
-//     assert_eq!(iter.next(), Some(int2lit(1)));
-//     assert_eq!(iter.next(), Some(int2lit(2)));
-//     assert_eq!(iter.next(), Some(int2lit(3)));
+//     assert_eq!(iter.next(), Some(Lit::from_int(1)));
+//     assert_eq!(iter.next(), Some(Lit::from_int(2)));
+//     assert_eq!(iter.next(), Some(Lit::from_int(3)));
 //     assert_eq!(iter.next(), None);
 // }
 
@@ -87,6 +87,6 @@ fn setup() -> Solver {
 }
 
 fn attach_clause<'a>(s: &'a mut Solver, vec: &[Lit]) -> &'a mut Clause {
-    let cid = s.cps[ClauseKind::Permanent as usize].new_clause(vec, vec.len());
-    &mut s.cps[ClauseKind::Permanent as usize].head[cid.to_index()]
+    let cid = s.cdb.new_clause(vec, vec.len(), true);
+    &mut s.cdb.clause[cid]
 }

@@ -1,27 +1,30 @@
-use crate::clause::ClauseKind;
 use crate::solver::Solver;
-use crate::traits::{LitIF, VarManagement};
-use crate::types::{LFALSE, LTRUE};
+use crate::traits::{LitIF, PropagatorIF, ValidatorIF, VarDBIF};
+use crate::types::{Lit, MaybeInconsistent, SolverError, NULL_CLAUSE};
 
-impl Solver {
-    pub fn inject_assigmnent(&mut self, vec: &[i32]) {
-        for val in vec {
-            self.vars[val.abs() as usize].assign = if *val < 0 { LFALSE } else { LTRUE };
+impl ValidatorIF for Solver {
+    fn inject_assigmnent(&mut self, vec: &[i32]) -> MaybeInconsistent {
+        if vec.is_empty() {
+            return Err(SolverError::Inconsistent);
         }
+        for val in vec {
+            let l = Lit::from_int(*val);
+            let vi = l.vi();
+            self.asgs
+                .enqueue(&mut self.vars[vi], l.lbool(), NULL_CLAUSE, 0)?;
+        }
+        Ok(())
     }
-
     /// returns None if the given assignment is a model of a problem.
-    /// Otherwise returns a clause which is not satisfiable.
-    pub fn validate(&self) -> Option<Vec<i32>> {
-        for ck in ClauseKind::Liftedlit as usize..=ClauseKind::Binclause as usize {
-            for ch in &self.cps[ck].head[1..] {
-                if !self.vars.satisfies(&ch.lits) {
-                    let mut v = Vec::new();
-                    for l in &ch.lits {
-                        v.push(l.int());
-                    }
-                    return Some(v);
+    /// Otherwise returns a clause which is not satisfiable under a given assignment.
+    fn validate(&self) -> Option<Vec<i32>> {
+        for ch in &self.cdb.clause[1..] {
+            if !self.vars.satisfies(&ch.lits) {
+                let mut v = Vec::new();
+                for l in &ch.lits {
+                    v.push(l.int());
                 }
+                return Some(v);
             }
         }
         None

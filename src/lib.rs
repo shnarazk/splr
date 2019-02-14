@@ -1,58 +1,25 @@
 //! This is a SAT solver in Rust.
 
-#[macro_export]
-macro_rules! clause {
-    ($cv: expr, $val: expr) => {{
-        match (&$cv, $val) {
-            (v, cid) => &v[cid.to_kind()].head[cid.to_index()],
-        }
-    }};
-}
-
-#[macro_export]
-macro_rules! clause_mut {
-    ($cv: expr, $val: expr) => {{
-        match (&mut $cv, $val) {
-            (v, cid) => &mut v[cid.to_kind()].head[cid.to_index()],
-        }
-    }};
-}
-
-#[allow(unused_macros)]
-macro_rules! uenqueue {
-    ($vs: expr, $tr: expr, $tl: expr, $lit: expr, $cid: expr) => {{
-        match (&$vs, &mut $tr, &$tl, $lit, $cid) {
-            (vs, tr, tl, lit, cid) => {
-                let mut v = &mut vs[lit.vi()];
-                v.assign = lit.lbool();
-                v.level = tl.len();
-                v.reason = cid;
-                tr.push(lit);
-            }
-        }
-    }};
-}
-
 // /// Subsumption-based clause/var eliminaiton
-/// Assignment management
-pub mod assign;
-/// Clause
+/// Clause struct
 pub mod clause;
-/// Configuration
+/// Solver configuration
 pub mod config;
-/// In-process elimination
+/// Pre/In-processor for clause subsumption and variable elimination
 pub mod eliminator;
-/// Implementation on solver restart.
+/// Assignment management
+pub mod propagator;
+/// Solver restart implementation
 pub mod restart;
-/// struct Solver
+/// The main struct
 pub mod solver;
-/// various data for SAT solving
+/// Collection of various stat data for SAT solving process
 pub mod state;
-/// Traits
+/// Interfaces between submodules (version 0.1)
 pub mod traits;
-/// Plumping layer.
+/// Plumping layer
 pub mod types;
-/// validates
+/// validates a given assignment for a problem.
 pub mod validator;
-/// Var
+/// Var struct
 pub mod var;
