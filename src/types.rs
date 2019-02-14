@@ -125,6 +125,16 @@ pub struct CNFDescription {
     pub pathname: String,
 }
 
+impl Default for CNFDescription {
+    fn default() -> CNFDescription {
+        CNFDescription {
+            num_of_variables: 0,
+            num_of_clauses: 0,
+            pathname: "".to_string(),
+        }
+    }
+}
+
 impl fmt::Display for CNFDescription {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let CNFDescription {
