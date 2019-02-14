@@ -1,3 +1,7 @@
+## 0.1.0
+
+- Answers were verified with Glucose and Lingeling.
+
 ## Technology Preview 13
 
 - all clauses are stored into a single ClauseDB
