@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 use structopt::StructOpt;
 
+/// Configuration built from command line options
 #[derive(StructOpt)]
 #[structopt(
     name = "splr",

@@ -29,9 +29,12 @@ impl ClauseIdIF for ClauseId {
     }
 }
 
+/// 'watch literal' structure
 #[derive(Clone)]
 pub struct Watch {
+    /// a cache of a literal in the clause
     pub blocker: Lit,
+    /// ClauseId
     pub c: ClauseId,
 }
 

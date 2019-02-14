@@ -10,10 +10,7 @@ use std::path::{Path, PathBuf};
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
-#[structopt(
-    name = "dmcr",
-    about = "DIMACS-format Model Checker in Rust"
-)]
+#[structopt(name = "dmcr", about = "DIMACS-format Model Checker in Rust")]
 struct TargetOpts {
     #[structopt(parse(from_os_str))]
     #[structopt(short = "a", long = "assign")]

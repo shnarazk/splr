@@ -7,6 +7,7 @@ use std::fmt;
 use std::fs::File;
 use std::io::{BufWriter, Write};
 
+/// A record of assignment. It's called 'trail' in Glucose.
 pub struct AssignStack {
     pub trail: Vec<Lit>,
     pub assign: Vec<Lbool>,
@@ -256,11 +257,11 @@ impl AssignStack {
     }
 }
 
-/// heap of VarId
-/// # Note
-/// - both fields has a fixed length. Don't use push and pop.
-/// - idxs[0] contains the number of alive elements
-///   `indx` is positions. So the unused field 0 can hold the last position as a special case.
+/// Heap of VarId, based on var activity
+// # Note
+// - both fields has a fixed length. Don't use push and pop.
+// - `idxs[0]` contains the number of alive elements
+//   `indx` is positions. So the unused field 0 can hold the last position as a special case.
 pub struct VarIdHeap {
     heap: Vec<VarId>, // order : usize -> VarId
     idxs: Vec<usize>, // VarId : -> order : usize

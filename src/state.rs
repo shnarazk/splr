@@ -9,6 +9,7 @@ use std::fmt;
 use std::path::Path;
 use std::time::SystemTime;
 
+/// A collection of named search heuristics
 #[derive(Eq, PartialEq)]
 pub enum SearchStrategy {
     Initial,
@@ -55,6 +56,7 @@ pub enum Stat {
     EndOfStatIndex,        // Don't use this dummy.
 }
 
+/// Data storage for `Solver`
 pub struct State {
     pub root_level: usize,
     pub num_vars: usize,
@@ -542,6 +544,7 @@ impl fmt::Display for State {
     }
 }
 
+/// Index for `Usize` data, used in `ProgressRecord`
 pub enum LogUsizeId {
     Propagate = 0,  //  0: propagate: usize,
     Decision,       //  1: decision: usize,
@@ -563,6 +566,7 @@ pub enum LogUsizeId {
     End,
 }
 
+/// Index for `f64` data, used in `ProgressRecord`
 pub enum LogF64Id {
     Progress = 0, //  0: progress: f64,
     EmaAsg,       //  1: ema_asg: f64,
@@ -575,6 +579,7 @@ pub enum LogF64Id {
     End,
 }
 
+/// Record of old stats.
 pub struct ProgressRecord {
     pub vali: [usize; LogUsizeId::End as usize],
     pub valf: [f64; LogF64Id::End as usize],

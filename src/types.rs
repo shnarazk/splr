@@ -95,7 +95,10 @@ impl LitIF for Lit {
     }
 }
 
-/// Lifted Bool type
+/// Lifted Bool type, consisting of
+///  - `FALSE`
+///  - `TRUE`
+///  - `BOTTOM`
 pub type Lbool = u8;
 /// the lifted **false**.
 pub const FALSE: u8 = 0;
@@ -110,11 +113,13 @@ fn negate_bool(b: Lbool) -> Lbool {
     b ^ 1
 }
 
+/// Internal exception
 // Returning `Result<(), a-singlen>` is identical to returning `bool`.
 pub enum SolverError {
     Inconsistent,
 }
 
+/// A Return type used by solver functions
 pub type MaybeInconsistent = Result<(), SolverError>;
 
 /// data about a problem.
@@ -146,6 +151,7 @@ impl fmt::Display for CNFDescription {
     }
 }
 
+/// convert `[Lit]` to `[i32]` (for debug)
 pub fn vec2int(v: &[Lit]) -> Vec<i32> {
     v.iter()
         .map(|l| match l {
