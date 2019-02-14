@@ -52,7 +52,7 @@ c
 
 While Splr comes with ABSOLUTELY NO WARRANTY, Splr version 0.1.0 (splr-0.1.0) was verified with the following problems:
 
-* The first 100 satisfiable 3-SAT problems from [SATLIB](https://www.cs.ubc.ca/~hoos/SATLIB/benchm.html), containing [https://www.cs.ubc.ca/~hoos/SATLIB/Benchmarks/SAT/RND3SAT/uf250-1065.tar.gz](250 variables): passed
-* [https://baldur.iti.kit.edu/sat-competition-2017/index.php?cat=tracks](SAT Competition 2017 Main track) ([https://baldur.iti.kit.edu/sat-competition-2017/benchmarks/Main.zip](350 problems)): with a 2000 sec timeout, Splr-0.1.0 solved:
+* The first 100 satisfiable 3-SAT problems from [SATLIB](https://www.cs.ubc.ca/~hoos/SATLIB/benchm.html), containing [250 variables](https://www.cs.ubc.ca/~hoos/SATLIB/Benchmarks/SAT/RND3SAT/uf250-1065.tar.gz): passed
+* [SAT Competition 2017](https://baldur.iti.kit.edu/sat-competition-2017/index.php?cat=tracks), [Main track](https://baldur.iti.kit.edu/sat-competition-2017/benchmarks/Main.zip): with a 2000 sec timeout, Splr-0.1.0 solved:
   * 72 satisfiable problems: all the solutions are correct (checked with dmcr).
   * 51 unsatisfiable problems: Lingeling or Glucose completely returns the same result.
