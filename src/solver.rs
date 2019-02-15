@@ -354,10 +354,10 @@ fn handle_conflict_path(
                 state.elim_trigger = cl;
                 elim.activate();
             }
-            // if 2 * cl < state.elim_trigger {
-            //     elim.activate();
-            //     state.elim_trigger = cl;
-            // }
+            if 2 * cl < state.elim_trigger {
+                elim.activate();
+                state.elim_trigger = cl;
+            }
         }
         state.progress(cdb, vars, None);
     }
