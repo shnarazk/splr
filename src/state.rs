@@ -10,7 +10,7 @@ use std::path::Path;
 use std::time::SystemTime;
 
 /// A collection of named search heuristics
-#[derive(Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum SearchStrategy {
     Initial,
     Generic,

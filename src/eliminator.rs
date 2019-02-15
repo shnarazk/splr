@@ -6,7 +6,7 @@ use crate::types::*;
 use crate::var::Var;
 use std::fmt;
 
-#[derive(PartialEq, Eq)]
+#[derive(Eq, Debug, PartialEq)]
 enum EliminatorMode {
     Deactive,
     Waiting,
