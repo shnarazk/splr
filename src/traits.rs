@@ -25,6 +25,10 @@ pub trait ClauseDBIF {
     /// simplify database by:
     /// * removing satisfiable clauses
     /// * calling exhausitve simplifier that tries **clause subsumption** and **variable elimination**.
+    ///
+    /// # Errors
+    ///
+    /// if solver becomes inconsistent.
     fn simplify(
         &mut self,
         asgs: &mut AssignStack,
@@ -53,7 +57,7 @@ pub trait ClauseDBIF {
 pub trait ClauseIdIF {
     /// convert a (lifted) clause id made from a `Lit` to Lit.
     fn to_lit(self) -> Lit;
-    /// return true if a given clause id is made from a `Lit`.
+    /// return `true` if a given clause id is made from a `Lit`.
     fn is_lifted_lit(self) -> bool;
     /// make a string for printing.
     fn format(self) -> String;
@@ -84,6 +88,10 @@ pub trait EliminatorIF {
     fn clear_var_queue(&mut self, vars: &mut [Var]);
     fn var_queue_len(&self) -> usize;
     /// run clause subsumption and variable elimination.
+    ///
+    /// # Errors
+    ///
+    /// if solver becomes inconsistent.
     fn eliminate(
         &mut self,
         asgs: &mut AssignStack,
@@ -142,11 +150,11 @@ pub trait PropagatorIF {
     fn new(n: usize) -> Self;
     /// return the number of assignments.
     fn len(&self) -> usize;
-    /// return true if there's no assignment.
+    /// return `true` if there's no assignment.
     fn is_empty(&self) -> bool;
     /// return the current decision level.
     fn level(&self) -> usize;
-    /// return true if the current decision level is zero.
+    /// return `true` if the current decision level is zero.
     fn is_zero(&self) -> bool;
     /// return the number of assignments at a given decision level `u`.
     fn num_at(&self, n: usize) -> usize;
@@ -159,8 +167,12 @@ pub trait PropagatorIF {
     /// execute *backjump*.
     fn cancel_until(&mut self, vars: &mut [Var], lv: usize);
     /// add an assignment caused by a clause; emit an exception if solver becomes inconsistent.
+    ///
+    /// # Errors
+    ///
+    /// if solver becomes inconsistent by the new assignment.
     fn enqueue(&mut self, v: &mut Var, sig: Lbool, cid: ClauseId, dl: usize) -> MaybeInconsistent;
-    /// add an assginment with no reason clause.
+    /// add an assginment with no reason clause without inconsistency check.
     fn enqueue_null(&mut self, v: &mut Var, sig: Lbool);
     /// unsafe enqueue; doesn't emit an exception.
     fn uncheck_enqueue(&mut self, vars: &mut [Var], l: Lit, cid: ClauseId);
@@ -170,7 +182,7 @@ pub trait PropagatorIF {
     fn update_order(&mut self, vec: &[Var], v: VarId);
     /// select a new decision variable.
     fn select_var(&mut self, vars: &[Var]) -> VarId;
-    /// dump all active clauses in solver to a file `fname`.
+    /// dump all active clauses and fixed assignments in solver to a CNF file `fname`.
     fn dump_cnf(&mut self, cdb: &ClauseDB, state: &State, vars: &[Var], fname: &str);
 }
 
@@ -193,8 +205,16 @@ pub trait SatSolverIF {
     /// make a solver for debug. Probably you should use `build` instead of this.
     fn new(config: Config, cnf: &CNFDescription) -> Solver;
     /// make a solver and load a CNF into it.
+    ///
+    /// # Errors
+    ///
+    /// IO error by failing to load a CNF file.
     fn build(config: Config) -> std::io::Result<Solver>;
     /// search an assignment.
+    ///
+    /// # Errors
+    ///
+    /// if solver becomes inconsistent by an internal error.
     fn solve(&mut self) -> SolverResult;
     /// add a vector of `Lit` as a clause to the solver.
     fn add_unchecked_clause(&mut self, v: &mut Vec<Lit>) -> Option<ClauseId>;
@@ -215,6 +235,10 @@ pub trait StateIF {
 /// API for SAT validator like `inject_assignment`, `validate` and so on.
 pub trait ValidatorIF {
     /// load a assignment set into solver.
+    ///
+    /// # Errors
+    ///
+    /// if solver becomes inconsistent.
     fn inject_assigmnent(&mut self, vec: &[i32]) -> MaybeInconsistent;
     /// return `true` is the loaded assigment set is satisfiable (a model of a problem).
     fn validate(&self) -> Option<Vec<i32>>;
@@ -232,7 +256,7 @@ pub trait VarDBIF {
     fn assigned(&self, l: Lit) -> Lbool;
     /// return `true` is the clause is the reason of the assignment.
     fn locked(&self, c: &Clause, cid: ClauseId) -> bool;
-    /// return true if the set of literals is satisfiable under the current assignment.
+    /// return `true` if the set of literals is satisfiable under the current assignment.
     fn satisfies(&self, c: &[Lit]) -> bool;
     /// return a LBD value for the set of literals.
     fn compute_lbd(&self, vec: &[Lit], keys: &mut [usize]) -> usize;

@@ -9,13 +9,15 @@ use crate::var::Var;
 use std::fs;
 use std::io::{BufRead, BufReader};
 
-/// normal results returned by Solver
+/// Normal results returned by Solver.
 pub enum Certificate {
     SAT(Vec<i32>),
-    UNSAT(Vec<i32>), // FIXME: replace with DRAT
+    /// ### TODO
+    /// the vector will be replaced with DRAT in future release
+    UNSAT(Vec<i32>),
 }
 
-/// abnormal termination flags
+/// Abnormal termination flags.
 pub enum SolverException {
     // StateUNSAT = 0,
     // StateSAT,
@@ -25,14 +27,14 @@ pub enum SolverException {
     UndescribedError,
 }
 
-/// The type that `Solver` returns
+/// The return type of `Solver::solve`.
 /// This captures the following three cases:
-/// * solved with a satisfiable assigment,
-/// * proved that it's an unsatisfiable problem, and
-/// * aborted due to Mios specification or an internal error
+/// * `Certificate::SAT` -- solved with a satisfiable assigment set,
+/// * `Certificate::UNSAT` -- proved that it's an unsatisfiable problem, and
+/// * `SolverException::*` -- caused by a bug
 pub type SolverResult = Result<Certificate, SolverException>;
 
-/// is the collection of all variables.
+/// SAT solver consisting of 5 sub modules.
 #[derive(Debug)]
 pub struct Solver {
     pub asgs: AssignStack, // Assignment

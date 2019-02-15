@@ -48,9 +48,9 @@ impl EliminatorIF for Eliminator {
     fn is_running(&self) -> bool {
         self.mode == EliminatorMode::Running
     }
-    /// FIXME: due to a potential bug of killing clauses and difficulty about
-    /// synchronization between 'garbage_collect' and clearing occur lists,
-    /// 'stop' should purge all occur lists to purge any dead clauses for now.
+    // FIXME: due to a potential bug of killing clauses and difficulty about
+    // synchronization between 'garbage_collect' and clearing occur lists,
+    // 'stop' should purge all occur lists to purge any dead clauses for now.
     fn stop(&mut self, cdb: &mut ClauseDB, vars: &mut [Var]) {
         let force: bool = true;
         self.clear_clause_queue(cdb);

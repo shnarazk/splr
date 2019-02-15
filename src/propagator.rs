@@ -77,7 +77,6 @@ impl PropagatorIF for AssignStack {
             Err(SolverError::Inconsistent)
         }
     }
-    /// panic if an conflict occurs.
     fn enqueue_null(&mut self, v: &mut Var, sig: Lbool) {
         debug_assert!(!v.is(Flag::EliminatedVar));
         debug_assert!(sig != BOTTOM);
