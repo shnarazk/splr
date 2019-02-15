@@ -1,6 +1,18 @@
 [package]
 name = "splr"
 version = "0.1.0"
-authors = ["shujinarazaki <shujinarazaki@protonmail.com>"]
+authors = ["Shuji Narazaki <shujinarazaki@protonmail.com>"]
+edition = "2018"
+description = "A pure rustic CDCL SAT solver based on Glucose"
+license-file = "LICENSE"
+repository = "https://gitlab.com/satisfiability01/splr"
+keywords = ["SAT", "logic"]
+categories = ["math"]
 
 [dependencies]
+structopt = "0.2.14"
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
