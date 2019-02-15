@@ -7,7 +7,7 @@ description = "A pure rustic CDCL SAT solver based on Glucose"
 license-file = "LICENSE"
 repository = "https://gitlab.com/satisfiability01/splr"
 keywords = ["SAT", "logic"]
-categories = ["math"]
+categories = ["science"]
 
 [dependencies]
 structopt = "0.2.14"
