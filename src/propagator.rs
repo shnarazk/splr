@@ -8,6 +8,7 @@ use std::fs::File;
 use std::io::{BufWriter, Write};
 
 /// A record of assignment. It's called 'trail' in Glucose.
+#[derive(Debug)]
 pub struct AssignStack {
     pub trail: Vec<Lit>,
     pub assign: Vec<Lbool>,
@@ -263,6 +264,7 @@ impl AssignStack {
 // - both fields has a fixed length. Don't use push and pop.
 // - `idxs[0]` contains the number of alive elements
 //   `indx` is positions. So the unused field 0 can hold the last position as a special case.
+#[derive(Debug)]
 pub struct VarIdHeap {
     heap: Vec<VarId>, // order : usize -> VarId
     idxs: Vec<usize>, // VarId : -> order : usize

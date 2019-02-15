@@ -33,6 +33,7 @@ pub enum SolverException {
 pub type SolverResult = Result<Certificate, SolverException>;
 
 /// is the collection of all variables.
+#[derive(Debug)]
 pub struct Solver {
     pub asgs: AssignStack, // Assignment
     pub cdb: ClauseDB,     // Clauses

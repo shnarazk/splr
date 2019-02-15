@@ -57,6 +57,7 @@ pub enum Stat {
 }
 
 /// Data storage for `Solver`
+#[derive(Debug)]
 pub struct State {
     pub root_level: usize,
     pub num_vars: usize,
@@ -580,6 +581,7 @@ pub enum LogF64Id {
 }
 
 /// Record of old stats.
+#[derive(Debug)]
 pub struct ProgressRecord {
     pub vali: [usize; LogUsizeId::End as usize],
     pub valf: [f64; LogF64Id::End as usize],

@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use structopt::StructOpt;
 
 /// Configuration built from command line options
-#[derive(StructOpt)]
+#[derive(Debug, StructOpt)]
 #[structopt(
     name = "splr",
     about = "SAT solver for Propositional Logic in Rust, version 0.1.0"

@@ -14,6 +14,7 @@ enum EliminatorMode {
 }
 
 /// Literal eliminator
+#[derive(Debug)]
 pub struct Eliminator {
     mode: EliminatorMode,
     clause_queue: Vec<ClauseId>,
@@ -780,6 +781,7 @@ impl Var {
 // - both fields has a fixed length. Don't use push and pop.
 // - `idxs[0]` contains the number of alive elements
 //   `indx` is positions. So the unused field 0 can hold the last position as a special case.
+#[derive(Debug)]
 pub struct VarOccHeap {
     heap: Vec<VarId>, // order : usize -> VarId
     idxs: Vec<usize>, // VarId : -> order : usize

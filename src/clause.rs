@@ -30,7 +30,7 @@ impl ClauseIdIF for ClauseId {
 }
 
 /// 'watch literal' structure
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Watch {
     /// a cache of a literal in the clause
     pub blocker: Lit,
@@ -92,6 +92,7 @@ impl WatchDBIF for Vec<Watch> {
 }
 
 /// A representation of 'clause'
+#[derive(Debug)]
 pub struct Clause {
     /// The literals in a clause.
     pub lits: Vec<Lit>,
@@ -219,6 +220,7 @@ impl fmt::Display for Clause {
 }
 
 /// Clause database
+#[derive(Debug)]
 pub struct ClauseDB {
     pub clause: Vec<Clause>,
     pub touched: Vec<bool>,

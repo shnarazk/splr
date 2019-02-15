@@ -5,6 +5,7 @@ use crate::traits::*;
 // const RESET_EMA: usize = 400;
 
 /// Exponential Moving Average w/ a calibrator
+#[derive(Debug)]
 pub struct Ema {
     val: f64,
     cal: f64,

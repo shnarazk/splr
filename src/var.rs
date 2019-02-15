@@ -8,6 +8,7 @@ const VAR_ACTIVITY_SCALE1: f64 = 1e-30;
 const VAR_ACTIVITY_SCALE2: f64 = 1e-30;
 
 /// Structure for variables.
+#[derive(Debug)]
 pub struct Var {
     /// reverse conversion to index. Note `VarId` must be `usize`.
     pub index: VarId,
