@@ -1,5 +1,5 @@
 // SAT solver for Propositional Logic in Rust
-// Version 0.1.0
+// Version 0.1.0 + m73
 
 use splr::config::Config;
 use splr::solver::{Certificate, Solver};
@@ -9,7 +9,7 @@ use std::fs::File;
 use std::io::{BufWriter, Write};
 use structopt::StructOpt;
 
-const VERSION: &str = "0.1.0";
+const VERSION: &str = "0.1.0 + m73";
 
 fn main() {
     let config = Config::from_args();
