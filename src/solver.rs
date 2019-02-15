@@ -42,8 +42,7 @@ pub struct Solver {
     pub vars: Vec<Var>,    // Variables
 }
 
-impl Solver {
-    /// make a solver
+impl SatSolverIF for Solver {
     fn new(config: Config, cnf: &CNFDescription) -> Solver {
         let nv = cnf.num_of_variables as usize;
         let nc = cnf.num_of_clauses as usize;
@@ -57,9 +56,6 @@ impl Solver {
             vars: Var::new_vars(nv),
         }
     }
-}
-
-impl SatSolverIF for Solver {
     fn solve(&mut self) -> SolverResult {
         let Solver {
             ref mut asgs,
