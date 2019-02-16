@@ -1,10 +1,11 @@
 // SAT solver for Propositional Logic in Rust
 // Version 0.1.0
 
+use splr::clause::CertifiedRecord;
 use splr::config::Config;
-use splr::solver::{Certificate, CertifiedRecord, Solver};
+use splr::solver::{Certificate, Solver};
 use splr::state::*;
-use splr::traits::{LitIF, SatSolverIF};
+use splr::traits::SatSolverIF;
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use structopt::StructOpt;
@@ -64,7 +65,7 @@ fn main() {
                 result.as_str()
             );
         }
-        Ok(Certificate::UNSAT(_)) => {
+        Ok(Certificate::UNSAT) => {
             if let Ok(out) = File::create(&result) {
                 let mut buf = BufWriter::new(out);
                 if let Err(why) = (|| {
@@ -82,7 +83,7 @@ fn main() {
                             buf.write_all(b"d ")?;
                         }
                         for l in x {
-                            buf.write_all(format!("{} " , l.to_i32()).as_bytes())?;
+                            buf.write_all(format!("{} " , l).as_bytes())?;
                         }
                         buf.write_all(b"0\n")?;
                     }

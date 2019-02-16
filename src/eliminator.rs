@@ -1,6 +1,5 @@
-use crate::clause::{Clause, ClauseDB};
+use crate::clause::{CertifiedRecord, Clause, ClauseDB};
 use crate::propagator::AssignStack;
-use crate::solver::CertifiedRecord;
 use crate::state::State;
 use crate::traits::*;
 use crate::types::*;
@@ -560,7 +559,11 @@ fn strengthen_clause(
         debug_assert!(1 < cdb.clause[cid].lits.len());
         elim.enqueue_clause(cid, &mut cdb.clause[cid]);
         elim.remove_lit_occur(vars, l, cid);
-        cdb.certified.push((CertifiedRecord::ADD, cdb.clause[cid].lits.clone()));
+        // cdb.certificate_add(&cdb.clause[cid].lits);
+        if !cdb.certified.is_empty() {
+            let temp = cdb.clause[cid].lits.iter().map(|l| l.to_i32()).collect();
+            cdb.certified.push((CertifiedRecord::ADD, temp));
+        }
         Ok(())
     }
 }
@@ -683,7 +686,7 @@ fn eliminate_var(
                         //     vec2int(&clause!(*cp, *n).lits)
                         // );
                         let lit = (*vec)[0];
-                        cdb.certified.push((CertifiedRecord::ADD, (*vec).clone()));
+                        cdb.certificate_add(&*vec);
                         asgs.enqueue(&mut vars[lit.vi()], lit.lbool(), NULL_CLAUSE, 0)?;
                     }
                     _ => {

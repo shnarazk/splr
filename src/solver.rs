@@ -1,4 +1,4 @@
-use crate::clause::{Clause, ClauseDB};
+use crate::clause::{CertifiedRecord, Clause, ClauseDB};
 use crate::config::Config;
 use crate::eliminator::Eliminator;
 use crate::propagator::AssignStack;
@@ -9,18 +9,12 @@ use crate::var::Var;
 use std::fs;
 use std::io::{BufRead, BufReader};
 
-#[derive(Debug, Eq, PartialEq)]
-pub enum CertifiedRecord {
-    ADD,
-    DELETE,
-}
-
-pub type DRAT = Vec<(CertifiedRecord, Vec<Lit>)>;
+pub type DRAT = Vec<(CertifiedRecord, Vec<i32>)>;
 
 /// Normal results returned by Solver.
-pub enum Certificate<'a> {
+pub enum Certificate {
     SAT(Vec<i32>),
-    UNSAT(&'a DRAT),
+    UNSAT,
 }
 
 /// Abnormal termination flags.
@@ -38,7 +32,7 @@ pub enum SolverException {
 /// * `Certificate::SAT` -- solved with a satisfiable assigment set,
 /// * `Certificate::UNSAT` -- proved that it's an unsatisfiable problem, and
 /// * `SolverException::*` -- caused by a bug
-pub type SolverResult<'a> = Result<Certificate<'a>, SolverException>;
+pub type SolverResult = Result<Certificate, SolverException>;
 
 /// SAT solver consisting of 5 sub modules.
 #[derive(Debug)]
@@ -58,7 +52,7 @@ impl SatSolverIF for Solver {
         let state = State::new(&config, cnf.clone());
         Solver {
             asgs: AssignStack::new(nv),
-            cdb: ClauseDB::new(nv, nc),
+            cdb: ClauseDB::new(nv, nc, config.use_certification),
             elim,
             state,
             vars: Var::new_vars(nv),
@@ -73,7 +67,7 @@ impl SatSolverIF for Solver {
             ref mut vars,
         } = self;
         if !state.ok {
-            return Ok(Certificate::UNSAT(&cdb.certified));
+            return Ok(Certificate::UNSAT);
         }
         // TODO: deal with assumptions
         // s.root_level = 0;
@@ -102,7 +96,7 @@ impl SatSolverIF for Solver {
                 // Why inconsistent? Because the CNF contains a conflict, not an error!
                 state.progress(cdb, vars, Some("conflict"));
                 state.ok = false;
-                return Ok(Certificate::UNSAT(&cdb.certified));
+                return Ok(Certificate::UNSAT);
             }
             state.progress(cdb, vars, Some("subsumed"));
         }
@@ -124,7 +118,7 @@ impl SatSolverIF for Solver {
             Ok(false) => {
                 state.progress(cdb, vars, None);
                 asgs.cancel_until(vars, 0);
-                Ok(Certificate::UNSAT(&cdb.certified))
+                Ok(Certificate::UNSAT)
             }
             Err(_) => {
                 asgs.cancel_until(vars, 0);
@@ -203,18 +197,8 @@ impl SatSolverIF for Solver {
             ..
         } = self;
         debug_assert!(asgs.level() == 0);
-        {
-            let mut temp = Vec::new();
-            let mut flag = false;
-            for l in &*v {
-                temp.push(*l);
-                if vars.assigned(*l) != BOTTOM {
-                    flag = true;
-                }
-            }
-            if flag {
-                cdb.certified.push((CertifiedRecord::ADD, temp));
-            }
+        if v.iter().any(|l| vars.assigned(*l) != BOTTOM) {
+            cdb.certificate_add(v);
         }
         v.sort_unstable();
         let mut j = 0;
@@ -322,7 +306,7 @@ fn handle_conflict_path(
 
     if learnt_len == 1 {
         // dump to certified even if it's a literal.
-        cdb.certified.push((CertifiedRecord::ADD, new_learnt.clone()));
+        cdb.certificate_add(new_learnt);
         asgs.uncheck_enqueue(vars, new_learnt[0], NULL_CLAUSE);
     } else {
         state.stats[Stat::Learnt as usize] += 1;

@@ -15,7 +15,7 @@ pub trait ClauseIF {
 
 /// API for clause management like `reduce`, `simplify`, `new_clause`, and so on.
 pub trait ClauseDBIF {
-    fn new(nv: usize, nc: usize) -> Self;
+    fn new(nv: usize, nc: usize, rectify: bool) -> Self;
     /// make a new clause from `state.new_learnt` and register it to clause database.
     fn attach(&mut self, state: &mut State, vars: &mut [Var], lbd: usize) -> ClauseId;
     /// unregister a clause `cid` from clase database and make the clause dead.
@@ -51,6 +51,10 @@ pub trait ClauseDBIF {
     fn count(&self, alive: bool) -> usize;
     /// return the number of clauses which satisfy given flags.
     fn countf(&self, mask: u16) -> usize;
+    /// record a clause to unsat certification
+    fn certificate_add(&mut self, vec: &[Lit]);
+    /// record a deleted clause to unsat certification
+    fn certificate_delete(&mut self, vec: &[Lit]);
 }
 
 /// API for Clause Id like `to_lit`, `is_lifted_lit` and so on.
