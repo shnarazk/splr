@@ -10,7 +10,7 @@ use std::fs::File;
 use std::io::{BufWriter, Write};
 use structopt::StructOpt;
 
-const VERSION: &str = "0.1.0 + M74";
+const VERSION: &str = "0.1.0+m74";
 
 fn main() {
     let config = Config::from_args();
