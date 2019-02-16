@@ -1,6 +1,7 @@
 ## 0.1.1
 
 - support DRAT, certificates of unsatisfiability
+- the answer file format was slightly modified.
 - better settings for eliminator
 
 ## 0.1.0, 2019-02-14
