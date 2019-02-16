@@ -207,13 +207,13 @@ pub trait RestartIF {
 /// API for SAT solver like `build`, `solve` and so on.
 pub trait SatSolverIF {
     /// make a solver for debug. Probably you should use `build` instead of this.
-    fn new(config: Config, cnf: &CNFDescription) -> Solver;
+    fn new(config: &Config, cnf: &CNFDescription) -> Solver;
     /// make a solver and load a CNF into it.
     ///
     /// # Errors
     ///
     /// IO error by failing to load a CNF file.
-    fn build(config: Config) -> std::io::Result<Solver>;
+    fn build(config: &Config) -> std::io::Result<Solver>;
     /// search an assignment.
     ///
     /// # Errors

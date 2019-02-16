@@ -45,11 +45,11 @@ pub struct Solver {
 }
 
 impl SatSolverIF for Solver {
-    fn new(config: Config, cnf: &CNFDescription) -> Solver {
+    fn new(config: &Config, cnf: &CNFDescription) -> Solver {
         let nv = cnf.num_of_variables as usize;
         let nc = cnf.num_of_clauses as usize;
         let elim = Eliminator::new(nv);
-        let state = State::new(&config, cnf.clone());
+        let state = State::new(config, cnf.clone());
         Solver {
             asgs: AssignStack::new(nv),
             cdb: ClauseDB::new(nv, nc, config.use_certification),
@@ -128,7 +128,7 @@ impl SatSolverIF for Solver {
             }
         }
     }
-    fn build(config: Config) -> std::io::Result<Solver> {
+    fn build(config: &Config) -> std::io::Result<Solver> {
         let fs = fs::File::open(&config.cnf)?;
         let mut rs = BufReader::new(fs);
         let mut buf = String::new();

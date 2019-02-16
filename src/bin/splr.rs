@@ -36,7 +36,7 @@ fn main() {
                 .to_string()
         )
     };
-    let mut s = Solver::build(config).expect("failed to load");
+    let mut s = Solver::build(&config).expect("failed to load");
     match s.solve() {
         Ok(Certificate::SAT(v)) => {
             if let Ok(out) = File::create(&result) {
