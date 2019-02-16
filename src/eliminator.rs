@@ -1,5 +1,6 @@
 use crate::clause::{Clause, ClauseDB};
 use crate::propagator::AssignStack;
+use crate::solver::CertifiedRecord;
 use crate::state::State;
 use crate::traits::*;
 use crate::types::*;
@@ -559,6 +560,7 @@ fn strengthen_clause(
         debug_assert!(1 < cdb.clause[cid].lits.len());
         elim.enqueue_clause(cid, &mut cdb.clause[cid]);
         elim.remove_lit_occur(vars, l, cid);
+        cdb.certified.push((CertifiedRecord::ADD, cdb.clause[cid].lits.clone()));
         Ok(())
     }
 }
@@ -681,6 +683,7 @@ fn eliminate_var(
                         //     vec2int(&clause!(*cp, *n).lits)
                         // );
                         let lit = (*vec)[0];
+                        cdb.certified.push((CertifiedRecord::ADD, (*vec).clone()));
                         asgs.enqueue(&mut vars[lit.vi()], lit.lbool(), NULL_CLAUSE, 0)?;
                     }
                     _ => {

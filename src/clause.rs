@@ -1,5 +1,6 @@
 use crate::eliminator::Eliminator;
 use crate::propagator::AssignStack;
+use crate::solver::{CertifiedRecord, DRAT};
 use crate::state::{Stat, State};
 use crate::traits::*;
 use crate::types::*;
@@ -227,6 +228,7 @@ pub struct ClauseDB {
     pub watcher: Vec<Vec<Watch>>,
     pub num_active: usize,
     pub num_learnt: usize,
+    pub certified: DRAT,
 }
 
 impl ClauseDBIF for ClauseDB {
@@ -245,6 +247,7 @@ impl ClauseDBIF for ClauseDB {
             watcher,
             num_active: 0,
             num_learnt: 0,
+            certified: Vec::new(),
         }
     }
     fn garbage_collect(&mut self) {
@@ -253,6 +256,7 @@ impl ClauseDBIF for ClauseDB {
             ref mut watcher,
             ref mut clause,
             ref mut touched,
+            ref mut certified,
             ..
         } = self;
         debug_assert_eq!(NULL_LIT.negate(), 1);
@@ -280,6 +284,14 @@ impl ClauseDBIF for ClauseDB {
                     if c.is(Flag::LearntClause) {
                         self.num_learnt -= 1;
                     }
+                    {
+                        let mut vec = Vec::new();
+                        for l in &c.lits {
+                            vec.push(*l);
+                        }
+                        certified.push((CertifiedRecord::DELETE, vec));
+                    }
+
                     c.lits.clear();
                 }
                 ws.detach(n);
@@ -386,6 +398,7 @@ impl ClauseDBIF for ClauseDB {
     // Note: set lbd to 0 if you want to add the clause to Permanent.
     fn attach(&mut self, state: &mut State, vars: &mut [Var], lbd: usize) -> ClauseId {
         let v = &mut state.new_learnt;
+        self.certified.push((CertifiedRecord::ADD, v.clone()));
         debug_assert!(1 < v.len());
         let mut i_max = 0;
         let mut lv_max = 0;

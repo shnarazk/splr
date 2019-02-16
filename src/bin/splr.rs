@@ -2,9 +2,9 @@
 // Version 0.1.0
 
 use splr::config::Config;
-use splr::solver::{Certificate, Solver};
+use splr::solver::{Certificate, CertifiedRecord, Solver};
 use splr::state::*;
-use splr::traits::SatSolverIF;
+use splr::traits::{LitIF, SatSolverIF};
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use structopt::StructOpt;
@@ -77,6 +77,15 @@ fn main() {
                     )?;
                     report(&s.state, &mut buf)?;
                     buf.write_all(b"s UNSATISFIABLE\n")?;
+                    for (f, x) in &s.cdb.certified {
+                        if *f == CertifiedRecord::DELETE {
+                            buf.write_all(b"d ")?;
+                        }
+                        for l in x {
+                            buf.write_all(format!("{} " , l.to_i32()).as_bytes())?;
+                        }
+                        buf.write_all(b"0\n")?;
+                    }
                     buf.write_all(b"0\n")
                 })() {
                     panic!("failed to save: {:?}!", why);
