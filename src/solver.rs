@@ -303,7 +303,6 @@ fn handle_conflict_path(
     let new_learnt = &mut state.new_learnt;
     asgs.cancel_until(vars, bl.max(state.root_level));
     let learnt_len = new_learnt.len();
-
     if learnt_len == 1 {
         // dump to certified even if it's a literal.
         cdb.certificate_add(new_learnt);
