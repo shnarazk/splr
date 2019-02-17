@@ -1,6 +1,5 @@
 use crate::eliminator::Eliminator;
 use crate::propagator::AssignStack;
-use crate::solver::DRAT;
 use crate::state::{Stat, State};
 use crate::traits::*;
 use crate::types::*;
@@ -18,6 +17,8 @@ pub enum CertifiedRecord {
     ADD,
     DELETE,
 }
+
+type DRAT = Vec<(CertifiedRecord, Vec<i32>)>;
 
 impl ClauseIdIF for ClauseId {
     #[inline(always)]

@@ -1,4 +1,4 @@
-use crate::clause::{CertifiedRecord, Clause, ClauseDB};
+use crate::clause::{Clause, ClauseDB};
 use crate::config::Config;
 use crate::eliminator::Eliminator;
 use crate::propagator::AssignStack;
@@ -8,8 +8,6 @@ use crate::types::*;
 use crate::var::Var;
 use std::fs;
 use std::io::{BufRead, BufReader};
-
-pub type DRAT = Vec<(CertifiedRecord, Vec<i32>)>;
 
 /// Normal results returned by Solver.
 pub enum Certificate {
