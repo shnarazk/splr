@@ -108,9 +108,7 @@ fn read_assignment(rs: &mut BufRead, cnf: &str, assign: &Option<PathBuf>) -> Opt
                         println!("{} seems an unsatisfiable problem. I can't handle it.", cnf);
                         return None;
                     } else if let Some(asg) = assign {
-                        println!("{} seems an illegal format file.",
-                                 asg.to_str().unwrap(),
-                        );
+                        println!("{} seems an illegal format file.", asg.to_str().unwrap(),);
                         return None;
                     }
                 }
