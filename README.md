@@ -52,7 +52,7 @@ Valid assignment for tests/sample.cnf found in .ans_sample.cnf.
 
 ## Correctness
 
-While Splr comes with **ABSOLUTELY NO WARRANTY**, Splr version 0.1.1 (splr-0.1.1) was verified with the following problems:
+While Splr comes with **ABSOLUTELY NO WARRANTY**, Splr version 0.1.0 (splr-0.1.0) was verified with the following problems:
 
 * The first 100 problems from
   [SATLIB](https://www.cs.ubc.ca/~hoos/SATLIB/benchm.html),
