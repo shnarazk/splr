@@ -23,6 +23,7 @@ fn main() {
     let mut from_file = true;
     let mut found = false;
     let mut args = TargetOpts::from_args();
+    let cnf = args.problem.to_str().unwrap();
     if !args.problem.exists() {
         println!("{} does not exist.", args.problem.to_str().unwrap(),);
         return;
@@ -41,7 +42,7 @@ fn main() {
     }
     if let Some(f) = &args.assign {
         if let Ok(d) = File::open(f.as_path()) {
-            if let Some(vec) = read_assignment(&mut BufReader::new(d)) {
+            if let Some(vec) = read_assignment(&mut BufReader::new(d), cnf, &args.assign) {
                 if s.inject_assigmnent(&vec).is_err() {
                     println!(
                         "{} seems an unsat problem but no proof.",
@@ -56,7 +57,7 @@ fn main() {
         }
     }
     if !found {
-        if let Some(vec) = read_assignment(&mut BufReader::new(stdin())) {
+        if let Some(vec) = read_assignment(&mut BufReader::new(stdin()), cnf, &args.assign) {
             if s.inject_assigmnent(&vec).is_err() {
                 println!(
                     "{} seems an unsat problem but no proof.",
@@ -89,7 +90,7 @@ fn main() {
     }
 }
 
-fn read_assignment(rs: &mut BufRead) -> Option<Vec<i32>> {
+fn read_assignment(rs: &mut BufRead, cnf: &str, assign: &Option<PathBuf>) -> Option<Vec<i32>> {
     let mut buf = String::new();
     loop {
         match rs.read_line(&mut buf) {
@@ -104,10 +105,12 @@ fn read_assignment(rs: &mut BufRead) -> Option<Vec<i32>> {
                         buf.clear();
                         continue;
                     } else if buf.starts_with("s UNSATISFIABLE") {
-                        println!("It seems an unsatisfiable problem. I can't handle it.");
+                        println!("{} seems an unsatisfiable problem. I can't handle it.", cnf);
                         return None;
-                    } else {
-                        println!("It seems an illegal format file.");
+                    } else if let Some(asg) = assign {
+                        println!("{} seems an illegal format file.",
+                                 asg.to_str().unwrap(),
+                        );
                         return None;
                     }
                 }
