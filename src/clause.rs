@@ -11,6 +11,15 @@ const CLA_ACTIVITY_MAX: f64 = 1e240;
 const CLA_ACTIVITY_SCALE1: f64 = 1e-30;
 const CLA_ACTIVITY_SCALE2: f64 = 1e-30;
 
+#[derive(Debug, Eq, PartialEq)]
+pub enum CertifiedRecord {
+    SENTINEL,
+    ADD,
+    DELETE,
+}
+
+type DRAT = Vec<(CertifiedRecord, Vec<i32>)>;
+
 impl ClauseIdIF for ClauseId {
     #[inline(always)]
     fn to_lit(self) -> Lit {
@@ -227,10 +236,11 @@ pub struct ClauseDB {
     pub watcher: Vec<Vec<Watch>>,
     pub num_active: usize,
     pub num_learnt: usize,
+    pub certified: DRAT,
 }
 
 impl ClauseDBIF for ClauseDB {
-    fn new(nv: usize, nc: usize) -> ClauseDB {
+    fn new(nv: usize, nc: usize, certify: bool) -> ClauseDB {
         let mut clause = Vec::with_capacity(1 + nc);
         clause.push(Clause::default());
         let mut watcher = Vec::with_capacity(2 * (nv + 1));
@@ -239,12 +249,17 @@ impl ClauseDBIF for ClauseDB {
             watcher.push(Vec::new().initialize(i));
             touched.push(false);
         }
+        let mut certified = Vec::new();
+        if certify {
+            certified.push((CertifiedRecord::SENTINEL, Vec::new()));
+        }
         ClauseDB {
             clause,
             touched,
             watcher,
             num_active: 0,
             num_learnt: 0,
+            certified,
         }
     }
     fn garbage_collect(&mut self) {
@@ -253,6 +268,7 @@ impl ClauseDBIF for ClauseDB {
             ref mut watcher,
             ref mut clause,
             ref mut touched,
+            ref mut certified,
             ..
         } = self;
         debug_assert_eq!(NULL_LIT.negate(), 1);
@@ -279,6 +295,10 @@ impl ClauseDBIF for ClauseDB {
                     });
                     if c.is(Flag::LearntClause) {
                         self.num_learnt -= 1;
+                    }
+                    if !certified.is_empty() {
+                        let temp = c.lits.iter().map(|l| l.to_i32()).collect::<Vec<i32>>();
+                        certified.push((CertifiedRecord::ADD, temp));
                     }
                     c.lits.clear();
                 }
@@ -386,6 +406,10 @@ impl ClauseDBIF for ClauseDB {
     // Note: set lbd to 0 if you want to add the clause to Permanent.
     fn attach(&mut self, state: &mut State, vars: &mut [Var], lbd: usize) -> ClauseId {
         let v = &mut state.new_learnt;
+        if !self.certified.is_empty() {
+            let temp = v.iter().map(|l| l.to_i32()).collect::<Vec<i32>>();
+            self.certified.push((CertifiedRecord::ADD, temp));
+        }
         debug_assert!(1 < v.len());
         let mut i_max = 0;
         let mut lv_max = 0;
@@ -496,6 +520,18 @@ impl ClauseDBIF for ClauseDB {
             elim.stop(self, vars);
         }
         Ok(())
+    }
+    fn certificate_add(&mut self, vec: &[Lit]) {
+        if !self.certified.is_empty() {
+            let temp = vec.iter().map(|l| l.to_i32()).collect::<Vec<i32>>();
+            self.certified.push((CertifiedRecord::ADD, temp));
+        }
+    }
+    fn certificate_delete(&mut self, vec: &[Lit]) {
+        if !self.certified.is_empty() {
+            let temp = vec.iter().map(|l| l.to_i32()).collect::<Vec<i32>>();
+            self.certified.push((CertifiedRecord::DELETE, temp));
+        }
     }
 }
 

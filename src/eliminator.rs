@@ -559,6 +559,10 @@ fn strengthen_clause(
         debug_assert!(1 < cdb.clause[cid].lits.len());
         elim.enqueue_clause(cid, &mut cdb.clause[cid]);
         elim.remove_lit_occur(vars, l, cid);
+        unsafe {
+            let vec = &cdb.clause[cid].lits[..] as *const [Lit];
+            cdb.certificate_add(&*vec);
+        }
         Ok(())
     }
 }
@@ -681,6 +685,7 @@ fn eliminate_var(
                         //     vec2int(&clause!(*cp, *n).lits)
                         // );
                         let lit = (*vec)[0];
+                        cdb.certificate_add(&*vec);
                         asgs.enqueue(&mut vars[lit.vi()], lit.lbool(), NULL_CLAUSE, 0)?;
                     }
                     _ => {
