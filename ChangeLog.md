@@ -1,3 +1,8 @@
+## 0.1.1
+
+- support DRAT, certificates of unsatisfiability
+- the answer file format was slightly modified.
+
 ## 0.1.0, 2019-02-14
 
 - Answers were verified with Glucose and Lingeling.

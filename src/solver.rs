@@ -12,9 +12,7 @@ use std::io::{BufRead, BufReader};
 /// Normal results returned by Solver.
 pub enum Certificate {
     SAT(Vec<i32>),
-    /// ### TODO
-    /// the vector will be replaced with DRAT in future release
-    UNSAT(Vec<i32>),
+    UNSAT,
 }
 
 /// Abnormal termination flags.
@@ -45,14 +43,14 @@ pub struct Solver {
 }
 
 impl SatSolverIF for Solver {
-    fn new(config: Config, cnf: &CNFDescription) -> Solver {
+    fn new(config: &Config, cnf: &CNFDescription) -> Solver {
         let nv = cnf.num_of_variables as usize;
         let nc = cnf.num_of_clauses as usize;
         let elim = Eliminator::new(nv);
-        let state = State::new(&config, cnf.clone());
+        let state = State::new(config, cnf.clone());
         Solver {
             asgs: AssignStack::new(nv),
-            cdb: ClauseDB::new(nv, nc),
+            cdb: ClauseDB::new(nv, nc, config.use_certification),
             elim,
             state,
             vars: Var::new_vars(nv),
@@ -67,7 +65,7 @@ impl SatSolverIF for Solver {
             ref mut vars,
         } = self;
         if !state.ok {
-            return Ok(Certificate::UNSAT(Vec::new()));
+            return Ok(Certificate::UNSAT);
         }
         // TODO: deal with assumptions
         // s.root_level = 0;
@@ -96,7 +94,7 @@ impl SatSolverIF for Solver {
                 // Why inconsistent? Because the CNF contains a conflict, not an error!
                 state.progress(cdb, vars, Some("conflict"));
                 state.ok = false;
-                return Ok(Certificate::UNSAT(Vec::new()));
+                return Ok(Certificate::UNSAT);
             }
             state.progress(cdb, vars, Some("subsumed"));
         }
@@ -118,9 +116,7 @@ impl SatSolverIF for Solver {
             Ok(false) => {
                 state.progress(cdb, vars, None);
                 asgs.cancel_until(vars, 0);
-                Ok(Certificate::UNSAT(
-                    state.conflicts.iter().map(|l| l.to_i32()).collect(),
-                ))
+                Ok(Certificate::UNSAT)
             }
             Err(_) => {
                 asgs.cancel_until(vars, 0);
@@ -130,7 +126,7 @@ impl SatSolverIF for Solver {
             }
         }
     }
-    fn build(config: Config) -> std::io::Result<Solver> {
+    fn build(config: &Config) -> std::io::Result<Solver> {
         let fs = fs::File::open(&config.cnf)?;
         let mut rs = BufReader::new(fs);
         let mut buf = String::new();
@@ -199,6 +195,9 @@ impl SatSolverIF for Solver {
             ..
         } = self;
         debug_assert!(asgs.level() == 0);
+        if v.iter().any(|l| vars.assigned(*l) != BOTTOM) {
+            cdb.certificate_add(v);
+        }
         v.sort_unstable();
         let mut j = 0;
         let mut l_ = NULL_LIT; // last literal; [x, x.negate()] means totology.
@@ -303,6 +302,8 @@ fn handle_conflict_path(
     asgs.cancel_until(vars, bl.max(state.root_level));
     let learnt_len = new_learnt.len();
     if learnt_len == 1 {
+        // dump to certified even if it's a literal.
+        cdb.certificate_add(new_learnt);
         asgs.uncheck_enqueue(vars, new_learnt[0], NULL_CLAUSE);
     } else {
         state.stats[Stat::Learnt as usize] += 1;

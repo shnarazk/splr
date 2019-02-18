@@ -242,7 +242,7 @@ impl Default for State {
             num_solved_vars: 0,
             num_eliminated_vars: 0,
             model: Vec::new(),
-            conflicts: vec![],
+            conflicts: Vec::new(),
             new_learnt: Vec::new(),
             an_seen: Vec::new(),
             lbd_temp: Vec::new(),
