@@ -110,7 +110,7 @@ pub struct Clause {
     /// A dynamic clause evaluation criterion based on the numer of references.
     pub activity: f64,
     /// Flags
-    flags: u16,
+    flags: Flag,
 }
 
 impl Default for Clause {
@@ -119,7 +119,7 @@ impl Default for Clause {
             lits: vec![],
             rank: 0,
             activity: 0.0,
-            flags: 0,
+            flags: Flag::empty(),
         }
     }
 }
@@ -134,28 +134,14 @@ impl ClauseIF for Clause {
 }
 
 impl FlagIF for Clause {
-    #[inline(always)]
     fn is(&self, flag: Flag) -> bool {
-        self.flags & (1 << flag as u16) != 0
+        self.flags.contains(flag)
     }
-    #[inline(always)]
     fn turn_off(&mut self, flag: Flag) {
-        self.flags &= !(1u16 << (flag as u16));
+        self.flags.remove(flag);
     }
-    #[inline(always)]
     fn turn_on(&mut self, flag: Flag) {
-        self.flags |= 1u16 << (flag as u16);
-    }
-}
-
-impl Clause {
-    #[allow(dead_code)]
-    fn set_flag(&mut self, flag: Flag, val: bool) {
-        if val {
-            self.flags |= (val as u16) << (flag as u16);
-        } else {
-            self.flags &= !(1 << (flag as u16));
-        }
+        self.flags.insert(flag);
     }
 }
 
@@ -326,7 +312,7 @@ impl ClauseDBIF for ClauseDB {
             //     panic!("done");
             // }
             debug_assert!(c.is(Flag::DeadClause));
-            c.flags = 0;
+            c.flags = Flag::empty();
             c.lits.clear();
             for l in v {
                 c.lits.push(*l);
@@ -340,7 +326,7 @@ impl ClauseDBIF for ClauseDB {
             }
             cid = self.clause.len();
             let c = Clause {
-                flags: 0,
+                flags: Flag::empty(),
                 lits,
                 rank,
                 activity: 0.0,
@@ -396,11 +382,11 @@ impl ClauseDBIF for ClauseDB {
             self.clause.len() - 1
         }
     }
-    fn countf(&self, mask: u16) -> usize {
+    fn countf(&self, mask: Flag) -> usize {
         self.clause
             .iter()
             .skip(1)
-            .filter(|&c| c.flags & mask == mask)
+            .filter(|&c| c.flags.contains(mask))
             .count()
     }
     // Note: set lbd to 0 if you want to add the clause to Permanent.

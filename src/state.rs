@@ -622,7 +622,7 @@ impl State {
         let nv = vars.len() - 1;
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
-        let nlearnts = cdb.countf(1 << Flag::DeadClause as u16 | 1 << Flag::LearntClause as u16);
+        let nlearnts = cdb.countf(Flag::LearntClause); // TODO eliminate DeadClause
         let ncnfl = self.stats[Stat::Conflict as usize];
         let nrestart = self.stats[Stat::Restart as usize];
         println!(

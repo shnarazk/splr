@@ -23,3 +23,6 @@ pub mod types;
 pub mod validator;
 /// Var structure
 pub mod var;
+
+#[macro_use]
+extern crate bitflags;
