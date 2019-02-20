@@ -1,16 +1,13 @@
 // SAT solver for Propositional Logic in Rust
-// Version 0.1.0
 
 use splr::clause::CertifiedRecord;
-use splr::config::Config;
+use splr::config::{Config, VERSION};
 use splr::solver::{Certificate, Solver};
 use splr::state::*;
 use splr::traits::SatSolverIF;
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use structopt::StructOpt;
-
-const VERSION: &str = "0.1.0+m74+m75";
 
 fn main() {
     let config = Config::from_args();
