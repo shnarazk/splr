@@ -8,7 +8,7 @@ pub type VarId = usize;
 
 /// 'Clause' Identifier, or 'clause' index, starting with one.
 /// Note: ids are re-used after 'garbage collection'.
-pub type ClauseId = usize;
+pub type ClauseId = u32;
 
 /// a dummy clause index.
 pub const NULL_CLAUSE: ClauseId = 0;
@@ -89,7 +89,7 @@ impl LitIF for Lit {
     }
     #[inline(always)]
     fn to_cid(self) -> ClauseId {
-        (self as usize) | 0x8000_0000_0000_0000
+        (self as ClauseId) | 0x8000_0000
     }
 }
 

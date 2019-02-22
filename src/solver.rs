@@ -73,13 +73,13 @@ impl SatSolverIF for Solver {
         state.progress_header();
         state.progress(cdb, vars, Some("loaded"));
         if state.use_elim {
-                if 20_000_000 < state.target.num_of_clauses {
-                    state.elim_eliminate_grow_limit = 0;
-                    state.elim_eliminate_loop_limit = 1_000_000;
-                    state.elim_subsume_loop_limit = 2_000_000;
-                }
-                elim.activate();
-                elim.prepare(cdb, vars, true);
+            if 20_000_000 < state.target.num_of_clauses {
+                state.elim_eliminate_grow_limit = 0;
+                state.elim_eliminate_loop_limit = 1_000_000;
+                state.elim_subsume_loop_limit = 2_000_000;
+            }
+            elim.activate();
+            elim.prepare(cdb, vars, true);
             for vi in 1..vars.len() {
                 let v = &mut vars[vi];
                 if v.assign != BOTTOM {
@@ -223,7 +223,7 @@ impl SatSolverIF for Solver {
             }
             _ => {
                 let cid = cdb.new_clause(&v, 0, false);
-                elim.add_cid_occur(vars, cid, &mut cdb.clause[cid], true);
+                elim.add_cid_occur(vars, cid, &mut cdb.clause[cid as usize], true);
                 Some(cid)
             }
         }
@@ -275,7 +275,7 @@ fn search(
                 state.stats[Stat::NoDecisionConflict as usize] += 1;
             }
             if asgs.level() == state.root_level {
-                analyze_final(asgs, state, vars, &cdb.clause[ci]);
+                analyze_final(asgs, state, vars, &cdb.clause[ci as usize]);
                 return Ok(false);
             }
             handle_conflict_path(asgs, cdb, elim, state, vars, ci);
@@ -312,7 +312,7 @@ fn handle_conflict_path(
         let lbd = vars.compute_lbd(&new_learnt, &mut state.lbd_temp);
         let l0 = new_learnt[0];
         let cid = cdb.attach(state, vars, lbd);
-        elim.add_cid_occur(vars, cid, &mut cdb.clause[cid], true);
+        elim.add_cid_occur(vars, cid, &mut cdb.clause[cid as usize], true);
         state.c_lvl.update(bl as f64);
         state.b_lvl.update(lbd as f64);
         if lbd <= 2 {
@@ -338,7 +338,7 @@ fn handle_conflict_path(
         if state.restart_thr <= 0.82 && nr < 4 {
             state.restart_thr += delta;
         } else if 0.44 <= state.restart_thr && 1000 < nr {
-            state.restart_thr -=delta;
+            state.restart_thr -= delta;
         } else {
             state.restart_thr -= (state.restart_thr - 0.60) * delta;
         }
@@ -353,7 +353,7 @@ fn handle_conflict_path(
             state.restart_blk -= (state.restart_blk - 1.40) * delta;
         }
         if state.use_elim {
-            if  0 < state.elim_trigger
+            if 0 < state.elim_trigger
                 && (state.elim_trigger as f64) + state.b_lvl.get() < state.c_lvl.get()
             {
                 if 20_000_000 < state.target.num_of_clauses {
@@ -362,7 +362,8 @@ fn handle_conflict_path(
                     state.elim_subsume_loop_limit = 3_000_000;
                 }
                 elim.activate();
-                if state.target.num_of_clauses < 20_000_000 && state.elim_eliminate_grow_limit < 16 {
+                if state.target.num_of_clauses < 20_000_000 && state.elim_eliminate_grow_limit < 16
+                {
                     state.elim_eliminate_grow_limit += 2;
                 }
                 if 10 < state.elim_subsume_literal_limit {
@@ -406,7 +407,7 @@ fn analyze(
         // println!("analyze {}", p.int());
         unsafe {
             debug_assert_ne!(cid, NULL_CLAUSE);
-            let c = &mut cdb.clause[cid] as *mut Clause;
+            let c = &mut cdb.clause[cid as usize] as *mut Clause;
             debug_assert!(!(*c).is(Flag::DeadClause));
             if (*c).is(Flag::LearntClause) {
                 cdb.bump_activity(&mut state.cla_inc, cid);
@@ -439,7 +440,9 @@ fn analyze(
                     if dl <= lvl {
                         // println!("- flag for {} which level is {}", q.int(), lvl);
                         path_cnt += 1;
-                        if v.reason != NULL_CLAUSE && cdb.clause[v.reason].is(Flag::LearntClause) {
+                        if v.reason != NULL_CLAUSE
+                            && cdb.clause[v.reason as usize].is(Flag::LearntClause)
+                        {
                             state.last_dl.push(*q);
                         }
                     } else {
@@ -506,7 +509,7 @@ fn simplify_learnt(
     let lbd = vars.compute_lbd(new_learnt, &mut state.lbd_temp);
     while let Some(l) = state.last_dl.pop() {
         let vi = l.vi();
-        if cdb.clause[vars[vi].reason].rank < lbd {
+        if cdb.clause[vars[vi].reason as usize].rank < lbd {
             vars.bump_activity(&mut state.var_inc, vi);
             asgs.update_order(vars, vi);
         }
@@ -545,7 +548,7 @@ fn redundant_lit(
     let top = clear.len();
     while let Some(sl) = stack.pop() {
         let cid = vars[sl.vi()].reason;
-        let c = &mut cdb.clause[cid];
+        let c = &mut cdb.clause[cid as usize];
         if (*c).lits.len() == 2 && vars.assigned((*c).lits[0]) == FALSE {
             (*c).lits.swap(0, 1);
         }
@@ -619,8 +622,8 @@ fn minimize_with_bi_clauses(cdb: &ClauseDB, vars: &[Var], temp: &mut [usize], ve
     let l0 = vec[0];
     let mut nsat = 0;
     let end = cdb.watcher[l0.negate() as usize][0].c;
-    for w in &cdb.watcher[l0.negate() as usize][1..end] {
-        let c = &cdb.clause[w.c];
+    for w in &cdb.watcher[l0.negate() as usize][1..end as usize] {
+        let c = &cdb.clause[w.c as usize];
         if c.lits.len() != 2 {
             continue;
         }
