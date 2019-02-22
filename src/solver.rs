@@ -72,12 +72,14 @@ impl SatSolverIF for Solver {
         state.num_solved_vars = asgs.len();
         state.progress_header();
         state.progress(cdb, vars, Some("loaded"));
-        if 20_000_000 < state.target.num_of_clauses {
-            state.use_elim = false;
-        }
         if state.use_elim {
-            elim.activate();
-            elim.prepare(cdb, vars, true);
+                if 20_000_000 < state.target.num_of_clauses {
+                    state.elim_eliminate_grow_limit = 0;
+                    state.elim_eliminate_loop_limit = 1_000_000;
+                    state.elim_subsume_loop_limit = 2_000_000;
+                }
+                elim.activate();
+                elim.prepare(cdb, vars, true);
             for vi in 1..vars.len() {
                 let v = &mut vars[vi];
                 if v.assign != BOTTOM {
@@ -332,33 +334,42 @@ fn handle_conflict_path(
         // micro tuning of restart thresholds
         let nr = state.stats[Stat::Restart as usize] - state.stats[Stat::RestartRecord as usize];
         state.stats[Stat::RestartRecord as usize] = state.stats[Stat::Restart as usize];
+        let delta: f64 = 0.025;
         if state.restart_thr <= 0.82 && nr < 4 {
-            state.restart_thr += 0.01;
+            state.restart_thr += delta;
         } else if 0.44 <= state.restart_thr && 1000 < nr {
-            state.restart_thr -= 0.01;
+            state.restart_thr -=delta;
         } else {
-            state.restart_thr -= (state.restart_thr - 0.60) * 0.01
+            state.restart_thr -= (state.restart_thr - 0.60) * delta;
         }
         let nb = state.stats[Stat::BlockRestart as usize]
             - state.stats[Stat::BlockRestartRecord as usize];
         state.stats[Stat::BlockRestartRecord as usize] = state.stats[Stat::BlockRestart as usize];
         if 1.05 <= state.restart_blk && nb < 4 {
-            state.restart_blk -= 0.01;
+            state.restart_blk -= delta;
         } else if state.restart_blk <= 1.8 && 1000 < nb {
-            state.restart_blk += 0.01;
+            state.restart_blk += delta;
         } else {
-            state.restart_blk -= (state.restart_blk - 1.40) * 0.01
+            state.restart_blk -= (state.restart_blk - 1.40) * delta;
         }
         if state.use_elim {
-            let cl = state.c_lvl.get() as usize;
-            if state.stats[Stat::ExhaustiveElimination as usize] == 1 && state.elim_trigger == 1 {
-                state.elim_trigger = cl;
+            if  0 < state.elim_trigger
+                && (state.elim_trigger as f64) + state.b_lvl.get() < state.c_lvl.get()
+            {
+                if 20_000_000 < state.target.num_of_clauses {
+                    state.elim_eliminate_grow_limit = 0;
+                    state.elim_eliminate_loop_limit = 800_000;
+                    state.elim_subsume_loop_limit = 3_000_000;
+                }
                 elim.activate();
+                if state.target.num_of_clauses < 20_000_000 && state.elim_eliminate_grow_limit < 16 {
+                    state.elim_eliminate_grow_limit += 2;
+                }
+                if 10 < state.elim_subsume_literal_limit {
+                    state.elim_subsume_literal_limit -= 2;
+                }
+                state.elim_trigger = (state.c_lvl.get() - state.b_lvl.get()) as usize;
             }
-            // if 2 * cl < state.elim_trigger {
-            //     elim.activate();
-            //     state.elim_trigger = cl;
-            // }
         }
         state.progress(cdb, vars, None);
     }
