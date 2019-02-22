@@ -109,7 +109,6 @@ pub struct State {
     pub elim_subsume_literal_limit: usize,
     pub elim_subsume_loop_limit: usize,
     /// MISC
-    pub progress_log: bool,
     pub ok: bool,
     pub next_reduction: usize, // renamed from `nbclausesbeforereduce`
     pub next_restart: usize,
@@ -132,7 +131,9 @@ pub struct State {
     pub last_dl: Vec<Lit>,
     pub start: SystemTime,
     pub dumper: ProgressRecord,
+    pub use_progress: bool,
     pub progress_cnt: usize,
+    pub progress_log: bool,
     pub target: CNFDescription,
 }
 
@@ -226,7 +227,6 @@ impl Default for State {
             elim_eliminate_loop_limit: 2_000_000,
             elim_subsume_literal_limit: 100,
             elim_subsume_loop_limit: 2_000_000,
-            progress_log: false,
             ok: true,
             next_reduction: 1000,
             next_restart: 100,
@@ -248,7 +248,9 @@ impl Default for State {
             lbd_temp: Vec::new(),
             last_dl: Vec::new(),
             start: SystemTime::now(),
+            use_progress: true,
             progress_cnt: 0,
+            progress_log: false,
             dumper: ProgressRecord::default(),
             target: CNFDescription::default(),
         }
@@ -352,6 +354,9 @@ impl StateIF for State {
         }
     }
     fn progress_header(&self) {
+        if !self.use_progress {
+            return;
+        }
         if self.progress_log {
             self.dump_header();
             return;
@@ -366,6 +371,9 @@ impl StateIF for State {
     }
     #[allow(clippy::cyclomatic_complexity)]
     fn progress(&mut self, cdb: &ClauseDB, vars: &[Var], mes: Option<&str>) {
+        if !self.use_progress {
+            return;
+        }
         if self.progress_log {
             self.dump(cdb, vars);
             return;
