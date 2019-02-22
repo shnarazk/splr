@@ -352,25 +352,23 @@ fn handle_conflict_path(
         } else {
             state.restart_blk -= (state.restart_blk - 1.40) * delta;
         }
-        if state.use_elim {
-            if 0 < state.elim_trigger
-                && (state.elim_trigger as f64) + state.b_lvl.get() < state.c_lvl.get()
-            {
-                if 20_000_000 < state.target.num_of_clauses {
-                    state.elim_eliminate_grow_limit = 0;
-                    state.elim_eliminate_loop_limit = 800_000;
-                    state.elim_subsume_loop_limit = 3_000_000;
-                }
-                elim.activate();
-                if state.target.num_of_clauses < 20_000_000 && state.elim_eliminate_grow_limit < 16
-                {
-                    state.elim_eliminate_grow_limit += 2;
-                }
-                if 10 < state.elim_subsume_literal_limit {
-                    state.elim_subsume_literal_limit -= 2;
-                }
-                state.elim_trigger = (state.c_lvl.get() - state.b_lvl.get()) as usize;
+        if state.use_elim
+            && 0 < state.elim_trigger
+            && (state.elim_trigger as f64) + state.b_lvl.get() < state.c_lvl.get()
+        {
+            if 20_000_000 < state.target.num_of_clauses {
+                state.elim_eliminate_grow_limit = 0;
+                state.elim_eliminate_loop_limit = 800_000;
+                state.elim_subsume_loop_limit = 3_000_000;
             }
+            elim.activate();
+            if state.target.num_of_clauses < 20_000_000 && state.elim_eliminate_grow_limit < 16 {
+                state.elim_eliminate_grow_limit += 2;
+            }
+            if 10 < state.elim_subsume_literal_limit {
+                state.elim_subsume_literal_limit -= 2;
+            }
+            state.elim_trigger = (state.c_lvl.get() - state.b_lvl.get()) as usize;
         }
         state.progress(cdb, vars, None);
     }
