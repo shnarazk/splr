@@ -1,6 +1,6 @@
 [package]
 name = "splr"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Shuji Narazaki <shujinarazaki@protonmail.com>"]
 edition = "2018"
 description = "A pure rustic CDCL SAT solver based on Glucose"
@@ -11,6 +11,7 @@ categories = ["science"]
 
 [dependencies]
 structopt = "0.2.14"
+bitflags = "1.0"
 
 [profile.release]
 lto = true

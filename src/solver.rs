@@ -12,9 +12,7 @@ use std::io::{BufRead, BufReader};
 /// Normal results returned by Solver.
 pub enum Certificate {
     SAT(Vec<i32>),
-    /// ### TODO
-    /// the vector will be replaced with DRAT in future release
-    UNSAT(Vec<i32>),
+    UNSAT,
 }
 
 /// Abnormal termination flags.
@@ -45,14 +43,14 @@ pub struct Solver {
 }
 
 impl SatSolverIF for Solver {
-    fn new(config: Config, cnf: &CNFDescription) -> Solver {
+    fn new(config: &Config, cnf: &CNFDescription) -> Solver {
         let nv = cnf.num_of_variables as usize;
         let nc = cnf.num_of_clauses as usize;
         let elim = Eliminator::new(nv);
-        let state = State::new(&config, cnf.clone());
+        let state = State::new(config, cnf.clone());
         Solver {
             asgs: AssignStack::new(nv),
-            cdb: ClauseDB::new(nv, nc),
+            cdb: ClauseDB::new(nv, nc, config.use_certification),
             elim,
             state,
             vars: Var::new_vars(nv),
@@ -67,17 +65,19 @@ impl SatSolverIF for Solver {
             ref mut vars,
         } = self;
         if !state.ok {
-            return Ok(Certificate::UNSAT(Vec::new()));
+            return Ok(Certificate::UNSAT);
         }
         // TODO: deal with assumptions
         // s.root_level = 0;
         state.num_solved_vars = asgs.len();
         state.progress_header();
         state.progress(cdb, vars, Some("loaded"));
-        if 20_000_000 < state.target.num_of_clauses {
-            state.use_elim = false;
-        }
         if state.use_elim {
+            if 20_000_000 < state.target.num_of_clauses {
+                state.elim_eliminate_grow_limit = 0;
+                state.elim_eliminate_loop_limit = 1_000_000;
+                state.elim_subsume_loop_limit = 2_000_000;
+            }
             elim.activate();
             elim.prepare(cdb, vars, true);
             for vi in 1..vars.len() {
@@ -96,7 +96,7 @@ impl SatSolverIF for Solver {
                 // Why inconsistent? Because the CNF contains a conflict, not an error!
                 state.progress(cdb, vars, Some("conflict"));
                 state.ok = false;
-                return Ok(Certificate::UNSAT(Vec::new()));
+                return Ok(Certificate::UNSAT);
             }
             state.progress(cdb, vars, Some("subsumed"));
         }
@@ -118,9 +118,7 @@ impl SatSolverIF for Solver {
             Ok(false) => {
                 state.progress(cdb, vars, None);
                 asgs.cancel_until(vars, 0);
-                Ok(Certificate::UNSAT(
-                    state.conflicts.iter().map(|l| l.to_i32()).collect(),
-                ))
+                Ok(Certificate::UNSAT)
             }
             Err(_) => {
                 asgs.cancel_until(vars, 0);
@@ -130,7 +128,7 @@ impl SatSolverIF for Solver {
             }
         }
     }
-    fn build(config: Config) -> std::io::Result<Solver> {
+    fn build(config: &Config) -> std::io::Result<Solver> {
         let fs = fs::File::open(&config.cnf)?;
         let mut rs = BufReader::new(fs);
         let mut buf = String::new();
@@ -199,6 +197,9 @@ impl SatSolverIF for Solver {
             ..
         } = self;
         debug_assert!(asgs.level() == 0);
+        if v.iter().any(|l| vars.assigned(*l) != BOTTOM) {
+            cdb.certificate_add(v);
+        }
         v.sort_unstable();
         let mut j = 0;
         let mut l_ = NULL_LIT; // last literal; [x, x.negate()] means totology.
@@ -222,7 +223,7 @@ impl SatSolverIF for Solver {
             }
             _ => {
                 let cid = cdb.new_clause(&v, 0, false);
-                elim.add_cid_occur(vars, cid, &mut cdb.clause[cid], true);
+                elim.add_cid_occur(vars, cid, &mut cdb.clause[cid as usize], true);
                 Some(cid)
             }
         }
@@ -274,7 +275,7 @@ fn search(
                 state.stats[Stat::NoDecisionConflict as usize] += 1;
             }
             if asgs.level() == state.root_level {
-                analyze_final(asgs, state, vars, &cdb.clause[ci]);
+                analyze_final(asgs, state, vars, &cdb.clause[ci as usize]);
                 return Ok(false);
             }
             handle_conflict_path(asgs, cdb, elim, state, vars, ci);
@@ -303,13 +304,15 @@ fn handle_conflict_path(
     asgs.cancel_until(vars, bl.max(state.root_level));
     let learnt_len = new_learnt.len();
     if learnt_len == 1 {
+        // dump to certified even if it's a literal.
+        cdb.certificate_add(new_learnt);
         asgs.uncheck_enqueue(vars, new_learnt[0], NULL_CLAUSE);
     } else {
         state.stats[Stat::Learnt as usize] += 1;
         let lbd = vars.compute_lbd(&new_learnt, &mut state.lbd_temp);
         let l0 = new_learnt[0];
         let cid = cdb.attach(state, vars, lbd);
-        elim.add_cid_occur(vars, cid, &mut cdb.clause[cid], true);
+        elim.add_cid_occur(vars, cid, &mut cdb.clause[cid as usize], true);
         state.c_lvl.update(bl as f64);
         state.b_lvl.update(lbd as f64);
         if lbd <= 2 {
@@ -331,33 +334,41 @@ fn handle_conflict_path(
         // micro tuning of restart thresholds
         let nr = state.stats[Stat::Restart as usize] - state.stats[Stat::RestartRecord as usize];
         state.stats[Stat::RestartRecord as usize] = state.stats[Stat::Restart as usize];
+        let delta: f64 = 0.025;
         if state.restart_thr <= 0.82 && nr < 4 {
-            state.restart_thr += 0.01;
+            state.restart_thr += delta;
         } else if 0.44 <= state.restart_thr && 1000 < nr {
-            state.restart_thr -= 0.01;
+            state.restart_thr -= delta;
         } else {
-            state.restart_thr -= (state.restart_thr - 0.60) * 0.01
+            state.restart_thr -= (state.restart_thr - 0.60) * delta;
         }
         let nb = state.stats[Stat::BlockRestart as usize]
             - state.stats[Stat::BlockRestartRecord as usize];
         state.stats[Stat::BlockRestartRecord as usize] = state.stats[Stat::BlockRestart as usize];
         if 1.05 <= state.restart_blk && nb < 4 {
-            state.restart_blk -= 0.01;
+            state.restart_blk -= delta;
         } else if state.restart_blk <= 1.8 && 1000 < nb {
-            state.restart_blk += 0.01;
+            state.restart_blk += delta;
         } else {
-            state.restart_blk -= (state.restart_blk - 1.40) * 0.01
+            state.restart_blk -= (state.restart_blk - 1.40) * delta;
         }
-        if state.use_elim {
-            let cl = state.c_lvl.get() as usize;
-            if state.stats[Stat::ExhaustiveElimination as usize] == 1 && state.elim_trigger == 1 {
-                state.elim_trigger = cl;
-                elim.activate();
+        if state.use_elim
+            && 0 < state.elim_trigger
+            && (state.elim_trigger as f64) + state.b_lvl.get() < state.c_lvl.get()
+        {
+            if 20_000_000 < state.target.num_of_clauses {
+                state.elim_eliminate_grow_limit = 0;
+                state.elim_eliminate_loop_limit = 800_000;
+                state.elim_subsume_loop_limit = 3_000_000;
             }
-            // if 2 * cl < state.elim_trigger {
-            //     elim.activate();
-            //     state.elim_trigger = cl;
-            // }
+            elim.activate();
+            if state.target.num_of_clauses < 20_000_000 && state.elim_eliminate_grow_limit < 16 {
+                state.elim_eliminate_grow_limit += 2;
+            }
+            if 10 < state.elim_subsume_literal_limit {
+                state.elim_subsume_literal_limit -= 2;
+            }
+            state.elim_trigger = (state.c_lvl.get() - state.b_lvl.get()) as usize;
         }
         state.progress(cdb, vars, None);
     }
@@ -394,7 +405,7 @@ fn analyze(
         // println!("analyze {}", p.int());
         unsafe {
             debug_assert_ne!(cid, NULL_CLAUSE);
-            let c = &mut cdb.clause[cid] as *mut Clause;
+            let c = &mut cdb.clause[cid as usize] as *mut Clause;
             debug_assert!(!(*c).is(Flag::DeadClause));
             if (*c).is(Flag::LearntClause) {
                 cdb.bump_activity(&mut state.cla_inc, cid);
@@ -427,7 +438,9 @@ fn analyze(
                     if dl <= lvl {
                         // println!("- flag for {} which level is {}", q.int(), lvl);
                         path_cnt += 1;
-                        if v.reason != NULL_CLAUSE && cdb.clause[v.reason].is(Flag::LearntClause) {
+                        if v.reason != NULL_CLAUSE
+                            && cdb.clause[v.reason as usize].is(Flag::LearntClause)
+                        {
                             state.last_dl.push(*q);
                         }
                     } else {
@@ -494,7 +507,7 @@ fn simplify_learnt(
     let lbd = vars.compute_lbd(new_learnt, &mut state.lbd_temp);
     while let Some(l) = state.last_dl.pop() {
         let vi = l.vi();
-        if cdb.clause[vars[vi].reason].rank < lbd {
+        if cdb.clause[vars[vi].reason as usize].rank < lbd {
             vars.bump_activity(&mut state.var_inc, vi);
             asgs.update_order(vars, vi);
         }
@@ -533,7 +546,7 @@ fn redundant_lit(
     let top = clear.len();
     while let Some(sl) = stack.pop() {
         let cid = vars[sl.vi()].reason;
-        let c = &mut cdb.clause[cid];
+        let c = &mut cdb.clause[cid as usize];
         if (*c).lits.len() == 2 && vars.assigned((*c).lits[0]) == FALSE {
             (*c).lits.swap(0, 1);
         }
@@ -607,8 +620,8 @@ fn minimize_with_bi_clauses(cdb: &ClauseDB, vars: &[Var], temp: &mut [usize], ve
     let l0 = vec[0];
     let mut nsat = 0;
     let end = cdb.watcher[l0.negate() as usize][0].c;
-    for w in &cdb.watcher[l0.negate() as usize][1..end] {
-        let c = &cdb.clause[w.c];
+    for w in &cdb.watcher[l0.negate() as usize][1..end as usize] {
+        let c = &cdb.clause[w.c as usize];
         if c.lits.len() != 2 {
             continue;
         }

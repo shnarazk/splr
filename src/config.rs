@@ -1,18 +1,20 @@
 use std::path::PathBuf;
 use structopt::StructOpt;
 
+pub const VERSION: &str = "0.1.1";
+
 /// Configuration built from command line options
 #[derive(Debug, StructOpt)]
 #[structopt(
     name = "splr",
-    about = "SAT solver for Propositional Logic in Rust, version 0.1.0"
+    about = "SAT solver for Propositional Logic in Rust, version 0.1.1"
 )]
 pub struct Config {
-    /// solf limit of clause DB (default is about 4GB)
+    /// soft limit of #clauses (default is about 4GB)
     #[structopt(long = "cl", default_value = "18000000")]
     pub clause_limit: usize,
     /// grow limit of #clauses by var elimination
-    #[structopt(long = "eg", default_value = "0")]
+    #[structopt(long = "eg", default_value = "4")]
     pub elim_grow_limit: usize,
     /// #literals in a merged clause by var elimination
     #[structopt(long = "el", default_value = "100")]
@@ -39,14 +41,20 @@ pub struct Config {
     #[structopt(long = "--log", short = "l")]
     pub use_log: bool,
     /// Disables exhaustive simplification
-    #[structopt(long = "no-elim", short = "e")]
+    #[structopt(long = "no-elim", short = "E")]
     pub no_elim: bool,
     /// Disables dynamic strategy adaptation
-    #[structopt(long = "no-adaptation", short = "a")]
+    #[structopt(long = "no-adaptation", short = "A")]
     pub no_adapt: bool,
     /// a CNF file to solve
     #[structopt(parse(from_os_str))]
     pub cnf: std::path::PathBuf,
+    /// Writes a DRAT UNSAT certification file
+    #[structopt(long = "certify", short = "c")]
+    pub use_certification: bool,
+    /// filename of DRAT UNSAT certification
+    #[structopt(long = "proof", default_value = "proof.out")]
+    pub proof_filename: String,
 }
 
 impl Default for Config {
@@ -65,6 +73,8 @@ impl Default for Config {
             no_elim: false,
             no_adapt: false,
             cnf: PathBuf::new(),
+            use_certification: false,
+            proof_filename: "proof.out".to_string(),
         }
     }
 }

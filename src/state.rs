@@ -109,7 +109,6 @@ pub struct State {
     pub elim_subsume_literal_limit: usize,
     pub elim_subsume_loop_limit: usize,
     /// MISC
-    pub progress_log: bool,
     pub ok: bool,
     pub next_reduction: usize, // renamed from `nbclausesbeforereduce`
     pub next_restart: usize,
@@ -132,7 +131,9 @@ pub struct State {
     pub last_dl: Vec<Lit>,
     pub start: SystemTime,
     pub dumper: ProgressRecord,
+    pub use_progress: bool,
     pub progress_cnt: usize,
+    pub progress_log: bool,
     pub target: CNFDescription,
 }
 
@@ -226,7 +227,6 @@ impl Default for State {
             elim_eliminate_loop_limit: 2_000_000,
             elim_subsume_literal_limit: 100,
             elim_subsume_loop_limit: 2_000_000,
-            progress_log: false,
             ok: true,
             next_reduction: 1000,
             next_restart: 100,
@@ -242,13 +242,15 @@ impl Default for State {
             num_solved_vars: 0,
             num_eliminated_vars: 0,
             model: Vec::new(),
-            conflicts: vec![],
+            conflicts: Vec::new(),
             new_learnt: Vec::new(),
             an_seen: Vec::new(),
             lbd_temp: Vec::new(),
             last_dl: Vec::new(),
             start: SystemTime::now(),
+            use_progress: true,
             progress_cnt: 0,
+            progress_log: false,
             dumper: ProgressRecord::default(),
             target: CNFDescription::default(),
         }
@@ -352,6 +354,9 @@ impl StateIF for State {
         }
     }
     fn progress_header(&self) {
+        if !self.use_progress {
+            return;
+        }
         if self.progress_log {
             self.dump_header();
             return;
@@ -366,6 +371,9 @@ impl StateIF for State {
     }
     #[allow(clippy::cyclomatic_complexity)]
     fn progress(&mut self, cdb: &ClauseDB, vars: &[Var], mes: Option<&str>) {
+        if !self.use_progress {
+            return;
+        }
         if self.progress_log {
             self.dump(cdb, vars);
             return;
@@ -622,7 +630,7 @@ impl State {
         let nv = vars.len() - 1;
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
-        let nlearnts = cdb.countf(1 << Flag::DeadClause as u16 | 1 << Flag::LearntClause as u16);
+        let nlearnts = cdb.countf(Flag::LearntClause); // TODO eliminate DeadClause
         let ncnfl = self.stats[Stat::Conflict as usize];
         let nrestart = self.stats[Stat::Restart as usize];
         println!(

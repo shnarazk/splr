@@ -8,7 +8,7 @@ pub type VarId = usize;
 
 /// 'Clause' Identifier, or 'clause' index, starting with one.
 /// Note: ids are re-used after 'garbage collection'.
-pub type ClauseId = usize;
+pub type ClauseId = u32;
 
 /// a dummy clause index.
 pub const NULL_CLAUSE: ClauseId = 0;
@@ -89,7 +89,7 @@ impl LitIF for Lit {
     }
     #[inline(always)]
     fn to_cid(self) -> ClauseId {
-        (self as usize) | 0x8000_0000_0000_0000
+        (self as ClauseId) | 0x8000_0000
     }
 }
 
@@ -178,21 +178,21 @@ impl<T> Delete<T> for Vec<T> {
     }
 }
 
-/// Collection of 1 bit properties for clause and var.
-#[derive(Clone, Copy, Eq, PartialEq)]
-pub enum Flag {
-    /// a clause is stored in DB, but is a garbage now.
-    DeadClause = 0,
-    /// a clause is a generated clause by conflict analysis and is removable.
-    LearntClause,
-    /// a clause is used recently in conflict analysis.
-    JustUsedClause,
-    /// a clause is registered in vars' occurrence list.
-    OccurLinked,
-    /// a clause or var is equeued for eliminator.
-    Enqueued,
-    /// a var is eliminated and managed by eliminator.
-    EliminatedVar,
-    /// mark to run garbage collector on the corresponding watcher lists
-    TouchedVar,
+bitflags! {
+    pub struct Flag: u16 {
+        /// a clause is stored in DB, but is a garbage now.
+        const DeadClause     = 0b0000_0000_0000_0001;
+        /// a clause is a generated clause by conflict analysis and is removable.
+        const LearntClause   = 0b0000_0000_0000_0010;
+        /// a clause is used recently in conflict analysis.
+        const JustUsedClause = 0b0000_0000_0000_0100;
+        /// a clause is registered in vars' occurrence list.
+        const OccurLinked    = 0b0000_0000_0000_1000;
+        /// a clause or var is equeued for eliminator.
+        const Enqueued       = 0b0000_0000_0001_0000;
+        /// a var is eliminated and managed by eliminator.
+        const EliminatedVar  = 0b0000_0000_0010_0000;
+        /// mark to run garbage collector on the corresponding watcher lists
+        const TouchedVar     = 0b0000_0000_0100_0000;
+    }
 }

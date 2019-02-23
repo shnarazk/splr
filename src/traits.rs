@@ -15,7 +15,7 @@ pub trait ClauseIF {
 
 /// API for clause management like `reduce`, `simplify`, `new_clause`, and so on.
 pub trait ClauseDBIF {
-    fn new(nv: usize, nc: usize) -> Self;
+    fn new(nv: usize, nc: usize, certify: bool) -> Self;
     /// make a new clause from `state.new_learnt` and register it to clause database.
     fn attach(&mut self, state: &mut State, vars: &mut [Var], lbd: usize) -> ClauseId;
     /// unregister a clause `cid` from clase database and make the clause dead.
@@ -50,7 +50,11 @@ pub trait ClauseDBIF {
     /// return the number of alive clauses in the database. Or return the database size if `active` is `false`.
     fn count(&self, alive: bool) -> usize;
     /// return the number of clauses which satisfy given flags.
-    fn countf(&self, mask: u16) -> usize;
+    fn countf(&self, mask: Flag) -> usize;
+    /// record a clause to unsat certification
+    fn certificate_add(&mut self, vec: &[Lit]);
+    /// record a deleted clause to unsat certification
+    fn certificate_delete(&mut self, vec: &[Lit]);
 }
 
 /// API for Clause Id like `to_lit`, `is_lifted_lit` and so on.
@@ -203,13 +207,13 @@ pub trait RestartIF {
 /// API for SAT solver like `build`, `solve` and so on.
 pub trait SatSolverIF {
     /// make a solver for debug. Probably you should use `build` instead of this.
-    fn new(config: Config, cnf: &CNFDescription) -> Solver;
+    fn new(config: &Config, cnf: &CNFDescription) -> Solver;
     /// make a solver and load a CNF into it.
     ///
     /// # Errors
     ///
     /// IO error by failing to load a CNF file.
-    fn build(config: Config) -> std::io::Result<Solver>;
+    fn build(config: &Config) -> std::io::Result<Solver>;
     /// search an assignment.
     ///
     /// # Errors
@@ -270,9 +274,9 @@ pub trait WatchDBIF {
     /// return the number of clauses in this watcher list; clauses are watching this literal.
     fn count(&self) -> usize;
     /// make a new 'watch', and add it to this watcher list.
-    fn register(&mut self, blocker: Lit, c: usize);
+    fn register(&mut self, blocker: Lit, c: ClauseId);
     /// remove *n*-th clause from the watcher list. *O(1)* operation.
-    fn detach(&mut self, n: usize);
+    fn detach(&mut self, n: ClauseId);
     /// remove a clause which id is `cid` from the watcher list. *O(n)* operation.
-    fn detach_with(&mut self, cid: usize);
+    fn detach_with(&mut self, cid: ClauseId);
 }

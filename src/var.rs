@@ -25,7 +25,7 @@ pub struct Var {
     pub pos_occurs: Vec<ClauseId>,
     /// list of clauses which contain this variable negatively.
     pub neg_occurs: Vec<ClauseId>,
-    flags: u16,
+    flags: Flag,
 }
 
 /// is the dummy var index.
@@ -43,7 +43,7 @@ impl VarIF for Var {
             activity: 0.0,
             pos_occurs: Vec::new(),
             neg_occurs: Vec::new(),
-            flags: 0,
+            flags: Flag::empty(),
         }
     }
     fn new_vars(n: usize) -> Vec<Var> {
@@ -60,15 +60,15 @@ impl VarIF for Var {
 impl FlagIF for Var {
     #[inline(always)]
     fn is(&self, flag: Flag) -> bool {
-        self.flags & (1 << flag as u16) != 0
+        self.flags.contains(flag)
     }
     #[inline(always)]
     fn turn_off(&mut self, flag: Flag) {
-        self.flags &= !(1u16 << (flag as u16));
+        self.flags.remove(flag);
     }
     #[inline(always)]
     fn turn_on(&mut self, flag: Flag) {
-        self.flags |= 1u16 << (flag as u16);
+        self.flags.insert(flag);
     }
 }
 
