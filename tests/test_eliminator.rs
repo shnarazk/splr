@@ -23,7 +23,7 @@ fn check_occurs() {
         num_of_clauses: 10,
         pathname: "".to_string(),
     };
-    let mut s = Solver::new(cfg, &cnf);
+    let mut s = Solver::new(&cfg, &cnf);
 
     let c1 = s.cdb.new_clause(&mkv![1, 2, 3], 3, true);
     let c2 = s.cdb.new_clause(&mkv![-2, 3, 4], 3, true);

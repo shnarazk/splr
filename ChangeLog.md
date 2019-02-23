@@ -1,3 +1,10 @@
+## 0.1.1, 2019-02-23
+
+- `splr --certify` generates DRAT, certificates of unsatisfiability.
+- Clause id was changed from u64 to u32.
+- The answer file format was slightly modified.
+- Some command line options were changed.
+
 ## 0.1.0, 2019-02-14
 
 - Answers were verified with Glucose and Lingeling.

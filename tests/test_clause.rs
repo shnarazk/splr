@@ -67,7 +67,7 @@ fn setup() -> Solver {
         num_of_clauses: 6,
         pathname: "".to_string(),
     };
-    let mut s = Solver::new(Default::default(), &cnf);
+    let mut s = Solver::new(&Default::default(), &cnf);
     attach_clause(&mut s, &mkv![1, 2, -3]).activity(1.0);
     attach_clause(&mut s, &mkv![1, -2, 3]).activity(4.0).rank(3);
     attach_clause(&mut s, &mkv![-1, 2, 3, 4]).activity(5.0);
@@ -88,5 +88,5 @@ fn setup() -> Solver {
 
 fn attach_clause<'a>(s: &'a mut Solver, vec: &[Lit]) -> &'a mut Clause {
     let cid = s.cdb.new_clause(vec, vec.len(), true);
-    &mut s.cdb.clause[cid]
+    &mut s.cdb.clause[cid as usize]
 }
