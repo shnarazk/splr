@@ -5,6 +5,7 @@ authors = ["Shuji Narazaki <shujinarazaki@protonmail.com>"]
 edition = "2018"
 description = "A pure rustic CDCL SAT solver based on Glucose"
 license-file = "LICENSE"
+readme = "README.md"
 repository = "https://gitlab.com/satisfiability01/splr"
 keywords = ["SAT", "logic"]
 categories = ["science"]
