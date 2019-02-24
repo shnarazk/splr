@@ -88,7 +88,10 @@ impl SatSolverIF for Solver {
                 match (v.pos_occurs.len(), v.neg_occurs.len()) {
                     (_, 0) => asgs.enqueue_null(v, TRUE),
                     (0, _) => asgs.enqueue_null(v, FALSE),
-                    _ => elim.enqueue_var(vars, vi, false),
+                    (p, m) => {
+                        v.phase = (m < p) as Lbool;
+                        elim.enqueue_var(vars, vi, false);
+                    }
                 };
             }
             state.progress(cdb, vars, Some("simplify"));
@@ -369,6 +372,11 @@ fn handle_conflict_path(
                 state.elim_subsume_literal_limit -= 2;
             }
             state.elim_trigger = (state.c_lvl.get() - state.b_lvl.get()) as usize;
+            if recession {
+                let _ = cdb.simplify(asgs, elim, state, vars);
+                state.stats[Stat::Recession as usize] = 0;
+                // state.elim_eliminate_grow_limit = temp;
+            }
         }
         state.progress(cdb, vars, None);
     }
