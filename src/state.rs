@@ -49,6 +49,8 @@ pub enum Stat {
     SatClauseElimination,  // the number of good old simplification
     ExhaustiveElimination, // the number of clause subsumption and varibale elimination
     Assign,                // the number of assigned variables
+    SolvedRecord,          // the last number of solved variables
+    Recession,             // the length of stagnation
     SumLBD,                // the sum of generated learnts' LBD
     NumBin,                // the number of binary clauses
     NumBinLearnt,          // the number of binary learnt clauses

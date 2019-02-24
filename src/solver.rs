@@ -329,7 +329,14 @@ fn handle_conflict_path(
         state.restart_update_lbd(lbd);
         state.stats[Stat::SumLBD as usize] += lbd;
     }
+    let recession = 8 * state.stats[Stat::ExhaustiveElimination as usize] < state.stats[Stat::Recession as usize];
     if tn_confl % 10_000 == 0 {
+        if state.stats[Stat::SolvedRecord as usize] == state.num_solved_vars {
+            state.stats[Stat::Recession as usize] += 1;
+        } else {
+            state.stats[Stat::Recession as usize] = 0;
+        }
+        state.stats[Stat::SolvedRecord as usize] = state.num_solved_vars;
         if tn_confl == 100_000 {
             asgs.cancel_until(vars, 0);
             state.adapt(cdb);
@@ -338,12 +345,12 @@ fn handle_conflict_path(
         let nr = state.stats[Stat::Restart as usize] - state.stats[Stat::RestartRecord as usize];
         state.stats[Stat::RestartRecord as usize] = state.stats[Stat::Restart as usize];
         let delta: f64 = 0.025;
-        if state.restart_thr <= 0.82 && nr < 4 {
+        if state.restart_thr <= 0.90 && nr < 4 {
             state.restart_thr += delta;
         } else if 0.44 <= state.restart_thr && 1000 < nr {
             state.restart_thr -= delta;
-        } else {
-            state.restart_thr -= (state.restart_thr - 0.60) * delta;
+        } else if 4 < nr && nr < 1000 {
+            state.restart_thr -= (state.restart_thr - 0.60) * 0.01;
         }
         let nb = state.stats[Stat::BlockRestart as usize]
             - state.stats[Stat::BlockRestartRecord as usize];
@@ -352,17 +359,40 @@ fn handle_conflict_path(
             state.restart_blk -= delta;
         } else if state.restart_blk <= 1.8 && 1000 < nb {
             state.restart_blk += delta;
-        } else {
-            state.restart_blk -= (state.restart_blk - 1.40) * delta;
+        } else if 4 < nb && nb < 1000 {
+            state.restart_blk -= (state.restart_blk - 1.40) * 0.01;
         }
         if state.use_elim
             && 0 < state.elim_trigger
             && (state.elim_trigger as f64) + state.b_lvl.get() < state.c_lvl.get()
+            || recession
         {
             if 20_000_000 < state.target.num_of_clauses {
                 state.elim_eliminate_grow_limit = 0;
                 state.elim_eliminate_loop_limit = 800_000;
                 state.elim_subsume_loop_limit = 3_000_000;
+            }
+            let temp = state.elim_eliminate_grow_limit;
+            if recession {
+                state.restart_step *= 2;
+                for v in &mut vars[1..] {
+                    if !v.is(Flag::EliminatedVar) {
+                        let p = v.pos_occurs.len() as f64;
+                        let m = v.neg_occurs.len() as f64;
+                        v.activity = p.min(m) / (p + m);
+                    }
+                }
+                asgs.cancel_until(vars, 0);
+                for v in &mut vars[1..] {
+                    if v.assign == BOTTOM && !v.is(Flag::EliminatedVar) {
+                        let p = v.pos_occurs.len() as f64;
+                        let m = v.neg_occurs.len() as f64;
+                        v.phase = (m < p) as Lbool;
+                    }
+                }
+                state.elim_eliminate_combination_limit = 30;
+                state.elim_eliminate_grow_limit = 64;
+                state.elim_subsume_literal_limit = 30;
             }
             elim.activate();
             if state.target.num_of_clauses < 20_000_000 && state.elim_eliminate_grow_limit < 16 {
@@ -373,9 +403,10 @@ fn handle_conflict_path(
             }
             state.elim_trigger = (state.c_lvl.get() - state.b_lvl.get()) as usize;
             if recession {
+                cdb.reduce(state, vars);
                 let _ = cdb.simplify(asgs, elim, state, vars);
                 state.stats[Stat::Recession as usize] = 0;
-                // state.elim_eliminate_grow_limit = temp;
+                state.elim_eliminate_grow_limit = temp;
             }
         }
         state.progress(cdb, vars, None);
