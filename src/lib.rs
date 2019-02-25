@@ -45,7 +45,7 @@ $ dmcr tests/sample.cnf
 Valid assignment set for tests/sample.cnf found in .ans_sample.cnf.
 ```
 
-The asnwer file has the following format.
+The answer file uses the following format.
 
 - It contains a single line starting with `s` and follewed by `SATISFIABLE` or `UNSATISFIABLE`.
 - It ends a line of assignments separated by a space and `0` as EOL, if the problem is satisfiable.
