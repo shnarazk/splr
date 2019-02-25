@@ -48,7 +48,7 @@ pub struct Config {
     pub no_adapt: bool,
     /// a CNF file to solve
     #[structopt(parse(from_os_str))]
-    pub cnf: std::path::PathBuf,
+    pub cnf_file: std::path::PathBuf,
     /// Writes a DRAT UNSAT certification file
     #[structopt(long = "certify", short = "c")]
     pub use_certification: bool,
@@ -72,7 +72,7 @@ impl Default for Config {
             use_log: false,
             no_elim: false,
             no_adapt: false,
-            cnf: PathBuf::new(),
+            cnf_file: PathBuf::new(),
             use_certification: false,
             proof_filename: "proof.out".to_string(),
         }

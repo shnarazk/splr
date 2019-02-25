@@ -29,7 +29,7 @@ fn main() {
         return;
     }
     let mut config = Config::default();
-    config.cnf = args.problem.clone();
+    config.cnf_file = args.problem.clone();
     let mut s = Solver::build(&config).expect("failed to load");
     if args.assign == None {
         args.assign = Some(PathBuf::from(format!(

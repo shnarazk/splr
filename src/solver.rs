@@ -132,7 +132,7 @@ impl SatSolverIF for Solver {
         }
     }
     fn build(config: &Config) -> std::io::Result<Solver> {
-        let fs = fs::File::open(&config.cnf)?;
+        let fs = fs::File::open(&config.cnf_file)?;
         let mut rs = BufReader::new(fs);
         let mut buf = String::new();
         let mut nv: usize = 0;
@@ -160,7 +160,7 @@ impl SatSolverIF for Solver {
         let cnf = CNFDescription {
             num_of_variables: nv,
             num_of_clauses: nc,
-            pathname: config.cnf.to_str().unwrap().to_string(),
+            pathname: config.cnf_file.to_str().unwrap().to_string(),
         };
         let mut s: Solver = Solver::new(config, &cnf);
         loop {
