@@ -329,12 +329,12 @@ fn handle_conflict_path(
         state.restart_update_lbd(lbd);
         state.stats[Stat::SumLBD as usize] += lbd;
     }
-    let recession = 8 * state.stats[Stat::ExhaustiveElimination as usize] < state.recession;
+    let recession = 8 * state.stats[Stat::ExhaustiveElimination as usize] < state.stagnation;
     if tn_confl % 10_000 == 0 {
         if state.stats[Stat::SolvedRecord as usize] == state.num_solved_vars {
-            state.recession += 1;
+            state.stagnation += 1;
         } else {
-            state.recession = 0;
+            state.stagnation = 0;
         }
         state.stats[Stat::SolvedRecord as usize] = state.num_solved_vars;
         if tn_confl == 100_000 {
@@ -405,7 +405,7 @@ fn handle_conflict_path(
             if recession {
                 cdb.reduce(state, vars);
                 cdb.simplify(asgs, elim, state, vars)?;
-                state.recession = 0;
+                state.stagnation = 0;
                 state.elim_eliminate_grow_limit = temp;
             }
         }

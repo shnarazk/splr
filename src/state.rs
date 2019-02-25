@@ -116,7 +116,7 @@ pub struct State {
     pub cur_restart: usize,
     pub after_restart: usize,
     pub elim_trigger: usize,
-    pub recession: usize,
+    pub stagnation: usize,
     pub stats: [usize; Stat::EndOfStatIndex as usize], // statistics
     pub ema_asg: Ema,
     pub ema_lbd: Ema,
@@ -235,7 +235,7 @@ impl Default for State {
             cur_restart: 1,
             after_restart: 0,
             elim_trigger: 1,
-            recession: 0,
+            stagnation: 0,
             stats: [0; Stat::EndOfStatIndex as usize],
             ema_asg: Ema::new(1),
             ema_lbd: Ema::new(1),
