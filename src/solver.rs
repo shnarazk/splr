@@ -281,7 +281,7 @@ fn search(
                 analyze_final(asgs, state, vars, &cdb.clause[ci as usize]);
                 return Ok(false);
             }
-            handle_conflict_path(asgs, cdb, elim, state, vars, ci);
+            handle_conflict_path(asgs, cdb, elim, state, vars, ci)?;
         }
     }
 }
@@ -294,7 +294,7 @@ fn handle_conflict_path(
     state: &mut State,
     vars: &mut [Var],
     ci: ClauseId,
-) {
+) -> MaybeInconsistent {
     let tn_confl = state.stats[Stat::Conflict as usize] as usize; // total number
     if tn_confl % 5000 == 0 && state.var_decay < state.var_decay_max {
         state.var_decay += 0.01;
@@ -329,12 +329,12 @@ fn handle_conflict_path(
         state.restart_update_lbd(lbd);
         state.stats[Stat::SumLBD as usize] += lbd;
     }
-    let recession = 8 * state.stats[Stat::ExhaustiveElimination as usize] < state.stats[Stat::Recession as usize];
+    let recession = 8 * state.stats[Stat::ExhaustiveElimination as usize] < state.recession;
     if tn_confl % 10_000 == 0 {
         if state.stats[Stat::SolvedRecord as usize] == state.num_solved_vars {
-            state.stats[Stat::Recession as usize] += 1;
+            state.recession += 1;
         } else {
-            state.stats[Stat::Recession as usize] = 0;
+            state.recession = 0;
         }
         state.stats[Stat::SolvedRecord as usize] = state.num_solved_vars;
         if tn_confl == 100_000 {
@@ -404,8 +404,8 @@ fn handle_conflict_path(
             state.elim_trigger = (state.c_lvl.get() - state.b_lvl.get()) as usize;
             if recession {
                 cdb.reduce(state, vars);
-                let _ = cdb.simplify(asgs, elim, state, vars);
-                state.stats[Stat::Recession as usize] = 0;
+                cdb.simplify(asgs, elim, state, vars)?;
+                state.recession = 0;
                 state.elim_eliminate_grow_limit = temp;
             }
         }
@@ -421,6 +421,7 @@ fn handle_conflict_path(
         state.cur_restart = ((tn_confl as f64) / (state.next_reduction as f64)) as usize + 1;
         cdb.reduce(state, vars);
     }
+    Ok(())
 }
 
 #[inline]
