@@ -20,7 +20,7 @@ Two executables will be installed:
 
 ## Usage
 
-Splr is a standalone program, taking an CNF file. The result will be saved to a file.
+Splr is a standalone program, taking a CNF file. The result will be saved to a file.
 
 ```
 $ splr tests/sample.cnf
