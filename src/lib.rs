@@ -85,7 +85,7 @@ Please check help document.
 ```plain
 $ splr --help
 USAGE:
-    splr-012 [FLAGS] [OPTIONS] <cnf_file>
+    splr [FLAGS] [OPTIONS] <cnf_file>
 
 FLAGS:
     -h, --help             Prints help information
