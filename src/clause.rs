@@ -471,7 +471,7 @@ impl ClauseDBIF for ClauseDB {
         vars: &mut [Var],
     ) -> MaybeInconsistent {
         debug_assert_eq!(asgs.level(), 0);
-        // reset reason since decision level is zero.
+        // we can reset all the reasons because decision level is zero.
         for v in &mut vars[1..] {
             v.reason = NULL_CLAUSE;
         }
@@ -479,19 +479,7 @@ impl ClauseDBIF for ClauseDB {
         loop {
             let na = asgs.len();
             elim.eliminate(asgs, self, state, vars)?;
-            for c in &mut self.clause[1..] {
-                if !c.is(Flag::DeadClause) && vars.satisfies(&c.lits) {
-                    c.kill(&mut self.touched);
-                    if elim.is_running() {
-                        for l in &c.lits {
-                            let v = &mut vars[l.vi()];
-                            if !v.is(Flag::EliminatedVar) {
-                                elim.enqueue_var(vars, l.vi(), true);
-                            }
-                        }
-                    }
-                }
-            }
+            self.eliminate_satisfied_clauses(elim, vars);
             if na == asgs.len()
                 && (!elim.is_running()
                     || (0 == elim.clause_queue_len() && 0 == elim.var_queue_len()))
@@ -518,6 +506,22 @@ impl ClauseDBIF for ClauseDB {
         if !self.certified.is_empty() {
             let temp = vec.iter().map(|l| l.to_i32()).collect::<Vec<i32>>();
             self.certified.push((CertifiedRecord::DELETE, temp));
+        }
+    }
+    fn eliminate_satisfied_clauses(&mut self, elim: &mut Eliminator, vars: &mut [Var]) {
+        for (cid, c) in &mut self.clause.iter_mut().enumerate().skip(1) {
+            if !c.is(Flag::DeadClause) && vars.satisfies(&c.lits) {
+                c.kill(&mut self.touched);
+                if elim.is_running() {
+                    elim.remove_cid_occur(vars, cid as ClauseId, c);
+                    for l in &c.lits {
+                        let v = &mut vars[l.vi()];
+                        if !v.is(Flag::EliminatedVar) {
+                            elim.enqueue_var(vars, l.vi(), true);
+                        }
+                    }
+                }
+            }
         }
     }
 }

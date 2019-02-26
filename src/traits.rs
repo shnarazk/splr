@@ -55,6 +55,7 @@ pub trait ClauseDBIF {
     fn certificate_add(&mut self, vec: &[Lit]);
     /// record a deleted clause to unsat certification
     fn certificate_delete(&mut self, vec: &[Lit]);
+    fn eliminate_satisfied_clauses(&mut self, elim: &mut Eliminator, vars: &mut [Var]);
 }
 
 /// API for Clause Id like `to_lit`, `is_lifted_lit` and so on.
