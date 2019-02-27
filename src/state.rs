@@ -8,6 +8,7 @@ use crate::var::Var;
 use std::fmt;
 use std::path::Path;
 use std::time::SystemTime;
+use std::io::{stdout, Write};
 
 /// A collection of named search heuristics
 #[derive(Debug, Eq, PartialEq)]
@@ -372,6 +373,14 @@ impl StateIF for State {
         println!("                                                  ");
         println!("                                                  ");
     }
+    fn flush(&self, mes: &str) {
+        if self.use_progress && !self.progress_log {
+            // print!("\x1B[1G{}", mes);
+            print!("{}", mes);
+            stdout().flush().unwrap();
+        }
+    }
+    /// `mes` should be shorter than or equal to 9, or 8 + a delimitor.
     #[allow(clippy::cyclomatic_complexity)]
     fn progress(&mut self, cdb: &ClauseDB, vars: &[Var], mes: Option<&str>) {
         if !self.use_progress {
@@ -519,6 +528,7 @@ impl StateIF for State {
                 self.restart_thr
             ),
         );
+        self.flush("\x1B[2K");
     }
 }
 

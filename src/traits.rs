@@ -235,6 +235,7 @@ pub trait StateIF {
     fn progress_header(&self);
     /// write stat data to stdio.
     fn progress(&mut self, cdb: &ClauseDB, vars: &[Var], mes: Option<&str>);
+    fn flush(&self, mes: &str);
 }
 
 /// API for SAT validator like `inject_assignment`, `validate` and so on.
