@@ -2,7 +2,7 @@ use crate::clause::{Clause, ClauseDB};
 use crate::config::Config;
 use crate::eliminator::Eliminator;
 use crate::propagator::AssignStack;
-use crate::state::{Stat, State};
+use crate::state::{SearchStrategy, Stat, State};
 use crate::traits::*;
 use crate::types::*;
 use crate::var::Var;
@@ -341,13 +341,14 @@ fn handle_conflict_path(
         state.restart_update_lbd(lbd);
         state.stats[Stat::SumLBD as usize] += lbd;
     }
-    let recession = 8 * state.stats[Stat::ExhaustiveElimination as usize] < state.stagnation;
     if tn_confl % 10_000 == 0 {
-        if state.stats[Stat::SolvedRecord as usize] == state.num_solved_vars {
-            state.stagnation += 1;
-        } else {
+        let nexpect = (vars.len() - state.num_solved_vars - state.num_eliminated_vars) / 10000;
+        if nexpect + state.stats[Stat::SolvedRecord as usize] < state.num_solved_vars {
             state.stagnation = 0;
+        } else {
+            state.stagnation += 1;
         }
+        let stagnate = 8 * state.stats[Stat::ExhaustiveElimination as usize] < state.stagnation;
         state.stats[Stat::SolvedRecord as usize] = state.num_solved_vars;
         if tn_confl == 100_000 {
             asgs.cancel_until(vars, 0);
@@ -374,51 +375,54 @@ fn handle_conflict_path(
         } else if 4 < nb && nb < 1000 {
             state.restart_blk -= (state.restart_blk - 1.40) * 0.01;
         }
+        // If there are too many 'blocks', Crash them!
         if state.use_elim
-            && 0 < state.elim_trigger
-            && (state.elim_trigger as f64) + state.b_lvl.get() < state.c_lvl.get()
-            || recession
+            && (state.strategy == SearchStrategy::Generic ||
+                state.strategy == SearchStrategy::HighSuccesive ||
+                state.strategy == SearchStrategy::ManyGlues)
+            && (0 < state.elim_trigger
+                && (state.elim_trigger as f64) + state.b_lvl.get() < state.c_lvl.get()
+                || stagnate)
         {
             if 20_000_000 < state.target.num_of_clauses {
                 state.elim_eliminate_grow_limit = 0;
                 state.elim_eliminate_loop_limit = 800_000;
                 state.elim_subsume_loop_limit = 3_000_000;
             }
-            let temp = state.elim_eliminate_grow_limit;
-            if recession {
-                state.restart_step *= 2;
-                for v in &mut vars[1..] {
-                    if !v.is(Flag::EliminatedVar) {
-                        let p = v.pos_occurs.len() as f64;
-                        let m = v.neg_occurs.len() as f64;
-                        v.activity = p.min(m) / (p + m);
-                    }
-                }
+            if stagnate {
+                // state.restart_step *= 2;
+                // for v in &mut vars[1..] {
+                //     if !v.is(Flag::EliminatedVar) {
+                //         let p = v.pos_occurs.len() as f64;
+                //         let m = v.neg_occurs.len() as f64;
+                //         v.activity = p.min(m) / (p + m);
+                //     }
+                // }
                 asgs.cancel_until(vars, 0);
-                for v in &mut vars[1..] {
-                    if v.assign == BOTTOM && !v.is(Flag::EliminatedVar) {
-                        let p = v.pos_occurs.len() as f64;
-                        let m = v.neg_occurs.len() as f64;
-                        v.phase = (m < p) as Lbool;
-                    }
-                }
-                state.elim_eliminate_combination_limit = 30;
-                state.elim_eliminate_grow_limit = 64;
-                state.elim_subsume_literal_limit = 30;
+                // for v in &mut vars[1..] {
+                //     if v.assign == BOTTOM && !v.is(Flag::EliminatedVar) {
+                //         let p = v.pos_occurs.len() as f64;
+                //         let m = v.neg_occurs.len() as f64;
+                //         v.phase = (m < p) as Lbool;
+                //     }
+                // }
+                // state.elim_eliminate_combination_limit = 30;
+                // state.elim_eliminate_grow_limit = 64;
+                // state.elim_subsume_literal_limit = 30;
             }
+            state.flush("exhaustive eliminator activated...");
             elim.activate();
-            if state.target.num_of_clauses < 20_000_000 && state.elim_eliminate_grow_limit < 16 {
-                state.elim_eliminate_grow_limit += 2;
-            }
-            if 10 < state.elim_subsume_literal_limit {
-                state.elim_subsume_literal_limit -= 2;
+            // if state.target.num_of_clauses < 20_000_000 && state.elim_eliminate_grow_limit < 16 {
+            //     state.elim_eliminate_grow_limit += 2;
+            // }
+            state.elim_eliminate_grow_limit /= 2;
+            if 30 < state.elim_subsume_literal_limit {
+                state.elim_subsume_literal_limit /= 2;
             }
             state.elim_trigger = (state.c_lvl.get() - state.b_lvl.get()) as usize;
-            if recession {
-                cdb.reduce(state, vars);
+            if stagnate {
                 cdb.simplify(asgs, elim, state, vars)?;
                 state.stagnation = 0;
-                state.elim_eliminate_grow_limit = temp;
             }
         }
         state.progress(cdb, vars, None);
