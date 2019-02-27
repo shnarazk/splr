@@ -14,10 +14,10 @@ pub struct Config {
     #[structopt(long = "cl", default_value = "18000000")]
     pub clause_limit: usize,
     /// grow limit of #clauses by var elimination
-    #[structopt(long = "eg", default_value = "4")]
+    #[structopt(long = "eg", default_value = "0")]
     pub elim_grow_limit: usize,
     /// #literals in a merged clause by var elimination
-    #[structopt(long = "el", default_value = "100")]
+    #[structopt(long = "el", default_value = "64")]
     pub elim_lit_limit: usize,
     /// #samples for average assignment rate
     #[structopt(long = "ra", default_value = "3500")]
