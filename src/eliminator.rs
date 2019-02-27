@@ -158,7 +158,7 @@ impl EliminatorIF for Eliminator {
             if asgs.propagate(cdb, state, vars) != NULL_CLAUSE {
                 return Err(SolverError::Inconsistent);
             }
-            cdb.eliminate_satisfied_clauses(self, vars);
+            cdb.eliminate_satisfied_clauses(self, vars, true);
             cdb.garbage_collect();
         }
         Ok(())
