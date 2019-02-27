@@ -72,14 +72,14 @@ impl SatSolverIF for Solver {
         state.num_solved_vars = asgs.len();
         state.progress_header();
         state.progress(cdb, vars, Some("loaded"));
-        if state.use_elim {
-            if 20_000_000 < state.target.num_of_clauses {
-                state.elim_eliminate_grow_limit = 0;
-                state.elim_eliminate_loop_limit = 1_000_000;
-                state.elim_subsume_loop_limit = 2_000_000;
-            }
+        state.flush("loading...");
+        let use_pre_processor = true;
+        let use_pre_processing_eliminator = false;
+        if use_pre_processor {
+            state.flush("initializing phases...");
             elim.activate();
             elim.prepare(cdb, vars, true);
+            // run simple preprocessor
             for vi in 1..vars.len() {
                 let v = &mut vars[vi];
                 if v.assign != BOTTOM {
@@ -94,15 +94,27 @@ impl SatSolverIF for Solver {
                     }
                 };
             }
-            state.progress(cdb, vars, Some("simplify"));
+            if !state.use_elim || !use_pre_processing_eliminator {
+                elim.stop(cdb, vars);
+            }
+            // state.progress(cdb, vars, Some("phase-in"));
+        }
+        if state.use_elim && use_pre_processing_eliminator {
+            state.flush("simpifying...");
+            if 20_000_000 < state.target.num_of_clauses {
+                state.elim_eliminate_grow_limit = 0;
+                state.elim_eliminate_loop_limit = 1_000_000;
+                state.elim_subsume_loop_limit = 2_000_000;
+            }
             if cdb.simplify(asgs, elim, state, vars).is_err() {
                 // Why inconsistent? Because the CNF contains a conflict, not an error!
                 state.progress(cdb, vars, Some("conflict"));
                 state.ok = false;
                 return Ok(Certificate::UNSAT);
             }
-            state.progress(cdb, vars, Some("subsumed"));
+            state.progress(cdb, vars, Some("process"));
         }
+        state.flush("start search...");
         match search(asgs, cdb, elim, state, vars) {
             Ok(true) => {
                 state.progress(cdb, vars, None);
