@@ -724,7 +724,9 @@ fn check_var_elimination_condition(
     }
     let limit = if 3 * state.cdb_soft_limit < 4 * cdb.count(true) {
         state.elim_eliminate_grow_limit / 4
-    } else { state.elim_eliminate_grow_limit };
+    } else {
+        state.elim_eliminate_grow_limit
+    };
     let clslen = pos.len() + neg.len();
     let mut cnt = 0;
     for c_pos in pos {

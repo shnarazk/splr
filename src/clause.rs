@@ -502,15 +502,11 @@ impl ClauseDBIF for ClauseDB {
     fn reset(&mut self, size: usize) {
         assert!(1 < self.clause.len());
         for c in &mut self.clause[1..] {
-            if c.is(Flag::LearntClause)
-                && !c.is(Flag::DeadClause)
-                && size < c.lits.len()
-            {
+            if c.is(Flag::LearntClause) && !c.is(Flag::DeadClause) && size < c.lits.len() {
                 c.kill(&mut self.touched);
             }
         }
         self.garbage_collect();
-
     }
     fn certificate_add(&mut self, vec: &[Lit]) {
         if !self.certified.is_empty() {
@@ -524,7 +520,12 @@ impl ClauseDBIF for ClauseDB {
             self.certified.push((CertifiedRecord::DELETE, temp));
         }
     }
-    fn eliminate_satisfied_clauses(&mut self, elim: &mut Eliminator, vars: &mut [Var], update_occur: bool) {
+    fn eliminate_satisfied_clauses(
+        &mut self,
+        elim: &mut Eliminator,
+        vars: &mut [Var],
+        update_occur: bool,
+    ) {
         for (cid, c) in &mut self.clause.iter_mut().enumerate().skip(1) {
             if !c.is(Flag::DeadClause) && vars.satisfies(&c.lits) {
                 c.kill(&mut self.touched);

@@ -6,9 +6,9 @@ use crate::traits::*;
 use crate::types::*;
 use crate::var::Var;
 use std::fmt;
+use std::io::{stdout, Write};
 use std::path::Path;
 use std::time::SystemTime;
-use std::io::{stdout, Write};
 
 /// A collection of named search heuristics
 #[derive(Debug, Eq, PartialEq)]

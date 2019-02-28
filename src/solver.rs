@@ -2,7 +2,7 @@ use crate::clause::{Clause, ClauseDB};
 use crate::config::Config;
 use crate::eliminator::Eliminator;
 use crate::propagator::AssignStack;
-use crate::state::{SearchStrategy, Stat, State};
+use crate::state::{Stat, State};
 use crate::traits::*;
 use crate::types::*;
 use crate::var::Var;
@@ -90,11 +90,11 @@ impl SatSolverIF for Solver {
                 match (v.pos_occurs.len(), v.neg_occurs.len()) {
                     (_, 0) => asgs.enqueue_null(v, TRUE),
                     (0, _) => asgs.enqueue_null(v, FALSE),
-                    (p, m) if m * 10 < p  => {
+                    (p, m) if m * 10 < p => {
                         v.phase = TRUE;
                         elim.enqueue_var(vars, vi, false);
                     }
-                    (p, m) if p * 10 < m  => {
+                    (p, m) if p * 10 < m => {
                         v.phase = FALSE;
                         elim.enqueue_var(vars, vi, false);
                     }
@@ -127,8 +127,8 @@ impl SatSolverIF for Solver {
                 match (v.pos_occurs.len(), v.neg_occurs.len()) {
                     (_, 0) => (),
                     (0, _) => (),
-                    (p, m) if m * 10 < p  => v.phase = TRUE,
-                    (p, m) if p * 10 < m  => v.phase = FALSE,
+                    (p, m) if m * 10 < p => v.phase = TRUE,
+                    (p, m) if p * 10 < m => v.phase = FALSE,
                     _ => (),
                 }
             }
