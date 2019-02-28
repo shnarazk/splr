@@ -123,8 +123,8 @@ fn report<W: Write>(state: &State, out: &mut BufWriter<W>) -> std::io::Result<()
     };
     out.write_all(
         format!(
-            "c {:<35}, v:{:8}, c:{:8}, time:{:9.2}\n",
-            state.target.pathname, state.target.num_of_variables, state.target.num_of_clauses, tm,
+            "c {:<43}, #var:{:9}, #cls:{:9}\n",
+            state.target.pathname, state.target.num_of_variables, state.target.num_of_clauses,
         )
         .as_bytes(),
     )?;
@@ -197,7 +197,12 @@ fn report<W: Write>(state: &State, out: &mut BufWriter<W>) -> std::io::Result<()
         .as_bytes(),
     )?;
     out.write_all(
-        format!("c Strategy: {}\n", state.strategy.to_str()).as_bytes()
+        format!(
+            "c     Strategy|mode:{:>9}, time:{:9.2}\n",
+            state.strategy.to_str(),
+            tm,
+        )
+        .as_bytes(),
     )?;
     out.write_all(b"c\n")?;
     Ok(())
