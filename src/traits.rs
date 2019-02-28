@@ -36,6 +36,7 @@ pub trait ClauseDBIF {
         state: &mut State,
         vars: &mut [Var],
     ) -> MaybeInconsistent;
+    fn reset(&mut self, size: usize);
     /// delete *dead* clauses from database, which are made by:
     /// * `reduce`
     /// * `simplify`

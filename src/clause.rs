@@ -496,6 +496,19 @@ impl ClauseDBIF for ClauseDB {
         }
         Ok(())
     }
+    fn reset(&mut self, size: usize) {
+        assert!(1 < self.clause.len());
+        for c in &mut self.clause[1..] {
+            if c.is(Flag::LearntClause)
+                && !c.is(Flag::DeadClause)
+                && size < c.lits.len()
+            {
+                c.kill(&mut self.touched);
+            }
+        }
+        self.garbage_collect();
+
+    }
     fn certificate_add(&mut self, vec: &[Lit]) {
         if !self.certified.is_empty() {
             let temp = vec.iter().map(|l| l.to_i32()).collect::<Vec<i32>>();

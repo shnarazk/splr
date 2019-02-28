@@ -71,6 +71,7 @@ impl EliminatorIF for Eliminator {
             return;
         }
         self.mode = EliminatorMode::Running;
+        cdb.reset(3);
         for v in &mut vars[1..] {
             v.pos_occurs.clear();
             v.neg_occurs.clear();

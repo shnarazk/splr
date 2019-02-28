@@ -74,7 +74,7 @@ impl SatSolverIF for Solver {
         state.progress(cdb, vars, Some("loaded"));
         state.flush("loading...");
         let use_pre_processor = true;
-        let use_pre_processing_eliminator = false;
+        let use_pre_processing_eliminator = true;
         if use_pre_processor {
             state.flush("initializing phases...");
             elim.activate();
@@ -88,11 +88,16 @@ impl SatSolverIF for Solver {
                 match (v.pos_occurs.len(), v.neg_occurs.len()) {
                     (_, 0) => asgs.enqueue_null(v, TRUE),
                     (0, _) => asgs.enqueue_null(v, FALSE),
-                    (p, m) => {
-                        v.phase = (m < p) as Lbool;
+                    (p, m) if m * 10 < p  => {
+                        v.phase = TRUE;
                         elim.enqueue_var(vars, vi, false);
                     }
-                };
+                    (p, m) if p * 10 < m  => {
+                        v.phase = FALSE;
+                        elim.enqueue_var(vars, vi, false);
+                    }
+                    _ => (),
+                }
             }
             if !state.use_elim || !use_pre_processing_eliminator {
                 elim.stop(cdb, vars);
@@ -111,6 +116,19 @@ impl SatSolverIF for Solver {
                 state.progress(cdb, vars, Some("conflict"));
                 state.ok = false;
                 return Ok(Certificate::UNSAT);
+            }
+            for vi in 1..vars.len() {
+                let v = &mut vars[vi];
+                if v.assign != BOTTOM || v.is(Flag::EliminatedVar) {
+                    continue;
+                }
+                match (v.pos_occurs.len(), v.neg_occurs.len()) {
+                    (_, 0) => (),
+                    (0, _) => (),
+                    (p, m) if m * 10 < p  => v.phase = TRUE,
+                    (p, m) if p * 10 < m  => v.phase = FALSE,
+                    _ => (),
+                }
             }
             state.progress(cdb, vars, Some("process"));
         }
@@ -342,7 +360,7 @@ fn handle_conflict_path(
         state.stats[Stat::SumLBD as usize] += lbd;
     }
     if tn_confl % 10_000 == 0 {
-        let nexpect = (vars.len() - state.num_solved_vars - state.num_eliminated_vars) / 10000;
+        let nexpect = (vars.len() - state.num_solved_vars) / 10000;
         if nexpect + state.stats[Stat::SolvedRecord as usize] < state.num_solved_vars {
             state.stagnation = 0;
         } else {
@@ -399,6 +417,7 @@ fn handle_conflict_path(
                 //     }
                 // }
                 asgs.cancel_until(vars, 0);
+                cdb.reset(3);
                 // for v in &mut vars[1..] {
                 //     if v.assign == BOTTOM && !v.is(Flag::EliminatedVar) {
                 //         let p = v.pos_occurs.len() as f64;
