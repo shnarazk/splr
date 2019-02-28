@@ -68,7 +68,9 @@ impl SatSolverIF for Solver {
         if !state.ok {
             return Ok(Certificate::UNSAT);
         }
-        check_size(cdb, state)?;
+        if cdb.check_size(state).is_err() {
+            return Err(SolverException::OutOfMemory)
+        }
         // TODO: deal with assumptions
         // s.root_level = 0;
         state.num_solved_vars = asgs.len();
@@ -159,6 +161,9 @@ impl SatSolverIF for Solver {
                 asgs.cancel_until(vars, 0);
                 state.progress(cdb, vars, Some("ERROR"));
                 state.ok = false;
+                if cdb.check_size(state).is_err() {
+                    return Err(SolverException::OutOfMemory)
+                }
                 Err(SolverException::Inconsistent)
             }
         }

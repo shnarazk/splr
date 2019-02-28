@@ -497,7 +497,11 @@ impl ClauseDBIF for ClauseDB {
             self.reset_lbd(vars, &mut state.lbd_temp);
             elim.stop(self, vars);
         }
-        Ok(())
+        if self.check_size(state).is_err() {
+            Err(SolverError::Inconsistent)
+        } else {
+            Ok(())
+        }
     }
     fn reset(&mut self, size: usize) {
         assert!(1 < self.clause.len());
@@ -541,6 +545,13 @@ impl ClauseDBIF for ClauseDB {
                     }
                 }
             }
+        }
+    }
+    fn check_size(&self, state: &State) -> MaybeInconsistent {
+        if self.count(false) <= state.cdb_soft_limit {
+            Ok(())
+        } else {
+            Err(SolverError::Inconsistent)
         }
     }
 }
