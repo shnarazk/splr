@@ -48,6 +48,9 @@ impl EliminatorIF for Eliminator {
     fn is_running(&self) -> bool {
         self.mode == EliminatorMode::Running
     }
+    fn is_waiting(&self) -> bool {
+        self.mode == EliminatorMode::Waiting
+    }
     // FIXME: due to a potential bug of killing clauses and difficulty about
     // synchronization between 'garbage_collect' and clearing occur lists,
     // 'stop' should purge all occur lists to purge any dead clauses for now.
@@ -71,7 +74,6 @@ impl EliminatorIF for Eliminator {
             return;
         }
         self.mode = EliminatorMode::Running;
-        cdb.reset(3);
         for v in &mut vars[1..] {
             v.pos_occurs.clear();
             v.neg_occurs.clear();

@@ -85,6 +85,7 @@ pub trait EliminatorIF {
     /// set eliminater's mode to **dormant**.
     fn stop(&mut self, cdb: &mut ClauseDB, vars: &mut [Var]);
     fn is_running(&self) -> bool;
+    fn is_waiting(&self) -> bool;
     /// rebuild occur lists.
     fn prepare(&mut self, cdb: &mut ClauseDB, vars: &mut [Var], force: bool);
     fn enqueue_clause(&mut self, cid: ClauseId, c: &mut Clause);
