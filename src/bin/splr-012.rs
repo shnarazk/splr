@@ -196,6 +196,9 @@ fn report<W: Write>(state: &State, out: &mut BufWriter<W>) -> std::io::Result<()
         )
         .as_bytes(),
     )?;
+    out.write_all(
+        format!("c Strategy: {}\n", state.strategy.to_str()).as_bytes()
+    )?;
     out.write_all(b"c\n")?;
     Ok(())
 }
