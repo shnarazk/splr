@@ -68,9 +68,7 @@ impl SatSolverIF for Solver {
         if !state.ok {
             return Ok(Certificate::UNSAT);
         }
-        if state.cdb_soft_limit < cdb.count(false) {
-            return Err(SolverException::OutOfMemory);
-        }
+        check_size(cdb, state)?;
         // TODO: deal with assumptions
         // s.root_level = 0;
         state.num_solved_vars = asgs.len();
@@ -717,4 +715,12 @@ fn minimize_with_bi_clauses(cdb: &ClauseDB, vars: &[Var], temp: &mut [usize], ve
         vec.retain(|l| temp[l.vi()] == key);
     }
     temp[0] = key;
+}
+
+fn check_size(cdb: &ClauseDB, state: &State) -> SolverResult {
+    if state.cdb_soft_limit < cdb.count(false) {
+        Err(SolverException::OutOfMemory)
+    } else {
+        Ok(Certificate::UNSAT)
+    }
 }
