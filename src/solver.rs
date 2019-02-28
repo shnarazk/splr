@@ -16,11 +16,12 @@ pub enum Certificate {
 }
 
 /// Abnormal termination flags.
+#[derive(Debug)]
 pub enum SolverException {
     // StateUNSAT = 0,
     // StateSAT,
     Inconsistent,
-    // OutOfMemory,
+    OutOfMemory,
     // TimeOut,
     UndescribedError,
 }
@@ -66,6 +67,9 @@ impl SatSolverIF for Solver {
         } = self;
         if !state.ok {
             return Ok(Certificate::UNSAT);
+        }
+        if state.cdb_soft_limit < cdb.count(false) {
+            return Err(SolverException::OutOfMemory);
         }
         // TODO: deal with assumptions
         // s.root_level = 0;
