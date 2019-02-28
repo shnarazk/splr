@@ -2,7 +2,7 @@ use crate::clause::{Clause, ClauseDB};
 use crate::config::Config;
 use crate::eliminator::Eliminator;
 use crate::propagator::AssignStack;
-use crate::state::{Stat, State};
+use crate::state::{SearchStrategy, Stat, State};
 use crate::traits::*;
 use crate::types::*;
 use crate::var::Var;
@@ -376,7 +376,10 @@ fn handle_conflict_path(
         let stagnate = 8 * state.stats[Stat::ExhaustiveElimination as usize] < state.stagnation;
         state.stats[Stat::SolvedRecord as usize] = state.num_solved_vars;
         if tn_confl == 100_000 {
+            state.flush("exhaustive eliminator activated...");
             asgs.cancel_until(vars, 0);
+            cdb.reset(3);
+            elim.activate();
             state.adapt(cdb);
         }
         // micro tuning of restart thresholds
@@ -400,13 +403,13 @@ fn handle_conflict_path(
         } else if 4 < nb && nb < 1000 {
             state.restart_blk -= (state.restart_blk - 1.40) * 0.01;
         }
-        // If there are too many 'blocks', Crash them!
+        // DELETE: If there are too many 'blocks', Crash them!
         if state.use_elim
             && (state.strategy == SearchStrategy::Generic ||
                 state.strategy == SearchStrategy::HighSuccesive ||
                 state.strategy == SearchStrategy::ManyGlues)
-            && (0 < state.elim_trigger
-                && (state.elim_trigger as f64) + state.b_lvl.get() < state.c_lvl.get()
+            && 0 < state.elim_trigger
+            && ((state.elim_trigger as f64) + state.b_lvl.get() < state.c_lvl.get()
                 || stagnate)
         {
             if 20_000_000 < state.target.num_of_clauses {
