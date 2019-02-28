@@ -721,11 +721,3 @@ fn minimize_with_bi_clauses(cdb: &ClauseDB, vars: &[Var], temp: &mut [usize], ve
     }
     temp[0] = key;
 }
-
-fn check_size(cdb: &ClauseDB, state: &State) -> SolverResult {
-    if state.cdb_soft_limit < cdb.count(false) {
-        Err(SolverException::OutOfMemory)
-    } else {
-        Ok(Certificate::UNSAT)
-    }
-}
