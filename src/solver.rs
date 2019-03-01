@@ -69,7 +69,7 @@ impl SatSolverIF for Solver {
             return Ok(Certificate::UNSAT);
         }
         if cdb.check_size(state).is_err() {
-            return Err(SolverException::OutOfMemory)
+            return Err(SolverException::OutOfMemory);
         }
         // TODO: deal with assumptions
         // s.root_level = 0;
@@ -121,8 +121,7 @@ impl SatSolverIF for Solver {
                 state.ok = false;
                 return Ok(Certificate::UNSAT);
             }
-            for vi in 1..vars.len() {
-                let v = &mut vars[vi];
+            for v in &mut vars[1..] {
                 if v.assign != BOTTOM || v.is(Flag::ELIMINATED) {
                     continue;
                 }
@@ -161,7 +160,7 @@ impl SatSolverIF for Solver {
                 state.progress(cdb, vars, Some("ERROR"));
                 state.ok = false;
                 if cdb.check_size(state).is_err() {
-                    return Err(SolverException::OutOfMemory)
+                    return Err(SolverException::OutOfMemory);
                 }
                 Err(SolverException::Inconsistent)
             }
