@@ -11,7 +11,7 @@ pub const VERSION: &str = "0.1.1+";
 )]
 pub struct Config {
     /// soft limit of #clauses (default is about 4GB)
-    #[structopt(long = "cl", default_value = "18000000")]
+    #[structopt(long = "cl", default_value = "24000000")]
     pub clause_limit: usize,
     /// grow limit of #clauses by var elimination
     #[structopt(long = "eg", default_value = "0")]
