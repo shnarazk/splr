@@ -404,12 +404,11 @@ fn handle_conflict_path(
         }
         // DELETE: If there are too many 'blocks', Crash them!
         if state.use_elim
-            && (state.strategy == SearchStrategy::Generic ||
-                state.strategy == SearchStrategy::HighSuccesive ||
-                state.strategy == SearchStrategy::ManyGlues)
             && 0 < state.elim_trigger
-            && ((state.elim_trigger as f64) + state.b_lvl.get() < state.c_lvl.get()
-                || stagnate)
+            && 100_000 < tn_confl
+            && ((state.strategy == SearchStrategy::Generic && stagnate)
+                || ((state.strategy == SearchStrategy::HighSuccesive || state.strategy == SearchStrategy::ManyGlues)
+                    && (state.elim_trigger as f64) + state.b_lvl.get() < state.c_lvl.get()))
         {
             if 20_000_000 < state.target.num_of_clauses {
                 state.elim_eliminate_grow_limit = 0;
