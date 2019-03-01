@@ -24,12 +24,12 @@ pub enum SearchStrategy {
 impl SearchStrategy {
     pub fn to_str(&self) -> &'static str {
         match self {
-            SearchStrategy::Initial => "Initial",
-            SearchStrategy::Generic => "Default",
-            SearchStrategy::LowDecisions => "LowDecs",
-            SearchStrategy::HighSuccesive => "HighSucc",
-            SearchStrategy::LowSuccesive => "LowSucc",
-            SearchStrategy::ManyGlues => "ManyGlue",
+            SearchStrategy::Initial => "in the initial search phase to determine a main strategy",
+            SearchStrategy::Generic => "generic (using the generic parameter set)",
+            SearchStrategy::LowDecisions => "LowDecs (many conflicts at low levels, using CSh)",
+            SearchStrategy::HighSuccesive => "HighSucc (long decision chains)",
+            SearchStrategy::LowSuccesive => "LowSucc (successive conflicts, using Luby)",
+            SearchStrategy::ManyGlues => "ManyGlue (many glue clauses)",
         }
     }
 }
@@ -372,6 +372,7 @@ impl StateIF for State {
         println!("                                                  ");
         println!("                                                  ");
         println!("                                                  ");
+        println!("                                                  ");
     }
     fn flush(&self, mes: &str) {
         if self.use_progress && !self.progress_log {
@@ -394,14 +395,14 @@ impl StateIF for State {
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
         self.progress_cnt += 1;
-        print!("\x1B[7A\x1B[1G");
+        print!("\x1B[8A\x1B[1G");
         let msg = match mes {
             None => self.strategy.to_str(),
             Some(x) => x,
         };
         let count = self.stats[Stat::Conflict as usize];
         let ave = self.stats[Stat::SumLBD as usize] as f64 / count as f64;
-        println!("\x1B[2K{}, Mode:{:>9}", self, msg);
+        println!("\x1B[2K{}", self);
         println!(
             "\x1B[2K #conflict:{}, #decision:{}, #propagate:{} ",
             i!(
@@ -528,6 +529,7 @@ impl StateIF for State {
                 self.restart_thr
             ),
         );
+        println!("\x1B[2K    Strategy|mode: {}", msg);
         self.flush("\x1B[2K");
     }
 }
@@ -544,7 +546,7 @@ impl fmt::Display for State {
         );
         let vclen = vc.len();
         let fnlen = self.target.pathname.len();
-        let width = 43;
+        let width = 59;
         if width < vclen + fnlen + 1 {
             write!(
                 f,

@@ -75,12 +75,12 @@ impl SatSolverIF for Solver {
         // s.root_level = 0;
         state.num_solved_vars = asgs.len();
         state.progress_header();
-        state.progress(cdb, vars, Some("loaded"));
+        state.progress(cdb, vars, Some("initialization phase"));
         state.flush("loading...");
         let use_pre_processor = true;
         let use_pre_processing_eliminator = true;
         if use_pre_processor {
-            state.flush("initializing phases...");
+            state.flush("phasing...");
             elim.activate();
             elim.prepare(cdb, vars, true);
             // run simple preprocessor
@@ -109,7 +109,7 @@ impl SatSolverIF for Solver {
             // state.progress(cdb, vars, Some("phase-in"));
         }
         if state.use_elim && use_pre_processing_eliminator {
-            state.flush("simpifying...");
+            state.flush("simplifying...");
             if 20_000_000 < state.target.num_of_clauses {
                 state.elim_eliminate_grow_limit = 0;
                 state.elim_eliminate_loop_limit = 1_000_000;
@@ -117,7 +117,7 @@ impl SatSolverIF for Solver {
             }
             if cdb.simplify(asgs, elim, state, vars).is_err() {
                 // Why inconsistent? Because the CNF contains a conflict, not an error!
-                state.progress(cdb, vars, Some("conflict"));
+                state.flush("found a trivial conflict in the CNF");
                 state.ok = false;
                 return Ok(Certificate::UNSAT);
             }
@@ -134,9 +134,8 @@ impl SatSolverIF for Solver {
                     _ => (),
                 }
             }
-            state.progress(cdb, vars, Some("process"));
         }
-        state.flush("start search...");
+        state.progress(cdb, vars, None);
         match search(asgs, cdb, elim, state, vars) {
             Ok(true) => {
                 state.progress(cdb, vars, None);
