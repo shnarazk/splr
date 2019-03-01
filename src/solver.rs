@@ -117,7 +117,7 @@ impl SatSolverIF for Solver {
             }
             if cdb.simplify(asgs, elim, state, vars).is_err() {
                 // Why inconsistent? Because the CNF contains a conflict, not an error!
-                state.flush("found a trivial conflict in the CNF");
+                state.progress(cdb, vars, None);
                 state.ok = false;
                 return Ok(Certificate::UNSAT);
             }
