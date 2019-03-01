@@ -117,8 +117,12 @@ impl SatSolverIF for Solver {
             }
             if cdb.simplify(asgs, elim, state, vars).is_err() {
                 // Why inconsistent? Because the CNF contains a conflict, not an error!
+                // Or out of memory.
                 state.progress(cdb, vars, None);
                 state.ok = false;
+                if cdb.check_size(state).is_err() {
+                    return Err(SolverException::OutOfMemory);
+                }
                 return Ok(Certificate::UNSAT);
             }
             for v in &mut vars[1..] {
