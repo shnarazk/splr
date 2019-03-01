@@ -344,11 +344,11 @@ impl StateIF for State {
             // Adjusting for low decision levels.
             // move some clauses with good lbd (col_lbd_bound) to Permanent
             for c in &mut cdb.clause[1..] {
-                if c.is(Flag::DeadClause) || !c.is(Flag::LearntClause) {
+                if c.is(Flag::DEAD) || !c.is(Flag::LEARNT) {
                     continue;
                 }
                 if c.rank <= self.co_lbd_bound {
-                    c.turn_off(Flag::LearntClause);
+                    c.turn_off(Flag::LEARNT);
                     cdb.num_learnt -= 1;
                 } else if re_init {
                     c.kill(&mut cdb.touched);
@@ -645,7 +645,7 @@ impl State {
         let nv = vars.len() - 1;
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
-        let nlearnts = cdb.countf(Flag::LearntClause); // TODO eliminate DeadClause
+        let nlearnts = cdb.countf(Flag::LEARNT); // TODO eliminate DEAD
         let ncnfl = self.stats[Stat::Conflict as usize];
         let nrestart = self.stats[Stat::Restart as usize];
         println!(

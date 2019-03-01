@@ -123,7 +123,7 @@ impl SatSolverIF for Solver {
             }
             for vi in 1..vars.len() {
                 let v = &mut vars[vi];
-                if v.assign != BOTTOM || v.is(Flag::EliminatedVar) {
+                if v.assign != BOTTOM || v.is(Flag::ELIMINATED) {
                     continue;
                 }
                 match (v.pos_occurs.len(), v.neg_occurs.len()) {
@@ -407,7 +407,8 @@ fn handle_conflict_path(
             && 0 < state.elim_trigger
             && 100_000 < tn_confl
             && ((state.strategy == SearchStrategy::Generic && stagnate)
-                || ((state.strategy == SearchStrategy::HighSuccesive || state.strategy == SearchStrategy::ManyGlues)
+                || ((state.strategy == SearchStrategy::HighSuccesive
+                    || state.strategy == SearchStrategy::ManyGlues)
                     && (state.elim_trigger as f64) + state.b_lvl.get() < state.c_lvl.get()))
         {
             if state.strategy == SearchStrategy::Generic {
@@ -421,7 +422,7 @@ fn handle_conflict_path(
             if stagnate {
                 // state.restart_step *= 2;
                 // for v in &mut vars[1..] {
-                //     if !v.is(Flag::EliminatedVar) {
+                //     if !v.is(Flag::ELIMINATED) {
                 //         let p = v.pos_occurs.len() as f64;
                 //         let m = v.neg_occurs.len() as f64;
                 //         v.activity = p.min(m) / (p + m);
@@ -430,7 +431,7 @@ fn handle_conflict_path(
                 asgs.cancel_until(vars, 0);
                 cdb.reset(3);
                 // for v in &mut vars[1..] {
-                //     if v.assign == BOTTOM && !v.is(Flag::EliminatedVar) {
+                //     if v.assign == BOTTOM && !v.is(Flag::ELIMINATED) {
                 //         let p = v.pos_occurs.len() as f64;
                 //         let m = v.neg_occurs.len() as f64;
                 //         v.phase = (m < p) as Lbool;
@@ -492,17 +493,17 @@ fn analyze(
         unsafe {
             debug_assert_ne!(cid, NULL_CLAUSE);
             let c = &mut cdb.clause[cid as usize] as *mut Clause;
-            debug_assert!(!(*c).is(Flag::DeadClause));
-            if (*c).is(Flag::LearntClause) {
+            debug_assert!(!(*c).is(Flag::DEAD));
+            if (*c).is(Flag::LEARNT) {
                 cdb.bump_activity(&mut state.cla_inc, cid);
                 if 2 < (*c).rank {
                     let nlevels = vars.compute_lbd(&(*c).lits, &mut state.lbd_temp);
                     if nlevels + 1 < (*c).rank {
                         if (*c).rank <= state.lbd_frozen_clause {
-                            (*c).turn_on(Flag::JustUsedClause);
+                            (*c).turn_on(Flag::JUST_USED);
                         }
                         if state.use_chan_seok && nlevels < state.co_lbd_bound {
-                            (*c).turn_off(Flag::LearntClause);
+                            (*c).turn_off(Flag::LEARNT);
                             cdb.num_learnt -= 1;
                         } else {
                             (*c).rank = nlevels;
@@ -517,15 +518,14 @@ fn analyze(
                 asgs.update_order(vars, vi);
                 let v = &mut vars[vi];
                 let lvl = v.level;
-                debug_assert!(!v.is(Flag::EliminatedVar));
+                debug_assert!(!v.is(Flag::ELIMINATED));
                 debug_assert!(v.assign != BOTTOM);
                 if 0 < lvl && !state.an_seen[vi] {
                     state.an_seen[vi] = true;
                     if dl <= lvl {
                         // println!("- flag for {} which level is {}", q.int(), lvl);
                         path_cnt += 1;
-                        if v.reason != NULL_CLAUSE
-                            && cdb.clause[v.reason as usize].is(Flag::LearntClause)
+                        if v.reason != NULL_CLAUSE && cdb.clause[v.reason as usize].is(Flag::LEARNT)
                         {
                             state.last_dl.push(*q);
                         }
