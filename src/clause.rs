@@ -503,7 +503,7 @@ impl ClauseDBIF for ClauseDB {
         }
     }
     fn reset(&mut self, size: usize) {
-        assert!(1 < self.clause.len());
+        debug_assert!(1 < self.clause.len());
         for c in &mut self.clause[1..] {
             if c.is(Flag::LEARNT) && !c.is(Flag::DEAD) && size < c.lits.len() {
                 c.kill(&mut self.touched);
