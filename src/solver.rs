@@ -410,6 +410,9 @@ fn handle_conflict_path(
                 || ((state.strategy == SearchStrategy::HighSuccesive || state.strategy == SearchStrategy::ManyGlues)
                     && (state.elim_trigger as f64) + state.b_lvl.get() < state.c_lvl.get()))
         {
+            if state.strategy == SearchStrategy::Generic {
+                state.elim_eliminate_grow_limit = 8;
+            }
             if 20_000_000 < state.target.num_of_clauses {
                 state.elim_eliminate_grow_limit = 0;
                 state.elim_eliminate_loop_limit = 800_000;
