@@ -10,8 +10,8 @@ pub const VERSION: &str = "0.1.1+";
     about = "SAT solver for Propositional Logic in Rust, version 0.1.2 alpha"
 )]
 pub struct Config {
-    /// soft limit of #clauses (default is about 4GB)
-    #[structopt(long = "cl", default_value = "24000000")]
+    /// soft limit of #clauses (24000000 is about 4GB)
+    #[structopt(long = "cl", default_value = "0")]
     pub clause_limit: usize,
     /// grow limit of #clauses by var elimination
     #[structopt(long = "eg", default_value = "0")]

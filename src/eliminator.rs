@@ -717,10 +717,10 @@ fn check_var_elimination_condition(
     v: VarId,
 ) -> bool {
     // avoid thrashing
-    if state.cdb_soft_limit < cdb.count(true) {
+    if 0 < state.cdb_soft_limit && state.cdb_soft_limit < cdb.count(true) {
         return true;
     }
-    let limit = if 3 * state.cdb_soft_limit < 4 * cdb.count(true) {
+    let limit = if 0 < state.cdb_soft_limit && 3 * state.cdb_soft_limit < 4 * cdb.count(true) {
         state.elim_eliminate_grow_limit / 4
     } else {
         state.elim_eliminate_grow_limit

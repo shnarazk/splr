@@ -547,7 +547,7 @@ impl ClauseDBIF for ClauseDB {
         }
     }
     fn check_size(&self, state: &State) -> MaybeInconsistent {
-        if self.count(false) <= state.cdb_soft_limit {
+        if state.cdb_soft_limit == 0 || self.count(false) <= state.cdb_soft_limit {
             Ok(())
         } else {
             Err(SolverError::Inconsistent)
