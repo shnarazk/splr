@@ -35,7 +35,7 @@ impl fmt::Display for SearchStrategy {
                     SearchStrategy::Generic => "Generic (using the generic parameter set)",
                     SearchStrategy::LowDecisions => "Many-Low-Level-Conflicts w/ CS heuristics",
                     SearchStrategy::HighSuccesive => "High-Successive-Conflicts w/ CS heuristics",
-                    SearchStrategy::LowSuccesive => "Low-Successive-Conflicts w/ Luby",
+                    SearchStrategy::LowSuccesive => "Low-Successive-Conflicts w/ Luby sequence",
                     SearchStrategy::ManyGlues => "Many-Glue-Clauses",
                 }
             )
