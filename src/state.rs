@@ -33,9 +33,9 @@ impl fmt::Display for SearchStrategy {
                         "in the initial search phase to determine a main strategy"
                     }
                     SearchStrategy::Generic => "Generic (using the generic parameter set)",
-                    SearchStrategy::LowDecisions => "Many-Low-Level-Conflicts (using CSh)",
-                    SearchStrategy::HighSuccesive => "High-Successive-conflicts",
-                    SearchStrategy::LowSuccesive => "Low-Successive-conflicts (using Luby)",
+                    SearchStrategy::LowDecisions => "Many-Low-Level-Conflicts w/ CS heuristics",
+                    SearchStrategy::HighSuccesive => "High-Successive-Conflicts w/ CS heuristics",
+                    SearchStrategy::LowSuccesive => "Low-Successive-Conflicts w/ Luby",
                     SearchStrategy::ManyGlues => "Many-Glue-Clauses",
                 }
             )

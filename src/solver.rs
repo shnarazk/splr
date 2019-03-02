@@ -436,7 +436,7 @@ fn handle_conflict_path(
         && 0 < cdb.num_learnt
     {
         state.cur_restart = ((tn_confl as f64) / (state.next_reduction as f64)) as usize + 1;
-        state.flush("reducing learnt clauses..");
+        state.flush("reducing...");
         cdb.reduce(state, vars);
     }
     Ok(())
