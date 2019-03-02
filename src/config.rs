@@ -43,9 +43,12 @@ pub struct Config {
     /// Disables exhaustive simplification
     #[structopt(long = "no-elim", short = "E")]
     pub no_elim: bool,
+    /// Disables dynamic restart adaptation
+    #[structopt(long = "no-adaptive_restart", short = "R")]
+    pub no_adaptive_restart: bool,
     /// Disables dynamic strategy adaptation
-    #[structopt(long = "no-adaptation", short = "A")]
-    pub no_adapt: bool,
+    #[structopt(long = "no-adaptive_strategy", short = "S")]
+    pub no_adaptive_strategy: bool,
     /// a CNF file to solve
     #[structopt(parse(from_os_str))]
     pub cnf_file: std::path::PathBuf,
@@ -71,7 +74,8 @@ impl Default for Config {
             output_filname: "".to_string(),
             use_log: false,
             no_elim: false,
-            no_adapt: false,
+            no_adaptive_restart: false,
+            no_adaptive_strategy: false,
             cnf_file: PathBuf::new(),
             use_certification: false,
             proof_filename: "proof.out".to_string(),

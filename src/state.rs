@@ -123,6 +123,7 @@ pub struct State {
     pub cdb_soft_limit: usize,
     pub ema_coeffs: (i32, i32),
     /// RESTART
+    pub adaptive_restart: bool,
     /// For force restart based on average LBD of newly generated clauses: 0.80.
     /// This is called `K` in Glusoce
     pub restart_thr: f64,
@@ -252,6 +253,7 @@ impl Default for State {
             cdb_inc: 300,
             cdb_inc_extra: 1000,
             cdb_soft_limit: 0,     // 248_000_000
+            adaptive_restart: false,
             restart_thr: 0.60,     // will be overwrited by bin/splr
             restart_blk: 1.40,     // will be overwrited by bin/splr
             restart_asg_len: 3500, // will be overwrited by bin/splr
@@ -315,7 +317,8 @@ impl StateIF for State {
                 .unwrap()
         };
         state.num_vars = cnf.num_of_variables;
-        state.adapt_strategy = !config.no_adapt;
+        state.adaptive_restart = !config.no_adaptive_restart;
+        state.adapt_strategy = !config.no_adaptive_strategy;
         state.cdb_soft_limit = config.clause_limit;
         state.elim_eliminate_grow_limit = config.elim_grow_limit;
         state.elim_subsume_literal_limit = config.elim_lit_limit;
