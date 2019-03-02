@@ -103,8 +103,8 @@ impl PropagatorIF for AssignStack {
             state.stats[Stat::Propagation as usize] += 1;
             unsafe {
                 let source = (*watcher).get_unchecked_mut(p);
-                let mut n = 1;
-                'next_clause: while n <= source.count() {
+                let mut n = 0;
+                'next_clause: while n < source.count() {
                     let w = source.get_unchecked_mut(n);
                     debug_assert!(!head[w.c as usize].is(Flag::DEAD));
                     if self.assigned(w.blocker) != TRUE {
@@ -130,7 +130,7 @@ impl PropagatorIF for AssignStack {
                                 (*watcher)
                                     .get_unchecked_mut(lk.negate() as usize)
                                     .register(first, w.c);
-                                source.detach(n as ClauseId);
+                                source.detach(n);
                                 *lits.get_unchecked_mut(1) = *lk;
                                 *lits.get_unchecked_mut(k) = false_lit;
                                 continue 'next_clause;

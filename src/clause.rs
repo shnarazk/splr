@@ -57,43 +57,26 @@ impl Default for Watch {
 }
 
 impl WatchDBIF for Vec<Watch> {
-    fn initialize(mut self, n: usize) -> Self {
-        if 2 <= n {
-            self.push(Watch::default());
-        }
+    fn initialize(self, _n: usize) -> Self {
         self
     }
     // #[inline(always)]
     fn count(&self) -> usize {
-        unsafe { self.get_unchecked(0).c as usize }
+        self.len()
     }
     // #[inline(always)]
     fn register(&mut self, blocker: Lit, c: ClauseId) {
-        unsafe {
-            let next = self.get_unchecked(0).c as usize + 1;
-            if next == self.len() {
-                self.push(Watch { blocker, c });
-            } else {
-                self.get_unchecked_mut(next).blocker = blocker;
-                self.get_unchecked_mut(next).c = c;
-            }
-            self.get_unchecked_mut(0).c = next as ClauseId;
-        }
+        self.push(Watch { blocker, c });
     }
     // #[inline(always)]
-    fn detach(&mut self, n: ClauseId) {
-        unsafe {
-            let last = self.get_unchecked(0).c as usize;
-            debug_assert!(0 < last);
-            *self.get_unchecked_mut(n as usize) = self.get_unchecked(last).clone();
-            self.get_unchecked_mut(0).c -= 1;
-        }
+    fn detach(&mut self, n: usize) {
+        self.swap_remove(n);
     }
     // #[inline(always)]
     fn detach_with(&mut self, cid: ClauseId) {
-        for n in 1..=self[0].c {
-            if self[n as usize].c == cid {
-                self.detach(n);
+        for (n, w) in self.iter().enumerate() {
+            if w.c == cid {
+                self.swap_remove(n);
                 return;
             }
         }
@@ -231,8 +214,8 @@ impl ClauseDBIF for ClauseDB {
         clause.push(Clause::default());
         let mut watcher = Vec::with_capacity(2 * (nv + 1));
         let mut touched = Vec::with_capacity(2 * (nv + 1));
-        for i in 0..2 * (nv + 1) {
-            watcher.push(Vec::new().initialize(i));
+        for _ in 0..2 * (nv + 1) {
+            watcher.push(Vec::new());
             touched.push(false);
         }
         let mut certified = Vec::new();
@@ -265,8 +248,8 @@ impl ClauseDBIF for ClauseDB {
                 continue;
             }
             touched[i + 2] = false;
-            let mut n = 1;
-            while n <= ws.count() {
+            let mut n = 0;
+            while n < ws.count() {
                 let cid = ws[n].c;
                 let c = &mut clause[cid as usize];
                 if !c.is(Flag::DEAD) {
@@ -288,7 +271,7 @@ impl ClauseDBIF for ClauseDB {
                     }
                     c.lits.clear();
                 }
-                ws.detach(n as ClauseId);
+                ws.detach(n);
             }
         }
         self.num_active = self.clause.len() - recycled.len();
@@ -577,7 +560,6 @@ impl ClauseDB {
                         vec2int(&lits)
                     );
                 }
-                // FIXME `watcher[watcher[0].c + 1 ..]` are garbages; Igrnore them!
                 if self.watcher[lits[0].negate() as usize]
                     .iter()
                     .all(|w| w.c != cid as ClauseId)
@@ -622,11 +604,7 @@ impl ClauseDB {
             }
         }
         for ws in &self.watcher[2..] {
-            let end = ws[0].c;
-            if end == 0 {
-                continue;
-            }
-            for w in &ws[1..end as usize] {
+            for w in ws {
                 if self.clause[w.c as usize].is(Flag::DEAD) && !deads.contains(&w.c) {
                     panic!("done");
                 }
