@@ -198,9 +198,8 @@ fn report<W: Write>(state: &State, out: &mut BufWriter<W>) -> std::io::Result<()
     )?;
     out.write_all(
         format!(
-            "c     Strategy|mode:{:>9}, time:{:9.2}\n",
-            format!("{:?}", state.strategy),
-            tm,
+            "c     Strategy|mode:{:>15}, time:{:9.2}\n",
+            state.strategy, tm,
         )
         .as_bytes(),
     )?;

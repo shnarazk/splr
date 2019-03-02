@@ -5,6 +5,7 @@ use crate::restart::Ema;
 use crate::traits::*;
 use crate::types::*;
 use crate::var::Var;
+use std::cmp::Ordering;
 use std::fmt;
 use std::io::{stdout, Write};
 use std::path::Path;
@@ -19,6 +20,45 @@ pub enum SearchStrategy {
     HighSuccesive,
     LowSuccesive,
     ManyGlues,
+}
+
+impl fmt::Display for SearchStrategy {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        if formatter.alternate() {
+            write!(
+                formatter,
+                "{}",
+                match self {
+                    SearchStrategy::Initial => {
+                        "in the initial search phase to determine a main strategy"
+                    }
+                    SearchStrategy::Generic => "Generic (using the generic parameter set)",
+                    SearchStrategy::LowDecisions => "Many-Low-Level-Conflicts (using CSh)",
+                    SearchStrategy::HighSuccesive => "High-Successive-conflicts",
+                    SearchStrategy::LowSuccesive => "Low-Successive-conflicts (using Luby)",
+                    SearchStrategy::ManyGlues => "Many-Glue-Clauses",
+                }
+            )
+        } else {
+            let name = match self {
+                SearchStrategy::Initial => "initial",
+                SearchStrategy::Generic => "generic",
+                SearchStrategy::LowDecisions => "LowDecs",
+                SearchStrategy::HighSuccesive => "HighSucc",
+                SearchStrategy::LowSuccesive => "LowSucc",
+                SearchStrategy::ManyGlues => "ManyGlue",
+            };
+            if let Some(w) = formatter.width() {
+                match name.len().cmp(&w) {
+                    Ordering::Equal => write!(formatter, "{}", name),
+                    Ordering::Less => write!(formatter, "{}{}", " ".repeat(w - name.len()), name),
+                    Ordering::Greater => write!(formatter, "{}", &name[..w]),
+                }
+            } else {
+                write!(formatter, "{}", name)
+            }
+        }
+    }
 }
 
 impl SearchStrategy {
@@ -396,10 +436,6 @@ impl StateIF for State {
         let sum = fixed + self.num_eliminated_vars;
         self.progress_cnt += 1;
         print!("\x1B[8A\x1B[1G");
-        let msg = match mes {
-            None => self.strategy.to_str(),
-            Some(x) => x,
-        };
         let count = self.stats[Stat::Conflict as usize];
         let ave = self.stats[Stat::SumLBD as usize] as f64 / count as f64;
         println!("\x1B[2K{}", self);
@@ -529,7 +565,11 @@ impl StateIF for State {
                 self.restart_thr
             ),
         );
-        println!("\x1B[2K    Strategy|mode: {}", msg);
+        if let Some(m) = mes {
+            println!("\x1B[2K    Strategy|mode: {}", m);
+        } else {
+            println!("\x1B[2K    Strategy|mode: {:#}", self.strategy);
+        }
         self.flush("\x1B[2K");
     }
 }
