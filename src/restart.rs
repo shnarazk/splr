@@ -35,9 +35,9 @@ impl RestartIF for State {
         // let _count = self.stats[Stat::Conflict as usize];
         // let _ave = self.sum_asg / count as f64 * self.num_vars as f64;
         if 100 < ncnfl
+            && !self.luby_restart
             && self.restart_step <= self.after_restart
             && self.restart_blk * self.ema_asg.get() < nas as f64
-        //    || config.restart_blk * ave < nas as f64
         {
             self.after_restart = 0;
             self.stats[Stat::BlockRestart as usize] += 1;
