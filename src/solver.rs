@@ -434,8 +434,8 @@ fn handle_conflict_path(
         state.progress(cdb, vars, None);
         state.restart_step = 50 + 40_000 * (stagnate as usize);
         if stagnate {
-            state.flush("stagnated...");
-            state.next_restart += 100_000;
+            state.flush(&format!("stagnated ({})...", state.stagnation));
+            state.next_restart += 80_000;
         }
     }
     state.var_inc /= state.var_decay;
