@@ -408,7 +408,7 @@ fn adapt_parameters(
     if !state.luby_restart && state.adaptive_restart {
         let delta: f64 = 0.025;
         let nr = state.stats[Stat::Restart as usize] - state.stats[Stat::RestartRecord as usize];
-        if state.restart_thr <= 0.95 && nr < 4 {
+        if state.restart_thr <= 0.99 && nr < 4 {
             state.restart_thr += delta;
         } else if 0.44 <= state.restart_thr && 1000 < nr {
             state.restart_thr -= delta;
@@ -418,7 +418,7 @@ fn adapt_parameters(
         let nb = state.stats[Stat::BlockRestart as usize]
             - state.stats[Stat::BlockRestartRecord as usize];
         state.stats[Stat::BlockRestartRecord as usize] = state.stats[Stat::BlockRestart as usize];
-        if 1.05 <= state.restart_blk && nb < 4 {
+        if 1.03 <= state.restart_blk && nb < 4 {
             state.restart_blk -= delta;
         } else if state.restart_blk <= 1.8 && 1000 < nb {
             state.restart_blk += delta;
