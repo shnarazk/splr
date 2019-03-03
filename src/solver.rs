@@ -369,74 +369,7 @@ fn handle_conflict_path(
         state.stats[Stat::SumLBD as usize] += lbd;
     }
     if tn_confl % 10_000 == 0 {
-        let nexpect = (vars.len() - state.num_solved_vars) / 20000;
-        if nexpect + state.stats[Stat::SolvedRecord as usize] < state.num_solved_vars {
-            state.stagnation = 0;
-        } else {
-            state.stagnation += 1;
-        }
-        let stagnate = ((1 + state.num_vars - state.num_solved_vars) as f64).log(2.0) < state.stagnation as f64;
-        state.stats[Stat::SolvedRecord as usize] = state.num_solved_vars;
-        // micro tuning of restart thresholds
-        state.stats[Stat::RestartRecord as usize] = state.stats[Stat::Restart as usize];
-        if !state.luby_restart && state.adaptive_restart {
-            let delta: f64 = 0.025;
-            let nr = state.stats[Stat::Restart as usize] - state.stats[Stat::RestartRecord as usize];
-            if state.restart_thr <= 0.95 && nr < 4 {
-                state.restart_thr += delta;
-            } else if 0.44 <= state.restart_thr && 1000 < nr {
-                state.restart_thr -= delta;
-            } else if 4 < nr && nr < 1000 {
-                state.restart_thr -= (state.restart_thr - 0.60) * 0.01;
-            }
-            let nb = state.stats[Stat::BlockRestart as usize]
-                - state.stats[Stat::BlockRestartRecord as usize];
-            state.stats[Stat::BlockRestartRecord as usize] = state.stats[Stat::BlockRestart as usize];
-            if 1.05 <= state.restart_blk && nb < 4 {
-                state.restart_blk -= delta;
-            } else if state.restart_blk <= 1.8 && 1000 < nb {
-                state.restart_blk += delta;
-            } else if 4 < nb && nb < 1000 {
-                state.restart_blk -= (state.restart_blk - 1.40) * 0.01;
-            }
-        }
-        if tn_confl == 100_000 {
-            state.stagnation = 0;
-            state.flush("exhaustive eliminator activated...");
-            asgs.cancel_until(vars, 0);
-            state.adapt(cdb);
-            cdb.reset(state.co_lbd_bound);
-            elim.activate();
-            cdb.simplify(asgs, elim, state, vars)?;
-        // } else if state.use_elim
-        //     && 0 < state.elim_trigger
-        //     && ((state.strategy == SearchStrategy::Generic && stagnate)
-        //         || ((state.strategy == SearchStrategy::HighSuccesive
-        //             || state.strategy == SearchStrategy::ManyGlues)
-        //             && (state.elim_trigger as f64) + state.b_lvl.get() < state.c_lvl.get()))
-        // {
-        //     let lbd = state.ema_lbd.get() as usize;
-        //     state.elim_eliminate_combination_limit = lbd;
-        //     state.elim_subsume_literal_limit = 2 * lbd;
-        //     if stagnate {
-        //         state.flush("stagnating...");
-        //         asgs.cancel_until(vars, 0);
-        //         cdb.reset(state.stats[Stat::ExhaustiveElimination as usize]);
-        //     }
-        //     state.flush("exhaustive eliminator activated...");
-        //     elim.activate();
-        //     state.elim_trigger = (state.c_lvl.get() - state.b_lvl.get()) as usize;
-        //     if stagnate {
-        //         cdb.simplify(asgs, elim, state, vars)?;
-        //         state.stagnation = 0;
-        //     }
-        }
-        state.progress(cdb, vars, None);
-        state.restart_step = 50 + 40_000 * (stagnate as usize);
-        if stagnate {
-            state.flush(&format!("stagnated ({})...", state.stagnation));
-            state.next_restart += 80_000;
-        }
+        adapt_parameters(asgs, cdb, elim, state, vars, tn_confl)?;
     }
     state.var_inc /= state.var_decay;
     state.cla_inc /= state.cla_decay;
@@ -447,6 +380,65 @@ fn handle_conflict_path(
     {
         state.cur_restart = ((tn_confl as f64) / (state.next_reduction as f64)) as usize + 1;
         cdb.reduce(state, vars);
+    }
+    Ok(())
+}
+
+fn adapt_parameters(
+    asgs: &mut AssignStack,
+    cdb: &mut ClauseDB,
+    elim: &mut Eliminator,
+    state: &mut State,
+    vars: &mut [Var],
+    nconflict: usize,
+) -> MaybeInconsistent {
+    let switch = 100_000;
+    if switch < nconflict && state.stats[Stat::SolvedRecord as usize] == state.num_solved_vars {
+        state.stagnation += 1;
+    } else {
+        state.stagnation = 0;
+    }
+    let stagnate = (state.num_vars - state.num_solved_vars)
+        .next_power_of_two()
+        .trailing_zeros()
+        < state.stagnation as u32;
+    state.stats[Stat::SolvedRecord as usize] = state.num_solved_vars;
+    // micro tuning of restart thresholds
+    state.stats[Stat::RestartRecord as usize] = state.stats[Stat::Restart as usize];
+    if !state.luby_restart && state.adaptive_restart {
+        let delta: f64 = 0.025;
+        let nr = state.stats[Stat::Restart as usize] - state.stats[Stat::RestartRecord as usize];
+        if state.restart_thr <= 0.95 && nr < 4 {
+            state.restart_thr += delta;
+        } else if 0.44 <= state.restart_thr && 1000 < nr {
+            state.restart_thr -= delta;
+        } else if 4 < nr && nr < 1000 {
+            state.restart_thr -= (state.restart_thr - 0.60) * 0.01;
+        }
+        let nb = state.stats[Stat::BlockRestart as usize]
+            - state.stats[Stat::BlockRestartRecord as usize];
+        state.stats[Stat::BlockRestartRecord as usize] = state.stats[Stat::BlockRestart as usize];
+        if 1.05 <= state.restart_blk && nb < 4 {
+            state.restart_blk -= delta;
+        } else if state.restart_blk <= 1.8 && 1000 < nb {
+            state.restart_blk += delta;
+        } else if 4 < nb && nb < 1000 {
+            state.restart_blk -= (state.restart_blk - 1.40) * 0.01;
+        }
+    }
+    if nconflict == switch {
+        state.flush("exhaustive eliminator activated...");
+        asgs.cancel_until(vars, 0);
+        state.adapt(cdb);
+        cdb.reset(state.co_lbd_bound);
+        elim.activate();
+        cdb.simplify(asgs, elim, state, vars)?;
+    }
+    state.progress(cdb, vars, None);
+    state.restart_step = 50 + 40_000 * (stagnate as usize);
+    if stagnate {
+        state.flush(&format!("stagnated ({})...", state.stagnation));
+        state.next_restart += 80_000;
     }
     Ok(())
 }

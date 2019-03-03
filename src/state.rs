@@ -252,7 +252,7 @@ impl Default for State {
             glureduce: true,
             cdb_inc: 300,
             cdb_inc_extra: 1000,
-            cdb_soft_limit: 0,     // 248_000_000
+            cdb_soft_limit: 0, // 248_000_000
             adaptive_restart: false,
             restart_thr: 0.60,     // will be overwrited by bin/splr
             restart_blk: 1.40,     // will be overwrited by bin/splr
