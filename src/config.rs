@@ -56,7 +56,7 @@ pub struct Config {
     #[structopt(long = "certify", short = "c")]
     pub use_certification: bool,
     /// filename of DRAT UNSAT certification
-    #[structopt(long = "proof", default_value = "proof.out")]
+    #[structopt(long = "proof", default_value = "proof.out", short = "p")]
     pub proof_filename: String,
     /// time limit in sec by WALL-CLOCK TIME. (zero for no limit).
     #[structopt(long = "to", default_value = "0")]
