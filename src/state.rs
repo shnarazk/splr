@@ -337,7 +337,7 @@ impl StateIF for State {
         state.an_seen = vec![false; cnf.num_of_variables + 1];
         state.lbd_temp = vec![0; cnf.num_of_variables + 1];
         state.target = cnf;
-        state.time_limit = config.time_limit;
+        state.time_limit = config.timeout;
         state
     }
     fn is_timeout(&self) -> bool {
@@ -345,9 +345,7 @@ impl StateIF for State {
             return false;
         }
         match self.start.elapsed() {
-            Ok(e) => {
-                self.time_limit < e.as_secs() as f64
-            }
+            Ok(e) => self.time_limit < e.as_secs() as f64,
             Err(_) => false,
         }
     }
