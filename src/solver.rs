@@ -22,7 +22,7 @@ pub enum SolverException {
     // StateSAT,
     Inconsistent,
     OutOfMemory,
-    // TimeOut,
+    TimeOut,
     UndescribedError,
 }
 
@@ -165,6 +165,9 @@ impl SatSolverIF for Solver {
                 state.ok = false;
                 if cdb.check_size(state).is_err() {
                     return Err(SolverException::OutOfMemory);
+                }
+                if state.is_timeout() {
+                    return Err(SolverException::TimeOut);
                 }
                 Err(SolverException::Inconsistent)
             }
@@ -370,6 +373,9 @@ fn handle_conflict_path(
     }
     if tn_confl % 10_000 == 0 {
         adapt_parameters(asgs, cdb, elim, state, vars, tn_confl)?;
+        if state.is_timeout() {
+            return Err(SolverError::Inconsistent);
+        }
     }
     state.var_inc /= state.var_decay;
     state.cla_inc /= state.cla_decay;

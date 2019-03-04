@@ -232,6 +232,8 @@ pub trait SatSolverIF {
 pub trait StateIF {
     /// return an initialized state based on solver configuration and data about a CNF file.
     fn new(config: &Config, cnf: CNFDescription) -> State;
+    /// return `true` if it is timed out.
+    fn is_timeout(&self) -> bool;
     /// change heuristics based on stat data.
     fn adapt(&mut self, cdb: &mut ClauseDB);
     /// write a header of stat data to stdio.

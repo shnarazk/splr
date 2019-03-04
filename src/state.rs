@@ -153,6 +153,7 @@ pub struct State {
     pub elim_subsume_loop_limit: usize,
     /// MISC
     pub ok: bool,
+    pub time_limit: f64,
     pub next_reduction: usize, // renamed from `nbclausesbeforereduce`
     pub next_restart: usize,
     pub cur_restart: usize,
@@ -273,6 +274,7 @@ impl Default for State {
             elim_subsume_literal_limit: 100,
             elim_subsume_loop_limit: 2_000_000,
             ok: true,
+            time_limit: 0.0,
             next_reduction: 1000,
             next_restart: 100,
             cur_restart: 1,
@@ -335,7 +337,19 @@ impl StateIF for State {
         state.an_seen = vec![false; cnf.num_of_variables + 1];
         state.lbd_temp = vec![0; cnf.num_of_variables + 1];
         state.target = cnf;
+        state.time_limit = config.time_limit;
         state
+    }
+    fn is_timeout(&self) -> bool {
+        if self.time_limit == 0.0 {
+            return false;
+        }
+        match self.start.elapsed() {
+            Ok(e) => {
+                self.time_limit < e.as_secs() as f64
+            }
+            Err(_) => false,
+        }
     }
     fn adapt(&mut self, cdb: &mut ClauseDB) {
         if !self.adapt_strategy || self.strategy != SearchStrategy::Initial {

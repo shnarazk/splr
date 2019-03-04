@@ -58,6 +58,9 @@ pub struct Config {
     /// filename of DRAT UNSAT certification
     #[structopt(long = "proof", default_value = "proof.out")]
     pub proof_filename: String,
+    /// time limit in sec by WALL-CLOCK TIME. (zero for no limit).
+    #[structopt(long = "time_limit", default_value = "0")]
+    pub time_limit: f64,
 }
 
 impl Default for Config {
@@ -79,6 +82,7 @@ impl Default for Config {
             cnf_file: PathBuf::new(),
             use_certification: false,
             proof_filename: "proof.out".to_string(),
+            time_limit: 0.0,
         }
     }
 }
