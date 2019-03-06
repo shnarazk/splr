@@ -34,8 +34,12 @@ impl fmt::Display for SearchStrategy {
                         "in the initial search phase to determine a main strategy"
                     }
                     SearchStrategy::Generic => "Non-Specific-Instance using generic settings",
-                    SearchStrategy::LowDecisions => "Many-Low-Level-Conflicts using Chan Seok heuristics",
-                    SearchStrategy::HighSuccesive => "High-Successive-Conflicts using Chan Seok heuristics",
+                    SearchStrategy::LowDecisions => {
+                        "Many-Low-Level-Conflicts using Chan Seok heuristics"
+                    }
+                    SearchStrategy::HighSuccesive => {
+                        "High-Successive-Conflicts using Chan Seok heuristics"
+                    }
                     SearchStrategy::LowSuccesive => "Low-Successive-Conflicts w/ Luby sequence",
                     SearchStrategy::ManyGlues => "Many-Glue-Clauses",
                 }
