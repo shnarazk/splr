@@ -6,8 +6,9 @@ edition = "2018"
 description = "A pure rustic CDCL SAT solver based on Glucose"
 license = "MPL-2.0"
 readme = "README.md"
-repository = "https://gitlab.com/satisfiability01/splr"
-keywords = ["SAT", "logic"]
+repository = "https://github.com/shnarazk/splr"
+homepage = "https://gitlab.com/satisfiability01/splr"
+keywords = ["SAT solver", "logic"]
 categories = ["science"]
 
 [dependencies]
