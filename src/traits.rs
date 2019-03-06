@@ -42,7 +42,7 @@ pub trait ClauseDBIF {
     /// * `simplify`
     /// * `kill`
     fn garbage_collect(&mut self);
-    /// return the id of a new clause.
+    /// allocate a new clause and return its id.
     fn new_clause(&mut self, v: &[Lit], rank: usize, learnt: bool) -> ClauseId;
     /// re-calculate the lbd vaules of all (learnt) clauses.
     fn reset_lbd(&mut self, vars: &[Var], temp: &mut [usize]);
