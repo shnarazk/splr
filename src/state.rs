@@ -139,6 +139,7 @@ pub struct State {
     pub luby_restart_inc: f64,
     pub luby_current_restarts: usize,
     pub luby_restart_factor: f64,
+    pub use_stagnation: bool,
     /// Eliminator
     pub use_elim: bool,
     /// 0 for no limit
@@ -152,6 +153,7 @@ pub struct State {
     pub elim_subsume_literal_limit: usize,
     pub elim_subsume_loop_limit: usize,
     /// MISC
+    pub config: Config,
     pub ok: bool,
     pub time_limit: f64,
     pub next_reduction: usize, // renamed from `nbclausesbeforereduce`
@@ -266,6 +268,7 @@ impl Default for State {
             luby_restart_inc: 2.0,
             luby_current_restarts: 0,
             luby_restart_factor: 100.0,
+            use_stagnation: true,
             ema_coeffs: (2 ^ 5, 2 ^ 15),
             use_elim: true,
             elim_eliminate_combination_limit: 80,
@@ -273,6 +276,7 @@ impl Default for State {
             elim_eliminate_loop_limit: 2_000_000,
             elim_subsume_literal_limit: 100,
             elim_subsume_loop_limit: 2_000_000,
+            config: Config::default(),
             ok: true,
             time_limit: 0.0,
             next_reduction: 1000,
@@ -329,6 +333,7 @@ impl StateIF for State {
         state.restart_asg_len = config.restart_asg_samples;
         state.restart_lbd_len = config.restart_lbd_samples;
         state.restart_step = config.restart_step;
+        state.use_stagnation = !config.no_stagnation;
         state.progress_log = config.use_log;
         state.use_elim = !config.no_elim;
         state.ema_asg = Ema::new(config.restart_asg_samples);
@@ -338,6 +343,7 @@ impl StateIF for State {
         state.lbd_temp = vec![0; cnf.num_of_variables + 1];
         state.target = cnf;
         state.time_limit = config.timeout;
+        state.config = config.clone();
         state
     }
     fn is_timeout(&self) -> bool {

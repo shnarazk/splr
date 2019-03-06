@@ -404,10 +404,11 @@ fn adapt_parameters(
     } else {
         state.stagnation = 0;
     }
-    let stagnate = (state.num_vars - state.num_solved_vars)
-        .next_power_of_two()
-        .trailing_zeros()
-        < state.stagnation as u32;
+    let stagnate = state.use_stagnation
+        && ((state.num_vars - state.num_solved_vars)
+            .next_power_of_two()
+            .trailing_zeros()
+            < state.stagnation as u32);
     state.stats[Stat::SolvedRecord as usize] = state.num_solved_vars;
     // micro tuning of restart thresholds
     state.stats[Stat::RestartRecord as usize] = state.stats[Stat::Restart as usize];

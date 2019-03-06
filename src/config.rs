@@ -4,7 +4,7 @@ use structopt::StructOpt;
 pub const VERSION: &str = "0.1.1+";
 
 /// Configuration built from command line options
-#[derive(Debug, StructOpt)]
+#[derive(Clone, Debug, StructOpt)]
 #[structopt(
     name = "splr",
     about = "SAT solver for Propositional Logic in Rust, version 0.1.2 alpha"
@@ -49,6 +49,9 @@ pub struct Config {
     /// Disables dynamic strategy adaptation
     #[structopt(long = "no-adaptive_strategy", short = "S")]
     pub no_adaptive_strategy: bool,
+    /// Disables stagnation model
+    #[structopt(long = "no-stagnation", short = "T")]
+    pub no_stagnation: bool,
     /// a CNF file to solve
     #[structopt(parse(from_os_str))]
     pub cnf_file: std::path::PathBuf,
@@ -79,6 +82,7 @@ impl Default for Config {
             no_elim: false,
             no_adaptive_restart: false,
             no_adaptive_strategy: false,
+            no_stagnation: false,
             cnf_file: PathBuf::new(),
             use_certification: false,
             proof_filename: "proof.out".to_string(),
