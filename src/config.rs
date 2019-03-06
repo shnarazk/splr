@@ -61,7 +61,7 @@ pub struct Config {
     /// filename of DRAT UNSAT certification
     #[structopt(long = "proof", default_value = "proof.out", short = "p")]
     pub proof_filename: String,
-    /// time limit in sec by WALL-CLOCK TIME. (zero for no limit).
+    /// CPU time limit in sec. (zero for no limit).
     #[structopt(long = "to", default_value = "0")]
     pub timeout: f64,
 }

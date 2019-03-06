@@ -1,6 +1,7 @@
 ## 0.1.2, 2019-03-07
 
 - tweak hueristic adaptation, restart, clause/variable elimination
+- use CPU time if available
 - More command line options were added.
 
 ## 0.1.1, 2019-02-23
