@@ -60,7 +60,7 @@ The answer file uses the following format.
 | --------- |------- |
 | `v`  | the number of variables used in the given CNF file |
 | `c`  | the number of clauses used in the given CNF file |
-| `time`  | elapsed wall clock time in seconds |
+| `time`  | elapsed CPU time in seconds |
 | `#conflict` | the number of conflicts |
 | `#decision` | the number of decisions |
 | `#propagate` | the number of propagates (its unit is literal) |
