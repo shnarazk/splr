@@ -4,6 +4,7 @@ version = "0.1.2"
 authors = ["Shuji Narazaki <shujinarazaki@protonmail.com>"]
 edition = "2018"
 description = "A pure rustic CDCL SAT solver based on Glucose"
+license = "MPL-2.0"
 license-file = "LICENSE"
 readme = "README.md"
 repository = "https://gitlab.com/satisfiability01/splr"

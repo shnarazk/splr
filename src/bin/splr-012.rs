@@ -112,7 +112,7 @@ fn main() {
                 println!("The certification was dumped to {}.", config.proof_filename,);
             }
         }
-        Err(_) => println!("Failed to execution by an internal error."),
+        Err(e) => println!("Failed to execution by an internal error: {:?}.", e),
     }
 }
 
@@ -123,8 +123,8 @@ fn report<W: Write>(state: &State, out: &mut BufWriter<W>) -> std::io::Result<()
     };
     out.write_all(
         format!(
-            "c {:<35}, v:{:8}, c:{:8}, time:{:9.2}\n",
-            state.target.pathname, state.target.num_of_variables, state.target.num_of_clauses, tm,
+            "c {:<43}, #var:{:9}, #cls:{:9}\n",
+            state.target.pathname, state.target.num_of_variables, state.target.num_of_clauses,
         )
         .as_bytes(),
     )?;
@@ -193,6 +193,13 @@ fn report<W: Write>(state: &State, out: &mut BufWriter<W>) -> std::io::Result<()
                 state.dumper.vali[LogUsizeId::ExhaustiveElim as usize]
             ),
             format!("{:>9.4}", state.dumper.valf[LogF64Id::RestartThrK as usize]),
+        )
+        .as_bytes(),
+    )?;
+    out.write_all(
+        format!(
+            "c     Strategy|mode:{:>15}, time:{:9.2}\n",
+            state.strategy, tm,
         )
         .as_bytes(),
     )?;

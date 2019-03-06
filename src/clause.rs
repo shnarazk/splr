@@ -57,43 +57,26 @@ impl Default for Watch {
 }
 
 impl WatchDBIF for Vec<Watch> {
-    fn initialize(mut self, n: usize) -> Self {
-        if 2 <= n {
-            self.push(Watch::default());
-        }
+    fn initialize(self, _n: usize) -> Self {
         self
     }
     // #[inline(always)]
     fn count(&self) -> usize {
-        unsafe { self.get_unchecked(0).c as usize }
+        self.len()
     }
     // #[inline(always)]
     fn register(&mut self, blocker: Lit, c: ClauseId) {
-        unsafe {
-            let next = self.get_unchecked(0).c as usize + 1;
-            if next == self.len() {
-                self.push(Watch { blocker, c });
-            } else {
-                self.get_unchecked_mut(next).blocker = blocker;
-                self.get_unchecked_mut(next).c = c;
-            }
-            self.get_unchecked_mut(0).c = next as ClauseId;
-        }
+        self.push(Watch { blocker, c });
     }
     // #[inline(always)]
-    fn detach(&mut self, n: ClauseId) {
-        unsafe {
-            let last = self.get_unchecked(0).c as usize;
-            debug_assert!(0 < last);
-            *self.get_unchecked_mut(n as usize) = self.get_unchecked(last).clone();
-            self.get_unchecked_mut(0).c -= 1;
-        }
+    fn detach(&mut self, n: usize) {
+        self.swap_remove(n);
     }
     // #[inline(always)]
     fn detach_with(&mut self, cid: ClauseId) {
-        for n in 1..=self[0].c {
-            if self[n as usize].c == cid {
-                self.detach(n);
+        for (n, w) in self.iter().enumerate() {
+            if w.c == cid {
+                self.swap_remove(n);
                 return;
             }
         }
@@ -126,7 +109,7 @@ impl Default for Clause {
 
 impl ClauseIF for Clause {
     fn kill(&mut self, touched: &mut [bool]) {
-        self.turn_on(Flag::DeadClause);
+        self.turn_on(Flag::DEAD);
         debug_assert!(1 < self.lits[0] && 1 < self.lits[1]);
         touched[self.lits[0].negate() as usize] = true;
         touched[self.lits[1].negate() as usize] = true;
@@ -208,8 +191,8 @@ impl fmt::Display for Clause {
             f,
             "C{{{:?} {}{}}}",
             vec2int(&self.lits),
-            st(Flag::DeadClause, ", dead"),
-            st(Flag::Enqueued, ", enqueued"),
+            st(Flag::DEAD, ", dead"),
+            st(Flag::ENQUEUED, ", enqueued"),
         )
     }
 }
@@ -231,8 +214,8 @@ impl ClauseDBIF for ClauseDB {
         clause.push(Clause::default());
         let mut watcher = Vec::with_capacity(2 * (nv + 1));
         let mut touched = Vec::with_capacity(2 * (nv + 1));
-        for i in 0..2 * (nv + 1) {
-            watcher.push(Vec::new().initialize(i));
+        for _ in 0..2 * (nv + 1) {
+            watcher.push(Vec::new());
             touched.push(false);
         }
         let mut certified = Vec::new();
@@ -265,21 +248,21 @@ impl ClauseDBIF for ClauseDB {
                 continue;
             }
             touched[i + 2] = false;
-            let mut n = 1;
-            while n <= ws.count() {
+            let mut n = 0;
+            while n < ws.count() {
                 let cid = ws[n].c;
                 let c = &mut clause[cid as usize];
-                if !c.is(Flag::DeadClause) {
+                if !c.is(Flag::DEAD) {
                     n += 1;
                     continue;
                 }
                 if !c.lits.is_empty() {
-                    debug_assert!(c.is(Flag::DeadClause));
+                    debug_assert!(c.is(Flag::DEAD));
                     recycled.push(Watch {
                         blocker: NULL_LIT,
                         c: cid,
                     });
-                    if c.is(Flag::LearntClause) {
+                    if c.is(Flag::LEARNT) {
                         self.num_learnt -= 1;
                     }
                     if !certified.is_empty() {
@@ -288,7 +271,7 @@ impl ClauseDBIF for ClauseDB {
                     }
                     c.lits.clear();
                 }
-                ws.detach(n as ClauseId);
+                ws.detach(n);
             }
         }
         self.num_active = self.clause.len() - recycled.len();
@@ -301,17 +284,17 @@ impl ClauseDBIF for ClauseDB {
         if let Some(w) = self.watcher[NULL_LIT.negate() as usize].pop() {
             cid = w.c;
             let c = &mut self.clause[cid as usize];
-            // if !c.is(Flag::DeadClause) {
+            // if !c.is(Flag::DEAD) {
             //     println!("{} {:?}", cid.format(), vec2int(&c.lits));
             //     println!("len {}", self.watcher[NULL_LIT.negate() as usize].len());
             //     for w in &self.watcher[NULL_LIT.negate() as usize][..10] {
-            //         if !self.clause[w.c].is(Flag::DeadClause) {
+            //         if !self.clause[w.c].is(Flag::DEAD) {
             //             println!("{}", w.c.format());
             //         }
             //     }
             //     panic!("done");
             // }
-            debug_assert!(c.is(Flag::DeadClause));
+            debug_assert!(c.is(Flag::DEAD));
             c.flags = Flag::empty();
             c.lits.clear();
             for l in v {
@@ -335,7 +318,7 @@ impl ClauseDBIF for ClauseDB {
         };
         let c = &mut self.clause[cid as usize];
         if learnt {
-            c.turn_on(Flag::LearntClause);
+            c.turn_on(Flag::LEARNT);
             self.num_learnt += 1;
         }
         self.watcher[l0.negate() as usize].register(l1, cid);
@@ -346,7 +329,7 @@ impl ClauseDBIF for ClauseDB {
     fn reset_lbd(&mut self, vars: &[Var], temp: &mut [usize]) {
         let mut key = temp[0];
         for c in &mut self.clause[1..] {
-            if c.is(Flag::DeadClause) || c.is(Flag::LearntClause) {
+            if c.is(Flag::DEAD) || c.is(Flag::LEARNT) {
                 continue;
             }
             key += 1;
@@ -368,7 +351,7 @@ impl ClauseDBIF for ClauseDB {
         c.activity = a;
         if CLA_ACTIVITY_MAX < a {
             for c in &mut self.clause[1..] {
-                if c.is(Flag::LearntClause) {
+                if c.is(Flag::LEARNT) {
                     c.activity *= CLA_ACTIVITY_SCALE1;
                 }
             }
@@ -417,7 +400,7 @@ impl ClauseDBIF for ClauseDB {
     }
     fn detach(&mut self, cid: ClauseId) {
         let c = &mut self.clause[cid as usize];
-        debug_assert!(!c.is(Flag::DeadClause));
+        debug_assert!(!c.is(Flag::DEAD));
         debug_assert!(1 < c.lits.len());
         c.kill(&mut self.touched);
     }
@@ -431,8 +414,7 @@ impl ClauseDBIF for ClauseDB {
         state.next_reduction += state.cdb_inc;
         let mut perm = Vec::with_capacity(clause.len());
         for (i, b) in clause.iter().enumerate().skip(1) {
-            if b.is(Flag::LearntClause) && !b.is(Flag::DeadClause) && !vars.locked(b, i as ClauseId)
-            {
+            if b.is(Flag::LEARNT) && !b.is(Flag::DEAD) && !vars.locked(b, i as ClauseId) {
                 perm.push(i);
             }
         }
@@ -453,8 +435,8 @@ impl ClauseDBIF for ClauseDB {
         }
         for i in &perm[keep..] {
             let c = &mut clause[*i];
-            if c.is(Flag::JustUsedClause) {
-                c.turn_off(Flag::JustUsedClause)
+            if c.is(Flag::JUST_USED) {
+                c.turn_off(Flag::JUST_USED)
             }
             if 2 < c.rank {
                 c.kill(touched);
@@ -475,7 +457,10 @@ impl ClauseDBIF for ClauseDB {
         for v in &mut vars[1..] {
             v.reason = NULL_CLAUSE;
         }
-        elim.prepare(self, vars, true);
+        if elim.is_waiting() {
+            self.reset(state.co_lbd_bound);
+            elim.prepare(self, vars, true);
+        }
         loop {
             let na = asgs.len();
             elim.eliminate(asgs, self, state, vars)?;
@@ -494,7 +479,20 @@ impl ClauseDBIF for ClauseDB {
             self.reset_lbd(vars, &mut state.lbd_temp);
             elim.stop(self, vars);
         }
-        Ok(())
+        if self.check_size(state).is_err() {
+            Err(SolverError::Inconsistent)
+        } else {
+            Ok(())
+        }
+    }
+    fn reset(&mut self, size: usize) {
+        debug_assert!(1 < self.clause.len());
+        for c in &mut self.clause[1..] {
+            if c.is(Flag::LEARNT) && !c.is(Flag::DEAD) && size < c.lits.len() {
+                c.kill(&mut self.touched);
+            }
+        }
+        self.garbage_collect();
     }
     fn certificate_add(&mut self, vec: &[Lit]) {
         if !self.certified.is_empty() {
@@ -508,9 +506,14 @@ impl ClauseDBIF for ClauseDB {
             self.certified.push((CertifiedRecord::DELETE, temp));
         }
     }
-    fn eliminate_satisfied_clauses(&mut self, elim: &mut Eliminator, vars: &mut [Var], update_occur: bool) {
+    fn eliminate_satisfied_clauses(
+        &mut self,
+        elim: &mut Eliminator,
+        vars: &mut [Var],
+        update_occur: bool,
+    ) {
         for (cid, c) in &mut self.clause.iter_mut().enumerate().skip(1) {
-            if !c.is(Flag::DeadClause) && vars.satisfies(&c.lits) {
+            if !c.is(Flag::DEAD) && vars.satisfies(&c.lits) {
                 c.kill(&mut self.touched);
                 if elim.is_running() {
                     if update_occur {
@@ -518,12 +521,19 @@ impl ClauseDBIF for ClauseDB {
                     }
                     for l in &c.lits {
                         let v = &mut vars[l.vi()];
-                        if !v.is(Flag::EliminatedVar) {
+                        if !v.is(Flag::ELIMINATED) {
                             elim.enqueue_var(vars, l.vi(), true);
                         }
                     }
                 }
             }
+        }
+    }
+    fn check_size(&self, state: &State) -> MaybeInconsistent {
+        if state.cdb_soft_limit == 0 || self.count(false) <= state.cdb_soft_limit {
+            Ok(())
+        } else {
+            Err(SolverError::Inconsistent)
         }
     }
 }
@@ -536,12 +546,12 @@ impl ClauseDB {
             .map(|w| w.c)
             .collect::<Vec<ClauseId>>();
         for cid in deads {
-            if !self.clause[cid as usize].is(Flag::DeadClause) {
+            if !self.clause[cid as usize].is(Flag::DEAD) {
                 panic!("done");
             }
         }
         for cid in 1..self.clause.len() {
-            if !self.clause[cid].is(Flag::DeadClause) {
+            if !self.clause[cid].is(Flag::DEAD) {
                 let lits = &self.clause[cid].lits;
                 if lits.len() < 2 {
                     panic!(
@@ -550,7 +560,6 @@ impl ClauseDB {
                         vec2int(&lits)
                     );
                 }
-                // FIXME `watcher[watcher[0].c + 1 ..]` are garbages; Igrnore them!
                 if self.watcher[lits[0].negate() as usize]
                     .iter()
                     .all(|w| w.c != cid as ClauseId)
@@ -571,10 +580,10 @@ impl ClauseDB {
             .map(|w| w.c)
             .collect::<Vec<ClauseId>>();
         for cid in 1..self.clause.len() {
-            if self.clause[cid].is(Flag::DeadClause) && !deads.contains(&(cid as ClauseId)) {
+            if self.clause[cid].is(Flag::DEAD) && !deads.contains(&(cid as ClauseId)) {
                 panic!("done");
             }
-            if !self.clause[cid].is(Flag::DeadClause) {
+            if !self.clause[cid].is(Flag::DEAD) {
                 let lits = &self.clause[cid].lits;
                 if lits.len() < 2 {
                     panic!(
@@ -595,12 +604,8 @@ impl ClauseDB {
             }
         }
         for ws in &self.watcher[2..] {
-            let end = ws[0].c;
-            if end == 0 {
-                continue;
-            }
-            for w in &ws[1..end as usize] {
-                if self.clause[w.c as usize].is(Flag::DeadClause) && !deads.contains(&w.c) {
+            for w in ws {
+                if self.clause[w.c as usize].is(Flag::DEAD) && !deads.contains(&w.c) {
                     panic!("done");
                 }
             }

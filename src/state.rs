@@ -5,10 +5,11 @@ use crate::restart::Ema;
 use crate::traits::*;
 use crate::types::*;
 use crate::var::Var;
+use std::cmp::Ordering;
 use std::fmt;
+use std::io::{stdout, Write};
 use std::path::Path;
 use std::time::SystemTime;
-use std::io::{stdout, Write};
 
 /// A collection of named search heuristics
 #[derive(Debug, Eq, PartialEq)]
@@ -21,15 +22,54 @@ pub enum SearchStrategy {
     ManyGlues,
 }
 
+impl fmt::Display for SearchStrategy {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        if formatter.alternate() {
+            write!(
+                formatter,
+                "{}",
+                match self {
+                    SearchStrategy::Initial => {
+                        "in the initial search phase to determine a main strategy"
+                    }
+                    SearchStrategy::Generic => "Generic (using the generic parameter set)",
+                    SearchStrategy::LowDecisions => "Many-Low-Level-Conflicts w/ CS heuristics",
+                    SearchStrategy::HighSuccesive => "High-Successive-Conflicts w/ CS heuristics",
+                    SearchStrategy::LowSuccesive => "Low-Successive-Conflicts w/ Luby sequence",
+                    SearchStrategy::ManyGlues => "Many-Glue-Clauses",
+                }
+            )
+        } else {
+            let name = match self {
+                SearchStrategy::Initial => "initial",
+                SearchStrategy::Generic => "generic",
+                SearchStrategy::LowDecisions => "LowDecs",
+                SearchStrategy::HighSuccesive => "HighSucc",
+                SearchStrategy::LowSuccesive => "LowSucc",
+                SearchStrategy::ManyGlues => "ManyGlue",
+            };
+            if let Some(w) = formatter.width() {
+                match name.len().cmp(&w) {
+                    Ordering::Equal => write!(formatter, "{}", name),
+                    Ordering::Less => write!(formatter, "{}{}", " ".repeat(w - name.len()), name),
+                    Ordering::Greater => write!(formatter, "{}", &name[..w]),
+                }
+            } else {
+                write!(formatter, "{}", name)
+            }
+        }
+    }
+}
+
 impl SearchStrategy {
     pub fn to_str(&self) -> &'static str {
         match self {
-            SearchStrategy::Initial => "Initial",
-            SearchStrategy::Generic => "Default",
-            SearchStrategy::LowDecisions => "LowDecs",
-            SearchStrategy::HighSuccesive => "HighSucc",
-            SearchStrategy::LowSuccesive => "LowSucc",
-            SearchStrategy::ManyGlues => "ManyGlue",
+            SearchStrategy::Initial => "in the initial search phase to determine a main strategy",
+            SearchStrategy::Generic => "generic (using the generic parameter set)",
+            SearchStrategy::LowDecisions => "LowDecs (many conflicts at low levels, using CSh)",
+            SearchStrategy::HighSuccesive => "HighSucc (long decision chains)",
+            SearchStrategy::LowSuccesive => "LowSucc (successive conflicts, using Luby)",
+            SearchStrategy::ManyGlues => "ManyGlue (many glue clauses)",
         }
     }
 }
@@ -83,6 +123,7 @@ pub struct State {
     pub cdb_soft_limit: usize,
     pub ema_coeffs: (i32, i32),
     /// RESTART
+    pub adaptive_restart: bool,
     /// For force restart based on average LBD of newly generated clauses: 0.80.
     /// This is called `K` in Glusoce
     pub restart_thr: f64,
@@ -112,6 +153,7 @@ pub struct State {
     pub elim_subsume_loop_limit: usize,
     /// MISC
     pub ok: bool,
+    pub time_limit: f64,
     pub next_reduction: usize, // renamed from `nbclausesbeforereduce`
     pub next_restart: usize,
     pub cur_restart: usize,
@@ -211,7 +253,8 @@ impl Default for State {
             glureduce: true,
             cdb_inc: 300,
             cdb_inc_extra: 1000,
-            cdb_soft_limit: 18_000_000,
+            cdb_soft_limit: 0, // 248_000_000
+            adaptive_restart: false,
             restart_thr: 0.60,     // will be overwrited by bin/splr
             restart_blk: 1.40,     // will be overwrited by bin/splr
             restart_asg_len: 3500, // will be overwrited by bin/splr
@@ -231,6 +274,7 @@ impl Default for State {
             elim_subsume_literal_limit: 100,
             elim_subsume_loop_limit: 2_000_000,
             ok: true,
+            time_limit: 0.0,
             next_reduction: 1000,
             next_restart: 100,
             cur_restart: 1,
@@ -275,7 +319,8 @@ impl StateIF for State {
                 .unwrap()
         };
         state.num_vars = cnf.num_of_variables;
-        state.adapt_strategy = !config.no_adapt;
+        state.adaptive_restart = !config.no_adaptive_restart;
+        state.adapt_strategy = !config.no_adaptive_strategy;
         state.cdb_soft_limit = config.clause_limit;
         state.elim_eliminate_grow_limit = config.elim_grow_limit;
         state.elim_subsume_literal_limit = config.elim_lit_limit;
@@ -292,7 +337,17 @@ impl StateIF for State {
         state.an_seen = vec![false; cnf.num_of_variables + 1];
         state.lbd_temp = vec![0; cnf.num_of_variables + 1];
         state.target = cnf;
+        state.time_limit = config.timeout;
         state
+    }
+    fn is_timeout(&self) -> bool {
+        if self.time_limit == 0.0 {
+            return false;
+        }
+        match self.start.elapsed() {
+            Ok(e) => self.time_limit < e.as_secs() as f64,
+            Err(_) => false,
+        }
     }
     fn adapt(&mut self, cdb: &mut ClauseDB) {
         if !self.adapt_strategy || self.strategy != SearchStrategy::Initial {
@@ -344,11 +399,11 @@ impl StateIF for State {
             // Adjusting for low decision levels.
             // move some clauses with good lbd (col_lbd_bound) to Permanent
             for c in &mut cdb.clause[1..] {
-                if c.is(Flag::DeadClause) || !c.is(Flag::LearntClause) {
+                if c.is(Flag::DEAD) || !c.is(Flag::LEARNT) {
                     continue;
                 }
                 if c.rank <= self.co_lbd_bound {
-                    c.turn_off(Flag::LearntClause);
+                    c.turn_off(Flag::LEARNT);
                     cdb.num_learnt -= 1;
                 } else if re_init {
                     c.kill(&mut cdb.touched);
@@ -366,6 +421,7 @@ impl StateIF for State {
             return;
         }
         println!("{}", self);
+        println!("                                                  ");
         println!("                                                  ");
         println!("                                                  ");
         println!("                                                  ");
@@ -394,14 +450,10 @@ impl StateIF for State {
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
         self.progress_cnt += 1;
-        print!("\x1B[7A\x1B[1G");
-        let msg = match mes {
-            None => self.strategy.to_str(),
-            Some(x) => x,
-        };
+        print!("\x1B[8A\x1B[1G");
         let count = self.stats[Stat::Conflict as usize];
         let ave = self.stats[Stat::SumLBD as usize] as f64 / count as f64;
-        println!("\x1B[2K{}, Mode:{:>9}", self, msg);
+        println!("\x1B[2K{}", self);
         println!(
             "\x1B[2K #conflict:{}, #decision:{}, #propagate:{} ",
             i!(
@@ -528,6 +580,11 @@ impl StateIF for State {
                 self.restart_thr
             ),
         );
+        if let Some(m) = mes {
+            println!("\x1B[2K    Strategy|mode: {}", m);
+        } else {
+            println!("\x1B[2K    Strategy|mode: {:#}", self.strategy);
+        }
         self.flush("\x1B[2K");
     }
 }
@@ -544,7 +601,7 @@ impl fmt::Display for State {
         );
         let vclen = vc.len();
         let fnlen = self.target.pathname.len();
-        let width = 43;
+        let width = 59;
         if width < vclen + fnlen + 1 {
             write!(
                 f,
@@ -643,7 +700,7 @@ impl State {
         let nv = vars.len() - 1;
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
-        let nlearnts = cdb.countf(Flag::LearntClause); // TODO eliminate DeadClause
+        let nlearnts = cdb.countf(Flag::LEARNT); // TODO eliminate DEAD
         let ncnfl = self.stats[Stat::Conflict as usize];
         let nrestart = self.stats[Stat::Restart as usize];
         println!(

@@ -56,7 +56,7 @@ impl PropagatorIF for AssignStack {
         unsafe { self.assign.get_unchecked(l.vi()) ^ ((l & 1) as u8) }
     }
     fn enqueue(&mut self, v: &mut Var, sig: Lbool, cid: ClauseId, dl: usize) -> MaybeInconsistent {
-        debug_assert!(!v.is(Flag::EliminatedVar));
+        debug_assert!(!v.is(Flag::ELIMINATED));
         let val = self.assign[v.index];
         if val == BOTTOM {
             self.assign[v.index] = sig;
@@ -78,7 +78,7 @@ impl PropagatorIF for AssignStack {
         }
     }
     fn enqueue_null(&mut self, v: &mut Var, sig: Lbool) {
-        debug_assert!(!v.is(Flag::EliminatedVar));
+        debug_assert!(!v.is(Flag::ELIMINATED));
         debug_assert!(sig != BOTTOM);
         let val = self.assign[v.index];
         if val == BOTTOM {
@@ -103,10 +103,10 @@ impl PropagatorIF for AssignStack {
             state.stats[Stat::Propagation as usize] += 1;
             unsafe {
                 let source = (*watcher).get_unchecked_mut(p);
-                let mut n = 1;
-                'next_clause: while n <= source.count() {
+                let mut n = 0;
+                'next_clause: while n < source.count() {
                     let w = source.get_unchecked_mut(n);
-                    debug_assert!(!head[w.c as usize].is(Flag::DeadClause));
+                    debug_assert!(!head[w.c as usize].is(Flag::DEAD));
                     if self.assigned(w.blocker) != TRUE {
                         let lits = &mut head.get_unchecked_mut(w.c as usize).lits;
                         debug_assert!(2 <= lits.len());
@@ -130,7 +130,7 @@ impl PropagatorIF for AssignStack {
                                 (*watcher)
                                     .get_unchecked_mut(lk.negate() as usize)
                                     .register(first, w.c);
-                                source.detach(n as ClauseId);
+                                source.detach(n);
                                 *lits.get_unchecked_mut(1) = *lk;
                                 *lits.get_unchecked_mut(k) = false_lit;
                                 continue 'next_clause;
@@ -177,7 +177,7 @@ impl PropagatorIF for AssignStack {
         let dl = self.trail_lim.len();
         let vi = l.vi();
         let v = &mut vars[l.vi()];
-        debug_assert!(!v.is(Flag::EliminatedVar));
+        debug_assert!(!v.is(Flag::ELIMINATED));
         debug_assert!(self.assign[vi] == l.lbool() || self.assign[vi] == BOTTOM);
         self.assign[vi] = l.lbool();
         v.assign = l.lbool();
@@ -194,7 +194,7 @@ impl PropagatorIF for AssignStack {
         let dl = self.trail_lim.len();
         let vi = l.vi();
         let v = &mut vars[vi];
-        debug_assert!(!v.is(Flag::EliminatedVar));
+        debug_assert!(!v.is(Flag::ELIMINATED));
         debug_assert!(self.assign[vi] == l.lbool() || self.assign[vi] == BOTTOM);
         self.assign[vi] = l.lbool();
         v.assign = l.lbool();
@@ -211,7 +211,7 @@ impl PropagatorIF for AssignStack {
     #[allow(dead_code)]
     fn dump_cnf(&mut self, cdb: &ClauseDB, state: &State, vars: &[Var], fname: &str) {
         for v in vars {
-            if v.is(Flag::EliminatedVar) {
+            if v.is(Flag::ELIMINATED) {
                 if self.assign[v.index] != BOTTOM {
                     panic!("conflicting var {} {}", v.index, self.assign[v.index]);
                 } else {
@@ -326,7 +326,7 @@ impl VarOrderIF for VarIdHeap {
     fn select_var(&mut self, vars: &[Var]) -> VarId {
         loop {
             let vi = self.get_root(vars);
-            if vars[vi].assign == BOTTOM && !vars[vi].is(Flag::EliminatedVar) {
+            if vars[vi].assign == BOTTOM && !vars[vi].is(Flag::ELIMINATED) {
                 return vi;
             }
         }
@@ -334,7 +334,7 @@ impl VarOrderIF for VarIdHeap {
     fn rebuild(&mut self, vars: &[Var]) {
         self.reset();
         for v in &vars[1..] {
-            if v.assign == BOTTOM && !v.is(Flag::EliminatedVar) {
+            if v.assign == BOTTOM && !v.is(Flag::ELIMINATED) {
                 self.insert(vars, v.index);
             }
         }
