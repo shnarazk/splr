@@ -1,5 +1,6 @@
 // SAT solver for Propositional Logic in Rust
 
+use libc::{clock_gettime, timespec, CLOCK_PROCESS_CPUTIME_ID};
 use splr::clause::CertifiedRecord;
 use splr::config::{Config, VERSION};
 use splr::solver::{Certificate, Solver};
@@ -117,9 +118,19 @@ fn main() {
 }
 
 fn report<W: Write>(state: &State, out: &mut BufWriter<W>) -> std::io::Result<()> {
-    let tm = match state.start.elapsed() {
-        Ok(e) => e.as_secs() as f64 + f64::from(e.subsec_millis()) / 1000.0f64,
-        Err(_) => 0.0f64,
+    let tm = {
+        let mut time = timespec {
+            tv_sec: 0,
+            tv_nsec: 0,
+        };
+        if unsafe { clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &mut time) } == -1 {
+            match state.start.elapsed() {
+                Ok(e) => e.as_secs() as f64 + f64::from(e.subsec_millis()) / 1000.0f64,
+                Err(_) => 0.0f64,
+            }
+        } else {
+            time.tv_sec as f64 + time.tv_nsec as f64 / 1_000_000_000.0f64
+        }
     };
     out.write_all(
         format!(
