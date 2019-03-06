@@ -15,11 +15,17 @@ use std::time::SystemTime;
 /// A collection of named search heuristics
 #[derive(Debug, Eq, PartialEq)]
 pub enum SearchStrategy {
+    /// the initial search phase to determine a main strategy
     Initial,
+    /// Non-Specific-Instance using generic settings
     Generic,
+    /// Many-Low-Level-Conflicts using Chan Seok heuristics
     LowDecisions,
+    /// High-Successive-Conflicts using Chan Seok heuristics
     HighSuccesive,
+    /// Low-Successive-Conflicts w/ Luby sequence
     LowSuccesive,
+    /// Many-Glue-Clauses
     ManyGlues,
 }
 
