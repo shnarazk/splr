@@ -56,7 +56,9 @@ pub trait ClauseDBIF {
     fn certificate_add(&mut self, vec: &[Lit]);
     /// record a deleted clause to unsat certification
     fn certificate_delete(&mut self, vec: &[Lit]);
+    /// delete satisfied clauses at decision level zero.
     fn eliminate_satisfied_clauses(&mut self, elim: &mut Eliminator, vars: &mut [Var], occur: bool);
+    /// emit an error if the db size (the number of clauses) is over the limit.
     fn check_size(&self, state: &State) -> MaybeInconsistent;
 }
 
