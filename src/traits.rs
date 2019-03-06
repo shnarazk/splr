@@ -36,6 +36,7 @@ pub trait ClauseDBIF {
         state: &mut State,
         vars: &mut [Var],
     ) -> MaybeInconsistent;
+    fn reset(&mut self, size: usize);
     /// delete *dead* clauses from database, which are made by:
     /// * `reduce`
     /// * `simplify`
@@ -56,6 +57,7 @@ pub trait ClauseDBIF {
     /// record a deleted clause to unsat certification
     fn certificate_delete(&mut self, vec: &[Lit]);
     fn eliminate_satisfied_clauses(&mut self, elim: &mut Eliminator, vars: &mut [Var], occur: bool);
+    fn check_size(&self, state: &State) -> MaybeInconsistent;
 }
 
 /// API for Clause Id like `to_lit`, `is_lifted_lit` and so on.
@@ -84,6 +86,7 @@ pub trait EliminatorIF {
     /// set eliminater's mode to **dormant**.
     fn stop(&mut self, cdb: &mut ClauseDB, vars: &mut [Var]);
     fn is_running(&self) -> bool;
+    fn is_waiting(&self) -> bool;
     /// rebuild occur lists.
     fn prepare(&mut self, cdb: &mut ClauseDB, vars: &mut [Var], force: bool);
     fn enqueue_clause(&mut self, cid: ClauseId, c: &mut Clause);
@@ -229,6 +232,8 @@ pub trait SatSolverIF {
 pub trait StateIF {
     /// return an initialized state based on solver configuration and data about a CNF file.
     fn new(config: &Config, cnf: CNFDescription) -> State;
+    /// return `true` if it is timed out.
+    fn is_timeout(&self) -> bool;
     /// change heuristics based on stat data.
     fn adapt(&mut self, cdb: &mut ClauseDB);
     /// write a header of stat data to stdio.
@@ -278,7 +283,7 @@ pub trait WatchDBIF {
     /// make a new 'watch', and add it to this watcher list.
     fn register(&mut self, blocker: Lit, c: ClauseId);
     /// remove *n*-th clause from the watcher list. *O(1)* operation.
-    fn detach(&mut self, n: ClauseId);
+    fn detach(&mut self, n: usize);
     /// remove a clause which id is `cid` from the watcher list. *O(n)* operation.
     fn detach_with(&mut self, cid: ClauseId);
 }

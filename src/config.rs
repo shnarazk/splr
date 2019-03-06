@@ -10,8 +10,8 @@ pub const VERSION: &str = "0.1.1+";
     about = "SAT solver for Propositional Logic in Rust, version 0.1.2 alpha"
 )]
 pub struct Config {
-    /// soft limit of #clauses (default is about 4GB)
-    #[structopt(long = "cl", default_value = "18000000")]
+    /// soft limit of #clauses (24000000 is about 4GB)
+    #[structopt(long = "cl", default_value = "0")]
     pub clause_limit: usize,
     /// grow limit of #clauses by var elimination
     #[structopt(long = "eg", default_value = "0")]
@@ -43,9 +43,12 @@ pub struct Config {
     /// Disables exhaustive simplification
     #[structopt(long = "no-elim", short = "E")]
     pub no_elim: bool,
+    /// Disables dynamic restart adaptation
+    #[structopt(long = "no-adaptive_restart", short = "R")]
+    pub no_adaptive_restart: bool,
     /// Disables dynamic strategy adaptation
-    #[structopt(long = "no-adaptation", short = "A")]
-    pub no_adapt: bool,
+    #[structopt(long = "no-adaptive_strategy", short = "S")]
+    pub no_adaptive_strategy: bool,
     /// a CNF file to solve
     #[structopt(parse(from_os_str))]
     pub cnf_file: std::path::PathBuf,
@@ -53,8 +56,11 @@ pub struct Config {
     #[structopt(long = "certify", short = "c")]
     pub use_certification: bool,
     /// filename of DRAT UNSAT certification
-    #[structopt(long = "proof", default_value = "proof.out")]
+    #[structopt(long = "proof", default_value = "proof.out", short = "p")]
     pub proof_filename: String,
+    /// time limit in sec by WALL-CLOCK TIME. (zero for no limit).
+    #[structopt(long = "to", default_value = "0")]
+    pub timeout: f64,
 }
 
 impl Default for Config {
@@ -71,10 +77,12 @@ impl Default for Config {
             output_filname: "".to_string(),
             use_log: false,
             no_elim: false,
-            no_adapt: false,
+            no_adaptive_restart: false,
+            no_adaptive_strategy: false,
             cnf_file: PathBuf::new(),
             use_certification: false,
             proof_filename: "proof.out".to_string(),
+            timeout: 0.0,
         }
     }
 }

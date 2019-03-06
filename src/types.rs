@@ -181,18 +181,18 @@ impl<T> Delete<T> for Vec<T> {
 bitflags! {
     pub struct Flag: u16 {
         /// a clause is stored in DB, but is a garbage now.
-        const DeadClause     = 0b0000_0000_0000_0001;
+        const DEAD         = 0b0000_0000_0000_0001;
         /// a clause is a generated clause by conflict analysis and is removable.
-        const LearntClause   = 0b0000_0000_0000_0010;
+        const LEARNT       = 0b0000_0000_0000_0010;
         /// a clause is used recently in conflict analysis.
-        const JustUsedClause = 0b0000_0000_0000_0100;
+        const JUST_USED    = 0b0000_0000_0000_0100;
         /// a clause is registered in vars' occurrence list.
-        const OccurLinked    = 0b0000_0000_0000_1000;
+        const OCCUR_LINKED = 0b0000_0000_0000_1000;
         /// a clause or var is equeued for eliminator.
-        const Enqueued       = 0b0000_0000_0001_0000;
+        const ENQUEUED     = 0b0000_0000_0001_0000;
         /// a var is eliminated and managed by eliminator.
-        const EliminatedVar  = 0b0000_0000_0010_0000;
+        const ELIMINATED   = 0b0000_0000_0010_0000;
         /// mark to run garbage collector on the corresponding watcher lists
-        const TouchedVar     = 0b0000_0000_0100_0000;
+        const TOUCHED      = 0b0000_0000_0100_0000;
     }
 }
