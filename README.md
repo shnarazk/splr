@@ -78,7 +78,7 @@ While Splr comes with **ABSOLUTELY NO WARRANTY**, Splr version 0.1.0 (splr-0.1.0
 
 Note: splr-0.1.2 solved 139 instances in the same environment.
 
-## LICENSE
+## License
 
 Mozilla Public License Version 2.0, MPL-2.0. See [LICENSE](LICENSE).
 
