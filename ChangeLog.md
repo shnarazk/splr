@@ -1,6 +1,6 @@
 ## 0.1.2, 2019-03-07
 
-- tweak heuristic adaptation, restart, and clause/variable elimination modules
+- various updates on heuristic adaptation, restart, and clause/variable elimination modules
 - use CPU time if available
 - More command line options were added.
 
