@@ -18,13 +18,13 @@ pub trait ClauseDBIF {
     fn new(nv: usize, nc: usize, certify: bool) -> Self;
     /// make a new clause from `state.new_learnt` and register it to clause database.
     fn attach(&mut self, state: &mut State, vars: &mut [Var], lbd: usize) -> ClauseId;
-    /// unregister a clause `cid` from clase database and make the clause dead.
+    /// unregister a clause `cid` from clause database and make the clause dead.
     fn detach(&mut self, cid: ClauseId);
     /// halve the number of 'learnt' or *removable* clauses.
     fn reduce(&mut self, state: &mut State, vars: &mut [Var]);
     /// simplify database by:
     /// * removing satisfiable clauses
-    /// * calling exhausitve simplifier that tries **clause subsumption** and **variable elimination**.
+    /// * calling exhaustive simplifier that tries **clause subsumption** and **variable elimination**.
     ///
     /// # Errors
     ///
@@ -36,14 +36,15 @@ pub trait ClauseDBIF {
         state: &mut State,
         vars: &mut [Var],
     ) -> MaybeInconsistent;
+    fn reset(&mut self, size: usize);
     /// delete *dead* clauses from database, which are made by:
     /// * `reduce`
     /// * `simplify`
     /// * `kill`
     fn garbage_collect(&mut self);
-    /// return the id of a new clause.
+    /// allocate a new clause and return its id.
     fn new_clause(&mut self, v: &[Lit], rank: usize, learnt: bool) -> ClauseId;
-    /// re-calculate the lbd vaules of all (learnt) clauses.
+    /// re-calculate the lbd values of all (learnt) clauses.
     fn reset_lbd(&mut self, vars: &[Var], temp: &mut [usize]);
     /// update clause activity.
     fn bump_activity(&mut self, inc: &mut f64, cid: ClauseId);
@@ -55,6 +56,10 @@ pub trait ClauseDBIF {
     fn certificate_add(&mut self, vec: &[Lit]);
     /// record a deleted clause to unsat certification
     fn certificate_delete(&mut self, vec: &[Lit]);
+    /// delete satisfied clauses at decision level zero.
+    fn eliminate_satisfied_clauses(&mut self, elim: &mut Eliminator, vars: &mut [Var], occur: bool);
+    /// emit an error if the db size (the number of clauses) is over the limit.
+    fn check_size(&self, state: &State) -> MaybeInconsistent;
 }
 
 /// API for Clause Id like `to_lit`, `is_lifted_lit` and so on.
@@ -83,6 +88,7 @@ pub trait EliminatorIF {
     /// set eliminater's mode to **dormant**.
     fn stop(&mut self, cdb: &mut ClauseDB, vars: &mut [Var]);
     fn is_running(&self) -> bool;
+    fn is_waiting(&self) -> bool;
     /// rebuild occur lists.
     fn prepare(&mut self, cdb: &mut ClauseDB, vars: &mut [Var], force: bool);
     fn enqueue_clause(&mut self, cid: ClauseId, c: &mut Clause);
@@ -149,7 +155,7 @@ pub trait LitIF {
     fn to_cid(self) -> ClauseId;
 }
 
-/// API for assignemnet like `propagate`, `enqueue`, `cancel_until`, and so on.
+/// API for assignment like `propagate`, `enqueue`, `cancel_until`, and so on.
 pub trait PropagatorIF {
     fn new(n: usize) -> Self;
     /// return the number of assignments.
@@ -176,7 +182,7 @@ pub trait PropagatorIF {
     ///
     /// if solver becomes inconsistent by the new assignment.
     fn enqueue(&mut self, v: &mut Var, sig: Lbool, cid: ClauseId, dl: usize) -> MaybeInconsistent;
-    /// add an assginment with no reason clause without inconsistency check.
+    /// add an assignment with no reason clause without inconsistency check.
     fn enqueue_null(&mut self, v: &mut Var, sig: Lbool);
     /// unsafe enqueue; doesn't emit an exception.
     fn uncheck_enqueue(&mut self, vars: &mut [Var], l: Lit, cid: ClauseId);
@@ -198,7 +204,7 @@ pub trait RestartIF {
     fn force_restart(&mut self, ncnfl: &mut f64) -> bool;
     /// update data for forcing restart.
     fn restart_update_lbd(&mut self, lbd: usize);
-    /// update data for blokcin restart.
+    /// update data for blocking restart.
     fn restart_update_asg(&mut self, n: usize);
     /// update data for Luby restart.
     fn restart_update_luby(&mut self);
@@ -228,12 +234,15 @@ pub trait SatSolverIF {
 pub trait StateIF {
     /// return an initialized state based on solver configuration and data about a CNF file.
     fn new(config: &Config, cnf: CNFDescription) -> State;
+    /// return `true` if it is timed out.
+    fn is_timeout(&self) -> bool;
     /// change heuristics based on stat data.
     fn adapt(&mut self, cdb: &mut ClauseDB);
     /// write a header of stat data to stdio.
     fn progress_header(&self);
     /// write stat data to stdio.
     fn progress(&mut self, cdb: &ClauseDB, vars: &[Var], mes: Option<&str>);
+    fn flush(&self, mes: &str);
 }
 
 /// API for SAT validator like `inject_assignment`, `validate` and so on.
@@ -244,7 +253,7 @@ pub trait ValidatorIF {
     ///
     /// if solver becomes inconsistent.
     fn inject_assigmnent(&mut self, vec: &[i32]) -> MaybeInconsistent;
-    /// return `true` is the loaded assigment set is satisfiable (a model of a problem).
+    /// return `true` is the loaded assignment set is satisfiable (a model of a problem).
     fn validate(&self) -> Option<Vec<i32>>;
 }
 
@@ -276,7 +285,7 @@ pub trait WatchDBIF {
     /// make a new 'watch', and add it to this watcher list.
     fn register(&mut self, blocker: Lit, c: ClauseId);
     /// remove *n*-th clause from the watcher list. *O(1)* operation.
-    fn detach(&mut self, n: ClauseId);
+    fn detach(&mut self, n: usize);
     /// remove a clause which id is `cid` from the watcher list. *O(n)* operation.
     fn detach_with(&mut self, cid: ClauseId);
 }

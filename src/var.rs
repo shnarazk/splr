@@ -128,8 +128,8 @@ impl fmt::Display for Var {
             self.assign,
             self.level,
             self.reason.format(),
-            st(Flag::TouchedVar, ", touched"),
-            st(Flag::EliminatedVar, ", eliminated"),
+            st(Flag::TOUCHED, ", touched"),
+            st(Flag::ELIMINATED, ", eliminated"),
         )
     }
 }

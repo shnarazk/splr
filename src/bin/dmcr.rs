@@ -29,7 +29,7 @@ fn main() {
         return;
     }
     let mut config = Config::default();
-    config.cnf = args.problem.clone();
+    config.cnf_file = args.problem.clone();
     let mut s = Solver::build(&config).expect("failed to load");
     if args.assign == None {
         args.assign = Some(PathBuf::from(format!(
@@ -77,16 +77,19 @@ fn main() {
     }
     match s.validate() {
         Some(v) => println!(
-            "Invalid assignment for {} due to {:?}.",
+            "Invalid assignment set for {} due to {:?}.",
             args.problem.to_str().unwrap(),
             v
         ),
         None if from_file => println!(
-            "Valid assignment for {} found in {}.",
+            "Valid assignment set for {} found in {}.",
             &args.problem.to_str().unwrap(),
             &args.assign.unwrap().to_str().unwrap(),
         ),
-        None => println!("Valid assignment for {}.", &args.problem.to_str().unwrap()),
+        None => println!(
+            "Valid assignment set for {}.",
+            &args.problem.to_str().unwrap()
+        ),
     }
 }
 
