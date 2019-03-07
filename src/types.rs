@@ -58,11 +58,9 @@ impl LitIF for Lit {
     fn from_int(x: i32) -> Lit {
         (if x < 0 { -2 * x + 1 } else { 2 * x }) as Lit
     }
-    #[inline(always)]
     fn from_var(vi: VarId, p: Lbool) -> Lit {
         (vi as Lit) << 1 | ((p == FALSE) as Lit)
     }
-    #[inline(always)]
     fn vi(self) -> VarId {
         (self >> 1) as VarId
     }
@@ -75,19 +73,15 @@ impl LitIF for Lit {
     }
     /// - positive Lit (= even u32) => TRUE (= 1 as u8)
     /// - negative Lit (= odd u32)  => LFASE (= 0 as u8)
-    #[inline(always)]
     fn lbool(self) -> Lbool {
         (self & 1 == 0) as Lbool
     }
-    #[inline(always)]
     fn is_positive(self) -> bool {
         self & 1 == 0
     }
-    #[inline(always)]
     fn negate(self) -> Lit {
         self ^ 1
     }
-    #[inline(always)]
     fn to_cid(self) -> ClauseId {
         (self as ClauseId) | 0x8000_0000
     }
@@ -161,7 +155,6 @@ pub fn vec2int(v: &[Lit]) -> Vec<i32> {
 }
 
 impl<T> Delete<T> for Vec<T> {
-    #[inline(always)]
     fn delete_unstable<F>(&mut self, mut filter: F)
     where
         F: FnMut(&T) -> bool,

@@ -58,22 +58,18 @@ impl VarIF for Var {
 }
 
 impl FlagIF for Var {
-    #[inline(always)]
     fn is(&self, flag: Flag) -> bool {
         self.flags.contains(flag)
     }
-    #[inline(always)]
     fn turn_off(&mut self, flag: Flag) {
         self.flags.remove(flag);
     }
-    #[inline(always)]
     fn turn_on(&mut self, flag: Flag) {
         self.flags.insert(flag);
     }
 }
 
 impl VarDBIF for [Var] {
-    #[inline(always)]
     fn assigned(&self, l: Lit) -> Lbool {
         unsafe { self.get_unchecked(l.vi()).assign ^ ((l & 1) as u8) }
     }
@@ -91,7 +87,6 @@ impl VarDBIF for [Var] {
         }
         false
     }
-    #[inline]
     fn compute_lbd(&self, vec: &[Lit], keys: &mut [usize]) -> usize {
         let key = keys[0] + 1;
         let mut cnt = 0;

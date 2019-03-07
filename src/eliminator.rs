@@ -94,7 +94,6 @@ impl EliminatorIF for Eliminator {
             }
         }
     }
-    #[inline]
     fn enqueue_clause(&mut self, cid: ClauseId, c: &mut Clause) {
         if self.mode != EliminatorMode::Running || c.is(Flag::ENQUEUED) {
             return;
@@ -108,7 +107,6 @@ impl EliminatorIF for Eliminator {
         }
         self.clause_queue.clear();
     }
-    #[inline]
     fn enqueue_var(&mut self, vars: &mut [Var], vi: VarId, upward: bool) {
         if self.mode != EliminatorMode::Running {
             return;
@@ -628,7 +626,6 @@ fn make_eliminated_clause(cdb: &mut ClauseDB, vec: &mut Vec<Lit>, vi: VarId, cid
     // println!("make_eliminated_clause: eliminate({}) clause {:?}", vi, vec2int(&ch.lits));
 }
 
-#[inline]
 fn eliminate_var(
     asgs: &mut AssignStack,
     cdb: &mut ClauseDB,
@@ -707,7 +704,6 @@ fn eliminate_var(
 }
 
 /// returns `true` if elimination is impossible.
-#[inline]
 fn check_var_elimination_condition(
     cdb: &ClauseDB,
     state: &State,
@@ -861,7 +857,6 @@ impl VarOrderIF for VarOccHeap {
 }
 
 impl VarOccHeap {
-    #[inline(always)]
     fn contains(&self, v: VarId) -> bool {
         self.idxs[v] <= self.idxs[0]
     }

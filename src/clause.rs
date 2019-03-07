@@ -21,11 +21,9 @@ pub enum CertifiedRecord {
 type DRAT = Vec<(CertifiedRecord, Vec<i32>)>;
 
 impl ClauseIdIF for ClauseId {
-    #[inline(always)]
     fn to_lit(self) -> Lit {
         (self & 0x7FFF_FFFF) as Lit
     }
-    #[inline(always)]
     fn is_lifted_lit(self) -> bool {
         0 != 0x8000_0000 & self
     }
@@ -60,19 +58,15 @@ impl WatchDBIF for Vec<Watch> {
     fn initialize(self, _n: usize) -> Self {
         self
     }
-    // #[inline(always)]
     fn count(&self) -> usize {
         self.len()
     }
-    // #[inline(always)]
     fn register(&mut self, blocker: Lit, c: ClauseId) {
         self.push(Watch { blocker, c });
     }
-    // #[inline(always)]
     fn detach(&mut self, n: usize) {
         self.swap_remove(n);
     }
-    // #[inline(always)]
     fn detach_with(&mut self, cid: ClauseId) {
         for (n, w) in self.iter().enumerate() {
             if w.c == cid {
@@ -129,7 +123,6 @@ impl FlagIF for Clause {
 }
 
 impl PartialEq for Clause {
-    #[inline(always)]
     fn eq(&self, other: &Clause) -> bool {
         self == other
     }
@@ -138,7 +131,6 @@ impl PartialEq for Clause {
 impl Eq for Clause {}
 
 impl PartialOrd for Clause {
-    #[inline(always)]
     fn partial_cmp(&self, other: &Clause) -> Option<Ordering> {
         if self.rank < other.rank {
             Some(Ordering::Less)
@@ -155,7 +147,6 @@ impl PartialOrd for Clause {
 }
 
 impl Ord for Clause {
-    #[inline(always)]
     fn cmp(&self, other: &Clause) -> Ordering {
         if self.rank < other.rank {
             Ordering::Less

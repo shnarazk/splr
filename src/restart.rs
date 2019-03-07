@@ -73,17 +73,14 @@ impl RestartIF for State {
         }
         false
     }
-    #[inline(always)]
     fn restart_update_lbd(&mut self, lbd: usize) {
         self.ema_lbd.update(lbd as f64);
         self.after_restart += 1;
     }
-    #[inline(always)]
     fn restart_update_asg(&mut self, n: usize) {
         self.ema_asg.update(n as f64);
         // self.sum_asg += n as f64 / config.num_vars as f64;
     }
-    #[inline(always)]
     fn restart_update_luby(&mut self) {
         if self.luby_restart {
             self.luby_restart_num_conflict =

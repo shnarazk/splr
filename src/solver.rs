@@ -276,7 +276,6 @@ impl SatSolverIF for Solver {
 }
 
 /// main loop; returns `true` for SAT, `false` for UNSAT.
-#[inline]
 fn search(
     asgs: &mut AssignStack,
     cdb: &mut ClauseDB,
@@ -328,7 +327,6 @@ fn search(
     }
 }
 
-#[inline]
 fn handle_conflict_path(
     asgs: &mut AssignStack,
     cdb: &mut ClauseDB,
@@ -450,7 +448,6 @@ fn adapt_parameters(
     Ok(())
 }
 
-#[inline]
 fn analyze(
     asgs: &mut AssignStack,
     cdb: &mut ClauseDB,
@@ -543,7 +540,6 @@ fn analyze(
     simplify_learnt(asgs, cdb, state, vars)
 }
 
-#[inline]
 fn simplify_learnt(
     asgs: &mut AssignStack,
     cdb: &mut ClauseDB,
@@ -597,7 +593,6 @@ fn simplify_learnt(
     level_to_return
 }
 
-#[inline]
 fn redundant_lit(
     cdb: &mut ClauseDB,
     vars: &[Var],
@@ -636,7 +631,6 @@ fn redundant_lit(
     true
 }
 
-#[inline]
 fn analyze_final(asgs: &AssignStack, state: &mut State, vars: &[Var], c: &Clause) {
     let mut seen = vec![false; state.num_vars + 1];
     state.conflicts.clear();
@@ -672,7 +666,6 @@ fn analyze_final(asgs: &AssignStack, state: &mut State, vars: &[Var], c: &Clause
     }
 }
 
-#[inline]
 fn minimize_with_bi_clauses(cdb: &ClauseDB, vars: &[Var], temp: &mut [usize], vec: &mut Vec<Lit>) {
     let nlevels = vars.compute_lbd(vec, temp);
     if 6 < nlevels {

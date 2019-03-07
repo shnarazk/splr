@@ -27,31 +27,24 @@ impl PropagatorIF for AssignStack {
             var_order: VarIdHeap::new(n, n),
         }
     }
-    #[inline(always)]
     fn len(&self) -> usize {
         self.trail.len()
     }
-    #[inline(always)]
     fn is_empty(&self) -> bool {
         self.trail.is_empty()
     }
-    #[inline(always)]
     fn level(&self) -> usize {
         self.trail_lim.len()
     }
-    #[inline(always)]
     fn is_zero(&self) -> bool {
         self.trail_lim.is_empty()
     }
-    #[inline(always)]
     fn num_at(&self, n: usize) -> usize {
         self.trail_lim[n]
     }
-    #[inline(always)]
     fn remains(&self) -> bool {
         self.q_head < self.trail.len()
     }
-    #[inline(always)]
     fn assigned(&self, l: Lit) -> Lbool {
         unsafe { self.assign.get_unchecked(l.vi()) ^ ((l & 1) as u8) }
     }
@@ -93,7 +86,6 @@ impl PropagatorIF for AssignStack {
     /// propagate without checking dead clauses
     /// Note: this function assumes there's no dead clause.
     /// So Eliminator should call `garbage_collect` before me.
-    #[inline]
     fn propagate(&mut self, cdb: &mut ClauseDB, state: &mut State, vars: &mut [Var]) -> ClauseId {
         let head = &mut cdb.clause;
         let watcher = &mut cdb.watcher[..] as *mut [Vec<Watch>];
@@ -167,7 +159,6 @@ impl PropagatorIF for AssignStack {
         self.trail_lim.truncate(lv);
         self.q_head = lim;
     }
-    #[inline]
     fn uncheck_enqueue(&mut self, vars: &mut [Var], l: Lit, cid: ClauseId) {
         debug_assert!(l != 0, "Null literal is about to be equeued");
         debug_assert!(
@@ -242,17 +233,14 @@ impl PropagatorIF for AssignStack {
 }
 
 impl AssignStack {
-    #[inline(always)]
     fn level_up(&mut self) {
         self.trail_lim.push(self.trail.len());
     }
-    #[inline(always)]
     fn sweep(&mut self) -> Lit {
         let lit = self.trail[self.q_head];
         self.q_head += 1;
         lit
     }
-    #[inline(always)]
     fn catchup(&mut self) {
         self.q_head = self.trail.len();
     }
@@ -362,7 +350,6 @@ impl fmt::Display for AssignStack {
 }
 
 impl VarIdHeap {
-    #[inline(always)]
     fn contains(&self, v: VarId) -> bool {
         self.idxs[v] <= self.idxs[0]
     }
