@@ -188,7 +188,7 @@ pub struct State {
     pub lbd_temp: Vec<usize>,
     pub last_dl: Vec<Lit>,
     pub start: SystemTime,
-    pub dumper: ProgressRecord,
+    pub record: ProgressRecord,
     pub use_progress: bool,
     pub progress_cnt: usize,
     pub progress_log: bool,
@@ -196,10 +196,10 @@ pub struct State {
 }
 
 macro_rules! i {
-    ($format: expr, $dumper: expr, $key: expr, $val: expr) => {
+    ($format: expr, $record: expr, $key: expr, $val: expr) => {
         match $val {
             v => {
-                let ptr = &mut $dumper.vali[$key as usize];
+                let ptr = &mut $record.vali[$key as usize];
                 if (v as f64) * 1.6 < *ptr as f64 {
                     *ptr = v;
                     format!("\x1B[001m\x1B[031m{}\x1B[000m", format!($format, *ptr))
@@ -222,10 +222,10 @@ macro_rules! i {
 }
 
 macro_rules! f {
-    ($format: expr, $dumper: expr, $key: expr, $val: expr) => {
+    ($format: expr, $record: expr, $key: expr, $val: expr) => {
         match $val {
             v => {
-                let ptr = &mut $dumper.valf[$key as usize];
+                let ptr = &mut $record.valf[$key as usize];
                 if v * 1.6 < *ptr {
                     *ptr = v;
                     format!("\x1B[001m\x1B[031m{}\x1B[000m", format!($format, *ptr))
@@ -314,7 +314,7 @@ impl Default for State {
             use_progress: true,
             progress_cnt: 0,
             progress_log: false,
-            dumper: ProgressRecord::default(),
+            record: ProgressRecord::default(),
             target: CNFDescription::default(),
         }
     }
@@ -475,58 +475,58 @@ impl StateIF for State {
             "\x1B[2K #conflict:{}, #decision:{}, #propagate:{} ",
             i!(
                 "{:>11}",
-                self.dumper,
+                self.record,
                 LogUsizeId::Conflict,
                 self.stats[Stat::Conflict as usize]
             ),
             i!(
                 "{:>13}",
-                self.dumper,
+                self.record,
                 LogUsizeId::Decision,
                 self.stats[Stat::Decision as usize]
             ),
             i!(
                 "{:>15}",
-                self.dumper,
+                self.record,
                 LogUsizeId::Propagate,
                 self.stats[Stat::Propagation as usize]
             ),
         );
         println!(
             "\x1B[2K  Assignment|#rem:{}, #fix:{}, #elm:{}, prg%:{} ",
-            i!("{:>9}", self.dumper, LogUsizeId::Remain, nv - sum),
-            i!("{:>9}", self.dumper, LogUsizeId::Fixed, fixed),
+            i!("{:>9}", self.record, LogUsizeId::Remain, nv - sum),
+            i!("{:>9}", self.record, LogUsizeId::Fixed, fixed),
             i!(
                 "{:>9}",
-                self.dumper,
+                self.record,
                 LogUsizeId::Eliminated,
                 self.num_eliminated_vars
             ),
             f!(
                 "{:>9.4}",
-                self.dumper,
+                self.record,
                 LogF64Id::Progress,
                 (sum as f64) / (nv as f64) * 100.0
             ),
         );
         println!(
             "\x1B[2K Clause Kind|Remv:{}, LBD2:{}, Binc:{}, Perm:{} ",
-            i!("{:>9}", self.dumper, LogUsizeId::Removable, cdb.num_learnt),
+            i!("{:>9}", self.record, LogUsizeId::Removable, cdb.num_learnt),
             i!(
                 "{:>9}",
-                self.dumper,
+                self.record,
                 LogUsizeId::LBD2,
                 self.stats[Stat::NumLBD2 as usize]
             ),
             i!(
                 "{:>9}",
-                self.dumper,
+                self.record,
                 LogUsizeId::Binclause,
                 self.stats[Stat::NumBinLearnt as usize]
             ),
             i!(
                 "{:>9}",
-                self.dumper,
+                self.record,
                 LogUsizeId::Permanent,
                 cdb.num_active - cdb.num_learnt
             ),
@@ -535,37 +535,37 @@ impl StateIF for State {
             "\x1B[2K     Restart|#BLK:{}, #RST:{}, eASG:{}, eLBD:{} ",
             i!(
                 "{:>9}",
-                self.dumper,
+                self.record,
                 LogUsizeId::RestartBlock,
                 self.stats[Stat::BlockRestart as usize]
             ),
             i!(
                 "{:>9}",
-                self.dumper,
+                self.record,
                 LogUsizeId::Restart,
                 self.stats[Stat::Restart as usize]
             ),
             f!(
                 "{:>9.4}",
-                self.dumper,
+                self.record,
                 LogF64Id::EmaAsg,
                 self.ema_asg.get() / nv as f64
             ),
             f!(
                 "{:>9.4}",
-                self.dumper,
+                self.record,
                 LogF64Id::EmaLBD,
                 self.ema_lbd.get() / ave
             ),
         );
         println!(
             "\x1B[2K   Conflicts|aLBD:{}, bjmp:{}, cnfl:{} |blkR:{} ",
-            f!("{:>9.2}", self.dumper, LogF64Id::AveLBD, self.ema_lbd.get()),
-            f!("{:>9.2}", self.dumper, LogF64Id::BLevel, self.b_lvl.get()),
-            f!("{:>9.2}", self.dumper, LogF64Id::CLevel, self.c_lvl.get()),
+            f!("{:>9.2}", self.record, LogF64Id::AveLBD, self.ema_lbd.get()),
+            f!("{:>9.2}", self.record, LogF64Id::BLevel, self.b_lvl.get()),
+            f!("{:>9.2}", self.record, LogF64Id::CLevel, self.c_lvl.get()),
             f!(
                 "{:>9.4}",
-                self.dumper,
+                self.record,
                 LogF64Id::RestartBlkR,
                 self.restart_blk
             ),
@@ -574,25 +574,25 @@ impl StateIF for State {
             "\x1B[2K   Clause DB|#rdc:{}, #sce:{}, #exe:{} |frcK:{} ",
             i!(
                 "{:>9}",
-                self.dumper,
+                self.record,
                 LogUsizeId::Reduction,
                 self.stats[Stat::Reduction as usize]
             ),
             i!(
                 "{:>9}",
-                self.dumper,
+                self.record,
                 LogUsizeId::SatClauseElim,
                 self.stats[Stat::SatClauseElimination as usize]
             ),
             i!(
                 "{:>9}",
-                self.dumper,
+                self.record,
                 LogUsizeId::ExhaustiveElim,
                 self.stats[Stat::ExhaustiveElimination as usize]
             ),
             f!(
                 "{:>9.4}",
-                self.dumper,
+                self.record,
                 LogF64Id::RestartThrK,
                 self.restart_thr
             ),

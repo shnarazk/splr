@@ -142,29 +142,29 @@ fn report<W: Write>(state: &State, out: &mut BufWriter<W>) -> std::io::Result<()
     out.write_all(
         format!(
             "c  #conflict:{}, #decision:{}, #propagate:{} \n",
-            format!("{:>11}", state.dumper.vali[LogUsizeId::Conflict as usize]),
-            format!("{:>13}", state.dumper.vali[LogUsizeId::Decision as usize]),
-            format!("{:>15}", state.dumper.vali[LogUsizeId::Propagate as usize]),
+            format!("{:>11}", state.record.vali[LogUsizeId::Conflict as usize]),
+            format!("{:>13}", state.record.vali[LogUsizeId::Decision as usize]),
+            format!("{:>15}", state.record.vali[LogUsizeId::Propagate as usize]),
         )
         .as_bytes(),
     )?;
     out.write_all(
         format!(
             "c   Assignment|#rem:{}, #fix:{}, #elm:{}, prg%:{} \n",
-            format!("{:>9}", state.dumper.vali[LogUsizeId::Remain as usize]),
-            format!("{:>9}", state.dumper.vali[LogUsizeId::Fixed as usize]),
-            format!("{:>9}", state.dumper.vali[LogUsizeId::Eliminated as usize]),
-            format!("{:>9.4}", state.dumper.valf[LogF64Id::Progress as usize]),
+            format!("{:>9}", state.record.vali[LogUsizeId::Remain as usize]),
+            format!("{:>9}", state.record.vali[LogUsizeId::Fixed as usize]),
+            format!("{:>9}", state.record.vali[LogUsizeId::Eliminated as usize]),
+            format!("{:>9.4}", state.record.valf[LogF64Id::Progress as usize]),
         )
         .as_bytes(),
     )?;
     out.write_all(
         format!(
             "c  Clause Kind|Remv:{}, LBD2:{}, Binc:{}, Perm:{} \n",
-            format!("{:>9}", state.dumper.vali[LogUsizeId::Removable as usize]),
-            format!("{:>9}", state.dumper.vali[LogUsizeId::LBD2 as usize]),
-            format!("{:>9}", state.dumper.vali[LogUsizeId::Binclause as usize]),
-            format!("{:>9}", state.dumper.vali[LogUsizeId::Permanent as usize]),
+            format!("{:>9}", state.record.vali[LogUsizeId::Removable as usize]),
+            format!("{:>9}", state.record.vali[LogUsizeId::LBD2 as usize]),
+            format!("{:>9}", state.record.vali[LogUsizeId::Binclause as usize]),
+            format!("{:>9}", state.record.vali[LogUsizeId::Permanent as usize]),
         )
         .as_bytes(),
     )?;
@@ -173,37 +173,37 @@ fn report<W: Write>(state: &State, out: &mut BufWriter<W>) -> std::io::Result<()
             "c      Restart|#BLK:{}, #RST:{}, eASG:{}, eLBD:{} \n",
             format!(
                 "{:>9}",
-                state.dumper.vali[LogUsizeId::RestartBlock as usize]
+                state.record.vali[LogUsizeId::RestartBlock as usize]
             ),
-            format!("{:>9}", state.dumper.vali[LogUsizeId::Restart as usize]),
-            format!("{:>9.4}", state.dumper.valf[LogF64Id::EmaAsg as usize]),
-            format!("{:>9.4}", state.dumper.valf[LogF64Id::EmaLBD as usize]),
+            format!("{:>9}", state.record.vali[LogUsizeId::Restart as usize]),
+            format!("{:>9.4}", state.record.valf[LogF64Id::EmaAsg as usize]),
+            format!("{:>9.4}", state.record.valf[LogF64Id::EmaLBD as usize]),
         )
         .as_bytes(),
     )?;
     out.write_all(
         format!(
             "c    Conflicts|aLBD:{}, bjmp:{}, cnfl:{} |blkR:{} \n",
-            format!("{:>9.2}", state.dumper.valf[LogF64Id::AveLBD as usize]),
-            format!("{:>9.2}", state.dumper.valf[LogF64Id::BLevel as usize]),
-            format!("{:>9.2}", state.dumper.valf[LogF64Id::CLevel as usize]),
-            format!("{:>9.4}", state.dumper.valf[LogF64Id::RestartBlkR as usize]),
+            format!("{:>9.2}", state.record.valf[LogF64Id::AveLBD as usize]),
+            format!("{:>9.2}", state.record.valf[LogF64Id::BLevel as usize]),
+            format!("{:>9.2}", state.record.valf[LogF64Id::CLevel as usize]),
+            format!("{:>9.4}", state.record.valf[LogF64Id::RestartBlkR as usize]),
         )
         .as_bytes(),
     )?;
     out.write_all(
         format!(
             "c    Clause DB|#rdc:{}, #sce:{}, #exe:{} |frcK:{} \n",
-            format!("{:>9}", state.dumper.vali[LogUsizeId::Reduction as usize]),
+            format!("{:>9}", state.record.vali[LogUsizeId::Reduction as usize]),
             format!(
                 "{:>9}",
-                state.dumper.vali[LogUsizeId::SatClauseElim as usize]
+                state.record.vali[LogUsizeId::SatClauseElim as usize]
             ),
             format!(
                 "{:>9}",
-                state.dumper.vali[LogUsizeId::ExhaustiveElim as usize]
+                state.record.vali[LogUsizeId::ExhaustiveElim as usize]
             ),
-            format!("{:>9.4}", state.dumper.valf[LogF64Id::RestartThrK as usize]),
+            format!("{:>9.4}", state.record.valf[LogF64Id::RestartThrK as usize]),
         )
         .as_bytes(),
     )?;
