@@ -1,3 +1,9 @@
+## 0.1.2, 2019-03-07
+
+- various changes on heuristic adaptation, restart, and clause/variable elimination modules
+- use CPU time if available
+- More command line options were added.
+
 ## 0.1.1, 2019-02-23
 
 - `splr --certify` generates DRAT, certificates of unsatisfiability.
@@ -18,6 +24,6 @@
 ## Technology Preview 12
 
 - `Solver` were divided into 6 sub modules
-- resolved a perfomance regression
+- resolved a performance regression
 - switched to VSIDS instead of ACID
 - Glucose-style Watch structure

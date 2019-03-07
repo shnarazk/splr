@@ -15,7 +15,7 @@ pub const NULL_CLAUSE: ClauseId = 0;
 
 /// Literal encoded on `u32` as:
 ///
-/// - the literal corresponding to a positive occurence of *variable `n` is `2 * n` and
+/// - the literal corresponding to a positive occurrence of *variable `n` is `2 * n` and
 /// - that for the negative one is `2 * n + 1`.
 ///
 /// # Examples
@@ -112,7 +112,7 @@ fn negate_bool(b: Lbool) -> Lbool {
 }
 
 /// Internal exception
-// Returning `Result<(), a-singlen>` is identical to returning `bool`.
+// Returning `Result<(), a-singleton>` is identical to returning `bool`.
 pub enum SolverError {
     Inconsistent,
 }
@@ -181,18 +181,18 @@ impl<T> Delete<T> for Vec<T> {
 bitflags! {
     pub struct Flag: u16 {
         /// a clause is stored in DB, but is a garbage now.
-        const DeadClause     = 0b0000_0000_0000_0001;
+        const DEAD         = 0b0000_0000_0000_0001;
         /// a clause is a generated clause by conflict analysis and is removable.
-        const LearntClause   = 0b0000_0000_0000_0010;
+        const LEARNT       = 0b0000_0000_0000_0010;
         /// a clause is used recently in conflict analysis.
-        const JustUsedClause = 0b0000_0000_0000_0100;
+        const JUST_USED    = 0b0000_0000_0000_0100;
         /// a clause is registered in vars' occurrence list.
-        const OccurLinked    = 0b0000_0000_0000_1000;
-        /// a clause or var is equeued for eliminator.
-        const Enqueued       = 0b0000_0000_0001_0000;
+        const OCCUR_LINKED = 0b0000_0000_0000_1000;
+        /// a clause or var is enqueued for eliminator.
+        const ENQUEUED     = 0b0000_0000_0001_0000;
         /// a var is eliminated and managed by eliminator.
-        const EliminatedVar  = 0b0000_0000_0010_0000;
+        const ELIMINATED   = 0b0000_0000_0010_0000;
         /// mark to run garbage collector on the corresponding watcher lists
-        const TouchedVar     = 0b0000_0000_0100_0000;
+        const TOUCHED      = 0b0000_0000_0100_0000;
     }
 }
