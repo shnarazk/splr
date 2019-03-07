@@ -113,7 +113,7 @@ fn main() {
                 println!("The certification was dumped to {}.", config.proof_filename,);
             }
         }
-        Err(e) => println!("Failed to execution by an internal error: {:?}.", e),
+        Err(e) => println!("Failed to execution by {:?}.", e),
     }
 }
 
