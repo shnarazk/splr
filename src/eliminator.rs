@@ -279,7 +279,7 @@ impl Eliminator {
         let mut cnt = 0;
         debug_assert_eq!(asgs.level(), 0);
         while !self.clause_queue.is_empty() || self.bwdsub_assigns < asgs.len() {
-            // Check top-level assigments by creating a dummy clause and placing it in the queue:
+            // Check top-level assignments by creating a dummy clause and placing it in the queue:
             if self.clause_queue.is_empty() && self.bwdsub_assigns < asgs.len() {
                 let c = asgs.trail[self.bwdsub_assigns].to_cid();
                 self.clause_queue.push(c);
@@ -414,7 +414,7 @@ fn subsume(cdb: &mut ClauseDB, cid: ClauseId, other: ClauseId) -> Option<Lit> {
 
 /// Returns:
 /// - `(false, -)` if one of the clauses is always satisfied.
-/// - `(true, n)` if they are mergable to a n-literal clause.
+/// - `(true, n)` if they are mergeable to a n-literal clause.
 fn check_to_merge(
     cdb: &ClauseDB,
     vars: &[Var],
@@ -468,7 +468,7 @@ fn check_eliminator(cdb: &ClauseDB, vars: &[Var]) -> bool {
     //         }
     //     }
     // }
-    // all caulses are registered in corresponding occur_lists
+    // all clauses are registered in corresponding occur_lists
     for (cid, c) in cdb.clause.iter().enumerate().skip(1) {
         if c.is(Flag::DEAD) {
             continue;
@@ -607,7 +607,7 @@ fn make_eliminating_unit_clause(vec: &mut Vec<Lit>, x: Lit) {
 
 fn make_eliminated_clause(cdb: &mut ClauseDB, vec: &mut Vec<Lit>, vi: VarId, cid: ClauseId) {
     let first = vec.len();
-    // Copy clause to the vector. Remember the position where the varibale 'v' occurs:
+    // Copy clause to the vector. Remember the position where the variable 'v' occurs:
     let c = &cdb.clause[cid as usize];
     debug_assert!(!c.lits.is_empty());
     for l in &c.lits {

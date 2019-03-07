@@ -1,6 +1,6 @@
 ## 0.1.2, 2019-03-07
 
-- tweak hueristic adaptation, restart, and clause/variable elimination modules
+- tweak heuristic adaptation, restart, and clause/variable elimination modules
 - use CPU time if available
 - More command line options were added.
 
@@ -24,6 +24,6 @@
 ## Technology Preview 12
 
 - `Solver` were divided into 6 sub modules
-- resolved a perfomance regression
+- resolved a performance regression
 - switched to VSIDS instead of ACID
 - Glucose-style Watch structure

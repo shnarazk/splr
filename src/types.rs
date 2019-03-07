@@ -15,7 +15,7 @@ pub const NULL_CLAUSE: ClauseId = 0;
 
 /// Literal encoded on `u32` as:
 ///
-/// - the literal corresponding to a positive occurence of *variable `n` is `2 * n` and
+/// - the literal corresponding to a positive occurrence of *variable `n` is `2 * n` and
 /// - that for the negative one is `2 * n + 1`.
 ///
 /// # Examples
@@ -112,7 +112,7 @@ fn negate_bool(b: Lbool) -> Lbool {
 }
 
 /// Internal exception
-// Returning `Result<(), a-singlen>` is identical to returning `bool`.
+// Returning `Result<(), a-singleton>` is identical to returning `bool`.
 pub enum SolverError {
     Inconsistent,
 }
@@ -188,7 +188,7 @@ bitflags! {
         const JUST_USED    = 0b0000_0000_0000_0100;
         /// a clause is registered in vars' occurrence list.
         const OCCUR_LINKED = 0b0000_0000_0000_1000;
-        /// a clause or var is equeued for eliminator.
+        /// a clause or var is enqueued for eliminator.
         const ENQUEUED     = 0b0000_0000_0001_0000;
         /// a var is eliminated and managed by eliminator.
         const ELIMINATED   = 0b0000_0000_0010_0000;

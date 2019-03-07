@@ -90,7 +90,7 @@ pub struct Clause {
     pub lits: Vec<Lit>,
     /// A static clause evaluation criterion like LBD, NDD, or something.
     pub rank: usize,
-    /// A dynamic clause evaluation criterion based on the numer of references.
+    /// A dynamic clause evaluation criterion based on the number of references.
     pub activity: f64,
     /// Flags
     flags: Flag,

@@ -34,9 +34,9 @@ pub struct Config {
     /// #conflicts between restarts
     #[structopt(long = "rs", default_value = "50")]
     pub restart_step: usize,
-    /// output filiname; use default rule if it's empty.
+    /// output filename; use default rule if it's empty.
     #[structopt(long = "--output", short = "o", default_value = "")]
-    pub output_filname: String,
+    pub output_filename: String,
     /// Uses Glucose format for progress report
     #[structopt(long = "--log", short = "l")]
     pub use_log: bool,
@@ -77,7 +77,7 @@ impl Default for Config {
             restart_threshold: 0.60,
             restart_blocking: 1.40,
             restart_step: 50,
-            output_filname: "".to_string(),
+            output_filename: "".to_string(),
             use_log: false,
             no_elim: false,
             no_adaptive_restart: false,

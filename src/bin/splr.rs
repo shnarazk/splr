@@ -20,8 +20,8 @@ fn main() {
         return;
     }
     let input = config.cnf_file.to_str().unwrap().to_string();
-    let result = if config.output_filname != "" {
-        config.output_filname.to_string()
+    let result = if config.output_filename != "" {
+        config.output_filename.to_string()
     } else {
         format!(
             ".ans_{}",

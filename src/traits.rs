@@ -18,13 +18,13 @@ pub trait ClauseDBIF {
     fn new(nv: usize, nc: usize, certify: bool) -> Self;
     /// make a new clause from `state.new_learnt` and register it to clause database.
     fn attach(&mut self, state: &mut State, vars: &mut [Var], lbd: usize) -> ClauseId;
-    /// unregister a clause `cid` from clase database and make the clause dead.
+    /// unregister a clause `cid` from clause database and make the clause dead.
     fn detach(&mut self, cid: ClauseId);
     /// halve the number of 'learnt' or *removable* clauses.
     fn reduce(&mut self, state: &mut State, vars: &mut [Var]);
     /// simplify database by:
     /// * removing satisfiable clauses
-    /// * calling exhausitve simplifier that tries **clause subsumption** and **variable elimination**.
+    /// * calling exhaustive simplifier that tries **clause subsumption** and **variable elimination**.
     ///
     /// # Errors
     ///
@@ -44,7 +44,7 @@ pub trait ClauseDBIF {
     fn garbage_collect(&mut self);
     /// allocate a new clause and return its id.
     fn new_clause(&mut self, v: &[Lit], rank: usize, learnt: bool) -> ClauseId;
-    /// re-calculate the lbd vaules of all (learnt) clauses.
+    /// re-calculate the lbd values of all (learnt) clauses.
     fn reset_lbd(&mut self, vars: &[Var], temp: &mut [usize]);
     /// update clause activity.
     fn bump_activity(&mut self, inc: &mut f64, cid: ClauseId);
@@ -155,7 +155,7 @@ pub trait LitIF {
     fn to_cid(self) -> ClauseId;
 }
 
-/// API for assignemnet like `propagate`, `enqueue`, `cancel_until`, and so on.
+/// API for assignment like `propagate`, `enqueue`, `cancel_until`, and so on.
 pub trait PropagatorIF {
     fn new(n: usize) -> Self;
     /// return the number of assignments.
@@ -182,7 +182,7 @@ pub trait PropagatorIF {
     ///
     /// if solver becomes inconsistent by the new assignment.
     fn enqueue(&mut self, v: &mut Var, sig: Lbool, cid: ClauseId, dl: usize) -> MaybeInconsistent;
-    /// add an assginment with no reason clause without inconsistency check.
+    /// add an assignment with no reason clause without inconsistency check.
     fn enqueue_null(&mut self, v: &mut Var, sig: Lbool);
     /// unsafe enqueue; doesn't emit an exception.
     fn uncheck_enqueue(&mut self, vars: &mut [Var], l: Lit, cid: ClauseId);
@@ -204,7 +204,7 @@ pub trait RestartIF {
     fn force_restart(&mut self, ncnfl: &mut f64) -> bool;
     /// update data for forcing restart.
     fn restart_update_lbd(&mut self, lbd: usize);
-    /// update data for blokcin restart.
+    /// update data for blocking restart.
     fn restart_update_asg(&mut self, n: usize);
     /// update data for Luby restart.
     fn restart_update_luby(&mut self);
@@ -253,7 +253,7 @@ pub trait ValidatorIF {
     ///
     /// if solver becomes inconsistent.
     fn inject_assigmnent(&mut self, vec: &[i32]) -> MaybeInconsistent;
-    /// return `true` is the loaded assigment set is satisfiable (a model of a problem).
+    /// return `true` is the loaded assignment set is satisfiable (a model of a problem).
     fn validate(&self) -> Option<Vec<i32>>;
 }
 

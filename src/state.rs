@@ -93,13 +93,13 @@ pub enum Stat {
     Restart,               // the number of restart
     RestartRecord,         // the last recorded number of Restart
     BlockRestart,          // the number of blacking start
-    BlockRestartRecord,    // the last recorded number of BlockResatr
+    BlockRestartRecord,    // the last recorded number of BlockRestart
     Learnt,                // the number of learnt clauses (< Conflict)
     NoDecisionConflict,    // the number of 'no decision conflict'
     Propagation,           // the number of propagation
     Reduction,             // the number of reduction
     SatClauseElimination,  // the number of good old simplification
-    ExhaustiveElimination, // the number of clause subsumption and varibale elimination
+    ExhaustiveElimination, // the number of clause subsumption and variable elimination
     Assign,                // the number of assigned variables
     SolvedRecord,          // the last number of solved variables
     SumLBD,                // the sum of generated learnts' LBD
@@ -114,7 +114,7 @@ pub enum Stat {
 pub struct State {
     pub root_level: usize,
     pub num_vars: usize,
-    /// STARATEGY
+    /// STRATEGY
     pub adapt_strategy: bool,
     pub strategy: SearchStrategy,
     pub use_chan_seok: bool,
@@ -136,9 +136,9 @@ pub struct State {
     /// RESTART
     pub adaptive_restart: bool,
     /// For force restart based on average LBD of newly generated clauses: 0.80.
-    /// This is called `K` in Glusoce
+    /// This is called `K` in Glucose
     pub restart_thr: f64,
-    /// For block restart based on average assigments: 1.40.
+    /// For block restart based on average assignments: 1.40.
     /// This is called `R` in Glucose
     pub restart_blk: f64,
     pub restart_asg_len: usize,
@@ -160,7 +160,7 @@ pub struct State {
     /// Stop elimination if the increase of clauses is over this
     pub elim_eliminate_grow_limit: usize,
     pub elim_eliminate_loop_limit: usize,
-    /// Stop sumsumption if the size of a clause is over this
+    /// Stop subsumption if the size of a clause is over this
     pub elim_subsume_literal_limit: usize,
     pub elim_subsume_loop_limit: usize,
     /// MISC
@@ -268,10 +268,10 @@ impl Default for State {
             cdb_inc_extra: 1000,
             cdb_soft_limit: 0, // 248_000_000
             adaptive_restart: false,
-            restart_thr: 0.60,     // will be overwrited by bin/splr
-            restart_blk: 1.40,     // will be overwrited by bin/splr
-            restart_asg_len: 3500, // will be overwrited by bin/splr
-            restart_lbd_len: 100,  // will be overwrited by bin/splr
+            restart_thr: 0.60,     // will be overwritten by bin/splr
+            restart_blk: 1.40,     // will be overwritten by bin/splr
+            restart_asg_len: 3500, // will be overwritten by bin/splr
+            restart_lbd_len: 100,  // will be overwritten by bin/splr
             restart_expansion: 1.15,
             restart_step: 50,
             luby_restart: false,
@@ -453,7 +453,7 @@ impl StateIF for State {
             stdout().flush().unwrap();
         }
     }
-    /// `mes` should be shorter than or equal to 9, or 8 + a delimitor.
+    /// `mes` should be shorter than or equal to 9, or 8 + a delimiter.
     #[allow(clippy::cyclomatic_complexity)]
     fn progress(&mut self, cdb: &ClauseDB, vars: &[Var], mes: Option<&str>) {
         if !self.use_progress {

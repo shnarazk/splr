@@ -28,7 +28,7 @@ pub enum SolverException {
 
 /// The return type of `Solver::solve`.
 /// This captures the following three cases:
-/// * `Certificate::SAT` -- solved with a satisfiable assigment set,
+/// * `Certificate::SAT` -- solved with a satisfiable assignment set,
 /// * `Certificate::UNSAT` -- proved that it's an unsatisfiable problem, and
 /// * `SolverException::*` -- caused by a bug
 pub type SolverResult = Result<Certificate, SolverException>;
@@ -247,7 +247,7 @@ impl SatSolverIF for Solver {
         }
         v.sort_unstable();
         let mut j = 0;
-        let mut l_ = NULL_LIT; // last literal; [x, x.negate()] means totology.
+        let mut l_ = NULL_LIT; // last literal; [x, x.negate()] means tautology.
         for i in 0..v.len() {
             let li = v[i];
             let sat = vars.assigned(li);
