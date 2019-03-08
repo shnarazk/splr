@@ -403,17 +403,20 @@ fn adapt_parameters(
         state.stagnation = 0;
     }
     let stagnate = state.use_stagnation
-        && ((state.num_vars - state.num_solved_vars)
-            .next_power_of_two()
-            .trailing_zeros()
-            < state.stagnation as u32);
+        && !state.luby_restart
+        && 0 < state.stagnation
+        && (((state.num_vars - state.num_solved_vars) as f64).log(2.0)
+            * (state.c_lvl.get() / state.b_lvl.get()).sqrt()
+            < state.stagnation as f64);
+    let out_of_stagnation = state.stagnated && !stagnate;
+    state.stagnated = stagnate;
     state.stats[Stat::SolvedRecord as usize] = state.num_solved_vars;
     // micro tuning of restart thresholds
     let nr = state.stats[Stat::Restart as usize] - state.stats[Stat::RestartRecord as usize];
     state.stats[Stat::RestartRecord as usize] = state.stats[Stat::Restart as usize];
     let nb = state.stats[Stat::BlockRestart as usize] - state.stats[Stat::BlockRestartRecord as usize];
     state.stats[Stat::BlockRestartRecord as usize] = state.stats[Stat::BlockRestart as usize];
-    if !state.luby_restart && state.adaptive_restart {
+    if !state.luby_restart && state.adaptive_restart && !stagnate {
         let delta: f64 = 0.025;
         if state.restart_thr <= 0.95 && nr < 4 {
             state.restart_thr += delta;
@@ -430,7 +433,7 @@ fn adapt_parameters(
             state.restart_blk -= (state.restart_blk - state.config.restart_blocking) * 0.01;
         }
     }
-    if nconflict == switch {
+    if nconflict == switch || out_of_stagnation {
         state.flush("exhaustive eliminator activated...");
         asgs.cancel_until(vars, 0);
         state.adapt(cdb);

@@ -151,6 +151,7 @@ pub struct State {
     pub luby_current_restarts: usize,
     pub luby_restart_factor: f64,
     pub use_stagnation: bool,
+    pub stagnated: bool,
     /// Eliminator
     pub use_elim: bool,
     /// 0 for no limit
@@ -280,6 +281,7 @@ impl Default for State {
             luby_current_restarts: 0,
             luby_restart_factor: 100.0,
             use_stagnation: true,
+            stagnated: false,
             ema_coeffs: (2 ^ 5, 2 ^ 15),
             use_elim: true,
             elim_eliminate_combination_limit: 80,
