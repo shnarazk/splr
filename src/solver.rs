@@ -417,8 +417,8 @@ fn adapt_parameters(
             state.restart_thr += delta;
         } else if 0.44 <= state.restart_thr && 1000 < nr {
             state.restart_thr -= delta;
-        } else if 4 < nr && nr < 1000 {
-            state.restart_thr -= (state.restart_thr - 0.60) * 0.01;
+        } else if 2 < nr && nr < 1000 {
+            state.restart_thr -= (state.restart_thr - state.config.restart_threshold) * 0.01;
         }
         let nb = state.stats[Stat::BlockRestart as usize]
             - state.stats[Stat::BlockRestartRecord as usize];
@@ -428,7 +428,7 @@ fn adapt_parameters(
         } else if state.restart_blk <= 1.8 && 1000 < nb {
             state.restart_blk += delta;
         } else if 4 < nb && nb < 1000 {
-            state.restart_blk -= (state.restart_blk - 1.40) * 0.01;
+            state.restart_blk -= (state.restart_blk - state.config.restart_blocking) * 0.01;
         }
     }
     if nconflict == switch {
