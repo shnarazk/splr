@@ -433,7 +433,7 @@ fn adapt_parameters(
             state.restart_blk -= (state.restart_blk - state.config.restart_blocking) * 0.01;
         }
     }
-    if nconflict == switch || out_of_stagnation {
+    if state.use_elim && (nconflict == switch || out_of_stagnation) {
         state.flush("exhaustive eliminator activated...");
         asgs.cancel_until(vars, 0);
         state.adapt(cdb);
