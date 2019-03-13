@@ -414,7 +414,8 @@ fn adapt_parameters(
     // micro tuning of restart thresholds
     let nr = state.stats[Stat::Restart as usize] - state.stats[Stat::RestartRecord as usize];
     state.stats[Stat::RestartRecord as usize] = state.stats[Stat::Restart as usize];
-    let nb = state.stats[Stat::BlockRestart as usize] - state.stats[Stat::BlockRestartRecord as usize];
+    let nb =
+        state.stats[Stat::BlockRestart as usize] - state.stats[Stat::BlockRestartRecord as usize];
     state.stats[Stat::BlockRestartRecord as usize] = state.stats[Stat::BlockRestart as usize];
     if !state.luby_restart && state.adaptive_restart && !stagnate {
         let delta: f64 = 0.025;
