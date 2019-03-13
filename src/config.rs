@@ -7,7 +7,8 @@ pub const VERSION: &str = "0.1.2+stagnation-013";
 #[derive(Clone, Debug, StructOpt)]
 #[structopt(
     name = "splr",
-    about = "A SAT solver for Propositional Logic in Rust, version 0.1.2+stagnation-013"
+    about = "A SAT solver for Propositional Logic in Rust, version 0.1.2+stagnation-013
+https::/gitlab.com/satisfiability01/splr"
 )]
 pub struct Config {
     /// soft limit of #clauses (24000000 is about 4GB)
