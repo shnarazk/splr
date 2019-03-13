@@ -7,7 +7,7 @@ pub const VERSION: &str = "0.1.2+stagnation-013";
 #[derive(Clone, Debug, StructOpt)]
 #[structopt(
     name = "splr",
-    about = "SAT solver for Propositional Logic in Rust, version 0.1.2"
+    about = "A SAT solver for Propositional Logic in Rust, version 0.1.2+stagnation-013"
 )]
 pub struct Config {
     /// soft limit of #clauses (24000000 is about 4GB)
@@ -21,10 +21,10 @@ pub struct Config {
     pub elim_lit_limit: usize,
     /// #samples for average assignment rate
     #[structopt(long = "ra", default_value = "3500")]
-    pub restart_asg_samples: usize,
+    pub restart_asg_len: usize,
     /// #samples for average LBD of learnt clauses
     #[structopt(long = "rl", default_value = "50")]
-    pub restart_lbd_samples: usize,
+    pub restart_lbd_len: usize,
     /// threshold for forcing restart (K in Glucose)
     #[structopt(long = "rt", default_value = "0.60")]
     pub restart_threshold: f64,
@@ -34,12 +34,18 @@ pub struct Config {
     /// #conflicts between restarts
     #[structopt(long = "rs", default_value = "50")]
     pub restart_step: usize,
-    /// output filename/stdout; use default rule if it's empty.
-    #[structopt(long = "--output", short = "o", default_value = "")]
-    pub output_filename: String,
+    /// a CNF file to solve
+    #[structopt(parse(from_os_str))]
+    pub cnf_filename: std::path::PathBuf,
     /// output directory, applied to answer and proof
-    #[structopt(long = "--dump-dir", short = "d", default_value = ".")]
-    pub directory: String,
+    #[structopt(long = "--dir", short = "o", default_value = ".")]
+    pub output_dirname: String,
+    /// result filename/stdout; use default if empty
+    #[structopt(long = "--result", short = "r", default_value = "")]
+    pub result_filename: String,
+    /// filename of DRAT UNSAT certification
+    #[structopt(long = "proof", default_value = "proof.out", short = "p")]
+    pub proof_filename: String,
     /// Uses Glucose format for progress report
     #[structopt(long = "--log", short = "l")]
     pub use_log: bool,
@@ -55,16 +61,10 @@ pub struct Config {
     /// Disables stagnation model
     #[structopt(long = "no-stagnation", short = "T")]
     pub no_stagnation: bool,
-    /// a CNF file to solve
-    #[structopt(parse(from_os_str))]
-    pub cnf_file: std::path::PathBuf,
     /// Writes a DRAT UNSAT certification file
     #[structopt(long = "certify", short = "c")]
     pub use_certification: bool,
-    /// filename of DRAT UNSAT certification
-    #[structopt(long = "proof", default_value = "proof.out", short = "p")]
-    pub proof_filename: String,
-    /// CPU time limit in sec. (zero for no limit).
+    /// CPU time limit in sec. (zero for no limit)
     #[structopt(long = "to", default_value = "0")]
     pub timeout: f64,
 }
@@ -75,21 +75,21 @@ impl Default for Config {
             clause_limit: 18_000_000,
             elim_grow_limit: 0,
             elim_lit_limit: 100,
-            restart_asg_samples: 3500,
-            restart_lbd_samples: 50,
+            restart_asg_len: 3500,
+            restart_lbd_len: 50,
             restart_threshold: 0.60,
             restart_blocking: 1.40,
             restart_step: 50,
-            output_filename: String::from(""),
-            directory: String::from("."),
+            cnf_filename: PathBuf::new(),
+            output_dirname: String::from("."),
+            result_filename: String::from(""),
+            proof_filename: String::from("proof.out"),
             use_log: false,
             no_elim: false,
             no_adaptive_restart: false,
             no_adaptive_strategy: false,
             no_stagnation: false,
-            cnf_file: PathBuf::new(),
             use_certification: false,
-            proof_filename: String::from("proof.out"),
             timeout: 0.0,
         }
     }
