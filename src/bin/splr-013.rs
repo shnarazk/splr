@@ -79,7 +79,7 @@ fn save_result(s: &Solver, res: &SolverResult, input: &str, output: Option<PathB
             }
             match output {
                 Some(f) => println!(
-                    "SATISFIABLE: {}. The answer was saved to {}.",
+                    "SATISFIABLE: {}. The result was saved to {}.",
                     input,
                     f.to_str().unwrap()
                 ),
@@ -103,7 +103,7 @@ fn save_result(s: &Solver, res: &SolverResult, input: &str, output: Option<PathB
             }
             match output {
                 Some(f) => println!(
-                    "UNSAT: {}, The answer was saved to {}.",
+                    "UNSAT: {}, The result was saved to {}.",
                     input,
                     f.to_str().unwrap()
                 ),

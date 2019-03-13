@@ -38,7 +38,7 @@ pub struct Config {
     /// a CNF file to solve
     #[structopt(parse(from_os_str))]
     pub cnf_filename: std::path::PathBuf,
-    /// output directory, applied to answer and proof
+    /// output directory, applied to result and proof
     #[structopt(long = "--dir", short = "o", default_value = ".")]
     pub output_dirname: String,
     /// result filename/stdout; use default if empty
