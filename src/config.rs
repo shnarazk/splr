@@ -34,9 +34,12 @@ pub struct Config {
     /// #conflicts between restarts
     #[structopt(long = "rs", default_value = "50")]
     pub restart_step: usize,
-    /// output filename; use default rule if it's empty.
+    /// output filename/stdout; use default rule if it's empty.
     #[structopt(long = "--output", short = "o", default_value = "")]
     pub output_filename: String,
+    /// output directory, applied to answer and proof
+    #[structopt(long = "--dump-dir", short = "d", default_value = ".")]
+    pub directory: String,
     /// Uses Glucose format for progress report
     #[structopt(long = "--log", short = "l")]
     pub use_log: bool,
@@ -77,7 +80,8 @@ impl Default for Config {
             restart_threshold: 0.60,
             restart_blocking: 1.40,
             restart_step: 50,
-            output_filename: "".to_string(),
+            output_filename: String::from(""),
+            directory: String::from("."),
             use_log: false,
             no_elim: false,
             no_adaptive_restart: false,
@@ -85,7 +89,7 @@ impl Default for Config {
             no_stagnation: false,
             cnf_file: PathBuf::new(),
             use_certification: false,
-            proof_filename: "proof.out".to_string(),
+            proof_filename: String::from("proof.out"),
             timeout: 0.0,
         }
     }
