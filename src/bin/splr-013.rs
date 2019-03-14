@@ -23,11 +23,15 @@ fn main() {
     let cnf_file = config.cnf_filename.to_str().unwrap().to_string();
     let ans_file: Option<PathBuf> = match config.result_filename.as_str() {
         "-" => None,
-        "" => Some(PathBuf::from(&config.output_dirname).join(PathBuf::from(format!(
-            ".ans_{}",
-            config.cnf_filename.file_name().unwrap().to_str().unwrap()
-        )))),
-        _ => Some(PathBuf::from(&config.output_dirname).join(PathBuf::from(&config.result_filename))),
+        "" => Some(
+            PathBuf::from(&config.output_dirname).join(PathBuf::from(format!(
+                ".ans_{}",
+                config.cnf_filename.file_name().unwrap().to_str().unwrap()
+            ))),
+        ),
+        _ => {
+            Some(PathBuf::from(&config.output_dirname).join(PathBuf::from(&config.result_filename)))
+        }
     };
     let proof_file: PathBuf =
         PathBuf::from(&config.output_dirname).join(PathBuf::from(&config.proof_filename));
