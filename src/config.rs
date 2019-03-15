@@ -95,3 +95,27 @@ impl Default for Config {
         }
     }
 }
+
+impl From<String> for Config {
+    fn from(path: String) -> Config {
+        let mut config = Config::default();
+        config.cnf_filename = PathBuf::from(path);
+        config
+    }
+}
+
+impl<'a> From<&'a str> for Config {
+    fn from(path: &'a str) -> Config {
+        let mut config = Config::default();
+        config.cnf_filename = PathBuf::from(path.to_string());
+        config
+    }
+}
+
+impl From<PathBuf> for Config {
+    fn from(path: PathBuf) -> Config {
+        let mut config = Config::default();
+        config.cnf_filename = path;
+        config
+    }
+}

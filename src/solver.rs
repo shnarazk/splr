@@ -58,6 +58,19 @@ impl SatSolverIF for Solver {
             vars: Var::new_vars(nv),
         }
     }
+    /// # Examples
+    ///
+    /// ```
+    /// use splr::traits::SatSolverIF;
+    /// use splr::config::Config;
+    /// use splr::solver::Solver;
+    ///
+    /// let config = Config::from("tests/sample.cnf");
+    /// if let Ok(mut s) = Solver::build(&config) {
+    ///     let res = s.solve();
+    ///     assert!(res.is_ok());
+    /// }
+    ///```
     fn solve(&mut self) -> SolverResult {
         let Solver {
             ref mut asgs,
@@ -174,6 +187,16 @@ impl SatSolverIF for Solver {
             }
         }
     }
+    /// # Examples
+    ///
+    /// ```
+    /// use splr::traits::SatSolverIF;
+    /// use splr::config::Config;
+    /// use splr::solver::Solver;
+    ///
+    /// let config = Config::from("tests/sample.cnf");
+    /// assert!(Solver::build(&config).is_ok());
+    ///```
     fn build(config: &Config) -> std::io::Result<Solver> {
         let fs = fs::File::open(&config.cnf_filename)?;
         let mut rs = BufReader::new(fs);
