@@ -433,7 +433,7 @@ fn adapt_parameters(
         && (((state.num_vars - state.num_solved_vars) as f64).log(2.0)
             * (state.c_lvl.get() / state.b_lvl.get()).sqrt()
             < state.stagnation as f64);
-    let out_of_stagnation = state.stagnated && !stagnate;
+    // let out_of_stagnation = state.stagnated && !stagnate;
     state.stagnated = stagnate;
     state.stats[Stat::SolvedRecord as usize] = state.num_solved_vars;
     // micro tuning of restart thresholds
@@ -459,7 +459,7 @@ fn adapt_parameters(
             state.restart_blk -= (state.restart_blk - state.config.restart_blocking) * 0.01;
         }
     }
-    if state.use_elim && (nconflict == switch || out_of_stagnation) {
+    if state.use_elim && nconflict == switch {
         state.flush("exhaustive eliminator activated...");
         asgs.cancel_until(vars, 0);
         state.adapt(cdb);
