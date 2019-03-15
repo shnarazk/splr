@@ -63,12 +63,13 @@ impl SatSolverIF for Solver {
     /// ```
     /// use splr::traits::SatSolverIF;
     /// use splr::config::Config;
-    /// use splr::solver::Solver;
+    /// use splr::solver::{Solver, Certificate};
     ///
     /// let config = Config::from("tests/sample.cnf");
     /// if let Ok(mut s) = Solver::build(&config) {
     ///     let res = s.solve();
     ///     assert!(res.is_ok());
+    ///     assert_ne!(res.unwrap(), Certificate::UNSAT);
     /// }
     ///```
     fn solve(&mut self) -> SolverResult {
