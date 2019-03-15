@@ -86,7 +86,7 @@ impl SatSolverIF for Solver {
         if cdb.check_size(state).is_err() {
             return Err(SolverException::OutOfMemory);
         }
-        // TODO: deal with assumptions
+        // NOTE: splr doesn't deal with assumptions.
         // s.root_level = 0;
         state.num_solved_vars = asgs.len();
         state.progress_header();

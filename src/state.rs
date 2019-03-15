@@ -729,7 +729,7 @@ impl State {
         let nv = vars.len() - 1;
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
-        let nlearnts = cdb.countf(Flag::LEARNT); // TODO eliminate DEAD
+        let nlearnts = cdb.countf(Flag::LEARNT);
         let ncnfl = self.stats[Stat::Conflict as usize];
         let nrestart = self.stats[Stat::Restart as usize];
         println!(
