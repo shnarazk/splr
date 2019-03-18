@@ -88,6 +88,7 @@ impl SatSolverIF for Solver {
         }
         // NOTE: splr doesn't deal with assumptions.
         // s.root_level = 0;
+        state.use_stagnation = false;
         state.num_solved_vars = asgs.len();
         state.progress_header();
         state.progress(cdb, vars, Some("initialization phase"));
