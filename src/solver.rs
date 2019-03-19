@@ -460,13 +460,15 @@ fn adapt_parameters(
             state.restart_blk -= (state.restart_blk - state.config.restart_blocking) * 0.01;
         }
     }
-    if state.use_elim && nconflict == switch {
+    if nconflict == switch {
         state.flush("exhaustive eliminator activated...");
         asgs.cancel_until(vars, 0);
-        state.adapt(cdb);
-        cdb.reset(state.co_lbd_bound);
-        elim.activate();
-        cdb.simplify(asgs, elim, state, vars)?;
+        state.adapt_strategy(cdb);
+        if state.use_elim {
+            cdb.reset(state.co_lbd_bound);
+            elim.activate();
+            cdb.simplify(asgs, elim, state, vars)?;
+        }
     }
     state.progress(cdb, vars, None);
     state.restart_step = 50 + 40_000 * (stagnate as usize);
