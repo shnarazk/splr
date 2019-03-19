@@ -173,7 +173,7 @@ pub struct State {
     pub cur_restart: usize,
     pub after_restart: usize,
     pub elim_trigger: usize,
-    pub stagnation: usize,
+    pub stagnation: isize,
     pub stats: [usize; Stat::EndOfStatIndex as usize], // statistics
     pub ema_asg: Ema,
     pub ema_lbd: Ema,

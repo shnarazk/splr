@@ -88,7 +88,7 @@ impl SatSolverIF for Solver {
         }
         // NOTE: splr doesn't deal with assumptions.
         // s.root_level = 0;
-        state.use_stagnation = false;
+        // state.use_stagnation = false;
         state.num_solved_vars = asgs.len();
         state.progress_header();
         state.progress(cdb, vars, Some("initialization phase"));
@@ -425,8 +425,8 @@ fn adapt_parameters(
     let switch = 100_000;
     if switch < nconflict && state.stats[Stat::SolvedRecord as usize] == state.num_solved_vars {
         state.stagnation += 1;
-    } else {
-        state.stagnation = 0;
+    } else if 0 < state.stagnation {
+        state.stagnation *= -1;
     }
     let stagnate = state.use_stagnation
         && !state.luby_restart
