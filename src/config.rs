@@ -59,8 +59,8 @@ pub struct Config {
     /// Disables dynamic strategy adaptation
     #[structopt(long = "no-adaptive_strategy", short = "S")]
     pub no_adaptive_strategy: bool,
-    /// Disables stagnation model
-    #[structopt(long = "no-stagnation", short = "T")]
+    /// Disables pendulum search model
+    #[structopt(long = "no-pendulum", short = "P")]
     pub no_stagnation: bool,
     /// Writes a DRAT UNSAT certification file
     #[structopt(long = "certify", short = "c")]
