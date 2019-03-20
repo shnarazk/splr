@@ -464,6 +464,7 @@ fn adapt_parameters(
         state.flush("exhaustive eliminator activated...");
         asgs.cancel_until(vars, 0);
         state.adapt_strategy(cdb);
+        state.stagnation = 0;
         if state.use_elim {
             cdb.reset(state.co_lbd_bound);
             elim.activate();
@@ -473,7 +474,7 @@ fn adapt_parameters(
     state.progress(cdb, vars, None);
     state.restart_step = 50 + 40_000 * (stagnate as usize);
     if stagnate {
-        //state.flush(&format!("stagnated ({})...", state.stagnation));
+        state.flush("stagnated...");
         state.next_restart += 80_000;
     }
     Ok(())
