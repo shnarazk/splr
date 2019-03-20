@@ -429,11 +429,14 @@ fn adapt_parameters(
         state.stagnation *= -1;
     }
     let stagnate = state.use_stagnation
-        && !state.luby_restart
+        && !state.use_luby_restart
         && 0 < state.stagnation
         && (((state.num_vars - state.num_solved_vars) as f64).log(2.0)
             * (state.c_lvl.get() / state.b_lvl.get()).sqrt()
             < state.stagnation as f64);
+    if !state.stagnated && stagnate {
+        state.stats[Stat::Stagnation as usize] += 1;
+    }
     // let out_of_stagnation = state.stagnated && !stagnate;
     state.stagnated = stagnate;
     state.stats[Stat::SolvedRecord as usize] = state.num_solved_vars;
@@ -443,7 +446,7 @@ fn adapt_parameters(
     let nb =
         state.stats[Stat::BlockRestart as usize] - state.stats[Stat::BlockRestartRecord as usize];
     state.stats[Stat::BlockRestartRecord as usize] = state.stats[Stat::BlockRestart as usize];
-    if !state.luby_restart && state.adaptive_restart && !stagnate {
+    if !state.use_luby_restart && state.adaptive_restart && !stagnate {
         let delta: f64 = 0.025;
         if state.restart_thr <= 0.95 && nr < 4 {
             state.restart_thr += delta;
@@ -474,7 +477,7 @@ fn adapt_parameters(
     state.progress(cdb, vars, None);
     state.restart_step = 50 + 40_000 * (stagnate as usize);
     if stagnate {
-        state.flush("stagnated...");
+        state.flush(&format!("stagnated ({})...", state.stagnation));
         state.next_restart += 80_000;
     }
     Ok(())

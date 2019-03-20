@@ -106,6 +106,7 @@ pub enum Stat {
     NumBin,                // the number of binary clauses
     NumBinLearnt,          // the number of binary learnt clauses
     NumLBD2,               // the number of clauses which LBD is 2
+    Stagnation,            // the number of stagnation
     EndOfStatIndex,        // Don't use this dummy.
 }
 
@@ -145,7 +146,7 @@ pub struct State {
     pub restart_lbd_len: usize,
     pub restart_expansion: f64,
     pub restart_step: usize,
-    pub luby_restart: bool,
+    pub use_luby_restart: bool,
     pub luby_restart_num_conflict: f64,
     pub luby_restart_inc: f64,
     pub luby_current_restarts: usize,
@@ -301,7 +302,7 @@ impl Default for State {
             restart_lbd_len: 100,  // will be overwritten by bin/splr
             restart_expansion: 1.15,
             restart_step: 50,
-            luby_restart: false,
+            use_luby_restart: false,
             luby_restart_num_conflict: 0.0,
             luby_restart_inc: 2.0,
             luby_current_restarts: 0,
@@ -417,7 +418,7 @@ impl StateIF for State {
         if self.stats[Stat::NoDecisionConflict as usize] < 30_000 {
             self.strategy = SearchStrategy::LowSuccesive;
             if !self.use_stagnation {
-                self.luby_restart = true;
+                self.use_luby_restart = true;
                 self.luby_restart_factor = 100.0;
             }
             self.var_decay = 0.999;
@@ -589,11 +590,15 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K   Conflicts|aLBD:{}, bjmp:{}, cnfl:{} |stag:{} ",
+            "\x1B[2K   Conflicts|aLBD:{}, bjmp:{}, cnfl:{} |#stg:{} ",
             fm!("{:>9.2}", self.record, LogF64Id::AveLBD, self.ema_lbd.get()),
             fm!("{:>9.2}", self.record, LogF64Id::BLevel, self.b_lvl.get()),
             fm!("{:>9.2}", self.record, LogF64Id::CLevel, self.c_lvl.get()),
-            format!("{:>9}", self.stagnation),
+            im!("{:>9}",
+                self.record,
+                LogUsizeId::Stagnation,
+                self.stats[Stat::Stagnation as usize]
+            ),
         );
         println!(
             "\x1B[2K   Clause DB|#rdc:{}, #sce:{} |blkR:{}, frcK:{} ",
@@ -692,8 +697,9 @@ pub enum LogUsizeId {
     Reduction,      // 12: reduction: usize,
     SatClauseElim,  // 13: simplification: usize,
     ExhaustiveElim, // 14: elimination: usize,
-    // ElimClauseQueue, // 15: elim_clause_queue: usize,
-    // ElimVarQueue, // 16: elim_var_queue: usize,
+    Stagnation,     // 15: stagnation: usize,
+    // ElimClauseQueue, // 16: elim_clause_queue: usize,
+    // ElimVarQueue, // 17: elim_var_queue: usize,
     End,
 }
 
