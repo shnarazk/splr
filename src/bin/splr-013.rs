@@ -33,6 +33,10 @@ fn main() {
             Some(PathBuf::from(&config.output_dirname).join(PathBuf::from(&config.result_filename)))
         }
     };
+    if config.proof_filename != "proof.out" && !config.use_certification {
+        println!("Abort: You set a proof filename with '--proof' explicitly, but didn't set '--certify'. It doesn't look good.");
+        return;
+    }
     let proof_file: PathBuf =
         PathBuf::from(&config.output_dirname).join(PathBuf::from(&config.proof_filename));
     let mut s = Solver::build(&config).expect("failed to load");
@@ -52,10 +56,17 @@ fn main() {
 fn save_result(s: &Solver, res: &SolverResult, input: &str, output: Option<PathBuf>) {
     let mut ofile;
     let mut otty;
+    let mut redirect = false;
     let mut buf: &mut dyn Write = match output {
-        Some(ref f) => {
-            ofile = BufWriter::new(File::create(f).expect("fail to create"));
-            &mut ofile
+        Some(ref file) => {
+            if let Ok(f) = File::create(file) {
+                ofile = BufWriter::new(f);
+                &mut ofile
+            } else {
+                redirect = true;
+                otty = BufWriter::new(std::io::stdout());
+                &mut otty
+            }
         }
         None => {
             otty = BufWriter::new(std::io::stdout());
@@ -64,6 +75,19 @@ fn save_result(s: &Solver, res: &SolverResult, input: &str, output: Option<PathB
     };
     match res {
         Ok(Certificate::SAT(v)) => {
+            match output {
+                Some(ref f) if redirect => println!(
+                    "SATISFIABLE: {}.\nRedirect the result to STDOUT instead of {} due to an IO error.\n",
+                    input,
+                    f.to_string_lossy(),
+                    ),
+                Some(ref f) => println!(
+                    "SATISFIABLE: {}. The result was saved to {}.",
+                    input,
+                    f.to_str().unwrap()
+                ),
+                _ => println!("SATISFIABLE: {}.", input),
+            }
             if let Err(why) = (|| {
                 buf.write_all(
                     format!(
@@ -79,18 +103,24 @@ fn save_result(s: &Solver, res: &SolverResult, input: &str, output: Option<PathB
                 }
                 buf.write(b"0\n")
             })() {
-                panic!("failed to save: {:?}!", why);
-            }
-            match output {
-                Some(f) => println!(
-                    "SATISFIABLE: {}. The result was saved to {}.",
-                    input,
-                    f.to_str().unwrap()
-                ),
-                None => println!("SATISFIABLE: {}.", input),
+                println!("Abort: failed to save by {}!", why);
             }
         }
         Ok(Certificate::UNSAT) => {
+            match output {
+                Some(ref f) if redirect => println!(
+                    "UNSAT: {}.\nRedirect the result to STDOUT insteard of {} due to an IO error.\n",
+                    input,
+                    f.to_string_lossy()
+                ),
+                Some(ref f)  => println!(
+                    "UNSAT: {}, The result was saved to {}.",
+                    input,
+                    f.to_str().unwrap()
+                ),
+
+                _ => println!("UNSAT: {}.", input),
+            }
             if let Err(why) = (|| {
                 buf.write_all(
                     format!(
@@ -103,15 +133,7 @@ fn save_result(s: &Solver, res: &SolverResult, input: &str, output: Option<PathB
                 buf.write_all(b"s UNSATISFIABLE\n")?;
                 buf.write_all(b"0\n")
             })() {
-                panic!("failed to save: {:?}!", why);
-            }
-            match output {
-                Some(f) => println!(
-                    "UNSAT: {}, The result was saved to {}.",
-                    input,
-                    f.to_str().unwrap()
-                ),
-                None => println!("UNSAT: {}.", input),
+                println!("Abort: failed to save by {}!", why);
             }
         }
         Err(e) => println!("Failed to execution by {:?}.", e),
@@ -119,10 +141,16 @@ fn save_result(s: &Solver, res: &SolverResult, input: &str, output: Option<PathB
 }
 
 fn save_proof(s: &Solver, input: &str, output: &PathBuf) {
-    let mut buf = if let Ok(out) = File::create(output) {
-        BufWriter::new(out)
-    } else {
-        panic!("failed to create {:?}!", output);
+    let mut buf = match File::create(output) {
+        Ok(out) => BufWriter::new(out),
+        Err(e) => {
+            println!(
+                "Abort: failed to create the proof file {:?} by {}!",
+                output.to_string_lossy(),
+                e
+            );
+            return;
+        }
     };
     if let Err(why) = (|| {
         buf.write_all(
@@ -140,7 +168,12 @@ fn save_proof(s: &Solver, input: &str, output: &PathBuf) {
         }
         buf.write_all(b"0\n")
     })() {
-        panic!("failed to save: {:?}!", why);
+        println!(
+            "Abort: failed to save to {} by {}!",
+            output.to_string_lossy(),
+            why
+        );
+        return;
     }
     println!(
         "The certification was saved to {}.",
