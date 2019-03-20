@@ -196,7 +196,7 @@ pub struct State {
     pub target: CNFDescription,
 }
 
-macro_rules! i {
+macro_rules! im {
     ($format: expr, $record: expr, $key: expr, $val: expr) => {
         match $val {
             v => {
@@ -222,7 +222,33 @@ macro_rules! i {
     };
 }
 
+macro_rules! i {
+    ($format: expr, $record: expr, $key: expr, $val: expr) => {
+        match $val {
+            v => {
+                let ptr = &mut $record.vali[$key as usize];
+                *ptr = v;
+                format!($format, *ptr)
+
+            }
+        }
+    };
+}
+
+#[allow(unused_macros)]
 macro_rules! f {
+    ($format: expr, $record: expr, $key: expr, $val: expr) => {
+        match $val {
+            v => {
+                let ptr = &mut $record.valf[$key as usize];
+                *ptr = v;
+                format!($format, *ptr)
+            }
+        }
+    };
+}
+
+macro_rules! fm {
     ($format: expr, $record: expr, $key: expr, $val: expr) => {
         match $val {
             v => {
@@ -496,15 +522,15 @@ impl StateIF for State {
         );
         println!(
             "\x1B[2K  Assignment|#rem:{}, #fix:{}, #elm:{}, prg%:{} ",
-            i!("{:>9}", self.record, LogUsizeId::Remain, nv - sum),
-            i!("{:>9}", self.record, LogUsizeId::Fixed, fixed),
-            i!(
+            im!("{:>9}", self.record, LogUsizeId::Remain, nv - sum),
+            im!("{:>9}", self.record, LogUsizeId::Fixed, fixed),
+            im!(
                 "{:>9}",
                 self.record,
                 LogUsizeId::Eliminated,
                 self.num_eliminated_vars
             ),
-            f!(
+            fm!(
                 "{:>9.4}",
                 self.record,
                 LogF64Id::Progress,
@@ -513,20 +539,20 @@ impl StateIF for State {
         );
         println!(
             "\x1B[2K Clause Kind|Remv:{}, LBD2:{}, Binc:{}, Perm:{} ",
-            i!("{:>9}", self.record, LogUsizeId::Removable, cdb.num_learnt),
-            i!(
+            im!("{:>9}", self.record, LogUsizeId::Removable, cdb.num_learnt),
+            im!(
                 "{:>9}",
                 self.record,
                 LogUsizeId::LBD2,
                 self.stats[Stat::NumLBD2 as usize]
             ),
-            i!(
+            im!(
                 "{:>9}",
                 self.record,
                 LogUsizeId::Binclause,
                 self.stats[Stat::NumBinLearnt as usize]
             ),
-            i!(
+            im!(
                 "{:>9}",
                 self.record,
                 LogUsizeId::Permanent,
@@ -535,25 +561,25 @@ impl StateIF for State {
         );
         println!(
             "\x1B[2K     Restart|#BLK:{}, #RST:{}, eASG:{}, eLBD:{} ",
-            i!(
+            im!(
                 "{:>9}",
                 self.record,
                 LogUsizeId::RestartBlock,
                 self.stats[Stat::BlockRestart as usize]
             ),
-            i!(
+            im!(
                 "{:>9}",
                 self.record,
                 LogUsizeId::Restart,
                 self.stats[Stat::Restart as usize]
             ),
-            f!(
+            fm!(
                 "{:>9.4}",
                 self.record,
                 LogF64Id::EmaAsg,
                 self.ema_asg.get() / nv as f64
             ),
-            f!(
+            fm!(
                 "{:>9.4}",
                 self.record,
                 LogF64Id::EmaLBD,
@@ -561,38 +587,33 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K   Conflicts|aLBD:{}, bjmp:{}, cnfl:{} |blkR:{} ",
-            f!("{:>9.2}", self.record, LogF64Id::AveLBD, self.ema_lbd.get()),
-            f!("{:>9.2}", self.record, LogF64Id::BLevel, self.b_lvl.get()),
-            f!("{:>9.2}", self.record, LogF64Id::CLevel, self.c_lvl.get()),
-            f!(
-                "{:>9.4}",
-                self.record,
-                LogF64Id::RestartBlkR,
-                self.restart_blk
-            ),
+            "\x1B[2K   Conflicts|aLBD:{}, bjmp:{}, cnfl:{} |stag:{} ",
+            fm!("{:>9.2}", self.record, LogF64Id::AveLBD, self.ema_lbd.get()),
+            fm!("{:>9.2}", self.record, LogF64Id::BLevel, self.b_lvl.get()),
+            fm!("{:>9.2}", self.record, LogF64Id::CLevel, self.c_lvl.get()),
+            format!("{:>9}", self.stagnation),
         );
         println!(
-            "\x1B[2K   Clause DB|#rdc:{}, #sce:{}, #exe:{} |frcK:{} ",
-            i!(
+            "\x1B[2K   Clause DB|#rdc:{}, #sce:{} |blkR:{}, frcK:{} ",
+            im!(
                 "{:>9}",
                 self.record,
                 LogUsizeId::Reduction,
                 self.stats[Stat::Reduction as usize]
             ),
-            i!(
+            im!(
                 "{:>9}",
                 self.record,
                 LogUsizeId::SatClauseElim,
                 self.stats[Stat::SatClauseElimination as usize]
             ),
-            i!(
-                "{:>9}",
+            fm!(
+                "{:>9.4}",
                 self.record,
-                LogUsizeId::ExhaustiveElim,
-                self.stats[Stat::ExhaustiveElimination as usize]
+                LogF64Id::RestartBlkR,
+                self.restart_blk
             ),
-            f!(
+            fm!(
                 "{:>9.4}",
                 self.record,
                 LogF64Id::RestartThrK,

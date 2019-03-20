@@ -473,7 +473,7 @@ fn adapt_parameters(
     state.progress(cdb, vars, None);
     state.restart_step = 50 + 40_000 * (stagnate as usize);
     if stagnate {
-        state.flush(&format!("stagnated ({})...", state.stagnation));
+        //state.flush(&format!("stagnated ({})...", state.stagnation));
         state.next_restart += 80_000;
     }
     Ok(())
