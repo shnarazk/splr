@@ -416,8 +416,10 @@ impl StateIF for State {
         }
         if self.stats[Stat::NoDecisionConflict as usize] < 30_000 {
             self.strategy = SearchStrategy::LowSuccesive;
-            self.luby_restart = true;
-            self.luby_restart_factor = 100.0;
+            if !self.use_stagnation {
+                self.luby_restart = true;
+                self.luby_restart_factor = 100.0;
+            }
             self.var_decay = 0.999;
             self.var_decay_max = 0.999;
         }
