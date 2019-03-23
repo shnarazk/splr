@@ -35,7 +35,7 @@ pub struct Config {
     /// #conflicts between restarts
     #[structopt(long = "rs", default_value = "50")]
     pub restart_step: usize,
-    /// a DIMCS format CNF file
+    /// a DIMACS format CNF file
     #[structopt(parse(from_os_str))]
     pub cnf_filename: std::path::PathBuf,
     /// output directory, applied to result and proof
