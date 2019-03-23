@@ -193,7 +193,7 @@ impl fmt::Display for Clause {
 pub struct ClauseDB {
     pub clause: Vec<Clause>,
     pub touched: Vec<bool>,
-    pub watcher: Vec<Vec<Watch>>,
+    pub watcher: Vec<[Vec<Watch>; 2]>,
     pub num_active: usize,
     pub num_learnt: usize,
     pub certified: DRAT,
@@ -206,7 +206,7 @@ impl ClauseDBIF for ClauseDB {
         let mut watcher = Vec::with_capacity(2 * (nv + 1));
         let mut touched = Vec::with_capacity(2 * (nv + 1));
         for _ in 0..2 * (nv + 1) {
-            watcher.push(Vec::new());
+            watcher.push([Vec::new(), Vec::new()]);
             touched.push(false);
         }
         let mut certified = Vec::new();
@@ -239,30 +239,32 @@ impl ClauseDBIF for ClauseDB {
                 continue;
             }
             touched[i + 2] = false;
-            let mut n = 0;
-            while n < ws.count() {
-                let cid = ws[n].c;
-                let c = &mut clause[cid as usize];
-                if !c.is(Flag::DEAD) {
-                    n += 1;
-                    continue;
-                }
-                if !c.lits.is_empty() {
-                    debug_assert!(c.is(Flag::DEAD));
-                    recycled.push(Watch {
-                        blocker: NULL_LIT,
-                        c: cid,
-                    });
-                    if c.is(Flag::LEARNT) {
-                        self.num_learnt -= 1;
+            for k in &[0, 1] {
+                let mut n = 0;
+                while n < ws[*k].count() {
+                    let cid = ws[*k][n].c;
+                    let c = &mut clause[cid as usize];
+                    if !c.is(Flag::DEAD) {
+                        n += 1;
+                        continue;
                     }
-                    if !certified.is_empty() {
-                        let temp = c.lits.iter().map(|l| l.to_i32()).collect::<Vec<i32>>();
-                        certified.push((CertifiedRecord::ADD, temp));
+                    if !c.lits.is_empty() {
+                        debug_assert!(c.is(Flag::DEAD));
+                        recycled[0].push(Watch {
+                            blocker: NULL_LIT,
+                            c: cid,
+                        });
+                        if c.is(Flag::LEARNT) {
+                            self.num_learnt -= 1;
+                        }
+                        if !certified.is_empty() {
+                            let temp = c.lits.iter().map(|l| l.to_i32()).collect::<Vec<i32>>();
+                            certified.push((CertifiedRecord::ADD, temp));
+                        }
+                        c.lits.clear();
                     }
-                    c.lits.clear();
+                    ws[*k].detach(n);
                 }
-                ws.detach(n);
             }
         }
         self.num_active = self.clause.len() - recycled.len();
@@ -272,7 +274,8 @@ impl ClauseDBIF for ClauseDB {
         let cid;
         let l0 = v[0];
         let l1 = v[1];
-        if let Some(w) = self.watcher[NULL_LIT.negate() as usize].pop() {
+        let bin = v.len() == 2;
+        if let Some(w) = self.watcher[NULL_LIT.negate() as usize][0].pop() {
             cid = w.c;
             let c = &mut self.clause[cid as usize];
             // if !c.is(Flag::DEAD) {
@@ -312,8 +315,8 @@ impl ClauseDBIF for ClauseDB {
             c.turn_on(Flag::LEARNT);
             self.num_learnt += 1;
         }
-        self.watcher[l0.negate() as usize].register(l1, cid);
-        self.watcher[l1.negate() as usize].register(l0, cid);
+        self.watcher[l0.negate() as usize][bin as usize].register(l1, cid);
+        self.watcher[l1.negate() as usize][bin as usize].register(l0, cid);
         self.num_active += 1;
         cid
     }
@@ -351,7 +354,7 @@ impl ClauseDBIF for ClauseDB {
     }
     fn count(&self, alive: bool) -> usize {
         if alive {
-            self.clause.len() - self.watcher[NULL_LIT.negate() as usize].len() - 1
+            self.clause.len() - self.watcher[NULL_LIT.negate() as usize][0].len() - 1
         } else {
             self.clause.len() - 1
         }
@@ -529,6 +532,7 @@ impl ClauseDBIF for ClauseDB {
     }
 }
 
+/*
 impl ClauseDB {
     #[allow(dead_code)]
     fn check_liveness1(&self) -> bool {
@@ -618,3 +622,4 @@ impl ClauseDB {
         }
     }
 }
+*/

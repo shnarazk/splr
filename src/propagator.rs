@@ -88,15 +88,50 @@ impl PropagatorIF for AssignStack {
     /// So Eliminator should call `garbage_collect` before me.
     fn propagate(&mut self, cdb: &mut ClauseDB, state: &mut State, vars: &mut [Var]) -> ClauseId {
         let head = &mut cdb.clause;
-        let watcher = &mut cdb.watcher[..] as *mut [Vec<Watch>];
+        let watcher = &mut cdb.watcher[..] as *mut [[Vec<Watch>; 2]];
         while self.remains() {
             let p: usize = self.sweep() as usize;
             let false_lit = (p as Lit).negate();
             state.stats[Stat::Propagation] += 1;
+            let bin = 1;
             unsafe {
-                let source = (*watcher).get_unchecked_mut(p);
+                let source = &mut (*watcher).get_unchecked_mut(p)[bin];
                 let mut n = 0;
-                'next_clause: while n < source.count() {
+                'next_biclause: while n < source.len() {
+                    let w = source.get_unchecked_mut(n);
+                    debug_assert!(!head[w.c as usize].is(Flag::DEAD));
+                    if self.assigned(w.blocker) != TRUE {
+                        let lits = &mut head.get_unchecked_mut(w.c as usize).lits;
+                        debug_assert!(2 == lits.len());
+                        debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
+                        let mut first = *lits.get_unchecked(0);
+                        if first == false_lit {
+                            first = *lits.get_unchecked(1);
+                            *lits.get_unchecked_mut(0) = first;
+                            *lits.get_unchecked_mut(1) = false_lit;
+                        }
+                        let first_value = self.assigned(first);
+                        // If 0th watch is true, then clause is already satisfied.
+                        if first != w.blocker && first_value == TRUE {
+                            w.blocker = first;
+                            n += 1;
+                            continue 'next_biclause;
+                        }
+                        if first_value == FALSE {
+                            self.catchup();
+                            return w.c;
+                        } else {
+                            self.uncheck_enqueue(vars, first, w.c);
+                        }
+                    }
+                    n += 1;
+                }
+            }
+            let bin = 0;
+            unsafe {
+                let source = &mut (*watcher).get_unchecked_mut(p)[bin];
+                let mut n = 0;
+                'next_clause: while n < source.len() {
                     let w = source.get_unchecked_mut(n);
                     debug_assert!(!head[w.c as usize].is(Flag::DEAD));
                     if self.assigned(w.blocker) != TRUE {
@@ -120,7 +155,7 @@ impl PropagatorIF for AssignStack {
                             // below is equivalent to 'assigned(lk) != FALSE'
                             if (((lk & 1) as u8) ^ self.assign.get_unchecked(lk.vi())) != 0 {
                                 (*watcher)
-                                    .get_unchecked_mut(lk.negate() as usize)
+                                    .get_unchecked_mut(lk.negate() as usize)[bin]
                                     .register(first, w.c);
                                 source.detach(n);
                                 *lits.get_unchecked_mut(1) = *lk;

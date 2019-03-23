@@ -1,13 +1,13 @@
 use std::path::PathBuf;
 use structopt::StructOpt;
 
-pub const VERSION: &str = "0.1.2+stagnation-013";
+pub const VERSION: &str = "0.1.2+stagnation-013+bi-watchers";
 
 /// Configuration built from command line options
 #[derive(Clone, Debug, StructOpt)]
 #[structopt(
     name = "splr",
-    about = "A SAT solver for Propositional Logic in Rust, version 0.1.2+stagnation-013
+    about = "A SAT solver for Propositional Logic in Rust, version 0.1.2+stagnation-013+bi-watchers
 https://github.com/shnarazk/splr"
 )]
 pub struct Config {
@@ -35,7 +35,7 @@ pub struct Config {
     /// #conflicts between restarts
     #[structopt(long = "rs", default_value = "50")]
     pub restart_step: usize,
-    /// a CNF file to solve
+    /// a DIMCS format CNF file
     #[structopt(parse(from_os_str))]
     pub cnf_filename: std::path::PathBuf,
     /// output directory, applied to result and proof
