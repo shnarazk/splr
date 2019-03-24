@@ -93,38 +93,16 @@ impl PropagatorIF for AssignStack {
             let p: usize = self.sweep() as usize;
             let false_lit = (p as Lit).negate();
             state.stats[Stat::Propagation] += 1;
-            let bin = 1;
             unsafe {
-                let source = &mut (*watcher).get_unchecked_mut(p)[bin];
-                let mut n = 0;
-                'next_biclause: while n < source.len() {
-                    let w = source.get_unchecked_mut(n);
-                    debug_assert!(!head[w.c as usize].is(Flag::DEAD));
-                    if self.assigned(w.blocker) != TRUE {
-                        let lits = &mut head.get_unchecked_mut(w.c as usize).lits;
-                        debug_assert!(2 == lits.len());
-                        debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
-                        let mut first = *lits.get_unchecked(0);
-                        if first == false_lit {
-                            first = *lits.get_unchecked(1);
-                            *lits.get_unchecked_mut(0) = first;
-                            *lits.get_unchecked_mut(1) = false_lit;
-                        }
-                        let first_value = self.assigned(first);
-                        // If 0th watch is true, then clause is already satisfied.
-                        if first != w.blocker && first_value == TRUE {
-                            w.blocker = first;
-                            n += 1;
-                            continue 'next_biclause;
-                        }
-                        if first_value == FALSE {
+                for w in &(*watcher)[p][1] {
+                    match self.assigned(w.blocker) {
+                        FALSE => {
                             self.catchup();
                             return w.c;
-                        } else {
-                            self.uncheck_enqueue(vars, first, w.c);
                         }
+                        BOTTOM => self.uncheck_enqueue(vars, w.blocker, w.c),
+                        _ => (),
                     }
-                    n += 1;
                 }
             }
             let bin = 0;
