@@ -25,7 +25,9 @@ pub enum SearchStrategy {
     /// High-Successive-Conflicts using Chan Seok heuristics
     HighSuccesive,
     /// Low-Successive-Conflicts w/ Luby sequence
-    LowSuccesive,
+    LowSuccesiveLuby,
+    /// Low-Successive-Conflicts w/o Luby sequence
+    LowSuccesiveM,
     /// Many-Glue-Clauses
     ManyGlues,
 }
@@ -47,7 +49,8 @@ impl fmt::Display for SearchStrategy {
                     SearchStrategy::HighSuccesive => {
                         "High-Successive-Conflicts using Chan Seok heuristics"
                     }
-                    SearchStrategy::LowSuccesive => "Low-Successive-Conflicts' w/o Luby sequence",
+                    SearchStrategy::LowSuccesiveLuby => "Low-Successive-Conflicts-Luby' w/ Luby sequence",
+                    SearchStrategy::LowSuccesiveM => "Low-Successive-Conflicts-Modified w/o Luby sequence",
                     SearchStrategy::ManyGlues => "Many-Glue-Clauses",
                 }
             )
@@ -57,7 +60,8 @@ impl fmt::Display for SearchStrategy {
                 SearchStrategy::Generic => "generic",
                 SearchStrategy::LowDecisions => "LowDecs",
                 SearchStrategy::HighSuccesive => "HighSucc",
-                SearchStrategy::LowSuccesive => "LowSucc",
+                SearchStrategy::LowSuccesiveLuby => "LowSuccLuby",
+                SearchStrategy::LowSuccesiveM => "LowSuccM",
                 SearchStrategy::ManyGlues => "ManyGlue",
             };
             if let Some(w) = formatter.width() {
@@ -80,7 +84,8 @@ impl SearchStrategy {
             SearchStrategy::Generic => "generic (using the generic parameter set)",
             SearchStrategy::LowDecisions => "LowDecs (many conflicts at low levels, using CSh)",
             SearchStrategy::HighSuccesive => "HighSucc (long decision chains)",
-            SearchStrategy::LowSuccesive => "LowSucc (successive conflicts)",
+            SearchStrategy::LowSuccesiveLuby => "LowSuccLuby (successive conflicts)",
+            SearchStrategy::LowSuccesiveM => "LowSuccP (successive conflicts)",
             SearchStrategy::ManyGlues => "ManyGlue (many glue clauses)",
         }
     }
@@ -427,10 +432,12 @@ impl StateIF for State {
             re_init = true;
         }
         if self.stats[Stat::NoDecisionConflict] < 30_000 {
-            self.strategy = SearchStrategy::LowSuccesive;
             if !self.use_stagnation {
+                self.strategy = SearchStrategy::LowSuccesiveLuby;
                 self.use_luby_restart = true;
                 self.luby_restart_factor = 100.0;
+            } else {
+                self.strategy = SearchStrategy::LowSuccesiveM;
             }
             self.var_decay = 0.999;
             self.var_decay_max = 0.999;
