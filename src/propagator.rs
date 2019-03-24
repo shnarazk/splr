@@ -101,8 +101,10 @@ impl PropagatorIF for AssignStack {
                             self.catchup();
                             return w.c;
                         }
-                        BOTTOM => self.uncheck_enqueue(vars, w.blocker, w.c),
-                        _ => (),
+                        TRUE => (),
+                        // conflicts are designated not only BOTTOM
+                        // but also BOTTOM.negate().
+                        _ => self.uncheck_enqueue(vars, w.blocker, w.c),
                     }
                 }
             }
