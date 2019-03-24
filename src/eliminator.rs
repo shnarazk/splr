@@ -583,17 +583,20 @@ fn strengthen(cdb: &mut ClauseDB, cid: ClauseId, p: Lit) -> bool {
         return true;
     }
     if lits[0] == p || lits[1] == p {
-        let q = if lits[0] == p {
+        let (q, r) = if lits[0] == p {
             lits.swap_remove(0);
-            lits[0]
+            (lits[0],lits[1])
         } else {
             lits.swap_remove(1);
-            lits[1]
+            (lits[1], lits[0])
         };
         debug_assert!(1 < p.negate());
         let bin_new = lits.len() == 2;
         watcher[p.negate() as usize][bin_old as usize].detach_with(cid);
-        watcher[q.negate() as usize][bin_new as usize].register(q, cid);
+        watcher[q.negate() as usize][bin_new as usize].register(r, cid);
+        // update another bocker
+        watcher[r.negate() as usize][bin_old as usize].detach_with(cid);
+        watcher[r.negate() as usize][bin_new as usize].register(q, cid);
     } else {
         lits.delete_unstable(|&x| x == p);
     }

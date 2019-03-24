@@ -95,6 +95,7 @@ impl PropagatorIF for AssignStack {
             state.stats[Stat::Propagation] += 1;
             unsafe {
                 for w in &(*watcher)[p][1] {
+                    debug_assert_ne!(w.blocker, false_lit);
                     match self.assigned(w.blocker) {
                         FALSE => {
                             self.catchup();

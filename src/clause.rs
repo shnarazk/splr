@@ -267,7 +267,7 @@ impl ClauseDBIF for ClauseDB {
                 }
             }
         }
-        self.num_active = self.clause.len() - recycled.len();
+        self.num_active = self.clause.len() - recycled[0].len();
         // debug_assert!(self.check_liveness2());
     }
     fn new_clause(&mut self, v: &[Lit], rank: usize, learnt: bool) -> ClauseId {
