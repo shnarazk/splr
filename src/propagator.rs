@@ -109,9 +109,8 @@ impl PropagatorIF for AssignStack {
                 }
             }
             let bin = 0;
-            let mut conflict_clause: Option<ClauseId> = None;
-            let mut num_conflict_update: usize = 0;
-            let mut conflict_clause_size: usize = 100000;
+            let mut conflict_clause: ClauseId = NULL_CLAUSE;
+            let mut conflict_clause_size: usize = 3;
             unsafe {
                 let source = &mut (*watcher).get_unchecked_mut(p)[bin];
                 let mut n = 0;
@@ -148,13 +147,14 @@ impl PropagatorIF for AssignStack {
                             }
                         }
                         if first_value == FALSE {
-                            if None == conflict_clause || lits.len() < conflict_clause_size {
-                                num_conflict_update += 1;
-                                conflict_clause_size = lits.len();
-                                conflict_clause = Some(w.c);
+                            let n = lits.len();
+                            if n == 3 {
+                                self.catchup();
+                                return w.c;
+                            } else if NULL_CLAUSE == conflict_clause || n < conflict_clause_size {
+                                conflict_clause_size = n;
+                                conflict_clause = w.c;
                             }
-                            // self.catchup();
-                            // return w.c;
                         } else {
                             self.uncheck_enqueue(vars, first, w.c);
                         }
@@ -162,11 +162,12 @@ impl PropagatorIF for AssignStack {
                     n += 1;
                 }
             }
-            if let Some(cid) = conflict_clause {
+            if NULL_CLAUSE != conflict_clause {
                 // if 1 < num_conflict_update {
                 //     state.flush(&format!("{},", num_conflict_update));
                 // }
-                return cid;
+                self.catchup();
+                return conflict_clause;
             }
         }
         NULL_CLAUSE
