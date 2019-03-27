@@ -391,7 +391,7 @@ impl StateIF for State {
         state.restart_asg_len = config.restart_asg_len;
         state.restart_lbd_len = config.restart_lbd_len;
         state.restart_step = config.restart_step;
-        state.use_stagnation = !config.no_stagnation;
+        state.use_stagnation = config.no_stagnation;
         state.progress_log = config.use_log;
         state.use_elim = !config.no_elim;
         state.ema_asg = Ema::new(config.restart_asg_len);
