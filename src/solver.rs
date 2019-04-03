@@ -472,7 +472,6 @@ fn adapt_parameters(
         state.adapt_strategy(cdb);
         state.stagnation = 0;
         if state.use_elim {
-            cdb.reset(state.co_lbd_bound);
             elim.activate();
             cdb.simplify(asgs, elim, state, vars)?;
         }
