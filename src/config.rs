@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use structopt::StructOpt;
 
-pub const VERSION: &str = "0.1.2+stagnation-013+bi-watchers";
+pub const VERSION: &str = "0.1.2+stagnation-013+bi-watchers+conflict-minimization";
 
 /// Configuration built from command line options
 #[derive(Clone, Debug, StructOpt)]
