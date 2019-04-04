@@ -62,6 +62,9 @@ pub struct Config {
     /// Disables pendulum search model
     #[structopt(long = "no-pendulum", short = "P")]
     pub no_stagnation: bool,
+    /// Disables learnt minimization
+    #[structopt(long = "no-learnt-min", short = "M")]
+    pub no_learnt_minimization: bool,
     /// Writes a DRAT UNSAT certification file
     #[structopt(long = "certify", short = "c")]
     pub use_certification: bool,
@@ -90,6 +93,7 @@ impl Default for Config {
             no_adaptive_restart: false,
             no_adaptive_strategy: false,
             no_stagnation: false,
+            no_learnt_minimization: false,
             use_certification: false,
             timeout: 0.0,
         }

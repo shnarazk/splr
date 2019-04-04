@@ -2,7 +2,7 @@ use crate::clause::{Clause, ClauseDB};
 use crate::config::Config;
 use crate::eliminator::Eliminator;
 use crate::propagator::AssignStack;
-use crate::state::{Stat, State};
+use crate::state::{LogUsizeId,Stat, State};
 use crate::traits::*;
 use crate::types::*;
 use crate::var::Var;
@@ -423,29 +423,33 @@ fn adapt_parameters(
     nconflict: usize,
 ) -> MaybeInconsistent {
     let switch = 100_000;
-    if switch < nconflict && state.stats[Stat::SolvedRecord] == state.num_solved_vars {
-        state.stagnation += 1;
-    } else if 0 < state.stagnation {
-        state.stagnation *= -1;
-    }
-    let stagnate = state.use_stagnation
+    let stopped = switch < nconflict && state.stats[Stat::SolvedRecord as usize] == state.num_solved_vars
+        && state.record.vali[LogUsizeId::Binclause as usize] == state.stats[Stat::NumBinLearnt];
+    let stagnated = state.use_stagnation
+        && switch < nconflict
         && !state.use_luby_restart
-        && 0 < state.stagnation
+        && stopped
         && (((state.num_vars - state.num_solved_vars) as f64).log(2.0)
             * (state.c_lvl.get() / state.b_lvl.get()).sqrt()
-            < state.stagnation as f64);
-    if !state.stagnated && stagnate {
+            < state.stagnation as f64)
+        ;
+    if !state.stagnated && stagnated {
         state.stats[Stat::Stagnation] += 1;
+    } else if state.stagnated && !stagnated {
+        state.stagnation *= -1;
+    }
+    if stopped {
+        state.stagnation += 1;
     }
     // let out_of_stagnation = state.stagnated && !stagnate;
-    state.stagnated = stagnate;
+    state.stagnated = stagnated;
     state.stats[Stat::SolvedRecord] = state.num_solved_vars;
     // micro tuning of restart thresholds
     let nr = state.stats[Stat::Restart] - state.stats[Stat::RestartRecord];
     state.stats[Stat::RestartRecord] = state.stats[Stat::Restart];
     let nb = state.stats[Stat::BlockRestart] - state.stats[Stat::BlockRestartRecord];
     state.stats[Stat::BlockRestartRecord] = state.stats[Stat::BlockRestart];
-    if !state.use_luby_restart && state.adaptive_restart && !stagnate {
+    if !state.use_luby_restart && state.adaptive_restart && !stagnated {
         let delta: f64 = 0.025;
         if state.restart_thr <= 0.95 && nr < 4 {
             state.restart_thr += delta;
@@ -468,14 +472,13 @@ fn adapt_parameters(
         state.adapt_strategy(cdb);
         state.stagnation = 0;
         if state.use_elim {
-            cdb.reset(state.co_lbd_bound);
             elim.activate();
             cdb.simplify(asgs, elim, state, vars)?;
         }
     }
     state.progress(cdb, vars, None);
-    state.restart_step = 50 + 40_000 * (stagnate as usize);
-    if stagnate {
+    state.restart_step = 50 + 40_000 * (stagnated as usize);
+    if stagnated {
         state.flush(&format!("stagnated ({})...", state.stagnation));
         state.next_restart += 80_000;
     }
