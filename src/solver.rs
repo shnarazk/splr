@@ -2,7 +2,7 @@ use crate::clause::{Clause, ClauseDB};
 use crate::config::Config;
 use crate::eliminator::Eliminator;
 use crate::propagator::AssignStack;
-use crate::state::{LogUsizeId,Stat, State};
+use crate::state::{LogUsizeId, Stat, State};
 use crate::traits::*;
 use crate::types::*;
 use crate::var::Var;
@@ -423,7 +423,8 @@ fn adapt_parameters(
     nconflict: usize,
 ) -> MaybeInconsistent {
     let switch = 100_000;
-    let stopped = switch < nconflict && state.stats[Stat::SolvedRecord as usize] == state.num_solved_vars
+    let stopped = switch < nconflict
+        && state.stats[Stat::SolvedRecord as usize] == state.num_solved_vars
         && state.record.vali[LogUsizeId::Binclause as usize] == state.stats[Stat::NumBinLearnt];
     let stagnated = state.use_stagnation
         && switch < nconflict
@@ -431,8 +432,7 @@ fn adapt_parameters(
         && stopped
         && (((state.num_vars - state.num_solved_vars) as f64).log(2.0)
             * (state.c_lvl.get() / state.b_lvl.get()).sqrt()
-            < state.stagnation as f64)
-        ;
+            < state.stagnation as f64);
     if !state.stagnated && stagnated {
         state.stats[Stat::Stagnation] += 1;
     } else if state.stagnated && !stagnated {

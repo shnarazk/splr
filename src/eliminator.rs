@@ -585,7 +585,7 @@ fn strengthen(cdb: &mut ClauseDB, cid: ClauseId, p: Lit) -> bool {
     if lits[0] == p || lits[1] == p {
         let (q, r) = if lits[0] == p {
             lits.swap_remove(0);
-            (lits[0],lits[1])
+            (lits[0], lits[1])
         } else {
             lits.swap_remove(1);
             (lits[1], lits[0])

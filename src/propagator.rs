@@ -137,8 +137,7 @@ impl PropagatorIF for AssignStack {
                         for (k, lk) in lits.iter().enumerate().skip(2) {
                             // below is equivalent to 'assigned(lk) != FALSE'
                             if (((lk & 1) as u8) ^ self.assign.get_unchecked(lk.vi())) != 0 {
-                                (*watcher)
-                                    .get_unchecked_mut(lk.negate() as usize)[bin]
+                                (*watcher).get_unchecked_mut(lk.negate() as usize)[bin]
                                     .register(first, w.c);
                                 source.detach(n);
                                 *lits.get_unchecked_mut(1) = *lk;

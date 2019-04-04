@@ -49,8 +49,12 @@ impl fmt::Display for SearchStrategy {
                     SearchStrategy::HighSuccesive => {
                         "High-Successive-Conflicts using Chan Seok heuristics"
                     }
-                    SearchStrategy::LowSuccesiveLuby => "Low-Successive-Conflicts-Luby w/ Luby sequence",
-                    SearchStrategy::LowSuccesiveM => "Low-Successive-Conflicts-Modified w/o Luby sequence",
+                    SearchStrategy::LowSuccesiveLuby => {
+                        "Low-Successive-Conflicts-Luby w/ Luby sequence"
+                    }
+                    SearchStrategy::LowSuccesiveM => {
+                        "Low-Successive-Conflicts-Modified w/o Luby sequence"
+                    }
                     SearchStrategy::ManyGlues => "Many-Glue-Clauses",
                 }
             )
