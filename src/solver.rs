@@ -455,7 +455,7 @@ fn adapt_parameters(
             state.restart_thr += delta;
         } else if 0.44 <= state.restart_thr && 1000 < nr {
             state.restart_thr -= delta;
-        } else if 2 < nr && nr < 1000 {
+        } else if 4 < nr && nr < 1000 {
             state.restart_thr -= (state.restart_thr - state.config.restart_threshold) * 0.01;
         }
         if 1.05 <= state.restart_blk && nb < 4 {
