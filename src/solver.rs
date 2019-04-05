@@ -402,7 +402,7 @@ fn adapt_parameters(
     } else {
         state.stagnation = 0;
     }
-    let stagnate = state.use_stagnation
+    let stagnated = state.use_stagnation
         && ((state.num_vars - state.num_solved_vars)
             .next_power_of_two()
             .trailing_zeros()
@@ -440,8 +440,8 @@ fn adapt_parameters(
         cdb.simplify(asgs, elim, state, vars)?;
     }
     state.progress(cdb, vars, None);
-    state.restart_step = 50 + 40_000 * (stagnate as usize);
-    if stagnate {
+    state.restart_step = 50 + 40_000 * (stagnated as usize);
+    if stagnated {
         state.flush(&format!("stagnated ({})...", state.stagnation));
         state.next_restart += 80_000;
     }
