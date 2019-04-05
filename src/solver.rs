@@ -420,8 +420,7 @@ fn adapt_parameters(
         } else if 4 < nr && nr < 1000 {
             state.restart_thr -= (state.restart_thr - 0.60) * 0.01;
         }
-        let nb = state.stats[Stat::BlockRestart]
-            - state.stats[Stat::BlockRestartRecord];
+        let nb = state.stats[Stat::BlockRestart] - state.stats[Stat::BlockRestartRecord];
         state.stats[Stat::BlockRestartRecord] = state.stats[Stat::BlockRestart];
         if 1.05 <= state.restart_blk && nb < 4 {
             state.restart_blk -= delta;
