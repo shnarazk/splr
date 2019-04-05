@@ -159,7 +159,7 @@ pub struct State {
     pub restart_lbd_len: usize,
     pub restart_expansion: f64,
     pub restart_step: usize,
-    pub luby_restart: bool,
+    pub use_luby_restart: bool,
     pub luby_restart_num_conflict: f64,
     pub luby_restart_inc: f64,
     pub luby_current_restarts: usize,
@@ -288,7 +288,7 @@ impl Default for State {
             restart_lbd_len: 100,  // will be overwritten by bin/splr
             restart_expansion: 1.15,
             restart_step: 50,
-            luby_restart: false,
+            use_luby_restart: false,
             luby_restart_num_conflict: 0.0,
             luby_restart_inc: 2.0,
             luby_current_restarts: 0,
@@ -355,14 +355,14 @@ impl StateIF for State {
         state.elim_subsume_literal_limit = config.elim_lit_limit;
         state.restart_thr = config.restart_threshold;
         state.restart_blk = config.restart_blocking;
-        state.restart_asg_len = config.restart_asg_samples;
-        state.restart_lbd_len = config.restart_lbd_samples;
+        state.restart_asg_len = config.restart_asg_len;
+        state.restart_lbd_len = config.restart_lbd_len;
         state.restart_step = config.restart_step;
         state.use_stagnation = !config.no_stagnation;
         state.progress_log = config.use_log;
         state.use_elim = !config.no_elim;
-        state.ema_asg = Ema::new(config.restart_asg_samples);
-        state.ema_lbd = Ema::new(config.restart_lbd_samples);
+        state.ema_asg = Ema::new(config.restart_asg_len);
+        state.ema_lbd = Ema::new(config.restart_lbd_len);
         state.model = vec![BOTTOM; cnf.num_of_variables + 1];
         state.an_seen = vec![false; cnf.num_of_variables + 1];
         state.lbd_temp = vec![0; cnf.num_of_variables + 1];
@@ -402,7 +402,7 @@ impl StateIF for State {
         }
         if self.stats[Stat::NoDecisionConflict as usize] < 30_000 {
             self.strategy = SearchStrategy::LowSuccesive;
-            self.luby_restart = true;
+            self.use_luby_restart = true;
             self.luby_restart_factor = 100.0;
             self.var_decay = 0.999;
             self.var_decay_max = 0.999;

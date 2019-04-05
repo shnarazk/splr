@@ -21,10 +21,10 @@ pub struct Config {
     pub elim_lit_limit: usize,
     /// #samples for average assignment rate
     #[structopt(long = "ra", default_value = "3500")]
-    pub restart_asg_samples: usize,
+    pub restart_asg_len: usize,
     /// #samples for average LBD of learnt clauses
     #[structopt(long = "rl", default_value = "50")]
-    pub restart_lbd_samples: usize,
+    pub restart_lbd_len: usize,
     /// threshold for forcing restart (K in Glucose)
     #[structopt(long = "rt", default_value = "0.60")]
     pub restart_threshold: f64,
@@ -72,8 +72,8 @@ impl Default for Config {
             clause_limit: 18_000_000,
             elim_grow_limit: 0,
             elim_lit_limit: 100,
-            restart_asg_samples: 3500,
-            restart_lbd_samples: 50,
+            restart_asg_len: 3500,
+            restart_lbd_len: 50,
             restart_threshold: 0.60,
             restart_blocking: 1.40,
             restart_step: 50,

@@ -410,7 +410,7 @@ fn adapt_parameters(
     state.stats[Stat::SolvedRecord] = state.num_solved_vars;
     // micro tuning of restart thresholds
     state.stats[Stat::RestartRecord] = state.stats[Stat::Restart];
-    if !state.luby_restart && state.adaptive_restart {
+    if !state.use_luby_restart && state.adaptive_restart {
         let delta: f64 = 0.025;
         let nr = state.stats[Stat::Restart] - state.stats[Stat::RestartRecord];
         if state.restart_thr <= 0.95 && nr < 4 {
