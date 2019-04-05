@@ -434,7 +434,7 @@ fn adapt_parameters(
     if nconflict == switch {
         state.flush("exhaustive eliminator activated...");
         asgs.cancel_until(vars, 0);
-        state.adapt(cdb);
+        state.adapt_strategy(cdb);
         cdb.reset(state.co_lbd_bound);
         elim.activate();
         cdb.simplify(asgs, elim, state, vars)?;

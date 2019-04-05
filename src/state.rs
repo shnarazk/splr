@@ -380,7 +380,7 @@ impl StateIF for State {
             Err(_) => false,
         }
     }
-    fn adapt(&mut self, cdb: &mut ClauseDB) {
+    fn adapt_strategy(&mut self, cdb: &mut ClauseDB) {
         if !self.use_adapt_strategy || self.strategy != SearchStrategy::Initial {
             return;
         }
