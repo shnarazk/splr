@@ -129,7 +129,7 @@ pub struct State {
     pub root_level: usize,
     pub num_vars: usize,
     /// STRATEGY
-    pub adapt_strategy: bool,
+    pub use_adapt_strategy: bool,
     pub strategy: SearchStrategy,
     pub use_chan_seok: bool,
     pub co_lbd_bound: usize,
@@ -266,7 +266,7 @@ impl Default for State {
         State {
             root_level: 0,
             num_vars: 0,
-            adapt_strategy: true,
+            use_adapt_strategy: true,
             strategy: SearchStrategy::Initial,
             use_chan_seok: false,
             co_lbd_bound: 5,
@@ -349,7 +349,7 @@ impl StateIF for State {
         };
         state.num_vars = cnf.num_of_variables;
         state.adaptive_restart = !config.no_adaptive_restart;
-        state.adapt_strategy = !config.no_adaptive_strategy;
+        state.use_adapt_strategy = !config.no_adaptive_strategy;
         state.cdb_soft_limit = config.clause_limit;
         state.elim_eliminate_grow_limit = config.elim_grow_limit;
         state.elim_subsume_literal_limit = config.elim_lit_limit;
@@ -381,7 +381,7 @@ impl StateIF for State {
         }
     }
     fn adapt(&mut self, cdb: &mut ClauseDB) {
-        if !self.adapt_strategy || self.strategy != SearchStrategy::Initial {
+        if !self.use_adapt_strategy || self.strategy != SearchStrategy::Initial {
             return;
         }
         let mut re_init = false;
