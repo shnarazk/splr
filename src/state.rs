@@ -9,6 +9,7 @@ use libc::{clock_gettime, timespec, CLOCK_PROCESS_CPUTIME_ID};
 use std::cmp::Ordering;
 use std::fmt;
 use std::io::{stdout, Write};
+use std::ops::{Index, IndexMut};
 use std::path::Path;
 use std::time::SystemTime;
 
@@ -107,6 +108,19 @@ pub enum Stat {
     NumBinLearnt,          // the number of binary learnt clauses
     NumLBD2,               // the number of clauses which LBD is 2
     EndOfStatIndex,        // Don't use this dummy.
+}
+
+impl Index<Stat> for [usize] {
+    type Output = usize;
+    fn index(&self, i: Stat) -> &usize {
+        &self[i as usize]
+    }
+}
+
+impl IndexMut<Stat> for [usize] {
+    fn index_mut(&mut self, i: Stat) -> &mut usize {
+        &mut self[i as usize]
+    }
 }
 
 /// Data storage for `Solver`

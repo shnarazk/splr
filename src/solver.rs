@@ -288,7 +288,7 @@ fn search(
     state.restart_update_luby();
     loop {
         let ci = asgs.propagate(cdb, state, vars);
-        state.stats[Stat::Propagation as usize] += 1;
+        state.stats[Stat::Propagation] += 1;
         if ci == NULL_CLAUSE {
             if state.num_vars <= asgs.len() + state.num_eliminated_vars {
                 return Ok(true);
@@ -307,16 +307,16 @@ fn search(
                 let vi = asgs.select_var(&vars);
                 let p = vars[vi].phase;
                 asgs.uncheck_assume(vars, Lit::from_var(vi, p));
-                state.stats[Stat::Decision as usize] += 1;
+                state.stats[Stat::Decision] += 1;
                 a_decision_was_made = true;
             }
         } else {
             conflict_c += 1.0;
-            state.stats[Stat::Conflict as usize] += 1;
+            state.stats[Stat::Conflict] += 1;
             if a_decision_was_made {
                 a_decision_was_made = false;
             } else {
-                state.stats[Stat::NoDecisionConflict as usize] += 1;
+                state.stats[Stat::NoDecisionConflict] += 1;
             }
             if asgs.level() == state.root_level {
                 analyze_final(asgs, state, vars, &cdb.clause[ci as usize]);
@@ -335,7 +335,7 @@ fn handle_conflict_path(
     vars: &mut [Var],
     ci: ClauseId,
 ) -> MaybeInconsistent {
-    let tn_confl = state.stats[Stat::Conflict as usize] as usize; // total number
+    let tn_confl = state.stats[Stat::Conflict]; // total number
     if tn_confl % 5000 == 0 && state.var_decay < state.var_decay_max {
         state.var_decay += 0.01;
     }
@@ -351,7 +351,7 @@ fn handle_conflict_path(
         cdb.certificate_add(new_learnt);
         asgs.uncheck_enqueue(vars, new_learnt[0], NULL_CLAUSE);
     } else {
-        state.stats[Stat::Learnt as usize] += 1;
+        state.stats[Stat::Learnt] += 1;
         let lbd = vars.compute_lbd(&new_learnt, &mut state.lbd_temp);
         let l0 = new_learnt[0];
         let cid = cdb.attach(state, vars, lbd);
@@ -359,15 +359,15 @@ fn handle_conflict_path(
         state.c_lvl.update(bl as f64);
         state.b_lvl.update(lbd as f64);
         if lbd <= 2 {
-            state.stats[Stat::NumLBD2 as usize] += 1;
+            state.stats[Stat::NumLBD2] += 1;
         }
         if learnt_len == 2 {
-            state.stats[Stat::NumBin as usize] += 1;
-            state.stats[Stat::NumBinLearnt as usize] += 1;
+            state.stats[Stat::NumBin] += 1;
+            state.stats[Stat::NumBinLearnt] += 1;
         }
         asgs.uncheck_enqueue(vars, l0, cid);
         state.restart_update_lbd(lbd);
-        state.stats[Stat::SumLBD as usize] += lbd;
+        state.stats[Stat::SumLBD] += lbd;
     }
     if tn_confl % 10_000 == 0 {
         adapt_parameters(asgs, cdb, elim, state, vars, tn_confl)?;
@@ -379,7 +379,7 @@ fn handle_conflict_path(
     state.cla_inc /= state.cla_decay;
     if ((state.use_chan_seok && !state.glureduce && state.first_reduction < cdb.num_learnt)
         || (state.glureduce
-            && state.cur_restart * state.next_reduction <= state.stats[Stat::Conflict as usize]))
+            && state.cur_restart * state.next_reduction <= state.stats[Stat::Conflict]))
         && 0 < cdb.num_learnt
     {
         state.cur_restart = ((tn_confl as f64) / (state.next_reduction as f64)) as usize + 1;
@@ -397,7 +397,7 @@ fn adapt_parameters(
     nconflict: usize,
 ) -> MaybeInconsistent {
     let switch = 100_000;
-    if switch < nconflict && state.stats[Stat::SolvedRecord as usize] == state.num_solved_vars {
+    if switch < nconflict && state.stats[Stat::SolvedRecord] == state.num_solved_vars {
         state.stagnation += 1;
     } else {
         state.stagnation = 0;
@@ -407,12 +407,12 @@ fn adapt_parameters(
             .next_power_of_two()
             .trailing_zeros()
             < state.stagnation as u32);
-    state.stats[Stat::SolvedRecord as usize] = state.num_solved_vars;
+    state.stats[Stat::SolvedRecord] = state.num_solved_vars;
     // micro tuning of restart thresholds
-    state.stats[Stat::RestartRecord as usize] = state.stats[Stat::Restart as usize];
+    state.stats[Stat::RestartRecord] = state.stats[Stat::Restart];
     if !state.luby_restart && state.adaptive_restart {
         let delta: f64 = 0.025;
-        let nr = state.stats[Stat::Restart as usize] - state.stats[Stat::RestartRecord as usize];
+        let nr = state.stats[Stat::Restart] - state.stats[Stat::RestartRecord];
         if state.restart_thr <= 0.95 && nr < 4 {
             state.restart_thr += delta;
         } else if 0.44 <= state.restart_thr && 1000 < nr {
@@ -420,9 +420,9 @@ fn adapt_parameters(
         } else if 4 < nr && nr < 1000 {
             state.restart_thr -= (state.restart_thr - 0.60) * 0.01;
         }
-        let nb = state.stats[Stat::BlockRestart as usize]
-            - state.stats[Stat::BlockRestartRecord as usize];
-        state.stats[Stat::BlockRestartRecord as usize] = state.stats[Stat::BlockRestart as usize];
+        let nb = state.stats[Stat::BlockRestart]
+            - state.stats[Stat::BlockRestartRecord];
+        state.stats[Stat::BlockRestartRecord] = state.stats[Stat::BlockRestart];
         if 1.05 <= state.restart_blk && nb < 4 {
             state.restart_blk -= delta;
         } else if state.restart_blk <= 1.8 && 1000 < nb {
