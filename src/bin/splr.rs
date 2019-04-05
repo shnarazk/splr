@@ -12,21 +12,21 @@ use structopt::StructOpt;
 
 fn main() {
     let config = Config::from_args();
-    if !config.cnf_file.exists() {
+    if !config.cnf_filename.exists() {
         println!(
             "{} does not exist.",
-            config.cnf_file.file_name().unwrap().to_str().unwrap()
+            config.cnf_filename.file_name().unwrap().to_str().unwrap()
         );
         return;
     }
-    let input = config.cnf_file.to_str().unwrap().to_string();
+    let input = config.cnf_filename.to_str().unwrap().to_string();
     let result = if config.output_filename != "" {
         config.output_filename.to_string()
     } else {
         format!(
             ".ans_{}",
             config
-                .cnf_file
+                .cnf_filename
                 .file_name()
                 .unwrap()
                 .to_str()
