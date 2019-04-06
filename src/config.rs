@@ -90,7 +90,7 @@ impl Default for Config {
             restart_step: 50,
             cnf_filename: PathBuf::new(),
             output_dirname: PathBuf::from("."),
-            result_filename: PathBuf::from(""),
+            result_filename: PathBuf::new(),
             proof_filename: PathBuf::from("proof.out"),
             use_log: false,
             no_elim: false,
