@@ -90,3 +90,14 @@ impl Default for Config {
         }
     }
 }
+
+impl<T> From<T> for Config
+where
+    PathBuf: From<T>,
+{
+    fn from(path: T) -> Config {
+        let mut config = Config::default();
+        config.cnf_filename = PathBuf::from(path);
+        config
+    }
+}

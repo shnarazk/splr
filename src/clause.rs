@@ -360,7 +360,7 @@ impl ClauseDBIF for ClauseDB {
         self.clause
             .iter()
             .skip(1)
-            .filter(|&c| c.flags.contains(mask))
+            .filter(|&c| c.flags.contains(mask) && !c.flags.contains(Flag::DEAD))
             .count()
     }
     // Note: set lbd to 0 if you want to add the clause to Permanent.
@@ -529,6 +529,7 @@ impl ClauseDBIF for ClauseDB {
     }
 }
 
+/*
 impl ClauseDB {
     #[allow(dead_code)]
     fn check_liveness1(&self) -> bool {
@@ -618,3 +619,4 @@ impl ClauseDB {
         }
     }
 }
+*/

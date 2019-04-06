@@ -10,6 +10,7 @@ use std::fs;
 use std::io::{BufRead, BufReader};
 
 /// Normal results returned by Solver.
+#[derive(Debug, PartialEq)]
 pub enum Certificate {
     SAT(Vec<i32>),
     UNSAT,
@@ -57,6 +58,20 @@ impl SatSolverIF for Solver {
             vars: Var::new_vars(nv),
         }
     }
+    /// # Examples
+    ///
+    /// ```
+    /// use splr::traits::SatSolverIF;
+    /// use splr::config::Config;
+    /// use splr::solver::{Solver, Certificate};
+    ///
+    /// let config = Config::from("tests/sample.cnf");
+    /// if let Ok(mut s) = Solver::build(&config) {
+    ///     let res = s.solve();
+    ///     assert!(res.is_ok());
+    ///     assert_ne!(res.unwrap(), Certificate::UNSAT);
+    /// }
+    ///```
     fn solve(&mut self) -> SolverResult {
         let Solver {
             ref mut asgs,
@@ -71,7 +86,7 @@ impl SatSolverIF for Solver {
         if cdb.check_size(state).is_err() {
             return Err(SolverException::OutOfMemory);
         }
-        // TODO: deal with assumptions
+        // NOTE: splr doesn't deal with assumptions.
         // s.root_level = 0;
         state.num_solved_vars = asgs.len();
         state.progress_header();
@@ -173,6 +188,16 @@ impl SatSolverIF for Solver {
             }
         }
     }
+    /// # Examples
+    ///
+    /// ```
+    /// use splr::traits::SatSolverIF;
+    /// use splr::config::Config;
+    /// use splr::solver::Solver;
+    ///
+    /// let config = Config::from("tests/sample.cnf");
+    /// assert!(Solver::build(&config).is_ok());
+    ///```
     fn build(config: &Config) -> std::io::Result<Solver> {
         let fs = fs::File::open(&config.cnf_filename)?;
         let mut rs = BufReader::new(fs);

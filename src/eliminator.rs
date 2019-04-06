@@ -51,7 +51,7 @@ impl EliminatorIF for Eliminator {
     fn is_waiting(&self) -> bool {
         self.mode == EliminatorMode::Waiting
     }
-    // FIXME: due to a potential bug of killing clauses and difficulty about
+    // Due to a potential bug of killing clauses and difficulty about
     // synchronization between 'garbage_collect' and clearing occur lists,
     // 'stop' should purge all occur lists to purge any dead clauses for now.
     fn stop(&mut self, cdb: &mut ClauseDB, vars: &mut [Var]) {

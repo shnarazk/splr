@@ -25,7 +25,9 @@ pub enum SearchStrategy {
     /// High-Successive-Conflicts using Chan Seok heuristics
     HighSuccesive,
     /// Low-Successive-Conflicts w/ Luby sequence
-    LowSuccesive,
+    LowSuccesiveLuby,
+    /// Low-Successive-Conflicts w/o Luby sequence
+    LowSuccesiveM,
     /// Many-Glue-Clauses
     ManyGlues,
 }
@@ -47,7 +49,12 @@ impl fmt::Display for SearchStrategy {
                     SearchStrategy::HighSuccesive => {
                         "High-Successive-Conflicts using Chan Seok heuristics"
                     }
-                    SearchStrategy::LowSuccesive => "Low-Successive-Conflicts w/ Luby sequence",
+                    SearchStrategy::LowSuccesiveLuby => {
+                        "Low-Successive-Conflicts-Luby w/ Luby sequence"
+                    }
+                    SearchStrategy::LowSuccesiveM => {
+                        "Low-Successive-Conflicts-Modified w/o Luby sequence"
+                    }
                     SearchStrategy::ManyGlues => "Many-Glue-Clauses",
                 }
             )
@@ -57,7 +64,8 @@ impl fmt::Display for SearchStrategy {
                 SearchStrategy::Generic => "generic",
                 SearchStrategy::LowDecisions => "LowDecs",
                 SearchStrategy::HighSuccesive => "HighSucc",
-                SearchStrategy::LowSuccesive => "LowSucc",
+                SearchStrategy::LowSuccesiveLuby => "LowSuccLuby",
+                SearchStrategy::LowSuccesiveM => "LowSuccM",
                 SearchStrategy::ManyGlues => "ManyGlue",
             };
             if let Some(w) = formatter.width() {
@@ -80,7 +88,8 @@ impl SearchStrategy {
             SearchStrategy::Generic => "generic (using the generic parameter set)",
             SearchStrategy::LowDecisions => "LowDecs (many conflicts at low levels, using CSh)",
             SearchStrategy::HighSuccesive => "HighSucc (long decision chains)",
-            SearchStrategy::LowSuccesive => "LowSucc (successive conflicts, using Luby)",
+            SearchStrategy::LowSuccesiveLuby => "LowSuccLuby (successive conflicts)",
+            SearchStrategy::LowSuccesiveM => "LowSuccP (successive conflicts)",
             SearchStrategy::ManyGlues => "ManyGlue (many glue clauses)",
         }
     }
@@ -107,6 +116,7 @@ pub enum Stat {
     NumBin,                // the number of binary clauses
     NumBinLearnt,          // the number of binary learnt clauses
     NumLBD2,               // the number of clauses which LBD is 2
+    Stagnation,            // the number of stagnation
     EndOfStatIndex,        // Don't use this dummy.
 }
 
@@ -165,6 +175,7 @@ pub struct State {
     pub luby_current_restarts: usize,
     pub luby_restart_factor: f64,
     pub use_stagnation: bool,
+    pub stagnated: bool,
     /// Eliminator
     pub use_elim: bool,
     /// 0 for no limit
@@ -186,7 +197,7 @@ pub struct State {
     pub cur_restart: usize,
     pub after_restart: usize,
     pub elim_trigger: usize,
-    pub stagnation: usize,
+    pub stagnation: isize,
     pub stats: [usize; Stat::EndOfStatIndex as usize], // statistics
     pub ema_asg: Ema,
     pub ema_lbd: Ema,
@@ -207,31 +218,6 @@ pub struct State {
     pub progress_cnt: usize,
     pub progress_log: bool,
     pub target: CNFDescription,
-}
-
-macro_rules! i {
-    ($format: expr, $record: expr, $key: expr, $val: expr) => {
-        match $val {
-            v => {
-                let ptr = &mut $record.vali[$key as usize];
-                *ptr = v;
-                format!($format, *ptr)
-            }
-        }
-    };
-}
-
-#[allow(unused_macros)]
-macro_rules! f {
-    ($format: expr, $record: expr, $key: expr, $val: expr) => {
-        match $val {
-            v => {
-                let ptr = &mut $record.valf[$key as usize];
-                *ptr = v;
-                format!($format, *ptr)
-            }
-        }
-    };
 }
 
 macro_rules! im {
@@ -255,6 +241,31 @@ macro_rules! im {
                     *ptr = v;
                     format!($format, *ptr)
                 }
+            }
+        }
+    };
+}
+
+macro_rules! i {
+    ($format: expr, $record: expr, $key: expr, $val: expr) => {
+        match $val {
+            v => {
+                let ptr = &mut $record.vali[$key as usize];
+                *ptr = v;
+                format!($format, *ptr)
+            }
+        }
+    };
+}
+
+#[allow(unused_macros)]
+macro_rules! f {
+    ($format: expr, $record: expr, $key: expr, $val: expr) => {
+        match $val {
+            v => {
+                let ptr = &mut $record.valf[$key as usize];
+                *ptr = v;
+                format!($format, *ptr)
             }
         }
     };
@@ -319,6 +330,7 @@ impl Default for State {
             luby_current_restarts: 0,
             luby_restart_factor: 100.0,
             use_stagnation: true,
+            stagnated: false,
             ema_coeffs: (2 ^ 5, 2 ^ 15),
             use_elim: true,
             elim_eliminate_combination_limit: 80,
@@ -424,7 +436,7 @@ impl StateIF for State {
             re_init = true;
         }
         if self.stats[Stat::NoDecisionConflict] < 30_000 {
-            self.strategy = SearchStrategy::LowSuccesive;
+            self.strategy = SearchStrategy::LowSuccesiveLuby;
             self.use_luby_restart = true;
             self.luby_restart_factor = 100.0;
             self.var_decay = 0.999;
@@ -596,19 +608,19 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K   Conflicts|aLBD:{}, bjmp:{}, cnfl:{} |blkR:{} ",
+            "\x1B[2K    Conflict|aLBD:{}, bjmp:{}, cnfl:{} |#stg:{} ",
             fm!("{:>9.2}", self.record, LogF64Id::AveLBD, self.ema_lbd.get()),
             fm!("{:>9.2}", self.record, LogF64Id::BLevel, self.b_lvl.get()),
             fm!("{:>9.2}", self.record, LogF64Id::CLevel, self.c_lvl.get()),
-            fm!(
-                "{:>9.4}",
+            im!(
+                "{:>9}",
                 self.record,
-                LogF64Id::RestartBlkR,
-                self.restart_blk
+                LogUsizeId::Stagnation,
+                self.stats[Stat::Stagnation]
             ),
         );
         println!(
-            "\x1B[2K   Clause DB|#rdc:{}, #sce:{}, #exe:{} |frcK:{} ",
+            "\x1B[2K   Clause DB|#rdc:{}, #sce:{} |blkR:{}, frcK:{} ",
             im!(
                 "{:>9}",
                 self.record,
@@ -621,11 +633,11 @@ impl StateIF for State {
                 LogUsizeId::SatClauseElim,
                 self.stats[Stat::SatClauseElimination]
             ),
-            im!(
-                "{:>9}",
+            fm!(
+                "{:>9.4}",
                 self.record,
-                LogUsizeId::ExhaustiveElim,
-                self.stats[Stat::ExhaustiveElimination]
+                LogF64Id::RestartBlkR,
+                self.restart_blk
             ),
             fm!(
                 "{:>9.4}",
@@ -704,8 +716,9 @@ pub enum LogUsizeId {
     Reduction,      // 12: reduction: usize,
     SatClauseElim,  // 13: simplification: usize,
     ExhaustiveElim, // 14: elimination: usize,
-    // ElimClauseQueue, // 15: elim_clause_queue: usize,
-    // ElimVarQueue, // 16: elim_var_queue: usize,
+    Stagnation,     // 15: stagnation: usize,
+    // ElimClauseQueue, // 16: elim_clause_queue: usize,
+    // ElimVarQueue, // 17: elim_var_queue: usize,
     End,
 }
 
@@ -764,7 +777,7 @@ impl State {
         let nv = vars.len() - 1;
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
-        let nlearnts = cdb.countf(Flag::LEARNT); // TODO eliminate DEAD
+        let nlearnts = cdb.countf(Flag::LEARNT);
         let ncnfl = self.stats[Stat::Conflict];
         let nrestart = self.stats[Stat::Restart];
         println!(

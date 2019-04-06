@@ -50,7 +50,7 @@ pub trait ClauseDBIF {
     fn bump_activity(&mut self, inc: &mut f64, cid: ClauseId);
     /// return the number of alive clauses in the database. Or return the database size if `active` is `false`.
     fn count(&self, alive: bool) -> usize;
-    /// return the number of clauses which satisfy given flags.
+    /// return the number of clauses which satisfy given flags and aren't DEAD.
     fn countf(&self, mask: Flag) -> usize;
     /// record a clause to unsat certification
     fn certificate_add(&mut self, vec: &[Lit]);
