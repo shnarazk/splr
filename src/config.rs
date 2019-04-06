@@ -34,9 +34,18 @@ pub struct Config {
     /// #conflicts between restarts
     #[structopt(long = "rs", default_value = "50")]
     pub restart_step: usize,
-    /// output filename; use default rule if it's empty.
-    #[structopt(long = "--output", short = "o", default_value = "")]
-    pub output_filename: String,
+    /// a DIMACS format CNF file
+    #[structopt(parse(from_os_str))]
+    pub cnf_filename: std::path::PathBuf,
+    /// output directory, applied to result and proof
+    #[structopt(long = "--dir", short = "o", default_value = ".")]
+    pub output_dirname: String,
+    /// result filename/stdout; use default if empty
+    #[structopt(long = "--result", short = "r", default_value = "")]
+    pub result_filename: String,
+    /// filename of DRAT UNSAT certification
+    #[structopt(long = "proof", default_value = "proof.out", short = "p")]
+    pub proof_filename: String,
     /// Uses Glucose format for progress report
     #[structopt(long = "--log", short = "l")]
     pub use_log: bool,
@@ -49,18 +58,15 @@ pub struct Config {
     /// Disables dynamic strategy adaptation
     #[structopt(long = "no-adaptive_strategy", short = "S")]
     pub no_adaptive_strategy: bool,
-    /// Disables stagnation model
-    #[structopt(long = "no-stagnation", short = "T")]
+    /// Disables pendulum search model
+    #[structopt(long = "no-pendulum", short = "P")]
     pub no_stagnation: bool,
-    /// a CNF file to solve
-    #[structopt(parse(from_os_str))]
-    pub cnf_filename: std::path::PathBuf,
+    /// Disables learnt minimization
+    #[structopt(long = "no-learnt-min", short = "M")]
+    pub no_learnt_minimization: bool,
     /// Writes a DRAT UNSAT certification file
     #[structopt(long = "certify", short = "c")]
     pub use_certification: bool,
-    /// filename of DRAT UNSAT certification
-    #[structopt(long = "proof", default_value = "proof.out", short = "p")]
-    pub proof_filename: String,
     /// CPU time limit in sec. (zero for no limit).
     #[structopt(long = "to", default_value = "0")]
     pub timeout: f64,
@@ -77,15 +83,17 @@ impl Default for Config {
             restart_threshold: 0.60,
             restart_blocking: 1.40,
             restart_step: 50,
-            output_filename: "".to_string(),
+            cnf_filename: PathBuf::new(),
+            output_dirname: String::new(),
+            result_filename: "".to_string(),
+            proof_filename: "proof.out".to_string(),
             use_log: false,
             no_elim: false,
             no_adaptive_restart: false,
             no_adaptive_strategy: false,
             no_stagnation: false,
-            cnf_filename: PathBuf::new(),
+            no_learnt_minimization: false,
             use_certification: false,
-            proof_filename: "proof.out".to_string(),
             timeout: 0.0,
         }
     }
