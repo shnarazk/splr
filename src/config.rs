@@ -47,7 +47,7 @@ pub struct Config {
     #[structopt(
         long = "proof",
         default_value = "proof.out",
-        short = "",
+        short = "p",
         parse(from_os_str)
     )]
     pub proof_filename: PathBuf,
