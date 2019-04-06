@@ -58,9 +58,6 @@ impl WatchDBIF for Vec<Watch> {
     fn initialize(self, _n: usize) -> Self {
         self
     }
-    fn count(&self) -> usize {
-        self.len()
-    }
     fn register(&mut self, blocker: Lit, c: ClauseId) {
         self.push(Watch { blocker, c });
     }
@@ -241,7 +238,7 @@ impl ClauseDBIF for ClauseDB {
             touched[i + 2] = false;
             for k in &[0, 1] {
                 let mut n = 0;
-                while n < ws[*k].count() {
+                while n < ws[*k].len() {
                     let cid = ws[*k][n].c;
                     let c = &mut clause[cid as usize];
                     if !c.is(Flag::DEAD) {
