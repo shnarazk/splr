@@ -162,9 +162,6 @@ impl PropagatorIF for AssignStack {
                 }
             }
             if NULL_CLAUSE != conflict_clause {
-                // if 1 < num_conflict_update {
-                //     state.flush(&format!("{},", num_conflict_update));
-                // }
                 self.catchup();
                 return conflict_clause;
             }
