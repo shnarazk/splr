@@ -25,7 +25,7 @@ fn main() {
         "-" => None,
         "" => Some(config.output_dirname.join(PathBuf::from(format!(
             ".ans_{}",
-            config.cnf_filename.to_string_lossy(),
+            config.cnf_filename.file_name().unwrap().to_string_lossy(),
         )))),
         _ => Some(config.output_dirname.join(&config.result_filename)),
     };
