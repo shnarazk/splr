@@ -21,16 +21,11 @@ fn main() {
         return;
     }
     let cnf_file = config.cnf_filename.to_string_lossy();
-    let ans_file: Option<PathBuf> = match config
-        .result_filename
-        .to_string_lossy()
-        .into_owned()
-        .as_str()
-    {
+    let ans_file: Option<PathBuf> = match config.result_filename.to_string_lossy().as_ref() {
         "-" => None,
         "" => Some(config.output_dirname.join(PathBuf::from(format!(
             ".ans_{}",
-            config.cnf_filename.file_name().unwrap().to_string_lossy(),
+            config.cnf_filename.to_string_lossy(),
         )))),
         _ => Some(config.output_dirname.join(&config.result_filename)),
     };
