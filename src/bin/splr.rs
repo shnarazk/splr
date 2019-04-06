@@ -21,24 +21,19 @@ fn main() {
         return;
     }
     let cnf_file = config.cnf_filename.to_str().unwrap().to_string();
-    let ans_file: Option<PathBuf> = match config.result_filename.as_str() {
+    let ans_file: Option<PathBuf> = match config.result_filename.to_string_lossy().as_ref() {
         "-" => None,
-        "" => Some(
-            PathBuf::from(&config.output_dirname).join(PathBuf::from(format!(
-                ".ans_{}",
-                config.cnf_filename.file_name().unwrap().to_str().unwrap()
-            ))),
-        ),
-        _ => {
-            Some(PathBuf::from(&config.output_dirname).join(PathBuf::from(&config.result_filename)))
-        }
+        "" => Some(config.output_dirname.join(PathBuf::from(format!(
+            ".ans_{}",
+            config.cnf_filename.to_string_lossy()
+        )))),
+        _ => Some(config.output_dirname.join(&config.result_filename)),
     };
-    if config.proof_filename != "proof.out" && !config.use_certification {
+    if config.proof_filename.to_string_lossy() != "proof.out" && !config.use_certification {
         println!("Abort: You set a proof filename with '--proof' explicitly, but didn't set '--certify'. It doesn't look good.");
         return;
     }
-    let proof_file: PathBuf =
-        PathBuf::from(&config.output_dirname).join(PathBuf::from(&config.proof_filename));
+    let proof_file: PathBuf = config.output_dirname.join(&config.proof_filename);
     let mut s = Solver::build(&config).expect("failed to load");
     let res = s.solve();
     match &res {

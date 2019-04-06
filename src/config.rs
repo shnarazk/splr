@@ -36,16 +36,21 @@ pub struct Config {
     pub restart_step: usize,
     /// a DIMACS format CNF file
     #[structopt(parse(from_os_str))]
-    pub cnf_filename: std::path::PathBuf,
+    pub cnf_filename: PathBuf,
     /// output directory, applied to result and proof
-    #[structopt(long = "--dir", short = "o", default_value = ".")]
-    pub output_dirname: String,
+    #[structopt(long = "--dir", short = "o", default_value = ".", parse(from_os_str))]
+    pub output_dirname: PathBuf,
     /// result filename/stdout; use default if empty
-    #[structopt(long = "--result", short = "r", default_value = "")]
-    pub result_filename: String,
+    #[structopt(long = "--result", short = "r", default_value = "", parse(from_os_str))]
+    pub result_filename: PathBuf,
     /// filename of DRAT UNSAT certification
-    #[structopt(long = "proof", default_value = "proof.out", short = "p")]
-    pub proof_filename: String,
+    #[structopt(
+        long = "proof",
+        default_value = "proof.out",
+        short = "",
+        parse(from_os_str)
+    )]
+    pub proof_filename: PathBuf,
     /// Uses Glucose format for progress report
     #[structopt(long = "--log", short = "l")]
     pub use_log: bool,
@@ -84,9 +89,9 @@ impl Default for Config {
             restart_blocking: 1.40,
             restart_step: 50,
             cnf_filename: PathBuf::new(),
-            output_dirname: String::from("."),
-            result_filename: String::from(""),
-            proof_filename: String::from("proof.out"),
+            output_dirname: PathBuf::from("."),
+            result_filename: PathBuf::from(""),
+            proof_filename: PathBuf::from("proof.out"),
             use_log: false,
             no_elim: false,
             no_adaptive_restart: false,
