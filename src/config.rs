@@ -67,7 +67,7 @@ pub struct Config {
     /// Writes a DRAT UNSAT certification file
     #[structopt(long = "certify", short = "c")]
     pub use_certification: bool,
-    /// CPU time limit in sec. (zero for no limit).
+    /// CPU time limit in sec. (zero for no limit)
     #[structopt(long = "to", default_value = "0")]
     pub timeout: f64,
 }
@@ -85,8 +85,8 @@ impl Default for Config {
             restart_step: 50,
             cnf_filename: PathBuf::new(),
             output_dirname: String::new(),
-            result_filename: "".to_string(),
-            proof_filename: "proof.out".to_string(),
+            result_filename: String::from("."),
+            proof_filename: String::from("proof.out"),
             use_log: false,
             no_elim: false,
             no_adaptive_restart: false,

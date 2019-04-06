@@ -92,7 +92,7 @@ impl PropagatorIF for AssignStack {
         while self.remains() {
             let p: usize = self.sweep() as usize;
             let false_lit = (p as Lit).negate();
-            state.stats[Stat::Propagation as usize] += 1;
+            state.stats[Stat::Propagation] += 1;
             unsafe {
                 let source = (*watcher).get_unchecked_mut(p);
                 let mut n = 0;
