@@ -93,6 +93,8 @@ impl PropagatorIF for AssignStack {
             let p: usize = self.sweep() as usize;
             let false_lit = (p as Lit).negate();
             state.stats[Stat::Propagation] += 1;
+            let mut conflict_clause: ClauseId = NULL_CLAUSE;
+            let mut conflict_clause_size: usize = 3;
             unsafe {
                 let source = (*watcher).get_unchecked_mut(p);
                 let mut n = 0;
@@ -129,14 +131,24 @@ impl PropagatorIF for AssignStack {
                             }
                         }
                         if first_value == FALSE {
-                            self.catchup();
-                            return w.c;
+                            let n = lits.len();
+                            if n == 3 || state.config.no_learnt_minimization {
+                                self.catchup();
+                                return w.c;
+                            } else if NULL_CLAUSE == conflict_clause || n < conflict_clause_size {
+                                conflict_clause_size = n;
+                                conflict_clause = w.c;
+                            }
                         } else {
                             self.uncheck_enqueue(vars, first, w.c);
                         }
                     }
                     n += 1;
                 }
+            }
+            if NULL_CLAUSE != conflict_clause {
+                self.catchup();
+                return conflict_clause;
             }
         }
         NULL_CLAUSE
