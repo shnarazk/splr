@@ -429,9 +429,8 @@ fn adapt_parameters(
         && switch < nconflict
         && !state.use_luby_restart
         && stopped
-        && (((state.num_vars - state.num_solved_vars) as f64).log(2.0)
-            * (state.c_lvl.get() / state.b_lvl.get()).sqrt()
-            < state.stagnation as f64);
+        && ((state.num_vars - state.num_solved_vars) as f64 / 64.0).powf(1.25) < state.stagnation as f64
+        ;
     if !state.stagnated && stagnated {
         state.stats[Stat::Stagnation] += 1;
     } else if state.stagnated && !stagnated {
@@ -529,10 +528,10 @@ fn analyze(
             }
             for q in &(*c).lits[((p != NULL_LIT) as usize)..] {
                 let vi = q.vi();
-                vars.bump_activity(&mut state.var_inc, vi);
+                let lvl = vars[vi].level;
+                vars.bump_activity(&mut state.var_inc, vi, lvl as f64 / dl as f64);
                 asgs.update_order(vars, vi);
                 let v = &mut vars[vi];
-                let lvl = v.level;
                 debug_assert!(!v.is(Flag::ELIMINATED));
                 debug_assert!(v.assign != BOTTOM);
                 if 0 < lvl && !state.an_seen[vi] {
@@ -604,11 +603,12 @@ fn simplify_learnt(
         minimize_with_bi_clauses(cdb, vars, &mut state.lbd_temp, new_learnt);
     }
     // glucose heuristics
+    let dl = asgs.level() as f64;
     let lbd = vars.compute_lbd(new_learnt, &mut state.lbd_temp);
     while let Some(l) = state.last_dl.pop() {
         let vi = l.vi();
         if cdb.clause[vars[vi].reason as usize].rank < lbd {
-            vars.bump_activity(&mut state.var_inc, vi);
+            vars.bump_activity(&mut state.var_inc, vi, vars[vi].level as f64 / dl);
             asgs.update_order(vars, vi);
         }
     }

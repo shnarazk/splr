@@ -100,9 +100,9 @@ impl VarDBIF for [Var] {
         keys[0] = key;
         cnt
     }
-    fn bump_activity(&mut self, inc: &mut f64, vi: VarId) {
+    fn bump_activity(&mut self, inc: &mut f64, vi: VarId, scale: f64) {
         let v = &mut self[vi];
-        let a = v.activity + *inc;
+        let a = v.activity + *inc * scale;
         v.activity = a;
         if VAR_ACTIVITY_MAX < a {
             for v in &mut self[1..] {
