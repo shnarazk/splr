@@ -88,7 +88,7 @@ impl PropagatorIF for AssignStack {
     /// So Eliminator should call `garbage_collect` before me.
     fn propagate(&mut self, cdb: &mut ClauseDB, state: &mut State, vars: &mut [Var]) -> ClauseId {
         let head = &mut cdb.clause;
-        let watcher = &mut cdb.watcher[..] as *mut [[Vec<Watch>; 1]];
+        let watcher = &mut cdb.watcher[..] as *mut [[Vec<Watch>; 2]];
         while self.remains() {
             let p: usize = self.sweep() as usize;
             let false_lit = (p as Lit).negate();
