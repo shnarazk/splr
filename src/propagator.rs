@@ -88,23 +88,25 @@ impl PropagatorIF for AssignStack {
     /// So Eliminator should call `garbage_collect` before me.
     fn propagate(&mut self, cdb: &mut ClauseDB, state: &mut State, vars: &mut [Var]) -> ClauseId {
         let head = &mut cdb.clause;
-        let watcher = &mut cdb.watcher[..] as *mut [[Vec<Watch>; 2]];
+        let watcher = &mut cdb.watcher[..] as *mut [[Vec<Watch>; 1]];
         while self.remains() {
             let p: usize = self.sweep() as usize;
             let false_lit = (p as Lit).negate();
             state.stats[Stat::Propagation] += 1;
-            unsafe {
-                for w in &(*watcher)[p][1] {
-                    debug_assert_ne!(w.blocker, false_lit);
-                    match self.assigned(w.blocker) {
-                        FALSE => {
-                            self.catchup();
-                            return w.c;
+            if !state.config.no_learnt_minimization {
+                unsafe {
+                    for w in &(*watcher)[p][0] {
+                        debug_assert_ne!(w.blocker, false_lit);
+                        match self.assigned(w.blocker) {
+                            FALSE => {
+                                self.catchup();
+                                return w.c;
+                            }
+                            TRUE => (),
+                            // conflicts are designated not only BOTTOM
+                            // but also BOTTOM.negate().
+                            _ => self.uncheck_enqueue(vars, w.blocker, w.c),
                         }
-                        TRUE => (),
-                        // conflicts are designated not only BOTTOM
-                        // but also BOTTOM.negate().
-                        _ => self.uncheck_enqueue(vars, w.blocker, w.c),
                     }
                 }
             }

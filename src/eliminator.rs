@@ -573,7 +573,7 @@ fn strengthen(cdb: &mut ClauseDB, cid: ClauseId, p: Lit) -> bool {
     }
     debug_assert!(1 < p.negate());
     let lits = &mut (*c).lits;
-    let bin_old = lits.len() == 2;
+    let bin_old = false;        // lits.len() == 2;
     debug_assert!(1 < lits.len());
     if lits.len() == 2 {
         if lits[0] == p {
@@ -591,7 +591,7 @@ fn strengthen(cdb: &mut ClauseDB, cid: ClauseId, p: Lit) -> bool {
             (lits[1], lits[0])
         };
         debug_assert!(1 < p.negate());
-        let bin_new = lits.len() == 2;
+        let bin_new = false;    // lits.len() == 2;
         watcher[p.negate() as usize][bin_old as usize].detach_with(cid);
         watcher[q.negate() as usize][bin_new as usize].register(r, cid);
         // update another bocker

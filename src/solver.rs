@@ -716,8 +716,11 @@ fn minimize_with_bi_clauses(cdb: &ClauseDB, vars: &[Var], temp: &mut [usize], ve
     }
     let l0 = vec[0];
     let mut nsat = 0;
-    for w in &cdb.watcher[l0.negate() as usize][1] {
+    for w in &cdb.watcher[l0.negate() as usize][0] {
         let c = &cdb.clause[w.c as usize];
+        if 2 < c.lits.len() {
+            continue;
+        }
         debug_assert_eq!(c.lits.len(), 2);
         debug_assert!(c.lits[0] == l0 || c.lits[1] == l0);
         let other = c.lits[(c.lits[0] == l0) as usize];
