@@ -93,25 +93,21 @@ impl PropagatorIF for AssignStack {
             let p: usize = self.sweep() as usize;
             let false_lit = (p as Lit).negate();
             state.stats[Stat::Propagation] += 1;
-            /*
-            if state.config.learnt_minimization {
-                unsafe {
-                    for w in &(*watcher)[p][0] {
-                        debug_assert_ne!(w.blocker, false_lit);
-                        match self.assigned(w.blocker) {
-                            FALSE => {
-                                self.catchup();
-                                return w.c;
-                            }
-                            TRUE => (),
-                            // conflicts are designated not only BOTTOM
-                            // but also BOTTOM.negate().
-                            _ => self.uncheck_enqueue(vars, w.blocker, w.c),
+            unsafe {
+                for w in &(*watcher)[p][1] {
+                    debug_assert_ne!(w.blocker, false_lit);
+                    match self.assigned(w.blocker) {
+                        FALSE => {
+                            self.catchup();
+                            return w.c;
                         }
+                        TRUE => (),
+                        // conflicts are designated not only BOTTOM
+                        // but also BOTTOM.negate().
+                        _ => self.uncheck_enqueue(vars, w.blocker, w.c),
                     }
                 }
             }
-            */
             let bin = 0;
             let mut conflict_clause: ClauseId = NULL_CLAUSE;
             let mut conflict_clause_size: usize = 3;
@@ -121,19 +117,8 @@ impl PropagatorIF for AssignStack {
                 'next_clause: while n < source.len() {
                     let w = source.get_unchecked_mut(n);
                     debug_assert!(!head[w.c as usize].is(Flag::DEAD));
-                    let blocker_value = self.assigned(w.blocker);
-                    if  blocker_value != TRUE {
+                    if self.assigned(w.blocker) != TRUE {
                         let lits = &mut head.get_unchecked_mut(w.c as usize).lits;
-                        if lits.len() == 2 {
-                            if blocker_value == FALSE {
-                                self.catchup();
-                                return w.c;
-                            } else {
-                                self.uncheck_enqueue(vars, w.blocker, w.c);
-                                n += 1;
-                                continue;
-                            }
-                        }
                         debug_assert!(2 <= lits.len());
                         debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
                         let mut first = *lits.get_unchecked(0);

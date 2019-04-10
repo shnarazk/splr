@@ -271,7 +271,7 @@ impl ClauseDBIF for ClauseDB {
         let cid;
         let l0 = v[0];
         let l1 = v[1];
-        let bin = false;        // v.len() == 2;
+        let bin = v.len() == 2;
         if let Some(w) = self.watcher[NULL_LIT.negate() as usize][0].pop() {
             cid = w.c;
             let c = &mut self.clause[cid as usize];
