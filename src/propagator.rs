@@ -93,7 +93,7 @@ impl PropagatorIF for AssignStack {
             let p: usize = self.sweep() as usize;
             let false_lit = (p as Lit).negate();
             state.stats[Stat::Propagation] += 1;
-            if !state.config.no_learnt_minimization {
+            if state.config.learnt_minimization {
                 unsafe {
                     for w in &(*watcher)[p][0] {
                         debug_assert_ne!(w.blocker, false_lit);
@@ -149,7 +149,7 @@ impl PropagatorIF for AssignStack {
                         }
                         if first_value == FALSE {
                             let n = lits.len();
-                            if n == 3 || state.config.no_learnt_minimization {
+                            if n == 3 || !state.config.learnt_minimization {
                                 self.catchup();
                                 return w.c;
                             } else if NULL_CLAUSE == conflict_clause || n < conflict_clause_size {
