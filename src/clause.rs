@@ -72,6 +72,14 @@ impl WatchDBIF for Vec<Watch> {
             }
         }
     }
+    fn update_blocker(&mut self, cid: ClauseId, l: Lit) {
+        for w in &mut self[..] {
+            if w.c == cid {
+                w.blocker = l;
+                return;
+            }
+        }
+    }
 }
 
 /// A representation of 'clause'

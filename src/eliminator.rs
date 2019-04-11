@@ -582,18 +582,27 @@ fn strengthen(cdb: &mut ClauseDB, cid: ClauseId, p: Lit) -> bool {
         return true;
     }
     if lits[0] == p || lits[1] == p {
-        let q = if lits[0] == p {
+        let (q, r) = if lits[0] == p {
             lits.swap_remove(0);
-            lits[0]
+            (lits[0], lits[1])
         } else {
             lits.swap_remove(1);
-            lits[1]
+            (lits[1], lits[0])
         };
         debug_assert!(1 < p.negate());
         watcher[p.negate() as usize].detach_with(cid);
-        watcher[q.negate() as usize].register(q, cid);
+        watcher[q.negate() as usize].register(r, cid);
+        // update another bocker
+        watcher[r.negate() as usize].update_blocker(cid, q);
     } else {
         lits.delete_unstable(|&x| x == p);
+        if lits.len() == 2 {
+            // make sure the blockers are the opposite literals
+            let q = lits[0];
+            let r = lits[1];
+            watcher[q.negate() as usize].update_blocker(cid, r);
+            watcher[r.negate() as usize].update_blocker(cid, q);
+        }
     }
     false
 }
