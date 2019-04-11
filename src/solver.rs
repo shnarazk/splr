@@ -459,9 +459,11 @@ fn adapt_parameters(
         state.flush("exhaustive eliminator activated...");
         asgs.cancel_until(vars, 0);
         state.adapt_strategy(cdb);
-        cdb.reset(state.co_lbd_bound);
-        elim.activate();
-        cdb.simplify(asgs, elim, state, vars)?;
+        if state.use_elim {
+            cdb.reset(state.co_lbd_bound);
+            elim.activate();
+            cdb.simplify(asgs, elim, state, vars)?;
+        }
     }
     state.progress(cdb, vars, None);
     state.restart_step = 50 + 40_000 * (stagnated as usize);
