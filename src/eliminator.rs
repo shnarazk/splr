@@ -597,6 +597,12 @@ fn strengthen(cdb: &mut ClauseDB, cid: ClauseId, p: Lit) -> bool {
         }
     } else {
         lits.delete_unstable(|&x| x == p);
+        if lits.len() == 2 {    // update another bocker
+            let q = lits[0];
+            let r = lits[1];
+            watcher[q.negate() as usize].update_blocker(cid, r);
+            watcher[r.negate() as usize].update_blocker(cid, q);
+        }
     }
     false
 }
