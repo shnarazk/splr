@@ -100,7 +100,7 @@ impl PropagatorIF for AssignStack {
                 let mut n = 0;
                 'next_clause: while n < source.len() {
                     let w = source.get_unchecked_mut(n);
-                    assert!(!head[w.c as usize].is(Flag::DEAD));
+                    debug_assert!(!head[w.c as usize].is(Flag::DEAD));
                     let blocker_value = self.assigned(w.blocker);
                     if blocker_value != TRUE {
                         let lits = &mut head.get_unchecked_mut(w.c as usize).lits;
