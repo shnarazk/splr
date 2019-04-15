@@ -595,14 +595,11 @@ fn strengthen(cdb: &mut ClauseDB, cid: ClauseId, p: Lit) -> bool {
         // update another bocker
         watcher[r.negate() as usize].update_blocker(cid, q);
     } else {
-        lits.delete_unstable(|&x| x == p);
-        if lits.len() == 2 {
-            // make sure the blockers are the opposite literals
-            let q = lits[0];
-            let r = lits[1];
-            watcher[q.negate() as usize].update_blocker(cid, r);
-            watcher[r.negate() as usize].update_blocker(cid, q);
-        }
+        // make sure the blockers are the opposite literals
+        let q = lits[0];
+        let r = lits[1];
+        watcher[q.negate() as usize].update_blocker(cid, r);
+        watcher[r.negate() as usize].update_blocker(cid, q);
     }
     false
 }
