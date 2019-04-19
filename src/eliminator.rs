@@ -592,12 +592,14 @@ fn strengthen(cdb: &mut ClauseDB, cid: ClauseId, p: Lit) -> bool {
         debug_assert!(1 < p.negate());
         watcher[p.negate() as usize].detach_with(cid);
         watcher[q.negate() as usize].register(r, cid);
-        if lits.len() == 2 {    // update another bocker
+        if lits.len() == 2 {
+            // update another bocker
             watcher[r.negate() as usize].update_blocker(cid, q);
         }
     } else {
         lits.delete_unstable(|&x| x == p);
-        if lits.len() == 2 {    // update another bocker
+        if lits.len() == 2 {
+            // update another bocker
             let q = lits[0];
             let r = lits[1];
             watcher[q.negate() as usize].update_blocker(cid, r);
