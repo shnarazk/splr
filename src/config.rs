@@ -15,7 +15,7 @@ pub struct Config {
     #[structopt(long = "cl", default_value = "0")]
     pub clause_limit: usize,
     /// grow limit of #clauses by var elimination
-    #[structopt(long = "eg", default_value = "0")]
+    #[structopt(long = "eg", default_value = "4")]
     pub elim_grow_limit: usize,
     /// #literals in a merged clause by var elimination
     #[structopt(long = "el", default_value = "64")]
@@ -69,7 +69,7 @@ pub struct Config {
     pub no_stagnation: bool,
     /// Disables learnt minimization
     #[structopt(long = "no-learnt-min", short = "M")]
-    pub no_learnt_minimization: bool,
+    pub learnt_minimization: bool,
     /// Writes a DRAT UNSAT certification file
     #[structopt(long = "certify", short = "c")]
     pub use_certification: bool,
@@ -82,7 +82,7 @@ impl Default for Config {
     fn default() -> Config {
         Config {
             clause_limit: 18_000_000,
-            elim_grow_limit: 0,
+            elim_grow_limit: 4,
             elim_lit_limit: 100,
             restart_asg_len: 3500,
             restart_lbd_len: 50,
@@ -98,7 +98,7 @@ impl Default for Config {
             no_adaptive_restart: false,
             no_adaptive_strategy: false,
             no_stagnation: false,
-            no_learnt_minimization: false,
+            learnt_minimization: false,
             use_certification: false,
             timeout: 0.0,
         }
