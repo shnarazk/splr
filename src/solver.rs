@@ -448,7 +448,7 @@ fn adapt_parameters(
     state.stats[Stat::RestartRecord] = state.stats[Stat::Restart];
     let nb = state.stats[Stat::BlockRestart] - state.stats[Stat::BlockRestartRecord];
     state.stats[Stat::BlockRestartRecord] = state.stats[Stat::BlockRestart];
-    if !state.use_luby_restart && state.adaptive_restart && !stagnated {
+    if !state.use_luby_restart && state.adaptive_restart {
         let delta: f64 = 0.025;
         if state.restart_thr <= 0.95 && nr < 4 {
             state.restart_thr += delta;
