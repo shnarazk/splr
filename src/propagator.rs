@@ -146,7 +146,7 @@ impl PropagatorIF for AssignStack {
                         }
                         if first_value == FALSE {
                             let n = lits.len();
-                            if state.config.no_learnt_minimization {
+                            if !state.config.with_learnt_minimization {
                                 self.catchup();
                                 return w.c;
                             } else if NULL_CLAUSE == conflict_clause || n < conflict_clause_size {
