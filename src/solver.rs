@@ -395,7 +395,7 @@ fn handle_conflict_path(
         state.stats[Stat::SumLBD] += lbd;
     }
     if tn_confl % 10_000 == 0 {
-        adapt_parameters_new(asgs, cdb, elim, state, vars, tn_confl)?;
+        adapt_parameters(asgs, cdb, elim, state, vars, tn_confl)?;
         if state.is_timeout() {
             return Err(SolverError::Inconsistent);
         }
@@ -413,7 +413,7 @@ fn handle_conflict_path(
     Ok(())
 }
 
-fn adapt_parameters_new(
+fn adapt_parameters(
     asgs: &mut AssignStack,
     cdb: &mut ClauseDB,
     elim: &mut Eliminator,
@@ -471,68 +471,6 @@ fn adapt_parameters_new(
         state.adapt_strategy(cdb);
         state.stagnation = 0;
         if state.use_elim {
-            elim.activate();
-            cdb.simplify(asgs, elim, state, vars)?;
-        }
-    }
-    state.progress(cdb, vars, None);
-    state.restart_step = 50 + 40_000 * (stagnated as usize);
-    if stagnated {
-        state.flush(&format!("stagnated ({})...", state.stagnation));
-        state.next_restart += 80_000;
-    }
-    Ok(())
-}
-
-#[allow(dead_code)]
-fn adapt_parameters_old(
-    asgs: &mut AssignStack,
-    cdb: &mut ClauseDB,
-    elim: &mut Eliminator,
-    state: &mut State,
-    vars: &mut [Var],
-    nconflict: usize,
-) -> MaybeInconsistent {
-    let switch = 100_000;
-    if switch < nconflict && state.stats[Stat::SolvedRecord] == state.num_solved_vars {
-        state.stagnation += 1;
-    } else {
-        state.stagnation = 0;
-    }
-    let stagnated = state.use_stagnation
-        && ((state.num_vars - state.num_solved_vars)
-            .next_power_of_two()
-            .trailing_zeros()
-            < state.stagnation as u32);
-    state.stats[Stat::SolvedRecord] = state.num_solved_vars;
-    // micro tuning of restart thresholds
-    state.stats[Stat::RestartRecord] = state.stats[Stat::Restart];
-    if !state.use_luby_restart && state.adaptive_restart {
-        let delta: f64 = 0.025;
-        let nr = state.stats[Stat::Restart] - state.stats[Stat::RestartRecord];
-        if state.restart_thr <= 0.95 && nr < 4 {
-            state.restart_thr += delta;
-        } else if 0.44 <= state.restart_thr && 1000 < nr {
-            state.restart_thr -= delta;
-        } else if 4 < nr && nr < 1000 {
-            state.restart_thr -= (state.restart_thr - 0.60) * 0.01;
-        }
-        let nb = state.stats[Stat::BlockRestart] - state.stats[Stat::BlockRestartRecord];
-        state.stats[Stat::BlockRestartRecord] = state.stats[Stat::BlockRestart];
-        if 1.05 <= state.restart_blk && nb < 4 {
-            state.restart_blk -= delta;
-        } else if state.restart_blk <= 1.8 && 1000 < nb {
-            state.restart_blk += delta;
-        } else if 4 < nb && nb < 1000 {
-            state.restart_blk -= (state.restart_blk - 1.40) * 0.01;
-        }
-    }
-    if nconflict == switch {
-        state.flush("exhaustive eliminator activated...");
-        asgs.cancel_until(vars, 0);
-        state.adapt_strategy(cdb);
-        if state.use_elim {
-            cdb.reset(state.co_lbd_bound);
             elim.activate();
             cdb.simplify(asgs, elim, state, vars)?;
         }
