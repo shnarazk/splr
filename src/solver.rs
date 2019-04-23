@@ -524,10 +524,10 @@ fn analyze(
                     }
                 }
             }
-            // println!("- handle {}", cid.fmt());
-            if (*c).lits.len() == 2 && (*c).lits[0] != p {
+            if p != NULL_LIT && (*c).lits.len() == 2 && (*c).lits[1] == p {
                 (*c).lits.swap(0, 1);
             }
+            // println!("- handle {}", cid.fmt());
             for q in &(*c).lits[((p != NULL_LIT) as usize)..] {
                 let vi = q.vi();
                 vars.bump_activity(&mut state.var_inc, vi);
