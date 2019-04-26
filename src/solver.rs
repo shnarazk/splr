@@ -2,7 +2,7 @@ use crate::clause::{Clause, ClauseDB};
 use crate::config::Config;
 use crate::eliminator::Eliminator;
 use crate::propagator::AssignStack;
-use crate::state::{LogUsizeId, Stat, State};
+use crate::state::{Stat, State};
 use crate::traits::*;
 use crate::types::*;
 use crate::var::Var;
@@ -323,7 +323,6 @@ fn search(
                 asgs.cancel_until(vars, state.root_level);
             } else if asgs.level() == 0 {
                 if cdb.simplify(asgs, elim, state, vars).is_err() {
-                    debug_assert!(false, "interal error by simplify");
                     return Err(SolverError::Inconsistent);
                 }
                 state.num_solved_vars = asgs.len();
@@ -422,33 +421,44 @@ fn adapt_parameters(
     nconflict: usize,
 ) -> MaybeInconsistent {
     let switch = 100_000;
-    let stopped = switch < nconflict
-        && state.stats[Stat::SolvedRecord as usize] == state.num_solved_vars
-        && state.record.vali[LogUsizeId::Binclause as usize] == state.stats[Stat::NumBinLearnt];
-    let stagnated = state.use_stagnation
-        && switch < nconflict
-        && !state.use_luby_restart
-        && stopped
-        && (((state.num_vars - state.num_solved_vars) as f64).log(2.0)
-            * (state.c_lvl.get() / state.b_lvl.get()).sqrt()
-            < state.stagnation as f64);
-    if !state.stagnated && stagnated {
-        state.stats[Stat::Stagnation] += 1;
-    } else if state.stagnated && !stagnated {
-        state.stagnation *= -1;
+    {
+        let stopped = switch < nconflict
+            && state.stats[Stat::SolvedRecord as usize] == state.num_solved_vars
+            // && state.record.vali[LogUsizeId::Binclause as usize] == state.stats[Stat::NumBinLearnt]
+            ;
+        let stagnated = state.use_stagnation
+            && switch < nconflict
+            && !state.use_luby_restart
+            && stopped
+            // && ((state.num_vars - state.num_solved_vars)
+            //     .next_power_of_two()
+            //     .trailing_zeros()
+            //     < state.stagnation as u32)
+            && (((state.num_vars - state.num_solved_vars) as f64).log(2.0)
+            //     * (state.c_lvl.get() / state.b_lvl.get()).sqrt()
+                < state.stagnation as f64)
+            ;
+        if stopped {
+            state.stagnation += 1;
+            if !state.stagnated && stagnated {
+                state.stats[Stat::Stagnation] += 1;
+            }
+        } else if state.stagnated {
+            state.stagnation *= -1;
+            // state.stagnation = 0;
+        } else if 0 < state.stagnation {
+            state.stagnation = 0;
+        }
+        // let out_of_stagnation = state.stagnated && !stagnate;
+        state.stagnated = stagnated;
     }
-    if stopped {
-        state.stagnation += 1;
-    }
-    // let out_of_stagnation = state.stagnated && !stagnate;
-    state.stagnated = stagnated;
     state.stats[Stat::SolvedRecord] = state.num_solved_vars;
     // micro tuning of restart thresholds
     let nr = state.stats[Stat::Restart] - state.stats[Stat::RestartRecord];
     state.stats[Stat::RestartRecord] = state.stats[Stat::Restart];
     let nb = state.stats[Stat::BlockRestart] - state.stats[Stat::BlockRestartRecord];
     state.stats[Stat::BlockRestartRecord] = state.stats[Stat::BlockRestart];
-    if !state.use_luby_restart && state.adaptive_restart && !stagnated {
+    if !state.use_luby_restart && state.adaptive_restart && !state.stagnated {
         let delta: f64 = 0.025;
         if state.restart_thr <= 0.95 && nr < 4 {
             state.restart_thr += delta;
@@ -469,15 +479,15 @@ fn adapt_parameters(
         state.flush("exhaustive eliminator activated...");
         asgs.cancel_until(vars, 0);
         state.adapt_strategy(cdb);
-        state.stagnation = 0;
         if state.use_elim {
+            cdb.reset(state.co_lbd_bound);
             elim.activate();
             cdb.simplify(asgs, elim, state, vars)?;
         }
     }
     state.progress(cdb, vars, None);
-    state.restart_step = 50 + 40_000 * (stagnated as usize);
-    if stagnated {
+    state.restart_step = 50 + 40_000 * (state.stagnated as usize);
+    if state.stagnated {
         state.flush(&format!("stagnated ({})...", state.stagnation));
         state.next_restart += 80_000;
     }
