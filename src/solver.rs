@@ -434,9 +434,8 @@ fn adapt_parameters(
             state.stagnation = 0;
         }
         let stagnated = ((state.num_vars - state.num_solved_vars)
-                         .next_power_of_two()
-                         .trailing_zeros()
-                         as isize)
+            .next_power_of_two()
+            .trailing_zeros() as isize)
             < state.stagnation;
         // && (((state.num_vars - state.num_solved_vars) as f64).log(2.0)
         //     / (state.c_lvl.get() / state.b_lvl.get()).sqrt().max(1.0)
