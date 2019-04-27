@@ -26,7 +26,7 @@ pub struct Config {
     #[structopt(long = "rl", default_value = "50")]
     pub restart_lbd_len: usize,
     /// threshold for forcing restart (K in Glucose)
-    #[structopt(long = "rt", default_value = "0.60")]
+    #[structopt(long = "rt", default_value = "0.70")]
     pub restart_threshold: f64,
     /// threshold for blocking restart (R in Glucose)
     #[structopt(long = "rb", default_value = "1.40")]
@@ -56,16 +56,16 @@ pub struct Config {
     pub use_log: bool,
     /// Disables exhaustive simplification
     #[structopt(long = "no-elim", short = "E")]
-    pub no_elim: bool,
+    pub without_elim: bool,
     /// Disables dynamic restart adaptation
     #[structopt(long = "no-adaptive_restart", short = "R")]
-    pub no_adaptive_restart: bool,
+    pub without_adaptive_restart: bool,
     /// Disables dynamic strategy adaptation
     #[structopt(long = "no-adaptive_strategy", short = "S")]
-    pub no_adaptive_strategy: bool,
+    pub without_adaptive_strategy: bool,
     /// Disables pendulum search model
     #[structopt(long = "no-pendulum", short = "P")]
-    pub no_stagnation: bool,
+    pub without_stagnation: bool,
     /// Disables learnt minimization
     #[structopt(long = "with-learnt-min", short = "M")]
     pub with_learnt_minimization: bool,
@@ -93,10 +93,10 @@ impl Default for Config {
             result_filename: PathBuf::new(),
             proof_filename: PathBuf::from("proof.out"),
             use_log: false,
-            no_elim: false,
-            no_adaptive_restart: false,
-            no_adaptive_strategy: false,
-            no_stagnation: false,
+            without_elim: false,
+            without_adaptive_restart: false,
+            without_adaptive_strategy: false,
+            without_stagnation: false,
             with_learnt_minimization: false,
             use_certification: false,
             timeout: 0.0,

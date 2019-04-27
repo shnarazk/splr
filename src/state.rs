@@ -385,8 +385,8 @@ impl StateIF for State {
                 .unwrap()
         };
         state.num_vars = cnf.num_of_variables;
-        state.adaptive_restart = !config.no_adaptive_restart;
-        state.use_adapt_strategy = !config.no_adaptive_strategy;
+        state.adaptive_restart = !config.without_adaptive_restart;
+        state.use_adapt_strategy = !config.without_adaptive_strategy;
         state.cdb_soft_limit = config.clause_limit;
         state.elim_eliminate_grow_limit = config.elim_grow_limit;
         state.elim_subsume_literal_limit = config.elim_lit_limit;
@@ -395,9 +395,9 @@ impl StateIF for State {
         state.restart_asg_len = config.restart_asg_len;
         state.restart_lbd_len = config.restart_lbd_len;
         state.restart_step = config.restart_step;
-        state.use_stagnation = !config.no_stagnation;
+        state.use_stagnation = !config.without_stagnation;
         state.progress_log = config.use_log;
-        state.use_elim = !config.no_elim;
+        state.use_elim = !config.without_elim;
         state.ema_asg = Ema::new(config.restart_asg_len);
         state.ema_lbd = Ema::new(config.restart_lbd_len);
         state.model = vec![BOTTOM; cnf.num_of_variables + 1];
