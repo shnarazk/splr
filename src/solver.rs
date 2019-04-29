@@ -423,20 +423,20 @@ fn adapt_parameters(
     nconflict: usize,
 ) -> MaybeInconsistent {
     let switch = 100_000;
-    if state.use_stagnation && !state.use_luby_restart && switch <= nconflict {
+    if state.use_deep_search_mode && !state.use_luby_restart && switch <= nconflict {
         let stopped = state.stats[Stat::SolvedRecord] == state.num_solved_vars;
         // && state.record.vali[LogUsizeId::Binclause] == state.stats[Stat::NumBinLearnt]
         if stopped {
-            state.stagnation += 1;
-        } else if 0 < state.stagnation && state.stagnated {
-            state.stagnation *= -1;
+            state.slack_duration += 1;
+        } else if 0 < state.slack_duration && state.stagnated {
+            state.slack_duration *= -1;
         } else {
-            state.stagnation = 0;
+            state.slack_duration = 0;
         }
         let stagnated = ((state.num_vars - state.num_solved_vars)
             .next_power_of_two()
             .trailing_zeros() as isize)
-            < state.stagnation;
+            < state.slack_duration;
         // && (((state.num_vars - state.num_solved_vars) as f64).log(2.0)
         //     / (state.c_lvl.get() / state.b_lvl.get()).sqrt().max(1.0)
         //     <= state.stagnation as f64)
@@ -479,10 +479,10 @@ fn adapt_parameters(
         }
     }
     state.progress(cdb, vars, None);
-    if state.use_stagnation {
+    if state.use_deep_search_mode {
         state.restart_step = 50 + 40_000 * (state.stagnated as usize);
         if state.stagnated {
-            state.flush(&format!("stagnated ({})...", state.stagnation));
+            state.flush(&format!("stagnated ({})...", state.slack_duration));
             state.next_restart += 80_000;
         }
     }

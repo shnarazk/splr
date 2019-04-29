@@ -174,7 +174,7 @@ pub struct State {
     pub luby_restart_inc: f64,
     pub luby_current_restarts: usize,
     pub luby_restart_factor: f64,
-    pub use_stagnation: bool,
+    pub use_deep_search_mode: bool,
     pub stagnated: bool,
     /// Eliminator
     pub use_elim: bool,
@@ -197,7 +197,7 @@ pub struct State {
     pub cur_restart: usize,
     pub after_restart: usize,
     pub elim_trigger: usize,
-    pub stagnation: isize,
+    pub slack_duration: isize,
     pub stats: [usize; Stat::EndOfStatIndex as usize], // statistics
     pub ema_asg: Ema,
     pub ema_lbd: Ema,
@@ -329,7 +329,7 @@ impl Default for State {
             luby_restart_inc: 2.0,
             luby_current_restarts: 0,
             luby_restart_factor: 100.0,
-            use_stagnation: true,
+            use_deep_search_mode: true,
             stagnated: false,
             ema_coeffs: (2 ^ 5, 2 ^ 15),
             use_elim: true,
@@ -346,7 +346,7 @@ impl Default for State {
             cur_restart: 1,
             after_restart: 0,
             elim_trigger: 1,
-            stagnation: 0,
+            slack_duration: 0,
             stats: [0; Stat::EndOfStatIndex as usize],
             ema_asg: Ema::new(1),
             ema_lbd: Ema::new(1),
@@ -395,7 +395,7 @@ impl StateIF for State {
         state.restart_asg_len = config.restart_asg_len;
         state.restart_lbd_len = config.restart_lbd_len;
         state.restart_step = config.restart_step;
-        state.use_stagnation = !config.without_stagnation;
+        state.use_deep_search_mode = !config.without_deep_search;
         state.progress_log = config.use_log;
         state.use_elim = !config.without_elim;
         state.ema_asg = Ema::new(config.restart_asg_len);
@@ -436,7 +436,7 @@ impl StateIF for State {
             re_init = true;
         }
         if self.stats[Stat::NoDecisionConflict] < 30_000 {
-            if !self.use_stagnation {
+            if !self.use_deep_search_mode {
                 self.strategy = SearchStrategy::LowSuccesiveLuby;
                 self.use_luby_restart = true;
                 self.luby_restart_factor = 100.0;

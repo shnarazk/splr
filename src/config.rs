@@ -55,18 +55,18 @@ pub struct Config {
     #[structopt(long = "--log", short = "l")]
     pub use_log: bool,
     /// Disables exhaustive simplification
-    #[structopt(long = "no-elim", short = "E")]
+    #[structopt(long = "without-elim", short = "E")]
     pub without_elim: bool,
     /// Disables dynamic restart adaptation
-    #[structopt(long = "no-adaptive_restart", short = "R")]
+    #[structopt(long = "without-adaptive_restart", short = "R")]
     pub without_adaptive_restart: bool,
     /// Disables dynamic strategy adaptation
-    #[structopt(long = "no-adaptive_strategy", short = "S")]
+    #[structopt(long = "without-adaptive_strategy", short = "S")]
     pub without_adaptive_strategy: bool,
-    /// Disables pendulum search model
-    #[structopt(long = "no-pendulum", short = "P")]
-    pub without_stagnation: bool,
-    /// Disables learnt minimization
+    /// Disables deep search mode
+    #[structopt(long = "without-deep-search", short = "D")]
+    pub without_deep_search: bool,
+    /// Enables learnt minimization
     #[structopt(long = "with-learnt-min", short = "M")]
     pub with_learnt_minimization: bool,
     /// Writes a DRAT UNSAT certification file
@@ -96,7 +96,7 @@ impl Default for Config {
             without_elim: false,
             without_adaptive_restart: false,
             without_adaptive_strategy: false,
-            without_stagnation: false,
+            without_deep_search: false,
             with_learnt_minimization: false,
             use_certification: false,
             timeout: 0.0,
