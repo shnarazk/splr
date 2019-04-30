@@ -446,26 +446,31 @@ fn adapt_parameters(
         state.stagnated = stagnated;
     }
     state.stats[Stat::SolvedRecord] = state.num_solved_vars;
-    // micro tuning of restart thresholds
     if !state.use_luby_restart && state.adaptive_restart && !state.stagnated {
-        let delta: f64 = 0.01;
+        let moving: f64 = 0.04;
+        let spring: f64 = 0.02;
+        let margin: f64 = 0.20;
+        let too_few: usize = 4;
+        let too_many: usize = 400;
+        // restart_threshold
         let nr = state.stats[Stat::Restart] - state.stats[Stat::RestartRecord];
         state.stats[Stat::RestartRecord] = state.stats[Stat::Restart];
-        if state.restart_thr <= 0.95 && nr < 4 {
-            state.restart_thr += delta;
-        } else if 0.55 <= state.restart_thr && 400 < nr {
-            state.restart_thr -= delta;
-        } else if 4 < nr && nr < 400 {
-            state.restart_thr -= (state.restart_thr - state.config.restart_threshold) * 0.01;
+        if state.restart_thr <= state.config.restart_threshold + margin && nr < too_few {
+            state.restart_thr += moving;
+        } else if state.config.restart_threshold - margin <= state.restart_thr && too_many < nr {
+            state.restart_thr -= moving;
+        } else if too_few <= nr && nr <= too_many {
+            state.restart_thr -= (state.restart_thr - state.config.restart_threshold) * spring;
         }
+        // restart_blocking
         let nb = state.stats[Stat::BlockRestart] - state.stats[Stat::BlockRestartRecord];
         state.stats[Stat::BlockRestartRecord] = state.stats[Stat::BlockRestart];
-        if 1.05 <= state.restart_blk && nb < 4 {
-            state.restart_blk -= delta;
-        } else if state.restart_blk <= 1.75 && 400 < nb {
-            state.restart_blk += delta;
-        } else if 4 < nb && nb < 400 {
-            state.restart_blk -= (state.restart_blk - state.config.restart_blocking) * 0.01;
+        if state.config.restart_blocking - margin <= state.restart_blk && nb < too_few {
+            state.restart_blk -= moving;
+        } else if state.restart_blk <= state.config.restart_blocking + margin && too_many < nb {
+            state.restart_blk += moving;
+        } else if too_few <= nb && nb <= too_many {
+            state.restart_blk -= (state.restart_blk - state.config.restart_blocking) * spring;
         }
     }
     if nconflict == switch {
