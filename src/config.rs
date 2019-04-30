@@ -67,7 +67,7 @@ pub struct Config {
     #[structopt(long = "without-deep-search", short = "D")]
     pub without_deep_search: bool,
     /// Enables learnt minimization
-    #[structopt(long = "with-learnt-min", short = "M")]
+    #[structopt(long = "with-learnt-minimization", short = "M")]
     pub with_learnt_minimization: bool,
     /// Writes a DRAT UNSAT certification file
     #[structopt(long = "certify", short = "c")]
