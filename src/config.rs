@@ -10,40 +10,40 @@ pub const VERSION: &str = "0.1.2";
     about = "SAT solver for Propositional Logic in Rust, version 0.1.2"
 )]
 pub struct Config {
-    /// soft limit of #clauses (24000000 is about 4GB)
+    /// soft limit of #clauses (24M is about 4GB)
     #[structopt(long = "cl", default_value = "0")]
     pub clause_limit: usize,
     /// grow limit of #clauses by var elimination
     #[structopt(long = "eg", default_value = "4")]
     pub elim_grow_limit: usize,
-    /// #literals in a merged clause by var elimination
+    /// #literals in a clause by var elimination
     #[structopt(long = "el", default_value = "64")]
     pub elim_lit_limit: usize,
-    /// #samples for average assignment rate
+    /// length for assignment average
     #[structopt(long = "ra", default_value = "3500")]
     pub restart_asg_len: usize,
-    /// #samples for average LBD of learnt clauses
+    /// length for LBD average
     #[structopt(long = "rl", default_value = "50")]
     pub restart_lbd_len: usize,
-    /// threshold for forcing restart (K in Glucose)
+    /// forcing restart threshold
     #[structopt(long = "rt", default_value = "0.70")]
-    pub restart_threshold: f64,
-    /// threshold for blocking restart (R in Glucose)
+    pub restart_threshold: f64, // Glucose's K
+    /// blocking restart threshold
     #[structopt(long = "rb", default_value = "1.40")]
-    pub restart_blocking: f64,
+    pub restart_blocking: f64, // Glucose's R
     /// #conflicts between restarts
     #[structopt(long = "rs", default_value = "50")]
     pub restart_step: usize,
     /// a DIMACS format CNF file
     #[structopt(parse(from_os_str))]
     pub cnf_filename: PathBuf,
-    /// output directory, applied to result and proof
+    /// output directory
     #[structopt(long = "--dir", short = "o", default_value = ".", parse(from_os_str))]
     pub output_dirname: PathBuf,
-    /// result filename/stdout; use default if empty
+    /// result filename/stdout
     #[structopt(long = "--result", short = "r", default_value = "", parse(from_os_str))]
     pub result_filename: PathBuf,
-    /// filename of DRAT UNSAT certification
+    /// filename for DRAT certification
     #[structopt(
         long = "proof",
         default_value = "proof.out",
@@ -72,7 +72,7 @@ pub struct Config {
     /// Writes a DRAT UNSAT certification file
     #[structopt(long = "certify", short = "c")]
     pub use_certification: bool,
-    /// CPU time limit in sec. (zero for no limit)
+    /// CPU time limit in sec. (0 for no limit)
     #[structopt(long = "to", default_value = "0")]
     pub timeout: f64,
 }
