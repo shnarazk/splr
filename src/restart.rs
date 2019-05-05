@@ -37,7 +37,7 @@ impl RestartIF for State {
         if 100 < ncnfl
             && !self.use_luby_restart
             && self.restart_step <= self.after_restart
-            && self.restart_blk * self.ema_asg.get() < nas as f64
+            && self.ema_asg.get() < (nas as f64) * self.restart_blk
         {
             self.after_restart = 0;
             self.stats[Stat::BlockRestart] += 1;

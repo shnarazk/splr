@@ -81,7 +81,7 @@ The answer file uses the following format.
 | `#rdc` | the number of `reduce` invocations |
 | `#sce` | the number of satisfied clause eliminations done by `simplify` |
 | `#exe` | the number of exhaustive simplifications, that try both of clause subsumption and variable elimination |
-| `blkR` | the coefficient for blocking restart, called 'R' in Glucose |
+| `blkR` | the coefficient for blocking restart, the reciprocal of 'R' in Glucose |
 | `frcK` | the coefficient for forcing restart, called 'K' in Glucose |
 
 ## Command line options
@@ -113,7 +113,7 @@ OPTIONS:
     -o, --output <output_filename>    output filename; use default rule if it's empty. [default: ]
     -p, --proof <proof_filename>      filename of DRAT UNSAT certification [default: proof.out]
         --ra <restart_asg_samples>    #samples for average assignment rate [default: 3500]
-        --rb <restart_blocking>       threshold for blocking restart (R in Glucose) [default: 1.40]
+        --rb <restart_blocking>       threshold for blocking restart (= 1/Glucose-R) [default: 1.40]
         --rl <restart_lbd_samples>    #samples for average LBD of learnt clauses [default: 50]
         --rs <restart_step>           #conflicts between restarts [default: 50]
         --rt <restart_threshold>      threshold for forcing restart (K in Glucose) [default: 0.60]

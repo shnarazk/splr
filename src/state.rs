@@ -318,8 +318,8 @@ impl Default for State {
             cdb_inc_extra: 1000,
             cdb_soft_limit: 0, // 248_000_000
             adaptive_restart: false,
-            restart_thr: 0.60,     // will be overwritten by bin/splr
-            restart_blk: 1.40,     // will be overwritten by bin/splr
+            restart_thr: 0.70,     // will be overwritten by bin/splr
+            restart_blk: 0.70,     // will be overwritten by bin/splr
             restart_asg_len: 3500, // will be overwritten by bin/splr
             restart_lbd_len: 100,  // will be overwritten by bin/splr
             restart_expansion: 1.15,
