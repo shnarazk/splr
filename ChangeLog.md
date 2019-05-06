@@ -1,3 +1,7 @@
+## 0.1.3, 2019-05-07
+
+- a tiny pack of updates on restart parameters and command line options
+
 ## 0.1.2, 2019-03-07
 
 - various changes on heuristic adaptation, restart, and clause/variable elimination modules
