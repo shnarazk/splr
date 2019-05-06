@@ -489,7 +489,6 @@ fn adapt_parameters(
         state.restart_step = 50 + 40_000 * (state.stagnated as usize);
         if state.stagnated {
             state.flush(&format!("stagnated ({})...", state.slack_duration));
-            state.next_restart += 80_000;
         }
     }
     Ok(())

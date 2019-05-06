@@ -194,7 +194,6 @@ pub struct State {
     pub ok: bool,
     pub time_limit: f64,
     pub next_reduction: usize, // renamed from `nbclausesbeforereduce`
-    pub next_restart: usize,
     pub cur_restart: usize,
     pub after_restart: usize,
     pub elim_trigger: usize,
@@ -344,7 +343,6 @@ impl Default for State {
             ok: true,
             time_limit: 0.0,
             next_reduction: 1000,
-            next_restart: 100,
             cur_restart: 1,
             after_restart: 0,
             elim_trigger: 1,
