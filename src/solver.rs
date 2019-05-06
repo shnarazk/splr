@@ -451,25 +451,25 @@ fn adapt_parameters(
         let spring: f64 = 0.02;
         let margin: f64 = 0.20;
         let too_few: usize = 4;
-        let too_many: usize = 1000;
+        let too_many: usize = 400;
         // restart_threshold
         let nr = state.stats[Stat::Restart] - state.stats[Stat::RestartRecord];
         state.stats[Stat::RestartRecord] = state.stats[Stat::Restart];
-        if state.restart_thr <= state.config.restart_threshold + margin && nr < too_few / 2 {
+        if state.restart_thr <= state.config.restart_threshold + margin && nr < too_few {
             state.restart_thr += moving;
-        } else if state.config.restart_threshold - margin <= state.restart_thr && too_many / 4 < nr {
+        } else if state.config.restart_threshold - margin <= state.restart_thr && too_many < nr {
             state.restart_thr -= moving;
-        } else if too_few / 2 <= nr && nr <= too_many / 4 {
+        } else if too_few <= nr && nr <= too_many {
             state.restart_thr -= (state.restart_thr - state.config.restart_threshold) * spring;
         }
         // restart_blocking
         let nb = state.stats[Stat::BlockRestart] - state.stats[Stat::BlockRestartRecord];
         state.stats[Stat::BlockRestartRecord] = state.stats[Stat::BlockRestart];
-        if state.config.restart_blocking - margin <= state.restart_blk && nb < too_few * 2 {
+        if state.config.restart_blocking - margin <= state.restart_blk && nb < too_few {
             state.restart_blk -= moving;
-        } else if state.restart_blk <= state.config.restart_blocking + margin && too_many * 4 < nb {
+        } else if state.restart_blk <= state.config.restart_blocking + margin && too_many < nb {
             state.restart_blk += moving;
-        } else if too_few * 2 <= nb && nb <= too_many * 4 {
+        } else if too_few <= nb && nb <= too_many {
             state.restart_blk -= (state.restart_blk - state.config.restart_blocking) * spring;
         }
     }
