@@ -458,20 +458,37 @@ fn adapt_parameters(
         let nb = state.stats[Stat::BlockRestart] - state.stats[Stat::BlockRestartRecord];
         state.stats[Stat::BlockRestartRecord] = state.stats[Stat::BlockRestart];
         let br_ratio = (state.stats[Stat::BlockRestart] as f64 + 1.0) / (state.stats[Stat::Restart] as f64 + 1.0);
-        if state.restart_thr <= state.config.restart_threshold + margin && nr < too_few / 2 {
-            state.restart_thr += moving;
-        } else if state.config.restart_threshold - margin <= state.restart_thr && br_ratio < 0.9 {
-            state.restart_thr -= moving;
-        } else if too_few / 2 <= nr && nr <= too_many / 4 {
+        if nb == 0 && nr == 0 {
             state.restart_thr -= (state.restart_thr - state.config.restart_threshold) * spring;
-        }
-        // restart_blocking
-        if state.config.restart_blocking - margin <= state.restart_blk && nb < too_few * 2 {
-            state.restart_blk += moving;
-        } else if state.restart_blk <= state.config.restart_blocking + margin && 2.0 < br_ratio {
-            state.restart_blk -= moving;
-        } else if too_few * 2 <= nb && nb <= too_many * 4 {
             state.restart_blk -= (state.restart_blk - state.config.restart_blocking) * spring;
+            state.force_restart_by_stagnation = true;
+        } else if br_ratio < 0.3 {
+            if state.config.restart_threshold - margin < state.restart_thr {
+                state.restart_thr -= moving;
+            }
+            if state.restart_blk < state.config.restart_blocking + margin {
+                state.restart_blk += moving;
+            }
+        } else if 3.0 < br_ratio {
+            if state.restart_thr < state.config.restart_blocking + margin {
+                state.restart_thr += moving;
+            }
+            if state.config.restart_blocking - margin < state.restart_blk {
+                state.restart_blk -= moving;
+            }
+        } else {
+            // restart_forcing
+            if state.restart_thr < state.config.restart_threshold + margin && nr < too_few {
+                state.restart_thr += moving;
+            } else if state.config.restart_threshold - margin < state.restart_thr && too_many < nr {
+                state.restart_thr -= moving;
+            }
+            // restart_blocking
+            if state.restart_blk < state.config.restart_blocking + margin && nb < too_few {
+                state.restart_blk += moving;
+            } else if state.config.restart_blocking - margin < state.restart_blk && too_many < nb {
+                state.restart_blk -= moving;
+            }
         }
     }
     if nconflict == switch {
