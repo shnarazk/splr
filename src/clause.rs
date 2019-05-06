@@ -433,8 +433,7 @@ impl ClauseDBIF for ClauseDB {
             let c = &mut clause[*i];
             if c.is(Flag::JUST_USED) {
                 c.turn_off(Flag::JUST_USED)
-            }
-            if 2 < c.rank {
+            } else if 2 < c.rank {
                 c.kill(touched);
             }
         }
