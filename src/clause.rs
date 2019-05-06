@@ -58,9 +58,6 @@ impl WatchDBIF for Vec<Watch> {
     fn initialize(self, _n: usize) -> Self {
         self
     }
-    fn count(&self) -> usize {
-        self.len()
-    }
     fn register(&mut self, blocker: Lit, c: ClauseId) {
         self.push(Watch { blocker, c });
     }
@@ -71,6 +68,14 @@ impl WatchDBIF for Vec<Watch> {
         for (n, w) in self.iter().enumerate() {
             if w.c == cid {
                 self.swap_remove(n);
+                return;
+            }
+        }
+    }
+    fn update_blocker(&mut self, cid: ClauseId, l: Lit) {
+        for w in &mut self[..] {
+            if w.c == cid {
+                w.blocker = l;
                 return;
             }
         }
@@ -240,7 +245,7 @@ impl ClauseDBIF for ClauseDB {
             }
             touched[i + 2] = false;
             let mut n = 0;
-            while n < ws.count() {
+            while n < ws.len() {
                 let cid = ws[n].c;
                 let c = &mut clause[cid as usize];
                 if !c.is(Flag::DEAD) {
@@ -360,7 +365,7 @@ impl ClauseDBIF for ClauseDB {
         self.clause
             .iter()
             .skip(1)
-            .filter(|&c| c.flags.contains(mask))
+            .filter(|&c| c.flags.contains(mask) && !c.flags.contains(Flag::DEAD))
             .count()
     }
     // Note: set lbd to 0 if you want to add the clause to Permanent.
@@ -433,7 +438,7 @@ impl ClauseDBIF for ClauseDB {
                 c.kill(touched);
             }
         }
-        state.stats[Stat::Reduction as usize] += 1;
+        state.stats[Stat::Reduction] += 1;
         self.garbage_collect();
     }
     fn simplify(
@@ -464,9 +469,9 @@ impl ClauseDBIF for ClauseDB {
             }
         }
         self.garbage_collect();
-        state.stats[Stat::SatClauseElimination as usize] += 1;
+        state.stats[Stat::SatClauseElimination] += 1;
         if elim.is_running() {
-            state.stats[Stat::ExhaustiveElimination as usize] += 1;
+            state.stats[Stat::ExhaustiveElimination] += 1;
             self.reset_lbd(vars, &mut state.lbd_temp);
             elim.stop(self, vars);
         }
@@ -529,6 +534,7 @@ impl ClauseDBIF for ClauseDB {
     }
 }
 
+/*
 impl ClauseDB {
     #[allow(dead_code)]
     fn check_liveness1(&self) -> bool {
@@ -618,3 +624,4 @@ impl ClauseDB {
         }
     }
 }
+*/

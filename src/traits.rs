@@ -50,7 +50,7 @@ pub trait ClauseDBIF {
     fn bump_activity(&mut self, inc: &mut f64, cid: ClauseId);
     /// return the number of alive clauses in the database. Or return the database size if `active` is `false`.
     fn count(&self, alive: bool) -> usize;
-    /// return the number of clauses which satisfy given flags.
+    /// return the number of clauses which satisfy given flags and aren't DEAD.
     fn countf(&self, mask: Flag) -> usize;
     /// record a clause to unsat certification
     fn certificate_add(&mut self, vec: &[Lit]);
@@ -237,7 +237,7 @@ pub trait StateIF {
     /// return `true` if it is timed out.
     fn is_timeout(&self) -> bool;
     /// change heuristics based on stat data.
-    fn adapt(&mut self, cdb: &mut ClauseDB);
+    fn adapt_strategy(&mut self, cdb: &mut ClauseDB);
     /// write a header of stat data to stdio.
     fn progress_header(&self);
     /// write stat data to stdio.
@@ -280,12 +280,12 @@ pub trait VarDBIF {
 /// API for 'watcher list' like `attach`, `detach`, `detach_with` and so on.
 pub trait WatchDBIF {
     fn initialize(self, n: usize) -> Self;
-    /// return the number of clauses in this watcher list; clauses are watching this literal.
-    fn count(&self) -> usize;
     /// make a new 'watch', and add it to this watcher list.
     fn register(&mut self, blocker: Lit, c: ClauseId);
     /// remove *n*-th clause from the watcher list. *O(1)* operation.
     fn detach(&mut self, n: usize);
     /// remove a clause which id is `cid` from the watcher list. *O(n)* operation.
     fn detach_with(&mut self, cid: ClauseId);
+    /// update blocker of cid.
+    fn update_blocker(&mut self, cid: ClauseId, l: Lit);
 }
