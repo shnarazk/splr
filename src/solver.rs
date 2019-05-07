@@ -10,6 +10,7 @@ use std::fs;
 use std::io::{BufRead, BufReader};
 
 /// Normal results returned by Solver.
+#[derive(Debug, PartialEq)]
 pub enum Certificate {
     SAT(Vec<i32>),
     UNSAT,
@@ -57,6 +58,20 @@ impl SatSolverIF for Solver {
             vars: Var::new_vars(nv),
         }
     }
+    /// # Examples
+    ///
+    /// ```
+    /// use splr::traits::SatSolverIF;
+    /// use splr::config::Config;
+    /// use splr::solver::{Solver, Certificate};
+    ///
+    /// let config = Config::from("tests/sample.cnf");
+    /// if let Ok(mut s) = Solver::build(&config) {
+    ///     let res = s.solve();
+    ///     assert!(res.is_ok());
+    ///     assert_ne!(res.unwrap(), Certificate::UNSAT);
+    /// }
+    ///```
     fn solve(&mut self) -> SolverResult {
         let Solver {
             ref mut asgs,
@@ -71,7 +86,7 @@ impl SatSolverIF for Solver {
         if cdb.check_size(state).is_err() {
             return Err(SolverException::OutOfMemory);
         }
-        // TODO: deal with assumptions
+        // NOTE: splr doesn't deal with assumptions.
         // s.root_level = 0;
         state.num_solved_vars = asgs.len();
         state.progress_header();
@@ -173,8 +188,18 @@ impl SatSolverIF for Solver {
             }
         }
     }
+    /// # Examples
+    ///
+    /// ```
+    /// use splr::traits::SatSolverIF;
+    /// use splr::config::Config;
+    /// use splr::solver::Solver;
+    ///
+    /// let config = Config::from("tests/sample.cnf");
+    /// assert!(Solver::build(&config).is_ok());
+    ///```
     fn build(config: &Config) -> std::io::Result<Solver> {
-        let fs = fs::File::open(&config.cnf_file)?;
+        let fs = fs::File::open(&config.cnf_filename)?;
         let mut rs = BufReader::new(fs);
         let mut buf = String::new();
         let mut nv: usize = 0;
@@ -202,7 +227,7 @@ impl SatSolverIF for Solver {
         let cnf = CNFDescription {
             num_of_variables: nv,
             num_of_clauses: nc,
-            pathname: config.cnf_file.to_str().unwrap().to_string(),
+            pathname: config.cnf_filename.to_str().unwrap().to_string(),
         };
         let mut s: Solver = Solver::new(config, &cnf);
         loop {
@@ -288,7 +313,7 @@ fn search(
     state.restart_update_luby();
     loop {
         let ci = asgs.propagate(cdb, state, vars);
-        state.stats[Stat::Propagation as usize] += 1;
+        state.stats[Stat::Propagation] += 1;
         if ci == NULL_CLAUSE {
             if state.num_vars <= asgs.len() + state.num_eliminated_vars {
                 return Ok(true);
@@ -307,16 +332,16 @@ fn search(
                 let vi = asgs.select_var(&vars);
                 let p = vars[vi].phase;
                 asgs.uncheck_assume(vars, Lit::from_var(vi, p));
-                state.stats[Stat::Decision as usize] += 1;
+                state.stats[Stat::Decision] += 1;
                 a_decision_was_made = true;
             }
         } else {
             conflict_c += 1.0;
-            state.stats[Stat::Conflict as usize] += 1;
+            state.stats[Stat::Conflict] += 1;
             if a_decision_was_made {
                 a_decision_was_made = false;
             } else {
-                state.stats[Stat::NoDecisionConflict as usize] += 1;
+                state.stats[Stat::NoDecisionConflict] += 1;
             }
             if asgs.level() == state.root_level {
                 analyze_final(asgs, state, vars, &cdb.clause[ci as usize]);
@@ -335,7 +360,7 @@ fn handle_conflict_path(
     vars: &mut [Var],
     ci: ClauseId,
 ) -> MaybeInconsistent {
-    let tn_confl = state.stats[Stat::Conflict as usize] as usize; // total number
+    let tn_confl = state.stats[Stat::Conflict]; // total number
     if tn_confl % 5000 == 0 && state.var_decay < state.var_decay_max {
         state.var_decay += 0.01;
     }
@@ -351,7 +376,7 @@ fn handle_conflict_path(
         cdb.certificate_add(new_learnt);
         asgs.uncheck_enqueue(vars, new_learnt[0], NULL_CLAUSE);
     } else {
-        state.stats[Stat::Learnt as usize] += 1;
+        state.stats[Stat::Learnt] += 1;
         let lbd = vars.compute_lbd(&new_learnt, &mut state.lbd_temp);
         let l0 = new_learnt[0];
         let cid = cdb.attach(state, vars, lbd);
@@ -359,15 +384,15 @@ fn handle_conflict_path(
         state.c_lvl.update(bl as f64);
         state.b_lvl.update(lbd as f64);
         if lbd <= 2 {
-            state.stats[Stat::NumLBD2 as usize] += 1;
+            state.stats[Stat::NumLBD2] += 1;
         }
         if learnt_len == 2 {
-            state.stats[Stat::NumBin as usize] += 1;
-            state.stats[Stat::NumBinLearnt as usize] += 1;
+            state.stats[Stat::NumBin] += 1;
+            state.stats[Stat::NumBinLearnt] += 1;
         }
         asgs.uncheck_enqueue(vars, l0, cid);
         state.restart_update_lbd(lbd);
-        state.stats[Stat::SumLBD as usize] += lbd;
+        state.stats[Stat::SumLBD] += lbd;
     }
     if tn_confl % 10_000 == 0 {
         adapt_parameters(asgs, cdb, elim, state, vars, tn_confl)?;
@@ -379,7 +404,7 @@ fn handle_conflict_path(
     state.cla_inc /= state.cla_decay;
     if ((state.use_chan_seok && !state.glureduce && state.first_reduction < cdb.num_learnt)
         || (state.glureduce
-            && state.cur_restart * state.next_reduction <= state.stats[Stat::Conflict as usize]))
+            && state.cur_restart * state.next_reduction <= state.stats[Stat::Conflict]))
         && 0 < cdb.num_learnt
     {
         state.cur_restart = ((tn_confl as f64) / (state.next_reduction as f64)) as usize + 1;
@@ -388,6 +413,7 @@ fn handle_conflict_path(
     Ok(())
 }
 
+#[allow(dead_code)]
 fn adapt_parameters(
     asgs: &mut AssignStack,
     cdb: &mut ClauseDB,
@@ -397,53 +423,73 @@ fn adapt_parameters(
     nconflict: usize,
 ) -> MaybeInconsistent {
     let switch = 100_000;
-    if switch < nconflict && state.stats[Stat::SolvedRecord as usize] == state.num_solved_vars {
-        state.stagnation += 1;
-    } else {
-        state.stagnation = 0;
-    }
-    let stagnate = state.use_stagnation
-        && ((state.num_vars - state.num_solved_vars)
-            .next_power_of_two()
-            .trailing_zeros()
-            < state.stagnation as u32);
-    state.stats[Stat::SolvedRecord as usize] = state.num_solved_vars;
-    // micro tuning of restart thresholds
-    state.stats[Stat::RestartRecord as usize] = state.stats[Stat::Restart as usize];
-    if !state.luby_restart && state.adaptive_restart {
-        let delta: f64 = 0.025;
-        let nr = state.stats[Stat::Restart as usize] - state.stats[Stat::RestartRecord as usize];
-        if state.restart_thr <= 0.95 && nr < 4 {
-            state.restart_thr += delta;
-        } else if 0.44 <= state.restart_thr && 1000 < nr {
-            state.restart_thr -= delta;
-        } else if 4 < nr && nr < 1000 {
-            state.restart_thr -= (state.restart_thr - 0.60) * 0.01;
+    if state.use_deep_search_mode && !state.use_luby_restart && switch <= nconflict {
+        let stopped = state.stats[Stat::SolvedRecord] == state.num_solved_vars;
+        // && state.record.vali[LogUsizeId::Binclause] == state.stats[Stat::NumBinLearnt]
+        if stopped {
+            state.slack_duration += 1;
+        } else if 0 < state.slack_duration && state.stagnated {
+            state.slack_duration *= -1;
+        } else {
+            state.slack_duration = 0;
         }
-        let nb = state.stats[Stat::BlockRestart as usize]
-            - state.stats[Stat::BlockRestartRecord as usize];
-        state.stats[Stat::BlockRestartRecord as usize] = state.stats[Stat::BlockRestart as usize];
-        if 1.05 <= state.restart_blk && nb < 4 {
-            state.restart_blk -= delta;
-        } else if state.restart_blk <= 1.8 && 1000 < nb {
-            state.restart_blk += delta;
-        } else if 4 < nb && nb < 1000 {
-            state.restart_blk -= (state.restart_blk - 1.40) * 0.01;
+        let stagnated = ((state.num_vars - state.num_solved_vars)
+            .next_power_of_two()
+            .trailing_zeros() as isize)
+            < state.slack_duration;
+        // && (((state.num_vars - state.num_solved_vars) as f64).log(2.0)
+        //     / (state.c_lvl.get() / state.b_lvl.get()).sqrt().max(1.0)
+        //     <= state.stagnation as f64)
+        if !state.stagnated && stagnated {
+            state.stats[Stat::Stagnation] += 1;
+        }
+        state.stagnated = stagnated;
+    }
+    state.stats[Stat::SolvedRecord] = state.num_solved_vars;
+    if !state.use_luby_restart && state.adaptive_restart && !state.stagnated {
+        let moving: f64 = 0.04;
+        let spring: f64 = 0.02;
+        let margin: f64 = 0.20;
+        let too_few: usize = 4;
+        let too_many: usize = 400;
+        // restart_threshold
+        let nr = state.stats[Stat::Restart] - state.stats[Stat::RestartRecord];
+        state.stats[Stat::RestartRecord] = state.stats[Stat::Restart];
+        if state.restart_thr <= state.config.restart_threshold + margin && nr < too_few {
+            state.restart_thr += moving;
+        } else if state.config.restart_threshold - margin <= state.restart_thr && too_many < nr {
+            state.restart_thr -= moving;
+        } else if too_few <= nr && nr <= too_many {
+            state.restart_thr -= (state.restart_thr - state.config.restart_threshold) * spring;
+        }
+        // restart_blocking
+        let nb = state.stats[Stat::BlockRestart] - state.stats[Stat::BlockRestartRecord];
+        state.stats[Stat::BlockRestartRecord] = state.stats[Stat::BlockRestart];
+        if state.config.restart_blocking - margin <= state.restart_blk && nb < too_few {
+            state.restart_blk -= moving;
+        } else if state.restart_blk <= state.config.restart_blocking + margin && too_many < nb {
+            state.restart_blk += moving;
+        } else if too_few <= nb && nb <= too_many {
+            state.restart_blk -= (state.restart_blk - state.config.restart_blocking) * spring;
         }
     }
     if nconflict == switch {
         state.flush("exhaustive eliminator activated...");
         asgs.cancel_until(vars, 0);
-        state.adapt(cdb);
-        cdb.reset(state.co_lbd_bound);
-        elim.activate();
-        cdb.simplify(asgs, elim, state, vars)?;
+        state.adapt_strategy(cdb);
+        if state.use_elim {
+            cdb.reset(state.co_lbd_bound);
+            elim.activate();
+            cdb.simplify(asgs, elim, state, vars)?;
+        }
     }
     state.progress(cdb, vars, None);
-    state.restart_step = 50 + 40_000 * (stagnate as usize);
-    if stagnate {
-        state.flush(&format!("stagnated ({})...", state.stagnation));
-        state.next_restart += 80_000;
+    if state.use_deep_search_mode {
+        state.restart_step = 50 + 40_000 * (state.stagnated as usize);
+        if state.stagnated {
+            state.flush(&format!("stagnated ({})...", state.slack_duration));
+            state.next_restart += 80_000;
+        }
     }
     Ok(())
 }
@@ -486,6 +532,9 @@ fn analyze(
                         }
                     }
                 }
+            }
+            if p != NULL_LIT && (*c).lits.len() == 2 && (*c).lits[1] == p {
+                (*c).lits.swap(0, 1);
             }
             // println!("- handle {}", cid.fmt());
             for q in &(*c).lits[((p != NULL_LIT) as usize)..] {

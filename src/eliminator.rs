@@ -51,7 +51,7 @@ impl EliminatorIF for Eliminator {
     fn is_waiting(&self) -> bool {
         self.mode == EliminatorMode::Waiting
     }
-    // FIXME: due to a potential bug of killing clauses and difficulty about
+    // Due to a potential bug of killing clauses and difficulty about
     // synchronization between 'garbage_collect' and clearing occur lists,
     // 'stop' should purge all occur lists to purge any dead clauses for now.
     fn stop(&mut self, cdb: &mut ClauseDB, vars: &mut [Var]) {
@@ -582,18 +582,29 @@ fn strengthen(cdb: &mut ClauseDB, cid: ClauseId, p: Lit) -> bool {
         return true;
     }
     if lits[0] == p || lits[1] == p {
-        let q = if lits[0] == p {
+        let (q, r) = if lits[0] == p {
             lits.swap_remove(0);
-            lits[0]
+            (lits[0], lits[1])
         } else {
             lits.swap_remove(1);
-            lits[1]
+            (lits[1], lits[0])
         };
         debug_assert!(1 < p.negate());
         watcher[p.negate() as usize].detach_with(cid);
-        watcher[q.negate() as usize].register(q, cid);
+        watcher[q.negate() as usize].register(r, cid);
+        if lits.len() == 2 {
+            // update another bocker
+            watcher[r.negate() as usize].update_blocker(cid, q);
+        }
     } else {
         lits.delete_unstable(|&x| x == p);
+        if lits.len() == 2 {
+            // update another bocker
+            let q = lits[0];
+            let r = lits[1];
+            watcher[q.negate() as usize].update_blocker(cid, r);
+            watcher[r.negate() as usize].update_blocker(cid, q);
+        }
     }
     false
 }
