@@ -55,7 +55,7 @@ impl Testing for Clause {
 //     assert_eq!(iter.next(), None);
 // }
 
-#[test]
+// #[test]
 fn clause_sort() -> () {
     let s = setup();
     assert_eq!(s.state.ok, true);

@@ -92,15 +92,31 @@ impl PropagatorIF for AssignStack {
         while self.remains() {
             let p: usize = self.sweep() as usize;
             let false_lit = (p as Lit).negate();
-            state.stats[Stat::Propagation as usize] += 1;
+            state.stats[Stat::Propagation] += 1;
+            let mut conflict_clause: ClauseId = NULL_CLAUSE;
+            let mut conflict_clause_size: usize = 3;
             unsafe {
                 let source = (*watcher).get_unchecked_mut(p);
                 let mut n = 0;
-                'next_clause: while n < source.count() {
+                'next_clause: while n < source.len() {
                     let w = source.get_unchecked_mut(n);
                     debug_assert!(!head[w.c as usize].is(Flag::DEAD));
-                    if self.assigned(w.blocker) != TRUE {
+                    let blocker_value = self.assigned(w.blocker);
+                    if blocker_value != TRUE {
                         let lits = &mut head.get_unchecked_mut(w.c as usize).lits;
+                        if lits.len() == 2 {
+                            match blocker_value {
+                                FALSE => {
+                                    self.catchup();
+                                    return w.c;
+                                }
+                                _ => {
+                                    self.uncheck_enqueue(vars, w.blocker, w.c);
+                                    n += 1;
+                                    continue 'next_clause;
+                                }
+                            }
+                        }
                         debug_assert!(2 <= lits.len());
                         debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
                         let mut first = *lits.get_unchecked(0);
@@ -129,14 +145,24 @@ impl PropagatorIF for AssignStack {
                             }
                         }
                         if first_value == FALSE {
-                            self.catchup();
-                            return w.c;
+                            let n = lits.len();
+                            if !state.config.with_learnt_minimization {
+                                self.catchup();
+                                return w.c;
+                            } else if NULL_CLAUSE == conflict_clause || n < conflict_clause_size {
+                                conflict_clause_size = n;
+                                conflict_clause = w.c;
+                            }
                         } else {
                             self.uncheck_enqueue(vars, first, w.c);
                         }
                     }
                     n += 1;
                 }
+            }
+            if NULL_CLAUSE != conflict_clause {
+                self.catchup();
+                return conflict_clause;
             }
         }
         NULL_CLAUSE
