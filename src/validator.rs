@@ -11,7 +11,7 @@ impl ValidatorIF for Solver {
             let l = Lit::from_int(*val);
             let vi = l.vi();
             self.asgs
-                .enqueue(&mut self.vars[vi], l.lbool(), NULL_CLAUSE, 0)?;
+                .enqueue(&mut self.vars, vi, l.lbool(), NULL_CLAUSE, 0)?;
         }
         Ok(())
     }

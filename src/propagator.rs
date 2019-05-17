@@ -48,7 +48,8 @@ impl PropagatorIF for AssignStack {
     fn assigned(&self, l: Lit) -> Lbool {
         unsafe { self.assign.get_unchecked(l.vi()) ^ ((l & 1) as u8) }
     }
-    fn enqueue(&mut self, v: &mut Var, sig: Lbool, cid: ClauseId, dl: usize) -> MaybeInconsistent {
+    fn enqueue(&mut self, vars: &mut [Var], vi: VarId, sig: Lbool, cid: ClauseId, dl: usize) -> MaybeInconsistent {
+        let v = &mut vars[vi];
         debug_assert!(!v.is(Flag::ELIMINATED));
         let val = self.assign[v.index];
         if val == BOTTOM {
@@ -70,7 +71,8 @@ impl PropagatorIF for AssignStack {
             Err(SolverError::Inconsistent)
         }
     }
-    fn enqueue_null(&mut self, v: &mut Var, sig: Lbool) {
+    fn enqueue_null(&mut self, vars: &mut [Var], vi: VarId, sig: Lbool) {
+        let v = &mut vars[vi];
         debug_assert!(!v.is(Flag::ELIMINATED));
         debug_assert!(sig != BOTTOM);
         let val = self.assign[v.index];
@@ -82,6 +84,7 @@ impl PropagatorIF for AssignStack {
             self.trail.push(Lit::from_var(v.index, sig));
         }
         debug_assert!(self.assign[v.index] == sig);
+        self.var_order.remove(vars, vi);
     }
     /// propagate without checking dead clauses
     /// Note: this function assumes there's no dead clause.
@@ -193,7 +196,7 @@ impl PropagatorIF for AssignStack {
         );
         let dl = self.trail_lim.len();
         let vi = l.vi();
-        let v = &mut vars[l.vi()];
+        let v = &mut vars[vi];
         debug_assert!(!v.is(Flag::ELIMINATED));
         debug_assert!(self.assign[vi] == l.lbool() || self.assign[vi] == BOTTOM);
         self.assign[vi] = l.lbool();
@@ -386,7 +389,9 @@ impl VarIdHeap {
         }
     }
     fn get_root(&mut self, vars: &[Var]) -> VarId {
-        let s = 1;
+        self.take(vars, 1)
+    }
+    fn take(&mut self, vars: &[Var], s: usize) -> VarId {
         let vs = self.heap[s];
         let n = self.idxs[0];
         let vn = self.heap[n];
