@@ -21,6 +21,10 @@ pub struct Var {
     pub level: usize,
     /// a dynamic evaluation criterion like VSIDS or ACID.
     pub activity: f64,
+    // a dynamic evaluation criterion for CHB instead of VSIDS or ACID.
+    pub reward_q: f64,
+    /// the last conflict index that related to this variable.
+    pub last_conflict: usize,
     /// list of clauses which contain this variable positively.
     pub pos_occurs: Vec<ClauseId>,
     /// list of clauses which contain this variable negatively.
@@ -41,6 +45,8 @@ impl VarIF for Var {
             reason: NULL_CLAUSE,
             level: 0,
             activity: 0.0,
+            reward_q: 0.0,
+            last_conflict: 0,
             pos_occurs: Vec::new(),
             neg_occurs: Vec::new(),
             flags: Flag::empty(),
@@ -49,9 +55,7 @@ impl VarIF for Var {
     fn new_vars(n: usize) -> Vec<Var> {
         let mut vec = Vec::with_capacity(n + 1);
         for i in 0..=n {
-            let mut v = Var::new(i);
-            v.activity = (n - i) as f64;
-            vec.push(v);
+            vec.push(Var::new(i));
         }
         vec
     }

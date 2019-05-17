@@ -346,6 +346,7 @@ fn search(
                 analyze_final(asgs, state, vars, &cdb.clause[ci as usize]);
                 return Ok(false);
             }
+            asgs.distribute_chb_reward(state, vars, ci != NULL_CLAUSE);
             handle_conflict_path(asgs, cdb, elim, state, vars, ci)?;
         }
     }
@@ -508,6 +509,7 @@ fn analyze(
     let mut p = NULL_LIT;
     let mut ti = asgs.len() - 1; // trail index
     let mut path_cnt = 0;
+    let nconf = state.stats[Stat::Conflict];
     state.last_dl.clear();
     loop {
         // println!("analyze {}", p.int());
@@ -541,6 +543,7 @@ fn analyze(
                 vars.bump_activity(&mut state.var_inc, vi);
                 asgs.update_order(vars, vi);
                 let v = &mut vars[vi];
+                v.last_conflict = nconf;
                 let lvl = v.level;
                 debug_assert!(!v.is(Flag::ELIMINATED));
                 debug_assert!(v.assign != BOTTOM);
