@@ -15,7 +15,6 @@ pub struct AssignStack {
     trail_lim: Vec<usize>,
     q_head: usize,
     propagate_start: usize,
-    propagate_end: usize,
     var_order: VarIdHeap, // Variable Order
 }
 
@@ -27,7 +26,6 @@ impl PropagatorIF for AssignStack {
             trail_lim: Vec::new(),
             q_head: 0,
             propagate_start: 0,
-            propagate_end: 0,
             var_order: VarIdHeap::new(n, n),
         }
     }
@@ -117,7 +115,6 @@ impl PropagatorIF for AssignStack {
                         if lits.len() == 2 {
                             match blocker_value {
                                 FALSE => {
-                                    self.propagate_end = self.q_head;
                                     self.catchup();
                                     return w.c;
                                 }
@@ -158,7 +155,6 @@ impl PropagatorIF for AssignStack {
                         if first_value == FALSE {
                             let n = lits.len();
                             if !state.config.with_learnt_minimization {
-                                self.propagate_end = self.q_head;
                                 self.catchup();
                                 return w.c;
                             } else if NULL_CLAUSE == conflict_clause || n < conflict_clause_size {
@@ -173,49 +169,37 @@ impl PropagatorIF for AssignStack {
                 }
             }
             if NULL_CLAUSE != conflict_clause {
-                self.propagate_end = self.q_head;
                 self.catchup();
                 return conflict_clause;
             }
         }
-        self.propagate_end = self.q_head;
         NULL_CLAUSE
     }
-    fn distribute_chb_reward(&mut self, state: &mut State, vars: &mut [Var], in_conflict: bool) {
+    fn distribute_chb_reward(&mut self, state: &mut State, vars: &mut [Var], in_conflict: bool, cl: usize) {
+        // let multiplier = if in_conflict { 1.0 } else { 0.5 };
         let nconf = state.stats[Stat::Conflict];
-        // if self.trail_lim.is_empty() {
-        //     return;
-        // }
-        let last_decision = self.trail_lim[self.trail_lim.len() - 1];
-        let multiplier = 0.9;
-        //for i in &self.trail_lim[..last_decision] {
-        //    let l = self.trail[*i];
-        for l in &self.trail[..last_decision] {
-            let vi = l.vi();
-            let v = &mut vars[vi];
-            let reward = multiplier / ((nconf - v.last_conflict) as f64 + 1.0);
+        for l in &self.trail[self.propagate_start..] {
+            let v = &mut vars[l.vi()];
+            // assert!(nconf == 0 || nconf > v.last_conflict, format!("{}, {}, {}", nconf, v.last_conflict, in_conflict));
+            let delta = v.level as f64 / cl as f64;
+            let reward = if in_conflict {
+                (0.9 + 0.1 * delta) / ((nconf - v.last_conflict) as f64 + 1.0)
+            } else if v.reason == NULL_CLAUSE {
+                0.8 / ((nconf - v.last_conflict) as f64 + 1.0)
+            } else {
+                0.5 / ((nconf - v.last_conflict) as f64 + 1.0)
+            };
             v.reward_q = (1.0 - state.chb_alpha) * v.reward_q + state.chb_alpha * reward;
             debug_assert!(0.0 <= v.reward_q && v.reward_q <= 1.0);
-            assert!(!self.var_order.contains(vi));
-        }
-        let multiplier = 1.0;
-        //for i in &self.trail_lim[last_decision..] {
-        //    let l = self.trail[*i];
-        for l in &self.trail[last_decision..] {
-            let vi = l.vi();
-            let v = &mut vars[vi];
-            let reward = multiplier / ((nconf - v.last_conflict) as f64 + 1.0);
-            v.reward_q = (1.0 - state.chb_alpha) * v.reward_q + state.chb_alpha * reward;
-            debug_assert!(0.0 <= v.reward_q && v.reward_q <= 1.0);
-            assert!(!self.var_order.contains(vi),
-                    format!("var_order includes {}: {:?}", l.to_i32(), v));
         }
         if in_conflict && 0.06 < state.chb_alpha {
-            state.chb_alpha -= 0.000001;
+            state.chb_alpha -= 0.000_001;
         }
     }
-    fn cancel_until(&mut self, vars: &mut [Var], lv: usize) {
-        if self.trail_lim.len() <= lv {
+    fn cancel_until(&mut self, state: &mut State, vars: &mut [Var], lv: usize) {
+        let nconf = state.stats[Stat::Conflict];
+        let lvl = self.trail_lim.len();
+        if lvl <= lv {
             return;
         }
         let lim = self.trail_lim[lv];
@@ -225,13 +209,23 @@ impl PropagatorIF for AssignStack {
             v.phase = self.assign[vi];
             self.assign[vi] = BOTTOM;
             v.assign = BOTTOM;
+            {
+                // CHB
+                let multiplier = if v.reason == NULL_CLAUSE { 1.0 } else { 0.9 };
+                // let delta = 1.0 - v.level as f64 / lvl as f64;
+                // let reward = /* 1.0 */ (0.5 + 0.5 * delta) / ((nconf - v.last_conflict) as f64 + 1.0);
+                let reward = multiplier / ((nconf - v.last_conflict) as f64 + 1.0);
+                v.reward_q = (1.0 - state.chb_alpha) * v.reward_q + state.chb_alpha * reward;
+            }
             v.reason = NULL_CLAUSE;
             self.var_order.insert(vars, vi);
         }
         self.trail.truncate(lim);
         self.trail_lim.truncate(lv);
         self.q_head = lim;
-        // self.var_order.rebuild(vars);
+        if 0.06 < state.chb_alpha {
+            state.chb_alpha -= 0.000_001;
+        }
     }
     fn uncheck_enqueue(&mut self, vars: &mut [Var], l: Lit, cid: ClauseId) {
         debug_assert!(l != 0, "Null literal is about to be equeued");
@@ -457,8 +451,8 @@ impl VarIdHeap {
         let mut q = start;
         let vq = self.heap[q];
         debug_assert!(0 < vq, "size of heap is too small");
-        let aq = vars[vq].reward_q;
         // let aq = vars[vq].activity;
+        let aq = vars[vq].reward_q;
         loop {
             let p = q / 2;
             if p == 0 {
@@ -468,8 +462,8 @@ impl VarIdHeap {
                 return;
             } else {
                 let vp = self.heap[p];
-                let ap = vars[vp].reward_q;
                 // let ap = vars[vp].activity;
+                let ap = vars[vp].reward_q;
                 if ap < aq {
                     // move down the current parent, and make it empty
                     self.heap[q] = vp;
@@ -489,20 +483,20 @@ impl VarIdHeap {
         let n = self.len();
         let mut i = start;
         let vi = self.heap[i];
-        let ai = vars[vi].reward_q;
         // let ai = vars[vi].activity;
+        let ai = vars[vi].reward_q;
         loop {
             let l = 2 * i; // left
             if l < n {
                 let vl = self.heap[l];
-                let al = vars[vl].reward_q;
                 // let al = vars[vl].activity;
+                let al = vars[vl].reward_q;
                 let r = l + 1; // right
-                let (target, vc, ac) = if r < n && al < vars[self.heap[r]].reward_q {
                 // let (target, vc, ac) = if r < n && al < vars[self.heap[r]].activity {
+                let (target, vc, ac) = if r < n && al < vars[self.heap[r]].reward_q {
                     let vr = self.heap[r];
-                    (r, vr, vars[vr].reward_q)
                     // (r, vr, vars[vr].activity)
+                    (r, vr, vars[vr].reward_q)
                 } else {
                     (l, vl, al)
                 };

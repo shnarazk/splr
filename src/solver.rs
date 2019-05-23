@@ -166,16 +166,16 @@ impl SatSolverIF for Solver {
                     }
                 }
                 elim.extend_model(&mut result);
-                asgs.cancel_until(vars, 0);
+                asgs.cancel_until(state, vars, 0);
                 Ok(Certificate::SAT(result))
             }
             Ok(false) => {
                 state.progress(cdb, vars, None);
-                asgs.cancel_until(vars, 0);
+                asgs.cancel_until(state, vars, 0);
                 Ok(Certificate::UNSAT)
             }
             Err(_) => {
-                asgs.cancel_until(vars, 0);
+                asgs.cancel_until(state, vars, 0);
                 state.progress(cdb, vars, Some("ERROR"));
                 state.ok = false;
                 if cdb.check_size(state).is_err() {
@@ -313,16 +313,17 @@ fn search(
     state.restart_update_luby();
     loop {
         let ci = asgs.propagate(cdb, state, vars);
+        // asgs.distribute_chb_reward(state, vars, ci != NULL_CLAUSE, asgs.level());
         if ci == NULL_CLAUSE {
             if state.num_vars <= asgs.len() + state.num_eliminated_vars {
                 return Ok(true);
             }
             // DYNAMIC FORCING RESTART
             if state.force_restart(&mut conflict_c) {
-                asgs.cancel_until(vars, state.root_level);
+                asgs.cancel_until(state, vars, state.root_level);
             } else if asgs.level() == 0 {
                 if cdb.simplify(asgs, elim, state, vars).is_err() {
-                    debug_assert!(false, "interal error by simplify");
+                    // debug_assert!(false, "interal error by simplify");
                     return Err(SolverError::Inconsistent);
                 }
                 state.num_solved_vars = asgs.len();
@@ -346,7 +347,7 @@ fn search(
                 analyze_final(asgs, state, vars, &cdb.clause[ci as usize]);
                 return Ok(false);
             }
-            asgs.distribute_chb_reward(state, vars, ci != NULL_CLAUSE);
+            // asgs.distribute_chb_reward(state, vars, ci != NULL_CLAUSE, asgs.level());
             handle_conflict_path(asgs, cdb, elim, state, vars, ci)?;
         }
     }
@@ -368,8 +369,12 @@ fn handle_conflict_path(
     // DYNAMIC BLOCKING RESTART
     state.block_restart(asgs, tn_confl);
     let bl = analyze(asgs, cdb, state, vars, ci);
+    //let nconf = asgs.level();
+    // for l in &state.new_learnt {
+    //     vars[l.vi()].last_conflict = nconf;
+    // }
+    asgs.cancel_until(state, vars, bl.max(state.root_level));
     let new_learnt = &mut state.new_learnt;
-    asgs.cancel_until(vars, bl.max(state.root_level));
     let learnt_len = new_learnt.len();
     if learnt_len == 1 {
         // dump to certified even if it's a literal.
@@ -475,7 +480,7 @@ fn adapt_parameters(
     }
     if nconflict == switch {
         state.flush("exhaustive eliminator activated...");
-        asgs.cancel_until(vars, 0);
+        asgs.cancel_until(state, vars, 0);
         state.adapt_strategy(cdb);
         if state.use_elim {
             cdb.reset(state.co_lbd_bound);
@@ -543,10 +548,10 @@ fn analyze(
                 vars.bump_activity(&mut state.var_inc, vi);
                 asgs.update_order(vars, vi);
                 let v = &mut vars[vi];
-                v.last_conflict = nconf;
                 let lvl = v.level;
                 debug_assert!(!v.is(Flag::ELIMINATED));
                 debug_assert!(v.assign != BOTTOM);
+                v.last_conflict = nconf;
                 if 0 < lvl && !state.an_seen[vi] {
                     state.an_seen[vi] = true;
                     if dl <= lvl {
