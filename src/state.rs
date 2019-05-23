@@ -313,7 +313,7 @@ impl Default for State {
             var_decay: 0.9,
             var_decay_max: 0.95,
             var_inc: 0.9,
-            chb_alpha: 0.4,
+            chb_alpha: 0.08,
             first_reduction: 1000,
             glureduce: true,
             cdb_inc: 300,

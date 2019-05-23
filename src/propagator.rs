@@ -203,6 +203,8 @@ impl PropagatorIF for AssignStack {
             return;
         }
         let lim = self.trail_lim[lv];
+        let alpha = state.chb_alpha;
+        let beta = 0.9;
         for l in &self.trail[lim..] {
             let vi = l.vi();
             let v = &mut vars[vi];
@@ -211,11 +213,30 @@ impl PropagatorIF for AssignStack {
             v.assign = BOTTOM;
             {
                 // CHB
-                let multiplier = if v.reason == NULL_CLAUSE { 1.0 } else { 0.9 };
+                // let multiplier = if v.reason == NULL_CLAUSE { 1.0 } else { 0.9 };
                 // let delta = 1.0 - v.level as f64 / lvl as f64;
                 // let reward = /* 1.0 */ (0.5 + 0.5 * delta) / ((nconf - v.last_conflict) as f64 + 1.0);
-                let reward = multiplier / ((nconf - v.last_conflict) as f64 + 1.0);
-                v.reward_q = (1.0 - state.chb_alpha) * v.reward_q + state.chb_alpha * reward;
+                // let reward = multiplier / ((nconf - v.last_conflict) as f64 + 1.0);
+                // v.reward_q = (1.0 - state.chb_alpha) * v.reward_q + state.chb_alpha * reward;
+                // CHB2
+                let level = if v.is(Flag::JUST_USED) /* v.reason == NULL_CLAUSE */ {
+                    // v.level as f64 / lvl as f64
+                    // 1.0 / (1 + lvl - v.level) as f64
+                    1.0 / lvl as f64
+                } else if v.reason == NULL_CLAUSE {
+                    0.25 / lvl as f64
+                } else {
+                    0.0 // (1.0 - v.level as f64 / lvl as f64) * (v.last_conflict as f64 / nconf as f64)
+                };
+                let history = if v.is(Flag::JUST_USED) || v.reason == NULL_CLAUSE || true {
+                    1.0 / (1 + nconf - v.last_conflict) as f64
+                    // v.last_conflict as f64 / nconf as f64
+                } else {
+                    0.0
+                };
+                v.reward_q = (1.0 - alpha) * v.reward_q
+                    + alpha * ((1.0 - beta) * level + beta * history);
+                v.turn_off(Flag::JUST_USED);
             }
             v.reason = NULL_CLAUSE;
             self.var_order.insert(vars, vi);
@@ -223,7 +244,7 @@ impl PropagatorIF for AssignStack {
         self.trail.truncate(lim);
         self.trail_lim.truncate(lv);
         self.q_head = lim;
-        if 0.06 < state.chb_alpha {
+        if 0.005 < state.chb_alpha {
             state.chb_alpha -= 0.000_001;
         }
     }

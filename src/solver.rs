@@ -552,6 +552,7 @@ fn analyze(
                 debug_assert!(!v.is(Flag::ELIMINATED));
                 debug_assert!(v.assign != BOTTOM);
                 v.last_conflict = nconf;
+                v.turn_on(Flag::JUST_USED);
                 if 0 < lvl && !state.an_seen[vi] {
                     state.an_seen[vi] = true;
                     if dl <= lvl {
