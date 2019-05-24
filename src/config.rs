@@ -19,6 +19,12 @@ pub struct Config {
     /// #literals in a clause by var elimination
     #[structopt(long = "el", default_value = "64")]
     pub elim_lit_limit: usize,
+    /// CHB: reward = (1-α) reward + α update
+    #[structopt(long = "chb-alpha", default_value = "0.04")]
+    pub chb_alpha: f64,
+    /// CHB: update = (1-β) level + β history
+    #[structopt(long = "chb-beta", default_value = "0.7")]
+    pub chb_beta: f64,
     /// length for assignment average
     #[structopt(long = "ra", default_value = "3500")]
     pub restart_asg_len: usize,
@@ -83,6 +89,8 @@ impl Default for Config {
             clause_limit: 18_000_000,
             elim_grow_limit: 4,
             elim_lit_limit: 100,
+            chb_alpha: 0.04,
+            chb_beta: 0.7,
             restart_asg_len: 3500,
             restart_lbd_len: 50,
             restart_threshold: 0.60,

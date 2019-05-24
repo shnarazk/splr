@@ -150,7 +150,6 @@ pub struct State {
     pub var_decay: f64,
     pub var_decay_max: f64,
     pub var_inc: f64,
-    pub chb_alpha: f64,
     /// CLAUSE REDUCTION
     pub first_reduction: usize,
     pub glureduce: bool,
@@ -313,7 +312,6 @@ impl Default for State {
             var_decay: 0.9,
             var_decay_max: 0.95,
             var_inc: 0.9,
-            chb_alpha: 0.08,
             first_reduction: 1000,
             glureduce: true,
             cdb_inc: 300,

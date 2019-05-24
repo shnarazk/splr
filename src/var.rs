@@ -45,7 +45,7 @@ impl VarIF for Var {
             reason: NULL_CLAUSE,
             level: 0,
             activity: 0.0,
-            reward_q: 0.0,
+            reward_q: 0.1,
             last_conflict: 0,
             pos_occurs: Vec::new(),
             neg_occurs: Vec::new(),
