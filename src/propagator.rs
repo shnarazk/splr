@@ -557,9 +557,7 @@ impl VarIdHeap {
         self.heap.swap(n, s);
         self.idxs.swap(vn, vs);
         self.idxs[0] -= 1;
-        if 1 < self.idxs[0] {
-            self.percolate_down(&vec, 1);
-        }
+        self.percolate_down(&vec, s);
     }
     #[allow(dead_code)]
     fn check(&self, s: &str) {
