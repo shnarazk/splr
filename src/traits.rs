@@ -175,7 +175,7 @@ pub trait PropagatorIF {
     /// execute *propagate*.
     fn propagate(&mut self, cdb: &mut ClauseDB, state: &mut State, vars: &mut [Var]) -> ClauseId;
     /// Rewarding by Conflict History-based Branching
-    fn distribute_chb_reward(&mut self, state: &mut State, vars: &mut [Var], in_conflict: bool, cl: usize);
+    fn distribute_chb_reward(&mut self, state: &mut State, vars: &mut [Var], in_conflict: bool);
     /// execute *backjump*.
     fn cancel_until(&mut self, state: &mut State, vars: &mut [Var], lv: usize);
     /// add an assignment caused by a clause; emit an exception if solver becomes inconsistent.

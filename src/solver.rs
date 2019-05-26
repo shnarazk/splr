@@ -313,7 +313,7 @@ fn search(
     state.restart_update_luby();
     loop {
         let ci = asgs.propagate(cdb, state, vars);
-        // asgs.distribute_chb_reward(state, vars, ci != NULL_CLAUSE, asgs.level());
+        asgs.distribute_chb_reward(state, vars, ci != NULL_CLAUSE);
         if ci == NULL_CLAUSE {
             if state.num_vars <= asgs.len() + state.num_eliminated_vars {
                 return Ok(true);

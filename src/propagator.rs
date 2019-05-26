@@ -175,37 +175,28 @@ impl PropagatorIF for AssignStack {
         }
         NULL_CLAUSE
     }
-    fn distribute_chb_reward(&mut self, state: &mut State, vars: &mut [Var], in_conflict: bool, cl: usize) {
-        // let multiplier = if in_conflict { 1.0 } else { 0.5 };
+    fn distribute_chb_reward(&mut self, state: &mut State, vars: &mut [Var], in_conflict: bool) {
+        let multiplier = if in_conflict { 1.0 } else { 0.9 };
         let nconf = state.stats[Stat::Conflict];
         let alpha = state.config.chb_alpha;
         for l in &self.trail[self.propagate_start..] {
             let v = &mut vars[l.vi()];
-            // assert!(nconf == 0 || nconf > v.last_conflict, format!("{}, {}, {}", nconf, v.last_conflict, in_conflict));
-            let delta = v.level as f64 / cl as f64;
-            let reward = if in_conflict {
-                (0.9 + 0.1 * delta) / ((nconf - v.last_conflict) as f64 + 1.0)
-            } else if v.reason == NULL_CLAUSE {
-                0.8 / ((nconf - v.last_conflict) as f64 + 1.0)
-            } else {
-                0.5 / ((nconf - v.last_conflict) as f64 + 1.0)
-            };
+            let reward = multiplier / (nconf - v.last_conflict + 1) as f64;
             v.reward_q = (1.0 - alpha) * v.reward_q + alpha * reward;
-            debug_assert!(0.0 <= v.reward_q && v.reward_q <= 1.0);
         }
         if in_conflict && 0.06 < state.config.chb_alpha {
             state.config.chb_alpha -= 0.000_001;
         }
     }
     fn cancel_until(&mut self, state: &mut State, vars: &mut [Var], lv: usize) {
-        let nconf = state.stats[Stat::Conflict];
+        let _nconf = state.stats[Stat::Conflict];
         let lvl = self.trail_lim.len();
         if lvl <= lv {
             return;
         }
         let lim = self.trail_lim[lv];
-        let alph = state.config.chb_alpha;
-        let beta = state.config.chb_beta;
+        let _alph = state.config.chb_alpha;
+        let _beta = state.config.chb_beta;
         for l in &self.trail[lim..] {
             let vi = l.vi();
             let v = &mut vars[vi];
@@ -214,11 +205,12 @@ impl PropagatorIF for AssignStack {
             v.assign = BOTTOM;
             {
                 // CHB
-                let multiplier = if v.reason == NULL_CLAUSE { 1.0 } else { 0.9 };
+                // let multiplier = if v.reason == NULL_CLAUSE { 1.0 } else { 0.9 };
                 // let delta = 1.0 - v.level as f64 / lvl as f64;
                 // let reward = /* 1.0 */ (0.5 + 0.5 * delta) / (nconf - v.last_conflict + 1) as f64;
-                let reward = multiplier / ( nconf - v.last_conflict + 1) as f64;
-                v.reward_q = (1.0 - alph) * v.reward_q + alph * reward;
+                // let reward = multiplier / ( nconf - v.last_conflict + 1) as f64;
+                // let reward = multiplier * v.last_conflict as f64 / nconf as f64;
+                // v.reward_q = (1.0 - alph) * v.reward_q + alph * reward;
 //                // CHB2
 //                let level = if v.is(Flag::JUST_USED) /* v.reason == NULL_CLAUSE */ {
 //                    v.level as f64 / lvl as f64
