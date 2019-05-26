@@ -70,8 +70,8 @@ pub struct Config {
     #[structopt(long = "without-adaptive_strategy", short = "S")]
     pub without_adaptive_strategy: bool,
     /// Disables deep search mode
-    #[structopt(long = "without-deep-search", short = "D")]
-    pub without_deep_search: bool,
+    #[structopt(long = "with-deep-search", short = "D")]
+    pub with_deep_search: bool,
     /// Enables learnt minimization
     #[structopt(long = "with-learnt-minimization", short = "M")]
     pub with_learnt_minimization: bool,
@@ -104,7 +104,7 @@ impl Default for Config {
             without_elim: false,
             without_adaptive_restart: false,
             without_adaptive_strategy: false,
-            without_deep_search: false,
+            with_deep_search: false,
             with_learnt_minimization: false,
             use_certification: false,
             timeout: 0.0,
