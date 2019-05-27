@@ -1,4 +1,5 @@
 use crate::clause::Clause;
+use crate::state::State;
 use crate::traits::*;
 use crate::types::*;
 use std::fmt;
@@ -100,15 +101,15 @@ impl VarDBIF for [Var] {
         keys[0] = key;
         cnt
     }
-    fn bump_activity(&mut self, inc: &mut f64, vi: VarId) {
+    fn bump_activity(&mut self, state: &mut State, vi: VarId) {
         let v = &mut self[vi];
-        let a = v.activity + *inc;
+        let a = v.activity + state.var_inc;
         v.activity = a;
         if VAR_ACTIVITY_MAX < a {
             for v in &mut self[1..] {
                 v.activity *= VAR_ACTIVITY_SCALE1;
             }
-            *inc *= VAR_ACTIVITY_SCALE2;
+            state.var_inc *= VAR_ACTIVITY_SCALE2;
         }
     }
 }

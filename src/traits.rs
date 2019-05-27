@@ -281,7 +281,7 @@ pub trait VarDBIF {
     /// return a LBD value for the set of literals.
     fn compute_lbd(&self, vec: &[Lit], keys: &mut [usize]) -> usize;
     /// update the variable's activity.
-    fn bump_activity(&mut self, inc: &mut f64, vi: VarId);
+    fn bump_activity(&mut self, state: &mut State, vi: VarId);
 }
 
 /// API for 'watcher list' like `attach`, `detach`, `detach_with` and so on.

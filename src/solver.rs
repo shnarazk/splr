@@ -501,9 +501,8 @@ fn analyze(
     vars: &mut [Var],
     confl: ClauseId,
 ) -> usize {
-    let learnt = &mut state.new_learnt;
-    learnt.clear();
-    learnt.push(0);
+    state.new_learnt.clear();
+    state.new_learnt.push(0);
     let dl = asgs.level();
     let mut cid = confl;
     let mut p = NULL_LIT;
@@ -539,7 +538,7 @@ fn analyze(
             // println!("- handle {}", cid.fmt());
             for q in &(*c).lits[((p != NULL_LIT) as usize)..] {
                 let vi = q.vi();
-                vars.bump_activity(&mut state.var_inc, vi);
+                vars.bump_activity(state, vi);
                 asgs.update_order(vars, vi);
                 let v = &mut vars[vi];
                 let lvl = v.level;
@@ -556,7 +555,7 @@ fn analyze(
                         }
                     } else {
                         // println!("- push {} to learnt, which level is {}", q.int(), lvl);
-                        learnt.push(*q);
+                        state.new_learnt.push(*q);
                     }
                 } else {
                     // if !state.an_seen[vi] {
@@ -584,6 +583,7 @@ fn analyze(
             ti -= 1;
         }
     }
+    let learnt = &mut state.new_learnt;
     learnt[0] = p.negate();
     // println!("- appending {}, the result is {:?}", learnt[0].int(), vec2int(learnt));
     simplify_learnt(asgs, cdb, state, vars)
@@ -595,33 +595,35 @@ fn simplify_learnt(
     state: &mut State,
     vars: &mut [Var],
 ) -> usize {
-    let State {
-        ref mut new_learnt,
-        ref mut an_seen,
-        ..
-    } = state;
-    let mut to_clear: Vec<Lit> = vec![new_learnt[0]];
+    let mut to_clear: Vec<Lit> = vec![state.new_learnt[0]];
     let mut levels = vec![false; asgs.level() + 1];
-    for l in &new_learnt[1..] {
-        to_clear.push(*l);
-        levels[vars[l.vi()].level] = true;
-    }
-    new_learnt.retain(|l| {
-        vars[l.vi()].reason == NULL_CLAUSE
-            || !redundant_lit(cdb, vars, an_seen, *l, &mut to_clear, &levels)
-    });
-    if new_learnt.len() < 30 {
-        minimize_with_bi_clauses(cdb, vars, &mut state.lbd_temp, new_learnt);
+    {
+        let State { ref mut new_learnt,
+                    ref mut an_seen,
+                    ref mut lbd_temp,
+                    .. } = state;
+        for l in &new_learnt[1..] {
+            to_clear.push(*l);
+            levels[vars[l.vi()].level] = true;
+        }
+        new_learnt.retain(|l| {
+            vars[l.vi()].reason == NULL_CLAUSE
+                || !redundant_lit(cdb, vars, an_seen, *l, &mut to_clear, &levels)
+        });
+        if new_learnt.len() < 30 {
+            minimize_with_bi_clauses(cdb, vars, lbd_temp, new_learnt);
+        }
     }
     // glucose heuristics
-    let lbd = vars.compute_lbd(new_learnt, &mut state.lbd_temp);
+    let lbd = vars.compute_lbd(&mut state.new_learnt, &mut state.lbd_temp);
     while let Some(l) = state.last_dl.pop() {
         let vi = l.vi();
         if cdb.clause[vars[vi].reason as usize].rank < lbd {
-            vars.bump_activity(&mut state.var_inc, vi);
+            vars.bump_activity(state, vi);
             asgs.update_order(vars, vi);
         }
     }
+    let State { ref mut new_learnt, .. } = state;
     // find correct backtrack level from remaining literals
     let mut level_to_return = 0;
     if 1 < new_learnt.len() {
@@ -637,7 +639,7 @@ fn simplify_learnt(
         new_learnt.swap(1, max_i);
     }
     for l in &to_clear {
-        an_seen[l.vi()] = false;
+        state.an_seen[l.vi()] = false;
     }
     level_to_return
 }
