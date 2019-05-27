@@ -1,13 +1,13 @@
 use std::path::PathBuf;
 use structopt::StructOpt;
 
-pub const VERSION: &str = "0.1.3";
+pub const VERSION: &str = "0.1.3+PLRC";
 
 /// Configuration built from command line options
 #[derive(Clone, Debug, StructOpt)]
 #[structopt(
     name = "splr",
-    about = "SAT solver for Propositional Logic in Rust, version 0.1.3"
+    about = "SAT solver for Propositional Logic in Rust, version 0.1.3+PLRC"
 )]
 pub struct Config {
     /// soft limit of #clauses (24M is about 4GB)
