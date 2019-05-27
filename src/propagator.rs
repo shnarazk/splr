@@ -398,19 +398,27 @@ impl VarIdHeap {
         }
     }
     fn get_root(&mut self, vars: &[Var]) -> VarId {
-        let s = 1;
+        self.take(vars, 1)
+    }
+    fn take(&mut self, vars: &[Var], s: usize) -> VarId {
+        debug_assert!(s <= self.idxs[0]);
         let vs = self.heap[s];
+        self.remove(vars, vs);
+        vs
+    }
+    fn remove(&mut self, vars: &[Var], vs: VarId) {
+        let s = self.idxs[vs];
         let n = self.idxs[0];
+        if n < s {
+            return;
+        }
         let vn = self.heap[n];
         debug_assert!(vn != 0, "Invalid VarId for heap");
         debug_assert!(vs != 0, "Invalid VarId for heap");
         self.heap.swap(n, s);
         self.idxs.swap(vn, vs);
         self.idxs[0] -= 1;
-        if 1 < self.idxs[0] {
-            self.percolate_down(&vars, 1);
-        }
-        vs
+        self.percolate_down(vars, s);
     }
     fn percolate_up(&mut self, vars: &[Var], start: usize) {
         let mut q = start;
@@ -480,19 +488,6 @@ impl VarIdHeap {
     #[allow(dead_code)]
     fn peek(&self) -> VarId {
         self.heap[1]
-    }
-    #[allow(dead_code)]
-    fn remove(&mut self, vec: &[Var], vs: VarId) {
-        let s = self.idxs[vs];
-        let n = self.idxs[0];
-        if n < s {
-            return;
-        }
-        let vn = self.heap[n];
-        self.heap.swap(n, s);
-        self.idxs.swap(vn, vs);
-        self.idxs[0] -= 1;
-        self.percolate_down(&vec, s);
     }
     #[allow(dead_code)]
     fn check(&self, s: &str) {
