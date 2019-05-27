@@ -105,8 +105,8 @@ impl SatSolverIF for Solver {
                     continue;
                 }
                 match (v.pos_occurs.len(), v.neg_occurs.len()) {
-                    (_, 0) => asgs.enqueue_null(v, TRUE),
-                    (0, _) => asgs.enqueue_null(v, FALSE),
+                    (_, 0) => asgs.enqueue_null(vars, vi, TRUE),
+                    (0, _) => asgs.enqueue_null(vars, vi, FALSE),
                     (p, m) if m * 10 < p => {
                         v.phase = TRUE;
                         elim.enqueue_var(vars, vi, false);
@@ -288,7 +288,7 @@ impl SatSolverIF for Solver {
         match v.len() {
             0 => None, // Empty clause is UNSAT.
             1 => {
-                asgs.enqueue_null(&mut vars[v[0].vi()], v[0].lbool());
+                asgs.enqueue_null(vars, v[0].vi(), v[0].lbool());
                 Some(NULL_CLAUSE)
             }
             _ => {

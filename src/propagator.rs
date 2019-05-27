@@ -48,10 +48,11 @@ impl PropagatorIF for AssignStack {
     fn assigned(&self, l: Lit) -> Lbool {
         unsafe { self.assign.get_unchecked(l.vi()) ^ ((l & 1) as u8) }
     }
-    fn enqueue(&mut self, v: &mut Var, sig: Lbool, cid: ClauseId, dl: usize) -> MaybeInconsistent {
-        debug_assert!(!v.is(Flag::ELIMINATED));
-        let val = self.assign[v.index];
+    fn enqueue(&mut self, vars: &mut [Var], vi: VarId, sig: Lbool, cid: ClauseId, dl: usize) -> MaybeInconsistent {
+        let val = self.assign[vi];
         if val == BOTTOM {
+            let v = &mut vars[vi];
+            debug_assert!(!v.is(Flag::ELIMINATED));
             self.assign[v.index] = sig;
             v.assign = sig;
             v.reason = cid;
@@ -63,6 +64,7 @@ impl PropagatorIF for AssignStack {
             debug_assert!(!self.trail.contains(&Lit::from_var(v.index, TRUE)));
             debug_assert!(!self.trail.contains(&Lit::from_var(v.index, FALSE)));
             self.trail.push(Lit::from_var(v.index, sig));
+            self.var_order.remove(vars, vi);
             Ok(())
         } else if val == sig {
             Ok(())
@@ -70,7 +72,8 @@ impl PropagatorIF for AssignStack {
             Err(SolverError::Inconsistent)
         }
     }
-    fn enqueue_null(&mut self, v: &mut Var, sig: Lbool) {
+    fn enqueue_null(&mut self, vars: &mut [Var], vi: VarId, sig: Lbool) {
+        let v = &mut vars[vi];
         debug_assert!(!v.is(Flag::ELIMINATED));
         debug_assert!(sig != BOTTOM);
         let val = self.assign[v.index];
@@ -80,8 +83,8 @@ impl PropagatorIF for AssignStack {
             v.reason = NULL_CLAUSE;
             v.level = 0;
             self.trail.push(Lit::from_var(v.index, sig));
+            self.var_order.remove(vars, vi);
         }
-        debug_assert!(self.assign[v.index] == sig);
     }
     /// propagate without checking dead clauses
     /// Note: this function assumes there's no dead clause.
@@ -203,6 +206,7 @@ impl PropagatorIF for AssignStack {
         debug_assert!(!self.trail.contains(&l));
         debug_assert!(!self.trail.contains(&l.negate()));
         self.trail.push(l);
+        self.var_order.remove(vars, vi);
     }
     fn uncheck_assume(&mut self, vars: &mut [Var], l: Lit) {
         debug_assert!(!self.trail.contains(&l));
@@ -218,6 +222,7 @@ impl PropagatorIF for AssignStack {
         v.level = dl;
         v.reason = NULL_CLAUSE;
         self.trail.push(l);
+        // self.var_order.remove(vars, vi);
     }
     fn select_var(&mut self, vars: &[Var]) -> VarId {
         self.var_order.select_var(vars)
