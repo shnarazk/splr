@@ -48,7 +48,14 @@ impl PropagatorIF for AssignStack {
     fn assigned(&self, l: Lit) -> Lbool {
         unsafe { self.assign.get_unchecked(l.vi()) ^ ((l & 1) as u8) }
     }
-    fn enqueue(&mut self, vars: &mut [Var], vi: VarId, sig: Lbool, cid: ClauseId, dl: usize) -> MaybeInconsistent {
+    fn enqueue(
+        &mut self,
+        vars: &mut [Var],
+        vi: VarId,
+        sig: Lbool,
+        cid: ClauseId,
+        dl: usize,
+    ) -> MaybeInconsistent {
         let val = self.assign[vi];
         if val == BOTTOM {
             let v = &mut vars[vi];
