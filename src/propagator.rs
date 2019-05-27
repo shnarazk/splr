@@ -237,6 +237,9 @@ impl PropagatorIF for AssignStack {
     fn update_order(&mut self, vec: &[Var], v: VarId) {
         self.var_order.update(vec, v)
     }
+    fn rebuild_order(&mut self, vars: &mut [Var]) {
+        self.var_order.rebuild(vars);
+    }
     #[allow(dead_code)]
     fn dump_cnf(&mut self, cdb: &ClauseDB, state: &State, vars: &[Var], fname: &str) {
         for v in vars {

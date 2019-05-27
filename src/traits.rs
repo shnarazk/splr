@@ -197,6 +197,8 @@ pub trait PropagatorIF {
     fn uncheck_assume(&mut self, vars: &mut [Var], l: Lit);
     /// update the internal heap on var order.
     fn update_order(&mut self, vec: &[Var], v: VarId);
+    /// rebuild the var order heap.
+    fn rebuild_order(&mut self, vars: &mut [Var]);
     /// select a new decision variable.
     fn select_var(&mut self, vars: &[Var]) -> VarId;
     /// dump all active clauses and fixed assignments in solver to a CNF file `fname`.
