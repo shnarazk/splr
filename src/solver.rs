@@ -323,7 +323,7 @@ fn search(
                 asgs.cancel_until(vars, state.root_level);
             } else if asgs.level() == 0 {
                 if cdb.simplify(asgs, elim, state, vars).is_err() {
-                    debug_assert!(false, "interal error by simplify");
+                    dbg!("interal error by simplify");
                     return Err(SolverError::Inconsistent);
                 }
                 state.num_solved_vars = asgs.len();

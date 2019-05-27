@@ -507,7 +507,7 @@ impl StateIF for State {
         }
     }
     /// `mes` should be shorter than or equal to 9, or 8 + a delimiter.
-    #[allow(clippy::cyclomatic_complexity)]
+    #[allow(clippy::cognitive_complexity)]
     fn progress(&mut self, cdb: &ClauseDB, vars: &[Var], mes: Option<&str>) {
         if !self.use_progress {
             return;
