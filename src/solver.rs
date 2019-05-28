@@ -600,10 +600,12 @@ fn simplify_learnt(
     let mut to_clear: Vec<Lit> = vec![state.new_learnt[0]];
     let mut levels = vec![false; asgs.level() + 1];
     {
-        let State { ref mut new_learnt,
-                    ref mut an_seen,
-                    ref mut lbd_temp,
-                    .. } = state;
+        let State {
+            ref mut new_learnt,
+            ref mut an_seen,
+            ref mut lbd_temp,
+            ..
+        } = state;
         for l in &new_learnt[1..] {
             to_clear.push(*l);
             levels[vars[l.vi()].level] = true;
@@ -626,7 +628,9 @@ fn simplify_learnt(
     //         asgs.update_order(vars, vi);
     //     }
     // }
-    let State { ref mut new_learnt, .. } = state;
+    let State {
+        ref mut new_learnt, ..
+    } = state;
     // find correct backtrack level from remaining literals
     let mut level_to_return = 0;
     if 1 < new_learnt.len() {
