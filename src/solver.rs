@@ -617,15 +617,15 @@ fn simplify_learnt(
         }
     }
     // glucose heuristics
-    let dl = asgs.level();
-    let lbd = vars.compute_lbd(&state.new_learnt, &mut state.lbd_temp);
-    while let Some(l) = state.last_dl.pop() {
-        let vi = l.vi();
-        if cdb.clause[vars[vi].reason as usize].rank < lbd {
-            vars[vi].bump_activity(state, dl);
-            asgs.update_order(vars, vi);
-        }
-    }
+    // let dl = asgs.level();
+    // let lbd = vars.compute_lbd(&state.new_learnt, &mut state.lbd_temp);
+    // while let Some(l) = state.last_dl.pop() {
+    //     let vi = l.vi();
+    //     if cdb.clause[vars[vi].reason as usize].rank < lbd {
+    //         vars[vi].bump_activity(state, dl);
+    //         asgs.update_order(vars, vi);
+    //     }
+    // }
     let State { ref mut new_learnt, .. } = state;
     // find correct backtrack level from remaining literals
     let mut level_to_return = 0;
