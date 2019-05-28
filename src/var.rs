@@ -69,12 +69,11 @@ impl VarIF for Var {
         }
         self.reward
     }
-    fn bump_activity(&mut self, state: &mut State, _dl: usize) {
+    fn bump_activity(&mut self, state: &mut State, dl: usize) {
         let diff = state.stats[Stat::Conflict] - self.last_update;
-        // let reward = self.activity + state.var_inc;
         // let reward = (state.stats[Stat::Conflict] as f64 + self.activity) / 2.0;
-        let reward = 0.9 + self.reward * VAR_ACTIVITY_DECAY.powi(diff as i32);
-        self.reward = reward;
+        self.reward =
+            0.2 + 1.0 / (dl + 1) as f64 + self.reward * VAR_ACTIVITY_DECAY.powi(diff as i32);
         self.last_update = state.stats[Stat::Conflict];
     }
 }
