@@ -1,12 +1,10 @@
 use crate::clause::Clause;
-use crate::state::State;
+use crate::state::{Stat, State};
 use crate::traits::*;
 use crate::types::*;
 use std::fmt;
 
-const VAR_ACTIVITY_MAX: f64 = 1e240;
-const VAR_ACTIVITY_SCALE1: f64 = 1e-30;
-const VAR_ACTIVITY_SCALE2: f64 = 1e-30;
+const VAR_ACTIVITY_DECAY: f64 = 0.90;
 
 /// Structure for variables.
 #[derive(Debug)]
@@ -21,12 +19,16 @@ pub struct Var {
     /// decision level at which this variables is assigned.
     pub level: usize,
     /// a dynamic evaluation criterion like VSIDS or ACID.
-    pub activity: f64,
+    pub reward: f64,
     /// list of clauses which contain this variable positively.
     pub pos_occurs: Vec<ClauseId>,
     /// list of clauses which contain this variable negatively.
     pub neg_occurs: Vec<ClauseId>,
     flags: Flag,
+    /// PLRC
+    pub num_assumed: usize,
+    pub num_learned: usize,
+    pub last_update: usize,
 }
 
 /// is the dummy var index.
@@ -41,20 +43,39 @@ impl VarIF for Var {
             phase: BOTTOM,
             reason: NULL_CLAUSE,
             level: 0,
-            activity: 0.0,
+            reward: 0.0,
             pos_occurs: Vec::new(),
             neg_occurs: Vec::new(),
             flags: Flag::empty(),
+            num_assumed: 0,
+            num_learned: 0,
+            last_update: 0,
         }
     }
     fn new_vars(n: usize) -> Vec<Var> {
         let mut vec = Vec::with_capacity(n + 1);
         for i in 0..=n {
             let mut v = Var::new(i);
-            v.activity = (n - i) as f64;
+            v.reward = (n - i) as f64;
             vec.push(v);
         }
         vec
+    }
+    fn activity(&mut self, present: usize) -> f64 {
+        let diff = present - self.last_update;
+        if 0 < diff {
+            self.last_update = present;
+            self.reward *= VAR_ACTIVITY_DECAY.powi(diff as i32);
+        }
+        self.reward
+    }
+    fn bump_activity(&mut self, state: &mut State, _dl: usize) {
+        let diff = state.stats[Stat::Conflict] - self.last_update;
+        // let reward = self.activity + state.var_inc;
+        // let reward = (state.stats[Stat::Conflict] as f64 + self.activity) / 2.0;
+        let reward = 0.9 + self.reward * VAR_ACTIVITY_DECAY.powi(diff as i32);
+        self.reward = reward;
+        self.last_update = state.stats[Stat::Conflict];
     }
 }
 
@@ -100,17 +121,6 @@ impl VarDBIF for [Var] {
         }
         keys[0] = key;
         cnt
-    }
-    fn bump_activity(&mut self, state: &mut State, vi: VarId) {
-        let v = &mut self[vi];
-        let a = v.activity + state.var_inc;
-        v.activity = a;
-        if VAR_ACTIVITY_MAX < a {
-            for v in &mut self[1..] {
-                v.activity *= VAR_ACTIVITY_SCALE1;
-            }
-            state.var_inc *= VAR_ACTIVITY_SCALE2;
-        }
     }
 }
 

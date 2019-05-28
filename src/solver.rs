@@ -329,8 +329,9 @@ fn search(
                 state.num_solved_vars = asgs.len();
             }
             if !asgs.remains() {
-                let vi = asgs.select_var(&vars);
+                let vi = asgs.select_var(vars);
                 let p = vars[vi].phase;
+                vars[vi].num_assumed += 1;
                 asgs.uncheck_assume(vars, Lit::from_var(vi, p));
                 state.stats[Stat::Decision] += 1;
                 a_decision_was_made = true;
@@ -338,6 +339,7 @@ fn search(
         } else {
             conflict_c += 1.0;
             state.stats[Stat::Conflict] += 1;
+            asgs.update_var_heap_index(state.stats[Stat::Conflict]);
             if a_decision_was_made {
                 a_decision_was_made = false;
             } else {
@@ -400,7 +402,7 @@ fn handle_conflict_path(
             return Err(SolverError::Inconsistent);
         }
     }
-    state.var_inc /= state.var_decay;
+    // state.var_inc /= state.var_decay;
     state.cla_inc /= state.cla_decay;
     if ((state.use_chan_seok && !state.glureduce && state.first_reduction < cdb.num_learnt)
         || (state.glureduce
@@ -538,7 +540,7 @@ fn analyze(
             // println!("- handle {}", cid.fmt());
             for q in &(*c).lits[((p != NULL_LIT) as usize)..] {
                 let vi = q.vi();
-                vars.bump_activity(state, vi);
+                vars[vi].bump_activity(state, dl);
                 asgs.update_order(vars, vi);
                 let v = &mut vars[vi];
                 let lvl = v.level;
@@ -615,11 +617,12 @@ fn simplify_learnt(
         }
     }
     // glucose heuristics
-    let lbd = vars.compute_lbd(&mut state.new_learnt, &mut state.lbd_temp);
+    let dl = asgs.level();
+    let lbd = vars.compute_lbd(&state.new_learnt, &mut state.lbd_temp);
     while let Some(l) = state.last_dl.pop() {
         let vi = l.vi();
         if cdb.clause[vars[vi].reason as usize].rank < lbd {
-            vars.bump_activity(state, vi);
+            vars[vi].bump_activity(state, dl);
             asgs.update_order(vars, vi);
         }
     }

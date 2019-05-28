@@ -1,6 +1,6 @@
 use crate::clause::{ClauseDB, Watch};
 use crate::state::{Stat, State};
-use crate::traits::{FlagIF, LitIF, PropagatorIF, WatchDBIF};
+use crate::traits::{FlagIF, LitIF, PropagatorIF, VarIF, WatchDBIF};
 use crate::types::*;
 use crate::var::Var;
 use std::fmt;
@@ -66,7 +66,7 @@ impl PropagatorIF for AssignStack {
             v.level = dl;
             if dl == 0 {
                 v.reason = NULL_CLAUSE;
-                v.activity = 0.0;
+                v.reward = 0.0;
             }
             debug_assert!(!self.trail.contains(&Lit::from_var(v.index, TRUE)));
             debug_assert!(!self.trail.contains(&Lit::from_var(v.index, FALSE)));
@@ -231,10 +231,13 @@ impl PropagatorIF for AssignStack {
         self.trail.push(l);
         // self.var_order.remove(vars, vi);
     }
-    fn select_var(&mut self, vars: &[Var]) -> VarId {
+    fn select_var(&mut self, vars: &mut [Var]) -> VarId {
         self.var_order.select_var(vars)
     }
-    fn update_order(&mut self, vec: &[Var], v: VarId) {
+    fn update_var_heap_index(&mut self, present: usize) {
+        self.var_order.coef = present;
+    }
+    fn update_order(&mut self, vec: &mut [Var], v: VarId) {
         self.var_order.update(vec, v)
     }
     fn rebuild_order(&mut self, vars: &mut [Var]) {
@@ -296,23 +299,25 @@ impl AssignStack {
 pub struct VarIdHeap {
     heap: Vec<VarId>, // order : usize -> VarId
     idxs: Vec<usize>, // VarId : -> order : usize
+    coef: usize,      // extra parameter to element ordering
 }
 
 trait VarOrderIF {
     fn new(n: usize, init: usize) -> VarIdHeap;
-    fn update(&mut self, vec: &[Var], v: VarId);
-    fn insert(&mut self, vec: &[Var], vi: VarId);
+    fn update(&mut self, vars: &mut [Var], v: VarId);
+    fn insert(&mut self, vars: &mut [Var], vi: VarId);
     fn clear(&mut self);
     fn len(&self) -> usize;
     fn is_empty(&self) -> bool;
-    fn select_var(&mut self, vars: &[Var]) -> VarId;
-    fn rebuild(&mut self, vars: &[Var]);
+    fn select_var(&mut self, vars: &mut [Var]) -> VarId;
+    fn rebuild(&mut self, vars: &mut [Var]);
 }
 
 impl VarOrderIF for VarIdHeap {
     fn new(n: usize, init: usize) -> VarIdHeap {
         let mut heap = Vec::with_capacity(n + 1);
         let mut idxs = Vec::with_capacity(n + 1);
+        let coef = 0;
         heap.push(0);
         idxs.push(n);
         for i in 1..=n {
@@ -320,19 +325,19 @@ impl VarOrderIF for VarIdHeap {
             idxs.push(i);
         }
         idxs[0] = init;
-        VarIdHeap { heap, idxs }
+        VarIdHeap { heap, idxs, coef }
     }
-    fn update(&mut self, vec: &[Var], v: VarId) {
+    fn update(&mut self, vars: &mut [Var], v: VarId) {
         debug_assert!(v != 0, "Invalid VarId");
         let start = self.idxs[v];
         if self.contains(v) {
-            self.percolate_up(vec, start)
+            self.percolate_up(vars, start)
         }
     }
-    fn insert(&mut self, vec: &[Var], vi: VarId) {
+    fn insert(&mut self, vars: &mut [Var], vi: VarId) {
         if self.contains(vi) {
             let i = self.idxs[vi];
-            self.percolate_up(&vec, i);
+            self.percolate_up(vars, i);
             return;
         }
         let i = self.idxs[vi];
@@ -341,7 +346,7 @@ impl VarOrderIF for VarIdHeap {
         self.heap.swap(i, n);
         self.idxs.swap(vi, vn);
         self.idxs[0] = n;
-        self.percolate_up(&vec, n);
+        self.percolate_up(vars, n);
     }
     fn clear(&mut self) {
         self.reset()
@@ -352,7 +357,7 @@ impl VarOrderIF for VarIdHeap {
     fn is_empty(&self) -> bool {
         self.idxs[0] == 0
     }
-    fn select_var(&mut self, vars: &[Var]) -> VarId {
+    fn select_var(&mut self, vars: &mut [Var]) -> VarId {
         loop {
             let vi = self.get_root(vars);
             if vars[vi].assign == BOTTOM && !vars[vi].is(Flag::ELIMINATED) {
@@ -360,11 +365,12 @@ impl VarOrderIF for VarIdHeap {
             }
         }
     }
-    fn rebuild(&mut self, vars: &[Var]) {
+    fn rebuild(&mut self, vars: &mut [Var]) {
         self.reset();
-        for v in &vars[1..] {
+        for vi in 1..vars.len() {
+            let v = &vars[vi];
             if v.assign == BOTTOM && !v.is(Flag::ELIMINATED) {
-                self.insert(vars, v.index);
+                self.insert(vars, vi);
             }
         }
     }
@@ -400,16 +406,16 @@ impl VarIdHeap {
             self.heap[i] = i;
         }
     }
-    fn get_root(&mut self, vars: &[Var]) -> VarId {
+    fn get_root(&mut self, vars: &mut [Var]) -> VarId {
         self.take(vars, 1)
     }
-    fn take(&mut self, vars: &[Var], s: usize) -> VarId {
+    fn take(&mut self, vars: &mut [Var], s: usize) -> VarId {
         debug_assert!(s <= self.idxs[0]);
         let vs = self.heap[s];
         self.remove(vars, vs);
         vs
     }
-    fn remove(&mut self, vars: &[Var], vs: VarId) {
+    fn remove(&mut self, vars: &mut [Var], vs: VarId) {
         let s = self.idxs[vs];
         let n = self.idxs[0];
         if n < s {
@@ -423,11 +429,11 @@ impl VarIdHeap {
         self.idxs[0] -= 1;
         self.percolate_down(vars, s);
     }
-    fn percolate_up(&mut self, vars: &[Var], start: usize) {
+    fn percolate_up(&mut self, vars: &mut [Var], start: usize) {
         let mut q = start;
         let vq = self.heap[q];
         debug_assert!(0 < vq, "size of heap is too small");
-        let aq = vars[vq].activity;
+        let aq = vars[vq].activity(self.coef);
         loop {
             let p = q / 2;
             if p == 0 {
@@ -437,7 +443,7 @@ impl VarIdHeap {
                 return;
             } else {
                 let vp = self.heap[p];
-                let ap = vars[vp].activity;
+                let ap = vars[vp].activity(self.coef);
                 if ap < aq {
                     // move down the current parent, and make it empty
                     self.heap[q] = vp;
@@ -453,20 +459,20 @@ impl VarIdHeap {
             }
         }
     }
-    fn percolate_down(&mut self, vars: &[Var], start: usize) {
+    fn percolate_down(&mut self, vars: &mut [Var], start: usize) {
         let n = self.len();
         let mut i = start;
         let vi = self.heap[i];
-        let ai = vars[vi].activity;
+        let ai = vars[vi].activity(self.coef);
         loop {
             let l = 2 * i; // left
             if l < n {
                 let vl = self.heap[l];
-                let al = vars[vl].activity;
+                let al = vars[vl].activity(self.coef);
                 let r = l + 1; // right
-                let (target, vc, ac) = if r < n && al < vars[self.heap[r]].activity {
+                let (target, vc, ac) = if r < n && al < vars[self.heap[r]].activity(self.coef) {
                     let vr = self.heap[r];
-                    (r, vr, vars[vr].activity)
+                    (r, vr, vars[vr].activity(self.coef))
                 } else {
                     (l, vl, al)
                 };

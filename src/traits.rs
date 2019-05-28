@@ -195,12 +195,14 @@ pub trait PropagatorIF {
     fn uncheck_enqueue(&mut self, vars: &mut [Var], l: Lit, cid: ClauseId);
     /// unsafe assume; doesn't emit an exception.
     fn uncheck_assume(&mut self, vars: &mut [Var], l: Lit);
+    /// select a new decision variable.
+    fn select_var(&mut self, vars: &mut [Var]) -> VarId;
+    // update the interal parameter in the var head.
+    fn update_var_heap_index(&mut self, present: usize);
     /// update the internal heap on var order.
-    fn update_order(&mut self, vec: &[Var], v: VarId);
+    fn update_order(&mut self, vec: &mut [Var], v: VarId);
     /// rebuild the var order heap.
     fn rebuild_order(&mut self, vars: &mut [Var]);
-    /// select a new decision variable.
-    fn select_var(&mut self, vars: &[Var]) -> VarId;
     /// dump all active clauses and fixed assignments in solver to a CNF file `fname`.
     fn dump_cnf(&mut self, cdb: &ClauseDB, state: &State, vars: &[Var], fname: &str);
 }
@@ -270,6 +272,9 @@ pub trait ValidatorIF {
 pub trait VarIF {
     fn new(i: usize) -> Var;
     fn new_vars(n: usize) -> Vec<Var>;
+    /// return current activity
+    fn activity(&mut self, present: usize) -> f64;
+    fn bump_activity(&mut self, state: &mut State, dl: usize);
 }
 
 /// API for var DB like `assigned`, `locked`, `compute_lbd` and so on.
@@ -282,8 +287,6 @@ pub trait VarDBIF {
     fn satisfies(&self, c: &[Lit]) -> bool;
     /// return a LBD value for the set of literals.
     fn compute_lbd(&self, vec: &[Lit], keys: &mut [usize]) -> usize;
-    /// update the variable's activity.
-    fn bump_activity(&mut self, state: &mut State, vi: VarId);
 }
 
 /// API for 'watcher list' like `attach`, `detach`, `detach_with` and so on.
