@@ -61,20 +61,38 @@ impl VarIF for Var {
         }
         vec
     }
-    fn activity(&mut self, present: usize) -> f64 {
+    fn activity(&mut self, nconfl: usize) -> f64 {
+        /*
+        // EVSIDS modified
         let diff = present - self.last_update;
         if 0 < diff {
             self.last_update = present;
             self.reward *= VAR_ACTIVITY_DECAY.powi(diff as i32);
         }
+        */
+        // /*
+        // CHB modified
+        let diff = self.num_used;
+        if 0 < diff {
+            let diff = nconfl - self.last_update;
+            let decay: f64 = 0.05;
+            self.reward = self.reward * (1.0 - decay).powi(diff as i32) + 1.0 / ( diff + 1) as f64;
+            self.num_used = 0;
+        }
+        // */
         self.reward
     }
     fn bump_activity(&mut self, state: &mut State, dl: usize) {
+        /*
+        // EVSIDS modified
         let diff = state.stats[Stat::Conflict] - self.last_update;
-        // let reward = (state.stats[Stat::Conflict] as f64 + self.activity) / 2.0;
         self.reward =
             0.2 + 1.0 / (dl + 1) as f64 + self.reward * VAR_ACTIVITY_DECAY.powi(diff as i32);
+        */
+        // /*
+        // CHB modified
         self.last_update = state.stats[Stat::Conflict];
+        // */
     }
 }
 
