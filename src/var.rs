@@ -26,7 +26,7 @@ pub struct Var {
     pub neg_occurs: Vec<ClauseId>,
     flags: Flag,
     /// PLRC
-    pub num_assumed: usize,
+    pub num_used: usize,
     pub num_learned: usize,
     pub last_update: usize,
 }
@@ -47,7 +47,7 @@ impl VarIF for Var {
             pos_occurs: Vec::new(),
             neg_occurs: Vec::new(),
             flags: Flag::empty(),
-            num_assumed: 0,
+            num_used: 0,
             num_learned: 0,
             last_update: 0,
         }

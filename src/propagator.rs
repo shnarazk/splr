@@ -101,6 +101,7 @@ impl PropagatorIF for AssignStack {
         let watcher = &mut cdb.watcher[..] as *mut [Vec<Watch>];
         while self.remains() {
             let p: usize = self.sweep() as usize;
+            vars[(p as Lit).vi()].num_used += 1;
             let false_lit = (p as Lit).negate();
             state.stats[Stat::Propagation] += 1;
             let mut conflict_clause: ClauseId = NULL_CLAUSE;

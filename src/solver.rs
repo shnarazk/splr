@@ -331,7 +331,7 @@ fn search(
             if !asgs.remains() {
                 let vi = asgs.select_var(vars);
                 let p = vars[vi].phase;
-                vars[vi].num_assumed += 1;
+                // vars[vi].num_used += 1;
                 asgs.uncheck_assume(vars, Lit::from_var(vi, p));
                 state.stats[Stat::Decision] += 1;
                 a_decision_was_made = true;
