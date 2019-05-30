@@ -198,7 +198,7 @@ pub trait PropagatorIF {
     /// select a new decision variable.
     fn select_var(&mut self, vars: &mut [Var]) -> VarId;
     // update the interal parameter in the var head.
-    fn update_var_heap_index(&mut self, present: usize);
+    fn update_var_heap_index(&mut self, nconfl: usize);
     /// update the internal heap on var order.
     fn update_order(&mut self, vec: &mut [Var], v: VarId);
     /// rebuild the var order heap.

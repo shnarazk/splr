@@ -234,8 +234,8 @@ impl PropagatorIF for AssignStack {
     fn select_var(&mut self, vars: &mut [Var]) -> VarId {
         self.var_order.select_var(vars)
     }
-    fn update_var_heap_index(&mut self, present: usize) {
-        self.var_order.coef = present;
+    fn update_var_heap_index(&mut self, ncofl: usize) {
+        self.var_order.coef = ncofl;
     }
     fn update_order(&mut self, vec: &mut [Var], v: VarId) {
         self.var_order.update(vec, v)
