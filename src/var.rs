@@ -4,7 +4,7 @@ use crate::traits::*;
 use crate::types::*;
 use std::fmt;
 
-const VAR_ACTIVITY_DECAY: f64 = 0.90;
+const VAR_ACTIVITY_DECAY: f64 = 0.96;
 
 /// Structure for variables.
 #[derive(Debug)]
@@ -75,14 +75,14 @@ impl VarIF for Var {
         let diff = self.num_used;
         if 0 < diff {
             let diff = nconfl - self.last_update;
-            let decay: f64 = 0.05;
-            self.reward = self.reward * (1.0 - decay).powi(diff as i32) + 1.0 / ( diff + 1) as f64;
+            self.reward =
+                1.0 / (diff + 1) as f64 + self.reward * VAR_ACTIVITY_DECAY.powi(diff as i32);
             self.num_used = 0;
         }
         // */
         self.reward
     }
-    fn bump_activity(&mut self, state: &mut State, dl: usize) {
+    fn bump_activity(&mut self, state: &mut State, _dl: usize) {
         /*
         // EVSIDS modified
         let diff = state.stats[Stat::Conflict] - self.last_update;
