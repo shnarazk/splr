@@ -175,7 +175,7 @@ pub trait PropagatorIF {
     /// execute *propagate*.
     fn propagate(&mut self, cdb: &mut ClauseDB, state: &mut State, vars: &mut [Var]) -> ClauseId;
     /// execute *backjump*.
-    fn cancel_until(&mut self, vars: &mut [Var], lv: usize);
+    fn cancel_until(&mut self, state: &mut State, vars: &mut [Var], lv: usize);
     /// add an assignment caused by a clause; emit an exception if solver becomes inconsistent.
     ///
     /// # Errors
@@ -273,8 +273,9 @@ pub trait VarIF {
     fn new(i: usize) -> Var;
     fn new_vars(n: usize) -> Vec<Var>;
     /// return current activity
-    fn activity(&mut self, present: usize) -> f64;
-    fn bump_activity(&mut self, state: &mut State, dl: usize);
+    fn activity(&mut self, _: usize) -> f64;
+    fn bump_activity(&mut self, state: &mut State, reward: f64);
+    fn decay_activity(&mut self, state: &mut State);
 }
 
 /// API for var DB like `assigned`, `locked`, `compute_lbd` and so on.

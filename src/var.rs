@@ -4,7 +4,7 @@ use crate::traits::*;
 use crate::types::*;
 use std::fmt;
 
-const VAR_ACTIVITY_DECAY: f64 = 0.96;
+const VAR_ACTIVITY_DECAY: f64 = 0.98;
 
 /// Structure for variables.
 #[derive(Debug)]
@@ -26,8 +26,6 @@ pub struct Var {
     pub neg_occurs: Vec<ClauseId>,
     flags: Flag,
     /// PLRC
-    pub num_used: usize,
-    pub num_learned: usize,
     pub last_update: usize,
 }
 
@@ -47,8 +45,6 @@ impl VarIF for Var {
             pos_occurs: Vec::new(),
             neg_occurs: Vec::new(),
             flags: Flag::empty(),
-            num_used: 0,
-            num_learned: 0,
             last_update: 0,
         }
     }
@@ -61,38 +57,72 @@ impl VarIF for Var {
         }
         vec
     }
-    fn activity(&mut self, nconfl: usize) -> f64 {
+    fn activity(&mut self, _: usize) -> f64 {
         /*
         // EVSIDS modified
-        let diff = present - self.last_update;
+        let diff = ncnf - self.last_update;
         if 0 < diff {
-            self.last_update = present;
+            self.last_update = ncnf;
             self.reward *= VAR_ACTIVITY_DECAY.powi(diff as i32);
         }
         */
-        // /*
+        /*
         // CHB modified
         let diff = self.num_used;
         if 0 < diff {
             let diff = nconfl - self.last_update;
-            self.reward =
-                1.0 / (diff + 1) as f64 + self.reward * VAR_ACTIVITY_DECAY.powi(diff as i32);
+            self.reward = 1.0 / (diff + 1) as f64
+                // + 0.2 * ((self.last_level + 1) as f64).log(10.0)
+                + self.reward * (VAR_ACTIVITY_DECAY + (0.1 * ((self.last_level + 1) as f64).log(10.0)).powi(diff as i32)).max(0.98);
             self.num_used = 0;
         }
-        // */
+        self.reward
+        */
+        /*
+        // CHB modified2
+        let age = ncnf - self.last_update;
+        if 0 < age {
+            if 0 < self.num_learned {
+                // let rate = self.num_learned as f64 / (1 + ncnf - self.last_assign) as f64;
+                self.reward += self.num_learned as f64;
+                self.num_learned = 0;
+            }
+            self.reward *= VAR_ACTIVITY_DECAY;
+            self.last_update = ncnf;
+        }
+        */
         self.reward
     }
-    fn bump_activity(&mut self, state: &mut State, _dl: usize) {
+    fn bump_activity(&mut self, state: &mut State, reward: f64) {
+        self.decay_activity(state);
+        self.reward += reward;
+        // self.reward = (self.reward + reward) / 2.0;
         /*
         // EVSIDS modified
         let diff = state.stats[Stat::Conflict] - self.last_update;
         self.reward =
             0.2 + 1.0 / (dl + 1) as f64 + self.reward * VAR_ACTIVITY_DECAY.powi(diff as i32);
         */
-        // /*
+        /*
         // CHB modified
-        self.last_update = state.stats[Stat::Conflict];
-        // */
+        self.num_learned += 1;
+        self.last_learnt = state.stats[Stat::Conflict];
+        */
+        // if dl == self.level {
+        //     self.reward += 0.1 as f64;
+        // }
+        // if self.reason == NULL_CLAUSE {
+        //     self.reward += 1.0;
+        // } else {
+        //     self.reward += 0.25;
+        // }
+    }
+    fn decay_activity(&mut self, state: &mut State) {
+        let age = state.stats[Stat::Conflict] - self.last_update;
+        if 0 < age {
+            self.reward *= VAR_ACTIVITY_DECAY.powi(age as i32);
+            self.last_update += age;
+        }
     }
 }
 

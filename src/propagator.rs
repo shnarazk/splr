@@ -101,7 +101,6 @@ impl PropagatorIF for AssignStack {
         let watcher = &mut cdb.watcher[..] as *mut [Vec<Watch>];
         while self.remains() {
             let p: usize = self.sweep() as usize;
-            vars[(p as Lit).vi()].num_used += 1;
             let false_lit = (p as Lit).negate();
             state.stats[Stat::Propagation] += 1;
             let mut conflict_clause: ClauseId = NULL_CLAUSE;
@@ -178,14 +177,16 @@ impl PropagatorIF for AssignStack {
         }
         NULL_CLAUSE
     }
-    fn cancel_until(&mut self, vars: &mut [Var], lv: usize) {
-        if self.trail_lim.len() <= lv {
+    fn cancel_until(&mut self, state: &mut State, vars: &mut [Var], lv: usize) {
+        let clvl = self.trail_lim.len();
+        if clvl <= lv {
             return;
         }
         let lim = self.trail_lim[lv];
         for l in &self.trail[lim..] {
             let vi = l.vi();
             let v = &mut vars[vi];
+            v.decay_activity(state);
             v.phase = self.assign[vi];
             self.assign[vi] = BOTTOM;
             v.assign = BOTTOM;

@@ -166,16 +166,16 @@ impl SatSolverIF for Solver {
                     }
                 }
                 elim.extend_model(&mut result);
-                asgs.cancel_until(vars, 0);
+                asgs.cancel_until(state, vars, 0);
                 Ok(Certificate::SAT(result))
             }
             Ok(false) => {
                 state.progress(cdb, vars, None);
-                asgs.cancel_until(vars, 0);
+                asgs.cancel_until(state, vars, 0);
                 Ok(Certificate::UNSAT)
             }
             Err(_) => {
-                asgs.cancel_until(vars, 0);
+                asgs.cancel_until(state, vars, 0);
                 state.progress(cdb, vars, Some("ERROR"));
                 state.ok = false;
                 if cdb.check_size(state).is_err() {
@@ -320,7 +320,7 @@ fn search(
             }
             // DYNAMIC FORCING RESTART
             if state.force_restart(&mut conflict_c) {
-                asgs.cancel_until(vars, state.root_level);
+                asgs.cancel_until(state, vars, state.root_level);
             } else if asgs.level() == 0 {
                 if cdb.simplify(asgs, elim, state, vars).is_err() {
                     dbg!("interal error by simplify");
@@ -370,8 +370,8 @@ fn handle_conflict_path(
     // DYNAMIC BLOCKING RESTART
     state.block_restart(asgs, tn_confl);
     let bl = analyze(asgs, cdb, state, vars, ci);
+    asgs.cancel_until(state, vars, bl.max(state.root_level));
     let new_learnt = &mut state.new_learnt;
-    asgs.cancel_until(vars, bl.max(state.root_level));
     let learnt_len = new_learnt.len();
     if learnt_len == 1 {
         // dump to certified even if it's a literal.
@@ -477,7 +477,7 @@ fn adapt_parameters(
     }
     if nconflict == switch {
         state.flush("exhaustive eliminator activated...");
-        asgs.cancel_until(vars, 0);
+        asgs.cancel_until(state, vars, 0);
         state.adapt_strategy(cdb);
         if state.use_elim {
             cdb.reset(state.co_lbd_bound);
@@ -510,6 +510,7 @@ fn analyze(
     let mut p = NULL_LIT;
     let mut ti = asgs.len() - 1; // trail index
     let mut path_cnt = 0;
+    let progress = 1.0 - asgs.trail.len() as f64 / vars.len() as f64;
     state.last_dl.clear();
     loop {
         // println!("analyze {}", p.int());
@@ -540,13 +541,13 @@ fn analyze(
             // println!("- handle {}", cid.fmt());
             for q in &(*c).lits[((p != NULL_LIT) as usize)..] {
                 let vi = q.vi();
-                vars[vi].bump_activity(state, dl);
                 asgs.update_order(vars, vi);
                 let v = &mut vars[vi];
                 let lvl = v.level;
                 debug_assert!(!v.is(Flag::ELIMINATED));
                 debug_assert!(v.assign != BOTTOM);
                 if 0 < lvl && !state.an_seen[vi] {
+                    v.bump_activity(state, 1.0 + progress /* + progress */);
                     state.an_seen[vi] = true;
                     if dl <= lvl {
                         // println!("- flag for {} which level is {}", q.int(), lvl);
@@ -587,6 +588,7 @@ fn analyze(
     }
     let learnt = &mut state.new_learnt;
     learnt[0] = p.negate();
+    vars[learnt[0].vi()].bump_activity(state, 1.0 + progress);
     // println!("- appending {}, the result is {:?}", learnt[0].int(), vec2int(learnt));
     simplify_learnt(asgs, cdb, state, vars)
 }
@@ -618,16 +620,18 @@ fn simplify_learnt(
             minimize_with_bi_clauses(cdb, vars, lbd_temp, new_learnt);
         }
     }
+    /*
     // glucose heuristics
     // let dl = asgs.level();
-    // let lbd = vars.compute_lbd(&state.new_learnt, &mut state.lbd_temp);
-    // while let Some(l) = state.last_dl.pop() {
-    //     let vi = l.vi();
-    //     if cdb.clause[vars[vi].reason as usize].rank < lbd {
-    //         vars[vi].bump_activity(state, dl);
-    //         asgs.update_order(vars, vi);
-    //     }
-    // }
+    let lbd = vars.compute_lbd(&state.new_learnt, &mut state.lbd_temp);
+    while let Some(l) = state.last_dl.pop() {
+        let vi = l.vi();
+        if cdb.clause[vars[vi].reason as usize].rank < lbd {
+            vars[vi].bump_activity(state, 1.0);
+            asgs.update_order(vars, vi);
+        }
+    }
+    */
     let State {
         ref mut new_learnt, ..
     } = state;
