@@ -547,7 +547,7 @@ fn analyze(
                 debug_assert!(!v.is(Flag::ELIMINATED));
                 debug_assert!(v.assign != BOTTOM);
                 if 0 < lvl && !state.an_seen[vi] {
-                    v.bump_activity(state, 1.0 + progress /* + progress */);
+                    v.bump_activity(state, 1.0 + progress);
                     state.an_seen[vi] = true;
                     if dl <= lvl {
                         // println!("- flag for {} which level is {}", q.int(), lvl);
