@@ -1,11 +1,8 @@
 use crate::clause::Clause;
+use crate::state::{Stat, State};
 use crate::traits::*;
 use crate::types::*;
 use std::fmt;
-
-const VAR_ACTIVITY_MAX: f64 = 1e240;
-const VAR_ACTIVITY_SCALE1: f64 = 1e-30;
-const VAR_ACTIVITY_SCALE2: f64 = 1e-30;
 
 /// Structure for variables.
 #[derive(Debug)]
@@ -55,6 +52,12 @@ impl VarIF for Var {
         }
         vec
     }
+    fn bump_activity(&mut self, state: &State, _scale: f64) {
+        // let reward = state.stats[Stat::Propagation] as f64;
+        let reward = state.stats[Stat::Conflict] as f64;
+        let r = 0.5;
+        self.activity = r * reward + (1.0 - r) * self.activity;
+    }
 }
 
 impl FlagIF for Var {
@@ -99,17 +102,6 @@ impl VarDBIF for [Var] {
         }
         keys[0] = key;
         cnt
-    }
-    fn bump_activity(&mut self, inc: &mut f64, vi: VarId) {
-        let v = &mut self[vi];
-        let a = v.activity + *inc;
-        v.activity = a;
-        if VAR_ACTIVITY_MAX < a {
-            for v in &mut self[1..] {
-                v.activity *= VAR_ACTIVITY_SCALE1;
-            }
-            *inc *= VAR_ACTIVITY_SCALE2;
-        }
     }
 }
 

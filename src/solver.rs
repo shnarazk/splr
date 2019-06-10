@@ -361,9 +361,6 @@ fn handle_conflict_path(
     ci: ClauseId,
 ) -> MaybeInconsistent {
     let tn_confl = state.stats[Stat::Conflict]; // total number
-    if tn_confl % 5000 == 0 && state.var_decay < state.var_decay_max {
-        state.var_decay += 0.01;
-    }
     state.restart_update_asg(asgs.len());
     // DYNAMIC BLOCKING RESTART
     state.block_restart(asgs, tn_confl);
@@ -400,7 +397,6 @@ fn handle_conflict_path(
             return Err(SolverError::Inconsistent);
         }
     }
-    state.var_inc /= state.var_decay;
     state.cla_inc /= state.cla_decay;
     if ((state.use_chan_seok && !state.glureduce && state.first_reduction < cdb.num_learnt)
         || (state.glureduce
@@ -501,14 +497,15 @@ fn analyze(
     vars: &mut [Var],
     confl: ClauseId,
 ) -> usize {
-    let learnt = &mut state.new_learnt;
-    learnt.clear();
-    learnt.push(0);
+    state.new_learnt.clear();
+    state.new_learnt.push(0);
     let dl = asgs.level();
     let mut cid = confl;
     let mut p = NULL_LIT;
     let mut ti = asgs.len() - 1; // trail index
     let mut path_cnt = 0;
+    let mut _conflict_core = 0;
+    let a_rate = asgs.trail.len() as f64 / vars.len() as f64;
     state.last_dl.clear();
     loop {
         // println!("analyze {}", p.int());
@@ -539,7 +536,6 @@ fn analyze(
             // println!("- handle {}", cid.fmt());
             for q in &(*c).lits[((p != NULL_LIT) as usize)..] {
                 let vi = q.vi();
-                vars.bump_activity(&mut state.var_inc, vi);
                 asgs.update_order(vars, vi);
                 let v = &mut vars[vi];
                 let lvl = v.level;
@@ -547,8 +543,10 @@ fn analyze(
                 debug_assert!(v.assign != BOTTOM);
                 if 0 < lvl && !state.an_seen[vi] {
                     state.an_seen[vi] = true;
+                    // v.bump_activity(state, dl as f64);
                     if dl <= lvl {
                         // println!("- flag for {} which level is {}", q.int(), lvl);
+                        _conflict_core += 1;
                         path_cnt += 1;
                         if v.reason != NULL_CLAUSE && cdb.clause[v.reason as usize].is(Flag::LEARNT)
                         {
@@ -556,7 +554,9 @@ fn analyze(
                         }
                     } else {
                         // println!("- push {} to learnt, which level is {}", q.int(), lvl);
-                        learnt.push(*q);
+                        // vars.bump_activity(state, vi, conflict_core as f64);
+                        // vars.bump_activity(state, vi, a_rate);
+                        state.new_learnt.push(*q);
                     }
                 } else {
                     // if !state.an_seen[vi] {
@@ -584,9 +584,19 @@ fn analyze(
             ti -= 1;
         }
     }
-    learnt[0] = p.negate();
+    state.new_learnt[0] = p.negate();
     // println!("- appending {}, the result is {:?}", learnt[0].int(), vec2int(learnt));
-    simplify_learnt(asgs, cdb, state, vars)
+    let ret = simplify_learnt(asgs, cdb, state, vars);
+    // glucose heuristics
+    let lbd = vars.compute_lbd(&state.new_learnt, &mut state.lbd_temp);
+    while let Some(l) = state.last_dl.pop() {
+        let v = &mut vars[l.vi()];
+        if cdb.clause[v.reason as usize].rank < lbd {
+            // vars.bump_activity(state, vi, conflict_core as f64);
+            v.bump_activity(state, a_rate);
+        }
+    }
+    ret
 }
 
 fn simplify_learnt(
@@ -612,15 +622,6 @@ fn simplify_learnt(
     });
     if new_learnt.len() < 30 {
         minimize_with_bi_clauses(cdb, vars, &mut state.lbd_temp, new_learnt);
-    }
-    // glucose heuristics
-    let lbd = vars.compute_lbd(new_learnt, &mut state.lbd_temp);
-    while let Some(l) = state.last_dl.pop() {
-        let vi = l.vi();
-        if cdb.clause[vars[vi].reason as usize].rank < lbd {
-            vars.bump_activity(&mut state.var_inc, vi);
-            asgs.update_order(vars, vi);
-        }
     }
     // find correct backtrack level from remaining literals
     let mut level_to_return = 0;

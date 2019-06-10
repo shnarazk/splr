@@ -147,9 +147,6 @@ pub struct State {
     /// CLAUSE/VARIABLE ACTIVITY
     pub cla_decay: f64,
     pub cla_inc: f64,
-    pub var_decay: f64,
-    pub var_decay_max: f64,
-    pub var_inc: f64,
     /// CLAUSE REDUCTION
     pub first_reduction: usize,
     pub glureduce: bool,
@@ -309,9 +306,6 @@ impl Default for State {
             lbd_frozen_clause: 30,
             cla_decay: 0.999,
             cla_inc: 1.0,
-            var_decay: 0.9,
-            var_decay_max: 0.95,
-            var_inc: 0.9,
             first_reduction: 1000,
             glureduce: true,
             cdb_inc: 300,
@@ -443,8 +437,6 @@ impl StateIF for State {
             } else {
                 self.strategy = SearchStrategy::LowSuccesiveM;
             }
-            self.var_decay = 0.999;
-            self.var_decay_max = 0.999;
         }
         if self.stats[Stat::NoDecisionConflict] > 54_400 {
             self.strategy = SearchStrategy::HighSuccesive;
@@ -452,14 +444,10 @@ impl StateIF for State {
             self.glureduce = true;
             self.co_lbd_bound = 3;
             self.first_reduction = 30000;
-            self.var_decay = 0.99;
-            self.var_decay_max = 0.99;
             // randomize_on_restarts = 1;
         }
         if self.stats[Stat::NumLBD2] - self.stats[Stat::NumBin] > 20_000 {
             self.strategy = SearchStrategy::ManyGlues;
-            self.var_decay = 0.91;
-            self.var_decay_max = 0.91;
         }
         if self.strategy == SearchStrategy::Initial {
             self.strategy = SearchStrategy::Generic;
