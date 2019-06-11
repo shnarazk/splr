@@ -276,6 +276,7 @@ pub trait VarIF {
     fn activity(&mut self, _: usize) -> f64;
     fn bump_activity(&mut self, state: &mut State, reward: f64);
     fn decay_activity(&mut self, state: &mut State);
+    fn drift(&mut self);
 }
 
 /// API for var DB like `assigned`, `locked`, `compute_lbd` and so on.

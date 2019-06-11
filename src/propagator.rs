@@ -187,6 +187,7 @@ impl PropagatorIF for AssignStack {
             let vi = l.vi();
             let v = &mut vars[vi];
             v.decay_activity(state);
+            v.drift();
             v.phase = self.assign[vi];
             self.assign[vi] = BOTTOM;
             v.assign = BOTTOM;

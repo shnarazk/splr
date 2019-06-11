@@ -370,6 +370,9 @@ fn handle_conflict_path(
     // DYNAMIC BLOCKING RESTART
     state.block_restart(asgs, tn_confl);
     let bl = analyze(asgs, cdb, state, vars, ci);
+    // for l in &state.new_learnt {
+    //     vars[l.vi()].drift(l.lbool());
+    // }
     asgs.cancel_until(state, vars, bl.max(state.root_level));
     let new_learnt = &mut state.new_learnt;
     let learnt_len = new_learnt.len();
@@ -510,7 +513,6 @@ fn analyze(
     let mut p = NULL_LIT;
     let mut ti = asgs.len() - 1; // trail index
     let mut path_cnt = 0;
-    let progress = 1.0 - asgs.trail.len() as f64 / vars.len() as f64;
     state.last_dl.clear();
     loop {
         // println!("analyze {}", p.int());
@@ -547,7 +549,7 @@ fn analyze(
                 debug_assert!(!v.is(Flag::ELIMINATED));
                 debug_assert!(v.assign != BOTTOM);
                 if 0 < lvl && !state.an_seen[vi] {
-                    v.bump_activity(state, 1.0 + progress);
+                    // v.bump_activity(state, 1.0);
                     state.an_seen[vi] = true;
                     if dl <= lvl {
                         // println!("- flag for {} which level is {}", q.int(), lvl);
@@ -588,7 +590,7 @@ fn analyze(
     }
     let learnt = &mut state.new_learnt;
     learnt[0] = p.negate();
-    vars[learnt[0].vi()].bump_activity(state, 1.0 + progress);
+    vars[learnt[0].vi()].bump_activity(state, 1.0);
     // println!("- appending {}, the result is {:?}", learnt[0].int(), vec2int(learnt));
     simplify_learnt(asgs, cdb, state, vars)
 }

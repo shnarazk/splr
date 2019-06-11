@@ -4,7 +4,7 @@ use crate::traits::*;
 use crate::types::*;
 use std::fmt;
 
-const VAR_ACTIVITY_DECAY: f64 = 0.98;
+const VAR_ACTIVITY_DECAY: f64 = 0.95;
 
 /// Structure for variables.
 #[derive(Debug)]
@@ -15,6 +15,7 @@ pub struct Var {
     pub assign: Lbool,
     /// the previous assigned value
     pub phase: Lbool,
+    pub spin: f64,
     pub reason: ClauseId,
     /// decision level at which this variables is assigned.
     pub level: usize,
@@ -39,6 +40,7 @@ impl VarIF for Var {
             index: i,
             assign: BOTTOM,
             phase: BOTTOM,
+            spin: 0f64,
             reason: NULL_CLAUSE,
             level: 0,
             reward: 0.0,
@@ -56,6 +58,26 @@ impl VarIF for Var {
             vec.push(v);
         }
         vec
+    }
+    fn drift(&mut self) {
+        let current = self.assign;
+        let bias = if current == TRUE {
+            1.0
+        } else if current == FALSE {
+            -1.0
+        } else {
+            0.0
+        };
+        self.spin = 0.05 * bias + 0.95 * self.spin;
+        if 0.8 < self.spin && current == FALSE {
+            self.reward += 0.2;
+        } else if self.spin < -0.8 && current == TRUE {
+            self.reward += 0.2;
+        } else {
+            // if self.spin.abs() < 0.2 {
+            //     self.reward += 1.0;
+            // }
+        }
     }
     fn activity(&mut self, _: usize) -> f64 {
         /*
@@ -94,7 +116,7 @@ impl VarIF for Var {
         self.reward
     }
     fn bump_activity(&mut self, state: &mut State, reward: f64) {
-        self.decay_activity(state);
+        // self.decay_activity(state);
         self.reward += reward;
         // self.reward = (self.reward + reward) / 2.0;
         /*
