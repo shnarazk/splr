@@ -4,7 +4,7 @@ use crate::traits::*;
 use crate::types::*;
 use std::fmt;
 
-const VAR_ACTIVITY_DECAY: f64 = 0.98;
+const VAR_ACTIVITY_DECAY: f64 = 0.92;
 
 /// Structure for variables.
 #[derive(Debug)]
@@ -19,14 +19,16 @@ pub struct Var {
     /// decision level at which this variables is assigned.
     pub level: usize,
     /// a dynamic evaluation criterion like VSIDS or ACID.
-    pub reward: f64,
+    pub reward_p: f64,
+    pub reward_m: f64,
     /// list of clauses which contain this variable positively.
     pub pos_occurs: Vec<ClauseId>,
     /// list of clauses which contain this variable negatively.
     pub neg_occurs: Vec<ClauseId>,
     flags: Flag,
     /// PLRC
-    pub last_update: usize,
+    pub last_update_p: usize,
+    pub last_update_m: usize,
 }
 
 /// is the dummy var index.
@@ -41,18 +43,21 @@ impl VarIF for Var {
             phase: BOTTOM,
             reason: NULL_CLAUSE,
             level: 0,
-            reward: 0.0,
+            reward_p: 0.0,
+            reward_m: 0.0,
             pos_occurs: Vec::new(),
             neg_occurs: Vec::new(),
             flags: Flag::empty(),
-            last_update: 0,
+            last_update_p: 0,
+            last_update_m: 0,
         }
     }
     fn new_vars(n: usize) -> Vec<Var> {
         let mut vec = Vec::with_capacity(n + 1);
         for i in 0..=n {
             let mut v = Var::new(i);
-            v.reward = (n - i) as f64;
+            v.reward_p = (n - i) as f64;
+            v.reward_m = (n - i) as f64;
             vec.push(v);
         }
         vec
@@ -91,11 +96,15 @@ impl VarIF for Var {
             self.last_update = ncnf;
         }
         */
-        self.reward
+        self.reward_p + self.reward_m
     }
     fn bump_activity(&mut self, state: &mut State, reward: f64) {
         self.decay_activity(state);
-        self.reward += reward;
+        if self.assign == TRUE {
+            self.reward_p += reward;
+        } else {
+            self.reward_m += reward;
+        }
         // self.reward = (self.reward + reward) / 2.0;
         /*
         // EVSIDS modified
@@ -118,10 +127,26 @@ impl VarIF for Var {
         // }
     }
     fn decay_activity(&mut self, state: &mut State) {
-        let age = state.stats[Stat::Conflict] - self.last_update;
+        let age = state.stats[Stat::Conflict] - self.last_update_p;
         if 0 < age {
-            self.reward *= VAR_ACTIVITY_DECAY.powi(age as i32);
-            self.last_update += age;
+            let decay = VAR_ACTIVITY_DECAY;
+            // let decay =
+            //     if state.stats[Stat::Conflict] < 100 {
+            //         VAR_ACTIVITY_DECAY
+            //     } else {
+            //         let la = state.ema_lbd.get();
+            //         let _lc = state.c_lvl.get();
+            //         let _lb = state.b_lvl.get();
+            //         0.94 - 0.05 / la.sqrt()
+            //     };
+            self.reward_p *= decay.powi(age as i32);
+            self.last_update_p += age;
+        }
+        let age = state.stats[Stat::Conflict] - self.last_update_m;
+        if 0 < age {
+            let decay = VAR_ACTIVITY_DECAY;
+            self.reward_m *= decay.powi(age as i32);
+            self.last_update_m += age;
         }
     }
 }

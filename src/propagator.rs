@@ -66,7 +66,8 @@ impl PropagatorIF for AssignStack {
             v.level = dl;
             if dl == 0 {
                 v.reason = NULL_CLAUSE;
-                v.reward = 0.0;
+                v.reward_p = 0.0;
+                v.reward_m = 0.0;
             }
             debug_assert!(!self.trail.contains(&Lit::from_var(v.index, TRUE)));
             debug_assert!(!self.trail.contains(&Lit::from_var(v.index, FALSE)));
