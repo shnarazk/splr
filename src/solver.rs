@@ -329,8 +329,18 @@ fn search(
                 state.num_solved_vars = asgs.len();
             }
             if !asgs.remains() {
-                let vi = asgs.select_var(&vars);
-                let p = vars[vi].phase;
+                let vi = asgs.select_var(vars);
+                let v = &vars[vi];
+                let p = v.phase;
+                let _p = if 1.0 * v.activity_f < v.activity_t {
+                    TRUE
+                } else if 1.0 * v.activity_t < v.activity_f {
+                    FALSE
+                } else {
+                    v.phase
+                };
+                //assert!((v.activity_f < v.activity_t && p == TRUE) || (v.activity_t < v.activity_f && p == FALSE));
+
                 asgs.uncheck_assume(vars, Lit::from_var(vi, p));
                 state.stats[Stat::Decision] += 1;
                 a_decision_was_made = true;
@@ -541,7 +551,7 @@ fn analyze(
                 let vi = q.vi();
                 // Why allow to accept double rewarding? Because
                 // this is better for 3-SATs.
-                asgs.update_order(vars, vi);
+                // vars.bump_activity(&mut state.var_inc, vi);
                 let v = &mut vars[vi];
                 let lvl = v.level;
                 debug_assert!(!v.is(Flag::ELIMINATED));
@@ -559,6 +569,7 @@ fn analyze(
                         // println!("- push {} to learnt, which level is {}", q.int(), lvl);
                         learnt.push(*q);
                     }
+                    vars.bump_activity(&mut state.var_inc, vi);
                 } else {
                     // if !state.an_seen[vi] {
                     //     println!("- ignore {} because it was flagged", q.int());
@@ -614,6 +625,7 @@ fn simplify_learnt(
     if new_learnt.len() < 30 {
         minimize_with_bi_clauses(cdb, vars, &mut state.lbd_temp, new_learnt);
     }
+    /*
     // glucose heuristics
     let lbd = vars.compute_lbd(new_learnt, &mut state.lbd_temp);
     while let Some(l) = state.last_dl.pop() {
@@ -622,6 +634,7 @@ fn simplify_learnt(
             vars.bump_activity(&mut state.var_inc, vi);
         }
     }
+    */
     // find correct backtrack level from remaining literals
     let mut level_to_return = 0;
     if 1 < new_learnt.len() {

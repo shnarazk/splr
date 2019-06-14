@@ -4,8 +4,7 @@ use crate::types::*;
 use std::fmt;
 
 const VAR_ACTIVITY_MAX: f64 = 1e240;
-const VAR_ACTIVITY_SCALE1: f64 = 1e-30;
-const VAR_ACTIVITY_SCALE2: f64 = 1e-30;
+const VAR_ACTIVITY_SCALE: f64 = 1e-30;
 
 /// Structure for variables.
 #[derive(Debug)]
@@ -21,6 +20,8 @@ pub struct Var {
     pub level: usize,
     /// a dynamic evaluation criterion like VSIDS or ACID.
     pub activity: f64,
+    pub activity_t: f64,
+    pub activity_f: f64,
     /// list of clauses which contain this variable positively.
     pub pos_occurs: Vec<ClauseId>,
     /// list of clauses which contain this variable negatively.
@@ -41,6 +42,8 @@ impl VarIF for Var {
             reason: NULL_CLAUSE,
             level: 0,
             activity: 0.0,
+            activity_t: 0.0,
+            activity_f: 0.0,
             pos_occurs: Vec::new(),
             neg_occurs: Vec::new(),
             flags: Flag::empty(),
@@ -50,6 +53,8 @@ impl VarIF for Var {
         let mut vec = Vec::with_capacity(n + 1);
         for i in 0..=n {
             let mut v = Var::new(i);
+            v.activity_t = 0.0;
+            v.activity_f = 0.0;
             v.activity = (n - i) as f64;
             vec.push(v);
         }
@@ -102,13 +107,19 @@ impl VarDBIF for [Var] {
     }
     fn bump_activity(&mut self, inc: &mut f64, vi: VarId) {
         let v = &mut self[vi];
-        let a = v.activity + *inc;
-        v.activity = a;
-        if VAR_ACTIVITY_MAX < a {
+        if v.assign == TRUE {
+            v.activity_t += *inc;
+        } else {
+            v.activity_f += *inc;
+        }
+        v.activity = v.activity_t.max(v.activity_f);
+        if VAR_ACTIVITY_MAX < v.activity {
             for v in &mut self[1..] {
-                v.activity *= VAR_ACTIVITY_SCALE1;
+                v.activity_t *= VAR_ACTIVITY_SCALE;
+                v.activity_f *= VAR_ACTIVITY_SCALE;
+                v.activity *= VAR_ACTIVITY_SCALE;
             }
-            *inc *= VAR_ACTIVITY_SCALE2;
+            *inc *= VAR_ACTIVITY_SCALE;
         }
     }
 }
