@@ -331,13 +331,13 @@ fn search(
             if !asgs.remains() {
                 let vi = asgs.select_var(vars);
                 let v = &vars[vi];
-                let p = v.phase;
-                let _p = if 1.0 * v.activity_f < v.activity_t {
-                    TRUE
-                } else if 1.0 * v.activity_t < v.activity_f {
-                    FALSE
-                } else {
-                    v.phase
+                // let p = v.phase;
+                let p = {
+                    let t: f64 = v.activity_t.log(2.0) - v.activity_f.log(2.0);
+                    let s = t / (t.powi(2)+ 0.8).sqrt(); // [-1, 1]
+                    let r = (state.stats[Stat::Propagation] % 256) as f64 / 256.0;
+                    let d = r * s; // [-1, 1] bigger s, bigger d
+                    (0.5 <= v.phase as f64 + d) as Lbool
                 };
                 //assert!((v.activity_f < v.activity_t && p == TRUE) || (v.activity_t < v.activity_f && p == FALSE));
 
