@@ -551,7 +551,7 @@ fn analyze(
                 let vi = q.vi();
                 // Why allow to accept double rewarding? Because
                 // this is better for 3-SATs.
-                // vars.bump_activity(&mut state.var_inc, vi);
+                vars.bump_activity(&mut state.var_inc, vi);
                 let v = &mut vars[vi];
                 let lvl = v.level;
                 debug_assert!(!v.is(Flag::ELIMINATED));
@@ -569,7 +569,6 @@ fn analyze(
                         // println!("- push {} to learnt, which level is {}", q.int(), lvl);
                         learnt.push(*q);
                     }
-                    vars.bump_activity(&mut state.var_inc, vi);
                 } else {
                     // if !state.an_seen[vi] {
                     //     println!("- ignore {} because it was flagged", q.int());
