@@ -332,12 +332,18 @@ fn search(
                 let vi = asgs.select_var(vars);
                 let v = &vars[vi];
                 // let p = v.phase;
-                let p = {
+                let p = if v.phase != BOTTOM {
+                    v.phase
+                } else {
+                    (v.activity_f < v.activity_t) as Lbool
+                    /*
                     let t: f64 = v.activity_t.log(2.0) - v.activity_f.log(2.0);
-                    let s = t / (t.powi(2)+ 0.8).sqrt(); // [-1, 1]
-                    let r = (state.stats[Stat::Propagation] % 256) as f64 / 256.0;
-                    let d = r * s; // [-1, 1] bigger s, bigger d
-                    (0.5 <= v.phase as f64 + d) as Lbool
+                    let s: f64 = t / (t.powi(2)+ 0.8).sqrt(); // [-1, 1]
+                    let r: f64 = (state.stats[Stat::Propagation] % 512) as f64 / 256.0 - 1.0; // [-1, 1]
+                    let d: f64  = r + s; // [-2, 2] bigger s, bigger d
+                    // (0.5 <= v.phase as f64 + d) as Lbool
+                    (0.0 <= d) as Lbool
+                    */
                 };
                 //assert!((v.activity_f < v.activity_t && p == TRUE) || (v.activity_t < v.activity_f && p == FALSE));
 
@@ -547,6 +553,11 @@ fn analyze(
                 (*c).lits.swap(0, 1);
             }
             // println!("- handle {}", cid.fmt());
+            if p == NULL_LIT {
+                let vi = (*c).lits[0].vi();
+                vars.bump_activity_extra(&mut state.var_inc, vi);
+                vars[vi].assign = BOTTOM;
+            }
             for q in &(*c).lits[((p != NULL_LIT) as usize)..] {
                 let vi = q.vi();
                 // Why allow to accept double rewarding? Because
@@ -596,6 +607,7 @@ fn analyze(
         }
     }
     learnt[0] = p.negate();
+    vars.bump_activity(&mut state.var_inc, p.vi());
     // println!("- appending {}, the result is {:?}", learnt[0].int(), vec2int(learnt));
     simplify_learnt(asgs, cdb, state, vars)
 }
