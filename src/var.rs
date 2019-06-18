@@ -55,7 +55,7 @@ impl VarIF for Var {
             let mut v = Var::new(i);
             v.activity_t = 0.0;
             v.activity_f = 0.0;
-            v.activity = (n - i) as f64;
+            v.activity = 0.0;
             vec.push(v);
         }
         vec
