@@ -109,10 +109,12 @@ impl VarDBIF for [Var] {
         let v = &mut self[vi];
         if v.assign == TRUE {
             v.activity_t += *inc;
+            v.activity = 1.4 * v.activity_t + v.activity_f;
         } else {
             v.activity_f += *inc;
+            v.activity = 1.4 * v.activity_f + v.activity_t;
         }
-        v.activity = v.activity_t + v.activity_f;
+        // v.activity = v.activity_t.max(v.activity_f);
         if VAR_ACTIVITY_MAX < v.activity {
             for v in &mut self[1..] {
                 v.activity_t *= VAR_ACTIVITY_SCALE;
