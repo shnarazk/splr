@@ -107,15 +107,12 @@ impl SatSolverIF for Solver {
                 match (v.pos_occurs.len(), v.neg_occurs.len()) {
                     (_, 0) => asgs.enqueue_null(vars, vi, TRUE),
                     (0, _) => asgs.enqueue_null(vars, vi, FALSE),
-                    (p, m) if m * 10 < p => {
-                        v.phase = TRUE;
-                        elim.enqueue_var(vars, vi, false);
+                    (p, m) => {
+                        v.phase = (m < p) as Lbool;
+                        if m * 10 < p || p * 10 < m {
+                            elim.enqueue_var(vars, vi, false);
+                        }
                     }
-                    (p, m) if p * 10 < m => {
-                        v.phase = FALSE;
-                        elim.enqueue_var(vars, vi, false);
-                    }
-                    _ => (),
                 }
             }
             if !state.use_elim || !use_pre_processing_eliminator {
