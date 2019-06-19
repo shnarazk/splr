@@ -181,14 +181,7 @@ pub trait PropagatorIF {
     /// # Errors
     ///
     /// if solver becomes inconsistent by the new assignment.
-    fn enqueue(
-        &mut self,
-        vars: &mut [Var],
-        vi: VarId,
-        sig: Lbool,
-        cid: ClauseId,
-        dl: usize,
-    ) -> MaybeInconsistent;
+    fn enqueue(&mut self, vars: &mut [Var], l: Lit, cid: ClauseId, dl: usize) -> MaybeInconsistent;
     /// add an assignment with no reason clause without inconsistency check.
     fn enqueue_null(&mut self, vars: &mut [Var], vi: VarId, sig: Lbool);
     /// unsafe enqueue; doesn't emit an exception.
