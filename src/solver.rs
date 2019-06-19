@@ -554,12 +554,12 @@ fn analyze(
                 let vi = q.vi();
                 let v = &mut vars[vi];
                 debug_assert!(!v.is(Flag::ELIMINATED));
-                debug_assert!(v.assign != BOTTOM);
                 let lvl = v.level;
                 // Why allow to accept double rewarding? Because
                 // this is better for 3-SATs.
                 have_to_rescale |= v.bump_activity(state.var_inc, lvl == dl);
                 if 0 < lvl && !state.an_seen[vi] {
+                    debug_assert!(v.assign != BOTTOM);
                     state.an_seen[vi] = true;
                     if dl <= lvl {
                         // println!("- flag for {} which level is {}", q.int(), lvl);
