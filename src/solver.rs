@@ -107,11 +107,8 @@ impl SatSolverIF for Solver {
                 match (v.pos_occurs.len(), v.neg_occurs.len()) {
                     (_, 0) => asgs.enqueue_null(vars, vi, TRUE),
                     (0, _) => asgs.enqueue_null(vars, vi, FALSE),
-                    (p, m) => {
-                        v.phase = (m < p) as Lbool;
-                        if m * 10 < p || p * 10 < m {
-                            elim.enqueue_var(vars, vi, false);
-                        }
+                    (p, m) => if p.min(m) < 8 {
+                        elim.enqueue_var(vars, vi, false)
                     }
                 }
             }
@@ -142,11 +139,8 @@ impl SatSolverIF for Solver {
                     continue;
                 }
                 match (v.pos_occurs.len(), v.neg_occurs.len()) {
-                    (_, 0) => (),
-                    (0, _) => (),
-                    (p, m) if m * 10 < p => v.phase = TRUE,
-                    (p, m) if p * 10 < m => v.phase = FALSE,
-                    _ => (),
+                    (p, m) if p == 0 || m == 0 => (),
+                    (p, m) => v.phase = (m < p) as Lbool,
                 }
             }
         }
