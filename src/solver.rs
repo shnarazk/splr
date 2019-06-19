@@ -541,6 +541,7 @@ fn analyze(
                 let vi = q.vi();
                 // Why allow to accept double rewarding? Because
                 // this is better for 3-SATs.
+                vars.bump_activity(&mut state.var_inc, vi);
                 asgs.update_order(vars, vi);
                 let v = &mut vars[vi];
                 let lvl = v.level;
