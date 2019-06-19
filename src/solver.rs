@@ -522,6 +522,7 @@ fn analyze(
     let mut p = NULL_LIT;
     let mut ti = asgs.len() - 1; // trail index
     let mut path_cnt = 0;
+    let mut have_to_rescale = false;
     state.last_dl.clear();
     loop {
         // println!("analyze {}", p.int());
@@ -550,24 +551,25 @@ fn analyze(
                 (*c).lits.swap(0, 1);
             }
             // println!("- handle {}", cid.fmt());
-            if p == NULL_LIT {
-                let vi = (*c).lits[0].vi();
-                vars.bump_activity_extra(&mut state.var_inc, vi);
-                vars[vi].assign = BOTTOM;
-            }
+            // if p == NULL_LIT {
+            //     let vi = (*c).lits[0].vi();
+            //     vars.bump_activity_extra(&mut state.var_inc, vi);
+            //     vars[vi].assign = BOTTOM;
+            // }
             for q in &(*c).lits[((p != NULL_LIT) as usize)..] {
                 let vi = q.vi();
-                // Why allow to accept double rewarding? Because
-                // this is better for 3-SATs.
-                vars.bump_activity(&mut state.var_inc, vi);
                 let v = &mut vars[vi];
-                let lvl = v.level;
                 debug_assert!(!v.is(Flag::ELIMINATED));
                 debug_assert!(v.assign != BOTTOM);
+                let lvl = v.level;
+                // Why allow to accept double rewarding? Because
+                // this is better for 3-SATs.
+                have_to_rescale |= v.bump_activity(state.var_inc, lvl == dl);
                 if 0 < lvl && !state.an_seen[vi] {
                     state.an_seen[vi] = true;
                     if dl <= lvl {
                         // println!("- flag for {} which level is {}", q.int(), lvl);
+                        v.assign = BOTTOM;
                         path_cnt += 1;
                         if v.reason != NULL_CLAUSE && cdb.clause[v.reason as usize].is(Flag::LEARNT)
                         {
@@ -604,7 +606,10 @@ fn analyze(
         }
     }
     learnt[0] = p.negate();
-    vars.bump_activity(&mut state.var_inc, p.vi());
+    have_to_rescale |= vars[p.vi()].bump_activity(state.var_inc, false);
+    if have_to_rescale {
+        vars.rescale_activity(&mut state.var_inc);
+    }
     // println!("- appending {}, the result is {:?}", learnt[0].int(), vec2int(learnt));
     simplify_learnt(asgs, cdb, state, vars)
 }

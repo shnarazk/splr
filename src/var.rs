@@ -60,6 +60,18 @@ impl VarIF for Var {
         }
         vec
     }
+    fn bump_activity(&mut self, inc: f64, special: bool) -> bool {
+        if special {
+            self.activity_f += inc / 2.0;
+            self.activity_t += inc / 2.0;
+        } else if self.assign == TRUE {
+            self.activity_t += inc;
+        } else {
+            self.activity_f += inc;
+        }
+        self.activity = self.activity_t + self.activity_f;
+        VAR_ACTIVITY_MAX < self.activity
+    }
 }
 
 impl FlagIF for Var {
@@ -105,32 +117,13 @@ impl VarDBIF for [Var] {
         keys[0] = key;
         cnt
     }
-    fn bump_activity(&mut self, inc: &mut f64, vi: VarId) {
-        let v = &mut self[vi];
-        if v.assign == TRUE {
-            v.activity_t += *inc;
-            v.activity = 1.4 * v.activity_t + v.activity_f;
-        } else {
-            v.activity_f += *inc;
-            v.activity = 1.4 * v.activity_f + v.activity_t;
+    fn rescale_activity (&mut self, inc: &mut f64) {
+        for v in &mut self[1..] {
+            v.activity_t *= VAR_ACTIVITY_SCALE;
+            v.activity_f *= VAR_ACTIVITY_SCALE;
+            v.activity *= VAR_ACTIVITY_SCALE;
         }
-        // v.activity = v.activity_t.max(v.activity_f);
-        if VAR_ACTIVITY_MAX < v.activity {
-            for v in &mut self[1..] {
-                v.activity_t *= VAR_ACTIVITY_SCALE;
-                v.activity_f *= VAR_ACTIVITY_SCALE;
-                v.activity *= VAR_ACTIVITY_SCALE;
-            }
-            *inc *= VAR_ACTIVITY_SCALE;
-        }
-    }
-    fn bump_activity_extra(&mut self, inc: &mut f64, vi: VarId) {
-        let v = &mut self[vi];
-        if v.assign == TRUE {
-            v.activity_f += *inc;
-        } else {
-            v.activity_t += *inc;
-        }
+        *inc *= VAR_ACTIVITY_SCALE;
     }
 }
 
