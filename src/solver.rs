@@ -107,7 +107,7 @@ impl SatSolverIF for Solver {
                 match (v.pos_occurs.len(), v.neg_occurs.len()) {
                     (_, 0) => asgs.enqueue_null(vars, vi, TRUE),
                     (0, _) => asgs.enqueue_null(vars, vi, FALSE),
-                    (p, m) => if p.min(m) < 8 {
+                    (p, m) => if p.min(m) < 4 {
                         elim.enqueue_var(vars, vi, false)
                     }
                 }
