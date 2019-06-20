@@ -213,7 +213,6 @@ impl PropagatorIF for AssignStack {
         debug_assert!(!self.trail.contains(&l));
         debug_assert!(!self.trail.contains(&l.negate()));
         self.trail.push(l);
-        self.var_order.remove(vars, vi);
     }
     fn uncheck_assume(&mut self, vars: &mut [Var], l: Lit) {
         debug_assert!(!self.trail.contains(&l));
