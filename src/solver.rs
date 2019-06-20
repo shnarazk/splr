@@ -322,7 +322,8 @@ fn search(
             if !asgs.remains() {
                 let vi = asgs.select_var(vars);
                 let v = &vars[vi];
-                // let p = v.phase;
+                let _p = v.phase;
+                let _p = (v.activity_f < v.activity_t) as Lbool;
                 let p = if v.phase != BOTTOM {
                     v.phase
                 } else {
@@ -545,11 +546,6 @@ fn analyze(
                 (*c).lits.swap(0, 1);
             }
             // println!("- handle {}", cid.fmt());
-            // if p == NULL_LIT {
-            //     let vi = (*c).lits[0].vi();
-            //     vars.bump_activity_extra(&mut state.var_inc, vi);
-            //     vars[vi].assign = BOTTOM;
-            // }
             for q in &(*c).lits[((p != NULL_LIT) as usize)..] {
                 let vi = q.vi();
                 let v = &mut vars[vi];
@@ -557,13 +553,13 @@ fn analyze(
                 let lvl = v.level;
                 // Why allow to accept double rewarding? Because
                 // this is better for 3-SATs.
-                have_to_rescale |= v.bump_activity(state.var_inc, lvl == dl);
+                have_to_rescale |= v.bump_activity(state.var_inc, false);
                 if 0 < lvl && !state.an_seen[vi] {
                     debug_assert!(v.assign != BOTTOM);
                     state.an_seen[vi] = true;
                     if dl <= lvl {
                         // println!("- flag for {} which level is {}", q.int(), lvl);
-                        v.assign = BOTTOM;
+                        // v.assign = BOTTOM;
                         path_cnt += 1;
                         if v.reason != NULL_CLAUSE && cdb.clause[v.reason as usize].is(Flag::LEARNT)
                         {
@@ -599,13 +595,46 @@ fn analyze(
             ti -= 1;
         }
     }
+    {
+        let v = &mut vars[state.conflict_lit.vi()];
+        /*
+        let inc = state.var_inc;
+        if v.assign == TRUE {
+            v.activity_t -= 0.75 * inc;
+            v.activity_f += 0.25 * inc;
+        } else {
+            v.activity_f -= 0.75 * inc;
+            v.activity_t += 0.25 * inc;
+        }
+        */
+        v.activity_t = v.activity / 2.0;
+        v.activity_f = v.activity / 2.0;
+        v.assign = BOTTOM;
+    }
     learnt[0] = p.negate();
     have_to_rescale |= vars[p.vi()].bump_activity(state.var_inc, false);
     if have_to_rescale {
         vars.rescale_activity(&mut state.var_inc);
     }
     // println!("- appending {}, the result is {:?}", learnt[0].int(), vec2int(learnt));
-    simplify_learnt(asgs, cdb, state, vars)
+    let ret = simplify_learnt(asgs, cdb, state, vars);
+    /*
+    for l in &state.new_learnt[..] {
+        let v = &mut vars[l.vi()];
+        let inc = state.var_inc / 2.0;
+        if ret < v.level {
+            if v.assign == TRUE {
+                v.activity_f += inc;
+                v.activity_t -= inc;
+            } else {
+                v.activity_f -= inc;
+                v.activity_t += inc;
+            }
+            v.assign = BOTTOM;
+        }
+    }
+    */
+    ret
 }
 
 fn simplify_learnt(

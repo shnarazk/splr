@@ -118,6 +118,7 @@ impl PropagatorIF for AssignStack {
                             match blocker_value {
                                 FALSE => {
                                     self.catchup();
+                                    state.conflict_lit = p as Lit;
                                     return w.c;
                                 }
                                 _ => {
@@ -158,6 +159,7 @@ impl PropagatorIF for AssignStack {
                             let n = lits.len();
                             if !state.config.with_learnt_minimization {
                                 self.catchup();
+                                state.conflict_lit = p as Lit;
                                 return w.c;
                             } else if NULL_CLAUSE == conflict_clause || n < conflict_clause_size {
                                 conflict_clause_size = n;
@@ -172,6 +174,7 @@ impl PropagatorIF for AssignStack {
             }
             if NULL_CLAUSE != conflict_clause {
                 self.catchup();
+                state.conflict_lit = p as Lit;
                 return conflict_clause;
             }
         }
