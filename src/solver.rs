@@ -598,18 +598,92 @@ fn analyze(
     }
     {
         let v = &mut vars[state.conflict_lit.vi()];
-        /*
         let inc = state.var_inc;
-        if v.assign == TRUE {
-            v.activity_t -= 0.75 * inc;
-            v.activity_f += 0.25 * inc;
-        } else {
-            v.activity_f -= 0.75 * inc;
-            v.activity_t += 0.25 * inc;
-        }
+        let t = state.slack_duration as f64;
+        // let t = state.stats[Stat::Stagnation] as f64;
+        //let scale = 0.5 / (1.0 + (0.5 / 0.000_1 - 1.0) * (-0.25 * t as f64).exp());
+        let scale = 0.5 / (1.0 + (0.5 / 0.001 - 1.0) * (-2.0 * t as f64).exp());
+        let _t: f64 = state.stats[Stat::Conflict] as f64;
+        let _scale = 0.5 / (1.0 + (0.5 / 0.000_01 - 1.0) * (-0.000_002 * t as f64).exp());
+        /*
+        let scale = 0.0;
+            "splr-014",     1,       "UF225(100)",  36.665
+            "splr-014",     2,       "UF250(100)", 114.985
+            "splr-014",     3,      "UUF250(100)", 277.667
+            "splr-014",     4,      "SR2015/itox",   1.974
+            "splr-014",     5,      "SR2015/m283",  37.646
+            "splr-014",     6,       "SR2015/38b",  18.460
+            "splr-014",     7,       "SR2015/44b", 141.034
+
+T62.2.0.cnf                                3160296,10898509 |time:   520.33
+ #conflict:     294383, #decision:      1501784, #propagate:     1043668649
+  Assignment|#rem:   720398, #fix:    38484, #elm:  2401414, prg%:  77.2047
+ Clause Kind|Remv:    66847, LBD2:    29701, Binc:    15817, Perm:  5228189
+     Restart|#BLK:     1456, #RST:     1598, eASG:   0.0224, eLBD:   0.5679
+    Conflict|aLBD:     4.91, bjmp:    11.37, cnfl:    46.98 |#stg:        0
+   Clause DB|#rdc:       13, #sce:      301 |blkR:   1.4000, frcK:   0.7000
+    Strategy|mode: Non-Specific-Instance using generic settings
+
+        0.5 / (1.0 + (0.5 / 0.000_001 - 1.0) * (-0.000_002 * t as f64).exp());
+              |        t  |        scale |
+              | --------- | ------------ |
+              |         0 | 0.0000010000 |
+              |   100_000 | 0.0000012214 |
+              |   200_000 | 0.0000014918 |
+              | 1_000_000 | 0.0000073890 |
+              | 2_000_000 | 0.0000545923 |
+              | 4_000_000 | 0.0029632970 |
+              |10_000_000 | 0.4994852431 |
+
+            "splr-014",     1,       "UF225(100)",  36.997
+            "splr-014",     2,       "UF250(100)", 109.937
+            "splr-014",     3,      "UUF250(100)", 280.655
+            "splr-014",     4,      "SR2015/itox",   1.698
+            "splr-014",     5,      "SR2015/m283",  22.458
+            "splr-014",     6,       "SR2015/38b",  16.289
+            "splr-014",     7,       "SR2015/44b", 185.103
+
+T62.2.0.cnf                                3160296,10898509 |time:   539.22
+ #conflict:     306563, #decision:      1577488, #propagate:     1095752031
+  Assignment|#rem:   756083, #fix:     4430, #elm:  2399783, prg%:  76.0756
+ Clause Kind|Remv:   102385, LBD2:    30616, Binc:    15750, Perm:  5535987
+     Restart|#BLK:     1619, #RST:     1581, eASG:   0.0195, eLBD:   0.5087
+    Conflict|aLBD:     4.51, bjmp:    10.95, cnfl:    36.42 |#stg:        0
+   Clause DB|#rdc:       12, #sce:      281 |blkR:   1.4000, frcK:   0.7000
+    Strategy|mode: Non-Specific-Instance using generic settings
+
+        0.5 / (1.0 + (0.5 / 0.000_01 - 1.0) * (-0.000_002 * t as f64).exp());
+            "splr-014",     1,       "UF225(100)",  38.682
+            "splr-014",     2,       "UF250(100)", 115.066
+            "splr-014",     3,      "UUF250(100)", 280.271
+            "splr-014",     4,      "SR2015/itox",   1.797
+            "splr-014",     5,      "SR2015/m283",  43.651
+            "splr-014",     6,       "SR2015/38b",  14.454
+            "splr-014",     7,       "SR2015/44b",  62.715
+
+T62.2.0.cnf                                3160296,10898509 |time:   513.91
+ #conflict:     271980, #decision:      1427915, #propagate:      990971409
+  Assignment|#rem:   756940, #fix:     1906, #elm:  2401450, prg%:  76.0484
+ Clause Kind|Remv:   110069, LBD2:    29190, Binc:    15503, Perm:  5546847
+     Restart|#BLK:     1320, #RST:     1536, eASG:   0.0178, eLBD:   0.9938
+    Conflict|aLBD:     8.63, bjmp:    14.87, cnfl:    64.61 |#stg:        0
+   Clause DB|#rdc:       11, #sce:      297 |blkR:   1.4000, frcK:   0.7000
+    Strategy|mode: Non-Specific-Instance using generic settings
+         */
+        /* - from double weighting conflicting variable w/o lit. bias
+         * - to equally weighting conflicting variable w/o literal bias
+         * - where scale ¥in [0, 0.5]
+         * Therefore, x: 0 -> 0.5 =>     y: (1.0 + 1.0) -> (0.5, 0.5)
+         * namely,    x: 0 -> 0.5 => inc_y: (0.0 + 1.0) -> (-0.5, 0.5)
         */
-        v.activity_t = v.activity / 2.0;
-        v.activity_f = v.activity / 2.0;
+        if v.assign == TRUE {
+            v.activity_t -= scale * inc;
+            v.activity_f += (1.0 - scale) * inc;
+        } else {
+            v.activity_f -= scale * inc;
+            v.activity_t += (1.0 - scale) * inc;
+        }
+        v.activity = v.activity_t + v.activity_f;
         v.assign = BOTTOM;
     }
     learnt[0] = p.negate();
