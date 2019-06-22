@@ -383,6 +383,7 @@ fn handle_conflict_path(
         // dump to certified even if it's a literal.
         cdb.certificate_add(new_learnt);
         asgs.uncheck_enqueue(vars, new_learnt[0], NULL_CLAUSE);
+        state.slack_duration = 0;
     } else {
         state.stats[Stat::Learnt] += 1;
         let lbd = vars.compute_lbd(&new_learnt, &mut state.lbd_temp);
@@ -431,19 +432,19 @@ fn adapt_parameters(
     nconflict: usize,
 ) -> MaybeInconsistent {
     let switch = 100_000;
-    if state.use_deep_search_mode && !state.use_luby_restart && switch <= nconflict {
+    if !state.use_luby_restart && switch <= nconflict {
         let stopped = state.stats[Stat::SolvedRecord] == state.num_solved_vars;
         // && state.record.vali[LogUsizeId::Binclause] == state.stats[Stat::NumBinLearnt]
         if stopped {
             state.slack_duration += 1;
         } else if 0 < state.slack_duration && state.stagnated {
-            state.slack_duration *= -1;
+            state.slack_duration = 0;
         } else {
             state.slack_duration = 0;
         }
         let stagnated = ((state.num_vars - state.num_solved_vars)
             .next_power_of_two()
-            .trailing_zeros() as isize)
+            .trailing_zeros() as usize)
             < state.slack_duration;
         // && (((state.num_vars - state.num_solved_vars) as f64).log(2.0)
         //     / (state.c_lvl.get() / state.b_lvl.get()).sqrt().max(1.0)
@@ -492,12 +493,12 @@ fn adapt_parameters(
         }
     }
     state.progress(cdb, vars, None);
+    if state.stagnated {
+        state.flush(&format!("stagnated ({})...", state.slack_duration));
+    }
     if state.use_deep_search_mode {
         state.restart_step = 50 + 40_000 * (state.stagnated as usize);
-        if state.stagnated {
-            state.flush(&format!("stagnated ({})...", state.slack_duration));
-            state.next_restart += 80_000;
-        }
+        state.next_restart += 80_000;
     }
     Ok(())
 }

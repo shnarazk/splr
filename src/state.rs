@@ -197,7 +197,7 @@ pub struct State {
     pub cur_restart: usize,
     pub after_restart: usize,
     pub elim_trigger: usize,
-    pub slack_duration: isize,
+    pub slack_duration: usize,
     pub stats: [usize; Stat::EndOfStatIndex as usize], // statistics
     pub ema_asg: Ema,
     pub ema_lbd: Ema,
@@ -397,7 +397,7 @@ impl StateIF for State {
         state.restart_asg_len = config.restart_asg_len;
         state.restart_lbd_len = config.restart_lbd_len;
         state.restart_step = config.restart_step;
-        state.use_deep_search_mode = !config.without_deep_search;
+        state.use_deep_search_mode = config.with_deep_search;
         state.progress_log = config.use_log;
         state.use_elim = !config.without_elim;
         state.ema_asg = Ema::new(config.restart_asg_len);
