@@ -59,6 +59,7 @@ impl RestartIF for State {
             || (!self.use_luby_restart
                 && self.restart_step <= self.after_restart
                 && ave < self.ema_lbd.get() * self.restart_thr)
+            || self.force_restart_by_stagnation
         {
             self.stats[Stat::Restart] += 1;
             self.after_restart = 0;
@@ -68,6 +69,9 @@ impl RestartIF for State {
                 self.luby_restart_num_conflict =
                     luby(self.luby_restart_inc, self.luby_current_restarts)
                         * self.luby_restart_factor;
+            }
+            if self.force_restart_by_stagnation {
+                self.force_restart_by_stagnation = false;
             }
             return true;
         }

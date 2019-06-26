@@ -457,7 +457,7 @@ fn adapt_parameters(
         state.stagnated = stagnated;
     }
     state.stats[Stat::SolvedRecord] = state.num_solved_vars;
-    if !state.use_luby_restart && state.adaptive_restart && !state.stagnated {
+    if !state.use_luby_restart && state.adaptive_restart /* && !state.stagnated */ {
         let moving: f64 = 0.04;
         let spring: f64 = 0.02;
         let margin: f64 = 0.20;
@@ -466,26 +466,47 @@ fn adapt_parameters(
         // restart_threshold
         let nr = state.stats[Stat::Restart] - state.stats[Stat::RestartRecord];
         state.stats[Stat::RestartRecord] = state.stats[Stat::Restart];
-        if state.restart_thr <= state.config.restart_threshold + margin && nr < too_few {
-            state.restart_thr += moving;
-        } else if state.config.restart_threshold - margin <= state.restart_thr && too_many < nr {
-            state.restart_thr -= moving;
-        } else if too_few <= nr && nr <= too_many {
-            state.restart_thr -= (state.restart_thr - state.config.restart_threshold) * spring;
-        }
-        // restart_blocking
         let nb = state.stats[Stat::BlockRestart] - state.stats[Stat::BlockRestartRecord];
         state.stats[Stat::BlockRestartRecord] = state.stats[Stat::BlockRestart];
-        if state.config.restart_blocking - margin <= state.restart_blk && nb < too_few {
-            state.restart_blk -= moving;
-        } else if state.restart_blk <= state.config.restart_blocking + margin && too_many < nb {
-            state.restart_blk += moving;
-        } else if too_few <= nb && nb <= too_many {
+        let _br_ratio = (state.stats[Stat::BlockRestart] as f64 + 1.0) / (state.stats[Stat::Restart] as f64 + 1.0);
+        let br_ratio = nb as f64 / nr as f64;
+        if nr == 0 {
+            state.force_restart_by_stagnation = true;
+        }
+        if nb == 0 && nr == 0 {
+            state.restart_thr -= (state.restart_thr - state.config.restart_threshold) * spring;
             state.restart_blk -= (state.restart_blk - state.config.restart_blocking) * spring;
+        } else if br_ratio < 0.99 {
+            if state.config.restart_threshold - margin < state.restart_thr {
+                state.restart_thr -= moving;
+            }
+            if state.restart_blk < state.config.restart_blocking + margin {
+                state.restart_blk += moving;
+            }
+        } else if 24.0 < br_ratio {
+            if state.restart_thr < state.config.restart_blocking + margin {
+                state.restart_thr += moving;
+            }
+            if state.config.restart_blocking - margin < state.restart_blk {
+                state.restart_blk -= moving;
+            }
+        } else {
+            // restart_forcing
+            if state.restart_thr < state.config.restart_threshold + margin && nr < too_few {
+                state.restart_thr += moving;
+            } else if state.config.restart_threshold - margin < state.restart_thr && too_many < nr {
+                state.restart_thr -= moving;
+            }
+            // restart_blocking
+            if state.restart_blk < state.config.restart_blocking + margin && nb < too_few {
+                state.restart_blk += moving;
+            } else if state.config.restart_blocking - margin < state.restart_blk && too_many < nb {
+                state.restart_blk -= moving;
+            }
         }
     }
     if nconflict == switch {
-        state.flush("exhaustive eliminator activated...");
+        state.flush("activating an exhaustive eliminator...");
         asgs.cancel_until(vars, 0);
         state.adapt_strategy(cdb);
         if state.use_elim {
@@ -498,8 +519,9 @@ fn adapt_parameters(
     if state.stagnated {
         state.flush(&format!("stagnated ({})...", state.slack_duration));
     }
-    if state.use_deep_search_mode {
-        state.restart_step = 50 + 40_000 * (state.stagnated as usize);
+    if state.use_deep_search_mode && state.stagnated {
+        // state.restart_step = 50 + 40_000 * (state.stagnated as usize);
+        state.restart_step = 40_000;
         state.next_restart += 80_000;
     }
     Ok(())

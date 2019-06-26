@@ -42,7 +42,7 @@ impl fmt::Display for SearchStrategy {
                     SearchStrategy::Initial => {
                         "in the initial search phase to determine a main strategy"
                     }
-                    SearchStrategy::Generic => "Non-Specific-Instance using generic settings",
+                    SearchStrategy::Generic => "Non-Specific-Instance using a generic setting",
                     SearchStrategy::LowDecisions => {
                         "Many-Low-Level-Conflicts using Chan Seok heuristics"
                     }
@@ -176,6 +176,7 @@ pub struct State {
     pub luby_restart_factor: f64,
     pub use_deep_search_mode: bool,
     pub stagnated: bool,
+    pub force_restart_by_stagnation: bool,
     /// Eliminator
     pub use_elim: bool,
     /// 0 for no limit
@@ -332,6 +333,7 @@ impl Default for State {
             luby_restart_factor: 100.0,
             use_deep_search_mode: true,
             stagnated: false,
+            force_restart_by_stagnation: false,
             ema_coeffs: (2 ^ 5, 2 ^ 15),
             use_elim: true,
             elim_eliminate_combination_limit: 80,
