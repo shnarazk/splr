@@ -268,7 +268,7 @@ pub trait ValidatorIF {
 pub trait VarIF {
     fn new(i: usize) -> Var;
     fn new_vars(n: usize) -> Vec<Var>;
-    fn bump_activity(&mut self, inc: f64, special: bool) -> bool;
+    fn bump_activity(&mut self, inc: f64) -> bool;
 }
 
 /// API for var DB like `assigned`, `locked`, `compute_lbd` and so on.

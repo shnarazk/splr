@@ -20,8 +20,8 @@ pub struct Var {
     pub level: usize,
     /// a dynamic evaluation criterion like VSIDS or ACID.
     pub activity: f64,
-    pub activity_t: f64,
-    pub activity_f: f64,
+    // pub activity_t: f64,
+    // pub activity_f: f64,
     /// list of clauses which contain this variable positively.
     pub pos_occurs: Vec<ClauseId>,
     /// list of clauses which contain this variable negatively.
@@ -42,8 +42,8 @@ impl VarIF for Var {
             reason: NULL_CLAUSE,
             level: 0,
             activity: 0.0,
-            activity_t: 0.0,
-            activity_f: 0.0,
+            // activity_t: 0.0,
+            // activity_f: 0.0,
             pos_occurs: Vec::new(),
             neg_occurs: Vec::new(),
             flags: Flag::empty(),
@@ -53,23 +53,23 @@ impl VarIF for Var {
         let mut vec = Vec::with_capacity(n + 1);
         for i in 0..=n {
             let mut v = Var::new(i);
-            v.activity_t = 0.0;
-            v.activity_f = 0.0;
+            // v.activity_t = 0.0;
+            // v.activity_f = 0.0;
             v.activity = 0.0;
             vec.push(v);
         }
         vec
     }
-    fn bump_activity(&mut self, inc: f64, special: bool) -> bool {
-        if special {
-            self.activity_f += inc / 2.0;
-            self.activity_t += inc / 2.0;
-        } else if self.assign == TRUE {
+    fn bump_activity(&mut self, inc: f64) -> bool {
+        /*
+        if self.assign == TRUE {
             self.activity_t += inc;
         } else {
             self.activity_f += inc;
         }
         self.activity = self.activity_t + self.activity_f;
+        */
+        self.activity += inc;
         VAR_ACTIVITY_MAX < self.activity
     }
 }
@@ -119,8 +119,8 @@ impl VarDBIF for [Var] {
     }
     fn rescale_activity (&mut self, inc: &mut f64) {
         for v in &mut self[1..] {
-            v.activity_t *= VAR_ACTIVITY_SCALE;
-            v.activity_f *= VAR_ACTIVITY_SCALE;
+            // v.activity_t *= VAR_ACTIVITY_SCALE;
+            // v.activity_f *= VAR_ACTIVITY_SCALE;
             v.activity *= VAR_ACTIVITY_SCALE;
         }
         *inc *= VAR_ACTIVITY_SCALE;
