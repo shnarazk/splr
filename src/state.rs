@@ -427,7 +427,7 @@ impl StateIF for State {
         }
         let mut re_init = false;
         let decpc = self.stats[Stat::Decision] as f64 / self.stats[Stat::Conflict] as f64;
-        if decpc <= 1.2 {
+        if decpc <= 1.12 {
             self.strategy = SearchStrategy::LowDecisions;
             self.use_chan_seok = true;
             self.co_lbd_bound = 4;
