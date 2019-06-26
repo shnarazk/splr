@@ -80,7 +80,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Config {
         Config {
-            clause_limit: 18_000_000,
+            clause_limit: 36_000_000,
             elim_grow_limit: 4,
             elim_lit_limit: 100,
             restart_asg_len: 3500,
