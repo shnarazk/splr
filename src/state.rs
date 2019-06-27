@@ -331,7 +331,7 @@ impl Default for State {
             luby_restart_inc: 2.0,
             luby_current_restarts: 0,
             luby_restart_factor: 100.0,
-            use_deep_search_mode: true,
+            use_deep_search_mode: false,
             stagnated: false,
             force_restart_by_stagnation: false,
             ema_coeffs: (2 ^ 5, 2 ^ 15),

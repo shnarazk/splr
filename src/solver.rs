@@ -468,15 +468,14 @@ fn adapt_parameters(
         state.stats[Stat::RestartRecord] = state.stats[Stat::Restart];
         let nb = state.stats[Stat::BlockRestart] - state.stats[Stat::BlockRestartRecord];
         state.stats[Stat::BlockRestartRecord] = state.stats[Stat::BlockRestart];
-        let _br_ratio = (state.stats[Stat::BlockRestart] as f64 + 1.0) / (state.stats[Stat::Restart] as f64 + 1.0);
-        let br_ratio = nb as f64 / nr as f64;
+        let br_ratio = (state.stats[Stat::BlockRestart] as f64 + 1.0) / (state.stats[Stat::Restart] as f64 + 1.0);
         if nr == 0 {
-            state.force_restart_by_stagnation = true;
+            state.force_restart_by_stagnation = true; // this is very important.
         }
         if nb == 0 && nr == 0 {
             state.restart_thr -= (state.restart_thr - state.config.restart_threshold) * spring;
             state.restart_blk -= (state.restart_blk - state.config.restart_blocking) * spring;
-        } else if br_ratio < 0.99 {
+        } else if br_ratio < 0.95 {
             if state.config.restart_threshold - margin < state.restart_thr {
                 state.restart_thr -= moving;
             }
