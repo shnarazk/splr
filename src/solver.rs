@@ -441,8 +441,8 @@ fn adapt_parameters(
         // && state.record.vali[LogUsizeId::Binclause] == state.stats[Stat::NumBinLearnt]
         if stopped {
             state.slack_duration += 1;
-        } else if 0 < state.slack_duration && state.stagnated {
-            state.slack_duration = 0;
+        // } else if 0 < state.slack_duration && state.stagnated {
+        //     state.slack_duration = 0;
         } else {
             state.slack_duration = 0;
         }
