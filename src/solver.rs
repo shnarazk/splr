@@ -472,17 +472,17 @@ fn adapt_parameters(
         if nr == 0 {
             state.force_restart_by_stagnation = true; // this is very important.
         }
-        if nb == 0 && nr == 0 {
+        if nb == 0 && (nr == 0 || state.stagnated) {
             state.restart_thr -= (state.restart_thr - state.config.restart_threshold) * spring;
             state.restart_blk -= (state.restart_blk - state.config.restart_blocking) * spring;
-        } else if br_ratio < 0.95 {
+        } else if (state.stagnated && br_ratio < 1.0) ||  br_ratio < 0.5 {
             if state.config.restart_threshold - margin < state.restart_thr {
                 state.restart_thr -= moving;
             }
             if state.restart_blk < state.config.restart_blocking + margin {
                 state.restart_blk += moving;
             }
-        } else if 24.0 < br_ratio {
+        } else if (state.stagnated && 16.0 < br_ratio) || 8.0 < br_ratio {
             if state.restart_thr < state.config.restart_blocking + margin {
                 state.restart_thr += moving;
             }
