@@ -282,7 +282,7 @@ pub trait VarDBIF {
     /// return a LBD value for the set of literals.
     fn compute_lbd(&self, vec: &[Lit], keys: &mut [usize]) -> usize;
     /// update the variable's activity.
-    fn rescale_activity (&mut self, inc: &mut f64);
+    fn rescale_activity(&mut self, inc: &mut f64);
 }
 
 /// API for 'watcher list' like `attach`, `detach`, `detach_with` and so on.

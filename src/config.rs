@@ -5,10 +5,7 @@ pub const VERSION: &str = "0.1.3+LR";
 
 /// Configuration built from command line options
 #[derive(Clone, Debug, StructOpt)]
-#[structopt(
-    name = "splr",
-    about = "SAT solver for Propositional Logic in Rust"
-)]
+#[structopt(name = "splr", about = "SAT solver for Propositional Logic in Rust")]
 pub struct Config {
     /// soft limit of #clauses (24M is about 4GB)
     #[structopt(long = "cl", default_value = "0")]

@@ -107,8 +107,10 @@ impl SatSolverIF for Solver {
                 match (v.pos_occurs.len(), v.neg_occurs.len()) {
                     (_, 0) => asgs.enqueue_null(vars, vi, TRUE),
                     (0, _) => asgs.enqueue_null(vars, vi, FALSE),
-                    (p, m) => if p.min(m) < 4 {
-                        elim.enqueue_var(vars, vi, false)
+                    (p, m) => {
+                        if p.min(m) < 4 {
+                            elim.enqueue_var(vars, vi, false)
+                        }
                     }
                 }
             }
@@ -457,7 +459,9 @@ fn adapt_parameters(
         state.stagnated = stagnated;
     }
     state.stats[Stat::SolvedRecord] = state.num_solved_vars;
-    if !state.use_luby_restart && state.adaptive_restart /* && !state.stagnated */ {
+    if !state.use_luby_restart && state.adaptive_restart
+    /* && !state.stagnated */
+    {
         let moving: f64 = 0.04;
         let spring: f64 = 0.02;
         let margin: f64 = 0.20;
@@ -468,14 +472,15 @@ fn adapt_parameters(
         state.stats[Stat::RestartRecord] = state.stats[Stat::Restart];
         let nb = state.stats[Stat::BlockRestart] - state.stats[Stat::BlockRestartRecord];
         state.stats[Stat::BlockRestartRecord] = state.stats[Stat::BlockRestart];
-        let br_ratio = (state.stats[Stat::BlockRestart] as f64 + 1.0) / (state.stats[Stat::Restart] as f64 + 1.0);
+        let br_ratio = (state.stats[Stat::BlockRestart] as f64 + 1.0)
+            / (state.stats[Stat::Restart] as f64 + 1.0);
         if nr == 0 {
             state.force_restart_by_stagnation = true; // this is very important.
         }
         if nb == 0 && (nr == 0 || state.stagnated) {
             state.restart_thr -= (state.restart_thr - state.config.restart_threshold) * spring;
             state.restart_blk -= (state.restart_blk - state.config.restart_blocking) * spring;
-        } else if (state.stagnated && br_ratio < 1.0) ||  br_ratio < 0.5 {
+        } else if (state.stagnated && br_ratio < 1.0) || br_ratio < 0.5 {
             if state.config.restart_threshold - margin < state.restart_thr {
                 state.restart_thr -= moving;
             }

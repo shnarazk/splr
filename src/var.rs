@@ -117,7 +117,7 @@ impl VarDBIF for [Var] {
         keys[0] = key;
         cnt
     }
-    fn rescale_activity (&mut self, inc: &mut f64) {
+    fn rescale_activity(&mut self, inc: &mut f64) {
         for v in &mut self[1..] {
             // v.activity_t *= VAR_ACTIVITY_SCALE;
             // v.activity_f *= VAR_ACTIVITY_SCALE;
