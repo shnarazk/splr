@@ -427,7 +427,7 @@ impl StateIF for State {
         }
         let mut re_init = false;
         let decpc = self.stats[Stat::Decision] as f64 / self.stats[Stat::Conflict] as f64;
-        if decpc <= 1.12 {
+        if decpc <= 1.25 {
             self.strategy = SearchStrategy::LowDecisions;
             self.use_chan_seok = true;
             self.co_lbd_bound = 4;
@@ -437,6 +437,12 @@ impl StateIF for State {
             self.cur_restart =
                 (self.stats[Stat::Conflict] as f64 / self.next_reduction as f64 + 1.0) as usize;
             self.cdb_inc = 0;
+            if self.target.num_of_variables <= 1000 {
+                // exploitation and exploration
+                self.var_decay_max = 0.8;
+                self.var_decay_max = 0.8;
+                self.use_deep_search_mode = true;
+            }
             re_init = true;
         }
         if self.stats[Stat::NoDecisionConflict] < 30_000 {
@@ -467,6 +473,12 @@ impl StateIF for State {
         }
         if self.strategy == SearchStrategy::Initial {
             self.strategy = SearchStrategy::Generic;
+            if self.target.num_of_variables <= 1000 {
+                // exploitation and exploration
+                self.var_decay = 0.8;
+                self.var_decay_max = 0.8;
+                self.use_deep_search_mode = true;
+            }
             return;
         }
         if self.use_chan_seok {
