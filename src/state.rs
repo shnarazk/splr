@@ -331,7 +331,7 @@ impl Default for State {
             luby_restart_inc: 2.0,
             luby_current_restarts: 0,
             luby_restart_factor: 100.0,
-            use_deep_search_mode: false,
+            use_deep_search_mode: true,
             stagnated: false,
             force_restart_by_stagnation: false,
             ema_coeffs: (2 ^ 5, 2 ^ 15),
@@ -399,7 +399,7 @@ impl StateIF for State {
         state.restart_asg_len = config.restart_asg_len;
         state.restart_lbd_len = config.restart_lbd_len;
         state.restart_step = config.restart_step;
-        state.use_deep_search_mode = config.with_deep_search;
+        state.use_deep_search_mode = !config.without_deep_search;
         state.progress_log = config.use_log;
         state.use_elim = !config.without_elim;
         state.ema_asg = Ema::new(config.restart_asg_len);
