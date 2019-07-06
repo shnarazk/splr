@@ -415,7 +415,6 @@ fn handle_conflict_path(
     Ok(())
 }
 
-#[allow(dead_code)]
 fn adapt_parameters(
     asgs: &mut AssignStack,
     cdb: &mut ClauseDB,
@@ -425,19 +424,19 @@ fn adapt_parameters(
     nconflict: usize,
 ) -> MaybeInconsistent {
     let switch = 100_000;
-    if state.use_deep_search_mode && !state.use_luby_restart && switch <= nconflict {
+    if !state.use_luby_restart && switch <= nconflict {
         let stopped = state.stats[Stat::SolvedRecord] == state.num_solved_vars;
         // && state.record.vali[LogUsizeId::Binclause] == state.stats[Stat::NumBinLearnt]
         if stopped {
             state.slack_duration += 1;
-        } else if 0 < state.slack_duration && state.stagnated {
-            state.slack_duration *= -1;
+        // } else if 0 < state.slack_duration && state.stagnated {
+        //     state.slack_duration = 0;
         } else {
             state.slack_duration = 0;
         }
         let stagnated = ((state.num_vars - state.num_solved_vars)
             .next_power_of_two()
-            .trailing_zeros() as isize)
+            .trailing_zeros() as usize)
             < state.slack_duration;
         // && (((state.num_vars - state.num_solved_vars) as f64).log(2.0)
         //     / (state.c_lvl.get() / state.b_lvl.get()).sqrt().max(1.0)
@@ -448,35 +447,57 @@ fn adapt_parameters(
         state.stagnated = stagnated;
     }
     state.stats[Stat::SolvedRecord] = state.num_solved_vars;
-    if !state.use_luby_restart && state.adaptive_restart && !state.stagnated {
-        let moving: f64 = 0.04;
-        let spring: f64 = 0.02;
+    if !state.use_luby_restart && state.adaptive_restart
+    /* && !state.stagnated */
+    {
+        let moving: f64 = 0.03;
         let margin: f64 = 0.20;
         let too_few: usize = 4;
         let too_many: usize = 400;
         // restart_threshold
         let nr = state.stats[Stat::Restart] - state.stats[Stat::RestartRecord];
         state.stats[Stat::RestartRecord] = state.stats[Stat::Restart];
-        if state.restart_thr <= state.config.restart_threshold + margin && nr < too_few {
-            state.restart_thr += moving;
-        } else if state.config.restart_threshold - margin <= state.restart_thr && too_many < nr {
-            state.restart_thr -= moving;
-        } else if too_few <= nr && nr <= too_many {
-            state.restart_thr -= (state.restart_thr - state.config.restart_threshold) * spring;
-        }
-        // restart_blocking
         let nb = state.stats[Stat::BlockRestart] - state.stats[Stat::BlockRestartRecord];
         state.stats[Stat::BlockRestartRecord] = state.stats[Stat::BlockRestart];
-        if state.config.restart_blocking - margin <= state.restart_blk && nb < too_few {
-            state.restart_blk -= moving;
-        } else if state.restart_blk <= state.config.restart_blocking + margin && too_many < nb {
-            state.restart_blk += moving;
-        } else if too_few <= nb && nb <= too_many {
-            state.restart_blk -= (state.restart_blk - state.config.restart_blocking) * spring;
+        let br_ratio = (state.stats[Stat::BlockRestart] as f64 + 1.0)
+            / (state.stats[Stat::Restart] as f64 + 1.0);
+        // if nr == 0 {                         // this is very important.
+        //     state.force_restart_by_stagnation = true; // link with 'else'
+        // }
+        if (state.stagnated && br_ratio < 0.2) || br_ratio < 0.1 {
+            if state.config.restart_threshold - margin < state.restart_thr {
+                state.restart_thr -= moving;
+            }
+            if state.restart_blk < state.config.restart_blocking + margin {
+                state.restart_blk += moving;
+            }
+        } else if (state.stagnated && 16.0 < br_ratio) || 32.0 < br_ratio {
+            if state.restart_thr < state.config.restart_blocking + margin {
+                state.restart_thr += moving;
+            }
+            if state.config.restart_blocking - margin < state.restart_blk {
+                state.restart_blk -= moving;
+            }
         }
+        /*
+        {
+            // dumping restart_forcing
+            if state.restart_thr < state.config.restart_threshold + margin && nr < too_few {
+                state.restart_thr += moving;
+            } else if state.config.restart_threshold - margin < state.restart_thr && too_many < nr {
+                state.restart_thr -= moving;
+            }
+            // dumping restart_blocking
+            if state.restart_blk < state.config.restart_blocking + margin && nb < too_few {
+                state.restart_blk += moving;
+            } else if state.config.restart_blocking - margin < state.restart_blk && too_many < nb {
+                state.restart_blk -= moving;
+            }
+        }
+         */
     }
     if nconflict == switch {
-        state.flush("exhaustive eliminator activated...");
+        state.flush("activating an exhaustive eliminator...");
         asgs.cancel_until(vars, 0);
         state.adapt_strategy(cdb);
         if state.use_elim {
@@ -486,11 +507,16 @@ fn adapt_parameters(
         }
     }
     state.progress(cdb, vars, None);
+    if state.stagnated {
+        state.flush(&format!("stagnated ({})...", state.slack_duration));
+    }
     if state.use_deep_search_mode {
-        state.restart_step = 50 + 40_000 * (state.stagnated as usize);
         if state.stagnated {
-            state.flush(&format!("stagnated ({})...", state.slack_duration));
-            state.next_restart += 80_000;
+            let bonus = 20_000;
+            state.restart_step = 50 + bonus;
+            state.next_restart += 2 * bonus;
+        } else if !state.stagnated && 0 < state.stats[Stat::Stagnation] {
+            state.restart_step = 1000;
         }
     }
     Ok(())
