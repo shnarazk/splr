@@ -450,8 +450,8 @@ fn adapt_parameters(
     if !state.use_luby_restart && state.adaptive_restart
     /* && !state.stagnated */
     {
-        let moving: f64 = 0.01;
-        let margin: f64 = 0.20;
+        // let moving: f64 = 0.01;
+        // let margin: f64 = 0.20;
         // let too_few: usize = 4;
         // let too_many: usize = 400;
         // restart_threshold
