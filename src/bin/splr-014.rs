@@ -42,11 +42,20 @@ fn main() {
             if config.use_certification && *cert == Certificate::UNSAT {
                 save_proof(&s, &cnf_file, &proof_file);
             }
+            {
+                if let Ok(f) = File::create("dist.csv") {
+                    let mut buf = BufWriter::new(f);
+                    buf.write_all("conflict, var activity dist\n".as_bytes()).unwrap();
+                    for (i, x) in s.state.dists.iter().enumerate() {
+                        buf.write_all(format!("{:>8},{:>10.5}\n", i, x).as_bytes()).unwrap();
+                    }
+                }
+            }
         }
         Err(e) => println!("Failed to execution by {:?}.", e),
     }
 }
-
+                        
 #[allow(dead_code)]
 fn save_result(s: &Solver, res: &SolverResult, input: &str, output: Option<PathBuf>) {
     let mut ofile;

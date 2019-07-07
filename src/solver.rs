@@ -350,9 +350,27 @@ fn search(
                 return Ok(false);
             }
             handle_conflict_path(asgs, cdb, elim, state, vars, ci)?;
+            {
+                if state.stats[Stat::Conflict] % 1000 == 0 {
+                    state.dists.push(compute_dist(vars));
+                }
+            }
         }
     }
 }
+
+fn compute_dist(vars: &[Var]) -> f64 {
+    let n = vars.len() as f64 - 1.0;
+    let mut t1 = 0.0f64;
+    let mut t2 = 0.0f64;
+    for v in &vars[1..] {
+        let a = v.reward;
+        t1 += a;
+        t2 += a.powi(2);
+    }
+    t2 / n - (t1 / n).powi(2)
+}
+
 
 fn handle_conflict_path(
     asgs: &mut AssignStack,
