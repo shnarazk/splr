@@ -450,10 +450,10 @@ fn adapt_parameters(
     if !state.use_luby_restart && state.adaptive_restart
     /* && !state.stagnated */
     {
-        let moving: f64 = 0.03;
+        let moving: f64 = 0.01;
         let margin: f64 = 0.20;
-        let too_few: usize = 4;
-        let too_many: usize = 400;
+        // let too_few: usize = 4;
+        // let too_many: usize = 400;
         // restart_threshold
         let nr = state.stats[Stat::Restart] - state.stats[Stat::RestartRecord];
         state.stats[Stat::RestartRecord] = state.stats[Stat::Restart];
@@ -461,9 +461,22 @@ fn adapt_parameters(
         state.stats[Stat::BlockRestartRecord] = state.stats[Stat::BlockRestart];
         let br_ratio = (state.stats[Stat::BlockRestart] as f64 + 1.0)
             / (state.stats[Stat::Restart] as f64 + 1.0);
-        // if nr == 0 {                         // this is very important.
-        //     state.force_restart_by_stagnation = true; // link with 'else'
-        // }
+        // let br_ratio = (nb + 1) as f64 / (nr + 1) as f64;
+        if nconflict == switch {
+            if br_ratio < 0.1 {
+                state.restart_step += 100;
+                state.restart_blk += 0.2;
+            } else if br_ratio < 0.5 {
+                state.restart_step += 20;
+                state.restart_blk += 0.1;
+            } else if 10.0 < br_ratio {
+                state.restart_blk -= 0.1;
+            }
+        }
+        if nb == 0 && nr == 0 && !state.stagnated {   // this is very important.
+            state.force_restart_by_stagnation = true; // link with 'else'
+        }
+        /*
         if (state.stagnated && br_ratio < 0.2) || br_ratio < 0.1 {
             if state.config.restart_threshold - margin < state.restart_thr {
                 state.restart_thr -= moving;
@@ -479,6 +492,7 @@ fn adapt_parameters(
                 state.restart_blk -= moving;
             }
         }
+        */
         /*
         {
             // dumping restart_forcing
