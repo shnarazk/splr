@@ -47,7 +47,7 @@ fn main() {
                     let mut buf = BufWriter::new(f);
                     buf.write_all("conflict, var activity dist\n".as_bytes()).unwrap();
                     for (i, x) in s.state.dists.iter().enumerate() {
-                        buf.write_all(format!("{:>8},{:>10.5}\n", i, x).as_bytes()).unwrap();
+                        buf.write_all(format!("{:>8},{:>10.5},{:>10.5}\n", i, x.0, x.1).as_bytes()).unwrap();
                     }
                 }
             }

@@ -219,7 +219,7 @@ pub struct State {
     pub progress_cnt: usize,
     pub progress_log: bool,
     pub target: CNFDescription,
-    pub dists: Vec<f64>,
+    pub dists: Vec<(f64, f64)>,
 }
 
 macro_rules! im {
