@@ -31,17 +31,15 @@ impl EmaIF for Ema {
 
 impl RestartIF for State {
     fn block_restart(&mut self, asgs: &AssignStack, ncnfl: usize) -> bool {
-        let count = self.stats[Stat::Conflict];
         let nas = asgs.len();
-        // let _count = self.stats[Stat::Conflict];
-        // let _ave = self.sum_asg / count as f64 * self.num_vars as f64;
-        if 100 < ncnfl
-            && !self.use_luby_restart
-            && self.next_restart <= count
+        // let _ave = self.sum_asg / ncnfl as f64 * self.num_vars as f64;
+        if !self.use_luby_restart
+            && !self.force_restart_by_stagnation
+            && self.next_restart <= ncnfl
             && self.restart_blk * self.ema_asg.get() < nas as f64
         {
             self.after_restart = 0;
-            self.next_restart = count + self.restart_step;
+            self.next_restart = ncnfl + self.restart_step;
             self.stats[Stat::BlockRestart] += 1;
             return true;
         }
