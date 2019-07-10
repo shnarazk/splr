@@ -153,6 +153,8 @@ impl SatSolverIF for Solver {
                 }
             }
         }
+        state.va_dist_max = var_activity_dist(vars);
+        state.va_dist_min = state.va_dist_max;
         state.progress(cdb, vars, None);
         match search(asgs, cdb, elim, state, vars) {
             Ok(true) => {
@@ -377,6 +379,8 @@ fn handle_conflict_path(
         // dump to certified even if it's a literal.
         cdb.certificate_add(new_learnt);
         asgs.uncheck_enqueue(vars, new_learnt[0], NULL_CLAUSE);
+        state.va_dist_max = var_activity_dist(vars);
+        state.va_dist_min = state.va_dist_max;
     } else {
         state.stats[Stat::Learnt] += 1;
         let lbd = vars.compute_lbd(&new_learnt, &mut state.lbd_temp);
@@ -505,21 +509,39 @@ fn adapt_parameters(
             elim.activate();
             cdb.simplify(asgs, elim, state, vars)?;
         }
+        state.va_dist_max = var_activity_dist(vars);
+        state.va_dist_min = state.va_dist_max;
     }
     state.progress(cdb, vars, None);
     if state.stagnated {
         state.flush(&format!("stagnated ({})...", state.slack_duration));
     }
-    if state.use_deep_search_mode {
-        if state.stagnated {
-            let bonus = 20_000;
-            state.restart_step = 50 + bonus;
-            state.next_restart += 2 * bonus;
-        } else if !state.stagnated && 0 < state.stats[Stat::Stagnation] {
-            state.restart_step = 1000;
+    // if state.use_deep_search_mode {
+    //     if state.stagnated {
+    //         let bonus = 20_000;
+    //         state.restart_step = 50 + bonus;
+    //         state.next_restart += 2 * bonus;
+    //     } else if !state.stagnated && 0 < state.stats[Stat::Stagnation] {
+    //         state.restart_step = 1000;
+    //     }
+    // }
+    Ok(())
+}
+
+fn var_activity_dist(vars: &[Var]) -> f64 {
+    let mut n = 0;
+    let mut t1 = 0.0f64;
+    let mut t2 = 0.0f64;
+    for v in &vars[1..] {
+        if 0 < v.level {
+            let a = v.reward;
+            t1 += a;
+            t2 += a.powi(2);
+            n += 1;
         }
     }
-    Ok(())
+    let ave = t1 / n as f64;
+    t2 / n as f64 - ave.powi(2)
 }
 
 fn analyze(

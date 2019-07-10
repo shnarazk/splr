@@ -104,6 +104,7 @@ pub enum Stat {
     RestartRecord,         // the last recorded number of Restart
     BlockRestart,          // the number of blacking start
     BlockRestartRecord,    // the last recorded number of BlockRestart
+    RestartByVA,           // the number of restart by var activity divergence
     Learnt,                // the number of learnt clauses (< Conflict)
     NoDecisionConflict,    // the number of 'no decision conflict'
     Propagation,           // the number of propagation
@@ -177,6 +178,8 @@ pub struct State {
     pub use_deep_search_mode: bool,
     pub stagnated: bool,
     pub force_restart_by_stagnation: bool,
+    pub va_dist_max: f64,
+    pub va_dist_min: f64,
     /// Eliminator
     pub use_elim: bool,
     /// 0 for no limit
@@ -333,6 +336,8 @@ impl Default for State {
             use_deep_search_mode: true,
             stagnated: false,
             force_restart_by_stagnation: false,
+            va_dist_max: 0.0,
+            va_dist_min: 0.0,
             ema_coeffs: (2 ^ 5, 2 ^ 15),
             use_elim: true,
             elim_eliminate_combination_limit: 80,
@@ -626,7 +631,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K   Clause DB|#rdc:{}, #sce:{} |blkR:{}, frcK:{} ",
+            "\x1B[2K   Clause DB|#rdc:{}, #sce:{} |blkR:{} |byVA:{} ",
             im!(
                 "{:>9}",
                 self.record,
@@ -645,11 +650,19 @@ impl StateIF for State {
                 LogF64Id::RestartBlkR,
                 self.restart_blk
             ),
+/*
             fm!(
                 "{:>9.4}",
                 self.record,
                 LogF64Id::RestartThrK,
                 self.restart_thr
+            ),
+*/
+            im!(
+                "{:>9}",
+                self.record,
+                LogUsizeId::RestartByVA,
+                self.stats[Stat::RestartByVA]
             ),
         );
         if let Some(m) = mes {
@@ -719,12 +732,13 @@ pub enum LogUsizeId {
     Permanent,      //  9: permanent: usize,
     RestartBlock,   // 10: restart_block: usize,
     Restart,        // 11: restart_count: usize,
-    Reduction,      // 12: reduction: usize,
-    SatClauseElim,  // 13: simplification: usize,
-    ExhaustiveElim, // 14: elimination: usize,
-    Stagnation,     // 15: stagnation: usize,
-    // ElimClauseQueue, // 16: elim_clause_queue: usize,
-    // ElimVarQueue, // 17: elim_var_queue: usize,
+    RestartByVA,    // 12: force_restart: usize
+    Reduction,      // 13: reduction: usize,
+    SatClauseElim,  // 14: simplification: usize,
+    ExhaustiveElim, // 15: elimination: usize,
+    Stagnation,     // 16: stagnation: usize,
+    // ElimClauseQueue, // 17: elim_clause_queue: usize,
+    // ElimVarQueue, // 18: elim_var_queue: usize,
     End,
 }
 

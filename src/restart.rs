@@ -31,15 +31,17 @@ impl EmaIF for Ema {
 
 impl RestartIF for State {
     fn block_restart(&mut self, asgs: &AssignStack, ncnfl: usize) -> bool {
+        let count = self.stats[Stat::Conflict];
         let nas = asgs.len();
         // let _count = self.stats[Stat::Conflict];
         // let _ave = self.sum_asg / count as f64 * self.num_vars as f64;
         if 100 < ncnfl
             && !self.use_luby_restart
-            && self.restart_step <= self.after_restart
+            && self.next_restart <= count
             && self.restart_blk * self.ema_asg.get() < nas as f64
         {
             self.after_restart = 0;
+            self.next_restart = count + self.restart_step;
             self.stats[Stat::BlockRestart] += 1;
             return true;
         }
@@ -57,12 +59,13 @@ impl RestartIF for State {
         let ave = self.stats[Stat::SumLBD] as f64 / count as f64;
         if (self.use_luby_restart && self.luby_restart_num_conflict <= *ncnfl)
             || (!self.use_luby_restart
-                && self.restart_step <= self.after_restart
+                && self.next_restart <= count
                 && ave < self.ema_lbd.get() * self.restart_thr)
             || self.force_restart_by_stagnation
         {
             self.stats[Stat::Restart] += 1;
             self.after_restart = 0;
+            self.next_restart = count + self.restart_step;
             if self.use_luby_restart {
                 *ncnfl = 0.0;
                 self.luby_current_restarts += 1;
@@ -70,7 +73,10 @@ impl RestartIF for State {
                     luby(self.luby_restart_inc, self.luby_current_restarts)
                         * self.luby_restart_factor;
             }
-            self.force_restart_by_stagnation = false;
+            if self.force_restart_by_stagnation {
+                self.force_restart_by_stagnation = false;
+                self.next_restart += 1_000;
+            }
             return true;
         }
         false
