@@ -105,6 +105,7 @@ pub enum Stat {
     BlockRestart,          // the number of blacking start
     BlockRestartRecord,    // the last recorded number of BlockRestart
     RestartByVA,           // the number of restart by var activity divergence
+    BlockByVA,             // the number of blockinng restart by VAD
     Learnt,                // the number of learnt clauses (< Conflict)
     NoDecisionConflict,    // the number of 'no decision conflict'
     Propagation,           // the number of propagation
@@ -151,6 +152,7 @@ pub struct State {
     pub var_decay: f64,
     pub var_decay_max: f64,
     pub var_inc: f64,
+    pub var_activity_updated: usize,
     /// CLAUSE REDUCTION
     pub first_reduction: usize,
     pub glureduce: bool,
@@ -180,6 +182,7 @@ pub struct State {
     pub force_restart_by_stagnation: bool,
     pub va_dist_max: f64,
     pub va_dist_min: f64,
+    pub va_dist_now: f64,
     /// Eliminator
     pub use_elim: bool,
     /// 0 for no limit
@@ -222,6 +225,7 @@ pub struct State {
     pub progress_cnt: usize,
     pub progress_log: bool,
     pub target: CNFDescription,
+    pub development_history: Vec<(f64, f64)>,
 }
 
 macro_rules! im {
@@ -316,6 +320,7 @@ impl Default for State {
             var_decay: 0.9,
             var_decay_max: 0.95,
             var_inc: 0.9,
+            var_activity_updated: 0,
             first_reduction: 1000,
             glureduce: true,
             cdb_inc: 300,
@@ -338,6 +343,7 @@ impl Default for State {
             force_restart_by_stagnation: false,
             va_dist_max: 0.0,
             va_dist_min: 0.0,
+            va_dist_now: 0.0,
             ema_coeffs: (2 ^ 5, 2 ^ 15),
             use_elim: true,
             elim_eliminate_combination_limit: 80,
@@ -374,6 +380,7 @@ impl Default for State {
             progress_log: false,
             record: ProgressRecord::default(),
             target: CNFDescription::default(),
+            development_history: Vec::new(),
         }
     }
 }
@@ -592,7 +599,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K     Restart|#BLK:{}, #RST:{}, eASG:{}, eLBD:{} ",
+            "\x1B[2K     Restart|#BLK:{}, byVA:{}, #RST:{}, byVA:{} ",
             im!(
                 "{:>9}",
                 self.record,
@@ -602,20 +609,21 @@ impl StateIF for State {
             im!(
                 "{:>9}",
                 self.record,
+                LogUsizeId::BlockByVA,
+                self.stats[Stat::BlockByVA]
+            ),
+
+            im!(
+                "{:>9}",
+                self.record,
                 LogUsizeId::Restart,
                 self.stats[Stat::Restart]
             ),
-            fm!(
-                "{:>9.4}",
+            im!(
+                "{:>9}",
                 self.record,
-                LogF64Id::EmaAsg,
-                self.ema_asg.get() / nv as f64
-            ),
-            fm!(
-                "{:>9.4}",
-                self.record,
-                LogF64Id::EmaLBD,
-                self.ema_lbd.get() / ave
+                LogUsizeId::RestartByVA,
+                self.stats[Stat::RestartByVA]
             ),
         );
         println!(
@@ -631,7 +639,8 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K   Clause DB|#rdc:{}, #sce:{} |blkR:{} |byVA:{} ",
+            // "\x1B[2K   Clause DB|#rdc:{}, #sce:{} |blkR:{} |frcK:{} ",
+            "\x1B[2K   Clause DB|#rdc:{}, #sce:{} |eASG:{} |eLBD:{} ",
             im!(
                 "{:>9}",
                 self.record,
@@ -644,13 +653,13 @@ impl StateIF for State {
                 LogUsizeId::SatClauseElim,
                 self.stats[Stat::SatClauseElimination]
             ),
+/*
             fm!(
                 "{:>9.4}",
                 self.record,
                 LogF64Id::RestartBlkR,
                 self.restart_blk
             ),
-/*
             fm!(
                 "{:>9.4}",
                 self.record,
@@ -658,11 +667,17 @@ impl StateIF for State {
                 self.restart_thr
             ),
 */
-            im!(
-                "{:>9}",
+            fm!(
+                "{:>9.4}",
                 self.record,
-                LogUsizeId::RestartByVA,
-                self.stats[Stat::RestartByVA]
+                LogF64Id::EmaAsg,
+                self.ema_asg.get() / nv as f64
+            ),
+            fm!(
+                "{:>9.4}",
+                self.record,
+                LogF64Id::EmaLBD,
+                self.ema_lbd.get() / ave
             ),
         );
         if let Some(m) = mes {
@@ -732,13 +747,14 @@ pub enum LogUsizeId {
     Permanent,      //  9: permanent: usize,
     RestartBlock,   // 10: restart_block: usize,
     Restart,        // 11: restart_count: usize,
-    RestartByVA,    // 12: force_restart: usize
-    Reduction,      // 13: reduction: usize,
-    SatClauseElim,  // 14: simplification: usize,
-    ExhaustiveElim, // 15: elimination: usize,
-    Stagnation,     // 16: stagnation: usize,
-    // ElimClauseQueue, // 17: elim_clause_queue: usize,
-    // ElimVarQueue, // 18: elim_var_queue: usize,
+    BlockByVA,      // 12: force_restart: usize
+    RestartByVA,    // 13: force_restart: usize
+    Reduction,      // 14: reduction: usize,
+    SatClauseElim,  // 15: simplification: usize,
+    ExhaustiveElim, // 16: elimination: usize,
+    Stagnation,     // 17: stagnation: usize,
+    // ElimClauseQueue, // 18: elim_clause_queue: usize,
+    // ElimVarQueue, // 19: elim_var_queue: usize,
     End,
 }
 

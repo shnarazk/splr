@@ -153,8 +153,6 @@ impl SatSolverIF for Solver {
                 }
             }
         }
-        state.va_dist_max = var_activity_dist(vars);
-        state.va_dist_min = state.va_dist_max;
         state.progress(cdb, vars, None);
         match search(asgs, cdb, elim, state, vars) {
             Ok(true) => {
@@ -321,6 +319,11 @@ fn search(
                 return Ok(true);
             }
             // DYNAMIC FORCING RESTART
+            if (state.num_vars - state.num_eliminated_vars) / 20 < state.var_activity_updated {
+                state.var_activity_updated = 0;
+                state.va_dist_now = var_activity_dist(vars, state.stats[Stat::Conflict]);
+                // state.development_history.push((state.va_dist_max, n as f64));
+            }
             if state.force_restart(&mut conflict_c) {
                 asgs.cancel_until(vars, state.root_level);
             } else if asgs.level() == 0 {
@@ -379,8 +382,13 @@ fn handle_conflict_path(
         // dump to certified even if it's a literal.
         cdb.certificate_add(new_learnt);
         asgs.uncheck_enqueue(vars, new_learnt[0], NULL_CLAUSE);
-        state.va_dist_max = var_activity_dist(vars);
-        state.va_dist_min = state.va_dist_max;
+        // state.va_dist_max = var_activity_dist(vars);
+        // state.va_dist_min = state.va_dist_max;
+        {
+            let band = (state.va_dist_max - state.va_dist_min) / 16.0;
+            state.va_dist_max -= band;
+            state.va_dist_min += band;
+        }
     } else {
         state.stats[Stat::Learnt] += 1;
         let lbd = vars.compute_lbd(&new_learnt, &mut state.lbd_temp);
@@ -459,8 +467,6 @@ fn adapt_parameters(
             elim.activate();
             cdb.simplify(asgs, elim, state, vars)?;
         }
-        state.va_dist_max = var_activity_dist(vars);
-        state.va_dist_min = state.va_dist_max;
     }
     state.progress(cdb, vars, None);
     if state.stagnated {
@@ -469,13 +475,13 @@ fn adapt_parameters(
     Ok(())
 }
 
-fn var_activity_dist(vars: &[Var]) -> f64 {
+fn var_activity_dist(vars: &mut [Var], ncnfl: usize) -> f64 {
     let mut n = 0;
     let mut t1 = 0.0f64;
     let mut t2 = 0.0f64;
-    for v in &vars[1..] {
+    for v in &mut vars[1..] {
         if 0 < v.level {
-            let a = v.reward;
+            let a = v.activity(ncnfl);
             t1 += a;
             t2 += a.powi(2);
             n += 1;

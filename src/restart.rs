@@ -55,11 +55,34 @@ impl RestartIF for State {
         //     return false;
         // }
         let ave = self.stats[Stat::SumLBD] as f64 / count as f64;
+        if !self.use_luby_restart
+            && self.next_restart <= count
+            && 0.0 < self.va_dist_now
+        {
+            self.next_restart = count + self.restart_step;
+            if 1.2 * self.va_dist_max < self.va_dist_now {
+                let rate = self.va_dist_now / self.va_dist_max;
+                self.va_dist_max = self.va_dist_now;
+                self.stats[Stat::BlockByVA] += 1;
+                self.stats[Stat::BlockRestart] += 1;
+                // self.force_restart_by_stagnation = true;
+                self.next_restart += rate as usize * self.restart_step;
+                return false;
+            } else if self.va_dist_now < 1.1 * self.va_dist_min {
+                self.va_dist_min = self.va_dist_now;
+                self.stats[Stat::BlockByVA] += 1;
+                self.stats[Stat::BlockRestart] += 1;
+                self.next_restart += (10.0 * (self.va_dist_max / self.va_dist_now)) as usize;
+                return false;
+            }
+            return false;
+        }
         if (self.use_luby_restart && self.luby_restart_num_conflict <= *ncnfl)
             || (!self.use_luby_restart
                 && self.next_restart <= count
+                && !self.force_restart_by_stagnation
                 && ave < self.ema_lbd.get() * self.restart_thr)
-            || self.force_restart_by_stagnation
+            || (self.next_restart <= count && self.force_restart_by_stagnation)
         {
             self.stats[Stat::Restart] += 1;
             self.after_restart = 0;
@@ -73,7 +96,6 @@ impl RestartIF for State {
             }
             if self.force_restart_by_stagnation {
                 self.force_restart_by_stagnation = false;
-                self.next_restart += 1_000;
             }
             return true;
         }
