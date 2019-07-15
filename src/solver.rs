@@ -372,7 +372,6 @@ fn compute_dist(vars: &[Var]) -> (f64, f64) {
     (ave, t2 / n - ave.powi(2))
 }
 
-
 fn handle_conflict_path(
     asgs: &mut AssignStack,
     cdb: &mut ClauseDB,
@@ -492,7 +491,7 @@ fn adapt_parameters(
                 state.restart_blk -= 0.1;
             }
         }
-        if nb == 0 && nr == 0 && !state.stagnated {   // this is very important.
+        if nr == 0 {   // this is very important.
             state.force_restart_by_stagnation = true; // link with 'else'
         }
         /*
