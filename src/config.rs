@@ -29,10 +29,10 @@ pub struct Config {
     #[structopt(long = "rt", default_value = "0.70")]
     pub restart_threshold: f64, // Glucose's K
     /// blocking restart threshold
-    #[structopt(long = "rb", default_value = "1.40")]
+    #[structopt(long = "rb", default_value = "1.25")]
     pub restart_blocking: f64, // Glucose's R
     /// #conflicts between restarts
-    #[structopt(long = "rs", default_value = "50")]
+    #[structopt(long = "rs", default_value = "5")]
     pub restart_step: usize,
     /// a DIMACS format CNF file
     #[structopt(parse(from_os_str))]

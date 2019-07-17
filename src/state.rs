@@ -1,7 +1,7 @@
 use crate::clause::ClauseDB;
 use crate::config::Config;
 use crate::eliminator::Eliminator;
-use crate::restart::Ema;
+use crate::restart::{Ema, Ema2};
 use crate::traits::*;
 use crate::types::*;
 use crate::var::Var;
@@ -104,8 +104,8 @@ pub enum Stat {
     RestartRecord,         // the last recorded number of Restart
     BlockRestart,          // the number of blacking start
     BlockRestartRecord,    // the last recorded number of BlockRestart
-    RestartByVA,           // the number of restart by var activity divergence
-    BlockByVA,             // the number of blockinng restart by VAD
+    VADHigh,               // the number of high VAD period
+    VADLow,                // the number of low VAD period
     Learnt,                // the number of learnt clauses (< Conflict)
     NoDecisionConflict,    // the number of 'no decision conflict'
     Propagation,           // the number of propagation
@@ -152,7 +152,6 @@ pub struct State {
     pub var_decay: f64,
     pub var_decay_max: f64,
     pub var_inc: f64,
-    pub var_activity_updated: usize,
     /// CLAUSE REDUCTION
     pub first_reduction: usize,
     pub glureduce: bool,
@@ -180,9 +179,8 @@ pub struct State {
     pub use_deep_search_mode: bool,
     pub stagnated: bool,
     pub force_restart_by_stagnation: bool,
-    pub va_dist_max: f64,
-    pub va_dist_min: f64,
-    pub va_dist_now: f64,
+    pub va_dist: f64,
+    pub va_dist_ema: Ema2,
     /// Eliminator
     pub use_elim: bool,
     /// 0 for no limit
@@ -206,10 +204,13 @@ pub struct State {
     pub elim_trigger: usize,
     pub slack_duration: usize,
     pub stats: [usize; Stat::EndOfStatIndex as usize], // statistics
-    pub ema_asg: Ema,
+    pub ema_asg: Ema2,
     pub ema_lbd: Ema,
+    pub ema_restart_len: Ema,
+    pub ema_deep_search: Ema,
+    pub ema_conflict_clash: Ema2,
     pub b_lvl: Ema,
-    pub c_lvl: Ema,
+    pub c_lvl: Ema2,
     pub sum_asg: f64,
     pub num_solved_vars: usize,
     pub num_eliminated_vars: usize,
@@ -320,7 +321,6 @@ impl Default for State {
             var_decay: 0.9,
             var_decay_max: 0.95,
             var_inc: 0.9,
-            var_activity_updated: 0,
             first_reduction: 1000,
             glureduce: true,
             cdb_inc: 300,
@@ -341,9 +341,8 @@ impl Default for State {
             use_deep_search_mode: true,
             stagnated: false,
             force_restart_by_stagnation: false,
-            va_dist_max: 0.0,
-            va_dist_min: 0.0,
-            va_dist_now: 0.0,
+            va_dist: 0.0,
+            va_dist_ema: Ema2::new(1_000).with_fast(10),
             ema_coeffs: (2 ^ 5, 2 ^ 15),
             use_elim: true,
             elim_eliminate_combination_limit: 80,
@@ -361,10 +360,13 @@ impl Default for State {
             elim_trigger: 1,
             slack_duration: 0,
             stats: [0; Stat::EndOfStatIndex as usize],
-            ema_asg: Ema::new(1),
-            ema_lbd: Ema::new(1),
+            ema_asg: Ema2::new(5_000).with_fast(20),
+            ema_lbd: Ema::new(5_000),
+            ema_restart_len: Ema::new(1_000),
+            ema_deep_search: Ema::new(1_000),
+            ema_conflict_clash: Ema2::new(5_000).with_fast(4),
             b_lvl: Ema::new(5_000),
-            c_lvl: Ema::new(5_000),
+            c_lvl: Ema2::new(5_000).with_fast(4),
             sum_asg: 0.0,
             num_solved_vars: 0,
             num_eliminated_vars: 0,
@@ -412,7 +414,7 @@ impl StateIF for State {
         state.use_deep_search_mode = true;
         state.progress_log = config.use_log;
         state.use_elim = !config.without_elim;
-        state.ema_asg = Ema::new(config.restart_asg_len);
+        state.ema_asg = Ema2::new(config.restart_asg_len).with_fast(state.restart_step / 2);
         state.ema_lbd = Ema::new(config.restart_lbd_len);
         state.model = vec![BOTTOM; cnf.num_of_variables + 1];
         state.an_seen = vec![false; cnf.num_of_variables + 1];
@@ -599,20 +601,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K     Restart|#BLK:{}, byVA:{}, #RST:{}, byVA:{} ",
-            im!(
-                "{:>9}",
-                self.record,
-                LogUsizeId::RestartBlock,
-                self.stats[Stat::BlockRestart]
-            ),
-            im!(
-                "{:>9}",
-                self.record,
-                LogUsizeId::BlockByVA,
-                self.stats[Stat::BlockByVA]
-            ),
-
+            "\x1B[2K     Restart|#RST:{}, #ext:{}, leng:{}, vasd:{} ",
             im!(
                 "{:>9}",
                 self.record,
@@ -622,25 +611,65 @@ impl StateIF for State {
             im!(
                 "{:>9}",
                 self.record,
-                LogUsizeId::RestartByVA,
-                self.stats[Stat::RestartByVA]
+                LogUsizeId::RestartBlock,
+                self.stats[Stat::BlockRestart]
+            ),
+/*
+            im!(
+                "{:>9}",
+                self.record,
+                LogUsizeId::VADHigh,
+                self.stats[Stat::VADHigh]
+            ),
+*/
+            fm!(
+                "{:>9.4}",
+                self.record,
+                LogF64Id::AveRST,
+                self.ema_restart_len.get()
+            ),
+/*
+            im!(
+                "{:>9}",
+                self.record,
+                LogUsizeId::VADLow,
+                self.stats[Stat::VADLow]
+            ),
+*/
+/*
+            fm!(
+                "{:>9.4}",
+                self.record,
+                LogF64Id::EmaDS,
+                self.ema_deep_search.get()
+            ),
+*/
+            fm!(
+                "{:>9.4}",
+                self.record,
+                LogF64Id::EmaCC,
+                // self.ema_conflict_clash.get()
+                self.va_dist_ema.rate()
             ),
         );
         println!(
-            "\x1B[2K    Conflict|aLBD:{}, bjmp:{}, cnfl:{} |#stg:{} ",
+            "\x1B[2K    Conflict|aLBD:{}, bjmp:{}, cnfl:{} |rLBD:{} ",
             fm!("{:>9.2}", self.record, LogF64Id::AveLBD, self.ema_lbd.get()),
             fm!("{:>9.2}", self.record, LogF64Id::BLevel, self.b_lvl.get()),
             fm!("{:>9.2}", self.record, LogF64Id::CLevel, self.c_lvl.get()),
+            fm!("{:>9.4}", self.record, LogF64Id::EmaLBD, self.ema_lbd.get() / ave),
+/*
             im!(
                 "{:>9}",
                 self.record,
                 LogUsizeId::Stagnation,
-                self.stats[Stat::Stagnation]
+                self.slack_duration // self.stats[Stat::Stagnation]
             ),
+*/
         );
         println!(
             // "\x1B[2K   Clause DB|#rdc:{}, #sce:{} |blkR:{} |frcK:{} ",
-            "\x1B[2K   Clause DB|#rdc:{}, #sce:{} |eASG:{} |eLBD:{} ",
+            "\x1B[2K   Clause DB|#rdc:{}, #sce:{} |eASG:{} |rASG:{} ",
             im!(
                 "{:>9}",
                 self.record,
@@ -673,12 +702,7 @@ impl StateIF for State {
                 LogF64Id::EmaAsg,
                 self.ema_asg.get() / nv as f64
             ),
-            fm!(
-                "{:>9.4}",
-                self.record,
-                LogF64Id::EmaLBD,
-                self.ema_lbd.get() / ave
-            ),
+            fm!("{:>9.4}", self.record, LogF64Id::EmaAsgR, self.ema_asg.rate()),
         );
         if let Some(m) = mes {
             println!("\x1B[2K    Strategy|mode: {}", m);
@@ -747,8 +771,8 @@ pub enum LogUsizeId {
     Permanent,      //  9: permanent: usize,
     RestartBlock,   // 10: restart_block: usize,
     Restart,        // 11: restart_count: usize,
-    BlockByVA,      // 12: force_restart: usize
-    RestartByVA,    // 13: force_restart: usize
+    VADHigh,        // 12: force_restart: usize
+    VADLow,         // 13: force_restart: usize
     Reduction,      // 14: reduction: usize,
     SatClauseElim,  // 15: simplification: usize,
     ExhaustiveElim, // 16: elimination: usize,
@@ -768,6 +792,10 @@ pub enum LogF64Id {
     CLevel,       //  5: conflict_level: f64,
     RestartThrK,  //  6: restart K
     RestartBlkR,  //  7: restart R
+    AveRST,       //  8: ema of restart length
+    EmaDS,        //  9: ema of deep search length
+    EmaCC,        // 10: ema of conflict clash
+    EmaAsgR,      // 11: ratio of assign EMAs
     End,
 }
 

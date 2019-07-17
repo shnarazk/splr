@@ -310,6 +310,7 @@ fn search(
 ) -> Result<bool, SolverError> {
     let mut conflict_c = 0.0; // for Luby restart
     let mut a_decision_was_made = false;
+    let mut continue_conflicts = 0;
     state.restart_update_luby();
     loop {
         let ci = asgs.propagate(cdb, state, vars);
@@ -318,13 +319,21 @@ fn search(
             if state.num_vars <= asgs.len() + state.num_eliminated_vars {
                 return Ok(true);
             }
-            // DYNAMIC FORCING RESTART
-            if (state.num_vars - state.num_eliminated_vars) / 20 < state.var_activity_updated {
-                state.var_activity_updated = 0;
-                state.va_dist_now = var_activity_dist(vars, state.stats[Stat::Conflict]);
-                // state.development_history.push((state.va_dist_max, n as f64));
+            state.restart_update_asg(asgs.len());
+            if 0 < continue_conflicts {
+                state.ema_conflict_clash.update(f64::from(continue_conflicts));
+                continue_conflicts = 0;
             }
-            if state.force_restart(&mut conflict_c) {
+            // DYNAMIC FORCING RESTART
+            {
+                // let tn_confl = state.stats[Stat::Conflict];
+                // if state.next_restart == tn_confl {
+                //     let ad = vars.activity_sd(tn_confl);
+                //     state.va_dist = 2.0 * ad.1 * state.restart_step as f64;
+                //     // state.development_history.push(ad);
+                // }
+            }
+            if state.restart(asgs.len(), asgs.level(), &mut conflict_c) {
                 asgs.cancel_until(vars, state.root_level);
             } else if asgs.level() == 0 {
                 if cdb.simplify(asgs, elim, state, vars).is_err() {
@@ -343,6 +352,7 @@ fn search(
             }
         } else {
             conflict_c += 1.0;
+            continue_conflicts += 1;
             state.stats[Stat::Conflict] += 1;
             asgs.update_var_heap_index(state.stats[Stat::Conflict]);
             if a_decision_was_made {
@@ -371,9 +381,6 @@ fn handle_conflict_path(
     if tn_confl % 5000 == 0 && state.var_decay < state.var_decay_max {
         state.var_decay += 0.01;
     }
-    state.restart_update_asg(asgs.len());
-    // DYNAMIC BLOCKING RESTART
-    state.block_restart(asgs, tn_confl);
     let bl = analyze(asgs, cdb, state, vars, ci);
     let new_learnt = &mut state.new_learnt;
     asgs.cancel_until(vars, bl.max(state.root_level));
@@ -382,14 +389,20 @@ fn handle_conflict_path(
         // dump to certified even if it's a literal.
         cdb.certificate_add(new_learnt);
         asgs.uncheck_enqueue(vars, new_learnt[0], NULL_CLAUSE);
-        // state.va_dist_max = var_activity_dist(vars);
-        // state.va_dist_min = state.va_dist_max;
-        {
-            let band = (state.va_dist_max - state.va_dist_min) / 16.0;
-            state.va_dist_max -= band;
-            state.va_dist_min += band;
-        }
+        // update restart parameters
+        state.stats[Stat::Restart] += 1;
+        state.ema_restart_len.update(state.after_restart as f64);
+        state.after_restart = 0;
+        state.next_restart = tn_confl + state.restart_step;
+        state.ema_conflict_clash.update(0.0);
+        state.va_dist_ema.update(vars.activity_sd(tn_confl));
     } else {
+        let mut tmp = 0.0;
+        for l in &new_learnt[..] {
+            let v = &mut vars[l.vi()];
+            tmp += v.activity(tn_confl);
+        }
+        state.va_dist_ema.update(1.0 / tmp);
         state.stats[Stat::Learnt] += 1;
         let lbd = vars.compute_lbd(&new_learnt, &mut state.lbd_temp);
         let l0 = new_learnt[0];
@@ -473,22 +486,6 @@ fn adapt_parameters(
         state.flush(&format!("stagnated ({})...", state.slack_duration));
     }
     Ok(())
-}
-
-fn var_activity_dist(vars: &mut [Var], ncnfl: usize) -> f64 {
-    let mut n = 0;
-    let mut t1 = 0.0f64;
-    let mut t2 = 0.0f64;
-    for v in &mut vars[1..] {
-        if 0 < v.level {
-            let a = v.activity(ncnfl);
-            t1 += a;
-            t2 += a.powi(2);
-            n += 1;
-        }
-    }
-    let ave = t1 / n as f64;
-    t2 / n as f64 - ave.powi(2)
 }
 
 fn analyze(

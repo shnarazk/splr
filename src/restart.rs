@@ -1,4 +1,3 @@
-use crate::propagator::AssignStack;
 use crate::state::{Stat, State};
 use crate::traits::*;
 
@@ -30,74 +29,51 @@ impl EmaIF for Ema {
 }
 
 impl RestartIF for State {
-    fn block_restart(&mut self, asgs: &AssignStack, ncnfl: usize) -> bool {
-        let nas = asgs.len();
-        // let _ave = self.sum_asg / ncnfl as f64 * self.num_vars as f64;
-        if !self.use_luby_restart
-            && !self.force_restart_by_stagnation
-            && self.next_restart <= ncnfl
-            && self.restart_blk * self.ema_asg.get() < nas as f64
-        {
-            self.after_restart = 0;
-            self.next_restart = ncnfl + self.restart_step;
-            self.stats[Stat::BlockRestart] += 1;
-            return true;
-        }
-        false
-    }
-    fn force_restart(&mut self, ncnfl: &mut f64) -> bool {
-        let count = self.stats[Stat::Conflict];
-        // if count <= RESET_EMA {
-        //     if count == RESET_EMA {
-        //         self.ema_asg.reset();
-        //         self.ema_lbd.reset();
-        //     }
-        //     return false;
-        // }
-        let ave = self.stats[Stat::SumLBD] as f64 / count as f64;
-        if !self.use_luby_restart
-            && self.next_restart <= count
-            && 0.0 < self.va_dist_now
-        {
-            self.next_restart = count + self.restart_step;
-            if 1.2 * self.va_dist_max < self.va_dist_now {
-                let rate = self.va_dist_now / self.va_dist_max;
-                self.va_dist_max = self.va_dist_now;
-                self.stats[Stat::BlockByVA] += 1;
-                self.stats[Stat::BlockRestart] += 1;
-                // self.force_restart_by_stagnation = true;
-                self.next_restart += rate as usize * self.restart_step;
-                return false;
-            } else if self.va_dist_now < 1.1 * self.va_dist_min {
-                self.va_dist_min = self.va_dist_now;
-                self.stats[Stat::BlockByVA] += 1;
-                self.stats[Stat::BlockRestart] += 1;
-                self.next_restart += (10.0 * (self.va_dist_max / self.va_dist_now)) as usize;
-                return false;
-            }
-            return false;
-        }
-        if (self.use_luby_restart && self.luby_restart_num_conflict <= *ncnfl)
-            || (!self.use_luby_restart
-                && self.next_restart <= count
-                && !self.force_restart_by_stagnation
-                && ave < self.ema_lbd.get() * self.restart_thr)
-            || (self.next_restart <= count && self.force_restart_by_stagnation)
-        {
-            self.stats[Stat::Restart] += 1;
-            self.after_restart = 0;
-            self.next_restart = count + self.restart_step;
-            if self.use_luby_restart {
-                *ncnfl = 0.0;
+    fn restart(&mut self, nasg: usize, dl: usize, cnfl_ratio: &mut f64) -> bool {
+        // Firstly do all tasks for Luby
+        if self.use_luby_restart {
+            if self.luby_restart_num_conflict <= *cnfl_ratio {
+                self.stats[Stat::Restart] += 1;
+                *cnfl_ratio = 0.0;
                 self.luby_current_restarts += 1;
                 self.luby_restart_num_conflict =
                     luby(self.luby_restart_inc, self.luby_current_restarts)
-                        * self.luby_restart_factor;
+                    * self.luby_restart_factor;
+                return true;
             }
-            if self.force_restart_by_stagnation {
-                self.force_restart_by_stagnation = false;
-            }
+            return false;
+        }
+        let ncnfl = self.stats[Stat::Conflict];
+        // NOTE: due to continuous conflicts, 'ncnfl == next_restart' might be skipped.
+        if ncnfl < self.next_restart {
+            return false;
+        }
+        let ave_lbd = self.stats[Stat::SumLBD] as f64 / ncnfl as f64;
+        let _force_cond = ave_lbd < self.ema_lbd.get() * self.restart_thr;
+        let _force_cond_proven_bad = self.va_dist_ema.rate() < 1.0;
+        let force_cond0 = self.c_lvl.get() < 0.7 * self.c_lvl.get_fast();
+        let _block_cond = self.ema_asg.get() < 0.85 * nasg as f64; // self.restart_blk
+        let block_cond0 = self.restart_blk < self.va_dist_ema.rate();
+
+        // FORCING RESTART PATH
+        if force_cond0 && !block_cond0 {
+            self.stats[Stat::Restart] += 1;
+            self.ema_restart_len.update(self.after_restart as f64);
+            self.after_restart = 0;
+            self.next_restart = ncnfl + 2 * self.restart_step;
+            self.ema_conflict_clash.update(0.0);
             return true;
+        }
+        // fine grain BLOCKING RESTART PATH
+        if !force_cond0 && block_cond0
+        {
+            self.next_restart = ncnfl + self.restart_step;
+            if dl < self.b_lvl.get() as usize {
+                self.next_restart += self.restart_step;
+            }
+            self.stats[Stat::BlockRestart] += 1;
+            // self.ema_deep_search.update(self.after_restart as f64);
+            return false;
         }
         false
     }
@@ -142,7 +118,8 @@ fn luby(y: f64, mut x: usize) -> f64 {
 }
 
 /// Exponential Moving Average pair
-struct Ema2 {
+#[derive(Debug)]
+pub struct Ema2 {
     fast: f64,
     slow: f64,
     calf: f64,
@@ -152,18 +129,18 @@ struct Ema2 {
 }
 
 impl EmaIF for Ema2 {
-    fn new(f: usize) -> Ema2 {
+    fn new(s: usize) -> Ema2 {
         Ema2 {
             fast: 0.0,
             slow: 0.0,
             calf: 0.0,
             cals: 0.0,
-            fe: 1.0 / (f as f64),
-            se: 1.0 / (f as f64),
+            fe: 1.0 / (s as f64),
+            se: 1.0 / (s as f64),
         }
     }
     fn get(&self) -> f64 {
-        self.fast / self.calf
+        self.slow / self.cals
     }
     fn update(&mut self, x: f64) {
         self.fast = self.fe * x + (1.0 - self.fe) * self.fast;
@@ -178,13 +155,14 @@ impl EmaIF for Ema2 {
 }
 
 impl Ema2 {
-    #[allow(dead_code)]
-    fn rate(&self) -> f64 {
+    pub fn rate(&self) -> f64 {
         self.fast / self.slow * (self.cals / self.calf)
     }
-    #[allow(dead_code)]
-    fn with_slow(mut self, s: u64) -> Ema2 {
-        self.se = 1.0 / (s as f64);
+    pub fn with_fast(mut self, f: usize) -> Ema2 {
+        self.fe = 1.0 / (f as f64);
         self
+    }
+    fn get_fast(&self) -> f64 {
+        self.fast / self.calf
     }
 }

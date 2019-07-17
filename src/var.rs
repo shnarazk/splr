@@ -90,7 +90,6 @@ impl VarIF for Var {
         // /*
         // CHB modified
         self.last_update = state.stats[Stat::Conflict];
-        state.var_activity_updated += 1;
         // */
     }
 }
@@ -137,6 +136,22 @@ impl VarDBIF for [Var] {
         }
         keys[0] = key;
         cnt
+    }
+    fn activity_sd(&mut self, ncnfl: usize) -> f64 {
+        let mut n = 0;
+        let mut t1 = 0.0f64;
+        // let mut t2 = 0.0f64;
+        for v in &mut self[1..] {
+            if 0 < v.level {
+                let a = v.activity(ncnfl);
+                t1 += a;
+                // t2 += a.powi(2);
+                n += 1;
+            }
+        }
+        let ave = t1 / f64::from(n);
+        // (ave, (t2 / f64::from(n) - ave.powi(2)).sqrt())
+        ave
     }
 }
 

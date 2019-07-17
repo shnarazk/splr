@@ -209,10 +209,8 @@ pub trait PropagatorIF {
 
 /// API for restart like `block_restart`, `force_restart` and so on.
 pub trait RestartIF {
-    /// block restart if needed.
-    fn block_restart(&mut self, asgs: &AssignStack, ncnfl: usize) -> bool;
-    /// force restart if needed.
-    fn force_restart(&mut self, ncnfl: &mut f64) -> bool;
+    /// check restart condition
+    fn restart(&mut self, nasg: usize, dl: usize, ncnfl: &mut f64) -> bool;
     /// update data for forcing restart.
     fn restart_update_lbd(&mut self, lbd: usize);
     /// update data for blocking restart.
@@ -287,6 +285,7 @@ pub trait VarDBIF {
     fn satisfies(&self, c: &[Lit]) -> bool;
     /// return a LBD value for the set of literals.
     fn compute_lbd(&self, vec: &[Lit], keys: &mut [usize]) -> usize;
+    fn activity_sd(&mut self, ncnfl: usize) -> f64;
 }
 
 /// API for 'watcher list' like `attach`, `detach`, `detach_with` and so on.
