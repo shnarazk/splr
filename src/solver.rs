@@ -310,7 +310,7 @@ fn search(
 ) -> Result<bool, SolverError> {
     let mut conflict_c = 0.0; // for Luby restart
     let mut a_decision_was_made = false;
-    let mut continue_conflicts = 0;
+    let mut continuous_conflicts = 0;
     state.restart_update_luby();
     loop {
         let ci = asgs.propagate(cdb, state, vars);
@@ -320,9 +320,9 @@ fn search(
                 return Ok(true);
             }
             state.restart_update_asg(asgs.len());
-            if 0 < continue_conflicts {
-                state.ema_conflict_clash.update(f64::from(continue_conflicts));
-                continue_conflicts = 0;
+            if 0 < continuous_conflicts {
+                state.ema_conflict_clash.update(f64::from(continuous_conflicts));
+                continuous_conflicts = 0;
             }
             // DYNAMIC FORCING RESTART
             {
@@ -352,7 +352,7 @@ fn search(
             }
         } else {
             conflict_c += 1.0;
-            continue_conflicts += 1;
+            continuous_conflicts += 1;
             state.stats[Stat::Conflict] += 1;
             asgs.update_var_heap_index(state.stats[Stat::Conflict]);
             if a_decision_was_made {
@@ -365,6 +365,10 @@ fn search(
                 return Ok(false);
             }
             handle_conflict_path(asgs, cdb, elim, state, vars, ci)?;
+            if asgs.level() == 0 {
+                state.ema_conflict_clash.update(f64::from(continuous_conflicts));
+                continuous_conflicts = 0;
+            }
         }
     }
 }
@@ -394,15 +398,13 @@ fn handle_conflict_path(
         state.ema_restart_len.update(state.after_restart as f64);
         state.after_restart = 0;
         state.next_restart = tn_confl + state.restart_step;
-        state.ema_conflict_clash.update(0.0);
-        state.va_dist_ema.update(vars.activity_sd(tn_confl));
     } else {
         let mut tmp = 0.0;
         for l in &new_learnt[..] {
             let v = &mut vars[l.vi()];
-            tmp += v.activity(tn_confl);
+            tmp += 1.0 / v.activity(tn_confl);
         }
-        state.va_dist_ema.update(1.0 / tmp);
+        state.va_dist_ema.update(1.0 / tmp); // bigger is better
         state.stats[Stat::Learnt] += 1;
         let lbd = vars.compute_lbd(&new_learnt, &mut state.lbd_temp);
         let l0 = new_learnt[0];
@@ -532,14 +534,13 @@ fn analyze(
             // println!("- handle {}", cid.fmt());
             for q in &(*c).lits[((p != NULL_LIT) as usize)..] {
                 let vi = q.vi();
-                vars[vi].bump_activity(state, dl);
-                asgs.update_order(vars, vi);
                 let v = &mut vars[vi];
                 let lvl = v.level;
                 debug_assert!(!v.is(Flag::ELIMINATED));
                 debug_assert!(v.assign != BOTTOM);
                 if 0 < lvl && !state.an_seen[vi] {
                     state.an_seen[vi] = true;
+                    v.bump_activity(state, dl);
                     if dl <= lvl {
                         // println!("- flag for {} which level is {}", q.int(), lvl);
                         path_cnt += 1;

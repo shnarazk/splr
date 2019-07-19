@@ -32,7 +32,7 @@ pub struct Config {
     #[structopt(long = "rb", default_value = "1.25")]
     pub restart_blocking: f64, // Glucose's R
     /// #conflicts between restarts
-    #[structopt(long = "rs", default_value = "5")]
+    #[structopt(long = "rs", default_value = "50")]
     pub restart_step: usize,
     /// a DIMACS format CNF file
     #[structopt(parse(from_os_str))]

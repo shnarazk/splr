@@ -48,13 +48,16 @@ impl RestartIF for State {
         if ncnfl < self.next_restart {
             return false;
         }
-        let ave_lbd = self.stats[Stat::SumLBD] as f64 / ncnfl as f64;
-        let _force_cond = ave_lbd < self.ema_lbd.get() * self.restart_thr;
-        let _force_cond_proven_bad = self.va_dist_ema.rate() < 1.0;
-        let force_cond0 = self.c_lvl.get() < 0.7 * self.c_lvl.get_fast();
-        let _block_cond = self.ema_asg.get() < 0.85 * nasg as f64; // self.restart_blk
-        let block_cond0 = self.restart_blk < self.va_dist_ema.rate();
-
+        // let ave_lbd = self.stats[Stat::SumLBD] as f64 / ncnfl as f64;
+        // let _force_cond = ave_lbd < self.ema_lbd.get() * self.restart_thr;
+        // let _force_cond_proven_bad = self.va_dist_ema.rate() < 1.0;
+        // let force_cond0_proven_good = self.c_lvl.get() < 0.7 * self.c_lvl.get_fast();
+        // let force_cond0 = self.va_dist_ema.rate() < self.restart_thr; // bigger is better
+        let force_cond0 = self.va_dist_ema.rate() < self.restart_thr * self.ema_asg.rate();
+        // let block_cond0 = self.ema_asg.rate() < 0.85 * nasg as f64; // self.restart_blk
+        let block_cond0 = self.restart_blk * self.ema_asg.get() < nasg as f64;
+        // let block_cond0 = self.restart_blk < self.va_dist_ema.rate();
+        // let block_cond0 = self.restart_blk * self.ema_asg.rate() < self.va_dist_ema.rate();
         // FORCING RESTART PATH
         if force_cond0 && !block_cond0 {
             self.stats[Stat::Restart] += 1;
@@ -67,13 +70,20 @@ impl RestartIF for State {
         // fine grain BLOCKING RESTART PATH
         if !force_cond0 && block_cond0
         {
-            self.next_restart = ncnfl + self.restart_step;
+            if 1.0 < self.va_dist_ema.rate() {
+                self.next_restart = ncnfl + 4 * self.restart_step;
+            } else {
+                self.next_restart = ncnfl + self.restart_step;
+            }
             if dl < self.b_lvl.get() as usize {
                 self.next_restart += self.restart_step;
             }
             self.stats[Stat::BlockRestart] += 1;
             // self.ema_deep_search.update(self.after_restart as f64);
             return false;
+        }
+        if block_cond0 {
+            self.next_restart = ncnfl + 1; // for ema_asg
         }
         false
     }
@@ -162,6 +172,7 @@ impl Ema2 {
         self.fe = 1.0 / (f as f64);
         self
     }
+    #[allow(dead_code)]
     fn get_fast(&self) -> f64 {
         self.fast / self.calf
     }

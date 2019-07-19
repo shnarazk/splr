@@ -342,7 +342,7 @@ impl Default for State {
             stagnated: false,
             force_restart_by_stagnation: false,
             va_dist: 0.0,
-            va_dist_ema: Ema2::new(1_000).with_fast(10),
+            va_dist_ema: Ema2::new(5_000).with_fast(10),
             ema_coeffs: (2 ^ 5, 2 ^ 15),
             use_elim: true,
             elim_eliminate_combination_limit: 80,
@@ -413,6 +413,7 @@ impl StateIF for State {
         state.restart_step = config.restart_step;
         state.use_deep_search_mode = true;
         state.progress_log = config.use_log;
+        state.va_dist_ema = Ema2::new(10_000).with_fast(state.restart_step);
         state.use_elim = !config.without_elim;
         state.ema_asg = Ema2::new(config.restart_asg_len).with_fast(state.restart_step / 2);
         state.ema_lbd = Ema::new(config.restart_lbd_len);
@@ -601,7 +602,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K     Restart|#RST:{}, #ext:{}, leng:{}, vasd:{} ",
+            "\x1B[2K     Restart|#RST:{}, #ext:{}, leng:{}, rSVA:{} ",
             im!(
                 "{:>9}",
                 self.record,
