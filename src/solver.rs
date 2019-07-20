@@ -518,8 +518,6 @@ fn analyze(
             // println!("- handle {}", cid.fmt());
             for q in &(*c).lits[((p != NULL_LIT) as usize)..] {
                 let vi = q.vi();
-                vars[vi].bump_activity(ncnfl);
-                asgs.update_order(vars, vi);
                 let v = &mut vars[vi];
                 let lvl = v.level;
                 debug_assert!(!v.is(Flag::ELIMINATED));
@@ -537,6 +535,9 @@ fn analyze(
                         // println!("- push {} to learnt, which level is {}", q.int(), lvl);
                         state.new_learnt.push(*q);
                     }
+                    v.bump_activity(ncnfl);
+                    // Don't remove the below. This is very useful.
+                    asgs.update_order(vars, vi);
                 } else {
                     // if !state.an_seen[vi] {
                     //     println!("- ignore {} because it was flagged", q.int());
