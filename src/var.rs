@@ -1,10 +1,9 @@
 use crate::clause::Clause;
-use crate::state::{Stat, State};
 use crate::traits::*;
 use crate::types::*;
 use std::fmt;
 
-const VAR_ACTIVITY_DECAY: f64 = 0.95;
+const VAR_ACTIVITY_DECAY: f64 = 0.99;
 
 /// Structure for variables.
 #[derive(Debug)]
@@ -25,10 +24,8 @@ pub struct Var {
     /// list of clauses which contain this variable negatively.
     pub neg_occurs: Vec<ClauseId>,
     flags: Flag,
-    /// PLRC
-    pub num_used: usize,
-    pub num_learned: usize,
-    pub last_update: usize,
+    /// for EMA-based activity
+    last_used: usize,
 }
 
 /// is the dummy var index.
@@ -47,9 +44,7 @@ impl VarIF for Var {
             pos_occurs: Vec::new(),
             neg_occurs: Vec::new(),
             flags: Flag::empty(),
-            num_used: 0,
-            num_learned: 0,
-            last_update: 0,
+            last_used: 0,
         }
     }
     fn new_vars(n: usize) -> Vec<Var> {
@@ -61,38 +56,17 @@ impl VarIF for Var {
         }
         vec
     }
-    fn activity(&mut self, nconfl: usize) -> f64 {
-        /*
-        // EVSIDS modified
-        let diff = present - self.last_update;
+    fn activity(&mut self, ncnfl: usize) -> f64 {
+        let diff = ncnfl - self.last_used;
         if 0 < diff {
-            self.last_update = present;
             self.reward *= VAR_ACTIVITY_DECAY.powi(diff as i32);
+            self.last_used = ncnfl;
         }
-        */
-        // /*
-        // CHB modified
-        let diff = self.num_used;
-        if 0 < diff {
-            let diff = nconfl - self.last_update;
-            self.reward =
-                1.0 / (diff + 1) as f64 + self.reward * VAR_ACTIVITY_DECAY.powi(diff as i32);
-            self.num_used = 0;
-        }
-        // */
         self.reward
     }
-    fn bump_activity(&mut self, state: &mut State, _dl: usize) {
-        /*
-        // EVSIDS modified
-        let diff = state.stats[Stat::Conflict] - self.last_update;
-        self.reward =
-            0.2 + 1.0 / (dl + 1) as f64 + self.reward * VAR_ACTIVITY_DECAY.powi(diff as i32);
-        */
-        // /*
-        // CHB modified
-        self.last_update = state.stats[Stat::Conflict];
-        // */
+    fn bump_activity(&mut self, ncnfl: usize) {
+        self.activity(ncnfl);
+        self.reward += 1.0 - VAR_ACTIVITY_DECAY;
     }
 }
 

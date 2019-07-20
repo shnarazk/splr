@@ -318,8 +318,8 @@ fn search(
             if state.num_vars <= asgs.len() + state.num_eliminated_vars {
                 return Ok(true);
             }
-            // DYNAMIC FORCING RESTART
-            if state.force_restart(&mut conflict_c) {
+            // THE UNIFIED DYNAMIC RESTART CONTROL POINT
+            if state.restart(asgs, &mut conflict_c) {
                 asgs.cancel_until(vars, state.root_level);
             } else if asgs.level() == 0 {
                 if cdb.simplify(asgs, elim, state, vars).is_err() {
@@ -331,7 +331,6 @@ fn search(
             if !asgs.remains() {
                 let vi = asgs.select_var(vars);
                 let p = vars[vi].phase;
-                // vars[vi].num_used += 1;
                 asgs.uncheck_assume(vars, Lit::from_var(vi, p));
                 state.stats[Stat::Decision] += 1;
                 a_decision_was_made = true;
@@ -367,8 +366,6 @@ fn handle_conflict_path(
         state.var_decay += 0.01;
     }
     state.restart_update_asg(asgs.len());
-    // DYNAMIC BLOCKING RESTART
-    state.block_restart(asgs, tn_confl);
     let bl = analyze(asgs, cdb, state, vars, ci);
     let new_learnt = &mut state.new_learnt;
     asgs.cancel_until(vars, bl.max(state.root_level));
@@ -426,11 +423,8 @@ fn adapt_parameters(
     let switch = 100_000;
     if !state.use_luby_restart && switch <= nconflict {
         let stopped = state.stats[Stat::SolvedRecord] == state.num_solved_vars;
-        // && state.record.vali[LogUsizeId::Binclause] == state.stats[Stat::NumBinLearnt]
         if stopped {
             state.slack_duration += 1;
-        // } else if 0 < state.slack_duration && state.stagnated {
-        //     state.slack_duration = 0;
         } else {
             state.slack_duration = 0;
         }
@@ -447,54 +441,11 @@ fn adapt_parameters(
         state.stagnated = stagnated;
     }
     state.stats[Stat::SolvedRecord] = state.num_solved_vars;
-    if !state.use_luby_restart && state.adaptive_restart
-    /* && !state.stagnated */
-    {
-        let moving: f64 = 0.03;
-        let margin: f64 = 0.20;
-        let too_few: usize = 4;
-        let too_many: usize = 400;
-        // restart_threshold
-        let nr = state.stats[Stat::Restart] - state.stats[Stat::RestartRecord];
+    if !state.use_luby_restart && state.adaptive_restart {
+        // let nr = state.stats[Stat::Restart] - state.stats[Stat::RestartRecord];
         state.stats[Stat::RestartRecord] = state.stats[Stat::Restart];
-        let nb = state.stats[Stat::BlockRestart] - state.stats[Stat::BlockRestartRecord];
+        // let nb = state.stats[Stat::BlockRestart] - state.stats[Stat::BlockRestartRecord];
         state.stats[Stat::BlockRestartRecord] = state.stats[Stat::BlockRestart];
-        let br_ratio = (state.stats[Stat::BlockRestart] as f64 + 1.0)
-            / (state.stats[Stat::Restart] as f64 + 1.0);
-        // if nr == 0 {                         // this is very important.
-        //     state.force_restart_by_stagnation = true; // link with 'else'
-        // }
-        if (state.stagnated && br_ratio < 0.2) || br_ratio < 0.1 {
-            if state.config.restart_threshold - margin < state.restart_thr {
-                state.restart_thr -= moving;
-            }
-            if state.restart_blk < state.config.restart_blocking + margin {
-                state.restart_blk += moving;
-            }
-        } else if (state.stagnated && 16.0 < br_ratio) || 32.0 < br_ratio {
-            if state.restart_thr < state.config.restart_blocking + margin {
-                state.restart_thr += moving;
-            }
-            if state.config.restart_blocking - margin < state.restart_blk {
-                state.restart_blk -= moving;
-            }
-        }
-        /*
-        {
-            // dumping restart_forcing
-            if state.restart_thr < state.config.restart_threshold + margin && nr < too_few {
-                state.restart_thr += moving;
-            } else if state.config.restart_threshold - margin < state.restart_thr && too_many < nr {
-                state.restart_thr -= moving;
-            }
-            // dumping restart_blocking
-            if state.restart_blk < state.config.restart_blocking + margin && nb < too_few {
-                state.restart_blk += moving;
-            } else if state.config.restart_blocking - margin < state.restart_blk && too_many < nb {
-                state.restart_blk -= moving;
-            }
-        }
-         */
     }
     if nconflict == switch {
         state.flush("activating an exhaustive eliminator...");
@@ -531,6 +482,7 @@ fn analyze(
 ) -> usize {
     state.new_learnt.clear();
     state.new_learnt.push(0);
+    let ncnfl = state.stats[Stat::Conflict];
     let dl = asgs.level();
     let mut cid = confl;
     let mut p = NULL_LIT;
@@ -566,7 +518,7 @@ fn analyze(
             // println!("- handle {}", cid.fmt());
             for q in &(*c).lits[((p != NULL_LIT) as usize)..] {
                 let vi = q.vi();
-                vars[vi].bump_activity(state, dl);
+                vars[vi].bump_activity(ncnfl);
                 asgs.update_order(vars, vi);
                 let v = &mut vars[vi];
                 let lvl = v.level;
@@ -650,7 +602,7 @@ fn simplify_learnt(
     // while let Some(l) = state.last_dl.pop() {
     //     let vi = l.vi();
     //     if cdb.clause[vars[vi].reason as usize].rank < lbd {
-    //         vars[vi].bump_activity(state, dl);
+    //         vars[vi].bump_activity(ncnfl);
     //         asgs.update_order(vars, vi);
     //     }
     // }

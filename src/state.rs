@@ -176,7 +176,6 @@ pub struct State {
     pub luby_restart_factor: f64,
     pub use_deep_search_mode: bool,
     pub stagnated: bool,
-    pub force_restart_by_stagnation: bool,
     /// Eliminator
     pub use_elim: bool,
     /// 0 for no limit
@@ -202,6 +201,7 @@ pub struct State {
     pub stats: [usize; Stat::EndOfStatIndex as usize], // statistics
     pub ema_asg: Ema,
     pub ema_lbd: Ema,
+    pub ema_restart_len: Ema,
     pub b_lvl: Ema,
     pub c_lvl: Ema,
     pub sum_asg: f64,
@@ -332,7 +332,6 @@ impl Default for State {
             luby_restart_factor: 100.0,
             use_deep_search_mode: true,
             stagnated: false,
-            force_restart_by_stagnation: false,
             ema_coeffs: (2 ^ 5, 2 ^ 15),
             use_elim: true,
             elim_eliminate_combination_limit: 80,
@@ -352,6 +351,7 @@ impl Default for State {
             stats: [0; Stat::EndOfStatIndex as usize],
             ema_asg: Ema::new(1),
             ema_lbd: Ema::new(1),
+            ema_restart_len: Ema::new(5_000),
             b_lvl: Ema::new(5_000),
             c_lvl: Ema::new(5_000),
             sum_asg: 0.0,
@@ -587,7 +587,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K     Restart|#BLK:{}, #RST:{}, eASG:{}, eLBD:{} ",
+            "\x1B[2K     Restart|#BLK:{}, #RST:{}, alen:{}, ----: -------- ",
             im!(
                 "{:>9}",
                 self.record,
@@ -600,18 +600,7 @@ impl StateIF for State {
                 LogUsizeId::Restart,
                 self.stats[Stat::Restart]
             ),
-            fm!(
-                "{:>9.4}",
-                self.record,
-                LogF64Id::EmaAsg,
-                self.ema_asg.get() / nv as f64
-            ),
-            fm!(
-                "{:>9.4}",
-                self.record,
-                LogF64Id::EmaLBD,
-                self.ema_lbd.get() / ave
-            ),
+            fm!("{:>9.4}", self.record, LogF64Id::EmaRestart, self.ema_restart_len.get()),
         );
         println!(
             "\x1B[2K    Conflict|aLBD:{}, bjmp:{}, cnfl:{} |#stg:{} ",
@@ -626,7 +615,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K   Clause DB|#rdc:{}, #sce:{} |blkR:{}, frcK:{} ",
+            "\x1B[2K   Clause DB|#rdc:{}, #sce:{} |eASG:{}, eLBD:{} ",
             im!(
                 "{:>9}",
                 self.record,
@@ -639,18 +628,8 @@ impl StateIF for State {
                 LogUsizeId::SatClauseElim,
                 self.stats[Stat::SatClauseElimination]
             ),
-            fm!(
-                "{:>9.4}",
-                self.record,
-                LogF64Id::RestartBlkR,
-                self.restart_blk
-            ),
-            fm!(
-                "{:>9.4}",
-                self.record,
-                LogF64Id::RestartThrK,
-                self.restart_thr
-            ),
+            fm!("{:>9.4}", self.record, LogF64Id::EmaAsg, self.ema_asg.get() / nv as f64),
+            fm!("{:>9.4}", self.record, LogF64Id::EmaLBD, self.ema_lbd.get() / ave),
         );
         if let Some(m) = mes {
             println!("\x1B[2K    Strategy|mode: {}", m);
@@ -738,6 +717,7 @@ pub enum LogF64Id {
     CLevel,       //  5: conflict_level: f64,
     RestartThrK,  //  6: restart K
     RestartBlkR,  //  7: restart R
+    EmaRestart,   //  8: average effective restart step
     End,
 }
 

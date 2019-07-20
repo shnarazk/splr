@@ -209,10 +209,8 @@ pub trait PropagatorIF {
 
 /// API for restart like `block_restart`, `force_restart` and so on.
 pub trait RestartIF {
-    /// block restart if needed.
-    fn block_restart(&mut self, asgs: &AssignStack, ncnfl: usize) -> bool;
-    /// force restart if needed.
-    fn force_restart(&mut self, ncnfl: &mut f64) -> bool;
+    /// check restart conditions
+    fn restart(&mut self, asgs: &AssignStack, luby_count: &mut f64) -> bool;
     /// update data for forcing restart.
     fn restart_update_lbd(&mut self, lbd: usize);
     /// update data for blocking restart.
@@ -274,7 +272,7 @@ pub trait VarIF {
     fn new_vars(n: usize) -> Vec<Var>;
     /// return current activity
     fn activity(&mut self, present: usize) -> f64;
-    fn bump_activity(&mut self, state: &mut State, dl: usize);
+    fn bump_activity(&mut self, ncnfl: usize);
 }
 
 /// API for var DB like `assigned`, `locked`, `compute_lbd` and so on.
