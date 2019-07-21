@@ -66,7 +66,7 @@ impl VarIF for Var {
             self.reward *= VAR_ACTIVITY_DECAY.powi(diff as i32);
             self.last_used = ncnfl;
         }
-        self.reward
+        self.reward + (self.inconsistent + self.uip) as f64
     }
     fn bump_activity(&mut self, ncnfl: usize) {
         self.activity(ncnfl);
