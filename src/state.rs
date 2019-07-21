@@ -219,6 +219,7 @@ pub struct State {
     pub progress_cnt: usize,
     pub progress_log: bool,
     pub target: CNFDescription,
+    pub development_history: Vec<(usize, f64, f64, f64, f64)>,
 }
 
 macro_rules! im {
@@ -369,6 +370,7 @@ impl Default for State {
             progress_log: false,
             record: ProgressRecord::default(),
             target: CNFDescription::default(),
+            development_history: Vec::new(),
         }
     }
 }

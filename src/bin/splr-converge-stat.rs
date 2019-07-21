@@ -45,6 +45,20 @@ fn main() {
         }
         Err(e) => println!("Failed to execution by {:?}.", e),
     }
+    if let Ok(f) = File::create("dist.csv") {
+        let mut buf = BufWriter::new(f);
+        buf.write_all("#conflicts, conf vars, multi conf vars, 1st UIPS, multi 1st UIPS\n".as_bytes()).unwrap();
+        for (c, i, mi, u, mu) in s.state.development_history.iter() {
+            buf.write_all(format!("{:>7},{:>8.5},{:>8.5},{:>8.5},{:>8.5}\n",
+                                  c,
+                                  i,
+                                  mi,
+                                  u,
+                                  mu)
+                          .as_bytes())
+                .unwrap();
+        }
+    }
 }
 
 #[allow(dead_code)]

@@ -26,6 +26,8 @@ pub struct Var {
     flags: Flag,
     /// for EMA-based activity
     last_used: usize,
+    pub inconsistent: usize,
+    pub uip: usize,
 }
 
 /// is the dummy var index.
@@ -45,6 +47,8 @@ impl VarIF for Var {
             neg_occurs: Vec::new(),
             flags: Flag::empty(),
             last_used: 0,
+            inconsistent: 0,
+            uip: 0,
         }
     }
     fn new_vars(n: usize) -> Vec<Var> {

@@ -378,6 +378,7 @@ fn handle_conflict_path(
         state.stats[Stat::Learnt] += 1;
         let lbd = vars.compute_lbd(&new_learnt, &mut state.lbd_temp);
         let l0 = new_learnt[0];
+        vars[l0.vi()].uip += 1;
         let cid = cdb.attach(state, vars, lbd);
         elim.add_cid_occur(vars, cid, &mut cdb.clause[cid as usize], true);
         state.c_lvl.update(bl as f64);
@@ -392,6 +393,36 @@ fn handle_conflict_path(
         asgs.uncheck_enqueue(vars, l0, cid);
         state.restart_update_lbd(lbd);
         state.stats[Stat::SumLBD] += lbd;
+    }
+    // convergence stat
+    if tn_confl % 1_000 == 0 {
+        let ncnfl = state.stats[Stat::Conflict];
+        let alive = state.num_vars;
+        let mut incn = 0;
+        let mut minc = 0;
+        let mut fuip = 0;
+        let mut mfui = 0;
+        for v in &vars[..] {
+            if 0 < v.inconsistent {
+                incn += 1;
+                if 1 < v.inconsistent {
+                    minc += 1;
+                }
+            }
+            if 0 < v.uip {
+                fuip += 1;
+                if 1 < v.uip {
+                    mfui += 1;
+                }
+            }
+        }
+        state.development_history
+            .push((ncnfl,
+                   (incn as f64 / alive as f64).log(10.0),
+                   (minc as f64 / alive as f64).log(10.0),
+                   (fuip as f64 / alive as f64).log(10.0),
+                   (mfui as f64 / alive as f64).log(10.0),
+            ));
     }
     if tn_confl % 10_000 == 0 {
         adapt_parameters(asgs, cdb, elim, state, vars, tn_confl)?;
