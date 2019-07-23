@@ -399,6 +399,7 @@ fn handle_conflict_path(
     }
     // convergence stat
     if tn_confl % 1_000 == 0 {
+        /*
         let ncnfl = state.stats[Stat::Conflict];
         let alive = state.num_vars;
         let mut incn = 0;
@@ -431,9 +432,11 @@ fn handle_conflict_path(
         }
         assert_eq!(incn, state.inconsistent_sum);
         assert_eq!(fuip, state.uip_sum);
+        */
         let diff = state.uip_sum - state.stats[Stat::NumUipRecord];
         state.ema_uip_inc.update(diff as f64);
         state.stats[Stat::NumUipRecord] = state.uip_sum;
+        /*
         state.development_history
             .push((ncnfl,
                    (state.inconsistent_sum as f64 / alive as f64),
@@ -443,6 +446,7 @@ fn handle_conflict_path(
                    (mfui as f64 / alive as f64),
                    (unoi as f64 / alive as f64),
             ));
+        */
     }
     if tn_confl % 10_000 == 0 {
         adapt_parameters(asgs, cdb, elim, state, vars, tn_confl)?;
@@ -509,9 +513,9 @@ fn adapt_parameters(
         }
     }
     state.progress(cdb, vars, None);
-    if state.stagnated {
-        state.flush(&format!("stagnated ({})...", state.slack_duration));
-    }
+    // if state.stagnated {
+    //     state.flush(&format!("stagnated ({})...", state.slack_duration));
+    // }
     if state.use_deep_search_mode {
         if state.stagnated {
             let bonus = 20_000;
@@ -522,7 +526,7 @@ fn adapt_parameters(
         }
     }
     if state.ema_uip_inc.get() < 20.0 && 10_000 < state.uip_sum && !state.bonding_mode {
-        state.flush(&format!("switching to bonding mode..."));
+        state.flush(&"switching to bonding mode...".to_string());
         // to simplify Var::activity, we add bonus to their reward here.
         for v in &mut vars[..] {
             // v.reward = (v.uip + v.inconsistent) as f64;

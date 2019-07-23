@@ -67,7 +67,7 @@ impl VarIF for Var {
             self.last_used = ncnfl;
         }
         if self.is(Flag::BONDING_MODE) {
-            ((self.inconsistent + self.uip) as f64).sqrt()
+            (self.inconsistent + self.uip) as f64
         } else {
             self.reward
         }

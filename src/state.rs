@@ -598,9 +598,8 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K     Restart|#BLK:{}, #RST:{}, alen:{}, ----:--------- ",
-            im!(
-                "{:>9}",
+            "\x1B[2K     Restart|#BLK:{}, #RST:{}, alen:{}, core:{} ",
+            im!("{:>9}",
                 self.record,
                 LogUsizeId::RestartBlock,
                 self.stats[Stat::BlockRestart]
@@ -612,6 +611,7 @@ impl StateIF for State {
                 self.stats[Stat::Restart]
             ),
             fm!("{:>9.2}", self.record, LogF64Id::EmaRestart, self.ema_restart_len.get()),
+            im!("{:>9}", self.record, LogUsizeId::UIPSum, self.uip_sum),
         );
         println!(
             "\x1B[2K    Conflict|aLBD:{}, bjmp:{}, cnfl:{}  core:{} ",
@@ -708,6 +708,7 @@ pub enum LogUsizeId {
     SatClauseElim,  // 13: simplification: usize,
     ExhaustiveElim, // 14: elimination: usize,
     Stagnation,     // 15: stagnation: usize,
+    UIPSum,         // 16: uip_sum: usize,
     // ElimClauseQueue, // 16: elim_clause_queue: usize,
     // ElimVarQueue, // 17: elim_var_queue: usize,
     End,
