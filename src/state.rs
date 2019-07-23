@@ -117,6 +117,7 @@ pub enum Stat {
     NumBinLearnt,          // the number of binary learnt clauses
     NumLBD2,               // the number of clauses which LBD is 2
     Stagnation,            // the number of stagnation
+    NumUipRecord,          // diff of the number of first UIP vars
     EndOfStatIndex,        // Don't use this dummy.
 }
 
@@ -176,6 +177,7 @@ pub struct State {
     pub luby_restart_factor: f64,
     pub use_deep_search_mode: bool,
     pub stagnated: bool,
+    pub bonding_mode: bool,
     /// Eliminator
     pub use_elim: bool,
     /// 0 for no limit
@@ -202,6 +204,9 @@ pub struct State {
     pub ema_asg: Ema,
     pub ema_lbd: Ema,
     pub ema_restart_len: Ema,
+    pub uip_sum: usize,
+    pub inconsistent_sum: usize,
+    pub ema_uip_inc: Ema,
     pub b_lvl: Ema,
     pub c_lvl: Ema,
     pub sum_asg: f64,
@@ -219,7 +224,7 @@ pub struct State {
     pub progress_cnt: usize,
     pub progress_log: bool,
     pub target: CNFDescription,
-    pub development_history: Vec<(usize, f64, f64, f64, f64)>,
+    pub development_history: Vec<(usize, f64, f64, f64, f64, f64, f64)>,
 }
 
 macro_rules! im {
@@ -333,6 +338,7 @@ impl Default for State {
             luby_restart_factor: 100.0,
             use_deep_search_mode: true,
             stagnated: false,
+            bonding_mode: false,
             ema_coeffs: (2 ^ 5, 2 ^ 15),
             use_elim: true,
             elim_eliminate_combination_limit: 80,
@@ -353,6 +359,9 @@ impl Default for State {
             ema_asg: Ema::new(1),
             ema_lbd: Ema::new(1),
             ema_restart_len: Ema::new(5_000),
+            uip_sum: 0,
+            inconsistent_sum: 0,
+            ema_uip_inc: Ema::new(100),
             b_lvl: Ema::new(5_000),
             c_lvl: Ema::new(5_000),
             sum_asg: 0.0,
@@ -589,7 +598,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K     Restart|#BLK:{}, #RST:{}, alen:{}, ----: -------- ",
+            "\x1B[2K     Restart|#BLK:{}, #RST:{}, alen:{}, ----:--------- ",
             im!(
                 "{:>9}",
                 self.record,
@@ -602,19 +611,14 @@ impl StateIF for State {
                 LogUsizeId::Restart,
                 self.stats[Stat::Restart]
             ),
-            fm!("{:>9.4}", self.record, LogF64Id::EmaRestart, self.ema_restart_len.get()),
+            fm!("{:>9.2}", self.record, LogF64Id::EmaRestart, self.ema_restart_len.get()),
         );
         println!(
-            "\x1B[2K    Conflict|aLBD:{}, bjmp:{}, cnfl:{} |#stg:{} ",
+            "\x1B[2K    Conflict|aLBD:{}, bjmp:{}, cnfl:{}  core:{} ",
             fm!("{:>9.2}", self.record, LogF64Id::AveLBD, self.ema_lbd.get()),
             fm!("{:>9.2}", self.record, LogF64Id::BLevel, self.b_lvl.get()),
             fm!("{:>9.2}", self.record, LogF64Id::CLevel, self.c_lvl.get()),
-            im!(
-                "{:>9}",
-                self.record,
-                LogUsizeId::Stagnation,
-                self.stats[Stat::Stagnation]
-            ),
+            fm!("{:>9.2}", self.record, LogF64Id::EmaUIPInc, self.ema_uip_inc.get()),
         );
         println!(
             "\x1B[2K   Clause DB|#rdc:{}, #sce:{} |eASG:{}, eLBD:{} ",
@@ -720,6 +724,7 @@ pub enum LogF64Id {
     RestartThrK,  //  6: restart K
     RestartBlkR,  //  7: restart R
     EmaRestart,   //  8: average effective restart step
+    EmaUIPInc,    //  9: increasing speed of the number of first UIP vars
     End,
 }
 

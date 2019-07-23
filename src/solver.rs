@@ -378,6 +378,9 @@ fn handle_conflict_path(
         state.stats[Stat::Learnt] += 1;
         let lbd = vars.compute_lbd(&new_learnt, &mut state.lbd_temp);
         let l0 = new_learnt[0];
+        if vars[l0.vi()].uip == 0 {
+            state.uip_sum += 1;
+        }
         vars[l0.vi()].uip += 1;
         let cid = cdb.attach(state, vars, lbd);
         elim.add_cid_occur(vars, cid, &mut cdb.clause[cid as usize], true);
@@ -399,14 +402,21 @@ fn handle_conflict_path(
         let ncnfl = state.stats[Stat::Conflict];
         let alive = state.num_vars;
         let mut incn = 0;
-        let mut minc = 0;
         let mut fuip = 0;
+        let mut minc = 0;
         let mut mfui = 0;
+        let mut inou = 0;
+        let mut unoi = 0;
         for v in &vars[..] {
-            if 0 < v.inconsistent {
+            if 0 == v.inconsistent && 0 == v.uip {
+                // done nothing
+            } else if 0 < v.inconsistent {
                 incn += 1;
                 if 1 < v.inconsistent {
                     minc += 1;
+                }
+                if 0 == v.uip {
+                    inou += 1;
                 }
             }
             if 0 < v.uip {
@@ -414,14 +424,24 @@ fn handle_conflict_path(
                 if 1 < v.uip {
                     mfui += 1;
                 }
+                if 0 == v.inconsistent {
+                    unoi += 1;
+                }
             }
         }
+        assert_eq!(incn, state.inconsistent_sum);
+        assert_eq!(fuip, state.uip_sum);
+        let diff = state.uip_sum - state.stats[Stat::NumUipRecord];
+        state.ema_uip_inc.update(diff as f64);
+        state.stats[Stat::NumUipRecord] = state.uip_sum;
         state.development_history
             .push((ncnfl,
-                   (incn as f64 / alive as f64).log(10.0),
-                   (minc as f64 / alive as f64).log(10.0),
-                   (fuip as f64 / alive as f64).log(10.0),
-                   (mfui as f64 / alive as f64).log(10.0),
+                   (state.inconsistent_sum as f64 / alive as f64),
+                   (minc as f64 / alive as f64),
+                   (inou as f64 / alive as f64),
+                   (state.uip_sum as f64 / alive as f64),
+                   (mfui as f64 / alive as f64),
+                   (unoi as f64 / alive as f64),
             ));
     }
     if tn_confl % 10_000 == 0 {
@@ -500,6 +520,16 @@ fn adapt_parameters(
         } else if !state.stagnated && 0 < state.stats[Stat::Stagnation] {
             state.restart_step = 1000;
         }
+    }
+    if state.ema_uip_inc.get() < 20.0 && 10_000 < state.uip_sum && !state.bonding_mode {
+        state.flush(&format!("switching to bonding mode..."));
+        // to simplify Var::activity, we add bonus to their reward here.
+        for v in &mut vars[..] {
+            // v.reward = (v.uip + v.inconsistent) as f64;
+            // v.last_used = nconflict;
+            v.turn_on(Flag::BONDING_MODE);
+        }
+        state.bonding_mode = true;
     }
     Ok(())
 }

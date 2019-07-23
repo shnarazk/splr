@@ -25,7 +25,7 @@ pub struct Var {
     pub neg_occurs: Vec<ClauseId>,
     flags: Flag,
     /// for EMA-based activity
-    last_used: usize,
+    pub last_used: usize,
     pub inconsistent: usize,
     pub uip: usize,
 }
@@ -66,7 +66,11 @@ impl VarIF for Var {
             self.reward *= VAR_ACTIVITY_DECAY.powi(diff as i32);
             self.last_used = ncnfl;
         }
-        self.reward + (self.inconsistent + self.uip) as f64
+        if self.is(Flag::BONDING_MODE) {
+            ((self.inconsistent + self.uip) as f64).sqrt()
+        } else {
+            self.reward
+        }
     }
     fn bump_activity(&mut self, ncnfl: usize) {
         self.activity(ncnfl);

@@ -118,6 +118,9 @@ impl PropagatorIF for AssignStack {
                             match blocker_value {
                                 FALSE => {
                                     self.catchup();
+                                    if vars[false_lit.vi()].inconsistent == 0 {
+                                        state.inconsistent_sum += 1;
+                                    }
                                     vars[false_lit.vi()].inconsistent += 1;
                                     return w.c;
                                 }
@@ -157,6 +160,9 @@ impl PropagatorIF for AssignStack {
                         }
                         if first_value == FALSE {
                             let n = lits.len();
+                            if vars[false_lit.vi()].inconsistent == 0 {
+                                state.inconsistent_sum += 1;
+                            }
                             vars[false_lit.vi()].inconsistent += 1;
                             if !state.config.with_learnt_minimization {
                                 self.catchup();
