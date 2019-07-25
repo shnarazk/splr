@@ -273,6 +273,7 @@ pub trait VarIF {
     /// return current activity
     fn activity(&mut self, present: usize) -> f64;
     fn bump_activity(&mut self, ncnfl: usize);
+    fn bump_clash_activity(&mut self) -> usize;
 }
 
 /// API for var DB like `assigned`, `locked`, `compute_lbd` and so on.

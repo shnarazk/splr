@@ -35,7 +35,7 @@ impl RestartIF for State {
         let ncnfl = self.stats[Stat::Conflict];
         let nas = asgs.len();
         // first, handle Luby path
-        if self.use_luby_restart {
+        if self.use_luby_restart || self.bonding_mode {
             if self.luby_restart_num_conflict <= *luby_count {
                 self.stats[Stat::Restart] += 1;
                 self.ema_restart_len.update(self.after_restart as f64);

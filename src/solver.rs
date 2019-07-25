@@ -378,10 +378,7 @@ fn handle_conflict_path(
         state.stats[Stat::Learnt] += 1;
         let lbd = vars.compute_lbd(&new_learnt, &mut state.lbd_temp);
         let l0 = new_learnt[0];
-        if vars[l0.vi()].uip == 0 {
-            state.uip_sum += 1;
-        }
-        vars[l0.vi()].uip += 1;
+        state.num_cp += vars[l0.vi()].bump_clash_activity();
         let cid = cdb.attach(state, vars, lbd);
         elim.add_cid_occur(vars, cid, &mut cdb.clause[cid as usize], true);
         state.c_lvl.update(bl as f64);
@@ -433,9 +430,9 @@ fn handle_conflict_path(
         assert_eq!(incn, state.inconsistent_sum);
         assert_eq!(fuip, state.uip_sum);
         */
-        let diff = state.uip_sum - state.stats[Stat::NumUipRecord];
-        state.ema_uip_inc.update(diff as f64);
-        state.stats[Stat::NumUipRecord] = state.uip_sum;
+        let diff = state.num_cp - state.stats[Stat::NumCPRecord];
+        state.ema_cp_inc.update(diff as f64 / 1000.0);
+        state.stats[Stat::NumCPRecord] = state.num_cp;
         /*
         state.development_history
             .push((ncnfl,
@@ -507,7 +504,7 @@ fn adapt_parameters(
         asgs.cancel_until(vars, 0);
         state.adapt_strategy(cdb);
         if state.use_elim {
-            cdb.reset(state.co_lbd_bound);
+            // cdb.reset(state.co_lbd_bound);
             elim.activate();
             cdb.simplify(asgs, elim, state, vars)?;
         }
@@ -525,15 +522,27 @@ fn adapt_parameters(
             state.restart_step = 1000;
         }
     }
-    if state.ema_uip_inc.get() < 20.0 && 10_000 < state.uip_sum && !state.bonding_mode {
-        state.flush(&"switching to bonding mode...".to_string());
-        // to simplify Var::activity, we add bonus to their reward here.
-        for v in &mut vars[..] {
-            // v.reward = (v.uip + v.inconsistent) as f64;
-            // v.last_used = nconflict;
-            v.turn_on(Flag::BONDING_MODE);
+    if 4 < state.slack_duration {
+        if !state.bonding_mode
+            && state.ema_cp_inc.get() < 0.2
+            && 2 * state.num_cp < state.num_vars - state.num_eliminated_vars
+        {
+            state.flush(&"switching to bonding mode...".to_string());
+            // to simplify Var::activity, we add bonus to their reward here.
+            for v in &mut vars[..] {
+                v.turn_on(Flag::BONDING_MODE);
+            }
+            state.bonding_mode = true;
+        } else if state.bonding_mode
+            // && 0.25 < state.ema_cp_inc.get()
+            && state.num_vars - state.num_eliminated_vars < 2 * state.num_cp
+        {
+            state.flush(&"revert from bonding mode...".to_string());
+            for v in &mut vars[..] {
+                v.turn_off(Flag::BONDING_MODE);
+            }
+            state.bonding_mode = false;
         }
-        state.bonding_mode = true;
     }
     Ok(())
 }

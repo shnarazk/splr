@@ -25,9 +25,8 @@ pub struct Var {
     pub neg_occurs: Vec<ClauseId>,
     flags: Flag,
     /// for EMA-based activity
-    pub last_used: usize,
-    pub inconsistent: usize,
-    pub uip: usize,
+    last_used: usize,
+    cp_count: usize,
 }
 
 /// is the dummy var index.
@@ -47,8 +46,7 @@ impl VarIF for Var {
             neg_occurs: Vec::new(),
             flags: Flag::empty(),
             last_used: 0,
-            inconsistent: 0,
-            uip: 0,
+            cp_count: 0,
         }
     }
     fn new_vars(n: usize) -> Vec<Var> {
@@ -61,20 +59,28 @@ impl VarIF for Var {
         vec
     }
     fn activity(&mut self, ncnfl: usize) -> f64 {
-        let diff = ncnfl - self.last_used;
-        if 0 < diff {
-            self.reward *= VAR_ACTIVITY_DECAY.powi(diff as i32);
-            self.last_used = ncnfl;
-        }
         if self.is(Flag::BONDING_MODE) {
-            (self.inconsistent + self.uip) as f64
+            // this mode does not need decaying
+            self.cp_count as f64
         } else {
+            let diff = ncnfl - self.last_used;
+            if 0 < diff {
+                self.reward *= VAR_ACTIVITY_DECAY.powi(diff as i32);
+                self.last_used = ncnfl;
+            }
             self.reward
         }
     }
     fn bump_activity(&mut self, ncnfl: usize) {
-        self.activity(ncnfl);
-        self.reward += 1.0 - VAR_ACTIVITY_DECAY;
+        if !self.is(Flag::BONDING_MODE) {
+            self.activity(ncnfl);
+            self.reward += 1.0 - VAR_ACTIVITY_DECAY;
+        }
+    }
+    fn bump_clash_activity(&mut self) -> usize {
+        let new = (self.cp_count == 0) as usize;
+        self.cp_count += 1;
+        new
     }
 }
 

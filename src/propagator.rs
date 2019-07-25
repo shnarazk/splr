@@ -116,10 +116,7 @@ impl PropagatorIF for AssignStack {
                             match blocker_value {
                                 FALSE => {
                                     self.catchup();
-                                    if vars[false_lit.vi()].inconsistent == 0 {
-                                        state.inconsistent_sum += 1;
-                                    }
-                                    vars[false_lit.vi()].inconsistent += 1;
+                                    state.num_cp += vars[false_lit.vi()].bump_clash_activity();
                                     return w.c;
                                 }
                                 _ => {
@@ -157,10 +154,7 @@ impl PropagatorIF for AssignStack {
                             }
                         }
                         if first_value == FALSE {
-                            if vars[false_lit.vi()].inconsistent == 0 {
-                                state.inconsistent_sum += 1;
-                            }
-                            vars[false_lit.vi()].inconsistent += 1;
+                            state.num_cp += vars[false_lit.vi()].bump_clash_activity();
                             self.catchup();
                             return w.c;
                         } else {
