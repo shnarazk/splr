@@ -3,7 +3,7 @@ use crate::propagator::AssignStack;
 use crate::state::{Stat, State};
 use crate::traits::*;
 use crate::types::*;
-use crate::var::Var;
+use crate::var::VarDB;
 use std::cmp::Ordering;
 use std::fmt;
 
@@ -322,8 +322,8 @@ impl ClauseDBIF for ClauseDB {
         self.num_active += 1;
         cid
     }
-    fn reset_lbd(&mut self, vars: &[Var], temp: &mut [usize]) {
-        let mut key = temp[0];
+    fn reset_lbd(&mut self, vdb: &mut VarDB) {
+        let mut key = vdb.lbd_temp[0];
         for c in &mut self.clause[1..] {
             if c.is(Flag::DEAD) || c.is(Flag::LEARNT) {
                 continue;
@@ -331,15 +331,15 @@ impl ClauseDBIF for ClauseDB {
             key += 1;
             let mut cnt = 0;
             for l in &c.lits {
-                let lv = vars[l.vi()].level;
-                if temp[lv] != key && lv != 0 {
-                    temp[lv] = key;
+                let lv = vdb.vars[l.vi()].level;
+                if vdb.lbd_temp[lv] != key && lv != 0 {
+                    vdb.lbd_temp[lv] = key;
                     cnt += 1;
                 }
             }
             c.rank = cnt;
         }
-        temp[0] = key + 1;
+        vdb.lbd_temp[0] = key + 1;
     }
     fn bump_activity(&mut self, inc: &mut f64, cid: ClauseId) {
         let c = &mut self.clause[cid as usize];
@@ -369,7 +369,7 @@ impl ClauseDBIF for ClauseDB {
             .count()
     }
     // Note: set lbd to 0 if you want to add the clause to Permanent.
-    fn attach(&mut self, state: &mut State, vars: &mut [Var], lbd: usize) -> ClauseId {
+    fn attach(&mut self, state: &mut State, vdb: &mut VarDB, lbd: usize) -> ClauseId {
         let v = &mut state.new_learnt;
         if !self.certified.is_empty() {
             let temp = v.iter().map(|l| l.to_i32()).collect::<Vec<i32>>();
@@ -381,8 +381,8 @@ impl ClauseDBIF for ClauseDB {
         // seek a literal with max level
         for (i, l) in v.iter().enumerate() {
             let vi = l.vi();
-            let lv = vars[vi].level;
-            if vars[vi].assign != BOTTOM && lv_max < lv {
+            let lv = vdb.vars[vi].level;
+            if vdb.vars[vi].assign != BOTTOM && lv_max < lv {
                 i_max = i;
                 lv_max = lv;
             }
@@ -400,8 +400,8 @@ impl ClauseDBIF for ClauseDB {
         debug_assert!(1 < c.lits.len());
         c.kill(&mut self.touched);
     }
-    fn reduce(&mut self, state: &mut State, vars: &mut [Var]) {
-        self.reset_lbd(vars, &mut state.lbd_temp);
+    fn reduce(&mut self, state: &mut State, vdb: &mut VarDB) {
+        self.reset_lbd(vdb);
         let ClauseDB {
             ref mut clause,
             ref mut touched,
@@ -410,7 +410,7 @@ impl ClauseDBIF for ClauseDB {
         state.next_reduction += state.cdb_inc;
         let mut perm = Vec::with_capacity(clause.len());
         for (i, b) in clause.iter().enumerate().skip(1) {
-            if b.is(Flag::LEARNT) && !b.is(Flag::DEAD) && !vars.locked(b, i as ClauseId) {
+            if b.is(Flag::LEARNT) && !b.is(Flag::DEAD) && !vdb.locked(b, i as ClauseId) {
                 perm.push(i);
             }
         }
@@ -446,21 +446,21 @@ impl ClauseDBIF for ClauseDB {
         asgs: &mut AssignStack,
         elim: &mut Eliminator,
         state: &mut State,
-        vars: &mut [Var],
+        vdb: &mut VarDB,
     ) -> MaybeInconsistent {
         debug_assert_eq!(asgs.level(), 0);
         // we can reset all the reasons because decision level is zero.
-        for v in &mut vars[1..] {
+        for v in &mut vdb.vars[1..] {
             v.reason = NULL_CLAUSE;
         }
         if elim.is_waiting() {
             self.reset(state.co_lbd_bound);
-            elim.prepare(self, vars, true);
+            elim.prepare(self, vdb, true);
         }
         loop {
             let na = asgs.len();
-            elim.eliminate(asgs, self, state, vars)?;
-            self.eliminate_satisfied_clauses(elim, vars, true);
+            elim.eliminate(asgs, self, state, vdb)?;
+            self.eliminate_satisfied_clauses(elim, vdb, true);
             if na == asgs.len()
                 && (!elim.is_running()
                     || (0 == elim.clause_queue_len() && 0 == elim.var_queue_len()))
@@ -472,8 +472,8 @@ impl ClauseDBIF for ClauseDB {
         state.stats[Stat::SatClauseElimination] += 1;
         if elim.is_running() {
             state.stats[Stat::ExhaustiveElimination] += 1;
-            self.reset_lbd(vars, &mut state.lbd_temp);
-            elim.stop(self, vars);
+            self.reset_lbd(vdb);
+            elim.stop(self, vdb);
         }
         if self.check_size(state).is_err() {
             Err(SolverError::Inconsistent)
@@ -505,20 +505,20 @@ impl ClauseDBIF for ClauseDB {
     fn eliminate_satisfied_clauses(
         &mut self,
         elim: &mut Eliminator,
-        vars: &mut [Var],
+        vdb: &mut VarDB,
         update_occur: bool,
     ) {
         for (cid, c) in &mut self.clause.iter_mut().enumerate().skip(1) {
-            if !c.is(Flag::DEAD) && vars.satisfies(&c.lits) {
+            if !c.is(Flag::DEAD) && vdb.satisfies(&c.lits) {
                 c.kill(&mut self.touched);
                 if elim.is_running() {
                     if update_occur {
-                        elim.remove_cid_occur(vars, cid as ClauseId, c);
+                        elim.remove_cid_occur(vdb, cid as ClauseId, c);
                     }
                     for l in &c.lits {
-                        let v = &mut vars[l.vi()];
+                        let v = &mut vdb.vars[l.vi()];
                         if !v.is(Flag::ELIMINATED) {
-                            elim.enqueue_var(vars, l.vi(), true);
+                            elim.enqueue_var(vdb, l.vi(), true);
                         }
                     }
                 }

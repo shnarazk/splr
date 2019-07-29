@@ -187,7 +187,7 @@ bitflags! {
         const ELIMINATED   = 0b0000_0000_0010_0000;
         /// mark to run garbage collector on the corresponding watcher lists
         const TOUCHED      = 0b0000_0000_0100_0000;
-        /// search bonding mode only for vars
-        const BONDING_MODE = 0b0000_0000_1000_0000;
+        /// a variable was conflict or used as a first UID
+        const POLAR_VAR    = 0b0000_0000_1000_0000;
     }
 }

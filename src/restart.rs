@@ -1,6 +1,7 @@
 use crate::propagator::AssignStack;
 use crate::state::{Stat, State};
 use crate::traits::*;
+use crate::var::VarDB;
 
 // const RESET_EMA: usize = 400;
 
@@ -31,11 +32,13 @@ impl EmaIF for Ema {
 
 impl RestartIF for State {
     /// return true to forcing restart. Otherwise false.
-    fn restart(&mut self, asgs: &AssignStack, luby_count: &mut f64) -> bool {
+    fn restart(&mut self, asgs: &AssignStack, _vdb: &mut VarDB, luby_count: &mut f64) -> bool {
         let ncnfl = self.stats[Stat::Conflict];
         let nas = asgs.len();
+        // polar parameters
+        let _epsilon = 0.05;
         // first, handle Luby path
-        if self.use_luby_restart || self.bonding_mode {
+        if self.use_luby_restart {
             if self.luby_restart_num_conflict <= *luby_count {
                 self.stats[Stat::Restart] += 1;
                 self.ema_restart_len.update(self.after_restart as f64);
@@ -44,28 +47,27 @@ impl RestartIF for State {
                 self.luby_current_restarts += 1;
                 self.luby_restart_num_conflict =
                     luby(self.luby_restart_inc, self.luby_current_restarts)
-                    * self.luby_restart_factor;
+                        * self.luby_restart_factor;
                 return true;
             }
             return false;
         }
-        // check blocking condition
-        if self.restart_step <= self.after_restart
-            && self.restart_blk * self.ema_asg.get() < nas as f64
-        {
-            self.after_restart = 0;
-            self.stats[Stat::BlockRestart] += 1;
-            return true;
+        if self.after_restart < self.restart_step {
+            return false;
         }
-        // check invorking condition
+        // check invoking condition
         let ave = self.stats[Stat::SumLBD] as f64 / ncnfl as f64;
-        if self.restart_step <= self.after_restart
-            && ave < self.ema_lbd.get() * self.restart_thr
-        {
+        if ave < self.ema_lbd.get() * self.restart_thr {
             self.stats[Stat::Restart] += 1;
             self.ema_restart_len.update(self.after_restart as f64);
             self.after_restart = 0;
             return true;
+        }
+        // check blocking condition
+        if self.restart_blk * self.ema_asg.get() < nas as f64 {
+            self.after_restart = 0;
+            self.stats[Stat::BlockRestart] += 1;
+            return false;
         }
         false
     }
@@ -110,7 +112,8 @@ fn luby(y: f64, mut x: usize) -> f64 {
 }
 
 /// Exponential Moving Average pair
-struct Ema2 {
+#[derive(Debug)]
+pub struct Ema2 {
     fast: f64,
     slow: f64,
     calf: f64,
@@ -120,18 +123,18 @@ struct Ema2 {
 }
 
 impl EmaIF for Ema2 {
-    fn new(f: usize) -> Ema2 {
+    fn new(s: usize) -> Ema2 {
         Ema2 {
             fast: 0.0,
             slow: 0.0,
             calf: 0.0,
             cals: 0.0,
-            fe: 1.0 / (f as f64),
-            se: 1.0 / (f as f64),
+            fe: 1.0 / (s as f64),
+            se: 1.0 / (s as f64),
         }
     }
     fn get(&self) -> f64 {
-        self.fast / self.calf
+        self.slow / self.cals
     }
     fn update(&mut self, x: f64) {
         self.fast = self.fe * x + (1.0 - self.fe) * self.fast;
@@ -140,19 +143,20 @@ impl EmaIF for Ema2 {
         self.cals = self.se + (1.0 - self.se) * self.cals;
     }
     fn reset(&mut self) {
-        self.slow = self.fast;
-        self.cals = self.calf;
+        self.fast = self.slow;
+        self.calf = self.cals;
     }
 }
 
 impl Ema2 {
-    #[allow(dead_code)]
-    fn rate(&self) -> f64 {
+    pub fn get_fast(&self) -> f64 {
+        self.fast / self.calf
+    }
+    pub fn rate(&self) -> f64 {
         self.fast / self.slow * (self.cals / self.calf)
     }
-    #[allow(dead_code)]
-    fn with_slow(mut self, s: u64) -> Ema2 {
-        self.se = 1.0 / (s as f64);
+    pub fn with_fast(mut self, f: u64) -> Self {
+        self.fe = 1.0 / (f as f64);
         self
     }
 }

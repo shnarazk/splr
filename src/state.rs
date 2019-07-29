@@ -4,7 +4,7 @@ use crate::eliminator::Eliminator;
 use crate::restart::Ema;
 use crate::traits::*;
 use crate::types::*;
-use crate::var::Var;
+use crate::var::VarDB;
 use libc::{clock_gettime, timespec, CLOCK_PROCESS_CPUTIME_ID};
 use std::cmp::Ordering;
 use std::fmt;
@@ -118,6 +118,7 @@ pub enum Stat {
     NumLBD2,               // the number of clauses which LBD is 2
     Stagnation,            // the number of stagnation
     NumCPRecord,           // diff of the number of clash pairs
+    PolarRestart,          // the number of restart by polarization
     EndOfStatIndex,        // Don't use this dummy.
 }
 
@@ -177,7 +178,9 @@ pub struct State {
     pub luby_restart_factor: f64,
     pub use_deep_search_mode: bool,
     pub stagnated: bool,
-    pub bonding_mode: bool,
+    /// POLARIZATION
+    pub num_polar_vars: usize,
+    pub ema_pv_inc: Ema,
     /// Eliminator
     pub use_elim: bool,
     /// 0 for no limit
@@ -204,8 +207,6 @@ pub struct State {
     pub ema_asg: Ema,
     pub ema_lbd: Ema,
     pub ema_restart_len: Ema,
-    pub num_cp: usize,
-    pub ema_cp_inc: Ema,
     pub b_lvl: Ema,
     pub c_lvl: Ema,
     pub sum_asg: f64,
@@ -215,7 +216,6 @@ pub struct State {
     pub conflicts: Vec<Lit>,
     pub new_learnt: Vec<Lit>,
     pub an_seen: Vec<bool>,
-    pub lbd_temp: Vec<usize>,
     pub last_dl: Vec<Lit>,
     pub start: SystemTime,
     pub record: ProgressRecord,
@@ -323,6 +323,7 @@ impl Default for State {
             cdb_inc: 300,
             cdb_inc_extra: 1000,
             cdb_soft_limit: 0, // 248_000_000
+            ema_coeffs: (2 ^ 5, 2 ^ 15),
             adaptive_restart: false,
             restart_thr: 0.60,     // will be overwritten by bin/splr
             restart_blk: 1.40,     // will be overwritten by bin/splr
@@ -337,8 +338,8 @@ impl Default for State {
             luby_restart_factor: 100.0,
             use_deep_search_mode: true,
             stagnated: false,
-            bonding_mode: false,
-            ema_coeffs: (2 ^ 5, 2 ^ 15),
+            num_polar_vars: 0,
+            ema_pv_inc: Ema::new(75),
             use_elim: true,
             elim_eliminate_combination_limit: 80,
             elim_eliminate_grow_limit: 0, // 64
@@ -358,8 +359,6 @@ impl Default for State {
             ema_asg: Ema::new(1),
             ema_lbd: Ema::new(1),
             ema_restart_len: Ema::new(5_000),
-            num_cp: 0,
-            ema_cp_inc: Ema::new(100),
             b_lvl: Ema::new(5_000),
             c_lvl: Ema::new(5_000),
             sum_asg: 0.0,
@@ -369,7 +368,6 @@ impl Default for State {
             conflicts: Vec::new(),
             new_learnt: Vec::new(),
             an_seen: Vec::new(),
-            lbd_temp: Vec::new(),
             last_dl: Vec::new(),
             start: SystemTime::now(),
             use_progress: true,
@@ -413,7 +411,6 @@ impl StateIF for State {
         state.ema_lbd = Ema::new(config.restart_lbd_len);
         state.model = vec![BOTTOM; cnf.num_of_variables + 1];
         state.an_seen = vec![false; cnf.num_of_variables + 1];
-        state.lbd_temp = vec![0; cnf.num_of_variables + 1];
         state.target = cnf;
         state.time_limit = config.timeout;
         state.config = config.clone();
@@ -509,6 +506,7 @@ impl StateIF for State {
         println!("                                                  ");
         println!("                                                  ");
         println!("                                                  ");
+        println!("                                                  ");
     }
     fn flush(&self, mes: &str) {
         if self.use_progress && !self.progress_log {
@@ -519,19 +517,19 @@ impl StateIF for State {
     }
     /// `mes` should be shorter than or equal to 9, or 8 + a delimiter.
     #[allow(clippy::cognitive_complexity)]
-    fn progress(&mut self, cdb: &ClauseDB, vars: &[Var], mes: Option<&str>) {
+    fn progress(&mut self, cdb: &ClauseDB, vdb: &VarDB, mes: Option<&str>) {
         if !self.use_progress {
             return;
         }
         if self.progress_log {
-            self.dump(cdb, vars);
+            self.dump(cdb, vdb);
             return;
         }
-        let nv = vars.len() - 1;
+        let nv = vdb.vars.len() - 1;
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
         self.progress_cnt += 1;
-        print!("\x1B[8A\x1B[1G");
+        print!("\x1B[9A\x1B[1G");
         let count = self.stats[Stat::Conflict];
         let ave = self.stats[Stat::SumLBD] as f64 / count as f64;
         println!("\x1B[2K{}", self);
@@ -596,8 +594,9 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K     Restart|#BLK:{}, #RST:{}, aLen:{}, #pol:{} ",
-            im!("{:>9}",
+            "\x1B[2K     Restart|#BLK:{}, #RST:{}, aLen:{}, ____: ------- ",
+            im!(
+                "{:>9}",
                 self.record,
                 LogUsizeId::RestartBlock,
                 self.stats[Stat::BlockRestart]
@@ -608,16 +607,18 @@ impl StateIF for State {
                 LogUsizeId::Restart,
                 self.stats[Stat::Restart]
             ),
-            fm!("{:>9.2}", self.record, LogF64Id::EmaRestart, self.ema_restart_len.get()),
-            // im!("{:>9}", self.record, LogUsizeId::UIPSum, self.uip_sum),
-            im!("{:>9.2}", self.record, LogUsizeId::NumCP, self.num_cp),
+            fm!(
+                "{:>9.2}",
+                self.record,
+                LogF64Id::EmaRestart,
+                self.ema_restart_len.get()
+            ),
         );
         println!(
-            "\x1B[2K    Conflict|aLBD:{}, bjmp:{}, cnfl:{}  pol+:{} ",
+            "\x1B[2K    Conflict|aLBD:{}, bjmp:{}, cnfl:{}  ____:          ",
             fm!("{:>9.2}", self.record, LogF64Id::AveLBD, self.ema_lbd.get()),
             fm!("{:>9.2}", self.record, LogF64Id::BLevel, self.b_lvl.get()),
             fm!("{:>9.2}", self.record, LogF64Id::CLevel, self.c_lvl.get()),
-            fm!("{:>9.4}", self.record, LogF64Id::EmaCPInc, self.ema_cp_inc.get()),
         );
         println!(
             "\x1B[2K   Clause DB|#rdc:{}, #sce:{} |eASG:{}, eLBD:{} ",
@@ -633,8 +634,40 @@ impl StateIF for State {
                 LogUsizeId::SatClauseElim,
                 self.stats[Stat::SatClauseElimination]
             ),
-            fm!("{:>9.4}", self.record, LogF64Id::EmaAsg, self.ema_asg.get() / nv as f64),
-            fm!("{:>9.4}", self.record, LogF64Id::EmaLBD, self.ema_lbd.get() / ave),
+            fm!(
+                "{:>9.4}",
+                self.record,
+                LogF64Id::EmaAsg,
+                self.ema_asg.get() / nv as f64
+            ),
+            fm!(
+                "{:>9.4}",
+                self.record,
+                LogF64Id::EmaLBD,
+                self.ema_lbd.get() / ave
+            ),
+        );
+        println!(
+            "\x1B[2KPolarization|#pol:{}, pol%:{}, rate:{}, vdcy:{} ",
+            im!(
+                "{:>9.2}",
+                self.record,
+                LogUsizeId::NumPV,
+                self.num_polar_vars
+            ),
+            fm!(
+                "{:>9.4}",
+                self.record,
+                LogF64Id::PVRatio,
+                (100 * self.num_polar_vars) as f64 / nv as f64
+            ),
+            fm!(
+                "{:>9.2}",
+                self.record,
+                LogF64Id::EmaPVInc,
+                self.ema_pv_inc.get()
+            ),
+            format!("{:>9.4}", vdb.activity_decay),
         );
         if let Some(m) = mes {
             println!("\x1B[2K    Strategy|mode: {}", m);
@@ -707,9 +740,9 @@ pub enum LogUsizeId {
     SatClauseElim,  // 13: simplification: usize,
     ExhaustiveElim, // 14: elimination: usize,
     Stagnation,     // 15: stagnation: usize,
-    NumCP,          // 16: the number of clash pair vars
-    // ElimClauseQueue, // 17: elim_clause_queue: usize,
-    // ElimVarQueue, // 18: elim_var_queue: usize,
+    NumPV,          // 16: the number of Polar vars
+    // ElimClauseQueue, // __: elim_clause_queue: usize,
+    // ElimVarQueue, // __: elim_var_queue: usize,
     End,
 }
 
@@ -724,7 +757,8 @@ pub enum LogF64Id {
     RestartThrK,  //  6: restart K
     RestartBlkR,  //  7: restart R
     EmaRestart,   //  8: average effective restart step
-    EmaCPInc,     //  9: increasing speed of the number of clash pair vars
+    EmaPVInc,     //  9: increasing speed of the number of polar vars
+    PVRatio,      // 10: the percentage of polar vars
     End,
 }
 
@@ -741,6 +775,34 @@ impl Default for ProgressRecord {
             vali: [0; LogUsizeId::End as usize],
             valf: [0.0; LogF64Id::End as usize],
         }
+    }
+}
+
+impl Index<LogUsizeId> for ProgressRecord {
+    type Output = usize;
+    fn index(&self, i: LogUsizeId) -> &usize {
+        &self.vali[i as usize]
+    }
+}
+
+impl Index<LogUsizeId> for [usize] {
+    type Output = usize;
+    fn index(&self, i: LogUsizeId) -> &usize {
+        &self[i as usize]
+    }
+}
+
+impl Index<LogF64Id> for ProgressRecord {
+    type Output = f64;
+    fn index(&self, i: LogF64Id) -> &f64 {
+        &self.valf[i as usize]
+    }
+}
+
+impl Index<LogF64Id> for [f64] {
+    type Output = f64;
+    fn index(&self, i: LogF64Id) -> &f64 {
+        &self[i as usize]
     }
 }
 
@@ -765,9 +827,9 @@ impl State {
              c ========================================================================================================="
         );
     }
-    fn dump(&mut self, cdb: &ClauseDB, vars: &[Var]) {
+    fn dump(&mut self, cdb: &ClauseDB, vdb: &VarDB) {
         self.progress_cnt += 1;
-        let nv = vars.len() - 1;
+        let nv = vdb.vars.len() - 1;
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
         let nlearnts = cdb.countf(Flag::LEARNT);
@@ -789,13 +851,13 @@ impl State {
         );
     }
     #[allow(dead_code)]
-    fn dump_details(&mut self, cdb: &ClauseDB, elim: &Eliminator, vars: &[Var], mes: Option<&str>) {
+    fn dump_details(&mut self, cdb: &ClauseDB, elim: &Eliminator, vdb: &VarDB, mes: Option<&str>) {
         self.progress_cnt += 1;
         let msg = match mes {
             None => self.strategy.to_str(),
             Some(x) => x,
         };
-        let nv = vars.len() - 1;
+        let nv = vdb.vars.len() - 1;
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
         println!(

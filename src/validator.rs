@@ -11,7 +11,7 @@ impl ValidatorIF for Solver {
             let l = Lit::from_int(*val);
             let vi = l.vi();
             self.asgs
-                .enqueue(&mut self.vars, vi, l.lbool(), NULL_CLAUSE, 0)?;
+                .enqueue(&mut self.vdb, vi, l.lbool(), NULL_CLAUSE, 0)?;
         }
         Ok(())
     }
@@ -19,7 +19,7 @@ impl ValidatorIF for Solver {
     /// Otherwise returns a clause which is not satisfiable under a given assignment.
     fn validate(&self) -> Option<Vec<i32>> {
         for ch in &self.cdb.clause[1..] {
-            if !self.vars.satisfies(&ch.lits) {
+            if !self.vdb.satisfies(&ch.lits) {
                 let mut v = Vec::new();
                 for l in &ch.lits {
                     v.push(l.to_i32());

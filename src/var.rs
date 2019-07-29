@@ -3,7 +3,7 @@ use crate::traits::*;
 use crate::types::*;
 use std::fmt;
 
-const VAR_ACTIVITY_DECAY: f64 = 0.99;
+const VAR_ACTIVITY_DECAY: f64 = 0.92;
 
 /// Structure for variables.
 #[derive(Debug)]
@@ -25,8 +25,8 @@ pub struct Var {
     pub neg_occurs: Vec<ClauseId>,
     flags: Flag,
     /// for EMA-based activity
-    last_used: usize,
-    cp_count: usize,
+    pub last_used: usize,
+    pub polar_count: usize,
 }
 
 /// is the dummy var index.
@@ -46,7 +46,7 @@ impl VarIF for Var {
             neg_occurs: Vec::new(),
             flags: Flag::empty(),
             last_used: 0,
-            cp_count: 0,
+            polar_count: 0,
         }
     }
     fn new_vars(n: usize) -> Vec<Var> {
@@ -57,30 +57,6 @@ impl VarIF for Var {
             vec.push(v);
         }
         vec
-    }
-    fn activity(&mut self, ncnfl: usize) -> f64 {
-        if self.is(Flag::BONDING_MODE) {
-            // this mode does not need decaying
-            self.cp_count as f64
-        } else {
-            let diff = ncnfl - self.last_used;
-            if 0 < diff {
-                self.reward *= VAR_ACTIVITY_DECAY.powi(diff as i32);
-                self.last_used = ncnfl;
-            }
-            self.reward
-        }
-    }
-    fn bump_activity(&mut self, ncnfl: usize) {
-        if !self.is(Flag::BONDING_MODE) {
-            self.activity(ncnfl);
-            self.reward += 1.0 - VAR_ACTIVITY_DECAY;
-        }
-    }
-    fn bump_clash_activity(&mut self) -> usize {
-        let new = (self.cp_count == 0) as usize;
-        self.cp_count += 1;
-        new
     }
 }
 
@@ -96,15 +72,35 @@ impl FlagIF for Var {
     }
 }
 
-impl VarDBIF for [Var] {
+/// Structure for variables.
+#[derive(Debug)]
+pub struct VarDB {
+    /// vars
+    pub vars: Vec<Var>,
+    /// the current conflict number
+    pub current_conflict: usize,
+    /// var activity decay
+    pub activity_decay: f64,
+    pub lbd_temp: Vec<usize>,
+}
+
+impl VarDBIF for VarDB {
+    fn new(n: usize) -> Self {
+        VarDB {
+            vars: Var::new_vars(n),
+            current_conflict: 0,
+            activity_decay: VAR_ACTIVITY_DECAY,
+            lbd_temp: vec![0; n + 1],
+        }
+    }
     fn assigned(&self, l: Lit) -> Lbool {
-        unsafe { self.get_unchecked(l.vi()).assign ^ ((l & 1) as u8) }
+        unsafe { self.vars.get_unchecked(l.vi()).assign ^ ((l & 1) as u8) }
     }
     fn locked(&self, c: &Clause, cid: ClauseId) -> bool {
         let lits = &c.lits;
         debug_assert!(1 < lits.len());
         let l0 = lits[0];
-        self.assigned(l0) == TRUE && self[l0.vi()].reason == cid
+        self.assigned(l0) == TRUE && self.vars[l0.vi()].reason == cid
     }
     fn satisfies(&self, vec: &[Lit]) -> bool {
         for l in vec {
@@ -114,18 +110,42 @@ impl VarDBIF for [Var] {
         }
         false
     }
-    fn compute_lbd(&self, vec: &[Lit], keys: &mut [usize]) -> usize {
-        let key = keys[0] + 1;
+    fn compute_lbd(&mut self, vec: &[Lit]) -> usize {
+        let key = self.lbd_temp[0] + 1;
         let mut cnt = 0;
         for l in vec {
-            let lv = self[l.vi()].level;
-            if keys[lv] != key {
-                keys[lv] = key;
+            let lv = self.vars[l.vi()].level;
+            if self.lbd_temp[lv] != key {
+                self.lbd_temp[lv] = key;
                 cnt += 1;
             }
         }
-        keys[0] = key;
+        self.lbd_temp[0] = key;
         cnt
+    }
+    fn activity(&mut self, vi: VarId) -> f64 {
+        let v = &mut self.vars[vi];
+        if self.current_conflict != v.last_used {
+            let diff = self.current_conflict - v.last_used;
+            let decay = self.activity_decay;
+            v.last_used = self.current_conflict;
+            v.reward *= decay.powi(diff as i32);
+        }
+        v.reward
+    }
+    fn bump_activity(&mut self, vi: VarId) {
+        self.activity(vi);
+        self.vars[vi].reward += 1.0 - self.activity_decay;
+    }
+    fn bump_polar_activity(&mut self, vi: VarId) -> usize {
+        let v = &mut self.vars[vi];
+        v.polar_count += 1;
+        if v.is(Flag::POLAR_VAR) {
+            0
+        } else {
+            v.turn_on(Flag::POLAR_VAR);
+            1
+        }
     }
 }
 

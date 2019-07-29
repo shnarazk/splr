@@ -26,10 +26,10 @@ pub struct Config {
     #[structopt(long = "rl", default_value = "50")]
     pub restart_lbd_len: usize,
     /// forcing restart threshold
-    #[structopt(long = "rt", default_value = "0.80")]
+    #[structopt(long = "rt", default_value = "0.70")]
     pub restart_threshold: f64, // Glucose's K
     /// blocking restart threshold
-    #[structopt(long = "rb", default_value = "1.20")]
+    #[structopt(long = "rb", default_value = "1.40")]
     pub restart_blocking: f64, // Glucose's R
     /// #conflicts between restarts
     #[structopt(long = "rs", default_value = "50")]
@@ -63,7 +63,7 @@ pub struct Config {
     /// Disables dynamic strategy adaptation
     #[structopt(long = "without-adaptive_strategy", short = "S")]
     pub without_adaptive_strategy: bool,
-    /// Disables deep search mode
+    /// Enables deep search mode
     #[structopt(long = "with-deep-search", short = "D")]
     pub with_deep_search: bool,
     /// Writes a DRAT UNSAT certification file
