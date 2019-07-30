@@ -3,7 +3,7 @@ use crate::traits::*;
 use crate::types::*;
 use std::fmt;
 
-const VAR_ACTIVITY_DECAY: f64 = 0.92;
+const VAR_ACTIVITY_DECAY: f64 = 0.94;
 
 /// Structure for variables.
 #[derive(Debug)]
@@ -84,12 +84,23 @@ pub struct VarDB {
     pub lbd_temp: Vec<usize>,
 }
 
+impl Default for VarDB {
+    fn default() -> VarDB {
+        VarDB {
+            vars: Vec::new(),
+            current_conflict: 0,
+            activity_decay: VAR_ACTIVITY_DECAY,
+            lbd_temp: Vec::new(),
+        }
+    }
+}
+
 impl VarDBIF for VarDB {
-    fn new(n: usize) -> Self {
+    fn new(n: usize, activity_decay: f64) -> Self {
         VarDB {
             vars: Var::new_vars(n),
             current_conflict: 0,
-            activity_decay: VAR_ACTIVITY_DECAY,
+            activity_decay,
             lbd_temp: vec![0; n + 1],
         }
     }

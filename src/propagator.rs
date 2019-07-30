@@ -116,7 +116,6 @@ impl PropagatorIF for AssignStack {
                             match blocker_value {
                                 FALSE => {
                                     self.catchup();
-                                    // state.num_polar_vars += vdb.vars[false_lit.vi()].bump_polar_activity();
                                     return w.c;
                                 }
                                 _ => {
@@ -154,7 +153,6 @@ impl PropagatorIF for AssignStack {
                             }
                         }
                         if first_value == FALSE {
-                            // state.num_polar_vars += vdb.vars[false_lit.vi()].bump_polar_activity();
                             self.catchup();
                             return w.c;
                         } else {

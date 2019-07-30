@@ -55,7 +55,7 @@ impl SatSolverIF for Solver {
             cdb: ClauseDB::new(nv, nc, config.use_certification),
             elim,
             state,
-            vdb: VarDB::new(nv),
+            vdb: VarDB::new(nv, config.var_activity_decay),
         }
     }
     /// # Examples
@@ -328,6 +328,7 @@ fn search(
                 }
                 state.num_solved_vars = asgs.len();
             }
+/*
             if !asgs.remains() {
                 let vi = asgs.select_var(vdb);
                 let p = vdb.vars[vi].phase;
@@ -335,6 +336,7 @@ fn search(
                 state.stats[Stat::Decision] += 1;
                 a_decision_was_made = true;
             }
+*/
         } else {
             conflict_c += 1.0;
             state.stats[Stat::Conflict] += 1;
@@ -349,6 +351,13 @@ fn search(
                 return Ok(false);
             }
             handle_conflict_path(asgs, cdb, elim, state, vdb, ci)?;
+        }
+        if !asgs.remains() {
+            let vi = asgs.select_var(vdb);
+            let p = vdb.vars[vi].phase;
+            asgs.uncheck_assume(vdb, Lit::from_var(vi, p));
+            state.stats[Stat::Decision] += 1;
+            a_decision_was_made = true;
         }
     }
 }
@@ -374,6 +383,9 @@ fn handle_conflict_path(
         // dump to certified even if it's a literal.
         cdb.certificate_add(new_learnt);
         asgs.uncheck_enqueue(vdb, new_learnt[0], NULL_CLAUSE);
+        if vdb.activity_decay < 0.99 {
+            vdb.activity_decay += 0.01;
+        }
     } else {
         state.stats[Stat::Learnt] += 1;
         let lbd = vdb.compute_lbd(&new_learnt);
@@ -390,62 +402,24 @@ fn handle_conflict_path(
             state.stats[Stat::NumBin] += 1;
             state.stats[Stat::NumBinLearnt] += 1;
         }
-        asgs.uncheck_enqueue(vdb, l0, cid);
         state.restart_update_lbd(lbd);
         state.stats[Stat::SumLBD] += lbd;
-    }
-    // convergence stat
-    if tn_confl % 10_000 == 0 {
-        /*
-        let ncnfl = state.stats[Stat::Conflict];
-        let alive = state.num_vars;
-        let mut incn = 0;
-        let mut fuip = 0;
-        let mut minc = 0;
-        let mut mfui = 0;
-        let mut inou = 0;
-        let mut unoi = 0;
-        for v in &vars[..] {
-            if 0 == v.inconsistent && 0 == v.uip {
-                // done nothing
-            } else if 0 < v.inconsistent {
-                incn += 1;
-                if 1 < v.inconsistent {
-                    minc += 1;
-                }
-                if 0 == v.uip {
-                    inou += 1;
-                }
-            }
-            if 0 < v.uip {
-                fuip += 1;
-                if 1 < v.uip {
-                    mfui += 1;
-                }
-                if 0 == v.inconsistent {
-                    unoi += 1;
-                }
-            }
+
+        let ave = state.stats[Stat::SumLBD] as f64 / tn_confl as f64;
+        let trend = state.ema_lbd.get() / ave;
+        let bj = ((state.ema_pv_inc.ratio() * bl as f64) / trend) as usize;
+        let bad_trend: bool = 2.0 < trend && bj < bl && state.ema_pv_inc.ratio() < 0.7;
+        let saturated: bool = state.ema_pv_inc.ratio() < 0.4
+            && (state.ema_lbd.get() - state.b_lvl.get()).abs() < 1.0;
+        if !state.use_luby_restart && bad_trend {
+            asgs.cancel_until(vdb, bj.max(state.root_level));
+            state.stats[Stat::Restart] += 1;
+        } else if !state.use_luby_restart && saturated {
+            asgs.cancel_until(vdb, state.root_level);
+            state.stats[Stat::Restart] += 1;
+        } else {
+            asgs.uncheck_enqueue(vdb, l0, cid);
         }
-        assert_eq!(incn, state.inconsistent_sum);
-        assert_eq!(fuip, state.uip_sum);
-        */
-        let diff = (state.num_polar_vars - state.stats[Stat::NumCPRecord]) as f64;
-        let fixed = (state.num_solved_vars - state.record[LogUsizeId::Fixed]) as f64;
-        // let alives = (state.num_vars - state.num_eliminated_vars) as f64;
-        state.ema_pv_inc.update((diff + fixed) / 10_000.0);
-        state.stats[Stat::NumCPRecord] = state.num_polar_vars;
-        /*
-        state.development_history
-            .push((ncnfl,
-                   (state.inconsistent_sum as f64 / alive as f64),
-                   (minc as f64 / alive as f64),
-                   (inou as f64 / alive as f64),
-                   (state.uip_sum as f64 / alive as f64),
-                   (mfui as f64 / alive as f64),
-                   (unoi as f64 / alive as f64),
-            ));
-        */
     }
     if tn_confl % 10_000 == 0 {
         adapt_parameters(asgs, cdb, elim, state, vdb, tn_confl)?;
@@ -495,12 +469,95 @@ fn adapt_parameters(
         state.stagnated = stagnated;
     }
     state.stats[Stat::SolvedRecord] = state.num_solved_vars;
+    {
+        /*
+        let alive = state.num_vars;
+        let mut incn = 0;
+        let mut fuip = 0;
+        let mut minc = 0;
+        let mut mfui = 0;
+        let mut inou = 0;
+        let mut unoi = 0;
+        for v in &vars[..] {
+            if 0 == v.inconsistent && 0 == v.uip {
+                // done nothing
+            } else if 0 < v.inconsistent {
+                incn += 1;
+                if 1 < v.inconsistent {
+                    minc += 1;
+                }
+                if 0 == v.uip {
+                    inou += 1;
+                }
+            }
+            if 0 < v.uip {
+                fuip += 1;
+                if 1 < v.uip {
+                    mfui += 1;
+                }
+                if 0 == v.inconsistent {
+                    unoi += 1;
+                }
+            }
+        }
+        */
+        let diff = (state.num_polar_vars - state.stats[Stat::NumCPRecord]) as f64;
+        let fixed = (state.num_solved_vars - state.record[LogUsizeId::Fixed]) as f64;
+        // let alives = (state.num_vars - state.num_eliminated_vars) as f64;
+        state.ema_pv_inc.update((0.0 * diff + fixed) / 10_000.0);
+        state.stats[Stat::NumCPRecord] = state.num_polar_vars;
+        /*
+        state.development_history
+            .push((ncnfl,
+                   (state.inconsistent_sum as f64 / alive as f64),
+                   (minc as f64 / alive as f64),
+                   (inou as f64 / alive as f64),
+                   (state.uip_sum as f64 / alive as f64),
+                   (mfui as f64 / alive as f64),
+                   (unoi as f64 / alive as f64),
+            ));
+        */
+    }
+    /*
     if !state.use_luby_restart && state.adaptive_restart {
         // let nr = state.stats[Stat::Restart] - state.stats[Stat::RestartRecord];
         state.stats[Stat::RestartRecord] = state.stats[Stat::Restart];
         // let nb = state.stats[Stat::BlockRestart] - state.stats[Stat::BlockRestartRecord];
         state.stats[Stat::BlockRestartRecord] = state.stats[Stat::BlockRestart];
+        let margin: f64 = 0.20;
+        let moving: f64 = 1.002;
+        let incr = state.ema_pv_inc.get();
+        let rate = state.ema_pv_inc.ratio();
+        if state.stagnated && (1.0 < incr || 2.0 < rate) {
+            if state.config.restart_threshold - margin < state.restart_thr {
+                state.restart_thr /= moving;
+            }
+            if state.restart_blk < state.config.restart_blocking + margin {
+                state.restart_blk *= moving;
+            }
+        } else if state.stagnated && (incr < 0.001 || rate < 0.5) {
+            if state.restart_thr < state.config.restart_threshold + margin {
+                state.restart_thr *= moving;
+            }
+            if state.config.restart_blocking - margin < state.restart_blk {
+                state.restart_blk /= moving;
+            }
+        } else if !state.stagnated {
+            // dumping restart_forcing
+            if state.restart_thr < state.config.restart_threshold + margin {
+                state.restart_thr *= moving;
+            } else if state.config.restart_threshold - margin < state.restart_thr {
+                state.restart_thr /= moving;
+            }
+            // dumping restart_blocking
+            if state.restart_blk < state.config.restart_blocking + margin {
+                state.restart_blk *= moving;
+            } else if state.config.restart_blocking - margin < state.restart_blk {
+                state.restart_blk /= moving;
+            }
+        }
     }
+*/
     if nconflict == switch {
         state.flush("activating an exhaustive eliminator...");
         asgs.cancel_until(vdb, 0);
@@ -511,16 +568,17 @@ fn adapt_parameters(
             cdb.simplify(asgs, elim, state, vdb)?;
         }
     }
-    if state.record[LogF64Id::EmaPVInc] < state.ema_pv_inc.get() {
-        if vdb.activity_decay < 0.99 {
-            vdb.activity_decay += 0.01;
-        }
-    // if 0.75 < vdb.activity_decay { vdb.activity_decay *= 0.99; }
-    } else {
+    // convergence stat
+    if state.ema_pv_inc.get() < state.record[LogF64Id::EmaPVInc] {
         // if vdb.activity_decay < 0.98 { vdb.activity_decay *= 1.01; }
-        if 0.85 < vdb.activity_decay {
-            vdb.activity_decay *= 0.995;
+        if 0.8 < vdb.activity_decay {
+            vdb.activity_decay *= 0.99;
         }
+    //} else {
+    //    if vdb.activity_decay < 0.99 {
+    //        vdb.activity_decay += 0.01;
+    //    }
+    //    // if 0.75 < vdb.activity_decay { vdb.activity_decay *= 0.99; }
     }
     state.progress(cdb, vdb, None);
     // if state.stagnated {

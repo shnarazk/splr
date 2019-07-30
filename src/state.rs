@@ -1,7 +1,7 @@
 use crate::clause::ClauseDB;
 use crate::config::Config;
 use crate::eliminator::Eliminator;
-use crate::restart::Ema;
+use crate::restart::{Ema, Ema2};
 use crate::traits::*;
 use crate::types::*;
 use crate::var::VarDB;
@@ -180,7 +180,7 @@ pub struct State {
     pub stagnated: bool,
     /// POLARIZATION
     pub num_polar_vars: usize,
-    pub ema_pv_inc: Ema,
+    pub ema_pv_inc: Ema2,
     /// Eliminator
     pub use_elim: bool,
     /// 0 for no limit
@@ -325,7 +325,7 @@ impl Default for State {
             cdb_soft_limit: 0, // 248_000_000
             ema_coeffs: (2 ^ 5, 2 ^ 15),
             adaptive_restart: false,
-            restart_thr: 0.60,     // will be overwritten by bin/splr
+            restart_thr: 0.70,     // will be overwritten by bin/splr
             restart_blk: 1.40,     // will be overwritten by bin/splr
             restart_asg_len: 3500, // will be overwritten by bin/splr
             restart_lbd_len: 100,  // will be overwritten by bin/splr
@@ -339,7 +339,7 @@ impl Default for State {
             use_deep_search_mode: true,
             stagnated: false,
             num_polar_vars: 0,
-            ema_pv_inc: Ema::new(75),
+            ema_pv_inc: Ema2::new(75).with_fast(25),
             use_elim: true,
             elim_eliminate_combination_limit: 80,
             elim_eliminate_grow_limit: 0, // 64
@@ -404,7 +404,7 @@ impl StateIF for State {
         state.restart_asg_len = config.restart_asg_len;
         state.restart_lbd_len = config.restart_lbd_len;
         state.restart_step = config.restart_step;
-        state.use_deep_search_mode = true;
+        state.use_deep_search_mode = config.with_deep_search;
         state.progress_log = config.use_log;
         state.use_elim = !config.without_elim;
         state.ema_asg = Ema::new(config.restart_asg_len);
@@ -443,7 +443,7 @@ impl StateIF for State {
             self.cdb_inc = 0;
             re_init = true;
         }
-        if self.stats[Stat::NoDecisionConflict] < 30_000 {
+        if self.stats[Stat::NoDecisionConflict] < 20_000 /* 30_000 */ {
             if !self.use_deep_search_mode {
                 self.strategy = SearchStrategy::LowSuccesiveLuby;
                 self.use_luby_restart = true;
@@ -594,31 +594,33 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K     Restart|#BLK:{}, #RST:{}, aLen:{}, ____: ------- ",
+            "\x1B[2K     Restart|#BLK:{}, thrd:{}, #RST:{}, thrd:{} ",
             im!(
                 "{:>9}",
                 self.record,
                 LogUsizeId::RestartBlock,
                 self.stats[Stat::BlockRestart]
             ),
+            fm!("{:>9.4}", self.record, LogF64Id::RestartBlkR, self.restart_blk),
             im!(
                 "{:>9}",
                 self.record,
                 LogUsizeId::Restart,
                 self.stats[Stat::Restart]
             ),
+            fm!("{:>9.4}", self.record, LogF64Id::RestartThrK, self.restart_thr),
+        );
+        println!(
+            "\x1B[2K    Conflict|aLBD:{}, bjmp:{}, cnfl:{} |alen:{} ",
+            fm!("{:>9.2}", self.record, LogF64Id::AveLBD, self.ema_lbd.get()),
+            fm!("{:>9.2}", self.record, LogF64Id::BLevel, self.b_lvl.get()),
+            fm!("{:>9.2}", self.record, LogF64Id::CLevel, self.c_lvl.get()),
             fm!(
                 "{:>9.2}",
                 self.record,
                 LogF64Id::EmaRestart,
                 self.ema_restart_len.get()
             ),
-        );
-        println!(
-            "\x1B[2K    Conflict|aLBD:{}, bjmp:{}, cnfl:{}  ____:          ",
-            fm!("{:>9.2}", self.record, LogF64Id::AveLBD, self.ema_lbd.get()),
-            fm!("{:>9.2}", self.record, LogF64Id::BLevel, self.b_lvl.get()),
-            fm!("{:>9.2}", self.record, LogF64Id::CLevel, self.c_lvl.get()),
         );
         println!(
             "\x1B[2K   Clause DB|#rdc:{}, #sce:{} |eASG:{}, eLBD:{} ",
@@ -648,25 +650,28 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2KPolarization|#pol:{}, pol%:{}, rate:{}, vdcy:{} ",
+            "\x1B[2KPolarization|#pol:{}, incr:{}, trnd:{}, vdcy:{} ",
             im!(
                 "{:>9.2}",
                 self.record,
                 LogUsizeId::NumPV,
                 self.num_polar_vars
             ),
+/* pol%:{}
             fm!(
                 "{:>9.4}",
                 self.record,
                 LogF64Id::PVRatio,
                 (100 * self.num_polar_vars) as f64 / nv as f64
             ),
+*/
             fm!(
-                "{:>9.2}",
+                "{:>9.4}",
                 self.record,
                 LogF64Id::EmaPVInc,
                 self.ema_pv_inc.get()
             ),
+            format!("{:>9.4}", self.ema_pv_inc.ratio()),
             format!("{:>9.4}", vdb.activity_decay),
         );
         if let Some(m) = mes {

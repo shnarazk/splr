@@ -272,7 +272,7 @@ pub trait VarIF {
 
 /// API for var DB like `assigned`, `locked`, `compute_lbd` and so on.
 pub trait VarDBIF {
-    fn new(n: usize) -> Self;
+    fn new(n: usize, activity_decay: f64) -> Self;
     /// return the 'value' of a given literal.
     fn assigned(&self, l: Lit) -> Lbool;
     /// return `true` is the clause is the reason of the assignment.

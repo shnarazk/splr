@@ -34,6 +34,9 @@ pub struct Config {
     /// #conflicts between restarts
     #[structopt(long = "rs", default_value = "50")]
     pub restart_step: usize,
+    /// variable activity decay
+    #[structopt(long = "vd", default_value = "0.94")]
+    pub var_activity_decay: f64,
     /// a DIMACS format CNF file
     #[structopt(parse(from_os_str))]
     pub cnf_filename: PathBuf,
@@ -82,9 +85,10 @@ impl Default for Config {
             elim_lit_limit: 100,
             restart_asg_len: 3500,
             restart_lbd_len: 50,
-            restart_threshold: 0.60,
+            restart_threshold: 0.70,
             restart_blocking: 1.40,
             restart_step: 50,
+            var_activity_decay: 0.94,
             cnf_filename: PathBuf::new(),
             output_dirname: PathBuf::from("."),
             result_filename: PathBuf::new(),
