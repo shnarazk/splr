@@ -422,7 +422,7 @@ fn handle_conflict_path(
             state.b_lvl.update(0.0);
             state.stats[Stat::Restart] += 1;
             state.restart_freq.update(1.0);
-            vdb.reset_folding_points();
+            // vdb.reset_folding_points();
         } else if !state.use_luby_restart
             && num_restart < state.num_polar_vars
             && bj < bl
