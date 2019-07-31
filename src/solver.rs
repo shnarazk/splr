@@ -375,6 +375,7 @@ fn handle_conflict_path(
         state.var_decay += 0.01;
     }
     state.restart_update_asg(asgs.len());
+    state.c_lvl.update(asgs.level() as f64);
     let bl = analyze(asgs, cdb, state, vdb, ci);
     let new_learnt = &mut state.new_learnt;
     asgs.cancel_until(vdb, bl.max(state.root_level));
@@ -386,6 +387,7 @@ fn handle_conflict_path(
         if vdb.activity_decay < 0.99 {
             vdb.activity_decay += 0.01;
         }
+        state.b_lvl.update(0.0);
     } else {
         state.stats[Stat::Learnt] += 1;
         let lbd = vdb.compute_lbd(&new_learnt);
@@ -393,8 +395,6 @@ fn handle_conflict_path(
         state.num_polar_vars += vdb.bump_polar_activity(l0.vi());
         let cid = cdb.attach(state, vdb, lbd);
         elim.add_cid_occur(vdb, cid, &mut cdb.clause[cid as usize], true);
-        state.c_lvl.update(bl as f64);
-        state.b_lvl.update(lbd as f64);
         if lbd <= 2 {
             state.stats[Stat::NumLBD2] += 1;
         }
@@ -406,19 +406,40 @@ fn handle_conflict_path(
         state.stats[Stat::SumLBD] += lbd;
 
         let ave = state.stats[Stat::SumLBD] as f64 / tn_confl as f64;
-        let trend = state.ema_lbd.get() / ave;
-        let bj = ((state.ema_pv_inc.ratio() * bl as f64) / trend) as usize;
-        let bad_trend: bool = 2.0 < trend && bj < bl && state.ema_pv_inc.ratio() < 0.7;
-        let saturated: bool = state.ema_pv_inc.ratio() < 0.4
-            && (state.ema_lbd.get() - state.b_lvl.get()).abs() < 1.0;
-        if !state.use_luby_restart && bad_trend {
-            asgs.cancel_until(vdb, bj.max(state.root_level));
+        let num_restart = state.stats[Stat::Restart] + state.stats[Stat::PartialRestart];
+        let _trend = state.ema_lbd.get() / ave;
+        let pv_inc = state.ema_pv_inc.get();
+        let _pv_ratio = state.ema_pv_inc.ratio();
+        let _restart_freq = state.restart_freq.get();
+        let bj = (lbd / 2).max(state.root_level);
+        if !state.use_luby_restart
+            && pv_inc < 0.04
+            && num_restart < state.num_polar_vars
+            // && restart_freq < pv_ratio
+        {
+            // done exhaustive search
+            asgs.cancel_until(vdb, 0);
+            state.b_lvl.update(0.0);
             state.stats[Stat::Restart] += 1;
-        } else if !state.use_luby_restart && saturated {
-            asgs.cancel_until(vdb, state.root_level);
-            state.stats[Stat::Restart] += 1;
+            state.restart_freq.update(1.0);
+            vdb.reset_folding_points();
+        } else if !state.use_luby_restart
+            && num_restart < state.num_polar_vars
+            && bj < bl
+        {
+            // big jump after exhaustive search
+            asgs.cancel_until(vdb, bj);
+            state.b_lvl.update(bj as f64);
+            if bj == state.root_level {
+                state.stats[Stat::Restart] += 1;
+            } else {
+                state.stats[Stat::PartialRestart] += 1;
+            }
+            state.restart_freq.update(1.0); // with a bonus
         } else {
+            state.b_lvl.update(bl as f64);
             asgs.uncheck_enqueue(vdb, l0, cid);
+            state.restart_freq.update(0.0);
         }
     }
     if tn_confl % 10_000 == 0 {

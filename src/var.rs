@@ -158,6 +158,11 @@ impl VarDBIF for VarDB {
             1
         }
     }
+    fn reset_folding_points(&mut self) {
+        for v in &mut self.vars[1..] {
+            v.turn_off(Flag::POLAR_VAR);
+        }
+    }
 }
 
 impl fmt::Display for Var {

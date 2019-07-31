@@ -104,6 +104,8 @@ pub enum Stat {
     RestartRecord,         // the last recorded number of Restart
     BlockRestart,          // the number of blacking start
     BlockRestartRecord,    // the last recorded number of BlockRestart
+    PartialRestart,        // the number of partial restart
+    LubyRestart,           // the number of Luby restart
     Learnt,                // the number of learnt clauses (< Conflict)
     NoDecisionConflict,    // the number of 'no decision conflict'
     Propagation,           // the number of propagation
@@ -178,6 +180,7 @@ pub struct State {
     pub luby_restart_factor: f64,
     pub use_deep_search_mode: bool,
     pub stagnated: bool,
+    pub restart_freq: Ema,
     /// POLARIZATION
     pub num_polar_vars: usize,
     pub ema_pv_inc: Ema2,
@@ -206,7 +209,6 @@ pub struct State {
     pub stats: [usize; Stat::EndOfStatIndex as usize], // statistics
     pub ema_asg: Ema,
     pub ema_lbd: Ema,
-    pub ema_restart_len: Ema,
     pub b_lvl: Ema,
     pub c_lvl: Ema,
     pub sum_asg: f64,
@@ -338,6 +340,7 @@ impl Default for State {
             luby_restart_factor: 100.0,
             use_deep_search_mode: true,
             stagnated: false,
+            restart_freq: Ema::new(75),
             num_polar_vars: 0,
             ema_pv_inc: Ema2::new(75).with_fast(25),
             use_elim: true,
@@ -358,7 +361,6 @@ impl Default for State {
             stats: [0; Stat::EndOfStatIndex as usize],
             ema_asg: Ema::new(1),
             ema_lbd: Ema::new(1),
-            ema_restart_len: Ema::new(5_000),
             b_lvl: Ema::new(5_000),
             c_lvl: Ema::new(5_000),
             sum_asg: 0.0,
@@ -593,6 +595,7 @@ impl StateIF for State {
                 cdb.num_active - cdb.num_learnt
             ),
         );
+/*
         println!(
             "\x1B[2K     Restart|#BLK:{}, thrd:{}, #RST:{}, thrd:{} ",
             im!(
@@ -610,20 +613,21 @@ impl StateIF for State {
             ),
             fm!("{:>9.4}", self.record, LogF64Id::RestartThrK, self.restart_thr),
         );
+*/
         println!(
-            "\x1B[2K    Conflict|aLBD:{}, bjmp:{}, cnfl:{} |alen:{} ",
+            "\x1B[2K    Conflict|aLBD:{}, bjmp:{}, cnfl:{}, eLBD:{} ",
             fm!("{:>9.2}", self.record, LogF64Id::AveLBD, self.ema_lbd.get()),
             fm!("{:>9.2}", self.record, LogF64Id::BLevel, self.b_lvl.get()),
             fm!("{:>9.2}", self.record, LogF64Id::CLevel, self.c_lvl.get()),
             fm!(
-                "{:>9.2}",
+                "{:>9.4}",
                 self.record,
-                LogF64Id::EmaRestart,
-                self.ema_restart_len.get()
+                LogF64Id::EmaLBD,
+                self.ema_lbd.get() / ave
             ),
         );
         println!(
-            "\x1B[2K   Clause DB|#rdc:{}, #sce:{} |eASG:{}, eLBD:{} ",
+            "\x1B[2K   Clause DB|#rdc:{}, #sce:{} |eASG:{}, ____:          ",
             im!(
                 "{:>9}",
                 self.record,
@@ -642,15 +646,9 @@ impl StateIF for State {
                 LogF64Id::EmaAsg,
                 self.ema_asg.get() / nv as f64
             ),
-            fm!(
-                "{:>9.4}",
-                self.record,
-                LogF64Id::EmaLBD,
-                self.ema_lbd.get() / ave
-            ),
         );
         println!(
-            "\x1B[2KPolarization|#pol:{}, incr:{}, trnd:{}, vdcy:{} ",
+            "\x1B[2K     Folding|#fvs:{}, incr:{}, trnd:{}, vdcy:{} ",
             im!(
                 "{:>9.2}",
                 self.record,
@@ -673,6 +671,28 @@ impl StateIF for State {
             ),
             format!("{:>9.4}", self.ema_pv_inc.ratio()),
             format!("{:>9.4}", vdb.activity_decay),
+        );
+        println!(
+            "\x1B[2K     Restart|full:{}, part:{}, freq:{}, Luby:{} ",
+            im!(
+                "{:>9}",
+                self.record,
+                LogUsizeId::Restart,
+                self.stats[Stat::Restart]
+            ),
+            im!(
+                "{:>9}",
+                self.record,
+                LogUsizeId::RestartPartial,
+                self.stats[Stat::PartialRestart]
+            ),
+            format!("{:>9.4}", self.restart_freq.get()),
+            im!(
+                "{:>9}",
+                self.record,
+                LogUsizeId::RestartLuby,
+                self.stats[Stat::LubyRestart]
+            ),
         );
         if let Some(m) = mes {
             println!("\x1B[2K    Strategy|mode: {}", m);
@@ -740,12 +760,14 @@ pub enum LogUsizeId {
     Binclause,      //  8: binclause: usize,
     Permanent,      //  9: permanent: usize,
     RestartBlock,   // 10: restart_block: usize,
-    Restart,        // 11: restart_count: usize,
-    Reduction,      // 12: reduction: usize,
-    SatClauseElim,  // 13: simplification: usize,
-    ExhaustiveElim, // 14: elimination: usize,
-    Stagnation,     // 15: stagnation: usize,
-    NumPV,          // 16: the number of Polar vars
+    Restart,        // 10: restart_count: usize,
+    RestartLuby,    // 11: Luby restart
+    RestartPartial, // 12: partial_restart_count: usize,
+    Reduction,      // 13: reduction: usize,
+    SatClauseElim,  // 14: simplification: usize,
+    ExhaustiveElim, // 15: elimination: usize,
+    Stagnation,     // 16: stagnation: usize,
+    NumPV,          // 17: the number of Polar vars
     // ElimClauseQueue, // __: elim_clause_queue: usize,
     // ElimVarQueue, // __: elim_var_queue: usize,
     End,

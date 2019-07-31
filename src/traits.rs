@@ -285,6 +285,7 @@ pub trait VarDBIF {
     fn activity(&mut self, vi: VarId) -> f64;
     fn bump_activity(&mut self, vi: VarId);
     fn bump_polar_activity(&mut self, vi: VarId) -> usize;
+    fn reset_folding_points(&mut self);
 }
 
 /// API for 'watcher list' like `attach`, `detach`, `detach_with` and so on.

@@ -33,15 +33,14 @@ impl EmaIF for Ema {
 impl RestartIF for State {
     /// return true to forcing restart. Otherwise false.
     fn restart(&mut self, asgs: &AssignStack, _vdb: &mut VarDB, luby_count: &mut f64) -> bool {
-        let ncnfl = self.stats[Stat::Conflict];
-        let nas = asgs.len();
+        let _ncnfl = self.stats[Stat::Conflict];
+        let _nas = asgs.len();
         // polar parameters
         let _epsilon = 0.05;
         // first, handle Luby path
         if self.use_luby_restart {
             if self.luby_restart_num_conflict <= *luby_count {
-                self.stats[Stat::Restart] += 1;
-                self.ema_restart_len.update(self.after_restart as f64);
+                self.stats[Stat::LubyRestart] += 1;
                 self.after_restart = 0;
                 *luby_count = 0.0;
                 self.luby_current_restarts += 1;
@@ -175,5 +174,11 @@ impl Ema2 {
     pub fn with_fast(mut self, f: u64) -> Self {
         self.fe = 1.0 / (f as f64);
         self
+    }
+    pub fn initialize(&mut self) {
+        self.fast = 0.0;
+        self.slow = 0.0;
+        self.calf = 0.0;
+        self.cals = 0.0;
     }
 }
