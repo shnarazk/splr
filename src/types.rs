@@ -187,7 +187,9 @@ bitflags! {
         const ELIMINATED   = 0b0000_0000_0010_0000;
         /// mark to run garbage collector on the corresponding watcher lists
         const TOUCHED      = 0b0000_0000_0100_0000;
-        /// a variable was conflict or used as a first UID
-        const POLAR_VAR    = 0b0000_0000_1000_0000;
+        /// this variable was used as a first UID in the present run
+        const FOLDED       = 0b0000_0000_1000_0000;
+        /// this variable was used as a first UID so far
+        const FOLDED_EVER  = 0b0000_0001_0000_0000;
     }
 }

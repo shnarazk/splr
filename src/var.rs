@@ -3,7 +3,7 @@ use crate::traits::*;
 use crate::types::*;
 use std::fmt;
 
-const VAR_ACTIVITY_DECAY: f64 = 0.94;
+const VAR_ACTIVITY_DECAY: f64 = 0.93;
 
 /// Structure for variables.
 #[derive(Debug)]
@@ -26,7 +26,7 @@ pub struct Var {
     flags: Flag,
     /// for EMA-based activity
     pub last_used: usize,
-    pub polar_count: usize,
+    pub folding_count: usize,
 }
 
 /// is the dummy var index.
@@ -46,7 +46,7 @@ impl VarIF for Var {
             neg_occurs: Vec::new(),
             flags: Flag::empty(),
             last_used: 0,
-            polar_count: 0,
+            folding_count: 0,
         }
     }
     fn new_vars(n: usize) -> Vec<Var> {
@@ -148,20 +148,28 @@ impl VarDBIF for VarDB {
         self.activity(vi);
         self.vars[vi].reward += 1.0 - self.activity_decay;
     }
-    fn bump_polar_activity(&mut self, vi: VarId) -> usize {
+    fn bump_folding_activity(&mut self, vi: VarId) -> usize {
         let v = &mut self.vars[vi];
-        v.polar_count += 1;
-        if v.is(Flag::POLAR_VAR) {
+        v.folding_count += 1;
+        if v.is(Flag::FOLDED) {
             0
         } else {
-            v.turn_on(Flag::POLAR_VAR);
+            v.turn_on(Flag::FOLDED);
+            v.turn_on(Flag::FOLDED_EVER);
             1
         }
     }
     fn reset_folding_points(&mut self) {
         for v in &mut self.vars[1..] {
-            v.turn_off(Flag::POLAR_VAR);
+            v.turn_off(Flag::FOLDED);
         }
+    }
+    fn count_on(&self, flag: Flag, on: bool) -> usize {
+        self.vars
+            .iter()
+            .skip(1)
+            .filter(|v| v.is(flag) == on)
+            .count()
     }
 }
 

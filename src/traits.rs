@@ -284,8 +284,9 @@ pub trait VarDBIF {
     /// return current activity
     fn activity(&mut self, vi: VarId) -> f64;
     fn bump_activity(&mut self, vi: VarId);
-    fn bump_polar_activity(&mut self, vi: VarId) -> usize;
+    fn bump_folding_activity(&mut self, vi: VarId) -> usize;
     fn reset_folding_points(&mut self);
+    fn count_on(&self, flag: Flag, on: bool) -> usize;
 }
 
 /// API for 'watcher list' like `attach`, `detach`, `detach_with` and so on.

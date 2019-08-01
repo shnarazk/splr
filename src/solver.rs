@@ -2,7 +2,7 @@ use crate::clause::{Clause, ClauseDB};
 use crate::config::Config;
 use crate::eliminator::Eliminator;
 use crate::propagator::AssignStack;
-use crate::state::{LogF64Id, LogUsizeId, Stat, State};
+use crate::state::{LogF64Id, Stat, State};
 use crate::traits::*;
 use crate::types::*;
 use crate::var::VarDB;
@@ -328,15 +328,15 @@ fn search(
                 }
                 state.num_solved_vars = asgs.len();
             }
-/*
-            if !asgs.remains() {
-                let vi = asgs.select_var(vdb);
-                let p = vdb.vars[vi].phase;
-                asgs.uncheck_assume(vdb, Lit::from_var(vi, p));
-                state.stats[Stat::Decision] += 1;
-                a_decision_was_made = true;
-            }
-*/
+        /*
+                    if !asgs.remains() {
+                        let vi = asgs.select_var(vdb);
+                        let p = vdb.vars[vi].phase;
+                        asgs.uncheck_assume(vdb, Lit::from_var(vi, p));
+                        state.stats[Stat::Decision] += 1;
+                        a_decision_was_made = true;
+                    }
+        */
         } else {
             conflict_c += 1.0;
             state.stats[Stat::Conflict] += 1;
@@ -387,59 +387,77 @@ fn handle_conflict_path(
         if vdb.activity_decay < 0.99 {
             vdb.activity_decay += 0.01;
         }
+        state.ema_folds_ratio.update(1.0);
         state.b_lvl.update(0.0);
     } else {
         state.stats[Stat::Learnt] += 1;
         let lbd = vdb.compute_lbd(&new_learnt);
         let l0 = new_learnt[0];
-        state.num_polar_vars += vdb.bump_polar_activity(l0.vi());
-        let cid = cdb.attach(state, vdb, lbd);
-        elim.add_cid_occur(vdb, cid, &mut cdb.clause[cid as usize], true);
+        {
+            let fp = vdb.bump_folding_activity(l0.vi());
+            state.num_folding_vars += fp;
+            state.ema_folds_ratio.update(fp as f64);
+        }
         if lbd <= 2 {
             state.stats[Stat::NumLBD2] += 1;
         }
         if learnt_len == 2 {
             state.stats[Stat::NumBin] += 1;
             state.stats[Stat::NumBinLearnt] += 1;
+            let l1 = new_learnt[1];
+            let fp = vdb.bump_folding_activity(l1.vi());
+            state.num_folding_vars += fp;
+            state.ema_folds_ratio.update(fp as f64);
         }
+        let cid = cdb.attach(state, vdb, lbd);
+        elim.add_cid_occur(vdb, cid, &mut cdb.clause[cid as usize], true);
         state.restart_update_lbd(lbd);
         state.stats[Stat::SumLBD] += lbd;
-
-        let ave = state.stats[Stat::SumLBD] as f64 / tn_confl as f64;
-        let num_restart = state.stats[Stat::Restart] + state.stats[Stat::PartialRestart];
-        let _trend = state.ema_lbd.get() / ave;
-        let pv_inc = state.ema_pv_inc.get();
-        let _pv_ratio = state.ema_pv_inc.ratio();
-        let _restart_freq = state.restart_freq.get();
-        let bj = (lbd / 2).max(state.root_level);
+        // Fold-based Restart Control
+        let _nvar = state.num_vars - state.num_solved_vars - state.num_eliminated_vars;
+        let lbd_trend = state.ema_lbd.get() * tn_confl as f64 / state.stats[Stat::SumLBD] as f64;
+        let folding_ratio = state.ema_folds_ratio.get();
+        let folding_trend = state.ema_folds_ratio.trend();
+        let restart_ratio = state.partial_restart_ratio.get();
+        let bj = (bl / 2).max(state.root_level);
         if !state.use_luby_restart
-            && pv_inc < 0.04
-            && num_restart < state.num_polar_vars
-            // && restart_freq < pv_ratio
+            && folding_ratio < 0.1 / (1.0 + state.stats[Stat::Restart] as f64)
+            && folding_trend < 0.25
+            && 1_000 < state.after_restart
+        // && restart_freq < pv_ratio
         {
-            // done exhaustive search
+            // stop a exhaustive search and restart
             asgs.cancel_until(vdb, 0);
             state.b_lvl.update(0.0);
+            state.partial_restart_ratio.update(1.0);
+            vdb.reset_folding_points();
+            vdb.activity_decay = state.config.var_activity_decay;
+            state.num_folding_vars = 0;
+            state.num_partial_restart = 0;
+            state.num_partial_restart_try = 0;
+            state.ema_folds_ratio.reinitialize1();
             state.stats[Stat::Restart] += 1;
-            state.restart_freq.update(1.0);
-            // vdb.reset_folding_points();
         } else if !state.use_luby_restart
-            && num_restart < state.num_polar_vars
+            && 1.4 < lbd_trend
+            && folding_trend < 0.5
             && bj < bl
+            && restart_ratio < folding_ratio
+            && state.num_partial_restart_try < state.num_folding_vars
         {
-            // big jump after exhaustive search
+            // partial restart
             asgs.cancel_until(vdb, bj);
             state.b_lvl.update(bj as f64);
-            if bj == state.root_level {
-                state.stats[Stat::Restart] += 1;
-            } else {
-                state.stats[Stat::PartialRestart] += 1;
-            }
-            state.restart_freq.update(1.0); // with a bonus
+            state.num_partial_restart += 1;
+            state.num_partial_restart_try += 1;
+            state.stats[Stat::PartialRestart] += 1;
+            state.partial_restart_ratio.update(1.0); // with a bonus
         } else {
+            if !state.use_luby_restart && state.num_partial_restart_try < state.num_folding_vars {
+                state.num_partial_restart_try += 1;
+            }
             state.b_lvl.update(bl as f64);
             asgs.uncheck_enqueue(vdb, l0, cid);
-            state.restart_freq.update(0.0);
+            state.partial_restart_ratio.update(0.0);
         }
     }
     if tn_confl % 10_000 == 0 {
@@ -522,11 +540,6 @@ fn adapt_parameters(
             }
         }
         */
-        let diff = (state.num_polar_vars - state.stats[Stat::NumCPRecord]) as f64;
-        let fixed = (state.num_solved_vars - state.record[LogUsizeId::Fixed]) as f64;
-        // let alives = (state.num_vars - state.num_eliminated_vars) as f64;
-        state.ema_pv_inc.update((0.0 * diff + fixed) / 10_000.0);
-        state.stats[Stat::NumCPRecord] = state.num_polar_vars;
         /*
         state.development_history
             .push((ncnfl,
@@ -540,45 +553,45 @@ fn adapt_parameters(
         */
     }
     /*
-    if !state.use_luby_restart && state.adaptive_restart {
-        // let nr = state.stats[Stat::Restart] - state.stats[Stat::RestartRecord];
-        state.stats[Stat::RestartRecord] = state.stats[Stat::Restart];
-        // let nb = state.stats[Stat::BlockRestart] - state.stats[Stat::BlockRestartRecord];
-        state.stats[Stat::BlockRestartRecord] = state.stats[Stat::BlockRestart];
-        let margin: f64 = 0.20;
-        let moving: f64 = 1.002;
-        let incr = state.ema_pv_inc.get();
-        let rate = state.ema_pv_inc.ratio();
-        if state.stagnated && (1.0 < incr || 2.0 < rate) {
-            if state.config.restart_threshold - margin < state.restart_thr {
-                state.restart_thr /= moving;
-            }
-            if state.restart_blk < state.config.restart_blocking + margin {
-                state.restart_blk *= moving;
-            }
-        } else if state.stagnated && (incr < 0.001 || rate < 0.5) {
-            if state.restart_thr < state.config.restart_threshold + margin {
-                state.restart_thr *= moving;
-            }
-            if state.config.restart_blocking - margin < state.restart_blk {
-                state.restart_blk /= moving;
-            }
-        } else if !state.stagnated {
-            // dumping restart_forcing
-            if state.restart_thr < state.config.restart_threshold + margin {
-                state.restart_thr *= moving;
-            } else if state.config.restart_threshold - margin < state.restart_thr {
-                state.restart_thr /= moving;
-            }
-            // dumping restart_blocking
-            if state.restart_blk < state.config.restart_blocking + margin {
-                state.restart_blk *= moving;
-            } else if state.config.restart_blocking - margin < state.restart_blk {
-                state.restart_blk /= moving;
+        if !state.use_luby_restart && state.adaptive_restart {
+            // let nr = state.stats[Stat::Restart] - state.stats[Stat::RestartRecord];
+            state.stats[Stat::RestartRecord] = state.stats[Stat::Restart];
+            // let nb = state.stats[Stat::BlockRestart] - state.stats[Stat::BlockRestartRecord];
+            state.stats[Stat::BlockRestartRecord] = state.stats[Stat::BlockRestart];
+            let margin: f64 = 0.20;
+            let moving: f64 = 1.002;
+            let incr = state.ema_folds_ratio.get();
+            let rate = state.ema_folds_ratio.ratio();
+            if state.stagnated && (1.0 < incr || 2.0 < rate) {
+                if state.config.restart_threshold - margin < state.restart_thr {
+                    state.restart_thr /= moving;
+                }
+                if state.restart_blk < state.config.restart_blocking + margin {
+                    state.restart_blk *= moving;
+                }
+            } else if state.stagnated && (incr < 0.001 || rate < 0.5) {
+                if state.restart_thr < state.config.restart_threshold + margin {
+                    state.restart_thr *= moving;
+                }
+                if state.config.restart_blocking - margin < state.restart_blk {
+                    state.restart_blk /= moving;
+                }
+            } else if !state.stagnated {
+                // dumping restart_forcing
+                if state.restart_thr < state.config.restart_threshold + margin {
+                    state.restart_thr *= moving;
+                } else if state.config.restart_threshold - margin < state.restart_thr {
+                    state.restart_thr /= moving;
+                }
+                // dumping restart_blocking
+                if state.restart_blk < state.config.restart_blocking + margin {
+                    state.restart_blk *= moving;
+                } else if state.config.restart_blocking - margin < state.restart_blk {
+                    state.restart_blk /= moving;
+                }
             }
         }
-    }
-*/
+    */
     if nconflict == switch {
         state.flush("activating an exhaustive eliminator...");
         asgs.cancel_until(vdb, 0);
@@ -590,16 +603,16 @@ fn adapt_parameters(
         }
     }
     // convergence stat
-    if state.ema_pv_inc.get() < state.record[LogF64Id::EmaPVInc] {
+    if state.ema_folds_ratio.get() < state.record[LogF64Id::EmaPVInc] {
         // if vdb.activity_decay < 0.98 { vdb.activity_decay *= 1.01; }
         if 0.8 < vdb.activity_decay {
-            vdb.activity_decay *= 0.99;
+            vdb.activity_decay *= 0.98; // make sure to keep a large range
         }
-    //} else {
-    //    if vdb.activity_decay < 0.99 {
-    //        vdb.activity_decay += 0.01;
-    //    }
-    //    // if 0.75 < vdb.activity_decay { vdb.activity_decay *= 0.99; }
+        //} else {
+        //    if vdb.activity_decay < 0.99 {
+        //        vdb.activity_decay += 0.01;
+        //    }
+        //    // if 0.75 < vdb.activity_decay { vdb.activity_decay *= 0.99; }
     }
     state.progress(cdb, vdb, None);
     // if state.stagnated {

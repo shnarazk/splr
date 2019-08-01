@@ -49,9 +49,7 @@ impl RestartIF for State {
                         * self.luby_restart_factor;
                 return true;
             }
-            if 0.8 < self.ema_pv_inc.ratio()
-                && 4.0 * self.ema_lbd.get() < self.c_lvl.get()
-            {
+            if 0.8 < self.ema_folds_ratio.trend() && 4.0 * self.ema_lbd.get() < self.c_lvl.get() {
                 self.use_luby_restart = false;
             }
             return false;
@@ -59,32 +57,32 @@ impl RestartIF for State {
         if self.after_restart < self.restart_step {
             return false;
         }
-/*
-        if (self.num_vars - self.num_eliminated_vars < 2 * self.num_polar_vars
-            || self.ema_pv_inc.get() < 0.0001)
-            && self.ema_pv_inc.ratio() < 0.5
-            && (self.ema_lbd.get() - self.b_lvl.get()).abs() < 1.0
-        {
-            self.use_luby_restart = true;
-            return true;
-        }
-        // check invoking condition
-        let ave = self.stats[Stat::SumLBD] as f64 / ncnfl as f64;
-        if false && ave < self.ema_lbd.get() * self.restart_thr {
-            self.stats[Stat::Restart] += 1;
-            self.ema_restart_len.update(self.after_restart as f64);
-            self.after_restart = 0;
-            return true;
-        }
-*/
-/*
-        // check blocking condition
-        if self.restart_blk * self.ema_asg.get() < nas as f64 {
-            self.after_restart = 0;
-            self.stats[Stat::BlockRestart] += 1;
-            return false;
-        }
-*/
+        /*
+                if (self.num_vars - self.num_eliminated_vars < 2 * self.num_polar_vars
+                    || self.ema_folds_inc.get() < 0.0001)
+                    && self.ema_folds_inc.ratio() < 0.5
+                    && (self.ema_lbd.get() - self.b_lvl.get()).abs() < 1.0
+                {
+                    self.use_luby_restart = true;
+                    return true;
+                }
+                // check invoking condition
+                let ave = self.stats[Stat::SumLBD] as f64 / ncnfl as f64;
+                if false && ave < self.ema_lbd.get() * self.restart_thr {
+                    self.stats[Stat::Restart] += 1;
+                    self.ema_restart_len.update(self.after_restart as f64);
+                    self.after_restart = 0;
+                    return true;
+                }
+        */
+        /*
+                // check blocking condition
+                if self.restart_blk * self.ema_asg.get() < nas as f64 {
+                    self.after_restart = 0;
+                    self.stats[Stat::BlockRestart] += 1;
+                    return false;
+                }
+        */
         false
     }
     fn restart_update_lbd(&mut self, lbd: usize) {
@@ -168,17 +166,21 @@ impl Ema2 {
     pub fn get_fast(&self) -> f64 {
         self.fast / self.calf
     }
-    pub fn ratio(&self) -> f64 {
+    pub fn trend(&self) -> f64 {
         self.fast / self.slow * (self.cals / self.calf)
     }
     pub fn with_fast(mut self, f: u64) -> Self {
         self.fe = 1.0 / (f as f64);
         self
     }
-    pub fn initialize(&mut self) {
-        self.fast = 0.0;
-        self.slow = 0.0;
-        self.calf = 0.0;
-        self.cals = 0.0;
+    pub fn initialize1(mut self) -> Self {
+        self.reinitialize1();
+        self
+    }
+    pub fn reinitialize1(&mut self) {
+        self.fast = 1.0;
+        self.slow = 1.0;
+        self.calf = 1.0;
+        self.cals = 1.0;
     }
 }
