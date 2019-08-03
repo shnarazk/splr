@@ -172,11 +172,13 @@ pub struct State {
     pub restart_lbd_len: usize,
     pub restart_expansion: f64,
     pub restart_step: usize,
+    pub restart_block_step: usize,
     pub use_luby_restart: bool,
     pub luby_restart_num_conflict: f64,
     pub luby_restart_inc: f64,
     pub luby_current_restarts: usize,
     pub luby_restart_factor: f64,
+    pub luby_restart_cnfl_cnt: f64,
     pub use_deep_search_mode: bool,
     pub stagnated: bool,
     /// Folding computation
@@ -335,11 +337,13 @@ impl Default for State {
             restart_lbd_len: 100,  // will be overwritten by bin/splr
             restart_expansion: 1.15,
             restart_step: 50,
+            restart_block_step: 0,
             use_luby_restart: false,
             luby_restart_num_conflict: 0.0,
             luby_restart_inc: 2.0,
             luby_current_restarts: 0,
             luby_restart_factor: 100.0,
+            luby_restart_cnfl_cnt: 0.0,
             use_deep_search_mode: true,
             stagnated: false,
             num_folding_vars: 0,
@@ -634,7 +638,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K   Clause DB|#rdc:{}, #sce:{} |eASG:{}, vdcy:{} ",
+            "\x1B[2K   Clause DB|#rdc:{}, #sce:{} |asg%:{}, vdcy:{} ",
             im!(
                 "{:>9}",
                 self.record,
@@ -651,7 +655,7 @@ impl StateIF for State {
                 "{:>9.4}",
                 self.record,
                 LogF64Id::EmaAsg,
-                self.ema_asg.get() / nv as f64
+                100.0 * self.ema_asg.get() / nv as f64
             ),
             format!("{:>9.4}", vdb.activity_decay),
         );
