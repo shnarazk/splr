@@ -638,7 +638,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K   Clause DB|#rdc:{}, #sce:{} |asg%:{}, vdcy:{} ",
+            "\x1B[2K   Clause DB|#rdc:{}, #sce:{},|asg%:{}, vdcy:{} ",
             im!(
                 "{:>9}",
                 self.record,

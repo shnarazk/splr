@@ -378,11 +378,17 @@ fn handle_conflict_path(
     if learnt_len == 1 {
         // dump to certified even if it's a literal.
         cdb.certificate_add(new_learnt);
-        asgs.uncheck_enqueue(vdb, new_learnt[0], NULL_CLAUSE);
+        let l0 = new_learnt[0];
+        asgs.uncheck_enqueue(vdb, l0, NULL_CLAUSE);
+        if false {
+            // TODO: 単位節はfoldingしているのか？
+            let fp = vdb.bump_folding_activity(l0.vi());
+            state.num_folding_vars += fp;
+            state.ema_folds_ratio.update(1.0);
+        }
         // if vdb.activity_decay < 0.99 {
         //      vdb.activity_decay += 0.01;
         // }
-        // state.ema_folds_ratio.update(1.0); TODO: 単位節はfoldingしているのか？
         state.b_lvl.update(0.0);
     } else {
         state.stats[Stat::Learnt] += 1;
