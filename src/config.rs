@@ -75,6 +75,9 @@ pub struct Config {
     /// CPU time limit in sec. (0 for no limit)
     #[structopt(long = "to", default_value = "0")]
     pub timeout: f64,
+    /// for developer
+    #[structopt(long = "debug-dump")]
+    pub debug_dump: bool,
 }
 
 impl Default for Config {
@@ -100,6 +103,7 @@ impl Default for Config {
             with_deep_search: false,
             use_certification: false,
             timeout: 0.0,
+            debug_dump: false,
         }
     }
 }

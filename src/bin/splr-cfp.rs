@@ -46,8 +46,8 @@ fn main() {
         Err(e) => println!("Failed to execution by {:?}.", e),
     }
     // /*
-    if !s.state.development_history.is_empty() {
-        if let Ok(f) = File::create("dist.csv") {
+    if s.state.config.debug_dump && !s.state.development_history.is_empty() {
+        if let Ok(f) = File::create("debug-dump.csv") {
             let mut buf = BufWriter::new(f);
             buf.write_all(b"conflict,value,kind\n").unwrap();
             for (c, lr, gr, lf, gf, ns, _) in s.state.development_history.iter() {

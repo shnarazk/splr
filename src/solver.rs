@@ -418,7 +418,7 @@ fn handle_conflict_path(
             asgs.uncheck_enqueue(vdb, l0, cid);
         }
     }
-    if ncnfl % 2500 == 0 && false {
+    if state.config.debug_dump && ncnfl % 1_000 == 0 {
         state.development_history.push((
             ncnfl,
             state.num_partial_restart as f64,
