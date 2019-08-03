@@ -318,7 +318,7 @@ fn search(
             if state.num_vars <= asgs.len() + state.num_eliminated_vars {
                 return Ok(true);
             }
-            state.block_restart(asgs);
+            // state.block_restart(asgs);
         } else {
             state.luby_restart_cnfl_cnt += 1.0;
             state.stats[Stat::Conflict] += 1;

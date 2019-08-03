@@ -47,10 +47,15 @@ impl RestartIF for State {
             return false;
         }
         self.after_restart += 1;
+
+        /*
         if 0 < self.restart_block_step {
             self.restart_block_step -= 1;
+            self.b_lvl.update(bl as f64);
+            self.partial_restart_ratio.update(0.0);
             return false;
         }
+         */
 
         let ncnfl = self.stats[Stat::Conflict];
         let bl = asgs.level();
