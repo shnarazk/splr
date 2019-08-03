@@ -181,6 +181,7 @@ pub struct State {
     pub stagnated: bool,
     /// Folding computation
     pub num_folding_vars: usize,
+    pub num_folding_vars_last: usize,
     pub num_partial_restart: usize,
     pub num_partial_restart_try: usize,
     pub partial_restart_ratio: Ema,
@@ -342,6 +343,7 @@ impl Default for State {
             use_deep_search_mode: true,
             stagnated: false,
             num_folding_vars: 0,
+            num_folding_vars_last: 1,
             num_partial_restart: 0,
             num_partial_restart_try: 0,
             partial_restart_ratio: Ema::new(75),

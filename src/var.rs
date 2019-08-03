@@ -3,7 +3,7 @@ use crate::traits::*;
 use crate::types::*;
 use std::fmt;
 
-const VAR_ACTIVITY_DECAY: f64 = 0.93;
+const VAR_ACTIVITY_DECAY: f64 = 0.92;
 
 /// Structure for variables.
 #[derive(Debug)]

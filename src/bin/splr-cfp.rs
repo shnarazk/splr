@@ -45,24 +45,21 @@ fn main() {
         }
         Err(e) => println!("Failed to execution by {:?}.", e),
     }
-    /*
-    if let Ok(f) = File::create("dist.csv") {
-        let mut buf = BufWriter::new(f);
-        buf.write_all("#conflicts, conf vars, multi conf vars, 1st UIPS, multi 1st UIPS\n".as_bytes()).unwrap();
-        for (c, i, im, ix, u, um, ux) in s.state.development_history.iter() {
-            buf.write_all(format!("{:>7},{:>8.5},{:>8.5},{:>8.5},{:>8.5},{:>8.5},{:>8.5}\n",
-                                  c,
-                                  i,
-                                  im,
-                                  ix,
-                                  u,
-                                  um,
-                                  ux)
-                          .as_bytes())
-                .unwrap();
+    // /*
+    if !s.state.development_history.is_empty() {
+        if let Ok(f) = File::create("dist.csv") {
+            let mut buf = BufWriter::new(f);
+            buf.write_all(b"conflict,value,kind\n").unwrap();
+            for (c, lr, gr, lf, gf, ns, _) in s.state.development_history.iter() {
+                buf.write_all(format!("{:>7.0},{:>8.0},\"l-restart\"\n",c, lr).as_bytes()).unwrap();
+                buf.write_all(format!("{:>7.0},{:>8.0},\"g-restart\"\n",c, gr).as_bytes()).unwrap();
+                buf.write_all(format!("{:>7.0},{:>8.0},\"l-folding\"\n",c, lf).as_bytes()).unwrap();
+                buf.write_all(format!("{:>7.0},{:>8.0},\"g-folding\"\n",c, gf).as_bytes()).unwrap();
+                buf.write_all(format!("{:>7.0},{:>8.0},\"solved\"\n",c, ns).as_bytes()).unwrap();
+            }
         }
     }
-     */
+    // */
 }
 
 #[allow(dead_code)]

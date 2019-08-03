@@ -35,7 +35,7 @@ pub struct Config {
     #[structopt(long = "rs", default_value = "50")]
     pub restart_step: usize,
     /// variable activity decay
-    #[structopt(long = "vd", default_value = "0.93")]
+    #[structopt(long = "vd", default_value = "0.92")]
     pub var_activity_decay: f64,
     /// a DIMACS format CNF file
     #[structopt(parse(from_os_str))]
@@ -88,7 +88,7 @@ impl Default for Config {
             restart_threshold: 0.70,
             restart_blocking: 1.40,
             restart_step: 50,
-            var_activity_decay: 0.93,
+            var_activity_decay: 0.92,
             cnf_filename: PathBuf::new(),
             output_dirname: PathBuf::from("."),
             result_filename: PathBuf::new(),

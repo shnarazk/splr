@@ -384,9 +384,9 @@ fn handle_conflict_path(
         // dump to certified even if it's a literal.
         cdb.certificate_add(new_learnt);
         asgs.uncheck_enqueue(vdb, new_learnt[0], NULL_CLAUSE);
-        if vdb.activity_decay < 0.99 {
-            vdb.activity_decay += 0.01;
-        }
+        // if vdb.activity_decay < 0.99 {
+        //      vdb.activity_decay += 0.01;
+        // }
         state.ema_folds_ratio.update(1.0);
         state.b_lvl.update(0.0);
     } else {
@@ -420,10 +420,12 @@ fn handle_conflict_path(
         let folding_trend = state.ema_folds_ratio.trend();
         let restart_ratio = state.partial_restart_ratio.get();
         let bj = (bl / 2).max(state.root_level);
+        let _scale = 1 + state.stats[Stat::Restart];
+        let scale = 1 + state.slack_duration;
         if !state.use_luby_restart
-            && folding_ratio < 0.1 / (1.0 + state.stats[Stat::Restart] as f64)
-            && folding_trend < 0.25
-            && 1_000 < state.after_restart
+            && folding_ratio < 0.1 / (scale as f64)
+            && folding_trend < 0.025 / (scale as f64)
+            && 1_000 * scale < state.after_restart
         // && restart_freq < pv_ratio
         {
             // stop a exhaustive search and restart
@@ -432,10 +434,24 @@ fn handle_conflict_path(
             state.partial_restart_ratio.update(1.0);
             vdb.reset_folding_points();
             vdb.activity_decay = state.config.var_activity_decay;
+            // vdb.activity_decay
+            //     += (state.num_folding_vars as f64 / state.num_folding_vars_last as f64)
+            //     .sqrt()
+            //     .min(0.999);
+            // vdb.activity_decay *= 0.5;
+            // if 1 < state.slack_duration {
+            //     let k: f64 = (state.slack_duration as f64).log(10.0);
+            //     vdb.activity_decay = (vdb.activity_decay + k) / (k + 1.0);
+            // }
+            // if vdb.activity_decay < 0.96 {
+            //     vdb.activity_decay *= 1.001; // make sure to keep a large range
+            // }
+            state.num_folding_vars_last = state.num_folding_vars;
             state.num_folding_vars = 0;
             state.num_partial_restart = 0;
             state.num_partial_restart_try = 0;
             state.ema_folds_ratio.reinitialize1();
+            state.after_restart = 0;
             state.stats[Stat::Restart] += 1;
         } else if !state.use_luby_restart
             && 1.4 < lbd_trend
@@ -451,6 +467,12 @@ fn handle_conflict_path(
             state.num_partial_restart_try += 1;
             state.stats[Stat::PartialRestart] += 1;
             state.partial_restart_ratio.update(1.0); // with a bonus
+            // increment only based on sucessful partial restarts
+            vdb.activity_decay = {
+                let n: f64 = state.num_partial_restart as f64 / 100.0;
+                let s: f64 = state.config.var_activity_decay;
+                (n + s) / (n + 1.0)
+            };
         } else {
             if !state.use_luby_restart && state.num_partial_restart_try < state.num_folding_vars {
                 state.num_partial_restart_try += 1;
@@ -459,6 +481,17 @@ fn handle_conflict_path(
             asgs.uncheck_enqueue(vdb, l0, cid);
             state.partial_restart_ratio.update(0.0);
         }
+    }
+    if tn_confl % 2500 == 0 && false {
+        state.development_history
+            .push((tn_confl,
+                   state.num_partial_restart as f64,
+                   state.stats[Stat::Restart] as f64,
+                   state.num_folding_vars as f64,
+                   vdb.count_on(Flag::FOLDED_EVER, true) as f64,
+                   state.num_solved_vars as f64,
+                   0.0,
+            ));
     }
     if tn_confl % 10_000 == 0 {
         adapt_parameters(asgs, cdb, elim, state, vdb, tn_confl)?;
@@ -602,12 +635,18 @@ fn adapt_parameters(
             cdb.simplify(asgs, elim, state, vdb)?;
         }
     }
+    if 9 * (state.num_vars - state.num_eliminated_vars) < 10 * state.num_folding_vars
+        && state.num_vars * 100 < state.stats[Stat::Conflict]
+    {
+        state.use_luby_restart = true;
+        vdb.activity_decay = 0.95;
+    }
     // convergence stat
     if state.ema_folds_ratio.get() < state.record[LogF64Id::EmaPVInc] {
         // if vdb.activity_decay < 0.98 { vdb.activity_decay *= 1.01; }
-        if 0.8 < vdb.activity_decay {
-            vdb.activity_decay *= 0.98; // make sure to keep a large range
-        }
+        // if 0.8 < vdb.activity_decay {
+        //     vdb.activity_decay *= 0.98; // make sure to keep a large range
+        // }
         //} else {
         //    if vdb.activity_decay < 0.99 {
         //        vdb.activity_decay += 0.01;
