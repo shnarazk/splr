@@ -467,7 +467,7 @@ fn handle_conflict_path(
             state.num_partial_restart_try += 1;
             state.stats[Stat::PartialRestart] += 1;
             state.partial_restart_ratio.update(1.0); // with a bonus
-            // increment only based on sucessful partial restarts
+                                                     // increment only based on sucessful partial restarts
             vdb.activity_decay = {
                 let n: f64 = state.num_partial_restart as f64 / 100.0;
                 let s: f64 = state.config.var_activity_decay;
@@ -483,15 +483,15 @@ fn handle_conflict_path(
         }
     }
     if tn_confl % 2500 == 0 && false {
-        state.development_history
-            .push((tn_confl,
-                   state.num_partial_restart as f64,
-                   state.stats[Stat::Restart] as f64,
-                   state.num_folding_vars as f64,
-                   vdb.count_on(Flag::FOLDED_EVER, true) as f64,
-                   state.num_solved_vars as f64,
-                   0.0,
-            ));
+        state.development_history.push((
+            tn_confl,
+            state.num_partial_restart as f64,
+            state.stats[Stat::Restart] as f64,
+            state.num_folding_vars as f64,
+            vdb.count_on(Flag::FOLDED_EVER, true) as f64,
+            state.num_solved_vars as f64,
+            0.0,
+        ));
     }
     if tn_confl % 10_000 == 0 {
         adapt_parameters(asgs, cdb, elim, state, vdb, tn_confl)?;
