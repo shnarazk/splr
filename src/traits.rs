@@ -176,6 +176,8 @@ pub trait PropagatorIF {
     fn propagate(&mut self, cdb: &mut ClauseDB, state: &mut State, vdb: &mut VarDB) -> ClauseId;
     /// execute *backjump*.
     fn cancel_until(&mut self, vdb: &mut VarDB, lv: usize);
+    /// update the number of assigned variables and return its progress.
+    fn check_progress(&mut self) -> isize;
     /// add an assignment caused by a clause; emit an exception if solver becomes inconsistent.
     ///
     /// # Errors
@@ -211,7 +213,7 @@ pub trait RestartIF {
     fn restart(&mut self, asgs: &mut AssignStack, vdb: &mut VarDB) -> bool;
     /// check restart conditions
     fn check_restart(&mut self, asgs: &AssignStack, vdb: &mut VarDB) -> bool;
-    fn block_restart(&mut self, asgs: &AssignStack) -> bool;
+    // fn block_restart(&mut self, asgs: &AssignStack) -> bool;
     /// update data for forcing restart.
     fn restart_update_lbd(&mut self, lbd: usize);
     /// update data for blocking restart.
@@ -289,7 +291,6 @@ pub trait VarDBIF {
     fn bump_activity(&mut self, vi: VarId);
     fn bump_folding_activity(&mut self, vi: VarId) -> usize;
     fn reset_folding_points(&mut self);
-    fn count_on(&self, flag: Flag, on: bool) -> usize;
 }
 
 /// API for 'watcher list' like `attach`, `detach`, `detach_with` and so on.

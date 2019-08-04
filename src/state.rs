@@ -182,8 +182,6 @@ pub struct State {
     pub use_deep_search_mode: bool,
     pub stagnated: bool,
     /// Folding computation
-    pub num_folding_vars: usize,
-    pub num_folding_vars_last: usize,
     pub num_partial_restart: usize,
     pub num_partial_restart_try: usize,
     pub partial_restart_ratio: Ema,
@@ -212,10 +210,10 @@ pub struct State {
     pub slack_duration: usize,
     pub stats: [usize; Stat::EndOfStatIndex as usize], // statistics
     pub ema_asg: Ema,
+    pub ema_asg_progress: Ema2,
     pub ema_lbd: Ema,
     pub b_lvl: Ema,
     pub c_lvl: Ema,
-    pub sum_asg: f64,
     pub num_solved_vars: usize,
     pub num_eliminated_vars: usize,
     pub model: Vec<Lbool>,
@@ -331,8 +329,8 @@ impl Default for State {
             cdb_soft_limit: 0, // 248_000_000
             ema_coeffs: (2 ^ 5, 2 ^ 15),
             adaptive_restart: false,
-            restart_thr: 0.70,     // will be overwritten by bin/splr
-            restart_blk: 1.40,     // will be overwritten by bin/splr
+            restart_thr: 1.50,     // will be overwritten by bin/splr
+            restart_blk: 1.20,     // will be overwritten by bin/splr
             restart_asg_len: 3500, // will be overwritten by bin/splr
             restart_lbd_len: 100,  // will be overwritten by bin/splr
             restart_expansion: 1.15,
@@ -346,8 +344,6 @@ impl Default for State {
             luby_restart_cnfl_cnt: 0.0,
             use_deep_search_mode: true,
             stagnated: false,
-            num_folding_vars: 0,
-            num_folding_vars_last: 1,
             num_partial_restart: 0,
             num_partial_restart_try: 0,
             partial_restart_ratio: Ema::new(75),
@@ -369,10 +365,10 @@ impl Default for State {
             slack_duration: 0,
             stats: [0; Stat::EndOfStatIndex as usize],
             ema_asg: Ema::new(1),
+            ema_asg_progress: Ema2::new(5_000).with_fast(100),
             ema_lbd: Ema::new(1),
             b_lvl: Ema::new(5_000),
             c_lvl: Ema::new(5_000),
-            sum_asg: 0.0,
             num_solved_vars: 0,
             num_eliminated_vars: 0,
             model: Vec::new(),
@@ -568,7 +564,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K  Assignment|#rem:{}, #fix:{}, #elm:{}, prg%:{} ",
+            "\x1B[2K    Progress|#rem:{}, #fix:{}, #elm:{}, prg%:{} ",
             im!("{:>9}", self.record, LogUsizeId::Remain, nv - sum),
             im!("{:>9}", self.record, LogUsizeId::Fixed, fixed),
             im!(
@@ -638,35 +634,25 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K   Clause DB|#rdc:{}, #sce:{},|asg%:{}, vdcy:{} ",
+            "\x1B[2K  Assignment|asg%:{}, #prg:{}, vdcy:{},|clrd:{} ",
+            format!("{:>9.4}", 100.0 * self.ema_asg.get() / nv as f64),
+            format!("{:>9.2}", self.ema_asg_progress.get()),
+            format!("{:>9.4}", vdb.activity_decay),
             im!(
                 "{:>9}",
                 self.record,
                 LogUsizeId::Reduction,
                 self.stats[Stat::Reduction]
             ),
-            im!(
-                "{:>9}",
-                self.record,
-                LogUsizeId::SatClauseElim,
-                self.stats[Stat::SatClauseElimination]
-            ),
-            fm!(
-                "{:>9.4}",
-                self.record,
-                LogF64Id::EmaAsg,
-                100.0 * self.ema_asg.get() / nv as f64
-            ),
-            format!("{:>9.4}", vdb.activity_decay),
         );
         println!(
-            "\x1B[2K     Folding|#all:{}, #now:{}, prob:{}, trnd:{} ",
-            format!("{:>9}", vdb.count_on(Flag::FOLDED_EVER, true)),
+            "\x1B[2K     Folding|#all:{}, #now:{}, prob:{}, fast:{} ",
+            format!("{:>9}", vdb.num_folding_vars),
             im!(
                 "{:>9.2}",
                 self.record,
                 LogUsizeId::NumPV,
-                self.num_folding_vars
+                vdb.num_current_folding_vars
             ),
             /* pol%:{}
                         fm!(
@@ -682,7 +668,7 @@ impl StateIF for State {
                 LogF64Id::EmaPVInc,
                 self.ema_folds_ratio.get()
             ),
-            format!("{:>9.4}", self.ema_folds_ratio.trend()),
+            format!("{:>9.4}", self.ema_folds_ratio.get_fast()),
         );
         println!(
             "\x1B[2K     Restart|full:{}, part:{}, prob:{}, Luby:{} ",
@@ -791,8 +777,8 @@ pub enum LogF64Id {
     RestartThrK,  //  6: restart K
     RestartBlkR,  //  7: restart R
     EmaRestart,   //  8: average effective restart step
-    EmaPVInc,     //  9: increasing speed of the number of polar vars
-    PVRatio,      // 10: the percentage of polar vars
+    EmaPVInc,     //  9: increasing speed of the number of folding vars
+    PVRatio,      // 10: the percentage of folding vars
     End,
 }
 

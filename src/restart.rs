@@ -47,27 +47,19 @@ impl RestartIF for State {
             return false;
         }
         self.after_restart += 1;
-
-        /*
-        if 0 < self.restart_block_step {
-            self.restart_block_step -= 1;
-            self.b_lvl.update(bl as f64);
-            self.partial_restart_ratio.update(0.0);
-            return false;
-        }
-         */
-
         let ncnfl = self.stats[Stat::Conflict];
         let bl = asgs.level();
         let bj = (bl / 2).max(self.root_level);
-        let _nvar = self.num_vars - self.num_solved_vars - self.num_eliminated_vars;
+        let apc_ratio = self.ema_asg_progress.get();
+        let apc_fast =  self.ema_asg_progress.get_fast();
         let folding_ratio = self.ema_folds_ratio.get();
-        let folding_trend = self.ema_folds_ratio.trend();
+        let folding_fast = self.ema_folds_ratio.trend();
         let restart_ratio = self.partial_restart_ratio.get();
         let scale = 1 + self.slack_duration; // 1 + self.stats[Stat::Restart];
 
         let full_covered_condition: bool =
             folding_ratio < 0.1 / (scale as f64).sqrt()
+            // && folding_fast < 0.1 // (scale as f64).sqrt()
             // && folding_trend < 0.025 / (scale as f64).sqrt()
             // && folding_trend < 0.25
             // && 1_000 * scale < self.after_restart
@@ -77,22 +69,28 @@ impl RestartIF for State {
         let glucose_restart_condition: bool =
         {
             let average_lbd = self.stats[Stat::SumLBD] as f64 / ncnfl as f64;
-            // let a = self.slack_duration as f64;
-            // (average_lbd + a) / (1.0 + a) < self.ema_lbd.get() * self.restart_thr
-            average_lbd < self.ema_lbd.get() * self.restart_thr
+            average_lbd * self.restart_thr < self.ema_lbd.get()
         };
 
-        let _glucose_blocking_condition: bool =
+        let glucose_blocking_condition: bool =
             self.restart_blk * self.ema_asg.get() < asgs.len() as f64
             ;
 
+        let assignment_improve_condition: bool =
+            0.0 <= apc_ratio
+            || 0.0 <= apc_fast
+            || glucose_blocking_condition
+            ;
+
         let global_restart_condition: bool =
-            full_covered_condition
+            !assignment_improve_condition
+            && full_covered_condition
             && 0 < self.num_partial_restart
             ;
 
         let partial_restart_condition: bool =
-            glucose_restart_condition
+            !assignment_improve_condition
+            && glucose_restart_condition
             && bj < bl
             ;
 
@@ -100,24 +98,12 @@ impl RestartIF for State {
             && 0 < self.num_partial_restart
         { // stop a exhaustive search and restart
             asgs.cancel_until(vdb, 0);
+            asgs.check_progress();
             self.b_lvl.update(0.0);
             self.partial_restart_ratio.update(1.0);
             vdb.reset_folding_points();
             vdb.activity_decay = self.config.var_activity_decay;
-            // vdb.activity_decay
-            //     += (self.num_folding_vars as f64 / self.num_folding_vars_last as f64)
-            //     .sqrt()
-            //     .min(0.999);
-            // vdb.activity_decay *= 0.5;
-            // if 1 < self.slack_duration {
-            //     let k: f64 = (self.slack_duration as f64).log(10.0);
-            //     vdb.activity_decay = (vdb.activity_decay + k) / (k + 1.0);
-            // }
-            // if vdb.activity_decay < 0.96 {
-            //     vdb.activity_decay *= 1.001; // make sure to keep a large range
-            // }
-            self.num_folding_vars_last = self.num_folding_vars;
-            self.num_folding_vars = 0;
+            vdb.num_current_folding_vars = 0;
             self.num_partial_restart = 0;
             self.num_partial_restart_try = 0;
             self.ema_folds_ratio.reinitialize1();
@@ -125,9 +111,10 @@ impl RestartIF for State {
             self.stats[Stat::Restart] += 1;
         } else if partial_restart_condition
             && restart_ratio < folding_ratio
-            && self.num_partial_restart_try <= self.num_folding_vars
+            && self.num_partial_restart_try <= vdb.num_current_folding_vars
         {
             asgs.cancel_until(vdb, bj);
+            asgs.check_progress();
             self.b_lvl.update(bj as f64);
             self.num_partial_restart += 1;
             self.num_partial_restart_try += 1;
@@ -135,7 +122,7 @@ impl RestartIF for State {
             if false {
                 // reset some counters on folding
                 vdb.reset_folding_points();
-                self.num_folding_vars = 0;
+                vdb.num_current_folding_vars = 0;
                 self.ema_folds_ratio.reinitialize1();
             }
             // end of the reset block
@@ -147,7 +134,7 @@ impl RestartIF for State {
                 (n + s) / (n + 1.0)
             };
         } else {
-            if partial_restart_condition && folding_trend < 0.5 {
+            if partial_restart_condition && folding_fast < 0.5 {
                 self.num_partial_restart_try += 1;
             }
             self.b_lvl.update(bl as f64);
@@ -194,7 +181,7 @@ impl RestartIF for State {
                 }
                 // check invoking condition
                 let ave = self.stats[Stat::SumLBD] as f64 / ncnfl as f64;
-                if false && ave < self.ema_lbd.get() * self.restart_thr {
+                if false && ave * self.restart_thr < self.ema_lbd.get() {
                     self.stats[Stat::Restart] += 1;
                     self.ema_restart_len.update(self.after_restart as f64);
                     self.after_restart = 0;
@@ -211,12 +198,15 @@ impl RestartIF for State {
         */
         false
     }
+/*
     /// return true to block restart.
     fn block_restart(&mut self, asgs: &AssignStack) -> bool {
         if self.use_luby_restart || 0 < self.restart_block_step {
             return false;
         }
-        if self.restart_blk * self.ema_asg.get() < asgs.len() as f64 {
+        if self.restart_blk * self.ema_asg.get() < asgs.len() as f64
+            && 0.0 < self.ema_asg_progress.get()
+        {
             self.restart_block_step = self.restart_step;
             self.after_restart = 0;
             self.stats[Stat::BlockRestart] += 1;
@@ -224,12 +214,12 @@ impl RestartIF for State {
         }
         false
     }
+*/
     fn restart_update_lbd(&mut self, lbd: usize) {
         self.ema_lbd.update(lbd as f64);
     }
     fn restart_update_asg(&mut self, n: usize) {
         self.ema_asg.update(n as f64);
-        // self.sum_asg += n as f64 / config.num_vars as f64;
     }
     fn restart_update_luby(&mut self) {
         if self.use_luby_restart {

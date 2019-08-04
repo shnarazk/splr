@@ -121,7 +121,7 @@ OPTIONS:
         --rb <restart_blocking>       blocking restart threshold [default: 1.40]
         --rl <restart_lbd_len>        length for LBD average [default: 50]
         --rs <restart_step>           #conflicts between restarts [default: 50]
-        --rt <restart_threshold>      forcing restart threshold [default: 0.70]
+        --rt <restart_threshold>      forcing restart threshold [default: 1.50]
     -r, --result <result_filename>    result filename/stdout [default: ]
         --to <timeout>                CPU time limit in sec. (0 for no limit) [default: 0]
 

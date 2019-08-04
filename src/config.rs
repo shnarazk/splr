@@ -26,10 +26,10 @@ pub struct Config {
     #[structopt(long = "rl", default_value = "50")]
     pub restart_lbd_len: usize,
     /// forcing restart threshold
-    #[structopt(long = "rt", default_value = "0.70")]
+    #[structopt(long = "rt", default_value = "2.00")]
     pub restart_threshold: f64, // Glucose's K
     /// blocking restart threshold
-    #[structopt(long = "rb", default_value = "1.40")]
+    #[structopt(long = "rb", default_value = "1.20")]
     pub restart_blocking: f64, // Glucose's R
     /// #conflicts between restarts
     #[structopt(long = "rs", default_value = "50")]
@@ -88,8 +88,8 @@ impl Default for Config {
             elim_lit_limit: 100,
             restart_asg_len: 3500,
             restart_lbd_len: 50,
-            restart_threshold: 0.70,
-            restart_blocking: 1.40,
+            restart_threshold: 1.50,
+            restart_blocking: 1.20,
             restart_step: 50,
             var_activity_decay: 0.92,
             cnf_filename: PathBuf::new(),

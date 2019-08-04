@@ -14,6 +14,7 @@ pub struct AssignStack {
     pub assign: Vec<Lbool>,
     trail_lim: Vec<usize>,
     q_head: usize,
+    num_assigned_vars: usize,
     var_order: VarIdHeap, // Variable Order
 }
 
@@ -24,6 +25,7 @@ impl PropagatorIF for AssignStack {
             assign: vec![BOTTOM; n + 1],
             trail_lim: Vec::new(),
             q_head: 0,
+            num_assigned_vars: 0,
             var_order: VarIdHeap::new(n, n),
         }
     }
@@ -182,6 +184,12 @@ impl PropagatorIF for AssignStack {
         self.trail.truncate(lim);
         self.trail_lim.truncate(lv);
         self.q_head = lim;
+    }
+    fn check_progress(&mut self) -> isize {
+        let nasgs = self.trail.len();
+        let diff = nasgs as isize - self.num_assigned_vars as isize;
+        self.num_assigned_vars = nasgs;
+        diff
     }
     fn uncheck_enqueue(&mut self, vdb: &mut VarDB, l: Lit, cid: ClauseId) {
         debug_assert!(l != 0, "Null literal is about to be equeued");

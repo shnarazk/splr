@@ -2,7 +2,7 @@ use crate::clause::{Clause, ClauseDB};
 use crate::config::Config;
 use crate::eliminator::Eliminator;
 use crate::propagator::AssignStack;
-use crate::state::{LogF64Id, Stat, State};
+use crate::state::{Stat, State};
 use crate::traits::*;
 use crate::types::*;
 use crate::var::VarDB;
@@ -167,15 +167,18 @@ impl SatSolverIF for Solver {
                 }
                 elim.extend_model(&mut result);
                 asgs.cancel_until(vdb, 0);
+                asgs.check_progress();
                 Ok(Certificate::SAT(result))
             }
             Ok(false) => {
                 state.progress(cdb, vdb, None);
                 asgs.cancel_until(vdb, 0);
+                asgs.check_progress();
                 Ok(Certificate::UNSAT)
             }
             Err(_) => {
                 asgs.cancel_until(vdb, 0);
+                asgs.check_progress();
                 state.progress(cdb, vdb, Some("ERROR"));
                 state.ok = false;
                 if cdb.check_size(state).is_err() {
@@ -338,6 +341,7 @@ fn search(
         // THE UNIFIED DYNAMIC RESTART CONTROL POINT
         if tate.check_restart(asgs, vdb, &mut conflict_c) {
             asgs.cancel_until(vdb, l);
+            asgs.check_progress();
         }
 */
         if asgs.level() == 0 {
@@ -374,17 +378,16 @@ fn handle_conflict_path(
     let bl = analyze(asgs, cdb, state, vdb, ci);
     let new_learnt = &mut state.new_learnt;
     asgs.cancel_until(vdb, bl.max(state.root_level));
+    state.ema_asg_progress.update(asgs.check_progress() as f64);
     let learnt_len = new_learnt.len();
     if learnt_len == 1 {
         // dump to certified even if it's a literal.
         cdb.certificate_add(new_learnt);
         let l0 = new_learnt[0];
         asgs.uncheck_enqueue(vdb, l0, NULL_CLAUSE);
-        if false {
+        if true {
             // TODO: 単位節はfoldingしているのか？
-            let fp = vdb.bump_folding_activity(l0.vi());
-            state.num_folding_vars += fp;
-            state.ema_folds_ratio.update(1.0);
+            state.ema_folds_ratio.update(vdb.bump_folding_activity(l0.vi()) as f64);
         }
         // if vdb.activity_decay < 0.99 {
         //      vdb.activity_decay += 0.01;
@@ -394,11 +397,7 @@ fn handle_conflict_path(
         state.stats[Stat::Learnt] += 1;
         let lbd = vdb.compute_lbd(&new_learnt);
         let l0 = new_learnt[0];
-        {
-            let fp = vdb.bump_folding_activity(l0.vi());
-            state.num_folding_vars += fp;
-            state.ema_folds_ratio.update(fp as f64);
-        }
+        state.ema_folds_ratio.update(vdb.bump_folding_activity(l0.vi()) as f64);
         if lbd <= 2 {
             state.stats[Stat::NumLBD2] += 1;
         }
@@ -406,9 +405,7 @@ fn handle_conflict_path(
             state.stats[Stat::NumBin] += 1;
             state.stats[Stat::NumBinLearnt] += 1;
             let l1 = new_learnt[1];
-            let fp = vdb.bump_folding_activity(l1.vi());
-            state.num_folding_vars += fp;
-            state.ema_folds_ratio.update(fp as f64);
+            state.ema_folds_ratio.update(vdb.bump_folding_activity(l1.vi()) as f64);
         }
         let cid = cdb.attach(state, vdb, lbd);
         elim.add_cid_occur(vdb, cid, &mut cdb.clause[cid as usize], true);
@@ -423,10 +420,10 @@ fn handle_conflict_path(
             ncnfl,
             state.num_partial_restart as f64,
             state.stats[Stat::Restart] as f64,
-            state.num_folding_vars as f64,
-            vdb.count_on(Flag::FOLDED_EVER, true) as f64,
+            vdb.num_current_folding_vars as f64,
+            vdb.num_folding_vars as f64,
             state.num_solved_vars as f64,
-            0.0,
+            state.ema_asg.get(),
         ));
     }
     if ncnfl % 10_000 == 0 {
@@ -477,117 +474,16 @@ fn adapt_parameters(
         state.stagnated = stagnated;
     }
     state.stats[Stat::SolvedRecord] = state.num_solved_vars;
-    {
-        /*
-        let alive = state.num_vars;
-        let mut incn = 0;
-        let mut fuip = 0;
-        let mut minc = 0;
-        let mut mfui = 0;
-        let mut inou = 0;
-        let mut unoi = 0;
-        for v in &vars[..] {
-            if 0 == v.inconsistent && 0 == v.uip {
-                // done nothing
-            } else if 0 < v.inconsistent {
-                incn += 1;
-                if 1 < v.inconsistent {
-                    minc += 1;
-                }
-                if 0 == v.uip {
-                    inou += 1;
-                }
-            }
-            if 0 < v.uip {
-                fuip += 1;
-                if 1 < v.uip {
-                    mfui += 1;
-                }
-                if 0 == v.inconsistent {
-                    unoi += 1;
-                }
-            }
-        }
-        */
-        /*
-        state.development_history
-            .push((ncnfl,
-                   (state.inconsistent_sum as f64 / alive as f64),
-                   (minc as f64 / alive as f64),
-                   (inou as f64 / alive as f64),
-                   (state.uip_sum as f64 / alive as f64),
-                   (mfui as f64 / alive as f64),
-                   (unoi as f64 / alive as f64),
-            ));
-        */
-    }
-    /*
-        if !state.use_luby_restart && state.adaptive_restart {
-            // let nr = state.stats[Stat::Restart] - state.stats[Stat::RestartRecord];
-            state.stats[Stat::RestartRecord] = state.stats[Stat::Restart];
-            // let nb = state.stats[Stat::BlockRestart] - state.stats[Stat::BlockRestartRecord];
-            state.stats[Stat::BlockRestartRecord] = state.stats[Stat::BlockRestart];
-            let margin: f64 = 0.20;
-            let moving: f64 = 1.002;
-            let incr = state.ema_folds_ratio.get();
-            let rate = state.ema_folds_ratio.ratio();
-            if state.stagnated && (1.0 < incr || 2.0 < rate) {
-                if state.config.restart_threshold - margin < state.restart_thr {
-                    state.restart_thr /= moving;
-                }
-                if state.restart_blk < state.config.restart_blocking + margin {
-                    state.restart_blk *= moving;
-                }
-            } else if state.stagnated && (incr < 0.001 || rate < 0.5) {
-                if state.restart_thr < state.config.restart_threshold + margin {
-                    state.restart_thr *= moving;
-                }
-                if state.config.restart_blocking - margin < state.restart_blk {
-                    state.restart_blk /= moving;
-                }
-            } else if !state.stagnated {
-                // dumping restart_forcing
-                if state.restart_thr < state.config.restart_threshold + margin {
-                    state.restart_thr *= moving;
-                } else if state.config.restart_threshold - margin < state.restart_thr {
-                    state.restart_thr /= moving;
-                }
-                // dumping restart_blocking
-                if state.restart_blk < state.config.restart_blocking + margin {
-                    state.restart_blk *= moving;
-                } else if state.config.restart_blocking - margin < state.restart_blk {
-                    state.restart_blk /= moving;
-                }
-            }
-        }
-    */
     if nconflict == switch {
         state.flush("activating an exhaustive eliminator...");
         asgs.cancel_until(vdb, 0);
+        asgs.check_progress();
         state.adapt_strategy(cdb);
         if state.use_elim {
             // cdb.reset(state.co_lbd_bound);
             elim.activate();
             cdb.simplify(asgs, elim, state, vdb)?;
         }
-    }
-//    if 9 * (state.num_vars - state.num_eliminated_vars) < 10 * state.num_folding_vars
-//        && state.num_vars * 100 < state.stats[Stat::Conflict]
-//    {
-//        state.use_luby_restart = true;
-//        vdb.activity_decay = 0.95;
-//    }
-    // convergence stat
-    if state.ema_folds_ratio.get() < state.record[LogF64Id::EmaPVInc] {
-        // if vdb.activity_decay < 0.98 { vdb.activity_decay *= 1.01; }
-        // if 0.8 < vdb.activity_decay {
-        //     vdb.activity_decay *= 0.98; // make sure to keep a large range
-        // }
-        //} else {
-        //    if vdb.activity_decay < 0.99 {
-        //        vdb.activity_decay += 0.01;
-        //    }
-        //    // if 0.75 < vdb.activity_decay { vdb.activity_decay *= 0.99; }
     }
     state.progress(cdb, vdb, None);
     // if state.stagnated {

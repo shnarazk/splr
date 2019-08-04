@@ -82,6 +82,8 @@ pub struct VarDB {
     /// var activity decay
     pub activity_decay: f64,
     pub lbd_temp: Vec<usize>,
+    pub num_folding_vars: usize,
+    pub num_current_folding_vars: usize,
 }
 
 impl Default for VarDB {
@@ -91,6 +93,8 @@ impl Default for VarDB {
             current_conflict: 0,
             activity_decay: VAR_ACTIVITY_DECAY,
             lbd_temp: Vec::new(),
+            num_folding_vars: 0,
+            num_current_folding_vars: 0,
         }
     }
 }
@@ -102,6 +106,8 @@ impl VarDBIF for VarDB {
             current_conflict: 0,
             activity_decay,
             lbd_temp: vec![0; n + 1],
+            num_folding_vars: 0,
+            num_current_folding_vars: 0,
         }
     }
     fn assigned(&self, l: Lit) -> Lbool {
@@ -151,25 +157,21 @@ impl VarDBIF for VarDB {
     fn bump_folding_activity(&mut self, vi: VarId) -> usize {
         let v = &mut self.vars[vi];
         v.folding_count += 1;
-        if v.is(Flag::FOLDED) {
-            0
-        } else {
-            v.turn_on(Flag::FOLDED);
+        let ret = !v.is(Flag::FOLDED) as usize;
+        if !v.is(Flag::FOLDED_EVER) {
             v.turn_on(Flag::FOLDED_EVER);
-            1
+            self.num_folding_vars += 1;
         }
+        if !v.is(Flag::FOLDED) {
+            v.turn_on(Flag::FOLDED);
+            self.num_current_folding_vars += 1;
+        }
+        ret
     }
     fn reset_folding_points(&mut self) {
         for v in &mut self.vars[1..] {
             v.turn_off(Flag::FOLDED);
         }
-    }
-    fn count_on(&self, flag: Flag, on: bool) -> usize {
-        self.vars
-            .iter()
-            .skip(1)
-            .filter(|v| v.is(flag) == on)
-            .count()
     }
 }
 
