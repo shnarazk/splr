@@ -46,11 +46,12 @@ fn main() {
         Err(e) => println!("Failed to execution by {:?}.", e),
     }
     // /*
-    if s.state.config.debug_dump && !s.state.development_history.is_empty() {
-        if let Ok(f) = File::create("debug-dump.csv") {
+    if 0 < s.state.config.debug_dump && !s.state.development_history.is_empty() {
+        let dump = config.cnf_filename.file_stem().unwrap().to_str().unwrap();
+        if let Ok(f) = File::create(format!("debug-dump_{}.csv", dump)) {
             let mut buf = BufWriter::new(f);
             buf.write_all(b"conflict,value,kind\n").unwrap();
-            for (c, lr, gr, lf, gf, ns, _) in s.state.development_history.iter() {
+            for (c, lr, gr, lf, gf, ns, na, bc) in s.state.development_history.iter() {
                 buf.write_all(format!("{:>7.0},{:>8.0},\"l-restart\"\n", c, lr).as_bytes())
                     .unwrap();
                 buf.write_all(format!("{:>7.0},{:>8.0},\"g-restart\"\n", c, gr).as_bytes())
@@ -60,6 +61,10 @@ fn main() {
                 buf.write_all(format!("{:>7.0},{:>8.0},\"g-folding\"\n", c, gf).as_bytes())
                     .unwrap();
                 buf.write_all(format!("{:>7.0},{:>8.0},\"solved\"\n", c, ns).as_bytes())
+                    .unwrap();
+                buf.write_all(format!("{:>7.0},{:>8.0},\"assigned\"\n", c,na).as_bytes())
+                    .unwrap();
+                buf.write_all(format!("{:>7.0},{:>8.0},\"binclause\"\n", c, bc).as_bytes())
                     .unwrap();
             }
         }

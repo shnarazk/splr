@@ -20,16 +20,16 @@ pub struct Config {
     #[structopt(long = "el", default_value = "64")]
     pub elim_lit_limit: usize,
     /// length for assignment average
-    #[structopt(long = "ra", default_value = "3500")]
+    #[structopt(long = "ra", default_value = "50")]
     pub restart_asg_len: usize,
     /// length for LBD average
     #[structopt(long = "rl", default_value = "50")]
     pub restart_lbd_len: usize,
     /// forcing restart threshold
-    #[structopt(long = "rt", default_value = "2.00")]
+    #[structopt(long = "rt", default_value = "1.20")]
     pub restart_threshold: f64, // Glucose's K
     /// blocking restart threshold
-    #[structopt(long = "rb", default_value = "1.20")]
+    #[structopt(long = "rb", default_value = "1.00")]
     pub restart_blocking: f64, // Glucose's R
     /// #conflicts between restarts
     #[structopt(long = "rs", default_value = "50")]
@@ -76,8 +76,8 @@ pub struct Config {
     #[structopt(long = "to", default_value = "0")]
     pub timeout: f64,
     /// for developer
-    #[structopt(long = "debug-dump")]
-    pub debug_dump: bool,
+    #[structopt(long = "debug-dump", default_value = "0")]
+    pub debug_dump: usize,
 }
 
 impl Default for Config {
@@ -86,10 +86,10 @@ impl Default for Config {
             clause_limit: 18_000_000,
             elim_grow_limit: 4,
             elim_lit_limit: 100,
-            restart_asg_len: 3500,
+            restart_asg_len: 50,
             restart_lbd_len: 50,
-            restart_threshold: 1.50,
-            restart_blocking: 1.20,
+            restart_threshold: 1.20,
+            restart_blocking: 1.00,
             restart_step: 50,
             var_activity_decay: 0.92,
             cnf_filename: PathBuf::new(),
@@ -103,7 +103,7 @@ impl Default for Config {
             with_deep_search: false,
             use_certification: false,
             timeout: 0.0,
-            debug_dump: false,
+            debug_dump: 0,
         }
     }
 }

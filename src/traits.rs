@@ -211,8 +211,6 @@ pub trait PropagatorIF {
 pub trait RestartIF {
     /// new local/global restart control
     fn restart(&mut self, asgs: &mut AssignStack, vdb: &mut VarDB) -> bool;
-    /// check restart conditions
-    fn check_restart(&mut self, asgs: &AssignStack, vdb: &mut VarDB) -> bool;
     // fn block_restart(&mut self, asgs: &AssignStack) -> bool;
     /// update data for forcing restart.
     fn restart_update_lbd(&mut self, lbd: usize);

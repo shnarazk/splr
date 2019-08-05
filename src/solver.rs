@@ -321,7 +321,6 @@ fn search(
             if state.num_vars <= asgs.len() + state.num_eliminated_vars {
                 return Ok(true);
             }
-            // state.block_restart(asgs);
         } else {
             state.luby_restart_cnfl_cnt += 1.0;
             state.stats[Stat::Conflict] += 1;
@@ -337,13 +336,6 @@ fn search(
             }
             handle_conflict_path(asgs, cdb, elim, state, vdb, ci)?;
         }
-/*
-        // THE UNIFIED DYNAMIC RESTART CONTROL POINT
-        if tate.check_restart(asgs, vdb, &mut conflict_c) {
-            asgs.cancel_until(vdb, l);
-            asgs.check_progress();
-        }
-*/
         if asgs.level() == 0 {
             if cdb.simplify(asgs, elim, state, vdb).is_err() {
                 dbg!("interal error by simplify");
@@ -385,13 +377,22 @@ fn handle_conflict_path(
         cdb.certificate_add(new_learnt);
         let l0 = new_learnt[0];
         asgs.uncheck_enqueue(vdb, l0, NULL_CLAUSE);
-        if true {
-            // TODO: 単位節はfoldingしているのか？
-            state.ema_folds_ratio.update(vdb.bump_folding_activity(l0.vi()) as f64);
+        if false {
+            //vdb.num_current_folding_vars -=
+            //    vdb.vars[l0.vi()].folding_count.min(vdb.num_current_folding_vars);
+            // vdb.bump_folding_activity(l0.vi());
+            // state.ema_folds_ratio.update(0.0); // this is not a typo.
+            // state.ema_folds_ratio.reinitialize1();
+            // extra task
+            vdb.reset_folding_points();
+            vdb.activity_decay = state.config.var_activity_decay;
+            state.num_partial_restart = 0;
+            state.num_partial_restart_try = 0;
         }
         // if vdb.activity_decay < 0.99 {
         //      vdb.activity_decay += 0.01;
         // }
+        state.restart_update_lbd(0);
         state.b_lvl.update(0.0);
     } else {
         state.stats[Stat::Learnt] += 1;
@@ -415,7 +416,7 @@ fn handle_conflict_path(
             asgs.uncheck_enqueue(vdb, l0, cid);
         }
     }
-    if state.config.debug_dump && ncnfl % 1_000 == 0 {
+    if 0 < state.config.debug_dump && ncnfl % state.config.debug_dump == 0 {
         state.development_history.push((
             ncnfl,
             state.num_partial_restart as f64,
@@ -424,7 +425,8 @@ fn handle_conflict_path(
             vdb.num_folding_vars as f64,
             state.num_solved_vars as f64,
             state.ema_asg.get(),
-        ));
+            state.stats[Stat::NumBin] as f64,
+   ));
     }
     if ncnfl % 10_000 == 0 {
         adapt_parameters(asgs, cdb, elim, state, vdb, ncnfl)?;

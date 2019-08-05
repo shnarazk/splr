@@ -172,6 +172,7 @@ impl VarDBIF for VarDB {
         for v in &mut self.vars[1..] {
             v.turn_off(Flag::FOLDED);
         }
+        self.num_current_folding_vars = 0;
     }
 }
 

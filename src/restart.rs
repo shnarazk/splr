@@ -48,53 +48,105 @@ impl RestartIF for State {
         }
         self.after_restart += 1;
         let ncnfl = self.stats[Stat::Conflict];
+        let _scale = 1 + self.slack_duration; // 1 + self.stats[Stat::Restart];
+        let scale: f64 = vdb.num_current_folding_vars as f64
+            / vdb.num_folding_vars as f64;
+        // (self.num_vars - self.num_eliminated_vars) as f64;
         let bl = asgs.level();
-        let bj = (bl / 2).max(self.root_level);
+        let _bj = (bl / 2).max(self.root_level);
+        let bj = (((1.0 - scale) * bl as f64) as usize).max(self.root_level);
         let apc_ratio = self.ema_asg_progress.get();
         let apc_fast =  self.ema_asg_progress.get_fast();
+        let _apc_trend =  self.ema_asg_progress.trend();
         let folding_ratio = self.ema_folds_ratio.get();
-        let folding_fast = self.ema_folds_ratio.trend();
+        let folding_fast = self.ema_folds_ratio.get_fast();
+        let folding_trend = self.ema_folds_ratio.trend();
         let restart_ratio = self.partial_restart_ratio.get();
-        let scale = 1 + self.slack_duration; // 1 + self.stats[Stat::Restart];
+
 
         let full_covered_condition: bool =
-            folding_ratio < 0.1 / (scale as f64).sqrt()
-            // && folding_fast < 0.1 // (scale as f64).sqrt()
-            // && folding_trend < 0.025 / (scale as f64).sqrt()
-            // && folding_trend < 0.25
-            // && 1_000 * scale < self.after_restart
+            vdb.num_folding_vars == vdb.num_current_folding_vars
+                // folding_ratio < 0.02 / (scale as f64).sqrt()
+            && 0.2 < folding_ratio
+            && 1.0 < folding_trend
+                // && folding_trend < 0.1 // (scale as f64).sqrt()
+                // && folding_trend < 0.025 / (scale as f64).sqrt()
+                // && folding_trend < 0.25
+                // && 1_000 * scale < self.after_restart
             && 1_000 < self.after_restart
             ;
 
         let glucose_restart_condition: bool =
         {
             let average_lbd = self.stats[Stat::SumLBD] as f64 / ncnfl as f64;
-            average_lbd * self.restart_thr < self.ema_lbd.get()
+            self.restart_thr * average_lbd < self.ema_lbd.get()
         };
 
         let glucose_blocking_condition: bool =
-            self.restart_blk * self.ema_asg.get() < asgs.len() as f64
-            ;
+        {
+            // let cover: f64 = vdb.num_current_folding_vars as f64 / self.num_vars as f64;
+            // let cover: f64 = vdb.num_current_folding_vars as f64 / vdb.num_folding_vars as f64;
+            // self.restart_blk * self.ema_asg.get() < asgs.len() as f64
+            // self.restart_blk < self.ema_asg.trend()
+            // self.restart_blk * cover < self.ema_asg.trend()
+            self.restart_blk * (self.stats[Stat::SumASG] as f64) < asgs.len() as f64
+        };
 
         let assignment_improve_condition: bool =
             0.0 <= apc_ratio
             || 0.0 <= apc_fast
-            || glucose_blocking_condition
+            ;
+        
+        let assignment_stagnated_condition: bool =
+        {
+            let thrd = vdb.num_folding_vars as f64 / 1000.0;
+            apc_ratio.abs() < thrd
+                && apc_fast.abs() < thrd / 2.0
+        };
+        
+        let restartable_condition: bool =
+        {
+            let _cover: f64 = vdb.num_current_folding_vars as f64
+                / vdb.num_folding_vars as f64;
+            folding_ratio < 0.4
+                && folding_fast < 0.2
+        };
+
+        let most_covered_condition: bool =
+        {
+            let _cover: f64 = vdb.num_current_folding_vars as f64
+                / vdb.num_folding_vars as f64;
+            folding_ratio < 0.2
+                && folding_fast < 0.1
+        };
+
+        let partial_restart_condition: bool = true
+            // !glucose_blocking_condition
+            // && !assignment_improve_condition
+            && glucose_restart_condition
+            && bj < bl
+            && restartable_condition
+            // && self.root_level < bj
             ;
 
-        let global_restart_condition: bool =
+        let _global_restart_condition: bool =
             !assignment_improve_condition
             && full_covered_condition
             && 0 < self.num_partial_restart
             ;
 
-        let partial_restart_condition: bool =
-            !assignment_improve_condition
-            && glucose_restart_condition
-            && bj < bl
+        let global_restart_condition: bool =
+            !glucose_blocking_condition
+            && ((glucose_restart_condition
+                 && bj < bl
+                 && most_covered_condition
+                 && self.root_level == bj)
+                || assignment_stagnated_condition)
+            // && most_covered_condition
             ;
 
         if global_restart_condition
+            // && most_covered_condition
             && 0 < self.num_partial_restart
         { // stop a exhaustive search and restart
             asgs.cancel_until(vdb, 0);
@@ -103,14 +155,15 @@ impl RestartIF for State {
             self.partial_restart_ratio.update(1.0);
             vdb.reset_folding_points();
             vdb.activity_decay = self.config.var_activity_decay;
-            vdb.num_current_folding_vars = 0;
             self.num_partial_restart = 0;
             self.num_partial_restart_try = 0;
             self.ema_folds_ratio.reinitialize1();
             self.after_restart = 0;
             self.stats[Stat::Restart] += 1;
+            self.stats[Stat::SumASG] = 0;
         } else if partial_restart_condition
-            && restart_ratio < folding_ratio
+            && most_covered_condition
+            && restart_ratio < scale * folding_ratio
             && self.num_partial_restart_try <= vdb.num_current_folding_vars
         {
             asgs.cancel_until(vdb, bj);
@@ -122,10 +175,8 @@ impl RestartIF for State {
             if false {
                 // reset some counters on folding
                 vdb.reset_folding_points();
-                vdb.num_current_folding_vars = 0;
                 self.ema_folds_ratio.reinitialize1();
             }
-            // end of the reset block
             self.partial_restart_ratio.update(1.0); // with a bonus
             // increment only based on sucessful partial restarts
             vdb.activity_decay = {
@@ -134,7 +185,7 @@ impl RestartIF for State {
                 (n + s) / (n + 1.0)
             };
         } else {
-            if partial_restart_condition && folding_fast < 0.5 {
+            if partial_restart_condition {
                 self.num_partial_restart_try += 1;
             }
             self.b_lvl.update(bl as f64);
@@ -144,82 +195,13 @@ impl RestartIF for State {
         true
     }
 
-    /// return true to forcing restart. Otherwise false.
-    fn check_restart(&mut self, asgs: &AssignStack, _vdb: &mut VarDB) -> bool {
-        let _ncnfl = self.stats[Stat::Conflict];
-        let _nas = asgs.len();
-        // polar parameters
-        let _epsilon = 0.05;
-        // first, handle Luby path
-        if self.use_luby_restart {
-            if self.luby_restart_num_conflict <= self.luby_restart_cnfl_cnt {
-                self.stats[Stat::LubyRestart] += 1;
-                self.after_restart = 0;
-                self.luby_restart_cnfl_cnt = 0.0;
-                self.luby_current_restarts += 1;
-                self.luby_restart_num_conflict =
-                    luby(self.luby_restart_inc, self.luby_current_restarts)
-                        * self.luby_restart_factor;
-                return true;
-            }
-            if 0.8 < self.ema_folds_ratio.trend() && 4.0 * self.ema_lbd.get() < self.c_lvl.get() {
-                self.use_luby_restart = false;
-            }
-            return false;
-        }
-        if self.after_restart < self.restart_step {
-            return false;
-        }
-        /*
-                if (self.num_vars - self.num_eliminated_vars < 2 * self.num_polar_vars
-                    || self.ema_folds_inc.get() < 0.0001)
-                    && self.ema_folds_inc.ratio() < 0.5
-                    && (self.ema_lbd.get() - self.b_lvl.get()).abs() < 1.0
-                {
-                    self.use_luby_restart = true;
-                    return true;
-                }
-                // check invoking condition
-                let ave = self.stats[Stat::SumLBD] as f64 / ncnfl as f64;
-                if false && ave * self.restart_thr < self.ema_lbd.get() {
-                    self.stats[Stat::Restart] += 1;
-                    self.ema_restart_len.update(self.after_restart as f64);
-                    self.after_restart = 0;
-                    return true;
-                }
-        */
-        /*
-                // check blocking condition
-                if self.restart_blk * self.ema_asg.get() < nas as f64 {
-                    self.after_restart = 0;
-                    self.stats[Stat::BlockRestart] += 1;
-                    return false;
-                }
-        */
-        false
-    }
-/*
-    /// return true to block restart.
-    fn block_restart(&mut self, asgs: &AssignStack) -> bool {
-        if self.use_luby_restart || 0 < self.restart_block_step {
-            return false;
-        }
-        if self.restart_blk * self.ema_asg.get() < asgs.len() as f64
-            && 0.0 < self.ema_asg_progress.get()
-        {
-            self.restart_block_step = self.restart_step;
-            self.after_restart = 0;
-            self.stats[Stat::BlockRestart] += 1;
-            return false;
-        }
-        false
-    }
-*/
     fn restart_update_lbd(&mut self, lbd: usize) {
         self.ema_lbd.update(lbd as f64);
+        self.stats[Stat::SumLBD] += lbd;
     }
     fn restart_update_asg(&mut self, n: usize) {
         self.ema_asg.update(n as f64);
+        self.stats[Stat::SumASG] = self.stats[Stat::SumASG].max(n);
     }
     fn restart_update_luby(&mut self) {
         if self.use_luby_restart {
@@ -297,7 +279,7 @@ impl Ema2 {
     pub fn trend(&self) -> f64 {
         self.fast / self.slow * (self.cals / self.calf)
     }
-    pub fn with_fast(mut self, f: u64) -> Self {
+    pub fn with_fast(mut self, f: usize) -> Self {
         self.fe = 1.0 / (f as f64);
         self
     }
@@ -308,7 +290,5 @@ impl Ema2 {
     pub fn reinitialize1(&mut self) {
         self.fast = 1.0;
         self.slow = 1.0;
-        self.calf = 1.0;
-        self.cals = 1.0;
     }
 }

@@ -114,6 +114,7 @@ pub enum Stat {
     ExhaustiveElimination, // the number of clause subsumption and variable elimination
     Assign,                // the number of assigned variables
     SolvedRecord,          // the last number of solved variables
+    SumASG,                // the num of the number of assignment after each backjump
     SumLBD,                // the sum of generated learnts' LBD
     NumBin,                // the number of binary clauses
     NumBinLearnt,          // the number of binary learnt clauses
@@ -209,7 +210,7 @@ pub struct State {
     pub elim_trigger: usize,
     pub slack_duration: usize,
     pub stats: [usize; Stat::EndOfStatIndex as usize], // statistics
-    pub ema_asg: Ema,
+    pub ema_asg: Ema2,
     pub ema_asg_progress: Ema2,
     pub ema_lbd: Ema,
     pub b_lvl: Ema,
@@ -227,7 +228,7 @@ pub struct State {
     pub progress_cnt: usize,
     pub progress_log: bool,
     pub target: CNFDescription,
-    pub development_history: Vec<(usize, f64, f64, f64, f64, f64, f64)>,
+    pub development_history: Vec<(usize, f64, f64, f64, f64, f64, f64, f64)>,
 }
 
 macro_rules! im {
@@ -329,8 +330,8 @@ impl Default for State {
             cdb_soft_limit: 0, // 248_000_000
             ema_coeffs: (2 ^ 5, 2 ^ 15),
             adaptive_restart: false,
-            restart_thr: 1.50,     // will be overwritten by bin/splr
-            restart_blk: 1.20,     // will be overwritten by bin/splr
+            restart_thr: 1.20,     // will be overwritten by bin/splr
+            restart_blk: 1.00,     // will be overwritten by bin/splr
             restart_asg_len: 3500, // will be overwritten by bin/splr
             restart_lbd_len: 100,  // will be overwritten by bin/splr
             restart_expansion: 1.15,
@@ -364,7 +365,7 @@ impl Default for State {
             elim_trigger: 1,
             slack_duration: 0,
             stats: [0; Stat::EndOfStatIndex as usize],
-            ema_asg: Ema::new(1),
+            ema_asg: Ema2::new(1),
             ema_asg_progress: Ema2::new(5_000).with_fast(100),
             ema_lbd: Ema::new(1),
             b_lvl: Ema::new(5_000),
@@ -414,7 +415,7 @@ impl StateIF for State {
         state.use_deep_search_mode = config.with_deep_search;
         state.progress_log = config.use_log;
         state.use_elim = !config.without_elim;
-        state.ema_asg = Ema::new(config.restart_asg_len);
+        state.ema_asg = Ema2::new(200_000).with_fast(config.restart_asg_len);
         state.ema_lbd = Ema::new(config.restart_lbd_len);
         state.model = vec![BOTTOM; cnf.num_of_variables + 1];
         state.an_seen = vec![false; cnf.num_of_variables + 1];
@@ -623,9 +624,9 @@ impl StateIF for State {
         */
         println!(
             "\x1B[2K    Conflict|cnfl:{}, bjmp:{}, aLBD:{}, trnd:{} ",
-            fm!("{:>9.2}", self.record, LogF64Id::CLevel, self.c_lvl.get()),
-            fm!("{:>9.2}", self.record, LogF64Id::BLevel, self.b_lvl.get()),
-            fm!("{:>9.2}", self.record, LogF64Id::AveLBD, self.ema_lbd.get()),
+            fm!("{:>9.4}", self.record, LogF64Id::CLevel, self.c_lvl.get()),
+            fm!("{:>9.4}", self.record, LogF64Id::BLevel, self.b_lvl.get()),
+            fm!("{:>9.4}", self.record, LogF64Id::AveLBD, self.ema_lbd.get()),
             fm!(
                 "{:>9.4}",
                 self.record,
@@ -634,16 +635,21 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K  Assignment|asg%:{}, #prg:{}, vdcy:{},|clrd:{} ",
-            format!("{:>9.4}", 100.0 * self.ema_asg.get() / nv as f64),
-            format!("{:>9.2}", self.ema_asg_progress.get()),
-            format!("{:>9.4}", vdb.activity_decay),
-            im!(
-                "{:>9}",
+            "\x1B[2K  Assignment|asg%:{}, #prg:{}, trnd:{}, vdcy:{} ",
+            fm!(
+                "{:>9.4}",
                 self.record,
-                LogUsizeId::Reduction,
-                self.stats[Stat::Reduction]
+                LogF64Id::EmaAsg,
+                100.0 * self.ema_asg.get() / nv as f64
             ),
+            format!("{:>9.2}", self.ema_asg_progress.get()),
+            fm!(
+                "{:>9.4}",
+                self.record,
+                LogF64Id::EmaAsgTrend,
+                self.ema_asg.trend()
+            ),
+            format!("{:>9.4}", vdb.activity_decay),
         );
         println!(
             "\x1B[2K     Folding|#all:{}, #now:{}, prob:{}, fast:{} ",
@@ -770,15 +776,16 @@ pub enum LogUsizeId {
 pub enum LogF64Id {
     Progress = 0, //  0: progress: f64,
     EmaAsg,       //  1: ema_asg: f64,
-    EmaLBD,       //  2: ema_lbd: f64,
-    AveLBD,       //  3: ave_lbd: f64,
-    BLevel,       //  4: backjump_level: f64,
-    CLevel,       //  5: conflict_level: f64,
-    RestartThrK,  //  6: restart K
-    RestartBlkR,  //  7: restart R
-    EmaRestart,   //  8: average effective restart step
-    EmaPVInc,     //  9: increasing speed of the number of folding vars
-    PVRatio,      // 10: the percentage of folding vars
+    EmaAsgTrend,  //  2: ema_asg_trend: f64,
+    EmaLBD,       //  3: ema_lbd: f64,
+    AveLBD,       //  4: ave_lbd: f64,
+    BLevel,       //  5: backjump_level: f64,
+    CLevel,       //  6: conflict_level: f64,
+    RestartThrK,  //  7: restart K
+    RestartBlkR,  //  8: restart R
+    EmaRestart,   //  9: average effective restart step
+    EmaPVInc,     // 10: increasing speed of the number of folding vars
+    PVRatio,      // 11: the percentage of folding vars
     End,
 }
 
