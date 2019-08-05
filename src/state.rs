@@ -366,7 +366,7 @@ impl Default for State {
             slack_duration: 0,
             stats: [0; Stat::EndOfStatIndex as usize],
             ema_asg: Ema2::new(1),
-            ema_asg_progress: Ema2::new(5_000).with_fast(100),
+            ema_asg_progress: Ema2::new(5_000).with_fast(100).initialize1(),
             ema_lbd: Ema::new(1),
             b_lvl: Ema::new(5_000),
             c_lvl: Ema::new(5_000),
@@ -624,8 +624,8 @@ impl StateIF for State {
         */
         println!(
             "\x1B[2K    Conflict|cnfl:{}, bjmp:{}, aLBD:{}, trnd:{} ",
-            fm!("{:>9.4}", self.record, LogF64Id::CLevel, self.c_lvl.get()),
-            fm!("{:>9.4}", self.record, LogF64Id::BLevel, self.b_lvl.get()),
+            fm!("{:>9.2}", self.record, LogF64Id::CLevel, self.c_lvl.get()),
+            fm!("{:>9.2}", self.record, LogF64Id::BLevel, self.b_lvl.get()),
             fm!("{:>9.4}", self.record, LogF64Id::AveLBD, self.ema_lbd.get()),
             fm!(
                 "{:>9.4}",
@@ -677,7 +677,7 @@ impl StateIF for State {
             format!("{:>9.4}", self.ema_folds_ratio.get_fast()),
         );
         println!(
-            "\x1B[2K     Restart|full:{}, part:{}, prob:{}, Luby:{} ",
+            "\x1B[2K     Restart|byAS:{}, byFV:{}, prob:{}, Luby:{} ",
             format!("{:>9}", self.stats[Stat::Restart]),
             im!(
                 "{:>9}",

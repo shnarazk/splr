@@ -377,17 +377,11 @@ fn handle_conflict_path(
         cdb.certificate_add(new_learnt);
         let l0 = new_learnt[0];
         asgs.uncheck_enqueue(vdb, l0, NULL_CLAUSE);
-        if false {
-            //vdb.num_current_folding_vars -=
-            //    vdb.vars[l0.vi()].folding_count.min(vdb.num_current_folding_vars);
-            // vdb.bump_folding_activity(l0.vi());
-            // state.ema_folds_ratio.update(0.0); // this is not a typo.
-            // state.ema_folds_ratio.reinitialize1();
+        if true {
+            vdb.bump_folding_activity(l0.vi());
+            state.ema_folds_ratio.update(1.0);
             // extra task
-            vdb.reset_folding_points();
             vdb.activity_decay = state.config.var_activity_decay;
-            state.num_partial_restart = 0;
-            state.num_partial_restart_try = 0;
         }
         // if vdb.activity_decay < 0.99 {
         //      vdb.activity_decay += 0.01;
