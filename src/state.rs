@@ -408,9 +408,7 @@ impl StateIF for State {
             self.cdb_inc = 0;
             re_init = true;
         }
-        if self.stats[Stat::NoDecisionConflict] < 20_000
-        /* 30_000 */
-        {
+        if self.stats[Stat::NoDecisionConflict] < 30_000 {
             self.strategy = SearchStrategy::LowSuccesiveLuby;
             self.use_luby_restart = true;
             self.luby_restart_factor = 100.0;
@@ -488,7 +486,7 @@ impl StateIF for State {
             self.dump(cdb, vdb);
             return;
         }
-        let nv = vdb.vars.len() - 1;
+        let nv = self.num_vars;
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
         self.progress_cnt += 1;
@@ -604,7 +602,7 @@ impl StateIF for State {
                 "{:>9.4}",
                 self.record,
                 LogF64Id::FUPPrg,
-                100.0 * vdb.num_fup_once as f64 / self.num_vars as f64
+                100.0 * vdb.num_fup_once as f64 / (nv - sum) as f64
             ),
         );
         println!(

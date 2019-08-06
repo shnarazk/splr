@@ -377,10 +377,11 @@ fn handle_conflict_path(
         cdb.certificate_add(new_learnt);
         let l0 = new_learnt[0];
         asgs.uncheck_enqueue(vdb, l0, NULL_CLAUSE);
-        if true {
-            vdb.set_fup(l0.vi());
-            state.ema_fup_inc.update(1.0);
+        if vdb.fup_full_connected {
+            vdb.reset_fups(true);
         }
+        vdb.set_fup(l0.vi());
+        state.ema_fup_inc.update(1.0);
         state.restart_update_lbd(0);
         state.b_lvl.update(0.0);
     } else {

@@ -110,18 +110,16 @@ impl RestartIF for State {
         let fup_fast = self.ema_fup_inc.get_fast();
 
         let asg_stagnated: bool = {
-            let thrd = -1.0;
+            let thrd = vdb.asg_stagnation_threshold;
             thrd < asg_ratio && asg_ratio < 0.0 && thrd / 2.0 < asg_fast && asg_fast < 0.0
         };
 
         let fup_stagnated: bool = {
-            let thrd = 0.2;
-            fup_ratio < thrd && fup_fast < thrd / 2.0
+            let thrd = vdb.fup_stagnation_threshold;
+            !vdb.fup_full_connected && fup_ratio < thrd && fup_fast < thrd / 2.0
         };
 
-        let restart_condition = asg_stagnated || fup_stagnated;
-
-        if restart_condition {
+        if asg_stagnated || fup_stagnated {
             asgs.cancel_until(vdb, 0);
             asgs.check_progress();
             self.b_lvl.update(0.0);
@@ -136,12 +134,22 @@ impl RestartIF for State {
                 self.stats[Stat::RestartByFUP] += 1;
             }
             self.max_assignment = 0;
-            vdb.reset_fups();
             {
                 let s = self.config.var_activity_decay;
                 let m = self.config.var_activity_d_max;
                 let k = self.stats[Stat::RestartByFUP] as f64 / self.stats[Stat::Restart] as f64;
                 vdb.activity_decay = k * m + (1.0 - k) * s;
+            }
+            if !vdb.fup_full_connected {
+                vdb.reset_fups(false);
+            }
+            if fup_stagnated
+                && self.num_vars - self.num_solved_vars - self.num_eliminated_vars
+                    <= vdb.num_fup_once
+            {
+                vdb.fup_full_connected = true;
+                vdb.asg_stagnation_threshold /= 5.0;
+                vdb.fup_stagnation_threshold /= 5.0;
             }
         } else {
             let bl = asgs.level();

@@ -23,7 +23,7 @@ pub struct Config {
     #[structopt(long = "vd", default_value = "0.90")]
     pub var_activity_decay: f64,
     /// maximum variable activity decay
-    #[structopt(long = "vm", default_value = "0.98")]
+    #[structopt(long = "vm", default_value = "0.96")]
     pub var_activity_d_max: f64,
     /// a DIMACS format CNF file
     #[structopt(parse(from_os_str))]

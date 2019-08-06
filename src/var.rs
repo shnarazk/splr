@@ -80,6 +80,9 @@ pub struct VarDB {
     pub activity_decay: f64,
     pub num_fup: usize,
     pub num_fup_once: usize,
+    pub asg_stagnation_threshold: f64,
+    pub fup_stagnation_threshold: f64,
+    pub fup_full_connected: bool,
     pub current_conflict: usize,
     pub lbd_temp: Vec<usize>,
 }
@@ -91,6 +94,9 @@ impl Default for VarDB {
             activity_decay: VAR_ACTIVITY_DECAY,
             num_fup: 0,
             num_fup_once: 0,
+            asg_stagnation_threshold: -1.0,
+            fup_stagnation_threshold: 0.1,
+            fup_full_connected: false,
             current_conflict: 0,
             lbd_temp: Vec::new(),
         }
@@ -104,6 +110,9 @@ impl VarDBIF for VarDB {
             activity_decay,
             num_fup: 0,
             num_fup_once: 0,
+            asg_stagnation_threshold: -1.0,
+            fup_stagnation_threshold: 0.1,
+            fup_full_connected: false,
             current_conflict: 0,
             lbd_temp: vec![0; n + 1],
         }
@@ -165,11 +174,18 @@ impl VarDBIF for VarDB {
         }
         ret
     }
-    fn reset_fups(&mut self) {
+    fn reset_fups(&mut self, full_clear: bool) {
         for v in &mut self.vars[1..] {
             v.turn_off(Flag::FUP);
+            if full_clear {
+                v.turn_off(Flag::FUP_ONCE);
+            }
         }
         self.num_fup = 0;
+        if full_clear {
+            self.num_fup_once = 0;
+            self.fup_full_connected = false;
+        }
     }
 }
 

@@ -288,7 +288,7 @@ pub trait VarDBIF {
     fn activity(&mut self, vi: VarId) -> f64;
     fn bump_activity(&mut self, vi: VarId);
     fn set_fup(&mut self, vi: VarId) -> usize;
-    fn reset_fups(&mut self);
+    fn reset_fups(&mut self, full_clear: bool);
 }
 
 /// API for 'watcher list' like `attach`, `detach`, `detach_with` and so on.
