@@ -1,13 +1,13 @@
 use std::path::PathBuf;
 use structopt::StructOpt;
 
-pub const VERSION: &str = "0.1.3+CHB4";
+pub const VERSION: &str = "0.1.4-RC1";
 
 /// Configuration built from command line options
 #[derive(Clone, Debug, StructOpt)]
 #[structopt(
     name = "splr",
-    about = "SAT solver for Propositional Logic in Rust, version 0.1.3+PLRC"
+    about = "SAT solver for Propositional Logic in Rust, version 0.1.4-RC1"
 )]
 pub struct Config {
     /// soft limit of #clauses (24M is about 4GB)
@@ -19,24 +19,12 @@ pub struct Config {
     /// #literals in a clause by var elimination
     #[structopt(long = "el", default_value = "64")]
     pub elim_lit_limit: usize,
-    /// length for assignment average
-    #[structopt(long = "ra", default_value = "50")]
-    pub restart_asg_len: usize,
-    /// length for LBD average
-    #[structopt(long = "rl", default_value = "50")]
-    pub restart_lbd_len: usize,
-    /// forcing restart threshold
-    #[structopt(long = "rt", default_value = "1.20")]
-    pub restart_threshold: f64, // Glucose's K
-    /// blocking restart threshold
-    #[structopt(long = "rb", default_value = "1.00")]
-    pub restart_blocking: f64, // Glucose's R
-    /// #conflicts between restarts
-    #[structopt(long = "rs", default_value = "50")]
-    pub restart_step: usize,
     /// variable activity decay
-    #[structopt(long = "vd", default_value = "0.92")]
+    #[structopt(long = "vd", default_value = "0.90")]
     pub var_activity_decay: f64,
+    /// maximum variable activity decay
+    #[structopt(long = "vm", default_value = "0.98")]
+    pub var_activity_d_max: f64,
     /// a DIMACS format CNF file
     #[structopt(parse(from_os_str))]
     pub cnf_filename: PathBuf,
@@ -60,15 +48,9 @@ pub struct Config {
     /// Disables exhaustive simplification
     #[structopt(long = "without-elim", short = "E")]
     pub without_elim: bool,
-    /// Disables dynamic restart adaptation
-    #[structopt(long = "without-adaptive_restart", short = "R")]
-    pub without_adaptive_restart: bool,
     /// Disables dynamic strategy adaptation
     #[structopt(long = "without-adaptive_strategy", short = "S")]
     pub without_adaptive_strategy: bool,
-    /// Enables deep search mode
-    #[structopt(long = "with-deep-search", short = "D")]
-    pub with_deep_search: bool,
     /// Writes a DRAT UNSAT certification file
     #[structopt(long = "certify", short = "c")]
     pub use_certification: bool,
@@ -86,21 +68,15 @@ impl Default for Config {
             clause_limit: 18_000_000,
             elim_grow_limit: 4,
             elim_lit_limit: 100,
-            restart_asg_len: 50,
-            restart_lbd_len: 50,
-            restart_threshold: 1.20,
-            restart_blocking: 1.00,
-            restart_step: 50,
-            var_activity_decay: 0.92,
+            var_activity_decay: 0.90,
+            var_activity_d_max: 0.98,
             cnf_filename: PathBuf::new(),
             output_dirname: PathBuf::from("."),
             result_filename: PathBuf::new(),
             proof_filename: PathBuf::from("proof.out"),
             use_log: false,
             without_elim: false,
-            without_adaptive_restart: false,
             without_adaptive_strategy: false,
-            with_deep_search: false,
             use_certification: false,
             timeout: 0.0,
             debug_dump: 0,

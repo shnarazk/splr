@@ -26,7 +26,6 @@ pub struct Var {
     flags: Flag,
     /// for EMA-based activity
     pub last_used: usize,
-    pub folding_count: usize,
 }
 
 /// is the dummy var index.
@@ -46,7 +45,6 @@ impl VarIF for Var {
             neg_occurs: Vec::new(),
             flags: Flag::empty(),
             last_used: 0,
-            folding_count: 0,
         }
     }
     fn new_vars(n: usize) -> Vec<Var> {
@@ -78,23 +76,23 @@ pub struct VarDB {
     /// vars
     pub vars: Vec<Var>,
     /// the current conflict number
-    pub current_conflict: usize,
     /// var activity decay
     pub activity_decay: f64,
+    pub num_fup: usize,
+    pub num_fup_once: usize,
+    pub current_conflict: usize,
     pub lbd_temp: Vec<usize>,
-    pub num_folding_vars: usize,
-    pub num_current_folding_vars: usize,
 }
 
 impl Default for VarDB {
     fn default() -> VarDB {
         VarDB {
             vars: Vec::new(),
-            current_conflict: 0,
             activity_decay: VAR_ACTIVITY_DECAY,
+            num_fup: 0,
+            num_fup_once: 0,
+            current_conflict: 0,
             lbd_temp: Vec::new(),
-            num_folding_vars: 0,
-            num_current_folding_vars: 0,
         }
     }
 }
@@ -103,11 +101,11 @@ impl VarDBIF for VarDB {
     fn new(n: usize, activity_decay: f64) -> Self {
         VarDB {
             vars: Var::new_vars(n),
-            current_conflict: 0,
             activity_decay,
+            num_fup: 0,
+            num_fup_once: 0,
+            current_conflict: 0,
             lbd_temp: vec![0; n + 1],
-            num_folding_vars: 0,
-            num_current_folding_vars: 0,
         }
     }
     fn assigned(&self, l: Lit) -> Lbool {
@@ -154,25 +152,24 @@ impl VarDBIF for VarDB {
         self.activity(vi);
         self.vars[vi].reward += 1.0 - self.activity_decay;
     }
-    fn bump_folding_activity(&mut self, vi: VarId) -> usize {
+    fn set_fup(&mut self, vi: VarId) -> usize {
         let v = &mut self.vars[vi];
-        v.folding_count += 1;
-        let ret = !v.is(Flag::FOLDED) as usize;
-        if !v.is(Flag::FOLDED_EVER) {
-            v.turn_on(Flag::FOLDED_EVER);
-            self.num_folding_vars += 1;
+        let ret = !v.is(Flag::FUP) as usize;
+        if !v.is(Flag::FUP_ONCE) {
+            v.turn_on(Flag::FUP_ONCE);
+            self.num_fup_once += 1;
         }
-        if !v.is(Flag::FOLDED) {
-            v.turn_on(Flag::FOLDED);
-            self.num_current_folding_vars += 1;
+        if !v.is(Flag::FUP) {
+            v.turn_on(Flag::FUP);
+            self.num_fup += 1;
         }
         ret
     }
-    fn reset_folding_points(&mut self) {
+    fn reset_fups(&mut self) {
         for v in &mut self.vars[1..] {
-            v.turn_off(Flag::FOLDED);
+            v.turn_off(Flag::FUP);
         }
-        self.num_current_folding_vars = 0;
+        self.num_fup = 0;
     }
 }
 
@@ -181,13 +178,15 @@ impl fmt::Display for Var {
         let st = |flag, mes| if self.is(flag) { mes } else { "" };
         write!(
             f,
-            "V{}({} at {} by {} {}{})",
+            "V{}({} at {} by {} {}{}{}{})",
             self.index,
             self.assign,
             self.level,
             self.reason.format(),
             st(Flag::TOUCHED, ", touched"),
             st(Flag::ELIMINATED, ", eliminated"),
+            st(Flag::FUP_ONCE, ", fup_once"),
+            st(Flag::FUP, ", fup"),
         )
     }
 }

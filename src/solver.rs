@@ -362,15 +362,15 @@ fn handle_conflict_path(
     ci: ClauseId,
 ) -> MaybeInconsistent {
     let ncnfl = state.stats[Stat::Conflict]; // total number
-    if ncnfl % 5000 == 0 && state.var_decay < state.var_decay_max {
-        state.var_decay += 0.01;
+    if ncnfl % 5000 == 0 && vdb.activity_decay < state.config.var_activity_d_max {
+        vdb.activity_decay += 0.01;
     }
-    state.restart_update_asg(asgs.len());
     state.c_lvl.update(asgs.level() as f64);
     let bl = analyze(asgs, cdb, state, vdb, ci);
-    let new_learnt = &mut state.new_learnt;
     asgs.cancel_until(vdb, bl.max(state.root_level));
-    state.ema_asg_progress.update(asgs.check_progress() as f64);
+    state.restart_update_asg(asgs.len()); // TODO: after or before backtrack
+    state.ema_asg_inc.update(asgs.check_progress() as f64);
+    let new_learnt = &mut state.new_learnt;
     let learnt_len = new_learnt.len();
     if learnt_len == 1 {
         // dump to certified even if it's a literal.
@@ -378,21 +378,16 @@ fn handle_conflict_path(
         let l0 = new_learnt[0];
         asgs.uncheck_enqueue(vdb, l0, NULL_CLAUSE);
         if true {
-            vdb.bump_folding_activity(l0.vi());
-            state.ema_folds_ratio.update(1.0);
-            // extra task
-            vdb.activity_decay = state.config.var_activity_decay;
+            vdb.set_fup(l0.vi());
+            state.ema_fup_inc.update(1.0);
         }
-        // if vdb.activity_decay < 0.99 {
-        //      vdb.activity_decay += 0.01;
-        // }
         state.restart_update_lbd(0);
         state.b_lvl.update(0.0);
     } else {
         state.stats[Stat::Learnt] += 1;
         let lbd = vdb.compute_lbd(&new_learnt);
         let l0 = new_learnt[0];
-        state.ema_folds_ratio.update(vdb.bump_folding_activity(l0.vi()) as f64);
+        state.ema_fup_inc.update(vdb.set_fup(l0.vi()) as f64);
         if lbd <= 2 {
             state.stats[Stat::NumLBD2] += 1;
         }
@@ -400,12 +395,11 @@ fn handle_conflict_path(
             state.stats[Stat::NumBin] += 1;
             state.stats[Stat::NumBinLearnt] += 1;
             let l1 = new_learnt[1];
-            state.ema_folds_ratio.update(vdb.bump_folding_activity(l1.vi()) as f64);
+            state.ema_fup_inc.update(vdb.set_fup(l1.vi()) as f64);
         }
         let cid = cdb.attach(state, vdb, lbd);
         elim.add_cid_occur(vdb, cid, &mut cdb.clause[cid as usize], true);
         state.restart_update_lbd(lbd);
-        state.stats[Stat::SumLBD] += lbd;
         if !state.restart(asgs, vdb) {
             asgs.uncheck_enqueue(vdb, l0, cid);
         }
@@ -413,14 +407,13 @@ fn handle_conflict_path(
     if 0 < state.config.debug_dump && ncnfl % state.config.debug_dump == 0 {
         state.development_history.push((
             ncnfl,
-            state.num_partial_restart as f64,
             state.stats[Stat::Restart] as f64,
-            vdb.num_current_folding_vars as f64,
-            vdb.num_folding_vars as f64,
+            vdb.num_fup as f64,
+            vdb.num_fup_once as f64,
             state.num_solved_vars as f64,
             state.ema_asg.get(),
             state.stats[Stat::NumBin] as f64,
-   ));
+        ));
     }
     if ncnfl % 10_000 == 0 {
         adapt_parameters(asgs, cdb, elim, state, vdb, ncnfl)?;
@@ -432,10 +425,10 @@ fn handle_conflict_path(
     state.cla_inc /= state.cla_decay;
     if ((state.use_chan_seok && !state.glureduce && state.first_reduction < cdb.num_learnt)
         || (state.glureduce
-            && state.cur_restart * state.next_reduction <= state.stats[Stat::Conflict]))
+            && state.cur_reduction * state.next_reduction <= state.stats[Stat::Conflict]))
         && 0 < cdb.num_learnt
     {
-        state.cur_restart = ((ncnfl as f64) / (state.next_reduction as f64)) as usize + 1;
+        state.cur_reduction = ((ncnfl as f64) / (state.next_reduction as f64)) as usize + 1;
         cdb.reduce(state, vdb);
     }
     Ok(())
@@ -447,30 +440,10 @@ fn adapt_parameters(
     elim: &mut Eliminator,
     state: &mut State,
     vdb: &mut VarDB,
-    nconflict: usize,
+    ncnfl: usize,
 ) -> MaybeInconsistent {
     let switch = 100_000;
-    if !state.use_luby_restart && switch <= nconflict {
-        let stopped = state.stats[Stat::SolvedRecord] == state.num_solved_vars;
-        if stopped {
-            state.slack_duration += 1;
-        } else {
-            state.slack_duration = 0;
-        }
-        let stagnated = ((state.num_vars - state.num_solved_vars)
-            .next_power_of_two()
-            .trailing_zeros() as usize)
-            < state.slack_duration;
-        // && (((state.num_vars - state.num_solved_vars) as f64).log(2.0)
-        //     / (state.c_lvl.get() / state.b_lvl.get()).sqrt().max(1.0)
-        //     <= state.stagnation as f64)
-        if !state.stagnated && stagnated {
-            state.stats[Stat::Stagnation] += 1;
-        }
-        state.stagnated = stagnated;
-    }
-    state.stats[Stat::SolvedRecord] = state.num_solved_vars;
-    if nconflict == switch {
+    if ncnfl == switch {
         state.flush("activating an exhaustive eliminator...");
         asgs.cancel_until(vdb, 0);
         asgs.check_progress();
@@ -482,18 +455,6 @@ fn adapt_parameters(
         }
     }
     state.progress(cdb, vdb, None);
-    // if state.stagnated {
-    //     state.flush(&format!("stagnated ({})...", state.slack_duration));
-    // }
-    if state.use_deep_search_mode {
-        if state.stagnated {
-            let bonus = 20_000;
-            state.restart_step = 50 + bonus;
-            state.next_restart += 2 * bonus;
-        } else if !state.stagnated && 0 < state.stats[Stat::Stagnation] {
-            state.restart_step = 1000;
-        }
-    }
     Ok(())
 }
 
