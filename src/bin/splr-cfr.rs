@@ -56,13 +56,13 @@ fn main() {
                     .unwrap();
                 buf.write_all(format!("{:>7},{:>8.0},\"solved\"\n", n, b).as_bytes())
                     .unwrap();
-                buf.write_all(format!("{:>7},{:>8.0},\"asv inc 100\"\n", n, c).as_bytes())
+                buf.write_all(format!("{:>7},{:>8.2},\"acv\"\n", n, c).as_bytes())
                     .unwrap();
-                buf.write_all(format!("{:>7},{:>8.0},\"acv\"\n", n, d).as_bytes())
+                buf.write_all(format!("{:>7},{:>8.0},\"sua\"\n", n, d).as_bytes())
                     .unwrap();
-                buf.write_all(format!("{:>7},{:>8.0},\"sua\"\n", n, e).as_bytes())
+                buf.write_all(format!("{:>7},{:>8.0},\"fup\"\n", n, e).as_bytes())
                     .unwrap();
-                buf.write_all(format!("{:>7},{:>8.0},\"fup\"\n", n, f).as_bytes())
+                buf.write_all(format!("{:>7},{:>8.0},\"suf\"\n", n, f).as_bytes())
                     .unwrap();
             }
         }

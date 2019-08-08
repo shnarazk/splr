@@ -1,7 +1,7 @@
 use crate::clause::ClauseDB;
 use crate::config::Config;
 use crate::eliminator::Eliminator;
-use crate::restart::{Ema, Ema2};
+use crate::restart::Ema;
 use crate::traits::*;
 use crate::types::*;
 use crate::var::VarDB;
@@ -165,12 +165,6 @@ pub struct State {
     pub after_restart: usize,
     /// Restart by stagnation
     pub sum_lbd: usize,
-    // pub ema_asg_inc: Ema2,
-    pub ema_asv_inc: Ema2,
-    pub ema_acv_inc: Ema2,
-    pub ema_sua_inc: Ema2,
-    pub ema_fup_inc: Ema2,
-    pub ema_suf_inc: Ema2,
     pub restart_ratio: Ema,
     /// Restart by Luby
     pub use_luby_restart: bool,
@@ -318,12 +312,6 @@ impl Default for State {
             ema_coeffs: ema,
             after_restart: 0,
             sum_lbd: 0,
-            // ema_asg_inc: Ema2::new(ema.0).with_fast(ema.1).initialize1(),
-            ema_asv_inc: Ema2::new(ema.0).with_fast(ema.1).initialize1(),
-            ema_acv_inc: Ema2::new(ema.0).with_fast(ema.1).initialize1(),
-            ema_sua_inc: Ema2::new(ema.0).with_fast(ema.1).initialize1(),
-            ema_fup_inc: Ema2::new(ema.0).with_fast(ema.1).initialize1(),
-            ema_suf_inc: Ema2::new(ema.0).with_fast(ema.1).initialize1(),
             restart_ratio: Ema::new(ema.0),
             use_luby_restart: false,
             luby_restart_num_conflict: 0.0,
@@ -579,7 +567,7 @@ impl StateIF for State {
                 "{:>9.2}",
                 self.record,
                 LogF64Id::AsgInc,
-                self.ema_asv_inc.get()
+                vdb.asv.diff_ema.get()
             ),
             fm!(
                 "{:>9.4}",
@@ -596,30 +584,30 @@ impl StateIF for State {
         );
         println!(
             "\x1B[2K   First UIP|#all:{}, #now:{}, #inc:{}, xpnd:{} ",
-            im!("{:>9}", self.record, LogUsizeId::SuF, vdb.num_suf),
-            im!("{:>9}", self.record, LogUsizeId::FUP, vdb.num_fup),
+            im!("{:>9}", self.record, LogUsizeId::SuF, vdb.suf.num),
+            im!("{:>9}", self.record, LogUsizeId::FUP, vdb.fup.num),
             fm!(
                 "{:>9.4}",
                 self.record,
                 LogF64Id::FUPInc,
-                self.ema_fup_inc.get()
+                vdb.fup.diff_ema.get()
             ),
-/*
+            /*
             fm!(
                 "{:>9.4}",
                 self.record,
                 LogF64Id::FUPPrg,
                 100.0 * vdb.num_suf as f64 / (nv - sum) as f64
             ),
-*/
+            */
             fm!(
                 "{:>9.4}",
                 self.record,
                 LogF64Id::SuFInc,
-                self.ema_suf_inc.get()
+                vdb.suf.diff_ema.get()
             ),
         );
-        self.record[LogF64Id::FUPPrg] = 100.0 * vdb.num_suf as f64 / (nv - sum) as f64;
+        self.record[LogF64Id::FUPPrg] = 100.0 * vdb.suf.num as f64 / (nv - sum) as f64;
         println!(
             "\x1B[2K     Restart|#byA:{}, #byF:{}, #byL:{}, prb%:{} ",
             im!(

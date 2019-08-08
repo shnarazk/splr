@@ -362,15 +362,26 @@ fn handle_conflict_path(
     ci: ClauseId,
 ) -> MaybeInconsistent {
     let ncnfl = state.stats[Stat::Conflict]; // total number
-    // if ncnfl % 5000 == 0 && vdb.activity_decay < state.config.var_activity_d_max {
-    //     vdb.activity_decay += 0.001;
-    // }
+    if ncnfl % 5000 == 0 && vdb.activity_decay < state.config.var_activity_d_max {
+        vdb.activity_decay += 0.001;
+    }
     state.c_lvl.update(asgs.level() as f64);
     let bl = analyze(asgs, cdb, state, vdb, ci);
     asgs.cancel_until(vdb, bl.max(state.root_level));
     state.restart_update_asg(asgs.len()); // TODO: after or before backtrack
-    for l in &asgs.trail[..] {
-        vdb.set_acv(l.vi());
+    {
+        let VarDB {
+            ref mut vars,
+            ref mut acv,
+            ref mut sua,
+            ..
+        } = vdb;
+        for l in &asgs.trail[..] {
+            let v = &mut vars[l.vi()];
+            acv.add(v);
+            // vdb.set_acv(l.vi());
+            sua.add(v);
+        }
     }
     let new_learnt = &mut state.new_learnt;
     let learnt_len = new_learnt.len();
@@ -380,39 +391,65 @@ fn handle_conflict_path(
         let l0 = new_learnt[0];
         asgs.check_progress();
         asgs.uncheck_enqueue(vdb, l0, NULL_CLAUSE);
-        // vdb.reset_acvs(false);
-        // vdb.reset_fups(false);
-        // if vdb.sua_is_closed {
-        //     vdb.reset_acvs(true);
-        // }
-        // if vdb.suf_is_closed {
-        //     vdb.reset_fups(true);
-        // }
-        vdb.set_acv(l0.vi());
-        state.ema_acv_inc.update(1.0);
-        vdb.set_fup(l0.vi());
-        // state.ema_fup_inc.update(1.0);
-        state.restart_update_lbd(0);
-        state.b_lvl.update(0.0);
+        // Finding a unit learn clause changes the shape of the problem.
+        {
+            let VarDB {
+                ref mut vars,
+                ref mut asv,
+                ref mut acv,
+                ref mut sua,
+                ref mut fup,
+                ref mut suf,
+                ..
+            } = vdb;
+            for v in &mut vars[1..] {
+                if !v.is(Flag::ELIMINATED) {
+                    asv.remove(v);
+                    acv.remove(v);
+                    sua.remove(v);
+                    fup.remove(v);
+                    suf.remove(v);
+                }
+            }
+            asv.reset();
+            acv.reset();
+            sua.reset();
+            fup.reset();
+            suf.reset();
+        }
     } else {
         state.stats[Stat::Learnt] += 1;
         let lbd = vdb.compute_lbd(&new_learnt);
         let l0 = new_learnt[0];
-        vdb.set_fup(l0.vi());
-        if lbd <= 2 {
-            state.stats[Stat::NumLBD2] += 1;
-        }
-        if learnt_len == 2 {
-            state.stats[Stat::NumBin] += 1;
-            state.stats[Stat::NumBinLearnt] += 1;
-            let l1 = new_learnt[1];
-            vdb.set_fup(l1.vi());
+        {
+            let VarDB {
+                ref mut vars,
+                ref mut asv,
+                ref mut fup,
+                ref mut suf,
+                ..
+            } = vdb;
+            // vdb.set_fup(l0.vi());
+            let v0 = &mut vars[l0.vi()];
+            fup.add(v0);
+            suf.add(v0);
+            if lbd <= 2 {
+                state.stats[Stat::NumLBD2] += 1;
+            }
+            if learnt_len == 2 {
+                state.stats[Stat::NumBin] += 1;
+                state.stats[Stat::NumBinLearnt] += 1;
+                let l1 = new_learnt[1];
+                let v1 = &mut vars[l1.vi()];
+                fup.add(v1);
+                suf.add(v1);
+            }
+            asv.num = asgs.len();
+            asv.diff = asgs.check_progress() as f64;
         }
         let cid = cdb.attach(state, vdb, lbd);
         elim.add_cid_occur(vdb, cid, &mut cdb.clause[cid as usize], true);
         state.restart_update_lbd(lbd);
-        vdb.num_asv = asgs.len();
-        vdb.asv_inc = asgs.check_progress() as f64;
         if !state.restart(asgs, vdb) {
             asgs.uncheck_enqueue(vdb, l0, cid);
         }
@@ -422,11 +459,11 @@ fn handle_conflict_path(
             ncnfl,
             state.stats[Stat::Restart] as f64,
             state.num_solved_vars as f64,
-            100.0 * state.ema_asv_inc.get(), // vdb.num_asv as f64,
-            vdb.num_acv as f64,
-            vdb.num_sua as f64,
-            vdb.num_fup as f64,
-            // vdb.num_suf as f64,
+            // (100.0 * vdb.asv.diff_ema.get()).min(state.num_vars as f64),
+            vdb.acv.num as f64,
+            vdb.sua.num as f64,
+            vdb.fup.num as f64,
+            vdb.suf.num as f64,
         ));
     }
     if ncnfl % 10_000 == 0 {

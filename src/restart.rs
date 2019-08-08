@@ -1,6 +1,7 @@
 use crate::propagator::AssignStack;
 use crate::state::{Stat, State};
 use crate::traits::*;
+use crate::types::Flag;
 use crate::var::VarDB;
 
 /// Exponential Moving Average w/ a calibrator
@@ -104,115 +105,62 @@ impl RestartIF for State {
             return false;
         }
         self.after_restart += 1;
+        let mut level0_restart = false;
         let mut level1_restart = false;
         let mut level2_restart = false;
+        let sup = |long, rate, thrd| rate < thrd && long < thrd && rate < long;
 
-        //////////////// level 1
-        //////// asv
-        {
-            let asv_long = self.ema_asv_inc.get();
-            let asv_rate = self.ema_asv_inc.get_fast();
-            let thrd = vdb.asv_threshold;
-            let v = asv_rate < thrd && asv_long < thrd && asv_rate < asv_long;
-            if !vdb.asv_is_closed {
-                self.ema_asv_inc.update(vdb.asv_inc as f64);
-                vdb.asv_inc = 0.0;
-                if v {
-                    vdb.asv_is_closed = true;
-                    level1_restart = true;
-                    self.stats[Stat::RestartByAsg] += 1;
-                }
-            }
-        };
-        //////// acv
-        {
-            let acv_long = self.ema_acv_inc.get();
-            let acv_rate = self.ema_acv_inc.get_fast();
-            let thrd = vdb.acv_stagnation_threshold;
-            let v = acv_rate < thrd && acv_rate < acv_long && acv_long < thrd;
-            if !vdb.acv_is_closed {
-                self.ema_acv_inc.update(vdb.acv_inc as f64);
-                vdb.acv_inc = 0.0;
-                if v {
-                    vdb.acv_is_closed = true;
-                    // level1_restart = true;
-                    // self.stats[Stat::RestartByAsg] += 1;
-                }
-            }
+        // level 0
+        if vdb.asv.check(sup) {
+            // level0_restart = true;
+            // self.stats[Stat::RestartByAsg] += 1;
         }
 
-        //////// fup
-        {
-            let fup_long = self.ema_fup_inc.get();
-            let fup_rate = self.ema_fup_inc.get_fast();
-            let thrd = vdb.fup_stagnation_threshold;
-            let v = fup_rate < thrd && fup_rate < fup_long && fup_long < thrd;
-            if !vdb.fup_is_closed {
-                self.ema_fup_inc.update(vdb.fup_inc as f64);
-                vdb.fup_inc = 0.0;
-                if v {
-                    vdb.fup_is_closed = true;
-                    // level1_restart = true;
-                    // self.stats[Stat::RestartByFUP] += 1;
-                }
-            }
-        };
+        // level 1
+        vdb.acv.check(sup);
+        vdb.fup.check(|long, _rate, _thrd| long < 0.01);
+        level1_restart = vdb.acv.is_closed & vdb.fup.is_closed;
 
-        //////////////// level 2
-        //////// sua
-        {
-            let sua_long = self.ema_sua_inc.get();
-            let sua_rate = self.ema_sua_inc.get_fast();
-            let thrd = vdb.sua_stagnation_threshold;
-            let v = sua_rate < thrd && sua_rate < sua_long && sua_long < thrd;
-            if !vdb.sua_is_closed {
-                self.ema_sua_inc.update(vdb.sua_inc as f64);
-                vdb.sua_inc = 0.0;
-                if v {
-                    vdb.sua_is_closed = true;
-                    // level2_restart = true;
-                    // self.stats[Stat::RestartBySUA] += 1;
-                }
-            }
-        };
+        if level1_restart {
+            self.stats[Stat::RestartByAsg] += 1;
+            self.stats[Stat::RestartByFUP] += 1;
+        }
 
-        //////// suf
-        {
-            let suf_long = self.ema_suf_inc.get();
-            let suf_rate = self.ema_suf_inc.get_fast();
-            let thrd = vdb.suf_stagnation_threshold;
-            let v = suf_rate < thrd && suf_rate < suf_long && suf_long < thrd;
-            if !vdb.suf_is_closed {
-                self.ema_suf_inc.update(vdb.suf_inc as f64);
-                vdb.suf_inc = 0.0;
-                if v {
-                    vdb.suf_is_closed = true;
-                    level2_restart = true;
-                    self.stats[Stat::RestartByFUP] += 1; // BySUF
-                }
-            }
-        };
+        // level 2
+        if vdb.sua.check(sup) {
+            // level2_restart = true;
+            // self.stats[Stat::RestartBySuA] += 1;
+        }
+        if vdb.suf.check(sup) {
+            // level2_restart = true;
+            // self.stats[Stat::RestartBySuF] += 1;
+        }
 
-        if level1_restart || level2_restart {
+        if level0_restart || level1_restart || level2_restart {
             asgs.cancel_until(vdb, 0);
             asgs.check_progress();
             self.b_lvl.update(0.0);
             self.restart_ratio.update(1.0);
-            if true {
-                vdb.reset_asv();
-                self.ema_asv_inc.reinitialize1();
+            // level 2 are never cleared.
+            if level0_restart || level1_restart || level2_restart {
+                // No need to asv.remove. It has a pseudo flag.
+                vdb.asv.reset();
             }
             if level1_restart || level2_restart {
-                vdb.reset_acv();
-                self.ema_acv_inc.reinitialize1();
-                vdb.reset_fup();
-                self.ema_fup_inc.reinitialize1();
-            }
-            if level2_restart {
-                vdb.reset_sua();
-                self.ema_sua_inc.reinitialize1();
-                vdb.reset_suf();
-                self.ema_suf_inc.reinitialize1();
+                let VarDB {
+                    ref mut vars,
+                    ref mut acv,
+                    ref mut fup,
+                    ..
+                } = vdb;
+                for v in &mut vars[1..] {
+                    if !v.is(Flag::ELIMINATED) {
+                        acv.remove(v);
+                        fup.remove(v);
+                    }
+                }
+                acv.reset();
+                fup.reset();
             }
             self.after_restart = 0;
             self.stats[Stat::Restart] += 1;
