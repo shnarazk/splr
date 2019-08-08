@@ -288,9 +288,13 @@ pub trait VarDBIF {
     fn activity(&mut self, vi: VarId) -> f64;
     fn bump_activity(&mut self, vi: VarId);
     fn set_acv(&mut self, vi: VarId) -> usize;
-    fn reset_acvs(&mut self, full_clear: bool);
     fn set_fup(&mut self, vi: VarId) -> usize;
-    fn reset_fups(&mut self, full_clear: bool);
+    fn reset_asv(&mut self);
+    fn reset_acv(&mut self);
+    fn reset_sua(&mut self);
+    fn reset_fup(&mut self);
+    fn reset_suf(&mut self);
+
 }
 
 /// API for 'watcher list' like `attach`, `detach`, `detach_with` and so on.

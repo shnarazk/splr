@@ -380,23 +380,25 @@ fn handle_conflict_path(
         let l0 = new_learnt[0];
         asgs.check_progress();
         asgs.uncheck_enqueue(vdb, l0, NULL_CLAUSE);
-        if vdb.sua_is_closed {
-            vdb.reset_acvs(true);
-        }
-        if vdb.suf_is_closed {
-            vdb.reset_fups(true);
-        }
+        // vdb.reset_acvs(false);
+        // vdb.reset_fups(false);
+        // if vdb.sua_is_closed {
+        //     vdb.reset_acvs(true);
+        // }
+        // if vdb.suf_is_closed {
+        //     vdb.reset_fups(true);
+        // }
         vdb.set_acv(l0.vi());
         state.ema_acv_inc.update(1.0);
         vdb.set_fup(l0.vi());
-        state.ema_fup_inc.update(1.0);
+        // state.ema_fup_inc.update(1.0);
         state.restart_update_lbd(0);
         state.b_lvl.update(0.0);
     } else {
         state.stats[Stat::Learnt] += 1;
         let lbd = vdb.compute_lbd(&new_learnt);
         let l0 = new_learnt[0];
-        state.ema_fup_inc.update(vdb.set_fup(l0.vi()) as f64);
+        vdb.set_fup(l0.vi());
         if lbd <= 2 {
             state.stats[Stat::NumLBD2] += 1;
         }
@@ -404,11 +406,13 @@ fn handle_conflict_path(
             state.stats[Stat::NumBin] += 1;
             state.stats[Stat::NumBinLearnt] += 1;
             let l1 = new_learnt[1];
-            state.ema_fup_inc.update(vdb.set_fup(l1.vi()) as f64);
+            vdb.set_fup(l1.vi());
         }
         let cid = cdb.attach(state, vdb, lbd);
         elim.add_cid_occur(vdb, cid, &mut cdb.clause[cid as usize], true);
         state.restart_update_lbd(lbd);
+        vdb.num_asv = asgs.len();
+        vdb.asv_inc = asgs.check_progress() as f64;
         if !state.restart(asgs, vdb) {
             asgs.uncheck_enqueue(vdb, l0, cid);
         }
@@ -417,12 +421,12 @@ fn handle_conflict_path(
         state.development_history.push((
             ncnfl,
             state.stats[Stat::Restart] as f64,
-            // state.ema_asg.get(),
             state.num_solved_vars as f64,
+            100.0 * state.ema_asv_inc.get(), // vdb.num_asv as f64,
             vdb.num_acv as f64,
             vdb.num_sua as f64,
             vdb.num_fup as f64,
-            vdb.num_suf as f64,
+            // vdb.num_suf as f64,
         ));
     }
     if ncnfl % 10_000 == 0 {

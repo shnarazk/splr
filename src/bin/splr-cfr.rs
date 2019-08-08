@@ -51,18 +51,18 @@ fn main() {
         if let Ok(f) = File::create(format!("dbg_{}.csv", dump)) {
             let mut buf = BufWriter::new(f);
             buf.write_all(b"conflict,value,kind\n").unwrap();
-            for (c, r, s, a, sa, f, sf) in s.state.development_history.iter() {
-                buf.write_all(format!("{:>7},{:>8.0},\"restart\"\n", c, r).as_bytes())
+            for (n, a, b, c, d, e, f) in s.state.development_history.iter() {
+                buf.write_all(format!("{:>7},{:>8.0},\"restart\"\n", n, a).as_bytes())
                     .unwrap();
-                buf.write_all(format!("{:>7},{:>8.0},\"solved\"\n", c, s).as_bytes())
+                buf.write_all(format!("{:>7},{:>8.0},\"solved\"\n", n, b).as_bytes())
                     .unwrap();
-                buf.write_all(format!("{:>7},{:>8.0},\"acv\"\n", c, a).as_bytes())
+                buf.write_all(format!("{:>7},{:>8.0},\"asv inc 100\"\n", n, c).as_bytes())
                     .unwrap();
-                buf.write_all(format!("{:>7},{:>8.0},\"sup acv\"\n", c, sa).as_bytes())
+                buf.write_all(format!("{:>7},{:>8.0},\"acv\"\n", n, d).as_bytes())
                     .unwrap();
-                buf.write_all(format!("{:>7},{:>8.0},\"fup\"\n", c, f).as_bytes())
+                buf.write_all(format!("{:>7},{:>8.0},\"sua\"\n", n, e).as_bytes())
                     .unwrap();
-                buf.write_all(format!("{:>7},{:>8.0},\"sup fup\"\n", c, sf).as_bytes())
+                buf.write_all(format!("{:>7},{:>8.0},\"fup\"\n", n, f).as_bytes())
                     .unwrap();
             }
         }

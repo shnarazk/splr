@@ -104,12 +104,6 @@ impl RestartIF for State {
             return false;
         }
         self.after_restart += 1;
-        // sua is not used
-        // if vdb.sua_is_open {
-        //     self.ema_sua_inc.update(vdb.sua_inc as f64);
-        //     vdb.sua_inc = 0;
-        // }
-
         let mut level1_restart = false;
         let mut level2_restart = false;
 
@@ -121,12 +115,12 @@ impl RestartIF for State {
             let thrd = vdb.asv_threshold;
             let v = asv_rate < thrd && asv_long < thrd && asv_rate < asv_long;
             if !vdb.asv_is_closed {
-                self.ema_asv_inc.update(asgs.check_progress() as f64);
-                // `vdb.asv_inc` is overwritten by `asgs.check_progress()`
+                self.ema_asv_inc.update(vdb.asv_inc as f64);
+                vdb.asv_inc = 0.0;
                 if v {
                     vdb.asv_is_closed = true;
-                    // level1_restart = true;
-                    // self.stats[Stat::RestartByAsg] += 1;
+                    level1_restart = true;
+                    self.stats[Stat::RestartByAsg] += 1;
                 }
             }
         };
@@ -138,11 +132,11 @@ impl RestartIF for State {
             let v = acv_rate < thrd && acv_rate < acv_long && acv_long < thrd;
             if !vdb.acv_is_closed {
                 self.ema_acv_inc.update(vdb.acv_inc as f64);
-                vdb.acv_inc = 0;
+                vdb.acv_inc = 0.0;
                 if v {
                     vdb.acv_is_closed = true;
-                    level1_restart = true;
-                    self.stats[Stat::RestartByAsg] += 1;
+                    // level1_restart = true;
+                    // self.stats[Stat::RestartByAsg] += 1;
                 }
             }
         }
@@ -154,12 +148,12 @@ impl RestartIF for State {
             let thrd = vdb.fup_stagnation_threshold;
             let v = fup_rate < thrd && fup_rate < fup_long && fup_long < thrd;
             if !vdb.fup_is_closed {
-                // `ema_fup_inc` is set in solver::handle_conflict_path
-                // `vdb.fup_inc` is set in solver::handle_conflict_path
+                self.ema_fup_inc.update(vdb.fup_inc as f64);
+                vdb.fup_inc = 0.0;
                 if v {
                     vdb.fup_is_closed = true;
-                    level1_restart = true;
-                    self.stats[Stat::RestartByFUP] += 1;
+                    // level1_restart = true;
+                    // self.stats[Stat::RestartByFUP] += 1;
                 }
             }
         };
@@ -173,10 +167,10 @@ impl RestartIF for State {
             let v = sua_rate < thrd && sua_rate < sua_long && sua_long < thrd;
             if !vdb.sua_is_closed {
                 self.ema_sua_inc.update(vdb.sua_inc as f64);
-                vdb.sua_inc = 0;
+                vdb.sua_inc = 0.0;
                 if v {
-                    // level2_restart = true;
                     vdb.sua_is_closed = true;
+                    // level2_restart = true;
                     // self.stats[Stat::RestartBySUA] += 1;
                 }
             }
@@ -190,10 +184,10 @@ impl RestartIF for State {
             let v = suf_rate < thrd && suf_rate < suf_long && suf_long < thrd;
             if !vdb.suf_is_closed {
                 self.ema_suf_inc.update(vdb.suf_inc as f64);
-                vdb.suf_inc = 0;
+                vdb.suf_inc = 0.0;
                 if v {
-                    level2_restart = true;
                     vdb.suf_is_closed = true;
+                    level2_restart = true;
                     self.stats[Stat::RestartByFUP] += 1; // BySUF
                 }
             }
@@ -204,11 +198,22 @@ impl RestartIF for State {
             asgs.check_progress();
             self.b_lvl.update(0.0);
             self.restart_ratio.update(1.0);
-            // self.ema_asg_inc.reinitialize1();
-            vdb.reset_acvs(level2_restart);
-            self.ema_acv_inc.reinitialize1();
-            vdb.reset_fups(level2_restart);
-            self.ema_fup_inc.reinitialize1();
+            if true {
+                vdb.reset_asv();
+                self.ema_asv_inc.reinitialize1();
+            }
+            if level1_restart || level2_restart {
+                vdb.reset_acv();
+                self.ema_acv_inc.reinitialize1();
+                vdb.reset_fup();
+                self.ema_fup_inc.reinitialize1();
+            }
+            if level2_restart {
+                vdb.reset_sua();
+                self.ema_sua_inc.reinitialize1();
+                vdb.reset_suf();
+                self.ema_suf_inc.reinitialize1();
+            }
             self.after_restart = 0;
             self.stats[Stat::Restart] += 1;
             {

@@ -1,4 +1,5 @@
 use crate::clause::Clause;
+use crate::restart::Ema2;
 use crate::traits::*;
 use crate::types::*;
 use std::fmt;
@@ -69,6 +70,51 @@ impl FlagIF for Var {
     }
 }
 
+#[derive(Debug)]
+pub struct VarSet {
+    pub flag: Flag,
+    pub num: usize,
+    pub diff: f64,
+    pub diff_ema: Ema2,
+    pub is_closed: bool,
+    pub threshold: f64,
+}
+
+impl VarSet {
+    pub fn add(&mut self, v: &mut Var) {
+        if !v.is(self.flag) {
+            v.turn_on(self.flag);
+            self.num += 1;
+            self.diff += 1.0;
+        }
+    }
+    pub fn reset(&mut self) {
+        self.num = 0;
+        self.diff = 0.0;
+        self.is_closed = false;
+        self.diff_ema.reinitialize1();
+    }
+    fn commit(&mut self) {
+        self.diff_ema.update(self.diff as f64);
+        self.diff = 0.0;
+    }
+    fn update(&mut self) -> bool {
+        let long = self.diff_ema.get();
+        let rate = self.diff_ema.get_fast();
+        let thrd = self.threshold;
+        let v = rate < thrd && long < thrd && rate < long;
+        if !self.is_closed {
+            self.diff_ema.update(self.diff as f64);
+            self.diff = 0.0;
+            if v {
+                self.is_closed = true;
+                return true;
+            }
+        }
+        false
+    }
+}
+
 /// Structure for variables.
 #[derive(Debug)]
 pub struct VarDB {
@@ -78,32 +124,40 @@ pub struct VarDB {
     /// var activity decay
     pub activity_decay: f64,
 
-    // Level 1 good old alternative: ASsigned variable
-    pub num_asv: usize,         // use asgs.check_progress
-    pub asv_inc: usize,         // use asgs.check_progress
+    /// ### About levels
+    ///
+    /// - Level 0 is a memory cleared at each restart
+    /// - Level 1 is bascially a memory held during restarts
+    /// - Level 2 is a memory to clear Level 1 data
+
+    /// Level 0 good old no-memory ASsigned Variable
+    pub num_asv: usize,
+    pub asv_inc: f64,
     pub asv_is_closed: bool,
     pub asv_threshold: f64,
 
+
     /// Level 1: assigned or cancelled variable
     pub num_acv: usize,
-    pub acv_inc: usize,
+    pub acv_inc: f64,
     pub acv_is_closed: bool,
     pub acv_stagnation_threshold: f64,
 
     /// Level 2: superium of AVS
     pub num_sua: usize,
-    pub sua_inc: usize,
+    pub sua_inc: f64,
     pub sua_is_closed: bool,
     pub sua_stagnation_threshold: f64,
 
     /// Level 1: First Unified implication Point
     pub num_fup: usize,
+    pub fup_inc: f64,
     pub fup_is_closed: bool,
     pub fup_stagnation_threshold: f64,
 
     /// Level 2: superium of FUP
     pub num_suf: usize,
-    pub suf_inc: usize,
+    pub suf_inc: f64,
     pub suf_is_closed: bool,
     pub suf_stagnation_threshold: f64,
 
@@ -118,25 +172,27 @@ impl Default for VarDB {
             activity_decay: VAR_ACTIVITY_DECAY,
 
             num_asv: 0,
-            asv_inc: 0,
+            asv_inc: 0.0,
             asv_is_closed: false,
             asv_threshold: STAGNATION_THRESHOLD,
 
             num_acv: 0,
-            acv_inc: 0,
+            acv_inc: 0.0,
             acv_is_closed: false,
-            acv_stagnation_threshold: STAGNATION_THRESHOLD / 100f64,
+            acv_stagnation_threshold: STAGNATION_THRESHOLD,
 
             num_sua: 0,
-            sua_inc: 0,
+            sua_inc: 0.0,
             sua_is_closed: false,
             sua_stagnation_threshold: STAGNATION_THRESHOLD,
 
             num_fup: 0,
+            fup_inc: 0.0,
             fup_is_closed: false,
             fup_stagnation_threshold: STAGNATION_THRESHOLD,
+
             num_suf: 0,
-            suf_inc: 0,
+            suf_inc: 0.0,
             suf_is_closed: false,
             suf_stagnation_threshold: STAGNATION_THRESHOLD,
 
@@ -148,33 +204,33 @@ impl Default for VarDB {
 
 impl VarDBIF for VarDB {
     fn new(n: usize, activity_decay: f64) -> Self {
-        let _scale: f64 = - (n as f64).log(2f64);
-        let scale: f64 = -0.01;
+        let scale: f64 = - (n as f64).log(2f64);
         VarDB {
             vars: Var::new_vars(n),
             activity_decay,
 
             num_asv: 0,
-            asv_inc: 0,
+            asv_inc: 0.0,
             asv_is_closed: false,
-            asv_threshold: STAGNATION_THRESHOLD * scale,
+            asv_threshold: 0.5,
 
             num_acv: 0,
-            acv_inc: 0,
+            acv_inc: 0.0,
             acv_is_closed: false,
-            acv_stagnation_threshold: STAGNATION_THRESHOLD / 100f64,
+            acv_stagnation_threshold: STAGNATION_THRESHOLD * scale,
 
             num_sua: 0,
-            sua_inc: 0,
+            sua_inc: 0.0,
             sua_is_closed: false,
-            sua_stagnation_threshold: STAGNATION_THRESHOLD / 10f64,
+            sua_stagnation_threshold: STAGNATION_THRESHOLD * scale,
 
             num_fup: 0,
+            fup_inc: 0.0,
             fup_is_closed: false,
             fup_stagnation_threshold: STAGNATION_THRESHOLD,
 
             num_suf: 0,
-            suf_inc: 0,
+            suf_inc: 0.0,
             suf_is_closed: false,
             suf_stagnation_threshold: STAGNATION_THRESHOLD / 10f64,
 
@@ -233,7 +289,7 @@ impl VarDBIF for VarDB {
         if !v.is(Flag::SUA) {
             v.turn_on(Flag::SUA);
             self.num_sua += 1;
-            self.sua_inc += 1;
+            self.sua_inc += 1.0;
         }
         if !v.is(Flag::ACV) {
             v.turn_on(Flag::ACV);
@@ -241,48 +297,58 @@ impl VarDBIF for VarDB {
         }
         ret
     }
-    fn reset_acvs(&mut self, full_clear: bool) {
-        for v in &mut self.vars[1..] {
-            v.turn_off(Flag::ACV);
-            if full_clear {
-                v.turn_off(Flag::SUA);
-            }
-        }
-        self.num_acv = 0;
-        if full_clear {
-            self.num_sua = 0;
-            self.sua_is_closed = false;
-        }
-        self.sua_inc = 0;
-    }
-
     fn set_fup(&mut self, vi: VarId) -> usize {
         let v = &mut self.vars[vi];
         let ret = !v.is(Flag::FUP) as usize;
         if !v.is(Flag::SUF) {
             v.turn_on(Flag::SUF);
             self.num_suf += 1;
-            self.suf_inc += 1;
+            self.suf_inc += 1.0;
         }
         if !v.is(Flag::FUP) {
             v.turn_on(Flag::FUP);
             self.num_fup += 1;
+            self.fup_inc += 1.0;
         }
         ret
     }
-    fn reset_fups(&mut self, full_clear: bool) {
+    fn reset_asv(&mut self) {
+        self.num_asv = 0;
+        self.asv_inc = 0.0;
+        self.asv_is_closed = false;
+    }
+    fn reset_acv(&mut self) {
+        for v in &mut self.vars[1..] {
+            v.turn_off(Flag::ACV);
+        }
+        self.num_acv = 0;
+        self.acv_inc = 0.0;
+        self.acv_is_closed = false;
+    }
+    fn reset_sua(&mut self) {
+        for v in &mut self.vars[1..] {
+            v.turn_off(Flag::SUA);
+        }
+        self.num_sua = 0;
+        self.sua_inc = 0.0;
+        self.sua_is_closed = false;
+    }
+    fn reset_fup(&mut self) {
         for v in &mut self.vars[1..] {
             v.turn_off(Flag::FUP);
-            if full_clear {
-                v.turn_off(Flag::SUF);
-            }
         }
         self.num_fup = 0;
-        if full_clear {
-            self.num_suf = 0;
-            self.suf_is_closed = false;
+        self.fup_inc = 0.0;
+        self.fup_is_closed = false;
+    }
+
+    fn reset_suf(&mut self) {
+        for v in &mut self.vars[1..] {
+            v.turn_off(Flag::SUF);
         }
-        self.suf_inc = 0;
+        self.num_suf = 0;
+        self.suf_inc = 0.0;
+        self.suf_is_closed = false;
     }
 }
 
