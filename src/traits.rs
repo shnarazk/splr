@@ -287,6 +287,8 @@ pub trait VarDBIF {
     /// return current activity
     fn activity(&mut self, vi: VarId) -> f64;
     fn bump_activity(&mut self, vi: VarId);
+    fn set_acv(&mut self, vi: VarId) -> usize;
+    fn reset_acvs(&mut self, full_clear: bool);
     fn set_fup(&mut self, vi: VarId) -> usize;
     fn reset_fups(&mut self, full_clear: bool);
 }

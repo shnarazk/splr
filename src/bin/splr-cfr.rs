@@ -48,21 +48,21 @@ fn main() {
     // /*
     if 0 < s.state.config.debug_dump && !s.state.development_history.is_empty() {
         let dump = config.cnf_filename.file_stem().unwrap().to_str().unwrap();
-        if let Ok(f) = File::create(format!("debug-dump_{}.csv", dump)) {
+        if let Ok(f) = File::create(format!("dbg_{}.csv", dump)) {
             let mut buf = BufWriter::new(f);
             buf.write_all(b"conflict,value,kind\n").unwrap();
-            for (c, r, f, o, s, a, b) in s.state.development_history.iter() {
+            for (c, r, s, a, sa, f, sf) in s.state.development_history.iter() {
                 buf.write_all(format!("{:>7},{:>8.0},\"restart\"\n", c, r).as_bytes())
-                    .unwrap();
-                buf.write_all(format!("{:>7},{:>8.0},\"fup\"\n", c, f).as_bytes())
-                    .unwrap();
-                buf.write_all(format!("{:>7},{:>8.0},\"fup_once\"\n", c, o).as_bytes())
                     .unwrap();
                 buf.write_all(format!("{:>7},{:>8.0},\"solved\"\n", c, s).as_bytes())
                     .unwrap();
-                buf.write_all(format!("{:>7},{:>8.0},\"assigned\"\n", c, a).as_bytes())
+                buf.write_all(format!("{:>7},{:>8.0},\"acv\"\n", c, a).as_bytes())
                     .unwrap();
-                buf.write_all(format!("{:>7},{:>8.0},\"binclause\"\n", c, b).as_bytes())
+                buf.write_all(format!("{:>7},{:>8.0},\"sup acv\"\n", c, sa).as_bytes())
+                    .unwrap();
+                buf.write_all(format!("{:>7},{:>8.0},\"fup\"\n", c, f).as_bytes())
+                    .unwrap();
+                buf.write_all(format!("{:>7},{:>8.0},\"sup fup\"\n", c, sf).as_bytes())
                     .unwrap();
             }
         }
@@ -273,7 +273,7 @@ fn report(state: &State, out: &mut dyn Write) -> std::io::Result<()> {
     out.write_all(
         format!(
             "c    First UIP|#all:{}, #now:{}, #inc:{}, end%:{} \n",
-            format!("{:>9}", state.record[LogUsizeId::FUPOnce]),
+            format!("{:>9}", state.record[LogUsizeId::SuF]),
             format!("{:>9}", state.record[LogUsizeId::FUP]),
             format!("{:>9.4}", state.record[LogF64Id::FUPInc]),
             format!("{:>9.4}", state.record[LogF64Id::FUPPrg]),

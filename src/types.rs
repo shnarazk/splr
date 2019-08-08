@@ -187,9 +187,13 @@ bitflags! {
         const ELIMINATED   = 0b0000_0000_0010_0000;
         /// mark to run garbage collector on the corresponding watcher lists
         const TOUCHED      = 0b0000_0000_0100_0000;
-        /// this variable was used as a first UID in the present run
+        /// a variable is used as a first UID in the present run
         const FUP          = 0b0000_0000_1000_0000;
-        /// this variable was used as a first UID so far
-        const FUP_ONCE     = 0b0000_0001_0000_0000;
+        /// superium of fup: a variable has ever been used as a first UID so far
+        const SUF          = 0b0000_0001_0000_0000;
+        /// assigned or cancelled variable
+        const ACV          = 0b0000_0010_0000_0000;
+        /// superium of asg: a variable has ever been assigned so far
+        const SUA          = 0b0000_0100_0000_0000;
     }
 }

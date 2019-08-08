@@ -104,60 +104,130 @@ impl RestartIF for State {
             return false;
         }
         self.after_restart += 1;
-        let asg_ratio = self.ema_asg_inc.get();
-        let asg_fast = self.ema_asg_inc.get_fast();
-        let fup_ratio = self.ema_fup_inc.get();
-        let fup_fast = self.ema_fup_inc.get_fast();
+        // sua is not used
+        // if vdb.sua_is_open {
+        //     self.ema_sua_inc.update(vdb.sua_inc as f64);
+        //     vdb.sua_inc = 0;
+        // }
 
-        let asg_stagnated: bool = {
-            let thrd = vdb.asg_stagnation_threshold;
-            thrd < asg_ratio && asg_ratio < 0.0 && thrd / 2.0 < asg_fast && asg_fast < 0.0
+        let mut level1_restart = false;
+        let mut level2_restart = false;
+
+        //////////////// level 1
+        //////// asv
+        {
+            let asv_long = self.ema_asv_inc.get();
+            let asv_rate = self.ema_asv_inc.get_fast();
+            let thrd = vdb.asv_threshold;
+            let v = asv_rate < thrd && asv_long < thrd && asv_rate < asv_long;
+            if !vdb.asv_is_closed {
+                self.ema_asv_inc.update(asgs.check_progress() as f64);
+                // `vdb.asv_inc` is overwritten by `asgs.check_progress()`
+                if v {
+                    vdb.asv_is_closed = true;
+                    // level1_restart = true;
+                    // self.stats[Stat::RestartByAsg] += 1;
+                }
+            }
         };
+        //////// acv
+        {
+            let acv_long = self.ema_acv_inc.get();
+            let acv_rate = self.ema_acv_inc.get_fast();
+            let thrd = vdb.acv_stagnation_threshold;
+            let v = acv_rate < thrd && acv_rate < acv_long && acv_long < thrd;
+            if !vdb.acv_is_closed {
+                self.ema_acv_inc.update(vdb.acv_inc as f64);
+                vdb.acv_inc = 0;
+                if v {
+                    vdb.acv_is_closed = true;
+                    level1_restart = true;
+                    self.stats[Stat::RestartByAsg] += 1;
+                }
+            }
+        }
 
-        let fup_stagnated: bool = {
+        //////// fup
+        {
+            let fup_long = self.ema_fup_inc.get();
+            let fup_rate = self.ema_fup_inc.get_fast();
             let thrd = vdb.fup_stagnation_threshold;
-            !vdb.fup_full_connected && fup_ratio < thrd && fup_fast < thrd / 2.0
+            let v = fup_rate < thrd && fup_rate < fup_long && fup_long < thrd;
+            if !vdb.fup_is_closed {
+                // `ema_fup_inc` is set in solver::handle_conflict_path
+                // `vdb.fup_inc` is set in solver::handle_conflict_path
+                if v {
+                    vdb.fup_is_closed = true;
+                    level1_restart = true;
+                    self.stats[Stat::RestartByFUP] += 1;
+                }
+            }
         };
 
-        if asg_stagnated || fup_stagnated {
+        //////////////// level 2
+        //////// sua
+        {
+            let sua_long = self.ema_sua_inc.get();
+            let sua_rate = self.ema_sua_inc.get_fast();
+            let thrd = vdb.sua_stagnation_threshold;
+            let v = sua_rate < thrd && sua_rate < sua_long && sua_long < thrd;
+            if !vdb.sua_is_closed {
+                self.ema_sua_inc.update(vdb.sua_inc as f64);
+                vdb.sua_inc = 0;
+                if v {
+                    // level2_restart = true;
+                    vdb.sua_is_closed = true;
+                    // self.stats[Stat::RestartBySUA] += 1;
+                }
+            }
+        };
+
+        //////// suf
+        {
+            let suf_long = self.ema_suf_inc.get();
+            let suf_rate = self.ema_suf_inc.get_fast();
+            let thrd = vdb.suf_stagnation_threshold;
+            let v = suf_rate < thrd && suf_rate < suf_long && suf_long < thrd;
+            if !vdb.suf_is_closed {
+                self.ema_suf_inc.update(vdb.suf_inc as f64);
+                vdb.suf_inc = 0;
+                if v {
+                    level2_restart = true;
+                    vdb.suf_is_closed = true;
+                    self.stats[Stat::RestartByFUP] += 1; // BySUF
+                }
+            }
+        };
+
+        if level1_restart || level2_restart {
             asgs.cancel_until(vdb, 0);
             asgs.check_progress();
             self.b_lvl.update(0.0);
             self.restart_ratio.update(1.0);
+            // self.ema_asg_inc.reinitialize1();
+            vdb.reset_acvs(level2_restart);
+            self.ema_acv_inc.reinitialize1();
+            vdb.reset_fups(level2_restart);
             self.ema_fup_inc.reinitialize1();
-            self.ema_asg_inc.reinitialize1();
             self.after_restart = 0;
             self.stats[Stat::Restart] += 1;
-            if asg_stagnated {
-                self.stats[Stat::RestartByAsg] += 1;
-            } else if fup_stagnated {
-                self.stats[Stat::RestartByFUP] += 1;
-            }
-            self.max_assignment = 0;
             {
-                let s = self.config.var_activity_decay;
-                let m = self.config.var_activity_d_max;
-                let k = self.stats[Stat::RestartByFUP] as f64 / self.stats[Stat::Restart] as f64;
-                vdb.activity_decay = k * m + (1.0 - k) * s;
+                let ra = self.stats[Stat::RestartByAsg];
+                let rf = self.stats[Stat::RestartByFUP];
+                if 0 < ra && 0 < rf {
+                    let s = self.config.var_activity_decay;
+                    let m = self.config.var_activity_d_max;
+                    let k = ra.max(rf) as f64 / (ra + rf) as f64;
+                    vdb.activity_decay = k * m + (1.0 - k) * s;
+                }
             }
-            if !vdb.fup_full_connected {
-                vdb.reset_fups(false);
-            }
-            if fup_stagnated
-                && self.num_vars - self.num_solved_vars - self.num_eliminated_vars
-                    <= vdb.num_fup_once
-            {
-                vdb.fup_full_connected = true;
-                vdb.asg_stagnation_threshold /= 5.0;
-                vdb.fup_stagnation_threshold /= 5.0;
-            }
+            true
         } else {
             let bl = asgs.level();
             self.b_lvl.update(bl as f64);
             self.restart_ratio.update(0.0);
-            return false;
+            false
         }
-        true
     }
 
     fn restart_update_lbd(&mut self, lbd: usize) {
@@ -165,7 +235,6 @@ impl RestartIF for State {
         self.ema_lbd.update(lbd as f64);
     }
     fn restart_update_asg(&mut self, n: usize) {
-        self.max_assignment = self.max_assignment.max(n);
         self.ema_asg.update(n as f64);
     }
     fn restart_update_luby(&mut self) {

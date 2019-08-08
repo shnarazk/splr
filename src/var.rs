@@ -4,6 +4,7 @@ use crate::types::*;
 use std::fmt;
 
 const VAR_ACTIVITY_DECAY: f64 = 0.92;
+const STAGNATION_THRESHOLD: f64 = 0.72;
 
 /// Structure for variables.
 #[derive(Debug)]
@@ -50,9 +51,7 @@ impl VarIF for Var {
     fn new_vars(n: usize) -> Vec<Var> {
         let mut vec = Vec::with_capacity(n + 1);
         for i in 0..=n {
-            let mut v = Var::new(i);
-            v.reward = (n - i) as f64;
-            vec.push(v);
+            vec.push(Var::new(i));
         }
         vec
     }
@@ -78,11 +77,36 @@ pub struct VarDB {
     /// the current conflict number
     /// var activity decay
     pub activity_decay: f64,
+
+    // Level 1 good old alternative: ASsigned variable
+    pub num_asv: usize,         // use asgs.check_progress
+    pub asv_inc: usize,         // use asgs.check_progress
+    pub asv_is_closed: bool,
+    pub asv_threshold: f64,
+
+    /// Level 1: assigned or cancelled variable
+    pub num_acv: usize,
+    pub acv_inc: usize,
+    pub acv_is_closed: bool,
+    pub acv_stagnation_threshold: f64,
+
+    /// Level 2: superium of AVS
+    pub num_sua: usize,
+    pub sua_inc: usize,
+    pub sua_is_closed: bool,
+    pub sua_stagnation_threshold: f64,
+
+    /// Level 1: First Unified implication Point
     pub num_fup: usize,
-    pub num_fup_once: usize,
-    pub asg_stagnation_threshold: f64,
+    pub fup_is_closed: bool,
     pub fup_stagnation_threshold: f64,
-    pub fup_full_connected: bool,
+
+    /// Level 2: superium of FUP
+    pub num_suf: usize,
+    pub suf_inc: usize,
+    pub suf_is_closed: bool,
+    pub suf_stagnation_threshold: f64,
+
     pub current_conflict: usize,
     pub lbd_temp: Vec<usize>,
 }
@@ -92,11 +116,30 @@ impl Default for VarDB {
         VarDB {
             vars: Vec::new(),
             activity_decay: VAR_ACTIVITY_DECAY,
+
+            num_asv: 0,
+            asv_inc: 0,
+            asv_is_closed: false,
+            asv_threshold: STAGNATION_THRESHOLD,
+
+            num_acv: 0,
+            acv_inc: 0,
+            acv_is_closed: false,
+            acv_stagnation_threshold: STAGNATION_THRESHOLD / 100f64,
+
+            num_sua: 0,
+            sua_inc: 0,
+            sua_is_closed: false,
+            sua_stagnation_threshold: STAGNATION_THRESHOLD,
+
             num_fup: 0,
-            num_fup_once: 0,
-            asg_stagnation_threshold: -1.0,
-            fup_stagnation_threshold: 0.1,
-            fup_full_connected: false,
+            fup_is_closed: false,
+            fup_stagnation_threshold: STAGNATION_THRESHOLD,
+            num_suf: 0,
+            suf_inc: 0,
+            suf_is_closed: false,
+            suf_stagnation_threshold: STAGNATION_THRESHOLD,
+
             current_conflict: 0,
             lbd_temp: Vec::new(),
         }
@@ -105,14 +148,36 @@ impl Default for VarDB {
 
 impl VarDBIF for VarDB {
     fn new(n: usize, activity_decay: f64) -> Self {
+        let _scale: f64 = - (n as f64).log(2f64);
+        let scale: f64 = -0.01;
         VarDB {
             vars: Var::new_vars(n),
             activity_decay,
+
+            num_asv: 0,
+            asv_inc: 0,
+            asv_is_closed: false,
+            asv_threshold: STAGNATION_THRESHOLD * scale,
+
+            num_acv: 0,
+            acv_inc: 0,
+            acv_is_closed: false,
+            acv_stagnation_threshold: STAGNATION_THRESHOLD / 100f64,
+
+            num_sua: 0,
+            sua_inc: 0,
+            sua_is_closed: false,
+            sua_stagnation_threshold: STAGNATION_THRESHOLD / 10f64,
+
             num_fup: 0,
-            num_fup_once: 0,
-            asg_stagnation_threshold: -1.0,
-            fup_stagnation_threshold: 0.1,
-            fup_full_connected: false,
+            fup_is_closed: false,
+            fup_stagnation_threshold: STAGNATION_THRESHOLD,
+
+            num_suf: 0,
+            suf_inc: 0,
+            suf_is_closed: false,
+            suf_stagnation_threshold: STAGNATION_THRESHOLD / 10f64,
+
             current_conflict: 0,
             lbd_temp: vec![0; n + 1],
         }
@@ -153,6 +218,7 @@ impl VarDBIF for VarDB {
             let diff = self.current_conflict - v.last_used;
             let decay = self.activity_decay;
             v.last_used = self.current_conflict;
+            // assert!(0.0 <= decay, format!("decay {}", decay));
             v.reward *= decay.powi(diff as i32);
         }
         v.reward
@@ -161,12 +227,42 @@ impl VarDBIF for VarDB {
         self.activity(vi);
         self.vars[vi].reward += 1.0 - self.activity_decay;
     }
+    fn set_acv(&mut self, vi: VarId) -> usize {
+        let v = &mut self.vars[vi];
+        let ret = !v.is(Flag::ACV) as usize;
+        if !v.is(Flag::SUA) {
+            v.turn_on(Flag::SUA);
+            self.num_sua += 1;
+            self.sua_inc += 1;
+        }
+        if !v.is(Flag::ACV) {
+            v.turn_on(Flag::ACV);
+            self.num_acv += 1;
+        }
+        ret
+    }
+    fn reset_acvs(&mut self, full_clear: bool) {
+        for v in &mut self.vars[1..] {
+            v.turn_off(Flag::ACV);
+            if full_clear {
+                v.turn_off(Flag::SUA);
+            }
+        }
+        self.num_acv = 0;
+        if full_clear {
+            self.num_sua = 0;
+            self.sua_is_closed = false;
+        }
+        self.sua_inc = 0;
+    }
+
     fn set_fup(&mut self, vi: VarId) -> usize {
         let v = &mut self.vars[vi];
         let ret = !v.is(Flag::FUP) as usize;
-        if !v.is(Flag::FUP_ONCE) {
-            v.turn_on(Flag::FUP_ONCE);
-            self.num_fup_once += 1;
+        if !v.is(Flag::SUF) {
+            v.turn_on(Flag::SUF);
+            self.num_suf += 1;
+            self.suf_inc += 1;
         }
         if !v.is(Flag::FUP) {
             v.turn_on(Flag::FUP);
@@ -178,14 +274,15 @@ impl VarDBIF for VarDB {
         for v in &mut self.vars[1..] {
             v.turn_off(Flag::FUP);
             if full_clear {
-                v.turn_off(Flag::FUP_ONCE);
+                v.turn_off(Flag::SUF);
             }
         }
         self.num_fup = 0;
         if full_clear {
-            self.num_fup_once = 0;
-            self.fup_full_connected = false;
+            self.num_suf = 0;
+            self.suf_is_closed = false;
         }
+        self.suf_inc = 0;
     }
 }
 
@@ -201,7 +298,7 @@ impl fmt::Display for Var {
             self.reason.format(),
             st(Flag::TOUCHED, ", touched"),
             st(Flag::ELIMINATED, ", eliminated"),
-            st(Flag::FUP_ONCE, ", fup_once"),
+            st(Flag::SUF, ", suf"),
             st(Flag::FUP, ", fup"),
         )
     }

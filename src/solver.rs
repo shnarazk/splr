@@ -362,24 +362,32 @@ fn handle_conflict_path(
     ci: ClauseId,
 ) -> MaybeInconsistent {
     let ncnfl = state.stats[Stat::Conflict]; // total number
-    if ncnfl % 5000 == 0 && vdb.activity_decay < state.config.var_activity_d_max {
-        vdb.activity_decay += 0.01;
-    }
+    // if ncnfl % 5000 == 0 && vdb.activity_decay < state.config.var_activity_d_max {
+    //     vdb.activity_decay += 0.001;
+    // }
     state.c_lvl.update(asgs.level() as f64);
     let bl = analyze(asgs, cdb, state, vdb, ci);
     asgs.cancel_until(vdb, bl.max(state.root_level));
     state.restart_update_asg(asgs.len()); // TODO: after or before backtrack
-    state.ema_asg_inc.update(asgs.check_progress() as f64);
+    for l in &asgs.trail[..] {
+        vdb.set_acv(l.vi());
+    }
     let new_learnt = &mut state.new_learnt;
     let learnt_len = new_learnt.len();
     if learnt_len == 1 {
         // dump to certified even if it's a literal.
         cdb.certificate_add(new_learnt);
         let l0 = new_learnt[0];
+        asgs.check_progress();
         asgs.uncheck_enqueue(vdb, l0, NULL_CLAUSE);
-        if vdb.fup_full_connected {
+        if vdb.sua_is_closed {
+            vdb.reset_acvs(true);
+        }
+        if vdb.suf_is_closed {
             vdb.reset_fups(true);
         }
+        vdb.set_acv(l0.vi());
+        state.ema_acv_inc.update(1.0);
         vdb.set_fup(l0.vi());
         state.ema_fup_inc.update(1.0);
         state.restart_update_lbd(0);
@@ -409,11 +417,12 @@ fn handle_conflict_path(
         state.development_history.push((
             ncnfl,
             state.stats[Stat::Restart] as f64,
-            vdb.num_fup as f64,
-            vdb.num_fup_once as f64,
+            // state.ema_asg.get(),
             state.num_solved_vars as f64,
-            state.ema_asg.get(),
-            state.stats[Stat::NumBin] as f64,
+            vdb.num_acv as f64,
+            vdb.num_sua as f64,
+            vdb.num_fup as f64,
+            vdb.num_suf as f64,
         ));
     }
     if ncnfl % 10_000 == 0 {
