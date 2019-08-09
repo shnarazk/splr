@@ -92,8 +92,8 @@ impl Ema2 {
 /// Glucose original (or Lingering-style) forcing restart condition
 /// ### Implementing the original algorithm
 ///
-/// ```
-///    rst: RestartLBD::new(0.8);
+/// ```ignore
+///    rst = RestartLBD::new(0.8);
 ///    rst.add(learnt.lbd());
 ///    if rst.check(|ema, ave| ave < rst.threshold * ema.get_fast()) {
 ///        restarting...
@@ -102,8 +102,8 @@ impl Ema2 {
 ///
 /// ### Implementing an EMA-based variant
 ///
-/// ```
-///    rst: RestartLBD::new(0.8);
+/// ```ignore
+///    rst = RestartLBD::new(0.8);
 ///    rst.add(learnt.lbd());
 ///    if rst.check(|ema, _| ema.get() < rst.threshold * ema.get_fast()) {
 ///        restarting...
@@ -156,8 +156,8 @@ impl RestartLBD {
 /// Glucose original (or Lingering-style) restart blocking condition
 /// ### Implementing the original algorithm
 ///
-/// ```
-///    blk: RestartASG::new(1.20);
+/// ```ignore
+///    blk = RestartASG::new(1.20);
 ///    blk.add(solver.num_assigns);
 ///    if blk.check(|ema, ave| blk.threshold * ave < ema.get_fast()) {
 ///        blocking...
@@ -165,8 +165,8 @@ impl RestartLBD {
 /// ```
 /// ### Implementing an EMA-based variant
 ///
-/// ```
-///    blk: RestartASG::new(1.20);
+/// ```ignore
+///    blk = RestartASG::new(1.20);
 ///    blk.add(solver.num_assigns);
 ///    if blk.check(|ema, _| blk.threshold * ema.get() < ema.get_fast()) {
 ///        blocking...
