@@ -5,10 +5,9 @@ use crate::types::*;
 use std::fmt;
 use std::ops::{Index, IndexMut, Range};
 
+const VAR_ACTIVITY_DECAY: f64 = 0.92;
 const EMA_SLOW: usize = 8192; // 2 ^ 13; 2 ^ 15 = 32768
 const EMA_FAST: usize = 64; // 2 ^ 6
-const VAR_ACTIVITY_DECAY: f64 = 0.92;
-const CLOSE_THRD: f64 = 0.5; // 0.72;
 
 /// Structure for variables.
 #[derive(Debug)]
@@ -77,7 +76,7 @@ impl FlagIF for Var {
 pub struct VarSet {
     pub flag: Option<Flag>,
     pub num: usize,
-    pub diff: f64,
+    pub diff: Option<f64>,
     pub diff_ema: Ema2,
     pub is_closed: bool,
     pub threshold: f64,
@@ -88,7 +87,7 @@ impl VarSetIF for VarSet {
         VarSet {
             flag,
             num: 0,
-            diff: 0.0,
+            diff: None,
             diff_ema: Ema2::new(EMA_SLOW).with_fast(EMA_FAST).initialize1(),
             is_closed: false,
             threshold,
@@ -103,41 +102,48 @@ impl VarSetIF for VarSet {
     }
     fn reset(&mut self) {
         self.num = 0;
-        self.diff = 0.0;
+        self.diff = None;
         self.is_closed = false;
         self.diff_ema.reinitialize1();
     }
 }
 
-impl<'a> RestartHeuristics<'a> for VarSet {
+impl<'a> ProgressEvaluatorIF<'a> for VarSet {
     type Memory = Ema2;
     type Item = &'a mut Var;
-    fn add(&mut self, v: Self::Item) {
+    fn add(&mut self, v: Self::Item) -> &mut Self {
         match self.flag {
             Some(flag) => {
                 if !v.is(flag) {
                     v.turn_on(flag);
                     self.num += 1;
-                    self.diff += 1.0;
+                    self.diff = Some(self.diff.map_or(1.0, |v| v + 1.0));
+                } else if self.diff.is_none() {
+                    self.diff = Some(0.0);
                 }
             }
             None => {
                 self.num += 1;
-                self.diff += 1.0;
+                self.diff = Some(self.diff.map_or(1.0, |v| v + 1.0));
             }
         }
+        self
     }
-    fn commit(&mut self) {
-        self.diff_ema.update(self.diff as f64);
-        self.diff = 0.0;
-    }
-    fn check<F>(&mut self, f: F) -> bool
+    fn check_restart<F>(&mut self, f: F) -> bool
     where
         F: Fn(&Self::Memory, f64) -> bool,
     {
-        self.is_closed = f(&self.diff_ema, self.threshold);
-        self.commit();
-        self.is_closed
+        if let Some(diff) = self.diff {
+            self.diff_ema.update(diff as f64);
+            self.diff = None;
+            self.is_closed = f(&self.diff_ema, self.threshold);
+            self.is_closed
+        } else {
+            panic!(
+                "VarSet:{:?} you tried to check without giving a value.",
+                self.flag
+            );
+        }
     }
 }
 
@@ -149,20 +155,6 @@ pub struct VarDB {
     /// the current conflict number
     /// var activity decay
     pub activity_decay: f64,
-
-    /// ### About levels
-    ///
-    /// - Level 0 is a memory cleared at each restart
-    /// - Level 1 is a memory held during restarts but clear after mega-restart
-    /// - Level 2 is a memory not to reset by restarts
-    /// *Note: all levels clear after finding a unit learnt (simplification).*
-
-    /// Level 0 good old no-memory ASsigned Variable
-    pub asv: VarSet,
-    pub acv: VarSet,
-    pub sua: VarSet,
-    pub fup: VarSet,
-    pub suf: VarSet,
     pub current_conflict: usize,
     pub lbd_temp: Vec<usize>,
 }
@@ -172,12 +164,6 @@ impl Default for VarDB {
         VarDB {
             vars: Vec::new(),
             activity_decay: VAR_ACTIVITY_DECAY,
-
-            asv: VarSet::new(None, CLOSE_THRD),
-            acv: VarSet::new(Some(Flag::ACV), CLOSE_THRD),
-            sua: VarSet::new(Some(Flag::SUA), CLOSE_THRD),
-            fup: VarSet::new(Some(Flag::FUP), CLOSE_THRD),
-            suf: VarSet::new(Some(Flag::SUF), CLOSE_THRD),
             current_conflict: 0,
             lbd_temp: Vec::new(),
         }
@@ -212,17 +198,9 @@ impl IndexMut<Range<usize>> for VarDB {
 
 impl VarDBIF for VarDB {
     fn new(n: usize, activity_decay: f64) -> Self {
-        let scale: f64 = (n as f64).log(2f64);
         VarDB {
             vars: Var::new_vars(n),
             activity_decay,
-
-            // asv: VarSet::new(None, 0.5),
-            asv: VarSet::new(None, CLOSE_THRD * scale),
-            acv: VarSet::new(Some(Flag::ACV), CLOSE_THRD * scale),
-            sua: VarSet::new(Some(Flag::SUA), CLOSE_THRD * scale),
-            fup: VarSet::new(Some(Flag::FUP), 0.05),
-            suf: VarSet::new(Some(Flag::SUF), CLOSE_THRD),
             current_conflict: 0,
             lbd_temp: vec![0; n + 1],
         }

@@ -207,6 +207,18 @@ pub trait PropagatorIF {
     fn dump_cnf(&mut self, cdb: &ClauseDB, state: &State, vars: &[Var], fname: &str);
 }
 
+/// API for data set for restart control
+pub trait ProgressEvaluatorIF<'a> {
+    type Memory;
+    type Item;
+    /// update an internal EMA memory from the current state.
+    fn add(&mut self, item: Self::Item) -> &mut Self;
+    /// return `true` if we should invoke restart now.
+    fn check_restart<F>(&mut self, f: F) -> bool
+    where
+        F: Fn(&Self::Memory, f64) -> bool;
+}
+
 /// API for restart like `block_restart`, `force_restart` and so on.
 pub trait RestartIF {
     /// new local/global restart control
@@ -282,19 +294,6 @@ pub trait VarDBIF {
     /// return current activity
     fn activity(&mut self, vi: VarId) -> f64;
     fn bump_activity(&mut self, vi: VarId);
-}
-
-pub trait RestartHeuristics<'a> {
-    type Memory;
-    type Item;
-    /// update an internal EMA memory from the current state.
-    fn add(&mut self, item: Self::Item);
-    /// remove a var from the set.
-    fn commit(&mut self);
-    /// return `true` if we should invoke restart now.
-    fn check<F>(&mut self, f: F) -> bool
-    where
-        F: Fn(&Self::Memory, f64) -> bool;
 }
 
 pub trait VarSetIF {

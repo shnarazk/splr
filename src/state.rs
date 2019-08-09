@@ -1,7 +1,7 @@
 use crate::clause::ClauseDB;
 use crate::config::Config;
 use crate::eliminator::Eliminator;
-use crate::restart::{Ema, RestartLBD, RestartASG};
+use crate::restart::{Ema, ProgressEvaluatorPack};
 use crate::traits::*;
 use crate::types::*;
 use crate::var::VarDB;
@@ -163,9 +163,8 @@ pub struct State {
     pub ema_coeffs: (usize, usize),
     /// RESTART
     pub after_restart: usize,
+    pub rst: ProgressEvaluatorPack,
     /// Restart by stagnation
-    pub restart_lbd: RestartLBD,
-    pub restart_asg: RestartASG,
     pub restart_ratio: Ema,
     /// Restart by Luby
     pub use_luby_restart: bool,
@@ -310,8 +309,7 @@ impl Default for State {
             cdb_soft_limit: 0, // 248_000_000
             ema_coeffs: ema,
             after_restart: 0,
-            restart_lbd: RestartLBD::new(0.1),
-            restart_asg: RestartASG::new(0.1),
+            rst: ProgressEvaluatorPack::new(1),
             restart_ratio: Ema::new(ema.0),
             use_luby_restart: false,
             luby_restart_num_conflict: 0.0,
@@ -363,6 +361,7 @@ impl StateIF for State {
         state.num_vars = cnf.num_of_variables;
         state.use_adapt_strategy = !config.without_adaptive_strategy;
         state.cdb_soft_limit = config.clause_limit;
+        state.rst = ProgressEvaluatorPack::new(cnf.num_of_variables);
         state.elim_eliminate_grow_limit = config.elim_grow_limit;
         state.elim_subsume_literal_limit = config.elim_lit_limit;
         state.use_elim = !config.without_elim;
@@ -483,7 +482,7 @@ impl StateIF for State {
         let sum = fixed + self.num_eliminated_vars;
         self.progress_cnt += 1;
         print!("\x1B[9A\x1B[1G");
-        let ave_lbd = self.restart_lbd.sum / self.restart_lbd.num as f64;
+        let ave_lbd = self.rst.lbd.sum / self.rst.lbd.num as f64;
         println!("\x1B[2K{}", self);
         println!(
             "\x1B[2K #conflict:{}, #decision:{}, #propagate:{} ",
@@ -554,17 +553,22 @@ impl StateIF for State {
                 "{:>9.4}",
                 self.record,
                 LogF64Id::LBDTrend,
-                self.restart_lbd.ema.get() / ave_lbd
+                self.rst.lbd.ema.get() / ave_lbd
             ),
         );
         println!(
             "\x1B[2K  Assignment|#ave:{}, #inc:{}, vadc:{}, prg%:{}  ",
-            fm!("{:>9.0}", self.record, LogF64Id::Asg, self.restart_asg.ema.get()),
+            fm!(
+                "{:>9.0}",
+                self.record,
+                LogF64Id::Asg,
+                self.rst.asg.ema.get()
+            ),
             fm!(
                 "{:>9.2}",
                 self.record,
                 LogF64Id::AsgInc,
-                vdb.asv.diff_ema.get()
+                self.rst.asv.diff_ema.get()
             ),
             fm!(
                 "{:>9.4}",
@@ -576,18 +580,18 @@ impl StateIF for State {
                 "{:>9.4}",
                 self.record,
                 LogF64Id::AsgPrg,
-                100.0 * self.restart_asg.ema.get() / nv as f64
+                100.0 * self.rst.asg.ema.get() / nv as f64
             ),
         );
         println!(
             "\x1B[2K   First UIP|#all:{}, #now:{}, #inc:{}, xpnd:{} ",
-            im!("{:>9}", self.record, LogUsizeId::SuF, vdb.suf.num),
-            im!("{:>9}", self.record, LogUsizeId::FUP, vdb.fup.num),
+            im!("{:>9}", self.record, LogUsizeId::SuF, self.rst.suf.num),
+            im!("{:>9}", self.record, LogUsizeId::FUP, self.rst.fup.num),
             fm!(
                 "{:>9.4}",
                 self.record,
                 LogF64Id::FUPInc,
-                vdb.fup.diff_ema.get()
+                self.rst.fup.diff_ema.get()
             ),
             /*
             fm!(
@@ -601,10 +605,10 @@ impl StateIF for State {
                 "{:>9.4}",
                 self.record,
                 LogF64Id::SuFInc,
-                vdb.suf.diff_ema.get()
+                self.rst.suf.diff_ema.get()
             ),
         );
-        self.record[LogF64Id::FUPPrg] = 100.0 * vdb.suf.num as f64 / (nv - sum) as f64;
+        self.record[LogF64Id::FUPPrg] = 100.0 * self.rst.suf.num as f64 / (nv - sum) as f64;
         println!(
             "\x1B[2K     Restart|#byA:{}, #byF:{}, #byL:{}, prb%:{} ",
             im!(
@@ -847,9 +851,9 @@ impl State {
             0,
             0,
             self.stats[Stat::Restart],
-            self.restart_asg.ema.get(),
-            self.restart_lbd.ema.get(),
-            self.restart_lbd.ema.get(),
+            self.rst.asg.ema.get(),
+            self.rst.lbd.ema.get(),
+            self.rst.lbd.ema.get(),
             self.b_lvl.get(),
             self.c_lvl.get(),
             elim.clause_queue_len(),
