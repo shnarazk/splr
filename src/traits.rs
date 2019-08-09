@@ -211,11 +211,6 @@ pub trait PropagatorIF {
 pub trait RestartIF {
     /// new local/global restart control
     fn restart(&mut self, asgs: &mut AssignStack, vdb: &mut VarDB) -> bool;
-    // fn block_restart(&mut self, asgs: &AssignStack) -> bool;
-    /// update data for forcing restart.
-    fn restart_update_lbd(&mut self, lbd: usize);
-    /// update data for blocking restart.
-    fn restart_update_asg(&mut self, n: usize);
     /// update data for Luby restart.
     fn restart_update_luby(&mut self);
 }
@@ -289,15 +284,25 @@ pub trait VarDBIF {
     fn bump_activity(&mut self, vi: VarId);
 }
 
-pub trait VarSetIF {
-    fn new(flag: Option<Flag>, threshold: f64) -> Self;
-    fn add(&mut self, v: &mut Var);
-    fn remove(&self, v: &mut Var);
-    fn reset(&mut self);
+pub trait RestartHeuristics<'a> {
+    type Memory;
+    type Item;
+    /// update an internal EMA memory from the current state.
+    fn add(&mut self, item: Self::Item);
+    /// remove a var from the set.
     fn commit(&mut self);
+    /// return `true` if we should invoke restart now.
     fn check<F>(&mut self, f: F) -> bool
     where
-        F: Fn(f64, f64, f64) -> bool;
+        F: Fn(&Self::Memory, f64) -> bool;
+}
+
+pub trait VarSetIF {
+    fn new(flag: Option<Flag>, threshold: f64) -> Self;
+    /// remove a var from the set.
+    fn remove(&self, v: &mut Var);
+    /// reset after restart
+    fn reset(&mut self);
 }
 
 /// API for 'watcher list' like `attach`, `detach`, `detach_with` and so on.

@@ -368,7 +368,7 @@ fn handle_conflict_path(
     state.c_lvl.update(asgs.level() as f64);
     let bl = analyze(asgs, cdb, state, vdb, ci);
     asgs.cancel_until(vdb, bl.max(state.root_level));
-    state.restart_update_asg(asgs.len()); // TODO: after or before backtrack
+    state.restart_asg.add(asgs.len()); // TODO: after or before backtrack
     {
         let VarDB {
             ref mut vars,
@@ -397,25 +397,19 @@ fn handle_conflict_path(
                 ref mut vars,
                 ref mut asv,
                 ref mut acv,
-                ref mut sua,
                 ref mut fup,
-                ref mut suf,
                 ..
             } = vdb;
             for v in &mut vars[1..] {
                 if !v.is(Flag::ELIMINATED) {
                     asv.remove(v);
                     acv.remove(v);
-                    sua.remove(v);
                     fup.remove(v);
-                    suf.remove(v);
                 }
             }
             asv.reset();
             acv.reset();
-            sua.reset();
             fup.reset();
-            suf.reset();
         }
     } else {
         state.stats[Stat::Learnt] += 1;
@@ -449,7 +443,7 @@ fn handle_conflict_path(
         }
         let cid = cdb.attach(state, vdb, lbd);
         elim.add_cid_occur(vdb, cid, &mut cdb.clause[cid as usize], true);
-        state.restart_update_lbd(lbd);
+        state.restart_lbd.add(lbd);
         if !state.restart(asgs, vdb) {
             asgs.uncheck_enqueue(vdb, l0, cid);
         }

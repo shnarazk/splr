@@ -94,7 +94,25 @@ impl VarSetIF for VarSet {
             threshold,
         }
     }
-    fn add(&mut self, v: &mut Var) {
+    fn remove(&self, v: &mut Var) {
+        if let Some(flag) = self.flag {
+            if v.is(flag) {
+                v.turn_off(flag);
+            }
+        }
+    }
+    fn reset(&mut self) {
+        self.num = 0;
+        self.diff = 0.0;
+        self.is_closed = false;
+        self.diff_ema.reinitialize1();
+    }
+}
+
+impl<'a> RestartHeuristics<'a> for VarSet {
+    type Memory = Ema2;
+    type Item = &'a mut Var;
+    fn add(&mut self, v: Self::Item) {
         match self.flag {
             Some(flag) => {
                 if !v.is(flag) {
@@ -109,41 +127,17 @@ impl VarSetIF for VarSet {
             }
         }
     }
-    fn remove(&self, v: &mut Var) {
-        if let Some(flag) = self.flag {
-            if v.is(flag) {
-                v.turn_off(flag);
-            }
-        }
-    }
-    fn reset(&mut self) {
-        self.num = 0;
-        self.diff = 0.0;
-        self.is_closed = false;
-        self.diff_ema.reinitialize1();
-    }
     fn commit(&mut self) {
         self.diff_ema.update(self.diff as f64);
         self.diff = 0.0;
     }
     fn check<F>(&mut self, f: F) -> bool
     where
-        F: Fn(f64, f64, f64) -> bool,
+        F: Fn(&Self::Memory, f64) -> bool,
     {
-        let long = self.diff_ema.get();
-        let rate = self.diff_ema.get_fast();
-        let thrd = self.threshold;
-        // let v = rate < thrd && long < thrd && rate < long;
-        let v = f(long, rate, thrd);
-        if !self.is_closed {
-            self.diff_ema.update(self.diff as f64);
-            self.diff = 0.0;
-            if v {
-                self.is_closed = true;
-                return true;
-            }
-        }
-        false
+        self.is_closed = f(&self.diff_ema, self.threshold);
+        self.commit();
+        self.is_closed
     }
 }
 

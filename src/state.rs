@@ -1,7 +1,7 @@
 use crate::clause::ClauseDB;
 use crate::config::Config;
 use crate::eliminator::Eliminator;
-use crate::restart::Ema;
+use crate::restart::{Ema, RestartLBD, RestartASG};
 use crate::traits::*;
 use crate::types::*;
 use crate::var::VarDB;
@@ -164,7 +164,8 @@ pub struct State {
     /// RESTART
     pub after_restart: usize,
     /// Restart by stagnation
-    pub sum_lbd: usize,
+    pub restart_lbd: RestartLBD,
+    pub restart_asg: RestartASG,
     pub restart_ratio: Ema,
     /// Restart by Luby
     pub use_luby_restart: bool,
@@ -192,8 +193,6 @@ pub struct State {
     pub time_limit: f64,
     pub use_progress: bool,
     pub stats: [usize; Stat::EndOfStatIndex as usize], // statistics
-    pub ema_asg: Ema,
-    pub ema_lbd: Ema,
     pub b_lvl: Ema,
     pub c_lvl: Ema,
     pub conflicts: Vec<Lit>,
@@ -311,7 +310,8 @@ impl Default for State {
             cdb_soft_limit: 0, // 248_000_000
             ema_coeffs: ema,
             after_restart: 0,
-            sum_lbd: 0,
+            restart_lbd: RestartLBD::new(0.1),
+            restart_asg: RestartASG::new(0.1),
             restart_ratio: Ema::new(ema.0),
             use_luby_restart: false,
             luby_restart_num_conflict: 0.0,
@@ -331,8 +331,6 @@ impl Default for State {
             time_limit: 0.0,
             use_progress: true,
             stats: [0; Stat::EndOfStatIndex as usize],
-            ema_asg: Ema::new(ema.0),
-            ema_lbd: Ema::new(ema.0),
             b_lvl: Ema::new(ema.0),
             c_lvl: Ema::new(ema.0),
             conflicts: Vec::new(),
@@ -485,8 +483,7 @@ impl StateIF for State {
         let sum = fixed + self.num_eliminated_vars;
         self.progress_cnt += 1;
         print!("\x1B[9A\x1B[1G");
-        let count = self.stats[Stat::Conflict];
-        let ave_lbd = self.sum_lbd as f64 / count as f64;
+        let ave_lbd = self.restart_lbd.sum / self.restart_lbd.num as f64;
         println!("\x1B[2K{}", self);
         println!(
             "\x1B[2K #conflict:{}, #decision:{}, #propagate:{} ",
@@ -557,12 +554,12 @@ impl StateIF for State {
                 "{:>9.4}",
                 self.record,
                 LogF64Id::LBDTrend,
-                self.ema_lbd.get() / ave_lbd
+                self.restart_lbd.ema.get() / ave_lbd
             ),
         );
         println!(
             "\x1B[2K  Assignment|#ave:{}, #inc:{}, vadc:{}, prg%:{}  ",
-            fm!("{:>9.0}", self.record, LogF64Id::Asg, self.ema_asg.get()),
+            fm!("{:>9.0}", self.record, LogF64Id::Asg, self.restart_asg.ema.get()),
             fm!(
                 "{:>9.2}",
                 self.record,
@@ -579,7 +576,7 @@ impl StateIF for State {
                 "{:>9.4}",
                 self.record,
                 LogF64Id::AsgPrg,
-                100.0 * self.ema_asg.get() / nv as f64
+                100.0 * self.restart_asg.ema.get() / nv as f64
             ),
         );
         println!(
@@ -850,9 +847,9 @@ impl State {
             0,
             0,
             self.stats[Stat::Restart],
-            self.ema_asg.get(),
-            self.ema_lbd.get(),
-            self.ema_lbd.get(),
+            self.restart_asg.ema.get(),
+            self.restart_lbd.ema.get(),
+            self.restart_lbd.ema.get(),
             self.b_lvl.get(),
             self.c_lvl.get(),
             elim.clause_queue_len(),

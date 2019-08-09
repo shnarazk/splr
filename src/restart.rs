@@ -87,6 +87,94 @@ impl Ema2 {
     }
 }
 
+/// Glucose's original forcing restart condition
+#[derive(Debug)]
+pub struct RestartLBD {
+    pub sum: f64,
+    pub num: usize,
+    pub threshold: f64,
+    pub ema: Ema,
+    lbd: usize,
+}
+
+impl RestartHeuristics<'_> for RestartLBD {
+    type Memory = Ema;
+    type Item = usize;
+    fn add(&mut self, item: Self::Item) {
+        self.sum += item as f64;
+        self.num += 1;
+        self.lbd += item;
+    }
+    fn commit(&mut self) {
+        self.ema.update(self.lbd as f64);
+        self.lbd = 0;
+    }
+    fn check<F>(&mut self, f: F) -> bool
+    where
+        F: Fn(&Self::Memory, f64) -> bool,
+    {
+        let ret = f(&self.ema, self.threshold);
+        self.commit();
+        ret
+    }
+}
+
+impl RestartLBD {
+    pub fn new(threshold: f64) -> Self {
+        RestartLBD {
+            sum: 0.0,
+            num: 0,
+            threshold,
+            ema: Ema::new(5000),
+            lbd: 0,
+        }
+    }
+}
+
+/// Glucose's original restart blocking condition
+#[derive(Debug)]
+pub struct RestartASG {
+    pub sum: usize,
+    pub num: usize,
+    pub threshold: f64,
+    pub ema: Ema,
+    asg: usize,
+}
+
+impl RestartHeuristics<'_> for RestartASG {
+    type Memory = Ema;
+    type Item = usize;
+    fn add(&mut self, item: Self::Item) {
+        self.sum += item;
+        self.num += 1;
+        self.asg += item;
+    }
+    fn commit(&mut self) {
+        self.ema.update(self.asg as f64);
+        self.asg = 0;
+    }
+    fn check<F>(&mut self, f: F) -> bool
+    where
+        F: Fn(&Self::Memory, f64) -> bool,
+    {
+        let ret = f(&self.ema, self.threshold);
+        self.commit();
+        ret
+    }
+}
+
+impl RestartASG {
+    pub fn new(threshold: f64) -> Self {
+        RestartASG {
+            sum: 0,
+            num: 0,
+            threshold,
+            ema: Ema::new(5000),
+            asg: 0,
+        }
+    }
+}
+
 impl RestartIF for State {
     // stagnation-triggered restart engine
     fn restart(&mut self, asgs: &mut AssignStack, vdb: &mut VarDB) -> bool {
@@ -105,10 +193,14 @@ impl RestartIF for State {
             return false;
         }
         self.after_restart += 1;
-        let mut level0_restart = false;
-        let mut level1_restart = false;
-        let mut level2_restart = false;
-        let sup = |long, rate, thrd| rate < thrd && long < thrd && rate < long;
+        let level0_restart = false;
+        let level1_restart: bool;
+        let level2_restart = false;
+        let sup = |e2: &Ema2, thrd| {
+            let long = e2.get();
+            let rate = e2.get_fast();
+            rate < thrd && long < thrd && rate < long
+        };
 
         // level 0
         if vdb.asv.check(sup) {
@@ -118,7 +210,7 @@ impl RestartIF for State {
 
         // level 1
         vdb.acv.check(sup);
-        vdb.fup.check(|long, _rate, _thrd| long < 0.01);
+        vdb.fup.check(|e2, _| e2.get() < 0.01);
         level1_restart = vdb.acv.is_closed & vdb.fup.is_closed;
 
         if level1_restart {
@@ -181,14 +273,6 @@ impl RestartIF for State {
             self.restart_ratio.update(0.0);
             false
         }
-    }
-
-    fn restart_update_lbd(&mut self, lbd: usize) {
-        self.sum_lbd += lbd;
-        self.ema_lbd.update(lbd as f64);
-    }
-    fn restart_update_asg(&mut self, n: usize) {
-        self.ema_asg.update(n as f64);
     }
     fn restart_update_luby(&mut self) {
         if self.use_luby_restart {
