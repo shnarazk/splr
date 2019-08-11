@@ -610,7 +610,13 @@ impl StateIF for State {
         );
         self.record[LogF64Id::FUPPrg] = 100.0 * self.rst.suf.num as f64 / (nv - sum) as f64;
         println!(
-            "\x1B[2K     Restart|#byA:{}, #byF:{}, #byL:{}, prb%:{} ",
+            "\x1B[2K     Restart|#sum:{}, #byA:{}, #byF:{}, prb%:{} ",
+            im!(
+                "{:>9}",
+                self.record,
+                LogUsizeId::Restart,
+                self.stats[Stat::Restart]
+            ),
             im!(
                 "{:>9}",
                 self.record,
@@ -623,12 +629,14 @@ impl StateIF for State {
                 LogUsizeId::RestartByFUP,
                 self.stats[Stat::RestartByFUP]
             ),
-            im!(
-                "{:>9}",
-                self.record,
-                LogUsizeId::RestartByLuby,
-                self.stats[Stat::RestartByLuby]
-            ),
+            /*
+                        im!(
+                            "{:>9}",
+                            self.record,
+                            LogUsizeId::RestartByLuby,
+                            self.stats[Stat::RestartByLuby]
+                        ),
+            */
             fm!(
                 "{:>9.4}",
                 self.record,
@@ -636,6 +644,7 @@ impl StateIF for State {
                 100.0 * self.restart_ratio.get()
             ),
         );
+        self.record[LogUsizeId::RestartByLuby] = self.stats[Stat::RestartByLuby];
         if let Some(m) = mes {
             println!("\x1B[2K    Strategy|mode: {}", m);
         } else {

@@ -93,19 +93,19 @@ impl Ema2 {
 /// ### Implementing the original algorithm
 ///
 /// ```ignore
-///    rst = RestartLBD::new(0.8);
+///    rst = RestartLBD::new(1.4);
 ///    rst.add(learnt.lbd());
-///    if rst.check(|ema, ave| ave < rst.threshold * ema.get_fast()) {
+///    if rst.update(|ema, ave| rst.threshold * ave < ema.get()) {
 ///        restarting...
 ///    }
 /// ```
 ///
-/// ### Implementing an EMA-based variant
+/// ### Implementing an EMA-pair-based variant
 ///
 /// ```ignore
-///    rst = RestartLBD::new(0.8);
+///    rst = RestartLBD2::new(1.4);
 ///    rst.add(learnt.lbd());
-///    if rst.check(|ema, _| ema.get() < rst.threshold * ema.get_fast()) {
+///    if rst.update(|ema, _| rst.threshold * ema.get() < ema.get_fast()) {
 ///        restarting...
 ///    }
 /// ```
@@ -116,28 +116,50 @@ pub struct RestartLBD {
     pub threshold: f64,
     pub ema: Ema,
     lbd: Option<usize>,
+    result: bool,
+    timer: usize,
 }
 
 impl ProgressEvaluatorIF<'_> for RestartLBD {
     type Memory = Ema;
     type Item = usize;
     fn add(&mut self, item: Self::Item) -> &mut RestartLBD {
+        // assert_eq!(self.lbd, None);
         self.sum += item as f64;
         self.num += 1;
-        self.lbd = Some(self.lbd.map_or(item, |v| v + item));
+        self.lbd = Some(item);
         self
     }
-    fn check_restart<F>(&mut self, f: F) -> bool
+    fn update<F>(&mut self, f: F) -> bool
     where
         F: Fn(&Self::Memory, f64) -> bool,
     {
         if let Some(lbd) = self.lbd {
             self.ema.update(lbd as f64);
             self.lbd = None;
-            f(&self.ema, self.sum as f64 / self.num as f64)
+            if 0 < self.timer {
+                self.timer -= 1;
+                false
+            } else {
+                self.result = f(&self.ema, self.sum / self.num as f64);
+                if self.result {
+                    self.timer = 10;
+                }
+                self.result
+            }
         } else {
-            panic!("RestartLBD: you tried to check without add");
+            panic!("RestartLBD: you tried to update without add");
         }
+    }
+    fn is_active(&self) -> bool {
+        0 < self.timer && self.result
+    }
+    fn check<F>(&mut self, f: F) -> bool
+    where
+        F: Fn(&Self::Memory, f64) -> bool,
+    {
+        assert!(self.lbd.is_none());
+        f(&self.ema, self.sum / self.num as f64)
     }
 }
 
@@ -147,8 +169,10 @@ impl RestartLBD {
             sum: 0.0,
             num: 0,
             threshold,
-            ema: Ema::new(5000),
+            ema: Ema::new(75),
             lbd: None,
+            result: false,
+            timer: 0,
         }
     }
 }
@@ -157,18 +181,18 @@ impl RestartLBD {
 /// ### Implementing the original algorithm
 ///
 /// ```ignore
-///    blk = RestartASG::new(1.20);
+///    blk = RestartASG::new(1.0 / 0.8);
 ///    blk.add(solver.num_assigns);
-///    if blk.check(|ema, ave| blk.threshold * ave < ema.get_fast()) {
+///    if blk.update(|ema, ave| blk.threshold * ave < ema.get()) {
 ///        blocking...
 ///    }
 /// ```
-/// ### Implementing an EMA-based variant
+/// ### Implementing an EMA-pair-based variant
 ///
 /// ```ignore
-///    blk = RestartASG::new(1.20);
+///    blk = RestartASG2::new(1.0 / 0.8);
 ///    blk.add(solver.num_assigns);
-///    if blk.check(|ema, _| blk.threshold * ema.get() < ema.get_fast()) {
+///    if blk.update(|ema, _| blk.threshold * ema.get() < ema.get_fast()) {
 ///        blocking...
 ///    }
 /// ```
@@ -179,28 +203,50 @@ pub struct RestartASG {
     pub threshold: f64,
     pub ema: Ema,
     asg: Option<usize>,
+    result: bool,
+    timer: usize,
 }
 
 impl ProgressEvaluatorIF<'_> for RestartASG {
     type Memory = Ema;
     type Item = usize;
     fn add(&mut self, item: Self::Item) -> &mut Self {
+        assert!(self.asg.is_none());
         self.sum += item;
         self.num += 1;
         self.asg = Some(self.asg.map_or(item, |v| v + item));
         self
     }
-    fn check_restart<F>(&mut self, f: F) -> bool
+    fn update<F>(&mut self, f: F) -> bool
     where
         F: Fn(&Self::Memory, f64) -> bool,
     {
         if let Some(a) = self.asg {
             self.ema.update(a as f64);
             self.asg = None;
-            f(&self.ema, self.sum as f64 / self.num as f64)
+            if 0 < self.timer {
+                self.timer -= 1;
+                return true;
+            } else {
+                self.result = f(&self.ema, self.sum as f64 / self.num as f64);
+                if self.result {
+                    self.timer = 25;
+                }
+                self.result
+            }
         } else {
-            panic!("RestartASG: you tried to check without add");
+            panic!("RestartASG: you tried to update without add");
         }
+    }
+    fn is_active(&self) -> bool {
+        0 < self.timer && self.result
+    }
+    fn check<F>(&mut self, f: F) -> bool
+    where
+        F: Fn(&Self::Memory, f64) -> bool,
+    {
+        assert!(self.asg.is_none());
+        f(&self.ema, self.sum as f64 / self.num as f64)
     }
 }
 
@@ -210,8 +256,10 @@ impl RestartASG {
             sum: 0,
             num: 0,
             threshold,
-            ema: Ema::new(5000),
+            ema: Ema::new(200),
             asg: None,
+            result: false,
+            timer: 10,
         }
     }
 }
@@ -224,6 +272,7 @@ pub struct RestartLuby {
     pub current_restart: usize,
     pub factor: f64,
     pub cnfl_cnt: f64,
+    result: bool,
 }
 
 impl ProgressEvaluatorIF<'_> for RestartLuby {
@@ -235,7 +284,7 @@ impl ProgressEvaluatorIF<'_> for RestartLuby {
         }
         self
     }
-    fn check_restart<F>(&mut self, _f: F) -> bool
+    fn update<F>(&mut self, _f: F) -> bool
     where
         F: Fn(&Self::Memory, f64) -> bool,
     {
@@ -243,9 +292,20 @@ impl ProgressEvaluatorIF<'_> for RestartLuby {
             self.cnfl_cnt = 0.0;
             self.current_restart += 1;
             self.num_conflict = luby(self.inc, self.current_restart) * self.factor;
-            return true;
+            self.result = true;
+        } else {
+            self.result = false;
         }
-        false
+        self.result
+    }
+    fn is_active(&self) -> bool {
+        self.result
+    }
+    fn check<F>(&mut self, _f: F) -> bool
+    where
+        F: Fn(&Self::Memory, f64) -> bool,
+    {
+        panic!("RestartLuby doesn't implement check.");
     }
 }
 
@@ -258,6 +318,7 @@ impl Default for RestartLuby {
             current_restart: 0,
             factor: 100.0,
             cnfl_cnt: 0.0,
+            result: false,
         }
     }
 }
@@ -271,6 +332,7 @@ impl RestartLuby {
             current_restart: 0,
             factor,
             cnfl_cnt: 0.0,
+            result: false,
         }
     }
     pub fn initialize(&mut self, in_use: bool) -> &mut Self {
@@ -324,57 +386,57 @@ impl RestartIF for State {
             return false;
         }
         self.after_restart += 1;
-        let level0_restart = false;
-        let level1_restart: bool;
-        let level2_restart = false;
         let sup = |e2: &Ema2, thrd| {
             let long = e2.get();
             let rate = e2.get_fast();
             rate < thrd && long < thrd && rate < long
         };
+        self.rst.asg.update(|ema, ave| 1.05 * ave < ema.get()); // to stop
+        self.rst.lbd.update(|ema, ave| 2.0 * ave < ema.get());  // to force
+        self.rst.asv.update(sup);
+        // self.rst.acv.update(sup);
+        self.rst.fup.update(|e2, _| e2.get_fast() < 0.25);
+        // self.rst.sua.update(sup);
+        // self.rst.suf.update(sup);
 
-        // level 0
-        if self.rst.asg.check_restart(|ema, ave| ema.get() < 0.8 * ave) {
-            // level0_restart = true;
-            // self.stats[Stat::RestartByAsg] += 1;
-        }
-        self.rst
-            .lbd
-            .check_restart(|ema, ave| 1.28 * ave < ema.get());
-        self.rst.asv.check_restart(sup);
-
-        // level 1
-        self.rst.acv.check_restart(sup);
-        self.rst.fup.check_restart(|e2, _| e2.get() < 0.01);
-        level1_restart = self.rst.acv.is_closed & self.rst.fup.is_closed;
-
-        if level1_restart {
+        let level0_restart = if !self.rst.asg.is_active() && self.rst.lbd.is_active()
+        // && !self.rst.asv.is_active()
+        {
             self.stats[Stat::RestartByAsg] += 1;
-            self.stats[Stat::RestartByFUP] += 1;
+            true
         }
+        /* else if self.rst.asg.should_restart() {
+          // This is ant-blocking condition.
+          // self.stats[Stat::BlockingByAsg] += 1;
+          // false
+        } */
+        else {
+            false
+        };
 
-        // level 2
-        if self.rst.sua.check_restart(sup) {
-            // level2_restart = true;
-            // self.stats[Stat::RestartBySuA] += 1;
-        }
-        if self.rst.suf.check_restart(sup) {
-            // level2_restart = true;
-            // self.stats[Stat::RestartBySuF] += 1;
-        }
+        let level1_restart =
+            /* if self.rst.fup.is_active() {
+                level1_restart = true;
+                self.stats[Stat::RestartByAsg] += 1;
+                self.stats[Stat::RestartByFUP] += 1;
+            } */
+            false;
 
-        if level0_restart || level1_restart || level2_restart {
+        let level2_restart =
+            /*
+            if self.rst.sua.is_active() {
+               level2_restart = true;
+               self.stats[Stat::RestartBySuA] += 1;
+           } */
+            false;
+
+        if level0_restart || level1_restart {
             asgs.cancel_until(vdb, 0);
             asgs.check_progress();
-            self.b_lvl.update(0.0);
             self.restart_ratio.update(1.0);
-            // level 2 are never cleared.
-            if level0_restart || level1_restart || level2_restart {
-                // No need to asv.remove. It has a pseudo flag.
-                self.rst.asv.reset();
-            }
+            // No need to call remove nor reset for asv. It's memoryless. 
             if level1_restart || level2_restart {
-                for v in &mut vdb.vars[1..] {
+                for v in &mut vdb[1..] {
                     if !v.is(Flag::ELIMINATED) {
                         self.rst.acv.remove(v);
                         self.rst.fup.remove(v);
@@ -383,6 +445,7 @@ impl RestartIF for State {
                 self.rst.acv.reset();
                 self.rst.fup.reset();
             }
+            // level 2 are never cleared.
             self.after_restart = 0;
             self.stats[Stat::Restart] += 1;
             {
@@ -397,8 +460,6 @@ impl RestartIF for State {
             }
             true
         } else {
-            let bl = asgs.level();
-            self.b_lvl.update(bl as f64);
             self.restart_ratio.update(0.0);
             false
         }

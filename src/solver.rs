@@ -365,10 +365,9 @@ fn handle_conflict_path(
     if ncnfl % 5000 == 0 && vdb.activity_decay < state.config.var_activity_d_max {
         vdb.activity_decay += 0.001;
     }
-    state.c_lvl.update(asgs.level() as f64);
-    let bl = analyze(asgs, cdb, state, vdb, ci);
-    asgs.cancel_until(vdb, bl.max(state.root_level));
-    state.rst.asg.add(asgs.len()); // TODO: after or before backtrack
+    let peak_assigns = asgs.level();
+    let bl = analyze(asgs, cdb, state, vdb, ci).max(state.root_level);
+    asgs.cancel_until(vdb, bl);
     for l in &asgs.trail[..] {
         let v = &mut vdb[l.vi()];
         state.rst.acv.add(v);
@@ -383,17 +382,19 @@ fn handle_conflict_path(
         let l0 = new_learnt[0];
         asgs.check_progress();
         asgs.uncheck_enqueue(vdb, l0, NULL_CLAUSE);
-        // Finding a unit learn clause changes the shape of the problem.
-        for v in &mut vdb.vars[1..] {
-            if !v.is(Flag::ELIMINATED) {
-                state.rst.asv.remove(v);
-                state.rst.acv.remove(v);
-                state.rst.fup.remove(v);
-            }
+    /*
+    // Finding a unit learn clause changes the shape of the problem.
+    for v in &mut vdb.vars[1..] {
+        if !v.is(Flag::ELIMINATED) {
+            state.rst.asv.remove(v);
+            state.rst.acv.remove(v);
+            state.rst.fup.remove(v);
         }
-        state.rst.asv.reset();
-        state.rst.acv.reset();
-        state.rst.fup.reset();
+    }
+    state.rst.asv.reset();
+    state.rst.acv.reset();
+    state.rst.fup.reset();
+     */
     } else {
         state.stats[Stat::Learnt] += 1;
         let lbd = vdb.compute_lbd(&new_learnt);
@@ -413,11 +414,15 @@ fn handle_conflict_path(
             state.rst.fup.add(v1);
             state.rst.suf.add(v1);
         }
-        state.rst.asv.num = asgs.len();
-        state.rst.asv.diff = Some(asgs.check_progress() as f64);
+        state.c_lvl.update(peak_assigns as f64);
+        state.b_lvl.update(bl as f64);
+        // This 'asg' is a checker for blocking. Be careful.
         let cid = cdb.attach(state, vdb, lbd);
         elim.add_cid_occur(vdb, cid, &mut cdb.clause[cid as usize], true);
         state.rst.lbd.add(lbd);
+        state.rst.asg.add(peak_assigns);
+        state.rst.asv.num = asgs.len();
+        state.rst.asv.diff = Some(asgs.check_progress() as f64);
         if !state.restart(asgs, vdb) {
             asgs.uncheck_enqueue(vdb, l0, cid);
         }

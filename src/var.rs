@@ -3,7 +3,7 @@ use crate::restart::Ema2;
 use crate::traits::*;
 use crate::types::*;
 use std::fmt;
-use std::ops::{Index, IndexMut, Range};
+use std::ops::{Index, IndexMut, Range, RangeFrom};
 
 const VAR_ACTIVITY_DECAY: f64 = 0.92;
 const EMA_SLOW: usize = 8192; // 2 ^ 13; 2 ^ 15 = 32768
@@ -78,8 +78,8 @@ pub struct VarSet {
     pub num: usize,
     pub diff: Option<f64>,
     pub diff_ema: Ema2,
-    pub is_closed: bool,
     pub threshold: f64,
+    is_closed: bool,
 }
 
 impl VarSetIF for VarSet {
@@ -129,7 +129,7 @@ impl<'a> ProgressEvaluatorIF<'a> for VarSet {
         }
         self
     }
-    fn check_restart<F>(&mut self, f: F) -> bool
+    fn update<F>(&mut self, f: F) -> bool
     where
         F: Fn(&Self::Memory, f64) -> bool,
     {
@@ -140,10 +140,20 @@ impl<'a> ProgressEvaluatorIF<'a> for VarSet {
             self.is_closed
         } else {
             panic!(
-                "VarSet:{:?} you tried to check without giving a value.",
+                "VarSet:{:?} you tried to update without giving a value.",
                 self.flag
             );
         }
+    }
+    fn is_active(&self) -> bool {
+        self.is_closed
+    }
+    fn check<F>(&mut self, f: F) -> bool
+    where
+        F: Fn(&Self::Memory, f64) -> bool,
+    {
+        assert!(self.diff.is_none());
+        f(&self.diff_ema, self.threshold)
     }
 }
 
@@ -172,12 +182,14 @@ impl Default for VarDB {
 
 impl Index<usize> for VarDB {
     type Output = Var;
+    #[inline]
     fn index(&self, i: usize) -> &Var {
         &self.vars[i]
     }
 }
 
 impl IndexMut<usize> for VarDB {
+    #[inline]
     fn index_mut(&mut self, i: usize) -> &mut Var {
         &mut self.vars[i]
     }
@@ -185,13 +197,30 @@ impl IndexMut<usize> for VarDB {
 
 impl Index<Range<usize>> for VarDB {
     type Output = [Var];
+    #[inline]
     fn index(&self, r: Range<usize>) -> &[Var] {
         &self.vars[r]
     }
 }
 
+impl Index<RangeFrom<usize>> for VarDB {
+    type Output = [Var];
+    #[inline]
+    fn index(&self, r: RangeFrom<usize>) -> &[Var] {
+        &self.vars[r]
+    }
+}
+
 impl IndexMut<Range<usize>> for VarDB {
+    #[inline]
     fn index_mut(&mut self, r: Range<usize>) -> &mut [Var] {
+        &mut self.vars[r]
+    }
+}
+
+impl IndexMut<RangeFrom<usize>> for VarDB {
+    #[inline]
+    fn index_mut(&mut self, r: RangeFrom<usize>) -> &mut [Var] {
         &mut self.vars[r]
     }
 }

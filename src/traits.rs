@@ -207,14 +207,20 @@ pub trait PropagatorIF {
     fn dump_cnf(&mut self, cdb: &ClauseDB, state: &State, vars: &[Var], fname: &str);
 }
 
-/// API for data set for restart control
+/// API for data set for restart/block control
 pub trait ProgressEvaluatorIF<'a> {
     type Memory;
     type Item;
     /// update an internal EMA memory from the current state.
     fn add(&mut self, item: Self::Item) -> &mut Self;
-    /// return `true` if we should invoke restart now.
-    fn check_restart<F>(&mut self, f: F) -> bool
+    /// update internal data with the predicate, return `true` if it holds.
+    fn update<F>(&mut self, f: F) -> bool
+    where
+        F: Fn(&Self::Memory, f64) -> bool;
+    /// return `true` if the last update's result is true. return true.
+    fn is_active(&self) -> bool;
+    /// run the predicate, return `true` if it holds.
+    fn check<F>(&mut self, f: F) -> bool
     where
         F: Fn(&Self::Memory, f64) -> bool;
 }
