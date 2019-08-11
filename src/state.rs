@@ -545,105 +545,92 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K    Conflict|cnfl:{}, bjmp:{}, aLBD:{}, trnd:{} ",
-            fm!("{:>9.2}", self.record, LogF64Id::CLevel, self.c_lvl.get()),
-            fm!("{:>9.2}", self.record, LogF64Id::BLevel, self.b_lvl.get()),
-            fm!("{:>9.2}", self.record, LogF64Id::LBD, ave_lbd),
-            fm!(
-                "{:>9.4}",
+            "\x1B[2K  Assignment|#max:{}, #ave:{}, e-64:{}, trnd:{}  ",
+            im!(
+                "{:>9.0}",
                 self.record,
-                LogF64Id::LBDTrend,
-                self.rst.lbd.ema.get() / ave_lbd
+                LogUsizeId::AsgMax,
+                self.rst.asg.max
             ),
-        );
-        println!(
-            "\x1B[2K  Assignment|#ave:{}, #inc:{}, vadc:{}, prg%:{}  ",
             fm!(
                 "{:>9.0}",
                 self.record,
-                LogF64Id::Asg,
-                self.rst.asg.ema.get()
+                LogF64Id::VADecay,
+                self.rst.asg.sum as f64 / self.rst.asg.num as f64
             ),
             fm!(
-                "{:>9.2}",
+                "{:>9.0}",
                 self.record,
                 LogF64Id::AsgInc,
-                self.rst.asv.diff_ema.get()
-            ),
-            fm!(
-                "{:>9.4}",
-                self.record,
-                LogF64Id::VADecay,
-                vdb.activity_decay
+                self.rst.asg.ema.get()
             ),
             fm!(
                 "{:>9.4}",
                 self.record,
                 LogF64Id::AsgPrg,
-                100.0 * self.rst.asg.ema.get() / nv as f64
+                self.rst.asg.trend()
             ),
         );
         println!(
-            "\x1B[2K   First UIP|#all:{}, #now:{}, #inc:{}, xpnd:{} ",
-            im!("{:>9}", self.record, LogUsizeId::SuF, self.rst.suf.num),
-            im!("{:>9}", self.record, LogUsizeId::FUP, self.rst.fup.num),
+            "\x1B[2K  Learnt LBD|#num:{}, #ave:{}, e-64:{}, trnd:{} ",
+            // "\x1B[2K    Conflict|cnfl:{}, bjmp:{}, aLBD:{}, trnd:{} ",
+            im!("{:>9.0}", self.record, LogUsizeId::Learnt, self.rst.lbd.num),
+            fm!("{:>9.2}", self.record, LogF64Id::LBDave, ave_lbd),
+            fm!("{:>9.2}", self.record, LogF64Id::LBDema1, self.rst.lbd.ema.get()),
             fm!(
                 "{:>9.4}",
                 self.record,
-                LogF64Id::FUPInc,
+                LogF64Id::LBDTrend,
+                self.rst.lbd.trend()
+            ),
+        );
+        println!(
+            "\x1B[2K   First UIP|#sum:{}, rate:{}, e-64:{}, trnd:{} ",
+            im!("{:>9}", self.record, LogUsizeId::FUP, self.rst.fup.sum),
+            fm!("{:>9.4}", self.record, LogF64Id::FUPave,
+                self.rst.fup.sum as f64 / self.rst.fup.cnt as f64
+            ),
+            fm!(
+                "{:>9.4}",
+                self.record,
+                LogF64Id::FUPdif,
                 self.rst.fup.diff_ema.get()
+            ),
+            fm!(
+                "{:>9.4}",
+                self.record,
+                LogF64Id::FUPtrd,
+                self.rst.fup.trend()
             ),
             /*
             fm!(
                 "{:>9.4}",
                 self.record,
-                LogF64Id::FUPPrg,
-                100.0 * vdb.num_suf as f64 / (nv - sum) as f64
+                LogF64Id::SuFInc,
+                0.0 // self.rst.suf.diff_ema.get()
             ),
             */
-            fm!(
-                "{:>9.4}",
-                self.record,
-                LogF64Id::SuFInc,
-                self.rst.suf.diff_ema.get()
-            ),
         );
-        self.record[LogF64Id::FUPPrg] = 100.0 * self.rst.suf.num as f64 / (nv - sum) as f64;
+        // self.record[LogF64Id::FUPPrg] = 100.0 * self.rst.suf.num as f64 / (nv - sum) as f64;
         println!(
-            "\x1B[2K     Restart|#sum:{}, #byA:{}, #byF:{}, prb%:{} ",
+            "\x1B[2K    Analysis|cLvl:{}, bLvl:{}, #rst:{}, rate:{} ",
+            fm!("{:>9.2}", self.record, LogF64Id::CLevel, self.c_lvl.get()),
+            fm!("{:>9.2}", self.record, LogF64Id::BLevel, self.b_lvl.get()),
             im!(
                 "{:>9}",
                 self.record,
                 LogUsizeId::Restart,
                 self.stats[Stat::Restart]
             ),
-            im!(
-                "{:>9}",
-                self.record,
-                LogUsizeId::RestartByAsg,
-                self.stats[Stat::RestartByAsg]
-            ),
-            im!(
-                "{:>9}",
-                self.record,
-                LogUsizeId::RestartByFUP,
-                self.stats[Stat::RestartByFUP]
-            ),
-            /*
-                        im!(
-                            "{:>9}",
-                            self.record,
-                            LogUsizeId::RestartByLuby,
-                            self.stats[Stat::RestartByLuby]
-                        ),
-            */
             fm!(
                 "{:>9.4}",
                 self.record,
                 LogF64Id::RestartRatio,
-                100.0 * self.restart_ratio.get()
+                self.restart_ratio.get()
             ),
         );
+        self.record[LogUsizeId::RestartByAsg] = self.stats[Stat::RestartByAsg];
+        self.record[LogUsizeId::RestartByFUP] = self.stats[Stat::RestartByFUP];
         self.record[LogUsizeId::RestartByLuby] = self.stats[Stat::RestartByLuby];
         if let Some(m) = mes {
             println!("\x1B[2K    Strategy|mode: {}", m);
@@ -652,10 +639,11 @@ impl StateIF for State {
         }
         self.flush("\x1B[2K");
         // update undisplayed fields
-        self.record[LogUsizeId::Restart] = self.stats[Stat::Restart];
         self.record[LogUsizeId::Reduction] = self.stats[Stat::Reduction];
         self.record[LogUsizeId::SatClauseElim] = self.stats[Stat::SatClauseElimination];
         self.record[LogUsizeId::ExhaustiveElim] = self.stats[Stat::ExhaustiveElimination];
+        self.record[LogUsizeId::Reduction] = self.stats[Stat::Reduction];
+
     }
 }
 
@@ -715,6 +703,7 @@ pub enum LogUsizeId {
     LBD2,           //  7: lbd2: usize,
     Binclause,      //  8: binclause: usize,
     Permanent,      //  9: permanent: usize,
+    Learnt,         //
     Restart,        // 10: restart_count: usize,
     RestartByLuby,  // 11: restart_by_Luby restart
     RestartByAsg,   // 12: restart_by_assign_stagnation: usize,
@@ -725,6 +714,7 @@ pub enum LogUsizeId {
     Stagnation,     // 17: stagnation: usize,
     FUP,            // 18: the number of current fups
     SuF,            // 19: the number of superium of fups
+    AsgMax,         // 20:
     // ElimClauseQueue, // __: elim_clause_queue: usize,
     // ElimVarQueue, // __: elim_var_queue: usize,
     End,
@@ -738,8 +728,14 @@ pub enum LogF64Id {
     AsgPrg,       //  3: ema_asg percentage: f64,
     FUPInc,       //  4: ema_fup_inc.slow: f64,
     FUPPrg,       //  6: num_fup percentage: f64,
+    FUPave,
+    FUPdif,
+    FUPtrd,
     SuFInc,       //  5: ema_suf_inc.slow: f64,
     LBD,          //  7: ema_lbd: f64,
+    LBDave,
+    LBDema1,
+    LBDema2,
     LBDTrend,     //  8: ema_lbd trend: f64,
     BLevel,       //  9: backjump_level: f64,
     CLevel,       // 10: conflict_level: f64,

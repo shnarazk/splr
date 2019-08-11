@@ -2,7 +2,8 @@ use crate::clause::{Clause, ClauseDB};
 use crate::config::Config;
 use crate::eliminator::Eliminator;
 use crate::propagator::AssignStack;
-use crate::state::{Stat, State};
+use crate::restart::ProgressEvaluatorPack;
+use crate::state::{LogUsizeId, Stat, State};
 use crate::traits::*;
 use crate::types::*;
 use crate::var::VarDB;
@@ -363,17 +364,12 @@ fn handle_conflict_path(
 ) -> MaybeInconsistent {
     let ncnfl = state.stats[Stat::Conflict]; // total number
     if ncnfl % 5000 == 0 && vdb.activity_decay < state.config.var_activity_d_max {
-        vdb.activity_decay += 0.001;
+        vdb.activity_decay += 0.01;
     }
-    let peak_assigns = asgs.level();
+    let c_level = asgs.level();
+    let c_asgns = asgs.num_at(asgs.level()-1);
     let bl = analyze(asgs, cdb, state, vdb, ci).max(state.root_level);
     asgs.cancel_until(vdb, bl);
-    for l in &asgs.trail[..] {
-        let v = &mut vdb[l.vi()];
-        state.rst.acv.add(v);
-        // state.rst.vdb.set_acv(l.vi());
-        state.rst.sua.add(v);
-    }
     let new_learnt = &mut state.new_learnt;
     let learnt_len = new_learnt.len();
     if learnt_len == 1 {
@@ -382,61 +378,66 @@ fn handle_conflict_path(
         let l0 = new_learnt[0];
         asgs.check_progress();
         asgs.uncheck_enqueue(vdb, l0, NULL_CLAUSE);
-    /*
-    // Finding a unit learn clause changes the shape of the problem.
-    for v in &mut vdb.vars[1..] {
-        if !v.is(Flag::ELIMINATED) {
-            state.rst.asv.remove(v);
-            state.rst.acv.remove(v);
-            state.rst.fup.remove(v);
-        }
-    }
-    state.rst.asv.reset();
-    state.rst.acv.reset();
-    state.rst.fup.reset();
-     */
     } else {
         state.stats[Stat::Learnt] += 1;
         let lbd = vdb.compute_lbd(&new_learnt);
         let l0 = new_learnt[0];
-        // state.rst.set_fup(l0.vi());
         let v0 = &mut vdb.vars[l0.vi()];
-        state.rst.fup.add(v0);
-        state.rst.suf.add(v0);
+        state.rst.fup.add(v0).commit();
+        // state.rst.suf.add(v0).commit();
         if lbd <= 2 {
             state.stats[Stat::NumLBD2] += 1;
         }
         if learnt_len == 2 {
             state.stats[Stat::NumBin] += 1;
             state.stats[Stat::NumBinLearnt] += 1;
-            let l1 = new_learnt[1];
-            let v1 = &mut vdb.vars[l1.vi()];
-            state.rst.fup.add(v1);
-            state.rst.suf.add(v1);
+            // let l1 = new_learnt[1];
+            // let v1 = &mut vdb.vars[l1.vi()];
+            // state.rst.fup.add(v1);
+            // state.rst.suf.add(v1);
         }
-        state.c_lvl.update(peak_assigns as f64);
+        state.c_lvl.update(c_level as f64);
         state.b_lvl.update(bl as f64);
         // This 'asg' is a checker for blocking. Be careful.
         let cid = cdb.attach(state, vdb, lbd);
         elim.add_cid_occur(vdb, cid, &mut cdb.clause[cid as usize], true);
-        state.rst.lbd.add(lbd);
-        state.rst.asg.add(peak_assigns);
-        state.rst.asv.num = asgs.len();
-        state.rst.asv.diff = Some(asgs.check_progress() as f64);
+        state.rst.lbd.add(lbd).commit();
+        // state.rst.asg.add(asgs.len()).commit();
+        state.rst.asg.add(c_asgns).commit();
+        // state.rst.asv.num = asgs.len();
+        // state.rst.asv.diff = Some(asgs.check_progress() as f64);
+        // state.rst.asv.commit();
+        // state.rst.acv.commit();
+        // state.rst.sua.commit();
         if !state.restart(asgs, vdb) {
             asgs.uncheck_enqueue(vdb, l0, cid);
         }
     }
     if 0 < state.config.debug_dump && ncnfl % state.config.debug_dump == 0 {
+        let State {
+            stats,
+            rst,
+            ..
+        } = state;
+        let ProgressEvaluatorPack {
+            lbd,
+            asg,
+            fup,
+            ..
+        } = rst;
         state.development_history.push((
             ncnfl,
-            state.stats[Stat::Restart] as f64,
-            state.num_solved_vars as f64,
-            // (100.0 * vdb.asv.diff_ema.get()).min(state.num_vars as f64),
-            state.rst.acv.num as f64,
-            state.rst.sua.num as f64,
-            state.rst.fup.num as f64,
-            state.rst.suf.num as f64,
+            (stats[Stat::RestartByAsg] as f64 + 1.0).ln(),
+            (stats[Stat::RestartByFUP] as f64 + 1.0).ln(),
+            // state.num_solved_vars as f64,
+            lbd.trend().min(10.0),
+            asg.trend().min(10.0),
+            fup.trend().min(10.0),
+            // state.rst.acv.num as f64,
+            // state.rst.sua.num as f64,
+            // (fup.num as f64 + 1.0).ln(),
+            // suf.num as f64,
+            0.0
         ));
     }
     if ncnfl % 10_000 == 0 {
@@ -477,6 +478,13 @@ fn adapt_parameters(
             elim.activate();
             cdb.simplify(asgs, elim, state, vdb)?;
         }
+    }
+    if false && state.record[LogUsizeId::Fixed] < state.num_solved_vars {
+        // Finding a unit learn clause changes the shape of the problem.
+        for v in &mut vdb.vars[1..] {
+            state.rst.fup.remove(v);
+        }
+        state.rst.fup.reset();
     }
     state.progress(cdb, vdb, None);
     Ok(())

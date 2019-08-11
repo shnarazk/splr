@@ -104,6 +104,11 @@ impl PropagatorIF for AssignStack {
         while self.remains() {
             let p: usize = self.sweep() as usize;
             let false_lit = (p as Lit).negate();
+            // {
+            //     let v = &mut vdb[(p as Lit).vi()];
+            //     state.rst.acv.add(v);
+            //     state.rst.sua.add(v);
+            // }
             state.stats[Stat::Propagation] += 1;
             unsafe {
                 let source = (*watcher).get_unchecked_mut(p);

@@ -1,13 +1,10 @@
 use crate::clause::Clause;
-use crate::restart::Ema2;
 use crate::traits::*;
 use crate::types::*;
 use std::fmt;
 use std::ops::{Index, IndexMut, Range, RangeFrom};
 
 const VAR_ACTIVITY_DECAY: f64 = 0.92;
-const EMA_SLOW: usize = 8192; // 2 ^ 13; 2 ^ 15 = 32768
-const EMA_FAST: usize = 64; // 2 ^ 6
 
 /// Structure for variables.
 #[derive(Debug)]
@@ -69,91 +66,6 @@ impl FlagIF for Var {
     }
     fn turn_on(&mut self, flag: Flag) {
         self.flags.insert(flag);
-    }
-}
-
-#[derive(Debug)]
-pub struct VarSet {
-    pub flag: Option<Flag>,
-    pub num: usize,
-    pub diff: Option<f64>,
-    pub diff_ema: Ema2,
-    pub threshold: f64,
-    is_closed: bool,
-}
-
-impl VarSetIF for VarSet {
-    fn new(flag: Option<Flag>, threshold: f64) -> Self {
-        VarSet {
-            flag,
-            num: 0,
-            diff: None,
-            diff_ema: Ema2::new(EMA_SLOW).with_fast(EMA_FAST).initialize1(),
-            is_closed: false,
-            threshold,
-        }
-    }
-    fn remove(&self, v: &mut Var) {
-        if let Some(flag) = self.flag {
-            if v.is(flag) {
-                v.turn_off(flag);
-            }
-        }
-    }
-    fn reset(&mut self) {
-        self.num = 0;
-        self.diff = None;
-        self.is_closed = false;
-        self.diff_ema.reinitialize1();
-    }
-}
-
-impl<'a> ProgressEvaluatorIF<'a> for VarSet {
-    type Memory = Ema2;
-    type Item = &'a mut Var;
-    fn add(&mut self, v: Self::Item) -> &mut Self {
-        match self.flag {
-            Some(flag) => {
-                if !v.is(flag) {
-                    v.turn_on(flag);
-                    self.num += 1;
-                    self.diff = Some(self.diff.map_or(1.0, |v| v + 1.0));
-                } else if self.diff.is_none() {
-                    self.diff = Some(0.0);
-                }
-            }
-            None => {
-                self.num += 1;
-                self.diff = Some(self.diff.map_or(1.0, |v| v + 1.0));
-            }
-        }
-        self
-    }
-    fn update<F>(&mut self, f: F) -> bool
-    where
-        F: Fn(&Self::Memory, f64) -> bool,
-    {
-        if let Some(diff) = self.diff {
-            self.diff_ema.update(diff as f64);
-            self.diff = None;
-            self.is_closed = f(&self.diff_ema, self.threshold);
-            self.is_closed
-        } else {
-            panic!(
-                "VarSet:{:?} you tried to update without giving a value.",
-                self.flag
-            );
-        }
-    }
-    fn is_active(&self) -> bool {
-        self.is_closed
-    }
-    fn check<F>(&mut self, f: F) -> bool
-    where
-        F: Fn(&Self::Memory, f64) -> bool,
-    {
-        assert!(self.diff.is_none());
-        f(&self.diff_ema, self.threshold)
     }
 }
 
@@ -286,14 +198,13 @@ impl fmt::Display for Var {
         let st = |flag, mes| if self.is(flag) { mes } else { "" };
         write!(
             f,
-            "V{}({} at {} by {} {}{}{}{})",
+            "V{}({} at {} by {} {}{}{})",
             self.index,
             self.assign,
             self.level,
             self.reason.format(),
             st(Flag::TOUCHED, ", touched"),
             st(Flag::ELIMINATED, ", eliminated"),
-            st(Flag::SUF, ", suf"),
             st(Flag::FUP, ", fup"),
         )
     }

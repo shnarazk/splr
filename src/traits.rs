@@ -211,18 +211,21 @@ pub trait PropagatorIF {
 pub trait ProgressEvaluatorIF<'a> {
     type Memory;
     type Item;
-    /// update an internal EMA memory from the current state.
+    /// accumulate data into an internal stroage.
     fn add(&mut self, item: Self::Item) -> &mut Self;
-    /// update internal data with the predicate, return `true` if it holds.
-    fn update<F>(&mut self, f: F) -> bool
+    /// update an internal EMA memory from the current state.
+    fn commit(&mut self) -> &mut Self;
+    /// update its state based on the result of the predicate.
+    fn update<F>(&mut self, f: F) -> &mut Self
     where
         F: Fn(&Self::Memory, f64) -> bool;
     /// return `true` if the last update's result is true. return true.
     fn is_active(&self) -> bool;
     /// run the predicate, return `true` if it holds.
-    fn check<F>(&mut self, f: F) -> bool
+    fn eval<F,R>(&self, f: F) -> R
     where
-        F: Fn(&Self::Memory, f64) -> bool;
+        F: Fn(&Self::Memory, f64) -> R;
+    fn trend(&self) -> f64;
 }
 
 /// API for restart like `block_restart`, `force_restart` and so on.
