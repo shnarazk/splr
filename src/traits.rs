@@ -310,7 +310,7 @@ pub trait VarDBIF {
 }
 
 pub trait VarSetIF {
-    fn new(flag: Option<Flag>, threshold: f64) -> Self;
+    fn new(flag: Option<Flag>) -> Self;
     /// remove a var from the set.
     fn remove(&self, v: &mut Var);
     /// reset after restart

@@ -252,27 +252,17 @@ fn report(state: &State, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c     Analyzis|cLvl:{}, bLvl:{}, #rst:{}, run%:{} \n",
-            format!("{:>9.2}", state.record[LogF64Id::CLevel]),
-            format!("{:>9.2}", state.record[LogF64Id::BLevel]),
-            format!("{:>9.0}", state.record[LogUsizeId::Restart]),
-            format!("{:>9.4}", state.record[LogF64Id::RestartRatio]),
-        )
-        .as_bytes(),
-    )?;
-    out.write_all(
-        format!(
             "c   Assignment|#ave:{}, #ave:{}, e-64:{}, trnd:{} \n",
             format!("{:>9.0}", state.record[LogUsizeId::AsgMax]),
-            format!("{:>9.2}", state.record[LogF64Id::ASGave]),
-            format!("{:>9.4}", state.record[LogF64Id::ASGema]),
+            format!("{:>9.0}", state.record[LogF64Id::ASGave]),
+            format!("{:>9.0}", state.record[LogF64Id::ASGema]),
             format!("{:>9.4}", state.record[LogF64Id::ASGtrn]),
         )
         .as_bytes(),
     )?;
     out.write_all(
         format!(
-            "c   Learnt LBD|#num:{}, #ave:{}, #e-64:{}, trnd:{} \n",
+            "c   Learnt LBD|#num:{}, #ave:{}, e-64:{}, trnd:{} \n",
             format!("{:>9.0}", state.record[LogUsizeId::Learnt]),
             format!("{:>9.2}", state.record[LogF64Id::LBDave]),
             format!("{:>9.2}", state.record[LogF64Id::LBDema]),
@@ -282,21 +272,21 @@ fn report(state: &State, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c      Restart|#byA:{}, #byF:{}, #byL:{}, #sum:{} \n",
-            format!("{:>9}", state.record[LogUsizeId::RestartByAsg]),
-            format!("{:>9}", state.record[LogUsizeId::RestartByFUP]),
-            format!("{:>9}", state.record[LogUsizeId::RestartByLuby]),
-            format!("{:>9}", state.record[LogUsizeId::Restart]),
+            "c    First UIP|#sum:{}, rate:{}, e-64:{}, trnd:{} \n",
+            format!("{:>9.0}", state.record[LogUsizeId::FUPnum]),
+            format!("{:>9.4}", state.record[LogF64Id::FUPave]),
+            format!("{:>9.4}", state.record[LogF64Id::FUPema]),
+            format!("{:>9.4}", state.record[LogF64Id::FUPtrd]),
         )
         .as_bytes(),
     )?;
     out.write_all(
         format!(
-            "c     ClauseDB|#rdc:{}, #sce:{}, #exe:{}, ____:{} \n",
-            format!("{:>9}", state.record[LogUsizeId::Reduction]),
-            format!("{:>9}", state.record[LogUsizeId::SatClauseElim]),
-            format!("{:>9}", state.record[LogUsizeId::ExhaustiveElim]),
-            format!("{:>9}", 0),
+            "c     Analysis|cLvl:{}, bLvl:{}, #rst:{}, run%:{} \n",
+            format!("{:>9.2}", state.record[LogF64Id::CLevel]),
+            format!("{:>9.2}", state.record[LogF64Id::BLevel]),
+            format!("{:>9.0}", state.record[LogUsizeId::Restart]),
+            format!("{:>9.4}", state.record[LogF64Id::RestartRatio]),
         )
         .as_bytes(),
     )?;

@@ -4,9 +4,9 @@ use crate::traits::*;
 use crate::types::Flag;
 use crate::var::{Var, VarDB};
 
-// const CLOSE_THRD: f64 = 0.5; // 0.72;
 const EMA_SLOW: usize = 8192; // 2 ^ 13; 2 ^ 15 = 32768
 const EMA_FAST: usize = 64; // 2 ^ 6
+const GLUCOSE_BLOCKING: f64 = 1.4;
 
 /// Exponential Moving Average w/ a calibrator
 #[derive(Debug)]
@@ -107,11 +107,7 @@ pub struct RestartExecutor {
     pub use_luby_restart: bool,
     pub lbd: RestartLBD,
     pub asg: RestartASG,
-    // pub asv: VarSet,
-    // pub acv: VarSet,
-    // pub sua: VarSet,
     pub fup: VarSet,
-    // pub suf: VarSet,
     pub luby: RestartLuby,
 }
 
@@ -126,11 +122,7 @@ impl RestartExecutor {
             use_luby_restart: false,
             lbd: RestartLBD::new(0.1),
             asg: RestartASG::new(0.1),
-            // asv: VarSet::new(None, CLOSE_THRD * scale),
-            // acv: VarSet::new(Some(Flag::ACV), CLOSE_THRD * scale),
-            // sua: VarSet::new(Some(Flag::SUA), CLOSE_THRD * scale),
-            fup: VarSet::new(Some(Flag::FUP), 0.05),
-            // suf: VarSet::new(Some(Flag::SUF), CLOSE_THRD),
+            fup: VarSet::new(Some(Flag::FUP)),
             luby: RestartLuby::new(2.0, 100.0),
         }
     }
@@ -164,7 +156,7 @@ impl RestartIF for RestartExecutor {
                 return false;
             }
         }
-        if 1.4 < self.asg.trend() {
+        if GLUCOSE_BLOCKING < self.asg.trend() {
             self.cooling = Some(self.cooling_dumper * self.fup.trend());
             self.restart_ratio.update(0.0);
             return false;
@@ -172,27 +164,9 @@ impl RestartIF for RestartExecutor {
 
         // (0.8, 3.6) -- (1.2, 1.2)
         let restart = // 0.8 < self.fup.trend() &&
-            // self.asg.trend() < 0.8
             8.4 - 6.0 * self.fup.trend() < self.lbd.trend()
             && 1.25 < self.lbd.trend()
             ;
-        /*
-        let fract = 1.2 < self.lbd.trend() && 1.2 < self.fup.trend();
-        if  fract {
-            stats[Stat::RestartByAsg] += 1;
-        }
-        let still = 3.5 < self.lbd.trend() && 0.8 < self.fup.trend();
-        if  still {
-            stats[Stat::RestartByFUP] += 1;
-        }
-        let restart = fract || still;
-         */
-
-        /* else if self.asg.should_restart() {
-          // This is ant-blocking condition.
-          // stats[Stat::BlockingByAsg] += 1;
-          // false
-        } */
         if restart {
             self.cooling = Some(self.cooling_dumper * self.fup.trend());
             asgs.cancel_until(vdb, 0);
@@ -202,11 +176,9 @@ impl RestartIF for RestartExecutor {
             if self.fup.is_active() && false {
                 for v in &mut vdb.vars[1..] {
                     if !v.is(Flag::ELIMINATED) {
-                        // self.acv.remove(v);
                         self.fup.remove(v);
                     }
                 }
-                // self.acv.reset();
                 self.fup.reset();
             }
             self.after_restart = 0;
@@ -533,6 +505,15 @@ fn luby(y: f64, mut x: usize) -> f64 {
     y.powf(seq as f64)
 }
 
+/// A superium of variables as a metrics of progress of search.
+/// There were a various categories:
+/// - assigned variable set, AVS
+/// - assigned or cancelled variables, ACV
+/// - superium of ACV (not being reset), SuA
+/// - first UIPs, FUP
+/// - superium of first UIPs, SuA
+///
+/// AVS was a variant of the present AGS. And it has no flag in Var::flag field.
 #[derive(Debug)]
 pub struct VarSet {
     pub flag: Option<Flag>,
@@ -540,12 +521,11 @@ pub struct VarSet {
     pub cnt: usize,
     pub diff: Option<f64>,
     pub diff_ema: Ema2,
-    pub threshold: f64,
     is_closed: bool,
 }
 
 impl VarSetIF for VarSet {
-    fn new(flag: Option<Flag>, threshold: f64) -> Self {
+    fn new(flag: Option<Flag>) -> Self {
         VarSet {
             flag,
             sum: 0,
@@ -553,7 +533,6 @@ impl VarSetIF for VarSet {
             diff: None,
             diff_ema: Ema2::new(EMA_SLOW).with_fast(EMA_FAST).initialize1(),
             is_closed: false,
-            threshold,
         }
     }
     fn remove(&self, v: &mut Var) {
@@ -619,7 +598,7 @@ impl<'a> ProgressEvaluatorIF<'a> for VarSet {
         F: Fn(&Self::Memory, f64) -> R,
     {
         // assert!(self.diff.is_none());
-        f(&self.diff_ema, self.threshold)
+        f(&self.diff_ema, self.sum as f64 / self.cnt as f64)
     }
     fn trend(&self) -> f64 {
         self.diff_ema.get() * self.cnt as f64 / self.sum as f64

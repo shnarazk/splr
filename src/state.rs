@@ -148,10 +148,9 @@ pub struct State {
     pub use_chan_seok: bool,
     pub co_lbd_bound: usize,
     pub lbd_frozen_clause: usize,
-    /// CLAUSE/VARIABLE ACTIVITY
+    /// CLAUSE ACTIVITY
     pub cla_decay: f64,
     pub cla_inc: f64,
-    pub var_inc: f64,
     /// CLAUSE REDUCTION
     pub cur_reduction: usize,
     pub first_reduction: usize,
@@ -160,12 +159,10 @@ pub struct State {
     pub cdb_inc: usize,
     pub cdb_inc_extra: usize,
     pub cdb_soft_limit: usize,
-    pub ema_coeffs: (usize, usize),
     /// RESTART
     pub rst: RestartExecutor,
     /// Eliminator
     pub use_elim: bool,
-    /// 0 for no limit
     /// Stop elimination if a generated resolvent is larger than this
     /// 0 means no limit.
     pub elim_eliminate_combination_limit: usize,
@@ -175,7 +172,6 @@ pub struct State {
     /// Stop subsumption if the size of a clause is over this
     pub elim_subsume_literal_limit: usize,
     pub elim_subsume_loop_limit: usize,
-    pub elim_trigger: usize,
     /// MISC
     pub ok: bool,
     pub model: Vec<Lbool>,
@@ -289,7 +285,6 @@ impl Default for State {
             lbd_frozen_clause: 30,
             cla_decay: 0.999,
             cla_inc: 1.0,
-            var_inc: 0.9,
             cur_reduction: 1,
             first_reduction: 1000,
             next_reduction: 1000,
@@ -297,7 +292,6 @@ impl Default for State {
             cdb_inc: 300,
             cdb_inc_extra: 1000,
             cdb_soft_limit: 0, // 248_000_000
-            ema_coeffs: ema,
             rst: RestartExecutor::new(1),
             use_elim: true,
             elim_eliminate_combination_limit: 80,
@@ -305,7 +299,6 @@ impl Default for State {
             elim_eliminate_loop_limit: 2_000_000,
             elim_subsume_literal_limit: 100,
             elim_subsume_loop_limit: 2_000_000,
-            elim_trigger: 1,
             ok: true,
             model: Vec::new(),
             time_limit: 0.0,
@@ -579,7 +572,7 @@ impl StateIF for State {
             fm!(
                 "{:>9.4}",
                 self.record,
-                LogF64Id::FUPdif,
+                LogF64Id::FUPema,
                 self.rst.fup.diff_ema.get()
             ),
             fm!(
@@ -703,7 +696,7 @@ pub enum LogF64Id {
     FUPinc,       //  4: ema_fup.diff_ema.slow: f64,
     FUPprg,       //  5: num_fup percentage: f64,
     FUPave,       //  6: rst.fup.{sum / num}
-    FUPdif,       //  7: rst.fup.diff_ema.get
+    FUPema,       //  7: rst.fup.diff_ema.get
     FUPtrd,       //  8: rst.fup.trend
     LBDave,       //  9: rst.lbd.{sum / sum}
     LBDema,       // 10: rst.lbd.ema.get

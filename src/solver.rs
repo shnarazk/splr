@@ -431,7 +431,6 @@ fn handle_conflict_path(
             return Err(SolverError::Inconsistent);
         }
     }
-    // state.var_inc /= state.var_decay;
     state.cla_inc /= state.cla_decay;
     if ((state.use_chan_seok && !state.glureduce && state.first_reduction < cdb.num_learnt)
         || (state.glureduce
