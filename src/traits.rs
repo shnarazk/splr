@@ -231,9 +231,7 @@ pub trait ProgressEvaluatorIF<'a> {
 /// API for restart like `block_restart`, `force_restart` and so on.
 pub trait RestartIF {
     /// new local/global restart control
-    fn restart(&mut self, asgs: &mut AssignStack, vdb: &mut VarDB) -> bool;
-    /// update data for Luby restart.
-    fn restart_update_luby(&mut self);
+    fn restart(&mut self, asgs: &mut AssignStack, vdb: &mut VarDB, stats: &mut [usize], remains: usize) -> bool;
 }
 
 /// API for SAT solver like `build`, `solve` and so on.

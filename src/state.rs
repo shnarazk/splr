@@ -1,7 +1,7 @@
 use crate::clause::ClauseDB;
 use crate::config::Config;
 use crate::eliminator::Eliminator;
-use crate::restart::{Ema, ProgressEvaluatorPack};
+use crate::restart::{Ema, RestartExecutor};
 use crate::traits::*;
 use crate::types::*;
 use crate::var::VarDB;
@@ -162,17 +162,7 @@ pub struct State {
     pub cdb_soft_limit: usize,
     pub ema_coeffs: (usize, usize),
     /// RESTART
-    pub after_restart: usize,
-    pub rst: ProgressEvaluatorPack,
-    /// Restart by stagnation
-    pub restart_ratio: Ema,
-    /// Restart by Luby
-    pub use_luby_restart: bool,
-    pub luby_restart_num_conflict: f64,
-    pub luby_restart_inc: f64,
-    pub luby_current_restarts: usize,
-    pub luby_restart_factor: f64,
-    pub luby_restart_cnfl_cnt: f64,
+    pub rst: RestartExecutor,
     /// Eliminator
     pub use_elim: bool,
     /// 0 for no limit
@@ -308,15 +298,7 @@ impl Default for State {
             cdb_inc_extra: 1000,
             cdb_soft_limit: 0, // 248_000_000
             ema_coeffs: ema,
-            after_restart: 0,
-            rst: ProgressEvaluatorPack::new(1),
-            restart_ratio: Ema::new(ema.0),
-            use_luby_restart: false,
-            luby_restart_num_conflict: 0.0,
-            luby_restart_inc: 2.0,
-            luby_current_restarts: 0,
-            luby_restart_factor: 100.0,
-            luby_restart_cnfl_cnt: 0.0,
+            rst: RestartExecutor::new(1),
             use_elim: true,
             elim_eliminate_combination_limit: 80,
             elim_eliminate_grow_limit: 0, // 64
@@ -361,7 +343,7 @@ impl StateIF for State {
         state.num_vars = cnf.num_of_variables;
         state.use_adapt_strategy = !config.without_adaptive_strategy;
         state.cdb_soft_limit = config.clause_limit;
-        state.rst = ProgressEvaluatorPack::new(cnf.num_of_variables);
+        state.rst = RestartExecutor::new(cnf.num_of_variables);
         state.elim_eliminate_grow_limit = config.elim_grow_limit;
         state.elim_subsume_literal_limit = config.elim_lit_limit;
         state.use_elim = !config.without_elim;
@@ -401,8 +383,8 @@ impl StateIF for State {
         }
         if self.stats[Stat::NoDecisionConflict] < 30_000 {
             self.strategy = SearchStrategy::LowSuccesiveLuby;
-            self.use_luby_restart = true;
-            self.luby_restart_factor = 100.0;
+            self.rst.use_luby_restart = true;
+            self.rst.luby.factor = 100.0;
             self.config.var_activity_decay = 0.999;
             self.config.var_activity_d_max = 0.999;
         }
@@ -555,22 +537,23 @@ impl StateIF for State {
             fm!(
                 "{:>9.0}",
                 self.record,
-                LogF64Id::VADecay,
+                LogF64Id::AsgAve,
                 self.rst.asg.sum as f64 / self.rst.asg.num as f64
             ),
             fm!(
                 "{:>9.0}",
                 self.record,
-                LogF64Id::AsgInc,
+                LogF64Id::AsgEma,
                 self.rst.asg.ema.get()
             ),
             fm!(
                 "{:>9.4}",
                 self.record,
-                LogF64Id::AsgPrg,
+                LogF64Id::AsgTrn,
                 self.rst.asg.trend()
             ),
         );
+        self.record[LogF64Id::VADecay] = vdb.activity_decay;
         println!(
             "\x1B[2K  Learnt LBD|#num:{}, #ave:{}, e-64:{}, trnd:{} ",
             // "\x1B[2K    Conflict|cnfl:{}, bjmp:{}, aLBD:{}, trnd:{} ",
@@ -613,7 +596,7 @@ impl StateIF for State {
         );
         // self.record[LogF64Id::FUPPrg] = 100.0 * self.rst.suf.num as f64 / (nv - sum) as f64;
         println!(
-            "\x1B[2K    Analysis|cLvl:{}, bLvl:{}, #rst:{}, rate:{} ",
+            "\x1B[2K    Analysis|cLvl:{}, bLvl:{}, #rst:{}, run%:{} ",
             fm!("{:>9.2}", self.record, LogF64Id::CLevel, self.c_lvl.get()),
             fm!("{:>9.2}", self.record, LogF64Id::BLevel, self.b_lvl.get()),
             im!(
@@ -626,7 +609,7 @@ impl StateIF for State {
                 "{:>9.4}",
                 self.record,
                 LogF64Id::RestartRatio,
-                self.restart_ratio.get()
+                100.0 * self.rst.restart_ratio.get()
             ),
         );
         self.record[LogUsizeId::RestartByAsg] = self.stats[Stat::RestartByAsg];
@@ -724,8 +707,9 @@ pub enum LogUsizeId {
 pub enum LogF64Id {
     Progress = 0, //  0: progress: f64,
     Asg,          //  1: ema_asg: f64,
-    AsgInc,       //  2: ema_asg_inc.slow: f64,
-    AsgPrg,       //  3: ema_asg percentage: f64,
+    AsgAve,
+    AsgEma,       //  2: ema_asg_inc.slow: f64,
+    AsgTrn,       //  3: ema_asg percentage: f64,
     FUPInc,       //  4: ema_fup_inc.slow: f64,
     FUPPrg,       //  6: num_fup percentage: f64,
     FUPave,

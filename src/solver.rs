@@ -2,7 +2,7 @@ use crate::clause::{Clause, ClauseDB};
 use crate::config::Config;
 use crate::eliminator::Eliminator;
 use crate::propagator::AssignStack;
-use crate::restart::ProgressEvaluatorPack;
+use crate::restart::RestartExecutor;
 use crate::state::{LogUsizeId, Stat, State};
 use crate::traits::*;
 use crate::types::*;
@@ -312,9 +312,14 @@ fn search(
     state: &mut State,
     vdb: &mut VarDB,
 ) -> Result<bool, SolverError> {
-    state.luby_restart_cnfl_cnt = 0.0;
     let mut a_decision_was_made = false;
-    state.restart_update_luby();
+//    state.luby_restart_cnfl_cnt = 0.0;
+//    state.restart_update_luby();
+//  if self.use_luby_restart {
+//      self.luby_restart_num_conflict =
+//          luby(self.luby_restart_inc, self.luby_current_restarts) * self.luby_restart_factor;
+//  }
+    state.rst.luby.initialize(state.rst.use_luby_restart);
     loop {
         let ci = asgs.propagate(cdb, state, vdb);
         state.stats[Stat::Propagation] += 1;
@@ -323,7 +328,8 @@ fn search(
                 return Ok(true);
             }
         } else {
-            state.luby_restart_cnfl_cnt += 1.0;
+            // state.luby_restart_cnfl_cnt += 1.0;
+            state.rst.luby.add(()).commit();
             state.stats[Stat::Conflict] += 1;
             vdb.current_conflict = state.stats[Stat::Conflict];
             if a_decision_was_made {
@@ -384,32 +390,26 @@ fn handle_conflict_path(
         let l0 = new_learnt[0];
         let v0 = &mut vdb.vars[l0.vi()];
         state.rst.fup.add(v0).commit();
-        // state.rst.suf.add(v0).commit();
         if lbd <= 2 {
             state.stats[Stat::NumLBD2] += 1;
         }
         if learnt_len == 2 {
             state.stats[Stat::NumBin] += 1;
             state.stats[Stat::NumBinLearnt] += 1;
-            // let l1 = new_learnt[1];
-            // let v1 = &mut vdb.vars[l1.vi()];
-            // state.rst.fup.add(v1);
-            // state.rst.suf.add(v1);
         }
         state.c_lvl.update(c_level as f64);
         state.b_lvl.update(bl as f64);
-        // This 'asg' is a checker for blocking. Be careful.
         let cid = cdb.attach(state, vdb, lbd);
         elim.add_cid_occur(vdb, cid, &mut cdb.clause[cid as usize], true);
         state.rst.lbd.add(lbd).commit();
-        // state.rst.asg.add(asgs.len()).commit();
         state.rst.asg.add(c_asgns).commit();
         // state.rst.asv.num = asgs.len();
         // state.rst.asv.diff = Some(asgs.check_progress() as f64);
         // state.rst.asv.commit();
         // state.rst.acv.commit();
-        // state.rst.sua.commit();
-        if !state.restart(asgs, vdb) {
+
+        let remains = state.num_vars - state.num_solved_vars - state.num_eliminated_vars;
+        if !state.rst.restart(asgs, vdb, &mut state.stats, remains) {
             asgs.uncheck_enqueue(vdb, l0, cid);
         }
     }
@@ -419,7 +419,7 @@ fn handle_conflict_path(
             rst,
             ..
         } = state;
-        let ProgressEvaluatorPack {
+        let RestartExecutor {
             lbd,
             asg,
             fup,

@@ -262,11 +262,11 @@ fn report(state: &State, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c   Assignment|#ave:{}, #inc:{}, vadc:{}, end%:{} \n",
-            format!("{:>9.0}", state.record[LogF64Id::Asg]),
-            format!("{:>9.2}", state.record[LogF64Id::AsgInc]),
-            format!("{:>9.4}", state.record[LogF64Id::VADecay]),
-            format!("{:>9.4}", state.record[LogF64Id::AsgPrg]),
+            "c   Assignment|#ave:{}, #ave:{}, e-64:{}, trnd:{} \n",
+            format!("{:>9.0}", state.record[LogUsizeId::AsgMax]),
+            format!("{:>9.2}", state.record[LogF64Id::AsgAve]),
+            format!("{:>9.4}", state.record[LogF64Id::AsgEma]),
+            format!("{:>9.4}", state.record[LogF64Id::AsgTrn]),
         )
         .as_bytes(),
     )?;

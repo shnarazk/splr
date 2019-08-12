@@ -1,5 +1,5 @@
 use crate::propagator::AssignStack;
-use crate::state::{Stat, State};
+use crate::state::Stat;
 use crate::traits::*;
 use crate::types::Flag;
 use crate::var::{Var, VarDB};
@@ -91,127 +91,6 @@ impl Ema2 {
     }
 }
 
-impl RestartIF for State {
-    // stagnation-triggered restart engine
-    fn restart(&mut self, asgs: &mut AssignStack, vdb: &mut VarDB) -> bool {
-        if self.use_luby_restart {
-            if self.luby_restart_num_conflict <= self.luby_restart_cnfl_cnt {
-                self.stats[Stat::Restart] += 1;
-                self.stats[Stat::RestartByLuby] += 1;
-                self.after_restart = 0;
-                self.luby_restart_cnfl_cnt = 0.0;
-                self.luby_current_restarts += 1;
-                self.luby_restart_num_conflict =
-                    luby(self.luby_restart_inc, self.luby_current_restarts)
-                        * self.luby_restart_factor;
-                return true;
-            }
-            return false;
-        }
-        self.after_restart += 1;
-        // if self.after_restart < 32 {
-        //     self.restart_ratio.update(0.0);
-        //     return false
-        // }
-        if let Some(t) = self.rst.cooling {
-            if self.rst.fup.trend() < t {
-                self.rst.cooling = None;
-            } else {
-                self.restart_ratio.update(0.0);
-                return false;
-            }
-        }
-        if 1.4 < self.rst.asg.trend() {
-            self.rst.cooling = Some(0.95 * self.rst.fup.trend());
-            return false;
-        }
-
-        // (0.8, 3.6) -- (1.2, 1.2)
-        let restart = // 0.8 < self.rst.fup.trend() &&
-            // self.rst.asg.trend() < 0.8
-            8.4 - 6.0 * self.rst.fup.trend() < self.rst.lbd.trend()
-            && 1.25 < self.rst.lbd.trend()
-            ;
-        /*
-        let fract = 1.2 < self.rst.lbd.trend() && 1.2 < self.rst.fup.trend();
-        if  fract {
-            self.stats[Stat::RestartByAsg] += 1;
-        }
-        let still = 3.5 < self.rst.lbd.trend() && 0.8 < self.rst.fup.trend();
-        if  still {
-            self.stats[Stat::RestartByFUP] += 1;
-        }
-        let restart = fract || still;
-         */
-
-        /* else if self.rst.asg.should_restart() {
-          // This is ant-blocking condition.
-          // self.stats[Stat::BlockingByAsg] += 1;
-          // false
-        } */
-        // if self.rst.asv.is_active() {
-        //     self.stats[Stat::RestartByFUP] += 1;
-        //     restart = false;
-        // }
-        // if self.rst.sua.is_active() {
-        //     level2_restart = true;
-        //     self.stats[Stat::RestartBySuA] += 1;
-        // }
-
-        if restart {
-            self.rst.cooling = Some(0.9 * self.rst.fup.trend());
-            asgs.cancel_until(vdb, 0);
-            asgs.check_progress();
-            self.restart_ratio.update(1.0);
-            // No need to call remove nor reset for asv. It's memoryless. 
-            if self.rst.fup.is_active() && false {
-                for v in &mut vdb.vars[1..] {
-                    if !v.is(Flag::ELIMINATED) {
-                        // self.rst.acv.remove(v);
-                        self.rst.fup.remove(v);
-                    }
-                }
-                // self.rst.acv.reset();
-                self.rst.fup.reset();
-            }
-            self.after_restart = 0;
-            self.stats[Stat::Restart] += 1;
-            // {
-            //     let ra = self.stats[Stat::RestartByAsg];
-            //     let rf = self.stats[Stat::RestartByFUP];
-            //     if 0 < ra && 0 < rf {
-            //         let s = self.config.var_activity_decay;
-            //         let m = self.config.var_activity_d_max;
-            //         let k = ra.max(rf) as f64 / (ra + rf) as f64;
-            //         vdb.activity_decay = k * m + (1.0 - k) * s;
-            //     }
-            // }
-            true
-        } else if self.rst.fup.trend().log(10.0) < -2.0 {
-            if self.num_vars - self.num_solved_vars - self.num_eliminated_vars < 2 * self.rst.fup.sum {
-            self.use_luby_restart = true;
-            } else {
-                for v in &mut vdb.vars[1..] {
-                    if !v.is(Flag::ELIMINATED) {
-                        self.rst.fup.remove(v);
-                    }
-                }
-                self.rst.fup.reset();
-            }
-            false
-        } else {
-            self.restart_ratio.update(0.0);
-            false
-        }
-    }
-    fn restart_update_luby(&mut self) {
-        if self.use_luby_restart {
-            self.luby_restart_num_conflict =
-                luby(self.luby_restart_inc, self.luby_current_restarts) * self.luby_restart_factor;
-        }
-    }
-}
-
 /// Exponential Moving Average w/ a calibrator
 /// ### About levels
 ///
@@ -220,8 +99,12 @@ impl RestartIF for State {
 /// - Level 2 is a memory not to reset by restarts
 /// *Note: all levels clear after finding a unit learnt (simplification).*
 #[derive(Debug)]
-pub struct ProgressEvaluatorPack {
+pub struct RestartExecutor {
+    pub restart_ratio: Ema,
     pub cooling: Option<f64>,
+    pub cooling_dumper: f64,
+    pub after_restart: usize,
+    pub use_luby_restart: bool,
     pub lbd: RestartLBD,
     pub asg: RestartASG,
     // pub asv: VarSet,
@@ -229,13 +112,18 @@ pub struct ProgressEvaluatorPack {
     // pub sua: VarSet,
     pub fup: VarSet,
     // pub suf: VarSet,
+    pub luby: RestartLuby,
 }
 
-impl ProgressEvaluatorPack {
-    pub fn new(n: usize) -> ProgressEvaluatorPack {
+impl RestartExecutor {
+    pub fn new(n: usize) -> RestartExecutor {
         let _scale: f64 = (n as f64).log(2f64);
-        ProgressEvaluatorPack {
+        RestartExecutor {
+            restart_ratio: Ema::new(EMA_SLOW),
             cooling: None,
+            cooling_dumper: 0.98,
+            after_restart: 0,
+            use_luby_restart: false,
             lbd: RestartLBD::new(0.1),
             asg: RestartASG::new(0.1),
             // asv: VarSet::new(None, CLOSE_THRD * scale),
@@ -243,10 +131,109 @@ impl ProgressEvaluatorPack {
             // sua: VarSet::new(Some(Flag::SUA), CLOSE_THRD * scale),
             fup: VarSet::new(Some(Flag::FUP), 0.05),
             // suf: VarSet::new(Some(Flag::SUF), CLOSE_THRD),
+            luby: RestartLuby::new(2.0, 100.0),
         }
     }
 }
 
+impl RestartIF for RestartExecutor {
+    // stagnation-triggered restart engine
+    fn restart(&mut self, asgs: &mut AssignStack, vdb: &mut VarDB, stats: &mut [usize], remains: usize) -> bool {
+        if self.use_luby_restart {
+            if self.luby.update(|_, _|true).is_active() {
+                self.after_restart = 0;
+                stats[Stat::Restart] += 1;
+                stats[Stat::RestartByLuby] += 1;
+                return true;
+            } else {
+                return false;
+            }
+        }
+        self.after_restart += 1;
+        if let Some(t) = self.cooling {
+            if self.fup.trend() < t {
+                self.cooling = None;
+            } else {
+                self.restart_ratio.update(0.0);
+                return false;
+            }
+        }
+        if 1.4 < self.asg.trend() {
+            self.cooling = Some(self.cooling_dumper * self.fup.trend());
+            self.restart_ratio.update(0.0);
+            return false;
+        }
+
+        // (0.8, 3.6) -- (1.2, 1.2)
+        let restart = // 0.8 < self.fup.trend() &&
+            // self.asg.trend() < 0.8
+            8.4 - 6.0 * self.fup.trend() < self.lbd.trend()
+            && 1.25 < self.lbd.trend()
+            ;
+        /*
+        let fract = 1.2 < self.lbd.trend() && 1.2 < self.fup.trend();
+        if  fract {
+            stats[Stat::RestartByAsg] += 1;
+        }
+        let still = 3.5 < self.lbd.trend() && 0.8 < self.fup.trend();
+        if  still {
+            stats[Stat::RestartByFUP] += 1;
+        }
+        let restart = fract || still;
+         */
+
+        /* else if self.asg.should_restart() {
+          // This is ant-blocking condition.
+          // stats[Stat::BlockingByAsg] += 1;
+          // false
+        } */
+        if restart {
+            self.cooling = Some(self.cooling_dumper * self.fup.trend());
+            asgs.cancel_until(vdb, 0);
+            asgs.check_progress();
+            self.restart_ratio.update(1.0);
+            // No need to call remove nor reset for asv. It's memoryless. 
+            if self.fup.is_active() && false {
+                for v in &mut vdb.vars[1..] {
+                    if !v.is(Flag::ELIMINATED) {
+                        // self.acv.remove(v);
+                        self.fup.remove(v);
+                    }
+                }
+                // self.acv.reset();
+                self.fup.reset();
+            }
+            self.after_restart = 0;
+            stats[Stat::Restart] += 1;
+            // {
+            //     let ra = stats[Stat::RestartByAsg];
+            //     let rf = stats[Stat::RestartByFUP];
+            //     if 0 < ra && 0 < rf {
+            //         let s = self.config.var_activity_decay;
+            //         let m = self.config.var_activity_d_max;
+            //         let k = ra.max(rf) as f64 / (ra + rf) as f64;
+            //         vdb.activity_decay = k * m + (1.0 - k) * s;
+            //     }
+            // }
+            true
+        } else if self.fup.trend().log(10.0) < -2.0 {
+            if remains < 2 * self.fup.sum {
+            self.use_luby_restart = true;
+            } else {
+                for v in &mut vdb.vars[1..] {
+                    if !v.is(Flag::ELIMINATED) {
+                        self.fup.remove(v);
+                    }
+                }
+                self.fup.reset();
+            }
+            false
+        } else {
+            self.restart_ratio.update(0.0);
+            false
+        }
+    }
+}
 
 /// Glucose original (or Lingering-style) forcing restart condition
 /// ### Implementing the original algorithm
@@ -254,7 +241,7 @@ impl ProgressEvaluatorPack {
 /// ```ignore
 ///    rst = RestartLBD::new(1.4);
 ///    rst.add(learnt.lbd()).commit();
-///    if rst.update(|ema, ave| rst.threshold * ave < ema.get()).is_active() {
+///    if rst.eval(|ema, ave| rst.threshold * ave < ema.get()) {
 ///        restarting...
 ///    }
 /// ```
@@ -264,7 +251,7 @@ impl ProgressEvaluatorPack {
 /// ```ignore
 ///    rst = RestartLBD2::new(1.4);
 ///    rst.add(learnt.lbd()).commit();
-///    if rst.update(|ema, _| rst.threshold * ema.get() < ema.get_fast()).is_active() {
+///    if rst.eval(|ema, _| rst.threshold * ema.get() < ema.get_fast())) {
 ///        restarting...
 ///    }
 /// ```
@@ -333,7 +320,7 @@ impl RestartLBD {
             sum: 0.0,
             num: 0,
             threshold,
-            ema: Ema::new(75),
+            ema: Ema::new(EMA_FAST),
             lbd: None,
             result: false,
             timer: 0,
@@ -347,7 +334,7 @@ impl RestartLBD {
 /// ```ignore
 ///    blk = RestartASG::new(1.0 / 0.8);
 ///    blk.add(solver.num_assigns).commit();
-///    if blk.update(|ema, ave| blk.threshold * ave < ema.get()).is_active() {
+///    if blk.eval(|ema, ave| blk.threshold * ave < ema.get()) {
 ///        blocking...
 ///    }
 /// ```
@@ -356,7 +343,7 @@ impl RestartLBD {
 /// ```ignore
 ///    blk = RestartASG2::new(1.0 / 0.8);
 ///    blk.add(solver.num_assigns).commit();
-///    if blk.update(|ema, _| blk.threshold * ema.get() < ema.get_fast()).is_active() {
+///    if blk.eval(|ema, _| blk.threshold * ema.get() < ema.get_fast()) {
 ///        blocking...
 ///    }
 /// ```
@@ -397,18 +384,9 @@ impl ProgressEvaluatorIF<'_> for RestartASG {
     {
         assert!(self.asg.is_none());
         self.result = f(&self.ema, self.sum as f64 / self.num as f64);
-        // if 0 < self.timer {
-        //     self.timer -= 1;
-        // } else {
-        //
-        //     if self.result {
-        //         self.timer = 50;
-        //     }
-        // }
         self
     }
     fn is_active(&self) -> bool {
-        // 0 < self.timer &&
         self.result
     }
     fn eval<F, R>(&self, f: F) -> R
@@ -430,7 +408,7 @@ impl RestartASG {
             sum: 0,
             num: 0,
             threshold,
-            ema: Ema::new(200),
+            ema: Ema::new(EMA_FAST),
             asg: None,
             result: false,
             // timer: 20,
@@ -518,6 +496,7 @@ impl RestartLuby {
     pub fn initialize(&mut self, in_use: bool) -> &mut Self {
         self.in_use = in_use;
         if self.in_use {
+            self.cnfl_cnt = 0.0;
             self.num_conflict = luby(self.inc, self.current_restart) * self.factor;
         }
         self
