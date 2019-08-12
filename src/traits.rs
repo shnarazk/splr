@@ -222,7 +222,7 @@ pub trait ProgressEvaluatorIF<'a> {
     /// return `true` if the last update's result is true. return true.
     fn is_active(&self) -> bool;
     /// run the predicate, return `true` if it holds.
-    fn eval<F,R>(&self, f: F) -> R
+    fn eval<F, R>(&self, f: F) -> R
     where
         F: Fn(&Self::Memory, f64) -> R;
     fn trend(&self) -> f64;
@@ -231,7 +231,13 @@ pub trait ProgressEvaluatorIF<'a> {
 /// API for restart like `block_restart`, `force_restart` and so on.
 pub trait RestartIF {
     /// new local/global restart control
-    fn restart(&mut self, asgs: &mut AssignStack, vdb: &mut VarDB, stats: &mut [usize], remains: usize) -> bool;
+    fn restart(
+        &mut self,
+        asgs: &mut AssignStack,
+        vdb: &mut VarDB,
+        stats: &mut [usize],
+        remains: usize,
+    ) -> bool;
 }
 
 /// API for SAT solver like `build`, `solve` and so on.

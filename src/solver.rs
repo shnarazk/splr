@@ -313,12 +313,6 @@ fn search(
     vdb: &mut VarDB,
 ) -> Result<bool, SolverError> {
     let mut a_decision_was_made = false;
-//    state.luby_restart_cnfl_cnt = 0.0;
-//    state.restart_update_luby();
-//  if self.use_luby_restart {
-//      self.luby_restart_num_conflict =
-//          luby(self.luby_restart_inc, self.luby_current_restarts) * self.luby_restart_factor;
-//  }
     state.rst.luby.initialize(state.rst.use_luby_restart);
     loop {
         let ci = asgs.propagate(cdb, state, vdb);
@@ -373,7 +367,7 @@ fn handle_conflict_path(
         vdb.activity_decay += 0.01;
     }
     let c_level = asgs.level();
-    let c_asgns = asgs.num_at(asgs.level()-1);
+    let c_asgns = asgs.num_at(asgs.level() - 1);
     let bl = analyze(asgs, cdb, state, vdb, ci).max(state.root_level);
     asgs.cancel_until(vdb, bl);
     let new_learnt = &mut state.new_learnt;
@@ -414,17 +408,8 @@ fn handle_conflict_path(
         }
     }
     if 0 < state.config.debug_dump && ncnfl % state.config.debug_dump == 0 {
-        let State {
-            stats,
-            rst,
-            ..
-        } = state;
-        let RestartExecutor {
-            lbd,
-            asg,
-            fup,
-            ..
-        } = rst;
+        let State { stats, rst, .. } = state;
+        let RestartExecutor { lbd, asg, fup, .. } = rst;
         state.development_history.push((
             ncnfl,
             (stats[Stat::RestartByAsg] as f64 + 1.0).ln(),
@@ -437,7 +422,7 @@ fn handle_conflict_path(
             // state.rst.sua.num as f64,
             // (fup.num as f64 + 1.0).ln(),
             // suf.num as f64,
-            0.0
+            0.0,
         ));
     }
     if ncnfl % 10_000 == 0 {

@@ -528,28 +528,23 @@ impl StateIF for State {
         );
         println!(
             "\x1B[2K  Assignment|#max:{}, #ave:{}, e-64:{}, trnd:{}  ",
-            im!(
-                "{:>9.0}",
-                self.record,
-                LogUsizeId::AsgMax,
-                self.rst.asg.max
-            ),
+            im!("{:>9.0}", self.record, LogUsizeId::AsgMax, self.rst.asg.max),
             fm!(
                 "{:>9.0}",
                 self.record,
-                LogF64Id::AsgAve,
+                LogF64Id::ASGave,
                 self.rst.asg.sum as f64 / self.rst.asg.num as f64
             ),
             fm!(
                 "{:>9.0}",
                 self.record,
-                LogF64Id::AsgEma,
+                LogF64Id::ASGema,
                 self.rst.asg.ema.get()
             ),
             fm!(
                 "{:>9.4}",
                 self.record,
-                LogF64Id::AsgTrn,
+                LogF64Id::ASGtrn,
                 self.rst.asg.trend()
             ),
         );
@@ -559,18 +554,26 @@ impl StateIF for State {
             // "\x1B[2K    Conflict|cnfl:{}, bjmp:{}, aLBD:{}, trnd:{} ",
             im!("{:>9.0}", self.record, LogUsizeId::Learnt, self.rst.lbd.num),
             fm!("{:>9.2}", self.record, LogF64Id::LBDave, ave_lbd),
-            fm!("{:>9.2}", self.record, LogF64Id::LBDema1, self.rst.lbd.ema.get()),
+            fm!(
+                "{:>9.2}",
+                self.record,
+                LogF64Id::LBDema,
+                self.rst.lbd.ema.get()
+            ),
             fm!(
                 "{:>9.4}",
                 self.record,
-                LogF64Id::LBDTrend,
+                LogF64Id::LBDtrd,
                 self.rst.lbd.trend()
             ),
         );
         println!(
             "\x1B[2K   First UIP|#sum:{}, rate:{}, e-64:{}, trnd:{} ",
-            im!("{:>9}", self.record, LogUsizeId::FUP, self.rst.fup.sum),
-            fm!("{:>9.4}", self.record, LogF64Id::FUPave,
+            im!("{:>9}", self.record, LogUsizeId::FUPnum, self.rst.fup.sum),
+            fm!(
+                "{:>9.4}",
+                self.record,
+                LogF64Id::FUPave,
                 self.rst.fup.sum as f64 / self.rst.fup.cnt as f64
             ),
             fm!(
@@ -585,16 +588,7 @@ impl StateIF for State {
                 LogF64Id::FUPtrd,
                 self.rst.fup.trend()
             ),
-            /*
-            fm!(
-                "{:>9.4}",
-                self.record,
-                LogF64Id::SuFInc,
-                0.0 // self.rst.suf.diff_ema.get()
-            ),
-            */
         );
-        // self.record[LogF64Id::FUPPrg] = 100.0 * self.rst.suf.num as f64 / (nv - sum) as f64;
         println!(
             "\x1B[2K    Analysis|cLvl:{}, bLvl:{}, #rst:{}, run%:{} ",
             fm!("{:>9.2}", self.record, LogF64Id::CLevel, self.c_lvl.get()),
@@ -626,7 +620,6 @@ impl StateIF for State {
         self.record[LogUsizeId::SatClauseElim] = self.stats[Stat::SatClauseElimination];
         self.record[LogUsizeId::ExhaustiveElim] = self.stats[Stat::ExhaustiveElimination];
         self.record[LogUsizeId::Reduction] = self.stats[Stat::Reduction];
-
     }
 }
 
@@ -686,18 +679,16 @@ pub enum LogUsizeId {
     LBD2,           //  7: lbd2: usize,
     Binclause,      //  8: binclause: usize,
     Permanent,      //  9: permanent: usize,
-    Learnt,         //
-    Restart,        // 10: restart_count: usize,
-    RestartByLuby,  // 11: restart_by_Luby restart
-    RestartByAsg,   // 12: restart_by_assign_stagnation: usize,
-    RestartByFUP,   // 13: restart_by_fup_stagnation: usize
-    Reduction,      // 14: reduction: usize,
-    SatClauseElim,  // 15: simplification: usize,
-    ExhaustiveElim, // 16: elimination: usize,
-    Stagnation,     // 17: stagnation: usize,
-    FUP,            // 18: the number of current fups
-    SuF,            // 19: the number of superium of fups
-    AsgMax,         // 20:
+    Learnt,         // 10: learnt - binclause: usize
+    Restart,        // 11: restart_count: usize,
+    RestartByLuby,  // 12: restart_by_Luby restart
+    RestartByAsg,   // 13: restart_by_assign_stagnation: usize,
+    RestartByFUP,   // 14: restart_by_fup_stagnation: usize
+    Reduction,      // 15: reduction: usize,
+    SatClauseElim,  // 16: simplification: usize,
+    ExhaustiveElim, // 17: elimination: usize,
+    FUPnum,         // 18: the number of current fups
+    AsgMax,         // 19:
     // ElimClauseQueue, // __: elim_clause_queue: usize,
     // ElimVarQueue, // __: elim_var_queue: usize,
     End,
@@ -705,27 +696,22 @@ pub enum LogUsizeId {
 
 /// Index for `f64` data, used in `ProgressRecord`
 pub enum LogF64Id {
-    Progress = 0, //  0: progress: f64,
-    Asg,          //  1: ema_asg: f64,
-    AsgAve,
-    AsgEma,       //  2: ema_asg_inc.slow: f64,
-    AsgTrn,       //  3: ema_asg percentage: f64,
-    FUPInc,       //  4: ema_fup_inc.slow: f64,
-    FUPPrg,       //  6: num_fup percentage: f64,
-    FUPave,
-    FUPdif,
-    FUPtrd,
-    SuFInc,       //  5: ema_suf_inc.slow: f64,
-    LBD,          //  7: ema_lbd: f64,
-    LBDave,
-    LBDema1,
-    LBDema2,
-    LBDTrend,     //  8: ema_lbd trend: f64,
-    BLevel,       //  9: backjump_level: f64,
-    CLevel,       // 10: conflict_level: f64,
-    VADecay,      // 11: variable activity decay: f64,
-    RestartRatio, // 12: restart_ratio: usize
-    EmaRestart,   // 13: average effective restart step
+    Progress = 0, //  0: #remain / num_vars
+    ASGave,       //  1: rst.asg.{sum / num}
+    ASGema,       //  2: ema_asg.ema.get
+    ASGtrn,       //  3: ema_asg.trend
+    FUPinc,       //  4: ema_fup.diff_ema.slow: f64,
+    FUPprg,       //  5: num_fup percentage: f64,
+    FUPave,       //  6: rst.fup.{sum / num}
+    FUPdif,       //  7: rst.fup.diff_ema.get
+    FUPtrd,       //  8: rst.fup.trend
+    LBDave,       //  9: rst.lbd.{sum / sum}
+    LBDema,       // 10: rst.lbd.ema.get
+    LBDtrd,       // 11: ema_lbd trend
+    BLevel,       // 12: backjump_level
+    CLevel,       // 13: conflict_level
+    RestartRatio, // 14: rst.restart_ratio
+    VADecay,      // 15: vdb.activity_decay
     End,
 }
 

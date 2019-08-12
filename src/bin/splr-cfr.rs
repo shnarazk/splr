@@ -252,11 +252,11 @@ fn report(state: &State, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c     Conflict|cnfl:{}, bjmp:{}, aLBD:{}, trnd:{} \n",
+            "c     Analyzis|cLvl:{}, bLvl:{}, #rst:{}, run%:{} \n",
             format!("{:>9.2}", state.record[LogF64Id::CLevel]),
             format!("{:>9.2}", state.record[LogF64Id::BLevel]),
-            format!("{:>9.2}", state.record[LogF64Id::LBD]),
-            format!("{:>9.4}", state.record[LogF64Id::LBDTrend]),
+            format!("{:>9.0}", state.record[LogUsizeId::Restart]),
+            format!("{:>9.4}", state.record[LogF64Id::RestartRatio]),
         )
         .as_bytes(),
     )?;
@@ -264,19 +264,19 @@ fn report(state: &State, out: &mut dyn Write) -> std::io::Result<()> {
         format!(
             "c   Assignment|#ave:{}, #ave:{}, e-64:{}, trnd:{} \n",
             format!("{:>9.0}", state.record[LogUsizeId::AsgMax]),
-            format!("{:>9.2}", state.record[LogF64Id::AsgAve]),
-            format!("{:>9.4}", state.record[LogF64Id::AsgEma]),
-            format!("{:>9.4}", state.record[LogF64Id::AsgTrn]),
+            format!("{:>9.2}", state.record[LogF64Id::ASGave]),
+            format!("{:>9.4}", state.record[LogF64Id::ASGema]),
+            format!("{:>9.4}", state.record[LogF64Id::ASGtrn]),
         )
         .as_bytes(),
     )?;
     out.write_all(
         format!(
-            "c    First UIP|#all:{}, #now:{}, #inc:{}, end%:{} \n",
-            format!("{:>9}", state.record[LogUsizeId::SuF]),
-            format!("{:>9}", state.record[LogUsizeId::FUP]),
-            format!("{:>9.4}", state.record[LogF64Id::FUPInc]),
-            format!("{:>9.4}", state.record[LogF64Id::FUPPrg]),
+            "c   Learnt LBD|#num:{}, #ave:{}, #e-64:{}, trnd:{} \n",
+            format!("{:>9.0}", state.record[LogUsizeId::Learnt]),
+            format!("{:>9.2}", state.record[LogF64Id::LBDave]),
+            format!("{:>9.2}", state.record[LogF64Id::LBDema]),
+            format!("{:>9.4}", state.record[LogF64Id::LBDtrd]),
         )
         .as_bytes(),
     )?;
