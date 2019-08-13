@@ -3,7 +3,7 @@ use crate::config::Config;
 use crate::eliminator::Eliminator;
 use crate::propagator::AssignStack;
 use crate::restart::RestartExecutor;
-use crate::state::{LogUsizeId, Stat, State};
+use crate::state::{Stat, State};
 use crate::traits::*;
 use crate::types::*;
 use crate::var::VarDB;
@@ -378,6 +378,21 @@ fn handle_conflict_path(
         let l0 = new_learnt[0];
         asgs.check_progress();
         asgs.uncheck_enqueue(vdb, l0, NULL_CLAUSE);
+        if state.rst.fup.diff_ema.get() < 0.000_1 // 3
+            && state.rst.fup.trend() < 0.01 // 1
+            && state.rst.restart_ratio.get() < 0.000_000_001
+        // 8
+        {
+            if 4 * state.num_unsolved_vars() < 5 * state.rst.fup.sum {
+                state.rst.luby.in_use = true;
+                state.rst.use_luby_restart = true;
+            } else {
+                for v in &mut vdb.vars[1..] {
+                    state.rst.fup.remove(v);
+                }
+                state.rst.fup.reset();
+            }
+        }
     } else {
         state.stats[Stat::Learnt] += 1;
         let lbd = vdb.compute_lbd(&new_learnt);
@@ -401,9 +416,7 @@ fn handle_conflict_path(
         // state.rst.asv.diff = Some(asgs.check_progress() as f64);
         // state.rst.asv.commit();
         // state.rst.acv.commit();
-
-        let remains = state.num_vars - state.num_solved_vars - state.num_eliminated_vars;
-        if !state.rst.restart(asgs, vdb, &mut state.stats, remains) {
+        if !state.rst.restart(asgs, vdb, &mut state.stats) {
             asgs.uncheck_enqueue(vdb, l0, cid);
         }
     }
@@ -462,13 +475,6 @@ fn adapt_parameters(
             elim.activate();
             cdb.simplify(asgs, elim, state, vdb)?;
         }
-    }
-    if false && state.record[LogUsizeId::Fixed] < state.num_solved_vars {
-        // Finding a unit learn clause changes the shape of the problem.
-        for v in &mut vdb.vars[1..] {
-            state.rst.fup.remove(v);
-        }
-        state.rst.fup.reset();
     }
     state.progress(cdb, vdb, None);
     Ok(())

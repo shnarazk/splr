@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use structopt::StructOpt;
 
-pub const VERSION: &str = "0.1.4-RC1";
+pub const VERSION: &str = "0.2.0-RC0";
 
 /// Configuration built from command line options
 #[derive(Clone, Debug, StructOpt)]

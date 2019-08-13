@@ -347,6 +347,9 @@ impl StateIF for State {
         state.target = cnf;
         state
     }
+    fn num_unsolved_vars(&self) -> usize {
+        self.num_vars - self.num_solved_vars - self.num_eliminated_vars
+    }
     fn is_timeout(&self) -> bool {
         if self.time_limit == 0.0 {
             return false;
@@ -449,12 +452,11 @@ impl StateIF for State {
             return;
         }
         if self.progress_log {
-            self.dump(cdb, vdb);
+            self.dump(cdb);
             return;
         }
         let nv = self.num_vars;
-        let fixed = self.num_solved_vars;
-        let sum = fixed + self.num_eliminated_vars;
+        let sum = self.num_solved_vars + self.num_eliminated_vars;
         self.progress_cnt += 1;
         print!("\x1B[9A\x1B[1G");
         let ave_lbd = self.rst.lbd.sum / self.rst.lbd.num as f64;
@@ -482,8 +484,18 @@ impl StateIF for State {
         );
         println!(
             "\x1B[2K    Progress|#rem:{}, #fix:{}, #elm:{}, prg%:{} ",
-            im!("{:>9}", self.record, LogUsizeId::Remain, nv - sum),
-            im!("{:>9}", self.record, LogUsizeId::Fixed, fixed),
+            im!(
+                "{:>9}",
+                self.record,
+                LogUsizeId::Remain,
+                self.num_unsolved_vars()
+            ),
+            im!(
+                "{:>9}",
+                self.record,
+                LogUsizeId::Fixed,
+                self.num_solved_vars
+            ),
             im!(
                 "{:>9}",
                 self.record,
@@ -771,37 +783,36 @@ impl State {
              c ========================================================================================================="
         );
     }
-    fn dump(&mut self, cdb: &ClauseDB, vdb: &VarDB) {
+    fn dump(&mut self, cdb: &ClauseDB) {
         self.progress_cnt += 1;
-        let nv = vdb.vars.len() - 1;
-        let fixed = self.num_solved_vars;
-        let sum = fixed + self.num_eliminated_vars;
+        let nv = self.num_vars;
+        let sum = self.num_solved_vars + self.num_eliminated_vars;
         let nlearnts = cdb.countf(Flag::LEARNT);
         let ncnfl = self.stats[Stat::Conflict];
         let nrestart = self.stats[Stat::Restart];
         println!(
             "c | {:>8}  {:>8} {:>8} | {:>7} {:>8} {:>8} |  {:>4}  {:>8} {:>7} {:>8} | {:>6.3} % |",
-            nrestart,                              // restart
-            0,                                     // blocked
-            ncnfl / nrestart.max(1),               // average cfc (Conflict / Restart)
-            nv - fixed - self.num_eliminated_vars, // alive vars
-            cdb.count(true) - nlearnts,            // given clauses
-            0,                                     // alive literals
-            self.stats[Stat::Reduction],           // clause reduction
-            nlearnts,                              // alive learnts
-            self.stats[Stat::NumLBD2],             // learnts with LBD = 2
-            ncnfl - nlearnts,                      // removed learnts
-            (sum as f32) / (nv as f32) * 100.0,    // progress
+            nrestart,                           // restart
+            0,                                  // blocked
+            ncnfl / nrestart.max(1),            // average cfc (Conflict / Restart)
+            self.num_unsolved_vars(),           // alive vars
+            cdb.count(true) - nlearnts,         // given clauses
+            0,                                  // alive literals
+            self.stats[Stat::Reduction],        // clause reduction
+            nlearnts,                           // alive learnts
+            self.stats[Stat::NumLBD2],          // learnts with LBD = 2
+            ncnfl - nlearnts,                   // removed learnts
+            (sum as f32) / (nv as f32) * 100.0, // progress
         );
     }
     #[allow(dead_code)]
-    fn dump_details(&mut self, cdb: &ClauseDB, elim: &Eliminator, vdb: &VarDB, mes: Option<&str>) {
+    fn dump_details(&mut self, cdb: &ClauseDB, elim: &Eliminator, mes: Option<&str>) {
         self.progress_cnt += 1;
         let msg = match mes {
             None => self.strategy.to_str(),
             Some(x) => x,
         };
-        let nv = vdb.vars.len() - 1;
+        let nv = self.num_vars;
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
         println!(
@@ -810,8 +821,8 @@ impl State {
              {:>6},{:>6}",
             self.progress_cnt,
             msg,
-            nv - sum,
-            fixed,
+            self.num_unsolved_vars(),
+            self.num_solved_vars,
             self.num_eliminated_vars,
             (sum as f32) / (nv as f32) * 100.0,
             cdb.num_learnt,

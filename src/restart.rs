@@ -130,20 +130,16 @@ impl RestartExecutor {
 
 impl RestartIF for RestartExecutor {
     // stagnation-triggered restart engine
-    fn restart(
-        &mut self,
-        asgs: &mut AssignStack,
-        vdb: &mut VarDB,
-        stats: &mut [usize],
-        remains: usize,
-    ) -> bool {
+    fn restart(&mut self, asgs: &mut AssignStack, vdb: &mut VarDB, stats: &mut [usize]) -> bool {
         if self.use_luby_restart {
             if self.luby.update(|_, _| true).is_active() {
                 self.after_restart = 0;
                 stats[Stat::Restart] += 1;
                 stats[Stat::RestartByLuby] += 1;
+                self.restart_ratio.update(1.0);
                 return true;
             } else {
+                self.restart_ratio.update(0.0);
                 return false;
             }
         }
@@ -172,15 +168,6 @@ impl RestartIF for RestartExecutor {
             asgs.cancel_until(vdb, 0);
             asgs.check_progress();
             self.restart_ratio.update(1.0);
-            // No need to call remove nor reset for asv. It's memoryless.
-            if self.fup.is_active() && false {
-                for v in &mut vdb.vars[1..] {
-                    if !v.is(Flag::ELIMINATED) {
-                        self.fup.remove(v);
-                    }
-                }
-                self.fup.reset();
-            }
             self.after_restart = 0;
             stats[Stat::Restart] += 1;
             // {
@@ -194,18 +181,6 @@ impl RestartIF for RestartExecutor {
             //     }
             // }
             true
-        } else if self.fup.trend().log(10.0) < -2.0 {
-            if remains < 2 * self.fup.sum {
-                self.use_luby_restart = true;
-            } else {
-                for v in &mut vdb.vars[1..] {
-                    if !v.is(Flag::ELIMINATED) {
-                        self.fup.remove(v);
-                    }
-                }
-                self.fup.reset();
-            }
-            false
         } else {
             self.restart_ratio.update(0.0);
             false
@@ -473,10 +448,8 @@ impl RestartLuby {
     }
     pub fn initialize(&mut self, in_use: bool) -> &mut Self {
         self.in_use = in_use;
-        if self.in_use {
-            self.cnfl_cnt = 0.0;
-            self.num_conflict = luby(self.inc, self.current_restart) * self.factor;
-        }
+        self.cnfl_cnt = 0.0;
+        self.num_conflict = luby(self.inc, self.current_restart) * self.factor;
         self
     }
 }
