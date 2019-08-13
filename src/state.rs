@@ -13,8 +13,7 @@ use std::ops::{Index, IndexMut};
 use std::path::Path;
 use std::time::SystemTime;
 
-const EMA_SLOW: usize = 8192; // 2 ^ 13; 2 ^ 15 = 32768
-const EMA_FAST: usize = 64; // 2 ^ 6
+const EMA_SLOW: usize = 16384; // 2 ^ 14; 2 ^ 15 = 32768
 
 /// A collection of named search heuristics
 #[derive(Debug, Eq, PartialEq)]
@@ -107,6 +106,7 @@ pub enum Stat {
     RestartByAsg,          // the number of restarts by assign stagnation
     RestartByFUP,          // the number of restarts by 1st unified (implication) point
     RestartByLuby,         // the number of Luby restart
+    Blocking,              // the number of restart block
     Learnt,                // the number of learnt clauses (< Conflict)
     NoDecisionConflict,    // the number of 'no decision conflict'
     Propagation,           // the number of propagation
@@ -270,7 +270,6 @@ macro_rules! fm {
 
 impl Default for State {
     fn default() -> State {
-        let ema = (EMA_SLOW, EMA_FAST);
         State {
             config: Config::default(),
             target: CNFDescription::default(),
@@ -292,7 +291,7 @@ impl Default for State {
             cdb_inc: 300,
             cdb_inc_extra: 1000,
             cdb_soft_limit: 0, // 248_000_000
-            rst: RestartExecutor::new(1),
+            rst: RestartExecutor::new(),
             use_elim: true,
             elim_eliminate_combination_limit: 80,
             elim_eliminate_grow_limit: 0, // 64
@@ -304,8 +303,8 @@ impl Default for State {
             time_limit: 0.0,
             use_progress: true,
             stats: [0; Stat::EndOfStatIndex as usize],
-            b_lvl: Ema::new(ema.0),
-            c_lvl: Ema::new(ema.0),
+            b_lvl: Ema::new(EMA_SLOW),
+            c_lvl: Ema::new(EMA_SLOW),
             conflicts: Vec::new(),
             new_learnt: Vec::new(),
             an_seen: Vec::new(),
@@ -336,7 +335,7 @@ impl StateIF for State {
         state.num_vars = cnf.num_of_variables;
         state.use_adapt_strategy = !config.without_adaptive_strategy;
         state.cdb_soft_limit = config.clause_limit;
-        state.rst = RestartExecutor::new(cnf.num_of_variables);
+        state.rst = RestartExecutor::new();
         state.elim_eliminate_grow_limit = config.elim_grow_limit;
         state.elim_subsume_literal_limit = config.elim_lit_limit;
         state.use_elim = !config.without_elim;
@@ -437,6 +436,7 @@ impl StateIF for State {
         println!("                                                  ");
         println!("                                                  ");
         println!("                                                  ");
+        println!("                                                  ");
     }
     fn flush(&self, mes: &str) {
         if self.use_progress && !self.progress_log {
@@ -458,7 +458,7 @@ impl StateIF for State {
         let nv = self.num_vars;
         let sum = self.num_solved_vars + self.num_eliminated_vars;
         self.progress_cnt += 1;
-        print!("\x1B[9A\x1B[1G");
+        print!("\x1B[10A\x1B[1G");
         let ave_lbd = self.rst.lbd.sum / self.rst.lbd.num as f64;
         println!("\x1B[2K{}", self);
         println!(
@@ -510,7 +510,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K Clause Kind|Remv:{}, LBD2:{}, Binc:{}, Perm:{} ",
+            "\x1B[2K   Clause DB|Remv:{}, LBD2:{}, Binc:{}, Perm:{} ",
             im!("{:>9}", self.record, LogUsizeId::Removable, cdb.num_learnt),
             im!(
                 "{:>9}",
@@ -538,13 +538,14 @@ impl StateIF for State {
                 "{:>9.0}",
                 self.record,
                 LogF64Id::ASGave,
-                self.rst.asg.sum as f64 / self.rst.asg.num as f64
+                // self.rst.asg.sum as f64 / self.rst.asg.num as f64
+                self.rst.asg.get()
             ),
             fm!(
                 "{:>9.0}",
                 self.record,
                 LogF64Id::ASGema,
-                self.rst.asg.ema.get()
+                self.rst.asg.get_fast()
             ),
             fm!(
                 "{:>9.4}",
@@ -555,22 +556,16 @@ impl StateIF for State {
         );
         self.record[LogF64Id::VADecay] = vdb.activity_decay;
         println!(
-            "\x1B[2K  Learnt LBD|#num:{}, #ave:{}, e-64:{}, trnd:{} ",
-            // "\x1B[2K    Conflict|cnfl:{}, bjmp:{}, aLBD:{}, trnd:{} ",
-            im!("{:>9.0}", self.record, LogUsizeId::Learnt, self.rst.lbd.num),
-            fm!("{:>9.2}", self.record, LogF64Id::LBDave, ave_lbd),
-            fm!(
-                "{:>9.2}",
+            "\x1B[2K    Analysis|cLvl:{}, bLvl:{}, #grp:{}, ____:{} ",
+            fm!("{:>9.2}", self.record, LogF64Id::CLevel, self.c_lvl.get()),
+            fm!("{:>9.2}", self.record, LogF64Id::BLevel, self.b_lvl.get()),
+            im!(
+                "{:>9.0}",
                 self.record,
-                LogF64Id::LBDema,
-                self.rst.lbd.ema.get()
+                LogUsizeId::FUPgrp,
+                self.rst.fup.num_build
             ),
-            fm!(
-                "{:>9.4}",
-                self.record,
-                LogF64Id::LBDtrd,
-                self.rst.lbd.trend()
-            ),
+            "",
         );
         println!(
             "\x1B[2K   First UIP|#sum:{}, rate:{}, e-64:{}, trnd:{} ",
@@ -595,15 +590,38 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K    Analysis|cLvl:{}, bLvl:{}, #rst:{}, run%:{} ",
-            fm!("{:>9.2}", self.record, LogF64Id::CLevel, self.c_lvl.get()),
-            fm!("{:>9.2}", self.record, LogF64Id::BLevel, self.b_lvl.get()),
+            "\x1B[2K  Learnt LBD|#num:{}, #ave:{}, e-64:{}, trnd:{} ",
+            // "\x1B[2K    Conflict|cnfl:{}, bjmp:{}, aLBD:{}, trnd:{} ",
+            im!("{:>9.0}", self.record, LogUsizeId::Learnt, self.rst.lbd.num),
+            fm!("{:>9.2}", self.record, LogF64Id::LBDave, ave_lbd),
+            fm!(
+                "{:>9.2}",
+                self.record,
+                LogF64Id::LBDema,
+                self.rst.lbd.ema.get()
+            ),
+            fm!(
+                "{:>9.4}",
+                self.record,
+                LogF64Id::LBDtrd,
+                self.rst.lbd.trend()
+            ),
+        );
+        println!(
+            "\x1B[2K     Restart|#rst:{}, #blc:{}, dura:{}, rate:{} ",
             im!(
-                "{:>9}",
+                "{:>9.0}",
                 self.record,
                 LogUsizeId::Restart,
                 self.stats[Stat::Restart]
             ),
+            im!(
+                "{:>9.0}",
+                self.record,
+                LogUsizeId::Blocking,
+                self.stats[Stat::Blocking]
+            ),
+            format!("{:>9.2}", self.rst.cooling_steps.get()),
             fm!(
                 "{:>9.4}",
                 self.record,
@@ -689,11 +707,13 @@ pub enum LogUsizeId {
     RestartByLuby,  // 12: restart_by_Luby restart
     RestartByAsg,   // 13: restart_by_assign_stagnation: usize,
     RestartByFUP,   // 14: restart_by_fup_stagnation: usize
+    Blocking,       // ??:
     Reduction,      // 15: reduction: usize,
     SatClauseElim,  // 16: simplification: usize,
     ExhaustiveElim, // 17: elimination: usize,
     FUPnum,         // 18: the number of current fups
-    AsgMax,         // 19:
+    FUPgrp,         // 19: the number of FUP graph generation
+    AsgMax,         // 20: te maximum number of assigned variables
     // ElimClauseQueue, // __: elim_clause_queue: usize,
     // ElimVarQueue, // __: elim_var_queue: usize,
     End,
@@ -830,7 +850,7 @@ impl State {
             0,
             0,
             self.stats[Stat::Restart],
-            self.rst.asg.ema.get(),
+            self.rst.asg.get_fast(),
             self.rst.lbd.ema.get(),
             self.rst.lbd.ema.get(),
             self.b_lvl.get(),

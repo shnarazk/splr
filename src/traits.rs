@@ -232,6 +232,7 @@ pub trait ProgressEvaluatorIF<'a> {
 pub trait RestartIF {
     /// new local/global restart control
     fn restart(&mut self, asgs: &mut AssignStack, vdb: &mut VarDB, stats: &mut [usize]) -> bool;
+    fn check_stationary_fup(&mut self, vdb: &mut VarDB);
 }
 
 /// API for SAT solver like `build`, `solve` and so on.

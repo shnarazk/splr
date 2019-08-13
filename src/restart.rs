@@ -4,9 +4,9 @@ use crate::traits::*;
 use crate::types::Flag;
 use crate::var::{Var, VarDB};
 
-const EMA_SLOW: usize = 8192; // 2 ^ 13; 2 ^ 15 = 32768
-const EMA_FAST: usize = 64; // 2 ^ 6
-const GLUCOSE_BLOCKING: f64 = 1.4;
+const EMA_SLOW: usize = 16384; // 2 ^ 14; 2 ^ 15 = 32768
+const EMA_FAST: usize = 64;    // 2 ^ 6
+// const GLUCOSE_BLOCKING: f64 = 4.0;
 
 /// Exponential Moving Average w/ a calibrator
 #[derive(Debug)]
@@ -101,27 +101,30 @@ impl Ema2 {
 #[derive(Debug)]
 pub struct RestartExecutor {
     pub restart_ratio: Ema,
+    pub stationary_thrd: (f64, f64),
     pub cooling: Option<f64>,
     pub cooling_dumper: f64,
+    pub cooling_steps: Ema,
     pub after_restart: usize,
     pub use_luby_restart: bool,
     pub lbd: RestartLBD,
-    pub asg: RestartASG,
+    pub asg: RestartASG2,
     pub fup: VarSet,
     pub luby: RestartLuby,
 }
 
 impl RestartExecutor {
-    pub fn new(n: usize) -> RestartExecutor {
-        let _scale: f64 = (n as f64).log(2f64);
+    pub fn new() -> RestartExecutor {
         RestartExecutor {
             restart_ratio: Ema::new(EMA_SLOW),
+            stationary_thrd: (0.04, 0.7), // (0.000_1, 0.01),
             cooling: None,
-            cooling_dumper: 0.98,
+            cooling_dumper: 0.999,
+            cooling_steps: Ema::new(EMA_SLOW),
             after_restart: 0,
             use_luby_restart: false,
             lbd: RestartLBD::new(0.1),
-            asg: RestartASG::new(0.1),
+            asg: RestartASG2::new(0.1),
             fup: VarSet::new(Some(Flag::FUP)),
             luby: RestartLuby::new(2.0, 100.0),
         }
@@ -145,50 +148,70 @@ impl RestartIF for RestartExecutor {
         }
         self.after_restart += 1;
         if let Some(t) = self.cooling {
-            if self.fup.trend() < t {
+            let nt = t - 1.0; // / self.fup.trend();
+                              // 0.002 < (self.fup.trend() - t).abs()
+                              // self.fup.trend() < t.min(1.0)
+            if nt < 0.0 {
+                self.cooling_steps.update(self.after_restart as f64);
                 self.cooling = None;
             } else {
+                self.cooling = Some(nt);
                 self.restart_ratio.update(0.0);
                 return false;
             }
         }
-        if GLUCOSE_BLOCKING < self.asg.trend() {
-            self.cooling = Some(self.cooling_dumper * self.fup.trend());
+        if 2.0 < self.asg.trend() {
+            self.after_restart = 0;
+            self.cooling = Some(25.0);
             self.restart_ratio.update(0.0);
+            stats[Stat::Blocking] += 1;
             return false;
         }
-
-        // (0.8, 3.6) -- (1.2, 1.2)
-        let restart = // 0.8 < self.fup.trend() &&
-            8.4 - 6.0 * self.fup.trend() < self.lbd.trend()
-            && 1.25 < self.lbd.trend()
+        let restart = // 2.0 < self.lbd.trend()
+            // 8.4 - 6.0 * self.fup.trend() < self.lbd.trend() // (0.8, 3.6) -- (1.2, 1.2)
+            // 6.0 - 4.0 * self.fup.trend() < self.lbd.trend()
+            // 1.2 + 4.0 * self.fup.trend() < self.lbd.trend()
+            1.5 < self.lbd.trend()
+            // && 1.0 < self.fup.trend()
             ;
         if restart {
-            self.cooling = Some(self.cooling_dumper * self.fup.trend());
             asgs.cancel_until(vdb, 0);
             asgs.check_progress();
+            self.cooling = Some(25.0);
             self.restart_ratio.update(1.0);
-            self.after_restart = 0;
             stats[Stat::Restart] += 1;
-            // {
-            //     let ra = stats[Stat::RestartByAsg];
-            //     let rf = stats[Stat::RestartByFUP];
-            //     if 0 < ra && 0 < rf {
-            //         let s = self.config.var_activity_decay;
-            //         let m = self.config.var_activity_d_max;
-            //         let k = ra.max(rf) as f64 / (ra + rf) as f64;
-            //         vdb.activity_decay = k * m + (1.0 - k) * s;
-            //     }
-            // }
+            self.after_restart = 0;
             true
         } else {
+            if false && 2.0 < self.asg.trend() {
+                self.after_restart = 0;
+                self.cooling = Some(25.0);
+                self.restart_ratio.update(0.0);
+                stats[Stat::Blocking] += 1;
+                self.after_restart = 0;
+                return false;
+            }
+            if self.restart_ratio.get() < 0.000_000_001 {
+                self.check_stationary_fup(vdb);
+            }
             self.restart_ratio.update(0.0);
             false
         }
     }
+    fn check_stationary_fup(&mut self, vdb: &mut VarDB) {
+        if self.cooling.is_none()
+            && self.fup.diff_ema.get() < self.stationary_thrd.0
+            && self.fup.trend() < self.stationary_thrd.1
+        {
+            for v in &mut vdb.vars[1..] {
+                self.fup.remove(v);
+            }
+            self.fup.reset();
+        }
+    }
 }
 
-/// Glucose original (or Lingering-style) forcing restart condition
+/// Glucose-style forcing restart condition w/o restart_steps
 /// ### Implementing the original algorithm
 ///
 /// ```ignore
@@ -199,15 +222,6 @@ impl RestartIF for RestartExecutor {
 ///    }
 /// ```
 ///
-/// ### Implementing an EMA-pair-based variant
-///
-/// ```ignore
-///    rst = RestartLBD2::new(1.4);
-///    rst.add(learnt.lbd()).commit();
-///    if rst.eval(|ema, _| rst.threshold * ema.get() < ema.get_fast())) {
-///        restarting...
-///    }
-/// ```
 #[derive(Debug)]
 pub struct RestartLBD {
     pub sum: f64,
@@ -281,22 +295,13 @@ impl RestartLBD {
     }
 }
 
-/// Glucose original (or Lingering-style) restart blocking condition
+/// Glucose-style restart blocking condition w/o restart_steps
 /// ### Implementing the original algorithm
 ///
 /// ```ignore
 ///    blk = RestartASG::new(1.0 / 0.8);
 ///    blk.add(solver.num_assigns).commit();
 ///    if blk.eval(|ema, ave| blk.threshold * ave < ema.get()) {
-///        blocking...
-///    }
-/// ```
-/// ### Implementing an EMA-pair-based variant
-///
-/// ```ignore
-///    blk = RestartASG2::new(1.0 / 0.8);
-///    blk.add(solver.num_assigns).commit();
-///    if blk.eval(|ema, _| blk.threshold * ema.get() < ema.get_fast()) {
 ///        blocking...
 ///    }
 /// ```
@@ -370,8 +375,82 @@ impl RestartASG {
 }
 
 #[derive(Debug)]
+pub struct RestartASG2 {
+    pub max: usize,
+    pub sum: usize,
+    pub num: usize,
+    pub threshold: f64,
+    ema: Ema2,
+    asg: Option<usize>,
+    result: bool,
+    // timer: usize,
+}
+
+impl ProgressEvaluatorIF<'_> for RestartASG2 {
+    type Memory = Ema2;
+    type Item = usize;
+    fn add(&mut self, item: Self::Item) -> &mut Self {
+        assert!(self.asg.is_none());
+        self.sum += item;
+        self.num += 1;
+        self.asg = Some(item);
+        self
+    }
+    fn commit(&mut self) -> &mut Self {
+        assert!(!self.asg.is_none());
+        if let Some(a) = self.asg {
+            self.ema.update(a as f64);
+            self.asg = None;
+            self.max = a.max(self.max);
+        }
+        self
+    }
+    fn update<F>(&mut self, f: F) -> &mut Self
+    where
+        F: Fn(&Self::Memory, f64) -> bool,
+    {
+        assert!(self.asg.is_none());
+        self.result = f(&self.ema, self.sum as f64 / self.num as f64);
+        self
+    }
+    fn is_active(&self) -> bool {
+        self.result
+    }
+    fn eval<F, R>(&self, f: F) -> R
+    where
+        F: Fn(&Self::Memory, f64) -> R,
+    {
+        assert!(self.asg.is_none());
+        f(&self.ema, self.sum as f64 / self.num as f64)
+    }
+    fn trend(&self) -> f64 {
+        self.ema.trend()
+    }
+}
+
+impl RestartASG2 {
+    pub fn new(threshold: f64) -> Self {
+        RestartASG2 {
+            max: 0,
+            sum: 0,
+            num: 0,
+            threshold,
+            ema: Ema2::new(EMA_SLOW).with_fast(EMA_FAST),
+            asg: None,
+            result: false,
+            // timer: 20,
+        }
+    }
+    pub fn get(&self) -> f64 {
+        self.ema.get()
+    }
+    pub fn get_fast(&self) -> f64 {
+        self.ema.get_fast()
+    }
+}
+
+#[derive(Debug)]
 pub struct RestartLuby {
-    pub in_use: bool,
     pub num_conflict: f64,
     pub inc: f64,
     pub current_restart: usize,
@@ -382,9 +461,9 @@ pub struct RestartLuby {
 
 impl ProgressEvaluatorIF<'_> for RestartLuby {
     type Memory = usize;
-    type Item = ();
-    fn add(&mut self, _item: Self::Item) -> &mut Self {
-        if self.in_use {
+    type Item = bool;
+    fn add(&mut self, in_use: Self::Item) -> &mut Self {
+        if in_use {
             self.cnfl_cnt += 1.0;
         }
         self
@@ -396,7 +475,7 @@ impl ProgressEvaluatorIF<'_> for RestartLuby {
     where
         F: Fn(&Self::Memory, f64) -> bool,
     {
-        if self.in_use && self.num_conflict <= self.cnfl_cnt {
+        if self.num_conflict <= self.cnfl_cnt {
             self.cnfl_cnt = 0.0;
             self.current_restart += 1;
             self.num_conflict = luby(self.inc, self.current_restart) * self.factor;
@@ -423,7 +502,6 @@ impl ProgressEvaluatorIF<'_> for RestartLuby {
 impl Default for RestartLuby {
     fn default() -> Self {
         RestartLuby {
-            in_use: false,
             num_conflict: 0.0,
             inc: 2.0,
             current_restart: 0,
@@ -437,7 +515,6 @@ impl Default for RestartLuby {
 impl RestartLuby {
     pub fn new(inc: f64, factor: f64) -> Self {
         RestartLuby {
-            in_use: false,
             num_conflict: 0.0,
             inc,
             current_restart: 0,
@@ -446,8 +523,7 @@ impl RestartLuby {
             result: false,
         }
     }
-    pub fn initialize(&mut self, in_use: bool) -> &mut Self {
-        self.in_use = in_use;
+    pub fn initialize(&mut self) -> &mut Self {
         self.cnfl_cnt = 0.0;
         self.num_conflict = luby(self.inc, self.current_restart) * self.factor;
         self
@@ -495,6 +571,7 @@ pub struct VarSet {
     pub diff: Option<f64>,
     pub diff_ema: Ema2,
     is_closed: bool,
+    pub num_build: usize,
 }
 
 impl VarSetIF for VarSet {
@@ -504,8 +581,9 @@ impl VarSetIF for VarSet {
             sum: 0,
             cnt: 0,
             diff: None,
-            diff_ema: Ema2::new(EMA_SLOW).with_fast(EMA_FAST).initialize1(),
+            diff_ema: Ema2::new(EMA_SLOW).with_fast(EMA_FAST),
             is_closed: false,
+            num_build: 1,
         }
     }
     fn remove(&self, v: &mut Var) {
@@ -521,6 +599,7 @@ impl VarSetIF for VarSet {
         self.diff = None;
         self.is_closed = false;
         self.diff_ema.reinitialize1();
+        self.num_build += 1;
     }
 }
 

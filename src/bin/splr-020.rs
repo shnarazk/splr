@@ -43,7 +43,7 @@ fn main() {
                 save_proof(&s, &cnf_file, &proof_file);
             }
         }
-        Err(e) => println!("Failed to execution by {:?}.", e),
+        Err(e) => println!("Failed to solve by {:?}.", e),
     }
     // /*
     if 0 < s.state.config.debug_dump && !s.state.development_history.is_empty() {
@@ -56,7 +56,7 @@ fn main() {
                     .unwrap();
                 buf.write_all(format!("{:>7},{:>8.0},\"restartFUP\"\n", n, b).as_bytes())
                     .unwrap();
-                buf.write_all(format!("{:>7},{:>8.5},\"LDBtrend\"\n", n, c).as_bytes())
+                buf.write_all(format!("{:>7},{:>8.5},\"LBDtrend\"\n", n, c).as_bytes())
                     .unwrap();
                 buf.write_all(format!("{:>7},{:>8.5},\"ASGtrend\"\n", n, d).as_bytes())
                     .unwrap();

@@ -42,7 +42,12 @@ impl PropagatorIF for AssignStack {
         self.trail_lim.is_empty()
     }
     fn num_at(&self, n: usize) -> usize {
-        self.trail_lim[n]
+        if self.trail_lim.is_empty() {
+            assert_eq!(n, 0);
+            self.trail.len()
+        } else {
+            self.trail_lim[n]
+        }
     }
     fn remains(&self) -> bool {
         self.q_head < self.trail.len()

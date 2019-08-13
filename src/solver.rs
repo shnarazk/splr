@@ -313,7 +313,7 @@ fn search(
     vdb: &mut VarDB,
 ) -> Result<bool, SolverError> {
     let mut a_decision_was_made = false;
-    state.rst.luby.initialize(state.rst.use_luby_restart);
+    state.rst.luby.initialize();
     loop {
         let ci = asgs.propagate(cdb, state, vdb);
         state.stats[Stat::Propagation] += 1;
@@ -323,7 +323,7 @@ fn search(
             }
         } else {
             // state.luby_restart_cnfl_cnt += 1.0;
-            state.rst.luby.add(()).commit();
+            state.rst.luby.add(state.rst.use_luby_restart).commit();
             state.stats[Stat::Conflict] += 1;
             vdb.current_conflict = state.stats[Stat::Conflict];
             if a_decision_was_made {
@@ -378,21 +378,8 @@ fn handle_conflict_path(
         let l0 = new_learnt[0];
         asgs.check_progress();
         asgs.uncheck_enqueue(vdb, l0, NULL_CLAUSE);
-        if state.rst.fup.diff_ema.get() < 0.000_1 // 3
-            && state.rst.fup.trend() < 0.01 // 1
-            && state.rst.restart_ratio.get() < 0.000_000_001
-        // 8
-        {
-            if 4 * state.num_unsolved_vars() < 5 * state.rst.fup.sum {
-                state.rst.luby.in_use = true;
-                state.rst.use_luby_restart = true;
-            } else {
-                for v in &mut vdb.vars[1..] {
-                    state.rst.fup.remove(v);
-                }
-                state.rst.fup.reset();
-            }
-        }
+        // state.num_solved_vars = asgs.num_at(0);
+        state.rst.check_stationary_fup(vdb);
     } else {
         state.stats[Stat::Learnt] += 1;
         let lbd = vdb.compute_lbd(&new_learnt);
@@ -431,9 +418,6 @@ fn handle_conflict_path(
             lbd.trend().min(10.0),
             asg.trend().min(10.0),
             fup.trend().min(10.0),
-            // state.rst.acv.num as f64,
-            // state.rst.sua.num as f64,
-            // (fup.num as f64 + 1.0).ln(),
             // suf.num as f64,
             0.0,
         ));
@@ -451,7 +435,9 @@ fn handle_conflict_path(
         && 0 < cdb.num_learnt
     {
         state.cur_reduction = ((ncnfl as f64) / (state.next_reduction as f64)) as usize + 1;
+        state.flush("reducing...");
         cdb.reduce(state, vdb);
+        state.rst.check_stationary_fup(vdb);
     }
     Ok(())
 }
