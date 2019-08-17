@@ -50,19 +50,14 @@ fn main() {
         let dump = config.cnf_filename.file_stem().unwrap().to_str().unwrap();
         if let Ok(f) = File::create(format!("dbg_{}.csv", dump)) {
             let mut buf = BufWriter::new(f);
-            buf.write_all(b"conflict,value,kind\n").unwrap();
+            buf.write_all(b"conflict,restart,solved,ASG,FUP,LBD,misc\n").unwrap();
             for (n, a, b, c, d, e, f) in s.state.development_history.iter() {
-                buf.write_all(format!("{:>7},{:>8.0},\"restartAsg\"\n", n, a).as_bytes())
-                    .unwrap();
-                buf.write_all(format!("{:>7},{:>8.0},\"restartFUP\"\n", n, b).as_bytes())
-                    .unwrap();
-                buf.write_all(format!("{:>7},{:>8.5},\"LBDtrend\"\n", n, c).as_bytes())
-                    .unwrap();
-                buf.write_all(format!("{:>7},{:>8.5},\"ASGtrend\"\n", n, d).as_bytes())
-                    .unwrap();
-                buf.write_all(format!("{:>7},{:>8.5},\"FUPtrend\"\n", n, e).as_bytes())
-                    .unwrap();
-                buf.write_all(format!("{:>7},{:>8.5},\"none\"\n", n, f).as_bytes())
+                buf
+                    .write_all(
+                        format!("{:>7},{:>8.0},{:>8.5},{:>8.5},{:>8.5},{:>8.5},{:>8.5}\n",
+                                n, a, b, c, d, e, f)
+                            .as_bytes()
+                    )
                     .unwrap();
             }
         }

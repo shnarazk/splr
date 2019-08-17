@@ -378,7 +378,7 @@ impl StateIF for State {
         }
         if self.stats[Stat::NoDecisionConflict] < 30_000 {
             self.strategy = SearchStrategy::LowSuccesiveLuby;
-            self.rst.use_luby_restart = true;
+            self.rst.use_luby = true;
             self.rst.luby.factor = 100.0;
             self.config.var_activity_decay = 0.999;
             self.config.var_activity_d_max = 0.999;
@@ -556,7 +556,7 @@ impl StateIF for State {
         );
         self.record[LogF64Id::VADecay] = vdb.activity_decay;
         println!(
-            "\x1B[2K    Analysis|cLvl:{}, bLvl:{}, #grp:{}, ____:{} ",
+            "\x1B[2K    Analysis|cLvl:{}, bLvl:{}, dead:{}, ____:{} ",
             fm!("{:>9.2}", self.record, LogF64Id::CLevel, self.c_lvl.get()),
             fm!("{:>9.2}", self.record, LogF64Id::BLevel, self.b_lvl.get()),
             im!(
@@ -568,13 +568,13 @@ impl StateIF for State {
             "",
         );
         println!(
-            "\x1B[2K   First UIP|#sum:{}, rate:{}, e-64:{}, trnd:{} ",
+            "\x1B[2K   First UIP|#sum:{}, #ave:{}, e-64:{}, trnd:{} ",
             im!("{:>9}", self.record, LogUsizeId::FUPnum, self.rst.fup.sum),
             fm!(
                 "{:>9.4}",
                 self.record,
                 LogF64Id::FUPave,
-                self.rst.fup.sum as f64 / self.rst.fup.cnt as f64
+                self.rst.fup.sum as f64 / self.rst.fup.num as f64
             ),
             fm!(
                 "{:>9.4}",
@@ -608,7 +608,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K     Restart|#rst:{}, #blc:{}, dura:{}, rate:{} ",
+            "\x1B[2K     Restart|#rst:{}, #blk:{}, dura:{}, rate:{} ",
             im!(
                 "{:>9.0}",
                 self.record,
@@ -621,7 +621,7 @@ impl StateIF for State {
                 LogUsizeId::Blocking,
                 self.stats[Stat::Blocking]
             ),
-            format!("{:>9.2}", self.rst.cooling_steps.get()),
+            format!("{:>9.2}", self.rst.blocking_ema.get()),
             fm!(
                 "{:>9.4}",
                 self.record,

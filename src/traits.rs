@@ -125,6 +125,8 @@ pub trait EmaIF {
     fn get(&self) -> f64;
     fn reset(&mut self) {}
     fn update(&mut self, x: f64);
+    fn initialize(self, init: f64) -> Self;
+    fn reinitialize(&mut self, init: f64) -> &mut Self;
 }
 
 /// API for [object properties](../types/enum.Flag.html) like `is`, `turn_off`, `turn_on` and so on.
@@ -211,12 +213,15 @@ pub trait PropagatorIF {
 pub trait ProgressEvaluatorIF<'a> {
     type Memory;
     type Item;
+/*
     /// accumulate data into an internal stroage.
     fn add(&mut self, item: Self::Item) -> &mut Self;
     /// update an internal EMA memory from the current state.
     fn commit(&mut self) -> &mut Self;
+*/
+    fn update(&mut self, item: Self::Item);
     /// update its state based on the result of the predicate.
-    fn update<F>(&mut self, f: F) -> &mut Self
+    fn update_with<F>(&mut self, f: F) -> &mut Self
     where
         F: Fn(&Self::Memory, f64) -> bool;
     /// return `true` if the last update's result is true. return true.
@@ -232,7 +237,8 @@ pub trait ProgressEvaluatorIF<'a> {
 pub trait RestartIF {
     /// new local/global restart control
     fn restart(&mut self, asgs: &mut AssignStack, vdb: &mut VarDB, stats: &mut [usize]) -> bool;
-    fn check_stationary_fup(&mut self, vdb: &mut VarDB);
+    // fn reset_fup(&mut self, vdb: &mut VarDB);
+    // fn check_stationary_fup(&mut self, vdb: &mut VarDB);
 }
 
 /// API for SAT solver like `build`, `solve` and so on.
@@ -307,11 +313,13 @@ pub trait VarDBIF {
 }
 
 pub trait VarSetIF {
-    fn new(flag: Option<Flag>) -> Self;
+    fn new(flag: Flag) -> Self;
     /// remove a var from the set.
     fn remove(&self, v: &mut Var);
     /// reset after restart
     fn reset(&mut self);
+    fn reach_top(&self) -> bool;
+    fn reach_bottom(&self) -> bool;
 }
 
 /// API for 'watcher list' like `attach`, `detach`, `detach_with` and so on.

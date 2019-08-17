@@ -5,8 +5,10 @@ use crate::types::Flag;
 use crate::var::{Var, VarDB};
 
 const EMA_SLOW: usize = 16384; // 2 ^ 14; 2 ^ 15 = 32768
-const EMA_FAST: usize = 64;    // 2 ^ 6
-// const GLUCOSE_BLOCKING: f64 = 4.0;
+const EMA_FAST: usize = 64; // 2 ^ 6
+                            // const GLUCOSE_BLOCKING: f64 = 4.0;
+const BLOCK_STEP: usize = EMA_FAST / 2;
+const RESTART_THRESHOLD: f64 = 1.6;
 
 /// Exponential Moving Average w/ a calibrator
 #[derive(Debug)]
@@ -30,6 +32,14 @@ impl EmaIF for Ema {
     }
     fn get(&self) -> f64 {
         self.val / self.cal
+    }
+    fn initialize(mut self, init: f64) -> Self {
+        self.val = init;
+        self
+    }
+    fn reinitialize(&mut self, init: f64) -> &mut Self {
+        self.val = init;
+        self
     }
 }
 
@@ -68,6 +78,19 @@ impl EmaIF for Ema2 {
         self.fast = self.slow;
         self.calf = self.cals;
     }
+    fn initialize(mut self, init: f64) -> Self {
+        self.fast = init;
+        self.slow = init;
+        self
+    }
+    fn reinitialize(&mut self, init: f64) -> &mut Self {
+        // self.fast = self.slow;
+        self.fast = init;
+        self.slow = init;
+        self.calf = 0.0;
+        self.cals = 0.0;
+        self
+    }
 }
 
 impl Ema2 {
@@ -80,14 +103,6 @@ impl Ema2 {
     pub fn with_fast(mut self, f: usize) -> Self {
         self.fe = 1.0 / (f as f64);
         self
-    }
-    pub fn initialize1(mut self) -> Self {
-        self.reinitialize1();
-        self
-    }
-    pub fn reinitialize1(&mut self) {
-        self.fast = 1.0;
-        self.slow = 1.0;
     }
 }
 
@@ -102,11 +117,14 @@ impl Ema2 {
 pub struct RestartExecutor {
     pub restart_ratio: Ema,
     pub stationary_thrd: (f64, f64),
-    pub cooling: Option<f64>,
-    pub cooling_dumper: f64,
-    pub cooling_steps: Ema,
+    pub blocking: bool,
+    pub blocking_cnt: usize,
+    pub blocking_ema: Ema,
     pub after_restart: usize,
-    pub use_luby_restart: bool,
+    pub increasing_fup: bool,
+    pub trend_max: f64,
+    pub trend_min: f64,
+    pub use_luby: bool,
     pub lbd: RestartLBD,
     pub asg: RestartASG2,
     pub fup: VarSet,
@@ -117,15 +135,18 @@ impl RestartExecutor {
     pub fn new() -> RestartExecutor {
         RestartExecutor {
             restart_ratio: Ema::new(EMA_SLOW),
-            stationary_thrd: (0.04, 0.7), // (0.000_1, 0.01),
-            cooling: None,
-            cooling_dumper: 0.999,
-            cooling_steps: Ema::new(EMA_SLOW),
-            after_restart: 0,
-            use_luby_restart: false,
-            lbd: RestartLBD::new(0.1),
-            asg: RestartASG2::new(0.1),
-            fup: VarSet::new(Some(Flag::FUP)),
+            stationary_thrd: (0.1, 0.01), // (fup.trend, not used),
+            blocking: false,
+            blocking_cnt: 0,
+            blocking_ema: Ema::new(EMA_SLOW),
+            after_restart: 1,
+            increasing_fup: true,
+            trend_max: 0.0,
+            trend_min: 1000.0,
+            use_luby: false,
+            lbd: RestartLBD::new(RESTART_THRESHOLD),
+            asg: RestartASG2::new(RESTART_THRESHOLD),
+            fup: VarSet::new(Flag::FUP),
             luby: RestartLuby::new(2.0, 100.0),
         }
     }
@@ -133,84 +154,136 @@ impl RestartExecutor {
 
 impl RestartIF for RestartExecutor {
     // stagnation-triggered restart engine
-    fn restart(&mut self, asgs: &mut AssignStack, vdb: &mut VarDB, stats: &mut [usize]) -> bool {
-        if self.use_luby_restart {
-            if self.luby.update(|_, _| true).is_active() {
-                self.after_restart = 0;
-                stats[Stat::Restart] += 1;
+    fn restart(&mut self, _asgs: &mut AssignStack, _vdb: &mut VarDB, stats: &mut [usize]) -> bool {
+        if self.use_luby {
+            self.luby.update(true);
+            if self.luby.is_active() {
                 stats[Stat::RestartByLuby] += 1;
+                stats[Stat::Restart] += 1;
                 self.restart_ratio.update(1.0);
                 return true;
             } else {
-                self.restart_ratio.update(0.0);
-                return false;
+                return self.return_without_restart();
             }
         }
-        self.after_restart += 1;
-        if let Some(t) = self.cooling {
-            let nt = t - 1.0; // / self.fup.trend();
-                              // 0.002 < (self.fup.trend() - t).abs()
-                              // self.fup.trend() < t.min(1.0)
-            if nt < 0.0 {
-                self.cooling_steps.update(self.after_restart as f64);
-                self.cooling = None;
+        let RestartExecutor {
+            after_restart,
+            increasing_fup,
+            trend_min,
+            trend_max,
+            // blocking,
+            // blocking_cnt,
+            // lbd,
+            // asg,
+            fup,
+            ..
+        } = self;
+        *after_restart += 1;
+        let mut peak = false;
+        let mut band = 0.0;
+        let trend = fup.trend();
+        if *increasing_fup {
+            if *trend_max < trend {
+                *trend_max = trend;
             } else {
-                self.cooling = Some(nt);
-                self.restart_ratio.update(0.0);
-                return false;
+                peak = true;
+                *increasing_fup = false;
+                band = *trend_max - *trend_min;
+                *trend_min = *trend_max;
             }
-        }
-        if 2.0 < self.asg.trend() {
-            self.after_restart = 0;
-            self.cooling = Some(25.0);
-            self.restart_ratio.update(0.0);
-            stats[Stat::Blocking] += 1;
-            return false;
-        }
-        let restart = // 2.0 < self.lbd.trend()
-            // 8.4 - 6.0 * self.fup.trend() < self.lbd.trend() // (0.8, 3.6) -- (1.2, 1.2)
-            // 6.0 - 4.0 * self.fup.trend() < self.lbd.trend()
-            // 1.2 + 4.0 * self.fup.trend() < self.lbd.trend()
-            1.5 < self.lbd.trend()
-            // && 1.0 < self.fup.trend()
-            ;
-        if restart {
-            asgs.cancel_until(vdb, 0);
-            asgs.check_progress();
-            self.cooling = Some(25.0);
-            self.restart_ratio.update(1.0);
-            stats[Stat::Restart] += 1;
-            self.after_restart = 0;
-            true
         } else {
-            if false && 2.0 < self.asg.trend() {
-                self.after_restart = 0;
-                self.cooling = Some(25.0);
-                self.restart_ratio.update(0.0);
-                stats[Stat::Blocking] += 1;
-                self.after_restart = 0;
-                return false;
+            if trend < *trend_min {
+                *trend_min = trend;
+            } else {
+                peak = true;
+                *increasing_fup = true;
+                band = *trend_max - *trend_min;
+                *trend_max = *trend_min;
             }
-            if self.restart_ratio.get() < 0.000_000_001 {
-                self.check_stationary_fup(vdb);
-            }
-            self.restart_ratio.update(0.0);
-            false
         }
-    }
-    fn check_stationary_fup(&mut self, vdb: &mut VarDB) {
-        if self.cooling.is_none()
-            && self.fup.diff_ema.get() < self.stationary_thrd.0
-            && self.fup.trend() < self.stationary_thrd.1
+        // let level = 1.0;        // fup.trend_ema.get(); // 1.0
+        // let increasing = level < fup.trend();
+        if 10 < *after_restart && 0.01 < band && peak
+        // ((*increasing_fup && !increasing) || (!*increasing_fup && increasing))
         {
-            for v in &mut vdb.vars[1..] {
-                self.fup.remove(v);
-            }
-            self.fup.reset();
+            // *increasing_fup = !*increasing_fup;
+            self.return_for_restart(stats)
+        } else {
+            // *increasing_fup = increasing;
+            self.return_without_restart()
         }
+        /*
+        if 0 < *after_restart {
+            *after_restart += 1;
+        }
+        if 0 < *after_restart && 0 < *blocking_cnt {
+            *after_restart += 1;
+        }
+        if *blocking_cnt == 0 && asg.threshold < asg.trend() {
+            self.return_for_blocking(stats)
+        } else if (*blocking_cnt == 0 /* || !*blocking */) && lbd.threshold < lbd.trend() {
+            self.return_for_restart(stats)
+        } else if *blocking_cnt == 0 {
+            self.return_without_restart()
+        } else {
+            *blocking_cnt -= 1;
+            if *blocking_cnt == 0 {
+                self.blocking_ema.update((self.after_restart - 1) as f64);
+                asg.threshold = RESTART_THRESHOLD;
+                lbd.threshold = RESTART_THRESHOLD;
+            }
+            return self.return_without_restart();
+        }
+        */
     }
 }
 
+impl RestartExecutor {
+    fn return_for_restart(&mut self, stats: &mut [usize]) -> bool {
+        self.lbd.threshold *= 2.0;
+        self.blocking = false;
+        if 0 < self.after_restart {
+            self.blocking_ema.update((self.after_restart - 1) as f64);
+        }
+        self.blocking_cnt = BLOCK_STEP;
+        self.after_restart = 1;
+        self.restart_ratio.update(1.0);
+        stats[Stat::Restart] += 1;
+        true
+    }
+    #[allow(dead_code)]
+    fn return_for_blocking(&mut self, stats: &mut [usize]) -> bool {
+        self.asg.threshold *= 2.0;
+        self.blocking = true;
+        if 0 < self.after_restart {
+            self.blocking_ema.update((self.after_restart - 1) as f64);
+        }
+        self.blocking_cnt = BLOCK_STEP;
+        self.after_restart = 1;
+        self.restart_ratio.update(0.0);
+        stats[Stat::Blocking] += 1;
+        false
+    }
+    fn return_without_restart(&mut self) -> bool {
+        self.restart_ratio.update(0.0);
+        false
+    }
+    #[allow(dead_code)]
+    pub fn reset_fup(&mut self, vdb: &mut VarDB) {
+        for v in &mut vdb.vars[1..] {
+            self.fup.remove(v);
+        }
+        self.fup.reset();
+    }
+    #[allow(dead_code)]
+    pub fn check_stationary_fup(&mut self, vdb: &mut VarDB) {
+        if 100 < self.fup.num
+            && self.fup.trend() < self.stationary_thrd.0
+        {
+            self.reset_fup(vdb)
+        }
+    }
+}
 /// Glucose-style forcing restart condition w/o restart_steps
 /// ### Implementing the original algorithm
 ///
@@ -236,6 +309,7 @@ pub struct RestartLBD {
 impl ProgressEvaluatorIF<'_> for RestartLBD {
     type Memory = Ema;
     type Item = usize;
+    /*
     fn add(&mut self, item: Self::Item) -> &mut RestartLBD {
         // assert_eq!(self.lbd, None);
         self.sum += item as f64;
@@ -251,7 +325,13 @@ impl ProgressEvaluatorIF<'_> for RestartLBD {
         }
         self
     }
-    fn update<F>(&mut self, f: F) -> &mut Self
+    */
+    fn update(&mut self, item: Self::Item) {
+        self.sum += item as f64;
+        self.num += 1;
+        self.ema.update(item as f64)
+    }
+    fn update_with<F>(&mut self, f: F) -> &mut Self
     where
         F: Fn(&Self::Memory, f64) -> bool,
     {
@@ -320,6 +400,7 @@ pub struct RestartASG {
 impl ProgressEvaluatorIF<'_> for RestartASG {
     type Memory = Ema;
     type Item = usize;
+    /*
     fn add(&mut self, item: Self::Item) -> &mut Self {
         assert!(self.asg.is_none());
         self.sum += item;
@@ -336,7 +417,12 @@ impl ProgressEvaluatorIF<'_> for RestartASG {
         }
         self
     }
-    fn update<F>(&mut self, f: F) -> &mut Self
+    */
+    fn update(&mut self, item: Self::Item) {
+        self.ema.update(item as f64);
+        self.max = item.max(self.max);
+    }
+    fn update_with<F>(&mut self, f: F) -> &mut Self
     where
         F: Fn(&Self::Memory, f64) -> bool,
     {
@@ -389,6 +475,7 @@ pub struct RestartASG2 {
 impl ProgressEvaluatorIF<'_> for RestartASG2 {
     type Memory = Ema2;
     type Item = usize;
+    /*
     fn add(&mut self, item: Self::Item) -> &mut Self {
         assert!(self.asg.is_none());
         self.sum += item;
@@ -405,7 +492,12 @@ impl ProgressEvaluatorIF<'_> for RestartASG2 {
         }
         self
     }
-    fn update<F>(&mut self, f: F) -> &mut Self
+    */
+    fn update(&mut self, item: Self::Item) {
+        self.ema.update(item as f64);
+        self.max = item.max(self.max);
+    }
+    fn update_with<F>(&mut self, f: F) -> &mut Self
     where
         F: Fn(&Self::Memory, f64) -> bool,
     {
@@ -447,6 +539,11 @@ impl RestartASG2 {
     pub fn get_fast(&self) -> f64 {
         self.ema.get_fast()
     }
+    pub fn reset(&mut self) {
+        self.max = 0;
+        self.sum = 0;
+        self.num = 0;
+    }
 }
 
 #[derive(Debug)]
@@ -462,6 +559,7 @@ pub struct RestartLuby {
 impl ProgressEvaluatorIF<'_> for RestartLuby {
     type Memory = usize;
     type Item = bool;
+    /*
     fn add(&mut self, in_use: Self::Item) -> &mut Self {
         if in_use {
             self.cnfl_cnt += 1.0;
@@ -471,7 +569,21 @@ impl ProgressEvaluatorIF<'_> for RestartLuby {
     fn commit(&mut self) -> &mut Self {
         self
     }
-    fn update<F>(&mut self, _f: F) -> &mut Self
+    */
+    fn update(&mut self, in_use: Self::Item) {
+        if in_use {
+            self.cnfl_cnt += 1.0;
+            if self.num_conflict <= self.cnfl_cnt {
+                self.cnfl_cnt = 0.0;
+                self.current_restart += 1;
+                self.num_conflict = luby(self.inc, self.current_restart) * self.factor;
+                self.result = true;
+            } else {
+                self.result = false;
+            }
+        }
+    }
+    fn update_with<F>(&mut self, _f: F) -> &mut Self
     where
         F: Fn(&Self::Memory, f64) -> bool,
     {
@@ -565,9 +677,9 @@ fn luby(y: f64, mut x: usize) -> f64 {
 /// AVS was a variant of the present AGS. And it has no flag in Var::flag field.
 #[derive(Debug)]
 pub struct VarSet {
-    pub flag: Option<Flag>,
+    pub flag: Flag,
     pub sum: usize,
-    pub cnt: usize,
+    pub num: usize,
     pub diff: Option<f64>,
     pub diff_ema: Ema2,
     is_closed: bool,
@@ -575,53 +687,50 @@ pub struct VarSet {
 }
 
 impl VarSetIF for VarSet {
-    fn new(flag: Option<Flag>) -> Self {
+    fn new(flag: Flag) -> Self {
         VarSet {
             flag,
             sum: 0,
-            cnt: 0,
+            num: 0,
             diff: None,
-            diff_ema: Ema2::new(EMA_SLOW).with_fast(EMA_FAST),
+            diff_ema: Ema2::new(EMA_SLOW * 4).with_fast(EMA_FAST * 4),
             is_closed: false,
             num_build: 1,
         }
     }
     fn remove(&self, v: &mut Var) {
-        if let Some(flag) = self.flag {
-            if v.is(flag) {
-                v.turn_off(flag);
-            }
+        if v.is(self.flag) {
+            v.turn_off(self.flag);
         }
     }
     fn reset(&mut self) {
         self.sum = 0;
-        self.cnt = 0;
+        self.num = 0;
         self.diff = None;
         self.is_closed = false;
-        self.diff_ema.reinitialize1();
+        self.diff_ema.reinitialize(1.0);
         self.num_build += 1;
+    }
+    fn reach_top(&self) -> bool {
+        self.diff_ema.get_fast() <= self.diff_ema.get()
+    }
+    fn reach_bottom(&self) -> bool {
+        true
     }
 }
 
 impl<'a> ProgressEvaluatorIF<'a> for VarSet {
     type Memory = Ema2;
     type Item = &'a mut Var;
+    /*
     fn add(&mut self, v: Self::Item) -> &mut Self {
-        self.cnt += 1;
-        match self.flag {
-            Some(flag) => {
-                if !v.is(flag) {
-                    v.turn_on(flag);
-                    self.sum += 1;
-                    self.diff = Some(self.diff.map_or(1.0, |v| v + 1.0));
-                } else if self.diff.is_none() {
-                    self.diff = Some(0.0);
-                }
-            }
-            None => {
-                self.sum += 1;
-                self.diff = Some(self.diff.map_or(1.0, |v| v + 1.0));
-            }
+        self.num += 1;
+        if !v.is(self.flag) {
+            v.turn_on(self.flag);
+            self.sum += 1;
+            self.diff = Some(self.diff.map_or(1.0, |v| v + 1.0));
+        } else if self.diff.is_none() {
+            self.diff = Some(0.0);
         }
         self
     }
@@ -634,12 +743,23 @@ impl<'a> ProgressEvaluatorIF<'a> for VarSet {
         }
         self
     }
-    fn update<F>(&mut self, f: F) -> &mut Self
+    */
+    fn update(&mut self, v: Self::Item) {
+        self.num += 1;
+        if !v.is(self.flag) {
+            v.turn_on(self.flag);
+            self.sum += 1;
+            self.diff_ema.update(1.0);
+        } else {
+            self.diff_ema.update(0.0);
+        }
+    }
+    fn update_with<F>(&mut self, f: F) -> &mut Self
     where
         F: Fn(&Self::Memory, f64) -> bool,
     {
         // assert!(self.diff.is_none());
-        self.is_closed = f(&self.diff_ema, self.sum as f64 / self.cnt as f64);
+        self.is_closed = f(&self.diff_ema, self.sum as f64 / self.num as f64);
         self
     }
     fn is_active(&self) -> bool {
@@ -650,9 +770,9 @@ impl<'a> ProgressEvaluatorIF<'a> for VarSet {
         F: Fn(&Self::Memory, f64) -> R,
     {
         // assert!(self.diff.is_none());
-        f(&self.diff_ema, self.sum as f64 / self.cnt as f64)
+        f(&self.diff_ema, self.sum as f64 / self.num as f64)
     }
     fn trend(&self) -> f64 {
-        self.diff_ema.get() * self.cnt as f64 / self.sum as f64
+        self.diff_ema.get() * self.num as f64 / self.sum as f64
     }
 }

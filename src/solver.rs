@@ -323,7 +323,7 @@ fn search(
             }
         } else {
             // state.luby_restart_cnfl_cnt += 1.0;
-            state.rst.luby.add(state.rst.use_luby_restart).commit();
+            // state.rst.luby.update(state.rst.use_luby);
             state.stats[Stat::Conflict] += 1;
             vdb.current_conflict = state.stats[Stat::Conflict];
             if a_decision_was_made {
@@ -367,7 +367,7 @@ fn handle_conflict_path(
         vdb.activity_decay += 0.01;
     }
     let c_level = asgs.level();
-    let c_asgns = asgs.num_at(asgs.level() - 1);
+    let c_asgns = asgs.len(); // asgs.num_at(asgs.level() - 1);
     let bl = analyze(asgs, cdb, state, vdb, ci).max(state.root_level);
     asgs.cancel_until(vdb, bl);
     let new_learnt = &mut state.new_learnt;
@@ -378,14 +378,30 @@ fn handle_conflict_path(
         let l0 = new_learnt[0];
         asgs.check_progress();
         asgs.uncheck_enqueue(vdb, l0, NULL_CLAUSE);
+        if state.num_vars - state.num_eliminated_vars <= state.rst.asg.max {
+            state.rst.asg.reset();
+        }
+        if state.num_unsolved_vars() <= state.rst.fup.sum {
+            state.rst.reset_fup(vdb);
+        }
         // state.num_solved_vars = asgs.num_at(0);
-        state.rst.check_stationary_fup(vdb);
+        // state.rst.check_stationary_fup(vdb);
+        // state.development_history.push((
+        //     ncnfl,
+        //     state.rst.fup.trend(),            // a
+        //     state.rst.lbd.trend(),            // b
+        //     state.rst.asg.trend(),            // c
+        //     state.rst.cooling.unwrap_or(0.0), // d
+        //     // suf.num as f64,
+        //     0.0,
+        //     0.0,
+        // ));
     } else {
         state.stats[Stat::Learnt] += 1;
         let lbd = vdb.compute_lbd(&new_learnt);
         let l0 = new_learnt[0];
         let v0 = &mut vdb.vars[l0.vi()];
-        state.rst.fup.add(v0).commit();
+        state.rst.fup.update(v0);
         if lbd <= 2 {
             state.stats[Stat::NumLBD2] += 1;
         }
@@ -397,12 +413,10 @@ fn handle_conflict_path(
         state.b_lvl.update(bl as f64);
         let cid = cdb.attach(state, vdb, lbd);
         elim.add_cid_occur(vdb, cid, &mut cdb.clause[cid as usize], true);
-        state.rst.lbd.add(lbd).commit();
-        state.rst.asg.add(c_asgns).commit();
+        state.rst.lbd.update(lbd);
+        state.rst.asg.update(c_asgns);
         // state.rst.asv.num = asgs.len();
         // state.rst.asv.diff = Some(asgs.check_progress() as f64);
-        // state.rst.asv.commit();
-        // state.rst.acv.commit();
         if !state.rst.restart(asgs, vdb, &mut state.stats) {
             asgs.uncheck_enqueue(vdb, l0, cid);
         }
@@ -412,13 +426,11 @@ fn handle_conflict_path(
         let RestartExecutor { lbd, asg, fup, .. } = rst;
         state.development_history.push((
             ncnfl,
-            (stats[Stat::RestartByAsg] as f64 + 1.0).ln(),
-            (stats[Stat::RestartByFUP] as f64 + 1.0).ln(),
-            // state.num_solved_vars as f64,
-            lbd.trend().min(10.0),
-            asg.trend().min(10.0),
-            fup.trend().min(10.0),
-            // suf.num as f64,
+            stats[Stat::Restart] as f64,
+            state.num_solved_vars as f64 / state.num_vars as f64,
+            asg.trend().min(5.0),
+            fup.trend().min(5.0),
+            lbd.trend().min(5.0),
             0.0,
         ));
     }
@@ -435,7 +447,7 @@ fn handle_conflict_path(
         && 0 < cdb.num_learnt
     {
         state.cur_reduction = ((ncnfl as f64) / (state.next_reduction as f64)) as usize + 1;
-        state.flush("reducing...");
+        // state.flush("reducing...");
         cdb.reduce(state, vdb);
         state.rst.check_stationary_fup(vdb);
     }
