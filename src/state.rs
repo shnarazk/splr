@@ -1,5 +1,5 @@
 use crate::clause::ClauseDB;
-use crate::config::Config;
+use crate::config::{Config, EMA_SLOW};
 use crate::eliminator::Eliminator;
 use crate::restart::{Ema, RestartExecutor};
 use crate::traits::*;
@@ -12,8 +12,6 @@ use std::io::{stdout, Write};
 use std::ops::{Index, IndexMut};
 use std::path::Path;
 use std::time::SystemTime;
-
-const EMA_SLOW: usize = 16384; // 2 ^ 14; 2 ^ 15 = 32768
 
 /// A collection of named search heuristics
 #[derive(Debug, Eq, PartialEq)]
@@ -556,7 +554,7 @@ impl StateIF for State {
         );
         self.record[LogF64Id::VADecay] = vdb.activity_decay;
         println!(
-            "\x1B[2K    Analysis|cLvl:{}, bLvl:{}, dead:{}, ____:{} ",
+            "\x1B[2K    Analysis|cLvl:{}, bLvl:{}, dead:{}, thrd:{} ",
             fm!("{:>9.2}", self.record, LogF64Id::CLevel, self.c_lvl.get()),
             fm!("{:>9.2}", self.record, LogF64Id::BLevel, self.b_lvl.get()),
             im!(
@@ -565,7 +563,7 @@ impl StateIF for State {
                 LogUsizeId::FUPgrp,
                 self.rst.fup.num_build
             ),
-            "",
+            format!("{:>9.4}", self.rst.stationary_thrd.0),
         );
         println!(
             "\x1B[2K   First UIP|#sum:{}, #ave:{}, e-64:{}, trnd:{} ",
@@ -608,7 +606,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K     Restart|#rst:{}, #blk:{}, dura:{}, rate:{} ",
+            "\x1B[2K     Restart|#rst:{}, #blk:{}, leng:{}, rate:{} ",
             im!(
                 "{:>9.0}",
                 self.record,
@@ -621,11 +619,16 @@ impl StateIF for State {
                 LogUsizeId::Blocking,
                 self.stats[Stat::Blocking]
             ),
-            format!("{:>9.2}", self.rst.blocking_ema.get()),
+            fm!(
+                "{:>9.0}",
+                self.record,
+                LogF64Id::RSTrat,
+                self.rst.blocking_ema.get()
+            ),
             fm!(
                 "{:>9.4}",
                 self.record,
-                LogF64Id::RestartRatio,
+                LogF64Id::RSTlen,
                 100.0 * self.rst.restart_ratio.get()
             ),
         );
@@ -735,8 +738,9 @@ pub enum LogF64Id {
     LBDtrd,       // 11: ema_lbd trend
     BLevel,       // 12: backjump_level
     CLevel,       // 13: conflict_level
-    RestartRatio, // 14: rst.restart_ratio
-    VADecay,      // 15: vdb.activity_decay
+    RSTrat,       // 14: rst.restart_ratio
+    RSTlen,       // 15: rst.blocking_ema
+    VADecay,      // 16: vdb.activity_decay
     End,
 }
 

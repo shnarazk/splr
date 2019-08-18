@@ -1,13 +1,10 @@
+use crate::config::{EMA_FAST, EMA_SLOW};
 use crate::propagator::AssignStack;
 use crate::state::Stat;
 use crate::traits::*;
 use crate::types::Flag;
 use crate::var::{Var, VarDB};
 
-const EMA_SLOW: usize = 16384; // 2 ^ 14; 2 ^ 15 = 32768
-const EMA_FAST: usize = 64; // 2 ^ 6
-                            // const GLUCOSE_BLOCKING: f64 = 4.0;
-const BLOCK_STEP: usize = EMA_FAST / 2;
 const RESTART_THRESHOLD: f64 = 1.6;
 
 /// Exponential Moving Average w/ a calibrator
@@ -85,10 +82,8 @@ impl EmaIF for Ema2 {
     }
     fn reinitialize(&mut self, init: f64) -> &mut Self {
         // self.fast = self.slow;
-        self.fast = init;
-        self.slow = init;
-        self.calf = 0.0;
-        self.cals = 0.0;
+        self.fast = init * self.calf;
+        // self.slow = init * self.cals;
         self
     }
 }
@@ -117,8 +112,6 @@ impl Ema2 {
 pub struct RestartExecutor {
     pub restart_ratio: Ema,
     pub stationary_thrd: (f64, f64),
-    pub blocking: bool,
-    pub blocking_cnt: usize,
     pub blocking_ema: Ema,
     pub after_restart: usize,
     pub increasing_fup: bool,
@@ -135,9 +128,7 @@ impl RestartExecutor {
     pub fn new() -> RestartExecutor {
         RestartExecutor {
             restart_ratio: Ema::new(EMA_SLOW),
-            stationary_thrd: (0.1, 0.01), // (fup.trend, not used),
-            blocking: false,
-            blocking_cnt: 0,
+            stationary_thrd: (0.25, 0.98), // (fup.trend, decay factor),
             blocking_ema: Ema::new(EMA_SLOW),
             after_restart: 1,
             increasing_fup: true,
@@ -171,10 +162,6 @@ impl RestartIF for RestartExecutor {
             increasing_fup,
             trend_min,
             trend_max,
-            // blocking,
-            // blocking_cnt,
-            // lbd,
-            // asg,
             fup,
             ..
         } = self;
@@ -201,51 +188,19 @@ impl RestartIF for RestartExecutor {
                 *trend_max = *trend_min;
             }
         }
-        // let level = 1.0;        // fup.trend_ema.get(); // 1.0
-        // let increasing = level < fup.trend();
-        if 10 < *after_restart && 0.01 < band && peak
-        // ((*increasing_fup && !increasing) || (!*increasing_fup && increasing))
-        {
-            // *increasing_fup = !*increasing_fup;
+        if 10 < *after_restart && 0.01 < band && peak {
             self.return_for_restart(stats)
         } else {
-            // *increasing_fup = increasing;
             self.return_without_restart()
         }
-        /*
-        if 0 < *after_restart {
-            *after_restart += 1;
-        }
-        if 0 < *after_restart && 0 < *blocking_cnt {
-            *after_restart += 1;
-        }
-        if *blocking_cnt == 0 && asg.threshold < asg.trend() {
-            self.return_for_blocking(stats)
-        } else if (*blocking_cnt == 0 /* || !*blocking */) && lbd.threshold < lbd.trend() {
-            self.return_for_restart(stats)
-        } else if *blocking_cnt == 0 {
-            self.return_without_restart()
-        } else {
-            *blocking_cnt -= 1;
-            if *blocking_cnt == 0 {
-                self.blocking_ema.update((self.after_restart - 1) as f64);
-                asg.threshold = RESTART_THRESHOLD;
-                lbd.threshold = RESTART_THRESHOLD;
-            }
-            return self.return_without_restart();
-        }
-        */
     }
 }
 
 impl RestartExecutor {
     fn return_for_restart(&mut self, stats: &mut [usize]) -> bool {
-        self.lbd.threshold *= 2.0;
-        self.blocking = false;
         if 0 < self.after_restart {
             self.blocking_ema.update((self.after_restart - 1) as f64);
         }
-        self.blocking_cnt = BLOCK_STEP;
         self.after_restart = 1;
         self.restart_ratio.update(1.0);
         stats[Stat::Restart] += 1;
@@ -253,12 +208,9 @@ impl RestartExecutor {
     }
     #[allow(dead_code)]
     fn return_for_blocking(&mut self, stats: &mut [usize]) -> bool {
-        self.asg.threshold *= 2.0;
-        self.blocking = true;
         if 0 < self.after_restart {
             self.blocking_ema.update((self.after_restart - 1) as f64);
         }
-        self.blocking_cnt = BLOCK_STEP;
         self.after_restart = 1;
         self.restart_ratio.update(0.0);
         stats[Stat::Blocking] += 1;
@@ -277,9 +229,8 @@ impl RestartExecutor {
     }
     #[allow(dead_code)]
     pub fn check_stationary_fup(&mut self, vdb: &mut VarDB) {
-        if 100 < self.fup.num
-            && self.fup.trend() < self.stationary_thrd.0
-        {
+        if 100 < self.fup.num && self.fup.trend() < self.stationary_thrd.0 {
+            self.stationary_thrd.0 *= self.stationary_thrd.1;
             self.reset_fup(vdb)
         }
     }
@@ -385,6 +336,7 @@ impl RestartLBD {
 ///        blocking...
 ///    }
 /// ```
+/*
 #[derive(Debug)]
 pub struct RestartASG {
     pub max: usize,
@@ -459,6 +411,7 @@ impl RestartASG {
         }
     }
 }
+ */
 
 #[derive(Debug)]
 pub struct RestartASG2 {
@@ -693,7 +646,7 @@ impl VarSetIF for VarSet {
             sum: 0,
             num: 0,
             diff: None,
-            diff_ema: Ema2::new(EMA_SLOW * 4).with_fast(EMA_FAST * 4),
+            diff_ema: Ema2::new(EMA_SLOW).with_fast(EMA_FAST * 4),
             is_closed: false,
             num_build: 1,
         }

@@ -2,6 +2,8 @@ use std::path::PathBuf;
 use structopt::StructOpt;
 
 pub const VERSION: &str = "0.2.0-RC0";
+pub const EMA_FAST: usize = 64; // 2 ^ 6
+pub const EMA_SLOW: usize = 32768; // 2 ^ 15 = 32768
 
 /// Configuration built from command line options
 #[derive(Clone, Debug, StructOpt)]

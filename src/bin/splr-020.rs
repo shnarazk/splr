@@ -50,15 +50,17 @@ fn main() {
         let dump = config.cnf_filename.file_stem().unwrap().to_str().unwrap();
         if let Ok(f) = File::create(format!("dbg_{}.csv", dump)) {
             let mut buf = BufWriter::new(f);
-            buf.write_all(b"conflict,restart,solved,ASG,FUP,LBD,misc\n").unwrap();
+            buf.write_all(b"conflict,restart,solved,ASG,FUP,LBD,misc\n")
+                .unwrap();
             for (n, a, b, c, d, e, f) in s.state.development_history.iter() {
-                buf
-                    .write_all(
-                        format!("{:>7},{:>8.0},{:>8.5},{:>8.5},{:>8.5},{:>8.5},{:>8.5}\n",
-                                n, a, b, c, d, e, f)
-                            .as_bytes()
+                buf.write_all(
+                    format!(
+                        "{:>7},{:>8.0},{:>8.5},{:>8.5},{:>8.5},{:>8.5},{:>8.5}\n",
+                        n, a, b, c, d, e, f
                     )
-                    .unwrap();
+                    .as_bytes(),
+                )
+                .unwrap();
             }
         }
     }
@@ -281,7 +283,7 @@ fn report(state: &State, out: &mut dyn Write) -> std::io::Result<()> {
             format!("{:>9.2}", state.record[LogF64Id::CLevel]),
             format!("{:>9.2}", state.record[LogF64Id::BLevel]),
             format!("{:>9.0}", state.record[LogUsizeId::Restart]),
-            format!("{:>9.4}", state.record[LogF64Id::RestartRatio]),
+            format!("{:>9.4}", state.record[LogF64Id::RSTrat]),
         )
         .as_bytes(),
     )?;

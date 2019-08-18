@@ -322,8 +322,6 @@ fn search(
                 return Ok(true);
             }
         } else {
-            // state.luby_restart_cnfl_cnt += 1.0;
-            // state.rst.luby.update(state.rst.use_luby);
             state.stats[Stat::Conflict] += 1;
             vdb.current_conflict = state.stats[Stat::Conflict];
             if a_decision_was_made {
@@ -384,18 +382,6 @@ fn handle_conflict_path(
         if state.num_unsolved_vars() <= state.rst.fup.sum {
             state.rst.reset_fup(vdb);
         }
-        // state.num_solved_vars = asgs.num_at(0);
-        // state.rst.check_stationary_fup(vdb);
-        // state.development_history.push((
-        //     ncnfl,
-        //     state.rst.fup.trend(),            // a
-        //     state.rst.lbd.trend(),            // b
-        //     state.rst.asg.trend(),            // c
-        //     state.rst.cooling.unwrap_or(0.0), // d
-        //     // suf.num as f64,
-        //     0.0,
-        //     0.0,
-        // ));
     } else {
         state.stats[Stat::Learnt] += 1;
         let lbd = vdb.compute_lbd(&new_learnt);
@@ -415,9 +401,10 @@ fn handle_conflict_path(
         elim.add_cid_occur(vdb, cid, &mut cdb.clause[cid as usize], true);
         state.rst.lbd.update(lbd);
         state.rst.asg.update(c_asgns);
-        // state.rst.asv.num = asgs.len();
-        // state.rst.asv.diff = Some(asgs.check_progress() as f64);
-        if !state.rst.restart(asgs, vdb, &mut state.stats) {
+        if state.rst.restart(asgs, vdb, &mut state.stats) {
+            asgs.cancel_until(vdb, 0);
+            asgs.check_progress();
+        } else {
             asgs.uncheck_enqueue(vdb, l0, cid);
         }
     }

@@ -213,12 +213,12 @@ pub trait PropagatorIF {
 pub trait ProgressEvaluatorIF<'a> {
     type Memory;
     type Item;
-/*
-    /// accumulate data into an internal stroage.
-    fn add(&mut self, item: Self::Item) -> &mut Self;
-    /// update an internal EMA memory from the current state.
-    fn commit(&mut self) -> &mut Self;
-*/
+    /*
+        /// accumulate data into an internal stroage.
+        fn add(&mut self, item: Self::Item) -> &mut Self;
+        /// update an internal EMA memory from the current state.
+        fn commit(&mut self) -> &mut Self;
+    */
     fn update(&mut self, item: Self::Item);
     /// update its state based on the result of the predicate.
     fn update_with<F>(&mut self, f: F) -> &mut Self
