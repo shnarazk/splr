@@ -236,7 +236,7 @@ pub trait ProgressEvaluatorIF<'a> {
 /// API for restart like `block_restart`, `force_restart` and so on.
 pub trait RestartIF {
     /// new local/global restart control
-    fn restart(&mut self, asgs: &mut AssignStack, vdb: &mut VarDB, stats: &mut [usize]) -> bool;
+    fn restart(&mut self, stats: &mut [usize]) -> bool;
     // fn reset_fup(&mut self, vdb: &mut VarDB);
     // fn check_stationary_fup(&mut self, vdb: &mut VarDB);
 }

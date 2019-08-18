@@ -376,7 +376,9 @@ fn handle_conflict_path(
         let l0 = new_learnt[0];
         asgs.check_progress();
         asgs.uncheck_enqueue(vdb, l0, NULL_CLAUSE);
-        if state.num_vars - state.num_eliminated_vars <= state.rst.asg.max {
+        if 0 < state.config.dump_interval
+            && state.num_vars - state.num_eliminated_vars <= state.rst.asg.max
+        {
             state.rst.asg.reset();
         }
         if state.num_unsolved_vars() <= state.rst.fup.sum {
@@ -395,20 +397,29 @@ fn handle_conflict_path(
             state.stats[Stat::NumBin] += 1;
             state.stats[Stat::NumBinLearnt] += 1;
         }
-        state.c_lvl.update(c_level as f64);
-        state.b_lvl.update(bl as f64);
         let cid = cdb.attach(state, vdb, lbd);
         elim.add_cid_occur(vdb, cid, &mut cdb.clause[cid as usize], true);
-        state.rst.lbd.update(lbd);
-        state.rst.asg.update(c_asgns);
-        if state.rst.restart(asgs, vdb, &mut state.stats) {
+        if 0 < state.config.dump_interval {
+            state.c_lvl.update(c_level as f64);
+            state.b_lvl.update(bl as f64);
+            state.rst.lbd.update(lbd);
+            state.rst.asg.update(c_asgns);
+        }
+        if state.rst.restart(&mut state.stats) {
             asgs.cancel_until(vdb, 0);
             asgs.check_progress();
+            if 0 < state.config.dump_interval {
+                state.rst.restart_ratio.update(1.0);
+            }
+            state.rst.check_stationary_fup(vdb);
         } else {
             asgs.uncheck_enqueue(vdb, l0, cid);
+            if 0 < state.config.dump_interval {
+                state.rst.restart_ratio.update(0.0);
+            }
         }
     }
-    if 0 < state.config.debug_dump && ncnfl % state.config.debug_dump == 0 {
+    if 0 < state.config.dump_interval && ncnfl % state.config.dump_interval == 0 {
         let State { stats, rst, .. } = state;
         let RestartExecutor { lbd, asg, fup, .. } = rst;
         state.development_history.push((
@@ -436,7 +447,6 @@ fn handle_conflict_path(
         state.cur_reduction = ((ncnfl as f64) / (state.next_reduction as f64)) as usize + 1;
         // state.flush("reducing...");
         cdb.reduce(state, vdb);
-        state.rst.check_stationary_fup(vdb);
     }
     Ok(())
 }

@@ -46,7 +46,7 @@ fn main() {
         Err(e) => println!("Failed to solve by {:?}.", e),
     }
     // /*
-    if 0 < s.state.config.debug_dump && !s.state.development_history.is_empty() {
+    if 0 < s.state.config.dump_interval && !s.state.development_history.is_empty() {
         let dump = config.cnf_filename.file_stem().unwrap().to_str().unwrap();
         if let Ok(f) = File::create(format!("dbg_{}.csv", dump)) {
             let mut buf = BufWriter::new(f);

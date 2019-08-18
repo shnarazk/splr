@@ -1,5 +1,4 @@
 use crate::config::{EMA_FAST, EMA_SLOW};
-use crate::propagator::AssignStack;
 use crate::state::Stat;
 use crate::traits::*;
 use crate::types::Flag;
@@ -82,8 +81,12 @@ impl EmaIF for Ema2 {
     }
     fn reinitialize(&mut self, init: f64) -> &mut Self {
         // self.fast = self.slow;
-        self.fast = init * self.calf;
+        // self.fast = init * self.calf;
         // self.slow = init * self.cals;
+        self.fast = init; // self.fe * x + (1.0 - self.fe) * self.fast;
+        self.slow = init; // self.se * x + (1.0 - self.se) * self.slow;
+        self.calf = 0.0;
+        self.cals = 0.0;
         self
     }
 }
@@ -112,7 +115,7 @@ impl Ema2 {
 pub struct RestartExecutor {
     pub restart_ratio: Ema,
     pub stationary_thrd: (f64, f64),
-    pub blocking_ema: Ema,
+    pub interval_ema: Ema,
     pub after_restart: usize,
     pub increasing_fup: bool,
     pub trend_max: f64,
@@ -124,12 +127,12 @@ pub struct RestartExecutor {
     pub luby: RestartLuby,
 }
 
-impl RestartExecutor {
-    pub fn new() -> RestartExecutor {
+impl Default for RestartExecutor {
+    fn default() -> Self {
         RestartExecutor {
             restart_ratio: Ema::new(EMA_SLOW),
-            stationary_thrd: (0.25, 0.98), // (fup.trend, decay factor),
-            blocking_ema: Ema::new(EMA_SLOW),
+            stationary_thrd: (0.25, 0.95), // (fup.trend, decay factor),
+            interval_ema: Ema::new(EMA_SLOW),
             after_restart: 1,
             increasing_fup: true,
             trend_max: 0.0,
@@ -142,16 +145,21 @@ impl RestartExecutor {
         }
     }
 }
+impl RestartExecutor {
+    pub fn new() -> RestartExecutor {
+        RestartExecutor::default()
+    }
+}
 
 impl RestartIF for RestartExecutor {
     // stagnation-triggered restart engine
-    fn restart(&mut self, _asgs: &mut AssignStack, _vdb: &mut VarDB, stats: &mut [usize]) -> bool {
+    fn restart(&mut self, stats: &mut [usize]) -> bool {
         if self.use_luby {
             self.luby.update(true);
             if self.luby.is_active() {
                 stats[Stat::RestartByLuby] += 1;
                 stats[Stat::Restart] += 1;
-                self.restart_ratio.update(1.0);
+                // self.restart_ratio.update(1.0);
                 return true;
             } else {
                 return self.return_without_restart();
@@ -159,10 +167,10 @@ impl RestartIF for RestartExecutor {
         }
         let RestartExecutor {
             after_restart,
+            fup,
             increasing_fup,
             trend_min,
             trend_max,
-            fup,
             ..
         } = self;
         *after_restart += 1;
@@ -178,17 +186,16 @@ impl RestartIF for RestartExecutor {
                 band = *trend_max - *trend_min;
                 *trend_min = *trend_max;
             }
+        } else if trend < *trend_min {
+            *trend_min = trend;
         } else {
-            if trend < *trend_min {
-                *trend_min = trend;
-            } else {
-                peak = true;
-                *increasing_fup = true;
-                band = *trend_max - *trend_min;
-                *trend_max = *trend_min;
-            }
+            peak = true;
+            *increasing_fup = true;
+            band = *trend_max - *trend_min;
+            *trend_max = *trend_min;
         }
         if 10 < *after_restart && 0.01 < band && peak {
+            // self.check_stationary_fup(vdb);
             self.return_for_restart(stats)
         } else {
             self.return_without_restart()
@@ -199,37 +206,25 @@ impl RestartIF for RestartExecutor {
 impl RestartExecutor {
     fn return_for_restart(&mut self, stats: &mut [usize]) -> bool {
         if 0 < self.after_restart {
-            self.blocking_ema.update((self.after_restart - 1) as f64);
+            self.interval_ema.update((self.after_restart - 1) as f64);
         }
         self.after_restart = 1;
-        self.restart_ratio.update(1.0);
+        // self.restart_ratio.update(1.0);
         stats[Stat::Restart] += 1;
         true
     }
-    #[allow(dead_code)]
-    fn return_for_blocking(&mut self, stats: &mut [usize]) -> bool {
-        if 0 < self.after_restart {
-            self.blocking_ema.update((self.after_restart - 1) as f64);
-        }
-        self.after_restart = 1;
-        self.restart_ratio.update(0.0);
-        stats[Stat::Blocking] += 1;
-        false
-    }
     fn return_without_restart(&mut self) -> bool {
-        self.restart_ratio.update(0.0);
+        // self.restart_ratio.update(0.0);
         false
     }
-    #[allow(dead_code)]
     pub fn reset_fup(&mut self, vdb: &mut VarDB) {
         for v in &mut vdb.vars[1..] {
             self.fup.remove(v);
         }
         self.fup.reset();
     }
-    #[allow(dead_code)]
     pub fn check_stationary_fup(&mut self, vdb: &mut VarDB) {
-        if 100 < self.fup.num && self.fup.trend() < self.stationary_thrd.0 {
+        if EMA_FAST / 4 < self.fup.num && self.fup.trend() < self.stationary_thrd.0 {
             self.stationary_thrd.0 *= self.stationary_thrd.1;
             self.reset_fup(vdb)
         }
