@@ -191,6 +191,19 @@ impl VarDBIF for VarDB {
         self.activity(vi);
         self.vars[vi].reward += 1.0 - self.activity_decay;
     }
+    fn force_reset(&mut self, ncnfl: usize) -> bool {
+        let mut cnt = 20_000;
+        let mut modified: bool = false;
+        for v in &mut self.vars[1..] {
+            if !v.is(Flag::ELIMINATED) && v.reward == 0.0 && 0 < v.level && 0 < cnt {
+                v.reward = 1.0;
+                v.last_used = ncnfl;
+                modified = true;
+                cnt -= 1;
+            }
+        }
+        modified
+    }
 }
 
 impl fmt::Display for Var {

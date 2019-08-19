@@ -405,13 +405,17 @@ fn handle_conflict_path(
             state.rst.lbd.update(lbd);
             state.rst.asg.update(c_asgns);
         }
-        if state.rst.restart(&mut state.stats) {
+        if state.rst.restart() {
+            state.stats[Stat::Restart] += 1;
+            if state.rst.use_luby {
+                state.stats[Stat::RestartByLuby] += 1;
+            }
+            state.rst.check_stationary_fup(vdb);
             asgs.cancel_until(vdb, 0);
             asgs.check_progress();
             if 0 < state.config.dump_interval {
                 state.rst.restart_ratio.update(1.0);
             }
-            state.rst.check_stationary_fup(vdb);
         } else {
             asgs.uncheck_enqueue(vdb, l0, cid);
             if 0 < state.config.dump_interval {
@@ -462,6 +466,7 @@ fn adapt_parameters(
     let switch = 100_000;
     if ncnfl == switch {
         state.flush("activating an exhaustive eliminator...");
+        state.stats[Stat::Restart] += 1;
         asgs.cancel_until(vdb, 0);
         asgs.check_progress();
         state.adapt_strategy(cdb);

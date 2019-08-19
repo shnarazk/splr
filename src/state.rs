@@ -621,7 +621,7 @@ impl StateIF for State {
             );
         }
         println!(
-            "\x1B[2K     Restart|#rst:{}, #blk:{}, leng:{}, died:{} ",
+            "\x1B[2K     Restart|#rst:{}, #blk:{}, leng:{}, #gen:{} ",
             im!(
                 "{:>9.0}",
                 self.record,

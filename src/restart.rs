@@ -1,5 +1,4 @@
 use crate::config::{EMA_FAST, EMA_SLOW};
-use crate::state::Stat;
 use crate::traits::*;
 use crate::types::Flag;
 use crate::var::{Var, VarDB};
@@ -116,10 +115,10 @@ pub struct RestartExecutor {
     pub restart_ratio: Ema,
     pub stationary_thrd: (f64, f64),
     pub interval_ema: Ema,
-    pub after_restart: usize,
-    pub increasing_fup: bool,
-    pub trend_max: f64,
-    pub trend_min: f64,
+    after_restart: usize,
+    increasing_fup: bool,
+    trend_duration: usize,
+    trend_band: (f64, f64),
     pub use_luby: bool,
     pub lbd: RestartLBD,
     pub asg: RestartASG2,
@@ -135,8 +134,8 @@ impl Default for RestartExecutor {
             interval_ema: Ema::new(EMA_SLOW),
             after_restart: 1,
             increasing_fup: true,
-            trend_max: 0.0,
-            trend_min: 1000.0,
+            trend_duration: 0,
+            trend_band: (0.0, 1000.0),
             use_luby: false,
             lbd: RestartLBD::new(RESTART_THRESHOLD),
             asg: RestartASG2::new(RESTART_THRESHOLD),
@@ -153,69 +152,53 @@ impl RestartExecutor {
 
 impl RestartIF for RestartExecutor {
     // stagnation-triggered restart engine
-    fn restart(&mut self, stats: &mut [usize]) -> bool {
+    fn restart(&mut self) -> bool {
         if self.use_luby {
             self.luby.update(true);
-            if self.luby.is_active() {
-                stats[Stat::RestartByLuby] += 1;
-                stats[Stat::Restart] += 1;
-                // self.restart_ratio.update(1.0);
-                return true;
-            } else {
-                return self.return_without_restart();
-            }
+            return self.luby.is_active();
         }
         let RestartExecutor {
             after_restart,
             fup,
             increasing_fup,
-            trend_min,
-            trend_max,
+            trend_duration,
+            trend_band,
             ..
         } = self;
         *after_restart += 1;
         let mut peak = false;
-        let mut band = 0.0;
-        let trend = fup.trend();
+        let trend = (fup.trend() * 25.0).floor() / 25.0; // omit tiny differences
         if *increasing_fup {
-            if *trend_max < trend {
-                *trend_max = trend;
+            if trend_band.1 <= trend {
+                trend_band.1 = trend;
+                *trend_duration += 1;
             } else {
                 peak = true;
                 *increasing_fup = false;
-                band = *trend_max - *trend_min;
-                *trend_min = *trend_max;
+                trend_band.0 = trend_band.1;
             }
-        } else if trend < *trend_min {
-            *trend_min = trend;
+        } else if trend <= trend_band.0 {
+            trend_band.0 = trend;
+            *trend_duration += 1;
         } else {
             peak = true;
             *increasing_fup = true;
-            band = *trend_max - *trend_min;
-            *trend_max = *trend_min;
+            trend_band.1 = trend_band.0;
         }
-        if 10 < *after_restart && 0.01 < band && peak {
-            // self.check_stationary_fup(vdb);
-            self.return_for_restart(stats)
+        if peak && EMA_SLOW / 2 < *trend_duration {
+            *trend_duration = 0;
+            self.return_for_restart()
         } else {
-            self.return_without_restart()
+            false
         }
     }
 }
 
 impl RestartExecutor {
-    fn return_for_restart(&mut self, stats: &mut [usize]) -> bool {
-        if 0 < self.after_restart {
-            self.interval_ema.update((self.after_restart - 1) as f64);
-        }
-        self.after_restart = 1;
-        // self.restart_ratio.update(1.0);
-        stats[Stat::Restart] += 1;
+    fn return_for_restart(&mut self) -> bool {
+        self.interval_ema.update(self.after_restart as f64);
+        self.after_restart = 0;
         true
-    }
-    fn return_without_restart(&mut self) -> bool {
-        // self.restart_ratio.update(0.0);
-        false
     }
     pub fn reset_fup(&mut self, vdb: &mut VarDB) {
         for v in &mut vdb.vars[1..] {
@@ -224,7 +207,7 @@ impl RestartExecutor {
         self.fup.reset();
     }
     pub fn check_stationary_fup(&mut self, vdb: &mut VarDB) {
-        if EMA_FAST / 4 < self.fup.num && self.fup.trend() < self.stationary_thrd.0 {
+        if EMA_FAST / 8 < self.fup.num && self.fup.trend() < self.stationary_thrd.0 {
             self.stationary_thrd.0 *= self.stationary_thrd.1;
             self.reset_fup(vdb)
         }
@@ -255,23 +238,6 @@ pub struct RestartLBD {
 impl ProgressEvaluatorIF<'_> for RestartLBD {
     type Memory = Ema;
     type Item = usize;
-    /*
-    fn add(&mut self, item: Self::Item) -> &mut RestartLBD {
-        // assert_eq!(self.lbd, None);
-        self.sum += item as f64;
-        self.num += 1;
-        self.lbd = Some(item);
-        self
-    }
-    fn commit(&mut self) -> &mut Self {
-        assert!(!self.lbd.is_none());
-        if let Some(lbd) = self.lbd {
-            self.ema.update(lbd as f64);
-            self.lbd = None;
-        }
-        self
-    }
-    */
     fn update(&mut self, item: Self::Item) {
         self.sum += item as f64;
         self.num += 1;
@@ -423,24 +389,6 @@ pub struct RestartASG2 {
 impl ProgressEvaluatorIF<'_> for RestartASG2 {
     type Memory = Ema2;
     type Item = usize;
-    /*
-    fn add(&mut self, item: Self::Item) -> &mut Self {
-        assert!(self.asg.is_none());
-        self.sum += item;
-        self.num += 1;
-        self.asg = Some(item);
-        self
-    }
-    fn commit(&mut self) -> &mut Self {
-        assert!(!self.asg.is_none());
-        if let Some(a) = self.asg {
-            self.ema.update(a as f64);
-            self.asg = None;
-            self.max = a.max(self.max);
-        }
-        self
-    }
-    */
     fn update(&mut self, item: Self::Item) {
         self.ema.update(item as f64);
         self.max = item.max(self.max);
@@ -507,17 +455,6 @@ pub struct RestartLuby {
 impl ProgressEvaluatorIF<'_> for RestartLuby {
     type Memory = usize;
     type Item = bool;
-    /*
-    fn add(&mut self, in_use: Self::Item) -> &mut Self {
-        if in_use {
-            self.cnfl_cnt += 1.0;
-        }
-        self
-    }
-    fn commit(&mut self) -> &mut Self {
-        self
-    }
-    */
     fn update(&mut self, in_use: Self::Item) {
         if in_use {
             self.cnfl_cnt += 1.0;
@@ -641,7 +578,7 @@ impl VarSetIF for VarSet {
             sum: 0,
             num: 0,
             diff: None,
-            diff_ema: Ema2::new(EMA_SLOW).with_fast(EMA_FAST * 4),
+            diff_ema: Ema2::new(EMA_SLOW * 2).with_fast(EMA_FAST * 16),
             is_closed: false,
             num_build: 1,
         }
@@ -656,7 +593,7 @@ impl VarSetIF for VarSet {
         self.num = 0;
         self.diff = None;
         self.is_closed = false;
-        self.diff_ema.reinitialize(1.0);
+        self.diff_ema.reinitialize(0.0);
         self.num_build += 1;
     }
     fn reach_top(&self) -> bool {
@@ -670,28 +607,6 @@ impl VarSetIF for VarSet {
 impl<'a> ProgressEvaluatorIF<'a> for VarSet {
     type Memory = Ema2;
     type Item = &'a mut Var;
-    /*
-    fn add(&mut self, v: Self::Item) -> &mut Self {
-        self.num += 1;
-        if !v.is(self.flag) {
-            v.turn_on(self.flag);
-            self.sum += 1;
-            self.diff = Some(self.diff.map_or(1.0, |v| v + 1.0));
-        } else if self.diff.is_none() {
-            self.diff = Some(0.0);
-        }
-        self
-    }
-    fn commit(&mut self) -> &mut Self {
-        if let Some(diff) = self.diff {
-            self.diff_ema.update(diff);
-            self.diff = None;
-        } else {
-            panic!("VarSet {:?}::commit, self.diff is None", self.flag);
-        }
-        self
-    }
-    */
     fn update(&mut self, v: Self::Item) {
         self.num += 1;
         if !v.is(self.flag) {
