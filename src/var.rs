@@ -191,6 +191,10 @@ impl VarDBIF for VarDB {
         self.activity(vi);
         self.vars[vi].reward += 1.0 - self.activity_decay;
     }
+}
+
+impl VarDB {
+    #[allow(dead_code)]
     fn force_reset(&mut self, ncnfl: usize) -> bool {
         let mut cnt = 20_000;
         let mut modified: bool = false;

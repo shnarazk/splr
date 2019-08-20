@@ -101,10 +101,7 @@ pub enum Stat {
     Conflict = 0,          // the number of backjump
     Decision,              // the number of decision
     Restart,               // the number of restart
-    RestartByAsg,          // the number of restarts by assign stagnation
-    RestartByFUP,          // the number of restarts by 1st unified (implication) point
     RestartByLuby,         // the number of Luby restart
-    Blocking,              // the number of restart block
     Learnt,                // the number of learnt clauses (< Conflict)
     NoDecisionConflict,    // the number of 'no decision conflict'
     Propagation,           // the number of propagation
@@ -289,7 +286,7 @@ impl Default for State {
             cdb_inc: 300,
             cdb_inc_extra: 1000,
             cdb_soft_limit: 0, // 248_000_000
-            rst: RestartExecutor::new(),
+            rst: RestartExecutor::default(),
             use_elim: true,
             elim_eliminate_combination_limit: 80,
             elim_eliminate_grow_limit: 0, // 64
@@ -333,7 +330,7 @@ impl StateIF for State {
         state.num_vars = cnf.num_of_variables;
         state.use_adapt_strategy = !config.without_adaptive_strategy;
         state.cdb_soft_limit = config.clause_limit;
-        state.rst = RestartExecutor::new();
+        state.rst = RestartExecutor::new(config.restart_interval, config.restart_quantum);
         state.elim_eliminate_grow_limit = config.elim_grow_limit;
         state.elim_subsume_literal_limit = config.elim_lit_limit;
         state.use_elim = !config.without_elim;
@@ -568,9 +565,9 @@ impl StateIF for State {
                     "{:>9.4}",
                     self.record,
                     LogF64Id::RSTlen,
-                    100.0 * self.rst.restart_ratio.get()
+                    100.0 * self.rst.ratio.get()
                 ),
-                format!("{:>9.4}", self.rst.stationary_thrd.0),
+                format!("{:>9.4}", self.rst.threshold.0),
             );
         }
         println!(
@@ -621,7 +618,7 @@ impl StateIF for State {
             );
         }
         println!(
-            "\x1B[2K     Restart|#rst:{}, #blk:{}, leng:{}, #gen:{} ",
+            "\x1B[2K     Restart|#exe:{}, Luby:{}, leng:{}, #gen:{} ",
             im!(
                 "{:>9.0}",
                 self.record,
@@ -631,8 +628,8 @@ impl StateIF for State {
             im!(
                 "{:>9.0}",
                 self.record,
-                LogUsizeId::Blocking,
-                self.stats[Stat::Blocking]
+                LogUsizeId::RestartByLuby,
+                self.stats[Stat::RestartByLuby]
             ),
             fm!(
                 "{:>9.0}",
@@ -647,9 +644,6 @@ impl StateIF for State {
                 self.rst.fup.num_build
             ),
         );
-        self.record[LogUsizeId::RestartByAsg] = self.stats[Stat::RestartByAsg];
-        self.record[LogUsizeId::RestartByFUP] = self.stats[Stat::RestartByFUP];
-        self.record[LogUsizeId::RestartByLuby] = self.stats[Stat::RestartByLuby];
         if let Some(m) = mes {
             println!("\x1B[2K    Strategy|mode: {}", m);
         } else {
@@ -723,15 +717,12 @@ pub enum LogUsizeId {
     Learnt,         // 10: learnt - binclause: usize
     Restart,        // 11: restart_count: usize,
     RestartByLuby,  // 12: restart_by_Luby restart
-    RestartByAsg,   // 13: restart_by_assign_stagnation: usize,
-    RestartByFUP,   // 14: restart_by_fup_stagnation: usize
-    Blocking,       // ??:
-    Reduction,      // 15: reduction: usize,
-    SatClauseElim,  // 16: simplification: usize,
-    ExhaustiveElim, // 17: elimination: usize,
-    FUPnum,         // 18: the number of current fups
-    FUPgrp,         // 19: the number of FUP graph generation
-    AsgMax,         // 20: te maximum number of assigned variables
+    Reduction,      // 13: reduction: usize,
+    SatClauseElim,  // 14: simplification: usize,
+    ExhaustiveElim, // 15: elimination: usize,
+    FUPnum,         // 16: the number of current fups
+    FUPgrp,         // 17: the number of FUP graph generation
+    AsgMax,         // 18: te maximum number of assigned variables
     // ElimClauseQueue, // __: elim_clause_queue: usize,
     // ElimVarQueue, // __: elim_var_queue: usize,
     End,
@@ -753,8 +744,8 @@ pub enum LogF64Id {
     LBDtrd,       // 11: ema_lbd trend
     BLevel,       // 12: backjump_level
     CLevel,       // 13: conflict_level
-    RSTrat,       // 14: rst.restart_ratio
-    RSTlen,       // 15: rst.blocking_ema
+    RSTrat,       // 14: rst.ratio
+    RSTlen,       // 15: rst.interval_ema
     VADecay,      // 16: vdb.activity_decay
     End,
 }

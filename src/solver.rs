@@ -402,24 +402,23 @@ fn handle_conflict_path(
         if 0 < state.config.dump_interval {
             state.c_lvl.update(c_level as f64);
             state.b_lvl.update(bl as f64);
-            state.rst.lbd.update(lbd);
             state.rst.asg.update(c_asgns);
+            state.rst.lbd.update(lbd);
         }
-        if state.rst.restart() {
+        if state.rst.restart(vdb) {
             state.stats[Stat::Restart] += 1;
             if state.rst.use_luby {
                 state.stats[Stat::RestartByLuby] += 1;
             }
-            state.rst.check_stationary_fup(vdb);
             asgs.cancel_until(vdb, 0);
             asgs.check_progress();
             if 0 < state.config.dump_interval {
-                state.rst.restart_ratio.update(1.0);
+                state.rst.ratio.update(1.0);
             }
         } else {
             asgs.uncheck_enqueue(vdb, l0, cid);
             if 0 < state.config.dump_interval {
-                state.rst.restart_ratio.update(0.0);
+                state.rst.ratio.update(0.0);
             }
         }
     }

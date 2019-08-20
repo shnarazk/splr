@@ -1,4 +1,4 @@
-use crate::config::{EMA_FAST, EMA_SLOW};
+use crate::config::{EMA_FAST, EMA_SLOW, RESTART_INTV, RESTART_QNTM, RESTART_THRD};
 use crate::traits::*;
 use crate::types::Flag;
 use crate::var::{Var, VarDB};
@@ -103,56 +103,56 @@ impl Ema2 {
     }
 }
 
-/// Exponential Moving Average w/ a calibrator
-/// ### About levels
-///
-/// - Level 0 is a memory cleared at each restart
-/// - Level 1 is a memory held during restarts but clear after mega-restart
-/// - Level 2 is a memory not to reset by restarts
-/// *Note: all levels clear after finding a unit learnt (simplification).*
+/// A Luby + First-UIP driven Restart Engine
 #[derive(Debug)]
 pub struct RestartExecutor {
-    pub restart_ratio: Ema,
-    pub stationary_thrd: (f64, f64),
     pub interval_ema: Ema,
+    pub ratio: Ema,
+    pub threshold: (f64, f64),
+    pub use_luby: bool,
+    pub asg: RestartASG,
+    pub fup: VarSet,
+    pub lbd: RestartLBD,
+    pub luby: RestartLuby,
     after_restart: usize,
-    increasing_fup: bool,
+    interval: usize,
+    quantum: f64,
+    trend_dir: (bool, usize),
     trend_duration: usize,
     trend_band: (f64, f64),
-    pub use_luby: bool,
-    pub lbd: RestartLBD,
-    pub asg: RestartASG2,
-    pub fup: VarSet,
-    pub luby: RestartLuby,
 }
 
 impl Default for RestartExecutor {
     fn default() -> Self {
         RestartExecutor {
-            restart_ratio: Ema::new(EMA_SLOW),
-            stationary_thrd: (0.25, 0.95), // (fup.trend, decay factor),
+            ratio: Ema::new(EMA_SLOW),
+            interval: RESTART_INTV,
             interval_ema: Ema::new(EMA_SLOW),
+            quantum: RESTART_QNTM as f64,
+            threshold: RESTART_THRD, // (fup.trend, decay factor),
+            use_luby: false,
+            asg: RestartASG::new(RESTART_THRESHOLD),
+            fup: VarSet::new(Flag::FUP),
+            lbd: RestartLBD::new(RESTART_THRESHOLD),
+            luby: RestartLuby::new(2.0, 100.0),
             after_restart: 1,
-            increasing_fup: true,
+            trend_dir: (true, 0),
             trend_duration: 0,
             trend_band: (0.0, 1000.0),
-            use_luby: false,
-            lbd: RestartLBD::new(RESTART_THRESHOLD),
-            asg: RestartASG2::new(RESTART_THRESHOLD),
-            fup: VarSet::new(Flag::FUP),
-            luby: RestartLuby::new(2.0, 100.0),
         }
     }
 }
 impl RestartExecutor {
-    pub fn new() -> RestartExecutor {
-        RestartExecutor::default()
+    pub fn new(interval: usize, quantum: usize) -> RestartExecutor {
+        let mut re = RestartExecutor::default();
+        re.interval = interval;
+        re.quantum = quantum as f64;
+        re
     }
 }
 
 impl RestartIF for RestartExecutor {
-    // stagnation-triggered restart engine
-    fn restart(&mut self) -> bool {
+    fn restart(&mut self, vdb: &mut VarDB) -> bool {
         if self.use_luby {
             self.luby.update(true);
             return self.luby.is_active();
@@ -160,59 +160,63 @@ impl RestartIF for RestartExecutor {
         let RestartExecutor {
             after_restart,
             fup,
-            increasing_fup,
-            trend_duration,
+            interval,
+            quantum,
+            threshold,
+            trend_dir,
             trend_band,
             ..
         } = self;
+        let mut todo = false;
+        let r_trend = fup.trend();
+        let q_trend = (r_trend * *quantum).floor() / *quantum;
         *after_restart += 1;
-        let mut peak = false;
-        let trend = (fup.trend() * 25.0).floor() / 25.0; // omit tiny differences
-        if *increasing_fup {
-            if trend_band.1 <= trend {
-                trend_band.1 = trend;
-                *trend_duration += 1;
+        // * trend_dir.0: fup's trend is increasing
+        // * trend_dir.1: its duration
+        // * trend_band: (minimum trend, maximum trend)
+        if trend_dir.0 {
+            if trend_band.1 <= q_trend {
+                trend_dir.1 += 1;
+                trend_band.1 = q_trend;
             } else {
-                peak = true;
-                *increasing_fup = false;
+                if *interval < trend_dir.1 && 1.0 / *quantum <= trend_band.1 - trend_band.0 {
+                    todo = true;
+                }
+                *trend_dir = (false, 0);
                 trend_band.0 = trend_band.1;
             }
-        } else if trend <= trend_band.0 {
-            trend_band.0 = trend;
-            *trend_duration += 1;
+        } else if q_trend <= trend_band.0 {
+            trend_dir.1 += 1;
+            trend_band.0 = q_trend;
         } else {
-            peak = true;
-            *increasing_fup = true;
+            if *interval <= trend_dir.1 && 1.0 / *quantum <= trend_band.1 - trend_band.0 {
+                todo = true;
+            }
+            *trend_dir = (true, 0);
             trend_band.1 = trend_band.0;
         }
-        if peak && EMA_SLOW / 2 < *trend_duration {
-            *trend_duration = 0;
-            self.return_for_restart()
-        } else {
-            false
+        if *interval <= trend_dir.1 && r_trend < threshold.0 {
+            trend_dir.1 = 0;
+            *trend_band = (1.0, 0.0);
+            threshold.0 *= threshold.1;
+            self.reset_fup(vdb);
+            todo = true;
         }
+        if todo {
+            self.interval_ema.update(self.after_restart as f64);
+            self.after_restart = 0;
+            return true;
+        }
+        false
     }
-}
-
-impl RestartExecutor {
-    fn return_for_restart(&mut self) -> bool {
-        self.interval_ema.update(self.after_restart as f64);
-        self.after_restart = 0;
-        true
-    }
-    pub fn reset_fup(&mut self, vdb: &mut VarDB) {
+    fn reset_fup(&mut self, vdb: &mut VarDB) {
         for v in &mut vdb.vars[1..] {
             self.fup.remove(v);
         }
         self.fup.reset();
     }
-    pub fn check_stationary_fup(&mut self, vdb: &mut VarDB) {
-        if EMA_FAST / 8 < self.fup.num && self.fup.trend() < self.stationary_thrd.0 {
-            self.stationary_thrd.0 *= self.stationary_thrd.1;
-            self.reset_fup(vdb)
-        }
-    }
 }
+
 /// Glucose-style forcing restart condition w/o restart_steps
 /// ### Implementing the original algorithm
 ///
@@ -232,7 +236,6 @@ pub struct RestartLBD {
     pub ema: Ema,
     lbd: Option<usize>,
     result: bool,
-    timer: usize,
 }
 
 impl ProgressEvaluatorIF<'_> for RestartLBD {
@@ -248,18 +251,11 @@ impl ProgressEvaluatorIF<'_> for RestartLBD {
         F: Fn(&Self::Memory, f64) -> bool,
     {
         assert!(self.lbd.is_none());
-        if 0 < self.timer {
-            self.timer -= 1;
-        } else {
-            self.result = f(&self.ema, self.sum / self.num as f64);
-            if self.result {
-                self.timer = 50;
-            }
-        }
+        self.result = f(&self.ema, self.sum / self.num as f64);
         self
     }
     fn is_active(&self) -> bool {
-        0 < self.timer && self.result
+        self.result
     }
     fn eval<F, R>(&self, f: F) -> R
     where
@@ -282,7 +278,6 @@ impl RestartLBD {
             ema: Ema::new(EMA_FAST),
             lbd: None,
             result: false,
-            timer: 0,
         }
     }
 }
@@ -307,7 +302,6 @@ pub struct RestartASG {
     pub ema: Ema,
     asg: Option<usize>,
     result: bool,
-    // timer: usize,
 }
 
 impl ProgressEvaluatorIF<'_> for RestartASG {
@@ -368,14 +362,13 @@ impl RestartASG {
             ema: Ema::new(EMA_FAST),
             asg: None,
             result: false,
-            // timer: 20,
         }
     }
 }
  */
 
 #[derive(Debug)]
-pub struct RestartASG2 {
+pub struct RestartASG {
     pub max: usize,
     pub sum: usize,
     pub num: usize,
@@ -383,10 +376,9 @@ pub struct RestartASG2 {
     ema: Ema2,
     asg: Option<usize>,
     result: bool,
-    // timer: usize,
 }
 
-impl ProgressEvaluatorIF<'_> for RestartASG2 {
+impl ProgressEvaluatorIF<'_> for RestartASG {
     type Memory = Ema2;
     type Item = usize;
     fn update(&mut self, item: Self::Item) {
@@ -416,9 +408,9 @@ impl ProgressEvaluatorIF<'_> for RestartASG2 {
     }
 }
 
-impl RestartASG2 {
+impl RestartASG {
     pub fn new(threshold: f64) -> Self {
-        RestartASG2 {
+        RestartASG {
             max: 0,
             sum: 0,
             num: 0,
@@ -426,7 +418,6 @@ impl RestartASG2 {
             ema: Ema2::new(EMA_SLOW).with_fast(EMA_FAST),
             asg: None,
             result: false,
-            // timer: 20,
         }
     }
     pub fn get(&self) -> f64 {
@@ -595,12 +586,6 @@ impl VarSetIF for VarSet {
         self.is_closed = false;
         self.diff_ema.reinitialize(0.0);
         self.num_build += 1;
-    }
-    fn reach_top(&self) -> bool {
-        self.diff_ema.get_fast() <= self.diff_ema.get()
-    }
-    fn reach_bottom(&self) -> bool {
-        true
     }
 }
 

@@ -82,20 +82,28 @@ pub trait Delete<T> {
 
 /// API for Eliminator like `activate`, `stop`, `eliminate` and so on.
 pub trait EliminatorIF {
+    /// return a new `Eliminator`.
     fn new(nv: usize) -> Eliminator;
     /// set eliminater's mode to **ready**.
     fn activate(&mut self);
     /// set eliminater's mode to **dormant**.
     fn stop(&mut self, cdb: &mut ClauseDB, vdb: &mut VarDB);
+    /// return `true` if the eliminator is active.
     fn is_running(&self) -> bool;
+    /// return `true` if the eliminator is ready (waiting for a trigger).
     fn is_waiting(&self) -> bool;
     /// rebuild occur lists.
     fn prepare(&mut self, cdb: &mut ClauseDB, vdb: &mut VarDB, force: bool);
     fn enqueue_clause(&mut self, cid: ClauseId, c: &mut Clause);
+    /// clear clause queue.
     fn clear_clause_queue(&mut self, cdb: &mut ClauseDB);
+    /// return the length of the eliminator's clause queue.
     fn clause_queue_len(&self) -> usize;
+    /// enqueue `vi`-the Var into the eliminator's var queue.
     fn enqueue_var(&mut self, vdb: &mut VarDB, vi: VarId, upword: bool);
+    /// reset the eliminator's var queue.
     fn clear_var_queue(&mut self, vdb: &mut VarDB);
+    /// return the length of the eliminator's var queue.
     fn var_queue_len(&self) -> usize;
     /// run clause subsumption and variable elimination.
     ///
@@ -121,18 +129,27 @@ pub trait EliminatorIF {
 
 /// API for Exponential Moving Average, EMA, like `get`, `reset`, `update` and so on.
 pub trait EmaIF {
+    /// return a new `Ema`.
     fn new(f: usize) -> Self;
+    /// return the value of `Ema`.
     fn get(&self) -> f64;
+    /// reset the `Ema`.
     fn reset(&mut self) {}
+    /// add a new value `x` to the `Ema`.
     fn update(&mut self, x: f64);
+    /// reset the `Ema` with an initial value `init`.
     fn initialize(self, init: f64) -> Self;
+    /// reset the refered `Ema` with an initial value `init`.
     fn reinitialize(&mut self, init: f64) -> &mut Self;
 }
 
 /// API for [object properties](../types/enum.Flag.html) like `is`, `turn_off`, `turn_on` and so on.
 pub trait FlagIF {
+    /// return `true` if the `flag` is on.
     fn is(&self, flag: Flag) -> bool;
+    /// turn the `flag` off.
     fn turn_off(&mut self, flag: Flag);
+    /// turn the `flag` on.
     fn turn_on(&mut self, flag: Flag);
 }
 
@@ -213,12 +230,6 @@ pub trait PropagatorIF {
 pub trait ProgressEvaluatorIF<'a> {
     type Memory;
     type Item;
-    /*
-        /// accumulate data into an internal stroage.
-        fn add(&mut self, item: Self::Item) -> &mut Self;
-        /// update an internal EMA memory from the current state.
-        fn commit(&mut self) -> &mut Self;
-    */
     fn update(&mut self, item: Self::Item);
     /// update its state based on the result of the predicate.
     fn update_with<F>(&mut self, f: F) -> &mut Self
@@ -236,9 +247,9 @@ pub trait ProgressEvaluatorIF<'a> {
 /// API for restart like `block_restart`, `force_restart` and so on.
 pub trait RestartIF {
     /// new local/global restart control
-    fn restart(&mut self) -> bool;
-    // fn reset_fup(&mut self, vdb: &mut VarDB);
-    // fn check_stationary_fup(&mut self, vdb: &mut VarDB);
+    fn restart(&mut self, vdb: &mut VarDB) -> bool;
+    /// reset the first UIP set.
+    fn reset_fup(&mut self, vdb: &mut VarDB);
 }
 
 /// API for SAT solver like `build`, `solve` and so on.
@@ -275,6 +286,7 @@ pub trait StateIF {
     fn progress_header(&self);
     /// write stat data to stdio.
     fn progress(&mut self, cdb: &ClauseDB, vdb: &VarDB, mes: Option<&str>);
+    /// display an one-line messege immediately.
     fn flush(&self, mes: &str);
 }
 
@@ -292,7 +304,9 @@ pub trait ValidatorIF {
 
 /// API for Var, providing `new` and `new_vars`.
 pub trait VarIF {
+    /// return a new `Var`.
     fn new(i: usize) -> Var;
+    /// return an `n`-length vector of new `Var`s.
     fn new_vars(n: usize) -> Vec<Var>;
 }
 
@@ -309,8 +323,10 @@ pub trait VarDBIF {
     fn compute_lbd(&mut self, vec: &[Lit]) -> usize;
     /// return current activity
     fn activity(&mut self, vi: VarId) -> f64;
+    /// bump the activity of the vi-th variable.
     fn bump_activity(&mut self, vi: VarId);
-    fn force_reset(&mut self, ncnfl: usize) -> bool;
+    // bump unassigned variables' activities
+    // fn force_reset(&mut self, ncnfl: usize) -> bool;
 }
 
 pub trait VarSetIF {
@@ -319,8 +335,6 @@ pub trait VarSetIF {
     fn remove(&self, v: &mut Var);
     /// reset after restart
     fn reset(&mut self);
-    fn reach_top(&self) -> bool;
-    fn reach_bottom(&self) -> bool;
 }
 
 /// API for 'watcher list' like `attach`, `detach`, `detach_with` and so on.
