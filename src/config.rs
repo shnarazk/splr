@@ -6,8 +6,8 @@ pub const VERSION: &str = "0.2.0-RC0";
 pub const EMA_FAST: usize = 64; // 2 ^ 6
 pub const EMA_SLOW: usize = 32768; // 2 ^ 15
 
-pub const RESTART_INTV: usize = 1024;
-pub const RESTART_QNTM: usize = 40;
+pub const RESTART_INTV: usize = 32;
+pub const RESTART_QNTM: usize = 32;
 pub const RESTART_THRD: (f64, f64) = (0.25, 0.95);
 
 /// Configuration built from command line options
@@ -18,10 +18,10 @@ pub struct Config {
     #[structopt(long = "cl", default_value = "0")]
     pub clause_limit: usize,
     /// minimal interval of restarts
-    #[structopt(long = "ri", default_value = "1024")]
+    #[structopt(long = "ri", default_value = "32")]
     pub restart_interval: usize,
     /// steps of fup quantization
-    #[structopt(long = "rq", default_value = "40")]
+    #[structopt(long = "rq", default_value = "32")]
     pub restart_quantum: usize,
     /// grow limit of #clauses by v-elim.
     #[structopt(long = "eg", default_value = "4")]
@@ -29,10 +29,10 @@ pub struct Config {
     /// #literals in a clause in v-elim.
     #[structopt(long = "el", default_value = "64")]
     pub elim_lit_limit: usize,
-    /// init. variable activity decay
+    /// init. var. activity decay
     #[structopt(long = "vd", default_value = "0.90")]
     pub var_activity_decay: f64,
-    /// max. variable activity decay
+    /// max. var. activity decay
     #[structopt(long = "vm", default_value = "0.96")]
     pub var_activity_d_max: f64,
     /// a DIMACS format CNF file
@@ -41,7 +41,7 @@ pub struct Config {
     /// output directory
     #[structopt(long = "--dir", short = "o", default_value = ".", parse(from_os_str))]
     pub output_dirname: PathBuf,
-    /// result filename/stdout
+    /// result filename or stdout
     #[structopt(long = "--result", short = "r", default_value = "", parse(from_os_str))]
     pub result_filename: PathBuf,
     /// filename for DRAT cert.
@@ -64,7 +64,7 @@ pub struct Config {
     /// Writes a DRAT UNSAT certification
     #[structopt(long = "certify", short = "c")]
     pub use_certification: bool,
-    /// CPU time limit in sec.
+    /// soft limit for CPU time in sec.
     #[structopt(long = "to", default_value = "0")]
     pub timeout: f64,
     /// Interval for dumping stat info.

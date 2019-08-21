@@ -116,10 +116,10 @@ pub struct RestartExecutor {
     pub luby: RestartLuby,
     after_restart: usize,
     interval: usize,
-    quantum: f64,
+    quantumize: usize,
     trend_dir: (bool, usize),
     trend_duration: usize,
-    trend_band: (f64, f64),
+    qtrend_band: (usize, usize),
 }
 
 impl Default for RestartExecutor {
@@ -128,7 +128,7 @@ impl Default for RestartExecutor {
             ratio: Ema::new(EMA_SLOW),
             interval: RESTART_INTV,
             interval_ema: Ema::new(EMA_SLOW),
-            quantum: RESTART_QNTM as f64,
+            quantumize: RESTART_QNTM,
             threshold: RESTART_THRD, // (fup.trend, decay factor),
             use_luby: false,
             asg: RestartASG::new(RESTART_THRESHOLD),
@@ -138,15 +138,15 @@ impl Default for RestartExecutor {
             after_restart: 1,
             trend_dir: (true, 0),
             trend_duration: 0,
-            trend_band: (0.0, 1000.0),
+            qtrend_band: (0, 1000),
         }
     }
 }
 impl RestartExecutor {
-    pub fn new(interval: usize, quantum: usize) -> RestartExecutor {
+    pub fn new(interval: usize, quantumize: usize) -> RestartExecutor {
         let mut re = RestartExecutor::default();
         re.interval = interval;
-        re.quantum = quantum as f64;
+        re.quantumize = quantumize;
         re
     }
 }
@@ -161,48 +161,74 @@ impl RestartIF for RestartExecutor {
             after_restart,
             fup,
             interval,
-            quantum,
+            quantumize,
             threshold,
             trend_dir,
-            trend_band,
+            qtrend_band,
             ..
         } = self;
-        let mut todo = false;
+        let (band_min, band_max) = qtrend_band;
+        let mut restart_point = false;
         let r_trend = fup.trend();
-        let q_trend = (r_trend * *quantum).floor() / *quantum;
+        let q_trend = (r_trend * *quantumize as f64) as usize;
         *after_restart += 1;
         // * trend_dir.0: fup's trend is increasing
         // * trend_dir.1: its duration
-        // * trend_band: (minimum trend, maximum trend)
         if trend_dir.0 {
-            if trend_band.1 <= q_trend {
+            if *band_max < q_trend {
                 trend_dir.1 += 1;
-                trend_band.1 = q_trend;
-            } else {
-                if *interval < trend_dir.1 && 1.0 / *quantum <= trend_band.1 - trend_band.0 {
-                    todo = true;
+                *band_max = q_trend;
+            } else if *band_max == q_trend {
+                if 0 < trend_dir.1 {
+                    trend_dir.1 += 1;
                 }
-                *trend_dir = (false, 0);
-                trend_band.0 = trend_band.1;
+            } else {
+                if *interval < trend_dir.1
+                    && 4 <= *band_max - *band_min
+                    && 3 <= *band_max - q_trend
+                {
+                    restart_point = true;
+                    *trend_dir = (false, 0);
+                    *band_min = *band_max;
+                } else if q_trend < *band_min {
+                    *trend_dir = (false, 0);
+                    *band_min = *band_max;
+                } else {
+                    trend_dir.1 += 1;
+                }
             }
-        } else if q_trend <= trend_band.0 {
-            trend_dir.1 += 1;
-            trend_band.0 = q_trend;
         } else {
-            if *interval <= trend_dir.1 && 1.0 / *quantum <= trend_band.1 - trend_band.0 {
-                todo = true;
+            if q_trend < *band_min {
+                trend_dir.1 += 1;
+                *band_min = q_trend;
+            } else if q_trend == *band_min {
+                if 0 < trend_dir.1 {
+                    trend_dir.1 += 1;
+                }
+            } else {
+                if *interval <= trend_dir.1
+                    && 4 <= *band_max - *band_min
+                    && 3 <= q_trend - *band_min
+                {
+                    // restart_point = true;
+                    *trend_dir = (true, 0);
+                    *band_max = *band_min;
+                } else if *band_max < q_trend {
+                    *trend_dir = (true, 0);
+                    *band_max = *band_min;
+                } else {
+                    trend_dir.1 += 1;
+                }
             }
-            *trend_dir = (true, 0);
-            trend_band.1 = trend_band.0;
         }
         if *interval <= trend_dir.1 && r_trend < threshold.0 {
             trend_dir.1 = 0;
-            *trend_band = (1.0, 0.0);
+            *qtrend_band = (*quantumize, 0);
             threshold.0 *= threshold.1;
             self.reset_fup(vdb);
-            todo = true;
+            restart_point = true;
         }
-        if todo {
+        if restart_point {
             self.interval_ema.update(self.after_restart as f64);
             self.after_restart = 0;
             return true;
