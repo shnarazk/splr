@@ -6,8 +6,8 @@ pub const VERSION: &str = "0.2.0-RC0";
 pub const EMA_FAST: usize = 64; // 2 ^ 6
 pub const EMA_SLOW: usize = 32768; // 2 ^ 15
 
-pub const RESTART_INTV: usize = 32;
-pub const RESTART_QNTM: usize = 32;
+pub const RESTART_INTV: usize = EMA_FAST;
+pub const RESTART_QNTM: usize = 100;
 pub const RESTART_THRD: (f64, f64) = (0.25, 0.95);
 
 /// Configuration built from command line options
@@ -18,10 +18,10 @@ pub struct Config {
     #[structopt(long = "cl", default_value = "0")]
     pub clause_limit: usize,
     /// minimal interval of restarts
-    #[structopt(long = "ri", default_value = "32")]
+    #[structopt(long = "ri", default_value = "64")]
     pub restart_interval: usize,
     /// steps of fup quantization
-    #[structopt(long = "rq", default_value = "32")]
+    #[structopt(long = "rq", default_value = "100")]
     pub restart_quantum: usize,
     /// grow limit of #clauses by v-elim.
     #[structopt(long = "eg", default_value = "4")]
@@ -55,7 +55,7 @@ pub struct Config {
     /// Uses Glucose format for progress report
     #[structopt(long = "--log", short = "l")]
     pub use_log: bool,
-    /// Disables exhaustive simplification
+    /// Disables exhaustive clause/var elimination
     #[structopt(long = "no-elim", short = "E")]
     pub without_elim: bool,
     /// Disables dynamic strategy adaptation

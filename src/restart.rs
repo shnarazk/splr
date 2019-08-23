@@ -3,7 +3,7 @@ use crate::traits::*;
 use crate::types::Flag;
 use crate::var::{Var, VarDB};
 
-const RESTART_THRESHOLD: f64 = 1.6;
+const RESTART_THRESHOLD: f64 = 1.1;
 
 /// Exponential Moving Average w/ a calibrator
 #[derive(Debug)]
@@ -109,6 +109,7 @@ pub struct RestartExecutor {
     pub interval_ema: Ema,
     pub ratio: Ema,
     pub threshold: (f64, f64),
+    pub trend_dir: (bool, usize),
     pub use_luby: bool,
     pub asg: RestartASG,
     pub fup: VarSet,
@@ -116,29 +117,28 @@ pub struct RestartExecutor {
     pub luby: RestartLuby,
     after_restart: usize,
     interval: usize,
-    quantumize: usize,
-    trend_dir: (bool, usize),
-    trend_duration: usize,
     qtrend_band: (usize, usize),
+    quantumize: usize,
+    trend_duration: usize,
 }
 
 impl Default for RestartExecutor {
     fn default() -> Self {
         RestartExecutor {
-            ratio: Ema::new(EMA_SLOW),
-            interval: RESTART_INTV,
             interval_ema: Ema::new(EMA_SLOW),
-            quantumize: RESTART_QNTM,
+            ratio: Ema::new(EMA_SLOW),
             threshold: RESTART_THRD, // (fup.trend, decay factor),
+            trend_dir: (true, 0),
             use_luby: false,
             asg: RestartASG::new(RESTART_THRESHOLD),
             fup: VarSet::new(Flag::FUP),
             lbd: RestartLBD::new(RESTART_THRESHOLD),
             luby: RestartLuby::new(2.0, 100.0),
             after_restart: 1,
-            trend_dir: (true, 0),
-            trend_duration: 0,
+            interval: RESTART_INTV,
             qtrend_band: (0, 1000),
+            quantumize: RESTART_QNTM,
+            trend_duration: 0,
         }
     }
 }
