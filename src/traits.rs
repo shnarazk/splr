@@ -248,8 +248,6 @@ pub trait ProgressEvaluatorIF<'a> {
 pub trait RestartIF {
     /// new local/global restart control
     fn restart(&mut self, vdb: &mut VarDB) -> bool;
-    /// reset the first UIP set.
-    fn reset_fup(&mut self, vdb: &mut VarDB);
 }
 
 /// API for SAT solver like `build`, `solve` and so on.
@@ -335,6 +333,8 @@ pub trait VarSetIF {
     fn remove(&self, v: &mut Var);
     /// reset after restart
     fn reset(&mut self);
+    /// reset the flag in `Var`s and itself.
+    fn reset_vars(&mut self, vdb: &mut VarDB);
 }
 
 /// API for 'watcher list' like `attach`, `detach`, `detach_with` and so on.

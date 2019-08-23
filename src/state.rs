@@ -429,8 +429,8 @@ impl StateIF for State {
         println!("                                                  ");
         println!("                                                  ");
         println!("                                                  ");
+        println!("                                                  ");
         if 0 < self.config.dump_interval {
-            println!("                                                  ");
             println!("                                                  ");
             println!("                                                  ");
         }
@@ -457,7 +457,7 @@ impl StateIF for State {
         self.progress_cnt += 1;
         print!(
             "\x1B[{}A\x1B[1G",
-            if 0 < self.config.dump_interval { 10 } else { 7 }
+            if 0 < self.config.dump_interval { 10 } else { 8 }
         );
         println!("\x1B[2K{}", self);
         println!(
@@ -592,44 +592,42 @@ impl StateIF for State {
                 self.rst.fup.trend()
             ),
         );
-        if 0 < self.config.dump_interval {
-            println!(
-                "\x1B[2K  Learnt LBD|#num:{}, #ave:{}, e-64:{}, trnd:{} ",
-                // "\x1B[2K    Conflict|cnfl:{}, bjmp:{}, aLBD:{}, trnd:{} ",
-                im!("{:>9.0}", self.record, LogUsizeId::Learnt, self.rst.lbd.num),
-                fm!(
-                    "{:>9.2}",
-                    self.record,
-                    LogF64Id::LBDave,
-                    self.rst.lbd.sum / self.rst.lbd.num as f64
-                ),
-                fm!(
-                    "{:>9.2}",
-                    self.record,
-                    LogF64Id::LBDema,
-                    self.rst.lbd.ema.get()
-                ),
-                fm!(
-                    "{:>9.4}",
-                    self.record,
-                    LogF64Id::LBDtrd,
-                    self.rst.lbd.trend()
-                ),
-            );
-        }
         println!(
-            "\x1B[2K     Restart|#exe:{}, Luby:{}, leng:{}, #gen:{} ",
+            "\x1B[2K  Learnt LBD|#num:{}, #ave:{}, e-64:{}, trnd:{} ",
+            // "\x1B[2K    Conflict|cnfl:{}, bjmp:{}, aLBD:{}, trnd:{} ",
+            im!("{:>9.0}", self.record, LogUsizeId::Learnt, self.rst.lbd.num),
+            fm!(
+                "{:>9.2}",
+                self.record,
+                LogF64Id::LBDave,
+                self.rst.lbd.sum / self.rst.lbd.num as f64
+            ),
+            fm!(
+                "{:>9.2}",
+                self.record,
+                LogF64Id::LBDema,
+                self.rst.lbd.ema.get()
+            ),
+            fm!(
+                "{:>9.4}",
+                self.record,
+                LogF64Id::LBDtrd,
+                self.rst.lbd.trend()
+            ),
+        );
+        println!(
+            "\x1B[2K     Restart|#exe:{}, setl:{}, leng:{}, #gen:{} ",
             im!(
                 "{:>9.0}",
                 self.record,
                 LogUsizeId::Restart,
                 self.stats[Stat::Restart]
             ),
-            im!(
-                "{:>9.0}",
+            fm!(
+                "{:>9.2}",
                 self.record,
-                LogUsizeId::RestartByLuby,
-                self.stats[Stat::RestartByLuby]
+                LogF64Id::STLlen,
+                self.rst.settle_ema.get()
             ),
             fm!(
                 "{:>9.0}",
@@ -651,6 +649,7 @@ impl StateIF for State {
         }
         self.flush("\x1B[2K");
         // update undisplayed fields
+        self.record[LogUsizeId::RestartByLuby] = self.stats[Stat::RestartByLuby];
         self.record[LogUsizeId::Reduction] = self.stats[Stat::Reduction];
         self.record[LogUsizeId::SatClauseElim] = self.stats[Stat::SatClauseElimination];
         self.record[LogUsizeId::ExhaustiveElim] = self.stats[Stat::ExhaustiveElimination];
@@ -746,7 +745,8 @@ pub enum LogF64Id {
     CLevel,       // 13: conflict_level
     RSTrat,       // 14: rst.ratio
     RSTlen,       // 15: rst.interval_ema
-    VADecay,      // 16: vdb.activity_decay
+    STLlen,
+    VADecay, // 16: vdb.activity_decay
     End,
 }
 

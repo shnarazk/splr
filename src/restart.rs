@@ -3,7 +3,7 @@ use crate::traits::*;
 use crate::types::Flag;
 use crate::var::{Var, VarDB};
 
-const RESTART_THRESHOLD: f64 = 1.1;
+const RESTART_THRESHOLD: f64 = 1.4;
 
 /// Exponential Moving Average w/ a calibrator
 #[derive(Debug)]
@@ -108,10 +108,12 @@ impl Ema2 {
 pub struct RestartExecutor {
     pub interval_ema: Ema,
     pub ratio: Ema,
+    pub settle_ema: Ema,
     pub threshold: (f64, f64),
     pub trend_dir: (bool, usize),
     pub use_luby: bool,
     pub asg: RestartASG,
+    pub cnf: VarSet,
     pub fup: VarSet,
     pub lbd: RestartLBD,
     pub luby: RestartLuby,
@@ -119,6 +121,7 @@ pub struct RestartExecutor {
     interval: usize,
     qtrend_band: (usize, usize),
     quantumize: usize,
+    settle_time: usize,
     trend_duration: usize,
 }
 
@@ -127,10 +130,12 @@ impl Default for RestartExecutor {
         RestartExecutor {
             interval_ema: Ema::new(EMA_SLOW),
             ratio: Ema::new(EMA_SLOW),
+            settle_ema: Ema::new(EMA_SLOW),
             threshold: RESTART_THRD, // (fup.trend, decay factor),
             trend_dir: (true, 0),
             use_luby: false,
             asg: RestartASG::new(RESTART_THRESHOLD),
+            cnf: VarSet::new(Flag::CNFVAR),
             fup: VarSet::new(Flag::FUP),
             lbd: RestartLBD::new(RESTART_THRESHOLD),
             luby: RestartLuby::new(2.0, 100.0),
@@ -138,6 +143,7 @@ impl Default for RestartExecutor {
             interval: RESTART_INTV,
             qtrend_band: (0, 1000),
             quantumize: RESTART_QNTM,
+            settle_time: 0,
             trend_duration: 0,
         }
     }
@@ -159,6 +165,8 @@ impl RestartIF for RestartExecutor {
         }
         let RestartExecutor {
             after_restart,
+            settle_time,
+            settle_ema,
             fup,
             interval,
             quantumize,
@@ -171,6 +179,7 @@ impl RestartIF for RestartExecutor {
         let mut restart_point = false;
         let r_trend = fup.trend();
         let q_trend = (r_trend * *quantumize as f64) as usize;
+        *settle_time += 1;
         *after_restart += 1;
         // * trend_dir.0: fup's trend is increasing
         // * trend_dir.1: its duration
@@ -178,21 +187,33 @@ impl RestartIF for RestartExecutor {
             if *band_max < q_trend {
                 trend_dir.1 += 1;
                 *band_max = q_trend;
+                if *interval < *after_restart && self.lbd.threshold < self.lbd.trend() {
+                    restart_point = true;
+                    trend_dir.1 = 0;
+                    *band_min = q_trend;
+                }
             } else if *band_max == q_trend {
                 if 0 < trend_dir.1 {
                     trend_dir.1 += 1;
                 }
-            } else {
-                if *interval < trend_dir.1
-                    && 4 <= *band_max - *band_min
-                    && 3 <= *band_max - q_trend
-                {
+                if *interval < *after_restart && self.lbd.threshold < self.lbd.trend() {
                     restart_point = true;
+                    trend_dir.1 = 0;
+                    *band_min = q_trend;
+                }
+            } else {
+                if *interval < trend_dir.1 && 3 <= *band_max - *band_min && 2 <= *band_max - q_trend
+                {
+                    // restart_point = true;
                     *trend_dir = (false, 0);
-                    *band_min = *band_max;
+                    // *band_min = *band_max;
+                    *band_min = q_trend;
+                    *band_max = q_trend;
                 } else if q_trend < *band_min {
                     *trend_dir = (false, 0);
-                    *band_min = *band_max;
+                    // *band_min = *band_max;
+                    *band_min = q_trend;
+                    *band_max = q_trend;
                 } else {
                     trend_dir.1 += 1;
                 }
@@ -207,39 +228,50 @@ impl RestartIF for RestartExecutor {
                 }
             } else {
                 if *interval <= trend_dir.1
-                    && 4 <= *band_max - *band_min
-                    && 3 <= q_trend - *band_min
+                    && 3 <= *band_max - *band_min
+                    && 2 <= q_trend - *band_min
                 {
+                    settle_ema.update((*settle_time) as f64);
+                    *settle_time = 0;
                     // restart_point = true;
+                    *after_restart = 0;
                     *trend_dir = (true, 0);
-                    *band_max = *band_min;
+                    // *band_max = *band_min;
+                    *band_min = q_trend;
+                    *band_max = q_trend;
                 } else if *band_max < q_trend {
+                    settle_ema.update((*settle_time) as f64);
+                    *settle_time = 0;
+                    *after_restart = 0;
                     *trend_dir = (true, 0);
-                    *band_max = *band_min;
+                    // *band_max = *band_min;
+                    *band_min = q_trend;
+                    *band_max = q_trend;
                 } else {
                     trend_dir.1 += 1;
                 }
             }
         }
         if *interval <= trend_dir.1 && r_trend < threshold.0 {
-            trend_dir.1 = 0;
+            settle_ema.update((*settle_time) as f64);
+            *settle_time = 0;
+            *trend_dir = (true, 0);
             *qtrend_band = (*quantumize, 0);
             threshold.0 *= threshold.1;
-            self.reset_fup(vdb);
-            restart_point = true;
+            if self.lbd.threshold < self.lbd.trend() {
+                restart_point = true;
+            }
+            // self.reset_fup(vdb);
+            self.fup.reset_vars(vdb);
+            self.cnf.reset_vars(vdb);
         }
         if restart_point {
             self.interval_ema.update(self.after_restart as f64);
             self.after_restart = 0;
+            self.settle_time = 0;
             return true;
         }
         false
-    }
-    fn reset_fup(&mut self, vdb: &mut VarDB) {
-        for v in &mut vdb.vars[1..] {
-            self.fup.remove(v);
-        }
-        self.fup.reset();
     }
 }
 
@@ -612,6 +644,12 @@ impl VarSetIF for VarSet {
         self.is_closed = false;
         self.diff_ema.reinitialize(0.0);
         self.num_build += 1;
+    }
+    fn reset_vars(&mut self, vdb: &mut VarDB) {
+        for v in &mut vdb.vars[1..] {
+            self.remove(v);
+        }
+        self.reset();
     }
 }
 
