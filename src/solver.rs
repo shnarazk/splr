@@ -400,13 +400,11 @@ fn handle_conflict_path(
         }
         let cid = cdb.attach(state, vdb, lbd);
         elim.add_cid_occur(vdb, cid, &mut cdb.clause[cid as usize], true);
-        if state.rst.trend_dir.0 {
-            state.rst.lbd.update(lbd);
-        }
         if 0 < state.config.dump_interval {
             state.c_lvl.update(c_level as f64);
             state.b_lvl.update(bl as f64);
             state.rst.asg.update(c_asgns);
+            state.rst.lbd.update(lbd);
         }
         if state.rst.restart(vdb) {
             state.stats[Stat::Restart] += 1;

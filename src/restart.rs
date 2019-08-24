@@ -108,21 +108,22 @@ impl Ema2 {
 pub struct RestartExecutor {
     pub interval_ema: Ema,
     pub ratio: Ema,
+    pub num_settle: usize,
+    pub num_overrun: usize,
     pub settle_ema: Ema,
     pub threshold: (f64, f64),
-    pub trend_dir: (bool, usize),
+    pub trend_up: bool,
     pub use_luby: bool,
     pub asg: RestartASG,
     pub cnf: VarSet,
     pub fup: VarSet,
     pub lbd: RestartLBD,
     pub luby: RestartLuby,
-    after_restart: usize,
     interval: usize,
-    qtrend_band: (usize, usize),
+    last_qtrend: usize,
     quantumize: usize,
-    settle_time: usize,
-    trend_duration: usize,
+    restart_len: usize,
+    settle_len: usize,
 }
 
 impl Default for RestartExecutor {
@@ -130,21 +131,22 @@ impl Default for RestartExecutor {
         RestartExecutor {
             interval_ema: Ema::new(EMA_SLOW),
             ratio: Ema::new(EMA_SLOW),
-            settle_ema: Ema::new(EMA_SLOW),
+            num_settle: 0,
+            num_overrun: 0,
+            settle_ema: Ema::new(256),
             threshold: RESTART_THRD, // (fup.trend, decay factor),
-            trend_dir: (true, 0),
+            trend_up: true,
             use_luby: false,
             asg: RestartASG::new(RESTART_THRESHOLD),
             cnf: VarSet::new(Flag::CNFVAR),
             fup: VarSet::new(Flag::FUP),
             lbd: RestartLBD::new(RESTART_THRESHOLD),
             luby: RestartLuby::new(2.0, 100.0),
-            after_restart: 1,
             interval: RESTART_INTV,
-            qtrend_band: (0, 1000),
+            last_qtrend: 0,
             quantumize: RESTART_QNTM,
-            settle_time: 0,
-            trend_duration: 0,
+            restart_len: 1,
+            settle_len: 0,
         }
     }
 }
@@ -153,6 +155,7 @@ impl RestartExecutor {
         let mut re = RestartExecutor::default();
         re.interval = interval;
         re.quantumize = quantumize;
+        re.settle_ema.update(EMA_FAST as f64);
         re
     }
 }
@@ -164,111 +167,47 @@ impl RestartIF for RestartExecutor {
             return self.luby.is_active();
         }
         let RestartExecutor {
-            after_restart,
-            settle_time,
+            num_settle,
+            num_overrun,
             settle_ema,
-            fup,
-            interval,
+            cnf,
+            last_qtrend,
             quantumize,
+            restart_len,
+            settle_len,
             threshold,
-            trend_dir,
-            qtrend_band,
+            trend_up,
             ..
         } = self;
-        let (band_min, band_max) = qtrend_band;
         let mut restart_point = false;
-        let r_trend = fup.trend();
+        let r_trend = cnf.trend();
         let q_trend = (r_trend * *quantumize as f64) as usize;
-        *settle_time += 1;
-        *after_restart += 1;
-        // * trend_dir.0: fup's trend is increasing
-        // * trend_dir.1: its duration
-        if trend_dir.0 {
-            if *band_max < q_trend {
-                trend_dir.1 += 1;
-                *band_max = q_trend;
-                if *interval < *after_restart && self.lbd.threshold < self.lbd.trend() {
-                    restart_point = true;
-                    trend_dir.1 = 0;
-                    *band_min = q_trend;
-                }
-            } else if *band_max == q_trend {
-                if 0 < trend_dir.1 {
-                    trend_dir.1 += 1;
-                }
-                if *interval < *after_restart && self.lbd.threshold < self.lbd.trend() {
-                    restart_point = true;
-                    trend_dir.1 = 0;
-                    *band_min = q_trend;
-                }
-            } else {
-                if *interval < trend_dir.1 && 3 <= *band_max - *band_min && 2 <= *band_max - q_trend
-                {
-                    // restart_point = true;
-                    *trend_dir = (false, 0);
-                    // *band_min = *band_max;
-                    *band_min = q_trend;
-                    *band_max = q_trend;
-                } else if q_trend < *band_min {
-                    *trend_dir = (false, 0);
-                    // *band_min = *band_max;
-                    *band_min = q_trend;
-                    *band_max = q_trend;
-                } else {
-                    trend_dir.1 += 1;
-                }
-            }
-        } else {
-            if q_trend < *band_min {
-                trend_dir.1 += 1;
-                *band_min = q_trend;
-            } else if q_trend == *band_min {
-                if 0 < trend_dir.1 {
-                    trend_dir.1 += 1;
-                }
-            } else {
-                if *interval <= trend_dir.1
-                    && 3 <= *band_max - *band_min
-                    && 2 <= q_trend - *band_min
-                {
-                    settle_ema.update((*settle_time) as f64);
-                    *settle_time = 0;
-                    // restart_point = true;
-                    *after_restart = 0;
-                    *trend_dir = (true, 0);
-                    // *band_max = *band_min;
-                    *band_min = q_trend;
-                    *band_max = q_trend;
-                } else if *band_max < q_trend {
-                    settle_ema.update((*settle_time) as f64);
-                    *settle_time = 0;
-                    *after_restart = 0;
-                    *trend_dir = (true, 0);
-                    // *band_max = *band_min;
-                    *band_min = q_trend;
-                    *band_max = q_trend;
-                } else {
-                    trend_dir.1 += 1;
-                }
-            }
+        *restart_len += 1;
+        *settle_len += 1;
+        if *trend_up && q_trend < *last_qtrend {
+            *settle_len = 0;
+            *trend_up = false;
+        } else if !*trend_up && *last_qtrend < q_trend {
+            settle_ema.update(8.max(*settle_len) as f64);
+            *num_settle += 1;
+            *settle_len = 0;
+            *trend_up = true;
+        } else if !*trend_up && settle_ema.get() * 1.8 < *settle_len as f64 {
+            settle_ema.update((4 * *settle_len) as f64);
+            *num_overrun += 1;
+            *num_settle += 1;
+            *settle_len = 0;
+            restart_point = true;
         }
-        if *interval <= trend_dir.1 && r_trend < threshold.0 {
-            settle_ema.update((*settle_time) as f64);
-            *settle_time = 0;
-            *trend_dir = (true, 0);
-            *qtrend_band = (*quantumize, 0);
-            threshold.0 *= threshold.1;
-            if self.lbd.threshold < self.lbd.trend() {
-                restart_point = true;
-            }
-            // self.reset_fup(vdb);
-            self.fup.reset_vars(vdb);
-            self.cnf.reset_vars(vdb);
-        }
+        *last_qtrend = q_trend;
         if restart_point {
-            self.interval_ema.update(self.after_restart as f64);
-            self.after_restart = 0;
-            self.settle_time = 0;
+            self.interval_ema.update(self.restart_len as f64);
+            self.restart_len = 0;
+            if r_trend < threshold.0 {
+                threshold.0 *= threshold.1;
+                self.fup.reset_vars(vdb);
+                self.cnf.reset_vars(vdb);
+            }
             return true;
         }
         false

@@ -6,8 +6,8 @@ pub const VERSION: &str = "0.2.0-RC0";
 pub const EMA_FAST: usize = 64; // 2 ^ 6
 pub const EMA_SLOW: usize = 32768; // 2 ^ 15
 
-pub const RESTART_INTV: usize = EMA_FAST;
-pub const RESTART_QNTM: usize = 100;
+pub const RESTART_INTV: usize = 256;
+pub const RESTART_QNTM: usize = 256;
 pub const RESTART_THRD: (f64, f64) = (0.25, 0.95);
 
 /// Configuration built from command line options
@@ -18,10 +18,10 @@ pub struct Config {
     #[structopt(long = "cl", default_value = "0")]
     pub clause_limit: usize,
     /// minimal interval of restarts
-    #[structopt(long = "ri", default_value = "64")]
+    #[structopt(long = "ri", default_value = "256")]
     pub restart_interval: usize,
     /// steps of fup quantization
-    #[structopt(long = "rq", default_value = "100")]
+    #[structopt(long = "rq", default_value = "256")]
     pub restart_quantum: usize,
     /// grow limit of #clauses by v-elim.
     #[structopt(long = "eg", default_value = "4")]

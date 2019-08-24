@@ -558,18 +558,51 @@ impl StateIF for State {
         self.record[LogF64Id::VADecay] = vdb.activity_decay;
         if 0 < self.config.dump_interval {
             println!(
-                "\x1B[2K    Analysis|cLvl:{}, bLvl:{}, rstR:{}, thrd:{} ",
+                "\x1B[2K    Analysis|cLvl:{}, bLvl:{}, #stl:{}, stlL:{} ",
                 fm!("{:>9.2}", self.record, LogF64Id::CLevel, self.c_lvl.get()),
                 fm!("{:>9.2}", self.record, LogF64Id::BLevel, self.b_lvl.get()),
-                fm!(
-                    "{:>9.4}",
+                im!(
+                    "{:>9.0}",
                     self.record,
-                    LogF64Id::RSTlen,
-                    100.0 * self.rst.ratio.get()
+                    LogUsizeId::STL,
+                    self.rst.num_settle
                 ),
-                format!("{:>9.4}", self.rst.threshold.0),
+                fm!(
+                    "{:>9.2}",
+                    self.record,
+                    LogF64Id::STLlen,
+                    self.rst.settle_ema.get()
+                ),
             );
         }
+        self.record[LogF64Id::RSTlen] = 100.0 * self.rst.ratio.get();
+        println!(
+            "\x1B[2K ConfVar set|#sum:{}, #ave:{}, e-64:{}, trnd:{} ",
+            im!("{:>9}", self.record, LogUsizeId::CNFnum, self.rst.cnf.sum),
+            fm!(
+                "{:>9.4}",
+                self.record,
+                LogF64Id::CNFave,
+                self.rst.cnf.sum as f64 / self.rst.cnf.num as f64
+            ),
+            fm!(
+                "{:>9.4}",
+                self.record,
+                LogF64Id::CNFema,
+                self.rst.cnf.diff_ema.get()
+            ),
+            fm!(
+                "{:>9.4}",
+                self.record,
+                LogF64Id::CNFtrd,
+                self.rst.cnf.trend()
+            ),
+        );
+        self.record[LogUsizeId::FUPnum] = self.rst.fup.sum;
+        self.record[LogF64Id::FUPave] = self.rst.fup.sum as f64 / self.rst.fup.num as f64;
+        self.record[LogF64Id::FUPema] = self.rst.fup.diff_ema.get();
+        self.record[LogF64Id::FUPtrd] = self.rst.fup.trend();
+/*
         println!(
             "\x1B[2K   First UIP|#sum:{}, #ave:{}, e-64:{}, trnd:{} ",
             im!("{:>9}", self.record, LogUsizeId::FUPnum, self.rst.fup.sum),
@@ -592,6 +625,7 @@ impl StateIF for State {
                 self.rst.fup.trend()
             ),
         );
+*/
         println!(
             "\x1B[2K  Learnt LBD|#num:{}, #ave:{}, e-64:{}, trnd:{} ",
             // "\x1B[2K    Conflict|cnfl:{}, bjmp:{}, aLBD:{}, trnd:{} ",
@@ -616,18 +650,18 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K     Restart|#exe:{}, setl:{}, leng:{}, #gen:{} ",
+            "\x1B[2K     Restart|#exe:{}, byTO:{}, leng:{}, #gen:{} ",
             im!(
                 "{:>9.0}",
                 self.record,
                 LogUsizeId::Restart,
                 self.stats[Stat::Restart]
             ),
-            fm!(
-                "{:>9.2}",
+            im!(
+                "{:>9.0}",
                 self.record,
-                LogF64Id::STLlen,
-                self.rst.settle_ema.get()
+                LogUsizeId::STLovr,
+                self.rst.num_overrun
             ),
             fm!(
                 "{:>9.0}",
@@ -719,9 +753,12 @@ pub enum LogUsizeId {
     Reduction,      // 13: reduction: usize,
     SatClauseElim,  // 14: simplification: usize,
     ExhaustiveElim, // 15: elimination: usize,
-    FUPnum,         // 16: the number of current fups
-    FUPgrp,         // 17: the number of FUP graph generation
-    AsgMax,         // 18: te maximum number of assigned variables
+    CNFnum,         // 16: the number of conflicting vars
+    FUPnum,         // 17: the number of current fups
+    FUPgrp,         // 18: the number of FUP graph generation
+    AsgMax,         // 19: the maximum number of assigned variables
+    STL,            // 20: the number of settlements
+    STLovr,         // 21: the number of timeout-ed settlements
     // ElimClauseQueue, // __: elim_clause_queue: usize,
     // ElimVarQueue, // __: elim_var_queue: usize,
     End,
@@ -733,20 +770,23 @@ pub enum LogF64Id {
     ASGave,       //  1: rst.asg.{sum / num}
     ASGema,       //  2: ema_asg.ema.get
     ASGtrn,       //  3: ema_asg.trend
-    FUPinc,       //  4: ema_fup.diff_ema.slow: f64,
-    FUPprg,       //  5: num_fup percentage: f64,
-    FUPave,       //  6: rst.fup.{sum / num}
-    FUPema,       //  7: rst.fup.diff_ema.get
-    FUPtrd,       //  8: rst.fup.trend
-    LBDave,       //  9: rst.lbd.{sum / sum}
-    LBDema,       // 10: rst.lbd.ema.get
-    LBDtrd,       // 11: ema_lbd trend
-    BLevel,       // 12: backjump_level
-    CLevel,       // 13: conflict_level
-    RSTrat,       // 14: rst.ratio
-    RSTlen,       // 15: rst.interval_ema
-    STLlen,
-    VADecay, // 16: vdb.activity_decay
+    CNFave,       //  4: rst.cnf.{sum / num}
+    CNFema,       //  5: rst.cnf.get
+    CNFtrd,       //  6: rst.cnf.trend
+    FUPinc,       //  7: ema_fup.diff_ema.slow: f64,
+    FUPprg,       //  8: num_fup percentage: f64,
+    FUPave,       //  9: rst.fup.{sum / num}
+    FUPema,       // 10: rst.fup.diff_ema.get
+    FUPtrd,       // 11: rst.fup.trend
+    LBDave,       // 12: rst.lbd.{sum / num}
+    LBDema,       // 13: rst.lbd.ema.get
+    LBDtrd,       // 14: ema_lbd trend
+    BLevel,       // 15: backjump_level
+    CLevel,       // 16: conflict_level
+    RSTrat,       // 17: rst.ratio
+    RSTlen,       // 18: rst.interval_ema
+    STLlen,       // 19: rst.settle_ema.get
+    VADecay,      // 20: vdb.activity_decay
     End,
 }
 
