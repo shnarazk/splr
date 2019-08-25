@@ -561,12 +561,7 @@ impl StateIF for State {
                 "\x1B[2K    Analysis|cLvl:{}, bLvl:{}, #stl:{}, stlL:{} ",
                 fm!("{:>9.2}", self.record, LogF64Id::CLevel, self.c_lvl.get()),
                 fm!("{:>9.2}", self.record, LogF64Id::BLevel, self.b_lvl.get()),
-                im!(
-                    "{:>9.0}",
-                    self.record,
-                    LogUsizeId::STL,
-                    self.rst.num_settle
-                ),
+                im!("{:>9.0}", self.record, LogUsizeId::STL, self.rst.num_settle),
                 fm!(
                     "{:>9.2}",
                     self.record,
@@ -602,30 +597,30 @@ impl StateIF for State {
         self.record[LogF64Id::FUPave] = self.rst.fup.sum as f64 / self.rst.fup.num as f64;
         self.record[LogF64Id::FUPema] = self.rst.fup.diff_ema.get();
         self.record[LogF64Id::FUPtrd] = self.rst.fup.trend();
-/*
-        println!(
-            "\x1B[2K   First UIP|#sum:{}, #ave:{}, e-64:{}, trnd:{} ",
-            im!("{:>9}", self.record, LogUsizeId::FUPnum, self.rst.fup.sum),
-            fm!(
-                "{:>9.4}",
-                self.record,
-                LogF64Id::FUPave,
-                self.rst.fup.sum as f64 / self.rst.fup.num as f64
-            ),
-            fm!(
-                "{:>9.4}",
-                self.record,
-                LogF64Id::FUPema,
-                self.rst.fup.diff_ema.get()
-            ),
-            fm!(
-                "{:>9.4}",
-                self.record,
-                LogF64Id::FUPtrd,
-                self.rst.fup.trend()
-            ),
-        );
-*/
+        /*
+                println!(
+                    "\x1B[2K   First UIP|#sum:{}, #ave:{}, e-64:{}, trnd:{} ",
+                    im!("{:>9}", self.record, LogUsizeId::FUPnum, self.rst.fup.sum),
+                    fm!(
+                        "{:>9.4}",
+                        self.record,
+                        LogF64Id::FUPave,
+                        self.rst.fup.sum as f64 / self.rst.fup.num as f64
+                    ),
+                    fm!(
+                        "{:>9.4}",
+                        self.record,
+                        LogF64Id::FUPema,
+                        self.rst.fup.diff_ema.get()
+                    ),
+                    fm!(
+                        "{:>9.4}",
+                        self.record,
+                        LogF64Id::FUPtrd,
+                        self.rst.fup.trend()
+                    ),
+                );
+        */
         println!(
             "\x1B[2K  Learnt LBD|#num:{}, #ave:{}, e-64:{}, trnd:{} ",
             // "\x1B[2K    Conflict|cnfl:{}, bjmp:{}, aLBD:{}, trnd:{} ",
