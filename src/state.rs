@@ -340,6 +340,7 @@ impl StateIF for State {
         state.use_adapt_strategy = !config.without_adaptive_strategy;
         state.cdb_soft_limit = config.clause_limit;
         state.rst = RestartExecutor::new(config.restart_interval, config.restart_quantum);
+        state.rst.record_stat = 0 < config.dump_interval;
         state.elim_eliminate_grow_limit = config.elim_grow_limit;
         state.elim_subsume_literal_limit = config.elim_lit_limit;
         state.use_elim = !config.without_elim;
@@ -439,8 +440,8 @@ impl StateIF for State {
         println!("                                                  ");
         println!("                                                  ");
         println!("                                                  ");
-        println!("                                                  ");
         if 0 < self.config.dump_interval {
+            println!("                                                  ");
             println!("                                                  ");
             println!("                                                  ");
             println!("                                                  ");
@@ -468,7 +469,7 @@ impl StateIF for State {
         self.progress_cnt += 1;
         print!(
             "\x1B[{}A\x1B[1G",
-            if 0 < self.config.dump_interval { 12 } else { 9 }
+            if 0 < self.config.dump_interval { 12 } else { 8 }
         );
         println!("\x1B[2K{}", self);
         println!(
@@ -576,7 +577,7 @@ impl StateIF for State {
                 format!("{:>9.0}", 0),
             );
         }
-        self.record[LogF64Id::RSTlen] = 100.0 * self.rst.ratio.get();
+        self.record[LogF64Id::RSTlen] = 100.0 * self.rst.restart_ratio.get();
         println!(
             "\x1B[2K  Learnt LBD|#num:{}, #ave:{}, #gen:{}, trnd:{} ",
             // "\x1B[2K    Conflict|cnfl:{}, bjmp:{}, aLBD:{}, trnd:{} ",
@@ -650,62 +651,63 @@ impl StateIF for State {
                 self.rst.fup.trend()
             ),
         );
-        println!(
-            "\x1B[2K Expand' seg|#rst:{}, #seg:{}, eTop:{}, eLen:{} ",
-            im!(
-                "{:>9.0}",
-                self.record,
-                LogUsizeId::RSTu,
-                self.rst.num_restart_u
-            ),
-            im!(
-                "{:>9.0}",
-                self.record,
-                LogUsizeId::End,
-                self.rst.num_segup
-            ),
-            fm!(
-                "{:>9.4}",
-                self.record,
-                LogF64Id::RSTuL,
-                self.rst.climb_ema.get()
-            ),
-            fm!(
-                "{:>9.2}",
-                self.record,
-                LogF64Id::End,
-                self.rst.climb_len_ema.get()
-            ),
-        );
-        println!(
-            "\x1B[2K Shrink' seg|#rst:{}, #seg:{}, eBot:{}, eLen:{} ",
-            im!(
-                "{:>9.0}",
-                self.record,
-                LogUsizeId::RSTd,
-                self.rst.num_restart_d
-            ),
-            im!(
-                "{:>9.0}",
-                self.record,
-                LogUsizeId::End,
-                self.rst.num_segdw
-            ),
-            fm!(
-                "{:>9.4}",
-                self.record,
-                LogF64Id::RSTdL,
-                self.rst.settle_ema.get()
-            ),
-            fm!(
-                "{:>9.2}",
-                self.record,
-                LogF64Id::End,
-                self.rst.settle_len_ema.get()
-            ),
-        );
-        self.record[LogUsizeId::Restart] = self.stats[Stat::Restart];
-        
+        if 0 < self.config.dump_interval {
+            println!(
+                "\x1B[2K  Upwd phase|#rst:{}, #seg:{}, eTop:{}, eLen:{} ",
+                im!(
+                    "{:>9.0}",
+                    self.record,
+                    LogUsizeId::RSTu,
+                    self.rst.phase_uw.num_restart
+                ),
+                im!(
+                    "{:>9.0}",
+                    self.record,
+                    LogUsizeId::End,
+                    self.rst.phase_uw.num
+                ),
+                fm!(
+                    "{:>9.4}",
+                    self.record,
+                    LogF64Id::RSTuL,
+                    self.rst.phase_uw.end_point.get()
+                ),
+                fm!(
+                    "{:>9.2}",
+                    self.record,
+                    LogF64Id::End,
+                    self.rst.phase_uw.len.get()
+                ),
+            );
+            println!(
+                "\x1B[2K  Down phase|#rst:{}, #seg:{}, eTop:{}, eLen:{} ",
+                im!(
+                    "{:>9.0}",
+                    self.record,
+                    LogUsizeId::RSTd,
+                    self.rst.phase_dw.num_restart
+                ),
+                im!(
+                    "{:>9.0}",
+                    self.record,
+                    LogUsizeId::End,
+                    self.rst.phase_dw.num
+                ),
+                fm!(
+                    "{:>9.4}",
+                    self.record,
+                    LogF64Id::RSTdL,
+                    self.rst.phase_dw.end_point.get()
+                ),
+                fm!(
+                    "{:>9.2}",
+                    self.record,
+                    LogF64Id::End,
+                    self.rst.phase_dw.len.get()
+                ),
+            );
+            self.record[LogUsizeId::Restart] = self.stats[Stat::Restart];
+        }        
         if let Some(m) = mes {
             println!("\x1B[2K    Strategy|mode: {}", m);
         } else {

@@ -103,68 +103,82 @@ impl Ema2 {
     }
 }
 
+/// A memory on Restart segments
+#[derive(Debug)]
+pub struct PhaseStat {
+    pub num: usize,
+    pub len: Ema,
+    pub num_restart: usize,
+    pub end_point: Ema,
+}
+
+impl Default for PhaseStat {
+    fn default() -> Self {
+        PhaseStat {
+            num: 0,
+            len: Ema::new(EMA_SLOW),
+            num_restart: 0,
+            end_point: Ema::new(64),
+        }
+    }
+}
+
 /// A Luby + First-UIP driven Restart Engine
+/// Note:
+///
+/// - axs: accelaration of expansion of segmentation
+/// - acr: accelaration of clause refinement
 #[derive(Debug)]
 pub struct RestartExecutor {
-    pub interval_ema: Ema,
-    pub ratio: Ema,
-    pub num_segup: usize,
-    pub num_segdw: usize,
-    pub num_restart_u: usize,
-    pub num_restart_d: usize,
-    pub climb_ema: Ema,
-    pub climb_len_ema: Ema,
-    pub settle_ema: Ema,
-    pub settle_len_ema: Ema,
-    pub threshold: (f64, f64),
-    pub trend_up: bool,
-    pub use_luby: bool,
     pub asg: RestartASG,
     pub cnf: VarSet,
     pub fup: VarSet,
     pub lbd: RestartLBD,
     pub luby: RestartLuby,
     interval: usize,
-    last_trend: f64,
-    strt_trend: f64,
-    last_qtrend: usize,
+    last_axs: f64,
+    last_restart_axs: f64,
+    last_restart_acr: f64,
     quantumize: usize,
-    restart_len: usize,
     pub segment_len: usize,
-    last_restart_fup: f64,
-    last_restart_lbd: f64,
+    pub threshold: (f64, f64),
+    pub trend_up: bool,
+    pub use_luby: bool,
+    // stats
+    pub record_stat: bool,
+    beg_axs: f64,
+    pub phase_uw: PhaseStat,
+    pub phase_dw: PhaseStat,
+    restart_len: usize,
+    pub restart_len_ema: Ema,
+    pub restart_ratio: Ema,
 }
 
 impl Default for RestartExecutor {
     fn default() -> Self {
         RestartExecutor {
-            interval_ema: Ema::new(EMA_SLOW),
-            ratio: Ema::new(EMA_SLOW),
-            num_segdw: 0,
-            num_segup: 0,
-            num_restart_u: 0,
-            num_restart_d: 0,
-            climb_ema: Ema::new(64),
-            climb_len_ema: Ema::new(EMA_SLOW),
-            settle_ema: Ema::new(64),
-            settle_len_ema: Ema::new(EMA_SLOW),
-            threshold: RESTART_THRD, // (fup.trend, decay factor),
-            trend_up: true,
-            use_luby: false,
             asg: RestartASG::new(RESTART_THRESHOLD),
             cnf: VarSet::new(Flag::CNFVAR),
             fup: VarSet::new(Flag::FUP),
             lbd: RestartLBD::new(RESTART_THRESHOLD),
             luby: RestartLuby::new(2.0, 100.0),
             interval: RESTART_INTV,
-            last_trend: 1.0,
-            strt_trend: 0.0,
-            last_qtrend: RESTART_QNTM,
+            last_axs: 1.0,
+            last_restart_axs: 1.00,
+            last_restart_acr: 2.00,
             quantumize: RESTART_QNTM,
-            restart_len: 1,
             segment_len: 0,
-            last_restart_fup: 1.00,
-            last_restart_lbd: 2.00,
+            threshold: RESTART_THRD, // (fup.trend, decay factor),
+            trend_up: true,
+            use_luby: false,
+            // stats
+            record_stat: false,
+            beg_axs: 0.0,
+            phase_uw: PhaseStat::default(),
+            phase_dw: PhaseStat::default(),
+            restart_len: 1,
+            restart_len_ema: Ema::new(EMA_SLOW),
+            restart_ratio: Ema::new(EMA_SLOW),
         }
     }
 }
@@ -173,8 +187,8 @@ impl RestartExecutor {
         let mut re = RestartExecutor::default();
         re.interval = interval;
         re.quantumize = quantumize;
-        re.climb_ema.update(1.0);
-        re.settle_ema.update(1.0);
+        re.phase_dw.end_point.update(1.0);
+        re.phase_uw.end_point.update(1.0);
         re
     }
 }
@@ -185,83 +199,88 @@ impl RestartIF for RestartExecutor {
             self.luby.update(true);
             return self.luby.is_active();
         }
+        let axs = self.cnf.trend(); // or fup
+        let acr = self.lbd.trend();
         let RestartExecutor {
-            num_segdw,
-            num_segup,
-            num_restart_u,
-            num_restart_d,
-            climb_ema,
-            climb_len_ema,
-            settle_ema,
-            settle_len_ema,
-            cnf,
-            fup,
-            lbd,
-            last_trend,
-            strt_trend,
-            last_qtrend,
+            last_axs,
+            last_restart_axs,
+            last_restart_acr,
             quantumize,
-            restart_len,
             segment_len,
             threshold,
             trend_up,
-            last_restart_fup,
-            last_restart_lbd,
+            record_stat,
+            beg_axs,
+            phase_dw,
+            phase_uw,
+            restart_len,
             ..
         } = self;
         let check = 64;
         let segmin = 32;
         let mut restart_point = false;
-        let r_trend = fup.trend();
-        let q_trend = (r_trend * *quantumize as f64) as usize;
-        *restart_len += 1;
+        let qc = (axs * *quantumize as f64) as usize;
+        let ql = (*last_axs * *quantumize as f64) as usize;
+        if *record_stat {
+            *restart_len += 1;
+        }
         *segment_len += 1;
         if *segment_len <= segmin {
         } else if *trend_up && *segment_len % check == check - 1
-            && 1.6f64.max(1.1 * *last_restart_lbd) < lbd.trend()
+            && 1.6f64.max(1.1 * *last_restart_acr) < acr
         {
-            *num_restart_u += 1;
+            if *record_stat {
+                phase_uw.num_restart += 1;
+            }
             restart_point = true;
-            *last_restart_lbd = 1.0;
-        } else if *trend_up && q_trend < *last_qtrend {
-            climb_ema.update(*last_trend);
-            settle_ema.update(*strt_trend);
-            climb_len_ema.update(*segment_len as f64);
-            *num_segup += 1;
+        } else if *trend_up && qc < ql {
+            if *record_stat {
+                phase_uw.end_point.update(*last_axs);
+                phase_dw.end_point.update(*beg_axs);
+                phase_uw.len.update(*segment_len as f64);
+                phase_uw.num += 1;
+                *beg_axs = axs;
+            }
             *segment_len = 0;
-            *strt_trend = r_trend;
             *trend_up = false;
-            *last_restart_fup = 2.0;
-            *last_restart_lbd = 1.0;
+            *last_restart_axs = axs;
+            *last_restart_acr = acr;
         } else if !*trend_up && *segment_len % check == check - 1
-            && r_trend < cnf.trend().min(0.95 * *last_restart_fup)
+            && axs < 0.98 * *last_restart_axs
         {
-            *num_restart_d += 1;
+            if *record_stat {
+                phase_dw.num_restart += 1;
+            }
             restart_point = true;
-        } else if !*trend_up && *last_qtrend < q_trend {
-            climb_ema.update(*strt_trend);
-            settle_ema.update(*last_trend);
-            settle_len_ema.update(*segment_len as f64);
-            *num_segdw += 1;
+        } else if !*trend_up && ql < qc {
+            if *record_stat {
+                phase_uw.end_point.update(*beg_axs);
+                phase_dw.end_point.update(*last_axs);
+                phase_dw.len.update(*segment_len as f64);
+                phase_dw.num += 1;
+                *beg_axs = axs;
+            }
             *segment_len = 0;
-            *strt_trend = r_trend;
             *trend_up = true;
-            *last_restart_fup = 2.0;
-            *last_restart_lbd = 1.0;
+            *last_restart_axs = axs;
+            *last_restart_acr = acr;
         }
-        *last_trend = r_trend;
-        *last_qtrend = q_trend;
+        *last_axs = axs;
         if restart_point {
-            self.last_restart_fup = self.fup.trend();
-            self.last_restart_lbd = self.lbd.trend();
-            self.interval_ema.update(self.restart_len as f64);
-            self.restart_len = 0;
+            self.last_restart_axs = axs;
+            self.last_restart_acr = acr;
+            if *record_stat {
+                self.restart_len_ema.update(self.restart_len as f64);
+                self.restart_len = 0;
+            }
             return true;
         }
-        if r_trend < threshold.0 {
+        if axs < threshold.0 {
             threshold.0 *= threshold.1;
             self.fup.reset_vars(vdb);
             self.cnf.reset_vars(vdb);
+            *last_restart_axs = 2.0;
+            *last_restart_acr = 1.0;
             return true;
         }
         false

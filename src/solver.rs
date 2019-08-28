@@ -414,19 +414,19 @@ fn handle_conflict_path(
             asgs.cancel_until(vdb, 0);
             asgs.check_progress();
             if 0 < state.config.dump_interval {
-                state.rst.ratio.update(1.0);
+                state.rst.restart_ratio.update(1.0);
             }
         } else {
             asgs.uncheck_enqueue(vdb, l0, cid);
             if 0 < state.config.dump_interval {
-                state.rst.ratio.update(0.0);
+                state.rst.restart_ratio.update(0.0);
             }
         }
     }
     if 0 < state.config.dump_interval && ncnfl % state.config.dump_interval == 0 {
         let State { stats, rst, .. } = state;
         let RestartExecutor {
-            cnf, fup, climb_ema, settle_ema, ..
+            cnf, fup, phase_dw, phase_uw, ..
         } = rst;
         state.development_history.push((
             ncnfl,
@@ -434,8 +434,8 @@ fn handle_conflict_path(
             state.num_solved_vars as f64 / state.num_vars as f64,
             cnf.trend().min(5.0),
             fup.trend().min(5.0),
-            climb_ema.get(),
-            settle_ema.get()
+            phase_dw.end_point.get(),
+            phase_uw.end_point.get(),
         ));
     }
     if ncnfl % 10_000 == 0 {
