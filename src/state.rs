@@ -188,9 +188,12 @@ pub struct State {
 
 macro_rules! im {
     ($format: expr, $record: expr, $key: expr, $val: expr) => {
-        match $val {
-            v => {
-                let ptr = &mut $record.vali[$key as usize];
+        match ($val, $key) {
+            (v, LogUsizeId::End) => {
+                format!($format, v)
+            }
+            (v, k) => {
+                let ptr = &mut $record.vali[k as usize];
                 if (v as f64) * 1.6 < *ptr as f64 {
                     *ptr = v;
                     format!("\x1B[001m\x1B[031m{}\x1B[000m", format!($format, *ptr))
@@ -214,9 +217,12 @@ macro_rules! im {
 
 macro_rules! i {
     ($format: expr, $record: expr, $key: expr, $val: expr) => {
-        match $val {
-            v => {
-                let ptr = &mut $record.vali[$key as usize];
+        match ($val, $key) {
+            (v, LogUsizeId::End) => {
+                format!($format, v)
+            }
+            (v, k) => {
+                let ptr = &mut $record.vali[k as usize];
                 *ptr = v;
                 format!($format, *ptr)
             }
@@ -239,9 +245,12 @@ macro_rules! f {
 
 macro_rules! fm {
     ($format: expr, $record: expr, $key: expr, $val: expr) => {
-        match $val {
-            v => {
-                let ptr = &mut $record.valf[$key as usize];
+        match ($val as f64, $key) {
+            (v, LogF64Id::End) => {
+                format!($format, v)
+            }
+            (v, k) => {
+                let ptr = &mut $record.valf[k as usize];
                 if v * 1.6 < *ptr {
                     *ptr = v;
                     format!("\x1B[001m\x1B[031m{}\x1B[000m", format!($format, *ptr))
@@ -430,7 +439,9 @@ impl StateIF for State {
         println!("                                                  ");
         println!("                                                  ");
         println!("                                                  ");
+        println!("                                                  ");
         if 0 < self.config.dump_interval {
+            println!("                                                  ");
             println!("                                                  ");
             println!("                                                  ");
         }
@@ -457,7 +468,7 @@ impl StateIF for State {
         self.progress_cnt += 1;
         print!(
             "\x1B[{}A\x1B[1G",
-            if 0 < self.config.dump_interval { 10 } else { 8 }
+            if 0 < self.config.dump_interval { 12 } else { 9 }
         );
         println!("\x1B[2K{}", self);
         println!(
@@ -561,18 +572,38 @@ impl StateIF for State {
                 "\x1B[2K    Analysis|cLvl:{}, bLvl:{}, #stl:{}, stlL:{} ",
                 fm!("{:>9.2}", self.record, LogF64Id::CLevel, self.c_lvl.get()),
                 fm!("{:>9.2}", self.record, LogF64Id::BLevel, self.b_lvl.get()),
-                im!("{:>9.0}", self.record, LogUsizeId::STL, self.rst.num_settle),
-                fm!(
-                    "{:>9.2}",
-                    self.record,
-                    LogF64Id::STLlen,
-                    self.rst.settle_ema.get()
-                ),
+                format!("{:>9.0}", 0),
+                format!("{:>9.0}", 0),
             );
         }
         self.record[LogF64Id::RSTlen] = 100.0 * self.rst.ratio.get();
         println!(
-            "\x1B[2K ConfVar set|#sum:{}, #ave:{}, e-64:{}, trnd:{} ",
+            "\x1B[2K  Learnt LBD|#num:{}, #ave:{}, #gen:{}, trnd:{} ",
+            // "\x1B[2K    Conflict|cnfl:{}, bjmp:{}, aLBD:{}, trnd:{} ",
+            im!("{:>9.0}", self.record, LogUsizeId::Learnt, self.rst.lbd.num),
+            fm!(
+                "{:>9.2}",
+                self.record,
+                LogF64Id::LBDave,
+                self.rst.lbd.sum / self.rst.lbd.num as f64
+            ),
+            im!(
+                "{:>9.0}",
+                self.record,
+                LogUsizeId::FUPgrp,
+                self.rst.fup.num_build
+            ),
+
+            fm!(
+                "{:>9.4}",
+                self.record,
+                LogF64Id::LBDtrd,
+                self.rst.lbd.trend()
+            ),
+        );
+        self.record[LogF64Id::LBDema] = self.rst.lbd.ema.get();
+        println!(
+            "\x1B[2K    Conflict|#var:{}, #ave:{}, e-64:{}, trnd:{} ",
             im!("{:>9}", self.record, LogUsizeId::CNFnum, self.rst.cnf.sum),
             fm!(
                 "{:>9.4}",
@@ -593,84 +624,88 @@ impl StateIF for State {
                 self.rst.cnf.trend()
             ),
         );
-        self.record[LogUsizeId::FUPnum] = self.rst.fup.sum;
-        self.record[LogF64Id::FUPave] = self.rst.fup.sum as f64 / self.rst.fup.num as f64;
-        self.record[LogF64Id::FUPema] = self.rst.fup.diff_ema.get();
-        self.record[LogF64Id::FUPtrd] = self.rst.fup.trend();
-        /*
-                println!(
-                    "\x1B[2K   First UIP|#sum:{}, #ave:{}, e-64:{}, trnd:{} ",
-                    im!("{:>9}", self.record, LogUsizeId::FUPnum, self.rst.fup.sum),
-                    fm!(
-                        "{:>9.4}",
-                        self.record,
-                        LogF64Id::FUPave,
-                        self.rst.fup.sum as f64 / self.rst.fup.num as f64
-                    ),
-                    fm!(
-                        "{:>9.4}",
-                        self.record,
-                        LogF64Id::FUPema,
-                        self.rst.fup.diff_ema.get()
-                    ),
-                    fm!(
-                        "{:>9.4}",
-                        self.record,
-                        LogF64Id::FUPtrd,
-                        self.rst.fup.trend()
-                    ),
-                );
-        */
+        // self.record[LogUsizeId::FUPnum] = self.rst.fup.sum;
+        // self.record[LogF64Id::FUPave] = self.rst.fup.sum as f64 / self.rst.fup.num as f64;
+        // self.record[LogF64Id::FUPema] = self.rst.fup.diff_ema.get();
+        // self.record[LogF64Id::FUPtrd] = self.rst.fup.trend();
         println!(
-            "\x1B[2K  Learnt LBD|#num:{}, #ave:{}, e-64:{}, trnd:{} ",
-            // "\x1B[2K    Conflict|cnfl:{}, bjmp:{}, aLBD:{}, trnd:{} ",
-            im!("{:>9.0}", self.record, LogUsizeId::Learnt, self.rst.lbd.num),
+            "\x1B[2K   First UIP|#var:{}, #ave:{}, e-64:{}, trnd:{} ",
+            im!("{:>9}", self.record, LogUsizeId::FUPnum, self.rst.fup.sum),
             fm!(
-                "{:>9.2}",
+                "{:>9.4}",
                 self.record,
-                LogF64Id::LBDave,
-                self.rst.lbd.sum / self.rst.lbd.num as f64
-            ),
-            fm!(
-                "{:>9.2}",
-                self.record,
-                LogF64Id::LBDema,
-                self.rst.lbd.ema.get()
+                LogF64Id::FUPave,
+                self.rst.fup.sum as f64 / self.rst.fup.num as f64
             ),
             fm!(
                 "{:>9.4}",
                 self.record,
-                LogF64Id::LBDtrd,
-                self.rst.lbd.trend()
+                LogF64Id::FUPema,
+                self.rst.fup.diff_ema.get()
+            ),
+            fm!(
+                "{:>9.4}",
+                self.record,
+                LogF64Id::FUPtrd,
+                self.rst.fup.trend()
             ),
         );
         println!(
-            "\x1B[2K     Restart|#exe:{}, byTO:{}, leng:{}, #gen:{} ",
+            "\x1B[2K Expand' seg|#rst:{}, #seg:{}, eTop:{}, eLen:{} ",
             im!(
                 "{:>9.0}",
                 self.record,
-                LogUsizeId::Restart,
-                self.stats[Stat::Restart]
+                LogUsizeId::RSTu,
+                self.rst.num_restart_u
             ),
             im!(
                 "{:>9.0}",
                 self.record,
-                LogUsizeId::STLovr,
-                self.rst.num_overrun
+                LogUsizeId::End,
+                self.rst.num_segup
             ),
             fm!(
+                "{:>9.4}",
+                self.record,
+                LogF64Id::RSTuL,
+                self.rst.climb_ema.get()
+            ),
+            fm!(
+                "{:>9.2}",
+                self.record,
+                LogF64Id::End,
+                self.rst.climb_len_ema.get()
+            ),
+        );
+        println!(
+            "\x1B[2K Shrink' seg|#rst:{}, #seg:{}, eBot:{}, eLen:{} ",
+            im!(
                 "{:>9.0}",
                 self.record,
-                LogF64Id::RSTrat,
-                self.rst.interval_ema.get()
+                LogUsizeId::RSTd,
+                self.rst.num_restart_d
             ),
             im!(
                 "{:>9.0}",
                 self.record,
-                LogUsizeId::FUPgrp,
-                self.rst.fup.num_build
+                LogUsizeId::End,
+                self.rst.num_segdw
+            ),
+            fm!(
+                "{:>9.4}",
+                self.record,
+                LogF64Id::RSTdL,
+                self.rst.settle_ema.get()
+            ),
+            fm!(
+                "{:>9.2}",
+                self.record,
+                LogF64Id::End,
+                self.rst.settle_len_ema.get()
             ),
         );
+        self.record[LogUsizeId::Restart] = self.stats[Stat::Restart];
+        
         if let Some(m) = mes {
             println!("\x1B[2K    Strategy|mode: {}", m);
         } else {
@@ -752,8 +787,8 @@ pub enum LogUsizeId {
     FUPnum,         // 17: the number of current fups
     FUPgrp,         // 18: the number of FUP graph generation
     AsgMax,         // 19: the maximum number of assigned variables
-    STL,            // 20: the number of settlements
-    STLovr,         // 21: the number of timeout-ed settlements
+    RSTd,           // 2
+    RSTu,           // 2
     // ElimClauseQueue, // __: elim_clause_queue: usize,
     // ElimVarQueue, // __: elim_var_queue: usize,
     End,
@@ -778,6 +813,8 @@ pub enum LogF64Id {
     LBDtrd,       // 14: ema_lbd trend
     BLevel,       // 15: backjump_level
     CLevel,       // 16: conflict_level
+    RSTuL,        // : rst.climb_ema.get
+    RSTdL,        // : rst.settle_ema.get
     RSTrat,       // 17: rst.ratio
     RSTlen,       // 18: rst.interval_ema
     STLlen,       // 19: rst.settle_ema.get

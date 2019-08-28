@@ -400,12 +400,12 @@ fn handle_conflict_path(
         }
         let cid = cdb.attach(state, vdb, lbd);
         elim.add_cid_occur(vdb, cid, &mut cdb.clause[cid as usize], true);
-        if 0 < state.config.dump_interval {
-            state.c_lvl.update(c_level as f64);
-            state.b_lvl.update(bl as f64);
-            state.rst.asg.update(c_asgns);
+        if state.rst.trend_up {
             state.rst.lbd.update(lbd);
         }
+        state.c_lvl.update(c_level as f64);
+        state.b_lvl.update(bl as f64);
+        state.rst.asg.update(c_asgns);
         if state.rst.restart(vdb) {
             state.stats[Stat::Restart] += 1;
             if state.rst.use_luby {
@@ -426,16 +426,16 @@ fn handle_conflict_path(
     if 0 < state.config.dump_interval && ncnfl % state.config.dump_interval == 0 {
         let State { stats, rst, .. } = state;
         let RestartExecutor {
-            lbd, asg, cnf, fup, ..
+            cnf, fup, climb_ema, settle_ema, ..
         } = rst;
         state.development_history.push((
             ncnfl,
             stats[Stat::Restart] as f64,
             state.num_solved_vars as f64 / state.num_vars as f64,
-            asg.trend().min(5.0),
             cnf.trend().min(5.0),
             fup.trend().min(5.0),
-            lbd.trend().min(5.0),
+            climb_ema.get(),
+            settle_ema.get()
         ));
     }
     if ncnfl % 10_000 == 0 {
