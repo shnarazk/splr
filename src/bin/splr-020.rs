@@ -50,7 +50,7 @@ fn main() {
         let dump = config.cnf_filename.file_stem().unwrap().to_str().unwrap();
         if let Ok(f) = File::create(format!("dbg_{}.csv", dump)) {
             let mut buf = BufWriter::new(f);
-            buf.write_all(b"conflict,restart,solved,CNF,FUP,bottom,top\n").unwrap();
+            buf.write_all(b"conflict,restart,solved,CNF,FUP,LBD,restart_ratio\n").unwrap();
             for (n, a, b, c, d, e, f) in s.state.development_history.iter() {
                 buf.write_all(
                     format!(

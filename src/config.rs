@@ -8,7 +8,7 @@ pub const EMA_SLOW: usize = 32768; // 2 ^ 15
 
 pub const RESTART_INTV: usize = 256;
 pub const RESTART_QNTM: usize = 256;
-pub const RESTART_THRD: (f64, f64) = (0.5, 0.9);
+pub const RESTART_THRD: (f64, f64) = (0.4, 0.9);
 
 /// Configuration built from command line options
 #[derive(Clone, Debug, StructOpt)]

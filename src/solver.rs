@@ -426,16 +426,16 @@ fn handle_conflict_path(
     if 0 < state.config.dump_interval && ncnfl % state.config.dump_interval == 0 {
         let State { stats, rst, .. } = state;
         let RestartExecutor {
-            cnf, fup, phase_dw, phase_uw, ..
+            cnf, fup, lbd, restart_ratio, ..
         } = rst;
         state.development_history.push((
             ncnfl,
             stats[Stat::Restart] as f64,
             state.num_solved_vars as f64 / state.num_vars as f64,
-            cnf.trend().min(5.0),
-            fup.trend().min(5.0),
-            phase_dw.end_point.get(),
-            phase_uw.end_point.get(),
+            cnf.trend().min(2.0),
+            fup.trend().min(2.0),
+            lbd.trend().min(2.0),
+            restart_ratio.get().min(2.0),
         ));
     }
     if ncnfl % 10_000 == 0 {

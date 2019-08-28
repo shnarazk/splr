@@ -116,9 +116,9 @@ impl Default for PhaseStat {
     fn default() -> Self {
         PhaseStat {
             num: 0,
-            len: Ema::new(EMA_SLOW),
+            len: Ema::new(1024),
             num_restart: 0,
-            end_point: Ema::new(64),
+            end_point: Ema::new(32),
         }
     }
 }
@@ -139,7 +139,7 @@ pub struct RestartExecutor {
     last_axs: f64,
     last_restart_axs: f64,
     last_restart_acr: f64,
-    quantumize: usize,
+    quantization: usize,
     pub segment_len: usize,
     pub threshold: (f64, f64),
     pub trend_up: bool,
@@ -166,7 +166,7 @@ impl Default for RestartExecutor {
             last_axs: 1.0,
             last_restart_axs: 1.00,
             last_restart_acr: 2.00,
-            quantumize: RESTART_QNTM,
+            quantization: RESTART_QNTM,
             segment_len: 0,
             threshold: RESTART_THRD, // (fup.trend, decay factor),
             trend_up: true,
@@ -183,10 +183,10 @@ impl Default for RestartExecutor {
     }
 }
 impl RestartExecutor {
-    pub fn new(interval: usize, quantumize: usize) -> RestartExecutor {
+    pub fn new(interval: usize, quantization: usize) -> RestartExecutor {
         let mut re = RestartExecutor::default();
         re.interval = interval;
-        re.quantumize = quantumize;
+        re.quantization = quantization;
         re.phase_dw.end_point.update(1.0);
         re.phase_uw.end_point.update(1.0);
         re
@@ -205,7 +205,7 @@ impl RestartIF for RestartExecutor {
             last_axs,
             last_restart_axs,
             last_restart_acr,
-            quantumize,
+            quantization,
             segment_len,
             threshold,
             trend_up,
@@ -219,15 +219,17 @@ impl RestartIF for RestartExecutor {
         let check = 64;
         let segmin = 32;
         let mut restart_point = false;
-        let qc = (axs * *quantumize as f64) as usize;
-        let ql = (*last_axs * *quantumize as f64) as usize;
+        let qc = (axs * *quantization as f64) as usize;
+        let ql = (*last_axs * *quantization as f64) as usize;
         if *record_stat {
             *restart_len += 1;
         }
         *segment_len += 1;
-        if *segment_len <= segmin {
+        if *segment_len < segmin {
+        } else if *segment_len == segmin {
+            *trend_up = *beg_axs < axs;
         } else if *trend_up && *segment_len % check == check - 1
-            && 1.6f64.max(1.1 * *last_restart_acr) < acr
+            && 1.6f64.max(1.02 * *last_restart_acr) < acr
         {
             if *record_stat {
                 phase_uw.num_restart += 1;
