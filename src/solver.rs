@@ -381,16 +381,16 @@ fn handle_conflict_path(
         {
             state.rst.asg.reset();
         }
-        if state.num_unsolved_vars() <= state.rst.fup.sum {
+        if state.num_unsolved_vars() <= state.rst.cnf.sum {
             state.rst.cnf.reset_vars(vdb);
-            state.rst.fup.reset_vars(vdb);
+            if 0 < state.config.dump_interval {
+                state.rst.fup.reset_vars(vdb);
+            }
         }
     } else {
         state.stats[Stat::Learnt] += 1;
         let lbd = vdb.compute_lbd(&new_learnt);
         let l0 = new_learnt[0];
-        let v0 = &mut vdb.vars[l0.vi()];
-        state.rst.fup.update(v0);
         if lbd <= 2 {
             state.stats[Stat::NumLBD2] += 1;
         }
@@ -400,12 +400,15 @@ fn handle_conflict_path(
         }
         let cid = cdb.attach(state, vdb, lbd);
         elim.add_cid_occur(vdb, cid, &mut cdb.clause[cid as usize], true);
-        if state.rst.trend_up {
+        if state.rst.upward_segment {
             state.rst.lbd.update(lbd);
         }
         state.c_lvl.update(c_level as f64);
         state.b_lvl.update(bl as f64);
-        state.rst.asg.update(c_asgns);
+        if 0 < state.config.dump_interval {
+            state.rst.asg.update(c_asgns);
+            state.rst.fup.update(&mut vdb.vars[l0.vi()]);
+        }
         if state.rst.restart(vdb) {
             state.stats[Stat::Restart] += 1;
             if state.rst.use_luby {
@@ -426,7 +429,11 @@ fn handle_conflict_path(
     if 0 < state.config.dump_interval && ncnfl % state.config.dump_interval == 0 {
         let State { stats, rst, .. } = state;
         let RestartExecutor {
-            cnf, fup, lbd, restart_ratio, ..
+            cnf,
+            fup,
+            lbd,
+            restart_ratio,
+            ..
         } = rst;
         state.development_history.push((
             ncnfl,

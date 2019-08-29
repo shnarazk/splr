@@ -6,8 +6,8 @@ pub const VERSION: &str = "0.2.0-RC0";
 pub const EMA_FAST: usize = 64; // 2 ^ 6
 pub const EMA_SLOW: usize = 32768; // 2 ^ 15
 
-pub const RESTART_INTV: usize = 256;
-pub const RESTART_QNTM: usize = 256;
+pub const RESTART_INTV: usize = EMA_FAST / 2;
+pub const RESTART_QNTM: usize = 1024;
 pub const RESTART_THRD: (f64, f64) = (0.4, 0.9);
 
 /// Configuration built from command line options
@@ -17,12 +17,12 @@ pub struct Config {
     /// soft limit of #clauses (24M~4GB)
     #[structopt(long = "cl", default_value = "0")]
     pub clause_limit: usize,
-    /// minimal interval of restarts
-    #[structopt(long = "ri", default_value = "256")]
-    pub restart_interval: usize,
-    /// steps of fup quantization
-    #[structopt(long = "rq", default_value = "256")]
-    pub restart_quantum: usize,
+    // /// minimal interval of restarts
+    // #[structopt(long = "ri", default_value = "32")]
+    // pub restart_interval: usize,
+    // /// steps of fup quantization
+    // #[structopt(long = "rq", default_value = "1024")]
+    // pub restart_quantum: usize,
     /// grow limit of #clauses by v-elim.
     #[structopt(long = "eg", default_value = "4")]
     pub elim_grow_limit: usize,
@@ -76,8 +76,8 @@ impl Default for Config {
     fn default() -> Config {
         Config {
             clause_limit: 18_000_000,
-            restart_interval: 1024,
-            restart_quantum: 50,
+            // restart_interval: RESTART_INTV,
+            // restart_quantum: RESTART_QNTM,
             elim_grow_limit: 4,
             elim_lit_limit: 100,
             var_activity_decay: 0.90,

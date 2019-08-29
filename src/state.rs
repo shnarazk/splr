@@ -189,9 +189,7 @@ pub struct State {
 macro_rules! im {
     ($format: expr, $record: expr, $key: expr, $val: expr) => {
         match ($val, $key) {
-            (v, LogUsizeId::End) => {
-                format!($format, v)
-            }
+            (v, LogUsizeId::End) => format!($format, v),
             (v, k) => {
                 let ptr = &mut $record.vali[k as usize];
                 if (v as f64) * 1.6 < *ptr as f64 {
@@ -218,9 +216,7 @@ macro_rules! im {
 macro_rules! i {
     ($format: expr, $record: expr, $key: expr, $val: expr) => {
         match ($val, $key) {
-            (v, LogUsizeId::End) => {
-                format!($format, v)
-            }
+            (v, LogUsizeId::End) => format!($format, v),
             (v, k) => {
                 let ptr = &mut $record.vali[k as usize];
                 *ptr = v;
@@ -246,9 +242,7 @@ macro_rules! f {
 macro_rules! fm {
     ($format: expr, $record: expr, $key: expr, $val: expr) => {
         match ($val as f64, $key) {
-            (v, LogF64Id::End) => {
-                format!($format, v)
-            }
+            (v, LogF64Id::End) => format!($format, v),
             (v, k) => {
                 let ptr = &mut $record.valf[k as usize];
                 if v * 1.6 < *ptr {
@@ -339,7 +333,7 @@ impl StateIF for State {
         state.num_vars = cnf.num_of_variables;
         state.use_adapt_strategy = !config.without_adaptive_strategy;
         state.cdb_soft_limit = config.clause_limit;
-        state.rst = RestartExecutor::new(config.restart_interval, config.restart_quantum);
+        state.rst = RestartExecutor::default();
         state.rst.record_stat = 0 < config.dump_interval;
         state.elim_eliminate_grow_limit = config.elim_grow_limit;
         state.elim_subsume_literal_limit = config.elim_lit_limit;
@@ -433,17 +427,8 @@ impl StateIF for State {
             return;
         }
         println!("{}", self);
-        println!("                                                  ");
-        println!("                                                  ");
-        println!("                                                  ");
-        println!("                                                  ");
-        println!("                                                  ");
-        println!("                                                  ");
-        println!("                                                  ");
-        if 0 < self.config.dump_interval {
-            println!("                                                  ");
-            println!("                                                  ");
-            println!("                                                  ");
+        let repeat = if 0 < self.config.dump_interval { 11 } else { 5 };
+        for _i in 0..repeat {
             println!("                                                  ");
         }
     }
@@ -469,7 +454,7 @@ impl StateIF for State {
         self.progress_cnt += 1;
         print!(
             "\x1B[{}A\x1B[1G",
-            if 0 < self.config.dump_interval { 12 } else { 8 }
+            if 0 < self.config.dump_interval { 12 } else { 6 }
         );
         println!("\x1B[2K{}", self);
         println!(
@@ -521,7 +506,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K   Clause DB|Remv:{}, LBD2:{}, Binc:{}, Perm:{} ",
+            "\x1B[2K    ClauseDB|Remv:{}, LBD2:{}, Binc:{}, Perm:{} ",
             im!("{:>9}", self.record, LogUsizeId::Removable, cdb.num_learnt),
             im!(
                 "{:>9}",
@@ -542,6 +527,25 @@ impl StateIF for State {
                 cdb.num_active - cdb.num_learnt
             ),
         );
+        println!(
+            "\x1B[2K    Analysis|cLvl:{}, bLvl:{}, #rst:{}, #gen:{} ",
+            fm!("{:>9.2}", self.record, LogF64Id::CLevel, self.c_lvl.get()),
+            fm!("{:>9.2}", self.record, LogF64Id::BLevel, self.b_lvl.get()),
+            im!(
+                "{:>9.0}",
+                self.record,
+                LogUsizeId::Restart,
+                self.stats[Stat::Restart]
+            ),
+            im!(
+                "{:>9.0}",
+                self.record,
+                LogUsizeId::End,
+                self.rst.cnf.num_build
+            ),
+        );
+        self.record[LogF64Id::VADecay] = vdb.activity_decay;
+        self.record[LogF64Id::RSTlen] = 100.0 * self.rst.restart_ratio.get();
         if 0 < self.config.dump_interval {
             println!(
                 "\x1B[2K  Assignment|#max:{}, #ave:{}, e-64:{}, trnd:{}  ",
@@ -566,92 +570,72 @@ impl StateIF for State {
                     self.rst.asg.trend()
                 ),
             );
-        }
-        self.record[LogF64Id::VADecay] = vdb.activity_decay;
-        if 0 < self.config.dump_interval {
             println!(
-                "\x1B[2K    Analysis|cLvl:{}, bLvl:{}, #stl:{}, stlL:{} ",
-                fm!("{:>9.2}", self.record, LogF64Id::CLevel, self.c_lvl.get()),
-                fm!("{:>9.2}", self.record, LogF64Id::BLevel, self.b_lvl.get()),
-                format!("{:>9.0}", 0),
-                format!("{:>9.0}", 0),
+                "\x1B[2K  Learnt LBD|#num:{}, #ave:{}, e-64:{}, trnd:{} ",
+                im!("{:>9.0}", self.record, LogUsizeId::End, self.rst.lbd.num),
+                fm!(
+                    "{:>9.2}",
+                    self.record,
+                    LogF64Id::LBDave,
+                    self.rst.lbd.sum / self.rst.lbd.num as f64
+                ),
+                fm!(
+                    "{:>9.2}",
+                    self.record,
+                    LogF64Id::End,
+                    self.rst.lbd.ema.get()
+                ),
+                fm!(
+                    "{:>9.4}",
+                    self.record,
+                    LogF64Id::LBDtrd,
+                    self.rst.lbd.trend()
+                ),
             );
-        }
-        self.record[LogF64Id::RSTlen] = 100.0 * self.rst.restart_ratio.get();
-        println!(
-            "\x1B[2K  Learnt LBD|#num:{}, #ave:{}, #gen:{}, trnd:{} ",
-            // "\x1B[2K    Conflict|cnfl:{}, bjmp:{}, aLBD:{}, trnd:{} ",
-            im!("{:>9.0}", self.record, LogUsizeId::Learnt, self.rst.lbd.num),
-            fm!(
-                "{:>9.2}",
-                self.record,
-                LogF64Id::LBDave,
-                self.rst.lbd.sum / self.rst.lbd.num as f64
-            ),
-            im!(
-                "{:>9.0}",
-                self.record,
-                LogUsizeId::FUPgrp,
-                self.rst.fup.num_build
-            ),
-
-            fm!(
-                "{:>9.4}",
-                self.record,
-                LogF64Id::LBDtrd,
-                self.rst.lbd.trend()
-            ),
-        );
-        self.record[LogF64Id::LBDema] = self.rst.lbd.ema.get();
-        println!(
-            "\x1B[2K    Conflict|#var:{}, #ave:{}, e-64:{}, trnd:{} ",
-            im!("{:>9}", self.record, LogUsizeId::CNFnum, self.rst.cnf.sum),
-            fm!(
-                "{:>9.4}",
-                self.record,
-                LogF64Id::CNFave,
-                self.rst.cnf.sum as f64 / self.rst.cnf.num as f64
-            ),
-            fm!(
-                "{:>9.4}",
-                self.record,
-                LogF64Id::CNFema,
-                self.rst.cnf.diff_ema.get()
-            ),
-            fm!(
-                "{:>9.4}",
-                self.record,
-                LogF64Id::CNFtrd,
-                self.rst.cnf.trend()
-            ),
-        );
-        // self.record[LogUsizeId::FUPnum] = self.rst.fup.sum;
-        // self.record[LogF64Id::FUPave] = self.rst.fup.sum as f64 / self.rst.fup.num as f64;
-        // self.record[LogF64Id::FUPema] = self.rst.fup.diff_ema.get();
-        // self.record[LogF64Id::FUPtrd] = self.rst.fup.trend();
-        println!(
-            "\x1B[2K   First UIP|#var:{}, #ave:{}, e-64:{}, trnd:{} ",
-            im!("{:>9}", self.record, LogUsizeId::FUPnum, self.rst.fup.sum),
-            fm!(
-                "{:>9.4}",
-                self.record,
-                LogF64Id::FUPave,
-                self.rst.fup.sum as f64 / self.rst.fup.num as f64
-            ),
-            fm!(
-                "{:>9.4}",
-                self.record,
-                LogF64Id::FUPema,
-                self.rst.fup.diff_ema.get()
-            ),
-            fm!(
-                "{:>9.4}",
-                self.record,
-                LogF64Id::FUPtrd,
-                self.rst.fup.trend()
-            ),
-        );
-        if 0 < self.config.dump_interval {
+            println!(
+                "\x1B[2K   Cnfl ever|#var:{}, #ave:{}, e-64:{}, trnd:{} ",
+                im!("{:>9}", self.record, LogUsizeId::CNFnum, self.rst.cnf.sum),
+                fm!(
+                    "{:>9.4}",
+                    self.record,
+                    LogF64Id::CNFave,
+                    self.rst.cnf.sum as f64 / self.rst.cnf.num as f64
+                ),
+                fm!(
+                    "{:>9.4}",
+                    self.record,
+                    LogF64Id::CNFema,
+                    self.rst.cnf.diff_ema.get()
+                ),
+                fm!(
+                    "{:>9.4}",
+                    self.record,
+                    LogF64Id::CNFtrd,
+                    self.rst.cnf.trend()
+                ),
+            );
+            println!(
+                "\x1B[2K   First UIP|#var:{}, #ave:{}, e-64:{}, trnd:{} ",
+                im!("{:>9}", self.record, LogUsizeId::FUPnum, self.rst.fup.sum),
+                fm!(
+                    "{:>9.4}",
+                    self.record,
+                    LogF64Id::FUPave,
+                    self.rst.fup.sum as f64 / self.rst.fup.num as f64
+                ),
+                fm!(
+                    "{:>9.4}",
+                    self.record,
+                    LogF64Id::FUPema,
+                    self.rst.fup.diff_ema.get_fast()
+                ),
+                fm!(
+                    "{:>9.4}",
+                    self.record,
+                    LogF64Id::FUPtrd,
+                    self.rst.fup.trend()
+                ),
+            );
             println!(
                 "\x1B[2K  Upwd phase|#rst:{}, #seg:{}, eTop:{}, eLen:{} ",
                 im!(
@@ -706,8 +690,30 @@ impl StateIF for State {
                     self.rst.phase_dw.len.get()
                 ),
             );
-            self.record[LogUsizeId::Restart] = self.stats[Stat::Restart];
-        }        
+        } else {
+            self.record[LogUsizeId::AsgMax] = self.rst.asg.max;
+            self.record[LogF64Id::ASGave] = self.rst.asg.get();
+            self.record[LogF64Id::ASGema] = self.rst.asg.get_fast();
+            self.record[LogF64Id::ASGtrn] = self.rst.asg.trend();
+
+            self.record[LogF64Id::LBDave] = self.rst.lbd.sum / self.rst.lbd.num as f64;
+            self.record[LogF64Id::LBDtrd] = self.rst.lbd.sum / self.rst.lbd.trend();
+
+            self.record[LogUsizeId::CNFnum] = self.rst.cnf.sum;
+            self.record[LogF64Id::CNFave] = self.rst.cnf.sum as f64 / self.rst.cnf.num as f64;
+            self.record[LogF64Id::CNFema] = self.rst.cnf.diff_ema.get();
+            self.record[LogF64Id::CNFtrd] = self.rst.cnf.trend();
+
+            self.record[LogF64Id::FUPema] = self.rst.fup.diff_ema.get();
+            self.record[LogUsizeId::FUPnum] = self.rst.fup.sum;
+            self.record[LogF64Id::FUPave] = self.rst.fup.sum as f64 / self.rst.fup.num as f64;
+            self.record[LogF64Id::FUPtrd] = self.rst.fup.trend();
+
+            self.record[LogUsizeId::RSTu] = self.rst.phase_uw.num_restart;
+            self.record[LogF64Id::RSTuL] = self.rst.phase_uw.end_point.get();
+            self.record[LogUsizeId::RSTd] = self.rst.phase_uw.num_restart;
+            self.record[LogF64Id::RSTdL] = self.rst.phase_uw.end_point.get();
+        }
         if let Some(m) = mes {
             println!("\x1B[2K    Strategy|mode: {}", m);
         } else {
@@ -715,6 +721,8 @@ impl StateIF for State {
         }
         self.flush("\x1B[2K");
         // update undisplayed fields
+        self.record[LogUsizeId::Learnt] = self.rst.lbd.num;
+        self.record[LogF64Id::LBDema] = self.rst.lbd.ema.get();
         self.record[LogUsizeId::RestartByLuby] = self.stats[Stat::RestartByLuby];
         self.record[LogUsizeId::Reduction] = self.stats[Stat::Reduction];
         self.record[LogUsizeId::SatClauseElim] = self.stats[Stat::SatClauseElimination];
