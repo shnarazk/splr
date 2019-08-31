@@ -15,7 +15,7 @@ pub const ACR_THRESHOLD: f64 = 1.4;
 
 /// Configuration built from command line options
 #[derive(Clone, Debug, StructOpt)]
-#[structopt(name = "splr", about = "SAT solver for Propositional Logic in Rust")]
+#[structopt(name = "splr", about, author)]
 pub struct Config {
     /// soft limit of #clauses (24M~4GB)
     #[structopt(long = "cl", default_value = "0")]

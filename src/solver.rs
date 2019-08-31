@@ -381,12 +381,14 @@ fn handle_conflict_path(
         {
             state.rst.asg.reset();
         }
+        /* FIXME
         if state.num_unsolved_vars() <= state.rst.cnf.sum {
             state.rst.cnf.reset_vars(vdb);
             if 0 < state.config.dump_interval {
                 state.rst.fup.reset_vars(vdb);
             }
         }
+        */
     } else {
         state.stats[Stat::Learnt] += 1;
         let lbd = vdb.compute_lbd(&new_learnt);
@@ -430,9 +432,10 @@ fn handle_conflict_path(
         let State { stats, rst, .. } = state;
         let RestartExecutor {
             cnf,
+            cnf2,
             fup,
             lbd,
-            restart_ratio,
+            restart_ratio: _,
             ..
         } = rst;
         state.development_history.push((
@@ -440,9 +443,10 @@ fn handle_conflict_path(
             stats[Stat::Restart] as f64,
             state.num_solved_vars as f64 / state.num_vars as f64,
             cnf.trend().min(2.0),
+            cnf2.trend().min(2.0),
             fup.trend().min(2.0),
             lbd.trend().min(2.0),
-            restart_ratio.get().min(2.0),
+            // restart_ratio.get().min(2.0),
         ));
     }
     if ncnfl % 10_000 == 0 {
@@ -498,9 +502,15 @@ fn analyze(
 ) -> usize {
     state.new_learnt.clear();
     state.new_learnt.push(0);
+    if 0 < state.config.dump_interval {
+        state
+            .rst
+            .cnf
+            .update(&mut vdb[cdb.clause[confl as usize].lits[0].vi()]);
+    }
     state
         .rst
-        .cnf
+        .cnf2
         .update(&mut vdb[cdb.clause[confl as usize].lits[0].vi()]);
     let dl = asgs.level();
     let mut cid = confl;

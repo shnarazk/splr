@@ -1,6 +1,6 @@
-use crate::config::{ACR_THRESHOLD, EMA_FAST, EMA_SLOW, RESTART_INTV, RESTART_QNTM, RESTART_THRD};
+use crate::config::{EMA_FAST, EMA_SLOW, RESTART_INTV, RESTART_QNTM, RESTART_THRD};
 use crate::traits::*;
-use crate::types::Flag;
+use crate::types::{Flag, FALSE, TRUE};
 use crate::var::{Var, VarDB};
 
 const RESTART_THRESHOLD: f64 = 1.4;
@@ -141,6 +141,7 @@ impl Default for PhaseStat {
 pub struct RestartExecutor {
     pub asg: RestartASG,
     pub cnf: VarSet,
+    pub cnf2: VarSet,
     pub fup: VarSet,
     pub lbd: RestartLBD,
     pub luby: RestartLuby,
@@ -174,6 +175,7 @@ impl Default for RestartExecutor {
         RestartExecutor {
             asg: RestartASG::new(RESTART_THRESHOLD),
             cnf: VarSet::new(Flag::CNFVAR),
+            cnf2: VarSet::new(Flag::CNFVAR2),
             fup: VarSet::new(Flag::FUP),
             lbd: RestartLBD::new(RESTART_THRESHOLD),
             luby: RestartLuby::new(2.0, 100.0),
@@ -206,6 +208,8 @@ impl RestartIF for RestartExecutor {
         re
     }
     fn restart(&mut self, vdb: &mut VarDB) -> bool {
+        return self._restart(vdb);
+
         if self.use_luby {
             self.luby.update(true);
             return self.luby.is_active();
@@ -291,6 +295,51 @@ impl RestartIF for RestartExecutor {
             self.cnf.reset_vars(vdb);
             if *record_stat {
                 self.fup.reset_vars(vdb);
+                self.cnf2.reset_vars(vdb);
+            }
+            return true;
+        }
+        false
+    }
+}
+
+impl RestartExecutor {
+    fn _restart(&mut self, vdb: &mut VarDB) -> bool {
+        if self.use_luby {
+            self.luby.update(true);
+            return self.luby.is_active();
+        }
+        let avs = self.cnf2.trend(); // cnf is better than fup
+        let RestartExecutor {
+            previous_avs: pre,
+            segment_len: len,
+            record_stat: stat,
+            phase_uw: phase,
+            ..
+        } = self;
+        let diff = ((*pre - avs) * self.quantization as f64) as isize;
+        if *stat {
+            *len += 1;
+        }
+        if 1 <= diff {
+            if *stat {
+                phase.end_point.update(*pre);
+                phase.len.update(*len as f64);
+                self.restart_len_ema.update(*len as f64);
+                phase.num_restart += 1;
+                *len = 0;
+            }
+            *pre = avs;
+            return true;
+        } else if diff <= -1 {
+            *pre = avs;
+        }
+        if avs < self.threshold.0 {
+            self.threshold.0 *= self.threshold.1;
+            self.cnf2.reset_vars(vdb);
+            if *stat {
+                self.fup.reset_vars(vdb);
+                self.cnf.reset_vars(vdb);
             }
             return true;
         }
@@ -679,6 +728,7 @@ impl VarSetIF for VarSet {
 impl<'a> ProgressEvaluatorIF<'a> for VarSet {
     type Memory = Ema2;
     type Item = &'a mut Var;
+    /*
     fn update(&mut self, v: Self::Item) {
         self.num += 1;
         if !v.is(self.flag) {
@@ -687,6 +737,29 @@ impl<'a> ProgressEvaluatorIF<'a> for VarSet {
             self.diff_ema.update(1.0);
         } else {
             self.diff_ema.update(0.0);
+        }
+    } */
+    fn update(&mut self, v: Self::Item) {
+        self.num += 1;
+        if !v.is(self.flag) {
+            v.turn_on(self.flag);
+            self.sum += 1;
+            self.diff_ema.update(1.0);
+        } else if self.flag == Flag::CNFVAR2
+            && (   (v.assign == TRUE  && !v.is(Flag::LAST_CNF))
+                || (v.assign == FALSE && !v.is(Flag::LAST_CNF)))
+        {
+            self.sum += 1;
+            self.diff_ema.update(1.0);
+        } else {
+            self.diff_ema.update(0.0);
+        }
+        if self.flag == Flag::CNFVAR2 {
+            if v.assign == TRUE {
+                v.turn_on(Flag::LAST_CNF);
+            } else {
+                v.turn_off(Flag::LAST_CNF);
+            }
         }
     }
     fn update_with<F>(&mut self, f: F) -> &mut Self
