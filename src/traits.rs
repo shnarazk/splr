@@ -246,6 +246,7 @@ pub trait ProgressEvaluatorIF<'a> {
 
 /// API for restart like `block_restart`, `force_restart` and so on.
 pub trait RestartIF {
+    fn new(acr_threshold: f64, avs_threshold: f64) -> Self;
     /// new local/global restart control
     fn restart(&mut self, vdb: &mut VarDB) -> bool;
 }

@@ -1,4 +1,4 @@
-use crate::config::{EMA_FAST, EMA_SLOW, RESTART_INTV, RESTART_QNTM, RESTART_THRD};
+use crate::config::{ACR_THRESHOLD, EMA_FAST, EMA_SLOW, RESTART_INTV, RESTART_QNTM, RESTART_THRD};
 use crate::traits::*;
 use crate::types::Flag;
 use crate::var::{Var, VarDB};
@@ -110,6 +110,7 @@ pub struct PhaseStat {
     pub len: Ema,
     pub num_restart: usize,
     pub end_point: Ema,
+    pub restart_scaling: f64,
     pub restart_trigger: f64,
     trigger: f64,
 }
@@ -121,6 +122,7 @@ impl Default for PhaseStat {
             len: Ema::new(1024),
             num_restart: 0,
             end_point: Ema::new(32),
+            restart_scaling: 0.9985,
             restart_trigger: 1.0,
             trigger: 1.0,
         }
@@ -130,7 +132,7 @@ impl Default for PhaseStat {
 /// A Luby + First-UIP driven Restart Engine
 /// Note:
 ///
-/// - axs: accelaration of expansion of segmentation
+/// - avs: accelaration of variable segmentation
 /// - acr: accelaration of clause refinement
 /// - segment: a successive conflicts
 /// - phase: two kinds of segments: rpward or downward segment
@@ -142,7 +144,7 @@ pub struct RestartExecutor {
     pub fup: VarSet,
     pub lbd: RestartLBD,
     pub luby: RestartLuby,
-    previous_axs: f64,
+    previous_avs: f64,
     quantization: usize,
     restart_interval: usize,
     pub segment_len: usize,
@@ -156,7 +158,7 @@ pub struct RestartExecutor {
     restart_len: usize,
     pub restart_len_ema: Ema,
     pub restart_ratio: Ema,
-    segment_beg_axs: f64,
+    segment_beg_avs: f64,
 }
 
 impl Default for RestartExecutor {
@@ -175,7 +177,7 @@ impl Default for RestartExecutor {
             fup: VarSet::new(Flag::FUP),
             lbd: RestartLBD::new(RESTART_THRESHOLD),
             luby: RestartLuby::new(2.0, 100.0),
-            previous_axs: 1.0,
+            previous_avs: 1.0,
             quantization: RESTART_QNTM,
             restart_interval: RESTART_INTV,
             segment_len: 0,
@@ -189,23 +191,31 @@ impl Default for RestartExecutor {
             restart_len: 1,
             restart_len_ema: Ema::new(EMA_SLOW),
             restart_ratio: Ema::new(EMA_SLOW),
-            segment_beg_axs: 0.0,
+            segment_beg_avs: 0.0,
         }
     }
 }
 
 impl RestartIF for RestartExecutor {
+    fn new(acr_threshold: f64, _avs_threshold: f64) -> Self {
+        let mut re = RestartExecutor::default();
+        // re.phase_dw.restart_trigger = avs_threshold;
+        // re.phase_dw.trigger = avs_threshold;
+        re.phase_uw.restart_trigger = acr_threshold;
+        re.phase_uw.trigger = acr_threshold;
+        re
+    }
     fn restart(&mut self, vdb: &mut VarDB) -> bool {
         if self.use_luby {
             self.luby.update(true);
             return self.luby.is_active();
         }
-        let axs = self.cnf.trend(); // cnf is better than fup
+        let avs = self.cnf.trend(); // cnf is better than fup
         let acr = self.lbd.trend();
         let segmin = self.restart_interval;
         let check = segmin * 2;
         let RestartExecutor {
-            previous_axs,
+            previous_avs,
             quantization,
             segment_len,
             threshold,
@@ -214,19 +224,19 @@ impl RestartIF for RestartExecutor {
             phase_dw,
             phase_uw,
             restart_len,
-            segment_beg_axs,
+            segment_beg_avs,
             ..
         } = self;
         let mut restart_point = false;
-        let qc = (axs * *quantization as f64) as usize;
-        let ql = (*previous_axs * *quantization as f64) as usize;
+        let qc = (avs * *quantization as f64) as usize;
+        let ql = (*previous_avs * *quantization as f64) as usize;
         if *record_stat {
             *restart_len += 1;
         }
         *segment_len += 1;
         if *segment_len < segmin {
         } else if *segment_len == segmin {
-            *upward_segment = *segment_beg_axs < axs;
+            *upward_segment = *segment_beg_avs < avs;
         } else if *upward_segment {
             if *segment_len % check == 0 && phase_uw.trigger < acr {
                 if *record_stat {
@@ -236,19 +246,19 @@ impl RestartIF for RestartExecutor {
                 restart_point = true;
             } else if qc < ql {
                 if *record_stat {
-                    phase_uw.end_point.update(*previous_axs);
-                    phase_dw.end_point.update(*segment_beg_axs);
+                    phase_dw.end_point.update(*segment_beg_avs);
+                    phase_uw.end_point.update(*previous_avs);
                     phase_uw.len.update(*segment_len as f64);
                     phase_uw.num += 1;
-                    *segment_beg_axs = axs;
+                    *segment_beg_avs = avs;
                 }
+                phase_dw.trigger = phase_dw.restart_scaling * avs;
                 phase_uw.trigger = phase_uw.restart_trigger;
-                phase_dw.trigger = 0.99 * axs;
                 *segment_len = 0;
                 *upward_segment = false;
             }
         } else {
-            if *segment_len % check == 0 && axs < phase_dw.trigger {
+            if *segment_len % check == 0 && avs < phase_dw.trigger {
                 if *record_stat {
                     phase_dw.num_restart += 1;
                 }
@@ -256,19 +266,19 @@ impl RestartIF for RestartExecutor {
                 restart_point = true;
             } else if ql < qc {
                 if *record_stat {
-                    phase_uw.end_point.update(*segment_beg_axs);
-                    phase_dw.end_point.update(*previous_axs);
+                    phase_uw.end_point.update(*segment_beg_avs);
+                    phase_dw.end_point.update(*previous_avs);
                     phase_dw.len.update(*segment_len as f64);
                     phase_dw.num += 1;
-                    *segment_beg_axs = axs;
+                    *segment_beg_avs = avs;
                 }
-                phase_dw.trigger = axs;
+                phase_dw.trigger = phase_dw.restart_scaling * avs;
                 phase_uw.trigger = phase_uw.restart_trigger;
                 *segment_len = 0;
                 *upward_segment = true;
             }
         }
-        *previous_axs = axs;
+        *previous_avs = avs;
         if restart_point {
             if *record_stat {
                 self.restart_len_ema.update(self.restart_len as f64);
@@ -276,7 +286,7 @@ impl RestartIF for RestartExecutor {
             }
             return true;
         }
-        if axs < threshold.0 {
+        if avs < threshold.0 {
             threshold.0 *= threshold.1;
             self.cnf.reset_vars(vdb);
             if *record_stat {

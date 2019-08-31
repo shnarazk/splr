@@ -333,7 +333,7 @@ impl StateIF for State {
         state.num_vars = cnf.num_of_variables;
         state.use_adapt_strategy = !config.without_adaptive_strategy;
         state.cdb_soft_limit = config.clause_limit;
-        state.rst = RestartExecutor::default();
+        state.rst = RestartExecutor::new(config.restart_acr, config.restart_avs);
         state.rst.record_stat = 0 < config.dump_interval;
         state.elim_eliminate_grow_limit = config.elim_grow_limit;
         state.elim_subsume_literal_limit = config.elim_lit_limit;
@@ -637,7 +637,7 @@ impl StateIF for State {
                 ),
             );
             println!(
-                "\x1B[2K  Upwd phase|#rst:{}, #seg:{}, eTop:{}, eLen:{} ",
+                "\x1B[2K  Upwd phase|#rst:{}, #seg:{}, bLvl:{}, eLen:{} ",
                 im!(
                     "{:>9.0}",
                     self.record,
@@ -664,7 +664,7 @@ impl StateIF for State {
                 ),
             );
             println!(
-                "\x1B[2K  Down phase|#rst:{}, #seg:{}, eTop:{}, eLen:{} ",
+                "\x1B[2K  Down phase|#rst:{}, #seg:{}, tLvl:{}, eLen:{} ",
                 im!(
                     "{:>9.0}",
                     self.record,

@@ -10,6 +10,9 @@ pub const RESTART_INTV: usize = EMA_FAST / 2;
 pub const RESTART_QNTM: usize = 1024;
 pub const RESTART_THRD: (f64, f64) = (0.4, 0.9);
 
+pub const ACR_THRESHOLD: f64 = 1.4;
+// pub const AVS_THRESHOLD: f64 = 1.25;
+
 /// Configuration built from command line options
 #[derive(Clone, Debug, StructOpt)]
 #[structopt(name = "splr", about = "SAT solver for Propositional Logic in Rust")]
@@ -17,6 +20,12 @@ pub struct Config {
     /// soft limit of #clauses (24M~4GB)
     #[structopt(long = "cl", default_value = "0")]
     pub clause_limit: usize,
+    /// scaling for A. Clause Refinement
+    #[structopt(long = "rc", default_value = "1.6")]
+    pub restart_acr: f64,
+    /// scaling for A. Var. Segmentation
+    #[structopt(long = "rv", default_value = "1.6")]
+    pub restart_avs: f64,
     // /// minimal interval of restarts
     // #[structopt(long = "ri", default_value = "32")]
     // pub restart_interval: usize,
@@ -76,6 +85,8 @@ impl Default for Config {
     fn default() -> Config {
         Config {
             clause_limit: 18_000_000,
+            restart_acr: ACR_THRESHOLD,
+            restart_avs: 0.99,
             // restart_interval: RESTART_INTV,
             // restart_quantum: RESTART_QNTM,
             elim_grow_limit: 4,
