@@ -105,7 +105,7 @@ impl Ema2 {
 
 /// A memory on Restart segments
 #[derive(Debug)]
-pub struct PhaseStat {
+pub struct SegmentStat {
     pub num: usize,
     pub len: Ema,
     pub num_restart: usize,
@@ -115,9 +115,9 @@ pub struct PhaseStat {
     trigger: f64,
 }
 
-impl Default for PhaseStat {
+impl Default for SegmentStat {
     fn default() -> Self {
-        PhaseStat {
+        SegmentStat {
             num: 0,
             len: Ema::new(1024),
             num_restart: 0,
@@ -132,20 +132,18 @@ impl Default for PhaseStat {
 /// A Luby + First-UIP driven Restart Engine
 /// Note:
 ///
-/// - avs: accelaration of variable segmentation
+/// - als: accelaration of literal segmentation
 /// - acr: accelaration of clause refinement
 /// - segment: a successive conflicts
-/// - phase: two kinds of segments: rpward or downward segment
-///
+//
 #[derive(Debug)]
 pub struct RestartExecutor {
     pub asg: RestartASG,
-    pub cnf: VarSet,
-    pub cnf2: VarSet,
+    pub cls: VarSet,
     pub fup: VarSet,
     pub lbd: RestartLBD,
     pub luby: RestartLuby,
-    previous_avs: f64,
+    previous_als: f64,
     quantization: usize,
     restart_interval: usize,
     pub segment_len: usize,
@@ -154,32 +152,26 @@ pub struct RestartExecutor {
     pub use_luby: bool,
     // stats
     pub record_stat: bool,
-    pub phase_dw: PhaseStat,
-    pub phase_uw: PhaseStat,
+    pub segment: SegmentStat,
     restart_len: usize,
     pub restart_len_ema: Ema,
     pub restart_ratio: Ema,
-    segment_beg_avs: f64,
+    segment_beg_als: f64,
 }
 
 impl Default for RestartExecutor {
     fn default() -> Self {
-        let mut phase_dw = PhaseStat::default();
-        phase_dw.end_point.update(1.0);
-        phase_dw.restart_trigger = 1.0;
-        phase_dw.trigger = 1.0;
-        let mut phase_uw = PhaseStat::default();
-        phase_uw.end_point.update(1.0);
-        phase_uw.restart_trigger = 1.6;
-        phase_uw.trigger = 1.6;
+        let mut segment = SegmentStat::default();
+        segment.end_point.update(1.0);
+        segment.restart_trigger = 1.0;
+        segment.trigger = 1.0;
         RestartExecutor {
             asg: RestartASG::new(RESTART_THRESHOLD),
-            cnf: VarSet::new(Flag::CNFVAR),
-            cnf2: VarSet::new(Flag::CNFVAR2),
+            cls: VarSet::new(Flag::CNFLIT),
             fup: VarSet::new(Flag::FUP),
             lbd: RestartLBD::new(RESTART_THRESHOLD),
             luby: RestartLuby::new(2.0, 100.0),
-            previous_avs: 1.0,
+            previous_als: 1.0,
             quantization: RESTART_QNTM,
             restart_interval: RESTART_INTV,
             segment_len: 0,
@@ -188,160 +180,54 @@ impl Default for RestartExecutor {
             use_luby: false,
             // stats
             record_stat: false,
-            phase_dw,
-            phase_uw,
+            segment,
             restart_len: 1,
             restart_len_ema: Ema::new(EMA_SLOW),
             restart_ratio: Ema::new(EMA_SLOW),
-            segment_beg_avs: 0.0,
+            segment_beg_als: 0.0,
         }
     }
 }
 
 impl RestartIF for RestartExecutor {
-    fn new(acr_threshold: f64, _avs_threshold: f64) -> Self {
-        let mut re = RestartExecutor::default();
-        // re.phase_dw.restart_trigger = avs_threshold;
-        // re.phase_dw.trigger = avs_threshold;
-        re.phase_uw.restart_trigger = acr_threshold;
-        re.phase_uw.trigger = acr_threshold;
+    fn new(_acr_threshold: f64, _als_threshold: f64) -> Self {
+        let re = RestartExecutor::default();
+        // re.segment.restart_trigger = als_threshold;
+        // re.segment.trigger = als_threshold;
         re
     }
-    fn restart(&mut self, vdb: &mut VarDB) -> bool {
-        return self._restart(vdb);
-
+    fn restart(&mut self) -> bool {
         if self.use_luby {
             self.luby.update(true);
             return self.luby.is_active();
         }
-        let avs = self.cnf.trend(); // cnf is better than fup
-        let acr = self.lbd.trend();
-        let segmin = self.restart_interval;
-        let check = segmin * 2;
         let RestartExecutor {
-            previous_avs,
-            quantization,
-            segment_len,
-            threshold,
-            upward_segment,
-            record_stat,
-            phase_dw,
-            phase_uw,
-            restart_len,
-            segment_beg_avs,
-            ..
-        } = self;
-        let mut restart_point = false;
-        let qc = (avs * *quantization as f64) as usize;
-        let ql = (*previous_avs * *quantization as f64) as usize;
-        if *record_stat {
-            *restart_len += 1;
-        }
-        *segment_len += 1;
-        if *segment_len < segmin {
-        } else if *segment_len == segmin {
-            *upward_segment = *segment_beg_avs < avs;
-        } else if *upward_segment {
-            if *segment_len % check == 0 && phase_uw.trigger < acr {
-                if *record_stat {
-                    phase_uw.num_restart += 1;
-                }
-                phase_uw.trigger *= 1.1;
-                restart_point = true;
-            } else if qc < ql {
-                if *record_stat {
-                    phase_dw.end_point.update(*segment_beg_avs);
-                    phase_uw.end_point.update(*previous_avs);
-                    phase_uw.len.update(*segment_len as f64);
-                    phase_uw.num += 1;
-                    *segment_beg_avs = avs;
-                }
-                phase_dw.trigger = phase_dw.restart_scaling * avs;
-                phase_uw.trigger = phase_uw.restart_trigger;
-                *segment_len = 0;
-                *upward_segment = false;
-            }
-        } else {
-            if *segment_len % check == 0 && avs < phase_dw.trigger {
-                if *record_stat {
-                    phase_dw.num_restart += 1;
-                }
-                phase_dw.trigger *= 0.99;
-                restart_point = true;
-            } else if ql < qc {
-                if *record_stat {
-                    phase_uw.end_point.update(*segment_beg_avs);
-                    phase_dw.end_point.update(*previous_avs);
-                    phase_dw.len.update(*segment_len as f64);
-                    phase_dw.num += 1;
-                    *segment_beg_avs = avs;
-                }
-                phase_dw.trigger = phase_dw.restart_scaling * avs;
-                phase_uw.trigger = phase_uw.restart_trigger;
-                *segment_len = 0;
-                *upward_segment = true;
-            }
-        }
-        *previous_avs = avs;
-        if restart_point {
-            if *record_stat {
-                self.restart_len_ema.update(self.restart_len as f64);
-                self.restart_len = 0;
-            }
-            return true;
-        }
-        if avs < threshold.0 {
-            threshold.0 *= threshold.1;
-            self.cnf.reset_vars(vdb);
-            if *record_stat {
-                self.fup.reset_vars(vdb);
-                self.cnf2.reset_vars(vdb);
-            }
-            return true;
-        }
-        false
-    }
-}
-
-impl RestartExecutor {
-    fn _restart(&mut self, vdb: &mut VarDB) -> bool {
-        if self.use_luby {
-            self.luby.update(true);
-            return self.luby.is_active();
-        }
-        let avs = self.cnf2.trend(); // cnf is better than fup
-        let RestartExecutor {
-            previous_avs: pre,
+            previous_als: pre,
             segment_len: len,
             record_stat: stat,
-            phase_uw: phase,
+            segment: seg,
             ..
         } = self;
-        let diff = ((*pre - avs) * self.quantization as f64) as isize;
+        let avs = self.cls.trend(); // cls is better than fup
+        let lbd = self.lbd.trend();
+        let diff = ((*pre - avs).abs() * self.quantization as f64) as usize;
         if *stat {
             *len += 1;
         }
-        if 1 <= diff {
-            if *stat {
-                phase.end_point.update(*pre);
-                phase.len.update(*len as f64);
-                self.restart_len_ema.update(*len as f64);
-                phase.num_restart += 1;
-                *len = 0;
+        if 2 <= diff {
+            seg.num += 1;
+            if  1.5 < lbd {
+                if *stat {
+                    seg.end_point.update(*pre);
+                    seg.len.update(*len as f64);
+                    self.restart_len_ema.update(*len as f64);
+                    seg.num_restart += 1;
+                    *len = 0;
+                }
+                *pre = avs;
+                return true;
             }
             *pre = avs;
-            return true;
-        } else if diff <= -1 {
-            *pre = avs;
-        }
-        if avs < self.threshold.0 {
-            self.threshold.0 *= self.threshold.1;
-            self.cnf2.reset_vars(vdb);
-            if *stat {
-                self.fup.reset_vars(vdb);
-                self.cnf.reset_vars(vdb);
-            }
-            return true;
         }
         false
     }
@@ -745,7 +631,7 @@ impl<'a> ProgressEvaluatorIF<'a> for VarSet {
             v.turn_on(self.flag);
             self.sum += 1;
             self.diff_ema.update(1.0);
-        } else if self.flag == Flag::CNFVAR2
+        } else if self.flag == Flag::CNFLIT
             && (   (v.assign == TRUE  && !v.is(Flag::LAST_CNF))
                 || (v.assign == FALSE && !v.is(Flag::LAST_CNF)))
         {
@@ -754,7 +640,7 @@ impl<'a> ProgressEvaluatorIF<'a> for VarSet {
         } else {
             self.diff_ema.update(0.0);
         }
-        if self.flag == Flag::CNFVAR2 {
+        if self.flag == Flag::CNFLIT {
             if v.assign == TRUE {
                 v.turn_on(Flag::LAST_CNF);
             } else {

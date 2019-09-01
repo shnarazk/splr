@@ -427,7 +427,7 @@ impl StateIF for State {
             return;
         }
         println!("{}", self);
-        let repeat = if 0 < self.config.dump_interval { 11 } else { 5 };
+        let repeat = if 0 < self.config.dump_interval { 10 } else { 5 };
         for _i in 0..repeat {
             println!("                                                  ");
         }
@@ -454,7 +454,7 @@ impl StateIF for State {
         self.progress_cnt += 1;
         print!(
             "\x1B[{}A\x1B[1G",
-            if 0 < self.config.dump_interval { 12 } else { 6 }
+            if 0 < self.config.dump_interval { 11 } else { 6 }
         );
         println!("\x1B[2K{}", self);
         println!(
@@ -541,7 +541,7 @@ impl StateIF for State {
                 "{:>9.0}",
                 self.record,
                 LogUsizeId::End,
-                self.rst.cnf.num_build
+                self.rst.cls.num_build
             ),
         );
         self.record[LogF64Id::VADecay] = vdb.activity_decay;
@@ -594,24 +594,24 @@ impl StateIF for State {
             );
             println!(
                 "\x1B[2K   Cnfl ever|#var:{}, #ave:{}, e-64:{}, trnd:{} ",
-                im!("{:>9}", self.record, LogUsizeId::CNFnum, self.rst.cnf.sum),
+                im!("{:>9}", self.record, LogUsizeId::CNFnum, self.rst.cls.sum),
                 fm!(
                     "{:>9.4}",
                     self.record,
                     LogF64Id::CNFave,
-                    self.rst.cnf.sum as f64 / self.rst.cnf.num as f64
+                    self.rst.cls.sum as f64 / self.rst.cls.num as f64
                 ),
                 fm!(
                     "{:>9.4}",
                     self.record,
                     LogF64Id::CNFema,
-                    self.rst.cnf.diff_ema.get()
+                    self.rst.cls.diff_ema.get()
                 ),
                 fm!(
                     "{:>9.4}",
                     self.record,
                     LogF64Id::CNFtrd,
-                    self.rst.cnf.trend()
+                    self.rst.cls.trend()
                 ),
             );
             println!(
@@ -636,8 +636,9 @@ impl StateIF for State {
                     self.rst.fup.trend()
                 ),
             );
+            /*
             println!(
-                "\x1B[2K  Upwd phase|#rst:{}, #seg:{}, bLvl:{}, eLen:{} ",
+                "\x1B[2K     Segment|#rst:{}, #seg:{}, bLvl:{}, eLen:{} ",
                 im!(
                     "{:>9.0}",
                     self.record,
@@ -663,31 +664,32 @@ impl StateIF for State {
                     self.rst.phase_uw.len.get()
                 ),
             );
+            */
             println!(
-                "\x1B[2K  Down phase|#rst:{}, #seg:{}, tLvl:{}, eLen:{} ",
+                "\x1B[2K     Segment|#rst:{}, #seg:{}, tLvl:{}, eLen:{} ",
                 im!(
                     "{:>9.0}",
                     self.record,
                     LogUsizeId::RSTd,
-                    self.rst.phase_dw.num_restart
+                    self.rst.segment.num_restart
                 ),
                 im!(
                     "{:>9.0}",
                     self.record,
                     LogUsizeId::End,
-                    self.rst.phase_dw.num
+                    self.rst.segment.num
                 ),
                 fm!(
                     "{:>9.4}",
                     self.record,
                     LogF64Id::RSTdL,
-                    self.rst.phase_dw.end_point.get()
+                    self.rst.segment.end_point.get()
                 ),
                 fm!(
                     "{:>9.2}",
                     self.record,
                     LogF64Id::End,
-                    self.rst.phase_dw.len.get()
+                    self.rst.segment.len.get()
                 ),
             );
         } else {
@@ -699,20 +701,16 @@ impl StateIF for State {
             self.record[LogF64Id::LBDave] = self.rst.lbd.sum / self.rst.lbd.num as f64;
             self.record[LogF64Id::LBDtrd] = self.rst.lbd.sum / self.rst.lbd.trend();
 
-            self.record[LogUsizeId::CNFnum] = self.rst.cnf.sum;
-            self.record[LogF64Id::CNFave] = self.rst.cnf.sum as f64 / self.rst.cnf.num as f64;
-            self.record[LogF64Id::CNFema] = self.rst.cnf.diff_ema.get();
-            self.record[LogF64Id::CNFtrd] = self.rst.cnf.trend();
+            self.record[LogUsizeId::CNFnum] = self.rst.cls.sum;
+            self.record[LogF64Id::CNFave] = self.rst.cls.sum as f64 / self.rst.cls.num as f64;
+            self.record[LogF64Id::CNFema] = self.rst.cls.diff_ema.get();
+            self.record[LogF64Id::CNFtrd] = self.rst.cls.trend();
 
             self.record[LogF64Id::FUPema] = self.rst.fup.diff_ema.get();
             self.record[LogUsizeId::FUPnum] = self.rst.fup.sum;
             self.record[LogF64Id::FUPave] = self.rst.fup.sum as f64 / self.rst.fup.num as f64;
             self.record[LogF64Id::FUPtrd] = self.rst.fup.trend();
 
-            self.record[LogUsizeId::RSTu] = self.rst.phase_uw.num_restart;
-            self.record[LogF64Id::RSTuL] = self.rst.phase_uw.end_point.get();
-            self.record[LogUsizeId::RSTd] = self.rst.phase_uw.num_restart;
-            self.record[LogF64Id::RSTdL] = self.rst.phase_uw.end_point.get();
         }
         if let Some(m) = mes {
             println!("\x1B[2K    Strategy|mode: {}", m);
@@ -810,9 +808,9 @@ pub enum LogF64Id {
     ASGave,       //  1: rst.asg.{sum / num}
     ASGema,       //  2: ema_asg.ema.get
     ASGtrn,       //  3: ema_asg.trend
-    CNFave,       //  4: rst.cnf.{sum / num}
-    CNFema,       //  5: rst.cnf.get
-    CNFtrd,       //  6: rst.cnf.trend
+    CNFave,       //  4: rst.cls.{sum / num}
+    CNFema,       //  5: rst.cls.get
+    CNFtrd,       //  6: rst.cls.trend
     FUPinc,       //  7: ema_fup.diff_ema.slow: f64,
     FUPprg,       //  8: num_fup percentage: f64,
     FUPave,       //  9: rst.fup.{sum / num}

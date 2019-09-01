@@ -248,7 +248,7 @@ pub trait ProgressEvaluatorIF<'a> {
 pub trait RestartIF {
     fn new(acr_threshold: f64, avs_threshold: f64) -> Self;
     /// new local/global restart control
-    fn restart(&mut self, vdb: &mut VarDB) -> bool;
+    fn restart(&mut self) -> bool;
 }
 
 /// API for SAT solver like `build`, `solve` and so on.

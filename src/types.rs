@@ -190,7 +190,7 @@ bitflags! {
         /// a variable is used as a first UID in the present run
         const FUP          = 0b0000_0000_1000_0000;
         const CNFVAR       = 0b0000_0001_0000_0000;
-        const CNFVAR2      = 0b0000_0010_0000_0000;
+        const CNFLIT       = 0b0000_0010_0000_0000;
         const LAST_CNF     = 0b0000_0100_0000_0000;
 //        /// superium of fup: a variable has ever been used as a first UID so far
 //        const SUF          = 0b0000_0001_0000_0000;

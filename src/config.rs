@@ -7,7 +7,7 @@ pub const EMA_FAST: usize = 64; // 2 ^ 6
 pub const EMA_SLOW: usize = 32768; // 2 ^ 15
 
 pub const RESTART_INTV: usize = EMA_FAST / 2;
-pub const RESTART_QNTM: usize = 1024;
+pub const RESTART_QNTM: usize = 10_000;
 pub const RESTART_THRD: (f64, f64) = (0.4, 0.9);
 
 pub const ACR_THRESHOLD: f64 = 1.4;
