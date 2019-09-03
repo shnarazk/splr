@@ -393,6 +393,7 @@ fn handle_conflict_path(
         state.stats[Stat::Learnt] += 1;
         let lbd = vdb.compute_lbd(&new_learnt);
         let l0 = new_learnt[0];
+        /*
         if lbd <= 2 {
             state.stats[Stat::NumLBD2] += 1;
         }
@@ -402,11 +403,10 @@ fn handle_conflict_path(
         }
         let cid = cdb.attach(state, vdb, lbd);
         elim.add_cid_occur(vdb, cid, &mut cdb.clause[cid as usize], true);
-        if state.rst.upward_segment {
-            state.rst.lbd.update(lbd);
-        }
+        state.rst.lbd.update(lbd);
         state.c_lvl.update(c_level as f64);
         state.b_lvl.update(bl as f64);
+        */
         if 0 < state.config.dump_interval {
             state.rst.asg.update(c_asgns);
             state.rst.fup.update(&mut vdb.vars[l0.vi()]);
@@ -422,6 +422,22 @@ fn handle_conflict_path(
                 state.rst.restart_ratio.update(1.0);
             }
         } else {
+
+        if lbd <= 2 {
+            state.stats[Stat::NumLBD2] += 1;
+        }
+        if learnt_len == 2 {
+            state.stats[Stat::NumBin] += 1;
+            state.stats[Stat::NumBinLearnt] += 1;
+        }
+        let cid = cdb.attach(state, vdb, lbd);
+        elim.add_cid_occur(vdb, cid, &mut cdb.clause[cid as usize], true);
+        if !state.rst.restart_blocking() {
+            state.rst.lbd.update(lbd);
+        }
+        state.c_lvl.update(c_level as f64);
+        state.b_lvl.update(bl as f64);
+
             asgs.uncheck_enqueue(vdb, l0, cid);
             if 0 < state.config.dump_interval {
                 state.rst.restart_ratio.update(0.0);
@@ -441,9 +457,9 @@ fn handle_conflict_path(
             ncnfl,
             stats[Stat::Restart] as f64,
             state.num_solved_vars as f64 / state.num_vars as f64,
-            cls.trend().min(2.0),
-            fup.trend().min(2.0),
-            lbd.trend().min(2.0),
+            cls.trend(),
+            fup.trend(),
+            lbd.trend(),
             restart_ratio.get().min(2.0),
         ));
     }

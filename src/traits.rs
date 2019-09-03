@@ -230,6 +230,7 @@ pub trait PropagatorIF {
 pub trait ProgressEvaluatorIF<'a> {
     type Memory;
     type Item;
+    fn get(&self) -> f64;
     fn update(&mut self, item: Self::Item);
     /// update its state based on the result of the predicate.
     fn update_with<F>(&mut self, f: F) -> &mut Self
@@ -249,6 +250,7 @@ pub trait RestartIF {
     fn new(acr_threshold: f64, avs_threshold: f64) -> Self;
     /// new local/global restart control
     fn restart(&mut self) -> bool;
+    fn restart_blocking(&self) -> bool;
 }
 
 /// API for SAT solver like `build`, `solve` and so on.
@@ -330,6 +332,8 @@ pub trait VarDBIF {
 
 pub trait VarSetIF {
     fn new(flag: Flag) -> Self;
+    /// get fast EMA
+    fn get_fast(&self) -> f64;
     /// remove a var from the set.
     fn remove(&self, v: &mut Var);
     /// reset after restart

@@ -1,8 +1,9 @@
-use crate::config::{EMA_FAST, EMA_SLOW, RESTART_INTV, RESTART_QNTM, RESTART_THRD};
+use crate::config::{EMA_FAST, EMA_SLOW, RESTART_QNTM};
 use crate::traits::*;
 use crate::types::{Flag, FALSE, TRUE};
 use crate::var::{Var, VarDB};
 
+const RESTART_INTERVAL: usize = 20;
 const RESTART_THRESHOLD: f64 = 1.4;
 
 /// Exponential Moving Average w/ a calibrator
@@ -145,10 +146,8 @@ pub struct RestartExecutor {
     pub luby: RestartLuby,
     previous_als: f64,
     quantization: usize,
-    restart_interval: usize,
     pub segment_len: usize,
-    pub threshold: (f64, f64),
-    pub upward_segment: bool,
+    pub segment_weight: f64,
     pub use_luby: bool,
     // stats
     pub record_stat: bool,
@@ -156,7 +155,6 @@ pub struct RestartExecutor {
     restart_len: usize,
     pub restart_len_ema: Ema,
     pub restart_ratio: Ema,
-    segment_beg_als: f64,
 }
 
 impl Default for RestartExecutor {
@@ -168,15 +166,13 @@ impl Default for RestartExecutor {
         RestartExecutor {
             asg: RestartASG::new(RESTART_THRESHOLD),
             cls: VarSet::new(Flag::CNFLIT),
-            fup: VarSet::new(Flag::FUP),
+            fup: VarSet::new(Flag::FUL),
             lbd: RestartLBD::new(RESTART_THRESHOLD),
             luby: RestartLuby::new(2.0, 100.0),
             previous_als: 1.0,
             quantization: RESTART_QNTM,
-            restart_interval: RESTART_INTV,
             segment_len: 0,
-            threshold: RESTART_THRD, // (fup.trend, decay factor),
-            upward_segment: true,
+            segment_weight: 0.0,
             use_luby: false,
             // stats
             record_stat: false,
@@ -184,7 +180,6 @@ impl Default for RestartExecutor {
             restart_len: 1,
             restart_len_ema: Ema::new(EMA_SLOW),
             restart_ratio: Ema::new(EMA_SLOW),
-            segment_beg_als: 0.0,
         }
     }
 }
@@ -203,33 +198,50 @@ impl RestartIF for RestartExecutor {
         }
         let RestartExecutor {
             previous_als: pre,
-            segment_len: len,
+            quantization: q,
             record_stat: stat,
             segment: seg,
+            segment_len: len,
+            segment_weight: w,
             ..
         } = self;
-        let avs = self.cls.trend(); // cls is better than fup
+        let cls = self.cls.trend(); // cls is better than fup
+        let ful = self.fup.trend();
         let lbd = self.lbd.trend();
-        let diff = ((*pre - avs).abs() * self.quantization as f64) as usize;
-        if *stat {
-            *len += 1;
+        let diff = (cls - *pre) * *q as f64;
+        *w += ful;
+        *len += 1;
+        if *w < RESTART_INTERVAL as f64 { // if *len < RESTART_INTERVAL {
+            return false;
         }
-        if 2 <= diff {
-            seg.num += 1;
-            if  1.5 < lbd {
-                if *stat {
-                    seg.end_point.update(*pre);
-                    seg.len.update(*len as f64);
-                    self.restart_len_ema.update(*len as f64);
-                    seg.num_restart += 1;
-                    *len = 0;
-                }
-                *pre = avs;
-                return true;
+        if 1.3 < lbd {
+            if *stat {
+                seg.end_point.update(*pre);
+                seg.len.update(*len as f64);
+                self.restart_len_ema.update(*len as f64);
+                seg.num_restart += 1;
             }
-            *pre = avs;
+            *len = 0;
+            *w = 0.0;
+            *pre = cls;
+            seg.num += 1;
+            return true;
+        } else if diff < -0.01 * (RESTART_INTERVAL as f64) {
+            if *stat {
+                seg.end_point.update(*pre);
+                seg.len.update(*len as f64);
+                self.restart_len_ema.update(*len as f64);
+                seg.num_restart += 1;
+            }
+            *len = 0;
+            *w = 0.0;
+            seg.num += 1;
+            return true;
         }
         false
+    }
+    fn restart_blocking(&self) -> bool {
+        self.segment_weight < RESTART_INTERVAL as f64
     }
 }
 
@@ -257,6 +269,9 @@ pub struct RestartLBD {
 impl ProgressEvaluatorIF<'_> for RestartLBD {
     type Memory = Ema;
     type Item = usize;
+    fn get(&self) -> f64 {
+        self.ema.get()
+    }
     fn update(&mut self, item: Self::Item) {
         self.sum += item as f64;
         self.num += 1;
@@ -291,7 +306,7 @@ impl RestartLBD {
             sum: 0.0,
             num: 0,
             threshold,
-            ema: Ema::new(EMA_FAST),
+            ema: Ema::new(RESTART_INTERVAL),
             lbd: None,
             result: false,
         }
@@ -375,7 +390,7 @@ impl RestartASG {
             sum: 0,
             num: 0,
             threshold,
-            ema: Ema::new(EMA_FAST),
+            ema: Ema::new(RESTART_INTERVAL),
             asg: None,
             result: false,
         }
@@ -394,9 +409,12 @@ pub struct RestartASG {
     result: bool,
 }
 
-impl ProgressEvaluatorIF<'_> for RestartASG {
+impl<'a> ProgressEvaluatorIF<'a> for RestartASG {
     type Memory = Ema2;
     type Item = usize;
+    fn get(&self) -> f64 {
+        self.ema.get()
+    }
     fn update(&mut self, item: Self::Item) {
         self.ema.update(item as f64);
         self.max = item.max(self.max);
@@ -431,7 +449,7 @@ impl RestartASG {
             sum: 0,
             num: 0,
             threshold,
-            ema: Ema2::new(EMA_SLOW).with_fast(EMA_FAST),
+            ema: Ema2::new(EMA_SLOW).with_fast(RESTART_INTERVAL),
             asg: None,
             result: false,
         }
@@ -459,9 +477,12 @@ pub struct RestartLuby {
     result: bool,
 }
 
-impl ProgressEvaluatorIF<'_> for RestartLuby {
+impl<'a> ProgressEvaluatorIF<'a> for RestartLuby {
     type Memory = usize;
     type Item = bool;
+    fn get(&self) -> f64 {
+        0.0
+    }
     fn update(&mut self, in_use: Self::Item) {
         if in_use {
             self.cnfl_cnt += 1.0;
@@ -569,11 +590,11 @@ fn luby(y: f64, mut x: usize) -> f64 {
 /// AVS was a variant of the present AGS. And it has no flag in Var::flag field.
 #[derive(Debug)]
 pub struct VarSet {
-    pub flag: Flag,
+    flag: Flag,
     pub sum: usize,
     pub num: usize,
-    pub diff: Option<f64>,
-    pub diff_ema: Ema2,
+    diff: Option<f64>,
+    diff_ema: Ema2,
     is_closed: bool,
     pub num_build: usize,
 }
@@ -589,6 +610,9 @@ impl VarSetIF for VarSet {
             is_closed: false,
             num_build: 1,
         }
+    }
+    fn get_fast(&self) -> f64 {
+        self.diff_ema.get_fast()
     }
     fn remove(&self, v: &mut Var) {
         if v.is(self.flag) {
@@ -614,6 +638,9 @@ impl VarSetIF for VarSet {
 impl<'a> ProgressEvaluatorIF<'a> for VarSet {
     type Memory = Ema2;
     type Item = &'a mut Var;
+    fn get(&self) -> f64 {
+        self.diff_ema.get()
+    }
     /*
     fn update(&mut self, v: Self::Item) {
         self.num += 1;
@@ -631,6 +658,12 @@ impl<'a> ProgressEvaluatorIF<'a> for VarSet {
             v.turn_on(self.flag);
             self.sum += 1;
             self.diff_ema.update(1.0);
+        } else if self.flag == Flag::FUL
+            && (   (v.phase == TRUE  && !v.is(Flag::LAST_FUL))
+                    || (v.phase == FALSE && !v.is(Flag::LAST_FUL)))
+        {
+            self.sum += 1;
+            self.diff_ema.update(1.0);
         } else if self.flag == Flag::CNFLIT
             && (   (v.assign == TRUE  && !v.is(Flag::LAST_CNF))
                 || (v.assign == FALSE && !v.is(Flag::LAST_CNF)))
@@ -645,6 +678,12 @@ impl<'a> ProgressEvaluatorIF<'a> for VarSet {
                 v.turn_on(Flag::LAST_CNF);
             } else {
                 v.turn_off(Flag::LAST_CNF);
+            }
+        } else if self.flag == Flag::FUL {
+            if v.phase == TRUE {
+                v.turn_on(Flag::LAST_FUL);
+            } else {
+                v.turn_off(Flag::LAST_FUL);
             }
         }
     }

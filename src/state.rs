@@ -583,7 +583,7 @@ impl StateIF for State {
                     "{:>9.2}",
                     self.record,
                     LogF64Id::End,
-                    self.rst.lbd.ema.get()
+                    self.rst.lbd.get()
                 ),
                 fm!(
                     "{:>9.4}",
@@ -593,7 +593,7 @@ impl StateIF for State {
                 ),
             );
             println!(
-                "\x1B[2K   Cnfl ever|#var:{}, #ave:{}, e-64:{}, trnd:{} ",
+                "\x1B[2K Conflct Lit|#var:{}, #ave:{}, e-64:{}, trnd:{} ",
                 im!("{:>9}", self.record, LogUsizeId::CNFnum, self.rst.cls.sum),
                 fm!(
                     "{:>9.4}",
@@ -605,7 +605,7 @@ impl StateIF for State {
                     "{:>9.4}",
                     self.record,
                     LogF64Id::CNFema,
-                    self.rst.cls.diff_ema.get()
+                    self.rst.cls.get()
                 ),
                 fm!(
                     "{:>9.4}",
@@ -627,7 +627,7 @@ impl StateIF for State {
                     "{:>9.4}",
                     self.record,
                     LogF64Id::FUPema,
-                    self.rst.fup.diff_ema.get_fast()
+                    self.rst.fup.get_fast()
                 ),
                 fm!(
                     "{:>9.4}",
@@ -638,7 +638,7 @@ impl StateIF for State {
             );
             /*
             println!(
-                "\x1B[2K     Segment|#rst:{}, #seg:{}, bLvl:{}, eLen:{} ",
+                "\x1B[2K     Segment|#rst:{}, #num:{}, bLvl:{}, eLen:{} ",
                 im!(
                     "{:>9.0}",
                     self.record,
@@ -703,10 +703,10 @@ impl StateIF for State {
 
             self.record[LogUsizeId::CNFnum] = self.rst.cls.sum;
             self.record[LogF64Id::CNFave] = self.rst.cls.sum as f64 / self.rst.cls.num as f64;
-            self.record[LogF64Id::CNFema] = self.rst.cls.diff_ema.get();
+            self.record[LogF64Id::CNFema] = self.rst.cls.get();
             self.record[LogF64Id::CNFtrd] = self.rst.cls.trend();
 
-            self.record[LogF64Id::FUPema] = self.rst.fup.diff_ema.get();
+            self.record[LogF64Id::FUPema] = self.rst.fup.get();
             self.record[LogUsizeId::FUPnum] = self.rst.fup.sum;
             self.record[LogF64Id::FUPave] = self.rst.fup.sum as f64 / self.rst.fup.num as f64;
             self.record[LogF64Id::FUPtrd] = self.rst.fup.trend();
@@ -720,7 +720,7 @@ impl StateIF for State {
         self.flush("\x1B[2K");
         // update undisplayed fields
         self.record[LogUsizeId::Learnt] = self.rst.lbd.num;
-        self.record[LogF64Id::LBDema] = self.rst.lbd.ema.get();
+        self.record[LogF64Id::LBDema] = self.rst.lbd.get();
         self.record[LogUsizeId::RestartByLuby] = self.stats[Stat::RestartByLuby];
         self.record[LogUsizeId::Reduction] = self.stats[Stat::Reduction];
         self.record[LogUsizeId::SatClauseElim] = self.stats[Stat::SatClauseElimination];
@@ -941,8 +941,8 @@ impl State {
             0,
             self.stats[Stat::Restart],
             self.rst.asg.get_fast(),
-            self.rst.lbd.ema.get(),
-            self.rst.lbd.ema.get(),
+            self.rst.lbd.get(),
+            self.rst.lbd.get(),
             self.b_lvl.get(),
             self.c_lvl.get(),
             elim.clause_queue_len(),
