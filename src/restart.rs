@@ -198,43 +198,38 @@ impl RestartIF for RestartExecutor {
         }
         let RestartExecutor {
             previous_als: pre,
-            quantization: q,
             record_stat: stat,
             segment: seg,
             segment_len: len,
-            segment_weight: w,
+            // segment_weight: w,
             ..
         } = self;
-        let cls = self.cls.trend(); // cls is better than fup
-        let ful = self.fup.trend();
+        let asg = self.asg.trend();
+        // let cls = self.cls.trend();
+        // let ful = self.fup.trend();
         let lbd = self.lbd.trend();
-        let diff = (cls - *pre) * *q as f64;
-        *w += ful;
-        *len += 1;
-        if *w < RESTART_INTERVAL as f64 { // if *len < RESTART_INTERVAL {
+        // let _diff = (cls - *pre) * *q as f64;
+        if 2.5 < asg {
+            *len = 0;
+            // *w = 0.0;
+            seg.num += 1;
             return false;
         }
-        if 1.3 < lbd {
+        // *w += ful;
+        *len += 1;
+        if *len < RESTART_INTERVAL {
+            return false;
+        }
+        if 1.5 < lbd {
             if *stat {
                 seg.end_point.update(*pre);
                 seg.len.update(*len as f64);
-                self.restart_len_ema.update(*len as f64);
                 seg.num_restart += 1;
+                self.restart_len_ema.update(*len as f64);
             }
             *len = 0;
-            *w = 0.0;
-            *pre = cls;
-            seg.num += 1;
-            return true;
-        } else if diff < -0.01 * (RESTART_INTERVAL as f64) {
-            if *stat {
-                seg.end_point.update(*pre);
-                seg.len.update(*len as f64);
-                self.restart_len_ema.update(*len as f64);
-                seg.num_restart += 1;
-            }
-            *len = 0;
-            *w = 0.0;
+            // *w = 0.0;
+            // *pre = ful;
             seg.num += 1;
             return true;
         }
@@ -606,7 +601,7 @@ impl VarSetIF for VarSet {
             sum: 0,
             num: 0,
             diff: None,
-            diff_ema: Ema2::new(EMA_SLOW * 2).with_fast(EMA_FAST * 16),
+            diff_ema: Ema2::new(EMA_SLOW).with_fast(EMA_FAST),
             is_closed: false,
             num_build: 1,
         }

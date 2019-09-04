@@ -432,9 +432,7 @@ fn handle_conflict_path(
         }
         let cid = cdb.attach(state, vdb, lbd);
         elim.add_cid_occur(vdb, cid, &mut cdb.clause[cid as usize], true);
-        if !state.rst.restart_blocking() {
-            state.rst.lbd.update(lbd);
-        }
+        state.rst.lbd.update(lbd);
         state.c_lvl.update(c_level as f64);
         state.b_lvl.update(bl as f64);
 
