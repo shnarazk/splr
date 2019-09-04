@@ -379,8 +379,6 @@ impl StateIF for State {
             self.strategy = SearchStrategy::LowSuccesiveLuby;
             self.rst.use_luby = true;
             self.rst.luby.factor = 100.0;
-            self.config.var_activity_decay = 0.999;
-            self.config.var_activity_d_max = 0.999;
         }
         if self.stats[Stat::NoDecisionConflict] > 54_400 {
             self.strategy = SearchStrategy::HighSuccesive;
@@ -388,14 +386,10 @@ impl StateIF for State {
             self.glureduce = true;
             self.co_lbd_bound = 3;
             self.first_reduction = 30000;
-            self.config.var_activity_decay = 0.99;
-            self.config.var_activity_d_max = 0.99;
             // randomize_on_restarts = 1;
         }
         if self.stats[Stat::NumLBD2] - self.stats[Stat::NumBin] > 20_000 {
             self.strategy = SearchStrategy::ManyGlues;
-            self.config.var_activity_decay = 0.91;
-            self.config.var_activity_d_max = 0.91;
         }
         if self.strategy == SearchStrategy::Initial {
             self.strategy = SearchStrategy::Generic;
@@ -441,7 +435,7 @@ impl StateIF for State {
     }
     /// `mes` should be shorter than or equal to 9, or 8 + a delimiter.
     #[allow(clippy::cognitive_complexity)]
-    fn progress(&mut self, cdb: &ClauseDB, vdb: &VarDB, mes: Option<&str>) {
+    fn progress(&mut self, cdb: &ClauseDB, _vdb: &VarDB, mes: Option<&str>) {
         if !self.use_progress {
             return;
         }
@@ -544,7 +538,6 @@ impl StateIF for State {
                 self.rst.cls.num_build
             ),
         );
-        self.record[LogF64Id::VADecay] = vdb.activity_decay;
         self.record[LogF64Id::RSTlen] = 100.0 * self.rst.restart_ratio.get();
         if 0 < self.config.dump_interval {
             println!(
@@ -826,7 +819,6 @@ pub enum LogF64Id {
     RSTrat,       // 17: rst.ratio
     RSTlen,       // 18: rst.interval_ema
     STLlen,       // 19: rst.settle_ema.get
-    VADecay,      // 20: vdb.activity_decay
     End,
 }
 

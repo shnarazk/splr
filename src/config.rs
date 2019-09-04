@@ -38,12 +38,6 @@ pub struct Config {
     /// #literals in a clause in v-elim.
     #[structopt(long = "el", default_value = "64")]
     pub elim_lit_limit: usize,
-    /// init. var. activity decay
-    #[structopt(long = "vd", default_value = "0.90")]
-    pub var_activity_decay: f64,
-    /// max. var. activity decay
-    #[structopt(long = "vm", default_value = "0.96")]
-    pub var_activity_d_max: f64,
     /// a DIMACS format CNF file
     #[structopt(parse(from_os_str))]
     pub cnf_filename: PathBuf,
@@ -91,8 +85,6 @@ impl Default for Config {
             // restart_quantum: RESTART_QNTM,
             elim_grow_limit: 4,
             elim_lit_limit: 100,
-            var_activity_decay: 0.90,
-            var_activity_d_max: 0.98,
             cnf_filename: PathBuf::new(),
             output_dirname: PathBuf::from("."),
             result_filename: PathBuf::new(),

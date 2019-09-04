@@ -2,7 +2,6 @@ use crate::clause::{Clause, ClauseDB};
 use crate::config::Config;
 use crate::eliminator::Eliminator;
 use crate::propagator::AssignStack;
-use crate::restart::RestartExecutor;
 use crate::state::{Stat, State};
 use crate::traits::*;
 use crate::types::*;
@@ -56,7 +55,7 @@ impl SatSolverIF for Solver {
             cdb: ClauseDB::new(nv, nc, config.use_certification),
             elim,
             state,
-            vdb: VarDB::new(nv, config.var_activity_decay),
+            vdb: VarDB::new(nv, 0.99),
         }
     }
     /// # Examples
@@ -323,7 +322,7 @@ fn search(
             }
         } else {
             state.stats[Stat::Conflict] += 1;
-            vdb.current_conflict = state.stats[Stat::Conflict];
+            vdb.update_stat(state);
             if a_decision_was_made {
                 a_decision_was_made = false;
             } else {
@@ -361,9 +360,6 @@ fn handle_conflict_path(
     ci: ClauseId,
 ) -> MaybeInconsistent {
     let ncnfl = state.stats[Stat::Conflict]; // total number
-    if ncnfl % 5000 == 0 && vdb.activity_decay < state.config.var_activity_d_max {
-        vdb.activity_decay += 0.01;
-    }
     let c_level = asgs.level();
     let c_asgns = asgs.len(); // asgs.num_at(asgs.level() - 1);
     let bl = analyze(asgs, cdb, state, vdb, ci).max(state.root_level);
@@ -393,7 +389,7 @@ fn handle_conflict_path(
         state.stats[Stat::Learnt] += 1;
         let lbd = vdb.compute_lbd(&new_learnt);
         let l0 = new_learnt[0];
-        /*
+
         if lbd <= 2 {
             state.stats[Stat::NumLBD2] += 1;
         }
@@ -403,12 +399,11 @@ fn handle_conflict_path(
         }
         let cid = cdb.attach(state, vdb, lbd);
         elim.add_cid_occur(vdb, cid, &mut cdb.clause[cid as usize], true);
+        state.rst.asg.update(c_asgns);
         state.rst.lbd.update(lbd);
         state.c_lvl.update(c_level as f64);
         state.b_lvl.update(bl as f64);
-        */
         if 0 < state.config.dump_interval {
-            state.rst.asg.update(c_asgns);
             state.rst.fup.update(&mut vdb.vars[l0.vi()]);
         }
         if state.rst.restart() {
@@ -422,20 +417,6 @@ fn handle_conflict_path(
                 state.rst.restart_ratio.update(1.0);
             }
         } else {
-
-        if lbd <= 2 {
-            state.stats[Stat::NumLBD2] += 1;
-        }
-        if learnt_len == 2 {
-            state.stats[Stat::NumBin] += 1;
-            state.stats[Stat::NumBinLearnt] += 1;
-        }
-        let cid = cdb.attach(state, vdb, lbd);
-        elim.add_cid_occur(vdb, cid, &mut cdb.clause[cid as usize], true);
-        state.rst.lbd.update(lbd);
-        state.c_lvl.update(c_level as f64);
-        state.b_lvl.update(bl as f64);
-
             asgs.uncheck_enqueue(vdb, l0, cid);
             if 0 < state.config.dump_interval {
                 state.rst.restart_ratio.update(0.0);
@@ -444,21 +425,14 @@ fn handle_conflict_path(
     }
     if 0 < state.config.dump_interval && ncnfl % state.config.dump_interval == 0 {
         let State { stats, rst, .. } = state;
-        let RestartExecutor {
-            cls,
-            fup,
-            lbd,
-            restart_ratio,
-            ..
-        } = rst;
         state.development_history.push((
             ncnfl,
             stats[Stat::Restart] as f64,
-            state.num_solved_vars as f64 / state.num_vars as f64,
-            cls.trend(),
-            fup.trend(),
-            lbd.trend(),
-            restart_ratio.get().min(2.0),
+            rst.asg.trend().min(10.0), // num_solved_vars as f64 / num_vars as f64
+            rst.cls.trend().min(10.0),
+            rst.fup.trend().min(10.0),
+            rst.lbd.trend().min(10.0),
+            rst.restart_ratio.get().min(10.0),
         ));
     }
     if ncnfl % 10_000 == 0 {
@@ -514,10 +488,10 @@ fn analyze(
 ) -> usize {
     state.new_learnt.clear();
     state.new_learnt.push(0);
-    state
-        .rst
-        .cls
-        .update(&mut vdb[cdb.clause[confl as usize].lits[0].vi()]);
+    if 0 < state.config.dump_interval {
+        let v = &mut vdb[cdb.clause[confl as usize].lits[0].vi()];
+        state.rst.cls.update(v);
+    }
     let dl = asgs.level();
     let mut cid = confl;
     let mut p = NULL_LIT;

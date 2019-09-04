@@ -1,10 +1,9 @@
 use crate::clause::Clause;
+use crate::state::{Stat, State};
 use crate::traits::*;
 use crate::types::*;
 use std::fmt;
 use std::ops::{Index, IndexMut, Range, RangeFrom};
-
-const VAR_ACTIVITY_DECAY: f64 = 0.92;
 
 /// Structure for variables.
 #[derive(Debug)]
@@ -74,10 +73,10 @@ impl FlagIF for Var {
 pub struct VarDB {
     /// vars
     pub vars: Vec<Var>,
-    /// the current conflict number
-    /// var activity decay
-    pub activity_decay: f64,
-    pub current_conflict: usize,
+    /// the current conflict's ordinal number
+    current_conflict: usize,
+    /// the current restart's ordinal number
+    current_restart: usize,
     pub lbd_temp: Vec<usize>,
 }
 
@@ -85,8 +84,8 @@ impl Default for VarDB {
     fn default() -> VarDB {
         VarDB {
             vars: Vec::new(),
-            activity_decay: VAR_ACTIVITY_DECAY,
             current_conflict: 0,
+            current_restart: 0,
             lbd_temp: Vec::new(),
         }
     }
@@ -138,11 +137,11 @@ impl IndexMut<RangeFrom<usize>> for VarDB {
 }
 
 impl VarDBIF for VarDB {
-    fn new(n: usize, activity_decay: f64) -> Self {
+    fn new(n: usize, _activity_decay: f64) -> Self {
         VarDB {
             vars: Var::new_vars(n),
-            activity_decay,
             current_conflict: 0,
+            current_restart: 0,
             lbd_temp: vec![0; n + 1],
         }
     }
@@ -163,6 +162,10 @@ impl VarDBIF for VarDB {
         }
         false
     }
+    fn update_stat(&mut self, state: &State) {
+        self.current_conflict = state.stats[Stat::Conflict] + 1;
+        self.current_restart = state.stats[Stat::Restart] + 1;
+    }
     fn compute_lbd(&mut self, vec: &[Lit]) -> usize {
         let key = self.lbd_temp[0] + 1;
         let mut cnt = 0;
@@ -176,20 +179,20 @@ impl VarDBIF for VarDB {
         self.lbd_temp[0] = key;
         cnt
     }
+    #[inline(always)]
     fn activity(&mut self, vi: VarId) -> f64 {
-        let v = &mut self.vars[vi];
-        if self.current_conflict != v.last_used {
-            let diff = self.current_conflict - v.last_used;
-            let decay = self.activity_decay;
-            v.last_used = self.current_conflict;
-            // assert!(0.0 <= decay, format!("decay {}", decay));
-            v.reward *= decay.powi(diff as i32);
-        }
-        v.reward
+        // let v = &mut self.vars[vi];
+        // if self.current_conflict != v.last_used {
+        //     let diff = self.current_conflict - v.last_used;
+        //     let decay = self.activity_decay;
+        //     v.last_used = self.current_conflict;
+        //     // assert!(0.0 <= decay, format!("decay {}", decay));
+        //     v.reward *= decay.powi(diff as i32);
+        // }
+        self.vars[vi].reward
     }
     fn bump_activity(&mut self, vi: VarId) {
-        self.activity(vi);
-        self.vars[vi].reward += 1.0 - self.activity_decay;
+        self.vars[vi].reward = (self.vars[vi].reward + self.current_conflict as f64) / 2.0;
     }
 }
 
