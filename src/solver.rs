@@ -361,9 +361,6 @@ fn handle_conflict_path(
     ci: ClauseId,
 ) -> MaybeInconsistent {
     let ncnfl = state.stats[Stat::Conflict]; // total number
-    if ncnfl % 5000 == 0 && state.var_decay < state.var_decay_max {
-        state.var_decay += 0.01;
-    }
     state.restart_update_asg(asgs.len());
     // DYNAMIC BLOCKING RESTART
     state.block_restart(asgs, ncnfl);
@@ -411,7 +408,6 @@ fn handle_conflict_path(
             return Err(SolverError::Inconsistent);
         }
     }
-    state.var_inc /= state.var_decay;
     state.cla_inc /= state.cla_decay;
     if ((state.use_chan_seok && !state.glureduce && state.first_reduction < cdb.num_learnt)
         || (state.glureduce
