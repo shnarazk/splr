@@ -405,7 +405,7 @@ impl ClauseDBIF for ClauseDB {
         let learnt = 0 < lbd && 2 < v.len() && (!state.use_chan_seok || state.co_lbd_bound < lbd);
         let cid = self.new_clause(&v, lbd, learnt);
         let c = &mut self.clause[cid as usize];
-        c.activity = state.var_inc;
+        c.activity = state.cla_inc;
         cid
     }
     fn detach(&mut self, cid: ClauseId) {
