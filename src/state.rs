@@ -614,10 +614,10 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K    Conflict|aLBD:{}, bjmp:{}, cnfl:{} |#stg:{} ",
+            "\x1B[2K    Conflict|aLBD:{}, cnfl:{}, bjmp:{} |#stg:{} ",
             fm!("{:>9.2}", self.record, LogF64Id::AveLBD, self.ema_lbd.get()),
-            fm!("{:>9.2}", self.record, LogF64Id::BLevel, self.b_lvl.get()),
             fm!("{:>9.2}", self.record, LogF64Id::CLevel, self.c_lvl.get()),
+            fm!("{:>9.2}", self.record, LogF64Id::BLevel, self.b_lvl.get()),
             im!(
                 "{:>9}",
                 self.record,
