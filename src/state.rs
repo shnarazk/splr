@@ -757,6 +757,32 @@ impl Default for ProgressRecord {
     }
 }
 
+impl Index<LogUsizeId> for ProgressRecord {
+    type Output = usize;
+    fn index(&self, i: LogUsizeId) -> &usize {
+        &self.vali[i as usize]
+    }
+}
+
+impl IndexMut<LogUsizeId> for ProgressRecord {
+    fn index_mut(&mut self, i: LogUsizeId) -> &mut usize {
+        &mut self.vali[i as usize]
+    }
+}
+
+impl Index<LogF64Id> for ProgressRecord {
+    type Output = f64;
+    fn index(&self, i: LogF64Id) -> &f64 {
+        &self.valf[i as usize]
+    }
+}
+
+impl IndexMut<LogF64Id> for ProgressRecord {
+    fn index_mut(&mut self, i: LogF64Id) -> &mut f64 {
+        &mut self.valf[i as usize]
+    }
+}
+
 impl State {
     #[allow(dead_code)]
     fn dump_header_details(&self) {
