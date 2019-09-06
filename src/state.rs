@@ -183,7 +183,7 @@ pub struct State {
     pub progress_log: bool,
     pub start: SystemTime,
     pub record: ProgressRecord,
-    pub development_history: Vec<(usize, f64, f64, f64, f64, f64, f64)>,
+    pub development_history: Vec<(usize, f64, f64, f64, f64, f64, f64, f64)>,
 }
 
 macro_rules! im {
@@ -421,7 +421,7 @@ impl StateIF for State {
             return;
         }
         println!("{}", self);
-        let repeat = if 0 < self.config.dump_interval { 10 } else { 5 };
+        let repeat = if 0 < self.config.dump_interval { 9 } else { 5 };
         for _i in 0..repeat {
             println!("                                                  ");
         }
@@ -448,7 +448,7 @@ impl StateIF for State {
         self.progress_cnt += 1;
         print!(
             "\x1B[{}A\x1B[1G",
-            if 0 < self.config.dump_interval { 11 } else { 6 }
+            if 0 < self.config.dump_interval { 10 } else { 6 }
         );
         println!("\x1B[2K{}", self);
         println!(
@@ -522,7 +522,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K    Analysis|cLvl:{}, bLvl:{}, #rst:{}, #gen:{} ",
+            "\x1B[2K    Analysis|cLvl:{}, bLvl:{}, #rst:{}, eLen:{} ",
             fm!("{:>9.2}", self.record, LogF64Id::CLevel, self.c_lvl.get()),
             fm!("{:>9.2}", self.record, LogF64Id::BLevel, self.b_lvl.get()),
             im!(
@@ -531,14 +531,14 @@ impl StateIF for State {
                 LogUsizeId::Restart,
                 self.stats[Stat::Restart]
             ),
-            im!(
-                "{:>9.0}",
+            fm!(
+                "{:>9.2}",
                 self.record,
-                LogUsizeId::End,
-                self.rst.cls.num_build
+                LogF64Id::RSTlen,
+                self.rst.invoking_segment.len.get()
             ),
         );
-        self.record[LogF64Id::RSTlen] = 100.0 * self.rst.restart_ratio.get();
+        // self.record[LogF64Id::RSTlen] = 100.0 * self.rst.restart_ratio.get();
         if 0 < self.config.dump_interval {
             println!(
                 "\x1B[2K  Assignment|#max:{}, #ave:{}, e-64:{}, trnd:{}  ",
@@ -585,6 +585,7 @@ impl StateIF for State {
                     self.rst.lbd.trend()
                 ),
             );
+            /*
             println!(
                 "\x1B[2K Conflct Lit|#var:{}, #ave:{}, e-64:{}, trnd:{} ",
                 im!("{:>9}", self.record, LogUsizeId::CNFnum, self.rst.cls.sum),
@@ -609,26 +610,27 @@ impl StateIF for State {
             );
             println!(
                 "\x1B[2K   First UIP|#var:{}, #ave:{}, e-64:{}, trnd:{} ",
-                im!("{:>9}", self.record, LogUsizeId::FUPnum, self.rst.fup.sum),
+                im!("{:>9}", self.record, LogUsizeId::FULnum, self.rst.ful.sum),
                 fm!(
                     "{:>9.4}",
                     self.record,
-                    LogF64Id::FUPave,
-                    self.rst.fup.sum as f64 / self.rst.fup.num as f64
+                    LogF64Id::FULave,
+                    self.rst.ful.sum as f64 / self.rst.ful.num as f64
                 ),
                 fm!(
                     "{:>9.4}",
                     self.record,
-                    LogF64Id::FUPema,
-                    self.rst.fup.get_fast()
+                    LogF64Id::FULema,
+                    self.rst.ful.get_fast()
                 ),
                 fm!(
                     "{:>9.4}",
                     self.record,
-                    LogF64Id::FUPtrd,
-                    self.rst.fup.trend()
+                    LogF64Id::FULtrd,
+                    self.rst.ful.trend()
                 ),
             );
+            */
             /*
             println!(
                 "\x1B[2K     Segment|#rst:{}, #num:{}, bLvl:{}, eLen:{} ",
@@ -659,30 +661,57 @@ impl StateIF for State {
             );
             */
             println!(
-                "\x1B[2K     Segment|#rst:{}, #seg:{}, tLvl:{}, eLen:{} ",
+                "\x1B[2K Restart blk|#exe:{}, rate:{}, thrd:{}, eLen:{} ",
                 im!(
                     "{:>9.0}",
                     self.record,
-                    LogUsizeId::RSTd,
-                    self.rst.segment.num_restart
-                ),
-                im!(
-                    "{:>9.0}",
-                    self.record,
-                    LogUsizeId::End,
-                    self.rst.segment.num
+                    LogUsizeId::BLKnum,
+                    self.rst.blocking_segment.num
                 ),
                 fm!(
                     "{:>9.4}",
                     self.record,
-                    LogF64Id::RSTdL,
-                    self.rst.segment.end_point.get()
+                    LogF64Id::End,
+                    1.0 / self.rst.blocking_segment.len.get()
+                ),
+                fm!(
+                    "{:>9.4}",
+                    self.record,
+                    LogF64Id::BLKthr,
+                    self.rst.blocking_segment.trigger
                 ),
                 fm!(
                     "{:>9.2}",
                     self.record,
+                    LogF64Id::BLKlen,
+                    self.rst.blocking_segment.len.get()
+                ),
+            );
+            println!(
+                "\x1B[2K Restart inv|#exe:{}, rate:{}, thrd:{}, eLen:{} ",
+                im!(
+                    "{:>9.0}",
+                    self.record,
+                    LogUsizeId::RSTnum,
+                    self.rst.invoking_segment.num
+                ),
+                fm!(
+                    "{:>9.4}",
+                    self.record,
                     LogF64Id::End,
-                    self.rst.segment.len.get()
+                    1.0 / self.rst.invoking_segment.len.get()
+                ),
+                fm!(
+                    "{:>9.4}",
+                    self.record,
+                    LogF64Id::RSTthr,
+                    self.rst.invoking_segment.trigger
+                ),
+                fm!(
+                    "{:>9.2}",
+                    self.record,
+                    LogF64Id::RSTlen,
+                    self.rst.invoking_segment.len.get()
                 ),
             );
         } else {
@@ -699,10 +728,10 @@ impl StateIF for State {
             self.record[LogF64Id::CNFema] = self.rst.cls.get();
             self.record[LogF64Id::CNFtrd] = self.rst.cls.trend();
 
-            self.record[LogF64Id::FUPema] = self.rst.fup.get();
-            self.record[LogUsizeId::FUPnum] = self.rst.fup.sum;
-            self.record[LogF64Id::FUPave] = self.rst.fup.sum as f64 / self.rst.fup.num as f64;
-            self.record[LogF64Id::FUPtrd] = self.rst.fup.trend();
+            self.record[LogF64Id::FULema] = self.rst.ful.get();
+            self.record[LogUsizeId::FULnum] = self.rst.ful.sum;
+            self.record[LogF64Id::FULave] = self.rst.ful.sum as f64 / self.rst.ful.num as f64;
+            self.record[LogF64Id::FULtrd] = self.rst.ful.trend();
 
         }
         if let Some(m) = mes {
@@ -785,11 +814,11 @@ pub enum LogUsizeId {
     SatClauseElim,  // 14: simplification: usize,
     ExhaustiveElim, // 15: elimination: usize,
     CNFnum,         // 16: the number of conflicting vars
-    FUPnum,         // 17: the number of current fups
-    FUPgrp,         // 18: the number of FUP graph generation
+    FULnum,         // 17: the number of current ful
+    FULgrp,         // 18: the number of FUL graph generation
     AsgMax,         // 19: the maximum number of assigned variables
-    RSTd,           // 2
-    RSTu,           // 2
+    RSTnum,         // 2
+    BLKnum,
     // ElimClauseQueue, // __: elim_clause_queue: usize,
     // ElimVarQueue, // __: elim_var_queue: usize,
     End,
@@ -804,20 +833,21 @@ pub enum LogF64Id {
     CNFave,       //  4: rst.cls.{sum / num}
     CNFema,       //  5: rst.cls.get
     CNFtrd,       //  6: rst.cls.trend
-    FUPinc,       //  7: ema_fup.diff_ema.slow: f64,
-    FUPprg,       //  8: num_fup percentage: f64,
-    FUPave,       //  9: rst.fup.{sum / num}
-    FUPema,       // 10: rst.fup.diff_ema.get
-    FUPtrd,       // 11: rst.fup.trend
+    FULinc,       //  7: ema_ful.diff_ema.slow: f64,
+    FULprg,       //  8: num_ful percentage: f64,
+    FULave,       //  9: rst.ful.{sum / num}
+    FULema,       // 10: rst.ful.diff_ema.get
+    FULtrd,       // 11: rst.ful.trend
     LBDave,       // 12: rst.lbd.{sum / num}
     LBDema,       // 13: rst.lbd.ema.get
     LBDtrd,       // 14: ema_lbd trend
     BLevel,       // 15: backjump_level
     CLevel,       // 16: conflict_level
-    RSTuL,        // : rst.climb_ema.get
-    RSTdL,        // : rst.settle_ema.get
-    RSTrat,       // 17: rst.ratio
-    RSTlen,       // 18: rst.interval_ema
+    RSTrat,       // 17: rst.invoking_segment.ratio
+    BLKlen,       // 18: rst.blocking_segment.len.get
+    BLKthr,
+    RSTlen,       // 18: rst.invoking_segment.len.get
+    RSTthr,
     STLlen,       // 19: rst.settle_ema.get
     End,
 }

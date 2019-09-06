@@ -78,6 +78,7 @@ pub struct VarDB {
     /// the current restart's ordinal number
     current_restart: usize,
     pub lbd_temp: Vec<usize>,
+    activity_decay: f64,
 }
 
 impl Default for VarDB {
@@ -87,6 +88,7 @@ impl Default for VarDB {
             current_conflict: 0,
             current_restart: 0,
             lbd_temp: Vec::new(),
+            activity_decay: 0.98,
         }
     }
 }
@@ -143,6 +145,7 @@ impl VarDBIF for VarDB {
             current_conflict: 0,
             current_restart: 0,
             lbd_temp: vec![0; n + 1],
+            activity_decay: 0.98,
         }
     }
     fn assigned(&self, l: Lit) -> Lbool {
@@ -181,18 +184,28 @@ impl VarDBIF for VarDB {
     }
     #[inline(always)]
     fn activity(&mut self, vi: VarId) -> f64 {
-        // let v = &mut self.vars[vi];
-        // if self.current_conflict != v.last_used {
-        //     let diff = self.current_conflict - v.last_used;
-        //     let decay = self.activity_decay;
-        //     v.last_used = self.current_conflict;
-        //     // assert!(0.0 <= decay, format!("decay {}", decay));
-        //     v.reward *= decay.powi(diff as i32);
-        // }
-        self.vars[vi].reward
+        let v = &mut self.vars[vi];
+        if self.current_conflict != v.last_used {
+            let diff = self.current_conflict - v.last_used;
+            let decay = self.activity_decay;
+            v.last_used = self.current_conflict;
+            // assert!(0.0 <= decay, format!("decay {}", decay));
+            v.reward *= decay.powi(diff as i32);
+        }
+        v.reward
+        // self.vars[vi].reward
     }
     fn bump_activity(&mut self, vi: VarId) {
-        self.vars[vi].reward = (self.vars[vi].reward + self.current_conflict as f64) / 2.0;
+        /*
+        // self.vars[vi].reward = (self.vars[vi].reward + self.current_conflict as f64) / 2.0;
+        let r = self.current_restart as f64;
+        let a = (self.vars[vi].reward + r) / 2.0;
+        // self.vars[vi].reward = a;
+        self.vars[vi].reward = a.max(r - 1.0);
+         */
+        self.activity(vi);
+        self.vars[vi].reward
+            = 1.0 - self.activity_decay + self.activity_decay * self.vars[vi].reward;
     }
 }
 

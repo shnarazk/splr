@@ -381,7 +381,7 @@ fn handle_conflict_path(
         if state.num_unsolved_vars() <= state.rst.cls.sum {
             state.rst.cls.reset_vars(vdb);
             if 0 < state.config.dump_interval {
-                state.rst.fup.reset_vars(vdb);
+                state.rst.ful.reset_vars(vdb);
             }
         }
         */
@@ -401,11 +401,11 @@ fn handle_conflict_path(
         elim.add_cid_occur(vdb, cid, &mut cdb.clause[cid as usize], true);
         state.rst.asg.update(c_asgns);
         state.rst.lbd.update(lbd);
-        state.c_lvl.update(c_level as f64);
-        state.b_lvl.update(bl as f64);
         if 0 < state.config.dump_interval {
-            state.rst.fup.update(&mut vdb.vars[l0.vi()]);
+            state.c_lvl.update(c_level as f64);
+            state.b_lvl.update(bl as f64);
         }
+        // state.rst.ful.update(&mut vdb.vars[l0.vi()]);
         if state.rst.restart() {
             state.stats[Stat::Restart] += 1;
             if state.rst.use_luby {
@@ -413,14 +413,8 @@ fn handle_conflict_path(
             }
             asgs.cancel_until(vdb, 0);
             asgs.check_progress();
-            if 0 < state.config.dump_interval {
-                state.rst.restart_ratio.update(1.0);
-            }
         } else {
             asgs.uncheck_enqueue(vdb, l0, cid);
-            if 0 < state.config.dump_interval {
-                state.rst.restart_ratio.update(0.0);
-            }
         }
     }
     if 0 < state.config.dump_interval && ncnfl % state.config.dump_interval == 0 {
@@ -428,11 +422,12 @@ fn handle_conflict_path(
         state.development_history.push((
             ncnfl,
             stats[Stat::Restart] as f64,
-            rst.asg.trend().min(10.0), // num_solved_vars as f64 / num_vars as f64
+            rst.asg.trend().min(4.0), // num_solved_vars as f64 / num_vars as f64,
             rst.cls.trend().min(10.0),
-            rst.fup.trend().min(10.0),
-            rst.lbd.trend().min(10.0),
-            rst.restart_ratio.get().min(10.0),
+            rst.ful.trend().min(10.0),
+            rst.lbd.trend().min(4.0),
+            rst.blocking_segment.len.get(),
+            rst.invoking_segment.len.get(),
         ));
     }
     if ncnfl % 10_000 == 0 {
@@ -488,9 +483,9 @@ fn analyze(
 ) -> usize {
     state.new_learnt.clear();
     state.new_learnt.push(0);
-    if 0 < state.config.dump_interval {
-        let v = &mut vdb[cdb.clause[confl as usize].lits[0].vi()];
-        state.rst.cls.update(v);
+    {
+        // let v = &mut vdb[cdb.clause[confl as usize].lits[0].vi()];
+        // state.rst.cls.update(v);
     }
     let dl = asgs.level();
     let mut cid = confl;

@@ -50,13 +50,13 @@ fn main() {
         let dump = config.cnf_filename.file_stem().unwrap().to_str().unwrap();
         if let Ok(f) = File::create(format!("dbg_{}.csv", dump)) {
             let mut buf = BufWriter::new(f);
-            buf.write_all(b"conflict,restart,ASG,CLS,FUP,LBD,restart_ratio\n")
+            buf.write_all(b"conflict,restart,ASG,CLS,FUP,LBD,rl,sl\n")
                 .unwrap();
-            for (n, a, b, c, d, e, f) in s.state.development_history.iter() {
+            for (n, a, b, c, d, e, f, g) in s.state.development_history.iter() {
                 buf.write_all(
                     format!(
-                        "{:>7},{:>8.0},{:>8.5},{:>8.5},{:>8.5},{:>8.5},{:>8.5}\n",
-                        n, a, b, c, d, e, f
+                        "{:>7},{:>8.0},{:>8.5},{:>8.5},{:>8.5},{:>8.5},{:>8.5},{:>8.5}\n",
+                        n, a, b, c, d, e, f, g
                     )
                     .as_bytes(),
                 )
@@ -270,10 +270,10 @@ fn report(state: &State, out: &mut dyn Write) -> std::io::Result<()> {
     out.write_all(
         format!(
             "c    First UIP|#sum:{}, rate:{}, e-64:{}, trnd:{} \n",
-            format!("{:>9.0}", state.record[LogUsizeId::FUPnum]),
-            format!("{:>9.4}", state.record[LogF64Id::FUPave]),
-            format!("{:>9.4}", state.record[LogF64Id::FUPema]),
-            format!("{:>9.4}", state.record[LogF64Id::FUPtrd]),
+            format!("{:>9.0}", state.record[LogUsizeId::FULnum]),
+            format!("{:>9.4}", state.record[LogF64Id::FULave]),
+            format!("{:>9.4}", state.record[LogF64Id::FULema]),
+            format!("{:>9.4}", state.record[LogF64Id::FULtrd]),
         )
         .as_bytes(),
     )?;

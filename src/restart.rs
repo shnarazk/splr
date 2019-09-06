@@ -1,9 +1,9 @@
-use crate::config::{EMA_FAST, EMA_SLOW, RESTART_QNTM};
+use crate::config::{EMA_FAST, EMA_SLOW};
 use crate::traits::*;
 use crate::types::{Flag, FALSE, TRUE};
 use crate::var::{Var, VarDB};
 
-const RESTART_INTERVAL: usize = 20;
+const RESTART_INTERVAL: usize = 32;
 const RESTART_THRESHOLD: f64 = 1.4;
 
 /// Exponential Moving Average w/ a calibrator
@@ -108,78 +108,74 @@ impl Ema2 {
 #[derive(Debug)]
 pub struct SegmentStat {
     pub num: usize,
+    pub lockdown_len: usize,
     pub len: Ema,
-    pub num_restart: usize,
-    pub end_point: Ema,
-    pub restart_scaling: f64,
-    pub restart_trigger: f64,
-    trigger: f64,
+    pub trigger: f64,
 }
 
 impl Default for SegmentStat {
     fn default() -> Self {
+        let mut len = Ema::new(EMA_FAST);
+        len.update(0.0);
         SegmentStat {
             num: 0,
-            len: Ema::new(1024),
-            num_restart: 0,
-            end_point: Ema::new(32),
-            restart_scaling: 0.9985,
-            restart_trigger: 1.0,
+            lockdown_len: RESTART_INTERVAL,
+            len,
             trigger: 1.0,
         }
     }
 }
 
-/// A Luby + First-UIP driven Restart Engine
+impl SegmentStat {
+    fn new(trigger: f64) -> Self {
+        let mut ss = SegmentStat::default();
+        ss.trigger = trigger;
+        ss
+    }
+}
+
+/// A Luby + ASG//LBD driven Restart Engine
 /// Note:
 ///
-/// - als: accelaration of literal segmentation
-/// - acr: accelaration of clause refinement
+/// - als: Accelaration of Literal Segmentation
+/// - acr: Accelaration of Clause Refinement
+/// - cls: Conflicting Literal Separation
+/// - ful: First Unified implication Literals
 /// - segment: a successive conflicts
 //
 #[derive(Debug)]
 pub struct RestartExecutor {
     pub asg: RestartASG,
     pub cls: VarSet,
-    pub fup: VarSet,
+    pub ful: VarSet,
     pub lbd: RestartLBD,
     pub luby: RestartLuby,
-    previous_als: f64,
-    quantization: usize,
-    pub segment_len: usize,
-    pub segment_weight: f64,
     pub use_luby: bool,
     // stats
     pub record_stat: bool,
-    pub segment: SegmentStat,
-    restart_len: usize,
-    pub restart_len_ema: Ema,
-    pub restart_ratio: Ema,
+    pub blocking_segment: SegmentStat,
+    pub invoking_segment: SegmentStat,
+    blocking_len: usize,
+    invoking_len: usize,
+    restart_lockdown: usize,
 }
 
 impl Default for RestartExecutor {
     fn default() -> Self {
-        let mut segment = SegmentStat::default();
-        segment.end_point.update(1.0);
-        segment.restart_trigger = 1.0;
-        segment.trigger = 1.0;
         RestartExecutor {
             asg: RestartASG::new(RESTART_THRESHOLD),
             cls: VarSet::new(Flag::CNFLIT),
-            fup: VarSet::new(Flag::FUL),
+            ful: VarSet::new(Flag::FUL),
             lbd: RestartLBD::new(RESTART_THRESHOLD),
             luby: RestartLuby::new(2.0, 100.0),
-            previous_als: 1.0,
-            quantization: RESTART_QNTM,
-            segment_len: 0,
-            segment_weight: 0.0,
             use_luby: false,
             // stats
             record_stat: false,
-            segment,
-            restart_len: 1,
-            restart_len_ema: Ema::new(EMA_SLOW),
-            restart_ratio: Ema::new(EMA_SLOW),
+            blocking_segment: SegmentStat::new(2.00),
+            invoking_segment: SegmentStat::new(1.40),
+            blocking_len: 0,
+            invoking_len: 0,
+            restart_lockdown: 0,
         }
     }
 }
@@ -197,46 +193,63 @@ impl RestartIF for RestartExecutor {
             return self.luby.is_active();
         }
         let RestartExecutor {
-            previous_als: pre,
-            record_stat: stat,
-            segment: seg,
-            segment_len: len,
-            // segment_weight: w,
+            blocking_segment: blocking,
+            invoking_segment: invoking,
+            restart_lockdown: lock,
+            blocking_len,
+            invoking_len,
             ..
         } = self;
         let asg = self.asg.trend();
-        // let cls = self.cls.trend();
-        // let ful = self.fup.trend();
         let lbd = self.lbd.trend();
-        // let _diff = (cls - *pre) * *q as f64;
-        if 2.5 < asg {
-            *len = 0;
-            // *w = 0.0;
-            seg.num += 1;
-            return false;
-        }
-        // *w += ful;
-        *len += 1;
-        if *len < RESTART_INTERVAL {
-            return false;
-        }
-        if 1.5 < lbd {
-            if *stat {
-                seg.end_point.update(*pre);
-                seg.len.update(*len as f64);
-                seg.num_restart += 1;
-                self.restart_len_ema.update(*len as f64);
+        let b_ave = blocking.len.get();
+        let i_ave = invoking.len.get();
+        *blocking_len += 1;
+        *invoking_len += 1;
+        if 0 < *lock {   // asg < 0.08
+            *lock -= 1;
+            if 1 < *lock || true {
+                return false;
             }
-            *len = 0;
-            // *w = 0.0;
-            // *pre = ful;
-            seg.num += 1;
+        } else if blocking.trigger < asg || 1_000 < *blocking_len {
+            *lock = blocking.lockdown_len;
+            blocking.num += 1;
+            blocking.len.update(*blocking_len as f64);
+            *blocking_len = 0;
+            if 160.0 < b_ave && 1.2 < blocking.trigger {
+                blocking.trigger -= 0.001;
+            } else if b_ave < 120.0 && blocking.trigger < 4.0 {
+                blocking.trigger += 0.001;
+            }
+            return false;
+//         } else if false && (asg < blocking.trigger || 1_000 < *blocking_len) {
+//             *lock = blocking.lockdown_len;
+//             blocking.num += 1;
+//             blocking.len.update(*blocking_len as f64);
+//             *blocking_len = 0;
+//             if 80.0 < b_ave && blocking.trigger < 0.8 {
+//                 blocking.trigger += 0.001;
+//             } else if b_ave < 40.0 && 0.1 < blocking.trigger {
+//                 blocking.trigger -= 0.001;
+//             }
+//             return false;
+        }
+        if invoking.trigger < lbd || 1_000 < *invoking_len {
+            *lock = invoking.lockdown_len;
+            invoking.num += 1;
+            invoking.len.update(*invoking_len as f64);
+            *invoking_len = 0;
+            if 160.0 < i_ave && 1.2 < invoking.trigger {
+                invoking.trigger -= 0.001;
+            } else if i_ave < 120.0 && invoking.trigger < 4.0 {
+                invoking.trigger += 0.001;
+            }
             return true;
         }
         false
     }
     fn restart_blocking(&self) -> bool {
-        self.segment_weight < RESTART_INTERVAL as f64
+        1 < self.restart_lockdown
     }
 }
 
