@@ -5,18 +5,15 @@ pub const VERSION: &str = "0.2.0-alpha.0";
 
 /// Configuration built from command line options
 #[derive(Clone, Debug, StructOpt)]
-#[structopt(
-    name = "splr",
-    about
-)]
+#[structopt(name = "splr", about, author)]
 pub struct Config {
-    /// soft limit of #clauses (24M is about 4GB)
+    /// soft limit of #clauses (24MC~4GB)
     #[structopt(long = "cl", default_value = "0")]
     pub clause_limit: usize,
-    /// grow limit of #clauses by var elimination
+    /// grow limit of #clauses by v-elim
     #[structopt(long = "eg", default_value = "4")]
     pub elim_grow_limit: usize,
-    /// #literals in a clause by var elimination
+    /// #literals in a clause by v-elim
     #[structopt(long = "el", default_value = "64")]
     pub elim_lit_limit: usize,
     /// length for assignment average
@@ -38,12 +35,12 @@ pub struct Config {
     #[structopt(parse(from_os_str))]
     pub cnf_filename: PathBuf,
     /// output directory
-    #[structopt(long = "--dir", short = "o", default_value = ".", parse(from_os_str))]
+    #[structopt(long = "dir", short = "o", default_value = ".", parse(from_os_str))]
     pub output_dirname: PathBuf,
     /// result filename/stdout
-    #[structopt(long = "--result", short = "r", default_value = "", parse(from_os_str))]
+    #[structopt(long = "result", short = "r", default_value = "", parse(from_os_str))]
     pub result_filename: PathBuf,
-    /// filename for DRAT certification
+    /// filename for DRAT cert.
     #[structopt(
         long = "proof",
         default_value = "proof.out",
@@ -51,17 +48,17 @@ pub struct Config {
         parse(from_os_str)
     )]
     pub proof_filename: PathBuf,
-    /// Uses Glucose format for progress report
-    #[structopt(long = "--log", short = "l")]
+    /// Uses Glucose-like progress report
+    #[structopt(long = "log", short = "l")]
     pub use_log: bool,
     /// Disables exhaustive simplification
     #[structopt(long = "without-elim", short = "E")]
     pub without_elim: bool,
     /// Disables dynamic restart adaptation
-    #[structopt(long = "without-adaptive_restart", short = "R")]
+    #[structopt(long = "without-adaptive-restart", short = "R")]
     pub without_adaptive_restart: bool,
     /// Disables dynamic strategy adaptation
-    #[structopt(long = "without-adaptive_strategy", short = "S")]
+    #[structopt(long = "without-adaptive-strategy", short = "S")]
     pub without_adaptive_strategy: bool,
     /// Disables deep search mode
     #[structopt(long = "without-deep-search", short = "D")]
@@ -72,7 +69,7 @@ pub struct Config {
     /// Writes a DRAT UNSAT certification file
     #[structopt(long = "certify", short = "c")]
     pub use_certification: bool,
-    /// CPU time limit in sec. (0 for no limit)
+    /// CPU time limit in sec.
     #[structopt(long = "to", default_value = "0")]
     pub timeout: f64,
     /// interval for dumpping stat data
