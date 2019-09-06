@@ -360,13 +360,13 @@ fn handle_conflict_path(
     vars: &mut [Var],
     ci: ClauseId,
 ) -> MaybeInconsistent {
-    let tn_confl = state.stats[Stat::Conflict]; // total number
-    if tn_confl % 5000 == 0 && state.var_decay < state.var_decay_max {
+    let ncnfl = state.stats[Stat::Conflict]; // total number
+    if ncnfl % 5000 == 0 && state.var_decay < state.var_decay_max {
         state.var_decay += 0.01;
     }
     state.restart_update_asg(asgs.len());
     // DYNAMIC BLOCKING RESTART
-    state.block_restart(asgs, tn_confl);
+    state.block_restart(asgs, ncnfl);
     let bl = analyze(asgs, cdb, state, vars, ci);
     let new_learnt = &mut state.new_learnt;
     asgs.cancel_until(vars, bl.max(state.root_level));
@@ -394,8 +394,18 @@ fn handle_conflict_path(
         state.restart_update_lbd(lbd);
         state.stats[Stat::SumLBD] += lbd;
     }
-    if tn_confl % 10_000 == 0 {
-        adapt_parameters(asgs, cdb, elim, state, vars, tn_confl)?;
+    if 0 < state.config.dump_interval && ncnfl % state.config.dump_interval == 0 {
+        state.development.push((ncnfl,
+                                state.stats[Stat::Restart] as f64,
+                                state.ema_asg.get().min(10.0),
+                                state.ema_lbd.get().min(10.0),
+                                0.0, // rst.blocking_segment.len.get()
+                                0.0, // rst.invoking_segment.len.get()
+                                0.0,
+        ));
+    }
+    if ncnfl % 10_000 == 0 {
+        adapt_parameters(asgs, cdb, elim, state, vars, ncnfl)?;
         if state.is_timeout() {
             return Err(SolverError::Inconsistent);
         }
@@ -407,7 +417,7 @@ fn handle_conflict_path(
             && state.cur_restart * state.next_reduction <= state.stats[Stat::Conflict]))
         && 0 < cdb.num_learnt
     {
-        state.cur_restart = ((tn_confl as f64) / (state.next_reduction as f64)) as usize + 1;
+        state.cur_restart = ((ncnfl as f64) / (state.next_reduction as f64)) as usize + 1;
         cdb.reduce(state, vars);
     }
     Ok(())

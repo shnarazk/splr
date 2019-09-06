@@ -75,6 +75,9 @@ pub struct Config {
     /// CPU time limit in sec. (0 for no limit)
     #[structopt(long = "to", default_value = "0")]
     pub timeout: f64,
+    /// interval for dumpping stat data
+    #[structopt(long = "stat", default_value = "0")]
+    pub dump_interval: usize,
 }
 
 impl Default for Config {
@@ -100,6 +103,7 @@ impl Default for Config {
             with_learnt_minimization: false,
             use_certification: false,
             timeout: 0.0,
+            dump_interval: 0,
         }
     }
 }
