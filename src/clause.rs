@@ -6,6 +6,7 @@ use crate::types::*;
 use crate::var::Var;
 use std::cmp::Ordering;
 use std::fmt;
+use std::ops::{Index, IndexMut};
 
 const CLA_ACTIVITY_MAX: f64 = 1e240;
 const CLA_ACTIVITY_SCALE1: f64 = 1e-30;
@@ -202,6 +203,19 @@ pub struct ClauseDB {
     pub num_active: usize,
     pub num_learnt: usize,
     pub certified: DRAT,
+}
+
+impl Index<ClauseId> for ClauseDB {
+    type Output = Clause;
+    fn index(&self, cid: ClauseId) -> &Clause {
+        &self.clause[cid as usize]
+    }
+}
+
+impl IndexMut<ClauseId> for ClauseDB {
+    fn index_mut(&mut self, cid: ClauseId) -> &mut Clause {
+        &mut self.clause[cid as usize]
+    }
 }
 
 impl ClauseDBIF for ClauseDB {

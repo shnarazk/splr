@@ -293,7 +293,7 @@ impl SatSolverIF for Solver {
             }
             _ => {
                 let cid = cdb.new_clause(&v, 0, false);
-                elim.add_cid_occur(vars, cid, &mut cdb.clause[cid as usize], true);
+                elim.add_cid_occur(vars, cid, &mut cdb[cid], true);
                 Some(cid)
             }
         }
@@ -381,7 +381,7 @@ fn handle_conflict_path(
         let lbd = vars.compute_lbd(&new_learnt, &mut state.lbd_temp);
         let l0 = new_learnt[0];
         let cid = cdb.attach(state, vars, lbd);
-        elim.add_cid_occur(vars, cid, &mut cdb.clause[cid as usize], true);
+        elim.add_cid_occur(vars, cid, &mut cdb[cid], true);
         state.c_lvl.update(cl as f64);
         state.b_lvl.update(bl as f64);
         if lbd <= 2 {
@@ -525,7 +525,7 @@ fn analyze(
         // println!("analyze {}", p.int());
         unsafe {
             debug_assert_ne!(cid, NULL_CLAUSE);
-            let c = &mut cdb.clause[cid as usize] as *mut Clause;
+            let c = &mut cdb[cid] as *mut Clause;
             debug_assert!(!(*c).is(Flag::DEAD));
             if (*c).is(Flag::LEARNT) {
                 cdb.bump_activity(&mut state.cla_inc, cid);
@@ -666,7 +666,7 @@ fn redundant_lit(
     let top = clear.len();
     while let Some(sl) = stack.pop() {
         let cid = vars[sl.vi()].reason;
-        let c = &mut cdb.clause[cid as usize];
+        let c = &mut cdb[cid];
         if (*c).lits.len() == 2 && vars.assigned((*c).lits[0]) == FALSE {
             (*c).lits.swap(0, 1);
         }

@@ -103,7 +103,7 @@ impl EliminatorIF for Eliminator {
     }
     fn clear_clause_queue(&mut self, cdb: &mut ClauseDB) {
         for cid in &self.clause_queue {
-            cdb.clause[*cid as usize].turn_off(Flag::ENQUEUED);
+            cdb[*cid].turn_off(Flag::ENQUEUED);
         }
         self.clause_queue.clear();
     }
@@ -296,7 +296,7 @@ impl Eliminator {
                 cid.to_lit().vi()
             } else {
                 let mut tmp = cdb.count(true);
-                let c = &mut cdb.clause[cid as usize];
+                let c = &mut cdb[cid];
                 c.turn_off(Flag::ENQUEUED);
                 let lits = &c.lits;
                 if c.is(Flag::DEAD) || state.elim_subsume_literal_limit < lits.len() {
@@ -364,8 +364,8 @@ fn try_subsume(
             // );
             cdb.detach(did);
             elim.remove_cid_occur(vars, did, &mut cdb.clause[did as usize]);
-            if !cdb.clause[did as usize].is(Flag::LEARNT) {
-                cdb.clause[cid as usize].turn_off(Flag::LEARNT);
+            if !cdb[did].is(Flag::LEARNT) {
+                cdb[cid].turn_off(Flag::LEARNT);
             }
         }
         Some(l) => {
@@ -392,8 +392,8 @@ fn subsume(cdb: &mut ClauseDB, cid: ClauseId, other: ClauseId) -> Option<Lit> {
         return None;
     }
     let mut ret: Lit = NULL_LIT;
-    let ch = &cdb.clause[cid as usize];
-    let ob = &cdb.clause[other as usize];
+    let ch = &cdb[cid];
+    let ob = &cdb[other];
     debug_assert!(ob.lits.contains(&ob.lits[0]));
     debug_assert!(ob.lits.contains(&ob.lits[1]));
     'next: for l in &ch.lits {
@@ -527,27 +527,27 @@ fn strengthen_clause(
     cid: ClauseId,
     l: Lit,
 ) -> MaybeInconsistent {
-    debug_assert!(!cdb.clause[cid as usize].is(Flag::DEAD));
-    debug_assert!(1 < cdb.clause[cid as usize].lits.len());
+    debug_assert!(!cdb[cid].is(Flag::DEAD));
+    debug_assert!(1 < cdb[cid].lits.len());
     cdb.touched[l as usize] = true;
     cdb.touched[l.negate() as usize] = true;
     debug_assert_ne!(cid, NULL_CLAUSE);
     if strengthen(cdb, cid, l) {
         // Vaporize the binary clause
-        debug_assert!(2 == cdb.clause[cid as usize].lits.len());
-        let c0 = cdb.clause[cid as usize].lits[0];
+        debug_assert!(2 == cdb[cid].lits.len());
+        let c0 = cdb[cid].lits[0];
         debug_assert_ne!(c0, l);
         // println!("{} {:?} is removed and its first literal {} is enqueued.", cid.format(), vec2int(&cdb.clause[cid].lits), c0.int());
         cdb.detach(cid);
-        elim.remove_cid_occur(vars, cid, &mut cdb.clause[cid as usize]);
+        elim.remove_cid_occur(vars, cid, &mut cdb[cid]);
         asgs.enqueue(&mut vars[c0.vi()], c0.lbool(), NULL_CLAUSE, 0)
     } else {
         // println!("cid {} drops literal {}", cid.fmt(), l.int());
-        debug_assert!(1 < cdb.clause[cid as usize].lits.len());
-        elim.enqueue_clause(cid, &mut cdb.clause[cid as usize]);
+        debug_assert!(1 < cdb[cid].lits.len());
+        elim.enqueue_clause(cid, &mut cdb[cid]);
         elim.remove_lit_occur(vars, l, cid);
         unsafe {
-            let vec = &cdb.clause[cid as usize].lits[..] as *const [Lit];
+            let vec = &cdb[cid].lits[..] as *const [Lit];
             cdb.certificate_add(&*vec);
         }
         Ok(())
@@ -558,8 +558,8 @@ fn strengthen_clause(
 /// returns true if the clause became a unit clause.
 /// Called only from strengthen_clause
 fn strengthen(cdb: &mut ClauseDB, cid: ClauseId, p: Lit) -> bool {
-    debug_assert!(!cdb.clause[cid as usize].is(Flag::DEAD));
-    debug_assert!(1 < cdb.clause[cid as usize].lits.len());
+    debug_assert!(!cdb[cid].is(Flag::DEAD));
+    debug_assert!(1 < cdb[cid].lits.len());
     let ClauseDB {
         ref mut clause,
         ref mut watcher,
@@ -617,7 +617,7 @@ fn make_eliminating_unit_clause(vec: &mut Vec<Lit>, x: Lit) {
 fn make_eliminated_clause(cdb: &mut ClauseDB, vec: &mut Vec<Lit>, vi: VarId, cid: ClauseId) {
     let first = vec.len();
     // Copy clause to the vector. Remember the position where the variable 'v' occurs:
-    let c = &cdb.clause[cid as usize];
+    let c = &cdb[cid];
     debug_assert!(!c.lits.is_empty());
     for l in &c.lits {
         vec.push(*l as Lit);
@@ -694,18 +694,18 @@ fn eliminate_var(
                             0
                         };
                         let cid = cdb.attach(state, vars, rank);
-                        elim.add_cid_occur(vars, cid, &mut cdb.clause[cid as usize], true);
+                        elim.add_cid_occur(vars, cid, &mut cdb[cid], true);
                     }
                 }
             }
         }
         for cid in &*pos {
             cdb.detach(*cid);
-            elim.remove_cid_occur(vars, *cid, &mut cdb.clause[*cid as usize]);
+            elim.remove_cid_occur(vars, *cid, &mut cdb[*cid]);
         }
         for cid in &*neg {
             cdb.detach(*cid);
-            elim.remove_cid_occur(vars, *cid, &mut cdb.clause[*cid as usize]);
+            elim.remove_cid_occur(vars, *cid, &mut cdb[*cid]);
         }
         vars[vi].pos_occurs.clear();
         vars[vi].neg_occurs.clear();
@@ -761,13 +761,13 @@ fn make_eliminated_clauses(
     let tmp = &mut elim.elim_clauses;
     if neg.len() < pos.len() {
         for cid in neg {
-            debug_assert!(!cdb.clause[*cid as usize].is(Flag::DEAD));
+            debug_assert!(!cdb[*cid].is(Flag::DEAD));
             make_eliminated_clause(cdb, tmp, v, *cid);
         }
         make_eliminating_unit_clause(tmp, Lit::from_var(v, TRUE));
     } else {
         for cid in pos {
-            debug_assert!(!cdb.clause[*cid as usize].is(Flag::DEAD));
+            debug_assert!(!cdb[*cid].is(Flag::DEAD));
             make_eliminated_clause(cdb, tmp, v, *cid);
         }
         make_eliminating_unit_clause(tmp, Lit::from_var(v, FALSE));
