@@ -88,5 +88,5 @@ fn setup() -> Solver {
 
 fn attach_clause<'a>(s: &'a mut Solver, vec: &[Lit]) -> &'a mut Clause {
     let cid = s.cdb.new_clause(vec, vec.len(), true);
-    &mut s.cdb.clause[cid as usize]
+    &mut s.cdb[cid]
 }
