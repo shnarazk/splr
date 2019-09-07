@@ -3,10 +3,10 @@ use crate::propagator::AssignStack;
 use crate::state::{Stat, State};
 use crate::traits::*;
 use crate::types::*;
-use crate::var::Var;
+use crate::var::VarDB;
 use std::cmp::Ordering;
 use std::fmt;
-use std::ops::{Index, IndexMut};
+use std::ops::{Index, IndexMut, Range, RangeFrom};
 
 const CLA_ACTIVITY_MAX: f64 = 1e240;
 const CLA_ACTIVITY_SCALE1: f64 = 1e-30;
@@ -197,12 +197,14 @@ impl fmt::Display for Clause {
 /// Clause database
 #[derive(Debug)]
 pub struct ClauseDB {
-    pub clause: Vec<Clause>,
+    clause: Vec<Clause>,
     pub touched: Vec<bool>,
     pub watcher: Vec<Vec<Watch>>,
     pub num_active: usize,
     pub num_learnt: usize,
     pub certified: DRAT,
+    pub activity_inc: f64,
+    pub activity_decay: f64,
 }
 
 impl Index<ClauseId> for ClauseDB {
@@ -215,6 +217,36 @@ impl Index<ClauseId> for ClauseDB {
 impl IndexMut<ClauseId> for ClauseDB {
     fn index_mut(&mut self, cid: ClauseId) -> &mut Clause {
         &mut self.clause[cid as usize]
+    }
+}
+
+impl Index<Range<usize>> for ClauseDB {
+    type Output = [Clause];
+    #[inline]
+    fn index(&self, r: Range<usize>) -> &[Clause] {
+        &self.clause[r]
+    }
+}
+
+impl Index<RangeFrom<usize>> for ClauseDB {
+    type Output = [Clause];
+    #[inline]
+    fn index(&self, r: RangeFrom<usize>) -> &[Clause] {
+        &self.clause[r]
+    }
+}
+
+impl IndexMut<Range<usize>> for ClauseDB {
+    #[inline]
+    fn index_mut(&mut self, r: Range<usize>) -> &mut [Clause] {
+        &mut self.clause[r]
+    }
+}
+
+impl IndexMut<RangeFrom<usize>> for ClauseDB {
+    #[inline]
+    fn index_mut(&mut self, r: RangeFrom<usize>) -> &mut [Clause] {
+        &mut self.clause[r]
     }
 }
 
@@ -239,7 +271,15 @@ impl ClauseDBIF for ClauseDB {
             num_active: 0,
             num_learnt: 0,
             certified,
+            activity_inc: 1.0,
+            activity_decay: 0.999,
         }
+    }
+    fn len(&self) -> usize {
+        self.clause.len()
+    }
+    fn is_empty(&self) -> bool {
+        self.clause.is_empty()
     }
     fn garbage_collect(&mut self) {
         // debug_assert!(self.check_liveness1());
@@ -336,7 +376,7 @@ impl ClauseDBIF for ClauseDB {
         self.num_active += 1;
         cid
     }
-    fn reset_lbd(&mut self, vars: &[Var], temp: &mut [usize]) {
+    fn reset_lbd(&mut self, vars: &VarDB, temp: &mut [usize]) {
         let mut key = temp[0];
         for c in &mut self.clause[1..] {
             if c.is(Flag::DEAD) || c.is(Flag::LEARNT) {
@@ -355,9 +395,9 @@ impl ClauseDBIF for ClauseDB {
         }
         temp[0] = key + 1;
     }
-    fn bump_activity(&mut self, inc: &mut f64, cid: ClauseId) {
+    fn bump_activity(&mut self, cid: ClauseId) {
         let c = &mut self.clause[cid as usize];
-        let a = c.activity + *inc;
+        let a = c.activity + self.activity_inc;
         c.activity = a;
         if CLA_ACTIVITY_MAX < a {
             for c in &mut self.clause[1..] {
@@ -365,7 +405,7 @@ impl ClauseDBIF for ClauseDB {
                     c.activity *= CLA_ACTIVITY_SCALE1;
                 }
             }
-            *inc *= CLA_ACTIVITY_SCALE2;
+            self.activity_inc *= CLA_ACTIVITY_SCALE2;
         }
     }
     fn count(&self, alive: bool) -> usize {
@@ -383,7 +423,7 @@ impl ClauseDBIF for ClauseDB {
             .count()
     }
     // Note: set lbd to 0 if you want to add the clause to Permanent.
-    fn attach(&mut self, state: &mut State, vars: &mut [Var], lbd: usize) -> ClauseId {
+    fn attach(&mut self, state: &mut State, vars: &mut VarDB, lbd: usize) -> ClauseId {
         let v = &mut state.new_learnt;
         if !self.certified.is_empty() {
             let temp = v.iter().map(|l| l.to_i32()).collect::<Vec<i32>>();
@@ -405,7 +445,7 @@ impl ClauseDBIF for ClauseDB {
         let learnt = 0 < lbd && 2 < v.len() && (!state.use_chan_seok || state.co_lbd_bound < lbd);
         let cid = self.new_clause(&v, lbd, learnt);
         let c = &mut self.clause[cid as usize];
-        c.activity = state.cla_inc;
+        c.activity = self.activity_inc;
         cid
     }
     fn detach(&mut self, cid: ClauseId) {
@@ -414,7 +454,7 @@ impl ClauseDBIF for ClauseDB {
         debug_assert!(1 < c.lits.len());
         c.kill(&mut self.touched);
     }
-    fn reduce(&mut self, state: &mut State, vars: &mut [Var]) {
+    fn reduce(&mut self, state: &mut State, vars: &mut VarDB) {
         self.reset_lbd(vars, &mut state.lbd_temp);
         let ClauseDB {
             ref mut clause,
@@ -460,7 +500,7 @@ impl ClauseDBIF for ClauseDB {
         asgs: &mut AssignStack,
         elim: &mut Eliminator,
         state: &mut State,
-        vars: &mut [Var],
+        vars: &mut VarDB,
     ) -> MaybeInconsistent {
         debug_assert_eq!(asgs.level(), 0);
         // we can reset all the reasons because decision level is zero.
@@ -519,7 +559,7 @@ impl ClauseDBIF for ClauseDB {
     fn eliminate_satisfied_clauses(
         &mut self,
         elim: &mut Eliminator,
-        vars: &mut [Var],
+        vars: &mut VarDB,
         update_occur: bool,
     ) {
         for (cid, c) in &mut self.clause.iter_mut().enumerate().skip(1) {
@@ -545,6 +585,22 @@ impl ClauseDBIF for ClauseDB {
         } else {
             Err(SolverError::Inconsistent)
         }
+    }
+    fn make_permanent(&mut self, threshold: usize, reinit: bool) {
+        // Adjusting for low decision levels.
+        // move some clauses with good lbd (col_lbd_bound) to Permanent
+        for c in &mut self.clause[1..] {
+            if c.is(Flag::DEAD) || !c.is(Flag::LEARNT) {
+                continue;
+            }
+            if c.rank <= threshold {
+                c.turn_off(Flag::LEARNT);
+                self.num_learnt -= 1;
+            } else if reinit {
+                c.kill(&mut self.touched);
+            }
+        }
+        self.garbage_collect();
     }
 }
 

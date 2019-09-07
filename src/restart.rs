@@ -1,5 +1,6 @@
+use crate::config::Config;
 use crate::propagator::AssignStack;
-use crate::state::{Stat, State};
+use crate::state::Stat;
 use crate::traits::*;
 
 // const RESET_EMA: usize = 400;
@@ -29,62 +30,112 @@ impl EmaIF for Ema {
     }
 }
 
-impl RestartIF for State {
+//
+#[derive(Debug)]
+pub struct RestartExecutor {
+    pub adaptive_restart: bool,
+    pub ema_asg: Ema,
+    pub ema_lbd: Ema,
+    /// For force restart based on average LBD of newly generated clauses: 0.80.
+    /// This is called `K` in Glucose
+    pub invoking_threshold: f64,
+    /// For block restart based on average assignments: 1.40.
+    /// This is called `R` in Glucose
+    pub blocking_threshold: f64,
+    pub use_luby_restart: bool,
+    pub luby_restart_num_conflict: f64,
+    pub luby_restart_inc: f64,
+    pub luby_current_restart: usize,
+    pub luby_restart_factor: f64,
+    pub after_restart: usize,
+    pub cur_restart: usize,
+    pub next_restart: usize,
+    pub restart_step: usize,
+    luby_count: f64,
+}
+
+impl Default for RestartExecutor {
+    fn default() -> Self {
+        RestartExecutor {
+            adaptive_restart: true,
+            ema_asg: Ema::new(1),
+            ema_lbd: Ema::new(1),
+            invoking_threshold: 0.60,
+            blocking_threshold: 1.40,
+            use_luby_restart: false,
+            luby_restart_num_conflict: 0.0,
+            luby_restart_inc: 2.0,
+            luby_current_restart: 0,
+            luby_restart_factor: 100.0,
+            after_restart: 0,
+            cur_restart: 1,
+            next_restart: 100,
+            restart_step: 100,
+            luby_count: 0.0,
+        }
+    }
+}
+impl RestartIF for RestartExecutor {
+    fn new(config: &Config) -> Self {
+        let mut re = RestartExecutor::default();
+        re.adaptive_restart = !config.without_adaptive_restart;
+        re.ema_asg = Ema::new(config.restart_asg_len);
+        re.ema_lbd = Ema::new(config.restart_lbd_len);
+        re.invoking_threshold = config.restart_threshold;
+        re.blocking_threshold = config.restart_blocking;
+        re.restart_step = config.restart_step;
+        re
+    }
     fn block_restart(&mut self, asgs: &AssignStack, ncnfl: usize) -> bool {
         let nas = asgs.len();
-        // let _count = self.stats[Stat::Conflict];
-        // let _ave = self.sum_asg / count as f64 * self.num_vars as f64;
         if 100 < ncnfl
             && !self.use_luby_restart
             && self.restart_step <= self.after_restart
-            && self.restart_blk * self.ema_asg.get() < nas as f64
+            && self.blocking_threshold * self.ema_asg.get() < nas as f64
         {
             self.after_restart = 0;
-            self.stats[Stat::BlockRestart] += 1;
             return true;
         }
         false
     }
-    fn force_restart(&mut self, ncnfl: &mut f64) -> bool {
-        let count = self.stats[Stat::Conflict];
-        // if count <= RESET_EMA {
-        //     if count == RESET_EMA {
-        //         self.ema_asg.reset();
-        //         self.ema_lbd.reset();
-        //     }
-        //     return false;
-        // }
-        let ave = self.stats[Stat::SumLBD] as f64 / count as f64;
-        if (self.use_luby_restart && self.luby_restart_num_conflict <= *ncnfl)
+    fn force_restart(&mut self, stats: &[usize]) -> bool {
+        let count = stats[Stat::Conflict];
+        let ave = stats[Stat::SumLBD] as f64 / count as f64;
+        if (self.use_luby_restart && self.luby_restart_num_conflict <= self.luby_count)
             || (!self.use_luby_restart
                 && self.restart_step <= self.after_restart
-                && ave < self.ema_lbd.get() * self.restart_thr)
+                && ave < self.ema_lbd.get() * self.invoking_threshold)
         {
-            self.stats[Stat::Restart] += 1;
             self.after_restart = 0;
             if self.use_luby_restart {
-                *ncnfl = 0.0;
-                self.luby_current_restarts += 1;
+                self.luby_count = 0.0;
+                self.luby_current_restart += 1;
                 self.luby_restart_num_conflict =
-                    luby(self.luby_restart_inc, self.luby_current_restarts)
+                    luby(self.luby_restart_inc, self.luby_current_restart)
                         * self.luby_restart_factor;
             }
             return true;
         }
         false
     }
-    fn restart_update_lbd(&mut self, lbd: usize) {
+    fn update_lbd(&mut self, lbd: usize) {
         self.ema_lbd.update(lbd as f64);
         self.after_restart += 1;
     }
-    fn restart_update_asg(&mut self, n: usize) {
+    fn update_asg(&mut self, n: usize) {
         self.ema_asg.update(n as f64);
         // self.sum_asg += n as f64 / config.num_vars as f64;
     }
-    fn restart_update_luby(&mut self) {
+    fn initialize_luby(&mut self) {
         if self.use_luby_restart {
             self.luby_restart_num_conflict =
-                luby(self.luby_restart_inc, self.luby_current_restarts) * self.luby_restart_factor;
+                luby(self.luby_restart_inc, self.luby_current_restart) * self.luby_restart_factor;
+            self.luby_count = 0.0;
+        }
+    }
+    fn update_luby(&mut self) {
+        if self.use_luby_restart {
+            self.luby_count += 1.0;
         }
     }
 }

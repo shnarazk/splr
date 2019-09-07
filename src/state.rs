@@ -1,10 +1,10 @@
 use crate::clause::ClauseDB;
 use crate::config::Config;
 use crate::eliminator::Eliminator;
-use crate::restart::Ema;
+use crate::restart::{Ema, RestartExecutor};
 use crate::traits::*;
 use crate::types::*;
-use crate::var::Var;
+use crate::var::{Var, VarDB};
 use libc::{clock_gettime, timespec, CLOCK_PROCESS_CPUTIME_ID};
 use std::cmp::Ordering;
 use std::fmt;
@@ -144,36 +144,14 @@ pub struct State {
     pub use_chan_seok: bool,
     pub co_lbd_bound: usize,
     pub lbd_frozen_clause: usize,
-    /// CLAUSE/VARIABLE ACTIVITY
-    pub cla_decay: f64,
-    pub cla_inc: f64,
-    pub var_decay: f64,
-    pub var_decay_max: f64,
-    pub var_inc: f64,
     /// CLAUSE REDUCTION
     pub first_reduction: usize,
     pub glureduce: bool,
     pub cdb_inc: usize,
     pub cdb_inc_extra: usize,
     pub cdb_soft_limit: usize,
-    pub ema_coeffs: (i32, i32),
     /// RESTART
-    pub adaptive_restart: bool,
-    /// For force restart based on average LBD of newly generated clauses: 0.80.
-    /// This is called `K` in Glucose
-    pub restart_thr: f64,
-    /// For block restart based on average assignments: 1.40.
-    /// This is called `R` in Glucose
-    pub restart_blk: f64,
-    pub restart_asg_len: usize,
-    pub restart_lbd_len: usize,
-    pub restart_expansion: f64,
-    pub restart_step: usize,
-    pub use_luby_restart: bool,
-    pub luby_restart_num_conflict: f64,
-    pub luby_restart_inc: f64,
-    pub luby_current_restarts: usize,
-    pub luby_restart_factor: f64,
+    pub rst: RestartExecutor,
     pub use_deep_search_mode: bool,
     pub stagnated: bool,
     /// Eliminator
@@ -193,17 +171,11 @@ pub struct State {
     pub ok: bool,
     pub time_limit: f64,
     pub next_reduction: usize, // renamed from `nbclausesbeforereduce`
-    pub next_restart: usize,
-    pub cur_restart: usize,
-    pub after_restart: usize,
     pub elim_trigger: usize,
     pub slack_duration: isize,
     pub stats: [usize; Stat::EndOfStatIndex as usize], // statistics
-    pub ema_asg: Ema,
-    pub ema_lbd: Ema,
     pub b_lvl: Ema,
     pub c_lvl: Ema,
-    pub sum_asg: f64,
     pub num_solved_vars: usize,
     pub num_eliminated_vars: usize,
     pub model: Vec<Lbool>,
@@ -223,9 +195,10 @@ pub struct State {
 
 macro_rules! im {
     ($format: expr, $record: expr, $key: expr, $val: expr) => {
-        match $val {
-            v => {
-                let ptr = &mut $record.vali[$key as usize];
+        match ($val, $key) {
+            (v, LogUsizeId::End) => format!($format, v),
+            (v, k) => {
+                let ptr = &mut $record[k];
                 if (v as f64) * 1.6 < *ptr as f64 {
                     *ptr = v;
                     format!("\x1B[001m\x1B[031m{}\x1B[000m", format!($format, *ptr))
@@ -249,22 +222,10 @@ macro_rules! im {
 
 macro_rules! i {
     ($format: expr, $record: expr, $key: expr, $val: expr) => {
-        match $val {
-            v => {
-                let ptr = &mut $record.vali[$key as usize];
-                *ptr = v;
-                format!($format, *ptr)
-            }
-        }
-    };
-}
-
-#[allow(unused_macros)]
-macro_rules! f {
-    ($format: expr, $record: expr, $key: expr, $val: expr) => {
-        match $val {
-            v => {
-                let ptr = &mut $record.valf[$key as usize];
+        match ($val, $key) {
+            (v, LogUsizeId::End) => format!($format, v),
+            (v, k) => {
+                let ptr = &mut $record[k];
                 *ptr = v;
                 format!($format, *ptr)
             }
@@ -274,9 +235,10 @@ macro_rules! f {
 
 macro_rules! fm {
     ($format: expr, $record: expr, $key: expr, $val: expr) => {
-        match $val {
-            v => {
-                let ptr = &mut $record.valf[$key as usize];
+        match ($val, $key) {
+            (v, LogF64Id::End) => format!($format, v),
+            (v, k) => {
+                let ptr = &mut $record[k];
                 if v * 1.6 < *ptr {
                     *ptr = v;
                     format!("\x1B[001m\x1B[031m{}\x1B[000m", format!($format, *ptr))
@@ -298,6 +260,20 @@ macro_rules! fm {
     };
 }
 
+#[allow(unused_macros)]
+macro_rules! f {
+    ($format: expr, $record: expr, $key: expr, $val: expr) => {
+        match ($val, $key) {
+            (v, LogF64Id::End) => format!($format, v),
+            (v, k) => {
+                let ptr = &mut $record[k];
+                *ptr = v;
+                format!($format, *ptr)
+            }
+        }
+    };
+}
+
 impl Default for State {
     fn default() -> State {
         State {
@@ -308,31 +284,14 @@ impl Default for State {
             use_chan_seok: false,
             co_lbd_bound: 5,
             lbd_frozen_clause: 30,
-            cla_decay: 0.999,
-            cla_inc: 1.0,
-            var_decay: 0.9,
-            var_decay_max: 0.95,
-            var_inc: 0.9,
             first_reduction: 1000,
             glureduce: true,
             cdb_inc: 300,
             cdb_inc_extra: 1000,
             cdb_soft_limit: 0, // 248_000_000
-            adaptive_restart: false,
-            restart_thr: 0.60,     // will be overwritten by bin/splr
-            restart_blk: 1.40,     // will be overwritten by bin/splr
-            restart_asg_len: 3500, // will be overwritten by bin/splr
-            restart_lbd_len: 100,  // will be overwritten by bin/splr
-            restart_expansion: 1.15,
-            restart_step: 50,
-            use_luby_restart: false,
-            luby_restart_num_conflict: 0.0,
-            luby_restart_inc: 2.0,
-            luby_current_restarts: 0,
-            luby_restart_factor: 100.0,
             use_deep_search_mode: true,
             stagnated: false,
-            ema_coeffs: (2 ^ 5, 2 ^ 15),
+            rst: RestartExecutor::new(&Config::default()),
             use_elim: true,
             elim_eliminate_combination_limit: 80,
             elim_eliminate_grow_limit: 0, // 64
@@ -343,17 +302,11 @@ impl Default for State {
             ok: true,
             time_limit: 0.0,
             next_reduction: 1000,
-            next_restart: 100,
-            cur_restart: 1,
-            after_restart: 0,
             elim_trigger: 1,
             slack_duration: 0,
             stats: [0; Stat::EndOfStatIndex as usize],
-            ema_asg: Ema::new(1),
-            ema_lbd: Ema::new(1),
             b_lvl: Ema::new(5_000),
             c_lvl: Ema::new(5_000),
-            sum_asg: 0.0,
             num_solved_vars: 0,
             num_eliminated_vars: 0,
             model: Vec::new(),
@@ -387,21 +340,14 @@ impl StateIF for State {
                 .unwrap()
         };
         state.num_vars = cnf.num_of_variables;
-        state.adaptive_restart = !config.without_adaptive_restart;
         state.use_adapt_strategy = !config.without_adaptive_strategy;
         state.cdb_soft_limit = config.clause_limit;
         state.elim_eliminate_grow_limit = config.elim_grow_limit;
         state.elim_subsume_literal_limit = config.elim_lit_limit;
-        state.restart_thr = config.restart_threshold;
-        state.restart_blk = config.restart_blocking;
-        state.restart_asg_len = config.restart_asg_len;
-        state.restart_lbd_len = config.restart_lbd_len;
-        state.restart_step = config.restart_step;
+        state.rst = RestartExecutor::new(config);
         state.use_deep_search_mode = !config.without_deep_search;
         state.progress_log = config.use_log;
         state.use_elim = !config.without_elim;
-        state.ema_asg = Ema::new(config.restart_asg_len);
-        state.ema_lbd = Ema::new(config.restart_lbd_len);
         state.model = vec![BOTTOM; cnf.num_of_variables + 1];
         state.an_seen = vec![false; cnf.num_of_variables + 1];
         state.lbd_temp = vec![0; cnf.num_of_variables + 1];
@@ -409,6 +355,9 @@ impl StateIF for State {
         state.time_limit = config.timeout;
         state.config = config.clone();
         state
+    }
+    fn num_unsolved_vars(&self) -> usize {
+        self.num_vars - self.num_solved_vars - self.num_eliminated_vars
     }
     fn is_timeout(&self) -> bool {
         if self.time_limit == 0.0 {
@@ -419,7 +368,7 @@ impl StateIF for State {
             Err(_) => false,
         }
     }
-    fn adapt_strategy(&mut self, cdb: &mut ClauseDB) {
+    fn adapt_strategy(&mut self, cdb: &mut ClauseDB, vdb: &mut VarDB) {
         if !self.use_adapt_strategy || self.strategy != SearchStrategy::Initial {
             return;
         }
@@ -432,7 +381,7 @@ impl StateIF for State {
             self.glureduce = true;
             self.first_reduction = 2000;
             self.next_reduction = 2000;
-            self.cur_restart =
+            self.rst.cur_restart =
                 (self.stats[Stat::Conflict] as f64 / self.next_reduction as f64 + 1.0) as usize;
             self.cdb_inc = 0;
             re_init = true;
@@ -440,13 +389,13 @@ impl StateIF for State {
         if self.stats[Stat::NoDecisionConflict] < 30_000 {
             if !self.use_deep_search_mode {
                 self.strategy = SearchStrategy::LowSuccesiveLuby;
-                self.use_luby_restart = true;
-                self.luby_restart_factor = 100.0;
+                self.rst.use_luby_restart = true;
+                self.rst.luby_restart_factor = 100.0;
             } else {
                 self.strategy = SearchStrategy::LowSuccesiveM;
             }
-            self.var_decay = 0.999;
-            self.var_decay_max = 0.999;
+            vdb.activity_decay = 0.999;
+            vdb.activity_decay_max = 0.999;
         }
         if self.stats[Stat::NoDecisionConflict] > 54_400 {
             self.strategy = SearchStrategy::HighSuccesive;
@@ -454,34 +403,21 @@ impl StateIF for State {
             self.glureduce = true;
             self.co_lbd_bound = 3;
             self.first_reduction = 30000;
-            self.var_decay = 0.99;
-            self.var_decay_max = 0.99;
+            vdb.activity_decay = 0.99;
+            vdb.activity_decay_max = 0.99;
             // randomize_on_restarts = 1;
         }
         if self.stats[Stat::NumLBD2] - self.stats[Stat::NumBin] > 20_000 {
             self.strategy = SearchStrategy::ManyGlues;
-            self.var_decay = 0.91;
-            self.var_decay_max = 0.91;
+            vdb.activity_decay = 0.91;
+            vdb.activity_decay_max = 0.91;
         }
         if self.strategy == SearchStrategy::Initial {
             self.strategy = SearchStrategy::Generic;
             return;
         }
         if self.use_chan_seok {
-            // Adjusting for low decision levels.
-            // move some clauses with good lbd (col_lbd_bound) to Permanent
-            for c in &mut cdb.clause[1..] {
-                if c.is(Flag::DEAD) || !c.is(Flag::LEARNT) {
-                    continue;
-                }
-                if c.rank <= self.co_lbd_bound {
-                    c.turn_off(Flag::LEARNT);
-                    cdb.num_learnt -= 1;
-                } else if re_init {
-                    c.kill(&mut cdb.touched);
-                }
-            }
-            cdb.garbage_collect();
+            cdb.make_permanent(self.co_lbd_bound, re_init);
         }
     }
     fn progress_header(&self) {
@@ -509,8 +445,8 @@ impl StateIF for State {
         }
     }
     /// `mes` should be shorter than or equal to 9, or 8 + a delimiter.
-    #[allow(clippy::cyclomatic_complexity)]
-    fn progress(&mut self, cdb: &ClauseDB, vars: &[Var], mes: Option<&str>) {
+    #[allow(clippy::cognitive_complexity)]
+    fn progress(&mut self, cdb: &ClauseDB, vars: &VarDB, mes: Option<&str>) {
         if !self.use_progress {
             return;
         }
@@ -604,18 +540,23 @@ impl StateIF for State {
                 "{:>9.4}",
                 self.record,
                 LogF64Id::EmaAsg,
-                self.ema_asg.get() / nv as f64
+                self.rst.ema_asg.get() / nv as f64
             ),
             fm!(
                 "{:>9.4}",
                 self.record,
                 LogF64Id::EmaLBD,
-                self.ema_lbd.get() / ave
+                self.rst.ema_lbd.get() / ave
             ),
         );
         println!(
             "\x1B[2K    Conflict|aLBD:{}, cnfl:{}, bjmp:{} |#stg:{} ",
-            fm!("{:>9.2}", self.record, LogF64Id::AveLBD, self.ema_lbd.get()),
+            fm!(
+                "{:>9.2}",
+                self.record,
+                LogF64Id::AveLBD,
+                self.rst.ema_lbd.get()
+            ),
             fm!("{:>9.2}", self.record, LogF64Id::CLevel, self.c_lvl.get()),
             fm!("{:>9.2}", self.record, LogF64Id::BLevel, self.b_lvl.get()),
             im!(
@@ -643,13 +584,13 @@ impl StateIF for State {
                 "{:>9.4}",
                 self.record,
                 LogF64Id::RestartBlkR,
-                self.restart_blk
+                self.rst.blocking_threshold
             ),
             fm!(
                 "{:>9.4}",
                 self.record,
                 LogF64Id::RestartThrK,
-                self.restart_thr
+                self.rst.invoking_threshold
             ),
         );
         if let Some(m) = mes {
@@ -804,7 +745,7 @@ impl State {
              c ========================================================================================================="
         );
     }
-    fn dump(&mut self, cdb: &ClauseDB, vars: &[Var]) {
+    fn dump(&mut self, cdb: &ClauseDB, vars: &VarDB) {
         self.progress_cnt += 1;
         let nv = vars.len() - 1;
         let fixed = self.num_solved_vars;
@@ -852,9 +793,9 @@ impl State {
             0,
             self.stats[Stat::BlockRestart],
             self.stats[Stat::Restart],
-            self.ema_asg.get(),
-            self.ema_lbd.get(),
-            self.ema_lbd.get(),
+            self.rst.ema_asg.get(),
+            self.rst.ema_lbd.get(),
+            self.rst.ema_lbd.get(),
             self.b_lvl.get(),
             self.c_lvl.get(),
             elim.clause_queue_len(),

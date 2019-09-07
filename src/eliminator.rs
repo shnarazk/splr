@@ -3,7 +3,7 @@ use crate::propagator::AssignStack;
 use crate::state::State;
 use crate::traits::*;
 use crate::types::*;
-use crate::var::Var;
+use crate::var::{Var, VarDB};
 use std::fmt;
 
 #[derive(Eq, Debug, PartialEq)]
@@ -54,12 +54,12 @@ impl EliminatorIF for Eliminator {
     // Due to a potential bug of killing clauses and difficulty about
     // synchronization between 'garbage_collect' and clearing occur lists,
     // 'stop' should purge all occur lists to purge any dead clauses for now.
-    fn stop(&mut self, cdb: &mut ClauseDB, vars: &mut [Var]) {
+    fn stop(&mut self, cdb: &mut ClauseDB, vars: &mut VarDB) {
         let force: bool = true;
         self.clear_clause_queue(cdb);
         self.clear_var_queue(vars);
         if force {
-            for c in &mut cdb.clause[1..] {
+            for c in &mut cdb[1..] {
                 c.turn_off(Flag::OCCUR_LINKED);
             }
             for v in &mut vars[1..] {
@@ -69,7 +69,7 @@ impl EliminatorIF for Eliminator {
         }
         self.mode = EliminatorMode::Deactive;
     }
-    fn prepare(&mut self, cdb: &mut ClauseDB, vars: &mut [Var], force: bool) {
+    fn prepare(&mut self, cdb: &mut ClauseDB, vars: &mut VarDB, force: bool) {
         if self.mode != EliminatorMode::Waiting {
             return;
         }
@@ -78,7 +78,7 @@ impl EliminatorIF for Eliminator {
             v.pos_occurs.clear();
             v.neg_occurs.clear();
         }
-        for (cid, c) in &mut cdb.clause.iter_mut().enumerate().skip(1) {
+        for (cid, c) in &mut cdb[0..].iter_mut().enumerate().skip(1) {
             if c.is(Flag::DEAD) || c.is(Flag::OCCUR_LINKED) {
                 continue;
             }
@@ -107,14 +107,14 @@ impl EliminatorIF for Eliminator {
         }
         self.clause_queue.clear();
     }
-    fn enqueue_var(&mut self, vars: &mut [Var], vi: VarId, upward: bool) {
+    fn enqueue_var(&mut self, vars: &mut VarDB, vi: VarId, upward: bool) {
         if self.mode != EliminatorMode::Running {
             return;
         }
         self.var_queue.insert(vars, vi, upward);
         vars[vi].turn_on(Flag::ENQUEUED);
     }
-    fn clear_var_queue(&mut self, vars: &mut [Var]) {
+    fn clear_var_queue(&mut self, vars: &mut VarDB) {
         self.var_queue.clear(vars);
     }
     fn clause_queue_len(&self) -> usize {
@@ -128,7 +128,7 @@ impl EliminatorIF for Eliminator {
         asgs: &mut AssignStack,
         cdb: &mut ClauseDB,
         state: &mut State,
-        vars: &mut [Var],
+        vars: &mut VarDB,
     ) -> MaybeInconsistent {
         debug_assert!(asgs.level() == 0);
         if self.mode == EliminatorMode::Deactive {
@@ -206,7 +206,7 @@ impl EliminatorIF for Eliminator {
             i -= width;
         }
     }
-    fn add_cid_occur(&mut self, vars: &mut [Var], cid: ClauseId, c: &mut Clause, enqueue: bool) {
+    fn add_cid_occur(&mut self, vars: &mut VarDB, cid: ClauseId, c: &mut Clause, enqueue: bool) {
         if self.mode != EliminatorMode::Running || c.is(Flag::OCCUR_LINKED) {
             return;
         }
@@ -235,7 +235,7 @@ impl EliminatorIF for Eliminator {
             self.enqueue_clause(cid, c);
         }
     }
-    fn remove_lit_occur(&mut self, vars: &mut [Var], l: Lit, cid: ClauseId) {
+    fn remove_lit_occur(&mut self, vars: &mut VarDB, l: Lit, cid: ClauseId) {
         let v = &mut vars[l.vi()];
         if l.is_positive() {
             debug_assert_eq!(v.pos_occurs.iter().filter(|&c| *c == cid).count(), 1);
@@ -248,7 +248,7 @@ impl EliminatorIF for Eliminator {
         }
         self.enqueue_var(vars, l.vi(), true);
     }
-    fn remove_cid_occur(&mut self, vars: &mut [Var], cid: ClauseId, c: &mut Clause) {
+    fn remove_cid_occur(&mut self, vars: &mut VarDB, cid: ClauseId, c: &mut Clause) {
         debug_assert!(self.mode == EliminatorMode::Running);
         debug_assert!(!cid.is_lifted_lit());
         c.turn_off(Flag::OCCUR_LINKED);
@@ -272,7 +272,7 @@ impl Eliminator {
         asgs: &mut AssignStack,
         cdb: &mut ClauseDB,
         state: &State,
-        vars: &mut [Var],
+        vars: &mut VarDB,
     ) -> MaybeInconsistent {
         let mut cnt = 0;
         debug_assert_eq!(asgs.level(), 0);
@@ -334,7 +334,7 @@ impl Eliminator {
                         if *did == cid {
                             continue;
                         }
-                        let db = &cdb.clause[*did as usize];
+                        let db = &cdb[*did];
                         if !db.is(Flag::DEAD) && db.lits.len() <= state.elim_subsume_literal_limit {
                             try_subsume(asgs, cdb, self, vars, cid, *did)?;
                         }
@@ -350,7 +350,7 @@ fn try_subsume(
     asgs: &mut AssignStack,
     cdb: &mut ClauseDB,
     elim: &mut Eliminator,
-    vars: &mut [Var],
+    vars: &mut VarDB,
     cid: ClauseId,
     did: ClauseId,
 ) -> MaybeInconsistent {
@@ -363,7 +363,7 @@ fn try_subsume(
             //          *clause!(cdb, cid),
             // );
             cdb.detach(did);
-            elim.remove_cid_occur(vars, did, &mut cdb.clause[did as usize]);
+            elim.remove_cid_occur(vars, did, &mut cdb[did]);
             if !cdb[did].is(Flag::LEARNT) {
                 cdb[cid].turn_off(Flag::LEARNT);
             }
@@ -383,7 +383,7 @@ fn subsume(cdb: &mut ClauseDB, cid: ClauseId, other: ClauseId) -> Option<Lit> {
     debug_assert!(!other.is_lifted_lit());
     if cid.is_lifted_lit() {
         let l = cid.to_lit();
-        let oh = &cdb.clause[other as usize];
+        let oh = &cdb[other];
         for lo in &oh.lits {
             if l == lo.negate() {
                 return Some(l);
@@ -415,13 +415,13 @@ fn subsume(cdb: &mut ClauseDB, cid: ClauseId, other: ClauseId) -> Option<Lit> {
 /// - `(true, n)` if they are mergeable to a n-literal clause.
 fn check_to_merge(
     cdb: &ClauseDB,
-    vars: &[Var],
+    vars: &VarDB,
     cp: ClauseId,
     cq: ClauseId,
     v: VarId,
 ) -> (bool, usize) {
-    let pqb = &cdb.clause[cp as usize];
-    let qpb = &cdb.clause[cq as usize];
+    let pqb = &cdb[cp];
+    let qpb = &cdb[cq];
     let ps_smallest = pqb.lits.len() < qpb.lits.len();
     let (pb, qb) = if ps_smallest { (pqb, qpb) } else { (qpb, pqb) };
     let mut size = pb.lits.len() + 1;
@@ -467,7 +467,7 @@ fn check_eliminator(cdb: &ClauseDB, vars: &[Var]) -> bool {
     //     }
     // }
     // all clauses are registered in corresponding occur_lists
-    for (cid, c) in cdb.clause.iter().enumerate().skip(1) {
+    for (cid, c) in cdb[0..].iter().enumerate().skip(1) {
         if c.is(Flag::DEAD) {
             continue;
         }
@@ -488,8 +488,8 @@ fn check_eliminator(cdb: &ClauseDB, vars: &[Var]) -> bool {
 /// Returns **false** if one of the clauses is always satisfied. (merge_vec should not be used.)
 fn merge(cdb: &mut ClauseDB, cip: ClauseId, ciq: ClauseId, v: VarId, vec: &mut Vec<Lit>) -> usize {
     vec.clear();
-    let pqb = &cdb.clause[cip as usize];
-    let qpb = &cdb.clause[ciq as usize];
+    let pqb = &cdb[cip];
+    let qpb = &cdb[ciq];
     let ps_smallest = pqb.lits.len() < qpb.lits.len();
     let (pb, qb) = if ps_smallest { (pqb, qpb) } else { (qpb, pqb) };
     // println!(" -  {:?}{:?} & {:?}{:?}", vec2int(&ph.lit),vec2int(&pb.lits),vec2int(&qh.lit),vec2int(&qb.lits));
@@ -522,7 +522,7 @@ fn merge(cdb: &mut ClauseDB, cip: ClauseId, ciq: ClauseId, v: VarId, vec: &mut V
 fn strengthen_clause(
     cdb: &mut ClauseDB,
     elim: &mut Eliminator,
-    vars: &mut [Var],
+    vars: &mut VarDB,
     asgs: &mut AssignStack,
     cid: ClauseId,
     l: Lit,
@@ -560,12 +560,7 @@ fn strengthen_clause(
 fn strengthen(cdb: &mut ClauseDB, cid: ClauseId, p: Lit) -> bool {
     debug_assert!(!cdb[cid].is(Flag::DEAD));
     debug_assert!(1 < cdb[cid].lits.len());
-    let ClauseDB {
-        ref mut clause,
-        ref mut watcher,
-        ..
-    } = cdb;
-    let c = &mut clause[cid as usize];
+    let c = &mut cdb[cid];
     // debug_assert!((*ch).lits.contains(&p));
     // debug_assert!(1 < (*ch).lits.len());
     if (*c).is(Flag::DEAD) {
@@ -590,11 +585,12 @@ fn strengthen(cdb: &mut ClauseDB, cid: ClauseId, p: Lit) -> bool {
             (lits[1], lits[0])
         };
         debug_assert!(1 < p.negate());
-        watcher[p.negate() as usize].detach_with(cid);
-        watcher[q.negate() as usize].register(r, cid);
-        if lits.len() == 2 {
+        let len = lits.len();
+        cdb.watcher[p.negate() as usize].detach_with(cid);
+        cdb.watcher[q.negate() as usize].register(r, cid);
+        if len == 2 {
             // update another bocker
-            watcher[r.negate() as usize].update_blocker(cid, q);
+            cdb.watcher[r.negate() as usize].update_blocker(cid, q);
         }
     } else {
         lits.delete_unstable(|&x| x == p);
@@ -602,8 +598,8 @@ fn strengthen(cdb: &mut ClauseDB, cid: ClauseId, p: Lit) -> bool {
             // update another bocker
             let q = lits[0];
             let r = lits[1];
-            watcher[q.negate() as usize].update_blocker(cid, r);
-            watcher[r.negate() as usize].update_blocker(cid, q);
+            cdb.watcher[q.negate() as usize].update_blocker(cid, r);
+            cdb.watcher[r.negate() as usize].update_blocker(cid, q);
         }
     }
     false
@@ -642,7 +638,7 @@ fn eliminate_var(
     cdb: &mut ClauseDB,
     elim: &mut Eliminator,
     state: &mut State,
-    vars: &mut [Var],
+    vars: &mut VarDB,
     vi: VarId,
 ) -> MaybeInconsistent {
     let v = &mut vars[vi];
@@ -651,10 +647,8 @@ fn eliminate_var(
     }
     debug_assert!(!v.is(Flag::ELIMINATED));
     // count only alive clauses
-    v.pos_occurs
-        .retain(|&c| !cdb.clause[c as usize].is(Flag::DEAD));
-    v.neg_occurs
-        .retain(|&c| !cdb.clause[c as usize].is(Flag::DEAD));
+    v.pos_occurs.retain(|&c| !cdb[c].is(Flag::DEAD));
+    v.neg_occurs.retain(|&c| !cdb[c].is(Flag::DEAD));
     let pos = &v.pos_occurs as *const Vec<ClauseId>;
     let neg = &v.neg_occurs as *const Vec<ClauseId>;
     unsafe {
@@ -667,7 +661,7 @@ fn eliminate_var(
         let vec = &mut state.new_learnt as *mut Vec<Lit>;
         // Produce clauses in cross product:
         for p in &*pos {
-            let rank_p = cdb.clause[*p as usize].rank;
+            let rank_p = cdb[*p].rank;
             for n in &*neg {
                 // println!("eliminator replaces {} with a cross product {:?}", p.fmt(), vec2int(&vec));
                 match merge(cdb, *p, *n, vi, &mut *vec) {
@@ -686,10 +680,8 @@ fn eliminate_var(
                         asgs.enqueue(&mut vars[lit.vi()], lit.lbool(), NULL_CLAUSE, 0)?;
                     }
                     _ => {
-                        let rank = if cdb.clause[*p as usize].is(Flag::LEARNT)
-                            && cdb.clause[*n as usize].is(Flag::LEARNT)
-                        {
-                            rank_p.min(cdb.clause[*n as usize].rank)
+                        let rank = if cdb[*p].is(Flag::LEARNT) && cdb[*n].is(Flag::LEARNT) {
+                            rank_p.min(cdb[*n].rank)
                         } else {
                             0
                         };
@@ -718,7 +710,7 @@ fn eliminate_var(
 fn check_var_elimination_condition(
     cdb: &ClauseDB,
     state: &State,
-    vars: &[Var],
+    vars: &VarDB,
     pos: &[ClauseId],
     neg: &[ClauseId],
     v: VarId,
@@ -793,12 +785,12 @@ pub struct VarOccHeap {
 
 trait VarOrderIF {
     fn new(n: usize, init: usize) -> VarOccHeap;
-    fn insert(&mut self, vec: &[Var], vi: VarId, upword: bool);
-    fn clear(&mut self, vars: &mut [Var]);
+    fn insert(&mut self, vec: &VarDB, vi: VarId, upword: bool);
+    fn clear(&mut self, vars: &mut VarDB);
     fn len(&self) -> usize;
     fn is_empty(&self) -> bool;
-    fn select_var(&mut self, vars: &[Var]) -> Option<VarId>;
-    fn rebuild(&mut self, vars: &[Var]);
+    fn select_var(&mut self, vars: &VarDB) -> Option<VarId>;
+    fn rebuild(&mut self, vars: &VarDB);
 }
 
 impl VarOrderIF for VarOccHeap {
@@ -814,7 +806,7 @@ impl VarOrderIF for VarOccHeap {
         idxs[0] = init;
         VarOccHeap { heap, idxs }
     }
-    fn insert(&mut self, vars: &[Var], vi: VarId, upward: bool) {
+    fn insert(&mut self, vars: &VarDB, vi: VarId, upward: bool) {
         debug_assert!(vi < self.heap.len());
         if self.contains(vi) {
             let i = self.idxs[vi];
@@ -834,7 +826,7 @@ impl VarOrderIF for VarOccHeap {
         self.idxs[0] = n;
         self.percolate_up(vars, n);
     }
-    fn clear(&mut self, vars: &mut [Var]) {
+    fn clear(&mut self, vars: &mut VarDB) {
         for v in &mut self.heap[0..self.idxs[0]] {
             vars[*v].turn_off(Flag::ENQUEUED);
         }
@@ -846,7 +838,7 @@ impl VarOrderIF for VarOccHeap {
     fn is_empty(&self) -> bool {
         self.idxs[0] == 0
     }
-    fn select_var(&mut self, vars: &[Var]) -> Option<VarId> {
+    fn select_var(&mut self, vars: &VarDB) -> Option<VarId> {
         loop {
             let vi = self.get_root(vars);
             if vi == 0 {
@@ -857,7 +849,7 @@ impl VarOrderIF for VarOccHeap {
             }
         }
     }
-    fn rebuild(&mut self, vars: &[Var]) {
+    fn rebuild(&mut self, vars: &VarDB) {
         self.reset();
         for v in &vars[1..] {
             if v.assign == BOTTOM && !v.is(Flag::ELIMINATED) {
@@ -877,7 +869,7 @@ impl VarOccHeap {
             self.heap[i] = i;
         }
     }
-    fn get_root(&mut self, vars: &[Var]) -> VarId {
+    fn get_root(&mut self, vars: &VarDB) -> VarId {
         let s = 1;
         let vs = self.heap[s];
         let n = self.idxs[0];
@@ -896,7 +888,7 @@ impl VarOccHeap {
         }
         vs
     }
-    fn percolate_up(&mut self, vars: &[Var], start: usize) {
+    fn percolate_up(&mut self, vars: &VarDB, start: usize) {
         let mut q = start;
         let vq = self.heap[q];
         debug_assert!(0 < vq, "size of heap is too small");
@@ -926,7 +918,7 @@ impl VarOccHeap {
             }
         }
     }
-    fn percolate_down(&mut self, vars: &[Var], start: usize) {
+    fn percolate_down(&mut self, vars: &VarDB, start: usize) {
         let n = self.len();
         let mut i = start;
         let vi = self.heap[i];
@@ -966,7 +958,7 @@ impl VarOccHeap {
         self.heap[1]
     }
     #[allow(dead_code)]
-    fn remove(&mut self, vec: &[Var], vs: VarId) {
+    fn remove(&mut self, vec: &VarDB, vs: VarId) {
         let s = self.idxs[vs];
         let n = self.idxs[0];
         if n < s {

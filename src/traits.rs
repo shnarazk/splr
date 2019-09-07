@@ -5,7 +5,7 @@ use crate::propagator::AssignStack;
 use crate::solver::{Solver, SolverResult};
 use crate::state::State;
 use crate::types::{CNFDescription, ClauseId, Flag, Lbool, Lit, MaybeInconsistent, VarId};
-use crate::var::Var;
+use crate::var::{Var, VarDB};
 
 /// API for Clause, providing `kill`.
 pub trait ClauseIF {
@@ -15,13 +15,18 @@ pub trait ClauseIF {
 
 /// API for clause management like `reduce`, `simplify`, `new_clause`, and so on.
 pub trait ClauseDBIF {
+    /// return a new instance
     fn new(nv: usize, nc: usize, certify: bool) -> Self;
+    /// return the length of `clause`
+    fn len(&self) -> usize;
     /// make a new clause from `state.new_learnt` and register it to clause database.
-    fn attach(&mut self, state: &mut State, vars: &mut [Var], lbd: usize) -> ClauseId;
+    /// return true if it's empty
+    fn is_empty(&self) -> bool;
+    fn attach(&mut self, state: &mut State, vars: &mut VarDB, lbd: usize) -> ClauseId;
     /// unregister a clause `cid` from clause database and make the clause dead.
     fn detach(&mut self, cid: ClauseId);
     /// halve the number of 'learnt' or *removable* clauses.
-    fn reduce(&mut self, state: &mut State, vars: &mut [Var]);
+    fn reduce(&mut self, state: &mut State, vars: &mut VarDB);
     /// simplify database by:
     /// * removing satisfiable clauses
     /// * calling exhaustive simplifier that tries **clause subsumption** and **variable elimination**.
@@ -34,7 +39,7 @@ pub trait ClauseDBIF {
         asgs: &mut AssignStack,
         elim: &mut Eliminator,
         state: &mut State,
-        vars: &mut [Var],
+        vars: &mut VarDB,
     ) -> MaybeInconsistent;
     fn reset(&mut self, size: usize);
     /// delete *dead* clauses from database, which are made by:
@@ -45,9 +50,9 @@ pub trait ClauseDBIF {
     /// allocate a new clause and return its id.
     fn new_clause(&mut self, v: &[Lit], rank: usize, learnt: bool) -> ClauseId;
     /// re-calculate the lbd values of all (learnt) clauses.
-    fn reset_lbd(&mut self, vars: &[Var], temp: &mut [usize]);
+    fn reset_lbd(&mut self, vars: &VarDB, temp: &mut [usize]);
     /// update clause activity.
-    fn bump_activity(&mut self, inc: &mut f64, cid: ClauseId);
+    fn bump_activity(&mut self, cid: ClauseId);
     /// return the number of alive clauses in the database. Or return the database size if `active` is `false`.
     fn count(&self, alive: bool) -> usize;
     /// return the number of clauses which satisfy given flags and aren't DEAD.
@@ -57,9 +62,11 @@ pub trait ClauseDBIF {
     /// record a deleted clause to unsat certification
     fn certificate_delete(&mut self, vec: &[Lit]);
     /// delete satisfied clauses at decision level zero.
-    fn eliminate_satisfied_clauses(&mut self, elim: &mut Eliminator, vars: &mut [Var], occur: bool);
+    fn eliminate_satisfied_clauses(&mut self, elim: &mut Eliminator, vars: &mut VarDB, occur: bool);
     /// emit an error if the db size (the number of clauses) is over the limit.
     fn check_size(&self, state: &State) -> MaybeInconsistent;
+    /// change good learnt clauses to permanent one
+    fn make_permanent(&mut self, threshold: usize, reinit: bool);
 }
 
 /// API for Clause Id like `to_lit`, `is_lifted_lit` and so on.
@@ -86,16 +93,16 @@ pub trait EliminatorIF {
     /// set eliminater's mode to **ready**.
     fn activate(&mut self);
     /// set eliminater's mode to **dormant**.
-    fn stop(&mut self, cdb: &mut ClauseDB, vars: &mut [Var]);
+    fn stop(&mut self, cdb: &mut ClauseDB, vars: &mut VarDB);
     fn is_running(&self) -> bool;
     fn is_waiting(&self) -> bool;
     /// rebuild occur lists.
-    fn prepare(&mut self, cdb: &mut ClauseDB, vars: &mut [Var], force: bool);
+    fn prepare(&mut self, cdb: &mut ClauseDB, vars: &mut VarDB, force: bool);
     fn enqueue_clause(&mut self, cid: ClauseId, c: &mut Clause);
     fn clear_clause_queue(&mut self, cdb: &mut ClauseDB);
     fn clause_queue_len(&self) -> usize;
-    fn enqueue_var(&mut self, vars: &mut [Var], vi: VarId, upword: bool);
-    fn clear_var_queue(&mut self, vars: &mut [Var]);
+    fn enqueue_var(&mut self, vars: &mut VarDB, vi: VarId, upword: bool);
+    fn clear_var_queue(&mut self, vars: &mut VarDB);
     fn var_queue_len(&self) -> usize;
     /// run clause subsumption and variable elimination.
     ///
@@ -107,16 +114,16 @@ pub trait EliminatorIF {
         asgs: &mut AssignStack,
         cdb: &mut ClauseDB,
         state: &mut State,
-        vars: &mut [Var],
+        vars: &mut VarDB,
     ) -> MaybeInconsistent;
     /// add assignments for eliminated vars to `model`.
     fn extend_model(&mut self, model: &mut Vec<i32>);
     /// register a clause id to all corresponding occur lists.
-    fn add_cid_occur(&mut self, vars: &mut [Var], cid: ClauseId, c: &mut Clause, enqueue: bool);
+    fn add_cid_occur(&mut self, vars: &mut VarDB, cid: ClauseId, c: &mut Clause, enqueue: bool);
     /// remove a clause id from literal's occur list.
-    fn remove_lit_occur(&mut self, vars: &mut [Var], l: Lit, cid: ClauseId);
+    fn remove_lit_occur(&mut self, vars: &mut VarDB, l: Lit, cid: ClauseId);
     /// remove a clause id from all corresponding occur lists.
-    fn remove_cid_occur(&mut self, vars: &mut [Var], cid: ClauseId, c: &mut Clause);
+    fn remove_cid_occur(&mut self, vars: &mut VarDB, cid: ClauseId, c: &mut Clause);
 }
 
 /// API for Exponential Moving Average, EMA, like `get`, `reset`, `update` and so on.
@@ -173,9 +180,9 @@ pub trait PropagatorIF {
     /// return the *value* of a given literal.
     fn assigned(&self, l: Lit) -> Lbool;
     /// execute *propagate*.
-    fn propagate(&mut self, cdb: &mut ClauseDB, state: &mut State, vars: &mut [Var]) -> ClauseId;
+    fn propagate(&mut self, cdb: &mut ClauseDB, state: &mut State, vars: &mut VarDB) -> ClauseId;
     /// execute *backjump*.
-    fn cancel_until(&mut self, vars: &mut [Var], lv: usize);
+    fn cancel_until(&mut self, vars: &mut VarDB, lv: usize);
     /// add an assignment caused by a clause; emit an exception if solver becomes inconsistent.
     ///
     /// # Errors
@@ -185,29 +192,33 @@ pub trait PropagatorIF {
     /// add an assignment with no reason clause without inconsistency check.
     fn enqueue_null(&mut self, v: &mut Var, sig: Lbool);
     /// unsafe enqueue; doesn't emit an exception.
-    fn uncheck_enqueue(&mut self, vars: &mut [Var], l: Lit, cid: ClauseId);
+    fn uncheck_enqueue(&mut self, vars: &mut VarDB, l: Lit, cid: ClauseId);
     /// unsafe assume; doesn't emit an exception.
-    fn uncheck_assume(&mut self, vars: &mut [Var], l: Lit);
+    fn uncheck_assume(&mut self, vars: &mut VarDB, l: Lit);
     /// update the internal heap on var order.
-    fn update_order(&mut self, vec: &[Var], v: VarId);
+    fn update_order(&mut self, vec: &VarDB, v: VarId);
     /// select a new decision variable.
-    fn select_var(&mut self, vars: &[Var]) -> VarId;
+    fn select_var(&mut self, vars: &VarDB) -> VarId;
     /// dump all active clauses and fixed assignments in solver to a CNF file `fname`.
-    fn dump_cnf(&mut self, cdb: &ClauseDB, state: &State, vars: &[Var], fname: &str);
+    fn dump_cnf(&mut self, cdb: &ClauseDB, state: &State, vars: &VarDB, fname: &str);
 }
 
 /// API for restart like `block_restart`, `force_restart` and so on.
 pub trait RestartIF {
+    /// return a new instance
+    fn new(config: &Config) -> Self;
     /// block restart if needed.
     fn block_restart(&mut self, asgs: &AssignStack, ncnfl: usize) -> bool;
     /// force restart if needed.
-    fn force_restart(&mut self, ncnfl: &mut f64) -> bool;
+    fn force_restart(&mut self, stats: &[usize]) -> bool;
     /// update data for forcing restart.
-    fn restart_update_lbd(&mut self, lbd: usize);
+    fn update_lbd(&mut self, lbd: usize);
     /// update data for blocking restart.
-    fn restart_update_asg(&mut self, n: usize);
+    fn update_asg(&mut self, n: usize);
+    /// initialize data for Luby restart.
+    fn initialize_luby(&mut self);
     /// update data for Luby restart.
-    fn restart_update_luby(&mut self);
+    fn update_luby(&mut self);
 }
 
 /// API for SAT solver like `build`, `solve` and so on.
@@ -234,14 +245,16 @@ pub trait SatSolverIF {
 pub trait StateIF {
     /// return an initialized state based on solver configuration and data about a CNF file.
     fn new(config: &Config, cnf: CNFDescription) -> State;
+    /// return the number of unsolved vars
+    fn num_unsolved_vars(&self) -> usize;
     /// return `true` if it is timed out.
     fn is_timeout(&self) -> bool;
     /// change heuristics based on stat data.
-    fn adapt_strategy(&mut self, cdb: &mut ClauseDB);
+    fn adapt_strategy(&mut self, cdb: &mut ClauseDB, vdb: &mut VarDB);
     /// write a header of stat data to stdio.
     fn progress_header(&self);
     /// write stat data to stdio.
-    fn progress(&mut self, cdb: &ClauseDB, vars: &[Var], mes: Option<&str>);
+    fn progress(&mut self, cdb: &ClauseDB, vars: &VarDB, mes: Option<&str>);
     fn flush(&self, mes: &str);
 }
 
@@ -265,16 +278,24 @@ pub trait VarIF {
 
 /// API for var DB like `assigned`, `locked`, `compute_lbd` and so on.
 pub trait VarDBIF {
+    /// return a new instance
+    fn new(n: usize) -> Self;
+    /// return the length of `vars`
+    fn len(&self) -> usize;
+    /// return true if it's empty
+    fn is_empty(&self) -> bool;
     /// return the 'value' of a given literal.
     fn assigned(&self, l: Lit) -> Lbool;
     /// return `true` is the clause is the reason of the assignment.
     fn locked(&self, c: &Clause, cid: ClauseId) -> bool;
     /// return `true` if the set of literals is satisfiable under the current assignment.
     fn satisfies(&self, c: &[Lit]) -> bool;
+    /// copy some stat data from `State`
+    fn update_stat(&mut self, state: &State);
     /// return a LBD value for the set of literals.
     fn compute_lbd(&self, vec: &[Lit], keys: &mut [usize]) -> usize;
     /// update the variable's activity.
-    fn bump_activity(&mut self, inc: &mut f64, vi: VarId);
+    fn bump_activity(&mut self, vi: VarId);
 }
 
 /// API for 'watcher list' like `attach`, `detach`, `detach_with` and so on.
