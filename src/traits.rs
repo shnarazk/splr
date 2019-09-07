@@ -16,7 +16,7 @@ pub trait ClauseIF {
 /// API for clause management like `reduce`, `simplify`, `new_clause`, and so on.
 pub trait ClauseDBIF {
     /// return a new instance
-    fn new(nv: usize, nc: usize, certify: bool) -> Self;
+    fn new(config: &Config, nv: usize, nc: usize) -> Self;
     /// return the length of `clause`
     fn len(&self) -> usize;
     /// make a new clause from `state.new_learnt` and register it to clause database.
@@ -41,7 +41,7 @@ pub trait ClauseDBIF {
         state: &mut State,
         vars: &mut VarDB,
     ) -> MaybeInconsistent;
-    fn reset(&mut self, size: usize);
+    fn reset(&mut self);
     /// delete *dead* clauses from database, which are made by:
     /// * `reduce`
     /// * `simplify`
@@ -64,9 +64,9 @@ pub trait ClauseDBIF {
     /// delete satisfied clauses at decision level zero.
     fn eliminate_satisfied_clauses(&mut self, elim: &mut Eliminator, vars: &mut VarDB, occur: bool);
     /// emit an error if the db size (the number of clauses) is over the limit.
-    fn check_size(&self, state: &State) -> MaybeInconsistent;
+    fn check_size(&self) -> MaybeInconsistent;
     /// change good learnt clauses to permanent one
-    fn make_permanent(&mut self, threshold: usize, reinit: bool);
+    fn make_permanent(&mut self, reinit: bool);
 }
 
 /// API for Clause Id like `to_lit`, `is_lifted_lit` and so on.
@@ -89,7 +89,7 @@ pub trait Delete<T> {
 
 /// API for Eliminator like `activate`, `stop`, `eliminate` and so on.
 pub trait EliminatorIF {
-    fn new(nv: usize) -> Eliminator;
+    fn new(config: &Config, nv: usize) -> Eliminator;
     /// set eliminater's mode to **ready**.
     fn activate(&mut self);
     /// set eliminater's mode to **dormant**.

@@ -48,11 +48,11 @@ impl SatSolverIF for Solver {
     fn new(config: &Config, cnf: &CNFDescription) -> Solver {
         let nv = cnf.num_of_variables as usize;
         let nc = cnf.num_of_clauses as usize;
-        let elim = Eliminator::new(nv);
+        let elim = Eliminator::new(config, nv);
         let state = State::new(config, cnf.clone());
         Solver {
             asgs: AssignStack::new(nv),
-            cdb: ClauseDB::new(nv, nc, config.use_certification),
+            cdb: ClauseDB::new(config, nv, nc),
             elim,
             state,
             vdb: VarDB::new(nv),
@@ -83,7 +83,7 @@ impl SatSolverIF for Solver {
         if !state.ok {
             return Ok(Certificate::UNSAT);
         }
-        if cdb.check_size(state).is_err() {
+        if cdb.check_size().is_err() {
             return Err(SolverException::OutOfMemory);
         }
         // NOTE: splr doesn't deal with assumptions.
@@ -118,12 +118,12 @@ impl SatSolverIF for Solver {
                     _ => (),
                 }
             }
-            if !state.use_elim || !use_pre_processing_eliminator {
+            if !elim.enable || !use_pre_processing_eliminator {
                 elim.stop(cdb, vdb);
             }
             // state.progress(cdb, vdb, Some("phase-in"));
         }
-        if state.use_elim && use_pre_processing_eliminator {
+        if elim.enable && use_pre_processing_eliminator {
             state.flush("simplifying...");
             // if 20_000_000 < state.target.num_of_clauses {
             //     state.elim_eliminate_grow_limit = 0;
@@ -135,7 +135,7 @@ impl SatSolverIF for Solver {
                 // Or out of memory.
                 state.progress(cdb, vdb, None);
                 state.ok = false;
-                if cdb.check_size(state).is_err() {
+                if cdb.check_size().is_err() {
                     return Err(SolverException::OutOfMemory);
                 }
                 return Ok(Certificate::UNSAT);
@@ -178,7 +178,7 @@ impl SatSolverIF for Solver {
                 asgs.cancel_until(vdb, 0);
                 state.progress(cdb, vdb, Some("ERROR"));
                 state.ok = false;
-                if cdb.check_size(state).is_err() {
+                if cdb.check_size().is_err() {
                     return Err(SolverException::OutOfMemory);
                 }
                 if state.is_timeout() {
@@ -416,12 +416,12 @@ fn handle_conflict_path(
     }
     cdb.activity_inc /= cdb.activity_decay;
     vdb.activity_inc /= vdb.activity_decay;
-    if ((state.use_chan_seok && !state.glureduce && state.first_reduction < cdb.num_learnt)
-        || (state.glureduce
-            && state.rst.cur_restart * state.next_reduction <= state.stats[Stat::Conflict]))
+    if ((state.use_chan_seok && !cdb.glureduce && cdb.first_reduction < cdb.num_learnt)
+        || (cdb.glureduce
+            && state.rst.cur_restart * cdb.next_reduction <= state.stats[Stat::Conflict]))
         && 0 < cdb.num_learnt
     {
-        state.rst.cur_restart = ((ncnfl as f64) / (state.next_reduction as f64)) as usize + 1;
+        state.rst.cur_restart = ((ncnfl as f64) / (cdb.next_reduction as f64)) as usize + 1;
         cdb.reduce(state, vdb);
     }
     Ok(())
@@ -497,8 +497,8 @@ fn adapt_parameters(
         state.flush("exhaustive eliminator activated...");
         asgs.cancel_until(vdb, 0);
         state.adapt_strategy(cdb, vdb);
-        if state.use_elim {
-            cdb.reset(state.co_lbd_bound);
+        if elim.enable {
+            cdb.reset();
             elim.activate();
             cdb.simplify(asgs, elim, state, vdb)?;
         }
@@ -541,10 +541,10 @@ fn analyze(
                 if 2 < (*c).rank {
                     let nlevels = vdb.compute_lbd(&(*c).lits, &mut state.lbd_temp);
                     if nlevels + 1 < (*c).rank {
-                        if (*c).rank <= state.lbd_frozen_clause {
+                        if (*c).rank <= cdb.lbd_frozen_clause {
                             (*c).turn_on(Flag::JUST_USED);
                         }
-                        if state.use_chan_seok && nlevels < state.co_lbd_bound {
+                        if state.use_chan_seok && nlevels < cdb.co_lbd_bound {
                             (*c).turn_off(Flag::LEARNT);
                             cdb.num_learnt -= 1;
                         } else {

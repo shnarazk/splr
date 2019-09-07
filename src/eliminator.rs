@@ -1,4 +1,5 @@
 use crate::clause::{Clause, ClauseDB};
+use crate::config::Config;
 use crate::propagator::AssignStack;
 use crate::state::State;
 use crate::traits::*;
@@ -16,29 +17,49 @@ enum EliminatorMode {
 /// Literal eliminator
 #[derive(Debug)]
 pub struct Eliminator {
+    pub enable: bool,
     mode: EliminatorMode,
     clause_queue: Vec<ClauseId>,
     var_queue: VarOccHeap,
     bwdsub_assigns: usize,
     elim_clauses: Vec<Lit>,
+    /// 0 for no limit
+    /// Stop elimination if a generated resolvent is larger than this
+    /// 0 means no limit.
+    pub eliminate_combination_limit: usize,
+    /// Stop elimination if the increase of clauses is over this
+    pub eliminate_grow_limit: usize,
+    pub eliminate_loop_limit: usize,
+    /// Stop subsumption if the size of a clause is over this
+    pub subsume_literal_limit: usize,
+    pub subsume_loop_limit: usize,
 }
 
 impl Default for Eliminator {
     fn default() -> Eliminator {
         Eliminator {
+            enable: true,
             mode: EliminatorMode::Deactive,
             var_queue: VarOccHeap::new(0, 0),
             clause_queue: Vec::new(),
             bwdsub_assigns: 0,
             elim_clauses: Vec::new(),
+            eliminate_combination_limit: 80,
+            eliminate_grow_limit: 0, // 64
+            eliminate_loop_limit: 2_000_000,
+            subsume_literal_limit: 100,
+            subsume_loop_limit: 2_000_000,
         }
     }
 }
 
 impl EliminatorIF for Eliminator {
-    fn new(nv: usize) -> Eliminator {
+    fn new(config: &Config, nv: usize) -> Eliminator {
         let mut e = Eliminator::default();
+        e.enable = !config.without_elim;
         e.var_queue = VarOccHeap::new(nv, 0);
+        e.eliminate_grow_limit = config.elim_grow_limit;
+        e.subsume_literal_limit = config.elim_lit_limit;
         e
     }
     fn activate(&mut self) {
@@ -140,20 +161,20 @@ impl EliminatorIF for Eliminator {
             || !self.clause_queue.is_empty()
         {
             if !self.clause_queue.is_empty() || self.bwdsub_assigns < asgs.len() {
-                self.backward_subsumption_check(asgs, cdb, state, vars)?;
+                self.backward_subsumption_check(asgs, cdb, vars)?;
             }
             while let Some(vi) = self.var_queue.select_var(vars) {
                 let v = &mut vars[vi];
                 v.turn_off(Flag::ENQUEUED);
                 cnt += 1;
-                if cnt < state.elim_eliminate_loop_limit
+                if cnt < self.eliminate_loop_limit
                     && !v.is(Flag::ELIMINATED)
                     && v.assign == BOTTOM
                 {
                     eliminate_var(asgs, cdb, self, state, vars, vi)?;
                 }
             }
-            self.backward_subsumption_check(asgs, cdb, state, vars)?;
+            self.backward_subsumption_check(asgs, cdb, vars)?;
             debug_assert!(self.clause_queue.is_empty());
             cdb.garbage_collect();
             if asgs.propagate(cdb, state, vars) != NULL_CLAUSE {
@@ -271,7 +292,6 @@ impl Eliminator {
         &mut self,
         asgs: &mut AssignStack,
         cdb: &mut ClauseDB,
-        state: &State,
         vars: &mut VarDB,
     ) -> MaybeInconsistent {
         let mut cnt = 0;
@@ -289,7 +309,7 @@ impl Eliminator {
             };
             // assert_ne!(cid, 0);
             cnt += 1;
-            if state.elim_subsume_loop_limit < cnt {
+            if self.subsume_loop_limit < cnt {
                 continue;
             }
             let best = if cid.is_lifted_lit() {
@@ -299,7 +319,7 @@ impl Eliminator {
                 let c = &mut cdb[cid];
                 c.turn_off(Flag::ENQUEUED);
                 let lits = &c.lits;
-                if c.is(Flag::DEAD) || state.elim_subsume_literal_limit < lits.len() {
+                if c.is(Flag::DEAD) || self.subsume_literal_limit < lits.len() {
                     continue;
                 }
                 // if c is subsumed by c', both of c and c' are included in the occurs of all literals of c
@@ -335,7 +355,7 @@ impl Eliminator {
                             continue;
                         }
                         let db = &cdb[*did];
-                        if !db.is(Flag::DEAD) && db.lits.len() <= state.elim_subsume_literal_limit {
+                        if !db.is(Flag::DEAD) && db.lits.len() <= self.subsume_literal_limit {
                             try_subsume(asgs, cdb, self, vars, cid, *did)?;
                         }
                     }
@@ -652,7 +672,7 @@ fn eliminate_var(
     let pos = &v.pos_occurs as *const Vec<ClauseId>;
     let neg = &v.neg_occurs as *const Vec<ClauseId>;
     unsafe {
-        if check_var_elimination_condition(cdb, state, vars, &*pos, &*neg, vi) {
+        if check_var_elimination_condition(cdb, elim, vars, &*pos, &*neg, vi) {
             return Ok(());
         }
         // OK, eliminate the literal and build constraints on it.
@@ -702,27 +722,27 @@ fn eliminate_var(
         vars[vi].pos_occurs.clear();
         vars[vi].neg_occurs.clear();
         vars[vi].turn_on(Flag::ELIMINATED);
-        elim.backward_subsumption_check(asgs, cdb, state, vars)
+        elim.backward_subsumption_check(asgs, cdb, vars)
     }
 }
 
 /// returns `true` if elimination is impossible.
 fn check_var_elimination_condition(
     cdb: &ClauseDB,
-    state: &State,
+    elim: &Eliminator,
     vars: &VarDB,
     pos: &[ClauseId],
     neg: &[ClauseId],
     v: VarId,
 ) -> bool {
     // avoid thrashing
-    if 0 < state.cdb_soft_limit && state.cdb_soft_limit < cdb.count(true) {
+    if 0 < cdb.soft_limit && cdb.soft_limit < cdb.count(true) {
         return true;
     }
-    let limit = if 0 < state.cdb_soft_limit && 3 * state.cdb_soft_limit < 4 * cdb.count(true) {
-        state.elim_eliminate_grow_limit / 4
+    let limit = if 0 < cdb.soft_limit && 3 * cdb.soft_limit < 4 * cdb.count(true) {
+        elim.eliminate_grow_limit / 4
     } else {
-        state.elim_eliminate_grow_limit
+        elim.eliminate_grow_limit
     };
     let clslen = pos.len() + neg.len();
     let mut cnt = 0;
@@ -732,8 +752,8 @@ fn check_var_elimination_condition(
             if res {
                 cnt += 1;
                 if clslen + limit < cnt
-                    || (state.elim_eliminate_combination_limit != 0
-                        && state.elim_eliminate_combination_limit < clause_size)
+                    || (elim.eliminate_combination_limit != 0
+                        && elim.eliminate_combination_limit < clause_size)
                 {
                     return true;
                 }

@@ -138,46 +138,24 @@ impl IndexMut<Stat> for [usize] {
 pub struct State {
     pub root_level: usize,
     pub num_vars: usize,
+    pub num_solved_vars: usize,
+    pub num_eliminated_vars: usize,
     /// STRATEGY
     pub use_adapt_strategy: bool,
     pub strategy: SearchStrategy,
     pub use_chan_seok: bool,
-    pub co_lbd_bound: usize,
-    pub lbd_frozen_clause: usize,
-    /// CLAUSE REDUCTION
-    pub first_reduction: usize,
-    pub glureduce: bool,
-    pub cdb_inc: usize,
-    pub cdb_inc_extra: usize,
-    pub cdb_soft_limit: usize,
     /// RESTART
     pub rst: RestartExecutor,
     pub use_deep_search_mode: bool,
     pub stagnated: bool,
-    /// Eliminator
-    pub use_elim: bool,
-    /// 0 for no limit
-    /// Stop elimination if a generated resolvent is larger than this
-    /// 0 means no limit.
-    pub elim_eliminate_combination_limit: usize,
-    /// Stop elimination if the increase of clauses is over this
-    pub elim_eliminate_grow_limit: usize,
-    pub elim_eliminate_loop_limit: usize,
-    /// Stop subsumption if the size of a clause is over this
-    pub elim_subsume_literal_limit: usize,
-    pub elim_subsume_loop_limit: usize,
     /// MISC
     pub config: Config,
     pub ok: bool,
     pub time_limit: f64,
-    pub next_reduction: usize, // renamed from `nbclausesbeforereduce`
-    pub elim_trigger: usize,
     pub slack_duration: isize,
     pub stats: [usize; Stat::EndOfStatIndex as usize], // statistics
     pub b_lvl: Ema,
     pub c_lvl: Ema,
-    pub num_solved_vars: usize,
-    pub num_eliminated_vars: usize,
     pub model: Vec<Lbool>,
     pub conflicts: Vec<Lit>,
     pub new_learnt: Vec<Lit>,
@@ -191,6 +169,43 @@ pub struct State {
     pub progress_log: bool,
     pub target: CNFDescription,
     pub development: Vec<(usize, f64, f64, f64, f64, f64, f64)>,
+}
+
+impl Default for State {
+    fn default() -> State {
+        State {
+            root_level: 0,
+            num_vars: 0,
+            num_solved_vars: 0,
+            num_eliminated_vars: 0,
+            use_adapt_strategy: true,
+            strategy: SearchStrategy::Initial,
+            use_chan_seok: false,
+            use_deep_search_mode: true,
+            stagnated: false,
+            rst: RestartExecutor::new(&Config::default()),
+            config: Config::default(),
+            ok: true,
+            time_limit: 0.0,
+            slack_duration: 0,
+            stats: [0; Stat::EndOfStatIndex as usize],
+            b_lvl: Ema::new(5_000),
+            c_lvl: Ema::new(5_000),
+            model: Vec::new(),
+            conflicts: Vec::new(),
+            new_learnt: Vec::new(),
+            an_seen: Vec::new(),
+            lbd_temp: Vec::new(),
+            last_dl: Vec::new(),
+            start: SystemTime::now(),
+            use_progress: true,
+            progress_cnt: 0,
+            progress_log: false,
+            record: ProgressRecord::default(),
+            target: CNFDescription::default(),
+            development: Vec::new(),
+        }
+    }
 }
 
 macro_rules! im {
@@ -274,58 +289,6 @@ macro_rules! f {
     };
 }
 
-impl Default for State {
-    fn default() -> State {
-        State {
-            root_level: 0,
-            num_vars: 0,
-            use_adapt_strategy: true,
-            strategy: SearchStrategy::Initial,
-            use_chan_seok: false,
-            co_lbd_bound: 5,
-            lbd_frozen_clause: 30,
-            first_reduction: 1000,
-            glureduce: true,
-            cdb_inc: 300,
-            cdb_inc_extra: 1000,
-            cdb_soft_limit: 0, // 248_000_000
-            use_deep_search_mode: true,
-            stagnated: false,
-            rst: RestartExecutor::new(&Config::default()),
-            use_elim: true,
-            elim_eliminate_combination_limit: 80,
-            elim_eliminate_grow_limit: 0, // 64
-            elim_eliminate_loop_limit: 2_000_000,
-            elim_subsume_literal_limit: 100,
-            elim_subsume_loop_limit: 2_000_000,
-            config: Config::default(),
-            ok: true,
-            time_limit: 0.0,
-            next_reduction: 1000,
-            elim_trigger: 1,
-            slack_duration: 0,
-            stats: [0; Stat::EndOfStatIndex as usize],
-            b_lvl: Ema::new(5_000),
-            c_lvl: Ema::new(5_000),
-            num_solved_vars: 0,
-            num_eliminated_vars: 0,
-            model: Vec::new(),
-            conflicts: Vec::new(),
-            new_learnt: Vec::new(),
-            an_seen: Vec::new(),
-            lbd_temp: Vec::new(),
-            last_dl: Vec::new(),
-            start: SystemTime::now(),
-            use_progress: true,
-            progress_cnt: 0,
-            progress_log: false,
-            record: ProgressRecord::default(),
-            target: CNFDescription::default(),
-            development: Vec::new(),
-        }
-    }
-}
-
 impl StateIF for State {
     fn new(config: &Config, mut cnf: CNFDescription) -> State {
         let mut state = State::default();
@@ -341,13 +304,9 @@ impl StateIF for State {
         };
         state.num_vars = cnf.num_of_variables;
         state.use_adapt_strategy = !config.without_adaptive_strategy;
-        state.cdb_soft_limit = config.clause_limit;
-        state.elim_eliminate_grow_limit = config.elim_grow_limit;
-        state.elim_subsume_literal_limit = config.elim_lit_limit;
         state.rst = RestartExecutor::new(config);
         state.use_deep_search_mode = !config.without_deep_search;
         state.progress_log = config.use_log;
-        state.use_elim = !config.without_elim;
         state.model = vec![BOTTOM; cnf.num_of_variables + 1];
         state.an_seen = vec![false; cnf.num_of_variables + 1];
         state.lbd_temp = vec![0; cnf.num_of_variables + 1];
@@ -377,13 +336,13 @@ impl StateIF for State {
         if decpc <= 1.2 {
             self.strategy = SearchStrategy::LowDecisions;
             self.use_chan_seok = true;
-            self.co_lbd_bound = 4;
-            self.glureduce = true;
-            self.first_reduction = 2000;
-            self.next_reduction = 2000;
             self.rst.cur_restart =
-                (self.stats[Stat::Conflict] as f64 / self.next_reduction as f64 + 1.0) as usize;
-            self.cdb_inc = 0;
+                (self.stats[Stat::Conflict] as f64 / cdb.next_reduction as f64 + 1.0) as usize;
+            cdb.co_lbd_bound = 4;
+            cdb.first_reduction = 2000;
+            cdb.glureduce = true;
+            cdb.inc_step = 0;
+            cdb.next_reduction = 2000;
             re_init = true;
         }
         if self.stats[Stat::NoDecisionConflict] < 30_000 {
@@ -400,9 +359,9 @@ impl StateIF for State {
         if self.stats[Stat::NoDecisionConflict] > 54_400 {
             self.strategy = SearchStrategy::HighSuccesive;
             self.use_chan_seok = true;
-            self.glureduce = true;
-            self.co_lbd_bound = 3;
-            self.first_reduction = 30000;
+            cdb.co_lbd_bound = 3;
+            cdb.first_reduction = 30000;
+            cdb.glureduce = true;
             vdb.activity_decay = 0.99;
             vdb.activity_decay_max = 0.99;
             // randomize_on_restarts = 1;
@@ -417,7 +376,7 @@ impl StateIF for State {
             return;
         }
         if self.use_chan_seok {
-            cdb.make_permanent(self.co_lbd_bound, re_init);
+            cdb.make_permanent(re_init);
         }
     }
     fn progress_header(&self) {
@@ -429,13 +388,10 @@ impl StateIF for State {
             return;
         }
         println!("{}", self);
-        println!("                                                  ");
-        println!("                                                  ");
-        println!("                                                  ");
-        println!("                                                  ");
-        println!("                                                  ");
-        println!("                                                  ");
-        println!("                                                  ");
+        let repeat = if true || 0 < self.config.dump_interval { 7 } else { 7 };
+        for _i in 0..repeat {
+            println!("                                                  ");
+        }
     }
     fn flush(&self, mes: &str) {
         if self.use_progress && !self.progress_log {
@@ -458,7 +414,10 @@ impl StateIF for State {
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
         self.progress_cnt += 1;
-        print!("\x1B[8A\x1B[1G");
+        print!(
+            "\x1B[{}A\x1B[1G",
+            if true || 0 < self.config.dump_interval { 8 } else { 8 },
+        );
         let count = self.stats[Stat::Conflict];
         let ave = self.stats[Stat::SumLBD] as f64 / count as f64;
         println!("\x1B[2K{}", self);
