@@ -1,6 +1,6 @@
 [package]
 name = "splr"
-version = "0.2.0-alpha.0"
+version = "0.1.4"
 authors = ["Shuji Narazaki <shujinarazaki@protonmail.com>"]
 abount = "SAT solver for Propositional Logic in Rust"
 description = "A pure rustic CDCL SAT solver based on Glucose"
