@@ -1,11 +1,8 @@
 use crate::clause::Clause;
+use crate::state::Stat;
 use crate::traits::*;
 use crate::types::*;
 use std::fmt;
-
-const VAR_ACTIVITY_MAX: f64 = 1e240;
-const VAR_ACTIVITY_SCALE1: f64 = 1e-30;
-const VAR_ACTIVITY_SCALE2: f64 = 1e-30;
 
 /// Structure for variables.
 #[derive(Debug)]
@@ -98,16 +95,11 @@ impl VarDBIF for [Var] {
         keys[0] = key;
         cnt
     }
-    fn bump_activity(&mut self, inc: &mut f64, vi: VarId) {
+    fn bump_activity(&mut self, vi: VarId, stats: &[usize]) {
+        let r = (stats[Stat::Conflict] + 1) as f64;
         let v = &mut self[vi];
-        let a = v.activity + *inc;
-        v.activity = a;
-        if VAR_ACTIVITY_MAX < a {
-            for v in &mut self[1..] {
-                v.activity *= VAR_ACTIVITY_SCALE1;
-            }
-            *inc *= VAR_ACTIVITY_SCALE2;
-        }
+        let a = (v.activity + r) / 2.0;
+        v.activity = a; // .max(lvl as f64);
     }
 }
 

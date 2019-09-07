@@ -546,7 +546,7 @@ fn analyze(
             // println!("- handle {}", cid.fmt());
             for q in &(*c).lits[((p != NULL_LIT) as usize)..] {
                 let vi = q.vi();
-                vars.bump_activity(&mut state.var_inc, vi);
+                vars.bump_activity(vi, &state.stats);
                 asgs.update_order(vars, vi);
                 let v = &mut vars[vi];
                 let lvl = v.level;
@@ -625,7 +625,7 @@ fn simplify_learnt(
     while let Some(l) = state.last_dl.pop() {
         let vi = l.vi();
         if cdb.clause[vars[vi].reason as usize].rank < lbd {
-            vars.bump_activity(&mut state.var_inc, vi);
+            vars.bump_activity(vi, &state.stats);
             asgs.update_order(vars, vi);
         }
     }
