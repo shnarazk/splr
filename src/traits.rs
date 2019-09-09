@@ -53,6 +53,8 @@ pub trait ClauseDBIF {
     fn reset_lbd(&mut self, vars: &VarDB, temp: &mut [usize]);
     /// update clause activity.
     fn bump_activity(&mut self, cid: ClauseId);
+    /// increment activity step.
+    fn scale_activity(&mut self);
     /// return the number of alive clauses in the database. Or return the database size if `active` is `false`.
     fn count(&self, alive: bool) -> usize;
     /// return the number of clauses which satisfy given flags and aren't DEAD.
@@ -162,6 +164,15 @@ pub trait LitIF {
     fn to_cid(self) -> ClauseId;
 }
 
+pub trait ProgressEvaluator {
+    type Input;
+    fn update(&mut self, val: Self::Input);
+    fn get(&self) -> f64;
+    fn trend(&self) -> f64;
+    fn is_active(&self) -> bool;
+    fn new(config: &Config) -> Self;
+}
+
 /// API for assignment like `propagate`, `enqueue`, `cancel_until`, and so on.
 pub trait PropagatorIF {
     fn new(n: usize) -> Self;
@@ -208,13 +219,9 @@ pub trait RestartIF {
     /// return a new instance
     fn new(config: &Config) -> Self;
     /// block restart if needed.
-    fn block_restart(&mut self, asgs: &AssignStack, ncnfl: usize) -> bool;
+    fn block_restart(&mut self) -> bool;
     /// force restart if needed.
-    fn force_restart(&mut self, stats: &[usize]) -> bool;
-    /// update data for forcing restart.
-    fn update_lbd(&mut self, lbd: usize);
-    /// update data for blocking restart.
-    fn update_asg(&mut self, n: usize);
+    fn force_restart(&mut self) -> bool;
     /// initialize data for Luby restart.
     fn initialize_luby(&mut self);
     /// update data for Luby restart.
@@ -296,6 +303,8 @@ pub trait VarDBIF {
     fn compute_lbd(&self, vec: &[Lit], keys: &mut [usize]) -> usize;
     /// update the variable's activity.
     fn bump_activity(&mut self, vi: VarId);
+    /// increment activity step.
+    fn scale_activity(&mut self);
 }
 
 /// API for 'watcher list' like `attach`, `detach`, `detach_with` and so on.

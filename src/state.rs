@@ -416,10 +416,12 @@ impl StateIF for State {
         self.progress_cnt += 1;
         print!(
             "\x1B[{}A\x1B[1G",
-            if true || 0 < self.config.dump_interval { 8 } else { 8 },
+            if true || 0 < self.config.dump_interval {
+                8
+            } else {
+                8
+            },
         );
-        let count = self.stats[Stat::Conflict];
-        let ave = self.stats[Stat::SumLBD] as f64 / count as f64;
         println!("\x1B[2K{}", self);
         println!(
             "\x1B[2K #conflict:{}, #decision:{}, #propagate:{} ",
@@ -499,31 +501,26 @@ impl StateIF for State {
                 "{:>9.4}",
                 self.record,
                 LogF64Id::EmaAsg,
-                self.rst.ema_asg.get() / nv as f64
+                self.rst.asg.trend()
             ),
             fm!(
                 "{:>9.4}",
                 self.record,
                 LogF64Id::EmaLBD,
-                self.rst.ema_lbd.get() / ave
+                self.rst.lbd.trend()
             ),
         );
         println!(
-            "\x1B[2K    Conflict|aLBD:{}, cnfl:{}, bjmp:{} |#stg:{} ",
+            "\x1B[2K    Conflict|aLBD:{}, cnfl:{}, bjmp:{}, ____:{} ",
             fm!(
                 "{:>9.2}",
                 self.record,
                 LogF64Id::AveLBD,
-                self.rst.ema_lbd.get()
+                self.rst.lbd.get()
             ),
             fm!("{:>9.2}", self.record, LogF64Id::CLevel, self.c_lvl.get()),
             fm!("{:>9.2}", self.record, LogF64Id::BLevel, self.b_lvl.get()),
-            im!(
-                "{:>9}",
-                self.record,
-                LogUsizeId::Stagnation,
-                self.stats[Stat::Stagnation]
-            ),
+            im!("{:>9.0}", self.record, LogUsizeId::End, 0),
         );
         println!(
             "\x1B[2K   Clause DB|#rdc:{}, #sce:{} |blkR:{}, frcK:{} ",
@@ -543,13 +540,13 @@ impl StateIF for State {
                 "{:>9.4}",
                 self.record,
                 LogF64Id::RestartBlkR,
-                self.rst.blocking_threshold
+                self.rst.asg.threshold
             ),
             fm!(
                 "{:>9.4}",
                 self.record,
                 LogF64Id::RestartThrK,
-                self.rst.invoking_threshold
+                self.rst.lbd.threshold
             ),
         );
         if let Some(m) = mes {
@@ -752,9 +749,9 @@ impl State {
             0,
             self.stats[Stat::BlockRestart],
             self.stats[Stat::Restart],
-            self.rst.ema_asg.get(),
-            self.rst.ema_lbd.get(),
-            self.rst.ema_lbd.get(),
+            self.rst.asg.get(),
+            self.rst.lbd.get(),
+            self.rst.lbd.get(),
             self.b_lvl.get(),
             self.c_lvl.get(),
             elim.clause_queue_len(),

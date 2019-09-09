@@ -312,13 +312,14 @@ fn search(
     state.rst.initialize_luby();
     loop {
         let ci = asgs.propagate(cdb, state, vdb);
+        vdb.update_stat(state);
         state.stats[Stat::Propagation] += 1;
         if ci == NULL_CLAUSE {
             if state.num_vars <= asgs.len() + state.num_eliminated_vars {
                 return Ok(true);
             }
             // DYNAMIC FORCING RESTART
-            if state.rst.force_restart(&state.stats) {
+            if state.rst.force_restart() {
                 state.stats[Stat::Restart] += 1;
                 asgs.cancel_until(vdb, state.root_level);
             } else if asgs.level() == 0 {
@@ -364,9 +365,9 @@ fn handle_conflict_path(
     if ncnfl % 5000 == 0 && vdb.activity_decay < vdb.activity_decay_max {
         vdb.activity_decay += 0.01;
     }
-    state.rst.update_asg(asgs.len());
+    state.rst.asg.update(asgs.len());
     // DYNAMIC BLOCKING RESTART
-    if state.rst.block_restart(asgs, ncnfl) {
+    if state.rst.block_restart() {
         state.stats[Stat::BlockRestart] += 1;
     }
     let cl = asgs.level();
@@ -394,15 +395,17 @@ fn handle_conflict_path(
             state.stats[Stat::NumBinLearnt] += 1;
         }
         asgs.uncheck_enqueue(vdb, l0, cid);
-        state.rst.update_lbd(lbd);
+        state.rst.lbd.update(lbd);
         state.stats[Stat::SumLBD] += lbd;
     }
+    cdb.scale_activity();
+    vdb.scale_activity();
     if 0 < state.config.dump_interval && ncnfl % state.config.dump_interval == 0 {
         state.development.push((
             ncnfl,
             state.stats[Stat::Restart] as f64,
-            state.rst.ema_asg.get().min(10.0),
-            state.rst.ema_lbd.get().min(10.0),
+            state.rst.asg.trend().min(10.0),
+            state.rst.lbd.trend().min(10.0),
             0.0, // rst.blocking_segment.len.get()
             0.0, // rst.invoking_segment.len.get()
             0.0,
@@ -414,8 +417,6 @@ fn handle_conflict_path(
             return Err(SolverError::Inconsistent);
         }
     }
-    cdb.activity_inc /= cdb.activity_decay;
-    vdb.activity_inc /= vdb.activity_decay;
     if ((state.use_chan_seok && !cdb.glureduce && cdb.first_reduction < cdb.num_learnt)
         || (cdb.glureduce
             && state.rst.cur_restart * cdb.next_reduction <= state.stats[Stat::Conflict]))
@@ -469,28 +470,28 @@ fn adapt_parameters(
         // restart_threshold
         let nr = state.stats[Stat::Restart] - state.stats[Stat::RestartRecord];
         state.stats[Stat::RestartRecord] = state.stats[Stat::Restart];
-        if state.rst.invoking_threshold <= state.config.restart_threshold + margin && nr < too_few {
-            state.rst.invoking_threshold += moving;
-        } else if state.config.restart_threshold - margin <= state.rst.invoking_threshold
+        if state.rst.lbd.threshold <= state.config.restart_threshold + margin && nr < too_few {
+            state.rst.lbd.threshold += moving;
+        } else if state.config.restart_threshold - margin <= state.rst.lbd.threshold
             && too_many < nr
         {
-            state.rst.invoking_threshold -= moving;
+            state.rst.lbd.threshold -= moving;
         } else if too_few <= nr && nr <= too_many {
-            state.rst.invoking_threshold -=
-                (state.rst.invoking_threshold - state.config.restart_threshold) * spring;
+            state.rst.lbd.threshold -=
+                (state.rst.lbd.threshold - state.config.restart_threshold) * spring;
         }
         // restart_blocking
         let nb = state.stats[Stat::BlockRestart] - state.stats[Stat::BlockRestartRecord];
         state.stats[Stat::BlockRestartRecord] = state.stats[Stat::BlockRestart];
-        if state.config.restart_blocking - margin <= state.rst.blocking_threshold && nb < too_few {
-            state.rst.blocking_threshold -= moving;
-        } else if state.rst.blocking_threshold <= state.config.restart_blocking + margin
+        if state.config.restart_blocking - margin <= state.rst.asg.threshold && nb < too_few {
+            state.rst.asg.threshold -= moving;
+        } else if state.rst.asg.threshold <= state.config.restart_blocking + margin
             && too_many < nb
         {
-            state.rst.blocking_threshold += moving;
+            state.rst.asg.threshold += moving;
         } else if too_few <= nb && nb <= too_many {
-            state.rst.blocking_threshold -=
-                (state.rst.blocking_threshold - state.config.restart_blocking) * spring;
+            state.rst.asg.threshold -=
+                (state.rst.asg.threshold - state.config.restart_blocking) * spring;
         }
     }
     if nconflict == switch {

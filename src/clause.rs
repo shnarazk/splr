@@ -1,4 +1,4 @@
-use crate::config::Config;
+use crate::config::{ACTIVITY_MAX, ACTIVITY_SCALE, Config};
 use crate::eliminator::Eliminator;
 use crate::propagator::AssignStack;
 use crate::state::{Stat, State};
@@ -8,10 +8,6 @@ use crate::var::VarDB;
 use std::cmp::Ordering;
 use std::fmt;
 use std::ops::{Index, IndexMut, Range, RangeFrom};
-
-const CLA_ACTIVITY_MAX: f64 = 1e240;
-const CLA_ACTIVITY_SCALE1: f64 = 1e-30;
-const CLA_ACTIVITY_SCALE2: f64 = 1e-30;
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum CertifiedRecord {
@@ -416,14 +412,17 @@ impl ClauseDBIF for ClauseDB {
         let c = &mut self.clause[cid as usize];
         let a = c.activity + self.activity_inc;
         c.activity = a;
-        if CLA_ACTIVITY_MAX < a {
+        if ACTIVITY_MAX < a {
             for c in &mut self.clause[1..] {
                 if c.is(Flag::LEARNT) {
-                    c.activity *= CLA_ACTIVITY_SCALE1;
+                    c.activity *= ACTIVITY_SCALE;
                 }
             }
-            self.activity_inc *= CLA_ACTIVITY_SCALE2;
+            self.activity_inc *= ACTIVITY_SCALE;
         }
+    }
+    fn scale_activity(&mut self) {
+        self.activity_inc /= self.activity_decay;
     }
     fn count(&self, alive: bool) -> usize {
         if alive {

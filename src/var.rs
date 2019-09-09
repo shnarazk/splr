@@ -1,13 +1,10 @@
 use crate::clause::Clause;
+use crate::config::{ACTIVITY_MAX, ACTIVITY_SCALE};
 use crate::state::{Stat, State};
 use crate::traits::*;
 use crate::types::*;
 use std::fmt;
 use std::ops::{Index, IndexMut, Range, RangeFrom};
-
-const VAR_ACTIVITY_MAX: f64 = 1e240;
-const VAR_ACTIVITY_SCALE1: f64 = 1e-30;
-const VAR_ACTIVITY_SCALE2: f64 = 1e-30;
 
 /// Structure for variables.
 #[derive(Debug)]
@@ -200,12 +197,15 @@ impl VarDBIF for VarDB {
         let v = &mut self.var[vi];
         let a = v.activity + self.activity_inc;
         v.activity = a;
-        if VAR_ACTIVITY_MAX < a {
+        if ACTIVITY_MAX < a {
             for v in &mut self[1..] {
-                v.activity *= VAR_ACTIVITY_SCALE1;
+                v.activity *= ACTIVITY_SCALE;
             }
-            self.activity_inc *= VAR_ACTIVITY_SCALE2;
+            self.activity_inc *= ACTIVITY_SCALE;
         }
+    }
+    fn scale_activity(&mut self) {
+        self.activity_inc /= self.activity_decay;
     }
 }
 

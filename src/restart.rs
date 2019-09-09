@@ -1,6 +1,4 @@
 use crate::config::Config;
-use crate::propagator::AssignStack;
-use crate::state::Stat;
 use crate::traits::*;
 
 // const RESET_EMA: usize = 400;
@@ -30,81 +28,127 @@ impl EmaIF for Ema {
     }
 }
 
-//
+#[derive(Debug)]
+pub struct ProgressASG {
+    asg: usize,
+    ema: Ema,
+    /// For block restart based on average assignments: 1.40.
+    /// This is called `R` in Glucose
+    pub threshold: f64,
+}
+
+impl ProgressEvaluator for ProgressASG {
+    type Input = usize;
+    fn update(&mut self, n: usize) {
+        self.asg = n;
+        self.ema.update(n as f64);
+    }
+    fn get(&self) -> f64 {
+        self.ema.get()
+    }
+    fn trend(&self) -> f64 {
+        (self.asg as f64) / self.ema.get()
+    }
+    fn is_active(&self) -> bool {
+        self.threshold * self.ema.get() < (self.asg as f64)
+    }
+    fn new(config: &Config) -> Self {
+        ProgressASG {
+            ema: Ema::new(config.restart_asg_len),
+            asg: 0,
+            threshold: config.restart_blocking,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct ProgressLBD {
+    ema: Ema,
+    num: usize,
+    sum: usize,
+    /// For force restart based on average LBD of newly generated clauses: 0.80.
+    /// This is called `K` in Glucose
+    pub threshold: f64,
+}
+
+impl ProgressEvaluator for ProgressLBD {
+    type Input = usize;
+    fn update(&mut self, d: usize) {
+        self.num += 1;
+        self.sum += d;
+        self.ema.update(d as f64);
+    }
+    fn get(&self) -> f64 {
+        self.ema.get()
+    }
+    fn trend(&self) -> f64 {
+        self.ema.get() * (self.num as f64) / (self.sum as f64)
+    }
+    fn is_active(&self) -> bool {
+        (self.sum as f64) < self.ema.get() * (self.num as f64) * self.threshold
+    }
+    fn new(config: &Config) -> Self {
+        ProgressLBD {
+            ema: Ema::new(config.restart_lbd_len),
+            num: 0,
+            sum: 0,
+            threshold: config.restart_threshold,
+        }
+    }
+}
+
+// Restart stat
 #[derive(Debug)]
 pub struct RestartExecutor {
     pub adaptive_restart: bool,
-    pub ema_asg: Ema,
-    pub ema_lbd: Ema,
-    /// For force restart based on average LBD of newly generated clauses: 0.80.
-    /// This is called `K` in Glucose
-    pub invoking_threshold: f64,
-    /// For block restart based on average assignments: 1.40.
-    /// This is called `R` in Glucose
-    pub blocking_threshold: f64,
+    pub asg: ProgressASG,
+    pub lbd: ProgressLBD,
     pub use_luby_restart: bool,
-    pub luby_restart_num_conflict: f64,
-    pub luby_restart_inc: f64,
-    pub luby_current_restart: usize,
-    pub luby_restart_factor: f64,
     pub after_restart: usize,
     pub cur_restart: usize,
     pub next_restart: usize,
     pub restart_step: usize,
     luby_count: f64,
+    pub luby_restart_num_conflict: f64,
+    pub luby_restart_inc: f64,
+    pub luby_current_restart: usize,
+    pub luby_restart_factor: f64,
 }
 
-impl Default for RestartExecutor {
-    fn default() -> Self {
+impl RestartIF for RestartExecutor {
+    fn new(config: &Config) -> Self {
         RestartExecutor {
-            adaptive_restart: true,
-            ema_asg: Ema::new(1),
-            ema_lbd: Ema::new(1),
-            invoking_threshold: 0.60,
-            blocking_threshold: 1.40,
+            adaptive_restart: !config.without_adaptive_restart,
+            asg: ProgressASG::new(config),
+            lbd: ProgressLBD::new(config),
             use_luby_restart: false,
+            after_restart: 0,
+            cur_restart: 1,
+            next_restart: 100,
+            restart_step: config.restart_step,
+            luby_count: 0.0,
             luby_restart_num_conflict: 0.0,
             luby_restart_inc: 2.0,
             luby_current_restart: 0,
             luby_restart_factor: 100.0,
-            after_restart: 0,
-            cur_restart: 1,
-            next_restart: 100,
-            restart_step: 100,
-            luby_count: 0.0,
         }
     }
-}
-impl RestartIF for RestartExecutor {
-    fn new(config: &Config) -> Self {
-        let mut re = RestartExecutor::default();
-        re.adaptive_restart = !config.without_adaptive_restart;
-        re.ema_asg = Ema::new(config.restart_asg_len);
-        re.ema_lbd = Ema::new(config.restart_lbd_len);
-        re.invoking_threshold = config.restart_threshold;
-        re.blocking_threshold = config.restart_blocking;
-        re.restart_step = config.restart_step;
-        re
-    }
-    fn block_restart(&mut self, asgs: &AssignStack, ncnfl: usize) -> bool {
-        let nas = asgs.len();
-        if 100 < ncnfl
+    fn block_restart(&mut self) -> bool {
+        if 100 < self.lbd.num
             && !self.use_luby_restart
             && self.restart_step <= self.after_restart
-            && self.blocking_threshold * self.ema_asg.get() < nas as f64
+            && self.asg.is_active()
         {
             self.after_restart = 0;
             return true;
         }
         false
     }
-    fn force_restart(&mut self, stats: &[usize]) -> bool {
-        let count = stats[Stat::Conflict];
-        let ave = stats[Stat::SumLBD] as f64 / count as f64;
+    fn force_restart(&mut self) -> bool {
         if (self.use_luby_restart && self.luby_restart_num_conflict <= self.luby_count)
             || (!self.use_luby_restart
                 && self.restart_step <= self.after_restart
-                && ave < self.ema_lbd.get() * self.invoking_threshold)
+                && self.lbd.is_active())
         {
             self.after_restart = 0;
             if self.use_luby_restart {
@@ -117,14 +161,6 @@ impl RestartIF for RestartExecutor {
             return true;
         }
         false
-    }
-    fn update_lbd(&mut self, lbd: usize) {
-        self.ema_lbd.update(lbd as f64);
-        self.after_restart += 1;
-    }
-    fn update_asg(&mut self, n: usize) {
-        self.ema_asg.update(n as f64);
-        // self.sum_asg += n as f64 / config.num_vars as f64;
     }
     fn initialize_luby(&mut self) {
         if self.use_luby_restart {
