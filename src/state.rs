@@ -141,7 +141,6 @@ pub struct State {
     pub num_solved_vars: usize,
     pub num_eliminated_vars: usize,
     /// STRATEGY
-    pub use_adapt_strategy: bool,
     pub strategy: SearchStrategy,
     pub use_chan_seok: bool,
     /// RESTART
@@ -177,7 +176,6 @@ impl Default for State {
             num_vars: 0,
             num_solved_vars: 0,
             num_eliminated_vars: 0,
-            use_adapt_strategy: true,
             strategy: SearchStrategy::Initial,
             use_chan_seok: false,
             stagnated: false,
@@ -301,7 +299,6 @@ impl StateIF for State {
                 .unwrap()
         };
         state.num_vars = cnf.num_of_variables;
-        state.use_adapt_strategy = !config.without_adaptive_strategy;
         state.rst = RestartExecutor::new(config);
         state.progress_log = config.use_log;
         state.model = vec![BOTTOM; cnf.num_of_variables + 1];
@@ -325,7 +322,7 @@ impl StateIF for State {
         }
     }
     fn adapt_strategy(&mut self, cdb: &mut ClauseDB, vdb: &mut VarDB) {
-        if !self.use_adapt_strategy || self.strategy != SearchStrategy::Initial {
+        if self.config.without_adaptive_strategy || self.strategy != SearchStrategy::Initial {
             return;
         }
         let mut re_init = false;
