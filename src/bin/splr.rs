@@ -49,13 +49,13 @@ fn main() {
         let dump = config.cnf_filename.file_stem().unwrap().to_str().unwrap();
         if let Ok(f) = File::create(format!("stat_{}.csv", dump)) {
             let mut buf = BufWriter::new(f);
-            buf.write_all(b"conflict,restart,ASG,CLS,FUP,LBD,rl,sl\n")
+            buf.write_all(b"conflict,solved,restart,block,ASG,LBD\n")
                 .unwrap();
-            for (n, a, b, c, d, e, f) in s.state.development.iter() {
+            for (n, a, b, c, d, e) in s.state.development.iter() {
                 buf.write_all(
                     format!(
-                        "{:>7},{:>8.0},{:>8.5},{:>8.5},{:>8.5},{:>8.5},{:>8.5}\n",
-                        n, a, b, c, d, e, f
+                        "{:>7.0},{:>8.5},{:>8.0},{:>8.0},{:>8.5},{:>8.5}\n",
+                        n, a, b, c, d, e,
                     )
                     .as_bytes(),
                 )

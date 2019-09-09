@@ -318,7 +318,7 @@ fn search(
             if state.num_vars <= asgs.len() + state.num_eliminated_vars {
                 return Ok(true);
             }
-            // DYNAMIC FORCING RESTART
+            // DYNAMIC FORCING RESTART based on LBD values, updated by conflict
             if state.rst.force_restart() {
                 state.stats[Stat::Restart] += 1;
                 asgs.cancel_until(vdb, state.root_level);
@@ -367,7 +367,8 @@ fn handle_conflict_path(
     }
     state.rst.asg.update(asgs.len());
     state.rst.after_restart += 1;
-    // DYNAMIC BLOCKING RESTART
+    // DYNAMIC BLOCKING RESTART based on ASG, updated on conflict path
+    // If we can settle this conflict w/o restart, solver will get a big progress.
     if state.rst.block_restart() {
         state.stats[Stat::BlockRestart] += 1;
     }
@@ -404,12 +405,12 @@ fn handle_conflict_path(
     if 0 < state.config.dump_interval && ncnfl % state.config.dump_interval == 0 {
         state.development.push((
             ncnfl,
+            (state.num_solved_vars + state.num_eliminated_vars) as f64
+                / state.target.num_of_variables as f64,
             state.stats[Stat::Restart] as f64,
+            state.stats[Stat::BlockRestart] as f64,
             state.rst.asg.trend().min(10.0),
             state.rst.lbd.trend().min(10.0),
-            0.0, // rst.blocking_segment.len.get()
-            0.0, // rst.invoking_segment.len.get()
-            0.0,
         ));
     }
     if ncnfl % 10_000 == 0 {

@@ -140,18 +140,14 @@ pub struct State {
     pub num_vars: usize,
     pub num_solved_vars: usize,
     pub num_eliminated_vars: usize,
-    /// STRATEGY
-    pub strategy: SearchStrategy,
-    pub use_chan_seok: bool,
-    /// RESTART
-    pub rst: RestartExecutor,
-    pub stagnated: bool,
-    /// MISC
     pub config: Config,
-    pub ok: bool,
-    pub time_limit: f64,
-    pub slack_duration: isize,
+    pub rst: RestartExecutor,
     pub stats: [usize; Stat::EndOfStatIndex as usize], // statistics
+    pub strategy: SearchStrategy,
+    pub target: CNFDescription,
+    pub use_chan_seok: bool,
+    /// MISC
+    pub ok: bool,
     pub b_lvl: Ema,
     pub c_lvl: Ema,
     pub model: Vec<Lbool>,
@@ -160,13 +156,15 @@ pub struct State {
     pub an_seen: Vec<bool>,
     pub lbd_temp: Vec<usize>,
     pub last_dl: Vec<Lit>,
+    pub slack_duration: isize,
+    pub stagnated: bool,
     pub start: SystemTime,
+    pub time_limit: f64,
     pub record: ProgressRecord,
     pub use_progress: bool,
     pub progress_cnt: usize,
     pub progress_log: bool,
-    pub target: CNFDescription,
-    pub development: Vec<(usize, f64, f64, f64, f64, f64, f64)>,
+    pub development: Vec<(usize, f64, f64, f64, f64, f64)>,
 }
 
 impl Default for State {
@@ -176,15 +174,13 @@ impl Default for State {
             num_vars: 0,
             num_solved_vars: 0,
             num_eliminated_vars: 0,
-            strategy: SearchStrategy::Initial,
-            use_chan_seok: false,
-            stagnated: false,
-            rst: RestartExecutor::new(&Config::default()),
             config: Config::default(),
-            ok: true,
-            time_limit: 0.0,
-            slack_duration: 0,
+            rst: RestartExecutor::new(&Config::default()),
             stats: [0; Stat::EndOfStatIndex as usize],
+            strategy: SearchStrategy::Initial,
+            target: CNFDescription::default(),
+            use_chan_seok: false,
+            ok: true,
             b_lvl: Ema::new(5_000),
             c_lvl: Ema::new(5_000),
             model: Vec::new(),
@@ -193,12 +189,14 @@ impl Default for State {
             an_seen: Vec::new(),
             lbd_temp: Vec::new(),
             last_dl: Vec::new(),
+            slack_duration: 0,
+            stagnated: false,
             start: SystemTime::now(),
+            time_limit: 0.0,
             use_progress: true,
             progress_cnt: 0,
             progress_log: false,
             record: ProgressRecord::default(),
-            target: CNFDescription::default(),
             development: Vec::new(),
         }
     }
@@ -382,11 +380,7 @@ impl StateIF for State {
             return;
         }
         println!("{}", self);
-        let repeat = if true || 0 < self.config.dump_interval {
-            7
-        } else {
-            7
-        };
+        let repeat = 7;
         for _i in 0..repeat {
             println!("                                                  ");
         }
@@ -412,14 +406,7 @@ impl StateIF for State {
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
         self.progress_cnt += 1;
-        print!(
-            "\x1B[{}A\x1B[1G",
-            if true || 0 < self.config.dump_interval {
-                8
-            } else {
-                8
-            },
-        );
+        print!("\x1B[8A\x1B[1G");
         println!("\x1B[2K{}", self);
         println!(
             "\x1B[2K #conflict:{}, #decision:{}, #propagate:{} ",
