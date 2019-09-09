@@ -382,7 +382,11 @@ impl StateIF for State {
             return;
         }
         println!("{}", self);
-        let repeat = if true || 0 < self.config.dump_interval { 7 } else { 7 };
+        let repeat = if true || 0 < self.config.dump_interval {
+            7
+        } else {
+            7
+        };
         for _i in 0..repeat {
             println!("                                                  ");
         }
@@ -506,12 +510,7 @@ impl StateIF for State {
         );
         println!(
             "\x1B[2K    Conflict|aLBD:{}, cnfl:{}, bjmp:{}, ____:{} ",
-            fm!(
-                "{:>9.2}",
-                self.record,
-                LogF64Id::AveLBD,
-                self.rst.lbd.get()
-            ),
+            fm!("{:>9.2}", self.record, LogF64Id::AveLBD, self.rst.lbd.get()),
             fm!("{:>9.2}", self.record, LogF64Id::CLevel, self.c_lvl.get()),
             fm!("{:>9.2}", self.record, LogF64Id::BLevel, self.b_lvl.get()),
             im!("{:>9.0}", self.record, LogUsizeId::End, 0),

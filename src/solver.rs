@@ -486,8 +486,7 @@ fn adapt_parameters(
         state.stats[Stat::BlockRestartRecord] = state.stats[Stat::BlockRestart];
         if state.config.restart_blocking - margin <= state.rst.asg.threshold && nb < too_few {
             state.rst.asg.threshold -= moving;
-        } else if state.rst.asg.threshold <= state.config.restart_blocking + margin
-            && too_many < nb
+        } else if state.rst.asg.threshold <= state.config.restart_blocking + margin && too_many < nb
         {
             state.rst.asg.threshold += moving;
         } else if too_few <= nb && nb <= too_many {

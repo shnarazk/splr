@@ -1,4 +1,4 @@
-use crate::config::{ACTIVITY_MAX, ACTIVITY_SCALE, Config};
+use crate::config::{Config, ACTIVITY_MAX, ACTIVITY_SCALE};
 use crate::eliminator::Eliminator;
 use crate::propagator::AssignStack;
 use crate::state::{Stat, State};
@@ -280,7 +280,7 @@ impl ClauseDBIF for ClauseDB {
             activity_decay: 0.999,
             inc_step: 300,
             extra_inc: 1000,
-            soft_limit: config.clause_limit,  // 248_000_000
+            soft_limit: config.clause_limit, // 248_000_000
             co_lbd_bound: 5,
             lbd_frozen_clause: 30,
             first_reduction: 1000,

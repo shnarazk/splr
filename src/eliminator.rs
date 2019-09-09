@@ -167,9 +167,7 @@ impl EliminatorIF for Eliminator {
                 let v = &mut vars[vi];
                 v.turn_off(Flag::ENQUEUED);
                 cnt += 1;
-                if cnt < self.eliminate_loop_limit
-                    && !v.is(Flag::ELIMINATED)
-                    && v.assign == BOTTOM
+                if cnt < self.eliminate_loop_limit && !v.is(Flag::ELIMINATED) && v.assign == BOTTOM
                 {
                     eliminate_var(asgs, cdb, self, state, vars, vi)?;
                 }
