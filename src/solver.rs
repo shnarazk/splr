@@ -366,6 +366,7 @@ fn handle_conflict_path(
         vdb.activity_decay += 0.01;
     }
     state.rst.asg.update(asgs.len());
+    state.rst.after_restart += 1;
     // DYNAMIC BLOCKING RESTART
     if state.rst.block_restart() {
         state.stats[Stat::BlockRestart] += 1;
