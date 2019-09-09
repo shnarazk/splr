@@ -66,7 +66,7 @@ pub struct Config {
     /// Disables deep search mode
     // #[structopt(long = "without-deep-search", short = "D")]
     #[structopt(skip)]
-    pub without_deep_search: bool,
+    pub with_deep_search: bool,
     /// Writes a DRAT UNSAT certification file
     #[structopt(long = "certify", short = "c")]
     pub use_certification: bool,
@@ -97,7 +97,7 @@ impl Default for Config {
             without_elim: false,
             without_adaptive_restart: false,
             without_adaptive_strategy: false,
-            without_deep_search: true,
+            with_deep_search: false,
             use_certification: false,
             timeout: 0.0,
             dump_interval: 0,

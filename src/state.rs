@@ -146,7 +146,6 @@ pub struct State {
     pub use_chan_seok: bool,
     /// RESTART
     pub rst: RestartExecutor,
-    pub use_deep_search_mode: bool,
     pub stagnated: bool,
     /// MISC
     pub config: Config,
@@ -181,7 +180,6 @@ impl Default for State {
             use_adapt_strategy: true,
             strategy: SearchStrategy::Initial,
             use_chan_seok: false,
-            use_deep_search_mode: true,
             stagnated: false,
             rst: RestartExecutor::new(&Config::default()),
             config: Config::default(),
@@ -305,7 +303,6 @@ impl StateIF for State {
         state.num_vars = cnf.num_of_variables;
         state.use_adapt_strategy = !config.without_adaptive_strategy;
         state.rst = RestartExecutor::new(config);
-        state.use_deep_search_mode = !config.without_deep_search;
         state.progress_log = config.use_log;
         state.model = vec![BOTTOM; cnf.num_of_variables + 1];
         state.an_seen = vec![false; cnf.num_of_variables + 1];
@@ -346,7 +343,7 @@ impl StateIF for State {
             re_init = true;
         }
         if self.stats[Stat::NoDecisionConflict] < 30_000 {
-            if !self.use_deep_search_mode {
+            if !self.config.with_deep_search {
                 self.strategy = SearchStrategy::LowSuccesiveLuby;
                 self.rst.use_luby_restart = true;
                 self.rst.luby_restart_factor = 100.0;
