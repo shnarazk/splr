@@ -64,11 +64,9 @@ pub struct Config {
     #[structopt(long = "without-adaptive-strategy", short = "S")]
     pub without_adaptive_strategy: bool,
     /// Disables deep search mode
-    #[structopt(long = "without-deep-search", short = "D")]
+    // #[structopt(long = "without-deep-search", short = "D")]
+    #[structopt(skip)]
     pub without_deep_search: bool,
-    /// Enables learnt minimization
-    #[structopt(long = "with-learnt-minimization", short = "M")]
-    pub with_learnt_minimization: bool,
     /// Writes a DRAT UNSAT certification file
     #[structopt(long = "certify", short = "c")]
     pub use_certification: bool,
@@ -99,8 +97,7 @@ impl Default for Config {
             without_elim: false,
             without_adaptive_restart: false,
             without_adaptive_strategy: false,
-            without_deep_search: false,
-            with_learnt_minimization: false,
+            without_deep_search: true,
             use_certification: false,
             timeout: 0.0,
             dump_interval: 0,

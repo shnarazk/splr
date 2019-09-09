@@ -105,7 +105,6 @@ FLAGS:
     -c, --certify                      Writes a DRAT UNSAT certification file
     -l, --log                          Uses Glucose format for progress report
     -V, --version                      Prints version information
-    -M, --with-learnt-minimization     Enables learnt minimization
     -R, --without-adaptive_restart     Disables dynamic restart adaptation
     -S, --without-adaptive_strategy    Disables dynamic strategy adaptation
     -D, --without-deep-search          Disables deep search mode
