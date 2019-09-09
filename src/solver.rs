@@ -387,8 +387,10 @@ fn handle_conflict_path(
         let l0 = new_learnt[0];
         let cid = cdb.attach(state, vdb, lbd);
         elim.add_cid_occur(vdb, cid, &mut cdb[cid], true);
-        state.c_lvl.update(cl as f64);
-        state.b_lvl.update(bl as f64);
+        if 0 < state.config.dump_interval {
+            state.c_lvl.update(cl as f64);
+            state.b_lvl.update(bl as f64);
+        }
         if lbd <= 2 {
             state.stats[Stat::NumLBD2] += 1;
         }

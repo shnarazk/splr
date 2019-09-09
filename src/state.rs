@@ -380,7 +380,7 @@ impl StateIF for State {
             return;
         }
         println!("{}", self);
-        let repeat = 7;
+        let repeat = if 0 < self.config.dump_interval { 7 } else { 5 };
         for _i in 0..repeat {
             println!("                                                  ");
         }
@@ -406,7 +406,14 @@ impl StateIF for State {
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
         self.progress_cnt += 1;
-        print!("\x1B[8A\x1B[1G");
+        print!(
+            "\x1B[{}A\x1B[1G",
+            if 0 < self.config.dump_interval {
+                8
+            } else {
+                6
+            },
+        );
         println!("\x1B[2K{}", self);
         println!(
             "\x1B[2K #conflict:{}, #decision:{}, #propagate:{} ",
@@ -495,40 +502,51 @@ impl StateIF for State {
                 self.rst.lbd.trend()
             ),
         );
-        println!(
-            "\x1B[2K    Conflict|aLBD:{}, cnfl:{}, bjmp:{}, ____:{} ",
-            fm!("{:>9.2}", self.record, LogF64Id::AveLBD, self.rst.lbd.get()),
-            fm!("{:>9.2}", self.record, LogF64Id::CLevel, self.c_lvl.get()),
-            fm!("{:>9.2}", self.record, LogF64Id::BLevel, self.b_lvl.get()),
-            im!("{:>9.0}", self.record, LogUsizeId::End, 0),
-        );
-        println!(
-            "\x1B[2K   Clause DB|#rdc:{}, #sce:{} |blkR:{}, frcK:{} ",
-            im!(
-                "{:>9}",
-                self.record,
-                LogUsizeId::Reduction,
-                self.stats[Stat::Reduction]
-            ),
-            im!(
-                "{:>9}",
-                self.record,
-                LogUsizeId::SatClauseElim,
-                self.stats[Stat::SatClauseElimination]
-            ),
-            fm!(
-                "{:>9.4}",
-                self.record,
-                LogF64Id::RestartBlkR,
-                self.rst.asg.threshold
-            ),
-            fm!(
-                "{:>9.4}",
-                self.record,
-                LogF64Id::RestartThrK,
-                self.rst.lbd.threshold
-            ),
-        );
+        if 0 < self.config.dump_interval {
+            println!(
+                "\x1B[2K    Conflict|aLBD:{}, cnfl:{}, bjmp:{}, rpc%:{} ",
+                fm!("{:>9.2}", self.record, LogF64Id::AveLBD, self.rst.lbd.get()),
+                fm!("{:>9.2}", self.record, LogF64Id::CLevel, self.c_lvl.get()),
+                fm!("{:>9.2}", self.record, LogF64Id::BLevel, self.b_lvl.get()),
+                fm!("{:>9.4}", self.record, LogF64Id::End,
+                    100.0 * self.stats[Stat::Restart] as f64 / self.stats[Stat::Conflict] as f64)
+            );
+            println!(
+                "\x1B[2K   Clause DB|#rdc:{}, #sce:{} |blkR:{}, frcK:{} ",
+                im!(
+                    "{:>9}",
+                    self.record,
+                    LogUsizeId::Reduction,
+                    self.stats[Stat::Reduction]
+                ),
+                im!(
+                    "{:>9}",
+                    self.record,
+                    LogUsizeId::SatClauseElim,
+                    self.stats[Stat::SatClauseElimination]
+                ),
+                fm!(
+                    "{:>9.4}",
+                    self.record,
+                    LogF64Id::RestartBlkR,
+                    self.rst.asg.threshold
+                ),
+                fm!(
+                    "{:>9.4}",
+                    self.record,
+                    LogF64Id::RestartThrK,
+                    self.rst.lbd.threshold
+                ),
+            );
+        } else {
+            self.record[LogF64Id::AveLBD] = self.rst.lbd.get();
+            self.record[LogF64Id::CLevel] = self.c_lvl.get();
+            self.record[LogF64Id::BLevel] = self.b_lvl.get();
+            self.record[LogUsizeId::Reduction] = self.stats[Stat::Reduction];
+            self.record[LogUsizeId::SatClauseElim] = self.stats[Stat::SatClauseElimination];
+            self.record[LogF64Id::RestartBlkR] = self.rst.asg.threshold;
+            self.record[LogF64Id::RestartThrK] = self.rst.lbd.threshold;
+        }
         if let Some(m) = mes {
             println!("\x1B[2K    Strategy|mode: {}", m);
         } else {
