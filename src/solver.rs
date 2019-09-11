@@ -319,6 +319,7 @@ fn search(
                 return Ok(true);
             }
             // DYNAMIC FORCING RESTART based on LBD values, updated by conflict
+            state.last_asg = asgs.len();
             if state.rst.force_restart() {
                 state.stats[Stat::Restart] += 1;
                 asgs.cancel_until(vdb, state.root_level);
@@ -365,10 +366,13 @@ fn handle_conflict_path(
     if ncnfl % 5000 == 0 && vdb.activity_decay < vdb.activity_decay_max {
         vdb.activity_decay += 0.01;
     }
-    state.rst.asg.update(asgs.len());
     state.rst.after_restart += 1;
     // DYNAMIC BLOCKING RESTART based on ASG, updated on conflict path
     // If we can settle this conflict w/o restart, solver will get a big progress.
+    if 0 < state.last_asg {
+        state.rst.asg.update(asgs.len());
+        state.last_asg = 0;
+    }
     if state.rst.block_restart() {
         state.stats[Stat::BlockRestart] += 1;
     }

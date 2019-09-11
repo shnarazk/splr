@@ -3,8 +3,8 @@ use structopt::StructOpt;
 
 pub const VERSION: &str = "0.2.0-alpha.0";
 
-pub const ACTIVITY_MAX: f64 = 1e120;
-pub const ACTIVITY_SCALE: f64 = 1e-120;
+pub const ACTIVITY_MAX: f64 = 1e256;
+pub const ACTIVITY_SCALE: f64 = 1e-256;
 
 /// Configuration built from command line options
 #[derive(Clone, Debug, StructOpt)]

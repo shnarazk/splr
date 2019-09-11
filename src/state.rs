@@ -1,7 +1,7 @@
 use crate::clause::ClauseDB;
 use crate::config::Config;
 use crate::eliminator::Eliminator;
-use crate::restart::{Ema, RestartExecutor};
+use crate::restart::RestartExecutor;
 use crate::traits::*;
 use crate::types::*;
 use crate::var::{Var, VarDB};
@@ -154,8 +154,9 @@ pub struct State {
     pub conflicts: Vec<Lit>,
     pub new_learnt: Vec<Lit>,
     pub an_seen: Vec<bool>,
-    pub lbd_temp: Vec<usize>,
+    pub last_asg: usize,
     pub last_dl: Vec<Lit>,
+    pub lbd_temp: Vec<usize>,
     pub slack_duration: isize,
     pub stagnated: bool,
     pub start: SystemTime,
@@ -187,8 +188,9 @@ impl Default for State {
             conflicts: Vec::new(),
             new_learnt: Vec::new(),
             an_seen: Vec::new(),
-            lbd_temp: Vec::new(),
+            last_asg: 0,
             last_dl: Vec::new(),
+            lbd_temp: Vec::new(),
             slack_duration: 0,
             stagnated: false,
             start: SystemTime::now(),
