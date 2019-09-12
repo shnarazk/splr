@@ -411,11 +411,7 @@ impl StateIF for State {
         self.progress_cnt += 1;
         print!(
             "\x1B[{}A\x1B[1G",
-            if 0 < self.config.dump_interval {
-                8
-            } else {
-                6
-            },
+            if 0 < self.config.dump_interval { 8 } else { 6 },
         );
         println!("\x1B[2K{}", self);
         println!(
@@ -511,8 +507,12 @@ impl StateIF for State {
                 fm!("{:>9.2}", self.record, LogF64Id::AveLBD, self.rst.lbd.get()),
                 fm!("{:>9.2}", self.record, LogF64Id::CLevel, self.c_lvl.get()),
                 fm!("{:>9.2}", self.record, LogF64Id::BLevel, self.b_lvl.get()),
-                fm!("{:>9.4}", self.record, LogF64Id::End,
-                    100.0 * self.stats[Stat::Restart] as f64 / self.stats[Stat::Conflict] as f64)
+                fm!(
+                    "{:>9.4}",
+                    self.record,
+                    LogF64Id::End,
+                    100.0 * self.stats[Stat::Restart] as f64 / self.stats[Stat::Conflict] as f64
+                )
             );
             println!(
                 "\x1B[2K   Clause DB|#rdc:{}, #sce:{} |blkR:{}, frcK:{} ",

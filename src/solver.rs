@@ -446,7 +446,9 @@ fn adapt_parameters(
     nconflict: usize,
 ) -> MaybeInconsistent {
     let switch = 100_000;
-    if !state.config.without_deep_search && !state.rst.use_luby_restart /* && switch <= nconflict */ {
+    if !state.config.without_deep_search && !state.rst.use_luby_restart
+    /* && switch <= nconflict */
+    {
         let stopped = state.stats[Stat::SolvedRecord] == state.num_solved_vars;
         // && state.record.vali[LogUsizeId::Binclause] == state.stats[Stat::NumBinLearnt]
         if stopped {
