@@ -340,12 +340,12 @@ impl StateIF for State {
             re_init = true;
         }
         if self.stats[Stat::NoDecisionConflict] < 30_000 {
-            if !self.config.with_deep_search {
+            if !self.config.without_deep_search {
+                self.strategy = SearchStrategy::LowSuccesiveM;
+            } else {
                 self.strategy = SearchStrategy::LowSuccesiveLuby;
                 self.rst.use_luby_restart = true;
                 self.rst.luby_restart_factor = 100.0;
-            } else {
-                self.strategy = SearchStrategy::LowSuccesiveM;
             }
             vdb.activity_decay = 0.999;
             vdb.activity_decay_max = 0.999;
@@ -367,6 +367,7 @@ impl StateIF for State {
         }
         if self.strategy == SearchStrategy::Initial {
             self.strategy = SearchStrategy::Generic;
+            // self.config.without_deep_search = self.c_lvl.get().powf(2.0) < (self.num_unsolved_vars() as f64);
             return;
         }
         if self.use_chan_seok {

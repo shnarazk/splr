@@ -446,7 +446,7 @@ fn adapt_parameters(
     nconflict: usize,
 ) -> MaybeInconsistent {
     let switch = 100_000;
-    if state.config.with_deep_search && !state.rst.use_luby_restart && switch <= nconflict {
+    if !state.config.without_deep_search && !state.rst.use_luby_restart /* && switch <= nconflict */ {
         let stopped = state.stats[Stat::SolvedRecord] == state.num_solved_vars;
         // && state.record.vali[LogUsizeId::Binclause] == state.stats[Stat::NumBinLearnt]
         if stopped {
@@ -512,10 +512,10 @@ fn adapt_parameters(
         }
     }
     state.progress(cdb, vdb, None);
-    if state.config.with_deep_search {
+    if !state.config.without_deep_search {
         state.rst.restart_step = 50 + 40_000 * (state.stagnated as usize);
         if state.stagnated {
-            state.flush(&format!("stagnated ({})...", state.slack_duration));
+            state.flush(&format!("deep searching ({})...", state.slack_duration));
             state.rst.next_restart += 80_000;
         }
     }

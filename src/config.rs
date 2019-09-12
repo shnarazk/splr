@@ -3,8 +3,8 @@ use structopt::StructOpt;
 
 pub const VERSION: &str = "0.2.0-alpha.0";
 
-pub const ACTIVITY_MAX: f64 = 1e256;
-pub const ACTIVITY_SCALE: f64 = 1e-256;
+pub const ACTIVITY_MAX: f64 = 1e308;
+pub const ACTIVITY_SCALE: f64 = 1e-308;
 
 /// Configuration built from command line options
 #[derive(Clone, Debug, StructOpt)]
@@ -64,9 +64,8 @@ pub struct Config {
     #[structopt(long = "without-adaptive-strategy", short = "S")]
     pub without_adaptive_strategy: bool,
     /// Disables deep search mode
-    // #[structopt(long = "without-deep-search", short = "D")]
-    #[structopt(skip)]
-    pub with_deep_search: bool,
+    #[structopt(long = "without-deep-search", short = "D")]
+    pub without_deep_search: bool,
     /// Writes a DRAT UNSAT certification file
     #[structopt(long = "certify", short = "c")]
     pub use_certification: bool,
@@ -97,7 +96,7 @@ impl Default for Config {
             without_elim: false,
             without_adaptive_restart: false,
             without_adaptive_strategy: false,
-            with_deep_search: false,
+            without_deep_search: true,
             use_certification: false,
             timeout: 0.0,
             dump_interval: 0,
