@@ -2,7 +2,7 @@
 name = "splr"
 version = "0.1.4"
 authors = ["Shuji Narazaki <shujinarazaki@protonmail.com>"]
-abount = "SAT solver for Propositional Logic in Rust"
+about = "SAT solver for Propositional Logic in Rust"
 description = "A pure rustic CDCL SAT solver based on Glucose"
 edition = "2018"
 license = "MPL-2.0"
