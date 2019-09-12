@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use structopt::StructOpt;
 
-pub const VERSION: &str = "0.2.0-alpha.0";
+pub const VERSION: &str = "0.1.4";
 
 pub const ACTIVITY_MAX: f64 = 1e308;
 pub const ACTIVITY_SCALE: f64 = 1e-308;
