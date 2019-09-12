@@ -2,7 +2,7 @@
 
 - fix wrong computations about `State::{c_lvl, b_lvl}`, `Clause::activity`
 - add '--stat' option to dump a history of internal state
-- new structs for better modulality: `ProgressEvaluator`, `RestartExecutor`, `VarDB`
+- add new structs for better modulality: `ProgressEvaluator`, `RestartExecutor`, `VarDB`
 
 ## 0.1.3, 2019-05-07
 
