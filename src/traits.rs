@@ -15,13 +15,13 @@ pub trait ClauseIF {
 
 /// API for clause management like `reduce`, `simplify`, `new_clause`, and so on.
 pub trait ClauseDBIF {
-    /// return a new instance
+    /// return a new instance.
     fn new(config: &Config, nv: usize, nc: usize) -> Self;
-    /// return the length of `clause`
+    /// return the length of `clause`.
     fn len(&self) -> usize;
-    /// make a new clause from `state.new_learnt` and register it to clause database.
-    /// return true if it's empty
+    /// return true if it's empty.
     fn is_empty(&self) -> bool;
+    /// make a new clause from `state.new_learnt` and register it to clause database.
     fn attach(&mut self, state: &mut State, vars: &mut VarDB, lbd: usize) -> ClauseId;
     /// unregister a clause `cid` from clause database and make the clause dead.
     fn detach(&mut self, cid: ClauseId);
@@ -59,15 +59,15 @@ pub trait ClauseDBIF {
     fn count(&self, alive: bool) -> usize;
     /// return the number of clauses which satisfy given flags and aren't DEAD.
     fn countf(&self, mask: Flag) -> usize;
-    /// record a clause to unsat certification
+    /// record a clause to unsat certification.
     fn certificate_add(&mut self, vec: &[Lit]);
-    /// record a deleted clause to unsat certification
+    /// record a deleted clause to unsat certification.
     fn certificate_delete(&mut self, vec: &[Lit]);
     /// delete satisfied clauses at decision level zero.
     fn eliminate_satisfied_clauses(&mut self, elim: &mut Eliminator, vars: &mut VarDB, occur: bool);
     /// emit an error if the db size (the number of clauses) is over the limit.
     fn check_size(&self) -> MaybeInconsistent;
-    /// change good learnt clauses to permanent one
+    /// change good learnt clauses to permanent one.
     fn make_permanent(&mut self, reinit: bool);
 }
 
@@ -91,20 +91,29 @@ pub trait Delete<T> {
 
 /// API for Eliminator like `activate`, `stop`, `eliminate` and so on.
 pub trait EliminatorIF {
+    /// return a new instance.
     fn new(config: &Config, nv: usize) -> Eliminator;
     /// set eliminater's mode to **ready**.
     fn activate(&mut self);
     /// set eliminater's mode to **dormant**.
     fn stop(&mut self, cdb: &mut ClauseDB, vars: &mut VarDB);
+    /// check if the eliminator is running.
     fn is_running(&self) -> bool;
+    /// check if the eliminator is active and waits for next `eliminate`.
     fn is_waiting(&self) -> bool;
     /// rebuild occur lists.
     fn prepare(&mut self, cdb: &mut ClauseDB, vars: &mut VarDB, force: bool);
+    /// enqueue a clause into eliminator's clause queue.
     fn enqueue_clause(&mut self, cid: ClauseId, c: &mut Clause);
+    /// clear eliminator's clause queue.
     fn clear_clause_queue(&mut self, cdb: &mut ClauseDB);
+    /// return the length of eliminator's clause queue.
     fn clause_queue_len(&self) -> usize;
+    /// enqueue a var into eliminator's var queue.
     fn enqueue_var(&mut self, vars: &mut VarDB, vi: VarId, upword: bool);
+    /// clear eliminator's war queue
     fn clear_var_queue(&mut self, vars: &mut VarDB);
+    /// return the length of eliminator's clause queue.
     fn var_queue_len(&self) -> usize;
     /// run clause subsumption and variable elimination.
     ///
@@ -130,16 +139,23 @@ pub trait EliminatorIF {
 
 /// API for Exponential Moving Average, EMA, like `get`, `reset`, `update` and so on.
 pub trait EmaIF {
+    /// return a new Ema.
     fn new(f: usize) -> Self;
+    /// return the current value of Ema.
     fn get(&self) -> f64;
+    /// reset an Ema.
     fn reset(&mut self) {}
+    /// update Ema.
     fn update(&mut self, x: f64);
 }
 
 /// API for [object properties](../types/enum.Flag.html) like `is`, `turn_off`, `turn_on` and so on.
 pub trait FlagIF {
+    /// return true if the flag in on.
     fn is(&self, flag: Flag) -> bool;
+    /// toggle the flag off.
     fn turn_off(&mut self, flag: Flag);
+    /// toggle the flag on.
     fn turn_on(&mut self, flag: Flag);
 }
 
@@ -165,16 +181,23 @@ pub trait LitIF {
 }
 
 pub trait ProgressEvaluator {
+    /// the type of the argment of `update`.
     type Input;
+    /// catch up with the current state.
     fn update(&mut self, val: Self::Input);
+    /// return the current value.
     fn get(&self) -> f64;
+    /// return a ratio of short / long statistics.
     fn trend(&self) -> f64;
+    /// map the value into a bool for forcing/blocking restart.
     fn is_active(&self) -> bool;
+    /// return a new instance.
     fn new(config: &Config) -> Self;
 }
 
 /// API for assignment like `propagate`, `enqueue`, `cancel_until`, and so on.
 pub trait PropagatorIF {
+    /// return a new instance.
     fn new(n: usize) -> Self;
     /// return the number of assignments.
     fn len(&self) -> usize;
@@ -216,7 +239,7 @@ pub trait PropagatorIF {
 
 /// API for restart like `block_restart`, `force_restart` and so on.
 pub trait RestartIF {
-    /// return a new instance
+    /// return a new instance.
     fn new(config: &Config) -> Self;
     /// block restart if needed.
     fn block_restart(&mut self) -> bool;
@@ -252,7 +275,7 @@ pub trait SatSolverIF {
 pub trait StateIF {
     /// return an initialized state based on solver configuration and data about a CNF file.
     fn new(config: &Config, cnf: CNFDescription) -> State;
-    /// return the number of unsolved vars
+    /// return the number of unsolved vars.
     fn num_unsolved_vars(&self) -> usize;
     /// return `true` if it is timed out.
     fn is_timeout(&self) -> bool;
@@ -262,6 +285,7 @@ pub trait StateIF {
     fn progress_header(&self);
     /// write stat data to stdio.
     fn progress(&mut self, cdb: &ClauseDB, vars: &VarDB, mes: Option<&str>);
+    /// write a short message to stdout.
     fn flush(&self, mes: &str);
 }
 
@@ -279,17 +303,19 @@ pub trait ValidatorIF {
 
 /// API for Var, providing `new` and `new_vars`.
 pub trait VarIF {
+    /// return a new instance.
     fn new(i: usize) -> Var;
+    /// return a new vector of $n$ `Var`s.
     fn new_vars(n: usize) -> Vec<Var>;
 }
 
 /// API for var DB like `assigned`, `locked`, `compute_lbd` and so on.
 pub trait VarDBIF {
-    /// return a new instance
+    /// return a new instance.
     fn new(n: usize) -> Self;
-    /// return the length of `vars`
+    /// return the length of `vars`.
     fn len(&self) -> usize;
-    /// return true if it's empty
+    /// return true if it's empty.
     fn is_empty(&self) -> bool;
     /// return the 'value' of a given literal.
     fn assigned(&self, l: Lit) -> Lbool;
@@ -297,7 +323,7 @@ pub trait VarDBIF {
     fn locked(&self, c: &Clause, cid: ClauseId) -> bool;
     /// return `true` if the set of literals is satisfiable under the current assignment.
     fn satisfies(&self, c: &[Lit]) -> bool;
-    /// copy some stat data from `State`
+    /// copy some stat data from `State`.
     fn update_stat(&mut self, state: &State);
     /// return a LBD value for the set of literals.
     fn compute_lbd(&self, vec: &[Lit], keys: &mut [usize]) -> usize;
@@ -317,5 +343,5 @@ pub trait WatchDBIF {
     /// remove a clause which id is `cid` from the watcher list. *O(n)* operation.
     fn detach_with(&mut self, cid: ClauseId);
     /// update blocker of cid.
-    fn update_blocker(&mut self, cid: ClauseId, l: Lit);
+    fn update_blocker(&mut self, cid: ClauseId, l: Lit`);
 }
