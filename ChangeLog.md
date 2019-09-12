@@ -1,8 +1,8 @@
 ## 0.1.4, 2019-09-12
 
-- fix wrong computations about State::{c_lvl, b_lvl}, Clause::activity
+- fix wrong computations about `State::{c_lvl, b_lvl}`, `Clause::activity`
 - add '--stat' option to dump a history of internal state
-- new structs for better modulality: ProgressEvaluator, RestartExecutor, VarDB
+- new structs for better modulality: `ProgressEvaluator`, `RestartExecutor`, `VarDB`
 
 ## 0.1.3, 2019-05-07
 
