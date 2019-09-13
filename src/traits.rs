@@ -343,5 +343,5 @@ pub trait WatchDBIF {
     /// remove a clause which id is `cid` from the watcher list. *O(n)* operation.
     fn detach_with(&mut self, cid: ClauseId);
     /// update blocker of cid.
-    fn update_blocker(&mut self, cid: ClauseId, l: Lit`);
+    fn update_blocker(&mut self, cid: ClauseId, l: Lit);
 }
