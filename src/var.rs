@@ -1,5 +1,5 @@
 use crate::clause::Clause;
-use crate::config::{ACTIVITY_MAX, ACTIVITY_SCALE};
+use crate::config::{ACTIVITY_MAX};
 use crate::state::{Stat, State};
 use crate::traits::*;
 use crate::types::*;
@@ -198,10 +198,11 @@ impl VarDBIF for VarDB {
         let a = v.activity + self.activity_inc;
         v.activity = a;
         if ACTIVITY_MAX < a {
+            let scale = 1.0 / self.activity_inc;
             for v in &mut self[1..] {
-                v.activity *= ACTIVITY_SCALE;
+                v.activity *= scale;
             }
-            self.activity_inc *= ACTIVITY_SCALE;
+            self.activity_inc *= scale;
         }
     }
     fn scale_activity(&mut self) {

@@ -1,4 +1,4 @@
-use crate::config::{Config, ACTIVITY_MAX, ACTIVITY_SCALE};
+use crate::config::{Config, ACTIVITY_MAX};
 use crate::eliminator::Eliminator;
 use crate::propagator::AssignStack;
 use crate::state::{Stat, State};
@@ -413,12 +413,13 @@ impl ClauseDBIF for ClauseDB {
         let a = c.activity + self.activity_inc;
         c.activity = a;
         if ACTIVITY_MAX < a {
+            let scale = 1.0 / self.activity_inc;
             for c in &mut self.clause[1..] {
                 if c.is(Flag::LEARNT) {
-                    c.activity *= ACTIVITY_SCALE;
+                    c.activity *= scale;
                 }
             }
-            self.activity_inc *= ACTIVITY_SCALE;
+            self.activity_inc *= scale;
         }
     }
     fn scale_activity(&mut self) {
