@@ -93,7 +93,7 @@ fn main() {
     }
 }
 
-fn read_assignment(rs: &mut BufRead, cnf: &str, assign: &Option<PathBuf>) -> Option<Vec<i32>> {
+fn read_assignment(rs: &mut dyn BufRead, cnf: &str, assign: &Option<PathBuf>) -> Option<Vec<i32>> {
     let mut buf = String::new();
     loop {
         match rs.read_line(&mut buf) {

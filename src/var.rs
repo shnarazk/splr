@@ -1,11 +1,10 @@
 use crate::clause::Clause;
+use crate::config::{ACTIVITY_MAX, ACTIVITY_SCALE};
+use crate::state::{Stat, State};
 use crate::traits::*;
 use crate::types::*;
 use std::fmt;
-
-const VAR_ACTIVITY_MAX: f64 = 1e240;
-const VAR_ACTIVITY_SCALE1: f64 = 1e-30;
-const VAR_ACTIVITY_SCALE2: f64 = 1e-30;
+use std::ops::{Index, IndexMut, Range, RangeFrom};
 
 /// Structure for variables.
 #[derive(Debug)]
@@ -49,9 +48,7 @@ impl VarIF for Var {
     fn new_vars(n: usize) -> Vec<Var> {
         let mut vec = Vec::with_capacity(n + 1);
         for i in 0..=n {
-            let mut v = Var::new(i);
-            v.activity = (n - i) as f64;
-            vec.push(v);
+            vec.push(Var::new(i));
         }
         vec
     }
@@ -69,9 +66,100 @@ impl FlagIF for Var {
     }
 }
 
-impl VarDBIF for [Var] {
+/// Structure for variables.
+#[derive(Debug)]
+pub struct VarDB {
+    /// vars
+    var: Vec<Var>,
+    /// the current conflict's ordinal number
+    current_conflict: usize,
+    /// the current restart's ordinal number
+    current_restart: usize,
+    pub lbd_temp: Vec<usize>,
+    pub activity_inc: f64,
+    pub activity_decay: f64,
+    pub activity_decay_max: f64,
+}
+
+impl Default for VarDB {
+    fn default() -> VarDB {
+        VarDB {
+            var: Vec::new(),
+            current_conflict: 0,
+            current_restart: 0,
+            lbd_temp: Vec::new(),
+            activity_inc: 1.0,
+            activity_decay: 0.9,
+            activity_decay_max: 0.95,
+        }
+    }
+}
+
+impl Index<usize> for VarDB {
+    type Output = Var;
+    #[inline]
+    fn index(&self, i: usize) -> &Var {
+        &self.var[i]
+    }
+}
+
+impl IndexMut<usize> for VarDB {
+    #[inline]
+    fn index_mut(&mut self, i: usize) -> &mut Var {
+        &mut self.var[i]
+    }
+}
+
+impl Index<Range<usize>> for VarDB {
+    type Output = [Var];
+    #[inline]
+    fn index(&self, r: Range<usize>) -> &[Var] {
+        &self.var[r]
+    }
+}
+
+impl Index<RangeFrom<usize>> for VarDB {
+    type Output = [Var];
+    #[inline]
+    fn index(&self, r: RangeFrom<usize>) -> &[Var] {
+        &self.var[r]
+    }
+}
+
+impl IndexMut<Range<usize>> for VarDB {
+    #[inline]
+    fn index_mut(&mut self, r: Range<usize>) -> &mut [Var] {
+        &mut self.var[r]
+    }
+}
+
+impl IndexMut<RangeFrom<usize>> for VarDB {
+    #[inline]
+    fn index_mut(&mut self, r: RangeFrom<usize>) -> &mut [Var] {
+        &mut self.var[r]
+    }
+}
+
+impl VarDBIF for VarDB {
+    fn new(n: usize) -> Self {
+        VarDB {
+            var: Var::new_vars(n),
+            current_conflict: 0,
+            current_restart: 0,
+            lbd_temp: vec![0; n + 1],
+            activity_inc: 1.0,
+            activity_decay: 0.9,
+            activity_decay_max: 0.95,
+        }
+    }
+    fn len(&self) -> usize {
+        self.var.len()
+    }
+    fn is_empty(&self) -> bool {
+        self.var.is_empty()
+    }
     fn assigned(&self, l: Lit) -> Lbool {
-        unsafe { self.get_unchecked(l.vi()).assign ^ ((l & 1) as u8) }
+        unsafe { self.var.get_unchecked(l.vi()).assign ^ ((l & 1) as u8) }
     }
     fn locked(&self, c: &Clause, cid: ClauseId) -> bool {
         let lits = &c.lits;
@@ -87,6 +175,11 @@ impl VarDBIF for [Var] {
         }
         false
     }
+    fn update_stat(&mut self, state: &State) {
+        self.current_conflict = state.stats[Stat::Conflict] + 1;
+        self.current_restart = state.stats[Stat::Restart] + 1;
+    }
+
     fn compute_lbd(&self, vec: &[Lit], keys: &mut [usize]) -> usize {
         let key = keys[0] + 1;
         let mut cnt = 0;
@@ -100,16 +193,19 @@ impl VarDBIF for [Var] {
         keys[0] = key;
         cnt
     }
-    fn bump_activity(&mut self, inc: &mut f64, vi: VarId) {
-        let v = &mut self[vi];
-        let a = v.activity + *inc;
+    fn bump_activity(&mut self, vi: VarId) {
+        let v = &mut self.var[vi];
+        let a = v.activity + self.activity_inc;
         v.activity = a;
-        if VAR_ACTIVITY_MAX < a {
+        if ACTIVITY_MAX < a {
             for v in &mut self[1..] {
-                v.activity *= VAR_ACTIVITY_SCALE1;
+                v.activity *= ACTIVITY_SCALE;
             }
-            *inc *= VAR_ACTIVITY_SCALE2;
+            self.activity_inc *= ACTIVITY_SCALE;
         }
+    }
+    fn scale_activity(&mut self) {
+        self.activity_inc /= self.activity_decay;
     }
 }
 
