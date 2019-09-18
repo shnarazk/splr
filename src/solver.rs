@@ -267,7 +267,7 @@ impl SatSolverIF for Solver {
             ..
         } = self;
         debug_assert!(asgs.level() == 0);
-        if v.iter().any(|l| vdb.assigned(*l) != BOTTOM) {
+        if v.iter().any(|l| vdb.assigned(*l) < BOTTOM) {
             cdb.certificate_add(v);
         }
         v.sort_unstable();

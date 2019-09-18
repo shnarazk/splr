@@ -7,43 +7,56 @@ use std::fmt;
 use std::fs::File;
 use std::io::{BufWriter, Write};
 
+const BITVEC_REPR: bool = false;
+
 /// A record of assignment. It's called 'trail' in Glucose.
 #[derive(Debug)]
 pub struct AssignStack {
     pub trail: Vec<Lit>,
-    assign: Vec<Lbool>,
-    asgvec: Vec<u64>,
+    asgvec: Vec<Lbool>,
+    asgpack: Vec<u64>,
     trail_lim: Vec<usize>,
     q_head: usize,
     var_order: VarIdHeap, // Variable Order
 }
 
 /// ```
-/// let x: Lbool = var_assign!(self.assign, lit.vi());
+/// let x: Lbool = var_assign!(self, lit.vi());
 /// ```
 macro_rules! var_assign {
-    ($vec: expr, $var: expr) => {
-        match ($vec, $var) {
-            (v, vi) => {
-                let a = &v[vi >> 5];
-                let w = 2 * (vi % 32);
-                ((*a >> w) & 3) as u8
+    ($asg: expr, $var: expr) => {
+        match $var {
+            vi => {
+                if BITVEC_REPR {
+                    let a = &$asg.asgpack[vi >> 5];
+                    // let w = (vi % 32) << 1;
+                    let w = (vi & 0x1f) << 1;
+                    ((*a >> w) & 3) as u8
+                } else {
+                    $asg.asgvec[vi]
+                }
             }
         }
     }
 }
 
 macro_rules! lit_assign {
-    ($vec: expr, $lit: expr) => {
-        match ($vec, $lit) {
-            (v, l) => {
+    ($asg: expr, $lit: expr) => {
+        match $lit {
+            l => {
                 let vi = l.vi();
-                let a = &v[vi >> 5];
-                let w = (vi % 32) << 1;
-                match (((*a >> w) & 3) as u8) ^ ((l & 1) as u8) {
-                    TRUE => TRUE,
-                    FALSE => FALSE,
-                    _ => BOTTOM,
+                if BITVEC_REPR {
+                    let a = &$asg.asgpack[vi >> 5];
+                    // let w = (vi % 32) << 1;
+                    let w = (vi & 0x1f) << 1;
+                    (((*a >> w) & 3) as u8) ^ ((l & 1) as u8)
+                    // match (((*a >> w) & 3) as u8) ^ ((l & 1) as u8) {
+                    //     TRUE => TRUE,
+                    //     FALSE => FALSE,
+                    //     _ => BOTTOM,
+                    // }
+                } else {
+                    $asg.asgvec[vi] ^ (l as u8 & 1)
                 }
             }
         }
@@ -51,28 +64,38 @@ macro_rules! lit_assign {
 }
 
 macro_rules! set_assign {
-    ($vec: expr, $lit: expr) => {
-        match ($vec, $lit) {
-            (v, l) => {
+    ($asg: expr, $lit: expr) => {
+        match $lit {
+            l => {
                 let vi = l.vi();
-                let a = &mut v[vi >> 5];
-                let w = (vi % 32) << 1;
-                let b = l.lbool();
-                *a &= !(3 << w);
-                *a |= (b as u64) << w;
+                if BITVEC_REPR {
+                    let a = &mut $asg.asgpack[vi >> 5];
+                    // let w = (vi % 32) << 1;
+                    let w = (vi & 0x1f) << 1;
+                    let b = l.lbool();
+                    *a &= !(3 << w);
+                    *a |= (b as u64) << w;
+                } else {
+                    $asg.asgvec[vi] = l.lbool();   // l as u8 & 1
+                }
             }
         }
     }
 }
+
 macro_rules! unset_assign {
-    ($vec: expr, $var: expr) => {
-        match ($vec, $var) {
-            (v, vi) => {
-                let a = &mut v[vi >> 5];
-                let w = (vi % 32) << 1;
-                // 0 for TRUE, 1 for FALSE, 2 for BOTTOM
-                *a &= !(1 << w);
-                *a |= 2 << w;
+    ($asg: expr, $var: expr) => {
+        match $var {
+            vi => {
+                if BITVEC_REPR {
+                    let a = &mut $asg.asgpack[vi >> 5];
+                    let w = (vi & 0x1f) << 1;
+                    // 0 for TRUE, 1 for FALSE, 2 for BOTTOM
+                    *a &= !(1 << w);
+                    *a |= 2 << w;
+                } else {
+                    $asg.asgvec[vi] = BOTTOM;
+                }
             }
         }
     }
@@ -82,8 +105,8 @@ impl PropagatorIF for AssignStack {
     fn new(n: usize) -> AssignStack {
         AssignStack {
             trail: Vec::with_capacity(n),
-            assign: vec![BOTTOM; n + 1],
-            asgvec: vec![0xaaaa_aaaa_aaaa_aaaa; 1 + n / 32],
+            asgvec: vec![BOTTOM; 1 + n],
+            asgpack: vec![0xaaaa_aaaa_aaaa_aaaa; 1 + n / 32],
             trail_lim: Vec::new(),
             q_head: 0,
             var_order: VarIdHeap::new(n, n),
@@ -117,22 +140,13 @@ impl PropagatorIF for AssignStack {
     /// *a |= (b as u64) << w;
     /// ```
     fn assigned(&self, l: Lit) -> Lbool {
-        let x = unsafe { self.assign.get_unchecked(l.vi()) ^ ((l & 1) as u8) };
-        let y = lit_assign!(&self.asgvec, l);
-        assert!(x == y || (1 < x && 1 < y), format!("assign: {}, asgvec: {}", x, y));
-        unsafe { self.assign.get_unchecked(l.vi()) ^ ((l & 1) as u8) }
-        // let vi = l.vi();
-        // (((self.assign[vi >> 5] >> (2 * (vi % 32))) & 3) as u8) ^ ((l & 1) as u8)
-        // lit_assign!(&self.assign, l)
+        lit_assign!(self, l)
     }
     fn enqueue(&mut self, v: &mut Var, sig: Lbool, cid: ClauseId, dl: usize) -> MaybeInconsistent {
         debug_assert!(!v.is(Flag::ELIMINATED));
-        let val = self.assign[v.index];
-        assert_eq!(val, var_assign!(&self.asgvec, v.index));
-        if val == BOTTOM {
-            self.assign[v.index] = sig;
-            set_assign!(&mut self.asgvec, Lit::from_var(v.index, sig));
-            assert_eq!(self.assign[v.index], var_assign!(&self.asgvec, v.index));
+        let val = var_assign!(self, v.index);
+        if BOTTOM == val {
+            set_assign!(self, Lit::from_var(v.index, sig));
             v.assign = sig;
             v.reason = cid;
             v.level = dl;
@@ -153,18 +167,14 @@ impl PropagatorIF for AssignStack {
     fn enqueue_null(&mut self, v: &mut Var, sig: Lbool) {
         debug_assert!(!v.is(Flag::ELIMINATED));
         debug_assert!(sig != BOTTOM);
-        let val = self.assign[v.index];
-        assert_eq!(val, var_assign!(&self.asgvec, v.index));
-        if val == BOTTOM {
-            self.assign[v.index] = sig;
-            set_assign!(&mut self.asgvec, Lit::from_var(v.index, sig));
-            assert_eq!(self.assign[v.index], var_assign!(&self.asgvec, v.index));
+        if BOTTOM == var_assign!(self, v.index) {
+            set_assign!(self, Lit::from_var(v.index, sig));
             v.assign = sig;
             v.reason = NULL_CLAUSE;
             v.level = 0;
             self.trail.push(Lit::from_var(v.index, sig));
         }
-        debug_assert!(self.assign[v.index] == sig);
+        // debug_assert!(self.assign[v.index] == sig);
     }
     /// propagate without checking dead clauses
     /// Note: this function assumes there's no dead clause.
@@ -182,22 +192,18 @@ impl PropagatorIF for AssignStack {
                     let w = source.get_unchecked_mut(n);
                     n += 1;
                     debug_assert!(!cdb[w.c].is(Flag::DEAD));
-                    let blocker_value = self.assigned(w.blocker);
+                    let blocker_value = lit_assign!(self, w.blocker);
                     if blocker_value == TRUE {
                         continue 'next_clause;
                     }
                     let lits = &mut cdb[w.c].lits;
                     if lits.len() == 2 {
-                        match blocker_value {
-                            FALSE => {
-                                self.catchup();
-                                return w.c;
-                            }
-                            _ => {
-                                self.uncheck_enqueue(vars, w.blocker, w.c);
-                                continue 'next_clause;
-                            }
+                        if blocker_value == FALSE {
+                            self.catchup();
+                            return w.c;
                         }
+                        self.uncheck_enqueue(vars, w.blocker, w.c);
+                        continue 'next_clause;
                     }
                     debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
                     let mut first = *lits.get_unchecked(0);
@@ -206,7 +212,7 @@ impl PropagatorIF for AssignStack {
                         *lits.get_unchecked_mut(0) = first;
                         *lits.get_unchecked_mut(1) = false_lit;
                     }
-                    let first_value = self.assigned(first);
+                    let first_value = lit_assign!(self, first);
                     // If 0th watch is true, then clause is already satisfied.
                     if first != w.blocker && first_value == TRUE {
                         w.blocker = first;
@@ -215,10 +221,8 @@ impl PropagatorIF for AssignStack {
                     for (k, lk) in lits.iter().enumerate().skip(2) {
                         // below is equivalent to 'assigned(*lk) != FALSE'
                         // if (((lk & 1) as u8) ^ self.assign.get_unchecked(lk.vi())) != 0 {
-                        if self.assigned(*lk) != FALSE {
-                            (*watcher)
-                                .get_unchecked_mut(lk.negate() as usize)
-                                .register(first, w.c);
+                        if lit_assign!(self, *lk) != FALSE {
+                            (*watcher)[lk.negate() as usize].register(first, w.c);
                             n -= 1;
                             source.detach(n);
                             *lits.get_unchecked_mut(1) = *lk;
@@ -229,9 +233,8 @@ impl PropagatorIF for AssignStack {
                     if first_value == FALSE {
                         self.catchup();
                         return w.c;
-                    } else {
-                        self.uncheck_enqueue(vars, first, w.c);
                     }
+                    self.uncheck_enqueue(vars, first, w.c);
                 }
             }
         }
@@ -245,11 +248,8 @@ impl PropagatorIF for AssignStack {
         for l in &self.trail[lim..] {
             let vi = l.vi();
             let v = &mut vars[vi];
-            v.phase = self.assign[vi];
-            assert_eq!(self.assign[v.index], var_assign!(&self.asgvec, v.index));
-            self.assign[vi] = BOTTOM;
-            unset_assign!(&mut self.asgvec, vi);
-            assert_eq!(self.assign[v.index], var_assign!(&self.asgvec, v.index));
+            unset_assign!(self, vi);
+            v.phase = v.assign;
             v.assign = BOTTOM;
             v.reason = NULL_CLAUSE;
             self.var_order.insert(vars, vi);
@@ -266,12 +266,10 @@ impl PropagatorIF for AssignStack {
         );
         let dl = self.trail_lim.len();
         let vi = l.vi();
-        let v = &mut vars[l.vi()];
+        let v = &mut vars[vi];
         debug_assert!(!v.is(Flag::ELIMINATED));
-        debug_assert!(self.assign[vi] == l.lbool() || self.assign[vi] == BOTTOM);
-        self.assign[vi] = l.lbool();
-        set_assign!(&mut self.asgvec, l);
-        assert_eq!(self.assign[v.index], var_assign!(&self.asgvec, v.index));
+        debug_assert!(var_assign!(self, vi) == l.lbool() || var_assign!(self, vi) == BOTTOM);
+        set_assign!(self, l);
         v.assign = l.lbool();
         v.level = dl;
         v.reason = cid;
@@ -287,9 +285,8 @@ impl PropagatorIF for AssignStack {
         let vi = l.vi();
         let v = &mut vars[vi];
         debug_assert!(!v.is(Flag::ELIMINATED));
-        debug_assert!(self.assign[vi] == l.lbool() || self.assign[vi] == BOTTOM);
-        self.assign[vi] = l.lbool();
-        set_assign!(&mut self.asgvec, l);
+        // debug_assert!(self.assign[vi] == l.lbool() || self.assign[vi] == BOTTOM);
+        set_assign!(self, l);
         v.assign = l.lbool();
         v.level = dl;
         v.reason = NULL_CLAUSE;
@@ -305,8 +302,8 @@ impl PropagatorIF for AssignStack {
     fn dump_cnf(&mut self, cdb: &ClauseDB, state: &State, vars: &VarDB, fname: &str) {
         for v in &vars[1..] {
             if v.is(Flag::ELIMINATED) {
-                if self.assign[v.index] < BOTTOM {
-                    panic!("conflicting var {} {}", v.index, self.assign[v.index]);
+                if var_assign!(self, v.index) != BOTTOM {
+                    panic!("conflicting var {} {}", v.index, var_assign!(self, v.index) /* self.assign[v.index] */ );
                 } else {
                     println!("eliminate var {}", v.index);
                 }
