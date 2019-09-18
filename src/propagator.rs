@@ -76,15 +76,6 @@ impl PropagatorIF for AssignStack {
     fn remains(&self) -> bool {
         self.q_head < self.trail.len()
     }
-    /// - to set `lit` to TRUE
-    /// ```
-    /// let v = l.vi();
-    /// let a = &mut self.assign[v >> 5];
-    /// let w = 2 * v % 32;
-    /// let b = lit.lbool();
-    /// *a &= !(3 << w);
-    /// *a |= (b as u64) << w;
-    /// ```
     fn assigned(&self, l: Lit) -> Lbool {
         lit_assign!(self, l)
     }
