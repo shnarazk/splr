@@ -119,14 +119,14 @@ impl PropagatorIF for AssignStack {
     fn propagate(&mut self, cdb: &mut ClauseDB, state: &mut State, vars: &mut VarDB) -> ClauseId {
         let watcher = &mut cdb.watcher[..] as *mut [Vec<Watch>];
         while self.remains() {
-            let p: Lit = self.sweep();
-            let false_lit = p.negate();
+            let p: usize = self.sweep() as usize;
+            let false_lit = (p as Lit).negate();
             state.stats[Stat::Propagation] += 1;
             unsafe {
-                let source = &mut (*watcher)[p as usize];
+                let source = (*watcher).get_unchecked_mut(p);
                 let mut n = 0;
                 'next_clause: while n < source.len() {
-                    let w = &mut source[n];
+                    let w = source.get_unchecked_mut(n);
                     n += 1;
                     debug_assert!(!cdb[w.c].is(Flag::DEAD));
                     let blocker_value = lit_assign!(self, w.blocker);
@@ -143,26 +143,27 @@ impl PropagatorIF for AssignStack {
                         continue 'next_clause;
                     }
                     debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
-                    let mut first = lits[0];
+                    let mut first = *lits.get_unchecked(0);
                     if first == false_lit {
-                        first = lits[1];
-                        lits[0] = first;
-                        lits[1] = false_lit;
+                        first = *lits.get_unchecked(1);
+                        *lits.get_unchecked_mut(0) = first;
+                        *lits.get_unchecked_mut(1) = false_lit;
                     }
                     let first_value = lit_assign!(self, first);
                     // If 0th watch is true, then clause is already satisfied.
-                    if first_value == TRUE {
-                        // assert_ne!(first, w.blocker);
+                    if first != w.blocker && first_value == TRUE {
                         w.blocker = first;
                         continue 'next_clause;
                     }
                     for (k, lk) in lits.iter().enumerate().skip(2) {
+                        // below is equivalent to 'assigned(*lk) != FALSE'
+                        // if (((lk & 1) as u8) ^ self.assign.get_unchecked(lk.vi())) != 0 {
                         if lit_assign!(self, *lk) != FALSE {
                             (*watcher)[lk.negate() as usize].register(first, w.c);
                             n -= 1;
                             source.detach(n);
-                            lits[1] = *lk;
-                            lits[k] = false_lit;
+                            *lits.get_unchecked_mut(1) = *lk;
+                            *lits.get_unchecked_mut(k) = false_lit;
                             continue 'next_clause;
                         }
                     }
