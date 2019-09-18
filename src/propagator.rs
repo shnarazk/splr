@@ -7,14 +7,11 @@ use std::fmt;
 use std::fs::File;
 use std::io::{BufWriter, Write};
 
-const BITVEC_REPR: bool = false;
-
 /// A record of assignment. It's called 'trail' in Glucose.
 #[derive(Debug)]
 pub struct AssignStack {
     pub trail: Vec<Lit>,
     asgvec: Vec<Lbool>,
-    asgpack: Vec<u64>,
     trail_lim: Vec<usize>,
     q_head: usize,
     var_order: VarIdHeap, // Variable Order
@@ -25,86 +22,30 @@ pub struct AssignStack {
 /// ```
 macro_rules! var_assign {
     ($asg: expr, $var: expr) => {
-        match $var {
-            vi => {
-                if BITVEC_REPR {
-                    let a = &$asg.asgpack[vi >> 5];
-                    // let w = (vi % 32) << 1;
-                    let w = (vi & 0x1f) << 1;
-                    ((*a >> w) & 3) as u8
-                } else {
-                    $asg.asgvec[vi]
-                    // $asg.asgvec[vi * 2]
-                }
-            }
-        }
-    }
+        $asg.asgvec[$var]
+    };
 }
 
 macro_rules! lit_assign {
     ($asg: expr, $lit: expr) => {
         match $lit {
-            l => {
-                let vi = l.vi();
-                if BITVEC_REPR {
-                    let a = &$asg.asgpack[vi >> 5];
-                    // let w = (vi % 32) << 1;
-                    let w = (vi & 0x1f) << 1;
-                    (((*a >> w) & 3) as u8) ^ ((l & 1) as u8)
-                    // match (((*a >> w) & 3) as u8) ^ ((l & 1) as u8) {
-                    //     TRUE => TRUE,
-                    //     FALSE => FALSE,
-                    //     _ => BOTTOM,
-                    // }
-                } else {
-                    $asg.asgvec[vi] ^ (l as u8 & 1)
-                    // $asg.asgvec[l as usize]
-                }
-            }
+            l => $asg.asgvec[l.vi()] ^ (l as u8 & 1),
         }
-    }
+    };
 }
 
 macro_rules! set_assign {
     ($asg: expr, $lit: expr) => {
         match $lit {
-            l => {
-                let vi = l.vi();
-                let b = l.lbool();
-                if BITVEC_REPR {
-                    let a = &mut $asg.asgpack[vi >> 5];
-                    // let w = (vi % 32) << 1;
-                    let w = (vi & 0x1f) << 1;
-                    *a &= !(3 << w);
-                    *a |= (b as u64) << w;
-                } else {
-                    $asg.asgvec[vi] = b;
-                    // $asg.asgvec[l as usize] = TRUE;
-                    // $asg.asgvec[l.negate() as usize] = FALSE;
-                }
-            }
+            l => $asg.asgvec[l.vi()] = l.lbool(),
         }
-    }
+    };
 }
 
 macro_rules! unset_assign {
     ($asg: expr, $var: expr) => {
-        match $var {
-            vi => {
-                if BITVEC_REPR {
-                    let a = &mut $asg.asgpack[vi >> 5];
-                    let w = (vi & 0x1f) << 1;
-                    // 0 for TRUE, 1 for FALSE, 2 for BOTTOM
-                    *a &= !(1 << w);
-                    *a |= 2 << w;
-                } else {
-                    $asg.asgvec[vi] = BOTTOM;
-                    // $asg.asgvec[vi * 2] = BOTTOM;
-                    // $asg.asgvec[vi * 2 + 1] = BOTTOM;
-                }
-            }
-        }
-    }
+        $asg.asgvec[$var] = BOTTOM
+    };
 }
 
 impl PropagatorIF for AssignStack {
@@ -112,7 +53,6 @@ impl PropagatorIF for AssignStack {
         AssignStack {
             trail: Vec::with_capacity(n),
             asgvec: vec![BOTTOM; 1 + n],
-            asgpack: Vec::new(), // vec![0xaaaa_aaaa_aaaa_aaaa; 1 + n / 32],
             trail_lim: Vec::new(),
             q_head: 0,
             var_order: VarIdHeap::new(n, n),
@@ -309,7 +249,7 @@ impl PropagatorIF for AssignStack {
         for v in &vars[1..] {
             if v.is(Flag::ELIMINATED) {
                 if var_assign!(self, v.index) != BOTTOM {
-                    panic!("conflicting var {} {}", v.index, var_assign!(self, v.index) /* self.assign[v.index] */ );
+                    panic!("conflicting var {} {}", v.index, var_assign!(self, v.index));
                 } else {
                     println!("eliminate var {}", v.index);
                 }

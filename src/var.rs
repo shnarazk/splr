@@ -1,5 +1,5 @@
 use crate::clause::Clause;
-use crate::config::{ACTIVITY_MAX};
+use crate::config::ACTIVITY_MAX;
 use crate::state::{Stat, State};
 use crate::traits::*;
 use crate::types::*;
