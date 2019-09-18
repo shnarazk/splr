@@ -34,6 +34,7 @@ macro_rules! var_assign {
                     ((*a >> w) & 3) as u8
                 } else {
                     $asg.asgvec[vi]
+                    // $asg.asgvec[vi * 2]
                 }
             }
         }
@@ -57,6 +58,7 @@ macro_rules! lit_assign {
                     // }
                 } else {
                     $asg.asgvec[vi] ^ (l as u8 & 1)
+                    // $asg.asgvec[l as usize]
                 }
             }
         }
@@ -68,15 +70,17 @@ macro_rules! set_assign {
         match $lit {
             l => {
                 let vi = l.vi();
+                let b = l.lbool();
                 if BITVEC_REPR {
                     let a = &mut $asg.asgpack[vi >> 5];
                     // let w = (vi % 32) << 1;
                     let w = (vi & 0x1f) << 1;
-                    let b = l.lbool();
                     *a &= !(3 << w);
                     *a |= (b as u64) << w;
                 } else {
-                    $asg.asgvec[vi] = l.lbool();   // l as u8 & 1
+                    $asg.asgvec[vi] = b;
+                    // $asg.asgvec[l as usize] = TRUE;
+                    // $asg.asgvec[l.negate() as usize] = FALSE;
                 }
             }
         }
@@ -95,6 +99,8 @@ macro_rules! unset_assign {
                     *a |= 2 << w;
                 } else {
                     $asg.asgvec[vi] = BOTTOM;
+                    // $asg.asgvec[vi * 2] = BOTTOM;
+                    // $asg.asgvec[vi * 2 + 1] = BOTTOM;
                 }
             }
         }
@@ -106,7 +112,7 @@ impl PropagatorIF for AssignStack {
         AssignStack {
             trail: Vec::with_capacity(n),
             asgvec: vec![BOTTOM; 1 + n],
-            asgpack: vec![0xaaaa_aaaa_aaaa_aaaa; 1 + n / 32],
+            asgpack: Vec::new(), // vec![0xaaaa_aaaa_aaaa_aaaa; 1 + n / 32],
             trail_lim: Vec::new(),
             q_head: 0,
             var_order: VarIdHeap::new(n, n),
