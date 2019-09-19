@@ -255,6 +255,27 @@ impl IndexMut<RangeFrom<usize>> for ClauseDB {
     }
 }
 
+impl ActivityIF for ClauseDB {
+    type Ix = ClauseId;
+    fn bump_activity(&mut self, cid: Self::Ix) {
+        let c = &mut self.clause[cid as usize];
+        let a = c.activity + self.activity_inc;
+        c.activity = a;
+        if ACTIVITY_MAX < a {
+            let scale = 1.0 / self.activity_inc;
+            for c in &mut self.clause[1..] {
+                if c.is(Flag::LEARNT) {
+                    c.activity *= scale;
+                }
+            }
+            self.activity_inc *= scale;
+        }
+    }
+    fn scale_activity(&mut self) {
+        self.activity_inc /= self.activity_decay;
+    }
+}
+
 impl ClauseDBIF for ClauseDB {
     fn new(config: &Config, nv: usize, nc: usize) -> ClauseDB {
         let mut clause = Vec::with_capacity(1 + nc);
@@ -407,23 +428,6 @@ impl ClauseDBIF for ClauseDB {
             c.rank = cnt;
         }
         temp[0] = key + 1;
-    }
-    fn bump_activity(&mut self, cid: ClauseId) {
-        let c = &mut self.clause[cid as usize];
-        let a = c.activity + self.activity_inc;
-        c.activity = a;
-        if ACTIVITY_MAX < a {
-            let scale = 1.0 / self.activity_inc;
-            for c in &mut self.clause[1..] {
-                if c.is(Flag::LEARNT) {
-                    c.activity *= scale;
-                }
-            }
-            self.activity_inc *= scale;
-        }
-    }
-    fn scale_activity(&mut self) {
-        self.activity_inc /= self.activity_decay;
     }
     fn count(&self, alive: bool) -> usize {
         if alive {

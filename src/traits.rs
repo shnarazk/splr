@@ -7,6 +7,15 @@ use crate::state::State;
 use crate::types::{CNFDescription, ClauseId, Flag, Lbool, Lit, MaybeInconsistent, VarId};
 use crate::var::{Var, VarDB};
 
+/// API for Clause and Var rewarding
+pub trait ActivityIF {
+    type Ix;
+    /// update an elememnt's activity.
+    fn bump_activity(&mut self, ix: Self::Ix);
+    /// increment activity step.
+    fn scale_activity(&mut self);
+}
+
 /// API for Clause, providing `kill`.
 pub trait ClauseIF {
     /// make a clause *dead*; the clause still exists in clause database as a garbage.
@@ -51,10 +60,6 @@ pub trait ClauseDBIF {
     fn new_clause(&mut self, v: &[Lit], rank: usize, learnt: bool) -> ClauseId;
     /// re-calculate the lbd values of all (learnt) clauses.
     fn reset_lbd(&mut self, vars: &VarDB, temp: &mut [usize]);
-    /// update clause activity.
-    fn bump_activity(&mut self, cid: ClauseId);
-    /// increment activity step.
-    fn scale_activity(&mut self);
     /// return the number of alive clauses in the database. Or return the database size if `active` is `false`.
     fn count(&self, alive: bool) -> usize;
     /// return the number of clauses which satisfy given flags and aren't DEAD.
@@ -327,10 +332,6 @@ pub trait VarDBIF {
     fn update_stat(&mut self, state: &State);
     /// return a LBD value for the set of literals.
     fn compute_lbd(&self, vec: &[Lit], keys: &mut [usize]) -> usize;
-    /// update the variable's activity.
-    fn bump_activity(&mut self, vi: VarId);
-    /// increment activity step.
-    fn scale_activity(&mut self);
 }
 
 /// API for 'watcher list' like `attach`, `detach`, `detach_with` and so on.

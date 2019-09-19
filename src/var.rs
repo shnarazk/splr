@@ -140,6 +140,25 @@ impl IndexMut<RangeFrom<usize>> for VarDB {
     }
 }
 
+impl ActivityIF for VarDB {
+    type Ix = VarId;
+    fn bump_activity(&mut self, vi: Self::Ix) {
+        let v = &mut self.var[vi];
+        let a = v.activity + self.activity_inc;
+        v.activity = a;
+        if ACTIVITY_MAX < a {
+            let scale = 1.0 / self.activity_inc;
+            for v in &mut self[1..] {
+                v.activity *= scale;
+            }
+            self.activity_inc *= scale;
+        }
+    }
+    fn scale_activity(&mut self) {
+        self.activity_inc /= self.activity_decay;
+    }
+}
+
 impl VarDBIF for VarDB {
     fn new(n: usize) -> Self {
         VarDB {
@@ -192,21 +211,6 @@ impl VarDBIF for VarDB {
         }
         keys[0] = key;
         cnt
-    }
-    fn bump_activity(&mut self, vi: VarId) {
-        let v = &mut self.var[vi];
-        let a = v.activity + self.activity_inc;
-        v.activity = a;
-        if ACTIVITY_MAX < a {
-            let scale = 1.0 / self.activity_inc;
-            for v in &mut self[1..] {
-                v.activity *= scale;
-            }
-            self.activity_inc *= scale;
-        }
-    }
-    fn scale_activity(&mut self) {
-        self.activity_inc /= self.activity_decay;
     }
 }
 
