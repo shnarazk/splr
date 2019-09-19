@@ -160,7 +160,7 @@ impl PropagatorIF for AssignStack {
                     }
                     let first_value = lit_assign!(self, first);
                     // If 0th watch is true, then clause is already satisfied.
-                    if first_value == TRUE && first != w.blocker {
+                    if first != w.blocker && first_value == TRUE {
                         w.blocker = first;
                         continue 'next_clause;
                     }
