@@ -123,13 +123,13 @@ pub enum Stat {
 impl Index<Stat> for [usize] {
     type Output = usize;
     fn index(&self, i: Stat) -> &usize {
-        &self[i as usize]
+        unsafe { self.get_unchecked(i as usize) }
     }
 }
 
 impl IndexMut<Stat> for [usize] {
     fn index_mut(&mut self, i: Stat) -> &mut usize {
-        &mut self[i as usize]
+        unsafe { self.get_unchecked_mut(i as usize) }
     }
 }
 
