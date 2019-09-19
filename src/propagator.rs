@@ -1,6 +1,7 @@
 use crate::clause::{ClauseDB, Watch};
+use crate::config::Config;
 use crate::state::{Stat, State};
-use crate::traits::{ClauseDBIF, FlagIF, LitIF, PropagatorIF, WatchDBIF};
+use crate::traits::{ClauseDBIF, FlagIF, Instantiate, LitIF, PropagatorIF, WatchDBIF};
 use crate::types::*;
 use crate::var::{Var, VarDB};
 use std::fmt;
@@ -52,16 +53,20 @@ macro_rules! unset_assign {
     };
 }
 
-impl PropagatorIF for AssignStack {
-    fn new(n: usize) -> AssignStack {
+impl Instantiate for AssignStack {
+    fn new(_: &Config, cnf: &CNFDescription) -> AssignStack {
+        let nv = cnf.num_of_variables;
         AssignStack {
-            trail: Vec::with_capacity(n),
-            asgvec: vec![BOTTOM; 1 + n],
+            trail: Vec::with_capacity(nv),
+            asgvec: vec![BOTTOM; 1 + nv],
             trail_lim: Vec::new(),
             q_head: 0,
-            var_order: VarIdHeap::new(n, n),
+            var_order: VarIdHeap::new(nv, nv),
         }
     }
+}
+
+impl PropagatorIF for AssignStack {
     fn len(&self) -> usize {
         self.trail.len()
     }

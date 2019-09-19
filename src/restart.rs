@@ -1,6 +1,6 @@
 use crate::config::Config;
 use crate::traits::*;
-use crate::types::Ema;
+use crate::types::{CNFDescription, Ema};
 
 // const RESET_EMA: usize = 400;
 
@@ -11,6 +11,16 @@ pub struct ProgressASG {
     /// For block restart based on average assignments: 1.40.
     /// This is called `R` in Glucose
     pub threshold: f64,
+}
+
+impl Instantiate for ProgressASG {
+    fn new(config: &Config, _: &CNFDescription) -> Self {
+        ProgressASG {
+            ema: Ema::new(config.restart_asg_len),
+            asg: 0,
+            threshold: config.restart_blocking,
+        }
+    }
 }
 
 impl ProgressEvaluator for ProgressASG {
@@ -28,13 +38,6 @@ impl ProgressEvaluator for ProgressASG {
     fn is_active(&self) -> bool {
         self.threshold * self.ema.get() < (self.asg as f64)
     }
-    fn new(config: &Config) -> Self {
-        ProgressASG {
-            ema: Ema::new(config.restart_asg_len),
-            asg: 0,
-            threshold: config.restart_blocking,
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -45,6 +48,17 @@ pub struct ProgressLBD {
     /// For force restart based on average LBD of newly generated clauses: 0.80.
     /// This is called `K` in Glucose
     pub threshold: f64,
+}
+
+impl Instantiate for ProgressLBD {
+    fn new(config: &Config, _: &CNFDescription) -> Self {
+        ProgressLBD {
+            ema: Ema::new(config.restart_lbd_len),
+            num: 0,
+            sum: 0,
+            threshold: config.restart_threshold,
+        }
+    }
 }
 
 impl ProgressEvaluator for ProgressLBD {
@@ -62,14 +76,6 @@ impl ProgressEvaluator for ProgressLBD {
     }
     fn is_active(&self) -> bool {
         (self.sum as f64) < self.ema.get() * (self.num as f64) * self.threshold
-    }
-    fn new(config: &Config) -> Self {
-        ProgressLBD {
-            ema: Ema::new(config.restart_lbd_len),
-            num: 0,
-            sum: 0,
-            threshold: config.restart_threshold,
-        }
     }
 }
 
@@ -91,12 +97,12 @@ pub struct RestartExecutor {
     pub luby_restart_factor: f64,
 }
 
-impl RestartIF for RestartExecutor {
-    fn new(config: &Config) -> Self {
+impl Instantiate for RestartExecutor {
+    fn new(config: &Config, cnf: &CNFDescription) -> Self {
         RestartExecutor {
             adaptive_restart: !config.without_adaptive_restart,
-            asg: ProgressASG::new(config),
-            lbd: ProgressLBD::new(config),
+            asg: ProgressASG::new(config, cnf),
+            lbd: ProgressLBD::new(config, cnf),
             use_luby_restart: false,
             after_restart: 0,
             cur_restart: 1,
@@ -109,6 +115,9 @@ impl RestartIF for RestartExecutor {
             luby_restart_factor: 100.0,
         }
     }
+}
+
+impl RestartIF for RestartExecutor {
     fn block_restart(&mut self) -> bool {
         if 100 < self.lbd.num
             && !self.use_luby_restart

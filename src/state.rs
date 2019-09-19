@@ -10,7 +10,6 @@ use std::cmp::Ordering;
 use std::fmt;
 use std::io::{stdout, Write};
 use std::ops::{Index, IndexMut};
-use std::path::Path;
 use std::time::SystemTime;
 
 /// A collection of named search heuristics
@@ -176,7 +175,7 @@ impl Default for State {
             num_solved_vars: 0,
             num_eliminated_vars: 0,
             config: Config::default(),
-            rst: RestartExecutor::new(&Config::default()),
+            rst: RestartExecutor::new(&Config::default(), &CNFDescription::default()),
             stats: [0; Stat::EndOfStatIndex as usize],
             strategy: SearchStrategy::Initial,
             target: CNFDescription::default(),
@@ -285,30 +284,23 @@ macro_rules! f {
     };
 }
 
-impl StateIF for State {
-    fn new(config: &Config, mut cnf: CNFDescription) -> State {
+impl Instantiate for State {
+    fn new(config: &Config, cnf: &CNFDescription) -> State {
         let mut state = State::default();
-        cnf.pathname = if cnf.pathname == "" {
-            "--".to_string()
-        } else {
-            Path::new(&cnf.pathname)
-                .file_name()
-                .unwrap()
-                .to_os_string()
-                .into_string()
-                .unwrap()
-        };
         state.num_vars = cnf.num_of_variables;
-        state.rst = RestartExecutor::new(config);
+        state.rst = RestartExecutor::new(config, &cnf);
         state.progress_log = config.use_log;
         state.model = vec![BOTTOM; cnf.num_of_variables + 1];
         state.an_seen = vec![false; cnf.num_of_variables + 1];
         state.lbd_temp = vec![0; cnf.num_of_variables + 1];
-        state.target = cnf;
+        state.target = cnf.clone();
         state.time_limit = config.timeout;
         state.config = config.clone();
         state
     }
+}
+
+impl StateIF for State {
     fn num_unsolved_vars(&self) -> usize {
         self.num_vars - self.num_solved_vars - self.num_eliminated_vars
     }

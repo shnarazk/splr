@@ -53,8 +53,9 @@ impl Default for Eliminator {
     }
 }
 
-impl EliminatorIF for Eliminator {
-    fn new(config: &Config, nv: usize) -> Eliminator {
+impl Instantiate for Eliminator {
+    fn new(config: &Config, cnf: &CNFDescription) -> Eliminator {
+        let nv = cnf.num_of_variables;
         let mut e = Eliminator::default();
         e.enable = !config.without_elim;
         e.var_queue = VarOccHeap::new(nv, 0);
@@ -62,6 +63,9 @@ impl EliminatorIF for Eliminator {
         e.subsume_literal_limit = config.elim_lit_limit;
         e
     }
+}
+
+impl EliminatorIF for Eliminator {
     fn activate(&mut self) {
         debug_assert!(self.mode != EliminatorMode::Running);
         self.mode = EliminatorMode::Waiting;

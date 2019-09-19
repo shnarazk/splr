@@ -8,6 +8,7 @@ use crate::types::*;
 use crate::var::VarDB;
 use std::fs;
 use std::io::{BufRead, BufReader};
+use std::path::Path;
 
 /// Normal results returned by Solver.
 #[derive(Debug, PartialEq)]
@@ -44,20 +45,19 @@ pub struct Solver {
     pub vdb: VarDB,        // Variables
 }
 
-impl SatSolverIF for Solver {
+impl Instantiate for Solver {
     fn new(config: &Config, cnf: &CNFDescription) -> Solver {
-        let nv = cnf.num_of_variables as usize;
-        let nc = cnf.num_of_clauses as usize;
-        let elim = Eliminator::new(config, nv);
-        let state = State::new(config, cnf.clone());
         Solver {
-            asgs: AssignStack::new(nv),
-            cdb: ClauseDB::new(config, nv, nc),
-            elim,
-            state,
-            vdb: VarDB::new(nv),
+            asgs: AssignStack::new(config, cnf),
+            cdb: ClauseDB::new(config, cnf),
+            elim: Eliminator::new(config, cnf),
+            state: State::new(config, cnf),
+            vdb: VarDB::new(config, cnf),
         }
     }
+}
+
+impl SatSolverIF for Solver {
     /// # Examples
     ///
     /// ```
@@ -227,7 +227,14 @@ impl SatSolverIF for Solver {
         let cnf = CNFDescription {
             num_of_variables: nv,
             num_of_clauses: nc,
-            pathname: config.cnf_filename.to_str().unwrap().to_string(),
+            pathname:
+            if config.cnf_filename.to_string_lossy().is_empty() {
+                "--".to_string()
+            } else {
+                Path::new(&config.cnf_filename.to_string_lossy().into_owned())
+                    .file_name()
+                    .map_or("aStrangeNamed".to_string(), |f| f.to_string_lossy().into_owned())
+            }
         };
         let mut s: Solver = Solver::new(config, &cnf);
         loop {

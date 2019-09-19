@@ -276,8 +276,10 @@ impl ActivityIF for ClauseDB {
     }
 }
 
-impl ClauseDBIF for ClauseDB {
-    fn new(config: &Config, nv: usize, nc: usize) -> ClauseDB {
+impl Instantiate for ClauseDB {
+    fn new(config: &Config, cnf: &CNFDescription) -> ClauseDB {
+        let nv = cnf.num_of_variables;
+        let nc = cnf.num_of_clauses;
         let mut clause = Vec::with_capacity(1 + nc);
         clause.push(Clause::default());
         let mut watcher = Vec::with_capacity(2 * (nv + 1));
@@ -309,6 +311,9 @@ impl ClauseDBIF for ClauseDB {
             glureduce: true,
         }
     }
+}
+
+impl ClauseDBIF for ClauseDB {
     fn len(&self) -> usize {
         self.clause.len()
     }

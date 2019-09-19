@@ -24,8 +24,6 @@ pub trait ClauseIF {
 
 /// API for clause management like `reduce`, `simplify`, `new_clause`, and so on.
 pub trait ClauseDBIF {
-    /// return a new instance.
-    fn new(config: &Config, nv: usize, nc: usize) -> Self;
     /// return the length of `clause`.
     fn len(&self) -> usize;
     /// return true if it's empty.
@@ -96,8 +94,6 @@ pub trait Delete<T> {
 
 /// API for Eliminator like `activate`, `stop`, `eliminate` and so on.
 pub trait EliminatorIF {
-    /// return a new instance.
-    fn new(config: &Config, nv: usize) -> Eliminator;
     /// set eliminater's mode to **ready**.
     fn activate(&mut self);
     /// set eliminater's mode to **dormant**.
@@ -164,6 +160,11 @@ pub trait FlagIF {
     fn turn_on(&mut self, flag: Flag);
 }
 
+/// API for data instantiation based on `Configuration` and `CNFDescription`
+pub trait Instantiate {
+    fn new(conf: &Config, cnf: &CNFDescription) -> Self;
+}
+
 /// API for Literal like `from_int`, `from_var`, `to_cid` and so on.
 pub trait LitIF {
     /// convert from `i32`.
@@ -196,14 +197,10 @@ pub trait ProgressEvaluator {
     fn trend(&self) -> f64;
     /// map the value into a bool for forcing/blocking restart.
     fn is_active(&self) -> bool;
-    /// return a new instance.
-    fn new(config: &Config) -> Self;
 }
 
 /// API for assignment like `propagate`, `enqueue`, `cancel_until`, and so on.
 pub trait PropagatorIF {
-    /// return a new instance.
-    fn new(n: usize) -> Self;
     /// return the number of assignments.
     fn len(&self) -> usize;
     /// return `true` if there's no assignment.
@@ -244,8 +241,6 @@ pub trait PropagatorIF {
 
 /// API for restart like `block_restart`, `force_restart` and so on.
 pub trait RestartIF {
-    /// return a new instance.
-    fn new(config: &Config) -> Self;
     /// block restart if needed.
     fn block_restart(&mut self) -> bool;
     /// force restart if needed.
@@ -258,8 +253,6 @@ pub trait RestartIF {
 
 /// API for SAT solver like `build`, `solve` and so on.
 pub trait SatSolverIF {
-    /// make a solver for debug. Probably you should use `build` instead of this.
-    fn new(config: &Config, cnf: &CNFDescription) -> Solver;
     /// make a solver and load a CNF into it.
     ///
     /// # Errors
@@ -278,8 +271,6 @@ pub trait SatSolverIF {
 
 /// API for state/statistics management, providing `progress`.
 pub trait StateIF {
-    /// return an initialized state based on solver configuration and data about a CNF file.
-    fn new(config: &Config, cnf: CNFDescription) -> State;
     /// return the number of unsolved vars.
     fn num_unsolved_vars(&self) -> usize;
     /// return `true` if it is timed out.
@@ -316,8 +307,6 @@ pub trait VarIF {
 
 /// API for var DB like `assigned`, `locked`, `compute_lbd` and so on.
 pub trait VarDBIF {
-    /// return a new instance.
-    fn new(n: usize) -> Self;
     /// return the length of `vars`.
     fn len(&self) -> usize;
     /// return true if it's empty.

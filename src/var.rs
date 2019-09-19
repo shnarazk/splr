@@ -1,5 +1,5 @@
 use crate::clause::Clause;
-use crate::config::ACTIVITY_MAX;
+use crate::config::{ACTIVITY_MAX, Config};
 use crate::state::{Stat, State};
 use crate::traits::*;
 use crate::types::*;
@@ -159,18 +159,23 @@ impl ActivityIF for VarDB {
     }
 }
 
-impl VarDBIF for VarDB {
-    fn new(n: usize) -> Self {
+impl Instantiate for VarDB {
+    fn new(_: &Config, cnf: &CNFDescription) -> Self {
+        let nv = cnf.num_of_variables;
         VarDB {
-            var: Var::new_vars(n),
+            var: Var::new_vars(nv),
             current_conflict: 0,
             current_restart: 0,
-            lbd_temp: vec![0; n + 1],
+            lbd_temp: vec![0; nv + 1],
             activity_inc: 1.0,
             activity_decay: 0.9,
             activity_decay_max: 0.95,
         }
     }
+
+}
+
+impl VarDBIF for VarDB {
     fn len(&self) -> usize {
         self.var.len()
     }
