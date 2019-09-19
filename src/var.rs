@@ -99,14 +99,14 @@ impl Index<usize> for VarDB {
     type Output = Var;
     #[inline]
     fn index(&self, i: usize) -> &Var {
-        &self.var[i]
+        unsafe { self.var.get_unchecked(i) }
     }
 }
 
 impl IndexMut<usize> for VarDB {
     #[inline]
     fn index_mut(&mut self, i: usize) -> &mut Var {
-        &mut self.var[i]
+        unsafe { self.var.get_unchecked_mut(i) }
     }
 }
 
@@ -122,14 +122,14 @@ impl Index<RangeFrom<usize>> for VarDB {
     type Output = [Var];
     #[inline]
     fn index(&self, r: RangeFrom<usize>) -> &[Var] {
-        &self.var[r]
+        unsafe { self.var.get_unchecked(r) }
     }
 }
 
 impl IndexMut<Range<usize>> for VarDB {
     #[inline]
     fn index_mut(&mut self, r: Range<usize>) -> &mut [Var] {
-        &mut self.var[r]
+        unsafe { self.var.get_unchecked_mut(r) }
     }
 }
 

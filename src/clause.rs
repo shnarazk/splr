@@ -215,13 +215,13 @@ pub struct ClauseDB {
 impl Index<ClauseId> for ClauseDB {
     type Output = Clause;
     fn index(&self, cid: ClauseId) -> &Clause {
-        &self.clause[cid as usize]
+        unsafe { self.clause.get_unchecked(cid as usize) }
     }
 }
 
 impl IndexMut<ClauseId> for ClauseDB {
     fn index_mut(&mut self, cid: ClauseId) -> &mut Clause {
-        &mut self.clause[cid as usize]
+        unsafe { self.clause.get_unchecked_mut(cid as usize) }
     }
 }
 

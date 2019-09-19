@@ -22,14 +22,17 @@ pub struct AssignStack {
 /// ```
 macro_rules! var_assign {
     ($asg: expr, $var: expr) => {
-        $asg.asgvec[$var]
+        unsafe { *$asg.asgvec.get_unchecked($var) }
     };
 }
 
 macro_rules! lit_assign {
     ($asg: expr, $lit: expr) => {
         match $lit {
-            l => $asg.asgvec[l.vi()] ^ (l as u8 & 1),
+            l => {
+                #[allow(unused_unsafe)]
+                unsafe { *$asg.asgvec.get_unchecked(l.vi()) ^ (l as u8 & 1) }
+            }
         }
     };
 }
@@ -37,14 +40,15 @@ macro_rules! lit_assign {
 macro_rules! set_assign {
     ($asg: expr, $lit: expr) => {
         match $lit {
-            l => $asg.asgvec[l.vi()] = l.lbool(),
+            l => unsafe { *$asg.asgvec.get_unchecked_mut(l.vi()) = l.lbool(); },
         }
     };
 }
 
+#[allow(unused_unsafe)]
 macro_rules! unset_assign {
     ($asg: expr, $var: expr) => {
-        $asg.asgvec[$var] = BOTTOM
+        unsafe { *$asg.asgvec.get_unchecked_mut($var) = BOTTOM; }
     };
 }
 
@@ -119,11 +123,11 @@ impl PropagatorIF for AssignStack {
     fn propagate(&mut self, cdb: &mut ClauseDB, state: &mut State, vars: &mut VarDB) -> ClauseId {
         let watcher = &mut cdb.watcher[..] as *mut [Vec<Watch>];
         while self.remains() {
-            let p: usize = self.sweep() as usize;
+            let p = self.sweep();
             let false_lit = (p as Lit).negate();
             state.stats[Stat::Propagation] += 1;
             unsafe {
-                let source = (*watcher).get_unchecked_mut(p);
+                let source = (*watcher).get_unchecked_mut(p as usize);
                 let mut n = 0;
                 'next_clause: while n < source.len() {
                     let w = source.get_unchecked_mut(n);
