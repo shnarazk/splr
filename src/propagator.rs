@@ -155,26 +155,21 @@ impl PropagatorIF for AssignStack {
                     let mut first = *lits.get_unchecked(0);
                     if first == false_lit {
                         first = *lits.get_unchecked(1);
-                        *lits.get_unchecked_mut(0) = first;
-                        *lits.get_unchecked_mut(1) = false_lit;
+                        lits.swap(0, 1);
                     }
                     let first_value = lit_assign!(self, first);
-                    // If 0th watch is true, then clause is already satisfied.
                     if first != w.blocker && first_value == TRUE {
                         w.blocker = first;
                         continue 'next_clause;
                     }
                     for (k, lk) in lits.iter().enumerate().skip(2) {
-                        // below is equivalent to 'assigned(*lk) != FALSE'
-                        // if (((lk & 1) as u8) ^ self.assign.get_unchecked(lk.vi())) != 0 {
                         if lit_assign!(self, *lk) != FALSE {
                             (*watcher)
                                 .get_unchecked_mut(lk.negate() as usize)
                                 .register(first, w.c);
                             n -= 1;
                             source.detach(n);
-                            *lits.get_unchecked_mut(1) = *lk;
-                            *lits.get_unchecked_mut(k) = false_lit;
+                            lits.swap(1, k);
                             continue 'next_clause;
                         }
                     }
