@@ -277,7 +277,7 @@ impl ActivityIF for ClauseDB {
 }
 
 impl Instantiate for ClauseDB {
-    fn new(config: &Config, cnf: &CNFDescription) -> ClauseDB {
+    fn instantiate(config: &Config, cnf: &CNFDescription) -> ClauseDB {
         let nv = cnf.num_of_variables;
         let nc = cnf.num_of_clauses;
         let mut clause = Vec::with_capacity(1 + nc);

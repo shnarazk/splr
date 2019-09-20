@@ -162,7 +162,7 @@ pub trait FlagIF {
 
 /// API for data instantiation based on `Configuration` and `CNFDescription`
 pub trait Instantiate {
-    fn new(conf: &Config, cnf: &CNFDescription) -> Self;
+    fn instantiate(conf: &Config, cnf: &CNFDescription) -> Self;
 }
 
 /// API for Literal like `from_int`, `from_var`, `to_cid` and so on.

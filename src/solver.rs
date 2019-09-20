@@ -46,13 +46,13 @@ pub struct Solver {
 }
 
 impl Instantiate for Solver {
-    fn new(config: &Config, cnf: &CNFDescription) -> Solver {
+    fn instantiate(config: &Config, cnf: &CNFDescription) -> Solver {
         Solver {
-            asgs: AssignStack::new(config, cnf),
-            cdb: ClauseDB::new(config, cnf),
-            elim: Eliminator::new(config, cnf),
-            state: State::new(config, cnf),
-            vdb: VarDB::new(config, cnf),
+            asgs: AssignStack::instantiate(config, cnf),
+            cdb: ClauseDB::instantiate(config, cnf),
+            elim: Eliminator::instantiate(config, cnf),
+            state: State::instantiate(config, cnf),
+            vdb: VarDB::instantiate(config, cnf),
         }
     }
 }
@@ -237,7 +237,7 @@ impl SatSolverIF for Solver {
                     })
             },
         };
-        let mut s: Solver = Solver::new(config, &cnf);
+        let mut s: Solver = Solver::instantiate(config, &cnf);
         loop {
             buf.clear();
             match rs.read_line(&mut buf) {

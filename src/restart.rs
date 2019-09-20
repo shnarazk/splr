@@ -14,7 +14,7 @@ pub struct ProgressASG {
 }
 
 impl Instantiate for ProgressASG {
-    fn new(config: &Config, _: &CNFDescription) -> Self {
+    fn instantiate(config: &Config, _: &CNFDescription) -> Self {
         ProgressASG {
             ema: Ema::new(config.restart_asg_len),
             asg: 0,
@@ -51,7 +51,7 @@ pub struct ProgressLBD {
 }
 
 impl Instantiate for ProgressLBD {
-    fn new(config: &Config, _: &CNFDescription) -> Self {
+    fn instantiate(config: &Config, _: &CNFDescription) -> Self {
         ProgressLBD {
             ema: Ema::new(config.restart_lbd_len),
             num: 0,
@@ -98,11 +98,11 @@ pub struct RestartExecutor {
 }
 
 impl Instantiate for RestartExecutor {
-    fn new(config: &Config, cnf: &CNFDescription) -> Self {
+    fn instantiate(config: &Config, cnf: &CNFDescription) -> Self {
         RestartExecutor {
             adaptive_restart: !config.without_adaptive_restart,
-            asg: ProgressASG::new(config, cnf),
-            lbd: ProgressLBD::new(config, cnf),
+            asg: ProgressASG::instantiate(config, cnf),
+            lbd: ProgressLBD::instantiate(config, cnf),
             use_luby_restart: false,
             after_restart: 0,
             cur_restart: 1,

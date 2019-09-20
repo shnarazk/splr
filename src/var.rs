@@ -160,7 +160,7 @@ impl ActivityIF for VarDB {
 }
 
 impl Instantiate for VarDB {
-    fn new(_: &Config, cnf: &CNFDescription) -> Self {
+    fn instantiate(_: &Config, cnf: &CNFDescription) -> Self {
         let nv = cnf.num_of_variables;
         VarDB {
             var: Var::new_vars(nv),

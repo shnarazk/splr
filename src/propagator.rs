@@ -54,7 +54,7 @@ macro_rules! unset_assign {
 }
 
 impl Instantiate for AssignStack {
-    fn new(_: &Config, cnf: &CNFDescription) -> AssignStack {
+    fn instantiate(_: &Config, cnf: &CNFDescription) -> AssignStack {
         let nv = cnf.num_of_variables;
         AssignStack {
             trail: Vec::with_capacity(nv),

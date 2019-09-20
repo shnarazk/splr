@@ -54,7 +54,7 @@ impl Default for Eliminator {
 }
 
 impl Instantiate for Eliminator {
-    fn new(config: &Config, cnf: &CNFDescription) -> Eliminator {
+    fn instantiate(config: &Config, cnf: &CNFDescription) -> Eliminator {
         let nv = cnf.num_of_variables;
         let mut e = Eliminator::default();
         e.enable = !config.without_elim;
