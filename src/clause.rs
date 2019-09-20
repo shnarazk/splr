@@ -372,7 +372,7 @@ impl ClauseDBIF for ClauseDB {
         let l1 = v[1];
         if let Some(w) = self.watcher[NULL_LIT.negate() as usize].pop() {
             cid = w.c;
-            let c = &mut self.clause[cid as usize];
+            let c = &mut self[cid];
             // if !c.is(Flag::DEAD) {
             //     println!("{} {:?}", cid.format(), vec2int(&c.lits));
             //     println!("len {}", self.watcher[NULL_LIT.negate() as usize].len());
@@ -405,7 +405,7 @@ impl ClauseDBIF for ClauseDB {
             };
             self.clause.push(c);
         };
-        let c = &mut self.clause[cid as usize];
+        let c = &mut self[cid];
         if learnt {
             c.turn_on(Flag::LEARNT);
             self.num_learnt += 1;
@@ -417,7 +417,7 @@ impl ClauseDBIF for ClauseDB {
     }
     fn reset_lbd(&mut self, vars: &VarDB, temp: &mut [usize]) {
         let mut key = temp[0];
-        for c in &mut self.clause[1..] {
+        for c in &mut self[1..] {
             if c.is(Flag::DEAD) || c.is(Flag::LEARNT) {
                 continue;
             }

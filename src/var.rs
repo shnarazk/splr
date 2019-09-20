@@ -204,17 +204,20 @@ impl VarDBIF for VarDB {
     }
 
     fn compute_lbd(&self, vec: &[Lit], keys: &mut [usize]) -> usize {
-        let key = keys[0] + 1;
-        let mut cnt = 0;
-        for l in vec {
-            let lv = self[l.vi()].level;
-            if keys[lv] != key {
-                keys[lv] = key;
-                cnt += 1;
+        unsafe {
+            let key = keys.get_unchecked(0) + 1;
+            let mut cnt = 0;
+            for l in vec {
+                let lv = self[l.vi()].level;
+                let p = keys.get_unchecked_mut(lv);
+                if  *p != key {
+                    *p = key;
+                    cnt += 1;
+                }
             }
+            *keys.get_unchecked_mut(0) = key;
+            cnt
         }
-        keys[0] = key;
-        cnt
     }
 }
 
