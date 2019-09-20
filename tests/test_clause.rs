@@ -67,7 +67,7 @@ fn setup() -> Solver {
         num_of_clauses: 6,
         pathname: "".to_string(),
     };
-    let mut s = Solver::new(&Default::default(), &cnf);
+    let mut s = Solver::instantiate(&Default::default(), &cnf);
     attach_clause(&mut s, &mkv![1, 2, -3]).activity(1.0);
     attach_clause(&mut s, &mkv![1, -2, 3]).activity(4.0).rank(3);
     attach_clause(&mut s, &mkv![-1, 2, 3, 4]).activity(5.0);
