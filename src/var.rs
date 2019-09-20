@@ -1,5 +1,5 @@
 use crate::clause::Clause;
-use crate::config::{ACTIVITY_MAX, Config};
+use crate::config::{Config, ACTIVITY_MAX};
 use crate::state::{Stat, State};
 use crate::traits::*;
 use crate::types::*;
@@ -172,7 +172,6 @@ impl Instantiate for VarDB {
             activity_decay_max: 0.95,
         }
     }
-
 }
 
 impl VarDBIF for VarDB {

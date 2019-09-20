@@ -227,14 +227,15 @@ impl SatSolverIF for Solver {
         let cnf = CNFDescription {
             num_of_variables: nv,
             num_of_clauses: nc,
-            pathname:
-            if config.cnf_filename.to_string_lossy().is_empty() {
+            pathname: if config.cnf_filename.to_string_lossy().is_empty() {
                 "--".to_string()
             } else {
                 Path::new(&config.cnf_filename.to_string_lossy().into_owned())
                     .file_name()
-                    .map_or("aStrangeNamed".to_string(), |f| f.to_string_lossy().into_owned())
-            }
+                    .map_or("aStrangeNamed".to_string(), |f| {
+                        f.to_string_lossy().into_owned()
+                    })
+            },
         };
         let mut s: Solver = Solver::new(config, &cnf);
         loop {
