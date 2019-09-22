@@ -49,7 +49,7 @@ fn main() {
         let dump = config.cnf_filename.file_stem().unwrap().to_str().unwrap();
         if let Ok(f) = File::create(format!("stat_{}.csv", dump)) {
             let mut buf = BufWriter::new(f);
-            buf.write_all(b"conflict,solved,restart,block,ASG,LBD\n")
+            buf.write_all(b"conflict,restart,actMax,exceeds,ASG,LBD\n")
                 .unwrap();
             for (n, a, b, c, d, e) in s.state.development.iter() {
                 buf.write_all(
