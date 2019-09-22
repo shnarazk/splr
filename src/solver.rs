@@ -323,9 +323,26 @@ fn search(
             }
             // DYNAMIC FORCING RESTART based on LBD values, updated by conflict
             state.last_asg = asgs.len();
-            if state.rst.force_restart() {
+            if (20 < vdb.new_records.len() && state.rst.force_restart())
+                || 100 < vdb.new_records.len()
+
+//            if state.rst.force_restart()
+            {
                 state.stats[Stat::Restart] += 1;
                 asgs.cancel_until(vdb, state.root_level);
+                if 0 < state.config.dump_interval
+                    && state.stats[Stat::Restart] % state.config.dump_interval == 0
+                {
+                    state.development.push((
+                        state.stats[Stat::Conflict],
+                        state.stats[Stat::Restart] as f64,
+                        vdb[vdb.activity_max].activity.log(10.0),
+                        vdb.new_records.len() as f64,
+                        state.rst.asg.trend().min(10.0),
+                        state.rst.lbd.trend().min(10.0),
+                    ));
+                }
+                vdb.update_record(); // 20190921
             } else if asgs.level() == 0 {
                 if cdb.simplify(asgs, elim, state, vdb).is_err() {
                     debug_assert!(false, "interal error by simplify");
@@ -411,13 +428,12 @@ fn handle_conflict_path(
     }
     cdb.scale_activity();
     vdb.scale_activity();
-    if 0 < state.config.dump_interval && ncnfl % state.config.dump_interval == 0 {
+    if false && 0 < state.config.dump_interval && ncnfl % state.config.dump_interval == 0 {
         state.development.push((
             ncnfl,
-            (state.num_solved_vars + state.num_eliminated_vars) as f64
-                / state.target.num_of_variables as f64,
             state.stats[Stat::Restart] as f64,
-            state.stats[Stat::BlockRestart] as f64,
+            vdb[vdb.activity_max].activity.log(10.0),
+            vdb.new_records.len() as f64,
             state.rst.asg.trend().min(10.0),
             state.rst.lbd.trend().min(10.0),
         ));

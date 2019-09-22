@@ -79,6 +79,10 @@ pub struct VarDB {
     pub activity_inc: f64,
     pub activity_decay: f64,
     pub activity_decay_max: f64,
+    /// 20190921-rr
+    pub activity_max: VarId,
+    pub activity_max_next: VarId,
+    pub new_records: Vec<VarId>,
 }
 
 impl Default for VarDB {
@@ -91,6 +95,9 @@ impl Default for VarDB {
             activity_inc: 1.0,
             activity_decay: 0.9,
             activity_decay_max: 0.95,
+            activity_max: 0,
+            activity_max_next: 0,
+            new_records: Vec::new(),
         }
     }
 }
@@ -146,6 +153,17 @@ impl ActivityIF for VarDB {
         let v = &mut self.var[vi];
         let a = v.activity + self.activity_inc;
         v.activity = a;
+        if vi != self.activity_max
+            && self.var[self.activity_max].activity < a
+            && self.new_records.iter().all(|v| *v != vi)
+        {
+            if self.new_records.is_empty() {
+                self.activity_max_next = vi;
+            } else if self.var[self.activity_max_next].activity < a {
+                self.activity_max_next = vi;
+            }
+            self.new_records.push(vi);
+        }
         if ACTIVITY_MAX < a {
             let scale = 1.0 / self.activity_inc;
             for v in &mut self[1..] {
@@ -170,7 +188,18 @@ impl Instantiate for VarDB {
             activity_inc: 1.0,
             activity_decay: 0.9,
             activity_decay_max: 0.95,
+            activity_max: 0,      // NULL_VAR
+            activity_max_next: 0, // NULL_VAR
+            new_records: Vec::new(),
         }
+    }
+}
+
+impl VarDB {
+    pub fn update_record(&mut self) {
+        self.activity_max = self.activity_max_next;
+        self.activity_max_next = 0;
+        self.new_records.clear();
     }
 }
 
