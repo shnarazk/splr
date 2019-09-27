@@ -83,6 +83,7 @@ pub struct VarDB {
     pub activity_max: VarId,
     pub activity_max_next: VarId,
     pub new_records: Vec<VarId>,
+    pub max_pool_size: Ema,
 }
 
 impl Default for VarDB {
@@ -98,6 +99,7 @@ impl Default for VarDB {
             activity_max: 0,
             activity_max_next: 0,
             new_records: Vec::new(),
+            max_pool_size: Ema::new(256),
         }
     }
 }
@@ -157,9 +159,7 @@ impl ActivityIF for VarDB {
             && self.var[self.activity_max].activity < a
             && self.new_records.iter().all(|v| *v != vi)
         {
-            if self.new_records.is_empty() {
-                self.activity_max_next = vi;
-            } else if self.var[self.activity_max_next].activity < a {
+            if self.activity_max_next == 0 || self.var[self.activity_max_next].activity < a {
                 self.activity_max_next = vi;
             }
             self.new_records.push(vi);
@@ -191,6 +191,7 @@ impl Instantiate for VarDB {
             activity_max: 0,      // NULL_VAR
             activity_max_next: 0, // NULL_VAR
             new_records: Vec::new(),
+            max_pool_size: Ema::new(256),
         }
     }
 }
@@ -199,6 +200,7 @@ impl VarDB {
     pub fn update_record(&mut self) {
         self.activity_max = self.activity_max_next;
         self.activity_max_next = 0;
+        self.max_pool_size.update(self.new_records.len() as f64);
         self.new_records.clear();
     }
 }
@@ -243,7 +245,7 @@ impl VarDBIF for VarDB {
             for l in vec {
                 let lv = self[l.vi()].level;
                 let p = keys.get_unchecked_mut(lv);
-                if  *p != key {
+                if *p != key {
                     *p = key;
                     cnt += 1;
                 }
