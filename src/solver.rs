@@ -328,14 +328,11 @@ fn search(
             }
             // DYNAMIC FORCING RESTART based on LBD values, updated by conflict
             state.last_asg = asgs.len();
-            if (20 < vdb.new_records.len() && state.rst.force_restart())
-                || 100 < vdb.new_records.len()
-
-//            if state.rst.force_restart()
-            {
+            if state.rst.force_restart() {
                 state.stats[Stat::Restart] += 1;
                 asgs.cancel_until(vdb, state.root_level);
-                if 0 < state.config.dump_interval
+                if false
+                    && 0 < state.config.dump_interval
                     && state.stats[Stat::Restart] % state.config.dump_interval == 0
                 {
                     state.development.push((
@@ -402,9 +399,26 @@ fn handle_conflict_path(
         state.stats[Stat::BlockRestart] += 1;
     }
     let cl = asgs.level();
-    let bl = analyze(asgs, cdb, state, vdb, ci);
+    let mut bl = analyze(asgs, cdb, state, vdb, ci);
+    let mut backwarp = false;
     let new_learnt = &mut state.new_learnt;
+    if 4.0 * vdb.max_pool_size.get() < vdb.new_records.len() as f64 {
+        backwarp = true;
+        bl = vdb[vdb.activity_max_next].level;
+        // println!("bl:{}, ema:{:>8.2}, cur: {} ", bl, vdb.max_pool_size.get(), vdb.new_records.len());
+    }
     asgs.cancel_until(vdb, bl.max(state.root_level));
+    if backwarp {
+        state.development.push((
+            ncnfl,
+            state.stats[Stat::Restart] as f64,
+            vdb[vdb.activity_max].activity.log(10.0),
+            vdb.new_records.len() as f64,
+            state.rst.asg.trend().min(10.0),
+            state.rst.lbd.trend().min(10.0),
+        ));
+        vdb.update_record();
+    }
     let learnt_len = new_learnt.len();
     if learnt_len == 1 {
         // dump to certified even if it's a literal.
@@ -427,13 +441,17 @@ fn handle_conflict_path(
             state.stats[Stat::NumBin] += 1;
             state.stats[Stat::NumBinLearnt] += 1;
         }
-        asgs.uncheck_enqueue(vdb, l0, cid);
+        if !backwarp {
+            asgs.uncheck_enqueue(vdb, l0, cid);
+        }
         state.rst.lbd.update(lbd);
         state.stats[Stat::SumLBD] += lbd;
     }
     cdb.scale_activity();
     vdb.scale_activity();
-    if false && 0 < state.config.dump_interval && ncnfl % state.config.dump_interval == 0 {
+    if false
+    /* && 0 < state.config.dump_interval && ncnfl % state.config.dump_interval == 0 */
+    {
         state.development.push((
             ncnfl,
             state.stats[Stat::Restart] as f64,
