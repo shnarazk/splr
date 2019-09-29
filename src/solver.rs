@@ -402,10 +402,11 @@ fn handle_conflict_path(
     let mut bl = analyze(asgs, cdb, state, vdb, ci);
     let mut backwarp = false;
     let new_learnt = &mut state.new_learnt;
-    if 4.0 * vdb.max_pool_size.get() < vdb.new_records.len() as f64 {
+    if vdb.restart_by_backlog() {
         backwarp = true;
-        bl = vdb[vdb.activity_max_next].level;
-        // println!("bl:{}, ema:{:>8.2}, cur: {} ", bl, vdb.max_pool_size.get(), vdb.new_records.len());
+        // let bl2 = vdb[vdb.activity_max_next].level;
+        // bl = if bl2 < bl { bl2 } else { bl / 2 };
+        bl = state.root_level;
     }
     asgs.cancel_until(vdb, bl.max(state.root_level));
     if backwarp {

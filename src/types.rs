@@ -260,5 +260,7 @@ bitflags! {
         const ELIMINATED   = 0b0000_0000_0010_0000;
         /// mark to run garbage collector on the corresponding watcher lists
         const TOUCHED      = 0b0000_0000_0100_0000;
+        /// a variable has got a larger-than-top activity.
+        const BIGBUMPED    = 0b0000_0000_1000_0000;
     }
 }
