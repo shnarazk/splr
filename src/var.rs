@@ -164,7 +164,8 @@ impl ActivityIF for VarDB {
             && self.var[self.activity_max].activity < a
         {
             self.var[vi].turn_on(Flag::BIGBUMPED);
-            if self.activity_max_next == 0 || self.var[self.activity_max_next].activity < a {
+            assert!(self.var[0].activity == 0.0);
+            if self.var[self.activity_max_next].activity < a {
                 self.activity_max_next = vi;
             }
             self.new_records.push(vi);
