@@ -80,10 +80,11 @@ pub struct VarDB {
     pub activity_decay: f64,
     pub activity_decay_max: f64,
     /// 20190921-rr
+    pub restart_on_conflict_path: bool,
     pub activity_max: VarId,
-    pub activity_max_next: VarId,
+    activity_max_next: VarId,
     pub new_records: Vec<VarId>,
-    pub max_pool_size: Ema,
+    max_pool_size: Ema,
 }
 
 impl Default for VarDB {
@@ -96,6 +97,8 @@ impl Default for VarDB {
             activity_inc: 1.0,
             activity_decay: 0.9,
             activity_decay_max: 0.95,
+            /// 20190921-rr
+            restart_on_conflict_path: true,
             activity_max: 0,
             activity_max_next: 0,
             new_records: Vec::new(),
@@ -155,10 +158,12 @@ impl ActivityIF for VarDB {
         let v = &mut self.var[vi];
         let a = v.activity + self.activity_inc;
         v.activity = a;
-        if vi != self.activity_max
+        if self.restart_on_conflict_path
+            && !v.is(Flag::BIGBUMPED)
+            && vi != self.activity_max
             && self.var[self.activity_max].activity < a
-            && self.new_records.iter().all(|v| *v != vi)
         {
+            self.var[vi].turn_on(Flag::BIGBUMPED);
             if self.activity_max_next == 0 || self.var[self.activity_max_next].activity < a {
                 self.activity_max_next = vi;
             }
@@ -188,6 +193,7 @@ impl Instantiate for VarDB {
             activity_inc: 1.0,
             activity_decay: 0.9,
             activity_decay_max: 0.95,
+            restart_on_conflict_path: true,
             activity_max: 0,      // NULL_VAR
             activity_max_next: 0, // NULL_VAR
             new_records: Vec::new(),
@@ -198,10 +204,19 @@ impl Instantiate for VarDB {
 
 impl VarDB {
     pub fn update_record(&mut self) {
-        self.activity_max = self.activity_max_next;
-        self.activity_max_next = 0;
-        self.max_pool_size.update(self.new_records.len() as f64);
-        self.new_records.clear();
+        if self.restart_on_conflict_path {
+            self.activity_max = self.activity_max_next;
+            self.activity_max_next = 0;
+            self.max_pool_size.update(self.new_records.len() as f64);
+            for vi in &self.new_records[..] {
+                self.var[*vi].turn_off(Flag::BIGBUMPED);
+            }
+            self.new_records.clear();
+        }
+    }
+    pub fn restart_by_backlog(&self) -> bool {
+        self.restart_on_conflict_path
+            && 4.0 * self.max_pool_size.get() < self.new_records.len() as f64
     }
 }
 
