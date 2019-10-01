@@ -208,6 +208,7 @@ pub trait PropagatorIF {
     /// return `true` if the current decision level is zero.
     fn is_zero(&self) -> bool;
     /// return the number of assignments at a given decision level `u`.
+    /// In other word, the index for the level `n + 1` variable by decision
     fn num_at(&self, n: usize) -> usize;
     /// return `true` if there are unpropagated assignments.
     fn remains(&self) -> bool;
