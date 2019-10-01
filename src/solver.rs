@@ -490,7 +490,7 @@ fn adapt_parameters(
     nconflict: usize,
 ) -> MaybeInconsistent {
     let switch = 100_000;
-    if !state.config.without_deep_search && !state.rst.use_luby_restart
+    // if !state.config.without_deep_search && !state.rst.use_luby_restart
     /* && switch <= nconflict */
     {
         let stopped = state.stats[Stat::SolvedRecord] == state.num_solved_vars;
@@ -511,11 +511,14 @@ fn adapt_parameters(
         //     <= state.stagnation as f64)
         if !state.stagnated && stagnated {
             state.stats[Stat::Stagnation] += 1;
+            if !state.config.without_deep_search {
+                state.rst.next_restart += 80_000;
+            }
         }
         state.stagnated = stagnated;
     }
     state.stats[Stat::SolvedRecord] = state.num_solved_vars;
-    if !state.rst.use_luby_restart && state.rst.adaptive_restart && !state.stagnated {
+    if !state.rst.use_luby_restart && state.rst.adaptive_restart /* && !state.stagnated */ {
         let moving: f64 = 0.04;
         let spring: f64 = 0.02;
         let margin: f64 = 0.20;
@@ -558,13 +561,11 @@ fn adapt_parameters(
         }
     }
     state.progress(cdb, vdb, None);
-    if !state.config.without_deep_search {
-        state.rst.restart_step = 50 + 40_000 * (state.stagnated as usize);
-        if state.stagnated {
-            state.flush(&format!("deep searching ({})...", state.slack_duration));
-            state.rst.next_restart += 80_000;
-        }
+    if state.stagnated {
+        state.flush(&format!("deep searching ({})...", state.slack_duration));
     }
+    // state.rst.restart_step = 50 + 40_000 * (state.stagnated as usize);
+    // state.rst.restart_step = 50 + 1_000 * (state.stagnated as usize);
     Ok(())
 }
 
