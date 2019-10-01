@@ -1,5 +1,6 @@
 use crate::clause::Clause;
 use crate::config::{Config, ACTIVITY_MAX};
+use crate::propagator::AssignStack;
 use crate::state::{Stat, State};
 use crate::traits::*;
 use crate::types::*;
@@ -83,8 +84,8 @@ pub struct VarDB {
     pub restart_on_conflict_path: bool,
     pub activity_max: VarId,
     activity_max_next: VarId,
-    pub new_records: Vec<VarId>,
-    max_pool_size: Ema,
+    pub max_pool_size: Ema,
+    pub num_excess: usize,
 }
 
 impl Default for VarDB {
@@ -101,8 +102,8 @@ impl Default for VarDB {
             restart_on_conflict_path: true,
             activity_max: 0,
             activity_max_next: 0,
-            new_records: Vec::new(),
             max_pool_size: Ema::new(256),
+            num_excess: 0,
         }
     }
 }
@@ -164,11 +165,11 @@ impl ActivityIF for VarDB {
             && self.var[self.activity_max].activity < a
         {
             self.var[vi].turn_on(Flag::BIGBUMPED);
-            assert!(self.var[0].activity == 0.0);
+            self.num_excess += 1;
+            // assert!(self.var[0].activity == 0.0);
             if self.var[self.activity_max_next].activity < a {
                 self.activity_max_next = vi;
             }
-            self.new_records.push(vi);
         }
         if ACTIVITY_MAX < a {
             let scale = 1.0 / self.activity_inc;
@@ -197,27 +198,32 @@ impl Instantiate for VarDB {
             restart_on_conflict_path: true,
             activity_max: 0,      // NULL_VAR
             activity_max_next: 0, // NULL_VAR
-            new_records: Vec::new(),
             max_pool_size: Ema::new(256),
+            num_excess: 0,
         }
     }
 }
 
 impl VarDB {
-    pub fn update_record(&mut self) {
+    // call me before every restart
+    pub fn update_record(&mut self, asgs: &AssignStack) {
         if self.restart_on_conflict_path {
             self.activity_max = self.activity_max_next;
             self.activity_max_next = 0;
-            self.max_pool_size.update(self.new_records.len() as f64);
-            for vi in &self.new_records[..] {
-                self.var[*vi].turn_off(Flag::BIGBUMPED);
+            if 0 < self.num_excess {
+                self.max_pool_size.update(self.num_excess as f64);
             }
-            self.new_records.clear();
+            if 0 < asgs.level() {
+                for l in &asgs.trail[..] {
+                    self.var[l.vi()].turn_off(Flag::BIGBUMPED);
+                }
+            }
+            self.num_excess = 0;
         }
     }
     pub fn restart_by_backlog(&self) -> bool {
         self.restart_on_conflict_path
-            && 4.0 * self.max_pool_size.get() < self.new_records.len() as f64
+            && 4.0 * self.max_pool_size.get() < self.num_excess as f64
     }
 }
 

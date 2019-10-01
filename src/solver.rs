@@ -328,23 +328,24 @@ fn search(
             }
             // DYNAMIC FORCING RESTART based on LBD values, updated by conflict
             state.last_asg = asgs.len();
-            if state.rst.force_restart() {
+            if state.rst.force_restart() && (!state.stagnated || 0  < vdb.num_excess)
+            // 0.5 * vdb.max_pool_size.get() < vdb.num_excess as f64
+            {
                 state.stats[Stat::Restart] += 1;
                 asgs.cancel_until(vdb, state.root_level);
-                if false
-                    && 0 < state.config.dump_interval
+                if 0 < state.config.dump_interval
                     && state.stats[Stat::Restart] % state.config.dump_interval == 0
                 {
                     state.development.push((
                         state.stats[Stat::Conflict],
                         state.stats[Stat::Restart] as f64,
                         vdb[vdb.activity_max].activity.log(10.0),
-                        vdb.new_records.len() as f64,
+                        vdb.num_excess as f64,
                         state.rst.asg.trend().min(10.0),
                         state.rst.lbd.trend().min(10.0),
                     ));
                 }
-                vdb.update_record(); // 20190921
+                vdb.update_record(asgs); // 20190921
             } else if asgs.level() == 0 {
                 if cdb.simplify(asgs, elim, state, vdb).is_err() {
                     debug_assert!(false, "interal error by simplify");
@@ -414,11 +415,11 @@ fn handle_conflict_path(
             ncnfl,
             state.stats[Stat::Restart] as f64,
             vdb[vdb.activity_max].activity.log(10.0),
-            vdb.new_records.len() as f64,
+            vdb.num_excess as f64,
             state.rst.asg.trend().min(10.0),
             state.rst.lbd.trend().min(10.0),
         ));
-        vdb.update_record();
+        vdb.update_record(asgs);
     }
     let learnt_len = new_learnt.len();
     if learnt_len == 1 {
@@ -457,7 +458,7 @@ fn handle_conflict_path(
             ncnfl,
             state.stats[Stat::Restart] as f64,
             vdb[vdb.activity_max].activity.log(10.0),
-            vdb.new_records.len() as f64,
+            vdb.num_excess as f64,
             state.rst.asg.trend().min(10.0),
             state.rst.lbd.trend().min(10.0),
         ));
