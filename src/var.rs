@@ -12,9 +12,9 @@ pub struct Var {
     /// reverse conversion to index. Note `VarId` must be `usize`.
     pub index: VarId,
     /// the current value.
-    pub assign: Lbool,
+    pub assign: Option<bool>,
     /// the previous assigned value
-    pub phase: Lbool,
+    pub phase: bool,
     pub reason: ClauseId,
     /// decision level at which this variables is assigned.
     pub level: usize,
@@ -35,8 +35,8 @@ impl VarIF for Var {
     fn new(i: usize) -> Var {
         Var {
             index: i,
-            assign: BOTTOM,
-            phase: BOTTOM,
+            assign: None,
+            phase: false,
             reason: NULL_CLAUSE,
             level: 0,
             activity: 0.0,
@@ -181,18 +181,22 @@ impl VarDBIF for VarDB {
     fn is_empty(&self) -> bool {
         self.var.is_empty()
     }
-    fn assigned(&self, l: Lit) -> Lbool {
-        unsafe { self.var.get_unchecked(l.vi()).assign ^ ((l & 1) as u8) }
+    fn assigned(&self, l: Lit) -> Option<bool> {
+        // unsafe { self.var.get_unchecked(l.vi()).assign ^ ((l & 1) as u8) }
+        match unsafe { self.var.get_unchecked(l.vi()).assign } {
+            Some(x) if !l.as_bool() => Some(!x),
+            x => x,
+        }
     }
     fn locked(&self, c: &Clause, cid: ClauseId) -> bool {
         let lits = &c.lits;
         debug_assert!(1 < lits.len());
         let l0 = lits[0];
-        self.assigned(l0) == TRUE && self[l0.vi()].reason == cid
+        self.assigned(l0) == Some(true) && self[l0.vi()].reason == cid
     }
     fn satisfies(&self, vec: &[Lit]) -> bool {
         for l in vec {
-            if self.assigned(*l) == TRUE {
+            if self.assigned(*l) == Some(true) {
                 return true;
             }
         }
@@ -226,7 +230,7 @@ impl fmt::Display for Var {
         let st = |flag, mes| if self.is(flag) { mes } else { "" };
         write!(
             f,
-            "V{}({} at {} by {} {}{})",
+            "V{}({:?} at {} by {} {}{})",
             self.index,
             self.assign,
             self.level,

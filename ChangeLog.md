@@ -1,3 +1,8 @@
+## 0.1.5, as of 2019-10-02
+
+- The literal endconding uses even integers for positive literals
+- `Lbool` was changed to `Option<bool>`
+
 ## 0.1.4, 2019-09-12
 
 - fix wrong computations about `State::{c_lvl, b_lvl}`, `Clause::activity`
