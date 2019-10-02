@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use structopt::StructOpt;
 
-pub const VERSION: &str = "0.1.5-dev.0 #92";
+pub const VERSION: &str = "0.1.5-dev.1";
 pub const ACTIVITY_MAX: f64 = 1e308;
 
 /// Configuration built from command line options
