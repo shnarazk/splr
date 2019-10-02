@@ -112,27 +112,6 @@ impl PropagatorIF for AssignStack {
             Some(x) if x == sig => Ok(()),
             _ => Err(SolverError::Inconsistent),
         }
-/*
-        let val = var_assign!(self, v.index);
-        if BOTTOM == val {
-            set_assign!(self, Lit::from_var(v.index, sig));
-            v.assign = sig;
-            v.reason = cid;
-            v.level = dl;
-            if dl == 0 {
-                v.reason = NULL_CLAUSE;
-                v.activity = 0.0;
-            }
-            debug_assert!(!self.trail.contains(&Lit::from_var(v.index, true)));
-            debug_assert!(!self.trail.contains(&Lit::from_var(v.index, false)));
-            self.trail.push(Lit::from_var(v.index, sig));
-            Ok(())
-        } else if val == sig {
-            Ok(())
-        } else {
-            Err(SolverError::Inconsistent)
-        }
-*/
     }
     fn enqueue_null(&mut self, v: &mut Var, sig: bool) {
         debug_assert!(!v.is(Flag::ELIMINATED));

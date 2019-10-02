@@ -84,19 +84,6 @@ impl LitIF for Lit {
     }
 }
 
-// Lifted Bool type, consisting of
-//  - `FALSE`
-//  - `TRUE`
-//  - `BOTTOM`
-// pub type Lbool = Option<bool>;
-// pub const BOTTOM: Option<bool> = None;
-
-/// Note: this function doesn't work on BOTTOM.
-// #[allow(dead_code)]
-// fn negate_bool(b: Option<bool>) -> Option<bool> {
-//     b ^ 1
-// }
-
 /// Exponential Moving Average w/ a calibrator
 #[derive(Debug)]
 pub struct Ema {
