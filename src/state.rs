@@ -149,7 +149,7 @@ pub struct State {
     pub ok: bool,
     pub b_lvl: Ema,
     pub c_lvl: Ema,
-    pub model: Vec<Lbool>,
+    pub model: Vec<Option<bool>>,
     pub conflicts: Vec<Lit>,
     pub new_learnt: Vec<Lit>,
     pub an_seen: Vec<bool>,
@@ -290,7 +290,7 @@ impl Instantiate for State {
         state.num_vars = cnf.num_of_variables;
         state.rst = RestartExecutor::instantiate(config, &cnf);
         state.progress_log = config.use_log;
-        state.model = vec![BOTTOM; cnf.num_of_variables + 1];
+        state.model = vec![None; cnf.num_of_variables + 1];
         state.an_seen = vec![false; cnf.num_of_variables + 1];
         state.lbd_temp = vec![0; cnf.num_of_variables + 1];
         state.target = cnf.clone();

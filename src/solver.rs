@@ -101,18 +101,18 @@ impl SatSolverIF for Solver {
             // run simple preprocessor
             for vi in 1..vdb.len() {
                 let v = &mut vdb[vi];
-                if v.assign != BOTTOM {
+                if v.assign.is_some() {
                     continue;
                 }
                 match (v.pos_occurs.len(), v.neg_occurs.len()) {
-                    (_, 0) => asgs.enqueue_null(v, TRUE),
-                    (0, _) => asgs.enqueue_null(v, FALSE),
+                    (_, 0) => asgs.enqueue_null(v, true),
+                    (0, _) => asgs.enqueue_null(v, false),
                     (p, m) if m * 10 < p => {
-                        v.phase = TRUE;
+                        v.phase = true;
                         elim.enqueue_var(vdb, vi, false);
                     }
                     (p, m) if p * 10 < m => {
-                        v.phase = FALSE;
+                        v.phase = false;
                         elim.enqueue_var(vdb, vi, false);
                     }
                     _ => (),
@@ -141,14 +141,14 @@ impl SatSolverIF for Solver {
                 return Ok(Certificate::UNSAT);
             }
             for v in &mut vdb[1..] {
-                if v.assign != BOTTOM || v.is(Flag::ELIMINATED) {
+                if v.assign.is_some() || v.is(Flag::ELIMINATED) {
                     continue;
                 }
                 match (v.pos_occurs.len(), v.neg_occurs.len()) {
                     (_, 0) => (),
                     (0, _) => (),
-                    (p, m) if m * 10 < p => v.phase = TRUE,
-                    (p, m) if p * 10 < m => v.phase = FALSE,
+                    (p, m) if m * 10 < p => v.phase = true,
+                    (p, m) if p * 10 < m => v.phase = false,
                     _ => (),
                 }
             }
@@ -160,8 +160,8 @@ impl SatSolverIF for Solver {
                 let mut result = Vec::new();
                 for (vi, v) in vdb[0..].iter().enumerate().take(state.num_vars + 1).skip(1) {
                     match v.assign {
-                        TRUE => result.push(vi as i32),
-                        FALSE => result.push(0 - vi as i32),
+                        Some(true) => result.push(vi as i32),
+                        Some(false) => result.push(0 - vi as i32),
                         _ => result.push(0),
                     }
                 }
@@ -255,7 +255,7 @@ impl SatSolverIF for Solver {
                             Err(_) => (),
                         }
                     }
-                    if !v.is_empty() && s.add_unchecked_clause(&mut v) == None {
+                    if !v.is_empty() && s.add_unchecked_clause(&mut v).is_none() {
                         s.state.ok = false;
                     }
                 }
@@ -275,7 +275,7 @@ impl SatSolverIF for Solver {
             ..
         } = self;
         debug_assert!(asgs.level() == 0);
-        if v.iter().any(|l| vdb.assigned(*l) < BOTTOM) {
+        if v.iter().any(|l| vdb.assigned(*l).is_some()) {
             cdb.certificate_add(v);
         }
         v.sort_unstable();
@@ -284,9 +284,9 @@ impl SatSolverIF for Solver {
         for i in 0..v.len() {
             let li = v[i];
             let sat = vdb.assigned(li);
-            if sat == TRUE || li.negate() == l_ {
+            if sat == Some(true) || li.negate() == l_ {
                 return Some(NULL_CLAUSE);
-            } else if sat != FALSE && li != l_ {
+            } else if sat != Some(false) && li != l_ {
                 v[j] = li;
                 j += 1;
                 l_ = li;
@@ -582,7 +582,7 @@ fn analyze(
                 let v = &mut vdb[vi];
                 let lvl = v.level;
                 debug_assert!(!v.is(Flag::ELIMINATED));
-                debug_assert!(v.assign != BOTTOM);
+                debug_assert!(v.assign.is_some());
                 if 0 < lvl && !state.an_seen[vi] {
                     state.an_seen[vi] = true;
                     if dl <= lvl {
@@ -693,7 +693,7 @@ fn redundant_lit(
     while let Some(sl) = stack.pop() {
         let cid = vdb[sl.vi()].reason;
         let c = &mut cdb[cid];
-        if (*c).lits.len() == 2 && vdb.assigned((*c).lits[0]) == FALSE {
+        if (*c).lits.len() == 2 && vdb.assigned((*c).lits[0]) == Some(false) {
             (*c).lits.swap(0, 1);
         }
         for q in &(*c).lits[1..] {
@@ -771,7 +771,7 @@ fn minimize_with_bi_clauses(cdb: &ClauseDB, vdb: &VarDB, temp: &mut [usize], vec
         debug_assert!(c.lits[0] == l0 || c.lits[1] == l0);
         let other = c.lits[(c.lits[0] == l0) as usize];
         let vi = other.vi();
-        if temp[vi] == key && vdb.assigned(other) == TRUE {
+        if temp[vi] == key && vdb.assigned(other) == Some(true) {
             nsat += 1;
             temp[vi] -= 1;
         }

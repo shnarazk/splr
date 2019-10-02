@@ -112,7 +112,7 @@ impl EliminatorIF for Eliminator {
         if force {
             for vi in 1..vars.len() {
                 let v = &vars[vi];
-                if v.is(Flag::ELIMINATED) || v.assign != BOTTOM {
+                if v.is(Flag::ELIMINATED) || v.assign.is_some() {
                     continue;
                 }
                 self.enqueue_var(vars, vi, true);
@@ -171,7 +171,7 @@ impl EliminatorIF for Eliminator {
                 let v = &mut vars[vi];
                 v.turn_off(Flag::ENQUEUED);
                 cnt += 1;
-                if cnt < self.eliminate_loop_limit && !v.is(Flag::ELIMINATED) && v.assign == BOTTOM
+                if cnt < self.eliminate_loop_limit && !v.is(Flag::ELIMINATED) && v.assign.is_none()
                 {
                     eliminate_var(asgs, cdb, self, state, vars, vi)?;
                 }
@@ -204,12 +204,13 @@ impl EliminatorIF for Eliminator {
                     break;
                 }
                 let l = self.elim_clauses[i];
-                let model_value = match model[l.vi() - 1] {
-                    x if x == l.to_i32() => TRUE,
-                    x if -x == l.to_i32() => FALSE,
-                    _ => BOTTOM,
-                };
-                if model_value != FALSE {
+                // let model_value = match model[l.vi() - 1] {
+                //     x if x == l.to_i32() => Some(true),
+                //     x if -x == l.to_i32() => Some(false),
+                //     _ => None,
+                // };
+                // if model_value != Some(false) {
+                if -model[l.vi() - 1] != l.to_i32() {
                     if i < width {
                         break 'next;
                     }
@@ -277,7 +278,7 @@ impl EliminatorIF for Eliminator {
         c.turn_off(Flag::OCCUR_LINKED);
         debug_assert!(c.is(Flag::DEAD));
         for l in &c.lits {
-            if vars[l.vi()].assign == BOTTOM {
+            if vars[l.vi()].assign.is_none() {
                 self.remove_lit_occur(vars, *l, cid);
                 if !vars[l.vi()].is(Flag::ELIMINATED) {
                     self.enqueue_var(vars, l.vi(), true);
@@ -329,7 +330,7 @@ impl Eliminator {
                 let mut b = 0;
                 for l in lits {
                     let v = &vars[l.vi()];
-                    if v.assign != BOTTOM {
+                    if v.assign.is_some() {
                         continue;
                     }
                     let nsum = if l.is_positive() {
@@ -650,8 +651,8 @@ fn make_eliminated_clause(cdb: &mut ClauseDB, vec: &mut Vec<Lit>, vi: VarId, cid
     // Store the length of the clause last:
     debug_assert_eq!(vec[first].vi(), vi);
     vec.push(c.lits.len() as Lit);
-    cdb.touched[Lit::from_var(vi, TRUE) as usize] = true;
-    cdb.touched[Lit::from_var(vi, FALSE) as usize] = true;
+    cdb.touched[Lit::from_var(vi, true) as usize] = true;
+    cdb.touched[Lit::from_var(vi, false) as usize] = true;
     // println!("make_eliminated_clause: eliminate({}) clause {:?}", vi, vec2int(&ch.lits));
 }
 
@@ -664,7 +665,7 @@ fn eliminate_var(
     vi: VarId,
 ) -> MaybeInconsistent {
     let v = &mut vars[vi];
-    if v.assign != BOTTOM {
+    if v.assign.is_some() {
         return Ok(());
     }
     debug_assert!(!v.is(Flag::ELIMINATED));
@@ -778,13 +779,13 @@ fn make_eliminated_clauses(
             debug_assert!(!cdb[*cid].is(Flag::DEAD));
             make_eliminated_clause(cdb, tmp, v, *cid);
         }
-        make_eliminating_unit_clause(tmp, Lit::from_var(v, TRUE));
+        make_eliminating_unit_clause(tmp, Lit::from_var(v, true));
     } else {
         for cid in pos {
             debug_assert!(!cdb[*cid].is(Flag::DEAD));
             make_eliminated_clause(cdb, tmp, v, *cid);
         }
-        make_eliminating_unit_clause(tmp, Lit::from_var(v, FALSE));
+        make_eliminating_unit_clause(tmp, Lit::from_var(v, false));
     }
 }
 
@@ -874,7 +875,7 @@ impl VarOrderIF for VarOccHeap {
     fn rebuild(&mut self, vars: &VarDB) {
         self.reset();
         for v in &vars[1..] {
-            if v.assign == BOTTOM && !v.is(Flag::ELIMINATED) {
+            if v.assign.is_none() && !v.is(Flag::ELIMINATED) {
                 self.insert(vars, v.index, true);
             }
         }

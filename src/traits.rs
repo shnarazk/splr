@@ -4,7 +4,7 @@ use crate::eliminator::Eliminator;
 use crate::propagator::AssignStack;
 use crate::solver::{Solver, SolverResult};
 use crate::state::State;
-use crate::types::{CNFDescription, ClauseId, Flag, Lbool, Lit, MaybeInconsistent, VarId};
+use crate::types::{CNFDescription, ClauseId, Flag, Lit, MaybeInconsistent, VarId};
 use crate::var::{Var, VarDB};
 
 /// API for Clause and Var rewarding
@@ -171,13 +171,13 @@ pub trait LitIF {
     fn from_int(x: i32) -> Self;
     /// convert [VarId](../type.VarId.html) to [Lit](../type.Lit.html).
     /// It returns a positive literal if `p` is `TRUE` or `BOTTOM`.
-    fn from_var(vi: VarId, p: Lbool) -> Self;
+    fn from_var(vi: VarId, p: bool) -> Self;
     /// convert to var index.
     fn vi(self) -> VarId;
     /// convert to `i32`.
     fn to_i32(self) -> i32;
     /// convert to `Lbool`.
-    fn lbool(self) -> Lbool;
+    fn lbool(self) -> bool;
     /// return the sign or *phase*; return `true` if it is a positive literal.
     fn is_positive(self) -> bool;
     /// flip the sign.
@@ -214,7 +214,7 @@ pub trait PropagatorIF {
     /// return `true` if there are unpropagated assignments.
     fn remains(&self) -> bool;
     /// return the *value* of a given literal.
-    fn assigned(&self, l: Lit) -> Lbool;
+    fn assigned(&self, l: Lit) -> Option<bool>;
     /// execute *propagate*.
     fn propagate(&mut self, cdb: &mut ClauseDB, state: &mut State, vars: &mut VarDB) -> ClauseId;
     /// execute *backjump*.
@@ -224,9 +224,9 @@ pub trait PropagatorIF {
     /// # Errors
     ///
     /// if solver becomes inconsistent by the new assignment.
-    fn enqueue(&mut self, v: &mut Var, sig: Lbool, cid: ClauseId, dl: usize) -> MaybeInconsistent;
+    fn enqueue(&mut self, v: &mut Var, sig: bool, cid: ClauseId, dl: usize) -> MaybeInconsistent;
     /// add an assignment with no reason clause without inconsistency check.
-    fn enqueue_null(&mut self, v: &mut Var, sig: Lbool);
+    fn enqueue_null(&mut self, v: &mut Var, sig: bool);
     /// unsafe enqueue; doesn't emit an exception.
     fn uncheck_enqueue(&mut self, vars: &mut VarDB, l: Lit, cid: ClauseId);
     /// unsafe assume; doesn't emit an exception.
@@ -312,7 +312,7 @@ pub trait VarDBIF {
     /// return true if it's empty.
     fn is_empty(&self) -> bool;
     /// return the 'value' of a given literal.
-    fn assigned(&self, l: Lit) -> Lbool;
+    fn assigned(&self, l: Lit) -> Option<bool>;
     /// return `true` is the clause is the reason of the assignment.
     fn locked(&self, c: &Clause, cid: ClauseId) -> bool;
     /// return `true` if the set of literals is satisfiable under the current assignment.
