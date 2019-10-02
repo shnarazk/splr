@@ -56,28 +56,25 @@ pub const NULL_LIT: Lit = 0;
 
 impl LitIF for Lit {
     fn from_int(x: i32) -> Lit {
-        (if x < 0 { -2 * x + 1 } else { 2 * x }) as Lit
+        (if x < 0 { -2 * x } else { 2 * x + 1}) as Lit
     }
     fn from_var(vi: VarId, p: bool) -> Lit {
-        (vi as Lit) << 1 | ((p == false) as Lit)
+        (vi as Lit) << 1 | (p as Lit)
     }
     fn vi(self) -> VarId {
         (self >> 1) as VarId
     }
     fn to_i32(self) -> i32 {
         if self % 2 == 0 {
-            (self >> 1) as i32
-        } else {
             ((self >> 1) as i32).neg()
+        } else {
+            (self >> 1) as i32
         }
     }
     /// - positive Lit (= even u32) => Some(true)
     /// - negative Lit (= odd u32)  => Some(false)
-    fn lbool(self) -> bool {
-        self & 1 == 0
-    }
-    fn is_positive(self) -> bool {
-        self & 1 == 0
+    fn as_bool(self) -> bool {
+        (self & 1) != 0
     }
     fn negate(self) -> Lit {
         self ^ 1
