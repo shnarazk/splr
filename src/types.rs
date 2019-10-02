@@ -23,10 +23,10 @@ pub const NULL_CLAUSE: ClauseId = 0;
 /// ```
 /// use splr::traits::LitIF;
 /// use splr::types::*;
-/// assert_eq!(2, Lit::from_int( 1) as i32);
-/// assert_eq!(3, Lit::from_int(-1) as i32);
-/// assert_eq!(4, Lit::from_int( 2) as i32);
-/// assert_eq!(5, Lit::from_int(-2) as i32);
+/// assert_eq!(2, Lit::from_int(-1) as i32);
+/// assert_eq!(3, Lit::from_int( 1) as i32);
+/// assert_eq!(4, Lit::from_int(-2) as i32);
+/// assert_eq!(5, Lit::from_int( 2) as i32);
 /// assert_eq!( 1, Lit::from_int( 1).to_i32());
 /// assert_eq!(-1, Lit::from_int(-1).to_i32());
 /// assert_eq!( 2, Lit::from_int( 2).to_i32());
