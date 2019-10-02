@@ -291,7 +291,7 @@ impl SatSolverIF for Solver {
         match v.len() {
             0 => None, // Empty clause is UNSAT.
             1 => {
-                asgs.enqueue_null(&mut vdb[v[0].vi()], v[0].lbool());
+                asgs.enqueue_null(&mut vdb[v[0].vi()], v[0].as_bool());
                 Some(NULL_CLAUSE)
             }
             _ => {

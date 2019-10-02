@@ -34,7 +34,7 @@ macro_rules! lit_assign {
                 #[allow(unused_unsafe)]
                 // unsafe { *$asg.asgvec.get_unchecked(l.vi()) ^ (l as u8 & 1) }
                 match unsafe { *$asg.asgvec.get_unchecked(l.vi()) } {
-                    Some(x) if !l.is_positive() => Some(!x),
+                    Some(x) if !l.as_bool() => Some(!x),
                     x => x,
                 }
             }
@@ -45,7 +45,7 @@ macro_rules! lit_assign {
 macro_rules! set_assign {
     ($asg: expr, $lit: expr) => {
         match $lit {
-            l => unsafe { *$asg.asgvec.get_unchecked_mut(l.vi()) = Some(l.lbool()); },
+            l => unsafe { *$asg.asgvec.get_unchecked_mut(l.vi()) = Some(l.as_bool()); },
         }
     };
 }
@@ -234,9 +234,9 @@ impl PropagatorIF for AssignStack {
         let vi = l.vi();
         let v = &mut vars[vi];
         debug_assert!(!v.is(Flag::ELIMINATED));
-        debug_assert!(var_assign!(self, vi) == Some(l.lbool()) || var_assign!(self, vi).is_none());
+        debug_assert!(var_assign!(self, vi) == Some(l.as_bool()) || var_assign!(self, vi).is_none());
         set_assign!(self, l);
-        v.assign = Some(l.lbool());
+        v.assign = Some(l.as_bool());
         v.level = dl;
         v.reason = cid;
         debug_assert!(!self.trail.contains(&l));
@@ -253,7 +253,7 @@ impl PropagatorIF for AssignStack {
         debug_assert!(!v.is(Flag::ELIMINATED));
         // debug_assert!(self.assign[vi] == l.lbool() || self.assign[vi] == BOTTOM);
         set_assign!(self, l);
-        v.assign = Some(l.lbool());
+        v.assign = Some(l.as_bool());
         v.level = dl;
         v.reason = NULL_CLAUSE;
         self.trail.push(l);

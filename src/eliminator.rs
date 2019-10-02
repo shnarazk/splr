@@ -238,7 +238,7 @@ impl EliminatorIF for Eliminator {
             let v = &mut vars[l.vi()];
             v.turn_on(Flag::TOUCHED);
             if !v.is(Flag::ELIMINATED) {
-                if l.is_positive() {
+                if l.as_bool() {
                     debug_assert!(
                         !v.pos_occurs.contains(&cid),
                         format!("{} {:?} {}", cid.format(), vec2int(&c.lits), v.index,)
@@ -261,7 +261,7 @@ impl EliminatorIF for Eliminator {
     }
     fn remove_lit_occur(&mut self, vars: &mut VarDB, l: Lit, cid: ClauseId) {
         let v = &mut vars[l.vi()];
-        if l.is_positive() {
+        if l.as_bool() {
             debug_assert_eq!(v.pos_occurs.iter().filter(|&c| *c == cid).count(), 1);
             v.pos_occurs.delete_unstable(|&c| c == cid);
             debug_assert!(!v.pos_occurs.contains(&cid));
@@ -333,7 +333,7 @@ impl Eliminator {
                     if v.assign.is_some() {
                         continue;
                     }
-                    let nsum = if l.is_positive() {
+                    let nsum = if l.as_bool() {
                         v.neg_occurs.len()
                     } else {
                         v.pos_occurs.len()
@@ -496,7 +496,7 @@ fn check_eliminator(cdb: &ClauseDB, vars: &[Var]) -> bool {
         }
         for l in &c.lits {
             let v = l.vi();
-            if l.is_positive() {
+            if l.as_bool() {
                 if !vars[v].pos_occurs.contains(&(cid as ClauseId)) {
                     panic!("failed to check {} {:#}", (cid as ClauseId).format(), c);
                 }
@@ -563,7 +563,7 @@ fn strengthen_clause(
         // println!("{} {:?} is removed and its first literal {} is enqueued.", cid.format(), vec2int(&cdb.clause[cid].lits), c0.int());
         cdb.detach(cid);
         elim.remove_cid_occur(vars, cid, &mut cdb[cid]);
-        asgs.enqueue(&mut vars[c0.vi()], c0.lbool(), NULL_CLAUSE, 0)
+        asgs.enqueue(&mut vars[c0.vi()], c0.as_bool(), NULL_CLAUSE, 0)
     } else {
         // println!("cid {} drops literal {}", cid.fmt(), l.int());
         debug_assert!(1 < cdb[cid].lits.len());
@@ -700,7 +700,7 @@ fn eliminate_var(
                         // );
                         let lit = (*vec)[0];
                         cdb.certificate_add(&*vec);
-                        asgs.enqueue(&mut vars[lit.vi()], lit.lbool(), NULL_CLAUSE, 0)?;
+                        asgs.enqueue(&mut vars[lit.vi()], lit.as_bool(), NULL_CLAUSE, 0)?;
                     }
                     _ => {
                         let rank = if cdb[*p].is(Flag::LEARNT) && cdb[*n].is(Flag::LEARNT) {

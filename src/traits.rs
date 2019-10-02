@@ -176,10 +176,8 @@ pub trait LitIF {
     fn vi(self) -> VarId;
     /// convert to `i32`.
     fn to_i32(self) -> i32;
-    /// convert to `Lbool`.
-    fn lbool(self) -> bool;
-    /// return the sign or *phase*; return `true` if it is a positive literal.
-    fn is_positive(self) -> bool;
+    /// convert to `bool` from Some values.
+    fn as_bool(self) -> bool;
     /// flip the sign.
     fn negate(self) -> Lit;
     /// lift a literal to a *virtual* clause id.
