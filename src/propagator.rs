@@ -34,7 +34,7 @@ macro_rules! lit_assign {
                 #[allow(unused_unsafe)]
                 // unsafe { *$asg.asgvec.get_unchecked(l.vi()) ^ (l as u8 & 1) }
                 match unsafe { *$asg.asgvec.get_unchecked(l.vi()) } {
-                    Some(x) if l & 1 == 1 => Some(!x),
+                    Some(x) if !l.is_positive() => Some(!x),
                     x => x,
                 }
             }
