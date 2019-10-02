@@ -462,7 +462,7 @@ impl ClauseDBIF for ClauseDB {
         for (i, l) in v.iter().enumerate() {
             let vi = l.vi();
             let lv = vars[vi].level;
-            if vars[vi].assign != BOTTOM && lv_max < lv {
+            if vars[vi].assign.is_some() && lv_max < lv {
                 i_max = i;
                 lv_max = lv;
             }
