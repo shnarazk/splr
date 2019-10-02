@@ -12,7 +12,7 @@ use std::io::{BufWriter, Write};
 #[derive(Debug)]
 pub struct AssignStack {
     pub trail: Vec<Lit>,
-    asgvec: Vec<Lbool>,
+    asgvec: Vec<Option<bool>>,
     trail_lim: Vec<usize>,
     q_head: usize,
     var_order: VarIdHeap, // Variable Order
@@ -32,7 +32,11 @@ macro_rules! lit_assign {
         match $lit {
             l => {
                 #[allow(unused_unsafe)]
-                unsafe { *$asg.asgvec.get_unchecked(l.vi()) ^ (l as u8 & 1) }
+                // unsafe { *$asg.asgvec.get_unchecked(l.vi()) ^ (l as u8 & 1) }
+                match unsafe { *$asg.asgvec.get_unchecked(l.vi()) } {
+                    Some(x) if !l.as_bool() => Some(!x),
+                    x => x,
+                }
             }
         }
     };
@@ -41,7 +45,7 @@ macro_rules! lit_assign {
 macro_rules! set_assign {
     ($asg: expr, $lit: expr) => {
         match $lit {
-            l => unsafe { *$asg.asgvec.get_unchecked_mut(l.vi()) = l.lbool(); },
+            l => unsafe { *$asg.asgvec.get_unchecked_mut(l.vi()) = Some(l.as_bool()); },
         }
     };
 }
@@ -49,7 +53,7 @@ macro_rules! set_assign {
 #[allow(unused_unsafe)]
 macro_rules! unset_assign {
     ($asg: expr, $var: expr) => {
-        unsafe { *$asg.asgvec.get_unchecked_mut($var) = BOTTOM; }
+        unsafe { *$asg.asgvec.get_unchecked_mut($var) = None; }
     };
 }
 
@@ -58,7 +62,7 @@ impl Instantiate for AssignStack {
         let nv = cnf.num_of_variables;
         AssignStack {
             trail: Vec::with_capacity(nv),
-            asgvec: vec![BOTTOM; 1 + nv],
+            asgvec: vec![None; 1 + nv],
             trail_lim: Vec::new(),
             q_head: 0,
             var_order: VarIdHeap::new(nv, nv),
@@ -85,11 +89,30 @@ impl PropagatorIF for AssignStack {
     fn remains(&self) -> bool {
         self.q_head < self.trail.len()
     }
-    fn assigned(&self, l: Lit) -> Lbool {
+    fn assigned(&self, l: Lit) -> Option<bool> {
         lit_assign!(self, l)
     }
-    fn enqueue(&mut self, v: &mut Var, sig: Lbool, cid: ClauseId, dl: usize) -> MaybeInconsistent {
+    fn enqueue(&mut self, v: &mut Var, sig: bool, cid: ClauseId, dl: usize) -> MaybeInconsistent {
         debug_assert!(!v.is(Flag::ELIMINATED));
+        match var_assign!(self, v.index) {
+            None => {
+                set_assign!(self, Lit::from_var(v.index, sig));
+                v.assign = Some(sig);
+                v.reason = cid;
+                v.level = dl;
+                if dl == 0 {
+                    v.reason = NULL_CLAUSE;
+                    v.activity = 0.0;
+                }
+                debug_assert!(!self.trail.contains(&Lit::from_var(v.index, true)));
+                debug_assert!(!self.trail.contains(&Lit::from_var(v.index, false)));
+                self.trail.push(Lit::from_var(v.index, sig));
+                Ok(())
+            }
+            Some(x) if x == sig => Ok(()),
+            _ => Err(SolverError::Inconsistent),
+        }
+/*
         let val = var_assign!(self, v.index);
         if BOTTOM == val {
             set_assign!(self, Lit::from_var(v.index, sig));
@@ -100,8 +123,8 @@ impl PropagatorIF for AssignStack {
                 v.reason = NULL_CLAUSE;
                 v.activity = 0.0;
             }
-            debug_assert!(!self.trail.contains(&Lit::from_var(v.index, TRUE)));
-            debug_assert!(!self.trail.contains(&Lit::from_var(v.index, FALSE)));
+            debug_assert!(!self.trail.contains(&Lit::from_var(v.index, true)));
+            debug_assert!(!self.trail.contains(&Lit::from_var(v.index, false)));
             self.trail.push(Lit::from_var(v.index, sig));
             Ok(())
         } else if val == sig {
@@ -109,13 +132,13 @@ impl PropagatorIF for AssignStack {
         } else {
             Err(SolverError::Inconsistent)
         }
+*/
     }
-    fn enqueue_null(&mut self, v: &mut Var, sig: Lbool) {
+    fn enqueue_null(&mut self, v: &mut Var, sig: bool) {
         debug_assert!(!v.is(Flag::ELIMINATED));
-        debug_assert!(sig != BOTTOM);
-        if BOTTOM == var_assign!(self, v.index) {
+        if var_assign!(self, v.index).is_none() {
             set_assign!(self, Lit::from_var(v.index, sig));
-            v.assign = sig;
+            v.assign = Some(sig);
             v.reason = NULL_CLAUSE;
             v.level = 0;
             self.trail.push(Lit::from_var(v.index, sig));
@@ -139,12 +162,12 @@ impl PropagatorIF for AssignStack {
                     n += 1;
                     debug_assert!(!cdb[w.c].is(Flag::DEAD));
                     let blocker_value = lit_assign!(self, w.blocker);
-                    if blocker_value == TRUE {
+                    if blocker_value == Some(true) {
                         continue 'next_clause;
                     }
                     let lits = &mut cdb[w.c].lits;
                     if lits.len() == 2 {
-                        if blocker_value == FALSE {
+                        if blocker_value == Some(false) {
                             self.catchup();
                             return w.c;
                         }
@@ -158,12 +181,12 @@ impl PropagatorIF for AssignStack {
                         lits.swap(0, 1);
                     }
                     let first_value = lit_assign!(self, first);
-                    if first != w.blocker && first_value == TRUE {
+                    if first != w.blocker && first_value == Some(true) {
                         w.blocker = first;
                         continue 'next_clause;
                     }
                     for (k, lk) in lits.iter().enumerate().skip(2) {
-                        if lit_assign!(self, *lk) != FALSE {
+                        if lit_assign!(self, *lk) != Some(false) {
                             (*watcher)
                                 .get_unchecked_mut(lk.negate() as usize)
                                 .register(first, w.c);
@@ -173,7 +196,7 @@ impl PropagatorIF for AssignStack {
                             continue 'next_clause;
                         }
                     }
-                    if first_value == FALSE {
+                    if first_value == Some(false) {
                         self.catchup();
                         return w.c;
                     }
@@ -192,8 +215,8 @@ impl PropagatorIF for AssignStack {
             let vi = l.vi();
             let v = &mut vars[vi];
             unset_assign!(self, vi);
-            v.phase = v.assign;
-            v.assign = BOTTOM;
+            v.phase = v.assign.unwrap();
+            v.assign = None;
             v.reason = NULL_CLAUSE;
             self.var_order.insert(vars, vi);
         }
@@ -211,9 +234,9 @@ impl PropagatorIF for AssignStack {
         let vi = l.vi();
         let v = &mut vars[vi];
         debug_assert!(!v.is(Flag::ELIMINATED));
-        debug_assert!(var_assign!(self, vi) == l.lbool() || var_assign!(self, vi) == BOTTOM);
+        debug_assert!(var_assign!(self, vi) == Some(l.as_bool()) || var_assign!(self, vi).is_none());
         set_assign!(self, l);
-        v.assign = l.lbool();
+        v.assign = Some(l.as_bool());
         v.level = dl;
         v.reason = cid;
         debug_assert!(!self.trail.contains(&l));
@@ -222,7 +245,7 @@ impl PropagatorIF for AssignStack {
     }
     fn uncheck_assume(&mut self, vars: &mut VarDB, l: Lit) {
         debug_assert!(!self.trail.contains(&l));
-        debug_assert!(!self.trail.contains(&l.negate()));
+        debug_assert!(!self.trail.contains(&l.negate()), format!("{:?}", l));
         self.level_up();
         let dl = self.trail_lim.len();
         let vi = l.vi();
@@ -230,7 +253,7 @@ impl PropagatorIF for AssignStack {
         debug_assert!(!v.is(Flag::ELIMINATED));
         // debug_assert!(self.assign[vi] == l.lbool() || self.assign[vi] == BOTTOM);
         set_assign!(self, l);
-        v.assign = l.lbool();
+        v.assign = Some(l.as_bool());
         v.level = dl;
         v.reason = NULL_CLAUSE;
         self.trail.push(l);
@@ -245,8 +268,8 @@ impl PropagatorIF for AssignStack {
     fn dump_cnf(&mut self, cdb: &ClauseDB, state: &State, vars: &VarDB, fname: &str) {
         for v in &vars[1..] {
             if v.is(Flag::ELIMINATED) {
-                if var_assign!(self, v.index) != BOTTOM {
-                    panic!("conflicting var {} {}", v.index, var_assign!(self, v.index));
+                if var_assign!(self, v.index).is_some() {
+                    panic!("conflicting var {} {:?}", v.index, var_assign!(self, v.index));
                 } else {
                     println!("eliminate var {}", v.index);
                 }
@@ -356,7 +379,7 @@ impl VarOrderIF for VarIdHeap {
     fn select_var(&mut self, vars: &VarDB) -> VarId {
         loop {
             let vi = self.get_root(vars);
-            if BOTTOM <= vars[vi].assign && !vars[vi].is(Flag::ELIMINATED) {
+            if vars[vi].assign.is_none() && !vars[vi].is(Flag::ELIMINATED) {
                 return vi;
             }
         }
@@ -364,7 +387,7 @@ impl VarOrderIF for VarIdHeap {
     fn rebuild(&mut self, vars: &VarDB) {
         self.reset();
         for v in &vars[1..] {
-            if BOTTOM <= v.assign && !v.is(Flag::ELIMINATED) {
+            if v.assign.is_none() && !v.is(Flag::ELIMINATED) {
                 self.insert(vars, v.index);
             }
         }
