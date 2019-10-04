@@ -323,7 +323,7 @@ fn search(
             }
             // DYNAMIC FORCING RESTART based on LBD values, updated by conflict
             state.last_asg = asgs.len();
-            if state.rst.force_restart() && (!state.stagnated || 0  < vdb.num_excess)
+            if state.rst.force_restart() && (!state.stagnated || 0 < vdb.num_excess)
             // 0.5 * vdb.max_pool_size.get() < vdb.num_excess as f64
             {
                 state.stats[Stat::Restart] += 1;
@@ -506,14 +506,14 @@ fn adapt_parameters(
         //     <= state.stagnation as f64)
         if !state.stagnated && stagnated {
             state.stats[Stat::Stagnation] += 1;
-            if !state.config.without_deep_search {
-                state.rst.next_restart += 80_000;
-            }
+            // if !state.config.without_deep_search {
+            //     state.rst.next_restart += 80_000;
+            // }
         }
         state.stagnated = stagnated;
     }
     state.stats[Stat::SolvedRecord] = state.num_solved_vars;
-    if !state.rst.use_luby_restart && state.rst.adaptive_restart /* && !state.stagnated */ {
+    if !state.rst.use_luby_restart && state.rst.adaptive_restart && !state.stagnated {
         let moving: f64 = 0.04;
         let spring: f64 = 0.02;
         let margin: f64 = 0.20;
@@ -559,7 +559,7 @@ fn adapt_parameters(
     if state.stagnated {
         state.flush(&format!("deep searching ({})...", state.slack_duration));
     }
-    // state.rst.restart_step = 50 + 40_000 * (state.stagnated as usize);
+    state.rst.restart_step = 50 + 40_000 * (state.stagnated as usize);
     // state.rst.restart_step = 50 + 1_000 * (state.stagnated as usize);
     Ok(())
 }
