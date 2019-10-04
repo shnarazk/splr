@@ -219,6 +219,30 @@ impl VarDB {
                 }
             }
             self.num_excess = 0;
+>>>>>>> 11cb523e738b793f277a75adc4a72bdcdc7815ec
+        }
+    }
+    pub fn restart_by_backlog(&self) -> bool {
+        self.restart_on_conflict_path
+            && 4.0 * self.max_pool_size.get() < self.num_excess as f64
+    }
+}
+
+impl VarDB {
+    // call me before every restart
+    pub fn update_record(&mut self, asgs: &AssignStack) {
+        if self.restart_on_conflict_path {
+            self.activity_max = self.activity_max_next;
+            self.activity_max_next = 0;
+            if 0 < self.num_excess {
+                self.max_pool_size.update(self.num_excess as f64);
+            }
+            if 0 < asgs.level() {
+                for l in &asgs.trail[..] {
+                    self.var[l.vi()].turn_off(Flag::BIGBUMPED);
+                }
+            }
+            self.num_excess = 0;
         }
     }
     pub fn restart_by_backlog(&self) -> bool {
