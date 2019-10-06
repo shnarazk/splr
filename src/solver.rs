@@ -99,6 +99,7 @@ impl SatSolverIF for Solver {
             elim.activate();
             elim.prepare(cdb, vdb, true);
             // run simple preprocessor
+            let nv = state.target.num_of_variables;
             for vi in 1..vdb.len() {
                 let v = &mut vdb[vi];
                 if v.assign.is_some() {
@@ -109,7 +110,10 @@ impl SatSolverIF for Solver {
                     (0, _) => asgs.enqueue_null(v, false),
                     (p, m) => {
                         v.phase = m < p;
-                        elim.enqueue_var(vdb, vi, false);
+                        v.activity = (nv - p.min(m)) as f64;
+                        if m.min(p) <= 10 {
+                            elim.enqueue_var(vdb, vi, false);
+                        }
                     }
                 }
             }
@@ -135,19 +139,8 @@ impl SatSolverIF for Solver {
                 }
                 return Ok(Certificate::UNSAT);
             }
-            for v in &mut vdb[1..] {
-                if v.assign.is_some() || v.is(Flag::ELIMINATED) {
-                    continue;
-                }
-                match (v.pos_occurs.len(), v.neg_occurs.len()) {
-                    (_, 0) => (),
-                    (0, _) => (),
-                    (p, m) if m * 10 < p => v.phase = true,
-                    (p, m) if p * 10 < m => v.phase = false,
-                    _ => (),
-                }
-            }
         }
+        asgs.rebuild(vdb);
         state.progress(cdb, vdb, None);
         match search(asgs, cdb, elim, state, vdb) {
             Ok(true) => {

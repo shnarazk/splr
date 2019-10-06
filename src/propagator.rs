@@ -240,8 +240,8 @@ impl PropagatorIF for AssignStack {
     fn select_var(&mut self, vars: &VarDB) -> VarId {
         self.var_order.select_var(vars)
     }
-    fn update_order(&mut self, vec: &VarDB, v: VarId) {
-        self.var_order.update(vec, v)
+    fn update_order(&mut self, vdb: &VarDB, v: VarId) {
+        self.var_order.update(vdb, v)
     }
     #[allow(dead_code)]
     fn dump_cnf(&mut self, cdb: &ClauseDB, state: &State, vars: &VarDB, fname: &str) {
@@ -273,6 +273,9 @@ impl PropagatorIF for AssignStack {
                     .unwrap();
             }
         }
+    }
+    fn rebuild (&mut self, vdb: &VarDB) {
+        self.var_order.rebuild(vdb);
     }
 }
 
