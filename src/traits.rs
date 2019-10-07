@@ -236,6 +236,7 @@ pub trait PropagatorIF {
     fn select_var(&mut self, vars: &VarDB) -> VarId;
     /// dump all active clauses and fixed assignments in solver to a CNF file `fname`.
     fn dump_cnf(&mut self, cdb: &ClauseDB, state: &State, vars: &VarDB, fname: &str);
+    /// rebuild VarHeap.
     fn rebuild (&mut self, vdb: &VarDB);
 }
 
