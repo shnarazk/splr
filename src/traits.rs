@@ -205,6 +205,8 @@ pub trait PropagatorIF {
     fn rebuild_order(&mut self, vars: &mut [Var]);
     /// dump all active clauses and fixed assignments in solver to a CNF file `fname`.
     fn dump_cnf(&mut self, cdb: &ClauseDB, state: &State, vars: &[Var], fname: &str);
+    /// rebuild VarHeap.
+    fn rebuild(&mut self, vdb: &mut [Var]);
 }
 
 /// API for restart like `block_restart`, `force_restart` and so on.

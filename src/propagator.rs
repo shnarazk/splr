@@ -274,6 +274,9 @@ impl PropagatorIF for AssignStack {
             }
         }
     }
+    fn rebuild(&mut self, vdb: &mut [Var]) {
+        self.var_order.rebuild(vdb);
+    }
 }
 
 impl AssignStack {
