@@ -369,6 +369,7 @@ fn handle_conflict_path(
     state.restart_update_asg(asgs.len());
     // DYNAMIC BLOCKING RESTART
     state.block_restart(asgs, tn_confl);
+    let cl = asgs.level();
     let bl = analyze(asgs, cdb, state, vars, ci);
     let new_learnt = &mut state.new_learnt;
     asgs.cancel_until(vars, bl.max(state.root_level));
@@ -383,8 +384,8 @@ fn handle_conflict_path(
         let l0 = new_learnt[0];
         let cid = cdb.attach(state, vars, lbd);
         elim.add_cid_occur(vars, cid, &mut cdb.clause[cid as usize], true);
-        state.c_lvl.update(bl as f64);
-        state.b_lvl.update(lbd as f64);
+        state.c_lvl.update(cl as f64);
+        state.b_lvl.update(bl as f64);
         if lbd <= 2 {
             state.stats[Stat::NumLBD2] += 1;
         }

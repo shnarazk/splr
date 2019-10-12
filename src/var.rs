@@ -55,9 +55,7 @@ impl VarIF for Var {
     fn new_vars(n: usize) -> Vec<Var> {
         let mut vec = Vec::with_capacity(n + 1);
         for i in 0..=n {
-            let mut v = Var::new(i);
-            v.reward = (n - i) as f64;
-            vec.push(v);
+            vec.push(Var::new(i));
         }
         vec
     }
