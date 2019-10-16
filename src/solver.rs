@@ -107,11 +107,15 @@ impl SatSolverIF for Solver {
                 match (v.pos_occurs.len(), v.neg_occurs.len()) {
                     (_, 0) => asgs.enqueue_null(vars, vi, TRUE),
                     (0, _) => asgs.enqueue_null(vars, vi, FALSE),
-                    (p, m) => {
-                        if m.min(p) * 8 < m.max(p) {
-                            elim.enqueue_var(vars, vi, false);
-                        }
+                    (p, m) if m * 10 < p => {
+                        v.phase = TRUE;
+                        elim.enqueue_var(vars, vi, false);
                     }
+                    (p, m) if p * 10 < m => {
+                        v.phase = FALSE;
+                        elim.enqueue_var(vars, vi, false);
+                    }
+                    _ => (),
                 }
             }
             if !state.use_elim || !use_pre_processing_eliminator {
@@ -143,14 +147,13 @@ impl SatSolverIF for Solver {
                 match (v.pos_occurs.len(), v.neg_occurs.len()) {
                     (_, 0) => (),
                     (0, _) => (),
-                    (p, m) => {
-                        v.reward = (p.max(m) - p.min(m)) as f64 / (p + m) as f64;
-                        v.phase = if m < p { TRUE } else { FALSE };
-                    }
+                    (p, m) if m * 10 < p => v.phase = TRUE,
+                    (p, m) if p * 10 < m => v.phase = FALSE,
+                    _ => (),
                 }
             }
         }
-        asgs.rebuild(vars);
+        // asgs.rebuild(vars);
         state.progress(cdb, vars, None);
         match search(asgs, cdb, elim, state, vars) {
             Ok(true) => {
