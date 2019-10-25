@@ -11,7 +11,7 @@ use crate::var::{Var, VarDB};
 pub trait ActivityIF {
     type Ix;
     /// update an elememnt's activity.
-    fn bump_activity(&mut self, ix: Self::Ix);
+    fn bump_activity(&mut self, ix: Self::Ix, val: usize);
     /// increment activity step.
     fn scale_activity(&mut self);
 }
@@ -231,13 +231,13 @@ pub trait PropagatorIF {
     /// unsafe assume; doesn't emit an exception.
     fn uncheck_assume(&mut self, vars: &mut VarDB, l: Lit);
     /// update the internal heap on var order.
-    fn update_order(&mut self, vec: &VarDB, v: VarId);
+    fn update_order(&mut self, vdb: &mut VarDB, v: VarId);
     /// select a new decision variable.
-    fn select_var(&mut self, vars: &VarDB) -> VarId;
+    fn select_var(&mut self, vdb: &mut VarDB) -> VarId;
     /// dump all active clauses and fixed assignments in solver to a CNF file `fname`.
     fn dump_cnf(&mut self, cdb: &ClauseDB, state: &State, vars: &VarDB, fname: &str);
     /// rebuild VarHeap.
-    fn rebuild (&mut self, vdb: &VarDB);
+    fn rebuild (&mut self, vdb: &mut VarDB);
 }
 
 /// API for restart like `block_restart`, `force_restart` and so on.

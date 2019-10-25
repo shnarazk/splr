@@ -99,7 +99,6 @@ impl SatSolverIF for Solver {
             elim.activate();
             elim.prepare(cdb, vdb, true);
             // run simple preprocessor
-            let nv = state.target.num_of_variables;
             for vi in 1..vdb.len() {
                 let v = &mut vdb[vi];
                 if v.assign.is_some() {
@@ -110,7 +109,6 @@ impl SatSolverIF for Solver {
                     (0, _) => asgs.enqueue_null(v, false),
                     (p, m) => {
                         v.phase = m < p;
-                        v.activity = (nv - p.min(m)) as f64;
                         if m.min(p) <= 10 {
                             elim.enqueue_var(vdb, vi, false);
                         }
@@ -327,7 +325,7 @@ fn search(
                     state.development.push((
                         state.stats[Stat::Conflict],
                         state.stats[Stat::Restart] as f64,
-                        vdb[vdb.activity_max].activity.log(10.0),
+                        vdb.activity(vdb.activity_max).log(10.0),
                         vdb.num_excess as f64,
                         state.rst.asg.trend().min(10.0),
                         state.rst.lbd.trend().min(10.0),
@@ -342,7 +340,7 @@ fn search(
                 state.num_solved_vars = asgs.len();
             }
             if !asgs.remains() {
-                let vi = asgs.select_var(&vdb);
+                let vi = asgs.select_var(vdb);
                 let p = vdb[vi].phase;
                 asgs.uncheck_assume(vdb, Lit::from_var(vi, p));
                 state.stats[Stat::Decision] += 1;
@@ -402,7 +400,7 @@ fn handle_conflict_path(
         state.development.push((
             ncnfl,
             state.stats[Stat::Restart] as f64,
-            vdb[vdb.activity_max].activity.log(10.0),
+            vdb.activity(vdb.activity_max).log(10.0),
             vdb.num_excess as f64,
             state.rst.asg.trend().min(10.0),
             state.rst.lbd.trend().min(10.0),
@@ -445,7 +443,7 @@ fn handle_conflict_path(
         state.development.push((
             ncnfl,
             state.stats[Stat::Restart] as f64,
-            vdb[vdb.activity_max].activity.log(10.0),
+            vdb.activity(vdb.activity_max).log(10.0),
             vdb.num_excess as f64,
             state.rst.asg.trend().min(10.0),
             state.rst.lbd.trend().min(10.0),
@@ -580,7 +578,7 @@ fn analyze(
             let c = &mut cdb[cid] as *mut Clause;
             debug_assert!(!(*c).is(Flag::DEAD));
             if (*c).is(Flag::LEARNT) {
-                cdb.bump_activity(cid);
+                cdb.bump_activity(cid, 0);
                 if 2 < (*c).rank {
                     let nlevels = vdb.compute_lbd(&(*c).lits, &mut state.lbd_temp);
                     if nlevels + 1 < (*c).rank {
@@ -602,7 +600,7 @@ fn analyze(
             // println!("- handle {}", cid.fmt());
             for q in &(*c).lits[((p != NULL_LIT) as usize)..] {
                 let vi = q.vi();
-                vdb.bump_activity(vi);
+                vdb.bump_activity(vi, dl);
                 asgs.update_order(vdb, vi);
                 let v = &mut vdb[vi];
                 let lvl = v.level;
@@ -662,6 +660,7 @@ fn simplify_learnt(
         ref mut an_seen,
         ..
     } = state;
+    let dl = asgs.level();
     let mut to_clear: Vec<Lit> = vec![new_learnt[0]];
     let mut levels = vec![false; asgs.level() + 1];
     for l in &new_learnt[1..] {
@@ -680,7 +679,7 @@ fn simplify_learnt(
     while let Some(l) = state.last_dl.pop() {
         let vi = l.vi();
         if cdb[vdb[vi].reason].rank < lbd {
-            vdb.bump_activity(vi);
+            vdb.bump_activity(vi, dl);
             asgs.update_order(vdb, vi);
         }
     }

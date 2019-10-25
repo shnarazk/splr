@@ -1,11 +1,13 @@
 use crate::clause::Clause;
-use crate::config::{Config, ACTIVITY_MAX};
+use crate::config::Config;
 use crate::propagator::AssignStack;
 use crate::state::{Stat, State};
 use crate::traits::*;
 use crate::types::*;
 use std::fmt;
 use std::ops::{Index, IndexMut, Range, RangeFrom};
+
+const VAR_ACTIVITY_DECAY: f64 = 0.90;
 
 /// Structure for variables.
 #[derive(Debug)]
@@ -16,11 +18,16 @@ pub struct Var {
     pub assign: Option<bool>,
     /// the previous assigned value
     pub phase: bool,
+    /// clause propagated from
     pub reason: ClauseId,
     /// decision level at which this variables is assigned.
     pub level: usize,
-    /// a dynamic evaluation criterion like VSIDS or ACID.
-    pub activity: f64,
+    // a dynamic evaluation criterion like VSIDS or ACID.
+    // activity: f64,
+    /// reward value for CHB
+    reward: f64,
+    /// number of conflicts at last update
+    pub last_update: usize,
     /// list of clauses which contain this variable positively.
     pub pos_occurs: Vec<ClauseId>,
     /// list of clauses which contain this variable negatively.
@@ -40,7 +47,9 @@ impl VarIF for Var {
             phase: false,
             reason: NULL_CLAUSE,
             level: 0,
-            activity: 0.0,
+            // activity: 0.0,
+            last_update: 0,
+            reward: 0.0,
             pos_occurs: Vec::new(),
             neg_occurs: Vec::new(),
             flags: Flag::empty(),
@@ -99,7 +108,7 @@ impl Default for VarDB {
             activity_decay: 0.9,
             activity_decay_max: 0.95,
             /// 20190921-rr
-            restart_on_conflict_path: true,
+            restart_on_conflict_path: false,
             activity_max: 0,
             activity_max_next: 0,
             max_pool_size: Ema::new(256),
@@ -155,28 +164,27 @@ impl IndexMut<RangeFrom<usize>> for VarDB {
 
 impl ActivityIF for VarDB {
     type Ix = VarId;
-    fn bump_activity(&mut self, vi: Self::Ix) {
+    fn bump_activity(&mut self, vi: Self::Ix, dl: usize) {
+        let now = self.current_conflict;
         let v = &mut self.var[vi];
-        let a = v.activity + self.activity_inc;
-        v.activity = a;
+        // let a = v.activity + self.activity_inc;
+        // v.activity = a;
+        let diff = now - v.last_update;
+        // let reward = (state.stats[Stat::Conflict] as f64 + self.activity) / 2.0;
+        let reward = 0.2 + 1.0 / (dl + 1) as f64 + v.reward * VAR_ACTIVITY_DECAY.powi(diff as i32);
+        v.reward = reward;
+        v.last_update = self.current_conflict;
         if self.restart_on_conflict_path
             && !v.is(Flag::BIGBUMPED)
             && vi != self.activity_max
-            && self.var[self.activity_max].activity < a
+            && self.var[self.activity_max].reward < reward
         {
             self.var[vi].turn_on(Flag::BIGBUMPED);
             self.num_excess += 1;
             // assert!(self.var[0].activity == 0.0);
-            if self.var[self.activity_max_next].activity < a {
+            if self.var[self.activity_max_next].reward < reward {
                 self.activity_max_next = vi;
             }
-        }
-        if ACTIVITY_MAX < a {
-            let scale = 1.0 / self.activity_inc;
-            for v in &mut self[1..] {
-                v.activity *= scale;
-            }
-            self.activity_inc *= scale;
         }
     }
     fn scale_activity(&mut self) {
@@ -225,6 +233,17 @@ impl VarDB {
         self.restart_on_conflict_path
             && 4.0 * self.max_pool_size.get() < self.num_excess as f64
     }
+    pub fn activity(&mut self, vi: VarId) -> f64 {
+        let now = self.current_conflict;
+        let v = &mut self[vi];
+        let diff = now - v.last_update;
+        if 0 < diff {
+            v.last_update = now;
+            v.reward *= VAR_ACTIVITY_DECAY.powi(diff as i32);
+        }
+        v.reward
+    }
+
 }
 
 impl VarDBIF for VarDB {
