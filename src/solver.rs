@@ -148,6 +148,8 @@ impl SatSolverIF for Solver {
                 }
             }
         }
+        elim.set_initial_reward(vdb);
+        asgs.rebuild_order(vdb);
         state.progress(cdb, vdb, None);
         match search(asgs, cdb, elim, state, vdb) {
             Ok(true) => {
@@ -334,7 +336,7 @@ fn search(
                 state.num_solved_vars = asgs.len();
             }
             if !asgs.remains() {
-                let vi = asgs.select_var(&vdb);
+                let vi = asgs.select_var(vdb);
                 let p = vdb[vi].phase;
                 asgs.uncheck_assume(vdb, Lit::from_var(vi, p));
                 state.stats[Stat::Decision] += 1;
@@ -550,7 +552,7 @@ fn analyze(
             let c = &mut cdb[cid] as *mut Clause;
             debug_assert!(!(*c).is(Flag::DEAD));
             if (*c).is(Flag::LEARNT) {
-                cdb.bump_activity(cid);
+                cdb.bump_activity(cid, 0);
                 if 2 < (*c).rank {
                     let nlevels = vdb.compute_lbd(&(*c).lits, &mut state.lbd_temp);
                     if nlevels + 1 < (*c).rank {
@@ -572,7 +574,7 @@ fn analyze(
             // println!("- handle {}", cid.fmt());
             for q in &(*c).lits[((p != NULL_LIT) as usize)..] {
                 let vi = q.vi();
-                vdb.bump_activity(vi);
+                vdb.bump_activity(vi, dl);
                 asgs.update_order(vdb, vi);
                 let v = &mut vdb[vi];
                 let lvl = v.level;
@@ -632,6 +634,7 @@ fn simplify_learnt(
         ref mut an_seen,
         ..
     } = state;
+    let dl = asgs.level();
     let mut to_clear: Vec<Lit> = vec![new_learnt[0]];
     let mut levels = vec![false; asgs.level() + 1];
     for l in &new_learnt[1..] {
@@ -650,7 +653,7 @@ fn simplify_learnt(
     while let Some(l) = state.last_dl.pop() {
         let vi = l.vi();
         if cdb[vdb[vi].reason].rank < lbd {
-            vdb.bump_activity(vi);
+            vdb.bump_activity(vi, dl);
             asgs.update_order(vdb, vi);
         }
     }

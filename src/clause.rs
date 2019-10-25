@@ -257,7 +257,7 @@ impl IndexMut<RangeFrom<usize>> for ClauseDB {
 
 impl ActivityIF for ClauseDB {
     type Ix = ClauseId;
-    fn bump_activity(&mut self, cid: Self::Ix) {
+    fn bump_activity(&mut self, cid: Self::Ix, _: usize) {
         let c = &mut self.clause[cid as usize];
         let a = c.activity + self.activity_inc;
         c.activity = a;

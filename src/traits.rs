@@ -11,7 +11,7 @@ use crate::var::{Var, VarDB};
 pub trait ActivityIF {
     type Ix;
     /// update an elememnt's activity.
-    fn bump_activity(&mut self, ix: Self::Ix);
+    fn bump_activity(&mut self, ix: Self::Ix, dl: usize);
     /// increment activity step.
     fn scale_activity(&mut self);
 }
@@ -135,7 +135,9 @@ pub trait EliminatorIF {
     /// remove a clause id from literal's occur list.
     fn remove_lit_occur(&mut self, vars: &mut VarDB, l: Lit, cid: ClauseId);
     /// remove a clause id from all corresponding occur lists.
-    fn remove_cid_occur(&mut self, vars: &mut VarDB, cid: ClauseId, c: &mut Clause);
+    fn remove_cid_occur(&mut self, vdb: &mut VarDB, cid: ClauseId, c: &mut Clause);
+    /// set all vars' activities
+    fn set_initial_reward(&self, vdb: &mut VarDB);
 }
 
 /// API for Exponential Moving Average, EMA, like `get`, `reset`, `update` and so on.
@@ -229,10 +231,12 @@ pub trait PropagatorIF {
     fn uncheck_enqueue(&mut self, vars: &mut VarDB, l: Lit, cid: ClauseId);
     /// unsafe assume; doesn't emit an exception.
     fn uncheck_assume(&mut self, vars: &mut VarDB, l: Lit);
-    /// update the internal heap on var order.
-    fn update_order(&mut self, vec: &VarDB, v: VarId);
     /// select a new decision variable.
-    fn select_var(&mut self, vars: &VarDB) -> VarId;
+    fn select_var(&mut self, vdb: &mut VarDB) -> VarId;
+    /// update the internal heap on var order.
+    fn update_order(&mut self, vdb: &mut VarDB, v: VarId);
+    /// rebuild the internal var_order
+    fn rebuild_order(&mut self, vdb: &mut VarDB);
     /// dump all active clauses and fixed assignments in solver to a CNF file `fname`.
     fn dump_cnf(&mut self, cdb: &ClauseDB, state: &State, vars: &VarDB, fname: &str);
 }
@@ -319,6 +323,8 @@ pub trait VarDBIF {
     fn update_stat(&mut self, state: &State);
     /// return a LBD value for the set of literals.
     fn compute_lbd(&self, vec: &[Lit], keys: &mut [usize]) -> usize;
+    /// return the current activity of vi-th var.
+    fn activity(&mut self, vi: VarId) -> f64;
 }
 
 /// API for 'watcher list' like `attach`, `detach`, `detach_with` and so on.

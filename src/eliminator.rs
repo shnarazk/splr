@@ -272,18 +272,24 @@ impl EliminatorIF for Eliminator {
         }
         self.enqueue_var(vars, l.vi(), true);
     }
-    fn remove_cid_occur(&mut self, vars: &mut VarDB, cid: ClauseId, c: &mut Clause) {
+    fn remove_cid_occur(&mut self, vdb: &mut VarDB, cid: ClauseId, c: &mut Clause) {
         debug_assert!(self.mode == EliminatorMode::Running);
         debug_assert!(!cid.is_lifted_lit());
         c.turn_off(Flag::OCCUR_LINKED);
         debug_assert!(c.is(Flag::DEAD));
         for l in &c.lits {
-            if vars[l.vi()].assign.is_none() {
-                self.remove_lit_occur(vars, *l, cid);
-                if !vars[l.vi()].is(Flag::ELIMINATED) {
-                    self.enqueue_var(vars, l.vi(), true);
+            if vdb[l.vi()].assign.is_none() {
+                self.remove_lit_occur(vdb, *l, cid);
+                if !vdb[l.vi()].is(Flag::ELIMINATED) {
+                    self.enqueue_var(vdb, l.vi(), true);
                 }
             }
+        }
+    }
+    fn set_initial_reward(&self, vdb: &mut VarDB) {
+        let nv = vdb.len();
+        for (i, vi) in self.var_queue.heap.iter().enumerate().skip(1) {
+            vdb[*vi].reward = (nv - i) as f64; // two phase rewarding
         }
     }
 }
