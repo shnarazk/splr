@@ -45,7 +45,9 @@ macro_rules! lit_assign {
 macro_rules! set_assign {
     ($asg: expr, $lit: expr) => {
         match $lit {
-            l => unsafe { *$asg.asgvec.get_unchecked_mut(l.vi()) = Some(l.as_bool()); },
+            l => unsafe {
+                *$asg.asgvec.get_unchecked_mut(l.vi()) = Some(l.as_bool());
+            },
         }
     };
 }
@@ -53,7 +55,9 @@ macro_rules! set_assign {
 #[allow(unused_unsafe)]
 macro_rules! unset_assign {
     ($asg: expr, $var: expr) => {
-        unsafe { *$asg.asgvec.get_unchecked_mut($var) = None; }
+        unsafe {
+            *$asg.asgvec.get_unchecked_mut($var) = None;
+        }
     };
 }
 
@@ -213,7 +217,9 @@ impl PropagatorIF for AssignStack {
         let vi = l.vi();
         let v = &mut vdb[vi];
         debug_assert!(!v.is(Flag::ELIMINATED));
-        debug_assert!(var_assign!(self, vi) == Some(l.as_bool()) || var_assign!(self, vi).is_none());
+        debug_assert!(
+            var_assign!(self, vi) == Some(l.as_bool()) || var_assign!(self, vi).is_none()
+        );
         set_assign!(self, l);
         v.assign = Some(l.as_bool());
         v.level = dl;
@@ -251,7 +257,11 @@ impl PropagatorIF for AssignStack {
         for v in &vdb[1..] {
             if v.is(Flag::ELIMINATED) {
                 if var_assign!(self, v.index).is_some() {
-                    panic!("conflicting var {} {:?}", v.index, var_assign!(self, v.index));
+                    panic!(
+                        "conflicting var {} {:?}",
+                        v.index,
+                        var_assign!(self, v.index)
+                    );
                 } else {
                     println!("eliminate var {}", v.index);
                 }

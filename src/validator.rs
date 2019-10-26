@@ -10,7 +10,8 @@ impl ValidatorIF for Solver {
         for val in vec {
             let l = Lit::from_int(*val);
             let vi = l.vi();
-            self.asgs.enqueue(&mut self.vdb[vi], l.as_bool(), NULL_CLAUSE, 0)?;
+            self.asgs
+                .enqueue(&mut self.vdb[vi], l.as_bool(), NULL_CLAUSE, 0)?;
         }
         Ok(())
     }

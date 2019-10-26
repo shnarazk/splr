@@ -22,11 +22,13 @@ pub struct Var {
     pub level: usize,
     /// a dynamic evaluation criterion like VSIDS or ACID.
     pub reward: f64,
+    /// the number of conflicts at which this var was rewarded lastly
     last_update: usize,
     /// list of clauses which contain this variable positively.
     pub pos_occurs: Vec<ClauseId>,
     /// list of clauses which contain this variable negatively.
     pub neg_occurs: Vec<ClauseId>,
+    /// the `Flag`s
     flags: Flag,
 }
 
@@ -214,7 +216,7 @@ impl VarDBIF for VarDB {
             for l in vec {
                 let lv = self[l.vi()].level;
                 let p = keys.get_unchecked_mut(lv);
-                if  *p != key {
+                if *p != key {
                     *p = key;
                     cnt += 1;
                 }
