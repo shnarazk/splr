@@ -127,7 +127,7 @@ impl PropagatorIF for AssignStack {
     /// propagate without checking dead clauses
     /// Note: this function assumes there's no dead clause.
     /// So Eliminator should call `garbage_collect` before me.
-    fn propagate(&mut self, cdb: &mut ClauseDB, state: &mut State, vars: &mut VarDB) -> ClauseId {
+    fn propagate(&mut self, cdb: &mut ClauseDB, state: &mut State, vdb: &mut VarDB) -> ClauseId {
         let watcher = &mut cdb.watcher[..] as *mut [Vec<Watch>];
         while self.remains() {
             let p = self.sweep();
@@ -150,7 +150,7 @@ impl PropagatorIF for AssignStack {
                             self.catchup();
                             return w.c;
                         }
-                        self.uncheck_enqueue(vars, w.blocker, w.c);
+                        self.uncheck_enqueue(vdb, w.blocker, w.c);
                         continue 'next_clause;
                     }
                     debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
@@ -179,31 +179,31 @@ impl PropagatorIF for AssignStack {
                         self.catchup();
                         return w.c;
                     }
-                    self.uncheck_enqueue(vars, first, w.c);
+                    self.uncheck_enqueue(vdb, first, w.c);
                 }
             }
         }
         NULL_CLAUSE
     }
-    fn cancel_until(&mut self, vars: &mut VarDB, lv: usize) {
+    fn cancel_until(&mut self, vdb: &mut VarDB, lv: usize) {
         if self.trail_lim.len() <= lv {
             return;
         }
         let lim = self.trail_lim[lv];
         for l in &self.trail[lim..] {
             let vi = l.vi();
-            let v = &mut vars[vi];
+            let v = &mut vdb[vi];
             unset_assign!(self, vi);
             v.phase = v.assign.unwrap();
             v.assign = None;
             v.reason = NULL_CLAUSE;
-            self.var_order.insert(vars, vi);
+            self.var_order.insert(vdb, vi);
         }
         self.trail.truncate(lim);
         self.trail_lim.truncate(lv);
         self.q_head = lim;
     }
-    fn uncheck_enqueue(&mut self, vars: &mut VarDB, l: Lit, cid: ClauseId) {
+    fn uncheck_enqueue(&mut self, vdb: &mut VarDB, l: Lit, cid: ClauseId) {
         debug_assert!(l != 0, "Null literal is about to be equeued");
         debug_assert!(
             self.trail_lim.is_empty() || cid != 0,
@@ -211,7 +211,7 @@ impl PropagatorIF for AssignStack {
         );
         let dl = self.trail_lim.len();
         let vi = l.vi();
-        let v = &mut vars[vi];
+        let v = &mut vdb[vi];
         debug_assert!(!v.is(Flag::ELIMINATED));
         debug_assert!(var_assign!(self, vi) == Some(l.as_bool()) || var_assign!(self, vi).is_none());
         set_assign!(self, l);
@@ -222,13 +222,13 @@ impl PropagatorIF for AssignStack {
         debug_assert!(!self.trail.contains(&l.negate()));
         self.trail.push(l);
     }
-    fn uncheck_assume(&mut self, vars: &mut VarDB, l: Lit) {
+    fn uncheck_assume(&mut self, vdb: &mut VarDB, l: Lit) {
         debug_assert!(!self.trail.contains(&l));
         debug_assert!(!self.trail.contains(&l.negate()), format!("{:?}", l));
         self.level_up();
         let dl = self.trail_lim.len();
         let vi = l.vi();
-        let v = &mut vars[vi];
+        let v = &mut vdb[vi];
         debug_assert!(!v.is(Flag::ELIMINATED));
         // debug_assert!(self.assign[vi] == l.lbool() || self.assign[vi] == BOTTOM);
         set_assign!(self, l);
@@ -247,8 +247,8 @@ impl PropagatorIF for AssignStack {
         self.var_order.rebuild(vdb);
     }
     #[allow(dead_code)]
-    fn dump_cnf(&mut self, cdb: &ClauseDB, state: &State, vars: &VarDB, fname: &str) {
-        for v in &vars[1..] {
+    fn dump_cnf(&mut self, cdb: &ClauseDB, state: &State, vdb: &VarDB, fname: &str) {
+        for v in &vdb[1..] {
             if v.is(Flag::ELIMINATED) {
                 if var_assign!(self, v.index).is_some() {
                     panic!("conflicting var {} {:?}", v.index, var_assign!(self, v.index));

@@ -4,7 +4,7 @@ use crate::eliminator::Eliminator;
 use crate::restart::RestartExecutor;
 use crate::traits::*;
 use crate::types::*;
-use crate::var::{Var, VarDB};
+use crate::var::VarDB;
 use libc::{clock_gettime, timespec, CLOCK_PROCESS_CPUTIME_ID};
 use std::cmp::Ordering;
 use std::fmt;
@@ -389,15 +389,15 @@ impl StateIF for State {
     }
     /// `mes` should be shorter than or equal to 9, or 8 + a delimiter.
     #[allow(clippy::cognitive_complexity)]
-    fn progress(&mut self, cdb: &ClauseDB, vars: &VarDB, mes: Option<&str>) {
+    fn progress(&mut self, cdb: &ClauseDB, vdb: &VarDB, mes: Option<&str>) {
         if !self.use_progress {
             return;
         }
         if self.progress_log {
-            self.dump(cdb, vars);
+            self.dump(cdb, vdb);
             return;
         }
-        let nv = vars.len() - 1;
+        let nv = vdb.len() - 1;
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
         self.progress_cnt += 1;
@@ -694,9 +694,9 @@ impl State {
              c ========================================================================================================="
         );
     }
-    fn dump(&mut self, cdb: &ClauseDB, vars: &VarDB) {
+    fn dump(&mut self, cdb: &ClauseDB, vdb: &VarDB) {
         self.progress_cnt += 1;
-        let nv = vars.len() - 1;
+        let nv = vdb.len() - 1;
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
         let nlearnts = cdb.countf(Flag::LEARNT);
@@ -718,13 +718,13 @@ impl State {
         );
     }
     #[allow(dead_code)]
-    fn dump_details(&mut self, cdb: &ClauseDB, elim: &Eliminator, vars: &[Var], mes: Option<&str>) {
+    fn dump_details(&mut self, cdb: &ClauseDB, elim: &Eliminator, vdb: &VarDB, mes: Option<&str>) {
         self.progress_cnt += 1;
         let msg = match mes {
             None => self.strategy.to_str(),
             Some(x) => x,
         };
-        let nv = vars.len() - 1;
+        let nv = vdb.len() - 1;
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
         println!(
