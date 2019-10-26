@@ -1,5 +1,6 @@
-## 0.1.5, as of 2019-10-02
+## 0.1.5, as of 2019-10-25
 
+- out-of-range activity initialization
 - The literal endconding uses even integers for positive literals
 - `Lbool` was changed to `Option<bool>`
 
