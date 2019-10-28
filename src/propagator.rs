@@ -1,7 +1,7 @@
 use crate::clause::{ClauseDB, Watch};
 use crate::config::Config;
 use crate::state::{Stat, State};
-use crate::traits::{ClauseDBIF, FlagIF, Instantiate, LitIF, PropagatorIF, WatchDBIF};
+use crate::traits::{ClauseDBIF, FlagIF, Instantiate, LitIF, PropagatorIF, VarDBIF, WatchDBIF};
 use crate::types::*;
 use crate::var::{Var, VarDB};
 use std::fmt;
@@ -45,7 +45,9 @@ macro_rules! lit_assign {
 macro_rules! set_assign {
     ($asg: expr, $lit: expr) => {
         match $lit {
-            l => unsafe { *$asg.asgvec.get_unchecked_mut(l.vi()) = Some(l.as_bool()); },
+            l => unsafe {
+                *$asg.asgvec.get_unchecked_mut(l.vi()) = Some(l.as_bool());
+            },
         }
     };
 }
@@ -53,7 +55,9 @@ macro_rules! set_assign {
 #[allow(unused_unsafe)]
 macro_rules! unset_assign {
     ($asg: expr, $var: expr) => {
-        unsafe { *$asg.asgvec.get_unchecked_mut($var) = None; }
+        unsafe {
+            *$asg.asgvec.get_unchecked_mut($var) = None;
+        }
     };
 }
 
@@ -102,7 +106,7 @@ impl PropagatorIF for AssignStack {
                 v.level = dl;
                 if dl == 0 {
                     v.reason = NULL_CLAUSE;
-                    v.activity = 0.0;
+                    // v.activity = 0.0;
                 }
                 debug_assert!(!self.trail.contains(&Lit::from_var(v.index, true)));
                 debug_assert!(!self.trail.contains(&Lit::from_var(v.index, false)));
@@ -127,7 +131,7 @@ impl PropagatorIF for AssignStack {
     /// propagate without checking dead clauses
     /// Note: this function assumes there's no dead clause.
     /// So Eliminator should call `garbage_collect` before me.
-    fn propagate(&mut self, cdb: &mut ClauseDB, state: &mut State, vars: &mut VarDB) -> ClauseId {
+    fn propagate(&mut self, cdb: &mut ClauseDB, state: &mut State, vdb: &mut VarDB) -> ClauseId {
         let watcher = &mut cdb.watcher[..] as *mut [Vec<Watch>];
         while self.remains() {
             let p = self.sweep();
@@ -150,7 +154,7 @@ impl PropagatorIF for AssignStack {
                             self.catchup();
                             return w.c;
                         }
-                        self.uncheck_enqueue(vars, w.blocker, w.c);
+                        self.uncheck_enqueue(vdb, w.blocker, w.c);
                         continue 'next_clause;
                     }
                     debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
@@ -179,31 +183,31 @@ impl PropagatorIF for AssignStack {
                         self.catchup();
                         return w.c;
                     }
-                    self.uncheck_enqueue(vars, first, w.c);
+                    self.uncheck_enqueue(vdb, first, w.c);
                 }
             }
         }
         NULL_CLAUSE
     }
-    fn cancel_until(&mut self, vars: &mut VarDB, lv: usize) {
+    fn cancel_until(&mut self, vdb: &mut VarDB, lv: usize) {
         if self.trail_lim.len() <= lv {
             return;
         }
         let lim = self.trail_lim[lv];
         for l in &self.trail[lim..] {
             let vi = l.vi();
-            let v = &mut vars[vi];
+            let v = &mut vdb[vi];
             unset_assign!(self, vi);
             v.phase = v.assign.unwrap();
             v.assign = None;
             v.reason = NULL_CLAUSE;
-            self.var_order.insert(vars, vi);
+            self.var_order.insert(vdb, vi);
         }
         self.trail.truncate(lim);
         self.trail_lim.truncate(lv);
         self.q_head = lim;
     }
-    fn uncheck_enqueue(&mut self, vars: &mut VarDB, l: Lit, cid: ClauseId) {
+    fn uncheck_enqueue(&mut self, vdb: &mut VarDB, l: Lit, cid: ClauseId) {
         debug_assert!(l != 0, "Null literal is about to be equeued");
         debug_assert!(
             self.trail_lim.is_empty() || cid != 0,
@@ -211,9 +215,11 @@ impl PropagatorIF for AssignStack {
         );
         let dl = self.trail_lim.len();
         let vi = l.vi();
-        let v = &mut vars[vi];
+        let v = &mut vdb[vi];
         debug_assert!(!v.is(Flag::ELIMINATED));
-        debug_assert!(var_assign!(self, vi) == Some(l.as_bool()) || var_assign!(self, vi).is_none());
+        debug_assert!(
+            var_assign!(self, vi) == Some(l.as_bool()) || var_assign!(self, vi).is_none()
+        );
         set_assign!(self, l);
         v.assign = Some(l.as_bool());
         v.level = dl;
@@ -222,13 +228,13 @@ impl PropagatorIF for AssignStack {
         debug_assert!(!self.trail.contains(&l.negate()));
         self.trail.push(l);
     }
-    fn uncheck_assume(&mut self, vars: &mut VarDB, l: Lit) {
+    fn uncheck_assume(&mut self, vdb: &mut VarDB, l: Lit) {
         debug_assert!(!self.trail.contains(&l));
         debug_assert!(!self.trail.contains(&l.negate()), format!("{:?}", l));
         self.level_up();
         let dl = self.trail_lim.len();
         let vi = l.vi();
-        let v = &mut vars[vi];
+        let v = &mut vdb[vi];
         debug_assert!(!v.is(Flag::ELIMINATED));
         // debug_assert!(self.assign[vi] == l.lbool() || self.assign[vi] == BOTTOM);
         set_assign!(self, l);
@@ -237,18 +243,25 @@ impl PropagatorIF for AssignStack {
         v.reason = NULL_CLAUSE;
         self.trail.push(l);
     }
-    fn select_var(&mut self, vars: &VarDB) -> VarId {
-        self.var_order.select_var(vars)
+    fn select_var(&mut self, vdb: &mut VarDB) -> VarId {
+        self.var_order.select_var(vdb)
     }
-    fn update_order(&mut self, vec: &VarDB, v: VarId) {
-        self.var_order.update(vec, v)
+    fn update_order(&mut self, vdb: &mut VarDB, v: VarId) {
+        self.var_order.update(vdb, v)
+    }
+    fn rebuild_order(&mut self, vdb: &mut VarDB) {
+        self.var_order.rebuild(vdb);
     }
     #[allow(dead_code)]
-    fn dump_cnf(&mut self, cdb: &ClauseDB, state: &State, vars: &VarDB, fname: &str) {
-        for v in &vars[1..] {
+    fn dump_cnf(&mut self, cdb: &ClauseDB, state: &State, vdb: &VarDB, fname: &str) {
+        for v in &vdb[1..] {
             if v.is(Flag::ELIMINATED) {
                 if var_assign!(self, v.index).is_some() {
-                    panic!("conflicting var {} {:?}", v.index, var_assign!(self, v.index));
+                    panic!(
+                        "conflicting var {} {:?}",
+                        v.index,
+                        var_assign!(self, v.index)
+                    );
                 } else {
                     println!("eliminate var {}", v.index);
                 }
@@ -303,13 +316,13 @@ pub struct VarIdHeap {
 
 trait VarOrderIF {
     fn new(n: usize, init: usize) -> VarIdHeap;
-    fn update(&mut self, vec: &VarDB, v: VarId);
-    fn insert(&mut self, vec: &VarDB, vi: VarId);
+    fn update(&mut self, vdb: &mut VarDB, v: VarId);
+    fn insert(&mut self, vdb: &mut VarDB, vi: VarId);
     fn clear(&mut self);
     fn len(&self) -> usize;
     fn is_empty(&self) -> bool;
-    fn select_var(&mut self, vars: &VarDB) -> VarId;
-    fn rebuild(&mut self, vars: &VarDB);
+    fn select_var(&mut self, vdb: &mut VarDB) -> VarId;
+    fn rebuild(&mut self, vdb: &mut VarDB);
 }
 
 impl VarOrderIF for VarIdHeap {
@@ -325,17 +338,17 @@ impl VarOrderIF for VarIdHeap {
         idxs[0] = init;
         VarIdHeap { heap, idxs }
     }
-    fn update(&mut self, vec: &VarDB, v: VarId) {
+    fn update(&mut self, vdb: &mut VarDB, v: VarId) {
         debug_assert!(v != 0, "Invalid VarId");
         let start = self.idxs[v];
         if self.contains(v) {
-            self.percolate_up(vec, start)
+            self.percolate_up(vdb, start)
         }
     }
-    fn insert(&mut self, vec: &VarDB, vi: VarId) {
+    fn insert(&mut self, vdb: &mut VarDB, vi: VarId) {
         if self.contains(vi) {
             let i = self.idxs[vi];
-            self.percolate_up(&vec, i);
+            self.percolate_up(vdb, i);
             return;
         }
         let i = self.idxs[vi];
@@ -344,7 +357,7 @@ impl VarOrderIF for VarIdHeap {
         self.heap.swap(i, n);
         self.idxs.swap(vi, vn);
         self.idxs[0] = n;
-        self.percolate_up(&vec, n);
+        self.percolate_up(vdb, n);
     }
     fn clear(&mut self) {
         self.reset()
@@ -355,19 +368,19 @@ impl VarOrderIF for VarIdHeap {
     fn is_empty(&self) -> bool {
         self.idxs[0] == 0
     }
-    fn select_var(&mut self, vars: &VarDB) -> VarId {
+    fn select_var(&mut self, vdb: &mut VarDB) -> VarId {
         loop {
-            let vi = self.get_root(vars);
-            if vars[vi].assign.is_none() && !vars[vi].is(Flag::ELIMINATED) {
+            let vi = self.get_root(vdb);
+            if vdb[vi].assign.is_none() && !vdb[vi].is(Flag::ELIMINATED) {
                 return vi;
             }
         }
     }
-    fn rebuild(&mut self, vars: &VarDB) {
+    fn rebuild(&mut self, vdb: &mut VarDB) {
         self.reset();
-        for v in &vars[1..] {
-            if v.assign.is_none() && !v.is(Flag::ELIMINATED) {
-                self.insert(vars, v.index);
+        for vi in 1..vdb.len() {
+            if vdb[vi].assign.is_none() && !vdb[vi].is(Flag::ELIMINATED) {
+                self.insert(vdb, vi);
             }
         }
     }
@@ -403,7 +416,7 @@ impl VarIdHeap {
             self.heap[i] = i;
         }
     }
-    fn get_root(&mut self, vars: &VarDB) -> VarId {
+    fn get_root(&mut self, vdb: &mut VarDB) -> VarId {
         let s = 1;
         let vs = self.heap[s];
         let n = self.idxs[0];
@@ -414,15 +427,15 @@ impl VarIdHeap {
         self.idxs.swap(vn, vs);
         self.idxs[0] -= 1;
         if 1 < self.idxs[0] {
-            self.percolate_down(&vars, 1);
+            self.percolate_down(vdb, 1);
         }
         vs
     }
-    fn percolate_up(&mut self, vars: &VarDB, start: usize) {
+    fn percolate_up(&mut self, vdb: &mut VarDB, start: usize) {
         let mut q = start;
         let vq = self.heap[q];
         debug_assert!(0 < vq, "size of heap is too small");
-        let aq = vars[vq].activity;
+        let aq = vdb.activity(vq);
         loop {
             let p = q / 2;
             if p == 0 {
@@ -432,7 +445,7 @@ impl VarIdHeap {
                 return;
             } else {
                 let vp = self.heap[p];
-                let ap = vars[vp].activity;
+                let ap = vdb.activity(vp);
                 if ap < aq {
                     // move down the current parent, and make it empty
                     self.heap[q] = vp;
@@ -448,20 +461,20 @@ impl VarIdHeap {
             }
         }
     }
-    fn percolate_down(&mut self, vars: &VarDB, start: usize) {
+    fn percolate_down(&mut self, vdb: &mut VarDB, start: usize) {
         let n = self.len();
         let mut i = start;
         let vi = self.heap[i];
-        let ai = vars[vi].activity;
+        let ai = vdb.activity(vi);
         loop {
             let l = 2 * i; // left
             if l < n {
                 let vl = self.heap[l];
-                let al = vars[vl].activity;
+                let al = vdb.activity(vl);
                 let r = l + 1; // right
-                let (target, vc, ac) = if r < n && al < vars[self.heap[r]].activity {
+                let (target, vc, ac) = if r < n && al < vdb.activity(self.heap[r]) {
                     let vr = self.heap[r];
-                    (r, vr, vars[vr].activity)
+                    (r, vr, vdb.activity(vr))
                 } else {
                     (l, vl, al)
                 };
@@ -488,7 +501,7 @@ impl VarIdHeap {
         self.heap[1]
     }
     #[allow(dead_code)]
-    fn remove(&mut self, vars: &VarDB, vs: VarId) {
+    fn remove(&mut self, vdb: &mut VarDB, vs: VarId) {
         let s = self.idxs[vs];
         let n = self.idxs[0];
         if n < s {
@@ -499,7 +512,7 @@ impl VarIdHeap {
         self.idxs.swap(vn, vs);
         self.idxs[0] -= 1;
         if 1 < self.idxs[0] {
-            self.percolate_down(&vars, 1);
+            self.percolate_down(vdb, 1);
         }
     }
     #[allow(dead_code)]

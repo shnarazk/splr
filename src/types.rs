@@ -56,7 +56,7 @@ pub const NULL_LIT: Lit = 0;
 
 impl LitIF for Lit {
     fn from_int(x: i32) -> Lit {
-        (if x < 0 { -2 * x } else { 2 * x + 1}) as Lit
+        (if x < 0 { -2 * x } else { 2 * x + 1 }) as Lit
     }
     fn from_var(vi: VarId, p: bool) -> Lit {
         (vi as Lit) << 1 | (p as Lit)

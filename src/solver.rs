@@ -116,7 +116,6 @@ impl SatSolverIF for Solver {
             if !elim.enable || !use_pre_processing_eliminator {
                 elim.stop(cdb, vdb);
             }
-            // state.progress(cdb, vdb, Some("phase-in"));
         }
         if elim.enable && use_pre_processing_eliminator {
             state.flush("simplifying...");
@@ -148,6 +147,8 @@ impl SatSolverIF for Solver {
                 }
             }
         }
+        elim.set_initial_reward(vdb);
+        asgs.rebuild_order(vdb);
         state.progress(cdb, vdb, None);
         match search(asgs, cdb, elim, state, vdb) {
             Ok(true) => {
@@ -334,7 +335,7 @@ fn search(
                 state.num_solved_vars = asgs.len();
             }
             if !asgs.remains() {
-                let vi = asgs.select_var(&vdb);
+                let vi = asgs.select_var(vdb);
                 let p = vdb[vi].phase;
                 asgs.uncheck_assume(vdb, Lit::from_var(vi, p));
                 state.stats[Stat::Decision] += 1;
@@ -366,9 +367,6 @@ fn handle_conflict_path(
     ci: ClauseId,
 ) -> MaybeInconsistent {
     let ncnfl = state.stats[Stat::Conflict]; // total number
-    if ncnfl % 5000 == 0 && vdb.activity_decay < vdb.activity_decay_max {
-        vdb.activity_decay += 0.01;
-    }
     state.rst.after_restart += 1;
     // DYNAMIC BLOCKING RESTART based on ASG, updated on conflict path
     // If we can settle this conflict w/o restart, solver will get a big progress.
@@ -439,7 +437,6 @@ fn handle_conflict_path(
     Ok(())
 }
 
-#[allow(dead_code)]
 fn adapt_parameters(
     asgs: &mut AssignStack,
     cdb: &mut ClauseDB,
@@ -449,11 +446,8 @@ fn adapt_parameters(
     nconflict: usize,
 ) -> MaybeInconsistent {
     let switch = 100_000;
-    if !state.config.without_deep_search && !state.rst.use_luby_restart
-    /* && switch <= nconflict */
-    {
+    if !state.config.without_deep_search && !state.rst.use_luby_restart {
         let stopped = state.stats[Stat::SolvedRecord] == state.num_solved_vars;
-        // && state.record.vali[LogUsizeId::Binclause] == state.stats[Stat::NumBinLearnt]
         if stopped {
             state.slack_duration += 1;
         } else if 0 < state.slack_duration && state.stagnated {
@@ -509,7 +503,7 @@ fn adapt_parameters(
     if nconflict == switch {
         state.flush("exhaustive eliminator activated...");
         asgs.cancel_until(vdb, 0);
-        state.adapt_strategy(cdb, vdb);
+        state.adapt_strategy(cdb);
         if elim.enable {
             cdb.reset();
             elim.activate();
@@ -550,7 +544,7 @@ fn analyze(
             let c = &mut cdb[cid] as *mut Clause;
             debug_assert!(!(*c).is(Flag::DEAD));
             if (*c).is(Flag::LEARNT) {
-                cdb.bump_activity(cid);
+                cdb.bump_activity(cid, 0);
                 if 2 < (*c).rank {
                     let nlevels = vdb.compute_lbd(&(*c).lits, &mut state.lbd_temp);
                     if nlevels + 1 < (*c).rank {
@@ -572,7 +566,7 @@ fn analyze(
             // println!("- handle {}", cid.fmt());
             for q in &(*c).lits[((p != NULL_LIT) as usize)..] {
                 let vi = q.vi();
-                vdb.bump_activity(vi);
+                vdb.bump_activity(vi, dl);
                 asgs.update_order(vdb, vi);
                 let v = &mut vdb[vi];
                 let lvl = v.level;
@@ -632,6 +626,7 @@ fn simplify_learnt(
         ref mut an_seen,
         ..
     } = state;
+    let dl = asgs.level();
     let mut to_clear: Vec<Lit> = vec![new_learnt[0]];
     let mut levels = vec![false; asgs.level() + 1];
     for l in &new_learnt[1..] {
@@ -650,7 +645,7 @@ fn simplify_learnt(
     while let Some(l) = state.last_dl.pop() {
         let vi = l.vi();
         if cdb[vdb[vi].reason].rank < lbd {
-            vdb.bump_activity(vi);
+            vdb.bump_activity(vi, dl);
             asgs.update_order(vdb, vi);
         }
     }

@@ -1,10 +1,12 @@
 use crate::clause::Clause;
-use crate::config::{Config, ACTIVITY_MAX};
+use crate::config::Config;
 use crate::state::{Stat, State};
 use crate::traits::*;
 use crate::types::*;
 use std::fmt;
 use std::ops::{Index, IndexMut, Range, RangeFrom};
+
+const VAR_ACTIVITY_DECAY: f64 = 0.90;
 
 /// Structure for variables.
 #[derive(Debug)]
@@ -15,15 +17,19 @@ pub struct Var {
     pub assign: Option<bool>,
     /// the previous assigned value
     pub phase: bool,
+    /// the propagating clause
     pub reason: ClauseId,
     /// decision level at which this variables is assigned.
     pub level: usize,
     /// a dynamic evaluation criterion like VSIDS or ACID.
-    pub activity: f64,
+    pub reward: f64,
+    /// the number of conflicts at which this var was rewarded lastly
+    last_update: usize,
     /// list of clauses which contain this variable positively.
     pub pos_occurs: Vec<ClauseId>,
     /// list of clauses which contain this variable negatively.
     pub neg_occurs: Vec<ClauseId>,
+    /// the `Flag`s
     flags: Flag,
 }
 
@@ -39,7 +45,8 @@ impl VarIF for Var {
             phase: false,
             reason: NULL_CLAUSE,
             level: 0,
-            activity: 0.0,
+            reward: 0.0,
+            last_update: 0,
             pos_occurs: Vec::new(),
             neg_occurs: Vec::new(),
             flags: Flag::empty(),
@@ -75,10 +82,8 @@ pub struct VarDB {
     current_conflict: usize,
     /// the current restart's ordinal number
     current_restart: usize,
+    /// a working buffer for LBD calculation
     pub lbd_temp: Vec<usize>,
-    pub activity_inc: f64,
-    pub activity_decay: f64,
-    pub activity_decay_max: f64,
 }
 
 impl Default for VarDB {
@@ -88,9 +93,6 @@ impl Default for VarDB {
             current_conflict: 0,
             current_restart: 0,
             lbd_temp: Vec::new(),
-            activity_inc: 1.0,
-            activity_decay: 0.9,
-            activity_decay_max: 0.95,
         }
     }
 }
@@ -142,21 +144,15 @@ impl IndexMut<RangeFrom<usize>> for VarDB {
 
 impl ActivityIF for VarDB {
     type Ix = VarId;
-    fn bump_activity(&mut self, vi: Self::Ix) {
+    fn bump_activity(&mut self, vi: Self::Ix, dl: usize) {
         let v = &mut self.var[vi];
-        let a = v.activity + self.activity_inc;
-        v.activity = a;
-        if ACTIVITY_MAX < a {
-            let scale = 1.0 / self.activity_inc;
-            for v in &mut self[1..] {
-                v.activity *= scale;
-            }
-            self.activity_inc *= scale;
-        }
+        let now = self.current_conflict;
+        let diff = now - v.last_update;
+        // let reward = (state.stats[Stat::Conflict] as f64 + self.activity) / 2.0;
+        v.reward = 0.2 + 1.0 / (dl + 1) as f64 + v.reward * VAR_ACTIVITY_DECAY.powi(diff as i32);
+        v.last_update = now;
     }
-    fn scale_activity(&mut self) {
-        self.activity_inc /= self.activity_decay;
-    }
+    fn scale_activity(&mut self) {}
 }
 
 impl Instantiate for VarDB {
@@ -167,9 +163,6 @@ impl Instantiate for VarDB {
             current_conflict: 0,
             current_restart: 0,
             lbd_temp: vec![0; nv + 1],
-            activity_inc: 1.0,
-            activity_decay: 0.9,
-            activity_decay_max: 0.95,
         }
     }
 }
@@ -214,7 +207,7 @@ impl VarDBIF for VarDB {
             for l in vec {
                 let lv = self[l.vi()].level;
                 let p = keys.get_unchecked_mut(lv);
-                if  *p != key {
+                if *p != key {
                     *p = key;
                     cnt += 1;
                 }
@@ -222,6 +215,16 @@ impl VarDBIF for VarDB {
             *keys.get_unchecked_mut(0) = key;
             cnt
         }
+    }
+    fn activity(&mut self, vi: VarId) -> f64 {
+        let now = self.current_conflict;
+        let v = &mut self.var[vi];
+        let diff = now - v.last_update;
+        if 0 < diff {
+            v.last_update = now;
+            v.reward *= VAR_ACTIVITY_DECAY.powi(diff as i32);
+        }
+        v.reward
     }
 }
 
