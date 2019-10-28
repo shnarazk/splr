@@ -12,7 +12,7 @@ keywords = ["SAT", "SAT-solver", "logic", "satisfiability"]
 categories = ["science"]
 
 [dependencies]
-bitflags = "1.1"
+bitflags = "1.2"
 copyless = "0.1"
 libc = "0.2"
 structopt = "0.3"
