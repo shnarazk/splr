@@ -278,7 +278,7 @@ pub trait StateIF {
     /// return `true` if it is timed out.
     fn is_timeout(&self) -> bool;
     /// change heuristics based on stat data.
-    fn adapt_strategy(&mut self, cdb: &mut ClauseDB, vdb: &mut VarDB);
+    fn adapt_strategy(&mut self, cdb: &mut ClauseDB);
     /// write a header of stat data to stdio.
     fn progress_header(&self);
     /// write stat data to stdio.

@@ -116,7 +116,6 @@ impl SatSolverIF for Solver {
             if !elim.enable || !use_pre_processing_eliminator {
                 elim.stop(cdb, vdb);
             }
-            // state.progress(cdb, vdb, Some("phase-in"));
         }
         if elim.enable && use_pre_processing_eliminator {
             state.flush("simplifying...");
@@ -368,9 +367,6 @@ fn handle_conflict_path(
     ci: ClauseId,
 ) -> MaybeInconsistent {
     let ncnfl = state.stats[Stat::Conflict]; // total number
-    if ncnfl % 5000 == 0 && vdb.activity_decay < vdb.activity_decay_max {
-        vdb.activity_decay += 0.01;
-    }
     state.rst.after_restart += 1;
     // DYNAMIC BLOCKING RESTART based on ASG, updated on conflict path
     // If we can settle this conflict w/o restart, solver will get a big progress.
@@ -441,7 +437,6 @@ fn handle_conflict_path(
     Ok(())
 }
 
-#[allow(dead_code)]
 fn adapt_parameters(
     asgs: &mut AssignStack,
     cdb: &mut ClauseDB,
@@ -451,11 +446,8 @@ fn adapt_parameters(
     nconflict: usize,
 ) -> MaybeInconsistent {
     let switch = 100_000;
-    if !state.config.without_deep_search && !state.rst.use_luby_restart
-    /* && switch <= nconflict */
-    {
+    if !state.config.without_deep_search && !state.rst.use_luby_restart {
         let stopped = state.stats[Stat::SolvedRecord] == state.num_solved_vars;
-        // && state.record.vali[LogUsizeId::Binclause] == state.stats[Stat::NumBinLearnt]
         if stopped {
             state.slack_duration += 1;
         } else if 0 < state.slack_duration && state.stagnated {
@@ -511,7 +503,7 @@ fn adapt_parameters(
     if nconflict == switch {
         state.flush("exhaustive eliminator activated...");
         asgs.cancel_until(vdb, 0);
-        state.adapt_strategy(cdb, vdb);
+        state.adapt_strategy(cdb);
         if elim.enable {
             cdb.reset();
             elim.activate();

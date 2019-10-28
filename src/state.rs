@@ -313,7 +313,7 @@ impl StateIF for State {
             Err(_) => false,
         }
     }
-    fn adapt_strategy(&mut self, cdb: &mut ClauseDB, vdb: &mut VarDB) {
+    fn adapt_strategy(&mut self, cdb: &mut ClauseDB) {
         if self.config.without_adaptive_strategy || self.strategy != SearchStrategy::Initial {
             return;
         }
@@ -339,8 +339,6 @@ impl StateIF for State {
                 self.rst.use_luby_restart = true;
                 self.rst.luby_restart_factor = 100.0;
             }
-            vdb.activity_decay = 0.999;
-            vdb.activity_decay_max = 0.999;
         }
         if self.stats[Stat::NoDecisionConflict] > 54_400 {
             self.strategy = SearchStrategy::HighSuccesive;
@@ -348,14 +346,10 @@ impl StateIF for State {
             cdb.co_lbd_bound = 3;
             cdb.first_reduction = 30000;
             cdb.glureduce = true;
-            vdb.activity_decay = 0.99;
-            vdb.activity_decay_max = 0.99;
             // randomize_on_restarts = 1;
         }
         if self.stats[Stat::NumLBD2] - self.stats[Stat::NumBin] > 20_000 {
             self.strategy = SearchStrategy::ManyGlues;
-            vdb.activity_decay = 0.91;
-            vdb.activity_decay_max = 0.91;
         }
         if self.strategy == SearchStrategy::Initial {
             self.strategy = SearchStrategy::Generic;

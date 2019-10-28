@@ -17,6 +17,7 @@ pub struct Var {
     pub assign: Option<bool>,
     /// the previous assigned value
     pub phase: bool,
+    /// the propagating clause
     pub reason: ClauseId,
     /// decision level at which this variables is assigned.
     pub level: usize,
@@ -81,10 +82,8 @@ pub struct VarDB {
     current_conflict: usize,
     /// the current restart's ordinal number
     current_restart: usize,
+    /// a working buffer for LBD calculation
     pub lbd_temp: Vec<usize>,
-    pub activity_inc: f64,
-    pub activity_decay: f64,
-    pub activity_decay_max: f64,
 }
 
 impl Default for VarDB {
@@ -94,9 +93,6 @@ impl Default for VarDB {
             current_conflict: 0,
             current_restart: 0,
             lbd_temp: Vec::new(),
-            activity_inc: 1.0,
-            activity_decay: 0.9,
-            activity_decay_max: 0.95,
         }
     }
 }
@@ -156,9 +152,7 @@ impl ActivityIF for VarDB {
         v.reward = 0.2 + 1.0 / (dl + 1) as f64 + v.reward * VAR_ACTIVITY_DECAY.powi(diff as i32);
         v.last_update = now;
     }
-    fn scale_activity(&mut self) {
-        self.activity_inc /= self.activity_decay;
-    }
+    fn scale_activity(&mut self) {}
 }
 
 impl Instantiate for VarDB {
@@ -169,9 +163,6 @@ impl Instantiate for VarDB {
             current_conflict: 0,
             current_restart: 0,
             lbd_temp: vec![0; nv + 1],
-            activity_inc: 1.0,
-            activity_decay: 0.9,
-            activity_decay_max: 0.95,
         }
     }
 }
