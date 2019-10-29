@@ -448,7 +448,7 @@ impl ClauseDBIF for ClauseDB {
             .filter(|&c| c.flags.contains(mask) && !c.flags.contains(Flag::DEAD))
             .count()
     }
-    // Note: set lbd to 0 if you want to add the clause to Permanent.
+    // Note: set LBD to 0 if you want to add the clause to Permanent.
     fn attach(&mut self, state: &mut State, vdb: &mut VarDB, lbd: usize) -> ClauseId {
         let v = &mut state.new_learnt;
         if !self.certified.is_empty() {
@@ -614,7 +614,7 @@ impl ClauseDBIF for ClauseDB {
     }
     fn make_permanent(&mut self, reinit: bool) {
         // Adjusting for low decision levels.
-        // move some clauses with good lbd (col_lbd_bound) to Permanent
+        // move some clauses with good LBDs (col_lbd_bound) to Permanent
         for c in &mut self.clause[1..] {
             if c.is(Flag::DEAD) || !c.is(Flag::LEARNT) {
                 continue;

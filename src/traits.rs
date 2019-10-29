@@ -10,7 +10,7 @@ use crate::var::{Var, VarDB};
 /// API for Clause and Var rewarding
 pub trait ActivityIF {
     type Ix;
-    /// update an elememnt's activity.
+    /// update an element's activity.
     fn bump_activity(&mut self, ix: Self::Ix, dl: usize);
     /// increment activity step.
     fn scale_activity(&mut self);
@@ -56,7 +56,7 @@ pub trait ClauseDBIF {
     fn garbage_collect(&mut self);
     /// allocate a new clause and return its id.
     fn new_clause(&mut self, v: &[Lit], rank: usize, learnt: bool) -> ClauseId;
-    /// re-calculate the lbd values of all (learnt) clauses.
+    /// re-calculate the LBD values of all (learnt) clauses.
     fn reset_lbd(&mut self, vdb: &VarDB, temp: &mut [usize]);
     /// return the number of alive clauses in the database. Or return the database size if `active` is `false`.
     fn count(&self, alive: bool) -> usize;
@@ -94,9 +94,9 @@ pub trait Delete<T> {
 
 /// API for Eliminator like `activate`, `stop`, `eliminate` and so on.
 pub trait EliminatorIF {
-    /// set eliminater's mode to **ready**.
+    /// set eliminator's mode to **ready**.
     fn activate(&mut self);
-    /// set eliminater's mode to **dormant**.
+    /// set eliminator's mode to **dormant**.
     fn stop(&mut self, cdb: &mut ClauseDB, vdb: &mut VarDB);
     /// check if the eliminator is running.
     fn is_running(&self) -> bool;
