@@ -1,6 +1,6 @@
-## 0.1.5, as of 2019-10-28
+## 0.1.5, 2019-10-29
 
-- introduce big bang initialization for variable activity
+- introduce [big bang initialization](https://medium.com/backjump-technologies/big-bang-initialization-of-variable-activity-in-a-sat-solver-ada154f56fb0) for variable activity
 - The literal endconding uses even integers for positive literals
 - `Lbool` was changed to `Option<bool>`
 

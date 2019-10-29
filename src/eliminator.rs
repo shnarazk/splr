@@ -289,7 +289,7 @@ impl EliminatorIF for Eliminator {
     fn set_initial_reward(&self, vdb: &mut VarDB) {
         let nv = vdb.len();
         for (i, vi) in self.var_queue.heap.iter().enumerate().skip(1) {
-            vdb[*vi].reward = (nv - i) as f64; // two phase rewarding
+            vdb[*vi].reward = (nv - i) as f64; // big bang initialization
         }
     }
 }
