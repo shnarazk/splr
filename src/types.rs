@@ -23,10 +23,10 @@ pub const NULL_CLAUSE: ClauseId = 0;
 /// ```
 /// use splr::traits::LitIF;
 /// use splr::types::*;
-/// assert_eq!(2, Lit::from_int( 1) as i32);
-/// assert_eq!(3, Lit::from_int(-1) as i32);
-/// assert_eq!(4, Lit::from_int( 2) as i32);
-/// assert_eq!(5, Lit::from_int(-2) as i32);
+/// assert_eq!(2, Lit::from_int(-1) as i32);
+/// assert_eq!(3, Lit::from_int( 1) as i32);
+/// assert_eq!(4, Lit::from_int(-2) as i32);
+/// assert_eq!(5, Lit::from_int( 2) as i32);
 /// assert_eq!( 1, Lit::from_int( 1).to_i32());
 /// assert_eq!(-1, Lit::from_int(-1).to_i32());
 /// assert_eq!( 2, Lit::from_int( 2).to_i32());
@@ -42,12 +42,12 @@ pub const NULL_LIT: Lit = 0;
 /// ```
 /// use splr::traits::LitIF;
 /// use splr::types::*;
-/// assert_eq!(Lit::from_int(1), Lit::from_var(1 as VarId, TRUE));
-/// assert_eq!(Lit::from_int(2), Lit::from_var(2 as VarId, TRUE));
-/// assert_eq!(1, Lit::from_var(1, TRUE).vi());
-/// assert_eq!(1, Lit::from_var(1, FALSE).vi());
-/// assert_eq!(2, Lit::from_var(2, TRUE).vi());
-/// assert_eq!(2, Lit::from_var(2, FALSE).vi());
+/// assert_eq!(Lit::from_int(1), Lit::from_var(1 as VarId, true));
+/// assert_eq!(Lit::from_int(2), Lit::from_var(2 as VarId, true));
+/// assert_eq!(1, Lit::from_var(1, true).vi());
+/// assert_eq!(1, Lit::from_var(1, false).vi());
+/// assert_eq!(2, Lit::from_var(2, true).vi());
+/// assert_eq!(2, Lit::from_var(2, false).vi());
 /// assert_eq!(Lit::from_int( 1), Lit::from_int(-1).negate());
 /// assert_eq!(Lit::from_int(-1), Lit::from_int( 1).negate());
 /// assert_eq!(Lit::from_int( 2), Lit::from_int(-2).negate());
@@ -56,28 +56,25 @@ pub const NULL_LIT: Lit = 0;
 
 impl LitIF for Lit {
     fn from_int(x: i32) -> Lit {
-        (if x < 0 { -2 * x + 1 } else { 2 * x }) as Lit
+        (if x < 0 { -2 * x } else { 2 * x + 1 }) as Lit
     }
-    fn from_var(vi: VarId, p: Lbool) -> Lit {
-        (vi as Lit) << 1 | ((p == FALSE) as Lit)
+    fn from_var(vi: VarId, p: bool) -> Lit {
+        (vi as Lit) << 1 | (p as Lit)
     }
     fn vi(self) -> VarId {
         (self >> 1) as VarId
     }
     fn to_i32(self) -> i32 {
         if self % 2 == 0 {
-            (self >> 1) as i32
-        } else {
             ((self >> 1) as i32).neg()
+        } else {
+            (self >> 1) as i32
         }
     }
-    /// - positive Lit (= even u32) => TRUE (= 1 as u8)
-    /// - negative Lit (= odd u32)  => LFASE (= 0 as u8)
-    fn lbool(self) -> Lbool {
-        (self & 1 == 0) as Lbool
-    }
-    fn is_positive(self) -> bool {
-        self & 1 == 0
+    /// - positive Lit (= even u32) => Some(true)
+    /// - negative Lit (= odd u32)  => Some(false)
+    fn as_bool(self) -> bool {
+        (self & 1) != 0
     }
     fn negate(self) -> Lit {
         self ^ 1
@@ -85,24 +82,6 @@ impl LitIF for Lit {
     fn to_cid(self) -> ClauseId {
         (self as ClauseId) | 0x8000_0000
     }
-}
-
-/// Lifted Bool type, consisting of
-///  - `FALSE`
-///  - `TRUE`
-///  - `BOTTOM`
-pub type Lbool = u8;
-/// the lifted **false**.
-pub const FALSE: u8 = 0;
-/// the lifted **true**.
-pub const TRUE: u8 = 1;
-/// unbound bool.
-pub const BOTTOM: u8 = 2;
-
-/// Note: this function doesn't work on BOTTOM.
-#[allow(dead_code)]
-fn negate_bool(b: Lbool) -> Lbool {
-    b ^ 1
 }
 
 /// Exponential Moving Average w/ a calibrator

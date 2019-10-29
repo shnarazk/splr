@@ -1,14 +1,14 @@
 use std::path::PathBuf;
 use structopt::StructOpt;
 
-pub const VERSION: &str = "0.1.4";
+pub const VERSION: &str = "0.1.5";
 pub const ACTIVITY_MAX: f64 = 1e308;
 
 /// Configuration built from command line options
 #[derive(Clone, Debug, StructOpt)]
 #[structopt(name = "splr", about, author)]
 pub struct Config {
-    /// soft limit of #clauses (24MC~4GB)
+    /// soft limit of #clauses (6MC/GB)
     #[structopt(long = "cl", default_value = "0")]
     pub clause_limit: usize,
     /// grow limit of #clauses by v-elim
