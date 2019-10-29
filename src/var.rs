@@ -147,9 +147,9 @@ impl ActivityIF for VarDB {
     fn bump_activity(&mut self, vi: Self::Ix, dl: usize) {
         let v = &mut self.var[vi];
         let now = self.current_conflict;
-        let diff = now - v.last_update;
-        // let reward = (state.stats[Stat::Conflict] as f64 + self.activity) / 2.0;
-        v.reward = 0.2 + 1.0 / (dl + 1) as f64 + v.reward * VAR_ACTIVITY_DECAY.powi(diff as i32);
+        let t = (now - v.last_update) as i32;
+        // v.reward = (now as f64 + self.activity) / 2.0; // ASCID
+        v.reward = 0.2 + 1.0 / (dl + 1) as f64 + v.reward * VAR_ACTIVITY_DECAY.powi(t);
         v.last_update = now;
     }
     fn scale_activity(&mut self) {}
