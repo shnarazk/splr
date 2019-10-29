@@ -1,3 +1,4 @@
+#![doc(html_root_url = "https://docs.rs/splr/0.1.4")]
 /*!
 # a SAT Solver for Propositional Logic in Rust
 

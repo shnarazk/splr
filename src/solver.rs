@@ -8,6 +8,7 @@ use crate::types::*;
 use crate::var::VarDB;
 use std::fs;
 use std::io::{BufRead, BufReader};
+use std::path::Path;
 
 /// Normal results returned by Solver.
 #[derive(Debug, PartialEq)]
@@ -44,20 +45,19 @@ pub struct Solver {
     pub vdb: VarDB,        // Variables
 }
 
-impl SatSolverIF for Solver {
-    fn new(config: &Config, cnf: &CNFDescription) -> Solver {
-        let nv = cnf.num_of_variables as usize;
-        let nc = cnf.num_of_clauses as usize;
-        let elim = Eliminator::new(config, nv);
-        let state = State::new(config, cnf.clone());
+impl Instantiate for Solver {
+    fn instantiate(config: &Config, cnf: &CNFDescription) -> Solver {
         Solver {
-            asgs: AssignStack::new(nv),
-            cdb: ClauseDB::new(config, nv, nc),
-            elim,
-            state,
-            vdb: VarDB::new(nv),
+            asgs: AssignStack::instantiate(config, cnf),
+            cdb: ClauseDB::instantiate(config, cnf),
+            elim: Eliminator::instantiate(config, cnf),
+            state: State::instantiate(config, cnf),
+            vdb: VarDB::instantiate(config, cnf),
         }
     }
+}
+
+impl SatSolverIF for Solver {
     /// # Examples
     ///
     /// ```
@@ -101,27 +101,21 @@ impl SatSolverIF for Solver {
             // run simple preprocessor
             for vi in 1..vdb.len() {
                 let v = &mut vdb[vi];
-                if v.assign != BOTTOM {
+                if v.assign.is_some() {
                     continue;
                 }
                 match (v.pos_occurs.len(), v.neg_occurs.len()) {
-                    (_, 0) => asgs.enqueue_null(v, TRUE),
-                    (0, _) => asgs.enqueue_null(v, FALSE),
-                    (p, m) if m * 10 < p => {
-                        v.phase = TRUE;
+                    (_, 0) => asgs.enqueue_null(v, true),
+                    (0, _) => asgs.enqueue_null(v, false),
+                    (p, m) => {
+                        v.phase = m < p;
                         elim.enqueue_var(vdb, vi, false);
                     }
-                    (p, m) if p * 10 < m => {
-                        v.phase = FALSE;
-                        elim.enqueue_var(vdb, vi, false);
-                    }
-                    _ => (),
                 }
             }
             if !elim.enable || !use_pre_processing_eliminator {
                 elim.stop(cdb, vdb);
             }
-            // state.progress(cdb, vdb, Some("phase-in"));
         }
         if elim.enable && use_pre_processing_eliminator {
             state.flush("simplifying...");
@@ -141,18 +135,20 @@ impl SatSolverIF for Solver {
                 return Ok(Certificate::UNSAT);
             }
             for v in &mut vdb[1..] {
-                if v.assign != BOTTOM || v.is(Flag::ELIMINATED) {
+                if v.assign.is_some() || v.is(Flag::ELIMINATED) {
                     continue;
                 }
                 match (v.pos_occurs.len(), v.neg_occurs.len()) {
                     (_, 0) => (),
                     (0, _) => (),
-                    (p, m) if m * 10 < p => v.phase = TRUE,
-                    (p, m) if p * 10 < m => v.phase = FALSE,
+                    (p, m) if m * 10 < p => v.phase = true,
+                    (p, m) if p * 10 < m => v.phase = false,
                     _ => (),
                 }
             }
         }
+        elim.set_initial_reward(vdb);
+        asgs.rebuild_order(vdb);
         state.progress(cdb, vdb, None);
         match search(asgs, cdb, elim, state, vdb) {
             Ok(true) => {
@@ -160,8 +156,8 @@ impl SatSolverIF for Solver {
                 let mut result = Vec::new();
                 for (vi, v) in vdb[0..].iter().enumerate().take(state.num_vars + 1).skip(1) {
                     match v.assign {
-                        TRUE => result.push(vi as i32),
-                        FALSE => result.push(0 - vi as i32),
+                        Some(true) => result.push(vi as i32),
+                        Some(false) => result.push(0 - vi as i32),
                         _ => result.push(0),
                     }
                 }
@@ -227,9 +223,17 @@ impl SatSolverIF for Solver {
         let cnf = CNFDescription {
             num_of_variables: nv,
             num_of_clauses: nc,
-            pathname: config.cnf_filename.to_str().unwrap().to_string(),
+            pathname: if config.cnf_filename.to_string_lossy().is_empty() {
+                "--".to_string()
+            } else {
+                Path::new(&config.cnf_filename.to_string_lossy().into_owned())
+                    .file_name()
+                    .map_or("aStrangeNamed".to_string(), |f| {
+                        f.to_string_lossy().into_owned()
+                    })
+            },
         };
-        let mut s: Solver = Solver::new(config, &cnf);
+        let mut s: Solver = Solver::instantiate(config, &cnf);
         loop {
             buf.clear();
             match rs.read_line(&mut buf) {
@@ -247,7 +251,7 @@ impl SatSolverIF for Solver {
                             Err(_) => (),
                         }
                     }
-                    if !v.is_empty() && s.add_unchecked_clause(&mut v) == None {
+                    if !v.is_empty() && s.add_unchecked_clause(&mut v).is_none() {
                         s.state.ok = false;
                     }
                 }
@@ -267,7 +271,7 @@ impl SatSolverIF for Solver {
             ..
         } = self;
         debug_assert!(asgs.level() == 0);
-        if v.iter().any(|l| vdb.assigned(*l) != BOTTOM) {
+        if v.iter().any(|l| vdb.assigned(*l).is_some()) {
             cdb.certificate_add(v);
         }
         v.sort_unstable();
@@ -276,9 +280,9 @@ impl SatSolverIF for Solver {
         for i in 0..v.len() {
             let li = v[i];
             let sat = vdb.assigned(li);
-            if sat == TRUE || li.negate() == l_ {
+            if sat == Some(true) || li.negate() == l_ {
                 return Some(NULL_CLAUSE);
-            } else if sat != FALSE && li != l_ {
+            } else if sat != Some(false) && li != l_ {
                 v[j] = li;
                 j += 1;
                 l_ = li;
@@ -288,7 +292,7 @@ impl SatSolverIF for Solver {
         match v.len() {
             0 => None, // Empty clause is UNSAT.
             1 => {
-                asgs.enqueue_null(&mut vdb[v[0].vi()], v[0].lbool());
+                asgs.enqueue_null(&mut vdb[v[0].vi()], v[0].as_bool());
                 Some(NULL_CLAUSE)
             }
             _ => {
@@ -331,7 +335,7 @@ fn search(
                 state.num_solved_vars = asgs.len();
             }
             if !asgs.remains() {
-                let vi = asgs.select_var(&vdb);
+                let vi = asgs.select_var(vdb);
                 let p = vdb[vi].phase;
                 asgs.uncheck_assume(vdb, Lit::from_var(vi, p));
                 state.stats[Stat::Decision] += 1;
@@ -363,9 +367,6 @@ fn handle_conflict_path(
     ci: ClauseId,
 ) -> MaybeInconsistent {
     let ncnfl = state.stats[Stat::Conflict]; // total number
-    if ncnfl % 5000 == 0 && vdb.activity_decay < vdb.activity_decay_max {
-        vdb.activity_decay += 0.01;
-    }
     state.rst.after_restart += 1;
     // DYNAMIC BLOCKING RESTART based on ASG, updated on conflict path
     // If we can settle this conflict w/o restart, solver will get a big progress.
@@ -436,7 +437,6 @@ fn handle_conflict_path(
     Ok(())
 }
 
-#[allow(dead_code)]
 fn adapt_parameters(
     asgs: &mut AssignStack,
     cdb: &mut ClauseDB,
@@ -446,11 +446,8 @@ fn adapt_parameters(
     nconflict: usize,
 ) -> MaybeInconsistent {
     let switch = 100_000;
-    if !state.config.without_deep_search && !state.rst.use_luby_restart
-    /* && switch <= nconflict */
-    {
+    if !state.config.without_deep_search && !state.rst.use_luby_restart {
         let stopped = state.stats[Stat::SolvedRecord] == state.num_solved_vars;
-        // && state.record.vali[LogUsizeId::Binclause] == state.stats[Stat::NumBinLearnt]
         if stopped {
             state.slack_duration += 1;
         } else if 0 < state.slack_duration && state.stagnated {
@@ -506,7 +503,7 @@ fn adapt_parameters(
     if nconflict == switch {
         state.flush("exhaustive eliminator activated...");
         asgs.cancel_until(vdb, 0);
-        state.adapt_strategy(cdb, vdb);
+        state.adapt_strategy(cdb);
         if elim.enable {
             cdb.reset();
             elim.activate();
@@ -547,7 +544,7 @@ fn analyze(
             let c = &mut cdb[cid] as *mut Clause;
             debug_assert!(!(*c).is(Flag::DEAD));
             if (*c).is(Flag::LEARNT) {
-                cdb.bump_activity(cid);
+                cdb.bump_activity(cid, 0);
                 if 2 < (*c).rank {
                     let nlevels = vdb.compute_lbd(&(*c).lits, &mut state.lbd_temp);
                     if nlevels + 1 < (*c).rank {
@@ -569,12 +566,12 @@ fn analyze(
             // println!("- handle {}", cid.fmt());
             for q in &(*c).lits[((p != NULL_LIT) as usize)..] {
                 let vi = q.vi();
-                vdb.bump_activity(vi);
+                vdb.bump_activity(vi, dl);
                 asgs.update_order(vdb, vi);
                 let v = &mut vdb[vi];
                 let lvl = v.level;
                 debug_assert!(!v.is(Flag::ELIMINATED));
-                debug_assert!(v.assign != BOTTOM);
+                debug_assert!(v.assign.is_some());
                 if 0 < lvl && !state.an_seen[vi] {
                     state.an_seen[vi] = true;
                     if dl <= lvl {
@@ -629,6 +626,7 @@ fn simplify_learnt(
         ref mut an_seen,
         ..
     } = state;
+    let dl = asgs.level();
     let mut to_clear: Vec<Lit> = vec![new_learnt[0]];
     let mut levels = vec![false; asgs.level() + 1];
     for l in &new_learnt[1..] {
@@ -647,7 +645,7 @@ fn simplify_learnt(
     while let Some(l) = state.last_dl.pop() {
         let vi = l.vi();
         if cdb[vdb[vi].reason].rank < lbd {
-            vdb.bump_activity(vi);
+            vdb.bump_activity(vi, dl);
             asgs.update_order(vdb, vi);
         }
     }
@@ -685,7 +683,7 @@ fn redundant_lit(
     while let Some(sl) = stack.pop() {
         let cid = vdb[sl.vi()].reason;
         let c = &mut cdb[cid];
-        if (*c).lits.len() == 2 && vdb.assigned((*c).lits[0]) == FALSE {
+        if (*c).lits.len() == 2 && vdb.assigned((*c).lits[0]) == Some(false) {
             (*c).lits.swap(0, 1);
         }
         for q in &(*c).lits[1..] {
@@ -763,7 +761,7 @@ fn minimize_with_bi_clauses(cdb: &ClauseDB, vdb: &VarDB, temp: &mut [usize], vec
         debug_assert!(c.lits[0] == l0 || c.lits[1] == l0);
         let other = c.lits[(c.lits[0] == l0) as usize];
         let vi = other.vi();
-        if temp[vi] == key && vdb.assigned(other) == TRUE {
+        if temp[vi] == key && vdb.assigned(other) == Some(true) {
             nsat += 1;
             temp[vi] -= 1;
         }

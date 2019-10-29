@@ -4,13 +4,12 @@ use crate::eliminator::Eliminator;
 use crate::restart::RestartExecutor;
 use crate::traits::*;
 use crate::types::*;
-use crate::var::{Var, VarDB};
+use crate::var::VarDB;
 use libc::{clock_gettime, timespec, CLOCK_PROCESS_CPUTIME_ID};
 use std::cmp::Ordering;
 use std::fmt;
 use std::io::{stdout, Write};
 use std::ops::{Index, IndexMut};
-use std::path::Path;
 use std::time::SystemTime;
 
 /// A collection of named search heuristics
@@ -123,13 +122,13 @@ pub enum Stat {
 impl Index<Stat> for [usize] {
     type Output = usize;
     fn index(&self, i: Stat) -> &usize {
-        &self[i as usize]
+        unsafe { self.get_unchecked(i as usize) }
     }
 }
 
 impl IndexMut<Stat> for [usize] {
     fn index_mut(&mut self, i: Stat) -> &mut usize {
-        &mut self[i as usize]
+        unsafe { self.get_unchecked_mut(i as usize) }
     }
 }
 
@@ -150,7 +149,7 @@ pub struct State {
     pub ok: bool,
     pub b_lvl: Ema,
     pub c_lvl: Ema,
-    pub model: Vec<Lbool>,
+    pub model: Vec<Option<bool>>,
     pub conflicts: Vec<Lit>,
     pub new_learnt: Vec<Lit>,
     pub an_seen: Vec<bool>,
@@ -176,7 +175,7 @@ impl Default for State {
             num_solved_vars: 0,
             num_eliminated_vars: 0,
             config: Config::default(),
-            rst: RestartExecutor::new(&Config::default()),
+            rst: RestartExecutor::instantiate(&Config::default(), &CNFDescription::default()),
             stats: [0; Stat::EndOfStatIndex as usize],
             strategy: SearchStrategy::Initial,
             target: CNFDescription::default(),
@@ -285,30 +284,23 @@ macro_rules! f {
     };
 }
 
-impl StateIF for State {
-    fn new(config: &Config, mut cnf: CNFDescription) -> State {
+impl Instantiate for State {
+    fn instantiate(config: &Config, cnf: &CNFDescription) -> State {
         let mut state = State::default();
-        cnf.pathname = if cnf.pathname == "" {
-            "--".to_string()
-        } else {
-            Path::new(&cnf.pathname)
-                .file_name()
-                .unwrap()
-                .to_os_string()
-                .into_string()
-                .unwrap()
-        };
         state.num_vars = cnf.num_of_variables;
-        state.rst = RestartExecutor::new(config);
+        state.rst = RestartExecutor::instantiate(config, &cnf);
         state.progress_log = config.use_log;
-        state.model = vec![BOTTOM; cnf.num_of_variables + 1];
+        state.model = vec![None; cnf.num_of_variables + 1];
         state.an_seen = vec![false; cnf.num_of_variables + 1];
         state.lbd_temp = vec![0; cnf.num_of_variables + 1];
-        state.target = cnf;
+        state.target = cnf.clone();
         state.time_limit = config.timeout;
         state.config = config.clone();
         state
     }
+}
+
+impl StateIF for State {
     fn num_unsolved_vars(&self) -> usize {
         self.num_vars - self.num_solved_vars - self.num_eliminated_vars
     }
@@ -321,7 +313,7 @@ impl StateIF for State {
             Err(_) => false,
         }
     }
-    fn adapt_strategy(&mut self, cdb: &mut ClauseDB, vdb: &mut VarDB) {
+    fn adapt_strategy(&mut self, cdb: &mut ClauseDB) {
         if self.config.without_adaptive_strategy || self.strategy != SearchStrategy::Initial {
             return;
         }
@@ -347,8 +339,6 @@ impl StateIF for State {
                 self.rst.use_luby_restart = true;
                 self.rst.luby_restart_factor = 100.0;
             }
-            vdb.activity_decay = 0.999;
-            vdb.activity_decay_max = 0.999;
         }
         if self.stats[Stat::NoDecisionConflict] > 54_400 {
             self.strategy = SearchStrategy::HighSuccesive;
@@ -356,14 +346,10 @@ impl StateIF for State {
             cdb.co_lbd_bound = 3;
             cdb.first_reduction = 30000;
             cdb.glureduce = true;
-            vdb.activity_decay = 0.99;
-            vdb.activity_decay_max = 0.99;
             // randomize_on_restarts = 1;
         }
         if self.stats[Stat::NumLBD2] - self.stats[Stat::NumBin] > 20_000 {
             self.strategy = SearchStrategy::ManyGlues;
-            vdb.activity_decay = 0.91;
-            vdb.activity_decay_max = 0.91;
         }
         if self.strategy == SearchStrategy::Initial {
             self.strategy = SearchStrategy::Generic;
@@ -397,15 +383,15 @@ impl StateIF for State {
     }
     /// `mes` should be shorter than or equal to 9, or 8 + a delimiter.
     #[allow(clippy::cognitive_complexity)]
-    fn progress(&mut self, cdb: &ClauseDB, vars: &VarDB, mes: Option<&str>) {
+    fn progress(&mut self, cdb: &ClauseDB, vdb: &VarDB, mes: Option<&str>) {
         if !self.use_progress {
             return;
         }
         if self.progress_log {
-            self.dump(cdb, vars);
+            self.dump(cdb, vdb);
             return;
         }
-        let nv = vars.len() - 1;
+        let nv = vdb.len() - 1;
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
         self.progress_cnt += 1;
@@ -702,9 +688,9 @@ impl State {
              c ========================================================================================================="
         );
     }
-    fn dump(&mut self, cdb: &ClauseDB, vars: &VarDB) {
+    fn dump(&mut self, cdb: &ClauseDB, vdb: &VarDB) {
         self.progress_cnt += 1;
-        let nv = vars.len() - 1;
+        let nv = vdb.len() - 1;
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
         let nlearnts = cdb.countf(Flag::LEARNT);
@@ -726,13 +712,13 @@ impl State {
         );
     }
     #[allow(dead_code)]
-    fn dump_details(&mut self, cdb: &ClauseDB, elim: &Eliminator, vars: &[Var], mes: Option<&str>) {
+    fn dump_details(&mut self, cdb: &ClauseDB, elim: &Eliminator, vdb: &VarDB, mes: Option<&str>) {
         self.progress_cnt += 1;
         let msg = match mes {
             None => self.strategy.to_str(),
             Some(x) => x,
         };
-        let nv = vars.len() - 1;
+        let nv = vdb.len() - 1;
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
         println!(
