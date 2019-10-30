@@ -144,12 +144,12 @@ impl IndexMut<RangeFrom<usize>> for VarDB {
 
 impl ActivityIF for VarDB {
     type Ix = VarId;
-    fn bump_activity(&mut self, vi: Self::Ix, dl: usize) {
+    fn bump_activity(&mut self, vi: Self::Ix, _: usize) {
         let v = &mut self.var[vi];
         let now = self.current_conflict;
         let t = (now - v.last_update) as i32;
         // v.reward = (now as f64 + self.activity) / 2.0; // ASCID
-        v.reward = 0.2 + 1.0 / (dl + 1) as f64 + v.reward * VAR_ACTIVITY_DECAY.powi(t);
+        v.reward = 0.1 + v.reward * VAR_ACTIVITY_DECAY.powi(t);
         v.last_update = now;
     }
     fn scale_activity(&mut self) {}
