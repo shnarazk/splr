@@ -1,4 +1,4 @@
-use crate::clause::Clause;
+use crate::clause::{Clause, ClauseDB};
 use crate::config::Config;
 use crate::state::{Stat, State};
 use crate::traits::*;
@@ -181,6 +181,44 @@ impl VarDBIF for VarDB {
             x => x,
         }
     }
+    fn minimize_with_bi_clauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>) {
+        let nlevels = self.compute_lbd(vec);
+        if 6 < nlevels {
+            return;
+        }
+        let VarDB { ref mut lbd_temp, ref mut var, .. } = self;
+        let assigned = |l: Lit| -> Option<bool> {
+            match unsafe { var.get_unchecked(l.vi()).assign } {
+                Some(x) if !l.as_bool() => Some(!x),
+                x => x,
+            }
+        };
+        let key = lbd_temp[0] + 1;
+        for l in &vec[1..] {
+            lbd_temp[l.vi() as usize] = key;
+        }
+        let l0 = vec[0];
+        let mut nsat = 0;
+
+        for w in &cdb.watcher[l0.negate() as usize] {
+            let c = &cdb[w.c];
+            if c.lits.len() != 2 {
+                continue;
+            }
+            debug_assert!(c.lits[0] == l0 || c.lits[1] == l0);
+            let other = c.lits[(c.lits[0] == l0) as usize];
+            let vi = other.vi();
+            if lbd_temp[vi] == key && assigned(other) == Some(true) {
+                nsat += 1;
+                lbd_temp[vi] -= 1;
+            }
+        }
+        if 0 < nsat {
+            lbd_temp[l0.vi()] = key;
+            vec.retain(|l| lbd_temp[l.vi()] == key);
+        }
+        lbd_temp[0] = key;
+}
     fn locked(&self, c: &Clause, cid: ClauseId) -> bool {
         let lits = &c.lits;
         debug_assert!(1 < lits.len());
@@ -200,19 +238,19 @@ impl VarDBIF for VarDB {
         self.current_restart = state.stats[Stat::Restart] + 1;
     }
 
-    fn compute_lbd(&self, vec: &[Lit], keys: &mut [usize]) -> usize {
+    fn compute_lbd(&mut self, vec: &[Lit]) -> usize {
         unsafe {
-            let key = keys.get_unchecked(0) + 1;
+            let key = self.lbd_temp.get_unchecked(0) + 1;
             let mut cnt = 0;
             for l in vec {
                 let lv = self[l.vi()].level;
-                let p = keys.get_unchecked_mut(lv);
+                let p = self.lbd_temp.get_unchecked_mut(lv);
                 if *p != key {
                     *p = key;
                     cnt += 1;
                 }
             }
-            *keys.get_unchecked_mut(0) = key;
+            *self.lbd_temp.get_unchecked_mut(0) = key;
             cnt
         }
     }

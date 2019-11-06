@@ -57,7 +57,7 @@ pub trait ClauseDBIF {
     /// allocate a new clause and return its id.
     fn new_clause(&mut self, v: &[Lit], rank: usize, learnt: bool) -> ClauseId;
     /// re-calculate the LBD values of all (learnt) clauses.
-    fn reset_lbd(&mut self, vdb: &VarDB, temp: &mut [usize]);
+    fn reset_lbd(&mut self, vdb: &mut VarDB);
     /// return the number of alive clauses in the database. Or return the database size if `active` is `false`.
     fn count(&self, alive: bool) -> usize;
     /// return the number of clauses which satisfy given flags and aren't DEAD.
@@ -315,6 +315,8 @@ pub trait VarDBIF {
     fn is_empty(&self) -> bool;
     /// return the 'value' of a given literal.
     fn assigned(&self, l: Lit) -> Option<bool>;
+    /// minimize (simplify) a vec.
+    fn minimize_with_bi_clauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>);
     /// return `true` is the clause is the reason of the assignment.
     fn locked(&self, c: &Clause, cid: ClauseId) -> bool;
     /// return `true` if the set of literals is satisfiable under the current assignment.
@@ -322,9 +324,12 @@ pub trait VarDBIF {
     /// copy some stat data from `State`.
     fn update_stat(&mut self, state: &State);
     /// return a LBD value for the set of literals.
-    fn compute_lbd(&self, vec: &[Lit], keys: &mut [usize]) -> usize;
+    fn compute_lbd(&mut self, vec: &[Lit]) -> usize;
     /// return the current activity of vi-th var.
     fn activity(&mut self, vi: VarId) -> f64;
+    /// return true if the disruption counter is larger than `thr`.
+    fn check_disruption_threshold(&mut self, thr: usize) -> bool;
+    fn update_disruption(&mut self);
 }
 
 /// API for 'watcher list' like `attach`, `detach`, `detach_with` and so on.
