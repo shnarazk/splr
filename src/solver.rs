@@ -324,7 +324,12 @@ fn search(
             }
             // DYNAMIC FORCING RESTART based on LBD values, updated by conflict
             state.last_asg = asgs.len();
-            if state.rst.force_restart() {
+            if state.rst.force_restart()
+                // && vdb.restart_conditional(asgs, 4)
+                // && vdb.restart_conditional(asgs, state.stagnated as usize * 2 + 2)
+                // && (!state.stagnated || vdb.restart_conditional(asgs, 2.2))
+            {
+                vdb.update_disruption();
                 state.stats[Stat::Restart] += 1;
                 asgs.cancel_until(vdb, state.root_level);
             } else if asgs.level() == 0 {
@@ -511,11 +516,12 @@ fn adapt_parameters(
         }
     }
     state.progress(cdb, vdb, None);
+    let extra = 40_000;
     if !state.config.without_deep_search {
-        state.rst.restart_step = 50 + 40_000 * (state.stagnated as usize);
+        state.rst.restart_step = 50 + extra * (state.stagnated as usize);
         if state.stagnated {
             state.flush(&format!("deep searching ({})...", state.slack_duration));
-            state.rst.next_restart += 80_000;
+            state.rst.next_restart += 2 * extra;
         }
     }
     Ok(())
