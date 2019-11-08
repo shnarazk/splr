@@ -1,12 +1,13 @@
 use crate::clause::{ClauseDB, Watch};
 use crate::config::Config;
 use crate::state::{Stat, State};
-use crate::traits::{ClauseDBIF, FlagIF, Instantiate, LitIF, PropagatorIF, VarDBIF, WatchDBIF};
+use crate::traits::{ActivityIF, ClauseDBIF, FlagIF, Instantiate, LitIF, PropagatorIF, VarDBIF, WatchDBIF};
 use crate::types::*;
 use crate::var::{Var, VarDB};
 use std::fmt;
 use std::fs::File;
 use std::io::{BufWriter, Write};
+use std::ops::Index;
 
 /// A record of assignment. It's called 'trail' in Glucose.
 #[derive(Debug)]
@@ -16,6 +17,14 @@ pub struct AssignStack {
     trail_lim: Vec<usize>,
     q_head: usize,
     var_order: VarIdHeap, // Variable Order
+}
+
+impl Index<usize> for AssignStack {
+    type Output = Lit;
+    #[inline]
+    fn index(&self, i: usize) -> &Lit {
+        unsafe { self.trail.get_unchecked(i) }
+    }
 }
 
 /// ```
