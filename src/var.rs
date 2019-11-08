@@ -1,12 +1,13 @@
 use crate::clause::{Clause, ClauseDB};
 use crate::config::Config;
+use crate::propagator::AssignStack;
 use crate::state::{Stat, State};
 use crate::traits::*;
 use crate::types::*;
 use std::fmt;
 use std::ops::{Index, IndexMut, Range, RangeFrom};
 
-const VAR_ACTIVITY_DECAY: f64 = 0.90;
+const ACTIVITY_DECAY: f64 = 0.90;
 
 /// Structure for variables.
 #[derive(Debug)]
@@ -145,12 +146,21 @@ impl IndexMut<RangeFrom<usize>> for VarDB {
 impl ActivityIF for VarDB {
     type Ix = VarId;
     fn bump_activity(&mut self, vi: Self::Ix, dl: usize) {
+        assert!(0 < dl);
+        self.activity(vi);
         let v = &mut self.var[vi];
+        v.reward += 0.2 + 1.0 / dl as f64;
+    }
+    fn activity(&mut self, vi: Self::Ix) -> f64 {
         let now = self.current_conflict;
+        let v = &mut self.var[vi];
         let t = (now - v.last_update) as i32;
-        // v.reward = (now as f64 + self.activity) / 2.0; // ASCID
-        v.reward = 0.2 + 1.0 / (dl + 1) as f64 + v.reward * VAR_ACTIVITY_DECAY.powi(t);
-        v.last_update = now;
+        if 0 < t {
+            v.last_update = now;
+            v.reward *= ACTIVITY_DECAY.powi(t);
+
+        }
+        v.reward
     }
     fn scale_activity(&mut self) {}
 }

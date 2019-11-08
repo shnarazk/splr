@@ -88,7 +88,7 @@ pub struct Clause {
     /// A static clause evaluation criterion like LBD, NDD, or something.
     pub rank: usize,
     /// A dynamic clause evaluation criterion based on the number of references.
-    pub activity: f64,
+    activity: f64,
     /// Flags
     flags: Flag,
 }
@@ -270,6 +270,9 @@ impl ActivityIF for ClauseDB {
             }
             self.activity_inc *= scale;
         }
+    }
+    fn activity(&mut self, cid: Self::Ix) -> f64 {
+        self[cid].activity
     }
     fn scale_activity(&mut self) {
         self.activity_inc /= self.activity_decay;

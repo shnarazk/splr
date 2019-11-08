@@ -12,6 +12,8 @@ pub trait ActivityIF {
     type Ix;
     /// update an element's activity.
     fn bump_activity(&mut self, ix: Self::Ix, dl: usize);
+    /// return the activity of vi'th element.
+    fn activity(&mut self, ix: Self::Ix) -> f64;
     /// increment activity step.
     fn scale_activity(&mut self);
 }
@@ -325,10 +327,8 @@ pub trait VarDBIF {
     fn update_stat(&mut self, state: &State);
     /// return a LBD value for the set of literals.
     fn compute_lbd(&mut self, vec: &[Lit]) -> usize;
-    /// return the current activity of vi-th var.
-    fn activity(&mut self, vi: VarId) -> f64;
     /// return true if the disruption counter is larger than `thr`.
-    fn check_disruption_threshold(&mut self, thr: usize) -> bool;
+    fn restart_conditional(&mut self, asgs: &AssignStack, thr: f64) -> bool;
     fn update_disruption(&mut self);
 }
 

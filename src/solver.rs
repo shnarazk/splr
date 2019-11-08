@@ -408,7 +408,7 @@ fn handle_conflict_path(
         state.stats[Stat::SumLBD] += lbd;
     }
     cdb.scale_activity();
-    vdb.scale_activity();
+    // vdb.scale_activity();
     if 0 < state.config.dump_interval && ncnfl % state.config.dump_interval == 0 {
         state.development.push((
             ncnfl,
