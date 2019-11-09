@@ -19,7 +19,7 @@ trait Testing {
 
 impl Testing for Clause {
     fn activity(&mut self, a: f64) -> &mut Clause {
-        self.activity = a;
+        // self.activity = a;
         self
     }
     fn rank(&mut self, r: usize) -> &mut Clause {
