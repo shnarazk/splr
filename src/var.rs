@@ -85,27 +85,15 @@ pub struct VarDB {
     current_restart: usize,
     /// a working buffer for LBD calculation
     pub lbd_temp: Vec<usize>,
-    /// 20191101-disruption-threshold
-    // pub disruption_count: usize,
-    // pub disruption_average: Ema,
-    restart_on_conflict_path: bool,
-    max_rewarded_vi: VarId,
 }
 
 impl Default for VarDB {
     fn default() -> VarDB {
-        let mut disruption_average = Ema::new(256);
-        disruption_average.update(1.0);
         VarDB {
             var: Vec::new(),
             current_conflict: 0,
             current_restart: 0,
             lbd_temp: Vec::new(),
-            /// 20191101-disruption-threshold
-            // disruption_count: 0,
-            // disruption_average,
-            restart_on_conflict_path: true,
-            max_rewarded_vi: 1,
         }
     }
 }
@@ -158,7 +146,7 @@ impl IndexMut<RangeFrom<usize>> for VarDB {
 impl ActivityIF for VarDB {
     type Ix = VarId;
     fn bump_activity(&mut self, vi: Self::Ix, dl: usize) {
-        assert!(0 < dl);
+        debug_assert!(0 < dl);
         self.activity(vi);
         let v = &mut self.var[vi];
         v.reward += 0.2 + 1.0 / dl as f64;
@@ -180,18 +168,11 @@ impl ActivityIF for VarDB {
 impl Instantiate for VarDB {
     fn instantiate(_: &Config, cnf: &CNFDescription) -> Self {
         let nv = cnf.num_of_variables;
-        let mut disruption_average = Ema::new(256);
-        disruption_average.update(1.0);
         VarDB {
             var: Var::new_vars(nv),
             current_conflict: 0,
             current_restart: 0,
             lbd_temp: vec![0; nv + 1],
-            /// 20191101-disruption-threshold
-            // disruption_count: 0,
-            // disruption_average,
-            restart_on_conflict_path: true,
-            max_rewarded_vi: 1,
         }
     }
 }
@@ -286,13 +267,7 @@ impl VarDBIF for VarDB {
     /// 20191101-disruption-threshold
     fn restart_conditional(&mut self, asgs: &AssignStack, thr: f64) -> bool {
         // let len = self.len() as f64;
-        // thr * len < self.disruption_count as f64
-        // thr * self.disruption_average.get() <= self.disruption_count as f64
-        // let ba = self.activity(self.max_rewarded_vi);
-        // let nv = self.len();
         let lvl = asgs.level();
-        // let mut bot = 0.0;
-        // let mut top = 0.0;
         let mut flips = 0.0;
         let mut act_pre = self.activity(asgs[1].vi());
         for lv in 2..lvl / 2 as usize {
@@ -328,43 +303,6 @@ impl VarDBIF for VarDB {
         bot < top
 */
         // false
-/*
-        let nv = self.len();
-        let ba = 0.0;
-        self.lbd_temp[0] += 1;
-        let mark = self.lbd_temp[0];
-        let mut count = 0;
-        for vi in 1..nv {
-            if self.max_rewarded_vi == vi || self[vi].is(Flag::ELIMINATED) {
-                continue;
-            }
-            let lvl = self[vi].level;
-            if 0 == lvl || thr <= lvl {
-                continue;
-            }
-            let va = self.activity(vi);
-            if ba < va && self.lbd_temp[lvl] != mark {
-                self.lbd_temp[lvl] = mark;
-                count += 1;
-                if thr <= count + 2 {
-                    return true;
-                }
-            }
-        }
-        false
-*/
-    }
-    fn update_disruption(&mut self) {
-        let mut i = 0;
-        let mut b = self.activity(i);
-        for vi in 1..self.len() {
-            let a = self.activity(vi);
-            if b < a {
-                b = a;
-                i = vi;
-            }
-        }
-        self.max_rewarded_vi = i;
     }
 }
 

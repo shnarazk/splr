@@ -325,11 +325,8 @@ fn search(
             // DYNAMIC FORCING RESTART based on LBD values, updated by conflict
             state.last_asg = asgs.len();
             if state.rst.force_restart()
-                // && vdb.restart_conditional(asgs, 4)
-                // && vdb.restart_conditional(asgs, state.stagnated as usize * 2 + 2)
                 // && (!state.stagnated || vdb.restart_conditional(asgs, 2.2))
             {
-                vdb.update_disruption();
                 state.stats[Stat::Restart] += 1;
                 asgs.cancel_until(vdb, state.root_level);
             } else if asgs.level() == 0 {
@@ -431,10 +428,12 @@ fn handle_conflict_path(
             return Err(SolverError::Inconsistent);
         }
     }
-    if ((state.use_chan_seok && !cdb.glureduce && cdb.first_reduction < cdb.num_learnt)
-        || (cdb.glureduce
-            && state.rst.cur_restart * cdb.next_reduction <= state.stats[Stat::Conflict]))
-        && 0 < cdb.num_learnt
+    if if cdb.glureduce {
+        0 < cdb.num_learnt && state.rst.cur_restart * cdb.next_reduction <= ncnfl
+    }
+    else {
+        state.use_chan_seok && cdb.first_reduction < cdb.num_learnt
+    }
     {
         state.rst.cur_restart = ((ncnfl as f64) / (cdb.next_reduction as f64)) as usize + 1;
         cdb.reduce(state, vdb);

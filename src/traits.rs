@@ -329,7 +329,6 @@ pub trait VarDBIF {
     fn compute_lbd(&mut self, vec: &[Lit]) -> usize;
     /// return true if the disruption counter is larger than `thr`.
     fn restart_conditional(&mut self, asgs: &AssignStack, thr: f64) -> bool;
-    fn update_disruption(&mut self);
 }
 
 /// API for 'watcher list' like `attach`, `detach`, `detach_with` and so on.
