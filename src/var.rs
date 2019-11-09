@@ -10,7 +10,7 @@ use std::ops::{Index, IndexMut, Range, RangeFrom};
 const ACTIVITY_DECAY: f64 = 0.90;
 
 /// Structure for variables.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Var {
     /// reverse conversion to index. Note `VarId` must be `usize`.
     pub index: VarId,
@@ -75,7 +75,7 @@ impl FlagIF for Var {
 }
 
 /// Structure for variables.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct VarDB {
     /// vars
     var: Vec<Var>,

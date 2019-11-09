@@ -4,7 +4,7 @@ use crate::types::{CNFDescription, Ema};
 
 // const RESET_EMA: usize = 400;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ProgressASG {
     asg: usize,
     ema: Ema,
@@ -40,7 +40,7 @@ impl ProgressEvaluator for ProgressASG {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ProgressLBD {
     ema: Ema,
     num: usize,
@@ -80,7 +80,7 @@ impl ProgressEvaluator for ProgressLBD {
 }
 
 // Restart stat
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct RestartExecutor {
     pub adaptive_restart: bool,
     pub asg: ProgressASG,

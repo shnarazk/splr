@@ -7,7 +7,7 @@ use crate::types::*;
 use crate::var::{Var, VarDB};
 use std::fmt;
 
-#[derive(Eq, Debug, PartialEq)]
+#[derive(Clone, Eq, Debug, PartialEq)]
 enum EliminatorMode {
     Deactive,
     Waiting,
@@ -15,7 +15,7 @@ enum EliminatorMode {
 }
 
 /// Literal eliminator
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Eliminator {
     pub enable: bool,
     mode: EliminatorMode,
@@ -806,7 +806,7 @@ impl Var {
 // - both fields has a fixed length. Don't use push and pop.
 // - `idxs[0]` contains the number of alive elements
 //   `indx` is positions. So the unused field 0 can hold the last position as a special case.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct VarOccHeap {
     heap: Vec<VarId>, // order : usize -> VarId
     idxs: Vec<usize>, // VarId : -> order : usize

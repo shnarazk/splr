@@ -9,7 +9,7 @@ use std::cmp::Ordering;
 use std::fmt;
 use std::ops::{Index, IndexMut, Range, RangeFrom};
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CertifiedRecord {
     SENTINEL,
     ADD,
@@ -81,7 +81,7 @@ impl WatchDBIF for Vec<Watch> {
 }
 
 /// A representation of 'clause'
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Clause {
     /// The literals in a clause.
     pub lits: Vec<Lit>,
@@ -192,7 +192,7 @@ impl fmt::Display for Clause {
 }
 
 /// Clause database
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ClauseDB {
     clause: Vec<Clause>,
     pub touched: Vec<bool>,

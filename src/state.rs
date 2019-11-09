@@ -13,7 +13,7 @@ use std::ops::{Index, IndexMut};
 use std::time::SystemTime;
 
 /// A collection of named search heuristics
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SearchStrategy {
     /// the initial search phase to determine a main strategy
     Initial,
@@ -133,7 +133,7 @@ impl IndexMut<Stat> for [usize] {
 }
 
 /// Data storage for `Solver`
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct State {
     pub root_level: usize,
     pub num_vars: usize,
@@ -623,7 +623,7 @@ pub enum LogF64Id {
 }
 
 /// Record of old stats.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ProgressRecord {
     pub vali: [usize; LogUsizeId::End as usize],
     pub valf: [f64; LogF64Id::End as usize],

@@ -36,7 +36,7 @@ pub enum SolverException {
 pub type SolverResult = Result<Certificate, SolverException>;
 
 /// SAT solver consisting of 5 sub modules.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Solver {
     pub asgs: AssignStack, // Assignment
     pub cdb: ClauseDB,     // Clauses

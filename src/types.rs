@@ -85,7 +85,7 @@ impl LitIF for Lit {
 }
 
 /// Exponential Moving Average w/ a calibrator
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Ema {
     val: f64,
     cal: f64,
