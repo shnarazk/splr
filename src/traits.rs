@@ -321,7 +321,7 @@ pub trait VarDBIF {
     fn minimize_with_bi_clauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>);
     /// return `true` is the clause is the reason of the assignment.
     fn locked(&self, c: &Clause, cid: ClauseId) -> bool;
-    /// return `true` if the set of literals is satisfiable under the current assignment.
+    /// return `true` if the set of Lit is satisfiable under the current assignment.
     fn satisfies(&self, c: &[Lit]) -> bool;
     /// copy some stat data from `State`.
     fn update_stat(&mut self, state: &State);
