@@ -1,6 +1,10 @@
-use crate::solver::Solver;
-use crate::traits::{LitIF, PropagatorIF, ValidatorIF, VarDBIF};
-use crate::types::{Lit, MaybeInconsistent, SolverError, NULL_CLAUSE};
+use {
+    crate::{
+        solver::Solver,
+        traits::{ LitIF, PropagatorIF, ValidatorIF, VarDBIF },
+        types::{ Lit, MaybeInconsistent, SolverError, NULL_CLAUSE },
+    }
+};
 
 impl ValidatorIF for Solver {
     fn inject_assigmnent(&mut self, vec: &[i32]) -> MaybeInconsistent {

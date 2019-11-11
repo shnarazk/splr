@@ -1,13 +1,19 @@
 // DIMACS Model Checker in Rust
 #![allow(unused_imports)]
-use splr::config::Config;
-use splr::solver::Solver;
-use splr::traits::{SatSolverIF, ValidatorIF};
-use std::env;
-use std::fs::File;
-use std::io::{stdin, BufRead, BufReader, Result};
-use std::path::{Path, PathBuf};
-use structopt::StructOpt;
+use {
+    splr::{
+        config::Config,
+        solver::Solver,
+        traits::{ SatSolverIF, ValidatorIF },
+    },
+    std::{
+        env,
+        fs::File,
+        io::{ stdin, BufRead, BufReader, Result },
+        path::{Path, PathBuf},
+    },
+    structopt::StructOpt,
+};
 
 #[derive(StructOpt)]
 #[structopt(name = "dmcr", about = "DIMACS-format Model Checker in Rust")]

@@ -1,11 +1,15 @@
-use crate::clause::{Clause, ClauseDB};
-use crate::config::Config;
-use crate::propagator::AssignStack;
-use crate::state::State;
-use crate::traits::*;
-use crate::types::*;
-use crate::var::{Var, VarDB};
-use std::fmt;
+use {
+    crate::{
+        clause::{ Clause, ClauseDB },
+        config::Config,
+        propagator::AssignStack,
+        state::State,
+        traits::*,
+        types::*,
+        var::{ Var, VarDB },
+    },
+    std::fmt
+};
 
 #[derive(Clone, Eq, Debug, PartialEq)]
 enum EliminatorMode {

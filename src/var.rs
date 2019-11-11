@@ -1,11 +1,16 @@
-use crate::clause::{Clause, ClauseDB};
-use crate::config::Config;
-use crate::propagator::AssignStack;
-use crate::state::{Stat, State};
-use crate::traits::*;
-use crate::types::*;
-use std::fmt;
-use std::ops::{Index, IndexMut, Range, RangeFrom};
+use {
+    crate::{
+        clause::{ Clause, ClauseDB },
+        config::Config,
+        propagator::AssignStack,
+        state::{ Stat, State },
+        traits::*,
+        types::*,
+    },
+    std::{ fmt,
+           ops::{ Index, IndexMut, Range, RangeFrom },
+    }
+};
 
 const ACTIVITY_DECAY: f64 = 0.90;
 

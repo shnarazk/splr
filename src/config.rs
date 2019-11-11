@@ -1,5 +1,7 @@
-use std::path::PathBuf;
-use structopt::StructOpt;
+use {
+    std::path::PathBuf,
+    structopt::StructOpt,
+};
 
 pub const VERSION: &str = "0.1.6-dev.1";
 pub const ACTIVITY_MAX: f64 = 1e308;

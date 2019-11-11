@@ -1,14 +1,20 @@
-use crate::clause::{Clause, ClauseDB};
-use crate::config::Config;
-use crate::eliminator::Eliminator;
-use crate::propagator::AssignStack;
-use crate::state::{Stat, State};
-use crate::traits::*;
-use crate::types::*;
-use crate::var::VarDB;
-use std::fs;
-use std::io::{BufRead, BufReader};
-use std::path::Path;
+use {
+    crate::{
+        clause::{ Clause, ClauseDB },
+        config::Config,
+        eliminator::Eliminator,
+        propagator::AssignStack,
+        state::{ Stat, State },
+        traits::*,
+        types::*,
+        var::VarDB,
+    },
+    std::{
+        fs,
+        io::{ BufRead, BufReader },
+        path::Path,
+    }
+};
 
 /// Normal results returned by Solver.
 #[derive(Debug, PartialEq)]
