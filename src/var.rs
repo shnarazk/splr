@@ -154,7 +154,7 @@ impl ActivityIF for VarDB {
         debug_assert!(0 < dl);
         self.activity(vi);
         let v = &mut self.var[vi];
-        v.reward += 0.2 + 1.0 / dl as f64;
+        v.reward += 0.2 + 1.0 / (dl + 1) as f64;
     }
     fn activity(&mut self, vi: Self::Ix) -> f64 {
         let now = self.current_conflict;
