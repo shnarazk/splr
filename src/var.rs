@@ -90,6 +90,7 @@ pub struct VarDB {
     current_restart: usize,
     /// a working buffer for LBD calculation
     pub lbd_temp: Vec<usize>,
+    pub num_flip: Ema,
 }
 
 impl Default for VarDB {
@@ -99,6 +100,7 @@ impl Default for VarDB {
             current_conflict: 0,
             current_restart: 0,
             lbd_temp: Vec::new(),
+            num_flip: Ema::new(32),
         }
     }
 }
@@ -178,6 +180,7 @@ impl Instantiate for VarDB {
             current_conflict: 0,
             current_restart: 0,
             lbd_temp: vec![0; nv + 1],
+            num_flip: Ema::new(32),
         }
     }
 }
@@ -271,43 +274,19 @@ impl VarDBIF for VarDB {
     }
     /// 20191101-disruption-threshold
     fn restart_conditional(&mut self, asgs: &AssignStack, thr: f64) -> bool {
-        // let len = self.len() as f64;
-        let lvl = asgs.level();
         let mut flips = 0.0;
-        let mut act_pre = self.activity(asgs[1].vi());
-        for lv in 2..lvl / 2 as usize {
+        let mut act_pre = self.activity(asgs[0].vi());
+        for lv in 1..asgs.level() {
             let vi = asgs[asgs.num_at(lv)].vi();
-            debug_assert_eq!(self[vi].reason, NULL_CLAUSE);
+            assert_eq!(self[vi].reason, NULL_CLAUSE);
             let act = self.activity(vi);
-            if vi == 21 && 2.0 < act {
-                println!("- a legacy of big bang: {:>8.2} at {}", act, vi);
-            }
             if act_pre < act {
-                flips += 1.0 / (lv as f64 - 1.0);
-                if thr <= flips {
-                    return true;
-                }
+                flips += 1.0 / (lv + 1) as f64;
             }
             act_pre = act;
         }
-        false
-/*
-        for vi in 1..nv {
-            let lv = self[vi].level;
-            if 0 == lvl || self[vi].is(Flag::ELIMINATED) {
-                continue;
-            }
-            let va = self.activity(vi);
-            /* if lvl < lv && ba < self.activity(vi) {return true;} */
-            if 0 < lv && lv <= lvl && bot < va {
-                bot = va;
-            } else if lvl < lv && top < va {
-                top = va;
-            }
-        }
-        bot < top
-*/
-        // false
+        self.num_flip.update(flips);
+        thr <= flips
     }
 }
 
