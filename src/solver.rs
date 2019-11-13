@@ -525,7 +525,10 @@ fn adapt_parameters(
     if !state.config.without_deep_search {
         state.rst.restart_step = 50 + extra * (state.stagnated as usize);
         if state.stagnated {
-            state.flush(&format!("deep searching ({})...", state.slack_duration));
+            state.flush(&format!("deep searching ({}): {:>4.2}...",
+                                 state.slack_duration,
+                                 vdb.num_flip.get(),
+            ));
             state.rst.next_restart += 2 * extra;
         }
     }
