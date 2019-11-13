@@ -18,7 +18,7 @@ trait Testing {
 }
 
 impl Testing for Clause {
-    fn activity(&mut self, a: f64) -> &mut Clause {
+    fn activity(&mut self, _a: f64) -> &mut Clause {
         // self.activity = a;
         self
     }
