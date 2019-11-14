@@ -1,6 +1,6 @@
 use {
     crate::{
-        clause::{ Clause, ClauseDB },
+        clause::{ Clause, ClauseDB, Watch },
         config::Config,
         eliminator::Eliminator,
         propagator::AssignStack,
@@ -341,7 +341,7 @@ pub trait WatchDBIF {
     /// make a new 'watch', and add it to this watcher list.
     fn register(&mut self, blocker: Lit, c: ClauseId);
     /// remove *n*-th clause from the watcher list. *O(1)* operation.
-    fn detach(&mut self, n: usize);
+    fn detach(&mut self, n: usize) -> Watch;
     /// remove a clause which id is `cid` from the watcher list. *O(n)* operation.
     fn detach_with(&mut self, cid: ClauseId);
     /// update blocker of cid.

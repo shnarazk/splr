@@ -65,8 +65,8 @@ impl WatchDBIF for Vec<Watch> {
     fn register(&mut self, blocker: Lit, c: ClauseId) {
         self.push(Watch { blocker, c });
     }
-    fn detach(&mut self, n: usize) {
-        self.swap_remove(n);
+    fn detach(&mut self, n: usize) -> Watch {
+        self.swap_remove(n)
     }
     fn detach_with(&mut self, cid: ClauseId) {
         for (n, w) in self.iter().enumerate() {
@@ -354,12 +354,11 @@ impl ClauseDBIF for ClauseDB {
                     n += 1;
                     continue;
                 }
+                let w = ws.detach(n);
                 if !c.lits.is_empty() {
                     debug_assert!(c.is(Flag::DEAD));
-                    recycled.push(Watch {
-                        blocker: NULL_LIT,
-                        c: cid,
-                    });
+                    debug_assert_eq!(w.blocker, NULL_LIT); // w.blocker = NULL_LIT;
+                    recycled.push(w);
                     if c.is(Flag::LEARNT) {
                         self.num_learnt -= 1;
                     }
@@ -369,7 +368,6 @@ impl ClauseDBIF for ClauseDB {
                     }
                     c.lits.clear();
                 }
-                ws.detach(n);
             }
         }
         self.num_active = self.clause.len() - recycled.len();
