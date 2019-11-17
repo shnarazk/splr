@@ -121,7 +121,6 @@ pub enum Stat {
     NumBin,                // the number of binary clauses
     NumBinLearnt,          // the number of binary learnt clauses
     NumLBD2,               // the number of clauses which LBD is 2
-    Stagnation,            // the number of stagnation
     EndOfStatIndex,        // Don't use this dummy.
 }
 
@@ -161,8 +160,7 @@ pub struct State {
     pub an_seen: Vec<bool>,
     pub last_asg: usize,
     pub last_dl: Vec<Lit>,
-    pub slack_duration: isize,
-    pub stagnated: bool,
+    pub slack_duration: usize,
     pub start: SystemTime,
     pub time_limit: f64,
     pub record: ProgressRecord,
@@ -195,7 +193,6 @@ impl Default for State {
             last_asg: 0,
             last_dl: Vec::new(),
             slack_duration: 0,
-            stagnated: false,
             start: SystemTime::now(),
             time_limit: 0.0,
             use_progress: true,
@@ -609,9 +606,8 @@ pub enum LogUsizeId {
     Reduction,      // 12: reduction: usize,
     SatClauseElim,  // 13: simplification: usize,
     ExhaustiveElim, // 14: elimination: usize,
-    Stagnation,     // 15: stagnation: usize,
-    // ElimClauseQueue, // 16: elim_clause_queue: usize,
-    // ElimVarQueue, // 17: elim_var_queue: usize,
+    // ElimClauseQueue, // 15: elim_clause_queue: usize,
+    // ElimVarQueue, // 16: elim_var_queue: usize,
     End,
 }
 

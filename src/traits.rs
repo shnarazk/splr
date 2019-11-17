@@ -245,6 +245,8 @@ pub trait PropagatorIF {
     fn rebuild_order(&mut self, vdb: &mut VarDB);
     /// dump all active clauses and fixed assignments in solver to a CNF file `fname`.
     fn dump_cnf(&mut self, cdb: &ClauseDB, state: &State, vdb: &VarDB, fname: &str);
+    /// record current assignment history into `decs_old` just before a restart.
+    fn record_decs(&mut self);
 }
 
 /// API for restart like `block_restart`, `force_restart` and so on.
@@ -332,7 +334,7 @@ pub trait VarDBIF {
     /// return a LBD value for the set of literals.
     fn compute_lbd(&mut self, vec: &[Lit]) -> usize;
     /// return true if the disruption counter is larger than `thr`.
-    fn restart_conditional(&mut self, asgs: &AssignStack, thr: f64) -> bool;
+    fn restart_conditional(&mut self, asgs: &AssignStack, lbd: f64) -> bool;
 }
 
 /// API for 'watcher list' like `attach`, `detach`, `detach_with` and so on.

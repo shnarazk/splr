@@ -96,7 +96,7 @@ impl EmaIF for Ema {
     fn new(s: usize) -> Ema {
         Ema {
             val: 0.0,
-            cal: 0.0,
+            cal: 0.000_000_000_1,
             sca: 1.0 / (s as f64),
         }
     }
@@ -110,7 +110,8 @@ impl EmaIF for Ema {
 }
 
 /// Exponential Moving Average pair
-struct Ema2 {
+#[derive(Clone, Debug)]
+pub struct Ema2 {
     fast: f64,
     slow: f64,
     calf: f64,
@@ -124,8 +125,8 @@ impl EmaIF for Ema2 {
         Ema2 {
             fast: 0.0,
             slow: 0.0,
-            calf: 0.0,
-            cals: 0.0,
+            calf: 0.000_000_000_1,
+            cals: 0.000_000_000_1,
             fe: 1.0 / (f as f64),
             se: 1.0 / (f as f64),
         }
@@ -147,13 +148,16 @@ impl EmaIF for Ema2 {
 
 impl Ema2 {
     #[allow(dead_code)]
-    fn rate(&self) -> f64 {
+    pub fn trend(&self) -> f64 {
         self.fast / self.slow * (self.cals / self.calf)
     }
     #[allow(dead_code)]
-    fn with_slow(mut self, s: u64) -> Ema2 {
+    pub fn with_slow(mut self, s: usize) -> Ema2 {
         self.se = 1.0 / (s as f64);
         self
+    }
+    pub fn get_slow(&self) -> f64 {
+        self.slow / self.cals
     }
 }
 

@@ -47,8 +47,8 @@ impl ProgressEvaluator for ProgressASG {
 #[derive(Clone, Debug)]
 pub struct ProgressLBD {
     ema: Ema,
-    num: usize,
-    sum: usize,
+    pub num: usize,
+    pub sum: usize,
     /// For force restart based on average LBD of newly generated clauses: 0.80.
     /// This is called `K` in Glucose
     pub threshold: f64,

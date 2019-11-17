@@ -32,6 +32,7 @@ pub struct AssignStack {
     trail_lim: Vec<usize>,
     q_head: usize,
     var_order: VarIdHeap, // Variable Order
+    pub decs_old: Vec<Lit>,
 }
 
 impl Index<usize> for AssignStack {
@@ -94,6 +95,7 @@ impl Instantiate for AssignStack {
             trail_lim: Vec::new(),
             q_head: 0,
             var_order: VarIdHeap::new(nv, nv),
+            decs_old: Vec::new(),
         }
     }
 }
@@ -309,6 +311,12 @@ impl PropagatorIF for AssignStack {
                 buf.write_all(format!("{} 0\n", x.to_i32()).as_bytes())
                     .unwrap();
             }
+        }
+    }
+    fn record_decs(&mut self) {
+        self.decs_old.clear();
+        for lv in 0..self.level() {
+            self.decs_old.push(self.trail[self.num_at(lv)]);
         }
     }
 }

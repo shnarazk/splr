@@ -7,12 +7,16 @@ use {
         traits::*,
         types::*,
     },
-    std::{ fmt,
+    std::{ cmp::Ordering,
+           fmt,
            ops::{ Index, IndexMut, Range, RangeFrom },
     }
 };
 
 const ACTIVITY_DECAY: f64 = 0.90;
+const CONVERGE_FAST: usize = 16;
+const CONVERGE_SLOW: usize = 128;
+const CONVERGE_AVRG: usize = 32;
 
 /// Structure for variables.
 #[derive(Clone, Debug)]
@@ -90,7 +94,8 @@ pub struct VarDB {
     current_restart: usize,
     /// a working buffer for LBD calculation
     pub lbd_temp: Vec<usize>,
-    pub num_flip: Ema,
+    pub num_flip: Ema2,
+    pub cnv_flip: Ema,
 }
 
 impl Default for VarDB {
@@ -100,7 +105,8 @@ impl Default for VarDB {
             current_conflict: 0,
             current_restart: 0,
             lbd_temp: Vec::new(),
-            num_flip: Ema::new(32),
+            num_flip: Ema2::new(CONVERGE_FAST).with_slow(CONVERGE_SLOW),
+            cnv_flip: Ema::new(CONVERGE_AVRG),
         }
     }
 }
@@ -177,10 +183,8 @@ impl Instantiate for VarDB {
         let nv = cnf.num_of_variables;
         VarDB {
             var: Var::new_vars(nv),
-            current_conflict: 0,
-            current_restart: 0,
             lbd_temp: vec![0; nv + 1],
-            num_flip: Ema::new(32),
+            .. Default::default()
         }
     }
 }
@@ -273,20 +277,41 @@ impl VarDBIF for VarDB {
         }
     }
     /// 20191101-disruption-threshold
-    fn restart_conditional(&mut self, asgs: &AssignStack, thr: f64) -> bool {
-        let mut flips = 0.0;
-        let mut act_pre = self.activity(asgs[0].vi());
-        for lv in 1..asgs.level() {
-            let vi = asgs[asgs.num_at(lv)].vi();
-            assert_eq!(self[vi].reason, NULL_CLAUSE);
-            let act = self.activity(vi);
-            if act_pre < act {
-                flips += 1.0 / (lv + 1) as f64;
-            }
-            act_pre = act;
+    fn restart_conditional(&mut self, asgs: &AssignStack, lbd: f64) -> bool {
+        let lvl = asgs.level().min(asgs.decs_old.len());
+        let old = &asgs.decs_old[..lvl];
+        let mut new = Vec::new();
+        for lv in 0..lvl {
+            let l = asgs[asgs.num_at(lv)];
+            self.activity(l.vi());
+            new.push(l);
         }
-        self.num_flip.update(flips);
-        thr <= flips
+        new.sort_by(|&a, &b|
+                    match (self.var[a.vi()].reward, self.var[b.vi()].reward) {
+                        (x, y) if x > y => Ordering::Less,
+                        (x, y) if x < y => Ordering::Greater,
+                        _ => Ordering::Equal,
+                    });
+        let mut dist = 0.1;
+        'next_lit: for lv in 0..lvl {
+            let l = new[lv];
+            debug_assert_eq!(self[l.vi()].reason, NULL_CLAUSE);
+            for (i, lo) in old.iter().enumerate() {
+                if *lo == l {
+                    if i < lv {
+                        dist += (lv - i) as f64 / ((lv + 1) as f64).powi(2);
+                    }
+                    continue 'next_lit;
+                }
+            }
+            dist += 1.0 / (lv + 1) as f64;
+        }
+        let f = self.num_flip.get();
+        let s = self.num_flip.get_slow();
+        let d = (f - s).abs();
+        self.num_flip.update(dist);
+        self.cnv_flip.update(d);
+        self.cnv_flip.get() < 5.0 / lbd // 0.016
     }
 }
 
