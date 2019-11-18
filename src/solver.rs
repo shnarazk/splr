@@ -330,7 +330,11 @@ fn search(
             }
             // DYNAMIC FORCING RESTART based on LBD values, updated by conflict
             state.last_asg = asgs.len();
-            if state.rst.force_restart() && vdb.restart_conditional(asgs, state.rst.lbd.get()) {
+            if state.rst.force_restart()
+                || (state.rst.restart_step < state.rst.after_restart
+                    && state.c_lvl.get() < 1.1 * state.rst.lbd.get()
+                    && vdb.restart_conditional(asgs, state.rst.condition()))
+            {
                 state.rst.after_restart = 0;
                 state.stats[Stat::Restart] += 1;
                 asgs.record_decs();
@@ -504,10 +508,11 @@ fn adapt_parameters(
         }
     }
     state.progress(cdb, vdb, None);
-    state.flush(&format!("stagnate:{}, flip:{:>4.2}, conv:{:>4.2} ...",
+    state.flush(&format!("stagnate:{}, flip:{:>6.4}, conv:{:>6.4}, cond:{:>6.4} ...",
                          state.slack_duration,
                          vdb.num_flip.get(),
                          vdb.cnv_flip.get(),
+                         state.rst.condition(),
     ));
     Ok(())
 }

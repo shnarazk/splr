@@ -277,7 +277,7 @@ impl VarDBIF for VarDB {
         }
     }
     /// 20191101-disruption-threshold
-    fn restart_conditional(&mut self, asgs: &AssignStack, lbd: f64) -> bool {
+    fn restart_conditional(&mut self, asgs: &AssignStack, thr: f64) -> bool {
         let lvl = asgs.level().min(asgs.decs_old.len());
         let old = &asgs.decs_old[..lvl];
         let mut new = Vec::new();
@@ -311,7 +311,7 @@ impl VarDBIF for VarDB {
         let d = (f - s).abs();
         self.num_flip.update(dist);
         self.cnv_flip.update(d);
-        self.cnv_flip.get() < 5.0 / lbd // 0.016
+        self.cnv_flip.get() < thr // 0.016
     }
 }
 

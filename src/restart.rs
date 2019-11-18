@@ -163,6 +163,10 @@ impl RestartIF for RestartExecutor {
             self.luby_count += 1.0;
         }
     }
+    fn condition(&self) -> f64 {
+        // 0.01 * self.lbd.get().log(2.0)
+        0.012
+    }
 }
 
 /// Find the finite subsequence that contains index 'x', and the

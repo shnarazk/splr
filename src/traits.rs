@@ -259,6 +259,8 @@ pub trait RestartIF {
     fn initialize_luby(&mut self);
     /// update data for Luby restart.
     fn update_luby(&mut self);
+    /// 2019111*-db-extream1
+    fn condition(&self) -> f64;
 }
 
 /// API for SAT solver like `build`, `solve` and so on.
