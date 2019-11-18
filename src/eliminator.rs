@@ -194,7 +194,7 @@ impl EliminatorIF for Eliminator {
         let mut i = self.elim_clauses.len() - 1;
         let mut width;
         'next: loop {
-            width = self.elim_clauses[i] as usize;
+            width = usize::from(self.elim_clauses[i]);
             if width == 0 && i == 0 {
                 break;
             }
@@ -210,7 +210,7 @@ impl EliminatorIF for Eliminator {
                 //     _ => None,
                 // };
                 // if model_value != Some(false) {
-                if -model[l.vi() - 1] != l.to_i32() {
+                if -model[l.vi() - 1] != i32::from(l) {
                     if i < width {
                         break 'next;
                     }
@@ -223,7 +223,7 @@ impl EliminatorIF for Eliminator {
             debug_assert!(width == 1);
             let l = self.elim_clauses[i];
             // debug_assert!(model[l.vi() - 1] != l.negate().int());
-            model[l.vi() - 1] = l.to_i32(); // .neg();
+            model[l.vi() - 1] = i32::from(l); // .neg();
             if i < width {
                 break;
             }
@@ -238,7 +238,7 @@ impl EliminatorIF for Eliminator {
             let v = &mut vdb[l.vi()];
             v.turn_on(Flag::TOUCHED);
             if !v.is(Flag::ELIMINATED) {
-                if l.as_bool() {
+                if bool::from(*l) {
                     debug_assert!(
                         !v.pos_occurs.contains(&cid),
                         format!("{} {:?} {}", cid.format(), vec2int(&c.lits), v.index,)
@@ -261,7 +261,7 @@ impl EliminatorIF for Eliminator {
     }
     fn remove_lit_occur(&mut self, vdb: &mut VarDB, l: Lit, cid: ClauseId) {
         let v = &mut vdb[l.vi()];
-        if l.as_bool() {
+        if bool::from(l) {
             debug_assert_eq!(v.pos_occurs.iter().filter(|&c| *c == cid).count(), 1);
             v.pos_occurs.delete_unstable(|&c| c == cid);
             debug_assert!(!v.pos_occurs.contains(&cid));
@@ -308,7 +308,7 @@ impl Eliminator {
         while !self.clause_queue.is_empty() || self.bwdsub_assigns < asgs.len() {
             // Check top-level assignments by creating a dummy clause and placing it in the queue:
             if self.clause_queue.is_empty() && self.bwdsub_assigns < asgs.len() {
-                let c = asgs.trail[self.bwdsub_assigns].to_cid();
+                let c = ClauseId::from(asgs.trail[self.bwdsub_assigns]);
                 self.clause_queue.push(c);
                 self.bwdsub_assigns += 1;
             }
@@ -339,7 +339,7 @@ impl Eliminator {
                     if v.assign.is_some() {
                         continue;
                     }
-                    let nsum = if l.as_bool() {
+                    let nsum = if bool::from(*l) {
                         v.neg_occurs.len()
                     } else {
                         v.pos_occurs.len()
@@ -399,7 +399,7 @@ fn try_subsume(
         }
         Some(l) => {
             // println!("BackSubC subsumes {} from {} and {}", l.int(), cid.format(), did.format());
-            strengthen_clause(cdb, elim, vdb, asgs, did, l.negate())?;
+            strengthen_clause(cdb, elim, vdb, asgs, did, !l)?;
             elim.enqueue_var(vdb, l.vi(), true);
         }
         None => {}
@@ -414,7 +414,7 @@ fn subsume(cdb: &mut ClauseDB, cid: ClauseId, other: ClauseId) -> Option<Lit> {
         let l = cid.to_lit();
         let oh = &cdb[other];
         for lo in &oh.lits {
-            if l == lo.negate() {
+            if l == !*lo {
                 return Some(l);
             }
         }
@@ -429,7 +429,7 @@ fn subsume(cdb: &mut ClauseDB, cid: ClauseId, other: ClauseId) -> Option<Lit> {
         for lo in &ob.lits {
             if *l == *lo {
                 continue 'next;
-            } else if ret == NULL_LIT && *l == lo.negate() {
+            } else if ret == NULL_LIT && *l == !*lo {
                 ret = *l;
                 continue 'next;
             }
@@ -464,7 +464,7 @@ fn check_to_merge(
                     continue;
                 }
                 if j.vi() == l.vi() {
-                    if j.negate() == *l {
+                    if !*j == *l {
                         return (false, size);
                     } else {
                         continue 'next_literal;
@@ -502,7 +502,7 @@ fn check_eliminator(cdb: &ClauseDB, vdb: &[Var]) -> bool {
         }
         for l in &c.lits {
             let v = l.vi();
-            if l.as_bool() {
+            if bool::from(*l) {
                 if !vdb[v].pos_occurs.contains(&(cid as ClauseId)) {
                     panic!("failed to check {} {:#}", (cid as ClauseId).format(), c);
                 }
@@ -526,7 +526,7 @@ fn merge(cdb: &mut ClauseDB, cip: ClauseId, ciq: ClauseId, v: VarId, vec: &mut V
         if l.vi() != v {
             for j in &pb.lits {
                 if j.vi() == l.vi() {
-                    if j.negate() == *l {
+                    if !*j == *l {
                         return 0;
                     } else {
                         continue 'next_literal;
@@ -558,8 +558,8 @@ fn strengthen_clause(
 ) -> MaybeInconsistent {
     debug_assert!(!cdb[cid].is(Flag::DEAD));
     debug_assert!(1 < cdb[cid].lits.len());
-    cdb.touched[l as usize] = true;
-    cdb.touched[l.negate() as usize] = true;
+    cdb.touched[l] = true;
+    cdb.touched[!l] = true;
     debug_assert_ne!(cid, NULL_CLAUSE);
     if strengthen(cdb, cid, l) {
         // Vaporize the binary clause
@@ -569,7 +569,7 @@ fn strengthen_clause(
         // println!("{} {:?} is removed and its first literal {} is enqueued.", cid.format(), vec2int(&cdb.clause[cid].lits), c0.int());
         cdb.detach(cid);
         elim.remove_cid_occur(vdb, cid, &mut cdb[cid]);
-        asgs.enqueue(&mut vdb[c0.vi()], c0.as_bool(), NULL_CLAUSE, 0)
+        asgs.enqueue(&mut vdb[c0.vi()], bool::from(c0), NULL_CLAUSE, 0)
     } else {
         // println!("cid {} drops literal {}", cid.fmt(), l.int());
         debug_assert!(1 < cdb[cid].lits.len());
@@ -595,14 +595,14 @@ fn strengthen(cdb: &mut ClauseDB, cid: ClauseId, p: Lit) -> bool {
     if (*c).is(Flag::DEAD) {
         return false;
     }
-    debug_assert!(1 < p.negate());
+    debug_assert!(1 < usize::from(!p));
     let lits = &mut (*c).lits;
     debug_assert!(1 < lits.len());
     if lits.len() == 2 {
         if lits[0] == p {
             lits.swap(0, 1);
         }
-        debug_assert!(1 < lits[0].negate());
+        debug_assert!(1 < usize::from(!lits[0]));
         return true;
     }
     if lits[0] == p || lits[1] == p {
@@ -613,13 +613,13 @@ fn strengthen(cdb: &mut ClauseDB, cid: ClauseId, p: Lit) -> bool {
             lits.swap_remove(1);
             (lits[1], lits[0])
         };
-        debug_assert!(1 < p.negate());
+        debug_assert!(1 < usize::from(!p));
         let len = lits.len();
-        cdb.watcher[p.negate() as usize].detach_with(cid);
-        cdb.watcher[q.negate() as usize].register(r, cid);
+        cdb.watcher[!p].detach_with(cid);
+        cdb.watcher[!q].register(r, cid);
         if len == 2 {
             // update another bocker
-            cdb.watcher[r.negate() as usize].update_blocker(cid, q);
+            cdb.watcher[!r].update_blocker(cid, q);
         }
     } else {
         lits.delete_unstable(|&x| x == p);
@@ -627,8 +627,8 @@ fn strengthen(cdb: &mut ClauseDB, cid: ClauseId, p: Lit) -> bool {
             // update another bocker
             let q = lits[0];
             let r = lits[1];
-            cdb.watcher[q.negate() as usize].update_blocker(cid, r);
-            cdb.watcher[r.negate() as usize].update_blocker(cid, q);
+            cdb.watcher[!q].update_blocker(cid, r);
+            cdb.watcher[!r].update_blocker(cid, q);
         }
     }
     false
@@ -636,7 +636,7 @@ fn strengthen(cdb: &mut ClauseDB, cid: ClauseId, p: Lit) -> bool {
 
 fn make_eliminating_unit_clause(vec: &mut Vec<Lit>, x: Lit) {
     vec.push(x);
-    vec.push(1);
+    vec.push(Lit::from(1usize));
 }
 
 fn make_eliminated_clause(cdb: &mut ClauseDB, vec: &mut Vec<Lit>, vi: VarId, cid: ClauseId) {
@@ -656,9 +656,9 @@ fn make_eliminated_clause(cdb: &mut ClauseDB, vec: &mut Vec<Lit>, vi: VarId, cid
     }
     // Store the length of the clause last:
     debug_assert_eq!(vec[first].vi(), vi);
-    vec.push(c.lits.len() as Lit);
-    cdb.touched[Lit::from_var(vi, true) as usize] = true;
-    cdb.touched[Lit::from_var(vi, false) as usize] = true;
+    vec.push(Lit::from(c.lits.len()));
+    cdb.touched[Lit::from_var(vi, true)] = true;
+    cdb.touched[Lit::from_var(vi, false)] = true;
     // println!("make_eliminated_clause: eliminate({}) clause {:?}", vi, vec2int(&ch.lits));
 }
 
@@ -706,7 +706,7 @@ fn eliminate_var(
                         // );
                         let lit = (*vec)[0];
                         cdb.certificate_add(&*vec);
-                        asgs.enqueue(&mut vdb[lit.vi()], lit.as_bool(), NULL_CLAUSE, 0)?;
+                        asgs.enqueue(&mut vdb[lit.vi()], bool::from(lit), NULL_CLAUSE, 0)?;
                     }
                     _ => {
                         let rank = if cdb[*p].is(Flag::LEARNT) && cdb[*n].is(Flag::LEARNT) {

@@ -177,7 +177,7 @@ impl VarDBIF for VarDB {
     fn assigned(&self, l: Lit) -> Option<bool> {
         // unsafe { self.var.get_unchecked(l.vi()).assign ^ ((l & 1) as u8) }
         match unsafe { self.var.get_unchecked(l.vi()).assign } {
-            Some(x) if !l.as_bool() => Some(!x),
+            Some(x) if !bool::from(l) => Some(!x),
             x => x,
         }
     }

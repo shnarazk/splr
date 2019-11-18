@@ -34,7 +34,7 @@ macro_rules! lit_assign {
                 #[allow(unused_unsafe)]
                 // unsafe { *$asg.asgvec.get_unchecked(l.vi()) ^ (l as u8 & 1) }
                 match unsafe { *$asg.asgvec.get_unchecked(l.vi()) } {
-                    Some(x) if !l.as_bool() => Some(!x),
+                    Some(x) if !bool::from(l) => Some(!x),
                     x => x,
                 }
             }
@@ -46,7 +46,7 @@ macro_rules! set_assign {
     ($asg: expr, $lit: expr) => {
         match $lit {
             l => unsafe {
-                *$asg.asgvec.get_unchecked_mut(l.vi()) = Some(l.as_bool());
+                *$asg.asgvec.get_unchecked_mut(l.vi()) = Some(bool::from(l));
             },
         }
     };
@@ -135,10 +135,10 @@ impl PropagatorIF for AssignStack {
         let watcher = &mut cdb.watcher[..] as *mut [Vec<Watch>];
         while self.remains() {
             let p = self.sweep();
-            let false_lit = (p as Lit).negate();
+            let false_lit = !p;
             state.stats[Stat::Propagation] += 1;
             unsafe {
-                let source = (*watcher).get_unchecked_mut(p as usize);
+                let source = (*watcher).get_unchecked_mut(usize::from(p));
                 let mut n = 0;
                 'next_clause: while n < source.len() {
                     let w = source.get_unchecked_mut(n);
@@ -171,7 +171,7 @@ impl PropagatorIF for AssignStack {
                     for (k, lk) in lits.iter().enumerate().skip(2) {
                         if lit_assign!(self, *lk) != Some(false) {
                             (*watcher)
-                                .get_unchecked_mut(lk.negate() as usize)
+                                .get_unchecked_mut(usize::from(!*lk))
                                 .register(first, w.c);
                             n -= 1;
                             source.detach(n);
@@ -208,7 +208,7 @@ impl PropagatorIF for AssignStack {
         self.q_head = lim;
     }
     fn uncheck_enqueue(&mut self, vdb: &mut VarDB, l: Lit, cid: ClauseId) {
-        debug_assert!(l != 0, "Null literal is about to be equeued");
+        debug_assert!(usize::from(l) != 0, "Null literal is about to be equeued");
         debug_assert!(
             self.trail_lim.is_empty() || cid != 0,
             "Null CLAUSE is used for uncheck_enqueue"
@@ -218,19 +218,19 @@ impl PropagatorIF for AssignStack {
         let v = &mut vdb[vi];
         debug_assert!(!v.is(Flag::ELIMINATED));
         debug_assert!(
-            var_assign!(self, vi) == Some(l.as_bool()) || var_assign!(self, vi).is_none()
+            var_assign!(self, vi) == Some(bool::from(l)) || var_assign!(self, vi).is_none()
         );
         set_assign!(self, l);
-        v.assign = Some(l.as_bool());
+        v.assign = Some(bool::from(l));
         v.level = dl;
         v.reason = cid;
         debug_assert!(!self.trail.contains(&l));
-        debug_assert!(!self.trail.contains(&l.negate()));
+        debug_assert!(!self.trail.contains(&!l));
         self.trail.push(l);
     }
     fn uncheck_assume(&mut self, vdb: &mut VarDB, l: Lit) {
         debug_assert!(!self.trail.contains(&l));
-        debug_assert!(!self.trail.contains(&l.negate()), format!("{:?}", l));
+        debug_assert!(!self.trail.contains(&!l), format!("{:?}", l));
         self.level_up();
         let dl = self.trail_lim.len();
         let vi = l.vi();
@@ -238,7 +238,7 @@ impl PropagatorIF for AssignStack {
         debug_assert!(!v.is(Flag::ELIMINATED));
         // debug_assert!(self.assign[vi] == l.lbool() || self.assign[vi] == BOTTOM);
         set_assign!(self, l);
-        v.assign = Some(l.as_bool());
+        v.assign = Some(bool::from(l));
         v.level = dl;
         v.reason = NULL_CLAUSE;
         self.trail.push(l);
@@ -275,15 +275,13 @@ impl PropagatorIF for AssignStack {
                 .unwrap();
             for c in &cdb[1..] {
                 for l in &c.lits {
-                    buf.write_all(format!("{} ", l.to_i32()).as_bytes())
-                        .unwrap();
+                    buf.write_all(format!("{} ", i32::from(*l)).as_bytes()).unwrap();
                 }
                 buf.write_all(b"0\n").unwrap();
             }
             buf.write_all(b"c from trail\n").unwrap();
             for x in &self.trail {
-                buf.write_all(format!("{} 0\n", x.to_i32()).as_bytes())
-                    .unwrap();
+                buf.write_all(format!("{} 0\n", i32::from(*x)).as_bytes()).unwrap();
             }
         }
     }
@@ -388,7 +386,7 @@ impl VarOrderIF for VarIdHeap {
 
 impl fmt::Display for AssignStack {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let v = self.trail.iter().map(|l| l.to_i32()).collect::<Vec<i32>>();
+        let v = self.trail.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
         let len = self.level();
         let c = |i| {
             let a = self.num_at(i);

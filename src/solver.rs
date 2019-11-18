@@ -247,7 +247,7 @@ impl SatSolverIF for Solver {
                     for s in iter {
                         match s.parse::<i32>() {
                             Ok(0) => break,
-                            Ok(val) => v.push(Lit::from_int(val)),
+                            Ok(val) => v.push(Lit::from(val)),
                             Err(_) => (),
                         }
                     }
@@ -280,7 +280,7 @@ impl SatSolverIF for Solver {
         for i in 0..v.len() {
             let li = v[i];
             let sat = vdb.assigned(li);
-            if sat == Some(true) || li.negate() == l_ {
+            if sat == Some(true) || !li == l_ {
                 return Some(NULL_CLAUSE);
             } else if sat != Some(false) && li != l_ {
                 v[j] = li;
@@ -292,7 +292,7 @@ impl SatSolverIF for Solver {
         match v.len() {
             0 => None, // Empty clause is UNSAT.
             1 => {
-                asgs.enqueue_null(&mut vdb[v[0].vi()], v[0].as_bool());
+                asgs.enqueue_null(&mut vdb[v[0].vi()], bool::from(v[0]));
                 Some(NULL_CLAUSE)
             }
             _ => {
@@ -530,7 +530,7 @@ fn analyze(
 ) -> usize {
     let learnt = &mut state.new_learnt;
     learnt.clear();
-    learnt.push(0);
+    learnt.push(NULL_LIT);
     let dl = asgs.level();
     let mut cid = confl;
     let mut p = NULL_LIT;
@@ -610,7 +610,7 @@ fn analyze(
             ti -= 1;
         }
     }
-    learnt[0] = p.negate();
+    learnt[0] = !p;
     // println!("- appending {}, the result is {:?}", learnt[0].int(), vec2int(learnt));
     simplify_learnt(asgs, cdb, state, vdb)
 }
@@ -728,7 +728,7 @@ fn analyze_final(asgs: &AssignStack, state: &mut State, vdb: &VarDB, c: &Clause)
         let vi = l.vi();
         if seen[vi] {
             if vdb[vi].reason == NULL_CLAUSE {
-                state.conflicts.push(l.negate());
+                state.conflicts.push(!*l);
             } else {
                 for l in &c.lits[(c.lits.len() != 2) as usize..] {
                     let vi = l.vi();
@@ -753,7 +753,7 @@ fn minimize_with_bi_clauses(cdb: &ClauseDB, vdb: &VarDB, temp: &mut [usize], vec
     }
     let l0 = vec[0];
     let mut nsat = 0;
-    for w in &cdb.watcher[l0.negate() as usize] {
+    for w in &cdb.watcher[!l0] {
         let c = &cdb[w.c];
         if c.lits.len() != 2 {
             continue;

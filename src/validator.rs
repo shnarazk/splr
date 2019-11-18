@@ -8,10 +8,10 @@ impl ValidatorIF for Solver {
             return Err(SolverError::Inconsistent);
         }
         for val in vec {
-            let l = Lit::from_int(*val);
+            let l = Lit::from(*val);
             let vi = l.vi();
             self.asgs
-                .enqueue(&mut self.vdb[vi], l.as_bool(), NULL_CLAUSE, 0)?;
+                .enqueue(&mut self.vdb[vi], bool::from(l), NULL_CLAUSE, 0)?;
         }
         Ok(())
     }
@@ -22,7 +22,7 @@ impl ValidatorIF for Solver {
             if !self.vdb.satisfies(&ch.lits) {
                 let mut v = Vec::new();
                 for l in &ch.lits {
-                    v.push(l.to_i32());
+                    v.push(i32::from(*l));
                 }
                 return Some(v);
             }
