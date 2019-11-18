@@ -99,7 +99,8 @@ impl SatSolverIF for Solver {
             elim.activate();
             elim.prepare(cdb, vdb, true);
             // run simple preprocessor
-            for vi in 1..vdb.len() {
+            for vii in 1..vdb.len() {
+                let vi = VarId::from(vii);
                 let v = &mut vdb[vi];
                 if v.assign.is_some() {
                     continue;
@@ -153,7 +154,8 @@ impl SatSolverIF for Solver {
         match search(asgs, cdb, elim, state, vdb) {
             Ok(true) => {
                 state.progress(cdb, vdb, None);
-                let mut result = Vec::new();
+                let mut result: VarIdIndexed<i32> = VarIdIndexed::new();
+                result.push(0); // dummy
                 for (vi, v) in vdb[0..].iter().enumerate().take(state.num_vars + 1).skip(1) {
                     match v.assign {
                         Some(true) => result.push(vi as i32),
@@ -163,7 +165,7 @@ impl SatSolverIF for Solver {
                 }
                 elim.extend_model(&mut result);
                 asgs.cancel_until(vdb, 0);
-                Ok(Certificate::SAT(result))
+                Ok(Certificate::SAT(result.vec))
             }
             Ok(false) => {
                 state.progress(cdb, vdb, None);
@@ -672,7 +674,7 @@ fn simplify_learnt(
 fn redundant_lit(
     cdb: &mut ClauseDB,
     vdb: &VarDB,
-    seen: &mut [bool],
+    seen: &mut VarIdIndexed<bool>,
     l: Lit,
     clear: &mut Vec<Lit>,
     levels: &[bool],
@@ -708,7 +710,7 @@ fn redundant_lit(
 }
 
 fn analyze_final(asgs: &AssignStack, state: &mut State, vdb: &VarDB, c: &Clause) {
-    let mut seen = vec![false; state.num_vars + 1];
+    let mut seen = VarIdIndexed::from(vec![false; state.num_vars + 1]);
     state.conflicts.clear();
     if asgs.level() == 0 {
         return;
@@ -749,7 +751,7 @@ fn minimize_with_bi_clauses(cdb: &ClauseDB, vdb: &VarDB, temp: &mut [usize], vec
     }
     let key = temp[0] + 1;
     for l in &vec[1..] {
-        temp[l.vi() as usize] = key;
+        temp[usize::from(l.vi())] = key;
     }
     let l0 = vec[0];
     let mut nsat = 0;
@@ -760,15 +762,15 @@ fn minimize_with_bi_clauses(cdb: &ClauseDB, vdb: &VarDB, temp: &mut [usize], vec
         }
         debug_assert!(c.lits[0] == l0 || c.lits[1] == l0);
         let other = c.lits[(c.lits[0] == l0) as usize];
-        let vi = other.vi();
+        let vi = usize::from(other.vi());
         if temp[vi] == key && vdb.assigned(other) == Some(true) {
             nsat += 1;
             temp[vi] -= 1;
         }
     }
     if 0 < nsat {
-        temp[l0.vi()] = key;
-        vec.retain(|l| temp[l.vi()] == key);
+        temp[usize::from(l0.vi())] = key;
+        vec.retain(|l| temp[usize::from(l.vi())] == key);
     }
     temp[0] = key;
 }

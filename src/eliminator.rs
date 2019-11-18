@@ -110,7 +110,8 @@ impl EliminatorIF for Eliminator {
             self.add_cid_occur(vdb, cid as ClauseId, c, false);
         }
         if force {
-            for vi in 1..vdb.len() {
+            for vix in 1..vdb.len() {
+                let vi = VarId::from(vix);
                 let v = &vdb[vi];
                 if v.is(Flag::ELIMINATED) || v.assign.is_some() {
                     continue;
@@ -187,7 +188,7 @@ impl EliminatorIF for Eliminator {
         }
         Ok(())
     }
-    fn extend_model(&mut self, model: &mut Vec<i32>) {
+    fn extend_model(&mut self, model: &mut VarIdIndexed<i32>) {
         if self.elim_clauses.is_empty() {
             return;
         }
@@ -204,13 +205,7 @@ impl EliminatorIF for Eliminator {
                     break;
                 }
                 let l = self.elim_clauses[i];
-                // let model_value = match model[l.vi() - 1] {
-                //     x if x == l.to_i32() => Some(true),
-                //     x if -x == l.to_i32() => Some(false),
-                //     _ => None,
-                // };
-                // if model_value != Some(false) {
-                if -model[l.vi() - 1] != l.to_i32() {
+                if -model[l.vi()] != l.to_i32() {
                     if i < width {
                         break 'next;
                     }
@@ -223,7 +218,7 @@ impl EliminatorIF for Eliminator {
             debug_assert!(width == 1);
             let l = self.elim_clauses[i];
             // debug_assert!(model[l.vi() - 1] != l.negate().int());
-            model[l.vi() - 1] = l.to_i32(); // .neg();
+            model[l.vi()] = l.to_i32(); // .neg();
             if i < width {
                 break;
             }
@@ -333,7 +328,7 @@ impl Eliminator {
                 }
                 // if c is subsumed by c', both of c and c' are included in the occurs of all literals of c
                 // so searching the shortest occurs is most efficient.
-                let mut b = 0;
+                let mut b = VarId::default();
                 for l in lits {
                     let v = &vdb[l.vi()];
                     if v.assign.is_some() {
@@ -351,7 +346,7 @@ impl Eliminator {
                 }
                 b
             };
-            if best == 0 || vdb[best].is(Flag::ELIMINATED) {
+            if best == VarId::default() || vdb[best].is(Flag::ELIMINATED) {
                 continue;
             }
             unsafe {
@@ -478,7 +473,7 @@ fn check_to_merge(
 }
 
 #[allow(dead_code)]
-fn check_eliminator(cdb: &ClauseDB, vdb: &[Var]) -> bool {
+fn check_eliminator(cdb: &ClauseDB, vdb: &VarDB) -> bool {
     // clause_queue should be clear.
     // all elements in occur_lists exist.
     // for v in vdb {
@@ -826,19 +821,19 @@ impl VarOrderIF for VarOccHeap {
     fn new(n: usize, init: usize) -> VarOccHeap {
         let mut heap = Vec::with_capacity(n + 1);
         let mut idxs = Vec::with_capacity(n + 1);
-        heap.push(0);
+        heap.push(VarId::from(0));
         idxs.push(n);
         for i in 1..=n {
-            heap.push(i);
+            heap.push(VarId::from(i));
             idxs.push(i);
         }
         idxs[0] = init;
         VarOccHeap { heap, idxs }
     }
     fn insert(&mut self, vdb: &VarDB, vi: VarId, upward: bool) {
-        debug_assert!(vi < self.heap.len());
+        debug_assert!(usize::from(vi) < self.heap.len());
         if self.contains(vi) {
-            let i = self.idxs[vi];
+            let i = self.idxs[usize::from(vi)];
             if upward {
                 self.percolate_up(vdb, i);
             } else {
@@ -846,11 +841,11 @@ impl VarOrderIF for VarOccHeap {
             }
             return;
         }
-        let i = self.idxs[vi];
+        let i = self.idxs[usize::from(vi)];
         let n = self.idxs[0] + 1;
         let vn = self.heap[n];
         self.heap.swap(i, n);
-        self.idxs.swap(vi, vn);
+        self.idxs.swap(usize::from(vi), usize::from(vn));
         debug_assert!(n < self.heap.len());
         self.idxs[0] = n;
         self.percolate_up(vdb, n);
@@ -870,7 +865,7 @@ impl VarOrderIF for VarOccHeap {
     fn select_var(&mut self, vdb: &VarDB) -> Option<VarId> {
         loop {
             let vi = self.get_root(vdb);
-            if vi == 0 {
+            if vi == VarId::default() {
                 return None;
             }
             if !vdb[vi].is(Flag::ELIMINATED) {
@@ -890,12 +885,12 @@ impl VarOrderIF for VarOccHeap {
 
 impl VarOccHeap {
     fn contains(&self, v: VarId) -> bool {
-        self.idxs[v] <= self.idxs[0]
+        self.idxs[usize::from(v)] <= self.idxs[0]
     }
     fn reset(&mut self) {
         for i in 0..self.idxs.len() {
             self.idxs[i] = i;
-            self.heap[i] = i;
+            self.heap[i] = VarId::from(i);
         }
     }
     fn get_root(&mut self, vdb: &VarDB) -> VarId {
@@ -904,13 +899,13 @@ impl VarOccHeap {
         let n = self.idxs[0];
         debug_assert!(n < self.heap.len());
         if n == 0 {
-            return 0;
+            return VarId::default();
         }
         let vn = self.heap[n];
-        debug_assert!(vn != 0, "Invalid VarId for heap");
-        debug_assert!(vs != 0, "Invalid VarId for heap");
+        debug_assert!(vn != VarId::default(), "Invalid VarId for heap");
+        debug_assert!(vs != VarId::default(), "Invalid VarId for heap");
         self.heap.swap(n, s);
-        self.idxs.swap(vn, vs);
+        self.idxs.swap(usize::from(vn), usize::from(vs));
         self.idxs[0] -= 1;
         if 1 < self.idxs[0] {
             self.percolate_down(&vdb, 1);
@@ -920,14 +915,14 @@ impl VarOccHeap {
     fn percolate_up(&mut self, vdb: &VarDB, start: usize) {
         let mut q = start;
         let vq = self.heap[q];
-        debug_assert!(0 < vq, "size of heap is too small");
+        debug_assert!(0 < usize::from(vq), "size of heap is too small");
         let aq = vdb[vq].occur_activity();
         loop {
             let p = q / 2;
             if p == 0 {
                 self.heap[q] = vq;
-                debug_assert!(vq != 0, "Invalid index in percolate_up");
-                self.idxs[vq] = q;
+                debug_assert!(vq != VarId::default(), "Invalid index in percolate_up");
+                self.idxs[usize::from(vq)] = q;
                 return;
             } else {
                 let vp = self.heap[p];
@@ -935,13 +930,13 @@ impl VarOccHeap {
                 if ap > aq {
                     // move down the current parent, and make it empty
                     self.heap[q] = vp;
-                    debug_assert!(vq != 0, "Invalid index in percolate_up");
-                    self.idxs[vp] = q;
+                    debug_assert!(vq != VarId::default(), "Invalid index in percolate_up");
+                    self.idxs[usize::from(vp)] = q;
                     q = p;
                 } else {
                     self.heap[q] = vq;
-                    debug_assert!(vq != 0, "Invalid index in percolate_up");
-                    self.idxs[vq] = q;
+                    debug_assert!(vq != VarId::default(), "Invalid index in percolate_up");
+                    self.idxs[usize::from(vq)] = q;
                     return;
                 }
             }
@@ -966,56 +961,21 @@ impl VarOccHeap {
                 };
                 if ai > ac {
                     self.heap[i] = vc;
-                    self.idxs[vc] = i;
+                    self.idxs[usize::from(vc)] = i;
                     i = target;
                 } else {
                     self.heap[i] = vi;
-                    debug_assert!(vi != 0, "invalid index");
-                    self.idxs[vi] = i;
+                    debug_assert!(vi != VarId::default(), "invalid index");
+                    self.idxs[usize::from(vi)] = i;
                     return;
                 }
             } else {
                 self.heap[i] = vi;
-                debug_assert!(vi != 0, "invalid index");
-                self.idxs[vi] = i;
+                debug_assert!(vi != VarId::default(), "invalid index");
+                self.idxs[usize::from(vi)] = i;
                 return;
             }
         }
-    }
-    #[allow(dead_code)]
-    fn peek(&self) -> VarId {
-        self.heap[1]
-    }
-    #[allow(dead_code)]
-    fn remove(&mut self, vec: &VarDB, vs: VarId) {
-        let s = self.idxs[vs];
-        let n = self.idxs[0];
-        if n < s {
-            return;
-        }
-        let vn = self.heap[n];
-        self.heap.swap(n, s);
-        self.idxs.swap(vn, vs);
-        self.idxs[0] -= 1;
-        if 1 < self.idxs[0] {
-            self.percolate_down(&vec, 1);
-        }
-    }
-    #[allow(dead_code)]
-    fn check(&self, s: &str) {
-        let h = &mut self.heap.clone()[1..];
-        let d = &mut self.idxs.clone()[1..];
-        h.sort();
-        d.sort();
-        for i in 0..h.len() {
-            if h[i] != i + 1 {
-                panic!("heap {} {} {:?}", i, h[i], h);
-            }
-            if d[i] != i + 1 {
-                panic!("idxs {} {} {:?}", i, d[i], d);
-            }
-        }
-        println!(" - pass var_order test at {}", s);
     }
 }
 

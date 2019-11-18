@@ -23,7 +23,7 @@ pub struct AssignStack {
 /// ```
 macro_rules! var_assign {
     ($asg: expr, $var: expr) => {
-        unsafe { *$asg.asgvec.get_unchecked($var) }
+        unsafe { *$asg.asgvec.get_unchecked(usize::from($var)) }
     };
 }
 
@@ -33,7 +33,7 @@ macro_rules! lit_assign {
             l => {
                 #[allow(unused_unsafe)]
                 // unsafe { *$asg.asgvec.get_unchecked(l.vi()) ^ (l as u8 & 1) }
-                match unsafe { *$asg.asgvec.get_unchecked(l.vi()) } {
+                match unsafe { *$asg.asgvec.get_unchecked(usize::from(l.vi())) } {
                     Some(x) if !l.as_bool() => Some(!x),
                     x => x,
                 }
@@ -46,7 +46,7 @@ macro_rules! set_assign {
     ($asg: expr, $lit: expr) => {
         match $lit {
             l => unsafe {
-                *$asg.asgvec.get_unchecked_mut(l.vi()) = Some(l.as_bool());
+                *$asg.asgvec.get_unchecked_mut(usize::from(l.vi())) = Some(l.as_bool());
             },
         }
     };
@@ -56,7 +56,7 @@ macro_rules! set_assign {
 macro_rules! unset_assign {
     ($asg: expr, $var: expr) => {
         unsafe {
-            *$asg.asgvec.get_unchecked_mut($var) = None;
+            *$asg.asgvec.get_unchecked_mut(usize::from($var)) = None;
         }
     };
 }
@@ -310,8 +310,8 @@ impl AssignStack {
 //   `indx` is positions. So the unused field 0 can hold the last position as a special case.
 #[derive(Debug)]
 pub struct VarIdHeap {
-    heap: Vec<VarId>, // order : usize -> VarId
-    idxs: Vec<usize>, // VarId : -> order : usize
+    heap: Vec<VarId>,           // order : usize -> VarId
+    idxs: VarIdIndexed<usize>,  // VarId : -> order : usize
 }
 
 trait VarOrderIF {
@@ -328,18 +328,18 @@ trait VarOrderIF {
 impl VarOrderIF for VarIdHeap {
     fn new(n: usize, init: usize) -> VarIdHeap {
         let mut heap = Vec::with_capacity(n + 1);
-        let mut idxs = Vec::with_capacity(n + 1);
-        heap.push(0);
+        let mut idxs: VarIdIndexed<usize> = VarIdIndexed::from(Vec::with_capacity(n + 1));
+        heap.push(VarId::default());
         idxs.push(n);
         for i in 1..=n {
-            heap.push(i);
+            heap.push(VarId::from(i));
             idxs.push(i);
         }
-        idxs[0] = init;
+        idxs[VarId::default()] = init;
         VarIdHeap { heap, idxs }
     }
     fn update(&mut self, vdb: &mut VarDB, v: VarId) {
-        debug_assert!(v != 0, "Invalid VarId");
+        debug_assert!(v != VarId::default(), "Invalid VarId");
         let start = self.idxs[v];
         if self.contains(v) {
             self.percolate_up(vdb, start)
@@ -352,21 +352,21 @@ impl VarOrderIF for VarIdHeap {
             return;
         }
         let i = self.idxs[vi];
-        let n = self.idxs[0] + 1;
+        let n = self.idxs[VarId::default()] + 1;
         let vn = self.heap[n];
         self.heap.swap(i, n);
         self.idxs.swap(vi, vn);
-        self.idxs[0] = n;
+        self.idxs[VarId::default()] = n;
         self.percolate_up(vdb, n);
     }
     fn clear(&mut self) {
         self.reset()
     }
     fn len(&self) -> usize {
-        self.idxs[0]
+        self.idxs[VarId::default()]
     }
     fn is_empty(&self) -> bool {
-        self.idxs[0] == 0
+        self.idxs[VarId::default()] == 0
     }
     fn select_var(&mut self, vdb: &mut VarDB) -> VarId {
         loop {
@@ -378,7 +378,8 @@ impl VarOrderIF for VarIdHeap {
     }
     fn rebuild(&mut self, vdb: &mut VarDB) {
         self.reset();
-        for vi in 1..vdb.len() {
+        for vii in 1..vdb.len() {
+            let vi = VarId::from(vii);
             if vdb[vi].assign.is_none() && !vdb[vi].is(Flag::ELIMINATED) {
                 self.insert(vdb, vi);
             }
@@ -408,25 +409,26 @@ impl fmt::Display for AssignStack {
 
 impl VarIdHeap {
     fn contains(&self, v: VarId) -> bool {
-        self.idxs[v] <= self.idxs[0]
+        self.idxs[v] <= self.idxs[VarId::default()]
     }
     fn reset(&mut self) {
         for i in 0..self.idxs.len() {
-            self.idxs[i] = i;
-            self.heap[i] = i;
+            let vi = VarId::from(i);
+            self.idxs[vi] = i;
+            self.heap[i] = vi;
         }
     }
     fn get_root(&mut self, vdb: &mut VarDB) -> VarId {
         let s = 1;
         let vs = self.heap[s];
-        let n = self.idxs[0];
+        let n = self.idxs[VarId::default()];
         let vn = self.heap[n];
-        debug_assert!(vn != 0, "Invalid VarId for heap");
-        debug_assert!(vs != 0, "Invalid VarId for heap");
+        debug_assert!(vn != VarId::default(), "Invalid VarId for heap");
+        debug_assert!(vs != VarId::default(), "Invalid VarId for heap");
         self.heap.swap(n, s);
         self.idxs.swap(vn, vs);
-        self.idxs[0] -= 1;
-        if 1 < self.idxs[0] {
+        self.idxs[VarId::default()] -= 1;
+        if 1 < self.idxs[VarId::default()] {
             self.percolate_down(vdb, 1);
         }
         vs
@@ -434,13 +436,13 @@ impl VarIdHeap {
     fn percolate_up(&mut self, vdb: &mut VarDB, start: usize) {
         let mut q = start;
         let vq = self.heap[q];
-        debug_assert!(0 < vq, "size of heap is too small");
+        debug_assert!(VarId::default() != vq, "size of heap is too small");
         let aq = vdb.activity(vq);
         loop {
             let p = q / 2;
             if p == 0 {
                 self.heap[q] = vq;
-                debug_assert!(vq != 0, "Invalid index in percolate_up");
+                debug_assert!(VarId::default() != vq, "Invalid index in percolate_up");
                 self.idxs[vq] = q;
                 return;
             } else {
@@ -449,12 +451,12 @@ impl VarIdHeap {
                 if ap < aq {
                     // move down the current parent, and make it empty
                     self.heap[q] = vp;
-                    debug_assert!(vq != 0, "Invalid index in percolate_up");
+                    debug_assert!(VarId::default() != vq, "Invalid index in percolate_up");
                     self.idxs[vp] = q;
                     q = p;
                 } else {
                     self.heap[q] = vq;
-                    debug_assert!(vq != 0, "Invalid index in percolate_up");
+                    debug_assert!(VarId::default() != vq, "Invalid index in percolate_up");
                     self.idxs[vq] = q;
                     return;
                 }
@@ -484,52 +486,17 @@ impl VarIdHeap {
                     i = target;
                 } else {
                     self.heap[i] = vi;
-                    debug_assert!(vi != 0, "invalid index");
+                    debug_assert!(vi != VarId::default(), "invalid index");
                     self.idxs[vi] = i;
                     return;
                 }
             } else {
                 self.heap[i] = vi;
-                debug_assert!(vi != 0, "invalid index");
+                debug_assert!(vi != VarId::default(), "invalid index");
                 self.idxs[vi] = i;
                 return;
             }
         }
-    }
-    #[allow(dead_code)]
-    fn peek(&self) -> VarId {
-        self.heap[1]
-    }
-    #[allow(dead_code)]
-    fn remove(&mut self, vdb: &mut VarDB, vs: VarId) {
-        let s = self.idxs[vs];
-        let n = self.idxs[0];
-        if n < s {
-            return;
-        }
-        let vn = self.heap[n];
-        self.heap.swap(n, s);
-        self.idxs.swap(vn, vs);
-        self.idxs[0] -= 1;
-        if 1 < self.idxs[0] {
-            self.percolate_down(vdb, 1);
-        }
-    }
-    #[allow(dead_code)]
-    fn check(&self, s: &str) {
-        let h = &mut self.heap.clone()[1..];
-        let d = &mut self.idxs.clone()[1..];
-        h.sort();
-        d.sort();
-        for i in 0..h.len() {
-            if h[i] != i + 1 {
-                panic!("heap {} {} {:?}", i, h[i], h);
-            }
-            if d[i] != i + 1 {
-                panic!("idxs {} {} {:?}", i, d[i], d);
-            }
-        }
-        println!(" - pass var_order test at {}", s);
     }
 }
 

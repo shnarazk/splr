@@ -4,7 +4,7 @@ use crate::eliminator::Eliminator;
 use crate::propagator::AssignStack;
 use crate::solver::{Solver, SolverResult};
 use crate::state::State;
-use crate::types::{CNFDescription, ClauseId, Flag, Lit, MaybeInconsistent, VarId};
+use crate::types::{CNFDescription, ClauseId, Flag, Lit, MaybeInconsistent, VarId, VarIdIndexed};
 use crate::var::{Var, VarDB};
 
 /// API for Clause and Var rewarding
@@ -129,7 +129,7 @@ pub trait EliminatorIF {
         vdb: &mut VarDB,
     ) -> MaybeInconsistent;
     /// add assignments for eliminated vars to `model`.
-    fn extend_model(&mut self, model: &mut Vec<i32>);
+    fn extend_model(&mut self, model: &mut VarIdIndexed<i32>);
     /// register a clause id to all corresponding occur lists.
     fn add_cid_occur(&mut self, vdb: &mut VarDB, cid: ClauseId, c: &mut Clause, enqueue: bool);
     /// remove a clause id from literal's occur list.
@@ -304,7 +304,7 @@ pub trait VarIF {
     /// return a new instance.
     fn new(i: usize) -> Var;
     /// return a new vector of $n$ `Var`s.
-    fn new_vars(n: usize) -> Vec<Var>;
+    fn new_vars(n: usize) -> VarIdIndexed<Var>;
 }
 
 /// API for var DB like `assigned`, `locked`, `compute_lbd` and so on.

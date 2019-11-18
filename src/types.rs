@@ -1,10 +1,109 @@
 //! Basic types
 use crate::traits::{Delete, EmaIF, LitIF};
 use std::fmt;
-use std::ops::Neg;
+use std::ops::{Index, IndexMut, Neg, Range, RangeFrom};
 
 /// 'Variable' identifier or 'variable' index, starting with one.
-pub type VarId = usize;
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct VarId {
+    ix: usize
+}
+
+impl fmt::Display for VarId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "VarID:{}", self.ix)
+    }
+}
+
+impl From<VarId> for usize {
+    fn from(vi: VarId) -> Self { vi.ix }
+}
+
+impl From<usize> for VarId {
+    fn from(ix: usize) -> Self { VarId { ix } }
+}
+
+impl From<VarId> for i32 {
+    fn from(vi: VarId) -> Self { vi.ix  as i32 }
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct VarIdIndexed<T>
+    where T: Sized
+{
+    pub vec: Vec<T>
+}
+
+impl<T> VarIdIndexed<T> {
+    pub fn len(&self) -> usize {
+        self.vec.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.vec.is_empty()
+    }
+    pub fn new() -> Self {
+        VarIdIndexed { vec: Vec::new() }
+    }
+    pub fn push(&mut self, x: T) {
+        self.vec.push(x);
+    }
+    pub fn swap(&mut self, x: VarId, y: VarId) {
+        self.vec.swap(usize::from(x), usize::from(y));
+    }
+}
+
+impl<T> From<Vec<T>> for VarIdIndexed<T> {
+    fn from(vec: Vec<T>) -> Self {
+        VarIdIndexed {
+            vec
+        }
+    }
+}
+
+impl<T> Index<VarId> for VarIdIndexed<T> {
+    type Output = T;
+    #[inline]
+    fn index(&self, vi: VarId) -> &Self::Output {
+        unsafe { self.vec.get_unchecked(vi.ix) }
+    }
+}
+
+impl<T> IndexMut<VarId> for VarIdIndexed<T> {
+    #[inline]
+    fn index_mut(&mut self, vi: VarId) -> &mut T {
+        unsafe { self.vec.get_unchecked_mut(vi.ix) }
+    }
+}
+
+impl<T> Index<Range<usize>> for VarIdIndexed<T> {
+    type Output = [T];
+    #[inline]
+    fn index(&self, r: Range<usize>) -> &Self::Output {
+        &self.vec[r]
+    }
+}
+
+impl<T> Index<RangeFrom<usize>> for VarIdIndexed<T> {
+    type Output = [T];
+    #[inline]
+    fn index(&self, r: RangeFrom<usize>) -> &Self::Output {
+        unsafe { self.vec.get_unchecked(r) }
+    }
+}
+
+impl<T> IndexMut<Range<usize>> for VarIdIndexed<T> {
+    #[inline]
+    fn index_mut(&mut self, r: Range<usize>) -> &mut Self::Output {
+        unsafe { self.vec.get_unchecked_mut(r) }
+    }
+}
+
+impl<T> IndexMut<RangeFrom<usize>> for VarIdIndexed<T> {
+    #[inline]
+    fn index_mut(&mut self, r: RangeFrom<usize>) -> &mut Self::Output {
+        &mut self.vec[r]
+    }
+}
 
 /// 'Clause' Identifier, or 'clause' index, starting with one.
 /// Note: ids are re-used after 'garbage collection'.
@@ -59,10 +158,10 @@ impl LitIF for Lit {
         (if x < 0 { -2 * x } else { 2 * x + 1 }) as Lit
     }
     fn from_var(vi: VarId, p: bool) -> Lit {
-        (vi as Lit) << 1 | (p as Lit)
+        (vi.ix as Lit) << 1 | (p as Lit)
     }
     fn vi(self) -> VarId {
-        (self >> 1) as VarId
+        VarId { ix: (self >> 1) as usize }
     }
     fn to_i32(self) -> i32 {
         if self % 2 == 0 {

@@ -35,12 +35,14 @@ pub struct Var {
 
 /// is the dummy var index.
 #[allow(dead_code)]
-const NULL_VAR: VarId = 0;
+const NULL_VAR: VarId = VarId {
+    ix: 0
+};
 
 impl VarIF for Var {
     fn new(i: usize) -> Var {
         Var {
-            index: i,
+            index: VarId::from(i),
             assign: None,
             phase: false,
             reason: NULL_CLAUSE,
@@ -52,12 +54,12 @@ impl VarIF for Var {
             flags: Flag::empty(),
         }
     }
-    fn new_vars(n: usize) -> Vec<Var> {
+    fn new_vars(n: usize) -> VarIdIndexed<Var> {
         let mut vec = Vec::with_capacity(n + 1);
         for i in 0..=n {
             vec.push(Var::new(i));
         }
-        vec
+        VarIdIndexed::from(vec)
     }
 }
 
@@ -77,7 +79,7 @@ impl FlagIF for Var {
 #[derive(Debug)]
 pub struct VarDB {
     /// vars
-    var: Vec<Var>,
+    var: VarIdIndexed<Var>,
     /// the current conflict's ordinal number
     current_conflict: usize,
     /// the current restart's ordinal number
@@ -89,7 +91,7 @@ pub struct VarDB {
 impl Default for VarDB {
     fn default() -> VarDB {
         VarDB {
-            var: Vec::new(),
+            var: VarIdIndexed::new(),
             current_conflict: 0,
             current_restart: 0,
             lbd_temp: Vec::new(),
@@ -97,18 +99,18 @@ impl Default for VarDB {
     }
 }
 
-impl Index<usize> for VarDB {
+impl Index<VarId> for VarDB {
     type Output = Var;
     #[inline]
-    fn index(&self, i: usize) -> &Var {
-        unsafe { self.var.get_unchecked(i) }
+    fn index(&self, vi: VarId) -> &Var {
+        unsafe { self.var.vec.get_unchecked(usize::from(vi)) }
     }
 }
 
-impl IndexMut<usize> for VarDB {
+impl IndexMut<VarId> for VarDB {
     #[inline]
-    fn index_mut(&mut self, i: usize) -> &mut Var {
-        unsafe { self.var.get_unchecked_mut(i) }
+    fn index_mut(&mut self, vi: VarId) -> &mut Var {
+        unsafe { self.var.vec.get_unchecked_mut(usize::from(vi)) }
     }
 }
 
@@ -123,15 +125,15 @@ impl Index<Range<usize>> for VarDB {
 impl Index<RangeFrom<usize>> for VarDB {
     type Output = [Var];
     #[inline]
-    fn index(&self, r: RangeFrom<usize>) -> &[Var] {
-        unsafe { self.var.get_unchecked(r) }
+    fn index(&self, r: RangeFrom<usize>) -> &Self::Output {
+        &self.var.vec[r]
     }
 }
 
 impl IndexMut<Range<usize>> for VarDB {
     #[inline]
     fn index_mut(&mut self, r: Range<usize>) -> &mut [Var] {
-        unsafe { self.var.get_unchecked_mut(r) }
+        &mut self.var[r]
     }
 }
 
@@ -176,7 +178,7 @@ impl VarDBIF for VarDB {
     }
     fn assigned(&self, l: Lit) -> Option<bool> {
         // unsafe { self.var.get_unchecked(l.vi()).assign ^ ((l & 1) as u8) }
-        match unsafe { self.var.get_unchecked(l.vi()).assign } {
+        match self.var[l.vi()].assign {
             Some(x) if !l.as_bool() => Some(!x),
             x => x,
         }
