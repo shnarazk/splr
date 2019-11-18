@@ -332,7 +332,7 @@ fn search(
             state.last_asg = asgs.len();
             if state.rst.force_restart()
                 || (state.rst.restart_step < state.rst.after_restart
-                    && state.c_lvl.get() < 1.1 * state.rst.lbd.get()
+                    && state.c_lvl.get() < state.config.restart_threshold * state.rst.lbd.get()
                     && vdb.restart_conditional(asgs, state.rst.condition()))
             {
                 state.rst.after_restart = 0;

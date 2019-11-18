@@ -26,13 +26,13 @@ pub struct Config {
     #[structopt(long = "rl", default_value = "50")]
     pub restart_lbd_len: usize,
     /// forcing restart threshold
-    #[structopt(long = "rt", default_value = "0.40")]
+    #[structopt(long = "rt", default_value = "0.50")]
     pub restart_threshold: f64, // Glucose's K
     /// blocking restart threshold
     #[structopt(long = "rb", default_value = "1.40")]
     pub restart_blocking: f64, // Glucose's R
     /// #conflicts between restarts
-    #[structopt(long = "rs", default_value = "10")]
+    #[structopt(long = "rs", default_value = "36")]
     pub restart_step: usize,
     /// a DIMACS format CNF file
     #[structopt(parse(from_os_str))]
