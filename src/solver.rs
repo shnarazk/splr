@@ -330,11 +330,23 @@ fn search(
             }
             // DYNAMIC FORCING RESTART based on LBD values, updated by conflict
             state.last_asg = asgs.len();
-            if state.rst.force_restart()
-                || (state.rst.restart_step < state.rst.after_restart
-                    && state.c_lvl.get() < state.config.restart_threshold * state.rst.lbd.get()
-                    && vdb.restart_conditional(asgs, state.rst.condition()))
+            let lbd = state.rst.lbd.get();
+            let lvl = state.c_lvl.get();
+            let num = state.rst.lbd.num as f64;
+            let sum = state.rst.lbd.sum as f64;
+            let scale = if lvl.is_nan() || lbd <= 2.0 ||  lvl <= 2.0 {
+                1.0
+            } else {
+                lvl.log(lbd)
+            };
+            if //state.rst.force_restart()
+                state.rst.restart_step <= state.rst.after_restart
+                && sum < scale * lbd * num * state.config.restart_threshold // state.rst.lbd.threshold
+            // state.rst.restart_step < state.rst.after_restart
+            // && state.b_lvl.get() < 1.2 * state.rst.lbd.get()
+            // && vdb.restart_conditional(asgs, state.rst.condition()))
             {
+                // state.rst.restart_step = state.config.restart_step * (1 + state.slack_duration);
                 state.rst.after_restart = 0;
                 state.stats[Stat::Restart] += 1;
                 asgs.record_decs();
