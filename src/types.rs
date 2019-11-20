@@ -49,7 +49,9 @@ impl From<usize> for Lit {
 
 impl From<i32> for Lit {
     fn from(x: i32) -> Self {
-        Lit { ordinal: (if x < 0 { -2 * x } else { 2 * x + 1 }) as u32 }
+        Lit {
+            ordinal: (if x < 0 { -2 * x } else { 2 * x + 1 }) as u32,
+        }
     }
 }
 
@@ -68,10 +70,10 @@ impl From<Lit> for bool {
 }
 
 impl From<Lit> for ClauseId {
-     fn from(l: Lit) -> ClauseId {
-         (l.ordinal as ClauseId) | 0x8000_0000
-     }
- }
+    fn from(l: Lit) -> ClauseId {
+        (l.ordinal as ClauseId) | 0x8000_0000
+    }
+}
 
 impl From<Lit> for usize {
     fn from(l: Lit) -> usize {
@@ -92,7 +94,9 @@ impl From<Lit> for i32 {
 impl Not for Lit {
     type Output = Lit;
     fn not(self) -> Self {
-        Lit { ordinal: self.ordinal ^ 1 }
+        Lit {
+            ordinal: self.ordinal ^ 1,
+        }
     }
 }
 
@@ -154,7 +158,9 @@ impl IndexMut<Lit> for Vec<Vec<crate::clause::Watch>> {
 
 impl LitIF for Lit {
     fn from_var(vi: VarId, p: bool) -> Lit {
-        Lit { ordinal: (vi as u32) << 1 | (p as u32) }
+        Lit {
+            ordinal: (vi as u32) << 1 | (p as u32),
+        }
     }
     fn vi(self) -> VarId {
         (self.ordinal >> 1) as VarId

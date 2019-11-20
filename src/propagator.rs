@@ -275,13 +275,15 @@ impl PropagatorIF for AssignStack {
                 .unwrap();
             for c in &cdb[1..] {
                 for l in &c.lits {
-                    buf.write_all(format!("{} ", i32::from(*l)).as_bytes()).unwrap();
+                    buf.write_all(format!("{} ", i32::from(*l)).as_bytes())
+                        .unwrap();
                 }
                 buf.write_all(b"0\n").unwrap();
             }
             buf.write_all(b"c from trail\n").unwrap();
             for x in &self.trail {
-                buf.write_all(format!("{} 0\n", i32::from(*x)).as_bytes()).unwrap();
+                buf.write_all(format!("{} 0\n", i32::from(*x)).as_bytes())
+                    .unwrap();
             }
         }
     }
