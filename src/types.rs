@@ -23,14 +23,14 @@ pub const NULL_CLAUSE: ClauseId = 0;
 /// ```
 /// use splr::traits::LitIF;
 /// use splr::types::*;
-/// assert_eq!(2, Lit::from_int(-1) as i32);
-/// assert_eq!(3, Lit::from_int( 1) as i32);
-/// assert_eq!(4, Lit::from_int(-2) as i32);
-/// assert_eq!(5, Lit::from_int( 2) as i32);
-/// assert_eq!( 1, Lit::from_int( 1).to_i32());
-/// assert_eq!(-1, Lit::from_int(-1).to_i32());
-/// assert_eq!( 2, Lit::from_int( 2).to_i32());
-/// assert_eq!(-2, Lit::from_int(-2).to_i32());
+/// assert_eq!(2usize, Lit::from(-1i32).into());
+/// assert_eq!(3usize, Lit::from( 1i32).into());
+/// assert_eq!(4usize, Lit::from(-2i32).into());
+/// assert_eq!(5usize, Lit::from( 2i32).into());
+/// assert_eq!( 1i32, Lit::from( 1i32).into());
+/// assert_eq!(-1i32, Lit::from(-1i32).into());
+/// assert_eq!( 2i32, Lit::from( 2i32).into());
+/// assert_eq!(-2i32, Lit::from(-2i32).into());
 /// ```
 
 #[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
@@ -127,16 +127,16 @@ impl IndexMut<Lit> for Vec<Vec<crate::clause::Watch>> {
 /// ```
 /// use splr::traits::LitIF;
 /// use splr::types::*;
-/// assert_eq!(Lit::from_int(1), Lit::from_var(1 as VarId, true));
-/// assert_eq!(Lit::from_int(2), Lit::from_var(2 as VarId, true));
+/// assert_eq!(Lit::from(1i32), Lit::from_var(1 as VarId, true));
+/// assert_eq!(Lit::from(2i32), Lit::from_var(2 as VarId, true));
 /// assert_eq!(1, Lit::from_var(1, true).vi());
 /// assert_eq!(1, Lit::from_var(1, false).vi());
 /// assert_eq!(2, Lit::from_var(2, true).vi());
 /// assert_eq!(2, Lit::from_var(2, false).vi());
-/// assert_eq!(Lit::from_int( 1), Lit::from_int(-1).negate());
-/// assert_eq!(Lit::from_int(-1), Lit::from_int( 1).negate());
-/// assert_eq!(Lit::from_int( 2), Lit::from_int(-2).negate());
-/// assert_eq!(Lit::from_int(-2), Lit::from_int( 2).negate());
+/// assert_eq!(Lit::from( 1i32), !Lit::from(-1i32));
+/// assert_eq!(Lit::from(-1i32), !Lit::from( 1i32));
+/// assert_eq!(Lit::from( 2i32), !Lit::from(-2i32));
+/// assert_eq!(Lit::from(-2i32), !Lit::from( 2i32));
 /// ```
 
 impl LitIF for Lit {
