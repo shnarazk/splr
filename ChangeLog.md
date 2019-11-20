@@ -1,6 +1,6 @@
-## 0.2.0, as of 2019-11-19
+## 0.2.0, 2019-11-XX
 
-- re-implement `Lit` as a struct with standard traits
+- re-implement `Lit` as a struct with some standard traits
 
 ## 0.1.5, 2019-10-29
 
