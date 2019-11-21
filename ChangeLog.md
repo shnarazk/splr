@@ -1,3 +1,7 @@
+## 0.2.0, 2019-11-XX
+
+- re-implement `Lit` as a struct with some standard traits
+
 ## 0.1.5, 2019-10-29
 
 - introduce [big bang initialization](https://medium.com/backjump-technologies/big-bang-initialization-of-variable-activity-in-a-sat-solver-ada154f56fb0) for variable activity

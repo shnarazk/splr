@@ -20,7 +20,7 @@ type DRAT = Vec<(CertifiedRecord, Vec<i32>)>;
 
 impl ClauseIdIF for ClauseId {
     fn to_lit(self) -> Lit {
-        (self & 0x7FFF_FFFF) as Lit
+        Lit::from(self & 0x7FFF_FFFF)
     }
     fn is_lifted_lit(self) -> bool {
         0 != 0x8000_0000 & self
@@ -107,9 +107,9 @@ impl Default for Clause {
 impl ClauseIF for Clause {
     fn kill(&mut self, touched: &mut [bool]) {
         self.turn_on(Flag::DEAD);
-        debug_assert!(1 < self.lits[0] && 1 < self.lits[1]);
-        touched[self.lits[0].negate() as usize] = true;
-        touched[self.lits[1].negate() as usize] = true;
+        debug_assert!(1 < usize::from(self.lits[0]) && 1 < usize::from(self.lits[1]));
+        touched[!self.lits[0]] = true;
+        touched[!self.lits[1]] = true;
     }
 }
 
@@ -329,7 +329,7 @@ impl ClauseDBIF for ClauseDB {
             ref mut certified,
             ..
         } = self;
-        debug_assert_eq!(NULL_LIT.negate(), 1);
+        debug_assert_eq!(usize::from(!NULL_LIT), 1);
         let (recycles, wss) = watcher.split_at_mut(2);
         let recycled = &mut recycles[1];
         for (i, ws) in &mut wss.iter_mut().enumerate() {
@@ -355,7 +355,7 @@ impl ClauseDBIF for ClauseDB {
                         self.num_learnt -= 1;
                     }
                     if !certified.is_empty() {
-                        let temp = c.lits.iter().map(|l| l.to_i32()).collect::<Vec<i32>>();
+                        let temp = c.lits.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
                         certified.push((CertifiedRecord::ADD, temp));
                     }
                     c.lits.clear();
@@ -370,7 +370,7 @@ impl ClauseDBIF for ClauseDB {
         let cid;
         let l0 = v[0];
         let l1 = v[1];
-        if let Some(w) = self.watcher[NULL_LIT.negate() as usize].pop() {
+        if let Some(w) = self.watcher[!NULL_LIT].pop() {
             cid = w.c;
             let c = &mut self[cid];
             // if !c.is(Flag::DEAD) {
@@ -410,8 +410,8 @@ impl ClauseDBIF for ClauseDB {
             c.turn_on(Flag::LEARNT);
             self.num_learnt += 1;
         }
-        self.watcher[l0.negate() as usize].register(l1, cid);
-        self.watcher[l1.negate() as usize].register(l0, cid);
+        self.watcher[!l0].register(l1, cid);
+        self.watcher[!l1].register(l0, cid);
         self.num_active += 1;
         cid
     }
@@ -436,7 +436,7 @@ impl ClauseDBIF for ClauseDB {
     }
     fn count(&self, alive: bool) -> usize {
         if alive {
-            self.clause.len() - self.watcher[NULL_LIT.negate() as usize].len() - 1
+            self.clause.len() - self.watcher[!NULL_LIT].len() - 1
         } else {
             self.clause.len() - 1
         }
@@ -452,7 +452,7 @@ impl ClauseDBIF for ClauseDB {
     fn attach(&mut self, state: &mut State, vdb: &mut VarDB, lbd: usize) -> ClauseId {
         let v = &mut state.new_learnt;
         if !self.certified.is_empty() {
-            let temp = v.iter().map(|l| l.to_i32()).collect::<Vec<i32>>();
+            let temp = v.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
             self.certified.push((CertifiedRecord::ADD, temp));
         }
         debug_assert!(1 < v.len());
@@ -572,13 +572,13 @@ impl ClauseDBIF for ClauseDB {
     }
     fn certificate_add(&mut self, vec: &[Lit]) {
         if !self.certified.is_empty() {
-            let temp = vec.iter().map(|l| l.to_i32()).collect::<Vec<i32>>();
+            let temp = vec.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
             self.certified.push((CertifiedRecord::ADD, temp));
         }
     }
     fn certificate_delete(&mut self, vec: &[Lit]) {
         if !self.certified.is_empty() {
-            let temp = vec.iter().map(|l| l.to_i32()).collect::<Vec<i32>>();
+            let temp = vec.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
             self.certified.push((CertifiedRecord::DELETE, temp));
         }
     }
@@ -629,95 +629,3 @@ impl ClauseDBIF for ClauseDB {
         self.garbage_collect();
     }
 }
-
-/*
-impl ClauseDB {
-    #[allow(dead_code)]
-    fn check_liveness1(&self) -> bool {
-        let deads = self.watcher[NULL_LIT.negate() as usize]
-            .iter()
-            .map(|w| w.c)
-            .collect::<Vec<ClauseId>>();
-        for cid in deads {
-            if !self.clause[cid as usize].is(Flag::DEAD) {
-                panic!("done");
-            }
-        }
-        for cid in 1..self.clause.len() {
-            if !self.clause[cid].is(Flag::DEAD) {
-                let lits = &self.clause[cid].lits;
-                if lits.len() < 2 {
-                    panic!(
-                        "too short clause {} {:?}",
-                        (cid as ClauseId).format(),
-                        vec2int(&lits)
-                    );
-                }
-                if self.watcher[lits[0].negate() as usize]
-                    .iter()
-                    .all(|w| w.c != cid as ClauseId)
-                    || self.watcher[lits[1].negate() as usize]
-                        .iter()
-                        .all(|w| w.c != cid as ClauseId)
-                {
-                    panic!("watch broken");
-                }
-            }
-        }
-        true
-    }
-    #[allow(dead_code)]
-    fn check_liveness2(&self) -> bool {
-        let deads = self.watcher[NULL_LIT.negate() as usize]
-            .iter()
-            .map(|w| w.c)
-            .collect::<Vec<ClauseId>>();
-        for cid in 1..self.clause.len() {
-            if self.clause[cid].is(Flag::DEAD) && !deads.contains(&(cid as ClauseId)) {
-                panic!("done");
-            }
-            if !self.clause[cid].is(Flag::DEAD) {
-                let lits = &self.clause[cid].lits;
-                if lits.len() < 2 {
-                    panic!(
-                        "too short clause {} {:?}",
-                        (cid as ClauseId).format(),
-                        vec2int(&lits)
-                    );
-                }
-                if self.watcher[lits[0].negate() as usize]
-                    .iter()
-                    .all(|w| w.c != cid as ClauseId)
-                    || self.watcher[lits[1].negate() as usize]
-                        .iter()
-                        .all(|w| w.c != cid as ClauseId)
-                {
-                    panic!("watch broken");
-                }
-            }
-        }
-        for ws in &self.watcher[2..] {
-            for w in ws {
-                if self.clause[w.c as usize].is(Flag::DEAD) && !deads.contains(&w.c) {
-                    panic!("done");
-                }
-            }
-        }
-        true
-    }
-    #[allow(dead_code)]
-    fn check(&self) {
-        let total = self.count(false);
-        let nc = self.count(true);
-        let nc2 = self.watcher.iter().skip(2).map(|v| v.count()).sum();
-        if 2 * nc != nc2 {
-            panic!("2 * {} != {}; total {}; alive {}", nc, nc2, total, nc);
-        }
-        let nd = total - nc;
-        let nd2 = self.watcher[NULL_LIT.negate() as usize].len();
-        if nd != nd2 {
-            panic!("dead {} != {}; total {}; alive {}", nd, nd2, total, nc);
-        }
-    }
-}
-*/
