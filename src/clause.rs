@@ -1,13 +1,19 @@
-use crate::config::{Config, ACTIVITY_MAX};
-use crate::eliminator::Eliminator;
-use crate::propagator::AssignStack;
-use crate::state::{Stat, State};
-use crate::traits::*;
-use crate::types::*;
-use crate::var::VarDB;
-use std::cmp::Ordering;
-use std::fmt;
-use std::ops::{Index, IndexMut, Range, RangeFrom};
+use {
+    crate::{
+        config::{Config, ACTIVITY_MAX},
+        eliminator::Eliminator,
+        propagator::AssignStack,
+        state::{Stat, State},
+        traits::*,
+        types::*,
+        var::VarDB,
+    },
+    std::{
+        cmp::Ordering,
+        fmt,
+        ops::{Index, IndexMut, Range, RangeFrom},
+    },
+};
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum CertifiedRecord {

@@ -1,10 +1,16 @@
-use crate::clause::Clause;
-use crate::config::Config;
-use crate::state::{Stat, State};
-use crate::traits::*;
-use crate::types::*;
-use std::fmt;
-use std::ops::{Index, IndexMut, Range, RangeFrom};
+use {
+    crate::{
+        clause::Clause,
+        config::Config,
+        state::{Stat, State},
+        traits::*,
+        types::*,
+    },
+    std::{
+        fmt,
+        ops::{Index, IndexMut, Range, RangeFrom},
+    },
+};
 
 const VAR_ACTIVITY_DECAY: f64 = 0.90;
 

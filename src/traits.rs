@@ -1,11 +1,15 @@
-use crate::clause::{Clause, ClauseDB};
-use crate::config::Config;
-use crate::eliminator::Eliminator;
-use crate::propagator::AssignStack;
-use crate::solver::{Solver, SolverResult};
-use crate::state::State;
-use crate::types::{CNFDescription, ClauseId, Flag, Lit, MaybeInconsistent, VarId};
-use crate::var::{Var, VarDB};
+use {
+    crate::{
+        clause::{Clause, ClauseDB},
+        config::Config,
+        eliminator::Eliminator,
+        propagator::AssignStack,
+        solver::{Solver, SolverResult},
+        state::State,
+        types::{CNFDescription, ClauseId, Flag, Lit, MaybeInconsistent, VarId},
+        var::{Var, VarDB},
+    },
+};
 
 /// API for Clause and Var rewarding
 pub trait ActivityIF {

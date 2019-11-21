@@ -1,7 +1,11 @@
 //! Basic types
-use crate::traits::{Delete, EmaIF, LitIF};
-use std::fmt;
-use std::ops::{Index, IndexMut, Neg, Not};
+use {
+    crate::traits::{Delete, EmaIF, LitIF},
+    std::{
+        fmt,
+        ops::{Index, IndexMut, Neg, Not},
+    },
+};
 
 /// 'Variable' identifier or 'variable' index, starting with one.
 pub type VarId = usize;

@@ -1,12 +1,26 @@
-use crate::clause::{ClauseDB, Watch};
-use crate::config::Config;
-use crate::state::{Stat, State};
-use crate::traits::{ClauseDBIF, FlagIF, Instantiate, LitIF, PropagatorIF, VarDBIF, WatchDBIF};
-use crate::types::*;
-use crate::var::{Var, VarDB};
-use std::fmt;
-use std::fs::File;
-use std::io::{BufWriter, Write};
+use {
+    crate::{
+        clause::{ClauseDB, Watch},
+        config::Config,
+        state::{Stat, State},
+        traits::{
+            ClauseDBIF,
+            FlagIF,
+            Instantiate,
+            LitIF,
+            PropagatorIF,
+            VarDBIF,
+            WatchDBIF
+        },
+        types::*,
+        var::{Var, VarDB},
+    },
+    std::{
+        fmt,
+        fs::File,
+        io::{BufWriter, Write},
+    },
+};
 
 /// A record of assignment. It's called 'trail' in Glucose.
 #[derive(Debug)]
