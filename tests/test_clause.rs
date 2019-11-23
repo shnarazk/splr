@@ -1,8 +1,12 @@
 #![allow(dead_code)]
-use splr::clause::Clause;
-use splr::solver::Solver;
-use splr::traits::*;
-use splr::types::*;
+use {
+    splr::{
+        clause::Clause,
+        solver::Solver,
+        traits::*,
+        types::*,
+    },
+};
 
 macro_rules! mkv {
     ($($x:expr),*) => {
