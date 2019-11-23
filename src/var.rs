@@ -1,6 +1,6 @@
 use {
     crate::{
-        clause::Clause,
+        clause::{Clause, ClauseId},
         config::Config,
         state::{Stat, State},
         traits::*,
@@ -49,7 +49,7 @@ impl VarIF for Var {
             index: i,
             assign: None,
             phase: false,
-            reason: NULL_CLAUSE,
+            reason: ClauseId::default(),
             level: 0,
             reward: 0.0,
             last_update: 0,

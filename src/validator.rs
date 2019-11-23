@@ -1,8 +1,9 @@
 use {
     crate::{
+        clause::ClauseId,
         solver::Solver,
         traits::{LitIF, PropagatorIF, ValidatorIF, VarDBIF},
-        types::{Lit, MaybeInconsistent, SolverError, NULL_CLAUSE},
+        types::{Lit, MaybeInconsistent, SolverError},
     },
 };
 
@@ -15,7 +16,7 @@ impl ValidatorIF for Solver {
             let l = Lit::from(*val);
             let vi = l.vi();
             self.asgs
-                .enqueue(&mut self.vdb[vi], bool::from(l), NULL_CLAUSE, 0)?;
+                .enqueue(&mut self.vdb[vi], bool::from(l), ClauseId::default(), 0)?;
         }
         Ok(())
     }

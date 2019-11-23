@@ -24,12 +24,31 @@ pub enum CertifiedRecord {
 
 type DRAT = Vec<(CertifiedRecord, Vec<i32>)>;
 
-impl ClauseIdIF for ClauseId {
-    fn to_lit(self) -> Lit {
-        Lit::from(self & 0x7FFF_FFFF)
+/// 'Clause' Identifier, or 'clause' index, starting with one.
+/// Note: ids are re-used after 'garbage collection'.
+#[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
+pub struct ClauseId {
+    pub ordinal: u32,
+}
+
+impl From<usize> for ClauseId {
+    fn from(u: usize) -> ClauseId {
+        ClauseId { ordinal: u as u32 }
     }
+}
+
+impl fmt::Display for ClauseId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "CID{}", self.ordinal)
+    }
+}
+
+/// a dummy clause index.
+pub const NULL_CLAUSE: ClauseId = ClauseId { ordinal: 0};
+
+impl ClauseIdIF for ClauseId {
     fn is_lifted_lit(self) -> bool {
-        0 != 0x8000_0000 & self
+        0 != 0x8000_0000 & self.ordinal
     }
     fn format(self) -> String {
         if self == NULL_CLAUSE {
@@ -221,13 +240,13 @@ pub struct ClauseDB {
 impl Index<ClauseId> for ClauseDB {
     type Output = Clause;
     fn index(&self, cid: ClauseId) -> &Clause {
-        unsafe { self.clause.get_unchecked(cid as usize) }
+        unsafe { self.clause.get_unchecked(cid.ordinal as usize) }
     }
 }
 
 impl IndexMut<ClauseId> for ClauseDB {
     fn index_mut(&mut self, cid: ClauseId) -> &mut Clause {
-        unsafe { self.clause.get_unchecked_mut(cid as usize) }
+        unsafe { self.clause.get_unchecked_mut(cid.ordinal as usize) }
     }
 }
 
@@ -264,7 +283,7 @@ impl IndexMut<RangeFrom<usize>> for ClauseDB {
 impl ActivityIF for ClauseDB {
     type Ix = ClauseId;
     fn bump_activity(&mut self, cid: Self::Ix, _: usize) {
-        let c = &mut self.clause[cid as usize];
+        let c = &mut self.clause[cid.ordinal as usize];
         let a = c.activity + self.activity_inc;
         c.activity = a;
         if ACTIVITY_MAX < a {
@@ -346,7 +365,7 @@ impl ClauseDBIF for ClauseDB {
             let mut n = 0;
             while n < ws.len() {
                 let cid = ws[n].c;
-                let c = &mut clause[cid as usize];
+                let c = &mut clause[cid.ordinal as usize];
                 if !c.is(Flag::DEAD) {
                     n += 1;
                     continue;
@@ -402,7 +421,7 @@ impl ClauseDBIF for ClauseDB {
             for l in v {
                 lits.push(*l);
             }
-            cid = self.clause.len() as ClauseId;
+            cid = ClauseId::from(self.clause.len());
             let c = Clause {
                 flags: Flag::empty(),
                 lits,
@@ -476,12 +495,12 @@ impl ClauseDBIF for ClauseDB {
         v.swap(1, i_max);
         let learnt = 0 < lbd && 2 < v.len() && (!state.use_chan_seok || self.co_lbd_bound < lbd);
         let cid = self.new_clause(&v, lbd, learnt);
-        let c = &mut self.clause[cid as usize];
+        let c = &mut self.clause[cid.ordinal as usize];
         c.activity = self.activity_inc;
         cid
     }
     fn detach(&mut self, cid: ClauseId) {
-        let c = &mut self.clause[cid as usize];
+        let c = &mut self.clause[cid.ordinal as usize];
         debug_assert!(!c.is(Flag::DEAD));
         debug_assert!(1 < c.lits.len());
         c.kill(&mut self.touched);
@@ -496,7 +515,7 @@ impl ClauseDBIF for ClauseDB {
         self.next_reduction += self.inc_step;
         let mut perm = Vec::with_capacity(clause.len());
         for (i, b) in clause.iter().enumerate().skip(1) {
-            if b.is(Flag::LEARNT) && !b.is(Flag::DEAD) && !vdb.locked(b, i as ClauseId) {
+            if b.is(Flag::LEARNT) && !b.is(Flag::DEAD) && !vdb.locked(b, ClauseId::from(i)) {
                 perm.push(i);
             }
         }
@@ -599,7 +618,7 @@ impl ClauseDBIF for ClauseDB {
                 c.kill(&mut self.touched);
                 if elim.is_running() {
                     if update_occur {
-                        elim.remove_cid_occur(vdb, cid as ClauseId, c);
+                        elim.remove_cid_occur(vdb, ClauseId::from(cid), c);
                     }
                     for l in &c.lits {
                         let v = &mut vdb[l.vi()];

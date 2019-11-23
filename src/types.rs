@@ -1,6 +1,9 @@
 //! Basic types
 use {
-    crate::traits::{Delete, EmaIF, LitIF},
+    crate::{
+        clause::ClauseId,
+        traits::{Delete, EmaIF, LitIF},
+    },
     std::{
         fmt,
         ops::{Index, IndexMut, Neg, Not},
@@ -10,12 +13,6 @@ use {
 /// 'Variable' identifier or 'variable' index, starting with one.
 pub type VarId = usize;
 
-/// 'Clause' Identifier, or 'clause' index, starting with one.
-/// Note: ids are re-used after 'garbage collection'.
-pub type ClauseId = u32;
-
-/// a dummy clause index.
-pub const NULL_CLAUSE: ClauseId = 0;
 
 /// Literal encoded on `u32` as:
 ///
@@ -51,17 +48,17 @@ impl From<usize> for Lit {
     }
 }
 
+impl From<ClauseId> for Lit {
+    fn from(cid: ClauseId) -> Self {
+        Lit { ordinal: cid.ordinal & 0x7FFF_FFFF}
+    }
+}
+
 impl From<i32> for Lit {
     fn from(x: i32) -> Self {
         Lit {
             ordinal: (if x < 0 { -2 * x } else { 2 * x + 1 }) as u32,
         }
-    }
-}
-
-impl From<ClauseId> for Lit {
-    fn from(l: ClauseId) -> Self {
-        Lit { ordinal: l }
     }
 }
 
@@ -75,7 +72,7 @@ impl From<Lit> for bool {
 
 impl From<Lit> for ClauseId {
     fn from(l: Lit) -> ClauseId {
-        (l.ordinal as ClauseId) | 0x8000_0000
+        ClauseId { ordinal: l.ordinal | 0x8000_0000 }
     }
 }
 
