@@ -12,7 +12,7 @@ use {
     },
 };
 
-const VAR_ACTIVITY_DECAY: f64 = 0.90;
+const VAR_ACTIVITY_DECAY: f64 = 0.94;
 
 /// Structure for variables.
 #[derive(Debug)]
