@@ -1,4 +1,4 @@
-## 0.2.0, 2019-11-21
+## 0.2.0, 2019-11-29
 
 - re-implement `Lit` as a struct with some standard traits
 
