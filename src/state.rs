@@ -1,16 +1,22 @@
-use crate::clause::ClauseDB;
-use crate::config::Config;
-use crate::eliminator::Eliminator;
-use crate::restart::RestartExecutor;
-use crate::traits::*;
-use crate::types::*;
-use crate::var::VarDB;
-use libc::{clock_gettime, timespec, CLOCK_PROCESS_CPUTIME_ID};
-use std::cmp::Ordering;
-use std::fmt;
-use std::io::{stdout, Write};
-use std::ops::{Index, IndexMut};
-use std::time::SystemTime;
+use {
+    crate::{
+    clause::ClauseDB,
+        config::Config,
+        eliminator::Eliminator,
+        restart::RestartExecutor,
+        traits::*,
+        types::*,
+        var::VarDB,
+    },
+    libc::{clock_gettime, timespec, CLOCK_PROCESS_CPUTIME_ID},
+    std::{
+        cmp::Ordering,
+        fmt,
+        io::{stdout, Write},
+        ops::{Index, IndexMut},
+        time::SystemTime,
+    },
+};
 
 /// A collection of named search heuristics
 #[derive(Debug, Eq, PartialEq)]

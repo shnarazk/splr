@@ -1,5 +1,10 @@
+## 0.2.0, 2019-11-29
+
+- re-implement `Lit` as a struct with some standard traits
+
 ## 0.1.5, 2019-10-29
 
+- adopt a modified CHB instead of EVSIDS
 - introduce [big bang initialization](https://medium.com/backjump-technologies/big-bang-initialization-of-variable-activity-in-a-sat-solver-ada154f56fb0) for variable activity
 - The literal endconding uses even integers for positive literals
 - `Lbool` was changed to `Option<bool>`

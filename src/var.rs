@@ -1,12 +1,18 @@
-use crate::clause::Clause;
-use crate::config::Config;
-use crate::state::{Stat, State};
-use crate::traits::*;
-use crate::types::*;
-use std::fmt;
-use std::ops::{Index, IndexMut, Range, RangeFrom};
+use {
+    crate::{
+        clause::Clause,
+        config::Config,
+        state::{Stat, State},
+        traits::*,
+        types::*,
+    },
+    std::{
+        fmt,
+        ops::{Index, IndexMut, Range, RangeFrom},
+    },
+};
 
-const VAR_ACTIVITY_DECAY: f64 = 0.90;
+const VAR_ACTIVITY_DECAY: f64 = 0.94;
 
 /// Structure for variables.
 #[derive(Debug)]
@@ -177,7 +183,7 @@ impl VarDBIF for VarDB {
     fn assigned(&self, l: Lit) -> Option<bool> {
         // unsafe { self.var.get_unchecked(l.vi()).assign ^ ((l & 1) as u8) }
         match unsafe { self.var.get_unchecked(l.vi()).assign } {
-            Some(x) if !l.as_bool() => Some(!x),
+            Some(x) if !bool::from(l) => Some(!x),
             x => x,
         }
     }

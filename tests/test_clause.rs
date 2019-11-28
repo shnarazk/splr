@@ -7,7 +7,7 @@ use splr::types::*;
 macro_rules! mkv {
     ($($x:expr),*) => {
         match &[$($x),*] {
-            v => v.iter().map(|x| Lit::from_int(*x)).collect::<Vec<Lit>>(),
+            v => v.iter().map(|x| Lit::from(*x as i32)).collect::<Vec<Lit>>(),
         }
     };
 }

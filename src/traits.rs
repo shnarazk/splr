@@ -1,11 +1,15 @@
-use crate::clause::{Clause, ClauseDB};
-use crate::config::Config;
-use crate::eliminator::Eliminator;
-use crate::propagator::AssignStack;
-use crate::solver::{Solver, SolverResult};
-use crate::state::State;
-use crate::types::{CNFDescription, ClauseId, Flag, Lit, MaybeInconsistent, VarId};
-use crate::var::{Var, VarDB};
+use {
+    crate::{
+        clause::{Clause, ClauseDB},
+        config::Config,
+        eliminator::Eliminator,
+        propagator::AssignStack,
+        solver::{Solver, SolverResult},
+        state::State,
+        types::{CNFDescription, ClauseId, Flag, Lit, MaybeInconsistent, VarId},
+        var::{Var, VarDB},
+    },
+};
 
 /// API for Clause and Var rewarding
 pub trait ActivityIF {
@@ -169,21 +173,11 @@ pub trait Instantiate {
 
 /// API for Literal like `from_int`, `from_var`, `to_cid` and so on.
 pub trait LitIF {
-    /// convert from `i32`.
-    fn from_int(x: i32) -> Self;
     /// convert [VarId](../type.VarId.html) to [Lit](../type.Lit.html).
     /// It returns a positive literal if `p` is `TRUE` or `BOTTOM`.
     fn from_var(vi: VarId, p: bool) -> Self;
     /// convert to var index.
     fn vi(self) -> VarId;
-    /// convert to `i32`.
-    fn to_i32(self) -> i32;
-    /// convert to `bool` from Some values.
-    fn as_bool(self) -> bool;
-    /// flip the sign.
-    fn negate(self) -> Lit;
-    /// lift a literal to a *virtual* clause id.
-    fn to_cid(self) -> ClauseId;
 }
 
 pub trait ProgressEvaluator {
