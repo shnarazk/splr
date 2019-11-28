@@ -1,15 +1,20 @@
 // SAT solver for Propositional Logic in Rust
-
-use libc::{clock_gettime, timespec, CLOCK_PROCESS_CPUTIME_ID};
-use splr::clause::CertifiedRecord;
-use splr::config::{Config, VERSION};
-use splr::solver::{Certificate, Solver, SolverResult};
-use splr::state::*;
-use splr::traits::SatSolverIF;
-use std::fs::File;
-use std::io::{BufWriter, Write};
-use std::path::PathBuf;
-use structopt::StructOpt;
+use {
+    libc::{clock_gettime, timespec, CLOCK_PROCESS_CPUTIME_ID},
+    splr::{
+        clause::CertifiedRecord,
+        config::{Config, VERSION},
+        solver::{Certificate, Solver, SolverResult},
+        state::*,
+        traits::SatSolverIF,
+    },
+    std::{
+        fs::File,
+        io::{BufWriter, Write},
+        path::PathBuf,
+    },
+    structopt::StructOpt,
+};
 
 fn main() {
     let config = Config::from_args();
