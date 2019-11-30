@@ -1,12 +1,7 @@
 use {
     crate::{
-    clause::ClauseDB,
-        config::Config,
-        eliminator::Eliminator,
-        restart::RestartExecutor,
-        traits::*,
-        types::*,
-        var::VarDB,
+        clause::ClauseDB, config::Config, eliminator::Eliminator, restart::RestartExecutor,
+        traits::*, types::*, var::VarDB,
     },
     libc::{clock_gettime, timespec, CLOCK_PROCESS_CPUTIME_ID},
     std::{

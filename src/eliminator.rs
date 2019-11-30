@@ -1,6 +1,6 @@
 use {
     crate::{
-        clause::{Clause, ClauseDB},
+        clause::{Clause, ClauseDB, ClauseId},
         config::Config,
         propagator::AssignStack,
         state::State,
@@ -111,7 +111,7 @@ impl EliminatorIF for Eliminator {
             if c.is(Flag::DEAD) || c.is(Flag::OCCUR_LINKED) {
                 continue;
             }
-            self.add_cid_occur(vdb, cid as ClauseId, c, false);
+            self.add_cid_occur(vdb, ClauseId::from(cid), c, false);
         }
         if force {
             for vi in 1..vdb.len() {
@@ -183,7 +183,7 @@ impl EliminatorIF for Eliminator {
             self.backward_subsumption_check(asgs, cdb, vdb)?;
             debug_assert!(self.clause_queue.is_empty());
             cdb.garbage_collect();
-            if asgs.propagate(cdb, state, vdb) != NULL_CLAUSE {
+            if asgs.propagate(cdb, state, vdb) != ClauseId::default() {
                 return Err(SolverError::Inconsistent);
             }
             cdb.eliminate_satisfied_clauses(self, vdb, true);
@@ -317,8 +317,8 @@ impl Eliminator {
                 self.bwdsub_assigns += 1;
             }
             let cid = match self.clause_queue.pop() {
-                Some(x) => x,
-                None => 0,
+                Some(x) => ClauseId::from(x),
+                None => ClauseId::default(),
             };
             // assert_ne!(cid, 0);
             cnt += 1;
@@ -326,7 +326,7 @@ impl Eliminator {
                 continue;
             }
             let best = if cid.is_lifted_lit() {
-                cid.to_lit().vi()
+                Lit::from(cid).vi()
             } else {
                 let mut tmp = cdb.count(true);
                 let c = &mut cdb[cid];
@@ -415,7 +415,7 @@ fn try_subsume(
 fn subsume(cdb: &mut ClauseDB, cid: ClauseId, other: ClauseId) -> Option<Lit> {
     debug_assert!(!other.is_lifted_lit());
     if cid.is_lifted_lit() {
-        let l = cid.to_lit();
+        let l = Lit::from(cid);
         let oh = &cdb[other];
         for lo in &oh.lits {
             if l == !*lo {
@@ -507,11 +507,11 @@ fn check_eliminator(cdb: &ClauseDB, vdb: &[Var]) -> bool {
         for l in &c.lits {
             let v = l.vi();
             if bool::from(*l) {
-                if !vdb[v].pos_occurs.contains(&(cid as ClauseId)) {
-                    panic!("failed to check {} {:#}", (cid as ClauseId).format(), c);
+                if !vdb[v].pos_occurs.contains(&(ClauseId::from(cid))) {
+                    panic!("failed to check {} {:#}", (ClauseId::from(cid)).format(), c);
                 }
-            } else if !vdb[v].neg_occurs.contains(&(cid as ClauseId)) {
-                panic!("failed to check {} {:#}", (cid as ClauseId).format(), c);
+            } else if !vdb[v].neg_occurs.contains(&(ClauseId::from(cid))) {
+                panic!("failed to check {} {:#}", (ClauseId::from(cid)).format(), c);
             }
         }
     }
@@ -564,7 +564,7 @@ fn strengthen_clause(
     debug_assert!(1 < cdb[cid].lits.len());
     cdb.touched[l] = true;
     cdb.touched[!l] = true;
-    debug_assert_ne!(cid, NULL_CLAUSE);
+    debug_assert_ne!(cid, ClauseId::default());
     if strengthen(cdb, cid, l) {
         // Vaporize the binary clause
         debug_assert!(2 == cdb[cid].lits.len());
@@ -573,7 +573,7 @@ fn strengthen_clause(
         // println!("{} {:?} is removed and its first literal {} is enqueued.", cid.format(), vec2int(&cdb.clause[cid].lits), c0.int());
         cdb.detach(cid);
         elim.remove_cid_occur(vdb, cid, &mut cdb[cid]);
-        asgs.enqueue(&mut vdb[c0.vi()], bool::from(c0), NULL_CLAUSE, 0)
+        asgs.enqueue(&mut vdb[c0.vi()], bool::from(c0), ClauseId::default(), 0)
     } else {
         // println!("cid {} drops literal {}", cid.fmt(), l.int());
         debug_assert!(1 < cdb[cid].lits.len());
@@ -710,7 +710,7 @@ fn eliminate_var(
                         // );
                         let lit = (*vec)[0];
                         cdb.certificate_add(&*vec);
-                        asgs.enqueue(&mut vdb[lit.vi()], bool::from(lit), NULL_CLAUSE, 0)?;
+                        asgs.enqueue(&mut vdb[lit.vi()], bool::from(lit), ClauseId::default(), 0)?;
                     }
                     _ => {
                         let rank = if cdb[*p].is(Flag::LEARNT) && cdb[*n].is(Flag::LEARNT) {
