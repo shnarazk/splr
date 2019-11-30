@@ -317,7 +317,7 @@ impl Eliminator {
                 self.bwdsub_assigns += 1;
             }
             let cid = match self.clause_queue.pop() {
-                Some(x) => ClauseId::from(x),
+                Some(x) => x,
                 None => ClauseId::default(),
             };
             // assert_ne!(cid, 0);
