@@ -106,12 +106,14 @@ impl Not for Lit {
 
 impl Index<Lit> for [bool] {
     type Output = bool;
+    #[inline]
     fn index(&self, l: Lit) -> &Self::Output {
         unsafe { self.get_unchecked(usize::from(l)) }
     }
 }
 
 impl IndexMut<Lit> for [bool] {
+    #[inline]
     fn index_mut(&mut self, l: Lit) -> &mut Self::Output {
         unsafe { self.get_unchecked_mut(usize::from(l)) }
     }
@@ -119,12 +121,14 @@ impl IndexMut<Lit> for [bool] {
 
 impl Index<Lit> for Vec<bool> {
     type Output = bool;
+    #[inline]
     fn index(&self, l: Lit) -> &Self::Output {
         unsafe { self.get_unchecked(usize::from(l)) }
     }
 }
 
 impl IndexMut<Lit> for Vec<bool> {
+    #[inline]
     fn index_mut(&mut self, l: Lit) -> &mut Self::Output {
         unsafe { self.get_unchecked_mut(usize::from(l)) }
     }
@@ -132,12 +136,14 @@ impl IndexMut<Lit> for Vec<bool> {
 
 impl Index<Lit> for Vec<Vec<crate::clause::Watch>> {
     type Output = Vec<crate::clause::Watch>;
+    #[inline]
     fn index(&self, l: Lit) -> &Self::Output {
         unsafe { self.get_unchecked(usize::from(l)) }
     }
 }
 
 impl IndexMut<Lit> for Vec<Vec<crate::clause::Watch>> {
+    #[inline]
     fn index_mut(&mut self, l: Lit) -> &mut Self::Output {
         unsafe { self.get_unchecked_mut(usize::from(l)) }
     }
