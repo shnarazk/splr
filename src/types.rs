@@ -42,12 +42,14 @@ pub struct Lit {
 pub const NULL_LIT: Lit = Lit { ordinal: 0 };
 
 impl From<usize> for Lit {
+    #[inline]
     fn from(l: usize) -> Self {
         Lit { ordinal: l as u32 }
     }
 }
 
 impl From<i32> for Lit {
+    #[inline]
     fn from(x: i32) -> Self {
         Lit {
             ordinal: (if x < 0 { -2 * x } else { 2 * x + 1 }) as u32,
@@ -56,6 +58,7 @@ impl From<i32> for Lit {
 }
 
 impl From<ClauseId> for Lit {
+    #[inline]
     fn from(cid: ClauseId) -> Self {
         Lit {
             ordinal: cid.ordinal & 0x7FFF_FFFF,
@@ -66,12 +69,14 @@ impl From<ClauseId> for Lit {
 impl From<Lit> for bool {
     /// - positive Lit (= even u32) => Some(true)
     /// - negative Lit (= odd u32)  => Some(false)
+    #[inline]
     fn from(l: Lit) -> bool {
         (l.ordinal & 1) != 0
     }
 }
 
 impl From<Lit> for ClauseId {
+    #[inline]
     fn from(l: Lit) -> ClauseId {
         ClauseId {
             ordinal: l.ordinal | 0x8000_0000,
@@ -80,12 +85,14 @@ impl From<Lit> for ClauseId {
 }
 
 impl From<Lit> for usize {
+    #[inline]
     fn from(l: Lit) -> usize {
         l.ordinal as usize
     }
 }
 
 impl From<Lit> for i32 {
+    #[inline]
     fn from(l: Lit) -> i32 {
         if l.ordinal % 2 == 0 {
             ((l.ordinal >> 1) as i32).neg()
@@ -97,6 +104,7 @@ impl From<Lit> for i32 {
 
 impl Not for Lit {
     type Output = Lit;
+    #[inline]
     fn not(self) -> Self {
         Lit {
             ordinal: self.ordinal ^ 1,
@@ -167,11 +175,13 @@ impl IndexMut<Lit> for Vec<Vec<crate::clause::Watch>> {
 /// ```
 
 impl LitIF for Lit {
+    #[inline]
     fn from_var(vi: VarId, p: bool) -> Lit {
         Lit {
             ordinal: (vi as u32) << 1 | (p as u32),
         }
     }
+    #[inline]
     fn vi(self) -> VarId {
         (self.ordinal >> 1) as VarId
     }

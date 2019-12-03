@@ -34,12 +34,14 @@ pub struct ClauseId {
 const NULL_CLAUSE: ClauseId = ClauseId { ordinal: 0 };
 
 impl Default for ClauseId {
+    #[inline]
     fn default() -> Self {
         NULL_CLAUSE
     }
 }
 
 impl From<usize> for ClauseId {
+    #[inline]
     fn from(u: usize) -> ClauseId {
         ClauseId { ordinal: u as u32 }
     }
