@@ -515,6 +515,7 @@ fn adapt_parameters(
             elim.activate();
             cdb.simplify(asgs, elim, state, vdb)?;
         }
+        vdb.adapted = true;
     }
     state.progress(cdb, vdb, None);
     if !state.config.without_deep_search {
