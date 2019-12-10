@@ -398,10 +398,8 @@ fn handle_conflict_path(
         let l0 = new_learnt[0];
         let cid = cdb.attach(state, vdb, lbd);
         elim.add_cid_occur(vdb, cid, &mut cdb[cid], true);
-        if 0 < state.config.dump_interval {
-            state.c_lvl.update(cl as f64);
-            state.b_lvl.update(bl as f64);
-        }
+        state.c_lvl.update(cl as f64);
+        state.b_lvl.update(bl as f64);
         if lbd <= 2 {
             state.stats[Stat::NumLBD2] += 1;
         }
@@ -452,6 +450,16 @@ fn adapt_parameters(
     nconflict: usize,
 ) -> MaybeInconsistent {
     let switch = 100_000;
+    {
+        let n = nconflict / 10_000;
+        let delta = 1.0 - state.rst.lbd.get() / state.c_lvl.get();
+        if n.next_power_of_two().trailing_zeros() <= 2 * n.count_ones() {
+            vdb.reward_by_dl_ema.update(delta + 1.0);
+        } else {
+            vdb.reward_by_dl_ema.update(delta);
+        }
+    }
+    vdb.reward_by_dl = vdb.reward_by_dl_ema.get();
     if !state.config.without_deep_search && !state.rst.use_luby_restart {
         let stopped = state.stats[Stat::SolvedRecord] == state.num_solved_vars;
         if stopped {
@@ -515,7 +523,6 @@ fn adapt_parameters(
             elim.activate();
             cdb.simplify(asgs, elim, state, vdb)?;
         }
-        vdb.reward_by_dl = 0.25;
     }
     state.progress(cdb, vdb, None);
     if !state.config.without_deep_search {
@@ -525,6 +532,7 @@ fn adapt_parameters(
             state.rst.next_restart += 80_000;
         }
     }
+    state.flush(&format!("The new parameter: {} ...", vdb.reward_by_dl));
     Ok(())
 }
 

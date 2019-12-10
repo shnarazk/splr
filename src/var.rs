@@ -84,6 +84,7 @@ impl FlagIF for Var {
 pub struct VarDB {
     pub activity_decay: f64,
     pub reward_by_dl: f64,
+    pub reward_by_dl_ema: Ema,
     /// vars
     var: Vec<Var>,
     /// the current conflict's ordinal number
@@ -96,9 +97,12 @@ pub struct VarDB {
 
 impl Default for VarDB {
     fn default() -> VarDB {
+        let mut reward_by_dl_ema = Ema::new(3);
+        reward_by_dl_ema.update(0.01);
         VarDB {
             activity_decay: VAR_ACTIVITY_DECAY,
             reward_by_dl: 1.0,
+            reward_by_dl_ema,
             var: Vec::new(),
             current_conflict: 0,
             current_restart: 0,
@@ -159,6 +163,7 @@ impl ActivityIF for VarDB {
         let now = self.current_conflict;
         let t = (now - v.last_update) as i32;
         // v.reward = (now as f64 + self.activity) / 2.0; // ASCID
+        // v.reward = 0.2 + 1.0 / (dl + 1) as f64 + v.reward * self.activity_decay.powi(t);
         v.reward = 0.2 + self.reward_by_dl / (dl + 1) as f64 + v.reward * self.activity_decay.powi(t);
         v.last_update = now;
     }
