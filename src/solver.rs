@@ -450,16 +450,6 @@ fn adapt_parameters(
     nconflict: usize,
 ) -> MaybeInconsistent {
     let switch = 100_000;
-    {
-        let n = nconflict / 10_000;
-        let delta = 1.0 - state.rst.lbd.get() / state.c_lvl.get();
-        if n.next_power_of_two().trailing_zeros() <= 2 * n.count_ones() {
-            vdb.reward_by_dl_ema.update(delta + 1.0);
-        } else {
-            vdb.reward_by_dl_ema.update(delta);
-        }
-    }
-    vdb.reward_by_dl = vdb.reward_by_dl_ema.get();
     if !state.config.without_deep_search && !state.rst.use_luby_restart {
         let stopped = state.stats[Stat::SolvedRecord] == state.num_solved_vars;
         if stopped {
@@ -481,6 +471,18 @@ fn adapt_parameters(
         }
         state.stagnated = stagnated;
     }
+    /* {
+        let n = nconflict / 10_000;
+        let delta = 1.0 - (state.rst.lbd.get() / state.c_lvl.get()).min(1.0);
+        if n.next_power_of_two().trailing_zeros() <= 2 * n.count_ones() {
+            vdb.reward_by_dl_ema.update(1.25 * delta);
+            // vdb.reward_by_dl = 1.25 * delta;
+        } else {
+            vdb.reward_by_dl_ema.update(0.0);
+            // vdb.reward_by_dl = 0.0;
+        }
+        vdb.reward_by_dl = vdb.reward_by_dl_ema.get();
+    } */
     state.stats[Stat::SolvedRecord] = state.num_solved_vars;
     if !state.rst.use_luby_restart && state.rst.adaptive_restart && !state.stagnated {
         let moving: f64 = 0.04;
@@ -532,7 +534,6 @@ fn adapt_parameters(
             state.rst.next_restart += 80_000;
         }
     }
-    state.flush(&format!("The new parameter: {} ...", vdb.reward_by_dl));
     Ok(())
 }
 
