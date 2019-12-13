@@ -97,8 +97,8 @@ pub struct VarDB {
 
 impl Default for VarDB {
     fn default() -> VarDB {
-        let mut reward_by_dl_ema = Ema::new(20);
-        reward_by_dl_ema.update(0.01);
+        // let mut reward_by_dl_ema = Ema::new(20);
+        // reward_by_dl_ema.update(0.01);
         VarDB {
             activity_decay: VAR_ACTIVITY_DECAY,
             reward_by_dl: 1.0,
