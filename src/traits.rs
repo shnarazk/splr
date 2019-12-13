@@ -1,14 +1,12 @@
-use {
-    crate::{
-        clause::{Clause, ClauseDB},
-        config::Config,
-        eliminator::Eliminator,
-        propagator::AssignStack,
-        solver::{Solver, SolverResult},
-        state::State,
-        types::{CNFDescription, ClauseId, Flag, Lit, MaybeInconsistent, VarId},
-        var::{Var, VarDB},
-    },
+use crate::{
+    clause::{Clause, ClauseDB, ClauseId},
+    config::Config,
+    eliminator::Eliminator,
+    propagator::AssignStack,
+    solver::{Solver, SolverResult},
+    state::State,
+    types::{CNFDescription, Flag, Lit, MaybeInconsistent, VarId},
+    var::{Var, VarDB},
 };
 
 /// API for Clause and Var rewarding
@@ -80,8 +78,6 @@ pub trait ClauseDBIF {
 
 /// API for Clause Id like `to_lit`, `is_lifted_lit` and so on.
 pub trait ClauseIdIF {
-    /// convert a (lifted) clause id made from a `Lit` to Lit.
-    fn to_lit(self) -> Lit;
     /// return `true` if a given clause id is made from a `Lit`.
     fn is_lifted_lit(self) -> bool;
     /// make a string for printing.

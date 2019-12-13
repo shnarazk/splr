@@ -2,10 +2,7 @@
 #![allow(unused_imports)]
 #![allow(unused_variables)]
 #![allow(dead_code)]
-use splr::config::Config;
-use splr::solver::Solver;
-use splr::traits::*;
-use splr::types::*;
+use splr::{clause::ClauseId, config::Config, solver::Solver, traits::*, types::*};
 
 macro_rules! mkv {
     ($($x:expr),*) => {

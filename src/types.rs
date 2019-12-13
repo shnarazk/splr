@@ -1,6 +1,9 @@
 //! Basic types
 use {
-    crate::traits::{Delete, EmaIF, LitIF},
+    crate::{
+        clause::ClauseId,
+        traits::{Delete, EmaIF, LitIF},
+    },
     std::{
         fmt,
         ops::{Index, IndexMut, Neg, Not},
@@ -9,13 +12,6 @@ use {
 
 /// 'Variable' identifier or 'variable' index, starting with one.
 pub type VarId = usize;
-
-/// 'Clause' Identifier, or 'clause' index, starting with one.
-/// Note: ids are re-used after 'garbage collection'.
-pub type ClauseId = u32;
-
-/// a dummy clause index.
-pub const NULL_CLAUSE: ClauseId = 0;
 
 /// Literal encoded on `u32` as:
 ///
@@ -46,12 +42,14 @@ pub struct Lit {
 pub const NULL_LIT: Lit = Lit { ordinal: 0 };
 
 impl From<usize> for Lit {
+    #[inline]
     fn from(l: usize) -> Self {
         Lit { ordinal: l as u32 }
     }
 }
 
 impl From<i32> for Lit {
+    #[inline]
     fn from(x: i32) -> Self {
         Lit {
             ordinal: (if x < 0 { -2 * x } else { 2 * x + 1 }) as u32,
@@ -60,32 +58,41 @@ impl From<i32> for Lit {
 }
 
 impl From<ClauseId> for Lit {
-    fn from(l: ClauseId) -> Self {
-        Lit { ordinal: l }
+    #[inline]
+    fn from(cid: ClauseId) -> Self {
+        Lit {
+            ordinal: cid.ordinal & 0x7FFF_FFFF,
+        }
     }
 }
 
 impl From<Lit> for bool {
     /// - positive Lit (= even u32) => Some(true)
     /// - negative Lit (= odd u32)  => Some(false)
+    #[inline]
     fn from(l: Lit) -> bool {
         (l.ordinal & 1) != 0
     }
 }
 
 impl From<Lit> for ClauseId {
+    #[inline]
     fn from(l: Lit) -> ClauseId {
-        (l.ordinal as ClauseId) | 0x8000_0000
+        ClauseId {
+            ordinal: l.ordinal | 0x8000_0000,
+        }
     }
 }
 
 impl From<Lit> for usize {
+    #[inline]
     fn from(l: Lit) -> usize {
         l.ordinal as usize
     }
 }
 
 impl From<Lit> for i32 {
+    #[inline]
     fn from(l: Lit) -> i32 {
         if l.ordinal % 2 == 0 {
             ((l.ordinal >> 1) as i32).neg()
@@ -97,6 +104,7 @@ impl From<Lit> for i32 {
 
 impl Not for Lit {
     type Output = Lit;
+    #[inline]
     fn not(self) -> Self {
         Lit {
             ordinal: self.ordinal ^ 1,
@@ -106,12 +114,14 @@ impl Not for Lit {
 
 impl Index<Lit> for [bool] {
     type Output = bool;
+    #[inline]
     fn index(&self, l: Lit) -> &Self::Output {
         unsafe { self.get_unchecked(usize::from(l)) }
     }
 }
 
 impl IndexMut<Lit> for [bool] {
+    #[inline]
     fn index_mut(&mut self, l: Lit) -> &mut Self::Output {
         unsafe { self.get_unchecked_mut(usize::from(l)) }
     }
@@ -119,12 +129,14 @@ impl IndexMut<Lit> for [bool] {
 
 impl Index<Lit> for Vec<bool> {
     type Output = bool;
+    #[inline]
     fn index(&self, l: Lit) -> &Self::Output {
         unsafe { self.get_unchecked(usize::from(l)) }
     }
 }
 
 impl IndexMut<Lit> for Vec<bool> {
+    #[inline]
     fn index_mut(&mut self, l: Lit) -> &mut Self::Output {
         unsafe { self.get_unchecked_mut(usize::from(l)) }
     }
@@ -132,12 +144,14 @@ impl IndexMut<Lit> for Vec<bool> {
 
 impl Index<Lit> for Vec<Vec<crate::clause::Watch>> {
     type Output = Vec<crate::clause::Watch>;
+    #[inline]
     fn index(&self, l: Lit) -> &Self::Output {
         unsafe { self.get_unchecked(usize::from(l)) }
     }
 }
 
 impl IndexMut<Lit> for Vec<Vec<crate::clause::Watch>> {
+    #[inline]
     fn index_mut(&mut self, l: Lit) -> &mut Self::Output {
         unsafe { self.get_unchecked_mut(usize::from(l)) }
     }
@@ -161,11 +175,13 @@ impl IndexMut<Lit> for Vec<Vec<crate::clause::Watch>> {
 /// ```
 
 impl LitIF for Lit {
+    #[inline]
     fn from_var(vi: VarId, p: bool) -> Lit {
         Lit {
             ordinal: (vi as u32) << 1 | (p as u32),
         }
     }
+    #[inline]
     fn vi(self) -> VarId {
         (self.ordinal >> 1) as VarId
     }

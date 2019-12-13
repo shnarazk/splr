@@ -1,12 +1,7 @@
 use {
     crate::{
-    clause::ClauseDB,
-        config::Config,
-        eliminator::Eliminator,
-        restart::RestartExecutor,
-        traits::*,
-        types::*,
-        var::VarDB,
+        clause::ClauseDB, config::Config, eliminator::Eliminator, restart::RestartExecutor,
+        traits::*, types::*, var::VarDB,
     },
     libc::{clock_gettime, timespec, CLOCK_PROCESS_CPUTIME_ID},
     std::{
@@ -127,12 +122,14 @@ pub enum Stat {
 
 impl Index<Stat> for [usize] {
     type Output = usize;
+    #[inline]
     fn index(&self, i: Stat) -> &usize {
         unsafe { self.get_unchecked(i as usize) }
     }
 }
 
 impl IndexMut<Stat> for [usize] {
+    #[inline]
     fn index_mut(&mut self, i: Stat) -> &mut usize {
         unsafe { self.get_unchecked_mut(i as usize) }
     }
@@ -649,12 +646,14 @@ impl Default for ProgressRecord {
 
 impl Index<LogUsizeId> for ProgressRecord {
     type Output = usize;
+    #[inline]
     fn index(&self, i: LogUsizeId) -> &usize {
         &self.vali[i as usize]
     }
 }
 
 impl IndexMut<LogUsizeId> for ProgressRecord {
+    #[inline]
     fn index_mut(&mut self, i: LogUsizeId) -> &mut usize {
         &mut self.vali[i as usize]
     }
@@ -662,12 +661,14 @@ impl IndexMut<LogUsizeId> for ProgressRecord {
 
 impl Index<LogF64Id> for ProgressRecord {
     type Output = f64;
+    #[inline]
     fn index(&self, i: LogF64Id) -> &f64 {
         &self.valf[i as usize]
     }
 }
 
 impl IndexMut<LogF64Id> for ProgressRecord {
+    #[inline]
     fn index_mut(&mut self, i: LogF64Id) -> &mut f64 {
         &mut self.valf[i as usize]
     }

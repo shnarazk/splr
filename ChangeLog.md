@@ -1,6 +1,10 @@
+## 0.2.1, 2019-12-XX
+
+- redefine `ClauseId` as a struct
+
 ## 0.2.0, 2019-11-29
 
-- re-implement `Lit` as a struct with some standard traits
+- redefine `Lit` as a struct with some standard traits
 
 ## 0.1.5, 2019-10-29
 

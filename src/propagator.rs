@@ -1,17 +1,9 @@
 use {
     crate::{
-        clause::{ClauseDB, Watch},
+        clause::{ClauseDB, ClauseId, Watch},
         config::Config,
         state::{Stat, State},
-        traits::{
-            ClauseDBIF,
-            FlagIF,
-            Instantiate,
-            LitIF,
-            PropagatorIF,
-            VarDBIF,
-            WatchDBIF
-        },
+        traits::{ClauseDBIF, FlagIF, Instantiate, LitIF, PropagatorIF, VarDBIF, WatchDBIF},
         types::*,
         var::{Var, VarDB},
     },
@@ -119,7 +111,7 @@ impl PropagatorIF for AssignStack {
                 v.reason = cid;
                 v.level = dl;
                 if dl == 0 {
-                    v.reason = NULL_CLAUSE;
+                    v.reason = ClauseId::default();
                     // v.activity = 0.0;
                 }
                 debug_assert!(!self.trail.contains(&Lit::from_var(v.index, true)));
@@ -136,7 +128,7 @@ impl PropagatorIF for AssignStack {
         if var_assign!(self, v.index).is_none() {
             set_assign!(self, Lit::from_var(v.index, sig));
             v.assign = Some(sig);
-            v.reason = NULL_CLAUSE;
+            v.reason = ClauseId::default();
             v.level = 0;
             self.trail.push(Lit::from_var(v.index, sig));
         }
@@ -201,7 +193,7 @@ impl PropagatorIF for AssignStack {
                 }
             }
         }
-        NULL_CLAUSE
+        ClauseId::default()
     }
     fn cancel_until(&mut self, vdb: &mut VarDB, lv: usize) {
         if self.trail_lim.len() <= lv {
@@ -214,7 +206,7 @@ impl PropagatorIF for AssignStack {
             unset_assign!(self, vi);
             v.phase = v.assign.unwrap();
             v.assign = None;
-            v.reason = NULL_CLAUSE;
+            v.reason = ClauseId::default();
             self.var_order.insert(vdb, vi);
         }
         self.trail.truncate(lim);
@@ -224,7 +216,7 @@ impl PropagatorIF for AssignStack {
     fn uncheck_enqueue(&mut self, vdb: &mut VarDB, l: Lit, cid: ClauseId) {
         debug_assert!(usize::from(l) != 0, "Null literal is about to be equeued");
         debug_assert!(
-            self.trail_lim.is_empty() || cid != 0,
+            self.trail_lim.is_empty() || cid != ClauseId::default(),
             "Null CLAUSE is used for uncheck_enqueue"
         );
         let dl = self.trail_lim.len();
@@ -254,7 +246,7 @@ impl PropagatorIF for AssignStack {
         set_assign!(self, l);
         v.assign = Some(bool::from(l));
         v.level = dl;
-        v.reason = NULL_CLAUSE;
+        v.reason = ClauseId::default();
         self.trail.push(l);
     }
     fn select_var(&mut self, vdb: &mut VarDB) -> VarId {
