@@ -1,6 +1,6 @@
 use {
     crate::{
-        clause::Clause,
+        clause::{Clause, ClauseId},
         config::Config,
         state::{Stat, State},
         traits::*,
@@ -49,7 +49,7 @@ impl VarIF for Var {
             index: i,
             assign: None,
             phase: false,
-            reason: NULL_CLAUSE,
+            reason: ClauseId::default(),
             level: 0,
             reward: 0.0,
             last_update: 0,
@@ -82,6 +82,9 @@ impl FlagIF for Var {
 /// Structure for variables.
 #[derive(Debug)]
 pub struct VarDB {
+    pub activity_decay: f64,
+    pub reward_by_dl: f64,
+    // pub reward_by_dl_ema: Ema,
     /// vars
     var: Vec<Var>,
     /// the current conflict's ordinal number
@@ -94,7 +97,12 @@ pub struct VarDB {
 
 impl Default for VarDB {
     fn default() -> VarDB {
+        // let mut reward_by_dl_ema = Ema::new(20);
+        // reward_by_dl_ema.update(0.01);
         VarDB {
+            activity_decay: VAR_ACTIVITY_DECAY,
+            reward_by_dl: 1.0,
+            // reward_by_dl_ema,
             var: Vec::new(),
             current_conflict: 0,
             current_restart: 0,
@@ -155,7 +163,9 @@ impl ActivityIF for VarDB {
         let now = self.current_conflict;
         let t = (now - v.last_update) as i32;
         // v.reward = (now as f64 + self.activity) / 2.0; // ASCID
-        v.reward = 0.2 + 1.0 / (dl + 1) as f64 + v.reward * VAR_ACTIVITY_DECAY.powi(t);
+        v.reward = 0.2
+            + self.reward_by_dl / (dl + 1) as f64
+            + v.reward * self.activity_decay.powi(t);
         v.last_update = now;
     }
     fn scale_activity(&mut self) {}
@@ -166,9 +176,8 @@ impl Instantiate for VarDB {
         let nv = cnf.num_of_variables;
         VarDB {
             var: Var::new_vars(nv),
-            current_conflict: 0,
-            current_restart: 0,
             lbd_temp: vec![0; nv + 1],
+            .. VarDB::default()
         }
     }
 }
@@ -228,7 +237,7 @@ impl VarDBIF for VarDB {
         let diff = now - v.last_update;
         if 0 < diff {
             v.last_update = now;
-            v.reward *= VAR_ACTIVITY_DECAY.powi(diff as i32);
+            v.reward *= self.activity_decay.powi(diff as i32);
         }
         v.reward
     }

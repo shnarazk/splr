@@ -1,6 +1,6 @@
 use {
     crate::{
-        clause::{Clause, ClauseDB},
+        clause::{Clause, ClauseDB, ClauseId},
         config::Config,
         eliminator::Eliminator,
         propagator::AssignStack,
@@ -287,7 +287,7 @@ impl SatSolverIF for Solver {
             let li = v[i];
             let sat = vdb.assigned(li);
             if sat == Some(true) || !li == l_ {
-                return Some(NULL_CLAUSE);
+                return Some(ClauseId::default());
             } else if sat != Some(false) && li != l_ {
                 v[j] = li;
                 j += 1;
@@ -299,7 +299,7 @@ impl SatSolverIF for Solver {
             0 => None, // Empty clause is UNSAT.
             1 => {
                 asgs.enqueue_null(&mut vdb[v[0].vi()], bool::from(v[0]));
-                Some(NULL_CLAUSE)
+                Some(ClauseId::default())
             }
             _ => {
                 let cid = cdb.new_clause(&v, 0, false);
@@ -324,7 +324,7 @@ fn search(
         let ci = asgs.propagate(cdb, state, vdb);
         vdb.update_stat(state);
         state.stats[Stat::Propagation] += 1;
-        if ci == NULL_CLAUSE {
+        if ci == ClauseId::default() {
             if state.num_vars <= asgs.len() + state.num_eliminated_vars {
                 return Ok(true);
             }
@@ -391,17 +391,15 @@ fn handle_conflict_path(
     if learnt_len == 1 {
         // dump to certified even if it's a literal.
         cdb.certificate_add(new_learnt);
-        asgs.uncheck_enqueue(vdb, new_learnt[0], NULL_CLAUSE);
+        asgs.uncheck_enqueue(vdb, new_learnt[0], ClauseId::default());
     } else {
         state.stats[Stat::Learnt] += 1;
         let lbd = vdb.compute_lbd(&new_learnt, &mut state.lbd_temp);
         let l0 = new_learnt[0];
         let cid = cdb.attach(state, vdb, lbd);
         elim.add_cid_occur(vdb, cid, &mut cdb[cid], true);
-        if 0 < state.config.dump_interval {
-            state.c_lvl.update(cl as f64);
-            state.b_lvl.update(bl as f64);
-        }
+        state.c_lvl.update(cl as f64);
+        state.b_lvl.update(bl as f64);
         if lbd <= 2 {
             state.stats[Stat::NumLBD2] += 1;
         }
@@ -473,6 +471,18 @@ fn adapt_parameters(
         }
         state.stagnated = stagnated;
     }
+    /* {
+        let n = nconflict / 10_000;
+        let delta = 1.0 - (state.rst.lbd.get() / state.c_lvl.get()).min(1.0);
+        if n.next_power_of_two().trailing_zeros() <= 2 * n.count_ones() {
+            vdb.reward_by_dl_ema.update(1.25 * delta);
+            // vdb.reward_by_dl = 1.25 * delta;
+        } else {
+            vdb.reward_by_dl_ema.update(0.0);
+            // vdb.reward_by_dl = 0.0;
+        }
+        vdb.reward_by_dl = vdb.reward_by_dl_ema.get();
+    } */
     state.stats[Stat::SolvedRecord] = state.num_solved_vars;
     if !state.rst.use_luby_restart && state.rst.adaptive_restart && !state.stagnated {
         let moving: f64 = 0.04;
@@ -546,7 +556,7 @@ fn analyze(
     loop {
         // println!("analyze {}", p.int());
         unsafe {
-            debug_assert_ne!(cid, NULL_CLAUSE);
+            debug_assert_ne!(cid, ClauseId::default());
             let c = &mut cdb[cid] as *mut Clause;
             debug_assert!(!(*c).is(Flag::DEAD));
             if (*c).is(Flag::LEARNT) {
@@ -583,7 +593,7 @@ fn analyze(
                     if dl <= lvl {
                         // println!("- flag for {} which level is {}", q.int(), lvl);
                         path_cnt += 1;
-                        if v.reason != NULL_CLAUSE && cdb[v.reason].is(Flag::LEARNT) {
+                        if v.reason != ClauseId::default() && cdb[v.reason].is(Flag::LEARNT) {
                             state.last_dl.push(*q);
                         }
                     } else {
@@ -640,7 +650,7 @@ fn simplify_learnt(
         levels[vdb[l.vi()].level] = true;
     }
     new_learnt.retain(|l| {
-        vdb[l.vi()].reason == NULL_CLAUSE
+        vdb[l.vi()].reason == ClauseId::default()
             || !redundant_lit(cdb, vdb, an_seen, *l, &mut to_clear, &levels)
     });
     if new_learnt.len() < 30 {
@@ -696,7 +706,7 @@ fn redundant_lit(
             let vi = q.vi();
             let lv = vdb[vi].level;
             if 0 < lv && !seen[vi] {
-                if vdb[vi].reason != NULL_CLAUSE && levels[lv as usize] {
+                if vdb[vi].reason != ClauseId::default() && levels[lv as usize] {
                     seen[vi] = true;
                     stack.push(*q);
                     clear.push(*q);
@@ -733,7 +743,7 @@ fn analyze_final(asgs: &AssignStack, state: &mut State, vdb: &VarDB, c: &Clause)
     for l in &asgs.trail[asgs.num_at(0)..end] {
         let vi = l.vi();
         if seen[vi] {
-            if vdb[vi].reason == NULL_CLAUSE {
+            if vdb[vi].reason == ClauseId::default() {
                 state.conflicts.push(!*l);
             } else {
                 for l in &c.lits[(c.lits.len() != 2) as usize..] {

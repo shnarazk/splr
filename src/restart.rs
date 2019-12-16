@@ -1,9 +1,7 @@
-use {
-    crate::{
-        config::Config,
-        traits::*,
-        types::{CNFDescription, Ema},
-    },
+use crate::{
+    config::Config,
+    traits::*,
+    types::{CNFDescription, Ema},
 };
 
 // const RESET_EMA: usize = 400;
