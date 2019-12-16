@@ -1,7 +1,7 @@
 use crate::{
     config::Config,
     traits::*,
-    types::{CNFDescription, Ema},
+    types::{CNFDescription, Ema, Ema2},
 };
 
 // const RESET_EMA: usize = 400;
@@ -44,7 +44,7 @@ impl ProgressEvaluator for ProgressASG {
 
 #[derive(Debug)]
 pub struct ProgressLBD {
-    ema: Ema,
+    ema: Ema2,
     num: usize,
     sum: usize,
     /// For force restart based on average LBD of newly generated clauses: 0.80.
@@ -55,7 +55,7 @@ pub struct ProgressLBD {
 impl Instantiate for ProgressLBD {
     fn instantiate(config: &Config, _: &CNFDescription) -> Self {
         ProgressLBD {
-            ema: Ema::new(config.restart_lbd_len),
+            ema: Ema2::new(config.restart_lbd_len).with_slow(3 * config.restart_lbd_len),
             num: 0,
             sum: 0,
             threshold: config.restart_threshold,
@@ -74,7 +74,7 @@ impl ProgressEvaluator for ProgressLBD {
         self.ema.get()
     }
     fn trend(&self) -> f64 {
-        self.ema.get() * (self.num as f64) / (self.sum as f64)
+        (self.ema.get() * (self.num as f64) / (self.sum as f64)).max(self.ema.rate())
     }
     fn is_active(&self) -> bool {
         (self.sum as f64) < self.ema.get() * (self.num as f64) * self.threshold

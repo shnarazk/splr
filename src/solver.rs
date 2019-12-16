@@ -450,7 +450,8 @@ fn adapt_parameters(
     nconflict: usize,
 ) -> MaybeInconsistent {
     let switch = 100_000;
-    if !state.config.without_deep_search && !state.rst.use_luby_restart {
+    /* if !state.config.without_deep_search && !state.rst.use_luby_restart */
+    {
         let stopped = state.stats[Stat::SolvedRecord] == state.num_solved_vars;
         if stopped {
             state.slack_duration += 1;
@@ -470,6 +471,11 @@ fn adapt_parameters(
             state.stats[Stat::Stagnation] += 1;
         }
         state.stagnated = stagnated;
+        if stopped /* stagnated */ {
+            state.rst.restart_step += 1;
+        } else {
+            state.rst.restart_step = state.config.restart_lbd_len;
+        }
     }
     /* {
         let n = nconflict / 10_000;
@@ -487,16 +493,17 @@ fn adapt_parameters(
     if !state.rst.use_luby_restart && state.rst.adaptive_restart && !state.stagnated {
         let moving: f64 = 0.04;
         let spring: f64 = 0.02;
-        let margin: f64 = 0.20;
-        let too_few: usize = 4;
-        let too_many: usize = 400;
         // restart_threshold
+        let too_few: usize = 20;
+        let too_many: usize = 2000;
+        // let margin: f64 = 0.20;
         let nr = state.stats[Stat::Restart] - state.stats[Stat::RestartRecord];
         state.stats[Stat::RestartRecord] = state.stats[Stat::Restart];
-        if state.rst.lbd.threshold <= state.config.restart_threshold + margin && nr < too_few {
+        // if state.rst.lbd.threshold <= state.config.restart_threshold + margin && nr < too_few {
+        if state.rst.lbd.threshold + moving < 1.0 && nr < too_few {
             state.rst.lbd.threshold += moving;
-        } else if state.config.restart_threshold - margin <= state.rst.lbd.threshold
-            && too_many < nr
+        } else if /* state.config.restart_threshold - margin <= state.rst.lbd.threshold && */
+            too_many < nr
         {
             state.rst.lbd.threshold -= moving;
         } else if too_few <= nr && nr <= too_many {
@@ -504,17 +511,24 @@ fn adapt_parameters(
                 (state.rst.lbd.threshold - state.config.restart_threshold) * spring;
         }
         // restart_blocking
+        let too_few: usize = 0;
+        let too_many: usize = 400;
+        // let margin: f64 = 2.0;
         let nb = state.stats[Stat::BlockRestart] - state.stats[Stat::BlockRestartRecord];
         state.stats[Stat::BlockRestartRecord] = state.stats[Stat::BlockRestart];
-        if state.config.restart_blocking - margin <= state.rst.asg.threshold && nb < too_few {
+        /*
+        // if state.config.restart_blocking - margin <= state.rst.asg.threshold && nb < too_few {
+        if 1.0 <= state.rst.asg.threshold - moving && nb < too_few {
             state.rst.asg.threshold -= moving;
-        } else if state.rst.asg.threshold <= state.config.restart_blocking + margin && too_many < nb
+        } else if /* state.rst.asg.threshold <= state.config.restart_blocking + margin && */
+            too_many < nb || nr < nb
         {
             state.rst.asg.threshold += moving;
         } else if too_few <= nb && nb <= too_many {
             state.rst.asg.threshold -=
                 (state.rst.asg.threshold - state.config.restart_blocking) * spring;
         }
+        */
     }
     if nconflict == switch {
         state.flush("exhaustive eliminator activated...");
@@ -533,6 +547,9 @@ fn adapt_parameters(
             state.flush(&format!("deep searching ({})...", state.slack_duration));
             state.rst.next_restart += 80_000;
         }
+    }
+    if state.stagnated {
+        state.flush(&format!("stagnated restart_step {}...", state.rst.restart_step));
     }
     Ok(())
 }

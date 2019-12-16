@@ -213,7 +213,8 @@ impl EmaIF for Ema {
 }
 
 /// Exponential Moving Average pair
-struct Ema2 {
+#[derive(Debug)]
+pub struct Ema2 {
     fast: f64,
     slow: f64,
     calf: f64,
@@ -250,11 +251,11 @@ impl EmaIF for Ema2 {
 
 impl Ema2 {
     #[allow(dead_code)]
-    fn rate(&self) -> f64 {
+    pub fn rate(&self) -> f64 {
         self.fast / self.slow * (self.cals / self.calf)
     }
     #[allow(dead_code)]
-    fn with_slow(mut self, s: u64) -> Ema2 {
+    pub fn with_slow(mut self, s: usize) -> Ema2 {
         self.se = 1.0 / (s as f64);
         self
     }
