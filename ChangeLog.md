@@ -1,4 +1,4 @@
-## 0.2.1, 2019-12-XX
+## 0.2.1, 2019-12-17
 
 - redefine `ClauseId` as a struct
 
