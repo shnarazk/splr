@@ -18,7 +18,7 @@ use {
 
 fn main() {
     let mut config = Config::from_args();
-    config.without_deep_search = true;
+    config.without_adaptive_restart = true;
     if !config.cnf_filename.exists() {
         println!(
             "{} does not exist.",

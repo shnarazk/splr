@@ -454,15 +454,23 @@ fn adapt_parameters(
         let stopped = state.stats[Stat::SolvedRecord] == state.num_solved_vars;
         if stopped {
             state.slack_duration += 1;
-        } else if 0 < state.slack_duration && state.stagnated {
-            state.slack_duration *= -1;
+        // } else if 0 < state.slack_duration && state.stagnated {
+        //     state.slack_duration *= -1;
         } else {
             state.slack_duration = 0;
         }
-        if stopped {
-            vdb.reward_by_dl *= 0.99;
+        if stopped && 0.5 < state.rst.lbd.threshold {
+            state.rst.lbd.threshold *= 0.98;
+        } else {
+            state.rst.lbd.threshold = state.config.restart_threshold;
+        }
+        if stopped && 0.1 < vdb.reward_by_dl {
+            vdb.reward_by_dl *= 0.97;
         } else {
             vdb.reward_by_dl = 1.0;
+        }
+        if 100 < state.slack_duration {
+            state.slack_duration = 0;
         }
         let stagnated = ((state.num_vars - state.num_solved_vars)
             .next_power_of_two()
@@ -520,6 +528,10 @@ fn adapt_parameters(
         }
     }
     state.progress(cdb, vdb, None);
+    state.flush(&format!(" devel 0.2.2|thrR:{:>9.4}, rwd2:{:>9.4} |",
+                         state.rst.lbd.threshold,
+                         vdb.reward_by_dl,
+                         ));
     if !state.config.without_deep_search {
         state.rst.restart_step = 50 + 40_000 * (state.stagnated as usize);
         if state.stagnated {
