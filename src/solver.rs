@@ -115,6 +115,7 @@ impl SatSolverIF for Solver {
                     (0, _) => asgs.enqueue_null(v, false),
                     (p, m) => {
                         v.phase = m < p;
+                        v.polarity.update(if m < p { 1.0 } else { -1.0 });
                         elim.enqueue_var(vdb, vi, false);
                     }
                 }
@@ -342,7 +343,8 @@ fn search(
             }
             if !asgs.remains() {
                 let vi = asgs.select_var(vdb);
-                let p = vdb[vi].phase;
+                // let p = vdb[vi].phase;
+                let p = 0.0 < vdb[vi].polarity.get();
                 asgs.uncheck_assume(vdb, Lit::from_var(vi, p));
                 state.stats[Stat::Decision] += 1;
                 a_decision_was_made = true;
@@ -373,6 +375,18 @@ fn handle_conflict_path(
     ci: ClauseId,
 ) -> MaybeInconsistent {
     let ncnfl = state.stats[Stat::Conflict]; // total number
+    if state.rst.asg.best < asgs.len() {
+        let mut rank = 0;
+        let mut scale = 1.0;
+        for l in &asgs.trail {
+            let v = &mut vdb[l.vi()];
+            if rank < v.level {
+                rank = v.level;
+                scale *= 0.99;
+            }
+            v.best_order = scale;
+        }
+    }
     state.rst.after_restart += 1;
     // DYNAMIC BLOCKING RESTART based on ASG, updated on conflict path
     // If we can settle this conflict w/o restart, solver will get a big progress.
@@ -459,11 +473,11 @@ fn adapt_parameters(
         } else {
             state.slack_duration = 0;
         }
-        if stopped {
+        /* if stopped {
             vdb.reward_by_dl *= 0.99;
         } else {
             vdb.reward_by_dl = 1.0;
-        }
+        } */
         let stagnated = ((state.num_vars - state.num_solved_vars)
             .next_power_of_two()
             .trailing_zeros() as isize)

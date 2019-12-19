@@ -3,7 +3,7 @@ use {
         clause::{ClauseDB, ClauseId, Watch},
         config::Config,
         state::{Stat, State},
-        traits::{ClauseDBIF, FlagIF, Instantiate, LitIF, PropagatorIF, VarDBIF, WatchDBIF},
+        traits::{ClauseDBIF, EmaIF, FlagIF, Instantiate, LitIF, PropagatorIF, VarDBIF, WatchDBIF},
         types::*,
         var::{Var, VarDB},
     },
@@ -204,7 +204,12 @@ impl PropagatorIF for AssignStack {
             let vi = l.vi();
             let v = &mut vdb[vi];
             unset_assign!(self, vi);
-            v.phase = v.assign.unwrap();
+            // 20191219-variance-of-polarity
+            let val = v.assign.unwrap();
+            v.phase = val;
+            v.polarity.update(if val { 1.0 } else { -1.0 });
+            // let vop = 0.5 + 0.5 * v.polarity.get(); // [-1, 1] -> [0, 1]
+            v.variance_of_polarity = 1.0 - v.polarity.get().abs(); // vop * (1.0 - vop);
             v.assign = None;
             v.reason = ClauseId::default();
             self.var_order.insert(vdb, vi);

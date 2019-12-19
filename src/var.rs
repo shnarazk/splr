@@ -23,6 +23,10 @@ pub struct Var {
     pub assign: Option<bool>,
     /// the previous assigned value
     pub phase: bool,
+    /// polarity of assigned value
+    pub polarity: Ema,
+    /// variance-of-polarity = ema * (1.0 - ema)
+    pub variance_of_polarity: f64,
     /// the propagating clause
     pub reason: ClauseId,
     /// decision level at which this variables is assigned.
@@ -37,6 +41,7 @@ pub struct Var {
     pub neg_occurs: Vec<ClauseId>,
     /// the `Flag`s
     flags: Flag,
+    pub best_order: f64,
 }
 
 /// is the dummy var index.
@@ -49,6 +54,8 @@ impl VarIF for Var {
             index: i,
             assign: None,
             phase: false,
+            polarity: Ema::new(32),
+            variance_of_polarity: 0.5,
             reason: ClauseId::default(),
             level: 0,
             reward: 0.0,
@@ -56,6 +63,7 @@ impl VarIF for Var {
             pos_occurs: Vec::new(),
             neg_occurs: Vec::new(),
             flags: Flag::empty(),
+            best_order: 1.0,
         }
     }
     fn new_vars(n: usize) -> Vec<Var> {
@@ -84,6 +92,7 @@ impl FlagIF for Var {
 pub struct VarDB {
     pub activity_decay: f64,
     pub reward_by_dl: f64,
+    vop_ordering: bool,
     // pub reward_by_dl_ema: Ema,
     /// vars
     var: Vec<Var>,
@@ -102,6 +111,7 @@ impl Default for VarDB {
         VarDB {
             activity_decay: VAR_ACTIVITY_DECAY,
             reward_by_dl: 1.0,
+            vop_ordering: false,
             // reward_by_dl_ema,
             var: Vec::new(),
             current_conflict: 0,
@@ -232,14 +242,18 @@ impl VarDBIF for VarDB {
         }
     }
     fn activity(&mut self, vi: VarId) -> f64 {
-        let now = self.current_conflict;
         let v = &mut self.var[vi];
-        let diff = now - v.last_update;
-        if 0 < diff {
-            v.last_update = now;
-            v.reward *= self.activity_decay.powi(diff as i32);
+        if self.vop_ordering {
+            v.best_order * v.variance_of_polarity
+        } else {
+            let now = self.current_conflict;
+            let diff = now - v.last_update;
+            if 0 < diff {
+                v.last_update = now;
+                v.reward *= self.activity_decay.powi(diff as i32);
+            }
+            v.reward //  + v.best_order * v.variance_of_polarity
         }
-        v.reward
     }
 }
 

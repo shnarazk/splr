@@ -13,6 +13,7 @@ pub struct ProgressASG {
     /// For block restart based on average assignments: 1.40.
     /// This is called `R` in Glucose
     pub threshold: f64,
+    pub best: usize,
 }
 
 impl Instantiate for ProgressASG {
@@ -21,6 +22,7 @@ impl Instantiate for ProgressASG {
             ema: Ema::new(config.restart_asg_len),
             asg: 0,
             threshold: config.restart_blocking,
+            best: 0,
         }
     }
 }
@@ -30,6 +32,9 @@ impl ProgressEvaluator for ProgressASG {
     fn update(&mut self, n: usize) {
         self.asg = n;
         self.ema.update(n as f64);
+        if self.best < n {
+            self.best = n;
+        }
     }
     fn get(&self) -> f64 {
         self.ema.get()
