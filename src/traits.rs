@@ -140,28 +140,6 @@ pub trait EliminatorIF {
     fn set_initial_reward(&self, vdb: &mut VarDB);
 }
 
-/// API for Exponential Moving Average, EMA, like `get`, `reset`, `update` and so on.
-pub trait EmaIF {
-    /// return a new Ema.
-    fn new(f: usize) -> Self;
-    /// return the current value of Ema.
-    fn get(&self) -> f64;
-    /// reset an Ema.
-    fn reset(&mut self) {}
-    /// update Ema.
-    fn update(&mut self, x: f64);
-}
-
-/// API for [object properties](../types/enum.Flag.html) like `is`, `turn_off`, `turn_on` and so on.
-pub trait FlagIF {
-    /// return true if the flag in on.
-    fn is(&self, flag: Flag) -> bool;
-    /// toggle the flag off.
-    fn turn_off(&mut self, flag: Flag);
-    /// toggle the flag on.
-    fn turn_on(&mut self, flag: Flag);
-}
-
 /// API for data instantiation based on `Configuration` and `CNFDescription`
 pub trait Instantiate {
     fn instantiate(conf: &Config, cnf: &CNFDescription) -> Self;
@@ -199,7 +177,7 @@ pub trait PropagatorIF {
     fn level(&self) -> usize;
     /// return `true` if the current decision level is zero.
     fn is_zero(&self) -> bool;
-    /// return the number of assignments at a given decision level `u`.
+    /// return the number of assignments at less than or equal to decision level `u`.
     fn num_at(&self, n: usize) -> usize;
     /// return `true` if there are unpropagated assignments.
     fn remains(&self) -> bool;

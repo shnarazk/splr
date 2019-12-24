@@ -2,7 +2,7 @@
 use {
     crate::{
         clause::ClauseId,
-        traits::{Delete, EmaIF, LitIF},
+        traits::{Delete, LitIF},
     },
     std::{
         fmt,
@@ -187,6 +187,18 @@ impl LitIF for Lit {
     }
 }
 
+/// API for Exponential Moving Average, EMA, like `get`, `reset`, `update` and so on.
+pub trait EmaIF {
+    /// return a new Ema.
+    fn new(f: usize) -> Self;
+    /// return the current value of Ema.
+    fn get(&self) -> f64;
+    /// reset an Ema.
+    fn reset(&mut self) {}
+    /// update Ema.
+    fn update(&mut self, x: f64);
+}
+
 /// Exponential Moving Average w/ a calibrator
 #[derive(Debug)]
 pub struct Ema {
@@ -317,6 +329,16 @@ impl<T> Delete<T> for Vec<T> {
             }
         }
     }
+}
+
+/// API for [object properties](../types/enum.Flag.html) like `is`, `turn_off`, `turn_on` and so on.
+pub trait FlagIF {
+    /// return true if the flag in on.
+    fn is(&self, flag: Flag) -> bool;
+    /// toggle the flag off.
+    fn turn_off(&mut self, flag: Flag);
+    /// toggle the flag on.
+    fn turn_on(&mut self, flag: Flag);
 }
 
 bitflags! {

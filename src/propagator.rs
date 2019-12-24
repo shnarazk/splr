@@ -3,7 +3,7 @@ use {
         clause::{ClauseDB, ClauseId, Watch},
         config::Config,
         state::{Stat, State},
-        traits::{ClauseDBIF, EmaIF, FlagIF, Instantiate, LitIF, PropagatorIF, VarDBIF, WatchDBIF},
+        traits::{ClauseDBIF, Instantiate, LitIF, PropagatorIF, VarDBIF, WatchDBIF},
         types::*,
         var::{Var, VarDB},
     },
@@ -157,6 +157,7 @@ impl PropagatorIF for AssignStack {
                     let lits = &mut cdb[w.c].lits;
                     if lits.len() == 2 {
                         if blocker_value == Some(false) {
+                            vdb.last_conflict_weight = vdb[p.vi()].polarity.get().abs();
                             self.catchup();
                             return w.c;
                         }
@@ -186,6 +187,7 @@ impl PropagatorIF for AssignStack {
                         }
                     }
                     if first_value == Some(false) {
+                        vdb.last_conflict_weight = vdb[p.vi()].polarity.get().abs();
                         self.catchup();
                         return w.c;
                     }
@@ -208,8 +210,6 @@ impl PropagatorIF for AssignStack {
             let val = v.assign.unwrap();
             v.phase = val;
             v.polarity.update(if val { 1.0 } else { -1.0 });
-            // let vop = 0.5 + 0.5 * v.polarity.get(); // [-1, 1] -> [0, 1]
-            v.variance_of_polarity = 1.0 - v.polarity.get().abs(); // vop * (1.0 - vop);
             v.assign = None;
             v.reason = ClauseId::default();
             self.var_order.insert(vdb, vi);
