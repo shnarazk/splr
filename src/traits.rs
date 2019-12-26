@@ -215,10 +215,6 @@ pub trait RestartIF {
     fn block_restart(&mut self) -> bool;
     /// force restart if needed.
     fn force_restart(&mut self) -> bool;
-    /// initialize data for Luby restart.
-    fn initialize_luby(&mut self);
-    /// update data for Luby restart.
-    fn update_luby(&mut self);
 }
 
 /// API for SAT solver like `build`, `solve` and so on.

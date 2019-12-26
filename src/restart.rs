@@ -1,7 +1,10 @@
-use crate::{
-    config::Config,
-    traits::*,
-    types::*,
+use {
+    crate::{
+        config::Config,
+        traits::*,
+        types::*,
+    },
+    std::fmt,
 };
 
 // const RESET_EMA: usize = 400;
@@ -86,22 +89,119 @@ impl ProgressEvaluator for ProgressLBD {
     }
 }
 
+#[derive(Debug)]
+pub struct LubySeries {
+    pub active: bool,
+    next_restart: usize,
+    index: usize,
+    restart_inc: f64,
+    restart_step: usize,
+}
+
+impl Default for LubySeries {
+    fn default() -> Self {
+        LubySeries {
+            active: false,
+            next_restart: 0,
+            index: 1,
+            restart_inc: 2.0,
+            restart_step: 10,
+        }
+    }
+}
+
+impl Instantiate for LubySeries {
+    fn instantiate(config: &Config, _: &CNFDescription) -> Self {
+        LubySeries {
+            restart_step: config.restart_step,
+            .. LubySeries::default()
+        }
+    }
+}
+
+impl fmt::Display for LubySeries {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if self.active {
+            write!(f, "Luby[index:{}, step:{}]",
+                   self.index,
+                   self.next_restart,
+            )
+        } else {
+            write!(f, "Luby(deactive)")
+        }
+    }
+}
+
+impl ProgressEvaluator for LubySeries {
+    type Input = usize;
+    fn update(&mut self, reset: usize) {
+        assert!(self.active);
+        if reset == 0 {
+            self.index = 0;
+        } else {
+            self.index += 1;
+        }
+        self.next_restart = self.next_step();
+    }
+    fn get(&self) -> f64 {
+        self.next_restart as f64
+    }
+    fn trend(&self) -> f64 {
+        todo!()
+    }
+    fn is_active(&self) -> bool {
+        todo!()
+    }
+}
+
+/// Find the finite subsequence that contains index 'x', and the
+/// size of that subsequence as: 1, 1, 2, 1, 1, 2, 4, 1, 1, 2, 1, 1, 2, 4, 8
+impl LubySeries {
+    fn next_step(&self) -> usize {
+        if self.index == 0 {
+            return self.restart_step;
+        }
+        let mut size: usize = 1;
+        let mut seq: usize = 0;
+        while size < self.index + 1 {
+            seq += 1;
+            size = 2 * size + 1;
+        }
+        let mut x = self.index;
+        while size - 1 != x {
+            size = (size - 1) >> 1;
+            seq -= 1;
+            x %= size;
+        }
+        (self.restart_inc.powf(seq as f64) * self.restart_step as f64) as usize
+    }
+}
+
+#[test]
+fn test_luby_series() {
+    let mut luby = LubySeries {
+        active: true,
+        restart_step: 1,
+        .. LubySeries::default()
+    };
+    luby.update(0);
+    for v in vec![1, 1, 2, 1, 1, 2, 4, 1, 1, 2, 1, 1, 2, 4, 8] {
+        assert_eq!(luby.next_restart, v);
+        luby.update(1);
+    }
+}
+
 // Restart stat
 #[derive(Debug)]
 pub struct RestartExecutor {
     pub adaptive_restart: bool,
     pub asg: ProgressASG,
     pub lbd: ProgressLBD,
-    pub use_luby_restart: bool,
+    pub luby: LubySeries,
     pub after_restart: usize,
     pub cur_restart: usize,
     pub next_restart: usize,
     pub restart_step: usize,
-    luby_count: f64,
-    pub luby_restart_num_conflict: f64,
-    pub luby_restart_inc: f64,
-    pub luby_current_restart: usize,
-    pub luby_restart_factor: f64,
 }
 
 impl Instantiate for RestartExecutor {
@@ -110,16 +210,11 @@ impl Instantiate for RestartExecutor {
             adaptive_restart: !config.without_adaptive_restart,
             asg: ProgressASG::instantiate(config, cnf),
             lbd: ProgressLBD::instantiate(config, cnf),
-            use_luby_restart: false,
+            luby: LubySeries::instantiate(config, cnf),
             after_restart: 0,
             cur_restart: 1,
             next_restart: 100,
             restart_step: config.restart_step,
-            luby_count: 0.0,
-            luby_restart_num_conflict: 0.0,
-            luby_restart_inc: 2.0,
-            luby_current_restart: 0,
-            luby_restart_factor: 100.0,
         }
     }
 }
@@ -127,7 +222,7 @@ impl Instantiate for RestartExecutor {
 impl RestartIF for RestartExecutor {
     fn block_restart(&mut self) -> bool {
         if 100 < self.lbd.num
-            && !self.use_luby_restart
+            && !self.luby.active
             && self.restart_step <= self.after_restart
             && self.asg.is_active()
         {
@@ -137,57 +232,16 @@ impl RestartIF for RestartExecutor {
         false
     }
     fn force_restart(&mut self) -> bool {
-        if (self.use_luby_restart && self.luby_restart_num_conflict <= self.luby_count)
-            || (!self.use_luby_restart
-                && self.restart_step <= self.after_restart
-                && self.lbd.is_active())
-        {
-            self.after_restart = 0;
-            if self.use_luby_restart {
-                self.luby_count = 0.0;
-                self.luby_current_restart += 1;
-                self.luby_restart_num_conflict =
-                    luby(self.luby_restart_inc, self.luby_current_restart)
-                        * self.luby_restart_factor;
+        if self.luby.active {
+            if self.luby.next_restart <= self.after_restart {
+                self.luby.update(1);
+                self.after_restart = 0;
+                return true;
             }
+        } else if self.restart_step <= self.after_restart && self.lbd.is_active() {
+            self.after_restart = 0;
             return true;
         }
         false
     }
-    fn initialize_luby(&mut self) {
-        if self.use_luby_restart {
-            self.luby_restart_num_conflict =
-                luby(self.luby_restart_inc, self.luby_current_restart) * self.luby_restart_factor;
-            self.luby_count = 0.0;
-        }
-    }
-    fn update_luby(&mut self) {
-        if self.use_luby_restart {
-            self.luby_count += 1.0;
-        }
-    }
-}
-
-/// Find the finite subsequence that contains index 'x', and the
-/// size of that subsequence:
-fn luby(y: f64, mut x: usize) -> f64 {
-    let mut size: usize = 1;
-    let mut seq: usize = 0;
-    // for(size = 1, seq = 0; size < x + 1; seq++, size = 2 * size + 1);
-    while size < x + 1 {
-        seq += 1;
-        size = 2 * size + 1;
-    }
-    // while(size - 1 != x) {
-    //     size = (size - 1) >> 1;
-    //     seq--;
-    //     x = x % size;
-    // }
-    while size - 1 != x {
-        size = (size - 1) >> 1;
-        seq -= 1;
-        x %= size;
-    }
-    // return pow(y, seq);
-    y.powf(seq as f64)
 }

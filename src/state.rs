@@ -159,7 +159,7 @@ pub struct State {
     pub last_asg: usize,
     pub last_dl: Vec<Lit>,
     pub lbd_temp: Vec<usize>,
-    pub slack_duration: isize,
+    pub slack_duration: usize,
     pub stagnated: bool,
     pub start: SystemTime,
     pub time_limit: f64,
@@ -339,8 +339,7 @@ impl StateIF for State {
                 self.strategy = SearchStrategy::LowSuccesiveM;
             } else {
                 self.strategy = SearchStrategy::LowSuccesiveLuby;
-                self.rst.use_luby_restart = true;
-                self.rst.luby_restart_factor = 100.0;
+                self.rst.luby.active = true;
             }
         }
         if self.stats[Stat::NoDecisionConflict] > 54_400 {

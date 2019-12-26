@@ -320,7 +320,9 @@ fn search(
     vdb: &mut VarDB,
 ) -> Result<bool, SolverError> {
     let mut a_decision_was_made = false;
-    state.rst.initialize_luby();
+    if state.rst.luby.active {
+        state.rst.luby.update(0);
+    }
     loop {
         let ci = asgs.propagate(cdb, state, vdb);
         vdb.update_stat(state);
@@ -349,7 +351,6 @@ fn search(
                 a_decision_was_made = true;
             }
         } else {
-            state.rst.update_luby();
             state.stats[Stat::Conflict] += 1;
             if a_decision_was_made {
                 a_decision_was_made = false;
@@ -455,27 +456,30 @@ fn adapt_parameters(
         let stopped = state.stats[Stat::SolvedRecord] == state.num_solved_vars;
         if stopped {
             state.slack_duration += 1;
-        } else if 0 < state.slack_duration && state.stagnated {
-            state.slack_duration *= -1;
         } else {
             state.slack_duration = 0;
         }
-        if stopped {
+        /* if stopped {
             vdb.reward_by_dl *= 0.99;
         } else {
             vdb.reward_by_dl = 1.0;
-        }
+        } */
         let stagnated = ((state.num_vars - state.num_solved_vars)
             .next_power_of_two()
-            .trailing_zeros() as isize)
+            .trailing_zeros() as usize)
             < state.slack_duration;
+        // let stagnated = stopped;
         if !state.stagnated && stagnated {
             state.stats[Stat::Stagnation] += 1;
+            state.rst.luby.active = true;
+            state.rst.luby.update(0);
+        } else if state.stagnated && !stagnated {
+            state.rst.luby.active = false;
         }
         state.stagnated = stagnated;
     }
     state.stats[Stat::SolvedRecord] = state.num_solved_vars;
-    if !state.rst.use_luby_restart && state.rst.adaptive_restart && !state.stagnated {
+    if !state.rst.luby.active && state.rst.adaptive_restart && !state.stagnated {
         let moving: f64 = 0.04;
         let spring: f64 = 0.02;
         let margin: f64 = 0.20;
@@ -522,10 +526,16 @@ fn adapt_parameters(
     }
     state.progress(cdb, vdb, None);
     if !state.config.without_deep_search {
-        state.rst.restart_step = 50 + 40_000 * (state.stagnated as usize);
+        // state.rst.restart_step = state.config.restart_step * (1 + 19 * state.stagnated as usize);
+        // state.rst.restart_step = state.config.restart_step;
+        // state.rst.restart_step += (state.config.restart_step as f64 * (state.slack_duration as f64).log(1.2)) as usize;
+        // state.rst.restart_step += state.config.restart_step * state.slack_duration;
         if state.stagnated {
-            state.flush(&format!("deep searching ({})...", state.slack_duration));
-            state.rst.next_restart += 80_000;
+            state.flush(&format!("deep searching:{}, {}...",
+                                 state.rst.luby,
+                                 state.rst.after_restart,
+            ));
+            // state.rst.next_restart += 40_000;
         }
     }
     Ok(())
