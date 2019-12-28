@@ -90,6 +90,35 @@ impl ProgressEvaluator for ProgressLBD {
 }
 
 #[derive(Debug)]
+pub struct ProgressLVL {
+    ema: Ema2,
+}
+
+impl Instantiate for ProgressLVL {
+    fn instantiate(_: &Config, _: &CNFDescription) -> Self {
+        ProgressLVL {
+            ema: Ema2::new(100).with_slow(800),
+        }
+    }
+}
+
+impl ProgressEvaluator for ProgressLVL {
+    type Input = usize;
+    fn update(&mut self, l: usize) {
+        self.ema.update(l as f64);
+    }
+    fn get(&self) -> f64 {
+        self.ema.get()
+    }
+    fn trend(&self) -> f64 {
+        self.ema.rate()
+    }
+    fn is_active(&self) -> bool {
+        todo!()
+    }
+}
+
+#[derive(Debug)]
 pub struct LubySeries {
     pub active: bool,
     next_restart: usize,
@@ -197,6 +226,8 @@ pub struct RestartExecutor {
     pub adaptive_restart: bool,
     pub asg: ProgressASG,
     pub lbd: ProgressLBD,
+    pub blvl: ProgressLVL,
+    pub clvl: ProgressLVL,
     pub luby: LubySeries,
     pub after_restart: usize,
     pub cur_restart: usize,
@@ -210,6 +241,8 @@ impl Instantiate for RestartExecutor {
             adaptive_restart: !config.without_adaptive_restart,
             asg: ProgressASG::instantiate(config, cnf),
             lbd: ProgressLBD::instantiate(config, cnf),
+            blvl: ProgressLVL::instantiate(config, cnf),
+            clvl: ProgressLVL::instantiate(config, cnf),
             luby: LubySeries::instantiate(config, cnf),
             after_restart: 0,
             cur_restart: 1,

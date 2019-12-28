@@ -150,8 +150,6 @@ pub struct State {
     pub use_chan_seok: bool,
     /// MISC
     pub ok: bool,
-    pub b_lvl: Ema,
-    pub c_lvl: Ema,
     pub model: Vec<Option<bool>>,
     pub conflicts: Vec<Lit>,
     pub new_learnt: Vec<Lit>,
@@ -184,8 +182,6 @@ impl Default for State {
             target: CNFDescription::default(),
             use_chan_seok: false,
             ok: true,
-            b_lvl: Ema::new(5_000),
-            c_lvl: Ema::new(5_000),
             model: Vec::new(),
             conflicts: Vec::new(),
             new_learnt: Vec::new(),
@@ -493,8 +489,8 @@ impl StateIF for State {
             println!(
                 "\x1B[2K    Conflict|aLBD:{}, cnfl:{}, bjmp:{}, rpc%:{} ",
                 fm!("{:>9.2}", self.record, LogF64Id::AveLBD, self.rst.lbd.get()),
-                fm!("{:>9.2}", self.record, LogF64Id::CLevel, self.c_lvl.get()),
-                fm!("{:>9.2}", self.record, LogF64Id::BLevel, self.b_lvl.get()),
+                fm!("{:>9.2}", self.record, LogF64Id::CLevel, self.rst.clvl.get()),
+                fm!("{:>9.2}", self.record, LogF64Id::BLevel, self.rst.blvl.get()),
                 fm!(
                     "{:>9.4}",
                     self.record,
@@ -531,8 +527,8 @@ impl StateIF for State {
             );
         } else {
             self.record[LogF64Id::AveLBD] = self.rst.lbd.get();
-            self.record[LogF64Id::CLevel] = self.c_lvl.get();
-            self.record[LogF64Id::BLevel] = self.b_lvl.get();
+            self.record[LogF64Id::CLevel] = self.rst.clvl.get();
+            self.record[LogF64Id::BLevel] = self.rst.blvl.get();
             self.record[LogUsizeId::Reduction] = self.stats[Stat::Reduction];
             self.record[LogUsizeId::SatClauseElim] = self.stats[Stat::SatClauseElimination];
             self.record[LogF64Id::RestartBlkR] = self.rst.asg.threshold;
@@ -745,8 +741,8 @@ impl State {
             self.rst.asg.get(),
             self.rst.lbd.get(),
             self.rst.lbd.get(),
-            self.b_lvl.get(),
-            self.c_lvl.get(),
+            self.rst.blvl.get(),
+            self.rst.clvl.get(),
             elim.clause_queue_len(),
             elim.var_queue_len(),
         );
