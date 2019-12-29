@@ -117,6 +117,7 @@ pub enum Stat {
     NumBinLearnt,          // the number of binary learnt clauses
     NumLBD2,               // the number of clauses which LBD is 2
     Stagnation,            // the number of stagnation
+    FlipVarOrdering,       // the number of flipping var ordering algorithm
     EndOfStatIndex,        // Don't use this dummy.
 }
 

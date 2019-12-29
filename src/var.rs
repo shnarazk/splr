@@ -97,6 +97,7 @@ pub struct VarDB {
     /// a working buffer for LBD calculation
     pub lbd_temp: Vec<usize>,
     pub last_conflict_weight: f64,
+    pub vop_mode: bool,
 }
 
 impl Default for VarDB {
@@ -112,6 +113,7 @@ impl Default for VarDB {
             current_restart: 0,
             lbd_temp: Vec::new(),
             last_conflict_weight: 0.0,
+            vop_mode: false,
         }
     }
 }
@@ -168,10 +170,14 @@ impl ActivityIF for VarDB {
         let now = self.current_conflict;
         let t = (now - v.last_update) as i32;
         // v.reward = (now as f64 + self.activity) / 2.0; // ASCID
-        let w = 0.2  + 0.1 * self.last_conflict_weight;
-        v.reward = w // 0.2
-            + self.reward_by_dl / (dl + 1) as f64
-            + v.reward * self.activity_decay.powi(t);
+        // let w = 0.2 + 0.25 * self.last_conflict_weight;
+        if self.vop_mode {
+            v.reward = 1.0 - v.polarity.get().abs();
+        } else {
+            v.reward = 0.2
+                + self.reward_by_dl / (dl + 1) as f64
+                + v.reward * self.activity_decay.powi(t);
+        }
         v.last_update = now;
     }
     fn scale_activity(&mut self) {}

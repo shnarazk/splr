@@ -336,6 +336,12 @@ fn search(
             if state.rst.force_restart() {
                 state.stats[Stat::Restart] += 1;
                 asgs.cancel_until(vdb, state.root_level);
+                if false && !state.stagnated && state.stats[Stat::Restart] % 200 == 0 {
+                    state.stats[Stat::FlipVarOrdering] += 1;
+                    state.flush(&format!("S({})", state.stats[Stat::FlipVarOrdering]));
+                    vdb.vop_mode = !vdb.vop_mode;
+                    asgs.rebuild_order(vdb);
+                }
             } else if asgs.level() == 0 {
                 if cdb.simplify(asgs, elim, state, vdb).is_err() {
                     debug_assert!(false, "interal error by simplify");
@@ -362,6 +368,15 @@ fn search(
                 return Ok(false);
             }
             handle_conflict_path(asgs, cdb, elim, state, vdb, ci)?;
+            if false && state.stagnated
+                && state.stats[Stat::Conflict] % 100_000 == 0
+                && 1.25 < state.rst.clvl.trend()
+            {
+                state.stats[Stat::FlipVarOrdering] += 1;
+                state.flush(&format!("S({})", state.stats[Stat::FlipVarOrdering]));
+                vdb.vop_mode = !vdb.vop_mode;
+                asgs.rebuild_order(vdb);
+            }
         }
     }
 }
@@ -394,6 +409,12 @@ fn handle_conflict_path(
         // dump to certified even if it's a literal.
         cdb.certificate_add(new_learnt);
         asgs.uncheck_enqueue(vdb, new_learnt[0], ClauseId::default());
+        /* if state.stagnated {
+            vdb.vop_mode = !vdb.vop_mode;
+        } else {
+            vdb.vop_mode = false;
+        }
+        */
     } else {
         state.stats[Stat::Learnt] += 1;
         let lbd = vdb.compute_lbd(&new_learnt, &mut state.lbd_temp);
@@ -416,14 +437,24 @@ fn handle_conflict_path(
     cdb.scale_activity();
     vdb.scale_activity();
     if 0 < state.config.dump_interval && ncnfl % state.config.dump_interval == 0 {
+        let mut cnt1 = 0;
+        let mut cnt2 = 0;
+        for v in &vdb[1..] {
+            if v.polarity.get().abs() < 0.2 {
+                cnt1 += 1;
+                if v.polarity.get().abs() < 0.1 {
+                    cnt2 += 1;
+                }
+            }
+        }
         state.development.push((
             ncnfl,
             (state.num_solved_vars + state.num_eliminated_vars) as f64
                 / state.target.num_of_variables as f64,
             state.stats[Stat::Restart] as f64,
             state.stats[Stat::BlockRestart] as f64,
-            state.rst.asg.trend().min(10.0),
-            state.rst.lbd.trend().min(10.0),
+            cnt1 as f64, // state.rst.asg.trend().min(10.0),
+            cnt2 as f64, // state.rst.lbd.trend().min(10.0),
         ));
     }
     if ncnfl % 10_000 == 0 {
@@ -459,22 +490,21 @@ fn adapt_parameters(
         } else {
             state.slack_duration = 0;
         }
-        /* if stopped {
-            vdb.reward_by_dl *= 0.99;
-        } else {
-            vdb.reward_by_dl = 1.0;
-        } */
-        let stagnated = ((state.num_vars - state.num_solved_vars)
+        let _stagnated = ((state.num_vars - state.num_solved_vars)
             .next_power_of_two()
             .trailing_zeros() as usize)
             < state.slack_duration;
-        // let stagnated = stopped;
+        let stagnated = stopped;
         if !state.stagnated && stagnated {
             state.stats[Stat::Stagnation] += 1;
             state.rst.luby.active = true;
             state.rst.luby.update(0);
+            /* if 24.0 < state.c_lvl.get() {
+                vdb.vop_mode = true;
+            } */
         } else if state.stagnated && !stagnated {
             state.rst.luby.active = false;
+            // vdb.vop_mode = false;
         }
         state.stagnated = stagnated;
     }
@@ -525,19 +555,46 @@ fn adapt_parameters(
         }
     }
     state.progress(cdb, vdb, None);
+    let epl =                   // estimated path length
+    {
+        let working_set = state.rst.lbd.get();
+        let current_levels = state.rst.clvl.get();
+        let asg_exp = state.num_unsolved_vars() as f64 / state.rst.asg.get();
+        let estimated_levels = current_levels * asg_exp.max(1.0);
+        assert!(current_levels <= estimated_levels);
+        // working_set.powf(estimated_levels / current_levels)
+        working_set
+    };
+    // vdb.vop_mode = (200.0 < epl && state.stagnated) || 8000.0 < epl;
+    // vdb.vop_mode = false; // (20.0 < epl && state.stagnated) || 80.0 < epl;
+    if state.stagnated && !vdb.vop_mode {
+        vdb.reward_by_dl *= 0.99;
+    } else {
+        vdb.reward_by_dl = 1.0;
+    }
     if !state.config.without_deep_search {
         // state.rst.restart_step = state.config.restart_step * (1 + 19 * state.stagnated as usize);
         // state.rst.restart_step = state.config.restart_step;
         // state.rst.restart_step += (state.config.restart_step as f64 * (state.slack_duration as f64).log(1.2)) as usize;
         // state.rst.restart_step += state.config.restart_step * state.slack_duration;
         if state.stagnated {
-            state.flush(&format!("deep searching:{}, {}...",
-                                 state.rst.luby,
-                                 state.rst.after_restart,
-            ));
-            // state.rst.next_restart += 40_000;
+            state.rst.next_restart += 40_000;
         }
     }
+    state.flush(&format!("{} restart based on {}, flip: {}, epl:{:.0}...",
+                         if state.rst.luby.active {
+                             "Luby"
+                         } else {
+                             "Dynamic"
+                         },
+                         if vdb.vop_mode {
+                             "VoP"
+                         } else {
+                             "FirstUIP"
+                         },
+                         state.stats[Stat::FlipVarOrdering],
+                         epl,
+        ));
     Ok(())
 }
 
