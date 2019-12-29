@@ -121,8 +121,8 @@ impl ProgressEvaluator for ProgressLVL {
 #[derive(Debug)]
 pub struct LubySeries {
     pub active: bool,
+    pub index: usize,
     next_restart: usize,
-    index: usize,
     restart_inc: f64,
     restart_step: usize,
 }
@@ -131,8 +131,8 @@ impl Default for LubySeries {
     fn default() -> Self {
         LubySeries {
             active: false,
+            index: 0,
             next_restart: 0,
-            index: 1,
             restart_inc: 2.0,
             restart_step: 10,
         }
