@@ -3,7 +3,7 @@ use {
         clause::{ClauseDB, ClauseId, Watch},
         config::Config,
         state::{Stat, State},
-        traits::{ClauseDBIF, FlagIF, Instantiate, LitIF, PropagatorIF, VarDBIF, WatchDBIF},
+        traits::{ClauseDBIF, Instantiate, LitIF, PropagatorIF, VarDBIF, WatchDBIF},
         types::*,
         var::{Var, VarDB},
     },
