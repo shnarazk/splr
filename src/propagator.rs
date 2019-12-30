@@ -11,6 +11,7 @@ use {
         fmt,
         fs::File,
         io::{BufWriter, Write},
+        ops::{Index, Range, RangeFrom},
     },
 };
 
@@ -65,6 +66,30 @@ macro_rules! unset_assign {
             *$asg.asgvec.get_unchecked_mut($var) = None;
         }
     };
+}
+
+impl Index<usize> for AssignStack {
+    type Output = Lit;
+    #[inline]
+    fn index(&self, i: usize) -> &Lit {
+        unsafe { self.trail.get_unchecked(i) }
+    }
+}
+
+impl Index<Range<usize>> for AssignStack {
+    type Output = [Lit];
+    #[inline]
+    fn index(&self, r: Range<usize>) -> &[Lit] {
+        &self.trail[r]
+    }
+}
+
+impl Index<RangeFrom<usize>> for AssignStack {
+    type Output = [Lit];
+    #[inline]
+    fn index(&self, r: RangeFrom<usize>) -> &[Lit] {
+        unsafe { self.trail.get_unchecked(r) }
+    }
 }
 
 impl Instantiate for AssignStack {
