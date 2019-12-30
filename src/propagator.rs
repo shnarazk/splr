@@ -19,6 +19,7 @@ use {
 #[derive(Debug)]
 pub struct AssignStack {
     pub trail: Vec<Lit>,
+    pub propagated: usize,
     asgvec: Vec<Option<bool>>,
     trail_lim: Vec<usize>,
     q_head: usize,
@@ -97,6 +98,7 @@ impl Instantiate for AssignStack {
         let nv = cnf.num_of_variables;
         AssignStack {
             trail: Vec::with_capacity(nv),
+            propagated: 0,
             asgvec: vec![None; 1 + nv],
             trail_lim: Vec::new(),
             q_head: 0,
@@ -111,6 +113,9 @@ impl PropagatorIF for AssignStack {
     }
     fn is_empty(&self) -> bool {
         self.trail.is_empty()
+    }
+    fn head(&self) -> usize {
+        self.q_head
     }
     fn level(&self) -> usize {
         self.trail_lim.len()
@@ -185,6 +190,7 @@ impl PropagatorIF for AssignStack {
                     if lits.len() == 2 {
                         if blocker_value == Some(false) {
                             self.catchup();
+                            vdb.conflict_weight = vdb[p.vi()].polarity.get().abs();
                             return w.c;
                         }
                         self.uncheck_enqueue(vdb, w.blocker, w.c);
@@ -214,6 +220,7 @@ impl PropagatorIF for AssignStack {
                     }
                     if first_value == Some(false) {
                         self.catchup();
+                        vdb.conflict_weight = vdb[p.vi()].polarity.get().abs();
                         return w.c;
                     }
                     self.uncheck_enqueue(vdb, first, w.c);
@@ -239,6 +246,7 @@ impl PropagatorIF for AssignStack {
         self.trail.truncate(lim);
         self.trail_lim.truncate(lv);
         self.q_head = lim;
+        self.propagated = lim;
     }
     fn uncheck_enqueue(&mut self, vdb: &mut VarDB, l: Lit, cid: ClauseId) {
         debug_assert!(usize::from(l) != 0, "Null literal is about to be equeued");
@@ -330,6 +338,7 @@ impl AssignStack {
     }
     fn sweep(&mut self) -> Lit {
         let lit = self.trail[self.q_head];
+        self.propagated = self.q_head;
         self.q_head += 1;
         lit
     }

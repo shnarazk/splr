@@ -12,7 +12,7 @@ use {
     },
 };
 
-const VAR_ACTIVITY_DECAY: f64 = 0.94;
+const VAR_ACTIVITY_DECAY: f64 = 0.4;
 
 /// Structure for variables.
 #[derive(Debug)]
@@ -31,8 +31,10 @@ pub struct Var {
     pub level: usize,
     /// a dynamic evaluation criterion like VSIDS or ACID.
     pub reward: f64,
+    pub chb_reward: f64,
     /// the number of conflicts at which this var was rewarded lastly
-    last_update: usize,
+    // pub last_update: usize,
+    pub last_connected: usize,
     /// list of clauses which contain this variable positively.
     pub pos_occurs: Vec<ClauseId>,
     /// list of clauses which contain this variable negatively.
@@ -51,11 +53,13 @@ impl VarIF for Var {
             index: i,
             assign: None,
             phase: false,
-            polarity: Ema::new(16),
+            polarity: Ema::new(20),
             reason: ClauseId::default(),
             level: 0,
             reward: 0.0,
-            last_update: 0,
+            chb_reward: 0.0,
+            // last_update: 0,
+            last_connected: 0,
             pos_occurs: Vec::new(),
             neg_occurs: Vec::new(),
             flags: Flag::empty(),
@@ -96,6 +100,7 @@ pub struct VarDB {
     current_restart: usize,
     /// a working buffer for LBD calculation
     pub lbd_temp: Vec<usize>,
+    pub conflict_weight: f64,
 }
 
 impl Default for VarDB {
@@ -110,6 +115,7 @@ impl Default for VarDB {
             current_conflict: 0,
             current_restart: 0,
             lbd_temp: Vec::new(),
+            conflict_weight: 0.0,
         }
     }
 }
@@ -161,7 +167,7 @@ impl IndexMut<RangeFrom<usize>> for VarDB {
 
 impl ActivityIF for VarDB {
     type Ix = VarId;
-    fn bump_activity(&mut self, vi: Self::Ix, dl: usize) {
+    /* fn bump_activity(&mut self, vi: Self::Ix, dl: usize) {
         let v = &mut self.var[vi];
         let now = self.current_conflict;
         let t = (now - v.last_update) as i32;
@@ -170,6 +176,14 @@ impl ActivityIF for VarDB {
             + self.reward_by_dl / (dl + 1) as f64
             + v.reward * self.activity_decay.powi(t);
         v.last_update = now;
+    } */
+    fn bump_activity(&mut self, vi: Self::Ix, conflict: usize) {
+        let v = &mut self.var[vi];
+        let now = self.current_conflict;
+        let multiplier = if conflict == 1 { 1.0 } else { 0.9 };
+        let reward = multiplier / (now + 1 - v.last_connected) as f64;
+        v.chb_reward *= 1.0 - self.activity_decay;
+        v.chb_reward += self.activity_decay * reward;
     }
     fn scale_activity(&mut self) {}
 }
@@ -234,7 +248,7 @@ impl VarDBIF for VarDB {
             cnt
         }
     }
-    fn activity(&mut self, vi: VarId) -> f64 {
+    /* fn activity(&mut self, vi: VarId) -> f64 {
         let now = self.current_conflict;
         let v = &mut self.var[vi];
         let diff = now - v.last_update;
@@ -243,6 +257,13 @@ impl VarDBIF for VarDB {
             v.reward *= self.activity_decay.powi(diff as i32);
         }
         v.reward
+    } */
+    fn activity(&mut self, vi: VarId) -> f64 {
+        let v = &self.var[vi];
+        // let w = (v.polarity.get() + 1.0) * 0.5;
+        // (1.0 - w) * v.chb_reward[0] + w * v.chb_reward[1]
+        // v.chb_reward[v.phase as usize]
+        v.chb_reward
     }
 }
 

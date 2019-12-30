@@ -153,7 +153,7 @@ impl SatSolverIF for Solver {
                 }
             }
         }
-        elim.set_initial_reward(vdb);
+        // elim.set_initial_reward(vdb);
         asgs.rebuild_order(vdb);
         state.progress(cdb, vdb, None);
         match search(asgs, cdb, elim, state, vdb) {
@@ -319,22 +319,36 @@ fn search(
     vdb: &mut VarDB,
 ) -> Result<bool, SolverError> {
     let mut a_decision_was_made = false;
+    let mut restart_threshold = 0.1;
+    let mut remains = state.num_unsolved_vars();
     if state.rst.luby.active {
         state.rst.luby.update(0);
     }
     loop {
+        let propagation_start = if asgs.remains() {
+            asgs.head()
+        } else {
+            0
+        };
         let ci = asgs.propagate(cdb, state, vdb);
         vdb.update_stat(state);
         state.stats[Stat::Propagation] += 1;
-        if ci == ClauseId::default() {
+        let conflicting= ci != ClauseId::default();
+        for l in &asgs[propagation_start..asgs.propagated] {
+            vdb.bump_activity(l.vi(), conflicting as usize);
+        }
+        if !conflicting {
             if state.num_vars <= asgs.len() + state.num_eliminated_vars {
                 return Ok(true);
             }
             // DYNAMIC FORCING RESTART based on LBD values, updated by conflict
             state.last_asg = asgs.len();
-            if state.rst.force_restart() {
+            if vdb.conflict_weight < restart_threshold /* && state.rst.force_restart() */ {
                 state.stats[Stat::Restart] += 1;
                 asgs.cancel_until(vdb, state.root_level);
+                restart_threshold += vdb.conflict_weight;
+                restart_threshold *= 0.5;
+                vdb.conflict_weight = 1.0;
             } else if asgs.level() == 0 {
                 if cdb.simplify(asgs, elim, state, vdb).is_err() {
                     debug_assert!(false, "interal error by simplify");
@@ -351,6 +365,9 @@ fn search(
             }
         } else {
             state.stats[Stat::Conflict] += 1;
+            if 0.06 < vdb.activity_decay {
+                vdb.activity_decay -= 0.000_001;
+            }
             if a_decision_was_made {
                 a_decision_was_made = false;
             } else {
@@ -361,6 +378,10 @@ fn search(
                 return Ok(false);
             }
             handle_conflict_path(asgs, cdb, elim, state, vdb, ci)?;
+            if state.num_unsolved_vars() < remains {
+                restart_threshold = 0.1;
+                remains = state.num_unsolved_vars();
+            }
         }
     }
 }
@@ -381,7 +402,7 @@ fn handle_conflict_path(
         state.rst.asg.update(asgs.len());
         state.last_asg = 0;
     }
-    if state.rst.block_restart() {
+    if false && state.rst.block_restart() {
         state.stats[Stat::BlockRestart] += 1;
     }
     let cl = asgs.level();
@@ -524,7 +545,7 @@ fn adapt_parameters(
     if !state.config.without_deep_search {
         state.rst.restart_step = 50 + 40_000 * (state.stagnated as usize);
         if state.stagnated {
-            state.flush(&format!("deep searching ({})...", state.slack_duration));
+            state.flush(format!("deep searching ({})...", state.slack_duration));
             state.rst.next_restart += 80_000;
         }
     }
@@ -539,6 +560,7 @@ fn analyze(
     confl: ClauseId,
 ) -> usize {
     let learnt = &mut state.new_learnt;
+    let ncnf = state.stats[Stat::Conflict];
     learnt.clear();
     learnt.push(NULL_LIT);
     let dl = asgs.level();
@@ -576,12 +598,12 @@ fn analyze(
             // println!("- handle {}", cid.fmt());
             for q in &(*c).lits[((p != NULL_LIT) as usize)..] {
                 let vi = q.vi();
-                vdb.bump_activity(vi, dl);
-                asgs.update_order(vdb, vi);
+                // vdb.bump_activity(vi, dl);
                 let v = &mut vdb[vi];
                 let lvl = v.level;
                 debug_assert!(!v.is(Flag::ELIMINATED));
                 debug_assert!(v.assign.is_some());
+                v.last_connected = ncnf;
                 if 0 < lvl && !state.an_seen[vi] {
                     state.an_seen[vi] = true;
                     if dl <= lvl {
@@ -636,7 +658,7 @@ fn simplify_learnt(
         ref mut an_seen,
         ..
     } = state;
-    let dl = asgs.level();
+    let _dl = asgs.level();
     let mut to_clear: Vec<Lit> = vec![new_learnt[0]];
     let mut levels = vec![false; asgs.level() + 1];
     for l in &new_learnt[1..] {
@@ -651,14 +673,14 @@ fn simplify_learnt(
         minimize_with_bi_clauses(cdb, vdb, &mut state.lbd_temp, new_learnt);
     }
     // glucose heuristics
-    let lbd = vdb.compute_lbd(new_learnt, &mut state.lbd_temp);
+    /* let lbd = vdb.compute_lbd(new_learnt, &mut state.lbd_temp);
     while let Some(l) = state.last_dl.pop() {
         let vi = l.vi();
         if cdb[vdb[vi].reason].rank < lbd {
             vdb.bump_activity(vi, dl);
             asgs.update_order(vdb, vi);
         }
-    }
+    } */
     // find correct backtrack level from remaining literals
     let mut level_to_return = 0;
     if 1 < new_learnt.len() {
