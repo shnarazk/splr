@@ -587,7 +587,6 @@ fn analyze(
             for q in &(*c).lits[((p != NULL_LIT) as usize)..] {
                 let vi = q.vi();
                 vdb.bump_activity(vi, dl);
-                asgs.update_order(vdb, vi);
                 let v = &mut vdb[vi];
                 let lvl = v.level;
                 debug_assert!(!v.is(Flag::ELIMINATED));
@@ -666,7 +665,6 @@ fn simplify_learnt(
         let vi = l.vi();
         if cdb[vdb[vi].reason].rank < lbd {
             vdb.bump_activity(vi, dl);
-            asgs.update_order(vdb, vi);
         }
     }
     // find correct backtrack level from remaining literals
