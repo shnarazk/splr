@@ -291,9 +291,10 @@ impl EliminatorIF for Eliminator {
         }
     }
     fn set_initial_reward(&self, vdb: &mut VarDB) {
-        let nv = vdb.len();
-        for (i, vi) in self.var_queue.heap.iter().enumerate().skip(1) {
-            vdb[*vi].reward = (nv - i) as f64; // big bang initialization
+        let _nv = vdb.len();
+        for (_i, vi) in self.var_queue.heap.iter().enumerate().skip(1) {
+            // vdb[*vi].vsids_reward = (nv - i) as f64; // big bang initialization
+            vdb[*vi].vsids_reward = 0.6;
         }
     }
 }
