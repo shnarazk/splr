@@ -166,9 +166,8 @@ impl ActivityIF for VarDB {
         let now = self.current_conflict;
         let t = (now - v.last_update) as i32;
         // v.reward = (now as f64 + self.activity) / 2.0; // ASCID
-        v.reward = 0.2
-            + self.reward_by_dl / (dl + 1) as f64
-            + v.reward * self.activity_decay.powi(t);
+        v.reward =
+            0.2 + self.reward_by_dl / (dl + 1) as f64 + v.reward * self.activity_decay.powi(t);
         v.last_update = now;
     }
     fn scale_activity(&mut self) {}
@@ -180,7 +179,7 @@ impl Instantiate for VarDB {
         VarDB {
             var: Var::new_vars(nv),
             lbd_temp: vec![0; nv + 1],
-            .. VarDB::default()
+            ..VarDB::default()
         }
     }
 }
