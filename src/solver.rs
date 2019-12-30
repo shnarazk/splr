@@ -343,7 +343,7 @@ fn search(
             }
             // DYNAMIC FORCING RESTART based on LBD values, updated by conflict
             state.last_asg = asgs.len();
-            if vdb.conflict_weight < restart_threshold /* && state.rst.force_restart() */ {
+            if !a_decision_was_made && vdb.conflict_weight < restart_threshold /* && state.rst.force_restart() */ {
                 state.stats[Stat::Restart] += 1;
                 asgs.cancel_until(vdb, state.root_level);
                 restart_threshold += vdb.conflict_weight;
@@ -381,6 +381,8 @@ fn search(
             if state.num_unsolved_vars() < remains {
                 restart_threshold = 0.1;
                 remains = state.num_unsolved_vars();
+            } else {
+                restart_threshold += 0.000_000_1;
             }
         }
     }
