@@ -319,7 +319,9 @@ fn search(
     vdb: &mut VarDB,
 ) -> Result<bool, SolverError> {
     let mut a_decision_was_made = false;
-    state.rst.initialize_luby();
+    if state.rst.luby.active {
+        state.rst.luby.update(0);
+    }
     loop {
         let ci = asgs.propagate(cdb, state, vdb);
         vdb.update_stat(state);
@@ -348,7 +350,6 @@ fn search(
                 a_decision_was_made = true;
             }
         } else {
-            state.rst.update_luby();
             state.stats[Stat::Conflict] += 1;
             if a_decision_was_made {
                 a_decision_was_made = false;
@@ -474,7 +475,7 @@ fn adapt_parameters(
         state.stagnated = stagnated;
     }
     state.stats[Stat::SolvedRecord] = state.num_solved_vars;
-    if !state.rst.use_luby_restart && state.rst.adaptive_restart && !state.stagnated {
+    if !state.rst.luby.active && state.rst.adaptive_restart && !state.stagnated {
         let moving: f64 = 0.04;
         let spring: f64 = 0.02;
         let margin: f64 = 0.20;
