@@ -377,10 +377,10 @@ impl StateIF for State {
             println!("                                                  ");
         }
     }
-    fn flush(&self, mes: &str) {
+    fn flush<S: AsRef<str>>(&self, mes: S) {
         if self.use_progress && !self.progress_log {
             // print!("\x1B[1G{}", mes);
-            print!("{}", mes);
+            print!("{}", mes.as_ref());
             stdout().flush().unwrap();
         }
     }
