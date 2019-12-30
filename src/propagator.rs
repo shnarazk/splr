@@ -11,6 +11,7 @@ use {
         fmt,
         fs::File,
         io::{BufWriter, Write},
+        ops::{Index, Range, RangeFrom},
     },
 };
 
@@ -21,6 +22,7 @@ pub struct AssignStack {
     asgvec: Vec<Option<bool>>,
     trail_lim: Vec<usize>,
     q_head: usize,
+    pub propagated: usize,
     var_order: VarIdHeap, // Variable Order
 }
 
@@ -67,6 +69,30 @@ macro_rules! unset_assign {
     };
 }
 
+impl Index<usize> for AssignStack {
+    type Output = Lit;
+    #[inline]
+    fn index(&self, i: usize) -> &Lit {
+        unsafe { self.trail.get_unchecked(i) }
+    }
+}
+
+impl Index<Range<usize>> for AssignStack {
+    type Output = [Lit];
+    #[inline]
+    fn index(&self, r: Range<usize>) -> &[Lit] {
+        &self.trail[r]
+    }
+}
+
+impl Index<RangeFrom<usize>> for AssignStack {
+    type Output = [Lit];
+    #[inline]
+    fn index(&self, r: RangeFrom<usize>) -> &[Lit] {
+        unsafe { self.trail.get_unchecked(r) }
+    }
+}
+
 impl Instantiate for AssignStack {
     fn instantiate(_: &Config, cnf: &CNFDescription) -> AssignStack {
         let nv = cnf.num_of_variables;
@@ -75,6 +101,7 @@ impl Instantiate for AssignStack {
             asgvec: vec![None; 1 + nv],
             trail_lim: Vec::new(),
             q_head: 0,
+            propagated: 0,
             var_order: VarIdHeap::new(nv, nv),
         }
     }
@@ -86,6 +113,9 @@ impl PropagatorIF for AssignStack {
     }
     fn is_empty(&self) -> bool {
         self.trail.is_empty()
+    }
+    fn head(&self) -> usize {
+        self.q_head
     }
     fn level(&self) -> usize {
         self.trail_lim.len()
@@ -212,6 +242,7 @@ impl PropagatorIF for AssignStack {
         self.trail.truncate(lim);
         self.trail_lim.truncate(lv);
         self.q_head = lim;
+        self.propagated = lim;
     }
     fn uncheck_enqueue(&mut self, vdb: &mut VarDB, l: Lit, cid: ClauseId) {
         debug_assert!(usize::from(l) != 0, "Null literal is about to be equeued");
@@ -301,6 +332,7 @@ impl AssignStack {
     }
     fn sweep(&mut self) -> Lit {
         let lit = self.trail[self.q_head];
+        self.propagated = self.q_head;
         self.q_head += 1;
         lit
     }
