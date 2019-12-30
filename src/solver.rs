@@ -370,7 +370,7 @@ fn search(
                 restart_threshold = 0.1;
                 remains = state.num_unsolved_vars();
             } else {
-                restart_threshold += 0.000_001;
+                restart_threshold += 0.000_000_1;
             }
         }
     }
