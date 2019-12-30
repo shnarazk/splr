@@ -23,6 +23,8 @@ pub struct AssignStack {
     trail_lim: Vec<usize>,
     q_head: usize,
     var_order: VarIdHeap, // Variable Order
+    // polarity of conflicting var
+    pub pocv: f64,
 }
 
 /// ```
@@ -101,6 +103,7 @@ impl Instantiate for AssignStack {
             trail_lim: Vec::new(),
             q_head: 0,
             var_order: VarIdHeap::new(nv, nv),
+            pocv: 0.0,
         }
     }
 }
@@ -185,6 +188,7 @@ impl PropagatorIF for AssignStack {
                     if lits.len() == 2 {
                         if blocker_value == Some(false) {
                             self.catchup();
+                            self.pocv = vdb[p.vi()].polarity.get().abs();
                             return w.c;
                         }
                         self.uncheck_enqueue(vdb, w.blocker, w.c);
@@ -214,6 +218,7 @@ impl PropagatorIF for AssignStack {
                     }
                     if first_value == Some(false) {
                         self.catchup();
+                        self.pocv = vdb[p.vi()].polarity.get().abs();
                         return w.c;
                     }
                     self.uncheck_enqueue(vdb, first, w.c);
