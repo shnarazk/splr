@@ -194,7 +194,7 @@ impl Instantiate for VarDB {
         VarDB {
             var: Var::new_vars(nv),
             lbd_temp: vec![0; nv + 1],
-            .. VarDB::default()
+            ..VarDB::default()
         }
     }
 }

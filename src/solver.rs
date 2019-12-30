@@ -325,15 +325,11 @@ fn search(
         state.rst.luby.update(0);
     }
     loop {
-        let propagation_start = if asgs.remains() {
-            asgs.head()
-        } else {
-            0
-        };
+        let propagation_start = if asgs.remains() { asgs.head() } else { 0 };
         let ci = asgs.propagate(cdb, state, vdb);
         vdb.update_stat(state);
         state.stats[Stat::Propagation] += 1;
-        let conflicting= ci != ClauseId::default();
+        let conflicting = ci != ClauseId::default();
         for l in &asgs[propagation_start..asgs.propagated] {
             vdb.bump_activity(l.vi(), conflicting as usize);
         }
@@ -343,7 +339,9 @@ fn search(
             }
             // DYNAMIC FORCING RESTART based on LBD values, updated by conflict
             state.last_asg = asgs.len();
-            if !a_decision_was_made && vdb.conflict_weight < restart_threshold /* && state.rst.force_restart() */ {
+            if !a_decision_was_made && vdb.conflict_weight < restart_threshold
+            /* && state.rst.force_restart() */
+            {
                 state.stats[Stat::Restart] += 1;
                 asgs.cancel_until(vdb, state.root_level);
                 restart_threshold += vdb.conflict_weight;
