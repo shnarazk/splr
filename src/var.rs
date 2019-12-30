@@ -23,6 +23,8 @@ pub struct Var {
     pub assign: Option<bool>,
     /// the previous assigned value
     pub phase: bool,
+    /// polarity of assigned value
+    pub polarity: Ema,
     /// the propagating clause
     pub reason: ClauseId,
     /// decision level at which this variables is assigned.
@@ -49,6 +51,7 @@ impl VarIF for Var {
             index: i,
             assign: None,
             phase: false,
+            polarity: Ema::new(16),
             reason: ClauseId::default(),
             level: 0,
             reward: 0.0,
