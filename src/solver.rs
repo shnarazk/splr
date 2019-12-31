@@ -330,7 +330,7 @@ fn search(
         vdb.update_stat(state);
         state.stats[Stat::Propagation] += 1;
         let conflicting = ci != ClauseId::default();
-        for l in &asgs[propagation_start..asgs.propagated] {
+        for l in &asgs[propagation_start.. /* asgs.propagated */] {
             vdb.bump_activity(l.vi(), conflicting as usize);
         }
         if !conflicting {
