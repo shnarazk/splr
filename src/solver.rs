@@ -339,14 +339,14 @@ fn search(
             }
             // DYNAMIC FORCING RESTART based on LBD values, updated by conflict
             state.last_asg = asgs.len();
-            if !a_decision_was_made && vdb.conflict_weight < restart_threshold
+            if !a_decision_was_made && vdb.pocv < restart_threshold
             /* && state.rst.force_restart() */
             {
                 state.stats[Stat::Restart] += 1;
                 asgs.cancel_until(vdb, state.root_level);
-                restart_threshold += vdb.conflict_weight;
+                restart_threshold += vdb.pocv;
                 restart_threshold *= 0.5;
-                vdb.conflict_weight = 1.0;
+                vdb.pocv = 1.0;
             } else if asgs.level() == 0 {
                 if cdb.simplify(asgs, elim, state, vdb).is_err() {
                     debug_assert!(false, "interal error by simplify");

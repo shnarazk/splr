@@ -190,7 +190,7 @@ impl PropagatorIF for AssignStack {
                     if lits.len() == 2 {
                         if blocker_value == Some(false) {
                             self.catchup();
-                            vdb.conflict_weight = vdb[p.vi()].polarity.get().abs();
+                            vdb.pocv = vdb[p.vi()].polarity.get().abs();
                             return w.c;
                         }
                         self.uncheck_enqueue(vdb, w.blocker, w.c);
@@ -220,7 +220,7 @@ impl PropagatorIF for AssignStack {
                     }
                     if first_value == Some(false) {
                         self.catchup();
-                        vdb.conflict_weight = vdb[p.vi()].polarity.get().abs();
+                        vdb.pocv = vdb[p.vi()].polarity.get().abs();
                         return w.c;
                     }
                     self.uncheck_enqueue(vdb, first, w.c);

@@ -100,7 +100,7 @@ pub struct VarDB {
     current_restart: usize,
     /// a working buffer for LBD calculation
     pub lbd_temp: Vec<usize>,
-    pub conflict_weight: f64,
+    pub pocv: f64,
 }
 
 impl Default for VarDB {
@@ -115,7 +115,7 @@ impl Default for VarDB {
             current_conflict: 0,
             current_restart: 0,
             lbd_temp: Vec::new(),
-            conflict_weight: 0.0,
+            pocv: 0.0,
         }
     }
 }
