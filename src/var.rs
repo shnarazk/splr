@@ -8,6 +8,7 @@ use {
     },
     std::{
         fmt,
+        iter,
         ops::{Index, IndexMut, Range, RangeFrom},
     },
 };
@@ -264,6 +265,11 @@ impl VarDBIF for VarDB {
         // (1.0 - w) * v.chb_reward[0] + w * v.chb_reward[1]
         // v.chb_reward[v.phase as usize]
         v.chb_reward
+    fn initialize_reward(&mut self, iterator: iter::Skip<iter::Enumerate<std::slice::Iter<'_, usize>>>) {
+        let _nv = self.len();
+        for (_, vi) in iterator {
+            self.var[*vi].reward = 0.0; // (nv - i) as f64; // big bang initialization
+        }
     }
 }
 

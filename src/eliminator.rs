@@ -290,11 +290,8 @@ impl EliminatorIF for Eliminator {
             }
         }
     }
-    fn set_initial_reward(&self, vdb: &mut VarDB) {
-        let nv = vdb.len();
-        for (i, vi) in self.var_queue.heap.iter().enumerate().skip(1) {
-            vdb[*vi].reward = (nv - i) as f64; // big bang initialization
-        }
+    fn order_enumerator(&self) -> std::iter::Skip<std::iter::Enumerate<std::slice::Iter<'_, usize>>> {
+        self.var_queue.heap.iter().enumerate().skip(1)
     }
 }
 

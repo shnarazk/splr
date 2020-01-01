@@ -1,12 +1,15 @@
-use crate::{
-    clause::{Clause, ClauseDB, ClauseId},
-    config::Config,
-    eliminator::Eliminator,
-    propagator::AssignStack,
-    solver::{Solver, SolverResult},
-    state::State,
-    types::{CNFDescription, Flag, Lit, MaybeInconsistent, VarId},
-    var::{Var, VarDB},
+use {
+    crate::{
+        clause::{Clause, ClauseDB, ClauseId},
+        config::Config,
+        eliminator::Eliminator,
+        propagator::AssignStack,
+        solver::{Solver, SolverResult},
+        state::State,
+        types::{CNFDescription, Flag, Lit, MaybeInconsistent, VarId},
+        var::{Var, VarDB},
+    },
+    std::iter,
 };
 
 /// API for Clause and Var rewarding
@@ -136,8 +139,8 @@ pub trait EliminatorIF {
     fn remove_lit_occur(&mut self, vdb: &mut VarDB, l: Lit, cid: ClauseId);
     /// remove a clause id from all corresponding occur lists.
     fn remove_cid_occur(&mut self, vdb: &mut VarDB, cid: ClauseId, c: &mut Clause);
-    /// set all vars' activities
-    fn set_initial_reward(&self, vdb: &mut VarDB);
+    /// return the order of vars based on their occurrences
+    fn order_enumerator(&self) -> iter::Skip<iter::Enumerate<std::slice::Iter<'_, usize>>>;
 }
 
 /// API for data instantiation based on `Configuration` and `CNFDescription`
@@ -291,6 +294,7 @@ pub trait VarDBIF {
     fn compute_lbd(&self, vec: &[Lit], keys: &mut [usize]) -> usize;
     /// return the current activity of vi-th var.
     fn activity(&mut self, vi: VarId) -> f64;
+    fn initialize_reward(&mut self, iterator: iter::Skip<iter::Enumerate<std::slice::Iter<'_, usize>>>);
 }
 
 /// API for 'watcher list' like `attach`, `detach`, `detach_with` and so on.
