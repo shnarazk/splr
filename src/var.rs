@@ -23,15 +23,19 @@ pub struct Var {
     pub assign: Option<bool>,
     /// the previous assigned value
     pub phase: bool,
-    /// polarity of assigned value
-    pub polarity: Ema,
+    // /// polarity of assigned value
+    // pub polarity: Ema,
+    /// frequency of conflict: the reverse of the average conflict interval
+    pub foc: Ema,
     /// the propagating clause
     pub reason: ClauseId,
     /// decision level at which this variables is assigned.
     pub level: usize,
     /// a dynamic evaluation criterion like VSIDS or ACID.
     reward: f64,
-    /// the number of conflicts at which this var was rewarded lastly
+    /// the number of conflicts at which this var make a conflict.
+    last_conflict: usize,
+    /// the number of conflicts at which this var was rewarded lastly.
     last_update: usize,
     /// list of clauses which contain this variable positively.
     pub pos_occurs: Vec<ClauseId>,
@@ -51,10 +55,12 @@ impl VarIF for Var {
             index: i,
             assign: None,
             phase: false,
-            polarity: Ema::new(16),
+            // polarity: Ema::new(16),
+            foc: Ema::new(20),
             reason: ClauseId::default(),
             level: 0,
             reward: 0.0,
+            last_conflict: 0,
             last_update: 0,
             pos_occurs: Vec::new(),
             neg_occurs: Vec::new(),
@@ -67,6 +73,12 @@ impl VarIF for Var {
             vec.push(Var::new(i));
         }
         vec
+    }
+    fn record_conflict(&mut self, now: usize) -> f64 {
+        assert_ne!(self.last_conflict, now);
+        self.foc.update(1.0 / (now - self.last_conflict) as f64);
+        self.last_conflict = now;
+        self.foc.get()
     }
 }
 

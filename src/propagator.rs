@@ -3,7 +3,7 @@ use {
         clause::{ClauseDB, ClauseId, Watch},
         config::Config,
         state::{Stat, State},
-        traits::{ClauseDBIF, Instantiate, LitIF, PropagatorIF, VarDBIF, WatchDBIF},
+        traits::*,
         types::*,
         var::{Var, VarDB},
     },
@@ -139,7 +139,7 @@ impl PropagatorIF for AssignStack {
                     v.reason = ClauseId::default();
                     // v.activity = 0.0;
                 }
-                v.polarity.update(if sig { 1.0 } else { -1.0 });
+                // v.polarity.update(if sig { 1.0 } else { -1.0 });
                 debug_assert!(!self.trail.contains(&Lit::from_var(v.index, true)));
                 debug_assert!(!self.trail.contains(&Lit::from_var(v.index, false)));
                 self.trail.push(Lit::from_var(v.index, sig));
@@ -156,7 +156,7 @@ impl PropagatorIF for AssignStack {
             v.assign = Some(sig);
             v.reason = ClauseId::default();
             v.level = 0;
-            v.polarity.update(if sig { 1.0 } else { -1.0 });
+            // v.polarity.update(if sig { 1.0 } else { -1.0 });
             self.trail.push(Lit::from_var(v.index, sig));
         }
         // debug_assert!(self.assign[v.index] == sig);
@@ -166,6 +166,7 @@ impl PropagatorIF for AssignStack {
     /// So Eliminator should call `garbage_collect` before me.
     fn propagate(&mut self, cdb: &mut ClauseDB, state: &mut State, vdb: &mut VarDB) -> ClauseId {
         let watcher = &mut cdb.watcher[..] as *mut [Vec<Watch>];
+        let ncnfl = state.stats[Stat::Conflict] + 1;
         while self.remains() {
             let p = self.sweep();
             let false_lit = !p;
@@ -185,6 +186,7 @@ impl PropagatorIF for AssignStack {
                     if lits.len() == 2 {
                         if blocker_value == Some(false) {
                             self.catchup();
+                            state.rst.rcc.update(vdb[p.vi()].record_conflict(ncnfl));
                             return w.c;
                         }
                         self.uncheck_enqueue(vdb, w.blocker, w.c);
@@ -214,6 +216,7 @@ impl PropagatorIF for AssignStack {
                     }
                     if first_value == Some(false) {
                         self.catchup();
+                        state.rst.rcc.update(vdb[p.vi()].record_conflict(ncnfl));
                         return w.c;
                     }
                     self.uncheck_enqueue(vdb, first, w.c);
@@ -257,7 +260,7 @@ impl PropagatorIF for AssignStack {
         v.assign = Some(bool::from(l));
         v.level = dl;
         v.reason = cid;
-        v.polarity.update(if bool::from(l) { 1.0 } else { -1.0 });
+        // v.polarity.update(if bool::from(l) { 1.0 } else { -1.0 });
         debug_assert!(!self.trail.contains(&l));
         debug_assert!(!self.trail.contains(&!l));
         self.trail.push(l);
@@ -275,7 +278,7 @@ impl PropagatorIF for AssignStack {
         v.assign = Some(bool::from(l));
         v.level = dl;
         v.reason = ClauseId::default();
-        v.polarity.update(if bool::from(l) { 1.0 } else { -1.0 });
+        // v.polarity.update(if bool::from(l) { 1.0 } else { -1.0 });
         self.trail.push(l);
     }
     fn select_var(&mut self, vdb: &mut VarDB) -> VarId {
