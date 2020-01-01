@@ -262,7 +262,7 @@ impl EmaIF for Ema2 {
 }
 
 impl Ema2 {
-    pub fn rate(&self) -> f64 {
+    pub fn trend(&self) -> f64 {
         self.fast / self.slow * (self.cals / self.calf)
     }
     pub fn with_slow(mut self, s: usize) -> Ema2 {
