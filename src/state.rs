@@ -464,12 +464,12 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K     Restart|#BLK:{}, #RST:{}, eASG:{}, eLBD:{} ",
-            im!(
-                "{:>9}",
+            "\x1B[2K     Restart|heat:{}, #RST:{}, eASG:{}, eLBD:{} ",
+            fm!(
+                "{:>9.4}",
                 self.record,
-                LogUsizeId::RestartBlock,
-                self.stats[Stat::BlockRestart]
+                LogF64Id::Rcc,
+                self.rst.rcc.get()
             ),
             im!(
                 "{:>9}",
@@ -625,6 +625,7 @@ pub enum LogF64Id {
     CLevel,       //  5: conflict_level: f64,
     RestartThrK,  //  6: restart K
     RestartBlkR,  //  7: restart R
+    Rcc,          // 8: state.rst.rcc.get: f64
     End,
 }
 

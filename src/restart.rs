@@ -112,6 +112,52 @@ impl ProgressEvaluator for ProgressLVL {
 }
 
 #[derive(Debug)]
+pub struct ProgressRCC {
+    pub heat: Ema2,
+    threshold: f64,
+}
+
+impl Default for ProgressRCC {
+    fn default() -> Self {
+        ProgressRCC {
+            heat: Ema2::new(100).with_slow(8000),
+            threshold: 0.0,
+        }
+    }
+}
+
+impl Instantiate for ProgressRCC {
+    fn instantiate(config: &Config, _: &CNFDescription) -> Self {
+        ProgressRCC {
+            threshold: config.rcct,
+            ..ProgressRCC::default()
+        }
+    }
+}
+
+impl fmt::Display for ProgressRCC {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "ProgressRCC[heat:{}, thr:{}]", self.get(), self.threshold)
+    }
+}
+
+impl ProgressEvaluator for ProgressRCC {
+    type Input = f64;
+    fn update(&mut self, foc: Self::Input) {
+        self.heat.update(foc);
+    }
+    fn get(&self) -> f64 {
+        self.heat.get()
+    }
+    fn trend(&self) -> f64 {
+        self.heat.trend()
+    }
+    fn is_active(&self) -> bool {
+        self.threshold < self.heat.get()
+    }
+}
+
+#[derive(Debug)]
 pub struct LubySeries {
     pub active: bool,
     pub index: usize,
@@ -216,6 +262,7 @@ pub struct RestartExecutor {
     pub adaptive_restart: bool,
     pub asg: ProgressASG,
     pub lbd: ProgressLBD,
+    pub rcc: ProgressRCC,
     pub blvl: ProgressLVL,
     pub clvl: ProgressLVL,
     pub luby: LubySeries,
@@ -231,6 +278,7 @@ impl Instantiate for RestartExecutor {
             adaptive_restart: !config.without_adaptive_restart,
             asg: ProgressASG::instantiate(config, cnf),
             lbd: ProgressLBD::instantiate(config, cnf),
+            rcc: ProgressRCC::instantiate(config, cnf),
             blvl: ProgressLVL::instantiate(config, cnf),
             clvl: ProgressLVL::instantiate(config, cnf),
             luby: LubySeries::instantiate(config, cnf),
