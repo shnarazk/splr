@@ -274,6 +274,8 @@ pub trait VarIF {
     fn new(i: usize) -> Var;
     /// return a new vector of $n$ `Var`s.
     fn new_vars(n: usize) -> Vec<Var>;
+    // update internal records about conflict
+    fn record_conflict(&mut self, now: usize) -> f64;
 }
 
 /// API for var DB like `assigned`, `locked`, `compute_lbd` and so on.

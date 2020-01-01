@@ -72,6 +72,9 @@ pub struct Config {
     /// interval for dumpping stat data
     #[structopt(long = "stat", default_value = "0")]
     pub dump_interval: usize,
+    /// recurring conflict complexity threshold
+    #[structopt(long = "rcct", default_value = "1.5")]
+    pub rcct: f64,
 }
 
 impl Default for Config {
@@ -97,6 +100,7 @@ impl Default for Config {
             use_certification: false,
             timeout: 0.0,
             dump_interval: 0,
+            rcct: 0.1,
         }
     }
 }

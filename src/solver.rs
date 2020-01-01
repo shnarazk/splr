@@ -319,7 +319,6 @@ fn search(
     vdb: &mut VarDB,
 ) -> Result<bool, SolverError> {
     let mut a_decision_was_made = false;
-    let mut restart_threshold = 0.1;
     let mut remains = state.num_unsolved_vars();
     if state.rst.luby.active {
         state.rst.luby.update(0);
@@ -339,14 +338,9 @@ fn search(
             }
             // DYNAMIC FORCING RESTART based on LBD values, updated by conflict
             state.last_asg = asgs.len();
-            if !a_decision_was_made && vdb.pocv < restart_threshold
-            /* && state.rst.force_restart() */
-            {
+            if !a_decision_was_made && state.config.rcct < state.rst.rcc.trend() {
                 state.stats[Stat::Restart] += 1;
                 asgs.cancel_until(vdb, state.root_level);
-                restart_threshold += vdb.pocv;
-                restart_threshold *= 0.5;
-                vdb.pocv = 1.0;
             } else if asgs.level() == 0 {
                 if cdb.simplify(asgs, elim, state, vdb).is_err() {
                     debug_assert!(false, "interal error by simplify");
@@ -377,10 +371,7 @@ fn search(
             }
             handle_conflict_path(asgs, cdb, elim, state, vdb, ci)?;
             if state.num_unsolved_vars() < remains {
-                restart_threshold = 0.1;
                 remains = state.num_unsolved_vars();
-            } else {
-                restart_threshold += 0.000_000_1;
             }
         }
     }

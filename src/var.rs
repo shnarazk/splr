@@ -24,15 +24,16 @@ pub struct Var {
     pub assign: Option<bool>,
     /// the previous assigned value
     pub phase: bool,
-    /// polarity of assigned value
-    pub polarity: Ema,
+    /// Frequency of Conflict: the reverse of the average conflict interval
+    pub foc: Ema,
+    /// last conflict
+    last_conflict: usize,
     /// the propagating clause
     pub reason: ClauseId,
     /// decision level at which this variables is assigned.
     pub level: usize,
-    /// a dynamic evaluation criterion like VSIDS or ACID.
-    pub reward: f64,
-    pub chb_reward: f64,
+    /// a dynamic evaluation criterion for CHB
+    reward: f64,
     /// the number of conflicts at which this var was rewarded lastly
     // pub last_update: usize,
     pub last_connected: usize,
@@ -54,11 +55,11 @@ impl VarIF for Var {
             index: i,
             assign: None,
             phase: false,
-            polarity: Ema::new(20),
+            foc: Ema::new(20),
+            last_conflict: 0,
             reason: ClauseId::default(),
             level: 0,
             reward: 0.0,
-            chb_reward: 0.0,
             // last_update: 0,
             last_connected: 0,
             pos_occurs: Vec::new(),
@@ -72,6 +73,12 @@ impl VarIF for Var {
             vec.push(Var::new(i));
         }
         vec
+    }
+    fn record_conflict(&mut self, now: usize) -> f64 {
+        assert_ne!(self.last_conflict, now);
+        self.foc.update(1.0 / (now - self.last_conflict) as f64);
+        self.last_conflict = now;
+        self.foc.get()
     }
 }
 
@@ -183,8 +190,8 @@ impl ActivityIF for VarDB {
         let now = self.current_conflict;
         let multiplier = if conflict == 1 { 1.0 } else { 0.9 };
         let reward = multiplier / (now + 1 - v.last_connected) as f64;
-        v.chb_reward *= 1.0 - self.activity_decay;
-        v.chb_reward += self.activity_decay * reward;
+        v.reward *= 1.0 - self.activity_decay;
+        v.reward += self.activity_decay * reward;
     }
     fn scale_activity(&mut self) {}
 }
@@ -261,10 +268,8 @@ impl VarDBIF for VarDB {
     } */
     fn activity(&mut self, vi: VarId) -> f64 {
         let v = &self.var[vi];
-        // let w = (v.polarity.get() + 1.0) * 0.5;
-        // (1.0 - w) * v.chb_reward[0] + w * v.chb_reward[1]
-        // v.chb_reward[v.phase as usize]
-        v.chb_reward
+        v.reward
+    }
     fn initialize_reward(&mut self, iterator: iter::Skip<iter::Enumerate<std::slice::Iter<'_, usize>>>) {
         let _nv = self.len();
         for (_, vi) in iterator {
