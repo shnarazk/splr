@@ -1,9 +1,5 @@
 use {
-    crate::{
-        config::Config,
-        traits::*,
-        types::*,
-    },
+    crate::{config::Config, traits::*, types::*},
     std::fmt,
 };
 
@@ -77,7 +73,9 @@ impl ProgressEvaluator for ProgressLBD {
         self.ema.get()
     }
     fn trend(&self) -> f64 {
-        self.ema.trend().max(self.ema.get() * (self.num as f64) / (self.sum as f64))
+        self.ema
+            .trend()
+            .max(self.ema.get() * (self.num as f64) / (self.sum as f64))
     }
     fn is_active(&self) -> bool {
         (self.sum as f64) < self.ema.get() * (self.num as f64) * self.threshold
@@ -139,7 +137,12 @@ impl Instantiate for ProgressRCC {
 
 impl fmt::Display for ProgressRCC {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "ProgressRCC[heat:{}, thr:{}]", self.get(), self.threshold)
+        write!(
+            f,
+            "ProgressRCC[heat:{}, thr:{}]",
+            self.get(),
+            self.threshold
+        )
     }
 }
 
@@ -184,7 +187,7 @@ impl Instantiate for LubySeries {
     fn instantiate(config: &Config, _: &CNFDescription) -> Self {
         LubySeries {
             step: config.restart_step,
-            .. LubySeries::default()
+            ..LubySeries::default()
         }
     }
 }
@@ -192,10 +195,7 @@ impl Instantiate for LubySeries {
 impl fmt::Display for LubySeries {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if self.active {
-            write!(f, "Luby[index:{}, step:{}]",
-                   self.index,
-                   self.next_restart,
-            )
+            write!(f, "Luby[index:{}, step:{}]", self.index, self.next_restart,)
         } else {
             write!(f, "Luby(deactive)")
         }
@@ -252,7 +252,7 @@ fn test_luby_series() {
     let mut luby = LubySeries {
         active: true,
         step: 1,
-        .. LubySeries::default()
+        ..LubySeries::default()
     };
     luby.update(0);
     for v in vec![1, 1, 2, 1, 1, 2, 4, 1, 1, 2, 1, 1, 2, 4, 8] {
@@ -284,9 +284,9 @@ impl Instantiate for RestartExecutor {
             asg: ProgressASG::instantiate(config, cnf),
             lbd: ProgressLBD::instantiate(config, cnf),
             rcc: ProgressRCC::instantiate(config, cnf),
-            blvl: ProgressLVL::instantiate(config,cnf),
-            clvl: ProgressLVL::instantiate(config,cnf),
-            luby: LubySeries::instantiate(config,cnf),
+            blvl: ProgressLVL::instantiate(config, cnf),
+            clvl: ProgressLVL::instantiate(config, cnf),
+            luby: LubySeries::instantiate(config, cnf),
             after_restart: 0,
             cur_restart: 1,
             next_restart: 100,

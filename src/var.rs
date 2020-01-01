@@ -7,7 +7,7 @@ use {
         types::*,
     },
     std::{
-        fmt,
+        fmt, iter,
         ops::{Index, IndexMut, Range, RangeFrom},
     },
 };
@@ -30,7 +30,7 @@ pub struct Var {
     /// decision level at which this variables is assigned.
     pub level: usize,
     /// a dynamic evaluation criterion like VSIDS or ACID.
-    pub reward: f64,
+    reward: f64,
     /// the number of conflicts at which this var was rewarded lastly
     last_update: usize,
     /// list of clauses which contain this variable positively.
@@ -166,9 +166,8 @@ impl ActivityIF for VarDB {
         let now = self.current_conflict;
         let t = (now - v.last_update) as i32;
         // v.reward = (now as f64 + self.activity) / 2.0; // ASCID
-        v.reward = 0.2
-            + self.reward_by_dl / (dl + 1) as f64
-            + v.reward * self.activity_decay.powi(t);
+        v.reward =
+            0.2 + self.reward_by_dl / (dl + 1) as f64 + v.reward * self.activity_decay.powi(t);
         v.last_update = now;
     }
     fn scale_activity(&mut self) {}
@@ -180,7 +179,7 @@ impl Instantiate for VarDB {
         VarDB {
             var: Var::new_vars(nv),
             lbd_temp: vec![0; nv + 1],
-            .. VarDB::default()
+            ..VarDB::default()
         }
     }
 }
@@ -243,6 +242,15 @@ impl VarDBIF for VarDB {
             v.reward *= self.activity_decay.powi(diff as i32);
         }
         v.reward
+    }
+    fn initialize_reward(
+        &mut self,
+        iterator: iter::Skip<iter::Enumerate<std::slice::Iter<'_, usize>>>,
+    ) {
+        let _nv = self.len();
+        for (_, vi) in iterator {
+            self.var[*vi].reward = 0.0; // (nv - i) as f64; // big bang initialization
+        }
     }
 }
 
