@@ -332,7 +332,7 @@ fn search(
             }
             // DYNAMIC FORCING RESTART based on LBD values, updated by conflict
             state.last_asg = asgs.len();
-            if state.rst.force_restart() {
+            if !a_decision_was_made && state.config.rcct < state.rst.rcc.trend() { // state.rst.force_restart()
                 state.stats[Stat::Restart] += 1;
                 asgs.cancel_until(vdb, state.root_level);
             } else if asgs.level() == 0 {
