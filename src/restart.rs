@@ -77,7 +77,7 @@ impl ProgressEvaluator for ProgressLBD {
         self.ema.get()
     }
     fn trend(&self) -> f64 {
-        self.ema.rate().max(self.ema.get() * (self.num as f64) / (self.sum as f64))
+        self.ema.trend().max(self.ema.get() * (self.num as f64) / (self.sum as f64))
     }
     fn is_active(&self) -> bool {
         (self.sum as f64) < self.ema.get() * (self.num as f64) * self.threshold
@@ -106,7 +106,7 @@ impl ProgressEvaluator for ProgressLVL {
         self.ema.get()
     }
     fn trend(&self) -> f64 {
-        self.ema.rate()
+        self.ema.trend()
     }
     fn is_active(&self) -> bool {
         todo!()
