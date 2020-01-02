@@ -332,7 +332,7 @@ fn search(
             }
             // DYNAMIC FORCING RESTART based on LBD values, updated by conflict
             state.last_asg = asgs.len();
-            if !a_decision_was_made && state.config.rcct < state.rst.rcc.trend() { // state.rst.force_restart()
+            if state.rst.force_restart() {
                 state.stats[Stat::Restart] += 1;
                 asgs.cancel_until(vdb, state.root_level);
             } else if asgs.level() == 0 {
@@ -341,13 +341,6 @@ fn search(
                     return Err(SolverError::Inconsistent);
                 }
                 state.num_solved_vars = asgs.len();
-            }
-            if !asgs.remains() {
-                let vi = asgs.select_var(vdb);
-                let p = vdb[vi].phase;
-                asgs.uncheck_assume(vdb, Lit::from_var(vi, p));
-                state.stats[Stat::Decision] += 1;
-                a_decision_was_made = true;
             }
         } else {
             state.stats[Stat::Conflict] += 1;
@@ -361,6 +354,17 @@ fn search(
                 return Ok(false);
             }
             handle_conflict_path(asgs, cdb, elim, state, vdb, ci)?;
+            if state.rst.force_restart_on_conflict_path() {
+                state.stats[Stat::Restart] += 1;
+                asgs.cancel_until(vdb, state.root_level);
+            }
+        }
+        if !asgs.remains() {
+            let vi = asgs.select_var(vdb);
+            let p = vdb[vi].phase;
+            asgs.uncheck_assume(vdb, Lit::from_var(vi, p));
+            state.stats[Stat::Decision] += 1;
+            a_decision_was_made = true;
         }
     }
 }

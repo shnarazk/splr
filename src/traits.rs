@@ -218,6 +218,8 @@ pub trait RestartIF {
     fn block_restart(&mut self) -> bool;
     /// force restart if needed.
     fn force_restart(&mut self) -> bool;
+    /// force restart on a conflict path if needed.
+    fn force_restart_on_conflict_path(&mut self) -> bool;
 }
 
 /// API for SAT solver like `build`, `solve` and so on.

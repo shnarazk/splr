@@ -320,4 +320,11 @@ impl RestartIF for RestartExecutor {
         }
         false
     }
+    fn force_restart_on_conflict_path(&mut self) -> bool {
+        if self.restart_step <= self.after_restart && self.rcc.is_active() {
+            self.after_restart = 0;
+            return true;
+        }
+        false
+    }
 }
