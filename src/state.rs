@@ -325,7 +325,7 @@ impl StateIF for State {
         if decpc <= 1.2 {
             self.strategy = SearchStrategy::LowDecisions;
             self.use_chan_seok = true;
-            self.rst.cur_restart =
+            cdb.cur_restart =
                 (self.stats[Stat::Conflict] as f64 / cdb.next_reduction as f64 + 1.0) as usize;
             cdb.co_lbd_bound = 4;
             cdb.first_reduction = 2000;

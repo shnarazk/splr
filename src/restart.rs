@@ -272,7 +272,6 @@ pub struct RestartExecutor {
     pub clvl: ProgressLVL,
     pub luby: LubySeries,
     pub after_restart: usize,
-    pub cur_restart: usize,
     pub next_restart: usize,
     pub restart_step: usize,
 }
@@ -288,7 +287,6 @@ impl Instantiate for RestartExecutor {
             clvl: ProgressLVL::instantiate(config, cnf),
             luby: LubySeries::instantiate(config, cnf),
             after_restart: 0,
-            cur_restart: 1,
             next_restart: 100,
             restart_step: config.restart_step,
         }
