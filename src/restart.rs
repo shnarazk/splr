@@ -293,6 +293,13 @@ impl Instantiate for RestartExecutor {
     }
 }
 
+macro_rules! reset {
+    ($executor: expr) => {
+        $executor.after_restart = 0;
+        return true;
+    };
+}
+
 impl RestartIF for RestartExecutor {
     fn block_restart(&mut self) -> bool {
         if 100 < self.lbd.num
@@ -300,8 +307,7 @@ impl RestartIF for RestartExecutor {
             && self.restart_step <= self.after_restart
             && self.asg.is_active()
         {
-            self.after_restart = 0;
-            return true;
+            reset!(self);
         }
         false
     }
@@ -309,12 +315,10 @@ impl RestartIF for RestartExecutor {
         if self.luby.active {
             if self.luby.next_restart <= self.after_restart {
                 self.luby.update(1);
-                self.after_restart = 0;
-                return true;
+                reset!(self);
             }
         } else if self.restart_step <= self.after_restart && self.lbd.is_active() {
-            self.after_restart = 0;
-            return true;
+            reset!(self);
         }
         false
     }
