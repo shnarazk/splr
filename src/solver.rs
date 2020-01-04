@@ -432,8 +432,7 @@ fn handle_conflict_path(
         }
     }
     if ((state.use_chan_seok && !cdb.glureduce && cdb.first_reduction < cdb.num_learnt)
-        || (cdb.glureduce
-            && cdb.cur_restart * cdb.next_reduction <= state.stats[Stat::Conflict]))
+        || (cdb.glureduce && cdb.cur_restart * cdb.next_reduction <= state.stats[Stat::Conflict]))
         && 0 < cdb.num_learnt
     {
         cdb.cur_restart = ((ncnfl as f64) / (cdb.next_reduction as f64)) as usize + 1;
