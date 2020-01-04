@@ -354,10 +354,10 @@ fn search(
                 return Ok(false);
             }
             handle_conflict_path(asgs, cdb, elim, state, vdb, ci)?;
-            if state.rst.force_restart_on_conflict_path() {
+            /* if state.rst.force_restart_on_conflict_path() {
                 state.stats[Stat::Restart] += 1;
                 asgs.cancel_until(vdb, state.root_level);
-            }
+            } */
         }
         if !asgs.remains() {
             let vi = asgs.select_var(vdb);
