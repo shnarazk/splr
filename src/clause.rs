@@ -241,6 +241,7 @@ pub struct ClauseDB {
     pub lbd_frozen_clause: usize,
     pub first_reduction: usize,
     pub next_reduction: usize, // renamed from `nbclausesbeforereduce`
+    pub cur_restart: usize,
     pub glureduce: bool,
 }
 
@@ -342,6 +343,7 @@ impl Instantiate for ClauseDB {
             lbd_frozen_clause: 30,
             first_reduction: 1000,
             next_reduction: 1000,
+            cur_restart: 1,
             glureduce: true,
         }
     }
