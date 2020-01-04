@@ -76,7 +76,7 @@ impl VarIF for Var {
     }
     fn record_conflict(&mut self, now: usize) -> f64 {
         assert_ne!(self.last_conflict, now);
-        self.foc.update(1.0 / (now - self.last_conflict) as f64);
+        self.foc.update((1.0 / (now - self.last_conflict + 1) as f64).log(2.0));
         self.last_conflict = now;
         self.foc.get()
     }
@@ -173,13 +173,18 @@ impl IndexMut<RangeFrom<usize>> for VarDB {
 
 impl ActivityIF for VarDB {
     type Ix = VarId;
-    fn bump_activity(&mut self, vi: Self::Ix, dl: usize) {
+    fn bump_activity(&mut self, vi: Self::Ix, _dl: usize) {
         let v = &mut self.var[vi];
         let now = self.current_conflict;
         let t = (now - v.last_update) as i32;
-        // v.reward = (now as f64 + self.activity) / 2.0; // ASCID
-        v.reward =
-            0.2 + self.reward_by_dl / (dl + 1) as f64 + v.reward * self.activity_decay.powi(t);
+        if v.foc.get().is_nan() {
+            v.reward = 0.05;
+        } else {
+            // v.reward = (now as f64 + self.activity) / 2.0; // ASCID
+            v.reward =
+            // 0.2 + self.reward_by_dl / (dl + 1) as f64 + v.reward * self.activity_decay.powi(t);
+                v.foc.get() + v.reward * self.activity_decay.powi(t);
+        }
         v.last_update = now;
     }
     fn scale_activity(&mut self) {}

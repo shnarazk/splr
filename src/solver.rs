@@ -178,7 +178,7 @@ impl SatSolverIF for Solver {
             }
             Err(_) => {
                 asgs.cancel_until(vdb, 0);
-                state.progress(cdb, vdb, Some("ERROR"));
+                state.progress(cdb, vdb, None);
                 state.ok = false;
                 if cdb.check_size().is_err() {
                     return Err(SolverException::OutOfMemory);
@@ -640,7 +640,7 @@ fn simplify_learnt(
         ref mut an_seen,
         ..
     } = state;
-    let dl = asgs.level();
+    // let dl = asgs.level();
     let mut to_clear: Vec<Lit> = vec![new_learnt[0]];
     let mut levels = vec![false; asgs.level() + 1];
     for l in &new_learnt[1..] {
@@ -654,6 +654,7 @@ fn simplify_learnt(
     if new_learnt.len() < 30 {
         minimize_with_bi_clauses(cdb, vdb, &mut state.lbd_temp, new_learnt);
     }
+    /*
     // glucose heuristics
     let lbd = vdb.compute_lbd(new_learnt, &mut state.lbd_temp);
     while let Some(l) = state.last_dl.pop() {
@@ -662,7 +663,7 @@ fn simplify_learnt(
             vdb.bump_activity(vi, dl);
             asgs.update_order(vdb, vi);
         }
-    }
+    } */
     // find correct backtrack level from remaining literals
     let mut level_to_return = 0;
     if 1 < new_learnt.len() {
