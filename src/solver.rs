@@ -538,6 +538,7 @@ fn analyze(
     confl: ClauseId,
 ) -> usize {
     let learnt = &mut state.new_learnt;
+    let cweight = asgs.conflict_weight;
     learnt.clear();
     learnt.push(NULL_LIT);
     let dl = asgs.level();
@@ -635,7 +636,7 @@ fn simplify_learnt(
         ref mut an_seen,
         ..
     } = state;
-    let dl = asgs.level();
+    // let dl = asgs.level();
     let mut to_clear: Vec<Lit> = vec![new_learnt[0]];
     let mut levels = vec![false; asgs.level() + 1];
     for l in &new_learnt[1..] {
@@ -649,6 +650,7 @@ fn simplify_learnt(
     if new_learnt.len() < 30 {
         minimize_with_bi_clauses(cdb, vdb, &mut state.lbd_temp, new_learnt);
     }
+    /*
     // glucose heuristics
     let lbd = vdb.compute_lbd(new_learnt, &mut state.lbd_temp);
     while let Some(l) = state.last_dl.pop() {
@@ -658,6 +660,7 @@ fn simplify_learnt(
             asgs.update_order(vdb, vi);
         }
     }
+    */
     // find correct backtrack level from remaining literals
     let mut level_to_return = 0;
     if 1 < new_learnt.len() {
