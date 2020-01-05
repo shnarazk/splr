@@ -178,7 +178,7 @@ impl SatSolverIF for Solver {
             }
             Err(_) => {
                 asgs.cancel_until(vdb, 0);
-                state.progress(cdb, vdb, Some("ERROR"));
+                state.progress(cdb, vdb, None);
                 state.ok = false;
                 if cdb.check_size().is_err() {
                     return Err(SolverException::OutOfMemory);
