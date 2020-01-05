@@ -15,8 +15,9 @@ use {
 /// API for Clause and Var rewarding
 pub trait ActivityIF {
     type Ix;
+    type Inc;
     /// update an element's activity.
-    fn bump_activity(&mut self, ix: Self::Ix, dl: usize);
+    fn bump_activity(&mut self, ix: Self::Ix, dl: Self::Inc);
     /// increment activity step.
     fn scale_activity(&mut self);
 }

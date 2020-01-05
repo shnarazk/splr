@@ -554,7 +554,7 @@ fn analyze(
             let c = &mut cdb[cid] as *mut Clause;
             debug_assert!(!(*c).is(Flag::DEAD));
             if (*c).is(Flag::LEARNT) {
-                cdb.bump_activity(cid, 0);
+                cdb.bump_activity(cid, ());
                 if 2 < (*c).rank {
                     let nlevels = vdb.compute_lbd(&(*c).lits, &mut state.lbd_temp);
                     if nlevels + 1 < (*c).rank {
@@ -576,7 +576,7 @@ fn analyze(
             // println!("- handle {}", cid.fmt());
             for q in &(*c).lits[((p != NULL_LIT) as usize)..] {
                 let vi = q.vi();
-                vdb.bump_activity(vi, dl);
+                vdb.bump_activity(vi, cweight);
                 asgs.update_order(vdb, vi);
                 let v = &mut vdb[vi];
                 let lvl = v.level;
