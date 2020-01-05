@@ -538,7 +538,7 @@ fn analyze(
     confl: ClauseId,
 ) -> usize {
     let learnt = &mut state.new_learnt;
-    let cweight = asgs.conflict_weight;
+    let _cweight = asgs.conflict_weight;
     learnt.clear();
     learnt.push(NULL_LIT);
     let dl = asgs.level();
@@ -576,7 +576,7 @@ fn analyze(
             // println!("- handle {}", cid.fmt());
             for q in &(*c).lits[((p != NULL_LIT) as usize)..] {
                 let vi = q.vi();
-                vdb.bump_activity(vi, cweight);
+                vdb.bump_activity(vi, dl);
                 asgs.update_order(vdb, vi);
                 let v = &mut vdb[vi];
                 let lvl = v.level;
