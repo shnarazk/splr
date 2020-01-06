@@ -180,6 +180,8 @@ pub trait PropagatorIF {
     fn len(&self) -> usize;
     /// return `true` if there's no assignment.
     fn is_empty(&self) -> bool;
+    /// return the index of the first unpropagated var.
+    fn unpropagated_index(&self) -> usize;
     /// return the current decision level.
     fn level(&self) -> usize;
     /// return `true` if the current decision level is zero.

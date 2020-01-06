@@ -21,7 +21,9 @@ pub struct AssignStack {
     pub trail: Vec<Lit>,
     pub conflict_weight: f64,
     asgvec: Vec<Option<bool>>,
+    /// record of the number of vars assigned under a level.
     trail_lim: Vec<usize>,
+    /// points to the first unpropagated var
     q_head: usize,
     var_order: VarIdHeap, // Variable Order
 }
@@ -114,6 +116,9 @@ impl PropagatorIF for AssignStack {
     fn is_empty(&self) -> bool {
         self.trail.is_empty()
     }
+    fn unpropagated_index(&self) -> usize {
+        self.q_head
+    }
     fn level(&self) -> usize {
         self.trail_lim.len()
     }
@@ -187,9 +192,9 @@ impl PropagatorIF for AssignStack {
                     let lits = &mut cdb[w.c].lits;
                     if lits.len() == 2 {
                         if blocker_value == Some(false) {
-                            self.catchup();
                             self.conflict_weight = vdb[p.vi()].record_conflict(ncnfl);
-                            state.rst.rcc.update(self.conflict_weight);
+                            self.conflict_weight = vdb[p.vi()].foc.trend();
+                            // state.rst.rcc.update(self.conflict_weight);
                             return w.c;
                         }
                         self.uncheck_enqueue(vdb, w.blocker, w.c);
@@ -218,9 +223,9 @@ impl PropagatorIF for AssignStack {
                         }
                     }
                     if first_value == Some(false) {
-                        self.catchup();
                         self.conflict_weight = vdb[p.vi()].record_conflict(ncnfl);
-                        state.rst.rcc.update(self.conflict_weight);
+                        self.conflict_weight = vdb[p.vi()].foc.trend();
+                        // state.rst.rcc.update(self.conflict_weight);
                         return w.c;
                     }
                     self.uncheck_enqueue(vdb, first, w.c);
@@ -339,9 +344,6 @@ impl AssignStack {
         let lit = self.trail[self.q_head];
         self.q_head += 1;
         lit
-    }
-    fn catchup(&mut self) {
-        self.q_head = self.trail.len();
     }
 }
 
