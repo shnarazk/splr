@@ -161,17 +161,26 @@ pub trait LitIF {
     fn vi(self) -> VarId;
 }
 
+/// API for storing and investinaging internal development.
 pub trait ProgressEvaluator {
     /// the type of the argment of `update`.
     type Input;
-    /// catch up with the current state.
-    fn update(&mut self, val: Self::Input);
     /// return the current value.
     fn get(&self) -> f64;
-    /// return a ratio of short / long statistics.
-    fn trend(&self) -> f64;
     /// map the value into a bool for forcing/blocking restart.
-    fn is_active(&self) -> bool;
+    fn is_active(&self) -> bool {
+        unimplemented!()
+    }
+    /// reset an Ema.
+    fn reset(&mut self) {
+        unimplemented!()
+    }
+    /// return a ratio of short / long statistics.
+    fn trend(&self) -> f64 {
+        unimplemented!()
+    }
+    /// catch up with the current state.
+    fn update(&mut self, val: Self::Input);
 }
 
 /// API for assignment like `propagate`, `enqueue`, `cancel_until`, and so on.

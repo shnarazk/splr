@@ -2,7 +2,7 @@
 use {
     crate::{
         clause::ClauseId,
-        traits::{Delete, LitIF},
+        traits::{Delete, LitIF, ProgressEvaluator},
     },
     std::{
         fmt,
@@ -187,18 +187,6 @@ impl LitIF for Lit {
     }
 }
 
-/// API for Exponential Moving Average, EMA, like `get`, `reset`, `update` and so on.
-pub trait EmaIF {
-    /// return a new Ema.
-    fn new(f: usize) -> Self;
-    /// return the current value of Ema.
-    fn get(&self) -> f64;
-    /// reset an Ema.
-    fn reset(&mut self) {}
-    /// update Ema.
-    fn update(&mut self, x: f64);
-}
-
 /// Exponential Moving Average w/ a calibrator
 #[derive(Debug)]
 pub struct Ema {
@@ -207,20 +195,28 @@ pub struct Ema {
     sca: f64,
 }
 
-impl EmaIF for Ema {
-    fn new(s: usize) -> Ema {
+impl Ema {
+    pub fn new(s: usize) -> Ema {
         Ema {
             val: 0.0,
             cal: 0.0,
             sca: 1.0 / (s as f64),
         }
     }
+}
+
+impl ProgressEvaluator for Ema {
+    type Input = f64;
+    fn get(&self) -> f64 {
+        self.val / self.cal
+    }
+    fn reset(&mut self) {
+        self.val = 0.0;
+        self.cal = 0.0;
+    }
     fn update(&mut self, x: f64) {
         self.val = self.sca * x + (1.0 - self.sca) * self.val;
         self.cal = self.sca + (1.0 - self.sca) * self.cal;
-    }
-    fn get(&self) -> f64 {
-        self.val / self.cal
     }
 }
 
@@ -235,8 +231,8 @@ pub struct Ema2 {
     se: f64,
 }
 
-impl EmaIF for Ema2 {
-    fn new(f: usize) -> Ema2 {
+impl Ema2 {
+    pub fn new(f: usize) -> Ema2 {
         Ema2 {
             fast: 0.0,
             slow: 0.0,
@@ -246,28 +242,29 @@ impl EmaIF for Ema2 {
             se: 1.0 / (f as f64),
         }
     }
+    pub fn with_slow(mut self, s: usize) -> Ema2 {
+        self.se = 1.0 / (s as f64);
+        self
+    }
+}
+
+impl ProgressEvaluator for Ema2 {
+    type Input = f64;
     fn get(&self) -> f64 {
         self.fast / self.calf
+    }
+    fn reset(&mut self) {
+        self.slow = self.fast;
+        self.cals = self.calf;
+    }
+    fn trend(&self) -> f64 {
+        self.fast / self.slow * (self.cals / self.calf)
     }
     fn update(&mut self, x: f64) {
         self.fast = self.fe * x + (1.0 - self.fe) * self.fast;
         self.slow = self.se * x + (1.0 - self.se) * self.slow;
         self.calf = self.fe + (1.0 - self.fe) * self.calf;
         self.cals = self.se + (1.0 - self.se) * self.cals;
-    }
-    fn reset(&mut self) {
-        self.slow = self.fast;
-        self.cals = self.calf;
-    }
-}
-
-impl Ema2 {
-    pub fn trend(&self) -> f64 {
-        self.fast / self.slow * (self.cals / self.calf)
-    }
-    pub fn with_slow(mut self, s: usize) -> Ema2 {
-        self.se = 1.0 / (s as f64);
-        self
     }
 }
 

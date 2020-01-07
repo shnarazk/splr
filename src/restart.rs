@@ -26,18 +26,20 @@ impl Instantiate for ProgressASG {
 
 impl ProgressEvaluator for ProgressASG {
     type Input = usize;
-    fn update(&mut self, n: usize) {
-        self.asg = n;
-        self.ema.update(n as f64);
+    fn is_active(&self) -> bool {
+        // self.threshold * self.ema.get() < (self.asg as f64)
+        self.threshold < self.ema.trend()
     }
     fn get(&self) -> f64 {
         self.ema.get()
     }
     fn trend(&self) -> f64 {
-        (self.asg as f64) / self.ema.get()
+        // (self.asg as f64) / self.ema.get()
+        self.ema.trend()
     }
-    fn is_active(&self) -> bool {
-        self.threshold * self.ema.get() < (self.asg as f64)
+    fn update(&mut self, n: usize) {
+        self.asg = n;
+        self.ema.update(n as f64);
     }
 }
 
@@ -72,6 +74,9 @@ impl ProgressEvaluator for ProgressLBD {
     fn get(&self) -> f64 {
         self.ema.get()
     }
+    fn reset(&mut self) {
+        self.ema.reset();
+    }
     fn trend(&self) -> f64 {
         self.ema
             .trend()
@@ -105,9 +110,6 @@ impl ProgressEvaluator for ProgressLVL {
     }
     fn trend(&self) -> f64 {
         self.ema.trend()
-    }
-    fn is_active(&self) -> bool {
-        todo!()
     }
 }
 
@@ -215,12 +217,6 @@ impl ProgressEvaluator for LubySeries {
     }
     fn get(&self) -> f64 {
         self.next_restart as f64
-    }
-    fn trend(&self) -> f64 {
-        todo!()
-    }
-    fn is_active(&self) -> bool {
-        todo!()
     }
 }
 
