@@ -198,7 +198,8 @@ impl Ord for Clause {
 }
 
 impl Clause {
-    #[allow(dead_code)]
+    #[allow(dead_code,clippy::comparison_chain)]
+    #[inline]
     fn cmp_activity(&self, other: &Clause) -> Ordering {
         if self.reward > other.reward {
             Ordering::Less
