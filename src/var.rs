@@ -12,7 +12,7 @@ use {
     },
 };
 
-const VAR_ACTIVITY_DECAY: f64 = 0.94;
+const VAR_ACTIVITY_DECAY: f64 = 0.4;
 
 /// Structure for variables.
 #[derive(Debug)]
@@ -25,8 +25,8 @@ pub struct Var {
     pub phase: bool,
     // /// polarity of assigned value
     // pub polarity: Ema,
-    /// frequency of conflict: the reverse of the average conflict interval
-    pub foc: Ema,
+    // /// frequency of conflict: the reverse of the average conflict interval
+    // pub foc: Ema2,
     /// the propagating clause
     pub reason: ClauseId,
     /// decision level at which this variables is assigned.
@@ -56,7 +56,7 @@ impl VarIF for Var {
             assign: None,
             phase: false,
             // polarity: Ema::new(16),
-            foc: Ema::new(20),
+            // foc: Ema2::new(20).with_slow(100),
             reason: ClauseId::default(),
             level: 0,
             reward: 0.0,
@@ -74,11 +74,18 @@ impl VarIF for Var {
         }
         vec
     }
-    fn record_conflict(&mut self, now: usize) -> f64 {
-        assert_ne!(self.last_conflict, now);
-        self.foc.update((1.0 / (now - self.last_conflict + 1) as f64).log(2.0));
+    fn record_conflict(&mut self, _now: usize) -> f64 {
+        todo!()
+        /*
+        debug_assert_ne!(self.last_conflict, now);
+        debug_assert!(0.0 < ((now - self.last_conflict + 1) as f64));
+        self.foc.update(1.0 / ((now - self.last_conflict + 1) as f64));
         self.last_conflict = now;
         self.foc.get()
+        */
+    }
+    fn update_timestamp(&mut self, now: usize) {
+        self.last_update = now;
     }
 }
 
@@ -173,34 +180,14 @@ impl IndexMut<RangeFrom<usize>> for VarDB {
 
 impl ActivityIF for VarDB {
     type Ix = VarId;
-    type Inc = Option<f64>;
-    /*
-    fn activity(&mut self, vi: VarId) -> f64 {
-        let now = self.current_conflict;
-        let v = &mut self.var[vi];
-        let diff = now - v.last_update;
-        if 0 < diff {
-            v.last_update = now;
-            v.reward *= self.activity_decay.powi(diff as i32);
-        }
-        v.reward
-    }
-    fn bump_activity(&mut self, vi: Self::Ix, dl: Self::Inc) {
-        let v = &mut self.var[vi];
-        let now = self.current_conflict;
-        let t = (now - v.last_update) as i32;
-        // v.reward = (now as f64 + self.activity) / 2.0; // ASCID
-        v.reward =
-            0.2 + self.reward_by_dl / (dl + 1) as f64 + v.reward * self.activity_decay.powi(t);
-        v.last_update = now;
-    } */
+    type Inc = bool;
     fn activity(&mut self, vi: Self::Ix) -> f64 {
         self.var[vi].reward
     }
     fn bump_activity(&mut self, vi: Self::Ix, conflict: Self::Inc) {
         let v = &mut self.var[vi];
         let now = self.current_conflict;
-        let multiplier = if let Some(x) = conflict { x } else { 0.9 };
+        let multiplier = if conflict { 1.0 } else { 0.9 };
         let reward = multiplier / (now + 1 - v.last_update) as f64;
         v.reward *= 1.0 - self.activity_decay;
         v.reward += self.activity_decay * reward;

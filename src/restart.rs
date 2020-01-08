@@ -8,7 +8,7 @@ use {
 #[derive(Debug)]
 pub struct ProgressASG {
     asg: usize,
-    ema: Ema,
+    ema: Ema2,
     /// For block restart based on average assignments: 1.40.
     /// This is called `R` in Glucose
     pub threshold: f64,
@@ -17,7 +17,7 @@ pub struct ProgressASG {
 impl Instantiate for ProgressASG {
     fn instantiate(config: &Config, _: &CNFDescription) -> Self {
         ProgressASG {
-            ema: Ema::new(config.restart_asg_len),
+            ema: Ema2::new(4).with_slow(config.restart_asg_len),
             asg: 0,
             threshold: config.restart_blocking,
         }

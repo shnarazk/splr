@@ -289,6 +289,8 @@ pub trait VarIF {
     fn new_vars(n: usize) -> Vec<Var>;
     /// update the internal records about conflict.
     fn record_conflict(&mut self, now: usize) -> f64;
+    /// CHB: update timestamp
+    fn update_timestamp(&mut self, now: usize);
 }
 
 /// API for var DB like `assigned`, `locked`, `compute_lbd` and so on.

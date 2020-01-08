@@ -19,7 +19,7 @@ use {
 #[derive(Debug)]
 pub struct AssignStack {
     pub trail: Vec<Lit>,
-    pub conflict_weight: f64,
+    // pub conflict_weight: f64,
     asgvec: Vec<Option<bool>>,
     /// record of the number of vars assigned under a level.
     trail_lim: Vec<usize>,
@@ -100,7 +100,7 @@ impl Instantiate for AssignStack {
         let nv = cnf.num_of_variables;
         AssignStack {
             trail: Vec::with_capacity(nv),
-            conflict_weight: 0.0,
+            // conflict_weight: 0.0,
             asgvec: vec![None; 1 + nv],
             trail_lim: Vec::new(),
             q_head: 0,
@@ -172,7 +172,7 @@ impl PropagatorIF for AssignStack {
     /// Note: this function assumes there's no dead clause.
     /// So Eliminator should call `garbage_collect` before me.
     fn propagate(&mut self, cdb: &mut ClauseDB, state: &mut State, vdb: &mut VarDB) -> ClauseId {
-        let ncnfl = state.stats[Stat::Conflict] + 1;
+        // let ncnfl = state.stats[Stat::Conflict] + 1;
         let watcher = &mut cdb.watcher[..] as *mut [Vec<Watch>];
         while self.remains() {
             let p = self.sweep();
@@ -192,8 +192,7 @@ impl PropagatorIF for AssignStack {
                     let lits = &mut cdb[w.c].lits;
                     if lits.len() == 2 {
                         if blocker_value == Some(false) {
-                            self.conflict_weight = vdb[p.vi()].record_conflict(ncnfl);
-                            self.conflict_weight = vdb[p.vi()].foc.trend();
+                            // self.conflict_weight = vdb[p.vi()].record_conflict(ncnfl);
                             // state.rst.rcc.update(self.conflict_weight);
                             return w.c;
                         }
@@ -223,8 +222,7 @@ impl PropagatorIF for AssignStack {
                         }
                     }
                     if first_value == Some(false) {
-                        self.conflict_weight = vdb[p.vi()].record_conflict(ncnfl);
-                        self.conflict_weight = vdb[p.vi()].foc.trend();
+                        // self.conflict_weight = vdb[p.vi()].record_conflict(ncnfl);
                         // state.rst.rcc.update(self.conflict_weight);
                         return w.c;
                     }

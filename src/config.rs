@@ -29,7 +29,7 @@ pub struct Config {
     #[structopt(long = "rb", default_value = "1.40")]
     pub restart_blocking: f64, // Glucose's R
     /// #conflicts between restarts
-    #[structopt(long = "rs", default_value = "50")]
+    #[structopt(long = "rs", default_value = "20")]
     pub restart_step: usize,
     /// a DIMACS format CNF file
     #[structopt(parse(from_os_str))]
@@ -80,21 +80,21 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Config {
         Config {
-            clause_limit: 18_000_000,
+            clause_limit: 0,
             elim_grow_limit: 4,
             elim_lit_limit: 100,
             restart_asg_len: 3500,
-            restart_lbd_len: 50,
-            restart_threshold: 0.60,
-            restart_blocking: 1.40,
-            restart_step: 50,
+            restart_lbd_len: 30,
+            restart_threshold: 0.8,
+            restart_blocking: 1.2,
+            restart_step: 20,
             cnf_filename: PathBuf::new(),
             output_dirname: PathBuf::from("."),
             result_filename: PathBuf::new(),
             proof_filename: PathBuf::from("proof.out"),
             use_log: false,
             without_elim: false,
-            without_adaptive_restart: false,
+            without_adaptive_restart: true,
             without_adaptive_strategy: false,
             without_deep_search: true,
             use_certification: false,

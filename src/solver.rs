@@ -323,10 +323,15 @@ fn search(
         state.rst.luby.update(0);
     }
     loop {
+        let propagation_start = asgs.unpropagated_index();
         let ci = asgs.propagate(cdb, state, vdb);
         vdb.update_stat(state);
         state.stats[Stat::Propagation] += 1;
-        if ci == ClauseId::default() {
+        let conflicting = ci == ClauseId::default();
+        for l in &asgs[propagation_start..] {
+            vdb.bump_activity(l.vi(), conflicting);
+        }
+        if conflicting {
             if state.num_vars <= asgs.len() + state.num_eliminated_vars {
                 return Ok(true);
             }
@@ -510,9 +515,12 @@ fn adapt_parameters(
         */
     }
     if nconflict == switch {
+        // if nconflict % switch == 0 {
         state.flush("exhaustive eliminator activated...");
         asgs.cancel_until(vdb, 0);
-        state.adapt_strategy(cdb);
+        if nconflict == switch {
+            state.adapt_strategy(cdb);
+        }
         if elim.enable {
             cdb.reset();
             elim.activate();
@@ -537,8 +545,9 @@ fn analyze(
     vdb: &mut VarDB,
     confl: ClauseId,
 ) -> usize {
+    let ncnf = state.stats[Stat::Conflict];
     let learnt = &mut state.new_learnt;
-    let _cweight = asgs.conflict_weight;
+    // let cweight = asgs.conflict_weight;
     learnt.clear();
     learnt.push(NULL_LIT);
     let dl = asgs.level();
@@ -576,14 +585,14 @@ fn analyze(
             // println!("- handle {}", cid.fmt());
             for q in &(*c).lits[((p != NULL_LIT) as usize)..] {
                 let vi = q.vi();
-                vdb.bump_activity(vi, dl);
-                asgs.update_order(vdb, vi);
+                // vdb.bump_activity(vi, dl);
                 let v = &mut vdb[vi];
                 let lvl = v.level;
                 debug_assert!(!v.is(Flag::ELIMINATED));
                 debug_assert!(v.assign.is_some());
                 if 0 < lvl && !state.an_seen[vi] {
                     state.an_seen[vi] = true;
+                    v.update_timestamp(ncnf);
                     if dl <= lvl {
                         // println!("- flag for {} which level is {}", q.int(), lvl);
                         path_cnt += 1;
@@ -636,7 +645,6 @@ fn simplify_learnt(
         ref mut an_seen,
         ..
     } = state;
-    // let dl = asgs.level();
     let mut to_clear: Vec<Lit> = vec![new_learnt[0]];
     let mut levels = vec![false; asgs.level() + 1];
     for l in &new_learnt[1..] {
@@ -650,17 +658,18 @@ fn simplify_learnt(
     if new_learnt.len() < 30 {
         minimize_with_bi_clauses(cdb, vdb, &mut state.lbd_temp, new_learnt);
     }
-    /*
+    // /*
     // glucose heuristics
     let lbd = vdb.compute_lbd(new_learnt, &mut state.lbd_temp);
+    // let dl = asgs.level();
+    let ncnf = state.stats[Stat::Conflict];
     while let Some(l) = state.last_dl.pop() {
         let vi = l.vi();
         if cdb[vdb[vi].reason].rank < lbd {
-            vdb.bump_activity(vi, dl);
-            asgs.update_order(vdb, vi);
+            // vdb.bump_activity(vi, dl);
+            vdb[vi].update_timestamp(ncnf);
         }
     }
-    */
     // find correct backtrack level from remaining literals
     let mut level_to_return = 0;
     if 1 < new_learnt.len() {

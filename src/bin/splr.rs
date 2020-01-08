@@ -17,7 +17,17 @@ use {
 };
 
 fn main() {
-    let config = Config::from_args();
+    let options = Config::from_args();
+    let config = Config {
+        cnf_filename: options.cnf_filename,
+        output_dirname: options.output_dirname,
+        result_filename: options.result_filename,
+        proof_filename: options.proof_filename,
+        use_certification: options.use_certification,
+        timeout: options.timeout,
+        dump_interval: options.dump_interval,
+        ..Config::default()
+    };
     if !config.cnf_filename.exists() {
         println!(
             "{} does not exist.",
