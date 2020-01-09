@@ -174,6 +174,16 @@ impl IndexMut<RangeFrom<usize>> for VarDB {
 impl ActivityIF for VarDB {
     type Ix = VarId;
     type Inc = usize;
+    fn activity(&mut self, vi: Self::Ix) -> f64 {
+        let now = self.current_conflict;
+        let v = &mut self.var[vi];
+        let diff = now - v.last_update;
+        if 0 < diff {
+            v.last_update = now;
+            v.reward *= self.activity_decay.powi(diff as i32);
+        }
+        v.reward
+    }
     fn bump_activity(&mut self, vi: Self::Ix, dl: Self::Inc) {
         let v = &mut self.var[vi];
         let now = self.current_conflict;
@@ -245,16 +255,6 @@ impl VarDBIF for VarDB {
             *keys.get_unchecked_mut(0) = key;
             cnt
         }
-    }
-    fn activity(&mut self, vi: VarId) -> f64 {
-        let now = self.current_conflict;
-        let v = &mut self.var[vi];
-        let diff = now - v.last_update;
-        if 0 < diff {
-            v.last_update = now;
-            v.reward *= self.activity_decay.powi(diff as i32);
-        }
-        v.reward
     }
     fn initialize_reward(
         &mut self,

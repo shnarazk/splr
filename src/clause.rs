@@ -120,7 +120,7 @@ pub struct Clause {
     /// A static clause evaluation criterion like LBD, NDD, or something.
     pub rank: usize,
     /// A dynamic clause evaluation criterion based on the number of references.
-    pub activity: f64,
+    reward: f64,
     /// Flags
     flags: Flag,
 }
@@ -130,7 +130,7 @@ impl Default for Clause {
         Clause {
             lits: vec![],
             rank: 0,
-            activity: 0.0,
+            reward: 0.0,
             flags: Flag::empty(),
         }
     }
@@ -171,9 +171,9 @@ impl PartialOrd for Clause {
             Some(Ordering::Less)
         } else if other.rank < self.rank {
             Some(Ordering::Greater)
-        } else if self.activity > other.activity {
+        } else if self.reward > other.reward {
             Some(Ordering::Less)
-        } else if other.activity > self.activity {
+        } else if other.reward > self.reward {
             Some(Ordering::Greater)
         } else {
             Some(Ordering::Equal)
@@ -187,9 +187,9 @@ impl Ord for Clause {
             Ordering::Less
         } else if other.rank > self.rank {
             Ordering::Greater
-        } else if self.activity > other.activity {
+        } else if self.reward > other.reward {
             Ordering::Less
-        } else if other.activity > self.activity {
+        } else if other.reward > self.reward {
             Ordering::Greater
         } else {
             Ordering::Equal
@@ -200,9 +200,9 @@ impl Ord for Clause {
 impl Clause {
     #[allow(dead_code)]
     fn cmp_activity(&self, other: &Clause) -> Ordering {
-        if self.activity > other.activity {
+        if self.reward > other.reward {
             Ordering::Less
-        } else if other.activity > self.activity {
+        } else if other.reward > self.reward {
             Ordering::Greater
         } else {
             Ordering::Equal
@@ -293,15 +293,18 @@ impl IndexMut<RangeFrom<usize>> for ClauseDB {
 impl ActivityIF for ClauseDB {
     type Ix = ClauseId;
     type Inc = ();
+    fn activity(&mut self, ci: Self::Ix) -> f64 {
+        self[ci].reward
+    }
     fn bump_activity(&mut self, cid: Self::Ix, _: Self::Inc) {
         let c = &mut self.clause[cid.ordinal as usize];
-        let a = c.activity + self.activity_inc;
-        c.activity = a;
+        let a = c.reward + self.activity_inc;
+        c.reward = a;
         if ACTIVITY_MAX < a {
             let scale = 1.0 / self.activity_inc;
             for c in &mut self.clause[1..] {
                 if c.is(Flag::LEARNT) {
-                    c.activity *= scale;
+                    c.reward *= scale;
                 }
             }
             self.activity_inc *= scale;
@@ -427,7 +430,7 @@ impl ClauseDBIF for ClauseDB {
                 c.lits.push(*l);
             }
             c.rank = rank;
-            c.activity = 0.0;
+            c.reward = 0.0;
         } else {
             let mut lits = Vec::with_capacity(v.len());
             for l in v {
@@ -438,7 +441,7 @@ impl ClauseDBIF for ClauseDB {
                 flags: Flag::empty(),
                 lits,
                 rank,
-                activity: 0.0,
+                reward: 0.0,
             };
             self.clause.push(c);
         };
@@ -508,7 +511,7 @@ impl ClauseDBIF for ClauseDB {
         let learnt = 0 < lbd && 2 < v.len() && (!state.use_chan_seok || self.co_lbd_bound < lbd);
         let cid = self.new_clause(&v, lbd, learnt);
         let c = &mut self.clause[cid.ordinal as usize];
-        c.activity = self.activity_inc;
+        c.reward = self.activity_inc;
         cid
     }
     fn detach(&mut self, cid: ClauseId) {

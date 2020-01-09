@@ -16,6 +16,8 @@ use {
 pub trait ActivityIF {
     type Ix;
     type Inc;
+    /// return the current activity of an element.
+    fn activity(&mut self, vi: Self::Ix) -> f64;
     /// update an element's activity.
     fn bump_activity(&mut self, ix: Self::Ix, dl: Self::Inc);
     /// increment activity step.
@@ -293,8 +295,6 @@ pub trait VarDBIF {
     fn update_stat(&mut self, state: &State);
     /// return a LBD value for the set of literals.
     fn compute_lbd(&self, vec: &[Lit], keys: &mut [usize]) -> usize;
-    /// return the current activity of vi-th var.
-    fn activity(&mut self, vi: VarId) -> f64;
     /// initialize rewards based on an order of vars.
     fn initialize_reward(
         &mut self,
