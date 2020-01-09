@@ -76,7 +76,8 @@ impl VarIF for Var {
     }
     fn record_conflict(&mut self, now: usize) -> f64 {
         assert_ne!(self.last_conflict, now);
-        self.foc.update((1.0 / (now - self.last_conflict + 1) as f64).log(2.0));
+        self.foc
+            .update((1.0 / (now - self.last_conflict + 1) as f64).log(2.0));
         self.last_conflict = now;
         self.foc.get()
     }
