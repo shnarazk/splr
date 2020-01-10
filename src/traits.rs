@@ -161,14 +161,6 @@ pub trait LitIF {
 }
 
 pub trait ProgressEvaluator {
-    /// the type of the argment of `update`.
-    type Input;
-    /// catch up with the current state.
-    fn update(&mut self, val: Self::Input);
-    /// return the current value.
-    fn get(&self) -> f64;
-    /// return a ratio of short / long statistics.
-    fn trend(&self) -> f64;
     /// map the value into a bool for forcing/blocking restart.
     fn is_active(&self) -> bool;
 }

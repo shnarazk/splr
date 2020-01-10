@@ -189,14 +189,18 @@ impl LitIF for Lit {
 
 /// API for Exponential Moving Average, EMA, like `get`, `reset`, `update` and so on.
 pub trait EmaIF {
-    /// return a new Ema.
-    fn new(f: usize) -> Self;
-    /// return the current value of Ema.
+    /// the type of the argment of `update`.
+    type Input;
+    /// return the current value.
     fn get(&self) -> f64;
-    /// reset an Ema.
+    /// reset internal data.
     fn reset(&mut self) {}
-    /// update Ema.
-    fn update(&mut self, x: f64);
+    /// catch up with the current state.
+    fn update(&mut self, x: Self::Input);
+    /// return a ratio of short / long statistics.
+    fn trend(&self) -> f64 {
+        unimplemented!()
+    }
 }
 
 /// Exponential Moving Average w/ a calibrator
@@ -208,19 +212,23 @@ pub struct Ema {
 }
 
 impl EmaIF for Ema {
-    fn new(s: usize) -> Ema {
-        Ema {
-            val: 0.0,
-            cal: 0.0,
-            sca: 1.0 / (s as f64),
-        }
-    }
-    fn update(&mut self, x: f64) {
+    type Input = f64;
+    fn update(&mut self, x: Self::Input) {
         self.val = self.sca * x + (1.0 - self.sca) * self.val;
         self.cal = self.sca + (1.0 - self.sca) * self.cal;
     }
     fn get(&self) -> f64 {
         self.val / self.cal
+    }
+}
+
+impl Ema {
+    pub fn new(s: usize) -> Ema {
+        Ema {
+            val: 0.0,
+            cal: 0.0,
+            sca: 1.0 / (s as f64),
+        }
     }
 }
 
@@ -236,20 +244,11 @@ pub struct Ema2 {
 }
 
 impl EmaIF for Ema2 {
-    fn new(f: usize) -> Ema2 {
-        Ema2 {
-            fast: 0.0,
-            slow: 0.0,
-            calf: 0.0,
-            cals: 0.0,
-            fe: 1.0 / (f as f64),
-            se: 1.0 / (f as f64),
-        }
-    }
+    type Input = f64;
     fn get(&self) -> f64 {
         self.fast / self.calf
     }
-    fn update(&mut self, x: f64) {
+    fn update(&mut self, x: Self::Input) {
         self.fast = self.fe * x + (1.0 - self.fe) * self.fast;
         self.slow = self.se * x + (1.0 - self.se) * self.slow;
         self.calf = self.fe + (1.0 - self.fe) * self.calf;
@@ -262,9 +261,17 @@ impl EmaIF for Ema2 {
 }
 
 impl Ema2 {
-    pub fn trend(&self) -> f64 {
-        self.fast / self.slow * (self.cals / self.calf)
+    pub fn new(f: usize) -> Ema2 {
+        Ema2 {
+            fast: 0.0,
+            slow: 0.0,
+            calf: 0.0,
+            cals: 0.0,
+            fe: 1.0 / (f as f64),
+            se: 1.0 / (f as f64),
+        }
     }
+    // set secondary Ema's parameter
     pub fn with_slow(mut self, s: usize) -> Ema2 {
         self.se = 1.0 / (s as f64);
         self

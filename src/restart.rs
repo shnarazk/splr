@@ -24,7 +24,7 @@ impl Instantiate for ProgressASG {
     }
 }
 
-impl ProgressEvaluator for ProgressASG {
+impl EmaIF for ProgressASG {
     type Input = usize;
     fn update(&mut self, n: usize) {
         self.asg = n;
@@ -36,6 +36,9 @@ impl ProgressEvaluator for ProgressASG {
     fn trend(&self) -> f64 {
         (self.asg as f64) / self.ema.get()
     }
+}
+
+impl ProgressEvaluator for ProgressASG {
     fn is_active(&self) -> bool {
         self.threshold * self.ema.get() < (self.asg as f64)
     }
@@ -62,7 +65,7 @@ impl Instantiate for ProgressLBD {
     }
 }
 
-impl ProgressEvaluator for ProgressLBD {
+impl EmaIF for ProgressLBD {
     type Input = usize;
     fn update(&mut self, d: usize) {
         self.num += 1;
@@ -77,6 +80,9 @@ impl ProgressEvaluator for ProgressLBD {
             .trend()
             .max(self.ema.get() * (self.num as f64) / (self.sum as f64))
     }
+}
+
+impl ProgressEvaluator for ProgressLBD {
     fn is_active(&self) -> bool {
         (self.sum as f64) < self.ema.get() * (self.num as f64) * self.threshold
     }
@@ -95,7 +101,7 @@ impl Instantiate for ProgressLVL {
     }
 }
 
-impl ProgressEvaluator for ProgressLVL {
+impl EmaIF for ProgressLVL {
     type Input = usize;
     fn update(&mut self, l: usize) {
         self.ema.update(l as f64);
@@ -106,6 +112,9 @@ impl ProgressEvaluator for ProgressLVL {
     fn trend(&self) -> f64 {
         self.ema.trend()
     }
+}
+
+impl ProgressEvaluator for ProgressLVL {
     fn is_active(&self) -> bool {
         todo!()
     }
@@ -146,7 +155,7 @@ impl fmt::Display for ProgressRCC {
     }
 }
 
-impl ProgressEvaluator for ProgressRCC {
+impl EmaIF for ProgressRCC {
     type Input = f64;
     fn update(&mut self, foc: Self::Input) {
         self.heat.update(foc);
@@ -157,6 +166,9 @@ impl ProgressEvaluator for ProgressRCC {
     fn trend(&self) -> f64 {
         self.heat.trend()
     }
+}
+
+impl ProgressEvaluator for ProgressRCC {
     fn is_active(&self) -> bool {
         self.threshold < self.heat.get()
     }
@@ -202,7 +214,7 @@ impl fmt::Display for LubySeries {
     }
 }
 
-impl ProgressEvaluator for LubySeries {
+impl EmaIF for LubySeries {
     type Input = usize;
     fn update(&mut self, reset: usize) {
         assert!(self.active);
@@ -216,9 +228,9 @@ impl ProgressEvaluator for LubySeries {
     fn get(&self) -> f64 {
         self.next_restart as f64
     }
-    fn trend(&self) -> f64 {
-        todo!()
-    }
+}
+
+impl ProgressEvaluator for LubySeries {
     fn is_active(&self) -> bool {
         todo!()
     }
@@ -318,6 +330,7 @@ impl RestartIF for RestartExecutor {
                 reset!(self);
             }
         } else if self.restart_step <= self.after_restart && self.lbd.is_active() {
+            self.lbd.reset();
             reset!(self);
         }
         false
