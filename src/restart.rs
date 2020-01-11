@@ -314,7 +314,7 @@ impl RestartIF for RestartExecutor {
                 reset!(self);
             }
         } else if self.restart_step <= self.after_restart && self.lbd.is_active() {
-            self.lbd.reset();
+            // self.lbd.reset();
             reset!(self);
         }
         false
