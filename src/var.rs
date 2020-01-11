@@ -188,7 +188,7 @@ impl ActivityIF for VarDB {
         let v = &mut self.var[vi];
         let now = self.current_conflict;
         let multiplier = if conflict { 1.0 } else { 0.9 };
-        let reward = multiplier / (now + 1 - v.last_update) as f64;
+        let reward = multiplier / (now - v.last_update) as f64;
         v.reward *= 1.0 - self.activity_decay;
         v.reward += self.activity_decay * reward;
     }
