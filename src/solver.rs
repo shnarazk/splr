@@ -391,6 +391,7 @@ fn handle_conflict_path(
     }
     let cl = asgs.level();
     let bl = analyze(asgs, cdb, state, vdb, ci);
+    // analyze2(asgs, cdb, state, vdb, ci);
     let new_learnt = &mut state.new_learnt;
     asgs.cancel_until(vdb, bl.max(state.root_level));
     let learnt_len = new_learnt.len();
@@ -634,6 +635,59 @@ fn analyze(
     simplify_learnt(asgs, cdb, state, vdb)
 }
 
+#[allow(dead_code)]
+fn analyze_deeply(
+    asgs: &mut AssignStack,
+    cdb: &mut ClauseDB,
+    state: &mut State,
+    vdb: &mut VarDB,
+    confl: ClauseId,
+) {
+    let ncnf = state.stats[Stat::Conflict];
+    let mut cid = confl;
+    let mut p = NULL_LIT;
+    let mut ti = asgs.len(); // trail index
+    let mut seen = [false].repeat(state.num_vars + 1);
+    // let mut path_cnt = 0;
+    loop {
+        let c = &cdb[cid];
+        if cid != ClauseId::default() {
+            for q in &(*c).lits[((p != NULL_LIT) as usize)..] {
+                let vi = q.vi();
+                // vdb.bump_activity(vi, dl);
+                let v = &mut vdb[vi];
+                let lvl = v.level;
+                if 0 < lvl && !seen[vi] {
+                    seen[vi] = true;
+                    v.update_timestamp(ncnf);
+                    // path_cnt += 1;
+                }
+            }
+        }
+        if 0 < ti { 
+            ti -= 1;
+        } else {
+            return;
+        }
+        while !seen[asgs.trail[ti].vi()] {
+            if 0 < ti {
+                ti -= 1;
+            } else {
+                return;
+            }
+        }
+        p = asgs.trail[ti];
+        let next_vi = p.vi();
+        cid = vdb[next_vi].reason;
+        seen[next_vi] = false;
+        // path_cnt -= 1;
+        // if path_cnt <= 0 {
+        //     break;
+        // }
+    }
+    // vdb[p.vi()].update_timestamp(ncnf);
+}
+
 fn simplify_learnt(
     asgs: &mut AssignStack,
     cdb: &mut ClauseDB,
@@ -658,7 +712,7 @@ fn simplify_learnt(
     if new_learnt.len() < 30 {
         minimize_with_bi_clauses(cdb, vdb, &mut state.lbd_temp, new_learnt);
     }
-    // /*
+    /*
     // glucose heuristics
     let lbd = vdb.compute_lbd(new_learnt, &mut state.lbd_temp);
     // let dl = asgs.level();
@@ -669,7 +723,7 @@ fn simplify_learnt(
             // vdb.bump_activity(vi, dl);
             vdb[vi].update_timestamp(ncnf);
         }
-    }
+    } */
     // find correct backtrack level from remaining literals
     let mut level_to_return = 0;
     if 1 < new_learnt.len() {
