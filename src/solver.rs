@@ -630,6 +630,7 @@ fn analyze(
             ti -= 1;
         }
     }
+    vdb[p.vi()].update_timestamp(ncnf);
     learnt[0] = !p;
     // println!("- appending {}, the result is {:?}", learnt[0].int(), vec2int(learnt));
     simplify_learnt(asgs, cdb, state, vdb)
