@@ -7,7 +7,7 @@ use {
         state::{Stat, State},
         traits::*,
         types::*,
-        var::VarDB,
+        var::{LRB, VarDB},
     },
     std::{
         fs,
@@ -328,9 +328,9 @@ fn search(
         vdb.update_stat(state);
         state.stats[Stat::Propagation] += 1;
         let conflicting = ci == ClauseId::default();
-        for l in &asgs[propagation_start..] {
-            vdb.bump_activity(l.vi(), conflicting);
-        }
+        // for l in &asgs[propagation_start..] {
+        //     vdb.bump_activity(l.vi(), conflicting);
+        // }
         if conflicting {
             if state.num_vars <= asgs.len() + state.num_eliminated_vars {
                 return Ok(true);
@@ -401,6 +401,7 @@ fn handle_conflict_path(
         asgs.uncheck_enqueue(vdb, new_learnt[0], ClauseId::default());
     } else {
         state.stats[Stat::Learnt] += 1;
+        vdb.lrb_update(state.stats[Stat::Learnt]);
         let lbd = vdb.compute_lbd(&new_learnt, &mut state.lbd_temp);
         let l0 = new_learnt[0];
         let cid = cdb.attach(state, vdb, lbd);
@@ -546,7 +547,7 @@ fn analyze(
     vdb: &mut VarDB,
     confl: ClauseId,
 ) -> usize {
-    let ncnf = state.stats[Stat::Conflict];
+    // let ncnf = state.stats[Stat::Conflict];
     let learnt = &mut state.new_learnt;
     // let cweight = asgs.conflict_weight;
     learnt.clear();
@@ -593,7 +594,8 @@ fn analyze(
                 debug_assert!(v.assign.is_some());
                 if 0 < lvl && !state.an_seen[vi] {
                     state.an_seen[vi] = true;
-                    v.update_timestamp(ncnf);
+                    // v.update_timestamp(ncnf);
+                    vdb.lrb_analyze(vi);
                     if dl <= lvl {
                         // println!("- flag for {} which level is {}", q.int(), lvl);
                         path_cnt += 1;
@@ -631,7 +633,8 @@ fn analyze(
             ti -= 1;
         }
     }
-    vdb[p.vi()].update_timestamp(ncnf);
+    // vdb[p.vi()].update_timestamp(ncnf);
+    vdb.lrb_analyze(p.vi());
     learnt[0] = !p;
     // println!("- appending {}, the result is {:?}", learnt[0].int(), vec2int(learnt));
     simplify_learnt(asgs, cdb, state, vdb)

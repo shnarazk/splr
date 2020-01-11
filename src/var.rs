@@ -37,6 +37,11 @@ pub struct Var {
     last_conflict: usize,
     /// the number of conflicts at which this var was rewarded lastly.
     last_update: usize,
+
+    /// LRB
+    pub lrb_participated: usize,
+    pub lrb_assigned: usize,
+
     /// list of clauses which contain this variable positively.
     pub pos_occurs: Vec<ClauseId>,
     /// list of clauses which contain this variable negatively.
@@ -62,6 +67,8 @@ impl VarIF for Var {
             reward: 0.0,
             last_conflict: 0,
             last_update: 0,
+            lrb_participated: 0,
+            lrb_assigned: 0,
             pos_occurs: Vec::new(),
             neg_occurs: Vec::new(),
             flags: Flag::empty(),
@@ -101,6 +108,46 @@ impl FlagIF for Var {
     }
 }
 
+pub trait LRB {
+    fn lrb_initialize(&mut self, vi: VarId);
+    fn lrb_analyze(&mut self, vi: VarId);
+    fn lrb_assign(&mut self, vi: VarId);
+    fn lrb_unassign(&mut self, vi: VarId);
+    fn lrb_update(&mut self, nl: usize);
+}
+
+impl LRB for VarDB {
+    /// no need to call me; did at Var::new().
+    fn lrb_initialize(&mut self, vi: VarId) {
+        let v = &mut self.var[vi];
+        v.reward = 0.0;
+        v.lrb_assigned = 0;
+        v.lrb_participated = 0;
+    }
+    fn lrb_analyze(&mut self, vi: VarId) {
+        let v = &mut self.var[vi];
+        v.lrb_participated += 1;
+    }
+    fn lrb_assign(&mut self, vi: VarId) {
+        let v = &mut self.var[vi];
+        v.lrb_assigned = self.current_num_learnt;
+        v.lrb_participated = 0;
+    }
+    fn lrb_unassign(&mut self, vi: VarId) {
+        let nl: usize = self.current_num_learnt;
+        let alpha: f64 = self.activity_decay;
+        let v = &mut self.var[vi];
+        let interval = nl - v.lrb_assigned;
+        if 0 < interval {
+            let r = v.lrb_participated as f64 / interval as f64;
+            v.reward = (1.0 - alpha) * v.reward + alpha * r;
+        }
+    }
+    fn lrb_update(&mut self, nl: usize) {
+        self.current_num_learnt = nl;
+    }
+}
+
 /// Structure for variables.
 #[derive(Debug)]
 pub struct VarDB {
@@ -113,6 +160,8 @@ pub struct VarDB {
     current_conflict: usize,
     // /// the current restart's ordinal number
     // current_restart: usize,
+    current_num_learnt: usize,
+
     /// a working buffer for LBD calculation
     pub lbd_temp: Vec<usize>,
 }
@@ -128,6 +177,7 @@ impl Default for VarDB {
             var: Vec::new(),
             current_conflict: 0,
             // current_restart: 0,
+            current_num_learnt: 0,
             lbd_temp: Vec::new(),
         }
     }
