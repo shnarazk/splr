@@ -111,8 +111,8 @@ pub struct VarDB {
     var: Vec<Var>,
     /// the current conflict's ordinal number
     current_conflict: usize,
-    /// the current restart's ordinal number
-    current_restart: usize,
+    // /// the current restart's ordinal number
+    // current_restart: usize,
     /// a working buffer for LBD calculation
     pub lbd_temp: Vec<usize>,
 }
@@ -127,7 +127,7 @@ impl Default for VarDB {
             // reward_by_dl_ema,
             var: Vec::new(),
             current_conflict: 0,
-            current_restart: 0,
+            // current_restart: 0,
             lbd_temp: Vec::new(),
         }
     }
@@ -240,7 +240,7 @@ impl VarDBIF for VarDB {
     }
     fn update_stat(&mut self, state: &State) {
         self.current_conflict = state.stats[Stat::Conflict] + 1;
-        self.current_restart = state.stats[Stat::Restart] + 1;
+        // self.current_restart = state.stats[Stat::Restart] + 1;
     }
 
     fn compute_lbd(&self, vec: &[Lit], keys: &mut [usize]) -> usize {

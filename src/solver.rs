@@ -556,7 +556,7 @@ fn analyze(
     let mut p = NULL_LIT;
     let mut ti = asgs.len() - 1; // trail index
     let mut path_cnt = 0;
-    state.last_dl.clear();
+    // state.last_dl.clear();
     loop {
         // println!("analyze {}", p.int());
         unsafe {
@@ -597,11 +597,12 @@ fn analyze(
                     if dl <= lvl {
                         // println!("- flag for {} which level is {}", q.int(), lvl);
                         path_cnt += 1;
-                        if v.reason != ClauseId::default() && cdb[v.reason].is(Flag::LEARNT) {
-                            state.last_dl.push(*q);
-                        }
+                        // if v.reason != ClauseId::default() && cdb[v.reason].is(Flag::LEARNT) {
+                        //     state.last_dl.push(*q);
+                        // }
                     } else {
                         // println!("- push {} to learnt, which level is {}", q.int(), lvl);
+                        // v.update_timestamp(ncnf);
                         learnt.push(*q);
                     }
                 } else {
