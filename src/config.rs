@@ -20,16 +20,16 @@ pub struct Config {
     #[structopt(long = "ra", default_value = "3500")]
     pub restart_asg_len: usize,
     /// length for LBD average
-    #[structopt(long = "rl", default_value = "50")]
+    #[structopt(long = "rl", default_value = "40")]
     pub restart_lbd_len: usize,
     /// forcing restart threshold
     #[structopt(long = "rt", default_value = "0.70")]
     pub restart_threshold: f64, // Glucose's K
     /// blocking restart threshold
-    #[structopt(long = "rb", default_value = "1.40")]
+    #[structopt(long = "rb", default_value = "1.30")]
     pub restart_blocking: f64, // Glucose's R
     /// #conflicts between restarts
-    #[structopt(long = "rs", default_value = "20")]
+    #[structopt(long = "rs", default_value = "40")]
     pub restart_step: usize,
     /// a DIMACS format CNF file
     #[structopt(parse(from_os_str))]
@@ -84,10 +84,10 @@ impl Default for Config {
             elim_grow_limit: 4,
             elim_lit_limit: 100,
             restart_asg_len: 3500,
-            restart_lbd_len: 30,
-            restart_threshold: 0.8,
-            restart_blocking: 1.2,
-            restart_step: 20,
+            restart_lbd_len: 40,
+            restart_threshold: 0.70,
+            restart_blocking: 1.30,
+            restart_step: 40,
             cnf_filename: PathBuf::new(),
             output_dirname: PathBuf::from("."),
             result_filename: PathBuf::new(),
