@@ -323,14 +323,10 @@ fn search(
         state.rst.luby.update(0);
     }
     loop {
-        let propagation_start = asgs.unpropagated_index();
         let ci = asgs.propagate(cdb, state, vdb);
         vdb.update_stat(state);
         state.stats[Stat::Propagation] += 1;
         let conflicting = ci == ClauseId::default();
-        // for l in &asgs[propagation_start..] {
-        //     vdb.bump_activity(l.vi(), conflicting);
-        // }
         if conflicting {
             if state.num_vars <= asgs.len() + state.num_eliminated_vars {
                 return Ok(true);
@@ -391,8 +387,17 @@ fn handle_conflict_path(
     }
     let cl = asgs.level();
     let bl = analyze(asgs, cdb, state, vdb, ci);
+    vdb.lrb_scale();
     // analyze2(asgs, cdb, state, vdb, ci);
     let new_learnt = &mut state.new_learnt;
+    // lrb
+    for l in new_learnt.iter() {
+        for lit in &cdb[vdb[l.vi()].reason].lits {
+            if !new_learnt.contains(&lit) {
+                vdb.lrb_reason_var(lit.vi());
+            }
+        }
+    }
     asgs.cancel_until(vdb, bl.max(state.root_level));
     let learnt_len = new_learnt.len();
     if learnt_len == 1 {
@@ -401,7 +406,6 @@ fn handle_conflict_path(
         asgs.uncheck_enqueue(vdb, new_learnt[0], ClauseId::default());
     } else {
         state.stats[Stat::Learnt] += 1;
-        vdb.lrb_update(state.stats[Stat::Learnt]);
         let lbd = vdb.compute_lbd(&new_learnt, &mut state.lbd_temp);
         let l0 = new_learnt[0];
         let cid = cdb.attach(state, vdb, lbd);
@@ -420,6 +424,7 @@ fn handle_conflict_path(
         state.stats[Stat::SumLBD] += lbd;
     }
     cdb.scale_activity();
+    vdb.lrb_update(state.stats[Stat::Learnt]);
     vdb.scale_activity();
     if 0 < state.config.dump_interval && ncnfl % state.config.dump_interval == 0 {
         state.development.push((
@@ -594,8 +599,8 @@ fn analyze(
                 debug_assert!(v.assign.is_some());
                 if 0 < lvl && !state.an_seen[vi] {
                     state.an_seen[vi] = true;
-                    // v.update_timestamp(ncnf);
                     vdb.lrb_analyze(vi);
+                    // v.update_timestamp(ncnf);
                     if dl <= lvl {
                         // println!("- flag for {} which level is {}", q.int(), lvl);
                         path_cnt += 1;

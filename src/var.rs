@@ -39,8 +39,9 @@ pub struct Var {
     last_update: usize,
 
     /// LRB
-    pub lrb_participated: usize,
     pub lrb_assigned: usize,
+    pub lrb_participated: usize,
+    pub lrb_reasoned: usize,
 
     /// list of clauses which contain this variable positively.
     pub pos_occurs: Vec<ClauseId>,
@@ -67,8 +68,9 @@ impl VarIF for Var {
             reward: 0.0,
             last_conflict: 0,
             last_update: 0,
-            lrb_participated: 0,
             lrb_assigned: 0,
+            lrb_participated: 0,
+            lrb_reasoned: 0,
             pos_occurs: Vec::new(),
             neg_occurs: Vec::new(),
             flags: Flag::empty(),
@@ -112,6 +114,8 @@ pub trait LRB {
     fn lrb_initialize(&mut self, vi: VarId);
     fn lrb_analyze(&mut self, vi: VarId);
     fn lrb_assign(&mut self, vi: VarId);
+    fn lrb_reason_var(&mut self, vi: VarId);
+    fn lrb_scale(&mut self);
     fn lrb_unassign(&mut self, vi: VarId);
     fn lrb_update(&mut self, nl: usize);
 }
@@ -123,6 +127,7 @@ impl LRB for VarDB {
         v.reward = 0.0;
         v.lrb_assigned = 0;
         v.lrb_participated = 0;
+        v.lrb_reasoned = 0;
     }
     fn lrb_analyze(&mut self, vi: VarId) {
         let v = &mut self.var[vi];
@@ -132,15 +137,28 @@ impl LRB for VarDB {
         let v = &mut self.var[vi];
         v.lrb_assigned = self.current_num_learnt;
         v.lrb_participated = 0;
+        v.lrb_reasoned = 0;
+    }
+    fn lrb_reason_var(&mut self, vi: VarId) {
+        let v = &mut self.var[vi];
+        v.lrb_reasoned += 1;
+    }
+    fn lrb_scale(&mut self) {
+        for v in &mut self.var[1..] {
+            if v.assign.is_none() {
+                v.reward *= 0.95;
+            }
+        }
     }
     fn lrb_unassign(&mut self, vi: VarId) {
-        let nl: usize = self.current_num_learnt;
-        let alpha: f64 = self.activity_decay;
+        let alpha = self.activity_decay;
+        let nl = self.current_num_learnt;
         let v = &mut self.var[vi];
-        let interval = nl - v.lrb_assigned;
-        if 0 < interval {
-            let r = v.lrb_participated as f64 / interval as f64;
+        if v.lrb_assigned < nl {
+            let r = (v.lrb_participated + v.lrb_reasoned) as f64 / ((nl - v.lrb_assigned) as f64);
             v.reward = (1.0 - alpha) * v.reward + alpha * r;
+        } else {
+            v.reward *= 1.0 - alpha;
         }
     }
     fn lrb_update(&mut self, nl: usize) {

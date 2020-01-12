@@ -28,6 +28,18 @@ pub struct AssignStack {
     var_order: VarIdHeap, // Variable Order
 }
 
+impl Default for AssignStack {
+    fn default() -> Self {
+        AssignStack {
+            trail: Vec::new(),
+            asgvec: Vec::new(),
+            trail_lim: Vec::new(),
+            q_head: 0,
+            var_order: VarIdHeap::new(0, 0),
+        }
+    }
+}
+
 /// ```
 /// let x: Lbool = var_assign!(self, lit.vi());
 /// ```
@@ -102,9 +114,8 @@ impl Instantiate for AssignStack {
             trail: Vec::with_capacity(nv),
             // conflict_weight: 0.0,
             asgvec: vec![None; 1 + nv],
-            trail_lim: Vec::new(),
-            q_head: 0,
             var_order: VarIdHeap::new(nv, nv),
+            .. AssignStack::default()
         }
     }
 }
