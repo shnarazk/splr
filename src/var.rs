@@ -39,9 +39,10 @@ pub struct Var {
     last_update: usize,
 
     /// LRB
-    pub lrb_assigned: usize,
-    pub lrb_participated: usize,
-    pub lrb_reasoned: usize,
+    lrb_assigned: usize,
+    lrb_last_used: usize,
+    lrb_participated: usize,
+    lrb_reasoned: usize,
 
     /// list of clauses which contain this variable positively.
     pub pos_occurs: Vec<ClauseId>,
@@ -69,6 +70,7 @@ impl VarIF for Var {
             last_conflict: 0,
             last_update: 0,
             lrb_assigned: 0,
+            lrb_last_used: 0,
             lrb_participated: 0,
             lrb_reasoned: 0,
             pos_occurs: Vec::new(),
@@ -117,7 +119,7 @@ pub trait LRB {
     fn lrb_reason_var(&mut self, vi: VarId);
     fn lrb_scale(&mut self);
     fn lrb_unassign(&mut self, vi: VarId);
-    fn lrb_update(&mut self, nl: usize);
+    fn lrb_update(&mut self);
 }
 
 impl LRB for VarDB {
@@ -128,20 +130,28 @@ impl LRB for VarDB {
         v.lrb_assigned = 0;
         v.lrb_participated = 0;
         v.lrb_reasoned = 0;
+        v.lrb_last_used = 0;
     }
     fn lrb_analyze(&mut self, vi: VarId) {
         let v = &mut self.var[vi];
-        v.lrb_participated += 1;
+        if v.lrb_last_used < self.lrb_ordinal {
+            v.lrb_participated += 1;
+            v.lrb_last_used = self.lrb_ordinal;
+        }
     }
     fn lrb_assign(&mut self, vi: VarId) {
         let v = &mut self.var[vi];
-        v.lrb_assigned = self.current_num_learnt;
+        v.lrb_assigned = self.lrb_ordinal;
         v.lrb_participated = 0;
         v.lrb_reasoned = 0;
     }
     fn lrb_reason_var(&mut self, vi: VarId) {
         let v = &mut self.var[vi];
-        v.lrb_reasoned += 1;
+       //  assert_ne!(v.lrb_last_participated, self.lrb_ordinal);
+        if v.lrb_last_used < self.lrb_ordinal {
+            v.lrb_reasoned += 1;
+            v.lrb_last_used = self.lrb_ordinal;
+        }
     }
     fn lrb_scale(&mut self) {
         for v in &mut self.var[1..] {
@@ -152,17 +162,24 @@ impl LRB for VarDB {
     }
     fn lrb_unassign(&mut self, vi: VarId) {
         let alpha = self.activity_decay;
-        let nl = self.current_num_learnt;
         let v = &mut self.var[vi];
-        if v.lrb_assigned < nl {
-            let r = (v.lrb_participated + v.lrb_reasoned) as f64 / ((nl - v.lrb_assigned) as f64);
-            v.reward = (1.0 - alpha) * v.reward + alpha * r;
-        } else {
-            v.reward *= 1.0 - alpha;
+        let s = self.lrb_ordinal - v.lrb_assigned;
+        debug_assert!(v.lrb_participated + v.lrb_reasoned <= s + 1,
+                      format!("Error:: part:{:>.4}, res:{:>.4}, span:{}",
+                              v.lrb_participated,
+                              v.lrb_reasoned,
+                              s
+                      )
+        );
+        if 0 < s {
+            let p = v.lrb_participated as f64 / s as f64;
+            let r = v.lrb_reasoned as f64 / s as f64;
+            v.reward = (1.0 - alpha) * v.reward + alpha * (p + r);
         }
     }
-    fn lrb_update(&mut self, nl: usize) {
-        self.current_num_learnt = nl;
+    fn lrb_update(&mut self) {
+        self.lrb_ordinal += 1;
+        self.lrb_scale();
     }
 }
 
@@ -179,8 +196,9 @@ pub struct VarDB {
     // /// the current restart's ordinal number
     // current_restart: usize,
     current_num_learnt: usize,
-
-    /// a working buffer for LBD calculation
+    // lrb
+    lrb_ordinal: usize,
+   /// a working buffer for LBD calculation
     pub lbd_temp: Vec<usize>,
 }
 
@@ -196,6 +214,7 @@ impl Default for VarDB {
             current_conflict: 0,
             // current_restart: 0,
             current_num_learnt: 0,
+            lrb_ordinal: 0,
             lbd_temp: Vec::new(),
         }
     }

@@ -386,16 +386,14 @@ fn handle_conflict_path(
         state.stats[Stat::BlockRestart] += 1;
     }
     let cl = asgs.level();
+    vdb.lrb_update();
     let bl = analyze(asgs, cdb, state, vdb, ci);
-    vdb.lrb_scale();
     // analyze2(asgs, cdb, state, vdb, ci);
     let new_learnt = &mut state.new_learnt;
     // lrb
-    for l in new_learnt.iter() {
+    for l in &new_learnt[..] {
         for lit in &cdb[vdb[l.vi()].reason].lits {
-            if !new_learnt.contains(&lit) {
-                vdb.lrb_reason_var(lit.vi());
-            }
+            vdb.lrb_reason_var(lit.vi());
         }
     }
     asgs.cancel_until(vdb, bl.max(state.root_level));
@@ -424,7 +422,6 @@ fn handle_conflict_path(
         state.stats[Stat::SumLBD] += lbd;
     }
     cdb.scale_activity();
-    vdb.lrb_update(state.stats[Stat::Learnt]);
     vdb.scale_activity();
     if 0 < state.config.dump_interval && ncnfl % state.config.dump_interval == 0 {
         state.development.push((
