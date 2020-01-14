@@ -258,6 +258,9 @@ impl EmaIF for Ema2 {
         self.slow = self.fast;
         self.cals = self.calf;
     }
+    fn trend(&self) -> f64 {
+        self.fast / self.slow * (self.cals / self.calf)
+    }
 }
 
 impl Ema2 {
