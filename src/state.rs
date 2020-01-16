@@ -674,6 +674,22 @@ impl IndexMut<LogF64Id> for ProgressRecord {
     }
 }
 
+impl Index<Stat> for State {
+    type Output = usize;
+    #[inline]
+    fn index(&self, i: Stat) -> &usize {
+        &self.stats[i as usize]
+    }
+}
+
+impl IndexMut<Stat> for State {
+    #[inline]
+    fn index_mut(&mut self, i: Stat) -> &mut usize {
+        &mut self.stats[i as usize]
+    }
+}
+
+
 impl State {
     #[allow(dead_code)]
     fn dump_header_details(&self) {

@@ -333,7 +333,7 @@ fn search(
             // DYNAMIC FORCING RESTART based on LBD values, updated by conflict
             state.last_asg = asgs.len();
             if state.rst.force_restart() {
-                state.stats[Stat::Restart] += 1;
+                state[Stat::Restart] += 1;
                 asgs.cancel_until(vdb, state.root_level);
             } else if asgs.level() == 0 {
                 if cdb.simplify(asgs, elim, state, vdb).is_err() {
@@ -346,15 +346,15 @@ fn search(
                 let vi = asgs.select_var(vdb);
                 let p = vdb[vi].phase;
                 asgs.uncheck_assume(vdb, Lit::from_var(vi, p));
-                state.stats[Stat::Decision] += 1;
+                state[Stat::Decision] += 1;
                 a_decision_was_made = true;
             }
         } else {
-            state.stats[Stat::Conflict] += 1;
+            state[Stat::Conflict] += 1;
             if a_decision_was_made {
                 a_decision_was_made = false;
             } else {
-                state.stats[Stat::NoDecisionConflict] += 1;
+                state[Stat::NoDecisionConflict] += 1;
             }
             if asgs.level() == state.root_level {
                 analyze_final(asgs, state, vdb, &cdb[ci]);
@@ -373,7 +373,7 @@ fn handle_conflict_path(
     vdb: &mut VarDB,
     ci: ClauseId,
 ) -> MaybeInconsistent {
-    let ncnfl = state.stats[Stat::Conflict]; // total number
+    let ncnfl = state[Stat::Conflict]; // total number
     state.rst.after_restart += 1;
     // DYNAMIC BLOCKING RESTART based on ASG, updated on conflict path
     // If we can settle this conflict w/o restart, solver will get a big progress.
@@ -382,7 +382,7 @@ fn handle_conflict_path(
         state.last_asg = 0;
     }
     if state.rst.block_restart() {
-        state.stats[Stat::BlockRestart] += 1;
+        state[Stat::BlockRestart] += 1;
     }
     let cl = asgs.level();
     let bl = analyze(asgs, cdb, state, vdb, ci);
@@ -408,15 +408,15 @@ fn handle_conflict_path(
         state.c_lvl.update(cl as f64);
         state.b_lvl.update(bl as f64);
         if lbd <= 2 {
-            state.stats[Stat::NumLBD2] += 1;
+            state[Stat::NumLBD2] += 1;
         }
         if learnt_len == 2 {
-            state.stats[Stat::NumBin] += 1;
-            state.stats[Stat::NumBinLearnt] += 1;
+            state[Stat::NumBin] += 1;
+            state[Stat::NumBinLearnt] += 1;
         }
         asgs.uncheck_enqueue(vdb, l0, cid);
         state.rst.lbd.update(lbd);
-        state.stats[Stat::SumLBD] += lbd;
+        state[Stat::SumLBD] += lbd;
     }
     cdb.scale_activity();
     vdb.scale_activity();
@@ -425,8 +425,8 @@ fn handle_conflict_path(
             ncnfl,
             (state.num_solved_vars + state.num_eliminated_vars) as f64
                 / state.target.num_of_variables as f64,
-            state.stats[Stat::Restart] as f64,
-            state.stats[Stat::BlockRestart] as f64,
+            state[Stat::Restart] as f64,
+            state[Stat::BlockRestart] as f64,
             state.rst.asg.trend().min(10.0),
             state.rst.lbd.trend().min(10.0),
         ));
@@ -438,7 +438,7 @@ fn handle_conflict_path(
         }
     }
     if ((state.use_chan_seok && !cdb.glureduce && cdb.first_reduction < cdb.num_learnt)
-        || (cdb.glureduce && cdb.cur_restart * cdb.next_reduction <= state.stats[Stat::Conflict]))
+        || (cdb.glureduce && cdb.cur_restart * cdb.next_reduction <= state[Stat::Conflict]))
         && 0 < cdb.num_learnt
     {
         cdb.cur_restart = ((ncnfl as f64) / (cdb.next_reduction as f64)) as usize + 1;
@@ -457,7 +457,7 @@ fn adapt_parameters(
 ) -> MaybeInconsistent {
     let switch = 100_000;
     {
-        let stopped = state.stats[Stat::SolvedRecord] == state.num_solved_vars;
+        let stopped = state[Stat::SolvedRecord] == state.num_solved_vars;
         if stopped {
             state.slack_duration += 1;
         } else if 0 < state.slack_duration && state.stagnated {
@@ -475,11 +475,11 @@ fn adapt_parameters(
             .trailing_zeros() as isize)
             < state.slack_duration;
         if !state.stagnated && stagnated {
-            state.stats[Stat::Stagnation] += 1;
+            state[Stat::Stagnation] += 1;
         }
         state.stagnated = stagnated;
     }
-    state.stats[Stat::SolvedRecord] = state.num_solved_vars;
+    state[Stat::SolvedRecord] = state.num_solved_vars;
     if !state.rst.luby.active && state.rst.adaptive_restart && !state.stagnated {
         let moving: f64 = 0.04;
         let spring: f64 = 0.02;
@@ -487,8 +487,8 @@ fn adapt_parameters(
         let too_few: usize = 10;
         let too_many: usize = 1000;
         // restart_threshold
-        let nr = state.stats[Stat::Restart] - state.stats[Stat::RestartRecord];
-        state.stats[Stat::RestartRecord] = state.stats[Stat::Restart];
+        let nr = state[Stat::Restart] - state[Stat::RestartRecord];
+        state[Stat::RestartRecord] = state[Stat::Restart];
         if state.rst.lbd.threshold + moving < 1.0 && nr < too_few {
             state.rst.lbd.threshold += moving;
         } else if state.config.restart_threshold - margin <= state.rst.lbd.threshold
@@ -501,8 +501,8 @@ fn adapt_parameters(
         }
 
         // restart_blocking
-        let _nb = state.stats[Stat::BlockRestart] - state.stats[Stat::BlockRestartRecord];
-        state.stats[Stat::BlockRestartRecord] = state.stats[Stat::BlockRestart];
+        let _nb = state[Stat::BlockRestart] - state[Stat::BlockRestartRecord];
+        state[Stat::BlockRestartRecord] = state[Stat::BlockRestart];
         /*
         if state.config.restart_blocking - margin <= state.rst.asg.threshold && nb < too_few {
             state.rst.asg.threshold -= moving;
