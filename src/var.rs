@@ -2,7 +2,6 @@ use {
     crate::{
         clause::{Clause, ClauseId},
         config::Config,
-        state::{Stat, State},
         traits::*,
         types::*,
     },
@@ -103,10 +102,8 @@ pub struct VarDB {
     // pub reward_by_dl_ema: Ema,
     /// vars
     var: Vec<Var>,
-    /// the current conflict's ordinal number
-    current_conflict: usize,
-    /// the current restart's ordinal number
-    current_restart: usize,
+    /// the current conflict's ordinal
+    pub ordinal: usize,
     /// a working buffer for LBD calculation
     pub lbd_temp: Vec<usize>,
 }
@@ -120,8 +117,7 @@ impl Default for VarDB {
             reward_by_dl: 1.0,
             // reward_by_dl_ema,
             var: Vec::new(),
-            current_conflict: 0,
-            current_restart: 0,
+            ordinal: 0,
             lbd_temp: Vec::new(),
         }
     }
@@ -174,25 +170,26 @@ impl IndexMut<RangeFrom<usize>> for VarDB {
 
 impl ActivityIF for VarDB {
     type Ix = VarId;
-    type Inc = usize;
+    type Inc = ();
     fn activity(&mut self, vi: Self::Ix) -> f64 {
-        let now = self.current_conflict;
         let v = &mut self.var[vi];
-        let diff = now - v.last_update;
+        let diff =self.ordinal - v.last_update;
         if 0 < diff {
-            v.last_update = now;
+            v.last_update = self.ordinal;
             v.reward *= self.activity_decay.powi(diff as i32);
         }
         v.reward
     }
-    fn bump_activity(&mut self, vi: Self::Ix, dl: Self::Inc) {
+    fn bump_activity(&mut self, vi: Self::Ix, _: Self::Inc) {
         let v = &mut self.var[vi];
-        let now = self.current_conflict;
-        let t = (now - v.last_update) as i32;
+        let t = (self.ordinal - v.last_update) as i32;
         // v.reward = (now as f64 + self.activity) / 2.0; // ASCID
-        v.reward =
-            0.2 + self.reward_by_dl / (dl + 1) as f64 + v.reward * self.activity_decay.powi(t);
-        v.last_update = now;
+        // v.reward = 0.2 + self.reward_by_dl / (dl + 1) as f64 + v.reward * self.activity_decay.powi(t);
+        if 0 < t {
+            v.reward *= self.activity_decay.powi(t);
+            v.reward += 1.0 - self.activity_decay;
+            v.last_update = self.ordinal;
+        }
     }
     fn scale_activity(&mut self) {}
 }
@@ -236,9 +233,8 @@ impl VarDBIF for VarDB {
         }
         false
     }
-    fn update_stat(&mut self, state: &State) {
-        self.current_conflict = state.stats[Stat::Conflict] + 1;
-        self.current_restart = state.stats[Stat::Restart] + 1;
+    fn update_ordinal(&mut self) {
+        self.ordinal += 1;
     }
 
     fn compute_lbd(&self, vec: &[Lit], keys: &mut [usize]) -> usize {

@@ -284,7 +284,7 @@ pub trait VarDBIF {
     /// return `true` if the set of literals is satisfiable under the current assignment.
     fn satisfies(&self, c: &[Lit]) -> bool;
     /// copy some stat data from `State`.
-    fn update_stat(&mut self, state: &State);
+    fn update_ordinal(&mut self);
     /// return a LBD value for the set of literals.
     fn compute_lbd(&self, vec: &[Lit], keys: &mut [usize]) -> usize;
     /// initialize rewards based on an order of vars.

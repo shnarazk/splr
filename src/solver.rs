@@ -323,8 +323,8 @@ fn search(
         state.rst.luby.update(0);
     }
     loop {
+        vdb.update_ordinal();
         let ci = asgs.propagate(cdb, state, vdb);
-        vdb.update_stat(state);
         state.stats[Stat::Propagation] += 1;
         if ci == ClauseId::default() {
             if state.num_vars <= asgs.len() + state.num_eliminated_vars {
@@ -386,7 +386,13 @@ fn handle_conflict_path(
     }
     let cl = asgs.level();
     let bl = analyze(asgs, cdb, state, vdb, ci);
+    bump_vars(asgs, cdb, vdb, ci);
     let new_learnt = &mut state.new_learnt;
+    /* for l in &new_learnt[..] {
+        for lit in &cdb[vdb[l.vi()].reason].lits {
+            vdb.bump_activity(lit.vi(), 0);
+        }
+    } */
     asgs.cancel_until(vdb, bl.max(state.root_level));
     let learnt_len = new_learnt.len();
     if learnt_len == 1 {
@@ -576,13 +582,12 @@ fn analyze(
             // println!("- handle {}", cid.fmt());
             for q in &(*c).lits[((p != NULL_LIT) as usize)..] {
                 let vi = q.vi();
-                vdb.bump_activity(vi, dl);
-                asgs.update_order(vdb, vi);
-                let v = &mut vdb[vi];
-                let lvl = v.level;
-                debug_assert!(!v.is(Flag::ELIMINATED));
-                debug_assert!(v.assign.is_some());
+                let lvl = vdb[vi].level;
                 if 0 < lvl && !state.an_seen[vi] {
+                    // vdb.bump_activity(vi, ());
+                    let v = &mut vdb[vi];
+                    debug_assert!(!v.is(Flag::ELIMINATED));
+                    debug_assert!(v.assign.is_some());
                     state.an_seen[vi] = true;
                     if dl <= lvl {
                         // println!("- flag for {} which level is {}", q.int(), lvl);
@@ -620,9 +625,48 @@ fn analyze(
             ti -= 1;
         }
     }
+    debug_assert_eq!(vdb[p.vi()].level, dl); // So we don't have to call bump_activity
     learnt[0] = !p;
     // println!("- appending {}, the result is {:?}", learnt[0].int(), vec2int(learnt));
     simplify_learnt(asgs, cdb, state, vdb)
+}
+
+#[allow(dead_code)]
+fn bump_vars(
+    asgs: &mut AssignStack,
+    cdb: &mut ClauseDB,
+    vdb: &mut VarDB,
+    confl: ClauseId,
+) {
+    let mut cid = confl;
+    let mut p = NULL_LIT;
+    let mut ti = asgs.len(); // trail index
+    let mut seen = [false].repeat(vdb.len() + 1);
+    loop {
+        let c = &cdb[cid];
+        if cid != ClauseId::default() {
+            for q in &(*c).lits[((p != NULL_LIT) as usize)..] {
+                let vi = q.vi();
+                if !seen[vi] {
+                    vdb.bump_activity(vi, ());
+                    seen[vi] = true;
+                }
+            }
+        }
+        loop {
+            if 0 == ti {
+                return;
+            }
+            ti -= 1;
+            if seen[asgs.trail[ti].vi()] {
+                break;
+            }
+        }
+        p = asgs.trail[ti];
+        let next_vi = p.vi();
+        cid = vdb[next_vi].reason;
+        seen[next_vi] = false;
+    }
 }
 
 fn simplify_learnt(
@@ -657,7 +701,6 @@ fn simplify_learnt(
         let vi = l.vi();
         if cdb[vdb[vi].reason].rank < lbd {
             vdb.bump_activity(vi, dl);
-            asgs.update_order(vdb, vi);
         }
     }
     */
