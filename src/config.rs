@@ -11,7 +11,7 @@ pub struct Config {
     #[structopt(long = "cl", default_value = "0")]
     pub clause_limit: usize,
     /// grow limit of #clauses by v-elim
-    #[structopt(long = "eg", default_value = "4")]
+    #[structopt(long = "eg", default_value = "0")]
     pub elim_grow_limit: usize,
     /// #literals in a clause by v-elim
     #[structopt(long = "el", default_value = "64")]
@@ -20,16 +20,16 @@ pub struct Config {
     #[structopt(long = "ra", default_value = "3500")]
     pub restart_asg_len: usize,
     /// length for LBD average
-    #[structopt(long = "rl", default_value = "50")]
+    #[structopt(long = "rl", default_value = "40")]
     pub restart_lbd_len: usize,
     /// forcing restart threshold
-    #[structopt(long = "rt", default_value = "0.70")]
+    #[structopt(long = "rt", default_value = "0.80")]
     pub restart_threshold: f64, // Glucose's K
     /// blocking restart threshold
-    #[structopt(long = "rb", default_value = "1.40")]
+    #[structopt(long = "rb", default_value = "1.25")]
     pub restart_blocking: f64, // Glucose's R
     /// #conflicts between restarts
-    #[structopt(long = "rs", default_value = "50")]
+    #[structopt(long = "rs", default_value = "40")]
     pub restart_step: usize,
     /// a DIMACS format CNF file
     #[structopt(parse(from_os_str))]
@@ -55,13 +55,15 @@ pub struct Config {
     #[structopt(long = "without-elim", short = "E")]
     pub without_elim: bool,
     /// Disables dynamic restart adaptation
-    #[structopt(long = "without-adaptive-restart", short = "R")]
+    // #[structopt(long = "without-adaptive-restart", short = "R")]
+    #[structopt(skip = true)]
     pub without_adaptive_restart: bool,
     /// Disables dynamic strategy adaptation
     #[structopt(long = "without-adaptive-strategy", short = "S")]
     pub without_adaptive_strategy: bool,
     /// Disables deep search mode
-    #[structopt(long = "without-deep-search", short = "D")]
+    // #[structopt(long = "without-deep-search", short = "D")]
+    #[structopt(skip = true)]
     pub without_deep_search: bool,
     /// Writes a DRAT UNSAT certification file
     #[structopt(long = "certify", short = "c")]
@@ -94,7 +96,7 @@ impl Default for Config {
             proof_filename: PathBuf::from("proof.out"),
             use_log: false,
             without_elim: false,
-            without_adaptive_restart: false,
+            without_adaptive_restart: true,
             without_adaptive_strategy: false,
             without_deep_search: true,
             use_certification: false,
