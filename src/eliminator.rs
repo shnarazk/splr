@@ -183,7 +183,7 @@ impl EliminatorIF for Eliminator {
             self.backward_subsumption_check(asgs, cdb, vdb)?;
             debug_assert!(self.clause_queue.is_empty());
             cdb.garbage_collect();
-            if asgs.propagate(cdb, state, vdb) != ClauseId::default() {
+            if asgs.propagate(cdb, vdb) != ClauseId::default() {
                 return Err(SolverError::Inconsistent);
             }
             cdb.eliminate_satisfied_clauses(self, vdb, true);

@@ -324,8 +324,9 @@ fn search(
     }
     loop {
         vdb.update_ordinal();
-        let ci = asgs.propagate(cdb, state, vdb);
-        state.stats[Stat::Propagation] += 1;
+        state[Stat::Propagation] += 1;
+        let ci = asgs.propagate(cdb, vdb);
+        state[Stat::Propagation] += 1;
         if ci == ClauseId::default() {
             if state.num_vars <= asgs.len() + state.num_eliminated_vars {
                 return Ok(true);
@@ -544,7 +545,6 @@ fn analyze(
     confl: ClauseId,
 ) -> usize {
     let learnt = &mut state.new_learnt;
-    let _cweight = asgs.conflict_weight;
     learnt.clear();
     learnt.push(NULL_LIT);
     let dl = asgs.level();

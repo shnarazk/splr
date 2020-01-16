@@ -32,8 +32,6 @@ pub struct Var {
     pub level: usize,
     /// a dynamic evaluation criterion like VSIDS or ACID.
     reward: f64,
-    /// the number of conflicts at which this var make a conflict.
-    last_conflict: usize,
     /// the number of conflicts at which this var was rewarded lastly.
     last_update: usize,
     /// list of clauses which contain this variable positively.
@@ -59,7 +57,6 @@ impl VarIF for Var {
             reason: ClauseId::default(),
             level: 0,
             reward: 0.0,
-            last_conflict: 0,
             last_update: 0,
             pos_occurs: Vec::new(),
             neg_occurs: Vec::new(),
@@ -72,13 +69,6 @@ impl VarIF for Var {
             vec.push(Var::new(i));
         }
         vec
-    }
-    fn record_conflict(&mut self, now: usize) -> f64 {
-        assert_ne!(self.last_conflict, now);
-        self.foc
-            .update((1.0 / (now - self.last_conflict + 1) as f64).log(2.0));
-        self.last_conflict = now;
-        self.foc.get()
     }
 }
 
