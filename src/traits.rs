@@ -182,7 +182,7 @@ pub trait PropagatorIF {
     /// return the *value* of a given literal.
     fn assigned(&self, l: Lit) -> Option<bool>;
     /// execute *propagate*.
-    fn propagate(&mut self, cdb: &mut ClauseDB, state: &mut State, vdb: &mut VarDB) -> ClauseId;
+    fn propagate(&mut self, cdb: &mut ClauseDB, vdb: &mut VarDB) -> ClauseId;
     /// execute *backjump*.
     fn cancel_until(&mut self, vdb: &mut VarDB, lv: usize);
     /// add an assignment caused by a clause; emit an exception if solver becomes inconsistent.

@@ -323,9 +323,9 @@ fn search(
         state.rst.luby.update(0);
     }
     loop {
-        let ci = asgs.propagate(cdb, state, vdb);
-        vdb.update_stat(state);
+        let ci = asgs.propagate(cdb, vdb);
         state[Stat::Propagation] += 1;
+        vdb.update_stat(state);
         if ci == ClauseId::default() {
             if state.num_vars <= asgs.len() + state.num_eliminated_vars {
                 return Ok(true);
@@ -394,7 +394,6 @@ fn handle_conflict_path(
         cdb.certificate_add(new_learnt);
         asgs.uncheck_enqueue(vdb, new_learnt[0], ClauseId::default());
     } else {
-        state.stats[Stat::Learnt] += 1;
         let lbd = vdb.compute_lbd(&new_learnt, &mut state.lbd_temp);
         let l0 = new_learnt[0];
         let cid = cdb.attach(state, vdb, lbd);
@@ -411,6 +410,7 @@ fn handle_conflict_path(
         asgs.uncheck_enqueue(vdb, l0, cid);
         state.rst.lbd.update(lbd);
         state[Stat::SumLBD] += lbd;
+        state[Stat::Learnt] += 1;
     }
     cdb.scale_activity();
     vdb.scale_activity();
@@ -538,7 +538,6 @@ fn analyze(
     confl: ClauseId,
 ) -> usize {
     let learnt = &mut state.new_learnt;
-    let _cweight = asgs.conflict_weight;
     learnt.clear();
     learnt.push(NULL_LIT);
     let dl = asgs.level();

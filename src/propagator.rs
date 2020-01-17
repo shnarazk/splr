@@ -2,7 +2,7 @@ use {
     crate::{
         clause::{ClauseDB, ClauseId, Watch},
         config::Config,
-        state::{Stat, State},
+        state::State,
         traits::*,
         types::*,
         var::{Var, VarDB},
@@ -19,7 +19,6 @@ use {
 #[derive(Debug)]
 pub struct AssignStack {
     pub trail: Vec<Lit>,
-    pub conflict_weight: f64,
     asgvec: Vec<Option<bool>>,
     trail_lim: Vec<usize>,
     q_head: usize,
@@ -98,7 +97,6 @@ impl Instantiate for AssignStack {
         let nv = cnf.num_of_variables;
         AssignStack {
             trail: Vec::with_capacity(nv),
-            conflict_weight: 0.0,
             asgvec: vec![None; 1 + nv],
             trail_lim: Vec::new(),
             q_head: 0,
@@ -166,13 +164,11 @@ impl PropagatorIF for AssignStack {
     /// propagate without checking dead clauses
     /// Note: this function assumes there's no dead clause.
     /// So Eliminator should call `garbage_collect` before me.
-    fn propagate(&mut self, cdb: &mut ClauseDB, state: &mut State, vdb: &mut VarDB) -> ClauseId {
-        let ncnfl = state.stats[Stat::Conflict] + 1;
+    fn propagate(&mut self, cdb: &mut ClauseDB, vdb: &mut VarDB) -> ClauseId {
         let watcher = &mut cdb.watcher[..] as *mut [Vec<Watch>];
         while self.remains() {
             let p = self.sweep();
             let false_lit = !p;
-            state.stats[Stat::Propagation] += 1;
             unsafe {
                 let source = (*watcher).get_unchecked_mut(usize::from(p));
                 let mut n = 0;
@@ -187,9 +183,7 @@ impl PropagatorIF for AssignStack {
                     let lits = &mut cdb[w.c].lits;
                     if lits.len() == 2 {
                         if blocker_value == Some(false) {
-                            self.catchup();
-                            self.conflict_weight = vdb[p.vi()].record_conflict(ncnfl);
-                            state.rst.rcc.update(self.conflict_weight);
+                            // state.rst.rcc.update(vdb[p.vi()].record_conflict(ncnfl));
                             return w.c;
                         }
                         self.uncheck_enqueue(vdb, w.blocker, w.c);
@@ -218,9 +212,7 @@ impl PropagatorIF for AssignStack {
                         }
                     }
                     if first_value == Some(false) {
-                        self.catchup();
-                        self.conflict_weight = vdb[p.vi()].record_conflict(ncnfl);
-                        state.rst.rcc.update(self.conflict_weight);
+                        // state.rst.rcc.update(vdb[p.vi()].record_conflict(ncnfl));
                         return w.c;
                     }
                     self.uncheck_enqueue(vdb, first, w.c);
@@ -339,9 +331,6 @@ impl AssignStack {
         let lit = self.trail[self.q_head];
         self.q_head += 1;
         lit
-    }
-    fn catchup(&mut self) {
-        self.q_head = self.trail.len();
     }
 }
 

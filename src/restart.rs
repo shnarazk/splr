@@ -136,11 +136,8 @@ impl Default for ProgressRCC {
 }
 
 impl Instantiate for ProgressRCC {
-    fn instantiate(config: &Config, _: &CNFDescription) -> Self {
-        ProgressRCC {
-            threshold: config.rcct,
-            ..ProgressRCC::default()
-        }
+    fn instantiate(_: &Config, _: &CNFDescription) -> Self {
+        ProgressRCC::default()
     }
 }
 
@@ -279,7 +276,7 @@ pub struct RestartExecutor {
     pub adaptive_restart: bool,
     pub asg: ProgressASG,
     pub lbd: ProgressLBD,
-    pub rcc: ProgressRCC,
+    // pub rcc: ProgressRCC,
     pub blvl: ProgressLVL,
     pub clvl: ProgressLVL,
     pub luby: LubySeries,
@@ -294,7 +291,7 @@ impl Instantiate for RestartExecutor {
             adaptive_restart: !config.without_adaptive_restart,
             asg: ProgressASG::instantiate(config, cnf),
             lbd: ProgressLBD::instantiate(config, cnf),
-            rcc: ProgressRCC::instantiate(config, cnf),
+            // rcc: ProgressRCC::instantiate(config, cnf),
             blvl: ProgressLVL::instantiate(config, cnf),
             clvl: ProgressLVL::instantiate(config, cnf),
             luby: LubySeries::instantiate(config, cnf),
