@@ -545,7 +545,7 @@ fn analyze(
     let mut p = NULL_LIT;
     let mut ti = asgs.len() - 1; // trail index
     let mut path_cnt = 0;
-    state.last_dl.clear();
+    // state.last_dl.clear();
     loop {
         // println!("analyze {}", p.int());
         unsafe {
@@ -557,9 +557,9 @@ fn analyze(
                 if 2 < (*c).rank {
                     let nlevels = vdb.compute_lbd(&(*c).lits, &mut state.lbd_temp);
                     if nlevels + 1 < (*c).rank {
-                        if (*c).rank <= cdb.lbd_frozen_clause {
-                            (*c).turn_on(Flag::JUST_USED);
-                        }
+                        // if (*c).rank <= cdb.lbd_frozen_clause {
+                        //     (*c).turn_on(Flag::JUST_USED);
+                        // }
                         if state.use_chan_seok && nlevels < cdb.co_lbd_bound {
                             (*c).turn_off(Flag::LEARNT);
                             cdb.num_learnt -= 1;
