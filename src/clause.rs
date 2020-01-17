@@ -558,7 +558,7 @@ impl ClauseDBIF for ClauseDB {
                 c.kill(touched);
             }
         }
-        state.stats[Stat::Reduction] += 1;
+        state[Stat::Reduction] += 1;
         self.garbage_collect();
     }
     fn simplify(
@@ -589,9 +589,9 @@ impl ClauseDBIF for ClauseDB {
             }
         }
         self.garbage_collect();
-        state.stats[Stat::SatClauseElimination] += 1;
+        state[Stat::SatClauseElimination] += 1;
         if elim.is_running() {
-            state.stats[Stat::ExhaustiveElimination] += 1;
+            state[Stat::ExhaustiveElimination] += 1;
             self.reset_lbd(vdb, &mut state.lbd_temp);
             elim.stop(self, vdb);
         }

@@ -206,6 +206,21 @@ impl Default for State {
     }
 }
 
+impl Index<Stat> for State {
+    type Output = usize;
+    #[inline]
+    fn index(&self, i: Stat) -> &usize {
+        &self.stats[i as usize]
+    }
+}
+
+impl IndexMut<Stat> for State {
+    #[inline]
+    fn index_mut(&mut self, i: Stat) -> &mut usize {
+        &mut self.stats[i as usize]
+    }
+}
+
 macro_rules! im {
     ($format: expr, $record: expr, $key: expr, $val: expr) => {
         match ($val, $key) {
@@ -321,12 +336,12 @@ impl StateIF for State {
             return;
         }
         let mut re_init = false;
-        let decpc = self.stats[Stat::Decision] as f64 / self.stats[Stat::Conflict] as f64;
+        let decpc = self[Stat::Decision] as f64 / self[Stat::Conflict] as f64;
         if decpc <= 1.2 {
             self.strategy = SearchStrategy::LowDecisions;
             self.use_chan_seok = true;
             cdb.cur_restart =
-                (self.stats[Stat::Conflict] as f64 / cdb.next_reduction as f64 + 1.0) as usize;
+                (self[Stat::Conflict] as f64 / cdb.next_reduction as f64 + 1.0) as usize;
             cdb.co_lbd_bound = 4;
             cdb.first_reduction = 2000;
             cdb.glureduce = true;
@@ -334,7 +349,7 @@ impl StateIF for State {
             cdb.next_reduction = 2000;
             re_init = true;
         }
-        if self.stats[Stat::NoDecisionConflict] < 30_000 {
+        if self[Stat::NoDecisionConflict] < 30_000 {
             if !self.config.without_deep_search {
                 self.strategy = SearchStrategy::LowSuccesiveM;
             } else {
@@ -343,7 +358,7 @@ impl StateIF for State {
                 self.rst.luby.step = 100;
             }
         }
-        if self.stats[Stat::NoDecisionConflict] > 54_400 {
+        if self[Stat::NoDecisionConflict] > 54_400 {
             self.strategy = SearchStrategy::HighSuccesive;
             self.use_chan_seok = true;
             cdb.co_lbd_bound = 3;
@@ -351,7 +366,7 @@ impl StateIF for State {
             cdb.glureduce = true;
             // randomize_on_restarts = 1;
         }
-        if self.stats[Stat::NumLBD2] - self.stats[Stat::NumBin] > 20_000 {
+        if self[Stat::NumLBD2] - self[Stat::NumBin] > 20_000 {
             self.strategy = SearchStrategy::ManyGlues;
         }
         if self.strategy == SearchStrategy::Initial {
@@ -409,19 +424,19 @@ impl StateIF for State {
                 "{:>11}",
                 self.record,
                 LogUsizeId::Conflict,
-                self.stats[Stat::Conflict]
+                self[Stat::Conflict]
             ),
             i!(
                 "{:>13}",
                 self.record,
                 LogUsizeId::Decision,
-                self.stats[Stat::Decision]
+                self[Stat::Decision]
             ),
             i!(
                 "{:>15}",
                 self.record,
                 LogUsizeId::Propagate,
-                self.stats[Stat::Propagation]
+                self[Stat::Propagation]
             ),
         );
         println!(
@@ -448,13 +463,13 @@ impl StateIF for State {
                 "{:>9}",
                 self.record,
                 LogUsizeId::LBD2,
-                self.stats[Stat::NumLBD2]
+                self[Stat::NumLBD2]
             ),
             im!(
                 "{:>9}",
                 self.record,
                 LogUsizeId::Binclause,
-                self.stats[Stat::NumBinLearnt]
+                self[Stat::NumBinLearnt]
             ),
             im!(
                 "{:>9}",
@@ -469,13 +484,13 @@ impl StateIF for State {
                 "{:>9}",
                 self.record,
                 LogUsizeId::RestartBlock,
-                self.stats[Stat::BlockRestart]
+                self[Stat::BlockRestart]
             ),
             im!(
                 "{:>9}",
                 self.record,
                 LogUsizeId::Restart,
-                self.stats[Stat::Restart]
+                self[Stat::Restart]
             ),
             fm!(
                 "{:>9.4}",
@@ -500,7 +515,7 @@ impl StateIF for State {
                     "{:>9.4}",
                     self.record,
                     LogF64Id::End,
-                    100.0 * self.stats[Stat::Restart] as f64 / self.stats[Stat::Conflict] as f64
+                    100.0 * self[Stat::Restart] as f64 / self[Stat::Conflict] as f64
                 )
             );
             println!(
@@ -509,13 +524,13 @@ impl StateIF for State {
                     "{:>9}",
                     self.record,
                     LogUsizeId::Reduction,
-                    self.stats[Stat::Reduction]
+                    self[Stat::Reduction]
                 ),
                 im!(
                     "{:>9}",
                     self.record,
                     LogUsizeId::SatClauseElim,
-                    self.stats[Stat::SatClauseElimination]
+                    self[Stat::SatClauseElimination]
                 ),
                 fm!(
                     "{:>9.4}",
@@ -534,8 +549,8 @@ impl StateIF for State {
             self.record[LogF64Id::AveLBD] = self.rst.lbd.get();
             self.record[LogF64Id::CLevel] = self.c_lvl.get();
             self.record[LogF64Id::BLevel] = self.b_lvl.get();
-            self.record[LogUsizeId::Reduction] = self.stats[Stat::Reduction];
-            self.record[LogUsizeId::SatClauseElim] = self.stats[Stat::SatClauseElimination];
+            self.record[LogUsizeId::Reduction] = self[Stat::Reduction];
+            self.record[LogUsizeId::SatClauseElim] = self[Stat::SatClauseElimination];
             self.record[LogF64Id::RestartBlkR] = self.rst.asg.threshold;
             self.record[LogF64Id::RestartThrK] = self.rst.lbd.threshold;
         }
@@ -701,19 +716,19 @@ impl State {
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
         let nlearnts = cdb.countf(Flag::LEARNT);
-        let ncnfl = self.stats[Stat::Conflict];
-        let nrestart = self.stats[Stat::Restart];
+        let ncnfl = self[Stat::Conflict];
+        let nrestart = self[Stat::Restart];
         println!(
             "c | {:>8}  {:>8} {:>8} | {:>7} {:>8} {:>8} |  {:>4}  {:>8} {:>7} {:>8} | {:>6.3} % |",
             nrestart,                              // restart
-            self.stats[Stat::BlockRestart],        // blocked
+            self[Stat::BlockRestart],              // blocked
             ncnfl / nrestart.max(1),               // average cfc (Conflict / Restart)
             nv - fixed - self.num_eliminated_vars, // alive vars
             cdb.count(true) - nlearnts,            // given clauses
             0,                                     // alive literals
-            self.stats[Stat::Reduction],           // clause reduction
+            self[Stat::Reduction],                 // clause reduction
             nlearnts,                              // alive learnts
-            self.stats[Stat::NumLBD2],             // learnts with LBD = 2
+            self[Stat::NumLBD2],                   // learnts with LBD = 2
             ncnfl - nlearnts,                      // removed learnts
             (sum as f32) / (nv as f32) * 100.0,    // progress
         );
@@ -741,8 +756,8 @@ impl State {
             cdb.num_learnt,
             cdb.num_active,
             0,
-            self.stats[Stat::BlockRestart],
-            self.stats[Stat::Restart],
+            self[Stat::BlockRestart],
+            self[Stat::Restart],
             self.rst.asg.get(),
             self.rst.lbd.get(),
             self.rst.lbd.get(),

@@ -237,8 +237,8 @@ impl VarDBIF for VarDB {
         false
     }
     fn update_stat(&mut self, state: &State) {
-        self.current_conflict = state.stats[Stat::Conflict] + 1;
-        self.current_restart = state.stats[Stat::Restart] + 1;
+        self.current_conflict = state[Stat::Conflict] + 1;
+        self.current_restart = state[Stat::Restart] + 1;
     }
 
     fn compute_lbd(&self, vec: &[Lit], keys: &mut [usize]) -> usize {
