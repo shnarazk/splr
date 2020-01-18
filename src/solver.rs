@@ -545,79 +545,84 @@ fn analyze(
     let mut p = NULL_LIT;
     let mut ti = asgs.len() - 1; // trail index
     let mut path_cnt = 0;
+    let lbd_bound = cdb.co_lbd_bound;
     // state.last_dl.clear();
     loop {
         // println!("analyze {}", p.int());
-        unsafe {
-            debug_assert_ne!(cid, ClauseId::default());
-            let c = &mut cdb[cid] as *mut Clause;
-            debug_assert!(!(*c).is(Flag::DEAD));
-            if (*c).is(Flag::LEARNT) {
-                cdb.bump_activity(cid, ());
-                if 2 < (*c).rank {
-                    let nlevels = vdb.compute_lbd(&(*c).lits, &mut state.lbd_temp);
-                    if nlevels + 1 < (*c).rank {
-                        // if (*c).rank <= cdb.lbd_frozen_clause {
-                        //     (*c).turn_on(Flag::JUST_USED);
-                        // }
-                        if state.use_chan_seok && nlevels < cdb.co_lbd_bound {
-                            (*c).turn_off(Flag::LEARNT);
-                            cdb.num_learnt -= 1;
-                        } else {
-                            (*c).rank = nlevels;
-                        }
+        debug_assert_ne!(cid, ClauseId::default());
+        if cdb[cid].is(Flag::LEARNT) {
+            cdb.bump_activity(cid, ());
+            let c = &mut cdb[cid];
+            debug_assert!(!c.is(Flag::DEAD));
+            if 2 < c.rank {
+                let nlevels = vdb.compute_lbd(&c.lits, &mut state.lbd_temp);
+                if nlevels + 1 < c.rank {
+                    // if c.rank <= cdb.lbd_frozen_clause {
+                    //     c.turn_on(Flag::JUST_USED);
+                    // }
+                    if state.use_chan_seok && nlevels < lbd_bound {
+                        c.turn_off(Flag::LEARNT);
+                        cdb.num_learnt -= 1;
+                    } else {
+                        c.rank = nlevels;
                     }
                 }
             }
-            if p != NULL_LIT && (*c).lits.len() == 2 && (*c).lits[1] == p {
-                (*c).lits.swap(0, 1);
+        }
+        let c = &cdb[cid];
+        let range = {
+            let len = c.lits.len();
+            if c.lits.len() == 2 && c.lits[1] == p {
+                0..1
+            } else {
+                ((p != NULL_LIT) as usize)..len
             }
-            // println!("- handle {}", cid.fmt());
-            for q in &(*c).lits[((p != NULL_LIT) as usize)..] {
-                let vi = q.vi();
-                vdb.bump_activity(vi, dl);
-                asgs.update_order(vdb, vi);
-                let v = &mut vdb[vi];
-                let lvl = v.level;
-                debug_assert!(!v.is(Flag::ELIMINATED));
-                debug_assert!(v.assign.is_some());
-                if 0 < lvl && !state.an_seen[vi] {
-                    state.an_seen[vi] = true;
-                    if dl <= lvl {
-                        // println!("- flag for {} which level is {}", q.int(), lvl);
-                        path_cnt += 1;
-                        if v.reason != ClauseId::default() && cdb[v.reason].is(Flag::LEARNT) {
-                            state.last_dl.push(*q);
-                        }
-                    } else {
-                        // println!("- push {} to learnt, which level is {}", q.int(), lvl);
-                        learnt.push(*q);
+        };
+        // println!("- handle {}", cid.fmt());
+        for q in &c.lits[range] {
+            let vi = q.vi();
+            vdb.bump_activity(vi, dl);
+            asgs.update_order(vdb, vi);
+            let v = &mut vdb[vi];
+            let lvl = v.level;
+            debug_assert!(!v.is(Flag::ELIMINATED));
+            debug_assert!(v.assign.is_some());
+            if 0 < lvl && !state.an_seen[vi] {
+                state.an_seen[vi] = true;
+                if dl <= lvl {
+                    // println!("- flag for {} which level is {}", q.int(), lvl);
+                    path_cnt += 1;
+                    if v.reason != ClauseId::default() && cdb[v.reason].is(Flag::LEARNT) {
+                        state.last_dl.push(*q);
                     }
                 } else {
-                    // if !state.an_seen[vi] {
-                    //     println!("- ignore {} because it was flagged", q.int());
-                    // } else {
-                    //     println!("- ignore {} because its level is {}", q.int(), lvl);
-                    // }
+                    // println!("- push {} to learnt, which level is {}", q.int(), lvl);
+                    learnt.push(*q);
                 }
+            } else {
+                // if !state.an_seen[vi] {
+                //     println!("- ignore {} because it was flagged", q.int());
+                // } else {
+                //     println!("- ignore {} because its level is {}", q.int(), lvl);
+                // }
             }
-            // set the index of the next literal to ti
-            while !state.an_seen[asgs.trail[ti].vi()] {
-                // println!("- skip {} because it isn't flagged", asgs.trail[ti].int());
-                ti -= 1;
-            }
-            p = asgs.trail[ti];
-            let next_vi = p.vi();
-            cid = vdb[next_vi].reason;
-            // println!("- move to flagged {}, which reason is {}; num path: {}",
-            //          next_vi, path_cnt - 1, cid.fmt());
-            state.an_seen[next_vi] = false;
-            path_cnt -= 1;
-            if path_cnt <= 0 {
-                break;
-            }
+        }
+        // set the index of the next literal to ti
+        while !state.an_seen[asgs.trail[ti].vi()] {
+            // println!("- skip {} because it isn't flagged", asgs.trail[ti].int());
             ti -= 1;
         }
+        p = asgs.trail[ti];
+        let next_vi = p.vi();
+        cid = vdb[next_vi].reason;
+        // println!("- move to flagged {}, which reason is {}; num path: {}",
+        //          next_vi, path_cnt - 1, cid.fmt());
+        state.an_seen[next_vi] = false;
+        path_cnt -= 1;
+        if path_cnt <= 0 {
+            break;
+        }
+        ti -= 1;
     }
     learnt[0] = !p;
     // println!("- appending {}, the result is {:?}", learnt[0].int(), vec2int(learnt));
