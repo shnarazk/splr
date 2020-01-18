@@ -188,6 +188,12 @@ impl ClauseIF for Clause {
         touched[!self.lits[0]] = true;
         touched[!self.lits[1]] = true;
     }
+    fn is_empty(&self) -> bool {
+        self.lits.is_empty()
+    }
+    fn len(&self) -> usize {
+        self.lits.len()
+    }
 }
 
 impl FlagIF for Clause {

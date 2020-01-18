@@ -571,15 +571,15 @@ fn analyze(
         }
         let c = &cdb[cid];
         let range = {
-            let len = c.lits.len();
-            if c.lits.len() == 2 && c.lits[1] == p {
+            let len = c.len();
+            if len == 2 && c[1] == p {
                 0..1
             } else {
                 ((p != NULL_LIT) as usize)..len
             }
         };
         // println!("- handle {}", cid.fmt());
-        for q in &c.lits[range] {
+        for q in &c[range] {
             let vi = q.vi();
             vdb.bump_activity(vi, dl);
             asgs.update_order(vdb, vi);
@@ -699,10 +699,10 @@ fn redundant_lit(
     while let Some(sl) = stack.pop() {
         let cid = vdb[sl.vi()].reason;
         let c = &mut cdb[cid];
-        if (*c).lits.len() == 2 && vdb.assigned((*c).lits[0]) == Some(false) {
+        if (*c).len() == 2 && vdb.assigned((*c)[0]) == Some(false) {
             (*c).lits.swap(0, 1);
         }
-        for q in &(*c).lits[1..] {
+        for q in &(*c)[1..] {
             let vi = q.vi();
             let lv = vdb[vi].level;
             if 0 < lv && !seen[vi] {
@@ -746,7 +746,7 @@ fn analyze_final(asgs: &AssignStack, state: &mut State, vdb: &VarDB, c: &Clause)
             if vdb[vi].reason == ClauseId::default() {
                 state.conflicts.push(!*l);
             } else {
-                for l in &c.lits[(c.lits.len() != 2) as usize..] {
+                for l in &c[(c.len() != 2) as usize..] {
                     let vi = l.vi();
                     if 0 < vdb[vi].level {
                         seen[vi] = true;
@@ -771,11 +771,11 @@ fn minimize_with_bi_clauses(cdb: &ClauseDB, vdb: &VarDB, temp: &mut [usize], vec
     let mut nsat = 0;
     for w in &cdb.watcher[!l0] {
         let c = &cdb[w.c];
-        if c.lits.len() != 2 {
+        if c.len() != 2 {
             continue;
         }
-        debug_assert!(c.lits[0] == l0 || c.lits[1] == l0);
-        let other = c.lits[(c.lits[0] == l0) as usize];
+        debug_assert!(c[0] == l0 || c[1] == l0);
+        let other = c[(c[0] == l0) as usize];
         let vi = other.vi();
         if temp[vi] == key && vdb.assigned(other) == Some(true) {
             nsat += 1;
