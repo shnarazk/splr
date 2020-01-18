@@ -641,12 +641,7 @@ fn analyze(
 }
 
 #[allow(dead_code)]
-fn bump_vars(
-    asgs: &mut AssignStack,
-    cdb: &mut ClauseDB,
-    vdb: &mut VarDB,
-    confl: ClauseId,
-) {
+fn bump_vars(asgs: &mut AssignStack, cdb: &mut ClauseDB, vdb: &mut VarDB, confl: ClauseId) {
     debug_assert_ne!(confl, ClauseId::default());
     let mut cid = confl;
     let mut p = NULL_LIT;

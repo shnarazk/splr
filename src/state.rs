@@ -686,7 +686,6 @@ impl IndexMut<Stat> for State {
     }
 }
 
-
 impl State {
     #[allow(dead_code)]
     fn dump_header_details(&self) {

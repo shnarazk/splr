@@ -163,7 +163,7 @@ impl ActivityIF for VarDB {
     type Inc = ();
     fn activity(&mut self, vi: Self::Ix) -> f64 {
         let v = &mut self.var[vi];
-        let diff =self.ordinal - v.last_used;
+        let diff = self.ordinal - v.last_used;
         if 0 < diff {
             v.last_used = self.ordinal;
             v.reward *= self.activity_decay.powi(diff as i32);
