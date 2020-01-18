@@ -116,7 +116,7 @@ impl EmaIF for ProgressLVL {
 
 impl ProgressEvaluator for ProgressLVL {
     fn is_active(&self) -> bool {
-        todo!()
+        unimplemented!()
     }
 }
 
@@ -232,7 +232,7 @@ impl EmaIF for LubySeries {
 
 impl ProgressEvaluator for LubySeries {
     fn is_active(&self) -> bool {
-        todo!()
+        unimplemented!()
     }
 }
 
