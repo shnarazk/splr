@@ -136,6 +136,51 @@ impl Default for Clause {
     }
 }
 
+impl Index<usize> for Clause {
+    type Output = Lit;
+    #[inline]
+    fn index(&self, i: usize) -> &Lit {
+        unsafe { self.lits.get_unchecked(i) }
+    }
+}
+
+impl IndexMut<usize> for Clause {
+    #[inline]
+    fn index_mut(&mut self, i: usize) -> &mut Lit {
+        unsafe { self.lits.get_unchecked_mut(i) }
+    }
+}
+
+impl Index<Range<usize>> for Clause {
+    type Output = [Lit];
+    #[inline]
+    fn index(&self, r: Range<usize>) -> &[Lit] {
+        &self.lits[r]
+    }
+}
+
+impl Index<RangeFrom<usize>> for Clause {
+    type Output = [Lit];
+    #[inline]
+    fn index(&self, r: RangeFrom<usize>) -> &[Lit] {
+        &self.lits[r]
+    }
+}
+
+impl IndexMut<Range<usize>> for Clause {
+    #[inline]
+    fn index_mut(&mut self, r: Range<usize>) -> &mut [Lit] {
+        &mut self.lits[r]
+    }
+}
+
+impl IndexMut<RangeFrom<usize>> for Clause {
+    #[inline]
+    fn index_mut(&mut self, r: RangeFrom<usize>) -> &mut [Lit] {
+        &mut self.lits[r]
+    }
+}
+
 impl ClauseIF for Clause {
     fn kill(&mut self, touched: &mut [bool]) {
         self.turn_on(Flag::DEAD);
