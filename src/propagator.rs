@@ -183,7 +183,7 @@ impl PropagatorIF for AssignStack {
                     let lits = &mut cdb[w.c].lits;
                     if lits.len() == 2 {
                         if blocker_value == Some(false) {
-                            self.catchup();
+                            // self.catchup();
                             return w.c;
                         }
                         self.uncheck_enqueue(vdb, w.blocker, w.c);
@@ -212,7 +212,7 @@ impl PropagatorIF for AssignStack {
                         }
                     }
                     if first_value == Some(false) {
-                        self.catchup();
+                        // self.catchup();
                         return w.c;
                     }
                     self.uncheck_enqueue(vdb, first, w.c);
@@ -332,9 +332,9 @@ impl AssignStack {
         self.q_head += 1;
         lit
     }
-    fn catchup(&mut self) {
-        self.q_head = self.trail.len();
-    }
+//    fn catchup(&mut self) {
+//        self.q_head = self.trail.len();
+//    }
 }
 
 /// Heap of VarId, based on var activity

@@ -24,8 +24,8 @@ pub struct Var {
     pub phase: bool,
     // /// polarity of assigned value
     // pub polarity: Ema,
-    /// frequency of conflict: the reverse of the average conflict interval
-    pub foc: Ema,
+//    /// frequency of conflict: the reverse of the average conflict interval
+//    pub foc: Ema,
     /// the propagating clause
     pub reason: ClauseId,
     /// decision level at which this variables is assigned.
@@ -33,7 +33,7 @@ pub struct Var {
     /// a dynamic evaluation criterion like VSIDS or ACID.
     reward: f64,
     /// the number of conflicts at which this var was rewarded lastly.
-    last_update: usize,
+    last_used: usize,
     /// list of clauses which contain this variable positively.
     pub pos_occurs: Vec<ClauseId>,
     /// list of clauses which contain this variable negatively.
@@ -53,11 +53,11 @@ impl VarIF for Var {
             assign: None,
             phase: false,
             // polarity: Ema::new(16),
-            foc: Ema::new(20),
+            // foc: Ema::new(20),
             reason: ClauseId::default(),
             level: 0,
             reward: 0.0,
-            last_update: 0,
+            last_used: 0,
             pos_occurs: Vec::new(),
             neg_occurs: Vec::new(),
             flags: Flag::empty(),
@@ -163,22 +163,22 @@ impl ActivityIF for VarDB {
     type Inc = ();
     fn activity(&mut self, vi: Self::Ix) -> f64 {
         let v = &mut self.var[vi];
-        let diff =self.ordinal - v.last_update;
+        let diff =self.ordinal - v.last_used;
         if 0 < diff {
-            v.last_update = self.ordinal;
+            v.last_used = self.ordinal;
             v.reward *= self.activity_decay.powi(diff as i32);
         }
         v.reward
     }
     fn bump_activity(&mut self, vi: Self::Ix, _: Self::Inc) {
         let v = &mut self.var[vi];
-        let t = (self.ordinal - v.last_update) as i32;
+        let t = (self.ordinal - v.last_used) as i32;
         // v.reward = (now as f64 + self.activity) / 2.0; // ASCID
         // v.reward = 0.2 + self.reward_by_dl / (dl + 1) as f64 + v.reward * self.activity_decay.powi(t);
         if 0 < t {
             v.reward *= self.activity_decay.powi(t);
             v.reward += 1.0 - self.activity_decay;
-            v.last_update = self.ordinal;
+            v.last_used = self.ordinal;
         }
     }
     fn scale_activity(&mut self) {}

@@ -157,7 +157,7 @@ pub struct State {
     pub new_learnt: Vec<Lit>,
     pub an_seen: Vec<bool>,
     pub last_asg: usize,
-    pub last_dl: Vec<Lit>,
+    // pub last_dl: Vec<Lit>,
     pub lbd_temp: Vec<usize>,
     pub slack_duration: isize,
     pub stagnated: bool,
@@ -191,7 +191,7 @@ impl Default for State {
             new_learnt: Vec::new(),
             an_seen: Vec::new(),
             last_asg: 0,
-            last_dl: Vec::new(),
+            // last_dl: Vec::new(),
             lbd_temp: Vec::new(),
             slack_duration: 0,
             stagnated: false,
@@ -678,14 +678,14 @@ impl Index<Stat> for State {
     type Output = usize;
     #[inline]
     fn index(&self, i: Stat) -> &usize {
-        &self.stats[i as usize]
+        unsafe { self.stats.get_unchecked(i as usize) }
     }
 }
 
 impl IndexMut<Stat> for State {
     #[inline]
     fn index_mut(&mut self, i: Stat) -> &mut usize {
-        &mut self.stats[i as usize]
+        unsafe { self.stats.get_unchecked_mut(i as usize) }
     }
 }
 

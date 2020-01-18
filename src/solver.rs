@@ -552,7 +552,7 @@ fn analyze(
     let mut p = NULL_LIT;
     let mut ti = asgs.len() - 1; // trail index
     let mut path_cnt = 0;
-    state.last_dl.clear();
+    // state.last_dl.clear();
     loop {
         // println!("analyze {}", p.int());
         unsafe {
@@ -564,9 +564,9 @@ fn analyze(
                 if 2 < (*c).rank {
                     let nlevels = vdb.compute_lbd(&(*c).lits, &mut state.lbd_temp);
                     if nlevels + 1 < (*c).rank {
-                        if (*c).rank <= cdb.lbd_frozen_clause {
-                            (*c).turn_on(Flag::JUST_USED);
-                        }
+                        // if (*c).rank <= cdb.lbd_frozen_clause {
+                        //     (*c).turn_on(Flag::JUST_USED);
+                        // }
                         if state.use_chan_seok && nlevels < cdb.co_lbd_bound {
                             (*c).turn_off(Flag::LEARNT);
                             cdb.num_learnt -= 1;
@@ -583,18 +583,18 @@ fn analyze(
             for q in &(*c).lits[((p != NULL_LIT) as usize)..] {
                 let vi = q.vi();
                 let lvl = vdb[vi].level;
-                if 0 < lvl && !state.an_seen[vi] {
+                if 0 < lvl && !state.an_seen.get_unchecked(vi) {
                     // vdb.bump_activity(vi, ());
                     let v = &mut vdb[vi];
                     debug_assert!(!v.is(Flag::ELIMINATED));
                     debug_assert!(v.assign.is_some());
-                    state.an_seen[vi] = true;
+                    *state.an_seen.get_unchecked_mut(vi) = true;
                     if dl <= lvl {
                         // println!("- flag for {} which level is {}", q.int(), lvl);
                         path_cnt += 1;
-                        if v.reason != ClauseId::default() && cdb[v.reason].is(Flag::LEARNT) {
-                            state.last_dl.push(*q);
-                        }
+                        // if v.reason != ClauseId::default() && cdb[v.reason].is(Flag::LEARNT) {
+                        //     state.last_dl.push(*q);
+                        // }
                     } else {
                         // println!("- push {} to learnt, which level is {}", q.int(), lvl);
                         learnt.push(*q);
@@ -608,16 +608,16 @@ fn analyze(
                 }
             }
             // set the index of the next literal to ti
-            while !state.an_seen[asgs.trail[ti].vi()] {
+            while !state.an_seen[asgs.trail.get_unchecked(ti).vi()] {
                 // println!("- skip {} because it isn't flagged", asgs.trail[ti].int());
                 ti -= 1;
             }
-            p = asgs.trail[ti];
+            p = *asgs.trail.get_unchecked(ti);
             let next_vi = p.vi();
             cid = vdb[next_vi].reason;
             // println!("- move to flagged {}, which reason is {}; num path: {}",
             //          next_vi, path_cnt - 1, cid.fmt());
-            state.an_seen[next_vi] = false;
+            *state.an_seen.get_unchecked_mut(next_vi) = false;
             path_cnt -= 1;
             if path_cnt <= 0 {
                 break;
