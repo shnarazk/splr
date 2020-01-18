@@ -367,5 +367,9 @@ bitflags! {
         const ELIMINATED   = 0b0000_0000_0010_0000;
         /// mark to run garbage collector on the corresponding watcher lists
         const TOUCHED      = 0b0000_0000_0100_0000;
+        /// this var should be checked in Conflict Analysis.
+        const CA_SEEN      = 0b0000_0000_1000_0000;
+        /// this var should be checked in Var Rewarding.
+        const VR_SEEN      = 0b0000_0001_0000_0000;
     }
 }

@@ -155,7 +155,6 @@ pub struct State {
     pub model: Vec<Option<bool>>,
     pub conflicts: Vec<Lit>,
     pub new_learnt: Vec<Lit>,
-    pub an_seen: Vec<bool>,
     pub last_asg: usize,
     // pub last_dl: Vec<Lit>,
     pub lbd_temp: Vec<usize>,
@@ -189,7 +188,6 @@ impl Default for State {
             model: Vec::new(),
             conflicts: Vec::new(),
             new_learnt: Vec::new(),
-            an_seen: Vec::new(),
             last_asg: 0,
             // last_dl: Vec::new(),
             lbd_temp: Vec::new(),
@@ -294,7 +292,6 @@ impl Instantiate for State {
         state.rst = RestartExecutor::instantiate(config, &cnf);
         state.progress_log = config.use_log;
         state.model = vec![None; cnf.num_of_variables + 1];
-        state.an_seen = vec![false; cnf.num_of_variables + 1];
         state.lbd_temp = vec![0; cnf.num_of_variables + 1];
         state.target = cnf.clone();
         state.time_limit = config.timeout;
