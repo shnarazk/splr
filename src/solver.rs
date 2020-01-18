@@ -587,8 +587,8 @@ fn analyze(
             let lvl = v.level;
             debug_assert!(!v.is(Flag::ELIMINATED));
             debug_assert!(v.assign.is_some());
-            if 0 < lvl && !state.an_seen[vi] {
-                state.an_seen[vi] = true;
+            if 0 < lvl && !v.is(Flag::CA_SEEN) {
+                v.turn_on(Flag::CA_SEEN);
                 if dl <= lvl {
                     // println!("- flag for {} which level is {}", q.int(), lvl);
                     path_cnt += 1;
@@ -600,7 +600,7 @@ fn analyze(
                     learnt.push(*q);
                 }
             } else {
-                // if !state.an_seen[vi] {
+                // if !v.is(Flag::CA_SEEN) {
                 //     println!("- ignore {} because it was flagged", q.int());
                 // } else {
                 //     println!("- ignore {} because its level is {}", q.int(), lvl);
@@ -608,7 +608,7 @@ fn analyze(
             }
         }
         // set the index of the next literal to ti
-        while !state.an_seen[asgs.trail[ti].vi()] {
+        while !vdb[asgs.trail[ti].vi()].is(Flag::CA_SEEN) {
             // println!("- skip {} because it isn't flagged", asgs.trail[ti].int());
             ti -= 1;
         }
@@ -617,7 +617,7 @@ fn analyze(
         cid = vdb[next_vi].reason;
         // println!("- move to flagged {}, which reason is {}; num path: {}",
         //          next_vi, path_cnt - 1, cid.fmt());
-        state.an_seen[next_vi] = false;
+        vdb[next_vi].turn_off(Flag::CA_SEEN);
         path_cnt -= 1;
         if path_cnt <= 0 {
             break;
@@ -637,7 +637,6 @@ fn simplify_learnt(
 ) -> usize {
     let State {
         ref mut new_learnt,
-        ref mut an_seen,
         ..
     } = state;
     // let dl = asgs.level();
@@ -649,7 +648,7 @@ fn simplify_learnt(
     }
     new_learnt.retain(|l| {
         vdb[l.vi()].reason == ClauseId::default()
-            || !redundant_lit(cdb, vdb, an_seen, *l, &mut to_clear, &levels)
+            || !redundant_lit(cdb, vdb, *l, &mut to_clear, &levels)
     });
     if new_learnt.len() < 30 {
         minimize_with_bi_clauses(cdb, vdb, &mut state.lbd_temp, new_learnt);
@@ -680,15 +679,14 @@ fn simplify_learnt(
         new_learnt.swap(1, max_i);
     }
     for l in &to_clear {
-        an_seen[l.vi()] = false;
+        vdb[l.vi()].turn_off(Flag::CA_SEEN);
     }
     level_to_return
 }
 
 fn redundant_lit(
     cdb: &mut ClauseDB,
-    vdb: &VarDB,
-    seen: &mut [bool],
+    vdb: &mut VarDB,
     l: Lit,
     clear: &mut Vec<Lit>,
     levels: &[bool],
@@ -705,14 +703,14 @@ fn redundant_lit(
         for q in &(*c)[1..] {
             let vi = q.vi();
             let lv = vdb[vi].level;
-            if 0 < lv && !seen[vi] {
+            if 0 < lv && !vdb[vi].is(Flag::CA_SEEN) {
                 if vdb[vi].reason != ClauseId::default() && levels[lv as usize] {
-                    seen[vi] = true;
+                    vdb[vi].turn_on(Flag::CA_SEEN);
                     stack.push(*q);
                     clear.push(*q);
                 } else {
-                    for v in &clear[top..] {
-                        seen[v.vi()] = false;
+                    for l in &clear[top..] {
+                        vdb[l.vi()].turn_off(Flag::CA_SEEN);
                     }
                     clear.truncate(top);
                     return false;
@@ -723,7 +721,7 @@ fn redundant_lit(
     true
 }
 
-fn analyze_final(asgs: &AssignStack, state: &mut State, vdb: &VarDB, c: &Clause) {
+fn analyze_final(asgs: &AssignStack, state: &mut State, vdb: &mut VarDB, c: &Clause) {
     let mut seen = vec![false; state.num_vars + 1];
     state.conflicts.clear();
     if asgs.level() == 0 {
@@ -732,7 +730,7 @@ fn analyze_final(asgs: &AssignStack, state: &mut State, vdb: &VarDB, c: &Clause)
     for l in &c.lits {
         let vi = l.vi();
         if 0 < vdb[vi].level {
-            state.an_seen[vi] = true;
+            vdb[vi].turn_on(Flag::CA_SEEN);
         }
     }
     let end = if asgs.level() <= state.root_level {
