@@ -580,7 +580,8 @@ fn analyze(
         let reg = {
             let len = c.lits.len();
             if len == 2 && unsafe { *c.lits.get_unchecked(1) == p } {
-                0..1            // check only the first element
+                // check only the first element
+                0..1
             } else {
                 ((p != NULL_LIT) as usize)..len
             }
@@ -588,19 +589,15 @@ fn analyze(
         for q in &c.lits[reg] {
             let vi = q.vi();
             let lvl = vdb[vi].level;
-            if 0 < lvl && !vdb[vi].is(Flag::CA_SEEN) // !state.an_seen.get_unchecked(vi)
-            {
+            if 0 < lvl && !vdb[vi].is(Flag::CA_SEEN) {
                 // vdb.bump_activity(vi, ());
                 let v = &mut vdb[vi];
                 debug_assert!(!v.is(Flag::ELIMINATED));
                 debug_assert!(v.assign.is_some());
-                v.turn_on(Flag::CA_SEEN); // *state.an_seen.get_unchecked_mut(vi) = true;
+                v.turn_on(Flag::CA_SEEN);
                 if dl <= lvl {
                     // println!("- flag for {} which level is {}", q.int(), lvl);
                     path_cnt += 1;
-                    // if v.reason != ClauseId::default() && cdb[v.reason].is(Flag::LEARNT) {
-                    //     state.last_dl.push(*q);
-                    // }
                 } else {
                     // println!("- push {} to learnt, which level is {}", q.int(), lvl);
                     learnt.push(*q);
@@ -615,9 +612,7 @@ fn analyze(
         }
         // set the index of the next literal to ti
         unsafe {
-            while // !state.an_seen[asgs.trail.get_unchecked(ti).vi()]
-                !vdb[asgs.trail.get_unchecked(ti).vi()].is(Flag::CA_SEEN)
-            {
+            while !vdb[asgs.trail.get_unchecked(ti).vi()].is(Flag::CA_SEEN) {
                 // println!("- skip {} because it isn't flagged", asgs.trail[ti].int());
                 ti -= 1;
             }
@@ -627,7 +622,7 @@ fn analyze(
         cid = vdb[next_vi].reason;
         // println!("- move to flagged {}, which reason is {}; num path: {}",
         //          next_vi, path_cnt - 1, cid.fmt());
-        vdb[next_vi].turn_off(Flag::CA_SEEN); // *state.an_seen.get_unchecked_mut(next_vi) = false;
+        vdb[next_vi].turn_off(Flag::CA_SEEN);
         path_cnt -= 1;
         if path_cnt <= 0 {
             break;
@@ -652,7 +647,7 @@ fn bump_vars(asgs: &mut AssignStack, cdb: &mut ClauseDB, vdb: &mut VarDB, confl:
         let reg = {
             let len = c.lits.len();
             if len == 2 && unsafe { *c.lits.get_unchecked(1) == p } {
-                0..1            // check only the first element
+                0..1
             } else {
                 ((p != NULL_LIT) as usize)..len
             }
@@ -742,7 +737,6 @@ fn simplify_learnt(
 fn redundant_lit(
     cdb: &mut ClauseDB,
     vdb: &mut VarDB,
-//    seen: &mut [bool],
     l: Lit,
     clear: &mut Vec<Lit>,
     levels: &[bool],
@@ -759,7 +753,7 @@ fn redundant_lit(
         for q in &(*c).lits[1..] {
             let vi = q.vi();
             let lv = vdb[vi].level;
-            if 0 < lv && !vdb[vi].is(Flag::CA_SEEN) /* !seen[vi] */ {
+            if 0 < lv && !vdb[vi].is(Flag::CA_SEEN) {
                 if vdb[vi].reason != ClauseId::default() && levels[lv as usize] {
                     vdb[vi].turn_on(Flag::CA_SEEN); // seen[vi] = true;
                     stack.push(*q);

@@ -22,10 +22,6 @@ pub struct Var {
     pub assign: Option<bool>,
     /// the previous assigned value
     pub phase: bool,
-    // /// polarity of assigned value
-    // pub polarity: Ema,
-//    /// frequency of conflict: the reverse of the average conflict interval
-//    pub foc: Ema,
     /// the propagating clause
     pub reason: ClauseId,
     /// decision level at which this variables is assigned.
