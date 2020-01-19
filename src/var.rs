@@ -341,7 +341,8 @@ impl LBDIF for VarDB {
     fn compute_lbd(&mut self, vec: &[Lit]) -> usize {
         let VarDB { lbd_temp, var, .. } = self;
         unsafe {
-            let key = lbd_temp.get_unchecked(0) + 1;
+            let key: usize = lbd_temp.get_unchecked(0) + 1;
+            *lbd_temp.get_unchecked_mut(0) = key;
             let mut cnt = 0;
             for l in vec {
                 let lv = var[l.vi()].level;
@@ -351,28 +352,32 @@ impl LBDIF for VarDB {
                     cnt += 1;
                 }
             }
-            *lbd_temp.get_unchecked_mut(0) = key;
             cnt
         }
     }
     fn reset_lbd(&mut self, cdb: &mut ClauseDB) {
-        let temp = &mut self.lbd_temp;
-        let mut key = temp[0];
-        for c in &mut cdb[1..] {
-            if c.is(Flag::DEAD) || c.is(Flag::LEARNT) {
-                continue;
-            }
-            key += 1;
-            let mut cnt = 0;
-            for l in &c.lits {
-                let lv = self.var[l.vi()].level;
-                if temp[lv] != key && lv != 0 {
-                    temp[lv] = key;
-                    cnt += 1;
+        let VarDB { lbd_temp, .. } = self;
+        unsafe {
+            let mut key = *lbd_temp.get_unchecked(0);
+            for c in &mut cdb[1..] {
+                if c.is(Flag::DEAD) || c.is(Flag::LEARNT) {
+                    continue;
                 }
+                key += 1;
+                let mut cnt = 0;
+                for l in &c.lits {
+                    let lv = self.var[l.vi()].level;
+                    if lv != 0 {
+                        let p = lbd_temp.get_unchecked_mut(lv);
+                        if *p != key {
+                            *p = key;
+                            cnt += 1;
+                        }
+                    }
+                }
+                c.rank = cnt;
             }
-            c.rank = cnt;
+            *lbd_temp.get_unchecked_mut(0) = key;
         }
-        temp[0] = key + 1;
     }
 }
