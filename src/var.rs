@@ -25,8 +25,8 @@ pub struct Var {
     pub phase: bool,
     // /// polarity of assigned value
     // pub polarity: Ema,
-    /// frequency of conflict: the reverse of the average conflict interval
-    pub foc: Ema,
+    // /// frequency of conflict: the reverse of the average conflict interval
+    // pub foc: Ema,
     /// the propagating clause
     pub reason: ClauseId,
     /// decision level at which this variables is assigned.
@@ -72,7 +72,7 @@ impl VarIF for Var {
             assign: None,
             phase: false,
             // polarity: Ema::new(16),
-            foc: Ema::new(20),
+            // foc: Ema::new(20),
             reason: ClauseId::default(),
             level: 0,
             reward: 0.0,
@@ -90,6 +90,7 @@ impl VarIF for Var {
         }
         vec
     }
+    /*
     fn record_conflict(&mut self, now: usize) -> f64 {
         assert_ne!(self.last_conflict, now);
         self.foc
@@ -97,6 +98,7 @@ impl VarIF for Var {
         self.last_conflict = now;
         self.foc.get()
     }
+    */
     fn assigned(&self, l: Lit) -> Option<bool> {
         match self.assign {
             Some(x) if !bool::from(l) => Some(!x),

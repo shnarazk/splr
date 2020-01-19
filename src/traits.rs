@@ -277,8 +277,8 @@ pub trait VarIF {
     fn new(i: usize) -> Var;
     /// return a new vector of $n$ `Var`s.
     fn new_vars(n: usize) -> Vec<Var>;
-    /// update the internal records about conflict.
-    fn record_conflict(&mut self, now: usize) -> f64;
+    // /// update the internal records about conflict.
+    // fn record_conflict(&mut self, now: usize) -> f64;
     /// return its 'value'.
     fn assigned(&self, l: Lit) -> Option<bool>;
 }
