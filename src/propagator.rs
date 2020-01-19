@@ -25,6 +25,18 @@ pub struct AssignStack {
     var_order: VarIdHeap, // Variable Order
 }
 
+impl Default for AssignStack {
+    fn default() -> AssignStack {
+        AssignStack {
+            trail: Vec::new(),
+            asgvec: Vec::new(),
+            trail_lim: Vec::new(),
+            q_head: 0,
+            var_order: VarIdHeap::default(),
+        }
+    }
+}
+
 /// ```
 /// let x: Lbool = var_assign!(self, lit.vi());
 /// ```
@@ -98,9 +110,8 @@ impl Instantiate for AssignStack {
         AssignStack {
             trail: Vec::with_capacity(nv),
             asgvec: vec![None; 1 + nv],
-            trail_lim: Vec::new(),
-            q_head: 0,
             var_order: VarIdHeap::new(nv, nv),
+            ..AssignStack::default()
         }
     }
 }
@@ -350,6 +361,15 @@ impl AssignStack {
 pub struct VarIdHeap {
     heap: Vec<VarId>, // order : usize -> VarId
     idxs: Vec<usize>, // VarId : -> order : usize
+}
+
+impl Default for VarIdHeap {
+    fn default() -> VarIdHeap {
+        VarIdHeap {
+            heap: Vec::new(),
+            idxs: Vec::new(),
+        }
+    }
 }
 
 trait VarOrderIF {

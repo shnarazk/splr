@@ -39,6 +39,23 @@ pub struct Var {
     flags: Flag,
 }
 
+impl Default for Var {
+    fn default() -> Var {
+        Var {
+            index: 0,
+            assign: None,
+            phase: false,
+            reason: ClauseId::default(),
+            level: 0,
+            reward: 0.0,
+            last_update: 0,
+            pos_occurs: Vec::new(),
+            neg_occurs: Vec::new(),
+            flags: Flag::empty(),
+        }
+    }
+}
+
 impl fmt::Display for Var {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let st = |flag, mes| if self.is(flag) { mes } else { "" };
@@ -55,25 +72,22 @@ impl fmt::Display for Var {
     }
 }
 
-impl VarIF for Var {
-    fn new(i: usize) -> Var {
+impl From<usize> for Var {
+    #[inline]
+    fn from(i: usize) -> Self {
         Var {
             index: i,
-            assign: None,
-            phase: false,
-            reason: ClauseId::default(),
-            level: 0,
-            reward: 0.0,
-            last_update: 0,
-            pos_occurs: Vec::new(),
-            neg_occurs: Vec::new(),
-            flags: Flag::empty(),
+            ..Var::default()
         }
     }
+}
+
+impl Var {
+    /// return a new vector of $n$ `Var`s.
     fn new_vars(n: usize) -> Vec<Var> {
         let mut vec = Vec::with_capacity(n + 1);
         for i in 0..=n {
-            vec.push(Var::new(i));
+            vec.push(Var::from(i));
         }
         vec
     }

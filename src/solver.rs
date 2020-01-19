@@ -51,6 +51,18 @@ pub struct Solver {
     pub vdb: VarDB,        // Variables
 }
 
+impl Default for Solver {
+    fn default() -> Solver {
+        Solver {
+            asgs: AssignStack::default(),
+            cdb: ClauseDB::default(),
+            elim: Eliminator::default(),
+            state: State::default(),
+            vdb: VarDB::default(),
+        }
+    }
+}
+
 impl Instantiate for Solver {
     fn instantiate(config: &Config, cnf: &CNFDescription) -> Solver {
         Solver {

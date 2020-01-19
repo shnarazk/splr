@@ -296,6 +296,30 @@ pub struct ClauseDB {
     pub glureduce: bool,
 }
 
+impl Default for ClauseDB {
+    fn default() -> ClauseDB {
+        ClauseDB {
+            clause: Vec::new(),
+            touched: Vec::new(),
+            watcher: Vec::new(),
+            num_active: 0,
+            num_learnt: 0,
+            certified: Vec::new(),
+            activity_inc: 1.0,
+            activity_decay: 0.999,
+            inc_step: 300,
+            extra_inc: 1000,
+            soft_limit: 0, // 248_000_000
+            co_lbd_bound: 5,
+            lbd_frozen_clause: 30,
+            first_reduction: 1000,
+            next_reduction: 1000,
+            cur_restart: 1,
+            glureduce: true,
+        }
+    }
+}
+
 impl Index<ClauseId> for ClauseDB {
     type Output = Clause;
     #[inline]
@@ -386,20 +410,9 @@ impl Instantiate for ClauseDB {
             clause,
             touched,
             watcher,
-            num_active: 0,
-            num_learnt: 0,
             certified,
-            activity_inc: 1.0,
-            activity_decay: 0.999,
-            inc_step: 300,
-            extra_inc: 1000,
-            soft_limit: config.clause_limit, // 248_000_000
-            co_lbd_bound: 5,
-            lbd_frozen_clause: 30,
-            first_reduction: 1000,
-            next_reduction: 1000,
-            cur_restart: 1,
-            glureduce: true,
+            soft_limit: config.clause_limit,
+            ..ClauseDB::default()
         }
     }
 }

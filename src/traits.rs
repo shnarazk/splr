@@ -271,16 +271,6 @@ pub trait ValidatorIF {
     fn validate(&self) -> Option<Vec<i32>>;
 }
 
-/// API for Var, providing `new` and `new_vars`.
-pub trait VarIF {
-    /// return a new instance.
-    fn new(i: usize) -> Var;
-    /// return a new vector of $n$ `Var`s.
-    fn new_vars(n: usize) -> Vec<Var>;
-    /// return its 'value'.
-    fn assigned(&self, l: Lit) -> Option<bool>;
-}
-
 /// API for var DB like `assigned`, `locked`, and so on.
 pub trait VarDBIF {
     /// return the number of vars.
