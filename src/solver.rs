@@ -570,16 +570,8 @@ fn analyze(
             }
         }
         let c = &cdb[cid];
-        let range = {
-            let len = c.len();
-            if len == 2 && c[1] == p {
-                0..1
-            } else {
-                ((p != NULL_LIT) as usize)..len
-            }
-        };
         // println!("- handle {}", cid.fmt());
-        for q in &c[range] {
+        for q in &c[(p != NULL_LIT) as usize..] {
             let vi = q.vi();
             vdb.bump_activity(vi, dl);
             asgs.update_order(vdb, vi);
@@ -696,9 +688,6 @@ fn redundant_lit(
     while let Some(sl) = stack.pop() {
         let cid = vdb[sl.vi()].reason;
         let c = &mut cdb[cid];
-        if c.len() == 2 && vdb.assigned(c[0]) == Some(false) {
-            c.lits.swap(0, 1);
-        }
         for q in &(*c)[1..] {
             let vi = q.vi();
             let v = &vdb[vi];

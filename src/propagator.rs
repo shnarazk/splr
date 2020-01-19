@@ -187,6 +187,9 @@ impl PropagatorIF for AssignStack {
                             return w.c;
                         }
                         self.uncheck_enqueue(vdb, w.blocker, w.c);
+                        if lits[0] == false_lit {
+                            lits.swap(0, 1);
+                        }
                         continue 'next_clause;
                     }
                     debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
