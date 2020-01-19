@@ -546,7 +546,6 @@ fn analyze(
     let mut ti = asgs.len() - 1; // trail index
     let mut path_cnt = 0;
     let lbd_bound = cdb.co_lbd_bound;
-    // state.last_dl.clear();
     loop {
         // println!("analyze {}", p.int());
         debug_assert_ne!(cid, ClauseId::default());
@@ -584,9 +583,6 @@ fn analyze(
                 if dl <= lvl {
                     // println!("- flag for {} which level is {}", q.int(), lvl);
                     path_cnt += 1;
-                    if v.reason != ClauseId::default() && cdb[v.reason].is(Flag::LEARNT) {
-                        state.last_dl.push(*q);
-                    }
                 } else {
                     // println!("- push {} to learnt, which level is {}", q.int(), lvl);
                     learnt.push(*q);
@@ -644,17 +640,6 @@ fn simplify_learnt(
     if new_learnt.len() < 30 {
         vdb.minimize_with_bi_clauses(cdb, new_learnt);
     }
-    /*
-    // glucose heuristics
-    let lbd = vdb.compute_lbd(new_learnt, &mut state.lbd_temp);
-    while let Some(l) = state.last_dl.pop() {
-        let vi = l.vi();
-        if cdb[vdb[vi].reason].rank < lbd {
-            vdb.bump_activity(vi, dl);
-            asgs.update_order(vdb, vi);
-        }
-    }
-    */
     // find correct backtrack level from remaining literals
     let mut level_to_return = 0;
     if 1 < new_learnt.len() {
