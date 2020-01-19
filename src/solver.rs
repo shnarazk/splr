@@ -696,14 +696,15 @@ fn redundant_lit(
     while let Some(sl) = stack.pop() {
         let cid = vdb[sl.vi()].reason;
         let c = &mut cdb[cid];
-        if (*c).len() == 2 && vdb.assigned((*c)[0]) == Some(false) {
-            (*c).lits.swap(0, 1);
+        if c.len() == 2 && vdb.assigned(c[0]) == Some(false) {
+            c.lits.swap(0, 1);
         }
         for q in &(*c)[1..] {
             let vi = q.vi();
-            let lv = vdb[vi].level;
-            if 0 < lv && !vdb[vi].is(Flag::CA_SEEN) {
-                if vdb[vi].reason != ClauseId::default() && levels[lv as usize] {
+            let v = &vdb[vi];
+            let lv = v.level;
+            if 0 < lv && !v.is(Flag::CA_SEEN) {
+                if v.reason != ClauseId::default() && levels[lv as usize] {
                     vdb[vi].turn_on(Flag::CA_SEEN);
                     stack.push(*q);
                     clear.push(*q);
