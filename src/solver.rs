@@ -323,9 +323,9 @@ fn search(
         state.rst.luby.update(0);
     }
     loop {
+        vdb.update();
         let ci = asgs.propagate(cdb, vdb);
         state[Stat::Propagation] += 1;
-        vdb.update_stat(state);
         if ci == ClauseId::default() {
             if state.num_vars <= asgs.len() + state.num_eliminated_vars {
                 return Ok(true);

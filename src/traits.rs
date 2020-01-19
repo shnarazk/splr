@@ -295,8 +295,8 @@ pub trait VarDBIF {
     fn locked(&self, c: &Clause, cid: ClauseId) -> bool;
     /// return `true` if the set of literals is satisfiable under the current assignment.
     fn satisfies(&self, c: &[Lit]) -> bool;
-    /// copy some stat data from `State`.
-    fn update_stat(&mut self, state: &State);
+    /// update internal counter..
+    fn update(&mut self);
     /// initialize rewards based on an order of vars.
     fn initialize_reward(
         &mut self,

@@ -2,7 +2,6 @@ use {
     crate::{
         clause::{Clause, ClauseDB, ClauseId},
         config::Config,
-        state::{Stat, State},
         traits::*,
         types::*,
     },
@@ -124,13 +123,10 @@ impl FlagIF for Var {
 pub struct VarDB {
     pub activity_decay: f64,
     pub reward_by_dl: f64,
+    ordinal: usize,
     // pub reward_by_dl_ema: Ema,
     /// vars
     var: Vec<Var>,
-    /// the current conflict's ordinal number
-    current_conflict: usize,
-    /// the current restart's ordinal number
-    current_restart: usize,
     /// a working buffer for LBD calculation
     pub lbd_temp: Vec<usize>,
 }
@@ -142,10 +138,9 @@ impl Default for VarDB {
         VarDB {
             activity_decay: VAR_ACTIVITY_DECAY,
             reward_by_dl: 1.0,
+            ordinal: 0,
             // reward_by_dl_ema,
             var: Vec::new(),
-            current_conflict: 0,
-            current_restart: 0,
             lbd_temp: Vec::new(),
         }
     }
@@ -200,7 +195,7 @@ impl ActivityIF for VarDB {
     type Ix = VarId;
     type Inc = usize;
     fn activity(&mut self, vi: Self::Ix) -> f64 {
-        let now = self.current_conflict;
+        let now = self.ordinal;
         let v = &mut self.var[vi];
         let diff = now - v.last_update;
         if 0 < diff {
@@ -211,7 +206,7 @@ impl ActivityIF for VarDB {
     }
     fn bump_activity(&mut self, vi: Self::Ix, dl: Self::Inc) {
         let v = &mut self.var[vi];
-        let now = self.current_conflict;
+        let now = self.ordinal;
         let t = (now - v.last_update) as i32;
         // v.reward = (now as f64 + self.activity) / 2.0; // ASCID
         v.reward =
@@ -260,9 +255,8 @@ impl VarDBIF for VarDB {
         }
         false
     }
-    fn update_stat(&mut self, state: &State) {
-        self.current_conflict = state[Stat::Conflict] + 1;
-        self.current_restart = state[Stat::Restart] + 1;
+    fn update(&mut self) {
+        self.ordinal += 1;
     }
     fn initialize_reward(
         &mut self,
