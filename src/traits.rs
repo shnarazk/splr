@@ -162,6 +162,14 @@ pub trait LitIF {
     fn vi(self) -> VarId;
 }
 
+/// API for 'watcher list' like `attach`, `detach`, `detach_with` and so on.
+pub trait LBDIF {
+    /// return a LBD value for the set of literals.
+    fn compute_lbd(&mut self, vec: &[Lit]) -> usize;
+    /// re-calculate the LBD values of all (learnt) clauses.
+    fn reset_lbd(&mut self, cdb: &mut ClauseDB);
+}
+
 pub trait ProgressEvaluator {
     /// map the value into a bool for forcing/blocking restart.
     fn is_active(&self) -> bool;
@@ -275,7 +283,7 @@ pub trait VarIF {
     fn assigned(&self, l: Lit) -> Option<bool>;
 }
 
-/// API for var DB like `assigned`, `locked`, `compute_lbd` and so on.
+/// API for var DB like `assigned`, `locked`, and so on.
 pub trait VarDBIF {
     /// return the number of vars.
     fn len(&self) -> usize;
@@ -289,15 +297,11 @@ pub trait VarDBIF {
     fn satisfies(&self, c: &[Lit]) -> bool;
     /// copy some stat data from `State`.
     fn update_stat(&mut self, state: &State);
-    /// return a LBD value for the set of literals.
-    fn compute_lbd(&mut self, vec: &[Lit]) -> usize;
     /// initialize rewards based on an order of vars.
     fn initialize_reward(
         &mut self,
         iterator: iter::Skip<iter::Enumerate<std::slice::Iter<'_, usize>>>,
     );
-    /// re-calculate the LBD values of all (learnt) clauses.
-    fn reset_lbd(&mut self, cdb: &mut ClauseDB);
     // minimize a clause.
     fn minimize_with_bi_clauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>);
 }

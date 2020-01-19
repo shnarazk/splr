@@ -49,6 +49,22 @@ pub struct Var {
 #[allow(dead_code)]
 const NULL_VAR: VarId = 0;
 
+impl fmt::Display for Var {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let st = |flag, mes| if self.is(flag) { mes } else { "" };
+        write!(
+            f,
+            "V{}({:?} at {} by {} {}{})",
+            self.index,
+            self.assign,
+            self.level,
+            self.reason.format(),
+            st(Flag::TOUCHED, ", touched"),
+            st(Flag::ELIMINATED, ", eliminated"),
+        )
+    }
+}
+
 impl VarIF for Var {
     fn new(i: usize) -> Var {
         Var {
@@ -246,23 +262,6 @@ impl VarDBIF for VarDB {
         self.current_conflict = state[Stat::Conflict] + 1;
         self.current_restart = state[Stat::Restart] + 1;
     }
-    fn compute_lbd(&mut self, vec: &[Lit]) -> usize {
-        let VarDB { lbd_temp, var, .. } = self;
-        unsafe {
-            let key = lbd_temp.get_unchecked(0) + 1;
-            let mut cnt = 0;
-            for l in vec {
-                let lv = var[l.vi()].level;
-                let p = lbd_temp.get_unchecked_mut(lv);
-                if *p != key {
-                    *p = key;
-                    cnt += 1;
-                }
-            }
-            *lbd_temp.get_unchecked_mut(0) = key;
-            cnt
-        }
-    }
     fn initialize_reward(
         &mut self,
         iterator: iter::Skip<iter::Enumerate<std::slice::Iter<'_, usize>>>,
@@ -272,27 +271,6 @@ impl VarDBIF for VarDB {
             self.var[*vi].reward = 0.0; // (nv - i) as f64; // big bang initialization
         }
     }
-    fn reset_lbd(&mut self, cdb: &mut ClauseDB) {
-        let temp = &mut self.lbd_temp;
-        let mut key = temp[0];
-        for c in &mut cdb[1..] {
-            if c.is(Flag::DEAD) || c.is(Flag::LEARNT) {
-                continue;
-            }
-            key += 1;
-            let mut cnt = 0;
-            for l in &c.lits {
-                let lv = self.var[l.vi()].level;
-                if temp[lv] != key && lv != 0 {
-                    temp[lv] = key;
-                    cnt += 1;
-                }
-            }
-            c.rank = cnt;
-        }
-        temp[0] = key + 1;
-    }
-
     fn minimize_with_bi_clauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>) {
         let nlevels = self.compute_lbd(vec);
         let VarDB { lbd_temp, var, .. } = self;
@@ -326,18 +304,42 @@ impl VarDBIF for VarDB {
     }
 }
 
-impl fmt::Display for Var {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let st = |flag, mes| if self.is(flag) { mes } else { "" };
-        write!(
-            f,
-            "V{}({:?} at {} by {} {}{})",
-            self.index,
-            self.assign,
-            self.level,
-            self.reason.format(),
-            st(Flag::TOUCHED, ", touched"),
-            st(Flag::ELIMINATED, ", eliminated"),
-        )
+impl LBDIF for VarDB {
+    fn compute_lbd(&mut self, vec: &[Lit]) -> usize {
+        let VarDB { lbd_temp, var, .. } = self;
+        unsafe {
+            let key = lbd_temp.get_unchecked(0) + 1;
+            let mut cnt = 0;
+            for l in vec {
+                let lv = var[l.vi()].level;
+                let p = lbd_temp.get_unchecked_mut(lv);
+                if *p != key {
+                    *p = key;
+                    cnt += 1;
+                }
+            }
+            *lbd_temp.get_unchecked_mut(0) = key;
+            cnt
+        }
+    }
+    fn reset_lbd(&mut self, cdb: &mut ClauseDB) {
+        let temp = &mut self.lbd_temp;
+        let mut key = temp[0];
+        for c in &mut cdb[1..] {
+            if c.is(Flag::DEAD) || c.is(Flag::LEARNT) {
+                continue;
+            }
+            key += 1;
+            let mut cnt = 0;
+            for l in &c.lits {
+                let lv = self.var[l.vi()].level;
+                if temp[lv] != key && lv != 0 {
+                    temp[lv] = key;
+                    cnt += 1;
+                }
+            }
+            c.rank = cnt;
+        }
+        temp[0] = key + 1;
     }
 }
