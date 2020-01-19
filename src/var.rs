@@ -309,7 +309,7 @@ impl VarDBIF for VarDB {
         let mut ti = asgs.len(); // trail index
         debug_assert!(self.var[1..].iter().all(|v| !v.is(Flag::VR_SEEN)));
         loop {
-            for q in &cdb[cid].lits[(p != NULL_LIT) as usize ..] {
+            for q in &cdb[cid].lits[(p != NULL_LIT) as usize..] {
                 let vi = q.vi();
                 if !self.var[vi].is(Flag::VR_SEEN) {
                     self.var[vi].turn_on(Flag::VR_SEEN);
