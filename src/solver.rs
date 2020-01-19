@@ -636,8 +636,7 @@ fn simplify_learnt(
     vdb: &mut VarDB,
 ) -> usize {
     let State {
-        ref mut new_learnt,
-        ..
+        ref mut new_learnt, ..
     } = state;
     // let dl = asgs.level();
     let mut to_clear: Vec<Lit> = vec![new_learnt[0]];

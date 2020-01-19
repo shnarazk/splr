@@ -456,12 +456,7 @@ impl StateIF for State {
         println!(
             "\x1B[2K Clause Kind|Remv:{}, LBD2:{}, Binc:{}, Perm:{} ",
             im!("{:>9}", self.record, LogUsizeId::Removable, cdb.num_learnt),
-            im!(
-                "{:>9}",
-                self.record,
-                LogUsizeId::LBD2,
-                self[Stat::NumLBD2]
-            ),
+            im!("{:>9}", self.record, LogUsizeId::LBD2, self[Stat::NumLBD2]),
             im!(
                 "{:>9}",
                 self.record,
