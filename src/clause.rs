@@ -506,25 +506,6 @@ impl ClauseDBIF for ClauseDB {
         self.num_active += 1;
         cid
     }
-    fn reset_lbd(&mut self, vdb: &VarDB, temp: &mut [usize]) {
-        let mut key = temp[0];
-        for c in &mut self[1..] {
-            if c.is(Flag::DEAD) || c.is(Flag::LEARNT) {
-                continue;
-            }
-            key += 1;
-            let mut cnt = 0;
-            for l in &c.lits {
-                let lv = vdb[l.vi()].level;
-                if temp[lv] != key && lv != 0 {
-                    temp[lv] = key;
-                    cnt += 1;
-                }
-            }
-            c.rank = cnt;
-        }
-        temp[0] = key + 1;
-    }
     fn count(&self, alive: bool) -> usize {
         if alive {
             self.clause.len() - self.watcher[!NULL_LIT].len() - 1
@@ -572,7 +553,7 @@ impl ClauseDBIF for ClauseDB {
         c.kill(&mut self.touched);
     }
     fn reduce(&mut self, state: &mut State, vdb: &mut VarDB) {
-        self.reset_lbd(vdb, &mut state.lbd_temp);
+        vdb.reset_lbd(self);
         let ClauseDB {
             ref mut clause,
             ref mut touched,
@@ -643,7 +624,7 @@ impl ClauseDBIF for ClauseDB {
         state[Stat::SatClauseElimination] += 1;
         if elim.is_running() {
             state[Stat::ExhaustiveElimination] += 1;
-            self.reset_lbd(vdb, &mut state.lbd_temp);
+            vdb.reset_lbd(self);
             elim.stop(self, vdb);
         }
         if self.check_size().is_err() {

@@ -157,7 +157,6 @@ pub struct State {
     pub new_learnt: Vec<Lit>,
     pub last_asg: usize,
     pub last_dl: Vec<Lit>,
-    pub lbd_temp: Vec<usize>,
     pub slack_duration: isize,
     pub stagnated: bool,
     pub start: SystemTime,
@@ -190,7 +189,6 @@ impl Default for State {
             new_learnt: Vec::new(),
             last_asg: 0,
             last_dl: Vec::new(),
-            lbd_temp: Vec::new(),
             slack_duration: 0,
             stagnated: false,
             start: SystemTime::now(),
@@ -307,7 +305,6 @@ impl Instantiate for State {
         state.rst = RestartExecutor::instantiate(config, &cnf);
         state.progress_log = config.use_log;
         state.model = vec![None; cnf.num_of_variables + 1];
-        state.lbd_temp = vec![0; cnf.num_of_variables + 1];
         state.target = cnf.clone();
         state.time_limit = config.timeout;
         state.config = config.clone();

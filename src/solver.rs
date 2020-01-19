@@ -394,7 +394,7 @@ fn handle_conflict_path(
         cdb.certificate_add(new_learnt);
         asgs.uncheck_enqueue(vdb, new_learnt[0], ClauseId::default());
     } else {
-        let lbd = vdb.compute_lbd(&new_learnt, &mut state.lbd_temp);
+        let lbd = vdb.compute_lbd(&new_learnt);
         let l0 = new_learnt[0];
         let cid = cdb.attach(state, vdb, lbd);
         elim.add_cid_occur(vdb, cid, &mut cdb[cid], true);
@@ -555,7 +555,7 @@ fn analyze(
             let c = &mut cdb[cid];
             debug_assert!(!c.is(Flag::DEAD));
             if 2 < c.rank {
-                let nlevels = vdb.compute_lbd(&c.lits, &mut state.lbd_temp);
+                let nlevels = vdb.compute_lbd(&c.lits);
                 if nlevels + 1 < c.rank {
                     // if c.rank <= cdb.lbd_frozen_clause {
                     //     c.turn_on(Flag::JUST_USED);
@@ -650,7 +650,7 @@ fn simplify_learnt(
             || !redundant_lit(cdb, vdb, *l, &mut to_clear, &levels)
     });
     if new_learnt.len() < 30 {
-        minimize_with_bi_clauses(cdb, vdb, &mut state.lbd_temp, new_learnt);
+        vdb.minimize_with_bi_clauses(cdb, new_learnt);
     }
     /*
     // glucose heuristics
@@ -753,35 +753,4 @@ fn analyze_final(asgs: &AssignStack, state: &mut State, vdb: &mut VarDB, c: &Cla
         }
         seen[vi] = false;
     }
-}
-
-fn minimize_with_bi_clauses(cdb: &ClauseDB, vdb: &VarDB, temp: &mut [usize], vec: &mut Vec<Lit>) {
-    let nlevels = vdb.compute_lbd(vec, temp);
-    if 6 < nlevels {
-        return;
-    }
-    let key = temp[0] + 1;
-    for l in &vec[1..] {
-        temp[l.vi() as usize] = key;
-    }
-    let l0 = vec[0];
-    let mut nsat = 0;
-    for w in &cdb.watcher[!l0] {
-        let c = &cdb[w.c];
-        if c.len() != 2 {
-            continue;
-        }
-        debug_assert!(c[0] == l0 || c[1] == l0);
-        let other = c[(c[0] == l0) as usize];
-        let vi = other.vi();
-        if temp[vi] == key && vdb.assigned(other) == Some(true) {
-            nsat += 1;
-            temp[vi] -= 1;
-        }
-    }
-    if 0 < nsat {
-        temp[l0.vi()] = key;
-        vec.retain(|l| temp[l.vi()] == key);
-    }
-    temp[0] = key;
 }

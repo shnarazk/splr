@@ -68,8 +68,6 @@ pub trait ClauseDBIF {
     fn garbage_collect(&mut self);
     /// allocate a new clause and return its id.
     fn new_clause(&mut self, v: &[Lit], rank: usize, learnt: bool) -> ClauseId;
-    /// re-calculate the LBD values of all (learnt) clauses.
-    fn reset_lbd(&mut self, vdb: &VarDB, temp: &mut [usize]);
     /// return the number of alive clauses in the database. Or return the database size if `active` is `false`.
     fn count(&self, alive: bool) -> usize;
     /// return the number of clauses which satisfy given flags and aren't DEAD.
@@ -273,6 +271,8 @@ pub trait VarIF {
     fn new_vars(n: usize) -> Vec<Var>;
     /// update the internal records about conflict.
     fn record_conflict(&mut self, now: usize) -> f64;
+    /// return its 'value'.
+    fn assigned(&self, l: Lit) -> Option<bool>;
 }
 
 /// API for var DB like `assigned`, `locked`, `compute_lbd` and so on.
@@ -290,12 +290,16 @@ pub trait VarDBIF {
     /// copy some stat data from `State`.
     fn update_stat(&mut self, state: &State);
     /// return a LBD value for the set of literals.
-    fn compute_lbd(&self, vec: &[Lit], keys: &mut [usize]) -> usize;
+    fn compute_lbd(&mut self, vec: &[Lit]) -> usize;
     /// initialize rewards based on an order of vars.
     fn initialize_reward(
         &mut self,
         iterator: iter::Skip<iter::Enumerate<std::slice::Iter<'_, usize>>>,
     );
+    /// re-calculate the LBD values of all (learnt) clauses.
+    fn reset_lbd(&mut self, cdb: &mut ClauseDB);
+    // minimize a clause.
+    fn minimize_with_bi_clauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>);
 }
 
 /// API for 'watcher list' like `attach`, `detach`, `detach_with` and so on.

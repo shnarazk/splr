@@ -1,6 +1,6 @@
 use {
     crate::{
-        clause::{Clause, ClauseId},
+        clause::{Clause, ClauseDB, ClauseId},
         config::Config,
         state::{Stat, State},
         traits::*,
@@ -80,6 +80,12 @@ impl VarIF for Var {
             .update((1.0 / (now - self.last_conflict + 1) as f64).log(2.0));
         self.last_conflict = now;
         self.foc.get()
+    }
+    fn assigned(&self, l: Lit) -> Option<bool> {
+        match self.assign {
+            Some(x) if !bool::from(l) => Some(!x),
+            x => x,
+        }
     }
 }
 
@@ -240,20 +246,20 @@ impl VarDBIF for VarDB {
         self.current_conflict = state[Stat::Conflict] + 1;
         self.current_restart = state[Stat::Restart] + 1;
     }
-
-    fn compute_lbd(&self, vec: &[Lit], keys: &mut [usize]) -> usize {
+    fn compute_lbd(&mut self, vec: &[Lit]) -> usize {
+        let VarDB { lbd_temp, var, .. } = self;
         unsafe {
-            let key = keys.get_unchecked(0) + 1;
+            let key = lbd_temp.get_unchecked(0) + 1;
             let mut cnt = 0;
             for l in vec {
-                let lv = self[l.vi()].level;
-                let p = keys.get_unchecked_mut(lv);
+                let lv = var[l.vi()].level;
+                let p = lbd_temp.get_unchecked_mut(lv);
                 if *p != key {
                     *p = key;
                     cnt += 1;
                 }
             }
-            *keys.get_unchecked_mut(0) = key;
+            *lbd_temp.get_unchecked_mut(0) = key;
             cnt
         }
     }
@@ -265,6 +271,58 @@ impl VarDBIF for VarDB {
         for (_, vi) in iterator {
             self.var[*vi].reward = 0.0; // (nv - i) as f64; // big bang initialization
         }
+    }
+    fn reset_lbd(&mut self, cdb: &mut ClauseDB) {
+        let temp = &mut self.lbd_temp;
+        let mut key = temp[0];
+        for c in &mut cdb[1..] {
+            if c.is(Flag::DEAD) || c.is(Flag::LEARNT) {
+                continue;
+            }
+            key += 1;
+            let mut cnt = 0;
+            for l in &c.lits {
+                let lv = self.var[l.vi()].level;
+                if temp[lv] != key && lv != 0 {
+                    temp[lv] = key;
+                    cnt += 1;
+                }
+            }
+            c.rank = cnt;
+        }
+        temp[0] = key + 1;
+    }
+
+    fn minimize_with_bi_clauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>) {
+        let nlevels = self.compute_lbd(vec);
+        let VarDB { lbd_temp, var, .. } = self;
+        if 6 < nlevels {
+            return;
+        }
+        let key = lbd_temp[0] + 1;
+        for l in &vec[1..] {
+            lbd_temp[l.vi() as usize] = key;
+        }
+        let l0 = vec[0];
+        let mut nsat = 0;
+        for w in &cdb.watcher[!l0] {
+            let c = &cdb[w.c];
+            if c.len() != 2 {
+                continue;
+            }
+            debug_assert!(c[0] == l0 || c[1] == l0);
+            let other = c[(c[0] == l0) as usize];
+            let vi = other.vi();
+            if lbd_temp[vi] == key && var[vi].assigned(other) == Some(true) {
+                nsat += 1;
+                lbd_temp[vi] -= 1;
+            }
+        }
+        if 0 < nsat {
+            lbd_temp[l0.vi()] = key;
+            vec.retain(|l| lbd_temp[l.vi()] == key);
+        }
+        lbd_temp[0] = key;
     }
 }
 
