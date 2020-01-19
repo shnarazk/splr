@@ -2,6 +2,7 @@ use {
     crate::{
         clause::{Clause, ClauseDB, ClauseId},
         config::Config,
+        propagator::AssignStack,
         traits::*,
         types::*,
     },
@@ -297,6 +298,42 @@ impl VarDBIF for VarDB {
             vec.retain(|l| lbd_temp[l.vi()] == key);
         }
         lbd_temp[0] = key;
+    }
+    // This function is for Reason-Side Rewarding which must traverse the assign stack
+    // beyond first UIDs and bump all vars on the traversed tree.
+    // If you'd like to use this, you should stop bumping activities in `analyze`.
+    fn bump_vars(&mut self, asgs: &AssignStack, cdb: &ClauseDB, confl: ClauseId) {
+        debug_assert_ne!(confl, ClauseId::default());
+        let mut cid = confl;
+        let mut p = NULL_LIT;
+        let mut ti = asgs.len(); // trail index
+        debug_assert!(self.var[1..].iter().all(|v| !v.is(Flag::VR_SEEN)));
+        loop {
+            for q in &cdb[cid].lits[(p != NULL_LIT) as usize ..] {
+                let vi = q.vi();
+                if !self.var[vi].is(Flag::VR_SEEN) {
+                    self.var[vi].turn_on(Flag::VR_SEEN);
+                    self.bump_activity(vi, 0);
+                }
+            }
+            loop {
+                if 0 == ti {
+                    self.var[asgs.trail[ti].vi()].turn_off(Flag::VR_SEEN);
+                    debug_assert!(self.var[1..].iter().all(|v| !v.is(Flag::VR_SEEN)));
+                    return;
+                }
+                ti -= 1;
+                p = asgs.trail[ti];
+                let next_vi = p.vi();
+                if self.var[next_vi].is(Flag::VR_SEEN) {
+                    self.var[next_vi].turn_off(Flag::VR_SEEN);
+                    cid = self.var[next_vi].reason;
+                    if cid != ClauseId::default() {
+                        break;
+                    }
+                }
+            }
+        }
     }
 }
 

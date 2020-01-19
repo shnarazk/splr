@@ -386,6 +386,7 @@ fn handle_conflict_path(
     }
     let cl = asgs.level();
     let bl = analyze(asgs, cdb, state, vdb, ci);
+    // vdb.bump_vars(asgs, cdb, ci);
     let new_learnt = &mut state.new_learnt;
     asgs.cancel_until(vdb, bl.max(state.root_level));
     let learnt_len = new_learnt.len();

@@ -369,5 +369,7 @@ bitflags! {
         const TOUCHED      = 0b0000_0000_0100_0000;
         /// a var is checked during in the current conflict analysis.
         const CA_SEEN      = 0b0000_0000_1000_0000;
+        /// a var is checked during in var rewarding.
+        const VR_SEEN      = 0b0000_0001_0000_0000;
     }
 }

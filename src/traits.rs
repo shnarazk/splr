@@ -304,6 +304,8 @@ pub trait VarDBIF {
     );
     // minimize a clause.
     fn minimize_with_bi_clauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>);
+    // bump vars' activities.
+    fn bump_vars(&mut self, asgs: &AssignStack, cdb: &ClauseDB, confl: ClauseId);
 }
 
 /// API for 'watcher list' like `attach`, `detach`, `detach_with` and so on.

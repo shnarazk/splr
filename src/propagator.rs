@@ -161,9 +161,13 @@ impl PropagatorIF for AssignStack {
         }
         // debug_assert!(self.assign[v.index] == sig);
     }
-    /// propagate without checking dead clauses
-    /// Note: this function assumes there's no dead clause.
-    /// So Eliminator should call `garbage_collect` before me.
+    /// UNIT PROPAGATION.
+    /// Note:
+    ///  - *Precondition*: no checking dead clauses. They cause crash.
+    ///  - This function assumes there's no dead clause.
+    ///    So Eliminator should call `garbage_collect` before me.
+    ///  - The order of literals in binary clauses will be modified to hold
+    ///    propagatation order.
     fn propagate(&mut self, cdb: &mut ClauseDB, vdb: &mut VarDB) -> ClauseId {
         let watcher = &mut cdb.watcher[..] as *mut [Vec<Watch>];
         while self.remains() {
