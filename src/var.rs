@@ -23,18 +23,12 @@ pub struct Var {
     pub assign: Option<bool>,
     /// the previous assigned value
     pub phase: bool,
-    // /// polarity of assigned value
-    // pub polarity: Ema,
-    // /// frequency of conflict: the reverse of the average conflict interval
-    // pub foc: Ema,
     /// the propagating clause
     pub reason: ClauseId,
     /// decision level at which this variables is assigned.
     pub level: usize,
     /// a dynamic evaluation criterion like VSIDS or ACID.
     reward: f64,
-    /// the number of conflicts at which this var make a conflict.
-    last_conflict: usize,
     /// the number of conflicts at which this var was rewarded lastly.
     last_update: usize,
     /// list of clauses which contain this variable positively.
@@ -44,10 +38,6 @@ pub struct Var {
     /// the `Flag`s
     flags: Flag,
 }
-
-/// is the dummy var index.
-#[allow(dead_code)]
-const NULL_VAR: VarId = 0;
 
 impl fmt::Display for Var {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -71,12 +61,9 @@ impl VarIF for Var {
             index: i,
             assign: None,
             phase: false,
-            // polarity: Ema::new(16),
-            // foc: Ema::new(20),
             reason: ClauseId::default(),
             level: 0,
             reward: 0.0,
-            last_conflict: 0,
             last_update: 0,
             pos_occurs: Vec::new(),
             neg_occurs: Vec::new(),
@@ -90,15 +77,6 @@ impl VarIF for Var {
         }
         vec
     }
-    /*
-    fn record_conflict(&mut self, now: usize) -> f64 {
-        assert_ne!(self.last_conflict, now);
-        self.foc
-            .update((1.0 / (now - self.last_conflict + 1) as f64).log(2.0));
-        self.last_conflict = now;
-        self.foc.get()
-    }
-    */
     fn assigned(&self, l: Lit) -> Option<bool> {
         match self.assign {
             Some(x) if !bool::from(l) => Some(!x),
@@ -125,22 +103,18 @@ pub struct VarDB {
     pub activity_decay: f64,
     pub reward_by_dl: f64,
     ordinal: usize,
-    // pub reward_by_dl_ema: Ema,
     /// vars
     var: Vec<Var>,
     /// a working buffer for LBD calculation
-    pub lbd_temp: Vec<usize>,
+    lbd_temp: Vec<usize>,
 }
 
 impl Default for VarDB {
     fn default() -> VarDB {
-        // let mut reward_by_dl_ema = Ema::new(20);
-        // reward_by_dl_ema.update(0.01);
         VarDB {
             activity_decay: VAR_ACTIVITY_DECAY,
             reward_by_dl: 1.0,
             ordinal: 0,
-            // reward_by_dl_ema,
             var: Vec::new(),
             lbd_temp: Vec::new(),
         }
@@ -236,7 +210,6 @@ impl VarDBIF for VarDB {
         self.var.is_empty()
     }
     fn assigned(&self, l: Lit) -> Option<bool> {
-        // unsafe { self.var.get_unchecked(l.vi()).assign ^ ((l & 1) as u8) }
         match unsafe { self.var.get_unchecked(l.vi()).assign } {
             Some(x) if !bool::from(l) => Some(!x),
             x => x,
