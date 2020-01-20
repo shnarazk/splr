@@ -182,12 +182,6 @@ impl IndexMut<RangeFrom<usize>> for Clause {
 }
 
 impl ClauseIF for Clause {
-    fn kill(&mut self, touched: &mut [bool]) {
-        self.turn_on(Flag::DEAD);
-        debug_assert!(1 < usize::from(self.lits[0]) && 1 < usize::from(self.lits[1]));
-        touched[!self.lits[0]] = true;
-        touched[!self.lits[1]] = true;
-    }
     fn is_empty(&self) -> bool {
         self.lits.is_empty()
     }
@@ -249,7 +243,6 @@ impl Ord for Clause {
 }
 
 impl Clause {
-    #[allow(dead_code)]
     fn cmp_activity(&self, other: &Clause) -> Ordering {
         if self.reward > other.reward {
             Ordering::Less
@@ -258,6 +251,13 @@ impl Clause {
         } else {
             Ordering::Equal
         }
+    }
+    /// make a clause *dead*; the clause still exists in clause database as a garbage.
+    fn kill(&mut self, touched: &mut [bool]) {
+        self.turn_on(Flag::DEAD);
+        debug_assert!(1 < usize::from(self.lits[0]) && 1 < usize::from(self.lits[1]));
+        touched[!self.lits[0]] = true;
+        touched[!self.lits[1]] = true;
     }
 }
 

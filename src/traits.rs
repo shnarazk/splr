@@ -26,8 +26,6 @@ pub trait ActivityIF {
 
 /// API for Clause, providing `kill`.
 pub trait ClauseIF {
-    /// make a clause *dead*; the clause still exists in clause database as a garbage.
-    fn kill(&mut self, touched: &mut [bool]);
     /// return true if it contains no literals; a clause after unit propagation.
     fn is_empty(&self) -> bool;
     /// return the number of literals.
