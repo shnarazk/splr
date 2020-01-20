@@ -1,7 +1,11 @@
 use {
     crate::{
-        clause::ClauseDB, config::Config, eliminator::Eliminator, restart::RestartExecutor,
-        traits::*, types::*, var::VarDB,
+        clause::{ClauseDB, ClauseDBIF},
+        config::Config,
+        eliminator::{Eliminator, EliminatorIF},
+        restart::RestartExecutor,
+        types::*,
+        var::{VarDB, VarDBIF},
     },
     libc::{clock_gettime, timespec, CLOCK_PROCESS_CPUTIME_ID},
     std::{
@@ -12,6 +16,22 @@ use {
         time::SystemTime,
     },
 };
+
+/// API for state/statistics management, providing `progress`.
+pub trait StateIF {
+    /// return the number of unsolved vars.
+    fn num_unsolved_vars(&self) -> usize;
+    /// return `true` if it is timed out.
+    fn is_timeout(&self) -> bool;
+    /// change heuristics based on stat data.
+    fn adapt_strategy(&mut self, cdb: &mut ClauseDB);
+    /// write a header of stat data to stdio.
+    fn progress_header(&self);
+    /// write stat data to stdio.
+    fn progress(&mut self, cdb: &ClauseDB, vdb: &VarDB, mes: Option<&str>);
+    /// write a short message to stdout.
+    fn flush<S: AsRef<str>>(&self, mes: S);
+}
 
 /// A collection of named search heuristics
 #[derive(Debug, Eq, PartialEq)]

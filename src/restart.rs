@@ -1,7 +1,20 @@
 use {
-    crate::{config::Config, traits::*, types::*},
+    crate::{config::Config, types::*},
     std::fmt,
 };
+
+pub trait ProgressEvaluator {
+    /// map the value into a bool for forcing/blocking restart.
+    fn is_active(&self) -> bool;
+}
+
+/// API for restart like `block_restart`, `force_restart` and so on.
+pub trait RestartIF {
+    /// block restart if needed.
+    fn block_restart(&mut self) -> bool;
+    /// force restart if needed.
+    fn force_restart(&mut self) -> bool;
+}
 
 // const RESET_EMA: usize = 400;
 

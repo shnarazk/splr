@@ -162,8 +162,6 @@ pub mod restart;
 pub mod solver;
 /// Collection of various data and parameters for SAT solving process
 pub mod state;
-/// Interfaces between submodules
-pub mod traits;
 /// Plumping layer
 pub mod types;
 /// validates a given assignment for a problem.

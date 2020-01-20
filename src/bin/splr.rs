@@ -4,9 +4,8 @@ use {
     splr::{
         clause::CertifiedRecord,
         config::{Config, VERSION},
-        solver::{Certificate, Solver, SolverResult},
+        solver::{Certificate, SatSolverIF, Solver, SolverResult},
         state::*,
-        traits::SatSolverIF,
     },
     std::{
         fs::File,
