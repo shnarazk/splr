@@ -1,12 +1,11 @@
 use {
     crate::{
         config::{Config, ACTIVITY_MAX},
-        eliminator::Eliminator,
-        propagator::AssignStack,
+        eliminator::{Eliminator, EliminatorIF},
+        propagator::{AssignStack, PropagatorIF},
         state::{Stat, State},
-        traits::*,
         types::*,
-        var::VarDB,
+        var::{VarDB, VarDBIF, LBDIF},
     },
     std::{
         cmp::Ordering,
@@ -14,6 +13,85 @@ use {
         ops::{Index, IndexMut, Range, RangeFrom},
     },
 };
+
+/// API for Clause, providing `kill`.
+pub trait ClauseIF {
+    /// return true if it contains no literals; a clause after unit propagation.
+    fn is_empty(&self) -> bool;
+    /// return the number of literals.
+    fn len(&self) -> usize;
+}
+
+/// API for clause management like `reduce`, `simplify`, `new_clause`, and so on.
+pub trait ClauseDBIF {
+    /// return the length of `clause`.
+    fn len(&self) -> usize;
+    /// return true if it's empty.
+    fn is_empty(&self) -> bool;
+    /// make a new clause from `state.new_learnt` and register it to clause database.
+    fn attach(&mut self, state: &mut State, vdb: &mut VarDB, lbd: usize) -> ClauseId;
+    /// unregister a clause `cid` from clause database and make the clause dead.
+    fn detach(&mut self, cid: ClauseId);
+    /// halve the number of 'learnt' or *removable* clauses.
+    fn reduce(&mut self, state: &mut State, vdb: &mut VarDB);
+    /// simplify database by:
+    /// * removing satisfiable clauses
+    /// * calling exhaustive simplifier that tries **clause subsumption** and **variable elimination**.
+    ///
+    /// # Errors
+    ///
+    /// if solver becomes inconsistent.
+    fn simplify(
+        &mut self,
+        asgs: &mut AssignStack,
+        elim: &mut Eliminator,
+        state: &mut State,
+        vdb: &mut VarDB,
+    ) -> MaybeInconsistent;
+    fn reset(&mut self);
+    /// delete *dead* clauses from database, which are made by:
+    /// * `reduce`
+    /// * `simplify`
+    /// * `kill`
+    fn garbage_collect(&mut self);
+    /// allocate a new clause and return its id.
+    fn new_clause(&mut self, v: &[Lit], rank: usize, learnt: bool) -> ClauseId;
+    /// return the number of alive clauses in the database. Or return the database size if `active` is `false`.
+    fn count(&self, alive: bool) -> usize;
+    /// return the number of clauses which satisfy given flags and aren't DEAD.
+    fn countf(&self, mask: Flag) -> usize;
+    /// record a clause to unsat certification.
+    fn certificate_add(&mut self, vec: &[Lit]);
+    /// record a deleted clause to unsat certification.
+    fn certificate_delete(&mut self, vec: &[Lit]);
+    /// delete satisfied clauses at decision level zero.
+    fn eliminate_satisfied_clauses(&mut self, elim: &mut Eliminator, vdb: &mut VarDB, occur: bool);
+    /// emit an error if the db size (the number of clauses) is over the limit.
+    fn check_size(&self) -> MaybeInconsistent;
+    /// change good learnt clauses to permanent one.
+    fn make_permanent(&mut self, reinit: bool);
+}
+
+/// API for Clause Id like `to_lit`, `is_lifted_lit` and so on.
+pub trait ClauseIdIF {
+    /// return `true` if a given clause id is made from a `Lit`.
+    fn is_lifted_lit(self) -> bool;
+    /// make a string for printing.
+    fn format(self) -> String;
+}
+
+/// API for 'watcher list' like `attach`, `detach`, `detach_with` and so on.
+pub trait WatchDBIF {
+    fn initialize(self, n: usize) -> Self;
+    /// make a new 'watch', and add it to this watcher list.
+    fn register(&mut self, blocker: Lit, c: ClauseId);
+    /// remove *n*-th clause from the watcher list. *O(1)* operation.
+    fn detach(&mut self, n: usize);
+    /// remove a clause which id is `cid` from the watcher list. *O(n)* operation.
+    fn detach_with(&mut self, cid: ClauseId);
+    /// update blocker of cid.
+    fn update_blocker(&mut self, cid: ClauseId, l: Lit);
+}
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum CertifiedRecord {

@@ -1,9 +1,8 @@
 use {
     crate::{
-        clause::{Clause, ClauseDB, ClauseId},
+        clause::{Clause, ClauseDB, ClauseIF, ClauseId, ClauseIdIF},
         config::Config,
-        propagator::AssignStack,
-        traits::*,
+        propagator::{AssignStack, PropagatorIF},
         types::*,
     },
     std::{
@@ -11,6 +10,39 @@ use {
         ops::{Index, IndexMut, Range, RangeFrom},
     },
 };
+
+/// API for 'watcher list' like `attach`, `detach`, `detach_with` and so on.
+pub trait LBDIF {
+    /// return a LBD value for the set of literals.
+    fn compute_lbd(&mut self, vec: &[Lit]) -> usize;
+    /// re-calculate the LBD values of all (learnt) clauses.
+    fn reset_lbd(&mut self, cdb: &mut ClauseDB);
+}
+
+/// API for var DB like `assigned`, `locked`, and so on.
+pub trait VarDBIF {
+    /// return the number of vars.
+    fn len(&self) -> usize;
+    /// return true if it's empty.
+    fn is_empty(&self) -> bool;
+    /// return the 'value' of a given literal.
+    fn assigned(&self, l: Lit) -> Option<bool>;
+    /// return `true` is the clause is the reason of the assignment.
+    fn locked(&self, c: &Clause, cid: ClauseId) -> bool;
+    /// return `true` if the set of literals is satisfiable under the current assignment.
+    fn satisfies(&self, c: &[Lit]) -> bool;
+    /// update internal counter..
+    fn update(&mut self);
+    /// initialize rewards based on an order of vars.
+    fn initialize_reward(
+        &mut self,
+        iterator: iter::Skip<iter::Enumerate<std::slice::Iter<'_, usize>>>,
+    );
+    // minimize a clause.
+    fn minimize_with_bi_clauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>);
+    // bump vars' activities.
+    fn bump_vars(&mut self, asgs: &AssignStack, cdb: &ClauseDB, confl: ClauseId);
+}
 
 const VAR_ACTIVITY_DECAY: f64 = 0.94;
 

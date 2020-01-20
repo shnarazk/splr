@@ -1,15 +1,62 @@
 use {
     crate::{
-        clause::{Clause, ClauseDB, ClauseId},
+        clause::{Clause, ClauseDB, ClauseDBIF, ClauseIF, ClauseId, ClauseIdIF, WatchDBIF},
         config::Config,
-        propagator::AssignStack,
+        propagator::{AssignStack, PropagatorIF},
         state::State,
-        traits::*,
         types::*,
-        var::{Var, VarDB},
+        var::{Var, VarDB, VarDBIF},
     },
-    std::fmt,
+    std::{fmt, iter},
 };
+
+/// API for Eliminator like `activate`, `stop`, `eliminate` and so on.
+pub trait EliminatorIF {
+    /// set eliminator's mode to **ready**.
+    fn activate(&mut self);
+    /// set eliminator's mode to **dormant**.
+    fn stop(&mut self, cdb: &mut ClauseDB, vdb: &mut VarDB);
+    /// check if the eliminator is running.
+    fn is_running(&self) -> bool;
+    /// check if the eliminator is active and waits for next `eliminate`.
+    fn is_waiting(&self) -> bool;
+    /// rebuild occur lists.
+    fn prepare(&mut self, cdb: &mut ClauseDB, vdb: &mut VarDB, force: bool);
+    /// enqueue a clause into eliminator's clause queue.
+    fn enqueue_clause(&mut self, cid: ClauseId, c: &mut Clause);
+    /// clear eliminator's clause queue.
+    fn clear_clause_queue(&mut self, cdb: &mut ClauseDB);
+    /// return the length of eliminator's clause queue.
+    fn clause_queue_len(&self) -> usize;
+    /// enqueue a var into eliminator's var queue.
+    fn enqueue_var(&mut self, vdb: &mut VarDB, vi: VarId, upword: bool);
+    /// clear eliminator's war queue
+    fn clear_var_queue(&mut self, vdb: &mut VarDB);
+    /// return the length of eliminator's clause queue.
+    fn var_queue_len(&self) -> usize;
+    /// run clause subsumption and variable elimination.
+    ///
+    /// # Errors
+    ///
+    /// if solver becomes inconsistent.
+    fn eliminate(
+        &mut self,
+        asgs: &mut AssignStack,
+        cdb: &mut ClauseDB,
+        state: &mut State,
+        vdb: &mut VarDB,
+    ) -> MaybeInconsistent;
+    /// add assignments for eliminated vars to `model`.
+    fn extend_model(&mut self, model: &mut Vec<i32>);
+    /// register a clause id to all corresponding occur lists.
+    fn add_cid_occur(&mut self, vdb: &mut VarDB, cid: ClauseId, c: &mut Clause, enqueue: bool);
+    /// remove a clause id from literal's occur list.
+    fn remove_lit_occur(&mut self, vdb: &mut VarDB, l: Lit, cid: ClauseId);
+    /// remove a clause id from all corresponding occur lists.
+    fn remove_cid_occur(&mut self, vdb: &mut VarDB, cid: ClauseId, c: &mut Clause);
+    /// return the order of vars based on their occurrences
+    fn order_enumerator(&self) -> iter::Skip<iter::Enumerate<std::slice::Iter<'_, usize>>>;
+}
 
 #[derive(Eq, Debug, PartialEq)]
 enum EliminatorMode {

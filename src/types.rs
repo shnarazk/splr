@@ -1,14 +1,45 @@
 //! Basic types
 use {
-    crate::{
-        clause::ClauseId,
-        traits::{Delete, LitIF},
-    },
+    crate::{clause::ClauseId, config::Config},
     std::{
         fmt,
         ops::{Index, IndexMut, Neg, Not},
     },
 };
+
+/// API for Literal like `from_int`, `from_var`, `to_cid` and so on.
+pub trait LitIF {
+    /// convert [VarId](../type.VarId.html) to [Lit](../type.Lit.html).
+    /// It returns a positive literal if `p` is `TRUE` or `BOTTOM`.
+    fn from_var(vi: VarId, p: bool) -> Self;
+    /// convert to var index.
+    fn vi(self) -> VarId;
+}
+
+/// API for Clause and Var rewarding
+pub trait ActivityIF {
+    type Ix;
+    type Inc;
+    /// return the current activity of an element.
+    fn activity(&mut self, vi: Self::Ix) -> f64;
+    /// update an element's activity.
+    fn bump_activity(&mut self, ix: Self::Ix, dl: Self::Inc);
+    /// increment activity step.
+    fn scale_activity(&mut self);
+}
+
+/// API for data instantiation based on `Configuration` and `CNFDescription`
+pub trait Instantiate {
+    fn instantiate(conf: &Config, cnf: &CNFDescription) -> Self;
+}
+
+/// API for O(n) deletion from a list, providing `delete_unstable`.
+pub trait Delete<T> {
+    /// *O(n)* item deletion protocol.
+    fn delete_unstable<F>(&mut self, filter: F)
+    where
+        F: FnMut(&T) -> bool;
+}
 
 /// 'Variable' identifier or 'variable' index, starting with one.
 pub type VarId = usize;
@@ -21,7 +52,6 @@ pub type VarId = usize;
 /// # Examples
 ///
 /// ```
-/// use splr::traits::LitIF;
 /// use splr::types::*;
 /// assert_eq!(2usize, Lit::from(-1i32).into());
 /// assert_eq!(3usize, Lit::from( 1i32).into());
@@ -160,7 +190,6 @@ impl IndexMut<Lit> for Vec<Vec<crate::clause::Watch>> {
 /// # Examples
 ///
 /// ```
-/// use splr::traits::LitIF;
 /// use splr::types::*;
 /// assert_eq!(Lit::from(1i32), Lit::from_var(1 as VarId, true));
 /// assert_eq!(Lit::from(2i32), Lit::from_var(2 as VarId, true));

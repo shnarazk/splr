@@ -1,13 +1,13 @@
 use {
     crate::{
-        clause::{Clause, ClauseDB, ClauseId},
+        clause::{Clause, ClauseDB, ClauseDBIF, ClauseIF, ClauseId},
         config::Config,
-        eliminator::Eliminator,
-        propagator::AssignStack,
-        state::{Stat, State},
-        traits::*,
+        eliminator::{Eliminator, EliminatorIF},
+        propagator::{AssignStack, PropagatorIF},
+        restart::RestartIF,
+        state::{Stat, State, StateIF},
         types::*,
-        var::VarDB,
+        var::{VarDB, VarDBIF, LBDIF},
     },
     std::{
         fs,
@@ -15,6 +15,24 @@ use {
         path::Path,
     },
 };
+
+/// API for SAT solver like `build`, `solve` and so on.
+pub trait SatSolverIF {
+    /// make a solver and load a CNF into it.
+    ///
+    /// # Errors
+    ///
+    /// IO error by failing to load a CNF file.
+    fn build(config: &Config) -> std::io::Result<Solver>;
+    /// search an assignment.
+    ///
+    /// # Errors
+    ///
+    /// if solver becomes inconsistent by an internal error.
+    fn solve(&mut self) -> SolverResult;
+    /// add a vector of `Lit` as a clause to the solver.
+    fn add_unchecked_clause(&mut self, v: &mut Vec<Lit>) -> Option<ClauseId>;
+}
 
 /// Normal results returned by Solver.
 #[derive(Debug, PartialEq)]
@@ -79,9 +97,8 @@ impl SatSolverIF for Solver {
     /// # Examples
     ///
     /// ```
-    /// use splr::traits::SatSolverIF;
     /// use splr::config::Config;
-    /// use splr::solver::{Solver, Certificate};
+    /// use splr::solver::{Certificate, SatSolverIF, Solver};
     ///
     /// let config = Config::from("tests/sample.cnf");
     /// if let Ok(mut s) = Solver::build(&config) {
@@ -205,9 +222,8 @@ impl SatSolverIF for Solver {
     /// # Examples
     ///
     /// ```
-    /// use splr::traits::SatSolverIF;
     /// use splr::config::Config;
-    /// use splr::solver::Solver;
+    /// use splr::solver::{SatSolverIF, Solver};
     ///
     /// let config = Config::from("tests/sample.cnf");
     /// assert!(Solver::build(&config).is_ok());

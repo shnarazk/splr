@@ -1,9 +1,22 @@
 use crate::{
     clause::ClauseId,
+    propagator::PropagatorIF,
     solver::Solver,
-    traits::{LitIF, PropagatorIF, ValidatorIF, VarDBIF},
-    types::{Lit, MaybeInconsistent, SolverError},
+    types::{Lit, LitIF, MaybeInconsistent, SolverError},
+    var::VarDBIF,
 };
+
+/// API for SAT validator like `inject_assignment`, `validate` and so on.
+pub trait ValidatorIF {
+    /// load a assignment set into solver.
+    ///
+    /// # Errors
+    ///
+    /// if solver becomes inconsistent.
+    fn inject_assigmnent(&mut self, vec: &[i32]) -> MaybeInconsistent;
+    /// return `true` is the loaded assignment set is satisfiable (a model of a problem).
+    fn validate(&self) -> Option<Vec<i32>>;
+}
 
 impl ValidatorIF for Solver {
     fn inject_assigmnent(&mut self, vec: &[i32]) -> MaybeInconsistent {

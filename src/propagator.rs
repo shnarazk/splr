@@ -1,11 +1,10 @@
 use {
     crate::{
-        clause::{ClauseDB, ClauseId, Watch},
+        clause::{ClauseDB, ClauseDBIF, ClauseId, Watch, WatchDBIF},
         config::Config,
         state::State,
-        traits::*,
         types::*,
-        var::{Var, VarDB},
+        var::{Var, VarDB, VarDBIF},
     },
     std::{
         fmt,
@@ -14,6 +13,48 @@ use {
         ops::{Index, Range, RangeFrom},
     },
 };
+
+/// API for assignment like `propagate`, `enqueue`, `cancel_until`, and so on.
+pub trait PropagatorIF {
+    /// return the number of assignments.
+    fn len(&self) -> usize;
+    /// return `true` if there's no assignment.
+    fn is_empty(&self) -> bool;
+    /// return the current decision level.
+    fn level(&self) -> usize;
+    /// return `true` if the current decision level is zero.
+    fn is_zero(&self) -> bool;
+    /// return the number of assignments at a given decision level `u`.
+    fn num_at(&self, n: usize) -> usize;
+    /// return `true` if there are unpropagated assignments.
+    fn remains(&self) -> bool;
+    /// return the *value* of a given literal.
+    fn assigned(&self, l: Lit) -> Option<bool>;
+    /// execute *propagate*.
+    fn propagate(&mut self, cdb: &mut ClauseDB, vdb: &mut VarDB) -> ClauseId;
+    /// execute *backjump*.
+    fn cancel_until(&mut self, vdb: &mut VarDB, lv: usize);
+    /// add an assignment caused by a clause; emit an exception if solver becomes inconsistent.
+    ///
+    /// # Errors
+    ///
+    /// if solver becomes inconsistent by the new assignment.
+    fn enqueue(&mut self, v: &mut Var, sig: bool, cid: ClauseId, dl: usize) -> MaybeInconsistent;
+    /// add an assignment with no reason clause without inconsistency check.
+    fn enqueue_null(&mut self, v: &mut Var, sig: bool);
+    /// unsafe enqueue; doesn't emit an exception.
+    fn uncheck_enqueue(&mut self, vdb: &mut VarDB, l: Lit, cid: ClauseId);
+    /// unsafe assume; doesn't emit an exception.
+    fn uncheck_assume(&mut self, vdb: &mut VarDB, l: Lit);
+    /// select a new decision variable.
+    fn select_var(&mut self, vdb: &mut VarDB) -> VarId;
+    /// update the internal heap on var order.
+    fn update_order(&mut self, vdb: &mut VarDB, v: VarId);
+    /// rebuild the internal var_order
+    fn rebuild_order(&mut self, vdb: &mut VarDB);
+    /// dump all active clauses and fixed assignments in solver to a CNF file `fname`.
+    fn dump_cnf(&mut self, cdb: &ClauseDB, state: &State, vdb: &VarDB, fname: &str);
+}
 
 /// A record of assignment. It's called 'trail' in Glucose.
 #[derive(Debug)]
