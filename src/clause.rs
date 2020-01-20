@@ -82,7 +82,6 @@ pub trait ClauseIdIF {
 
 /// API for 'watcher list' like `attach`, `detach`, `detach_with` and so on.
 pub trait WatchDBIF {
-    fn initialize(self, n: usize) -> Self;
     /// make a new 'watch', and add it to this watcher list.
     fn register(&mut self, blocker: Lit, c: ClauseId);
     /// remove *n*-th clause from the watcher list. *O(1)* operation.
@@ -163,9 +162,6 @@ impl Default for Watch {
 }
 
 impl WatchDBIF for Vec<Watch> {
-    fn initialize(self, _n: usize) -> Self {
-        self
-    }
     fn register(&mut self, blocker: Lit, c: ClauseId) {
         self.push(Watch { blocker, c });
     }
