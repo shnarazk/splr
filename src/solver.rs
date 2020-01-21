@@ -658,6 +658,9 @@ fn simplify_learnt(
     let State {
         ref mut new_learnt, ..
     } = state;
+    if new_learnt.len() < 2 {
+        return 0;
+    }
     // let dl = asgs.level();
     let mut to_clear: Vec<Lit> = vec![new_learnt[0]];
     let mut levels = vec![false; asgs.level() + 1];
