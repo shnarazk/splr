@@ -422,14 +422,18 @@ fn handle_conflict_path(
         }
     }
     // vdb.bump_vars(asgs, cdb, ci);
-
-    asgs.cancel_until(vdb, bl.max(state.root_level));
     let learnt_len = new_learnt.len();
     if learnt_len == 1 {
         // dump to certified even if it's a literal.
         cdb.certificate_add(new_learnt);
-        asgs.uncheck_enqueue(vdb, new_learnt[0], ClauseId::default());
+        let fixed = new_learnt[0].vi();
+        let btlvl = vdb[fixed].level - 1;
+        debug_assert_eq!(btlvl, seek_clash_level(asgs, cdb, vdb, fixed));
+        asgs.uncheck_unitclause(vdb, new_learnt[0]);
+        asgs.cancel_until(vdb, btlvl); // bl.max(state.root_level)
+        // asgs.uncheck_enqueue(vdb, new_learnt[0], ClauseId::default());
     } else {
+        asgs.cancel_until(vdb, bl.max(state.root_level));
         let lbd = vdb.compute_lbd(&new_learnt);
         let l0 = new_learnt[0];
         let cid = cdb.attach(state, vdb, lbd);
@@ -762,5 +766,52 @@ fn analyze_final(asgs: &AssignStack, state: &mut State, vdb: &mut VarDB, c: &Cla
             }
         }
         seen[vi] = false;
+    }
+}
+
+fn seek_clash_level(asgs: &AssignStack, cdb: &ClauseDB, vdb: &VarDB, vi: VarId) -> usize {
+    for lit in &asgs[0..] {
+        if cdb[vdb[lit.vi()].reason].lits.iter().any(|l| l.vi() == vi) {
+            // println!("fix var {} goto {}", vi, vdb[lit.vi()].level - 1);
+            return vdb[lit.vi()].level - 1;
+        }
+    }
+    println!("fix var {} goto {}", vi, vdb[vi].level - 1);
+    return vdb[vi].level - 1;
+}
+
+fn dump_dependency(asgs: &AssignStack, cdb: &ClauseDB, vdb: &mut VarDB, confl: ClauseId) {
+    debug_assert_ne!(confl, ClauseId::default());
+    let mut cid = confl;
+    let mut p = NULL_LIT;
+    let mut ti = asgs.len(); // trail index
+    debug_assert!(vdb[1..].iter().all(|v| !v.is(Flag::VR_SEEN)));
+    println!();
+    loop {
+        for q in &cdb[cid].lits[(p != NULL_LIT) as usize..] {
+            let vi = q.vi();
+            if !vdb[vi].is(Flag::VR_SEEN) {
+                vdb[vi].turn_on(Flag::VR_SEEN);
+                println!(" - {}: {}: set", cid, vdb[vi]);
+            }
+        }
+        loop {
+            if 0 == ti {
+                vdb[asgs.trail[ti].vi()].turn_off(Flag::VR_SEEN);
+                debug_assert!(vdb[1..].iter().all(|v| !v.is(Flag::VR_SEEN)));
+                println!();
+                return;
+            }
+            ti -= 1;
+            p = asgs.trail[ti];
+            let next_vi = p.vi();
+            if vdb[next_vi].is(Flag::VR_SEEN) {
+                vdb[next_vi].turn_off(Flag::VR_SEEN);
+                cid = vdb[next_vi].reason;
+                if cid != ClauseId::default() {
+                    break;
+                }
+            }
+        }
     }
 }

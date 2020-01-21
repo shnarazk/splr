@@ -46,6 +46,8 @@ pub trait PropagatorIF {
     fn uncheck_enqueue(&mut self, vdb: &mut VarDB, l: Lit, cid: ClauseId);
     /// unsafe assume; doesn't emit an exception.
     fn uncheck_assume(&mut self, vdb: &mut VarDB, l: Lit);
+    /// unsafe make level 0 assumed literal.
+    fn uncheck_unitclause(&mut self, vdb: &mut VarDB, l: Lit);
     /// select a new decision variable.
     fn select_var(&mut self, vdb: &mut VarDB) -> VarId;
     /// update the internal heap on var order.
@@ -285,9 +287,16 @@ impl PropagatorIF for AssignStack {
             return;
         }
         let lim = self.trail_lim[lv];
+        let mut reassigns: Vec<Lit> = Vec::new();
         for l in &self.trail[lim..] {
             let vi = l.vi();
+            drop(l);            // l may be a wrong assignment by uncheck_unitclause.
             let v = &mut vdb[vi];
+            if v.level == 0 {
+                debug_assert!(v.reason == ClauseId::default());
+                reassigns.push(Lit::from(v));
+                continue;
+            }
             unset_assign!(self, vi);
             v.phase = v.assign.unwrap();
             v.assign = None;
@@ -297,6 +306,10 @@ impl PropagatorIF for AssignStack {
         self.trail.truncate(lim);
         self.trail_lim.truncate(lv);
         self.q_head = lim;
+        for l in reassigns.iter() {
+            debug_assert!(!self.trail.contains(l));
+            self.trail.push(*l);
+        }
     }
     fn uncheck_enqueue(&mut self, vdb: &mut VarDB, l: Lit, cid: ClauseId) {
         debug_assert!(usize::from(l) != 0, "Null literal is about to be equeued");
@@ -335,6 +348,17 @@ impl PropagatorIF for AssignStack {
         v.reason = ClauseId::default();
         // v.polarity.update(if bool::from(l) { 1.0 } else { -1.0 });
         self.trail.push(l);
+    }
+    /// Note: this function doesn't touch AssignStack::trail.
+    /// So it may keep the opposite value.
+    fn uncheck_unitclause(&mut self, vdb: &mut VarDB, l: Lit) {
+        assert!(!self.trail.contains(&l) && self.trail.contains(&!l));
+        let vi = l.vi();
+        let v = &mut vdb[vi];
+        set_assign!(self, l);
+        v.assign = Some(bool::from(l));
+        v.level = 0;
+        v.reason = ClauseId::default();
     }
     fn select_var(&mut self, vdb: &mut VarDB) -> VarId {
         self.var_order.select_var(vdb)
