@@ -44,7 +44,7 @@ pub trait VarDBIF {
     fn bump_vars(&mut self, asgs: &AssignStack, cdb: &ClauseDB, confl: ClauseId);
 }
 
-const VAR_ACTIVITY_DECAY: f64 = 0.94;
+const VAR_ACTIVITY_DECAY: f64 = 0.7;
 
 /// Structure for variables.
 #[derive(Debug)]
@@ -212,27 +212,28 @@ impl IndexMut<RangeFrom<usize>> for VarDB {
 
 impl ActivityIF for VarDB {
     type Ix = VarId;
-    type Inc = usize;
+    type Inc = ();
     fn activity(&mut self, vi: Self::Ix) -> f64 {
-        let now = self.ordinal;
         let v = &mut self.var[vi];
-        let diff = now - v.last_update;
-        if 0 < diff {
-            v.last_update = now;
-            v.reward *= self.activity_decay.powi(diff as i32);
+        if self.ordinal != v.timestamp {
+            v.reward *= self.activity_decay.powi((self.ordinal - v.timestamp) as i32);
+            v.timestamp = self.ordinal;
         }
         v.reward
     }
-    fn bump_activity(&mut self, vi: Self::Ix, dl: Self::Inc) {
+    fn bump_activity(&mut self, vi: Self::Ix, _: Self::Inc) {
         let v = &mut self.var[vi];
-        let now = self.ordinal;
-        let t = (now - v.last_update) as i32;
-        // v.reward = (now as f64 + self.activity) / 2.0; // ASCID
-        v.reward =
-            0.2 + self.reward_by_dl / (dl + 1) as f64 + v.reward * self.activity_decay.powi(t);
-        v.last_update = now;
+        if self.ordinal != v.timestamp {
+            v.reward *= self.activity_decay.powi((self.ordinal - v.timestamp) as i32);
+            v.reward += 1.0 - self.activity_decay;
+            v.timestamp = self.ordinal;
+        }
     }
-    fn scale_activity(&mut self) {}
+    fn scale_activity(&mut self) {
+        if self.activity_decay < 0.95 {
+            self.activity_decay += 0.000_001;
+        }
+    }
 }
 
 impl Instantiate for VarDB {
@@ -330,7 +331,7 @@ impl VarDBIF for VarDB {
                 let vi = q.vi();
                 if !self.var[vi].is(Flag::VR_SEEN) {
                     self.var[vi].turn_on(Flag::VR_SEEN);
-                    self.bump_activity(vi, 0);
+                    self.bump_activity(vi, ());
                 }
             }
             loop {

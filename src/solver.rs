@@ -414,8 +414,15 @@ fn handle_conflict_path(
     }
     let cl = asgs.level();
     let bl = analyze(asgs, cdb, state, vdb, ci);
-    // vdb.bump_vars(asgs, cdb, ci);
     let new_learnt = &mut state.new_learnt;
+    // Reason-Side Rewarding
+    for l in new_learnt.iter() {
+        for lit in &cdb[vdb[l.vi()].reason].lits {
+            vdb.bump_activity(lit.vi(), ());
+        }
+    }
+    // vdb.bump_vars(asgs, cdb, ci);
+
     asgs.cancel_until(vdb, bl.max(state.root_level));
     let learnt_len = new_learnt.len();
     if learnt_len == 1 {
@@ -483,20 +490,18 @@ fn adapt_parameters(
         let stopped = state[Stat::SolvedRecord] == state.num_solved_vars;
         if stopped {
             state.slack_duration += 1;
-        } else if 0 < state.slack_duration && state.stagnated {
-            state.slack_duration *= -1;
         } else {
             state.slack_duration = 0;
         }
-        if stopped {
-            vdb.reward_by_dl *= 0.99;
-        } else {
-            vdb.reward_by_dl = 1.0;
-        }
-        let stagnated = ((state.num_vars - state.num_solved_vars)
-            .next_power_of_two()
-            .trailing_zeros() as isize)
-            < state.slack_duration;
+        let stagnated =
+            if state.stagnated {
+                false
+            } else {
+                ((state.num_vars - state.num_solved_vars)
+                 .next_power_of_two()
+                 .trailing_zeros() as isize)
+                    < state.slack_duration
+            };
         if !state.stagnated && stagnated {
             state[Stat::Stagnation] += 1;
         }
@@ -601,21 +606,19 @@ fn analyze(
         // println!("- handle {}", cid.fmt());
         for q in &c[(p != NULL_LIT) as usize..] {
             let vi = q.vi();
-            vdb.bump_activity(vi, dl);
-            asgs.update_order(vdb, vi);
             let v = &mut vdb[vi];
-            let lvl = v.level;
             debug_assert!(!v.is(Flag::ELIMINATED));
             debug_assert!(v.assign.is_some());
-            if 0 < lvl && !v.is(Flag::CA_SEEN) {
+            if 0 < v.level && !v.is(Flag::CA_SEEN) {
                 v.turn_on(Flag::CA_SEEN);
-                if dl <= lvl {
+                if dl <= v.level {
                     // println!("- flag for {} which level is {}", q.int(), lvl);
                     path_cnt += 1;
                 } else {
                     // println!("- push {} to learnt, which level is {}", q.int(), lvl);
                     learnt.push(*q);
                 }
+                vdb.bump_activity(vi, ());
             } else {
                 // if !v.is(Flag::CA_SEEN) {
                 //     println!("- ignore {} because it was flagged", q.int());
