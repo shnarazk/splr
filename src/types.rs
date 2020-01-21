@@ -1,6 +1,6 @@
 //! Basic types
 use {
-    crate::{clause::ClauseId, config::Config},
+    crate::{clause::ClauseId, config::Config, var::Var},
     std::{
         fmt,
         ops::{Index, IndexMut, Neg, Not},
@@ -92,6 +92,30 @@ impl From<ClauseId> for Lit {
     fn from(cid: ClauseId) -> Self {
         Lit {
             ordinal: cid.ordinal & 0x7FFF_FFFF,
+        }
+    }
+}
+
+/// While Lit::oridinal is private, Var::{index, assign} are public.
+/// So we define the following here.
+impl From<&Var> for Lit {
+    fn from(v: &Var) -> Self {
+        Lit {
+            ordinal: match v.assign {
+                Some(true) => (v.index as u32) << 1 | 1 as u32,
+                _e => (v.index as u32) << 1,
+            }
+        }
+    }
+}
+
+impl From<&mut Var> for Lit {
+    fn from(v: &mut Var) -> Self {
+        Lit {
+            ordinal: match v.assign {
+                Some(true) => (v.index as u32) << 1 | 1 as u32,
+                _e => (v.index as u32) << 1,
+            }
         }
     }
 }
