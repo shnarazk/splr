@@ -62,7 +62,7 @@ pub struct Var {
     /// a dynamic evaluation criterion like VSIDS or ACID.
     reward: f64,
     /// the number of conflicts at which this var was rewarded lastly.
-    last_update: usize,
+    timestamp: usize,
     /// list of clauses which contain this variable positively.
     pub pos_occurs: Vec<ClauseId>,
     /// list of clauses which contain this variable negatively.
@@ -80,7 +80,7 @@ impl Default for Var {
             reason: ClauseId::default(),
             level: 0,
             reward: 0.0,
-            last_update: 0,
+            timestamp: 0,
             pos_occurs: Vec::new(),
             neg_occurs: Vec::new(),
             flags: Flag::empty(),
@@ -146,8 +146,7 @@ impl FlagIF for Var {
 /// Structure for variables.
 #[derive(Debug)]
 pub struct VarDB {
-    pub activity_decay: f64,
-    pub reward_by_dl: f64,
+    activity_decay: f64,
     ordinal: usize,
     /// vars
     var: Vec<Var>,
@@ -159,7 +158,6 @@ impl Default for VarDB {
     fn default() -> VarDB {
         VarDB {
             activity_decay: VAR_ACTIVITY_DECAY,
-            reward_by_dl: 1.0,
             ordinal: 0,
             var: Vec::new(),
             lbd_temp: Vec::new(),
