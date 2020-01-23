@@ -429,7 +429,7 @@ fn handle_conflict_path(
         let fixed = new_learnt[0].vi();
         let btlvl = vdb[fixed].level - 1;
         debug_assert_eq!(btlvl, seek_clash_level(asgs, cdb, vdb, fixed));
-        asgs.uncheck_unitclause(vdb, new_learnt[0]);
+        asgs.uncheck_flip(vdb, new_learnt[0]);
         asgs.cancel_until(vdb, btlvl); // bl.max(state.root_level)
         // asgs.uncheck_enqueue(vdb, new_learnt[0], ClauseId::default());
     } else {

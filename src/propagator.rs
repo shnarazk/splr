@@ -47,7 +47,7 @@ pub trait PropagatorIF {
     /// unsafe assume; doesn't emit an exception.
     fn uncheck_assume(&mut self, vdb: &mut VarDB, l: Lit);
     /// unsafe make level 0 assumed literal.
-    fn uncheck_unitclause(&mut self, vdb: &mut VarDB, l: Lit);
+    fn uncheck_flip(&mut self, vdb: &mut VarDB, l: Lit);
     /// select a new decision variable.
     fn select_var(&mut self, vdb: &mut VarDB) -> VarId;
     /// update the internal heap on var order.
@@ -353,7 +353,7 @@ impl PropagatorIF for AssignStack {
     }
     /// Note: this function doesn't touch AssignStack::trail.
     /// So it may keep the opposite value.
-    fn uncheck_unitclause(&mut self, vdb: &mut VarDB, l: Lit) {
+    fn uncheck_flip(&mut self, vdb: &mut VarDB, l: Lit) {
         debug_assert!(!self.trail.contains(&l) && self.trail.contains(&!l));
         let vi = l.vi();
         let v = &mut vdb[vi];
