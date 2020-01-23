@@ -783,39 +783,3 @@ fn seek_clash_level(asgs: &AssignStack, cdb: &ClauseDB, vdb: &VarDB, vi: VarId) 
     println!("fix var {} goto {}", vi, vdb[vi].level - 1);
     return vdb[vi].level - 1;
 }
-
-fn dump_dependency(asgs: &AssignStack, cdb: &ClauseDB, vdb: &mut VarDB, confl: ClauseId) {
-    debug_assert_ne!(confl, ClauseId::default());
-    let mut cid = confl;
-    let mut p = NULL_LIT;
-    let mut ti = asgs.len(); // trail index
-    debug_assert!(vdb[1..].iter().all(|v| !v.is(Flag::VR_SEEN)));
-    println!();
-    loop {
-        for q in &cdb[cid].lits[(p != NULL_LIT) as usize..] {
-            let vi = q.vi();
-            if !vdb[vi].is(Flag::VR_SEEN) {
-                vdb[vi].turn_on(Flag::VR_SEEN);
-                println!(" - {}: {}: set", cid, vdb[vi]);
-            }
-        }
-        loop {
-            if 0 == ti {
-                vdb[asgs.trail[ti].vi()].turn_off(Flag::VR_SEEN);
-                debug_assert!(vdb[1..].iter().all(|v| !v.is(Flag::VR_SEEN)));
-                println!();
-                return;
-            }
-            ti -= 1;
-            p = asgs.trail[ti];
-            let next_vi = p.vi();
-            if vdb[next_vi].is(Flag::VR_SEEN) {
-                vdb[next_vi].turn_off(Flag::VR_SEEN);
-                cid = vdb[next_vi].reason;
-                if cid != ClauseId::default() {
-                    break;
-                }
-            }
-        }
-    }
-}
