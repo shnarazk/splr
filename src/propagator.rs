@@ -247,6 +247,8 @@ impl PropagatorIF for AssignStack {
                         self.uncheck_enqueue(vdb, w.blocker, w.c);
                         if lits[0] == false_lit {
                             lits.swap(0, 1);
+                        // } else if vdb[lits[0].vi()].level < vdb[lits[1].vi()].level {
+                        //     panic!("something is wrong");
                         }
                         continue 'next_clause;
                     }
@@ -352,7 +354,7 @@ impl PropagatorIF for AssignStack {
     /// Note: this function doesn't touch AssignStack::trail.
     /// So it may keep the opposite value.
     fn uncheck_unitclause(&mut self, vdb: &mut VarDB, l: Lit) {
-        assert!(!self.trail.contains(&l) && self.trail.contains(&!l));
+        debug_assert!(!self.trail.contains(&l) && self.trail.contains(&!l));
         let vi = l.vi();
         let v = &mut vdb[vi];
         set_assign!(self, l);

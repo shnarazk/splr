@@ -648,6 +648,7 @@ fn analyze(
         }
         ti -= 1;
     }
+    debug_assert!(!vdb[p.vi()].is(Flag::CA_SEEN));
     learnt[0] = !p;
     // println!("- appending {}, the result is {:?}", learnt[0].int(), vec2int(learnt));
     simplify_learnt(asgs, cdb, state, vdb)
@@ -662,9 +663,6 @@ fn simplify_learnt(
     let State {
         ref mut new_learnt, ..
     } = state;
-    if new_learnt.len() < 2 {
-        return 0;
-    }
     // let dl = asgs.level();
     let mut to_clear: Vec<Lit> = vec![new_learnt[0]];
     let mut levels = vec![false; asgs.level() + 1];
@@ -672,11 +670,18 @@ fn simplify_learnt(
         to_clear.push(*l);
         levels[vdb[l.vi()].level] = true;
     }
+    debug_assert!(new_learnt[1..].iter().all(|l| vdb[l.vi()].level <= vdb[new_learnt[0].vi()].level));
+    let first = new_learnt[0];
     new_learnt.retain(|l| {
         vdb[l.vi()].reason == ClauseId::default()
             || !redundant_lit(cdb, vdb, *l, &mut to_clear, &levels)
     });
-    if new_learnt.len() < 30 {
+    if new_learnt[0] != first {
+        debug_assert_eq!(vdb.assigned(first), Some(false));
+        // println!("re-derivation!");
+        new_learnt.truncate(1);
+    }
+    if 2 < new_learnt.len() {
         vdb.minimize_with_bi_clauses(cdb, new_learnt);
     }
     // find correct backtrack level from remaining literals
@@ -710,9 +715,8 @@ fn redundant_lit(
     stack.push(l);
     let top = clear.len();
     while let Some(sl) = stack.pop() {
-        let cid = vdb[sl.vi()].reason;
-        let c = &mut cdb[cid];
-        for q in &(*c)[1..] {
+        debug_assert_eq!(cdb[vdb[sl.vi()].reason][0].vi(), sl.vi());
+        for q in &cdb[vdb[sl.vi()].reason][1..] {
             let vi = q.vi();
             let v = &vdb[vi];
             let lv = v.level;
