@@ -662,7 +662,8 @@ fn simplify_learnt(
         vdb[l.vi()].reason == ClauseId::default()
             || !redundant_lit(cdb, vdb, *l, &mut to_clear, &levels)
     });
-    if new_learnt.len() < 30 {
+    let len = new_learnt.len();
+    if 2 < len && len < 30 {
         vdb.minimize_with_bi_clauses(cdb, new_learnt);
     }
     // find correct backtrack level from remaining literals
