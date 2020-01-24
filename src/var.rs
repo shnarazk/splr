@@ -216,9 +216,9 @@ impl ActivityIF for VarDB {
     fn activity(&mut self, vi: Self::Ix) -> f64 {
         let now = self.ordinal;
         let v = &mut self.var[vi];
-        let diff = now - v.last_update;
+        let diff = now - v.timestamp;
         if 0 < diff {
-            v.last_update = now;
+            v.timestamp = now;
             v.reward *= self.activity_decay.powi(diff as i32);
         }
         v.reward
@@ -226,11 +226,11 @@ impl ActivityIF for VarDB {
     fn bump_activity(&mut self, vi: Self::Ix, dl: Self::Inc) {
         let v = &mut self.var[vi];
         let now = self.ordinal;
-        let t = (now - v.last_update) as i32;
+        let t = (now - v.timestamp) as i32;
         // v.reward = (now as f64 + self.activity) / 2.0; // ASCID
         v.reward =
-            0.2 + self.reward_by_dl / (dl + 1) as f64 + v.reward * self.activity_decay.powi(t);
-        v.last_update = now;
+            0.2 + 1.0 / (dl + 1) as f64 + v.reward * self.activity_decay.powi(t);
+        v.timestamp = now;
     }
     fn scale_activity(&mut self) {}
 }

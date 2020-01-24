@@ -488,11 +488,6 @@ fn adapt_parameters(
         } else {
             state.slack_duration = 0;
         }
-        if stopped {
-            vdb.reward_by_dl *= 0.99;
-        } else {
-            vdb.reward_by_dl = 1.0;
-        }
         let stagnated = ((state.num_vars - state.num_solved_vars)
             .next_power_of_two()
             .trailing_zeros() as isize)
