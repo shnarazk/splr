@@ -488,9 +488,10 @@ fn adapt_parameters(
         } else {
             state.slack_duration = 0;
         }
-        let stagnated = ((state.num_vars - state.num_solved_vars)
-            .next_power_of_two()
-            .trailing_zeros() as isize)
+        let stagnated = !state.stagnated &&
+            ((state.num_vars - state.num_solved_vars)
+             .next_power_of_two()
+             .trailing_zeros() as isize)
             < state.slack_duration;
         if !state.stagnated && stagnated {
             state[Stat::Stagnation] += 1;
