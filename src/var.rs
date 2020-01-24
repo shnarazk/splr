@@ -398,3 +398,41 @@ impl LBDIF for VarDB {
         }
     }
 }
+
+impl VarDB {
+    pub fn dump_dependency(&mut self, asgs: &AssignStack, cdb: &ClauseDB, confl: ClauseId) {
+        debug_assert_ne!(confl, ClauseId::default());
+        let mut cid = confl;
+        let mut p = NULL_LIT;
+        let mut ti = asgs.len(); // trail index
+        debug_assert!(self.var[1..].iter().all(|v| !v.is(Flag::VR_SEEN)));
+        println!();
+        loop {
+            for q in &cdb[cid].lits[(p != NULL_LIT) as usize..] {
+                let vi = q.vi();
+                if !self.var[vi].is(Flag::VR_SEEN) {
+                    self.var[vi].turn_on(Flag::VR_SEEN);
+                    println!(" - {}: {}: set", cid, self.var[vi]);
+                }
+            }
+            loop {
+                if 0 == ti {
+                    self.var[asgs.trail[ti].vi()].turn_off(Flag::VR_SEEN);
+                    debug_assert!(self.var[1..].iter().all(|v| !v.is(Flag::VR_SEEN)));
+                    println!();
+                    return;
+                }
+                ti -= 1;
+                p = asgs.trail[ti];
+                let next_vi = p.vi();
+                if self.var[next_vi].is(Flag::VR_SEEN) {
+                    self.var[next_vi].turn_off(Flag::VR_SEEN);
+                    cid = self.var[next_vi].reason;
+                    if cid != ClauseId::default() {
+                        break;
+                    }
+                }
+            }
+        }
+    }
+}
