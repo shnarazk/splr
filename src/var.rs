@@ -210,6 +210,14 @@ impl IndexMut<RangeFrom<usize>> for VarDB {
     }
 }
 
+impl Index<Lit> for VarDB {
+    type Output = Var;
+    #[inline]
+    fn index(&self, l: Lit) -> &Var {
+        unsafe { self.var.get_unchecked(l.vi()) }
+    }
+}
+
 impl ActivityIF for VarDB {
     type Ix = VarId;
     type Inc = usize;
