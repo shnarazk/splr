@@ -236,8 +236,7 @@ impl ActivityIF for VarDB {
         let now = self.ordinal;
         let t = (now - v.timestamp) as i32;
         // v.reward = (now as f64 + self.activity) / 2.0; // ASCID
-        v.reward =
-            0.2 + 1.0 / (dl + 1) as f64 + v.reward * self.activity_decay.powi(t);
+        v.reward = 0.2 + 1.0 / (dl + 1) as f64 + v.reward * self.activity_decay.powi(t);
         v.timestamp = now;
     }
     fn scale_activity(&mut self) {}

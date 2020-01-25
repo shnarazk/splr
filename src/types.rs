@@ -104,7 +104,7 @@ impl From<&Var> for Lit {
             ordinal: match v.assign {
                 Some(true) => (v.index as u32) << 1 | 1 as u32,
                 _e => (v.index as u32) << 1,
-            }
+            },
         }
     }
 }
@@ -115,7 +115,7 @@ impl From<&mut Var> for Lit {
             ordinal: match v.assign {
                 Some(true) => (v.index as u32) << 1 | 1 as u32,
                 _e => (v.index as u32) << 1,
-            }
+            },
         }
     }
 }
