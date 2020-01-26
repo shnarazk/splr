@@ -31,20 +31,28 @@ pub trait VarDBIF {
     fn locked(&self, c: &Clause, cid: ClauseId) -> bool;
     /// return `true` if the set of literals is satisfiable under the current assignment.
     fn satisfies(&self, c: &[Lit]) -> bool;
-    /// update internal counter..
-    fn update(&mut self);
-    /// initialize rewards based on an order of vars.
-    fn initialize_reward(
-        &mut self,
-        iterator: iter::Skip<iter::Enumerate<std::slice::Iter<'_, usize>>>,
-    );
     // minimize a clause.
     fn minimize_with_bi_clauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>);
     // bump vars' activities.
     fn bump_vars(&mut self, asgs: &AssignStack, cdb: &ClauseDB, confl: ClauseId);
 }
 
-const VAR_ACTIVITY_DECAY: f64 = 0.94;
+pub trait VarRewardIF {
+    type Inc;
+    fn activity(&mut self, vi: VarId) -> f64;
+    /// initialize rewards based on an order of vars.
+    fn initialize_reward(
+        &mut self,
+        iterator: iter::Skip<iter::Enumerate<std::slice::Iter<'_, usize>>>,
+    );
+    fn reward_at_analysis(&mut self, vi: VarId, x: Self::Inc);
+    fn reward_at_assign(&mut self, vi: VarId, x: Self::Inc);
+    fn reward_at_unassign(&mut self, vi: VarId, x: Self::Inc);
+    /// update internal counter..
+    fn reward_update(&mut self);
+}
+
+const VAR_ACTIVITY_DECAY: f64 = 0.7;
 
 /// Structure for variables.
 #[derive(Debug)]
@@ -69,6 +77,7 @@ pub struct Var {
     pub neg_occurs: Vec<ClauseId>,
     /// the `Flag`s
     flags: Flag,
+    participated: usize,
 }
 
 impl Default for Var {
@@ -84,6 +93,7 @@ impl Default for Var {
             pos_occurs: Vec::new(),
             neg_occurs: Vec::new(),
             flags: Flag::empty(),
+            participated: 0,
         }
     }
 }
@@ -218,28 +228,41 @@ impl Index<Lit> for VarDB {
     }
 }
 
-impl ActivityIF for VarDB {
-    type Ix = VarId;
-    type Inc = usize;
-    fn activity(&mut self, vi: Self::Ix) -> f64 {
-        let now = self.ordinal;
-        let v = &mut self.var[vi];
-        let diff = now - v.timestamp;
-        if 0 < diff {
-            v.timestamp = now;
-            v.reward *= self.activity_decay.powi(diff as i32);
+impl VarRewardIF for VarDB {
+    type Inc = ();
+    fn activity(&mut self, vi: VarId) -> f64 {
+        self[vi].reward
+    }
+    fn initialize_reward(
+        &mut self,
+        iterator: iter::Skip<iter::Enumerate<std::slice::Iter<'_, usize>>>,
+    ) {
+        let _nv = self.len();
+        for (_, vi) in iterator {
+            self.var[*vi].reward = 0.0; // (nv - i) as f64; // big bang initialization
         }
-        v.reward
     }
-    fn bump_activity(&mut self, vi: Self::Ix, dl: Self::Inc) {
+    fn reward_at_analysis(&mut self, vi: VarId, _ : Self::Inc) {
+        let v = &mut self[vi];
+        v.participated += 1;
+    }
+    fn reward_at_assign(&mut self,vi: VarId, _ : Self::Inc) {
+        self[vi].timestamp = self.ordinal;
+    }
+    fn reward_at_unassign(&mut self, vi: VarId, _ : Self::Inc) {
         let v = &mut self.var[vi];
-        let now = self.ordinal;
-        let t = (now - v.timestamp) as i32;
-        // v.reward = (now as f64 + self.activity) / 2.0; // ASCID
-        v.reward = 0.2 + 1.0 / (dl + 1) as f64 + v.reward * self.activity_decay.powi(t);
-        v.timestamp = now;
+        let duration = self.ordinal + 1 - v.timestamp;
+        let rate = v.participated as f64 / duration as f64;
+        v.reward *= self.activity_decay;
+        v.reward += (1.0 - self.activity_decay) * rate;
+        v.participated = 0;
     }
-    fn scale_activity(&mut self) {}
+    fn reward_update(&mut self) {
+        self.ordinal += 1;
+        if self.activity_decay < 0.92 {
+            self.activity_decay += 0.000_001;
+        }
+    }
 }
 
 impl Instantiate for VarDB {
@@ -279,18 +302,6 @@ impl VarDBIF for VarDB {
             }
         }
         false
-    }
-    fn update(&mut self) {
-        self.ordinal += 1;
-    }
-    fn initialize_reward(
-        &mut self,
-        iterator: iter::Skip<iter::Enumerate<std::slice::Iter<'_, usize>>>,
-    ) {
-        let _nv = self.len();
-        for (_, vi) in iterator {
-            self.var[*vi].reward = 0.0; // (nv - i) as f64; // big bang initialization
-        }
     }
     fn minimize_with_bi_clauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>) {
         let nlevels = self.compute_lbd(vec);
@@ -337,7 +348,7 @@ impl VarDBIF for VarDB {
                 let vi = q.vi();
                 if !self.var[vi].is(Flag::VR_SEEN) {
                     self.var[vi].turn_on(Flag::VR_SEEN);
-                    self.bump_activity(vi, 0);
+                    self.reward_at_analysis(vi, ());
                 }
             }
             loop {

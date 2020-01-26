@@ -7,7 +7,7 @@ use {
         restart::RestartIF,
         state::{Stat, State, StateIF},
         types::*,
-        var::{VarDB, VarDBIF, LBDIF},
+        var::{VarDB, VarDBIF, LBDIF, VarRewardIF},
     },
     std::{
         fs,
@@ -351,7 +351,7 @@ fn search(
         state.rst.luby.update(0);
     }
     loop {
-        vdb.update();
+        vdb.reward_update();
         let ci = asgs.propagate(cdb, vdb);
         state[Stat::Propagation] += 1;
         if ci == ClauseId::default() {
@@ -442,7 +442,6 @@ fn handle_conflict_path(
         state[Stat::Learnt] += 1;
     }
     cdb.scale_activity();
-    vdb.scale_activity();
     if 0 < state.config.dump_interval && ncnfl % state.config.dump_interval == 0 {
         state.development.push((
             ncnfl,
@@ -597,15 +596,16 @@ fn analyze(
         // println!("- handle {}", cid.fmt());
         for q in &c[(p != NULL_LIT) as usize..] {
             let vi = q.vi();
-            vdb.bump_activity(vi, dl);
-            asgs.update_order(vdb, vi);
-            let v = &mut vdb[vi];
-            let lvl = v.level;
-            debug_assert!(!v.is(Flag::ELIMINATED));
-            debug_assert!(v.assign.is_some());
-            if 0 < lvl && !v.is(Flag::CA_SEEN) {
+            if !vdb[vi].is(Flag::CA_SEEN) {
+                vdb.reward_at_analysis(vi, ());
+                let v = &mut vdb[vi];
+                if 0 == v.level {
+                    continue;
+                }
+                debug_assert!(!v.is(Flag::ELIMINATED));
+                debug_assert!(v.assign.is_some());
                 v.turn_on(Flag::CA_SEEN);
-                if dl <= lvl {
+                if dl <= v.level {
                     // println!("- flag for {} which level is {}", q.int(), lvl);
                     path_cnt += 1;
                 } else {
