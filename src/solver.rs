@@ -416,13 +416,13 @@ fn handle_conflict_path(
     let bl = analyze(asgs, cdb, state, vdb, ci);
     // vdb.bump_vars(asgs, cdb, ci);
     let new_learnt = &mut state.new_learnt;
-    asgs.cancel_until(vdb, bl.max(state.root_level));
     let learnt_len = new_learnt.len();
     if learnt_len == 1 {
         // dump to certified even if it's a literal.
         cdb.certificate_add(new_learnt);
-        asgs.uncheck_enqueue(vdb, new_learnt[0], ClauseId::default());
+        asgs.uncheck_fix(vdb, new_learnt[0]);
     } else {
+        asgs.cancel_until(vdb, bl.max(state.root_level));
         let lbd = vdb.compute_lbd(&new_learnt);
         let l0 = new_learnt[0];
         let cid = cdb.attach(state, vdb, lbd);
@@ -635,7 +635,9 @@ fn analyze(
         if path_cnt <= 0 {
             break;
         }
+        debug_assert!(0 < ti);
         ti -= 1;
+        debug_assert_ne!(cid, ClauseId::default());
     }
     learnt[0] = !p;
     // println!("- appending {}, the result is {:?}", learnt[0].int(), vec2int(learnt));

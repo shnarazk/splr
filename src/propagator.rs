@@ -46,6 +46,8 @@ pub trait PropagatorIF {
     fn uncheck_enqueue(&mut self, vdb: &mut VarDB, l: Lit, cid: ClauseId);
     /// unsafe assume; doesn't emit an exception.
     fn uncheck_assume(&mut self, vdb: &mut VarDB, l: Lit);
+    /// fix a var's assignment by a unit learnt clause.
+    fn uncheck_fix(&mut self, vdb: &mut VarDB, l: Lit);
     /// select a new decision variable.
     fn select_var(&mut self, vdb: &mut VarDB) -> VarId;
     /// update the internal heap on var order.
@@ -335,6 +337,29 @@ impl PropagatorIF for AssignStack {
         v.reason = ClauseId::default();
         // v.polarity.update(if bool::from(l) { 1.0 } else { -1.0 });
         self.trail.push(l);
+    }
+    fn uncheck_fix(&mut self, vdb: &mut VarDB, l: Lit) {
+        let vi = l.vi();
+        debug_assert!(0 < vdb[vi].level);
+        self.cancel_until(vdb, 0);
+        let v = &mut vdb[vi];
+        set_assign!(self, l);
+        v.assign = Some(bool::from(l));
+        v.level = 0;
+        v.reason = ClauseId::default();
+        if self.trail_lim.is_empty() {
+            self.trail.push(l);
+            self.q_head = 0;
+        } else {
+            let here = self.trail_lim[0];
+            debug_assert!(here < self.q_head);
+            self.q_head = here;
+            debug_assert!(here < self.trail.len());
+            self.trail.insert(here, l);
+            for p in &mut self.trail_lim {
+                *p += 1;
+            }
+        };
     }
     fn select_var(&mut self, vdb: &mut VarDB) -> VarId {
         self.var_order.select_var(vdb)
