@@ -53,7 +53,7 @@ pub trait VarRewardIF {
     fn reward_update(&mut self);
 }
 
-const VAR_ACTIVITY_DECAY: f64 = 0.95;
+const VAR_ACTIVITY_DECAY: f64 = 0.94;
 
 /// Structure for variables.
 #[derive(Debug)]
@@ -258,7 +258,7 @@ impl VarRewardIF for VarDB {
     }
     fn reward_update(&mut self) {
         self.ordinal += 1;
-        if self.activity_decay < 0.92 && false {
+        if self.activity_decay < 0.96 {
             self.activity_decay += 0.000_001;
         }
     }
