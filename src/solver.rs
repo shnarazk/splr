@@ -182,7 +182,7 @@ impl SatSolverIF for Solver {
                 }
             }
         }
-        vdb.initialize_reward(elim.order_enumerator());
+        vdb.initialize_reward(elim.sorted_iterator());
         asgs.rebuild_order(vdb);
         state.progress(cdb, vdb, None);
         match search(asgs, cdb, elim, state, vdb) {

@@ -7,7 +7,7 @@ use {
         types::*,
         var::{Var, VarDB, VarDBIF},
     },
-    std::{fmt, iter},
+    std::{fmt, slice::Iter},
 };
 
 /// API for Eliminator like `activate`, `stop`, `eliminate` and so on.
@@ -55,7 +55,7 @@ pub trait EliminatorIF {
     /// remove a clause id from all corresponding occur lists.
     fn remove_cid_occur(&mut self, vdb: &mut VarDB, cid: ClauseId, c: &mut Clause);
     /// return the order of vars based on their occurrences
-    fn order_enumerator(&self) -> iter::Skip<iter::Enumerate<std::slice::Iter<'_, usize>>>;
+    fn sorted_iterator(&self) -> Iter<'_, usize>;
 }
 
 #[derive(Eq, Debug, PartialEq)]
@@ -337,10 +337,8 @@ impl EliminatorIF for Eliminator {
             }
         }
     }
-    fn order_enumerator(
-        &self,
-    ) -> std::iter::Skip<std::iter::Enumerate<std::slice::Iter<'_, usize>>> {
-        self.var_queue.heap.iter().enumerate().skip(1)
+    fn sorted_iterator(&self) -> Iter<'_, usize> {
+        self.var_queue.heap[1..].iter()
     }
 }
 

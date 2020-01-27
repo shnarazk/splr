@@ -6,8 +6,9 @@ use {
         types::*,
     },
     std::{
-        fmt, iter,
+        fmt,
         ops::{Index, IndexMut, Range, RangeFrom},
+        slice::Iter,
     },
 };
 
