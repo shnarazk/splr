@@ -373,7 +373,7 @@ fn search(
             if !asgs.remains() {
                 let vi = asgs.select_var(vdb);
                 let p = vdb[vi].phase;
-                asgs.uncheck_assume(vdb, Lit::from_var(vi, p));
+                asgs.enqueue_by_decision(vdb, Lit::from_var(vi, p));
                 state[Stat::Decision] += 1;
                 a_decision_was_made = true;
             }
@@ -420,7 +420,7 @@ fn handle_conflict_path(
     if learnt_len == 1 {
         // dump to certified even if it's a literal.
         cdb.certificate_add(new_learnt);
-        asgs.uncheck_fix(vdb, new_learnt[0]);
+        asgs.enqueue_fixed(vdb, new_learnt[0]);
     } else {
         {
             // Reason-Side Rewarding
@@ -448,7 +448,7 @@ fn handle_conflict_path(
             state[Stat::NumBin] += 1;
             state[Stat::NumBinLearnt] += 1;
         }
-        asgs.uncheck_enqueue(vdb, l0, cid);
+        asgs.enqueue_by_implication(vdb, l0, cid);
         state.rst.lbd.update(lbd);
         state[Stat::SumLBD] += lbd;
         state[Stat::Learnt] += 1;

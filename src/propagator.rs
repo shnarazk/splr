@@ -31,24 +31,30 @@ pub trait PropagatorIF {
     /// return the *value* of a given literal.
     fn assigned(&self, l: Lit) -> Option<bool>;
     /// execute *propagate*.
-    fn propagate(&mut self, cdb: &mut ClauseDB, vdb: &mut VarDB) -> ClauseId;
-    /// execute *backjump*.
     fn cancel_until(&mut self, vdb: &mut VarDB, lv: usize);
+    /// unsafe enqueue (assign by implication); doesn't emit an exception.
+    fn enqueue_by_implication(&mut self, vdb: &mut VarDB, l: Lit, cid: ClauseId);
+    /// unsafe assume (assign by decision); doesn't emit an exception.
+    fn enqueue_by_decision(&mut self, vdb: &mut VarDB, l: Lit);
+    /// fix a var's assignment by a unit learnt clause.
+    fn enqueue_fixed(&mut self, vdb: &mut VarDB, l: Lit);
+    /// add an assignment with no reason clause without inconsistency check.
+    fn enqueue_null(&mut self, v: &mut Var, sig: bool);
+    /// select a new decision variable.
     /// add an assignment caused by a clause; emit an exception if solver becomes inconsistent.
     ///
     /// # Errors
     ///
     /// if solver becomes inconsistent by the new assignment.
-    fn enqueue(&mut self, v: &mut Var, sig: bool, cid: ClauseId, dl: usize) -> MaybeInconsistent;
-    /// add an assignment with no reason clause without inconsistency check.
-    fn enqueue_null(&mut self, v: &mut Var, sig: bool);
-    /// unsafe enqueue; doesn't emit an exception.
-    fn uncheck_enqueue(&mut self, vdb: &mut VarDB, l: Lit, cid: ClauseId);
-    /// unsafe assume; doesn't emit an exception.
-    fn uncheck_assume(&mut self, vdb: &mut VarDB, l: Lit);
-    /// fix a var's assignment by a unit learnt clause.
-    fn uncheck_fix(&mut self, vdb: &mut VarDB, l: Lit);
-    /// select a new decision variable.
+    fn try_to_enqueue(
+        &mut self,
+        v: &mut Var,
+        sig: bool,
+        cid: ClauseId,
+        dl: usize,
+    ) -> MaybeInconsistent;
+    fn propagate(&mut self, cdb: &mut ClauseDB, vdb: &mut VarDB) -> ClauseId;
+    /// execute *backjump*.
     fn select_var(&mut self, vdb: &mut VarDB) -> VarId;
     /// update the internal heap on var order.
     fn update_order(&mut self, vdb: &mut VarDB, v: VarId);
@@ -181,7 +187,107 @@ impl PropagatorIF for AssignStack {
     fn assigned(&self, l: Lit) -> Option<bool> {
         lit_assign!(self, l)
     }
-    fn enqueue(&mut self, v: &mut Var, sig: bool, cid: ClauseId, dl: usize) -> MaybeInconsistent {
+    fn cancel_until(&mut self, vdb: &mut VarDB, lv: usize) {
+        if self.trail_lim.len() <= lv {
+            return;
+        }
+        let lim = self.trail_lim[lv];
+        for l in &self.trail[lim..] {
+            let vi = l.vi();
+            let v = &mut vdb[vi];
+            unset_assign!(self, vi);
+            v.phase = v.assign.unwrap();
+            v.assign = None;
+            v.reason = ClauseId::default();
+            vdb.reward_at_unassign(vi);
+            self.var_order.insert(vdb, vi);
+        }
+        self.trail.truncate(lim);
+        self.trail_lim.truncate(lv);
+        self.q_head = lim;
+    }
+    fn enqueue_by_implication(&mut self, vdb: &mut VarDB, l: Lit, cid: ClauseId) {
+        debug_assert!(usize::from(l) != 0, "Null literal is about to be equeued");
+        debug_assert!(
+            self.trail_lim.is_empty() || cid != ClauseId::default(),
+            "Null CLAUSE is used for uncheck_enqueue"
+        );
+        let dl = self.trail_lim.len();
+        let vi = l.vi();
+        let v = &mut vdb[vi];
+        debug_assert!(!v.is(Flag::ELIMINATED));
+        debug_assert!(
+            var_assign!(self, vi) == Some(bool::from(l)) || var_assign!(self, vi).is_none()
+        );
+        set_assign!(self, l);
+        v.assign = Some(bool::from(l));
+        v.level = dl;
+        v.reason = cid;
+        vdb.reward_at_assign(vi);
+        // v.polarity.update(if bool::from(l) { 1.0 } else { -1.0 });
+        debug_assert!(!self.trail.contains(&l));
+        debug_assert!(!self.trail.contains(&!l));
+        self.trail.push(l);
+    }
+    fn enqueue_by_decision(&mut self, vdb: &mut VarDB, l: Lit) {
+        debug_assert!(!self.trail.contains(&l));
+        debug_assert!(!self.trail.contains(&!l), format!("{:?}", l));
+        self.level_up();
+        let dl = self.trail_lim.len();
+        let vi = l.vi();
+        let v = &mut vdb[vi];
+        debug_assert!(!v.is(Flag::ELIMINATED));
+        // debug_assert!(self.assign[vi] == l.lbool() || self.assign[vi] == BOTTOM);
+        set_assign!(self, l);
+        v.assign = Some(bool::from(l));
+        v.level = dl;
+        v.reason = ClauseId::default();
+        vdb.reward_at_assign(vi);
+        // v.polarity.update(if bool::from(l) { 1.0 } else { -1.0 });
+        self.trail.push(l);
+    }
+    fn enqueue_fixed(&mut self, vdb: &mut VarDB, l: Lit) {
+        let vi = l.vi();
+        debug_assert!(0 < vdb[vi].level);
+        self.cancel_until(vdb, 0);
+        let v = &mut vdb[vi];
+        set_assign!(self, l);
+        v.assign = Some(bool::from(l));
+        v.level = 0;
+        v.reason = ClauseId::default();
+        if self.trail_lim.is_empty() {
+            self.trail.push(l);
+            self.q_head = 0;
+        } else {
+            let here = self.trail_lim[0];
+            debug_assert!(here < self.q_head);
+            self.q_head = here;
+            debug_assert!(here < self.trail.len());
+            self.trail.insert(here, l);
+            for p in &mut self.trail_lim {
+                *p += 1;
+            }
+        };
+    }
+    fn enqueue_null(&mut self, v: &mut Var, sig: bool) {
+        debug_assert!(!v.is(Flag::ELIMINATED));
+        if var_assign!(self, v.index).is_none() {
+            set_assign!(self, Lit::from_var(v.index, sig));
+            v.assign = Some(sig);
+            v.reason = ClauseId::default();
+            v.level = 0;
+            // v.polarity.update(if sig { 1.0 } else { -1.0 });
+            self.trail.push(Lit::from_var(v.index, sig));
+        }
+        // debug_assert!(self.assign[v.index] == sig);
+    }
+    fn try_to_enqueue(
+        &mut self,
+        v: &mut Var,
+        sig: bool,
+        cid: ClauseId,
+        dl: usize,
+    ) -> MaybeInconsistent {
         debug_assert!(!v.is(Flag::ELIMINATED));
         match var_assign!(self, v.index) {
             None => {
@@ -202,18 +308,6 @@ impl PropagatorIF for AssignStack {
             Some(x) if x == sig => Ok(()),
             _ => Err(SolverError::Inconsistent),
         }
-    }
-    fn enqueue_null(&mut self, v: &mut Var, sig: bool) {
-        debug_assert!(!v.is(Flag::ELIMINATED));
-        if var_assign!(self, v.index).is_none() {
-            set_assign!(self, Lit::from_var(v.index, sig));
-            v.assign = Some(sig);
-            v.reason = ClauseId::default();
-            v.level = 0;
-            // v.polarity.update(if sig { 1.0 } else { -1.0 });
-            self.trail.push(Lit::from_var(v.index, sig));
-        }
-        // debug_assert!(self.assign[v.index] == sig);
     }
     /// UNIT PROPAGATION.
     /// Note:
@@ -244,7 +338,7 @@ impl PropagatorIF for AssignStack {
                             // state.rst.rcc.update(vdb[p.vi()].record_conflict(ncnfl));
                             return w.c;
                         }
-                        self.uncheck_enqueue(vdb, w.blocker, w.c);
+                        self.enqueue_by_implication(vdb, w.blocker, w.c);
                         if lits[0] == false_lit {
                             lits.swap(0, 1);
                         }
@@ -276,93 +370,11 @@ impl PropagatorIF for AssignStack {
                         // state.rst.rcc.update(vdb[p.vi()].record_conflict(ncnfl));
                         return w.c;
                     }
-                    self.uncheck_enqueue(vdb, first, w.c);
+                    self.enqueue_by_implication(vdb, first, w.c);
                 }
             }
         }
         ClauseId::default()
-    }
-    fn cancel_until(&mut self, vdb: &mut VarDB, lv: usize) {
-        if self.trail_lim.len() <= lv {
-            return;
-        }
-        let lim = self.trail_lim[lv];
-        for l in &self.trail[lim..] {
-            let vi = l.vi();
-            let v = &mut vdb[vi];
-            unset_assign!(self, vi);
-            v.phase = v.assign.unwrap();
-            v.assign = None;
-            v.reason = ClauseId::default();
-            vdb.reward_at_unassign(vi);
-            self.var_order.insert(vdb, vi);
-        }
-        self.trail.truncate(lim);
-        self.trail_lim.truncate(lv);
-        self.q_head = lim;
-    }
-    fn uncheck_enqueue(&mut self, vdb: &mut VarDB, l: Lit, cid: ClauseId) {
-        debug_assert!(usize::from(l) != 0, "Null literal is about to be equeued");
-        debug_assert!(
-            self.trail_lim.is_empty() || cid != ClauseId::default(),
-            "Null CLAUSE is used for uncheck_enqueue"
-        );
-        let dl = self.trail_lim.len();
-        let vi = l.vi();
-        let v = &mut vdb[vi];
-        debug_assert!(!v.is(Flag::ELIMINATED));
-        debug_assert!(
-            var_assign!(self, vi) == Some(bool::from(l)) || var_assign!(self, vi).is_none()
-        );
-        set_assign!(self, l);
-        v.assign = Some(bool::from(l));
-        v.level = dl;
-        v.reason = cid;
-        vdb.reward_at_assign(vi);
-        // v.polarity.update(if bool::from(l) { 1.0 } else { -1.0 });
-        debug_assert!(!self.trail.contains(&l));
-        debug_assert!(!self.trail.contains(&!l));
-        self.trail.push(l);
-    }
-    fn uncheck_assume(&mut self, vdb: &mut VarDB, l: Lit) {
-        debug_assert!(!self.trail.contains(&l));
-        debug_assert!(!self.trail.contains(&!l), format!("{:?}", l));
-        self.level_up();
-        let dl = self.trail_lim.len();
-        let vi = l.vi();
-        let v = &mut vdb[vi];
-        debug_assert!(!v.is(Flag::ELIMINATED));
-        // debug_assert!(self.assign[vi] == l.lbool() || self.assign[vi] == BOTTOM);
-        set_assign!(self, l);
-        v.assign = Some(bool::from(l));
-        v.level = dl;
-        v.reason = ClauseId::default();
-        vdb.reward_at_assign(vi);
-        // v.polarity.update(if bool::from(l) { 1.0 } else { -1.0 });
-        self.trail.push(l);
-    }
-    fn uncheck_fix(&mut self, vdb: &mut VarDB, l: Lit) {
-        let vi = l.vi();
-        debug_assert!(0 < vdb[vi].level);
-        self.cancel_until(vdb, 0);
-        let v = &mut vdb[vi];
-        set_assign!(self, l);
-        v.assign = Some(bool::from(l));
-        v.level = 0;
-        v.reason = ClauseId::default();
-        if self.trail_lim.is_empty() {
-            self.trail.push(l);
-            self.q_head = 0;
-        } else {
-            let here = self.trail_lim[0];
-            debug_assert!(here < self.q_head);
-            self.q_head = here;
-            debug_assert!(here < self.trail.len());
-            self.trail.insert(here, l);
-            for p in &mut self.trail_lim {
-                *p += 1;
-            }
-        };
     }
     fn select_var(&mut self, vdb: &mut VarDB) -> VarId {
         self.var_order.select_var(vdb)
