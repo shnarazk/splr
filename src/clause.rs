@@ -317,6 +317,7 @@ impl Ord for Clause {
 }
 
 impl Clause {
+    #[allow(clippy::comparison_chain)]
     fn cmp_activity(&self, other: &Clause) -> Ordering {
         if self.reward > other.reward {
             Ordering::Less
