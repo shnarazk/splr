@@ -39,21 +39,21 @@ pub trait VarDBIF {
 }
 
 pub trait VarRewardIF {
-    type Inc;
+    /// return var's activity.
     fn activity(&mut self, vi: VarId) -> f64;
     /// initialize rewards based on an order of vars.
-    fn initialize_reward(
-        &mut self,
-        iterator: iter::Skip<iter::Enumerate<std::slice::Iter<'_, usize>>>,
-    );
-    fn reward_at_analysis(&mut self, vi: VarId, x: Self::Inc);
-    fn reward_at_assign(&mut self, vi: VarId, x: Self::Inc);
-    fn reward_at_unassign(&mut self, vi: VarId, x: Self::Inc);
+    fn initialize_reward(&mut self, iterator: Iter<'_, usize>);
+    /// modify var's activity at conflict analysis in `analyze`.
+    fn reward_at_analysis(&mut self, vi: VarId);
+    /// modify var's activity at value assignment in `uncheck_{assume, enquue, fix}`.
+    fn reward_at_assign(&mut self, vi: VarId);
+    /// modify var's activity at value unassigment in `cancel_until`.
+    fn reward_at_unassign(&mut self, vi: VarId);
     /// update internal counter..
     fn reward_update(&mut self);
 }
 
-const VAR_ACTIVITY_DECAY: f64 = 0.7;
+const VAR_ACTIVITY_DECAY: f64 = 0.95;
 
 /// Structure for variables.
 #[derive(Debug)]
@@ -230,27 +230,25 @@ impl Index<Lit> for VarDB {
 }
 
 impl VarRewardIF for VarDB {
-    type Inc = ();
+    #[inline]
     fn activity(&mut self, vi: VarId) -> f64 {
         self[vi].reward
     }
-    fn initialize_reward(
-        &mut self,
-        iterator: iter::Skip<iter::Enumerate<std::slice::Iter<'_, usize>>>,
-    ) {
-        let _nv = self.len();
-        for (_, vi) in iterator {
-            self.var[*vi].reward = 0.0; // (nv - i) as f64; // big bang initialization
+    fn initialize_reward(&mut self, iterator: Iter<'_, usize>) {
+        let mut v = 0.5; // big bang initialization
+        for vi in iterator {
+            self.var[*vi].reward = v;
+            v *= 0.9;
         }
     }
-    fn reward_at_analysis(&mut self, vi: VarId, _ : Self::Inc) {
+    fn reward_at_analysis(&mut self, vi: VarId) {
         let v = &mut self[vi];
         v.participated += 1;
     }
-    fn reward_at_assign(&mut self,vi: VarId, _ : Self::Inc) {
+    fn reward_at_assign(&mut self, vi: VarId) {
         self[vi].timestamp = self.ordinal;
     }
-    fn reward_at_unassign(&mut self, vi: VarId, _ : Self::Inc) {
+    fn reward_at_unassign(&mut self, vi: VarId) {
         let v = &mut self.var[vi];
         let duration = self.ordinal + 1 - v.timestamp;
         let rate = v.participated as f64 / duration as f64;
@@ -260,7 +258,7 @@ impl VarRewardIF for VarDB {
     }
     fn reward_update(&mut self) {
         self.ordinal += 1;
-        if self.activity_decay < 0.92 {
+        if self.activity_decay < 0.92 && false {
             self.activity_decay += 0.000_001;
         }
     }
@@ -349,7 +347,7 @@ impl VarDBIF for VarDB {
                 let vi = q.vi();
                 if !self.var[vi].is(Flag::VR_SEEN) {
                     self.var[vi].turn_on(Flag::VR_SEEN);
-                    self.reward_at_analysis(vi, ());
+                    self.reward_at_analysis(vi);
                 }
             }
             loop {

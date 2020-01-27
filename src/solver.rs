@@ -7,7 +7,7 @@ use {
         restart::RestartIF,
         state::{Stat, State, StateIF},
         types::*,
-        var::{VarDB, VarDBIF, LBDIF, VarRewardIF},
+        var::{VarDB, VarDBIF, VarRewardIF, LBDIF},
     },
     std::{
         fs,
@@ -422,6 +422,18 @@ fn handle_conflict_path(
         cdb.certificate_add(new_learnt);
         asgs.uncheck_fix(vdb, new_learnt[0]);
     } else {
+        {
+            // Reason-Side Rewarding
+            let mut bumped = Vec::new();
+            for lit in new_learnt.iter() {
+                for l in &cdb[vdb[lit.vi()].reason].lits {
+                    if !bumped.contains(l) {
+                        vdb.reward_at_analysis(l.vi());
+                        bumped.push(*l);
+                    }
+                }
+            }
+        }
         asgs.cancel_until(vdb, bl.max(state.root_level));
         let lbd = vdb.compute_lbd(&new_learnt);
         let l0 = new_learnt[0];
@@ -597,7 +609,7 @@ fn analyze(
         for q in &c[(p != NULL_LIT) as usize..] {
             let vi = q.vi();
             if !vdb[vi].is(Flag::CA_SEEN) {
-                vdb.reward_at_analysis(vi, ());
+                vdb.reward_at_analysis(vi);
                 let v = &mut vdb[vi];
                 if 0 == v.level {
                     continue;

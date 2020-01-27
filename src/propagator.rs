@@ -294,7 +294,7 @@ impl PropagatorIF for AssignStack {
             v.phase = v.assign.unwrap();
             v.assign = None;
             v.reason = ClauseId::default();
-            vdb.reward_at_unassign(vi, ());
+            vdb.reward_at_unassign(vi);
             self.var_order.insert(vdb, vi);
         }
         self.trail.truncate(lim);
@@ -318,7 +318,7 @@ impl PropagatorIF for AssignStack {
         v.assign = Some(bool::from(l));
         v.level = dl;
         v.reason = cid;
-        vdb.reward_at_assign(vi, ());
+        vdb.reward_at_assign(vi);
         // v.polarity.update(if bool::from(l) { 1.0 } else { -1.0 });
         debug_assert!(!self.trail.contains(&l));
         debug_assert!(!self.trail.contains(&!l));
@@ -337,7 +337,7 @@ impl PropagatorIF for AssignStack {
         v.assign = Some(bool::from(l));
         v.level = dl;
         v.reason = ClauseId::default();
-        vdb.reward_at_assign(vi, ());
+        vdb.reward_at_assign(vi);
         // v.polarity.update(if bool::from(l) { 1.0 } else { -1.0 });
         self.trail.push(l);
     }
