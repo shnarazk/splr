@@ -49,11 +49,11 @@ pub trait VarRewardIF {
     fn reward_at_assign(&mut self, vi: VarId);
     /// modify var's activity at value unassigment in `cancel_until`.
     fn reward_at_unassign(&mut self, vi: VarId);
-    /// update internal counter..
+    /// update internal counter.
     fn reward_update(&mut self);
+    /// change reward mode.
+    fn shift_reward_mode(&mut self);
 }
-
-const VAR_ACTIVITY_DECAY: f64 = 0.94;
 
 /// Structure for variables.
 #[derive(Debug)]
@@ -154,10 +154,20 @@ impl FlagIF for Var {
     }
 }
 
+#[derive(Eq, Debug, PartialEq)]
+pub enum RewardStep {
+    HeatUp,
+    Annealing,
+    Crystalized,
+}
+
 /// Structure for variables.
 #[derive(Debug)]
 pub struct VarDB {
     activity_decay: f64,
+    activity_decay_max: f64,
+    activity_step: f64,
+    reward_mode: RewardStep,
     ordinal: usize,
     /// vars
     var: Vec<Var>,
@@ -167,8 +177,12 @@ pub struct VarDB {
 
 impl Default for VarDB {
     fn default() -> VarDB {
+        let diff = 0.1;
         VarDB {
-            activity_decay: VAR_ACTIVITY_DECAY,
+            activity_decay: 0.8,             // starting with a tiny value for learn
+            activity_decay_max: 0.8 + diff , // short ignition stage
+            activity_step: diff / 10_000.0,  // rapid bootup
+            reward_mode: RewardStep::HeatUp,
             ordinal: 0,
             var: Vec::new(),
             lbd_temp: Vec::new(),
@@ -258,8 +272,25 @@ impl VarRewardIF for VarDB {
     }
     fn reward_update(&mut self) {
         self.ordinal += 1;
-        if self.activity_decay < 0.96 {
-            self.activity_decay += 0.000_001;
+        if self.activity_decay < self.activity_decay_max {
+            self.activity_decay += self.activity_step;
+        } else {
+            self.shift_reward_mode();
+        }
+    }
+    fn shift_reward_mode(&mut self) {
+        match self.reward_mode {
+            RewardStep::HeatUp => {
+                self.reward_mode = RewardStep::Annealing;
+                self.activity_decay_max = 0.96;
+                self.activity_step *= 0.1;
+            },
+            RewardStep::Annealing => {
+                self.reward_mode = RewardStep::Crystalized;
+                self.activity_decay_max = 0.99;
+                self.activity_step *= 0.1;
+            }
+            RewardStep::Crystalized => (),
         }
     }
 }

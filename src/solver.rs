@@ -467,8 +467,14 @@ fn handle_conflict_path(
     }
     if ncnfl % 10_000 == 0 {
         adapt_parameters(asgs, cdb, elim, state, vdb, ncnfl)?;
-        if state.is_timeout() {
-            return Err(SolverError::Inconsistent);
+        if let Some(p) = state.elapsed() {
+            if 1.0 <= p {
+                return Err(SolverError::Inconsistent);
+            } else if state.default_rewarding && 0.5 <= p {
+                // force the final stage of rewarding to switch to 'deep search' mode
+                state.default_rewarding = false;
+                vdb.shift_reward_mode();
+            }
         }
     }
     if ((state.use_chan_seok && !cdb.glureduce && cdb.first_reduction < cdb.num_learnt)
