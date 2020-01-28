@@ -283,12 +283,12 @@ impl VarRewardIF for VarDB {
             RewardStep::HeatUp => {
                 self.reward_mode = RewardStep::Annealing;
                 self.activity_decay_max = 0.96;
-                self.activity_step *= 0.1;
+                self.activity_step *= 0.2;
             },
             RewardStep::Annealing => {
                 self.reward_mode = RewardStep::Crystalized;
-                self.activity_decay_max = 0.99;
-                self.activity_step *= 0.1;
+                self.activity_decay_max = 0.995;
+                self.activity_step *= 0.2;
             }
             RewardStep::Crystalized => (),
         }
