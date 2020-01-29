@@ -56,14 +56,16 @@ pub trait PropagatorIF {
     fn cancel_until(&mut self, vdb: &mut VarDB, lv: usize);
     /// execute *boolean constraint propagation* or *unit propagation*.
     fn propagate(&mut self, cdb: &mut ClauseDB, vdb: &mut VarDB) -> ClauseId;
+}
+
+/// API for var selection.
+pub trait VarSelectionIF {
     /// select a new decision variable.
     fn select_var(&mut self, vdb: &mut VarDB) -> VarId;
     /// update the internal heap on var order.
     fn update_order(&mut self, vdb: &mut VarDB, v: VarId);
     /// rebuild the internal var_order
     fn rebuild_order(&mut self, vdb: &mut VarDB);
-    /// dump all active clauses and fixed assignments in solver to a CNF file `fname`.
-    fn dump_cnf(&mut self, cdb: &ClauseDB, state: &State, vdb: &VarDB, fname: &str);
 }
 
 /// A record of assignment. It's called 'trail' in Glucose.
@@ -372,6 +374,9 @@ impl PropagatorIF for AssignStack {
         }
         ClauseId::default()
     }
+}
+
+impl VarSelectionIF for AssignStack {
     fn select_var(&mut self, vdb: &mut VarDB) -> VarId {
         self.var_order.select_var(vdb)
     }
@@ -381,6 +386,18 @@ impl PropagatorIF for AssignStack {
     fn rebuild_order(&mut self, vdb: &mut VarDB) {
         self.var_order.rebuild(vdb);
     }
+}
+
+impl AssignStack {
+    fn level_up(&mut self) {
+        self.trail_lim.push(self.trail.len());
+    }
+    fn sweep(&mut self) -> Lit {
+        let lit = self.trail[self.q_head];
+        self.q_head += 1;
+        lit
+    }
+    /// dump all active clauses and fixed assignments in solver to a CNF file.
     #[allow(dead_code)]
     fn dump_cnf(&mut self, cdb: &ClauseDB, state: &State, vdb: &VarDB, fname: &str) {
         for v in &vdb[1..] {
@@ -415,17 +432,6 @@ impl PropagatorIF for AssignStack {
                     .unwrap();
             }
         }
-    }
-}
-
-impl AssignStack {
-    fn level_up(&mut self) {
-        self.trail_lim.push(self.trail.len());
-    }
-    fn sweep(&mut self) -> Lit {
-        let lit = self.trail[self.q_head];
-        self.q_head += 1;
-        lit
     }
 }
 

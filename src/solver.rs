@@ -3,7 +3,7 @@ use {
         clause::{Clause, ClauseDB, ClauseDBIF, ClauseIF, ClauseId},
         config::Config,
         eliminator::{Eliminator, EliminatorIF},
-        propagator::{AssignStack, PropagatorIF},
+        propagator::{AssignStack, PropagatorIF, VarSelectionIF},
         restart::RestartIF,
         state::{Stat, State, StateIF},
         types::*,
