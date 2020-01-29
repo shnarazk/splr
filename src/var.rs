@@ -155,7 +155,7 @@ impl FlagIF for Var {
 }
 
 #[derive(Clone, Copy, Eq, Debug, PartialEq)]
-pub enum RewardStep {
+enum RewardStep {
     HeatUp = 0,
     Annealing,
     Final,
