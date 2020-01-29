@@ -27,7 +27,7 @@ impl ValidatorIF for Solver {
             let l = Lit::from(*val);
             let vi = l.vi();
             self.asgs
-                .try_to_enqueue(&mut self.vdb[vi], bool::from(l), ClauseId::default(), 0)?;
+                .enqueue(&mut self.vdb[vi], bool::from(l), ClauseId::default(), 0)?;
         }
         Ok(())
     }

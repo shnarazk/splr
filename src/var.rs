@@ -254,6 +254,13 @@ impl Index<Lit> for VarDB {
     }
 }
 
+impl IndexMut<Lit> for VarDB {
+    #[inline]
+    fn index_mut(&mut self, l: Lit) -> &mut Var {
+        unsafe { self.var.get_unchecked_mut(l.vi()) }
+    }
+}
+
 impl VarRewardIF for VarDB {
     #[inline]
     fn activity(&mut self, vi: VarId) -> f64 {

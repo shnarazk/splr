@@ -140,8 +140,8 @@ impl SatSolverIF for Solver {
                     continue;
                 }
                 match (v.pos_occurs.len(), v.neg_occurs.len()) {
-                    (_, 0) => asgs.enqueue_null(v, true),
-                    (0, _) => asgs.enqueue_null(v, false),
+                    (_, 0) => asgs.assign_at_rootlevel(vdb, Lit::from_var(vi, true)),
+                    (0, _) => asgs.assign_at_rootlevel(vdb, Lit::from_var(vi, false)),
                     (p, m) => {
                         v.phase = m < p;
                         elim.enqueue_var(vdb, vi, false);
@@ -296,7 +296,7 @@ impl SatSolverIF for Solver {
         Ok(s)
     }
     // renamed from clause_new
-    fn add_unchecked_clause(&mut self, v: &mut Vec<Lit>) -> Option<ClauseId> {
+    fn add_unchecked_clause(&mut self, lits: &mut Vec<Lit>) -> Option<ClauseId> {
         let Solver {
             ref mut asgs,
             ref mut cdb,
@@ -305,32 +305,32 @@ impl SatSolverIF for Solver {
             ..
         } = self;
         debug_assert!(asgs.level() == 0);
-        if v.iter().any(|l| vdb.assigned(*l).is_some()) {
-            cdb.certificate_add(v);
+        if lits.iter().any(|l| vdb.assigned(*l).is_some()) {
+            cdb.certificate_add(lits);
         }
-        v.sort_unstable();
+        lits.sort_unstable();
         let mut j = 0;
         let mut l_ = NULL_LIT; // last literal; [x, x.negate()] means tautology.
-        for i in 0..v.len() {
-            let li = v[i];
+        for i in 0..lits.len() {
+            let li = lits[i];
             let sat = vdb.assigned(li);
             if sat == Some(true) || !li == l_ {
                 return Some(ClauseId::default());
             } else if sat != Some(false) && li != l_ {
-                v[j] = li;
+                lits[j] = li;
                 j += 1;
                 l_ = li;
             }
         }
-        v.truncate(j);
-        match v.len() {
+        lits.truncate(j);
+        match lits.len() {
             0 => None, // Empty clause is UNSAT.
             1 => {
-                asgs.enqueue_null(&mut vdb[v[0].vi()], bool::from(v[0]));
+                asgs.assign_at_rootlevel(vdb, lits[0]);
                 Some(ClauseId::default())
             }
             _ => {
-                let cid = cdb.new_clause(&v, 0, false);
+                let cid = cdb.new_clause(lits, 0, false);
                 elim.add_cid_occur(vdb, cid, &mut cdb[cid], true);
                 Some(cid)
             }
@@ -373,7 +373,7 @@ fn search(
             if !asgs.remains() {
                 let vi = asgs.select_var(vdb);
                 let p = vdb[vi].phase;
-                asgs.enqueue_by_decision(vdb, Lit::from_var(vi, p));
+                asgs.assign_by_decision(vdb, Lit::from_var(vi, p));
                 state[Stat::Decision] += 1;
                 a_decision_was_made = true;
             }
@@ -420,7 +420,7 @@ fn handle_conflict_path(
     if learnt_len == 1 {
         // dump to certified even if it's a literal.
         cdb.certificate_add(new_learnt);
-        asgs.enqueue_fixed(vdb, new_learnt[0]);
+        asgs.assign_as_fixed(vdb, new_learnt[0]);
     } else {
         {
             // Reason-Side Rewarding
@@ -448,7 +448,7 @@ fn handle_conflict_path(
             state[Stat::NumBin] += 1;
             state[Stat::NumBinLearnt] += 1;
         }
-        asgs.enqueue_by_implication(vdb, l0, cid);
+        asgs.assign_by_implication(vdb, l0, cid);
         state.rst.lbd.update(lbd);
         state[Stat::SumLBD] += lbd;
         state[Stat::Learnt] += 1;
