@@ -154,12 +154,23 @@ impl FlagIF for Var {
     }
 }
 
-#[derive(Eq, Debug, PartialEq)]
+#[derive(Clone, Copy, Eq, Debug, PartialEq)]
 pub enum RewardStep {
-    HeatUp,
+    HeatUp = 0,
     Annealing,
-    Crystalized,
+    Final,
 }
+
+/// a reward table used in VarDB::shift_reward_mode
+///  - id: RewardStep
+///  - start: lower bound of the range
+///  - end: upper bound of the range
+///  - scale: scaling coefficient for activity decay
+const REWARDS: [(RewardStep, f64, f64, f64); 3] = [
+    (RewardStep::HeatUp,    0.80, 0.90, 0.0), // the last is dummy
+    (RewardStep::Annealing, 0.90, 0.96, 0.1),
+    (RewardStep::Final,     0.96, 0.98, 0.1),
+];
 
 /// Structure for variables.
 #[derive(Debug)]
@@ -177,12 +188,12 @@ pub struct VarDB {
 
 impl Default for VarDB {
     fn default() -> VarDB {
-        let diff = 0.1;
+        let reward = REWARDS[0];
         VarDB {
-            activity_decay: 0.8,             // starting with a tiny value for learn
-            activity_decay_max: 0.8 + diff , // short ignition stage
-            activity_step: diff / 10_000.0,  // rapid bootup
-            reward_mode: RewardStep::HeatUp,
+            activity_decay: reward.1,
+            activity_decay_max: reward.2,
+            activity_step: (reward.2 - reward.1) / 10_000.0,
+            reward_mode: reward.0,
             ordinal: 0,
             var: Vec::new(),
             lbd_temp: Vec::new(),
@@ -279,18 +290,11 @@ impl VarRewardIF for VarDB {
         }
     }
     fn shift_reward_mode(&mut self) {
-        match self.reward_mode {
-            RewardStep::HeatUp => {
-                self.reward_mode = RewardStep::Annealing;
-                self.activity_decay_max = 0.96;
-                self.activity_step *= 0.2;
-            },
-            RewardStep::Annealing => {
-                self.reward_mode = RewardStep::Crystalized;
-                self.activity_decay_max = 0.995;
-                self.activity_step *= 0.2;
-            }
-            RewardStep::Crystalized => (),
+        if self.reward_mode != RewardStep::Final {
+            let reward = &REWARDS[self.reward_mode as usize + 1];
+            self.reward_mode = reward.0;
+            self.activity_decay_max = reward.2;
+            self.activity_step *= reward.3;
         }
     }
 }
