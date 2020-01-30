@@ -662,3 +662,24 @@ impl fmt::Display for VarIdHeap {
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_assign_at_rootlevel() {
+        let config = Config::default();
+        let cnf = CNFDescription {
+            num_of_variables: 4,
+            .. CNFDescription::default()
+        };
+        let mut vdb = VarDB::instantiate(&config, &cnf);
+        let mut propagator = AssignStack::instantiate(&config, &cnf);
+        assert!(propagator.assign_at_rootlevel(&mut vdb, Lit::from(1i32)).is_ok());
+        assert!(propagator.assign_at_rootlevel(&mut vdb, Lit::from(1i32)).is_ok());
+        assert!(propagator.assign_at_rootlevel(&mut vdb, Lit::from(2i32)).is_ok());
+        assert!(propagator.assign_at_rootlevel(&mut vdb, Lit::from(-3i32)).is_ok());
+        assert!(!propagator.assign_at_rootlevel(&mut vdb, Lit::from(-1i32)).is_ok());
+    }
+}
