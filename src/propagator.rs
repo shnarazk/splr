@@ -30,6 +30,12 @@ pub trait PropagatorIF {
     fn remains(&self) -> bool;
     /// return the *value* of a given literal.
     fn assigned(&self, l: Lit) -> Option<bool>;
+    /// add an assignment at level 0 as a precondition.
+    ///
+    /// # Errors
+    ///
+    /// emit `SolverError::Inconsistent` exception if solver becomes inconsistent.
+    fn assign_at_rootlevel(&mut self, vdb: &mut VarDB, l: Lit) -> MaybeInconsistent;
     /// unsafe enqueue (assign by implication); doesn't emit an exception.
     /// Warning: caller must assure the consistency after this assignment
     fn assign_by_implication(&mut self, vdb: &mut VarDB, l: Lit, cid: ClauseId);
@@ -40,13 +46,7 @@ pub trait PropagatorIF {
     /// fix a var's assignment by a unit learnt clause.
     /// ## Caveat
     /// Callers have to assure the consistency after this assignment.
-    fn assign_as_fixed(&mut self, vdb: &mut VarDB, l: Lit);
-    /// add an assignment at level 0 as a precondition.
-    ///
-    /// # Errors
-    ///
-    /// emit `SolverError::Inconsistent` exception if solver becomes inconsistent.
-    fn assign_at_rootlevel(&mut self, vdb: &mut VarDB, l: Lit) -> MaybeInconsistent;
+    fn assign_by_unitclause(&mut self, vdb: &mut VarDB, l: Lit);
     /// execute *backjump*.
     fn cancel_until(&mut self, vdb: &mut VarDB, lv: usize);
     /// execute *boolean constraint propagation* or *unit propagation*.
@@ -186,6 +186,24 @@ impl PropagatorIF for AssignStack {
     fn assigned(&self, l: Lit) -> Option<bool> {
         lit_assign!(self, l)
     }
+    fn assign_at_rootlevel(&mut self, vdb: &mut VarDB, l: Lit) -> MaybeInconsistent {
+        let v = &mut vdb[l];
+        debug_assert!(!v.is(Flag::ELIMINATED));
+        debug_assert_eq!(0, self.level());
+        match var_assign!(self, v.index) {
+            None => {
+                set_assign!(self, l);
+                v.assign = Some(bool::from(l));
+                v.reason = ClauseId::default();
+                v.level = 0;
+                // v.polarity.update(if sig { 1.0 } else { -1.0 });
+                self.trail.push(l);
+                Ok(())
+            }
+            Some(x) if x == bool::from(l) => Ok(()),
+            _ => Err(SolverError::Inconsistent),
+        }
+    }
     fn assign_by_implication(&mut self, vdb: &mut VarDB, l: Lit, cid: ClauseId) {
         debug_assert!(usize::from(l) != 0, "Null literal is about to be equeued");
         debug_assert!(
@@ -226,7 +244,7 @@ impl PropagatorIF for AssignStack {
         // v.polarity.update(if bool::from(l) { 1.0 } else { -1.0 });
         self.trail.push(l);
     }
-    fn assign_as_fixed(&mut self, vdb: &mut VarDB, l: Lit) {
+    fn assign_by_unitclause(&mut self, vdb: &mut VarDB, l: Lit) {
         let vi = l.vi();
         debug_assert!(0 < vdb[vi].level);
         self.cancel_until(vdb, 0);
@@ -248,24 +266,6 @@ impl PropagatorIF for AssignStack {
                 *p += 1;
             }
         };
-    }
-    fn assign_at_rootlevel(&mut self, vdb: &mut VarDB, l: Lit) -> MaybeInconsistent {
-        let v = &mut vdb[l];
-        debug_assert!(!v.is(Flag::ELIMINATED));
-        debug_assert_eq!(0, self.level());
-        match var_assign!(self, v.index) {
-            None => {
-                set_assign!(self, l);
-                v.assign = Some(bool::from(l));
-                v.reason = ClauseId::default();
-                v.level = 0;
-                // v.polarity.update(if sig { 1.0 } else { -1.0 });
-                self.trail.push(l);
-                Ok(())
-            }
-            Some(x) if x == bool::from(l) => Ok(()),
-            _ => Err(SolverError::Inconsistent),
-        }
     }
     fn cancel_until(&mut self, vdb: &mut VarDB, lv: usize) {
         if self.trail_lim.len() <= lv {

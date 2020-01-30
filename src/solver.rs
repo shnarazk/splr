@@ -433,7 +433,7 @@ fn handle_conflict_path(
     if learnt_len == 1 {
         // dump to certified even if it's a literal.
         cdb.certificate_add(new_learnt);
-        asgs.assign_as_fixed(vdb, new_learnt[0]);
+        asgs.assign_by_unitclause(vdb, new_learnt[0]);
     } else {
         {
             // Reason-Side Rewarding
