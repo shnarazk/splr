@@ -769,9 +769,9 @@ fn analyze_final(asgs: &AssignStack, state: &mut State, vdb: &mut VarDB, c: &Cla
     let end = if asgs.level() <= state.root_level {
         asgs.len()
     } else {
-        asgs.num_at(state.root_level)
+        asgs.len_upto(state.root_level)
     };
-    for l in &asgs.trail[asgs.num_at(0)..end] {
+    for l in &asgs.trail[asgs.len_upto(0)..end] {
         let vi = l.vi();
         if seen[vi] {
             if vdb[vi].reason == ClauseId::default() {

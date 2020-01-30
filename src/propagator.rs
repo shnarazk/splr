@@ -18,14 +18,17 @@ use {
 pub trait PropagatorIF {
     /// return the number of assignments.
     fn len(&self) -> usize;
+    /// return the number of assignments at a given decision level `u`.
+    /// ## Caveat
+    /// - it emits a panic by out of index range.
+    /// - it emits a panic if the level is 0.
+    fn len_upto(&self, n: usize) -> usize;
     /// return `true` if there's no assignment.
     fn is_empty(&self) -> bool;
     /// return the current decision level.
     fn level(&self) -> usize;
     /// return `true` if the current decision level is zero.
     fn is_zero(&self) -> bool;
-    /// return the number of assignments at a given decision level `u`.
-    fn num_at(&self, n: usize) -> usize;
     /// return `true` if there are unpropagated assignments.
     fn remains(&self) -> bool;
     /// return the *value* of a given literal.
@@ -168,6 +171,9 @@ impl PropagatorIF for AssignStack {
     fn len(&self) -> usize {
         self.trail.len()
     }
+    fn len_upto(&self, n: usize) -> usize {
+        self.trail_lim[n]
+    }
     fn is_empty(&self) -> bool {
         self.trail.is_empty()
     }
@@ -176,9 +182,6 @@ impl PropagatorIF for AssignStack {
     }
     fn is_zero(&self) -> bool {
         self.trail_lim.is_empty()
-    }
-    fn num_at(&self, n: usize) -> usize {
-        self.trail_lim[n]
     }
     fn remains(&self) -> bool {
         self.q_head < self.trail.len()
@@ -511,11 +514,11 @@ impl fmt::Display for AssignStack {
         let v = self.trail.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
         let len = self.level();
         let c = |i| {
-            let a = self.num_at(i);
+            let a = self.len_upto(i);
             match i {
                 0 => (0, &v[0..a]),
                 x if x == len - 1 => (i + 1, &v[a..]),
-                x => (x + 1, &v[a..self.num_at(x + 1)]),
+                x => (x + 1, &v[a..self.len_upto(x + 1)]),
             }
         };
         if 0 < len {
