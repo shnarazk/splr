@@ -657,8 +657,11 @@ impl fmt::Display for VarIdHeap {
 mod tests {
     use super::*;
 
+    fn lit(i: i32) -> Lit {
+        Lit::from(i)
+    }
     #[test]
-    fn test_assign_at_rootlevel() {
+    fn test_propagation() {
         let config = Config::default();
         let cnf = CNFDescription {
             num_of_variables: 4,
@@ -667,16 +670,54 @@ mod tests {
         let mut vardb = VarDB::instantiate(&config, &cnf);
         let vdb = &mut vardb;
         let mut asgs = AssignStack::instantiate(&config, &cnf);
-        assert!(asgs.assign_at_rootlevel(vdb, Lit::from(1i32)).is_ok());
-        assert!(asgs.assign_at_rootlevel(vdb, Lit::from(1i32)).is_ok());
-        assert!(asgs.assign_at_rootlevel(vdb, Lit::from(2i32)).is_ok());
-        assert!(asgs.assign_at_rootlevel(vdb, Lit::from(-3i32)).is_ok());
-        assert_eq!(asgs.trail.iter().map(|l| i32::from(*l)).collect::<Vec<i32>>(),
-                   vec![1, 2, -3]);
-        assert!(asgs.assign_at_rootlevel(vdb, Lit::from(-1i32)).is_err());
-        assert_eq!(asgs.trail.iter().map(|l| i32::from(*l)).collect::<Vec<i32>>(),
-                   vec![1, 2, -3]);
-        assert_eq!(3, asgs.len());
-        assert_eq!(0, asgs.level());
+        // [] + 1 => [1]
+        assert!(asgs.assign_at_rootlevel(vdb, lit(1)).is_ok());
+        assert_eq!(asgs.trail, vec![lit(1)]);
+
+        // [1] + 1 => [1]
+        assert!(asgs.assign_at_rootlevel(vdb, lit(1)).is_ok());
+        assert_eq!(asgs.trail, vec![lit(1)]);
+
+        // [1] + 2 => [1, 2]
+        assert!(asgs.assign_at_rootlevel(vdb, lit(2)).is_ok());
+        assert_eq!(asgs.trail, vec![lit(1), lit(2)]);
+
+        // [1, 2] + -1 => ABORT & [1, 2]
+        assert!(asgs.assign_at_rootlevel(vdb, lit(-1)).is_err());
+        assert_eq!(asgs.level(), 0);
+        assert_eq!(asgs.len(), 2);
+
+        // [1, 2] + 3 => [1, 2, 3]
+        asgs.assign_by_decision(vdb, lit(3));
+        assert_eq!(asgs.trail, vec![lit(1), lit(2), lit(3)]);
+        assert_eq!(asgs.level(), 1);
+        assert_eq!(asgs.len(), 3);
+        assert_eq!(asgs.len_upto(0), 2);
+
+        // [1, 2, 3] + 4 => [1, 2, 3, 4]
+        asgs.assign_by_decision(vdb, lit(4));
+        assert_eq!(asgs.trail, vec![lit(1), lit(2), lit(3), lit(4)]);
+        assert_eq!(asgs.level(), 2);
+        assert_eq!(asgs.len(), 4);
+        assert_eq!(asgs.len_upto(1), 3);
+
+        // [1, 2, 3] => [1, 2]
+        asgs.cancel_until(vdb, 1);
+        assert_eq!(asgs.trail, vec![lit(1), lit(2), lit(3)]);
+        assert_eq!(asgs.level(), 1);
+        assert_eq!(asgs.len(), 3);
+        assert_eq!(vdb.assigned(lit(1)), Some(true));
+        assert_eq!(vdb.assigned(lit(-1)), Some(false));
+        assert_eq!(vdb.assigned(lit(4)), None);
+
+        // [1, 2, 3] => [1, 2, -4]
+        asgs.assign_by_unitclause(vdb, Lit::from(-4i32));
+        assert_eq!(asgs.trail, vec![lit(1), lit(2), lit(-4)]);
+        assert_eq!(asgs.level(), 0);
+        assert_eq!(asgs.len(), 3);
+
+        assert_eq!(vdb.assigned(lit(-4)), Some(true));
+        // literal 3 hasn't been cancelled; it remains in the trail.
+        assert_eq!(vdb.assigned(lit(-3)), None);
     }
 }
