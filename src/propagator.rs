@@ -48,7 +48,8 @@ pub trait PropagatorIF {
     fn assign_by_decision(&mut self, vdb: &mut VarDB, l: Lit);
     /// fix a var's assignment by a unit learnt clause.
     /// ## Caveat
-    /// Callers have to assure the consistency after this assignment.
+    /// - Callers have to assure the consistency after this assignment.
+    /// - No need to restart; but execute `propagate` just afterward.
     fn assign_by_unitclause(&mut self, vdb: &mut VarDB, l: Lit);
     /// execute *backjump*.
     fn cancel_until(&mut self, vdb: &mut VarDB, lv: usize);
@@ -197,8 +198,8 @@ impl PropagatorIF for AssignStack {
             None => {
                 set_assign!(self, l);
                 v.assign = Some(bool::from(l));
-                v.reason = ClauseId::default();
                 v.level = 0;
+                v.reason = ClauseId::default();
                 // v.polarity.update(if sig { 1.0 } else { -1.0 });
                 self.trail.push(l);
                 Ok(())
@@ -248,27 +249,13 @@ impl PropagatorIF for AssignStack {
         self.trail.push(l);
     }
     fn assign_by_unitclause(&mut self, vdb: &mut VarDB, l: Lit) {
-        let vi = l.vi();
-        debug_assert!(0 < vdb[vi].level);
         self.cancel_until(vdb, 0);
-        let v = &mut vdb[vi];
+        let v = &mut vdb[l];
         set_assign!(self, l);
         v.assign = Some(bool::from(l));
         v.level = 0;
         v.reason = ClauseId::default();
-        if self.trail_lim.is_empty() {
-            self.trail.push(l);
-            self.q_head = 0;
-        } else {
-            let here = self.trail_lim[0];
-            debug_assert!(here < self.q_head);
-            self.q_head = here;
-            debug_assert!(here < self.trail.len());
-            self.trail.insert(here, l);
-            for p in &mut self.trail_lim {
-                *p += 1;
-            }
-        };
+        self.trail.push(l);
     }
     fn cancel_until(&mut self, vdb: &mut VarDB, lv: usize) {
         if self.trail_lim.len() <= lv {
