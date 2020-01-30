@@ -672,14 +672,15 @@ mod tests {
         let config = Config::default();
         let cnf = CNFDescription {
             num_of_variables: 4,
-            .. CNFDescription::default()
+            ..CNFDescription::default()
         };
-        let mut vdb = VarDB::instantiate(&config, &cnf);
-        let mut propagator = AssignStack::instantiate(&config, &cnf);
-        assert!(propagator.assign_at_rootlevel(&mut vdb, Lit::from(1i32)).is_ok());
-        assert!(propagator.assign_at_rootlevel(&mut vdb, Lit::from(1i32)).is_ok());
-        assert!(propagator.assign_at_rootlevel(&mut vdb, Lit::from(2i32)).is_ok());
-        assert!(propagator.assign_at_rootlevel(&mut vdb, Lit::from(-3i32)).is_ok());
-        assert!(!propagator.assign_at_rootlevel(&mut vdb, Lit::from(-1i32)).is_ok());
+        let mut vardb = VarDB::instantiate(&config, &cnf);
+        let vdb = &mut vardb;
+        let mut asgs = AssignStack::instantiate(&config, &cnf);
+        assert!(asgs.assign_at_rootlevel(vdb, Lit::from(1i32)).is_ok());
+        assert!(asgs.assign_at_rootlevel(vdb, Lit::from(1i32)).is_ok());
+        assert!(asgs.assign_at_rootlevel(vdb, Lit::from(2i32)).is_ok());
+        assert!(asgs.assign_at_rootlevel(vdb, Lit::from(-3i32)).is_ok());
+        assert!(asgs.assign_at_rootlevel(vdb, Lit::from(-1i32)).is_err());
     }
 }
