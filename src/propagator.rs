@@ -684,6 +684,12 @@ mod tests {
         assert!(asgs.assign_at_rootlevel(vdb, Lit::from(1i32)).is_ok());
         assert!(asgs.assign_at_rootlevel(vdb, Lit::from(2i32)).is_ok());
         assert!(asgs.assign_at_rootlevel(vdb, Lit::from(-3i32)).is_ok());
+        assert_eq!(asgs.trail.iter().map(|l| i32::from(*l)).collect::<Vec<i32>>(),
+                   vec![1, 2, -3]);
         assert!(asgs.assign_at_rootlevel(vdb, Lit::from(-1i32)).is_err());
+        assert_eq!(asgs.trail.iter().map(|l| i32::from(*l)).collect::<Vec<i32>>(),
+                   vec![1, 2, -3]);
+        assert_eq!(3, asgs.len());
+        assert_eq!(0, asgs.level());
     }
 }
