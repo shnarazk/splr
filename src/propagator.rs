@@ -71,9 +71,10 @@ pub trait VarSelectionIF {
 #[derive(Debug)]
 pub struct AssignStack {
     pub trail: Vec<Lit>,
-    asgvec: Vec<Option<bool>>,
     trail_lim: Vec<usize>,
     q_head: usize,
+    playback: Vec<Lit>,
+    asgvec: Vec<Option<bool>>,
     var_order: VarIdHeap, // Variable Order
 }
 
@@ -81,9 +82,10 @@ impl Default for AssignStack {
     fn default() -> AssignStack {
         AssignStack {
             trail: Vec::new(),
-            asgvec: Vec::new(),
             trail_lim: Vec::new(),
             q_head: 0,
+            playback: Vec::new(),
+            asgvec: Vec::new(),
             var_order: VarIdHeap::default(),
         }
     }
@@ -249,9 +251,24 @@ impl PropagatorIF for AssignStack {
         self.trail.push(l);
     }
     fn assign_by_unitclause(&mut self, vdb: &mut VarDB, l: Lit) {
-        self.cancel_until(vdb, 0);
-        let v = &mut vdb[l];
+        let lvl = vdb[l].level;
+        if 0 < lvl {
+            let start = self.trail_lim[0] + 1;
+            let end = self.trail_lim[lvl - 1] + 1;
+            let mut save = Vec::new();
+            for i in start..end {
+                save.push(self.trail[i]);
+            }
+            self.cancel_until(vdb, 0);
+            while let Some(l) = save.pop() {
+                self.playback.push(l);
+            }
+            self.playback.clear();
+        } else {
+            self.cancel_until(vdb, 0);
+        }
         set_assign!(self, l);
+        let v = &mut vdb[l];
         v.assign = Some(bool::from(l));
         v.level = 0;
         v.reason = ClauseId::default();
@@ -275,6 +292,7 @@ impl PropagatorIF for AssignStack {
         self.trail.truncate(lim);
         self.trail_lim.truncate(lv);
         self.q_head = lim;
+        self.playback.clear();
     }
     /// UNIT PROPAGATION.
     /// Note:
@@ -347,7 +365,21 @@ impl PropagatorIF for AssignStack {
 
 impl VarSelectionIF for AssignStack {
     fn select_var(&mut self, vdb: &mut VarDB) -> VarId {
-        self.var_order.select_var(vdb)
+        if self.playback.is_empty() {
+            self.var_order.select_var(vdb)
+        } else {
+            while let Some(l) = self.playback.pop() {
+                match vdb.assigned(l) {
+                    Some(true) => continue,
+                    Some(false) => {
+                        self.var_order.clear();
+                        break;
+                    }
+                    None => return l.vi(),
+                }
+            }
+            self.var_order.select_var(vdb)
+        }
     }
     fn update_order(&mut self, vdb: &mut VarDB, v: VarId) {
         self.var_order.update(vdb, v)
