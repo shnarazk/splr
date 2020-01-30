@@ -617,7 +617,7 @@ fn strengthen_clause(
         // println!("{} {:?} is removed and its first literal {} is enqueued.", cid.format(), vec2int(&cdb.clause[cid].lits), c0.int());
         cdb.detach(cid);
         elim.remove_cid_occur(vdb, cid, &mut cdb[cid]);
-        asgs.enqueue(&mut vdb[c0.vi()], bool::from(c0), ClauseId::default(), 0)
+        asgs.assign_at_rootlevel(vdb, c0)
     } else {
         // println!("cid {} drops literal {}", cid.fmt(), l.int());
         debug_assert!(1 < cdb[cid].len());
@@ -754,7 +754,7 @@ fn eliminate_var(
                         // );
                         let lit = (*vec)[0];
                         cdb.certificate_add(&*vec);
-                        asgs.enqueue(&mut vdb[lit.vi()], bool::from(lit), ClauseId::default(), 0)?;
+                        asgs.assign_at_rootlevel(vdb, lit)?;
                     }
                     _ => {
                         let rank = if cdb[*p].is(Flag::LEARNT) && cdb[*n].is(Flag::LEARNT) {

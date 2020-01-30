@@ -140,8 +140,18 @@ impl SatSolverIF for Solver {
                     continue;
                 }
                 match (v.pos_occurs.len(), v.neg_occurs.len()) {
-                    (_, 0) => asgs.assign_at_rootlevel(vdb, Lit::from_var(vi, true)),
-                    (0, _) => asgs.assign_at_rootlevel(vdb, Lit::from_var(vi, false)),
+                    (_, 0) => {
+                        let l = Lit::from_var(vi, true);
+                        if asgs.assign_at_rootlevel(vdb, l).is_err() {
+                            return Ok(Certificate::UNSAT);
+                        }
+                    }
+                    (0, _) => {
+                        let l = Lit::from_var(vi, false);
+                        if asgs.assign_at_rootlevel(vdb, l).is_err() {
+                            return Ok(Certificate::UNSAT);
+                        }
+                    }
                     (p, m) => {
                         v.phase = m < p;
                         elim.enqueue_var(vdb, vi, false);
@@ -326,8 +336,11 @@ impl SatSolverIF for Solver {
         match lits.len() {
             0 => None, // Empty clause is UNSAT.
             1 => {
-                asgs.assign_at_rootlevel(vdb, lits[0]);
-                Some(ClauseId::default())
+                if asgs.assign_at_rootlevel(vdb, lits[0]).is_ok() {
+                    Some(ClauseId::default())
+                } else {
+                    None
+                }
             }
             _ => {
                 let cid = cdb.new_clause(lits, 0, false);

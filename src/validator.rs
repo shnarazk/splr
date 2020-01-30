@@ -1,8 +1,7 @@
 use crate::{
-    clause::ClauseId,
     propagator::PropagatorIF,
     solver::Solver,
-    types::{Lit, LitIF, MaybeInconsistent, SolverError},
+    types::{Lit, MaybeInconsistent, SolverError},
     var::VarDBIF,
 };
 
@@ -23,11 +22,8 @@ impl ValidatorIF for Solver {
         if vec.is_empty() {
             return Err(SolverError::Inconsistent);
         }
-        for val in vec {
-            let l = Lit::from(*val);
-            let vi = l.vi();
-            self.asgs
-                .enqueue(&mut self.vdb[vi], bool::from(l), ClauseId::default(), 0)?;
+        for i in vec {
+            self.asgs.assign_at_rootlevel(&mut self.vdb, Lit::from(*i))?;
         }
         Ok(())
     }

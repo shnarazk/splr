@@ -4,7 +4,7 @@ use {
         config::Config,
         state::State,
         types::*,
-        var::{Var, VarDB, VarDBIF, VarRewardIF},
+        var::{VarDB, VarDBIF, VarRewardIF},
     },
     std::{
         fmt,
@@ -41,17 +41,12 @@ pub trait PropagatorIF {
     /// ## Caveat
     /// Callers have to assure the consistency after this assignment.
     fn assign_as_fixed(&mut self, vdb: &mut VarDB, l: Lit);
-    /// add an assignment with no reason clause.
-    /// ## Caveat
-    /// - Callers have to assure the consistency after this assignment.
-    /// - It's only for the initialization phase.
-    fn assign_at_rootlevel(&mut self, vdb: &mut VarDB, l: Lit);
-    /// add an assignment caused by a clause.
+    /// add an assignment at level 0 as a precondition.
     ///
     /// # Errors
     ///
     /// emit `SolverError::Inconsistent` exception if solver becomes inconsistent.
-    fn enqueue(&mut self, v: &mut Var, sig: bool, cid: ClauseId, dl: usize) -> MaybeInconsistent;
+    fn assign_at_rootlevel(&mut self, vdb: &mut VarDB, l: Lit) -> MaybeInconsistent;
     /// execute *backjump*.
     fn cancel_until(&mut self, vdb: &mut VarDB, lv: usize);
     /// execute *boolean constraint propagation* or *unit propagation*.
@@ -254,37 +249,21 @@ impl PropagatorIF for AssignStack {
             }
         };
     }
-    fn assign_at_rootlevel(&mut self, vdb: &mut VarDB, l: Lit) {
+    fn assign_at_rootlevel(&mut self, vdb: &mut VarDB, l: Lit) -> MaybeInconsistent {
         let v = &mut vdb[l];
         debug_assert!(!v.is(Flag::ELIMINATED));
-        if var_assign!(self, v.index).is_none() {
-            set_assign!(self, l);
-            v.assign = Some(bool::from(l));
-            v.reason = ClauseId::default();
-            v.level = 0;
-            // v.polarity.update(if sig { 1.0 } else { -1.0 });
-            self.trail.push(l);
-        }
-    }
-    fn enqueue(&mut self, v: &mut Var, sig: bool, cid: ClauseId, dl: usize) -> MaybeInconsistent {
-        debug_assert!(!v.is(Flag::ELIMINATED));
+        debug_assert_eq!(0, self.level());
         match var_assign!(self, v.index) {
             None => {
-                set_assign!(self, Lit::from_var(v.index, sig));
-                v.assign = Some(sig);
-                v.reason = cid;
-                v.level = dl;
-                if dl == 0 {
-                    v.reason = ClauseId::default();
-                    // v.activity = 0.0;
-                }
+                set_assign!(self, l);
+                v.assign = Some(bool::from(l));
+                v.reason = ClauseId::default();
+                v.level = 0;
                 // v.polarity.update(if sig { 1.0 } else { -1.0 });
-                debug_assert!(!self.trail.contains(&Lit::from_var(v.index, true)));
-                debug_assert!(!self.trail.contains(&Lit::from_var(v.index, false)));
-                self.trail.push(Lit::from_var(v.index, sig));
+                self.trail.push(l);
                 Ok(())
             }
-            Some(x) if x == sig => Ok(()),
+            Some(x) if x == bool::from(l) => Ok(()),
             _ => Err(SolverError::Inconsistent),
         }
     }
