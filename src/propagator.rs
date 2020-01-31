@@ -48,6 +48,7 @@ pub trait PropagatorIF {
     fn assign_by_decision(&mut self, vdb: &mut VarDB, l: Lit);
     /// fix a var's assignment by a unit learnt clause.
     /// ## Caveat
+    /// - The literal has to have been assigned already.
     /// - Callers have to assure the consistency after this assignment.
     /// - No need to restart; but execute `propagate` just afterward.
     fn assign_by_unitclause(&mut self, vdb: &mut VarDB, l: Lit);
@@ -251,21 +252,11 @@ impl PropagatorIF for AssignStack {
         self.trail.push(l);
     }
     fn assign_by_unitclause(&mut self, vdb: &mut VarDB, l: Lit) {
-        let lvl = vdb[l].level;
-        if 0 < lvl {
-            let start = self.trail_lim[0] + 1;
-            let end = self.trail_lim[lvl - 1] + 1;
-            let mut save = Vec::new();
-            for i in start..end {
-                save.push(self.trail[i]);
-            }
-            self.cancel_until(vdb, 0);
-            while let Some(l) = save.pop() {
-                self.playback.push(l);
-            }
-            self.playback.clear();
-        } else {
-            self.cancel_until(vdb, 0);
+        let save = self.trail[self.trail_lim[0]..self.trail_lim[vdb[l].level - 1]]
+            .to_vec();
+        self.cancel_until(vdb, 0);
+        for l in save.iter().rev() {
+            self.playback.push(*l);
         }
         set_assign!(self, l);
         let v = &mut vdb[l];
@@ -365,21 +356,17 @@ impl PropagatorIF for AssignStack {
 
 impl VarSelectionIF for AssignStack {
     fn select_var(&mut self, vdb: &mut VarDB) -> VarId {
-        if self.playback.is_empty() {
-            self.var_order.select_var(vdb)
-        } else {
-            while let Some(l) = self.playback.pop() {
-                match vdb.assigned(l) {
-                    Some(true) => continue,
-                    Some(false) => {
-                        self.var_order.clear();
-                        break;
-                    }
-                    None => return l.vi(),
+        while let Some(l) = self.playback.pop() {
+            match vdb.assigned(l) {
+                Some(true) => continue,
+                Some(false) => {
+                    self.playback.clear();
+                    break;
                 }
+                None => return l.vi(),
             }
-            self.var_order.select_var(vdb)
         }
+        self.var_order.select_var(vdb)
     }
     fn update_order(&mut self, vdb: &mut VarDB, v: VarId) {
         self.var_order.update(vdb, v)
@@ -738,18 +725,25 @@ mod tests {
         assert_eq!(asgs.trail, vec![lit(1), lit(2), lit(3)]);
         assert_eq!(asgs.level(), 1);
         assert_eq!(asgs.len(), 3);
+        assert_eq!(asgs.trail_lim, vec![2]);
         assert_eq!(vdb.assigned(lit(1)), Some(true));
         assert_eq!(vdb.assigned(lit(-1)), Some(false));
         assert_eq!(vdb.assigned(lit(4)), None);
 
-        // [1, 2, 3] => [1, 2, -4]
+        // [1, 2, 3] => [1, 2, 3, 4]
+        asgs.assign_by_decision(vdb, lit(4));
+        assert_eq!(asgs.trail, vec![lit(1), lit(2), lit(3), lit(4)]);
+        assert_eq!(vdb[lit(4)].level, 2);
+        assert_eq!(asgs.trail_lim, vec![2, 3]);
+
+        // [1, 2, 3, 4] => [1, 2, -4]
         asgs.assign_by_unitclause(vdb, Lit::from(-4i32));
         assert_eq!(asgs.trail, vec![lit(1), lit(2), lit(-4)]);
         assert_eq!(asgs.level(), 0);
         assert_eq!(asgs.len(), 3);
 
         assert_eq!(vdb.assigned(lit(-4)), Some(true));
-        // literal 3 hasn't been cancelled; it remains in the trail.
         assert_eq!(vdb.assigned(lit(-3)), None);
+        assert_eq!(asgs.playback, vec![lit(3)]);
     }
 }
