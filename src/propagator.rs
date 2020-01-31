@@ -706,18 +706,24 @@ mod tests {
         assert_eq!(asgs.trail, vec![lit(1), lit(2), lit(3)]);
         assert_eq!(asgs.level(), 1);
         assert_eq!(asgs.len(), 3);
+        assert_eq!(asgs.trail_lim, vec![2]);
         assert_eq!(vdb.assigned(lit(1)), Some(true));
         assert_eq!(vdb.assigned(lit(-1)), Some(false));
         assert_eq!(vdb.assigned(lit(4)), None);
 
-        // [1, 2, 3] => [1, 2, -4]
+        // [1, 2, 3] => [1, 2, 3, 4]
+        asgs.assign_by_decision(vdb, lit(4));
+        assert_eq!(asgs.trail, vec![lit(1), lit(2), lit(3), lit(4)]);
+        assert_eq!(vdb[lit(4)].level, 2);
+        assert_eq!(asgs.trail_lim, vec![2, 3]);
+
+        // [1, 2, 3, 4] => [1, 2, -4]
         asgs.assign_by_unitclause(vdb, Lit::from(-4i32));
         assert_eq!(asgs.trail, vec![lit(1), lit(2), lit(-4)]);
         assert_eq!(asgs.level(), 0);
         assert_eq!(asgs.len(), 3);
 
         assert_eq!(vdb.assigned(lit(-4)), Some(true));
-        // literal 3 hasn't been cancelled; it remains in the trail.
         assert_eq!(vdb.assigned(lit(-3)), None);
     }
 }
