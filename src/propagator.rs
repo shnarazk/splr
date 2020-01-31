@@ -200,7 +200,6 @@ impl PropagatorIF for AssignStack {
                 v.assign = Some(bool::from(l));
                 v.level = 0;
                 v.reason = ClauseId::default();
-                // v.polarity.update(if sig { 1.0 } else { -1.0 });
                 self.trail.push(l);
                 Ok(())
             }
@@ -226,7 +225,6 @@ impl PropagatorIF for AssignStack {
         v.level = dl;
         v.reason = cid;
         vdb.reward_at_assign(vi);
-        // v.polarity.update(if bool::from(l) { 1.0 } else { -1.0 });
         debug_assert!(!self.trail.contains(&l));
         debug_assert!(!self.trail.contains(&!l));
         self.trail.push(l);
@@ -245,7 +243,6 @@ impl PropagatorIF for AssignStack {
         v.level = dl;
         v.reason = ClauseId::default();
         vdb.reward_at_assign(vi);
-        // v.polarity.update(if bool::from(l) { 1.0 } else { -1.0 });
         self.trail.push(l);
     }
     fn assign_by_unitclause(&mut self, vdb: &mut VarDB, l: Lit) {
