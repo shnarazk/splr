@@ -77,6 +77,7 @@ pub struct AssignStack {
     playback: Vec<Lit>,
     asgvec: Vec<Option<bool>>,
     var_order: VarIdHeap, // Variable Order
+    nasgs: usize,
 }
 
 impl Default for AssignStack {
@@ -88,6 +89,7 @@ impl Default for AssignStack {
             playback: Vec::new(),
             asgvec: Vec::new(),
             var_order: VarIdHeap::default(),
+            nasgs: 0,
         }
     }
 }
@@ -252,12 +254,7 @@ impl PropagatorIF for AssignStack {
         self.trail.push(l);
     }
     fn assign_by_unitclause(&mut self, vdb: &mut VarDB, l: Lit) {
-        let save = self.trail[self.trail_lim[0]..self.trail_lim[vdb[l].level - 1]]
-            .to_vec();
         self.cancel_until(vdb, 0);
-        for l in save.iter().rev() {
-            self.playback.push(*l);
-        }
         set_assign!(self, l);
         let v = &mut vdb[l];
         v.assign = Some(bool::from(l));
@@ -266,8 +263,22 @@ impl PropagatorIF for AssignStack {
         self.trail.push(l);
     }
     fn cancel_until(&mut self, vdb: &mut VarDB, lv: usize) {
-        if self.trail_lim.len() <= lv {
+        let level = self.trail_lim.len();
+        if level <= lv {
             return;
+        }
+        if 0 < level {
+            let beg = self.trail_lim[0];
+            let end = self.trail_lim[level - 1];
+            if self.nasgs < end {
+                self.nasgs = self.nasgs.max(end);
+                self.playback.clear();
+                for l in self.trail[beg..end].iter().rev() {
+                    if vdb[*l].reason == ClauseId::default() {
+                        self.playback.push(*l);
+                    }
+                }
+            }
         }
         let lim = self.trail_lim[lv];
         for l in &self.trail[lim..] {
@@ -283,7 +294,6 @@ impl PropagatorIF for AssignStack {
         self.trail.truncate(lim);
         self.trail_lim.truncate(lv);
         self.q_head = lim;
-        self.playback.clear();
     }
     /// UNIT PROPAGATION.
     /// Note:
@@ -361,6 +371,7 @@ impl VarSelectionIF for AssignStack {
                 Some(true) => continue,
                 Some(false) => {
                     self.playback.clear();
+                    self.nasgs = *self.trail_lim.last().unwrap_or(&0);
                     break;
                 }
                 None => return l.vi(),
