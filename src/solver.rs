@@ -533,7 +533,6 @@ fn adapt_parameters(
         asgs.cancel_until(vdb, 0);
         state.adapt_strategy(cdb);
         if elim.enable {
-            cdb.reset();
             elim.activate();
             cdb.simplify(asgs, elim, state, vdb)?;
         }
