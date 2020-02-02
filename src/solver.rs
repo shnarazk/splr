@@ -3,11 +3,11 @@ use {
         clause::{Clause, ClauseDB, ClauseDBIF, ClauseIF, ClauseId},
         config::Config,
         eliminator::{Eliminator, EliminatorIF},
-        propagator::{AssignStack, PropagatorIF},
+        propagator::{AssignStack, PropagatorIF, VarSelectionIF},
         restart::RestartIF,
         state::{Stat, State, StateIF},
         types::*,
-        var::{VarDB, VarDBIF, LBDIF},
+        var::{VarDB, VarDBIF, VarRewardIF, LBDIF},
     },
     std::{
         fs,
@@ -140,8 +140,18 @@ impl SatSolverIF for Solver {
                     continue;
                 }
                 match (v.pos_occurs.len(), v.neg_occurs.len()) {
-                    (_, 0) => asgs.enqueue_null(v, true),
-                    (0, _) => asgs.enqueue_null(v, false),
+                    (_, 0) => {
+                        let l = Lit::from_assign(vi, true);
+                        if asgs.assign_at_rootlevel(vdb, l).is_err() {
+                            return Ok(Certificate::UNSAT);
+                        }
+                    }
+                    (0, _) => {
+                        let l = Lit::from_assign(vi, false);
+                        if asgs.assign_at_rootlevel(vdb, l).is_err() {
+                            return Ok(Certificate::UNSAT);
+                        }
+                    }
                     (p, m) => {
                         v.phase = m < p;
                         elim.enqueue_var(vdb, vi, false);
@@ -182,7 +192,7 @@ impl SatSolverIF for Solver {
                 }
             }
         }
-        vdb.initialize_reward(elim.order_enumerator());
+        vdb.initialize_reward(elim.sorted_iterator());
         asgs.rebuild_order(vdb);
         state.progress(cdb, vdb, None);
         match search(asgs, cdb, elim, state, vdb) {
@@ -296,7 +306,7 @@ impl SatSolverIF for Solver {
         Ok(s)
     }
     // renamed from clause_new
-    fn add_unchecked_clause(&mut self, v: &mut Vec<Lit>) -> Option<ClauseId> {
+    fn add_unchecked_clause(&mut self, lits: &mut Vec<Lit>) -> Option<ClauseId> {
         let Solver {
             ref mut asgs,
             ref mut cdb,
@@ -305,32 +315,35 @@ impl SatSolverIF for Solver {
             ..
         } = self;
         debug_assert!(asgs.level() == 0);
-        if v.iter().any(|l| vdb.assigned(*l).is_some()) {
-            cdb.certificate_add(v);
+        if lits.iter().any(|l| vdb.assigned(*l).is_some()) {
+            cdb.certificate_add(lits);
         }
-        v.sort_unstable();
+        lits.sort_unstable();
         let mut j = 0;
         let mut l_ = NULL_LIT; // last literal; [x, x.negate()] means tautology.
-        for i in 0..v.len() {
-            let li = v[i];
+        for i in 0..lits.len() {
+            let li = lits[i];
             let sat = vdb.assigned(li);
             if sat == Some(true) || !li == l_ {
                 return Some(ClauseId::default());
             } else if sat != Some(false) && li != l_ {
-                v[j] = li;
+                lits[j] = li;
                 j += 1;
                 l_ = li;
             }
         }
-        v.truncate(j);
-        match v.len() {
+        lits.truncate(j);
+        match lits.len() {
             0 => None, // Empty clause is UNSAT.
             1 => {
-                asgs.enqueue_null(&mut vdb[v[0].vi()], bool::from(v[0]));
-                Some(ClauseId::default())
+                if asgs.assign_at_rootlevel(vdb, lits[0]).is_ok() {
+                    Some(ClauseId::default())
+                } else {
+                    None
+                }
             }
             _ => {
-                let cid = cdb.new_clause(&v, 0, false);
+                let cid = cdb.new_clause(lits, 0, false);
                 elim.add_cid_occur(vdb, cid, &mut cdb[cid], true);
                 Some(cid)
             }
@@ -351,7 +364,7 @@ fn search(
         state.rst.luby.update(0);
     }
     loop {
-        vdb.update();
+        vdb.reward_update();
         let ci = asgs.propagate(cdb, vdb);
         state[Stat::Propagation] += 1;
         if ci == ClauseId::default() {
@@ -373,7 +386,7 @@ fn search(
             if !asgs.remains() {
                 let vi = asgs.select_var(vdb);
                 let p = vdb[vi].phase;
-                asgs.uncheck_assume(vdb, Lit::from_var(vi, p));
+                asgs.assign_by_decision(vdb, Lit::from_assign(vi, p));
                 state[Stat::Decision] += 1;
                 a_decision_was_made = true;
             }
@@ -416,13 +429,25 @@ fn handle_conflict_path(
     let bl = analyze(asgs, cdb, state, vdb, ci);
     // vdb.bump_vars(asgs, cdb, ci);
     let new_learnt = &mut state.new_learnt;
-    asgs.cancel_until(vdb, bl.max(state.root_level));
     let learnt_len = new_learnt.len();
     if learnt_len == 1 {
         // dump to certified even if it's a literal.
         cdb.certificate_add(new_learnt);
-        asgs.uncheck_enqueue(vdb, new_learnt[0], ClauseId::default());
+        asgs.assign_by_unitclause(vdb, new_learnt[0]);
     } else {
+        {
+            // Reason-Side Rewarding
+            let mut bumped = Vec::new();
+            for lit in new_learnt.iter() {
+                for l in &cdb[vdb[lit.vi()].reason].lits {
+                    if !bumped.contains(l) {
+                        vdb.reward_at_analysis(l.vi());
+                        bumped.push(*l);
+                    }
+                }
+            }
+        }
+        asgs.cancel_until(vdb, bl.max(state.root_level));
         let lbd = vdb.compute_lbd(&new_learnt);
         let l0 = new_learnt[0];
         let cid = cdb.attach(state, vdb, lbd);
@@ -436,13 +461,12 @@ fn handle_conflict_path(
             state[Stat::NumBin] += 1;
             state[Stat::NumBinLearnt] += 1;
         }
-        asgs.uncheck_enqueue(vdb, l0, cid);
+        asgs.assign_by_implication(vdb, l0, cid);
         state.rst.lbd.update(lbd);
         state[Stat::SumLBD] += lbd;
         state[Stat::Learnt] += 1;
     }
     cdb.scale_activity();
-    vdb.scale_activity();
     if 0 < state.config.dump_interval && ncnfl % state.config.dump_interval == 0 {
         state.development.push((
             ncnfl,
@@ -456,8 +480,14 @@ fn handle_conflict_path(
     }
     if ncnfl % 10_000 == 0 {
         adapt_parameters(asgs, cdb, elim, state, vdb, ncnfl)?;
-        if state.is_timeout() {
-            return Err(SolverError::Inconsistent);
+        if let Some(p) = state.elapsed() {
+            if 1.0 <= p {
+                return Err(SolverError::Inconsistent);
+            } else if state.default_rewarding && 0.5 <= p {
+                // force the final stage of rewarding to switch to 'deep search' mode
+                state.default_rewarding = false;
+                vdb.shift_reward_mode();
+            }
         }
     }
     if ((state.use_chan_seok && !cdb.glureduce && cdb.first_reduction < cdb.num_learnt)
@@ -597,15 +627,16 @@ fn analyze(
         // println!("- handle {}", cid.fmt());
         for q in &c[(p != NULL_LIT) as usize..] {
             let vi = q.vi();
-            vdb.bump_activity(vi, dl);
-            asgs.update_order(vdb, vi);
-            let v = &mut vdb[vi];
-            let lvl = v.level;
-            debug_assert!(!v.is(Flag::ELIMINATED));
-            debug_assert!(v.assign.is_some());
-            if 0 < lvl && !v.is(Flag::CA_SEEN) {
+            if !vdb[vi].is(Flag::CA_SEEN) {
+                vdb.reward_at_analysis(vi);
+                let v = &mut vdb[vi];
+                if 0 == v.level {
+                    continue;
+                }
+                debug_assert!(!v.is(Flag::ELIMINATED));
+                debug_assert!(v.assign.is_some());
                 v.turn_on(Flag::CA_SEEN);
-                if dl <= lvl {
+                if dl <= v.level {
                     // println!("- flag for {} which level is {}", q.int(), lvl);
                     path_cnt += 1;
                 } else {
@@ -635,7 +666,9 @@ fn analyze(
         if path_cnt <= 0 {
             break;
         }
+        debug_assert!(0 < ti);
         ti -= 1;
+        debug_assert_ne!(cid, ClauseId::default());
     }
     learnt[0] = !p;
     // println!("- appending {}, the result is {:?}", learnt[0].int(), vec2int(learnt));
@@ -736,9 +769,9 @@ fn analyze_final(asgs: &AssignStack, state: &mut State, vdb: &mut VarDB, c: &Cla
     let end = if asgs.level() <= state.root_level {
         asgs.len()
     } else {
-        asgs.num_at(state.root_level)
+        asgs.len_upto(state.root_level)
     };
-    for l in &asgs.trail[asgs.num_at(0)..end] {
+    for l in &asgs.trail[asgs.len_upto(0)..end] {
         let vi = l.vi();
         if seen[vi] {
             if vdb[vi].reason == ClauseId::default() {

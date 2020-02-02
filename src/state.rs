@@ -23,6 +23,8 @@ pub trait StateIF {
     fn num_unsolved_vars(&self) -> usize;
     /// return `true` if it is timed out.
     fn is_timeout(&self) -> bool;
+    /// return elapsed time as a fraction.
+    fn elapsed(&self) -> Option<f64>;
     /// change heuristics based on stat data.
     fn adapt_strategy(&mut self, cdb: &mut ClauseDB);
     /// write a header of stat data to stdio.
@@ -180,6 +182,7 @@ pub struct State {
     pub stagnated: bool,
     pub start: SystemTime,
     pub time_limit: f64,
+    pub default_rewarding: bool,
     pub record: ProgressRecord,
     pub use_progress: bool,
     pub progress_cnt: usize,
@@ -211,6 +214,7 @@ impl Default for State {
             stagnated: false,
             start: SystemTime::now(),
             time_limit: 0.0,
+            default_rewarding: true,
             use_progress: true,
             progress_cnt: 0,
             progress_log: false,
@@ -341,6 +345,15 @@ impl StateIF for State {
         match self.start.elapsed() {
             Ok(e) => self.time_limit < e.as_secs() as f64,
             Err(_) => false,
+        }
+    }
+    fn elapsed(&self) -> Option<f64> {
+        if self.time_limit == 0.0 {
+            return None;
+        }
+        match self.start.elapsed() {
+            Ok(e) => Some(e.as_secs() as f64 / self.time_limit),
+            Err(_) => None,
         }
     }
     fn adapt_strategy(&mut self, cdb: &mut ClauseDB) {

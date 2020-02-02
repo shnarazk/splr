@@ -7,7 +7,7 @@ use {
         types::*,
         var::{Var, VarDB, VarDBIF},
     },
-    std::{fmt, iter},
+    std::{fmt, slice::Iter},
 };
 
 /// API for Eliminator like `activate`, `stop`, `eliminate` and so on.
@@ -55,7 +55,7 @@ pub trait EliminatorIF {
     /// remove a clause id from all corresponding occur lists.
     fn remove_cid_occur(&mut self, vdb: &mut VarDB, cid: ClauseId, c: &mut Clause);
     /// return the order of vars based on their occurrences
-    fn order_enumerator(&self) -> iter::Skip<iter::Enumerate<std::slice::Iter<'_, usize>>>;
+    fn sorted_iterator(&self) -> Iter<'_, usize>;
 }
 
 #[derive(Eq, Debug, PartialEq)]
@@ -337,10 +337,8 @@ impl EliminatorIF for Eliminator {
             }
         }
     }
-    fn order_enumerator(
-        &self,
-    ) -> std::iter::Skip<std::iter::Enumerate<std::slice::Iter<'_, usize>>> {
-        self.var_queue.heap.iter().enumerate().skip(1)
+    fn sorted_iterator(&self) -> Iter<'_, usize> {
+        self.var_queue.heap[1..].iter()
     }
 }
 
@@ -619,7 +617,7 @@ fn strengthen_clause(
         // println!("{} {:?} is removed and its first literal {} is enqueued.", cid.format(), vec2int(&cdb.clause[cid].lits), c0.int());
         cdb.detach(cid);
         elim.remove_cid_occur(vdb, cid, &mut cdb[cid]);
-        asgs.enqueue(&mut vdb[c0.vi()], bool::from(c0), ClauseId::default(), 0)
+        asgs.assign_at_rootlevel(vdb, c0)
     } else {
         // println!("cid {} drops literal {}", cid.fmt(), l.int());
         debug_assert!(1 < cdb[cid].len());
@@ -707,8 +705,8 @@ fn make_eliminated_clause(cdb: &mut ClauseDB, vec: &mut Vec<Lit>, vi: VarId, cid
     // Store the length of the clause last:
     debug_assert_eq!(vec[first].vi(), vi);
     vec.push(Lit::from(c.len()));
-    cdb.touched[Lit::from_var(vi, true)] = true;
-    cdb.touched[Lit::from_var(vi, false)] = true;
+    cdb.touched[Lit::from_assign(vi, true)] = true;
+    cdb.touched[Lit::from_assign(vi, false)] = true;
     // println!("make_eliminated_clause: eliminate({}) clause {:?}", vi, vec2int(&ch.lits));
 }
 
@@ -756,7 +754,7 @@ fn eliminate_var(
                         // );
                         let lit = (*vec)[0];
                         cdb.certificate_add(&*vec);
-                        asgs.enqueue(&mut vdb[lit.vi()], bool::from(lit), ClauseId::default(), 0)?;
+                        asgs.assign_at_rootlevel(vdb, lit)?;
                     }
                     _ => {
                         let rank = if cdb[*p].is(Flag::LEARNT) && cdb[*n].is(Flag::LEARNT) {
@@ -835,13 +833,13 @@ fn make_eliminated_clauses(
             debug_assert!(!cdb[*cid].is(Flag::DEAD));
             make_eliminated_clause(cdb, tmp, v, *cid);
         }
-        make_eliminating_unit_clause(tmp, Lit::from_var(v, true));
+        make_eliminating_unit_clause(tmp, Lit::from_assign(v, true));
     } else {
         for cid in pos {
             debug_assert!(!cdb[*cid].is(Flag::DEAD));
             make_eliminated_clause(cdb, tmp, v, *cid);
         }
-        make_eliminating_unit_clause(tmp, Lit::from_var(v, false));
+        make_eliminating_unit_clause(tmp, Lit::from_assign(v, false));
     }
 }
 
