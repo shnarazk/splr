@@ -7,11 +7,11 @@ use {
     },
 };
 
-/// API for Literal like `from_int`, `from_var`, `to_cid` and so on.
+/// API for Literal like `from_int`, `from_assign`, `to_cid` and so on.
 pub trait LitIF {
     /// convert [VarId](../type.VarId.html) to [Lit](../type.Lit.html).
     /// It returns a positive literal if `p` is `TRUE` or `BOTTOM`.
-    fn from_var(vi: VarId, p: bool) -> Self;
+    fn from_assign(vi: VarId, p: bool) -> Self;
     /// convert to var index.
     fn vi(self) -> VarId;
 }
@@ -215,12 +215,12 @@ impl IndexMut<Lit> for Vec<Vec<crate::clause::Watch>> {
 ///
 /// ```
 /// use splr::types::*;
-/// assert_eq!(Lit::from(1i32), Lit::from_var(1 as VarId, true));
-/// assert_eq!(Lit::from(2i32), Lit::from_var(2 as VarId, true));
-/// assert_eq!(1, Lit::from_var(1, true).vi());
-/// assert_eq!(1, Lit::from_var(1, false).vi());
-/// assert_eq!(2, Lit::from_var(2, true).vi());
-/// assert_eq!(2, Lit::from_var(2, false).vi());
+/// assert_eq!(Lit::from(1i32), Lit::from_assign(1 as VarId, true));
+/// assert_eq!(Lit::from(2i32), Lit::from_assign(2 as VarId, true));
+/// assert_eq!(1, Lit::from_assign(1, true).vi());
+/// assert_eq!(1, Lit::from_assign(1, false).vi());
+/// assert_eq!(2, Lit::from_assign(2, true).vi());
+/// assert_eq!(2, Lit::from_assign(2, false).vi());
 /// assert_eq!(Lit::from( 1i32), !Lit::from(-1i32));
 /// assert_eq!(Lit::from(-1i32), !Lit::from( 1i32));
 /// assert_eq!(Lit::from( 2i32), !Lit::from(-2i32));
@@ -229,7 +229,7 @@ impl IndexMut<Lit> for Vec<Vec<crate::clause::Watch>> {
 
 impl LitIF for Lit {
     #[inline]
-    fn from_var(vi: VarId, p: bool) -> Lit {
+    fn from_assign(vi: VarId, p: bool) -> Lit {
         Lit {
             ordinal: (vi as u32) << 1 | (p as u32),
         }

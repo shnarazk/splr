@@ -141,13 +141,13 @@ impl SatSolverIF for Solver {
                 }
                 match (v.pos_occurs.len(), v.neg_occurs.len()) {
                     (_, 0) => {
-                        let l = Lit::from_var(vi, true);
+                        let l = Lit::from_assign(vi, true);
                         if asgs.assign_at_rootlevel(vdb, l).is_err() {
                             return Ok(Certificate::UNSAT);
                         }
                     }
                     (0, _) => {
-                        let l = Lit::from_var(vi, false);
+                        let l = Lit::from_assign(vi, false);
                         if asgs.assign_at_rootlevel(vdb, l).is_err() {
                             return Ok(Certificate::UNSAT);
                         }
@@ -386,7 +386,7 @@ fn search(
             if !asgs.remains() {
                 let vi = asgs.select_var(vdb);
                 let p = vdb[vi].phase;
-                asgs.assign_by_decision(vdb, Lit::from_var(vi, p));
+                asgs.assign_by_decision(vdb, Lit::from_assign(vi, p));
                 state[Stat::Decision] += 1;
                 a_decision_was_made = true;
             }

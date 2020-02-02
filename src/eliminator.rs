@@ -705,8 +705,8 @@ fn make_eliminated_clause(cdb: &mut ClauseDB, vec: &mut Vec<Lit>, vi: VarId, cid
     // Store the length of the clause last:
     debug_assert_eq!(vec[first].vi(), vi);
     vec.push(Lit::from(c.len()));
-    cdb.touched[Lit::from_var(vi, true)] = true;
-    cdb.touched[Lit::from_var(vi, false)] = true;
+    cdb.touched[Lit::from_assign(vi, true)] = true;
+    cdb.touched[Lit::from_assign(vi, false)] = true;
     // println!("make_eliminated_clause: eliminate({}) clause {:?}", vi, vec2int(&ch.lits));
 }
 
@@ -833,13 +833,13 @@ fn make_eliminated_clauses(
             debug_assert!(!cdb[*cid].is(Flag::DEAD));
             make_eliminated_clause(cdb, tmp, v, *cid);
         }
-        make_eliminating_unit_clause(tmp, Lit::from_var(v, true));
+        make_eliminating_unit_clause(tmp, Lit::from_assign(v, true));
     } else {
         for cid in pos {
             debug_assert!(!cdb[*cid].is(Flag::DEAD));
             make_eliminated_clause(cdb, tmp, v, *cid);
         }
-        make_eliminating_unit_clause(tmp, Lit::from_var(v, false));
+        make_eliminating_unit_clause(tmp, Lit::from_assign(v, false));
     }
 }
 
