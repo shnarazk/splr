@@ -286,7 +286,6 @@ fn test_luby_series() {
 // Restart stat
 #[derive(Debug)]
 pub struct RestartExecutor {
-    pub adaptive_restart: bool,
     pub asg: ProgressASG,
     pub lbd: ProgressLBD,
     // pub rcc: ProgressRCC,
@@ -301,7 +300,6 @@ pub struct RestartExecutor {
 impl Instantiate for RestartExecutor {
     fn instantiate(config: &Config, cnf: &CNFDescription) -> Self {
         RestartExecutor {
-            adaptive_restart: !config.without_adaptive_restart,
             asg: ProgressASG::instantiate(config, cnf),
             lbd: ProgressLBD::instantiate(config, cnf),
             // rcc: ProgressRCC::instantiate(config, cnf),

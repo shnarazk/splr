@@ -528,42 +528,6 @@ fn adapt_parameters(
         }
         state.stagnated = stagnated;
     }
-    state[Stat::SolvedRecord] = state.num_solved_vars;
-    if !state.rst.luby.active && state.rst.adaptive_restart && !state.stagnated {
-        let moving: f64 = 0.04;
-        let spring: f64 = 0.02;
-        let margin: f64 = 0.20;
-        let too_few: usize = 10;
-        let too_many: usize = 1000;
-        // restart_threshold
-        let nr = state[Stat::Restart] - state[Stat::RestartRecord];
-        state[Stat::RestartRecord] = state[Stat::Restart];
-        if state.rst.lbd.threshold + moving < 1.0 && nr < too_few {
-            state.rst.lbd.threshold += moving;
-        } else if state.config.restart_threshold - margin <= state.rst.lbd.threshold
-            && too_many < nr
-        {
-            state.rst.lbd.threshold -= moving;
-        } else if too_few <= nr && nr <= too_many {
-            state.rst.lbd.threshold -=
-                (state.rst.lbd.threshold - state.config.restart_threshold) * spring;
-        }
-
-        // restart_blocking
-        let _nb = state[Stat::BlockRestart] - state[Stat::BlockRestartRecord];
-        state[Stat::BlockRestartRecord] = state[Stat::BlockRestart];
-        /*
-        if state.config.restart_blocking - margin <= state.rst.asg.threshold && nb < too_few {
-            state.rst.asg.threshold -= moving;
-        } else if state.rst.asg.threshold <= state.config.restart_blocking + margin && too_many < nb
-        {
-            state.rst.asg.threshold += moving;
-        } else if too_few <= nb && nb <= too_many {
-            state.rst.asg.threshold -=
-                (state.rst.asg.threshold - state.config.restart_blocking) * spring;
-        }
-        */
-    }
     if nconflict == switch {
         state.flush("exhaustive eliminator activated...");
         asgs.cancel_until(vdb, 0);

@@ -54,9 +54,6 @@ pub struct Config {
     /// Disables exhaustive simplification
     #[structopt(long = "without-elim", short = "E")]
     pub without_elim: bool,
-    /// Disables dynamic restart adaptation
-    #[structopt(long = "without-adaptive-restart", short = "R")]
-    pub without_adaptive_restart: bool,
     /// Disables dynamic strategy adaptation
     #[structopt(long = "without-adaptive-strategy", short = "S")]
     pub without_adaptive_strategy: bool,
@@ -91,9 +88,8 @@ impl Default for Config {
             proof_filename: PathBuf::from("proof.out"),
             use_log: false,
             without_elim: false,
-            without_adaptive_restart: false,
             without_adaptive_strategy: false,
-            without_deep_search: true,
+            without_deep_search: false,
             use_certification: false,
             timeout: 0.0,
             dump_interval: 0,
