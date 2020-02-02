@@ -499,7 +499,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K     Restart|#BLK:{}, #RST:{}, eASG:{}, eLBD:{} ",
+            "\x1B[2K     Restart|#BLK:{}, #RST:{}, tASG:{}, tLBD:{} ",
             im!(
                 "{:>9}",
                 self.record,
@@ -527,7 +527,7 @@ impl StateIF for State {
         );
         if 0 < self.config.dump_interval {
             println!(
-                "\x1B[2K    Conflict|aLBD:{}, cnfl:{}, bjmp:{}, rpc%:{} ",
+                "\x1B[2K    Conflict|eLBD:{}, cnfl:{}, bjmp:{}, rpc%:{} ",
                 fm!("{:>9.2}", self.record, LogF64Id::AveLBD, self.rst.lbd.get()),
                 fm!("{:>9.2}", self.record, LogF64Id::CLevel, self.c_lvl.get()),
                 fm!("{:>9.2}", self.record, LogF64Id::BLevel, self.b_lvl.get()),

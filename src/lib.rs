@@ -72,9 +72,9 @@ The answer file uses the following format.
 | `Perm` | the number of given clauses and binary learnt clauses |
 | `#BLK` | the number of blocking restart |
 | `#RST` | the number of restart |
-| `eASG` | a moving rate of the number of assigned variables |
-| `eLBD` | a moving rate of earn clause's LBD |
-| `aLBD` | the EMA, Exponential Moving Average, of learn clauses' LBDs |
+| `tASG` | the trend rate of the number of assigned variables |
+| `tLBD` | the trend rate of learn clause's LBD |
+| `eLBD` | the EMA, Exponential Moving Average, of learn clauses' LBDs |
 | `cnfl` | the EMA of decision levels to which backjumps go |
 | `bjmp` | the EMA of decision levels at which conflicts occur |
 | `rpc%` | a percentage of restart per conflict |
@@ -91,8 +91,8 @@ Please check help message.
 
 ```plain
 $ splr --help
-splr 0.1.4
-Shuji Narazaki <shujinarazaki@protonmail.com>
+splr 0.3.0
+Narazaki Shuji <shujinarazaki@protonmail.com>
 A pure rustic CDCL SAT solver based on Glucose
 
 USAGE:
@@ -103,25 +103,24 @@ FLAGS:
     -c, --certify                      Writes a DRAT UNSAT certification file
     -l, --log                          Uses Glucose-like progress report
     -V, --version                      Prints version information
-    -R, --without-adaptive-restart     Disables dynamic restart adaptation
     -S, --without-adaptive-strategy    Disables dynamic strategy adaptation
     -D, --without-deep-search          Disables deep search mode
     -E, --without-elim                 Disables exhaustive simplification
 
 OPTIONS:
-        --cl <clause-limit>           soft limit of #clauses (24MC~4GB) [default: 0]
+        --cl <clause-limit>           soft limit of #clauses (6MC/GB) [default: 0]
         --stat <dump-interval>        interval for dumpping stat data [default: 0]
         --eg <elim-grow-limit>        grow limit of #clauses by v-elim [default: 4]
         --el <elim-lit-limit>         #literals in a clause by v-elim [default: 64]
     -o, --dir <output-dirname>        output directory [default: .]
-    -p, --proof <proof-filename>      filename for DRAT cert. [default: proof.out]
+    -p, --proof <proof-filename>      filename for DRAT cert [default: proof.out]
         --ra <restart-asg-len>        length for assignment average [default: 3500]
         --rb <restart-blocking>       blocking restart threshold [default: 1.40]
         --rl <restart-lbd-len>        length for LBD average [default: 50]
         --rs <restart-step>           #conflicts between restarts [default: 50]
         --rt <restart-threshold>      forcing restart threshold [default: 0.70]
     -r, --result <result-filename>    result filename/stdout [default: ]
-        --to <timeout>                CPU time limit in sec. [default: 0]
+        --to <timeout>                CPU time limit in sec [default: 0]
 
 ARGS:
     <cnf-filename>    a DIMACS format CNF file
