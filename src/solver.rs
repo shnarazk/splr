@@ -538,12 +538,13 @@ fn adapt_parameters(
             cdb.simplify(asgs, elim, state, vdb)?;
         }
     }
+    state[Stat::SolvedRecord] = state.num_solved_vars;
     state.progress(cdb, vdb, None);
     if !state.config.without_deep_search {
-        state.rst.restart_step = 50 + 40_000 * (state.stagnated as usize);
+        state.rst.restart_step = 50 + 10_000 * (state.stagnated as usize);
         if state.stagnated {
             state.flush(format!("deep searching ({})...", state.slack_duration));
-            state.rst.next_restart += 80_000;
+            state.rst.next_restart += 10_000;
         }
     }
     Ok(())
