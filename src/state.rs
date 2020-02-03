@@ -26,7 +26,7 @@ pub trait StateIF {
     /// return elapsed time as a fraction.
     fn elapsed(&self) -> Option<f64>;
     /// update internal counters and return true if solver stagnated.
-    fn check_stagnation(&mut self) -> bool;
+    fn check_stagnation(&mut self);
     /// change heuristics based on stat data.
     fn adapt_strategy(&mut self, cdb: &mut ClauseDB);
     /// write a header of stat data to stdio.
