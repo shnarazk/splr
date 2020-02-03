@@ -173,7 +173,6 @@ pub struct State {
     pub target: CNFDescription,
     pub use_chan_seok: bool,
     /// MISC
-    pub ok: bool,
     pub b_lvl: Ema,
     pub c_lvl: Ema,
     pub model: Vec<Option<bool>>,
@@ -205,7 +204,6 @@ impl Default for State {
             strategy: SearchStrategy::Initial,
             target: CNFDescription::default(),
             use_chan_seok: false,
-            ok: true,
             b_lvl: Ema::new(5_000),
             c_lvl: Ema::new(5_000),
             model: Vec::new(),

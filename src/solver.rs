@@ -104,9 +104,6 @@ impl SatSolverIF for Solver {
             ref mut state,
             ref mut vdb,
         } = self;
-        if !state.ok {
-            return Ok(Certificate::UNSAT);
-        }
         if cdb.check_size().is_err() {
             return Err(SolverError::OutOfMemory);
         }
@@ -162,7 +159,6 @@ impl SatSolverIF for Solver {
                 // Why inconsistent? Because the CNF contains a conflict, not an error!
                 // Or out of memory.
                 state.progress(cdb, vdb, None);
-                state.ok = false;
                 if cdb.check_size().is_err() {
                     return Err(SolverError::OutOfMemory);
                 }
@@ -207,7 +203,6 @@ impl SatSolverIF for Solver {
             Err(_) => {
                 asgs.cancel_until(vdb, 0);
                 state.progress(cdb, vdb, None);
-                state.ok = false;
                 if cdb.check_size().is_err() {
                     Err(SolverError::OutOfMemory)
                 } else if state.is_timeout() {
@@ -288,7 +283,6 @@ impl SatSolverIF for Solver {
                         }
                     }
                     if !v.is_empty() && s.add_unchecked_clause(&mut v).is_none() {
-                        s.state.ok = false;
                         return Err(SolverError::Inconsistent);
                     }
                 }
