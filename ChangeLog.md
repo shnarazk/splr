@@ -1,3 +1,24 @@
+## 0.3.0, 2020-02-05
+
+- remove src/traits.rs and revise traits:
+  - ActivityIF
+  - EmaIF
+  - LBDIF
+  - LitIF
+  - PropagatorIF
+  - StateIF
+  - VarDBIF
+  - VarRewardIF
+  - VarSelectionIF
+- adopt learning rate based branch with with reason side rewarding
+- better decay parameters
+- better tests in src/*.rs
+- drop adaptive_restart
+- add more ProgressEvaluators
+- implement Index and IndexMut traits on several structs
+- AssignStack::propagate normalizes flipped binary clasues to reduce computational cost in conflict analysis
+- make deep_search sporadic
+
 ## 0.2.1, 2019-12-17
 
 - redefine `ClauseId` as a struct
