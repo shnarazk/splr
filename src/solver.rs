@@ -509,25 +509,7 @@ fn adapt_parameters(
     nconflict: usize,
 ) -> MaybeInconsistent {
     let switch = 100_000;
-    {
-        let stopped = state[Stat::SolvedRecord] == state.num_solved_vars;
-        if stopped {
-            state.slack_duration += 1;
-        } else if 0 < state.slack_duration && state.stagnated {
-            state.slack_duration *= -1;
-        } else {
-            state.slack_duration = 0;
-        }
-        let stagnated = !state.stagnated
-            && ((state.num_vars - state.num_solved_vars)
-                .next_power_of_two()
-                .trailing_zeros() as isize)
-                < state.slack_duration;
-        if !state.stagnated && stagnated {
-            state[Stat::Stagnation] += 1;
-        }
-        state.stagnated = stagnated;
-    }
+    state.check_stagnation();
     if nconflict == switch {
         state.flush("exhaustive eliminator activated...");
         asgs.cancel_until(vdb, 0);
@@ -540,10 +522,12 @@ fn adapt_parameters(
     state[Stat::SolvedRecord] = state.num_solved_vars;
     state.progress(cdb, vdb, None);
     if !state.config.without_deep_search {
-        state.rst.restart_step = 50 + 10_000 * (state.stagnated as usize);
         if state.stagnated {
-            state.flush(format!("deep searching ({})...", state.slack_duration));
+            state.rst.restart_step = 10_00;
             state.rst.next_restart += 10_000;
+            state.flush(format!("deep searching ({})...", state.slack_duration));
+        } else {
+            state.rst.restart_step = state.config.restart_step;
         }
     }
     Ok(())

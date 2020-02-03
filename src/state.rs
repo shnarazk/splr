@@ -25,6 +25,8 @@ pub trait StateIF {
     fn is_timeout(&self) -> bool;
     /// return elapsed time as a fraction.
     fn elapsed(&self) -> Option<f64>;
+    /// update internal counters and return true if solver stagnated.
+    fn check_stagnation(&mut self) -> bool;
     /// change heuristics based on stat data.
     fn adapt_strategy(&mut self, cdb: &mut ClauseDB);
     /// write a header of stat data to stdio.
@@ -178,7 +180,7 @@ pub struct State {
     pub conflicts: Vec<Lit>,
     pub new_learnt: Vec<Lit>,
     pub last_asg: usize,
-    pub slack_duration: isize,
+    pub slack_duration: usize,
     pub stagnated: bool,
     pub start: SystemTime,
     pub time_limit: f64,
@@ -354,6 +356,22 @@ impl StateIF for State {
         match self.start.elapsed() {
             Ok(e) => Some(e.as_secs() as f64 / self.time_limit),
             Err(_) => None,
+        }
+    }
+    fn check_stagnation(&mut self) {
+        if self[Stat::SolvedRecord] == self.num_solved_vars {
+            self.slack_duration += 1;
+        } else {
+            self.slack_duration = 0;
+        }
+        if self.stagnated {
+            self.stagnated = false
+        } else if 0 < self.slack_duration {
+            self.stagnated = (self.num_unsolved_vars()
+                              .next_power_of_two()
+                              .trailing_zeros() as usize)
+                < self.slack_duration;
+            self[Stat::Stagnation] += 1;
         }
     }
     fn adapt_strategy(&mut self, cdb: &mut ClauseDB) {
