@@ -225,8 +225,7 @@ impl SatSolverIF for Solver {
     // fn build(config: &Config) -> std::io::Result<Solver> {
     fn build(config: &Config) -> Result<Solver, SolverError> {
         let fs = fs::File::open(&config.cnf_filename)
-            .map_or(Err(SolverError::FileNotFound),
-                    | f | Ok(f))?;
+            .map_or(Err(SolverError::FileNotFound), |f| Ok(f))?;
         let mut rs = BufReader::new(fs);
         let mut buf = String::new();
         let mut nv: usize = 0;
