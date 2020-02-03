@@ -41,23 +41,12 @@ pub enum Certificate {
     UNSAT,
 }
 
-/// Abnormal termination flags.
-#[derive(Debug)]
-pub enum SolverException {
-    // StateUNSAT = 0,
-    // StateSAT,
-    Inconsistent,
-    OutOfMemory,
-    TimeOut,
-    UndescribedError,
-}
-
 /// The return type of `Solver::solve`.
 /// This captures the following three cases:
 /// * `Certificate::SAT` -- solved with a satisfiable assignment set,
 /// * `Certificate::UNSAT` -- proved that it's an unsatisfiable problem, and
 /// * `SolverException::*` -- caused by a bug
-pub type SolverResult = Result<Certificate, SolverException>;
+pub type SolverResult = Result<Certificate, SolverError>;
 
 /// SAT solver consisting of 5 sub modules.
 #[derive(Debug)]
@@ -119,7 +108,7 @@ impl SatSolverIF for Solver {
             return Ok(Certificate::UNSAT);
         }
         if cdb.check_size().is_err() {
-            return Err(SolverException::OutOfMemory);
+            return Err(SolverError::OutOfMemory);
         }
         // NOTE: splr doesn't deal with assumptions.
         // s.root_level = 0;
@@ -175,7 +164,7 @@ impl SatSolverIF for Solver {
                 state.progress(cdb, vdb, None);
                 state.ok = false;
                 if cdb.check_size().is_err() {
-                    return Err(SolverException::OutOfMemory);
+                    return Err(SolverError::OutOfMemory);
                 }
                 return Ok(Certificate::UNSAT);
             }
@@ -220,12 +209,12 @@ impl SatSolverIF for Solver {
                 state.progress(cdb, vdb, None);
                 state.ok = false;
                 if cdb.check_size().is_err() {
-                    return Err(SolverException::OutOfMemory);
+                    Err(SolverError::OutOfMemory)
+                } else if state.is_timeout() {
+                    Err(SolverError::TimeOut)
+                } else {
+                    Err(SolverError::Inconsistent)
                 }
-                if state.is_timeout() {
-                    return Err(SolverException::TimeOut);
-                }
-                Err(SolverException::Inconsistent)
             }
         }
     }
@@ -241,7 +230,7 @@ impl SatSolverIF for Solver {
     // fn build(config: &Config) -> std::io::Result<Solver> {
     fn build(config: &Config) -> Result<Solver, SolverError> {
         let fs = fs::File::open(&config.cnf_filename)
-            .map_or(Err(SolverError::Inconsistent),
+            .map_or(Err(SolverError::FileNotFound),
                     | f | Ok(f))?;
         let mut rs = BufReader::new(fs);
         let mut buf = String::new();
@@ -300,6 +289,7 @@ impl SatSolverIF for Solver {
                     }
                     if !v.is_empty() && s.add_unchecked_clause(&mut v).is_none() {
                         s.state.ok = false;
+                        return Err(SolverError::Inconsistent);
                     }
                 }
                 Err(e) => panic!("{}", e),

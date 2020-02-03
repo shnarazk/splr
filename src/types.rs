@@ -334,11 +334,17 @@ impl Ema2 {
     }
 }
 
-/// Internal exception
-// Returning `Result<(), a-singleton>` is identical to returning `bool`.
+/// Internal errors
+/// Note: returning `Result<(), a-singleton>` is identical to returning `bool`.
 #[derive(Debug)]
 pub enum SolverError {
+    // StateUNSAT = 0,
+    // StateSAT,
+    FileNotFound,
     Inconsistent,
+    OutOfMemory,
+    TimeOut,
+    UndescribedError,
 }
 
 /// A Return type used by solver functions
