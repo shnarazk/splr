@@ -23,7 +23,7 @@ pub trait SatSolverIF {
     /// # Errors
     ///
     /// IO error by failing to load a CNF file.
-    fn build(config: &Config) -> std::io::Result<Solver>;
+    fn build(config: &Config) -> Result<Solver, SolverError>;
     /// search an assignment.
     ///
     /// # Errors
@@ -238,8 +238,11 @@ impl SatSolverIF for Solver {
     /// let config = Config::from("tests/sample.cnf");
     /// assert!(Solver::build(&config).is_ok());
     ///```
-    fn build(config: &Config) -> std::io::Result<Solver> {
-        let fs = fs::File::open(&config.cnf_filename)?;
+    // fn build(config: &Config) -> std::io::Result<Solver> {
+    fn build(config: &Config) -> Result<Solver, SolverError> {
+        let fs = fs::File::open(&config.cnf_filename)
+            .map_or(Err(SolverError::Inconsistent),
+                    | f | Ok(f))?;
         let mut rs = BufReader::new(fs);
         let mut buf = String::new();
         let mut nv: usize = 0;

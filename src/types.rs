@@ -336,6 +336,7 @@ impl Ema2 {
 
 /// Internal exception
 // Returning `Result<(), a-singleton>` is identical to returning `bool`.
+#[derive(Debug)]
 pub enum SolverError {
     Inconsistent,
 }
