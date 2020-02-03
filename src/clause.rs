@@ -808,7 +808,7 @@ mod tests {
         let mut cdb = ClauseDB::instantiate(&config, &cnf);
         let c1 = cdb.new_clause(&[lit(1), lit(2), lit(3)], 0, false);
         let c2 = cdb.new_clause(&[lit(-1), lit(4)], 0, false);
-        cdb[c2].reward= 2.4;
+        cdb[c2].reward = 2.4;
         assert_eq!(c1, c1);
         assert_eq!(c1 == c1, true);
         assert_ne!(c1, c2);
@@ -824,7 +824,7 @@ mod tests {
         };
         let mut cdb = ClauseDB::instantiate(&config, &cnf);
         let c1 = cdb.new_clause(&[lit(1), lit(2), lit(3)], 0, false);
-        assert_eq!(cdb[c1][0..].iter().map(| l | i32::from(*l)).sum::<i32>(), 6);
+        assert_eq!(cdb[c1][0..].iter().map(|l| i32::from(*l)).sum::<i32>(), 6);
         let mut iter = cdb[c1][0..].into_iter();
         assert_eq!(iter.next(), Some(&lit(1)));
         assert_eq!(iter.next(), Some(&lit(2)));

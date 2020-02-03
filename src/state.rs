@@ -367,9 +367,10 @@ impl StateIF for State {
         if self.stagnated {
             self.stagnated = false
         } else if 0 < self.slack_duration {
-            self.stagnated = (self.num_unsolved_vars()
-                              .next_power_of_two()
-                              .trailing_zeros() as usize)
+            self.stagnated = (self
+                .num_unsolved_vars()
+                .next_power_of_two()
+                .trailing_zeros() as usize)
                 < self.slack_duration;
             self[Stat::Stagnation] += 1;
         }
