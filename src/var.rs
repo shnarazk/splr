@@ -201,17 +201,17 @@ impl Default for VarDB {
     }
 }
 
-impl Index<usize> for VarDB {
+impl Index<VarId> for VarDB {
     type Output = Var;
     #[inline]
-    fn index(&self, i: usize) -> &Var {
+    fn index(&self, i: VarId) -> &Var {
         unsafe { self.var.get_unchecked(i) }
     }
 }
 
-impl IndexMut<usize> for VarDB {
+impl IndexMut<VarId> for VarDB {
     #[inline]
-    fn index_mut(&mut self, i: usize) -> &mut Var {
+    fn index_mut(&mut self, i: VarId) -> &mut Var {
         unsafe { self.var.get_unchecked_mut(i) }
     }
 }
