@@ -83,17 +83,17 @@ fn main() {
     }
     match s.validate() {
         Some(v) => println!(
-            "Invalid assignment set for {} due to {:?}.",
+            "An invalid assignment set for {} due to {:?}.",
             args.problem.to_str().unwrap(),
             v
         ),
         None if from_file => println!(
-            "Valid assignment set for {} found in {}.",
+            "A valid assignment set for {} is found in {}.",
             &args.problem.to_str().unwrap(),
             &args.assign.unwrap().to_str().unwrap(),
         ),
         None => println!(
-            "Valid assignment set for {}.",
+            "A valid assignment set for {}.",
             &args.problem.to_str().unwrap()
         ),
     }
