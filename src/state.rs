@@ -179,7 +179,7 @@ pub struct State {
     pub conflicts: Vec<Lit>,
     pub new_learnt: Vec<Lit>,
     pub last_asg: usize,
-    pub slack_duration: usize,
+    slack_duration: isize,
     pub stagnated: bool,
     pub start: SystemTime,
     pub time_limit: f64,
@@ -359,6 +359,8 @@ impl StateIF for State {
     fn check_stagnation(&mut self) {
         if self[Stat::SolvedRecord] == self.num_solved_vars {
             self.slack_duration += 1;
+        } else if 0 < self.slack_duration && self.stagnated {
+            self.slack_duration *= -1;
         } else {
             self.slack_duration = 0;
         }
@@ -368,7 +370,7 @@ impl StateIF for State {
             self.stagnated = (self
                 .num_unsolved_vars()
                 .next_power_of_two()
-                .trailing_zeros() as usize)
+                .trailing_zeros() as isize)
                 < self.slack_duration;
             self[Stat::Stagnation] += 1;
         }
