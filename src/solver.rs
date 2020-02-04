@@ -9,10 +9,7 @@ use {
         types::*,
         var::{VarDB, VarDBIF, VarRewardIF, LBDIF},
     },
-    std::{
-        convert::TryFrom,
-        io::BufRead,
-    }
+    std::{convert::TryFrom, io::BufRead},
 };
 
 /// API for SAT solver like `build`, `solve` and so on.
@@ -222,10 +219,7 @@ impl SatSolverIF for Solver {
     /// assert!(Solver::build(&config).is_ok());
     ///```
     fn build(config: &Config) -> Result<Solver, SolverError> {
-        let CNFStream {
-            cnf,
-            mut stream,
-        } = CNFStream::try_from(&config.cnf_filename)?;
+        let CNFStream { cnf, mut stream } = CNFStream::try_from(&config.cnf_filename)?;
         let mut buf = String::new();
         let mut s: Solver = Solver::instantiate(config, &cnf);
         loop {

@@ -57,11 +57,7 @@ fn main() {
                 .unwrap();
             for (n, a, b, c, d, e) in s.state.development.iter() {
                 buf.write_all(
-                    format!(
-                        "{:.0},{:.5},{:.0},{:.0},{:.5},{:.5}\n",
-                        n, a, b, c, d, e,
-                    )
-                    .as_bytes(),
+                    format!("{:.0},{:.5},{:.0},{:.0},{:.5},{:.5}\n", n, a, b, c, d, e,).as_bytes(),
                 )
                 .unwrap();
             }
