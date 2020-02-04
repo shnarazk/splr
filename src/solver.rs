@@ -682,10 +682,7 @@ fn analyze_final(asgs: &AssignStack, state: &mut State, vdb: &mut VarDB, c: &Cla
 
 #[cfg(test)]
 mod tests {
-    use {
-        std::path::PathBuf,
-        super::*,
-    };
+    use {super::*, std::path::PathBuf};
     #[test]
     fn test_solver() {
         let mut config = Config::default();

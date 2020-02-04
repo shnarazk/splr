@@ -126,7 +126,7 @@ fn save_result(s: &Solver, res: &SolverResult, input: &str, output: Option<PathB
                     f.to_string_lossy()
                     input,
                 ),
-                Some(ref f)  => println!(
+                Some(ref f) => println!(
                     "      Result|save: {}\nUNSAT: {}",
                     f.to_str().unwrap()
                     input,
@@ -264,8 +264,10 @@ fn report(state: &State, out: &mut dyn Write) -> std::io::Result<()> {
             format!("{:>9.2}", state[LogF64Id::AveLBD]),
             format!("{:>9.2}", state[LogF64Id::CLevel]),
             format!("{:>9.2}", state[LogF64Id::BLevel]),
-            format!("{:>9.4}",
-                    100.0 * state[Stat::Restart] as f64 / state[Stat::Conflict] as f64),
+            format!(
+                "{:>9.4}",
+                100.0 * state[Stat::Restart] as f64 / state[Stat::Conflict] as f64
+            ),
         )
         .as_bytes(),
     )?;
