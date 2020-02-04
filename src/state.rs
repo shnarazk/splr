@@ -343,7 +343,7 @@ impl StateIF for State {
             return false;
         }
         match self.start.elapsed() {
-            Ok(e) => self.time_limit < e.as_secs() as f64,
+            Ok(e) => self.time_limit <= e.as_secs() as f64,
             Err(_) => false,
         }
     }
