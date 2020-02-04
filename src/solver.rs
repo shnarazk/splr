@@ -1,3 +1,4 @@
+/// Crate 'solver' provides the top-level API as a SAT solver.
 use {
     crate::{
         clause::{Clause, ClauseDB, ClauseDBIF, ClauseIF, ClauseId},

@@ -1,4 +1,6 @@
 //! Basic types
+/// Crate 'types' provides various building blocks, including
+/// some common traits.
 use {
     crate::{clause::ClauseId, config::Config, var::Var},
     std::{
@@ -20,7 +22,7 @@ pub trait LitIF {
     fn vi(self) -> VarId;
 }
 
-/// API for Clause and Var rewarding
+/// API for clause and var rewarding
 pub trait ActivityIF {
     type Ix;
     type Inc;
@@ -32,7 +34,7 @@ pub trait ActivityIF {
     fn scale_activity(&mut self);
 }
 
-/// API for data instantiation based on `Configuration` and `CNFDescription`
+/// API for object instantiation based on `Configuration` and `CNFDescription`
 pub trait Instantiate {
     fn instantiate(conf: &Config, cnf: &CNFDescription) -> Self;
 }
@@ -46,6 +48,8 @@ pub trait Delete<T> {
 }
 
 /// 'Variable' identifier or 'variable' index, starting with one.
+/// Implementation note: NonZeroUsize can be used but requires a lot of changes.
+/// The current abstraction is imcomplete.
 pub type VarId = usize;
 
 /// Literal encoded on `u32` as:

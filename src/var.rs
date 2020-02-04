@@ -1,3 +1,4 @@
+/// Crate 'var' provides `var` object and its manager `VarDB`.
 use {
     crate::{
         clause::{Clause, ClauseDB, ClauseIF, ClauseId, ClauseIdIF},
