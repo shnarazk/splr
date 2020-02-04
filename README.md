@@ -54,7 +54,7 @@ s SATISFIABLE
 1 2 -3 4 -5 6 7 8 9 -10 11 12 13 14 -15 16 -17 18 19 20 21 -22 23 ... 0
 
 $ dmcr tests/sample.cnf
-Valid assignment set for tests/sample.cnf found in .ans_sample.cnf.
+A valid assignment set for tests/sample.cnf is found in .ans_sample.cnf.
 ```
 
 ## Correctness
