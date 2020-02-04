@@ -90,16 +90,16 @@ fn save_result(s: &Solver, res: &SolverResult, input: &str, output: Option<PathB
         Ok(Certificate::SAT(v)) => {
             match output {
                 Some(ref f) if redirect => println!(
-                    "      Result|dump: to STDOUT instead of {} due to an IO error.\nSATISFIABLE: {}.",
+                    "      Result|dump: to STDOUT instead of {} due to an IO error.\nSATISFIABLE: {}",
                     f.to_string_lossy(),
                     input,
                     ),
                 Some(ref f) => println!(
-                    "      Result|save: {}.\nSATISFIABLE: {}.",
+                    "      Result|save: {}\nSATISFIABLE: {}",
                     f.to_str().unwrap(),
                     input,
                 ),
-                _ => println!("SATISFIABLE: {}.", input),
+                _ => println!("SATISFIABLE: {}", input),
             }
             if let Err(why) = (|| {
                 buf.write_all(
@@ -122,17 +122,17 @@ fn save_result(s: &Solver, res: &SolverResult, input: &str, output: Option<PathB
         Ok(Certificate::UNSAT) => {
             match output {
                 Some(ref f) if redirect => println!(
-                    "UNSAT: {}.\nRedirect the result to STDOUT insteard of {} due to an IO error.\n",
-                    input,
+                    "      Result|dump: to STDOUT instead of {} due to an IO error.\nUNSAT: {}",
                     f.to_string_lossy()
+                    input,
                 ),
                 Some(ref f)  => println!(
-                    "UNSAT: {}, The result was saved to {}.",
-                    input,
+                    "      Result|save: {}\nUNSAT: {}",
                     f.to_str().unwrap()
+                    input,
                 ),
 
-                _ => println!("UNSAT: {}.", input),
+                _ => println!("UNSAT: {}", input),
             }
             if let Err(why) = (|| {
                 buf.write_all(
