@@ -66,7 +66,6 @@ pub type VarId = usize;
 /// assert_eq!( 2i32, Lit::from( 2i32).into());
 /// assert_eq!(-2i32, Lit::from(-2i32).into());
 /// ```
-
 #[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
 pub struct Lit {
     ordinal: u32,
@@ -230,7 +229,6 @@ impl IndexMut<Lit> for Vec<Vec<crate::clause::Watch>> {
 /// assert_eq!(Lit::from( 2i32), !Lit::from(-2i32));
 /// assert_eq!(Lit::from(-2i32), !Lit::from( 2i32));
 /// ```
-
 impl LitIF for Lit {
     #[inline]
     fn from_assign(vi: VarId, p: bool) -> Lit {
@@ -388,9 +386,25 @@ pub struct CNFStream {
     pub stream: BufReader<File>,
 }
 
+impl TryFrom<&str> for CNFStream {
+    type Error = SolverError;
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        CNFStream::try_from(&PathBuf::from(s))
+    }
+}
+
 impl TryFrom<&PathBuf> for CNFStream {
     type Error = SolverError;
     fn try_from(path: &PathBuf) -> Result<Self, Self::Error> {
+        let pathname = if path.to_string_lossy().is_empty() {
+            "--".to_string()
+        } else {
+            Path::new(&path.to_string_lossy().into_owned())
+                .file_name()
+                .map_or("aStrangeNamed".to_string(), |f| {
+                    f.to_string_lossy().into_owned()
+                })
+        };
         let fs = File::open(path).map_or(Err(SolverError::IOError), Ok)?;
         let mut stream = BufReader::new(fs);
         let mut buf = String::new();
@@ -422,15 +436,7 @@ impl TryFrom<&PathBuf> for CNFStream {
         let cnf = CNFDescription {
             num_of_variables: nv,
             num_of_clauses: nc,
-            pathname: if path.to_string_lossy().is_empty() {
-                "--".to_string()
-            } else {
-                Path::new(&path.to_string_lossy().into_owned())
-                    .file_name()
-                    .map_or("aStrangeNamed".to_string(), |f| {
-                        f.to_string_lossy().into_owned()
-                    })
-            },
+            pathname,
         };
         Ok(CNFStream { cnf, stream })
     }
@@ -488,5 +494,17 @@ bitflags! {
         const CA_SEEN      = 0b0000_0000_1000_0000;
         /// a var is checked during in var rewarding.
         const VR_SEEN      = 0b0000_0001_0000_0000;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_cnf() {
+        if let Ok(cnfs) = CNFStream::try_from("tests/sample.cnf") {
+            assert_eq!(cnfs.cnf.num_of_variables, 250);
+            assert_eq!(cnfs.cnf.num_of_clauses, 1065);
+        }
     }
 }
