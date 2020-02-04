@@ -90,14 +90,14 @@ fn save_result(s: &Solver, res: &SolverResult, input: &str, output: Option<PathB
         Ok(Certificate::SAT(v)) => {
             match output {
                 Some(ref f) if redirect => println!(
-                    "SATISFIABLE: {}.\nRedirect the result to STDOUT instead of {} due to an IO error.\n",
-                    input,
+                    "      Result|dump: to STDOUT instead of {} due to an IO error.\nSATISFIABLE: {}.",
                     f.to_string_lossy(),
+                    input,
                     ),
                 Some(ref f) => println!(
-                    "SATISFIABLE: {}. The result was saved to {}.",
+                    "      Result|save: {}.\nSATISFIABLE: {}.",
+                    f.to_str().unwrap(),
                     input,
-                    f.to_str().unwrap()
                 ),
                 _ => println!("SATISFIABLE: {}.", input),
             }
@@ -219,29 +219,29 @@ fn report(state: &State, out: &mut dyn Write) -> std::io::Result<()> {
     out.write_all(
         format!(
             "c  #conflict:{}, #decision:{}, #propagate:{} \n",
-            format!("{:>11}", state.record.vali[LogUsizeId::Conflict as usize]),
-            format!("{:>13}", state.record.vali[LogUsizeId::Decision as usize]),
-            format!("{:>15}", state.record.vali[LogUsizeId::Propagate as usize]),
+            format!("{:>11}", state[LogUsizeId::Conflict]),
+            format!("{:>13}", state[LogUsizeId::Decision]),
+            format!("{:>15}", state[LogUsizeId::Propagate]),
         )
         .as_bytes(),
     )?;
     out.write_all(
         format!(
             "c   Assignment|#rem:{}, #fix:{}, #elm:{}, prg%:{} \n",
-            format!("{:>9}", state.record.vali[LogUsizeId::Remain as usize]),
-            format!("{:>9}", state.record.vali[LogUsizeId::Fixed as usize]),
-            format!("{:>9}", state.record.vali[LogUsizeId::Eliminated as usize]),
-            format!("{:>9.4}", state.record.valf[LogF64Id::Progress as usize]),
+            format!("{:>9}", state[LogUsizeId::Remain]),
+            format!("{:>9}", state[LogUsizeId::Fixed]),
+            format!("{:>9}", state[LogUsizeId::Eliminated]),
+            format!("{:>9.4}", state[LogF64Id::Progress]),
         )
         .as_bytes(),
     )?;
     out.write_all(
         format!(
             "c  Clause Kind|Remv:{}, LBD2:{}, Binc:{}, Perm:{} \n",
-            format!("{:>9}", state.record.vali[LogUsizeId::Removable as usize]),
-            format!("{:>9}", state.record.vali[LogUsizeId::LBD2 as usize]),
-            format!("{:>9}", state.record.vali[LogUsizeId::Binclause as usize]),
-            format!("{:>9}", state.record.vali[LogUsizeId::Permanent as usize]),
+            format!("{:>9}", state[LogUsizeId::Removable]),
+            format!("{:>9}", state[LogUsizeId::LBD2]),
+            format!("{:>9}", state[LogUsizeId::Binclause]),
+            format!("{:>9}", state[LogUsizeId::Permanent]),
         )
         .as_bytes(),
     )?;
@@ -252,35 +252,30 @@ fn report(state: &State, out: &mut dyn Write) -> std::io::Result<()> {
                 "{:>9}",
                 state.record.vali[LogUsizeId::RestartBlock as usize]
             ),
-            format!("{:>9}", state.record.vali[LogUsizeId::Restart as usize]),
-            format!("{:>9.4}", state.record.valf[LogF64Id::EmaAsg as usize]),
-            format!("{:>9.4}", state.record.valf[LogF64Id::EmaLBD as usize]),
+            format!("{:>9}", state[LogUsizeId::Restart]),
+            format!("{:>9.4}", state[LogF64Id::EmaAsg]),
+            format!("{:>9.4}", state[LogF64Id::EmaLBD]),
         )
         .as_bytes(),
     )?;
     out.write_all(
         format!(
-            "c    Conflicts|aLBD:{}, bjmp:{}, cnfl:{} |blkR:{} \n",
-            format!("{:>9.2}", state.record.valf[LogF64Id::AveLBD as usize]),
-            format!("{:>9.2}", state.record.valf[LogF64Id::BLevel as usize]),
-            format!("{:>9.2}", state.record.valf[LogF64Id::CLevel as usize]),
-            format!("{:>9.4}", state.record.valf[LogF64Id::RestartBlkR as usize]),
+            "c     Conflict|eLBD:{}, cnfl:{}, bjmp:{}, rpc%:{} \n",
+            format!("{:>9.2}", state[LogF64Id::AveLBD]),
+            format!("{:>9.2}", state[LogF64Id::CLevel]),
+            format!("{:>9.2}", state[LogF64Id::BLevel]),
+            format!("{:>9.4}",
+                    100.0 * state[Stat::Restart] as f64 / state[Stat::Conflict] as f64),
         )
         .as_bytes(),
     )?;
     out.write_all(
         format!(
-            "c    Clause DB|#rdc:{}, #sce:{}, #exe:{} |frcK:{} \n",
-            format!("{:>9}", state.record.vali[LogUsizeId::Reduction as usize]),
-            format!(
-                "{:>9}",
-                state.record.vali[LogUsizeId::SatClauseElim as usize]
-            ),
-            format!(
-                "{:>9}",
-                state.record.vali[LogUsizeId::ExhaustiveElim as usize]
-            ),
-            format!("{:>9.4}", state.record.valf[LogF64Id::RestartThrK as usize]),
+            "c   misc stats|#rdc:{}, #sce:{}, stag:{}, vdcy:      0.0 \n",
+            format!("{:>9}", state[LogUsizeId::Reduction]),
+            format!("{:>9}", state[LogUsizeId::SatClauseElim]),
+            format!("{:>9}", state[LogUsizeId::Stagnation]),
+            // format!("{:>9.4}", vdb.activity_decay),
         )
         .as_bytes(),
     )?;

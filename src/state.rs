@@ -558,7 +558,7 @@ impl StateIF for State {
                 )
             );
             println!(
-                "\x1B[2K   Clause DB|#rdc:{}, #sce:{} |blkR:{}, frcK:{} ",
+                "\x1B[2K  misc stats|#rdc:{}, #sce:{}, stag:{}, vdcy:{} ",
                 im!(
                     "{:>9}",
                     self.record,
@@ -571,18 +571,13 @@ impl StateIF for State {
                     LogUsizeId::SatClauseElim,
                     self[Stat::SatClauseElimination]
                 ),
-                fm!(
-                    "{:>9.4}",
+                im!(
+                    "{:>9}",
                     self.record,
-                    LogF64Id::RestartBlkR,
-                    self.rst.asg.threshold
+                    LogUsizeId::Stagnation,
+                    self[Stat::Stagnation]
                 ),
-                fm!(
-                    "{:>9.4}",
-                    self.record,
-                    LogF64Id::RestartThrK,
-                    self.rst.lbd.threshold
-                ),
+                format!("{:>9.4}", vdb.activity_decay),
             );
         } else {
             self.record[LogF64Id::AveLBD] = self.rst.lbd.get();
@@ -590,8 +585,6 @@ impl StateIF for State {
             self.record[LogF64Id::BLevel] = self.b_lvl.get();
             self.record[LogUsizeId::Reduction] = self[Stat::Reduction];
             self.record[LogUsizeId::SatClauseElim] = self[Stat::SatClauseElimination];
-            self.record[LogF64Id::RestartBlkR] = self.rst.asg.threshold;
-            self.record[LogF64Id::RestartThrK] = self.rst.lbd.threshold;
         }
         if let Some(m) = mes {
             println!("\x1B[2K    Strategy|mode: {}", m);
@@ -646,6 +639,36 @@ impl fmt::Display for State {
     }
 }
 
+impl Index<LogUsizeId> for State {
+    type Output = usize;
+    #[inline]
+    fn index(&self, i: LogUsizeId) -> &Self::Output {
+        &self.record[i]
+    }
+}
+
+impl IndexMut<LogUsizeId> for State {
+    #[inline]
+    fn index_mut(&mut self, i: LogUsizeId) -> &mut Self::Output {
+        &mut self.record[i]
+    }
+}
+
+impl Index<LogF64Id> for State {
+    type Output = f64;
+    #[inline]
+    fn index(&self, i: LogF64Id) -> &Self::Output {
+        &self.record[i]
+    }
+}
+
+impl IndexMut<LogF64Id> for State {
+    #[inline]
+    fn index_mut(&mut self, i: LogF64Id) -> &mut Self::Output {
+        &mut self.record[i]
+    }
+}
+
 /// Index for `Usize` data, used in `ProgressRecord`
 pub enum LogUsizeId {
     Propagate = 0,  //  0: propagate: usize,
@@ -664,8 +687,6 @@ pub enum LogUsizeId {
     SatClauseElim,  // 13: simplification: usize,
     ExhaustiveElim, // 14: elimination: usize,
     Stagnation,     // 15: stagnation: usize,
-    // ElimClauseQueue, // 16: elim_clause_queue: usize,
-    // ElimVarQueue, // 17: elim_var_queue: usize,
     End,
 }
 
@@ -677,8 +698,6 @@ pub enum LogF64Id {
     AveLBD,       //  3: ave_lbd: f64,
     BLevel,       //  4: backjump_level: f64,
     CLevel,       //  5: conflict_level: f64,
-    RestartThrK,  //  6: restart K
-    RestartBlkR,  //  7: restart R
     End,
 }
 

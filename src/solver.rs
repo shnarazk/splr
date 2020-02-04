@@ -464,16 +464,15 @@ fn adapt_parameters(
         }
     }
     state[Stat::SolvedRecord] = state.num_solved_vars;
-    state.progress(cdb, vdb, None);
     if !state.config.without_deep_search {
         if state.stagnated {
             state.rst.restart_step = 10_000;
             state.rst.next_restart += 10_000;
-            state.flush(format!("deep searching ({})...", state.slack_duration));
         } else {
             state.rst.restart_step = state.config.restart_step;
         }
     }
+    state.progress(cdb, vdb, None);
     Ok(())
 }
 
