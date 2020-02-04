@@ -123,12 +123,12 @@ fn save_result(s: &Solver, res: &SolverResult, input: &str, output: Option<PathB
             match output {
                 Some(ref f) if redirect => println!(
                     "      Result|dump: to STDOUT instead of {} due to an IO error.\nUNSAT: {}",
-                    f.to_string_lossy()
+                    f.to_string_lossy(),
                     input,
                 ),
                 Some(ref f) => println!(
                     "      Result|save: {}\nUNSAT: {}",
-                    f.to_str().unwrap()
+                    f.to_str().unwrap(),
                     input,
                 ),
 
