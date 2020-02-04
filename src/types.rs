@@ -381,19 +381,24 @@ impl fmt::Display for CNFDescription {
     }
 }
 
-pub struct CNFStream {
+/// A wrapper structure to make a CNFDescription from a file.
+/// To make CNFDescription clonable, a BufReader should be separated from it.
+/// If you want to make a CNFDescription which isn't connected to a file,
+/// just call CNFDescription::default() directly.
+#[derive(Debug)]
+pub struct CNFReader {
     pub cnf: CNFDescription,
-    pub stream: BufReader<File>,
+    pub reader: BufReader<File>,
 }
 
-impl TryFrom<&str> for CNFStream {
+impl TryFrom<&str> for CNFReader {
     type Error = SolverError;
     fn try_from(s: &str) -> Result<Self, Self::Error> {
-        CNFStream::try_from(&PathBuf::from(s))
+        CNFReader::try_from(&PathBuf::from(s))
     }
 }
 
-impl TryFrom<&PathBuf> for CNFStream {
+impl TryFrom<&PathBuf> for CNFReader {
     type Error = SolverError;
     fn try_from(path: &PathBuf) -> Result<Self, Self::Error> {
         let pathname = if path.to_string_lossy().is_empty() {
@@ -406,13 +411,13 @@ impl TryFrom<&PathBuf> for CNFStream {
                 })
         };
         let fs = File::open(path).map_or(Err(SolverError::IOError), Ok)?;
-        let mut stream = BufReader::new(fs);
+        let mut reader = BufReader::new(fs);
         let mut buf = String::new();
         let mut nv: usize = 0;
         let mut nc: usize = 0;
         loop {
             buf.clear();
-            match stream.read_line(&mut buf) {
+            match reader.read_line(&mut buf) {
                 Ok(0) => break,
                 Ok(_k) => {
                     let mut iter = buf.split_whitespace();
@@ -438,7 +443,7 @@ impl TryFrom<&PathBuf> for CNFStream {
             num_of_clauses: nc,
             pathname,
         };
-        Ok(CNFStream { cnf, stream })
+        Ok(CNFReader { cnf, reader })
     }
 }
 
@@ -492,7 +497,7 @@ bitflags! {
         const TOUCHED      = 0b0000_0000_0100_0000;
         /// a var is checked during in the current conflict analysis.
         const CA_SEEN      = 0b0000_0000_1000_0000;
-        /// a var is checked during in var rewarding.
+        /// NOT IN USE: a var is checked during in var rewarding.
         const VR_SEEN      = 0b0000_0001_0000_0000;
     }
 }
@@ -502,7 +507,7 @@ mod tests {
     use super::*;
     #[test]
     fn test_cnf() {
-        if let Ok(cnfs) = CNFStream::try_from("tests/sample.cnf") {
+        if let Ok(cnfs) = CNFReader::try_from("tests/sample.cnf") {
             assert_eq!(cnfs.cnf.num_of_variables, 250);
             assert_eq!(cnfs.cnf.num_of_clauses, 1065);
         } else {

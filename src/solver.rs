@@ -219,12 +219,12 @@ impl SatSolverIF for Solver {
     /// assert!(Solver::build(&config).is_ok());
     ///```
     fn build(config: &Config) -> Result<Solver, SolverError> {
-        let CNFStream { cnf, mut stream } = CNFStream::try_from(&config.cnf_filename)?;
+        let CNFReader { cnf, mut reader } = CNFReader::try_from(&config.cnf_filename)?;
         let mut buf = String::new();
         let mut s: Solver = Solver::instantiate(config, &cnf);
         loop {
             buf.clear();
-            match stream.read_line(&mut buf) {
+            match reader.read_line(&mut buf) {
                 Ok(0) => break,
                 Ok(_) => {
                     if buf.starts_with('c') {
