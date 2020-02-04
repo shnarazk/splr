@@ -680,3 +680,23 @@ fn analyze_final(asgs: &AssignStack, state: &mut State, vdb: &mut VarDB, c: &Cla
         seen[vi] = false;
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use {
+        // crate::solver::Solver,
+        std::path::PathBuf,
+        super::*,
+    };
+    #[test]
+    fn test_solver() {
+        let mut config = Config::default();
+        config.cnf_filename = PathBuf::from("tests/sample.cnf");
+        if let Ok(s) = Solver::build(&config) {
+            assert_eq!(s.state.num_vars, 250);
+            assert_eq!(s.state.num_unsolved_vars(), 250);
+        } else {
+            panic!("failed to build a solver for tests/sample.cnf");
+        }
+    }
+}

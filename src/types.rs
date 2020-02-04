@@ -505,6 +505,8 @@ mod tests {
         if let Ok(cnfs) = CNFStream::try_from("tests/sample.cnf") {
             assert_eq!(cnfs.cnf.num_of_variables, 250);
             assert_eq!(cnfs.cnf.num_of_clauses, 1065);
+        } else {
+            panic!("failed to load tests/sample.cnf");
         }
     }
 }
