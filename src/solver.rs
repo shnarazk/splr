@@ -684,7 +684,6 @@ fn analyze_final(asgs: &AssignStack, state: &mut State, vdb: &mut VarDB, c: &Cla
 #[cfg(test)]
 mod tests {
     use {
-        // crate::solver::Solver,
         std::path::PathBuf,
         super::*,
     };
