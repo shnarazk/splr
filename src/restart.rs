@@ -269,20 +269,6 @@ impl LubySeries {
     }
 }
 
-#[test]
-fn test_luby_series() {
-    let mut luby = LubySeries {
-        active: true,
-        step: 1,
-        ..LubySeries::default()
-    };
-    luby.update(0);
-    for v in vec![1, 1, 2, 1, 1, 2, 4, 1, 1, 2, 1, 1, 2, 4, 8] {
-        assert_eq!(luby.next_restart, v);
-        luby.update(1);
-    }
-}
-
 // Restart stat
 #[derive(Debug)]
 pub struct RestartExecutor {
@@ -341,5 +327,24 @@ impl RestartIF for RestartExecutor {
             reset!(self);
         }
         false
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_luby_series() {
+        let mut luby = LubySeries {
+            active: true,
+            step: 1,
+            ..LubySeries::default()
+        };
+        luby.update(0);
+        for v in vec![1, 1, 2, 1, 1, 2, 4, 1, 1, 2, 1, 1, 2, 4, 8] {
+            assert_eq!(luby.next_restart, v);
+            luby.update(1);
+        }
     }
 }
