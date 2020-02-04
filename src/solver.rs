@@ -10,10 +10,9 @@ use {
         var::{VarDB, VarDBIF, VarRewardIF, LBDIF},
     },
     std::{
-        fs,
-        io::{BufRead, BufReader},
-        path::Path,
-    },
+        convert::TryFrom,
+        io::BufRead,
+    }
 };
 
 /// API for SAT solver like `build`, `solve` and so on.
@@ -222,51 +221,16 @@ impl SatSolverIF for Solver {
     /// let config = Config::from("tests/sample.cnf");
     /// assert!(Solver::build(&config).is_ok());
     ///```
-    // fn build(config: &Config) -> std::io::Result<Solver> {
     fn build(config: &Config) -> Result<Solver, SolverError> {
-        let fs = fs::File::open(&config.cnf_filename)
-            .map_or(Err(SolverError::FileNotFound), |f| Ok(f))?;
-        let mut rs = BufReader::new(fs);
+        let CNFStream {
+            cnf,
+            mut stream,
+        } = CNFStream::try_from(&config.cnf_filename)?;
         let mut buf = String::new();
-        let mut nv: usize = 0;
-        let mut nc: usize = 0;
-        loop {
-            buf.clear();
-            match rs.read_line(&mut buf) {
-                Ok(0) => break,
-                Ok(_k) => {
-                    let mut iter = buf.split_whitespace();
-                    if iter.next() == Some("p") && iter.next() == Some("cnf") {
-                        if let Some(v) = iter.next().map(|s| s.parse::<usize>().ok().unwrap()) {
-                            if let Some(c) = iter.next().map(|s| s.parse::<usize>().ok().unwrap()) {
-                                nv = v;
-                                nc = c;
-                                break;
-                            }
-                        }
-                    }
-                    continue;
-                }
-                Err(e) => panic!("{}", e),
-            }
-        }
-        let cnf = CNFDescription {
-            num_of_variables: nv,
-            num_of_clauses: nc,
-            pathname: if config.cnf_filename.to_string_lossy().is_empty() {
-                "--".to_string()
-            } else {
-                Path::new(&config.cnf_filename.to_string_lossy().into_owned())
-                    .file_name()
-                    .map_or("aStrangeNamed".to_string(), |f| {
-                        f.to_string_lossy().into_owned()
-                    })
-            },
-        };
         let mut s: Solver = Solver::instantiate(config, &cnf);
         loop {
             buf.clear();
-            match rs.read_line(&mut buf) {
+            match stream.read_line(&mut buf) {
                 Ok(0) => break,
                 Ok(_) => {
                     if buf.starts_with('c') {
@@ -288,7 +252,7 @@ impl SatSolverIF for Solver {
                 Err(e) => panic!("{}", e),
             }
         }
-        debug_assert_eq!(s.vdb.len() - 1, nv);
+        debug_assert_eq!(s.vdb.len() - 1, cnf.num_of_variables);
         Ok(s)
     }
     // renamed from clause_new

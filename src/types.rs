@@ -2,8 +2,12 @@
 use {
     crate::{clause::ClauseId, config::Config, var::Var},
     std::{
+        convert::TryFrom,
         fmt,
+        fs::File,
+        io::{BufRead, BufReader},
         ops::{Index, IndexMut, Neg, Not},
+        path::{Path, PathBuf},
     },
 };
 
@@ -340,7 +344,7 @@ impl Ema2 {
 pub enum SolverError {
     // StateUNSAT = 0,
     // StateSAT,
-    FileNotFound,
+    IOError,
     Inconsistent,
     OutOfMemory,
     TimeOut,
@@ -376,6 +380,59 @@ impl fmt::Display for CNFDescription {
             pathname: path,
         } = &self;
         write!(f, "CNF({}, {}, {})", nv, nc, path)
+    }
+}
+
+pub struct CNFStream {
+    pub cnf: CNFDescription,
+    pub stream: BufReader<File>,
+}
+
+impl TryFrom<&PathBuf> for CNFStream {
+    type Error = SolverError;
+    fn try_from(path: &PathBuf) -> Result<Self, Self::Error> {
+        let fs = File::open(path).map_or(Err(SolverError::IOError), Ok)?;
+        let mut stream = BufReader::new(fs);
+        let mut buf = String::new();
+        let mut nv: usize = 0;
+        let mut nc: usize = 0;
+        loop {
+            buf.clear();
+            match stream.read_line(&mut buf) {
+                Ok(0) => break,
+                Ok(_k) => {
+                    let mut iter = buf.split_whitespace();
+                    if iter.next() == Some("p") && iter.next() == Some("cnf") {
+                        if let Some(v) = iter.next().map(|s| s.parse::<usize>().ok().unwrap()) {
+                            if let Some(c) = iter.next().map(|s| s.parse::<usize>().ok().unwrap()) {
+                                nv = v;
+                                nc = c;
+                                break;
+                            }
+                        }
+                    }
+                    continue;
+                }
+                Err(e) => {
+                    println!("{}", e);
+                    return Err(SolverError::IOError);
+                }
+            }
+        }
+        let cnf = CNFDescription {
+            num_of_variables: nv,
+            num_of_clauses: nc,
+            pathname: if path.to_string_lossy().is_empty() {
+                "--".to_string()
+            } else {
+                Path::new(&path.to_string_lossy().into_owned())
+                    .file_name()
+                    .map_or("aStrangeNamed".to_string(), |f| {
+                        f.to_string_lossy().into_owned()
+                    })
+            },
+        };
+        Ok(CNFStream { cnf, stream })
     }
 }
 
