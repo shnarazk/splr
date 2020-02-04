@@ -58,7 +58,7 @@ fn main() {
             for (n, a, b, c, d, e) in s.state.development.iter() {
                 buf.write_all(
                     format!(
-                        "{:>7.0},{:>8.5},{:>8.0},{:>8.0},{:>8.5},{:>8.5}\n",
+                        "{:.0},{:.5},{:.0},{:.0},{:.5},{:.5}\n",
                         n, a, b, c, d, e,
                     )
                     .as_bytes(),
