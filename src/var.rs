@@ -13,7 +13,7 @@ use {
     },
 };
 
-/// API for 'watcher list' like `attach`, `detach`, `detach_with` and so on.
+/// API to calculate LBD.
 pub trait LBDIF {
     /// return a LBD value for the set of literals.
     fn compute_lbd(&mut self, vec: &[Lit]) -> usize;
@@ -39,6 +39,7 @@ pub trait VarDBIF {
     fn bump_vars(&mut self, asgs: &AssignStack, cdb: &ClauseDB, confl: ClauseId);
 }
 
+/// API for var rewarding.
 pub trait VarRewardIF {
     /// return var's activity.
     fn activity(&mut self, vi: VarId) -> f64;
@@ -56,7 +57,7 @@ pub trait VarRewardIF {
     fn shift_reward_mode(&mut self);
 }
 
-/// Structure for variables.
+/// Object representing a variable.
 #[derive(Debug)]
 pub struct Var {
     /// reverse conversion to index. Note `VarId` must be `usize`.
@@ -173,7 +174,7 @@ const REWARDS: [(RewardStep, f64, f64, f64); 3] = [
     (RewardStep::Final, 0.96, 0.98, 0.1),
 ];
 
-/// Structure for variables.
+/// A container of variables.
 #[derive(Debug)]
 pub struct VarDB {
     pub activity_decay: f64,

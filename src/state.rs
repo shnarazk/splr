@@ -1,3 +1,4 @@
+/// Crate `state` is a collection of internal data.
 use {
     crate::{
         clause::{ClauseDB, ClauseDBIF},

@@ -1,6 +1,7 @@
+/// Crate `clause` provides `clause` object and its manager `ClauseDB`
 use {
     crate::{
-        config::{Config, ACTIVITY_MAX},
+        config::Config,
         eliminator::{Eliminator, EliminatorIF},
         propagator::{AssignStack, PropagatorIF},
         state::{Stat, State},
@@ -92,6 +93,7 @@ pub trait WatchDBIF {
     fn update_blocker(&mut self, cid: ClauseId, l: Lit);
 }
 
+/// Record of clause operations to build DRAT certifications.
 #[derive(Debug, Eq, PartialEq)]
 pub enum CertifiedRecord {
     SENTINEL,
@@ -108,6 +110,7 @@ pub struct ClauseId {
     pub ordinal: u32,
 }
 
+const ACTIVITY_MAX: f64 = 1e308;
 const NULL_CLAUSE: ClauseId = ClauseId { ordinal: 0 };
 
 impl Default for ClauseId {

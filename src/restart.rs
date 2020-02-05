@@ -1,9 +1,11 @@
+/// Crate `restart` provides restart heuristics.
 use {
     crate::{config::Config, types::*},
     std::fmt,
 };
 
-pub trait ProgressEvaluator {
+/// API for restart condition.
+trait ProgressEvaluator {
     /// map the value into a bool for forcing/blocking restart.
     fn is_active(&self) -> bool;
 }
@@ -16,8 +18,7 @@ pub trait RestartIF {
     fn force_restart(&mut self) -> bool;
 }
 
-// const RESET_EMA: usize = 400;
-
+/// An assignment history used for blocking restart
 #[derive(Debug)]
 pub struct ProgressASG {
     asg: usize,
@@ -57,6 +58,7 @@ impl ProgressEvaluator for ProgressASG {
     }
 }
 
+/// An EMA of learnt clauses' LBD, used for forcing restart
 #[derive(Debug)]
 pub struct ProgressLBD {
     ema: Ema2,
@@ -101,6 +103,7 @@ impl ProgressEvaluator for ProgressLBD {
     }
 }
 
+/// An EMA of decision level.
 #[derive(Debug)]
 pub struct ProgressLVL {
     ema: Ema2,
@@ -133,8 +136,9 @@ impl ProgressEvaluator for ProgressLVL {
     }
 }
 
+/// An EMA of reccuring conflict complexity (unused now)
 #[derive(Debug)]
-pub struct ProgressRCC {
+struct ProgressRCC {
     pub heat: Ema2,
     threshold: f64,
 }
@@ -184,6 +188,7 @@ impl ProgressEvaluator for ProgressRCC {
     }
 }
 
+/// An implementation of Luby series.
 #[derive(Debug)]
 pub struct LubySeries {
     pub active: bool,
@@ -269,7 +274,7 @@ impl LubySeries {
     }
 }
 
-// Restart stat
+/// `RestartExecutor` provides restart API and holds data about restart conditions.
 #[derive(Debug)]
 pub struct RestartExecutor {
     pub asg: ProgressASG,

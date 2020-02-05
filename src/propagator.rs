@@ -1,3 +1,4 @@
+/// Crate `propagator` implements Boolean Constraint Propagation and decision var selection.
 use {
     crate::{
         clause::{ClauseDB, ClauseDBIF, ClauseId, Watch, WatchDBIF},

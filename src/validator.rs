@@ -1,3 +1,4 @@
+/// Crate `validator` implements a model checker.
 use crate::{
     propagator::PropagatorIF,
     solver::Solver,

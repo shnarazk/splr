@@ -1,5 +1,4 @@
-//! Basic types
-/// Crate 'types' provides various building blocks, including
+/// Crate `types' provides various building blocks, including
 /// some common traits.
 use {
     crate::{clause::ClauseId, config::Config, var::Var},

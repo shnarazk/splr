@@ -1,3 +1,4 @@
+/// Crate `eliminator` implments clause subsumption and var elimination.
 use {
     crate::{
         clause::{Clause, ClauseDB, ClauseDBIF, ClauseIF, ClauseId, ClauseIdIF, WatchDBIF},

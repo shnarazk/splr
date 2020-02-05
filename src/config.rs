@@ -1,7 +1,8 @@
+/// Crate `config` provides solver's configuration and CLI.
 use {std::path::PathBuf, structopt::StructOpt};
 
+/// Splr version number.
 pub const VERSION: &str = "0.3.0";
-pub const ACTIVITY_MAX: f64 = 1e308;
 
 /// Configuration built from command line options
 #[derive(Clone, Debug, StructOpt)]

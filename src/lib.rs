@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/splr/0.1.4")]
+#![doc(html_root_url = "https://docs.rs/splr/0.3.0")]
 /*!
 # a SAT Solver for Propositional Logic in Rust
 
@@ -151,25 +151,26 @@ While Splr comes with **ABSOLUTELY NO WARRANTY**, Splr version 0.1.0 (splr-0.1.0
      * The remaining 14 certificates weren't able to be verified due to [timeout](https://gitlab.com/satisfiability01/splr/issues/74#note_142021555) by drat-trim.
 */
 // /// Subsumption-based clause/var elimination
-/// Clause structure
+/// Crate `clause` provides `clause` object and its manager `ClauseDB`
 pub mod clause;
-/// Parameters used for Solver initialization
+/// Crate `config` provides solver's configuration and CLI.
 pub mod config;
-/// Pre/In-processor for clause subsumption and variable elimination
+/// Crate `eliminator` implments clause subsumption and var elimination.
 pub mod eliminator;
-/// Assignment management
+/// Crate `propagator` implements Boolean Constraint Propagation and decision var selection.
 pub mod propagator;
-/// Solver restart implementation
+/// Crate `restart` provides restart heuristics.
 pub mod restart;
-/// The main structure
+/// Crate `solver` provides the top-level API as a SAT solver.
 pub mod solver;
-/// Collection of various data and parameters for SAT solving process
+/// Crate `state` is a collection of internal data.
 pub mod state;
-/// Plumping layer
+/// Crate `types` provides various building blocks, including
+/// some common traits.
 pub mod types;
-/// validates a given assignment for a problem.
+/// Crate `validator` implements a model checker.
 pub mod validator;
-/// Var structure
+/// Crate 'var' provides `var` object and its manager `VarDB`.
 pub mod var;
 
 #[macro_use]
