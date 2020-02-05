@@ -170,7 +170,7 @@ pub mod state;
 pub mod types;
 /// Crate `validator` implements a model checker.
 pub mod validator;
-/// Crate 'var' provides `var` object and its manager `VarDB`.
+/// Crate `var` provides `var` object and its manager `VarDB`.
 pub mod var;
 
 #[macro_use]
