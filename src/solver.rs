@@ -427,7 +427,7 @@ fn handle_conflict_path(
         adapt_parameters(asgs, cdb, elim, state, vdb, ncnfl)?;
         if let Some(p) = state.elapsed() {
             if 1.0 <= p {
-                return Err(SolverError::Inconsistent);
+                return Err(SolverError::TimeOut);
             } else if state.default_rewarding && 0.5 <= p {
                 // force the final stage of rewarding to switch to 'deep search' mode
                 state.default_rewarding = false;
