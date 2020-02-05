@@ -9,7 +9,7 @@ readme = "README.md"
 repository = "https://github.com/shnarazk/splr"
 homepage = "https://github.com/shnarazk/splr"
 keywords = ["SAT", "SAT-solver", "logic", "satisfiability"]
-categories = ["science"]
+categories = ["mathematics", "science"]
 
 [dependencies]
 bitflags = "1.2"
