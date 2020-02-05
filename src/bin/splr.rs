@@ -237,7 +237,7 @@ fn report(state: &State, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c  Clause Kind|Remv:{}, LBD2:{}, Binc:{}, Perm:{} \n",
+            "c       Clause|Remv:{}, LBD2:{}, Binc:{}, Perm:{} \n",
             format!("{:>9}", state[LogUsizeId::Removable]),
             format!("{:>9}", state[LogUsizeId::LBD2]),
             format!("{:>9}", state[LogUsizeId::Binclause]),
@@ -273,7 +273,7 @@ fn report(state: &State, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c   misc stats|#rdc:{}, #sce:{}, stag:{}, vdcy:      0.0 \n",
+            "c         misc|#rdc:{}, #sce:{}, stag:{}, vdcy:      0.0 \n",
             format!("{:>9}", state[LogUsizeId::Reduction]),
             format!("{:>9}", state[LogUsizeId::SatClauseElim]),
             format!("{:>9}", state[LogUsizeId::Stagnation]),

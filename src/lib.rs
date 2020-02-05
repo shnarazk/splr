@@ -22,10 +22,10 @@ $ splr tests/sample.cnf
 sample.cnf                                         250,1065 |time:     0.44
  #conflict:      16712, #decision:        19487, #propagate:          36200
   Assignment|#rem:      235, #fix:        1, #elm:       14, prg%:   6.0000
- Clause Kind|Remv:    10091, LBD2:       35, Binc:        0, Perm:     1078
+      Clause|Remv:    10091, LBD2:       35, Binc:        0, Perm:     1078
      Restart|#BLK:      196, #RST:        0, tASG:   1.3333, tLBD:   1.0479
     Conflict|eLBD:    11.08, cnfl:    15.96, bjmp:    14.81, rpc%:   0.0000
-  misc stats|#rdc:        3, #sce:        2, stag:        0, vdcy:   0.9262
+        misc|#rdc:        3, #sce:        2, stag:        0, vdcy:   0.9262
     Strategy|mode: in the initial search phase to determine a main strategy
       Result|save: ./.ans_sample.cnf
 SATISFIABLE: tests/sample.cnf
@@ -36,10 +36,10 @@ c
 c sample.cnf                                 , #var:      250, #cls:     1065
 c  #conflict:      16712, #decision:        19487, #propagate:          36200
 c   Assignment|#rem:      235, #fix:        1, #elm:       14, prg%:   6.0000
-c  Clause Kind|Remv:    10091, LBD2:       35, Binc:        0, Perm:     1078
+c       Clause|Remv:    10091, LBD2:       35, Binc:        0, Perm:     1078
 c      Restart|#BLK:      196, #RST:        0, eASG:   1.3333, eLBD:   1.0479
 c     Conflict|eLBD:    11.08, cnfl:    15.96, bjmp:    14.81, rpc%:   0.0000
-c   misc stats|#rdc:        3, #sce:        2, stag:        0, vdcy:      0.0
+c         misc|#rdc:        3, #sce:        2, stag:        0, vdcy:      0.0
 c     Strategy|mode:        initial, time:     0.44
 c
 s SATISFIABLE

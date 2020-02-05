@@ -42,7 +42,7 @@ pub trait StateIF {
 pub enum SearchStrategy {
     /// the initial search phase to determine a main strategy
     Initial,
-    /// Non-Specific-Instance using generic settings
+    /// Non-Specific-Instance using a generic setting
     Generic,
     /// Many-Low-Level-Conflicts using Chan Seok heuristics
     LowDecisions,
@@ -499,7 +499,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K Clause Kind|Remv:{}, LBD2:{}, Binc:{}, Perm:{} ",
+            "\x1B[2K      Clause|Remv:{}, LBD2:{}, Binc:{}, Perm:{} ",
             im!("{:>9}", self.record, LogUsizeId::Removable, cdb.num_learnt),
             im!("{:>9}", self.record, LogUsizeId::LBD2, self[Stat::NumLBD2]),
             im!(
@@ -556,7 +556,7 @@ impl StateIF for State {
                 )
             );
             println!(
-                "\x1B[2K  misc stats|#rdc:{}, #sce:{}, stag:{}, vdcy:{} ",
+                "\x1B[2K        misc|#rdc:{}, #sce:{}, stag:{}, vdcy:{} ",
                 im!(
                     "{:>9}",
                     self.record,
