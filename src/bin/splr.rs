@@ -47,7 +47,7 @@ fn main() {
                 save_proof(&s, &cnf_file, &proof_file);
             }
         }
-        Err(e) => println!("Failed to execution by {:?}.", e),
+        Err(e) => println!("Failed to solve by {:?}.", e),
     }
     if 0 < s.state.config.dump_interval && !s.state.development.is_empty() {
         let dump = config.cnf_filename.file_stem().unwrap().to_str().unwrap();
@@ -149,7 +149,7 @@ fn save_result(s: &Solver, res: &SolverResult, input: &str, output: Option<PathB
                 println!("Abort: failed to save by {}!", why);
             }
         }
-        Err(e) => println!("Failed to execution by {:?}.", e),
+        Err(e) => println!("Failed to solve by {:?}.", e),
     }
 }
 
