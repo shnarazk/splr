@@ -616,13 +616,17 @@ impl fmt::Display for State {
             self.target.num_of_variables, self.target.num_of_clauses,
         );
         let vclen = vc.len();
-        let fnlen = self.target.pathname.len();
         let width = 59;
+        let mut fname = self.target.pathname.to_string();
+        if width <= fname.len() {
+            fname.truncate(58 - vclen);
+        }
+        let fnlen = fname.len();
         if width < vclen + fnlen + 1 {
             write!(
                 f,
                 "{:<w$} |time:{:>9.2}",
-                self.target.pathname,
+                fname,
                 tm,
                 w = width
             )
@@ -630,7 +634,7 @@ impl fmt::Display for State {
             write!(
                 f,
                 "{}{:>w$} |time:{:>9.2}",
-                self.target.pathname,
+                fname,
                 &vc,
                 tm,
                 w = width - fnlen,
