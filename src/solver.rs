@@ -108,7 +108,7 @@ impl SatSolverIF for Solver {
         // s.root_level = 0;
         state.num_solved_vars = asgs.len();
         state.progress_header();
-        set_parameters(asgs, cdb, elim, state, vdb)?;
+        setup_parameters(asgs, cdb, elim, state, vdb)?;
         state.progress(cdb, vdb, Some("initialization phase"));
         state.flush("loading...");
         let use_pre_processor = true;
@@ -448,7 +448,7 @@ fn handle_conflict_path(
     Ok(())
 }
 
-fn set_parameters(
+fn setup_parameters(
     _asgs: &mut AssignStack,
     cdb: &mut ClauseDB,
     elim: &mut Eliminator,
