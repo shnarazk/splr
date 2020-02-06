@@ -68,7 +68,7 @@ impl fmt::Display for SearchStrategy {
                     SearchStrategy::Initial => {
                         "in the initial search phase to determine a main strategy"
                     }
-                    SearchStrategy::Generic => "Non-Specific-Instance using generic settings",
+                    SearchStrategy::Generic => "Non-Specific-Instance using a generic setting",
                     SearchStrategy::LowDecisions => {
                         "Many-Low-Level-Conflicts using Chan Seok heuristics"
                     }
@@ -111,7 +111,7 @@ impl SearchStrategy {
     pub fn to_str(&self) -> &'static str {
         match self {
             SearchStrategy::Initial => "in the initial search phase to determine a main strategy",
-            SearchStrategy::Generic => "generic (using the generic parameter set)",
+            SearchStrategy::Generic => "generic (using a generic parameter set)",
             SearchStrategy::LowDecisions => "LowDecs (many conflicts at low levels, using CSh)",
             SearchStrategy::HighSuccesive => "HighSucc (long decision chains)",
             SearchStrategy::LowSuccesiveLuby => "LowSuccLuby (successive conflicts)",
