@@ -25,6 +25,7 @@ pub trait StateIF {
     /// return `true` if it is timed out.
     fn is_timeout(&self) -> bool;
     /// return elapsed time as a fraction.
+    /// return None if something is wrong.
     fn elapsed(&self) -> Option<f64>;
     /// update internal counters and return true if solver stagnated.
     fn check_stagnation(&mut self);
@@ -350,7 +351,7 @@ impl StateIF for State {
     }
     fn elapsed(&self) -> Option<f64> {
         if self.time_limit == 0.0 {
-            return None;
+            return Some(0.0);
         }
         match self.start.elapsed() {
             Ok(e) => Some(e.as_secs() as f64 / self.time_limit),

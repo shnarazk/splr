@@ -433,6 +433,8 @@ fn handle_conflict_path(
                 state.default_rewarding = false;
                 vdb.shift_reward_mode();
             }
+        } else {
+            return Err(SolverError::UndescribedError);
         }
     }
     if ((state.use_chan_seok && !cdb.glureduce && cdb.first_reduction < cdb.num_learnt)
