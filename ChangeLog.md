@@ -19,6 +19,7 @@
 - AssignStack::propagate normalizes flipped binary clasues to reduce computational cost in conflict analysis
 - make deep_search sporadic
 - revise output format; the last line contains only satisfiability and filename
+- use another parameter set for giant problems
 
 ## 0.2.1, 2019-12-17
 
