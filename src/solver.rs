@@ -108,6 +108,7 @@ impl SatSolverIF for Solver {
         // s.root_level = 0;
         state.num_solved_vars = asgs.len();
         state.progress_header();
+        set_parameters(asgs, cdb, elim, state, vdb)?;
         state.progress(cdb, vdb, Some("initialization phase"));
         state.flush("loading...");
         let use_pre_processor = true;
@@ -423,7 +424,7 @@ fn handle_conflict_path(
             state.rst.lbd.trend().min(10.0),
         ));
     }
-    if ncnfl % 10_000 == 0 {
+    if ncnfl % state.reflection_interval == 0 {
         adapt_parameters(asgs, cdb, elim, state, vdb, ncnfl)?;
         if let Some(p) = state.elapsed() {
             if 1.0 <= p {
@@ -447,6 +448,22 @@ fn handle_conflict_path(
     Ok(())
 }
 
+fn set_parameters(
+    _asgs: &mut AssignStack,
+    cdb: &mut ClauseDB,
+    elim: &mut Eliminator,
+    state: &mut State,
+    _vdb: &mut VarDB,
+) -> MaybeInconsistent {
+    if 800_000 < cdb.len() {
+        state.reflection_interval = 1000;
+        elim.eliminate_loop_limit = 10_000;
+        elim.subsume_literal_limit = 100;
+        elim.subsume_loop_limit = 10_000;
+    }
+    Ok(())
+}
+
 fn adapt_parameters(
     asgs: &mut AssignStack,
     cdb: &mut ClauseDB,
@@ -455,7 +472,7 @@ fn adapt_parameters(
     vdb: &mut VarDB,
     nconflict: usize,
 ) -> MaybeInconsistent {
-    let switch = 100_000;
+    let switch = 10 * state.reflection_interval;
     state.check_stagnation();
     if nconflict == switch {
         state.flush("exhaustive eliminator activated...");
@@ -469,8 +486,8 @@ fn adapt_parameters(
     state[Stat::SolvedRecord] = state.num_solved_vars;
     if !state.config.without_deep_search {
         if state.stagnated {
-            state.rst.restart_step = 10_000;
-            state.rst.next_restart += 10_000;
+            state.rst.restart_step = state.reflection_interval;
+            state.rst.next_restart += state.reflection_interval;
         } else {
             state.rst.restart_step = state.config.restart_step;
         }

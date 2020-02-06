@@ -174,6 +174,7 @@ pub struct State {
     pub strategy: SearchStrategy,
     pub target: CNFDescription,
     pub use_chan_seok: bool,
+    pub reflection_interval: usize,
     /// MISC
     pub b_lvl: Ema,
     pub c_lvl: Ema,
@@ -206,6 +207,7 @@ impl Default for State {
             strategy: SearchStrategy::Initial,
             target: CNFDescription::default(),
             use_chan_seok: false,
+            reflection_interval: 10_000,
             b_lvl: Ema::new(5_000),
             c_lvl: Ema::new(5_000),
             model: Vec::new(),
