@@ -31,7 +31,7 @@ pub trait EliminatorIF {
     fn clause_queue_len(&self) -> usize;
     /// enqueue a var into eliminator's var queue.
     fn enqueue_var(&mut self, vdb: &mut VarDB, vi: VarId, upword: bool);
-    /// clear eliminator's war queue
+    /// clear eliminator's var queue
     fn clear_var_queue(&mut self, vdb: &mut VarDB);
     /// return the length of eliminator's clause queue.
     fn var_queue_len(&self) -> usize;
