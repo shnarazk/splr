@@ -453,13 +453,21 @@ fn setup_parameters(
     cdb: &mut ClauseDB,
     elim: &mut Eliminator,
     state: &mut State,
-    _vdb: &mut VarDB,
+    vdb: &mut VarDB,
 ) -> MaybeInconsistent {
-    if 800_000 < cdb.len() {
-        state.reflection_interval = 1000;
-        elim.eliminate_loop_limit = 10_000;
-        elim.subsume_literal_limit = 100;
-        elim.subsume_loop_limit = 10_000;
+    let nb = cdb[1..].iter().filter(| c | c.len() == 2).count();
+    state[Stat::NumBin] = nb;
+    if 20_000_000 < cdb.len() {
+        // the number of variable trying to be eliminated
+        elim.eliminate_loop_limit = nb;
+        // elim.subsume_literal_limit = 1000;
+        // the number of clause trying to be subsumed
+        elim.subsume_loop_limit = 0;
+    }
+    if 1_000_000 < vdb.len() {
+        vdb.activity_step *= 0.1;
+    } else  if 100_000 < vdb.len() {
+        vdb.activity_step *= 0.5;
     }
     Ok(())
 }

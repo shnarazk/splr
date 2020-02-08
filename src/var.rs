@@ -179,7 +179,7 @@ const REWARDS: [(RewardStep, f64, f64, f64); 3] = [
 pub struct VarDB {
     pub activity_decay: f64,
     activity_decay_max: f64,
-    activity_step: f64,
+    pub activity_step: f64,
     reward_mode: RewardStep,
     ordinal: usize,
     /// vars
