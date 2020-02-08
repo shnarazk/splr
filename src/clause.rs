@@ -4,7 +4,7 @@ use {
         config::Config,
         eliminator::{Eliminator, EliminatorIF},
         propagator::{AssignStack, PropagatorIF},
-        state::{Stat, State},
+        state::{Stat, State, StateIF},
         types::*,
         var::{VarDB, VarDBIF, LBDIF},
     },
@@ -700,6 +700,7 @@ impl ClauseDBIF for ClauseDB {
             self.reset();
             elim.prepare(self, vdb, true);
         }
+        let start = state.elapsed().unwrap_or(0.0);
         loop {
             let na = asgs.len();
             elim.eliminate(asgs, self, state, vdb)?;
@@ -708,6 +709,11 @@ impl ClauseDBIF for ClauseDB {
                 && (!elim.is_running()
                     || (0 == elim.clause_queue_len() && 0 == elim.var_queue_len()))
             {
+                break;
+            }
+            if 0.1 <= state.elapsed().unwrap_or(1.0) - start {
+                elim.clear_clause_queue(self);
+                elim.clear_var_queue(vdb);
                 break;
             }
         }
