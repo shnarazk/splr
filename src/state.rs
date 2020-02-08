@@ -510,7 +510,7 @@ impl StateIF for State {
                 "{:>9}",
                 self.record,
                 LogUsizeId::Binclause,
-                self[Stat::NumBinLearnt]
+                self[Stat::NumBin] // self[Stat::NumBinLearnt]
             ),
             im!(
                 "{:>9}",
