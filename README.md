@@ -34,7 +34,7 @@ sample.cnf                                         250,1065 |time:     0.44
     Conflict|eLBD:    11.08, cnfl:    15.96, bjmp:    14.81, rpc%:   0.0000
         misc|#rdc:        3, #sce:        2, stag:        0, vdcy:   0.9262
     Strategy|mode: in the initial search phase to determine a main strategy
-      Result|save: ./.ans_sample.cnf
+      Result|file: ./.ans_sample.cnf
 SATISFIABLE: tests/sample.cnf
 
 $ cat .ans_sample.cnf
