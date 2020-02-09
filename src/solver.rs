@@ -108,7 +108,6 @@ impl SatSolverIF for Solver {
         // s.root_level = 0;
         state.num_solved_vars = asgs.len();
         state.progress_header();
-        setup_parameters(asgs, cdb, elim, state, vdb)?;
         state.progress(cdb, vdb, Some("initialization phase"));
         state.flush("loading...");
         let use_pre_processor = true;
@@ -249,6 +248,12 @@ impl SatSolverIF for Solver {
             }
         }
         debug_assert_eq!(s.vdb.len() - 1, cnf.num_of_variables);
+        s.state[Stat::NumBin] = s.cdb[1..].iter().filter(| c | c.len() == 2).count();
+        match s.vdb.len() {
+            l if 1_000_000 < l => s.vdb.activity_step *= 0.1,
+            l if 100_000 < l => s.vdb.activity_step *= 0.5,
+            _ => (),
+        }
         Ok(s)
     }
     // renamed from clause_new
@@ -444,23 +449,6 @@ fn handle_conflict_path(
     {
         cdb.cur_restart = ((ncnfl as f64) / (cdb.next_reduction as f64)) as usize + 1;
         cdb.reduce(state, vdb);
-    }
-    Ok(())
-}
-
-fn setup_parameters(
-    _asgs: &mut AssignStack,
-    cdb: &mut ClauseDB,
-    _elim: &mut Eliminator,
-    state: &mut State,
-    vdb: &mut VarDB,
-) -> MaybeInconsistent {
-    let nb = cdb[1..].iter().filter(| c | c.len() == 2).count();
-    state[Stat::NumBin] = nb;
-    if 1_000_000 < vdb.len() {
-        vdb.activity_step *= 0.1;
-    } else  if 100_000 < vdb.len() {
-        vdb.activity_step *= 0.5;
     }
     Ok(())
 }
