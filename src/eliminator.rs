@@ -103,7 +103,7 @@ impl Default for Eliminator {
             elim_clauses: Vec::new(),
             eliminate_combination_limit: 80,
             eliminate_grow_limit: 0, // 64
-            eliminate_occurrence_limit: 100_000,
+            eliminate_occurrence_limit: 800,
             subsume_literal_limit: 100,
         }
     }
@@ -194,7 +194,7 @@ impl EliminatorIF for Eliminator {
         }
         let v = &mut vdb[vi];
         if !v.is(Flag::ENQUEUED)
-            && v.pos_occurs.len() * v.pos_occurs.len() < self.eliminate_occurrence_limit
+            && v.occur_activity() < self.eliminate_occurrence_limit
         {
             v.turn_on(Flag::ENQUEUED);
             self.var_queue.insert(vdb, vi, upward);
