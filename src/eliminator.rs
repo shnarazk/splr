@@ -86,14 +86,10 @@ pub struct Eliminator {
     pub eliminate_combination_limit: usize,
     /// Stop elimination if the increase of clauses is over this
     pub eliminate_grow_limit: usize,
-    /// The upper limit of the loop for eliminating vars in `Eliminator::eliminate`
-    pub eliminate_loop_limit: usize,
     /// A criteria by the product's of its positive occurrences and negative ones
     pub eliminate_occurrence_limit: usize,
     /// Stop subsumption if the size of a clause is over this
     pub subsume_literal_limit: usize,
-    /// The upper limit of the loop for subsuming clauses in `Elimiantor::backward_subsumption_check`
-    pub subsume_loop_limit: usize,
 }
 
 impl Default for Eliminator {
@@ -107,10 +103,8 @@ impl Default for Eliminator {
             elim_clauses: Vec::new(),
             eliminate_combination_limit: 80,
             eliminate_grow_limit: 0, // 64
-            eliminate_loop_limit: 2_000_000_000,
             eliminate_occurrence_limit: 100_000,
             subsume_literal_limit: 100,
-            subsume_loop_limit: 2_000_000_000,
         }
     }
 }
@@ -233,7 +227,6 @@ impl EliminatorIF for Eliminator {
             thread::sleep(Duration::from_millis(time));
             timedout2.store(true, Ordering::Release);
         });
-        let mut cnt = 0;
         while self.bwdsub_assigns < asgs.len()
             || !self.var_queue.is_empty()
             || !self.clause_queue.is_empty()
@@ -245,8 +238,7 @@ impl EliminatorIF for Eliminator {
                 // timedout = cvar.wait(timedout).unwrap();
                 let v = &mut vdb[vi];
                 v.turn_off(Flag::ENQUEUED);
-                cnt += 1;
-                if cnt < self.eliminate_loop_limit && !v.is(Flag::ELIMINATED) && v.assign.is_none()
+                if !v.is(Flag::ELIMINATED) && v.assign.is_none()
                 {
                     eliminate_var(asgs, cdb, self, state, vdb, vi, &timedout)?;
                 }
@@ -378,7 +370,6 @@ impl Eliminator {
         vdb: &mut VarDB,
         timedout: &Arc<AtomicBool>,
     ) -> MaybeInconsistent {
-        let mut cnt = 0;
         debug_assert_eq!(asgs.level(), 0);
         while !self.clause_queue.is_empty() || self.bwdsub_assigns < asgs.len() {
             // Check top-level assignments by creating a dummy clause and placing it in the queue:
@@ -392,8 +383,7 @@ impl Eliminator {
                 None => ClauseId::default(),
             };
             // assert_ne!(cid, 0);
-            cnt += 1;
-            if self.subsume_loop_limit < cnt || timedout.load(Ordering::Acquire) {
+            if timedout.load(Ordering::Acquire) {
                 self.clear_clause_queue(cdb);
                 self.clear_var_queue(vdb);
                 continue;
