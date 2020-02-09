@@ -451,19 +451,12 @@ fn handle_conflict_path(
 fn setup_parameters(
     _asgs: &mut AssignStack,
     cdb: &mut ClauseDB,
-    elim: &mut Eliminator,
+    _elim: &mut Eliminator,
     state: &mut State,
     vdb: &mut VarDB,
 ) -> MaybeInconsistent {
     let nb = cdb[1..].iter().filter(| c | c.len() == 2).count();
     state[Stat::NumBin] = nb;
-    if 20_000_000 < cdb.len() {
-        // the number of variable trying to be eliminated
-        elim.eliminate_loop_limit = nb;
-        // elim.subsume_literal_limit = 1000;
-        // the number of clause trying to be subsumed
-        elim.subsume_loop_limit = 0;
-    }
     if 1_000_000 < vdb.len() {
         vdb.activity_step *= 0.1;
     } else  if 100_000 < vdb.len() {
