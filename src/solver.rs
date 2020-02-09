@@ -248,7 +248,7 @@ impl SatSolverIF for Solver {
             }
         }
         debug_assert_eq!(s.vdb.len() - 1, cnf.num_of_variables);
-        s.state[Stat::NumBin] = s.cdb[1..].iter().filter(| c | c.len() == 2).count();
+        s.state[Stat::NumBin] = s.cdb[1..].iter().filter(|c| c.len() == 2).count();
         match s.vdb.len() {
             l if 1_000_000 < l => s.vdb.activity_step *= 0.1,
             l if 100_000 < l => s.vdb.activity_step *= 0.5,

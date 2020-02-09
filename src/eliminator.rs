@@ -10,7 +10,10 @@ use {
     },
     std::{fmt, slice::Iter},
     std::{
-        sync::{Arc, atomic::{AtomicBool, Ordering}},
+        sync::{
+            atomic::{AtomicBool, Ordering},
+            Arc,
+        },
         thread,
         time::Duration,
     },
@@ -193,9 +196,7 @@ impl EliminatorIF for Eliminator {
             return;
         }
         let v = &mut vdb[vi];
-        if !v.is(Flag::ENQUEUED)
-            && v.occur_activity() < self.eliminate_occurrence_limit
-        {
+        if !v.is(Flag::ENQUEUED) && v.occur_activity() < self.eliminate_occurrence_limit {
             v.turn_on(Flag::ENQUEUED);
             self.var_queue.insert(vdb, vi, upward);
         }
@@ -238,8 +239,7 @@ impl EliminatorIF for Eliminator {
                 // timedout = cvar.wait(timedout).unwrap();
                 let v = &mut vdb[vi];
                 v.turn_off(Flag::ENQUEUED);
-                if !v.is(Flag::ELIMINATED) && v.assign.is_none()
-                {
+                if !v.is(Flag::ELIMINATED) && v.assign.is_none() {
                     eliminate_var(asgs, cdb, self, state, vdb, vi, &timedout)?;
                 }
             }

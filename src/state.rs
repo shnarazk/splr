@@ -625,13 +625,7 @@ impl fmt::Display for State {
         }
         let fnlen = fname.len();
         if width < vclen + fnlen + 1 {
-            write!(
-                f,
-                "{:<w$} |time:{:>9.2}",
-                fname,
-                tm,
-                w = width
-            )
+            write!(f, "{:<w$} |time:{:>9.2}", fname, tm, w = width)
         } else {
             write!(
                 f,
