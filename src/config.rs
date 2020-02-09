@@ -65,7 +65,7 @@ pub struct Config {
     #[structopt(long = "certify", short = "c")]
     pub use_certification: bool,
     /// CPU time limit in sec.
-    #[structopt(long = "to", default_value = "0")]
+    #[structopt(long = "to", default_value = "10000.0")]
     pub timeout: f64,
     /// interval for dumpping stat data
     #[structopt(long = "stat", default_value = "0")]
@@ -92,7 +92,7 @@ impl Default for Config {
             without_adaptive_strategy: false,
             without_deep_search: false,
             use_certification: false,
-            timeout: 0.0,
+            timeout: 10_000.0,
             dump_interval: 0,
         }
     }
