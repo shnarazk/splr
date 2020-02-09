@@ -95,7 +95,7 @@ fn save_result(s: &Solver, res: &SolverResult, input: &str, output: Option<PathB
                     input,
                     ),
                 Some(ref f) => println!(
-                    "      Result|save: {}\nSATISFIABLE: {}",
+                    "      Result|file: {}\nSATISFIABLE: {}",
                     f.to_str().unwrap(),
                     input,
                 ),
@@ -127,7 +127,7 @@ fn save_result(s: &Solver, res: &SolverResult, input: &str, output: Option<PathB
                     input,
                 ),
                 Some(ref f) => println!(
-                    "      Result|save: {}\nUNSAT: {}",
+                    "      Result|file: {}\nUNSAT: {}",
                     f.to_str().unwrap(),
                     input,
                 ),
