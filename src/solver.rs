@@ -108,8 +108,7 @@ impl SatSolverIF for Solver {
         // s.root_level = 0;
         state.num_solved_vars = asgs.len();
         state.progress_header();
-        state.progress(cdb, vdb, Some("initialization phase"));
-        state.flush("loading...");
+        state.progress(cdb, vdb, Some("loading..."));
         let use_pre_processor = true;
         let use_pre_processing_eliminator = true;
         if use_pre_processor {
