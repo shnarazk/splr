@@ -232,7 +232,7 @@ impl fmt::Display for LubySeries {
 impl EmaIF for LubySeries {
     type Input = usize;
     fn update(&mut self, reset: usize) {
-        assert!(self.active);
+        debug_assert!(self.active);
         if reset == 0 {
             self.index = 0;
         } else {
