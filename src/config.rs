@@ -12,10 +12,10 @@ pub struct Config {
     #[structopt(long = "cl", default_value = "0")]
     pub clause_limit: usize,
     /// grow limit of #clauses by v-elim
-    #[structopt(long = "eg", default_value = "4")]
+    #[structopt(long = "eg", default_value = "0")]
     pub elim_grow_limit: usize,
     /// #literals in a clause by v-elim
-    #[structopt(long = "el", default_value = "64")]
+    #[structopt(long = "el", default_value = "100")]
     pub elim_lit_limit: usize,
     /// length for assignment average
     #[structopt(long = "ra", default_value = "3500")]
@@ -75,8 +75,8 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Config {
         Config {
-            clause_limit: 18_000_000,
-            elim_grow_limit: 4,
+            clause_limit: 0,
+            elim_grow_limit: 0,
             elim_lit_limit: 100,
             restart_asg_len: 3500,
             restart_lbd_len: 50,
