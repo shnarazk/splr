@@ -765,10 +765,7 @@ impl ClauseDBIF for ClauseDB {
                         elim.remove_cid_occur(vdb, ClauseId::from(cid), c);
                     }
                     for l in &c.lits {
-                        let v = &mut vdb[l.vi()];
-                        if !v.is(Flag::ELIMINATED) {
-                            elim.enqueue_var(vdb, l.vi(), true);
-                        }
+                        elim.enqueue_var(vdb, l.vi(), true);
                     }
                 }
             }

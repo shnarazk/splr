@@ -9,6 +9,11 @@ use {
         var::{Var, VarDB, VarDBIF},
     },
     std::{fmt, slice::Iter},
+    std::{
+        sync::{Arc, atomic::{AtomicBool, Ordering}},
+        thread,
+        time::Duration,
+    },
 };
 
 /// API for Eliminator like `activate`, `stop`, `eliminate` and so on.
@@ -81,9 +86,13 @@ pub struct Eliminator {
     pub eliminate_combination_limit: usize,
     /// Stop elimination if the increase of clauses is over this
     pub eliminate_grow_limit: usize,
+    /// The upper limit of the loop for eliminating vars in `Eliminator::eliminate`
     pub eliminate_loop_limit: usize,
+    /// A criteria by the product's of its positive occurrences and negative ones
+    pub eliminate_occurrence_limit: usize,
     /// Stop subsumption if the size of a clause is over this
     pub subsume_literal_limit: usize,
+    /// The upper limit of the loop for subsuming clauses in `Elimiantor::backward_subsumption_check`
     pub subsume_loop_limit: usize,
 }
 
@@ -98,9 +107,10 @@ impl Default for Eliminator {
             elim_clauses: Vec::new(),
             eliminate_combination_limit: 80,
             eliminate_grow_limit: 0, // 64
-            eliminate_loop_limit: 2_000_000,
+            eliminate_loop_limit: 2_000_000_000,
+            eliminate_occurrence_limit: 100_000,
             subsume_literal_limit: 100,
-            subsume_loop_limit: 2_000_000,
+            subsume_loop_limit: 2_000_000_000,
         }
     }
 }
@@ -188,8 +198,13 @@ impl EliminatorIF for Eliminator {
         if self.mode != EliminatorMode::Running {
             return;
         }
-        self.var_queue.insert(vdb, vi, upward);
-        vdb[vi].turn_on(Flag::ENQUEUED);
+        let v = &mut vdb[vi];
+        if !v.is(Flag::ENQUEUED)
+            && v.pos_occurs.len() * v.pos_occurs.len() < self.eliminate_occurrence_limit
+        {
+            v.turn_on(Flag::ENQUEUED);
+            self.var_queue.insert(vdb, vi, upward);
+        }
     }
     fn clear_var_queue(&mut self, vdb: &mut VarDB) {
         self.var_queue.clear(vdb);
@@ -211,24 +226,32 @@ impl EliminatorIF for Eliminator {
         if self.mode == EliminatorMode::Deactive {
             return Ok(());
         }
+        let timedout = Arc::new(AtomicBool::new(false));
+        let timedout2 = timedout.clone();
+        let time = 100 * state.config.timeout as u64;
+        thread::spawn(move || {
+            thread::sleep(Duration::from_millis(time));
+            timedout2.store(true, Ordering::Release);
+        });
         let mut cnt = 0;
         while self.bwdsub_assigns < asgs.len()
             || !self.var_queue.is_empty()
             || !self.clause_queue.is_empty()
         {
             if !self.clause_queue.is_empty() || self.bwdsub_assigns < asgs.len() {
-                self.backward_subsumption_check(asgs, cdb, vdb)?;
+                self.backward_subsumption_check(asgs, cdb, vdb, &timedout)?;
             }
             while let Some(vi) = self.var_queue.select_var(vdb) {
+                // timedout = cvar.wait(timedout).unwrap();
                 let v = &mut vdb[vi];
                 v.turn_off(Flag::ENQUEUED);
                 cnt += 1;
                 if cnt < self.eliminate_loop_limit && !v.is(Flag::ELIMINATED) && v.assign.is_none()
                 {
-                    eliminate_var(asgs, cdb, self, state, vdb, vi)?;
+                    eliminate_var(asgs, cdb, self, state, vdb, vi, &timedout)?;
                 }
             }
-            self.backward_subsumption_check(asgs, cdb, vdb)?;
+            self.backward_subsumption_check(asgs, cdb, vdb, &timedout)?;
             debug_assert!(self.clause_queue.is_empty());
             cdb.garbage_collect();
             if asgs.propagate(cdb, vdb) != ClauseId::default() {
@@ -236,6 +259,10 @@ impl EliminatorIF for Eliminator {
             }
             cdb.eliminate_satisfied_clauses(self, vdb, true);
             cdb.garbage_collect();
+            if timedout.load(Ordering::Acquire) {
+                self.clear_clause_queue(cdb);
+                self.clear_var_queue(vdb);
+            }
         }
         Ok(())
     }
@@ -332,9 +359,7 @@ impl EliminatorIF for Eliminator {
         for l in &c.lits {
             if vdb[l.vi()].assign.is_none() {
                 self.remove_lit_occur(vdb, *l, cid);
-                if !vdb[l.vi()].is(Flag::ELIMINATED) {
-                    self.enqueue_var(vdb, l.vi(), true);
-                }
+                self.enqueue_var(vdb, l.vi(), true);
             }
         }
     }
@@ -351,6 +376,7 @@ impl Eliminator {
         asgs: &mut AssignStack,
         cdb: &mut ClauseDB,
         vdb: &mut VarDB,
+        timedout: &Arc<AtomicBool>,
     ) -> MaybeInconsistent {
         let mut cnt = 0;
         debug_assert_eq!(asgs.level(), 0);
@@ -367,7 +393,9 @@ impl Eliminator {
             };
             // assert_ne!(cid, 0);
             cnt += 1;
-            if self.subsume_loop_limit < cnt {
+            if self.subsume_loop_limit < cnt || timedout.load(Ordering::Acquire) {
+                self.clear_clause_queue(cdb);
+                self.clear_var_queue(vdb);
                 continue;
             }
             let best = if cid.is_lifted_lit() {
@@ -718,6 +746,7 @@ fn eliminate_var(
     state: &mut State,
     vdb: &mut VarDB,
     vi: VarId,
+    timedout: &Arc<AtomicBool>,
 ) -> MaybeInconsistent {
     let v = &mut vdb[vi];
     if v.assign.is_some() {
@@ -730,7 +759,7 @@ fn eliminate_var(
     let pos = &v.pos_occurs as *const Vec<ClauseId>;
     let neg = &v.neg_occurs as *const Vec<ClauseId>;
     unsafe {
-        if check_var_elimination_condition(cdb, elim, vdb, &*pos, &*neg, vi) {
+        if skip_var_elimination(cdb, elim, vdb, &*pos, &*neg, vi) {
             return Ok(());
         }
         // OK, eliminate the literal and build constraints on it.
@@ -780,14 +809,14 @@ fn eliminate_var(
         vdb[vi].pos_occurs.clear();
         vdb[vi].neg_occurs.clear();
         vdb[vi].turn_on(Flag::ELIMINATED);
-        elim.backward_subsumption_check(asgs, cdb, vdb)
+        elim.backward_subsumption_check(asgs, cdb, vdb, timedout)
     }
 }
 
 /// returns `true` if elimination is impossible.
-fn check_var_elimination_condition(
+fn skip_var_elimination(
     cdb: &ClauseDB,
-    elim: &Eliminator,
+    elim: &mut Eliminator,
     vdb: &VarDB,
     pos: &[ClauseId],
     neg: &[ClauseId],
