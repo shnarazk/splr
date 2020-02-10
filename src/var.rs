@@ -1,20 +1,63 @@
+/// Crate `var` provides `var` object and its manager `VarDB`.
 use {
     crate::{
-        clause::{Clause, ClauseId},
+        clause::{Clause, ClauseDB, ClauseIF, ClauseId, ClauseIdIF},
         config::Config,
-        state::{Stat, State},
-        traits::*,
+        propagator::{AssignStack, PropagatorIF},
         types::*,
     },
     std::{
         fmt,
         ops::{Index, IndexMut, Range, RangeFrom},
+        slice::Iter,
     },
 };
 
-const VAR_ACTIVITY_DECAY: f64 = 0.94;
+/// API to calculate LBD.
+pub trait LBDIF {
+    /// return a LBD value for the set of literals.
+    fn compute_lbd(&mut self, vec: &[Lit]) -> usize;
+    /// re-calculate the LBD values of all (learnt) clauses.
+    fn reset_lbd(&mut self, cdb: &mut ClauseDB);
+}
 
-/// Structure for variables.
+/// API for var DB like `assigned`, `locked`, and so on.
+pub trait VarDBIF {
+    /// return the number of vars.
+    fn len(&self) -> usize;
+    /// return true if it's empty.
+    fn is_empty(&self) -> bool;
+    /// return the 'value' of a given literal.
+    fn assigned(&self, l: Lit) -> Option<bool>;
+    /// return `true` is the clause is the reason of the assignment.
+    fn locked(&self, c: &Clause, cid: ClauseId) -> bool;
+    /// return `true` if the set of literals is satisfiable under the current assignment.
+    fn satisfies(&self, c: &[Lit]) -> bool;
+    // minimize a clause.
+    fn minimize_with_bi_clauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>);
+    // bump vars' activities.
+    fn bump_vars(&mut self, asgs: &AssignStack, cdb: &ClauseDB, confl: ClauseId);
+}
+
+/// API for var rewarding.
+pub trait VarRewardIF {
+    /// return var's activity.
+    fn activity(&mut self, vi: VarId) -> f64;
+    /// initialize rewards based on an order of vars.
+    fn initialize_reward(&mut self, iterator: Iter<'_, usize>);
+    /// modify var's activity at conflict analysis in `analyze`.
+    fn reward_at_analysis(&mut self, vi: VarId);
+    /// modify var's activity at value assignment in `uncheck_{assume, enquue, fix}`.
+    fn reward_at_assign(&mut self, vi: VarId);
+    /// modify var's activity at value unassigment in `cancel_until`.
+    fn reward_at_unassign(&mut self, vi: VarId);
+    /// update internal counter.
+    fn reward_update(&mut self);
+    /// change reward mode.
+    fn shift_reward_mode(&mut self);
+}
+
+/// Object representing a variable.
 #[derive(Debug)]
 pub struct Var {
     /// reverse conversion to index. Note `VarId` must be `usize`.
@@ -28,42 +71,76 @@ pub struct Var {
     /// decision level at which this variables is assigned.
     pub level: usize,
     /// a dynamic evaluation criterion like VSIDS or ACID.
-    pub reward: f64,
-    /// the number of conflicts at which this var was rewarded lastly
-    last_update: usize,
+    reward: f64,
+    /// the number of conflicts at which this var was rewarded lastly.
+    timestamp: usize,
     /// list of clauses which contain this variable positively.
     pub pos_occurs: Vec<ClauseId>,
     /// list of clauses which contain this variable negatively.
     pub neg_occurs: Vec<ClauseId>,
     /// the `Flag`s
     flags: Flag,
+    participated: usize,
 }
 
-/// is the dummy var index.
-#[allow(dead_code)]
-const NULL_VAR: VarId = 0;
-
-impl VarIF for Var {
-    fn new(i: usize) -> Var {
+impl Default for Var {
+    fn default() -> Var {
         Var {
-            index: i,
+            index: 0,
             assign: None,
             phase: false,
             reason: ClauseId::default(),
             level: 0,
             reward: 0.0,
-            last_update: 0,
+            timestamp: 0,
             pos_occurs: Vec::new(),
             neg_occurs: Vec::new(),
             flags: Flag::empty(),
+            participated: 0,
         }
     }
+}
+
+impl fmt::Display for Var {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let st = |flag, mes| if self.is(flag) { mes } else { "" };
+        write!(
+            f,
+            "V{}({:?} at {} by {} {}{})",
+            self.index,
+            self.assign,
+            self.level,
+            self.reason.format(),
+            st(Flag::TOUCHED, ", touched"),
+            st(Flag::ELIMINATED, ", eliminated"),
+        )
+    }
+}
+
+impl From<usize> for Var {
+    #[inline]
+    fn from(i: usize) -> Self {
+        Var {
+            index: i,
+            ..Var::default()
+        }
+    }
+}
+
+impl Var {
+    /// return a new vector of $n$ `Var`s.
     fn new_vars(n: usize) -> Vec<Var> {
         let mut vec = Vec::with_capacity(n + 1);
         for i in 0..=n {
-            vec.push(Var::new(i));
+            vec.push(Var::from(i));
         }
         vec
+    }
+    fn assigned(&self, l: Lit) -> Option<bool> {
+        match self.assign {
+            Some(x) if !bool::from(l) => Some(!x),
+            x => x,
+        }
     }
 }
 
@@ -79,49 +156,64 @@ impl FlagIF for Var {
     }
 }
 
-/// Structure for variables.
+#[derive(Clone, Copy, Eq, Debug, PartialEq)]
+enum RewardStep {
+    HeatUp = 0,
+    Annealing,
+    Final,
+}
+
+/// a reward table used in VarDB::shift_reward_mode
+///  - id: RewardStep
+///  - start: lower bound of the range
+///  - end: upper bound of the range
+///  - scale: scaling coefficient for activity decay
+const REWARDS: [(RewardStep, f64, f64, f64); 3] = [
+    (RewardStep::HeatUp, 0.80, 0.90, 0.0), // the last is dummy
+    (RewardStep::Annealing, 0.90, 0.96, 0.1),
+    (RewardStep::Final, 0.96, 0.98, 0.1),
+];
+
+/// A container of variables.
 #[derive(Debug)]
 pub struct VarDB {
     pub activity_decay: f64,
-    pub reward_by_dl: f64,
-    // pub reward_by_dl_ema: Ema,
+    activity_decay_max: f64,
+    pub activity_step: f64,
+    reward_mode: RewardStep,
+    ordinal: usize,
     /// vars
     var: Vec<Var>,
-    /// the current conflict's ordinal number
-    current_conflict: usize,
-    /// the current restart's ordinal number
-    current_restart: usize,
     /// a working buffer for LBD calculation
-    pub lbd_temp: Vec<usize>,
+    lbd_temp: Vec<usize>,
 }
 
 impl Default for VarDB {
     fn default() -> VarDB {
-        // let mut reward_by_dl_ema = Ema::new(20);
-        // reward_by_dl_ema.update(0.01);
+        let reward = REWARDS[0];
         VarDB {
-            activity_decay: VAR_ACTIVITY_DECAY,
-            reward_by_dl: 1.0,
-            // reward_by_dl_ema,
+            activity_decay: reward.1,
+            activity_decay_max: reward.2,
+            activity_step: (reward.2 - reward.1) / 10_000.0,
+            reward_mode: reward.0,
+            ordinal: 0,
             var: Vec::new(),
-            current_conflict: 0,
-            current_restart: 0,
             lbd_temp: Vec::new(),
         }
     }
 }
 
-impl Index<usize> for VarDB {
+impl Index<VarId> for VarDB {
     type Output = Var;
     #[inline]
-    fn index(&self, i: usize) -> &Var {
+    fn index(&self, i: VarId) -> &Var {
         unsafe { self.var.get_unchecked(i) }
     }
 }
 
-impl IndexMut<usize> for VarDB {
+impl IndexMut<VarId> for VarDB {
     #[inline]
-    fn index_mut(&mut self, i: usize) -> &mut Var {
+    fn index_mut(&mut self, i: VarId) -> &mut Var {
         unsafe { self.var.get_unchecked_mut(i) }
     }
 }
@@ -156,19 +248,64 @@ impl IndexMut<RangeFrom<usize>> for VarDB {
     }
 }
 
-impl ActivityIF for VarDB {
-    type Ix = VarId;
-    fn bump_activity(&mut self, vi: Self::Ix, dl: usize) {
-        let v = &mut self.var[vi];
-        let now = self.current_conflict;
-        let t = (now - v.last_update) as i32;
-        // v.reward = (now as f64 + self.activity) / 2.0; // ASCID
-        v.reward = 0.2
-            + self.reward_by_dl / (dl + 1) as f64
-            + v.reward * self.activity_decay.powi(t);
-        v.last_update = now;
+impl Index<Lit> for VarDB {
+    type Output = Var;
+    #[inline]
+    fn index(&self, l: Lit) -> &Var {
+        unsafe { self.var.get_unchecked(l.vi()) }
     }
-    fn scale_activity(&mut self) {}
+}
+
+impl IndexMut<Lit> for VarDB {
+    #[inline]
+    fn index_mut(&mut self, l: Lit) -> &mut Var {
+        unsafe { self.var.get_unchecked_mut(l.vi()) }
+    }
+}
+
+impl VarRewardIF for VarDB {
+    #[inline]
+    fn activity(&mut self, vi: VarId) -> f64 {
+        self[vi].reward
+    }
+    fn initialize_reward(&mut self, iterator: Iter<'_, usize>) {
+        let mut v = 0.5; // big bang initialization
+        for vi in iterator {
+            self.var[*vi].reward = v;
+            v *= 0.9;
+        }
+    }
+    fn reward_at_analysis(&mut self, vi: VarId) {
+        let v = &mut self[vi];
+        v.participated += 1;
+    }
+    fn reward_at_assign(&mut self, vi: VarId) {
+        self[vi].timestamp = self.ordinal;
+    }
+    fn reward_at_unassign(&mut self, vi: VarId) {
+        let v = &mut self.var[vi];
+        let duration = self.ordinal + 1 - v.timestamp;
+        let rate = v.participated as f64 / duration as f64;
+        v.reward *= self.activity_decay;
+        v.reward += (1.0 - self.activity_decay) * rate;
+        v.participated = 0;
+    }
+    fn reward_update(&mut self) {
+        self.ordinal += 1;
+        if self.activity_decay < self.activity_decay_max {
+            self.activity_decay += self.activity_step;
+        } else {
+            self.shift_reward_mode();
+        }
+    }
+    fn shift_reward_mode(&mut self) {
+        if self.reward_mode != RewardStep::Final {
+            let reward = &REWARDS[self.reward_mode as usize + 1];
+            self.reward_mode = reward.0;
+            self.activity_decay_max = reward.2;
+            self.activity_step *= reward.3;
+        }
+    }
 }
 
 impl Instantiate for VarDB {
@@ -177,7 +314,7 @@ impl Instantiate for VarDB {
         VarDB {
             var: Var::new_vars(nv),
             lbd_temp: vec![0; nv + 1],
-            .. VarDB::default()
+            ..VarDB::default()
         }
     }
 }
@@ -190,7 +327,6 @@ impl VarDBIF for VarDB {
         self.var.is_empty()
     }
     fn assigned(&self, l: Lit) -> Option<bool> {
-        // unsafe { self.var.get_unchecked(l.vi()).assign ^ ((l & 1) as u8) }
         match unsafe { self.var.get_unchecked(l.vi()).assign } {
             Some(x) if !bool::from(l) => Some(!x),
             x => x,
@@ -210,51 +346,154 @@ impl VarDBIF for VarDB {
         }
         false
     }
-    fn update_stat(&mut self, state: &State) {
-        self.current_conflict = state.stats[Stat::Conflict] + 1;
-        self.current_restart = state.stats[Stat::Restart] + 1;
+    fn minimize_with_bi_clauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>) {
+        let nlevels = self.compute_lbd(vec);
+        let VarDB { lbd_temp, var, .. } = self;
+        if 6 < nlevels {
+            return;
+        }
+        let key = lbd_temp[0] + 1;
+        for l in &vec[1..] {
+            lbd_temp[l.vi() as usize] = key;
+        }
+        let l0 = vec[0];
+        let mut nsat = 0;
+        for w in &cdb.watcher[!l0] {
+            let c = &cdb[w.c];
+            if c.len() != 2 {
+                continue;
+            }
+            debug_assert!(c[0] == l0 || c[1] == l0);
+            let other = c[(c[0] == l0) as usize];
+            let vi = other.vi();
+            if lbd_temp[vi] == key && var[vi].assigned(other) == Some(true) {
+                nsat += 1;
+                lbd_temp[vi] -= 1;
+            }
+        }
+        if 0 < nsat {
+            lbd_temp[l0.vi()] = key;
+            vec.retain(|l| lbd_temp[l.vi()] == key);
+        }
+        lbd_temp[0] = key;
     }
+    // This function is for Reason-Side Rewarding which must traverse the assign stack
+    // beyond first UIDs and bump all vars on the traversed tree.
+    // If you'd like to use this, you should stop bumping activities in `analyze`.
+    fn bump_vars(&mut self, asgs: &AssignStack, cdb: &ClauseDB, confl: ClauseId) {
+        debug_assert_ne!(confl, ClauseId::default());
+        let mut cid = confl;
+        let mut p = NULL_LIT;
+        let mut ti = asgs.len(); // trail index
+        debug_assert!(self.var[1..].iter().all(|v| !v.is(Flag::VR_SEEN)));
+        loop {
+            for q in &cdb[cid].lits[(p != NULL_LIT) as usize..] {
+                let vi = q.vi();
+                if !self.var[vi].is(Flag::VR_SEEN) {
+                    self.var[vi].turn_on(Flag::VR_SEEN);
+                    self.reward_at_analysis(vi);
+                }
+            }
+            loop {
+                if 0 == ti {
+                    self.var[asgs.trail[ti].vi()].turn_off(Flag::VR_SEEN);
+                    debug_assert!(self.var[1..].iter().all(|v| !v.is(Flag::VR_SEEN)));
+                    return;
+                }
+                ti -= 1;
+                p = asgs.trail[ti];
+                let next_vi = p.vi();
+                if self.var[next_vi].is(Flag::VR_SEEN) {
+                    self.var[next_vi].turn_off(Flag::VR_SEEN);
+                    cid = self.var[next_vi].reason;
+                    if cid != ClauseId::default() {
+                        break;
+                    }
+                }
+            }
+        }
+    }
+}
 
-    fn compute_lbd(&self, vec: &[Lit], keys: &mut [usize]) -> usize {
+impl LBDIF for VarDB {
+    fn compute_lbd(&mut self, vec: &[Lit]) -> usize {
+        let VarDB { lbd_temp, var, .. } = self;
         unsafe {
-            let key = keys.get_unchecked(0) + 1;
+            let key: usize = lbd_temp.get_unchecked(0) + 1;
+            *lbd_temp.get_unchecked_mut(0) = key;
             let mut cnt = 0;
             for l in vec {
-                let lv = self[l.vi()].level;
-                let p = keys.get_unchecked_mut(lv);
+                let lv = var[l.vi()].level;
+                let p = lbd_temp.get_unchecked_mut(lv);
                 if *p != key {
                     *p = key;
                     cnt += 1;
                 }
             }
-            *keys.get_unchecked_mut(0) = key;
             cnt
         }
     }
-    fn activity(&mut self, vi: VarId) -> f64 {
-        let now = self.current_conflict;
-        let v = &mut self.var[vi];
-        let diff = now - v.last_update;
-        if 0 < diff {
-            v.last_update = now;
-            v.reward *= self.activity_decay.powi(diff as i32);
+    fn reset_lbd(&mut self, cdb: &mut ClauseDB) {
+        let VarDB { lbd_temp, .. } = self;
+        unsafe {
+            let mut key = *lbd_temp.get_unchecked(0);
+            for c in &mut cdb[1..] {
+                if c.is(Flag::DEAD) || c.is(Flag::LEARNT) {
+                    continue;
+                }
+                key += 1;
+                let mut cnt = 0;
+                for l in &c.lits {
+                    let lv = self.var[l.vi()].level;
+                    if lv != 0 {
+                        let p = lbd_temp.get_unchecked_mut(lv);
+                        if *p != key {
+                            *p = key;
+                            cnt += 1;
+                        }
+                    }
+                }
+                c.rank = cnt;
+            }
+            *lbd_temp.get_unchecked_mut(0) = key;
         }
-        v.reward
     }
 }
 
-impl fmt::Display for Var {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let st = |flag, mes| if self.is(flag) { mes } else { "" };
-        write!(
-            f,
-            "V{}({:?} at {} by {} {}{})",
-            self.index,
-            self.assign,
-            self.level,
-            self.reason.format(),
-            st(Flag::TOUCHED, ", touched"),
-            st(Flag::ELIMINATED, ", eliminated"),
-        )
+impl VarDB {
+    pub fn dump_dependency(&mut self, asgs: &AssignStack, cdb: &ClauseDB, confl: ClauseId) {
+        debug_assert_ne!(confl, ClauseId::default());
+        let mut cid = confl;
+        let mut p = NULL_LIT;
+        let mut ti = asgs.len(); // trail index
+        debug_assert!(self.var[1..].iter().all(|v| !v.is(Flag::VR_SEEN)));
+        println!();
+        loop {
+            for q in &cdb[cid].lits[(p != NULL_LIT) as usize..] {
+                let vi = q.vi();
+                if !self.var[vi].is(Flag::VR_SEEN) {
+                    self.var[vi].turn_on(Flag::VR_SEEN);
+                    println!(" - {}: {}: set", cid, self.var[vi]);
+                }
+            }
+            loop {
+                if 0 == ti {
+                    self.var[asgs.trail[ti].vi()].turn_off(Flag::VR_SEEN);
+                    debug_assert!(self.var[1..].iter().all(|v| !v.is(Flag::VR_SEEN)));
+                    println!();
+                    return;
+                }
+                ti -= 1;
+                p = asgs.trail[ti];
+                let next_vi = p.vi();
+                if self.var[next_vi].is(Flag::VR_SEEN) {
+                    self.var[next_vi].turn_off(Flag::VR_SEEN);
+                    cid = self.var[next_vi].reason;
+                    if cid != ClauseId::default() {
+                        break;
+                    }
+                }
+            }
+        }
     }
 }

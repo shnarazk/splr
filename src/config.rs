@@ -1,7 +1,8 @@
+/// Crate `config` provides solver's configuration and CLI.
 use {std::path::PathBuf, structopt::StructOpt};
 
-pub const VERSION: &str = "0.2.1";
-pub const ACTIVITY_MAX: f64 = 1e308;
+/// Splr version number.
+pub const VERSION: &str = "0.3.0";
 
 /// Configuration built from command line options
 #[derive(Clone, Debug, StructOpt)]
@@ -11,10 +12,10 @@ pub struct Config {
     #[structopt(long = "cl", default_value = "0")]
     pub clause_limit: usize,
     /// grow limit of #clauses by v-elim
-    #[structopt(long = "eg", default_value = "4")]
+    #[structopt(long = "eg", default_value = "0")]
     pub elim_grow_limit: usize,
     /// #literals in a clause by v-elim
-    #[structopt(long = "el", default_value = "64")]
+    #[structopt(long = "el", default_value = "100")]
     pub elim_lit_limit: usize,
     /// length for assignment average
     #[structopt(long = "ra", default_value = "3500")]
@@ -54,9 +55,6 @@ pub struct Config {
     /// Disables exhaustive simplification
     #[structopt(long = "without-elim", short = "E")]
     pub without_elim: bool,
-    /// Disables dynamic restart adaptation
-    #[structopt(long = "without-adaptive-restart", short = "R")]
-    pub without_adaptive_restart: bool,
     /// Disables dynamic strategy adaptation
     #[structopt(long = "without-adaptive-strategy", short = "S")]
     pub without_adaptive_strategy: bool,
@@ -67,7 +65,7 @@ pub struct Config {
     #[structopt(long = "certify", short = "c")]
     pub use_certification: bool,
     /// CPU time limit in sec.
-    #[structopt(long = "to", default_value = "0")]
+    #[structopt(long = "to", default_value = "10000.0")]
     pub timeout: f64,
     /// interval for dumpping stat data
     #[structopt(long = "stat", default_value = "0")]
@@ -77,8 +75,8 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Config {
         Config {
-            clause_limit: 18_000_000,
-            elim_grow_limit: 4,
+            clause_limit: 0,
+            elim_grow_limit: 0,
             elim_lit_limit: 100,
             restart_asg_len: 3500,
             restart_lbd_len: 50,
@@ -91,11 +89,10 @@ impl Default for Config {
             proof_filename: PathBuf::from("proof.out"),
             use_log: false,
             without_elim: false,
-            without_adaptive_restart: false,
             without_adaptive_strategy: false,
-            without_deep_search: true,
+            without_deep_search: false,
             use_certification: false,
-            timeout: 0.0,
+            timeout: 10_000.0,
             dump_interval: 0,
         }
     }

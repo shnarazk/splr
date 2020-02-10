@@ -1,7 +1,7 @@
 [package]
 name = "splr"
-version = "0.2.1"
-authors = ["Shuji Narazaki <shujinarazaki@protonmail.com>"]
+version = "0.3.0"
+authors = ["Narazaki Shuji <shujinarazaki@protonmail.com>"]
 description = "A pure rustic CDCL SAT solver based on Glucose"
 edition = "2018"
 license = "MPL-2.0"
@@ -9,7 +9,7 @@ readme = "README.md"
 repository = "https://github.com/shnarazk/splr"
 homepage = "https://github.com/shnarazk/splr"
 keywords = ["SAT", "SAT-solver", "logic", "satisfiability"]
-categories = ["science"]
+categories = ["mathematics", "science"]
 
 [dependencies]
 bitflags = "1.2"
@@ -18,6 +18,6 @@ libc = "0.2"
 structopt = "0.3"
 
 [profile.release]
-lto = true
+lto = "fat"
 codegen-units = 1
 opt-level = 3

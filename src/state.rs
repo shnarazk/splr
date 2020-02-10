@@ -1,7 +1,12 @@
+/// Crate `state` is a collection of internal data.
 use {
     crate::{
-        clause::ClauseDB, config::Config, eliminator::Eliminator, restart::RestartExecutor,
-        traits::*, types::*, var::VarDB,
+        clause::{ClauseDB, ClauseDBIF},
+        config::Config,
+        eliminator::{Eliminator, EliminatorIF},
+        restart::RestartExecutor,
+        types::*,
+        var::{VarDB, VarDBIF},
     },
     libc::{clock_gettime, timespec, CLOCK_PROCESS_CPUTIME_ID},
     std::{
@@ -13,12 +18,33 @@ use {
     },
 };
 
+/// API for state/statistics management, providing `progress`.
+pub trait StateIF {
+    /// return the number of unsolved vars.
+    fn num_unsolved_vars(&self) -> usize;
+    /// return `true` if it is timed out.
+    fn is_timeout(&self) -> bool;
+    /// return elapsed time as a fraction.
+    /// return None if something is wrong.
+    fn elapsed(&self) -> Option<f64>;
+    /// update internal counters and return true if solver stagnated.
+    fn check_stagnation(&mut self);
+    /// change heuristics based on stat data.
+    fn adapt_strategy(&mut self, cdb: &mut ClauseDB);
+    /// write a header of stat data to stdio.
+    fn progress_header(&self);
+    /// write stat data to stdio.
+    fn progress(&mut self, cdb: &ClauseDB, vdb: &VarDB, mes: Option<&str>);
+    /// write a short message to stdout.
+    fn flush<S: AsRef<str>>(&self, mes: S);
+}
+
 /// A collection of named search heuristics
 #[derive(Debug, Eq, PartialEq)]
 pub enum SearchStrategy {
     /// the initial search phase to determine a main strategy
     Initial,
-    /// Non-Specific-Instance using generic settings
+    /// Non-Specific-Instance using a generic setting
     Generic,
     /// Many-Low-Level-Conflicts using Chan Seok heuristics
     LowDecisions,
@@ -42,7 +68,7 @@ impl fmt::Display for SearchStrategy {
                     SearchStrategy::Initial => {
                         "in the initial search phase to determine a main strategy"
                     }
-                    SearchStrategy::Generic => "Non-Specific-Instance using generic settings",
+                    SearchStrategy::Generic => "Non-Specific-Instance using a generic setting",
                     SearchStrategy::LowDecisions => {
                         "Many-Low-Level-Conflicts using Chan Seok heuristics"
                     }
@@ -85,7 +111,7 @@ impl SearchStrategy {
     pub fn to_str(&self) -> &'static str {
         match self {
             SearchStrategy::Initial => "in the initial search phase to determine a main strategy",
-            SearchStrategy::Generic => "generic (using the generic parameter set)",
+            SearchStrategy::Generic => "generic (using a generic parameter set)",
             SearchStrategy::LowDecisions => "LowDecs (many conflicts at low levels, using CSh)",
             SearchStrategy::HighSuccesive => "HighSucc (long decision chains)",
             SearchStrategy::LowSuccesiveLuby => "LowSuccLuby (successive conflicts)",
@@ -148,21 +174,19 @@ pub struct State {
     pub strategy: SearchStrategy,
     pub target: CNFDescription,
     pub use_chan_seok: bool,
+    pub reflection_interval: usize,
     /// MISC
-    pub ok: bool,
     pub b_lvl: Ema,
     pub c_lvl: Ema,
     pub model: Vec<Option<bool>>,
     pub conflicts: Vec<Lit>,
     pub new_learnt: Vec<Lit>,
-    pub an_seen: Vec<bool>,
     pub last_asg: usize,
-    pub last_dl: Vec<Lit>,
-    pub lbd_temp: Vec<usize>,
-    pub slack_duration: isize,
+    pub slack_duration: usize,
     pub stagnated: bool,
     pub start: SystemTime,
     pub time_limit: f64,
+    pub default_rewarding: bool,
     pub record: ProgressRecord,
     pub use_progress: bool,
     pub progress_cnt: usize,
@@ -183,26 +207,39 @@ impl Default for State {
             strategy: SearchStrategy::Initial,
             target: CNFDescription::default(),
             use_chan_seok: false,
-            ok: true,
+            reflection_interval: 10_000,
             b_lvl: Ema::new(5_000),
             c_lvl: Ema::new(5_000),
             model: Vec::new(),
             conflicts: Vec::new(),
             new_learnt: Vec::new(),
-            an_seen: Vec::new(),
             last_asg: 0,
-            last_dl: Vec::new(),
-            lbd_temp: Vec::new(),
             slack_duration: 0,
             stagnated: false,
             start: SystemTime::now(),
             time_limit: 0.0,
+            default_rewarding: true,
             use_progress: true,
             progress_cnt: 0,
             progress_log: false,
             record: ProgressRecord::default(),
             development: Vec::new(),
         }
+    }
+}
+
+impl Index<Stat> for State {
+    type Output = usize;
+    #[inline]
+    fn index(&self, i: Stat) -> &usize {
+        &self.stats[i as usize]
+    }
+}
+
+impl IndexMut<Stat> for State {
+    #[inline]
+    fn index_mut(&mut self, i: Stat) -> &mut usize {
+        &mut self.stats[i as usize]
     }
 }
 
@@ -294,8 +331,6 @@ impl Instantiate for State {
         state.rst = RestartExecutor::instantiate(config, &cnf);
         state.progress_log = config.use_log;
         state.model = vec![None; cnf.num_of_variables + 1];
-        state.an_seen = vec![false; cnf.num_of_variables + 1];
-        state.lbd_temp = vec![0; cnf.num_of_variables + 1];
         state.target = cnf.clone();
         state.time_limit = config.timeout;
         state.config = config.clone();
@@ -312,8 +347,34 @@ impl StateIF for State {
             return false;
         }
         match self.start.elapsed() {
-            Ok(e) => self.time_limit < e.as_secs() as f64,
+            Ok(e) => self.time_limit <= e.as_secs() as f64,
             Err(_) => false,
+        }
+    }
+    fn elapsed(&self) -> Option<f64> {
+        if self.time_limit == 0.0 {
+            return Some(0.0);
+        }
+        match self.start.elapsed() {
+            Ok(e) => Some(e.as_secs() as f64 / self.time_limit),
+            Err(_) => None,
+        }
+    }
+    fn check_stagnation(&mut self) {
+        if self[Stat::SolvedRecord] == self.num_solved_vars {
+            self.slack_duration += 1;
+        } else {
+            self.slack_duration = 0;
+        }
+        if self.stagnated {
+            self.stagnated = false
+        } else if 0 < self.slack_duration {
+            self.stagnated = (self
+                .num_unsolved_vars()
+                .next_power_of_two()
+                .trailing_zeros() as usize)
+                < self.slack_duration;
+            self[Stat::Stagnation] += 1;
         }
     }
     fn adapt_strategy(&mut self, cdb: &mut ClauseDB) {
@@ -321,12 +382,12 @@ impl StateIF for State {
             return;
         }
         let mut re_init = false;
-        let decpc = self.stats[Stat::Decision] as f64 / self.stats[Stat::Conflict] as f64;
+        let decpc = self[Stat::Decision] as f64 / self[Stat::Conflict] as f64;
         if decpc <= 1.2 {
             self.strategy = SearchStrategy::LowDecisions;
             self.use_chan_seok = true;
-            self.rst.cur_restart =
-                (self.stats[Stat::Conflict] as f64 / cdb.next_reduction as f64 + 1.0) as usize;
+            cdb.cur_restart =
+                (self[Stat::Conflict] as f64 / cdb.next_reduction as f64 + 1.0) as usize;
             cdb.co_lbd_bound = 4;
             cdb.first_reduction = 2000;
             cdb.glureduce = true;
@@ -334,16 +395,16 @@ impl StateIF for State {
             cdb.next_reduction = 2000;
             re_init = true;
         }
-        if self.stats[Stat::NoDecisionConflict] < 30_000 {
+        if self[Stat::NoDecisionConflict] < 30_000 {
             if !self.config.without_deep_search {
                 self.strategy = SearchStrategy::LowSuccesiveM;
             } else {
                 self.strategy = SearchStrategy::LowSuccesiveLuby;
-                self.rst.use_luby_restart = true;
-                self.rst.luby_restart_factor = 100.0;
+                self.rst.luby.active = true;
+                self.rst.luby.step = 100;
             }
         }
-        if self.stats[Stat::NoDecisionConflict] > 54_400 {
+        if self[Stat::NoDecisionConflict] > 54_400 {
             self.strategy = SearchStrategy::HighSuccesive;
             self.use_chan_seok = true;
             cdb.co_lbd_bound = 3;
@@ -351,7 +412,7 @@ impl StateIF for State {
             cdb.glureduce = true;
             // randomize_on_restarts = 1;
         }
-        if self.stats[Stat::NumLBD2] - self.stats[Stat::NumBin] > 20_000 {
+        if self[Stat::NumLBD2] - self[Stat::NumBin] > 20_000 {
             self.strategy = SearchStrategy::ManyGlues;
         }
         if self.strategy == SearchStrategy::Initial {
@@ -377,10 +438,10 @@ impl StateIF for State {
             println!("                                                  ");
         }
     }
-    fn flush(&self, mes: &str) {
+    fn flush<S: AsRef<str>>(&self, mes: S) {
         if self.use_progress && !self.progress_log {
             // print!("\x1B[1G{}", mes);
-            print!("{}", mes);
+            print!("{}", mes.as_ref());
             stdout().flush().unwrap();
         }
     }
@@ -409,19 +470,19 @@ impl StateIF for State {
                 "{:>11}",
                 self.record,
                 LogUsizeId::Conflict,
-                self.stats[Stat::Conflict]
+                self[Stat::Conflict]
             ),
             i!(
                 "{:>13}",
                 self.record,
                 LogUsizeId::Decision,
-                self.stats[Stat::Decision]
+                self[Stat::Decision]
             ),
             i!(
                 "{:>15}",
                 self.record,
                 LogUsizeId::Propagate,
-                self.stats[Stat::Propagation]
+                self[Stat::Propagation]
             ),
         );
         println!(
@@ -442,19 +503,14 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K Clause Kind|Remv:{}, LBD2:{}, Binc:{}, Perm:{} ",
+            "\x1B[2K      Clause|Remv:{}, LBD2:{}, Binc:{}, Perm:{} ",
             im!("{:>9}", self.record, LogUsizeId::Removable, cdb.num_learnt),
-            im!(
-                "{:>9}",
-                self.record,
-                LogUsizeId::LBD2,
-                self.stats[Stat::NumLBD2]
-            ),
+            im!("{:>9}", self.record, LogUsizeId::LBD2, self[Stat::NumLBD2]),
             im!(
                 "{:>9}",
                 self.record,
                 LogUsizeId::Binclause,
-                self.stats[Stat::NumBinLearnt]
+                self[Stat::NumBin] // self[Stat::NumBinLearnt]
             ),
             im!(
                 "{:>9}",
@@ -464,18 +520,18 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K     Restart|#BLK:{}, #RST:{}, eASG:{}, eLBD:{} ",
+            "\x1B[2K     Restart|#BLK:{}, #RST:{}, tASG:{}, tLBD:{} ",
             im!(
                 "{:>9}",
                 self.record,
                 LogUsizeId::RestartBlock,
-                self.stats[Stat::BlockRestart]
+                self[Stat::BlockRestart]
             ),
             im!(
                 "{:>9}",
                 self.record,
                 LogUsizeId::Restart,
-                self.stats[Stat::Restart]
+                self[Stat::Restart]
             ),
             fm!(
                 "{:>9.4}",
@@ -492,7 +548,7 @@ impl StateIF for State {
         );
         if 0 < self.config.dump_interval {
             println!(
-                "\x1B[2K    Conflict|aLBD:{}, cnfl:{}, bjmp:{}, rpc%:{} ",
+                "\x1B[2K    Conflict|eLBD:{}, cnfl:{}, bjmp:{}, rpc%:{} ",
                 fm!("{:>9.2}", self.record, LogF64Id::AveLBD, self.rst.lbd.get()),
                 fm!("{:>9.2}", self.record, LogF64Id::CLevel, self.c_lvl.get()),
                 fm!("{:>9.2}", self.record, LogF64Id::BLevel, self.b_lvl.get()),
@@ -500,44 +556,37 @@ impl StateIF for State {
                     "{:>9.4}",
                     self.record,
                     LogF64Id::End,
-                    100.0 * self.stats[Stat::Restart] as f64 / self.stats[Stat::Conflict] as f64
+                    100.0 * self[Stat::Restart] as f64 / self[Stat::Conflict] as f64
                 )
             );
             println!(
-                "\x1B[2K   Clause DB|#rdc:{}, #sce:{} |blkR:{}, frcK:{} ",
+                "\x1B[2K        misc|#rdc:{}, #sce:{}, stag:{}, vdcy:{} ",
                 im!(
                     "{:>9}",
                     self.record,
                     LogUsizeId::Reduction,
-                    self.stats[Stat::Reduction]
+                    self[Stat::Reduction]
                 ),
                 im!(
                     "{:>9}",
                     self.record,
                     LogUsizeId::SatClauseElim,
-                    self.stats[Stat::SatClauseElimination]
+                    self[Stat::SatClauseElimination]
                 ),
-                fm!(
-                    "{:>9.4}",
+                im!(
+                    "{:>9}",
                     self.record,
-                    LogF64Id::RestartBlkR,
-                    self.rst.asg.threshold
+                    LogUsizeId::Stagnation,
+                    self[Stat::Stagnation]
                 ),
-                fm!(
-                    "{:>9.4}",
-                    self.record,
-                    LogF64Id::RestartThrK,
-                    self.rst.lbd.threshold
-                ),
+                format!("{:>9.4}", vdb.activity_decay),
             );
         } else {
             self.record[LogF64Id::AveLBD] = self.rst.lbd.get();
             self.record[LogF64Id::CLevel] = self.c_lvl.get();
             self.record[LogF64Id::BLevel] = self.b_lvl.get();
-            self.record[LogUsizeId::Reduction] = self.stats[Stat::Reduction];
-            self.record[LogUsizeId::SatClauseElim] = self.stats[Stat::SatClauseElimination];
-            self.record[LogF64Id::RestartBlkR] = self.rst.asg.threshold;
-            self.record[LogF64Id::RestartThrK] = self.rst.lbd.threshold;
+            self.record[LogUsizeId::Reduction] = self[Stat::Reduction];
+            self.record[LogUsizeId::SatClauseElim] = self[Stat::SatClauseElimination];
         }
         if let Some(m) = mes {
             println!("\x1B[2K    Strategy|mode: {}", m);
@@ -569,26 +618,54 @@ impl fmt::Display for State {
             self.target.num_of_variables, self.target.num_of_clauses,
         );
         let vclen = vc.len();
-        let fnlen = self.target.pathname.len();
         let width = 59;
+        let mut fname = self.target.pathname.to_string();
+        if width <= fname.len() {
+            fname.truncate(58 - vclen);
+        }
+        let fnlen = fname.len();
         if width < vclen + fnlen + 1 {
-            write!(
-                f,
-                "{:<w$} |time:{:>9.2}",
-                self.target.pathname,
-                tm,
-                w = width
-            )
+            write!(f, "{:<w$} |time:{:>9.2}", fname, tm, w = width)
         } else {
             write!(
                 f,
                 "{}{:>w$} |time:{:>9.2}",
-                self.target.pathname,
+                fname,
                 &vc,
                 tm,
                 w = width - fnlen,
             )
         }
+    }
+}
+
+impl Index<LogUsizeId> for State {
+    type Output = usize;
+    #[inline]
+    fn index(&self, i: LogUsizeId) -> &Self::Output {
+        &self.record[i]
+    }
+}
+
+impl IndexMut<LogUsizeId> for State {
+    #[inline]
+    fn index_mut(&mut self, i: LogUsizeId) -> &mut Self::Output {
+        &mut self.record[i]
+    }
+}
+
+impl Index<LogF64Id> for State {
+    type Output = f64;
+    #[inline]
+    fn index(&self, i: LogF64Id) -> &Self::Output {
+        &self.record[i]
+    }
+}
+
+impl IndexMut<LogF64Id> for State {
+    #[inline]
+    fn index_mut(&mut self, i: LogF64Id) -> &mut Self::Output {
+        &mut self.record[i]
     }
 }
 
@@ -610,8 +687,6 @@ pub enum LogUsizeId {
     SatClauseElim,  // 13: simplification: usize,
     ExhaustiveElim, // 14: elimination: usize,
     Stagnation,     // 15: stagnation: usize,
-    // ElimClauseQueue, // 16: elim_clause_queue: usize,
-    // ElimVarQueue, // 17: elim_var_queue: usize,
     End,
 }
 
@@ -623,8 +698,6 @@ pub enum LogF64Id {
     AveLBD,       //  3: ave_lbd: f64,
     BLevel,       //  4: backjump_level: f64,
     CLevel,       //  5: conflict_level: f64,
-    RestartThrK,  //  6: restart K
-    RestartBlkR,  //  7: restart R
     End,
 }
 
@@ -701,19 +774,19 @@ impl State {
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
         let nlearnts = cdb.countf(Flag::LEARNT);
-        let ncnfl = self.stats[Stat::Conflict];
-        let nrestart = self.stats[Stat::Restart];
+        let ncnfl = self[Stat::Conflict];
+        let nrestart = self[Stat::Restart];
         println!(
             "c | {:>8}  {:>8} {:>8} | {:>7} {:>8} {:>8} |  {:>4}  {:>8} {:>7} {:>8} | {:>6.3} % |",
             nrestart,                              // restart
-            self.stats[Stat::BlockRestart],        // blocked
+            self[Stat::BlockRestart],              // blocked
             ncnfl / nrestart.max(1),               // average cfc (Conflict / Restart)
             nv - fixed - self.num_eliminated_vars, // alive vars
             cdb.count(true) - nlearnts,            // given clauses
             0,                                     // alive literals
-            self.stats[Stat::Reduction],           // clause reduction
+            self[Stat::Reduction],                 // clause reduction
             nlearnts,                              // alive learnts
-            self.stats[Stat::NumLBD2],             // learnts with LBD = 2
+            self[Stat::NumLBD2],                   // learnts with LBD = 2
             ncnfl - nlearnts,                      // removed learnts
             (sum as f32) / (nv as f32) * 100.0,    // progress
         );
@@ -741,8 +814,8 @@ impl State {
             cdb.num_learnt,
             cdb.num_active,
             0,
-            self.stats[Stat::BlockRestart],
-            self.stats[Stat::Restart],
+            self[Stat::BlockRestart],
+            self[Stat::Restart],
             self.rst.asg.get(),
             self.rst.lbd.get(),
             self.rst.lbd.get(),

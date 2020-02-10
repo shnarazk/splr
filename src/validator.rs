@@ -1,20 +1,31 @@
+/// Crate `validator` implements a model checker.
 use crate::{
-    clause::ClauseId,
+    propagator::PropagatorIF,
     solver::Solver,
-    traits::{LitIF, PropagatorIF, ValidatorIF, VarDBIF},
     types::{Lit, MaybeInconsistent, SolverError},
+    var::VarDBIF,
 };
+
+/// API for SAT validator like `inject_assignment`, `validate` and so on.
+pub trait ValidatorIF {
+    /// load a assignment set into solver.
+    ///
+    /// # Errors
+    ///
+    /// if solver becomes inconsistent.
+    fn inject_assigmnent(&mut self, vec: &[i32]) -> MaybeInconsistent;
+    /// return `true` is the loaded assignment set is satisfiable (a model of a problem).
+    fn validate(&self) -> Option<Vec<i32>>;
+}
 
 impl ValidatorIF for Solver {
     fn inject_assigmnent(&mut self, vec: &[i32]) -> MaybeInconsistent {
         if vec.is_empty() {
             return Err(SolverError::Inconsistent);
         }
-        for val in vec {
-            let l = Lit::from(*val);
-            let vi = l.vi();
+        for i in vec {
             self.asgs
-                .enqueue(&mut self.vdb[vi], bool::from(l), ClauseId::default(), 0)?;
+                .assign_at_rootlevel(&mut self.vdb, Lit::from(*i))?;
         }
         Ok(())
     }
