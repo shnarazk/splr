@@ -2,6 +2,7 @@
 
 - remove src/traits.rs and revise traits:
   - ActivityIF
+  - EliminatorIF
   - EmaIF
   - LBDIF
   - LitIF
