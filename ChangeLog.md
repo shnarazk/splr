@@ -1,4 +1,4 @@
-## 0.3.0, 2020-02-05
+## 0.3.0, 2020-02-10
 
 - remove src/traits.rs and revise traits:
   - ActivityIF
@@ -20,6 +20,7 @@
 - make deep_search sporadic
 - revise output format; the last line contains only satisfiability and filename
 - use another parameter set for giant problems
+- set the default value of timeout to 10000 instead of 0
 
 ## 0.2.1, 2019-12-17
 
