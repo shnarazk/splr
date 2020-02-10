@@ -16,8 +16,8 @@
 - better tests in src/*.rs
 - drop adaptive_restart
 - add more ProgressEvaluators
-- implement Index and IndexMut traits on several structs
-- AssignStack::propagate normalizes flipped binary clasues to reduce computational cost in conflict analysis
+- implement Index and IndexMut traits for several structs
+- AssignStack::propagate normalizes flipped binary clauses to reduce computational cost in conflict analysis
 - make deep_search sporadic
 - revise output format; the last line contains only satisfiability and filename
 - use another parameter set for giant problems
