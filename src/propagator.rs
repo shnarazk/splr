@@ -72,7 +72,6 @@ pub trait VarSelectionIF {
 #[derive(Debug)]
 pub struct AssignStack {
     pub trail: Vec<Lit>,
-    pub chrono_bt: bool,
     asgvec: Vec<Option<bool>>,
     trail_lim: Vec<usize>,
     q_head: usize,
@@ -83,7 +82,6 @@ impl Default for AssignStack {
     fn default() -> AssignStack {
         AssignStack {
             trail: Vec::new(),
-            chrono_bt: true,
             asgvec: Vec::new(),
             trail_lim: Vec::new(),
             q_head: 0,
@@ -217,7 +215,6 @@ impl PropagatorIF for AssignStack {
             self.trail_lim.is_empty() || cid != ClauseId::default(),
             "Null CLAUSE is used for uncheck_enqueue"
         );
-        let dl = self.trail_lim.len();
         let vi = l.vi();
         let v = &mut vdb[vi];
         debug_assert!(!v.is(Flag::ELIMINATED));
@@ -226,11 +223,7 @@ impl PropagatorIF for AssignStack {
         );
         set_assign!(self, l);
         v.assign = Some(bool::from(l));
-        v.level = if self.chrono_bt {
-            lv
-        } else {
-            dl
-        };
+        v.level = lv;
         v.reason = cid;
         vdb.reward_at_assign(vi);
         debug_assert!(!self.trail.contains(&l));
@@ -270,51 +263,28 @@ impl PropagatorIF for AssignStack {
             return;
         }
         let lim = self.trail_lim[lv];
-        // assert!(vdb[self.trail[lim]].reason == ClauseId::default());
-        if self.chrono_bt {
-            // FIXME: we can use in-place shifting technique.
-            let mut q: Vec<Lit> = Vec::new();
-            for l in &self.trail[lim..] {
-                let vi = l.vi();
-                let v = &mut vdb[vi];
-                // assert!(!self.trail.contains(&!*l));
-                // assert!(!v.assign.is_none());
-                if v.level <= lv {
-                    q.push(*l);
-                    continue;
-                }
-                unset_assign!(self, vi);
-                v.phase = v.assign.unwrap();
-                v.assign = None;
-                v.reason = ClauseId::default();
-                vdb.reward_at_unassign(vi);
-                self.var_order.insert(vdb, vi);
+        // FIXME: we can use in-place shifting technique.
+        let mut q: Vec<Lit> = Vec::new();
+        for l in &self.trail[lim..] {
+            let vi = l.vi();
+            let v = &mut vdb[vi];
+            if v.level <= lv {
+                q.push(*l);
+                continue;
             }
-            self.trail.truncate(lim);
-            // assert!(self.trail.iter().all(| l | !vdb[*l].assign.is_none()));
-            for l in &q {
-                // assert!(!vdb[*l].assign.is_none());
-                // assert!(!self.trail.contains(&!*l));
-                self.trail.push(*l);
-            }
-            self.trail_lim.truncate(lv);
-            self.q_head = self.trail.len();
-        } else {
-            for l in &self.trail[lim..] {
-                let vi = l.vi();
-                let v = &mut vdb[vi];
-                unset_assign!(self, vi);
-                v.phase = v.assign.unwrap();
-                v.assign = None;
-                v.reason = ClauseId::default();
-                vdb.reward_at_unassign(vi);
-                self.var_order.insert(vdb, vi);
-            }
-            self.trail.truncate(lim);
-            self.trail_lim.truncate(lv);
-            self.q_head = lim;
+            unset_assign!(self, vi);
+            v.phase = v.assign.unwrap();
+            v.assign = None;
+            v.reason = ClauseId::default();
+            vdb.reward_at_unassign(vi);
+            self.var_order.insert(vdb, vi);
         }
-        // assert!(self.trail.iter().all(| l | !vdb[*l].assign.is_none()));
+        self.trail.truncate(lim);
+        for l in &q {
+            self.trail.push(*l);
+        }
+        self.trail_lim.truncate(lv);
+        self.q_head = self.trail.len();
     }
     /// UNIT PROPAGATION.
     /// Note:
@@ -349,7 +319,6 @@ impl PropagatorIF for AssignStack {
                             lits.swap(0, 1);
                         }
                         let lvl = vdb[lits[1]].level;
-                        // assert!(!self.trail.contains(&!w.blocker));
                         self.assign_by_implication(vdb, w.blocker, w.c, lvl);
                         continue 'next_clause;
                     }
@@ -380,7 +349,6 @@ impl PropagatorIF for AssignStack {
                         return w.c;
                     }
                     let lv = lits[1..].iter().map(| l | vdb[*l].level).max().unwrap_or(0);
-                    // assert!(!self.trail.contains(&!first));
                     self.assign_by_implication(vdb, first, w.c, lv);
                 }
             }
