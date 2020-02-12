@@ -396,30 +396,32 @@ fn handle_conflict_path(
             // decision level, we let BCP propagating that literal at the second
             // highest decision level in conflicting cls.
             let decision = asgs[asgs.len_upto(cl - 1)];
-            assert_eq!(vdb[decision].level, cl);
-            println!("The Pass: back to {} from {} with {:?}", snd_l, cl, decision);
+            // assert_eq!(vdb[decision].level, cl);
+            // println!("The Pass: back to {} from {} with {:?}", snd_l, cl, decision);
             asgs.cancel_until(vdb, snd_l);
             // asgs.assign_by_decision(vdb, decision);
             return Ok(());
         } else {
             let lv = c.lits.iter().map(| l | vdb[*l].level).max().unwrap_or(0);
             asgs.cancel_until(vdb, lv); // this changes the decision level `cl`.
-            assert_eq!(lv, asgs.level());
-            println!("backtrack to conflicting clause's level: {} => {}", cl, lv);
+            // assert_eq!(lv, asgs.level());
+            // println!("backtrack to conflicting clause's level: {} => {}", cl, lv);
             chrono_pre_backtrace = true;
         }
     }
     let cl = asgs.level();
-    assert!(cdb[ci].lits.iter().any(|l| vdb[*l].level == cl));
+    // assert!(cdb[ci].lits.iter().any(|l| vdb[*l].level == cl));
     let bl = conflict_analyze(asgs, cdb, state, vdb, ci);
     let bl = bl.max(state.root_level);
     // vdb.bump_vars(asgs, cdb, ci);
     let new_learnt = &mut state.new_learnt;
+/*
     println!("{:?}:{}|{:?}",
              chrono_pre_backtrace,
              cl,
              new_learnt.iter().map(| l | (i32::from(*l), vdb[*l].level)).collect::<Vec<(i32, usize)>>(),
     );
+*/
     let al = if asgs.chrono_bt {
         new_learnt[1..].iter().map(| l | vdb[*l].level).max().unwrap_or(0)
     } else {
@@ -430,17 +432,17 @@ fn handle_conflict_path(
         // dump to certified even if it's a literal.
         cdb.certificate_add(new_learnt);
         if asgs.chrono_bt {
-            println!("fix");
+            // println!("fix");
             asgs.cancel_until(vdb, cl - 1);
             // asgs.assign_by_implication(vdb, new_learnt[0], ClauseId::default(), 0);
             asgs.assign_by_unitclause(vdb, new_learnt[0]);
-            println!("done");
+            // println!("done");
         } else {
             asgs.assign_by_unitclause(vdb, new_learnt[0]);
         }
     } else {
-        assert!(!chrono_pre_backtrace || vdb[new_learnt[0]].level == asgs.level());
-        assert!(chrono_pre_backtrace || vdb[new_learnt[0]].level == asgs.level());
+        // assert!(!chrono_pre_backtrace || vdb[new_learnt[0]].level == asgs.level());
+        // assert!(chrono_pre_backtrace || vdb[new_learnt[0]].level == asgs.level());
         {
             // Reason-Side Rewarding
             let mut bumped = Vec::new();
@@ -459,6 +461,7 @@ fn handle_conflict_path(
             asgs.cancel_until(vdb, bl);
         }
         let l0 = new_learnt[0];
+/*
         assert!(!asgs.trail.contains(&!l0),
                 format!("{:?}@{} at level:{}, learn_len: {} ",
                         l0,
@@ -468,6 +471,7 @@ fn handle_conflict_path(
                 ),
                
         );
+*/
         let lbd = vdb.compute_lbd(&new_learnt);
         let cid = cdb.attach(state, vdb, lbd);
         elim.add_cid_occur(vdb, cid, &mut cdb[cid], true);
@@ -481,13 +485,15 @@ fn handle_conflict_path(
             state[Stat::NumBinLearnt] += 1;
         }
         if chrono_pre_backtrace {
+/*
             println!("reassign {} at level {} from level {}",
                      i32::from(l0),
                      al,
                      vdb[l0].level,
             );
+*/
         } else {
-            println!("passing the normal path");
+            // println!("passing the normal path");
         }
         if asgs.chrono_bt {
             asgs.assign_by_implication(vdb, l0, cid, al);
@@ -658,9 +664,9 @@ fn conflict_analyze(
     if learnt.len() == 2 && learnt[1] == !p {
         learnt.truncate(1);
     }
-    assert!(learnt.iter().all(| l | *l != !p));
+    // assert!(learnt.iter().all(| l | *l != !p));
     learnt[0] = !p;
-    assert_eq!(vdb[p].level, asgs.level());
+    // assert_eq!(vdb[p].level, asgs.level());
     // println!("- appending {}, the result is {:?}", learnt[0].int(), vec2int(learnt));
     simplify_learnt(asgs, cdb, state, vdb)
 }
