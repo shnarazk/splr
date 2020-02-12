@@ -211,10 +211,10 @@ impl PropagatorIF for AssignStack {
     }
     fn assign_by_implication(&mut self, vdb: &mut VarDB, l: Lit, cid: ClauseId, lv: usize) {
         debug_assert!(usize::from(l) != 0, "Null literal is about to be equeued");
-        debug_assert!(
-            self.trail_lim.is_empty() || cid != ClauseId::default(),
-            "Null CLAUSE is used for uncheck_enqueue"
-        );
+        // debug_assert!(
+        //     self.trail_lim.is_empty() || cid != ClauseId::default(),
+        //     "Null CLAUSE is used for uncheck_enqueue"
+        // );
         let vi = l.vi();
         let v = &mut vdb[vi];
         debug_assert!(!v.is(Flag::ELIMINATED));
@@ -348,7 +348,7 @@ impl PropagatorIF for AssignStack {
                         // state.rst.rcc.update(vdb[p.vi()].record_conflict(ncnfl));
                         return w.c;
                     }
-                    let lv = lits[1..].iter().map(| l | vdb[*l].level).max().unwrap_or(0);
+                    let lv = lits[1..].iter().map(|l| vdb[*l].level).max().unwrap_or(0);
                     self.assign_by_implication(vdb, first, w.c, lv);
                 }
             }

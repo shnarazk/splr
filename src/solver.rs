@@ -352,6 +352,10 @@ fn search(
                 analyze_final(asgs, state, vdb, &cdb[ci]);
                 return Ok(false);
             }
+            /// For Chronological Backtracking
+            if cdb[ci].lits.iter().all(| l | vdb[*l].level == 0) {
+                return Ok(false);
+            }
             handle_conflict_path(asgs, cdb, elim, state, vdb, ci)?;
         }
     }
@@ -380,36 +384,40 @@ fn handle_conflict_path(
     let use_chrono_bt = true;
     if use_chrono_bt {
         let c = &cdb[ci];
-        let ls_max = c.lits.iter().map(| l | vdb[*l].level == cl).count();
+        let ls_max = c.lits.iter().map(|l| vdb[*l].level == cl).count();
         if 1 == ls_max {
-            let snd_l = c.lits.iter().map(| l |
-                                          {
-                                              let lv = vdb[*l].level;
-                                              if lv == cl {
-                                                  0
-                                              } else {
-                                                  lv
-                                              }
-                                          }
-            ).max().unwrap_or(0);
+            let snd_l = c
+                .lits
+                .iter()
+                .map(|l| vdb[*l].level)
+                .filter(|l| *l != cl)
+                .max()
+                .unwrap_or(0);
             // If the conflicting clause contains one literallfrom the maximal
             // decision level, we let BCP propagating that literal at the second
             // highest decision level in conflicting cls.
             asgs.cancel_until(vdb, snd_l);
             return Ok(());
         } else {
-            let lv = c.lits.iter().map(| l | vdb[*l].level).max().unwrap_or(0);
+            let lv = c.lits.iter().map(|l| vdb[*l].level).max().unwrap_or(0);
             asgs.cancel_until(vdb, lv); // this changes the decision level `cl`.
         }
     }
     let cl = asgs.level();
     let bl = conflict_analyze(asgs, cdb, state, vdb, ci).max(state.root_level);
+//    if state.new_learnt.is_empty() {
+//        return Err(SolverError::StateUNSAT);
+//    }
     // vdb.bump_vars(asgs, cdb, ci);
     let chrono_bt = 10_000 < ncnfl && 100 < cl - bl;
     let new_learnt = &mut state.new_learnt;
     let l0 = new_learnt[0];
     let al = if chrono_bt {
-        new_learnt[1..].iter().map(| l | vdb[*l].level).max().unwrap_or(0)
+        new_learnt[1..]
+            .iter()
+            .map(|l| vdb[*l].level)
+            .max()
+            .unwrap_or(0)
     } else {
         bl
     };
@@ -597,6 +605,17 @@ fn conflict_analyze(
         // set the index of the next literal to ti
         while !vdb[asgs.trail[ti].vi()].is(Flag::CA_SEEN) {
             // println!("- skip {} because it isn't flagged", asgs.trail[ti].int());
+//            if ti == 0 && path_cnt == 0 {
+//                learnt.remove(0);
+//                return simplify_learnt(asgs, cdb, state, vdb);
+//            }
+//            assert!(0 < ti,
+//                    format!("got:{}, dl:{}, path_cnt: {}",
+//                            learnt.len(),
+//                            asgs.level(),
+//                            path_cnt,
+//                    ),
+//            );
             ti -= 1;
         }
         p = asgs.trail[ti];
@@ -610,7 +629,7 @@ fn conflict_analyze(
         if vdb[next_vi].level == dl {
             path_cnt -= 1;
         }
-        if path_cnt <= 0 {
+        if path_cnt == 0 {
             break;
         }
         debug_assert!(0 < ti);
@@ -637,6 +656,9 @@ fn simplify_learnt(
         ref mut new_learnt, ..
     } = state;
     // let dl = asgs.level();
+//    if new_learnt.is_empty() {
+//        return 0;
+//    }
     let mut to_clear: Vec<Lit> = vec![new_learnt[0]];
     let mut levels = vec![false; asgs.level() + 1];
     for l in &new_learnt[1..] {
