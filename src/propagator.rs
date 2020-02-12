@@ -42,7 +42,7 @@ pub trait PropagatorIF {
     fn assign_at_rootlevel(&mut self, vdb: &mut VarDB, l: Lit) -> MaybeInconsistent;
     /// unsafe enqueue (assign by implication); doesn't emit an exception.
     /// Warning: caller must assure the consistency after this assignment
-    fn assign_by_implication(&mut self, vdb: &mut VarDB, l: Lit, cid: ClauseId);
+    fn assign_by_implication(&mut self, vdb: &mut VarDB, l: Lit, cid: ClauseId, lv: usize);
     /// unsafe assume (assign by decision); doesn't emit an exception.
     /// ## Caveat
     /// Callers have to assure the consistency after this assignment.
@@ -72,6 +72,7 @@ pub trait VarSelectionIF {
 #[derive(Debug)]
 pub struct AssignStack {
     pub trail: Vec<Lit>,
+    pub chrono_bt: bool,
     asgvec: Vec<Option<bool>>,
     trail_lim: Vec<usize>,
     q_head: usize,
@@ -82,6 +83,7 @@ impl Default for AssignStack {
     fn default() -> AssignStack {
         AssignStack {
             trail: Vec::new(),
+            chrono_bt: true,
             asgvec: Vec::new(),
             trail_lim: Vec::new(),
             q_head: 0,
@@ -201,6 +203,7 @@ impl PropagatorIF for AssignStack {
                 v.assign = Some(bool::from(l));
                 v.level = 0;
                 v.reason = ClauseId::default();
+                assert!(!self.trail.contains(&!l));
                 self.trail.push(l);
                 Ok(())
             }
@@ -208,7 +211,7 @@ impl PropagatorIF for AssignStack {
             _ => Err(SolverError::Inconsistent),
         }
     }
-    fn assign_by_implication(&mut self, vdb: &mut VarDB, l: Lit, cid: ClauseId) {
+    fn assign_by_implication(&mut self, vdb: &mut VarDB, l: Lit, cid: ClauseId, lv: usize) {
         debug_assert!(usize::from(l) != 0, "Null literal is about to be equeued");
         debug_assert!(
             self.trail_lim.is_empty() || cid != ClauseId::default(),
@@ -223,11 +226,16 @@ impl PropagatorIF for AssignStack {
         );
         set_assign!(self, l);
         v.assign = Some(bool::from(l));
-        v.level = dl;
+        v.level = if self.chrono_bt {
+            lv
+        } else {
+            dl
+        };
         v.reason = cid;
         vdb.reward_at_assign(vi);
         debug_assert!(!self.trail.contains(&l));
         debug_assert!(!self.trail.contains(&!l));
+        assert!(!self.trail.contains(&!l));
         self.trail.push(l);
     }
     fn assign_by_decision(&mut self, vdb: &mut VarDB, l: Lit) {
@@ -244,6 +252,7 @@ impl PropagatorIF for AssignStack {
         v.level = dl;
         v.reason = ClauseId::default();
         vdb.reward_at_assign(vi);
+        assert!(!self.trail.contains(&!l));
         self.trail.push(l);
     }
     fn assign_by_unitclause(&mut self, vdb: &mut VarDB, l: Lit) {
@@ -253,6 +262,7 @@ impl PropagatorIF for AssignStack {
         v.assign = Some(bool::from(l));
         v.level = 0;
         v.reason = ClauseId::default();
+        assert!(!self.trail.contains(&!l));
         self.trail.push(l);
     }
     fn cancel_until(&mut self, vdb: &mut VarDB, lv: usize) {
@@ -260,19 +270,51 @@ impl PropagatorIF for AssignStack {
             return;
         }
         let lim = self.trail_lim[lv];
-        for l in &self.trail[lim..] {
-            let vi = l.vi();
-            let v = &mut vdb[vi];
-            unset_assign!(self, vi);
-            v.phase = v.assign.unwrap();
-            v.assign = None;
-            v.reason = ClauseId::default();
-            vdb.reward_at_unassign(vi);
-            self.var_order.insert(vdb, vi);
+        assert!(vdb[self.trail[lim]].reason == ClauseId::default());
+        if self.chrono_bt {
+            // FIXME: we can use in-place shifting technique.
+            let mut q: Vec<Lit> = Vec::new();
+            for l in &self.trail[lim..] {
+                let vi = l.vi();
+                let v = &mut vdb[vi];
+                assert!(!self.trail.contains(&!*l));
+                assert!(!v.assign.is_none());
+                if v.level <= lv {
+                    q.push(*l);
+                    continue;
+                }
+                unset_assign!(self, vi);
+                v.phase = v.assign.unwrap();
+                v.assign = None;
+                v.reason = ClauseId::default();
+                vdb.reward_at_unassign(vi);
+                self.var_order.insert(vdb, vi);
+            }
+            self.trail.truncate(lim);
+            assert!(self.trail.iter().all(| l | !vdb[*l].assign.is_none()));
+            for l in &q {
+                assert!(!vdb[*l].assign.is_none());
+                assert!(!self.trail.contains(&!*l));
+                self.trail.push(*l);
+            }
+            self.trail_lim.truncate(lv);
+            self.q_head = self.trail.len();
+        } else {
+            for l in &self.trail[lim..] {
+                let vi = l.vi();
+                let v = &mut vdb[vi];
+                unset_assign!(self, vi);
+                v.phase = v.assign.unwrap();
+                v.assign = None;
+                v.reason = ClauseId::default();
+                vdb.reward_at_unassign(vi);
+                self.var_order.insert(vdb, vi);
+            }
+            self.trail.truncate(lim);
+            self.trail_lim.truncate(lv);
+            self.q_head = lim;
         }
-        self.trail.truncate(lim);
-        self.trail_lim.truncate(lv);
-        self.q_head = lim;
+        assert!(self.trail.iter().all(| l | !vdb[*l].assign.is_none()));
     }
     /// UNIT PROPAGATION.
     /// Note:
@@ -303,10 +345,12 @@ impl PropagatorIF for AssignStack {
                             // state.rst.rcc.update(vdb[p.vi()].record_conflict(ncnfl));
                             return w.c;
                         }
-                        self.assign_by_implication(vdb, w.blocker, w.c);
                         if lits[0] == false_lit {
                             lits.swap(0, 1);
                         }
+                        let lvl = vdb[lits[1]].level;
+                        assert!(!self.trail.contains(&!w.blocker));
+                        self.assign_by_implication(vdb, w.blocker, w.c, lvl);
                         continue 'next_clause;
                     }
                     debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
@@ -335,7 +379,9 @@ impl PropagatorIF for AssignStack {
                         // state.rst.rcc.update(vdb[p.vi()].record_conflict(ncnfl));
                         return w.c;
                     }
-                    self.assign_by_implication(vdb, first, w.c);
+                    let lv = lits[1..].iter().map(| l | vdb[*l].level).max().unwrap_or(0);
+                    assert!(!self.trail.contains(&!first));
+                    self.assign_by_implication(vdb, first, w.c, lv);
                 }
             }
         }

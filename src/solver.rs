@@ -377,15 +377,70 @@ fn handle_conflict_path(
         state[Stat::BlockRestart] += 1;
     }
     let cl = asgs.level();
-    let bl = analyze(asgs, cdb, state, vdb, ci);
+    let mut chrono_pre_backtrace = false;
+    if asgs.chrono_bt {
+        let c = &cdb[ci];
+        let ls_max = c.lits.iter().map(| l | vdb[*l].level == cl).count();
+        if 1 == ls_max {
+            let snd_l = c.lits.iter().map(| l |
+                                          {
+                                              let lv = vdb[*l].level;
+                                              if lv == cl {
+                                                  0
+                                              } else {
+                                                  lv
+                                              }
+                                          }
+            ).max().unwrap_or(0);
+            // If the conflicting clause contains one literallfrom the maximal
+            // decision level, we let BCP propagating that literal at the second
+            // highest decision level in conflicting cls.
+            let decision = asgs[asgs.len_upto(cl - 1)];
+            assert_eq!(vdb[decision].level, cl);
+            println!("The Pass: back to {} from {} with {:?}", snd_l, cl, decision);
+            asgs.cancel_until(vdb, snd_l);
+            // asgs.assign_by_decision(vdb, decision);
+            return Ok(());
+        } else {
+            let lv = c.lits.iter().map(| l | vdb[*l].level).max().unwrap_or(0);
+            asgs.cancel_until(vdb, lv); // this changes the decision level `cl`.
+            assert_eq!(lv, asgs.level());
+            println!("backtrack to conflicting clause's level: {} => {}", cl, lv);
+            chrono_pre_backtrace = true;
+        }
+    }
+    let cl = asgs.level();
+    assert!(cdb[ci].lits.iter().any(|l| vdb[*l].level == cl));
+    let bl = conflict_analyze(asgs, cdb, state, vdb, ci);
+    let bl = bl.max(state.root_level);
     // vdb.bump_vars(asgs, cdb, ci);
     let new_learnt = &mut state.new_learnt;
+    println!("{:?}:{}|{:?}",
+             chrono_pre_backtrace,
+             cl,
+             new_learnt.iter().map(| l | (i32::from(*l), vdb[*l].level)).collect::<Vec<(i32, usize)>>(),
+    );
+    let al = if asgs.chrono_bt {
+        new_learnt[1..].iter().map(| l | vdb[*l].level).max().unwrap_or(0)
+    } else {
+        bl
+    };
     let learnt_len = new_learnt.len();
     if learnt_len == 1 {
         // dump to certified even if it's a literal.
         cdb.certificate_add(new_learnt);
-        asgs.assign_by_unitclause(vdb, new_learnt[0]);
+        if asgs.chrono_bt {
+            println!("fix");
+            asgs.cancel_until(vdb, cl - 1);
+            // asgs.assign_by_implication(vdb, new_learnt[0], ClauseId::default(), 0);
+            asgs.assign_by_unitclause(vdb, new_learnt[0]);
+            println!("done");
+        } else {
+            asgs.assign_by_unitclause(vdb, new_learnt[0]);
+        }
     } else {
+        assert!(!chrono_pre_backtrace || vdb[new_learnt[0]].level == asgs.level());
+        assert!(chrono_pre_backtrace || vdb[new_learnt[0]].level == asgs.level());
         {
             // Reason-Side Rewarding
             let mut bumped = Vec::new();
@@ -398,9 +453,22 @@ fn handle_conflict_path(
                 }
             }
         }
-        asgs.cancel_until(vdb, bl.max(state.root_level));
-        let lbd = vdb.compute_lbd(&new_learnt);
+        if asgs.chrono_bt {
+            asgs.cancel_until(vdb, cl - 1);
+        } else {
+            asgs.cancel_until(vdb, bl);
+        }
         let l0 = new_learnt[0];
+        assert!(!asgs.trail.contains(&!l0),
+                format!("{:?}@{} at level:{}, learn_len: {} ",
+                        l0,
+                        vdb[l0].level,
+                        asgs.level(),
+                        learnt_len,
+                ),
+               
+        );
+        let lbd = vdb.compute_lbd(&new_learnt);
         let cid = cdb.attach(state, vdb, lbd);
         elim.add_cid_occur(vdb, cid, &mut cdb[cid], true);
         state.c_lvl.update(cl as f64);
@@ -412,7 +480,20 @@ fn handle_conflict_path(
             state[Stat::NumBin] += 1;
             state[Stat::NumBinLearnt] += 1;
         }
-        asgs.assign_by_implication(vdb, l0, cid);
+        if chrono_pre_backtrace {
+            println!("reassign {} at level {} from level {}",
+                     i32::from(l0),
+                     al,
+                     vdb[l0].level,
+            );
+        } else {
+            println!("passing the normal path");
+        }
+        if asgs.chrono_bt {
+            asgs.assign_by_implication(vdb, l0, cid, al);
+        } else {
+            asgs.assign_by_implication(vdb, l0, cid, bl);
+        }
         state.rst.lbd.update(lbd);
         state[Stat::SumLBD] += lbd;
         state[Stat::Learnt] += 1;
@@ -485,7 +566,7 @@ fn adapt_parameters(
     Ok(())
 }
 
-fn analyze(
+fn conflict_analyze(
     asgs: &mut AssignStack,
     cdb: &mut ClauseDB,
     state: &mut State,
@@ -562,7 +643,11 @@ fn analyze(
         // println!("- move to flagged {}, which reason is {}; num path: {}",
         //          next_vi, path_cnt - 1, cid.fmt());
         vdb[next_vi].turn_off(Flag::CA_SEEN);
-        path_cnt -= 1;
+        // since the trail can contain a literal which level is under `dl` after
+        // the `dl`-th thdecision var, we must skip it.
+        if vdb[next_vi].level == dl {
+            path_cnt -= 1;
+        }
         if path_cnt <= 0 {
             break;
         }
@@ -570,7 +655,12 @@ fn analyze(
         ti -= 1;
         debug_assert_ne!(cid, ClauseId::default());
     }
+    if learnt.len() == 2 && learnt[1] == !p {
+        learnt.truncate(1);
+    }
+    assert!(learnt.iter().all(| l | *l != !p));
     learnt[0] = !p;
+    assert_eq!(vdb[p].level, asgs.level());
     // println!("- appending {}, the result is {:?}", learnt[0].int(), vec2int(learnt));
     simplify_learnt(asgs, cdb, state, vdb)
 }
