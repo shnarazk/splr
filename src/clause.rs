@@ -733,11 +733,7 @@ impl ClauseDBIF for ClauseDB {
             vdb.reset_lbd(self);
             elim.stop(self, vdb);
         }
-        if self.check_size().is_err() {
-            Err(SolverError::Inconsistent)
-        } else {
-            Ok(())
-        }
+        self.check_size()
     }
     fn reset(&mut self) {
         debug_assert!(1 < self.clause.len());
@@ -784,7 +780,7 @@ impl ClauseDBIF for ClauseDB {
         if self.soft_limit == 0 || self.count(false) <= self.soft_limit {
             Ok(())
         } else {
-            Err(SolverError::Inconsistent)
+            Err(SolverError::OutOfMemory)
         }
     }
     fn make_permanent(&mut self, reinit: bool) {

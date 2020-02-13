@@ -190,23 +190,21 @@ impl SatSolverIF for Solver {
                 }
                 elim.extend_model(&mut result);
                 asgs.cancel_until(vdb, 0);
-                Ok(Certificate::SAT(result))
+                if let Some(_) = cdb.validate(vdb) {
+                    Err(SolverError::SolverBug)
+                } else {
+                    Ok(Certificate::SAT(result))
+                }
             }
             Ok(false) => {
                 state.progress(cdb, vdb, None);
                 asgs.cancel_until(vdb, 0);
                 Ok(Certificate::UNSAT)
             }
-            Err(_) => {
+            Err(e) => {
                 asgs.cancel_until(vdb, 0);
                 state.progress(cdb, vdb, None);
-                if cdb.check_size().is_err() {
-                    Err(SolverError::OutOfMemory)
-                } else if state.is_timeout() {
-                    Err(SolverError::TimeOut)
-                } else {
-                    Err(SolverError::Inconsistent)
-                }
+                Err(e)
             }
         }
     }
@@ -429,6 +427,10 @@ fn handle_conflict_path(
         asgs.cancel_until(vdb, cl - 1);
         asgs.assign_by_implication(vdb, l0, ClauseId::default(), al);
         state.num_solved_vars += 1;
+        if let Some(cid) = cdb.validate(vdb) {
+            panic!("{:?}", Vec::<i32>::from(&cdb[cid]));
+            return Err(SolverError::SolverBug);
+        }
     } else {
         {
             // Reason-Side Rewarding
