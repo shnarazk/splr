@@ -352,7 +352,7 @@ fn search(
                 analyze_final(asgs, state, vdb, &cdb[ci]);
                 return Ok(false);
             }
-            /// For Chronological Backtracking
+            // For Chronological Backtracking
             if cdb[ci].lits.iter().all(| l | vdb[*l].level == 0) {
                 return Ok(false);
             }

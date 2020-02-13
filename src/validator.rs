@@ -1,9 +1,9 @@
 /// Crate `validator` implements a model checker.
 use crate::{
+    clause::ClauseDBIF,
     propagator::PropagatorIF,
     solver::Solver,
     types::{Lit, MaybeInconsistent, SolverError},
-    var::VarDBIF,
 };
 
 /// API for SAT validator like `inject_assignment`, `validate` and so on.
@@ -32,15 +32,6 @@ impl ValidatorIF for Solver {
     /// returns None if the given assignment is a model of a problem.
     /// Otherwise returns a clause which is not satisfiable under a given assignment.
     fn validate(&self) -> Option<Vec<i32>> {
-        for ch in &self.cdb[1..] {
-            if !self.vdb.satisfies(&ch.lits) {
-                let mut v = Vec::new();
-                for l in &ch.lits {
-                    v.push(i32::from(*l));
-                }
-                return Some(v);
-            }
-        }
-        None
+        self.cdb.validate(&self.vdb).map(| cid | Vec::<i32>::from(&self.cdb[cid]))
     }
 }

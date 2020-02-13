@@ -71,6 +71,9 @@ pub trait ClauseDBIF {
     fn check_size(&self) -> MaybeInconsistent;
     /// change good learnt clauses to permanent one.
     fn make_permanent(&mut self, reinit: bool);
+    /// returns None if the given assignment is a model of a problem.
+    /// Otherwise returns a clause which is not satisfiable under a given assignment.
+    fn validate(&self, vdb: &VarDB) -> Option<ClauseId>;
 }
 
 /// API for Clause Id like `to_lit`, `is_lifted_lit` and so on.
@@ -255,6 +258,12 @@ impl IndexMut<RangeFrom<usize>> for Clause {
     #[inline]
     fn index_mut(&mut self, r: RangeFrom<usize>) -> &mut [Lit] {
         &mut self.lits[r]
+    }
+}
+
+impl From<&Clause> for Vec<i32> {
+    fn from(c: &Clause) -> Vec<i32> {
+        c.lits.iter().map(| l | i32::from(*l)).collect::<Vec<i32>>()
     }
 }
 
@@ -793,6 +802,14 @@ impl ClauseDBIF for ClauseDB {
             }
         }
         self.garbage_collect();
+    }
+    fn validate(&self, vdb: &VarDB) -> Option<ClauseId> {
+        for (i, c) in self.clause.iter().enumerate().skip(1) {
+            if !vdb.satisfies(&c.lits) {
+                return Some(ClauseId::from(i));
+            }
+        }
+        None
     }
 }
 
