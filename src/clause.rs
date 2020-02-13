@@ -12,6 +12,7 @@ use {
         cmp::Ordering,
         fmt,
         ops::{Index, IndexMut, Range, RangeFrom},
+        slice::Iter,
     },
 };
 
@@ -73,7 +74,8 @@ pub trait ClauseDBIF {
     fn make_permanent(&mut self, reinit: bool);
     /// returns None if the given assignment is a model of a problem.
     /// Otherwise returns a clause which is not satisfiable under a given assignment.
-    fn validate(&self, vdb: &VarDB) -> Option<ClauseId>;
+    /// Clauses with an unassigned literal are treated as falsified in `strict` mode.
+    fn validate(&self, vdb: &VarDB, strict: bool) -> Option<ClauseId>;
 }
 
 /// API for Clause Id like `to_lit`, `is_lifted_lit` and so on.
@@ -258,6 +260,22 @@ impl IndexMut<RangeFrom<usize>> for Clause {
     #[inline]
     fn index_mut(&mut self, r: RangeFrom<usize>) -> &mut [Lit] {
         &mut self.lits[r]
+    }
+}
+
+impl<'a> IntoIterator for &'a Clause {
+    type Item = &'a Lit;
+    type IntoIter = Iter<'a, Lit>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.lits.iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a mut Clause {
+    type Item = &'a Lit;
+    type IntoIter = Iter<'a, Lit>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.lits.iter()
     }
 }
 
@@ -799,10 +817,15 @@ impl ClauseDBIF for ClauseDB {
         }
         self.garbage_collect();
     }
-    fn validate(&self, vdb: &VarDB) -> Option<ClauseId> {
+    fn validate(&self, vdb: &VarDB, strict: bool) -> Option<ClauseId> {
         for (i, c) in self.clause.iter().enumerate().skip(1) {
-            if !vdb.satisfies(&c.lits) {
-                return Some(ClauseId::from(i));
+            if c.is(Flag::DEAD) {
+                continue;
+            }
+            match vdb.status(&c.lits) {
+                Some(false) => return Some(ClauseId::from(i)),
+                None if strict => return Some(ClauseId::from(i)),
+                _ => (),
             }
         }
         None

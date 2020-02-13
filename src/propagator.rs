@@ -12,6 +12,7 @@ use {
         fs::File,
         io::{BufWriter, Write},
         ops::{Index, Range, RangeFrom},
+        slice::Iter,
     },
 };
 
@@ -157,6 +158,20 @@ impl Index<RangeFrom<usize>> for AssignStack {
     }
 }
 
+impl<'a> IntoIterator for &'a mut AssignStack {
+    type Item = &'a Lit;
+    type IntoIter = Iter<'a, Lit>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.trail.iter()
+    }
+}
+
+impl From<&mut AssignStack> for Vec<i32> {
+    fn from(asgs: &mut AssignStack) -> Vec<i32> {
+        asgs.trail.iter().map(| l | i32::from(*l)).collect::<Vec<i32>>()
+    }
+}
+
 impl Instantiate for AssignStack {
     fn instantiate(_: &Config, cnf: &CNFDescription) -> AssignStack {
         let nv = cnf.num_of_variables;
@@ -228,7 +243,7 @@ impl PropagatorIF for AssignStack {
         vdb.reward_at_assign(vi);
         debug_assert!(!self.trail.contains(&l));
         debug_assert!(!self.trail.contains(&!l));
-        // assert!(!self.trail.contains(&!l));
+        assert!(!self.trail.contains(&!l));
         self.trail.push(l);
     }
     fn assign_by_decision(&mut self, vdb: &mut VarDB, l: Lit) {
@@ -245,7 +260,7 @@ impl PropagatorIF for AssignStack {
         v.level = dl;
         v.reason = ClauseId::default();
         vdb.reward_at_assign(vi);
-        // assert!(!self.trail.contains(&!l));
+        assert!(!self.trail.contains(&!l));
         self.trail.push(l);
     }
     fn assign_by_unitclause(&mut self, vdb: &mut VarDB, l: Lit) {
@@ -255,7 +270,7 @@ impl PropagatorIF for AssignStack {
         v.assign = Some(bool::from(l));
         v.level = 0;
         v.reason = ClauseId::default();
-        // assert!(!self.trail.contains(&!l));
+        assert!(!self.trail.contains(&!l));
         self.trail.push(l);
     }
     fn cancel_until(&mut self, vdb: &mut VarDB, lv: usize) {

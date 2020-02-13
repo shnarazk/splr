@@ -33,6 +33,11 @@ pub trait VarDBIF {
     fn locked(&self, c: &Clause, cid: ClauseId) -> bool;
     /// return `true` if the set of literals is satisfiable under the current assignment.
     fn satisfies(&self, c: &[Lit]) -> bool;
+    /// return Option<bool>
+    /// - Some(true) -- the literals is satisfied by a literal
+    /// - Some(false) -- the literals is unsatisfied; no unassigned literal
+    /// - None -- the literals contains an unassigned literal
+    fn status(&self, c: &[Lit]) -> Option<bool>;
     // minimize a clause.
     fn minimize_with_bi_clauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>);
     // bump vars' activities.
@@ -345,6 +350,21 @@ impl VarDBIF for VarDB {
             }
         }
         false
+    }
+    fn status(&self, vec: &[Lit]) -> Option<bool> {
+        let mut unbound = false;
+        for l in vec {
+            match self.assigned(*l) {
+                Some(true) => return Some(true),
+                None => unbound = true,
+                _ => (),
+            }
+        }
+        if unbound {
+            None
+        } else {
+            Some(false)
+        }
     }
     fn minimize_with_bi_clauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>) {
         let nlevels = self.compute_lbd(vec);
