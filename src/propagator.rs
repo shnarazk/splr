@@ -243,7 +243,7 @@ impl PropagatorIF for AssignStack {
         vdb.reward_at_assign(vi);
         debug_assert!(!self.trail.contains(&l));
         debug_assert!(!self.trail.contains(&!l));
-        assert!(!self.trail.contains(&!l));
+        debug_assert!(!self.trail.contains(&!l));
         self.trail.push(l);
     }
     fn assign_by_decision(&mut self, vdb: &mut VarDB, l: Lit) {
@@ -260,7 +260,7 @@ impl PropagatorIF for AssignStack {
         v.level = dl;
         v.reason = ClauseId::default();
         vdb.reward_at_assign(vi);
-        assert!(!self.trail.contains(&!l));
+        debug_assert!(!self.trail.contains(&!l));
         self.trail.push(l);
     }
     fn assign_by_unitclause(&mut self, vdb: &mut VarDB, l: Lit) {
@@ -270,7 +270,7 @@ impl PropagatorIF for AssignStack {
         v.assign = Some(bool::from(l));
         v.level = 0;
         v.reason = ClauseId::default();
-        assert!(!self.trail.contains(&!l));
+        debug_assert!(!self.trail.contains(&!l));
         self.trail.push(l);
     }
     fn cancel_until(&mut self, vdb: &mut VarDB, lv: usize) {

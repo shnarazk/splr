@@ -11,6 +11,7 @@ use {
         var::{VarDB, VarDBIF, VarRewardIF, LBDIF},
     },
     std::{convert::TryFrom, io::BufRead},
+    std::slice::Iter,
 };
 
 /// API for SAT solver like `build`, `solve` and so on.
@@ -267,7 +268,7 @@ impl SatSolverIF for Solver {
             ref mut vdb,
             ..
         } = self;
-        assert!(0 < lits.len());
+        // assert!(0 < lits.len());
         debug_assert!(asgs.level() == 0);
         if lits.iter().any(|l| vdb.assigned(*l).is_some()) {
             cdb.certificate_add(lits);
@@ -408,18 +409,13 @@ fn handle_conflict_path(
         }
     }
     let cl = asgs.level();
-    assert!(cdb[ci].lits.iter().any(| l | vdb[*l].level == cl));
+    debug_assert!(cdb[ci].lits.iter().any(| l | vdb[*l].level == cl));
     let bl = conflict_analyze(asgs, cdb, state, vdb, ci).max(state.root_level);
     if state.new_learnt.is_empty() {
-        fn dump(c: &Clause, vdb: &VarDB) -> Vec<(i32, usize)> {
-            c.into_iter()
-                .map(| l | (i32::from(*l), vdb[*l].level))
-                .collect::<Vec<(i32, usize)>>()
-        }
         println!("empty learnt at {}({}) by {:?}",
                  cl,
                  vdb[asgs.len_upto(cl - 1)].reason == ClauseId::default(),
-                 dump(&cdb[ci], vdb),
+                 vdb.dump(&cdb[ci]),
         );
         panic!();
         // return Err(SolverError::UndescribedError);
@@ -427,7 +423,7 @@ fn handle_conflict_path(
     // vdb.bump_vars(asgs, cdb, ci);
     let chrono_bt = use_chrono_bt && 10_000 < ncnfl && 100 < cl - bl;
     let new_learnt = &mut state.new_learnt;
-    assert!(0 < new_learnt.len());
+    debug_assert!(0 < new_learnt.len());
     let l0 = new_learnt[0];
     let al = if chrono_bt {
         new_learnt[1..]
@@ -449,24 +445,26 @@ fn handle_conflict_path(
         // asgs.cancel_until(vdb, 0);
         asgs.assign_by_implication(vdb, l0, ClauseId::default(), 0);
         state.num_solved_vars += 1;
-        println!("fix {}", i32::from(l0));
-        if use_chrono_bt {
+        // println!("fix {}", i32::from(l0));
+/*
+        // Note: propagations are executed in out of level order in chrono_bt mode.
+        // So there must be possibilities of a temporal inconsistency.
+        // It is found and settled in future.
+        if !use_chrono_bt {
             if let Some(cid) = cdb.validate(vdb, false) {
-                for i in 1..10usize {
-                    println!("{}{:?}",
-                             cid,
-                             Vec::<i32>::from(&cdb[ClauseId::from(i)]),
-                    );
-                }
-                panic!("conflict_analyses:{}-{}:{:?}\nA:{:?}",
-                       cid,
-                       cdb[cid].len(),
-                       Vec::<i32>::from(&cdb[cid]),
-                       Vec::<i32>::from(asgs),
-                );
+                let mut le = vdb.dump(&cdb[cid]);
+                le.truncate(20);
+                state.flush(
+                    format!("after fix {} from {}, falsified:{} {:?}",
+                            i32::from(l0),
+                            cl,
+                            cid,
+                            le,
+                    ));
                 // return Err(SolverError::SolverBug);
             }
         }
+*/
     } else {
         {
             // Reason-Side Rewarding
@@ -647,17 +645,12 @@ fn conflict_analyze(
         }
         {
             // println!("- skip {} because it isn't flagged", asgs.trail[ti].int());
-            let dump = | vec: &[Lit] | -> Vec<(i32, usize, bool)> {
-                vec.iter()
-                    .map(|l| (i32::from(*l), vdb[*l].level, vdb[*l].reason == ClauseId::default()))
-                    .collect::<Vec<(i32, usize, bool)>>()
-            };
-            assert!(0 < ti,
-                    format!("lv: {}, learnt: {:?}\nconflict: {:?}",
-                            dl,
-                            dump(learnt),
-                            dump(&cdb[confl].lits),
-                    ),
+            debug_assert!(0 < ti,
+                          format!("lv: {}, learnt: {:?}\nconflict: {:?}",
+                                  dl,
+                                  vdb.dump(&*learnt),
+                                  vdb.dump(&cdb[confl].lits),
+                          ),
             );
             ti -= 1;
         }
@@ -681,10 +674,10 @@ fn conflict_analyze(
         learnt.truncate(1);
         panic!("643")
     }
-    assert!(learnt.iter().all(| l | *l != !p));
-    assert_eq!(vdb[p].level, dl);
+    debug_assert!(learnt.iter().all(| l | *l != !p));
+    debug_assert_eq!(vdb[p].level, dl);
     learnt[0] = !p;
-    assert!(!learnt.is_empty());
+    debug_assert!(!learnt.is_empty());
     // assert_eq!(vdb[p].level, asgs.level());
     // println!("- appending {}, the result is {:?}", learnt[0].int(), vec2int(learnt));
     state.simplify_learnt(asgs, cdb, vdb)
@@ -829,6 +822,24 @@ fn analyze_final(asgs: &AssignStack, state: &mut State, vdb: &mut VarDB, c: &Cla
     }
 }
 
+impl VarDB {
+    fn dump<'a, V: IntoIterator<Item=&'a Lit, IntoIter=Iter<'a, Lit>>>
+        (&self, v: V)
+         -> Vec<(i32, usize, bool, Option<bool>)>
+    {
+        v.into_iter()
+            .map(| l | {
+                let v = &self[*l];
+                (i32::from(*l),
+                 v.level,
+                 v.reason == ClauseId::default(),
+                 v.assign,
+                )
+            })
+            .collect::<Vec<(i32, usize, bool, Option<bool>)>>()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use {super::*, std::path::PathBuf};
@@ -837,8 +848,8 @@ mod tests {
         let mut config = Config::default();
         config.cnf_filename = PathBuf::from("tests/sample.cnf");
         if let Ok(s) = Solver::build(&config) {
-            assert_eq!(s.state.num_vars, 250);
-            assert_eq!(s.state.num_unsolved_vars(), 250);
+            debug_assert_eq!(s.state.num_vars, 250);
+            debug_assert_eq!(s.state.num_unsolved_vars(), 250);
         } else {
             panic!("failed to build a solver for tests/sample.cnf");
         }
