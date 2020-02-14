@@ -422,7 +422,7 @@ fn handle_conflict_path(
         // return Err(SolverError::UndescribedError);
     }
     // vdb.bump_vars(asgs, cdb, ci);
-    let chrono_bt = use_chrono_bt; // && 10_000 < ncnfl && 100 < cl - bl;
+    let chrono_bt = use_chrono_bt && 10_000 < ncnfl && 100 < cl - bl;
     let new_learnt = &mut state.new_learnt;
     debug_assert!(0 < new_learnt.len());
     let l0 = new_learnt[0];
