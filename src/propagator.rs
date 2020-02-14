@@ -295,11 +295,11 @@ impl PropagatorIF for AssignStack {
             self.var_order.insert(vdb, vi);
         }
         self.trail.truncate(lim);
+        self.q_head = self.trail.len();
         for l in &q {
             self.trail.push(*l);
         }
         self.trail_lim.truncate(lv);
-        self.q_head = self.trail.len();
     }
     /// UNIT PROPAGATION.
     /// Note:
