@@ -440,13 +440,13 @@ fn handle_conflict_path(
         // PARTIAL FIXED SOLUTION
         // dump to certified even if it's a literal.
         cdb.certificate_add(new_learnt);
-        // asgs.assign_by_unitclause(vdb, l0);
-        // force to use chrono_bt
-        asgs.cancel_until(vdb, cl - 1);
-        asgs.cancel_until(vdb, 0);
-        asgs.assign_by_implication(vdb, l0, ClauseId::default(), 0);
+        if chrono_bt {
+            asgs.cancel_until(vdb, cl - 1);
+            asgs.assign_by_implication(vdb, l0, ClauseId::default(), 0);
+        } else {
+            asgs.assign_by_unitclause(vdb, l0);
+        }
         state.num_solved_vars += 1;
-        // println!("fix {}", i32::from(l0));
 /*
         // Note: propagations are executed in out of level order in chrono_bt mode.
         // So there must be possibilities of a temporal inconsistency.
