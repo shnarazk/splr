@@ -190,11 +190,12 @@ impl SatSolverIF for Solver {
                     }
                 }
                 elim.extend_model(&mut result);
-                if let Some(c)= cdb.validate(vdb, false) {
-                    panic!("solved: {:?}, {:?}, {:?}",
-                           c,
-                           cdb.validate(vdb, false),
-                           Vec::<i32>::from(&cdb[c]),
+                if let Some(cid)= cdb.validate(vdb, true) {
+                    panic!("Level {} generated assignment({:?}) falsifies {}:{:?}",
+                           asgs.level(),
+                           cdb.validate(vdb, false).is_none(),
+                           cid,
+                           vdb.dump(&cdb[cid]),
                     );
                     // return Err(SolverError::SolverBug);
                 }

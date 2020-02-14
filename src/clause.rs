@@ -819,7 +819,7 @@ impl ClauseDBIF for ClauseDB {
     }
     fn validate(&self, vdb: &VarDB, strict: bool) -> Option<ClauseId> {
         for (i, c) in self.clause.iter().enumerate().skip(1) {
-            if c.is(Flag::DEAD) {
+            if c.is(Flag::DEAD) || (strict && c.is(Flag::LEARNT)) {
                 continue;
             }
             match vdb.status(&c.lits) {
