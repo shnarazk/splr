@@ -389,8 +389,8 @@ fn handle_conflict_path(
     let use_chrono_bt = true;
     if use_chrono_bt {
         let c = &cdb[ci];
-        let ls_max = c.lits.iter().map(|l| vdb[*l].level == cl).count();
-        if 1 == ls_max {
+        let lcnt = c.lits.iter().map(|l| vdb[*l].level == cl).count();
+        if 1 == lcnt {
             let snd_l = c
                 .lits
                 .iter()
@@ -402,7 +402,7 @@ fn handle_conflict_path(
             // decision level, we let BCP propagating that literal at the second
             // highest decision level in conflicting cls.
             asgs.cancel_until(vdb, snd_l);
-            panic!("strange path");
+            panic!("1-up path");
             // return Ok(());
         } else {
             let lv = c.lits.iter().map(|l| vdb[*l].level).max().unwrap_or(0);
@@ -422,7 +422,7 @@ fn handle_conflict_path(
         // return Err(SolverError::UndescribedError);
     }
     // vdb.bump_vars(asgs, cdb, ci);
-    let chrono_bt = use_chrono_bt && 10_000 < ncnfl && 100 < cl - bl;
+    let chrono_bt = use_chrono_bt; // && 10_000 < ncnfl && 100 < cl - bl;
     let new_learnt = &mut state.new_learnt;
     debug_assert!(0 < new_learnt.len());
     let l0 = new_learnt[0];
@@ -443,7 +443,7 @@ fn handle_conflict_path(
         // asgs.assign_by_unitclause(vdb, l0);
         // force to use chrono_bt
         asgs.cancel_until(vdb, cl - 1);
-        // asgs.cancel_until(vdb, 0);
+        asgs.cancel_until(vdb, 0);
         asgs.assign_by_implication(vdb, l0, ClauseId::default(), 0);
         state.num_solved_vars += 1;
         // println!("fix {}", i32::from(l0));
