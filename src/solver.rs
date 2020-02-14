@@ -386,8 +386,8 @@ fn handle_conflict_path(
         state[Stat::BlockRestart] += 1;
     }
     let cl = asgs.level();
-    let use_chrono_bt = true;
-    if use_chrono_bt {
+    let mut use_chronobt = 1_000 < ncnfl && 0 < state.config.chronobt_threshold;
+    if use_chronobt {
         let c = &cdb[ci];
         let lcnt = c.lits.iter().map(|l| vdb[*l].level == cl).count();
         if 1 == lcnt {
@@ -412,21 +412,19 @@ fn handle_conflict_path(
     let cl = asgs.level();
     debug_assert!(cdb[ci].lits.iter().any(| l | vdb[*l].level == cl));
     let bl = conflict_analyze(asgs, cdb, state, vdb, ci).max(state.root_level);
-    if state.new_learnt.is_empty() {
-        println!("empty learnt at {}({}) by {:?}",
-                 cl,
-                 vdb[asgs.len_upto(cl - 1)].reason == ClauseId::default(),
-                 vdb.dump(&cdb[ci]),
-        );
-        panic!();
-        // return Err(SolverError::UndescribedError);
-    }
+    debug_assert!(state.new_learnt.is_empty(),
+                  format!("empty learnt at {}({}) by {:?}",
+                          cl,
+                          vdb[asgs.len_upto(cl - 1)].reason == ClauseId::default(),
+                          vdb.dump(&cdb[ci]),
+                  )
+    );
     // vdb.bump_vars(asgs, cdb, ci);
-    let chrono_bt = use_chrono_bt && 10_000 < ncnfl && 100 < cl - bl;
+    use_chronobt &= state.config.chronobt_threshold <= cl - bl;
     let new_learnt = &mut state.new_learnt;
-    debug_assert!(0 < new_learnt.len());
     let l0 = new_learnt[0];
-    let al = if chrono_bt {
+    // assign level
+    let al = if use_chronobt {
         new_learnt[1..]
             .iter()
             .map(|l| vdb[*l].level)
@@ -440,7 +438,7 @@ fn handle_conflict_path(
         // PARTIAL FIXED SOLUTION
         // dump to certified even if it's a literal.
         cdb.certificate_add(new_learnt);
-        if chrono_bt {
+        if use_chronobt {
             asgs.cancel_until(vdb, cl - 1);
             asgs.assign_by_implication(vdb, l0, ClauseId::default(), 0);
         } else {
@@ -451,7 +449,7 @@ fn handle_conflict_path(
         // Note: propagations are executed in out of level order in chrono_bt mode.
         // So there must be possibilities of a temporal inconsistency.
         // It is found and settled in future.
-        if !use_chrono_bt {
+        if !use_chronobt {
             if let Some(cid) = cdb.validate(vdb, false) {
                 let mut le = vdb.dump(&cdb[cid]);
                 le.truncate(20);
@@ -479,7 +477,7 @@ fn handle_conflict_path(
                 }
             }
         }
-        if chrono_bt {
+        if use_chronobt {
             asgs.cancel_until(vdb, cl - 1);
         } else {
             asgs.cancel_until(vdb, bl);
@@ -489,6 +487,12 @@ fn handle_conflict_path(
         elim.add_cid_occur(vdb, cid, &mut cdb[cid], true);
         state.c_lvl.update(cl as f64);
         state.b_lvl.update(bl as f64);
+        if use_chronobt {
+            asgs.assign_by_implication(vdb, l0, cid, al);
+        } else {
+            asgs.assign_by_implication(vdb, l0, cid, bl);
+        }
+        state.rst.lbd.update(lbd);
         if lbd <= 2 {
             state[Stat::NumLBD2] += 1;
         }
@@ -496,12 +500,6 @@ fn handle_conflict_path(
             state[Stat::NumBin] += 1;
             state[Stat::NumBinLearnt] += 1;
         }
-        if chrono_bt {
-            asgs.assign_by_implication(vdb, l0, cid, al);
-        } else {
-            asgs.assign_by_implication(vdb, l0, cid, bl);
-        }
-        state.rst.lbd.update(lbd);
         state[Stat::SumLBD] += lbd;
         state[Stat::Learnt] += 1;
     }
