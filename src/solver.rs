@@ -10,8 +10,7 @@ use {
         types::*,
         var::{VarDB, VarDBIF, VarRewardIF, LBDIF},
     },
-    std::{convert::TryFrom, io::BufRead},
-    std::slice::Iter,
+    std::{convert::TryFrom, io::BufRead, slice::Iter},
 };
 
 /// API for SAT solver like `build`, `solve` and so on.
@@ -190,12 +189,13 @@ impl SatSolverIF for Solver {
                     }
                 }
                 elim.extend_model(&mut result);
-                if let Some(cid)= cdb.validate(vdb, true) {
-                    panic!("Level {} generated assignment({:?}) falsifies {}:{:?}",
-                           asgs.level(),
-                           cdb.validate(vdb, false).is_none(),
-                           cid,
-                           vdb.dump(&cdb[cid]),
+                if let Some(cid) = cdb.validate(vdb, true) {
+                    panic!(
+                        "Level {} generated assignment({:?}) falsifies {}:{:?}",
+                        asgs.level(),
+                        cdb.validate(vdb, false).is_none(),
+                        cid,
+                        vdb.dump(&cdb[cid]),
                     );
                     // return Err(SolverError::SolverBug);
                 }
@@ -358,7 +358,7 @@ fn search(
                 return Ok(false);
             }
             // For Chronological Backtracking
-            if cdb[ci].lits.iter().all(| l | vdb[*l].level == 0) {
+            if cdb[ci].lits.iter().all(|l| vdb[*l].level == 0) {
                 return Ok(false);
             }
             handle_conflict_path(asgs, cdb, elim, state, vdb, ci)?;
@@ -402,22 +402,23 @@ fn handle_conflict_path(
             // decision level, we let BCP propagating that literal at the second
             // highest decision level in conflicting cls.
             asgs.cancel_until(vdb, snd_l);
-            panic!("1-up path");
-            // return Ok(());
+            return Ok(());
         } else {
             let lv = c.lits.iter().map(|l| vdb[*l].level).max().unwrap_or(0);
             asgs.cancel_until(vdb, lv); // this changes the decision level `cl`.
         }
     }
     let cl = asgs.level();
-    debug_assert!(cdb[ci].lits.iter().any(| l | vdb[*l].level == cl));
+    debug_assert!(cdb[ci].lits.iter().any(|l| vdb[*l].level == cl));
     let bl = conflict_analyze(asgs, cdb, state, vdb, ci).max(state.root_level);
-    debug_assert!(state.new_learnt.is_empty(),
-                  format!("empty learnt at {}({}) by {:?}",
-                          cl,
-                          vdb[asgs.len_upto(cl - 1)].reason == ClauseId::default(),
-                          vdb.dump(&cdb[ci]),
-                  )
+    debug_assert!(
+        state.new_learnt.is_empty(),
+        format!(
+            "empty learnt at {}({}) by {:?}",
+            cl,
+            vdb[asgs.len_upto(cl - 1)].reason == ClauseId::default(),
+            vdb.dump(&cdb[ci]),
+        )
     );
     // vdb.bump_vars(asgs, cdb, ci);
     use_chronobt &= state.config.chronobt_threshold <= cl - bl;
@@ -445,25 +446,6 @@ fn handle_conflict_path(
             asgs.assign_by_unitclause(vdb, l0);
         }
         state.num_solved_vars += 1;
-/*
-        // Note: propagations are executed in out of level order in chrono_bt mode.
-        // So there must be possibilities of a temporal inconsistency.
-        // It is found and settled in future.
-        if !use_chronobt {
-            if let Some(cid) = cdb.validate(vdb, false) {
-                let mut le = vdb.dump(&cdb[cid]);
-                le.truncate(20);
-                state.flush(
-                    format!("after fix {} from {}, falsified:{} {:?}",
-                            i32::from(l0),
-                            cl,
-                            cid,
-                            le,
-                    ));
-                // return Err(SolverError::SolverBug);
-            }
-        }
-*/
     } else {
         {
             // Reason-Side Rewarding
@@ -641,15 +623,16 @@ fn conflict_analyze(
         while {
             let v = &vdb[asgs.trail[ti].vi()];
             !v.is(Flag::CA_SEEN) || v.level != dl
-        }
-        {
+        } {
             // println!("- skip {} because it isn't flagged", asgs.trail[ti].int());
-            debug_assert!(0 < ti,
-                          format!("lv: {}, learnt: {:?}\nconflict: {:?}",
-                                  dl,
-                                  vdb.dump(&*learnt),
-                                  vdb.dump(&cdb[confl].lits),
-                          ),
+            debug_assert!(
+                0 < ti,
+                format!(
+                    "lv: {}, learnt: {:?}\nconflict: {:?}",
+                    dl,
+                    vdb.dump(&*learnt),
+                    vdb.dump(&cdb[confl].lits),
+                ),
             );
             ti -= 1;
         }
@@ -669,15 +652,9 @@ fn conflict_analyze(
         ti -= 1;
         debug_assert_ne!(cid, ClauseId::default());
     }
-    if learnt.len() == 2 && learnt[1] == !p {
-        learnt.truncate(1);
-        panic!("643")
-    }
-    debug_assert!(learnt.iter().all(| l | *l != !p));
+    debug_assert!(learnt.iter().all(|l| *l != !p));
     debug_assert_eq!(vdb[p].level, dl);
     learnt[0] = !p;
-    debug_assert!(!learnt.is_empty());
-    // assert_eq!(vdb[p].level, asgs.level());
     // println!("- appending {}, the result is {:?}", learnt[0].int(), vec2int(learnt));
     state.simplify_learnt(asgs, cdb, vdb)
 }
@@ -693,10 +670,6 @@ impl State {
         let State {
             ref mut new_learnt, ..
         } = self;
-        // let dl = asgs.level();
-    //    if new_learnt.is_empty() {
-    //        return 0;
-    //    }
         let mut to_clear: Vec<Lit> = vec![new_learnt[0]];
         let mut levels = vec![false; asgs.level() + 1];
         for l in &new_learnt[1..] {
@@ -705,22 +678,10 @@ impl State {
         }
         let len_o = new_learnt.len();
         let l0 = new_learnt[0];
-        new_learnt.retain(|l| {
-            //vdb[l.vi()].reason == ClauseId::default()
-            *l == l0
-                || !l.is_redundant(cdb, vdb, &mut to_clear, &levels)
-        });
+        new_learnt.retain(|l| *l == l0 || !l.is_redundant(cdb, vdb, &mut to_clear, &levels));
         let len = new_learnt.len();
         if 2 < len && len < 30 {
             vdb.minimize_with_bi_clauses(cdb, new_learnt);
-        }
-        if new_learnt.is_empty() {
-            println!("minimize nullify {}@{} from {:?} by {}",
-                     i32::from(l0),
-                     vdb[l0].level,
-                     (len_o, len),
-                     vdb[l0].reason,
-            );
         }
         // find correct backtrack level from remaining literals
         let mut level_to_return = 0;
@@ -822,17 +783,18 @@ fn analyze_final(asgs: &AssignStack, state: &mut State, vdb: &mut VarDB, c: &Cla
 }
 
 impl VarDB {
-    fn dump<'a, V: IntoIterator<Item=&'a Lit, IntoIter=Iter<'a, Lit>>>
-        (&self, v: V)
-         -> Vec<(i32, usize, bool, Option<bool>)>
-    {
+    fn dump<'a, V: IntoIterator<Item = &'a Lit, IntoIter = Iter<'a, Lit>>>(
+        &self,
+        v: V,
+    ) -> Vec<(i32, usize, bool, Option<bool>)> {
         v.into_iter()
-            .map(| l | {
+            .map(|l| {
                 let v = &self[*l];
-                (i32::from(*l),
-                 v.level,
-                 v.reason == ClauseId::default(),
-                 v.assign,
+                (
+                    i32::from(*l),
+                    v.level,
+                    v.reason == ClauseId::default(),
+                    v.assign,
                 )
             })
             .collect::<Vec<(i32, usize, bool, Option<bool>)>>()

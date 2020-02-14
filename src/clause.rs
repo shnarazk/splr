@@ -281,7 +281,7 @@ impl<'a> IntoIterator for &'a mut Clause {
 
 impl From<&Clause> for Vec<i32> {
     fn from(c: &Clause) -> Vec<i32> {
-        c.lits.iter().map(| l | i32::from(*l)).collect::<Vec<i32>>()
+        c.lits.iter().map(|l| i32::from(*l)).collect::<Vec<i32>>()
     }
 }
 

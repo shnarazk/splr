@@ -32,6 +32,8 @@ impl ValidatorIF for Solver {
     /// returns None if the given assignment is a model of a problem.
     /// Otherwise returns a clause which is not satisfiable under a given assignment.
     fn validate(&self) -> Option<Vec<i32>> {
-        self.cdb.validate(&self.vdb, true).map(| cid | Vec::<i32>::from(&self.cdb[cid]))
+        self.cdb
+            .validate(&self.vdb, true)
+            .map(|cid| Vec::<i32>::from(&self.cdb[cid]))
     }
 }

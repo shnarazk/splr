@@ -168,7 +168,7 @@ impl<'a> IntoIterator for &'a mut AssignStack {
 
 impl From<&mut AssignStack> for Vec<i32> {
     fn from(asgs: &mut AssignStack) -> Vec<i32> {
-        asgs.trail.iter().map(| l | i32::from(*l)).collect::<Vec<i32>>()
+        asgs.trail.iter().map(|l| i32::from(*l)).collect::<Vec<_>>()
     }
 }
 
