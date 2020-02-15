@@ -278,13 +278,14 @@ impl PropagatorIF for AssignStack {
             return;
         }
         let lim = self.trail_lim[lv];
-        // FIXME: we can use in-place shifting technique.
-        let mut q: Vec<Lit> = Vec::new();
-        for l in &self.trail[lim..] {
+        let mut shift = 0;
+        for i in lim..self.trail.len() {
+            let l = self.trail[i];
             let vi = l.vi();
             let v = &mut vdb[vi];
             if v.level <= lv {
-                q.push(*l);
+                self.trail[lim + shift] = l;
+                shift += 1;
                 continue;
             }
             unset_assign!(self, vi);
@@ -294,12 +295,9 @@ impl PropagatorIF for AssignStack {
             vdb.reward_at_unassign(vi);
             self.var_order.insert(vdb, vi);
         }
-        self.trail.truncate(lim);
-        self.q_head = self.trail.len();
-        for l in &q {
-            self.trail.push(*l);
-        }
+        self.trail.truncate(lim + shift);
         self.trail_lim.truncate(lv);
+        self.q_head = lim;
     }
     /// UNIT PROPAGATION.
     /// Note:
