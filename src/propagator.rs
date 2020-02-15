@@ -1,4 +1,5 @@
 /// Crate `propagator` implements Boolean Constraint Propagation and decision var selection.
+/// This version can handle Chronological and Non Chronological Backtrack.
 use {
     crate::{
         clause::{ClauseDB, ClauseDBIF, ClauseId, Watch, WatchDBIF},
@@ -216,7 +217,6 @@ impl PropagatorIF for AssignStack {
                 v.assign = Some(bool::from(l));
                 v.level = 0;
                 v.reason = ClauseId::default();
-                // assert!(!self.trail.contains(&!l));
                 self.trail.push(l);
                 Ok(())
             }
@@ -242,7 +242,6 @@ impl PropagatorIF for AssignStack {
         v.reason = cid;
         vdb.reward_at_assign(vi);
         debug_assert!(!self.trail.contains(&l));
-        debug_assert!(!self.trail.contains(&!l));
         debug_assert!(!self.trail.contains(&!l));
         self.trail.push(l);
     }

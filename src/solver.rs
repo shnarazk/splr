@@ -555,6 +555,7 @@ fn adapt_parameters(
     Ok(())
 }
 
+#[allow(clippy::cognitive_complexity)]
 fn conflict_analyze(
     asgs: &mut AssignStack,
     cdb: &mut ClauseDB,
@@ -652,7 +653,6 @@ fn conflict_analyze(
         }
         debug_assert!(0 < ti);
         ti -= 1;
-        debug_assert_ne!(cid, ClauseId::default());
     }
     debug_assert!(learnt.iter().all(|l| *l != !p));
     debug_assert_eq!(vdb[p].level, dl);
@@ -678,7 +678,6 @@ impl State {
             to_clear.push(*l);
             levels[vdb[l.vi()].level] = true;
         }
-        let len_o = new_learnt.len();
         let l0 = new_learnt[0];
         new_learnt.retain(|l| *l == l0 || !l.is_redundant(cdb, vdb, &mut to_clear, &levels));
         let len = new_learnt.len();
