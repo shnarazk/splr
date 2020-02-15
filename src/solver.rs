@@ -391,6 +391,7 @@ fn handle_conflict_path(
         let c = &cdb[ci];
         let lcnt = c.lits.iter().filter(|l| vdb[**l].level == cl).count();
         if 1 == lcnt {
+            let decision = *c.lits.iter().find(|l| vdb[**l].level == cl).unwrap();
             let snd_l = c
                 .lits
                 .iter()
@@ -401,7 +402,8 @@ fn handle_conflict_path(
             // If the conflicting clause contains one literallfrom the maximal
             // decision level, we let BCP propagating that literal at the second
             // highest decision level in conflicting cls.
-            asgs.cancel_until(vdb, snd_l);
+            asgs.cancel_until(vdb, snd_l - 1);
+            asgs.assign_by_decision(vdb, decision);
             return Ok(());
         } else {
             let lv = c.lits.iter().map(|l| vdb[*l].level).max().unwrap_or(0);
