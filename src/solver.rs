@@ -389,7 +389,7 @@ fn handle_conflict_path(
     let mut use_chronobt = 1_000 < ncnfl && 0 < state.config.chronobt_threshold;
     if use_chronobt {
         let c = &cdb[ci];
-        let lcnt = c.lits.iter().map(|l| vdb[*l].level == cl).count();
+        let lcnt = c.lits.iter().filter(|l| vdb[**l].level == cl).count();
         if 1 == lcnt {
             let snd_l = c
                 .lits
