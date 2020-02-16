@@ -207,6 +207,11 @@ impl SatSolverIF for Solver {
                 asgs.cancel_until(vdb, 0);
                 Ok(Certificate::UNSAT)
             }
+            Err(SolverError::NullLearnt) => {
+                state.progress(cdb, vdb, None);
+                asgs.cancel_until(vdb, 0);
+                Ok(Certificate::UNSAT)
+            }
             Err(e) => {
                 asgs.cancel_until(vdb, 0);
                 state.progress(cdb, vdb, None);
@@ -391,6 +396,7 @@ fn handle_conflict_path(
         let c = &cdb[ci];
         let lcnt = c.lits.iter().filter(|l| vdb[**l].level == cl).count();
         if 1 == lcnt {
+            debug_assert!(c.lits.iter().find(|l| vdb[**l].level == cl).is_some());
             let decision = *c.lits.iter().find(|l| vdb[**l].level == cl).unwrap();
             let snd_l = c
                 .lits
@@ -402,7 +408,14 @@ fn handle_conflict_path(
             // If the conflicting clause contains one literallfrom the maximal
             // decision level, we let BCP propagating that literal at the second
             // highest decision level in conflicting cls.
-            asgs.cancel_until(vdb, snd_l - 1);
+            if snd_l == 0 {
+                asgs.cancel_until(vdb, 0);
+            } else {
+                asgs.cancel_until(vdb, snd_l - 1);
+            }
+            debug_assert!(asgs.trail.iter().all(|l| l.vi() != decision.vi()),
+                          format!("lcnt == 1: level {}, snd level {}", cl, snd_l)
+            );
             asgs.assign_by_decision(vdb, decision);
             return Ok(());
         } else {
@@ -413,6 +426,9 @@ fn handle_conflict_path(
     let cl = asgs.level();
     debug_assert!(cdb[ci].lits.iter().any(|l| vdb[*l].level == cl));
     let bl = conflict_analyze(asgs, cdb, state, vdb, ci).max(state.root_level);
+    if state.new_learnt.is_empty() {
+        return Err(SolverError::NullLearnt);
+    }
     debug_assert!(
         state.new_learnt.is_empty(),
         format!(
@@ -443,6 +459,7 @@ fn handle_conflict_path(
         cdb.certificate_add(new_learnt);
         if use_chronobt {
             asgs.cancel_until(vdb, cl - 1);
+            debug_assert!(asgs.trail.iter().all(|l| l.vi() != l0.vi()));
             asgs.assign_by_implication(vdb, l0, ClauseId::default(), 0);
         } else {
             asgs.assign_by_unitclause(vdb, l0);

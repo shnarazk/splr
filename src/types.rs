@@ -347,6 +347,7 @@ pub enum SolverError {
     // StateSAT,
     IOError,
     Inconsistent,
+    NullLearnt,
     OutOfMemory,
     TimeOut,
     SolverBug,
