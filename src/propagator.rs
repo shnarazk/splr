@@ -217,7 +217,7 @@ impl PropagatorIF for AssignStack {
                 v.assign = Some(bool::from(l));
                 v.level = 0;
                 v.reason = ClauseId::default();
-                // assert!(!self.trail.contains(&!l));
+                debug_assert!(!self.trail.contains(&!l));
                 self.trail.push(l);
                 Ok(())
             }
@@ -227,10 +227,8 @@ impl PropagatorIF for AssignStack {
     }
     fn assign_by_implication(&mut self, vdb: &mut VarDB, l: Lit, cid: ClauseId, lv: usize) {
         debug_assert!(usize::from(l) != 0, "Null literal is about to be equeued");
-        // debug_assert!(
-        //     self.trail_lim.is_empty() || cid != ClauseId::default(),
-        //     "Null CLAUSE is used for uncheck_enqueue"
-        // );
+        // The following doesn't hold anymore by using chronoBT.
+        // assert!(self.trail_lim.is_empty() || cid != ClauseId::default());
         let vi = l.vi();
         let v = &mut vdb[vi];
         debug_assert!(!v.is(Flag::ELIMINATED));
@@ -278,30 +276,13 @@ impl PropagatorIF for AssignStack {
         if self.trail_lim.len() <= lv {
             return;
         }
-        // debug_assert!(self.trail.iter().all(|l| vdb[*l].assign.is_some()));
-        // debug_assert!(self.trail.iter().all(|k| !self.trail.contains(&!*k)));
         let lim = self.trail_lim[lv];
         let mut shift = lim;
         for i in lim..self.trail.len() {
             let l = self.trail[i];
-            // assert_eq!(1, self.trail.iter().filter(|m| **m == l).count());
-            // assert!(!self.trail[..shift].contains(&!l));
-            debug_assert!(
-                self.trail[..shift].iter().all(|k| l.vi() != k.vi()),
-                format!(
-                    "{:?} => {:?}",
-                    i32::from(l),
-                    self.trail
-                        .iter()
-                        .filter(|k| k.vi() == l.vi())
-                        .map(|l| i32::from(*l))
-                        .collect::<Vec<i32>>(),
-                )
-            );
             let vi = l.vi();
             let v = &mut vdb[vi];
             if v.level <= lv {
-                // assert!(shift <= i);
                 self.trail[shift] = l;
                 shift += 1;
                 continue;
