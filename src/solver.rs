@@ -412,24 +412,25 @@ fn handle_conflict_path(
                 .filter(|l| *l != cl)
                 .max()
                 .unwrap_or(0);
-            // If the conflicting clause contains one literallfrom the maximal
-            // decision level, we let BCP propagating that literal at the second
-            // highest decision level in conflicting cls.
-            if snd_l == 0 {
-                asgs.cancel_until(vdb, 0);
-            } else {
-                asgs.cancel_until(vdb, snd_l - 1);
+            if vdb.activity(asgs.len_upto(snd_l)) < vdb.activity(decision.vi()) {
+                // If the conflicting clause contains one literallfrom the maximal
+                // decision level, we let BCP propagating that literal at the second
+                // highest decision level in conflicting cls.
+                if snd_l == 0 {
+                    asgs.cancel_until(vdb, 0);
+                } else {
+                    asgs.cancel_until(vdb, snd_l - 1);
+                }
+                debug_assert!(
+                    asgs.trail.iter().all(|l| l.vi() != decision.vi()),
+                    format!("lcnt == 1: level {}, snd level {}", cl, snd_l)
+                );
+                asgs.assign_by_decision(vdb, decision);
+                return Ok(());
             }
-            debug_assert!(
-                asgs.trail.iter().all(|l| l.vi() != decision.vi()),
-                format!("lcnt == 1: level {}, snd level {}", cl, snd_l)
-            );
-            asgs.assign_by_decision(vdb, decision);
-            return Ok(());
-        } else {
-            let lv = c.lits.iter().map(|l| vdb[*l].level).max().unwrap_or(0);
-            asgs.cancel_until(vdb, lv); // this changes the decision level `cl`.
         }
+        let lv = c.lits.iter().map(|l| vdb[*l].level).max().unwrap_or(0);
+        asgs.cancel_until(vdb, lv); // this changes the decision level `cl`.
     }
     let cl = asgs.level();
     debug_assert!(cdb[ci].lits.iter().any(|l| vdb[*l].level == cl));
