@@ -189,15 +189,20 @@ impl SatSolverIF for Solver {
                     }
                 }
                 elim.extend_model(&mut result);
-                if let Some(cid) = cdb.validate(vdb, true) {
-                    panic!(
-                        "Level {} generated assignment({:?}) falsifies {}:{:?}",
-                        asgs.level(),
-                        cdb.validate(vdb, false).is_none(),
-                        cid,
-                        vdb.dump(&cdb[cid]),
-                    );
-                    // return Err(SolverError::SolverBug);
+                #[cfg(debug)]
+                {
+                    if let Some(cid) = cdb.validate(vdb, true) {
+                        panic!(
+                            "Level {} generated assignment({:?}) falsifies {}:{:?}",
+                            asgs.level(),
+                            cdb.validate(vdb, false).is_none(),
+                            cid,
+                            vdb.dump(&cdb[cid]),
+                        );
+                    }
+                }
+                if !cdb.validate(vdb, true).is_none() {
+                    return Err(SolverError::SolverBug);
                 }
                 asgs.cancel_until(vdb, 0);
                 Ok(Certificate::SAT(result))
@@ -274,7 +279,9 @@ impl SatSolverIF for Solver {
             ref mut vdb,
             ..
         } = self;
-        // assert!(0 < lits.len());
+        if lits.len() == 0 {
+            return None;
+        }
         debug_assert!(asgs.level() == 0);
         if lits.iter().any(|l| vdb.assigned(*l).is_some()) {
             cdb.certificate_add(lits);
@@ -362,7 +369,7 @@ fn search(
                 analyze_final(asgs, state, vdb, &cdb[ci]);
                 return Ok(false);
             }
-            // For Chronological Backtracking
+            // handle a simple UNSAT case here.
             if cdb[ci].lits.iter().all(|l| vdb[*l].level == 0) {
                 return Ok(false);
             }
@@ -413,8 +420,9 @@ fn handle_conflict_path(
             } else {
                 asgs.cancel_until(vdb, snd_l - 1);
             }
-            debug_assert!(asgs.trail.iter().all(|l| l.vi() != decision.vi()),
-                          format!("lcnt == 1: level {}, snd level {}", cl, snd_l)
+            debug_assert!(
+                asgs.trail.iter().all(|l| l.vi() != decision.vi()),
+                format!("lcnt == 1: level {}, snd level {}", cl, snd_l)
             );
             asgs.assign_by_decision(vdb, decision);
             return Ok(());

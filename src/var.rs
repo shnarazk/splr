@@ -352,19 +352,15 @@ impl VarDBIF for VarDB {
         false
     }
     fn status(&self, vec: &[Lit]) -> Option<bool> {
-        let mut unbound = false;
+        let mut falsified = Some(false);
         for l in vec {
             match self.assigned(*l) {
                 Some(true) => return Some(true),
-                None => unbound = true,
+                None => falsified = None,
                 _ => (),
             }
         }
-        if unbound {
-            None
-        } else {
-            Some(false)
-        }
+        falsified
     }
     fn minimize_with_bi_clauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>) {
         let nlevels = self.compute_lbd(vec);

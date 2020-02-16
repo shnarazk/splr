@@ -242,8 +242,8 @@ impl PropagatorIF for AssignStack {
         v.level = lv;
         v.reason = cid;
         vdb.reward_at_assign(vi);
-        // assert!(!self.trail.contains(&l));
-        // assert!(!self.trail.contains(&!l));
+        debug_assert!(!self.trail.contains(&l));
+        debug_assert!(!self.trail.contains(&!l));
         self.trail.push(l);
     }
     fn assign_by_decision(&mut self, vdb: &mut VarDB, l: Lit) {
@@ -260,41 +260,43 @@ impl PropagatorIF for AssignStack {
         v.level = dl;
         v.reason = ClauseId::default();
         vdb.reward_at_assign(vi);
-        // assert!(!self.trail.contains(&!l));
+        debug_assert!(!self.trail.contains(&!l));
         self.trail.push(l);
     }
     fn assign_by_unitclause(&mut self, vdb: &mut VarDB, l: Lit) {
         self.cancel_until(vdb, 0);
-        // assert!(self.trail.iter().all(|k| k.vi() != l.vi()));
+        debug_assert!(self.trail.iter().all(|k| k.vi() != l.vi()));
         let v = &mut vdb[l];
         set_assign!(self, l);
         v.assign = Some(bool::from(l));
         v.level = 0;
         v.reason = ClauseId::default();
-        // assert!(!self.trail.contains(&!l));
+        debug_assert!(!self.trail.contains(&!l));
         self.trail.push(l);
     }
     fn cancel_until(&mut self, vdb: &mut VarDB, lv: usize) {
         if self.trail_lim.len() <= lv {
             return;
         }
-        // assert!(self.trail.iter().all(|l| vdb[*l].assign.is_some()));
-        // assert!(self.trail.iter().all(|k| !self.trail.contains(&!*k)));
+        // debug_assert!(self.trail.iter().all(|l| vdb[*l].assign.is_some()));
+        // debug_assert!(self.trail.iter().all(|k| !self.trail.contains(&!*k)));
         let lim = self.trail_lim[lv];
         let mut shift = lim;
         for i in lim..self.trail.len() {
             let l = self.trail[i];
             // assert_eq!(1, self.trail.iter().filter(|m| **m == l).count());
             // assert!(!self.trail[..shift].contains(&!l));
-            debug_assert!(self.trail[..shift].iter().all(|k| l.vi() != k.vi()),
-                          format!("{:?} => {:?}",
-                                  i32::from(l),
-                                  self.trail
-                                  .iter()
-                                  .filter(|k| k.vi() == l.vi())
-                                  .map(|l| i32::from(*l))
-                                  .collect::<Vec<i32>>(),
-                          )
+            debug_assert!(
+                self.trail[..shift].iter().all(|k| l.vi() != k.vi()),
+                format!(
+                    "{:?} => {:?}",
+                    i32::from(l),
+                    self.trail
+                        .iter()
+                        .filter(|k| k.vi() == l.vi())
+                        .map(|l| i32::from(*l))
+                        .collect::<Vec<i32>>(),
+                )
             );
             let vi = l.vi();
             let v = &mut vdb[vi];
@@ -305,7 +307,6 @@ impl PropagatorIF for AssignStack {
                 continue;
             }
             unset_assign!(self, vi);
-            // assert!(v.assign.is_some(), format!("unassigned var {} in trail", vi));
             v.phase = v.assign.unwrap();
             v.assign = None;
             v.reason = ClauseId::default();
@@ -313,8 +314,8 @@ impl PropagatorIF for AssignStack {
             self.var_order.insert(vdb, vi);
         }
         self.trail.truncate(shift);
-        // assert!(self.trail.iter().all(|k| !self.trail.contains(&!*k)));
-        // assert!(self.trail.iter().all(|l| vdb[*l].assign.is_some()));
+        debug_assert!(self.trail.iter().all(|l| vdb[*l].assign.is_some()));
+        debug_assert!(self.trail.iter().all(|k| !self.trail.contains(&!*k)));
         self.trail_lim.truncate(lv);
         self.q_head = lim;
     }
