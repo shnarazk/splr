@@ -436,17 +436,17 @@ fn handle_conflict_path(
     debug_assert!(cdb[ci].lits.iter().any(|l| vdb[*l].level == cl));
     let bl = conflict_analyze(asgs, cdb, state, vdb, ci).max(state.root_level);
     if state.new_learnt.is_empty() {
+        #[cfg(debug)]
+        {
+            println!(
+                "empty learnt at {}({}) by {:?}",
+                cl,
+                vdb[asgs.len_upto(cl - 1)].reason == ClauseId::default(),
+                vdb.dump(&cdb[ci]),
+            );
+        }
         return Err(SolverError::NullLearnt);
     }
-    debug_assert!(
-        state.new_learnt.is_empty(),
-        format!(
-            "empty learnt at {}({}) by {:?}",
-            cl,
-            vdb[asgs.len_upto(cl - 1)].reason == ClauseId::default(),
-            vdb.dump(&cdb[ci]),
-        )
-    );
     // vdb.bump_vars(asgs, cdb, ci);
     use_chronobt &= state.config.chronobt_threshold <= cl - bl;
     let new_learnt = &mut state.new_learnt;
