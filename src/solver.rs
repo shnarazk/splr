@@ -448,11 +448,15 @@ fn handle_conflict_path(
     // vdb.bump_vars(asgs, cdb, ci);
     let new_learnt = &mut state.new_learnt;
     let l0 = new_learnt[0];
-    assert!(0 < cl);      // because 0 == cl means new_learnt.is_empty() checked above.
-    // - NCB places firstUIP on level bl: activity(v(cl)) < activity(firstUIP)
-    // - So the condition to use NCB is activity(firstUIP) <= activity(v(cl))
-    use_chronobt &= vdb.activity(l0.vi()) < vdb.activity(asgs.decision_vi(cl));
-    // use_chronobt &= state.config.chronobt_threshold <= cl - bl;
+    // assert: 0 < cl, which was checked already by new_learnt.is_empty().
+
+    // NCB places firstUIP on level bl, while CB does it on level cl.
+    // Therefore the condition to use CB is: activity(firstUIP) < activity(v(bl)).
+    // PREMISE: 0 < bl, because asgs.decision_vi accepts only non-zero values.
+    use_chronobt &= bl == 0
+        || state.config.chronobt_threshold <= cl - bl
+        || vdb.activity(l0.vi()) < vdb.activity(asgs.decision_vi(bl));
+
     // assign level
     let al = if use_chronobt {
         new_learnt[1..]
