@@ -319,7 +319,7 @@ impl SatSolverIF for Solver {
     }
 }
 
-/// main loop; returns `true` for SAT, `false` for UNSAT.
+/// main loop; returns `Ok(true)` for SAT, `Ok(false)` for UNSAT.
 fn search(
     asgs: &mut AssignStack,
     cdb: &mut ClauseDB,
@@ -469,7 +469,7 @@ fn handle_conflict_path(
     };
     let learnt_len = new_learnt.len();
     if learnt_len == 1 {
-        // PARTIAL FIXED SOLUTION
+        // PARTIAL FIXED SOLUTION by UNIT LEARNT CLAUSE
         // dump to certified even if it's a literal.
         cdb.certificate_add(new_learnt);
         if use_chronobt {
