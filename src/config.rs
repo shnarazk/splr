@@ -9,7 +9,7 @@ pub const VERSION: &str = "0.3.0-dev.0";
 #[structopt(name = "splr", about, author)]
 pub struct Config {
     /// threshold to use chronological backtrack
-    #[structopt(long = "chronoBT-threshold", short = "C", default_value = "10")]
+    #[structopt(long = "chronoBT-threshold", short = "C", default_value = "100")]
     pub chronobt_threshold: usize,
     /// soft limit of #clauses (6MC/GB)
     #[structopt(long = "cl", default_value = "0")]
