@@ -406,21 +406,19 @@ fn handle_conflict_path(
             debug_assert!(c.lits.iter().find(|l| vdb[**l].level == cl).is_some());
             let decision = *c.lits.iter().find(|l| vdb[**l].level == cl).unwrap();
             let snd_l = c
-                .lits
-                .iter()
+                .into_iter()
                 .map(|l| vdb[*l].level)
                 .filter(|l| *l != cl)
                 .max()
                 .unwrap_or(0);
-            if vdb.activity(asgs.len_upto(snd_l)) < vdb.activity(decision.vi()) {
+            if 0 < snd_l
+                && vdb.activity(asgs.decision_vi(snd_l)) < vdb.activity(decision.vi())
+            {
                 // If the conflicting clause contains one literallfrom the maximal
                 // decision level, we let BCP propagating that literal at the second
                 // highest decision level in conflicting cls.
-                if snd_l == 0 {
-                    asgs.cancel_until(vdb, 0);
-                } else {
-                    asgs.cancel_until(vdb, snd_l - 1);
-                }
+                // PREMISE: 0 < snd_l
+                asgs.cancel_until(vdb, snd_l - 1);
                 debug_assert!(
                     asgs.trail.iter().all(|l| l.vi() != decision.vi()),
                     format!("lcnt == 1: level {}, snd level {}", cl, snd_l)
@@ -448,9 +446,13 @@ fn handle_conflict_path(
         return Err(SolverError::NullLearnt);
     }
     // vdb.bump_vars(asgs, cdb, ci);
-    use_chronobt &= state.config.chronobt_threshold <= cl - bl;
     let new_learnt = &mut state.new_learnt;
     let l0 = new_learnt[0];
+    assert!(0 < cl);      // because 0 == cl means new_learnt.is_empty() checked above.
+    // - NCB places firstUIP on level bl: activity(v(cl)) < activity(firstUIP)
+    // - So the condition to use NCB is activity(firstUIP) <= activity(v(cl))
+    use_chronobt &= vdb.activity(l0.vi()) < vdb.activity(asgs.decision_vi(cl));
+    // use_chronobt &= state.config.chronobt_threshold <= cl - bl;
     // assign level
     let al = if use_chronobt {
         new_learnt[1..]

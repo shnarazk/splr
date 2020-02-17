@@ -30,6 +30,8 @@ pub trait PropagatorIF {
     fn is_empty(&self) -> bool;
     /// return the current decision level.
     fn level(&self) -> usize;
+    ///return the decision var's id at that level.
+    fn decision_vi(&self, lv: usize) -> VarId;
     /// return `true` if the current decision level is zero.
     fn is_zero(&self) -> bool;
     /// return `true` if there are unpropagated assignments.
@@ -197,6 +199,10 @@ impl PropagatorIF for AssignStack {
     }
     fn level(&self) -> usize {
         self.trail_lim.len()
+    }
+    fn decision_vi(&self, lv: usize) -> VarId {
+        debug_assert!(0 < lv);
+        self.trail[self.trail_lim[lv-1]].vi()
     }
     fn is_zero(&self) -> bool {
         self.trail_lim.is_empty()
