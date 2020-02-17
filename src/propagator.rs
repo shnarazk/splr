@@ -202,7 +202,7 @@ impl PropagatorIF for AssignStack {
     }
     fn decision_vi(&self, lv: usize) -> VarId {
         debug_assert!(0 < lv);
-        self.trail[self.trail_lim[lv-1]].vi()
+        self.trail[self.trail_lim[lv - 1]].vi()
     }
     fn is_zero(&self) -> bool {
         self.trail_lim.is_empty()

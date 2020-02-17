@@ -121,18 +121,19 @@ fn save_result(s: &Solver, res: &SolverResult, input: &str, output: Option<PathB
                     "      Result|dump: to STDOUT instead of {} due to an IO error.",
                     f.to_string_lossy(),
                 ),
-                Some(ref f) => println!(
-                    "      Result|file: {}",
-                    f.to_str().unwrap(),
-                ),
+                Some(ref f) => println!("      Result|file: {}", f.to_str().unwrap(),),
                 _ => (),
             }
             if s.state.config.use_certification {
-                let proof_file: PathBuf =
-                    s.state.config.output_dirname.join(&s.state.config.proof_filename);
+                let proof_file: PathBuf = s
+                    .state
+                    .config
+                    .output_dirname
+                    .join(&s.state.config.proof_filename);
                 save_proof(&s, &input, &proof_file);
-                println!(" Certificate|file: {}",
-                         s.state.config.proof_filename.to_string_lossy()
+                println!(
+                    " Certificate|file: {}",
+                    s.state.config.proof_filename.to_string_lossy()
                 );
             }
             println!("UNSAT: {}", input);

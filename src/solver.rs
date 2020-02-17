@@ -411,9 +411,7 @@ fn handle_conflict_path(
                 .filter(|l| *l != cl)
                 .max()
                 .unwrap_or(0);
-            if 0 < snd_l
-                && vdb.activity(asgs.decision_vi(snd_l)) < vdb.activity(decision.vi())
-            {
+            if 0 < snd_l && vdb.activity(asgs.decision_vi(snd_l)) < vdb.activity(decision.vi()) {
                 // If the conflicting clause contains one literallfrom the maximal
                 // decision level, we let BCP propagating that literal at the second
                 // highest decision level in conflicting cls.
