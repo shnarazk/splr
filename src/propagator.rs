@@ -301,7 +301,7 @@ impl PropagatorIF for AssignStack {
             self.var_order.insert(vdb, vi);
         }
         self.trail.truncate(shift);
-        debug_assert!(self.trail.iter().all(|l| vdb[*l].assign.is_some()));
+        debug_assert!(self.trail.iter().all(|l| vdb[l].assign.is_some()));
         debug_assert!(self.trail.iter().all(|k| !self.trail.contains(&!*k)));
         self.trail_lim.truncate(lv);
         self.q_head = lim;
@@ -368,7 +368,7 @@ impl PropagatorIF for AssignStack {
                         // state.rst.rcc.update(vdb[p.vi()].record_conflict(ncnfl));
                         return w.c;
                     }
-                    let lv = lits[1..].iter().map(|l| vdb[*l].level).max().unwrap_or(0);
+                    let lv = lits[1..].iter().map(|l| vdb[l].level).max().unwrap_or(0);
                     self.assign_by_implication(vdb, first, w.c, lv);
                 }
             }

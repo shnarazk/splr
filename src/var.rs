@@ -223,6 +223,21 @@ impl IndexMut<VarId> for VarDB {
     }
 }
 
+impl Index<&VarId> for VarDB {
+    type Output = Var;
+    #[inline]
+    fn index(&self, i: &VarId) -> &Var {
+        unsafe { self.var.get_unchecked(*i) }
+    }
+}
+
+impl IndexMut<&VarId> for VarDB {
+    #[inline]
+    fn index_mut(&mut self, i: &VarId) -> &mut Var {
+        unsafe { self.var.get_unchecked_mut(*i) }
+    }
+}
+
 impl Index<Range<usize>> for VarDB {
     type Output = [Var];
     #[inline]
@@ -264,6 +279,21 @@ impl Index<Lit> for VarDB {
 impl IndexMut<Lit> for VarDB {
     #[inline]
     fn index_mut(&mut self, l: Lit) -> &mut Var {
+        unsafe { self.var.get_unchecked_mut(l.vi()) }
+    }
+}
+
+impl Index<&Lit> for VarDB {
+    type Output = Var;
+    #[inline]
+    fn index(&self, l: &Lit) -> &Var {
+        unsafe { self.var.get_unchecked(l.vi()) }
+    }
+}
+
+impl IndexMut<&Lit> for VarDB {
+    #[inline]
+    fn index_mut(&mut self, l: &Lit) -> &mut Var {
         unsafe { self.var.get_unchecked_mut(l.vi()) }
     }
 }
