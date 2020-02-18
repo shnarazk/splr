@@ -440,7 +440,6 @@ fn handle_conflict_path(
     // Therefore the condition to use CB is: activity(firstUIP) < activity(v(bl)).
     // PREMISE: 0 < bl, because asgs.decision_vi accepts only non-zero values.
     use_chronobt &= bl == 0
-        || true
         || state.config.chronobt_threshold <= cl - bl
         || vdb.activity(l0.vi()) < vdb.activity(asgs.decision_vi(bl));
 
