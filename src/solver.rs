@@ -829,8 +829,8 @@ mod tests {
         let mut config = Config::default();
         config.cnf_filename = PathBuf::from("tests/sample.cnf");
         if let Ok(s) = Solver::build(&config) {
-            debug_assert_eq!(s.state.num_vars, 250);
-            debug_assert_eq!(s.state.num_unsolved_vars(), 250);
+            assert_eq!(s.state.num_vars, 250);
+            assert_eq!(s.state.num_unsolved_vars(), 250);
         } else {
             panic!("failed to build a solver for tests/sample.cnf");
         }
