@@ -304,7 +304,8 @@ impl PropagatorIF for AssignStack {
         debug_assert!(self.trail.iter().all(|l| vdb[l].assign.is_some()));
         debug_assert!(self.trail.iter().all(|k| !self.trail.contains(&!*k)));
         self.trail_lim.truncate(lv);
-        self.q_head = lim;
+        // assert!(lim < self.q_head) dosen't hold sometimes in chronoBT.
+        self.q_head = self.q_head.min(lim);
     }
     /// UNIT PROPAGATION.
     /// Note:
