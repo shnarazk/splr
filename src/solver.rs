@@ -231,10 +231,8 @@ impl SatSolverIF for Solver {
             buf.clear();
             match reader.read_line(&mut buf) {
                 Ok(0) => break,
+                Ok(_) if buf.starts_with('c') => continue,
                 Ok(_) => {
-                    if buf.starts_with('c') {
-                        continue;
-                    }
                     let iter = buf.split_whitespace();
                     let mut v: Vec<Lit> = Vec::new();
                     for s in iter {
@@ -269,7 +267,7 @@ impl SatSolverIF for Solver {
             ref mut vdb,
             ..
         } = self;
-        if lits.len() == 0 {
+        if lits.is_empty() {
             return None;
         }
         debug_assert!(asgs.level() == 0);
@@ -749,7 +747,7 @@ impl Lit {
                 let v = &vdb[vi];
                 let lv = v.level;
                 if 0 < lv && !v.is(Flag::CA_SEEN) {
-                    if v.reason != ClauseId::default() && levels[lv as usize] {
+                    if v.reason != ClauseId::default() && levels[lv] {
                         vdb[vi].turn_on(Flag::CA_SEEN);
                         stack.push(*q);
                         clear.push(*q);
@@ -812,7 +810,7 @@ impl VarDB {
             .map(|l| {
                 let v = &self[*l];
                 (
-                    i32::from(*l),
+                    i32::from(l),
                     v.level,
                     v.reason == ClauseId::default(),
                     v.assign,

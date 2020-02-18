@@ -162,6 +162,17 @@ impl From<Lit> for i32 {
     }
 }
 
+impl From<&Lit> for i32 {
+    #[inline]
+    fn from(l: &Lit) -> i32 {
+        if l.ordinal % 2 == 0 {
+            ((l.ordinal >> 1) as i32).neg()
+        } else {
+            (l.ordinal >> 1) as i32
+        }
+    }
+}
+
 impl Not for Lit {
     type Output = Lit;
     #[inline]
