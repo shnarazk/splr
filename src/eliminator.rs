@@ -187,7 +187,7 @@ impl EliminatorIF for Eliminator {
     }
     fn clear_clause_queue(&mut self, cdb: &mut ClauseDB) {
         for cid in &self.clause_queue {
-            cdb[*cid].turn_off(Flag::ENQUEUED);
+            cdb[cid].turn_off(Flag::ENQUEUED);
         }
         self.clause_queue.clear();
     }
@@ -430,7 +430,7 @@ impl Eliminator {
                         if *did == cid {
                             continue;
                         }
-                        let db = &cdb[*did];
+                        let db = &cdb[did];
                         if !db.is(Flag::DEAD) && db.len() <= self.subsume_literal_limit {
                             try_subsume(asgs, cdb, self, vdb, cid, *did)?;
                         }
@@ -758,7 +758,7 @@ fn eliminate_var(
         let vec = &mut state.new_learnt as *mut Vec<Lit>;
         // Produce clauses in cross product:
         for p in &*pos {
-            let rank_p = cdb[*p].rank;
+            let rank_p = cdb[p].rank;
             for n in &*neg {
                 // println!("eliminator replaces {} with a cross product {:?}", p.fmt(), vec2int(&vec));
                 match merge(cdb, *p, *n, vi, &mut *vec) {
@@ -777,8 +777,8 @@ fn eliminate_var(
                         asgs.assign_at_rootlevel(vdb, lit)?;
                     }
                     _ => {
-                        let rank = if cdb[*p].is(Flag::LEARNT) && cdb[*n].is(Flag::LEARNT) {
-                            rank_p.min(cdb[*n].rank)
+                        let rank = if cdb[p].is(Flag::LEARNT) && cdb[n].is(Flag::LEARNT) {
+                            rank_p.min(cdb[n].rank)
                         } else {
                             0
                         };
@@ -790,11 +790,11 @@ fn eliminate_var(
         }
         for cid in &*pos {
             cdb.detach(*cid);
-            elim.remove_cid_occur(vdb, *cid, &mut cdb[*cid]);
+            elim.remove_cid_occur(vdb, *cid, &mut cdb[cid]);
         }
         for cid in &*neg {
             cdb.detach(*cid);
-            elim.remove_cid_occur(vdb, *cid, &mut cdb[*cid]);
+            elim.remove_cid_occur(vdb, *cid, &mut cdb[cid]);
         }
         vdb[vi].pos_occurs.clear();
         vdb[vi].neg_occurs.clear();
@@ -850,13 +850,13 @@ fn make_eliminated_clauses(
     let tmp = &mut elim.elim_clauses;
     if neg.len() < pos.len() {
         for cid in neg {
-            debug_assert!(!cdb[*cid].is(Flag::DEAD));
+            debug_assert!(!cdb[cid].is(Flag::DEAD));
             make_eliminated_clause(cdb, tmp, v, *cid);
         }
         make_eliminating_unit_clause(tmp, Lit::from_assign(v, true));
     } else {
         for cid in pos {
-            debug_assert!(!cdb[*cid].is(Flag::DEAD));
+            debug_assert!(!cdb[cid].is(Flag::DEAD));
             make_eliminated_clause(cdb, tmp, v, *cid);
         }
         make_eliminating_unit_clause(tmp, Lit::from_assign(v, false));
