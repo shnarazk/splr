@@ -416,9 +416,11 @@ fn handle_conflict_path(
         let lv = c.lits.iter().map(|l| vdb[l].level).max().unwrap_or(0);
         asgs.cancel_until(vdb, lv); // this changes the decision level `cl`.
     }
+    // conflicting level
     let cl = asgs.level();
     debug_assert!(cdb[ci].lits.iter().any(|l| vdb[l].level == cl));
-    let bl = conflict_analyze(asgs, cdb, state, vdb, ci).max(state.root_level);
+    // backtrack level by analyze
+    let bl_a = conflict_analyze(asgs, cdb, state, vdb, ci).max(state.root_level);
     if state.new_learnt.is_empty() {
         #[cfg(debug)]
         {
@@ -439,19 +441,22 @@ fn handle_conflict_path(
     // NCB places firstUIP on level bl, while CB does it on level cl.
     // Therefore the condition to use CB is: activity(firstUIP) < activity(v(bl)).
     // PREMISE: 0 < bl, because asgs.decision_vi accepts only non-zero values.
-    use_chronobt &= bl == 0
-        || state.config.chronobt_threshold <= cl - bl
-        || vdb.activity(l0.vi()) < vdb.activity(asgs.decision_vi(bl));
+    use_chronobt &= bl_a == 0
+        || state.config.chronobt_threshold <= cl - bl_a
+        || vdb.activity(l0.vi()) < vdb.activity(asgs.decision_vi(bl_a));
 
-    // assign level
-    let al = if use_chronobt {
-        new_learnt[1..]
-            .iter()
-            .map(|l| vdb[l].level)
-            .max()
-            .unwrap_or(0)
+    // (assign level, backtrack level)
+    let (al, bl) = if use_chronobt {
+        (
+            new_learnt[1..]
+                .iter()
+                .map(|l| vdb[l].level)
+                .max()
+                .unwrap_or(0),
+            cl - 1
+        )
     } else {
-        bl
+        (bl_a, bl_a)
     };
     let learnt_len = new_learnt.len();
     if learnt_len == 1 {
@@ -459,7 +464,7 @@ fn handle_conflict_path(
         // dump to certified even if it's a literal.
         cdb.certificate_add(new_learnt);
         if use_chronobt {
-            asgs.cancel_until(vdb, cl - 1);
+            asgs.cancel_until(vdb, bl);
             debug_assert!(asgs.trail.iter().all(|l| l.vi() != l0.vi()));
             asgs.assign_by_implication(vdb, l0, ClauseId::default(), 0);
         } else {
@@ -479,21 +484,13 @@ fn handle_conflict_path(
                 }
             }
         }
-        if use_chronobt {
-            asgs.cancel_until(vdb, cl - 1);
-        } else {
-            asgs.cancel_until(vdb, bl);
-        }
+        asgs.cancel_until(vdb, bl);
         let lbd = vdb.compute_lbd(&new_learnt);
         let cid = cdb.attach(state, vdb, lbd);
         elim.add_cid_occur(vdb, cid, &mut cdb[cid], true);
         state.c_lvl.update(cl as f64);
         state.b_lvl.update(bl as f64);
-        if use_chronobt {
-            asgs.assign_by_implication(vdb, l0, cid, al);
-        } else {
-            asgs.assign_by_implication(vdb, l0, cid, bl);
-        }
+        asgs.assign_by_implication(vdb, l0, cid, al);
         state.rst.lbd.update(lbd);
         if lbd <= 2 {
             state[Stat::NumLBD2] += 1;
