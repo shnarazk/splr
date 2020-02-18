@@ -78,7 +78,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Config {
         Config {
-            chronobt_threshold: 10,
+            chronobt_threshold: 100,
             clause_limit: 0,
             elim_grow_limit: 0,
             elim_lit_limit: 100,
