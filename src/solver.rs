@@ -180,15 +180,7 @@ impl SatSolverIF for Solver {
         match search(asgs, cdb, elim, state, vdb) {
             Ok(true) => {
                 state.progress(cdb, vdb, None);
-                let mut result = Vec::new();
-                for (vi, v) in vdb[0..].iter().enumerate().skip(1) {
-                    match v.assign {
-                        Some(true) => result.push(vi as i32),
-                        Some(false) => result.push(0 - vi as i32),
-                        _ => result.push(0),
-                    }
-                }
-                elim.extend_model(&mut result);
+                elim.extend_model(vdb);
                 #[cfg(debug)]
                 {
                     if let Some(cid) = cdb.validate(vdb, true) {
@@ -201,18 +193,16 @@ impl SatSolverIF for Solver {
                         );
                     }
                 }
-                if !cdb.validate(vdb, true).is_none() {
+                if cdb.validate(vdb, true).is_some() {
                     return Err(SolverError::SolverBug);
                 }
+                let vals = vdb[1..].iter()
+                    .map(|v| i32::from(Lit::from(v)))
+                    .collect::<Vec<i32>>();
                 asgs.cancel_until(vdb, 0);
-                Ok(Certificate::SAT(result))
+                Ok(Certificate::SAT(vals))
             }
-            Ok(false) => {
-                state.progress(cdb, vdb, None);
-                asgs.cancel_until(vdb, 0);
-                Ok(Certificate::UNSAT)
-            }
-            Err(SolverError::NullLearnt) => {
+            Ok(false) | Err(SolverError::NullLearnt) => {
                 state.progress(cdb, vdb, None);
                 asgs.cancel_until(vdb, 0);
                 Ok(Certificate::UNSAT)

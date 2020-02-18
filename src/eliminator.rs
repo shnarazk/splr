@@ -55,8 +55,8 @@ pub trait EliminatorIF {
         state: &mut State,
         vdb: &mut VarDB,
     ) -> MaybeInconsistent;
-    /// add assignments for eliminated vars to `model`.
-    fn extend_model(&mut self, model: &mut Vec<i32>);
+    /// inject assignments for eliminated vars.
+    fn extend_model(&mut self, vdb: &mut VarDB);
     /// register a clause id to all corresponding occur lists.
     fn add_cid_occur(&mut self, vdb: &mut VarDB, cid: ClauseId, c: &mut Clause, enqueue: bool);
     /// remove a clause id from literal's occur list.
@@ -258,7 +258,7 @@ impl EliminatorIF for Eliminator {
         }
         Ok(())
     }
-    fn extend_model(&mut self, model: &mut Vec<i32>) {
+    fn extend_model(&mut self, vdb: &mut VarDB) {
         if self.elim_clauses.is_empty() {
             return;
         }
@@ -281,7 +281,7 @@ impl EliminatorIF for Eliminator {
                 //     _ => None,
                 // };
                 // if model_value != Some(false) {
-                if -model[l.vi() - 1] != i32::from(l) {
+                if !Lit::from(&vdb[l]) != l {
                     if i < width {
                         break 'next;
                     }
@@ -294,7 +294,7 @@ impl EliminatorIF for Eliminator {
             debug_assert!(width == 1);
             let l = self.elim_clauses[i];
             // debug_assert!(model[l.vi() - 1] != l.negate().int());
-            model[l.vi() - 1] = i32::from(l); // .neg();
+            vdb[l].assign = Some(bool::from(l));
             if i < width {
                 break;
             }
