@@ -196,7 +196,8 @@ impl SatSolverIF for Solver {
                 if cdb.validate(vdb, true).is_some() {
                     return Err(SolverError::SolverBug);
                 }
-                let vals = vdb[1..].iter()
+                let vals = vdb[1..]
+                    .iter()
                     .map(|v| i32::from(Lit::from(v)))
                     .collect::<Vec<i32>>();
                 asgs.cancel_until(vdb, 0);
@@ -394,7 +395,7 @@ fn handle_conflict_path(
             debug_assert!(c.iter().find(|l| vdb[*l].level == cl).is_some());
             let decision = *c.iter().find(|l| vdb[*l].level == cl).unwrap();
             let snd_l = c
-                .into_iter()
+                .iter()
                 .map(|l| vdb[l].level)
                 .filter(|l| *l != cl)
                 .max()
@@ -453,7 +454,7 @@ fn handle_conflict_path(
                 .map(|l| vdb[l].level)
                 .max()
                 .unwrap_or(0),
-            cl - 1
+            cl - 1,
         )
     } else {
         (bl_a, bl_a)
