@@ -441,9 +441,7 @@ fn handle_conflict_path(
     // NCB places firstUIP on level bl, while CB does it on level cl.
     // Therefore the condition to use CB is: activity(firstUIP) < activity(v(bl)).
     // PREMISE: 0 < bl, because asgs.decision_vi accepts only non-zero values.
-    use_chronobt &= bl_a == 0
-        || state.config.chronobt_threshold <= cl - bl_a
-        || vdb.activity(l0.vi()) < vdb.activity(asgs.decision_vi(bl_a));
+    use_chronobt &= bl_a == 0 || state.config.chronobt_threshold <= cl - bl_a;
 
     // (assign level, backtrack level)
     let (al, bl) = if use_chronobt {
