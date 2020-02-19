@@ -20,6 +20,8 @@ use {
 pub trait ClauseIF {
     /// return true if it contains no literals; a clause after unit propagation.
     fn is_empty(&self) -> bool;
+    /// return an iterator over its literals.
+    fn iter(&self) -> Iter<'_, Lit>;
     /// return the number of literals.
     fn len(&self) -> usize;
 }
@@ -288,6 +290,9 @@ impl From<&Clause> for Vec<i32> {
 impl ClauseIF for Clause {
     fn is_empty(&self) -> bool {
         self.lits.is_empty()
+    }
+    fn iter(&self) -> Iter<'_, Lit> {
+        self.lits.iter()
     }
     fn len(&self) -> usize {
         self.lits.len()

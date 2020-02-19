@@ -358,7 +358,7 @@ fn search(
                 return Ok(false);
             }
             // handle a simple UNSAT case here.
-            if cdb[ci].lits.iter().all(|l| vdb[l].level == 0) {
+            if cdb[ci].iter().all(|l| vdb[l].level == 0) {
                 return Ok(false);
             }
             handle_conflict_path(asgs, cdb, elim, state, vdb, ci)?;
@@ -389,10 +389,10 @@ fn handle_conflict_path(
     let mut use_chronobt = 1_000 < ncnfl && 0 < state.config.chronobt_threshold;
     if use_chronobt {
         let c = &cdb[ci];
-        let lcnt = c.lits.iter().filter(|l| vdb[*l].level == cl).count();
+        let lcnt = c.iter().filter(|l| vdb[*l].level == cl).count();
         if 1 == lcnt {
-            debug_assert!(c.lits.iter().find(|l| vdb[*l].level == cl).is_some());
-            let decision = *c.lits.iter().find(|l| vdb[*l].level == cl).unwrap();
+            debug_assert!(c.iter().find(|l| vdb[*l].level == cl).is_some());
+            let decision = *c.iter().find(|l| vdb[*l].level == cl).unwrap();
             let snd_l = c
                 .into_iter()
                 .map(|l| vdb[l].level)
@@ -413,12 +413,12 @@ fn handle_conflict_path(
                 return Ok(());
             }
         }
-        let lv = c.lits.iter().map(|l| vdb[l].level).max().unwrap_or(0);
+        let lv = c.iter().map(|l| vdb[l].level).max().unwrap_or(0);
         asgs.cancel_until(vdb, lv); // this changes the decision level `cl`.
     }
     // conflicting level
     let cl = asgs.level();
-    debug_assert!(cdb[ci].lits.iter().any(|l| vdb[l].level == cl));
+    debug_assert!(cdb[ci].iter().any(|l| vdb[l].level == cl));
     // backtrack level by analyze
     let bl_a = conflict_analyze(asgs, cdb, state, vdb, ci).max(state.root_level);
     if state.new_learnt.is_empty() {
