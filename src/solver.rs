@@ -415,7 +415,8 @@ fn handle_conflict_path(
             }
         }
         let lv = c.iter().map(|l| vdb[l].level).max().unwrap_or(0);
-        asgs.cancel_until(vdb, lv); // this changes the decision level `cl`.
+        // The following change the decision level which is stored to `cl`.
+        asgs.cancel_until(vdb, lv);
     }
     // conflicting level
     let cl = asgs.level();
