@@ -392,7 +392,7 @@ fn handle_conflict_path(
         let c = &cdb[ci];
         let lcnt = c.iter().filter(|l| vdb[*l].level == cl).count();
         if 1 == lcnt {
-            debug_assert!(c.iter().find(|l| vdb[*l].level == cl).is_some());
+            debug_assert!(c.iter().any(|l| vdb[l].level == cl));
             let decision = *c.iter().find(|l| vdb[*l].level == cl).unwrap();
             let snd_l = c
                 .iter()

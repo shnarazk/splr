@@ -108,8 +108,12 @@ impl From<ClauseId> for Lit {
 impl From<&Var> for Lit {
     fn from(v: &Var) -> Self {
         match v.assign {
-            Some(true) => Lit { ordinal: (v.index as u32) << 1 | 1 as u32 },
-            Some(false) => Lit { ordinal: (v.index as u32) << 1 },
+            Some(true) => Lit {
+                ordinal: (v.index as u32) << 1 | 1 as u32,
+            },
+            Some(false) => Lit {
+                ordinal: (v.index as u32) << 1,
+            },
             None => NULL_LIT,
         }
     }
