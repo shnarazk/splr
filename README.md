@@ -56,7 +56,20 @@ A valid assignment set for tests/sample.cnf is found in .ans_sample.cnf.
 
 ## Correctness
 
-While Splr comes with **ABSOLUTELY NO WARRANTY**, Splr version 0.1.0 (splr-0.1.0) was verified with the following problems:
+Note: Splr comes with **ABSOLUTELY NO WARRANTY**.
+
+### Version 0.3.1
+
+Splr version 0.3.1 (splr-0.3.1) was verified with the following problems:
+
+* [SAT Race 2019](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks](http://satcompetition.org/sr2019benchmarks.zip)
+  : with a 200 sec timeout, splr-0.1.0 solved:
+  * 32 satisfiable problems: all the solutions are correct.
+  * 3 unsatisfiable problems: all of them is verified with [grad](https://www21.in.tum.de/~lammich/grat/).
+
+### Version 0.1.0
+
+Splr version 0.1.0 (splr-0.1.0) was verified with the following problems:
 
 * The first 100 problems from
   [SATLIB](https://www.cs.ubc.ca/~hoos/SATLIB/benchm.html),
