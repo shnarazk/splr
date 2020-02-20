@@ -1,7 +1,11 @@
-## 0.3.1, 2020-02-++
+## 0.3.1, 2020-02-22
 
-- adopt Chronological Backtrack; A. Nadel and V. Ryvchin, “Chronological Backtracking,” i *Theory and Applications of Satisfiability Testing - SAT 2018*, pp.111–121, 2018.
+- adopt Chronological Backtrack; A. Nadel and V. Ryvchin: Chronological Backtracking, *Theory and Applications of Satisfiability Testing - SAT 2018*, pp.111–121, 2018.
 - dmcr enables colorized output.
+- add --chronobt-threshold option
+- revise validation framework: ClauseDBIF::validate, VarDBIF::status
+- add SolverError::{NullLearnt, SolverBug}
+- implement IntoIterator for {AssignStack, Clause}
 
 ## 0.3.0, 2020-02-10
 
