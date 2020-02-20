@@ -429,7 +429,7 @@ fn handle_conflict_path(
             println!(
                 "empty learnt at {}({}) by {:?}",
                 cl,
-                vdb[asgs.len_upto(cl - 1)].reason == ClauseId::default(),
+                vdb[asgs.decision_vi(cl)].reason == ClauseId::default(),
                 vdb.dump(&cdb[ci]),
             );
         }
@@ -789,9 +789,9 @@ fn analyze_final(asgs: &AssignStack, state: &mut State, vdb: &mut VarDB, c: &Cla
                 state.conflicts.push(!*l);
             } else {
                 for l in &c[(c.len() != 2) as usize..] {
-                    let vi = l.vi();
-                    if 0 < vdb[vi].level {
-                        seen[vi] = true;
+                    let vj = l.vi();
+                    if 0 < vdb[vj].level {
+                        seen[vj] = true;
                     }
                 }
             }
