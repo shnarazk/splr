@@ -12,6 +12,7 @@ use {
         cmp::Ordering,
         fmt,
         ops::{Index, IndexMut, Range, RangeFrom},
+        slice::Iter,
     },
 };
 
@@ -19,6 +20,8 @@ use {
 pub trait ClauseIF {
     /// return true if it contains no literals; a clause after unit propagation.
     fn is_empty(&self) -> bool;
+    /// return an iterator over its literals.
+    fn iter(&self) -> Iter<'_, Lit>;
     /// return the number of literals.
     fn len(&self) -> usize;
 }
@@ -71,6 +74,10 @@ pub trait ClauseDBIF {
     fn check_size(&self) -> MaybeInconsistent;
     /// change good learnt clauses to permanent one.
     fn make_permanent(&mut self, reinit: bool);
+    /// returns None if the given assignment is a model of a problem.
+    /// Otherwise returns a clause which is not satisfiable under a given assignment.
+    /// Clauses with an unassigned literal are treated as falsified in `strict` mode.
+    fn validate(&self, vdb: &VarDB, strict: bool) -> Option<ClauseId>;
 }
 
 /// API for Clause Id like `to_lit`, `is_lifted_lit` and so on.
@@ -258,9 +265,34 @@ impl IndexMut<RangeFrom<usize>> for Clause {
     }
 }
 
+impl<'a> IntoIterator for &'a Clause {
+    type Item = &'a Lit;
+    type IntoIter = Iter<'a, Lit>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.lits.iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a mut Clause {
+    type Item = &'a Lit;
+    type IntoIter = Iter<'a, Lit>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.lits.iter()
+    }
+}
+
+impl From<&Clause> for Vec<i32> {
+    fn from(c: &Clause) -> Vec<i32> {
+        c.lits.iter().map(|l| i32::from(*l)).collect::<Vec<i32>>()
+    }
+}
+
 impl ClauseIF for Clause {
     fn is_empty(&self) -> bool {
         self.lits.is_empty()
+    }
+    fn iter(&self) -> Iter<'_, Lit> {
+        self.lits.iter()
     }
     fn len(&self) -> usize {
         self.lits.len()
@@ -409,6 +441,21 @@ impl Index<ClauseId> for ClauseDB {
 impl IndexMut<ClauseId> for ClauseDB {
     #[inline]
     fn index_mut(&mut self, cid: ClauseId) -> &mut Clause {
+        unsafe { self.clause.get_unchecked_mut(cid.ordinal as usize) }
+    }
+}
+
+impl Index<&ClauseId> for ClauseDB {
+    type Output = Clause;
+    #[inline]
+    fn index(&self, cid: &ClauseId) -> &Clause {
+        unsafe { self.clause.get_unchecked(cid.ordinal as usize) }
+    }
+}
+
+impl IndexMut<&ClauseId> for ClauseDB {
+    #[inline]
+    fn index_mut(&mut self, cid: &ClauseId) -> &mut Clause {
         unsafe { self.clause.get_unchecked_mut(cid.ordinal as usize) }
     }
 }
@@ -724,11 +771,7 @@ impl ClauseDBIF for ClauseDB {
             vdb.reset_lbd(self);
             elim.stop(self, vdb);
         }
-        if self.check_size().is_err() {
-            Err(SolverError::Inconsistent)
-        } else {
-            Ok(())
-        }
+        self.check_size()
     }
     fn reset(&mut self) {
         debug_assert!(1 < self.clause.len());
@@ -775,7 +818,7 @@ impl ClauseDBIF for ClauseDB {
         if self.soft_limit == 0 || self.count(false) <= self.soft_limit {
             Ok(())
         } else {
-            Err(SolverError::Inconsistent)
+            Err(SolverError::OutOfMemory)
         }
     }
     fn make_permanent(&mut self, reinit: bool) {
@@ -793,6 +836,19 @@ impl ClauseDBIF for ClauseDB {
             }
         }
         self.garbage_collect();
+    }
+    fn validate(&self, vdb: &VarDB, strict: bool) -> Option<ClauseId> {
+        for (i, c) in self.clause.iter().enumerate().skip(1) {
+            if c.is(Flag::DEAD) || (strict && c.is(Flag::LEARNT)) {
+                continue;
+            }
+            match vdb.status(&c.lits) {
+                Some(false) => return Some(ClauseId::from(i)),
+                None if strict => return Some(ClauseId::from(i)),
+                _ => (),
+            }
+        }
+        None
     }
 }
 

@@ -1,3 +1,8 @@
+## 0.3.1, 2020-02-++
+
+- adopt Chronological Backtrack; A. Nadel and V. Ryvchin, “Chronological Backtracking,” i *Theory and Applications of Satisfiability Testing - SAT 2018*, pp.111–121, 2018.
+- dmcr enables colorized output.
+
 ## 0.3.0, 2020-02-10
 
 - remove src/traits.rs and revise traits:

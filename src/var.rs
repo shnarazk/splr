@@ -33,6 +33,11 @@ pub trait VarDBIF {
     fn locked(&self, c: &Clause, cid: ClauseId) -> bool;
     /// return `true` if the set of literals is satisfiable under the current assignment.
     fn satisfies(&self, c: &[Lit]) -> bool;
+    /// return Option<bool>
+    /// - Some(true) -- the literals is satisfied by a literal
+    /// - Some(false) -- the literals is unsatisfied; no unassigned literal
+    /// - None -- the literals contains an unassigned literal
+    fn status(&self, c: &[Lit]) -> Option<bool>;
     // minimize a clause.
     fn minimize_with_bi_clauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>);
     // bump vars' activities.
@@ -218,6 +223,21 @@ impl IndexMut<VarId> for VarDB {
     }
 }
 
+impl Index<&VarId> for VarDB {
+    type Output = Var;
+    #[inline]
+    fn index(&self, i: &VarId) -> &Var {
+        unsafe { self.var.get_unchecked(*i) }
+    }
+}
+
+impl IndexMut<&VarId> for VarDB {
+    #[inline]
+    fn index_mut(&mut self, i: &VarId) -> &mut Var {
+        unsafe { self.var.get_unchecked_mut(*i) }
+    }
+}
+
 impl Index<Range<usize>> for VarDB {
     type Output = [Var];
     #[inline]
@@ -259,6 +279,21 @@ impl Index<Lit> for VarDB {
 impl IndexMut<Lit> for VarDB {
     #[inline]
     fn index_mut(&mut self, l: Lit) -> &mut Var {
+        unsafe { self.var.get_unchecked_mut(l.vi()) }
+    }
+}
+
+impl Index<&Lit> for VarDB {
+    type Output = Var;
+    #[inline]
+    fn index(&self, l: &Lit) -> &Var {
+        unsafe { self.var.get_unchecked(l.vi()) }
+    }
+}
+
+impl IndexMut<&Lit> for VarDB {
+    #[inline]
+    fn index_mut(&mut self, l: &Lit) -> &mut Var {
         unsafe { self.var.get_unchecked_mut(l.vi()) }
     }
 }
@@ -345,6 +380,17 @@ impl VarDBIF for VarDB {
             }
         }
         false
+    }
+    fn status(&self, vec: &[Lit]) -> Option<bool> {
+        let mut falsified = Some(false);
+        for l in vec {
+            match self.assigned(*l) {
+                Some(true) => return Some(true),
+                None => falsified = None,
+                _ => (),
+            }
+        }
+        falsified
     }
     fn minimize_with_bi_clauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>) {
         let nlevels = self.compute_lbd(vec);

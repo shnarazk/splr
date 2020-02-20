@@ -104,13 +104,13 @@ impl From<ClauseId> for Lit {
 
 /// While Lit::oridinal is private, Var::{index, assign} are public.
 /// So we define the following here.
+/// CAVEAT: Unassigned vars are converted to the null literal.
 impl From<&Var> for Lit {
     fn from(v: &Var) -> Self {
-        Lit {
-            ordinal: match v.assign {
-                Some(true) => (v.index as u32) << 1 | 1 as u32,
-                _e => (v.index as u32) << 1,
-            },
+        match v.assign {
+            Some(true) => Lit { ordinal: (v.index as u32) << 1 | 1 as u32 },
+            Some(false) => Lit { ordinal: (v.index as u32) << 1 },
+            None => NULL_LIT,
         }
     }
 }
@@ -154,6 +154,17 @@ impl From<Lit> for usize {
 impl From<Lit> for i32 {
     #[inline]
     fn from(l: Lit) -> i32 {
+        if l.ordinal % 2 == 0 {
+            ((l.ordinal >> 1) as i32).neg()
+        } else {
+            (l.ordinal >> 1) as i32
+        }
+    }
+}
+
+impl From<&Lit> for i32 {
+    #[inline]
+    fn from(l: &Lit) -> i32 {
         if l.ordinal % 2 == 0 {
             ((l.ordinal >> 1) as i32).neg()
         } else {
@@ -347,8 +358,10 @@ pub enum SolverError {
     // StateSAT,
     IOError,
     Inconsistent,
+    NullLearnt,
     OutOfMemory,
     TimeOut,
+    SolverBug,
     UndescribedError,
 }
 

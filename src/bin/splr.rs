@@ -37,15 +37,11 @@ fn main() {
         println!("Abort: You set a proof filename with '--proof' explicitly, but didn't set '--certify'. It doesn't look good.");
         return;
     }
-    let proof_file: PathBuf = config.output_dirname.join(&config.proof_filename);
     let mut s = Solver::build(&config).expect("failed to load");
     let res = s.solve();
     match &res {
-        Ok(cert) => {
+        Ok(_) => {
             save_result(&s, &res, &cnf_file, ans_file);
-            if config.use_certification && *cert == Certificate::UNSAT {
-                save_proof(&s, &cnf_file, &proof_file);
-            }
         }
         Err(e) => println!("Failed to solve by {:?}.", e),
     }
@@ -122,18 +118,25 @@ fn save_result(s: &Solver, res: &SolverResult, input: &str, output: Option<PathB
         Ok(Certificate::UNSAT) => {
             match output {
                 Some(ref f) if redirect => println!(
-                    "      Result|dump: to STDOUT instead of {} due to an IO error.\nUNSAT: {}",
+                    "      Result|dump: to STDOUT instead of {} due to an IO error.",
                     f.to_string_lossy(),
-                    input,
                 ),
-                Some(ref f) => println!(
-                    "      Result|file: {}\nUNSAT: {}",
-                    f.to_str().unwrap(),
-                    input,
-                ),
-
-                _ => println!("UNSAT: {}", input),
+                Some(ref f) => println!("      Result|file: {}", f.to_str().unwrap(),),
+                _ => (),
             }
+            if s.state.config.use_certification {
+                let proof_file: PathBuf = s
+                    .state
+                    .config
+                    .output_dirname
+                    .join(&s.state.config.proof_filename);
+                save_proof(&s, &input, &proof_file);
+                println!(
+                    " Certificate|file: {}",
+                    s.state.config.proof_filename.to_string_lossy()
+                );
+            }
+            println!("UNSAT: {}", input);
             if let Err(why) = (|| {
                 buf.write_all(
                     format!(
@@ -188,10 +191,6 @@ fn save_proof(s: &Solver, input: &str, output: &PathBuf) {
         );
         return;
     }
-    println!(
-        "The certification was saved to {}.",
-        output.to_str().unwrap()
-    );
 }
 
 fn report(state: &State, out: &mut dyn Write) -> std::io::Result<()> {

@@ -10,7 +10,7 @@ use {
         types::*,
         var::{VarDB, VarDBIF, VarRewardIF, LBDIF},
     },
-    std::{convert::TryFrom, io::BufRead},
+    std::{convert::TryFrom, io::BufRead, slice::Iter},
 };
 
 /// API for SAT solver like `build`, `solve` and so on.
@@ -180,33 +180,38 @@ impl SatSolverIF for Solver {
         match search(asgs, cdb, elim, state, vdb) {
             Ok(true) => {
                 state.progress(cdb, vdb, None);
-                let mut result = Vec::new();
-                for (vi, v) in vdb[0..].iter().enumerate().take(state.num_vars + 1).skip(1) {
-                    match v.assign {
-                        Some(true) => result.push(vi as i32),
-                        Some(false) => result.push(0 - vi as i32),
-                        _ => result.push(0),
+                elim.extend_model(vdb);
+                #[cfg(debug)]
+                {
+                    if let Some(cid) = cdb.validate(vdb, true) {
+                        panic!(
+                            "Level {} generated assignment({:?}) falsifies {}:{:?}",
+                            asgs.level(),
+                            cdb.validate(vdb, false).is_none(),
+                            cid,
+                            vdb.dump(&cdb[cid]),
+                        );
                     }
                 }
-                elim.extend_model(&mut result);
+                if cdb.validate(vdb, true).is_some() {
+                    return Err(SolverError::SolverBug);
+                }
+                let vals = vdb[1..]
+                    .iter()
+                    .map(|v| i32::from(Lit::from(v)))
+                    .collect::<Vec<i32>>();
                 asgs.cancel_until(vdb, 0);
-                Ok(Certificate::SAT(result))
+                Ok(Certificate::SAT(vals))
             }
-            Ok(false) => {
+            Ok(false) | Err(SolverError::NullLearnt) => {
                 state.progress(cdb, vdb, None);
                 asgs.cancel_until(vdb, 0);
                 Ok(Certificate::UNSAT)
             }
-            Err(_) => {
+            Err(e) => {
                 asgs.cancel_until(vdb, 0);
                 state.progress(cdb, vdb, None);
-                if cdb.check_size().is_err() {
-                    Err(SolverError::OutOfMemory)
-                } else if state.is_timeout() {
-                    Err(SolverError::TimeOut)
-                } else {
-                    Err(SolverError::Inconsistent)
-                }
+                Err(e)
             }
         }
     }
@@ -227,10 +232,8 @@ impl SatSolverIF for Solver {
             buf.clear();
             match reader.read_line(&mut buf) {
                 Ok(0) => break,
+                Ok(_) if buf.starts_with('c') => continue,
                 Ok(_) => {
-                    if buf.starts_with('c') {
-                        continue;
-                    }
                     let iter = buf.split_whitespace();
                     let mut v: Vec<Lit> = Vec::new();
                     for s in iter {
@@ -265,6 +268,9 @@ impl SatSolverIF for Solver {
             ref mut vdb,
             ..
         } = self;
+        if lits.is_empty() {
+            return None;
+        }
         debug_assert!(asgs.level() == 0);
         if lits.iter().any(|l| vdb.assigned(*l).is_some()) {
             cdb.certificate_add(lits);
@@ -302,7 +308,7 @@ impl SatSolverIF for Solver {
     }
 }
 
-/// main loop; returns `true` for SAT, `false` for UNSAT.
+/// main loop; returns `Ok(true)` for SAT, `Ok(false)` for UNSAT.
 fn search(
     asgs: &mut AssignStack,
     cdb: &mut ClauseDB,
@@ -352,6 +358,10 @@ fn search(
                 analyze_final(asgs, state, vdb, &cdb[ci]);
                 return Ok(false);
             }
+            // handle a simple UNSAT case here.
+            if cdb[ci].iter().all(|l| vdb[l].level == 0) {
+                return Ok(false);
+            }
             handle_conflict_path(asgs, cdb, elim, state, vdb, ci)?;
         }
     }
@@ -377,14 +387,92 @@ fn handle_conflict_path(
         state[Stat::BlockRestart] += 1;
     }
     let cl = asgs.level();
-    let bl = analyze(asgs, cdb, state, vdb, ci);
+    let mut use_chronobt = 1_000 < ncnfl && 0 < state.config.chronobt_threshold;
+    if use_chronobt {
+        let c = &cdb[ci];
+        let lcnt = c.iter().filter(|l| vdb[*l].level == cl).count();
+        if 1 == lcnt {
+            debug_assert!(c.iter().find(|l| vdb[*l].level == cl).is_some());
+            let decision = *c.iter().find(|l| vdb[*l].level == cl).unwrap();
+            let snd_l = c
+                .iter()
+                .map(|l| vdb[l].level)
+                .filter(|l| *l != cl)
+                .max()
+                .unwrap_or(0);
+            if 0 < snd_l {
+                // If the conflicting clause contains one literallfrom the maximal
+                // decision level, we let BCP propagating that literal at the second
+                // highest decision level in conflicting cls.
+                // PREMISE: 0 < snd_l
+                asgs.cancel_until(vdb, snd_l - 1);
+                debug_assert!(
+                    asgs.trail.iter().all(|l| l.vi() != decision.vi()),
+                    format!("lcnt == 1: level {}, snd level {}", cl, snd_l)
+                );
+                asgs.assign_by_decision(vdb, decision);
+                return Ok(());
+            }
+        }
+        let lv = c.iter().map(|l| vdb[l].level).max().unwrap_or(0);
+        // The following change the decision level which is stored to `cl`.
+        asgs.cancel_until(vdb, lv);
+    }
+    // conflicting level
+    let cl = asgs.level();
+    debug_assert!(cdb[ci].iter().any(|l| vdb[l].level == cl));
+    // backtrack level by analyze
+    let bl_a = conflict_analyze(asgs, cdb, state, vdb, ci).max(state.root_level);
+    if state.new_learnt.is_empty() {
+        #[cfg(debug)]
+        {
+            println!(
+                "empty learnt at {}({}) by {:?}",
+                cl,
+                vdb[asgs.len_upto(cl - 1)].reason == ClauseId::default(),
+                vdb.dump(&cdb[ci]),
+            );
+        }
+        return Err(SolverError::NullLearnt);
+    }
     // vdb.bump_vars(asgs, cdb, ci);
     let new_learnt = &mut state.new_learnt;
+    let l0 = new_learnt[0];
+    // assert: 0 < cl, which was checked already by new_learnt.is_empty().
+
+    // NCB places firstUIP on level bl, while CB does it on level cl.
+    // Therefore the condition to use CB is: activity(firstUIP) < activity(v(bl)).
+    // PREMISE: 0 < bl, because asgs.decision_vi accepts only non-zero values.
+    use_chronobt &= bl_a == 0
+        || state.config.chronobt_threshold <= cl - bl_a
+        || vdb.activity(l0.vi()) < vdb.activity(asgs.decision_vi(bl_a));
+
+    // (assign level, backtrack level)
+    let (al, bl) = if use_chronobt {
+        (
+            new_learnt[1..]
+                .iter()
+                .map(|l| vdb[l].level)
+                .max()
+                .unwrap_or(0),
+            cl - 1,
+        )
+    } else {
+        (bl_a, bl_a)
+    };
     let learnt_len = new_learnt.len();
     if learnt_len == 1 {
+        // PARTIAL FIXED SOLUTION by UNIT LEARNT CLAUSE
         // dump to certified even if it's a literal.
         cdb.certificate_add(new_learnt);
-        asgs.assign_by_unitclause(vdb, new_learnt[0]);
+        if use_chronobt {
+            asgs.cancel_until(vdb, bl);
+            debug_assert!(asgs.trail.iter().all(|l| l.vi() != l0.vi()));
+            asgs.assign_by_implication(vdb, l0, ClauseId::default(), 0);
+        } else {
+            asgs.assign_by_unitclause(vdb, l0);
+        }
+        state.num_solved_vars += 1;
     } else {
         {
             // Reason-Side Rewarding
@@ -398,13 +486,14 @@ fn handle_conflict_path(
                 }
             }
         }
-        asgs.cancel_until(vdb, bl.max(state.root_level));
+        asgs.cancel_until(vdb, bl);
         let lbd = vdb.compute_lbd(&new_learnt);
-        let l0 = new_learnt[0];
         let cid = cdb.attach(state, vdb, lbd);
         elim.add_cid_occur(vdb, cid, &mut cdb[cid], true);
         state.c_lvl.update(cl as f64);
         state.b_lvl.update(bl as f64);
+        asgs.assign_by_implication(vdb, l0, cid, al);
+        state.rst.lbd.update(lbd);
         if lbd <= 2 {
             state[Stat::NumLBD2] += 1;
         }
@@ -412,8 +501,6 @@ fn handle_conflict_path(
             state[Stat::NumBin] += 1;
             state[Stat::NumBinLearnt] += 1;
         }
-        asgs.assign_by_implication(vdb, l0, cid);
-        state.rst.lbd.update(lbd);
         state[Stat::SumLBD] += lbd;
         state[Stat::Learnt] += 1;
     }
@@ -485,7 +572,8 @@ fn adapt_parameters(
     Ok(())
 }
 
-fn analyze(
+#[allow(clippy::cognitive_complexity)]
+fn conflict_analyze(
     asgs: &mut AssignStack,
     cdb: &mut ClauseDB,
     state: &mut State,
@@ -552,8 +640,20 @@ fn analyze(
             }
         }
         // set the index of the next literal to ti
-        while !vdb[asgs.trail[ti].vi()].is(Flag::CA_SEEN) {
+        while {
+            let v = &vdb[asgs.trail[ti].vi()];
+            !v.is(Flag::CA_SEEN) || v.level != dl
+        } {
             // println!("- skip {} because it isn't flagged", asgs.trail[ti].int());
+            debug_assert!(
+                0 < ti,
+                format!(
+                    "lv: {}, learnt: {:?}\nconflict: {:?}",
+                    dl,
+                    vdb.dump(&*learnt),
+                    vdb.dump(&cdb[confl].lits),
+                ),
+            );
             ti -= 1;
         }
         p = asgs.trail[ti];
@@ -562,96 +662,107 @@ fn analyze(
         // println!("- move to flagged {}, which reason is {}; num path: {}",
         //          next_vi, path_cnt - 1, cid.fmt());
         vdb[next_vi].turn_off(Flag::CA_SEEN);
+        // since the trail can contain a literal which level is under `dl` after
+        // the `dl`-th thdecision var, we must skip it.
         path_cnt -= 1;
-        if path_cnt <= 0 {
+        if path_cnt == 0 {
             break;
         }
         debug_assert!(0 < ti);
         ti -= 1;
-        debug_assert_ne!(cid, ClauseId::default());
     }
+    debug_assert!(learnt.iter().all(|l| *l != !p));
+    debug_assert_eq!(vdb[p].level, dl);
     learnt[0] = !p;
     // println!("- appending {}, the result is {:?}", learnt[0].int(), vec2int(learnt));
-    simplify_learnt(asgs, cdb, state, vdb)
+    state.simplify_learnt(asgs, cdb, vdb)
 }
 
-fn simplify_learnt(
-    asgs: &mut AssignStack,
-    cdb: &mut ClauseDB,
-    state: &mut State,
-    vdb: &mut VarDB,
-) -> usize {
-    let State {
-        ref mut new_learnt, ..
-    } = state;
-    // let dl = asgs.level();
-    let mut to_clear: Vec<Lit> = vec![new_learnt[0]];
-    let mut levels = vec![false; asgs.level() + 1];
-    for l in &new_learnt[1..] {
-        to_clear.push(*l);
-        levels[vdb[l.vi()].level] = true;
-    }
-    new_learnt.retain(|l| {
-        vdb[l.vi()].reason == ClauseId::default()
-            || !redundant_lit(cdb, vdb, *l, &mut to_clear, &levels)
-    });
-    let len = new_learnt.len();
-    if 2 < len && len < 30 {
-        vdb.minimize_with_bi_clauses(cdb, new_learnt);
-    }
-    // find correct backtrack level from remaining literals
-    let mut level_to_return = 0;
-    if 1 < new_learnt.len() {
-        let mut max_i = 1;
-        level_to_return = vdb[new_learnt[max_i].vi()].level;
-        for (i, l) in new_learnt.iter().enumerate().skip(2) {
-            let lv = vdb[l.vi()].level;
-            if level_to_return < lv {
-                level_to_return = lv;
-                max_i = i;
-            }
+impl State {
+    fn simplify_learnt(
+        // state: &mut State,
+        &mut self,
+        asgs: &mut AssignStack,
+        cdb: &mut ClauseDB,
+        vdb: &mut VarDB,
+    ) -> usize {
+        let State {
+            ref mut new_learnt, ..
+        } = self;
+        let mut to_clear: Vec<Lit> = vec![new_learnt[0]];
+        let mut levels = vec![false; asgs.level() + 1];
+        for l in &new_learnt[1..] {
+            to_clear.push(*l);
+            levels[vdb[l.vi()].level] = true;
         }
-        new_learnt.swap(1, max_i);
+        let l0 = new_learnt[0];
+        new_learnt.retain(|l| *l == l0 || !l.is_redundant(cdb, vdb, &mut to_clear, &levels));
+        let len = new_learnt.len();
+        if 2 < len && len < 30 {
+            vdb.minimize_with_bi_clauses(cdb, new_learnt);
+        }
+        // find correct backtrack level from remaining literals
+        let mut level_to_return = 0;
+        if 1 < new_learnt.len() {
+            let mut max_i = 1;
+            level_to_return = vdb[new_learnt[max_i].vi()].level;
+            for (i, l) in new_learnt.iter().enumerate().skip(2) {
+                let lv = vdb[l.vi()].level;
+                if level_to_return < lv {
+                    level_to_return = lv;
+                    max_i = i;
+                }
+            }
+            new_learnt.swap(1, max_i);
+        }
+        for l in &to_clear {
+            vdb[l.vi()].turn_off(Flag::CA_SEEN);
+        }
+        level_to_return
     }
-    for l in &to_clear {
-        vdb[l.vi()].turn_off(Flag::CA_SEEN);
-    }
-    level_to_return
 }
 
-fn redundant_lit(
-    cdb: &mut ClauseDB,
-    vdb: &mut VarDB,
-    l: Lit,
-    clear: &mut Vec<Lit>,
-    levels: &[bool],
-) -> bool {
-    let mut stack = Vec::new();
-    stack.push(l);
-    let top = clear.len();
-    while let Some(sl) = stack.pop() {
-        let cid = vdb[sl.vi()].reason;
-        let c = &mut cdb[cid];
-        for q in &(*c)[1..] {
-            let vi = q.vi();
-            let v = &vdb[vi];
-            let lv = v.level;
-            if 0 < lv && !v.is(Flag::CA_SEEN) {
-                if v.reason != ClauseId::default() && levels[lv as usize] {
-                    vdb[vi].turn_on(Flag::CA_SEEN);
-                    stack.push(*q);
-                    clear.push(*q);
-                } else {
-                    for l in &clear[top..] {
-                        vdb[l.vi()].turn_off(Flag::CA_SEEN);
+/// return `true` if the `lit` is redundant, which is defined by
+/// any leaf of implication graph for it isn't a fixed var nor a decision var.
+impl Lit {
+    fn is_redundant(
+        self,
+        cdb: &mut ClauseDB,
+        vdb: &mut VarDB,
+        clear: &mut Vec<Lit>,
+        levels: &[bool],
+    ) -> bool {
+        if vdb[self].reason == ClauseId::default() {
+            return false;
+        }
+        let mut stack = Vec::new();
+        stack.push(self);
+        let top = clear.len();
+        while let Some(sl) = stack.pop() {
+            let cid = vdb[sl.vi()].reason;
+            let c = &mut cdb[cid];
+            for q in &(*c)[1..] {
+                let vi = q.vi();
+                let v = &vdb[vi];
+                let lv = v.level;
+                if 0 < lv && !v.is(Flag::CA_SEEN) {
+                    if v.reason != ClauseId::default() && levels[lv] {
+                        vdb[vi].turn_on(Flag::CA_SEEN);
+                        stack.push(*q);
+                        clear.push(*q);
+                    } else {
+                        // one of the roots is a decision var at an unchecked level.
+                        for l in &clear[top..] {
+                            vdb[l.vi()].turn_off(Flag::CA_SEEN);
+                        }
+                        clear.truncate(top);
+                        return false;
                     }
-                    clear.truncate(top);
-                    return false;
                 }
             }
         }
+        true
     }
-    true
 }
 
 fn analyze_final(asgs: &AssignStack, state: &mut State, vdb: &mut VarDB, c: &Clause) {
@@ -686,6 +797,25 @@ fn analyze_final(asgs: &AssignStack, state: &mut State, vdb: &mut VarDB, c: &Cla
             }
         }
         seen[vi] = false;
+    }
+}
+
+impl VarDB {
+    fn dump<'a, V: IntoIterator<Item = &'a Lit, IntoIter = Iter<'a, Lit>>>(
+        &self,
+        v: V,
+    ) -> Vec<(i32, usize, bool, Option<bool>)> {
+        v.into_iter()
+            .map(|l| {
+                let v = &self[*l];
+                (
+                    i32::from(l),
+                    v.level,
+                    v.reason == ClauseId::default(),
+                    v.assign,
+                )
+            })
+            .collect::<Vec<(i32, usize, bool, Option<bool>)>>()
     }
 }
 
