@@ -387,7 +387,7 @@ fn handle_conflict_path(
         state[Stat::BlockRestart] += 1;
     }
     let cl = asgs.level();
-    let mut use_chronobt = 1_000 < ncnfl && 0 < state.config.chronobt_threshold;
+    let mut use_chronobt = 1_000 < ncnfl && 0 < state.config.chronobt;
     if use_chronobt {
         let c = &cdb[ci];
         let lcnt = c.iter().filter(|l| vdb[*l].level == cl).count();
@@ -444,7 +444,7 @@ fn handle_conflict_path(
     // Therefore the condition to use CB is: activity(firstUIP) < activity(v(bl)).
     // PREMISE: 0 < bl, because asgs.decision_vi accepts only non-zero values.
     use_chronobt &= bl_a == 0
-        || state.config.chronobt_threshold <= cl - bl_a
+        || state.config.chronobt <= cl - bl_a
         || vdb.activity(l0.vi()) < vdb.activity(asgs.decision_vi(bl_a));
 
     // (assign level, backtrack level)

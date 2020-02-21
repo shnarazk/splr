@@ -8,9 +8,9 @@ pub const VERSION: &str = "0.3.1-dev.1";
 #[derive(Clone, Debug, StructOpt)]
 #[structopt(name = "splr", about, author)]
 pub struct Config {
-    /// threshold to use chronological backtrack
-    #[structopt(long = "chronoBT-threshold", short = "C", default_value = "100")]
-    pub chronobt_threshold: usize,
+    /// threshold to use chronoBT
+    #[structopt(long = "chronoBT", short = "C", default_value = "100")]
+    pub chronobt: usize,
     /// soft limit of #clauses (6MC/GB)
     #[structopt(long = "cl", default_value = "0")]
     pub clause_limit: usize,
@@ -59,10 +59,10 @@ pub struct Config {
     #[structopt(long = "without-elim", short = "E")]
     pub without_elim: bool,
     /// Disables dynamic strategy adaptation
-    #[structopt(long = "without-adaptive-strategy", short = "S")]
+    #[structopt(long = "no-adaptive-strategy", short = "S")]
     pub without_adaptive_strategy: bool,
     /// Enables deep search mode
-    #[structopt(long = "with-deep-search", short = "D")]
+    #[structopt(skip)]
     pub with_deep_search: bool,
     /// Writes a DRAT UNSAT certification file
     #[structopt(long = "certify", short = "c")]
@@ -78,7 +78,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Config {
         Config {
-            chronobt_threshold: 100,
+            chronobt: 100,
             clause_limit: 0,
             elim_grow_limit: 0,
             elim_lit_limit: 100,
