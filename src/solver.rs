@@ -522,7 +522,8 @@ fn handle_conflict_path(
             if 1.0 <= p {
                 return Err(SolverError::TimeOut);
             } else if state.default_rewarding && 0.5 <= p {
-                // force the final stage of rewarding to switch to 'deep search' mode
+                // switch to the final stage of rewarding,
+                // which has a similar effect of deep search.
                 state.default_rewarding = false;
                 vdb.shift_reward_mode();
             }
@@ -560,7 +561,7 @@ fn adapt_parameters(
         }
     }
     state[Stat::SolvedRecord] = state.num_solved_vars;
-    if !state.config.without_deep_search {
+    if state.config.with_deep_search {
         if state.stagnated {
             state.rst.restart_step = state.reflection_interval;
             state.rst.next_restart += state.reflection_interval;

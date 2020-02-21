@@ -61,9 +61,9 @@ pub struct Config {
     /// Disables dynamic strategy adaptation
     #[structopt(long = "without-adaptive-strategy", short = "S")]
     pub without_adaptive_strategy: bool,
-    /// Disables deep search mode
-    #[structopt(long = "without-deep-search", short = "D")]
-    pub without_deep_search: bool,
+    /// Enables deep search mode
+    #[structopt(long = "with-deep-search", short = "D")]
+    pub with_deep_search: bool,
     /// Writes a DRAT UNSAT certification file
     #[structopt(long = "certify", short = "c")]
     pub use_certification: bool,
@@ -94,7 +94,7 @@ impl Default for Config {
             use_log: false,
             without_elim: false,
             without_adaptive_strategy: false,
-            without_deep_search: false,
+            with_deep_search: false,
             use_certification: false,
             timeout: 10_000.0,
             dump_interval: 0,

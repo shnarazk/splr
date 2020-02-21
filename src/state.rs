@@ -396,7 +396,7 @@ impl StateIF for State {
             re_init = true;
         }
         if self[Stat::NoDecisionConflict] < 30_000 {
-            if !self.config.without_deep_search {
+            if self.config.with_deep_search {
                 self.strategy = SearchStrategy::LowSuccesiveM;
             } else {
                 self.strategy = SearchStrategy::LowSuccesiveLuby;
