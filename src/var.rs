@@ -27,6 +27,8 @@ pub trait VarDBIF {
     fn len(&self) -> usize;
     /// return true if it's empty.
     fn is_empty(&self) -> bool;
+    /// return an interator over vars.
+    fn iter(&self) -> Iter<'_, Var>;
     /// return the 'value' of a given literal.
     fn assigned(&self, l: Lit) -> Option<bool>;
     /// return `true` is the clause is the reason of the assignment.
@@ -360,6 +362,9 @@ impl VarDBIF for VarDB {
     }
     fn is_empty(&self) -> bool {
         self.var.is_empty()
+    }
+    fn iter(&self) -> Iter<'_, Var> {
+        self.var.iter()
     }
     fn assigned(&self, l: Lit) -> Option<bool> {
         match unsafe { self.var.get_unchecked(l.vi()).assign } {
