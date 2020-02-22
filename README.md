@@ -68,6 +68,8 @@ Splr version 0.3.1 (splr-0.3.1) was checked with the following problems:
     * 3 were verified with [grad](https://www21.in.tum.de/~lammich/grat/).
 	* Verifying gto_p60c238-sc2018.cnf was timed out due to the size of the drat file (1.3 GB).
 
+![](https://user-images.githubusercontent.com/997855/75087001-2f897800-557e-11ea-99fd-83d891f8350b.png)
+
 #### Version 0.1.0
 
 Splr version 0.1.0 (splr-0.1.0) was checked with the following problems:
