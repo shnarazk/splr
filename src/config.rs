@@ -2,12 +2,15 @@
 use {std::path::PathBuf, structopt::StructOpt};
 
 /// Splr version number.
-pub const VERSION: &str = "0.3.0";
+pub const VERSION: &str = "0.3.1";
 
 /// Configuration built from command line options
 #[derive(Clone, Debug, StructOpt)]
 #[structopt(name = "splr", about, author)]
 pub struct Config {
+    /// threshold to use chronoBT
+    #[structopt(long = "chronoBT", short = "C", default_value = "100")]
+    pub chronobt: usize,
     /// soft limit of #clauses (6MC/GB)
     #[structopt(long = "cl", default_value = "0")]
     pub clause_limit: usize,
@@ -56,11 +59,11 @@ pub struct Config {
     #[structopt(long = "without-elim", short = "E")]
     pub without_elim: bool,
     /// Disables dynamic strategy adaptation
-    #[structopt(long = "without-adaptive-strategy", short = "S")]
+    #[structopt(long = "no-adaptive-strategy", short = "S")]
     pub without_adaptive_strategy: bool,
-    /// Disables deep search mode
-    #[structopt(long = "without-deep-search", short = "D")]
-    pub without_deep_search: bool,
+    /// Enables deep search mode
+    #[structopt(skip)]
+    pub with_deep_search: bool,
     /// Writes a DRAT UNSAT certification file
     #[structopt(long = "certify", short = "c")]
     pub use_certification: bool,
@@ -75,6 +78,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Config {
         Config {
+            chronobt: 100,
             clause_limit: 0,
             elim_grow_limit: 0,
             elim_lit_limit: 100,
@@ -90,7 +94,7 @@ impl Default for Config {
             use_log: false,
             without_elim: false,
             without_adaptive_strategy: false,
-            without_deep_search: false,
+            with_deep_search: false,
             use_certification: false,
             timeout: 10_000.0,
             dump_interval: 0,

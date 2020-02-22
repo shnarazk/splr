@@ -27,12 +27,19 @@ pub trait VarDBIF {
     fn len(&self) -> usize;
     /// return true if it's empty.
     fn is_empty(&self) -> bool;
+    /// return an interator over vars.
+    fn iter(&self) -> Iter<'_, Var>;
     /// return the 'value' of a given literal.
     fn assigned(&self, l: Lit) -> Option<bool>;
     /// return `true` is the clause is the reason of the assignment.
     fn locked(&self, c: &Clause, cid: ClauseId) -> bool;
     /// return `true` if the set of literals is satisfiable under the current assignment.
     fn satisfies(&self, c: &[Lit]) -> bool;
+    /// return Option<bool>
+    /// - Some(true) -- the literals is satisfied by a literal
+    /// - Some(false) -- the literals is unsatisfied; no unassigned literal
+    /// - None -- the literals contains an unassigned literal
+    fn status(&self, c: &[Lit]) -> Option<bool>;
     // minimize a clause.
     fn minimize_with_bi_clauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>);
     // bump vars' activities.
@@ -169,9 +176,9 @@ enum RewardStep {
 ///  - end: upper bound of the range
 ///  - scale: scaling coefficient for activity decay
 const REWARDS: [(RewardStep, f64, f64, f64); 3] = [
-    (RewardStep::HeatUp, 0.80, 0.90, 0.0), // the last is dummy
-    (RewardStep::Annealing, 0.90, 0.96, 0.1),
-    (RewardStep::Final, 0.96, 0.98, 0.1),
+    (RewardStep::HeatUp, 0.80, 0.92, 0.0), // the last is dummy
+    (RewardStep::Annealing, 0.92, 0.96, 0.1),
+    (RewardStep::Final, 0.96, 0.99, 0.1),
 ];
 
 /// A container of variables.
@@ -218,6 +225,21 @@ impl IndexMut<VarId> for VarDB {
     }
 }
 
+impl Index<&VarId> for VarDB {
+    type Output = Var;
+    #[inline]
+    fn index(&self, i: &VarId) -> &Var {
+        unsafe { self.var.get_unchecked(*i) }
+    }
+}
+
+impl IndexMut<&VarId> for VarDB {
+    #[inline]
+    fn index_mut(&mut self, i: &VarId) -> &mut Var {
+        unsafe { self.var.get_unchecked_mut(*i) }
+    }
+}
+
 impl Index<Range<usize>> for VarDB {
     type Output = [Var];
     #[inline]
@@ -259,6 +281,21 @@ impl Index<Lit> for VarDB {
 impl IndexMut<Lit> for VarDB {
     #[inline]
     fn index_mut(&mut self, l: Lit) -> &mut Var {
+        unsafe { self.var.get_unchecked_mut(l.vi()) }
+    }
+}
+
+impl Index<&Lit> for VarDB {
+    type Output = Var;
+    #[inline]
+    fn index(&self, l: &Lit) -> &Var {
+        unsafe { self.var.get_unchecked(l.vi()) }
+    }
+}
+
+impl IndexMut<&Lit> for VarDB {
+    #[inline]
+    fn index_mut(&mut self, l: &Lit) -> &mut Var {
         unsafe { self.var.get_unchecked_mut(l.vi()) }
     }
 }
@@ -326,6 +363,9 @@ impl VarDBIF for VarDB {
     fn is_empty(&self) -> bool {
         self.var.is_empty()
     }
+    fn iter(&self) -> Iter<'_, Var> {
+        self.var.iter()
+    }
     fn assigned(&self, l: Lit) -> Option<bool> {
         match unsafe { self.var.get_unchecked(l.vi()).assign } {
             Some(x) if !bool::from(l) => Some(!x),
@@ -345,6 +385,17 @@ impl VarDBIF for VarDB {
             }
         }
         false
+    }
+    fn status(&self, vec: &[Lit]) -> Option<bool> {
+        let mut falsified = Some(false);
+        for l in vec {
+            match self.assigned(*l) {
+                Some(true) => return Some(true),
+                None => falsified = None,
+                _ => (),
+            }
+        }
+        falsified
     }
     fn minimize_with_bi_clauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>) {
         let nlevels = self.compute_lbd(vec);
