@@ -11,6 +11,8 @@ It adopts various research results on SAT solvers:
 - chronological backtrack
 - heuristics adaptation
 
+Please check [ChangeLog](ChangeLog.md) about recent updates.
+
 *Many thanks to SAT researchers.*
 
 ## Install
