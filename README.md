@@ -63,8 +63,10 @@ Though Splr comes with **ABSOLUTELY NO WARRANTY**, I'd like to show some results
 Splr version 0.3.1 (splr-0.3.1) was checked with the following problems:
 
 * [SAT Race 2019](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks](http://satcompetition.org/sr2019benchmarks.zip),  splr-0.3.1 solved with a 200 sec timeout:
-  * 32 satisfiable problems: all the solutions were correct.
-  * 3 unsatisfiable problems: all of them are verified with [grad](https://www21.in.tum.de/~lammich/grat/).
+  * 35 satisfiable problems: all the solutions were correct.
+  * 4 unsatisfiable problems:
+    * 3 were verified with [grad](https://www21.in.tum.de/~lammich/grat/).
+	* Verifying gto_p60c238-sc2018.cnf was timed out due to the size of the drat file (1.3 GB).
 
 #### Version 0.1.0
 
