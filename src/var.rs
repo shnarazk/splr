@@ -447,12 +447,12 @@ impl VarDBIF for VarDB {
             }
             loop {
                 if 0 == ti {
-                    self.var[asgs.trail[ti].vi()].turn_off(Flag::VR_SEEN);
+                    self.var[asgs[ti].vi()].turn_off(Flag::VR_SEEN);
                     debug_assert!(self.var[1..].iter().all(|v| !v.is(Flag::VR_SEEN)));
                     return;
                 }
                 ti -= 1;
-                p = asgs.trail[ti];
+                p = asgs[ti];
                 let next_vi = p.vi();
                 if self.var[next_vi].is(Flag::VR_SEEN) {
                     self.var[next_vi].turn_off(Flag::VR_SEEN);
@@ -529,13 +529,13 @@ impl VarDB {
             }
             loop {
                 if 0 == ti {
-                    self.var[asgs.trail[ti].vi()].turn_off(Flag::VR_SEEN);
+                    self.var[asgs[ti].vi()].turn_off(Flag::VR_SEEN);
                     debug_assert!(self.var[1..].iter().all(|v| !v.is(Flag::VR_SEEN)));
                     println!();
                     return;
                 }
                 ti -= 1;
-                p = asgs.trail[ti];
+                p = asgs[ti];
                 let next_vi = p.vi();
                 if self.var[next_vi].is(Flag::VR_SEEN) {
                     self.var[next_vi].turn_off(Flag::VR_SEEN);

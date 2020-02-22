@@ -407,7 +407,7 @@ fn handle_conflict_path(
                 // PREMISE: 0 < snd_l
                 asgs.cancel_until(vdb, snd_l - 1);
                 debug_assert!(
-                    asgs.trail.iter().all(|l| l.vi() != decision.vi()),
+                    asgs.iter().all(|l| l.vi() != decision.vi()),
                     format!("lcnt == 1: level {}, snd level {}", cl, snd_l)
                 );
                 asgs.assign_by_decision(vdb, decision);
@@ -467,7 +467,7 @@ fn handle_conflict_path(
         cdb.certificate_add(new_learnt);
         if use_chronobt {
             asgs.cancel_until(vdb, bl);
-            debug_assert!(asgs.trail.iter().all(|l| l.vi() != l0.vi()));
+            debug_assert!(asgs.iter().all(|l| l.vi() != l0.vi()));
             asgs.assign_by_implication(vdb, l0, ClauseId::default(), 0);
         } else {
             asgs.assign_by_unitclause(vdb, l0);
@@ -642,10 +642,10 @@ fn conflict_analyze(
         }
         // set the index of the next literal to ti
         while {
-            let v = &vdb[asgs.trail[ti].vi()];
+            let v = &vdb[asgs[ti].vi()];
             !v.is(Flag::CA_SEEN) || v.level != dl
         } {
-            // println!("- skip {} because it isn't flagged", asgs.trail[ti].int());
+            // println!("- skip {} because it isn't flagged", asgs[ti].int());
             debug_assert!(
                 0 < ti,
                 format!(
@@ -657,7 +657,7 @@ fn conflict_analyze(
             );
             ti -= 1;
         }
-        p = asgs.trail[ti];
+        p = asgs[ti];
         let next_vi = p.vi();
         cid = vdb[next_vi].reason;
         // println!("- move to flagged {}, which reason is {}; num path: {}",
@@ -783,7 +783,7 @@ fn analyze_final(asgs: &AssignStack, state: &mut State, vdb: &mut VarDB, c: &Cla
     } else {
         asgs.len_upto(state.root_level)
     };
-    for l in &asgs.trail[asgs.len_upto(0)..end] {
+    for l in &asgs[asgs.len_upto(0)..end] {
         let vi = l.vi();
         if seen[vi] {
             if vdb[vi].reason == ClauseId::default() {

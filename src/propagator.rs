@@ -28,6 +28,8 @@ pub trait PropagatorIF {
     fn len_upto(&self, n: usize) -> usize;
     /// return `true` if there's no assignment.
     fn is_empty(&self) -> bool;
+    /// return an interator over assignment stack.
+    fn iter(&self) -> Iter<'_, Lit>;
     /// return the current decision level.
     fn level(&self) -> usize;
     ///return the decision var's id at that level.
@@ -196,6 +198,9 @@ impl PropagatorIF for AssignStack {
     }
     fn is_empty(&self) -> bool {
         self.trail.is_empty()
+    }
+    fn iter(&self) -> Iter<'_, Lit> {
+        self.trail.iter()
     }
     fn level(&self) -> usize {
         self.trail_lim.len()

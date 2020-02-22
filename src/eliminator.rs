@@ -374,7 +374,7 @@ impl Eliminator {
         while !self.clause_queue.is_empty() || self.bwdsub_assigns < asgs.len() {
             // Check top-level assignments by creating a dummy clause and placing it in the queue:
             if self.clause_queue.is_empty() && self.bwdsub_assigns < asgs.len() {
-                let c = ClauseId::from(asgs.trail[self.bwdsub_assigns]);
+                let c = ClauseId::from(asgs[self.bwdsub_assigns]);
                 self.clause_queue.push(c);
                 self.bwdsub_assigns += 1;
             }
