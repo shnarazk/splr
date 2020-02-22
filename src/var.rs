@@ -77,6 +77,8 @@ pub struct Var {
     pub reason: ClauseId,
     /// decision level at which this variables is assigned.
     pub level: usize,
+    /// the number of participation in conflict analysis
+    participated: usize,
     /// a dynamic evaluation criterion like VSIDS or ACID.
     reward: f64,
     /// the number of conflicts at which this var was rewarded lastly.
@@ -87,7 +89,6 @@ pub struct Var {
     pub neg_occurs: Vec<ClauseId>,
     /// the `Flag`s
     flags: Flag,
-    participated: usize,
 }
 
 impl Default for Var {
@@ -436,7 +437,7 @@ impl VarDBIF for VarDB {
         let mut cid = confl;
         let mut p = NULL_LIT;
         let mut ti = asgs.len(); // trail index
-        debug_assert!(self.var[1..].iter().all(|v| !v.is(Flag::VR_SEEN)));
+        debug_assert!(self.iter().skip(1).all(|v| !v.is(Flag::VR_SEEN)));
         loop {
             for q in &cdb[cid].lits[(p != NULL_LIT) as usize..] {
                 let vi = q.vi();
@@ -448,7 +449,7 @@ impl VarDBIF for VarDB {
             loop {
                 if 0 == ti {
                     self.var[asgs[ti].vi()].turn_off(Flag::VR_SEEN);
-                    debug_assert!(self.var[1..].iter().all(|v| !v.is(Flag::VR_SEEN)));
+                    debug_assert!(self.iter().skip(1).all(|v| !v.is(Flag::VR_SEEN)));
                     return;
                 }
                 ti -= 1;
@@ -517,7 +518,7 @@ impl VarDB {
         let mut cid = confl;
         let mut p = NULL_LIT;
         let mut ti = asgs.len(); // trail index
-        debug_assert!(self.var[1..].iter().all(|v| !v.is(Flag::VR_SEEN)));
+        debug_assert!(self.iter().skip(1).all(|v| !v.is(Flag::VR_SEEN)));
         println!();
         loop {
             for q in &cdb[cid].lits[(p != NULL_LIT) as usize..] {
@@ -530,7 +531,7 @@ impl VarDB {
             loop {
                 if 0 == ti {
                     self.var[asgs[ti].vi()].turn_off(Flag::VR_SEEN);
-                    debug_assert!(self.var[1..].iter().all(|v| !v.is(Flag::VR_SEEN)));
+                    debug_assert!(self.iter().skip(1).all(|v| !v.is(Flag::VR_SEEN)));
                     println!();
                     return;
                 }

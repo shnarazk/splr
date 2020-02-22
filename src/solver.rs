@@ -681,7 +681,6 @@ fn conflict_analyze(
 
 impl State {
     fn simplify_learnt(
-        // state: &mut State,
         &mut self,
         asgs: &mut AssignStack,
         cdb: &mut ClauseDB,
