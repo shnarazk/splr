@@ -179,11 +179,11 @@ pub enum RewardStep {
 ///  - start: lower bound of the range
 ///  - end: upper bound of the range
 ///  - scale: scaling coefficient for activity decay
-const REWARDS: [(RewardStep, f64, f64, f64); 4] = [
+const REWARD: [(RewardStep, f64, f64, f64); 4] = [
     (RewardStep::HeatUp, 0.80, 0.92, 0.0), // the last is dummy
-    (RewardStep::Annealing, 0.92, 0.94, 0.1),
-    (RewardStep::Final, 0.94, 0.96, 0.1),
-    (RewardStep::Fixed, 0.98, 0.98, 0.0),
+    (RewardStep::Annealing, 0.92, 0.96, 0.1),
+    (RewardStep::Final, 0.96, 0.99, 0.1),
+    (RewardStep::Fixed, 0.99, 0.99, 0.0),
 ];
 
 /// A container of variables.
@@ -202,7 +202,7 @@ pub struct VarDB {
 
 impl Default for VarDB {
     fn default() -> VarDB {
-        let reward = REWARDS[0];
+        let reward = REWARD[0];
         VarDB {
             activity_decay: reward.1,
             activity_decay_max: reward.2,
@@ -342,7 +342,7 @@ impl VarRewardIF for VarDB {
     }
     fn shift_reward_mode(&mut self) {
         if self.reward_mode < RewardStep::Final {
-            let reward = &REWARDS[self.reward_mode as usize + 1];
+            let reward = &REWARD[self.reward_mode as usize + 1];
             self.reward_mode = reward.0;
             self.activity_decay_max = reward.2;
             self.activity_step *= reward.3;
