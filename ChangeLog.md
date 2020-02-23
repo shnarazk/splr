@@ -1,3 +1,7 @@
+## 0.3.2, 2020-20-20
+
+- set var activity parameters for each search strategy correctly
+
 ## 0.3.1, 2020-02-22
 
 - adopt Chronological Backtrack; A. Nadel and V. Ryvchin: Chronological Backtracking, *Theory and Applications of Satisfiability Testing - SAT 2018*, pp.111–121, 2018.

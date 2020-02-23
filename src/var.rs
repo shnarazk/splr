@@ -62,6 +62,8 @@ pub trait VarRewardIF {
     fn reward_update(&mut self);
     /// change reward mode.
     fn shift_reward_mode(&mut self);
+    /// switch to a special reward mode for SearchStrategy::LowSuccessiveM.
+    fn fix_reward(&mut self, val: f64);
 }
 
 /// Object representing a variable.
@@ -164,11 +166,12 @@ impl FlagIF for Var {
     }
 }
 
-#[derive(Clone, Copy, Eq, Debug, PartialEq)]
-enum RewardStep {
+#[derive(Clone, Copy, Eq, Debug, PartialEq, PartialOrd, Ord)]
+pub enum RewardStep {
     HeatUp = 0,
     Annealing,
     Final,
+    Fixed,
 }
 
 /// a reward table used in VarDB::shift_reward_mode
@@ -176,10 +179,11 @@ enum RewardStep {
 ///  - start: lower bound of the range
 ///  - end: upper bound of the range
 ///  - scale: scaling coefficient for activity decay
-const REWARDS: [(RewardStep, f64, f64, f64); 3] = [
+const REWARDS: [(RewardStep, f64, f64, f64); 4] = [
     (RewardStep::HeatUp, 0.80, 0.92, 0.0), // the last is dummy
     (RewardStep::Annealing, 0.92, 0.96, 0.1),
     (RewardStep::Final, 0.96, 0.99, 0.1),
+    (RewardStep::Fixed, 0.999, 0.999, 0.0),
 ];
 
 /// A container of variables.
@@ -188,7 +192,7 @@ pub struct VarDB {
     pub activity_decay: f64,
     activity_decay_max: f64,
     pub activity_step: f64,
-    reward_mode: RewardStep,
+    pub reward_mode: RewardStep,
     ordinal: usize,
     /// vars
     var: Vec<Var>,
@@ -337,12 +341,18 @@ impl VarRewardIF for VarDB {
         }
     }
     fn shift_reward_mode(&mut self) {
-        if self.reward_mode != RewardStep::Final {
+        if self.reward_mode < RewardStep::Final {
             let reward = &REWARDS[self.reward_mode as usize + 1];
             self.reward_mode = reward.0;
             self.activity_decay_max = reward.2;
             self.activity_step *= reward.3;
         }
+    }
+    fn fix_reward(&mut self, r: f64) {
+        self.reward_mode = RewardStep::Fixed;
+        self.activity_decay = r;
+        self.activity_decay_max = r;
+        self.activity_step = 0.0;
     }
 }
 

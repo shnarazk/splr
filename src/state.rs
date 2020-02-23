@@ -6,7 +6,7 @@ use {
         eliminator::{Eliminator, EliminatorIF},
         restart::RestartExecutor,
         types::*,
-        var::{VarDB, VarDBIF},
+        var::{VarDB, VarDBIF, VarRewardIF},
     },
     libc::{clock_gettime, timespec, CLOCK_PROCESS_CPUTIME_ID},
     std::{
@@ -30,7 +30,7 @@ pub trait StateIF {
     /// update internal counters and return true if solver stagnated.
     fn check_stagnation(&mut self);
     /// change heuristics based on stat data.
-    fn adapt_strategy(&mut self, cdb: &mut ClauseDB);
+    fn adapt_strategy(&mut self, cdb: &mut ClauseDB, vdb: &mut VarDB);
     /// write a header of stat data to stdio.
     fn progress_header(&self);
     /// write stat data to stdio.
@@ -61,33 +61,11 @@ pub enum SearchStrategy {
 impl fmt::Display for SearchStrategy {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         if formatter.alternate() {
-            write!(
-                formatter,
-                "{}",
-                match self {
-                    SearchStrategy::Initial => {
-                        "in the initial search phase to determine a main strategy"
-                    }
-                    SearchStrategy::Generic => "Non-Specific-Instance using a generic setting",
-                    SearchStrategy::LowDecisions => {
-                        "Many-Low-Level-Conflicts using Chan Seok heuristics"
-                    }
-                    SearchStrategy::HighSuccesive => {
-                        "High-Successive-Conflicts using Chan Seok heuristics"
-                    }
-                    SearchStrategy::LowSuccesiveLuby => {
-                        "Low-Successive-Conflicts-Luby w/ Luby sequence"
-                    }
-                    SearchStrategy::LowSuccesiveM => {
-                        "Low-Successive-Conflicts-Modified w/o Luby sequence"
-                    }
-                    SearchStrategy::ManyGlues => "Many-Glue-Clauses",
-                }
-            )
+            write!(formatter, "{}", self.to_str())
         } else {
             let name = match self {
-                SearchStrategy::Initial => "initial",
-                SearchStrategy::Generic => "generic",
+                SearchStrategy::Initial => "Initial",
+                SearchStrategy::Generic => "Generic",
                 SearchStrategy::LowDecisions => "LowDecs",
                 SearchStrategy::HighSuccesive => "HighSucc",
                 SearchStrategy::LowSuccesiveLuby => "LowSuccLuby",
@@ -110,13 +88,20 @@ impl fmt::Display for SearchStrategy {
 impl SearchStrategy {
     pub fn to_str(&self) -> &'static str {
         match self {
-            SearchStrategy::Initial => "in the initial search phase to determine a main strategy",
-            SearchStrategy::Generic => "generic (using a generic parameter set)",
-            SearchStrategy::LowDecisions => "LowDecs (many conflicts at low levels, using CSh)",
-            SearchStrategy::HighSuccesive => "HighSucc (long decision chains)",
-            SearchStrategy::LowSuccesiveLuby => "LowSuccLuby (successive conflicts)",
-            SearchStrategy::LowSuccesiveM => "LowSuccP (successive conflicts)",
-            SearchStrategy::ManyGlues => "ManyGlue (many glue clauses)",
+            // in the initial search phase to determine a main strategy
+            SearchStrategy::Initial => "Initial search phase before a main strategy",
+            // Non-Specific-Instance using a generic setting
+            SearchStrategy::Generic => "Generic (using a generic parameter set)",
+            // Many-Low-Level-Conflicts using Chan Seok heuristics
+            SearchStrategy::LowDecisions => "LowDecisions (many conflicts at low levels)",
+            // High-Successive-Conflicts using Chan Seok heuristics
+            SearchStrategy::HighSuccesive => "HighSuccesiveConflict (long decision chains)",
+            // Low-Successive-Conflicts-Luby w/ Luby sequence
+            SearchStrategy::LowSuccesiveLuby => "LowSuccesiveLuby (successive conflicts)",
+            // Low-Successive-Conflicts-Modified w/o Luby sequence
+            SearchStrategy::LowSuccesiveM => "LowSuccesive w/o Luby (successive conflicts)",
+            // Many-Glue-Clauses
+            SearchStrategy::ManyGlues => "ManyGlueClauses",
         }
     }
 }
@@ -377,7 +362,7 @@ impl StateIF for State {
             self[Stat::Stagnation] += 1;
         }
     }
-    fn adapt_strategy(&mut self, cdb: &mut ClauseDB) {
+    fn adapt_strategy(&mut self, cdb: &mut ClauseDB, vdb: &mut VarDB) {
         if self.config.without_adaptive_strategy || self.strategy != SearchStrategy::Initial {
             return;
         }
@@ -398,6 +383,7 @@ impl StateIF for State {
         if self[Stat::NoDecisionConflict] < 30_000 {
             if self.config.with_deep_search {
                 self.strategy = SearchStrategy::LowSuccesiveM;
+                vdb.fix_reward(0.999);
             } else {
                 self.strategy = SearchStrategy::LowSuccesiveLuby;
                 self.rst.luby.active = true;
@@ -410,10 +396,11 @@ impl StateIF for State {
             cdb.co_lbd_bound = 3;
             cdb.first_reduction = 30000;
             cdb.glureduce = true;
-            // randomize_on_restarts = 1;
+            vdb.fix_reward(0.99);
         }
         if self[Stat::NumLBD2] - self[Stat::NumBin] > 20_000 {
             self.strategy = SearchStrategy::ManyGlues;
+            vdb.fix_reward(0.91);
         }
         if self.strategy == SearchStrategy::Initial {
             self.strategy = SearchStrategy::Generic;
@@ -591,7 +578,10 @@ impl StateIF for State {
         if let Some(m) = mes {
             println!("\x1B[2K    Strategy|mode: {}", m);
         } else {
-            println!("\x1B[2K    Strategy|mode: {:#}", self.strategy);
+            println!("\x1B[2K    Strategy|mode: {:#}({:?})",
+                     self.strategy,
+                     vdb.reward_mode,
+            );
         }
         self.flush("\x1B[2K");
     }
