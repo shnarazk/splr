@@ -398,7 +398,7 @@ impl StateIF for State {
             cdb.glureduce = true;
             vdb.fix_reward(0.99);
         }
-        if self[Stat::NumLBD2] > 20_000 + self[Stat::NumBin] {
+        if self[Stat::NumLBD2] > self[Stat::NumBin] + 20_000 {
             self.strategy = SearchStrategy::ManyGlues;
             vdb.fix_reward(0.91);
         }
