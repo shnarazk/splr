@@ -402,7 +402,7 @@ impl AssignStack {
         self.q_head += 1;
         lit
     }
-    /// dump all active clauses and fixed assignments in solver to a CNF file.
+    /// dump all active clauses and fixed assignments as a CNF file.
     #[allow(dead_code)]
     fn dump_cnf(&mut self, cdb: &ClauseDB, state: &State, vdb: &VarDB, fname: &str) {
         for v in &vdb[1..] {
