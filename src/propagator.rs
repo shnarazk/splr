@@ -338,7 +338,6 @@ impl PropagatorIF for AssignStack {
                     let lits = &mut cdb[w.c].lits;
                     if lits.len() == 2 {
                         if blocker_value == Some(false) {
-                            // state.rst.rcc.update(vdb[p.vi()].record_conflict(ncnfl));
                             return w.c;
                         }
                         if lits[0] == false_lit {
@@ -371,7 +370,6 @@ impl PropagatorIF for AssignStack {
                         }
                     }
                     if first_value == Some(false) {
-                        // state.rst.rcc.update(vdb[p.vi()].record_conflict(ncnfl));
                         return w.c;
                     }
                     let lv = lits[1..].iter().map(|l| vdb[l].level).max().unwrap_or(0);
