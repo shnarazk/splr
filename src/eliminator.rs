@@ -683,7 +683,7 @@ fn strengthen(cdb: &mut ClauseDB, cid: ClauseId, p: Lit) -> bool {
         debug_assert!(1 < usize::from(!p));
         let len = lits.len();
         cdb.watcher[!p].detach_with(cid);
-        cdb.watcher[!q].add(r, cid);
+        cdb.watcher[!q].register(r, cid);
         if len == 2 {
             // update another bocker
             cdb.watcher[!r].update_blocker(cid, q);

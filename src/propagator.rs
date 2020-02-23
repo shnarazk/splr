@@ -362,7 +362,7 @@ impl PropagatorIF for AssignStack {
                         if lit_assign!(self, *lk) != Some(false) {
                             (*watcher)
                                 .get_unchecked_mut(usize::from(!*lk))
-                                .add(first, w.c);
+                                .register(first, w.c);
                             n -= 1;
                             source.detach(n);
                             lits.swap(1, k);
