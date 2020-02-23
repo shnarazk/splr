@@ -91,9 +91,11 @@ pub trait ClauseIdIF {
 /// API for 'watcher list' like `attach`, `detach`, `detach_with` and so on.
 pub trait WatchDBIF {
     /// make a new 'watch', and add it to this watcher list.
-    fn register(&mut self, blocker: Lit, c: ClauseId);
+    fn add(&mut self, blocker: Lit, c: ClauseId);
+    /// add a Watch to this watcher list.
+    fn register(&mut self, w: Watch);
     /// remove *n*-th clause from the watcher list. *O(1)* operation.
-    fn detach(&mut self, n: usize);
+    fn detach(&mut self, n: usize) -> Watch;
     /// remove a clause which id is `cid` from the watcher list. *O(n)* operation.
     fn detach_with(&mut self, cid: ClauseId);
     /// update blocker of cid.
@@ -172,11 +174,14 @@ impl Default for Watch {
 }
 
 impl WatchDBIF for Vec<Watch> {
-    fn register(&mut self, blocker: Lit, c: ClauseId) {
+    fn add(&mut self, blocker: Lit, c: ClauseId) {
         self.push(Watch { blocker, c });
     }
-    fn detach(&mut self, n: usize) {
-        self.swap_remove(n);
+    fn register(&mut self, w: Watch) {
+        self.push(w);
+    }
+    fn detach(&mut self, n: usize) -> Watch {
+        self.swap_remove(n)
     }
     fn detach_with(&mut self, cid: ClauseId) {
         for (n, w) in self.iter().enumerate() {
@@ -186,6 +191,7 @@ impl WatchDBIF for Vec<Watch> {
             }
         }
     }
+    /// This O(n) functon is used only in Eliminator. So the cost can be ignore.
     fn update_blocker(&mut self, cid: ClauseId, l: Lit) {
         for w in &mut self[..] {
             if w.c == cid {
@@ -639,8 +645,8 @@ impl ClauseDBIF for ClauseDB {
             c.turn_on(Flag::LEARNT);
             self.num_learnt += 1;
         }
-        self.watcher[!l0].register(l1, cid);
-        self.watcher[!l1].register(l0, cid);
+        self.watcher[!l0].add(l1, cid);
+        self.watcher[!l1].add(l0, cid);
         self.num_active += 1;
         cid
     }
