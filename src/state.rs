@@ -404,7 +404,6 @@ impl StateIF for State {
         }
         if self.strategy == SearchStrategy::Initial {
             self.strategy = SearchStrategy::Generic;
-            // self.config.without_deep_search = self.c_lvl.get().powf(2.0) < (self.num_unsolved_vars() as f64);
             return;
         }
         if self.use_chan_seok {
