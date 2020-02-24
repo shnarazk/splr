@@ -124,9 +124,9 @@ pub enum Stat {
     Assign,                // the number of assigned variables
     SolvedRecord,          // the last number of solved variables
     SumLBD,                // the sum of generated learnts' LBD
-    NumBin,                // the number of binary clauses
+    NumBin,                // the number of binary clauses (both of given and learnt)
     NumBinLearnt,          // the number of binary learnt clauses
-    NumLBD2,               // the number of clauses which LBD is 2
+    NumLBD2,               // the number of learnt clauses which LBD is 2
     Stagnation,            // the number of stagnation
     EndOfStatIndex,        // Don't use this dummy.
 }
@@ -381,7 +381,7 @@ impl StateIF for State {
             self.strategy = SearchStrategy::HighSuccesive;
             self.use_chan_seok = true;
         }
-        if self[Stat::NumBin] + 20_000 < self[Stat::NumLBD2] {
+        if self[Stat::NumBinLearnt] + 20_000 < self[Stat::NumLBD2] {
             self.strategy = SearchStrategy::ManyGlues;
         }
         if self.strategy == SearchStrategy::Initial {
