@@ -16,7 +16,7 @@ use {
 
 /// API to calculate LBD.
 pub trait LBDIF {
-    /// return a LBD value for the set of literals.
+    /// return the LBD value for a set of literals.
     fn compute_lbd(&mut self, vec: &[Lit]) -> usize;
     /// re-calculate the LBD values of all (learnt) clauses.
     fn reset_lbd(&mut self, cdb: &mut ClauseDB);
@@ -43,10 +43,8 @@ pub trait VarDBIF {
     fn status(&self, c: &[Lit]) -> Option<bool>;
     /// set up parameters for each SearchStrategy.
     fn adapt_strategy(&mut self, mode: &SearchStrategy);
-    // minimize a clause.
-    fn minimize_with_bi_clauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>);
-    // bump vars' activities.
-    fn bump_vars(&mut self, asgs: &AssignStack, cdb: &ClauseDB, confl: ClauseId);
+    /// minimize a clause.
+    fn minimize_with_biclauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>);
 }
 
 /// API for var rewarding.
@@ -65,8 +63,6 @@ pub trait VarRewardIF {
     fn reward_update(&mut self);
     /// change reward mode.
     fn shift_reward_mode(&mut self);
-    /// switch to a special reward mode for SearchStrategy::LowSuccessiveM.
-    fn fix_reward(&mut self, val: f64);
 }
 
 /// Object representing a variable.
@@ -351,12 +347,6 @@ impl VarRewardIF for VarDB {
             self.activity_step *= reward.3;
         }
     }
-    fn fix_reward(&mut self, r: f64) {
-        self.reward_mode = RewardStep::Fixed;
-        self.activity_decay = r;
-        self.activity_decay_max = r;
-        self.activity_step = 0.0;
-    }
 }
 
 impl Instantiate for VarDB {
@@ -433,12 +423,11 @@ impl VarDBIF for VarDB {
             }
         }
     }
-    fn minimize_with_bi_clauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>) {
-        let nlevels = self.compute_lbd(vec);
-        let VarDB { lbd_temp, var, .. } = self;
-        if 6 < nlevels {
+    fn minimize_with_biclauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>) {
+        if 6 < self.compute_lbd(vec) {
             return;
         }
+        let VarDB { lbd_temp, var, .. } = self;
         let key = lbd_temp[0] + 1;
         for l in &vec[1..] {
             lbd_temp[l.vi() as usize] = key;
@@ -463,42 +452,6 @@ impl VarDBIF for VarDB {
             vec.retain(|l| lbd_temp[l.vi()] == key);
         }
         lbd_temp[0] = key;
-    }
-    // This function is for Reason-Side Rewarding which must traverse the assign stack
-    // beyond first UIDs and bump all vars on the traversed tree.
-    // If you'd like to use this, you should stop bumping activities in `analyze`.
-    fn bump_vars(&mut self, asgs: &AssignStack, cdb: &ClauseDB, confl: ClauseId) {
-        debug_assert_ne!(confl, ClauseId::default());
-        let mut cid = confl;
-        let mut p = NULL_LIT;
-        let mut ti = asgs.len(); // trail index
-        debug_assert!(self.iter().skip(1).all(|v| !v.is(Flag::VR_SEEN)));
-        loop {
-            for q in &cdb[cid].lits[(p != NULL_LIT) as usize..] {
-                let vi = q.vi();
-                if !self.var[vi].is(Flag::VR_SEEN) {
-                    self.var[vi].turn_on(Flag::VR_SEEN);
-                    self.reward_at_analysis(vi);
-                }
-            }
-            loop {
-                if 0 == ti {
-                    self.var[asgs[ti].vi()].turn_off(Flag::VR_SEEN);
-                    debug_assert!(self.iter().skip(1).all(|v| !v.is(Flag::VR_SEEN)));
-                    return;
-                }
-                ti -= 1;
-                p = asgs[ti];
-                let next_vi = p.vi();
-                if self.var[next_vi].is(Flag::VR_SEEN) {
-                    self.var[next_vi].turn_off(Flag::VR_SEEN);
-                    cid = self.var[next_vi].reason;
-                    if cid != ClauseId::default() {
-                        break;
-                    }
-                }
-            }
-        }
     }
 }
 
@@ -548,7 +501,52 @@ impl LBDIF for VarDB {
 }
 
 impl VarDB {
-    pub fn dump_dependency(&mut self, asgs: &AssignStack, cdb: &ClauseDB, confl: ClauseId) {
+    /// switch to a special reward mode for SearchStrategy::LowSuccessiveM.
+    fn fix_reward(&mut self, r: f64) {
+        self.reward_mode = RewardStep::Fixed;
+        self.activity_decay = r;
+        self.activity_decay_max = r;
+        self.activity_step = 0.0;
+    }
+    // This function is for Reason-Side Rewarding which must traverse the assign stack
+    // beyond first UIDs and bump all vars on the traversed tree.
+    // If you'd like to use this, you should stop bumping activities in `analyze`.
+    #[allow(dead_code)]
+    fn bump_vars(&mut self, asgs: &AssignStack, cdb: &ClauseDB, confl: ClauseId) {
+        debug_assert_ne!(confl, ClauseId::default());
+        let mut cid = confl;
+        let mut p = NULL_LIT;
+        let mut ti = asgs.len(); // trail index
+        debug_assert!(self.iter().skip(1).all(|v| !v.is(Flag::VR_SEEN)));
+        loop {
+            for q in &cdb[cid].lits[(p != NULL_LIT) as usize..] {
+                let vi = q.vi();
+                if !self.var[vi].is(Flag::VR_SEEN) {
+                    self.var[vi].turn_on(Flag::VR_SEEN);
+                    self.reward_at_analysis(vi);
+                }
+            }
+            loop {
+                if 0 == ti {
+                    self.var[asgs[ti].vi()].turn_off(Flag::VR_SEEN);
+                    debug_assert!(self.iter().skip(1).all(|v| !v.is(Flag::VR_SEEN)));
+                    return;
+                }
+                ti -= 1;
+                p = asgs[ti];
+                let next_vi = p.vi();
+                if self.var[next_vi].is(Flag::VR_SEEN) {
+                    self.var[next_vi].turn_off(Flag::VR_SEEN);
+                    cid = self.var[next_vi].reason;
+                    if cid != ClauseId::default() {
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    #[allow(dead_code)]
+    fn dump_dependency(&mut self, asgs: &AssignStack, cdb: &ClauseDB, confl: ClauseId) {
         debug_assert_ne!(confl, ClauseId::default());
         let mut cid = confl;
         let mut p = NULL_LIT;

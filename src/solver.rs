@@ -686,13 +686,13 @@ impl State {
         let mut levels = vec![false; asgs.level() + 1];
         for l in &new_learnt[1..] {
             to_clear.push(*l);
-            levels[vdb[l.vi()].level] = true;
+            levels[vdb[l].level] = true;
         }
         let l0 = new_learnt[0];
         new_learnt.retain(|l| *l == l0 || !l.is_redundant(cdb, vdb, &mut to_clear, &levels));
         let len = new_learnt.len();
         if 2 < len && len < 30 {
-            vdb.minimize_with_bi_clauses(cdb, new_learnt);
+            vdb.minimize_with_biclauses(cdb, new_learnt);
         }
         // find correct backtrack level from remaining literals
         let mut level_to_return = 0;
@@ -700,7 +700,7 @@ impl State {
             let mut max_i = 1;
             level_to_return = vdb[new_learnt[max_i].vi()].level;
             for (i, l) in new_learnt.iter().enumerate().skip(2) {
-                let lv = vdb[l.vi()].level;
+                let lv = vdb[l].level;
                 if level_to_return < lv {
                     level_to_return = lv;
                     max_i = i;
@@ -709,7 +709,7 @@ impl State {
             new_learnt.swap(1, max_i);
         }
         for l in &to_clear {
-            vdb[l.vi()].turn_off(Flag::CA_SEEN);
+            vdb[l].turn_off(Flag::CA_SEEN);
         }
         level_to_return
     }
@@ -746,7 +746,7 @@ impl Lit {
                     } else {
                         // one of the roots is a decision var at an unchecked level.
                         for l in &clear[top..] {
-                            vdb[l.vi()].turn_off(Flag::CA_SEEN);
+                            vdb[l].turn_off(Flag::CA_SEEN);
                         }
                         clear.truncate(top);
                         return false;
