@@ -896,7 +896,6 @@ impl ClauseDB {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

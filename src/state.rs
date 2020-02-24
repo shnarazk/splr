@@ -4,7 +4,7 @@ use {
         clause::{ClauseDB, ClauseDBIF},
         config::Config,
         eliminator::{Eliminator, EliminatorIF},
-        restart::{RestartExecutor},
+        restart::RestartExecutor,
         types::*,
         var::{VarDB, VarDBIF},
     },

@@ -403,13 +403,11 @@ impl VarDBIF for VarDB {
     }
     fn adapt_strategy(&mut self, mode: &SearchStrategy) {
         match mode {
-            SearchStrategy::Initial => {
-                match self.var.len() {
-                    l if 1_000_000 < l => self.activity_step *= 0.1,
-                    l if 100_000 < l => self.activity_step *= 0.5,
-                    _ => (),
-                }
-            }
+            SearchStrategy::Initial => match self.var.len() {
+                l if 1_000_000 < l => self.activity_step *= 0.1,
+                l if 100_000 < l => self.activity_step *= 0.5,
+                _ => (),
+            },
             SearchStrategy::Generic => (),
             SearchStrategy::LowDecisions => (),
             SearchStrategy::HighSuccesive => {
