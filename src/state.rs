@@ -4,9 +4,9 @@ use {
         clause::{ClauseDB, ClauseDBIF},
         config::Config,
         eliminator::{Eliminator, EliminatorIF},
-        restart::RestartExecutor,
+        restart::{RestartExecutor},
         types::*,
-        var::{VarDB, VarDBIF, VarRewardIF},
+        var::{VarDB, VarDBIF},
     },
     libc::{clock_gettime, timespec, CLOCK_PROCESS_CPUTIME_ID},
     std::{
@@ -30,7 +30,7 @@ pub trait StateIF {
     /// update internal counters and return true if solver stagnated.
     fn check_stagnation(&mut self);
     /// change heuristics based on stat data.
-    fn adapt_strategy(&mut self, cdb: &mut ClauseDB, vdb: &mut VarDB);
+    fn adapt_strategy(&mut self);
     /// write a header of stat data to stdio.
     fn progress_header(&self);
     /// write stat data to stdio.
@@ -362,52 +362,30 @@ impl StateIF for State {
             self[Stat::Stagnation] += 1;
         }
     }
-    fn adapt_strategy(&mut self, cdb: &mut ClauseDB, vdb: &mut VarDB) {
+    fn adapt_strategy(&mut self) {
         if self.config.without_adaptive_strategy || self.strategy != SearchStrategy::Initial {
             return;
         }
-        let mut re_init = false;
-        let decpc = self[Stat::Decision] as f64 / self[Stat::Conflict] as f64;
-        if decpc <= 1.2 {
+        if self[Stat::Decision] as f64 <= 1.2 * self[Stat::Conflict] as f64 {
             self.strategy = SearchStrategy::LowDecisions;
             self.use_chan_seok = true;
-            cdb.cur_restart =
-                (self[Stat::Conflict] as f64 / cdb.next_reduction as f64 + 1.0) as usize;
-            cdb.co_lbd_bound = 4;
-            cdb.first_reduction = 2000;
-            cdb.glureduce = true;
-            cdb.inc_step = 0;
-            cdb.next_reduction = 2000;
-            re_init = true;
         }
         if self[Stat::NoDecisionConflict] < 30_000 {
             if self.config.with_deep_search {
                 self.strategy = SearchStrategy::LowSuccesiveM;
-                vdb.fix_reward(0.999);
             } else {
                 self.strategy = SearchStrategy::LowSuccesiveLuby;
-                self.rst.luby.active = true;
-                self.rst.luby.step = 100;
             }
         }
-        if self[Stat::NoDecisionConflict] > 54_400 {
+        if 54_400 < self[Stat::NoDecisionConflict] {
             self.strategy = SearchStrategy::HighSuccesive;
             self.use_chan_seok = true;
-            cdb.co_lbd_bound = 3;
-            cdb.first_reduction = 30000;
-            cdb.glureduce = true;
-            vdb.fix_reward(0.99);
         }
-        if self[Stat::NumLBD2] > self[Stat::NumBin] + 20_000 {
+        if self[Stat::NumBin] + 20_000 < self[Stat::NumLBD2] {
             self.strategy = SearchStrategy::ManyGlues;
-            vdb.fix_reward(0.91);
         }
         if self.strategy == SearchStrategy::Initial {
             self.strategy = SearchStrategy::Generic;
-            return;
-        }
-        if self.use_chan_seok {
-            cdb.make_permanent(re_init);
         }
     }
     fn progress_header(&self) {
@@ -577,9 +555,9 @@ impl StateIF for State {
         if let Some(m) = mes {
             println!("\x1B[2K    Strategy|mode: {}", m);
         } else {
-            println!("\x1B[2K    Strategy|mode: {:#}({:?})",
-                     self.strategy,
-                     vdb.reward_mode,
+            println!(
+                "\x1B[2K    Strategy|mode: {:#}({:?})",
+                self.strategy, vdb.reward_mode,
             );
         }
         self.flush("\x1B[2K");

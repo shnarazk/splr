@@ -4,7 +4,7 @@ use {
         config::Config,
         eliminator::{Eliminator, EliminatorIF},
         propagator::{AssignStack, PropagatorIF},
-        state::{Stat, State, StateIF},
+        state::{SearchStrategy, Stat, State, StateIF},
         types::*,
         var::{VarDB, VarDBIF, LBDIF},
     },
@@ -36,8 +36,12 @@ pub trait ClauseDBIF {
     fn attach(&mut self, state: &mut State, vdb: &mut VarDB, lbd: usize) -> ClauseId;
     /// unregister a clause `cid` from clause database and make the clause dead.
     fn detach(&mut self, cid: ClauseId);
+    /// set up parameters for each SearchStrategy.
+    fn adapt_strategy(&mut self, mode: &SearchStrategy, nc: usize);
+    /// check a condition to reduce.
+    fn check_and_reduce(&mut self, state: &mut State, vdb: &mut VarDB, nc: usize);
     /// halve the number of 'learnt' or *removable* clauses.
-    fn reduce(&mut self, state: &mut State, vdb: &mut VarDB);
+    fn reduce(&mut self, state: &mut State, vdb: &mut VarDB, ncnfl: usize);
     /// simplify database by:
     /// * removing satisfiable clauses
     /// * calling exhaustive simplifier that tries **clause subsumption** and **variable elimination**.
@@ -394,17 +398,17 @@ pub struct ClauseDB {
     pub num_active: usize,
     pub num_learnt: usize,
     pub certified: DRAT,
-    pub activity_inc: f64,
-    pub activity_decay: f64,
-    pub inc_step: usize,
+    activity_inc: f64,
+    activity_decay: f64,
+    inc_step: usize,
     extra_inc: usize,
     pub soft_limit: usize,
     pub co_lbd_bound: usize,
-    pub lbd_frozen_clause: usize,
-    pub first_reduction: usize,
-    pub next_reduction: usize, // renamed from `nbclausesbeforereduce`
-    pub cur_restart: usize,
-    pub glureduce: bool,
+    lbd_frozen_clause: usize,
+    first_reduction: usize,
+    next_reduction: usize, // renamed from `nbclausesbeforereduce`
+    cur_restart: usize,
+    glureduce: bool,
 }
 
 impl Default for ClauseDB {
@@ -691,7 +695,44 @@ impl ClauseDBIF for ClauseDB {
         debug_assert!(1 < c.lits.len());
         c.kill(&mut self.touched);
     }
-    fn reduce(&mut self, state: &mut State, vdb: &mut VarDB) {
+    fn adapt_strategy(&mut self, mode: &SearchStrategy, nc: usize) {
+        match mode {
+            SearchStrategy::Initial => (),
+            SearchStrategy::Generic => (),
+            SearchStrategy::LowDecisions => {
+                self.co_lbd_bound = 4;
+                self.cur_restart = (nc as f64 / self.next_reduction as f64 + 1.0) as usize;
+                self.first_reduction = 2000;
+                self.glureduce = true;
+                self.inc_step = 0;
+                self.next_reduction = 2000;
+                self.make_permanent(true);
+            }
+            SearchStrategy::HighSuccesive => {
+                self.co_lbd_bound = 3;
+                self.first_reduction = 30000;
+                self.glureduce = true;
+                self.make_permanent(false);
+            }
+            SearchStrategy::LowSuccesiveLuby => (),
+            SearchStrategy::LowSuccesiveM => (),
+            SearchStrategy::ManyGlues => (),
+        }
+    }
+    fn check_and_reduce(&mut self, state: &mut State, vdb: &mut VarDB, nc: usize) {
+        if 0 == self.num_learnt {
+            return;
+        }
+        let go = if self.glureduce {
+            self.cur_restart * self.next_reduction <= nc
+        } else {
+            self.first_reduction < self.num_learnt
+        };
+        if go {
+            self.reduce(state, vdb, nc);
+        }
+    }
+    fn reduce(&mut self, state: &mut State, vdb: &mut VarDB, ncnfl: usize) {
         vdb.reset_lbd(self);
         let ClauseDB {
             ref mut clause,
@@ -731,6 +772,7 @@ impl ClauseDBIF for ClauseDB {
         }
         state[Stat::Reduction] += 1;
         self.garbage_collect();
+        self.cur_restart = ((ncnfl as f64) / (self.next_reduction as f64)) as usize + 1;
     }
     fn simplify(
         &mut self,

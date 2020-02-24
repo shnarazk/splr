@@ -4,6 +4,7 @@ use {
         clause::{Clause, ClauseDB, ClauseIF, ClauseId, ClauseIdIF},
         config::Config,
         propagator::{AssignStack, PropagatorIF},
+        state::SearchStrategy,
         types::*,
     },
     std::{
@@ -40,6 +41,8 @@ pub trait VarDBIF {
     /// - Some(false) -- the literals is unsatisfied; no unassigned literal
     /// - None -- the literals contains an unassigned literal
     fn status(&self, c: &[Lit]) -> Option<bool>;
+    /// set up parameters for each SearchStrategy.
+    fn adapt_strategy(&mut self, mode: &SearchStrategy);
     // minimize a clause.
     fn minimize_with_bi_clauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>);
     // bump vars' activities.
@@ -191,7 +194,7 @@ const REWARD: [(RewardStep, f64, f64, f64); 4] = [
 pub struct VarDB {
     pub activity_decay: f64,
     activity_decay_max: f64,
-    pub activity_step: f64,
+    activity_step: f64,
     pub reward_mode: RewardStep,
     ordinal: usize,
     /// vars
@@ -407,6 +410,28 @@ impl VarDBIF for VarDB {
             }
         }
         falsified
+    }
+    fn adapt_strategy(&mut self, mode: &SearchStrategy) {
+        match mode {
+            SearchStrategy::Initial => {
+                match self.var.len() {
+                    l if 1_000_000 < l => self.activity_step *= 0.1,
+                    l if 100_000 < l => self.activity_step *= 0.5,
+                    _ => (),
+                }
+            }
+            SearchStrategy::Generic => (),
+            SearchStrategy::LowDecisions => (),
+            SearchStrategy::HighSuccesive => {
+                self.fix_reward(0.99);
+            }
+            SearchStrategy::LowSuccesiveLuby | SearchStrategy::LowSuccesiveM => {
+                self.fix_reward(0.999);
+            }
+            SearchStrategy::ManyGlues => {
+                self.fix_reward(0.96);
+            }
+        }
     }
     fn minimize_with_bi_clauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>) {
         let nlevels = self.compute_lbd(vec);

@@ -252,11 +252,7 @@ impl SatSolverIF for Solver {
         }
         debug_assert_eq!(s.vdb.len() - 1, cnf.num_of_variables);
         s.state[Stat::NumBin] = s.cdb[1..].iter().filter(|c| c.len() == 2).count();
-        match s.vdb.len() {
-            l if 1_000_000 < l => s.vdb.activity_step *= 0.1,
-            l if 100_000 < l => s.vdb.activity_step *= 0.5,
-            _ => (),
-        }
+        s.vdb.adapt_strategy(&s.state.strategy);
         Ok(s)
     }
     // renamed from clause_new
@@ -531,13 +527,7 @@ fn handle_conflict_path(
             return Err(SolverError::UndescribedError);
         }
     }
-    if ((state.use_chan_seok && !cdb.glureduce && cdb.first_reduction < cdb.num_learnt)
-        || (cdb.glureduce && cdb.cur_restart * cdb.next_reduction <= state[Stat::Conflict]))
-        && 0 < cdb.num_learnt
-    {
-        cdb.cur_restart = ((ncnfl as f64) / (cdb.next_reduction as f64)) as usize + 1;
-        cdb.reduce(state, vdb);
-    }
+    cdb.check_and_reduce(state, vdb, state[Stat::Conflict]);
     Ok(())
 }
 
@@ -554,7 +544,10 @@ fn adapt_parameters(
     if nconflict == switch {
         state.flush("exhaustive eliminator activated...");
         asgs.cancel_until(vdb, 0);
-        state.adapt_strategy(cdb, vdb);
+        state.adapt_strategy();
+        cdb.adapt_strategy(&state.strategy, state[Stat::Conflict]);
+        vdb.adapt_strategy(&state.strategy);
+        state.rst.adapt_strategy(&state.strategy);
         if elim.enable {
             elim.activate();
             cdb.simplify(asgs, elim, state, vdb)?;
