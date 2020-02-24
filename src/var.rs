@@ -179,9 +179,9 @@ pub enum RewardStep {
 ///  - end: upper bound of the range
 ///  - scale: scaling coefficient for activity decay
 const REWARD: [(RewardStep, f64, f64, f64); 4] = [
-    (RewardStep::HeatUp, 0.80, 0.92, 0.0), // the last is dummy
-    (RewardStep::Annealing, 0.92, 0.96, 0.1),
-    (RewardStep::Final, 0.96, 0.99, 0.1),
+    (RewardStep::HeatUp, 0.90, 0.94, 0.0), // the last is dummy
+    (RewardStep::Annealing, 0.94, 0.96, 0.5),
+    (RewardStep::Final, 0.96, 0.98, 0.2),
     (RewardStep::Fixed, 0.99, 0.99, 0.0),
 ];
 
@@ -205,7 +205,7 @@ impl Default for VarDB {
         VarDB {
             activity_decay: reward.1,
             activity_decay_max: reward.2,
-            activity_step: (reward.2 - reward.1) / 10_000.0,
+            activity_step: (reward.2 - reward.1) / 50_000.0,
             reward_mode: reward.0,
             ordinal: 0,
             var: Vec::new(),
@@ -344,6 +344,7 @@ impl VarRewardIF for VarDB {
             let reward = &REWARD[self.reward_mode as usize + 1];
             self.reward_mode = reward.0;
             self.activity_decay_max = reward.2;
+            self.activity_decay = self.activity_decay.max(reward.1);
             self.activity_step *= reward.3;
         }
     }
@@ -404,7 +405,7 @@ impl VarDBIF for VarDB {
     fn adapt_strategy(&mut self, mode: &SearchStrategy) {
         match mode {
             SearchStrategy::Initial => match self.var.len() {
-                l if 1_000_000 < l => self.activity_step *= 0.1,
+                l if 1_000_000 < l => self.activity_step *= 0.2,
                 l if 100_000 < l => self.activity_step *= 0.5,
                 _ => (),
             },
@@ -417,7 +418,7 @@ impl VarDBIF for VarDB {
                 self.fix_reward(0.999);
             }
             SearchStrategy::ManyGlues => {
-                self.fix_reward(0.96);
+                self.fix_reward(0.98);
             }
         }
     }
