@@ -176,11 +176,12 @@ impl EliminatorIF for Eliminator {
             self.var_queue.insert(vdb, vi, upward);
         }
     }
-    fn eliminate(&mut self,
-                 asgs: &mut AssignStack,
-                 cdb: &mut ClauseDB,
-                 state: &mut State,
-                 vdb: &mut VarDB
+    fn eliminate(
+        &mut self,
+        asgs: &mut AssignStack,
+        cdb: &mut ClauseDB,
+        state: &mut State,
+        vdb: &mut VarDB,
     ) -> MaybeInconsistent {
         let start = state.elapsed().unwrap_or(0.0);
         loop {
