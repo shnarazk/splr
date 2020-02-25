@@ -80,7 +80,7 @@ pub trait ClauseDBIF {
     fn validate(&self, vdb: &VarDB, strict: bool) -> Option<ClauseId>;
 }
 
-/// API for Clause Id like `to_lit`, `is_lifted_lit` and so on.
+/// API for Clause Id.
 pub trait ClauseIdIF {
     /// return `true` if a given clause id is made from a `Lit`.
     fn is_lifted_lit(self) -> bool;
