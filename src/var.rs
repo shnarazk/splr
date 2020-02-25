@@ -154,12 +154,15 @@ impl Var {
 }
 
 impl FlagIF for Var {
+    #[inline]
     fn is(&self, flag: Flag) -> bool {
         self.flags.contains(flag)
     }
+    #[inline]
     fn turn_off(&mut self, flag: Flag) {
         self.flags.remove(flag);
     }
+    #[inline]
     fn turn_on(&mut self, flag: Flag) {
         self.flags.insert(flag);
     }
