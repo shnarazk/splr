@@ -38,8 +38,6 @@ pub trait PropagatorIF {
     fn is_zero(&self) -> bool;
     /// return `true` if there are unpropagated assignments.
     fn remains(&self) -> bool;
-    /// return the *value* of a given literal.
-    fn assigned(&self, l: Lit) -> Option<bool>;
     /// add an assignment at level 0 as a precondition.
     ///
     /// # Errors
@@ -214,9 +212,6 @@ impl PropagatorIF for AssignStack {
     }
     fn remains(&self) -> bool {
         self.q_head < self.trail.len()
-    }
-    fn assigned(&self, l: Lit) -> Option<bool> {
-        lit_assign!(self, l)
     }
     fn assign_at_rootlevel(&mut self, vdb: &mut VarDB, l: Lit) -> MaybeInconsistent {
         let v = &mut vdb[l];
