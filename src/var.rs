@@ -180,8 +180,8 @@ pub enum RewardStep {
 ///  - scale: scaling coefficient for activity decay
 const REWARD: [(RewardStep, f64, f64, f64); 4] = [
     (RewardStep::HeatUp, 0.90, 0.94, 0.0), // the last is dummy
-    (RewardStep::Annealing, 0.94, 0.95, 0.5),
-    (RewardStep::Final, 0.95, 0.96, 0.2),
+    (RewardStep::Annealing, 0.94, 0.96, 0.5),
+    (RewardStep::Final, 0.96, 0.98, 0.2),
     (RewardStep::Fixed, 0.99, 0.99, 0.0),
 ];
 
