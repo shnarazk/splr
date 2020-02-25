@@ -4,7 +4,7 @@ use {
         clause::{Clause, ClauseDB, ClauseDBIF, ClauseIF, ClauseId, ClauseIdIF, WatchDBIF},
         config::Config,
         propagator::{AssignStack, PropagatorIF},
-        state::State,
+        state::{State, StateIF},
         types::*,
         var::{Var, VarDB, VarDBIF},
     },
@@ -31,18 +31,8 @@ pub trait EliminatorIF {
     fn is_waiting(&self) -> bool;
     /// rebuild occur lists.
     fn prepare(&mut self, cdb: &mut ClauseDB, vdb: &mut VarDB, force: bool);
-    /// enqueue a clause into eliminator's clause queue.
-    fn enqueue_clause(&mut self, cid: ClauseId, c: &mut Clause);
-    /// clear eliminator's clause queue.
-    fn clear_clause_queue(&mut self, cdb: &mut ClauseDB);
-    /// return the length of eliminator's clause queue.
-    fn clause_queue_len(&self) -> usize;
     /// enqueue a var into eliminator's var queue.
     fn enqueue_var(&mut self, vdb: &mut VarDB, vi: VarId, upword: bool);
-    /// clear eliminator's var queue
-    fn clear_var_queue(&mut self, vdb: &mut VarDB);
-    /// return the length of eliminator's clause queue.
-    fn var_queue_len(&self) -> usize;
     /// run clause subsumption and variable elimination.
     ///
     /// # Errors
@@ -59,8 +49,6 @@ pub trait EliminatorIF {
     fn extend_model(&mut self, vdb: &mut VarDB);
     /// register a clause id to all corresponding occur lists.
     fn add_cid_occur(&mut self, vdb: &mut VarDB, cid: ClauseId, c: &mut Clause, enqueue: bool);
-    /// remove a clause id from literal's occur list.
-    fn remove_lit_occur(&mut self, vdb: &mut VarDB, l: Lit, cid: ClauseId);
     /// remove a clause id from all corresponding occur lists.
     fn remove_cid_occur(&mut self, vdb: &mut VarDB, cid: ClauseId, c: &mut Clause);
     /// return the order of vars based on their occurrences
@@ -178,19 +166,6 @@ impl EliminatorIF for Eliminator {
             }
         }
     }
-    fn enqueue_clause(&mut self, cid: ClauseId, c: &mut Clause) {
-        if self.mode != EliminatorMode::Running || c.is(Flag::ENQUEUED) {
-            return;
-        }
-        self.clause_queue.push(cid);
-        c.turn_on(Flag::ENQUEUED);
-    }
-    fn clear_clause_queue(&mut self, cdb: &mut ClauseDB) {
-        for cid in &self.clause_queue {
-            cdb[cid].turn_off(Flag::ENQUEUED);
-        }
-        self.clause_queue.clear();
-    }
     fn enqueue_var(&mut self, vdb: &mut VarDB, vi: VarId, upward: bool) {
         if self.mode != EliminatorMode::Running {
             return;
@@ -201,59 +176,27 @@ impl EliminatorIF for Eliminator {
             self.var_queue.insert(vdb, vi, upward);
         }
     }
-    fn clear_var_queue(&mut self, vdb: &mut VarDB) {
-        self.var_queue.clear(vdb);
-    }
-    fn clause_queue_len(&self) -> usize {
-        self.clause_queue.len()
-    }
-    fn var_queue_len(&self) -> usize {
-        self.var_queue.len()
-    }
-    fn eliminate(
-        &mut self,
-        asgs: &mut AssignStack,
-        cdb: &mut ClauseDB,
-        state: &mut State,
-        vdb: &mut VarDB,
+    fn eliminate(&mut self,
+                 asgs: &mut AssignStack,
+                 cdb: &mut ClauseDB,
+                 state: &mut State,
+                 vdb: &mut VarDB
     ) -> MaybeInconsistent {
-        debug_assert!(asgs.level() == 0);
-        if self.mode == EliminatorMode::Deactive {
-            return Ok(());
-        }
-        let timedout = Arc::new(AtomicBool::new(false));
-        let timedout2 = timedout.clone();
-        let time = 100 * state.config.timeout as u64;
-        thread::spawn(move || {
-            thread::sleep(Duration::from_millis(time));
-            timedout2.store(true, Ordering::Release);
-        });
-        while self.bwdsub_assigns < asgs.len()
-            || !self.var_queue.is_empty()
-            || !self.clause_queue.is_empty()
-        {
-            if !self.clause_queue.is_empty() || self.bwdsub_assigns < asgs.len() {
-                self.backward_subsumption_check(asgs, cdb, vdb, &timedout)?;
-            }
-            while let Some(vi) = self.var_queue.select_var(vdb) {
-                // timedout = cvar.wait(timedout).unwrap();
-                let v = &mut vdb[vi];
-                v.turn_off(Flag::ENQUEUED);
-                if !v.is(Flag::ELIMINATED) && v.assign.is_none() {
-                    eliminate_var(asgs, cdb, self, state, vdb, vi, &timedout)?;
-                }
-            }
-            self.backward_subsumption_check(asgs, cdb, vdb, &timedout)?;
-            debug_assert!(self.clause_queue.is_empty());
-            cdb.garbage_collect();
-            if asgs.propagate(cdb, vdb) != ClauseId::default() {
-                return Err(SolverError::Inconsistent);
-            }
+        let start = state.elapsed().unwrap_or(0.0);
+        loop {
+            let na = asgs.len();
+            self.eliminate_main(asgs, cdb, state, vdb)?;
             cdb.eliminate_satisfied_clauses(self, vdb, true);
-            cdb.garbage_collect();
-            if timedout.load(Ordering::Acquire) {
+            if na == asgs.len()
+                && (!self.is_running()
+                    || (0 == self.clause_queue_len() && 0 == self.var_queue_len()))
+            {
+                break;
+            }
+            if 0.1 <= state.elapsed().unwrap_or(1.0) - start {
                 self.clear_clause_queue(cdb);
                 self.clear_var_queue(vdb);
+                break;
             }
         }
         Ok(())
@@ -329,19 +272,6 @@ impl EliminatorIF for Eliminator {
         if enqueue {
             self.enqueue_clause(cid, c);
         }
-    }
-    fn remove_lit_occur(&mut self, vdb: &mut VarDB, l: Lit, cid: ClauseId) {
-        let v = &mut vdb[l.vi()];
-        if bool::from(l) {
-            debug_assert_eq!(v.pos_occurs.iter().filter(|&c| *c == cid).count(), 1);
-            v.pos_occurs.delete_unstable(|&c| c == cid);
-            debug_assert!(!v.pos_occurs.contains(&cid));
-        } else {
-            debug_assert_eq!(v.neg_occurs.iter().filter(|&c| *c == cid).count(), 1);
-            v.neg_occurs.delete_unstable(|&c| c == cid);
-            debug_assert!(!v.neg_occurs.contains(&cid));
-        }
-        self.enqueue_var(vdb, l.vi(), true);
     }
     fn remove_cid_occur(&mut self, vdb: &mut VarDB, cid: ClauseId, c: &mut Clause) {
         debug_assert!(self.mode == EliminatorMode::Running);
@@ -439,6 +369,106 @@ impl Eliminator {
             }
         }
         Ok(())
+    }
+    /// do the elimination task
+    fn eliminate_main(
+        &mut self,
+        asgs: &mut AssignStack,
+        cdb: &mut ClauseDB,
+        state: &mut State,
+        vdb: &mut VarDB,
+    ) -> MaybeInconsistent {
+        debug_assert!(asgs.level() == 0);
+        if self.mode == EliminatorMode::Deactive {
+            return Ok(());
+        }
+        let timedout = Arc::new(AtomicBool::new(false));
+        let timedout2 = timedout.clone();
+        let time = 100 * state.config.timeout as u64;
+        thread::spawn(move || {
+            thread::sleep(Duration::from_millis(time));
+            timedout2.store(true, Ordering::Release);
+        });
+        while self.bwdsub_assigns < asgs.len()
+            || !self.var_queue.is_empty()
+            || !self.clause_queue.is_empty()
+        {
+            if !self.clause_queue.is_empty() || self.bwdsub_assigns < asgs.len() {
+                self.backward_subsumption_check(asgs, cdb, vdb, &timedout)?;
+            }
+            while let Some(vi) = self.var_queue.select_var(vdb) {
+                // timedout = cvar.wait(timedout).unwrap();
+                let v = &mut vdb[vi];
+                v.turn_off(Flag::ENQUEUED);
+                if !v.is(Flag::ELIMINATED) && v.assign.is_none() {
+                    eliminate_var(asgs, cdb, self, state, vdb, vi, &timedout)?;
+                }
+            }
+            self.backward_subsumption_check(asgs, cdb, vdb, &timedout)?;
+            debug_assert!(self.clause_queue.is_empty());
+            cdb.garbage_collect();
+            if asgs.propagate(cdb, vdb) != ClauseId::default() {
+                return Err(SolverError::Inconsistent);
+            }
+            cdb.eliminate_satisfied_clauses(self, vdb, true);
+            cdb.garbage_collect();
+            if timedout.load(Ordering::Acquire) {
+                self.clear_clause_queue(cdb);
+                self.clear_var_queue(vdb);
+            }
+        }
+        Ok(())
+    }
+    /// remove a clause id from literal's occur list.
+    fn remove_lit_occur(&mut self, vdb: &mut VarDB, l: Lit, cid: ClauseId) {
+        let v = &mut vdb[l.vi()];
+        if bool::from(l) {
+            debug_assert_eq!(v.pos_occurs.iter().filter(|&c| *c == cid).count(), 1);
+            v.pos_occurs.delete_unstable(|&c| c == cid);
+            debug_assert!(!v.pos_occurs.contains(&cid));
+        } else {
+            debug_assert_eq!(v.neg_occurs.iter().filter(|&c| *c == cid).count(), 1);
+            v.neg_occurs.delete_unstable(|&c| c == cid);
+            debug_assert!(!v.neg_occurs.contains(&cid));
+        }
+        self.enqueue_var(vdb, l.vi(), true);
+    }
+
+    ///
+    /// clause queue operations
+    ///
+
+    /// enqueue a clause into eliminator's clause queue.
+    fn enqueue_clause(&mut self, cid: ClauseId, c: &mut Clause) {
+        if self.mode != EliminatorMode::Running || c.is(Flag::ENQUEUED) {
+            return;
+        }
+        self.clause_queue.push(cid);
+        c.turn_on(Flag::ENQUEUED);
+    }
+    /// clear eliminator's clause queue.
+    fn clear_clause_queue(&mut self, cdb: &mut ClauseDB) {
+        for cid in &self.clause_queue {
+            cdb[cid].turn_off(Flag::ENQUEUED);
+        }
+        self.clause_queue.clear();
+    }
+    /// return the length of eliminator's clause queue.
+    fn clause_queue_len(&self) -> usize {
+        self.clause_queue.len()
+    }
+
+    ///
+    /// var queue operations
+    ///
+
+    /// clear eliminator's var queue
+    fn clear_var_queue(&mut self, vdb: &mut VarDB) {
+        self.var_queue.clear(vdb);
+    }
+    /// return the length of eliminator's var queue.
+    fn var_queue_len(&self) -> usize {
+        self.var_queue.len()
     }
 }
 

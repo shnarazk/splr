@@ -3,7 +3,7 @@ use {
     crate::{
         clause::{ClauseDB, ClauseDBIF},
         config::Config,
-        eliminator::{Eliminator, EliminatorIF},
+        eliminator::Eliminator,
         restart::RestartExecutor,
         types::*,
         var::{VarDB, VarDBIF},
@@ -759,7 +759,7 @@ impl State {
         );
     }
     #[allow(dead_code)]
-    fn dump_details(&mut self, cdb: &ClauseDB, elim: &Eliminator, vdb: &VarDB, mes: Option<&str>) {
+    fn dump_details(&mut self, cdb: &ClauseDB, _: &Eliminator, vdb: &VarDB, mes: Option<&str>) {
         self.progress_cnt += 1;
         let msg = match mes {
             None => self.strategy.to_str(),
@@ -788,8 +788,8 @@ impl State {
             self.rst.lbd.get(),
             self.b_lvl.get(),
             self.c_lvl.get(),
-            elim.clause_queue_len(),
-            elim.var_queue_len(),
+            0, // elim.clause_queue_len(),
+            0, // elim.var_queue_len(),
         );
     }
 }
