@@ -1,6 +1,7 @@
 ## 0.3.2, 2020-20-20
 
 - set var activity parameters for each search strategy correctly
+- move Clause::simplify to Eliminator and make Eliminator::eliminate private
 
 ## 0.3.1, 2020-02-22
 
