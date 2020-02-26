@@ -61,8 +61,12 @@ fn main() {
     }
 }
 
-#[allow(dead_code)]
-fn save_result(s: &Solver, res: &SolverResult, input: &str, output: Option<PathBuf>) {
+fn save_result<S: AsRef<str> + std::fmt::Display>(
+    s: &Solver,
+    res: &SolverResult,
+    input: S,
+    output: Option<PathBuf>,
+) {
     let mut ofile;
     let mut otty;
     let mut redirect = false;
@@ -156,7 +160,7 @@ fn save_result(s: &Solver, res: &SolverResult, input: &str, output: Option<PathB
     }
 }
 
-fn save_proof(s: &Solver, input: &str, output: &PathBuf) {
+fn save_proof<S: AsRef<str> + std::fmt::Display>(s: &Solver, input: S, output: &PathBuf) {
     let mut buf = match File::create(output) {
         Ok(out) => BufWriter::new(out),
         Err(e) => {
