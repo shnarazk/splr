@@ -182,19 +182,22 @@ pub enum RewardStep {
 ///  - end: upper bound of the range
 ///  - scale: scaling coefficient for activity decay
 const REWARD: [(RewardStep, f64, f64, f64); 4] = [
-    (RewardStep::HeatUp, 0.90, 0.94, 0.0), // the last is dummy
-    (RewardStep::Annealing, 0.94, 0.95, 0.5),
-    (RewardStep::Final, 0.95, 0.96, 0.2),
+    (RewardStep::HeatUp, 0.80, 0.90, 0.0),
+    (RewardStep::Annealing, 0.90, 0.96, 0.1),
+    (RewardStep::Final, 0.96, 0.98, 0.1),
     (RewardStep::Fixed, 0.99, 0.99, 0.0),
 ];
 
 /// A container of variables.
 #[derive(Debug)]
 pub struct VarDB {
+    /// var activity decay
     pub activity_decay: f64,
     activity_decay_max: f64,
     activity_step: f64,
+    /// the current var reward mode
     pub reward_mode: RewardStep,
+    /// an index for counting elapsed time
     ordinal: usize,
     /// vars
     var: Vec<Var>,
@@ -408,7 +411,7 @@ impl VarDBIF for VarDB {
     fn adapt_strategy(&mut self, mode: &SearchStrategy) {
         match mode {
             SearchStrategy::Initial => match self.var.len() {
-                l if 1_000_000 < l => self.activity_step *= 0.2,
+                l if 1_000_000 < l => self.activity_step *= 0.1,
                 l if 100_000 < l => self.activity_step *= 0.5,
                 _ => (),
             },
