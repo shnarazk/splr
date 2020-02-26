@@ -3,7 +3,6 @@ use {
     crate::{
         config::Config,
         eliminator::{Eliminator, EliminatorIF},
-        propagator::{AssignStack, PropagatorIF},
         state::{SearchStrategy, Stat, State},
         types::*,
         var::{VarDB, VarDBIF, LBDIF},
@@ -40,20 +39,6 @@ pub trait ClauseDBIF {
     fn adapt_strategy(&mut self, mode: &SearchStrategy, nc: usize);
     /// check a condition to reduce.
     fn check_and_reduce(&mut self, state: &mut State, vdb: &mut VarDB, nc: usize);
-    /// simplify database by:
-    /// * removing satisfiable clauses
-    /// * calling exhaustive simplifier that tries **clause subsumption** and **variable elimination**.
-    ///
-    /// # Errors
-    ///
-    /// if solver becomes inconsistent.
-    fn simplify(
-        &mut self,
-        asgs: &mut AssignStack,
-        elim: &mut Eliminator,
-        state: &mut State,
-        vdb: &mut VarDB,
-    ) -> MaybeInconsistent;
     fn reset(&mut self);
     /// delete *dead* clauses from database, which are made by:
     /// * `reduce`
@@ -727,32 +712,6 @@ impl ClauseDBIF for ClauseDB {
         if go {
             self.reduce(state, vdb, nc);
         }
-    }
-    fn simplify(
-        &mut self,
-        asgs: &mut AssignStack,
-        elim: &mut Eliminator,
-        state: &mut State,
-        vdb: &mut VarDB,
-    ) -> MaybeInconsistent {
-        debug_assert_eq!(asgs.level(), 0);
-        // we can reset all the reasons because decision level is zero.
-        for v in &mut vdb[1..] {
-            v.reason = ClauseId::default();
-        }
-        if elim.is_waiting() {
-            self.reset();
-            elim.prepare(self, vdb, true);
-        }
-        elim.eliminate(asgs, self, state, vdb)?;
-        self.garbage_collect();
-        state[Stat::SatClauseElimination] += 1;
-        if elim.is_running() {
-            state[Stat::ExhaustiveElimination] += 1;
-            vdb.reset_lbd(self);
-            elim.stop(self, vdb);
-        }
-        self.check_size()
     }
     fn reset(&mut self) {
         debug_assert!(1 < self.clause.len());

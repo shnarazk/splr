@@ -4,9 +4,9 @@ use {
         clause::{Clause, ClauseDB, ClauseDBIF, ClauseIF, ClauseId, ClauseIdIF, WatchDBIF},
         config::Config,
         propagator::{AssignStack, PropagatorIF},
-        state::{State, StateIF},
+        state::{Stat, State, StateIF},
         types::*,
-        var::{Var, VarDB, VarDBIF},
+        var::{Var, VarDB, VarDBIF, LBDIF},
     },
     std::{fmt, slice::Iter},
     std::{
@@ -27,18 +27,18 @@ pub trait EliminatorIF {
     fn stop(&mut self, cdb: &mut ClauseDB, vdb: &mut VarDB);
     /// check if the eliminator is running.
     fn is_running(&self) -> bool;
-    /// check if the eliminator is active and waits for next `eliminate`.
-    fn is_waiting(&self) -> bool;
     /// rebuild occur lists.
     fn prepare(&mut self, cdb: &mut ClauseDB, vdb: &mut VarDB, force: bool);
     /// enqueue a var into eliminator's var queue.
     fn enqueue_var(&mut self, vdb: &mut VarDB, vi: VarId, upword: bool);
-    /// run clause subsumption and variable elimination.
+    /// simplify database by:
+    /// * removing satisfiable clauses
+    /// * calling exhaustive simplifier that tries **clause subsumption** and **variable elimination**.
     ///
     /// # Errors
     ///
     /// if solver becomes inconsistent.
-    fn eliminate(
+    fn simplify(
         &mut self,
         asgs: &mut AssignStack,
         cdb: &mut ClauseDB,
@@ -120,9 +120,6 @@ impl EliminatorIF for Eliminator {
     fn is_running(&self) -> bool {
         self.mode == EliminatorMode::Running
     }
-    fn is_waiting(&self) -> bool {
-        self.mode == EliminatorMode::Waiting
-    }
     // Due to a potential bug of killing clauses and difficulty about
     // synchronization between 'garbage_collect' and clearing occur lists,
     // 'stop' should purge all occur lists to purge any dead clauses for now.
@@ -176,31 +173,31 @@ impl EliminatorIF for Eliminator {
             self.var_queue.insert(vdb, vi, upward);
         }
     }
-    fn eliminate(
+    fn simplify(
         &mut self,
         asgs: &mut AssignStack,
         cdb: &mut ClauseDB,
         state: &mut State,
         vdb: &mut VarDB,
     ) -> MaybeInconsistent {
-        let start = state.elapsed().unwrap_or(0.0);
-        loop {
-            let na = asgs.len();
-            self.eliminate_main(asgs, cdb, state, vdb)?;
-            cdb.eliminate_satisfied_clauses(self, vdb, true);
-            if na == asgs.len()
-                && (!self.is_running()
-                    || (0 == self.clause_queue_len() && 0 == self.var_queue_len()))
-            {
-                break;
-            }
-            if 0.1 <= state.elapsed().unwrap_or(1.0) - start {
-                self.clear_clause_queue(cdb);
-                self.clear_var_queue(vdb);
-                break;
-            }
+        debug_assert_eq!(asgs.level(), 0);
+        // we can reset all the reasons because decision level is zero.
+        for v in &mut vdb[1..] {
+            v.reason = ClauseId::default();
         }
-        Ok(())
+        if self.is_waiting() {
+            cdb.reset();
+            self.prepare(cdb, vdb, true);
+        }
+        self.eliminate(asgs, cdb, state, vdb)?;
+        cdb.garbage_collect();
+        state[Stat::SatClauseElimination] += 1;
+        if self.is_running() {
+            state[Stat::ExhaustiveElimination] += 1;
+            vdb.reset_lbd(cdb);
+            self.stop(cdb, vdb);
+        }
+        cdb.check_size()
     }
     fn extend_model(&mut self, vdb: &mut VarDB) {
         if self.elim_clauses.is_empty() {
@@ -292,6 +289,11 @@ impl EliminatorIF for Eliminator {
 }
 
 impl Eliminator {
+    /// check if the eliminator is active and waits for next `eliminate`.
+    fn is_waiting(&self) -> bool {
+        self.mode == EliminatorMode::Waiting
+    }
+
     /// returns false if solver is inconsistent
     /// - calls `clause_queue.pop`
     fn backward_subsumption_check(
@@ -367,6 +369,37 @@ impl Eliminator {
                         }
                     }
                 }
+            }
+        }
+        Ok(())
+    }
+    /// run clause subsumption and variable elimination.
+    ///
+    /// # Errors
+    ///
+    /// if solver becomes inconsistent.
+    fn eliminate(
+        &mut self,
+        asgs: &mut AssignStack,
+        cdb: &mut ClauseDB,
+        state: &mut State,
+        vdb: &mut VarDB,
+    ) -> MaybeInconsistent {
+        let start = state.elapsed().unwrap_or(0.0);
+        loop {
+            let na = asgs.len();
+            self.eliminate_main(asgs, cdb, state, vdb)?;
+            cdb.eliminate_satisfied_clauses(self, vdb, true);
+            if na == asgs.len()
+                && (!self.is_running()
+                    || (0 == self.clause_queue_len() && 0 == self.var_queue_len()))
+            {
+                break;
+            }
+            if 0.1 <= state.elapsed().unwrap_or(1.0) - start {
+                self.clear_clause_queue(cdb);
+                self.clear_var_queue(vdb);
+                break;
             }
         }
         Ok(())
