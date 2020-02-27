@@ -429,12 +429,19 @@ impl VarDBIF for VarDB {
         }
     }
     fn minimize_with_biclauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>) {
-        if 6 < self.compute_lbd(vec) {
+        if vec.len() <= 2 {
             return;
         }
         let VarDB { lbd_temp, var, .. } = self;
         let key = lbd_temp[0] + 1;
+        // let mut lbd = 0;
         for l in &vec[1..] {
+            // if lbd_temp[l.vi() as usize] != key [
+            //     lbd += 1;
+            //     if 6 < lbd {
+            //         return;
+            //     }
+            // }
             lbd_temp[l.vi() as usize] = key;
         }
         let l0 = vec[0];
