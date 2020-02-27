@@ -211,7 +211,7 @@ impl Default for VarDB {
         VarDB {
             activity_decay: reward.1,
             activity_decay_max: reward.2,
-            activity_step: (reward.2 - reward.1) / 50_000.0,
+            activity_step: (reward.2 - reward.1) / 10_000.0,
             reward_mode: reward.0,
             ordinal: 0,
             var: Vec::new(),
