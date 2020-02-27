@@ -171,7 +171,7 @@ impl FlagIF for Var {
 #[derive(Clone, Copy, Eq, Debug, PartialEq, PartialOrd, Ord)]
 pub enum RewardStep {
     HeatUp = 0,
-    Annealing,
+    // Annealing,
     Final,
     Fixed,
 }
@@ -181,9 +181,9 @@ pub enum RewardStep {
 ///  - start: lower bound of the range
 ///  - end: upper bound of the range
 ///  - scale: scaling coefficient for activity decay
-const REWARD: [(RewardStep, f64, f64, f64); 4] = [
-    (RewardStep::HeatUp, 0.80, 0.92, 0.0),
-    (RewardStep::Annealing, 0.92, 0.96, 0.1),
+const REWARD: [(RewardStep, f64, f64, f64); 3] = [
+    (RewardStep::HeatUp, 0.80, 0.96, 0.0),
+    // (RewardStep::Annealing, 0.94, 0.96, 0.1),
     (RewardStep::Final, 0.96, 0.99, 0.1),
     (RewardStep::Fixed, 0.99, 0.99, 0.0),
 ];
@@ -416,7 +416,9 @@ impl VarDBIF for VarDB {
                 _ => (),
             },
             SearchStrategy::Generic => (),
-            SearchStrategy::LowDecisions => (),
+            SearchStrategy::LowDecisions => {
+                self.fix_reward(0.96);
+            }
             SearchStrategy::HighSuccesive => {
                 // self.fix_reward(0.99);
             }
@@ -429,7 +431,7 @@ impl VarDBIF for VarDB {
         }
     }
     fn minimize_with_biclauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>) {
-        if vec.len() <= 2 {
+        if vec.len() <= 1 {
             return;
         }
         let VarDB { lbd_temp, var, .. } = self;
@@ -514,6 +516,7 @@ impl LBDIF for VarDB {
 
 impl VarDB {
     /// switch to a special reward mode for SearchStrategy::LowSuccessiveM.
+    #[allow(dead_code)]
     fn fix_reward(&mut self, r: f64) {
         self.reward_mode = RewardStep::Fixed;
         self.activity_decay = r;
