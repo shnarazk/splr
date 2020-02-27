@@ -418,13 +418,13 @@ impl VarDBIF for VarDB {
             SearchStrategy::Generic => (),
             SearchStrategy::LowDecisions => (),
             SearchStrategy::HighSuccesive => {
-                self.fix_reward(0.99);
+                // self.fix_reward(0.99);
             }
             SearchStrategy::LowSuccesiveLuby | SearchStrategy::LowSuccesiveM => {
-                self.fix_reward(0.999);
+                // self.fix_reward(0.999);
             }
             SearchStrategy::ManyGlues => {
-                self.fix_reward(0.98);
+                // self.fix_reward(0.98);
             }
         }
     }
