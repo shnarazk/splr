@@ -521,7 +521,6 @@ fn handle_conflict_path(
                 // switch to the final stage of rewarding,
                 // which has a similar effect of deep search.
                 state.default_rewarding = false;
-                vdb.shift_reward_mode();
             }
         } else {
             return Err(SolverError::UndescribedError);

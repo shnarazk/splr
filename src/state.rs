@@ -556,8 +556,8 @@ impl StateIF for State {
             println!("\x1B[2K    Strategy|mode: {}", m);
         } else {
             println!(
-                "\x1B[2K    Strategy|mode: {:#}({:?})",
-                self.strategy, vdb.reward_mode,
+                "\x1B[2K    Strategy|mode: {:#}",
+                self.strategy,
             );
         }
         self.flush("\x1B[2K");

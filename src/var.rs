@@ -61,8 +61,6 @@ pub trait VarRewardIF {
     fn reward_at_unassign(&mut self, vi: VarId);
     /// update internal counter.
     fn reward_update(&mut self);
-    /// change reward mode.
-    fn shift_reward_mode(&mut self);
 }
 
 /// Object representing a variable.
@@ -176,27 +174,11 @@ pub enum RewardStep {
     Fixed,
 }
 
-/// a reward table used in VarDB::shift_reward_mode
-///  - id: RewardStep
-///  - start: lower bound of the range
-///  - end: upper bound of the range
-///  - scale: scaling coefficient for activity decay
-const REWARD: [(RewardStep, f64, f64, f64); 4] = [
-    (RewardStep::HeatUp, 0.80, 0.81, 0.0),
-    (RewardStep::Annealing, 0.81, 0.82, 0.1),
-    (RewardStep::Final, 0.82, 0.83, 0.1),
-    (RewardStep::Fixed, 0.99, 0.99, 0.0),
-];
-
 /// A container of variables.
 #[derive(Debug)]
 pub struct VarDB {
     /// var activity decay
     pub activity_decay: f64,
-    activity_decay_max: f64,
-    activity_step: f64,
-    /// the current var reward mode
-    pub reward_mode: RewardStep,
     /// an index for counting elapsed time
     ordinal: usize,
     /// vars
@@ -207,12 +189,8 @@ pub struct VarDB {
 
 impl Default for VarDB {
     fn default() -> VarDB {
-        let reward = REWARD[0];
         VarDB {
-            activity_decay: reward.1,
-            activity_decay_max: reward.2,
-            activity_step: 1.0 /* (reward.2 - reward.1) */ / 10_000.0,
-            reward_mode: reward.0,
+            activity_decay: 0.8,
             ordinal: 0,
             var: Vec::new(),
             lbd_temp: Vec::new(),
@@ -339,20 +317,6 @@ impl VarRewardIF for VarDB {
     }
     fn reward_update(&mut self) {
         self.ordinal += 1;
-        if self.activity_decay < self.activity_decay_max {
-            self.activity_decay += self.activity_step;
-        } else {
-            self.shift_reward_mode();
-        }
-    }
-    fn shift_reward_mode(&mut self) {
-        if self.reward_mode < RewardStep::Final {
-            let reward = &REWARD[self.reward_mode as usize + 1];
-            self.reward_mode = reward.0;
-            self.activity_decay_max = reward.2;
-            self.activity_decay = self.activity_decay.max(reward.1);
-            self.activity_step *= reward.3;
-        }
     }
 }
 
@@ -410,19 +374,11 @@ impl VarDBIF for VarDB {
     }
     fn adapt_strategy(&mut self, mode: &SearchStrategy, elapsed: f64) {
         self.activity_decay = (0.7 + 0.32 * elapsed.sqrt()).min(0.96);
-        self.activity_decay_max = self.activity_decay_max;
         match mode {
-            SearchStrategy::Initial =>
-                if self.ordinal == 0 {
-                    match self.var.len() {
-                        l if 1_000_000 < l => self.activity_step *= 0.1,
-                        l if 100_000 < l => self.activity_step *= 0.5,
-                        _ => (),
-                    }
-                }
+            SearchStrategy::Initial => (),
             SearchStrategy::Generic => (),
             SearchStrategy::LowDecisions => {
-                self.fix_reward(0.96);
+                // self.fix_reward(0.96);
             }
             SearchStrategy::HighSuccesive => {
                 // self.fix_reward(0.99);
@@ -520,14 +476,6 @@ impl LBDIF for VarDB {
 }
 
 impl VarDB {
-    /// switch to a special reward mode for SearchStrategy::LowSuccessiveM.
-    #[allow(dead_code)]
-    fn fix_reward(&mut self, r: f64) {
-        self.reward_mode = RewardStep::Fixed;
-        self.activity_decay = r;
-        self.activity_decay_max = r;
-        self.activity_step = 0.0;
-    }
     // This function is for Reason-Side Rewarding which must traverse the assign stack
     // beyond first UIDs and bump all vars on the traversed tree.
     // If you'd like to use this, you should stop bumping activities in `analyze`.
