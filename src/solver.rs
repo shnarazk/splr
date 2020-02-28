@@ -252,7 +252,7 @@ impl SatSolverIF for Solver {
         }
         debug_assert_eq!(s.vdb.len() - 1, cnf.num_of_variables);
         s.state[Stat::NumBin] = s.cdb[1..].iter().filter(|c| c.len() == 2).count();
-        s.vdb.adapt_strategy(&s.state.strategy);
+        s.vdb.adapt_strategy(&s.state.strategy, 0.0);
         Ok(s)
     }
     // renamed from clause_new
@@ -440,7 +440,7 @@ fn handle_conflict_path(
     // Therefore the condition to use CB is: activity(firstUIP) < activity(v(bl)).
     // PREMISE: 0 < bl, because asgs.decision_vi accepts only non-zero values.
     use_chronobt &= bl_a == 0
-        || state.config.chronobt <= cl - bl_a
+        || state.config.chronobt + bl_a <= cl
         || vdb.activity(l0.vi()) < vdb.activity(asgs.decision_vi(bl_a));
 
     // (assign level, backtrack level)
@@ -546,13 +546,13 @@ fn adapt_parameters(
         asgs.cancel_until(vdb, 0);
         state.adapt_strategy();
         cdb.adapt_strategy(&state.strategy, state[Stat::Conflict]);
-        vdb.adapt_strategy(&state.strategy);
         state.rst.adapt_strategy(&state.strategy);
         if elim.enable {
             elim.activate();
             elim.simplify(asgs, cdb, state, vdb)?;
         }
     }
+    vdb.adapt_strategy(&state.strategy, state.elapsed().unwrap_or(0.9));
     state[Stat::SolvedRecord] = state.num_solved_vars;
     if state.config.with_deep_search {
         if state.stagnated {

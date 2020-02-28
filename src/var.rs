@@ -42,7 +42,7 @@ pub trait VarDBIF {
     /// - None -- the literals contains an unassigned literal
     fn status(&self, c: &[Lit]) -> Option<bool>;
     /// set up parameters for each SearchStrategy.
-    fn adapt_strategy(&mut self, mode: &SearchStrategy);
+    fn adapt_strategy(&mut self, mode: &SearchStrategy, elapsed: f64);
     /// minimize a clause.
     fn minimize_with_biclauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>);
 }
@@ -171,7 +171,7 @@ impl FlagIF for Var {
 #[derive(Clone, Copy, Eq, Debug, PartialEq, PartialOrd, Ord)]
 pub enum RewardStep {
     HeatUp = 0,
-    // Annealing,
+    Annealing,
     Final,
     Fixed,
 }
@@ -181,10 +181,10 @@ pub enum RewardStep {
 ///  - start: lower bound of the range
 ///  - end: upper bound of the range
 ///  - scale: scaling coefficient for activity decay
-const REWARD: [(RewardStep, f64, f64, f64); 3] = [
-    (RewardStep::HeatUp, 0.80, 0.96, 0.0),
-    // (RewardStep::Annealing, 0.94, 0.96, 0.1),
-    (RewardStep::Final, 0.96, 0.99, 0.1),
+const REWARD: [(RewardStep, f64, f64, f64); 4] = [
+    (RewardStep::HeatUp, 0.80, 0.81, 0.0),
+    (RewardStep::Annealing, 0.81, 0.82, 0.1),
+    (RewardStep::Final, 0.82, 0.83, 0.1),
     (RewardStep::Fixed, 0.99, 0.99, 0.0),
 ];
 
@@ -211,7 +211,7 @@ impl Default for VarDB {
         VarDB {
             activity_decay: reward.1,
             activity_decay_max: reward.2,
-            activity_step: (reward.2 - reward.1) / 10_000.0,
+            activity_step: 1.0 /* (reward.2 - reward.1) */ / 10_000.0,
             reward_mode: reward.0,
             ordinal: 0,
             var: Vec::new(),
@@ -408,13 +408,18 @@ impl VarDBIF for VarDB {
         }
         falsified
     }
-    fn adapt_strategy(&mut self, mode: &SearchStrategy) {
+    fn adapt_strategy(&mut self, mode: &SearchStrategy, elapsed: f64) {
+        self.activity_decay = (0.7 + 0.32 * elapsed.sqrt()).min(0.96);
+        self.activity_decay_max = self.activity_decay_max;
         match mode {
-            SearchStrategy::Initial => match self.var.len() {
-                l if 1_000_000 < l => self.activity_step *= 0.1,
-                l if 100_000 < l => self.activity_step *= 0.5,
-                _ => (),
-            },
+            SearchStrategy::Initial =>
+                if self.ordinal == 0 {
+                    match self.var.len() {
+                        l if 1_000_000 < l => self.activity_step *= 0.1,
+                        l if 100_000 < l => self.activity_step *= 0.5,
+                        _ => (),
+                    }
+                }
             SearchStrategy::Generic => (),
             SearchStrategy::LowDecisions => {
                 self.fix_reward(0.96);
