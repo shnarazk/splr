@@ -373,23 +373,30 @@ impl VarDBIF for VarDB {
         falsified
     }
     fn adapt_strategy(&mut self, mode: &SearchStrategy, elapsed: f64) {
-        self.activity_decay = (0.7 + 0.32 * elapsed.sqrt()).min(0.96);
+        let mut s = 20.0;
         match mode {
             SearchStrategy::Initial => (),
             SearchStrategy::Generic => (),
             SearchStrategy::LowDecisions => {
                 // self.fix_reward(0.96);
+                s = 10.0;
             }
             SearchStrategy::HighSuccesive => {
                 // self.fix_reward(0.99);
+                s = 28.0;
             }
             SearchStrategy::LowSuccesiveLuby | SearchStrategy::LowSuccesiveM => {
                 // self.fix_reward(0.999);
+                s = 30.0;
             }
             SearchStrategy::ManyGlues => {
                 // self.fix_reward(0.98);
             }
         }
+        let e = elapsed.min(1.0);
+        let t = e * s;
+        let r = 0.9;
+        self.activity_decay = r + (1.0 - r) * (t + 1.0) .ln() / (s + 1.0).ln();
     }
     fn minimize_with_biclauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>) {
         if vec.len() <= 1 {
