@@ -310,9 +310,15 @@ impl VarRewardIF for VarDB {
     fn reward_at_unassign(&mut self, vi: VarId) {
         let v = &mut self.var[vi];
         let duration = self.ordinal + 1 - v.timestamp;
-        let rate = v.participated as f64 / duration as f64;
+        let rate = (v.participated as f64 / duration as f64).min(1.0);
         v.reward *= self.activity_decay;
         v.reward += (1.0 - self.activity_decay) * rate;
+        assert!(v.reward < 1.0,
+                format!("ad: {}, reward: {}, rate: {}",
+                        self.activity_decay,
+                        v.reward,
+                        rate
+                ));
         v.participated = 0;
     }
     fn reward_update(&mut self) {
@@ -373,21 +379,21 @@ impl VarDBIF for VarDB {
         falsified
     }
     fn adapt_strategy(&mut self, mode: &SearchStrategy, elapsed: f64) {
-        let mut s = 20.0;
+        let mut s = 100.0;
         match mode {
             SearchStrategy::Initial => (),
             SearchStrategy::Generic => (),
             SearchStrategy::LowDecisions => {
                 // self.fix_reward(0.96);
-                s = 10.0;
+                s = 20.0;
             }
             SearchStrategy::HighSuccesive => {
                 // self.fix_reward(0.99);
-                s = 28.0;
+                s = 140.0;
             }
             SearchStrategy::LowSuccesiveLuby | SearchStrategy::LowSuccesiveM => {
                 // self.fix_reward(0.999);
-                s = 30.0;
+                s = 200.0;
             }
             SearchStrategy::ManyGlues => {
                 // self.fix_reward(0.98);
@@ -396,7 +402,8 @@ impl VarDBIF for VarDB {
         let e = elapsed.min(1.0);
         let t = e * s;
         let r = 0.9;
-        self.activity_decay = r + (1.0 - r) * (t + 1.0) .ln() / (s + 1.0).ln();
+        let d = r + (1.0 - r) * (t + 1.0) .ln() / (s + 1.0).ln();
+        self.activity_decay = (self.activity_decay + d) * 0.5;
     }
     fn minimize_with_biclauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>) {
         if vec.len() <= 1 {
