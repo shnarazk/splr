@@ -485,12 +485,12 @@ impl LBDIF for VarDB {
 }
 
 impl VarDB {
-    pub fn dump_dependency(&mut self, asgs: &AssignStack, cdb: &ClauseDB, confl: ClauseId) {
+    fn dump_dependency(&mut self, asgs: &AssignStack, cdb: &ClauseDB, confl: ClauseId) {
         debug_assert_ne!(confl, ClauseId::default());
         let mut cid = confl;
         let mut p = NULL_LIT;
         let mut ti = asgs.len(); // trail index
-        debug_assert!(self.var[1..].iter().all(|v| !v.is(Flag::VR_SEEN)));
+        debug_assert!(self.iter().skip(1).all(|v| !v.is(Flag::VR_SEEN)));
         println!();
         loop {
             for q in &cdb[cid].lits[(p != NULL_LIT) as usize..] {
@@ -502,13 +502,13 @@ impl VarDB {
             }
             loop {
                 if 0 == ti {
-                    self.var[asgs.trail[ti].vi()].turn_off(Flag::VR_SEEN);
-                    debug_assert!(self.var[1..].iter().all(|v| !v.is(Flag::VR_SEEN)));
+                    self.var[asgs[ti].vi()].turn_off(Flag::VR_SEEN);
+                    debug_assert!(self.iter().skip(1).all(|v| !v.is(Flag::VR_SEEN)));
                     println!();
                     return;
                 }
                 ti -= 1;
-                p = asgs.trail[ti];
+                p = asgs[ti];
                 let next_vi = p.vi();
                 if self.var[next_vi].is(Flag::VR_SEEN) {
                     self.var[next_vi].turn_off(Flag::VR_SEEN);
