@@ -710,7 +710,8 @@ impl ClauseDBIF for ClauseDB {
             self.first_reduction < self.num_learnt
         };
         if go {
-            self.reduce(state, vdb, nc);
+            self.cur_restart = ((nc as f64) / (self.next_reduction as f64)) as usize + 1;
+            self.reduce(state, vdb);
         }
     }
     fn reset(&mut self) {
@@ -778,7 +779,7 @@ impl ClauseDBIF for ClauseDB {
 
 impl ClauseDB {
     /// halve the number of 'learnt' or *removable* clauses.
-    fn reduce(&mut self, state: &mut State, vdb: &mut VarDB, ncnfl: usize) {
+    fn reduce(&mut self, state: &mut State, vdb: &mut VarDB) {
         vdb.reset_lbd(self);
         let ClauseDB {
             ref mut clause,
@@ -818,7 +819,6 @@ impl ClauseDB {
         }
         state[Stat::Reduction] += 1;
         self.garbage_collect();
-        self.cur_restart = ((ncnfl as f64) / (self.next_reduction as f64)) as usize + 1;
     }
     /// change good learnt clauses to permanent one.
     fn make_permanent(&mut self, reinit: bool) {
