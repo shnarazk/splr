@@ -28,6 +28,8 @@ pub trait PropagatorIF {
     fn len_upto(&self, n: usize) -> usize;
     /// return `true` if there's no assignment.
     fn is_empty(&self) -> bool;
+    /// return an interator over assignment stack.
+    fn iter(&self) -> Iter<'_, Lit>;
     /// return the current decision level.
     fn level(&self) -> usize;
     ///return the decision var's id at that level.
@@ -36,8 +38,6 @@ pub trait PropagatorIF {
     fn is_zero(&self) -> bool;
     /// return `true` if there are unpropagated assignments.
     fn remains(&self) -> bool;
-    /// return the *value* of a given literal.
-    fn assigned(&self, l: Lit) -> Option<bool>;
     /// add an assignment at level 0 as a precondition.
     ///
     /// # Errors
@@ -197,6 +197,9 @@ impl PropagatorIF for AssignStack {
     fn is_empty(&self) -> bool {
         self.trail.is_empty()
     }
+    fn iter(&self) -> Iter<'_, Lit> {
+        self.trail.iter()
+    }
     fn level(&self) -> usize {
         self.trail_lim.len()
     }
@@ -209,9 +212,6 @@ impl PropagatorIF for AssignStack {
     }
     fn remains(&self) -> bool {
         self.q_head < self.trail.len()
-    }
-    fn assigned(&self, l: Lit) -> Option<bool> {
-        lit_assign!(self, l)
     }
     fn assign_at_rootlevel(&mut self, vdb: &mut VarDB, l: Lit) -> MaybeInconsistent {
         let v = &mut vdb[l];
@@ -333,7 +333,6 @@ impl PropagatorIF for AssignStack {
                     let lits = &mut cdb[w.c].lits;
                     if lits.len() == 2 {
                         if blocker_value == Some(false) {
-                            // state.rst.rcc.update(vdb[p.vi()].record_conflict(ncnfl));
                             return w.c;
                         }
                         if lits[0] == false_lit {
@@ -366,7 +365,6 @@ impl PropagatorIF for AssignStack {
                         }
                     }
                     if first_value == Some(false) {
-                        // state.rst.rcc.update(vdb[p.vi()].record_conflict(ncnfl));
                         return w.c;
                     }
                     let lv = lits[1..].iter().map(|l| vdb[l].level).max().unwrap_or(0);
@@ -399,7 +397,7 @@ impl AssignStack {
         self.q_head += 1;
         lit
     }
-    /// dump all active clauses and fixed assignments in solver to a CNF file.
+    /// dump all active clauses and fixed assignments as a CNF file.
     #[allow(dead_code)]
     fn dump_cnf(&mut self, cdb: &ClauseDB, state: &State, vdb: &VarDB, fname: &str) {
         for v in &vdb[1..] {
