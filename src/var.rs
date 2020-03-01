@@ -4,6 +4,7 @@ use {
         clause::{Clause, ClauseDB, ClauseIF, ClauseId, ClauseIdIF},
         config::Config,
         propagator::{AssignStack, PropagatorIF},
+        state::SearchStrategy,
         types::*,
     },
     std::{
@@ -40,6 +41,8 @@ pub trait VarDBIF {
     /// - Some(false) -- the literals is unsatisfied; no unassigned literal
     /// - None -- the literals contains an unassigned literal
     fn status(&self, c: &[Lit]) -> Option<bool>;
+    /// set up parameters for each SearchStrategy.
+    fn adapt_strategy(&mut self, mode: &SearchStrategy);
     /// minimize a clause.
     fn minimize_with_biclauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>);
 }
@@ -409,6 +412,16 @@ impl VarDBIF for VarDB {
         }
         falsified
     }
+    fn adapt_strategy(&mut self, mode: &SearchStrategy) {
+        match mode {
+            SearchStrategy::Initial => match self.var.len() {
+                l if 1_000_000 < l => self.activity_step *= 0.1,
+                l if 100_000 < l => self.activity_step *= 0.5,
+                _ => (),
+            },
+            _ => (),
+        }
+    }
     fn minimize_with_biclauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>) {
         if vec.len() <= 1 {
             return;
@@ -487,6 +500,7 @@ impl LBDIF for VarDB {
 }
 
 impl VarDB {
+    #[allow(dead_code)]
     fn dump_dependency(&mut self, asgs: &AssignStack, cdb: &ClauseDB, confl: ClauseId) {
         debug_assert_ne!(confl, ClauseId::default());
         let mut cid = confl;

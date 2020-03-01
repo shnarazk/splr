@@ -252,11 +252,7 @@ impl SatSolverIF for Solver {
         }
         debug_assert_eq!(s.vdb.len() - 1, cnf.num_of_variables);
         s.state[Stat::NumBin] = s.cdb[1..].iter().filter(|c| c.len() == 2).count();
-        match s.vdb.len() {
-            l if 1_000_000 < l => s.vdb.activity_step *= 0.1,
-            l if 100_000 < l => s.vdb.activity_step *= 0.5,
-            _ => (),
-        }
+        s.vdb.adapt_strategy(&s.state.strategy);
         Ok(s)
     }
     // renamed from clause_new
@@ -407,7 +403,7 @@ fn handle_conflict_path(
                 // PREMISE: 0 < snd_l
                 asgs.cancel_until(vdb, snd_l - 1);
                 debug_assert!(
-                    asgs.trail.iter().all(|l| l.vi() != decision.vi()),
+                    asgs.iter().all(|l| l.vi() != decision.vi()),
                     format!("lcnt == 1: level {}, snd level {}", cl, snd_l)
                 );
                 asgs.assign_by_decision(vdb, decision);
@@ -467,7 +463,7 @@ fn handle_conflict_path(
         cdb.certificate_add(new_learnt);
         if use_chronobt {
             asgs.cancel_until(vdb, bl);
-            debug_assert!(asgs.trail.iter().all(|l| l.vi() != l0.vi()));
+            debug_assert!(asgs.iter().all(|l| l.vi() != l0.vi()));
             asgs.assign_by_implication(vdb, l0, ClauseId::default(), 0);
         } else {
             asgs.assign_by_unitclause(vdb, l0);
@@ -642,10 +638,10 @@ fn conflict_analyze(
         }
         // set the index of the next literal to ti
         while {
-            let v = &vdb[asgs.trail[ti].vi()];
+            let v = &vdb[asgs[ti].vi()];
             !v.is(Flag::CA_SEEN) || v.level != dl
         } {
-            // println!("- skip {} because it isn't flagged", asgs.trail[ti].int());
+            // println!("- skip {} because it isn't flagged", asgs[ti].int());
             debug_assert!(
                 0 < ti,
                 format!(
@@ -657,7 +653,7 @@ fn conflict_analyze(
             );
             ti -= 1;
         }
-        p = asgs.trail[ti];
+        p = asgs[ti];
         let next_vi = p.vi();
         cid = vdb[next_vi].reason;
         // println!("- move to flagged {}, which reason is {}; num path: {}",
@@ -681,7 +677,6 @@ fn conflict_analyze(
 
 impl State {
     fn simplify_learnt(
-        // state: &mut State,
         &mut self,
         asgs: &mut AssignStack,
         cdb: &mut ClauseDB,
@@ -694,7 +689,7 @@ impl State {
         let mut levels = vec![false; asgs.level() + 1];
         for l in &new_learnt[1..] {
             to_clear.push(*l);
-            levels[vdb[l.vi()].level] = true;
+            levels[vdb[l].level] = true;
         }
         let l0 = new_learnt[0];
         new_learnt.retain(|l| *l == l0 || !l.is_redundant(cdb, vdb, &mut to_clear, &levels));
@@ -708,7 +703,7 @@ impl State {
             let mut max_i = 1;
             level_to_return = vdb[new_learnt[max_i].vi()].level;
             for (i, l) in new_learnt.iter().enumerate().skip(2) {
-                let lv = vdb[l.vi()].level;
+                let lv = vdb[l].level;
                 if level_to_return < lv {
                     level_to_return = lv;
                     max_i = i;
@@ -717,7 +712,7 @@ impl State {
             new_learnt.swap(1, max_i);
         }
         for l in &to_clear {
-            vdb[l.vi()].turn_off(Flag::CA_SEEN);
+            vdb[l].turn_off(Flag::CA_SEEN);
         }
         level_to_return
     }
@@ -754,7 +749,7 @@ impl Lit {
                     } else {
                         // one of the roots is a decision var at an unchecked level.
                         for l in &clear[top..] {
-                            vdb[l.vi()].turn_off(Flag::CA_SEEN);
+                            vdb[l].turn_off(Flag::CA_SEEN);
                         }
                         clear.truncate(top);
                         return false;
@@ -783,7 +778,7 @@ fn analyze_final(asgs: &AssignStack, state: &mut State, vdb: &mut VarDB, c: &Cla
     } else {
         asgs.len_upto(state.root_level)
     };
-    for l in &asgs.trail[asgs.len_upto(0)..end] {
+    for l in &asgs[asgs.len_upto(0)..end] {
         let vi = l.vi();
         if seen[vi] {
             if vdb[vi].reason == ClauseId::default() {
