@@ -61,33 +61,11 @@ pub enum SearchStrategy {
 impl fmt::Display for SearchStrategy {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         if formatter.alternate() {
-            write!(
-                formatter,
-                "{}",
-                match self {
-                    SearchStrategy::Initial => {
-                        "in the initial search phase to determine a main strategy"
-                    }
-                    SearchStrategy::Generic => "Non-Specific-Instance using a generic setting",
-                    SearchStrategy::LowDecisions => {
-                        "Many-Low-Level-Conflicts using Chan Seok heuristics"
-                    }
-                    SearchStrategy::HighSuccesive => {
-                        "High-Successive-Conflicts using Chan Seok heuristics"
-                    }
-                    SearchStrategy::LowSuccesiveLuby => {
-                        "Low-Successive-Conflicts-Luby w/ Luby sequence"
-                    }
-                    SearchStrategy::LowSuccesiveM => {
-                        "Low-Successive-Conflicts-Modified w/o Luby sequence"
-                    }
-                    SearchStrategy::ManyGlues => "Many-Glue-Clauses",
-                }
-            )
+            write!(formatter, "{}", self.to_str())
         } else {
             let name = match self {
-                SearchStrategy::Initial => "initial",
-                SearchStrategy::Generic => "generic",
+                SearchStrategy::Initial => "Initial",
+                SearchStrategy::Generic => "Generic",
                 SearchStrategy::LowDecisions => "LowDecs",
                 SearchStrategy::HighSuccesive => "HighSucc",
                 SearchStrategy::LowSuccesiveLuby => "LowSuccLuby",
@@ -110,13 +88,20 @@ impl fmt::Display for SearchStrategy {
 impl SearchStrategy {
     pub fn to_str(&self) -> &'static str {
         match self {
-            SearchStrategy::Initial => "in the initial search phase to determine a main strategy",
-            SearchStrategy::Generic => "generic (using a generic parameter set)",
-            SearchStrategy::LowDecisions => "LowDecs (many conflicts at low levels, using CSh)",
-            SearchStrategy::HighSuccesive => "HighSucc (long decision chains)",
-            SearchStrategy::LowSuccesiveLuby => "LowSuccLuby (successive conflicts)",
-            SearchStrategy::LowSuccesiveM => "LowSuccP (successive conflicts)",
-            SearchStrategy::ManyGlues => "ManyGlue (many glue clauses)",
+            // in the initial search phase to determine a main strategy
+            SearchStrategy::Initial => "Initial search phase before a main strategy",
+            // Non-Specific-Instance using a generic setting
+            SearchStrategy::Generic => "Generic (using a generic parameter set)",
+            // Many-Low-Level-Conflicts using Chan Seok heuristics
+            SearchStrategy::LowDecisions => "LowDecisions (many conflicts at low levels)",
+            // High-Successive-Conflicts using Chan Seok heuristics
+            SearchStrategy::HighSuccesive => "HighSuccesiveConflict (long decision chains)",
+            // Low-Successive-Conflicts-Luby w/ Luby sequence
+            SearchStrategy::LowSuccesiveLuby => "LowSuccesiveLuby (successive conflicts)",
+            // Low-Successive-Conflicts-Modified w/o Luby sequence
+            SearchStrategy::LowSuccesiveM => "LowSuccesive w/o Luby (successive conflicts)",
+            // Many-Glue-Clauses
+            SearchStrategy::ManyGlues => "ManyGlueClauses",
         }
     }
 }
@@ -139,9 +124,9 @@ pub enum Stat {
     Assign,                // the number of assigned variables
     SolvedRecord,          // the last number of solved variables
     SumLBD,                // the sum of generated learnts' LBD
-    NumBin,                // the number of binary clauses
+    NumBin,                // the number of binary clauses (both of given and learnt)
     NumBinLearnt,          // the number of binary learnt clauses
-    NumLBD2,               // the number of clauses which LBD is 2
+    NumLBD2,               // the number of learnt clauses which LBD is 2
     Stagnation,            // the number of stagnation
     EndOfStatIndex,        // Don't use this dummy.
 }
@@ -792,7 +777,7 @@ impl State {
         );
     }
     #[allow(dead_code)]
-    fn dump_details(&mut self, cdb: &ClauseDB, elim: &Eliminator, vdb: &VarDB, mes: Option<&str>) {
+    fn dump_details(&mut self, cdb: &ClauseDB, _: &Eliminator, vdb: &VarDB, mes: Option<&str>) {
         self.progress_cnt += 1;
         let msg = match mes {
             None => self.strategy.to_str(),
@@ -821,8 +806,8 @@ impl State {
             self.rst.lbd.get(),
             self.b_lvl.get(),
             self.c_lvl.get(),
-            elim.clause_queue_len(),
-            elim.var_queue_len(),
+            0, // elim.clause_queue_len(),
+            0, // elim.var_queue_len(),
         );
     }
 }
