@@ -182,8 +182,8 @@ pub enum RewardStep {
 ///  - end: upper bound of the range
 ///  - scale: scaling coefficient for activity decay
 const REWARD: [(RewardStep, f64, f64, f64); 3] = [
-    (RewardStep::HeatUp, 0.80, 0.96, 0.0),
-    // (RewardStep::Annealing, 0.94, 0.96, 0.1),
+    (RewardStep::HeatUp, 0.80, 0.92, 0.0),
+    (RewardStep::Annealing, 0.92, 0.96, 0.1),
     (RewardStep::Final, 0.96, 0.99, 0.1),
     (RewardStep::Fixed, 0.99, 0.99, 0.0),
 ];
@@ -417,7 +417,7 @@ impl VarDBIF for VarDB {
             },
             SearchStrategy::Generic => (),
             SearchStrategy::LowDecisions => {
-                self.fix_reward(0.96);
+                // self.fix_reward(0.96);
             }
             SearchStrategy::HighSuccesive => {
                 // self.fix_reward(0.99);
