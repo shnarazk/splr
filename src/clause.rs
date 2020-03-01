@@ -745,6 +745,15 @@ impl ClauseDBIF for ClauseDB {
                 self.next_reduction = 2000;
                 self.make_permanent(true);
             }
+            SearchStrategy::HighSuccesive => {
+                self.co_lbd_bound = 3;
+                self.first_reduction = 30000;
+                self.glureduce = true;
+                self.make_permanent(false);
+            }
+            SearchStrategy::LowSuccesiveLuby => (),
+            SearchStrategy::LowSuccesiveM => (),
+            SearchStrategy::ManyGlues => (),
         }
     }
     fn check_and_reduce(&mut self, state: &mut State, vdb: &mut VarDB, nc: usize) {

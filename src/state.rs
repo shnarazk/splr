@@ -3,7 +3,7 @@ use {
     crate::{
         clause::{ClauseDB, ClauseDBIF},
         config::Config,
-        eliminator::{Eliminator, EliminatorIF},
+        eliminator::Eliminator,
         restart::RestartExecutor,
         types::*,
         var::{VarDB, VarDBIF},
@@ -30,7 +30,7 @@ pub trait StateIF {
     /// update internal counters and return true if solver stagnated.
     fn check_stagnation(&mut self);
     /// change heuristics based on stat data.
-    fn adapt_strategy(&mut self, cdb: &mut ClauseDB);
+    fn adapt_strategy(&mut self);
     /// write a header of stat data to stdio.
     fn progress_header(&self);
     /// write stat data to stdio.
@@ -362,23 +362,13 @@ impl StateIF for State {
             self[Stat::Stagnation] += 1;
         }
     }
-    fn adapt_strategy(&mut self, cdb: &mut ClauseDB) {
+    fn adapt_strategy(&mut self) {
         if self.config.without_adaptive_strategy || self.strategy != SearchStrategy::Initial {
             return;
         }
-        let mut re_init = false;
-        let decpc = self[Stat::Decision] as f64 / self[Stat::Conflict] as f64;
-        if decpc <= 1.2 {
+        if self[Stat::Decision] as f64 <= 1.2 * self[Stat::Conflict] as f64 {
             self.strategy = SearchStrategy::LowDecisions;
             self.use_chan_seok = true;
-            cdb.cur_restart =
-                (self[Stat::Conflict] as f64 / cdb.next_reduction as f64 + 1.0) as usize;
-            cdb.co_lbd_bound = 4;
-            cdb.first_reduction = 2000;
-            cdb.glureduce = true;
-            cdb.inc_step = 0;
-            cdb.next_reduction = 2000;
-            re_init = true;
         }
         if self[Stat::NoDecisionConflict] < 30_000 {
             if self.config.with_deep_search {
@@ -389,24 +379,17 @@ impl StateIF for State {
                 self.rst.luby.step = 100;
             }
         }
-        if self[Stat::NoDecisionConflict] > 54_400 {
+        if 54_400 < self[Stat::NoDecisionConflict] {
             self.strategy = SearchStrategy::HighSuccesive;
             self.use_chan_seok = true;
-            cdb.co_lbd_bound = 3;
-            cdb.first_reduction = 30000;
-            cdb.glureduce = true;
-            // randomize_on_restarts = 1;
         }
-        if self[Stat::NumLBD2] - self[Stat::NumBin] > 20_000 {
+        if self[Stat::NumBin] + 20_000 < self[Stat::NumLBD2]  {
             self.strategy = SearchStrategy::ManyGlues;
         }
         if self.strategy == SearchStrategy::Initial {
             self.strategy = SearchStrategy::Generic;
             // self.config.without_deep_search = self.c_lvl.get().powf(2.0) < (self.num_unsolved_vars() as f64);
             return;
-        }
-        if self.use_chan_seok {
-            cdb.make_permanent(re_init);
         }
     }
     fn progress_header(&self) {

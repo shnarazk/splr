@@ -527,12 +527,7 @@ fn handle_conflict_path(
             return Err(SolverError::UndescribedError);
         }
     }
-    if ((state.use_chan_seok && !cdb.glureduce && cdb.first_reduction < cdb.num_learnt)
-        || (cdb.glureduce && cdb.cur_restart * cdb.next_reduction <= state[Stat::Conflict]))
-        && 0 < cdb.num_learnt
-    {
-        cdb.reduce(state, vdb);
-    }
+    cdb.check_and_reduce(state, vdb, state[Stat::Conflict]);
     Ok(())
 }
 
@@ -549,7 +544,8 @@ fn adapt_parameters(
     if nconflict == switch {
         state.flush("exhaustive eliminator activated...");
         asgs.cancel_until(vdb, 0);
-        state.adapt_strategy(cdb);
+        state.adapt_strategy();
+        cdb.adapt_strategy(&state.strategy, state[Stat::Conflict]);
         if elim.enable {
             elim.activate();
             cdb.simplify(asgs, elim, state, vdb)?;
