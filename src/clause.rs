@@ -4,7 +4,7 @@ use {
         config::Config,
         eliminator::{Eliminator, EliminatorIF},
         propagator::{AssignStack, PropagatorIF},
-        state::{Stat, State, StateIF},
+        state::{SearchStrategy, Stat, State, StateIF},
         types::*,
         var::{VarDB, VarDBIF, LBDIF},
     },
@@ -36,8 +36,10 @@ pub trait ClauseDBIF {
     fn attach(&mut self, state: &mut State, vdb: &mut VarDB, lbd: usize) -> ClauseId;
     /// unregister a clause `cid` from clause database and make the clause dead.
     fn detach(&mut self, cid: ClauseId);
-    /// halve the number of 'learnt' or *removable* clauses.
-    fn reduce(&mut self, state: &mut State, vdb: &mut VarDB);
+    /// set up parameters for each SearchStrategy.
+    fn adapt_strategy(&mut self, mode: &SearchStrategy, nc: usize);
+    /// check a condition to reduce.
+    fn check_and_reduce(&mut self, state: &mut State, vdb: &mut VarDB, nc: usize);
     /// simplify database by:
     /// * removing satisfiable clauses
     /// * calling exhaustive simplifier that tries **clause subsumption** and **variable elimination**.
@@ -72,15 +74,13 @@ pub trait ClauseDBIF {
     fn eliminate_satisfied_clauses(&mut self, elim: &mut Eliminator, vdb: &mut VarDB, occur: bool);
     /// emit an error if the db size (the number of clauses) is over the limit.
     fn check_size(&self) -> MaybeInconsistent;
-    /// change good learnt clauses to permanent one.
-    fn make_permanent(&mut self, reinit: bool);
     /// returns None if the given assignment is a model of a problem.
     /// Otherwise returns a clause which is not satisfiable under a given assignment.
     /// Clauses with an unassigned literal are treated as falsified in `strict` mode.
     fn validate(&self, vdb: &VarDB, strict: bool) -> Option<ClauseId>;
 }
 
-/// API for Clause Id like `to_lit`, `is_lifted_lit` and so on.
+/// API for Clause Id.
 pub trait ClauseIdIF {
     /// return `true` if a given clause id is made from a `Lit`.
     fn is_lifted_lit(self) -> bool;
@@ -690,47 +690,6 @@ impl ClauseDBIF for ClauseDB {
         debug_assert!(1 < c.lits.len());
         c.kill(&mut self.touched);
     }
-    fn reduce(&mut self, state: &mut State, vdb: &mut VarDB) {
-        vdb.reset_lbd(self);
-        let ClauseDB {
-            ref mut clause,
-            ref mut touched,
-            ..
-        } = self;
-        self.next_reduction += self.inc_step;
-        let mut perm = Vec::with_capacity(clause.len());
-        for (i, b) in clause.iter().enumerate().skip(1) {
-            if b.is(Flag::LEARNT) && !b.is(Flag::DEAD) && !vdb.locked(b, ClauseId::from(i)) {
-                perm.push(i);
-            }
-        }
-        if perm.is_empty() {
-            return;
-        }
-        let keep = perm.len() / 2;
-        if state.use_chan_seok {
-            perm.sort_by(|&a, &b| clause[a].cmp_activity(&clause[b]));
-        } else {
-            perm.sort_by(|&a, &b| clause[a].cmp(&clause[b]));
-            if clause[perm[keep]].rank <= 3 {
-                self.next_reduction += self.extra_inc;
-            }
-            if clause[perm[0]].rank <= 5 {
-                self.next_reduction += self.extra_inc;
-            };
-        }
-        for i in &perm[keep..] {
-            let c = &mut clause[*i];
-            // if c.is(Flag::JUST_USED) {
-            //     c.turn_off(Flag::JUST_USED)
-            // }
-            if 2 < c.rank {
-                c.kill(touched);
-            }
-        }
-        state[Stat::Reduction] += 1;
-        self.garbage_collect();
-    }
     fn simplify(
         &mut self,
         asgs: &mut AssignStack,
@@ -772,6 +731,35 @@ impl ClauseDBIF for ClauseDB {
             elim.stop(self, vdb);
         }
         self.check_size()
+    }
+    fn adapt_strategy(&mut self, mode: &SearchStrategy, nc: usize) {
+        match mode {
+            SearchStrategy::Initial => (),
+            SearchStrategy::Generic => (),
+            SearchStrategy::LowDecisions => {
+                self.co_lbd_bound = 4;
+                self.cur_restart = (nc as f64 / self.next_reduction as f64 + 1.0) as usize;
+                self.first_reduction = 2000;
+                self.glureduce = true;
+                self.inc_step = 0;
+                self.next_reduction = 2000;
+                self.make_permanent(true);
+            }
+        }
+    }
+    fn check_and_reduce(&mut self, state: &mut State, vdb: &mut VarDB, nc: usize) {
+        if 0 == self.num_learnt {
+            return;
+        }
+        let go = if self.glureduce {
+            self.cur_restart * self.next_reduction <= nc
+        } else {
+            self.first_reduction < self.num_learnt
+        };
+        if go {
+            self.cur_restart = ((nc as f64) / (self.next_reduction as f64)) as usize + 1;
+            self.reduce(state, vdb);
+        }
     }
     fn reset(&mut self) {
         debug_assert!(1 < self.clause.len());
@@ -821,6 +809,65 @@ impl ClauseDBIF for ClauseDB {
             Err(SolverError::OutOfMemory)
         }
     }
+    fn validate(&self, vdb: &VarDB, strict: bool) -> Option<ClauseId> {
+        for (i, c) in self.clause.iter().enumerate().skip(1) {
+            if c.is(Flag::DEAD) || (strict && c.is(Flag::LEARNT)) {
+                continue;
+            }
+            match vdb.status(&c.lits) {
+                Some(false) => return Some(ClauseId::from(i)),
+                None if strict => return Some(ClauseId::from(i)),
+                _ => (),
+            }
+        }
+        None
+    }
+}
+
+impl ClauseDB {
+    /// halve the number of 'learnt' or *removable* clauses.
+    fn reduce(&mut self, state: &mut State, vdb: &mut VarDB) {
+        vdb.reset_lbd(self);
+        let ClauseDB {
+            ref mut clause,
+            ref mut touched,
+            ..
+        } = self;
+        self.next_reduction += self.inc_step;
+        let mut perm = Vec::with_capacity(clause.len());
+        for (i, b) in clause.iter().enumerate().skip(1) {
+            if b.is(Flag::LEARNT) && !b.is(Flag::DEAD) && !vdb.locked(b, ClauseId::from(i)) {
+                perm.push(i);
+            }
+        }
+        if perm.is_empty() {
+            return;
+        }
+        let keep = perm.len() / 2;
+        if state.use_chan_seok {
+            perm.sort_by(|&a, &b| clause[a].cmp_activity(&clause[b]));
+        } else {
+            perm.sort_by(|&a, &b| clause[a].cmp(&clause[b]));
+            if clause[perm[keep]].rank <= 3 {
+                self.next_reduction += self.extra_inc;
+            }
+            if clause[perm[0]].rank <= 5 {
+                self.next_reduction += self.extra_inc;
+            };
+        }
+        for i in &perm[keep..] {
+            let c = &mut clause[*i];
+            // if c.is(Flag::JUST_USED) {
+            //     c.turn_off(Flag::JUST_USED)
+            // }
+            if 2 < c.rank {
+                c.kill(touched);
+            }
+        }
+        state[Stat::Reduction] += 1;
+        self.garbage_collect();
+    }
+    /// change good learnt clauses to permanent one.
     fn make_permanent(&mut self, reinit: bool) {
         // Adjusting for low decision levels.
         // move some clauses with good LBDs (col_lbd_bound) to Permanent
@@ -836,19 +883,6 @@ impl ClauseDBIF for ClauseDB {
             }
         }
         self.garbage_collect();
-    }
-    fn validate(&self, vdb: &VarDB, strict: bool) -> Option<ClauseId> {
-        for (i, c) in self.clause.iter().enumerate().skip(1) {
-            if c.is(Flag::DEAD) || (strict && c.is(Flag::LEARNT)) {
-                continue;
-            }
-            match vdb.status(&c.lits) {
-                Some(false) => return Some(ClauseId::from(i)),
-                None if strict => return Some(ClauseId::from(i)),
-                _ => (),
-            }
-        }
-        None
     }
 }
 

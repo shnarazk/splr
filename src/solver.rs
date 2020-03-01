@@ -531,7 +531,6 @@ fn handle_conflict_path(
         || (cdb.glureduce && cdb.cur_restart * cdb.next_reduction <= state[Stat::Conflict]))
         && 0 < cdb.num_learnt
     {
-        cdb.cur_restart = ((ncnfl as f64) / (cdb.next_reduction as f64)) as usize + 1;
         cdb.reduce(state, vdb);
     }
     Ok(())
