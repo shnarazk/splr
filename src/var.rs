@@ -4,7 +4,7 @@ use {
         clause::{Clause, ClauseDB, ClauseIF, ClauseId, ClauseIdIF},
         config::Config,
         propagator::{AssignStack, PropagatorIF},
-        state::SearchStrategy,
+        state::State,
         types::*,
     },
     std::{
@@ -42,7 +42,7 @@ pub trait VarDBIF {
     /// - None -- the literals contains an unassigned literal
     fn status(&self, c: &[Lit]) -> Option<bool>;
     /// set up parameters for each SearchStrategy.
-    fn adapt_strategy(&mut self, mode: &SearchStrategy, elapsed: f64);
+    fn adapt_strategy(&mut self, state: &State, elapsed: f64);
     /// minimize a clause.
     fn minimize_with_biclauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>);
 }
@@ -320,7 +320,7 @@ impl VarRewardIF for VarDB {
         let rate = (v.participated as f64 / duration as f64).min(1.0);
         v.reward *= self.activity_decay;
         v.reward += (1.0 - self.activity_decay) * rate;
-        assert!(v.reward < 1.0,
+        assert!(v.reward <= 1.0,
                 format!("ad: {}, reward: {}, rate: {}",
                         self.activity_decay,
                         v.reward,
@@ -385,9 +385,10 @@ impl VarDBIF for VarDB {
         }
         falsified
     }
-    fn adapt_strategy(&mut self, mode: &SearchStrategy, elapsed: f64) {
-        let mut s = 100.0;
-        match mode {
+    fn adapt_strategy(&mut self, state: &State, elapsed: f64) {
+        let s = state.config.timeout;
+        /*
+        match state.strategy {
             SearchStrategy::Initial => (),
             SearchStrategy::Generic => (),
             SearchStrategy::LowDecisions => {
@@ -406,6 +407,7 @@ impl VarDBIF for VarDB {
                 // self.fix_reward(0.98);
             }
         }
+        */
         let e = elapsed.min(1.0);
         let t = e * s;
         let r = 0.9;
