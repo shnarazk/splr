@@ -189,10 +189,13 @@ const REWARD: [(RewardStep, f64, f64, f64); 3] = [
 /// A container of variables.
 #[derive(Debug)]
 pub struct VarDB {
+    /// var activity decay
     pub activity_decay: f64,
     activity_decay_max: f64,
     pub activity_step: f64,
-    reward_mode: RewardStep,
+    /// the current var reward mode
+    pub reward_mode: RewardStep,
+    /// an index for counting elapsed time
     ordinal: usize,
     /// vars
     var: Vec<Var>,
@@ -407,11 +410,10 @@ impl VarDBIF for VarDB {
         falsified
     }
     fn minimize_with_biclauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>) {
-        let nlevels = self.compute_lbd(vec);
-        let VarDB { lbd_temp, var, .. } = self;
-        if 6 < nlevels {
+        if vec.len() <= 1 {
             return;
         }
+        let VarDB { lbd_temp, var, .. } = self;
         let key = lbd_temp[0] + 1;
         for l in &vec[1..] {
             lbd_temp[l.vi() as usize] = key;
