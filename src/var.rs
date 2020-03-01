@@ -500,14 +500,6 @@ impl LBDIF for VarDB {
 }
 
 impl VarDB {
-    /// switch to a special reward mode for SearchStrategy::LowSuccessiveM.
-    #[allow(dead_code)]
-    fn fix_reward(&mut self, r: f64) {
-        self.reward_mode = RewardStep::Fixed;
-        self.activity_decay = r;
-        self.activity_decay_max = r;
-        self.activity_step = 0.0;
-    }
     // This function is for Reason-Side Rewarding which must traverse the assign stack
     // beyond first UIDs and bump all vars on the traversed tree.
     // If you'd like to use this, you should stop bumping activities in `analyze`.
