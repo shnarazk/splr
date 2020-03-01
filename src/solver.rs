@@ -473,13 +473,9 @@ fn handle_conflict_path(
     } else {
         {
             // Reason-Side Rewarding
-            let mut bumped = Vec::new();
             for lit in new_learnt.iter() {
                 for l in &cdb[vdb[lit.vi()].reason].lits {
-                    if !bumped.contains(l) {
-                        vdb.reward_at_analysis(l.vi());
-                        bumped.push(*l);
-                    }
+                    vdb.reward_at_analysis(l.vi());
                 }
             }
         }
