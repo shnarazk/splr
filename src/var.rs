@@ -428,14 +428,7 @@ impl VarDBIF for VarDB {
         }
         let VarDB { lbd_temp, var, .. } = self;
         let key = lbd_temp[0] + 1;
-        // let mut lbd = 0;
         for l in &vec[1..] {
-            // if lbd_temp[l.vi() as usize] != key [
-            //     lbd += 1;
-            //     if 6 < lbd {
-            //         return;
-            //     }
-            // }
             lbd_temp[l.vi() as usize] = key;
         }
         let l0 = vec[0];
