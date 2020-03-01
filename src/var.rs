@@ -15,7 +15,7 @@ use {
 
 /// API to calculate LBD.
 pub trait LBDIF {
-    /// return a LBD value for the set of literals.
+    /// return the LBD value for a set of literals.
     fn compute_lbd(&mut self, vec: &[Lit]) -> usize;
     /// re-calculate the LBD values of all (learnt) clauses.
     fn reset_lbd(&mut self, cdb: &mut ClauseDB);
@@ -40,10 +40,8 @@ pub trait VarDBIF {
     /// - Some(false) -- the literals is unsatisfied; no unassigned literal
     /// - None -- the literals contains an unassigned literal
     fn status(&self, c: &[Lit]) -> Option<bool>;
-    // minimize a clause.
-    fn minimize_with_bi_clauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>);
-    // bump vars' activities.
-    fn bump_vars(&mut self, asgs: &AssignStack, cdb: &ClauseDB, confl: ClauseId);
+    /// minimize a clause.
+    fn minimize_with_biclauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>);
 }
 
 /// API for var rewarding.
@@ -77,17 +75,20 @@ pub struct Var {
     pub reason: ClauseId,
     /// decision level at which this variables is assigned.
     pub level: usize,
+    /// the number of participation in conflict analysis
+    participated: usize,
     /// a dynamic evaluation criterion like VSIDS or ACID.
     reward: f64,
-    /// the number of conflicts at which this var was rewarded lastly.
+    /// the number of conflicts at which this var was assigned lastly.
     timestamp: usize,
+    /// the number of conflicts at which this var was rewarded lastly.
+    used: usize,
     /// list of clauses which contain this variable positively.
     pub pos_occurs: Vec<ClauseId>,
     /// list of clauses which contain this variable negatively.
     pub neg_occurs: Vec<ClauseId>,
     /// the `Flag`s
     flags: Flag,
-    participated: usize,
 }
 
 impl Default for Var {
@@ -98,12 +99,13 @@ impl Default for Var {
             phase: false,
             reason: ClauseId::default(),
             level: 0,
+            participated: 0,
             reward: 0.0,
             timestamp: 0,
+            used: 0,
             pos_occurs: Vec::new(),
             neg_occurs: Vec::new(),
             flags: Flag::empty(),
-            participated: 0,
         }
     }
 }
@@ -152,19 +154,22 @@ impl Var {
 }
 
 impl FlagIF for Var {
+    #[inline]
     fn is(&self, flag: Flag) -> bool {
         self.flags.contains(flag)
     }
+    #[inline]
     fn turn_off(&mut self, flag: Flag) {
         self.flags.remove(flag);
     }
+    #[inline]
     fn turn_on(&mut self, flag: Flag) {
         self.flags.insert(flag);
     }
 }
 
-#[derive(Clone, Copy, Eq, Debug, PartialEq)]
-enum RewardStep {
+#[derive(Clone, Copy, Eq, Debug, PartialEq, PartialOrd, Ord)]
+pub enum RewardStep {
     HeatUp = 0,
     Annealing,
     Final,
@@ -175,8 +180,8 @@ enum RewardStep {
 ///  - start: lower bound of the range
 ///  - end: upper bound of the range
 ///  - scale: scaling coefficient for activity decay
-const REWARDS: [(RewardStep, f64, f64, f64); 3] = [
-    (RewardStep::HeatUp, 0.80, 0.92, 0.0), // the last is dummy
+const REWARD: [(RewardStep, f64, f64, f64); 3] = [
+    (RewardStep::HeatUp, 0.80, 0.92, 0.0),
     (RewardStep::Annealing, 0.92, 0.96, 0.1),
     (RewardStep::Final, 0.96, 0.99, 0.1),
 ];
@@ -197,7 +202,7 @@ pub struct VarDB {
 
 impl Default for VarDB {
     fn default() -> VarDB {
-        let reward = REWARDS[0];
+        let reward = REWARD[0];
         VarDB {
             activity_decay: reward.1,
             activity_decay_max: reward.2,
@@ -313,8 +318,12 @@ impl VarRewardIF for VarDB {
         }
     }
     fn reward_at_analysis(&mut self, vi: VarId) {
+        let t = self.ordinal;
         let v = &mut self[vi];
-        v.participated += 1;
+        if v.used < t {
+            v.participated += 1;
+            v.used = t;
+        }
     }
     fn reward_at_assign(&mut self, vi: VarId) {
         self[vi].timestamp = self.ordinal;
@@ -336,8 +345,8 @@ impl VarRewardIF for VarDB {
         }
     }
     fn shift_reward_mode(&mut self) {
-        if self.reward_mode != RewardStep::Final {
-            let reward = &REWARDS[self.reward_mode as usize + 1];
+        if self.reward_mode < RewardStep::Final {
+            let reward = &REWARD[self.reward_mode as usize + 1];
             self.reward_mode = reward.0;
             self.activity_decay_max = reward.2;
             self.activity_step *= reward.3;
@@ -397,7 +406,7 @@ impl VarDBIF for VarDB {
         }
         falsified
     }
-    fn minimize_with_bi_clauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>) {
+    fn minimize_with_biclauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>) {
         let nlevels = self.compute_lbd(vec);
         let VarDB { lbd_temp, var, .. } = self;
         if 6 < nlevels {
@@ -427,42 +436,6 @@ impl VarDBIF for VarDB {
             vec.retain(|l| lbd_temp[l.vi()] == key);
         }
         lbd_temp[0] = key;
-    }
-    // This function is for Reason-Side Rewarding which must traverse the assign stack
-    // beyond first UIDs and bump all vars on the traversed tree.
-    // If you'd like to use this, you should stop bumping activities in `analyze`.
-    fn bump_vars(&mut self, asgs: &AssignStack, cdb: &ClauseDB, confl: ClauseId) {
-        debug_assert_ne!(confl, ClauseId::default());
-        let mut cid = confl;
-        let mut p = NULL_LIT;
-        let mut ti = asgs.len(); // trail index
-        debug_assert!(self.var[1..].iter().all(|v| !v.is(Flag::VR_SEEN)));
-        loop {
-            for q in &cdb[cid].lits[(p != NULL_LIT) as usize..] {
-                let vi = q.vi();
-                if !self.var[vi].is(Flag::VR_SEEN) {
-                    self.var[vi].turn_on(Flag::VR_SEEN);
-                    self.reward_at_analysis(vi);
-                }
-            }
-            loop {
-                if 0 == ti {
-                    self.var[asgs.trail[ti].vi()].turn_off(Flag::VR_SEEN);
-                    debug_assert!(self.var[1..].iter().all(|v| !v.is(Flag::VR_SEEN)));
-                    return;
-                }
-                ti -= 1;
-                p = asgs.trail[ti];
-                let next_vi = p.vi();
-                if self.var[next_vi].is(Flag::VR_SEEN) {
-                    self.var[next_vi].turn_off(Flag::VR_SEEN);
-                    cid = self.var[next_vi].reason;
-                    if cid != ClauseId::default() {
-                        break;
-                    }
-                }
-            }
-        }
     }
 }
 

@@ -700,7 +700,7 @@ impl State {
         new_learnt.retain(|l| *l == l0 || !l.is_redundant(cdb, vdb, &mut to_clear, &levels));
         let len = new_learnt.len();
         if 2 < len && len < 30 {
-            vdb.minimize_with_bi_clauses(cdb, new_learnt);
+            vdb.minimize_with_biclauses(cdb, new_learnt);
         }
         // find correct backtrack level from remaining literals
         let mut level_to_return = 0;
