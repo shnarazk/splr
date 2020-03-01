@@ -82,8 +82,10 @@ pub struct Var {
     participated: usize,
     /// a dynamic evaluation criterion like VSIDS or ACID.
     reward: f64,
-    /// the number of conflicts at which this var was rewarded lastly.
+    /// the number of conflicts at which this var was assigned lastly.
     timestamp: usize,
+    /// the number of conflicts at which this var was rewarded lastly.
+    used: usize,
     /// list of clauses which contain this variable positively.
     pub pos_occurs: Vec<ClauseId>,
     /// list of clauses which contain this variable negatively.
@@ -100,12 +102,13 @@ impl Default for Var {
             phase: false,
             reason: ClauseId::default(),
             level: 0,
+            participated: 0,
             reward: 0.0,
             timestamp: 0,
+            used: 0,
             pos_occurs: Vec::new(),
             neg_occurs: Vec::new(),
             flags: Flag::empty(),
-            participated: 0,
         }
     }
 }
@@ -171,9 +174,8 @@ impl FlagIF for Var {
 #[derive(Clone, Copy, Eq, Debug, PartialEq, PartialOrd, Ord)]
 pub enum RewardStep {
     HeatUp = 0,
-    // Annealing,
+    Annealing,
     Final,
-    Fixed,
 }
 
 /// a reward table used in VarDB::shift_reward_mode
@@ -185,7 +187,6 @@ const REWARD: [(RewardStep, f64, f64, f64); 3] = [
     (RewardStep::HeatUp, 0.80, 0.92, 0.0),
     (RewardStep::Annealing, 0.92, 0.96, 0.1),
     (RewardStep::Final, 0.96, 0.99, 0.1),
-    (RewardStep::Fixed, 0.99, 0.99, 0.0),
 ];
 
 /// A container of variables.
@@ -194,7 +195,7 @@ pub struct VarDB {
     /// var activity decay
     pub activity_decay: f64,
     activity_decay_max: f64,
-    activity_step: f64,
+    pub activity_step: f64,
     /// the current var reward mode
     pub reward_mode: RewardStep,
     /// an index for counting elapsed time
@@ -323,8 +324,12 @@ impl VarRewardIF for VarDB {
         }
     }
     fn reward_at_analysis(&mut self, vi: VarId) {
+        let t = self.ordinal;
         let v = &mut self[vi];
-        v.participated += 1;
+        if v.used < t {
+            v.participated += 1;
+            v.used = t;
+        }
     }
     fn reward_at_assign(&mut self, vi: VarId) {
         self[vi].timestamp = self.ordinal;
@@ -350,7 +355,6 @@ impl VarRewardIF for VarDB {
             let reward = &REWARD[self.reward_mode as usize + 1];
             self.reward_mode = reward.0;
             self.activity_decay_max = reward.2;
-            self.activity_decay = self.activity_decay.max(reward.1);
             self.activity_step *= reward.3;
         }
     }
@@ -415,19 +419,7 @@ impl VarDBIF for VarDB {
                 l if 100_000 < l => self.activity_step *= 0.5,
                 _ => (),
             },
-            SearchStrategy::Generic => (),
-            SearchStrategy::LowDecisions => {
-                // self.fix_reward(0.96);
-            }
-            SearchStrategy::HighSuccesive => {
-                // self.fix_reward(0.99);
-            }
-            SearchStrategy::LowSuccesiveLuby | SearchStrategy::LowSuccesiveM => {
-                // self.fix_reward(0.999);
-            }
-            SearchStrategy::ManyGlues => {
-                // self.fix_reward(0.98);
-            }
+            _ => (),
         }
     }
     fn minimize_with_biclauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>) {
