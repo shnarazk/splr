@@ -546,6 +546,8 @@ fn adapt_parameters(
         asgs.cancel_until(vdb, 0);
         state.adapt_strategy();
         cdb.adapt_strategy(&state.strategy, state[Stat::Conflict]);
+        vdb.adapt_strategy(&state.strategy);
+        state.rst.adapt_strategy(&state.strategy);
         if elim.enable {
             elim.activate();
             cdb.simplify(asgs, elim, state, vdb)?;

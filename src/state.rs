@@ -375,8 +375,6 @@ impl StateIF for State {
                 self.strategy = SearchStrategy::LowSuccesiveM;
             } else {
                 self.strategy = SearchStrategy::LowSuccesiveLuby;
-                self.rst.luby.active = true;
-                self.rst.luby.step = 100;
             }
         }
         if 54_400 < self[Stat::NoDecisionConflict] {

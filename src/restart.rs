@@ -1,6 +1,6 @@
 /// Crate `restart` provides restart heuristics.
 use {
-    crate::{config::Config, types::*},
+    crate::{config::Config, state::SearchStrategy, types::*},
     std::fmt,
 };
 
@@ -12,6 +12,8 @@ trait ProgressEvaluator {
 
 /// API for restart like `block_restart`, `force_restart` and so on.
 pub trait RestartIF {
+    /// set up parameters for each SearchStrategy.
+    fn adapt_strategy(&mut self, mode: &SearchStrategy);
     /// block restart if needed.
     fn block_restart(&mut self) -> bool;
     /// force restart if needed.
@@ -312,6 +314,20 @@ macro_rules! reset {
 }
 
 impl RestartIF for RestartExecutor {
+    fn adapt_strategy(&mut self, mode: &SearchStrategy) {
+        match mode {
+            SearchStrategy::Initial => (),
+            SearchStrategy::Generic => (),
+            SearchStrategy::LowDecisions => (),
+            SearchStrategy::HighSuccesive => (),
+            SearchStrategy::LowSuccesiveLuby => {
+                self.luby.active = true;
+                self.luby.step = 100;
+            }
+            SearchStrategy::LowSuccesiveM => (),
+            SearchStrategy::ManyGlues => (),
+        }
+    }
     fn block_restart(&mut self) -> bool {
         if 100 < self.lbd.num
             && !self.luby.active
