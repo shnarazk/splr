@@ -386,7 +386,6 @@ impl StateIF for State {
         }
         if self.strategy == SearchStrategy::Initial {
             self.strategy = SearchStrategy::Generic;
-            return;
         }
     }
     fn progress_header(&self) {
