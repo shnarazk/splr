@@ -39,6 +39,7 @@ pub trait ClauseDBIF {
     fn adapt_strategy(&mut self, mode: &SearchStrategy, nc: usize);
     /// check a condition to reduce.
     fn check_and_reduce(&mut self, state: &mut State, vdb: &mut VarDB, nc: usize);
+    /// delete old 'big' learnt clauses.
     fn reset(&mut self);
     /// delete *dead* clauses from database, which are made by:
     /// * `reduce`
