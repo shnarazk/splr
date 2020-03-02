@@ -4,9 +4,9 @@ use {
         clause::{Clause, ClauseDB, ClauseDBIF, ClauseIF, ClauseId, ClauseIdIF, WatchDBIF},
         config::Config,
         propagator::{AssignStack, PropagatorIF},
-        state::State,
+        state::{Stat, State, StateIF},
         types::*,
-        var::{Var, VarDB, VarDBIF},
+        var::{Var, VarDB, VarDBIF, LBDIF},
     },
     std::{fmt, slice::Iter},
     std::{
@@ -43,6 +43,20 @@ pub trait EliminatorIF {
     fn clear_var_queue(&mut self, vdb: &mut VarDB);
     /// return the length of eliminator's clause queue.
     fn var_queue_len(&self) -> usize;
+    /// simplify database by:
+    /// * removing satisfiable clauses
+    /// * calling exhaustive simplifier that tries **clause subsumption** and **variable elimination**.
+    ///
+    /// # Errors
+    ///
+    /// if solver becomes inconsistent.
+    fn simplify(
+        &mut self,
+        asgs: &mut AssignStack,
+        cdb: &mut ClauseDB,
+        state: &mut State,
+        vdb: &mut VarDB,
+    ) -> MaybeInconsistent;
     /// run clause subsumption and variable elimination.
     ///
     /// # Errors
@@ -210,6 +224,49 @@ impl EliminatorIF for Eliminator {
     fn var_queue_len(&self) -> usize {
         self.var_queue.len()
     }
+    fn simplify(
+        &mut self,
+        asgs: &mut AssignStack,
+        cdb: &mut ClauseDB,
+        state: &mut State,
+        vdb: &mut VarDB,
+    ) -> MaybeInconsistent {
+        debug_assert_eq!(asgs.level(), 0);
+        // we can reset all the reasons because decision level is zero.
+        for v in &mut vdb[1..] {
+            v.reason = ClauseId::default();
+        }
+        if self.is_waiting() {
+            cdb.reset();
+            self.prepare(cdb, vdb, true);
+        }
+        let start = state.elapsed().unwrap_or(0.0);
+        loop {
+            let na = asgs.len();
+            self.eliminate(asgs, cdb, state, vdb)?;
+            cdb.eliminate_satisfied_clauses(self, vdb, true);
+            if na == asgs.len()
+                && (!self.is_running()
+                    || (0 == self.clause_queue_len() && 0 == self.var_queue_len()))
+            {
+                break;
+            }
+            if 0.1 <= state.elapsed().unwrap_or(1.0) - start {
+                self.clear_clause_queue(cdb);
+                self.clear_var_queue(vdb);
+                break;
+            }
+        }
+        cdb.garbage_collect();
+        state[Stat::SatClauseElimination] += 1;
+        if self.is_running() {
+            state[Stat::ExhaustiveElimination] += 1;
+            vdb.reset_lbd(cdb);
+            self.stop(cdb, vdb);
+        }
+        cdb.check_size()
+    }
+
     fn eliminate(
         &mut self,
         asgs: &mut AssignStack,

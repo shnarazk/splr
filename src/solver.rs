@@ -152,7 +152,7 @@ impl SatSolverIF for Solver {
             //     state.elim_eliminate_loop_limit = 1_000_000;
             //     state.elim_subsume_loop_limit = 2_000_000;
             // }
-            if cdb.simplify(asgs, elim, state, vdb).is_err() {
+            if elim.simplify(asgs, cdb, state, vdb).is_err() {
                 // Why inconsistent? Because the CNF contains a conflict, not an error!
                 // Or out of memory.
                 state.progress(cdb, vdb, None);
@@ -330,7 +330,7 @@ fn search(
                 state[Stat::Restart] += 1;
                 asgs.cancel_until(vdb, state.root_level);
             } else if asgs.level() == 0 {
-                if cdb.simplify(asgs, elim, state, vdb).is_err() {
+                if elim.simplify(asgs, cdb, state, vdb).is_err() {
                     debug_assert!(false, "interal error by simplify");
                     return Err(SolverError::Inconsistent);
                 }
@@ -550,7 +550,7 @@ fn adapt_parameters(
         state.rst.adapt_strategy(&state.strategy);
         if elim.enable {
             elim.activate();
-            cdb.simplify(asgs, elim, state, vdb)?;
+            elim.simplify(asgs, cdb, state, vdb)?;
         }
     }
     state[Stat::SolvedRecord] = state.num_solved_vars;

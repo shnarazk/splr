@@ -40,20 +40,7 @@ pub trait ClauseDBIF {
     fn adapt_strategy(&mut self, mode: &SearchStrategy, nc: usize);
     /// check a condition to reduce.
     fn check_and_reduce(&mut self, state: &mut State, vdb: &mut VarDB, nc: usize);
-    /// simplify database by:
-    /// * removing satisfiable clauses
-    /// * calling exhaustive simplifier that tries **clause subsumption** and **variable elimination**.
-    ///
-    /// # Errors
-    ///
-    /// if solver becomes inconsistent.
-    fn simplify(
-        &mut self,
-        asgs: &mut AssignStack,
-        elim: &mut Eliminator,
-        state: &mut State,
-        vdb: &mut VarDB,
-    ) -> MaybeInconsistent;
+    /// TODO
     fn reset(&mut self);
     /// delete *dead* clauses from database, which are made by:
     /// * `reduce`
@@ -689,48 +676,6 @@ impl ClauseDBIF for ClauseDB {
         debug_assert!(!c.is(Flag::DEAD));
         debug_assert!(1 < c.lits.len());
         c.kill(&mut self.touched);
-    }
-    fn simplify(
-        &mut self,
-        asgs: &mut AssignStack,
-        elim: &mut Eliminator,
-        state: &mut State,
-        vdb: &mut VarDB,
-    ) -> MaybeInconsistent {
-        debug_assert_eq!(asgs.level(), 0);
-        // we can reset all the reasons because decision level is zero.
-        for v in &mut vdb[1..] {
-            v.reason = ClauseId::default();
-        }
-        if elim.is_waiting() {
-            self.reset();
-            elim.prepare(self, vdb, true);
-        }
-        let start = state.elapsed().unwrap_or(0.0);
-        loop {
-            let na = asgs.len();
-            elim.eliminate(asgs, self, state, vdb)?;
-            self.eliminate_satisfied_clauses(elim, vdb, true);
-            if na == asgs.len()
-                && (!elim.is_running()
-                    || (0 == elim.clause_queue_len() && 0 == elim.var_queue_len()))
-            {
-                break;
-            }
-            if 0.1 <= state.elapsed().unwrap_or(1.0) - start {
-                elim.clear_clause_queue(self);
-                elim.clear_var_queue(vdb);
-                break;
-            }
-        }
-        self.garbage_collect();
-        state[Stat::SatClauseElimination] += 1;
-        if elim.is_running() {
-            state[Stat::ExhaustiveElimination] += 1;
-            vdb.reset_lbd(self);
-            elim.stop(self, vdb);
-        }
-        self.check_size()
     }
     fn adapt_strategy(&mut self, mode: &SearchStrategy, nc: usize) {
         match mode {
