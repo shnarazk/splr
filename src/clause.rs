@@ -2,9 +2,9 @@
 use {
     crate::{
         config::Config,
-        eliminator::{Eliminator, EliminatorIF},
-        propagator::{AssignStack, PropagatorIF},
-        state::{SearchStrategy, Stat, State, StateIF},
+        eliminator::Eliminator,
+        propagator::PropagatorIF,
+        state::{SearchStrategy, Stat, State},
         types::*,
         var::{VarDB, VarDBIF, LBDIF},
     },
