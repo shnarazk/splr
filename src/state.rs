@@ -381,7 +381,7 @@ impl StateIF for State {
             self.strategy = SearchStrategy::HighSuccesive;
             self.use_chan_seok = true;
         }
-        if self[Stat::NumBin] + 20_000 < self[Stat::NumLBD2] {
+        if self[Stat::NumBinLearnt] + 20_000 < self[Stat::NumLBD2] {
             self.strategy = SearchStrategy::ManyGlues;
         }
         if self.strategy == SearchStrategy::Initial {
