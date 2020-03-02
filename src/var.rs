@@ -186,7 +186,7 @@ pub enum RewardStep {
 const REWARD: [(RewardStep, f64, f64, f64); 3] = [
     (RewardStep::HeatUp, 0.80, 0.92, 0.0),
     (RewardStep::Annealing, 0.92, 0.96, 0.1),
-    (RewardStep::Final, 0.96, 0.99, 0.1),
+    (RewardStep::Final, 0.96, 0.97, 0.1),
 ];
 
 /// A container of variables.
@@ -316,12 +316,14 @@ impl VarRewardIF for VarDB {
     fn activity(&mut self, vi: VarId) -> f64 {
         self[vi].reward
     }
-    fn initialize_reward(&mut self, iterator: Iter<'_, usize>) {
-        let mut v = 0.5; // big bang initialization
-        for vi in iterator {
+    fn initialize_reward(&mut self, _iterator: Iter<'_, usize>) {
+        /*
+        let mut v = 0.0; // big bang initialization
+        for vi in iterator.rev() {
             self.var[*vi].reward = v;
             v *= 0.9;
         }
+        */
     }
     fn reward_at_analysis(&mut self, vi: VarId) {
         let t = self.ordinal;
@@ -412,8 +414,8 @@ impl VarDBIF for VarDB {
         }
         falsified
     }
-    fn adapt_strategy(&mut self, mode: &SearchStrategy) {
-        if *mode == SearchStrategy::Initial {
+    fn adapt_strategy(&mut self, _: &SearchStrategy) {
+        if self.ordinal == 0 {
             match self.var.len() {
                 l if 1_000_000 < l => self.activity_step *= 0.1,
                 l if 100_000 < l => self.activity_step *= 0.5,
