@@ -189,7 +189,23 @@ impl EliminatorIF for Eliminator {
             cdb.reset();
             self.prepare(cdb, vdb, true);
         }
-        self.eliminate(asgs, cdb, state, vdb)?;
+        let start = state.elapsed().unwrap_or(0.0);
+        loop {
+            let na = asgs.len();
+            self.eliminate(asgs, cdb, state, vdb)?;
+            cdb.eliminate_satisfied_clauses(self, vdb, true);
+            if na == asgs.len()
+                && (!self.is_running()
+                    || (0 == self.clause_queue_len() && 0 == self.var_queue_len()))
+            {
+                break;
+            }
+            if 0.1 <= state.elapsed().unwrap_or(1.0) - start {
+                self.clear_clause_queue(cdb);
+                self.clear_var_queue(vdb);
+                break;
+            }
+        }
         cdb.garbage_collect();
         state[Stat::SatClauseElimination] += 1;
         if self.is_running() {
@@ -293,7 +309,6 @@ impl Eliminator {
     fn is_waiting(&self) -> bool {
         self.mode == EliminatorMode::Waiting
     }
-
     /// returns false if solver is inconsistent
     /// - calls `clause_queue.pop`
     fn backward_subsumption_check(
@@ -379,33 +394,6 @@ impl Eliminator {
     ///
     /// if solver becomes inconsistent.
     fn eliminate(
-        &mut self,
-        asgs: &mut AssignStack,
-        cdb: &mut ClauseDB,
-        state: &mut State,
-        vdb: &mut VarDB,
-    ) -> MaybeInconsistent {
-        let start = state.elapsed().unwrap_or(0.0);
-        loop {
-            let na = asgs.len();
-            self.eliminate_main(asgs, cdb, state, vdb)?;
-            cdb.eliminate_satisfied_clauses(self, vdb, true);
-            if na == asgs.len()
-                && (!self.is_running()
-                    || (0 == self.clause_queue_len() && 0 == self.var_queue_len()))
-            {
-                break;
-            }
-            if 0.1 <= state.elapsed().unwrap_or(1.0) - start {
-                self.clear_clause_queue(cdb);
-                self.clear_var_queue(vdb);
-                break;
-            }
-        }
-        Ok(())
-    }
-    /// do the elimination task
-    fn eliminate_main(
         &mut self,
         asgs: &mut AssignStack,
         cdb: &mut ClauseDB,
