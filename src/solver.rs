@@ -461,7 +461,6 @@ fn handle_conflict_path(
         // PARTIAL FIXED SOLUTION by UNIT LEARNT CLAUSE
         // dump to certified even if it's a literal.
         cdb.certificate_add(new_learnt);
-        vdb.activity_decay = (vdb.activity_decay + vdb.activity(l0.vi())) * 0.5;
         if use_chronobt {
             asgs.cancel_until(vdb, bl);
             debug_assert!(asgs.iter().all(|l| l.vi() != l0.vi()));

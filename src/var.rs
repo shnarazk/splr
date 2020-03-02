@@ -4,7 +4,7 @@ use {
         clause::{Clause, ClauseDB, ClauseIF, ClauseId, ClauseIdIF},
         config::Config,
         propagator::{AssignStack, PropagatorIF},
-        state::State,
+        state::{State, SearchStrategy},
         types::*,
     },
     std::{
@@ -62,6 +62,8 @@ pub trait VarRewardIF {
     /// update internal counter.
     fn reward_update(&mut self);
 }
+
+const VAR_DECAY_START: f64 = 0.8;
 
 /// Object representing a variable.
 #[derive(Debug)]
@@ -193,7 +195,7 @@ pub struct VarDB {
 impl Default for VarDB {
     fn default() -> VarDB {
         VarDB {
-            activity_decay: 0.8,
+            activity_decay: VAR_DECAY_START,
             ordinal: 0,
             var: Vec::new(),
             lbd_temp: Vec::new(),
@@ -296,13 +298,7 @@ impl VarRewardIF for VarDB {
     fn activity(&mut self, vi: VarId) -> f64 {
         self[vi].reward
     }
-    fn initialize_reward(&mut self, iterator: Iter<'_, usize>) {
-        let mut v = 0.5; // big bang initialization
-        for vi in iterator {
-            self.var[*vi].reward = v;
-            v *= 0.9;
-        }
-    }
+    fn initialize_reward(&mut self, _iterator: Iter<'_, usize>) {}
     fn reward_at_analysis(&mut self, vi: VarId) {
         let t = self.ordinal;
         let v = &mut self[vi];
@@ -386,33 +382,32 @@ impl VarDBIF for VarDB {
         falsified
     }
     fn adapt_strategy(&mut self, state: &State, elapsed: f64) {
-        let s = state.config.timeout;
-        /*
+        let mut e = 0.98;
         match state.strategy {
             SearchStrategy::Initial => (),
             SearchStrategy::Generic => (),
             SearchStrategy::LowDecisions => {
                 // self.fix_reward(0.96);
-                s = 20.0;
+                e = 0.96;
             }
             SearchStrategy::HighSuccesive => {
                 // self.fix_reward(0.99);
-                s = 140.0;
+                e = 1.0;
             }
             SearchStrategy::LowSuccesiveLuby | SearchStrategy::LowSuccesiveM => {
                 // self.fix_reward(0.999);
-                s = 200.0;
+                e = 1.0;
             }
             SearchStrategy::ManyGlues => {
                 // self.fix_reward(0.98);
+                e = 0.99;
             }
         }
-        */
-        let e = elapsed.min(1.0);
-        let t = e * s;
-        let r = 0.9;
-        let d = r + (1.0 - r) * (t + 1.0) .ln() / (s + 1.0).ln();
-        self.activity_decay = (self.activity_decay + d) * 0.5;
+        let s = state.config.timeout * 10000.0 + 1.0;
+        let t = elapsed.min(1.0) * s + 1.0;
+        let b = VAR_DECAY_START;
+        let d = b + (e - b) * t.ln() / s.ln();
+        self.activity_decay = d; // (self.activity_decay + d) * 0.5;
     }
     fn minimize_with_biclauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>) {
         if vec.len() <= 1 {
