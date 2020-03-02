@@ -39,7 +39,7 @@ pub trait ClauseDBIF {
     fn adapt_strategy(&mut self, mode: &SearchStrategy, nc: usize);
     /// check a condition to reduce.
     fn check_and_reduce(&mut self, state: &mut State, vdb: &mut VarDB, nc: usize);
-    /// TODO
+    /// delete old 'big' learnt clauses.
     fn reset(&mut self);
     /// delete *dead* clauses from database, which are made by:
     /// * `reduce`
@@ -380,17 +380,17 @@ pub struct ClauseDB {
     pub num_active: usize,
     pub num_learnt: usize,
     pub certified: DRAT,
-    pub activity_inc: f64,
-    pub activity_decay: f64,
-    pub inc_step: usize,
+    activity_inc: f64,
+    activity_decay: f64,
+    inc_step: usize,
     extra_inc: usize,
     pub soft_limit: usize,
     pub co_lbd_bound: usize,
-    pub lbd_frozen_clause: usize,
-    pub first_reduction: usize,
-    pub next_reduction: usize, // renamed from `nbclausesbeforereduce`
-    pub cur_restart: usize,
-    pub glureduce: bool,
+    lbd_frozen_clause: usize,
+    first_reduction: usize,
+    next_reduction: usize, // renamed from `nbclausesbeforereduce`
+    cur_restart: usize,
+    glureduce: bool,
 }
 
 impl Default for ClauseDB {

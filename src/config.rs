@@ -2,7 +2,7 @@
 use {std::path::PathBuf, structopt::StructOpt};
 
 /// Splr version number.
-pub const VERSION: &str = "0.3.1-dev.1";
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Configuration built from command line options
 #[derive(Clone, Debug, StructOpt)]
