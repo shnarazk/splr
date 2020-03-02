@@ -2,8 +2,7 @@
 use {
     crate::{
         config::Config,
-        eliminator::Eliminator,
-        propagator::PropagatorIF,
+        eliminator::{Eliminator, EliminatorIF},
         state::{SearchStrategy, Stat, State},
         types::*,
         var::{VarDB, VarDBIF, LBDIF},
@@ -173,6 +172,7 @@ impl WatchDBIF for Vec<Watch> {
             }
         }
     }
+    /// This O(n) functon is used only in Eliminator. So the cost can be ignore.
     fn update_blocker(&mut self, cid: ClauseId, l: Lit) {
         for w in &mut self[..] {
             if w.c == cid {
