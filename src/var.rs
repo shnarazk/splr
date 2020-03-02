@@ -413,13 +413,12 @@ impl VarDBIF for VarDB {
         falsified
     }
     fn adapt_strategy(&mut self, mode: &SearchStrategy) {
-        match mode {
-            SearchStrategy::Initial => match self.var.len() {
+        if *mode == SearchStrategy::Initial {
+            match self.var.len() {
                 l if 1_000_000 < l => self.activity_step *= 0.1,
                 l if 100_000 < l => self.activity_step *= 0.5,
                 _ => (),
-            },
-            _ => (),
+            }
         }
     }
     fn minimize_with_biclauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>) {
