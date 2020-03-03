@@ -304,12 +304,10 @@ impl VarRewardIF for VarDB {
         }
     }
     fn reward_at_analysis(&mut self, vi: VarId) {
-        let n = self.ordinal;
+        let t = self.ordinal;
         let v = &mut self[vi];
-        if v.last_used < n {
-            v.participated += 1;
-            v.last_used = n;
-        }
+        v.participated += 1;
+        v.last_used = t;
     }
     fn reward_at_assign(&mut self, vi: VarId) {
         self[vi].timestamp = self.ordinal;
@@ -317,9 +315,10 @@ impl VarRewardIF for VarDB {
     fn reward_at_unassign(&mut self, vi: VarId) {
         let v = &mut self.var[vi];
         let duration = self.ordinal + 1 - v.timestamp;
+        let dormant = (self.ordinal + 1 - v.last_used) as f64;
         let rate = v.participated as f64 / duration as f64;
         v.reward *= self.activity_decay;
-        v.reward += (1.0 - self.activity_decay) * rate;
+        v.reward += (1.0 - self.activity_decay).powf(dormant) * rate;
         v.participated = 0;
     }
     fn reward_update(&mut self) {
