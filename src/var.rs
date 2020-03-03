@@ -85,7 +85,7 @@ pub struct Var {
     /// the number of conflicts at which this var was assigned.
     timestamp: usize,
     /// the number of conflicts at which this var was rewarded lastly.
-    used: usize,
+    last_used: usize,
     /// list of clauses which contain this variable positively.
     pub pos_occurs: Vec<ClauseId>,
     /// list of clauses which contain this variable negatively.
@@ -104,7 +104,7 @@ impl Default for Var {
             level: 0,
             reward: 0.0,
             timestamp: 0,
-            used: 0,
+            last_used: 0,
             pos_occurs: Vec::new(),
             neg_occurs: Vec::new(),
             flags: Flag::empty(),
@@ -302,9 +302,9 @@ impl VarRewardIF for VarDB {
     fn reward_at_analysis(&mut self, vi: VarId) {
         let t = self.ordinal;
         let v = &mut self[vi];
-        if v.used < t {
+        if v.last_used < t {
             v.participated += 1;
-            v.used = t;
+            v.last_used = t;
         }
     }
     fn reward_at_assign(&mut self, vi: VarId) {
@@ -313,9 +313,11 @@ impl VarRewardIF for VarDB {
     fn reward_at_unassign(&mut self, vi: VarId) {
         let v = &mut self.var[vi];
         let duration = self.ordinal + 1 - v.timestamp;
-        let rate = (v.participated as f64 / duration as f64).min(1.0);
+        let rate = v.participated as f64 / duration as f64;
+        // let dormant = ((v.last_used + 1 - v.timestamp) as f64).ln() + 1.0;
+        let dormant = ((v.last_used + 2 - v.timestamp) as f64).log(2.0);
         v.reward *= self.activity_decay;
-        v.reward += (1.0 - self.activity_decay) * rate;
+        v.reward += (1.0 - self.activity_decay).powf(dormant) * rate;
         v.participated = 0;
     }
     fn reward_update(&mut self) {
