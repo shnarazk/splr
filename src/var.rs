@@ -61,8 +61,6 @@ pub trait VarRewardIF {
     fn reward_at_unassign(&mut self, vi: VarId);
     /// update internal counter.
     fn reward_update(&mut self);
-    /// change reward mode.
-    fn shift_reward_mode(&mut self);
 }
 
 /// Object representing a variable.
@@ -172,10 +170,9 @@ impl FlagIF for Var {
 }
 
 #[derive(Clone, Copy, Eq, Debug, PartialEq, PartialOrd, Ord)]
-pub enum RewardStep {
-    HeatUp = 0,
-    Annealing,
-    Final,
+enum RewardStep {
+    Elevated = 0,
+    Fixed,
 }
 
 /// a reward table used in VarDB::shift_reward_mode
@@ -183,10 +180,9 @@ pub enum RewardStep {
 ///  - start: lower bound of the range
 ///  - end: upper bound of the range
 ///  - scale: scaling coefficient for activity decay
-const REWARD: [(RewardStep, f64, f64, f64); 3] = [
-    (RewardStep::HeatUp, 0.80, 0.92, 0.0),
-    (RewardStep::Annealing, 0.92, 0.96, 0.1),
-    (RewardStep::Final, 0.96, 0.97, 0.1),
+const REWARD: [(RewardStep, f64, f64, f64); 2] = [
+    (RewardStep::Elevated, 0.80, 0.96, 0.000_1),
+    (RewardStep::Fixed, 0.0, 0.0, 0.0),
 ];
 
 /// A container of variables.
@@ -197,7 +193,7 @@ pub struct VarDB {
     activity_decay_max: f64,
     pub activity_step: f64,
     /// the current var reward mode
-    pub reward_mode: RewardStep,
+    reward_mode: RewardStep,
     /// an index for counting elapsed time
     ordinal: usize,
     /// vars
@@ -212,7 +208,7 @@ impl Default for VarDB {
         VarDB {
             activity_decay: reward.1,
             activity_decay_max: reward.2,
-            activity_step: (reward.2 - reward.1) / 10_000.0,
+            activity_step: reward.3,
             reward_mode: reward.0,
             ordinal: 0,
             var: Vec::new(),
@@ -348,16 +344,6 @@ impl VarRewardIF for VarDB {
         self.ordinal += 1;
         if self.activity_decay < self.activity_decay_max {
             self.activity_decay += self.activity_step;
-        } else {
-            self.shift_reward_mode();
-        }
-    }
-    fn shift_reward_mode(&mut self) {
-        if self.reward_mode < RewardStep::Final {
-            let reward = &REWARD[self.reward_mode as usize + 1];
-            self.reward_mode = reward.0;
-            self.activity_decay_max = reward.2;
-            self.activity_step *= reward.3;
         }
     }
 }
@@ -414,13 +400,15 @@ impl VarDBIF for VarDB {
         }
         falsified
     }
-    fn adapt_strategy(&mut self, _: &SearchStrategy) {
-        if self.ordinal == 0 {
-            match self.var.len() {
-                l if 1_000_000 < l => self.activity_step *= 0.1,
-                l if 100_000 < l => self.activity_step *= 0.5,
-                _ => (),
-            }
+    fn adapt_strategy(&mut self, mode: &SearchStrategy) {
+        match mode {
+            SearchStrategy::Initial => (),
+            SearchStrategy::Generic => (),
+            SearchStrategy::LowDecisions => (),
+            SearchStrategy::HighSuccesive => self.fix_reward(0.99),
+            SearchStrategy::LowSuccesiveLuby => self.fix_reward(0.999),
+            SearchStrategy::LowSuccesiveM => self.fix_reward(0.999),
+            SearchStrategy::ManyGlues => self.fix_reward(0.91),
         }
     }
     fn minimize_with_biclauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>) {
@@ -501,6 +489,13 @@ impl LBDIF for VarDB {
 }
 
 impl VarDB {
+    /// switch to a special reward setting
+    fn fix_reward(&mut self, r: f64) {
+        self.reward_mode = RewardStep::Fixed;
+        self.activity_decay = r;
+        self.activity_decay_max = r;
+        self.activity_step = 0.0;
+    }
     #[allow(dead_code)]
     fn dump_dependency(&mut self, asgs: &AssignStack, cdb: &ClauseDB, confl: ClauseId) {
         debug_assert_ne!(confl, ClauseId::default());
