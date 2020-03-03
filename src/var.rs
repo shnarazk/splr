@@ -63,7 +63,7 @@ pub trait VarRewardIF {
     fn reward_update(&mut self);
 }
 
-const VAR_DECAY_START: f64 = 0.8;
+const VAR_DECAY_START: f64 = 0.9;
 
 /// Object representing a variable.
 #[derive(Debug)]
@@ -316,12 +316,6 @@ impl VarRewardIF for VarDB {
         let rate = (v.participated as f64 / duration as f64).min(1.0);
         v.reward *= self.activity_decay;
         v.reward += (1.0 - self.activity_decay) * rate;
-        assert!(v.reward <= 1.0,
-                format!("ad: {}, reward: {}, rate: {}",
-                        self.activity_decay,
-                        v.reward,
-                        rate
-                ));
         v.participated = 0;
     }
     fn reward_update(&mut self) {
@@ -403,10 +397,9 @@ impl VarDBIF for VarDB {
                 e = 0.99;
             }
         }
-        let s = state.config.timeout * 10000.0 + 1.0;
+        let s = /* state.config.timeout */ 10000.0 + 1.0;
         let t = elapsed.min(1.0) * s + 1.0;
-        let b = VAR_DECAY_START;
-        let d = b + (e - b) * t.ln() / s.ln();
+        let d = VAR_DECAY_START + (e - VAR_DECAY_START) * t.ln() / s.ln();
         self.activity_decay = d; // (self.activity_decay + d) * 0.5;
     }
     fn minimize_with_biclauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>) {
