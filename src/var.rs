@@ -80,8 +80,10 @@ pub struct Var {
     participated: usize,
     /// a dynamic evaluation criterion like VSIDS or ACID.
     reward: f64,
-    /// the number of conflicts at which this var was rewarded lastly.
+    /// the number of conflicts at which this var was assigned lastly.
     timestamp: usize,
+    /// the number of conflicts at which this var was rewarded lastly.
+    last_used: usize,
     /// list of clauses which contain this variable positively.
     pub pos_occurs: Vec<ClauseId>,
     /// list of clauses which contain this variable negatively.
@@ -100,6 +102,7 @@ impl Default for Var {
             level: 0,
             reward: 0.0,
             timestamp: 0,
+            last_used: 0,
             pos_occurs: Vec::new(),
             neg_occurs: Vec::new(),
             flags: Flag::empty(),
@@ -301,8 +304,12 @@ impl VarRewardIF for VarDB {
         }
     }
     fn reward_at_analysis(&mut self, vi: VarId) {
+        let n = self.ordinal;
         let v = &mut self[vi];
-        v.participated += 1;
+        if v.last_used < n {
+            v.participated += 1;
+            v.last_used = n;
+        }
     }
     fn reward_at_assign(&mut self, vi: VarId) {
         self[vi].timestamp = self.ordinal;
