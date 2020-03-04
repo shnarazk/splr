@@ -56,6 +56,11 @@ pub trait EliminatorIF {
     fn sorted_iterator(&self) -> Iter<'_, usize>;
 }
 
+/// API for getting stats about Eliminator's internal data.
+pub trait EliminatorStatIF {
+    fn stats(&self) -> (usize, usize);
+}
+
 #[derive(Eq, Debug, PartialEq)]
 enum EliminatorMode {
     Deactive,
@@ -64,26 +69,32 @@ enum EliminatorMode {
 }
 
 #[derive(Debug)]
-pub struct Occurs {
-    pub pos_occurs: Vec<ClauseId>,
-    pub neg_occurs: Vec<ClauseId>,
+pub struct LitOccurs {
+    pos_occurs: Vec<ClauseId>,
+    neg_occurs: Vec<ClauseId>,
 }
 
-impl Default for Occurs {
-    fn default() -> Occurs {
-        Occurs {
+impl Default for LitOccurs {
+    fn default() -> LitOccurs {
+        LitOccurs {
             pos_occurs: Vec::new(),
             neg_occurs: Vec::new(),
         }
     }
 }
 
-impl Occurs {
-    /// return a new vector of $n$ `Occurs`s.
-    fn new(n: usize) -> Vec<Occurs> {
+impl EliminatorStatIF for LitOccurs {
+    fn stats(&self) -> (usize, usize) {
+        (self.pos_occurs.len(), self.neg_occurs.len())
+    }
+}
+
+impl LitOccurs {
+    /// return a new vector of $n$ `LitOccurs`s.
+    fn new(n: usize) -> Vec<LitOccurs> {
         let mut vec = Vec::with_capacity(n + 1);
         for _ in 0..=n {
-            vec.push(Occurs::default());
+            vec.push(LitOccurs::default());
         }
         vec
     }
@@ -109,7 +120,7 @@ pub struct Eliminator {
     /// Stop subsumption if the size of a clause is over this
     pub subsume_literal_limit: usize,
     /// var
-    var: Vec<Occurs>,
+    var: Vec<LitOccurs>,
 }
 
 impl Default for Eliminator {
@@ -131,7 +142,7 @@ impl Default for Eliminator {
 }
 
 impl Index<VarId> for Eliminator {
-    type Output = Occurs;
+    type Output = LitOccurs;
     #[inline]
     fn index(&self, i: VarId) -> &Self::Output {
         unsafe { self.var.get_unchecked(i) }
@@ -146,7 +157,7 @@ impl IndexMut<VarId> for Eliminator {
 }
 
 impl Index<&VarId> for Eliminator {
-    type Output = Occurs;
+    type Output = LitOccurs;
     #[inline]
     fn index(&self, i: &VarId) -> &Self::Output {
         unsafe { self.var.get_unchecked(*i) }
@@ -161,7 +172,7 @@ impl IndexMut<&VarId> for Eliminator {
 }
 
 impl Index<Lit> for Eliminator {
-    type Output = Occurs;
+    type Output = LitOccurs;
     #[inline]
     fn index(&self, l: Lit) -> &Self::Output {
         unsafe { self.var.get_unchecked(l.vi()) }
@@ -176,7 +187,7 @@ impl IndexMut<Lit> for Eliminator {
 }
 
 impl Index<&Lit> for Eliminator {
-    type Output = Occurs;
+    type Output = LitOccurs;
     #[inline]
     fn index(&self, l: &Lit) -> &Self::Output {
         unsafe { self.var.get_unchecked(l.vi()) }
@@ -191,7 +202,7 @@ impl IndexMut<&Lit> for Eliminator {
 }
 
 impl Index<Range<usize>> for Eliminator {
-    type Output = [Occurs];
+    type Output = [LitOccurs];
     #[inline]
     fn index(&self, r: Range<usize>) -> &Self::Output {
         &self.var[r]
@@ -199,7 +210,7 @@ impl Index<Range<usize>> for Eliminator {
 }
 
 impl Index<RangeFrom<usize>> for Eliminator {
-    type Output = [Occurs];
+    type Output = [LitOccurs];
     #[inline]
     fn index(&self, r: RangeFrom<usize>) -> &Self::Output {
         unsafe { self.var.get_unchecked(r) }
@@ -228,7 +239,7 @@ impl Instantiate for Eliminator {
             var_queue: VarOccHeap::new(nv, 0),
             eliminate_grow_limit: config.elim_grow_limit,
             subsume_literal_limit: config.elim_lit_limit,
-            var: Occurs::new(nv + 1),
+            var: LitOccurs::new(nv + 1),
             ..Eliminator::default()
         }
     }
@@ -1053,7 +1064,7 @@ fn make_eliminated_clauses(
     }
 }
 
-impl Occurs {
+impl LitOccurs {
     fn activity(&self) -> usize {
         self.pos_occurs.len().min(self.neg_occurs.len())
     }
@@ -1072,12 +1083,12 @@ pub struct VarOccHeap {
 
 trait VarOrderIF {
     fn new(n: usize, init: usize) -> VarOccHeap;
-    fn insert(&mut self, occur: &[Occurs], vi: VarId, upword: bool);
+    fn insert(&mut self, occur: &[LitOccurs], vi: VarId, upword: bool);
     fn clear(&mut self, vdb: &mut VarDB);
     fn len(&self) -> usize;
     fn is_empty(&self) -> bool;
-    fn select_var(&mut self, occur: &[Occurs], vdb: &VarDB) -> Option<VarId>;
-    fn rebuild(&mut self, occur: &[Occurs], vdb: &VarDB);
+    fn select_var(&mut self, occur: &[LitOccurs], vdb: &VarDB) -> Option<VarId>;
+    fn rebuild(&mut self, occur: &[LitOccurs], vdb: &VarDB);
 }
 
 impl VarOrderIF for VarOccHeap {
@@ -1093,7 +1104,7 @@ impl VarOrderIF for VarOccHeap {
         idxs[0] = init;
         VarOccHeap { heap, idxs }
     }
-    fn insert(&mut self, occur: &[Occurs], vi: VarId, upward: bool) {
+    fn insert(&mut self, occur: &[LitOccurs], vi: VarId, upward: bool) {
         debug_assert!(vi < self.heap.len());
         if self.contains(vi) {
             let i = self.idxs[vi];
@@ -1125,7 +1136,7 @@ impl VarOrderIF for VarOccHeap {
     fn is_empty(&self) -> bool {
         self.idxs[0] == 0
     }
-    fn select_var(&mut self, occur: &[Occurs], vdb: &VarDB) -> Option<VarId> {
+    fn select_var(&mut self, occur: &[LitOccurs], vdb: &VarDB) -> Option<VarId> {
         loop {
             let vi = self.get_root(occur);
             if vi == 0 {
@@ -1136,7 +1147,7 @@ impl VarOrderIF for VarOccHeap {
             }
         }
     }
-    fn rebuild(&mut self, occur: &[Occurs], vdb: &VarDB) {
+    fn rebuild(&mut self, occur: &[LitOccurs], vdb: &VarDB) {
         self.reset();
         for v in &vdb[1..] {
             if v.assign.is_none() && !v.is(Flag::ELIMINATED) {
@@ -1156,7 +1167,7 @@ impl VarOccHeap {
             self.heap[i] = i;
         }
     }
-    fn get_root(&mut self, occur: &[Occurs]) -> VarId {
+    fn get_root(&mut self, occur: &[LitOccurs]) -> VarId {
         let s = 1;
         let vs = self.heap[s];
         let n = self.idxs[0];
@@ -1175,7 +1186,7 @@ impl VarOccHeap {
         }
         vs
     }
-    fn percolate_up(&mut self, occur: &[Occurs], start: usize) {
+    fn percolate_up(&mut self, occur: &[LitOccurs], start: usize) {
         let mut q = start;
         let vq = self.heap[q];
         debug_assert!(0 < vq, "size of heap is too small");
@@ -1205,7 +1216,7 @@ impl VarOccHeap {
             }
         }
     }
-    fn percolate_down(&mut self, occur: &[Occurs], start: usize) {
+    fn percolate_down(&mut self, occur: &[LitOccurs], start: usize) {
         let n = self.len();
         let mut i = start;
         let vi = self.heap[i];
@@ -1245,7 +1256,7 @@ impl VarOccHeap {
         self.heap[1]
     }
     #[allow(dead_code)]
-    fn remove(&mut self, occur: &[Occurs], vs: VarId) {
+    fn remove(&mut self, occur: &[LitOccurs], vs: VarId) {
         let s = self.idxs[vs];
         let n = self.idxs[0];
         if n < s {

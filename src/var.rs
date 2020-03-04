@@ -99,8 +99,6 @@ impl Default for Var {
             reward: 0.0,
             timestamp: 0,
             // last_used: 0,
-            // pos_occurs: Vec::new(),
-            // neg_occurs: Vec::new(),
             flags: Flag::empty(),
             participated: 0,
         }
