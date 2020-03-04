@@ -458,7 +458,7 @@ fn handle_conflict_path(
     };
     let learnt_len = new_learnt.len();
     if learnt_len == 1 {
-        // PARTIAL FIXED SOLUTION by UNIT LEARNT CLAUSE
+        //[PARTIAL FIXED SOLUTION by UNIT LEARNT CLAUSE GENERATION]
         // dump to certified even if it's a literal.
         cdb.certificate_add(new_learnt);
         if use_chronobt {
@@ -470,14 +470,17 @@ fn handle_conflict_path(
         }
         state.num_solved_vars += 1;
     } else {
+        //[Reason-Side Rewarding]
         {
-            // Reason-Side Rewarding
-            let mut bumped = Vec::new();
+            // At the present time, some reason clauses can contain first UIP or its negation.
+            // So we have to filter vars instead of literals to avoid double counting.
+            let mut bumped = vec![l0.vi()]; // Skip the var corresponding to the first UIP.
             for lit in new_learnt.iter() {
                 for l in &cdb[vdb[lit.vi()].reason].lits {
-                    if !bumped.contains(l) {
-                        vdb.reward_at_analysis(l.vi());
-                        bumped.push(*l);
+                    let vi = l.vi();
+                    if !bumped.contains(&vi) {
+                        vdb.reward_at_analysis(vi);
+                        bumped.push(vi);
                     }
                 }
             }
