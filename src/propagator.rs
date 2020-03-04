@@ -294,7 +294,8 @@ impl PropagatorIF for AssignStack {
                 continue;
             }
             unset_assign!(self, vi);
-            v.phase = v.assign.unwrap();
+            // v.phase = v.assign.unwrap();
+            v.set(Flag::PHASE, v.assign.unwrap());
             v.assign = None;
             v.reason = ClauseId::default();
             vdb.reward_at_unassign(vi);

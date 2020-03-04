@@ -289,6 +289,9 @@ impl FlagIF for Clause {
     fn is(&self, flag: Flag) -> bool {
         self.flags.contains(flag)
     }
+    fn set(&mut self, f: Flag, b: bool) {
+        self.flags.set(f, b);
+    }
     fn turn_off(&mut self, flag: Flag) {
         self.flags.remove(flag);
     }

@@ -119,10 +119,11 @@ impl SatSolverIF for Solver {
             // run simple preprocessor
             for vi in 1..vdb.len() {
                 let v = &mut vdb[vi];
+                let w = &elim[vi];
                 if v.assign.is_some() {
                     continue;
                 }
-                match (v.pos_occurs.len(), v.neg_occurs.len()) {
+                match (w.pos_occurs.len(), w.neg_occurs.len()) {
                     (_, 0) => {
                         let l = Lit::from_assign(vi, true);
                         if asgs.assign_at_rootlevel(vdb, l).is_err() {
@@ -136,7 +137,8 @@ impl SatSolverIF for Solver {
                         }
                     }
                     (p, m) => {
-                        v.phase = m < p;
+                        // v.phase = m < p;
+                        v.set(Flag::PHASE, m < p);
                         elim.enqueue_var(vdb, vi, false);
                     }
                 }
@@ -165,11 +167,14 @@ impl SatSolverIF for Solver {
                 if v.assign.is_some() || v.is(Flag::ELIMINATED) {
                     continue;
                 }
-                match (v.pos_occurs.len(), v.neg_occurs.len()) {
+                match (
+                    elim[v.index].pos_occurs.len(),
+                    elim[v.index].neg_occurs.len(),
+                ) {
                     (_, 0) => (),
                     (0, _) => (),
-                    (p, m) if m * 10 < p => v.phase = true,
-                    (p, m) if p * 10 < m => v.phase = false,
+                    (p, m) if m * 10 < p => v.turn_on(Flag::PHASE), // v.phase = true,
+                    (p, m) if p * 10 < m => v.turn_off(Flag::PHASE), // v.phase = false,
                     _ => (),
                 }
             }
@@ -338,7 +343,7 @@ fn search(
             }
             if !asgs.remains() {
                 let vi = asgs.select_var(vdb);
-                let p = vdb[vi].phase;
+                let p = vdb[vi].is(Flag::PHASE); // vdb[vi].phase;
                 asgs.assign_by_decision(vdb, Lit::from_assign(vi, p));
                 state[Stat::Decision] += 1;
                 a_decision_was_made = true;

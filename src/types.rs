@@ -493,6 +493,8 @@ impl<T> Delete<T> for Vec<T> {
 pub trait FlagIF {
     /// return true if the flag in on.
     fn is(&self, flag: Flag) -> bool;
+    /// set the flag.
+    fn set(&mut self, f: Flag, b: bool);
     /// toggle the flag off.
     fn turn_off(&mut self, flag: Flag);
     /// toggle the flag on.
@@ -501,6 +503,8 @@ pub trait FlagIF {
 
 bitflags! {
     pub struct Flag: u16 {
+
+        /// For clause
         /// a clause is stored in DB, but is a garbage now.
         const DEAD         = 0b0000_0000_0000_0001;
         /// a clause is a generated clause by conflict analysis and is removable.
@@ -511,14 +515,18 @@ bitflags! {
         const OCCUR_LINKED = 0b0000_0000_0000_1000;
         /// a clause or var is enqueued for eliminator.
         const ENQUEUED     = 0b0000_0000_0001_0000;
-        /// a var is eliminated and managed by eliminator.
-        const ELIMINATED   = 0b0000_0000_0010_0000;
         /// mark to run garbage collector on the corresponding watcher lists
-        const TOUCHED      = 0b0000_0000_0100_0000;
+        const TOUCHED      = 0b0000_0000_0010_0000;
+
+        /// For var
+        /// the previous assigned value of a Var.
+        const PHASE        = 0b0000_0001_0000_0000;
+        /// a var is eliminated and managed by eliminator.
+        const ELIMINATED   = 0b0000_0010_0000_0000;
         /// a var is checked during in the current conflict analysis.
-        const CA_SEEN      = 0b0000_0000_1000_0000;
+        const CA_SEEN      = 0b0000_0100_0000_0000;
         /// NOT IN USE: a var is checked during in var rewarding.
-        const VR_SEEN      = 0b0000_0001_0000_0000;
+        const VR_SEEN      = 0b0000_1000_0000_0000;
     }
 }
 
