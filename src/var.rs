@@ -70,8 +70,6 @@ pub struct Var {
     pub index: VarId,
     /// the current value.
     pub assign: Option<bool>,
-    // /// the previous assigned value
-    // pub phase: bool,
     /// the propagating clause
     pub reason: ClauseId,
     /// decision level at which this variables is assigned.
@@ -91,7 +89,6 @@ impl Default for Var {
         Var {
             index: 0,
             assign: None,
-            // phase: false,
             reason: ClauseId::default(),
             level: 0,
             reward: 0.0,
