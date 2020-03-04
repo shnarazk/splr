@@ -98,6 +98,10 @@ impl LitOccurs {
         }
         vec
     }
+    fn clear(&mut self) {
+        self.pos_occurs.clear();
+        self.neg_occurs.clear();
+    }
 }
 
 /// Literal eliminator
@@ -264,9 +268,8 @@ impl EliminatorIF for Eliminator {
             for c in &mut cdb[1..] {
                 c.turn_off(Flag::OCCUR_LINKED);
             }
-            for v in &mut self[1..] {
-                v.pos_occurs.clear();
-                v.neg_occurs.clear();
+            for w in &mut self[1..] {
+                w.clear();
             }
         }
         self.mode = EliminatorMode::Deactive;
@@ -276,9 +279,8 @@ impl EliminatorIF for Eliminator {
             return;
         }
         self.mode = EliminatorMode::Running;
-        for v in &mut self[1..] {
-            v.pos_occurs.clear();
-            v.neg_occurs.clear();
+        for w in &mut self[1..] {
+            w.clear();
         }
         for (cid, c) in &mut cdb[0..].iter_mut().enumerate().skip(1) {
             if c.is(Flag::DEAD) || c.is(Flag::OCCUR_LINKED) {
@@ -997,8 +999,7 @@ fn eliminate_var(
             cdb.detach(*cid);
             elim.remove_cid_occur(vdb, *cid, &mut cdb[cid]);
         }
-        elim[vi].pos_occurs.clear();
-        elim[vi].neg_occurs.clear();
+        elim[vi].clear();
         vdb[vi].turn_on(Flag::ELIMINATED);
         elim.backward_subsumption_check(asgs, cdb, vdb, timedout)
     }
