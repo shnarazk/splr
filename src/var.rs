@@ -83,7 +83,7 @@ pub struct Var {
     /// the number of conflicts at which this var was assigned lastly.
     timestamp: usize,
     /// the number of conflicts at which this var was rewarded lastly.
-    last_used: usize,
+    // last_used: usize,
     /// list of clauses which contain this variable positively.
     pub pos_occurs: Vec<ClauseId>,
     /// list of clauses which contain this variable negatively.
@@ -102,7 +102,7 @@ impl Default for Var {
             level: 0,
             reward: 0.0,
             timestamp: 0,
-            last_used: 0,
+            // last_used: 0,
             pos_occurs: Vec::new(),
             neg_occurs: Vec::new(),
             flags: Flag::empty(),
@@ -315,7 +315,7 @@ impl VarRewardIF for VarDB {
     fn reward_at_unassign(&mut self, vi: VarId) {
         let v = &mut self.var[vi];
         let duration = self.ordinal + 1 - v.timestamp;
-        let _dormant = (self.ordinal + 1 - v.last_used) as f64;
+        // let _dormant = (self.ordinal + 1 - v.last_used) as f64;
         let rate = v.participated as f64 / duration as f64;
         v.reward *= self.activity_decay;
         v.reward += (1.0 - self.activity_decay) * rate;
