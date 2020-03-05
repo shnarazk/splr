@@ -1,5 +1,9 @@
 /// Crate `config` provides solver's configuration and CLI.
-use {std::path::PathBuf, structopt::StructOpt};
+use {
+    crate::types::DecisionLevel,
+    std::path::PathBuf,
+    structopt::StructOpt,
+};
 
 /// Splr version number.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -10,7 +14,7 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub struct Config {
     /// threshold to use chronoBT
     #[structopt(long = "chronoBT", short = "C", default_value = "100")]
-    pub chronobt: usize,
+    pub chronobt: DecisionLevel,
     /// soft limit of #clauses (6MC/GB)
     #[structopt(long = "cl", default_value = "0")]
     pub clause_limit: usize,

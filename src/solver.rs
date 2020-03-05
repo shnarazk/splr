@@ -577,7 +577,7 @@ fn conflict_analyze(
     state: &mut State,
     vdb: &mut VarDB,
     confl: ClauseId,
-) -> usize {
+) -> DecisionLevel {
     let learnt = &mut state.new_learnt;
     learnt.clear();
     learnt.push(NULL_LIT);
@@ -682,15 +682,15 @@ impl State {
         asgs: &mut AssignStack,
         cdb: &mut ClauseDB,
         vdb: &mut VarDB,
-    ) -> usize {
+    ) -> DecisionLevel {
         let State {
             ref mut new_learnt, ..
         } = self;
         let mut to_clear: Vec<Lit> = vec![new_learnt[0]];
-        let mut levels = vec![false; asgs.level() + 1];
+        let mut levels = vec![false; asgs.level() as usize + 1];
         for l in &new_learnt[1..] {
             to_clear.push(*l);
-            levels[vdb[l].level] = true;
+            levels[vdb[l].level as usize] = true;
         }
         let l0 = new_learnt[0];
         new_learnt.retain(|l| *l == l0 || !l.is_redundant(cdb, vdb, &mut to_clear, &levels));
@@ -743,7 +743,7 @@ impl Lit {
                 let v = &vdb[vi];
                 let lv = v.level;
                 if 0 < lv && !v.is(Flag::CA_SEEN) {
-                    if v.reason != ClauseId::default() && levels[lv] {
+                    if v.reason != ClauseId::default() && levels[lv as usize] {
                         vdb[vi].turn_on(Flag::CA_SEEN);
                         stack.push(*q);
                         clear.push(*q);
@@ -801,7 +801,7 @@ impl VarDB {
     fn dump<'a, V: IntoIterator<Item = &'a Lit, IntoIter = Iter<'a, Lit>>>(
         &self,
         v: V,
-    ) -> Vec<(i32, usize, bool, Option<bool>)> {
+    ) -> Vec<(i32, DecisionLevel, bool, Option<bool>)> {
         v.into_iter()
             .map(|l| {
                 let v = &self[*l];
@@ -812,7 +812,7 @@ impl VarDB {
                     v.assign,
                 )
             })
-            .collect::<Vec<(i32, usize, bool, Option<bool>)>>()
+            .collect::<Vec<(i32, DecisionLevel, bool, Option<bool>)>>()
     }
 }
 

@@ -51,6 +51,9 @@ pub trait Delete<T> {
 /// The current abstraction is imcomplete.
 pub type VarId = usize;
 
+/// Decision Level Representation.
+pub type DecisionLevel = u32;
+
 /// Literal encoded on `u32` as:
 ///
 /// - the literal corresponding to a positive occurrence of *variable `n` is `2 * n` and

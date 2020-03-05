@@ -73,9 +73,9 @@ pub struct Var {
     /// the propagating clause
     pub reason: ClauseId,
     /// decision level at which this variables is assigned.
-    pub level: usize,
+    pub level: DecisionLevel,
     /// the number of participation in conflict analysis
-    participated: usize,
+    participated: u32,
     /// a dynamic evaluation criterion like VSIDS or ACID.
     reward: f64,
     /// the number of conflicts at which this var was assigned lastly.
@@ -434,7 +434,7 @@ impl LBDIF for VarDB {
             let mut cnt = 0;
             for l in vec {
                 let lv = var[l.vi()].level;
-                let p = lbd_temp.get_unchecked_mut(lv);
+                let p = lbd_temp.get_unchecked_mut(lv as usize);
                 if *p != key {
                     *p = key;
                     cnt += 1;
@@ -456,7 +456,7 @@ impl LBDIF for VarDB {
                 for l in &c.lits {
                     let lv = self.var[l.vi()].level;
                     if lv != 0 {
-                        let p = lbd_temp.get_unchecked_mut(lv);
+                        let p = lbd_temp.get_unchecked_mut(lv as usize);
                         if *p != key {
                             *p = key;
                             cnt += 1;

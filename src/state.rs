@@ -149,7 +149,7 @@ impl IndexMut<Stat> for [usize] {
 /// Data storage for `Solver`
 #[derive(Debug)]
 pub struct State {
-    pub root_level: usize,
+    pub root_level: DecisionLevel,
     pub num_vars: usize,
     pub num_solved_vars: usize,
     pub num_eliminated_vars: usize,
