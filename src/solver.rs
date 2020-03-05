@@ -476,7 +476,7 @@ fn handle_conflict_path(
         {
             // At the present time, some reason clauses can contain first UIP or its negation.
             // So we have to filter vars instead of literals to avoid double counting.
-            let mut bumped = vec![l0.vi()]; // Skip the var corresponding to the first UIP.
+            let mut bumped = new_learnt.iter().map(|l| l.vi()).collect::<Vec<VarId>>();
             for lit in new_learnt.iter() {
                 for l in &cdb[vdb[lit.vi()].reason].lits {
                     let vi = l.vi();
