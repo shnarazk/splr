@@ -307,8 +307,9 @@ impl VarRewardIF for VarDB {
     fn reward_at_unassign(&mut self, vi: VarId) {
         let v = &mut self.var[vi];
         let duration = (self.ordinal + 1 - v.timestamp) as f64;
-        let dormant = (self.ordinal - v.last_used) as f64;
-        let decay = self.activity_decay.powf(1.0 + dormant);
+        // let dormant = (self.ordinal - v.last_used) as f64;
+        // let decay = self.activity_decay.powf(1.0 + dormant);
+        let decay = self.activity_decay;
         let rate = v.participated as f64 / duration;
         v.reward *= decay;
         v.reward += (1.0 - decay) * rate;
