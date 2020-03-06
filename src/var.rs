@@ -4,7 +4,7 @@ use {
         clause::{Clause, ClauseDB, ClauseIF, ClauseId, ClauseIdIF},
         config::Config,
         propagator::{AssignStack, PropagatorIF},
-        state::SearchStrategy,
+        state::{SearchStrategy, Stat, State},
         types::*,
     },
     std::{
@@ -42,7 +42,7 @@ pub trait VarDBIF {
     /// - None -- the literals contains an unassigned literal
     fn status(&self, c: &[Lit]) -> Option<bool>;
     /// set up parameters for each SearchStrategy.
-    fn adapt_strategy(&mut self, mode: &SearchStrategy, elapsed: f64);
+    fn adapt_strategy(&mut self, state: &State);
     /// minimize a clause.
     fn minimize_with_biclauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>);
 }
@@ -80,6 +80,8 @@ pub struct Var {
     reward: f64,
     /// the number of conflicts at which this var was assigned lastly.
     timestamp: usize,
+    /// the number of conflicts at which this var was rewarded lastly.
+    last_used: usize,
     /// the `Flag`s
     flags: Flag,
 }
@@ -93,6 +95,7 @@ impl Default for Var {
             level: 0,
             reward: 0.0,
             timestamp: 0,
+            last_used: 0,
             flags: Flag::empty(),
             participated: 0,
         }
@@ -288,16 +291,12 @@ impl VarRewardIF for VarDB {
     fn activity(&mut self, vi: VarId) -> f64 {
         self[vi].reward
     }
-    fn initialize_reward(&mut self, iterator: Iter<'_, usize>) {
-        let mut v = 0.5; // big bang initialization
-        for vi in iterator {
-            self.var[*vi].reward = v;
-            v *= 0.9;
-        }
-    }
+    fn initialize_reward(&mut self, _iterator: Iter<'_, usize>) {}
     fn reward_at_analysis(&mut self, vi: VarId) {
+        let t = self.ordinal;
         let v = &mut self[vi];
         v.participated += 1;
+        v.last_used = t;
     }
     fn reward_at_assign(&mut self, vi: VarId) {
         self[vi].timestamp = self.ordinal;
@@ -305,9 +304,11 @@ impl VarRewardIF for VarDB {
     fn reward_at_unassign(&mut self, vi: VarId) {
         let v = &mut self.var[vi];
         let duration = self.ordinal + 1 - v.timestamp;
+        let dormant = ((v.last_used + 2 - v.timestamp) as f64).log(2.0);
+        let decay = self.activity_decay.powf(dormant);
         let rate = v.participated as f64 / duration as f64;
-        v.reward *= self.activity_decay;
-        v.reward += (1.0 - self.activity_decay) * rate;
+        v.reward *= decay;
+        v.reward += (1.0 - decay) * rate;
         v.participated = 0;
     }
     fn reward_update(&mut self) {
@@ -367,32 +368,30 @@ impl VarDBIF for VarDB {
         }
         falsified
     }
-    fn adapt_strategy(&mut self, mode: &SearchStrategy, elapsed: f64) {
-        let mut s = 20.0;
-        match mode {
+
+    fn adapt_strategy(&mut self, state: &State) {
+        let mut s = 0.8;
+        match state.strategy {
             SearchStrategy::Initial => (),
             SearchStrategy::Generic => (),
             SearchStrategy::LowDecisions => {
-                // self.fix_reward(0.96);
-                s = 10.0;
+                s = 0.7;
             }
             SearchStrategy::HighSuccesive => {
-                // self.fix_reward(0.99);
-                s = 28.0;
+                s = 0.9;
             }
             SearchStrategy::LowSuccesiveLuby | SearchStrategy::LowSuccesiveM => {
-                // self.fix_reward(0.999);
-                s = 30.0;
+                s = 0.9;
             }
             SearchStrategy::ManyGlues => {
-                // self.fix_reward(0.98);
+                s = 0.92;
             }
         }
-        let e = elapsed.min(1.0);
-        let t = e * s;
-        let r = 0.9;
-        self.activity_decay = r + (1.0 - r) * (t + 1.0).ln() / (s + 1.0).ln();
+        let t = 1.0 - 1.0 / (1.0 + (1.0 + state[Stat::Conflict] as f64).ln());
+        let d = s + (1.0 - s) * t;
+        self.activity_decay = d;
     }
+
     fn minimize_with_biclauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>) {
         if vec.len() <= 1 {
             return;
