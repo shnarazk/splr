@@ -137,7 +137,6 @@ impl SatSolverIF for Solver {
                         }
                     }
                     (p, m) => {
-                        // v.phase = m < p;
                         v.set(Flag::PHASE, m < p);
                         elim.enqueue_var(vdb, vi, false);
                     }
@@ -171,8 +170,8 @@ impl SatSolverIF for Solver {
                 match elim[v.index].stats() {
                     (_, 0) => (),
                     (0, _) => (),
-                    (p, m) if m * 10 < p => v.turn_on(Flag::PHASE), // v.phase = true,
-                    (p, m) if p * 10 < m => v.turn_off(Flag::PHASE), // v.phase = false,
+                    (p, m) if m * 10 < p => v.turn_on(Flag::PHASE),
+                    (p, m) if p * 10 < m => v.turn_off(Flag::PHASE),
                     _ => (),
                 }
             }
@@ -343,7 +342,7 @@ fn search(
             }
             if !asgs.remains() {
                 let vi = asgs.select_var(vdb);
-                let p = vdb[vi].is(Flag::PHASE); // vdb[vi].phase;
+                let p = vdb[vi].is(Flag::PHASE);
                 asgs.assign_by_decision(vdb, Lit::from_assign(vi, p));
                 state[Stat::Decision] += 1;
                 a_decision_was_made = true;
