@@ -299,14 +299,17 @@ impl VarRewardIF for VarDB {
         v.last_used = t;
     }
     fn reward_at_assign(&mut self, vi: VarId) {
-        self[vi].timestamp = self.ordinal;
+        let t = self.ordinal;
+        let v = &mut self[vi];
+        v.timestamp = t;
+        v.last_used = t;
     }
     fn reward_at_unassign(&mut self, vi: VarId) {
         let v = &mut self.var[vi];
-        let duration = self.ordinal + 1 - v.timestamp;
-        let dormant = ((v.last_used + 2 - v.timestamp) as f64).log(2.0);
-        let decay = self.activity_decay.powf(dormant);
-        let rate = v.participated as f64 / duration as f64;
+        let duration = (self.ordinal + 1 - v.timestamp) as f64;
+        let dormant = (self.ordinal - v.last_used) as f64;
+        let decay = self.activity_decay.powf(1.0 + dormant);
+        let rate = v.participated as f64 / duration;
         v.reward *= decay;
         v.reward += (1.0 - decay) * rate;
         v.participated = 0;
@@ -370,25 +373,32 @@ impl VarDBIF for VarDB {
     }
 
     fn adapt_strategy(&mut self, state: &State) {
-        let mut s = 0.8;
+        // let mut s = 0.8;
+        let mut k = 0.86;
         match state.strategy {
             SearchStrategy::Initial => (),
             SearchStrategy::Generic => (),
             SearchStrategy::LowDecisions => {
-                s = 0.7;
+                // s = 0.7;
+                k = 0.80;
             }
             SearchStrategy::HighSuccesive => {
-                s = 0.9;
+                // s = 0.9;
+                k = 0.90;
             }
             SearchStrategy::LowSuccesiveLuby | SearchStrategy::LowSuccesiveM => {
-                s = 0.9;
+                // s = 0.9;
+                k = 0.90;
             }
             SearchStrategy::ManyGlues => {
-                s = 0.92;
+                // s = 0.92;
+                k = 0.94;
             }
         }
-        let t = 1.0 - 1.0 / (1.0 + (1.0 + state[Stat::Conflict] as f64).ln());
-        let d = s + (1.0 - s) * t;
+        // let t = 1.0 - 1.0 / (1.0 + (1.0 + state[Stat::Conflict] as f64).ln());
+        let s = 0.8;
+        let t = 1.0 - 1.0 / (1.0 + ((state[Stat::Conflict] as f64) / 1000.0).sqrt());
+        let d = s + (1.0 - s) * k * t;
         self.activity_decay = d;
     }
 
