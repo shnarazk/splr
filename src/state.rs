@@ -173,9 +173,7 @@ pub struct State {
     pub time_limit: f64,
     pub default_rewarding: bool,
     pub record: ProgressRecord,
-    pub use_progress: bool,
     pub progress_cnt: usize,
-    pub progress_log: bool,
     pub development: Vec<(usize, f64, f64, f64, f64, f64)>,
 }
 
@@ -204,9 +202,7 @@ impl Default for State {
             start: SystemTime::now(),
             time_limit: 0.0,
             default_rewarding: true,
-            use_progress: true,
             progress_cnt: 0,
-            progress_log: false,
             record: ProgressRecord::default(),
             development: Vec::new(),
         }
@@ -314,7 +310,6 @@ impl Instantiate for State {
         let mut state = State::default();
         state.num_vars = cnf.num_of_variables;
         state.rst = RestartExecutor::instantiate(config, &cnf);
-        state.progress_log = config.use_log;
         state.model = vec![None; cnf.num_of_variables + 1];
         state.target = cnf.clone();
         state.time_limit = config.timeout;
@@ -389,10 +384,10 @@ impl StateIF for State {
         }
     }
     fn progress_header(&self) {
-        if !self.use_progress {
+        if self.config.quiet_mode {
             return;
         }
-        if self.progress_log {
+        if self.config.use_log {
             self.dump_header();
             return;
         }
@@ -403,7 +398,7 @@ impl StateIF for State {
         }
     }
     fn flush<S: AsRef<str>>(&self, mes: S) {
-        if self.use_progress && !self.progress_log {
+        if !self.config.quiet_mode && !self.config.use_log {
             // print!("\x1B[1G{}", mes);
             print!("{}", mes.as_ref());
             stdout().flush().unwrap();
@@ -412,10 +407,10 @@ impl StateIF for State {
     /// `mes` should be shorter than or equal to 9, or 8 + a delimiter.
     #[allow(clippy::cognitive_complexity)]
     fn progress(&mut self, cdb: &ClauseDB, vdb: &VarDB, mes: Option<&str>) {
-        if !self.use_progress {
+        if self.config.quiet_mode {
             return;
         }
-        if self.progress_log {
+        if self.config.use_log {
             self.dump(cdb, vdb);
             return;
         }
