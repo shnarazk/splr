@@ -366,33 +366,15 @@ impl VarDBIF for VarDB {
     }
 
     fn adapt_strategy(&mut self, state: &State) {
-        // let mut s = 0.8;
-        let mut k = 0.86;
-        match state.strategy {
-            SearchStrategy::Initial => (),
-            SearchStrategy::Generic => (),
-            SearchStrategy::LowDecisions => {
-                // s = 0.7;
-                k = 0.80;
-            }
-            SearchStrategy::HighSuccesive => {
-                // s = 0.9;
-                k = 0.90;
-            }
-            SearchStrategy::LowSuccesiveLuby | SearchStrategy::LowSuccesiveM => {
-                // s = 0.9;
-                k = 0.90;
-            }
-            SearchStrategy::ManyGlues => {
-                // s = 0.92;
-                k = 0.94;
-            }
-        }
-        // let t = 1.0 - 1.0 / (1.0 + (1.0 + state[Stat::Conflict] as f64).ln());
-        let s = 0.8;
+        let start = 0.8;
+        let end = match state.strategy {
+            SearchStrategy::HighSuccesive => 0.99,
+            SearchStrategy::LowSuccesiveLuby | SearchStrategy::LowSuccesiveM => 0.999,
+            SearchStrategy::ManyGlues => 0.92,
+            _ => 0.97,
+        };
         let t = 1.0 - 1.0 / (1.0 + ((state[Stat::Conflict] as f64) / 1000.0).sqrt());
-        let d = s + (1.0 - s) * k * t;
-        self.activity_decay = d;
+        self.activity_decay = start + (end - start) * t;
     }
 
     fn minimize_with_biclauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>) {
@@ -401,14 +383,7 @@ impl VarDBIF for VarDB {
         }
         let VarDB { lbd_temp, var, .. } = self;
         let key = lbd_temp[0] + 1;
-        // let mut lbd = 0;
         for l in &vec[1..] {
-            // if lbd_temp[l.vi() as usize] != key [
-            //     lbd += 1;
-            //     if 6 < lbd {
-            //         return;
-            //     }
-            // }
             lbd_temp[l.vi() as usize] = key;
         }
         let l0 = vec[0];
