@@ -392,7 +392,7 @@ pub struct ClauseDB {
     first_reduction: usize,
     next_reduction: usize, // renamed from `nbclausesbeforereduce`
     cur_restart: usize,
-    glureduce: bool,
+    glue_reduce: bool,
 }
 
 impl Default for ClauseDB {
@@ -414,7 +414,7 @@ impl Default for ClauseDB {
             first_reduction: 1000,
             next_reduction: 1000,
             cur_restart: 1,
-            glureduce: true,
+            glue_reduce: true,
         }
     }
 }
@@ -667,7 +667,7 @@ impl ClauseDBIF for ClauseDB {
             }
         }
         v.swap(1, i_max);
-        let learnt = 0 < lbd && 2 < v.len() && (!state.use_chan_seok || self.co_lbd_bound < lbd);
+        let learnt = 0 < lbd && 2 < v.len() && (!self.glue_reduce || self.co_lbd_bound < lbd);
         let cid = self.new_clause(&v, lbd, learnt);
         let c = &mut self.clause[cid.ordinal as usize];
         c.reward = self.activity_inc;
@@ -687,7 +687,7 @@ impl ClauseDBIF for ClauseDB {
                 self.co_lbd_bound = 4;
                 self.cur_restart = (nc as f64 / self.next_reduction as f64 + 1.0) as usize;
                 self.first_reduction = 2000;
-                self.glureduce = true;
+                self.glue_reduce = true;
                 self.inc_step = 0;
                 self.next_reduction = 2000;
                 self.make_permanent(true);
@@ -695,7 +695,7 @@ impl ClauseDBIF for ClauseDB {
             SearchStrategy::HighSuccesive => {
                 self.co_lbd_bound = 3;
                 self.first_reduction = 30000;
-                self.glureduce = true;
+                self.glue_reduce = true;
                 self.make_permanent(false);
             }
             SearchStrategy::LowSuccesiveLuby => (),
@@ -707,7 +707,7 @@ impl ClauseDBIF for ClauseDB {
         if 0 == self.num_learnt {
             return;
         }
-        let go = if self.glureduce {
+        let go = if self.glue_reduce {
             self.cur_restart * self.next_reduction <= nc
         } else {
             self.first_reduction < self.num_learnt
@@ -799,7 +799,7 @@ impl ClauseDB {
             return;
         }
         let keep = perm.len() / 2;
-        if state.use_chan_seok {
+        if self.glue_reduce {
             perm.sort_by(|&a, &b| clause[a].cmp_activity(&clause[b]));
         } else {
             perm.sort_by(|&a, &b| clause[a].cmp(&clause[b]));
