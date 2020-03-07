@@ -103,19 +103,20 @@ USAGE:
     splr [FLAGS] [OPTIONS] <cnf-filename>
 
 FLAGS:
-    -h, --help                         Prints help information
-    -c, --certify                      Writes a DRAT UNSAT certification file
-    -l, --log                          Uses Glucose-like progress report
-    -V, --version                      Prints version information
-    -S, --without-adaptive-strategy    Disables dynamic strategy adaptation
-    -D, --without-deep-search          Disables deep search mode
-    -E, --without-elim                 Disables exhaustive simplification
+    -h, --help                    Prints help information
+    -q, --quiet                   Disable any progress message
+    -c, --certify                 Writes a DRAT UNSAT certification file
+    -l, --log                     Uses Glucose-like progress report
+    -V, --version                 Prints version information
+    -S, --no-adaptive-strategy    Disables dynamic strategy adaptation
+    -E, --without-elim            Disables exhaustive simplification
 
 OPTIONS:
+    -C, --chronoBT <chronobt>         threshold to use chronoBT [default: 100]
         --cl <clause-limit>           soft limit of #clauses (6MC/GB) [default: 0]
         --stat <dump-interval>        interval for dumpping stat data [default: 0]
-        --eg <elim-grow-limit>        grow limit of #clauses by v-elim [default: 4]
-        --el <elim-lit-limit>         #literals in a clause by v-elim [default: 64]
+        --eg <elim-grow-limit>        grow limit of #clauses by v-elim [default: 0]
+        --el <elim-lit-limit>         #literals in a clause by v-elim [default: 100]
     -o, --dir <output-dirname>        output directory [default: .]
     -p, --proof <proof-filename>      filename for DRAT cert [default: proof.out]
         --ra <restart-asg-len>        length for assignment average [default: 3500]
@@ -124,7 +125,7 @@ OPTIONS:
         --rs <restart-step>           #conflicts between restarts [default: 50]
         --rt <restart-threshold>      forcing restart threshold [default: 0.70]
     -r, --result <result-filename>    result filename/stdout [default: ]
-        --to <timeout>                CPU time limit in sec [default: 0]
+        --to <timeout>                CPU time limit in sec [default: 10000.0]
 
 ARGS:
     <cnf-filename>    a DIMACS format CNF file
