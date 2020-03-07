@@ -19,12 +19,14 @@ Splr is a standalone program, taking a CNF file. The result will be saved to a f
 
 ```plain
 $ splr tests/sample.cnf
-sample.cnf                                         250,1065 |time:     0.37
- #conflict:      17792, #decision:        20650, #propagate:          38443
+sample.cnf                                         250,1065 |time:     0.24
+ #conflict:      12273, #decision:        13676, #propagate:          25950
   Assignment|#rem:      243, #fix:        1, #elm:        6, prg%:   2.8000
-      Clause|Remv:    11307, LBD2:       52, Binc:        0, Perm:     1056
-     Restart|#BLK:      213, #RST:        0, tASG:   1.3606, tLBD:   1.0145
-    Strategy|mode: in the initial search phase to determine a main strategy
+      Clause|Remv:     2337, LBD2:       46, Binc:        0, Perm:     1056
+     Restart|#BLK:      100, #RST:        0, tASG:   1.1967, tLBD:   1.0378
+    Conflict|eLBD:    11.92, cnfl:    18.87, bjmp:    17.84, rpc%:   0.0000
+        misc|#rdc:        9, #sce:        2, stag:        0, vdcy:   0.9292
+    Strategy|mode: Initial search phase before a main strategy
       Result|file: ./.ans_sample.cnf
 SATISFIABLE: tests/sample.cnf
 
