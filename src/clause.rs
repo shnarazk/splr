@@ -57,6 +57,8 @@ pub trait ClauseDBIF {
     fn certificate_delete(&mut self, vec: &[Lit]);
     /// delete satisfied clauses at decision level zero.
     fn eliminate_satisfied_clauses(&mut self, elim: &mut Eliminator, vdb: &mut VarDB, occur: bool);
+    /// return LBD threshold used in glue reduciton mode.
+    fn chan_seok_condition(&self) -> usize;
     /// emit an error if the db size (the number of clauses) is over the limit.
     fn check_size(&self) -> MaybeInconsistent;
     /// returns None if the given assignment is a model of a problem.
@@ -387,7 +389,7 @@ pub struct ClauseDB {
     inc_step: usize,
     extra_inc: usize,
     pub soft_limit: usize,
-    pub co_lbd_bound: usize,
+    co_lbd_bound: usize,
     lbd_frozen_clause: usize,
     first_reduction: usize,
     next_reduction: usize, // renamed from `nbclausesbeforereduce`
@@ -755,6 +757,13 @@ impl ClauseDBIF for ClauseDB {
                     }
                 }
             }
+        }
+    }
+    fn chan_seok_condition(&self) -> usize {
+        if self.glue_reduce {
+            self.co_lbd_bound
+        } else {
+            0
         }
     }
     fn check_size(&self) -> MaybeInconsistent {

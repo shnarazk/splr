@@ -588,7 +588,7 @@ fn conflict_analyze(
     let mut p = NULL_LIT;
     let mut ti = asgs.len() - 1; // trail index
     let mut path_cnt = 0;
-    let lbd_bound = cdb.co_lbd_bound;
+    let chan_seok_condition = cdb.chan_seok_condition();
     loop {
         // println!("analyze {}", p.int());
         debug_assert_ne!(cid, ClauseId::default());
@@ -602,7 +602,8 @@ fn conflict_analyze(
                     // if c.rank <= cdb.lbd_frozen_clause {
                     //     c.turn_on(Flag::JUST_USED);
                     // }
-                    if state.use_chan_seok && nlevels < lbd_bound {
+                    // chan_seok_condition is zero if !use_chan_seok
+                    if nlevels < chan_seok_condition {
                         c.turn_off(Flag::LEARNT);
                         cdb.num_learnt -= 1;
                     } else {

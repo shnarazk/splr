@@ -158,7 +158,6 @@ pub struct State {
     pub stats: [usize; Stat::EndOfStatIndex as usize], // statistics
     pub strategy: SearchStrategy,
     pub target: CNFDescription,
-    pub use_chan_seok: bool,
     pub reflection_interval: usize,
     /// MISC
     pub b_lvl: Ema,
@@ -189,7 +188,6 @@ impl Default for State {
             stats: [0; Stat::EndOfStatIndex as usize],
             strategy: SearchStrategy::Initial,
             target: CNFDescription::default(),
-            use_chan_seok: false,
             reflection_interval: 10_000,
             b_lvl: Ema::new(5_000),
             c_lvl: Ema::new(5_000),
@@ -363,7 +361,6 @@ impl StateIF for State {
         }
         if self[Stat::Decision] as f64 <= 1.2 * self[Stat::Conflict] as f64 {
             self.strategy = SearchStrategy::LowDecisions;
-            self.use_chan_seok = true;
         }
         if self[Stat::NoDecisionConflict] < 30_000 {
             if self.config.with_deep_search {
@@ -374,7 +371,6 @@ impl StateIF for State {
         }
         if 54_400 < self[Stat::NoDecisionConflict] {
             self.strategy = SearchStrategy::HighSuccesive;
-            self.use_chan_seok = true;
         }
         if self[Stat::NumBinLearnt] + 20_000 < self[Stat::NumLBD2] {
             self.strategy = SearchStrategy::ManyGlues;
