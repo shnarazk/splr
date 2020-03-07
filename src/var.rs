@@ -161,14 +161,6 @@ impl FlagIF for Var {
     }
 }
 
-#[derive(Clone, Copy, Eq, Debug, PartialEq, PartialOrd, Ord)]
-pub enum RewardStep {
-    HeatUp = 0,
-    Annealing,
-    Final,
-    Fixed,
-}
-
 /// A container of variables.
 #[derive(Debug)]
 pub struct VarDB {
