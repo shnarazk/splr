@@ -283,7 +283,7 @@ pub trait EmaIF {
 #[derive(Debug)]
 pub struct Ema {
     val: f64,
-    cal: f64,
+    // cal: f64,
     sca: f64,
 }
 
@@ -291,10 +291,10 @@ impl EmaIF for Ema {
     type Input = f64;
     fn update(&mut self, x: Self::Input) {
         self.val = self.sca * x + (1.0 - self.sca) * self.val;
-        self.cal = self.sca + (1.0 - self.sca) * self.cal;
+        // self.cal = self.sca + (1.0 - self.sca) * self.cal;
     }
     fn get(&self) -> f64 {
-        self.val / self.cal
+        self.val // / self.cal
     }
 }
 
@@ -302,7 +302,7 @@ impl Ema {
     pub fn new(s: usize) -> Ema {
         Ema {
             val: 0.0,
-            cal: 0.0,
+            // cal: 0.0,
             sca: 1.0 / (s as f64),
         }
     }
@@ -313,8 +313,8 @@ impl Ema {
 pub struct Ema2 {
     fast: f64,
     slow: f64,
-    calf: f64,
-    cals: f64,
+    // calf: f64,
+    // cals: f64,
     fe: f64,
     se: f64,
 }
@@ -322,20 +322,20 @@ pub struct Ema2 {
 impl EmaIF for Ema2 {
     type Input = f64;
     fn get(&self) -> f64 {
-        self.fast / self.calf
+        self.fast // / self.calf
     }
     fn update(&mut self, x: Self::Input) {
         self.fast = self.fe * x + (1.0 - self.fe) * self.fast;
         self.slow = self.se * x + (1.0 - self.se) * self.slow;
-        self.calf = self.fe + (1.0 - self.fe) * self.calf;
-        self.cals = self.se + (1.0 - self.se) * self.cals;
+        // self.calf = self.fe + (1.0 - self.fe) * self.calf;
+        // self.cals = self.se + (1.0 - self.se) * self.cals;
     }
     fn reset(&mut self) {
         self.slow = self.fast;
-        self.cals = self.calf;
+        // self.cals = self.calf;
     }
     fn trend(&self) -> f64 {
-        self.fast / self.slow * (self.cals / self.calf)
+        self.fast / self.slow // * (self.cals / self.calf)
     }
 }
 
@@ -344,8 +344,8 @@ impl Ema2 {
         Ema2 {
             fast: 0.0,
             slow: 0.0,
-            calf: 0.0,
-            cals: 0.0,
+            // calf: 0.0,
+            // cals: 0.0,
             fe: 1.0 / (f as f64),
             se: 1.0 / (f as f64),
         }
