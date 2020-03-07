@@ -1,9 +1,5 @@
 /// Crate `config` provides solver's configuration and CLI.
-use {
-    crate::types::DecisionLevel,
-    std::path::PathBuf,
-    structopt::StructOpt,
-};
+use {crate::types::DecisionLevel, std::path::PathBuf, structopt::StructOpt};
 
 /// Splr version number.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

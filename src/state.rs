@@ -418,7 +418,7 @@ impl StateIF for State {
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
         self.progress_cnt += 1;
-        print!("\x1B[{}A\x1B[1G", 8);
+        print!("\x1B[8A\x1B[1G");
         println!("\x1B[2K{}", self);
         println!(
             "\x1B[2K #conflict:{}, #decision:{}, #propagate:{} ",

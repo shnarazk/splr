@@ -536,7 +536,7 @@ impl fmt::Display for AssignStack {
             }
         };
         if 0 < len {
-            write!(f, "{:?}", (0..len).map(c).collect::<Vec<(DecisionLevel, &[i32])>>())
+            write!(f, "{:?}", (0..len).map(c).collect::<Vec<_>>())
         } else {
             write!(f, "# - trail[  0]  [0{:?}]", &v)
         }
