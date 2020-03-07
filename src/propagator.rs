@@ -317,11 +317,11 @@ impl PropagatorIF for AssignStack {
     ///    propagatation order.
     fn propagate(&mut self, cdb: &mut ClauseDB, vdb: &mut VarDB) -> ClauseId {
         let watcher = &mut cdb.watcher[..] as *mut [Vec<Watch>];
-        while self.remains() {
-            let p = self.sweep();
-            let false_lit = !p;
+        while let Some(p) = self.trail.get(self.q_head) {
+            self.q_head += 1;
+            let false_lit = !*p;
             unsafe {
-                let source = (*watcher).get_unchecked_mut(usize::from(p));
+                let source = (*watcher).get_unchecked_mut(usize::from(*p));
                 let mut n = 0;
                 'next_clause: while n < source.len() {
                     let w = source.get_unchecked_mut(n);
@@ -392,11 +392,6 @@ impl VarSelectionIF for AssignStack {
 impl AssignStack {
     fn level_up(&mut self) {
         self.trail_lim.push(self.trail.len());
-    }
-    fn sweep(&mut self) -> Lit {
-        let lit = self.trail[self.q_head];
-        self.q_head += 1;
-        lit
     }
     /// dump all active clauses and fixed assignments as a CNF file.
     #[allow(dead_code)]
