@@ -313,13 +313,13 @@ impl VarRewardIF for VarDB {
     fn reward_adjust_to(&mut self, state: &State) {
         let start = 0.8;
         let end = match state.strategy {
-            SearchStrategy::HighSuccesive => 0.99,
-            SearchStrategy::LowDecisions => 0.96,
-            SearchStrategy::LowSuccesiveLuby | SearchStrategy::LowSuccesiveM => 0.999,
-            SearchStrategy::ManyGlues => 0.92,
+            SearchStrategy::HighSuccesive => 0.98,
+            SearchStrategy::LowDecisions => 0.9,
+            SearchStrategy::LowSuccesiveLuby | SearchStrategy::LowSuccesiveM => 0.99,
+            SearchStrategy::ManyGlues => 0.96,
             _ => 0.97,
         };
-        let t = 1.0 - 1.0 / (1.0 + ((state[Stat::Conflict] as f64) / 1000.0).sqrt());
+        let t = 1.0 - 1.0 / (1.0 + ((state[Stat::Conflict] as f64) / 100.0).sqrt());
         self.activity_decay = start + (end - start) * t;
     }
 }
