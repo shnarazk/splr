@@ -392,7 +392,7 @@ impl StateIF for State {
             return;
         }
         println!("{}", self);
-        let repeat = if 0 < self.config.dump_interval { 7 } else { 5 };
+        let repeat = 7;
         for _i in 0..repeat {
             println!("                                                  ");
         }
@@ -418,10 +418,7 @@ impl StateIF for State {
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
         self.progress_cnt += 1;
-        print!(
-            "\x1B[{}A\x1B[1G",
-            if 0 < self.config.dump_interval { 8 } else { 6 },
-        );
+        print!("\x1B[{}A\x1B[1G", 8);
         println!("\x1B[2K{}", self);
         println!(
             "\x1B[2K #conflict:{}, #decision:{}, #propagate:{} ",
@@ -505,48 +502,40 @@ impl StateIF for State {
                 self.rst.lbd.trend()
             ),
         );
-        if 0 < self.config.dump_interval {
-            println!(
-                "\x1B[2K    Conflict|eLBD:{}, cnfl:{}, bjmp:{}, rpc%:{} ",
-                fm!("{:>9.2}", self.record, LogF64Id::AveLBD, self.rst.lbd.get()),
-                fm!("{:>9.2}", self.record, LogF64Id::CLevel, self.c_lvl.get()),
-                fm!("{:>9.2}", self.record, LogF64Id::BLevel, self.b_lvl.get()),
-                fm!(
-                    "{:>9.4}",
-                    self.record,
-                    LogF64Id::End,
-                    100.0 * self[Stat::Restart] as f64 / self[Stat::Conflict] as f64
-                )
-            );
-            println!(
-                "\x1B[2K        misc|#rdc:{}, #sce:{}, stag:{}, vdcy:{} ",
-                im!(
-                    "{:>9}",
-                    self.record,
-                    LogUsizeId::Reduction,
-                    self[Stat::Reduction]
-                ),
-                im!(
-                    "{:>9}",
-                    self.record,
-                    LogUsizeId::SatClauseElim,
-                    self[Stat::SatClauseElimination]
-                ),
-                im!(
-                    "{:>9}",
-                    self.record,
-                    LogUsizeId::Stagnation,
-                    self[Stat::Stagnation]
-                ),
-                format!("{:>9.4}", vdb.activity_decay),
-            );
-        } else {
-            self.record[LogF64Id::AveLBD] = self.rst.lbd.get();
-            self.record[LogF64Id::CLevel] = self.c_lvl.get();
-            self.record[LogF64Id::BLevel] = self.b_lvl.get();
-            self.record[LogUsizeId::Reduction] = self[Stat::Reduction];
-            self.record[LogUsizeId::SatClauseElim] = self[Stat::SatClauseElimination];
-        }
+        println!(
+            "\x1B[2K    Conflict|eLBD:{}, cnfl:{}, bjmp:{}, rpc%:{} ",
+            fm!("{:>9.2}", self.record, LogF64Id::AveLBD, self.rst.lbd.get()),
+            fm!("{:>9.2}", self.record, LogF64Id::CLevel, self.c_lvl.get()),
+            fm!("{:>9.2}", self.record, LogF64Id::BLevel, self.b_lvl.get()),
+            fm!(
+                "{:>9.4}",
+                self.record,
+                LogF64Id::End,
+                100.0 * self[Stat::Restart] as f64 / self[Stat::Conflict] as f64
+            )
+        );
+        println!(
+            "\x1B[2K        misc|#rdc:{}, #sce:{}, stag:{}, vdcy:{} ",
+            im!(
+                "{:>9}",
+                self.record,
+                LogUsizeId::Reduction,
+                self[Stat::Reduction]
+            ),
+            im!(
+                "{:>9}",
+                self.record,
+                LogUsizeId::SatClauseElim,
+                self[Stat::SatClauseElimination]
+            ),
+            im!(
+                "{:>9}",
+                self.record,
+                LogUsizeId::Stagnation,
+                self[Stat::Stagnation]
+            ),
+            format!("{:>9.4}", vdb.activity_decay),
+        );
         if let Some(m) = mes {
             println!("\x1B[2K    Strategy|mode: {}", m);
         } else {
