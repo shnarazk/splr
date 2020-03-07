@@ -256,7 +256,7 @@ impl SatSolverIF for Solver {
         }
         debug_assert_eq!(s.vdb.len() - 1, cnf.num_of_variables);
         s.state[Stat::NumBin] = s.cdb[1..].iter().filter(|c| c.len() == 2).count();
-        s.vdb.adapt_strategy(&s.state);
+        s.vdb.reward_adjust_to(&s.state);
         Ok(s)
     }
     // renamed from clause_new
@@ -558,7 +558,7 @@ fn adapt_parameters(
             elim.simplify(asgs, cdb, state, vdb)?;
         }
     }
-    vdb.adapt_strategy(state);
+    vdb.reward_adjust_to(state);
     state[Stat::SolvedRecord] = state.num_solved_vars;
     if state.config.with_deep_search {
         if state.stagnated {

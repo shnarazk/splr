@@ -41,8 +41,6 @@ pub trait VarDBIF {
     /// - Some(false) -- the literals is unsatisfied; no unassigned literal
     /// - None -- the literals contains an unassigned literal
     fn status(&self, c: &[Lit]) -> Option<bool>;
-    /// set up parameters for each SearchStrategy.
-    fn adapt_strategy(&mut self, state: &State);
     /// minimize a clause.
     fn minimize_with_biclauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>);
 }
@@ -61,6 +59,8 @@ pub trait VarRewardIF {
     fn reward_at_unassign(&mut self, vi: VarId);
     /// update internal counter.
     fn reward_update(&mut self);
+    /// update reward settings
+    fn reward_adjust_to(&mut self, state: &State);
 }
 
 /// Object representing a variable.
@@ -310,6 +310,17 @@ impl VarRewardIF for VarDB {
     fn reward_update(&mut self) {
         self.ordinal += 1;
     }
+    fn reward_adjust_to(&mut self, state: &State) {
+        let start = 0.8;
+        let end = match state.strategy {
+            SearchStrategy::HighSuccesive => 0.99,
+            SearchStrategy::LowSuccesiveLuby | SearchStrategy::LowSuccesiveM => 0.999,
+            SearchStrategy::ManyGlues => 0.92,
+            _ => 0.97,
+        };
+        let t = 1.0 - 1.0 / (1.0 + ((state[Stat::Conflict] as f64) / 1000.0).sqrt());
+        self.activity_decay = start + (end - start) * t;
+    }
 }
 
 impl Instantiate for VarDB {
@@ -364,19 +375,6 @@ impl VarDBIF for VarDB {
         }
         falsified
     }
-
-    fn adapt_strategy(&mut self, state: &State) {
-        let start = 0.8;
-        let end = match state.strategy {
-            SearchStrategy::HighSuccesive => 0.99,
-            SearchStrategy::LowSuccesiveLuby | SearchStrategy::LowSuccesiveM => 0.999,
-            SearchStrategy::ManyGlues => 0.92,
-            _ => 0.97,
-        };
-        let t = 1.0 - 1.0 / (1.0 + ((state[Stat::Conflict] as f64) / 1000.0).sqrt());
-        self.activity_decay = start + (end - start) * t;
-    }
-
     fn minimize_with_biclauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>) {
         if vec.len() <= 1 {
             return;
