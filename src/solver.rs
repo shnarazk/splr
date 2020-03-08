@@ -156,8 +156,10 @@ impl SatSolverIF for Solver {
             if elim.simplify(asgs, cdb, state, vdb).is_err() {
                 // Why inconsistent? Because the CNF contains a conflict, not an error!
                 // Or out of memory.
+                let q = state.config.quiet_mode;
                 state.config.quiet_mode = false;
                 state.progress(cdb, vdb, None);
+                state.config.quiet_mode = q;
                 if cdb.check_size().is_err() {
                     return Err(SolverError::OutOfMemory);
                 }
@@ -181,8 +183,10 @@ impl SatSolverIF for Solver {
         state.progress(cdb, vdb, None);
         match search(asgs, cdb, elim, state, vdb) {
             Ok(true) => {
+                let q = state.config.quiet_mode;
                 state.config.quiet_mode = false;
                 state.progress(cdb, vdb, None);
+                state.config.quiet_mode = q;
                 elim.extend_model(vdb);
                 #[cfg(debug)]
                 {
@@ -213,8 +217,10 @@ impl SatSolverIF for Solver {
             }
             Err(e) => {
                 asgs.cancel_until(vdb, 0);
+                let q = state.config.quiet_mode;
                 state.config.quiet_mode = false;
                 state.progress(cdb, vdb, None);
+                state.config.quiet_mode = q;
                 Err(e)
             }
         }

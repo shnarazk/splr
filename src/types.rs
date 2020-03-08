@@ -372,6 +372,12 @@ pub enum SolverError {
     UndescribedError,
 }
 
+impl fmt::Display for SolverError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
 /// A Return type used by solver functions
 pub type MaybeInconsistent = Result<(), SolverError>;
 
