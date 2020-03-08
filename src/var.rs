@@ -308,10 +308,10 @@ impl VarRewardIF for VarDB {
         let end = match state.strategy {
             SearchStrategy::Initial => 0.96,
             SearchStrategy::Generic => 0.97,
-            SearchStrategy::HighSuccesive => 0.98,
+            SearchStrategy::HighSuccesive => 0.99,
             SearchStrategy::LowDecisions => 0.94,
             SearchStrategy::LowSuccesiveLuby | SearchStrategy::LowSuccesiveM => 0.99,
-            SearchStrategy::ManyGlues => 0.94,
+            SearchStrategy::ManyGlues => 0.98,
         };
         let t = 1.0 - 1.0 / (1.0 + ((state[Stat::Conflict] as f64) / 40.0).sqrt());
         self.activity_decay = 0.5 * (self.activity_decay + start + (end - start) * t);
