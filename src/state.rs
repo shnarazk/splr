@@ -359,25 +359,23 @@ impl StateIF for State {
         if self.config.without_adaptive_strategy || self.strategy != SearchStrategy::Initial {
             return;
         }
-        if self[Stat::Decision] as f64 <= 1.2 * self[Stat::Conflict] as f64 {
-            self.strategy = SearchStrategy::LowDecisions;
-        }
-        if self[Stat::NoDecisionConflict] < 30_000 {
-            if self.config.with_deep_search {
-                self.strategy = SearchStrategy::LowSuccesiveM;
-            } else {
-                self.strategy = SearchStrategy::LowSuccesiveLuby;
+        self.strategy = match () {
+            _ if self[Stat::NumBinLearnt] + 20_000 < self[Stat::NumLBD2] => {
+                SearchStrategy::ManyGlues
             }
-        }
-        if 54_400 < self[Stat::NoDecisionConflict] {
-            self.strategy = SearchStrategy::HighSuccesive;
-        }
-        if self[Stat::NumBinLearnt] + 20_000 < self[Stat::NumLBD2] {
-            self.strategy = SearchStrategy::ManyGlues;
-        }
-        if self.strategy == SearchStrategy::Initial {
-            self.strategy = SearchStrategy::Generic;
-        }
+            _ if self[Stat::Decision] as f64 <= 1.2 * self[Stat::Conflict] as f64 => {
+                SearchStrategy::LowDecisions
+            }
+            _ if self[Stat::NoDecisionConflict] < 30_000 => {
+                if self.config.with_deep_search {
+                    SearchStrategy::LowSuccesiveM
+                } else {
+                    SearchStrategy::LowSuccesiveLuby
+                }
+            }
+            _ if 54_400 < self[Stat::NoDecisionConflict] => SearchStrategy::HighSuccesive,
+            _ => SearchStrategy::Generic,
+        };
     }
     fn progress_header(&self) {
         if self.config.quiet_mode {
