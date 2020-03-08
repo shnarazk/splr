@@ -307,7 +307,7 @@ impl VarRewardIF for VarDB {
         let start = 0.8;
         let end = match state.strategy {
             SearchStrategy::Initial => 0.96,
-            SearchStrategy::Generic => 0.98,
+            SearchStrategy::Generic => 0.96,
             SearchStrategy::HighSuccesive => 0.99,
             SearchStrategy::LowDecisions => 0.94,
             SearchStrategy::LowSuccesiveLuby | SearchStrategy::LowSuccesiveM => 0.99,
