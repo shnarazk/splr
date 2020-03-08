@@ -293,9 +293,9 @@ impl VarRewardIF for VarDB {
     fn reward_at_unassign(&mut self, vi: VarId) {
         let v = &mut self.var[vi];
         let duration = (self.ordinal + 1 - v.timestamp) as f64;
-        let di = duration.powf(1.5);
+        // let di = duration.powf(1.5);
         let decay = self.activity_decay;
-        let rate = v.participated as f64 / di;
+        let rate = v.participated as f64 / duration;
         v.reward *= decay;
         v.reward += (1.0 - decay) * rate;
         v.participated = 0;
@@ -306,12 +306,12 @@ impl VarRewardIF for VarDB {
     fn reward_adjust_to(&mut self, state: &State) {
         let start = 0.8;
         let end = match state.strategy {
-            SearchStrategy::Initial => 0.95,
-            SearchStrategy::Generic => 0.96,
+            SearchStrategy::Initial => 0.96,
+            SearchStrategy::Generic => 0.97,
             SearchStrategy::HighSuccesive => 0.98,
             SearchStrategy::LowDecisions => 0.94,
             SearchStrategy::LowSuccesiveLuby | SearchStrategy::LowSuccesiveM => 0.99,
-            SearchStrategy::ManyGlues => 0.96,
+            SearchStrategy::ManyGlues => 0.94,
         };
         let t = 1.0 - 1.0 / (1.0 + ((state[Stat::Conflict] as f64) / 40.0).sqrt());
         self.activity_decay = 0.5 * (self.activity_decay + start + (end - start) * t);
