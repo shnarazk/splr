@@ -4,6 +4,7 @@
 - move `Clause::simplify` to `Eliminator` and make `Eliminator::eliminate` private
 - make `Var` smaller
 - define `DecisionLevel`
+- generate a result file even if splr failed to solve
 
 ## 0.3.1, 2020-02-22
 
