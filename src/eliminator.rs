@@ -322,7 +322,6 @@ impl EliminatorIF for Eliminator {
             v.reason = ClauseId::default();
         }
         if self.is_waiting() {
-            cdb.reset();
             self.prepare(cdb, vdb, true);
         }
         self.eliminate(asgs, cdb, state, vdb)?;

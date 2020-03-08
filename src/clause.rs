@@ -394,7 +394,7 @@ pub struct ClauseDB {
     first_reduction: usize,
     next_reduction: usize, // renamed from `nbclausesbeforereduce`
     cur_restart: usize,
-    glue_reduce: bool,
+    use_chan_seok: bool,
 }
 
 impl Default for ClauseDB {
@@ -416,7 +416,7 @@ impl Default for ClauseDB {
             first_reduction: 1000,
             next_reduction: 1000,
             cur_restart: 1,
-            glue_reduce: true,
+            use_chan_seok: false,
         }
     }
 }
@@ -669,7 +669,7 @@ impl ClauseDBIF for ClauseDB {
             }
         }
         v.swap(1, i_max);
-        let learnt = 0 < lbd && 2 < v.len() && (!self.glue_reduce || self.co_lbd_bound < lbd);
+        let learnt = 0 < lbd && 2 < v.len() && (!self.use_chan_seok || self.co_lbd_bound < lbd);
         let cid = self.new_clause(&v, lbd, learnt);
         let c = &mut self.clause[cid.ordinal as usize];
         c.reward = self.activity_inc;
@@ -689,7 +689,7 @@ impl ClauseDBIF for ClauseDB {
                 self.co_lbd_bound = 4;
                 self.cur_restart = (nc as f64 / self.next_reduction as f64 + 1.0) as usize;
                 self.first_reduction = 2000;
-                self.glue_reduce = true;
+                self.use_chan_seok = true;
                 self.inc_step = 0;
                 self.next_reduction = 2000;
                 self.make_permanent(true);
@@ -697,7 +697,7 @@ impl ClauseDBIF for ClauseDB {
             SearchStrategy::HighSuccesive => {
                 self.co_lbd_bound = 3;
                 self.first_reduction = 30000;
-                self.glue_reduce = true;
+                self.use_chan_seok = true;
                 self.make_permanent(false);
             }
             SearchStrategy::LowSuccesiveLuby => (),
@@ -709,13 +709,14 @@ impl ClauseDBIF for ClauseDB {
         if 0 == self.num_learnt {
             return;
         }
-        let go = if self.glue_reduce {
-            self.cur_restart * self.next_reduction <= nc
-        } else {
+        let go = if self.use_chan_seok {
             self.first_reduction < self.num_learnt
+        } else {
+            self.cur_restart * self.next_reduction <= nc
         };
         if go {
-            self.reduce(state, vdb, nc);
+            self.cur_restart = ((nc as f64) / (self.next_reduction as f64)) as usize + 1;
+            self.reduce(state, vdb);
         }
     }
     fn reset(&mut self) {
@@ -760,7 +761,7 @@ impl ClauseDBIF for ClauseDB {
         }
     }
     fn chan_seok_condition(&self) -> usize {
-        if self.glue_reduce {
+        if self.use_chan_seok {
             self.co_lbd_bound
         } else {
             0
@@ -790,7 +791,7 @@ impl ClauseDBIF for ClauseDB {
 
 impl ClauseDB {
     /// halve the number of 'learnt' or *removable* clauses.
-    fn reduce(&mut self, state: &mut State, vdb: &mut VarDB, ncnfl: usize) {
+    fn reduce(&mut self, state: &mut State, vdb: &mut VarDB) {
         vdb.reset_lbd(self);
         let ClauseDB {
             ref mut clause,
@@ -808,7 +809,7 @@ impl ClauseDB {
             return;
         }
         let keep = perm.len() / 2;
-        if self.glue_reduce {
+        if self.use_chan_seok {
             perm.sort_by(|&a, &b| clause[a].cmp_activity(&clause[b]));
         } else {
             perm.sort_by(|&a, &b| clause[a].cmp(&clause[b]));
@@ -830,7 +831,6 @@ impl ClauseDB {
         }
         state[Stat::Reduction] += 1;
         self.garbage_collect();
-        self.cur_restart = ((ncnfl as f64) / (self.next_reduction as f64)) as usize + 1;
     }
     /// change good learnt clauses to permanent one.
     fn make_permanent(&mut self, reinit: bool) {
