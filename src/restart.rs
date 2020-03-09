@@ -318,7 +318,9 @@ impl RestartIF for RestartExecutor {
         match mode {
             SearchStrategy::Initial => (),
             SearchStrategy::Generic => (),
-            SearchStrategy::LowDecisions => (),
+            SearchStrategy::LowDecisions => {
+                self.lbd.threshold = 0.5 * self.lbd.threshold + 0.5;
+            }
             SearchStrategy::HighSuccesive => (),
             SearchStrategy::LowSuccesiveLuby => {
                 self.luby.active = true;
