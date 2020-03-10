@@ -465,7 +465,12 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K     Restart|#BLK:{}, #RST:{}, tASG:{}, tLBD:{} ",
+            "\x1B[2K {}|#BLK:{}, #RST:{}, tASG:{}, tLBD:{} ",
+            if rst.luby.active {
+                "\x1B[001m\x1B[035mLubyRestart\x1B[000m"
+            } else {
+                "    Restart"
+            },
             im!(
                 "{:>9}",
                 self.record,

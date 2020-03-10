@@ -279,7 +279,12 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c      Restart|#BLK:{}, #RST:{}, eASG:{}, eLBD:{} \n",
+            "c  {}|#BLK:{}, #RST:{}, eASG:{}, eLBD:{} \n",
+            if s.rst.luby.active {
+                "LubyRestart"
+            } else {
+                "    Restart"
+            },
             format!(
                 "{:>9}",
                 state.record.vali[LogUsizeId::RestartBlock as usize]
