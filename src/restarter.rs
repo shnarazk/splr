@@ -105,7 +105,7 @@ impl ProgressEvaluator for ProgressLBD {
 
 /// An EMA of decision level.
 #[derive(Debug)]
-pub struct ProgressLVL {
+struct ProgressLVL {
     ema: Ema2,
 }
 
