@@ -352,13 +352,6 @@ fn search(
                 }
                 state.num_solved_vars = asgs.len();
             }
-            if !asgs.remains() {
-                let vi = asgs.select_var(vdb);
-                let p = vdb[vi].is(Flag::PHASE);
-                asgs.assign_by_decision(vdb, Lit::from_assign(vi, p));
-                state[Stat::Decision] += 1;
-                a_decision_was_made = true;
-            }
         } else {
             state[Stat::Conflict] += 1;
             if a_decision_was_made {
@@ -375,6 +368,13 @@ fn search(
                 return Ok(false);
             }
             handle_conflict_path(asgs, cdb, elim, rst, state, vdb, ci)?;
+        }
+        if !asgs.remains() {
+            let vi = asgs.select_var(vdb);
+            let p = vdb[vi].is(Flag::PHASE);
+            asgs.assign_by_decision(vdb, Lit::from_assign(vi, p));
+            state[Stat::Decision] += 1;
+            a_decision_was_made = true;
         }
     }
 }
