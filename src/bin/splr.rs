@@ -104,7 +104,7 @@ fn save_result<S: AsRef<str> + std::fmt::Display>(
                     )
                     .as_bytes(),
                 )?;
-                report(&s.state, buf)?;
+                report(s, buf)?;
                 buf.write_all(b"s SATISFIABLE\n")?;
                 for x in v {
                     buf.write_all(format!("{} ", x).as_bytes())?;
@@ -144,7 +144,7 @@ fn save_result<S: AsRef<str> + std::fmt::Display>(
                     )
                     .as_bytes(),
                 )?;
-                report(&s.state, &mut buf)?;
+                report(s, &mut buf)?;
                 buf.write_all(b"s UNSATISFIABLE\n")?;
                 buf.write_all(b"0\n")
             })() {
@@ -172,7 +172,7 @@ fn save_result<S: AsRef<str> + std::fmt::Display>(
                     )
                         .as_bytes(),
                 )?;
-                report(&s.state, buf)?;
+                report(s, buf)?;
                 buf.write_all(
                     format!(
                         "c {}\n",
@@ -225,7 +225,8 @@ fn save_proof<S: AsRef<str> + std::fmt::Display>(s: &Solver, input: S, output: &
     }
 }
 
-fn report(state: &State, out: &mut dyn Write) -> std::io::Result<()> {
+fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
+    let state = &s.state;
     let tm = {
         let mut time = timespec {
             tv_sec: 0,
@@ -304,11 +305,11 @@ fn report(state: &State, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c         misc|#rdc:{}, #sce:{}, stag:{}, vdcy:      0.0 \n",
+            "c         misc|#rdc:{}, #sce:{}, stag:{}, vdcy: {} \n",
             format!("{:>9}", state[LogUsizeId::Reduction]),
             format!("{:>9}", state[LogUsizeId::SatClauseElim]),
             format!("{:>9}", state[LogUsizeId::Stagnation]),
-            // format!("{:>9.4}", vdb.activity_decay),
+            format!("{:>9.4}", s.vdb.activity_decay),
         )
         .as_bytes(),
     )?;
