@@ -36,7 +36,7 @@ pub trait ClauseDBIF {
     /// unregister a clause `cid` from clause database and make the clause dead.
     fn detach(&mut self, cid: ClauseId);
     /// check a condition to reduce.
-    fn check_and_reduce(&mut self, state: &mut State, vdb: &mut VarDB, nc: usize);
+    fn check_and_reduce(&mut self, vdb: &mut VarDB, nc: usize) -> bool;
     fn reset(&mut self);
     /// delete *dead* clauses from database, which are made by:
     /// * `reduce`
@@ -707,9 +707,9 @@ impl ClauseDBIF for ClauseDB {
         debug_assert!(1 < c.lits.len());
         c.kill(&mut self.touched);
     }
-    fn check_and_reduce(&mut self, state: &mut State, vdb: &mut VarDB, nc: usize) {
+    fn check_and_reduce(&mut self, vdb: &mut VarDB, nc: usize) -> bool {
         if 0 == self.num_learnt {
-            return;
+            return false;
         }
         let go = if self.use_chan_seok {
             self.first_reduction < self.num_learnt
@@ -718,8 +718,9 @@ impl ClauseDBIF for ClauseDB {
         };
         if go {
             self.cur_restart = ((nc as f64) / (self.next_reduction as f64)) as usize + 1;
-            self.reduce(state, vdb);
+            self.reduce(vdb);
         }
+        go
     }
     fn reset(&mut self) {
         debug_assert!(1 < self.clause.len());
@@ -793,7 +794,7 @@ impl ClauseDBIF for ClauseDB {
 
 impl ClauseDB {
     /// halve the number of 'learnt' or *removable* clauses.
-    fn reduce(&mut self, state: &mut State, vdb: &mut VarDB) {
+    fn reduce(&mut self, vdb: &mut VarDB) {
         vdb.reset_lbd(self);
         let ClauseDB {
             ref mut clause,
@@ -831,7 +832,6 @@ impl ClauseDB {
                 c.kill(touched);
             }
         }
-        state[Stat::Reduction] += 1;
         self.garbage_collect();
     }
     /// change good learnt clauses to permanent one.

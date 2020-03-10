@@ -545,7 +545,9 @@ fn handle_conflict_path(
             return Err(SolverError::UndescribedError);
         }
     }
-    cdb.check_and_reduce(state, vdb, state[Stat::Conflict]);
+    if cdb.check_and_reduce(vdb, state[Stat::Conflict]) {
+        state[Stat::Reduction] += 1;
+    }
     Ok(())
 }
 
