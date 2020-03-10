@@ -494,6 +494,8 @@ fn handle_conflict_path(
             // So we have to filter vars instead of literals to avoid double counting.
             let mut bumped = new_learnt.iter().map(|l| l.vi()).collect::<Vec<VarId>>();
             for lit in new_learnt.iter() {
+                //[Learnt Literal Rewarding]
+                //vdb.reward_at_analysis(lit.vi());
                 for l in &cdb[vdb[lit.vi()].reason].lits {
                     let vi = l.vi();
                     if !bumped.contains(&vi) {
@@ -620,7 +622,7 @@ fn conflict_analyze(
         for q in &c[(p != NULL_LIT) as usize..] {
             let vi = q.vi();
             if !vdb[vi].is(Flag::CA_SEEN) {
-                vdb.reward_at_analysis(vi);
+                // vdb.reward_at_analysis(vi);
                 let v = &mut vdb[vi];
                 if 0 == v.level {
                     continue;
@@ -631,6 +633,8 @@ fn conflict_analyze(
                 if dl <= v.level {
                     // println!("- flag for {} which level is {}", q.int(), lvl);
                     path_cnt += 1;
+                    //[Conflict-Side Rewarding]
+                    vdb.reward_at_analysis(vi);
                 } else {
                     // println!("- push {} to learnt, which level is {}", q.int(), lvl);
                     learnt.push(*q);
