@@ -538,10 +538,6 @@ fn handle_conflict_path(
         if let Some(p) = state.elapsed() {
             if 1.0 <= p {
                 return Err(SolverError::TimeOut);
-            } else if state.default_rewarding && 0.5 <= p {
-                // switch to the final stage of rewarding,
-                // which has a similar effect of deep search.
-                state.default_rewarding = false;
             }
         } else {
             return Err(SolverError::UndescribedError);
