@@ -303,16 +303,12 @@ impl Instantiate for Restarter {
         }
     }
     fn adapt_to(&mut self, state: &State, changed: bool) {
-        if !self.luby.active {
-            if state.c_lvl.get() < 1.5 * self.lbd.get() {
-                self.luby.active = true;
-            } else if state.config.with_deep_search {
-                if state.stagnated {
-                    self.restart_step = state.reflection_interval;
-                    self.next_restart += state.reflection_interval;
-                } else {
-                    self.restart_step = state.config.restart_step;
-                }
+        if !self.luby.active && state.config.with_deep_search {
+            if state.stagnated {
+                self.restart_step = state.reflection_interval;
+                self.next_restart += state.reflection_interval;
+            } else {
+                self.restart_step = state.config.restart_step;
             }
         }
         if !changed {
@@ -323,6 +319,12 @@ impl Instantiate for Restarter {
             SearchStrategy::Generic => (),
             SearchStrategy::LowDecisions => {
                 // self.lbd.threshold = 0.5 * self.lbd.threshold + 0.5;
+                if state.c_lvl.get() < 1.2 * self.lbd.get() {
+                    self.luby.active = true;
+                    self.luby.step = 100;
+                } else if changed {
+                    // self.lbd.threshold = 0.5 * self.lbd.threshold + 0.5;
+                }
             }
             SearchStrategy::HighSuccesive => (),
             SearchStrategy::LowSuccesiveLuby => {
