@@ -34,6 +34,7 @@ pub trait ActivityIF {
 }
 
 /// API for object instantiation based on `Configuration` and `CNFDescription`
+/// and adaptation.
 pub trait Instantiate {
     fn instantiate(conf: &Config, cnf: &CNFDescription) -> Self;
     /// set up internal parameters.
