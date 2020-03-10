@@ -534,7 +534,7 @@ fn handle_conflict_path(
         ));
     }
     if ncnfl % state.reflection_interval == 0 {
-        adapt_parameters(asgs, cdb, elim, rst, state, vdb)?;
+        adapt_modules(asgs, cdb, elim, rst, state, vdb)?;
         if let Some(p) = state.elapsed() {
             if 1.0 <= p {
                 return Err(SolverError::TimeOut);
@@ -552,7 +552,7 @@ fn handle_conflict_path(
 }
 
 #[inline]
-fn adapt_parameters(
+fn adapt_modules(
     asgs: &mut AssignStack,
     cdb: &mut ClauseDB,
     elim: &mut Eliminator,
