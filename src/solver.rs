@@ -575,14 +575,6 @@ fn adapt_modules(
     rst.adapt_to(state, switch);
     vdb.adapt_to(state, switch);
     state[Stat::SolvedRecord] = state.num_solved_vars;
-    if state.config.with_deep_search {
-        if state.stagnated {
-            rst.restart_step = state.reflection_interval;
-            rst.next_restart += state.reflection_interval;
-        } else {
-            rst.restart_step = state.config.restart_step;
-        }
-    }
     state.progress(cdb, rst, vdb, None);
     Ok(())
 }
