@@ -303,14 +303,16 @@ impl Instantiate for Restarter {
         }
     }
     fn adapt_to(&mut self, state: &State, changed: bool) {
-        if state.c_lvl.get() < 1.8 * self.lbd.get() {
-            self.luby.active = true;
-        } else if state.config.with_deep_search {
-            if state.stagnated {
-                self.restart_step = state.reflection_interval;
-                self.next_restart += state.reflection_interval;
-            } else {
-                self.restart_step = state.config.restart_step;
+        if !self.luby.active {
+            if state.c_lvl.get() < 1.5 * self.lbd.get() {
+                self.luby.active = true;
+            } else if state.config.with_deep_search {
+                if state.stagnated {
+                    self.restart_step = state.reflection_interval;
+                    self.next_restart += state.reflection_interval;
+                } else {
+                    self.restart_step = state.config.restart_step;
+                }
             }
         }
         if !changed {
