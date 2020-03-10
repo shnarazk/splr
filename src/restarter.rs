@@ -205,7 +205,7 @@ impl Default for LubySeries {
             index: 0,
             next_restart: 0,
             restart_inc: 2.0,
-            step: 10,
+            step: 100,
         }
     }
 }
@@ -311,25 +311,19 @@ impl Instantiate for Restarter {
                 self.restart_step = state.config.restart_step;
             }
         }
-        if !changed {
-            return;
-        }
         match state.strategy {
             SearchStrategy::Initial => (),
-            SearchStrategy::Generic => (),
+            SearchStrategy::Generic => {
+                self.luby.active = state.c_lvl.get() < 14.0;
+            }
             SearchStrategy::LowDecisions => {
-                // self.lbd.threshold = 0.5 * self.lbd.threshold + 0.5;
-                if state.c_lvl.get() < 1.2 * self.lbd.get() {
-                    self.luby.active = true;
-                    self.luby.step = 100;
-                } else if changed {
-                    // self.lbd.threshold = 0.5 * self.lbd.threshold + 0.5;
-                }
+                self.luby.active = state.c_lvl.get() < 14.0;
             }
             SearchStrategy::HighSuccesive => (),
             SearchStrategy::LowSuccesiveLuby => {
-                self.luby.active = true;
-                self.luby.step = 100;
+                if changed {
+                    self.luby.active = true;
+                }
             }
             SearchStrategy::LowSuccesiveM => (),
             SearchStrategy::ManyGlues => (),
