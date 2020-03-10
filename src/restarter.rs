@@ -302,7 +302,13 @@ impl Instantiate for Restarter {
             restart_step: config.restart_step,
         }
     }
-    fn adapt_to(&mut self, state: &State) {
+    fn adapt_to(&mut self, state: &State, changed: bool) {
+        if state.c_lvl.get() < 1.8 * self.lbd.get() {
+            self.luby.active = true;
+        }
+        if !changed {
+            return;
+        }
         match state.strategy {
             SearchStrategy::Initial => (),
             SearchStrategy::Generic => (),

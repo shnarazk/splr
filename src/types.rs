@@ -37,7 +37,8 @@ pub trait ActivityIF {
 pub trait Instantiate {
     fn instantiate(conf: &Config, cnf: &CNFDescription) -> Self;
     /// set up internal parameters.
-    fn adapt_to(&mut self, _: &State) {}
+    /// The 3rd argument is `true` just after strategy adaptation.
+    fn adapt_to(&mut self, _state: &State, _changed: bool) {}
 }
 
 /// API for O(n) deletion from a list, providing `delete_unstable`.

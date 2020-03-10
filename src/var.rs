@@ -59,8 +59,6 @@ pub trait VarRewardIF {
     fn reward_at_unassign(&mut self, vi: VarId);
     /// update internal counter.
     fn reward_update(&mut self);
-    /// update reward settings
-    fn reward_adjust_to(&mut self, state: &State);
 }
 
 /// Object representing a variable.
@@ -303,7 +301,18 @@ impl VarRewardIF for VarDB {
     fn reward_update(&mut self) {
         self.ordinal += 1;
     }
-    fn reward_adjust_to(&mut self, state: &State) {
+}
+
+impl Instantiate for VarDB {
+    fn instantiate(_: &Config, cnf: &CNFDescription) -> Self {
+        let nv = cnf.num_of_variables;
+        VarDB {
+            var: Var::new_vars(nv),
+            lbd_temp: vec![0; nv + 1],
+            ..VarDB::default()
+        }
+    }
+    fn adapt_to(&mut self, state: &State, _changed: bool) {
         let start = 0.8;
         let end = match state.strategy {
             SearchStrategy::Initial => 0.96,
@@ -315,17 +324,6 @@ impl VarRewardIF for VarDB {
         };
         let t = 1.0 - 1.0 / (1.0 + ((state[Stat::Conflict] as f64) / 40.0).sqrt());
         self.activity_decay = 0.5 * (self.activity_decay + start + (end - start) * t);
-    }
-}
-
-impl Instantiate for VarDB {
-    fn instantiate(_: &Config, cnf: &CNFDescription) -> Self {
-        let nv = cnf.num_of_variables;
-        VarDB {
-            var: Var::new_vars(nv),
-            lbd_temp: vec![0; nv + 1],
-            ..VarDB::default()
-        }
     }
 }
 

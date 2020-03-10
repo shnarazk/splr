@@ -529,7 +529,10 @@ impl Instantiate for ClauseDB {
             ..ClauseDB::default()
         }
     }
-    fn adapt_to(&mut self, state: &State) {
+    fn adapt_to(&mut self, state: &State, changed: bool) {
+        if !changed {
+            return;
+        }
         match state.strategy {
             SearchStrategy::Initial => (),
             SearchStrategy::Generic => (),

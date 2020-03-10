@@ -266,7 +266,7 @@ impl SatSolverIF for Solver {
         }
         debug_assert_eq!(s.vdb.len() - 1, cnf.num_of_variables);
         s.state[Stat::NumBin] = s.cdb[1..].iter().filter(|c| c.len() == 2).count();
-        s.vdb.reward_adjust_to(&s.state);
+        s.vdb.adapt_to(&s.state, false);
         Ok(s)
     }
     // renamed from clause_new
@@ -560,23 +560,20 @@ fn adapt_parameters(
     state: &mut State,
     vdb: &mut VarDB,
 ) -> MaybeInconsistent {
-    let switch = 10 * state.reflection_interval;
     state.check_stagnation();
-    if state[Stat::Conflict] == switch {
+    let switch = 10 * state.reflection_interval == state[Stat::Conflict];
+    if switch {
         state.flush("exhaustive eliminator activated...");
         asgs.cancel_until(vdb, 0);
         state.select_strategy();
-        cdb.adapt_to(state);
-        rst.adapt_to(state);
         if elim.enable {
             elim.activate();
             elim.simplify(asgs, cdb, state, vdb)?;
         }
     }
-    if state.c_lvl.get() < 1.8 * rst.lbd.get() {
-        rst.luby.active = true;
-    }
-    vdb.reward_adjust_to(state);
+    cdb.adapt_to(state, switch);
+    rst.adapt_to(state, switch);
+    vdb.adapt_to(state, switch);
     state[Stat::SolvedRecord] = state.num_solved_vars;
     if state.config.with_deep_search {
         if state.stagnated {
