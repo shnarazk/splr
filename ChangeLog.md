@@ -5,6 +5,7 @@
 - make `Var` smaller
 - define `DecisionLevel`
 - generate a result file even if splr failed to solve
+- define `restarter` as the sixth module of `Solver`
 
 ## 0.3.1, 2020-02-22
 
