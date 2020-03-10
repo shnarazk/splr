@@ -984,7 +984,7 @@ fn eliminate_var(
                         } else {
                             0
                         };
-                        let cid = cdb.attach(state, vdb, rank);
+                        let cid = cdb.attach(&mut *vec, vdb, rank);
                         elim.add_cid_occur(vdb, cid, &mut cdb[cid], true);
                     }
                 }

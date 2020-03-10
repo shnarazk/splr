@@ -32,7 +32,7 @@ pub trait ClauseDBIF {
     /// return true if it's empty.
     fn is_empty(&self) -> bool;
     /// make a new clause from `state.new_learnt` and register it to clause database.
-    fn attach(&mut self, state: &mut State, vdb: &mut VarDB, lbd: usize) -> ClauseId;
+    fn attach(&mut self, v: &mut [Lit], vdb: &mut VarDB, lbd: usize) -> ClauseId;
     /// unregister a clause `cid` from clause database and make the clause dead.
     fn detach(&mut self, cid: ClauseId);
     /// check a condition to reduce.
@@ -676,8 +676,7 @@ impl ClauseDBIF for ClauseDB {
             .count()
     }
     // Note: set LBD to 0 if you want to add the clause to Permanent.
-    fn attach(&mut self, state: &mut State, vdb: &mut VarDB, lbd: usize) -> ClauseId {
-        let v = &mut state.new_learnt;
+    fn attach(&mut self, v: &mut [Lit], vdb: &mut VarDB, lbd: usize) -> ClauseId {
         if !self.certified.is_empty() {
             let temp = v.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
             self.certified.push((CertifiedRecord::ADD, temp));

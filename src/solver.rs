@@ -506,8 +506,8 @@ fn handle_conflict_path(
             }
         }
         asgs.cancel_until(vdb, bl);
-        let lbd = vdb.compute_lbd(&new_learnt);
-        let cid = cdb.attach(state, vdb, lbd);
+        let lbd = vdb.compute_lbd(new_learnt);
+        let cid = cdb.attach(new_learnt, vdb, lbd);
         elim.add_cid_occur(vdb, cid, &mut cdb[cid], true);
         state.c_lvl.update(cl as f64);
         state.b_lvl.update(bl as f64);
