@@ -4,7 +4,7 @@ use {
         clause::{ClauseDB, ClauseDBIF},
         config::Config,
         eliminator::Eliminator,
-        restart::RestartExecutor,
+        restarter::Restarter,
         types::*,
         var::{VarDB, VarDBIF},
     },
@@ -30,11 +30,11 @@ pub trait StateIF {
     /// update internal counters and return true if solver stagnated.
     fn check_stagnation(&mut self);
     /// change heuristics based on stat data.
-    fn adapt_strategy(&mut self);
+    fn select_strategy(&mut self);
     /// write a header of stat data to stdio.
     fn progress_header(&self);
     /// write stat data to stdio.
-    fn progress(&mut self, cdb: &ClauseDB, vdb: &VarDB, mes: Option<&str>);
+    fn progress(&mut self, cdb: &ClauseDB, rst: &Restarter, vdb: &VarDB, mes: Option<&str>);
     /// write a short message to stdout.
     fn flush<S: AsRef<str>>(&self, mes: S);
 }
@@ -154,7 +154,6 @@ pub struct State {
     pub num_solved_vars: usize,
     pub num_eliminated_vars: usize,
     pub config: Config,
-    pub rst: RestartExecutor,
     pub stats: [usize; Stat::EndOfStatIndex as usize], // statistics
     pub strategy: SearchStrategy,
     pub target: CNFDescription,
@@ -184,7 +183,6 @@ impl Default for State {
             num_solved_vars: 0,
             num_eliminated_vars: 0,
             config: Config::default(),
-            rst: RestartExecutor::instantiate(&Config::default(), &CNFDescription::default()),
             stats: [0; Stat::EndOfStatIndex as usize],
             strategy: SearchStrategy::Initial,
             target: CNFDescription::default(),
@@ -307,7 +305,6 @@ impl Instantiate for State {
     fn instantiate(config: &Config, cnf: &CNFDescription) -> State {
         let mut state = State::default();
         state.num_vars = cnf.num_of_variables;
-        state.rst = RestartExecutor::instantiate(config, &cnf);
         state.model = vec![None; cnf.num_of_variables + 1];
         state.target = cnf.clone();
         state.time_limit = config.timeout;
@@ -355,7 +352,7 @@ impl StateIF for State {
             self[Stat::Stagnation] += 1;
         }
     }
-    fn adapt_strategy(&mut self) {
+    fn select_strategy(&mut self) {
         if self.config.without_adaptive_strategy || self.strategy != SearchStrategy::Initial {
             return;
         }
@@ -400,7 +397,7 @@ impl StateIF for State {
     }
     /// `mes` should be shorter than or equal to 9, or 8 + a delimiter.
     #[allow(clippy::cognitive_complexity)]
-    fn progress(&mut self, cdb: &ClauseDB, vdb: &VarDB, mes: Option<&str>) {
+    fn progress(&mut self, cdb: &ClauseDB, rst: &Restarter, vdb: &VarDB, mes: Option<&str>) {
         if self.config.quiet_mode {
             return;
         }
@@ -487,18 +484,18 @@ impl StateIF for State {
                 "{:>9.4}",
                 self.record,
                 LogF64Id::EmaAsg,
-                self.rst.asg.trend()
+                rst.asg.trend()
             ),
             fm!(
                 "{:>9.4}",
                 self.record,
                 LogF64Id::EmaLBD,
-                self.rst.lbd.trend()
+                rst.lbd.trend()
             ),
         );
         println!(
             "\x1B[2K    Conflict|eLBD:{}, cnfl:{}, bjmp:{}, rpc%:{} ",
-            fm!("{:>9.2}", self.record, LogF64Id::AveLBD, self.rst.lbd.get()),
+            fm!("{:>9.2}", self.record, LogF64Id::AveLBD, rst.lbd.get()),
             fm!("{:>9.2}", self.record, LogF64Id::CLevel, self.c_lvl.get()),
             fm!("{:>9.2}", self.record, LogF64Id::BLevel, self.b_lvl.get()),
             fm!(
@@ -734,7 +731,7 @@ impl State {
         );
     }
     #[allow(dead_code)]
-    fn dump_details(&mut self, cdb: &ClauseDB, _: &Eliminator, vdb: &VarDB, mes: Option<&str>) {
+    fn dump_details(&mut self, cdb: &ClauseDB, _: &Eliminator, rst: &Restarter, vdb: &VarDB, mes: Option<&str>) {
         self.progress_cnt += 1;
         let msg = match mes {
             None => self.strategy.to_str(),
@@ -758,9 +755,9 @@ impl State {
             0,
             self[Stat::BlockRestart],
             self[Stat::Restart],
-            self.rst.asg.get(),
-            self.rst.lbd.get(),
-            self.rst.lbd.get(),
+            rst.asg.get(),
+            rst.lbd.get(),
+            rst.lbd.get(),
             self.b_lvl.get(),
             self.c_lvl.get(),
             0, // elim.clause_queue_len(),

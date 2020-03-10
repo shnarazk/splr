@@ -35,8 +35,6 @@ pub trait ClauseDBIF {
     fn attach(&mut self, state: &mut State, vdb: &mut VarDB, lbd: usize) -> ClauseId;
     /// unregister a clause `cid` from clause database and make the clause dead.
     fn detach(&mut self, cid: ClauseId);
-    /// set up parameters for each SearchStrategy.
-    fn adapt_strategy(&mut self, mode: &SearchStrategy, nc: usize);
     /// check a condition to reduce.
     fn check_and_reduce(&mut self, state: &mut State, vdb: &mut VarDB, nc: usize);
     fn reset(&mut self);
@@ -531,6 +529,31 @@ impl Instantiate for ClauseDB {
             ..ClauseDB::default()
         }
     }
+    fn adapt_to(&mut self, state: &State) {
+        match state.strategy {
+            SearchStrategy::Initial => (),
+            SearchStrategy::Generic => (),
+            SearchStrategy::LowDecisions => {
+                let nc = state[Stat::Conflict];
+                self.co_lbd_bound = 4;
+                self.cur_restart = (nc as f64 / self.next_reduction as f64 + 1.0) as usize;
+                self.first_reduction = 2000;
+                self.use_chan_seok = true;
+                self.inc_step = 0;
+                self.next_reduction = 2000;
+                self.make_permanent(true);
+            }
+            SearchStrategy::HighSuccesive => {
+                self.co_lbd_bound = 3;
+                self.first_reduction = 30000;
+                self.use_chan_seok = true;
+                self.make_permanent(false);
+            }
+            SearchStrategy::LowSuccesiveLuby => (),
+            SearchStrategy::LowSuccesiveM => (),
+            SearchStrategy::ManyGlues => (),
+        }
+    }
 }
 
 impl ClauseDBIF for ClauseDB {
@@ -680,30 +703,6 @@ impl ClauseDBIF for ClauseDB {
         debug_assert!(!c.is(Flag::DEAD));
         debug_assert!(1 < c.lits.len());
         c.kill(&mut self.touched);
-    }
-    fn adapt_strategy(&mut self, mode: &SearchStrategy, nc: usize) {
-        match mode {
-            SearchStrategy::Initial => (),
-            SearchStrategy::Generic => (),
-            SearchStrategy::LowDecisions => {
-                self.co_lbd_bound = 4;
-                self.cur_restart = (nc as f64 / self.next_reduction as f64 + 1.0) as usize;
-                self.first_reduction = 2000;
-                self.use_chan_seok = true;
-                self.inc_step = 0;
-                self.next_reduction = 2000;
-                self.make_permanent(true);
-            }
-            SearchStrategy::HighSuccesive => {
-                self.co_lbd_bound = 3;
-                self.first_reduction = 30000;
-                self.use_chan_seok = true;
-                self.make_permanent(false);
-            }
-            SearchStrategy::LowSuccesiveLuby => (),
-            SearchStrategy::LowSuccesiveM => (),
-            SearchStrategy::ManyGlues => (),
-        }
     }
     fn check_and_reduce(&mut self, state: &mut State, vdb: &mut VarDB, nc: usize) {
         if 0 == self.num_learnt {

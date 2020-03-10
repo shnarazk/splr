@@ -309,7 +309,7 @@ impl VarRewardIF for VarDB {
             SearchStrategy::Initial => 0.96,
             SearchStrategy::Generic => 0.85,
             SearchStrategy::HighSuccesive => 0.99,
-            SearchStrategy::LowDecisions => 0.99,
+            SearchStrategy::LowDecisions => 0.98,
             SearchStrategy::LowSuccesiveLuby | SearchStrategy::LowSuccesiveM => 0.99,
             SearchStrategy::ManyGlues => 0.98,
         };

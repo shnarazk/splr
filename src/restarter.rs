@@ -1,6 +1,6 @@
 /// Crate `restart` provides restart heuristics.
 use {
-    crate::{config::Config, state::SearchStrategy, types::*},
+    crate::{config::Config, state::{SearchStrategy, State}, types::*},
     std::fmt,
 };
 
@@ -12,8 +12,6 @@ trait ProgressEvaluator {
 
 /// API for restart like `block_restart`, `force_restart` and so on.
 pub trait RestartIF {
-    /// set up parameters for each SearchStrategy.
-    fn adapt_strategy(&mut self, mode: &SearchStrategy);
     /// block restart if needed.
     fn block_restart(&mut self) -> bool;
     /// force restart if needed.
@@ -276,9 +274,9 @@ impl LubySeries {
     }
 }
 
-/// `RestartExecutor` provides restart API and holds data about restart conditions.
+/// `Restarter` provides restart API and holds data about restart conditions.
 #[derive(Debug)]
-pub struct RestartExecutor {
+pub struct Restarter {
     pub asg: ProgressASG,
     pub lbd: ProgressLBD,
     // pub rcc: ProgressRCC,
@@ -290,9 +288,9 @@ pub struct RestartExecutor {
     pub restart_step: usize,
 }
 
-impl Instantiate for RestartExecutor {
+impl Instantiate for Restarter {
     fn instantiate(config: &Config, cnf: &CNFDescription) -> Self {
-        RestartExecutor {
+        Restarter {
             asg: ProgressASG::instantiate(config, cnf),
             lbd: ProgressLBD::instantiate(config, cnf),
             // rcc: ProgressRCC::instantiate(config, cnf),
@@ -304,22 +302,12 @@ impl Instantiate for RestartExecutor {
             restart_step: config.restart_step,
         }
     }
-}
-
-macro_rules! reset {
-    ($executor: expr) => {
-        $executor.after_restart = 0;
-        return true;
-    };
-}
-
-impl RestartIF for RestartExecutor {
-    fn adapt_strategy(&mut self, mode: &SearchStrategy) {
-        match mode {
+    fn adapt_to(&mut self, state: &State) {
+        match state.strategy {
             SearchStrategy::Initial => (),
             SearchStrategy::Generic => (),
             SearchStrategy::LowDecisions => {
-                self.lbd.threshold = 0.5 * self.lbd.threshold + 0.5;
+                // self.lbd.threshold = 0.5 * self.lbd.threshold + 0.5;
             }
             SearchStrategy::HighSuccesive => (),
             SearchStrategy::LowSuccesiveLuby => {
@@ -330,6 +318,16 @@ impl RestartIF for RestartExecutor {
             SearchStrategy::ManyGlues => (),
         }
     }
+}
+
+macro_rules! reset {
+    ($executor: expr) => {
+        $executor.after_restart = 0;
+        return true;
+    };
+}
+
+impl RestartIF for Restarter {
     fn block_restart(&mut self) -> bool {
         if 100 < self.lbd.num
             && !self.luby.active

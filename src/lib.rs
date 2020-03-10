@@ -160,8 +160,8 @@ pub mod config;
 pub mod eliminator;
 /// Crate `propagator` implements Boolean Constraint Propagation and decision var selection.
 pub mod propagator;
-/// Crate `restart` provides restart heuristics.
-pub mod restart;
+/// Crate `restarter` provides restart heuristics.
+pub mod restarter;
 /// Crate `solver` provides the top-level API as a SAT solver.
 pub mod solver;
 /// Crate `state` is a collection of internal data.

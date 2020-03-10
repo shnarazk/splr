@@ -1,7 +1,7 @@
 /// Crate `types' provides various building blocks, including
 /// some common traits.
 use {
-    crate::{clause::ClauseId, config::Config, var::Var},
+    crate::{clause::ClauseId, config::Config, state::State, var::Var},
     std::{
         convert::TryFrom,
         fmt,
@@ -36,6 +36,8 @@ pub trait ActivityIF {
 /// API for object instantiation based on `Configuration` and `CNFDescription`
 pub trait Instantiate {
     fn instantiate(conf: &Config, cnf: &CNFDescription) -> Self;
+    /// set up internal parameters.
+    fn adapt_to(&mut self, _: &State) {}
 }
 
 /// API for O(n) deletion from a list, providing `delete_unstable`.
