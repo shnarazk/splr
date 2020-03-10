@@ -480,18 +480,8 @@ impl StateIF for State {
                 LogUsizeId::Restart,
                 self[Stat::Restart]
             ),
-            fm!(
-                "{:>9.4}",
-                self.record,
-                LogF64Id::EmaAsg,
-                rst.asg.trend()
-            ),
-            fm!(
-                "{:>9.4}",
-                self.record,
-                LogF64Id::EmaLBD,
-                rst.lbd.trend()
-            ),
+            fm!("{:>9.4}", self.record, LogF64Id::EmaAsg, rst.asg.trend()),
+            fm!("{:>9.4}", self.record, LogF64Id::EmaLBD, rst.lbd.trend()),
         );
         println!(
             "\x1B[2K    Conflict|eLBD:{}, cnfl:{}, bjmp:{}, rpc%:{} ",
@@ -731,7 +721,14 @@ impl State {
         );
     }
     #[allow(dead_code)]
-    fn dump_details(&mut self, cdb: &ClauseDB, _: &Eliminator, rst: &Restarter, vdb: &VarDB, mes: Option<&str>) {
+    fn dump_details(
+        &mut self,
+        cdb: &ClauseDB,
+        _: &Eliminator,
+        rst: &Restarter,
+        vdb: &VarDB,
+        mes: Option<&str>,
+    ) {
         self.progress_cnt += 1;
         let msg = match mes {
             None => self.strategy.to_str(),
