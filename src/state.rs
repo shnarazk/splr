@@ -358,9 +358,9 @@ impl StateIF for State {
             _ if self[Stat::NumBinLearnt] + 20_000 < self[Stat::NumLBD2] => {
                 SearchStrategy::ManyGlues
             }
-            // _ if self[Stat::Decision] as f64 <= 1.2 * self[Stat::Conflict] as f64 => {
-            //     SearchStrategy::LowDecisions
-            // }
+            _ if self[Stat::Decision] as f64 <= 1.2 * self[Stat::Conflict] as f64 => {
+                SearchStrategy::LowDecisions
+            }
             _ if self[Stat::NoDecisionConflict] < 30_000 => {
                 if self.config.with_deep_search {
                     SearchStrategy::LowSuccesiveM
