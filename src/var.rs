@@ -4,7 +4,7 @@ use {
         clause::{Clause, ClauseDB, ClauseIF, ClauseId, ClauseIdIF},
         config::Config,
         propagator::{AssignStack, PropagatorIF},
-        state::{State, StateIF},
+        state::{Stat, State, StateIF},
         types::*,
     },
     std::{
@@ -317,8 +317,9 @@ impl VarRewardIF for VarDB {
 impl Instantiate for VarDB {
     fn instantiate(_: &Config, cnf: &CNFDescription) -> Self {
         let nv = cnf.num_of_variables;
-        let mut core_size = Ema::new(10);
-        core_size.update((nv as f64).log(2.0));
+        let len = 10;
+        let mut core_size = Ema::new(len);
+        core_size.update(((len * nv) as f64).ln());
         VarDB {
             var: Var::new_vars(nv),
             lbd_temp: vec![0; nv + 1],
@@ -326,21 +327,10 @@ impl Instantiate for VarDB {
             ..VarDB::default()
         }
     }
-    fn adapt_to(&mut self, state: &State, changed: bool) {
-        /*
-        let start = 0.8;
-        let end = match state.strategy {
-            SearchStrategy::Initial => 0.96,
-            // SearchStrategy::Generic => 0.85,
-            SearchStrategy::HighSuccesive => 0.99,
-            SearchStrategy::LowDecisions => 0.94,
-            SearchStrategy::LowSuccesiveLuby | SearchStrategy::LowSuccesiveM => 0.99,
-            // SearchStrategy::ManyGlues => 0.98,
-            _=> 0.97,
-        };
-        let t = 1.0 - 1.0 / (1.0 + ((state[Stat::Conflict] as f64) / 40.0).sqrt());
-        self.activity_decay = 0.5 * (self.activity_decay + start + (end - start) * t);
-         */
+    fn adapt_to(&mut self, state: &State, _changed: bool) {
+        if 0 == state[Stat::Conflict] {
+            return;
+        }
         let msr: (f64, f64) = self.var[1..]
             .iter()
             .map(|v| v.reward)
@@ -349,28 +339,11 @@ impl Instantiate for VarDB {
         let thr = (msr.0 + ar) * 0.5;
         let core = self.var[1..].iter().filter(|v| thr <= v.reward).count();
         self.core_size.update(core as f64);
-        if changed {
-            let core = self.core_size.get();
-            let std = 25.0;
-            if 2.0 < core.log(std) {
-                self.activity_decay_max = 0.995;
-            } else {
-                let rim = (state.num_unsolved_vars() as f64 - core).max(1.0).log(std);
-                if 2.0 < rim {
-                    self.activity_decay_max -= 0.01 * rim;
-                }
-            }
+        if state[Stat::Conflict] % 100_000 == 0 {
+            let kernel = self.core_size.get() / state.num_unsolved_vars() as f64;
+            let scale = 0.010;   // This value is based on UF250 and UUF250.
+            self.activity_decay_max = 1.0 + scale * kernel.ln();
         }
-        /*
-        match state.strategy {
-            SearchStrategy::Initial => {
-                let t = 1.0 - 1.0 / (1.0 + ((state[Stat::Conflict] as f64) / 40.0).sqrt());
-                let end = 0.96;
-                self.activity_decay = start + (end - start) * t;
-            }
-            _=> (),
-        }
-        */
     }
 }
 
