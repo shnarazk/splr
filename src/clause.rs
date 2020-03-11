@@ -3,7 +3,7 @@ use {
     crate::{
         config::Config,
         eliminator::{Eliminator, EliminatorIF},
-        state::{SearchStrategy, Stat, State},
+        state::{ProgressComponent, SearchStrategy, Stat, State},
         types::*,
         var::{VarDB, VarDBIF, LBDIF},
     },
@@ -379,7 +379,7 @@ pub struct ClauseDB {
     clause: Vec<Clause>,
     pub touched: Vec<bool>,
     pub watcher: Vec<Vec<Watch>>,
-    pub num_active: usize,
+    num_active: usize,
     pub num_learnt: usize,
     pub certified: DRAT,
     activity_inc: f64,
@@ -788,6 +788,13 @@ impl ClauseDBIF for ClauseDB {
             }
         }
         None
+    }
+}
+
+impl ProgressComponent for ClauseDB {
+    type Output = (usize, usize);
+    fn progress_component(&self) -> Self::Output {
+        (self.num_active, self.num_learnt)
     }
 }
 

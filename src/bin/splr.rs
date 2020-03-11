@@ -232,6 +232,7 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
             time.tv_sec as f64 + time.tv_nsec as f64 / 1_000_000_000.0f64
         }
     };
+    let (_, vdb_activity_decay) = s.vdb.progress_component();
     out.write_all(
         format!(
             "c {:<43}, #var:{:9}, #cls:{:9}\n",
@@ -305,7 +306,7 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
             format!("{:>9}", state[LogUsizeId::Reduction]),
             format!("{:>9}", state[LogUsizeId::SatClauseElim]),
             format!("{:>9.0}", state[LogF64Id::CoreSize]),
-            format!("{:>9.4}", s.vdb.activity_decay),
+            format!("{:>9.4}", vdb_activity_decay),
         )
         .as_bytes(),
     )?;

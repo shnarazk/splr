@@ -4,7 +4,7 @@ use {
         clause::{Clause, ClauseDB, ClauseIF, ClauseId, ClauseIdIF},
         config::Config,
         propagator::{AssignStack, PropagatorIF},
-        state::{Stat, State},
+        state::{ProgressComponent, Stat, State},
         types::*,
     },
     std::{
@@ -165,16 +165,17 @@ impl FlagIF for Var {
 #[derive(Debug)]
 pub struct VarDB {
     /// var activity decay
-    pub activity_decay: f64,
+    activity_decay: f64,
     /// maximum var activity decay
-    pub activity_decay_max: f64,
+    activity_decay_max: f64,
     /// an index for counting elapsed time
     ordinal: usize,
     /// vars
     var: Vec<Var>,
     /// a working buffer for LBD calculation
     lbd_temp: Vec<usize>,
-    pub core_size: Ema,
+    /// estimated number of hot variable
+    core_size: Ema,
 }
 
 impl Default for VarDB {
@@ -460,6 +461,13 @@ impl LBDIF for VarDB {
             }
             *lbd_temp.get_unchecked_mut(0) = key;
         }
+    }
+}
+
+impl ProgressComponent for VarDB {
+    type Output = (f64, f64);
+    fn progress_component(&self) -> Self::Output {
+        (self.core_size.get(), self.activity_decay)
     }
 }
 

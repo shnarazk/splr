@@ -39,6 +39,12 @@ pub trait StateIF {
     fn flush<S: AsRef<str>>(&self, mes: S);
 }
 
+/// API for var rewarding.
+pub trait ProgressComponent {
+    type Output;
+    fn progress_component(&self) -> Self::Output;
+}
+
 /// A collection of named search heuristics
 #[derive(Debug, Eq, PartialEq)]
 pub enum SearchStrategy {
@@ -406,6 +412,8 @@ impl StateIF for State {
         let nv = vdb.len() - 1;
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
+        let (cdb_num_active, cdb_num_learnt) = cdb.progress_component();
+        let (vdb_core_size, vdb_activity_decay) = vdb.progress_component();
         self.progress_cnt += 1;
         print!("\x1B[8A\x1B[1G");
         println!("\x1B[2K{}", self);
@@ -449,7 +457,7 @@ impl StateIF for State {
         );
         println!(
             "\x1B[2K      Clause|Remv:{}, LBD2:{}, Binc:{}, Perm:{} ",
-            im!("{:>9}", self.record, LogUsizeId::Removable, cdb.num_learnt),
+            im!("{:>9}", self.record, LogUsizeId::Removable, cdb_num_learnt),
             im!("{:>9}", self.record, LogUsizeId::LBD2, self[Stat::NumLBD2]),
             im!(
                 "{:>9}",
@@ -461,7 +469,7 @@ impl StateIF for State {
                 "{:>9}",
                 self.record,
                 LogUsizeId::Permanent,
-                cdb.num_active - cdb.num_learnt
+                cdb_num_active - cdb_num_learnt
             ),
         );
         println!(
@@ -516,9 +524,9 @@ impl StateIF for State {
                 "{:>9.0}",
                 self.record,
                 LogF64Id::CoreSize,
-                vdb.core_size.get()
+                vdb_core_size
             ),
-            format!("{:>9.4}", vdb.activity_decay),
+            format!("{:>9.4}", vdb_activity_decay),
         );
         if let Some(m) = mes {
             println!("\x1B[2K    Strategy|mode: {}", m);
@@ -741,6 +749,7 @@ impl State {
         let nv = vdb.len() - 1;
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
+        let (cdb_num_active, cdb_num_learnt) = cdb.progress_component();
         println!(
             "{:>3}#{:>8},{:>7},{:>7},{:>7},{:>6.3},,{:>7},{:>7},\
              {:>7},,{:>5},{:>5},{:>6.2},{:>6.2},,{:>7.2},{:>8.2},{:>8.2},,\
@@ -751,8 +760,8 @@ impl State {
             fixed,
             self.num_eliminated_vars,
             (sum as f32) / (nv as f32) * 100.0,
-            cdb.num_learnt,
-            cdb.num_active,
+            cdb_num_learnt,
+            cdb_num_active,
             0,
             self[Stat::BlockRestart],
             self[Stat::Restart],
