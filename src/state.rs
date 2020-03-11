@@ -499,7 +499,7 @@ impl StateIF for State {
             )
         );
         println!(
-            "\x1B[2K        misc|#rdc:{}, #sce:{}, stag:{}, vdcy:{} ",
+            "\x1B[2K        misc|#rdc:{}, #sce:{}, core:{}, vdcy:{} ",
             im!(
                 "{:>9}",
                 self.record,
@@ -512,11 +512,11 @@ impl StateIF for State {
                 LogUsizeId::SatClauseElim,
                 self[Stat::SatClauseElimination]
             ),
-            im!(
-                "{:>9}",
+            fm!(
+                "{:>9.0}",
                 self.record,
-                LogUsizeId::Stagnation,
-                self[Stat::Stagnation]
+                LogF64Id::CoreSize,
+                vdb.core_size.get()
             ),
             format!("{:>9.4}", vdb.activity_decay),
         );
@@ -630,6 +630,7 @@ pub enum LogF64Id {
     AveLBD,       //  3: ave_lbd: f64,
     BLevel,       //  4: backjump_level: f64,
     CLevel,       //  5: conflict_level: f64,
+    CoreSize,     //  6: vdb.core_size.get: f64,
     End,
 }
 

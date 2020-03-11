@@ -4,7 +4,7 @@ use {
         clause::{Clause, ClauseDB, ClauseIF, ClauseId, ClauseIdIF},
         config::Config,
         propagator::{AssignStack, PropagatorIF},
-        state::{SearchStrategy, Stat, State},
+        state::{State, StateIF},
         types::*,
     },
     std::{
@@ -51,6 +51,8 @@ pub trait VarRewardIF {
     fn activity(&mut self, vi: VarId) -> f64;
     /// initialize rewards based on an order of vars.
     fn initialize_reward(&mut self, iterator: Iter<'_, usize>);
+    /// clear var's activity
+    fn clear_reward(&mut self, vi: VarId);
     /// modify var's activity at conflict analysis in `analyze`.
     fn reward_at_analysis(&mut self, vi: VarId);
     /// modify var's activity at value assignment in `uncheck_{assume, enquue, fix}`.
@@ -164,21 +166,26 @@ impl FlagIF for Var {
 pub struct VarDB {
     /// var activity decay
     pub activity_decay: f64,
+    /// maximum var activity decay
+    pub activity_decay_max: f64,
     /// an index for counting elapsed time
     ordinal: usize,
     /// vars
     var: Vec<Var>,
     /// a working buffer for LBD calculation
     lbd_temp: Vec<usize>,
+    pub core_size: Ema,
 }
 
 impl Default for VarDB {
     fn default() -> VarDB {
         VarDB {
             activity_decay: 0.8,
+            activity_decay_max: 0.99,
             ordinal: 0,
             var: Vec::new(),
             lbd_temp: Vec::new(),
+            core_size: Ema::new(10),
         }
     }
 }
@@ -279,6 +286,9 @@ impl VarRewardIF for VarDB {
         self[vi].reward
     }
     fn initialize_reward(&mut self, _iterator: Iter<'_, usize>) {}
+    fn clear_reward(&mut self, vi: VarId) {
+        self[vi].reward = 0.0;
+    }
     fn reward_at_analysis(&mut self, vi: VarId) {
         let v = &mut self[vi];
         v.participated += 1;
@@ -300,19 +310,24 @@ impl VarRewardIF for VarDB {
     }
     fn reward_update(&mut self) {
         self.ordinal += 1;
+        self.activity_decay = self.activity_decay_max.min(self.activity_decay + 0.000_01);
     }
 }
 
 impl Instantiate for VarDB {
     fn instantiate(_: &Config, cnf: &CNFDescription) -> Self {
         let nv = cnf.num_of_variables;
+        let mut core_size = Ema::new(10);
+        core_size.update((nv as f64).log(2.0));
         VarDB {
             var: Var::new_vars(nv),
             lbd_temp: vec![0; nv + 1],
+            core_size,
             ..VarDB::default()
         }
     }
-    fn adapt_to(&mut self, state: &State, _changed: bool) {
+    fn adapt_to(&mut self, state: &State, changed: bool) {
+        /*
         let start = 0.8;
         let end = match state.strategy {
             SearchStrategy::Initial => 0.96,
@@ -325,6 +340,37 @@ impl Instantiate for VarDB {
         };
         let t = 1.0 - 1.0 / (1.0 + ((state[Stat::Conflict] as f64) / 40.0).sqrt());
         self.activity_decay = 0.5 * (self.activity_decay + start + (end - start) * t);
+         */
+        let msr: (f64, f64) = self.var[1..]
+            .iter()
+            .map(|v| v.reward)
+            .fold((0.2, 0.0), |(m, s), x| (m.max(x), s + x));
+        let ar = msr.1 / self.var.len() as f64;
+        let thr = (msr.0 + ar) * 0.5;
+        let core = self.var[1..].iter().filter(|v| thr <= v.reward).count();
+        self.core_size.update(core as f64);
+        if changed {
+            let core = self.core_size.get();
+            let std = 25.0;
+            if 2.0 < core.log(std) {
+                self.activity_decay_max = 0.995;
+            } else {
+                let rim = (state.num_unsolved_vars() as f64 - core).max(1.0).log(std);
+                if 2.0 < rim {
+                    self.activity_decay_max -= 0.01 * rim;
+                }
+            }
+        }
+        /*
+        match state.strategy {
+            SearchStrategy::Initial => {
+                let t = 1.0 - 1.0 / (1.0 + ((state[Stat::Conflict] as f64) / 40.0).sqrt());
+                let end = 0.96;
+                self.activity_decay = start + (end - start) * t;
+            }
+            _=> (),
+        }
+        */
     }
 }
 

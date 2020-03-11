@@ -1,6 +1,10 @@
 /// Crate `restart` provides restart heuristics.
 use {
-    crate::{config::Config, state::{SearchStrategy, State}, types::*},
+    crate::{
+        config::Config,
+        state::{SearchStrategy, State},
+        types::*,
+    },
     std::fmt,
 };
 
@@ -322,8 +326,8 @@ impl Instantiate for Restarter {
             // SearchStrategy::LowSuccesiveM => (),
             // SearchStrategy::ManyGlues => (),
             // SearchStrategy::Generic => (),
-            _=> {
-                self.luby.active = state.c_lvl.get() < 14.0;
+            _ => {
+                // self.luby.active = state.c_lvl.get() < 14.0;
             }
         }
     }

@@ -6,7 +6,7 @@ use {
         propagator::{AssignStack, PropagatorIF},
         state::{Stat, State, StateIF},
         types::*,
-        var::{Var, VarDB, VarDBIF, LBDIF},
+        var::{Var, VarDB, VarDBIF, VarRewardIF, LBDIF},
     },
     std::{fmt, slice::Iter},
     std::{
@@ -990,6 +990,7 @@ fn eliminate_var(
                 }
             }
         }
+        //[VAR ELIMINATION]
         for cid in &*pos {
             cdb.detach(*cid);
             elim.remove_cid_occur(vdb, *cid, &mut cdb[cid]);
@@ -1000,6 +1001,7 @@ fn eliminate_var(
         }
         elim[vi].clear();
         vdb[vi].turn_on(Flag::ELIMINATED);
+        vdb.clear_reward(vi);
         elim.backward_subsumption_check(asgs, cdb, vdb, timedout)
     }
 }

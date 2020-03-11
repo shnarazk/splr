@@ -5,7 +5,7 @@ use {
         config::Config,
         eliminator::{Eliminator, EliminatorIF, EliminatorStatIF},
         propagator::{AssignStack, PropagatorIF, VarSelectionIF},
-        restarter::{Restarter, RestartIF},
+        restarter::{RestartIF, Restarter},
         state::{Stat, State, StateIF},
         types::*,
         var::{VarDB, VarDBIF, VarRewardIF, LBDIF},
@@ -48,12 +48,12 @@ pub type SolverResult = Result<Certificate, SolverError>;
 /// SAT solver consisting of 5 sub modules.
 #[derive(Debug)]
 pub struct Solver {
-    pub asgs: AssignStack,      // Assignment
-    pub cdb: ClauseDB,          // Clauses
-    pub elim: Eliminator,       // Clause/Variable Elimination
-    pub rst: Restarter,         // restart module
-    pub state: State,           // misc data
-    pub vdb: VarDB,             // Variables
+    pub asgs: AssignStack, // Assignment
+    pub cdb: ClauseDB,     // Clauses
+    pub elim: Eliminator,  // Clause/Variable Elimination
+    pub rst: Restarter,    // restart module
+    pub state: State,      // misc data
+    pub vdb: VarDB,        // Variables
 }
 
 impl Default for Solver {
@@ -367,7 +367,7 @@ fn search(
             if cdb[ci].iter().all(|l| vdb[l].level == 0) {
                 return Ok(false);
             }
-            handle_conflict_path(asgs, cdb, elim, rst, state, vdb, ci)?;
+            handle_conflict(asgs, cdb, elim, rst, state, vdb, ci)?;
         }
         if !asgs.remains() {
             let vi = asgs.select_var(vdb);
@@ -380,7 +380,7 @@ fn search(
 }
 
 #[inline]
-fn handle_conflict_path(
+fn handle_conflict(
     asgs: &mut AssignStack,
     cdb: &mut ClauseDB,
     elim: &mut Eliminator,
@@ -495,7 +495,7 @@ fn handle_conflict_path(
             let mut bumped = new_learnt.iter().map(|l| l.vi()).collect::<Vec<VarId>>();
             for lit in new_learnt.iter() {
                 //[Learnt Literal Rewarding]
-                //vdb.reward_at_analysis(lit.vi());
+                vdb.reward_at_analysis(lit.vi());
                 for l in &cdb[vdb[lit.vi()].reason].lits {
                     let vi = l.vi();
                     if !bumped.contains(&vi) {
