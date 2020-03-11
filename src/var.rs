@@ -4,7 +4,7 @@ use {
         clause::{Clause, ClauseDB, ClauseIF, ClauseId, ClauseIdIF},
         config::Config,
         propagator::{AssignStack, PropagatorIF},
-        state::{Stat, State, StateIF},
+        state::{Stat, State},
         types::*,
     },
     std::{
@@ -340,9 +340,7 @@ impl Instantiate for VarDB {
         let core = self.var[1..].iter().filter(|v| thr <= v.reward).count();
         self.core_size.update(core as f64);
         if state[Stat::Conflict] % 100_000 == 0 {
-            let kernel = self.core_size.get() / state.num_unsolved_vars() as f64;
-            let scale = 0.010;   // This value is based on UF250 and UUF250.
-            self.activity_decay_max = 1.0 + scale * kernel.ln();
+            self.activity_decay_max = 1.0 - 0.02 * (self.core_size.get().ln() - 2.0).max(0.0);
         }
     }
 }
