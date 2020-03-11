@@ -313,20 +313,18 @@ impl Instantiate for Restarter {
         }
         match state.strategy {
             SearchStrategy::Initial => (),
-            SearchStrategy::Generic => {
-                self.luby.active = state.c_lvl.get() < 14.0;
-            }
-            SearchStrategy::LowDecisions => {
-                self.luby.active = state.c_lvl.get() < 14.0;
-            }
-            SearchStrategy::HighSuccesive => (),
             SearchStrategy::LowSuccesiveLuby => {
                 if changed {
                     self.luby.active = true;
                 }
             }
-            SearchStrategy::LowSuccesiveM => (),
-            SearchStrategy::ManyGlues => (),
+            // SearchStrategy::HighSuccesive => (),
+            // SearchStrategy::LowSuccesiveM => (),
+            // SearchStrategy::ManyGlues => (),
+            // SearchStrategy::Generic => (),
+            _=> {
+                self.luby.active = state.c_lvl.get() < 14.0;
+            }
         }
     }
 }
