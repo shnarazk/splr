@@ -313,7 +313,7 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     out.write_all(
         format!(
             "c     Strategy|mode:{:>15}, time:{:9.2}\n",
-            state.strategy, tm,
+            state.strategy.0, tm,
         )
         .as_bytes(),
     )?;

@@ -182,7 +182,7 @@ impl Default for VarDB {
     fn default() -> VarDB {
         VarDB {
             activity_decay: 0.8,
-            activity_decay_max: 0.99,
+            activity_decay_max: 0.96,
             ordinal: 0,
             var: Vec::new(),
             lbd_temp: Vec::new(),
@@ -328,7 +328,7 @@ impl Instantiate for VarDB {
             ..VarDB::default()
         }
     }
-    fn adapt_to(&mut self, state: &State, _changed: bool) {
+    fn adapt_to(&mut self, state: &State) {
         if 0 == state[Stat::Conflict] {
             return;
         }

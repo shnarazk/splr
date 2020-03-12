@@ -161,7 +161,7 @@ pub struct State {
     pub num_eliminated_vars: usize,
     pub config: Config,
     pub stats: [usize; Stat::EndOfStatIndex as usize], // statistics
-    pub strategy: SearchStrategy,
+    pub strategy: (SearchStrategy, usize),
     pub target: CNFDescription,
     pub reflection_interval: usize,
     /// MISC
@@ -189,7 +189,7 @@ impl Default for State {
             num_eliminated_vars: 0,
             config: Config::default(),
             stats: [0; Stat::EndOfStatIndex as usize],
-            strategy: SearchStrategy::Initial,
+            strategy: (SearchStrategy::Initial, 0),
             target: CNFDescription::default(),
             reflection_interval: 10_000,
             b_lvl: Ema::new(5_000),
@@ -357,10 +357,11 @@ impl StateIF for State {
         }
     }
     fn select_strategy(&mut self) {
-        if self.config.without_adaptive_strategy || self.strategy != SearchStrategy::Initial {
+        if self.config.without_adaptive_strategy {
             return;
         }
-        self.strategy = match () {
+        debug_assert_eq!(self.strategy.0, SearchStrategy::Initial);
+        self.strategy.0 = match () {
             _ if self[Stat::NumBinLearnt] + 20_000 < self[Stat::NumLBD2] => {
                 SearchStrategy::ManyGlues
             }
@@ -377,6 +378,7 @@ impl StateIF for State {
             _ if 54_400 < self[Stat::NoDecisionConflict] => SearchStrategy::HighSuccesive,
             _ => SearchStrategy::Generic,
         };
+        self.strategy.1 = self[Stat::Conflict];
     }
     fn progress_header(&self) {
         if self.config.quiet_mode {
@@ -531,7 +533,7 @@ impl StateIF for State {
         if let Some(m) = mes {
             println!("\x1B[2K    Strategy|mode: {}", m);
         } else {
-            println!("\x1B[2K    Strategy|mode: {:#}", self.strategy,);
+            println!("\x1B[2K    Strategy|mode: {:#}", self.strategy.0);
         }
         self.flush("\x1B[2K");
     }
@@ -743,7 +745,7 @@ impl State {
     ) {
         self.progress_cnt += 1;
         let msg = match mes {
-            None => self.strategy.to_str(),
+            None => self.strategy.0.to_str(),
             Some(x) => x,
         };
         let nv = vdb.len() - 1;

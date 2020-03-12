@@ -532,14 +532,12 @@ impl Instantiate for ClauseDB {
             ..ClauseDB::default()
         }
     }
-    fn adapt_to(&mut self, state: &State, changed: bool) {
-        if !changed {
-            return;
-        }
+    fn adapt_to(&mut self, state: &State) {
         match state.strategy {
-            SearchStrategy::Initial => (),
-            SearchStrategy::Generic => (),
-            SearchStrategy::LowDecisions => {
+            (_, n) if n != state[Stat::Conflict] => (),
+            (SearchStrategy::Initial, _) => (),
+            (SearchStrategy::Generic, _) => (),
+            (SearchStrategy::LowDecisions, _) => {
                 let nc = state[Stat::Conflict];
                 self.co_lbd_bound = 4;
                 self.cur_restart = (nc as f64 / self.next_reduction as f64 + 1.0) as usize;
@@ -549,15 +547,15 @@ impl Instantiate for ClauseDB {
                 self.next_reduction = 2000;
                 self.make_permanent(true);
             }
-            SearchStrategy::HighSuccesive => {
+            (SearchStrategy::HighSuccesive, _) => {
                 self.co_lbd_bound = 3;
                 self.first_reduction = 30000;
                 self.use_chan_seok = true;
                 self.make_permanent(false);
             }
-            SearchStrategy::LowSuccesiveLuby => (),
-            SearchStrategy::LowSuccesiveM => (),
-            SearchStrategy::ManyGlues => (),
+            (SearchStrategy::LowSuccesiveLuby, _) => (),
+            (SearchStrategy::LowSuccesiveM, _) => (),
+            (SearchStrategy::ManyGlues, _) => (),
         }
     }
 }

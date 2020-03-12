@@ -2,7 +2,7 @@
 use {
     crate::{
         config::Config,
-        state::{SearchStrategy, State},
+        state::{SearchStrategy, Stat, State},
         types::*,
     },
     std::fmt,
@@ -306,7 +306,7 @@ impl Instantiate for Restarter {
             restart_step: config.restart_step,
         }
     }
-    fn adapt_to(&mut self, state: &State, changed: bool) {
+    fn adapt_to(&mut self, state: &State) {
         if !self.luby.active && state.config.with_deep_search {
             if state.stagnated {
                 self.restart_step = state.reflection_interval;
@@ -316,9 +316,9 @@ impl Instantiate for Restarter {
             }
         }
         match state.strategy {
-            SearchStrategy::Initial => (),
-            SearchStrategy::LowSuccesiveLuby => {
-                if changed {
+            (SearchStrategy::Initial, _) => (),
+            (SearchStrategy::LowSuccesiveLuby, n) => {
+                if n == state[Stat::Conflict] {
                     self.luby.active = true;
                 }
             }
