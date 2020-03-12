@@ -161,6 +161,7 @@ pub struct State {
     pub num_eliminated_vars: usize,
     pub config: Config,
     pub stats: [usize; Stat::EndOfStatIndex as usize], // statistics
+    /// Tuple of current strategy and the number of conflicts at which the strategy is selected.
     pub strategy: (SearchStrategy, usize),
     pub target: CNFDescription,
     pub reflection_interval: usize,
