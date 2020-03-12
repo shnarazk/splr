@@ -340,8 +340,8 @@ impl Instantiate for VarDB {
         let thr = (msr.0 + ar) * 0.5;
         let core = self.var[1..].iter().filter(|v| thr <= v.reward).count();
         self.core_size.update(core as f64);
-        if state[Stat::Conflict] % 100_000 == 0 {
-            self.activity_decay_max = 1.0 - 0.02 * (self.core_size.get().ln() - 2.0).max(0.0);
+        if state[Stat::Conflict] % 20_000 == 0 {
+            self.activity_decay_max = 1.0 - 0.003 * ((self.core_size.get() - 10.0).max(0.0).sqrt());
         }
     }
 }
