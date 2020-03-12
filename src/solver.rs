@@ -495,11 +495,11 @@ fn handle_conflict(
             let mut bumped = new_learnt.iter().map(|l| l.vi()).collect::<Vec<VarId>>();
             for lit in new_learnt.iter() {
                 //[Learnt Literal Rewarding]
-                // vdb.reward_at_analysis(lit.vi());
+                vdb.reward_at_analysis(lit.vi());
                 for l in &cdb[vdb[lit.vi()].reason].lits {
                     let vi = l.vi();
                     if !bumped.contains(&vi) {
-                        vdb.reward_at_analysis(vi);
+                        // vdb.reward_at_analysis(vi);
                         bumped.push(vi);
                     }
                 }
