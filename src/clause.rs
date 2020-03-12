@@ -55,6 +55,8 @@ pub trait ClauseDBIF {
     fn certificate_delete(&mut self, vec: &[Lit]);
     /// delete satisfied clauses at decision level zero.
     fn eliminate_satisfied_clauses(&mut self, elim: &mut Eliminator, vdb: &mut VarDB, occur: bool);
+    /// flag positive and negative literals of a var as dirty
+    fn touch_var(&mut self, vi: VarId);
     /// return LBD threshold used in glue reduciton mode.
     fn chan_seok_condition(&self) -> usize;
     /// emit an error if the db size (the number of clauses) is over the limit.
@@ -377,8 +379,9 @@ impl fmt::Display for Clause {
 #[derive(Debug)]
 pub struct ClauseDB {
     clause: Vec<Clause>,
-    pub touched: Vec<bool>,
     pub watcher: Vec<Vec<Watch>>,
+    /// dirty literals
+    touched: Vec<bool>,
     num_active: usize,
     pub num_learnt: usize,
     pub certified: DRAT,
@@ -761,6 +764,10 @@ impl ClauseDBIF for ClauseDB {
                 }
             }
         }
+    }
+    fn touch_var(&mut self, vi: VarId) {
+        self.touched[Lit::from_assign(vi, true)] = true;
+        self.touched[Lit::from_assign(vi, false)] = true;
     }
     fn chan_seok_condition(&self) -> usize {
         if self.use_chan_seok {

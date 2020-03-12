@@ -826,8 +826,7 @@ fn strengthen_clause(
 ) -> MaybeInconsistent {
     debug_assert!(!cdb[cid].is(Flag::DEAD));
     debug_assert!(1 < cdb[cid].len());
-    cdb.touched[l] = true;
-    cdb.touched[!l] = true;
+    cdb.touch_var(l.vi());
     debug_assert_ne!(cid, ClauseId::default());
     if strengthen(cdb, cid, l) {
         // Vaporize the binary clause
@@ -925,8 +924,7 @@ fn make_eliminated_clause(cdb: &mut ClauseDB, vec: &mut Vec<Lit>, vi: VarId, cid
     // Store the length of the clause last:
     debug_assert_eq!(vec[first].vi(), vi);
     vec.push(Lit::from(c.len()));
-    cdb.touched[Lit::from_assign(vi, true)] = true;
-    cdb.touched[Lit::from_assign(vi, false)] = true;
+    cdb.touch_var(vi);
     // println!("make_eliminated_clause: eliminate({}) clause {:?}", vi, vec2int(&ch.lits));
 }
 
