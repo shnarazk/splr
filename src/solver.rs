@@ -499,7 +499,7 @@ fn handle_conflict(
                 for l in &cdb[vdb[lit.vi()].reason].lits {
                     let vi = l.vi();
                     if !bumped.contains(&vi) {
-                        // vdb.reward_at_analysis(vi);
+                        vdb.reward_at_analysis(vi);
                         bumped.push(vi);
                     }
                 }
