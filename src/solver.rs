@@ -82,6 +82,18 @@ impl Instantiate for Solver {
     }
 }
 
+macro_rules! final_report {
+    ($cdb: expr, $rst: expr, $state: expr, $vdb: expr) => {
+        let q = $state.config.quiet_mode;
+        $state.config.quiet_mode = false;
+        if q {
+            $state.progress_header();
+        }
+        $state.progress($cdb, $rst, $vdb, None);
+        $state.config.quiet_mode = q;
+    }
+}
+
 impl SatSolverIF for Solver {
     /// # Examples
     ///
@@ -160,13 +172,7 @@ impl SatSolverIF for Solver {
             if elim.simplify(asgs, cdb, state, vdb).is_err() {
                 // Why inconsistent? Because the CNF contains a conflict, not an error!
                 // Or out of memory.
-                let q = state.config.quiet_mode;
-                state.config.quiet_mode = false;
-                if q {
-                    state.progress_header();
-                }
-                state.progress(cdb, rst, vdb, None);
-                state.config.quiet_mode = q;
+                final_report!(cdb, rst, state, vdb);
                 if cdb.check_size().is_err() {
                     return Err(SolverError::OutOfMemory);
                 }
@@ -190,13 +196,7 @@ impl SatSolverIF for Solver {
         state.progress(cdb, rst, vdb, None);
         match search(asgs, cdb, elim, rst, state, vdb) {
             Ok(true) => {
-                let q = state.config.quiet_mode;
-                state.config.quiet_mode = false;
-                if q {
-                    state.progress_header();
-                }
-                state.progress(cdb, rst, vdb, None);
-                state.config.quiet_mode = q;
+                final_report!(cdb, rst, state, vdb);
                 elim.extend_model(vdb);
                 #[cfg(debug)]
                 {
@@ -227,13 +227,7 @@ impl SatSolverIF for Solver {
             }
             Err(e) => {
                 asgs.cancel_until(vdb, 0);
-                let q = state.config.quiet_mode;
-                state.config.quiet_mode = false;
-                if q {
-                    state.progress_header();
-                }
-                state.progress(cdb, rst, vdb, None);
-                state.config.quiet_mode = q;
+                final_report!(cdb, rst, state, vdb);
                 Err(e)
             }
         }
