@@ -332,8 +332,8 @@ impl Instantiate for VarDB {
         }
     }
     fn adapt_to(&mut self, state: &State) {
-        const VRD_COEFF_STD: f64 = 0.003;
-        const VRD_COEFF_LOW: f64 = 0.008;
+        const VRD_DEC_STD: f64 = 0.003;
+        const VRD_DEC_HIGH: f64 = 0.008;
         const VRD_FILTER: f64 = 0.5;
         const VRD_INTERVAL: usize = 20_000;
         const VRD_MAX_START: f64 = 0.2;
@@ -351,8 +351,8 @@ impl Instantiate for VarDB {
         self.core_size.update(core as f64);
         if state[Stat::Conflict] % VRD_INTERVAL == 0 {
             let k = match state.strategy.0 {
-                SearchStrategy::LowDecisions => VRD_COEFF_LOW,
-                _ => VRD_COEFF_STD,
+                SearchStrategy::LowDecisions => VRD_DEC_HIGH,
+                _ => VRD_DEC_STD,
             };
             self.activity_decay_max =
                 1.0 - k * ((self.core_size.get() - VRD_OFFSET).max(0.0).sqrt());
