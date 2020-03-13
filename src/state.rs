@@ -523,12 +523,7 @@ impl StateIF for State {
                 LogUsizeId::SatClauseElim,
                 self[Stat::SatClauseElimination]
             ),
-            fm!(
-                "{:>9.0}",
-                self.record,
-                LogF64Id::CoreSize,
-                vdb_core_size
-            ),
+            fm!("{:>9.0}", self.record, LogF64Id::CoreSize, vdb_core_size),
             format!("{:>9.4}", vdb_activity_decay),
         );
         if let Some(m) = mes {

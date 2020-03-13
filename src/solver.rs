@@ -91,7 +91,7 @@ macro_rules! final_report {
         }
         $state.progress($cdb, $rst, $vdb, None);
         $state.config.quiet_mode = q;
-    }
+    };
 }
 
 impl SatSolverIF for Solver {
