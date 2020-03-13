@@ -6,14 +6,37 @@ use {
         config::{Config, VERSION},
         solver::{Certificate, SatSolverIF, Solver, SolverResult},
         state::*,
+        types::SolverError,
     },
     std::{
+        borrow::Cow,
         fs::File,
         io::{BufWriter, Write},
         path::PathBuf,
     },
     structopt::StructOpt,
 };
+
+const RED: &str = "\x1B[001m\x1B[031m";
+const GREEN: &str = "\x1B[001m\x1B[032m";
+const BLUE: &str = "\x1B[001m\x1B[034m";
+const RESET: &str = "\x1B[000m";
+
+fn colored(v: Result<bool, &SolverError>, c: bool) -> Cow<'static, str> {
+    if c {
+        match v {
+            Ok(false) => Cow::from(format!("{}UNSAT{}", GREEN, RESET)),
+            Ok(true) => Cow::from(format!("{}SATISFIABLE{}", BLUE, RESET)),
+            Err(e) => Cow::from(format!("{}{}{}", RED, e, RESET)),
+        }
+    } else {
+        match v {
+            Ok(false) => Cow::Borrowed("UNSAT"),
+            Ok(true) => Cow::Borrowed("SATISFIABLE"),
+            Err(e) => Cow::from(format!("{}", e)),
+        }
+    }
+}
 
 fn main() {
     let config = Config::from_args();
@@ -85,17 +108,16 @@ fn save_result<S: AsRef<str> + std::fmt::Display>(
         Ok(Certificate::SAT(v)) => {
             match output {
                 Some(ref f) if redirect => println!(
-                    "      Result|dump: to STDOUT instead of {} due to an IO error.\nSATISFIABLE: {}",
+                    "      Result|dump: to STDOUT instead of {} due to an IO error.",
                     f.to_string_lossy(),
-                    input,
                     ),
                 Some(ref f) => println!(
-                    "      Result|file: {}\nSATISFIABLE: {}",
+                    "      Result|file: {}",
                     f.to_str().unwrap(),
-                    input,
                 ),
-                _ => println!("SATISFIABLE: {}", input),
+                _ => (),
             }
+            println!("{}: {}", colored(Ok(true), true), input);
             if let Err(why) = (|| {
                 buf.write_all(
                     format!(
@@ -135,7 +157,7 @@ fn save_result<S: AsRef<str> + std::fmt::Display>(
                     s.state.config.proof_filename.to_string_lossy()
                 );
             }
-            println!("UNSAT: {}", input);
+            println!("{}: {}", colored(Ok(false), true), input);
             if let Err(why) = (|| {
                 buf.write_all(
                     format!(
@@ -160,7 +182,7 @@ fn save_result<S: AsRef<str> + std::fmt::Display>(
                 Some(ref f) => println!("      Result|file: {}", f.to_str().unwrap(),),
                 _ => (),
             }
-            println!("Failed to solve by {}: {}", e, input);
+            println!("Failed to solve by {}: {}", colored(Err(e), true), input);
             if let Err(why) = (|| {
                 buf.write_all(
                     format!(
