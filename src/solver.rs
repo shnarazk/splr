@@ -162,6 +162,9 @@ impl SatSolverIF for Solver {
                 // Or out of memory.
                 let q = state.config.quiet_mode;
                 state.config.quiet_mode = false;
+                if q {
+                    state.progress_header();
+                }
                 state.progress(cdb, rst, vdb, None);
                 state.config.quiet_mode = q;
                 if cdb.check_size().is_err() {
@@ -189,6 +192,9 @@ impl SatSolverIF for Solver {
             Ok(true) => {
                 let q = state.config.quiet_mode;
                 state.config.quiet_mode = false;
+                if q {
+                    state.progress_header();
+                }
                 state.progress(cdb, rst, vdb, None);
                 state.config.quiet_mode = q;
                 elim.extend_model(vdb);
@@ -223,6 +229,9 @@ impl SatSolverIF for Solver {
                 asgs.cancel_until(vdb, 0);
                 let q = state.config.quiet_mode;
                 state.config.quiet_mode = false;
+                if q {
+                    state.progress_header();
+                }
                 state.progress(cdb, rst, vdb, None);
                 state.config.quiet_mode = q;
                 Err(e)
