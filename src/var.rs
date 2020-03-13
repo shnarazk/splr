@@ -4,7 +4,7 @@ use {
         clause::{Clause, ClauseDB, ClauseIF, ClauseId, ClauseIdIF},
         config::Config,
         propagator::{AssignStack, PropagatorIF},
-        state::{ProgressComponent, Stat, State},
+        state::{ProgressComponent, SearchStrategy, Stat, State},
         types::*,
     },
     std::{
@@ -180,9 +180,11 @@ pub struct VarDB {
 
 impl Default for VarDB {
     fn default() -> VarDB {
+        const VRD_MAX: f64 = 0.96;
+        const VRD_START: f64 = 0.8;
         VarDB {
-            activity_decay: 0.8,
-            activity_decay_max: 0.96,
+            activity_decay: VRD_START,
+            activity_decay_max: VRD_MAX,
             ordinal: 0,
             var: Vec::new(),
             lbd_temp: Vec::new(),
@@ -310,8 +312,9 @@ impl VarRewardIF for VarDB {
         v.participated = 0;
     }
     fn reward_update(&mut self) {
+        const VRD_STEP: f64 = 0.000_01;
         self.ordinal += 1;
-        self.activity_decay = self.activity_decay_max.min(self.activity_decay + 0.000_01);
+        self.activity_decay = self.activity_decay_max.min(self.activity_decay + VRD_STEP);
     }
 }
 
@@ -329,19 +332,30 @@ impl Instantiate for VarDB {
         }
     }
     fn adapt_to(&mut self, state: &State) {
+        const VRD_COEFF_STD: f64 = 0.003;
+        const VRD_COEFF_LOW: f64 = 0.008;
+        const VRD_FILTER: f64 = 0.5;
+        const VRD_INTERVAL: usize = 20_000;
+        const VRD_MAX_START: f64 = 0.2;
+        const VRD_OFFSET: f64 = 10.0;
         if 0 == state[Stat::Conflict] {
             return;
         }
         let msr: (f64, f64) = self.var[1..]
             .iter()
             .map(|v| v.reward)
-            .fold((0.2, 0.0), |(m, s), x| (m.max(x), s + x));
+            .fold((VRD_MAX_START, 0.0), |(m, s), x| (m.max(x), s + x));
         let ar = msr.1 / self.var.len() as f64;
-        let thr = (msr.0 + ar) * 0.5;
+        let thr = (msr.0 + ar) * VRD_FILTER;
         let core = self.var[1..].iter().filter(|v| thr <= v.reward).count();
         self.core_size.update(core as f64);
-        if state[Stat::Conflict] % 20_000 == 0 {
-            self.activity_decay_max = 1.0 - 0.003 * ((self.core_size.get() - 10.0).max(0.0).sqrt());
+        if state[Stat::Conflict] % VRD_INTERVAL == 0 {
+            let k = match state.strategy.0 {
+                SearchStrategy::LowDecisions => VRD_COEFF_LOW,
+                _ => VRD_COEFF_STD,
+            };
+            self.activity_decay_max =
+                1.0 - k * ((self.core_size.get() - VRD_OFFSET).max(0.0).sqrt());
         }
     }
 }
