@@ -572,7 +572,10 @@ fn adapt_modules(
             elim.activate();
             elim.simplify(asgs, cdb, state, vdb)?;
         }
-        if state.strategy.0 == SearchStrategy::HighSuccesive {
+        if matches!(
+            state.strategy.0,
+            SearchStrategy::HighSuccesive | SearchStrategy::Generic
+        ) {
             state.config.chronobt = 0;
         }
     }
