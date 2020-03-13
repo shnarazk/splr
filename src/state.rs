@@ -226,12 +226,15 @@ impl IndexMut<Stat> for State {
 }
 
 macro_rules! im {
-    ($format: expr, $record: expr, $key: expr, $val: expr) => {
+    ($format: expr, $state: expr, $key: expr, $val: expr) => {
         match ($val, $key) {
             (v, LogUsizeId::End) => format!($format, v),
             (v, k) => {
-                let ptr = &mut $record[k];
-                if (v as f64) * 1.6 < *ptr as f64 {
+                let ptr = &mut $state.record[k];
+                if $state.config.quiet_mode {
+                    *ptr = v;
+                    format!($format, *ptr)
+                } else if (v as f64) * 1.6 < *ptr as f64 {
                     *ptr = v;
                     format!("\x1B[001m\x1B[031m{}\x1B[000m", format!($format, *ptr))
                 } else if v < *ptr {
@@ -253,11 +256,11 @@ macro_rules! im {
 }
 
 macro_rules! i {
-    ($format: expr, $record: expr, $key: expr, $val: expr) => {
+    ($format: expr, $state: expr, $key: expr, $val: expr) => {
         match ($val, $key) {
             (v, LogUsizeId::End) => format!($format, v),
             (v, k) => {
-                let ptr = &mut $record[k];
+                let ptr = &mut $state.record[k];
                 *ptr = v;
                 format!($format, *ptr)
             }
@@ -266,12 +269,15 @@ macro_rules! i {
 }
 
 macro_rules! fm {
-    ($format: expr, $record: expr, $key: expr, $val: expr) => {
+    ($format: expr, $state: expr, $key: expr, $val: expr) => {
         match ($val, $key) {
             (v, LogF64Id::End) => format!($format, v),
             (v, k) => {
-                let ptr = &mut $record[k];
-                if v * 1.6 < *ptr {
+                let ptr = &mut $state.record[k];
+                if $state.config.quiet_mode {
+                    *ptr = v;
+                    format!($format, *ptr)
+                } else if v * 1.6 < *ptr {
                     *ptr = v;
                     format!("\x1B[001m\x1B[031m{}\x1B[000m", format!($format, *ptr))
                 } else if v < *ptr {
@@ -294,11 +300,11 @@ macro_rules! fm {
 
 #[allow(unused_macros)]
 macro_rules! f {
-    ($format: expr, $record: expr, $key: expr, $val: expr) => {
+    ($format: expr, $state: expr, $key: expr, $val: expr) => {
         match ($val, $key) {
             (v, LogF64Id::End) => format!($format, v),
             (v, k) => {
-                let ptr = &mut $record[k];
+                let ptr = &mut $state.record[k];
                 *ptr = v;
                 format!($format, *ptr)
             }
@@ -424,53 +430,53 @@ impl StateIF for State {
             "\x1B[2K #conflict:{}, #decision:{}, #propagate:{} ",
             i!(
                 "{:>11}",
-                self.record,
+                self,
                 LogUsizeId::Conflict,
                 self[Stat::Conflict]
             ),
             i!(
                 "{:>13}",
-                self.record,
+                self,
                 LogUsizeId::Decision,
                 self[Stat::Decision]
             ),
             i!(
                 "{:>15}",
-                self.record,
+                self,
                 LogUsizeId::Propagate,
                 self[Stat::Propagation]
             ),
         );
         println!(
             "\x1B[2K  Assignment|#rem:{}, #fix:{}, #elm:{}, prg%:{} ",
-            im!("{:>9}", self.record, LogUsizeId::Remain, nv - sum),
-            im!("{:>9}", self.record, LogUsizeId::Fixed, fixed),
+            im!("{:>9}", self, LogUsizeId::Remain, nv - sum),
+            im!("{:>9}", self, LogUsizeId::Fixed, fixed),
             im!(
                 "{:>9}",
-                self.record,
+                self,
                 LogUsizeId::Eliminated,
                 self.num_eliminated_vars
             ),
             fm!(
                 "{:>9.4}",
-                self.record,
+                self,
                 LogF64Id::Progress,
                 (sum as f64) / (nv as f64) * 100.0
             ),
         );
         println!(
             "\x1B[2K      Clause|Remv:{}, LBD2:{}, Binc:{}, Perm:{} ",
-            im!("{:>9}", self.record, LogUsizeId::Removable, cdb_num_learnt),
-            im!("{:>9}", self.record, LogUsizeId::LBD2, self[Stat::NumLBD2]),
+            im!("{:>9}", self, LogUsizeId::Removable, cdb_num_learnt),
+            im!("{:>9}", self, LogUsizeId::LBD2, self[Stat::NumLBD2]),
             im!(
                 "{:>9}",
-                self.record,
+                self,
                 LogUsizeId::Binclause,
                 self[Stat::NumBin] // self[Stat::NumBinLearnt]
             ),
             im!(
                 "{:>9}",
-                self.record,
+                self,
                 LogUsizeId::Permanent,
                 cdb_num_active - cdb_num_learnt
             ),
@@ -484,27 +490,27 @@ impl StateIF for State {
             },
             im!(
                 "{:>9}",
-                self.record,
+                self,
                 LogUsizeId::RestartBlock,
                 self[Stat::BlockRestart]
             ),
             im!(
                 "{:>9}",
-                self.record,
+                self,
                 LogUsizeId::Restart,
                 self[Stat::Restart]
             ),
-            fm!("{:>9.4}", self.record, LogF64Id::EmaAsg, rst.asg.trend()),
-            fm!("{:>9.4}", self.record, LogF64Id::EmaLBD, rst.lbd.trend()),
+            fm!("{:>9.4}", self, LogF64Id::EmaAsg, rst.asg.trend()),
+            fm!("{:>9.4}", self, LogF64Id::EmaLBD, rst.lbd.trend()),
         );
         println!(
             "\x1B[2K    Conflict|eLBD:{}, cnfl:{}, bjmp:{}, rpc%:{} ",
-            fm!("{:>9.2}", self.record, LogF64Id::AveLBD, rst.lbd.get()),
-            fm!("{:>9.2}", self.record, LogF64Id::CLevel, self.c_lvl.get()),
-            fm!("{:>9.2}", self.record, LogF64Id::BLevel, self.b_lvl.get()),
+            fm!("{:>9.2}", self, LogF64Id::AveLBD, rst.lbd.get()),
+            fm!("{:>9.2}", self, LogF64Id::CLevel, self.c_lvl.get()),
+            fm!("{:>9.2}", self, LogF64Id::BLevel, self.b_lvl.get()),
             fm!(
                 "{:>9.4}",
-                self.record,
+                self,
                 LogF64Id::End,
                 100.0 * self[Stat::Restart] as f64 / self[Stat::Conflict] as f64
             )
@@ -513,17 +519,17 @@ impl StateIF for State {
             "\x1B[2K        misc|#rdc:{}, #sce:{}, core:{}, vdcy:{} ",
             im!(
                 "{:>9}",
-                self.record,
+                self,
                 LogUsizeId::Reduction,
                 self[Stat::Reduction]
             ),
             im!(
                 "{:>9}",
-                self.record,
+                self,
                 LogUsizeId::SatClauseElim,
                 self[Stat::SatClauseElimination]
             ),
-            fm!("{:>9.0}", self.record, LogF64Id::CoreSize, vdb_core_size),
+            fm!("{:>9.0}", self, LogF64Id::CoreSize, vdb_core_size),
             format!("{:>9.4}", vdb_activity_decay),
         );
         if let Some(m) = mes {

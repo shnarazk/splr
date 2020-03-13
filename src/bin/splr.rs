@@ -22,18 +22,18 @@ const GREEN: &str = "\x1B[001m\x1B[032m";
 const BLUE: &str = "\x1B[001m\x1B[034m";
 const RESET: &str = "\x1B[000m";
 
-fn colored(v: Result<bool, &SolverError>, c: bool) -> Cow<'static, str> {
-    if c {
-        match v {
-            Ok(false) => Cow::from(format!("{}UNSAT{}", GREEN, RESET)),
-            Ok(true) => Cow::from(format!("{}SATISFIABLE{}", BLUE, RESET)),
-            Err(e) => Cow::from(format!("{}{}{}", RED, e, RESET)),
-        }
-    } else {
+fn colored(v: Result<bool, &SolverError>, quiet: bool) -> Cow<'static, str> {
+    if quiet {
         match v {
             Ok(false) => Cow::Borrowed("UNSAT"),
             Ok(true) => Cow::Borrowed("SATISFIABLE"),
             Err(e) => Cow::from(format!("{}", e)),
+        }
+    } else {
+        match v {
+            Ok(false) => Cow::from(format!("{}UNSAT{}", GREEN, RESET)),
+            Ok(true) => Cow::from(format!("{}SATISFIABLE{}", BLUE, RESET)),
+            Err(e) => Cow::from(format!("{}{}{}", RED, e, RESET)),
         }
     }
 }
