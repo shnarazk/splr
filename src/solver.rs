@@ -6,7 +6,7 @@ use {
         eliminator::{Eliminator, EliminatorIF, EliminatorStatIF},
         propagator::{AssignStack, PropagatorIF, VarSelectionIF},
         restarter::{RestartIF, Restarter},
-        state::{Stat, State, StateIF},
+        state::{SearchStrategy, Stat, State, StateIF},
         types::*,
         var::{VarDB, VarDBIF, VarRewardIF, LBDIF},
     },
@@ -571,6 +571,9 @@ fn adapt_modules(
         if elim.enable {
             elim.activate();
             elim.simplify(asgs, cdb, state, vdb)?;
+        }
+        if state.strategy.0 == SearchStrategy::HighSuccesive {
+            state.config.chronobt = 0;
         }
     }
     cdb.adapt_to(state);

@@ -332,6 +332,7 @@ impl Instantiate for VarDB {
         }
     }
     fn adapt_to(&mut self, state: &State) {
+        const VRD_DEC_STRICT: f64 = 0.001;
         const VRD_DEC_STD: f64 = 0.003;
         const VRD_DEC_HIGH: f64 = 0.008;
         const VRD_FILTER: f64 = 0.5;
@@ -352,6 +353,7 @@ impl Instantiate for VarDB {
         if state[Stat::Conflict] % VRD_INTERVAL == 0 {
             let k = match state.strategy.0 {
                 SearchStrategy::LowDecisions => VRD_DEC_HIGH,
+                SearchStrategy::HighSuccesive => VRD_DEC_STRICT,
                 _ => VRD_DEC_STD,
             };
             self.activity_decay_max =
