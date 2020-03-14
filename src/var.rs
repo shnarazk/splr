@@ -180,6 +180,7 @@ pub struct VarDB {
 
 impl Default for VarDB {
     fn default() -> VarDB {
+        const CORE_HISOTRY: usize = 1;
         const VRD_MAX: f64 = 0.96;
         const VRD_START: f64 = 0.8;
         VarDB {
@@ -188,7 +189,7 @@ impl Default for VarDB {
             ordinal: 0,
             var: Vec::new(),
             lbd_temp: Vec::new(),
-            core_size: Ema::new(10),
+            core_size: Ema::new(CORE_HISOTRY),
         }
     }
 }
