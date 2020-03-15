@@ -71,8 +71,6 @@ pub trait ClauseDBIF {
 pub trait ClauseIdIF {
     /// return `true` if a given clause id is made from a `Lit`.
     fn is_lifted_lit(self) -> bool;
-    /// make a string for printing.
-    fn format(self) -> String;
 }
 
 /// API for 'watcher list' like `attach`, `detach`, `detach_with` and so on.
@@ -123,20 +121,18 @@ impl From<usize> for ClauseId {
 
 impl fmt::Display for ClauseId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "CID{}", self.ordinal)
+        if *self == ClauseId::default() {
+            write!(f, "NullClause")
+        } else {
+            write!(f, "CID{}", self.ordinal)
+        }
     }
 }
 
 impl ClauseIdIF for ClauseId {
+    /// return true if the clause is genereted from a literal by Eliminater.
     fn is_lifted_lit(self) -> bool {
         0 != 0x8000_0000 & self.ordinal
-    }
-    fn format(self) -> String {
-        if self == ClauseId::default() {
-            "NullClause".to_string()
-        } else {
-            format!("C::{}", self)
-        }
     }
 }
 

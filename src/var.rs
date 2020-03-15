@@ -1,7 +1,7 @@
 /// Crate `var` provides `var` object and its manager `VarDB`.
 use {
     crate::{
-        clause::{Clause, ClauseDB, ClauseIF, ClauseId, ClauseIdIF},
+        clause::{Clause, ClauseDB, ClauseIF, ClauseId},
         config::Config,
         propagator::{AssignStack, PropagatorIF},
         state::{ProgressComponent, SearchStrategy, Stat, State},
@@ -108,7 +108,7 @@ impl fmt::Display for Var {
             self.index,
             self.assign,
             self.level,
-            self.reason.format(),
+            self.reason,
             st(Flag::TOUCHED, ", touched"),
             st(Flag::ELIMINATED, ", eliminated"),
         )

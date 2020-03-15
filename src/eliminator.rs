@@ -389,13 +389,13 @@ impl EliminatorIF for Eliminator {
                 if bool::from(*l) {
                     debug_assert!(
                         !w.pos_occurs.contains(&cid),
-                        format!("{} {:?} {}", cid.format(), vec2int(&c.lits), v.index,)
+                        format!("{} {:?} {}", cid, vec2int(&c.lits), v.index,)
                     );
                     w.pos_occurs.push(cid);
                 } else {
                     debug_assert!(
                         !w.neg_occurs.contains(&cid),
-                        format!("{} {:?} {}", cid.format(), vec2int(&c.lits), v.index,)
+                        format!("{} {:?} {}", cid, vec2int(&c.lits), v.index,)
                     );
                     w.neg_occurs.push(cid);
                 }
@@ -653,7 +653,7 @@ fn try_subsume(
 ) -> MaybeInconsistent {
     match subsume(cdb, cid, did) {
         Some(NULL_LIT) => {
-            // println!("BackSubsC    => {} {:#} subsumed completely by {} {:#}",
+            // println!("BackSubsC    => {} {} subsumed completely by {} {:#}",
             //          did.fmt(),
             //          *clause!(cdb, cid),
             //          cid.fmt(),
@@ -772,10 +772,10 @@ fn check_eliminator(cdb: &ClauseDB, elim: &Eliminator, _vdb: &[Var]) -> bool {
             let v = l.vi();
             if bool::from(*l) {
                 if !elim[v].pos_occurs.contains(&(ClauseId::from(cid))) {
-                    panic!("failed to check {} {:#}", (ClauseId::from(cid)).format(), c);
+                    panic!("failed to check {} {:#}", (ClauseId::from(cid)), c);
                 }
             } else if !elim[v].neg_occurs.contains(&(ClauseId::from(cid))) {
-                panic!("failed to check {} {:#}", (ClauseId::from(cid)).format(), c);
+                panic!("failed to check {} {:#}", (ClauseId::from(cid)), c);
             }
         }
     }
