@@ -25,15 +25,15 @@ pub trait PropagatorIF {
     /// ## Caveat
     /// - it emits a panic by out of index range.
     /// - it emits a panic if the level is 0.
-    fn len_upto(&self, n: usize) -> usize;
+    fn len_upto(&self, n: DecisionLevel) -> usize;
     /// return `true` if there's no assignment.
     fn is_empty(&self) -> bool;
     /// return an interator over assignment stack.
     fn iter(&self) -> Iter<'_, Lit>;
     /// return the current decision level.
-    fn level(&self) -> usize;
+    fn level(&self) -> DecisionLevel;
     ///return the decision var's id at that level.
-    fn decision_vi(&self, lv: usize) -> VarId;
+    fn decision_vi(&self, lv: DecisionLevel) -> VarId;
     /// return `true` if the current decision level is zero.
     fn is_zero(&self) -> bool;
     /// return `true` if there are unpropagated assignments.
@@ -46,7 +46,7 @@ pub trait PropagatorIF {
     fn assign_at_rootlevel(&mut self, vdb: &mut VarDB, l: Lit) -> MaybeInconsistent;
     /// unsafe enqueue (assign by implication); doesn't emit an exception.
     /// Warning: caller must assure the consistency after this assignment
-    fn assign_by_implication(&mut self, vdb: &mut VarDB, l: Lit, cid: ClauseId, lv: usize);
+    fn assign_by_implication(&mut self, vdb: &mut VarDB, l: Lit, cid: ClauseId, lv: DecisionLevel);
     /// unsafe assume (assign by decision); doesn't emit an exception.
     /// ## Caveat
     /// Callers have to assure the consistency after this assignment.
@@ -57,7 +57,7 @@ pub trait PropagatorIF {
     /// - No need to restart; but execute `propagate` just afterward.
     fn assign_by_unitclause(&mut self, vdb: &mut VarDB, l: Lit);
     /// execute *backjump*.
-    fn cancel_until(&mut self, vdb: &mut VarDB, lv: usize);
+    fn cancel_until(&mut self, vdb: &mut VarDB, lv: DecisionLevel);
     /// execute *boolean constraint propagation* or *unit propagation*.
     fn propagate(&mut self, cdb: &mut ClauseDB, vdb: &mut VarDB) -> ClauseId;
 }
@@ -191,8 +191,8 @@ impl PropagatorIF for AssignStack {
     fn len(&self) -> usize {
         self.trail.len()
     }
-    fn len_upto(&self, n: usize) -> usize {
-        self.trail_lim[n]
+    fn len_upto(&self, n: DecisionLevel) -> usize {
+        self.trail_lim[n as usize]
     }
     fn is_empty(&self) -> bool {
         self.trail.is_empty()
@@ -200,12 +200,12 @@ impl PropagatorIF for AssignStack {
     fn iter(&self) -> Iter<'_, Lit> {
         self.trail.iter()
     }
-    fn level(&self) -> usize {
-        self.trail_lim.len()
+    fn level(&self) -> DecisionLevel {
+        self.trail_lim.len() as DecisionLevel
     }
-    fn decision_vi(&self, lv: usize) -> VarId {
+    fn decision_vi(&self, lv: DecisionLevel) -> VarId {
         debug_assert!(0 < lv);
-        self.trail[self.trail_lim[lv - 1]].vi()
+        self.trail[self.trail_lim[lv as usize - 1]].vi()
     }
     fn is_zero(&self) -> bool {
         self.trail_lim.is_empty()
@@ -231,7 +231,7 @@ impl PropagatorIF for AssignStack {
             _ => Err(SolverError::Inconsistent),
         }
     }
-    fn assign_by_implication(&mut self, vdb: &mut VarDB, l: Lit, cid: ClauseId, lv: usize) {
+    fn assign_by_implication(&mut self, vdb: &mut VarDB, l: Lit, cid: ClauseId, lv: DecisionLevel) {
         debug_assert!(usize::from(l) != 0, "Null literal is about to be equeued");
         // The following doesn't hold anymore by using chronoBT.
         // assert!(self.trail_lim.is_empty() || cid != ClauseId::default());
@@ -254,7 +254,7 @@ impl PropagatorIF for AssignStack {
         debug_assert!(!self.trail.contains(&l));
         debug_assert!(!self.trail.contains(&!l), format!("{:?}", l));
         self.level_up();
-        let dl = self.trail_lim.len();
+        let dl = self.trail_lim.len() as DecisionLevel;
         let vi = l.vi();
         let v = &mut vdb[vi];
         debug_assert!(!v.is(Flag::ELIMINATED));
@@ -275,14 +275,15 @@ impl PropagatorIF for AssignStack {
         v.assign = Some(bool::from(l));
         v.level = 0;
         v.reason = ClauseId::default();
+        vdb.clear_reward(l.vi());
         debug_assert!(!self.trail.contains(&!l));
         self.trail.push(l);
     }
-    fn cancel_until(&mut self, vdb: &mut VarDB, lv: usize) {
-        if self.trail_lim.len() <= lv {
+    fn cancel_until(&mut self, vdb: &mut VarDB, lv: DecisionLevel) {
+        if self.trail_lim.len() as u32 <= lv {
             return;
         }
-        let lim = self.trail_lim[lv];
+        let lim = self.trail_lim[lv as usize];
         let mut shift = lim;
         for i in lim..self.trail.len() {
             let l = self.trail[i];
@@ -294,7 +295,7 @@ impl PropagatorIF for AssignStack {
                 continue;
             }
             unset_assign!(self, vi);
-            v.phase = v.assign.unwrap();
+            v.set(Flag::PHASE, v.assign.unwrap());
             v.assign = None;
             v.reason = ClauseId::default();
             vdb.reward_at_unassign(vi);
@@ -303,7 +304,7 @@ impl PropagatorIF for AssignStack {
         self.trail.truncate(shift);
         debug_assert!(self.trail.iter().all(|l| vdb[l].assign.is_some()));
         debug_assert!(self.trail.iter().all(|k| !self.trail.contains(&!*k)));
-        self.trail_lim.truncate(lv);
+        self.trail_lim.truncate(lv as usize);
         // assert!(lim < self.q_head) dosen't hold sometimes in chronoBT.
         self.q_head = self.q_head.min(lim);
     }
@@ -316,11 +317,11 @@ impl PropagatorIF for AssignStack {
     ///    propagatation order.
     fn propagate(&mut self, cdb: &mut ClauseDB, vdb: &mut VarDB) -> ClauseId {
         let watcher = &mut cdb.watcher[..] as *mut [Vec<Watch>];
-        while self.remains() {
-            let p = self.sweep();
-            let false_lit = !p;
+        while let Some(p) = self.trail.get(self.q_head) {
+            self.q_head += 1;
+            let false_lit = !*p;
             unsafe {
-                let source = (*watcher).get_unchecked_mut(usize::from(p));
+                let source = (*watcher).get_unchecked_mut(usize::from(*p));
                 let mut n = 0;
                 'next_clause: while n < source.len() {
                     let w = source.get_unchecked_mut(n);
@@ -391,11 +392,6 @@ impl VarSelectionIF for AssignStack {
 impl AssignStack {
     fn level_up(&mut self) {
         self.trail_lim.push(self.trail.len());
-    }
-    fn sweep(&mut self) -> Lit {
-        let lit = self.trail[self.q_head];
-        self.q_head += 1;
-        lit
     }
     /// dump all active clauses and fixed assignments as a CNF file.
     #[allow(dead_code)]
@@ -540,7 +536,7 @@ impl fmt::Display for AssignStack {
             }
         };
         if 0 < len {
-            write!(f, "{:?}", (0..len).map(c).collect::<Vec<(usize, &[i32])>>())
+            write!(f, "{:?}", (0..len).map(c).collect::<Vec<_>>())
         } else {
             write!(f, "# - trail[  0]  [0{:?}]", &v)
         }

@@ -1,7 +1,13 @@
 ## 0.3.2, 2020-20-20
 
+- control var activity decay rate based on the number of hot vars.
 - set var activity parameters for each search strategy correctly
-- move Clause::simplify to Eliminator and make Eliminator::eliminate private
+- move `Clause::simplify` to `Eliminator` and make `Eliminator::eliminate` private
+- make `Var` smaller
+- define `DecisionLevel`
+- generate a result file even if splr failed to solve
+- define `restarter` as the sixth module of `Solver`
+- add `--quiet` mode to show only the last stats
 
 ## 0.3.1, 2020-02-22
 

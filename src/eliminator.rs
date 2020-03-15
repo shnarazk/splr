@@ -6,10 +6,11 @@ use {
         propagator::{AssignStack, PropagatorIF},
         state::{Stat, State, StateIF},
         types::*,
-        var::{Var, VarDB, VarDBIF, LBDIF},
+        var::{Var, VarDB, VarDBIF, VarRewardIF, LBDIF},
     },
     std::{fmt, slice::Iter},
     std::{
+        ops::{Index, IndexMut, Range, RangeFrom},
         sync::{
             atomic::{AtomicBool, Ordering},
             Arc,
@@ -55,11 +56,52 @@ pub trait EliminatorIF {
     fn sorted_iterator(&self) -> Iter<'_, usize>;
 }
 
+/// API for getting stats about Eliminator's internal data.
+pub trait EliminatorStatIF {
+    fn stats(&self) -> (usize, usize);
+}
+
 #[derive(Eq, Debug, PartialEq)]
 enum EliminatorMode {
     Deactive,
     Waiting,
     Running,
+}
+
+#[derive(Debug)]
+pub struct LitOccurs {
+    pos_occurs: Vec<ClauseId>,
+    neg_occurs: Vec<ClauseId>,
+}
+
+impl Default for LitOccurs {
+    fn default() -> LitOccurs {
+        LitOccurs {
+            pos_occurs: Vec::new(),
+            neg_occurs: Vec::new(),
+        }
+    }
+}
+
+impl EliminatorStatIF for LitOccurs {
+    fn stats(&self) -> (usize, usize) {
+        (self.pos_occurs.len(), self.neg_occurs.len())
+    }
+}
+
+impl LitOccurs {
+    /// return a new vector of $n$ `LitOccurs`s.
+    fn new(n: usize) -> Vec<LitOccurs> {
+        let mut vec = Vec::with_capacity(n + 1);
+        for _ in 0..=n {
+            vec.push(LitOccurs::default());
+        }
+        vec
+    }
+    fn clear(&mut self) {
+        self.pos_occurs.clear();
+        self.neg_occurs.clear();
+    }
 }
 
 /// Literal eliminator
@@ -81,6 +123,8 @@ pub struct Eliminator {
     pub eliminate_occurrence_limit: usize,
     /// Stop subsumption if the size of a clause is over this
     pub subsume_literal_limit: usize,
+    /// var
+    var: Vec<LitOccurs>,
 }
 
 impl Default for Eliminator {
@@ -96,19 +140,112 @@ impl Default for Eliminator {
             eliminate_grow_limit: 0, // 64
             eliminate_occurrence_limit: 800,
             subsume_literal_limit: 100,
+            var: Vec::new(),
         }
+    }
+}
+
+impl Index<VarId> for Eliminator {
+    type Output = LitOccurs;
+    #[inline]
+    fn index(&self, i: VarId) -> &Self::Output {
+        unsafe { self.var.get_unchecked(i) }
+    }
+}
+
+impl IndexMut<VarId> for Eliminator {
+    #[inline]
+    fn index_mut(&mut self, i: VarId) -> &mut Self::Output {
+        unsafe { self.var.get_unchecked_mut(i) }
+    }
+}
+
+impl Index<&VarId> for Eliminator {
+    type Output = LitOccurs;
+    #[inline]
+    fn index(&self, i: &VarId) -> &Self::Output {
+        unsafe { self.var.get_unchecked(*i) }
+    }
+}
+
+impl IndexMut<&VarId> for Eliminator {
+    #[inline]
+    fn index_mut(&mut self, i: &VarId) -> &mut Self::Output {
+        unsafe { self.var.get_unchecked_mut(*i) }
+    }
+}
+
+impl Index<Lit> for Eliminator {
+    type Output = LitOccurs;
+    #[inline]
+    fn index(&self, l: Lit) -> &Self::Output {
+        unsafe { self.var.get_unchecked(l.vi()) }
+    }
+}
+
+impl IndexMut<Lit> for Eliminator {
+    #[inline]
+    fn index_mut(&mut self, l: Lit) -> &mut Self::Output {
+        unsafe { self.var.get_unchecked_mut(l.vi()) }
+    }
+}
+
+impl Index<&Lit> for Eliminator {
+    type Output = LitOccurs;
+    #[inline]
+    fn index(&self, l: &Lit) -> &Self::Output {
+        unsafe { self.var.get_unchecked(l.vi()) }
+    }
+}
+
+impl IndexMut<&Lit> for Eliminator {
+    #[inline]
+    fn index_mut(&mut self, l: &Lit) -> &mut Self::Output {
+        unsafe { self.var.get_unchecked_mut(l.vi()) }
+    }
+}
+
+impl Index<Range<usize>> for Eliminator {
+    type Output = [LitOccurs];
+    #[inline]
+    fn index(&self, r: Range<usize>) -> &Self::Output {
+        &self.var[r]
+    }
+}
+
+impl Index<RangeFrom<usize>> for Eliminator {
+    type Output = [LitOccurs];
+    #[inline]
+    fn index(&self, r: RangeFrom<usize>) -> &Self::Output {
+        unsafe { self.var.get_unchecked(r) }
+    }
+}
+
+impl IndexMut<Range<usize>> for Eliminator {
+    #[inline]
+    fn index_mut(&mut self, r: Range<usize>) -> &mut Self::Output {
+        unsafe { self.var.get_unchecked_mut(r) }
+    }
+}
+
+impl IndexMut<RangeFrom<usize>> for Eliminator {
+    #[inline]
+    fn index_mut(&mut self, r: RangeFrom<usize>) -> &mut Self::Output {
+        &mut self.var[r]
     }
 }
 
 impl Instantiate for Eliminator {
     fn instantiate(config: &Config, cnf: &CNFDescription) -> Eliminator {
         let nv = cnf.num_of_variables;
-        let mut e = Eliminator::default();
-        e.enable = !config.without_elim;
-        e.var_queue = VarOccHeap::new(nv, 0);
-        e.eliminate_grow_limit = config.elim_grow_limit;
-        e.subsume_literal_limit = config.elim_lit_limit;
-        e
+        Eliminator {
+            enable: !config.without_elim,
+            var_queue: VarOccHeap::new(nv, 0),
+            eliminate_grow_limit: config.elim_grow_limit,
+            subsume_literal_limit: config.elim_lit_limit,
+            var: LitOccurs::new(nv + 1),
+            ..Eliminator::default()
+        }
     }
 }
 
@@ -131,9 +268,8 @@ impl EliminatorIF for Eliminator {
             for c in &mut cdb[1..] {
                 c.turn_off(Flag::OCCUR_LINKED);
             }
-            for v in &mut vdb[1..] {
-                v.pos_occurs.clear();
-                v.neg_occurs.clear();
+            for w in &mut self[1..] {
+                w.clear();
             }
         }
         self.mode = EliminatorMode::Deactive;
@@ -143,9 +279,8 @@ impl EliminatorIF for Eliminator {
             return;
         }
         self.mode = EliminatorMode::Running;
-        for v in &mut vdb[1..] {
-            v.pos_occurs.clear();
-            v.neg_occurs.clear();
+        for w in &mut self[1..] {
+            w.clear();
         }
         for (cid, c) in &mut cdb[0..].iter_mut().enumerate().skip(1) {
             if c.is(Flag::DEAD) || c.is(Flag::OCCUR_LINKED) {
@@ -168,9 +303,10 @@ impl EliminatorIF for Eliminator {
             return;
         }
         let v = &mut vdb[vi];
-        if !v.is(Flag::ENQUEUED) && v.occur_activity() < self.eliminate_occurrence_limit {
+        let w = &mut self[vi];
+        if !v.is(Flag::ENQUEUED) && w.activity() < self.eliminate_occurrence_limit {
             v.turn_on(Flag::ENQUEUED);
-            self.var_queue.insert(vdb, vi, upward);
+            self.var_queue.insert(&self.var, vi, upward);
         }
     }
     fn simplify(
@@ -186,7 +322,6 @@ impl EliminatorIF for Eliminator {
             v.reason = ClauseId::default();
         }
         if self.is_waiting() {
-            cdb.reset();
             self.prepare(cdb, vdb, true);
         }
         self.eliminate(asgs, cdb, state, vdb)?;
@@ -248,20 +383,21 @@ impl EliminatorIF for Eliminator {
         }
         for l in &c.lits {
             let v = &mut vdb[l.vi()];
+            let w = &mut self[l.vi()];
             v.turn_on(Flag::TOUCHED);
             if !v.is(Flag::ELIMINATED) {
                 if bool::from(*l) {
                     debug_assert!(
-                        !v.pos_occurs.contains(&cid),
-                        format!("{} {:?} {}", cid.format(), vec2int(&c.lits), v.index,)
+                        !w.pos_occurs.contains(&cid),
+                        format!("{} {:?} {}", cid, vec2int(&c.lits), v.index,)
                     );
-                    v.pos_occurs.push(cid);
+                    w.pos_occurs.push(cid);
                 } else {
                     debug_assert!(
-                        !v.neg_occurs.contains(&cid),
-                        format!("{} {:?} {}", cid.format(), vec2int(&c.lits), v.index,)
+                        !w.neg_occurs.contains(&cid),
+                        format!("{} {:?} {}", cid, vec2int(&c.lits), v.index,)
                     );
-                    v.neg_occurs.push(cid);
+                    w.neg_occurs.push(cid);
                 }
                 self.enqueue_var(vdb, l.vi(), false);
             }
@@ -336,13 +472,14 @@ impl Eliminator {
                 let mut b = 0;
                 for l in lits {
                     let v = &vdb[l.vi()];
+                    let w = &self[l.vi()];
                     if v.assign.is_some() {
                         continue;
                     }
                     let nsum = if bool::from(*l) {
-                        v.neg_occurs.len()
+                        w.neg_occurs.len()
                     } else {
-                        v.pos_occurs.len()
+                        w.pos_occurs.len()
                     };
                     if !v.is(Flag::ELIMINATED) && nsum < tmp {
                         b = l.vi();
@@ -356,8 +493,8 @@ impl Eliminator {
             }
             unsafe {
                 for cs in &[
-                    &mut vdb[best].pos_occurs as *mut Vec<ClauseId>,
-                    &mut vdb[best].neg_occurs as *mut Vec<ClauseId>,
+                    &mut self[best].pos_occurs as *mut Vec<ClauseId>,
+                    &mut self[best].neg_occurs as *mut Vec<ClauseId>,
                 ] {
                     for did in &**cs {
                         if *did == cid {
@@ -430,7 +567,7 @@ impl Eliminator {
             if !self.clause_queue.is_empty() || self.bwdsub_assigns < asgs.len() {
                 self.backward_subsumption_check(asgs, cdb, vdb, &timedout)?;
             }
-            while let Some(vi) = self.var_queue.select_var(vdb) {
+            while let Some(vi) = self.var_queue.select_var(&self.var, vdb) {
                 // timedout = cvar.wait(timedout).unwrap();
                 let v = &mut vdb[vi];
                 v.turn_off(Flag::ENQUEUED);
@@ -455,15 +592,15 @@ impl Eliminator {
     }
     /// remove a clause id from literal's occur list.
     fn remove_lit_occur(&mut self, vdb: &mut VarDB, l: Lit, cid: ClauseId) {
-        let v = &mut vdb[l.vi()];
+        let w = &mut self[l.vi()];
         if bool::from(l) {
-            debug_assert_eq!(v.pos_occurs.iter().filter(|&c| *c == cid).count(), 1);
-            v.pos_occurs.delete_unstable(|&c| c == cid);
-            debug_assert!(!v.pos_occurs.contains(&cid));
+            debug_assert_eq!(w.pos_occurs.iter().filter(|&c| *c == cid).count(), 1);
+            w.pos_occurs.delete_unstable(|&c| c == cid);
+            debug_assert!(!w.pos_occurs.contains(&cid));
         } else {
-            debug_assert_eq!(v.neg_occurs.iter().filter(|&c| *c == cid).count(), 1);
-            v.neg_occurs.delete_unstable(|&c| c == cid);
-            debug_assert!(!v.neg_occurs.contains(&cid));
+            debug_assert_eq!(w.neg_occurs.iter().filter(|&c| *c == cid).count(), 1);
+            w.neg_occurs.delete_unstable(|&c| c == cid);
+            debug_assert!(!w.neg_occurs.contains(&cid));
         }
         self.enqueue_var(vdb, l.vi(), true);
     }
@@ -516,7 +653,7 @@ fn try_subsume(
 ) -> MaybeInconsistent {
     match subsume(cdb, cid, did) {
         Some(NULL_LIT) => {
-            // println!("BackSubsC    => {} {:#} subsumed completely by {} {:#}",
+            // println!("BackSubsC    => {} {} subsumed completely by {} {:#}",
             //          did.fmt(),
             //          *clause!(cdb, cid),
             //          cid.fmt(),
@@ -609,7 +746,7 @@ fn check_to_merge(
 }
 
 #[allow(dead_code)]
-fn check_eliminator(cdb: &ClauseDB, vdb: &[Var]) -> bool {
+fn check_eliminator(cdb: &ClauseDB, elim: &Eliminator, _vdb: &[Var]) -> bool {
     // clause_queue should be clear.
     // all elements in occur_lists exist.
     // for v in vdb {
@@ -634,11 +771,11 @@ fn check_eliminator(cdb: &ClauseDB, vdb: &[Var]) -> bool {
         for l in &c.lits {
             let v = l.vi();
             if bool::from(*l) {
-                if !vdb[v].pos_occurs.contains(&(ClauseId::from(cid))) {
-                    panic!("failed to check {} {:#}", (ClauseId::from(cid)).format(), c);
+                if !elim[v].pos_occurs.contains(&(ClauseId::from(cid))) {
+                    panic!("failed to check {} {:#}", (ClauseId::from(cid)), c);
                 }
-            } else if !vdb[v].neg_occurs.contains(&(ClauseId::from(cid))) {
-                panic!("failed to check {} {:#}", (ClauseId::from(cid)).format(), c);
+            } else if !elim[v].neg_occurs.contains(&(ClauseId::from(cid))) {
+                panic!("failed to check {} {:#}", (ClauseId::from(cid)), c);
             }
         }
     }
@@ -689,8 +826,7 @@ fn strengthen_clause(
 ) -> MaybeInconsistent {
     debug_assert!(!cdb[cid].is(Flag::DEAD));
     debug_assert!(1 < cdb[cid].len());
-    cdb.touched[l] = true;
-    cdb.touched[!l] = true;
+    cdb.touch_var(l.vi());
     debug_assert_ne!(cid, ClauseId::default());
     if strengthen(cdb, cid, l) {
         // Vaporize the binary clause
@@ -788,8 +924,7 @@ fn make_eliminated_clause(cdb: &mut ClauseDB, vec: &mut Vec<Lit>, vi: VarId, cid
     // Store the length of the clause last:
     debug_assert_eq!(vec[first].vi(), vi);
     vec.push(Lit::from(c.len()));
-    cdb.touched[Lit::from_assign(vi, true)] = true;
-    cdb.touched[Lit::from_assign(vi, false)] = true;
+    cdb.touch_var(vi);
     // println!("make_eliminated_clause: eliminate({}) clause {:?}", vi, vec2int(&ch.lits));
 }
 
@@ -803,15 +938,16 @@ fn eliminate_var(
     timedout: &Arc<AtomicBool>,
 ) -> MaybeInconsistent {
     let v = &mut vdb[vi];
+    let w = &mut elim[vi];
     if v.assign.is_some() {
         return Ok(());
     }
     debug_assert!(!v.is(Flag::ELIMINATED));
     // count only alive clauses
-    v.pos_occurs.retain(|&c| !cdb[c].is(Flag::DEAD));
-    v.neg_occurs.retain(|&c| !cdb[c].is(Flag::DEAD));
-    let pos = &v.pos_occurs as *const Vec<ClauseId>;
-    let neg = &v.neg_occurs as *const Vec<ClauseId>;
+    w.pos_occurs.retain(|&c| !cdb[c].is(Flag::DEAD));
+    w.neg_occurs.retain(|&c| !cdb[c].is(Flag::DEAD));
+    let pos = &w.pos_occurs as *const Vec<ClauseId>;
+    let neg = &w.neg_occurs as *const Vec<ClauseId>;
     unsafe {
         if skip_var_elimination(cdb, elim, vdb, &*pos, &*neg, vi) {
             return Ok(());
@@ -846,12 +982,13 @@ fn eliminate_var(
                         } else {
                             0
                         };
-                        let cid = cdb.attach(state, vdb, rank);
+                        let cid = cdb.attach(&mut *vec, vdb, rank);
                         elim.add_cid_occur(vdb, cid, &mut cdb[cid], true);
                     }
                 }
             }
         }
+        //[VAR ELIMINATION]
         for cid in &*pos {
             cdb.detach(*cid);
             elim.remove_cid_occur(vdb, *cid, &mut cdb[cid]);
@@ -860,9 +997,9 @@ fn eliminate_var(
             cdb.detach(*cid);
             elim.remove_cid_occur(vdb, *cid, &mut cdb[cid]);
         }
-        vdb[vi].pos_occurs.clear();
-        vdb[vi].neg_occurs.clear();
+        elim[vi].clear();
         vdb[vi].turn_on(Flag::ELIMINATED);
+        vdb.clear_reward(vi);
         elim.backward_subsumption_check(asgs, cdb, vdb, timedout)
     }
 }
@@ -927,8 +1064,8 @@ fn make_eliminated_clauses(
     }
 }
 
-impl Var {
-    fn occur_activity(&self) -> usize {
+impl LitOccurs {
+    fn activity(&self) -> usize {
         self.pos_occurs.len().min(self.neg_occurs.len())
     }
 }
@@ -946,12 +1083,12 @@ pub struct VarOccHeap {
 
 trait VarOrderIF {
     fn new(n: usize, init: usize) -> VarOccHeap;
-    fn insert(&mut self, vec: &VarDB, vi: VarId, upword: bool);
+    fn insert(&mut self, occur: &[LitOccurs], vi: VarId, upword: bool);
     fn clear(&mut self, vdb: &mut VarDB);
     fn len(&self) -> usize;
     fn is_empty(&self) -> bool;
-    fn select_var(&mut self, vdb: &VarDB) -> Option<VarId>;
-    fn rebuild(&mut self, vdb: &VarDB);
+    fn select_var(&mut self, occur: &[LitOccurs], vdb: &VarDB) -> Option<VarId>;
+    fn rebuild(&mut self, occur: &[LitOccurs], vdb: &VarDB);
 }
 
 impl VarOrderIF for VarOccHeap {
@@ -967,14 +1104,14 @@ impl VarOrderIF for VarOccHeap {
         idxs[0] = init;
         VarOccHeap { heap, idxs }
     }
-    fn insert(&mut self, vdb: &VarDB, vi: VarId, upward: bool) {
+    fn insert(&mut self, occur: &[LitOccurs], vi: VarId, upward: bool) {
         debug_assert!(vi < self.heap.len());
         if self.contains(vi) {
             let i = self.idxs[vi];
             if upward {
-                self.percolate_up(vdb, i);
+                self.percolate_up(occur, i);
             } else {
-                self.percolate_down(vdb, i);
+                self.percolate_down(occur, i);
             }
             return;
         }
@@ -985,7 +1122,7 @@ impl VarOrderIF for VarOccHeap {
         self.idxs.swap(vi, vn);
         debug_assert!(n < self.heap.len());
         self.idxs[0] = n;
-        self.percolate_up(vdb, n);
+        self.percolate_up(occur, n);
     }
     fn clear(&mut self, vdb: &mut VarDB) {
         for v in &mut self.heap[0..self.idxs[0]] {
@@ -999,9 +1136,9 @@ impl VarOrderIF for VarOccHeap {
     fn is_empty(&self) -> bool {
         self.idxs[0] == 0
     }
-    fn select_var(&mut self, vdb: &VarDB) -> Option<VarId> {
+    fn select_var(&mut self, occur: &[LitOccurs], vdb: &VarDB) -> Option<VarId> {
         loop {
-            let vi = self.get_root(vdb);
+            let vi = self.get_root(occur);
             if vi == 0 {
                 return None;
             }
@@ -1010,11 +1147,11 @@ impl VarOrderIF for VarOccHeap {
             }
         }
     }
-    fn rebuild(&mut self, vdb: &VarDB) {
+    fn rebuild(&mut self, occur: &[LitOccurs], vdb: &VarDB) {
         self.reset();
         for v in &vdb[1..] {
             if v.assign.is_none() && !v.is(Flag::ELIMINATED) {
-                self.insert(vdb, v.index, true);
+                self.insert(occur, v.index, true);
             }
         }
     }
@@ -1030,7 +1167,7 @@ impl VarOccHeap {
             self.heap[i] = i;
         }
     }
-    fn get_root(&mut self, vdb: &VarDB) -> VarId {
+    fn get_root(&mut self, occur: &[LitOccurs]) -> VarId {
         let s = 1;
         let vs = self.heap[s];
         let n = self.idxs[0];
@@ -1045,15 +1182,15 @@ impl VarOccHeap {
         self.idxs.swap(vn, vs);
         self.idxs[0] -= 1;
         if 1 < self.idxs[0] {
-            self.percolate_down(&vdb, 1);
+            self.percolate_down(occur, 1);
         }
         vs
     }
-    fn percolate_up(&mut self, vdb: &VarDB, start: usize) {
+    fn percolate_up(&mut self, occur: &[LitOccurs], start: usize) {
         let mut q = start;
         let vq = self.heap[q];
         debug_assert!(0 < vq, "size of heap is too small");
-        let aq = vdb[vq].occur_activity();
+        let aq = occur[vq].activity();
         loop {
             let p = q / 2;
             if p == 0 {
@@ -1063,7 +1200,7 @@ impl VarOccHeap {
                 return;
             } else {
                 let vp = self.heap[p];
-                let ap = vdb[vp].occur_activity();
+                let ap = occur[vp].activity();
                 if ap > aq {
                     // move down the current parent, and make it empty
                     self.heap[q] = vp;
@@ -1079,20 +1216,20 @@ impl VarOccHeap {
             }
         }
     }
-    fn percolate_down(&mut self, vdb: &VarDB, start: usize) {
+    fn percolate_down(&mut self, occur: &[LitOccurs], start: usize) {
         let n = self.len();
         let mut i = start;
         let vi = self.heap[i];
-        let ai = vdb[vi].occur_activity();
+        let ai = occur[vi].activity();
         loop {
             let l = 2 * i; // left
             if l < n {
                 let vl = self.heap[l];
-                let al = vdb[vl].occur_activity();
+                let al = occur[vl].activity();
                 let r = l + 1; // right
-                let (target, vc, ac) = if r < n && al > vdb[self.heap[r]].occur_activity() {
+                let (target, vc, ac) = if r < n && al > occur[self.heap[r]].activity() {
                     let vr = self.heap[r];
-                    (r, vr, vdb[vr].occur_activity())
+                    (r, vr, occur[vr].activity())
                 } else {
                     (l, vl, al)
                 };
@@ -1119,7 +1256,7 @@ impl VarOccHeap {
         self.heap[1]
     }
     #[allow(dead_code)]
-    fn remove(&mut self, vec: &VarDB, vs: VarId) {
+    fn remove(&mut self, occur: &[LitOccurs], vs: VarId) {
         let s = self.idxs[vs];
         let n = self.idxs[0];
         if n < s {
@@ -1130,7 +1267,7 @@ impl VarOccHeap {
         self.idxs.swap(vn, vs);
         self.idxs[0] -= 1;
         if 1 < self.idxs[0] {
-            self.percolate_down(&vec, 1);
+            self.percolate_down(occur, 1);
         }
     }
     #[allow(dead_code)]

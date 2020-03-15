@@ -3,7 +3,7 @@ use {
     crate::{
         config::Config,
         eliminator::{Eliminator, EliminatorIF},
-        state::{SearchStrategy, Stat, State},
+        state::{ProgressComponent, SearchStrategy, Stat, State},
         types::*,
         var::{VarDB, VarDBIF, LBDIF},
     },
@@ -32,13 +32,11 @@ pub trait ClauseDBIF {
     /// return true if it's empty.
     fn is_empty(&self) -> bool;
     /// make a new clause from `state.new_learnt` and register it to clause database.
-    fn attach(&mut self, state: &mut State, vdb: &mut VarDB, lbd: usize) -> ClauseId;
+    fn attach(&mut self, v: &mut [Lit], vdb: &mut VarDB, lbd: usize) -> ClauseId;
     /// unregister a clause `cid` from clause database and make the clause dead.
     fn detach(&mut self, cid: ClauseId);
-    /// set up parameters for each SearchStrategy.
-    fn adapt_strategy(&mut self, mode: &SearchStrategy, nc: usize);
     /// check a condition to reduce.
-    fn check_and_reduce(&mut self, state: &mut State, vdb: &mut VarDB, nc: usize);
+    fn check_and_reduce(&mut self, vdb: &mut VarDB, nc: usize) -> bool;
     fn reset(&mut self);
     /// delete *dead* clauses from database, which are made by:
     /// * `reduce`
@@ -57,6 +55,10 @@ pub trait ClauseDBIF {
     fn certificate_delete(&mut self, vec: &[Lit]);
     /// delete satisfied clauses at decision level zero.
     fn eliminate_satisfied_clauses(&mut self, elim: &mut Eliminator, vdb: &mut VarDB, occur: bool);
+    /// flag positive and negative literals of a var as dirty
+    fn touch_var(&mut self, vi: VarId);
+    /// return LBD threshold used in glue reduciton mode.
+    fn chan_seok_condition(&self) -> usize;
     /// emit an error if the db size (the number of clauses) is over the limit.
     fn check_size(&self) -> MaybeInconsistent;
     /// returns None if the given assignment is a model of a problem.
@@ -69,8 +71,6 @@ pub trait ClauseDBIF {
 pub trait ClauseIdIF {
     /// return `true` if a given clause id is made from a `Lit`.
     fn is_lifted_lit(self) -> bool;
-    /// make a string for printing.
-    fn format(self) -> String;
 }
 
 /// API for 'watcher list' like `attach`, `detach`, `detach_with` and so on.
@@ -88,8 +88,11 @@ pub trait WatchDBIF {
 /// Record of clause operations to build DRAT certifications.
 #[derive(Debug, Eq, PartialEq)]
 pub enum CertifiedRecord {
+    /// placed at the end.
     SENTINEL,
+    /// added a (learnt) clause.
     ADD,
+    /// deleted a clause.
     DELETE,
 }
 
@@ -99,6 +102,7 @@ type DRAT = Vec<(CertifiedRecord, Vec<i32>)>;
 /// Note: ids are re-used after 'garbage collection'.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct ClauseId {
+    /// a sequence number.
     pub ordinal: u32,
 }
 
@@ -107,6 +111,7 @@ const NULL_CLAUSE: ClauseId = ClauseId { ordinal: 0 };
 
 impl Default for ClauseId {
     #[inline]
+    /// return the default empty clause, used in a reason slot or no conflict path.
     fn default() -> Self {
         NULL_CLAUSE
     }
@@ -121,20 +126,18 @@ impl From<usize> for ClauseId {
 
 impl fmt::Display for ClauseId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "CID{}", self.ordinal)
+        if *self == ClauseId::default() {
+            write!(f, "NullClause")
+        } else {
+            write!(f, "CID{}", self.ordinal)
+        }
     }
 }
 
 impl ClauseIdIF for ClauseId {
+    /// return true if the clause is genereted from a literal by Eliminater.
     fn is_lifted_lit(self) -> bool {
         0 != 0x8000_0000 & self.ordinal
-    }
-    fn format(self) -> String {
-        if self == ClauseId::default() {
-            "NullClause".to_string()
-        } else {
-            format!("C::{}", self)
-        }
     }
 }
 
@@ -289,6 +292,9 @@ impl FlagIF for Clause {
     fn is(&self, flag: Flag) -> bool {
         self.flags.contains(flag)
     }
+    fn set(&mut self, f: Flag, b: bool) {
+        self.flags.set(f, b);
+    }
     fn turn_off(&mut self, flag: Flag) {
         self.flags.remove(flag);
     }
@@ -373,45 +379,63 @@ impl fmt::Display for Clause {
 /// Clause database
 #[derive(Debug)]
 pub struct ClauseDB {
+    /// container of clauses
     clause: Vec<Clause>,
-    pub touched: Vec<bool>,
+    /// container of watch literals
     pub watcher: Vec<Vec<Watch>>,
-    pub num_active: usize,
+    /// the present number of learnt clauses
     pub num_learnt: usize,
+    num_active: usize,
+    /// clause history to make certification
     pub certified: DRAT,
+    /// a number of clauses to emit out-of-memory exception
+    pub soft_limit: usize,
+    /// flag for Chan Seok heuristics
+    use_chan_seok: bool,
+    /// 'small' clause threshold
+    co_lbd_bound: usize,
+    // not in use
+    // lbd_frozen_clause: usize,
+
+    //[clause rewarding]
     activity_inc: f64,
     activity_decay: f64,
+
+    //[Elimination]
+    /// dirty literals
+    touched: Vec<bool>,
+
+    //[reduction]
+    // increment step of reduction threshold
     inc_step: usize,
+    // bonus step of reduction threshold used in good progress
     extra_inc: usize,
-    pub soft_limit: usize,
-    pub co_lbd_bound: usize,
-    lbd_frozen_clause: usize,
     first_reduction: usize,
     next_reduction: usize, // renamed from `nbclausesbeforereduce`
-    cur_restart: usize,
-    glureduce: bool,
+    // an expansion coefficient for restart
+    reduction_coeff: usize,
 }
 
 impl Default for ClauseDB {
     fn default() -> ClauseDB {
         ClauseDB {
             clause: Vec::new(),
-            touched: Vec::new(),
             watcher: Vec::new(),
             num_active: 0,
             num_learnt: 0,
             certified: Vec::new(),
+            soft_limit: 0, // 248_000_000
+            use_chan_seok: false,
+            co_lbd_bound: 5,
+            // lbd_frozen_clause: 30,
             activity_inc: 1.0,
             activity_decay: 0.999,
+            touched: Vec::new(),
             inc_step: 300,
             extra_inc: 1000,
-            soft_limit: 0, // 248_000_000
-            co_lbd_bound: 5,
-            lbd_frozen_clause: 30,
             first_reduction: 1000,
             next_reduction: 1000,
-            cur_restart: 1,
-            glureduce: true,
+            reduction_coeff: 1,
         }
     }
 }
@@ -524,6 +548,32 @@ impl Instantiate for ClauseDB {
             certified,
             soft_limit: config.clause_limit,
             ..ClauseDB::default()
+        }
+    }
+    fn adapt_to(&mut self, state: &State) {
+        match state.strategy {
+            (_, n) if n != state[Stat::Conflict] => (),
+            (SearchStrategy::Initial, _) => (),
+            (SearchStrategy::Generic, _) => (),
+            (SearchStrategy::LowDecisions, _) => {
+                let nc = state[Stat::Conflict];
+                self.co_lbd_bound = 4;
+                self.reduction_coeff = (nc as f64 / self.next_reduction as f64 + 1.0) as usize;
+                self.first_reduction = 2000;
+                self.use_chan_seok = true;
+                self.inc_step = 0;
+                self.next_reduction = 2000;
+                self.make_permanent(true);
+            }
+            (SearchStrategy::HighSuccesive, _) => {
+                self.co_lbd_bound = 3;
+                self.first_reduction = 30000;
+                self.use_chan_seok = true;
+                self.make_permanent(false);
+            }
+            (SearchStrategy::LowSuccesiveLuby, _) => (),
+            (SearchStrategy::LowSuccesiveM, _) => (),
+            (SearchStrategy::ManyGlues, _) => (),
         }
     }
 }
@@ -645,8 +695,7 @@ impl ClauseDBIF for ClauseDB {
             .count()
     }
     // Note: set LBD to 0 if you want to add the clause to Permanent.
-    fn attach(&mut self, state: &mut State, vdb: &mut VarDB, lbd: usize) -> ClauseId {
-        let v = &mut state.new_learnt;
+    fn attach(&mut self, v: &mut [Lit], vdb: &mut VarDB, lbd: usize) -> ClauseId {
         if !self.certified.is_empty() {
             let temp = v.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
             self.certified.push((CertifiedRecord::ADD, temp));
@@ -664,7 +713,7 @@ impl ClauseDBIF for ClauseDB {
             }
         }
         v.swap(1, i_max);
-        let learnt = 0 < lbd && 2 < v.len() && (!state.use_chan_seok || self.co_lbd_bound < lbd);
+        let learnt = 0 < lbd && 2 < v.len() && (!self.use_chan_seok || self.co_lbd_bound < lbd);
         let cid = self.new_clause(&v, lbd, learnt);
         let c = &mut self.clause[cid.ordinal as usize];
         c.reward = self.activity_inc;
@@ -676,42 +725,20 @@ impl ClauseDBIF for ClauseDB {
         debug_assert!(1 < c.lits.len());
         c.kill(&mut self.touched);
     }
-    fn adapt_strategy(&mut self, mode: &SearchStrategy, nc: usize) {
-        match mode {
-            SearchStrategy::Initial => (),
-            SearchStrategy::Generic => (),
-            SearchStrategy::LowDecisions => {
-                self.co_lbd_bound = 4;
-                self.cur_restart = (nc as f64 / self.next_reduction as f64 + 1.0) as usize;
-                self.first_reduction = 2000;
-                self.glureduce = true;
-                self.inc_step = 0;
-                self.next_reduction = 2000;
-                self.make_permanent(true);
-            }
-            SearchStrategy::HighSuccesive => {
-                self.co_lbd_bound = 3;
-                self.first_reduction = 30000;
-                self.glureduce = true;
-                self.make_permanent(false);
-            }
-            SearchStrategy::LowSuccesiveLuby => (),
-            SearchStrategy::LowSuccesiveM => (),
-            SearchStrategy::ManyGlues => (),
-        }
-    }
-    fn check_and_reduce(&mut self, state: &mut State, vdb: &mut VarDB, nc: usize) {
+    fn check_and_reduce(&mut self, vdb: &mut VarDB, nc: usize) -> bool {
         if 0 == self.num_learnt {
-            return;
+            return false;
         }
-        let go = if self.glureduce {
-            self.cur_restart * self.next_reduction <= nc
-        } else {
+        let go = if self.use_chan_seok {
             self.first_reduction < self.num_learnt
+        } else {
+            self.reduction_coeff * self.next_reduction <= nc
         };
         if go {
-            self.reduce(state, vdb, nc);
+            self.reduction_coeff = ((nc as f64) / (self.next_reduction as f64)) as usize + 1;
+            self.reduce(vdb);
         }
+        go
     }
     fn reset(&mut self) {
         debug_assert!(1 < self.clause.len());
@@ -754,6 +781,17 @@ impl ClauseDBIF for ClauseDB {
             }
         }
     }
+    fn touch_var(&mut self, vi: VarId) {
+        self.touched[Lit::from_assign(vi, true)] = true;
+        self.touched[Lit::from_assign(vi, false)] = true;
+    }
+    fn chan_seok_condition(&self) -> usize {
+        if self.use_chan_seok {
+            self.co_lbd_bound
+        } else {
+            0
+        }
+    }
     fn check_size(&self) -> MaybeInconsistent {
         if self.soft_limit == 0 || self.count(false) <= self.soft_limit {
             Ok(())
@@ -776,9 +814,16 @@ impl ClauseDBIF for ClauseDB {
     }
 }
 
+impl ProgressComponent for ClauseDB {
+    type Output = (usize, usize);
+    fn progress_component(&self) -> Self::Output {
+        (self.num_active, self.num_learnt)
+    }
+}
+
 impl ClauseDB {
     /// halve the number of 'learnt' or *removable* clauses.
-    fn reduce(&mut self, state: &mut State, vdb: &mut VarDB, ncnfl: usize) {
+    fn reduce(&mut self, vdb: &mut VarDB) {
         vdb.reset_lbd(self);
         let ClauseDB {
             ref mut clause,
@@ -796,7 +841,7 @@ impl ClauseDB {
             return;
         }
         let keep = perm.len() / 2;
-        if state.use_chan_seok {
+        if self.use_chan_seok {
             perm.sort_by(|&a, &b| clause[a].cmp_activity(&clause[b]));
         } else {
             perm.sort_by(|&a, &b| clause[a].cmp(&clause[b]));
@@ -816,9 +861,7 @@ impl ClauseDB {
                 c.kill(touched);
             }
         }
-        state[Stat::Reduction] += 1;
         self.garbage_collect();
-        self.cur_restart = ((ncnfl as f64) / (self.next_reduction as f64)) as usize + 1;
     }
     /// change good learnt clauses to permanent one.
     fn make_permanent(&mut self, reinit: bool) {
