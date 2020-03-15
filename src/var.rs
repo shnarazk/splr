@@ -180,9 +180,9 @@ pub struct VarDB {
 
 impl Default for VarDB {
     fn default() -> VarDB {
-        const CORE_HISOTRY: usize = 1;
-        const VRD_MAX: f64 = 0.96;
-        const VRD_START: f64 = 0.8;
+        const CORE_HISOTRY: usize = 2;
+        const VRD_MAX: f64 = 1.0;
+        const VRD_START: f64 = 0.5;
         VarDB {
             activity_decay: VRD_START,
             activity_decay_max: VRD_MAX,
@@ -322,13 +322,9 @@ impl VarRewardIF for VarDB {
 impl Instantiate for VarDB {
     fn instantiate(_: &Config, cnf: &CNFDescription) -> Self {
         let nv = cnf.num_of_variables;
-        let len = 10;
-        let mut core_size = Ema::new(len);
-        core_size.update(((len * nv) as f64).ln());
         VarDB {
             var: Var::new_vars(nv),
             lbd_temp: vec![0; nv + 1],
-            core_size,
             ..VarDB::default()
         }
     }
