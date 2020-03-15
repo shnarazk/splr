@@ -88,8 +88,11 @@ pub trait WatchDBIF {
 /// Record of clause operations to build DRAT certifications.
 #[derive(Debug, Eq, PartialEq)]
 pub enum CertifiedRecord {
+    /// placed at the end.
     SENTINEL,
+    /// added a (learnt) clause.
     ADD,
+    /// deleted a clause.
     DELETE,
 }
 
@@ -99,6 +102,7 @@ type DRAT = Vec<(CertifiedRecord, Vec<i32>)>;
 /// Note: ids are re-used after 'garbage collection'.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct ClauseId {
+    /// a sequence number.
     pub ordinal: u32,
 }
 
@@ -107,6 +111,7 @@ const NULL_CLAUSE: ClauseId = ClauseId { ordinal: 0 };
 
 impl Default for ClauseId {
     #[inline]
+    /// return the default empty clause, used in a reason slot or no conflict path.
     fn default() -> Self {
         NULL_CLAUSE
     }
