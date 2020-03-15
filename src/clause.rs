@@ -379,46 +379,63 @@ impl fmt::Display for Clause {
 /// Clause database
 #[derive(Debug)]
 pub struct ClauseDB {
+    /// container of clauses
     clause: Vec<Clause>,
+    /// container of watch literals
     pub watcher: Vec<Vec<Watch>>,
-    /// dirty literals
-    touched: Vec<bool>,
-    num_active: usize,
+    /// the present number of learnt clauses
     pub num_learnt: usize,
+    num_active: usize,
+    /// clause history to make certification
     pub certified: DRAT,
+    /// a number of clauses to emit out-of-memory exception
+    pub soft_limit: usize,
+    /// flag for Chan Seok heuristics
+    use_chan_seok: bool,
+    /// 'small' clause threshold
+    co_lbd_bound: usize,
+    // not in use
+    // lbd_frozen_clause: usize,
+
+    //[clause rewarding]
     activity_inc: f64,
     activity_decay: f64,
+
+    //[Elimination]
+    /// dirty literals
+    touched: Vec<bool>,
+
+    //[reduction]
+    // increment step of reduction threshold
     inc_step: usize,
+    // bonus step of reduction threshold used in good progress
     extra_inc: usize,
-    pub soft_limit: usize,
-    co_lbd_bound: usize,
-    lbd_frozen_clause: usize,
     first_reduction: usize,
     next_reduction: usize, // renamed from `nbclausesbeforereduce`
-    cur_restart: usize,
-    use_chan_seok: bool,
+    // an expansion coefficient for restart
+    reduction_coeff: usize,
 }
 
 impl Default for ClauseDB {
     fn default() -> ClauseDB {
         ClauseDB {
             clause: Vec::new(),
-            touched: Vec::new(),
             watcher: Vec::new(),
             num_active: 0,
             num_learnt: 0,
             certified: Vec::new(),
+            soft_limit: 0, // 248_000_000
+            use_chan_seok: false,
+            co_lbd_bound: 5,
+            // lbd_frozen_clause: 30,
             activity_inc: 1.0,
             activity_decay: 0.999,
+            touched: Vec::new(),
             inc_step: 300,
             extra_inc: 1000,
-            soft_limit: 0, // 248_000_000
-            co_lbd_bound: 5,
-            lbd_frozen_clause: 30,
             first_reduction: 1000,
             next_reduction: 1000,
-            cur_restart: 1,
-            use_chan_seok: false,
+            reduction_coeff: 1,
         }
     }
 }
@@ -541,7 +558,7 @@ impl Instantiate for ClauseDB {
             (SearchStrategy::LowDecisions, _) => {
                 let nc = state[Stat::Conflict];
                 self.co_lbd_bound = 4;
-                self.cur_restart = (nc as f64 / self.next_reduction as f64 + 1.0) as usize;
+                self.reduction_coeff = (nc as f64 / self.next_reduction as f64 + 1.0) as usize;
                 self.first_reduction = 2000;
                 self.use_chan_seok = true;
                 self.inc_step = 0;
@@ -715,10 +732,10 @@ impl ClauseDBIF for ClauseDB {
         let go = if self.use_chan_seok {
             self.first_reduction < self.num_learnt
         } else {
-            self.cur_restart * self.next_reduction <= nc
+            self.reduction_coeff * self.next_reduction <= nc
         };
         if go {
-            self.cur_restart = ((nc as f64) / (self.next_reduction as f64)) as usize + 1;
+            self.reduction_coeff = ((nc as f64) / (self.next_reduction as f64)) as usize + 1;
             self.reduce(vdb);
         }
         go
