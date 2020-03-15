@@ -174,7 +174,7 @@ impl WatchDBIF for Vec<Watch> {
             }
         }
     }
-    /// This O(n) functon is used only in Eliminator. So the cost can be ignore.
+    /// This O(n) functon is used only in Eliminator. So the cost can be ignored.
     fn update_blocker(&mut self, cid: ClauseId, l: Lit) {
         for w in &mut self[..] {
             if w.c == cid {
