@@ -181,8 +181,8 @@ pub struct VarDB {
 impl Default for VarDB {
     fn default() -> VarDB {
         const CORE_HISOTRY: usize = 2;
-        const VRD_MAX: f64 = 1.0;
-        const VRD_START: f64 = 0.5;
+        const VRD_MAX: f64 = 0.96;
+        const VRD_START: f64 = 0.8;
         VarDB {
             activity_decay: VRD_START,
             activity_decay_max: VRD_MAX,
