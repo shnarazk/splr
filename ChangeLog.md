@@ -6,6 +6,7 @@
 - define `DecisionLevel`
 - generate a result file even if splr failed to solve
 - define `restarter` as the sixth module of `Solver`
+- add `--quiet` mode to show only the last stats
 
 ## 0.3.1, 2020-02-22
 
