@@ -1,4 +1,4 @@
-## 0.3.2, 2020-20-20
+## 0.3.2, 2020-03-99
 
 - control var activity decay rate based on the number of hot vars.
 - set var activity parameters for each search strategy correctly
