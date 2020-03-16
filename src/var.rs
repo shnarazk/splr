@@ -172,15 +172,15 @@ pub struct VarDB {
     ordinal: usize,
     /// vars
     var: Vec<Var>,
-    /// a working buffer for LBD calculation
-    lbd_temp: Vec<usize>,
     /// estimated number of hot variable
     core_size: Ema,
+    /// a working buffer for LBD calculation
+    lbd_temp: Vec<usize>,
 }
 
 impl Default for VarDB {
     fn default() -> VarDB {
-        const CORE_HISOTRY: usize = 2;
+        const CORE_HISOTRY_LEN: usize = 8;
         const VRD_MAX: f64 = 0.96;
         const VRD_START: f64 = 0.8;
         VarDB {
@@ -188,8 +188,8 @@ impl Default for VarDB {
             activity_decay_max: VRD_MAX,
             ordinal: 0,
             var: Vec::new(),
+            core_size: Ema::new(CORE_HISOTRY_LEN),
             lbd_temp: Vec::new(),
-            core_size: Ema::new(CORE_HISOTRY),
         }
     }
 }
@@ -337,6 +337,7 @@ impl Instantiate for VarDB {
         const VRD_MAX_START: f64 = 0.2;
         const VRD_OFFSET: f64 = 10.0;
         if 0 == state[Stat::Conflict] {
+            self.core_size.update(1.0);
             return;
         }
         let msr: (f64, f64) = self.var[1..]
