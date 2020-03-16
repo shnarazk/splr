@@ -194,9 +194,10 @@ impl SatSolverIF for Solver {
         vdb.initialize_reward(elim.sorted_iterator());
         asgs.rebuild_order(vdb);
         state.progress(cdb, rst, vdb, None);
-        match search(asgs, cdb, elim, rst, state, vdb) {
+        let answer = search(asgs, cdb, elim, rst, state, vdb);
+        final_report!(cdb, rst, state, vdb);
+        match answer {
             Ok(true) => {
-                final_report!(cdb, rst, state, vdb);
                 elim.extend_model(vdb);
                 #[cfg(debug)]
                 {
@@ -221,13 +222,11 @@ impl SatSolverIF for Solver {
                 Ok(Certificate::SAT(vals))
             }
             Ok(false) | Err(SolverError::NullLearnt) => {
-                state.progress(cdb, rst, vdb, None);
                 asgs.cancel_until(vdb, 0);
                 Ok(Certificate::UNSAT)
             }
             Err(e) => {
                 asgs.cancel_until(vdb, 0);
-                final_report!(cdb, rst, state, vdb);
                 Err(e)
             }
         }
