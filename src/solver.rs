@@ -305,11 +305,7 @@ impl SatSolverIF for Solver {
         match lits.len() {
             0 => None, // Empty clause is UNSAT.
             1 => {
-                if asgs.assign_at_rootlevel(vdb, lits[0]).is_ok() {
-                    Some(ClauseId::default())
-                } else {
-                    None
-                }
+                asgs.assign_at_rootlevel(vdb, lits[0]).map_or(None, |_| Some(ClauseId::default()))
             }
             _ => {
                 let cid = cdb.new_clause(lits, 0, false);
