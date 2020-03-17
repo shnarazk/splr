@@ -178,9 +178,10 @@ pub struct VarDB {
     lbd_temp: Vec<usize>,
 }
 
+const CORE_HISOTRY_LEN: usize = 10;
+
 impl Default for VarDB {
     fn default() -> VarDB {
-        const CORE_HISOTRY_LEN: usize = 8;
         const VRD_MAX: f64 = 0.96;
         const VRD_START: f64 = 0.8;
         VarDB {
@@ -329,6 +330,11 @@ impl Instantiate for VarDB {
         }
     }
     fn adapt_to(&mut self, state: &State) {
+        if 0 == state[Stat::Conflict] {
+            let nv = self.var.len() -1;
+            self.core_size.update(((CORE_HISOTRY_LEN * nv) as f64).ln());
+            return;
+        }
         const VRD_DEC_STRICT: f64 = 0.001;
         const VRD_DEC_STD: f64 = 0.003;
         const VRD_DEC_HIGH: f64 = 0.008;
@@ -336,10 +342,6 @@ impl Instantiate for VarDB {
         const VRD_INTERVAL: usize = 20_000;
         const VRD_MAX_START: f64 = 0.2;
         const VRD_OFFSET: f64 = 10.0;
-        if 0 == state[Stat::Conflict] {
-            self.core_size.update(1.0);
-            return;
-        }
         let msr: (f64, f64) = self.var[1..]
             .iter()
             .map(|v| v.reward)
@@ -354,8 +356,8 @@ impl Instantiate for VarDB {
                 SearchStrategy::HighSuccesive => VRD_DEC_STRICT,
                 _ => VRD_DEC_STD,
             };
-            self.activity_decay_max =
-                1.0 - k * ((self.core_size.get() - VRD_OFFSET).max(0.0).sqrt());
+            let delta = k * ((self.core_size.get() - VRD_OFFSET).max(0.0).sqrt());
+            self.activity_decay_max = 1.0 - delta;
         }
     }
 }
