@@ -1,6 +1,10 @@
 /// Crate `restart` provides restart heuristics.
 use {
-    crate::{config::Config, types::*},
+    crate::{
+        config::Config,
+        state::{SearchStrategy, Stat, State},
+        types::*,
+    },
     std::fmt,
 };
 
@@ -105,7 +109,7 @@ impl ProgressEvaluator for ProgressLBD {
 
 /// An EMA of decision level.
 #[derive(Debug)]
-pub struct ProgressLVL {
+struct ProgressLVL {
     ema: Ema2,
 }
 
@@ -205,7 +209,7 @@ impl Default for LubySeries {
             index: 0,
             next_restart: 0,
             restart_inc: 2.0,
-            step: 10,
+            step: 100,
         }
     }
 }
@@ -274,32 +278,57 @@ impl LubySeries {
     }
 }
 
-/// `RestartExecutor` provides restart API and holds data about restart conditions.
+/// `Restarter` provides restart API and holds data about restart conditions.
 #[derive(Debug)]
-pub struct RestartExecutor {
+pub struct Restarter {
     pub asg: ProgressASG,
     pub lbd: ProgressLBD,
     // pub rcc: ProgressRCC,
-    pub blvl: ProgressLVL,
-    pub clvl: ProgressLVL,
+    // pub blvl: ProgressLVL,
+    // pub clvl: ProgressLVL,
     pub luby: LubySeries,
     pub after_restart: usize,
-    pub next_restart: usize,
-    pub restart_step: usize,
+    next_restart: usize,
+    restart_step: usize,
 }
 
-impl Instantiate for RestartExecutor {
+impl Instantiate for Restarter {
     fn instantiate(config: &Config, cnf: &CNFDescription) -> Self {
-        RestartExecutor {
+        Restarter {
             asg: ProgressASG::instantiate(config, cnf),
             lbd: ProgressLBD::instantiate(config, cnf),
             // rcc: ProgressRCC::instantiate(config, cnf),
-            blvl: ProgressLVL::instantiate(config, cnf),
-            clvl: ProgressLVL::instantiate(config, cnf),
+            // blvl: ProgressLVL::instantiate(config, cnf),
+            // clvl: ProgressLVL::instantiate(config, cnf),
             luby: LubySeries::instantiate(config, cnf),
             after_restart: 0,
             next_restart: 100,
             restart_step: config.restart_step,
+        }
+    }
+    fn adapt_to(&mut self, state: &State) {
+        if !self.luby.active && state.config.with_deep_search {
+            if state.stagnated {
+                self.restart_step = state.reflection_interval;
+                self.next_restart += state.reflection_interval;
+            } else {
+                self.restart_step = state.config.restart_step;
+            }
+        }
+        match state.strategy {
+            (SearchStrategy::Initial, _) => (),
+            (SearchStrategy::LowSuccesiveLuby, n) => {
+                if n == state[Stat::Conflict] {
+                    self.luby.active = true;
+                }
+            }
+            // SearchStrategy::HighSuccesive => (),
+            // SearchStrategy::LowSuccesiveM => (),
+            // SearchStrategy::ManyGlues => (),
+            // SearchStrategy::Generic => (),
+            _ => {
+                // self.luby.active = state.c_lvl.get() < 14.0;
+            }
         }
     }
 }
@@ -311,7 +340,7 @@ macro_rules! reset {
     };
 }
 
-impl RestartIF for RestartExecutor {
+impl RestartIF for Restarter {
     fn block_restart(&mut self) -> bool {
         if 100 < self.lbd.num
             && !self.luby.active

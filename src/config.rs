@@ -1,8 +1,8 @@
 /// Crate `config` provides solver's configuration and CLI.
-use {std::path::PathBuf, structopt::StructOpt};
+use {crate::types::DecisionLevel, std::path::PathBuf, structopt::StructOpt};
 
 /// Splr version number.
-pub const VERSION: &str = "0.3.1";
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Configuration built from command line options
 #[derive(Clone, Debug, StructOpt)]
@@ -10,7 +10,7 @@ pub const VERSION: &str = "0.3.1";
 pub struct Config {
     /// threshold to use chronoBT
     #[structopt(long = "chronoBT", short = "C", default_value = "100")]
-    pub chronobt: usize,
+    pub chronobt: DecisionLevel,
     /// soft limit of #clauses (6MC/GB)
     #[structopt(long = "cl", default_value = "0")]
     pub clause_limit: usize,
@@ -52,6 +52,9 @@ pub struct Config {
         parse(from_os_str)
     )]
     pub proof_filename: PathBuf,
+    /// Disable any progress message
+    #[structopt(long = "quiet", short = "q")]
+    pub quiet_mode: bool,
     /// Uses Glucose-like progress report
     #[structopt(long = "log", short = "l")]
     pub use_log: bool,
@@ -91,6 +94,7 @@ impl Default for Config {
             output_dirname: PathBuf::from("."),
             result_filename: PathBuf::new(),
             proof_filename: PathBuf::from("proof.out"),
+            quiet_mode: false,
             use_log: false,
             without_elim: false,
             without_adaptive_strategy: false,

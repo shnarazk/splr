@@ -1,7 +1,7 @@
 /// Crate `types' provides various building blocks, including
 /// some common traits.
 use {
-    crate::{clause::ClauseId, config::Config, var::Var},
+    crate::{clause::ClauseId, config::Config, state::State, var::Var},
     std::{
         convert::TryFrom,
         fmt,
@@ -34,8 +34,11 @@ pub trait ActivityIF {
 }
 
 /// API for object instantiation based on `Configuration` and `CNFDescription`
+/// and adaptation.
 pub trait Instantiate {
     fn instantiate(conf: &Config, cnf: &CNFDescription) -> Self;
+    /// set up internal parameters.
+    fn adapt_to(&mut self, _state: &State) {}
 }
 
 /// API for O(n) deletion from a list, providing `delete_unstable`.
@@ -50,6 +53,9 @@ pub trait Delete<T> {
 /// Implementation note: NonZeroUsize can be used but requires a lot of changes.
 /// The current abstraction is imcomplete.
 pub type VarId = usize;
+
+/// Decision Level Representation.
+pub type DecisionLevel = u32;
 
 /// Literal encoded on `u32` as:
 ///
@@ -280,7 +286,7 @@ pub trait EmaIF {
 #[derive(Debug)]
 pub struct Ema {
     val: f64,
-    cal: f64,
+    // cal: f64,
     sca: f64,
 }
 
@@ -288,10 +294,10 @@ impl EmaIF for Ema {
     type Input = f64;
     fn update(&mut self, x: Self::Input) {
         self.val = self.sca * x + (1.0 - self.sca) * self.val;
-        self.cal = self.sca + (1.0 - self.sca) * self.cal;
+        // self.cal = self.sca + (1.0 - self.sca) * self.cal;
     }
     fn get(&self) -> f64 {
-        self.val / self.cal
+        self.val // / self.cal
     }
 }
 
@@ -299,7 +305,7 @@ impl Ema {
     pub fn new(s: usize) -> Ema {
         Ema {
             val: 0.0,
-            cal: 0.0,
+            // cal: 0.0,
             sca: 1.0 / (s as f64),
         }
     }
@@ -310,8 +316,8 @@ impl Ema {
 pub struct Ema2 {
     fast: f64,
     slow: f64,
-    calf: f64,
-    cals: f64,
+    // calf: f64,
+    // cals: f64,
     fe: f64,
     se: f64,
 }
@@ -319,20 +325,20 @@ pub struct Ema2 {
 impl EmaIF for Ema2 {
     type Input = f64;
     fn get(&self) -> f64 {
-        self.fast / self.calf
+        self.fast // / self.calf
     }
     fn update(&mut self, x: Self::Input) {
         self.fast = self.fe * x + (1.0 - self.fe) * self.fast;
         self.slow = self.se * x + (1.0 - self.se) * self.slow;
-        self.calf = self.fe + (1.0 - self.fe) * self.calf;
-        self.cals = self.se + (1.0 - self.se) * self.cals;
+        // self.calf = self.fe + (1.0 - self.fe) * self.calf;
+        // self.cals = self.se + (1.0 - self.se) * self.cals;
     }
     fn reset(&mut self) {
         self.slow = self.fast;
-        self.cals = self.calf;
+        // self.cals = self.calf;
     }
     fn trend(&self) -> f64 {
-        self.fast / self.slow * (self.cals / self.calf)
+        self.fast / self.slow // * (self.cals / self.calf)
     }
 }
 
@@ -341,8 +347,8 @@ impl Ema2 {
         Ema2 {
             fast: 0.0,
             slow: 0.0,
-            calf: 0.0,
-            cals: 0.0,
+            // calf: 0.0,
+            // cals: 0.0,
             fe: 1.0 / (f as f64),
             se: 1.0 / (f as f64),
         }
@@ -367,6 +373,12 @@ pub enum SolverError {
     TimeOut,
     SolverBug,
     UndescribedError,
+}
+
+impl fmt::Display for SolverError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 /// A Return type used by solver functions
@@ -493,6 +505,8 @@ impl<T> Delete<T> for Vec<T> {
 pub trait FlagIF {
     /// return true if the flag in on.
     fn is(&self, flag: Flag) -> bool;
+    /// set the flag.
+    fn set(&mut self, f: Flag, b: bool);
     /// toggle the flag off.
     fn turn_off(&mut self, flag: Flag);
     /// toggle the flag on.
@@ -501,6 +515,8 @@ pub trait FlagIF {
 
 bitflags! {
     pub struct Flag: u16 {
+
+        /// For clause
         /// a clause is stored in DB, but is a garbage now.
         const DEAD         = 0b0000_0000_0000_0001;
         /// a clause is a generated clause by conflict analysis and is removable.
@@ -511,14 +527,18 @@ bitflags! {
         const OCCUR_LINKED = 0b0000_0000_0000_1000;
         /// a clause or var is enqueued for eliminator.
         const ENQUEUED     = 0b0000_0000_0001_0000;
-        /// a var is eliminated and managed by eliminator.
-        const ELIMINATED   = 0b0000_0000_0010_0000;
         /// mark to run garbage collector on the corresponding watcher lists
-        const TOUCHED      = 0b0000_0000_0100_0000;
+        const TOUCHED      = 0b0000_0000_0010_0000;
+
+        /// For var
+        /// the previous assigned value of a Var.
+        const PHASE        = 0b0000_0001_0000_0000;
+        /// a var is eliminated and managed by eliminator.
+        const ELIMINATED   = 0b0000_0010_0000_0000;
         /// a var is checked during in the current conflict analysis.
-        const CA_SEEN      = 0b0000_0000_1000_0000;
+        const CA_SEEN      = 0b0000_0100_0000_0000;
         /// NOT IN USE: a var is checked during in var rewarding.
-        const VR_SEEN      = 0b0000_0001_0000_0000;
+        const VR_SEEN      = 0b0000_1000_0000_0000;
     }
 }
 

@@ -6,14 +6,37 @@ use {
         config::{Config, VERSION},
         solver::{Certificate, SatSolverIF, Solver, SolverResult},
         state::*,
+        types::SolverError,
     },
     std::{
+        borrow::Cow,
         fs::File,
         io::{BufWriter, Write},
         path::PathBuf,
     },
     structopt::StructOpt,
 };
+
+const RED: &str = "\x1B[001m\x1B[031m";
+const GREEN: &str = "\x1B[001m\x1B[032m";
+const BLUE: &str = "\x1B[001m\x1B[034m";
+const RESET: &str = "\x1B[000m";
+
+fn colored(v: Result<bool, &SolverError>, quiet: bool) -> Cow<'static, str> {
+    if quiet {
+        match v {
+            Ok(false) => Cow::Borrowed("UNSAT"),
+            Ok(true) => Cow::Borrowed("SATISFIABLE"),
+            Err(e) => Cow::from(format!("{}", e)),
+        }
+    } else {
+        match v {
+            Ok(false) => Cow::from(format!("{}UNSAT{}", GREEN, RESET)),
+            Ok(true) => Cow::from(format!("{}SATISFIABLE{}", BLUE, RESET)),
+            Err(e) => Cow::from(format!("{}{}{}", RED, e, RESET)),
+        }
+    }
+}
 
 fn main() {
     let config = Config::from_args();
@@ -39,12 +62,7 @@ fn main() {
     }
     let mut s = Solver::build(&config).expect("failed to load");
     let res = s.solve();
-    match &res {
-        Ok(_) => {
-            save_result(&s, &res, &cnf_file, ans_file);
-        }
-        Err(e) => println!("Failed to solve by {:?}.", e),
-    }
+    save_result(&s, &res, &cnf_file, ans_file);
     if 0 < s.state.config.dump_interval && !s.state.development.is_empty() {
         let dump = config.cnf_filename.file_stem().unwrap().to_str().unwrap();
         if let Ok(f) = File::create(format!("stat_{}.csv", dump)) {
@@ -61,8 +79,12 @@ fn main() {
     }
 }
 
-#[allow(dead_code)]
-fn save_result(s: &Solver, res: &SolverResult, input: &str, output: Option<PathBuf>) {
+fn save_result<S: AsRef<str> + std::fmt::Display>(
+    s: &Solver,
+    res: &SolverResult,
+    input: S,
+    output: Option<PathBuf>,
+) {
     let mut ofile;
     let mut otty;
     let mut redirect = false;
@@ -86,17 +108,16 @@ fn save_result(s: &Solver, res: &SolverResult, input: &str, output: Option<PathB
         Ok(Certificate::SAT(v)) => {
             match output {
                 Some(ref f) if redirect => println!(
-                    "      Result|dump: to STDOUT instead of {} due to an IO error.\nSATISFIABLE: {}",
+                    "      Result|dump: to STDOUT instead of {} due to an IO error.",
                     f.to_string_lossy(),
-                    input,
                     ),
                 Some(ref f) => println!(
-                    "      Result|file: {}\nSATISFIABLE: {}",
+                    "      Result|file: {}",
                     f.to_str().unwrap(),
-                    input,
                 ),
-                _ => println!("SATISFIABLE: {}", input),
+                _ => (),
             }
+            println!("{}: {}", colored(Ok(true), s.state.config.quiet_mode), input);
             if let Err(why) = (|| {
                 buf.write_all(
                     format!(
@@ -105,7 +126,7 @@ fn save_result(s: &Solver, res: &SolverResult, input: &str, output: Option<PathB
                     )
                     .as_bytes(),
                 )?;
-                report(&s.state, buf)?;
+                report(s, buf)?;
                 buf.write_all(b"s SATISFIABLE\n")?;
                 for x in v {
                     buf.write_all(format!("{} ", x).as_bytes())?;
@@ -136,7 +157,7 @@ fn save_result(s: &Solver, res: &SolverResult, input: &str, output: Option<PathB
                     s.state.config.proof_filename.to_string_lossy()
                 );
             }
-            println!("UNSAT: {}", input);
+            println!("{}: {}", colored(Ok(false), s.state.config.quiet_mode), input);
             if let Err(why) = (|| {
                 buf.write_all(
                     format!(
@@ -145,18 +166,42 @@ fn save_result(s: &Solver, res: &SolverResult, input: &str, output: Option<PathB
                     )
                     .as_bytes(),
                 )?;
-                report(&s.state, &mut buf)?;
+                report(s, &mut buf)?;
                 buf.write_all(b"s UNSATISFIABLE\n")?;
                 buf.write_all(b"0\n")
             })() {
                 println!("Abort: failed to save by {}!", why);
             }
         }
-        Err(e) => println!("Failed to solve by {:?}.", e),
+        Err(e) => {
+            match output {
+                Some(ref f) if redirect => println!(
+                    "      Result|dump: to STDOUT instead of {} due to an IO error.",
+                    f.to_string_lossy(),
+                ),
+                Some(ref f) => println!("      Result|file: {}", f.to_str().unwrap(),),
+                _ => (),
+            }
+            println!("Failed to solve by {}: {}", colored(Err(e), s.state.config.quiet_mode), input);
+            if let Err(why) = (|| {
+                buf.write_all(
+                    format!(
+                        "c An assignment set generated by splr-{} for {}\nc\n",
+                        VERSION, input,
+                    )
+                    .as_bytes(),
+                )?;
+                report(s, buf)?;
+                buf.write_all(format!("c {}\n", e,).as_bytes())?;
+                buf.write(b"0\n")
+            })() {
+                println!("Abort: failed to save by {}!", why);
+            }
+        }
     }
 }
 
-fn save_proof(s: &Solver, input: &str, output: &PathBuf) {
+fn save_proof<S: AsRef<str> + std::fmt::Display>(s: &Solver, input: S, output: &PathBuf) {
     let mut buf = match File::create(output) {
         Ok(out) => BufWriter::new(out),
         Err(e) => {
@@ -193,7 +238,8 @@ fn save_proof(s: &Solver, input: &str, output: &PathBuf) {
     }
 }
 
-fn report(state: &State, out: &mut dyn Write) -> std::io::Result<()> {
+fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
+    let state = &s.state;
     let tm = {
         let mut time = timespec {
             tv_sec: 0,
@@ -208,6 +254,7 @@ fn report(state: &State, out: &mut dyn Write) -> std::io::Result<()> {
             time.tv_sec as f64 + time.tv_nsec as f64 / 1_000_000_000.0f64
         }
     };
+    let (_, vdb_activity_decay) = s.vdb.progress_component();
     out.write_all(
         format!(
             "c {:<43}, #var:{:9}, #cls:{:9}\n",
@@ -246,7 +293,12 @@ fn report(state: &State, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c      Restart|#BLK:{}, #RST:{}, eASG:{}, eLBD:{} \n",
+            "c  {}|#BLK:{}, #RST:{}, eASG:{}, eLBD:{} \n",
+            if s.rst.luby.active {
+                "LubyRestart"
+            } else {
+                "    Restart"
+            },
             format!(
                 "{:>9}",
                 state.record.vali[LogUsizeId::RestartBlock as usize]
@@ -272,18 +324,18 @@ fn report(state: &State, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c         misc|#rdc:{}, #sce:{}, stag:{}, vdcy:      0.0 \n",
+            "c         misc|#rdc:{}, #sce:{}, core:{}, vdcy:{} \n",
             format!("{:>9}", state[LogUsizeId::Reduction]),
             format!("{:>9}", state[LogUsizeId::SatClauseElim]),
-            format!("{:>9}", state[LogUsizeId::Stagnation]),
-            // format!("{:>9.4}", vdb.activity_decay),
+            format!("{:>9.0}", state[LogF64Id::CoreSize]),
+            format!("{:>9.4}", vdb_activity_decay),
         )
         .as_bytes(),
     )?;
     out.write_all(
         format!(
             "c     Strategy|mode:{:>15}, time:{:9.2}\n",
-            state.strategy, tm,
+            state.strategy.0, tm,
         )
         .as_bytes(),
     )?;

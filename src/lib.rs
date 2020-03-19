@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/splr/0.3.0")]
+#![doc(html_root_url = "https://docs.rs/splr/0.3.2")]
 /*!
 # a SAT Solver for Propositional Logic in Rust
 
@@ -19,12 +19,14 @@ Splr is a standalone program, taking a CNF file. The result will be saved to a f
 
 ```plain
 $ splr tests/sample.cnf
-sample.cnf                                         250,1065 |time:     0.37
- #conflict:      17792, #decision:        20650, #propagate:          38443
+sample.cnf                                         250,1065 |time:     0.24
+ #conflict:      12273, #decision:        13676, #propagate:          25950
   Assignment|#rem:      243, #fix:        1, #elm:        6, prg%:   2.8000
-      Clause|Remv:    11307, LBD2:       52, Binc:        0, Perm:     1056
-     Restart|#BLK:      213, #RST:        0, tASG:   1.3606, tLBD:   1.0145
-    Strategy|mode: in the initial search phase to determine a main strategy
+      Clause|Remv:     2337, LBD2:       46, Binc:        0, Perm:     1056
+     Restart|#BLK:      100, #RST:        0, tASG:   1.1967, tLBD:   1.0378
+    Conflict|eLBD:    11.92, cnfl:    18.87, bjmp:    17.84, rpc%:   0.0000
+        misc|#rdc:        9, #sce:        2, stag:        0, vdcy:   0.9292
+    Strategy|mode: Initial search phase before a main strategy
       Result|file: ./.ans_sample.cnf
 SATISFIABLE: tests/sample.cnf
 
@@ -101,19 +103,20 @@ USAGE:
     splr [FLAGS] [OPTIONS] <cnf-filename>
 
 FLAGS:
-    -h, --help                         Prints help information
-    -c, --certify                      Writes a DRAT UNSAT certification file
-    -l, --log                          Uses Glucose-like progress report
-    -V, --version                      Prints version information
-    -S, --without-adaptive-strategy    Disables dynamic strategy adaptation
-    -D, --without-deep-search          Disables deep search mode
-    -E, --without-elim                 Disables exhaustive simplification
+    -h, --help                    Prints help information
+    -q, --quiet                   Disable any progress message
+    -c, --certify                 Writes a DRAT UNSAT certification file
+    -l, --log                     Uses Glucose-like progress report
+    -V, --version                 Prints version information
+    -S, --no-adaptive-strategy    Disables dynamic strategy adaptation
+    -E, --without-elim            Disables exhaustive simplification
 
 OPTIONS:
+    -C, --chronoBT <chronobt>         threshold to use chronoBT [default: 100]
         --cl <clause-limit>           soft limit of #clauses (6MC/GB) [default: 0]
         --stat <dump-interval>        interval for dumpping stat data [default: 0]
-        --eg <elim-grow-limit>        grow limit of #clauses by v-elim [default: 4]
-        --el <elim-lit-limit>         #literals in a clause by v-elim [default: 64]
+        --eg <elim-grow-limit>        grow limit of #clauses by v-elim [default: 0]
+        --el <elim-lit-limit>         #literals in a clause by v-elim [default: 100]
     -o, --dir <output-dirname>        output directory [default: .]
     -p, --proof <proof-filename>      filename for DRAT cert [default: proof.out]
         --ra <restart-asg-len>        length for assignment average [default: 3500]
@@ -122,7 +125,7 @@ OPTIONS:
         --rs <restart-step>           #conflicts between restarts [default: 50]
         --rt <restart-threshold>      forcing restart threshold [default: 0.70]
     -r, --result <result-filename>    result filename/stdout [default: ]
-        --to <timeout>                CPU time limit in sec [default: 0]
+        --to <timeout>                CPU time limit in sec [default: 10000.0]
 
 ARGS:
     <cnf-filename>    a DIMACS format CNF file
@@ -157,8 +160,8 @@ pub mod config;
 pub mod eliminator;
 /// Crate `propagator` implements Boolean Constraint Propagation and decision var selection.
 pub mod propagator;
-/// Crate `restart` provides restart heuristics.
-pub mod restart;
+/// Crate `restarter` provides restart heuristics.
+pub mod restarter;
 /// Crate `solver` provides the top-level API as a SAT solver.
 pub mod solver;
 /// Crate `state` is a collection of internal data.

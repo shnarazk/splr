@@ -1,15 +1,17 @@
-A SAT Solver for Propositional Logic in Rust
+A fast SAT Solver for Propositional Logic in Rust
 ----
 
-Splr is a pure [Rust](https://www.rust-lang.org)ic SAT solver, based on [Glucose 4.1](https://www.labri.fr/perso/lsimon/glucose/).
+Splr is a pure [Rust](https://www.rust-lang.org)ic fast SAT solver, based on [Glucose 4.1](https://www.labri.fr/perso/lsimon/glucose/).
 It adopts various research results on SAT solvers:
 
-- CDCL, watch literals and so on from [Minisat](http://minisat.se) and the ancestors
+- *CDCL*, *watch literals*, *LBD* and so on from Glucose, [Minisat](http://minisat.se) and the ancestors
 - Glucose-like dynamic blocking/forcing restarts based on [EMAs](https://arxiv.org/abs/1506.08905)
 - pre/in-process simplification based on clause subsumption and variable elimination
-- a variant of Learning Rate Based Branching with Reason Side Rewarding
-- chronological backtrack
-- heuristics adaptation
+- a variant of **Learning Rate Based Branching** with **Reason Side Rewarding**
+- **chronological backtrack** aka **chronoBT**
+- Glucose-like heuristics adaptation
+
+Please check [ChangeLog](ChangeLog.md) about recent updates.
 
 *Many thanks to SAT researchers.*
 
@@ -27,12 +29,14 @@ Splr is a standalone program, taking a CNF file. The result will be saved to a f
 
 ```plain
 $ splr tests/sample.cnf
-sample.cnf                                         250,1065 |time:     0.37
- #conflict:      17792, #decision:        20650, #propagate:          38443
+sample.cnf                                         250,1065 |time:     0.24
+ #conflict:      12273, #decision:        13676, #propagate:          25950
   Assignment|#rem:      243, #fix:        1, #elm:        6, prg%:   2.8000
-      Clause|Remv:    11307, LBD2:       52, Binc:        0, Perm:     1056
-     Restart|#BLK:      213, #RST:        0, tASG:   1.3606, tLBD:   1.0145
-    Strategy|mode: in the initial search phase to determine a main strategy
+      Clause|Remv:     2337, LBD2:       46, Binc:        0, Perm:     1056
+     Restart|#BLK:      100, #RST:        0, tASG:   1.1967, tLBD:   1.0378
+    Conflict|eLBD:    11.92, cnfl:    18.87, bjmp:    17.84, rpc%:   0.0000
+        misc|#rdc:        9, #sce:        2, stag:        0, vdcy:   0.9292
+    Strategy|mode: Initial search phase before a main strategy
       Result|file: ./.ans_sample.cnf
 SATISFIABLE: tests/sample.cnf
 

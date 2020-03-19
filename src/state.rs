@@ -3,8 +3,8 @@ use {
     crate::{
         clause::{ClauseDB, ClauseDBIF},
         config::Config,
-        eliminator::{Eliminator, EliminatorIF},
-        restart::RestartExecutor,
+        eliminator::Eliminator,
+        restarter::Restarter,
         types::*,
         var::{VarDB, VarDBIF},
     },
@@ -30,13 +30,19 @@ pub trait StateIF {
     /// update internal counters and return true if solver stagnated.
     fn check_stagnation(&mut self);
     /// change heuristics based on stat data.
-    fn adapt_strategy(&mut self, cdb: &mut ClauseDB);
+    fn select_strategy(&mut self);
     /// write a header of stat data to stdio.
     fn progress_header(&self);
     /// write stat data to stdio.
-    fn progress(&mut self, cdb: &ClauseDB, vdb: &VarDB, mes: Option<&str>);
+    fn progress(&mut self, cdb: &ClauseDB, rst: &Restarter, vdb: &VarDB, mes: Option<&str>);
     /// write a short message to stdout.
     fn flush<S: AsRef<str>>(&self, mes: S);
+}
+
+/// API for var rewarding.
+pub trait ProgressComponent {
+    type Output;
+    fn progress_component(&self) -> Self::Output;
 }
 
 /// A collection of named search heuristics
@@ -61,33 +67,11 @@ pub enum SearchStrategy {
 impl fmt::Display for SearchStrategy {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         if formatter.alternate() {
-            write!(
-                formatter,
-                "{}",
-                match self {
-                    SearchStrategy::Initial => {
-                        "in the initial search phase to determine a main strategy"
-                    }
-                    SearchStrategy::Generic => "Non-Specific-Instance using a generic setting",
-                    SearchStrategy::LowDecisions => {
-                        "Many-Low-Level-Conflicts using Chan Seok heuristics"
-                    }
-                    SearchStrategy::HighSuccesive => {
-                        "High-Successive-Conflicts using Chan Seok heuristics"
-                    }
-                    SearchStrategy::LowSuccesiveLuby => {
-                        "Low-Successive-Conflicts-Luby w/ Luby sequence"
-                    }
-                    SearchStrategy::LowSuccesiveM => {
-                        "Low-Successive-Conflicts-Modified w/o Luby sequence"
-                    }
-                    SearchStrategy::ManyGlues => "Many-Glue-Clauses",
-                }
-            )
+            write!(formatter, "{}", self.to_str())
         } else {
             let name = match self {
-                SearchStrategy::Initial => "initial",
-                SearchStrategy::Generic => "generic",
+                SearchStrategy::Initial => "Initial",
+                SearchStrategy::Generic => "Generic",
                 SearchStrategy::LowDecisions => "LowDecs",
                 SearchStrategy::HighSuccesive => "HighSucc",
                 SearchStrategy::LowSuccesiveLuby => "LowSuccLuby",
@@ -110,13 +94,20 @@ impl fmt::Display for SearchStrategy {
 impl SearchStrategy {
     pub fn to_str(&self) -> &'static str {
         match self {
-            SearchStrategy::Initial => "in the initial search phase to determine a main strategy",
-            SearchStrategy::Generic => "generic (using a generic parameter set)",
-            SearchStrategy::LowDecisions => "LowDecs (many conflicts at low levels, using CSh)",
-            SearchStrategy::HighSuccesive => "HighSucc (long decision chains)",
-            SearchStrategy::LowSuccesiveLuby => "LowSuccLuby (successive conflicts)",
-            SearchStrategy::LowSuccesiveM => "LowSuccP (successive conflicts)",
-            SearchStrategy::ManyGlues => "ManyGlue (many glue clauses)",
+            // in the initial search phase to determine a main strategy
+            SearchStrategy::Initial => "Initial search phase before a main strategy",
+            // Non-Specific-Instance using a generic setting
+            SearchStrategy::Generic => "Generic (using a generic parameter set)",
+            // Many-Low-Level-Conflicts using Chan Seok heuristics
+            SearchStrategy::LowDecisions => "LowDecisions (many conflicts at low levels)",
+            // High-Successive-Conflicts using Chan Seok heuristics
+            SearchStrategy::HighSuccesive => "HighSuccesiveConflict (long decision chains)",
+            // Low-Successive-Conflicts-Luby w/ Luby sequence
+            SearchStrategy::LowSuccesiveLuby => "LowSuccesiveLuby (successive conflicts)",
+            // Low-Successive-Conflicts-Modified w/o Luby sequence
+            SearchStrategy::LowSuccesiveM => "LowSuccesive w/o Luby (successive conflicts)",
+            // Many-Glue-Clauses
+            SearchStrategy::ManyGlues => "ManyGlueClauses",
         }
     }
 }
@@ -139,9 +130,9 @@ pub enum Stat {
     Assign,                // the number of assigned variables
     SolvedRecord,          // the last number of solved variables
     SumLBD,                // the sum of generated learnts' LBD
-    NumBin,                // the number of binary clauses
+    NumBin,                // the number of binary clauses (both of given and learnt)
     NumBinLearnt,          // the number of binary learnt clauses
-    NumLBD2,               // the number of clauses which LBD is 2
+    NumLBD2,               // the number of learnt clauses which LBD is 2
     Stagnation,            // the number of stagnation
     EndOfStatIndex,        // Don't use this dummy.
 }
@@ -164,16 +155,15 @@ impl IndexMut<Stat> for [usize] {
 /// Data storage for `Solver`
 #[derive(Debug)]
 pub struct State {
-    pub root_level: usize,
+    pub root_level: DecisionLevel,
     pub num_vars: usize,
     pub num_solved_vars: usize,
     pub num_eliminated_vars: usize,
     pub config: Config,
-    pub rst: RestartExecutor,
     pub stats: [usize; Stat::EndOfStatIndex as usize], // statistics
-    pub strategy: SearchStrategy,
+    /// Tuple of current strategy and the number of conflicts at which the strategy is selected.
+    pub strategy: (SearchStrategy, usize),
     pub target: CNFDescription,
-    pub use_chan_seok: bool,
     pub reflection_interval: usize,
     /// MISC
     pub b_lvl: Ema,
@@ -186,11 +176,8 @@ pub struct State {
     pub stagnated: bool,
     pub start: SystemTime,
     pub time_limit: f64,
-    pub default_rewarding: bool,
     pub record: ProgressRecord,
-    pub use_progress: bool,
     pub progress_cnt: usize,
-    pub progress_log: bool,
     pub development: Vec<(usize, f64, f64, f64, f64, f64)>,
 }
 
@@ -202,11 +189,9 @@ impl Default for State {
             num_solved_vars: 0,
             num_eliminated_vars: 0,
             config: Config::default(),
-            rst: RestartExecutor::instantiate(&Config::default(), &CNFDescription::default()),
             stats: [0; Stat::EndOfStatIndex as usize],
-            strategy: SearchStrategy::Initial,
+            strategy: (SearchStrategy::Initial, 0),
             target: CNFDescription::default(),
-            use_chan_seok: false,
             reflection_interval: 10_000,
             b_lvl: Ema::new(5_000),
             c_lvl: Ema::new(5_000),
@@ -218,10 +203,7 @@ impl Default for State {
             stagnated: false,
             start: SystemTime::now(),
             time_limit: 0.0,
-            default_rewarding: true,
-            use_progress: true,
             progress_cnt: 0,
-            progress_log: false,
             record: ProgressRecord::default(),
             development: Vec::new(),
         }
@@ -244,12 +226,15 @@ impl IndexMut<Stat> for State {
 }
 
 macro_rules! im {
-    ($format: expr, $record: expr, $key: expr, $val: expr) => {
+    ($format: expr, $state: expr, $key: expr, $val: expr) => {
         match ($val, $key) {
             (v, LogUsizeId::End) => format!($format, v),
             (v, k) => {
-                let ptr = &mut $record[k];
-                if (v as f64) * 1.6 < *ptr as f64 {
+                let ptr = &mut $state.record[k];
+                if $state.config.quiet_mode {
+                    *ptr = v;
+                    format!($format, *ptr)
+                } else if (v as f64) * 1.6 < *ptr as f64 {
                     *ptr = v;
                     format!("\x1B[001m\x1B[031m{}\x1B[000m", format!($format, *ptr))
                 } else if v < *ptr {
@@ -271,11 +256,11 @@ macro_rules! im {
 }
 
 macro_rules! i {
-    ($format: expr, $record: expr, $key: expr, $val: expr) => {
+    ($format: expr, $state: expr, $key: expr, $val: expr) => {
         match ($val, $key) {
             (v, LogUsizeId::End) => format!($format, v),
             (v, k) => {
-                let ptr = &mut $record[k];
+                let ptr = &mut $state.record[k];
                 *ptr = v;
                 format!($format, *ptr)
             }
@@ -284,12 +269,15 @@ macro_rules! i {
 }
 
 macro_rules! fm {
-    ($format: expr, $record: expr, $key: expr, $val: expr) => {
+    ($format: expr, $state: expr, $key: expr, $val: expr) => {
         match ($val, $key) {
             (v, LogF64Id::End) => format!($format, v),
             (v, k) => {
-                let ptr = &mut $record[k];
-                if v * 1.6 < *ptr {
+                let ptr = &mut $state.record[k];
+                if $state.config.quiet_mode {
+                    *ptr = v;
+                    format!($format, *ptr)
+                } else if v * 1.6 < *ptr {
                     *ptr = v;
                     format!("\x1B[001m\x1B[031m{}\x1B[000m", format!($format, *ptr))
                 } else if v < *ptr {
@@ -312,11 +300,11 @@ macro_rules! fm {
 
 #[allow(unused_macros)]
 macro_rules! f {
-    ($format: expr, $record: expr, $key: expr, $val: expr) => {
+    ($format: expr, $state: expr, $key: expr, $val: expr) => {
         match ($val, $key) {
             (v, LogF64Id::End) => format!($format, v),
             (v, k) => {
-                let ptr = &mut $record[k];
+                let ptr = &mut $state.record[k];
                 *ptr = v;
                 format!($format, *ptr)
             }
@@ -328,8 +316,6 @@ impl Instantiate for State {
     fn instantiate(config: &Config, cnf: &CNFDescription) -> State {
         let mut state = State::default();
         state.num_vars = cnf.num_of_variables;
-        state.rst = RestartExecutor::instantiate(config, &cnf);
-        state.progress_log = config.use_log;
         state.model = vec![None; cnf.num_of_variables + 1];
         state.target = cnf.clone();
         state.time_limit = config.timeout;
@@ -377,69 +363,46 @@ impl StateIF for State {
             self[Stat::Stagnation] += 1;
         }
     }
-    fn adapt_strategy(&mut self, cdb: &mut ClauseDB) {
-        if self.config.without_adaptive_strategy || self.strategy != SearchStrategy::Initial {
+    fn select_strategy(&mut self) {
+        if self.config.without_adaptive_strategy {
             return;
         }
-        let mut re_init = false;
-        let decpc = self[Stat::Decision] as f64 / self[Stat::Conflict] as f64;
-        if decpc <= 1.2 {
-            self.strategy = SearchStrategy::LowDecisions;
-            self.use_chan_seok = true;
-            cdb.cur_restart =
-                (self[Stat::Conflict] as f64 / cdb.next_reduction as f64 + 1.0) as usize;
-            cdb.co_lbd_bound = 4;
-            cdb.first_reduction = 2000;
-            cdb.glureduce = true;
-            cdb.inc_step = 0;
-            cdb.next_reduction = 2000;
-            re_init = true;
-        }
-        if self[Stat::NoDecisionConflict] < 30_000 {
-            if self.config.with_deep_search {
-                self.strategy = SearchStrategy::LowSuccesiveM;
-            } else {
-                self.strategy = SearchStrategy::LowSuccesiveLuby;
-                self.rst.luby.active = true;
-                self.rst.luby.step = 100;
+        debug_assert_eq!(self.strategy.0, SearchStrategy::Initial);
+        self.strategy.0 = match () {
+            _ if self[Stat::NumBinLearnt] + 20_000 < self[Stat::NumLBD2] => {
+                SearchStrategy::ManyGlues
             }
-        }
-        if self[Stat::NoDecisionConflict] > 54_400 {
-            self.strategy = SearchStrategy::HighSuccesive;
-            self.use_chan_seok = true;
-            cdb.co_lbd_bound = 3;
-            cdb.first_reduction = 30000;
-            cdb.glureduce = true;
-            // randomize_on_restarts = 1;
-        }
-        if self[Stat::NumLBD2] - self[Stat::NumBin] > 20_000 {
-            self.strategy = SearchStrategy::ManyGlues;
-        }
-        if self.strategy == SearchStrategy::Initial {
-            self.strategy = SearchStrategy::Generic;
-            // self.config.without_deep_search = self.c_lvl.get().powf(2.0) < (self.num_unsolved_vars() as f64);
-            return;
-        }
-        if self.use_chan_seok {
-            cdb.make_permanent(re_init);
-        }
+            _ if self[Stat::Decision] as f64 <= 1.2 * self[Stat::Conflict] as f64 => {
+                SearchStrategy::LowDecisions
+            }
+            _ if self[Stat::NoDecisionConflict] < 30_000 => {
+                if self.config.with_deep_search {
+                    SearchStrategy::LowSuccesiveM
+                } else {
+                    SearchStrategy::LowSuccesiveLuby
+                }
+            }
+            _ if 54_400 < self[Stat::NoDecisionConflict] => SearchStrategy::HighSuccesive,
+            _ => SearchStrategy::Generic,
+        };
+        self.strategy.1 = self[Stat::Conflict];
     }
     fn progress_header(&self) {
-        if !self.use_progress {
+        if self.config.quiet_mode {
             return;
         }
-        if self.progress_log {
+        if self.config.use_log {
             self.dump_header();
             return;
         }
         println!("{}", self);
-        let repeat = if 0 < self.config.dump_interval { 7 } else { 5 };
+        let repeat = 7;
         for _i in 0..repeat {
             println!("                                                  ");
         }
     }
     fn flush<S: AsRef<str>>(&self, mes: S) {
-        if self.use_progress && !self.progress_log {
+        if !self.config.quiet_mode && !self.config.use_log {
             // print!("\x1B[1G{}", mes);
             print!("{}", mes.as_ref());
             stdout().flush().unwrap();
@@ -447,151 +410,132 @@ impl StateIF for State {
     }
     /// `mes` should be shorter than or equal to 9, or 8 + a delimiter.
     #[allow(clippy::cognitive_complexity)]
-    fn progress(&mut self, cdb: &ClauseDB, vdb: &VarDB, mes: Option<&str>) {
-        if !self.use_progress {
+    fn progress(&mut self, cdb: &ClauseDB, rst: &Restarter, vdb: &VarDB, mes: Option<&str>) {
+        if self.config.quiet_mode {
             return;
         }
-        if self.progress_log {
+        if self.config.use_log {
             self.dump(cdb, vdb);
             return;
         }
         let nv = vdb.len() - 1;
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
+        let (cdb_num_active, cdb_num_learnt) = cdb.progress_component();
+        let (vdb_core_size, vdb_activity_decay) = vdb.progress_component();
         self.progress_cnt += 1;
-        print!(
-            "\x1B[{}A\x1B[1G",
-            if 0 < self.config.dump_interval { 8 } else { 6 },
-        );
+        print!("\x1B[8A\x1B[1G");
         println!("\x1B[2K{}", self);
         println!(
             "\x1B[2K #conflict:{}, #decision:{}, #propagate:{} ",
             i!(
                 "{:>11}",
-                self.record,
+                self,
                 LogUsizeId::Conflict,
                 self[Stat::Conflict]
             ),
             i!(
                 "{:>13}",
-                self.record,
+                self,
                 LogUsizeId::Decision,
                 self[Stat::Decision]
             ),
             i!(
                 "{:>15}",
-                self.record,
+                self,
                 LogUsizeId::Propagate,
                 self[Stat::Propagation]
             ),
         );
         println!(
             "\x1B[2K  Assignment|#rem:{}, #fix:{}, #elm:{}, prg%:{} ",
-            im!("{:>9}", self.record, LogUsizeId::Remain, nv - sum),
-            im!("{:>9}", self.record, LogUsizeId::Fixed, fixed),
+            im!("{:>9}", self, LogUsizeId::Remain, nv - sum),
+            im!("{:>9}", self, LogUsizeId::Fixed, fixed),
             im!(
                 "{:>9}",
-                self.record,
+                self,
                 LogUsizeId::Eliminated,
                 self.num_eliminated_vars
             ),
             fm!(
                 "{:>9.4}",
-                self.record,
+                self,
                 LogF64Id::Progress,
                 (sum as f64) / (nv as f64) * 100.0
             ),
         );
         println!(
             "\x1B[2K      Clause|Remv:{}, LBD2:{}, Binc:{}, Perm:{} ",
-            im!("{:>9}", self.record, LogUsizeId::Removable, cdb.num_learnt),
-            im!("{:>9}", self.record, LogUsizeId::LBD2, self[Stat::NumLBD2]),
+            im!("{:>9}", self, LogUsizeId::Removable, cdb_num_learnt),
+            im!("{:>9}", self, LogUsizeId::LBD2, self[Stat::NumLBD2]),
             im!(
                 "{:>9}",
-                self.record,
+                self,
                 LogUsizeId::Binclause,
                 self[Stat::NumBin] // self[Stat::NumBinLearnt]
             ),
             im!(
                 "{:>9}",
-                self.record,
+                self,
                 LogUsizeId::Permanent,
-                cdb.num_active - cdb.num_learnt
+                cdb_num_active - cdb_num_learnt
             ),
         );
         println!(
-            "\x1B[2K     Restart|#BLK:{}, #RST:{}, tASG:{}, tLBD:{} ",
+            "\x1B[2K {}|#BLK:{}, #RST:{}, tASG:{}, tLBD:{} ",
+            if rst.luby.active {
+                "\x1B[001m\x1B[035mLubyRestart\x1B[000m"
+            } else {
+                "    Restart"
+            },
             im!(
                 "{:>9}",
-                self.record,
+                self,
                 LogUsizeId::RestartBlock,
                 self[Stat::BlockRestart]
             ),
             im!(
                 "{:>9}",
-                self.record,
+                self,
                 LogUsizeId::Restart,
                 self[Stat::Restart]
             ),
-            fm!(
-                "{:>9.4}",
-                self.record,
-                LogF64Id::EmaAsg,
-                self.rst.asg.trend()
-            ),
-            fm!(
-                "{:>9.4}",
-                self.record,
-                LogF64Id::EmaLBD,
-                self.rst.lbd.trend()
-            ),
+            fm!("{:>9.4}", self, LogF64Id::EmaAsg, rst.asg.trend()),
+            fm!("{:>9.4}", self, LogF64Id::EmaLBD, rst.lbd.trend()),
         );
-        if 0 < self.config.dump_interval {
-            println!(
-                "\x1B[2K    Conflict|eLBD:{}, cnfl:{}, bjmp:{}, rpc%:{} ",
-                fm!("{:>9.2}", self.record, LogF64Id::AveLBD, self.rst.lbd.get()),
-                fm!("{:>9.2}", self.record, LogF64Id::CLevel, self.c_lvl.get()),
-                fm!("{:>9.2}", self.record, LogF64Id::BLevel, self.b_lvl.get()),
-                fm!(
-                    "{:>9.4}",
-                    self.record,
-                    LogF64Id::End,
-                    100.0 * self[Stat::Restart] as f64 / self[Stat::Conflict] as f64
-                )
-            );
-            println!(
-                "\x1B[2K        misc|#rdc:{}, #sce:{}, stag:{}, vdcy:{} ",
-                im!(
-                    "{:>9}",
-                    self.record,
-                    LogUsizeId::Reduction,
-                    self[Stat::Reduction]
-                ),
-                im!(
-                    "{:>9}",
-                    self.record,
-                    LogUsizeId::SatClauseElim,
-                    self[Stat::SatClauseElimination]
-                ),
-                im!(
-                    "{:>9}",
-                    self.record,
-                    LogUsizeId::Stagnation,
-                    self[Stat::Stagnation]
-                ),
-                format!("{:>9.4}", vdb.activity_decay),
-            );
-        } else {
-            self.record[LogF64Id::AveLBD] = self.rst.lbd.get();
-            self.record[LogF64Id::CLevel] = self.c_lvl.get();
-            self.record[LogF64Id::BLevel] = self.b_lvl.get();
-            self.record[LogUsizeId::Reduction] = self[Stat::Reduction];
-            self.record[LogUsizeId::SatClauseElim] = self[Stat::SatClauseElimination];
-        }
+        println!(
+            "\x1B[2K    Conflict|eLBD:{}, cnfl:{}, bjmp:{}, rpc%:{} ",
+            fm!("{:>9.2}", self, LogF64Id::AveLBD, rst.lbd.get()),
+            fm!("{:>9.2}", self, LogF64Id::CLevel, self.c_lvl.get()),
+            fm!("{:>9.2}", self, LogF64Id::BLevel, self.b_lvl.get()),
+            fm!(
+                "{:>9.4}",
+                self,
+                LogF64Id::End,
+                100.0 * self[Stat::Restart] as f64 / self[Stat::Conflict] as f64
+            )
+        );
+        println!(
+            "\x1B[2K        misc|#rdc:{}, #sce:{}, core:{}, vdcy:{} ",
+            im!(
+                "{:>9}",
+                self,
+                LogUsizeId::Reduction,
+                self[Stat::Reduction]
+            ),
+            im!(
+                "{:>9}",
+                self,
+                LogUsizeId::SatClauseElim,
+                self[Stat::SatClauseElimination]
+            ),
+            fm!("{:>9.0}", self, LogF64Id::CoreSize, vdb_core_size),
+            format!("{:>9.4}", vdb_activity_decay),
+        );
         if let Some(m) = mes {
             println!("\x1B[2K    Strategy|mode: {}", m);
         } else {
-            println!("\x1B[2K    Strategy|mode: {:#}", self.strategy);
+            println!("\x1B[2K    Strategy|mode: {:#}", self.strategy.0);
         }
         self.flush("\x1B[2K");
     }
@@ -698,6 +642,7 @@ pub enum LogF64Id {
     AveLBD,       //  3: ave_lbd: f64,
     BLevel,       //  4: backjump_level: f64,
     CLevel,       //  5: conflict_level: f64,
+    CoreSize,     //  6: vdb.core_size.get: f64,
     End,
 }
 
@@ -792,15 +737,23 @@ impl State {
         );
     }
     #[allow(dead_code)]
-    fn dump_details(&mut self, cdb: &ClauseDB, elim: &Eliminator, vdb: &VarDB, mes: Option<&str>) {
+    fn dump_details(
+        &mut self,
+        cdb: &ClauseDB,
+        _: &Eliminator,
+        rst: &Restarter,
+        vdb: &VarDB,
+        mes: Option<&str>,
+    ) {
         self.progress_cnt += 1;
         let msg = match mes {
-            None => self.strategy.to_str(),
+            None => self.strategy.0.to_str(),
             Some(x) => x,
         };
         let nv = vdb.len() - 1;
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
+        let (cdb_num_active, cdb_num_learnt) = cdb.progress_component();
         println!(
             "{:>3}#{:>8},{:>7},{:>7},{:>7},{:>6.3},,{:>7},{:>7},\
              {:>7},,{:>5},{:>5},{:>6.2},{:>6.2},,{:>7.2},{:>8.2},{:>8.2},,\
@@ -811,18 +764,18 @@ impl State {
             fixed,
             self.num_eliminated_vars,
             (sum as f32) / (nv as f32) * 100.0,
-            cdb.num_learnt,
-            cdb.num_active,
+            cdb_num_learnt,
+            cdb_num_active,
             0,
             self[Stat::BlockRestart],
             self[Stat::Restart],
-            self.rst.asg.get(),
-            self.rst.lbd.get(),
-            self.rst.lbd.get(),
+            rst.asg.get(),
+            rst.lbd.get(),
+            rst.lbd.get(),
             self.b_lvl.get(),
             self.c_lvl.get(),
-            elim.clause_queue_len(),
-            elim.var_queue_len(),
+            0, // elim.clause_queue_len(),
+            0, // elim.var_queue_len(),
         );
     }
 }
