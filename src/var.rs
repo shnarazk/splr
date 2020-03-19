@@ -306,7 +306,6 @@ impl VarRewardIF for VarDB {
     fn reward_at_unassign(&mut self, vi: VarId) {
         let v = &mut self.var[vi];
         let duration = (self.ordinal + 1 - v.timestamp) as f64;
-        // let di = duration.powf(1.5);
         let decay = self.activity_decay;
         let rate = v.participated as f64 / duration;
         v.reward *= decay;
@@ -331,7 +330,7 @@ impl Instantiate for VarDB {
     }
     fn adapt_to(&mut self, state: &State) {
         if 0 == state[Stat::Conflict] {
-            let nv = self.var.len() -1;
+            let nv = self.var.len();
             self.core_size.update(((CORE_HISOTRY_LEN * nv) as f64).ln());
             return;
         }
@@ -347,7 +346,7 @@ impl Instantiate for VarDB {
             .map(|v| v.reward)
             .fold((VRD_MAX_START, 0.0), |(m, s), x| (m.max(x), s + x));
         let ar = msr.1 / self.var.len() as f64;
-        let thr = (msr.0 + ar) * VRD_FILTER;
+        let thr = msr.0 * VRD_FILTER + ar * (1.0 - VRD_FILTER);
         let core = self.var[1..].iter().filter(|v| thr <= v.reward).count();
         self.core_size.update(core as f64);
         if state[Stat::Conflict] % VRD_INTERVAL == 0 {
@@ -356,7 +355,8 @@ impl Instantiate for VarDB {
                 SearchStrategy::HighSuccesive => VRD_DEC_STRICT,
                 _ => VRD_DEC_STD,
             };
-            let delta = k * ((self.core_size.get() - VRD_OFFSET).max(0.0).sqrt());
+            let c = (self.core_size.get() - VRD_OFFSET).max(1.0);
+            let delta = 0.1 * k * (c.sqrt() * c.ln());
             self.activity_decay_max = 1.0 - delta;
         }
     }

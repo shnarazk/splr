@@ -486,7 +486,6 @@ fn handle_conflict(
         }
         state.num_solved_vars += 1;
     } else {
-        //[Reason-Side Rewarding]
         {
             // At the present time, some reason clauses can contain first UIP or its negation.
             // So we have to filter vars instead of literals to avoid double counting.
@@ -497,6 +496,7 @@ fn handle_conflict(
                 for l in &cdb[vdb[lit.vi()].reason].lits {
                     let vi = l.vi();
                     if !bumped.contains(&vi) {
+                        //[Reason-Side Rewarding]
                         vdb.reward_at_analysis(vi);
                         bumped.push(vi);
                     }
