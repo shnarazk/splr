@@ -1,4 +1,4 @@
-A fast SAT Solver for Propositional Logic in Rust
+A fast (but please don't compare with Cadical) SAT Solver for Propositional Logic in Rust
 ----
 
 Splr is a pure [Rust](https://www.rust-lang.org)ic fast SAT solver, based on [Glucose 4.1](https://www.labri.fr/perso/lsimon/glucose/).
