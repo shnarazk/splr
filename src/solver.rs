@@ -304,9 +304,9 @@ impl SatSolverIF for Solver {
         lits.truncate(j);
         match lits.len() {
             0 => None, // Empty clause is UNSAT.
-            1 => {
-                asgs.assign_at_rootlevel(vdb, lits[0]).map_or(None, |_| Some(ClauseId::default()))
-            }
+            1 => asgs
+                .assign_at_rootlevel(vdb, lits[0])
+                .map_or(None, |_| Some(ClauseId::default())),
             _ => {
                 let cid = cdb.new_clause(lits, 0, false);
                 elim.add_cid_occur(vdb, cid, &mut cdb[cid], true);
@@ -581,7 +581,7 @@ fn adapt_modules(
 
 #[allow(clippy::cognitive_complexity)]
 fn conflict_analyze(
-    asgs: &mut AssignStack,
+    asgs: &AssignStack,
     cdb: &mut ClauseDB,
     state: &mut State,
     vdb: &mut VarDB,
@@ -691,8 +691,8 @@ fn conflict_analyze(
 impl State {
     fn simplify_learnt(
         &mut self,
-        asgs: &mut AssignStack,
-        cdb: &mut ClauseDB,
+        asgs: &AssignStack,
+        cdb: &ClauseDB,
         vdb: &mut VarDB,
     ) -> DecisionLevel {
         let State {
@@ -736,7 +736,7 @@ impl State {
 impl Lit {
     fn is_redundant(
         self,
-        cdb: &mut ClauseDB,
+        cdb: &ClauseDB,
         vdb: &mut VarDB,
         clear: &mut Vec<Lit>,
         levels: &[bool],
@@ -749,7 +749,7 @@ impl Lit {
         let top = clear.len();
         while let Some(sl) = stack.pop() {
             let cid = vdb[sl.vi()].reason;
-            let c = &mut cdb[cid];
+            let c = &cdb[cid];
             for q in &(*c)[1..] {
                 let vi = q.vi();
                 let v = &vdb[vi];

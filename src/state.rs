@@ -403,8 +403,11 @@ impl StateIF for State {
     }
     fn flush<S: AsRef<str>>(&self, mes: S) {
         if !self.config.quiet_mode && !self.config.use_log {
-            // print!("\x1B[1G{}", mes);
-            print!("{}", mes.as_ref());
+            if mes.as_ref().is_empty() {
+                print!("\x1B[1G\x1B[K")
+            } else {
+                print!("{}", mes.as_ref());
+            }
             stdout().flush().unwrap();
         }
     }
