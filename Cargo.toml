@@ -17,6 +17,9 @@ copyless = "0.1"
 libc = "0.2"
 structopt = "0.3"
 
+[features]
+# full = ["ema_calibration"]
+
 [profile.release]
 lto = "fat"
 codegen-units = 1
