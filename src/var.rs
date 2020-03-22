@@ -327,7 +327,7 @@ impl VarRewardIF for VarDB {
         v.reward += s;
         const SCALE: f64 = 1e-30;
         const SCALE_MAX: f64 = 1e240;
-        if SCALE_MAX  < v.reward {
+        if SCALE_MAX < v.reward {
             for v in &mut self.var[1..] {
                 v.reward *= SCALE;
             }
