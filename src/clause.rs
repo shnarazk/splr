@@ -832,9 +832,17 @@ impl ClauseDB {
         } = self;
         self.next_reduction += self.inc_step;
         let mut perm = Vec::with_capacity(clause.len());
-        for (i, b) in clause.iter().enumerate().skip(1) {
-            if b.is(Flag::LEARNT) && !b.is(Flag::DEAD) && !vdb.locked(b, ClauseId::from(i)) {
+        for (i, c) in clause.iter_mut().enumerate().skip(1) {
+            let used = c.is(Flag::JUST_USED);
+            if c.is(Flag::LEARNT)
+                && !c.is(Flag::DEAD)
+                && !vdb.locked(c, ClauseId::from(i))
+                && !used
+            {
                 perm.push(i);
+            }
+            if used {
+                c.turn_off(Flag::JUST_USED)
             }
         }
         if perm.is_empty() {
@@ -854,9 +862,6 @@ impl ClauseDB {
         }
         for i in &perm[keep..] {
             let c = &mut clause[*i];
-            // if c.is(Flag::JUST_USED) {
-            //     c.turn_off(Flag::JUST_USED)
-            // }
             if 2 < c.rank {
                 c.kill(touched);
             }

@@ -604,11 +604,9 @@ fn conflict_analyze(
             let c = &mut cdb[cid];
             debug_assert!(!c.is(Flag::DEAD));
             if 2 < c.rank {
+                c.turn_on(Flag::JUST_USED);
                 let nlevels = vdb.compute_lbd(&c.lits);
                 if nlevels + 1 < c.rank {
-                    // if c.rank <= cdb.lbd_frozen_clause {
-                    //     c.turn_on(Flag::JUST_USED);
-                    // }
                     // chan_seok_condition is zero if !use_chan_seok
                     if nlevels < chan_seok_condition {
                         c.turn_off(Flag::LEARNT);
