@@ -318,7 +318,12 @@ impl VarRewardIF for VarDB {
     #[cfg(feature = "EVSIDS")]
     fn reward_at_analysis(&mut self, vi: VarId) {
         let s = self.reward_step;
+        let t = self.ordinal;
         let v = &mut self[vi];
+        if v.timestamp == t {
+            return;
+        }
+        v.timestamp = t;
         v.reward += s;
         const SCALE: f64 = 1e-30;
         const SCALE_MAX: f64 = 1e240;
@@ -335,7 +340,8 @@ impl VarRewardIF for VarDB {
     fn reward_at_unassign(&mut self, _: VarId) {}
     #[cfg(feature = "EVSIDS")]
     fn reward_update(&mut self) {
-        const INC_SCALE: f64 = 1.001;
+        self.ordinal += 1;
+        const INC_SCALE: f64 = 1.01;
         self.reward_step *= INC_SCALE;
     }
 
