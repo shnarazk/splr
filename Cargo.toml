@@ -18,7 +18,8 @@ libc = "0.2"
 structopt = "0.3"
 
 [features]
-# full = ["ema_calibration"]
+EVSIDS = []
+ema_calibration = []
 
 [profile.release]
 lto = "fat"

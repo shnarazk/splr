@@ -176,11 +176,14 @@ pub struct VarDB {
     core_size: Ema,
     /// a working buffer for LBD calculation
     lbd_temp: Vec<usize>,
+    #[cfg(feature = "EVSIDS")]
+    reward_step: f64,
 }
 
 const CORE_HISOTRY_LEN: usize = 10;
 
 impl Default for VarDB {
+    #[cfg(not(feature = "EVSIDS"))]
     fn default() -> VarDB {
         const VRD_MAX: f64 = 0.96;
         const VRD_START: f64 = 0.8;
@@ -191,6 +194,20 @@ impl Default for VarDB {
             var: Vec::new(),
             core_size: Ema::new(CORE_HISOTRY_LEN),
             lbd_temp: Vec::new(),
+        }
+    }
+    #[cfg(feature = "EVSIDS")]
+    fn default() -> VarDB {
+        const VRD_MAX: f64 = 0.96;
+        const VRD_START: f64 = 0.8;
+        VarDB {
+            activity_decay: VRD_START,
+            activity_decay_max: VRD_MAX,
+            ordinal: 0,
+            var: Vec::new(),
+            core_size: Ema::new(CORE_HISOTRY_LEN),
+            lbd_temp: Vec::new(),
+            reward_step: 0.000_000_1,
         }
     }
 }
@@ -294,15 +311,49 @@ impl VarRewardIF for VarDB {
     fn clear_reward(&mut self, vi: VarId) {
         self[vi].reward = 0.0;
     }
+
+    //
+    // EVSIDS
+    //
+    #[cfg(feature = "EVSIDS")]
+    fn reward_at_analysis(&mut self, vi: VarId) {
+        let s = self.reward_step;
+        let v = &mut self[vi];
+        v.reward += s;
+        const SCALE: f64 = 1e-30;
+        const SCALE_MAX: f64 = 1e240;
+        if SCALE_MAX  < v.reward {
+            for v in &mut self.var[1..] {
+                v.reward *= SCALE;
+            }
+            self.reward_step *= SCALE;
+        }
+    }
+    #[cfg(feature = "EVSIDS")]
+    fn reward_at_assign(&mut self, _: VarId) {}
+    #[cfg(feature = "EVSIDS")]
+    fn reward_at_unassign(&mut self, _: VarId) {}
+    #[cfg(feature = "EVSIDS")]
+    fn reward_update(&mut self) {
+        const INC_SCALE: f64 = 1.001;
+        self.reward_step *= INC_SCALE;
+    }
+
+    //
+    // Learning Rate
+    //
+    #[cfg(not(feature = "EVSIDS"))]
     fn reward_at_analysis(&mut self, vi: VarId) {
         let v = &mut self[vi];
         v.participated += 1;
     }
+    #[cfg(not(feature = "EVSIDS"))]
     fn reward_at_assign(&mut self, vi: VarId) {
         let t = self.ordinal;
         let v = &mut self[vi];
         v.timestamp = t;
     }
+    #[cfg(not(feature = "EVSIDS"))]
     fn reward_at_unassign(&mut self, vi: VarId) {
         let v = &mut self.var[vi];
         let duration = (self.ordinal + 1 - v.timestamp) as f64;
@@ -312,6 +363,7 @@ impl VarRewardIF for VarDB {
         v.reward += (1.0 - decay) * rate;
         v.participated = 0;
     }
+    #[cfg(not(feature = "EVSIDS"))]
     fn reward_update(&mut self) {
         const VRD_STEP: f64 = 0.000_01;
         self.ordinal += 1;
