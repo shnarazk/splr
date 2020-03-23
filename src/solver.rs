@@ -365,11 +365,8 @@ fn search(
             if cdb[ci].iter().all(|l| vdb[l].level == 0) {
                 return Ok(false);
             }
-            if state[Stat::Conflict] < 1000 {
+            if state[Stat::Conflict] < 1000 || asgs.conflicts.0 == asgs.conflicts.1 {
                 state.switch_chronobt = Some(false);
-            } else if asgs.conflicts.0 == asgs.conflicts.1 {
-                // state.flush("i");
-                state.switch_chronobt = Some(true);
             }
             handle_conflict(asgs, cdb, elim, rst, state, vdb, ci)?;
             state.switch_chronobt = None;
