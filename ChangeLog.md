@@ -1,3 +1,8 @@
+## 0.3.3, 2020-12-31
+
+- activate `JUST_USED` for clause reduction
+- remove `ClauseDB::attach`
+
 ## 0.3.2, 2020-03-20
 
 - control var activity decay rate based on the number of hot vars
