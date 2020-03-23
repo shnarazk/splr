@@ -365,13 +365,22 @@ fn search(
             if cdb[ci].iter().all(|l| vdb[l].level == 0) {
                 return Ok(false);
             }
+            if state[Stat::Conflict] < 1000 {
+                state.switch_chronobt = Some(false);
+            } else if asgs.conflicts.0 == asgs.conflicts.1 {
+                // state.flush("i");
+                state.switch_chronobt = Some(true);
+            }
             handle_conflict(asgs, cdb, elim, rst, state, vdb, ci)?;
+            state.switch_chronobt = None;
         }
         if !asgs.remains() {
             let vi = asgs.select_var(vdb);
             let zero = ClauseId::default();
             let lvl = asgs.level();
-            if false /* rst.asg.trend() < 1.0 */ {
+            if false
+            /* rst.asg.trend() < 1.0 */
+            {
                 match propagate_in_sandbox(asgs, cdb, state, vdb, vi) {
                     [(p, _, _), (q, _, mut learnt)] if p == zero && q != zero => {
                         if learnt.len() == 1 {
@@ -437,7 +446,6 @@ fn search(
                     [(p, _, _), (q, _, _)] if p == q => {
                         // state.flush("");
                         // state.flush(format!("flush by {} at {}", vi, state[Stat::Conflict]));
-                        state.stop_chronobt = false;
                         // let lbd = lp.len();
                         // cdb.attach(&mut lp, vdb, lbd);
                         // let lbd = lq.len();
@@ -523,7 +531,7 @@ fn handle_conflict(
         state[Stat::BlockRestart] += 1;
     }
     let cl = asgs.level();
-    let mut use_chronobt = 1_000 < ncnfl && 0 < state.config.chronobt && !state.stop_chronobt;
+    let mut use_chronobt = state.switch_chronobt.unwrap_or(0 < state.config.chronobt);
     if use_chronobt {
         let c = &cdb[ci];
         let lcnt = c.iter().filter(|l| vdb[*l].level == cl).count();
@@ -547,17 +555,36 @@ fn handle_conflict(
                     format!("lcnt == 1: level {}, snd level {}", cl, snd_l)
                 );
                 asgs.assign_by_decision(vdb, decision);
-                state.stop_chronobt = false;
                 return Ok(());
             }
         }
-        let lv = c.iter().map(|l| vdb[l].level).max().unwrap_or(0);
-        // The following change the decision level which is stored to `cl`.
-        asgs.cancel_until(vdb, lv);
     }
     // conflicting level
-    let cl = asgs.level();
-    debug_assert!(cdb[ci].iter().any(|l| vdb[l].level == cl));
+    // By mixing two restart modes, we must assume a conflicting level is under the current decision level,
+    // even if `use_chronobt` is off, because `use_chronobt` is a flag for future behavior.
+    let cl = {
+        let cl = asgs.level();
+        let c = &cdb[ci];
+        let lv = c.iter().map(|l| vdb[l].level).max().unwrap_or(0);
+        if lv < cl {
+            asgs.cancel_until(vdb, lv);
+            lv
+        } else {
+            cl
+        }
+    };
+    assert!(
+        cdb[ci].iter().any(|l| vdb[l].level == cl),
+        format!(
+            "use_{}: {:?}, {:?}",
+            use_chronobt,
+            cl,
+            cdb[ci]
+                .iter()
+                .map(|l| (i32::from(*l), vdb[l].level))
+                .collect::<Vec<_>>(),
+        )
+    );
     // backtrack level by analyze
     let bl_a = conflict_analyze(asgs, cdb, state, vdb, ci).max(state.root_level);
     if state.new_learnt.is_empty() {
@@ -570,7 +597,6 @@ fn handle_conflict(
                 vdb.dump(&cdb[ci]),
             );
         }
-        state.stop_chronobt = false;
         return Err(SolverError::NullLearnt);
     }
     // vdb.bump_vars(asgs, cdb, ci);
@@ -581,10 +607,11 @@ fn handle_conflict(
     // NCB places firstUIP on level bl, while CB does it on level cl.
     // Therefore the condition to use CB is: activity(firstUIP) < activity(v(bl)).
     // PREMISE: 0 < bl, because asgs.decision_vi accepts only non-zero values.
-    use_chronobt &= bl_a == 0
-        || state.config.chronobt + bl_a <= cl
-        || vdb.activity(l0.vi()) < vdb.activity(asgs.decision_vi(bl_a));
-    state.stop_chronobt = false;
+    use_chronobt &= state.switch_chronobt.unwrap_or(
+        bl_a == 0
+            || state.config.chronobt + bl_a <= cl
+            || vdb.activity(l0.vi()) < vdb.activity(asgs.decision_vi(bl_a)),
+    );
 
     // (assign level, backtrack level)
     let (al, bl) = if use_chronobt {

@@ -80,6 +80,7 @@ pub struct AssignStack {
     trail_lim: Vec<usize>,
     q_head: usize,
     var_order: VarIdHeap, // Variable Order
+    pub conflicts: (VarId, VarId),
 }
 
 impl Default for AssignStack {
@@ -90,6 +91,7 @@ impl Default for AssignStack {
             trail_lim: Vec::new(),
             q_head: 0,
             var_order: VarIdHeap::default(),
+            conflicts: (0, 0),
         }
     }
 }
@@ -334,6 +336,8 @@ impl PropagatorIF for AssignStack {
                     let lits = &mut cdb[w.c].lits;
                     if lits.len() == 2 {
                         if blocker_value == Some(false) {
+                            self.conflicts.1 = self.conflicts.0;
+                            self.conflicts.0 = false_lit.vi();
                             return w.c;
                         }
                         if lits[0] == false_lit {
@@ -366,6 +370,8 @@ impl PropagatorIF for AssignStack {
                         }
                     }
                     if first_value == Some(false) {
+                        self.conflicts.1 = self.conflicts.0;
+                        self.conflicts.0 = false_lit.vi();
                         return w.c;
                     }
                     let lv = lits[1..].iter().map(|l| vdb[l].level).max().unwrap_or(0);

@@ -177,7 +177,7 @@ pub struct State {
     pub slack_duration: usize,
     pub stagnated: bool,
     pub start: SystemTime,
-    pub stop_chronobt: bool,
+    pub switch_chronobt: Option<bool>,
     pub time_limit: f64,
     pub development: Vec<(usize, f64, f64, f64, f64, f64)>,
 }
@@ -205,7 +205,7 @@ impl Default for State {
             slack_duration: 0,
             stagnated: false,
             start: SystemTime::now(),
-            stop_chronobt: false,
+            switch_chronobt: None,
             time_limit: 0.0,
             development: Vec::new(),
         }
