@@ -373,109 +373,15 @@ fn search(
         }
         if !asgs.remains() {
             let vi = asgs.select_var(vdb);
-            let zero = ClauseId::default();
-            let lvl = asgs.level();
-            if false
-            /* rst.asg.trend() < 1.0 */
-            {
-                match propagate_in_sandbox(asgs, cdb, state, vdb, vi) {
-                    [(p, _, _), (q, _, mut learnt)] if p == zero && q != zero => {
-                        if learnt.len() == 1 {
-                            asgs.assign_by_unitclause(vdb, learnt[0]);
-                        // asgs.assign_by_decision(vdb, Lit::from_assign(vi, false));
-                        } else {
-                            {
-                                let mut bumped =
-                                    learnt.iter().map(|l| l.vi()).collect::<Vec<VarId>>();
-                                for lit in learnt.iter() {
-                                    //[Learnt Literal Rewarding]
-                                    vdb.reward_at_analysis(lit.vi());
-                                    for l in &cdb[vdb[lit.vi()].reason].lits {
-                                        let vi = l.vi();
-                                        if !bumped.contains(&vi) {
-                                            //[Reason-Side Rewarding]
-                                            vdb.reward_at_analysis(vi);
-                                            bumped.push(vi);
-                                        }
-                                    }
-                                }
-                            }
-                            let cid = cdb.new_clause(&mut learnt, Some(vdb));
-                            asgs.assign_by_implication(vdb, learnt[0], cid, lvl);
-                            // asgs.assign_by_decision(vdb, lit);
-                            // state[Stat::Decision] += 1;
-                            // a_decision_was_made = true;
-                        }
-                    }
-                    [(p, _, mut learnt), (q, _, _)] if p != zero && q == zero => {
-                        if learnt.len() == 1 {
-                            asgs.assign_by_unitclause(vdb, learnt[0]);
-                        // asgs.assign_by_decision(vdb, Lit::from_assign(vi, true));
-                        } else {
-                            {
-                                let mut bumped =
-                                    learnt.iter().map(|l| l.vi()).collect::<Vec<VarId>>();
-                                for lit in learnt.iter() {
-                                    //[Learnt Literal Rewarding]
-                                    vdb.reward_at_analysis(lit.vi());
-                                    for l in &cdb[vdb[lit.vi()].reason].lits {
-                                        let vi = l.vi();
-                                        if !bumped.contains(&vi) {
-                                            //[Reason-Side Rewarding]
-                                            vdb.reward_at_analysis(vi);
-                                            bumped.push(vi);
-                                        }
-                                    }
-                                }
-                            }
-                            let cid = cdb.new_clause(&mut learnt, Some(vdb));
-                            asgs.assign_by_implication(vdb, learnt[0], cid, lvl);
-                            // asgs.assign_by_decision(vdb, lit);
-                            // state[Stat::Decision] += 1;
-                            // a_decision_was_made = true;
-                        }
-                    }
-                    [(p, lp, _), (q, lq, _)] if p == zero && q == zero => {
-                        asgs.assign_by_decision(vdb, Lit::from_assign(vi, lq.len() < lp.len()));
-                        state[Stat::Decision] += 1;
-                        a_decision_was_made = true;
-                    }
-                    [(p, _, _), (q, _, _)] if p == q => {
-                        // state.flush("");
-                        // state.flush(format!("flush by {} at {}", vi, state[Stat::Conflict]));
-                        // let lbd = lp.len();
-                        // cdb.attach(&mut lp, vdb, lbd);
-                        // let lbd = lq.len();
-                        // cdb.attach(&mut lq, vdb, lbd);
-                        // asgs.cancel_until(vdb, state.root_level);
-                        //elimc += 1;
-                        //if elimc % 1000 == 0 {
-                        //    elim.activate();
-                        //     elim.simplify(asgs, cdb, state, vdb)?;
-                        //}
-                        // asgs.assign_by_decision(vdb, Lit::from_assign(vi, lp.len() < lq.len()));
-                        let p = vdb[vi].is(Flag::PHASE);
-                        asgs.assign_by_decision(vdb, Lit::from_assign(vi, p));
-                        state[Stat::Decision] += 1;
-                        a_decision_was_made = true;
-                    }
-                    _ => {
-                        let p = vdb[vi].is(Flag::PHASE);
-                        asgs.assign_by_decision(vdb, Lit::from_assign(vi, p));
-                        state[Stat::Decision] += 1;
-                        a_decision_was_made = true;
-                    }
-                }
-            } else {
-                let p = vdb[vi].is(Flag::PHASE);
-                asgs.assign_by_decision(vdb, Lit::from_assign(vi, p));
-                state[Stat::Decision] += 1;
-                a_decision_was_made = true;
-            }
+            let p = vdb[vi].is(Flag::PHASE);
+            asgs.assign_by_decision(vdb, Lit::from_assign(vi, p));
+            state[Stat::Decision] += 1;
+            a_decision_was_made = true;
         }
     }
 }
 
+#[allow(dead_code)]
 fn propagate_in_sandbox(
     asgs: &mut AssignStack,
     cdb: &mut ClauseDB,

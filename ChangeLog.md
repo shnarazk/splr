@@ -2,6 +2,7 @@
 
 - activate `JUST_USED` for clause reduction
 - remove `ClauseDB::attach`
+- add an experimental restart scheme switcher
 
 ## 0.3.2, 2020-03-20
 
