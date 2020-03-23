@@ -371,7 +371,7 @@ fn search(
             let vi = asgs.select_var(vdb);
             let zero = ClauseId::default();
             let lvl = asgs.level();
-            if true /* rst.asg.trend() < 1.0 */ {
+            if false /* rst.asg.trend() < 1.0 */ {
                 match propagate_in_sandbox(asgs, cdb, state, vdb, vi) {
                     [(p, _, _), (q, _, mut learnt)] if p == zero && q != zero => {
                         if learnt.len() == 1 {
