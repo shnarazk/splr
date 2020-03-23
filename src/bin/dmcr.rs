@@ -1,11 +1,7 @@
 // DIMACS Model Checker in Rust
 #![allow(unused_imports)]
 use {
-    splr::{
-        config::Config,
-        solver::{SatSolverIF, Solver},
-        validator::ValidatorIF,
-    },
+    splr::{Config, SatSolverIF, Solver, ValidateIF},
     std::{
         env,
         fs::File,
@@ -30,23 +26,23 @@ struct TargetOpts {
     #[structopt(parse(from_os_str))]
     /// a CNF file
     problem: std::path::PathBuf,
-    #[structopt(long = "without-color", short = "C")]
+    #[structopt(long = "no-color", short = "C")]
     /// disable colorized output
-    without_color: bool,
+    no_color: bool,
 }
 
 fn main() {
     let mut from_file = true;
     let mut found = false;
     let mut args = TargetOpts::from_args();
-    let cnf = args.problem.to_str().unwrap();
-    if !args.problem.exists() {
-        println!("{} does not exist.", args.problem.to_str().unwrap(),);
-        return;
-    }
+    let cnf = args
+        .problem
+        .to_str()
+        .unwrap_or_else(|| panic!("{} does not exist.", args.problem.to_str().unwrap()));
     let mut config = Config::default();
-    config.cnf_filename = args.problem.clone();
-    let (red, green, blue) = if args.without_color {
+    config.cnf_file = args.problem.clone();
+    config.quiet_mode = true;
+    let (red, green, blue) = if args.no_color {
         (RESET, RESET, RESET)
     } else {
         (RED, GREEN, BLUE)
@@ -64,7 +60,7 @@ fn main() {
     if let Some(f) = &args.assign {
         if let Ok(d) = File::open(f.as_path()) {
             if let Some(vec) = read_assignment(&mut BufReader::new(d), cnf, &args.assign) {
-                if s.inject_assigmnent(&vec).is_err() {
+                if s.inject_assignment(&vec).is_err() {
                     println!(
                         "{}{} seems an unsat problem but no proof.{}",
                         blue,
@@ -81,7 +77,7 @@ fn main() {
     }
     if !found {
         if let Some(vec) = read_assignment(&mut BufReader::new(stdin()), cnf, &args.assign) {
-            if s.inject_assigmnent(&vec).is_err() {
+            if s.inject_assignment(&vec).is_err() {
                 println!(
                     "{}{} seems an unsat problem but no proof.{}",
                     blue,
@@ -130,11 +126,11 @@ fn read_assignment(rs: &mut dyn BufRead, cnf: &str, assign: &Option<PathBuf>) ->
         match rs.read_line(&mut buf) {
             Ok(0) => return Some(Vec::new()),
             Ok(_) => {
-                if buf.starts_with('c') {
+                if buf.starts_with("c ") {
                     buf.clear();
                     continue;
                 }
-                if buf.starts_with('s') {
+                if buf.starts_with("s ") {
                     if buf.starts_with("s SATISFIABLE") {
                         buf.clear();
                         continue;
@@ -144,17 +140,22 @@ fn read_assignment(rs: &mut dyn BufRead, cnf: &str, assign: &Option<PathBuf>) ->
                     } else if let Some(asg) = assign {
                         println!("{} seems an illegal format file.", asg.to_str().unwrap(),);
                         return None;
+                    } else {
+                        buf.clear();
                     }
                 }
-                let mut v: Vec<i32> = Vec::new();
-                for s in buf.split_whitespace() {
-                    match s.parse::<i32>() {
-                        Ok(0) => break,
-                        Ok(x) => v.push(x),
-                        Err(e) => panic!("{} by {}", e, s),
+                if buf.starts_with("v ") {
+                    let mut v: Vec<i32> = Vec::new();
+                    for s in buf[2..].split_whitespace() {
+                        match s.parse::<i32>() {
+                            Ok(0) => break,
+                            Ok(x) => v.push(x),
+                            Err(e) => panic!("{} by {}", e, s),
+                        }
                     }
+                    return Some(v);
                 }
-                return Some(v);
+                panic!("Failed to parse here: {}", buf);
             }
             Err(e) => panic!("{}", e),
         }

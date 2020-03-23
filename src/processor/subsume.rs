@@ -1,0 +1,121 @@
+/// Crate `eliminator` implements clause subsumption and var elimination.
+use {
+    super::{EliminateIF, Eliminator},
+    crate::{assign::AssignIF, cdb::ClauseDBIF, types::*},
+};
+
+pub fn try_subsume<A, C>(
+    asg: &mut A,
+    cdb: &mut C,
+    elim: &mut Eliminator,
+    cid: ClauseId,
+    did: ClauseId,
+) -> MaybeInconsistent
+where
+    A: AssignIF,
+    C: ClauseDBIF,
+{
+    match subsume(cdb, cid, did) {
+        Some(NULL_LIT) => {
+            #[cfg(feature = "trace_elimination")]
+            println!(
+                "BackSubsC    => {} {} subsumed completely by {} {:#}",
+                did, cdb[did], cid, cdb[cid],
+            );
+            cdb.detach(did);
+            elim.remove_cid_occur(asg, did, &mut cdb[did]);
+            if !cdb[did].is(Flag::LEARNT) {
+                cdb[cid].turn_off(Flag::LEARNT);
+            }
+        }
+        Some(l) => {
+            #[cfg(feature = "trace_elimination")]
+            println!("BackSubC subsumes {} from {} and {}", l, cid, did,);
+            strengthen_clause(asg, cdb, elim, did, !l)?;
+            elim.enqueue_var(asg, l.vi(), true);
+        }
+        None => {}
+    }
+    Ok(())
+}
+
+/// returns a literal if these clauses can be merged by the literal.
+fn subsume<C>(cdb: &mut C, cid: ClauseId, other: ClauseId) -> Option<Lit>
+where
+    C: ClauseDBIF,
+{
+    debug_assert!(!other.is_lifted_lit());
+    if cid.is_lifted_lit() {
+        let l = Lit::from(cid);
+        let oh = &cdb[other];
+        for lo in &oh.lits {
+            if l == !*lo {
+                return Some(l);
+            }
+        }
+        return None;
+    }
+    let mut ret: Lit = NULL_LIT;
+    let ch = &cdb[cid];
+    let ob = &cdb[other];
+    debug_assert!(ob.lits.contains(&ob[0]));
+    debug_assert!(ob.lits.contains(&ob[1]));
+    'next: for l in &ch.lits {
+        for lo in &ob.lits {
+            if *l == *lo {
+                continue 'next;
+            } else if ret == NULL_LIT && *l == !*lo {
+                ret = *l;
+                continue 'next;
+            }
+        }
+        return None;
+    }
+    Some(ret)
+}
+
+/// removes `l` from clause `cid`
+/// - calls `enqueue_clause`
+/// - calls `enqueue_var`
+fn strengthen_clause<A, C>(
+    asg: &mut A,
+    cdb: &mut C,
+    elim: &mut Eliminator,
+    cid: ClauseId,
+    l: Lit,
+) -> MaybeInconsistent
+where
+    A: AssignIF,
+    C: ClauseDBIF,
+{
+    debug_assert!(!cdb[cid].is(Flag::DEAD));
+    debug_assert!(1 < cdb[cid].len());
+    cdb.touch_var(l.vi());
+    debug_assert_ne!(cid, ClauseId::default());
+    if cdb.strengthen(cid, l) {
+        // Vaporize the binary clause
+        debug_assert!(2 == cdb[cid].len());
+        let c0 = cdb[cid][0];
+        debug_assert_ne!(c0, l);
+        #[cfg(feature = "trace_elimination")]
+        println!(
+            "{} {:?} is removed and its first literal {} is enqueued.",
+            cid, cdb[cid], c0,
+        );
+        cdb.detach(cid);
+        elim.remove_cid_occur(asg, cid, &mut cdb[cid]);
+        asg.assign_at_rootlevel(c0)
+    } else {
+        #[cfg(feature = "trace_elimination")]
+        println!("cid {} drops literal {}", cid, l);
+        #[cfg(feature = "boundary_check")]
+        assert!(1 < cdb[cid].len());
+        elim.enqueue_clause(cid, &mut cdb[cid]);
+        elim.remove_lit_occur(asg, l, cid);
+        unsafe {
+            let vec = &cdb[cid].lits[..] as *const [Lit];
+            cdb.certificate_add(&*vec);
+        }
+        Ok(())
+    }
+}
