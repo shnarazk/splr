@@ -31,8 +31,6 @@ pub trait ClauseDBIF {
     fn len(&self) -> usize;
     /// return true if it's empty.
     fn is_empty(&self) -> bool;
-    /// make a new clause from `state.new_learnt` and register it to clause database.
-    fn attach(&mut self, v: &mut [Lit], vdb: &mut VarDB, lbd: usize) -> ClauseId;
     /// unregister a clause `cid` from clause database and make the clause dead.
     fn detach(&mut self, cid: ClauseId);
     /// check a condition to reduce.
@@ -44,7 +42,9 @@ pub trait ClauseDBIF {
     /// * `kill`
     fn garbage_collect(&mut self);
     /// allocate a new clause and return its id.
-    fn new_clause(&mut self, v: &[Lit], rank: usize, learnt: bool) -> ClauseId;
+    /// * If 2nd arg is `Some(vdb)`, register `v` as a learnt after sorting based on assign level.
+    /// * Otherwise, register `v` as a permanent clause, which rank is zero.
+    fn new_clause(&mut self, v: &mut [Lit], level_sort: Option<&mut VarDB>) -> ClauseId;
     /// return the number of alive clauses in the database. Or return the database size if `active` is `false`.
     fn count(&self, alive: bool) -> usize;
     /// return the number of clauses which satisfy given flags and aren't DEAD.
@@ -631,7 +631,40 @@ impl ClauseDBIF for ClauseDB {
         self.num_active = self.clause.len() - recycled.len();
         // debug_assert!(self.check_liveness2());
     }
-    fn new_clause(&mut self, v: &[Lit], rank: usize, learnt: bool) -> ClauseId {
+    fn new_clause(&mut self, v: &mut [Lit], level_sort: Option<&mut VarDB>) -> ClauseId {
+        let reward = self.activity_inc;
+        let (rank, learnt) =
+        if let Some(vdb) = level_sort {
+            if !self.certified.is_empty() {
+                let temp = v.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
+                self.certified.push((CertifiedRecord::ADD, temp));
+            }
+            debug_assert!(1 < v.len());
+            let mut i_max = 1;
+            let mut lv_max = 0;
+            // seek a literal with max level
+            for (i, l) in v.iter().enumerate() {
+                let vi = l.vi();
+                let lv = vdb[vi].level;
+                if vdb[vi].assign.is_some() && lv_max < lv {
+                    i_max = i;
+                    lv_max = lv;
+                }
+            }
+            v.swap(1, i_max);
+            if v.len() <= 2 {
+                (0, false)
+            } else {
+                let lbd = vdb.compute_lbd(v);
+                if self.use_chan_seok && lbd <= self.co_lbd_bound {
+                    (0, false)
+                } else {
+                    (lbd, true)
+                }
+            }
+        } else {
+            (0, false)
+        };
         let cid;
         let l0 = v[0];
         let l1 = v[1];
@@ -655,7 +688,7 @@ impl ClauseDBIF for ClauseDB {
                 c.lits.push(*l);
             }
             c.rank = rank;
-            c.reward = 0.0;
+            c.reward = reward;
         } else {
             let mut lits = Vec::with_capacity(v.len());
             for l in v {
@@ -666,13 +699,14 @@ impl ClauseDBIF for ClauseDB {
                 flags: Flag::empty(),
                 lits,
                 rank,
-                reward: 0.0,
+                reward,
             };
             self.clause.push(c);
         };
         let c = &mut self[cid];
         if learnt {
             c.turn_on(Flag::LEARNT);
+            c.turn_on(Flag::JUST_USED);
             self.num_learnt += 1;
         }
         self.watcher[!l0].register(l1, cid);
@@ -693,31 +727,6 @@ impl ClauseDBIF for ClauseDB {
             .skip(1)
             .filter(|&c| c.flags.contains(mask) && !c.flags.contains(Flag::DEAD))
             .count()
-    }
-    // Note: set LBD to 0 if you want to add the clause to Permanent.
-    fn attach(&mut self, v: &mut [Lit], vdb: &mut VarDB, lbd: usize) -> ClauseId {
-        if !self.certified.is_empty() {
-            let temp = v.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
-            self.certified.push((CertifiedRecord::ADD, temp));
-        }
-        debug_assert!(1 < v.len());
-        let mut i_max = 1;
-        let mut lv_max = 0;
-        // seek a literal with max level
-        for (i, l) in v.iter().enumerate() {
-            let vi = l.vi();
-            let lv = vdb[vi].level;
-            if vdb[vi].assign.is_some() && lv_max < lv {
-                i_max = i;
-                lv_max = lv;
-            }
-        }
-        v.swap(1, i_max);
-        let learnt = 0 < lbd && 2 < v.len() && (!self.use_chan_seok || self.co_lbd_bound < lbd);
-        let cid = self.new_clause(&v, lbd, learnt);
-        let c = &mut self.clause[cid.ordinal as usize];
-        c.reward = self.activity_inc;
-        cid
     }
     fn detach(&mut self, cid: ClauseId) {
         let c = &mut self.clause[cid.ordinal as usize];
@@ -890,11 +899,39 @@ impl ClauseDB {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::propagator::{AssignStack, PropagatorIF};
 
     fn lit(i: i32) -> Lit {
         Lit::from(i)
     }
 
+    #[test]
+    fn test_clause_instanciation() -> () {
+        let config = Config::default();
+        let cnf = CNFDescription {
+            num_of_variables: 4,
+            ..CNFDescription::default()
+        };
+        let mut asgs = AssignStack::instantiate(&config, &cnf);
+        let mut cdb = ClauseDB::instantiate(&config, &cnf);
+        let mut vdb = VarDB::instantiate(&config, &cnf);
+        asgs.assign_by_decision(&mut vdb, lit(1));
+        asgs.assign_by_decision(&mut vdb, lit(-2));
+
+        let c1 = cdb.new_clause(&mut [lit(1), lit(2), lit(3)], None);
+        let c = &cdb[c1];
+        assert_eq!(c.rank, 0);
+        assert!(!c.is(Flag::DEAD));
+        assert!(!c.is(Flag::LEARNT));
+        assert!(!c.is(Flag::JUST_USED));
+
+        let c2 = cdb.new_clause(&mut [lit(-1), lit(2), lit(3)], Some(&mut vdb));
+        let c = &cdb[c2];
+        assert_eq!(c.rank, 2);
+        assert!(!c.is(Flag::DEAD));
+        assert!(c.is(Flag::LEARNT));
+        assert!(c.is(Flag::JUST_USED));
+    }
     #[test]
     fn test_clause_equality() -> () {
         let config = Config::default();
@@ -903,8 +940,8 @@ mod tests {
             ..CNFDescription::default()
         };
         let mut cdb = ClauseDB::instantiate(&config, &cnf);
-        let c1 = cdb.new_clause(&[lit(1), lit(2), lit(3)], 0, false);
-        let c2 = cdb.new_clause(&[lit(-1), lit(4)], 0, false);
+        let c1 = cdb.new_clause(&mut [lit(1), lit(2), lit(3)], None);
+        let c2 = cdb.new_clause(&mut [lit(-1), lit(4)], None);
         cdb[c2].reward = 2.4;
         assert_eq!(c1, c1);
         assert_eq!(c1 == c1, true);
@@ -920,7 +957,7 @@ mod tests {
             ..CNFDescription::default()
         };
         let mut cdb = ClauseDB::instantiate(&config, &cnf);
-        let c1 = cdb.new_clause(&[lit(1), lit(2), lit(3)], 0, false);
+        let c1 = cdb.new_clause(&mut [lit(1), lit(2), lit(3)], None);
         assert_eq!(cdb[c1][0..].iter().map(|l| i32::from(*l)).sum::<i32>(), 6);
         let mut iter = cdb[c1][0..].into_iter();
         assert_eq!(iter.next(), Some(&lit(1)));
