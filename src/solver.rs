@@ -308,7 +308,7 @@ impl SatSolverIF for Solver {
                 .assign_at_rootlevel(vdb, lits[0])
                 .map_or(None, |_| Some(ClauseId::default())),
             _ => {
-                let cid = cdb.new_clause(lits, 0, false);
+                let cid = cdb.new_clause(lits, None);
                 elim.add_cid_occur(vdb, cid, &mut cdb[cid], true);
                 Some(cid)
             }
@@ -394,8 +394,7 @@ fn search(
                                     }
                                 }
                             }
-                            let lbd = vdb.compute_lbd(&learnt);
-                            let cid = cdb.attach(&mut learnt, vdb, lbd);
+                            let cid = cdb.new_clause(&mut learnt, Some(vdb));
                             asgs.assign_by_implication(vdb, learnt[0], cid, lvl);
                             // asgs.assign_by_decision(vdb, lit);
                             // state[Stat::Decision] += 1;
@@ -423,8 +422,7 @@ fn search(
                                     }
                                 }
                             }
-                            let lbd = vdb.compute_lbd(&learnt);
-                            let cid = cdb.attach(&mut learnt, vdb, lbd);
+                            let cid = cdb.new_clause(&mut learnt, Some(vdb));
                             asgs.assign_by_implication(vdb, learnt[0], cid, lvl);
                             // asgs.assign_by_decision(vdb, lit);
                             // state[Stat::Decision] += 1;
@@ -633,12 +631,12 @@ fn handle_conflict(
             }
         }
         asgs.cancel_until(vdb, bl);
-        let lbd = vdb.compute_lbd(new_learnt);
-        let cid = cdb.attach(new_learnt, vdb, lbd);
+        let cid = cdb.new_clause(new_learnt, Some(vdb));
         elim.add_cid_occur(vdb, cid, &mut cdb[cid], true);
         state.c_lvl.update(cl as f64);
         state.b_lvl.update(bl as f64);
         asgs.assign_by_implication(vdb, l0, cid, al);
+        let lbd = cdb[cid].rank;
         rst.lbd.update(lbd);
         if lbd <= 2 {
             state[Stat::NumLBD2] += 1;

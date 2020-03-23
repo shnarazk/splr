@@ -958,7 +958,6 @@ fn eliminate_var(
         let vec = &mut state.new_learnt as *mut Vec<Lit>;
         // Produce clauses in cross product:
         for p in &*pos {
-            let rank_p = cdb[p].rank;
             for n in &*neg {
                 // println!("eliminator replaces {} with a cross product {:?}", p.fmt(), vec2int(&vec));
                 match merge(cdb, *p, *n, vi, &mut *vec) {
@@ -977,12 +976,11 @@ fn eliminate_var(
                         asgs.assign_at_rootlevel(vdb, lit)?;
                     }
                     _ => {
-                        let rank = if cdb[p].is(Flag::LEARNT) && cdb[n].is(Flag::LEARNT) {
-                            rank_p.min(cdb[n].rank)
+                        let cid = if cdb[p].is(Flag::LEARNT) && cdb[n].is(Flag::LEARNT) {
+                            cdb.new_clause(&mut *vec, Some(vdb))
                         } else {
-                            0
+                            cdb.new_clause(&mut *vec, None)
                         };
-                        let cid = cdb.attach(&mut *vec, vdb, rank);
                         elim.add_cid_occur(vdb, cid, &mut cdb[cid], true);
                     }
                 }
@@ -1323,10 +1321,10 @@ mod tests {
         };
         let mut s = Solver::instantiate(&cfg, &cnf);
 
-        let c1 = s.cdb.new_clause(&mkv![1, 2, 3], 3, true);
-        let c2 = s.cdb.new_clause(&mkv![-2, 3, 4], 3, true);
-        let c3 = s.cdb.new_clause(&mkv![-2, -3], 2, true);
-        let c4 = s.cdb.new_clause(&mkv![1, 2, -3, 9], 4, true);
+        let c1 = s.cdb.new_clause(&mut mkv![1, 2, 3], None);
+        let c2 = s.cdb.new_clause(&mut mkv![-2, 3, 4], None);
+        let c3 = s.cdb.new_clause(&mut mkv![-2, -3], None);
+        let c4 = s.cdb.new_clause(&mut mkv![1, 2, -3, 9], None);
         //    {
         //        let vec = [&c2, &c3]; // [&c1, &c2, &c3, &c4];
         //        for x in &vec {
@@ -1353,8 +1351,8 @@ mod tests {
     }
 
     fn mk_c(s: &mut Solver, i: usize, v: Vec<i32>) -> ClauseId {
-        let vec = v.iter().map(|i| Lit::from(*i)).collect::<Vec<Lit>>();
-        let cid = s.cdb.new_clause(&vec, vec.len(), true);
+        let mut vec = v.iter().map(|i| Lit::from(*i)).collect::<Vec<Lit>>();
+        let cid = s.cdb.new_clause(&mut vec, None);
         cid
     }
 }
