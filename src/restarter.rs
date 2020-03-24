@@ -40,7 +40,7 @@ pub struct ProgressASG {
     ema: Ema,
     /// For block restart based on average assignments: 1.40.
     /// This is called `R` in Glucose
-    pub threshold: f64,
+    threshold: f64,
 }
 
 impl Instantiate for ProgressASG {
@@ -81,7 +81,7 @@ pub struct ProgressLBD {
     sum: usize,
     /// For force restart based on average LBD of newly generated clauses: 0.80.
     /// This is called `K` in Glucose
-    pub threshold: f64,
+    threshold: f64,
 }
 
 impl Instantiate for ProgressLBD {
@@ -154,7 +154,7 @@ impl ProgressEvaluator for ProgressLVL {
 /// An EMA of reccuring conflict complexity (unused now).
 #[derive(Debug)]
 struct ProgressRCC {
-    pub heat: Ema2,
+    heat: Ema2,
     threshold: f64,
 }
 
@@ -206,11 +206,11 @@ impl ProgressEvaluator for ProgressRCC {
 /// An implementation of Luby series.
 #[derive(Debug)]
 pub struct LubySeries {
-    pub active: bool,
-    pub index: usize,
+    active: bool,
+    index: usize,
     next_restart: usize,
     restart_inc: f64,
-    pub step: usize,
+    step: usize,
 }
 
 impl Default for LubySeries {
