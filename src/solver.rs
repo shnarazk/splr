@@ -5,8 +5,8 @@ use {
         config::Config,
         eliminator::{Eliminator, EliminatorIF, EliminatorStatIF},
         propagator::{AssignStack, PropagatorIF, VarSelectionIF},
-        restarter::{RestartIF, Restarter},
-        state::{SearchStrategy, Stat, State, StateIF},
+        restarter::{RestartIF, Restarter, RestarterModule},
+        state::{ProgressComponent, SearchStrategy, Stat, State, StateIF},
         types::*,
         var::{VarDB, VarDBIF, VarRewardIF, LBDIF},
     },
@@ -327,9 +327,7 @@ fn search(
     vdb: &mut VarDB,
 ) -> Result<bool, SolverError> {
     let mut a_decision_was_made = false;
-    if rst.luby.active {
-        rst.luby.update(0);
-    }
+    rst.update(RestarterModule::Luby, 0);
     loop {
         vdb.reward_update();
         let ci = asgs.propagate(cdb, vdb);
@@ -423,11 +421,11 @@ fn handle_conflict(
     ci: ClauseId,
 ) -> MaybeInconsistent {
     let ncnfl = state[Stat::Conflict]; // total number
-    rst.after_restart += 1;
+    rst.update(RestarterModule::Counter, 1);
     // DYNAMIC BLOCKING RESTART based on ASG, updated on conflict path
     // If we can settle this conflict w/o restart, solver will get a big progress.
     if 0 < state.last_asg {
-        rst.asg.update(asgs.len());
+        rst.update(RestarterModule::ASG, asgs.len());
         state.last_asg = 0;
     }
     if rst.block_restart() {
@@ -567,7 +565,7 @@ fn handle_conflict(
         state.b_lvl.update(bl as f64);
         asgs.assign_by_implication(vdb, l0, cid, al);
         let lbd = cdb[cid].rank;
-        rst.lbd.update(lbd);
+        rst.update(RestarterModule::LBD, lbd);
         if lbd <= 2 {
             state[Stat::NumLBD2] += 1;
         }
@@ -580,14 +578,15 @@ fn handle_conflict(
     }
     cdb.scale_activity();
     if 0 < state.config.dump_interval && ncnfl % state.config.dump_interval == 0 {
+        let (_luby_active, rst_asg_trend, _lbd_get, rst_lbd_trend) = rst.progress_component();
         state.development.push((
             ncnfl,
             (state.num_solved_vars + state.num_eliminated_vars) as f64
                 / state.target.num_of_variables as f64,
             state[Stat::Restart] as f64,
             state[Stat::BlockRestart] as f64,
-            rst.asg.trend().min(10.0),
-            rst.lbd.trend().min(10.0),
+            rst_asg_trend.min(10.0),
+            rst_lbd_trend.min(10.0),
         ));
     }
     if ncnfl % state.reflection_interval == 0 {
@@ -618,7 +617,8 @@ fn adapt_modules(
     state.check_stagnation();
     state.flush("exhaustive eliminator activated...");
     asgs.cancel_until(vdb, 0);
-    if elim.enable && rst.asg.trend() < 1.0 {
+    let (_, rst_asg_trend, _, _) = rst.progress_component();
+    if elim.enable && rst_asg_trend < 1.0 {
         elim.activate();
         elim.simplify(asgs, cdb, state, vdb)?;
     }

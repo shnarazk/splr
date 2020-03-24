@@ -14,12 +14,22 @@ trait ProgressEvaluator {
     fn is_active(&self) -> bool;
 }
 
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum RestarterModule {
+    Counter = 0,
+    ASG,
+    LBD,
+    Luby,
+}
+
 /// API for restart like `block_restart`, `force_restart` and so on.
 pub trait RestartIF {
     /// block restart if needed.
     fn block_restart(&mut self) -> bool;
     /// force restart if needed.
     fn force_restart(&mut self) -> bool;
+    /// update specific submodule
+    fn update(&mut self, kind: RestarterModule, val: usize);
 }
 
 /// An assignment history used for blocking restart
@@ -281,13 +291,13 @@ impl LubySeries {
 /// `Restarter` provides restart API and holds data about restart conditions.
 #[derive(Debug)]
 pub struct Restarter {
-    pub asg: ProgressASG,
-    pub lbd: ProgressLBD,
+    asg: ProgressASG,
+    lbd: ProgressLBD,
     // pub rcc: ProgressRCC,
     // pub blvl: ProgressLVL,
     // pub clvl: ProgressLVL,
-    pub luby: LubySeries,
-    pub after_restart: usize,
+    luby: LubySeries,
+    after_restart: usize,
     next_restart: usize,
     restart_step: usize,
 }
@@ -361,6 +371,26 @@ impl RestartIF for Restarter {
             reset!(self);
         }
         false
+    }
+    fn update(&mut self, kind: RestarterModule, val: usize) {
+        match kind {
+            RestarterModule::Counter => {
+                // use an embeded value, expecting compile time optimization
+                self.after_restart += 1;
+            }
+            RestarterModule::ASG => {
+                self.asg.update(val);
+            }
+            RestarterModule::LBD => {
+                self.lbd.update(val);
+            }
+            RestarterModule::Luby => {
+                if self.luby.active {
+                    // use an embeded value, expecting compile time optimization
+                    self.luby.update(0);
+                }
+            }
+        }
     }
 }
 

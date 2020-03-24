@@ -755,6 +755,7 @@ impl State {
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
         let (cdb_num_active, cdb_num_learnt) = cdb.progress_component();
+        let (_luby_active, rst_asg_trend, rst_lbd_get, rst_lbd_trend) = rst.progress_component();
         println!(
             "{:>3}#{:>8},{:>7},{:>7},{:>7},{:>6.3},,{:>7},{:>7},\
              {:>7},,{:>5},{:>5},{:>6.2},{:>6.2},,{:>7.2},{:>8.2},{:>8.2},,\
@@ -770,9 +771,9 @@ impl State {
             0,
             self[Stat::BlockRestart],
             self[Stat::Restart],
-            rst.asg.get(),
-            rst.lbd.get(),
-            rst.lbd.get(),
+            rst_asg_trend,
+            rst_lbd_get,
+            rst_lbd_trend,
             self.b_lvl.get(),
             self.c_lvl.get(),
             0, // elim.clause_queue_len(),

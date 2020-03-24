@@ -255,6 +255,7 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
         }
     };
     let (_, vdb_activity_decay) = s.vdb.progress_component();
+    let (rst_luby_active, _asg_trend, _lbd_get, _lbd_trend) = s.rst.progress_component();
     out.write_all(
         format!(
             "c {:<43}, #var:{:9}, #cls:{:9}\n",
@@ -294,7 +295,7 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     out.write_all(
         format!(
             "c  {}|#BLK:{}, #RST:{}, eASG:{}, eLBD:{} \n",
-            if s.rst.luby.active {
+            if rst_luby_active {
                 "LubyRestart"
             } else {
                 "    Restart"
