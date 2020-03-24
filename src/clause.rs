@@ -34,7 +34,9 @@ pub trait ClauseDBIF {
     /// unregister a clause `cid` from clause database and make the clause dead.
     fn detach(&mut self, cid: ClauseId);
     /// check a condition to reduce.
-    fn check_and_reduce(&mut self, vdb: &mut VarDB, nc: usize) -> bool;
+    /// * return `true` if ruduction is done.
+    /// * Otherwise return `false`.
+    fn check_and_reduce(&mut self, state: &State, vdb: &mut VarDB) -> bool;
     fn reset(&mut self);
     /// delete *dead* clauses from database, which are made by:
     /// * `reduce`
@@ -734,10 +736,11 @@ impl ClauseDBIF for ClauseDB {
         debug_assert!(1 < c.lits.len());
         c.kill(&mut self.touched);
     }
-    fn check_and_reduce(&mut self, vdb: &mut VarDB, nc: usize) -> bool {
-        if 0 == self.num_learnt {
+    fn check_and_reduce(&mut self, state: &State, vdb: &mut VarDB) -> bool {
+        if state.config.without_reduce || 0 == self.num_learnt {
             return false;
         }
+        let nc = state[Stat::Conflict];
         let go = if self.use_chan_seok {
             self.first_reduction < self.num_learnt
         } else {

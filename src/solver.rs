@@ -600,7 +600,7 @@ fn handle_conflict(
             return Err(SolverError::UndescribedError);
         }
     }
-    if cdb.check_and_reduce(vdb, state[Stat::Conflict]) {
+    if cdb.check_and_reduce(state, vdb) {
         state[Stat::Reduction] += 1;
     }
     Ok(())
