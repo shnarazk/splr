@@ -396,14 +396,14 @@ impl RestartIF for Restarter {
 
 impl ProgressComponent<(bool, f64, f64, f64)> for Restarter {
     fn progress_component(&self) -> (bool, f64, f64, f64) {
-        (self.luby.active,
-         self.asg.trend(),
-         self.lbd.get(),
-         self.lbd.trend(),
+        (
+            self.luby.active,
+            self.asg.trend(),
+            self.lbd.get(),
+            self.lbd.trend(),
         )
     }
 }
-
 
 #[cfg(test)]
 mod tests {
