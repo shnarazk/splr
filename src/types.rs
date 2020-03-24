@@ -47,6 +47,7 @@ pub trait ActivityIF {
 pub trait Instantiate {
     fn instantiate(conf: &Config, cnf: &CNFDescription) -> Self;
     /// set up internal parameters.
+    /// CAVEAT: some `adapt_to` implementation might have a special condition: decision_level == 0.
     fn adapt_to(&mut self, _state: &State) {}
 }
 

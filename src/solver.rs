@@ -621,14 +621,20 @@ fn adapt_modules(
     vdb: &mut VarDB,
 ) -> MaybeInconsistent {
     state.check_stagnation();
+
+    // 'decision_level == 0' is required by `cdb.adapt_to`.
+    // But periodical restarts seem good. So we call it here.
+    asgs.cancel_until(vdb, state.root_level);
+
     let (_, rst_asg_trend, _, _) = rst.exports();
     if elim.enable && rst_asg_trend < 1.0 {
         state.flush("exhaustive eliminator activated...");
-        asgs.cancel_until(vdb, state.root_level);
+        // asgs.cancel_until(vdb, state.root_level);
         elim.activate();
         elim.simplify(asgs, cdb, state, vdb)?;
     }
     if 10 * state.reflection_interval == state[Stat::Conflict] {
+        // asgs.cancel_until(vdb, state.root_level);
         state.select_strategy();
         if state.strategy.0 == SearchStrategy::HighSuccesive {
             state.config.chronobt = 0;
@@ -665,7 +671,7 @@ fn conflict_analyze(
         if cdb[cid].is(Flag::LEARNT) {
             cdb.bump_activity(cid, ());
             let c = &mut cdb[cid];
-            debug_assert!(!c.is(Flag::DEAD));
+            debug_assert!(!c.is(Flag::DEAD), format!("found {} is dead: {}", cid, c));
             if 2 < c.rank {
                 c.turn_on(Flag::JUST_USED);
                 let nlevels = vdb.compute_lbd(&c.lits);

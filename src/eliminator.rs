@@ -326,7 +326,6 @@ impl EliminatorIF for Eliminator {
             self.prepare(cdb, vdb, true);
         }
         self.eliminate(asgs, cdb, state, vdb)?;
-        cdb.garbage_collect();
         state[Stat::SatClauseElimination] += 1;
         if self.is_running() {
             state[Stat::ExhaustiveElimination] += 1;
@@ -583,7 +582,6 @@ impl Eliminator {
                 return Err(SolverError::Inconsistent);
             }
             cdb.eliminate_satisfied_clauses(self, vdb, true);
-            cdb.garbage_collect();
             if timedout.load(Ordering::Acquire) {
                 self.clear_clause_queue(cdb);
                 self.clear_var_queue(vdb);
@@ -991,10 +989,12 @@ fn eliminate_var(
         //## VAR ELIMINATION
         //
         for cid in &*pos {
+            debug_assert!(!vdb.locked(&cdb[cid], *cid));
             cdb.detach(*cid);
             elim.remove_cid_occur(vdb, *cid, &mut cdb[cid]);
         }
         for cid in &*neg {
+            debug_assert!(!vdb.locked(&cdb[cid], *cid));
             cdb.detach(*cid);
             elim.remove_cid_occur(vdb, *cid, &mut cdb[cid]);
         }

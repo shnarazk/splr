@@ -15,7 +15,7 @@ use {
     },
 };
 
-/// API for Clause, providing `kill`.
+/// API for Clause, providing literal accessors.
 pub trait ClauseIF {
     /// return true if it contains no literals; a clause after unit propagation.
     fn is_empty(&self) -> bool;
@@ -558,6 +558,7 @@ impl Instantiate for ClauseDB {
             ..ClauseDB::default()
         }
     }
+    /// PRECONDITION: decision level == 0 if state.strategy.1 == state[Stat::Conflict]
     fn adapt_to(&mut self, state: &State) {
         match state.strategy {
             (_, n) if n != state[Stat::Conflict] => (),
@@ -571,12 +572,14 @@ impl Instantiate for ClauseDB {
                 self.use_chan_seok = true;
                 self.inc_step = 0;
                 self.next_reduction = 2000;
+                // This call requires 'decision level == 0'.
                 self.make_permanent(true);
             }
             (SearchStrategy::HighSuccesive, _) => {
                 self.co_lbd_bound = 3;
                 self.first_reduction = 30000;
                 self.use_chan_seok = true;
+                // This call requires 'decision level == 0'.
                 self.make_permanent(false);
             }
             (SearchStrategy::LowSuccesiveLuby, _) => (),
@@ -735,6 +738,9 @@ impl ClauseDBIF for ClauseDB {
             .filter(|&c| c.flags.contains(mask) && !c.flags.contains(Flag::DEAD))
             .count()
     }
+    /// Warning: this function is the only function that turns `Flag::DEAD` on without calling
+    /// `garbage_collect` which erases all the `DEAD` flags. So you must care about how and when
+    /// `garbage_collect` is called.
     fn detach(&mut self, cid: ClauseId) {
         let c = &mut self.clause[cid.ordinal as usize];
         debug_assert!(!c.is(Flag::DEAD));
@@ -797,6 +803,7 @@ impl ClauseDBIF for ClauseDB {
                 }
             }
         }
+        self.garbage_collect();
     }
     fn touch_var(&mut self, vi: VarId) {
         self.touched[Lit::from_assign(vi, true)] = true;
@@ -879,6 +886,7 @@ impl ClauseDB {
                 c.kill(touched);
             }
         }
+        debug_assert!(perm[0..keep].iter().all(|cid| !clause[*cid].is(Flag::DEAD)));
         self.garbage_collect();
     }
     /// change good learnt clauses to permanent one.
@@ -907,6 +915,19 @@ mod tests {
 
     fn lit(i: i32) -> Lit {
         Lit::from(i)
+    }
+
+    fn check_watches(cdb: &ClauseDB, cid: ClauseId) {
+        let c = &cdb.clause[cid.ordinal as usize];
+        if c.lits.is_empty() {
+            println!("skip checking watches of an empty clause");
+            return;
+        }
+        for l in &c.lits[0..=1] {
+            let ws = &cdb.watcher[!*l];
+            assert!(ws.iter().any(|w| w.c == cid));
+        }
+        println!("pass to check watches");
     }
 
     #[test]
