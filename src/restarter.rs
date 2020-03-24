@@ -289,10 +289,66 @@ impl LubySeries {
     }
 }
 
+/// An implementation of Cadical-style blocker.
+#[derive(Debug)]
+pub struct GeometricBlocker {
+    active: bool,
+    next_trigger: usize,
+    restart_inc: f64,
+}
+
+impl Default for GeometricBlocker {
+    fn default() -> Self {
+        GeometricBlocker {
+            active: true,
+            next_trigger: 1000,
+            restart_inc: 2.0,
+        }
+    }
+}
+
+impl Instantiate for GeometricBlocker {
+    fn instantiate(_config: &Config, _: &CNFDescription) -> Self {
+        GeometricBlocker {
+            ..GeometricBlocker::default()
+        }
+    }
+}
+
+impl fmt::Display for GeometricBlocker {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if self.active {
+            write!(f, "Stabilizer[+{}]", self.next_trigger)
+        } else {
+            write!(f, "Stabilizer[-{}]", self.next_trigger)
+        }
+    }
+}
+
+impl EmaIF for GeometricBlocker {
+    type Input = usize;
+    fn update(&mut self, now: usize) {
+        if self.next_trigger <= now {
+            self.active = !self.active;
+            self.next_trigger = ((self.next_trigger as f64) * self.restart_inc) as usize;
+        }
+    }
+    fn get(&self) -> f64 {
+        todo!()
+    }
+}
+
+impl ProgressEvaluator for GeometricBlocker {
+    fn is_active(&self) -> bool {
+        self.active
+    }
+}
+
 /// `Restarter` provides restart API and holds data about restart conditions.
 #[derive(Debug)]
 pub struct Restarter {
     asg: ProgressASG,
+    blk: GeometricBlocker,
     lbd: ProgressLBD,
     // pub rcc: ProgressRCC,
     // pub blvl: ProgressLVL,
@@ -307,6 +363,7 @@ impl Instantiate for Restarter {
     fn instantiate(config: &Config, cnf: &CNFDescription) -> Self {
         Restarter {
             asg: ProgressASG::instantiate(config, cnf),
+            blk: GeometricBlocker::instantiate(config, cnf),
             lbd: ProgressLBD::instantiate(config, cnf),
             // rcc: ProgressRCC::instantiate(config, cnf),
             // blvl: ProgressLVL::instantiate(config, cnf),
@@ -353,6 +410,9 @@ macro_rules! reset {
 
 impl RestartIF for Restarter {
     fn block_restart(&mut self) -> bool {
+        if self.blk.active {
+            return false;
+        }
         if 100 < self.lbd.num
             && !self.luby.active
             && self.restart_step <= self.after_restart
@@ -363,6 +423,9 @@ impl RestartIF for Restarter {
         false
     }
     fn force_restart(&mut self) -> bool {
+        if self.blk.active {
+            return false;
+        }
         if self.luby.active {
             if self.luby.next_restart <= self.after_restart {
                 self.luby.update(1);
@@ -378,6 +441,7 @@ impl RestartIF for Restarter {
             RestarterModule::Counter => {
                 // use an embeded value, expecting compile time optimization
                 self.after_restart += 1;
+                self.blk.update(self.after_restart);
             }
             RestarterModule::ASG => {
                 self.asg.update(val);
