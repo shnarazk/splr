@@ -36,19 +36,11 @@ pub trait StateIF {
     /// write stat data to stdio.
     fn progress<C, R, V>(&mut self, cdb: &C, rst: &R, vdb: &V, mes: Option<&str>)
     where
-        C: ProgressComponent<(usize, usize)>,
-        R: ProgressComponent<(bool, f64, f64, f64)>,
-        V: ProgressComponent<(f64, f64)>;
+        C: Export<(usize, usize)>,
+        R: Export<(bool, f64, f64, f64)>,
+        V: Export<(f64, f64)>;
     /// write a short message to stdout.
     fn flush<S: AsRef<str>>(&self, mes: S);
-}
-
-/// API for generating progress report.
-/// `progress` needs to access misc parameters and statistics, which should be uned locally in modules.
-/// To avoid to make them public, we define a generic accessor or exporter here.
-/// `T` is the list of exporting values.
-pub trait ProgressComponent<T> {
-    fn progress_component(&self) -> T;
 }
 
 /// A collection of named search heuristics.
@@ -423,9 +415,9 @@ impl StateIF for State {
     #[allow(clippy::cognitive_complexity)]
     fn progress<C, R, V>(&mut self, cdb: &C, rst: &R, vdb: &V, mes: Option<&str>)
     where
-        C: ProgressComponent<(usize, usize)>,
-        R: ProgressComponent<(bool, f64, f64, f64)>,
-        V: ProgressComponent<(f64, f64)>,
+        C: Export<(usize, usize)>,
+        R: Export<(bool, f64, f64, f64)>,
+        V: Export<(f64, f64)>,
     {
         if self.config.quiet_mode {
             return;
@@ -437,9 +429,9 @@ impl StateIF for State {
         let nv = self.target.num_of_variables;
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
-        let (cdb_num_active, cdb_num_learnt) = cdb.progress_component();
-        let (rst_luby_active, rst_asg_trend, rst_lbd_get, rst_lbd_trend) = rst.progress_component();
-        let (vdb_core_size, vdb_activity_decay) = vdb.progress_component();
+        let (cdb_num_active, cdb_num_learnt) = cdb.exports();
+        let (rst_luby_active, rst_asg_trend, rst_lbd_get, rst_lbd_trend) = rst.exports();
+        let (vdb_core_size, vdb_activity_decay) = vdb.exports();
         self.progress_cnt += 1;
         print!("\x1B[8A\x1B[1G");
         println!("\x1B[2K{}", self);
@@ -712,14 +704,14 @@ impl State {
     }
     fn dump<C, V>(&mut self, cdb: &C, _vdb: &V)
     where
-        C: ProgressComponent<(usize, usize)>,
-        V: ProgressComponent<(f64, f64)>,
+        C: Export<(usize, usize)>,
+        V: Export<(f64, f64)>,
     {
         self.progress_cnt += 1;
         let nv = self.target.num_of_variables;
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
-        let (cdb_num_active, cdb_num_learnt) = cdb.progress_component();
+        let (cdb_num_active, cdb_num_learnt) = cdb.exports();
         let ncnfl = self[Stat::Conflict];
         let nrestart = self[Stat::Restart];
         println!(
@@ -754,8 +746,8 @@ impl State {
         let nv = vdb.len() - 1;
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
-        let (cdb_num_active, cdb_num_learnt) = cdb.progress_component();
-        let (_luby_active, rst_asg_trend, rst_lbd_get, rst_lbd_trend) = rst.progress_component();
+        let (cdb_num_active, cdb_num_learnt) = cdb.exports();
+        let (_luby_active, rst_asg_trend, rst_lbd_get, rst_lbd_trend) = rst.exports();
         println!(
             "{:>3}#{:>8},{:>7},{:>7},{:>7},{:>6.3},,{:>7},{:>7},\
              {:>7},,{:>5},{:>5},{:>6.2},{:>6.2},,{:>7.2},{:>8.2},{:>8.2},,\

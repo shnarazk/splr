@@ -6,7 +6,7 @@ use {
         eliminator::{Eliminator, EliminatorIF, EliminatorStatIF},
         propagator::{AssignStack, PropagatorIF, VarSelectionIF},
         restarter::{RestartIF, Restarter, RestarterModule},
-        state::{ProgressComponent, SearchStrategy, Stat, State, StateIF},
+        state::{SearchStrategy, Stat, State, StateIF},
         types::*,
         var::{VarDB, VarDBIF, VarRewardIF, LBDIF},
     },
@@ -584,7 +584,7 @@ fn handle_conflict(
     }
     cdb.scale_activity();
     if 0 < state.config.dump_interval && ncnfl % state.config.dump_interval == 0 {
-        let (_luby_active, rst_asg_trend, _lbd_get, rst_lbd_trend) = rst.progress_component();
+        let (_luby_active, rst_asg_trend, _lbd_get, rst_lbd_trend) = rst.exports();
         state.development.push((
             ncnfl,
             (state.num_solved_vars + state.num_eliminated_vars) as f64
@@ -621,7 +621,7 @@ fn adapt_modules(
     vdb: &mut VarDB,
 ) -> MaybeInconsistent {
     state.check_stagnation();
-    let (_, rst_asg_trend, _, _) = rst.progress_component();
+    let (_, rst_asg_trend, _, _) = rst.exports();
     if elim.enable && rst_asg_trend < 1.0 {
         state.flush("exhaustive eliminator activated...");
         asgs.cancel_until(vdb, state.root_level);

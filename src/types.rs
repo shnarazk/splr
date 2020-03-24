@@ -12,6 +12,15 @@ use {
     },
 };
 
+/// API for accessing internal data in a module.
+/// For example, `State::progress` needs to access misc parameters and statistics,
+/// which should be uned locally in modules.
+/// To avoid to make them public, we define a generic accessor or exporter here.
+/// `T` is the list of exporting values.
+pub trait Export<T> {
+    fn exports(&self) -> T;
+}
+
 /// API for Literal like `from_int`, `from_assign`, `to_cid` and so on.
 pub trait LitIF {
     /// convert [VarId](../type.VarId.html) to [Lit](../type.Lit.html).

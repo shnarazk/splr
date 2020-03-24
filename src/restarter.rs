@@ -2,7 +2,7 @@
 use {
     crate::{
         config::Config,
-        state::{ProgressComponent, SearchStrategy, Stat, State},
+        state::{SearchStrategy, Stat, State},
         types::*,
     },
     std::fmt,
@@ -395,8 +395,8 @@ impl RestartIF for Restarter {
     }
 }
 
-impl ProgressComponent<(bool, f64, f64, f64)> for Restarter {
-    fn progress_component(&self) -> (bool, f64, f64, f64) {
+impl Export<(bool, f64, f64, f64)> for Restarter {
+    fn exports(&self) -> (bool, f64, f64, f64) {
         (
             self.luby.active,
             self.asg.trend(),

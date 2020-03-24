@@ -4,7 +4,7 @@ use {
         clause::{Clause, ClauseDB, ClauseIF, ClauseId},
         config::Config,
         propagator::{AssignStack, PropagatorIF},
-        state::{ProgressComponent, SearchStrategy, Stat, State},
+        state::{SearchStrategy, Stat, State},
         types::*,
     },
     std::{
@@ -538,8 +538,8 @@ impl LBDIF for VarDB {
     }
 }
 
-impl ProgressComponent<(f64, f64)> for VarDB {
-    fn progress_component(&self) -> (f64, f64) {
+impl Export<(f64, f64)> for VarDB {
+    fn exports(&self) -> (f64, f64) {
         (self.core_size.get(), self.activity_decay)
     }
 }

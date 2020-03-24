@@ -3,7 +3,7 @@ use {
     crate::{
         config::Config,
         eliminator::{Eliminator, EliminatorIF},
-        state::{ProgressComponent, SearchStrategy, Stat, State},
+        state::{SearchStrategy, Stat, State},
         types::*,
         var::{VarDB, VarDBIF, LBDIF},
     },
@@ -831,8 +831,8 @@ impl ClauseDBIF for ClauseDB {
     }
 }
 
-impl ProgressComponent<(usize, usize)> for ClauseDB {
-    fn progress_component(&self) -> (usize, usize) {
+impl Export<(usize, usize)> for ClauseDB {
+    fn exports(&self) -> (usize, usize) {
         (self.num_active, self.num_learnt)
     }
 }

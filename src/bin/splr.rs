@@ -6,7 +6,7 @@ use {
         config::{Config, VERSION},
         solver::{Certificate, SatSolverIF, Solver, SolverResult},
         state::*,
-        types::SolverError,
+        types::{Export, SolverError},
     },
     std::{
         borrow::Cow,
@@ -263,8 +263,8 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
             time.tv_sec as f64 + time.tv_nsec as f64 / 1_000_000_000.0f64
         }
     };
-    let (_, vdb_activity_decay) = s.vdb.progress_component();
-    let (rst_luby_active, _asg_trend, _lbd_get, _lbd_trend) = s.rst.progress_component();
+    let (_, vdb_activity_decay) = s.vdb.exports();
+    let (rst_luby_active, _asg_trend, _lbd_get, _lbd_trend) = s.rst.exports();
     out.write_all(
         format!(
             "c {:<43}, #var:{:9}, #cls:{:9}\n",
