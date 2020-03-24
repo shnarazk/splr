@@ -621,10 +621,10 @@ fn adapt_modules(
     vdb: &mut VarDB,
 ) -> MaybeInconsistent {
     state.check_stagnation();
-    state.flush("exhaustive eliminator activated...");
-    asgs.cancel_until(vdb, 0);
     let (_, rst_asg_trend, _, _) = rst.progress_component();
     if elim.enable && rst_asg_trend < 1.0 {
+        state.flush("exhaustive eliminator activated...");
+        asgs.cancel_until(vdb, state.root_level);
         elim.activate();
         elim.simplify(asgs, cdb, state, vdb)?;
     }
