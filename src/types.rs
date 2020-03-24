@@ -21,7 +21,7 @@ pub trait LitIF {
     fn vi(self) -> VarId;
 }
 
-/// API for clause and var rewarding
+/// API for clause and var rewarding.
 pub trait ActivityIF {
     type Ix;
     type Inc;
@@ -282,7 +282,7 @@ pub trait EmaIF {
     }
 }
 
-/// Exponential Moving Average w/ a calibrator
+/// Exponential Moving Average, with a calibrator if feature `ema_calibration` is on.
 #[derive(Debug)]
 pub struct Ema {
     val: f64,
@@ -323,7 +323,7 @@ impl Ema {
     }
 }
 
-/// Exponential Moving Average pair
+/// Exponential Moving Average pair, with a calibrator if feature `ema_calibration` is on.
 #[derive(Debug)]
 pub struct Ema2 {
     fast: f64,
@@ -392,7 +392,7 @@ impl Ema2 {
     }
 }
 
-/// Internal errors
+/// Internal errors.
 /// Note: returning `Result<(), a-singleton>` is identical to returning `bool`.
 #[derive(Debug)]
 pub enum SolverError {
@@ -413,7 +413,7 @@ impl fmt::Display for SolverError {
     }
 }
 
-/// A Return type used by solver functions
+/// A Return type used by solver functions.
 pub type MaybeInconsistent = Result<(), SolverError>;
 
 /// data about a problem.
@@ -511,7 +511,7 @@ impl TryFrom<&PathBuf> for CNFReader {
     }
 }
 
-/// convert `[Lit]` to `[i32]` (for debug)
+/// convert `[Lit]` to `[i32]` (for debug).
 pub fn vec2int(v: &[Lit]) -> Vec<i32> {
     v.iter().map(|l| i32::from(*l)).collect::<Vec<_>>()
 }
@@ -546,6 +546,7 @@ pub trait FlagIF {
 }
 
 bitflags! {
+    /// Misc flags used by `Clause` and `Var`.
     pub struct Flag: u16 {
 
         /// For clause

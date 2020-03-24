@@ -635,8 +635,7 @@ impl ClauseDBIF for ClauseDB {
     }
     fn new_clause(&mut self, v: &mut [Lit], level_sort: Option<&mut VarDB>) -> ClauseId {
         let reward = self.activity_inc;
-        let (rank, learnt) =
-        if let Some(vdb) = level_sort {
+        let (rank, learnt) = if let Some(vdb) = level_sort {
             if !self.certified.is_empty() {
                 let temp = v.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
                 self.certified.push((CertifiedRecord::ADD, temp));
@@ -845,10 +844,7 @@ impl ClauseDB {
         let mut perm = Vec::with_capacity(clause.len());
         for (i, c) in clause.iter_mut().enumerate().skip(1) {
             let used = c.is(Flag::JUST_USED);
-            if c.is(Flag::LEARNT)
-                && !c.is(Flag::DEAD)
-                && !vdb.locked(c, ClauseId::from(i))
-                && !used
+            if c.is(Flag::LEARNT) && !c.is(Flag::DEAD) && !vdb.locked(c, ClauseId::from(i)) && !used
             {
                 perm.push(i);
             }

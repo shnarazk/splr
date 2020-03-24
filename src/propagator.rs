@@ -437,7 +437,7 @@ impl AssignStack {
     }
 }
 
-/// Heap of VarId, based on var activity
+/// Heap of VarId, based on var activity.
 // # Note
 // - both fields has a fixed length. Don't use push and pop.
 // - `idxs[0]` contains the number of alive elements

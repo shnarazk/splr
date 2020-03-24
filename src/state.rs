@@ -51,7 +51,7 @@ pub trait ProgressComponent<T> {
     fn progress_component(&self) -> T;
 }
 
-/// A collection of named search heuristics
+/// A collection of named search heuristics.
 #[derive(Debug, Eq, PartialEq)]
 pub enum SearchStrategy {
     /// the initial search phase to determine a main strategy
@@ -118,7 +118,7 @@ impl SearchStrategy {
     }
 }
 
-/// stat index
+/// stat index.
 #[derive(Clone, Eq, PartialEq)]
 pub enum Stat {
     Conflict = 0,          // the number of backjump
@@ -158,7 +158,7 @@ impl IndexMut<Stat> for [usize] {
     }
 }
 
-/// Data storage for `Solver`
+/// Data storage for `Solver`.
 #[derive(Debug)]
 pub struct State {
     pub root_level: DecisionLevel,
@@ -610,7 +610,7 @@ impl IndexMut<LogF64Id> for State {
     }
 }
 
-/// Index for `Usize` data, used in `ProgressRecord`
+/// Index for `Usize` data, used in `ProgressRecord`.
 pub enum LogUsizeId {
     Propagate = 0,  //  0: propagate: usize,
     Decision,       //  1: decision: usize,
@@ -631,7 +631,7 @@ pub enum LogUsizeId {
     End,
 }
 
-/// Index for `f64` data, used in `ProgressRecord`
+/// Index for `f64` data, used in `ProgressRecord`.
 pub enum LogF64Id {
     Progress = 0, //  0: progress: f64,
     EmaAsg,       //  1: ema_asg: f64,

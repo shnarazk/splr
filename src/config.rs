@@ -8,10 +8,9 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 #[derive(Clone, Debug, StructOpt)]
 #[structopt(name = "splr", about, author)]
 pub struct Config {
-    // ////////////////////////////////////////////////////////////////////////////////
-    // I/O configuration
     //
-
+    //[I/O configuration]
+    //
     /// a DIMACS format CNF file
     #[structopt(parse(from_os_str))]
     pub cnf_filename: PathBuf,
@@ -45,10 +44,9 @@ pub struct Config {
     #[structopt(long = "log", short = "l")]
     pub use_log: bool,
 
-    // ////////////////////////////////////////////////////////////////////////////////
-    // clause DB
     //
-
+    //[clause DB]
+    //
     /// soft limit of #clauses (6MC/GB)
     #[structopt(long = "cl", default_value = "0")]
     pub clause_limit: usize,
@@ -58,7 +56,7 @@ pub struct Config {
     pub without_reduce: bool,
 
     //
-    // eliminator
+    //[eliminator]
     //
     /// grow limit of #clauses by v-elim
     #[structopt(long = "eg", default_value = "0")]
@@ -72,10 +70,9 @@ pub struct Config {
     #[structopt(long = "without-elim", short = "E")]
     pub without_elim: bool,
 
-    // ////////////////////////////////////////////////////////////////////////////////
-    // restarter
     //
-
+    //[restarter]
+    //
     /// length for assignment average
     #[structopt(long = "ra", default_value = "3500")]
     pub restart_asg_len: usize,
@@ -96,10 +93,9 @@ pub struct Config {
     #[structopt(long = "rt", default_value = "0.70")]
     pub restart_threshold: f64, // Glucose's K
 
-    // ////////////////////////////////////////////////////////////////////////////////
-    // solver configuration
     //
-
+    //[solver configuration]
+    //
     /// threshold to use chronoBT
     #[structopt(long = "chronoBT", short = "C", default_value = "100")]
     pub chronobt: DecisionLevel,
@@ -119,7 +115,6 @@ pub struct Config {
     /// Enables deep search mode
     #[structopt(skip)]
     pub with_deep_search: bool,
-
 }
 
 impl Default for Config {

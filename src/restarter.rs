@@ -14,6 +14,7 @@ trait ProgressEvaluator {
     fn is_active(&self) -> bool;
 }
 
+/// Submodule index to access them indirectly.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum RestarterModule {
     Counter = 0,
@@ -32,7 +33,7 @@ pub trait RestartIF {
     fn update(&mut self, kind: RestarterModule, val: usize);
 }
 
-/// An assignment history used for blocking restart
+/// An assignment history used for blocking restart.
 #[derive(Debug)]
 pub struct ProgressASG {
     asg: usize,
@@ -72,7 +73,7 @@ impl ProgressEvaluator for ProgressASG {
     }
 }
 
-/// An EMA of learnt clauses' LBD, used for forcing restart
+/// An EMA of learnt clauses' LBD, used for forcing restart.
 #[derive(Debug)]
 pub struct ProgressLBD {
     ema: Ema2,
@@ -150,7 +151,7 @@ impl ProgressEvaluator for ProgressLVL {
     }
 }
 
-/// An EMA of reccuring conflict complexity (unused now)
+/// An EMA of reccuring conflict complexity (unused now).
 #[derive(Debug)]
 struct ProgressRCC {
     pub heat: Ema2,

@@ -68,6 +68,7 @@ enum EliminatorMode {
     Running,
 }
 
+/// Mapping from Literal to Clauses.
 #[derive(Debug)]
 pub struct LitOccurs {
     pos_occurs: Vec<ClauseId>,

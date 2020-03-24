@@ -110,14 +110,15 @@ fn save_result<S: AsRef<str> + std::fmt::Display>(
                 Some(ref f) if redirect => println!(
                     "      Result|dump: to STDOUT instead of {} due to an IO error.",
                     f.to_string_lossy(),
-                    ),
-                Some(ref f) => println!(
-                    "      Result|file: {}",
-                    f.to_str().unwrap(),
                 ),
+                Some(ref f) => println!("      Result|file: {}", f.to_str().unwrap(),),
                 _ => (),
             }
-            println!("{}: {}", colored(Ok(true), s.state.config.quiet_mode), input);
+            println!(
+                "{}: {}",
+                colored(Ok(true), s.state.config.quiet_mode),
+                input
+            );
             if let Err(why) = (|| {
                 buf.write_all(
                     format!(
@@ -157,7 +158,11 @@ fn save_result<S: AsRef<str> + std::fmt::Display>(
                     s.state.config.proof_filename.to_string_lossy()
                 );
             }
-            println!("{}: {}", colored(Ok(false), s.state.config.quiet_mode), input);
+            println!(
+                "{}: {}",
+                colored(Ok(false), s.state.config.quiet_mode),
+                input
+            );
             if let Err(why) = (|| {
                 buf.write_all(
                     format!(
@@ -182,7 +187,11 @@ fn save_result<S: AsRef<str> + std::fmt::Display>(
                 Some(ref f) => println!("      Result|file: {}", f.to_str().unwrap(),),
                 _ => (),
             }
-            println!("Failed to solve by {}: {}", colored(Err(e), s.state.config.quiet_mode), input);
+            println!(
+                "Failed to solve by {}: {}",
+                colored(Err(e), s.state.config.quiet_mode),
+                input
+            );
             if let Err(why) = (|| {
                 buf.write_all(
                     format!(
