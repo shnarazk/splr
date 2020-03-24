@@ -39,7 +39,7 @@ fn colored(v: Result<bool, &SolverError>, quiet: bool) -> Cow<'static, str> {
 }
 
 fn main() {
-    let config = Config::from_args();
+    let config = Config::from_args().override_args();
     if !config.cnf_filename.exists() {
         println!(
             "{} does not exist.",

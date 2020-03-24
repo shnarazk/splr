@@ -170,3 +170,10 @@ where
         config
     }
 }
+
+impl Config {
+    pub fn override_args(mut self) -> Config {
+        self.without_reduce = true;
+        self
+    }
+}
