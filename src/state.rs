@@ -1,7 +1,7 @@
 /// Crate `state` is a collection of internal data.
 use {
     crate::{
-        clause::{ClauseDB, ClauseDBIF},
+        clause::ClauseDB,
         config::Config,
         eliminator::Eliminator,
         restarter::Restarter,
@@ -34,15 +34,21 @@ pub trait StateIF {
     /// write a header of stat data to stdio.
     fn progress_header(&self);
     /// write stat data to stdio.
-    fn progress(&mut self, cdb: &ClauseDB, rst: &Restarter, vdb: &VarDB, mes: Option<&str>);
+    fn progress<C, R, V>(&mut self, cdb: &C, rst: &R, vdb: &V, mes: Option<&str>)
+    where
+        C: ProgressComponent<(usize, usize)>,
+        R: ProgressComponent<(bool, f64, f64, f64)>,
+        V: ProgressComponent<(f64, f64)>;
     /// write a short message to stdout.
     fn flush<S: AsRef<str>>(&self, mes: S);
 }
 
-/// API for var rewarding.
-pub trait ProgressComponent {
-    type Output;
-    fn progress_component(&self) -> Self::Output;
+/// API for generating progress report.
+/// `progress` needs to access misc parameters and statistics, which should be uned locally in modules.
+/// To avoid to make them public, we define a generic accessor or exporter here.
+/// `T` is the list of exporting values.
+pub trait ProgressComponent<T> {
+    fn progress_component(&self) -> T;
 }
 
 /// A collection of named search heuristics
@@ -415,7 +421,12 @@ impl StateIF for State {
     }
     /// `mes` should be shorter than or equal to 9, or 8 + a delimiter.
     #[allow(clippy::cognitive_complexity)]
-    fn progress(&mut self, cdb: &ClauseDB, rst: &Restarter, vdb: &VarDB, mes: Option<&str>) {
+    fn progress<C, R, V>(&mut self, cdb: &C, rst: &R, vdb: &V, mes: Option<&str>)
+    where
+        C: ProgressComponent<(usize, usize)>,
+        R: ProgressComponent<(bool, f64, f64, f64)>,
+        V: ProgressComponent<(f64, f64)>,
+    {
         if self.config.quiet_mode {
             return;
         }
@@ -423,28 +434,19 @@ impl StateIF for State {
             self.dump(cdb, vdb);
             return;
         }
-        let nv = vdb.len() - 1;
+        let nv = self.target.num_of_variables;
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
         let (cdb_num_active, cdb_num_learnt) = cdb.progress_component();
+        let (rst_luby_active, rst_asg_trend, rst_lbd_get, rst_lbd_trend) = rst.progress_component();
         let (vdb_core_size, vdb_activity_decay) = vdb.progress_component();
         self.progress_cnt += 1;
         print!("\x1B[8A\x1B[1G");
         println!("\x1B[2K{}", self);
         println!(
             "\x1B[2K #conflict:{}, #decision:{}, #propagate:{} ",
-            i!(
-                "{:>11}",
-                self,
-                LogUsizeId::Conflict,
-                self[Stat::Conflict]
-            ),
-            i!(
-                "{:>13}",
-                self,
-                LogUsizeId::Decision,
-                self[Stat::Decision]
-            ),
+            i!("{:>11}", self, LogUsizeId::Conflict, self[Stat::Conflict]),
+            i!("{:>13}", self, LogUsizeId::Decision, self[Stat::Decision]),
             i!(
                 "{:>15}",
                 self,
@@ -488,7 +490,7 @@ impl StateIF for State {
         );
         println!(
             "\x1B[2K {}|#BLK:{}, #RST:{}, tASG:{}, tLBD:{} ",
-            if rst.luby.active {
+            if rst_luby_active {
                 "\x1B[001m\x1B[035mLubyRestart\x1B[000m"
             } else {
                 "    Restart"
@@ -499,18 +501,13 @@ impl StateIF for State {
                 LogUsizeId::RestartBlock,
                 self[Stat::BlockRestart]
             ),
-            im!(
-                "{:>9}",
-                self,
-                LogUsizeId::Restart,
-                self[Stat::Restart]
-            ),
-            fm!("{:>9.4}", self, LogF64Id::EmaAsg, rst.asg.trend()),
-            fm!("{:>9.4}", self, LogF64Id::EmaLBD, rst.lbd.trend()),
+            im!("{:>9}", self, LogUsizeId::Restart, self[Stat::Restart]),
+            fm!("{:>9.4}", self, LogF64Id::EmaAsg, rst_asg_trend),
+            fm!("{:>9.4}", self, LogF64Id::EmaLBD, rst_lbd_trend),
         );
         println!(
             "\x1B[2K    Conflict|eLBD:{}, cnfl:{}, bjmp:{}, rpc%:{} ",
-            fm!("{:>9.2}", self, LogF64Id::AveLBD, rst.lbd.get()),
+            fm!("{:>9.2}", self, LogF64Id::AveLBD, rst_lbd_get),
             fm!("{:>9.2}", self, LogF64Id::CLevel, self.c_lvl.get()),
             fm!("{:>9.2}", self, LogF64Id::BLevel, self.b_lvl.get()),
             fm!(
@@ -522,12 +519,7 @@ impl StateIF for State {
         );
         println!(
             "\x1B[2K        misc|#rdc:{}, #sce:{}, core:{}, vdcy:{} ",
-            im!(
-                "{:>9}",
-                self,
-                LogUsizeId::Reduction,
-                self[Stat::Reduction]
-            ),
+            im!("{:>9}", self, LogUsizeId::Reduction, self[Stat::Reduction]),
             im!(
                 "{:>9}",
                 self,
@@ -718,12 +710,16 @@ impl State {
              c ========================================================================================================="
         );
     }
-    fn dump(&mut self, cdb: &ClauseDB, vdb: &VarDB) {
+    fn dump<C, V>(&mut self, cdb: &C, _vdb: &V)
+    where
+        C: ProgressComponent<(usize, usize)>,
+        V: ProgressComponent<(f64, f64)>,
+    {
         self.progress_cnt += 1;
-        let nv = vdb.len() - 1;
+        let nv = self.target.num_of_variables;
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
-        let nlearnts = cdb.countf(Flag::LEARNT);
+        let (cdb_num_active, cdb_num_learnt) = cdb.progress_component();
         let ncnfl = self[Stat::Conflict];
         let nrestart = self[Stat::Restart];
         println!(
@@ -732,12 +728,12 @@ impl State {
             self[Stat::BlockRestart],              // blocked
             ncnfl / nrestart.max(1),               // average cfc (Conflict / Restart)
             nv - fixed - self.num_eliminated_vars, // alive vars
-            cdb.count(true) - nlearnts,            // given clauses
+            cdb_num_active - cdb_num_learnt,       // given clauses
             0,                                     // alive literals
             self[Stat::Reduction],                 // clause reduction
-            nlearnts,                              // alive learnts
+            cdb_num_learnt,                        // alive learnts
             self[Stat::NumLBD2],                   // learnts with LBD = 2
-            ncnfl - nlearnts,                      // removed learnts
+            ncnfl - cdb_num_learnt,                // removed learnts
             (sum as f32) / (nv as f32) * 100.0,    // progress
         );
     }

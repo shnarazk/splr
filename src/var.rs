@@ -538,9 +538,8 @@ impl LBDIF for VarDB {
     }
 }
 
-impl ProgressComponent for VarDB {
-    type Output = (f64, f64);
-    fn progress_component(&self) -> Self::Output {
+impl ProgressComponent<(f64, f64)> for VarDB {
+    fn progress_component(&self) -> (f64, f64) {
         (self.core_size.get(), self.activity_decay)
     }
 }

@@ -826,9 +826,8 @@ impl ClauseDBIF for ClauseDB {
     }
 }
 
-impl ProgressComponent for ClauseDB {
-    type Output = (usize, usize);
-    fn progress_component(&self) -> Self::Output {
+impl ProgressComponent<(usize, usize)> for ClauseDB {
+    fn progress_component(&self) -> (usize, usize) {
         (self.num_active, self.num_learnt)
     }
 }
