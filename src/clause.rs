@@ -399,15 +399,21 @@ pub struct ClauseDB {
     // not in use
     // lbd_frozen_clause: usize,
 
-    //[clause rewarding]
+    //
+    //## clause rewarding
+    //
     activity_inc: f64,
     activity_decay: f64,
 
-    //[Elimination]
+    //
+    //## Elimination
+    //
     /// dirty literals
     touched: Vec<bool>,
 
-    //[reduction]
+    //
+    //## reduction
+    //
     // increment step of reduction threshold
     inc_step: usize,
     // bonus step of reduction threshold used in good progress

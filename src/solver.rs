@@ -529,7 +529,9 @@ fn handle_conflict(
     };
     let learnt_len = new_learnt.len();
     if learnt_len == 1 {
-        //[PARTIAL FIXED SOLUTION by UNIT LEARNT CLAUSE GENERATION]
+        //
+        //## PARTIAL FIXED SOLUTION by UNIT LEARNT CLAUSE GENERATION
+        //
         // dump to certified even if it's a literal.
         cdb.certificate_add(new_learnt);
         if use_chronobt {
@@ -546,12 +548,16 @@ fn handle_conflict(
             // So we have to filter vars instead of literals to avoid double counting.
             let mut bumped = new_learnt.iter().map(|l| l.vi()).collect::<Vec<VarId>>();
             for lit in new_learnt.iter() {
-                //[Learnt Literal Rewarding]
+                //
+                //## Learnt Literal Rewarding
+                //
                 vdb.reward_at_analysis(lit.vi());
                 for l in &cdb[vdb[lit.vi()].reason].lits {
                     let vi = l.vi();
                     if !bumped.contains(&vi) {
-                        //[Reason-Side Rewarding]
+                        //
+                        //## Reason-Side Rewarding
+                        //
                         vdb.reward_at_analysis(vi);
                         bumped.push(vi);
                     }
@@ -690,7 +696,9 @@ fn conflict_analyze(
                 if dl <= v.level {
                     // println!("- flag for {} which level is {}", q.int(), lvl);
                     path_cnt += 1;
-                    //[Conflict-Side Rewarding]
+                    //
+                    //## Conflict-Side Rewarding
+                    //
                     vdb.reward_at_analysis(vi);
                 } else {
                     // println!("- push {} to learnt, which level is {}", q.int(), lvl);

@@ -549,7 +549,9 @@ bitflags! {
     /// Misc flags used by `Clause` and `Var`.
     pub struct Flag: u16 {
 
-        /// For clause
+        //
+        //## For Clause
+        //
         /// a clause is stored in DB, but is a garbage now.
         const DEAD         = 0b0000_0000_0000_0001;
         /// a clause is a generated clause by conflict analysis and is removable.
@@ -563,7 +565,9 @@ bitflags! {
         /// mark to run garbage collector on the corresponding watcher lists
         const TOUCHED      = 0b0000_0000_0010_0000;
 
-        /// For var
+        //
+        //## For Var
+        //
         /// the previous assigned value of a Var.
         const PHASE        = 0b0000_0001_0000_0000;
         /// a var is eliminated and managed by eliminator.

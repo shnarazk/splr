@@ -9,7 +9,7 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 #[structopt(name = "splr", about, author)]
 pub struct Config {
     //
-    //[I/O configuration]
+    //## I/O configuratio]
     //
     /// a DIMACS format CNF file
     #[structopt(parse(from_os_str))]
@@ -45,7 +45,7 @@ pub struct Config {
     pub use_log: bool,
 
     //
-    //[clause DB]
+    //## clause DB
     //
     /// soft limit of #clauses (6MC/GB)
     #[structopt(long = "cl", default_value = "0")]
@@ -56,7 +56,7 @@ pub struct Config {
     pub without_reduce: bool,
 
     //
-    //[eliminator]
+    //## eliminator
     //
     /// grow limit of #clauses by v-elim
     #[structopt(long = "eg", default_value = "0")]
@@ -71,7 +71,7 @@ pub struct Config {
     pub without_elim: bool,
 
     //
-    //[restarter]
+    //## restarter
     //
     /// length for assignment average
     #[structopt(long = "ra", default_value = "3500")]
@@ -94,7 +94,7 @@ pub struct Config {
     pub restart_threshold: f64, // Glucose's K
 
     //
-    //[solver configuration]
+    //## solver configuration
     //
     /// threshold to use chronoBT
     #[structopt(long = "chronoBT", short = "C", default_value = "100")]

@@ -987,7 +987,9 @@ fn eliminate_var(
                 }
             }
         }
-        //[VAR ELIMINATION]
+        //
+        //## VAR ELIMINATION
+        //
         for cid in &*pos {
             cdb.detach(*cid);
             elim.remove_cid_occur(vdb, *cid, &mut cdb[cid]);
