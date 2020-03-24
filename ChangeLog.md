@@ -3,6 +3,7 @@
 - activate `JUST_USED` for clause reduction
 - remove `ClauseDB::attach`
 - add an experimental restart scheme switcher
+- better modularity via trait `Export`, which is renamed from `ProgressComponent`
 
 ## 0.3.2, 2020-03-20
 
