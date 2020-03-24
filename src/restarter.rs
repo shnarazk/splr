@@ -309,9 +309,7 @@ impl Default for GeometricBlocker {
 
 impl Instantiate for GeometricBlocker {
     fn instantiate(_config: &Config, _: &CNFDescription) -> Self {
-        GeometricBlocker {
-            ..GeometricBlocker::default()
-        }
+        GeometricBlocker::default()
     }
 }
 
@@ -330,7 +328,7 @@ impl EmaIF for GeometricBlocker {
     fn update(&mut self, now: usize) {
         if self.next_trigger <= now {
             self.active = !self.active;
-            self.next_trigger = ((self.next_trigger as f64) * self.restart_inc) as usize;
+            self.next_trigger = ((now as f64) * self.restart_inc) as usize;
         }
     }
     fn get(&self) -> f64 {
@@ -410,11 +408,9 @@ macro_rules! reset {
 
 impl RestartIF for Restarter {
     fn block_restart(&mut self) -> bool {
-        if self.blk.active {
-            return false;
-        }
         if 100 < self.lbd.num
             && !self.luby.active
+            && !self.blk.active
             && self.restart_step <= self.after_restart
             && self.asg.is_active()
         {
@@ -423,14 +419,13 @@ impl RestartIF for Restarter {
         false
     }
     fn force_restart(&mut self) -> bool {
-        if self.blk.active {
-            return false;
-        }
         if self.luby.active {
             if self.luby.next_restart <= self.after_restart {
                 self.luby.update(1);
                 reset!(self);
             }
+        } else if self.blk.active {
+            return false;
         } else if self.restart_step <= self.after_restart && self.lbd.is_active() {
             reset!(self);
         }
@@ -441,7 +436,7 @@ impl RestartIF for Restarter {
             RestarterModule::Counter => {
                 // use an embeded value, expecting compile time optimization
                 self.after_restart += 1;
-                self.blk.update(self.after_restart);
+                self.blk.update(val);
             }
             RestarterModule::ASG => {
                 self.asg.update(val);

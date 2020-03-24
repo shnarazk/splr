@@ -421,7 +421,7 @@ fn handle_conflict(
     ci: ClauseId,
 ) -> MaybeInconsistent {
     let ncnfl = state[Stat::Conflict]; // total number
-    rst.update(RestarterModule::Counter, 1);
+    rst.update(RestarterModule::Counter, ncnfl);
     // DYNAMIC BLOCKING RESTART based on ASG, updated on conflict path
     // If we can settle this conflict w/o restart, solver will get a big progress.
     if 0 < state.last_asg {
