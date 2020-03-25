@@ -1,8 +1,13 @@
 /// Crate `state` is a collection of internal data.
 use {
     crate::{
-        clause::ClauseDBIF, config::Config, eliminator::EliminatorIF, propagator::PropagatorIF,
-        restarter::{RestartIF, RestartMode}, types::*, var::VarDBIF,
+        clause::ClauseDBIF,
+        config::Config,
+        eliminator::EliminatorIF,
+        propagator::PropagatorIF,
+        restarter::{RestartIF, RestartMode},
+        types::*,
+        var::VarDBIF,
     },
     libc::{clock_gettime, timespec, CLOCK_PROCESS_CPUTIME_ID},
     std::{
@@ -346,9 +351,7 @@ impl StateIF for State {
             _ if self[Stat::Decision] as f64 <= 1.2 * asgs_num_conflict as f64 => {
                 SearchStrategy::LowDecisions
             }
-            _ if self[Stat::NoDecisionConflict] < 30_000 => {
-                SearchStrategy::LowSuccesive
-            }
+            _ if self[Stat::NoDecisionConflict] < 30_000 => SearchStrategy::LowSuccesive,
             _ if 54_400 < self[Stat::NoDecisionConflict] => SearchStrategy::HighSuccesive,
             _ => SearchStrategy::Generic,
         };
@@ -412,8 +415,7 @@ impl StateIF for State {
 
         let (_num_full, elim_num_sat) = elim.exports();
 
-        let (rst_mode, rst_num_block, rst_asg_trend, rst_lbd_get, rst_lbd_trend) =
-            rst.exports();
+        let (rst_mode, rst_num_block, rst_asg_trend, rst_lbd_get, rst_lbd_trend) = rst.exports();
 
         let (vdb_core_size, vdb_activity_decay) = vdb.exports();
 
@@ -477,7 +479,6 @@ impl StateIF for State {
                 RestartMode::Dynamic => "    Restart",
                 RestartMode::Luby => "\x1B[001m\x1B[035mLubyRestart\x1B[000m",
                 RestartMode::Stabilize => "  \x1B[001m\x1B[030mStabilize\x1B[000m",
-
             },
             im!("{:>9}", self, LogUsizeId::RestartBlock, rst_num_block),
             im!("{:>9}", self, LogUsizeId::Restart, asgs_num_restart),
@@ -752,8 +753,7 @@ impl State {
             cdb_num_learnt,
             _num_reduction,
         ) = cdb.exports();
-        let (_mode, rst_num_block, rst_asg_trend, rst_lbd_get, rst_lbd_trend) =
-            rst.exports();
+        let (_mode, rst_num_block, rst_asg_trend, rst_lbd_get, rst_lbd_trend) = rst.exports();
         println!(
             "{:>3}#{:>8},{:>7},{:>7},{:>7},{:>6.3},,{:>7},{:>7},\
              {:>7},,{:>5},{:>5},{:>6.2},{:>6.2},,{:>7.2},{:>8.2},{:>8.2},,\
