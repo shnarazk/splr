@@ -11,19 +11,19 @@ pub struct Config {
     //
     //## I/O configuratio]
     //
-    /// a DIMACS format CNF file
+    /// A DIMACS format CNF file
     #[structopt(parse(from_os_str))]
     pub cnf_filename: PathBuf,
 
-    /// interval for dumpping stat data
+    /// Interval for dumpping stat data
     #[structopt(long = "stat", default_value = "0")]
     pub dump_interval: usize,
 
-    /// output directory
+    /// Output directory
     #[structopt(long = "dir", short = "o", default_value = ".", parse(from_os_str))]
     pub output_dirname: PathBuf,
 
-    /// filename for DRAT cert.
+    /// Filename for DRAT cert.
     #[structopt(
         long = "proof",
         default_value = "proof.out",
@@ -36,7 +36,7 @@ pub struct Config {
     #[structopt(long = "quiet", short = "q")]
     pub quiet_mode: bool,
 
-    /// result filename/stdout
+    /// Result filename/stdout
     #[structopt(long = "result", short = "r", default_value = "", parse(from_os_str))]
     pub result_filename: PathBuf,
 
@@ -47,18 +47,18 @@ pub struct Config {
     //
     //## clause DB
     //
-    /// soft limit of #clauses (6MC/GB)
+    /// Soft limit of #clauses (6MC/GB)
     #[structopt(long = "cl", default_value = "0")]
     pub clause_limit: usize,
 
-    /// disable clause reduction
-    #[structopt(long = "without-reduce")]
+    /// Disable clause reduction
+    #[structopt(long = "without-reduce", short = "R")]
     pub without_reduce: bool,
 
     //
     //## eliminator
     //
-    /// grow limit of #clauses by v-elim
+    /// Grow limit of #clauses by v-elim
     #[structopt(long = "eg", default_value = "0")]
     pub elim_grow_limit: usize,
 
@@ -73,15 +73,15 @@ pub struct Config {
     //
     //## restarter
     //
-    /// length for assignment average
+    /// Length for assignment average
     #[structopt(long = "ra", default_value = "3500")]
     pub restart_asg_len: usize,
 
-    /// blocking restart threshold
+    /// Blocking restart threshold
     #[structopt(long = "rb", default_value = "1.40")]
     pub restart_blocking: f64, // Glucose's R
 
-    /// length for LBD average
+    /// Length for LBD average
     #[structopt(long = "rl", default_value = "50")]
     pub restart_lbd_len: usize,
 
@@ -89,14 +89,18 @@ pub struct Config {
     #[structopt(long = "rs", default_value = "50")]
     pub restart_step: usize,
 
-    /// forcing restart threshold
+    /// Forcing restart threshold
     #[structopt(long = "rt", default_value = "0.70")]
     pub restart_threshold: f64, // Glucose's K
+
+    /// Disable geometric restart blocker
+    #[structopt(long = "without-stabilizer", short = "S")]
+    pub without_stab: bool,
 
     //
     //## solver configuration
     //
-    /// threshold to use chronoBT
+    /// Threshold to use chronoBT
     #[structopt(long = "chronoBT", short = "C", default_value = "100")]
     pub chronobt: DecisionLevel,
 
@@ -109,7 +113,7 @@ pub struct Config {
     pub use_certification: bool,
 
     /// Disables dynamic strategy adaptation
-    #[structopt(long = "no-adaptive-strategy", short = "S")]
+    #[structopt(long = "no-adaptive-strategy", short = "A")]
     pub without_adaptive_strategy: bool,
 
     /// Enables deep search mode
