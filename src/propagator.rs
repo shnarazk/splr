@@ -206,6 +206,7 @@ impl Export<(usize, usize, usize)> for AssignStack {
     ///```
     /// let (asgs_num_conflict, asgs_num_propagation, asgs_num_restart) = asgs.exports();
     ///```
+    #[inline]
     fn exports(&self) -> (usize, usize, usize) {
         (self.num_conflict, self.num_propagation, self.num_restart)
     }

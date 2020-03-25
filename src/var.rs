@@ -544,6 +544,10 @@ impl LBDIF for VarDB {
 }
 
 impl Export<(f64, f64)> for VarDB {
+    ///```
+    /// let (vdb_core_size, vdb_activity_decay) = vdb.exports();
+    ///```
+    #[inline]
     fn exports(&self) -> (f64, f64) {
         (self.core_size.get(), self.activity_decay)
     }

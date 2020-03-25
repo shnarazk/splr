@@ -483,6 +483,7 @@ impl Export<(RestartMode, usize, f64, f64, f64)> for Restarter {
     ///```
     /// let (rst_mode, rst_num_block, rst_asg_trend, rst_lbd_get, rst_lbd_trend) = rst.exports();
     ///```
+    #[inline]
     fn exports(&self) -> (RestartMode, usize, f64, f64, f64) {
         (
             if self.blk.active {

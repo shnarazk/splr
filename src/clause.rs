@@ -623,6 +623,7 @@ impl Export<(usize, usize, usize, usize, usize, usize)> for ClauseDB {
     ///```
     /// let (_active, _bi_clause, _bi_learnt, _lbd2, _learnt, _reduction) = cdb.exports();
     ///```
+    #[inline]
     fn exports(&self) -> (usize, usize, usize, usize, usize, usize) {
         (
             self.num_active,
