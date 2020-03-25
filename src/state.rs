@@ -23,8 +23,6 @@ pub trait StateIF {
     /// return elapsed time as a fraction.
     /// return None if something is wrong.
     fn elapsed(&self) -> Option<f64>;
-    /// update internal counters and return true if solver stagnated.
-    fn check_stagnation(&mut self);
     /// change heuristics based on stat data.
     fn select_strategy<A, C>(&mut self, asgs: &A, cdb: &C)
     where
@@ -122,8 +120,6 @@ pub enum Stat {
     NoDecisionConflict,
     /// the last number of solved variables
     SolvedRecord,
-    /// the number of stagnation
-    Stagnation,
     /// Don't use this dummy (setinel at the tail).
     EndOfStatIndex,
 }
@@ -165,8 +161,6 @@ pub struct State {
     pub new_learnt: Vec<Lit>,
     pub progress_cnt: usize,
     pub record: ProgressRecord,
-    pub slack_duration: usize,
-    pub stagnated: bool,
     pub start: SystemTime,
     pub time_limit: f64,
     pub development: Vec<(usize, f64, f64, f64, f64, f64)>,
@@ -192,8 +186,6 @@ impl Default for State {
             new_learnt: Vec::new(),
             progress_cnt: 0,
             record: ProgressRecord::default(),
-            slack_duration: 0,
-            stagnated: false,
             start: SystemTime::now(),
             time_limit: 0.0,
             development: Vec::new(),
@@ -336,24 +328,6 @@ impl StateIF for State {
             Ok(e) => Some(e.as_secs() as f64 / self.time_limit),
             Err(_) => None,
         }
-    }
-    fn check_stagnation(&mut self) {
-        if self[Stat::SolvedRecord] == self.num_solved_vars {
-            self.slack_duration += 1;
-        } else {
-            self.slack_duration = 0;
-        }
-        if self.stagnated {
-            self.stagnated = false
-        } else if 0 < self.slack_duration {
-            self.stagnated = (self
-                .num_unsolved_vars()
-                .next_power_of_two()
-                .trailing_zeros() as usize)
-                < self.slack_duration;
-            self[Stat::Stagnation] += 1;
-        }
-        self[Stat::SolvedRecord] = self.num_solved_vars;
     }
     fn select_strategy<A, C>(&mut self, asgs: &A, cdb: &C)
     where
@@ -627,7 +601,6 @@ pub enum LogUsizeId {
     Reduction,      // 12: reduction: usize,
     SatClauseElim,  // 13: simplification: usize,
     ExhaustiveElim, // 14: elimination: usize,
-    Stagnation,     // 15: stagnation: usize,
     End,
 }
 

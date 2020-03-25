@@ -605,7 +605,6 @@ fn adapt_modules(
     state: &mut State,
     vdb: &mut VarDB,
 ) -> MaybeInconsistent {
-    state.check_stagnation();
     state.progress(asgs, cdb, elim, rst, vdb, None);
 
     // 'decision_level == 0' is required by `cdb.adapt_to`.
