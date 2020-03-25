@@ -8,7 +8,7 @@ use {
         restarter::{RestartIF, Restarter, RestarterModule},
         state::{SearchStrategy, Stat, State, StateIF},
         types::*,
-        var::{VarDB, VarDBIF, VarRewardIF, LBDIF},
+        var::{VarDB, VarDBIF, VarRewardIF},
     },
     std::{convert::TryFrom, io::BufRead, slice::Iter},
 };
@@ -83,13 +83,13 @@ impl Instantiate for Solver {
 }
 
 macro_rules! final_report {
-    ($cdb: expr, $rst: expr, $state: expr, $vdb: expr) => {
+    ($asgs: expr, $cdb: expr, $elim: expr, $rst: expr, $state: expr, $vdb: expr) => {
         let q = $state.config.quiet_mode;
         $state.config.quiet_mode = false;
         if q {
             $state.progress_header();
         }
-        $state.progress($cdb, $rst, $vdb, None);
+        $state.progress($asgs, $cdb, $elim, $rst, $vdb, None);
         $state.config.quiet_mode = q;
     };
 }
@@ -124,7 +124,7 @@ impl SatSolverIF for Solver {
         // s.root_level = 0;
         state.num_solved_vars = asgs.len();
         state.progress_header();
-        state.progress(cdb, rst, vdb, Some("initialization phase"));
+        state.progress(asgs, cdb, elim, rst, vdb, Some("initialization phase"));
         state.flush("loading...");
         let use_pre_processor = true;
         let use_pre_processing_eliminator = true;
@@ -172,7 +172,7 @@ impl SatSolverIF for Solver {
             if elim.simplify(asgs, cdb, state, vdb).is_err() {
                 // Why inconsistent? Because the CNF contains a conflict, not an error!
                 // Or out of memory.
-                final_report!(cdb, rst, state, vdb);
+                final_report!(asgs, cdb, elim, rst, state, vdb);
                 if cdb.check_size().is_err() {
                     return Err(SolverError::OutOfMemory);
                 }
@@ -193,9 +193,9 @@ impl SatSolverIF for Solver {
         }
         vdb.initialize_reward(elim.sorted_iterator());
         asgs.rebuild_order(vdb);
-        state.progress(cdb, rst, vdb, None);
+        state.progress(asgs, cdb, elim, rst, vdb, None);
         let answer = search(asgs, cdb, elim, rst, state, vdb);
-        final_report!(cdb, rst, state, vdb);
+        final_report!(asgs, cdb, elim, rst, state, vdb);
         match answer {
             Ok(true) => {
                 elim.extend_model(vdb);
@@ -331,7 +331,6 @@ fn search(
     loop {
         vdb.reward_update();
         let ci = asgs.propagate(cdb, vdb);
-        state[Stat::Propagation] += 1;
         if ci == ClauseId::default() {
             if state.num_vars <= asgs.len() + state.num_eliminated_vars {
                 return Ok(true);
@@ -339,7 +338,6 @@ fn search(
             // DYNAMIC FORCING RESTART based on LBD values, updated by conflict
             state.last_asg = asgs.len();
             if rst.force_restart() {
-                state[Stat::Restart] += 1;
                 asgs.cancel_until(vdb, state.root_level);
             } else if asgs.level() == 0 {
                 if elim.simplify(asgs, cdb, state, vdb).is_err() {
@@ -349,7 +347,6 @@ fn search(
                 state.num_solved_vars = asgs.len();
             }
         } else {
-            state[Stat::Conflict] += 1;
             if a_decision_was_made {
                 a_decision_was_made = false;
             } else {
@@ -363,11 +360,7 @@ fn search(
             if cdb[ci].iter().all(|l| vdb[l].level == 0) {
                 return Ok(false);
             }
-            if state[Stat::Conflict] < 1000 || asgs.conflicts.0 == asgs.conflicts.1 {
-                state.switch_chronobt = Some(false);
-            }
             handle_conflict(asgs, cdb, elim, rst, state, vdb, ci)?;
-            state.switch_chronobt = None;
         }
         if !asgs.remains() {
             let vi = asgs.select_var(vdb);
@@ -420,7 +413,12 @@ fn handle_conflict(
     vdb: &mut VarDB,
     ci: ClauseId,
 ) -> MaybeInconsistent {
-    let ncnfl = state[Stat::Conflict]; // total number
+    let (ncnfl, _num_propagation, asgs_num_restart) = asgs.exports();
+    let switch_chronobt = if ncnfl < 1000 || asgs.conflicts.0 == asgs.conflicts.1 {
+        Some(false)
+    } else {
+        None
+    };
     rst.update(RestarterModule::Counter, ncnfl);
     // DYNAMIC BLOCKING RESTART based on ASG, updated on conflict path
     // If we can settle this conflict w/o restart, solver will get a big progress.
@@ -432,7 +430,7 @@ fn handle_conflict(
         state[Stat::BlockRestart] += 1;
     }
     let cl = asgs.level();
-    let mut use_chronobt = state.switch_chronobt.unwrap_or(0 < state.config.chronobt);
+    let mut use_chronobt = switch_chronobt.unwrap_or(0 < state.config.chronobt);
     if use_chronobt {
         let c = &cdb[ci];
         let lcnt = c.iter().filter(|l| vdb[*l].level == cl).count();
@@ -508,7 +506,7 @@ fn handle_conflict(
     // NCB places firstUIP on level bl, while CB does it on level cl.
     // Therefore the condition to use CB is: activity(firstUIP) < activity(v(bl)).
     // PREMISE: 0 < bl, because asgs.decision_vi accepts only non-zero values.
-    use_chronobt &= state.switch_chronobt.unwrap_or(
+    use_chronobt &= switch_chronobt.unwrap_or(
         bl_a == 0
             || state.config.chronobt + bl_a <= cl
             || vdb.activity(l0.vi()) < vdb.activity(asgs.decision_vi(bl_a)),
@@ -589,12 +587,13 @@ fn handle_conflict(
             ncnfl,
             (state.num_solved_vars + state.num_eliminated_vars) as f64
                 / state.target.num_of_variables as f64,
-            state[Stat::Restart] as f64,
+            asgs_num_restart as f64,
             state[Stat::BlockRestart] as f64,
             rst_asg_trend.min(10.0),
             rst_lbd_trend.min(10.0),
         ));
     }
+    cdb.check_and_reduce(vdb, ncnfl);
     if ncnfl % state.reflection_interval == 0 {
         adapt_modules(asgs, cdb, elim, rst, state, vdb)?;
         if let Some(p) = state.elapsed() {
@@ -604,9 +603,6 @@ fn handle_conflict(
         } else {
             return Err(SolverError::UndescribedError);
         }
-    }
-    if cdb.check_and_reduce(state, vdb) {
-        state[Stat::Reduction] += 1;
     }
     Ok(())
 }
@@ -621,6 +617,7 @@ fn adapt_modules(
     vdb: &mut VarDB,
 ) -> MaybeInconsistent {
     state.check_stagnation();
+    state.progress(asgs, cdb, elim, rst, vdb, None);
 
     // 'decision_level == 0' is required by `cdb.adapt_to`.
     // But periodical restarts seem good. So we call it here.
@@ -643,8 +640,6 @@ fn adapt_modules(
     cdb.adapt_to(state);
     rst.adapt_to(state);
     vdb.adapt_to(state);
-    state[Stat::SolvedRecord] = state.num_solved_vars;
-    state.progress(cdb, rst, vdb, None);
     Ok(())
 }
 
@@ -664,27 +659,12 @@ fn conflict_analyze(
     let mut p = NULL_LIT;
     let mut ti = asgs.len() - 1; // trail index
     let mut path_cnt = 0;
-    let chan_seok_condition = cdb.chan_seok_condition();
     loop {
         // println!("analyze {}", p.int());
         debug_assert_ne!(cid, ClauseId::default());
         if cdb[cid].is(Flag::LEARNT) {
             cdb.bump_activity(cid, ());
-            let c = &mut cdb[cid];
-            debug_assert!(!c.is(Flag::DEAD), format!("found {} is dead: {}", cid, c));
-            if 2 < c.rank {
-                c.turn_on(Flag::JUST_USED);
-                let nlevels = vdb.compute_lbd(&c.lits);
-                if nlevels + 1 < c.rank {
-                    // chan_seok_condition is zero if !use_chan_seok
-                    if nlevels < chan_seok_condition {
-                        c.turn_off(Flag::LEARNT);
-                        cdb.num_learnt -= 1;
-                    } else {
-                        c.rank = nlevels;
-                    }
-                }
-            }
+            cdb.convert_to_permanent(vdb, cid);
         }
         let c = &cdb[cid];
         // println!("- handle {}", cid.fmt());

@@ -75,23 +75,31 @@ pub trait VarSelectionIF {
 /// A record of assignment. It's called 'trail' in Glucose.
 #[derive(Debug)]
 pub struct AssignStack {
+    pub conflicts: (VarId, VarId),
     pub trail: Vec<Lit>,
     asgvec: Vec<Option<bool>>,
-    trail_lim: Vec<usize>,
+    num_conflict: usize,
+    num_propagation: usize,
+    num_restart: usize,
     q_head: usize,
+    root_level: DecisionLevel,
+    trail_lim: Vec<usize>,
     var_order: VarIdHeap, // Variable Order
-    pub conflicts: (VarId, VarId),
 }
 
 impl Default for AssignStack {
     fn default() -> AssignStack {
         AssignStack {
             trail: Vec::new(),
-            asgvec: Vec::new(),
-            trail_lim: Vec::new(),
-            q_head: 0,
-            var_order: VarIdHeap::default(),
             conflicts: (0, 0),
+            asgvec: Vec::new(),
+            num_conflict: 0,
+            num_propagation: 0,
+            num_restart: 0,
+            q_head: 0,
+            root_level: 0,
+            trail_lim: Vec::new(),
+            var_order: VarIdHeap::default(),
         }
     }
 }
@@ -178,14 +186,20 @@ impl From<&mut AssignStack> for Vec<i32> {
 }
 
 impl Instantiate for AssignStack {
-    fn instantiate(_: &Config, cnf: &CNFDescription) -> AssignStack {
+    fn instantiate(_cfg: &Config, cnf: &CNFDescription) -> AssignStack {
         let nv = cnf.num_of_variables;
         AssignStack {
-            trail: Vec::with_capacity(nv),
             asgvec: vec![None; 1 + nv],
+            trail: Vec::with_capacity(nv),
             var_order: VarIdHeap::new(nv, nv),
             ..AssignStack::default()
         }
+    }
+}
+
+impl Export<(usize, usize, usize)> for AssignStack {
+    fn exports(&self) -> (usize, usize, usize) {
+        (self.num_conflict, self.num_propagation, self.num_restart)
     }
 }
 
@@ -309,6 +323,9 @@ impl PropagatorIF for AssignStack {
         self.trail_lim.truncate(lv as usize);
         // assert!(lim < self.q_head) dosen't hold sometimes in chronoBT.
         self.q_head = self.q_head.min(lim);
+        if lv == self.root_level {
+            self.num_restart += 1;
+        }
     }
     /// UNIT PROPAGATION.
     /// Note:
@@ -319,6 +336,7 @@ impl PropagatorIF for AssignStack {
     ///    propagatation order.
     fn propagate(&mut self, cdb: &mut ClauseDB, vdb: &mut VarDB) -> ClauseId {
         let watcher = &mut cdb.watcher[..] as *mut [Vec<Watch>];
+        self.num_propagation += 1;
         while let Some(p) = self.trail.get(self.q_head) {
             self.q_head += 1;
             let false_lit = !*p;
@@ -338,6 +356,7 @@ impl PropagatorIF for AssignStack {
                         if blocker_value == Some(false) {
                             self.conflicts.1 = self.conflicts.0;
                             self.conflicts.0 = false_lit.vi();
+                            self.num_conflict += 1;
                             return w.c;
                         }
                         if lits[0] == false_lit {
@@ -372,6 +391,7 @@ impl PropagatorIF for AssignStack {
                     if first_value == Some(false) {
                         self.conflicts.1 = self.conflicts.0;
                         self.conflicts.0 = false_lit.vi();
+                        self.num_conflict += 1;
                         return w.c;
                     }
                     let lv = lits[1..].iter().map(|l| vdb[l].level).max().unwrap_or(0);

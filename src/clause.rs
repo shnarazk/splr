@@ -36,7 +36,9 @@ pub trait ClauseDBIF {
     /// check a condition to reduce.
     /// * return `true` if ruduction is done.
     /// * Otherwise return `false`.
-    fn check_and_reduce(&mut self, state: &State, vdb: &mut VarDB) -> bool;
+    fn check_and_reduce<V>(&mut self, vdb: &mut V, nc: usize) -> bool
+    where
+        V: VarDBIF + LBDIF;
     fn reset(&mut self);
     /// delete *dead* clauses from database, which are made by:
     /// * `reduce`
@@ -47,6 +49,10 @@ pub trait ClauseDBIF {
     /// * If 2nd arg is `Some(vdb)`, register `v` as a learnt after sorting based on assign level.
     /// * Otherwise, register `v` as a permanent clause, which rank is zero.
     fn new_clause(&mut self, v: &mut [Lit], level_sort: Option<&mut VarDB>) -> ClauseId;
+    /// check and convert a learnt clause to permanent if needed.
+    fn convert_to_permanent<V>(&mut self, vdb: &mut V, cid: ClauseId) -> bool
+    where
+        V: VarDBIF + LBDIF;
     /// return the number of alive clauses in the database. Or return the database size if `active` is `false`.
     fn count(&self, alive: bool) -> usize;
     /// return the number of clauses which satisfy given flags and aren't DEAD.
@@ -59,14 +65,14 @@ pub trait ClauseDBIF {
     fn eliminate_satisfied_clauses(&mut self, elim: &mut Eliminator, vdb: &mut VarDB, occur: bool);
     /// flag positive and negative literals of a var as dirty
     fn touch_var(&mut self, vi: VarId);
-    /// return LBD threshold used in glue reduciton mode.
-    fn chan_seok_condition(&self) -> usize;
     /// emit an error if the db size (the number of clauses) is over the limit.
     fn check_size(&self) -> MaybeInconsistent;
     /// returns None if the given assignment is a model of a problem.
     /// Otherwise returns a clause which is not satisfiable under a given assignment.
     /// Clauses with an unassigned literal are treated as falsified in `strict` mode.
-    fn validate(&self, vdb: &VarDB, strict: bool) -> Option<ClauseId>;
+    fn validate<V>(&self, vdb: &V, strict: bool) -> Option<ClauseId>
+    where
+        V: VarDBIF;
 }
 
 /// API for Clause Id.
@@ -385,13 +391,14 @@ pub struct ClauseDB {
     clause: Vec<Clause>,
     /// container of watch literals
     pub watcher: Vec<Vec<Watch>>,
-    /// the present number of learnt clauses
-    pub num_learnt: usize,
-    num_active: usize,
     /// clause history to make certification
     pub certified: DRAT,
     /// a number of clauses to emit out-of-memory exception
     pub soft_limit: usize,
+    /// the present number of learnt clauses
+    num_learnt: usize,
+    /// the number of active (not DEAD) clauses
+    num_active: usize,
     /// flag for Chan Seok heuristics
     use_chan_seok: bool,
     /// 'small' clause threshold
@@ -414,13 +421,16 @@ pub struct ClauseDB {
     //
     //## reduction
     //
-    // increment step of reduction threshold
+    /// increment step of reduction threshold
     inc_step: usize,
-    // bonus step of reduction threshold used in good progress
+    /// bonus step of reduction threshold used in good progress
     extra_inc: usize,
     first_reduction: usize,
     next_reduction: usize, // renamed from `nbclausesbeforereduce`
-    // an expansion coefficient for restart
+    /// the number of reductions.
+    num_reduction: usize,
+    reducable: bool,
+    /// an expansion coefficient for restart
     reduction_coeff: usize,
 }
 
@@ -443,6 +453,8 @@ impl Default for ClauseDB {
             extra_inc: 1000,
             first_reduction: 1000,
             next_reduction: 1000,
+            num_reduction: 0,
+            reducable: true,
             reduction_coeff: 1,
         }
     }
@@ -554,6 +566,7 @@ impl Instantiate for ClauseDB {
             touched,
             watcher,
             certified,
+            reducable: !config.without_reduce,
             soft_limit: config.clause_limit,
             ..ClauseDB::default()
         }
@@ -586,6 +599,12 @@ impl Instantiate for ClauseDB {
             (SearchStrategy::LowSuccesiveM, _) => (),
             (SearchStrategy::ManyGlues, _) => (),
         }
+    }
+}
+
+impl Export<(usize, usize, usize)> for ClauseDB {
+    fn exports(&self) -> (usize, usize, usize) {
+        (self.num_active, self.num_learnt, self.num_reduction)
     }
 }
 
@@ -724,6 +743,33 @@ impl ClauseDBIF for ClauseDB {
         self.num_active += 1;
         cid
     }
+    fn convert_to_permanent<V>(&mut self, vdb: &mut V, cid: ClauseId) -> bool
+    where
+        V: VarDBIF + LBDIF,
+    {
+        let chan_seok_condition = if self.use_chan_seok {
+            self.co_lbd_bound
+        } else {
+            0
+        };
+        let c = &mut self[cid];
+        debug_assert!(!c.is(Flag::DEAD), format!("found {} is dead: {}", cid, c));
+        if 2 < c.rank {
+            c.turn_on(Flag::JUST_USED);
+            let nlevels = vdb.compute_lbd(&c.lits);
+            if nlevels + 1 < c.rank {
+                // chan_seok_condition is zero if !use_chan_seok
+                if nlevels < chan_seok_condition {
+                    c.turn_off(Flag::LEARNT);
+                    self.num_learnt -= 1;
+                    return true;
+                } else {
+                    c.rank = nlevels;
+                }
+            }
+        }
+        false
+    }
     fn count(&self, alive: bool) -> usize {
         if alive {
             self.clause.len() - self.watcher[!NULL_LIT].len() - 1
@@ -747,11 +793,13 @@ impl ClauseDBIF for ClauseDB {
         debug_assert!(1 < c.lits.len());
         c.kill(&mut self.touched);
     }
-    fn check_and_reduce(&mut self, state: &State, vdb: &mut VarDB) -> bool {
-        if state.config.without_reduce || 0 == self.num_learnt {
+    fn check_and_reduce<V>(&mut self, vdb: &mut V, nc: usize) -> bool
+    where
+        V: VarDBIF + LBDIF,
+    {
+        if !self.reducable || 0 == self.num_learnt {
             return false;
         }
-        let nc = state[Stat::Conflict];
         let go = if self.use_chan_seok {
             self.first_reduction < self.num_learnt
         } else {
@@ -760,6 +808,7 @@ impl ClauseDBIF for ClauseDB {
         if go {
             self.reduction_coeff = ((nc as f64) / (self.next_reduction as f64)) as usize + 1;
             self.reduce(vdb);
+            self.num_reduction += 1;
         }
         go
     }
@@ -809,13 +858,6 @@ impl ClauseDBIF for ClauseDB {
         self.touched[Lit::from_assign(vi, true)] = true;
         self.touched[Lit::from_assign(vi, false)] = true;
     }
-    fn chan_seok_condition(&self) -> usize {
-        if self.use_chan_seok {
-            self.co_lbd_bound
-        } else {
-            0
-        }
-    }
     fn check_size(&self) -> MaybeInconsistent {
         if self.soft_limit == 0 || self.count(false) <= self.soft_limit {
             Ok(())
@@ -823,7 +865,10 @@ impl ClauseDBIF for ClauseDB {
             Err(SolverError::OutOfMemory)
         }
     }
-    fn validate(&self, vdb: &VarDB, strict: bool) -> Option<ClauseId> {
+    fn validate<V>(&self, vdb: &V, strict: bool) -> Option<ClauseId>
+    where
+        V: VarDBIF,
+    {
         for (i, c) in self.clause.iter().enumerate().skip(1) {
             if c.is(Flag::DEAD) || (strict && c.is(Flag::LEARNT)) {
                 continue;
@@ -838,15 +883,12 @@ impl ClauseDBIF for ClauseDB {
     }
 }
 
-impl Export<(usize, usize)> for ClauseDB {
-    fn exports(&self) -> (usize, usize) {
-        (self.num_active, self.num_learnt)
-    }
-}
-
 impl ClauseDB {
     /// halve the number of 'learnt' or *removable* clauses.
-    fn reduce(&mut self, vdb: &mut VarDB) {
+    fn reduce<V>(&mut self, vdb: &mut V)
+    where
+        V: VarDBIF + LBDIF,
+    {
         vdb.reset_lbd(self);
         let ClauseDB {
             ref mut clause,

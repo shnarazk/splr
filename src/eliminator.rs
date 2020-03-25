@@ -4,7 +4,7 @@ use {
         clause::{Clause, ClauseDB, ClauseDBIF, ClauseIF, ClauseId, ClauseIdIF, WatchDBIF},
         config::Config,
         propagator::{AssignStack, PropagatorIF},
-        state::{Stat, State, StateIF},
+        state::{State, StateIF},
         types::*,
         var::{Var, VarDB, VarDBIF, VarRewardIF, LBDIF},
     },
@@ -84,6 +84,12 @@ impl Default for LitOccurs {
     }
 }
 
+impl Export<(usize, usize)> for Eliminator {
+    fn exports(&self) -> (usize, usize) {
+        (self.num_full_elimination, self.num_sat_elimination)
+    }
+}
+
 impl EliminatorStatIF for LitOccurs {
     fn stats(&self) -> (usize, usize) {
         (self.pos_occurs.len(), self.neg_occurs.len())
@@ -126,6 +132,8 @@ pub struct Eliminator {
     pub subsume_literal_limit: usize,
     /// var
     var: Vec<LitOccurs>,
+    num_full_elimination: usize,
+    num_sat_elimination: usize,
 }
 
 impl Default for Eliminator {
@@ -142,6 +150,8 @@ impl Default for Eliminator {
             eliminate_occurrence_limit: 800,
             subsume_literal_limit: 100,
             var: Vec::new(),
+            num_full_elimination: 0,
+            num_sat_elimination: 0,
         }
     }
 }
@@ -326,9 +336,9 @@ impl EliminatorIF for Eliminator {
             self.prepare(cdb, vdb, true);
         }
         self.eliminate(asgs, cdb, state, vdb)?;
-        state[Stat::SatClauseElimination] += 1;
+        self.num_sat_elimination += 1;
         if self.is_running() {
-            state[Stat::ExhaustiveElimination] += 1;
+            self.num_full_elimination += 1;
             vdb.reset_lbd(cdb);
             self.stop(cdb, vdb);
         }
