@@ -6,6 +6,7 @@
 - better modularity via trait `Export`, which is renamed from `ProgressComponent`
 - stats data are stored in each modules.
 - change the meaning of option `-S`
+- remove `deep search` completely
 
 ## 0.3.2, 2020-03-20
 

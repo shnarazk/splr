@@ -397,17 +397,9 @@ impl Instantiate for Restarter {
         }
     }
     fn adapt_to(&mut self, state: &State, num_conflict: usize) {
-        if !self.luby.active && state.config.with_deep_search {
-            if state.stagnated {
-                self.restart_step = state.reflection_interval;
-                self.next_restart += state.reflection_interval;
-            } else {
-                self.restart_step = state.config.restart_step;
-            }
-        }
         match state.strategy {
             (SearchStrategy::Initial, _) => (),
-            (SearchStrategy::LowSuccesiveLuby, n) => {
+            (SearchStrategy::LowSuccesive, n) => {
                 if n == num_conflict {
                     self.luby.active = true;
                 }

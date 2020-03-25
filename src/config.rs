@@ -115,10 +115,6 @@ pub struct Config {
     /// Disables dynamic strategy adaptation
     #[structopt(long = "no-adaptive-strategy", short = "A")]
     pub without_adaptive_strategy: bool,
-
-    /// Enables deep search mode
-    #[structopt(skip)]
-    pub with_deep_search: bool,
 }
 
 impl Default for Config {
@@ -155,7 +151,6 @@ impl Default for Config {
             timeout: 10_000.0,
             use_certification: false,
             without_adaptive_strategy: false,
-            with_deep_search: false,
         }
     }
 }

@@ -62,10 +62,8 @@ pub enum SearchStrategy {
     LowDecisions,
     /// High-Successive-Conflicts using Chan Seok heuristics
     HighSuccesive,
-    /// Low-Successive-Conflicts w/ Luby sequence
-    LowSuccesiveLuby,
-    /// Low-Successive-Conflicts w/o Luby sequence
-    LowSuccesiveM,
+    /// Low-Successive-Conflicts using Luby sequence
+    LowSuccesive,
     /// Many-Glue-Clauses
     ManyGlues,
 }
@@ -80,8 +78,7 @@ impl fmt::Display for SearchStrategy {
                 SearchStrategy::Generic => "Generic",
                 SearchStrategy::LowDecisions => "LowDecs",
                 SearchStrategy::HighSuccesive => "HighSucc",
-                SearchStrategy::LowSuccesiveLuby => "LowSuccLuby",
-                SearchStrategy::LowSuccesiveM => "LowSuccM",
+                SearchStrategy::LowSuccesive => "LowSucc",
                 SearchStrategy::ManyGlues => "ManyGlue",
             };
             if let Some(w) = formatter.width() {
@@ -109,9 +106,7 @@ impl SearchStrategy {
             // High-Successive-Conflicts using Chan Seok heuristics
             SearchStrategy::HighSuccesive => "HighSuccesiveConflict (long decision chains)",
             // Low-Successive-Conflicts-Luby w/ Luby sequence
-            SearchStrategy::LowSuccesiveLuby => "LowSuccesiveLuby (successive conflicts)",
-            // Low-Successive-Conflicts-Modified w/o Luby sequence
-            SearchStrategy::LowSuccesiveM => "LowSuccesive w/o Luby (successive conflicts)",
+            SearchStrategy::LowSuccesive => "LowSuccesive (successive conflicts)",
             // Many-Glue-Clauses
             SearchStrategy::ManyGlues => "ManyGlueClauses",
         }
@@ -378,11 +373,7 @@ impl StateIF for State {
                 SearchStrategy::LowDecisions
             }
             _ if self[Stat::NoDecisionConflict] < 30_000 => {
-                if self.config.with_deep_search {
-                    SearchStrategy::LowSuccesiveM
-                } else {
-                    SearchStrategy::LowSuccesiveLuby
-                }
+                SearchStrategy::LowSuccesive
             }
             _ if 54_400 < self[Stat::NoDecisionConflict] => SearchStrategy::HighSuccesive,
             _ => SearchStrategy::Generic,
