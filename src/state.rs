@@ -1,13 +1,8 @@
 /// Crate `state` is a collection of internal data.
 use {
     crate::{
-        clause::ClauseDBIF,
-        config::Config,
-        eliminator::EliminatorIF,
-        propagator::PropagatorIF,
-        restarter::RestartIF,
-        types::*,
-        var::{VarDB, VarDBIF},
+        clause::ClauseDBIF, config::Config, eliminator::EliminatorIF, propagator::PropagatorIF,
+        restarter::RestartIF, types::*, var::VarDBIF,
     },
     libc::{clock_gettime, timespec, CLOCK_PROCESS_CPUTIME_ID},
     std::{
@@ -31,7 +26,10 @@ pub trait StateIF {
     /// update internal counters and return true if solver stagnated.
     fn check_stagnation(&mut self);
     /// change heuristics based on stat data.
-    fn select_strategy(&mut self);
+    fn select_strategy<A, C>(&mut self, asgs: &A, cdb: &C)
+    where
+        A: Export<(usize, usize, usize)> + PropagatorIF,
+        C: Export<(usize, usize, usize, usize, usize, usize)> + ClauseDBIF;
     /// write a header of stat data to stdio.
     fn progress_header(&self);
     /// write stat data to stdio.
@@ -45,9 +43,9 @@ pub trait StateIF {
         mes: Option<&str>,
     ) where
         A: Export<(usize, usize, usize)> + PropagatorIF,
-        C: Export<(usize, usize, usize)> + ClauseDBIF,
+        C: Export<(usize, usize, usize, usize, usize, usize)> + ClauseDBIF,
         E: Export<(usize, usize)> + EliminatorIF,
-        R: Export<(bool, f64, f64, f64)> + RestartIF,
+        R: Export<(usize, bool, f64, f64, f64)> + RestartIF,
         V: Export<(f64, f64)> + VarDBIF;
     /// write a short message to stdout.
     fn flush<S: AsRef<str>>(&self, mes: S);
@@ -123,21 +121,16 @@ impl SearchStrategy {
 /// stat index.
 #[derive(Clone, Eq, PartialEq)]
 pub enum Stat {
-    Conflict = 0,       // the number of backjump
-    Decision,           // the number of decision
-    Restart,            // the number of restart
-    RestartRecord,      // the last recorded number of Restart
-    BlockRestart,       // the number of blacking start
-    BlockRestartRecord, // the last recorded number of BlockRestart
-    Learnt,             // the number of learnt clauses (< Conflict)
-    NoDecisionConflict, // the number of 'no decision conflict'
-    SolvedRecord,       // the last number of solved variables
-    SumLBD,             // the sum of generated learnts' LBD
-    NumBin,             // the number of binary clauses (both of given and learnt)
-    NumBinLearnt,       // the number of binary learnt clauses
-    NumLBD2,            // the number of learnt clauses which LBD is 2
-    Stagnation,         // the number of stagnation
-    EndOfStatIndex,     // Don't use this dummy.
+    /// the number of decision
+    Decision = 0,
+    /// the number of 'no decision conflict'
+    NoDecisionConflict,
+    /// the last number of solved variables
+    SolvedRecord,
+    /// the number of stagnation
+    Stagnation,
+    /// Don't use this dummy (setinel at the tail).
+    EndOfStatIndex,
 }
 
 impl Index<Stat> for [usize] {
@@ -228,6 +221,18 @@ impl IndexMut<Stat> for State {
     }
 }
 
+impl Instantiate for State {
+    fn instantiate(config: &Config, cnf: &CNFDescription) -> State {
+        let mut state = State::default();
+        state.num_vars = cnf.num_of_variables;
+        state.model = vec![None; cnf.num_of_variables + 1];
+        state.target = cnf.clone();
+        state.time_limit = config.timeout;
+        state.config = config.clone();
+        state
+    }
+}
+
 macro_rules! im {
     ($format: expr, $state: expr, $key: expr, $val: expr) => {
         match ($val, $key) {
@@ -315,18 +320,6 @@ macro_rules! f {
     };
 }
 
-impl Instantiate for State {
-    fn instantiate(config: &Config, cnf: &CNFDescription) -> State {
-        let mut state = State::default();
-        state.num_vars = cnf.num_of_variables;
-        state.model = vec![None; cnf.num_of_variables + 1];
-        state.target = cnf.clone();
-        state.time_limit = config.timeout;
-        state.config = config.clone();
-        state
-    }
-}
-
 impl StateIF for State {
     fn num_unsolved_vars(&self) -> usize {
         self.num_vars - self.num_solved_vars - self.num_eliminated_vars
@@ -367,16 +360,21 @@ impl StateIF for State {
         }
         self[Stat::SolvedRecord] = self.num_solved_vars;
     }
-    fn select_strategy(&mut self) {
+    fn select_strategy<A, C>(&mut self, asgs: &A, cdb: &C)
+    where
+        A: Export<(usize, usize, usize)> + PropagatorIF,
+        C: Export<(usize, usize, usize, usize, usize, usize)> + ClauseDBIF,
+    {
         if self.config.without_adaptive_strategy {
             return;
         }
+        let (asgs_num_conflict, _num_propagation, _num_restart) = asgs.exports();
+        let (_active, _bi_clause, cdb_num_bi_learnt, cdb_num_lbd2, _learnt, _reduction) =
+            cdb.exports();
         debug_assert_eq!(self.strategy.0, SearchStrategy::Initial);
         self.strategy.0 = match () {
-            _ if self[Stat::NumBinLearnt] + 20_000 < self[Stat::NumLBD2] => {
-                SearchStrategy::ManyGlues
-            }
-            _ if self[Stat::Decision] as f64 <= 1.2 * self[Stat::Conflict] as f64 => {
+            _ if cdb_num_bi_learnt + 20_000 < cdb_num_lbd2 => SearchStrategy::ManyGlues,
+            _ if self[Stat::Decision] as f64 <= 1.2 * asgs_num_conflict as f64 => {
                 SearchStrategy::LowDecisions
             }
             _ if self[Stat::NoDecisionConflict] < 30_000 => {
@@ -389,7 +387,7 @@ impl StateIF for State {
             _ if 54_400 < self[Stat::NoDecisionConflict] => SearchStrategy::HighSuccesive,
             _ => SearchStrategy::Generic,
         };
-        self.strategy.1 = self[Stat::Conflict];
+        self.strategy.1 = asgs_num_conflict;
     }
     fn progress_header(&self) {
         if self.config.quiet_mode {
@@ -427,9 +425,9 @@ impl StateIF for State {
         mes: Option<&str>,
     ) where
         A: Export<(usize, usize, usize)> + PropagatorIF,
-        C: Export<(usize, usize, usize)> + ClauseDBIF,
+        C: Export<(usize, usize, usize, usize, usize, usize)> + ClauseDBIF,
         E: Export<(usize, usize)> + EliminatorIF,
-        R: Export<(bool, f64, f64, f64)> + RestartIF,
+        R: Export<(usize, bool, f64, f64, f64)> + RestartIF,
         V: Export<(f64, f64)> + VarDBIF,
     {
         //
@@ -437,13 +435,20 @@ impl StateIF for State {
         //
 
         let (asgs_num_conflict, asgs_num_propagation, asgs_num_restart) = asgs.exports();
-        self[Stat::Conflict] = asgs_num_conflict;
-        self[Stat::Restart] = asgs_num_restart;
 
-        let (cdb_num_active, cdb_num_learnt, cdb_num_reduction) = cdb.exports();
+        let (
+            cdb_num_active,
+            cdb_num_bi_clause,
+            _num_bi_learnt,
+            cdb_num_lbd2,
+            cdb_num_learnt,
+            cdb_num_reduction,
+        ) = cdb.exports();
+
         let (_num_full, elim_num_sat) = elim.exports();
 
-        let (rst_luby_active, rst_asg_trend, rst_lbd_get, rst_lbd_trend) = rst.exports();
+        let (rst_num_block, rst_luby_active, rst_asg_trend, rst_lbd_get, rst_lbd_trend) =
+            rst.exports();
 
         let (vdb_core_size, vdb_activity_decay) = vdb.exports();
 
@@ -451,7 +456,7 @@ impl StateIF for State {
             return;
         }
         if self.config.use_log {
-            self.dump(asgs, cdb, vdb);
+            self.dump(asgs, cdb, rst, vdb);
             return;
         }
         let nv = self.target.num_of_variables;
@@ -463,7 +468,7 @@ impl StateIF for State {
         println!("\x1B[2K{}", self);
         println!(
             "\x1B[2K #conflict:{}, #decision:{}, #propagate:{} ",
-            i!("{:>11}", self, LogUsizeId::Conflict, self[Stat::Conflict]),
+            i!("{:>11}", self, LogUsizeId::Conflict, asgs_num_conflict),
             i!("{:>13}", self, LogUsizeId::Decision, self[Stat::Decision]),
             i!("{:>15}", self, LogUsizeId::Propagate, asgs_num_propagation),
         );
@@ -487,12 +492,12 @@ impl StateIF for State {
         println!(
             "\x1B[2K      Clause|Remv:{}, LBD2:{}, Binc:{}, Perm:{} ",
             im!("{:>9}", self, LogUsizeId::Removable, cdb_num_learnt),
-            im!("{:>9}", self, LogUsizeId::LBD2, self[Stat::NumLBD2]),
+            im!("{:>9}", self, LogUsizeId::LBD2, cdb_num_lbd2),
             im!(
                 "{:>9}",
                 self,
                 LogUsizeId::Binclause,
-                self[Stat::NumBin] // self[Stat::NumBinLearnt]
+                cdb_num_bi_clause // cdb_num_bi_learnt
             ),
             im!(
                 "{:>9}",
@@ -508,12 +513,7 @@ impl StateIF for State {
             } else {
                 "    Restart"
             },
-            im!(
-                "{:>9}",
-                self,
-                LogUsizeId::RestartBlock,
-                self[Stat::BlockRestart]
-            ),
+            im!("{:>9}", self, LogUsizeId::RestartBlock, rst_num_block),
             im!("{:>9}", self, LogUsizeId::Restart, asgs_num_restart),
             fm!("{:>9.4}", self, LogF64Id::EmaAsg, rst_asg_trend),
             fm!("{:>9.4}", self, LogF64Id::EmaLBD, rst_lbd_trend),
@@ -527,7 +527,7 @@ impl StateIF for State {
                 "{:>9.4}",
                 self,
                 LogF64Id::End,
-                100.0 * asgs_num_restart as f64 / self[Stat::Conflict] as f64
+                100.0 * asgs_num_restart as f64 / asgs_num_conflict as f64
             )
         );
         println!(
@@ -718,10 +718,11 @@ impl State {
              c ========================================================================================================="
         );
     }
-    fn dump<A, C, V>(&mut self, asgs: &A, cdb: &C, _vdb: &V)
+    fn dump<A, C, R, V>(&mut self, asgs: &A, cdb: &C, rst: &R, _vdb: &V)
     where
         A: Export<(usize, usize, usize)>,
-        C: Export<(usize, usize, usize)>,
+        C: Export<(usize, usize, usize, usize, usize, usize)> + ClauseDBIF,
+        R: Export<(usize, bool, f64, f64, f64)> + RestartIF,
         V: Export<(f64, f64)>,
     {
         self.progress_cnt += 1;
@@ -729,18 +730,26 @@ impl State {
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
         let (asgs_num_conflict, _num_propagation, asgs_num_restart) = asgs.exports();
-        let (cdb_num_active, cdb_num_learnt, cdb_num_reduction) = cdb.exports();
+        let (
+            cdb_num_active,
+            _num_bi_clause,
+            _num_bi_learnt,
+            cdb_num_lbd2,
+            cdb_num_learnt,
+            cdb_num_reduction,
+        ) = cdb.exports();
+        let (rst_num_block, _luby_active, _asg_trend, _lbd_get, _lbd_trend) = rst.exports();
         println!(
             "c | {:>8}  {:>8} {:>8} | {:>7} {:>8} {:>8} |  {:>4}  {:>8} {:>7} {:>8} | {:>6.3} % |",
             asgs_num_restart,                            // restart
-            self[Stat::BlockRestart],                    // blocked
+            rst_num_block,                               // blocked
             asgs_num_conflict / asgs_num_restart.max(1), // average cfc (Conflict / Restart)
             nv - fixed - self.num_eliminated_vars,       // alive vars
             cdb_num_active - cdb_num_learnt,             // given clauses
             0,                                           // alive literals
             cdb_num_reduction,                           // clause reduction
             cdb_num_learnt,                              // alive learnts
-            self[Stat::NumLBD2],                         // learnts with LBD = 2
+            cdb_num_lbd2,                                // learnts with LBD = 2
             asgs_num_conflict - cdb_num_learnt,          // removed learnts
             (sum as f32) / (nv as f32) * 100.0,          // progress
         );
@@ -752,14 +761,14 @@ impl State {
         cdb: &C,
         _: &E,
         rst: &R,
-        vdb: &VarDB,
+        vdb: &V,
         mes: Option<&str>,
     ) where
-        A: Export<(usize, usize, usize)>,
-        C: Export<(usize, usize, usize)>,
-        E: Export<(usize, usize, usize)>,
-        R: Export<(bool, f64, f64, f64)>,
-        V: Export<(f64, f64)>,
+        A: Export<(usize, usize, usize)> + PropagatorIF,
+        C: Export<(usize, usize, usize, usize, usize, usize)> + ClauseDBIF,
+        E: Export<(usize, usize, usize)> + EliminatorIF,
+        R: Export<(usize, bool, f64, f64, f64)> + RestartIF,
+        V: Export<(f64, f64)> + VarDBIF,
     {
         self.progress_cnt += 1;
         let msg = match mes {
@@ -770,8 +779,16 @@ impl State {
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
         let (_num_conflict, _num_propagation, asgs_num_restart) = asgs.exports();
-        let (cdb_num_active, cdb_num_learnt, _num_reduction) = cdb.exports();
-        let (_luby_active, rst_asg_trend, rst_lbd_get, rst_lbd_trend) = rst.exports();
+        let (
+            cdb_num_active,
+            _num_bi_clause,
+            _num_bi_learnt,
+            _num_lbd2,
+            cdb_num_learnt,
+            _num_reduction,
+        ) = cdb.exports();
+        let (rst_num_block, _luby_active, rst_asg_trend, rst_lbd_get, rst_lbd_trend) =
+            rst.exports();
         println!(
             "{:>3}#{:>8},{:>7},{:>7},{:>7},{:>6.3},,{:>7},{:>7},\
              {:>7},,{:>5},{:>5},{:>6.2},{:>6.2},,{:>7.2},{:>8.2},{:>8.2},,\
@@ -785,7 +802,7 @@ impl State {
             cdb_num_learnt,
             cdb_num_active,
             0,
-            self[Stat::BlockRestart],
+            rst_num_block,
             asgs_num_restart,
             rst_asg_trend,
             rst_lbd_get,

@@ -267,8 +267,8 @@ impl SatSolverIF for Solver {
             }
         }
         debug_assert_eq!(s.vdb.len() - 1, cnf.num_of_variables);
-        s.state[Stat::NumBin] = s.cdb[1..].iter().filter(|c| c.len() == 2).count();
-        s.vdb.adapt_to(&s.state);
+        // s.state[Stat::NumBin] = s.cdb.iter().skip(1).filter(|c| c.len() == 2).count();
+        s.vdb.adapt_to(&s.state, 0);
         Ok(s)
     }
     // renamed from clause_new
@@ -414,7 +414,7 @@ fn handle_conflict(
     ci: ClauseId,
 ) -> MaybeInconsistent {
     let (ncnfl, _num_propagation, asgs_num_restart) = asgs.exports();
-    let switch_chronobt = if ncnfl < 1000 || asgs.conflicts.0 == asgs.conflicts.1 {
+    let switch_chronobt = if ncnfl < 1000 || asgs.recurrent_conflicts() {
         Some(false)
     } else {
         None
@@ -426,9 +426,7 @@ fn handle_conflict(
         rst.update(RestarterModule::ASG, asgs.len());
         state.last_asg = 0;
     }
-    if rst.block_restart() {
-        state[Stat::BlockRestart] += 1;
-    }
+    rst.block_restart();
     let cl = asgs.level();
     let mut use_chronobt = switch_chronobt.unwrap_or(0 < state.config.chronobt);
     if use_chronobt {
@@ -570,25 +568,16 @@ fn handle_conflict(
         asgs.assign_by_implication(vdb, l0, cid, al);
         let lbd = cdb[cid].rank;
         rst.update(RestarterModule::LBD, lbd);
-        if lbd <= 2 {
-            state[Stat::NumLBD2] += 1;
-        }
-        if learnt_len == 2 {
-            state[Stat::NumBin] += 1;
-            state[Stat::NumBinLearnt] += 1;
-        }
-        state[Stat::SumLBD] += lbd;
-        state[Stat::Learnt] += 1;
     }
     cdb.scale_activity();
     if 0 < state.config.dump_interval && ncnfl % state.config.dump_interval == 0 {
-        let (_luby_active, rst_asg_trend, _lbd_get, rst_lbd_trend) = rst.exports();
+        let (rst_num_block, _luby_active, rst_asg_trend, _lbd_get, rst_lbd_trend) = rst.exports();
         state.development.push((
             ncnfl,
             (state.num_solved_vars + state.num_eliminated_vars) as f64
                 / state.target.num_of_variables as f64,
             asgs_num_restart as f64,
-            state[Stat::BlockRestart] as f64,
+            rst_num_block as f64,
             rst_asg_trend.min(10.0),
             rst_lbd_trend.min(10.0),
         ));
@@ -623,23 +612,24 @@ fn adapt_modules(
     // But periodical restarts seem good. So we call it here.
     asgs.cancel_until(vdb, state.root_level);
 
-    let (_, rst_asg_trend, _, _) = rst.exports();
+    let (asgs_num_conflict, _num_propagation, _num_restart) = asgs.exports();
+    let (_, _, rst_asg_trend, _, _) = rst.exports();
     if elim.enable && rst_asg_trend < 1.0 {
         state.flush("exhaustive eliminator activated...");
         // asgs.cancel_until(vdb, state.root_level);
         elim.activate();
         elim.simplify(asgs, cdb, state, vdb)?;
     }
-    if 10 * state.reflection_interval == state[Stat::Conflict] {
+    if 10 * state.reflection_interval == asgs_num_conflict {
         // asgs.cancel_until(vdb, state.root_level);
-        state.select_strategy();
+        state.select_strategy(asgs, cdb);
         if state.strategy.0 == SearchStrategy::HighSuccesive {
             state.config.chronobt = 0;
         }
     }
-    cdb.adapt_to(state);
-    rst.adapt_to(state);
-    vdb.adapt_to(state);
+    cdb.adapt_to(state, asgs_num_conflict);
+    rst.adapt_to(state, asgs_num_conflict);
+    vdb.adapt_to(state, asgs_num_conflict);
     Ok(())
 }
 

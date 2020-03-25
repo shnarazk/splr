@@ -60,6 +60,8 @@ pub trait PropagatorIF {
     fn cancel_until(&mut self, vdb: &mut VarDB, lv: DecisionLevel);
     /// execute *boolean constraint propagation* or *unit propagation*.
     fn propagate(&mut self, cdb: &mut ClauseDB, vdb: &mut VarDB) -> ClauseId;
+    /// return `true` if subsequential propagations emit the same conflict.
+    fn recurrent_conflicts(&self) -> bool;
 }
 
 /// API for var selection.
@@ -75,31 +77,34 @@ pub trait VarSelectionIF {
 /// A record of assignment. It's called 'trail' in Glucose.
 #[derive(Debug)]
 pub struct AssignStack {
-    pub conflicts: (VarId, VarId),
     pub trail: Vec<Lit>,
     asgvec: Vec<Option<bool>>,
+    trail_lim: Vec<usize>,
+    q_head: usize,
+    root_level: DecisionLevel,
+    conflicts: (VarId, VarId),
+    var_order: VarIdHeap, // Variable Order
+
+    //
+    //## Statistics
     num_conflict: usize,
     num_propagation: usize,
     num_restart: usize,
-    q_head: usize,
-    root_level: DecisionLevel,
-    trail_lim: Vec<usize>,
-    var_order: VarIdHeap, // Variable Order
 }
 
 impl Default for AssignStack {
     fn default() -> AssignStack {
         AssignStack {
             trail: Vec::new(),
-            conflicts: (0, 0),
             asgvec: Vec::new(),
+            trail_lim: Vec::new(),
+            q_head: 0,
+            root_level: 0,
+            conflicts: (0, 0),
+            var_order: VarIdHeap::default(),
             num_conflict: 0,
             num_propagation: 0,
             num_restart: 0,
-            q_head: 0,
-            root_level: 0,
-            trail_lim: Vec::new(),
-            var_order: VarIdHeap::default(),
         }
     }
 }
@@ -198,6 +203,9 @@ impl Instantiate for AssignStack {
 }
 
 impl Export<(usize, usize, usize)> for AssignStack {
+    ///```
+    /// let (asgs_num_conflict, asgs_num_propagation, asgs_num_restart) = asgs.exports();
+    ///```
     fn exports(&self) -> (usize, usize, usize) {
         (self.num_conflict, self.num_propagation, self.num_restart)
     }
@@ -400,6 +408,9 @@ impl PropagatorIF for AssignStack {
             }
         }
         ClauseId::default()
+    }
+    fn recurrent_conflicts(&self) -> bool {
+        self.conflicts.0 == self.conflicts.1
     }
 }
 

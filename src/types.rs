@@ -48,7 +48,7 @@ pub trait Instantiate {
     fn instantiate(conf: &Config, cnf: &CNFDescription) -> Self;
     /// set up internal parameters.
     /// CAVEAT: some `adapt_to` implementation might have a special condition: decision_level == 0.
-    fn adapt_to(&mut self, _state: &State) {}
+    fn adapt_to(&mut self, _state: &State, _num_conflict: usize) {}
 }
 
 /// API for O(n) deletion from a list, providing `delete_unstable`.

@@ -3,7 +3,7 @@ use {
     crate::{
         config::Config,
         eliminator::{Eliminator, EliminatorIF},
-        state::{SearchStrategy, Stat, State},
+        state::{SearchStrategy, State},
         types::*,
         var::{VarDB, VarDBIF, LBDIF},
     },
@@ -11,7 +11,7 @@ use {
         cmp::Ordering,
         fmt,
         ops::{Index, IndexMut, Range, RangeFrom},
-        slice::Iter,
+        slice::{Iter, IterMut},
     },
 };
 
@@ -31,6 +31,10 @@ pub trait ClauseDBIF {
     fn len(&self) -> usize;
     /// return true if it's empty.
     fn is_empty(&self) -> bool;
+    /// return an iterator.
+    fn iter(&self) -> Iter<'_, Clause>;
+    /// return an mutable iterator.
+    fn iter_mut(&mut self) -> IterMut<'_, Clause>;
     /// unregister a clause `cid` from clause database and make the clause dead.
     fn detach(&mut self, cid: ClauseId);
     /// check a condition to reduce.
@@ -395,10 +399,6 @@ pub struct ClauseDB {
     pub certified: DRAT,
     /// a number of clauses to emit out-of-memory exception
     pub soft_limit: usize,
-    /// the present number of learnt clauses
-    num_learnt: usize,
-    /// the number of active (not DEAD) clauses
-    num_active: usize,
     /// flag for Chan Seok heuristics
     use_chan_seok: bool,
     /// 'small' clause threshold
@@ -427,11 +427,25 @@ pub struct ClauseDB {
     extra_inc: usize,
     first_reduction: usize,
     next_reduction: usize, // renamed from `nbclausesbeforereduce`
-    /// the number of reductions.
-    num_reduction: usize,
     reducable: bool,
     /// an expansion coefficient for restart
     reduction_coeff: usize,
+
+    //
+    //## statistics
+    //
+    /// the number of active (not DEAD) clauses.
+    num_active: usize,
+    /// the number of binary clauses.
+    num_bi_clause: usize,
+    /// the number of binary learnt clauses.
+    num_bi_learnt: usize,
+    /// the number of clauses which LBDs are 2.
+    num_lbd2: usize,
+    /// the present number of learnt clauses.
+    num_learnt: usize,
+    /// the number of reductions.
+    num_reduction: usize,
 }
 
 impl Default for ClauseDB {
@@ -439,8 +453,6 @@ impl Default for ClauseDB {
         ClauseDB {
             clause: Vec::new(),
             watcher: Vec::new(),
-            num_active: 0,
-            num_learnt: 0,
             certified: Vec::new(),
             soft_limit: 0, // 248_000_000
             use_chan_seok: false,
@@ -453,9 +465,14 @@ impl Default for ClauseDB {
             extra_inc: 1000,
             first_reduction: 1000,
             next_reduction: 1000,
-            num_reduction: 0,
             reducable: true,
             reduction_coeff: 1,
+            num_active: 0,
+            num_bi_clause: 0,
+            num_bi_learnt: 0,
+            num_lbd2: 0,
+            num_learnt: 0,
+            num_reduction: 0,
         }
     }
 }
@@ -572,15 +589,15 @@ impl Instantiate for ClauseDB {
         }
     }
     /// PRECONDITION: decision level == 0 if state.strategy.1 == state[Stat::Conflict]
-    fn adapt_to(&mut self, state: &State) {
+    fn adapt_to(&mut self, state: &State, num_conflict: usize) {
         match state.strategy {
-            (_, n) if n != state[Stat::Conflict] => (),
+            (_, n) if n != num_conflict => (),
             (SearchStrategy::Initial, _) => (),
             (SearchStrategy::Generic, _) => (),
             (SearchStrategy::LowDecisions, _) => {
-                let nc = state[Stat::Conflict];
                 self.co_lbd_bound = 4;
-                self.reduction_coeff = (nc as f64 / self.next_reduction as f64 + 1.0) as usize;
+                self.reduction_coeff =
+                    (num_conflict as f64 / self.next_reduction as f64 + 1.0) as usize;
                 self.first_reduction = 2000;
                 self.use_chan_seok = true;
                 self.inc_step = 0;
@@ -602,9 +619,19 @@ impl Instantiate for ClauseDB {
     }
 }
 
-impl Export<(usize, usize, usize)> for ClauseDB {
-    fn exports(&self) -> (usize, usize, usize) {
-        (self.num_active, self.num_learnt, self.num_reduction)
+impl Export<(usize, usize, usize, usize, usize, usize)> for ClauseDB {
+    ///```
+    /// let (_active, _bi_clause, _bi_learnt, _lbd2, _learnt, _reduction) = cdb.exports();
+    ///```
+    fn exports(&self) -> (usize, usize, usize, usize, usize, usize) {
+        (
+            self.num_active,
+            self.num_bi_clause,
+            self.num_bi_learnt,
+            self.num_lbd2,
+            self.num_learnt,
+            self.num_reduction,
+        )
     }
 }
 
@@ -614,6 +641,12 @@ impl ClauseDBIF for ClauseDB {
     }
     fn is_empty(&self) -> bool {
         self.clause.is_empty()
+    }
+    fn iter(&self) -> Iter<'_, Clause> {
+        self.clause.iter()
+    }
+    fn iter_mut(&mut self) -> IterMut<'_, Clause> {
+        self.clause.iter_mut()
     }
     fn garbage_collect(&mut self) {
         // debug_assert!(self.check_liveness1());
@@ -733,10 +766,22 @@ impl ClauseDBIF for ClauseDB {
             self.clause.push(c);
         };
         let c = &mut self[cid];
+        let len2 = c.lits.len() == 2;
         if learnt {
             c.turn_on(Flag::LEARNT);
             c.turn_on(Flag::JUST_USED);
+
+            let lbd2 = c.rank <= 2;
+            if len2 {
+                self.num_bi_learnt += 1;
+            }
+            if lbd2 {
+                self.num_lbd2 += 1;
+            }
             self.num_learnt += 1;
+        }
+        if len2 {
+            self.num_bi_clause += 1;
         }
         self.watcher[!l0].register(l1, cid);
         self.watcher[!l1].register(l0, cid);

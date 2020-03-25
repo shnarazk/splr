@@ -2,7 +2,7 @@
 use {
     crate::{
         config::Config,
-        state::{SearchStrategy, Stat, State},
+        state::{SearchStrategy, State},
         types::*,
     },
     std::fmt,
@@ -355,6 +355,11 @@ pub struct Restarter {
     after_restart: usize,
     next_restart: usize,
     restart_step: usize,
+
+    //
+    //## statistics
+    //
+    num_block: usize,
 }
 
 impl Instantiate for Restarter {
@@ -370,9 +375,10 @@ impl Instantiate for Restarter {
             after_restart: 0,
             next_restart: 100,
             restart_step: config.restart_step,
+            num_block: 0,
         }
     }
-    fn adapt_to(&mut self, state: &State) {
+    fn adapt_to(&mut self, state: &State, num_conflict: usize) {
         if !self.luby.active && state.config.with_deep_search {
             if state.stagnated {
                 self.restart_step = state.reflection_interval;
@@ -384,7 +390,7 @@ impl Instantiate for Restarter {
         match state.strategy {
             (SearchStrategy::Initial, _) => (),
             (SearchStrategy::LowSuccesiveLuby, n) => {
-                if n == state[Stat::Conflict] {
+                if n == num_conflict {
                     self.luby.active = true;
                 }
             }
@@ -414,6 +420,7 @@ impl RestartIF for Restarter {
             && self.restart_step <= self.after_restart
             && self.asg.is_active()
         {
+            self.num_block += 1;
             reset!(self);
         }
         false
@@ -454,9 +461,10 @@ impl RestartIF for Restarter {
     }
 }
 
-impl Export<(bool, f64, f64, f64)> for Restarter {
-    fn exports(&self) -> (bool, f64, f64, f64) {
+impl Export<(usize, bool, f64, f64, f64)> for Restarter {
+    fn exports(&self) -> (usize, bool, f64, f64, f64) {
         (
+            self.num_block,
             self.luby.active,
             self.asg.trend(),
             self.lbd.get(),

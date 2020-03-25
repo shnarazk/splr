@@ -1,10 +1,10 @@
 /// Crate `var` provides `var` object and its manager `VarDB`.
 use {
     crate::{
-        clause::{Clause, ClauseDB, ClauseIF, ClauseId},
+        clause::{Clause, ClauseDB, ClauseDBIF, ClauseIF, ClauseId},
         config::Config,
         propagator::{AssignStack, PropagatorIF},
-        state::{SearchStrategy, Stat, State},
+        state::{SearchStrategy, State},
         types::*,
     },
     std::{
@@ -19,7 +19,9 @@ pub trait LBDIF {
     /// return the LBD value for a set of literals.
     fn compute_lbd(&mut self, vec: &[Lit]) -> usize;
     /// re-calculate the LBD values of all (learnt) clauses.
-    fn reset_lbd(&mut self, cdb: &mut ClauseDB);
+    fn reset_lbd<C>(&mut self, cdb: &mut C)
+    where
+        C: ClauseDBIF;
 }
 
 /// API for var DB like `assigned`, `locked`, and so on.
@@ -386,8 +388,8 @@ impl Instantiate for VarDB {
             ..VarDB::default()
         }
     }
-    fn adapt_to(&mut self, state: &State) {
-        if 0 == state[Stat::Conflict] {
+    fn adapt_to(&mut self, state: &State, num_conflict: usize) {
+        if 0 == num_conflict {
             let nv = self.var.len();
             self.core_size.update(((CORE_HISOTRY_LEN * nv) as f64).ln());
             return;
@@ -407,7 +409,7 @@ impl Instantiate for VarDB {
         let thr = msr.0 * VRD_FILTER + ar * (1.0 - VRD_FILTER);
         let core = self.var[1..].iter().filter(|v| thr <= v.reward).count();
         self.core_size.update(core as f64);
-        if state[Stat::Conflict] % VRD_INTERVAL == 0 {
+        if num_conflict % VRD_INTERVAL == 0 {
             let k = match state.strategy.0 {
                 SearchStrategy::LowDecisions => VRD_DEC_HIGH,
                 SearchStrategy::HighSuccesive => VRD_DEC_STRICT,
@@ -511,11 +513,14 @@ impl LBDIF for VarDB {
             cnt
         }
     }
-    fn reset_lbd(&mut self, cdb: &mut ClauseDB) {
+    fn reset_lbd<C>(&mut self, cdb: &mut C)
+    where
+        C: ClauseDBIF,
+    {
         let VarDB { lbd_temp, .. } = self;
         unsafe {
             let mut key = *lbd_temp.get_unchecked(0);
-            for c in &mut cdb[1..] {
+            for c in &mut cdb.iter_mut().skip(1) {
                 if c.is(Flag::DEAD) || c.is(Flag::LEARNT) {
                     continue;
                 }

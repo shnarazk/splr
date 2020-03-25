@@ -85,6 +85,9 @@ impl Default for LitOccurs {
 }
 
 impl Export<(usize, usize)> for Eliminator {
+    ///```
+    /// let (elim_num_full_elimination, elim_num_sat_elimination) = elim.exports();
+    ///```
     fn exports(&self) -> (usize, usize) {
         (self.num_full_elimination, self.num_sat_elimination)
     }
