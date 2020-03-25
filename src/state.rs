@@ -2,7 +2,7 @@
 use {
     crate::{
         clause::ClauseDBIF, config::Config, eliminator::EliminatorIF, propagator::PropagatorIF,
-        restarter::RestartIF, types::*, var::VarDBIF,
+        restarter::{RestartIF, RestartMode}, types::*, var::VarDBIF,
     },
     libc::{clock_gettime, timespec, CLOCK_PROCESS_CPUTIME_ID},
     std::{
@@ -45,7 +45,7 @@ pub trait StateIF {
         A: Export<(usize, usize, usize)> + PropagatorIF,
         C: Export<(usize, usize, usize, usize, usize, usize)> + ClauseDBIF,
         E: Export<(usize, usize)> + EliminatorIF,
-        R: Export<(usize, bool, f64, f64, f64)> + RestartIF,
+        R: Export<(RestartMode, usize, f64, f64, f64)> + RestartIF,
         V: Export<(f64, f64)> + VarDBIF;
     /// write a short message to stdout.
     fn flush<S: AsRef<str>>(&self, mes: S);
@@ -427,7 +427,7 @@ impl StateIF for State {
         A: Export<(usize, usize, usize)> + PropagatorIF,
         C: Export<(usize, usize, usize, usize, usize, usize)> + ClauseDBIF,
         E: Export<(usize, usize)> + EliminatorIF,
-        R: Export<(usize, bool, f64, f64, f64)> + RestartIF,
+        R: Export<(RestartMode, usize, f64, f64, f64)> + RestartIF,
         V: Export<(f64, f64)> + VarDBIF,
     {
         //
@@ -447,7 +447,7 @@ impl StateIF for State {
 
         let (_num_full, elim_num_sat) = elim.exports();
 
-        let (rst_num_block, rst_luby_active, rst_asg_trend, rst_lbd_get, rst_lbd_trend) =
+        let (rst_mode, rst_num_block, rst_asg_trend, rst_lbd_get, rst_lbd_trend) =
             rst.exports();
 
         let (vdb_core_size, vdb_activity_decay) = vdb.exports();
@@ -508,10 +508,11 @@ impl StateIF for State {
         );
         println!(
             "\x1B[2K {}|#BLK:{}, #RST:{}, tASG:{}, tLBD:{} ",
-            if rst_luby_active {
-                "\x1B[001m\x1B[035mLubyRestart\x1B[000m"
-            } else {
-                "    Restart"
+            match rst_mode {
+                RestartMode::Dynamic => "    Restart",
+                RestartMode::Luby => "\x1B[001m\x1B[035mLubyRestart\x1B[000m",
+                RestartMode::Stabilize => "  \x1B[001m\x1B[030mStabilize\x1B[000m",
+
             },
             im!("{:>9}", self, LogUsizeId::RestartBlock, rst_num_block),
             im!("{:>9}", self, LogUsizeId::Restart, asgs_num_restart),
@@ -722,7 +723,7 @@ impl State {
     where
         A: Export<(usize, usize, usize)>,
         C: Export<(usize, usize, usize, usize, usize, usize)> + ClauseDBIF,
-        R: Export<(usize, bool, f64, f64, f64)> + RestartIF,
+        R: Export<(RestartMode, usize, f64, f64, f64)> + RestartIF,
         V: Export<(f64, f64)>,
     {
         self.progress_cnt += 1;
@@ -738,7 +739,7 @@ impl State {
             cdb_num_learnt,
             cdb_num_reduction,
         ) = cdb.exports();
-        let (rst_num_block, _luby_active, _asg_trend, _lbd_get, _lbd_trend) = rst.exports();
+        let (_mode, rst_num_block, _asg_trend, _lbd_get, _lbd_trend) = rst.exports();
         println!(
             "c | {:>8}  {:>8} {:>8} | {:>7} {:>8} {:>8} |  {:>4}  {:>8} {:>7} {:>8} | {:>6.3} % |",
             asgs_num_restart,                            // restart
@@ -767,7 +768,7 @@ impl State {
         A: Export<(usize, usize, usize)> + PropagatorIF,
         C: Export<(usize, usize, usize, usize, usize, usize)> + ClauseDBIF,
         E: Export<(usize, usize, usize)> + EliminatorIF,
-        R: Export<(usize, bool, f64, f64, f64)> + RestartIF,
+        R: Export<(RestartMode, usize, f64, f64, f64)> + RestartIF,
         V: Export<(f64, f64)> + VarDBIF,
     {
         self.progress_cnt += 1;
@@ -787,7 +788,7 @@ impl State {
             cdb_num_learnt,
             _num_reduction,
         ) = cdb.exports();
-        let (rst_num_block, _luby_active, rst_asg_trend, rst_lbd_get, rst_lbd_trend) =
+        let (_mode, rst_num_block, rst_asg_trend, rst_lbd_get, rst_lbd_trend) =
             rst.exports();
         println!(
             "{:>3}#{:>8},{:>7},{:>7},{:>7},{:>6.3},,{:>7},{:>7},\

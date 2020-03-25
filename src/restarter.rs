@@ -23,6 +23,17 @@ pub enum RestarterModule {
     Luby,
 }
 
+/// Restart modes
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum RestartMode {
+    /// Controlled by Glucose-like forcing and blocking restart scheme
+    Dynamic = 0,
+    /// Controlled by a good old scheme
+    Luby,
+    /// Controlled by CaDiCal-like Geometric Stabilizer
+    Stabilize,
+}
+
 /// API for restart like `block_restart`, `force_restart` and so on.
 pub trait RestartIF {
     /// block restart if needed.
@@ -292,6 +303,7 @@ impl LubySeries {
 /// An implementation of Cadical-style blocker.
 #[derive(Debug)]
 pub struct GeometricBlocker {
+    enable: bool,
     active: bool,
     next_trigger: usize,
     restart_inc: f64,
@@ -300,7 +312,8 @@ pub struct GeometricBlocker {
 impl Default for GeometricBlocker {
     fn default() -> Self {
         GeometricBlocker {
-            active: true,
+            enable: true,
+            active: false,
             next_trigger: 1000,
             restart_inc: 2.0,
         }
@@ -308,14 +321,19 @@ impl Default for GeometricBlocker {
 }
 
 impl Instantiate for GeometricBlocker {
-    fn instantiate(_config: &Config, _: &CNFDescription) -> Self {
-        GeometricBlocker::default()
+    fn instantiate(config: &Config, _: &CNFDescription) -> Self {
+        GeometricBlocker {
+            enable: !config.without_stab,
+            ..GeometricBlocker::default()
+        }
     }
 }
 
 impl fmt::Display for GeometricBlocker {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if self.active {
+        if !self.enable {
+            write!(f, "Stabilizer(dead)")
+        } else if self.active && self.enable {
             write!(f, "Stabilizer[+{}]", self.next_trigger)
         } else {
             write!(f, "Stabilizer[-{}]", self.next_trigger)
@@ -326,7 +344,7 @@ impl fmt::Display for GeometricBlocker {
 impl EmaIF for GeometricBlocker {
     type Input = usize;
     fn update(&mut self, now: usize) {
-        if self.next_trigger <= now {
+        if self.enable && self.next_trigger <= now {
             self.active = !self.active;
             self.next_trigger = ((now as f64) * self.restart_inc) as usize;
         }
@@ -461,11 +479,20 @@ impl RestartIF for Restarter {
     }
 }
 
-impl Export<(usize, bool, f64, f64, f64)> for Restarter {
-    fn exports(&self) -> (usize, bool, f64, f64, f64) {
+impl Export<(RestartMode, usize, f64, f64, f64)> for Restarter {
+    ///```
+    /// let (rst_mode, rst_num_block, rst_asg_trend, rst_lbd_get, rst_lbd_trend) = rst.exports();
+    ///```
+    fn exports(&self) -> (RestartMode, usize, f64, f64, f64) {
         (
+            if self.blk.active {
+                RestartMode::Stabilize
+            } else if self.luby.active {
+                RestartMode::Luby
+            } else {
+                RestartMode::Dynamic
+            },
             self.num_block,
-            self.luby.active,
             self.asg.trend(),
             self.lbd.get(),
             self.lbd.trend(),

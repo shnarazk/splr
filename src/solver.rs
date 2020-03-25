@@ -571,7 +571,7 @@ fn handle_conflict(
     }
     cdb.scale_activity();
     if 0 < state.config.dump_interval && ncnfl % state.config.dump_interval == 0 {
-        let (rst_num_block, _luby_active, rst_asg_trend, _lbd_get, rst_lbd_trend) = rst.exports();
+        let (_mode, rst_num_block, rst_asg_trend, _lbd_get, rst_lbd_trend) = rst.exports();
         state.development.push((
             ncnfl,
             (state.num_solved_vars + state.num_eliminated_vars) as f64

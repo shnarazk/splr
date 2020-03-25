@@ -144,6 +144,7 @@ impl Default for Config {
             restart_lbd_len: 50,
             restart_step: 50,
             restart_threshold: 0.60,
+            without_stab: false,
 
             // solver
             chronobt: 100,

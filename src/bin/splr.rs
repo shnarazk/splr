@@ -4,6 +4,7 @@ use {
     splr::{
         clause::CertifiedRecord,
         config::{Config, VERSION},
+        restarter::RestartMode,
         solver::{Certificate, SatSolverIF, Solver, SolverResult},
         state::*,
         types::{Export, SolverError},
@@ -265,7 +266,7 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     };
     let (asgs_num_conflict, _num_propagation, asgs_num_restart) = s.asgs.exports();
     let (_, vdb_activity_decay) = s.vdb.exports();
-    let (_num_block, rst_luby_active, _asg_trend, _lbd_get, _lbd_trend) = s.rst.exports();
+    let (rst_mode, _num_block, _asg_trend, _lbd_get, _lbd_trend) = s.rst.exports();
     out.write_all(
         format!(
             "c {:<43}, #var:{:9}, #cls:{:9}\n",
@@ -305,7 +306,7 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     out.write_all(
         format!(
             "c  {}|#BLK:{}, #RST:{}, eASG:{}, eLBD:{} \n",
-            if rst_luby_active {
+            if rst_mode == RestartMode::Luby {
                 "LubyRestart"
             } else {
                 "    Restart"
