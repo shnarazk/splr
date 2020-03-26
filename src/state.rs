@@ -416,7 +416,7 @@ impl StateIF for State {
             cdb_num_reduction,
         ) = cdb.exports();
 
-        let (_num_full, elim_num_sat) = elim.exports();
+        let (elim_num_full, _num_sat) = elim.exports();
 
         let (rst_mode, rst_num_block, rst_asg_trend, rst_lbd_get, rst_lbd_trend) = rst.exports();
 
@@ -501,9 +501,9 @@ impl StateIF for State {
             )
         );
         println!(
-            "\x1B[2K        misc|#rdc:{}, #sce:{}, core:{}, vdcy:{} ",
+            "\x1B[2K        misc|#rdc:{}, #elm:{}, core:{}, vdcy:{} ",
             im!("{:>9}", self, LogUsizeId::Reduction, cdb_num_reduction),
-            im!("{:>9}", self, LogUsizeId::SatClauseElim, elim_num_sat),
+            im!("{:>9}", self, LogUsizeId::Elimination, elim_num_full),
             fm!("{:>9.0}", self, LogF64Id::CoreSize, vdb_core_size),
             format!("{:>9.4}", vdb_activity_decay),
         );
@@ -603,8 +603,7 @@ pub enum LogUsizeId {
     RestartBlock,   // 10: restart_block: usize,
     Restart,        // 11: restart_count: usize,
     Reduction,      // 12: reduction: usize,
-    SatClauseElim,  // 13: simplification: usize,
-    ExhaustiveElim, // 14: elimination: usize,
+    Elimination,    // 13: full-featured elimination: usize,
     End,
 }
 

@@ -336,9 +336,9 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c         misc|#rdc:{}, #sce:{}, core:{}, vdcy:{} \n",
+            "c         misc|#rdc:{}, #elm:{}, core:{}, vdcy:{} \n",
             format!("{:>9}", state[LogUsizeId::Reduction]),
-            format!("{:>9}", state[LogUsizeId::SatClauseElim]),
+            format!("{:>9}", state[LogUsizeId::Elimination]),
             format!("{:>9.0}", state[LogF64Id::CoreSize]),
             format!("{:>9.4}", vdb_activity_decay),
         )
