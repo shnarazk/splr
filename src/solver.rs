@@ -327,6 +327,7 @@ fn search(
     state: &mut State,
     vdb: &mut VarDB,
 ) -> Result<bool, SolverError> {
+    const SIMPLIFICATION_PUT_OFF: usize = 64;
     let mut a_decision_was_made = false;
     rst.update(RestarterModule::Luby, 0);
     loop {
@@ -340,12 +341,6 @@ fn search(
             state.last_asg = asgs.len();
             if rst.force_restart() {
                 asgs.cancel_until(vdb, state.root_level);
-            } else if asgs.level() == 0 {
-                if elim.simplify(asgs, cdb, state, vdb).is_err() {
-                    debug_assert!(false, "interal error by simplify");
-                    return Err(SolverError::Inconsistent);
-                }
-                state.num_solved_vars = asgs.len();
             }
         } else {
             if a_decision_was_made {
@@ -362,6 +357,20 @@ fn search(
                 return Ok(false);
             }
             handle_conflict(asgs, cdb, elim, rst, state, vdb, ci)?;
+        }
+        if asgs.level() == state.root_level {
+            let nc = asgs.exports().0;
+            if state.last_solved == nc {
+                if elim.simplify(asgs, cdb, state, vdb).is_err() {
+                    return Err(SolverError::Inconsistent);
+                }
+            } else if SIMPLIFICATION_PUT_OFF + state.last_solved == nc  {
+                    elim.activate();
+                if elim.simplify(asgs, cdb, state, vdb).is_err() {
+                    return Err(SolverError::Inconsistent);
+                }
+            }
+            state.num_solved_vars = asgs.len();
         }
         if !asgs.remains() {
             let vi = asgs.select_var(vdb);
@@ -538,6 +547,7 @@ fn handle_conflict(
         } else {
             asgs.assign_by_unitclause(vdb, l0);
         }
+        state.last_solved = ncnfl;
         state.num_solved_vars += 1;
     } else {
         {
