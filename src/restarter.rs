@@ -12,7 +12,7 @@ use {
 trait ProgressEvaluator {
     /// map the value into a bool for forcing/blocking restart.
     fn is_active(&self) -> bool;
-    /// calculate  and set up the next condition
+    /// calculate and set up the next condition
     fn shift(&mut self);
 }
 
@@ -55,6 +55,17 @@ struct ProgressASG {
     /// For block restart based on average assignments: 1.40.
     /// This is called `R` in Glucose
     threshold: f64,
+}
+
+impl Default for ProgressASG {
+    fn default() -> ProgressASG {
+        ProgressASG {
+            enable: true,
+            ema: Ema::new(1),
+            asg: 0,
+            threshold: 1.4,
+        }
+    }
 }
 
 impl Instantiate for ProgressASG {
@@ -101,14 +112,24 @@ struct ProgressLBD {
     threshold: f64,
 }
 
+impl Default for ProgressLBD {
+    fn default() -> ProgressLBD {
+        ProgressLBD {
+            enable: true,
+            ema: Ema2::new(1),
+            num: 0,
+            sum: 0,
+            threshold: 1.4,
+        }
+    }
+}
+
 impl Instantiate for ProgressLBD {
     fn instantiate(config: &Config, _: &CNFDescription) -> Self {
         ProgressLBD {
-            enable: true,
             ema: Ema2::new(config.restart_lbd_len).with_slow(100_000),
-            num: 0,
-            sum: 0,
             threshold: config.restart_threshold,
+            ..ProgressLBD::default()
         }
     }
 }
@@ -454,6 +475,25 @@ pub struct Restarter {
     num_block: usize,
 }
 
+impl Default for Restarter {
+    fn default() -> Restarter {
+        Restarter {
+            asg: ProgressASG::default(),
+            blk: GeometricBlocker::default(),
+            int: ProgressInt::default(),
+            lbd: ProgressLBD::default(),
+            // rcc: ProgressRCC::default(),
+            // blvl: ProgressLVL::default(),
+            // clvl: ProgressLVL::default(),
+            luby: LubySeries::default(),
+            after_restart: 0,
+            next_restart: 100,
+            restart_step: 0,
+            num_block: 0,
+        }
+    }
+}
+
 impl Instantiate for Restarter {
     fn instantiate(config: &Config, cnf: &CNFDescription) -> Self {
         Restarter {
@@ -465,10 +505,8 @@ impl Instantiate for Restarter {
             // blvl: ProgressLVL::instantiate(config, cnf),
             // clvl: ProgressLVL::instantiate(config, cnf),
             luby: LubySeries::instantiate(config, cnf),
-            after_restart: 0,
-            next_restart: 100,
             restart_step: config.restart_step,
-            num_block: 0,
+            ..Restarter::default()
         }
     }
     fn adapt_to(&mut self, state: &State, num_conflict: usize) {
@@ -476,13 +514,10 @@ impl Instantiate for Restarter {
             (SearchStrategy::Initial, 0) => {
                 self.asg.enable = true;
                 self.blk.enable = true;
-                self.int.enable = false;
+                self.int.enable = true;
+                self.lbd.enable = false;
             }
-            (SearchStrategy::LowSuccesive, n) => {
-                if n == num_conflict {
-                    self.luby.enable = true;
-                }
-            }
+            (SearchStrategy::LowSuccesive, n) if n == num_conflict => self.luby.enable = true,
             // SearchStrategy::HighSuccesive => (),
             // SearchStrategy::LowSuccesiveM => (),
             // SearchStrategy::ManyGlues => (),
