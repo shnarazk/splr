@@ -155,7 +155,7 @@ impl ProgressEvaluator for ProgressLBD {
     fn is_active(&self) -> bool {
         self.enable
             // && (self.sum as f64) < self.ema.get() * (self.num as f64) * self.threshold
-            && self.threshold < self.trend()
+            && self.threshold < self.ema.trend()
     }
     fn shift(&mut self) {}
 }
@@ -512,10 +512,7 @@ impl Instantiate for Restarter {
     fn adapt_to(&mut self, state: &State, num_conflict: usize) {
         match state.strategy {
             (SearchStrategy::Initial, 0) => {
-                self.asg.enable = true;
-                self.blk.enable = true;
-                self.int.enable = true;
-                self.lbd.enable = false;
+                // self.int.enable = true;
             }
             (SearchStrategy::LowSuccesive, n) if n == num_conflict => self.luby.enable = true,
             // SearchStrategy::HighSuccesive => (),
