@@ -364,8 +364,8 @@ fn search(
                 if elim.simplify(asgs, cdb, state, vdb).is_err() {
                     return Err(SolverError::Inconsistent);
                 }
-            } else if SIMPLIFICATION_PUT_OFF + state.last_solved == nc  {
-                    elim.activate();
+            } else if SIMPLIFICATION_PUT_OFF + state.last_solved == nc {
+                elim.activate();
                 if elim.simplify(asgs, cdb, state, vdb).is_err() {
                     return Err(SolverError::Inconsistent);
                 }
