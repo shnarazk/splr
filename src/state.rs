@@ -162,7 +162,6 @@ pub struct State {
     pub c_lvl: Ema,
     pub conflicts: Vec<Lit>,
     pub last_asg: usize,
-    pub model: Vec<Option<bool>>,
     pub new_learnt: Vec<Lit>,
     pub progress_cnt: usize,
     pub record: ProgressRecord,
@@ -187,7 +186,6 @@ impl Default for State {
             c_lvl: Ema::new(5_000),
             conflicts: Vec::new(),
             last_asg: 0,
-            model: Vec::new(),
             new_learnt: Vec::new(),
             progress_cnt: 0,
             record: ProgressRecord::default(),
@@ -215,13 +213,18 @@ impl IndexMut<Stat> for State {
 
 impl Instantiate for State {
     fn instantiate(config: &Config, cnf: &CNFDescription) -> State {
-        let mut state = State::default();
-        state.num_vars = cnf.num_of_variables;
-        state.model = vec![None; cnf.num_of_variables + 1];
-        state.target = cnf.clone();
-        state.time_limit = config.timeout;
-        state.config = config.clone();
-        state
+        State {
+            num_vars: cnf.num_of_variables,
+            config: config.clone(),
+            strategy: if config.without_adaptive_strategy {
+                (SearchStrategy::Generic, 0)
+            } else {
+                (SearchStrategy::Initial, 0)
+            },
+            target: cnf.clone(),
+            time_limit: config.timeout,
+            ..State::default()
+        }
     }
 }
 
