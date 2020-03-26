@@ -625,7 +625,7 @@ fn adapt_modules(
     let (asgs_num_conflict, _num_propagation, _num_restart) = asgs.exports();
     let (_, _, rst_asg_trend, _, _) = rst.exports();
     if elim.enable && rst_asg_trend < 1.0 {
-        state.flush("exhaustive eliminator activated...");
+        // state.flush("exhaustive eliminator activated...");
         // asgs.cancel_until(vdb, state.root_level);
         elim.activate();
         elim.simplify(asgs, cdb, state, vdb)?;

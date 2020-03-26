@@ -293,7 +293,7 @@ impl PropagatorIF for AssignStack {
         self.trail.push(l);
     }
     fn assign_by_unitclause(&mut self, vdb: &mut VarDB, l: Lit) {
-        self.cancel_until(vdb, 0);
+        self.cancel_until(vdb, self.root_level);
         debug_assert!(self.trail.iter().all(|k| k.vi() != l.vi()));
         let v = &mut vdb[l];
         set_assign!(self, l);
