@@ -563,13 +563,17 @@ impl Eliminator {
         state: &mut State,
         vdb: &mut VarDB,
     ) -> MaybeInconsistent {
+        /// The ratio of time slot for single elimination step.
+        /// Since it is measured in millisecond, 1000 means executing elimination
+        /// until timed out. 100 means this function can consume 10% of a given time.
+        const TIMESLOT_FOR_ELIMINATION: u64 = 50;
         debug_assert!(asgs.level() == 0);
         if self.mode == EliminatorMode::Deactive {
             return Ok(());
         }
         let timedout = Arc::new(AtomicBool::new(false));
         let timedout2 = timedout.clone();
-        let time = 100 * state.config.timeout as u64;
+        let time = TIMESLOT_FOR_ELIMINATION * state.config.timeout as u64;
         thread::spawn(move || {
             thread::sleep(Duration::from_millis(time));
             timedout2.store(true, Ordering::Release);
