@@ -619,7 +619,7 @@ impl Instantiate for ClauseDB {
 }
 
 impl Export<(usize, usize, usize, usize, usize, usize)> for ClauseDB {
-    ///```
+    ///```ignore
     /// let (_active, _bi_clause, _bi_learnt, _lbd2, _learnt, _reduction) = cdb.exports();
     ///```
     #[inline]
@@ -1004,6 +1004,7 @@ mod tests {
         Lit::from(i)
     }
 
+    #[allow(dead_code)]
     fn check_watches(cdb: &ClauseDB, cid: ClauseId) {
         let c = &cdb.clause[cid.ordinal as usize];
         if c.lits.is_empty() {

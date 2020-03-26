@@ -589,7 +589,7 @@ impl RestartIF for Restarter {
 }
 
 impl Export<(RestartMode, usize, f64, f64, f64)> for Restarter {
-    ///```
+    ///```ignore
     /// let (_mode, _num_block, _asg_trend, _lbd_get, _lbd_trend) = rst.exports();
     ///```
     #[inline]
@@ -617,6 +617,7 @@ mod tests {
     #[test]
     fn test_luby_series() {
         let mut luby = LubySeries {
+            enable: true,
             active: true,
             step: 1,
             ..LubySeries::default()
@@ -624,7 +625,7 @@ mod tests {
         luby.update(0);
         for v in vec![1, 1, 2, 1, 1, 2, 4, 1, 1, 2, 1, 1, 2, 4, 8] {
             assert_eq!(luby.next_restart, v);
-            luby.update(1);
+            luby.shift();
         }
     }
 }

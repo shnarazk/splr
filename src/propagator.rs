@@ -203,7 +203,7 @@ impl Instantiate for AssignStack {
 }
 
 impl Export<(usize, usize, usize)> for AssignStack {
-    ///```
+    ///```ignore
     /// let (asgs_num_conflict, asgs_num_propagation, asgs_num_restart) = asgs.exports();
     ///```
     #[inline]
