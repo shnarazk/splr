@@ -7,6 +7,8 @@
 - stats data are stored in each modules.
 - change the meaning of option `-S`
 - remove `deep search` completely
+- refactor `ProgressEvaluator`s
+- change the definition of `Config::restart_threshold`
 
 ## 0.3.2, 2020-03-20
 

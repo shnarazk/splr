@@ -269,6 +269,7 @@ impl SatSolverIF for Solver {
         debug_assert_eq!(s.vdb.len() - 1, cnf.num_of_variables);
         // s.state[Stat::NumBin] = s.cdb.iter().skip(1).filter(|c| c.len() == 2).count();
         s.vdb.adapt_to(&s.state, 0);
+        s.rst.adapt_to(&s.state, 0);
         Ok(s)
     }
     // renamed from clause_new

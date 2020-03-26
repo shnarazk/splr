@@ -12,6 +12,8 @@ use {
 trait ProgressEvaluator {
     /// map the value into a bool for forcing/blocking restart.
     fn is_active(&self) -> bool;
+    /// calculate  and set up the next condition
+    fn shift(&mut self);
 }
 
 /// Submodule index to access them indirectly.
@@ -46,7 +48,8 @@ pub trait RestartIF {
 
 /// An assignment history used for blocking restart.
 #[derive(Debug)]
-pub struct ProgressASG {
+struct ProgressASG {
+    enable: bool,
     asg: usize,
     ema: Ema,
     /// For block restart based on average assignments: 1.40.
@@ -57,6 +60,7 @@ pub struct ProgressASG {
 impl Instantiate for ProgressASG {
     fn instantiate(config: &Config, _: &CNFDescription) -> Self {
         ProgressASG {
+            enable: true,
             ema: Ema::new(config.restart_asg_len),
             asg: 0,
             threshold: config.restart_blocking,
@@ -80,16 +84,19 @@ impl EmaIF for ProgressASG {
 
 impl ProgressEvaluator for ProgressASG {
     fn is_active(&self) -> bool {
-        self.threshold * self.ema.get() < (self.asg as f64)
+        self.enable && self.threshold * self.ema.get() < (self.asg as f64)
     }
+    fn shift(&mut self) {}
 }
 
 /// An EMA of learnt clauses' LBD, used for forcing restart.
 #[derive(Debug)]
-pub struct ProgressLBD {
+struct ProgressLBD {
+    enable: bool,
     ema: Ema2,
     num: usize,
     sum: usize,
+    tmp: f64,
     /// For force restart based on average LBD of newly generated clauses: 0.80.
     /// This is called `K` in Glucose
     threshold: f64,
@@ -98,7 +105,8 @@ pub struct ProgressLBD {
 impl Instantiate for ProgressLBD {
     fn instantiate(config: &Config, _: &CNFDescription) -> Self {
         ProgressLBD {
-            ema: Ema2::new(config.restart_lbd_len).with_slow(4 * config.restart_lbd_len),
+            enable: true,
+            ema: Ema2::new(config.restart_lbd_len).with_slow(100_000),
             num: 0,
             sum: 0,
             threshold: config.restart_threshold,
@@ -125,8 +133,11 @@ impl EmaIF for ProgressLBD {
 
 impl ProgressEvaluator for ProgressLBD {
     fn is_active(&self) -> bool {
-        (self.sum as f64) < self.ema.get() * (self.num as f64) * self.threshold
+        self.enable
+            // && (self.sum as f64) < self.ema.get() * (self.num as f64) * self.threshold
+            && self.threshold < self.trend()
     }
+    fn shift(&mut self) {}
 }
 
 /// An EMA of decision level.
@@ -160,6 +171,7 @@ impl ProgressEvaluator for ProgressLVL {
     fn is_active(&self) -> bool {
         todo!()
     }
+    fn shift(&mut self) {}
 }
 
 /// An EMA of reccuring conflict complexity (unused now).
@@ -212,11 +224,13 @@ impl ProgressEvaluator for ProgressRCC {
     fn is_active(&self) -> bool {
         self.threshold < self.heat.get()
     }
+    fn shift(&mut self) {}
 }
 
 /// An implementation of Luby series.
 #[derive(Debug)]
-pub struct LubySeries {
+struct LubySeries {
+    enable: bool,
     active: bool,
     index: usize,
     next_restart: usize,
@@ -226,12 +240,14 @@ pub struct LubySeries {
 
 impl Default for LubySeries {
     fn default() -> Self {
+        const STEP: usize = 100;
         LubySeries {
+            enable: false,
             active: false,
             index: 0,
-            next_restart: 0,
+            next_restart: STEP,
             restart_inc: 2.0,
-            step: 100,
+            step: STEP,
         }
     }
 }
@@ -247,7 +263,7 @@ impl Instantiate for LubySeries {
 
 impl fmt::Display for LubySeries {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if self.active {
+        if self.enable {
             write!(f, "Luby[index:{}, step:{}]", self.index, self.next_restart,)
         } else {
             write!(f, "Luby(deactive)")
@@ -257,14 +273,17 @@ impl fmt::Display for LubySeries {
 
 impl EmaIF for LubySeries {
     type Input = usize;
-    fn update(&mut self, reset: usize) {
-        debug_assert!(self.active);
-        if reset == 0 {
-            self.index = 0;
-        } else {
-            self.index += 1;
+    fn update(&mut self, index: usize) {
+        if !self.enable {
+            return;
         }
-        self.next_restart = self.next_step();
+        if index == 0 {
+            self.index = 0;
+            self.next_restart = self.next_step();
+            self.active = false;
+        } else {
+            self.active = self.next_restart < index;
+        }
     }
     fn get(&self) -> f64 {
         self.next_restart as f64
@@ -273,7 +292,12 @@ impl EmaIF for LubySeries {
 
 impl ProgressEvaluator for LubySeries {
     fn is_active(&self) -> bool {
-        todo!()
+        self.enable && self.active
+    }
+    fn shift(&mut self) {
+        self.active = false;
+        self.index += 1;
+        self.next_restart = self.next_step();
     }
 }
 
@@ -302,7 +326,7 @@ impl LubySeries {
 
 /// An implementation of Cadical-style blocker.
 #[derive(Debug)]
-pub struct GeometricBlocker {
+struct GeometricBlocker {
     enable: bool,
     active: bool,
     next_trigger: usize,
@@ -358,6 +382,56 @@ impl ProgressEvaluator for GeometricBlocker {
     fn is_active(&self) -> bool {
         self.active
     }
+    fn shift(&mut self) {}
+}
+
+/// Intergal Threshold
+#[derive(Debug)]
+struct ProgressInt {
+    enable: bool,
+    sum: f64,
+    threshold: f64,
+    step: f64,
+}
+
+impl Default for ProgressInt {
+    fn default() -> ProgressInt {
+        ProgressInt {
+            enable: false,
+            sum: 0.0,
+            threshold: 1000.0,
+            step: 2.0,
+        }
+    }
+}
+
+impl Instantiate for ProgressInt {
+    fn instantiate(_: &Config, _: &CNFDescription) -> Self {
+        ProgressInt::default()
+    }
+}
+
+impl EmaIF for ProgressInt {
+    type Input = usize;
+    fn update(&mut self, d: usize) {
+        self.sum += (d as f64).powf(1.5);
+    }
+    fn get(&self) -> f64 {
+        todo!()
+    }
+    fn trend(&self) -> f64 {
+        todo!()
+    }
+}
+
+impl ProgressEvaluator for ProgressInt {
+    fn is_active(&self) -> bool {
+        self.enable && self.threshold < self.sum
+    }
+    fn shift(&mut self) {
+        self.sum = 0.0;
+        self.threshold *= self.step;
+    }
 }
 
 /// `Restarter` provides restart API and holds data about restart conditions.
@@ -365,6 +439,7 @@ impl ProgressEvaluator for GeometricBlocker {
 pub struct Restarter {
     asg: ProgressASG,
     blk: GeometricBlocker,
+    int: ProgressInt,
     lbd: ProgressLBD,
     // pub rcc: ProgressRCC,
     // pub blvl: ProgressLVL,
@@ -385,6 +460,7 @@ impl Instantiate for Restarter {
         Restarter {
             asg: ProgressASG::instantiate(config, cnf),
             blk: GeometricBlocker::instantiate(config, cnf),
+            int: ProgressInt::instantiate(config, cnf),
             lbd: ProgressLBD::instantiate(config, cnf),
             // rcc: ProgressRCC::instantiate(config, cnf),
             // blvl: ProgressLVL::instantiate(config, cnf),
@@ -398,19 +474,21 @@ impl Instantiate for Restarter {
     }
     fn adapt_to(&mut self, state: &State, num_conflict: usize) {
         match state.strategy {
-            (SearchStrategy::Initial, _) => (),
+            (SearchStrategy::Initial, 0) => {
+                self.asg.enable = true;
+                self.blk.enable = true;
+                self.int.enable = false;
+            }
             (SearchStrategy::LowSuccesive, n) => {
                 if n == num_conflict {
-                    self.luby.active = true;
+                    self.luby.enable = true;
                 }
             }
             // SearchStrategy::HighSuccesive => (),
             // SearchStrategy::LowSuccesiveM => (),
             // SearchStrategy::ManyGlues => (),
             // SearchStrategy::Generic => (),
-            _ => {
-                // self.luby.active = state.c_lvl.get() < 14.0;
-            }
+            _ => (),
         }
     }
 }
@@ -424,26 +502,36 @@ macro_rules! reset {
 
 impl RestartIF for Restarter {
     fn block_restart(&mut self) -> bool {
-        if 100 < self.lbd.num
-            && !self.luby.active
-            && !self.blk.active
-            && self.restart_step <= self.after_restart
-            && self.asg.is_active()
-        {
+        if self.after_restart < self.restart_step || self.luby.enable || self.int.enable {
+            return false;
+        }
+        if self.blk.is_active() {
+            return false;
+        }
+        if self.asg.is_active() {
             self.num_block += 1;
             reset!(self);
         }
         false
     }
     fn force_restart(&mut self) -> bool {
-        if self.luby.active {
-            if self.luby.next_restart <= self.after_restart {
-                self.luby.update(1);
-                reset!(self);
-            }
-        } else if self.blk.active {
+        if self.luby.is_active() {
+            self.luby.shift();
+            reset!(self);
+        }
+        if self.blk.is_active() {
+            // blk doesn't need `shift`.
             return false;
-        } else if self.restart_step <= self.after_restart && self.lbd.is_active() {
+        }
+        if self.int.is_active() {
+            self.int.shift();
+            reset!(self);
+        }
+        if self.after_restart < self.restart_step {
+            return false;
+        }
+        if self.lbd.is_active() {
+            // lbd doesn't need `shift`.
             reset!(self);
         }
         false
@@ -453,34 +541,29 @@ impl RestartIF for Restarter {
             RestarterModule::Counter => {
                 // use an embeded value, expecting compile time optimization
                 self.after_restart += 1;
-                self.blk.update(val);
+                self.blk.update(self.after_restart);
+                self.luby.update(self.after_restart);
             }
-            RestarterModule::ASG => {
-                self.asg.update(val);
-            }
+            RestarterModule::ASG => self.asg.update(val),
             RestarterModule::LBD => {
                 self.lbd.update(val);
+                self.int.update(val);
             }
-            RestarterModule::Luby => {
-                if self.luby.active {
-                    // use an embeded value, expecting compile time optimization
-                    self.luby.update(0);
-                }
-            }
+            RestarterModule::Luby => self.luby.update(0),
         }
     }
 }
 
 impl Export<(RestartMode, usize, f64, f64, f64)> for Restarter {
     ///```
-    /// let (rst_mode, rst_num_block, rst_asg_trend, rst_lbd_get, rst_lbd_trend) = rst.exports();
+    /// let (_mode, _num_block, _asg_trend, _lbd_get, _lbd_trend) = rst.exports();
     ///```
     #[inline]
     fn exports(&self) -> (RestartMode, usize, f64, f64, f64) {
         (
-            if self.blk.active {
+            if self.blk.is_active() {
                 RestartMode::Stabilize
-            } else if self.luby.active {
+            } else if self.luby.enable {
                 RestartMode::Luby
             } else {
                 RestartMode::Dynamic

@@ -90,7 +90,7 @@ pub struct Config {
     pub restart_step: usize,
 
     /// Forcing restart threshold
-    #[structopt(long = "rt", default_value = "0.70")]
+    #[structopt(long = "rt", default_value = "1.2")]
     pub restart_threshold: f64, // Glucose's K
 
     /// Disable geometric restart blocker
@@ -143,7 +143,7 @@ impl Default for Config {
             restart_blocking: 1.40,
             restart_lbd_len: 50,
             restart_step: 50,
-            restart_threshold: 0.60,
+            restart_threshold: 1.2,
             without_stab: false,
 
             // solver
