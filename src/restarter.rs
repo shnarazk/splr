@@ -96,7 +96,6 @@ struct ProgressLBD {
     ema: Ema2,
     num: usize,
     sum: usize,
-    tmp: f64,
     /// For force restart based on average LBD of newly generated clauses: 0.80.
     /// This is called `K` in Glucose
     threshold: f64,
