@@ -126,43 +126,50 @@ impl SatSolverIF for Solver {
         state.progress_header();
         state.progress(asgs, cdb, elim, rst, vdb, Some("initialization phase"));
         state.flush("loading...");
-        let use_pre_processor = true;
-        let use_pre_processing_eliminator = true;
-        if use_pre_processor {
-            state.flush("phasing...");
-            elim.activate();
-            elim.prepare(cdb, vdb, true);
-            // run simple preprocessor
-            for vi in 1..vdb.len() {
-                let v = &mut vdb[vi];
-                let w = &elim[vi];
-                if v.assign.is_some() {
-                    continue;
-                }
-                match w.stats() {
-                    (_, 0) => {
-                        let l = Lit::from_assign(vi, true);
-                        if asgs.assign_at_rootlevel(vdb, l).is_err() {
-                            return Ok(Certificate::UNSAT);
-                        }
-                    }
-                    (0, _) => {
-                        let l = Lit::from_assign(vi, false);
-                        if asgs.assign_at_rootlevel(vdb, l).is_err() {
-                            return Ok(Certificate::UNSAT);
-                        }
-                    }
-                    (p, m) => {
-                        v.set(Flag::PHASE, m < p);
-                        elim.enqueue_var(vdb, vi, false);
-                    }
-                }
+        const USE_PRE_PROCESSING_ELIMINATOR: bool = true;
+
+        //
+        //## Propagate all trivial literals (an essential step)
+        //
+        // Set appropriate phases and push all the unit clauses to assign stack.
+        // To do so, we use eliminator's ocuur list.
+        // Thus we have to call `activate` and `prepare` firstly, to build occur lists.
+        // Otherwise all literals are assigned wrongly.
+        state.flush("phasing...");
+        elim.activate();
+        elim.prepare(cdb, vdb, true);
+        for vi in 1..vdb.len() {
+            let v = &mut vdb[vi];
+            if v.assign.is_some() {
+                continue;
             }
-            if !elim.enable || !use_pre_processing_eliminator {
-                elim.stop(cdb, vdb);
+            let w = &elim[vi];
+            match w.stats() {
+                (_, 0) => {
+                    let l = Lit::from_assign(vi, true);
+                    if asgs.assign_at_rootlevel(vdb, l).is_err() {
+                        return Ok(Certificate::UNSAT);
+                    }
+                }
+                (0, _) => {
+                    let l = Lit::from_assign(vi, false);
+                    if asgs.assign_at_rootlevel(vdb, l).is_err() {
+                        return Ok(Certificate::UNSAT);
+                    }
+                }
+                (p, m) => {
+                    v.set(Flag::PHASE, m < p);
+                    elim.enqueue_var(vdb, vi, false);
+                }
             }
         }
-        if elim.enable && use_pre_processing_eliminator {
+        //
+        //## Run eliminator
+        //
+        if !USE_PRE_PROCESSING_ELIMINATOR || !elim.enable {
+            elim.stop(cdb, vdb);
+        }
+        if USE_PRE_PROCESSING_ELIMINATOR && elim.enable {
             state.flush("simplifying...");
             // if 20_000_000 < state.target.num_of_clauses {
             //     state.elim_eliminate_grow_limit = 0;
@@ -190,10 +197,14 @@ impl SatSolverIF for Solver {
                     _ => (),
                 }
             }
+            vdb.initialize_reward(elim.sorted_iterator());
         }
-        vdb.initialize_reward(elim.sorted_iterator());
         asgs.rebuild_order(vdb);
         state.progress(asgs, cdb, elim, rst, vdb, None);
+
+        //
+        //## Search
+        //
         let answer = search(asgs, cdb, elim, rst, state, vdb);
         final_report!(asgs, cdb, elim, rst, state, vdb);
         match answer {
