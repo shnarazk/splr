@@ -415,7 +415,7 @@ impl Ema2 {
 
 /// Internal errors.
 /// Note: returning `Result<(), a-singleton>` is identical to returning `bool`.
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum SolverError {
     // StateUNSAT = 0,
     // StateSAT,

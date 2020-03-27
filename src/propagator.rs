@@ -248,6 +248,7 @@ impl PropagatorIF for AssignStack {
         self.q_head < self.trail.len()
     }
     fn assign_at_rootlevel(&mut self, vdb: &mut VarDB, l: Lit) -> MaybeInconsistent {
+        debug_assert!(l.vi() < vdb.len());
         let v = &mut vdb[l];
         debug_assert!(!v.is(Flag::ELIMINATED));
         debug_assert_eq!(0, self.level());
@@ -267,6 +268,7 @@ impl PropagatorIF for AssignStack {
     }
     fn assign_by_implication(&mut self, vdb: &mut VarDB, l: Lit, cid: ClauseId, lv: DecisionLevel) {
         debug_assert!(usize::from(l) != 0, "Null literal is about to be equeued");
+        debug_assert!(l.vi() < vdb.len());
         // The following doesn't hold anymore by using chronoBT.
         // assert!(self.trail_lim.is_empty() || cid != ClauseId::default());
         let vi = l.vi();
@@ -285,6 +287,7 @@ impl PropagatorIF for AssignStack {
         self.trail.push(l);
     }
     fn assign_by_decision(&mut self, vdb: &mut VarDB, l: Lit) {
+        debug_assert!(l.vi() < vdb.len());
         debug_assert!(!self.trail.contains(&l));
         debug_assert!(!self.trail.contains(&!l), format!("{:?}", l));
         self.level_up();
