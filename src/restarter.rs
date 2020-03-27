@@ -551,7 +551,8 @@ impl RestartIF for Restarter {
             reset!(self);
         }
         if self.blk.is_active() {
-            // blk doesn't need `shift`.
+            self.blk.shift();
+            // blk doesn't need to reset `after_restart`.
             return false;
         }
         if self.int.is_active() {
@@ -570,9 +571,8 @@ impl RestartIF for Restarter {
     fn update(&mut self, kind: RestarterModule, val: usize) {
         match kind {
             RestarterModule::Counter => {
-                // use an embeded value, expecting compile time optimization
                 self.after_restart += 1;
-                self.blk.update(self.after_restart);
+                self.blk.update(val);
                 self.luby.update(self.after_restart);
             }
             RestarterModule::ASG => self.asg.update(val),
