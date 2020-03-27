@@ -21,6 +21,19 @@ use {
 };
 
 /// API for Eliminator like `activate`, `stop`, `eliminate` and so on.
+///```
+/// use crate::{splr::config::Config, splr::types::*};
+/// use crate::splr::eliminator::{Eliminator, EliminatorIF};
+/// use crate::splr::solver::Solver;
+
+/// let mut s = Solver::instantiate(&Config::default(), &CNFDescription::default());
+/// let elim = &mut s.elim;
+/// assert_eq!(elim.is_running(), false);
+/// elim.activate();
+/// // At this point, the `elim` is in `ready` mode, not `running`.
+/// assert_eq!(elim.is_running(), false);
+/// assert_eq!(elim.simplify(&mut s.asgs, &mut s.cdb, &mut s.state, &mut s.vdb), Ok(()));
+///```
 pub trait EliminatorIF {
     /// set eliminator's mode to **ready**.
     fn activate(&mut self);

@@ -392,6 +392,12 @@ impl fmt::Display for Clause {
 }
 
 /// Clause database
+///
+///```
+/// use crate::{splr::config::Config, splr::types::*};
+/// use crate::splr::clause::ClauseDB;
+/// let cdb = ClauseDB::instantiate(&Config::default(), &CNFDescription::default());
+///```
 #[derive(Debug)]
 pub struct ClauseDB {
     /// container of clauses
