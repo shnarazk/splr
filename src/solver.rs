@@ -370,6 +370,7 @@ fn search(
         }
         if asgs.level() == state.root_level {
             if 0 < state.last_solved {
+                debug_assert_eq!(state.num_solved_vars, asgs.len());
                 // Simplification has been postponed because chronoBT was used.
                 state.last_solved = 0;
                 if elim.simplify(asgs, cdb, state, vdb).is_err() {
@@ -381,7 +382,8 @@ fn search(
                 //         return Err(SolverError::Inconsistent);
                 //     }
             }
-            debug_assert_eq!(state.num_solved_vars, asgs.len());
+            // By simplification, we may get further solutions.
+            state.num_solved_vars = asgs.len();
         }
         if !asgs.remains() {
             let vi = asgs.select_var(vdb);
