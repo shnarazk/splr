@@ -10,7 +10,12 @@ use {
         types::*,
         var::{VarDB, VarDBIF, VarRewardIF},
     },
-    std::{convert::TryFrom, io::BufRead, slice::Iter},
+    std::{
+        convert::TryFrom,
+        fs::File,
+        io::{BufRead, BufReader},
+        slice::Iter,
+    },
 };
 
 /// API for SAT solver like `build`, `solve` and so on.
@@ -252,36 +257,8 @@ impl SatSolverIF for Solver {
     /// assert!(Solver::build(&config).is_ok());
     ///```
     fn build(config: &Config) -> Result<Solver, SolverError> {
-        let CNFReader { cnf, mut reader } = CNFReader::try_from(&config.cnf_filename)?;
-        let mut buf = String::new();
-        let mut s: Solver = Solver::instantiate(config, &cnf);
-        loop {
-            buf.clear();
-            match reader.read_line(&mut buf) {
-                Ok(0) => break,
-                Ok(_) if buf.starts_with('c') => continue,
-                Ok(_) => {
-                    let iter = buf.split_whitespace();
-                    let mut v: Vec<Lit> = Vec::new();
-                    for s in iter {
-                        match s.parse::<i32>() {
-                            Ok(0) => break,
-                            Ok(val) => v.push(Lit::from(val)),
-                            Err(_) => (),
-                        }
-                    }
-                    if !v.is_empty() && s.add_unchecked_clause(&mut v).is_none() {
-                        return Err(SolverError::Inconsistent);
-                    }
-                }
-                Err(e) => panic!("{}", e),
-            }
-        }
-        debug_assert_eq!(s.vdb.len() - 1, cnf.num_of_variables);
-        // s.state[Stat::NumBin] = s.cdb.iter().skip(1).filter(|c| c.len() == 2).count();
-        s.vdb.adapt_to(&s.state, 0);
-        s.rst.adapt_to(&s.state, 0);
-        Ok(s)
+        let CNFReader { cnf, reader } = CNFReader::try_from(&config.cnf_filename)?;
+        Solver::instantiate(config, &cnf).inject(reader)
     }
     // renamed from clause_new
     fn add_unchecked_clause(&mut self, lits: &mut Vec<Lit>) -> Option<ClauseId> {
@@ -757,6 +734,39 @@ fn conflict_analyze(
     learnt[0] = !p;
     // println!("- appending {}, the result is {:?}", learnt[0].int(), vec2int(learnt));
     state.simplify_learnt(asgs, cdb, vdb)
+}
+
+impl Solver {
+    fn inject(mut self, mut reader: BufReader<File>) -> Result<Solver, SolverError> {
+        let mut buf = String::new();
+        loop {
+            buf.clear();
+            match reader.read_line(&mut buf) {
+                Ok(0) => break,
+                Ok(_) if buf.starts_with('c') => continue,
+                Ok(_) => {
+                    let iter = buf.split_whitespace();
+                    let mut v: Vec<Lit> = Vec::new();
+                    for s in iter {
+                        match s.parse::<i32>() {
+                            Ok(0) => break,
+                            Ok(val) => v.push(Lit::from(val)),
+                            Err(_) => (),
+                        }
+                    }
+                    if !v.is_empty() && self.add_unchecked_clause(&mut v).is_none() {
+                        return Err(SolverError::Inconsistent);
+                    }
+                }
+                Err(e) => panic!("{}", e),
+            }
+        }
+        debug_assert_eq!(self.vdb.len() - 1, self.state.target.num_of_variables);
+        // s.state[Stat::NumBin] = s.cdb.iter().skip(1).filter(|c| c.len() == 2).count();
+        self.vdb.adapt_to(&self.state, 0);
+        self.rst.adapt_to(&self.state, 0);
+        Ok(self)
+    }
 }
 
 impl State {
