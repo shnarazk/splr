@@ -297,7 +297,7 @@ impl EliminatorIF for Eliminator {
         for w in &mut self[1..] {
             w.clear();
         }
-        for (cid, c) in &mut cdb[0..].iter_mut().enumerate().skip(1) {
+        for (cid, c) in &mut cdb.iter_mut().enumerate().skip(1) {
             if c.is(Flag::DEAD) || c.is(Flag::OCCUR_LINKED) {
                 continue;
             }

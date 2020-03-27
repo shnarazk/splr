@@ -10,7 +10,7 @@ use {
     std::{
         fmt,
         ops::{Index, IndexMut, Range, RangeFrom},
-        slice::Iter,
+        slice::{Iter, IterMut},
     },
 };
 
@@ -32,6 +32,8 @@ pub trait VarDBIF {
     fn is_empty(&self) -> bool;
     /// return an interator over vars.
     fn iter(&self) -> Iter<'_, Var>;
+    /// return an interator over vars.
+    fn iter_mut(&mut self) -> IterMut<'_, Var>;
     /// return the 'value' of a given literal.
     fn assigned(&self, l: Lit) -> Option<bool>;
     /// return `true` is the clause is the reason of the assignment.
@@ -431,6 +433,9 @@ impl VarDBIF for VarDB {
     }
     fn iter(&self) -> Iter<'_, Var> {
         self.var.iter()
+    }
+    fn iter_mut(&mut self) -> IterMut<'_, Var> {
+        self.var.iter_mut()
     }
     fn assigned(&self, l: Lit) -> Option<bool> {
         match unsafe { self.var.get_unchecked(l.vi()).assign } {
