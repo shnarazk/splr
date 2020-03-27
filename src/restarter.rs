@@ -413,6 +413,7 @@ impl ProgressEvaluator for GeometricBlocker {
 struct ProgressBucket {
     enable: bool,
     sum: f64,
+    power: f64,
     step: f64,
     threshold: f64,
 }
@@ -422,6 +423,7 @@ impl Default for ProgressBucket {
         ProgressBucket {
             enable: false,
             sum: 0.0,
+            power: 1.5,
             step: 20.0,
             threshold: 1000.0,
         }
@@ -432,8 +434,9 @@ impl Instantiate for ProgressBucket {
     fn instantiate(config: &Config, _: &CNFDescription) -> Self {
         ProgressBucket {
             enable: config.avalanche_restart,
+            power: config.avalanche_exp,
             step: config.avalanche_step,
-            threshold: config.avalanche_threshold,
+            threshold: config.avalanche_thr,
             ..ProgressBucket::default()
         }
     }
@@ -442,7 +445,7 @@ impl Instantiate for ProgressBucket {
 impl EmaIF for ProgressBucket {
     type Input = usize;
     fn update(&mut self, d: usize) {
-        self.sum += (d as f64).powf(1.5);
+        self.sum += (d as f64).powf(self.power);
     }
     fn get(&self) -> f64 {
         todo!()

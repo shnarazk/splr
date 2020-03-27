@@ -78,12 +78,16 @@ pub struct Config {
     pub avalanche_restart: bool,
 
     /// Avalanche stepping factor
-    #[structopt(long = "avalanche-bucket", short = "as", default_value = "20.0")]
+    #[structopt(long = "as", default_value = "20.0")]
     pub avalanche_step: f64,
 
-    /// Avalanche Threshold (bucket size)
-    #[structopt(long = "avalanche-bucket", short = "at", default_value = "1000.0")]
-    pub avalanche_threshold: f64,
+    /// Avalanche power factor
+    #[structopt(long = "ap", default_value = "1.5")]
+    pub avalanche_exp: f64,
+
+    /// Avalanche threshold
+    #[structopt(long = "at", default_value = "1000.0")]
+    pub avalanche_thr: f64,
 
     /// Length for assignment average
     #[structopt(long = "ra", default_value = "3500")]
@@ -153,7 +157,8 @@ impl Default for Config {
             // restarter
             avalanche_restart: false,
             avalanche_step: 20.0,
-            avalanche_threshold: 1000.0,
+            avalanche_exp: 1.5,
+            avalanche_thr: 1000.0,
             restart_asg_len: 3500,
             restart_blocking: 1.40,
             restart_lbd_len: 50,
