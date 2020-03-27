@@ -34,6 +34,7 @@ pub enum RestartMode {
     Luby,
     /// Controlled by CaDiCal-like Geometric Stabilizer
     Stabilize,
+    Bucket,
 }
 
 /// API for restart like `block_restart`, `force_restart` and so on.
@@ -71,7 +72,7 @@ impl Default for ProgressASG {
 impl Instantiate for ProgressASG {
     fn instantiate(config: &Config, _: &CNFDescription) -> Self {
         ProgressASG {
-            enable: true,
+            enable: !config.avalanche_restart,
             ema: Ema::new(config.restart_asg_len),
             asg: 0,
             threshold: config.restart_blocking,
@@ -127,6 +128,7 @@ impl Default for ProgressLBD {
 impl Instantiate for ProgressLBD {
     fn instantiate(config: &Config, _: &CNFDescription) -> Self {
         ProgressLBD {
+            enable: !config.avalanche_restart,
             ema: Ema2::new(config.restart_lbd_len).with_slow(100_000),
             threshold: config.restart_threshold,
             ..ProgressLBD::default()
@@ -390,7 +392,8 @@ impl EmaIF for GeometricBlocker {
     fn update(&mut self, now: usize) {
         if self.enable && self.next_trigger <= now {
             self.active = !self.active;
-            self.next_trigger = ((now as f64) * self.restart_inc) as usize;
+            self.next_trigger = ((self.next_trigger as f64) * self.restart_inc) as usize;
+            //self.next_trigger += 1000 + (self.next_trigger as f64).sqrt() as usize;
         }
     }
     fn get(&self) -> f64 {
@@ -407,31 +410,34 @@ impl ProgressEvaluator for GeometricBlocker {
 
 /// Intergal Threshold
 #[derive(Debug)]
-struct ProgressInt {
+struct ProgressBucket {
     enable: bool,
     sum: f64,
     threshold: f64,
     step: f64,
 }
 
-impl Default for ProgressInt {
-    fn default() -> ProgressInt {
-        ProgressInt {
+impl Default for ProgressBucket {
+    fn default() -> ProgressBucket {
+        ProgressBucket {
             enable: false,
             sum: 0.0,
             threshold: 1000.0,
-            step: 2.0,
+            step: 20.0,
         }
     }
 }
 
-impl Instantiate for ProgressInt {
-    fn instantiate(_: &Config, _: &CNFDescription) -> Self {
-        ProgressInt::default()
+impl Instantiate for ProgressBucket {
+    fn instantiate(config: &Config, _: &CNFDescription) -> Self {
+        ProgressBucket {
+            enable: config.avalanche_restart,
+            ..ProgressBucket::default()
+        }
     }
 }
 
-impl EmaIF for ProgressInt {
+impl EmaIF for ProgressBucket {
     type Input = usize;
     fn update(&mut self, d: usize) {
         self.sum += (d as f64).powf(1.5);
@@ -444,13 +450,13 @@ impl EmaIF for ProgressInt {
     }
 }
 
-impl ProgressEvaluator for ProgressInt {
+impl ProgressEvaluator for ProgressBucket {
     fn is_active(&self) -> bool {
         self.enable && self.threshold < self.sum
     }
     fn shift(&mut self) {
         self.sum = 0.0;
-        self.threshold *= self.step;
+        self.threshold += self.step;
     }
 }
 
@@ -458,8 +464,8 @@ impl ProgressEvaluator for ProgressInt {
 #[derive(Debug)]
 pub struct Restarter {
     asg: ProgressASG,
+    bkt: ProgressBucket,
     blk: GeometricBlocker,
-    int: ProgressInt,
     lbd: ProgressLBD,
     // pub rcc: ProgressRCC,
     // pub blvl: ProgressLVL,
@@ -479,8 +485,8 @@ impl Default for Restarter {
     fn default() -> Restarter {
         Restarter {
             asg: ProgressASG::default(),
+            bkt: ProgressBucket::default(),
             blk: GeometricBlocker::default(),
-            int: ProgressInt::default(),
             lbd: ProgressLBD::default(),
             // rcc: ProgressRCC::default(),
             // blvl: ProgressLVL::default(),
@@ -498,8 +504,8 @@ impl Instantiate for Restarter {
     fn instantiate(config: &Config, cnf: &CNFDescription) -> Self {
         Restarter {
             asg: ProgressASG::instantiate(config, cnf),
+            bkt: ProgressBucket::instantiate(config, cnf),
             blk: GeometricBlocker::instantiate(config, cnf),
-            int: ProgressInt::instantiate(config, cnf),
             lbd: ProgressLBD::instantiate(config, cnf),
             // rcc: ProgressRCC::instantiate(config, cnf),
             // blvl: ProgressLVL::instantiate(config, cnf),
@@ -533,7 +539,7 @@ macro_rules! reset {
 
 impl RestartIF for Restarter {
     fn block_restart(&mut self) -> bool {
-        if self.after_restart < self.restart_step || self.luby.enable || self.int.enable {
+        if self.after_restart < self.restart_step || self.luby.enable || self.bkt.enable {
             return false;
         }
         if self.blk.is_active() {
@@ -555,8 +561,8 @@ impl RestartIF for Restarter {
             // blk doesn't need to reset `after_restart`.
             return false;
         }
-        if self.int.is_active() {
-            self.int.shift();
+        if self.bkt.is_active() {
+            self.bkt.shift();
             reset!(self);
         }
         if self.after_restart < self.restart_step {
@@ -577,8 +583,8 @@ impl RestartIF for Restarter {
             }
             RestarterModule::ASG => self.asg.update(val),
             RestarterModule::LBD => {
+                self.bkt.update(val);
                 self.lbd.update(val);
-                self.int.update(val);
             }
             RestarterModule::Luby => self.luby.update(0),
         }
@@ -604,6 +610,8 @@ impl Export<(RestartMode, usize, f64, f64, f64)> for Restarter {
         (
             if self.blk.is_active() {
                 RestartMode::Stabilize
+            } else if self.bkt.enable {
+                RestartMode::Bucket
             } else if self.luby.enable {
                 RestartMode::Luby
             } else {

@@ -73,6 +73,10 @@ pub struct Config {
     //
     //## restarter
     //
+    /// Enable Avalanche restart
+    #[structopt(long = "avalanche-restart", short = "A")]
+    pub avalanche_restart: bool,
+
     /// Length for assignment average
     #[structopt(long = "ra", default_value = "3500")]
     pub restart_asg_len: usize,
@@ -113,7 +117,7 @@ pub struct Config {
     pub use_certification: bool,
 
     /// Disables dynamic strategy adaptation
-    #[structopt(long = "no-adaptive-strategy", short = "A")]
+    #[structopt(long = "no-adaptive-strategy", short = "G")]
     pub without_adaptive_strategy: bool,
 }
 
@@ -137,6 +141,7 @@ impl Default for Config {
             elim_grow_limit: 0,
             elim_lit_limit: 100,
             without_elim: false,
+            avalanche_restart: false,
 
             // restarter
             restart_asg_len: 3500,
