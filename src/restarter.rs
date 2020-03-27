@@ -586,7 +586,17 @@ impl RestartIF for Restarter {
 }
 
 impl Export<(RestartMode, usize, f64, f64, f64)> for Restarter {
-    ///```ignore
+    /// exports:
+    ///  1. current restart mode
+    ///  1. the number of blocking restarts
+    ///  1. `asg.trend()`
+    ///  1. `lbd.get()`
+    ///  1. `lbd.trend()`
+    ///
+    ///```
+    /// use crate::{splr::config::Config, splr::types::*};
+    /// use crate::splr::restarter::Restarter;
+    /// let rst = Restarter::instantiate(&Config::default(), &CNFDescription::default());
     /// let (_mode, _num_block, _asg_trend, _lbd_get, _lbd_trend) = rst.exports();
     ///```
     #[inline]

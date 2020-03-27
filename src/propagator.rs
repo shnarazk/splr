@@ -204,7 +204,15 @@ impl Instantiate for AssignStack {
 }
 
 impl Export<(usize, usize, usize)> for AssignStack {
-    ///```ignore
+    /// exports:
+    ///  1. the number of conflicts
+    ///  1. the number of propagations
+    ///  1. the number of restarts
+    ///
+    ///```
+    /// use crate::{splr::config::Config, splr::types::*};
+    /// use crate::splr::propagator::AssignStack;
+    /// let asgs = AssignStack::instantiate(&Config::default(), &CNFDescription::default());
     /// let (asgs_num_conflict, asgs_num_propagation, asgs_num_restart) = asgs.exports();
     ///```
     #[inline]

@@ -85,7 +85,14 @@ impl Default for LitOccurs {
 }
 
 impl Export<(usize, usize)> for Eliminator {
-    ///```ignore
+    /// exports:
+    ///  1. the number of full eliminations
+    ///  1. the number of satisfied clause eliminations
+    ///
+    ///```
+    /// use crate::{splr::config::Config, splr::types::*};
+    /// use crate::splr::eliminator::Eliminator;
+    /// let elim = Eliminator::instantiate(&Config::default(), &CNFDescription::default());
     /// let (elim_num_full_elimination, elim_num_sat_elimination) = elim.exports();
     ///```
     #[inline]

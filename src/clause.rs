@@ -619,7 +619,18 @@ impl Instantiate for ClauseDB {
 }
 
 impl Export<(usize, usize, usize, usize, usize, usize)> for ClauseDB {
-    ///```ignore
+    /// exports:
+    ///  1. the number of active clauses
+    ///  1. the number of binary clauses
+    ///  1. the number of binary learnt clauses
+    ///  1. the number of clauses which LBDs are 2
+    ///  1. the number of learnt clauses
+    ///  1. the number of clause reductions
+    ///
+    ///```
+    /// use crate::{splr::config::Config, splr::types::*};
+    /// use crate::splr::clause::ClauseDB;
+    /// let cdb = ClauseDB::instantiate(&Config::default(), &CNFDescription::default());
     /// let (_active, _bi_clause, _bi_learnt, _lbd2, _learnt, _reduction) = cdb.exports();
     ///```
     #[inline]

@@ -549,7 +549,14 @@ impl LBDIF for VarDB {
 }
 
 impl Export<(f64, f64)> for VarDB {
-    ///```ignore
+    /// exports:
+    ///  1. `core_sise.get()`
+    ///  1. `activity_decay`
+    ///
+    ///```
+    /// use crate::{splr::config::Config, splr::types::*};
+    /// use crate::splr::var::VarDB;
+    /// let vdb = VarDB::instantiate(&Config::default(), &CNFDescription::default());
     ///let (vdb_core_size, vdb_activity_decay) = vdb.exports();
     ///```
     #[inline]
