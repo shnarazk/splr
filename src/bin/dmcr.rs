@@ -64,7 +64,7 @@ fn main() {
     if let Some(f) = &args.assign {
         if let Ok(d) = File::open(f.as_path()) {
             if let Some(vec) = read_assignment(&mut BufReader::new(d), cnf, &args.assign) {
-                if s.inject_assigmnent(&vec).is_err() {
+                if s.inject_assignment(&vec).is_err() {
                     println!(
                         "{}{} seems an unsat problem but no proof.{}",
                         blue,
@@ -81,7 +81,7 @@ fn main() {
     }
     if !found {
         if let Some(vec) = read_assignment(&mut BufReader::new(stdin()), cnf, &args.assign) {
-            if s.inject_assigmnent(&vec).is_err() {
+            if s.inject_assignment(&vec).is_err() {
                 println!(
                     "{}{} seems an unsat problem but no proof.{}",
                     blue,
