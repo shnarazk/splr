@@ -50,15 +50,21 @@ pub enum Certificate {
 /// * `SolverException::*` -- caused by a bug
 pub type SolverResult = Result<Certificate, SolverError>;
 
-/// SAT solver consisting of 5 sub modules.
+/// The SAT solver object consisting of 6 sub modules.
 #[derive(Debug)]
 pub struct Solver {
-    pub asgs: AssignStack, // Assignment
-    pub cdb: ClauseDB,     // Clauses
-    pub elim: Eliminator,  // Clause/Variable Elimination
-    pub rst: Restarter,    // restart module
-    pub state: State,      // misc data
-    pub vdb: VarDB,        // Variables
+    /// assignment management
+    pub asgs: AssignStack,
+    /// clause container
+    pub cdb: ClauseDB,
+    /// clause and variable elimination
+    pub elim: Eliminator,
+    /// restart management
+    pub rst: Restarter,
+    /// misc data holder
+    pub state: State,
+    /// var container
+    pub vdb: VarDB,
 }
 
 impl Default for Solver {
