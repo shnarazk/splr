@@ -646,6 +646,9 @@ fn adapt_modules(
         }
         elim.activate();
         elim.simplify(asgs, cdb, state, vdb)?;
+        // To prevent another simplification at `search`, update counters here.
+        state.last_solved = 0;
+        state.num_solved_vars = asgs.len();
     }
     if 10 * state.reflection_interval == asgs_num_conflict {
         if !FORCE_RESTART {
