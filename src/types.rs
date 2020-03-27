@@ -42,12 +42,23 @@ pub trait ActivityIF {
     fn scale_activity(&mut self);
 }
 
-/// API for object instantiation based on `Configuration` and `CNFDescription`
-/// and adaptation.
+/// API for object instantiation based on `Configuration` and `CNFDescription`.
+/// This is implemented by *all the Splr modules* except `Configuration` and `CNFDescription`.
+///
+/// # Example
+///
+/// ```
+/// use crate::{splr::config::Config, splr::types::*};
+/// use splr::{clause::ClauseDB, solver::Solver};
+/// let _ = ClauseDB::instantiate(&Config::default(), &CNFDescription::default());
+/// let _ = Solver::instantiate(&Config::default(), &CNFDescription::default());
+///```
 pub trait Instantiate {
+    /// make and return an object from `Config` and `CNFDescription`.
     fn instantiate(conf: &Config, cnf: &CNFDescription) -> Self;
     /// set up internal parameters.
-    /// CAVEAT: some `adapt_to` implementation might have a special condition: decision_level == 0.
+    /// # CAVEAT
+    /// some implementation might have a special premise to call: decision_level == 0.
     fn adapt_to(&mut self, _state: &State, _num_conflict: usize) {}
 }
 

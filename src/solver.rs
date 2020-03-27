@@ -75,6 +75,11 @@ impl Default for Solver {
 }
 
 impl Instantiate for Solver {
+    /// ```
+    /// use crate::{splr::config::Config, splr::types::*};
+    /// use splr::solver::Solver;
+    /// let s = Solver::instantiate(&Config::default(), &CNFDescription::default());
+    ///```
     fn instantiate(config: &Config, cnf: &CNFDescription) -> Solver {
         Solver {
             asgs: AssignStack::instantiate(config, cnf),

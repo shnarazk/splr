@@ -588,7 +588,8 @@ impl Instantiate for ClauseDB {
             ..ClauseDB::default()
         }
     }
-    /// PRECONDITION: decision level == 0 if state.strategy.1 == state[Stat::Conflict]
+    /// # PRECONDITION
+    /// decision level must be 0 if `state.strategy.1` == `state[Stat::Conflict]`
     fn adapt_to(&mut self, state: &State, num_conflict: usize) {
         match state.strategy {
             (_, n) if n != num_conflict => (),
