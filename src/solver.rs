@@ -326,7 +326,6 @@ fn search(
     state: &mut State,
     vdb: &mut VarDB,
 ) -> Result<bool, SolverError> {
-    const SIMPLIFICATION_PUT_OFF: usize = 64;
     let mut a_decision_was_made = false;
     rst.update(RestarterModule::Luby, 0);
     loop {
@@ -359,17 +358,15 @@ fn search(
         }
         if asgs.level() == state.root_level {
             let nc = asgs.exports().0;
-            if state.last_solved == nc {
-                if elim.simplify(asgs, cdb, state, vdb).is_err() {
-                    return Err(SolverError::Inconsistent);
-                }
-            } else if SIMPLIFICATION_PUT_OFF + state.last_solved == nc {
-                elim.activate();
-                if elim.simplify(asgs, cdb, state, vdb).is_err() {
-                    return Err(SolverError::Inconsistent);
-                }
+            if state.last_solved == nc && elim.simplify(asgs, cdb, state, vdb).is_err() {
+                return Err(SolverError::Inconsistent);
+                // } else if SIMPLIFICATION_PUT_OFF + state.last_solved == nc {
+                //     elim.activate();
+                //     if elim.simplify(asgs, cdb, state, vdb).is_err() {
+                //         return Err(SolverError::Inconsistent);
+                //     }
             }
-            state.num_solved_vars = asgs.len();
+            debug_assert_eq!(state.num_solved_vars, asgs.len());
         }
         if !asgs.remains() {
             let vi = asgs.select_var(vdb);

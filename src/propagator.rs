@@ -87,6 +87,7 @@ pub struct AssignStack {
 
     //
     //## Statistics
+    //
     num_conflict: usize,
     num_propagation: usize,
     num_restart: usize,
