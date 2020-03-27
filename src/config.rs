@@ -78,11 +78,11 @@ pub struct Config {
     pub avalanche_restart: bool,
 
     /// Avalanche stepping factor
-    #[structopt(long = "avalanche-bucket", short = "rs", default_value = "20.0")]
+    #[structopt(long = "avalanche-bucket", short = "as", default_value = "20.0")]
     pub avalanche_step: f64,
 
     /// Avalanche Threshold (bucket size)
-    #[structopt(long = "avalanche-bucket", short = "rt", default_value = "1000.0")]
+    #[structopt(long = "avalanche-bucket", short = "at", default_value = "1000.0")]
     pub avalanche_threshold: f64,
 
     /// Length for assignment average
