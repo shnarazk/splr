@@ -69,8 +69,11 @@ pub trait ClauseDBIF {
     fn eliminate_satisfied_clauses(&mut self, elim: &mut Eliminator, vdb: &mut VarDB, occur: bool);
     /// flag positive and negative literals of a var as dirty
     fn touch_var(&mut self, vi: VarId);
-    /// emit an error if the db size (the number of clauses) is over the limit.
-    fn check_size(&self) -> MaybeInconsistent;
+    /// check the number of clauses
+    /// * `Err(SolverError::OutOfMemory)` -- the db size is over the limit.
+    /// * `Ok(true)` -- enough small
+    /// * `Ok(false)` -- close to the limit
+    fn check_size(&self) -> Result<bool, SolverError>;
     /// returns None if the given assignment is a model of a problem.
     /// Otherwise returns a clause which is not satisfiable under a given assignment.
     /// Clauses with an unassigned literal are treated as falsified in `strict` mode.
@@ -398,7 +401,7 @@ pub struct ClauseDB {
     /// clause history to make certification
     pub certified: DRAT,
     /// a number of clauses to emit out-of-memory exception
-    pub soft_limit: usize,
+    soft_limit: usize,
     /// flag for Chan Seok heuristics
     use_chan_seok: bool,
     /// 'small' clause threshold
@@ -915,9 +918,9 @@ impl ClauseDBIF for ClauseDB {
         self.touched[Lit::from_assign(vi, true)] = true;
         self.touched[Lit::from_assign(vi, false)] = true;
     }
-    fn check_size(&self) -> MaybeInconsistent {
+    fn check_size(&self) -> Result<bool, SolverError> {
         if self.soft_limit == 0 || self.count(false) <= self.soft_limit {
-            Ok(())
+            Ok(0 == self.soft_limit || 4 * self.count(true) < 3 * self.soft_limit)
         } else {
             Err(SolverError::OutOfMemory)
         }

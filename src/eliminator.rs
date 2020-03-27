@@ -353,7 +353,7 @@ impl EliminatorIF for Eliminator {
             vdb.reset_lbd(cdb);
             self.stop(cdb, vdb);
         }
-        cdb.check_size()
+        cdb.check_size().map(|_| ())
     }
     fn extend_model(&mut self, vdb: &mut VarDB) {
         if self.elim_clauses.is_empty() {
@@ -1040,13 +1040,10 @@ fn skip_var_elimination(
     v: VarId,
 ) -> bool {
     // avoid thrashing
-    if 0 < cdb.soft_limit && cdb.soft_limit < cdb.count(true) {
-        return true;
-    }
-    let limit = if 0 < cdb.soft_limit && 3 * cdb.soft_limit < 4 * cdb.count(true) {
-        elim.eliminate_grow_limit / 4
-    } else {
-        elim.eliminate_grow_limit
+    let limit = match cdb.check_size() {
+        Ok(true) => elim.eliminate_grow_limit,
+        Ok(false) => elim.eliminate_grow_limit / 4,
+        Err(_) => return true,
     };
     let clslen = pos.len() + neg.len();
     let mut cnt = 0;
