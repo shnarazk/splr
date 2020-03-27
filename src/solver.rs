@@ -369,9 +369,12 @@ fn search(
             handle_conflict(asgs, cdb, elim, rst, state, vdb, ci)?;
         }
         if asgs.level() == state.root_level {
-            let nc = asgs.exports().0;
-            if state.last_solved == nc && elim.simplify(asgs, cdb, state, vdb).is_err() {
-                return Err(SolverError::Inconsistent);
+            if 0 < state.last_solved {
+                // Simplification has been postponed because chronoBT was used.
+                state.last_solved = 0;
+                if elim.simplify(asgs, cdb, state, vdb).is_err() {
+                    return Err(SolverError::Inconsistent);
+                }
                 // } else if SIMPLIFICATION_PUT_OFF + state.last_solved == nc {
                 //     elim.activate();
                 //     if elim.simplify(asgs, cdb, state, vdb).is_err() {
