@@ -131,6 +131,7 @@ impl SatSolverIF for Solver {
         if use_pre_processor {
             state.flush("phasing...");
             elim.activate();
+            elim.prepare(cdb, vdb, true);
             // run simple preprocessor
             for vi in 1..vdb.len() {
                 let v = &mut vdb[vi];
@@ -612,28 +613,22 @@ fn adapt_modules(
     state: &mut State,
     vdb: &mut VarDB,
 ) -> MaybeInconsistent {
-    const FORCE_RESTART: bool = true;
     state.progress(asgs, cdb, elim, rst, vdb, None);
 
     // 'decision_level == 0' is required by `cdb.adapt_to`.
     // But periodical restarts seem good. So we call it here.
-    if FORCE_RESTART {
-        asgs.cancel_until(vdb, state.root_level);
-    }
+    asgs.cancel_until(vdb, state.root_level);
 
     let (asgs_num_conflict, _num_propagation, _num_restart) = asgs.exports();
-    if elim.enable {
+    let (_, _, rst_asg_trend, _, _) = rst.exports();
+    if elim.enable && rst_asg_trend < 1.0 {
         // state.flush("exhaustive eliminator activated...");
-        if !FORCE_RESTART {
-            asgs.cancel_until(vdb, state.root_level);
-        }
+        // asgs.cancel_until(vdb, state.root_level);
         elim.activate();
         elim.simplify(asgs, cdb, state, vdb)?;
     }
     if 10 * state.reflection_interval == asgs_num_conflict {
-        if !FORCE_RESTART {
-            asgs.cancel_until(vdb, state.root_level);
-        }
+        // asgs.cancel_until(vdb, state.root_level);
         state.select_strategy(asgs, cdb);
         if state.strategy.0 == SearchStrategy::HighSuccesive {
             state.config.chronobt = 0;

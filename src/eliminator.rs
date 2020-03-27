@@ -28,6 +28,8 @@ pub trait EliminatorIF {
     fn stop(&mut self, cdb: &mut ClauseDB, vdb: &mut VarDB);
     /// check if the eliminator is running.
     fn is_running(&self) -> bool;
+    /// rebuild occur lists.
+    fn prepare(&mut self, cdb: &mut ClauseDB, vdb: &mut VarDB, force: bool);
     /// enqueue a var into eliminator's var queue.
     fn enqueue_var(&mut self, vdb: &mut VarDB, vi: VarId, upword: bool);
     /// simplify database by:
@@ -287,6 +289,30 @@ impl EliminatorIF for Eliminator {
         }
         self.mode = EliminatorMode::Deactive;
     }
+    fn prepare(&mut self, cdb: &mut ClauseDB, vdb: &mut VarDB, force: bool) {
+        if self.mode != EliminatorMode::Waiting {
+            return;
+        }
+        self.mode = EliminatorMode::Running;
+        for w in &mut self[1..] {
+            w.clear();
+        }
+        for (cid, c) in &mut cdb[0..].iter_mut().enumerate().skip(1) {
+            if c.is(Flag::DEAD) || c.is(Flag::OCCUR_LINKED) {
+                continue;
+            }
+            self.add_cid_occur(vdb, ClauseId::from(cid), c, false);
+        }
+        if force {
+            for vi in 1..vdb.len() {
+                let v = &vdb[vi];
+                if v.is(Flag::ELIMINATED) || v.assign.is_some() {
+                    continue;
+                }
+                self.enqueue_var(vdb, vi, true);
+            }
+        }
+    }
     fn enqueue_var(&mut self, vdb: &mut VarDB, vi: VarId, upward: bool) {
         if self.mode != EliminatorMode::Running {
             return;
@@ -416,31 +442,6 @@ impl Eliminator {
     /// check if the eliminator is active and waits for next `eliminate`.
     fn is_waiting(&self) -> bool {
         self.mode == EliminatorMode::Waiting
-    }
-    /// rebuild occur lists.
-    fn prepare(&mut self, cdb: &mut ClauseDB, vdb: &mut VarDB, force: bool) {
-        if self.mode != EliminatorMode::Waiting {
-            return;
-        }
-        self.mode = EliminatorMode::Running;
-        for w in &mut self[1..] {
-            w.clear();
-        }
-        for (cid, c) in &mut cdb[0..].iter_mut().enumerate().skip(1) {
-            if c.is(Flag::DEAD) || c.is(Flag::OCCUR_LINKED) {
-                continue;
-            }
-            self.add_cid_occur(vdb, ClauseId::from(cid), c, false);
-        }
-        if force {
-            for vi in 1..vdb.len() {
-                let v = &vdb[vi];
-                if v.is(Flag::ELIMINATED) || v.assign.is_some() {
-                    continue;
-                }
-                self.enqueue_var(vdb, vi, true);
-            }
-        }
     }
 
     /// returns false if solver is inconsistent
