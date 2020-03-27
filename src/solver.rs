@@ -627,22 +627,28 @@ fn adapt_modules(
     state: &mut State,
     vdb: &mut VarDB,
 ) -> MaybeInconsistent {
+    const FORCE_RESTART: bool = true;
     state.progress(asgs, cdb, elim, rst, vdb, None);
 
     // 'decision_level == 0' is required by `cdb.adapt_to`.
     // But periodical restarts seem good. So we call it here.
-    asgs.cancel_until(vdb, state.root_level);
+    if FORCE_RESTART {
+        asgs.cancel_until(vdb, state.root_level);
+    }
 
     let (asgs_num_conflict, _num_propagation, _num_restart) = asgs.exports();
     let (_, _, rst_asg_trend, _, _) = rst.exports();
     if elim.enable && rst_asg_trend < 1.0 {
-        // state.flush("exhaustive eliminator activated...");
-        // asgs.cancel_until(vdb, state.root_level);
+        if !FORCE_RESTART {
+            asgs.cancel_until(vdb, state.root_level);
+        }
         elim.activate();
         elim.simplify(asgs, cdb, state, vdb)?;
     }
     if 10 * state.reflection_interval == asgs_num_conflict {
-        // asgs.cancel_until(vdb, state.root_level);
+        if !FORCE_RESTART {
+            asgs.cancel_until(vdb, state.root_level);
+        }
         state.select_strategy(asgs, cdb);
         if state.strategy.0 == SearchStrategy::HighSuccesive {
             state.config.chronobt = 0;
