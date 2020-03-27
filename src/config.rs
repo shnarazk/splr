@@ -77,13 +77,13 @@ pub struct Config {
     #[structopt(long = "avalanche-restart", short = "A")]
     pub avalanche_restart: bool,
 
-    /// Avalanche stepping factor
-    #[structopt(long = "as", default_value = "20.0")]
-    pub avalanche_step: f64,
-
     /// Avalanche power factor
     #[structopt(long = "ap", default_value = "1.5")]
     pub avalanche_exp: f64,
+
+    /// Avalanche stepping factor
+    #[structopt(long = "as", default_value = "20.0")]
+    pub avalanche_step: f64,
 
     /// Avalanche threshold
     #[structopt(long = "at", default_value = "1000.0")]
@@ -156,9 +156,9 @@ impl Default for Config {
 
             // restarter
             avalanche_restart: false,
-            avalanche_step: 20.0,
-            avalanche_exp: 1.5,
-            avalanche_thr: 1000.0,
+            avalanche_exp: 1.4,
+            avalanche_step: 1.0,
+            avalanche_thr: 2000.0,
             restart_asg_len: 3500,
             restart_blocking: 1.40,
             restart_lbd_len: 50,
