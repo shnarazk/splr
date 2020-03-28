@@ -481,7 +481,7 @@ fn handle_conflict(
             cl
         }
     };
-    assert!(
+    debug_assert!(
         cdb[ci].iter().any(|l| vdb[l].level == cl),
         format!(
             "use_{}: {:?}, {:?}",
