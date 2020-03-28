@@ -926,7 +926,7 @@ mod tests {
     #[test]
     fn test_solver() {
         let mut config = Config::default();
-        config.cnf_filename = PathBuf::from("tests/sample.cnf");
+        config.cnf_file = PathBuf::from("tests/sample.cnf");
         if let Ok(s) = Solver::build(&config) {
             assert_eq!(s.state.num_vars, 250);
             assert_eq!(s.state.num_unsolved_vars(), 250);
