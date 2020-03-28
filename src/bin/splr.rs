@@ -78,6 +78,11 @@ fn main() {
             }
         }
     }
+    std::process::exit(match res {
+        Ok(Certificate::SAT(_)) => 10,
+        Ok(Certificate::UNSAT) => 20,
+        Err(_) => 0,
+    });
 }
 
 fn save_result<S: AsRef<str> + std::fmt::Display>(
