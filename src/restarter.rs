@@ -72,10 +72,10 @@ impl Default for ProgressASG {
 impl Instantiate for ProgressASG {
     fn instantiate(config: &Config, _: &CNFDescription) -> Self {
         ProgressASG {
-            enable: !config.avalanche_restart,
-            ema: Ema::new(config.restart_asg_len),
+            enable: !config.bucket_restart,
+            ema: Ema::new(config.rst_asg_len),
             asg: 0,
-            threshold: config.restart_blocking,
+            threshold: config.rst_asg_thr,
         }
     }
 }
@@ -128,9 +128,9 @@ impl Default for ProgressLBD {
 impl Instantiate for ProgressLBD {
     fn instantiate(config: &Config, _: &CNFDescription) -> Self {
         ProgressLBD {
-            enable: !config.avalanche_restart,
-            ema: Ema2::new(config.restart_lbd_len).with_slow(100_000),
-            threshold: config.restart_threshold,
+            enable: !config.bucket_restart,
+            ema: Ema2::new(config.rst_lbd_len).with_slow(100_000),
+            threshold: config.rst_lbd_thr,
             ..ProgressLBD::default()
         }
     }
@@ -348,16 +348,16 @@ impl LubySeries {
 
 /// An implementation of Cadical-style blocker.
 #[derive(Debug)]
-struct GeometricBlocker {
+struct GeometricStabilizer {
     enable: bool,
     active: bool,
     next_trigger: usize,
     restart_inc: f64,
 }
 
-impl Default for GeometricBlocker {
+impl Default for GeometricStabilizer {
     fn default() -> Self {
-        GeometricBlocker {
+        GeometricStabilizer {
             enable: true,
             active: false,
             next_trigger: 1000,
@@ -366,16 +366,17 @@ impl Default for GeometricBlocker {
     }
 }
 
-impl Instantiate for GeometricBlocker {
+impl Instantiate for GeometricStabilizer {
     fn instantiate(config: &Config, _: &CNFDescription) -> Self {
-        GeometricBlocker {
+        GeometricStabilizer {
             enable: !config.without_stab,
-            ..GeometricBlocker::default()
+            restart_inc: config.rst_stb_scl,
+            ..GeometricStabilizer::default()
         }
     }
 }
 
-impl fmt::Display for GeometricBlocker {
+impl fmt::Display for GeometricStabilizer {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if !self.enable {
             write!(f, "Stabilizer(dead)")
@@ -387,7 +388,7 @@ impl fmt::Display for GeometricBlocker {
     }
 }
 
-impl EmaIF for GeometricBlocker {
+impl EmaIF for GeometricStabilizer {
     type Input = usize;
     fn update(&mut self, now: usize) {
         if self.enable && self.next_trigger <= now {
@@ -401,7 +402,7 @@ impl EmaIF for GeometricBlocker {
     }
 }
 
-impl ProgressEvaluator for GeometricBlocker {
+impl ProgressEvaluator for GeometricStabilizer {
     fn is_active(&self) -> bool {
         self.active
     }
@@ -433,10 +434,10 @@ impl Default for ProgressBucket {
 impl Instantiate for ProgressBucket {
     fn instantiate(config: &Config, _: &CNFDescription) -> Self {
         ProgressBucket {
-            enable: config.avalanche_restart,
-            power: config.avalanche_exp,
-            step: config.avalanche_step,
-            threshold: config.avalanche_thr,
+            enable: config.bucket_restart,
+            power: 2.0, // config.rst_bkt_pwr,
+            step: config.rst_bkt_step,
+            threshold: config.rst_bkt_thr,
             ..ProgressBucket::default()
         }
     }
@@ -470,12 +471,12 @@ impl ProgressEvaluator for ProgressBucket {
 pub struct Restarter {
     asg: ProgressASG,
     bkt: ProgressBucket,
-    blk: GeometricBlocker,
     lbd: ProgressLBD,
     // pub rcc: ProgressRCC,
     // pub blvl: ProgressLVL,
     // pub clvl: ProgressLVL,
     luby: LubySeries,
+    stb: GeometricStabilizer,
     after_restart: usize,
     next_restart: usize,
     restart_step: usize,
@@ -491,12 +492,12 @@ impl Default for Restarter {
         Restarter {
             asg: ProgressASG::default(),
             bkt: ProgressBucket::default(),
-            blk: GeometricBlocker::default(),
             lbd: ProgressLBD::default(),
             // rcc: ProgressRCC::default(),
             // blvl: ProgressLVL::default(),
             // clvl: ProgressLVL::default(),
             luby: LubySeries::default(),
+            stb: GeometricStabilizer::default(),
             after_restart: 0,
             next_restart: 100,
             restart_step: 0,
@@ -510,12 +511,12 @@ impl Instantiate for Restarter {
         Restarter {
             asg: ProgressASG::instantiate(config, cnf),
             bkt: ProgressBucket::instantiate(config, cnf),
-            blk: GeometricBlocker::instantiate(config, cnf),
             lbd: ProgressLBD::instantiate(config, cnf),
             // rcc: ProgressRCC::instantiate(config, cnf),
             // blvl: ProgressLVL::instantiate(config, cnf),
             // clvl: ProgressLVL::instantiate(config, cnf),
             luby: LubySeries::instantiate(config, cnf),
+            stb: GeometricStabilizer::instantiate(config, cnf),
             restart_step: config.restart_step,
             ..Restarter::default()
         }
@@ -547,7 +548,7 @@ impl RestartIF for Restarter {
         if self.after_restart < self.restart_step || self.luby.enable || self.bkt.enable {
             return false;
         }
-        if self.blk.is_active() {
+        if self.stb.is_active() {
             return false;
         }
         if self.asg.is_active() {
@@ -561,8 +562,8 @@ impl RestartIF for Restarter {
             self.luby.shift();
             reset!(self);
         }
-        if self.blk.is_active() {
-            self.blk.shift();
+        if self.stb.is_active() {
+            self.stb.shift();
             // blk doesn't need to reset `after_restart`.
             return false;
         }
@@ -583,7 +584,7 @@ impl RestartIF for Restarter {
         match kind {
             RestarterModule::Counter => {
                 self.after_restart += 1;
-                self.blk.update(val);
+                self.stb.update(val);
                 self.luby.update(self.after_restart);
             }
             RestarterModule::ASG => self.asg.update(val),
@@ -613,7 +614,7 @@ impl Export<(RestartMode, usize, f64, f64, f64)> for Restarter {
     #[inline]
     fn exports(&self) -> (RestartMode, usize, f64, f64, f64) {
         (
-            if self.blk.is_active() {
+            if self.stb.is_active() {
                 RestartMode::Stabilize
             } else if self.bkt.enable {
                 RestartMode::Bucket

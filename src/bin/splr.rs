@@ -41,23 +41,23 @@ fn colored(v: Result<bool, &SolverError>, quiet: bool) -> Cow<'static, str> {
 
 fn main() {
     let config = Config::from_args().override_args();
-    if !config.cnf_filename.exists() {
+    if !config.cnf_file.exists() {
         println!(
             "{} does not exist.",
-            config.cnf_filename.file_name().unwrap().to_str().unwrap()
+            config.cnf_file.file_name().unwrap().to_str().unwrap()
         );
         return;
     }
-    let cnf_file = config.cnf_filename.to_string_lossy();
-    let ans_file: Option<PathBuf> = match config.result_filename.to_string_lossy().as_ref() {
+    let cnf_file = config.cnf_file.to_string_lossy();
+    let ans_file: Option<PathBuf> = match config.result_file.to_string_lossy().as_ref() {
         "-" => None,
-        "" => Some(config.output_dirname.join(PathBuf::from(format!(
+        "" => Some(config.output_dir.join(PathBuf::from(format!(
             ".ans_{}",
-            config.cnf_filename.file_name().unwrap().to_string_lossy(),
+            config.cnf_file.file_name().unwrap().to_string_lossy(),
         )))),
-        _ => Some(config.output_dirname.join(&config.result_filename)),
+        _ => Some(config.output_dir.join(&config.result_file)),
     };
-    if config.proof_filename.to_string_lossy() != "proof.out" && !config.use_certification {
+    if config.proof_file.to_string_lossy() != "proof.out" && !config.use_certification {
         println!("Abort: You set a proof filename with '--proof' explicitly, but didn't set '--certify'. It doesn't look good.");
         return;
     }
@@ -65,7 +65,7 @@ fn main() {
     let res = s.solve();
     save_result(&s, &res, &cnf_file, ans_file);
     if 0 < s.state.config.dump_interval && !s.state.development.is_empty() {
-        let dump = config.cnf_filename.file_stem().unwrap().to_str().unwrap();
+        let dump = config.cnf_file.file_stem().unwrap().to_str().unwrap();
         if let Ok(f) = File::create(format!("stat_{}.csv", dump)) {
             let mut buf = BufWriter::new(f);
             buf.write_all(b"conflict,solved,restart,block,ASG,LBD\n")
@@ -148,15 +148,12 @@ fn save_result<S: AsRef<str> + std::fmt::Display>(
                 _ => (),
             }
             if s.state.config.use_certification {
-                let proof_file: PathBuf = s
-                    .state
-                    .config
-                    .output_dirname
-                    .join(&s.state.config.proof_filename);
+                let proof_file: PathBuf =
+                    s.state.config.output_dir.join(&s.state.config.proof_file);
                 save_proof(&s, &input, &proof_file);
                 println!(
                     " Certificate|file: {}",
-                    s.state.config.proof_filename.to_string_lossy()
+                    s.state.config.proof_file.to_string_lossy()
                 );
             }
             println!(

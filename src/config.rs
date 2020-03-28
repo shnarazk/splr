@@ -9,11 +9,11 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 #[structopt(name = "splr", about, author)]
 pub struct Config {
     //
-    //## I/O configuratio]
+    //## I/O configuration
     //
-    /// A DIMACS format CNF file
+    /// CNF file in DIMACS format
     #[structopt(parse(from_os_str))]
-    pub cnf_filename: PathBuf,
+    pub cnf_file: PathBuf,
 
     /// Interval for dumpping stat data
     #[structopt(long = "stat", default_value = "0")]
@@ -21,16 +21,16 @@ pub struct Config {
 
     /// Output directory
     #[structopt(long = "dir", short = "o", default_value = ".", parse(from_os_str))]
-    pub output_dirname: PathBuf,
+    pub output_dir: PathBuf,
 
-    /// Filename for DRAT cert.
+    /// Cert. file in DRAT format
     #[structopt(
         long = "proof",
         default_value = "proof.out",
         short = "p",
         parse(from_os_str)
     )]
-    pub proof_filename: PathBuf,
+    pub proof_file: PathBuf,
 
     /// Disable any progress message
     #[structopt(long = "quiet", short = "q")]
@@ -38,7 +38,7 @@ pub struct Config {
 
     /// Result filename/stdout
     #[structopt(long = "result", short = "r", default_value = "", parse(from_os_str))]
-    pub result_filename: PathBuf,
+    pub result_file: PathBuf,
 
     /// Uses Glucose-like progress report
     #[structopt(long = "log", short = "l")]
@@ -73,41 +73,45 @@ pub struct Config {
     //
     //## restarter
     //
-    /// Enable Avalanche restart
-    #[structopt(long = "avalanche-restart", short = "A")]
-    pub avalanche_restart: bool,
-
-    /// Avalanche power factor
-    #[structopt(long = "ap", default_value = "1.5")]
-    pub avalanche_exp: f64,
-
-    /// Avalanche stepping factor
-    #[structopt(long = "as", default_value = "20.0")]
-    pub avalanche_step: f64,
-
-    /// Avalanche threshold
-    #[structopt(long = "at", default_value = "1000.0")]
-    pub avalanche_thr: f64,
-
-    /// Length for assignment average
-    #[structopt(long = "ra", default_value = "3500")]
-    pub restart_asg_len: usize,
-
-    /// Blocking restart threshold
-    #[structopt(long = "rb", default_value = "1.40")]
-    pub restart_blocking: f64, // Glucose's R
-
-    /// Length for LBD average
-    #[structopt(long = "rl", default_value = "50")]
-    pub restart_lbd_len: usize,
+    /// Enable Bucket restart
+    #[structopt(long = "bucket-restart", short = "B")]
+    pub bucket_restart: bool,
 
     /// #conflicts between restarts
     #[structopt(long = "rs", default_value = "50")]
     pub restart_step: usize,
 
+    /// Bucket power factor
+    #[structopt(long = "rbp", default_value = "1.25")]
+    pub rst_bkt_pwr: f64,
+
+    /// Bucket stepping factor
+    #[structopt(long = "rbs", default_value = "1.0")]
+    pub rst_bkt_step: f64,
+
+    /// Bucket threshold
+    #[structopt(long = "rbt", default_value = "2000.0")]
+    pub rst_bkt_thr: f64,
+
+    /// Length for assignment average
+    #[structopt(long = "ral", default_value = "3500")]
+    pub rst_asg_len: usize,
+
+    /// Blocking restart threshold
+    #[structopt(long = "rab", default_value = "1.40")]
+    pub rst_asg_thr: f64, // Glucose's R
+
+    /// Length for LBD average
+    #[structopt(long = "rll", default_value = "50")]
+    pub rst_lbd_len: usize,
+
     /// Forcing restart threshold
-    #[structopt(long = "rt", default_value = "1.2")]
-    pub restart_threshold: f64, // Glucose's K
+    #[structopt(long = "rlt", default_value = "1.2")]
+    pub rst_lbd_thr: f64, // Glucose's K
+
+    /// Stabilizer scaling
+    #[structopt(long = "rss", default_value = "2.0")]
+    pub rst_stb_scl: f64,
 
     /// Disable geometric restart blocker
     #[structopt(long = "without-stabilizer", short = "S")]
@@ -117,7 +121,7 @@ pub struct Config {
     //## solver configuration
     //
     /// Threshold to use chronoBT
-    #[structopt(long = "chronoBT", short = "C", default_value = "100")]
+    #[structopt(long = "chronoBT", default_value = "100")]
     pub chronobt: DecisionLevel,
 
     /// CPU time limit in sec.
@@ -137,12 +141,12 @@ impl Default for Config {
     fn default() -> Config {
         Config {
             // I/O
-            cnf_filename: PathBuf::new(),
+            cnf_file: PathBuf::new(),
             dump_interval: 0,
-            output_dirname: PathBuf::from("."),
-            proof_filename: PathBuf::from("proof.out"),
+            output_dir: PathBuf::from("."),
+            proof_file: PathBuf::from("proof.out"),
             quiet_mode: false,
-            result_filename: PathBuf::new(),
+            result_file: PathBuf::new(),
             use_log: false,
 
             // clause DB
@@ -155,15 +159,16 @@ impl Default for Config {
             without_elim: false,
 
             // restarter
-            avalanche_restart: false,
-            avalanche_exp: 1.4,
-            avalanche_step: 1.0,
-            avalanche_thr: 2000.0,
-            restart_asg_len: 3500,
-            restart_blocking: 1.40,
-            restart_lbd_len: 50,
+            bucket_restart: false,
             restart_step: 50,
-            restart_threshold: 1.2,
+            rst_bkt_pwr: 1.25,
+            rst_bkt_step: 1.0,
+            rst_bkt_thr: 2000.0,
+            rst_asg_len: 3500,
+            rst_asg_thr: 1.40,
+            rst_lbd_len: 50,
+            rst_lbd_thr: 1.2,
+            rst_stb_scl: 2.0,
             without_stab: false,
 
             // solver
@@ -181,7 +186,7 @@ where
 {
     fn from(path: T) -> Config {
         let mut config = Config::default();
-        config.cnf_filename = PathBuf::from(path);
+        config.cnf_file = PathBuf::from(path);
         config
     }
 }
@@ -189,6 +194,7 @@ where
 impl Config {
     #[allow(unused_mut)]
     pub fn override_args(mut self) -> Config {
+        self.bucket_restart = true;
         self
     }
 }

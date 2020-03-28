@@ -268,7 +268,7 @@ impl SatSolverIF for Solver {
     /// assert!(Solver::build(&config).is_ok());
     ///```
     fn build(config: &Config) -> Result<Solver, SolverError> {
-        let CNFReader { cnf, reader } = CNFReader::try_from(&config.cnf_filename)?;
+        let CNFReader { cnf, reader } = CNFReader::try_from(&config.cnf_file)?;
         Solver::instantiate(config, &cnf).inject(reader)
     }
     // renamed from clause_new

@@ -45,7 +45,7 @@ fn main() {
         return;
     }
     let mut config = Config::default();
-    config.cnf_filename = args.problem.clone();
+    config.cnf_file = args.problem.clone();
     let (red, green, blue) = if args.without_color {
         (RESET, RESET, RESET)
     } else {
