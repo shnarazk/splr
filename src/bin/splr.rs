@@ -26,15 +26,15 @@ const RESET: &str = "\x1B[000m";
 fn colored(v: Result<bool, &SolverError>, quiet: bool) -> Cow<'static, str> {
     if quiet {
         match v {
-            Ok(false) => Cow::Borrowed("UNSAT"),
-            Ok(true) => Cow::Borrowed("SATISFIABLE"),
-            Err(e) => Cow::from(format!("{}", e)),
+            Ok(false) => Cow::Borrowed("s UNSATISFIABLE"),
+            Ok(true) => Cow::Borrowed("s SATISFIABLE"),
+            Err(e) => Cow::from(format!("c UNKNOWN ({})", e)),
         }
     } else {
         match v {
-            Ok(false) => Cow::from(format!("{}UNSAT{}", GREEN, RESET)),
-            Ok(true) => Cow::from(format!("{}SATISFIABLE{}", BLUE, RESET)),
-            Err(e) => Cow::from(format!("{}{}{}", RED, e, RESET)),
+            Ok(false) => Cow::from(format!("{}s UNSATISFIABLE{}", GREEN, RESET)),
+            Ok(true) => Cow::from(format!("{}s SATISFIABLE{}", BLUE, RESET)),
+            Err(e) => Cow::from(format!("{}c UNKNOWN ({}){}", RED, e, RESET)),
         }
     }
 }
@@ -190,11 +190,7 @@ fn save_result<S: AsRef<str> + std::fmt::Display>(
                 Some(ref f) => println!("      Result|file: {}", f.to_str().unwrap(),),
                 _ => (),
             }
-            println!(
-                "Failed to solve by {}: {}",
-                colored(Err(e), s.state.config.quiet_mode),
-                input
-            );
+            println!("{}: {}", colored(Err(e), s.state.config.quiet_mode), input);
             if let Err(why) = (|| {
                 buf.write_all(
                     format!(
