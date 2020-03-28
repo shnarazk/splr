@@ -409,10 +409,11 @@ impl ProgressEvaluator for GeometricStabilizer {
     fn shift(&mut self) {}
 }
 
-/// Intergal Threshold
+/// Restart when LBD's sum is over a limit.
 #[derive(Debug)]
 struct ProgressBucket {
     enable: bool,
+    num_shift: usize,
     sum: f64,
     power: f64,
     step: f64,
@@ -423,10 +424,11 @@ impl Default for ProgressBucket {
     fn default() -> ProgressBucket {
         ProgressBucket {
             enable: false,
+            num_shift: 0,
             sum: 0.0,
-            power: 1.5,
-            step: 20.0,
-            threshold: 1000.0,
+            power: 1.25,
+            step: 1.0,
+            threshold: 2000.0,
         }
     }
 }
@@ -461,8 +463,11 @@ impl ProgressEvaluator for ProgressBucket {
         self.enable && self.threshold < self.sum
     }
     fn shift(&mut self) {
+        self.num_shift += 1;
         self.sum = 0.0;
         self.threshold += self.step;
+        // self.power = 1.0 + (self.num_shift as f64).powf(-0.2);
+        self.power = 1.0 + (self.num_shift as f64).powf(-0.1);
     }
 }
 
