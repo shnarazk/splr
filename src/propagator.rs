@@ -2,7 +2,7 @@
 /// This version can handle Chronological and Non Chronological Backtrack.
 use {
     crate::{
-        clause::{ClauseDB, ClauseDBIF, ClauseId, Watch, WatchDBIF},
+        clause::{ClauseDBIF, ClauseId, Watch, WatchDBIF},
         config::Config,
         state::State,
         types::*,
@@ -69,8 +69,9 @@ pub trait PropagatorIF: Index<usize, Output = Lit> {
     where
         V: VarDBIF + VarRewardIF;
     /// execute *boolean constraint propagation* or *unit propagation*.
-    fn propagate<V>(&mut self, cdb: &mut ClauseDB, vdb: &mut V) -> ClauseId
+    fn propagate<C, V>(&mut self, cdb: &mut C, vdb: &mut V) -> ClauseId
     where
+        C: ClauseDBIF,
         V: VarDBIF + VarRewardIF;
     /// return `true` if subsequential propagations emit the same conflict.
     fn recurrent_conflicts(&self) -> bool;
@@ -388,11 +389,13 @@ impl PropagatorIF for AssignStack {
     ///    So Eliminator should call `garbage_collect` before me.
     ///  - The order of literals in binary clauses will be modified to hold
     ///    propagatation order.
-    fn propagate<V>(&mut self, cdb: &mut ClauseDB, vdb: &mut V) -> ClauseId
+    fn propagate<C, V>(&mut self, cdb: &mut C, vdb: &mut V) -> ClauseId
     where
+        C: ClauseDBIF,
         V: VarDBIF + VarRewardIF,
     {
-        let watcher = &mut cdb.watcher[..] as *mut [Vec<Watch>];
+        // let watcher = &mut cdb.watcher[..] as *mut [Vec<Watch>];
+        let watcher = cdb.watcher_list_mut() as *mut [Vec<Watch>];
         self.num_propagation += 1;
         while let Some(p) = self.trail.get(self.q_head) {
             self.q_head += 1;

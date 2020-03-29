@@ -1,7 +1,7 @@
 /// Crate `eliminator` implments clause subsumption and var elimination.
 use {
     crate::{
-        clause::{Clause, ClauseDB, ClauseDBIF, ClauseIF, ClauseId, ClauseIdIF, WatchDBIF},
+        clause::{Clause, ClauseDB, ClauseDBIF, ClauseIF, ClauseId, ClauseIdIF},
         config::Config,
         propagator::{AssignStack, PropagatorIF},
         state::{State, StateIF},
@@ -898,9 +898,9 @@ fn merge(cdb: &mut ClauseDB, cip: ClauseId, ciq: ClauseId, v: VarId, vec: &mut V
 /// removes `l` from clause `cid`
 /// - calls `enqueue_clause`
 /// - calls `enqueue_var`
-fn strengthen_clause<A, V>(
+fn strengthen_clause<A, C, V>(
     asgs: &mut A,
-    cdb: &mut ClauseDB,
+    cdb: &mut C,
     elim: &mut Eliminator,
     vdb: &mut V,
     cid: ClauseId,
@@ -908,13 +908,14 @@ fn strengthen_clause<A, V>(
 ) -> MaybeInconsistent
 where
     A: PropagatorIF,
+    C: ClauseDBIF,
     V: VarDBIF + VarRewardIF,
 {
     debug_assert!(!cdb[cid].is(Flag::DEAD));
     debug_assert!(1 < cdb[cid].len());
     cdb.touch_var(l.vi());
     debug_assert_ne!(cid, ClauseId::default());
-    if strengthen(cdb, cid, l) {
+    if cdb.strengthen(cid, l) {
         // Vaporize the binary clause
         debug_assert!(2 == cdb[cid].len());
         let c0 = cdb[cid][0];
@@ -934,57 +935,6 @@ where
         }
         Ok(())
     }
-}
-
-/// removes Lit `p` from Clause *self*. This is an O(n) function!
-/// returns true if the clause became a unit clause.
-/// Called only from strengthen_clause
-fn strengthen(cdb: &mut ClauseDB, cid: ClauseId, p: Lit) -> bool {
-    debug_assert!(!cdb[cid].is(Flag::DEAD));
-    debug_assert!(1 < cdb[cid].len());
-    let c = &mut cdb[cid];
-    // debug_assert!((*ch).lits.contains(&p));
-    // debug_assert!(1 < (*ch).len());
-    if (*c).is(Flag::DEAD) {
-        return false;
-    }
-    debug_assert!(1 < usize::from(!p));
-    let lits = &mut (*c).lits;
-    debug_assert!(1 < lits.len());
-    if lits.len() == 2 {
-        if lits[0] == p {
-            lits.swap(0, 1);
-        }
-        debug_assert!(1 < usize::from(!lits[0]));
-        return true;
-    }
-    if lits[0] == p || lits[1] == p {
-        let (q, r) = if lits[0] == p {
-            lits.swap_remove(0);
-            (lits[0], lits[1])
-        } else {
-            lits.swap_remove(1);
-            (lits[1], lits[0])
-        };
-        debug_assert!(1 < usize::from(!p));
-        let len = lits.len();
-        cdb.watcher[!p].detach_with(cid);
-        cdb.watcher[!q].register(r, cid);
-        if len == 2 {
-            // update another bocker
-            cdb.watcher[!r].update_blocker(cid, q);
-        }
-    } else {
-        lits.delete_unstable(|&x| x == p);
-        if lits.len() == 2 {
-            // update another bocker
-            let q = lits[0];
-            let r = lits[1];
-            cdb.watcher[!q].update_blocker(cid, r);
-            cdb.watcher[!r].update_blocker(cid, q);
-        }
-    }
-    false
 }
 
 fn make_eliminating_unit_clause(vec: &mut Vec<Lit>, x: Lit) {

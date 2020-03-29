@@ -35,6 +35,8 @@ pub trait ClauseDBIF: IndexMut<ClauseId, Output = Clause> {
     fn iter(&self) -> Iter<'_, Clause>;
     /// return an mutable iterator.
     fn iter_mut(&mut self) -> IterMut<'_, Clause>;
+    /// return a watch list
+    fn watcher_list_mut(&mut self) -> &mut [Vec<Watch>];
     /// unregister a clause `cid` from clause database and make the clause dead.
     fn detach(&mut self, cid: ClauseId);
     /// check a condition to reduce.
@@ -85,6 +87,7 @@ pub trait ClauseDBIF: IndexMut<ClauseId, Output = Clause> {
     fn validate<V>(&self, vdb: &V, strict: bool) -> Option<ClauseId>
     where
         V: VarDBIF;
+    fn strengthen(&mut self, cid: ClauseId, p: Lit) -> bool;
 }
 
 /// API for Clause Id.
@@ -674,6 +677,10 @@ impl ClauseDBIF for ClauseDB {
     fn iter_mut(&mut self) -> IterMut<'_, Clause> {
         self.clause.iter_mut()
     }
+    #[inline]
+    fn watcher_list_mut(&mut self) -> &mut [Vec<Watch>] {
+        &mut self.watcher
+    }
     fn garbage_collect(&mut self) {
         // debug_assert!(self.check_liveness1());
         let ClauseDB {
@@ -953,6 +960,57 @@ impl ClauseDBIF for ClauseDB {
             }
         }
         None
+    }
+
+    /// removes Lit `p` from Clause *self*. This is an O(n) function!
+    /// returns true if the clause became a unit clause.
+    /// Called only from strengthen_clause
+    fn strengthen(&mut self, cid: ClauseId, p: Lit) -> bool {
+        debug_assert!(!self[cid].is(Flag::DEAD));
+        debug_assert!(1 < self[cid].len());
+        let c = &mut self[cid];
+        // debug_assert!((*ch).lits.contains(&p));
+        // debug_assert!(1 < (*ch).len());
+        if (*c).is(Flag::DEAD) {
+            return false;
+        }
+        debug_assert!(1 < usize::from(!p));
+        let lits = &mut (*c).lits;
+        debug_assert!(1 < lits.len());
+        if lits.len() == 2 {
+            if lits[0] == p {
+                lits.swap(0, 1);
+            }
+            debug_assert!(1 < usize::from(!lits[0]));
+            return true;
+        }
+        if lits[0] == p || lits[1] == p {
+            let (q, r) = if lits[0] == p {
+                lits.swap_remove(0);
+                (lits[0], lits[1])
+            } else {
+                lits.swap_remove(1);
+                (lits[1], lits[0])
+            };
+            debug_assert!(1 < usize::from(!p));
+            let len = lits.len();
+            self.watcher[!p].detach_with(cid);
+            self.watcher[!q].register(r, cid);
+            if len == 2 {
+                // update another bocker
+                self.watcher[!r].update_blocker(cid, q);
+            }
+        } else {
+            lits.delete_unstable(|&x| x == p);
+            if lits.len() == 2 {
+                // update another bocker
+                let q = lits[0];
+                let r = lits[1];
+                self.watcher[!q].update_blocker(cid, r);
+                self.watcher[!r].update_blocker(cid, q);
+            }
+        }
+        false
     }
 }
 
