@@ -70,6 +70,10 @@ pub struct Config {
     #[structopt(long = "el", default_value = "100")]
     pub elim_lit_lim: usize,
 
+    /// Threshold to elimination
+    #[structopt(long = "et", default_value = "128")]
+    pub elim_trigger: usize,
+
     /// Disables exhaustive simplification
     #[structopt(long = "without-elim", short = "E")]
     pub without_elim: bool,
@@ -165,6 +169,7 @@ impl Default for Config {
             // eliminator
             elim_grw_lim: 0,
             elim_lit_lim: 100,
+            elim_trigger: 128,
             without_elim: false,
 
             // restarter

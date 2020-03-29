@@ -6,7 +6,7 @@ use {
         eliminator::{Eliminator, EliminatorIF, EliminatorStatIF},
         propagator::{AssignStack, PropagatorIF, VarSelectionIF},
         restarter::{RestartIF, Restarter, RestarterModule},
-        state::{SearchStrategy, Stat, State, StateIF},
+        state::{Stat, State, StateIF},
         types::*,
         var::{VarDB, VarDBIF, VarRewardIF},
     },
@@ -359,19 +359,18 @@ fn search(
             }
             handle_conflict(asgs, cdb, elim, rst, state, vdb, ci)?;
         }
+        // Simplification has been postponed because chronoBT was used.
         if asgs.level() == state.root_level {
-            if 0 < state.last_solved {
-                debug_assert_eq!(state.num_solved_vars, asgs.len());
-                // Simplification has been postponed because chronoBT was used.
-                state.last_solved = 0;
+            // `elim.to_eliminate` is increased much in particular when vars are solved or
+            // learnts are small. We don't count the number of solved vars.
+            if state.config.elim_trigger < state.to_eliminate as usize {
+                state.to_eliminate = 0.0;
+                if elim.enable {
+                    elim.activate();
+                }
                 if elim.simplify(asgs, cdb, state, vdb).is_err() {
                     return Err(SolverError::Inconsistent);
                 }
-                // } else if SIMPLIFICATION_PUT_OFF + state.last_solved == nc {
-                //     elim.activate();
-                //     if elim.simplify(asgs, cdb, state, vdb).is_err() {
-                //         return Err(SolverError::Inconsistent);
-                //     }
             }
             // By simplification, we may get further solutions.
             state.num_solved_vars = asgs.len();
@@ -583,6 +582,9 @@ fn handle_conflict(
         asgs.assign_by_implication(vdb, l0, cid, al);
         let lbd = cdb[cid].rank;
         rst.update(RestarterModule::LBD, lbd);
+        if learnt_len < 10 {
+            state.to_eliminate += std::f64::consts::E.powf(-(learnt_len as f64));
+        }
     }
     cdb.scale_activity();
     if 0 < state.config.dump_int && ncnfl % state.config.dump_int == 0 {
@@ -620,35 +622,15 @@ fn adapt_modules(
     state: &mut State,
     vdb: &mut VarDB,
 ) -> MaybeInconsistent {
-    const FORCE_RESTART: bool = false;
     state.progress(asgs, cdb, elim, rst, vdb, None);
-
-    // 'decision_level == 0' is required by `cdb.adapt_to`.
-    // But periodical restarts seem good. So we call it here.
-    if FORCE_RESTART {
-        asgs.cancel_until(vdb, state.root_level);
-    }
-
     let (asgs_num_conflict, _num_propagation, _num_restart) = asgs.exports();
-    let (_, _, rst_asg_trend, _, _) = rst.exports();
-    if elim.enable && rst_asg_trend < 1.0 {
-        if !FORCE_RESTART {
-            asgs.cancel_until(vdb, state.root_level);
-        }
-        elim.activate();
-        elim.simplify(asgs, cdb, state, vdb)?;
-        // To prevent another simplification at `search`, update counters here.
-        state.last_solved = 0;
-        state.num_solved_vars = asgs.len();
-    }
     if 10 * state.reflection_interval == asgs_num_conflict {
-        if !FORCE_RESTART {
-            asgs.cancel_until(vdb, state.root_level);
-        }
+        asgs.cancel_until(vdb, state.root_level);
+        // 'decision_level == 0' is required by `cdb.adapt_to`.
         state.select_strategy(asgs, cdb);
-        if state.strategy.0 == SearchStrategy::HighSuccesive {
-            state.config.cbt_thr = 0;
-        }
+        // if state.strategy.0 == SearchStrategy::HighSuccesive {
+        //     state.config.cbt_thr = 0;
+        // }
     }
     cdb.adapt_to(state, asgs_num_conflict);
     rst.adapt_to(state, asgs_num_conflict);
