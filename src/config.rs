@@ -17,7 +17,7 @@ pub struct Config {
 
     /// Interval for dumpping stat data
     #[structopt(long = "stat", default_value = "0")]
-    pub dump_interval: usize,
+    pub dump_int: usize,
 
     /// Disable coloring
     #[structopt(long = "no-color", short = "C")]
@@ -128,12 +128,12 @@ pub struct Config {
     //
     //## solver configuration
     //
-    /// Threshold to use chronoBT
-    #[structopt(long = "chronoBT", default_value = "100")]
-    pub chronobt: DecisionLevel,
+    /// Level threshold to use chronoBT
+    #[structopt(long = "cbt", default_value = "100")]
+    pub cbt_thr: DecisionLevel,
 
     /// CPU time limit in sec.
-    #[structopt(long = "to", default_value = "10000.0")]
+    #[structopt(long = "timeout", short = "t", default_value = "10000.0")]
     pub timeout: f64,
 
     /// Writes a DRAT UNSAT certification file
@@ -150,7 +150,7 @@ impl Default for Config {
         Config {
             // I/O
             cnf_file: PathBuf::new(),
-            dump_interval: 0,
+            dump_int: 0,
             no_color: false,
             output_dir: PathBuf::from("."),
             proof_file: PathBuf::from("proof.out"),
@@ -182,7 +182,7 @@ impl Default for Config {
             without_stab: false,
 
             // solver
-            chronobt: 100,
+            cbt_thr: 100,
             timeout: 10_000.0,
             use_certification: false,
             without_adaptive_strategy: false,

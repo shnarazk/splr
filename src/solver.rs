@@ -442,7 +442,7 @@ fn handle_conflict(
     }
     rst.block_restart();
     let cl = asgs.level();
-    let mut use_chronobt = switch_chronobt.unwrap_or(0 < state.config.chronobt);
+    let mut use_chronobt = switch_chronobt.unwrap_or(0 < state.config.cbt_thr);
     if use_chronobt {
         let c = &cdb[ci];
         let lcnt = c.iter().filter(|l| vdb[*l].level == cl).count();
@@ -520,7 +520,7 @@ fn handle_conflict(
     // PREMISE: 0 < bl, because asgs.decision_vi accepts only non-zero values.
     use_chronobt &= switch_chronobt.unwrap_or(
         bl_a == 0
-            || state.config.chronobt + bl_a <= cl
+            || state.config.cbt_thr + bl_a <= cl
             || vdb.activity(l0.vi()) < vdb.activity(asgs.decision_vi(bl_a)),
     );
 
@@ -585,7 +585,7 @@ fn handle_conflict(
         rst.update(RestarterModule::LBD, lbd);
     }
     cdb.scale_activity();
-    if 0 < state.config.dump_interval && ncnfl % state.config.dump_interval == 0 {
+    if 0 < state.config.dump_int && ncnfl % state.config.dump_int == 0 {
         let (_mode, rst_num_block, rst_asg_trend, _lbd_get, rst_lbd_trend) = rst.exports();
         state.development.push((
             ncnfl,
@@ -647,7 +647,7 @@ fn adapt_modules(
         }
         state.select_strategy(asgs, cdb);
         if state.strategy.0 == SearchStrategy::HighSuccesive {
-            state.config.chronobt = 0;
+            state.config.cbt_thr = 0;
         }
     }
     cdb.adapt_to(state, asgs_num_conflict);
