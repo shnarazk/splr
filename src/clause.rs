@@ -2,10 +2,10 @@
 use {
     crate::{
         config::Config,
-        eliminator::{Eliminator, EliminatorIF},
+        eliminator::EliminatorIF,
         state::{SearchStrategy, State},
         types::*,
-        var::{VarDB, VarDBIF, LBDIF},
+        var::{VarDBIF, LBDIF},
     },
     std::{
         cmp::Ordering,
@@ -26,7 +26,7 @@ pub trait ClauseIF {
 }
 
 /// API for clause management like `reduce`, `simplify`, `new_clause`, and so on.
-pub trait ClauseDBIF {
+pub trait ClauseDBIF: IndexMut<ClauseId, Output = Clause> {
     /// return the length of `clause`.
     fn len(&self) -> usize;
     /// return true if it's empty.
@@ -52,7 +52,9 @@ pub trait ClauseDBIF {
     /// allocate a new clause and return its id.
     /// * If 2nd arg is `Some(vdb)`, register `v` as a learnt after sorting based on assign level.
     /// * Otherwise, register `v` as a permanent clause, which rank is zero.
-    fn new_clause(&mut self, v: &mut [Lit], level_sort: Option<&mut VarDB>) -> ClauseId;
+    fn new_clause<V>(&mut self, v: &mut [Lit], level_sort: Option<&mut V>) -> ClauseId
+    where
+        V: VarDBIF + LBDIF;
     /// check and convert a learnt clause to permanent if needed.
     fn convert_to_permanent<V>(&mut self, vdb: &mut V, cid: ClauseId) -> bool
     where
@@ -66,7 +68,10 @@ pub trait ClauseDBIF {
     /// record a deleted clause to unsat certification.
     fn certificate_delete(&mut self, vec: &[Lit]);
     /// delete satisfied clauses at decision level zero.
-    fn eliminate_satisfied_clauses(&mut self, elim: &mut Eliminator, vdb: &mut VarDB, occur: bool);
+    fn eliminate_satisfied_clauses<E, V>(&mut self, elim: &mut E, vdb: &mut V, occur: bool)
+    where
+        E: EliminatorIF,
+        V: VarDBIF;
     /// flag positive and negative literals of a var as dirty
     fn touch_var(&mut self, vi: VarId);
     /// check the number of clauses
@@ -715,7 +720,10 @@ impl ClauseDBIF for ClauseDB {
         self.num_active = self.clause.len() - recycled.len();
         // debug_assert!(self.check_liveness2());
     }
-    fn new_clause(&mut self, v: &mut [Lit], level_sort: Option<&mut VarDB>) -> ClauseId {
+    fn new_clause<V>(&mut self, v: &mut [Lit], level_sort: Option<&mut V>) -> ClauseId
+    where
+        V: VarDBIF + LBDIF,
+    {
         let reward = self.activity_inc;
         let (rank, learnt) = if let Some(vdb) = level_sort {
             if !self.certified.is_empty() {
@@ -899,12 +907,11 @@ impl ClauseDBIF for ClauseDB {
             self.certified.push((CertifiedRecord::DELETE, temp));
         }
     }
-    fn eliminate_satisfied_clauses(
-        &mut self,
-        elim: &mut Eliminator,
-        vdb: &mut VarDB,
-        update_occur: bool,
-    ) {
+    fn eliminate_satisfied_clauses<E, V>(&mut self, elim: &mut E, vdb: &mut V, update_occur: bool)
+    where
+        E: EliminatorIF,
+        V: VarDBIF,
+    {
         for (cid, c) in &mut self.clause.iter_mut().enumerate().skip(1) {
             if !c.is(Flag::DEAD) && vdb.satisfies(&c.lits) {
                 c.kill(&mut self.touched);

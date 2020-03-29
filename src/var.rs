@@ -25,7 +25,7 @@ pub trait LBDIF {
 }
 
 /// API for var DB like `assigned`, `locked`, and so on.
-pub trait VarDBIF {
+pub trait VarDBIF: IndexMut<VarId, Output = Var> + IndexMut<Lit, Output = Var> {
     /// return the number of vars.
     fn len(&self) -> usize;
     /// return true if it's empty.

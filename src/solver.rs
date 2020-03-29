@@ -311,7 +311,7 @@ impl SatSolverIF for Solver {
                 .assign_at_rootlevel(vdb, lits[0])
                 .map_or(None, |_| Some(ClauseId::default())),
             _ => {
-                let cid = cdb.new_clause(lits, None);
+                let cid = cdb.new_clause(lits, None::<&mut VarDB>);
                 elim.add_cid_occur(vdb, cid, &mut cdb[cid], true);
                 Some(cid)
             }
