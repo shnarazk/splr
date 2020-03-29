@@ -28,7 +28,7 @@ pub trait PropagatorIF: Index<usize, Output = Lit> {
     fn len_upto(&self, n: DecisionLevel) -> usize;
     /// return `true` if there's no assignment.
     fn is_empty(&self) -> bool;
-    /// return an interator over assignment stack.
+    /// return an iterator over assignment stack.
     fn iter(&self) -> Iter<'_, Lit>;
     /// return the current decision level.
     fn level(&self) -> DecisionLevel;

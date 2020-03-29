@@ -30,9 +30,9 @@ pub trait VarDBIF: IndexMut<VarId, Output = Var> + IndexMut<Lit, Output = Var> {
     fn len(&self) -> usize;
     /// return true if it's empty.
     fn is_empty(&self) -> bool;
-    /// return an interator over vars.
+    /// return an iterator over vars.
     fn iter(&self) -> Iter<'_, Var>;
-    /// return an interator over vars.
+    /// return an iterator over vars.
     fn iter_mut(&mut self) -> IterMut<'_, Var>;
     /// return the 'value' of a given literal.
     fn assigned(&self, l: Lit) -> Option<bool>;
