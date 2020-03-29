@@ -1026,7 +1026,9 @@ impl ClauseDB {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::clause::ClauseDB;
     use crate::propagator::{AssignStack, PropagatorIF};
+    use crate::var::VarDB;
 
     fn lit(i: i32) -> Lit {
         Lit::from(i)
@@ -1059,7 +1061,7 @@ mod tests {
         asgs.assign_by_decision(&mut vdb, lit(1));
         asgs.assign_by_decision(&mut vdb, lit(-2));
 
-        let c1 = cdb.new_clause(&mut [lit(1), lit(2), lit(3)], None);
+        let c1 = cdb.new_clause(&mut [lit(1), lit(2), lit(3)], None::<&mut VarDB>);
         let c = &cdb[c1];
         assert_eq!(c.rank, 0);
         assert!(!c.is(Flag::DEAD));
@@ -1081,8 +1083,8 @@ mod tests {
             ..CNFDescription::default()
         };
         let mut cdb = ClauseDB::instantiate(&config, &cnf);
-        let c1 = cdb.new_clause(&mut [lit(1), lit(2), lit(3)], None);
-        let c2 = cdb.new_clause(&mut [lit(-1), lit(4)], None);
+        let c1 = cdb.new_clause(&mut [lit(1), lit(2), lit(3)], None::<&mut VarDB>);
+        let c2 = cdb.new_clause(&mut [lit(-1), lit(4)], None::<&mut VarDB>);
         cdb[c2].reward = 2.4;
         assert_eq!(c1, c1);
         assert_eq!(c1 == c1, true);
@@ -1098,7 +1100,7 @@ mod tests {
             ..CNFDescription::default()
         };
         let mut cdb = ClauseDB::instantiate(&config, &cnf);
-        let c1 = cdb.new_clause(&mut [lit(1), lit(2), lit(3)], None);
+        let c1 = cdb.new_clause(&mut [lit(1), lit(2), lit(3)], None::<&mut VarDB>);
         assert_eq!(cdb[c1][0..].iter().map(|l| i32::from(*l)).sum::<i32>(), 6);
         let mut iter = cdb[c1][0..].into_iter();
         assert_eq!(iter.next(), Some(&lit(1)));

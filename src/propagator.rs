@@ -814,6 +814,7 @@ impl fmt::Display for VarIdHeap {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::var::VarDB;
 
     fn lit(i: i32) -> Lit {
         Lit::from(i)

@@ -1454,7 +1454,7 @@ mod tests {
 
     fn mk_c(s: &mut Solver, i: usize, v: Vec<i32>) -> ClauseId {
         let mut vec = v.iter().map(|i| Lit::from(*i)).collect::<Vec<Lit>>();
-        let cid = s.cdb.new_clause(&mut vec, None);
+        let cid = s.cdb.new_clause(&mut vec, None::<&mut VarDB>);
         cid
     }
 }
