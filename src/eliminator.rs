@@ -1401,7 +1401,8 @@ mod tests {
     #![allow(unused_imports)]
     #![allow(unused_variables)]
     #![allow(dead_code)]
-    use {super::*, crate::solver::Solver};
+    use super::*;
+    use crate::{clause::ClauseDB, solver::Solver, var::VarDB};
 
     macro_rules! mkv {
         ($($x:expr),*) => {
