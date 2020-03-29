@@ -5,7 +5,7 @@ use {crate::types::DecisionLevel, std::path::PathBuf, structopt::StructOpt};
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Configuration built from command line options
-#[derive(Clone, Debug, StructOpt)]
+#[derive(Clone, Debug, Default, StructOpt)]
 #[structopt(name = "splr", about, author)]
 pub struct Config {
     //
@@ -98,7 +98,7 @@ pub struct Config {
     pub rst_bkt_scl: f64,
 
     /// Bucket threshold
-    #[structopt(skip)] // long = "rbt", default_value = "2000.0"
+    #[structopt(skip)] // long = "rbt", default_value = "2000"
     pub rst_bkt_thr: usize,
 
     /// Length for assignment average
@@ -147,52 +147,6 @@ pub struct Config {
     /// Writes a DRAT UNSAT certification file
     #[structopt(long = "certify", short = "c")]
     pub use_certification: bool,
-}
-
-impl Default for Config {
-    fn default() -> Config {
-        Config {
-            // I/O
-            cnf_file: PathBuf::new(),
-            dump_int: 0,
-            no_color: false,
-            output_dir: PathBuf::from("."),
-            proof_file: PathBuf::from("proof.out"),
-            quiet_mode: false,
-            result_file: PathBuf::new(),
-            use_log: false,
-
-            // clause DB
-            clause_limit: 0,
-            without_reduce: false,
-
-            // eliminator
-            elim_grw_lim: 0,
-            elim_lit_lim: 100,
-            elim_trigger: 128,
-            without_elim: false,
-
-            // restarter
-            rst_step: 50,
-            rst_bkt_inc: 1.0,
-            rst_bkt_pwr: 1.5,
-            rst_bkt_scl: 0.001,
-            rst_bkt_thr: 2000,
-            rst_asg_len: 3500,
-            rst_asg_thr: 1.40,
-            rst_lbd_len: 50,
-            rst_lbd_slw: 10000,
-            rst_lbd_thr: 1.25,
-            rst_stb_scl: 2.0,
-            without_stab: false,
-
-            // solver
-            cbt_thr: 100,
-            timeout: 10_000.0,
-            use_certification: false,
-            without_adaptive_strategy: false,
-        }
-    }
 }
 
 impl<T> From<T> for Config
