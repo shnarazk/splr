@@ -1,14 +1,13 @@
 ## 0.3.3, 2020-12-31
 
+- change a lot of options' meanings and mnemonics
 - activate `JUST_USED` for clause reduction
 - remove `ClauseDB::attach`
-- add an experimental restart scheme switcher
+- change the activation timings of simplification
+- add and refactor restart module: GeometricStabilizer, ProgressBucket, ProgressLBD
 - better modularity via trait `Export`, which is renamed from `ProgressComponent`
 - stats data are stored in each modules.
-- change the meaning of option `-S`
 - remove `deep search` completely
-- refactor `ProgressEvaluator`s
-- change the definition of `Config::restart_threshold`
 
 ## 0.3.2, 2020-03-20
 
