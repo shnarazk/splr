@@ -56,7 +56,7 @@ pub struct Config {
     pub clause_limit: usize,
 
     /// Disable clause reduction
-    #[structopt(long = "without-reduce", short = "R")]
+    #[structopt(long = "no-reduce", short = "R")]
     pub without_reduce: bool,
 
     //
@@ -75,7 +75,7 @@ pub struct Config {
     pub elim_trigger: usize,
 
     /// Disables exhaustive simplification
-    #[structopt(long = "without-elim", short = "E")]
+    #[structopt(long = "no-elim", short = "E")]
     pub without_elim: bool,
 
     //
@@ -87,7 +87,7 @@ pub struct Config {
 
     /// #conflicts between restarts
     #[structopt(long = "rs", default_value = "50")]
-    pub restart_step: usize,
+    pub rst_step: usize,
 
     /// Bucket increment step
     #[structopt(long = "rbi", default_value = "1.0")]
@@ -113,12 +113,16 @@ pub struct Config {
     #[structopt(long = "rab", default_value = "1.40")]
     pub rst_asg_thr: f64, // Glucose's R
 
-    /// Length for LBD average
+    /// Short Length for LBD average
     #[structopt(long = "rll", default_value = "50")]
     pub rst_lbd_len: usize,
 
+    /// Long Length for LBD average
+    #[structopt(long = "rll", default_value = "10000")]
+    pub rst_lbd_lng: usize,
+
     /// Forcing restart threshold
-    #[structopt(long = "rlt", default_value = "1.2")]
+    #[structopt(long = "rlt", default_value = "1.1")]
     pub rst_lbd_thr: f64, // Glucose's K
 
     /// Stabilizer scaling
@@ -126,7 +130,7 @@ pub struct Config {
     pub rst_stb_scl: f64,
 
     /// Disable geometric restart blocker
-    #[structopt(long = "without-stabilizer", short = "S")]
+    #[structopt(long = "no-stabilizer", short = "S")]
     pub without_stab: bool,
 
     //
@@ -136,6 +140,10 @@ pub struct Config {
     #[structopt(long = "cbt", default_value = "100")]
     pub cbt_thr: DecisionLevel,
 
+    /// Disables dynamic strategy adaptation
+    #[structopt(long = "no-adapt", short = "A")]
+    pub without_adaptive_strategy: bool,
+
     /// CPU time limit in sec.
     #[structopt(long = "timeout", short = "t", default_value = "10000.0")]
     pub timeout: f64,
@@ -143,10 +151,6 @@ pub struct Config {
     /// Writes a DRAT UNSAT certification file
     #[structopt(long = "certify", short = "c")]
     pub use_certification: bool,
-
-    /// Disables dynamic strategy adaptation
-    #[structopt(long = "no-adaptive-strategy", short = "A")]
-    pub without_adaptive_strategy: bool,
 }
 
 impl Default for Config {
@@ -174,7 +178,7 @@ impl Default for Config {
 
             // restarter
             bucket_restart: false,
-            restart_step: 50,
+            rst_step: 50,
             rst_bkt_inc: 1.0,
             rst_bkt_pwr: 1.5,
             rst_bkt_scl: 0.001,
@@ -182,6 +186,7 @@ impl Default for Config {
             rst_asg_len: 3500,
             rst_asg_thr: 1.40,
             rst_lbd_len: 50,
+            rst_lbd_lng: 10000,
             rst_lbd_thr: 1.2,
             rst_stb_scl: 2.0,
             without_stab: false,

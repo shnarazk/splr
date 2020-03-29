@@ -129,7 +129,7 @@ impl Instantiate for ProgressLBD {
     fn instantiate(config: &Config, _: &CNFDescription) -> Self {
         ProgressLBD {
             enable: !config.bucket_restart,
-            ema: Ema2::new(config.rst_lbd_len).with_slow(100_000),
+            ema: Ema2::new(config.rst_lbd_len).with_slow(config.rst_lbd_lng),
             threshold: config.rst_lbd_thr,
             ..ProgressLBD::default()
         }
@@ -277,7 +277,7 @@ impl Default for LubySeries {
 impl Instantiate for LubySeries {
     fn instantiate(config: &Config, _: &CNFDescription) -> Self {
         LubySeries {
-            step: config.restart_step,
+            step: config.rst_step,
             ..LubySeries::default()
         }
     }
@@ -540,7 +540,7 @@ impl Instantiate for Restarter {
             // clvl: ProgressLVL::instantiate(config, cnf),
             luby: LubySeries::instantiate(config, cnf),
             stb: GeometricStabilizer::instantiate(config, cnf),
-            restart_step: config.restart_step,
+            restart_step: config.rst_step,
             ..Restarter::default()
         }
     }
