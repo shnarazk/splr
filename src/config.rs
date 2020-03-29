@@ -145,7 +145,7 @@ pub struct Config {
     pub use_certification: bool,
 
     /// Disables dynamic strategy adaptation
-    #[structopt(long = "no-adaptive-strategy", short = "G")]
+    #[structopt(long = "no-adaptive-strategy", short = "A")]
     pub without_adaptive_strategy: bool,
 }
 
