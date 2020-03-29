@@ -100,12 +100,15 @@ impl Instantiate for Solver {
 
 macro_rules! final_report {
     ($asgs: expr, $cdb: expr, $elim: expr, $rst: expr, $state: expr, $vdb: expr) => {
+        let c = $state.config.no_color;
         let q = $state.config.quiet_mode;
+        $state.config.no_color = true;
         $state.config.quiet_mode = false;
         if q {
             $state.progress_header();
         }
         $state.progress($asgs, $cdb, $elim, $rst, $vdb, None);
+        $state.config.no_color = c;
         $state.config.quiet_mode = q;
     };
 }

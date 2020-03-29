@@ -19,6 +19,10 @@ pub struct Config {
     #[structopt(long = "stat", default_value = "0")]
     pub dump_interval: usize,
 
+    /// Disable coloring
+    #[structopt(long = "no-color", short = "C")]
+    pub no_color: bool,
+
     /// Output directory
     #[structopt(long = "dir", short = "o", default_value = ".", parse(from_os_str))]
     pub output_dir: PathBuf,
@@ -143,6 +147,7 @@ impl Default for Config {
             // I/O
             cnf_file: PathBuf::new(),
             dump_interval: 0,
+            no_color: false,
             output_dir: PathBuf::from("."),
             proof_file: PathBuf::from("proof.out"),
             quiet_mode: false,

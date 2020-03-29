@@ -236,7 +236,7 @@ macro_rules! im {
             (v, LogUsizeId::End) => format!($format, v),
             (v, k) => {
                 let ptr = &mut $state.record[k];
-                if $state.config.quiet_mode {
+                if $state.config.no_color {
                     *ptr = v;
                     format!($format, *ptr)
                 } else if (v as f64) * 1.6 < *ptr as f64 {
@@ -279,7 +279,7 @@ macro_rules! fm {
             (v, LogF64Id::End) => format!($format, v),
             (v, k) => {
                 let ptr = &mut $state.record[k];
-                if $state.config.quiet_mode {
+                if $state.config.no_color {
                     *ptr = v;
                     format!($format, *ptr)
                 } else if v * 1.6 < *ptr {
@@ -482,8 +482,11 @@ impl StateIF for State {
             "\x1B[2K {}|#BLK:{}, #RST:{}, tASG:{}, tLBD:{} ",
             match rst_mode {
                 RestartMode::Dynamic => "    Restart",
+                RestartMode::Luby if self.config.no_color => "LubyRestart",
                 RestartMode::Luby => "\x1B[001m\x1B[035mLubyRestart\x1B[000m",
+                RestartMode::Stabilize if self.config.no_color => "  Stabilize",
                 RestartMode::Stabilize => "  \x1B[001m\x1B[030mStabilize\x1B[000m",
+                RestartMode::Bucket if self.config.no_color => "     Bucket",
                 RestartMode::Bucket => "     \x1B[001m\x1B[032mBucket\x1B[000m",
             },
             im!("{:>9}", self, LogUsizeId::RestartBlock, rst_num_block),
