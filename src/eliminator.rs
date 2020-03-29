@@ -276,8 +276,8 @@ impl Instantiate for Eliminator {
         Eliminator {
             enable: !config.without_elim,
             var_queue: VarOccHeap::new(nv, 0),
-            eliminate_grow_limit: config.elim_grow_limit,
-            subsume_literal_limit: config.elim_lit_limit,
+            eliminate_grow_limit: config.elim_grw_lim,
+            subsume_literal_limit: config.elim_lit_lim,
             var: LitOccurs::new(nv + 1),
             ..Eliminator::default()
         }

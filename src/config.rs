@@ -64,11 +64,11 @@ pub struct Config {
     //
     /// Grow limit of #clauses by v-elim
     #[structopt(long = "eg", default_value = "0")]
-    pub elim_grow_limit: usize,
+    pub elim_grw_lim: usize,
 
     /// #literals in a clause by v-elim
     #[structopt(long = "el", default_value = "100")]
-    pub elim_lit_limit: usize,
+    pub elim_lit_lim: usize,
 
     /// Disables exhaustive simplification
     #[structopt(long = "without-elim", short = "E")]
@@ -85,13 +85,17 @@ pub struct Config {
     #[structopt(long = "rs", default_value = "50")]
     pub restart_step: usize,
 
+    /// Bucket increment step
+    #[structopt(long = "rbi", default_value = "1.0")]
+    pub rst_bkt_inc: f64,
+
     /// Bucket power factor
     #[structopt(long = "rbp", default_value = "1.25")]
     pub rst_bkt_pwr: f64,
 
-    /// Bucket stepping factor
-    #[structopt(long = "rbs", default_value = "1.0")]
-    pub rst_bkt_step: f64,
+    /// Bucket time scale
+    #[structopt(long = "rbs", default_value = "0.001")]
+    pub rst_bkt_scl: f64,
 
     /// Bucket threshold
     #[structopt(long = "rbt", default_value = "2000.0")]
@@ -159,15 +163,16 @@ impl Default for Config {
             without_reduce: false,
 
             // eliminator
-            elim_grow_limit: 0,
-            elim_lit_limit: 100,
+            elim_grw_lim: 0,
+            elim_lit_lim: 100,
             without_elim: false,
 
             // restarter
             bucket_restart: false,
             restart_step: 50,
+            rst_bkt_inc: 1.0,
             rst_bkt_pwr: 1.25,
-            rst_bkt_step: 1.0,
+            rst_bkt_scl: 0.001,
             rst_bkt_thr: 2000.0,
             rst_asg_len: 3500,
             rst_asg_thr: 1.40,

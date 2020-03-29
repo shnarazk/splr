@@ -421,6 +421,8 @@ struct ProgressBucket {
     num_shift: usize,
     sum: f64,
     power: f64,
+    power_factor: f64,
+    power_scale: f64,
     step: f64,
     threshold: f64,
 }
@@ -432,6 +434,8 @@ impl Default for ProgressBucket {
             num_shift: 0,
             sum: 0.0,
             power: 1.25,
+            power_factor: 1.25,
+            power_scale: 0.0,
             step: 1.0,
             threshold: 2000.0,
         }
@@ -442,8 +446,10 @@ impl Instantiate for ProgressBucket {
     fn instantiate(config: &Config, _: &CNFDescription) -> Self {
         ProgressBucket {
             enable: config.bucket_restart,
-            power: 2.0, // config.rst_bkt_pwr,
-            step: config.rst_bkt_step,
+            power: config.rst_bkt_pwr,
+            power_factor: (config.rst_bkt_pwr - 1.0).max(0.0),
+            power_scale: config.rst_bkt_scl,
+            step: config.rst_bkt_inc,
             threshold: config.rst_bkt_thr,
             ..ProgressBucket::default()
         }
@@ -472,7 +478,12 @@ impl ProgressEvaluator for ProgressBucket {
         self.sum = 0.0;
         self.threshold += self.step;
         // self.power = 1.0 + (self.num_shift as f64).powf(-0.2);
-        self.power = 1.0 + (self.num_shift as f64).powf(-0.1);
+        // self.power = 1.0 + (1.0 + 0.001 * self.num_shift as f64).powf(-1.0);
+        if 0.0 < self.power_factor {
+            // If power_scale == 0.0, then p == 1.0 and power == config.rst_bkt_pwr.
+            let p = (1.0 + self.power_scale * self.num_shift as f64).powf(-1.0);
+            self.power = 1.0 + self.power_factor * p;
+        }
     }
 }
 
