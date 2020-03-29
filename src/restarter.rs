@@ -347,6 +347,11 @@ impl LubySeries {
 }
 
 /// An implementation of Cadical-style blocker.
+/// This is a stealth blocker between the other evalutars and solver;
+/// the other evaluators work as if this blocker doesn't exist.
+/// When an evaluator becomes active, we accept and shift it. But this blocker
+/// absorbs not only the forcing signal but also blocking singal.
+/// This exists in macro `reset`.
 #[derive(Debug)]
 struct GeometricStabilizer {
     enable: bool,
@@ -404,7 +409,7 @@ impl EmaIF for GeometricStabilizer {
 
 impl ProgressEvaluator for GeometricStabilizer {
     fn is_active(&self) -> bool {
-        self.active
+        self.enable && self.active
     }
     fn shift(&mut self) {}
 }
@@ -490,6 +495,7 @@ pub struct Restarter {
     //## statistics
     //
     num_block: usize,
+    num_stabilize: usize,
 }
 
 impl Default for Restarter {
@@ -507,6 +513,7 @@ impl Default for Restarter {
             next_restart: 100,
             restart_step: 0,
             num_block: 0,
+            num_stabilize: 0,
         }
     }
 }
@@ -544,6 +551,11 @@ impl Instantiate for Restarter {
 macro_rules! reset {
     ($executor: expr) => {
         $executor.after_restart = 0;
+        if $executor.stb.is_active() {
+            $executor.num_block += 1;
+            $executor.num_stabilize += 1;
+            return false;
+        }
         return true;
     };
 }
@@ -551,9 +563,6 @@ macro_rules! reset {
 impl RestartIF for Restarter {
     fn block_restart(&mut self) -> bool {
         if self.after_restart < self.restart_step || self.luby.enable || self.bkt.enable {
-            return false;
-        }
-        if self.stb.is_active() {
             return false;
         }
         if self.asg.is_active() {
@@ -567,11 +576,6 @@ impl RestartIF for Restarter {
             self.luby.shift();
             reset!(self);
         }
-        if self.stb.is_active() {
-            self.stb.shift();
-            // blk doesn't need to reset `after_restart`.
-            return false;
-        }
         if self.bkt.is_active() {
             self.bkt.shift();
             reset!(self);
@@ -580,7 +584,7 @@ impl RestartIF for Restarter {
             return false;
         }
         if self.lbd.is_active() {
-            // lbd doesn't need `shift`.
+            self.lbd.shift();
             reset!(self);
         }
         false
