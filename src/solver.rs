@@ -620,7 +620,7 @@ fn adapt_modules(
     state: &mut State,
     vdb: &mut VarDB,
 ) -> MaybeInconsistent {
-    const FORCE_RESTART: bool = true;
+    const FORCE_RESTART: bool = false;
     state.progress(asgs, cdb, elim, rst, vdb, None);
 
     // 'decision_level == 0' is required by `cdb.adapt_to`.
