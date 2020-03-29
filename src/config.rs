@@ -56,18 +56,18 @@ pub struct Config {
     pub clause_limit: usize,
 
     /// Disable clause reduction
-    #[structopt(long = "no-reduce", short = "R")]
+    #[structopt(skip)] //  long = "no-reduce", short = "R"
     pub without_reduce: bool,
 
     //
     //## eliminator
     //
     /// Grow limit of #clauses by v-elim
-    #[structopt(long = "eg", default_value = "0")]
+    #[structopt(long = "evg", default_value = "0")]
     pub elim_grw_lim: usize,
 
     /// #literals in a clause by v-elim
-    #[structopt(long = "el", default_value = "100")]
+    #[structopt(long = "evl", default_value = "100")]
     pub elim_lit_lim: usize,
 
     /// Threshold to elimination
@@ -81,29 +81,25 @@ pub struct Config {
     //
     //## restarter
     //
-    /// Enable Bucket restart
-    #[structopt(long = "bucket-restart", short = "B")]
-    pub bucket_restart: bool,
-
     /// #conflicts between restarts
     #[structopt(long = "rs", default_value = "50")]
     pub rst_step: usize,
 
     /// Bucket increment step
-    #[structopt(long = "rbi", default_value = "1.0")]
+    #[structopt(skip)] // long = "rbi", default_value = "1.0"
     pub rst_bkt_inc: f64,
 
     /// Bucket power factor
-    #[structopt(long = "rbp", default_value = "1.5")]
+    #[structopt(skip)] // long = "rbp", default_value = "1.5"
     pub rst_bkt_pwr: f64,
 
     /// Bucket time scale
-    #[structopt(long = "rbs", default_value = "0.001")]
+    #[structopt(skip)] // long = "rbs", default_value = "0.001"
     pub rst_bkt_scl: f64,
 
     /// Bucket threshold
-    #[structopt(long = "rbt", default_value = "2000.0")]
-    pub rst_bkt_thr: f64,
+    #[structopt(skip)] // long = "rbt", default_value = "2000.0"
+    pub rst_bkt_thr: usize,
 
     /// Length for assignment average
     #[structopt(long = "ral", default_value = "3500")]
@@ -113,24 +109,24 @@ pub struct Config {
     #[structopt(long = "rab", default_value = "1.40")]
     pub rst_asg_thr: f64, // Glucose's R
 
-    /// Short Length for LBD average
+    /// Length of LBD fast EMA
     #[structopt(long = "rll", default_value = "50")]
     pub rst_lbd_len: usize,
 
-    /// Long Length for LBD average
-    #[structopt(long = "rll", default_value = "10000")]
-    pub rst_lbd_lng: usize,
+    /// Length of LBD slow EMA
+    #[structopt(long = "rls", default_value = "10000")]
+    pub rst_lbd_slw: usize,
 
     /// Forcing restart threshold
-    #[structopt(long = "rlt", default_value = "1.1")]
+    #[structopt(long = "rlt", default_value = "1.25")]
     pub rst_lbd_thr: f64, // Glucose's K
 
     /// Stabilizer scaling
-    #[structopt(long = "rss", default_value = "2.0")]
+    #[structopt(skip)] // long = "rss", default_value = "2.0"
     pub rst_stb_scl: f64,
 
     /// Disable geometric restart blocker
-    #[structopt(long = "no-stabilizer", short = "S")]
+    #[structopt(skip)] // long = "no-stabilizer", short = "S"
     pub without_stab: bool,
 
     //
@@ -177,17 +173,16 @@ impl Default for Config {
             without_elim: false,
 
             // restarter
-            bucket_restart: false,
             rst_step: 50,
             rst_bkt_inc: 1.0,
             rst_bkt_pwr: 1.5,
             rst_bkt_scl: 0.001,
-            rst_bkt_thr: 2000.0,
+            rst_bkt_thr: 2000,
             rst_asg_len: 3500,
             rst_asg_thr: 1.40,
             rst_lbd_len: 50,
-            rst_lbd_lng: 10000,
-            rst_lbd_thr: 1.2,
+            rst_lbd_slw: 10000,
+            rst_lbd_thr: 1.25,
             rst_stb_scl: 2.0,
             without_stab: false,
 
@@ -214,8 +209,6 @@ where
 impl Config {
     #[allow(unused_mut)]
     pub fn override_args(mut self) -> Config {
-        self.bucket_restart = true;
-        self.rst_bkt_pwr = 1.5;
         self
     }
 }

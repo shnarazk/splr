@@ -72,10 +72,9 @@ impl Default for ProgressASG {
 impl Instantiate for ProgressASG {
     fn instantiate(config: &Config, _: &CNFDescription) -> Self {
         ProgressASG {
-            enable: !config.bucket_restart,
             ema: Ema::new(config.rst_asg_len),
-            asg: 0,
             threshold: config.rst_asg_thr,
+            ..ProgressASG::default()
         }
     }
 }
@@ -128,8 +127,7 @@ impl Default for ProgressLBD {
 impl Instantiate for ProgressLBD {
     fn instantiate(config: &Config, _: &CNFDescription) -> Self {
         ProgressLBD {
-            enable: !config.bucket_restart,
-            ema: Ema2::new(config.rst_lbd_len).with_slow(config.rst_lbd_lng),
+            ema: Ema2::new(config.rst_lbd_len).with_slow(config.rst_lbd_slw),
             threshold: config.rst_lbd_thr,
             ..ProgressLBD::default()
         }
@@ -363,7 +361,7 @@ struct GeometricStabilizer {
 impl Default for GeometricStabilizer {
     fn default() -> Self {
         GeometricStabilizer {
-            enable: true,
+            enable: false,
             active: false,
             next_trigger: 1000,
             restart_inc: 2.0,
@@ -374,7 +372,6 @@ impl Default for GeometricStabilizer {
 impl Instantiate for GeometricStabilizer {
     fn instantiate(config: &Config, _: &CNFDescription) -> Self {
         GeometricStabilizer {
-            enable: !config.without_stab,
             restart_inc: config.rst_stb_scl,
             ..GeometricStabilizer::default()
         }
@@ -445,12 +442,11 @@ impl Default for ProgressBucket {
 impl Instantiate for ProgressBucket {
     fn instantiate(config: &Config, _: &CNFDescription) -> Self {
         ProgressBucket {
-            enable: config.bucket_restart,
             power: config.rst_bkt_pwr,
             power_factor: (config.rst_bkt_pwr - 1.0).max(0.0),
             power_scale: config.rst_bkt_scl,
             step: config.rst_bkt_inc,
-            threshold: config.rst_bkt_thr,
+            threshold: config.rst_bkt_thr as f64,
             ..ProgressBucket::default()
         }
     }
