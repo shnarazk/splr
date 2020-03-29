@@ -94,7 +94,7 @@ pub struct Config {
     pub rst_bkt_inc: f64,
 
     /// Bucket power factor
-    #[structopt(long = "rbp", default_value = "1.25")]
+    #[structopt(long = "rbp", default_value = "1.5")]
     pub rst_bkt_pwr: f64,
 
     /// Bucket time scale
@@ -176,7 +176,7 @@ impl Default for Config {
             bucket_restart: false,
             restart_step: 50,
             rst_bkt_inc: 1.0,
-            rst_bkt_pwr: 1.25,
+            rst_bkt_pwr: 1.5,
             rst_bkt_scl: 0.001,
             rst_bkt_thr: 2000.0,
             rst_asg_len: 3500,
@@ -210,6 +210,7 @@ impl Config {
     #[allow(unused_mut)]
     pub fn override_args(mut self) -> Config {
         self.bucket_restart = true;
+        self.rst_bkt_pwr = 1.5;
         self
     }
 }
