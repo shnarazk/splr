@@ -727,7 +727,7 @@ fn conflict_analyze(
     debug_assert_eq!(vdb[p].level, dl);
     learnt[0] = !p;
     // println!("- appending {}, the result is {:?}", learnt[0].int(), vec2int(learnt));
-    state.simplify_learnt(asgs, cdb, vdb)
+    state.minimize_learnt(asgs, cdb, vdb)
 }
 
 impl Solver {
@@ -764,7 +764,7 @@ impl Solver {
 }
 
 impl State {
-    fn simplify_learnt(
+    fn minimize_learnt(
         &mut self,
         asgs: &AssignStack,
         cdb: &ClauseDB,
