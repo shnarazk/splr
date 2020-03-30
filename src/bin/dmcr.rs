@@ -30,9 +30,9 @@ struct TargetOpts {
     #[structopt(parse(from_os_str))]
     /// a CNF file
     problem: std::path::PathBuf,
-    #[structopt(long = "without-color", short = "C")]
+    #[structopt(long = "no-color", short = "C")]
     /// disable colorized output
-    without_color: bool,
+    no_color: bool,
 }
 
 fn main() {
@@ -46,7 +46,7 @@ fn main() {
     }
     let mut config = Config::default();
     config.cnf_file = args.problem.clone();
-    let (red, green, blue) = if args.without_color {
+    let (red, green, blue) = if args.no_color {
         (RESET, RESET, RESET)
     } else {
         (RED, GREEN, BLUE)
