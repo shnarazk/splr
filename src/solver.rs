@@ -622,7 +622,16 @@ fn adapt_modules(
 ) -> MaybeInconsistent {
     state.progress(asgs, cdb, elim, rst, vdb, None);
     let (asgs_num_conflict, _num_propagation, _num_restart) = asgs.exports();
+    let (_, _, rst_asg_trend, _, _) = rst.exports();
+    if elim.enable && rst_asg_trend < 1.0 {
+        asgs.cancel_until(vdb, state.root_level);
+        if 10 * state.reflection_interval == asgs_num_conflict {
+            elim.activate();
+        }
+        elim.simplify(asgs, cdb, state, vdb)?;
+    }
     if 10 * state.reflection_interval == asgs_num_conflict {
+        // Need to call it before `cdb.adapt_to`
         asgs.cancel_until(vdb, state.root_level);
         // 'decision_level == 0' is required by `cdb.adapt_to`.
         state.select_strategy(asgs, cdb);
