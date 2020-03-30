@@ -360,15 +360,13 @@ fn search(
         // Simplification has been postponed because chronoBT was used.
         if asgs.level() == state.root_level {
             // `elim.to_eliminate` is increased much in particular when vars are solved or
-            // learnts are small. We don't count the number of solved vars.
+            // learnts are small. We don't need to count the number of solved vars.
             if state.config.elim_trigger < state.to_eliminate as usize {
                 state.to_eliminate = 0.0;
                 if elim.enable {
                     elim.activate();
                 }
-                if elim.simplify(asgs, cdb, state, vdb).is_err() {
-                    return Err(SolverError::Inconsistent);
-                }
+                elim.simplify(asgs, cdb, state, vdb)?;
             }
             // By simplification, we may get further solutions.
             state.num_solved_vars = asgs.len();
@@ -622,18 +620,10 @@ fn adapt_modules(
 ) -> MaybeInconsistent {
     state.progress(asgs, cdb, elim, rst, vdb, None);
     let (asgs_num_conflict, _num_propagation, _num_restart) = asgs.exports();
-    let (_, _, rst_asg_trend, _, _) = rst.exports();
-    if elim.enable && rst_asg_trend < 1.0 {
-        asgs.cancel_until(vdb, state.root_level);
-        if 10 * state.reflection_interval == asgs_num_conflict {
-            elim.activate();
-        }
-        elim.simplify(asgs, cdb, state, vdb)?;
-    }
     if 10 * state.reflection_interval == asgs_num_conflict {
         // Need to call it before `cdb.adapt_to`
-        asgs.cancel_until(vdb, state.root_level);
         // 'decision_level == 0' is required by `cdb.adapt_to`.
+        asgs.cancel_until(vdb, state.root_level);
         state.select_strategy(asgs, cdb);
         // if state.strategy.0 == SearchStrategy::HighSuccesive {
         //     state.config.cbt_thr = 0;
