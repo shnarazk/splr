@@ -2,7 +2,6 @@
 use {
     crate::{
         clause::ClauseDBIF,
-        config::Config,
         eliminator::EliminatorIF,
         propagator::PropagatorIF,
         restarter::{RestartIF, RestartMode},

@@ -1,7 +1,6 @@
 /// Crate `clause` provides `clause` object and its manager `ClauseDB`
 use {
     crate::{
-        config::Config,
         eliminator::EliminatorIF,
         state::{SearchStrategy, State},
         types::*,

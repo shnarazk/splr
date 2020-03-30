@@ -1,7 +1,6 @@
 /// Crate `restart` provides restart heuristics.
 use {
     crate::{
-        config::Config,
         state::{SearchStrategy, State},
         types::*,
     },

@@ -2,7 +2,6 @@
 use {
     crate::{
         clause::ClauseDBIF,
-        config::Config,
         propagator::PropagatorIF,
         state::{SearchStrategy, State},
         types::*,

@@ -1,11 +1,12 @@
 /// Crate `types' provides various building blocks, including
 /// some common traits.
 pub use crate::{
-    clause::{Clause, ClauseIF, ClauseId, ClauseIdIF},
+    clause::{Clause, ClauseIF, ClauseId, ClauseIdIF, Watch},
+    config::Config,
     var::Var,
 };
 use {
-    crate::{config::Config, state::State},
+    crate::state::State,
     std::{
         convert::TryFrom,
         fmt,

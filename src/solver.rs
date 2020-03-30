@@ -2,7 +2,6 @@
 use {
     crate::{
         clause::{ClauseDB, ClauseDBIF},
-        config::Config,
         eliminator::{Eliminator, EliminatorIF},
         propagator::{AssignStack, PropagatorIF, VarSelectionIF},
         restarter::{RestartIF, Restarter, RestarterModule},
