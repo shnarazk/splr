@@ -630,9 +630,7 @@ fn adapt_modules(
         // }
     }
     #[cfg(feature = "boundary_check")]
-    {
-        assert!(state.strategy.1 != asgs_num_conflict || 0 == asgs.level());
-    }
+    assert!(state.strategy.1 != asgs_num_conflict || 0 == asgs.level());
     cdb.adapt_to(state, asgs_num_conflict);
     rst.adapt_to(state, asgs_num_conflict);
     vdb.adapt_to(state, asgs_num_conflict);
@@ -664,19 +662,17 @@ fn conflict_analyze(
         }
         let c = &cdb[cid];
         #[cfg(feature = "boundary_check")]
-        {
-            assert!(
-                0 < c.len(),
-                format!(
-                    "Level {} I-graph reaches {}:{} for {}:{}",
-                    asgs.level(),
-                    cid,
-                    c,
-                    p,
-                    &vdb[p]
-                )
-            );
-        }
+        assert!(
+            0 < c.len(),
+            format!(
+                "Level {} I-graph reaches {}:{} for {}:{}",
+                asgs.level(),
+                cid,
+                c,
+                p,
+                &vdb[p]
+            )
+        );
         // println!("- handle {}", cid.fmt());
         for q in &c[(p != NULL_LIT) as usize..] {
             let vi = q.vi();
@@ -798,9 +794,7 @@ impl State {
         }
         let l0 = new_learnt[0];
         #[cfg(feature = "boundary_check")]
-        {
-            assert!(0 < new_learnt.len());
-        }
+        assert!(0 < new_learnt.len());
         new_learnt.retain(|l| *l == l0 || !l.is_redundant(cdb, vdb, &mut to_clear, &levels));
         let len = new_learnt.len();
         if 2 < len && len < 30 {
@@ -847,9 +841,7 @@ impl Lit {
             let cid = vdb[sl.vi()].reason;
             let c = &cdb[cid];
             #[cfg(feature = "boundary_check")]
-            {
-                assert!(0 < c.len());
-            }
+            assert!(0 < c.len());
             for q in &(*c)[1..] {
                 let vi = q.vi();
                 let v = &vdb[vi];

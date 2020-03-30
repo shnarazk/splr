@@ -746,9 +746,7 @@ impl ClauseDBIF for ClauseDB {
                 self.certified.push((CertifiedRecord::ADD, temp));
             }
             #[cfg(feature = "boundary_check")]
-            {
-                debug_assert!(1 < v.len());
-            }
+            debug_assert!(1 < v.len());
             let mut i_max = 1;
             let mut lv_max = 0;
             // seek a literal with max level

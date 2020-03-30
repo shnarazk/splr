@@ -385,9 +385,7 @@ impl EliminatorIF for Eliminator {
         for v in vdb.iter_mut().skip(1) {
             if v.reason != ClauseId::default() {
                 #[cfg(feature = "boundary_check")]
-                {
-                    assert_eq!(v.level, state.root_level);
-                }
+                assert_eq!(v.level, state.root_level);
                 v.reason = ClauseId::default();
             }
         }
@@ -966,9 +964,7 @@ where
     } else {
         // println!("cid {} drops literal {}", cid.fmt(), l.int());
         #[cfg(feature = "boundary_check")]
-        {
-            assert!(1 < cdb[cid].len());
-        }
+        assert!(1 < cdb[cid].len());
         elim.enqueue_clause(cid, &mut cdb[cid]);
         elim.remove_lit_occur(vdb, l, cid);
         unsafe {
