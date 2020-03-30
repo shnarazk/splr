@@ -381,37 +381,6 @@ fn search(
     }
 }
 
-#[allow(dead_code)]
-fn propagate_in_sandbox(
-    asgs: &mut AssignStack,
-    cdb: &mut ClauseDB,
-    state: &mut State,
-    vdb: &mut VarDB,
-    vi: VarId,
-) -> [(ClauseId, Vec<Lit>, Vec<Lit>); 2] {
-    let lvl = asgs.level();
-    let mut res: [(ClauseId, Vec<Lit>, Vec<Lit>); 2] = [
-        (ClauseId::default(), Vec::new(), Vec::new()),
-        (ClauseId::default(), Vec::new(), Vec::new()),
-    ];
-    for (i, x) in [false, true].iter().enumerate() {
-        asgs.assign_by_decision(vdb, Lit::from_assign(vi, *x));
-        let ci = asgs.propagate(cdb, vdb);
-        let assigns = asgs[asgs.len_upto(lvl)..]
-            .iter()
-            .copied()
-            .collect::<Vec<_>>();
-        res[i].0 = ci;
-        res[i].1 = assigns;
-        if ci != ClauseId::default() {
-            conflict_analyze(asgs, cdb, state, vdb, ci);
-            res[i].2 = state.new_learnt.clone();
-        }
-        asgs.cancel_until(vdb, lvl);
-    }
-    res
-}
-
 #[inline]
 fn handle_conflict(
     asgs: &mut AssignStack,
@@ -609,7 +578,6 @@ fn handle_conflict(
     Ok(())
 }
 
-#[inline]
 fn adapt_modules(
     asgs: &mut AssignStack,
     cdb: &mut ClauseDB,
