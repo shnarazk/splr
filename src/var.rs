@@ -1,9 +1,9 @@
 /// Crate `var` provides `var` object and its manager `VarDB`.
 use {
     crate::{
-        clause::{ClauseDB, ClauseDBIF},
+        clause::ClauseDBIF,
         config::Config,
-        propagator::{AssignStack, PropagatorIF},
+        propagator::PropagatorIF,
         state::{SearchStrategy, State},
         types::*,
     },
@@ -46,7 +46,9 @@ pub trait VarDBIF: IndexMut<VarId, Output = Var> + IndexMut<Lit, Output = Var> {
     /// - None -- the literals contains an unassigned literal
     fn status(&self, c: &[Lit]) -> Option<bool>;
     /// minimize a clause.
-    fn minimize_with_biclauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>);
+    fn minimize_with_biclauses<C>(&mut self, cdb: &C, vec: &mut Vec<Lit>)
+    where
+        C: ClauseDBIF;
 }
 
 /// API for var rewarding.
@@ -468,7 +470,10 @@ impl VarDBIF for VarDB {
         }
         falsified
     }
-    fn minimize_with_biclauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>) {
+    fn minimize_with_biclauses<C>(&mut self, cdb: &C, vec: &mut Vec<Lit>)
+    where
+        C: ClauseDBIF,
+    {
         if vec.len() <= 1 {
             return;
         }
@@ -479,7 +484,7 @@ impl VarDBIF for VarDB {
         }
         let l0 = vec[0];
         let mut nsat = 0;
-        for w in &cdb.watcher[!l0] {
+        for w in cdb.watcher_list(!l0) {
             let c = &cdb[w.c];
             if c.len() != 2 {
                 continue;
@@ -570,7 +575,11 @@ impl VarDB {
     // beyond first UIDs and bump all vars on the traversed tree.
     // If you'd like to use this, you should stop bumping activities in `analyze`.
     #[allow(dead_code)]
-    fn bump_vars(&mut self, asgs: &AssignStack, cdb: &ClauseDB, confl: ClauseId) {
+    fn bump_vars<A, C>(&mut self, asgs: &A, cdb: &C, confl: ClauseId)
+    where
+        A: PropagatorIF,
+        C: ClauseDBIF,
+    {
         debug_assert_ne!(confl, ClauseId::default());
         let mut cid = confl;
         let mut p = NULL_LIT;
@@ -604,7 +613,11 @@ impl VarDB {
         }
     }
     #[allow(dead_code)]
-    fn dump_dependency(&mut self, asgs: &AssignStack, cdb: &ClauseDB, confl: ClauseId) {
+    fn dump_dependency<A, C>(&mut self, asgs: &A, cdb: &C, confl: ClauseId)
+    where
+        A: PropagatorIF,
+        C: ClauseDBIF,
+    {
         debug_assert_ne!(confl, ClauseId::default());
         let mut cid = confl;
         let mut p = NULL_LIT;

@@ -35,8 +35,10 @@ pub trait ClauseDBIF: IndexMut<ClauseId, Output = Clause> {
     fn iter(&self) -> Iter<'_, Clause>;
     /// return an mutable iterator.
     fn iter_mut(&mut self) -> IterMut<'_, Clause>;
-    /// return a watch list
-    fn watcher_list_mut(&mut self) -> &mut [Vec<Watch>];
+    /// return a watcher list
+    fn watcher_list(&self, l: Lit) -> &[Watch];
+    /// return the list of watch lists
+    fn watcher_lists_mut(&mut self) -> &mut [Vec<Watch>];
     /// unregister a clause `cid` from clause database and make the clause dead.
     fn detach(&mut self, cid: ClauseId);
     /// check a condition to reduce.
@@ -678,7 +680,11 @@ impl ClauseDBIF for ClauseDB {
         self.clause.iter_mut()
     }
     #[inline]
-    fn watcher_list_mut(&mut self) -> &mut [Vec<Watch>] {
+    fn watcher_list(&self, l: Lit) -> &[Watch] {
+        &self.watcher[l]
+    }
+    #[inline]
+    fn watcher_lists_mut(&mut self) -> &mut [Vec<Watch>] {
         &mut self.watcher
     }
     fn garbage_collect(&mut self) {

@@ -395,7 +395,7 @@ impl PropagatorIF for AssignStack {
         V: VarDBIF + VarRewardIF,
     {
         // let watcher = &mut cdb.watcher[..] as *mut [Vec<Watch>];
-        let watcher = cdb.watcher_list_mut() as *mut [Vec<Watch>];
+        let watcher = cdb.watcher_lists_mut() as *mut [Vec<Watch>];
         self.num_propagation += 1;
         while let Some(p) = self.trail.get(self.q_head) {
             self.q_head += 1;
