@@ -153,7 +153,7 @@ impl fmt::Display for ClauseId {
         if *self == ClauseId::default() {
             write!(f, "NullClause")
         } else {
-            write!(f, "CID{}", self.ordinal)
+            write!(f, "{}C", self.ordinal)
         }
     }
 }
@@ -392,7 +392,7 @@ impl fmt::Display for Clause {
         let st = |flag, mes| if self.is(flag) { mes } else { "" };
         write!(
             f,
-            "C{{{:?} {}{}}}",
+            "{{{:?}{}{}}}",
             vec2int(&self.lits),
             st(Flag::DEAD, ", dead"),
             st(Flag::ENQUEUED, ", enqueued"),

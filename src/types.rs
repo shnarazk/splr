@@ -109,6 +109,12 @@ pub struct Lit {
 /// a dummy literal.
 pub const NULL_LIT: Lit = Lit { ordinal: 0 };
 
+impl fmt::Display for Lit {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}L", i32::from(self))
+    }
+}
+
 impl From<usize> for Lit {
     #[inline]
     fn from(l: usize) -> Self {

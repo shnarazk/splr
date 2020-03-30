@@ -109,9 +109,13 @@ impl fmt::Display for Var {
         let st = |flag, mes| if self.is(flag) { mes } else { "" };
         write!(
             f,
-            "V{}({:?} at {} by {} {}{})",
+            "V{{{},{} at {} by {} {}{}}}",
             self.index,
-            self.assign,
+            match self.assign {
+                Some(true) => "T",
+                Some(false) => "F",
+                None => "_",
+            },
             self.level,
             self.reason,
             st(Flag::TOUCHED, ", touched"),
