@@ -118,7 +118,7 @@ pub struct Config {
     pub rst_lbd_slw: usize,
 
     /// Forcing restart threshold
-    #[structopt(long = "rlt", default_value = "1.25")]
+    #[structopt(long = "rlt", default_value = "0.70")]
     pub rst_lbd_thr: f64, // Glucose's K
 
     /// Stabilizer scaling

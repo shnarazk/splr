@@ -153,7 +153,7 @@ impl EmaIF for ProgressLBD {
 impl ProgressEvaluator for ProgressLBD {
     fn is_active(&self) -> bool {
         self.enable
-            // && (self.sum as f64) < self.ema.get() * (self.num as f64) * self.threshold
+        // && (self.sum as f64) < self.ema.get() * (self.num as f64) * self.threshold
             && self.threshold < self.ema.trend()
     }
     fn shift(&mut self) {}
@@ -360,7 +360,7 @@ struct GeometricStabilizer {
 impl Default for GeometricStabilizer {
     fn default() -> Self {
         GeometricStabilizer {
-            enable: false,
+            enable: true,
             active: false,
             next_trigger: 1000,
             restart_inc: 2.0,
