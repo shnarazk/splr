@@ -959,7 +959,10 @@ where
         asgs.assign_at_rootlevel(vdb, c0)
     } else {
         // println!("cid {} drops literal {}", cid.fmt(), l.int());
-        debug_assert!(1 < cdb[cid].len());
+        #[cfg(feature = "boundary_check")]
+        {
+            assert!(1 < cdb[cid].len());
+        }
         elim.enqueue_clause(cid, &mut cdb[cid]);
         elim.remove_lit_occur(vdb, l, cid);
         unsafe {

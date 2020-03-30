@@ -20,6 +20,7 @@ structopt = "0.3"
 [features]
 EVSIDS = []
 ema_calibration = []
+boundary_check = []
 
 [profile.release]
 lto = "fat"

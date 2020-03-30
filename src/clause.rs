@@ -742,7 +742,10 @@ impl ClauseDBIF for ClauseDB {
                 let temp = v.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
                 self.certified.push((CertifiedRecord::ADD, temp));
             }
-            debug_assert!(1 < v.len());
+            #[cfg(feature = "boundary_check")]
+            {
+                debug_assert!(1 < v.len());
+            }
             let mut i_max = 1;
             let mut lv_max = 0;
             // seek a literal with max level
