@@ -7,9 +7,10 @@ use {
         types::*,
         var::{VarDBIF, VarRewardIF, LBDIF},
     },
-    std::{fmt, slice::Iter},
     std::{
+        fmt,
         ops::{Index, IndexMut, Range, RangeFrom},
+        slice::Iter,
         sync::{
             atomic::{AtomicBool, Ordering},
             Arc,
