@@ -85,6 +85,8 @@ pub trait EliminatorIF {
         V: VarDBIF;
     /// return the order of vars based on their occurrences
     fn sorted_iterator(&self) -> Iter<'_, usize>;
+    /// return vi's stats
+    fn stats(&self, vi: VarId) -> (usize, usize);
 }
 
 /// API for getting stats about Eliminator's internal data.
@@ -129,12 +131,6 @@ impl Export<(usize, usize)> for Eliminator {
     #[inline]
     fn exports(&self) -> (usize, usize) {
         (self.num_full_elimination, self.num_sat_elimination)
-    }
-}
-
-impl EliminatorStatIF for LitOccurs {
-    fn stats(&self) -> (usize, usize) {
-        (self.pos_occurs.len(), self.neg_occurs.len())
     }
 }
 
@@ -498,6 +494,10 @@ impl EliminatorIF for Eliminator {
     }
     fn sorted_iterator(&self) -> Iter<'_, usize> {
         self.var_queue.heap[1..].iter()
+    }
+    fn stats(&self, vi: VarId) -> (usize, usize) {
+        let w = &self[vi];
+        (w.pos_occurs.len(), w.neg_occurs.len())
     }
 }
 

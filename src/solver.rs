@@ -3,7 +3,7 @@ use {
     crate::{
         clause::{Clause, ClauseDB, ClauseDBIF, ClauseIF, ClauseId},
         config::Config,
-        eliminator::{Eliminator, EliminatorIF, EliminatorStatIF},
+        eliminator::{Eliminator, EliminatorIF},
         propagator::{AssignStack, PropagatorIF, VarSelectionIF},
         restarter::{RestartIF, Restarter, RestarterModule},
         state::{Stat, State, StateIF},
@@ -162,8 +162,7 @@ impl SatSolverIF for Solver {
             if v.assign.is_some() {
                 continue;
             }
-            let w = &elim[vi];
-            match w.stats() {
+            match elim.stats(vi) {
                 (_, 0) => {
                     let l = Lit::from_assign(vi, true);
                     if asgs.assign_at_rootlevel(vdb, l).is_err() {
@@ -208,7 +207,7 @@ impl SatSolverIF for Solver {
                 if v.assign.is_some() || v.is(Flag::ELIMINATED) {
                     continue;
                 }
-                match elim[v.index].stats() {
+                match elim.stats(v.index) {
                     (_, 0) => (),
                     (0, _) => (),
                     (p, m) if m * 10 < p => v.turn_on(Flag::PHASE),
