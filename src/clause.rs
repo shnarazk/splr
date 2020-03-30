@@ -43,6 +43,9 @@ pub trait ClauseDBIF: IndexMut<ClauseId, Output = Clause> {
     /// check a condition to reduce.
     /// * return `true` if ruduction is done.
     /// * Otherwise return `false`.
+    ///
+    /// # CAVEAT
+    /// *precondition*: decision level == 0.
     fn check_and_reduce<V>(&mut self, vdb: &mut V, nc: usize) -> bool
     where
         V: VarDBIF + LBDIF;

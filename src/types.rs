@@ -142,7 +142,8 @@ impl From<ClauseId> for Lit {
 
 /// While Lit::oridinal is private, Var::{index, assign} are public.
 /// So we define the following here.
-/// CAVEAT: Unassigned vars are converted to the null literal.
+/// # CAVEAT
+/// Unassigned vars are converted to the null literal.
 impl From<&Var> for Lit {
     fn from(v: &Var) -> Self {
         match v.assign {
