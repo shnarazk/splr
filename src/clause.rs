@@ -871,7 +871,8 @@ impl ClauseDBIF for ClauseDB {
             .filter(|&c| c.flags.contains(mask) && !c.flags.contains(Flag::DEAD))
             .count()
     }
-    /// Warning: this function is the only function that turns `Flag::DEAD` on without calling
+    /// ## Warning
+    /// this function is the only function that turns `Flag::DEAD` on without calling
     /// `garbage_collect` which erases all the `DEAD` flags. So you must care about how and when
     /// `garbage_collect` is called.
     fn detach(&mut self, cid: ClauseId) {

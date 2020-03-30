@@ -22,6 +22,7 @@ pub trait PropagatorIF: Index<usize, Output = Lit> {
     /// return the number of assignments.
     fn len(&self) -> usize;
     /// return the number of assignments at a given decision level `u`.
+    ///
     /// ## Caveat
     /// - it emits a panic by out of index range.
     /// - it emits a panic if the level is 0.
@@ -47,7 +48,9 @@ pub trait PropagatorIF: Index<usize, Output = Lit> {
     where
         V: VarDBIF + VarRewardIF;
     /// unsafe enqueue (assign by implication); doesn't emit an exception.
-    /// Warning: caller must assure the consistency after this assignment
+    ///
+    /// ## Warning
+    /// Caller must assure the consistency after this assignment
     fn assign_by_implication<V>(&mut self, vdb: &mut V, l: Lit, cid: ClauseId, lv: DecisionLevel)
     where
         V: VarDBIF + VarRewardIF;
