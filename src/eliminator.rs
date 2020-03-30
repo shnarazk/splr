@@ -1,12 +1,12 @@
 /// Crate `eliminator` implments clause subsumption and var elimination.
 use {
     crate::{
-        clause::{Clause, ClauseDBIF, ClauseIF, ClauseId, ClauseIdIF},
+        clause::ClauseDBIF,
         config::Config,
         propagator::PropagatorIF,
         state::{State, StateIF},
         types::*,
-        var::{Var, VarDBIF, VarRewardIF, LBDIF},
+        var::{VarDBIF, VarRewardIF, LBDIF},
     },
     std::{fmt, slice::Iter},
     std::{

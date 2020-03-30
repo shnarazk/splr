@@ -1,7 +1,7 @@
 /// Crate `var` provides `var` object and its manager `VarDB`.
 use {
     crate::{
-        clause::{Clause, ClauseDB, ClauseDBIF, ClauseIF, ClauseId},
+        clause::{ClauseDB, ClauseDBIF},
         config::Config,
         propagator::{AssignStack, PropagatorIF},
         state::{SearchStrategy, State},

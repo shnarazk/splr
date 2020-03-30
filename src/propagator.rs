@@ -2,7 +2,7 @@
 /// This version can handle Chronological and Non Chronological Backtrack.
 use {
     crate::{
-        clause::{ClauseDBIF, ClauseId, Watch, WatchDBIF},
+        clause::{ClauseDBIF, Watch, WatchDBIF},
         config::Config,
         state::State,
         types::*,

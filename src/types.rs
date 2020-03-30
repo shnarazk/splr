@@ -1,7 +1,11 @@
 /// Crate `types' provides various building blocks, including
 /// some common traits.
+pub use crate::{
+    clause::{Clause, ClauseIF, ClauseId, ClauseIdIF},
+    var::Var,
+};
 use {
-    crate::{clause::ClauseId, config::Config, state::State, var::Var},
+    crate::{config::Config, state::State},
     std::{
         convert::TryFrom,
         fmt,
