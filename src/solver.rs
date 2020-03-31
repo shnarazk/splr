@@ -369,7 +369,10 @@ fn search(
                 elim.simplify(asgs, cdb, state, vdb)?;
             }
             // By simplification, we may get further solutions.
-            state.num_solved_vars = asgs.len();
+            if state.num_solved_vars < asgs.len() {
+                rst.update(RestarterModule::Reset, 0);
+                state.num_solved_vars = asgs.len();
+            }
         }
         if !asgs.remains() {
             let vi = asgs.select_var(vdb);
@@ -517,6 +520,7 @@ fn handle_conflict(
         }
         state.last_solved = ncnfl;
         state.num_solved_vars += 1;
+        rst.update(RestarterModule::Reset, 0);
     } else {
         {
             // At the present time, some reason clauses can contain first UIP or its negation.

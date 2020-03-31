@@ -11,7 +11,9 @@ use {
 trait ProgressEvaluator {
     /// map the value into a bool for forcing/blocking restart.
     fn is_active(&self) -> bool;
-    /// calculate and set up the next condition
+    /// reset internal state to the initial one.
+    fn reset_progress(&mut self) {}
+    /// calculate and set up the next condition.
     fn shift(&mut self);
 }
 
@@ -22,6 +24,7 @@ pub enum RestarterModule {
     ASG,
     LBD,
     Luby,
+    Reset,
 }
 
 /// Restart modes
@@ -355,6 +358,7 @@ struct GeometricStabilizer {
     active: bool,
     next_trigger: usize,
     restart_inc: f64,
+    step: usize,
 }
 
 impl Default for GeometricStabilizer {
@@ -364,6 +368,7 @@ impl Default for GeometricStabilizer {
             active: false,
             next_trigger: 1000,
             restart_inc: 2.0,
+            step: 1000,
         }
     }
 }
@@ -394,8 +399,10 @@ impl EmaIF for GeometricStabilizer {
     fn update(&mut self, now: usize) {
         if self.enable && self.next_trigger <= now {
             self.active = !self.active;
-            self.next_trigger = ((self.next_trigger as f64) * self.restart_inc) as usize;
+            // self.next_trigger = ((self.next_trigger as f64) * self.restart_inc) as usize;
             //self.next_trigger += 1000 + (self.next_trigger as f64).sqrt() as usize;
+            self.step = ((self.step as f64) * self.restart_inc) as usize;
+            self.next_trigger += self.step;
         }
     }
     fn get(&self) -> f64 {
@@ -406,6 +413,12 @@ impl EmaIF for GeometricStabilizer {
 impl ProgressEvaluator for GeometricStabilizer {
     fn is_active(&self) -> bool {
         self.enable && self.active
+    }
+    fn reset_progress(&mut self) {
+        if self.enable {
+            self.active = false;
+            self.step = 1000;
+        }
     }
     fn shift(&mut self) {}
 }
@@ -467,6 +480,13 @@ impl EmaIF for ProgressBucket {
 impl ProgressEvaluator for ProgressBucket {
     fn is_active(&self) -> bool {
         self.enable && self.threshold < self.sum
+    }
+    fn reset_progress(&mut self) {
+        if self.enable {
+            self.num_shift = 1;
+            self.threshold = 1000.0; // FIXME: we need the values in config
+            self.shift();
+        }
     }
     fn shift(&mut self) {
         self.num_shift += 1;
@@ -608,6 +628,7 @@ impl RestartIF for Restarter {
                 self.lbd.update(val);
             }
             RestarterModule::Luby => self.luby.update(0),
+            RestarterModule::Reset => (),
         }
     }
 }
