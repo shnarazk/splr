@@ -4,7 +4,7 @@
 - activate `JUST_USED` for clause reduction
 - remove `ClauseDB::attach`
 - change the activation timings of simplification
-- add and refactor restart module: GeometricStabilizer, ProgressBucket, ProgressLBD
+- add and refactor restart module: GeometricStabilizer, ProgressLBD
 - better modularity via trait `Export`, which is renamed from `ProgressComponent`
 - stats data are stored in each modules.
 - remove `deep search` completely

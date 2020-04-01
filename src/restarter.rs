@@ -36,7 +36,7 @@ pub enum RestartMode {
     Luby,
     /// Controlled by CaDiCal-like Geometric Stabilizer
     Stabilize,
-    Bucket,
+    // Bucket,
 }
 
 /// API for restart like `block_restart`, `force_restart` and so on.
@@ -506,7 +506,7 @@ impl ProgressEvaluator for ProgressBucket {
 #[derive(Debug)]
 pub struct Restarter {
     asg: ProgressASG,
-    bkt: ProgressBucket,
+    // bkt: ProgressBucket,
     lbd: ProgressLBD,
     // pub rcc: ProgressRCC,
     // pub blvl: ProgressLVL,
@@ -528,7 +528,7 @@ impl Default for Restarter {
     fn default() -> Restarter {
         Restarter {
             asg: ProgressASG::default(),
-            bkt: ProgressBucket::default(),
+            // bkt: ProgressBucket::default(),
             lbd: ProgressLBD::default(),
             // rcc: ProgressRCC::default(),
             // blvl: ProgressLVL::default(),
@@ -548,7 +548,7 @@ impl Instantiate for Restarter {
     fn instantiate(config: &Config, cnf: &CNFDescription) -> Self {
         Restarter {
             asg: ProgressASG::instantiate(config, cnf),
-            bkt: ProgressBucket::instantiate(config, cnf),
+            // bkt: ProgressBucket::instantiate(config, cnf),
             lbd: ProgressLBD::instantiate(config, cnf),
             // rcc: ProgressRCC::instantiate(config, cnf),
             // blvl: ProgressLVL::instantiate(config, cnf),
@@ -588,7 +588,8 @@ macro_rules! reset {
 
 impl RestartIF for Restarter {
     fn block_restart(&mut self) -> bool {
-        if self.after_restart < self.restart_step || self.luby.enable || self.bkt.enable {
+        // || self.bkt.enable
+        if self.after_restart < self.restart_step || self.luby.enable {
             return false;
         }
         if self.asg.is_active() {
@@ -602,10 +603,12 @@ impl RestartIF for Restarter {
             self.luby.shift();
             reset!(self);
         }
+        /*
         if self.bkt.is_active() {
             self.bkt.shift();
             reset!(self);
         }
+        */
         if self.after_restart < self.restart_step {
             return false;
         }
@@ -624,7 +627,7 @@ impl RestartIF for Restarter {
             }
             RestarterModule::ASG => self.asg.update(val),
             RestarterModule::LBD => {
-                self.bkt.update(val);
+                // self.bkt.update(val);
                 self.lbd.update(val);
             }
             RestarterModule::Luby => self.luby.update(0),
@@ -652,8 +655,8 @@ impl Export<(RestartMode, usize, f64, f64, f64)> for Restarter {
         (
             if self.stb.is_active() {
                 RestartMode::Stabilize
-            } else if self.bkt.enable {
-                RestartMode::Bucket
+            // } else if self.bkt.enable {
+            //     RestartMode::Bucket
             } else if self.luby.enable {
                 RestartMode::Luby
             } else {
