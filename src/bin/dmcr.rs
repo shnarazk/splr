@@ -39,11 +39,10 @@ fn main() {
     let mut from_file = true;
     let mut found = false;
     let mut args = TargetOpts::from_args();
-    let cnf = args.problem.to_str().unwrap();
-    if !args.problem.exists() {
-        println!("{} does not exist.", args.problem.to_str().unwrap(),);
-        return;
-    }
+    let cnf = args.problem.to_str().expect(&format!(
+        "{} does not exist.",
+        args.problem.to_str().unwrap()
+    ));
     let mut config = Config::default();
     config.cnf_file = args.problem.clone();
     let (red, green, blue) = if args.no_color {
