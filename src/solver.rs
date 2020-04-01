@@ -50,6 +50,21 @@ pub enum Certificate {
 pub type SolverResult = Result<Certificate, SolverError>;
 
 /// The SAT solver object consisting of 6 sub modules.
+/// ```
+/// use std::convert::TryFrom;
+/// use crate::splr::{state::{State, StateIF}, types::*};
+/// use crate::splr::solver::{SatSolverIF, Solver, Certificate::*};
+///
+/// let mut s = Solver::try_from("tests/sample.cnf").expect("can't load");
+/// assert_eq!(s.state.num_vars, 250);
+/// assert_eq!(s.state.num_unsolved_vars(), 250);
+/// if let Ok(SAT(v)) = &s.solve() {
+///     assert_eq!(v.len(), 250);
+/// } else {
+///     panic!("It should be satisfied!");
+/// }
+/// assert_eq!(Solver::try_from("tests/unsat.cnf").expect("can't load").solve(), Ok(UNSAT));
+/// ```
 #[derive(Debug)]
 pub struct Solver {
     /// assignment management
@@ -94,6 +109,23 @@ impl Instantiate for Solver {
             state: State::instantiate(config, cnf),
             vdb: VarDB::instantiate(config, cnf),
         }
+    }
+}
+
+impl TryFrom<&str> for Solver {
+    type Error = SolverError;
+    /// return a new solver bulid for a CNF file.
+    ///
+    /// # Example
+    /// ```
+    /// use std::convert::TryFrom;
+    /// use crate::splr::solver::{SatSolverIF, Solver};
+    ///
+    /// let mut s = Solver::try_from("tests/sample.cnf").expect("fail to load");
+    ///```
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        let config = Config::from(s);
+        Solver::build(&config)
     }
 }
 
@@ -894,11 +926,10 @@ impl VarDB {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, std::path::PathBuf};
+    use super::*;
     #[test]
     fn test_solver() {
-        let mut config = Config::default();
-        config.cnf_file = PathBuf::from("tests/sample.cnf");
+        let config = Config::from("tests/sample.cnf");
         if let Ok(s) = Solver::build(&config) {
             assert_eq!(s.state.num_vars, 250);
             assert_eq!(s.state.num_unsolved_vars(), 250);
