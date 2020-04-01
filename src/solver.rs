@@ -58,7 +58,7 @@ pub type SolverResult = Result<Certificate, SolverError>;
 /// let mut s = Solver::try_from("tests/sample.cnf").expect("can't load");
 /// assert_eq!(s.state.num_vars, 250);
 /// assert_eq!(s.state.num_unsolved_vars(), 250);
-/// if let Ok(SAT(v)) = &s.solve() {
+/// if let Ok(SAT(v)) = s.solve() {
 ///     assert_eq!(v.len(), 250);
 /// } else {
 ///     panic!("It should be satisfied!");
