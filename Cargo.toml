@@ -21,6 +21,7 @@ structopt = "0.3"
 EVSIDS = []
 ema_calibration = []
 boundary_check = []
+trace_analyze = []
 
 [profile.release]
 lto = "fat"

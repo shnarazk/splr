@@ -368,7 +368,10 @@ fn search(
             if state.num_vars <= asgs.len() + state.num_eliminated_vars {
                 return Ok(true);
             }
-            // DYNAMIC FORCING RESTART based on LBD values, updated by conflict
+
+            //
+            //## DYNAMIC FORCING RESTART based on LBD values, updated by conflict
+            //
             state.last_asg = asgs.len();
             if rst.force_restart() {
                 asgs.cancel_until(vdb, state.root_level);
@@ -427,18 +430,22 @@ fn handle_conflict(
     ci: ClauseId,
 ) -> MaybeInconsistent {
     let (ncnfl, _num_propagation, asgs_num_restart) = asgs.exports();
+    // If we can settle this conflict w/o restart, solver will get a big progress.
     let switch_chronobt = if ncnfl < 1000 || asgs.recurrent_conflicts() {
         Some(false)
     } else {
         None
     };
     rst.update(RestarterModule::Counter, ncnfl);
-    // DYNAMIC BLOCKING RESTART based on ASG, updated on conflict path
-    // If we can settle this conflict w/o restart, solver will get a big progress.
+
     if 0 < state.last_asg {
         rst.update(RestarterModule::ASG, asgs.len());
         state.last_asg = 0;
     }
+
+    //
+    //## DYNAMIC BLOCKING RESTART based on ASG, updated on conflict path
+    //
     rst.block_restart();
     let cl = asgs.level();
     let mut use_chronobt = switch_chronobt.unwrap_or(0 < state.config.cbt_thr);
@@ -658,7 +665,8 @@ fn conflict_analyze(
     let mut ti = asgs.len() - 1; // trail index
     let mut path_cnt = 0;
     loop {
-        // println!("analyze {}", p.int());
+        #[cfg(feature = "trace_analyze")]
+        println!("analyze {}", p.int());
         debug_assert_ne!(cid, ClauseId::default());
         if cdb[cid].is(Flag::LEARNT) {
             cdb.bump_activity(cid, ());
@@ -677,7 +685,8 @@ fn conflict_analyze(
                 &vdb[p]
             )
         );
-        // println!("- handle {}", cid.fmt());
+        #[cfg(feature = "trace_analyze")]
+        println!("- handle {}", cid.fmt());
         for q in &c[(p != NULL_LIT) as usize..] {
             let vi = q.vi();
             if !vdb[vi].is(Flag::CA_SEEN) {
@@ -697,15 +706,19 @@ fn conflict_analyze(
                     //
                     vdb.reward_at_analysis(vi);
                 } else {
-                    // println!("- push {} to learnt, which level is {}", q.int(), lvl);
+                    #[cfg(feature = "trace_analyze")]
+                    println!("- push {} to learnt, which level is {}", q.int(), lvl);
                     learnt.push(*q);
                 }
             } else {
-                // if !v.is(Flag::CA_SEEN) {
-                //     println!("- ignore {} because it was flagged", q.int());
-                // } else {
-                //     println!("- ignore {} because its level is {}", q.int(), lvl);
-                // }
+                #[cfg(feature = "trace_analyze")]
+                {
+                    if !v.is(Flag::CA_SEEN) {
+                        println!("- ignore {} because it was flagged", q.int());
+                    } else {
+                        println!("- ignore {} because its level is {}", q.int(), lvl);
+                    }
+                }
             }
         }
         // set the index of the next literal to ti
@@ -713,7 +726,8 @@ fn conflict_analyze(
             let v = &vdb[asgs[ti].vi()];
             !v.is(Flag::CA_SEEN) || v.level != dl
         } {
-            // println!("- skip {} because it isn't flagged", asgs[ti].int());
+            #[cfg(feature = "trace_analyze")]
+            println!("- skip {} because it isn't flagged", asgs[ti].int());
             debug_assert!(
                 0 < ti,
                 format!(
@@ -728,8 +742,13 @@ fn conflict_analyze(
         p = asgs[ti];
         let next_vi = p.vi();
         cid = vdb[next_vi].reason;
-        // println!("- move to flagged {}, which reason is {}; num path: {}",
-        //          next_vi, path_cnt - 1, cid.fmt());
+        #[cfg(feature = "trace_analyze")]
+        println!(
+            "- move to flagged {}, which reason is {}; num path: {}",
+            next_vi,
+            path_cnt - 1,
+            cid.fmt()
+        );
         vdb[next_vi].turn_off(Flag::CA_SEEN);
         // since the trail can contain a literal which level is under `dl` after
         // the `dl`-th thdecision var, we must skip it.
@@ -743,7 +762,12 @@ fn conflict_analyze(
     debug_assert!(learnt.iter().all(|l| *l != !p));
     debug_assert_eq!(vdb[p].level, dl);
     learnt[0] = !p;
-    // println!("- appending {}, the result is {:?}", learnt[0].int(), vec2int(learnt));
+    #[cfg(feature = "trace_analyze")]
+    println!(
+        "- appending {}, the result is {:?}",
+        learnt[0].int(),
+        vec2int(learnt)
+    );
     state.minimize_learnt(asgs, cdb, vdb)
 }
 
