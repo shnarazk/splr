@@ -397,6 +397,7 @@ impl PropagatorIF for AssignStack {
         V: VarDBIF + VarRewardIF,
     {
         let watcher = cdb.watcher_lists_mut() as *mut [Vec<Watch>];
+        let check_index = self.num_conflict + self.num_restart;
         self.num_propagation += 1;
         while let Some(p) = self.trail.get(self.q_head) {
             self.q_head += 1;
@@ -412,7 +413,13 @@ impl PropagatorIF for AssignStack {
                     if blocker_value == Some(true) {
                         continue 'next_clause;
                     }
-                    let lits = &mut cdb[w.c].lits;
+                    let Clause {
+                        ref mut lits,
+                        ref mut checked_at,
+                        ref mut search_from,
+                        ..
+                    } = cdb[w.c];
+                    // let lits = &mut cdb[w.c].lits;
                     if lits.len() == 2 {
                         if blocker_value == Some(false) {
                             self.conflicts.1 = self.conflicts.0;
@@ -438,7 +445,14 @@ impl PropagatorIF for AssignStack {
                         w.blocker = first;
                         continue 'next_clause;
                     }
-                    for (k, lk) in lits.iter().enumerate().skip(2) {
+                    //
+                    //## Skip checked falsified literals
+                    //
+                    if *checked_at < check_index {
+                        *checked_at = check_index;
+                        *search_from = 2;
+                    }
+                    for (k, lk) in lits.iter().enumerate().skip(*search_from) {
                         if lit_assign!(self, *lk) != Some(false) {
                             (*watcher)
                                 .get_unchecked_mut(usize::from(!*lk))
@@ -446,6 +460,7 @@ impl PropagatorIF for AssignStack {
                             n -= 1;
                             source.detach(n);
                             lits.swap(1, k);
+                            *search_from = k + 1;
                             continue 'next_clause;
                         }
                     }

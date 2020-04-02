@@ -219,6 +219,10 @@ pub struct Clause {
     pub lits: Vec<Lit>,
     /// A static clause evaluation criterion like LBD, NDD, or something.
     pub rank: usize,
+    /// the ordinal of conflict at which this clause is checked.
+    pub checked_at: usize,
+    /// the index from which `propagate` starts seaching an unfalsified literal.
+    pub search_from: usize,
     /// A dynamic clause evaluation criterion based on the number of references.
     reward: f64,
     /// Flags
@@ -230,6 +234,8 @@ impl Default for Clause {
         Clause {
             lits: vec![],
             rank: 0,
+            checked_at: 0,
+            search_from: 2,
             reward: 0.0,
             flags: Flag::empty(),
         }
@@ -796,6 +802,8 @@ impl ClauseDBIF for ClauseDB {
             }
             c.rank = rank;
             c.reward = reward;
+            c.checked_at = 0;
+            c.search_from = 2;
         } else {
             let mut lits = Vec::with_capacity(v.len());
             for l in v {
@@ -807,6 +815,7 @@ impl ClauseDBIF for ClauseDB {
                 lits,
                 rank,
                 reward,
+                ..Clause::default()
             };
             self.clause.push(c);
         };
