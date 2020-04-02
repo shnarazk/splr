@@ -60,6 +60,8 @@ pub type SolverResult = Result<Certificate, SolverError>;
 /// assert_eq!(s.state.num_unsolved_vars(), 250);
 /// if let Ok(SAT(v)) = s.solve() {
 ///     assert_eq!(v.len(), 250);
+///     // But don't expect `s.state.num_unsolved_vars() == 0` at this point.
+///     // It returns the nubmer of vars which were assigned at decision level 0.
 /// } else {
 ///     panic!("It should be satisfied!");
 /// }
