@@ -2,6 +2,7 @@
 
 - change a lot of options' meanings and mnemonics
 - better modularity via traits
+- add some features for development
 - activate `JUST_USED` for clause reduction
 - change the activation timings of simplification
 - add and refactor restart module: GeometricStabilizer, ProgressLBD
