@@ -4,9 +4,10 @@ use {
     splr::{
         clause::CertifiedRecord,
         config::{Config, VERSION},
+        restarter::RestartMode,
         solver::{Certificate, SatSolverIF, Solver, SolverResult},
         state::*,
-        types::SolverError,
+        types::{Export, SolverError},
     },
     std::{
         borrow::Cow,
@@ -25,46 +26,46 @@ const RESET: &str = "\x1B[000m";
 fn colored(v: Result<bool, &SolverError>, quiet: bool) -> Cow<'static, str> {
     if quiet {
         match v {
-            Ok(false) => Cow::Borrowed("UNSAT"),
-            Ok(true) => Cow::Borrowed("SATISFIABLE"),
-            Err(e) => Cow::from(format!("{}", e)),
+            Ok(false) => Cow::Borrowed("s UNSATISFIABLE"),
+            Ok(true) => Cow::Borrowed("s SATISFIABLE"),
+            Err(e) => Cow::from(format!("c UNKNOWN ({})", e)),
         }
     } else {
         match v {
-            Ok(false) => Cow::from(format!("{}UNSAT{}", GREEN, RESET)),
-            Ok(true) => Cow::from(format!("{}SATISFIABLE{}", BLUE, RESET)),
-            Err(e) => Cow::from(format!("{}{}{}", RED, e, RESET)),
+            Ok(false) => Cow::from(format!("{}s UNSATISFIABLE{}", GREEN, RESET)),
+            Ok(true) => Cow::from(format!("{}s SATISFIABLE{}", BLUE, RESET)),
+            Err(e) => Cow::from(format!("{}c UNKNOWN ({}){}", RED, e, RESET)),
         }
     }
 }
 
 fn main() {
-    let config = Config::from_args();
-    if !config.cnf_filename.exists() {
+    let config = Config::from_args().override_args();
+    if !config.cnf_file.exists() {
         println!(
             "{} does not exist.",
-            config.cnf_filename.file_name().unwrap().to_str().unwrap()
+            config.cnf_file.file_name().unwrap().to_str().unwrap()
         );
         return;
     }
-    let cnf_file = config.cnf_filename.to_string_lossy();
-    let ans_file: Option<PathBuf> = match config.result_filename.to_string_lossy().as_ref() {
+    let cnf_file = config.cnf_file.to_string_lossy();
+    let ans_file: Option<PathBuf> = match config.result_file.to_string_lossy().as_ref() {
         "-" => None,
-        "" => Some(config.output_dirname.join(PathBuf::from(format!(
+        "" => Some(config.output_dir.join(PathBuf::from(format!(
             ".ans_{}",
-            config.cnf_filename.file_name().unwrap().to_string_lossy(),
+            config.cnf_file.file_name().unwrap().to_string_lossy(),
         )))),
-        _ => Some(config.output_dirname.join(&config.result_filename)),
+        _ => Some(config.output_dir.join(&config.result_file)),
     };
-    if config.proof_filename.to_string_lossy() != "proof.out" && !config.use_certification {
+    if config.proof_file.to_string_lossy() != "proof.out" && !config.use_certification {
         println!("Abort: You set a proof filename with '--proof' explicitly, but didn't set '--certify'. It doesn't look good.");
         return;
     }
     let mut s = Solver::build(&config).expect("failed to load");
     let res = s.solve();
     save_result(&s, &res, &cnf_file, ans_file);
-    if 0 < s.state.config.dump_interval && !s.state.development.is_empty() {
-        let dump = config.cnf_filename.file_stem().unwrap().to_str().unwrap();
+    if 0 < s.state.config.dump_int && !s.state.development.is_empty() {
+        let dump = config.cnf_file.file_stem().unwrap().to_str().unwrap();
         if let Ok(f) = File::create(format!("stat_{}.csv", dump)) {
             let mut buf = BufWriter::new(f);
             buf.write_all(b"conflict,solved,restart,block,ASG,LBD\n")
@@ -77,6 +78,11 @@ fn main() {
             }
         }
     }
+    std::process::exit(match res {
+        Ok(Certificate::SAT(_)) => 10,
+        Ok(Certificate::UNSAT) => 20,
+        Err(_) => 0,
+    });
 }
 
 fn save_result<S: AsRef<str> + std::fmt::Display>(
@@ -110,14 +116,15 @@ fn save_result<S: AsRef<str> + std::fmt::Display>(
                 Some(ref f) if redirect => println!(
                     "      Result|dump: to STDOUT instead of {} due to an IO error.",
                     f.to_string_lossy(),
-                    ),
-                Some(ref f) => println!(
-                    "      Result|file: {}",
-                    f.to_str().unwrap(),
                 ),
+                Some(ref f) => println!("      Result|file: {}", f.to_str().unwrap(),),
                 _ => (),
             }
-            println!("{}: {}", colored(Ok(true), s.state.config.quiet_mode), input);
+            println!(
+                "{}: {}",
+                colored(Ok(true), s.state.config.quiet_mode),
+                input
+            );
             if let Err(why) = (|| {
                 buf.write_all(
                     format!(
@@ -146,18 +153,19 @@ fn save_result<S: AsRef<str> + std::fmt::Display>(
                 _ => (),
             }
             if s.state.config.use_certification {
-                let proof_file: PathBuf = s
-                    .state
-                    .config
-                    .output_dirname
-                    .join(&s.state.config.proof_filename);
+                let proof_file: PathBuf =
+                    s.state.config.output_dir.join(&s.state.config.proof_file);
                 save_proof(&s, &input, &proof_file);
                 println!(
                     " Certificate|file: {}",
-                    s.state.config.proof_filename.to_string_lossy()
+                    s.state.config.proof_file.to_string_lossy()
                 );
             }
-            println!("{}: {}", colored(Ok(false), s.state.config.quiet_mode), input);
+            println!(
+                "{}: {}",
+                colored(Ok(false), s.state.config.quiet_mode),
+                input
+            );
             if let Err(why) = (|| {
                 buf.write_all(
                     format!(
@@ -182,7 +190,7 @@ fn save_result<S: AsRef<str> + std::fmt::Display>(
                 Some(ref f) => println!("      Result|file: {}", f.to_str().unwrap(),),
                 _ => (),
             }
-            println!("Failed to solve by {}: {}", colored(Err(e), s.state.config.quiet_mode), input);
+            println!("{}: {}", colored(Err(e), s.state.config.quiet_mode), input);
             if let Err(why) = (|| {
                 buf.write_all(
                     format!(
@@ -254,7 +262,9 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
             time.tv_sec as f64 + time.tv_nsec as f64 / 1_000_000_000.0f64
         }
     };
-    let (_, vdb_activity_decay) = s.vdb.progress_component();
+    let (asgs_num_conflict, _num_propagation, asgs_num_restart) = s.asgs.exports();
+    let (_, vdb_activity_decay) = s.vdb.exports();
+    let (rst_mode, _num_block, _asg_trend, _lbd_get, _lbd_trend) = s.rst.exports();
     out.write_all(
         format!(
             "c {:<43}, #var:{:9}, #cls:{:9}\n",
@@ -294,7 +304,7 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     out.write_all(
         format!(
             "c  {}|#BLK:{}, #RST:{}, eASG:{}, eLBD:{} \n",
-            if s.rst.luby.active {
+            if rst_mode == RestartMode::Luby {
                 "LubyRestart"
             } else {
                 "    Restart"
@@ -317,16 +327,16 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
             format!("{:>9.2}", state[LogF64Id::BLevel]),
             format!(
                 "{:>9.4}",
-                100.0 * state[Stat::Restart] as f64 / state[Stat::Conflict] as f64
+                100.0 * asgs_num_restart as f64 / asgs_num_conflict as f64
             ),
         )
         .as_bytes(),
     )?;
     out.write_all(
         format!(
-            "c         misc|#rdc:{}, #sce:{}, core:{}, vdcy:{} \n",
+            "c         misc|#rdc:{}, #elm:{}, core:{}, vdcy:{} \n",
             format!("{:>9}", state[LogUsizeId::Reduction]),
-            format!("{:>9}", state[LogUsizeId::SatClauseElim]),
+            format!("{:>9}", state[LogUsizeId::Elimination]),
             format!("{:>9.0}", state[LogF64Id::CoreSize]),
             format!("{:>9.4}", vdb_activity_decay),
         )

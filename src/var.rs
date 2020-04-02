@@ -1,16 +1,15 @@
 /// Crate `var` provides `var` object and its manager `VarDB`.
 use {
     crate::{
-        clause::{Clause, ClauseDB, ClauseIF, ClauseId},
-        config::Config,
-        propagator::{AssignStack, PropagatorIF},
-        state::{ProgressComponent, SearchStrategy, Stat, State},
+        clause::ClauseDBIF,
+        propagator::PropagatorIF,
+        state::{SearchStrategy, State},
         types::*,
     },
     std::{
         fmt,
         ops::{Index, IndexMut, Range, RangeFrom},
-        slice::Iter,
+        slice::{Iter, IterMut},
     },
 };
 
@@ -19,17 +18,21 @@ pub trait LBDIF {
     /// return the LBD value for a set of literals.
     fn compute_lbd(&mut self, vec: &[Lit]) -> usize;
     /// re-calculate the LBD values of all (learnt) clauses.
-    fn reset_lbd(&mut self, cdb: &mut ClauseDB);
+    fn reset_lbd<C>(&mut self, cdb: &mut C)
+    where
+        C: ClauseDBIF;
 }
 
 /// API for var DB like `assigned`, `locked`, and so on.
-pub trait VarDBIF {
+pub trait VarDBIF: IndexMut<VarId, Output = Var> + IndexMut<Lit, Output = Var> {
     /// return the number of vars.
     fn len(&self) -> usize;
     /// return true if it's empty.
     fn is_empty(&self) -> bool;
-    /// return an interator over vars.
+    /// return an iterator over vars.
     fn iter(&self) -> Iter<'_, Var>;
+    /// return an iterator over vars.
+    fn iter_mut(&mut self) -> IterMut<'_, Var>;
     /// return the 'value' of a given literal.
     fn assigned(&self, l: Lit) -> Option<bool>;
     /// return `true` is the clause is the reason of the assignment.
@@ -42,7 +45,9 @@ pub trait VarDBIF {
     /// - None -- the literals contains an unassigned literal
     fn status(&self, c: &[Lit]) -> Option<bool>;
     /// minimize a clause.
-    fn minimize_with_biclauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>);
+    fn minimize_with_biclauses<C>(&mut self, cdb: &C, vec: &mut Vec<Lit>)
+    where
+        C: ClauseDBIF;
 }
 
 /// API for var rewarding.
@@ -104,9 +109,13 @@ impl fmt::Display for Var {
         let st = |flag, mes| if self.is(flag) { mes } else { "" };
         write!(
             f,
-            "V{}({:?} at {} by {} {}{})",
+            "V{{{},{} at {} by {} {}{}}}",
             self.index,
-            self.assign,
+            match self.assign {
+                Some(true) => "T",
+                Some(false) => "F",
+                None => "_",
+            },
             self.level,
             self.reason,
             st(Flag::TOUCHED, ", touched"),
@@ -386,8 +395,8 @@ impl Instantiate for VarDB {
             ..VarDB::default()
         }
     }
-    fn adapt_to(&mut self, state: &State) {
-        if 0 == state[Stat::Conflict] {
+    fn adapt_to(&mut self, state: &State, num_conflict: usize) {
+        if 0 == num_conflict {
             let nv = self.var.len();
             self.core_size.update(((CORE_HISOTRY_LEN * nv) as f64).ln());
             return;
@@ -407,7 +416,7 @@ impl Instantiate for VarDB {
         let thr = msr.0 * VRD_FILTER + ar * (1.0 - VRD_FILTER);
         let core = self.var[1..].iter().filter(|v| thr <= v.reward).count();
         self.core_size.update(core as f64);
-        if state[Stat::Conflict] % VRD_INTERVAL == 0 {
+        if num_conflict % VRD_INTERVAL == 0 {
             let k = match state.strategy.0 {
                 SearchStrategy::LowDecisions => VRD_DEC_HIGH,
                 SearchStrategy::HighSuccesive => VRD_DEC_STRICT,
@@ -429,6 +438,9 @@ impl VarDBIF for VarDB {
     }
     fn iter(&self) -> Iter<'_, Var> {
         self.var.iter()
+    }
+    fn iter_mut(&mut self) -> IterMut<'_, Var> {
+        self.var.iter_mut()
     }
     fn assigned(&self, l: Lit) -> Option<bool> {
         match unsafe { self.var.get_unchecked(l.vi()).assign } {
@@ -461,7 +473,10 @@ impl VarDBIF for VarDB {
         }
         falsified
     }
-    fn minimize_with_biclauses(&mut self, cdb: &ClauseDB, vec: &mut Vec<Lit>) {
+    fn minimize_with_biclauses<C>(&mut self, cdb: &C, vec: &mut Vec<Lit>)
+    where
+        C: ClauseDBIF,
+    {
         if vec.len() <= 1 {
             return;
         }
@@ -472,7 +487,7 @@ impl VarDBIF for VarDB {
         }
         let l0 = vec[0];
         let mut nsat = 0;
-        for w in &cdb.watcher[!l0] {
+        for w in cdb.watcher_list(!l0) {
             let c = &cdb[w.c];
             if c.len() != 2 {
                 continue;
@@ -511,11 +526,14 @@ impl LBDIF for VarDB {
             cnt
         }
     }
-    fn reset_lbd(&mut self, cdb: &mut ClauseDB) {
+    fn reset_lbd<C>(&mut self, cdb: &mut C)
+    where
+        C: ClauseDBIF,
+    {
         let VarDB { lbd_temp, .. } = self;
         unsafe {
             let mut key = *lbd_temp.get_unchecked(0);
-            for c in &mut cdb[1..] {
+            for c in &mut cdb.iter_mut().skip(1) {
                 if c.is(Flag::DEAD) || c.is(Flag::LEARNT) {
                     continue;
                 }
@@ -538,9 +556,19 @@ impl LBDIF for VarDB {
     }
 }
 
-impl ProgressComponent for VarDB {
-    type Output = (f64, f64);
-    fn progress_component(&self) -> Self::Output {
+impl Export<(f64, f64)> for VarDB {
+    /// exports:
+    ///  1. `core_sise.get()`
+    ///  1. `activity_decay`
+    ///
+    ///```
+    /// use crate::{splr::config::Config, splr::types::*};
+    /// use crate::splr::var::VarDB;
+    /// let vdb = VarDB::instantiate(&Config::default(), &CNFDescription::default());
+    ///let (vdb_core_size, vdb_activity_decay) = vdb.exports();
+    ///```
+    #[inline]
+    fn exports(&self) -> (f64, f64) {
         (self.core_size.get(), self.activity_decay)
     }
 }
@@ -550,7 +578,11 @@ impl VarDB {
     // beyond first UIDs and bump all vars on the traversed tree.
     // If you'd like to use this, you should stop bumping activities in `analyze`.
     #[allow(dead_code)]
-    fn bump_vars(&mut self, asgs: &AssignStack, cdb: &ClauseDB, confl: ClauseId) {
+    fn bump_vars<A, C>(&mut self, asgs: &A, cdb: &C, confl: ClauseId)
+    where
+        A: PropagatorIF,
+        C: ClauseDBIF,
+    {
         debug_assert_ne!(confl, ClauseId::default());
         let mut cid = confl;
         let mut p = NULL_LIT;
@@ -584,7 +616,11 @@ impl VarDB {
         }
     }
     #[allow(dead_code)]
-    fn dump_dependency(&mut self, asgs: &AssignStack, cdb: &ClauseDB, confl: ClauseId) {
+    fn dump_dependency<A, C>(&mut self, asgs: &A, cdb: &C, confl: ClauseId)
+    where
+        A: PropagatorIF,
+        C: ClauseDBIF,
+    {
         debug_assert_ne!(confl, ClauseId::default());
         let mut cid = confl;
         let mut p = NULL_LIT;

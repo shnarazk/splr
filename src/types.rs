@@ -1,7 +1,12 @@
 /// Crate `types' provides various building blocks, including
 /// some common traits.
+pub use crate::{
+    clause::{Clause, ClauseIF, ClauseId, ClauseIdIF, Watch},
+    config::Config,
+    var::Var,
+};
 use {
-    crate::{clause::ClauseId, config::Config, state::State, var::Var},
+    crate::state::State,
     std::{
         convert::TryFrom,
         fmt,
@@ -12,6 +17,15 @@ use {
     },
 };
 
+/// API for accessing internal data in a module.
+/// For example, `State::progress` needs to access misc parameters and statistics,
+/// which should be uned locally in modules.
+/// To avoid to make them public, we define a generic accessor or exporter here.
+/// `T` is the list of exporting values.
+pub trait Export<T> {
+    fn exports(&self) -> T;
+}
+
 /// API for Literal like `from_int`, `from_assign`, `to_cid` and so on.
 pub trait LitIF {
     /// convert [VarId](../type.VarId.html) to [Lit](../type.Lit.html).
@@ -21,7 +35,7 @@ pub trait LitIF {
     fn vi(self) -> VarId;
 }
 
-/// API for clause and var rewarding
+/// API for clause and var rewarding.
 pub trait ActivityIF {
     type Ix;
     type Inc;
@@ -33,12 +47,24 @@ pub trait ActivityIF {
     fn scale_activity(&mut self);
 }
 
-/// API for object instantiation based on `Configuration` and `CNFDescription`
-/// and adaptation.
+/// API for object instantiation based on `Configuration` and `CNFDescription`.
+/// This is implemented by *all the Splr modules* except `Configuration` and `CNFDescription`.
+///
+/// # Example
+///
+/// ```
+/// use crate::{splr::config::Config, splr::types::*};
+/// use splr::{clause::ClauseDB, solver::Solver};
+/// let _ = ClauseDB::instantiate(&Config::default(), &CNFDescription::default());
+/// let _ = Solver::instantiate(&Config::default(), &CNFDescription::default());
+///```
 pub trait Instantiate {
+    /// make and return an object from `Config` and `CNFDescription`.
     fn instantiate(conf: &Config, cnf: &CNFDescription) -> Self;
     /// set up internal parameters.
-    fn adapt_to(&mut self, _state: &State) {}
+    /// # CAVEAT
+    /// some implementation might have a special premise to call: decision_level == 0.
+    fn adapt_to(&mut self, _state: &State, _num_conflict: usize) {}
 }
 
 /// API for O(n) deletion from a list, providing `delete_unstable`.
@@ -83,6 +109,12 @@ pub struct Lit {
 /// a dummy literal.
 pub const NULL_LIT: Lit = Lit { ordinal: 0 };
 
+impl fmt::Display for Lit {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}L", i32::from(self))
+    }
+}
+
 impl From<usize> for Lit {
     #[inline]
     fn from(l: usize) -> Self {
@@ -110,7 +142,8 @@ impl From<ClauseId> for Lit {
 
 /// While Lit::oridinal is private, Var::{index, assign} are public.
 /// So we define the following here.
-/// CAVEAT: Unassigned vars are converted to the null literal.
+/// # CAVEAT
+/// Unassigned vars are converted to the null literal.
 impl From<&Var> for Lit {
     fn from(v: &Var) -> Self {
         match v.assign {
@@ -282,7 +315,7 @@ pub trait EmaIF {
     }
 }
 
-/// Exponential Moving Average w/ a calibrator
+/// Exponential Moving Average, with a calibrator if feature `ema_calibration` is on.
 #[derive(Debug)]
 pub struct Ema {
     val: f64,
@@ -323,7 +356,7 @@ impl Ema {
     }
 }
 
-/// Exponential Moving Average pair
+/// Exponential Moving Average pair, with a calibrator if feature `ema_calibration` is on.
 #[derive(Debug)]
 pub struct Ema2 {
     fast: f64,
@@ -392,9 +425,9 @@ impl Ema2 {
     }
 }
 
-/// Internal errors
+/// Internal errors.
 /// Note: returning `Result<(), a-singleton>` is identical to returning `bool`.
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum SolverError {
     // StateUNSAT = 0,
     // StateSAT,
@@ -413,7 +446,7 @@ impl fmt::Display for SolverError {
     }
 }
 
-/// A Return type used by solver functions
+/// A Return type used by solver functions.
 pub type MaybeInconsistent = Result<(), SolverError>;
 
 /// data about a problem.
@@ -511,7 +544,7 @@ impl TryFrom<&PathBuf> for CNFReader {
     }
 }
 
-/// convert `[Lit]` to `[i32]` (for debug)
+/// convert `[Lit]` to `[i32]` (for debug).
 pub fn vec2int(v: &[Lit]) -> Vec<i32> {
     v.iter().map(|l| i32::from(*l)).collect::<Vec<_>>()
 }
@@ -546,9 +579,12 @@ pub trait FlagIF {
 }
 
 bitflags! {
+    /// Misc flags used by `Clause` and `Var`.
     pub struct Flag: u16 {
 
-        /// For clause
+        //
+        //## For Clause
+        //
         /// a clause is stored in DB, but is a garbage now.
         const DEAD         = 0b0000_0000_0000_0001;
         /// a clause is a generated clause by conflict analysis and is removable.
@@ -562,7 +598,9 @@ bitflags! {
         /// mark to run garbage collector on the corresponding watcher lists
         const TOUCHED      = 0b0000_0000_0010_0000;
 
-        /// For var
+        //
+        //## For Var
+        //
         /// the previous assigned value of a Var.
         const PHASE        = 0b0000_0001_0000_0000;
         /// a var is eliminated and managed by eliminator.

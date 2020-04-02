@@ -2,7 +2,7 @@
 name = "splr"
 version = "0.3.3-dev.0"
 authors = ["Narazaki Shuji <shujinarazaki@protonmail.com>"]
-description = "A pure rustic CDCL SAT solver based on Glucose"
+description = "A modern CDCL SAT solver in Rust"
 edition = "2018"
 license = "MPL-2.0"
 readme = "README.md"
@@ -20,6 +20,8 @@ structopt = "0.3"
 [features]
 EVSIDS = []
 ema_calibration = []
+boundary_check = []
+trace_analyze = []
 
 [profile.release]
 lto = "fat"

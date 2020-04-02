@@ -1,6 +1,6 @@
 #![doc(html_root_url = "https://docs.rs/splr/0.3.2")]
 /*!
-# a SAT Solver for Propositional Logic in Rust
+# A modern CDCL SAT solver in Rust
 
 Splr is a pure Rustic SAT solver, based on [Glucose 4.1](https://www.labri.fr/perso/lsimon/glucose/).
 It adopts various research results on SAT solvers:

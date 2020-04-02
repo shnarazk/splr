@@ -30,23 +30,22 @@ struct TargetOpts {
     #[structopt(parse(from_os_str))]
     /// a CNF file
     problem: std::path::PathBuf,
-    #[structopt(long = "without-color", short = "C")]
+    #[structopt(long = "no-color", short = "C")]
     /// disable colorized output
-    without_color: bool,
+    no_color: bool,
 }
 
 fn main() {
     let mut from_file = true;
     let mut found = false;
     let mut args = TargetOpts::from_args();
-    let cnf = args.problem.to_str().unwrap();
-    if !args.problem.exists() {
-        println!("{} does not exist.", args.problem.to_str().unwrap(),);
-        return;
-    }
+    let cnf = args.problem.to_str().expect(&format!(
+        "{} does not exist.",
+        args.problem.to_str().unwrap()
+    ));
     let mut config = Config::default();
-    config.cnf_filename = args.problem.clone();
-    let (red, green, blue) = if args.without_color {
+    config.cnf_file = args.problem.clone();
+    let (red, green, blue) = if args.no_color {
         (RESET, RESET, RESET)
     } else {
         (RED, GREEN, BLUE)
@@ -64,7 +63,7 @@ fn main() {
     if let Some(f) = &args.assign {
         if let Ok(d) = File::open(f.as_path()) {
             if let Some(vec) = read_assignment(&mut BufReader::new(d), cnf, &args.assign) {
-                if s.inject_assigmnent(&vec).is_err() {
+                if s.inject_assignment(&vec).is_err() {
                     println!(
                         "{}{} seems an unsat problem but no proof.{}",
                         blue,
@@ -81,7 +80,7 @@ fn main() {
     }
     if !found {
         if let Some(vec) = read_assignment(&mut BufReader::new(stdin()), cnf, &args.assign) {
-            if s.inject_assigmnent(&vec).is_err() {
+            if s.inject_assignment(&vec).is_err() {
                 println!(
                     "{}{} seems an unsat problem but no proof.{}",
                     blue,

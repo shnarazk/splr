@@ -1,16 +1,20 @@
 /// Crate 'solver' provides the top-level API as a SAT solver.
 use {
     crate::{
-        clause::{Clause, ClauseDB, ClauseDBIF, ClauseIF, ClauseId},
-        config::Config,
-        eliminator::{Eliminator, EliminatorIF, EliminatorStatIF},
+        clause::{ClauseDB, ClauseDBIF},
+        eliminator::{Eliminator, EliminatorIF},
         propagator::{AssignStack, PropagatorIF, VarSelectionIF},
-        restarter::{RestartIF, Restarter},
-        state::{SearchStrategy, Stat, State, StateIF},
+        restarter::{RestartIF, Restarter, RestarterModule},
+        state::{Stat, State, StateIF},
         types::*,
-        var::{VarDB, VarDBIF, VarRewardIF, LBDIF},
+        var::{VarDB, VarDBIF, VarRewardIF},
     },
-    std::{convert::TryFrom, io::BufRead, slice::Iter},
+    std::{
+        convert::TryFrom,
+        fs::File,
+        io::{BufRead, BufReader},
+        slice::Iter,
+    },
 };
 
 /// API for SAT solver like `build`, `solve` and so on.
@@ -45,15 +49,38 @@ pub enum Certificate {
 /// * `SolverException::*` -- caused by a bug
 pub type SolverResult = Result<Certificate, SolverError>;
 
-/// SAT solver consisting of 5 sub modules.
+/// The SAT solver object consisting of 6 sub modules.
+/// ```
+/// use std::convert::TryFrom;
+/// use crate::splr::{state::{State, StateIF}, types::*};
+/// use crate::splr::solver::{SatSolverIF, Solver, Certificate::*};
+///
+/// let mut s = Solver::try_from("tests/sample.cnf").expect("can't load");
+/// assert_eq!(s.state.num_vars, 250);
+/// assert_eq!(s.state.num_unsolved_vars(), 250);
+/// if let Ok(SAT(v)) = s.solve() {
+///     assert_eq!(v.len(), 250);
+///     // But don't expect `s.state.num_unsolved_vars() == 0` at this point.
+///     // It returns the nubmer of vars which were assigned at decision level 0.
+/// } else {
+///     panic!("It should be satisfied!");
+/// }
+/// assert_eq!(Solver::try_from("tests/unsat.cnf").expect("can't load").solve(), Ok(UNSAT));
+/// ```
 #[derive(Debug)]
 pub struct Solver {
-    pub asgs: AssignStack, // Assignment
-    pub cdb: ClauseDB,     // Clauses
-    pub elim: Eliminator,  // Clause/Variable Elimination
-    pub rst: Restarter,    // restart module
-    pub state: State,      // misc data
-    pub vdb: VarDB,        // Variables
+    /// assignment management
+    pub asgs: AssignStack,
+    /// clause container
+    pub cdb: ClauseDB,
+    /// clause and variable elimination
+    pub elim: Eliminator,
+    /// restart management
+    pub rst: Restarter,
+    /// misc data holder
+    pub state: State,
+    /// var container
+    pub vdb: VarDB,
 }
 
 impl Default for Solver {
@@ -70,6 +97,11 @@ impl Default for Solver {
 }
 
 impl Instantiate for Solver {
+    /// ```
+    /// use crate::{splr::config::Config, splr::types::*};
+    /// use splr::solver::Solver;
+    /// let s = Solver::instantiate(&Config::default(), &CNFDescription::default());
+    ///```
     fn instantiate(config: &Config, cnf: &CNFDescription) -> Solver {
         Solver {
             asgs: AssignStack::instantiate(config, cnf),
@@ -82,14 +114,34 @@ impl Instantiate for Solver {
     }
 }
 
+impl TryFrom<&str> for Solver {
+    type Error = SolverError;
+    /// return a new solver bulid for a CNF file.
+    ///
+    /// # Example
+    /// ```
+    /// use std::convert::TryFrom;
+    /// use crate::splr::solver::{SatSolverIF, Solver};
+    ///
+    /// let mut s = Solver::try_from("tests/sample.cnf").expect("fail to load");
+    ///```
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        let config = Config::from(s);
+        Solver::build(&config)
+    }
+}
+
 macro_rules! final_report {
-    ($cdb: expr, $rst: expr, $state: expr, $vdb: expr) => {
+    ($asgs: expr, $cdb: expr, $elim: expr, $rst: expr, $state: expr, $vdb: expr) => {
+        let c = $state.config.no_color;
         let q = $state.config.quiet_mode;
+        $state.config.no_color = true;
         $state.config.quiet_mode = false;
         if q {
             $state.progress_header();
         }
-        $state.progress($cdb, $rst, $vdb, None);
+        $state.progress($asgs, $cdb, $elim, $rst, $vdb, None);
+        $state.config.no_color = c;
         $state.config.quiet_mode = q;
     };
 }
@@ -124,45 +176,51 @@ impl SatSolverIF for Solver {
         // s.root_level = 0;
         state.num_solved_vars = asgs.len();
         state.progress_header();
-        state.progress(cdb, rst, vdb, Some("initialization phase"));
+        state.progress(asgs, cdb, elim, rst, vdb, Some("initialization phase"));
         state.flush("loading...");
-        let use_pre_processor = true;
-        let use_pre_processing_eliminator = true;
-        if use_pre_processor {
-            state.flush("phasing...");
-            elim.activate();
-            elim.prepare(cdb, vdb, true);
-            // run simple preprocessor
-            for vi in 1..vdb.len() {
-                let v = &mut vdb[vi];
-                let w = &elim[vi];
-                if v.assign.is_some() {
-                    continue;
-                }
-                match w.stats() {
-                    (_, 0) => {
-                        let l = Lit::from_assign(vi, true);
-                        if asgs.assign_at_rootlevel(vdb, l).is_err() {
-                            return Ok(Certificate::UNSAT);
-                        }
-                    }
-                    (0, _) => {
-                        let l = Lit::from_assign(vi, false);
-                        if asgs.assign_at_rootlevel(vdb, l).is_err() {
-                            return Ok(Certificate::UNSAT);
-                        }
-                    }
-                    (p, m) => {
-                        v.set(Flag::PHASE, m < p);
-                        elim.enqueue_var(vdb, vi, false);
-                    }
-                }
+        const USE_PRE_PROCESSING_ELIMINATOR: bool = true;
+
+        //
+        //## Propagate all trivial literals (an essential step)
+        //
+        // Set appropriate phases and push all the unit clauses to assign stack.
+        // To do so, we use eliminator's ocuur list.
+        // Thus we have to call `activate` and `prepare` firstly, to build occur lists.
+        // Otherwise all literals are assigned wrongly.
+        state.flush("phasing...");
+        elim.activate();
+        elim.prepare(cdb, vdb, true);
+        for vi in 1..vdb.len() {
+            let v = &mut vdb[vi];
+            if v.assign.is_some() {
+                continue;
             }
-            if !elim.enable || !use_pre_processing_eliminator {
-                elim.stop(cdb, vdb);
+            match elim.stats(vi) {
+                (_, 0) => {
+                    let l = Lit::from_assign(vi, true);
+                    if asgs.assign_at_rootlevel(vdb, l).is_err() {
+                        return Ok(Certificate::UNSAT);
+                    }
+                }
+                (0, _) => {
+                    let l = Lit::from_assign(vi, false);
+                    if asgs.assign_at_rootlevel(vdb, l).is_err() {
+                        return Ok(Certificate::UNSAT);
+                    }
+                }
+                (p, m) => {
+                    v.set(Flag::PHASE, m < p);
+                    elim.enqueue_var(vdb, vi, false);
+                }
             }
         }
-        if elim.enable && use_pre_processing_eliminator {
+        //
+        //## Run eliminator
+        //
+        if !USE_PRE_PROCESSING_ELIMINATOR || !elim.enable {
+            elim.stop(cdb, vdb);
+        }
+        if USE_PRE_PROCESSING_ELIMINATOR && elim.enable {
             state.flush("simplifying...");
             // if 20_000_000 < state.target.num_of_clauses {
             //     state.elim_eliminate_grow_limit = 0;
@@ -172,7 +230,7 @@ impl SatSolverIF for Solver {
             if elim.simplify(asgs, cdb, state, vdb).is_err() {
                 // Why inconsistent? Because the CNF contains a conflict, not an error!
                 // Or out of memory.
-                final_report!(cdb, rst, state, vdb);
+                final_report!(asgs, cdb, elim, rst, state, vdb);
                 if cdb.check_size().is_err() {
                     return Err(SolverError::OutOfMemory);
                 }
@@ -182,7 +240,7 @@ impl SatSolverIF for Solver {
                 if v.assign.is_some() || v.is(Flag::ELIMINATED) {
                     continue;
                 }
-                match elim[v.index].stats() {
+                match elim.stats(v.index) {
                     (_, 0) => (),
                     (0, _) => (),
                     (p, m) if m * 10 < p => v.turn_on(Flag::PHASE),
@@ -190,12 +248,16 @@ impl SatSolverIF for Solver {
                     _ => (),
                 }
             }
+            vdb.initialize_reward(elim.sorted_iterator());
         }
-        vdb.initialize_reward(elim.sorted_iterator());
         asgs.rebuild_order(vdb);
-        state.progress(cdb, rst, vdb, None);
+        state.progress(asgs, cdb, elim, rst, vdb, None);
+
+        //
+        //## Search
+        //
         let answer = search(asgs, cdb, elim, rst, state, vdb);
-        final_report!(cdb, rst, state, vdb);
+        final_report!(asgs, cdb, elim, rst, state, vdb);
         match answer {
             Ok(true) => {
                 elim.extend_model(vdb);
@@ -241,35 +303,8 @@ impl SatSolverIF for Solver {
     /// assert!(Solver::build(&config).is_ok());
     ///```
     fn build(config: &Config) -> Result<Solver, SolverError> {
-        let CNFReader { cnf, mut reader } = CNFReader::try_from(&config.cnf_filename)?;
-        let mut buf = String::new();
-        let mut s: Solver = Solver::instantiate(config, &cnf);
-        loop {
-            buf.clear();
-            match reader.read_line(&mut buf) {
-                Ok(0) => break,
-                Ok(_) if buf.starts_with('c') => continue,
-                Ok(_) => {
-                    let iter = buf.split_whitespace();
-                    let mut v: Vec<Lit> = Vec::new();
-                    for s in iter {
-                        match s.parse::<i32>() {
-                            Ok(0) => break,
-                            Ok(val) => v.push(Lit::from(val)),
-                            Err(_) => (),
-                        }
-                    }
-                    if !v.is_empty() && s.add_unchecked_clause(&mut v).is_none() {
-                        return Err(SolverError::Inconsistent);
-                    }
-                }
-                Err(e) => panic!("{}", e),
-            }
-        }
-        debug_assert_eq!(s.vdb.len() - 1, cnf.num_of_variables);
-        s.state[Stat::NumBin] = s.cdb[1..].iter().filter(|c| c.len() == 2).count();
-        s.vdb.adapt_to(&s.state);
-        Ok(s)
+        let CNFReader { cnf, reader } = CNFReader::try_from(&config.cnf_file)?;
+        Solver::instantiate(config, &cnf).inject(reader)
     }
     // renamed from clause_new
     fn add_unchecked_clause(&mut self, lits: &mut Vec<Lit>) -> Option<ClauseId> {
@@ -308,7 +343,7 @@ impl SatSolverIF for Solver {
                 .assign_at_rootlevel(vdb, lits[0])
                 .map_or(None, |_| Some(ClauseId::default())),
             _ => {
-                let cid = cdb.new_clause(lits, None);
+                let cid = cdb.new_clause(lits, None::<&mut VarDB>);
                 elim.add_cid_occur(vdb, cid, &mut cdb[cid], true);
                 Some(cid)
             }
@@ -327,31 +362,23 @@ fn search(
     vdb: &mut VarDB,
 ) -> Result<bool, SolverError> {
     let mut a_decision_was_made = false;
-    if rst.luby.active {
-        rst.luby.update(0);
-    }
+    rst.update(RestarterModule::Luby, 0);
     loop {
         vdb.reward_update();
         let ci = asgs.propagate(cdb, vdb);
-        state[Stat::Propagation] += 1;
         if ci == ClauseId::default() {
             if state.num_vars <= asgs.len() + state.num_eliminated_vars {
                 return Ok(true);
             }
-            // DYNAMIC FORCING RESTART based on LBD values, updated by conflict
+
+            //
+            //## DYNAMIC FORCING RESTART based on LBD values, updated by conflict
+            //
             state.last_asg = asgs.len();
             if rst.force_restart() {
-                state[Stat::Restart] += 1;
                 asgs.cancel_until(vdb, state.root_level);
-            } else if asgs.level() == 0 {
-                if elim.simplify(asgs, cdb, state, vdb).is_err() {
-                    debug_assert!(false, "interal error by simplify");
-                    return Err(SolverError::Inconsistent);
-                }
-                state.num_solved_vars = asgs.len();
             }
         } else {
-            state[Stat::Conflict] += 1;
             if a_decision_was_made {
                 a_decision_was_made = false;
             } else {
@@ -365,11 +392,24 @@ fn search(
             if cdb[ci].iter().all(|l| vdb[l].level == 0) {
                 return Ok(false);
             }
-            if state[Stat::Conflict] < 1000 || asgs.conflicts.0 == asgs.conflicts.1 {
-                state.switch_chronobt = Some(false);
-            }
             handle_conflict(asgs, cdb, elim, rst, state, vdb, ci)?;
-            state.switch_chronobt = None;
+        }
+        // Simplification has been postponed because chronoBT was used.
+        if asgs.level() == state.root_level {
+            // `elim.to_eliminate` is increased much in particular when vars are solved or
+            // learnts are small. We don't need to count the number of solved vars.
+            if state.config.elim_trigger < state.to_eliminate as usize {
+                state.to_eliminate = 0.0;
+                if elim.enable {
+                    elim.activate();
+                }
+                elim.simplify(asgs, cdb, state, vdb)?;
+            }
+            // By simplification, we may get further solutions.
+            if state.num_solved_vars < asgs.len() {
+                rst.update(RestarterModule::Reset, 0);
+                state.num_solved_vars = asgs.len();
+            }
         }
         if !asgs.remains() {
             let vi = asgs.select_var(vdb);
@@ -379,37 +419,6 @@ fn search(
             a_decision_was_made = true;
         }
     }
-}
-
-#[allow(dead_code)]
-fn propagate_in_sandbox(
-    asgs: &mut AssignStack,
-    cdb: &mut ClauseDB,
-    state: &mut State,
-    vdb: &mut VarDB,
-    vi: VarId,
-) -> [(ClauseId, Vec<Lit>, Vec<Lit>); 2] {
-    let lvl = asgs.level();
-    let mut res: [(ClauseId, Vec<Lit>, Vec<Lit>); 2] = [
-        (ClauseId::default(), Vec::new(), Vec::new()),
-        (ClauseId::default(), Vec::new(), Vec::new()),
-    ];
-    for (i, x) in [false, true].iter().enumerate() {
-        asgs.assign_by_decision(vdb, Lit::from_assign(vi, *x));
-        let ci = asgs.propagate(cdb, vdb);
-        let assigns = asgs[asgs.len_upto(lvl)..]
-            .iter()
-            .copied()
-            .collect::<Vec<_>>();
-        res[i].0 = ci;
-        res[i].1 = assigns;
-        if ci != ClauseId::default() {
-            conflict_analyze(asgs, cdb, state, vdb, ci);
-            res[i].2 = state.new_learnt.clone();
-        }
-        asgs.cancel_until(vdb, lvl);
-    }
-    res
 }
 
 #[inline]
@@ -422,19 +431,26 @@ fn handle_conflict(
     vdb: &mut VarDB,
     ci: ClauseId,
 ) -> MaybeInconsistent {
-    let ncnfl = state[Stat::Conflict]; // total number
-    rst.after_restart += 1;
-    // DYNAMIC BLOCKING RESTART based on ASG, updated on conflict path
+    let (ncnfl, _num_propagation, asgs_num_restart) = asgs.exports();
     // If we can settle this conflict w/o restart, solver will get a big progress.
+    let switch_chronobt = if ncnfl < 1000 || asgs.recurrent_conflicts() {
+        Some(false)
+    } else {
+        None
+    };
+    rst.update(RestarterModule::Counter, ncnfl);
+
     if 0 < state.last_asg {
-        rst.asg.update(asgs.len());
+        rst.update(RestarterModule::ASG, asgs.len());
         state.last_asg = 0;
     }
-    if rst.block_restart() {
-        state[Stat::BlockRestart] += 1;
-    }
+
+    //
+    //## DYNAMIC BLOCKING RESTART based on ASG, updated on conflict path
+    //
+    rst.block_restart();
     let cl = asgs.level();
-    let mut use_chronobt = state.switch_chronobt.unwrap_or(0 < state.config.chronobt);
+    let mut use_chronobt = switch_chronobt.unwrap_or(0 < state.config.cbt_thr);
     if use_chronobt {
         let c = &cdb[ci];
         let lcnt = c.iter().filter(|l| vdb[*l].level == cl).count();
@@ -476,7 +492,7 @@ fn handle_conflict(
             cl
         }
     };
-    assert!(
+    debug_assert!(
         cdb[ci].iter().any(|l| vdb[l].level == cl),
         format!(
             "use_{}: {:?}, {:?}",
@@ -510,9 +526,9 @@ fn handle_conflict(
     // NCB places firstUIP on level bl, while CB does it on level cl.
     // Therefore the condition to use CB is: activity(firstUIP) < activity(v(bl)).
     // PREMISE: 0 < bl, because asgs.decision_vi accepts only non-zero values.
-    use_chronobt &= state.switch_chronobt.unwrap_or(
+    use_chronobt &= switch_chronobt.unwrap_or(
         bl_a == 0
-            || state.config.chronobt + bl_a <= cl
+            || state.config.cbt_thr + bl_a <= cl
             || vdb.activity(l0.vi()) < vdb.activity(asgs.decision_vi(bl_a)),
     );
 
@@ -531,7 +547,9 @@ fn handle_conflict(
     };
     let learnt_len = new_learnt.len();
     if learnt_len == 1 {
-        //[PARTIAL FIXED SOLUTION by UNIT LEARNT CLAUSE GENERATION]
+        //
+        //## PARTIAL FIXED SOLUTION by UNIT LEARNT CLAUSE GENERATION
+        //
         // dump to certified even if it's a literal.
         cdb.certificate_add(new_learnt);
         if use_chronobt {
@@ -541,19 +559,25 @@ fn handle_conflict(
         } else {
             asgs.assign_by_unitclause(vdb, l0);
         }
+        state.last_solved = ncnfl;
         state.num_solved_vars += 1;
+        rst.update(RestarterModule::Reset, 0);
     } else {
         {
             // At the present time, some reason clauses can contain first UIP or its negation.
             // So we have to filter vars instead of literals to avoid double counting.
             let mut bumped = new_learnt.iter().map(|l| l.vi()).collect::<Vec<VarId>>();
             for lit in new_learnt.iter() {
-                //[Learnt Literal Rewarding]
+                //
+                //## Learnt Literal Rewarding
+                //
                 vdb.reward_at_analysis(lit.vi());
                 for l in &cdb[vdb[lit.vi()].reason].lits {
                     let vi = l.vi();
                     if !bumped.contains(&vi) {
-                        //[Reason-Side Rewarding]
+                        //
+                        //## Reason-Side Rewarding
+                        //
                         vdb.reward_at_analysis(vi);
                         bumped.push(vi);
                     }
@@ -567,29 +591,25 @@ fn handle_conflict(
         state.b_lvl.update(bl as f64);
         asgs.assign_by_implication(vdb, l0, cid, al);
         let lbd = cdb[cid].rank;
-        rst.lbd.update(lbd);
-        if lbd <= 2 {
-            state[Stat::NumLBD2] += 1;
+        rst.update(RestarterModule::LBD, lbd);
+        if learnt_len < 10 {
+            state.to_eliminate += std::f64::consts::E.powf(-(learnt_len as f64));
         }
-        if learnt_len == 2 {
-            state[Stat::NumBin] += 1;
-            state[Stat::NumBinLearnt] += 1;
-        }
-        state[Stat::SumLBD] += lbd;
-        state[Stat::Learnt] += 1;
     }
     cdb.scale_activity();
-    if 0 < state.config.dump_interval && ncnfl % state.config.dump_interval == 0 {
+    if 0 < state.config.dump_int && ncnfl % state.config.dump_int == 0 {
+        let (_mode, rst_num_block, rst_asg_trend, _lbd_get, rst_lbd_trend) = rst.exports();
         state.development.push((
             ncnfl,
             (state.num_solved_vars + state.num_eliminated_vars) as f64
                 / state.target.num_of_variables as f64,
-            state[Stat::Restart] as f64,
-            state[Stat::BlockRestart] as f64,
-            rst.asg.trend().min(10.0),
-            rst.lbd.trend().min(10.0),
+            asgs_num_restart as f64,
+            rst_num_block as f64,
+            rst_asg_trend.min(10.0),
+            rst_lbd_trend.min(10.0),
         ));
     }
+    cdb.check_and_reduce(vdb, ncnfl);
     if ncnfl % state.reflection_interval == 0 {
         adapt_modules(asgs, cdb, elim, rst, state, vdb)?;
         if let Some(p) = state.elapsed() {
@@ -600,13 +620,9 @@ fn handle_conflict(
             return Err(SolverError::UndescribedError);
         }
     }
-    if cdb.check_and_reduce(vdb, state[Stat::Conflict]) {
-        state[Stat::Reduction] += 1;
-    }
     Ok(())
 }
 
-#[inline]
 fn adapt_modules(
     asgs: &mut AssignStack,
     cdb: &mut ClauseDB,
@@ -615,24 +631,22 @@ fn adapt_modules(
     state: &mut State,
     vdb: &mut VarDB,
 ) -> MaybeInconsistent {
-    state.check_stagnation();
-    state.flush("exhaustive eliminator activated...");
-    asgs.cancel_until(vdb, 0);
-    if elim.enable && rst.asg.trend() < 1.0 {
-        elim.activate();
-        elim.simplify(asgs, cdb, state, vdb)?;
+    state.progress(asgs, cdb, elim, rst, vdb, None);
+    let (asgs_num_conflict, _num_propagation, _num_restart) = asgs.exports();
+    if 10 * state.reflection_interval == asgs_num_conflict {
+        // Need to call it before `cdb.adapt_to`
+        // 'decision_level == 0' is required by `cdb.adapt_to`.
+        asgs.cancel_until(vdb, state.root_level);
+        state.select_strategy(asgs, cdb);
+        // if state.strategy.0 == SearchStrategy::HighSuccesive {
+        //     state.config.cbt_thr = 0;
+        // }
     }
-    if 10 * state.reflection_interval == state[Stat::Conflict] {
-        state.select_strategy();
-        if state.strategy.0 == SearchStrategy::HighSuccesive {
-            state.config.chronobt = 0;
-        }
-    }
-    cdb.adapt_to(state);
-    rst.adapt_to(state);
-    vdb.adapt_to(state);
-    state[Stat::SolvedRecord] = state.num_solved_vars;
-    state.progress(cdb, rst, vdb, None);
+    #[cfg(feature = "boundary_check")]
+    assert!(state.strategy.1 != asgs_num_conflict || 0 == asgs.level());
+    cdb.adapt_to(state, asgs_num_conflict);
+    rst.adapt_to(state, asgs_num_conflict);
+    vdb.adapt_to(state, asgs_num_conflict);
     Ok(())
 }
 
@@ -652,30 +666,29 @@ fn conflict_analyze(
     let mut p = NULL_LIT;
     let mut ti = asgs.len() - 1; // trail index
     let mut path_cnt = 0;
-    let chan_seok_condition = cdb.chan_seok_condition();
     loop {
-        // println!("analyze {}", p.int());
+        #[cfg(feature = "trace_analyze")]
+        println!("analyze {}", p.int());
         debug_assert_ne!(cid, ClauseId::default());
         if cdb[cid].is(Flag::LEARNT) {
             cdb.bump_activity(cid, ());
-            let c = &mut cdb[cid];
-            debug_assert!(!c.is(Flag::DEAD));
-            if 2 < c.rank {
-                c.turn_on(Flag::JUST_USED);
-                let nlevels = vdb.compute_lbd(&c.lits);
-                if nlevels + 1 < c.rank {
-                    // chan_seok_condition is zero if !use_chan_seok
-                    if nlevels < chan_seok_condition {
-                        c.turn_off(Flag::LEARNT);
-                        cdb.num_learnt -= 1;
-                    } else {
-                        c.rank = nlevels;
-                    }
-                }
-            }
+            cdb.convert_to_permanent(vdb, cid);
         }
         let c = &cdb[cid];
-        // println!("- handle {}", cid.fmt());
+        #[cfg(feature = "boundary_check")]
+        assert!(
+            0 < c.len(),
+            format!(
+                "Level {} I-graph reaches {}:{} for {}:{}",
+                asgs.level(),
+                cid,
+                c,
+                p,
+                &vdb[p]
+            )
+        );
+        #[cfg(feature = "trace_analyze")]
+        println!("- handle {}", cid.fmt());
         for q in &c[(p != NULL_LIT) as usize..] {
             let vi = q.vi();
             if !vdb[vi].is(Flag::CA_SEEN) {
@@ -690,18 +703,24 @@ fn conflict_analyze(
                 if dl <= v.level {
                     // println!("- flag for {} which level is {}", q.int(), lvl);
                     path_cnt += 1;
-                    //[Conflict-Side Rewarding]
+                    //
+                    //## Conflict-Side Rewarding
+                    //
                     vdb.reward_at_analysis(vi);
                 } else {
-                    // println!("- push {} to learnt, which level is {}", q.int(), lvl);
+                    #[cfg(feature = "trace_analyze")]
+                    println!("- push {} to learnt, which level is {}", q.int(), lvl);
                     learnt.push(*q);
                 }
             } else {
-                // if !v.is(Flag::CA_SEEN) {
-                //     println!("- ignore {} because it was flagged", q.int());
-                // } else {
-                //     println!("- ignore {} because its level is {}", q.int(), lvl);
-                // }
+                #[cfg(feature = "trace_analyze")]
+                {
+                    if !v.is(Flag::CA_SEEN) {
+                        println!("- ignore {} because it was flagged", q.int());
+                    } else {
+                        println!("- ignore {} because its level is {}", q.int(), lvl);
+                    }
+                }
             }
         }
         // set the index of the next literal to ti
@@ -709,7 +728,8 @@ fn conflict_analyze(
             let v = &vdb[asgs[ti].vi()];
             !v.is(Flag::CA_SEEN) || v.level != dl
         } {
-            // println!("- skip {} because it isn't flagged", asgs[ti].int());
+            #[cfg(feature = "trace_analyze")]
+            println!("- skip {} because it isn't flagged", asgs[ti].int());
             debug_assert!(
                 0 < ti,
                 format!(
@@ -724,8 +744,13 @@ fn conflict_analyze(
         p = asgs[ti];
         let next_vi = p.vi();
         cid = vdb[next_vi].reason;
-        // println!("- move to flagged {}, which reason is {}; num path: {}",
-        //          next_vi, path_cnt - 1, cid.fmt());
+        #[cfg(feature = "trace_analyze")]
+        println!(
+            "- move to flagged {}, which reason is {}; num path: {}",
+            next_vi,
+            path_cnt - 1,
+            cid.fmt()
+        );
         vdb[next_vi].turn_off(Flag::CA_SEEN);
         // since the trail can contain a literal which level is under `dl` after
         // the `dl`-th thdecision var, we must skip it.
@@ -739,12 +764,50 @@ fn conflict_analyze(
     debug_assert!(learnt.iter().all(|l| *l != !p));
     debug_assert_eq!(vdb[p].level, dl);
     learnt[0] = !p;
-    // println!("- appending {}, the result is {:?}", learnt[0].int(), vec2int(learnt));
-    state.simplify_learnt(asgs, cdb, vdb)
+    #[cfg(feature = "trace_analyze")]
+    println!(
+        "- appending {}, the result is {:?}",
+        learnt[0].int(),
+        vec2int(learnt)
+    );
+    state.minimize_learnt(asgs, cdb, vdb)
+}
+
+impl Solver {
+    fn inject(mut self, mut reader: BufReader<File>) -> Result<Solver, SolverError> {
+        let mut buf = String::new();
+        loop {
+            buf.clear();
+            match reader.read_line(&mut buf) {
+                Ok(0) => break,
+                Ok(_) if buf.starts_with('c') => continue,
+                Ok(_) => {
+                    let iter = buf.split_whitespace();
+                    let mut v: Vec<Lit> = Vec::new();
+                    for s in iter {
+                        match s.parse::<i32>() {
+                            Ok(0) => break,
+                            Ok(val) => v.push(Lit::from(val)),
+                            Err(_) => (),
+                        }
+                    }
+                    if !v.is_empty() && self.add_unchecked_clause(&mut v).is_none() {
+                        return Err(SolverError::Inconsistent);
+                    }
+                }
+                Err(e) => panic!("{}", e),
+            }
+        }
+        debug_assert_eq!(self.vdb.len() - 1, self.state.target.num_of_variables);
+        // s.state[Stat::NumBin] = s.cdb.iter().skip(1).filter(|c| c.len() == 2).count();
+        self.vdb.adapt_to(&self.state, 0);
+        self.rst.adapt_to(&self.state, 0);
+        Ok(self)
+    }
 }
 
 impl State {
-    fn simplify_learnt(
+    fn minimize_learnt(
         &mut self,
         asgs: &AssignStack,
         cdb: &ClauseDB,
@@ -760,6 +823,8 @@ impl State {
             levels[vdb[l].level as usize] = true;
         }
         let l0 = new_learnt[0];
+        #[cfg(feature = "boundary_check")]
+        assert!(0 < new_learnt.len());
         new_learnt.retain(|l| *l == l0 || !l.is_redundant(cdb, vdb, &mut to_clear, &levels));
         let len = new_learnt.len();
         if 2 < len && len < 30 {
@@ -805,6 +870,8 @@ impl Lit {
         while let Some(sl) = stack.pop() {
             let cid = vdb[sl.vi()].reason;
             let c = &cdb[cid];
+            #[cfg(feature = "boundary_check")]
+            assert!(0 < c.len());
             for q in &(*c)[1..] {
                 let vi = q.vi();
                 let v = &vdb[vi];
@@ -885,11 +952,10 @@ impl VarDB {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, std::path::PathBuf};
+    use super::*;
     #[test]
     fn test_solver() {
-        let mut config = Config::default();
-        config.cnf_filename = PathBuf::from("tests/sample.cnf");
+        let config = Config::from("tests/sample.cnf");
         if let Ok(s) = Solver::build(&config) {
             assert_eq!(s.state.num_vars, 250);
             assert_eq!(s.state.num_unsolved_vars(), 250);

@@ -1,8 +1,14 @@
 ## 0.3.3, 2020-12-31
 
+- change a lot of options' meanings and mnemonics
+- better modularity via traits
+- add some features for development
 - activate `JUST_USED` for clause reduction
+- change the activation timings of simplification
+- add and refactor restart module: GeometricStabilizer, ProgressLBD
+- stats data are stored in each module.
+- remove code about `deep search` completely
 - remove `ClauseDB::attach`
-- add an experimental restart scheme switcher
 
 ## 0.3.2, 2020-03-20
 

@@ -2,11 +2,10 @@
 /// This version can handle Chronological and Non Chronological Backtrack.
 use {
     crate::{
-        clause::{ClauseDB, ClauseDBIF, ClauseId, Watch, WatchDBIF},
-        config::Config,
+        clause::{ClauseDBIF, WatchDBIF},
         state::State,
         types::*,
-        var::{VarDB, VarDBIF, VarRewardIF},
+        var::{VarDBIF, VarRewardIF},
     },
     std::{
         fmt,
@@ -18,17 +17,18 @@ use {
 };
 
 /// API for assignment like `propagate`, `enqueue`, `cancel_until`, and so on.
-pub trait PropagatorIF {
+pub trait PropagatorIF: Index<usize, Output = Lit> {
     /// return the number of assignments.
     fn len(&self) -> usize;
     /// return the number of assignments at a given decision level `u`.
+    ///
     /// ## Caveat
     /// - it emits a panic by out of index range.
     /// - it emits a panic if the level is 0.
     fn len_upto(&self, n: DecisionLevel) -> usize;
     /// return `true` if there's no assignment.
     fn is_empty(&self) -> bool;
-    /// return an interator over assignment stack.
+    /// return an iterator over assignment stack.
     fn iter(&self) -> Iter<'_, Lit>;
     /// return the current decision level.
     fn level(&self) -> DecisionLevel;
@@ -43,33 +43,56 @@ pub trait PropagatorIF {
     /// # Errors
     ///
     /// emit `SolverError::Inconsistent` exception if solver becomes inconsistent.
-    fn assign_at_rootlevel(&mut self, vdb: &mut VarDB, l: Lit) -> MaybeInconsistent;
+    fn assign_at_rootlevel<V>(&mut self, vdb: &mut V, l: Lit) -> MaybeInconsistent
+    where
+        V: VarDBIF + VarRewardIF;
     /// unsafe enqueue (assign by implication); doesn't emit an exception.
-    /// Warning: caller must assure the consistency after this assignment
-    fn assign_by_implication(&mut self, vdb: &mut VarDB, l: Lit, cid: ClauseId, lv: DecisionLevel);
+    ///
+    /// ## Warning
+    /// Caller must assure the consistency after this assignment
+    fn assign_by_implication<V>(&mut self, vdb: &mut V, l: Lit, cid: ClauseId, lv: DecisionLevel)
+    where
+        V: VarDBIF + VarRewardIF;
     /// unsafe assume (assign by decision); doesn't emit an exception.
     /// ## Caveat
     /// Callers have to assure the consistency after this assignment.
-    fn assign_by_decision(&mut self, vdb: &mut VarDB, l: Lit);
+    fn assign_by_decision<V>(&mut self, vdb: &mut V, l: Lit)
+    where
+        V: VarDBIF + VarRewardIF;
     /// fix a var's assignment by a unit learnt clause.
     /// ## Caveat
     /// - Callers have to assure the consistency after this assignment.
     /// - No need to restart; but execute `propagate` just afterward.
-    fn assign_by_unitclause(&mut self, vdb: &mut VarDB, l: Lit);
+    fn assign_by_unitclause<V>(&mut self, vdb: &mut V, l: Lit)
+    where
+        V: VarDBIF + VarRewardIF;
     /// execute *backjump*.
-    fn cancel_until(&mut self, vdb: &mut VarDB, lv: DecisionLevel);
+    fn cancel_until<V>(&mut self, vdb: &mut V, lv: DecisionLevel)
+    where
+        V: VarDBIF + VarRewardIF;
     /// execute *boolean constraint propagation* or *unit propagation*.
-    fn propagate(&mut self, cdb: &mut ClauseDB, vdb: &mut VarDB) -> ClauseId;
+    fn propagate<C, V>(&mut self, cdb: &mut C, vdb: &mut V) -> ClauseId
+    where
+        C: ClauseDBIF,
+        V: VarDBIF + VarRewardIF;
+    /// return `true` if subsequential propagations emit the same conflict.
+    fn recurrent_conflicts(&self) -> bool;
 }
 
 /// API for var selection.
 pub trait VarSelectionIF {
     /// select a new decision variable.
-    fn select_var(&mut self, vdb: &mut VarDB) -> VarId;
+    fn select_var<V>(&mut self, vdb: &mut V) -> VarId
+    where
+        V: VarDBIF + VarRewardIF;
     /// update the internal heap on var order.
-    fn update_order(&mut self, vdb: &mut VarDB, v: VarId);
+    fn update_order<V>(&mut self, vdb: &mut V, v: VarId)
+    where
+        V: VarDBIF + VarRewardIF;
     /// rebuild the internal var_order
-    fn rebuild_order(&mut self, vdb: &mut VarDB);
+    fn rebuild_order<V>(&mut self, vdb: &mut V)
+    where
+        V: VarDBIF + VarRewardIF;
 }
 
 /// A record of assignment. It's called 'trail' in Glucose.
@@ -79,8 +102,16 @@ pub struct AssignStack {
     asgvec: Vec<Option<bool>>,
     trail_lim: Vec<usize>,
     q_head: usize,
+    root_level: DecisionLevel,
+    conflicts: (VarId, VarId),
     var_order: VarIdHeap, // Variable Order
-    pub conflicts: (VarId, VarId),
+
+    //
+    //## Statistics
+    //
+    num_conflict: usize,
+    num_propagation: usize,
+    num_restart: usize,
 }
 
 impl Default for AssignStack {
@@ -90,8 +121,12 @@ impl Default for AssignStack {
             asgvec: Vec::new(),
             trail_lim: Vec::new(),
             q_head: 0,
-            var_order: VarIdHeap::default(),
+            root_level: 0,
             conflicts: (0, 0),
+            var_order: VarIdHeap::default(),
+            num_conflict: 0,
+            num_propagation: 0,
+            num_restart: 0,
         }
     }
 }
@@ -178,14 +213,32 @@ impl From<&mut AssignStack> for Vec<i32> {
 }
 
 impl Instantiate for AssignStack {
-    fn instantiate(_: &Config, cnf: &CNFDescription) -> AssignStack {
+    fn instantiate(_cfg: &Config, cnf: &CNFDescription) -> AssignStack {
         let nv = cnf.num_of_variables;
         AssignStack {
-            trail: Vec::with_capacity(nv),
             asgvec: vec![None; 1 + nv],
+            trail: Vec::with_capacity(nv),
             var_order: VarIdHeap::new(nv, nv),
             ..AssignStack::default()
         }
+    }
+}
+
+impl Export<(usize, usize, usize)> for AssignStack {
+    /// exports:
+    ///  1. the number of conflicts
+    ///  1. the number of propagations
+    ///  1. the number of restarts
+    ///
+    ///```
+    /// use crate::{splr::config::Config, splr::types::*};
+    /// use crate::splr::propagator::AssignStack;
+    /// let asgs = AssignStack::instantiate(&Config::default(), &CNFDescription::default());
+    /// let (asgs_num_conflict, asgs_num_propagation, asgs_num_restart) = asgs.exports();
+    ///```
+    #[inline]
+    fn exports(&self) -> (usize, usize, usize) {
+        (self.num_conflict, self.num_propagation, self.num_restart)
     }
 }
 
@@ -215,7 +268,11 @@ impl PropagatorIF for AssignStack {
     fn remains(&self) -> bool {
         self.q_head < self.trail.len()
     }
-    fn assign_at_rootlevel(&mut self, vdb: &mut VarDB, l: Lit) -> MaybeInconsistent {
+    fn assign_at_rootlevel<V>(&mut self, vdb: &mut V, l: Lit) -> MaybeInconsistent
+    where
+        V: VarDBIF + VarRewardIF,
+    {
+        debug_assert!(l.vi() < vdb.len());
         let v = &mut vdb[l];
         debug_assert!(!v.is(Flag::ELIMINATED));
         debug_assert_eq!(0, self.level());
@@ -233,8 +290,12 @@ impl PropagatorIF for AssignStack {
             _ => Err(SolverError::Inconsistent),
         }
     }
-    fn assign_by_implication(&mut self, vdb: &mut VarDB, l: Lit, cid: ClauseId, lv: DecisionLevel) {
+    fn assign_by_implication<V>(&mut self, vdb: &mut V, l: Lit, cid: ClauseId, lv: DecisionLevel)
+    where
+        V: VarDBIF + VarRewardIF,
+    {
         debug_assert!(usize::from(l) != 0, "Null literal is about to be equeued");
+        debug_assert!(l.vi() < vdb.len());
         // The following doesn't hold anymore by using chronoBT.
         // assert!(self.trail_lim.is_empty() || cid != ClauseId::default());
         let vi = l.vi();
@@ -252,7 +313,11 @@ impl PropagatorIF for AssignStack {
         debug_assert!(!self.trail.contains(&!l));
         self.trail.push(l);
     }
-    fn assign_by_decision(&mut self, vdb: &mut VarDB, l: Lit) {
+    fn assign_by_decision<V>(&mut self, vdb: &mut V, l: Lit)
+    where
+        V: VarDBIF + VarRewardIF,
+    {
+        debug_assert!(l.vi() < vdb.len());
         debug_assert!(!self.trail.contains(&l));
         debug_assert!(!self.trail.contains(&!l), format!("{:?}", l));
         self.level_up();
@@ -269,8 +334,11 @@ impl PropagatorIF for AssignStack {
         debug_assert!(!self.trail.contains(&!l));
         self.trail.push(l);
     }
-    fn assign_by_unitclause(&mut self, vdb: &mut VarDB, l: Lit) {
-        self.cancel_until(vdb, 0);
+    fn assign_by_unitclause<V>(&mut self, vdb: &mut V, l: Lit)
+    where
+        V: VarDBIF + VarRewardIF,
+    {
+        self.cancel_until(vdb, self.root_level);
         debug_assert!(self.trail.iter().all(|k| k.vi() != l.vi()));
         let v = &mut vdb[l];
         set_assign!(self, l);
@@ -281,7 +349,10 @@ impl PropagatorIF for AssignStack {
         debug_assert!(!self.trail.contains(&!l));
         self.trail.push(l);
     }
-    fn cancel_until(&mut self, vdb: &mut VarDB, lv: DecisionLevel) {
+    fn cancel_until<V>(&mut self, vdb: &mut V, lv: DecisionLevel)
+    where
+        V: VarDBIF + VarRewardIF,
+    {
         if self.trail_lim.len() as u32 <= lv {
             return;
         }
@@ -304,11 +375,14 @@ impl PropagatorIF for AssignStack {
             self.var_order.insert(vdb, vi);
         }
         self.trail.truncate(shift);
-        debug_assert!(self.trail.iter().all(|l| vdb[l].assign.is_some()));
+        debug_assert!(self.trail.iter().all(|l| vdb[*l].assign.is_some()));
         debug_assert!(self.trail.iter().all(|k| !self.trail.contains(&!*k)));
         self.trail_lim.truncate(lv as usize);
         // assert!(lim < self.q_head) dosen't hold sometimes in chronoBT.
         self.q_head = self.q_head.min(lim);
+        if lv == self.root_level {
+            self.num_restart += 1;
+        }
     }
     /// UNIT PROPAGATION.
     /// Note:
@@ -317,8 +391,13 @@ impl PropagatorIF for AssignStack {
     ///    So Eliminator should call `garbage_collect` before me.
     ///  - The order of literals in binary clauses will be modified to hold
     ///    propagatation order.
-    fn propagate(&mut self, cdb: &mut ClauseDB, vdb: &mut VarDB) -> ClauseId {
-        let watcher = &mut cdb.watcher[..] as *mut [Vec<Watch>];
+    fn propagate<C, V>(&mut self, cdb: &mut C, vdb: &mut V) -> ClauseId
+    where
+        C: ClauseDBIF,
+        V: VarDBIF + VarRewardIF,
+    {
+        let watcher = cdb.watcher_lists_mut() as *mut [Vec<Watch>];
+        self.num_propagation += 1;
         while let Some(p) = self.trail.get(self.q_head) {
             self.q_head += 1;
             let false_lit = !*p;
@@ -338,6 +417,7 @@ impl PropagatorIF for AssignStack {
                         if blocker_value == Some(false) {
                             self.conflicts.1 = self.conflicts.0;
                             self.conflicts.0 = false_lit.vi();
+                            self.num_conflict += 1;
                             return w.c;
                         }
                         if lits[0] == false_lit {
@@ -372,25 +452,38 @@ impl PropagatorIF for AssignStack {
                     if first_value == Some(false) {
                         self.conflicts.1 = self.conflicts.0;
                         self.conflicts.0 = false_lit.vi();
+                        self.num_conflict += 1;
                         return w.c;
                     }
-                    let lv = lits[1..].iter().map(|l| vdb[l].level).max().unwrap_or(0);
+                    let lv = lits[1..].iter().map(|l| vdb[*l].level).max().unwrap_or(0);
                     self.assign_by_implication(vdb, first, w.c, lv);
                 }
             }
         }
         ClauseId::default()
     }
+    fn recurrent_conflicts(&self) -> bool {
+        self.conflicts.0 == self.conflicts.1
+    }
 }
 
 impl VarSelectionIF for AssignStack {
-    fn select_var(&mut self, vdb: &mut VarDB) -> VarId {
+    fn select_var<V>(&mut self, vdb: &mut V) -> VarId
+    where
+        V: VarDBIF + VarRewardIF,
+    {
         self.var_order.select_var(vdb)
     }
-    fn update_order(&mut self, vdb: &mut VarDB, v: VarId) {
+    fn update_order<V>(&mut self, vdb: &mut V, v: VarId)
+    where
+        V: VarDBIF + VarRewardIF,
+    {
         self.var_order.update(vdb, v)
     }
-    fn rebuild_order(&mut self, vdb: &mut VarDB) {
+    fn rebuild_order<V>(&mut self, vdb: &mut V)
+    where
+        V: VarDBIF + VarRewardIF,
+    {
         self.var_order.rebuild(vdb);
     }
 }
@@ -401,8 +494,12 @@ impl AssignStack {
     }
     /// dump all active clauses and fixed assignments as a CNF file.
     #[allow(dead_code)]
-    fn dump_cnf(&mut self, cdb: &ClauseDB, state: &State, vdb: &VarDB, fname: &str) {
-        for v in &vdb[1..] {
+    fn dump_cnf<C, V>(&mut self, cdb: &C, state: &State, vdb: &V, fname: &str)
+    where
+        C: ClauseDBIF,
+        V: VarDBIF,
+    {
+        for v in vdb.iter().skip(1) {
             if v.is(Flag::ELIMINATED) {
                 if var_assign!(self, v.index).is_some() {
                     panic!(
@@ -421,7 +518,7 @@ impl AssignStack {
             let nc: usize = cdb.len() - 1;
             buf.write_all(format!("p cnf {} {}\n", state.num_vars, nc + nv).as_bytes())
                 .unwrap();
-            for c in &cdb[1..] {
+            for c in cdb.iter().skip(1) {
                 for l in &c.lits {
                     buf.write_all(format!("{} ", i32::from(*l)).as_bytes())
                         .unwrap();
@@ -437,7 +534,7 @@ impl AssignStack {
     }
 }
 
-/// Heap of VarId, based on var activity
+/// Heap of VarId, based on var activity.
 // # Note
 // - both fields has a fixed length. Don't use push and pop.
 // - `idxs[0]` contains the number of alive elements
@@ -459,13 +556,21 @@ impl Default for VarIdHeap {
 
 trait VarOrderIF {
     fn new(n: usize, init: usize) -> VarIdHeap;
-    fn update(&mut self, vdb: &mut VarDB, v: VarId);
-    fn insert(&mut self, vdb: &mut VarDB, vi: VarId);
+    fn update<V>(&mut self, vdb: &mut V, v: VarId)
+    where
+        V: VarRewardIF;
+    fn insert<V>(&mut self, vdb: &mut V, vi: VarId)
+    where
+        V: VarRewardIF;
     fn clear(&mut self);
     fn len(&self) -> usize;
     fn is_empty(&self) -> bool;
-    fn select_var(&mut self, vdb: &mut VarDB) -> VarId;
-    fn rebuild(&mut self, vdb: &mut VarDB);
+    fn select_var<V>(&mut self, vdb: &mut V) -> VarId
+    where
+        V: VarDBIF + VarRewardIF;
+    fn rebuild<V>(&mut self, vdb: &mut V)
+    where
+        V: VarDBIF + VarRewardIF;
 }
 
 impl VarOrderIF for VarIdHeap {
@@ -481,14 +586,20 @@ impl VarOrderIF for VarIdHeap {
         idxs[0] = init;
         VarIdHeap { heap, idxs }
     }
-    fn update(&mut self, vdb: &mut VarDB, v: VarId) {
+    fn update<V>(&mut self, vdb: &mut V, v: VarId)
+    where
+        V: VarRewardIF,
+    {
         debug_assert!(v != 0, "Invalid VarId");
         let start = self.idxs[v];
         if self.contains(v) {
             self.percolate_up(vdb, start)
         }
     }
-    fn insert(&mut self, vdb: &mut VarDB, vi: VarId) {
+    fn insert<V>(&mut self, vdb: &mut V, vi: VarId)
+    where
+        V: VarRewardIF,
+    {
         if self.contains(vi) {
             let i = self.idxs[vi];
             self.percolate_up(vdb, i);
@@ -511,7 +622,10 @@ impl VarOrderIF for VarIdHeap {
     fn is_empty(&self) -> bool {
         self.idxs[0] == 0
     }
-    fn select_var(&mut self, vdb: &mut VarDB) -> VarId {
+    fn select_var<V>(&mut self, vdb: &mut V) -> VarId
+    where
+        V: VarDBIF + VarRewardIF,
+    {
         loop {
             let vi = self.get_root(vdb);
             if vdb[vi].assign.is_none() && !vdb[vi].is(Flag::ELIMINATED) {
@@ -519,7 +633,10 @@ impl VarOrderIF for VarIdHeap {
             }
         }
     }
-    fn rebuild(&mut self, vdb: &mut VarDB) {
+    fn rebuild<V>(&mut self, vdb: &mut V)
+    where
+        V: VarDBIF + VarRewardIF,
+    {
         self.reset();
         for vi in 1..vdb.len() {
             if vdb[vi].assign.is_none() && !vdb[vi].is(Flag::ELIMINATED) {
@@ -559,7 +676,10 @@ impl VarIdHeap {
             self.heap[i] = i;
         }
     }
-    fn get_root(&mut self, vdb: &mut VarDB) -> VarId {
+    fn get_root<V>(&mut self, vdb: &mut V) -> VarId
+    where
+        V: VarRewardIF,
+    {
         let s = 1;
         let vs = self.heap[s];
         let n = self.idxs[0];
@@ -574,7 +694,10 @@ impl VarIdHeap {
         }
         vs
     }
-    fn percolate_up(&mut self, vdb: &mut VarDB, start: usize) {
+    fn percolate_up<V>(&mut self, vdb: &mut V, start: usize)
+    where
+        V: VarRewardIF,
+    {
         let mut q = start;
         let vq = self.heap[q];
         debug_assert!(0 < vq, "size of heap is too small");
@@ -604,7 +727,10 @@ impl VarIdHeap {
             }
         }
     }
-    fn percolate_down(&mut self, vdb: &mut VarDB, start: usize) {
+    fn percolate_down<V>(&mut self, vdb: &mut V, start: usize)
+    where
+        V: VarRewardIF,
+    {
         let n = self.len();
         let mut i = start;
         let vi = self.heap[i];
@@ -644,7 +770,10 @@ impl VarIdHeap {
         self.heap[1]
     }
     #[allow(dead_code)]
-    fn remove(&mut self, vdb: &mut VarDB, vs: VarId) {
+    fn remove<V>(&mut self, vdb: &mut V, vs: VarId)
+    where
+        V: VarRewardIF,
+    {
         let s = self.idxs[vs];
         let n = self.idxs[0];
         if n < s {
@@ -689,6 +818,7 @@ impl fmt::Display for VarIdHeap {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::var::VarDB;
 
     fn lit(i: i32) -> Lit {
         Lit::from(i)
