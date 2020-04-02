@@ -1,13 +1,13 @@
 ## 0.3.3, 2020-12-31
 
 - change a lot of options' meanings and mnemonics
+- better modularity via traits
 - activate `JUST_USED` for clause reduction
-- remove `ClauseDB::attach`
 - change the activation timings of simplification
 - add and refactor restart module: GeometricStabilizer, ProgressLBD
-- better modularity via trait `Export`, which is renamed from `ProgressComponent`
 - stats data are stored in each modules.
-- remove `deep search` completely
+- remove code about `deep search` completely
+- remove `ClauseDB::attach`
 
 ## 0.3.2, 2020-03-20
 
