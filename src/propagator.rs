@@ -413,20 +413,14 @@ impl PropagatorIF for AssignStack {
                     if blocker_value == Some(true) {
                         continue 'next_clause;
                     }
-                    let Clause {
-                        ref mut lits,
-                        ref mut checked_at,
-                        ref mut search_from,
-                        ..
-                    } = cdb[w.c];
-                    // let lits = &mut cdb[w.c].lits;
-                    if lits.len() == 2 {
+                    if w.binary {
                         if blocker_value == Some(false) {
                             self.conflicts.1 = self.conflicts.0;
                             self.conflicts.0 = false_lit.vi();
                             self.num_conflict += 1;
                             return w.c;
                         }
+                        let Clause { ref mut lits, .. } = cdb[w.c];
                         if lits[0] == false_lit {
                             lits.swap(0, 1);
                         }
@@ -434,6 +428,12 @@ impl PropagatorIF for AssignStack {
                         self.assign_by_implication(vdb, w.blocker, w.c, lvl);
                         continue 'next_clause;
                     }
+                    let Clause {
+                        ref mut lits,
+                        ref mut checked_at,
+                        ref mut search_from,
+                        ..
+                    } = cdb[w.c];
                     debug_assert!(lits[0] == false_lit || lits[1] == false_lit);
                     let mut first = *lits.get_unchecked(0);
                     if first == false_lit {
@@ -456,7 +456,7 @@ impl PropagatorIF for AssignStack {
                         if lit_assign!(self, *lk) != Some(false) {
                             (*watcher)
                                 .get_unchecked_mut(usize::from(!*lk))
-                                .register(first, w.c);
+                                .register(first, w.c, false);
                             n -= 1;
                             source.detach(n);
                             lits.swap(1, k);

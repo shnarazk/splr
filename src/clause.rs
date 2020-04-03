@@ -103,7 +103,7 @@ pub trait ClauseIdIF {
 /// API for 'watcher list' like `attach`, `detach`, `detach_with` and so on.
 pub trait WatchDBIF {
     /// make a new 'watch', and add it to this watcher list.
-    fn register(&mut self, blocker: Lit, c: ClauseId);
+    fn register(&mut self, blocker: Lit, c: ClauseId, binary: bool);
     /// remove *n*-th clause from the watcher list. *O(1)* operation.
     fn detach(&mut self, n: usize);
     /// remove a clause which id is `cid` from the watcher list. *O(n)* operation.
@@ -175,6 +175,8 @@ pub struct Watch {
     pub blocker: Lit,
     /// ClauseId
     pub c: ClauseId,
+    /// whether clause is binary.
+    pub binary: bool,
 }
 
 impl Default for Watch {
@@ -182,13 +184,14 @@ impl Default for Watch {
         Watch {
             blocker: NULL_LIT,
             c: ClauseId::default(),
+            binary: false,
         }
     }
 }
 
 impl WatchDBIF for Vec<Watch> {
-    fn register(&mut self, blocker: Lit, c: ClauseId) {
-        self.push(Watch { blocker, c });
+    fn register(&mut self, blocker: Lit, c: ClauseId, binary: bool) {
+        self.push(Watch { blocker, c, binary });
     }
     fn detach(&mut self, n: usize) {
         self.swap_remove(n);
@@ -725,6 +728,7 @@ impl ClauseDBIF for ClauseDB {
                     recycled.push(Watch {
                         blocker: NULL_LIT,
                         c: cid,
+                        binary: c.lits.len() == 2,
                     });
                     if c.is(Flag::LEARNT) {
                         self.num_learnt -= 1;
@@ -837,8 +841,8 @@ impl ClauseDBIF for ClauseDB {
         if len2 {
             self.num_bi_clause += 1;
         }
-        self.watcher[!l0].register(l1, cid);
-        self.watcher[!l1].register(l0, cid);
+        self.watcher[!l0].register(l1, cid, len2);
+        self.watcher[!l1].register(l0, cid, len2);
         self.num_active += 1;
         cid
     }
@@ -1013,9 +1017,10 @@ impl ClauseDBIF for ClauseDB {
             };
             debug_assert!(1 < usize::from(!p));
             let len = lits.len();
+            let bin = len == 2;
             self.watcher[!p].detach_with(cid);
-            self.watcher[!q].register(r, cid);
-            if len == 2 {
+            self.watcher[!q].register(r, cid, bin);
+            if bin {
                 // update another bocker
                 self.watcher[!r].update_blocker(cid, q);
             }
