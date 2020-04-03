@@ -442,7 +442,6 @@ impl PropagatorIF for AssignStack {
                 'next_clause: while n < source.len() {
                     let w = source.get_unchecked_mut(n);
                     n += 1;
-                    debug_assert!(!cdb[w.c].is(Flag::DEAD));
                     let blocker_value = lit_assign!(self, w.blocker);
                     if blocker_value == Some(true) {
                         continue 'next_clause;
@@ -462,6 +461,7 @@ impl PropagatorIF for AssignStack {
                         );
                         continue 'next_clause;
                     }
+                    // debug_assert!(!cdb[w.c].is(Flag::DEAD));
                     let Clause {
                         ref mut lits,
                         ref mut checked_at,
