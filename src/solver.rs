@@ -555,7 +555,7 @@ fn handle_conflict(
         if use_chronobt {
             asgs.cancel_until(vdb, bl);
             debug_assert!(asgs.iter().all(|l| l.vi() != l0.vi()));
-            asgs.assign_by_implication(vdb, l0, ClauseId::default(), 0);
+            asgs.assign_by_implication(vdb, l0, AssignReason::default(), 0);
         } else {
             asgs.assign_by_unitclause(vdb, l0);
         }
@@ -572,14 +572,16 @@ fn handle_conflict(
                 //## Learnt Literal Rewarding
                 //
                 vdb.reward_at_analysis(lit.vi());
-                for l in &cdb[vdb[lit.vi()].reason].lits {
-                    let vi = l.vi();
-                    if !bumped.contains(&vi) {
-                        //
-                        //## Reason-Side Rewarding
-                        //
-                        vdb.reward_at_analysis(vi);
-                        bumped.push(vi);
+                if let AssignReason::Implication(r, _) = vdb[lit.vi()].reason {
+                    for l in &cdb[r].lits {
+                        let vi = l.vi();
+                        if !bumped.contains(&vi) {
+                            //
+                            //## Reason-Side Rewarding
+                            //
+                            vdb.reward_at_analysis(vi);
+                            bumped.push(vi);
+                        }
                     }
                 }
             }
@@ -589,7 +591,19 @@ fn handle_conflict(
         elim.add_cid_occur(vdb, cid, &mut cdb[cid], true);
         state.c_lvl.update(cl as f64);
         state.b_lvl.update(bl as f64);
-        asgs.assign_by_implication(vdb, l0, cid, al);
+        asgs.assign_by_implication(
+            vdb,
+            l0,
+            AssignReason::Implication(
+                cid,
+                if learnt_len == 2 {
+                    new_learnt[1]
+                } else {
+                    NULL_LIT
+                },
+            ),
+            al,
+        );
         let lbd = cdb[cid].rank;
         rst.update(RestarterModule::LBD, lbd);
         if learnt_len < 10 {
@@ -650,6 +664,9 @@ fn adapt_modules(
     Ok(())
 }
 
+///
+/// ## Conflict Analysis
+///
 #[allow(clippy::cognitive_complexity)]
 fn conflict_analyze(
     asgs: &AssignStack,
@@ -662,63 +679,102 @@ fn conflict_analyze(
     learnt.clear();
     learnt.push(NULL_LIT);
     let dl = asgs.level();
-    let mut cid = confl;
     let mut p = NULL_LIT;
     let mut ti = asgs.len() - 1; // trail index
     let mut path_cnt = 0;
     loop {
-        #[cfg(feature = "trace_analyze")]
-        println!("analyze {}", p.int());
-        debug_assert_ne!(cid, ClauseId::default());
-        if cdb[cid].is(Flag::LEARNT) {
-            cdb.bump_activity(cid, ());
-            cdb.convert_to_permanent(vdb, cid);
-        }
-        let c = &cdb[cid];
-        #[cfg(feature = "boundary_check")]
-        assert!(
-            0 < c.len(),
-            format!(
-                "Level {} I-graph reaches {}:{} for {}:{}",
-                asgs.level(),
-                cid,
-                c,
-                p,
-                &vdb[p]
-            )
-        );
-        #[cfg(feature = "trace_analyze")]
-        println!("- handle {}", cid.fmt());
-        for q in &c[(p != NULL_LIT) as usize..] {
-            let vi = q.vi();
-            if !vdb[vi].is(Flag::CA_SEEN) {
-                // vdb.reward_at_analysis(vi);
-                let v = &mut vdb[vi];
-                if 0 == v.level {
-                    continue;
-                }
-                debug_assert!(!v.is(Flag::ELIMINATED));
-                debug_assert!(v.assign.is_some());
-                v.turn_on(Flag::CA_SEEN);
-                if dl <= v.level {
-                    // println!("- flag for {} which level is {}", q.int(), lvl);
-                    path_cnt += 1;
-                    //
-                    //## Conflict-Side Rewarding
-                    //
-                    vdb.reward_at_analysis(vi);
+        let reason = if p == NULL_LIT {
+            AssignReason::Implication(confl, NULL_LIT)
+        } else {
+            vdb[p.vi()].reason
+        };
+        match reason {
+            AssignReason::None => panic!("here"),
+            AssignReason::Implication(_, l) if l != NULL_LIT => {
+                // cid = vdb[p.vi()].reason;
+                let vi = l.vi();
+                if !vdb[vi].is(Flag::CA_SEEN) {
+                    let v = &mut vdb[vi];
+                    if 0 == v.level {
+                        continue;
+                    }
+                    debug_assert!(!v.is(Flag::ELIMINATED));
+                    debug_assert!(v.assign.is_some());
+                    v.turn_on(Flag::CA_SEEN);
+                    if dl <= v.level {
+                        path_cnt += 1;
+                        vdb.reward_at_analysis(vi);
+                    } else {
+                        #[cfg(feature = "trace_analyze")]
+                        println!("- push {} to learnt, which level is {}", q.int(), lvl);
+                        learnt.push(l);
+                    }
                 } else {
                     #[cfg(feature = "trace_analyze")]
-                    println!("- push {} to learnt, which level is {}", q.int(), lvl);
-                    learnt.push(*q);
+                    {
+                        if !v.is(Flag::CA_SEEN) {
+                            println!("- ignore {} because it was flagged", q.int());
+                        } else {
+                            println!("- ignore {} because its level is {}", q.int(), lvl);
+                        }
+                    }
                 }
-            } else {
+            }
+            AssignReason::Implication(cid, _) => {
                 #[cfg(feature = "trace_analyze")]
-                {
-                    if !v.is(Flag::CA_SEEN) {
-                        println!("- ignore {} because it was flagged", q.int());
+                println!("analyze {}", p.int());
+                debug_assert_ne!(cid, ClauseId::default());
+                if cdb[cid].is(Flag::LEARNT) {
+                    cdb.bump_activity(cid, ());
+                    cdb.convert_to_permanent(vdb, cid);
+                }
+                let c = &cdb[cid];
+                #[cfg(feature = "boundary_check")]
+                assert!(
+                    0 < c.len(),
+                    format!(
+                        "Level {} I-graph reaches {}:{} for {}:{}",
+                        asgs.level(),
+                        cid,
+                        c,
+                        p,
+                        &vdb[p]
+                    )
+                );
+                #[cfg(feature = "trace_analyze")]
+                println!("- handle {}", cid.fmt());
+                for q in &c[(p != NULL_LIT) as usize..] {
+                    let vi = q.vi();
+                    if !vdb[vi].is(Flag::CA_SEEN) {
+                        // vdb.reward_at_analysis(vi);
+                        let v = &mut vdb[vi];
+                        if 0 == v.level {
+                            continue;
+                        }
+                        debug_assert!(!v.is(Flag::ELIMINATED));
+                        debug_assert!(v.assign.is_some());
+                        v.turn_on(Flag::CA_SEEN);
+                        if dl <= v.level {
+                            // println!("- flag for {} which level is {}", q.int(), lvl);
+                            path_cnt += 1;
+                            //
+                            //## Conflict-Side Rewarding
+                            //
+                            vdb.reward_at_analysis(vi);
+                        } else {
+                            #[cfg(feature = "trace_analyze")]
+                            println!("- push {} to learnt, which level is {}", q.int(), lvl);
+                            learnt.push(*q);
+                        }
                     } else {
-                        println!("- ignore {} because its level is {}", q.int(), lvl);
+                        #[cfg(feature = "trace_analyze")]
+                        {
+                            if !v.is(Flag::CA_SEEN) {
+                                println!("- ignore {} because it was flagged", q.int());
+                            } else {
+                                println!("- ignore {} because its level is {}", q.int(), lvl);
+                            }
+                        }
                     }
                 }
             }
@@ -742,16 +798,14 @@ fn conflict_analyze(
             ti -= 1;
         }
         p = asgs[ti];
-        let next_vi = p.vi();
-        cid = vdb[next_vi].reason;
         #[cfg(feature = "trace_analyze")]
         println!(
             "- move to flagged {}, which reason is {}; num path: {}",
-            next_vi,
+            p.vi(),
             path_cnt - 1,
             cid.fmt()
         );
-        vdb[next_vi].turn_off(Flag::CA_SEEN);
+        vdb[p].turn_off(Flag::CA_SEEN);
         // since the trail can contain a literal which level is under `dl` after
         // the `dl`-th thdecision var, we must skip it.
         path_cnt -= 1;
@@ -861,33 +915,56 @@ impl Lit {
         clear: &mut Vec<Lit>,
         levels: &[bool],
     ) -> bool {
-        if vdb[self].reason == ClauseId::default() {
+        if vdb[self].reason == AssignReason::default() {
             return false;
         }
         let mut stack = Vec::new();
         stack.push(self);
         let top = clear.len();
         while let Some(sl) = stack.pop() {
-            let cid = vdb[sl.vi()].reason;
-            let c = &cdb[cid];
-            #[cfg(feature = "boundary_check")]
-            assert!(0 < c.len());
-            for q in &(*c)[1..] {
-                let vi = q.vi();
-                let v = &vdb[vi];
-                let lv = v.level;
-                if 0 < lv && !v.is(Flag::CA_SEEN) {
-                    if v.reason != ClauseId::default() && levels[lv as usize] {
-                        vdb[vi].turn_on(Flag::CA_SEEN);
-                        stack.push(*q);
-                        clear.push(*q);
-                    } else {
-                        // one of the roots is a decision var at an unchecked level.
-                        for l in &clear[top..] {
-                            vdb[l].turn_off(Flag::CA_SEEN);
+            match vdb[sl.vi()].reason {
+                AssignReason::None => panic!("no idea"),
+                AssignReason::Implication(_, l) if l != NULL_LIT => {
+                    let vi = l.vi();
+                    let v = &vdb[vi];
+                    let lv = v.level;
+                    if 0 < lv && !v.is(Flag::CA_SEEN) {
+                        if v.reason != AssignReason::default() && levels[lv as usize] {
+                            vdb[vi].turn_on(Flag::CA_SEEN);
+                            stack.push(l);
+                            clear.push(l);
+                        } else {
+                            // one of the roots is a decision var at an unchecked level.
+                            for l in &clear[top..] {
+                                vdb[l].turn_off(Flag::CA_SEEN);
+                            }
+                            clear.truncate(top);
+                            return false;
                         }
-                        clear.truncate(top);
-                        return false;
+                    }
+                }
+                AssignReason::Implication(cid, _) => {
+                    let c = &cdb[cid];
+                    #[cfg(feature = "boundary_check")]
+                    assert!(0 < c.len());
+                    for q in &(*c)[1..] {
+                        let vi = q.vi();
+                        let v = &vdb[vi];
+                        let lv = v.level;
+                        if 0 < lv && !v.is(Flag::CA_SEEN) {
+                            if v.reason != AssignReason::default() && levels[lv as usize] {
+                                vdb[vi].turn_on(Flag::CA_SEEN);
+                                stack.push(*q);
+                                clear.push(*q);
+                            } else {
+                                // one of the roots is a decision var at an unchecked level.
+                                for l in &clear[top..] {
+                                    vdb[l].turn_off(Flag::CA_SEEN);
+                                }
+                                clear.truncate(top);
+                                return false;
+                            }
+                        }
                     }
                 }
             }
@@ -916,7 +993,7 @@ fn analyze_final(asgs: &AssignStack, state: &mut State, vdb: &mut VarDB, c: &Cla
     for l in &asgs[asgs.len_upto(0)..end] {
         let vi = l.vi();
         if seen[vi] {
-            if vdb[vi].reason == ClauseId::default() {
+            if vdb[vi].reason == AssignReason::default() {
                 state.conflicts.push(!*l);
             } else {
                 for l in &c[(c.len() != 2) as usize..] {
@@ -942,7 +1019,7 @@ impl VarDB {
                 (
                     i32::from(l),
                     v.level,
-                    v.reason == ClauseId::default(),
+                    v.reason == AssignReason::default(),
                     v.assign,
                 )
             })

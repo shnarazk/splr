@@ -384,10 +384,10 @@ impl EliminatorIF for Eliminator {
         debug_assert_eq!(asgs.level(), 0);
         // we can reset all the reasons because decision level is zero.
         for v in vdb.iter_mut().skip(1) {
-            if v.reason != ClauseId::default() {
+            if v.reason != AssignReason::None {
                 #[cfg(feature = "boundary_check")]
                 assert_eq!(v.level, state.root_level);
-                v.reason = ClauseId::default();
+                v.reason = AssignReason::None;
             }
         }
         if self.is_waiting() {

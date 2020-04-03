@@ -50,8 +50,13 @@ pub trait PropagatorIF: Index<usize, Output = Lit> {
     ///
     /// ## Warning
     /// Caller must assure the consistency after this assignment
-    fn assign_by_implication<V>(&mut self, vdb: &mut V, l: Lit, cid: ClauseId, lv: DecisionLevel)
-    where
+    fn assign_by_implication<V>(
+        &mut self,
+        vdb: &mut V,
+        l: Lit,
+        reason: AssignReason,
+        lv: DecisionLevel,
+    ) where
         V: VarDBIF + VarRewardIF;
     /// unsafe assume (assign by decision); doesn't emit an exception.
     /// ## Caveat
@@ -93,6 +98,30 @@ pub trait VarSelectionIF {
     fn rebuild_order<V>(&mut self, vdb: &mut V)
     where
         V: VarDBIF + VarRewardIF;
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum AssignReason {
+    /// One of not assigned, assigned by decision, or solved.
+    None,
+    /// Assigned by a clause. If it is binary, the reason literal is stored in the 2nd.
+    Implication(ClauseId, Lit),
+}
+
+impl Default for AssignReason {
+    fn default() -> AssignReason {
+        AssignReason::None
+    }
+}
+
+impl fmt::Display for AssignReason {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            AssignReason::None => write!(f, "reason:none"),
+            AssignReason::Implication(c, NULL_LIT) => write!(f, "reason:{}", c),
+            AssignReason::Implication(c, _) => write!(f, "reason:biclause{}", c),
+        }
+    }
 }
 
 /// A record of assignment. It's called 'trail' in Glucose.
@@ -281,7 +310,7 @@ impl PropagatorIF for AssignStack {
                 set_assign!(self, l);
                 v.assign = Some(bool::from(l));
                 v.level = 0;
-                v.reason = ClauseId::default();
+                v.reason = AssignReason::None;
                 debug_assert!(!self.trail.contains(&!l));
                 self.trail.push(l);
                 Ok(())
@@ -290,8 +319,13 @@ impl PropagatorIF for AssignStack {
             _ => Err(SolverError::Inconsistent),
         }
     }
-    fn assign_by_implication<V>(&mut self, vdb: &mut V, l: Lit, cid: ClauseId, lv: DecisionLevel)
-    where
+    fn assign_by_implication<V>(
+        &mut self,
+        vdb: &mut V,
+        l: Lit,
+        reason: AssignReason,
+        lv: DecisionLevel,
+    ) where
         V: VarDBIF + VarRewardIF,
     {
         debug_assert!(usize::from(l) != 0, "Null literal is about to be equeued");
@@ -307,7 +341,7 @@ impl PropagatorIF for AssignStack {
         set_assign!(self, l);
         v.assign = Some(bool::from(l));
         v.level = lv;
-        v.reason = cid;
+        v.reason = reason;
         vdb.reward_at_assign(vi);
         debug_assert!(!self.trail.contains(&l));
         debug_assert!(!self.trail.contains(&!l));
@@ -329,7 +363,7 @@ impl PropagatorIF for AssignStack {
         set_assign!(self, l);
         v.assign = Some(bool::from(l));
         v.level = dl;
-        v.reason = ClauseId::default();
+        v.reason = AssignReason::default();
         vdb.reward_at_assign(vi);
         debug_assert!(!self.trail.contains(&!l));
         self.trail.push(l);
@@ -344,7 +378,7 @@ impl PropagatorIF for AssignStack {
         set_assign!(self, l);
         v.assign = Some(bool::from(l));
         v.level = 0;
-        v.reason = ClauseId::default();
+        v.reason = AssignReason::default();
         vdb.clear_reward(l.vi());
         debug_assert!(!self.trail.contains(&!l));
         self.trail.push(l);
@@ -370,7 +404,7 @@ impl PropagatorIF for AssignStack {
             unset_assign!(self, vi);
             v.set(Flag::PHASE, v.assign.unwrap());
             v.assign = None;
-            v.reason = ClauseId::default();
+            v.reason = AssignReason::default();
             vdb.reward_at_unassign(vi);
             self.var_order.insert(vdb, vi);
         }
@@ -420,12 +454,12 @@ impl PropagatorIF for AssignStack {
                             self.num_conflict += 1;
                             return w.c;
                         }
-                        let Clause { ref mut lits, .. } = cdb[w.c];
-                        if lits[0] == false_lit {
-                            lits.swap(0, 1);
-                        }
-                        let lvl = vdb[lits[1]].level;
-                        self.assign_by_implication(vdb, w.blocker, w.c, lvl);
+                        self.assign_by_implication(
+                            vdb,
+                            w.blocker,
+                            AssignReason::Implication(w.c, false_lit),
+                            vdb[false_lit].level,
+                        );
                         continue 'next_clause;
                     }
                     let Clause {
@@ -471,7 +505,12 @@ impl PropagatorIF for AssignStack {
                         return w.c;
                     }
                     let lv = lits[1..].iter().map(|l| vdb[*l].level).max().unwrap_or(0);
-                    self.assign_by_implication(vdb, first, w.c, lv);
+                    self.assign_by_implication(
+                        vdb,
+                        first,
+                        AssignReason::Implication(w.c, NULL_LIT),
+                        lv,
+                    );
                 }
             }
         }

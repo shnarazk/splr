@@ -76,7 +76,7 @@ pub struct Var {
     /// the current value.
     pub assign: Option<bool>,
     /// the propagating clause
-    pub reason: ClauseId,
+    pub reason: AssignReason,
     /// decision level at which this variables is assigned.
     pub level: DecisionLevel,
     /// the number of participation in conflict analysis
@@ -94,7 +94,7 @@ impl Default for Var {
         Var {
             index: 0,
             assign: None,
-            reason: ClauseId::default(),
+            reason: AssignReason::default(),
             level: 0,
             reward: 0.0,
             timestamp: 0,
@@ -452,7 +452,8 @@ impl VarDBIF for VarDB {
         let lits = &c.lits;
         debug_assert!(1 < lits.len());
         let l0 = lits[0];
-        self.assigned(l0) == Some(true) && self[l0.vi()].reason == cid
+        self.assigned(l0) == Some(true)
+            && matches!(self[l0.vi()].reason, AssignReason::Implication(x, _) if x == cid)
     }
     fn satisfies(&self, vec: &[Lit]) -> bool {
         for l in vec {
@@ -607,8 +608,8 @@ impl VarDB {
                 let next_vi = p.vi();
                 if self.var[next_vi].is(Flag::VR_SEEN) {
                     self.var[next_vi].turn_off(Flag::VR_SEEN);
-                    cid = self.var[next_vi].reason;
-                    if cid != ClauseId::default() {
+                    if let AssignReason::Implication(c, _) = self.var[next_vi].reason {
+                        cid = c;
                         break;
                     }
                 }
@@ -647,8 +648,8 @@ impl VarDB {
                 let next_vi = p.vi();
                 if self.var[next_vi].is(Flag::VR_SEEN) {
                     self.var[next_vi].turn_off(Flag::VR_SEEN);
-                    cid = self.var[next_vi].reason;
-                    if cid != ClauseId::default() {
+                    if let AssignReason::Implication(c, _) = self.var[next_vi].reason {
+                        cid = c;
                         break;
                     }
                 }

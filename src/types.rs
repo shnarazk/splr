@@ -3,6 +3,7 @@
 pub use crate::{
     clause::{Clause, ClauseIF, ClauseId, ClauseIdIF, Watch},
     config::Config,
+    propagator::AssignReason,
     var::Var,
 };
 use {
