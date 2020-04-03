@@ -707,7 +707,7 @@ fn conflict_analyze(
                     } else {
                         #[cfg(feature = "trace_analyze")]
                         println!("- push {} to learnt, which level is {}", q.int(), lvl);
-                        learnt.push(l);
+                        // learnt.push(l);
                     }
                 } else {
                     #[cfg(feature = "trace_analyze")]
