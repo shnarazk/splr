@@ -2,9 +2,10 @@
 use {
     crate::{
         eliminator::EliminatorIF,
+        propagator::PropagatorIF,
         state::{SearchStrategy, State},
         types::*,
-        var::{VarDBIF, LBDIF},
+        var::VarDBIF,
     },
     std::{
         cmp::Ordering,
@@ -48,7 +49,7 @@ pub trait ClauseDBIF: IndexMut<ClauseId, Output = Clause> {
     /// *precondition*: decision level == 0.
     fn check_and_reduce<V>(&mut self, vdb: &mut V, nc: usize) -> bool
     where
-        V: VarDBIF + LBDIF;
+        V: VarDBIF;
     fn reset(&mut self);
     /// delete *dead* clauses from database, which are made by:
     /// * `reduce`
@@ -58,13 +59,19 @@ pub trait ClauseDBIF: IndexMut<ClauseId, Output = Clause> {
     /// allocate a new clause and return its id.
     /// * If 2nd arg is `Some(vdb)`, register `v` as a learnt after sorting based on assign level.
     /// * Otherwise, register `v` as a permanent clause, which rank is zero.
-    fn new_clause<V>(&mut self, v: &mut [Lit], level_sort: Option<&mut V>) -> ClauseId
+    fn new_clause<A, V>(
+        &mut self,
+        asgs: &mut A,
+        v: &mut [Lit],
+        level_sort: Option<&mut V>,
+    ) -> ClauseId
     where
-        V: VarDBIF + LBDIF;
+        A: PropagatorIF,
+        V: VarDBIF;
     /// check and convert a learnt clause to permanent if needed.
-    fn convert_to_permanent<V>(&mut self, vdb: &mut V, cid: ClauseId) -> bool
+    fn convert_to_permanent<A>(&mut self, asgs: &mut A, cid: ClauseId) -> bool
     where
-        V: VarDBIF + LBDIF;
+        A: PropagatorIF;
     /// return the number of alive clauses in the database. Or return the database size if `active` is `false`.
     fn count(&self, alive: bool) -> usize;
     /// return the number of clauses which satisfy given flags and aren't DEAD.
@@ -745,9 +752,15 @@ impl ClauseDBIF for ClauseDB {
         self.num_active = self.clause.len() - recycled.len();
         // debug_assert!(self.check_liveness2());
     }
-    fn new_clause<V>(&mut self, vec: &mut [Lit], level_sort: Option<&mut V>) -> ClauseId
+    fn new_clause<A, V>(
+        &mut self,
+        asgs: &mut A,
+        vec: &mut [Lit],
+        level_sort: Option<&mut V>,
+    ) -> ClauseId
     where
-        V: VarDBIF + LBDIF,
+        A: PropagatorIF,
+        V: VarDBIF,
     {
         let reward = self.activity_inc;
         let (rank, learnt) = if let Some(vdb) = level_sort {
@@ -760,11 +773,11 @@ impl ClauseDBIF for ClauseDB {
             let mut i_max = 1;
             let mut lv_max = 0;
             // seek a literal with max level
-            let (level, var) = vdb.lv_mut();
+            let level = asgs.level_ref();
             for (i, l) in vec.iter().enumerate() {
                 let vi = l.vi();
                 let lv = level[vi];
-                if var[vi].assign.is_some() && lv_max < lv {
+                if vdb[vi].assign.is_some() && lv_max < lv {
                     i_max = i;
                     lv_max = lv;
                 }
@@ -773,7 +786,7 @@ impl ClauseDBIF for ClauseDB {
             if vec.len() <= 2 {
                 (0, false)
             } else {
-                let lbd = vdb.compute_lbd(vec);
+                let lbd = asgs.compute_lbd(vec);
                 if self.use_chan_seok && lbd <= self.co_lbd_bound {
                     (0, false)
                 } else {
@@ -847,9 +860,9 @@ impl ClauseDBIF for ClauseDB {
         self.num_active += 1;
         cid
     }
-    fn convert_to_permanent<V>(&mut self, vdb: &mut V, cid: ClauseId) -> bool
+    fn convert_to_permanent<A>(&mut self, asgs: &mut A, cid: ClauseId) -> bool
     where
-        V: VarDBIF + LBDIF,
+        A: PropagatorIF,
     {
         let chan_seok_condition = if self.use_chan_seok {
             self.co_lbd_bound
@@ -860,7 +873,7 @@ impl ClauseDBIF for ClauseDB {
         debug_assert!(!c.is(Flag::DEAD), format!("found {} is dead: {}", cid, c));
         if 2 < c.rank {
             c.turn_on(Flag::JUST_USED);
-            let nlevels = vdb.compute_lbd(&c.lits);
+            let nlevels = asgs.compute_lbd(&c.lits);
             if nlevels + 1 < c.rank {
                 // chan_seok_condition is zero if !use_chan_seok
                 if nlevels < chan_seok_condition {
@@ -900,7 +913,7 @@ impl ClauseDBIF for ClauseDB {
     }
     fn check_and_reduce<V>(&mut self, vdb: &mut V, nc: usize) -> bool
     where
-        V: VarDBIF + LBDIF,
+        V: VarDBIF,
     {
         if !self.reducable || 0 == self.num_learnt {
             return false;
@@ -998,6 +1011,7 @@ impl ClauseDBIF for ClauseDB {
         if (*c).is(Flag::DEAD) {
             return false;
         }
+        (*c).turn_on(Flag::JUST_USED);
         debug_assert!(1 < usize::from(!p));
         let lits = &mut (*c).lits;
         debug_assert!(1 < lits.len());
@@ -1043,9 +1057,8 @@ impl ClauseDB {
     /// halve the number of 'learnt' or *removable* clauses.
     fn reduce<V>(&mut self, vdb: &mut V)
     where
-        V: VarDBIF + LBDIF,
+        V: VarDBIF,
     {
-        vdb.reset_lbd(self);
         let ClauseDB {
             ref mut clause,
             ref mut touched,

@@ -5,7 +5,7 @@ use {
         propagator::PropagatorIF,
         state::{State, StateIF},
         types::*,
-        var::{VarDBIF, VarRewardIF, LBDIF},
+        var::{VarDBIF, VarRewardIF},
     },
     std::{
         fmt,
@@ -70,7 +70,7 @@ pub trait EliminatorIF {
     where
         A: PropagatorIF,
         C: ClauseDBIF,
-        V: VarDBIF + VarRewardIF + LBDIF;
+        V: VarDBIF + VarRewardIF;
     /// inject assignments for eliminated vars.
     fn extend_model<V>(&mut self, vdb: &mut V)
     where
@@ -379,7 +379,7 @@ impl EliminatorIF for Eliminator {
     where
         A: PropagatorIF,
         C: ClauseDBIF,
-        V: VarDBIF + VarRewardIF + LBDIF,
+        V: VarDBIF + VarRewardIF,
     {
         debug_assert_eq!(asgs.level(), 0);
         // we can reset all the reasons because decision level is zero.
@@ -397,7 +397,6 @@ impl EliminatorIF for Eliminator {
         self.num_sat_elimination += 1;
         if self.is_running() {
             self.num_full_elimination += 1;
-            vdb.reset_lbd(cdb);
             self.stop(cdb, vdb);
         }
         cdb.check_size().map(|_| ())
@@ -611,7 +610,7 @@ impl Eliminator {
     where
         A: PropagatorIF,
         C: ClauseDBIF,
-        V: VarDBIF + VarRewardIF + LBDIF,
+        V: VarDBIF + VarRewardIF,
     {
         let start = state.elapsed().unwrap_or(0.0);
         loop {
@@ -643,7 +642,7 @@ impl Eliminator {
     where
         A: PropagatorIF,
         C: ClauseDBIF,
-        V: VarDBIF + VarRewardIF + LBDIF,
+        V: VarDBIF + VarRewardIF,
     {
         /// The ratio of time slot for single elimination step.
         /// Since it is measured in millisecond, 1000 means executing elimination
@@ -1018,7 +1017,7 @@ fn eliminate_var<A, C, V>(
 where
     A: PropagatorIF,
     C: ClauseDBIF,
-    V: VarDBIF + VarRewardIF + LBDIF,
+    V: VarDBIF + VarRewardIF,
 {
     let v = &mut vdb[vi];
     let w = &mut elim[vi];
@@ -1060,9 +1059,9 @@ where
                     }
                     _ => {
                         let cid = if cdb[*p].is(Flag::LEARNT) && cdb[*n].is(Flag::LEARNT) {
-                            cdb.new_clause(&mut *vec, Some(vdb))
+                            cdb.new_clause(asgs, &mut *vec, Some(vdb))
                         } else {
-                            cdb.new_clause(&mut *vec, None::<&mut V>)
+                            cdb.new_clause(asgs, &mut *vec, None::<&mut V>)
                         };
                         elim.add_cid_occur(vdb, cid, &mut cdb[cid], true);
                     }

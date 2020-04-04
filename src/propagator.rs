@@ -16,8 +16,18 @@ use {
     },
 };
 
+/// API to calculate LBD.
+pub trait LBDIF {
+    /// return the LBD value for a set of literals.
+    fn compute_lbd(&mut self, vec: &[Lit]) -> usize;
+    /// re-calculate the LBD values of all (learnt) clauses.
+    fn reset_lbd<C>(&mut self, cdb: &mut C, all: bool)
+    where
+        C: ClauseDBIF;
+}
+
 /// API for assignment like `propagate`, `enqueue`, `cancel_until`, and so on.
-pub trait PropagatorIF: Index<usize, Output = Lit> {
+pub trait PropagatorIF: Index<usize, Output = Lit> + LBDIF {
     /// return the number of assignments.
     fn len(&self) -> usize;
     /// return the number of assignments at a given decision level `u`.
@@ -82,6 +92,7 @@ pub trait PropagatorIF: Index<usize, Output = Lit> {
         V: VarDBIF + VarRewardIF;
     /// return `true` if subsequential propagations emit the same conflict.
     fn recurrent_conflicts(&self) -> bool;
+    fn level_ref(&self) -> &[DecisionLevel];
 }
 
 /// API for var selection.
@@ -127,6 +138,8 @@ impl fmt::Display for AssignReason {
 /// A record of assignment. It's called 'trail' in Glucose.
 #[derive(Debug)]
 pub struct AssignStack {
+    /// levels of vars
+    pub level: Vec<DecisionLevel>,
     pub trail: Vec<Lit>,
     asgvec: Vec<Option<bool>>,
     trail_lim: Vec<usize>,
@@ -136,16 +149,24 @@ pub struct AssignStack {
     var_order: VarIdHeap, // Variable Order
 
     //
+    //## LBD
+    //
+    /// a working buffer for LBD calculation
+    lbd_temp: Vec<usize>,
+
+    //
     //## Statistics
     //
     num_conflict: usize,
     num_propagation: usize,
     num_restart: usize,
+    num_lbd_update: usize,
 }
 
 impl Default for AssignStack {
     fn default() -> AssignStack {
         AssignStack {
+            level: Vec::new(),
             trail: Vec::new(),
             asgvec: Vec::new(),
             trail_lim: Vec::new(),
@@ -153,9 +174,11 @@ impl Default for AssignStack {
             root_level: 0,
             conflicts: (0, 0),
             var_order: VarIdHeap::default(),
+            lbd_temp: Vec::new(),
             num_conflict: 0,
             num_propagation: 0,
             num_restart: 0,
+            num_lbd_update: 0,
         }
     }
 }
@@ -245,9 +268,11 @@ impl Instantiate for AssignStack {
     fn instantiate(_cfg: &Config, cnf: &CNFDescription) -> AssignStack {
         let nv = cnf.num_of_variables;
         AssignStack {
-            asgvec: vec![None; 1 + nv],
+            level: vec![DecisionLevel::default(); nv + 1],
             trail: Vec::with_capacity(nv),
+            asgvec: vec![None; 1 + nv],
             var_order: VarIdHeap::new(nv, nv),
+            lbd_temp: vec![0; nv + 1],
             ..AssignStack::default()
         }
     }
@@ -303,7 +328,7 @@ impl PropagatorIF for AssignStack {
     {
         let vi = l.vi();
         debug_assert!(vi < vdb.len());
-        vdb.level_mut()[vi] = 0;
+        self.level[vi] = 0;
         let v = &mut vdb[vi];
         debug_assert!(!v.is(Flag::ELIMINATED));
         debug_assert_eq!(0, self.level());
@@ -334,7 +359,7 @@ impl PropagatorIF for AssignStack {
         // The following doesn't hold anymore by using chronoBT.
         // assert!(self.trail_lim.is_empty() || cid != ClauseId::default());
         let vi = l.vi();
-        vdb.level_mut()[vi] = lv;
+        self.level[vi] = lv;
         let v = &mut vdb[vi];
         debug_assert!(!v.is(Flag::ELIMINATED));
         debug_assert!(
@@ -358,7 +383,7 @@ impl PropagatorIF for AssignStack {
         self.level_up();
         let dl = self.trail_lim.len() as DecisionLevel;
         let vi = l.vi();
-        vdb.level_mut()[vi] = dl;
+        self.level[vi] = dl;
         let v = &mut vdb[vi];
         debug_assert!(!v.is(Flag::ELIMINATED));
         // debug_assert!(self.assign[vi] == l.lbool() || self.assign[vi] == BOTTOM);
@@ -376,7 +401,7 @@ impl PropagatorIF for AssignStack {
         self.cancel_until(vdb, self.root_level);
         debug_assert!(self.trail.iter().all(|k| k.vi() != l.vi()));
         let vi = l.vi();
-        vdb.level_mut()[vi] = 0;
+        self.level[vi] = 0;
         let v = &mut vdb[l];
         set_assign!(self, l);
         v.assign = Some(bool::from(l));
@@ -397,7 +422,7 @@ impl PropagatorIF for AssignStack {
         for i in lim..self.trail.len() {
             let l = self.trail[i];
             let vi = l.vi();
-            if vdb.level_mut()[vi] <= lv {
+            if self.level[vi] <= lv {
                 self.trail[shift] = l;
                 shift += 1;
                 continue;
@@ -435,7 +460,6 @@ impl PropagatorIF for AssignStack {
         let watcher = cdb.watcher_lists_mut() as *mut [Vec<Watch>];
         let check_index = self.num_conflict + self.num_restart;
         unsafe {
-            let level = vdb.level_mut() as *const [DecisionLevel];
             self.num_propagation += 1;
             while let Some(p) = self.trail.get(self.q_head) {
                 self.q_head += 1;
@@ -460,7 +484,7 @@ impl PropagatorIF for AssignStack {
                             vdb,
                             w.blocker,
                             AssignReason::Implication(w.c, false_lit),
-                            (*level)[false_lit.vi()],
+                            self.level[false_lit.vi()],
                         );
                         continue 'next_clause;
                     }
@@ -509,7 +533,7 @@ impl PropagatorIF for AssignStack {
                     }
                     let lv = lits[1..]
                         .iter()
-                        .map(|l| (*level)[l.vi()])
+                        .map(|l| self.level[l.vi()])
                         .max()
                         .unwrap_or(0);
                     self.assign_by_implication(
@@ -525,6 +549,65 @@ impl PropagatorIF for AssignStack {
     }
     fn recurrent_conflicts(&self) -> bool {
         self.conflicts.0 == self.conflicts.1
+    }
+    fn level_ref(&self) -> &[DecisionLevel] {
+        &self.level
+    }
+}
+
+impl LBDIF for AssignStack {
+    fn compute_lbd(&mut self, vec: &[Lit]) -> usize {
+        let AssignStack {
+            lbd_temp, level, ..
+        } = self;
+        unsafe {
+            let key: usize = lbd_temp.get_unchecked(0) + 1;
+            *lbd_temp.get_unchecked_mut(0) = key;
+            let mut cnt = 0;
+            for l in vec {
+                let lv = level[l.vi()];
+                let p = lbd_temp.get_unchecked_mut(lv as usize);
+                if *p != key {
+                    *p = key;
+                    cnt += 1;
+                }
+            }
+            cnt
+        }
+    }
+    fn reset_lbd<C>(&mut self, cdb: &mut C, _all: bool)
+    where
+        C: ClauseDBIF,
+    {
+        let AssignStack { lbd_temp, .. } = self;
+        unsafe {
+            let mut key = *lbd_temp.get_unchecked(0);
+            for c in &mut cdb.iter_mut().skip(1) {
+                if c.is(Flag::DEAD) || !c.is(Flag::LEARNT) {
+                    continue;
+                }
+                if
+                /* !all && */
+                !c.is(Flag::JUST_USED) {
+                    continue;
+                }
+                key += 1;
+                let mut cnt = 0;
+                for l in &c.lits {
+                    let lv = self.level[l.vi()];
+                    if lv != 0 {
+                        let p = lbd_temp.get_unchecked_mut(lv as usize);
+                        if *p != key {
+                            *p = key;
+                            cnt += 1;
+                        }
+                    }
+                }
+                c.rank = cnt;
+            }
+            *lbd_temp.get_unchecked_mut(0) = key;
+        }
+        self.num_lbd_update += 1;
     }
 }
 

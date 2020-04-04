@@ -10,16 +10,6 @@ use {
     },
 };
 
-/// API to calculate LBD.
-pub trait LBDIF {
-    /// return the LBD value for a set of literals.
-    fn compute_lbd(&mut self, vec: &[Lit]) -> usize;
-    /// re-calculate the LBD values of all (learnt) clauses.
-    fn reset_lbd<C>(&mut self, cdb: &mut C)
-    where
-        C: ClauseDBIF;
-}
-
 /// API for var DB like `assigned`, `locked`, and so on.
 pub trait VarDBIF: IndexMut<VarId, Output = Var> + IndexMut<Lit, Output = Var> {
     /// return the number of vars.
@@ -45,8 +35,6 @@ pub trait VarDBIF: IndexMut<VarId, Output = Var> + IndexMut<Lit, Output = Var> {
     fn minimize_with_biclauses<C>(&mut self, cdb: &C, vec: &mut Vec<Lit>)
     where
         C: ClauseDBIF;
-    fn level_mut(&mut self) -> &mut [DecisionLevel];
-    fn lv_mut(&mut self) -> (&[DecisionLevel], &mut [Var]);
 }
 
 /// API for var rewarding.
@@ -170,8 +158,6 @@ impl FlagIF for Var {
 /// A container of variables.
 #[derive(Debug)]
 pub struct VarDB {
-    /// levels of vars
-    level: Vec<DecisionLevel>,
     /// var activity decay
     activity_decay: f64,
     /// maximum var activity decay
@@ -182,8 +168,6 @@ pub struct VarDB {
     var: Vec<Var>,
     /// estimated number of hot variable
     core_size: Ema,
-    /// a working buffer for LBD calculation
-    lbd_temp: Vec<usize>,
     #[cfg(feature = "EVSIDS")]
     reward_step: f64,
 }
@@ -196,13 +180,11 @@ impl Default for VarDB {
         const VRD_MAX: f64 = 0.96;
         const VRD_START: f64 = 0.8;
         VarDB {
-            level: Vec::new(),
             activity_decay: VRD_START,
             activity_decay_max: VRD_MAX,
             ordinal: 0,
             var: Vec::new(),
             core_size: Ema::new(CORE_HISOTRY_LEN),
-            lbd_temp: Vec::new(),
         }
     }
     #[cfg(feature = "EVSIDS")]
@@ -210,13 +192,11 @@ impl Default for VarDB {
         const VRD_MAX: f64 = 0.96;
         const VRD_START: f64 = 0.8;
         VarDB {
-            level: Vec::new(),
             activity_decay: VRD_START,
             activity_decay_max: VRD_MAX,
             ordinal: 0,
             var: Vec::new(),
             core_size: Ema::new(CORE_HISOTRY_LEN),
-            lbd_temp: Vec::new(),
             reward_step: 0.000_000_1,
         }
     }
@@ -391,9 +371,7 @@ impl Instantiate for VarDB {
     fn instantiate(_: &Config, cnf: &CNFDescription) -> Self {
         let nv = cnf.num_of_variables;
         VarDB {
-            level: vec![DecisionLevel::default(); nv + 1],
             var: Var::new_vars(nv),
-            lbd_temp: vec![0; nv + 1],
             ..VarDB::default()
         }
     }
@@ -488,10 +466,10 @@ impl VarDBIF for VarDB {
         if vec.len() <= 1 {
             return;
         }
-        let VarDB { lbd_temp, var, .. } = self;
-        let key = lbd_temp[0] + 1;
+        let mut lbd_temp = vec![false; self.len()];
+        let VarDB { var, .. } = self;
         for l in &vec[1..] {
-            lbd_temp[l.vi() as usize] = key;
+            lbd_temp[l.vi() as usize] = true;
         }
         let l0 = vec[0];
         let mut nsat = 0;
@@ -503,71 +481,14 @@ impl VarDBIF for VarDB {
             debug_assert!(c[0] == l0 || c[1] == l0);
             let other = c[(c[0] == l0) as usize];
             let vi = other.vi();
-            if lbd_temp[vi] == key && var[vi].assigned(other) == Some(true) {
+            if lbd_temp[vi] && var[vi].assigned(other) == Some(true) {
                 nsat += 1;
-                lbd_temp[vi] -= 1;
+                lbd_temp[vi] = false;
             }
         }
         if 0 < nsat {
-            lbd_temp[l0.vi()] = key;
-            vec.retain(|l| lbd_temp[l.vi()] == key);
-        }
-        lbd_temp[0] = key;
-    }
-    fn level_mut(&mut self) -> &mut [DecisionLevel] {
-        &mut self.level
-    }
-    fn lv_mut(&mut self) -> (&[DecisionLevel], &mut [Var]) {
-        (&self.level, &mut self.var)
-    }
-}
-
-impl LBDIF for VarDB {
-    fn compute_lbd(&mut self, vec: &[Lit]) -> usize {
-        let VarDB {
-            lbd_temp, level, ..
-        } = self;
-        unsafe {
-            let key: usize = lbd_temp.get_unchecked(0) + 1;
-            *lbd_temp.get_unchecked_mut(0) = key;
-            let mut cnt = 0;
-            for l in vec {
-                let lv = level[l.vi()];
-                let p = lbd_temp.get_unchecked_mut(lv as usize);
-                if *p != key {
-                    *p = key;
-                    cnt += 1;
-                }
-            }
-            cnt
-        }
-    }
-    fn reset_lbd<C>(&mut self, cdb: &mut C)
-    where
-        C: ClauseDBIF,
-    {
-        let VarDB { lbd_temp, .. } = self;
-        unsafe {
-            let mut key = *lbd_temp.get_unchecked(0);
-            for c in &mut cdb.iter_mut().skip(1) {
-                if c.is(Flag::DEAD) || c.is(Flag::LEARNT) {
-                    continue;
-                }
-                key += 1;
-                let mut cnt = 0;
-                for l in &c.lits {
-                    let lv = self.level[l.vi()];
-                    if lv != 0 {
-                        let p = lbd_temp.get_unchecked_mut(lv as usize);
-                        if *p != key {
-                            *p = key;
-                            cnt += 1;
-                        }
-                    }
-                }
-                c.rank = cnt;
-            }
-            *lbd_temp.get_unchecked_mut(0) = key;
+            lbd_temp[l0.vi()] = true;
+            vec.retain(|l| lbd_temp[l.vi()]);
         }
     }
 }
