@@ -745,14 +745,14 @@ impl ClauseDBIF for ClauseDB {
         self.num_active = self.clause.len() - recycled.len();
         // debug_assert!(self.check_liveness2());
     }
-    fn new_clause<V>(&mut self, v: &mut [Lit], level_sort: Option<&mut V>) -> ClauseId
+    fn new_clause<V>(&mut self, vec: &mut [Lit], level_sort: Option<&mut V>) -> ClauseId
     where
         V: VarDBIF + LBDIF,
     {
         let reward = self.activity_inc;
         let (rank, learnt) = if let Some(vdb) = level_sort {
             if !self.certified.is_empty() {
-                let temp = v.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
+                let temp = vec.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
                 self.certified.push((CertifiedRecord::ADD, temp));
             }
             #[cfg(feature = "boundary_check")]
@@ -760,19 +760,20 @@ impl ClauseDBIF for ClauseDB {
             let mut i_max = 1;
             let mut lv_max = 0;
             // seek a literal with max level
-            for (i, l) in v.iter().enumerate() {
+            let (level, var) = vdb.lv_mut();
+            for (i, l) in vec.iter().enumerate() {
                 let vi = l.vi();
-                let lv = vdb[vi].level;
-                if vdb[vi].assign.is_some() && lv_max < lv {
+                let lv = level[vi];
+                if var[vi].assign.is_some() && lv_max < lv {
                     i_max = i;
                     lv_max = lv;
                 }
             }
-            v.swap(1, i_max);
-            if v.len() <= 2 {
+            vec.swap(1, i_max);
+            if vec.len() <= 2 {
                 (0, false)
             } else {
-                let lbd = vdb.compute_lbd(v);
+                let lbd = vdb.compute_lbd(vec);
                 if self.use_chan_seok && lbd <= self.co_lbd_bound {
                     (0, false)
                 } else {
@@ -783,8 +784,8 @@ impl ClauseDBIF for ClauseDB {
             (0, false)
         };
         let cid;
-        let l0 = v[0];
-        let l1 = v[1];
+        let l0 = vec[0];
+        let l1 = vec[1];
         if let Some(w) = self.watcher[!NULL_LIT].pop() {
             cid = w.c;
             let c = &mut self[cid];
@@ -801,7 +802,7 @@ impl ClauseDBIF for ClauseDB {
             debug_assert!(c.is(Flag::DEAD));
             c.flags = Flag::empty();
             c.lits.clear();
-            for l in v {
+            for l in vec {
                 c.lits.push(*l);
             }
             c.rank = rank;
@@ -809,8 +810,8 @@ impl ClauseDBIF for ClauseDB {
             c.checked_at = 0;
             c.search_from = 2;
         } else {
-            let mut lits = Vec::with_capacity(v.len());
-            for l in v {
+            let mut lits = Vec::with_capacity(vec.len());
+            for l in vec {
                 lits.push(*l);
             }
             cid = ClauseId::from(self.clause.len());

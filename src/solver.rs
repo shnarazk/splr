@@ -389,9 +389,10 @@ fn search(
                 return Ok(false);
             }
             // handle a simple UNSAT case here.
-            if cdb[ci].iter().all(|l| vdb[l].level == 0) {
-                return Ok(false);
-            }
+            // let level = vdb.level_mut();
+            // if cdb[ci].iter().all(|l| level[l.vi()] == 0) {
+            //     return Ok(false);
+            // }
             handle_conflict(asgs, cdb, elim, rst, state, vdb, ci)?;
         }
         // Simplification has been postponed because chronoBT was used.
@@ -452,14 +453,15 @@ fn handle_conflict(
     let cl = asgs.level();
     let mut use_chronobt = switch_chronobt.unwrap_or(0 < state.config.cbt_thr);
     if use_chronobt {
+        let level = vdb.level_mut();
         let c = &cdb[ci];
-        let lcnt = c.iter().filter(|l| vdb[*l].level == cl).count();
+        let lcnt = c.iter().filter(|l| level[l.vi()] == cl).count();
         if 1 == lcnt {
-            debug_assert!(c.iter().any(|l| vdb[l].level == cl));
-            let decision = *c.iter().find(|l| vdb[*l].level == cl).unwrap();
+            debug_assert!(c.iter().any(|l| level[l.vi()] == cl));
+            let decision = *c.iter().find(|l| level[l.vi()] == cl).unwrap();
             let snd_l = c
                 .iter()
-                .map(|l| vdb[l].level)
+                .map(|l| level[l.vi()])
                 .filter(|l| *l != cl)
                 .max()
                 .unwrap_or(0);
@@ -484,7 +486,8 @@ fn handle_conflict(
     let cl = {
         let cl = asgs.level();
         let c = &cdb[ci];
-        let lv = c.iter().map(|l| vdb[l].level).max().unwrap_or(0);
+        let level = vdb.level_mut();
+        let lv = c.iter().map(|l| level[l.vi()]).max().unwrap_or(0);
         if lv < cl {
             asgs.cancel_until(vdb, lv);
             lv
@@ -493,14 +496,14 @@ fn handle_conflict(
         }
     };
     debug_assert!(
-        cdb[ci].iter().any(|l| vdb[l].level == cl),
+        cdb[ci].iter().any(|l| vdb.level_mut()[l.vi()] == cl),
         format!(
             "use_{}: {:?}, {:?}",
             use_chronobt,
             cl,
             cdb[ci]
                 .iter()
-                .map(|l| (i32::from(*l), vdb[l].level))
+                .map(|l| (i32::from(*l), vdb.level_mut()[l.vi()]))
                 .collect::<Vec<_>>(),
         )
     );
@@ -535,11 +538,14 @@ fn handle_conflict(
     // (assign level, backtrack level)
     let (al, bl) = if use_chronobt {
         (
-            new_learnt[1..]
-                .iter()
-                .map(|l| vdb[l].level)
-                .max()
-                .unwrap_or(0),
+            {
+                let level = vdb.level_mut();
+                new_learnt[1..]
+                    .iter()
+                    .map(|l| level[l.vi()])
+                    .max()
+                    .unwrap_or(0)
+            },
             cl - 1,
         )
     } else {
@@ -694,14 +700,15 @@ fn conflict_analyze(
                 // cid = vdb[p.vi()].reason;
                 let vi = l.vi();
                 if !vdb[vi].is(Flag::CA_SEEN) {
+                    let lvl = vdb.level_mut()[vi];
                     let v = &mut vdb[vi];
-                    if 0 == v.level {
+                    if 0 == lvl {
                         continue;
                     }
                     debug_assert!(!v.is(Flag::ELIMINATED));
                     debug_assert!(v.assign.is_some());
                     v.turn_on(Flag::CA_SEEN);
-                    if dl <= v.level {
+                    if dl <= lvl {
                         path_cnt += 1;
                         vdb.reward_at_analysis(vi);
                     } else {
@@ -747,14 +754,15 @@ fn conflict_analyze(
                     let vi = q.vi();
                     if !vdb[vi].is(Flag::CA_SEEN) {
                         // vdb.reward_at_analysis(vi);
+                        let lvl = vdb.level_mut()[vi];
                         let v = &mut vdb[vi];
-                        if 0 == v.level {
+                        if 0 == lvl {
                             continue;
                         }
                         debug_assert!(!v.is(Flag::ELIMINATED));
                         debug_assert!(v.assign.is_some());
                         v.turn_on(Flag::CA_SEEN);
-                        if dl <= v.level {
+                        if dl <= lvl {
                             // println!("- flag for {} which level is {}", q.int(), lvl);
                             path_cnt += 1;
                             //
@@ -781,8 +789,10 @@ fn conflict_analyze(
         }
         // set the index of the next literal to ti
         while {
-            let v = &vdb[asgs[ti].vi()];
-            !v.is(Flag::CA_SEEN) || v.level != dl
+            let vi = asgs[ti].vi();
+            let lvl = vdb.level_mut()[vi];
+            let v = &vdb[vi];
+            !v.is(Flag::CA_SEEN) || lvl != dl
         } {
             #[cfg(feature = "trace_analyze")]
             println!("- skip {} because it isn't flagged", asgs[ti].int());
@@ -816,7 +826,7 @@ fn conflict_analyze(
         ti -= 1;
     }
     debug_assert!(learnt.iter().all(|l| *l != !p));
-    debug_assert_eq!(vdb[p].level, dl);
+    debug_assert_eq!(vdb.level_mut()[p.vi()], dl);
     learnt[0] = !p;
     #[cfg(feature = "trace_analyze")]
     println!(
@@ -872,9 +882,10 @@ impl State {
         } = self;
         let mut to_clear: Vec<Lit> = vec![new_learnt[0]];
         let mut levels = vec![false; asgs.level() as usize + 1];
+        let level = vdb.level_mut();
         for l in &new_learnt[1..] {
             to_clear.push(*l);
-            levels[vdb[l].level as usize] = true;
+            levels[level[l.vi()] as usize] = true;
         }
         let l0 = new_learnt[0];
         #[cfg(feature = "boundary_check")]
@@ -886,11 +897,12 @@ impl State {
         }
         // find correct backtrack level from remaining literals
         let mut level_to_return = 0;
+        let level = vdb.level_mut();
         if 1 < new_learnt.len() {
             let mut max_i = 1;
-            level_to_return = vdb[new_learnt[max_i].vi()].level;
+            level_to_return = level[new_learnt[max_i].vi()];
             for (i, l) in new_learnt.iter().enumerate().skip(2) {
-                let lv = vdb[l].level;
+                let lv = level[l.vi()];
                 if level_to_return < lv {
                     level_to_return = lv;
                     max_i = i;
@@ -921,22 +933,23 @@ impl Lit {
         let mut stack = Vec::new();
         stack.push(self);
         let top = clear.len();
+        let (level, var) = vdb.lv_mut();
         while let Some(sl) = stack.pop() {
-            match vdb[sl.vi()].reason {
+            match var[sl.vi()].reason {
                 AssignReason::None => panic!("no idea"),
                 AssignReason::Implication(_, l) if l != NULL_LIT => {
                     let vi = l.vi();
-                    let v = &vdb[vi];
-                    let lv = v.level;
+                    let lv = level[vi];
+                    let v = &mut var[vi];
                     if 0 < lv && !v.is(Flag::CA_SEEN) {
                         if v.reason != AssignReason::default() && levels[lv as usize] {
-                            vdb[vi].turn_on(Flag::CA_SEEN);
+                            v.turn_on(Flag::CA_SEEN);
                             stack.push(l);
                             clear.push(l);
                         } else {
                             // one of the roots is a decision var at an unchecked level.
                             for l in &clear[top..] {
-                                vdb[l].turn_off(Flag::CA_SEEN);
+                                var[l.vi()].turn_off(Flag::CA_SEEN);
                             }
                             clear.truncate(top);
                             return false;
@@ -949,17 +962,17 @@ impl Lit {
                     assert!(0 < c.len());
                     for q in &(*c)[1..] {
                         let vi = q.vi();
-                        let v = &vdb[vi];
-                        let lv = v.level;
+                        let lv = level[vi];
+                        let v = &mut var[vi];
                         if 0 < lv && !v.is(Flag::CA_SEEN) {
                             if v.reason != AssignReason::default() && levels[lv as usize] {
-                                vdb[vi].turn_on(Flag::CA_SEEN);
+                                v.turn_on(Flag::CA_SEEN);
                                 stack.push(*q);
                                 clear.push(*q);
                             } else {
                                 // one of the roots is a decision var at an unchecked level.
                                 for l in &clear[top..] {
-                                    vdb[l].turn_off(Flag::CA_SEEN);
+                                    var[l.vi()].turn_off(Flag::CA_SEEN);
                                 }
                                 clear.truncate(top);
                                 return false;
@@ -981,7 +994,7 @@ fn analyze_final(asgs: &AssignStack, state: &mut State, vdb: &mut VarDB, c: &Cla
     }
     for l in &c.lits {
         let vi = l.vi();
-        if 0 < vdb[vi].level {
+        if 0 < vdb.level_mut()[vi] {
             vdb[vi].turn_on(Flag::CA_SEEN);
         }
     }
@@ -996,9 +1009,10 @@ fn analyze_final(asgs: &AssignStack, state: &mut State, vdb: &mut VarDB, c: &Cla
             if vdb[vi].reason == AssignReason::default() {
                 state.conflicts.push(!*l);
             } else {
+                let level = vdb.level_mut();
                 for l in &c[(c.len() != 2) as usize..] {
                     let vj = l.vi();
-                    if 0 < vdb[vj].level {
+                    if 0 < level[vj] {
                         seen[vj] = true;
                     }
                 }
@@ -1010,15 +1024,16 @@ fn analyze_final(asgs: &AssignStack, state: &mut State, vdb: &mut VarDB, c: &Cla
 
 impl VarDB {
     fn dump<'a, V: IntoIterator<Item = &'a Lit, IntoIter = Iter<'a, Lit>>>(
-        &self,
+        &mut self,
         v: V,
     ) -> Vec<(i32, DecisionLevel, bool, Option<bool>)> {
         v.into_iter()
             .map(|l| {
+                let lvl = self.level_mut()[l.vi()];
                 let v = &self[*l];
                 (
                     i32::from(l),
-                    v.level,
+                    lvl,
                     v.reason == AssignReason::default(),
                     v.assign,
                 )

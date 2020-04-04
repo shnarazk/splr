@@ -301,15 +301,16 @@ impl PropagatorIF for AssignStack {
     where
         V: VarDBIF + VarRewardIF,
     {
-        debug_assert!(l.vi() < vdb.len());
-        let v = &mut vdb[l];
+        let vi = l.vi();
+        debug_assert!(vi < vdb.len());
+        vdb.level_mut()[vi] = 0;
+        let v = &mut vdb[vi];
         debug_assert!(!v.is(Flag::ELIMINATED));
         debug_assert_eq!(0, self.level());
         match var_assign!(self, v.index) {
             None => {
                 set_assign!(self, l);
                 v.assign = Some(bool::from(l));
-                v.level = 0;
                 v.reason = AssignReason::None;
                 debug_assert!(!self.trail.contains(&!l));
                 self.trail.push(l);
@@ -333,6 +334,7 @@ impl PropagatorIF for AssignStack {
         // The following doesn't hold anymore by using chronoBT.
         // assert!(self.trail_lim.is_empty() || cid != ClauseId::default());
         let vi = l.vi();
+        vdb.level_mut()[vi] = lv;
         let v = &mut vdb[vi];
         debug_assert!(!v.is(Flag::ELIMINATED));
         debug_assert!(
@@ -340,7 +342,6 @@ impl PropagatorIF for AssignStack {
         );
         set_assign!(self, l);
         v.assign = Some(bool::from(l));
-        v.level = lv;
         v.reason = reason;
         vdb.reward_at_assign(vi);
         debug_assert!(!self.trail.contains(&l));
@@ -357,12 +358,12 @@ impl PropagatorIF for AssignStack {
         self.level_up();
         let dl = self.trail_lim.len() as DecisionLevel;
         let vi = l.vi();
+        vdb.level_mut()[vi] = dl;
         let v = &mut vdb[vi];
         debug_assert!(!v.is(Flag::ELIMINATED));
         // debug_assert!(self.assign[vi] == l.lbool() || self.assign[vi] == BOTTOM);
         set_assign!(self, l);
         v.assign = Some(bool::from(l));
-        v.level = dl;
         v.reason = AssignReason::default();
         vdb.reward_at_assign(vi);
         debug_assert!(!self.trail.contains(&!l));
@@ -374,10 +375,11 @@ impl PropagatorIF for AssignStack {
     {
         self.cancel_until(vdb, self.root_level);
         debug_assert!(self.trail.iter().all(|k| k.vi() != l.vi()));
+        let vi = l.vi();
+        vdb.level_mut()[vi] = 0;
         let v = &mut vdb[l];
         set_assign!(self, l);
         v.assign = Some(bool::from(l));
-        v.level = 0;
         v.reason = AssignReason::default();
         vdb.clear_reward(l.vi());
         debug_assert!(!self.trail.contains(&!l));
@@ -395,12 +397,12 @@ impl PropagatorIF for AssignStack {
         for i in lim..self.trail.len() {
             let l = self.trail[i];
             let vi = l.vi();
-            let v = &mut vdb[vi];
-            if v.level <= lv {
+            if vdb.level_mut()[vi] <= lv {
                 self.trail[shift] = l;
                 shift += 1;
                 continue;
             }
+            let v = &mut vdb[vi];
             unset_assign!(self, vi);
             v.set(Flag::PHASE, v.assign.unwrap());
             v.assign = None;
@@ -432,11 +434,12 @@ impl PropagatorIF for AssignStack {
     {
         let watcher = cdb.watcher_lists_mut() as *mut [Vec<Watch>];
         let check_index = self.num_conflict + self.num_restart;
-        self.num_propagation += 1;
-        while let Some(p) = self.trail.get(self.q_head) {
-            self.q_head += 1;
-            let false_lit = !*p;
-            unsafe {
+        unsafe {
+            let level = vdb.level_mut() as *const [DecisionLevel];
+            self.num_propagation += 1;
+            while let Some(p) = self.trail.get(self.q_head) {
+                self.q_head += 1;
+                let false_lit = !*p;
                 let source = (*watcher).get_unchecked_mut(usize::from(*p));
                 let mut n = 0;
                 'next_clause: while n < source.len() {
@@ -457,7 +460,7 @@ impl PropagatorIF for AssignStack {
                             vdb,
                             w.blocker,
                             AssignReason::Implication(w.c, false_lit),
-                            vdb[false_lit].level,
+                            (*level)[false_lit.vi()],
                         );
                         continue 'next_clause;
                     }
@@ -504,7 +507,11 @@ impl PropagatorIF for AssignStack {
                         self.num_conflict += 1;
                         return w.c;
                     }
-                    let lv = lits[1..].iter().map(|l| vdb[*l].level).max().unwrap_or(0);
+                    let lv = lits[1..]
+                        .iter()
+                        .map(|l| (*level)[l.vi()])
+                        .max()
+                        .unwrap_or(0);
                     self.assign_by_implication(
                         vdb,
                         first,

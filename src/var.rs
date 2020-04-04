@@ -48,6 +48,8 @@ pub trait VarDBIF: IndexMut<VarId, Output = Var> + IndexMut<Lit, Output = Var> {
     fn minimize_with_biclauses<C>(&mut self, cdb: &C, vec: &mut Vec<Lit>)
     where
         C: ClauseDBIF;
+    fn level_mut(&mut self) -> &mut [DecisionLevel];
+    fn lv_mut(&mut self) -> (&[DecisionLevel], &mut [Var]);
 }
 
 /// API for var rewarding.
@@ -77,8 +79,8 @@ pub struct Var {
     pub assign: Option<bool>,
     /// the propagating clause
     pub reason: AssignReason,
-    /// decision level at which this variables is assigned.
-    pub level: DecisionLevel,
+    //    /// decision level at which this variables is assigned.
+    //    pub level: DecisionLevel,
     /// the number of participation in conflict analysis
     participated: u32,
     /// a dynamic evaluation criterion like VSIDS or ACID.
@@ -95,7 +97,6 @@ impl Default for Var {
             index: 0,
             assign: None,
             reason: AssignReason::default(),
-            level: 0,
             reward: 0.0,
             timestamp: 0,
             flags: Flag::empty(),
@@ -109,14 +110,13 @@ impl fmt::Display for Var {
         let st = |flag, mes| if self.is(flag) { mes } else { "" };
         write!(
             f,
-            "V{{{},{} at {} by {} {}{}}}",
+            "V{{{},{} by {} {}{}}}",
             self.index,
             match self.assign {
                 Some(true) => "T",
                 Some(false) => "F",
                 None => "_",
             },
-            self.level,
             self.reason,
             st(Flag::TOUCHED, ", touched"),
             st(Flag::ELIMINATED, ", eliminated"),
@@ -173,6 +173,8 @@ impl FlagIF for Var {
 /// A container of variables.
 #[derive(Debug)]
 pub struct VarDB {
+    /// levels of vars
+    level: Vec<DecisionLevel>,
     /// var activity decay
     activity_decay: f64,
     /// maximum var activity decay
@@ -197,6 +199,7 @@ impl Default for VarDB {
         const VRD_MAX: f64 = 0.96;
         const VRD_START: f64 = 0.8;
         VarDB {
+            level: Vec::new(),
             activity_decay: VRD_START,
             activity_decay_max: VRD_MAX,
             ordinal: 0,
@@ -210,6 +213,7 @@ impl Default for VarDB {
         const VRD_MAX: f64 = 0.96;
         const VRD_START: f64 = 0.8;
         VarDB {
+            level: Vec::new(),
             activity_decay: VRD_START,
             activity_decay_max: VRD_MAX,
             ordinal: 0,
@@ -390,24 +394,21 @@ impl Instantiate for VarDB {
     fn instantiate(_: &Config, cnf: &CNFDescription) -> Self {
         let nv = cnf.num_of_variables;
         VarDB {
+            level: vec![DecisionLevel::default(); nv + 1],
             var: Var::new_vars(nv),
             lbd_temp: vec![0; nv + 1],
             ..VarDB::default()
         }
     }
+    #[allow(unused_variables)]
     fn adapt_to(&mut self, state: &State, num_conflict: usize) {
         if 0 == num_conflict {
             let nv = self.var.len();
             self.core_size.update(((CORE_HISOTRY_LEN * nv) as f64).ln());
             return;
         }
-        const VRD_DEC_STRICT: f64 = 0.001;
-        const VRD_DEC_STD: f64 = 0.003;
-        const VRD_DEC_HIGH: f64 = 0.008;
         const VRD_FILTER: f64 = 0.5;
-        const VRD_INTERVAL: usize = 20_000;
         const VRD_MAX_START: f64 = 0.2;
-        const VRD_OFFSET: f64 = 10.0;
         let msr: (f64, f64) = self.var[1..]
             .iter()
             .map(|v| v.reward)
@@ -507,17 +508,25 @@ impl VarDBIF for VarDB {
         }
         lbd_temp[0] = key;
     }
+    fn level_mut(&mut self) -> &mut [DecisionLevel] {
+        &mut self.level
+    }
+    fn lv_mut(&mut self) -> (&[DecisionLevel], &mut [Var]) {
+        (&self.level, &mut self.var)
+    }
 }
 
 impl LBDIF for VarDB {
     fn compute_lbd(&mut self, vec: &[Lit]) -> usize {
-        let VarDB { lbd_temp, var, .. } = self;
+        let VarDB {
+            lbd_temp, level, ..
+        } = self;
         unsafe {
             let key: usize = lbd_temp.get_unchecked(0) + 1;
             *lbd_temp.get_unchecked_mut(0) = key;
             let mut cnt = 0;
             for l in vec {
-                let lv = var[l.vi()].level;
+                let lv = level[l.vi()];
                 let p = lbd_temp.get_unchecked_mut(lv as usize);
                 if *p != key {
                     *p = key;
@@ -541,7 +550,7 @@ impl LBDIF for VarDB {
                 key += 1;
                 let mut cnt = 0;
                 for l in &c.lits {
-                    let lv = self.var[l.vi()].level;
+                    let lv = self.level[l.vi()];
                     if lv != 0 {
                         let p = lbd_temp.get_unchecked_mut(lv as usize);
                         if *p != key {
