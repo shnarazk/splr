@@ -22,6 +22,7 @@ EVSIDS = []
 ema_calibration = []
 boundary_check = []
 trace_analyze = []
+use_core = []
 
 [profile.release]
 lto = "fat"

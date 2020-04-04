@@ -1,11 +1,8 @@
+#[cfg(feature = "use_core")]
+use crate::state::SearchStrategy;
 /// Crate `var` provides `var` object and its manager `VarDB`.
 use {
-    crate::{
-        clause::ClauseDBIF,
-        propagator::PropagatorIF,
-        state::{SearchStrategy, State},
-        types::*,
-    },
+    crate::{clause::ClauseDBIF, propagator::PropagatorIF, state::State, types::*},
     std::{
         fmt,
         ops::{Index, IndexMut, Range, RangeFrom},
@@ -417,15 +414,24 @@ impl Instantiate for VarDB {
         let thr = msr.0 * VRD_FILTER + ar * (1.0 - VRD_FILTER);
         let core = self.var[1..].iter().filter(|v| thr <= v.reward).count();
         self.core_size.update(core as f64);
-        if num_conflict % VRD_INTERVAL == 0 {
-            let k = match state.strategy.0 {
-                SearchStrategy::LowDecisions => VRD_DEC_HIGH,
-                SearchStrategy::HighSuccesive => VRD_DEC_STRICT,
-                _ => VRD_DEC_STD,
-            };
-            let c = (self.core_size.get() - VRD_OFFSET).max(1.0);
-            let delta = 0.1 * k * (c.sqrt() * c.ln());
-            self.activity_decay_max = 1.0 - delta;
+        #[cfg(feature = "use_core")]
+        {
+            const VRD_DEC_STRICT: f64 = 0.001;
+            const VRD_DEC_STD: f64 = 0.003;
+            const VRD_DEC_HIGH: f64 = 0.008;
+            const VRD_INTERVAL: usize = 20_000;
+            const VRD_OFFSET: f64 = 10.0;
+
+            if num_conflict % VRD_INTERVAL == 0 {
+                let k = match state.strategy.0 {
+                    SearchStrategy::LowDecisions => VRD_DEC_HIGH,
+                    SearchStrategy::HighSuccesive => VRD_DEC_STRICT,
+                    _ => VRD_DEC_STD,
+                };
+                let c = (self.core_size.get() - VRD_OFFSET).max(1.0);
+                let delta = 0.1 * k * (c.sqrt() * c.ln());
+                self.activity_decay_max = 1.0 - delta;
+            }
         }
     }
 }
