@@ -575,38 +575,31 @@ impl LBDIF for AssignStack {
             cnt
         }
     }
-    fn reset_lbd<C>(&mut self, cdb: &mut C, _all: bool)
+    fn reset_lbd<C>(&mut self, cdb: &mut C, all: bool)
     where
         C: ClauseDBIF,
     {
         let AssignStack { lbd_temp, .. } = self;
-        unsafe {
-            let mut key = *lbd_temp.get_unchecked(0);
-            for c in &mut cdb.iter_mut().skip(1) {
-                if c.is(Flag::DEAD) || !c.is(Flag::LEARNT) {
-                    continue;
-                }
-                if
-                /* !all && */
-                !c.is(Flag::JUST_USED) {
-                    continue;
-                }
-                key += 1;
-                let mut cnt = 0;
-                for l in &c.lits {
-                    let lv = self.level[l.vi()];
-                    if lv != 0 {
-                        let p = lbd_temp.get_unchecked_mut(lv as usize);
-                        if *p != key {
-                            *p = key;
-                            cnt += 1;
-                        }
+        let mut key = lbd_temp[0];
+        for c in &mut cdb.iter_mut().skip(1) {
+            if c.is(Flag::DEAD) || !c.is(Flag::LEARNT) || (!all && !c.is(Flag::JUST_USED)) {
+                continue;
+            }
+            key += 1;
+            let mut cnt = 0;
+            for l in &c.lits {
+                let lv = self.level[l.vi()];
+                if lv != 0 {
+                    let p = unsafe { lbd_temp.get_unchecked_mut(lv as usize) };
+                    if *p != key {
+                        *p = key;
+                        cnt += 1;
                     }
                 }
-                c.rank = cnt;
             }
-            *lbd_temp.get_unchecked_mut(0) = key;
+            c.rank = cnt;
         }
+        lbd_temp[0] = key;
         self.num_lbd_update += 1;
     }
 }
