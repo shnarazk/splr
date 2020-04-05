@@ -386,7 +386,7 @@ impl EliminateIF for Eliminator {
         for v in vdb.iter_mut().skip(1) {
             if v.reason != AssignReason::None {
                 #[cfg(feature = "boundary_check")]
-                assert_eq!(v.level, state.root_level);
+                assert_eq!(asgs.level_ref()[v.index], state.root_level);
                 v.reason = AssignReason::None;
             }
         }

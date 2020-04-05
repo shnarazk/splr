@@ -801,7 +801,8 @@ fn conflict_analyze(
         } {
             #[cfg(feature = "trace_analyze")]
             println!("- skip {} because it isn't flagged", asgs[ti].int());
-            debug_assert!(
+            #[cfg(feature = "boundary_check")]
+            assert!(
                 0 < ti,
                 format!(
                     "lv: {}, learnt: {:?}\nconflict: {:?}",
@@ -1028,6 +1029,7 @@ fn analyze_final(asgs: &AssignStack, state: &mut State, vdb: &mut VarDB, c: &Cla
     }
 }
 
+#[allow(dead_code)]
 impl VarDB {
     fn dump<'a, A, V: IntoIterator<Item = &'a Lit, IntoIter = Iter<'a, Lit>>>(
         &mut self,

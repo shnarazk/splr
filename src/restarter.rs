@@ -155,9 +155,7 @@ impl EmaIF for ProgressLBD {
 
 impl ProgressEvaluator for ProgressLBD {
     fn is_active(&self) -> bool {
-        self.enable
-        // && (self.sum as f64) < self.ema.get() * (self.num as f64) * self.threshold
-            && self.threshold < self.ema.trend()
+        self.enable && self.threshold < self.ema.trend()
     }
     fn shift(&mut self) {}
 }
