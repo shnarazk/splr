@@ -615,7 +615,7 @@ fn handle_conflict(
         );
         let lbd = cdb[cid].rank;
         rst.update(RestarterModule::LBD, lbd);
-        if learnt_len < 10 {
+        if learnt_len < 8 {
             state.to_eliminate += std::f64::consts::E.powf(-(learnt_len as f64));
         }
     }
