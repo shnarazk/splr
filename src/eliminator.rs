@@ -462,13 +462,13 @@ impl EliminateIF for Eliminator {
                 if bool::from(*l) {
                     debug_assert!(
                         !w.pos_occurs.contains(&cid),
-                        format!("{} {:?} {}", cid, vec2int(&c.lits), v.index,)
+                        format!("{} {:?} {}", cid, c, v.index,)
                     );
                     w.pos_occurs.push(cid);
                 } else {
                     debug_assert!(
                         !w.neg_occurs.contains(&cid),
-                        format!("{} {:?} {}", cid, vec2int(&c.lits), v.index,)
+                        format!("{} {:?} {}", cid, c, v.index,)
                     );
                     w.neg_occurs.push(cid);
                 }
@@ -765,12 +765,11 @@ where
 {
     match subsume(cdb, cid, did) {
         Some(NULL_LIT) => {
-            // println!("BackSubsC    => {} {} subsumed completely by {} {:#}",
-            //          did.fmt(),
-            //          *clause!(cdb, cid),
-            //          cid.fmt(),
-            //          *clause!(cdb, cid),
-            // );
+            #[cfg(feature = "trace_elimination")]
+            println!(
+                "BackSubsC    => {} {} subsumed completely by {} {:#}",
+                did, cdb[did], cid, cdb[cid],
+            );
             cdb.detach(did);
             elim.remove_cid_occur(vdb, did, &mut cdb[did]);
             if !cdb[did].is(Flag::LEARNT) {
@@ -778,7 +777,8 @@ where
             }
         }
         Some(l) => {
-            // println!("BackSubC subsumes {} from {} and {}", l.int(), cid.format(), did.format());
+            #[cfg(feature = "trace_elimination")]
+            println!("BackSubC subsumes {} from {} and {}", l, cid, did,);
             strengthen_clause(asgs, cdb, elim, vdb, did, !l)?;
             elim.enqueue_var(vdb, l.vi(), true);
         }
@@ -908,7 +908,8 @@ where
     let qpb = &cdb[ciq];
     let ps_smallest = pqb.len() < qpb.len();
     let (pb, qb) = if ps_smallest { (pqb, qpb) } else { (qpb, pqb) };
-    // println!(" -  {:?}{:?} & {:?}{:?}", vec2int(&ph.lit),vec2int(&pb.lits),vec2int(&qh.lit),vec2int(&qb.lits));
+    #[cfg(feature = "trace_elimination")]
+    println!(" -  {:?} & {:?}", pb, qb);
     'next_literal: for l in &qb.lits {
         if l.vi() != v {
             for j in &pb.lits {
@@ -928,7 +929,14 @@ where
             vec.push(*l);
         }
     }
-    // println!("merge generated {:?} from {} and {} to eliminate {}", vec2int(vec.clone()), p, q, v);
+    #[cfg(feature = "trace_elimination")]
+    println!(
+        "merge generated {:?} from {} and {} to eliminate {}",
+        vec2int(&vec),
+        pb,
+        qb,
+        v
+    );
     vec.len()
 }
 
@@ -957,12 +965,17 @@ where
         debug_assert!(2 == cdb[cid].len());
         let c0 = cdb[cid][0];
         debug_assert_ne!(c0, l);
-        // println!("{} {:?} is removed and its first literal {} is enqueued.", cid.format(), vec2int(&cdb.clause[cid].lits), c0.int());
+        #[cfg(feature = "trace_elimination")]
+        println!(
+            "{} {:?} is removed and its first literal {} is enqueued.",
+            cid, cdb[cid], c0,
+        );
         cdb.detach(cid);
         elim.remove_cid_occur(vdb, cid, &mut cdb[cid]);
         asgs.assign_at_rootlevel(vdb, c0)
     } else {
-        // println!("cid {} drops literal {}", cid.fmt(), l.int());
+        #[cfg(feature = "trace_elimination")]
+        println!("cid {} drops literal {}", cid, l);
         #[cfg(feature = "boundary_check")]
         assert!(1 < cdb[cid].len());
         elim.enqueue_clause(cid, &mut cdb[cid]);
@@ -1001,8 +1014,9 @@ where
     // Store the length of the clause last:
     debug_assert_eq!(vec[first].vi(), vi);
     vec.push(Lit::from(c.len()));
+    #[cfg(feature = "trace_elimination")]
+    println!("make_eliminated_clause: eliminate({}) clause {:?}", vi, c);
     cdb.touch_var(vi);
-    // println!("make_eliminated_clause: eliminate({}) clause {:?}", vi, vec2int(&ch.lits));
 }
 
 fn eliminate_var<A, C, V>(
@@ -1041,18 +1055,24 @@ where
         // Produce clauses in cross product:
         for p in &*pos {
             for n in &*neg {
-                // println!("eliminator replaces {} with a cross product {:?}", p.fmt(), vec2int(&vec));
+                #[cfg(feature = "trace_elimination")]
+                println!(
+                    "eliminator replaces {} with a cross product {:?}",
+                    p,
+                    vec2int(&*vec)
+                );
                 match merge(cdb, *p, *n, vi, &mut *vec) {
                     0 => (),
                     1 => {
-                        // println!(
-                        //     "eliminate_var: grounds {} from {}{:?} and {}{:?}",
-                        //     vec[0].int(),
-                        //     p.fmt(),
-                        //     vec2int(&clause!(*cp, *p).lits),
-                        //     n.fmt(),
-                        //     vec2int(&clause!(*cp, *n).lits)
-                        // );
+                        #[cfg(feature = "trace_elimination")]
+                        println!(
+                            "eliminate_var: grounds {} from {}{:?} and {}{:?}",
+                            (*vec)[0],
+                            p,
+                            cdb[*p],
+                            n,
+                            cdb[*n],
+                        );
                         let lit = (*vec)[0];
                         cdb.certificate_add(&*vec);
                         asgs.assign_at_rootlevel(vdb, lit)?;
