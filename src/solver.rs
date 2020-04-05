@@ -713,12 +713,12 @@ fn conflict_analyze(
                         path_cnt += 1;
                         vdb.reward_at_analysis(vi);
                     } else {
-                        #[cfg(feature = "trace_analyze")]
+                        #[cfg(feature = "trace_analysis")]
                         println!("- push {} to learnt, which level is {}", q.int(), lvl);
                         // learnt.push(l);
                     }
                 } else {
-                    #[cfg(feature = "trace_analyze")]
+                    #[cfg(feature = "trace_analysis")]
                     {
                         if !v.is(Flag::CA_SEEN) {
                             println!("- ignore {} because it was flagged", q.int());
@@ -729,7 +729,7 @@ fn conflict_analyze(
                 }
             }
             AssignReason::Implication(cid, _) => {
-                #[cfg(feature = "trace_analyze")]
+                #[cfg(feature = "trace_analysis")]
                 println!("analyze {}", p.int());
                 debug_assert_ne!(cid, ClauseId::default());
                 if cdb[cid].is(Flag::LEARNT) {
@@ -751,7 +751,7 @@ fn conflict_analyze(
                         &vdb[p]
                     )
                 );
-                #[cfg(feature = "trace_analyze")]
+                #[cfg(feature = "trace_analysis")]
                 println!("- handle {}", cid.fmt());
                 for q in &c[(p != NULL_LIT) as usize..] {
                     let vi = q.vi();
@@ -773,12 +773,12 @@ fn conflict_analyze(
                             //
                             vdb.reward_at_analysis(vi);
                         } else {
-                            #[cfg(feature = "trace_analyze")]
+                            #[cfg(feature = "trace_analysis")]
                             println!("- push {} to learnt, which level is {}", q.int(), lvl);
                             learnt.push(*q);
                         }
                     } else {
-                        #[cfg(feature = "trace_analyze")]
+                        #[cfg(feature = "trace_analysis")]
                         {
                             if !v.is(Flag::CA_SEEN) {
                                 println!("- ignore {} because it was flagged", q.int());
@@ -797,7 +797,7 @@ fn conflict_analyze(
             let v = &vdb[vi];
             !v.is(Flag::CA_SEEN) || lvl != dl
         } {
-            #[cfg(feature = "trace_analyze")]
+            #[cfg(feature = "trace_analysis")]
             println!("- skip {} because it isn't flagged", asgs[ti].int());
             #[cfg(feature = "boundary_check")]
             assert!(
@@ -812,7 +812,7 @@ fn conflict_analyze(
             ti -= 1;
         }
         p = asgs[ti];
-        #[cfg(feature = "trace_analyze")]
+        #[cfg(feature = "trace_analysis")]
         println!(
             "- move to flagged {}, which reason is {}; num path: {}",
             p.vi(),
@@ -832,7 +832,7 @@ fn conflict_analyze(
     debug_assert!(learnt.iter().all(|l| *l != !p));
     debug_assert_eq!(asgs.level_ref()[p.vi()], dl);
     learnt[0] = !p;
-    #[cfg(feature = "trace_analyze")]
+    #[cfg(feature = "trace_analysis")]
     println!(
         "- appending {}, the result is {:?}",
         learnt[0].int(),
