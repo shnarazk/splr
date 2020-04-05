@@ -116,7 +116,7 @@ pub trait WatchDBIF {
     /// remove a clause which id is `cid` from the watcher list. *O(n)* operation.
     fn detach_with(&mut self, cid: ClauseId);
     /// update blocker of cid.
-    fn update_blocker(&mut self, cid: ClauseId, l: Lit);
+    fn update_blocker(&mut self, cid: ClauseId, l: Lit, binary: bool);
 }
 
 /// Record of clause operations to build DRAT certifications.
@@ -212,10 +212,11 @@ impl WatchDBIF for Vec<Watch> {
         }
     }
     /// This O(n) functon is used only in Eliminator. So the cost can be ignored.
-    fn update_blocker(&mut self, cid: ClauseId, l: Lit) {
+    fn update_blocker(&mut self, cid: ClauseId, l: Lit, binary: bool) {
         for w in &mut self[..] {
             if w.c == cid {
                 w.blocker = l;
+                w.binary = binary;
                 return;
             }
         }
@@ -1037,7 +1038,7 @@ impl ClauseDBIF for ClauseDB {
             self.watcher[!q].register(r, cid, bin);
             if bin {
                 // update another bocker
-                self.watcher[!r].update_blocker(cid, q);
+                self.watcher[!r].update_blocker(cid, q, true);
             }
         } else {
             lits.delete_unstable(|&x| x == p);
@@ -1045,8 +1046,8 @@ impl ClauseDBIF for ClauseDB {
                 // update another bocker
                 let q = lits[0];
                 let r = lits[1];
-                self.watcher[!q].update_blocker(cid, r);
-                self.watcher[!r].update_blocker(cid, q);
+                self.watcher[!q].update_blocker(cid, r, true);
+                self.watcher[!r].update_blocker(cid, q, true);
             }
         }
         false
