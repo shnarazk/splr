@@ -1,8 +1,8 @@
 /// Crate `eliminator` implments clause subsumption and var elimination.
 use {
     crate::{
+        assigner::AssignIF,
         clause::ClauseDBIF,
-        propagator::PropagatorIF,
         state::{State, StateIF},
         types::*,
         var::{VarDBIF, VarRewardIF},
@@ -23,7 +23,7 @@ use {
 /// API for Eliminator like `activate`, `stop`, `eliminate` and so on.
 ///```
 /// use crate::{splr::config::Config, splr::types::*};
-/// use crate::splr::eliminator::{Eliminator, EliminatorIF};
+/// use crate::splr::eliminator::{Eliminator, EliminateIF};
 /// use crate::splr::solver::Solver;
 
 /// let mut s = Solver::instantiate(&Config::default(), &CNFDescription::default());
@@ -34,7 +34,7 @@ use {
 /// assert_eq!(elim.is_running(), false);
 /// assert_eq!(elim.simplify(&mut s.asgs, &mut s.cdb, &mut s.state, &mut s.vdb), Ok(()));
 ///```
-pub trait EliminatorIF {
+pub trait EliminateIF {
     /// set eliminator's mode to **ready**.
     fn activate(&mut self);
     /// set eliminator's mode to **dormant**.
@@ -68,7 +68,7 @@ pub trait EliminatorIF {
         vdb: &mut V,
     ) -> MaybeInconsistent
     where
-        A: PropagatorIF,
+        A: AssignIF,
         C: ClauseDBIF,
         V: VarDBIF + VarRewardIF;
     /// inject assignments for eliminated vars.
@@ -298,7 +298,7 @@ impl Instantiate for Eliminator {
     }
 }
 
-impl EliminatorIF for Eliminator {
+impl EliminateIF for Eliminator {
     fn activate(&mut self) {
         debug_assert!(self.mode != EliminatorMode::Running);
         self.mode = EliminatorMode::Waiting;
@@ -377,7 +377,7 @@ impl EliminatorIF for Eliminator {
         vdb: &mut V,
     ) -> MaybeInconsistent
     where
-        A: PropagatorIF,
+        A: AssignIF,
         C: ClauseDBIF,
         V: VarDBIF + VarRewardIF,
     {
@@ -520,7 +520,7 @@ impl Eliminator {
         timedout: &Arc<AtomicBool>,
     ) -> MaybeInconsistent
     where
-        A: PropagatorIF,
+        A: AssignIF,
         C: ClauseDBIF,
         V: VarDBIF + VarRewardIF,
     {
@@ -608,7 +608,7 @@ impl Eliminator {
         vdb: &mut V,
     ) -> MaybeInconsistent
     where
-        A: PropagatorIF,
+        A: AssignIF,
         C: ClauseDBIF,
         V: VarDBIF + VarRewardIF,
     {
@@ -640,7 +640,7 @@ impl Eliminator {
         vdb: &mut V,
     ) -> MaybeInconsistent
     where
-        A: PropagatorIF,
+        A: AssignIF,
         C: ClauseDBIF,
         V: VarDBIF + VarRewardIF,
     {
@@ -759,7 +759,7 @@ fn try_subsume<A, C, V>(
     did: ClauseId,
 ) -> MaybeInconsistent
 where
-    A: PropagatorIF,
+    A: AssignIF,
     C: ClauseDBIF,
     V: VarDBIF + VarRewardIF,
 {
@@ -944,7 +944,7 @@ fn strengthen_clause<A, C, V>(
     l: Lit,
 ) -> MaybeInconsistent
 where
-    A: PropagatorIF,
+    A: AssignIF,
     C: ClauseDBIF,
     V: VarDBIF + VarRewardIF,
 {
@@ -1015,7 +1015,7 @@ fn eliminate_var<A, C, V>(
     timedout: &Arc<AtomicBool>,
 ) -> MaybeInconsistent
 where
-    A: PropagatorIF,
+    A: AssignIF,
     C: ClauseDBIF,
     V: VarDBIF + VarRewardIF,
 {

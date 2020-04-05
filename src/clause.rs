@@ -1,8 +1,8 @@
 /// Crate `clause` provides `clause` object and its manager `ClauseDB`
 use {
     crate::{
-        eliminator::EliminatorIF,
-        propagator::PropagatorIF,
+        assigner::AssignIF,
+        eliminator::EliminateIF,
         state::{SearchStrategy, State},
         types::*,
         var::VarDBIF,
@@ -66,12 +66,12 @@ pub trait ClauseDBIF: IndexMut<ClauseId, Output = Clause> {
         level_sort: Option<&mut V>,
     ) -> ClauseId
     where
-        A: PropagatorIF,
+        A: AssignIF,
         V: VarDBIF;
     /// check and convert a learnt clause to permanent if needed.
     fn convert_to_permanent<A>(&mut self, asgs: &mut A, cid: ClauseId) -> bool
     where
-        A: PropagatorIF;
+        A: AssignIF;
     /// return the number of alive clauses in the database. Or return the database size if `active` is `false`.
     fn count(&self, alive: bool) -> usize;
     /// return the number of clauses which satisfy given flags and aren't DEAD.
@@ -83,7 +83,7 @@ pub trait ClauseDBIF: IndexMut<ClauseId, Output = Clause> {
     /// delete satisfied clauses at decision level zero.
     fn eliminate_satisfied_clauses<E, V>(&mut self, elim: &mut E, vdb: &mut V, occur: bool)
     where
-        E: EliminatorIF,
+        E: EliminateIF,
         V: VarDBIF;
     /// flag positive and negative literals of a var as dirty
     fn touch_var(&mut self, vi: VarId);
@@ -760,7 +760,7 @@ impl ClauseDBIF for ClauseDB {
         level_sort: Option<&mut V>,
     ) -> ClauseId
     where
-        A: PropagatorIF,
+        A: AssignIF,
         V: VarDBIF,
     {
         let reward = self.activity_inc;
@@ -863,7 +863,7 @@ impl ClauseDBIF for ClauseDB {
     }
     fn convert_to_permanent<A>(&mut self, asgs: &mut A, cid: ClauseId) -> bool
     where
-        A: PropagatorIF,
+        A: AssignIF,
     {
         let chan_seok_condition = if self.use_chan_seok {
             self.co_lbd_bound
@@ -957,7 +957,7 @@ impl ClauseDBIF for ClauseDB {
     }
     fn eliminate_satisfied_clauses<E, V>(&mut self, elim: &mut E, vdb: &mut V, update_occur: bool)
     where
-        E: EliminatorIF,
+        E: EliminateIF,
         V: VarDBIF,
     {
         for (cid, c) in &mut self.clause.iter_mut().enumerate().skip(1) {
@@ -1127,7 +1127,7 @@ impl ClauseDB {
 mod tests {
     use super::*;
     use crate::clause::ClauseDB;
-    use crate::propagator::{AssignStack, PropagatorIF};
+    use crate::propagator::{AssignIF, AssignStack};
     use crate::var::VarDB;
 
     fn lit(i: i32) -> Lit {

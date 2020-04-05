@@ -152,14 +152,14 @@ While Splr comes with **ABSOLUTELY NO WARRANTY**, Splr version 0.1.0 (splr-0.1.0
      * The remaining 14 certificates weren't able to be verified due to [timeout](https://gitlab.com/satisfiability01/splr/issues/74#note_142021555) by drat-trim.
 */
 // /// Subsumption-based clause/var elimination
+/// Crate `assigner` implements Boolean Constraint Propagation and decision var selection.
+pub mod assigner;
 /// Crate `clause` provides `clause` object and its manager `ClauseDB`
 pub mod clause;
 /// Crate `config` provides solver's configuration and CLI.
 pub mod config;
 /// Crate `eliminator` implments clause subsumption and var elimination.
 pub mod eliminator;
-/// Crate `propagator` implements Boolean Constraint Propagation and decision var selection.
-pub mod propagator;
 /// Crate `restarter` provides restart heuristics.
 pub mod restarter;
 /// Crate `solver` provides the top-level API as a SAT solver.

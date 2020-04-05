@@ -1,9 +1,9 @@
 /// Crate 'solver' provides the top-level API as a SAT solver.
 use {
     crate::{
+        assigner::{AssignIF, AssignStack, VarSelectionIF},
         clause::{ClauseDB, ClauseDBIF},
-        eliminator::{Eliminator, EliminatorIF},
-        propagator::{AssignStack, PropagatorIF, VarSelectionIF},
+        eliminator::{EliminateIF, Eliminator},
         restarter::{RestartIF, Restarter, RestarterModule},
         state::{Stat, State, StateIF},
         types::*,
@@ -1035,7 +1035,7 @@ impl VarDB {
         v: V,
     ) -> Vec<(i32, DecisionLevel, bool, Option<bool>)>
     where
-        A: PropagatorIF,
+        A: AssignIF,
     {
         v.into_iter()
             .map(|l| {

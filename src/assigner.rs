@@ -27,7 +27,7 @@ pub trait LBDIF {
 }
 
 /// API for assignment like `propagate`, `enqueue`, `cancel_until`, and so on.
-pub trait PropagatorIF: Index<usize, Output = Lit> + LBDIF {
+pub trait AssignIF: Index<usize, Output = Lit> + LBDIF {
     /// return the number of assignments.
     fn len(&self) -> usize;
     /// return the number of assignments at a given decision level `u`.
@@ -296,7 +296,7 @@ impl Export<(usize, usize, usize)> for AssignStack {
     }
 }
 
-impl PropagatorIF for AssignStack {
+impl AssignIF for AssignStack {
     fn len(&self) -> usize {
         self.trail.len()
     }

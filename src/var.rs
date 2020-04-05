@@ -2,7 +2,7 @@
 use crate::state::SearchStrategy;
 /// Crate `var` provides `var` object and its manager `VarDB`.
 use {
-    crate::{clause::ClauseDBIF, propagator::PropagatorIF, state::State, types::*},
+    crate::{assigner::AssignIF, clause::ClauseDBIF, state::State, types::*},
     std::{
         fmt,
         ops::{Index, IndexMut, Range, RangeFrom},
@@ -517,7 +517,7 @@ impl VarDB {
     #[allow(dead_code)]
     fn bump_vars<A, C>(&mut self, asgs: &A, cdb: &C, confl: ClauseId)
     where
-        A: PropagatorIF,
+        A: AssignIF,
         C: ClauseDBIF,
     {
         debug_assert_ne!(confl, ClauseId::default());
@@ -555,7 +555,7 @@ impl VarDB {
     #[allow(dead_code)]
     fn dump_dependency<A, C>(&mut self, asgs: &A, cdb: &C, confl: ClauseId)
     where
-        A: PropagatorIF,
+        A: AssignIF,
         C: ClauseDBIF,
     {
         debug_assert_ne!(confl, ClauseId::default());

@@ -1,9 +1,9 @@
 /// Crate `state` is a collection of internal data.
 use {
     crate::{
+        assigner::AssignIF,
         clause::ClauseDBIF,
-        eliminator::EliminatorIF,
-        propagator::PropagatorIF,
+        eliminator::EliminateIF,
         restarter::{RestartIF, RestartMode},
         types::*,
         var::VarDBIF,
@@ -30,7 +30,7 @@ pub trait StateIF {
     /// change heuristics based on stat data.
     fn select_strategy<A, C>(&mut self, asgs: &A, cdb: &C)
     where
-        A: Export<(usize, usize, usize)> + PropagatorIF,
+        A: Export<(usize, usize, usize)> + AssignIF,
         C: Export<(usize, usize, usize, usize, usize, usize)> + ClauseDBIF;
     /// write a header of stat data to stdio.
     fn progress_header(&self);
@@ -44,9 +44,9 @@ pub trait StateIF {
         vdb: &V,
         mes: Option<&str>,
     ) where
-        A: Export<(usize, usize, usize)> + PropagatorIF,
+        A: Export<(usize, usize, usize)> + AssignIF,
         C: Export<(usize, usize, usize, usize, usize, usize)> + ClauseDBIF,
-        E: Export<(usize, usize)> + EliminatorIF,
+        E: Export<(usize, usize)> + EliminateIF,
         R: Export<(RestartMode, usize, f64, f64, f64)> + RestartIF,
         V: Export<(f64, f64)> + VarDBIF;
     /// write a short message to stdout.
@@ -342,7 +342,7 @@ impl StateIF for State {
     }
     fn select_strategy<A, C>(&mut self, asgs: &A, cdb: &C)
     where
-        A: Export<(usize, usize, usize)> + PropagatorIF,
+        A: Export<(usize, usize, usize)> + AssignIF,
         C: Export<(usize, usize, usize, usize, usize, usize)> + ClauseDBIF,
     {
         if self.config.without_adaptive_strategy {
@@ -398,9 +398,9 @@ impl StateIF for State {
         vdb: &V,
         mes: Option<&str>,
     ) where
-        A: Export<(usize, usize, usize)> + PropagatorIF,
+        A: Export<(usize, usize, usize)> + AssignIF,
         C: Export<(usize, usize, usize, usize, usize, usize)> + ClauseDBIF,
-        E: Export<(usize, usize)> + EliminatorIF,
+        E: Export<(usize, usize)> + EliminateIF,
         R: Export<(RestartMode, usize, f64, f64, f64)> + RestartIF,
         V: Export<(f64, f64)> + VarDBIF,
     {
@@ -739,9 +739,9 @@ impl State {
         vdb: &V,
         mes: Option<&str>,
     ) where
-        A: Export<(usize, usize, usize)> + PropagatorIF,
+        A: Export<(usize, usize, usize)> + AssignIF,
         C: Export<(usize, usize, usize, usize, usize, usize)> + ClauseDBIF,
-        E: Export<(usize, usize, usize)> + EliminatorIF,
+        E: Export<(usize, usize, usize)> + EliminateIF,
         R: Export<(RestartMode, usize, f64, f64, f64)> + RestartIF,
         V: Export<(f64, f64)> + VarDBIF,
     {
