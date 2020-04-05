@@ -871,6 +871,9 @@ impl ClauseDBIF for ClauseDB {
             0
         };
         let c = &mut self[cid];
+        if c.is(Flag::JUST_USED) {
+            return false;
+        }
         debug_assert!(!c.is(Flag::DEAD), format!("found {} is dead: {}", cid, c));
         if 2 < c.rank {
             c.turn_on(Flag::JUST_USED);

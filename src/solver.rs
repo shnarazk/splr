@@ -3,7 +3,7 @@ use {
     crate::{
         clause::{ClauseDB, ClauseDBIF},
         eliminator::{Eliminator, EliminatorIF},
-        propagator::{AssignStack, PropagatorIF, VarSelectionIF, LBDIF},
+        propagator::{AssignStack, PropagatorIF, VarSelectionIF},
         restarter::{RestartIF, Restarter, RestarterModule},
         state::{Stat, State, StateIF},
         types::*,
@@ -399,14 +399,14 @@ fn search(
         if asgs.level() == state.root_level {
             // `elim.to_eliminate` is increased much in particular when vars are solved or
             // learnts are small. We don't need to count the number of solved vars.
-            asgs.reset_lbd(cdb, false);
+            // asgs.reset_lbd(cdb, false);
             if state.config.elim_trigger < state.to_eliminate as usize {
                 state.to_eliminate = 0.0;
                 if elim.enable {
                     elim.activate();
                 }
                 elim.simplify(asgs, cdb, state, vdb)?;
-                asgs.reset_lbd(cdb, false);
+                // asgs.reset_lbd(cdb, false);
             }
             // By simplification, we may get further solutions.
             if state.num_solved_vars < asgs.len() {
@@ -632,9 +632,7 @@ fn handle_conflict(
             rst_lbd_trend.min(10.0),
         ));
     }
-    if cdb.check_and_reduce(vdb, ncnfl) {
-        asgs.reset_lbd(cdb, true);
-    }
+    cdb.check_and_reduce(vdb, ncnfl);
     if ncnfl % state.reflection_interval == 0 {
         adapt_modules(asgs, cdb, elim, rst, state, vdb)?;
         if let Some(p) = state.elapsed() {
@@ -737,10 +735,10 @@ fn conflict_analyze(
                 println!("analyze {}", p.int());
                 debug_assert_ne!(cid, ClauseId::default());
                 if cdb[cid].is(Flag::LEARNT) {
-                    cdb.bump_activity(cid, ());
-                    if !cdb.convert_to_permanent(asgs, cid) {
+                    if !cdb[cid].is(Flag::JUST_USED) && !cdb.convert_to_permanent(asgs, cid) {
                         cdb[cid].turn_on(Flag::JUST_USED);
                     }
+                    cdb.bump_activity(cid, ());
                 }
                 let c = &cdb[cid];
                 #[cfg(feature = "boundary_check")]
