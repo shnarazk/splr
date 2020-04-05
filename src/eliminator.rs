@@ -1426,10 +1426,18 @@ mod tests {
         };
         let mut s = Solver::instantiate(&cfg, &cnf);
 
-        let c1 = s.cdb.new_clause(&mut mkv![1, 2, 3], None::<&mut VarDB>);
-        let c2 = s.cdb.new_clause(&mut mkv![-2, 3, 4], None::<&mut VarDB>);
-        let c3 = s.cdb.new_clause(&mut mkv![-2, -3], None::<&mut VarDB>);
-        let c4 = s.cdb.new_clause(&mut mkv![1, 2, -3, 9], None::<&mut VarDB>);
+        let c1 = s
+            .cdb
+            .new_clause(&mut s.asgs, &mut mkv![1, 2, 3], None::<&mut VarDB>);
+        let c2 = s
+            .cdb
+            .new_clause(&mut s.asgs, &mut mkv![-2, 3, 4], None::<&mut VarDB>);
+        let c3 = s
+            .cdb
+            .new_clause(&mut s.asgs, &mut mkv![-2, -3], None::<&mut VarDB>);
+        let c4 = s
+            .cdb
+            .new_clause(&mut s.asgs, &mut mkv![1, 2, -3, 9], None::<&mut VarDB>);
         //    {
         //        let vec = [&c2, &c3]; // [&c1, &c2, &c3, &c4];
         //        for x in &vec {
@@ -1455,9 +1463,9 @@ mod tests {
         //    println!("::done");
     }
 
-    fn mk_c(s: &mut Solver, i: usize, v: Vec<i32>) -> ClauseId {
-        let mut vec = v.iter().map(|i| Lit::from(*i)).collect::<Vec<Lit>>();
-        let cid = s.cdb.new_clause(&mut vec, None::<&mut VarDB>);
-        cid
-    }
+    // fn mk_c(s: &mut Solver, i: usize, v: Vec<i32>) -> ClauseId {
+    //     let mut vec = v.iter().map(|i| Lit::from(*i)).collect::<Vec<Lit>>();
+    //     let cid = s.cdb.new_clause(&mut vec, None::<&mut VarDB>);
+    //     cid
+    // }
 }

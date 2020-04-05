@@ -1021,7 +1021,7 @@ mod tests {
         // [1, 2, 3] => [1, 2, 3, 4]
         asgs.assign_by_decision(vdb, lit(4));
         assert_eq!(asgs.trail, vec![lit(1), lit(2), lit(3), lit(4)]);
-        assert_eq!(vdb[lit(4)].level, 2);
+        assert_eq!(asgs.level[lit(4).vi()], 2);
         assert_eq!(asgs.trail_lim, vec![2, 3]);
 
         // [1, 2, 3, 4] => [1, 2, -4]

@@ -1161,14 +1161,14 @@ mod tests {
         asgs.assign_by_decision(&mut vdb, lit(1));
         asgs.assign_by_decision(&mut vdb, lit(-2));
 
-        let c1 = cdb.new_clause(&mut [lit(1), lit(2), lit(3)], None::<&mut VarDB>);
+        let c1 = cdb.new_clause(&mut asgs, &mut [lit(1), lit(2), lit(3)], None::<&mut VarDB>);
         let c = &cdb[c1];
         assert_eq!(c.rank, 0);
         assert!(!c.is(Flag::DEAD));
         assert!(!c.is(Flag::LEARNT));
         assert!(!c.is(Flag::JUST_USED));
 
-        let c2 = cdb.new_clause(&mut [lit(-1), lit(2), lit(3)], Some(&mut vdb));
+        let c2 = cdb.new_clause(&mut asgs, &mut [lit(-1), lit(2), lit(3)], Some(&mut vdb));
         let c = &cdb[c2];
         assert_eq!(c.rank, 2);
         assert!(!c.is(Flag::DEAD));
@@ -1182,9 +1182,10 @@ mod tests {
             num_of_variables: 4,
             ..CNFDescription::default()
         };
+        let mut asgs = AssignStack::instantiate(&config, &cnf);
         let mut cdb = ClauseDB::instantiate(&config, &cnf);
-        let c1 = cdb.new_clause(&mut [lit(1), lit(2), lit(3)], None::<&mut VarDB>);
-        let c2 = cdb.new_clause(&mut [lit(-1), lit(4)], None::<&mut VarDB>);
+        let c1 = cdb.new_clause(&mut asgs, &mut [lit(1), lit(2), lit(3)], None::<&mut VarDB>);
+        let c2 = cdb.new_clause(&mut asgs, &mut [lit(-1), lit(4)], None::<&mut VarDB>);
         cdb[c2].reward = 2.4;
         assert_eq!(c1, c1);
         assert_eq!(c1 == c1, true);
@@ -1199,8 +1200,9 @@ mod tests {
             num_of_variables: 4,
             ..CNFDescription::default()
         };
+        let mut asgs = AssignStack::instantiate(&config, &cnf);
         let mut cdb = ClauseDB::instantiate(&config, &cnf);
-        let c1 = cdb.new_clause(&mut [lit(1), lit(2), lit(3)], None::<&mut VarDB>);
+        let c1 = cdb.new_clause(&mut asgs, &mut [lit(1), lit(2), lit(3)], None::<&mut VarDB>);
         assert_eq!(cdb[c1][0..].iter().map(|l| i32::from(*l)).sum::<i32>(), 6);
         let mut iter = cdb[c1][0..].into_iter();
         assert_eq!(iter.next(), Some(&lit(1)));
