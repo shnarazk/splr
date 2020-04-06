@@ -805,9 +805,23 @@ fn conflict_analyze(
                 }
             }
         }
+        // In an unsat problem, a conflict can occur at decision level zero
+        // by a clause which literals' levels are zero.
+        // So we have the posibility getting the following situation.
+        if p == NULL_LIT && path_cnt == 0 {
+            #[cfg(feature = "boundary_check")]
+            println!("Empty learnt at lvl:{}", asgs.level());
+            learnt.clear();
+            return state.root_level;
+        }
         // set the index of the next literal to ti
         while {
             let vi = asgs[ti].vi();
+            #[cfg(feature = "boundary_check")]
+            assert!(
+                vi < asgs.level_ref().len(),
+                format!("ti:{}, lit:{}, len:{}", ti, asgs[ti], asgs.len(),)
+            );
             let lvl = asgs.level_ref()[vi];
             let v = &vdb[vi];
             !v.is(Flag::CA_SEEN) || lvl != dl
@@ -818,7 +832,9 @@ fn conflict_analyze(
             assert!(
                 0 < ti,
                 format!(
-                    "lv: {}, learnt: {:?}\nconflict: {:?}",
+                    "p:{}, path_cnt:{}, lv:{}, learnt:{:?}\nconflict:{:?}",
+                    p,
+                    path_cnt,
                     dl,
                     vdb.dump(asgs, &*learnt),
                     vdb.dump(asgs, &cdb[confl].lits),
