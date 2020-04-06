@@ -53,6 +53,31 @@ pub trait StateIF {
     fn flush<S: AsRef<str>>(&self, mes: S);
 }
 
+/// Phase saving modes.
+#[derive(Debug, Eq, PartialEq)]
+pub enum PhaseMode {
+    /// Mixing best and random values.
+    BestRnd,
+    /// Use the inverted value.
+    Invert,
+    /// the orignal saving mode.
+    Latest,
+}
+
+impl fmt::Display for PhaseMode {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            formatter,
+            "{}",
+            match self {
+                PhaseMode::BestRnd => "best and random phasing",
+                PhaseMode::Invert => "inverted last",
+                PhaseMode::Latest => "latest saving",
+            }
+        )
+    }
+}
+
 /// A collection of named search heuristics.
 #[derive(Debug, Eq, PartialEq)]
 pub enum SearchStrategy {
@@ -151,6 +176,7 @@ pub struct State {
     pub num_solved_vars: usize,
     pub num_eliminated_vars: usize,
     pub config: Config,
+    pub phase_select: PhaseMode,
     pub stats: [usize; Stat::EndOfStatIndex as usize], // statistics
     /// Tuple of current strategy and the number of conflicts at which the strategy is selected.
     pub strategy: (SearchStrategy, usize),
@@ -179,6 +205,7 @@ impl Default for State {
             num_solved_vars: 0,
             num_eliminated_vars: 0,
             config: Config::default(),
+            phase_select: PhaseMode::Latest,
             stats: [0; Stat::EndOfStatIndex as usize],
             strategy: (SearchStrategy::Initial, 0),
             target: CNFDescription::default(),

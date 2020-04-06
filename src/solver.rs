@@ -5,7 +5,7 @@ use {
         clause::{ClauseDB, ClauseDBIF},
         eliminate::{EliminateIF, Eliminator},
         restart::{RestartIF, Restarter, RestarterModule},
-        state::{Stat, State, StateIF},
+        state::{PhaseMode, Stat, State, StateIF},
         types::*,
         var::{VarDB, VarDBIF, VarRewardIF},
     },
@@ -414,7 +414,18 @@ fn search(
         }
         if !asgs.remains() {
             let vi = asgs.select_var(vdb);
-            let p = vdb[vi].is(Flag::PHASE);
+            let p = match state.phase_select {
+                PhaseMode::BestRnd => {
+                    let num_propagation = asgs.exports().1;
+                    match num_propagation % 8 {
+                        0 => num_propagation % 16 == 1,
+                        4 => vdb[vi].is(Flag::PHASE),
+                        _ => vdb[vi].is(Flag::BEST_PHASE),
+                    }
+                }
+                PhaseMode::Invert => !vdb[vi].is(Flag::PHASE),
+                PhaseMode::Latest => vdb[vi].is(Flag::PHASE),
+            };
             asgs.assign_by_decision(vdb, Lit::from_assign(vi, p));
             state[Stat::Decision] += 1;
             a_decision_was_made = true;
@@ -668,6 +679,10 @@ fn adapt_modules(
     cdb.adapt_to(state, asgs_num_conflict);
     rst.adapt_to(state, asgs_num_conflict);
     vdb.adapt_to(state, asgs_num_conflict);
+    state.phase_select = match (asgs_num_conflict / state.reflection_interval) % 2 {
+        0 => PhaseMode::BestRnd,
+        _ => PhaseMode::Latest,
+    };
     Ok(())
 }
 

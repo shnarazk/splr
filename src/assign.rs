@@ -157,6 +157,7 @@ pub struct AssignStack {
     //
     //## Statistics
     //
+    num_best_assign: usize,
     num_conflict: usize,
     num_propagation: usize,
     num_restart: usize,
@@ -175,6 +176,7 @@ impl Default for AssignStack {
             conflicts: (0, 0),
             var_order: VarIdHeap::default(),
             lbd_temp: Vec::new(),
+            num_best_assign: 0,
             num_conflict: 0,
             num_propagation: 0,
             num_restart: 0,
@@ -544,6 +546,10 @@ impl AssignIF for AssignStack {
                     );
                 }
             }
+        }
+        if self.num_best_assign < self.trail.len() {
+            self.num_best_assign = self.trail.len();
+            vdb.save_best_phase(self);
         }
         ClauseId::default()
     }

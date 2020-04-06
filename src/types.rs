@@ -602,14 +602,16 @@ bitflags! {
         //
         //## For Var
         //
-        /// the previous assigned value of a Var.
-        const PHASE        = 0b0000_0001_0000_0000;
         /// a var is eliminated and managed by eliminator.
-        const ELIMINATED   = 0b0000_0010_0000_0000;
+        const ELIMINATED   = 0b0000_0001_0000_0000;
         /// a var is checked during in the current conflict analysis.
-        const CA_SEEN      = 0b0000_0100_0000_0000;
+        const CA_SEEN      = 0b0000_0010_0000_0000;
+        /// the previous assigned value of a Var.
+        const PHASE        = 0b0000_0100_0000_0000;
+        /// the previous assigned value of a Var.
+        const BEST_PHASE   = 0b0000_1000_0000_0000;
         /// NOT IN USE: a var is checked during in var rewarding.
-        const VR_SEEN      = 0b0000_1000_0000_0000;
+        const VR_SEEN      = 0b0001_0000_0000_0000;
     }
 }
 
