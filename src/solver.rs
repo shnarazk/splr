@@ -388,11 +388,13 @@ fn search(
                 analyze_final(asgs, state, vdb, &cdb[ci]);
                 return Ok(false);
             }
-            // handle a simple UNSAT case here.
-            // let level = vdb.level_ref();
-            // if cdb[ci].iter().all(|l| level[l.vi()] == 0) {
-            //     return Ok(false);
-            // }
+            // The above condition isn't enough if you use chronoBT
+            // due to the incoherence between the current level and conflicting level.
+            // So we need to add a catch here.
+            let level = asgs.level_ref();
+            if cdb[ci].iter().all(|l| level[l.vi()] == 0) {
+                return Ok(false);
+            }
             handle_conflict(asgs, cdb, elim, rst, state, vdb, ci)?;
         }
         // Simplification has been postponed because chronoBT was used.
@@ -805,6 +807,8 @@ fn conflict_analyze(
                 }
             }
         }
+        // The following case was subsumed into `search`.
+        /*
         // In an unsat problem, a conflict can occur at decision level zero
         // by a clause which literals' levels are zero.
         // So we have the posibility getting the following situation.
@@ -814,6 +818,7 @@ fn conflict_analyze(
             learnt.clear();
             return state.root_level;
         }
+        */
         // set the index of the next literal to ti
         while {
             let vi = asgs[ti].vi();
