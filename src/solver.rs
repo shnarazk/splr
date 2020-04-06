@@ -388,13 +388,6 @@ fn search(
                 analyze_final(asgs, state, vdb, &cdb[ci]);
                 return Ok(false);
             }
-            // The above condition isn't enough if you use chronoBT
-            // due to the incoherence between the current level and conflicting level.
-            // So we need to add a catch here.
-            let level = asgs.level_ref();
-            if cdb[ci].iter().all(|l| level[l.vi()] == 0) {
-                return Ok(false);
-            }
             handle_conflict(asgs, cdb, elim, rst, state, vdb, ci)?;
         }
         // Simplification has been postponed because chronoBT was used.
@@ -446,6 +439,14 @@ fn handle_conflict(
     vdb: &mut VarDB,
     ci: ClauseId,
 ) -> MaybeInconsistent {
+    // we need a catch here for handling the possibility of level zero conflict
+    // at higher level due to the incoherence between the current level and conflicting
+    // level in chronoBT. This leads to UNSAT solution. No need to update misc stats.
+    let level = asgs.level_ref();
+    if cdb[ci].iter().all(|l| level[l.vi()] == 0) {
+        return Err(SolverError::NullLearnt);
+    }
+
     let (ncnfl, _num_propagation, asgs_num_restart) = asgs.exports();
     // If we can settle this conflict w/o restart, solver will get a big progress.
     let switch_chronobt = if ncnfl < 1000 || asgs.recurrent_conflicts() {
