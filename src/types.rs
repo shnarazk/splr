@@ -1,7 +1,7 @@
 /// Crate `types' provides various building blocks, including
 /// some common traits.
 pub use crate::{
-    assigner::AssignReason,
+    assign::AssignReason,
     clause::{Clause, ClauseIF, ClauseId, ClauseIdIF, Watch},
     config::Config,
     var::Var,

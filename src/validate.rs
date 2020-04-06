@@ -1,6 +1,6 @@
 /// Crate `validator` implements a model checker.
 use crate::{
-    assigner::AssignIF,
+    assign::AssignIF,
     clause::ClauseDBIF,
     solver::Solver,
     types::{Lit, MaybeInconsistent, SolverError},
@@ -26,7 +26,7 @@ impl ValidatorIF for Solver {
     ///
     /// ```
     /// use crate::{splr::config::Config, splr::types::*};
-    /// use splr::{solver::Solver, validator::ValidatorIF};
+    /// use splr::{solver::Solver, validate::ValidatorIF};
     ///
     /// let cnf = CNFDescription {
     ///         num_of_variables: 4,
@@ -53,7 +53,7 @@ impl ValidatorIF for Solver {
     ///
     /// ```
     /// use crate::{splr::config::Config, splr::types::*};
-    /// use splr::{solver::Solver, validator::ValidatorIF};
+    /// use splr::{solver::Solver, validate::ValidatorIF};
     ///
     /// let cnf = CNFDescription {
     ///         num_of_variables: 4,

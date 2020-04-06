@@ -286,7 +286,7 @@ impl Export<(usize, usize, usize)> for AssignStack {
     ///
     ///```
     /// use crate::{splr::config::Config, splr::types::*};
-    /// use crate::splr::propagator::AssignStack;
+    /// use crate::splr::assign::AssignStack;
     /// let asgs = AssignStack::instantiate(&Config::default(), &CNFDescription::default());
     /// let (asgs_num_conflict, asgs_num_propagation, asgs_num_restart) = asgs.exports();
     ///```

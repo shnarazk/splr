@@ -2,7 +2,7 @@
 use crate::state::SearchStrategy;
 /// Crate `var` provides `var` object and its manager `VarDB`.
 use {
-    crate::{assigner::AssignIF, clause::ClauseDBIF, state::State, types::*},
+    crate::{assign::AssignIF, clause::ClauseDBIF, state::State, types::*},
     std::{
         fmt,
         ops::{Index, IndexMut, Range, RangeFrom},

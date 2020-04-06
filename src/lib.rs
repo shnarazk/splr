@@ -153,15 +153,15 @@ While Splr comes with **ABSOLUTELY NO WARRANTY**, Splr version 0.1.0 (splr-0.1.0
 */
 // /// Subsumption-based clause/var elimination
 /// Crate `assigner` implements Boolean Constraint Propagation and decision var selection.
-pub mod assigner;
+pub mod assign;
 /// Crate `clause` provides `clause` object and its manager `ClauseDB`
 pub mod clause;
 /// Crate `config` provides solver's configuration and CLI.
 pub mod config;
 /// Crate `eliminator` implments clause subsumption and var elimination.
-pub mod eliminator;
+pub mod eliminate;
 /// Crate `restarter` provides restart heuristics.
-pub mod restarter;
+pub mod restart;
 /// Crate `solver` provides the top-level API as a SAT solver.
 pub mod solver;
 /// Crate `state` is a collection of internal data.
@@ -170,7 +170,7 @@ pub mod state;
 /// some common traits.
 pub mod types;
 /// Crate `validator` implements a model checker.
-pub mod validator;
+pub mod validate;
 /// Crate `var` provides `var` object and its manager `VarDB`.
 pub mod var;
 

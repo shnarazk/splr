@@ -1,8 +1,8 @@
 /// Crate `clause` provides `clause` object and its manager `ClauseDB`
 use {
     crate::{
-        assigner::AssignIF,
-        eliminator::EliminateIF,
+        assign::AssignIF,
+        eliminate::EliminateIF,
         state::{SearchStrategy, State},
         types::*,
         var::VarDBIF,
@@ -1126,8 +1126,8 @@ impl ClauseDB {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::assign::{AssignIF, AssignStack};
     use crate::clause::ClauseDB;
-    use crate::propagator::{AssignIF, AssignStack};
     use crate::var::VarDB;
 
     fn lit(i: i32) -> Lit {

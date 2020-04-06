@@ -4,7 +4,7 @@ use {
     splr::{
         config::Config,
         solver::{SatSolverIF, Solver},
-        validator::ValidatorIF,
+        validate::ValidatorIF,
     },
     std::{
         env,

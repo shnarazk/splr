@@ -1,7 +1,7 @@
 /// Crate `eliminator` implments clause subsumption and var elimination.
 use {
     crate::{
-        assigner::AssignIF,
+        assign::AssignIF,
         clause::ClauseDBIF,
         state::{State, StateIF},
         types::*,
@@ -23,7 +23,7 @@ use {
 /// API for Eliminator like `activate`, `stop`, `eliminate` and so on.
 ///```
 /// use crate::{splr::config::Config, splr::types::*};
-/// use crate::splr::eliminator::{Eliminator, EliminateIF};
+/// use crate::splr::eliminate::{Eliminator, EliminateIF};
 /// use crate::splr::solver::Solver;
 
 /// let mut s = Solver::instantiate(&Config::default(), &CNFDescription::default());
@@ -124,7 +124,7 @@ impl Export<(usize, usize)> for Eliminator {
     ///
     ///```
     /// use crate::{splr::config::Config, splr::types::*};
-    /// use crate::splr::eliminator::Eliminator;
+    /// use crate::splr::eliminate::Eliminator;
     /// let elim = Eliminator::instantiate(&Config::default(), &CNFDescription::default());
     /// let (elim_num_full_elimination, elim_num_sat_elimination) = elim.exports();
     ///```

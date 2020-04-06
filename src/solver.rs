@@ -1,10 +1,10 @@
 /// Crate 'solver' provides the top-level API as a SAT solver.
 use {
     crate::{
-        assigner::{AssignIF, AssignStack, VarSelectionIF},
+        assign::{AssignIF, AssignStack, VarSelectionIF},
         clause::{ClauseDB, ClauseDBIF},
-        eliminator::{EliminateIF, Eliminator},
-        restarter::{RestartIF, Restarter, RestarterModule},
+        eliminate::{EliminateIF, Eliminator},
+        restart::{RestartIF, Restarter, RestarterModule},
         state::{Stat, State, StateIF},
         types::*,
         var::{VarDB, VarDBIF, VarRewardIF},

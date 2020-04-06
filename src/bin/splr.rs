@@ -4,7 +4,7 @@ use {
     splr::{
         clause::CertifiedRecord,
         config::{Config, VERSION},
-        restarter::RestartMode,
+        restart::RestartMode,
         solver::{Certificate, SatSolverIF, Solver, SolverResult},
         state::*,
         types::{Export, SolverError},

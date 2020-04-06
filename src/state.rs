@@ -1,10 +1,10 @@
 /// Crate `state` is a collection of internal data.
 use {
     crate::{
-        assigner::AssignIF,
+        assign::AssignIF,
         clause::ClauseDBIF,
-        eliminator::EliminateIF,
-        restarter::{RestartIF, RestartMode},
+        eliminate::EliminateIF,
+        restart::{RestartIF, RestartMode},
         types::*,
         var::VarDBIF,
     },
