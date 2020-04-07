@@ -1,8 +1,11 @@
-#[cfg(feature = "use_core")]
-use crate::state::SearchStrategy;
 /// Crate `var` provides `var` object and its manager `VarDB`.
 use {
-    crate::{assign::AssignIF, clause::ClauseDBIF, state::State, types::*},
+    crate::{
+        assign::AssignIF,
+        clause::ClauseDBIF,
+        state::{SearchStrategy, State},
+        types::*,
+    },
     std::{
         fmt,
         ops::{Index, IndexMut, Range, RangeFrom},
@@ -198,8 +201,8 @@ impl Default for VarDB {
     }
     #[cfg(feature = "EVSIDS")]
     fn default() -> VarDB {
-        const VRD_MAX: f64 = 0.96;
-        const VRD_START: f64 = 0.8;
+        const VRD_MAX: f64 = 0.99;
+        const VRD_START: f64 = 0.99;
         VarDB {
             activity_decay: VRD_START,
             activity_decay_max: VRD_MAX,
@@ -328,28 +331,31 @@ impl Instantiate for VarDB {
     }
     #[allow(unused_variables)]
     fn adapt_to(&mut self, state: &State, num_conflict: usize) {
-        if 0 == num_conflict {
-            let nv = self.var.len();
-            self.core_size.update(((CORE_HISOTRY_LEN * nv) as f64).ln());
-            return;
-        }
-        const VRD_FILTER: f64 = 0.5;
-        const VRD_MAX_START: f64 = 0.2;
-        let msr: (f64, f64) = self.var[1..]
-            .iter()
-            .map(|v| v.reward)
-            .fold((VRD_MAX_START, 0.0), |(m, s), x| (m.max(x), s + x));
-        let ar = msr.1 / self.var.len() as f64;
-        let thr = msr.0 * VRD_FILTER + ar * (1.0 - VRD_FILTER);
-        let core = self.var[1..].iter().filter(|v| thr <= v.reward).count();
-        self.core_size.update(core as f64);
+        const VRD_DEC_STRICT: f64 = 0.001;
+        const VRD_DEC_STD: f64 = 0.003;
+        const VRD_DEC_HIGH: f64 = 0.008;
+        const VRD_INTERVAL: usize = 20_000;
+
         #[cfg(feature = "use_core")]
         {
-            const VRD_DEC_STRICT: f64 = 0.001;
-            const VRD_DEC_STD: f64 = 0.003;
-            const VRD_DEC_HIGH: f64 = 0.008;
-            const VRD_INTERVAL: usize = 20_000;
+            const VRD_FILTER: f64 = 0.5;
+            const VRD_MAX_START: f64 = 0.2;
             const VRD_OFFSET: f64 = 10.0;
+
+            if 0 == num_conflict {
+                let nv = self.var.len();
+                self.core_size.update(((CORE_HISOTRY_LEN * nv) as f64).ln());
+                return;
+            }
+
+            let msr: (f64, f64) = self.var[1..]
+                .iter()
+                .map(|v| v.reward)
+                .fold((VRD_MAX_START, 0.0), |(m, s), x| (m.max(x), s + x));
+            let ar = msr.1 / self.var.len() as f64;
+            let thr = msr.0 * VRD_FILTER + ar * (1.0 - VRD_FILTER);
+            let core = self.var[1..].iter().filter(|v| thr <= v.reward).count();
+            self.core_size.update(core as f64);
 
             if num_conflict % VRD_INTERVAL == 0 {
                 let k = match state.strategy.0 {
@@ -359,6 +365,19 @@ impl Instantiate for VarDB {
                 };
                 let c = (self.core_size.get() - VRD_OFFSET).max(1.0);
                 let delta = 0.1 * k * (c.sqrt() * c.ln());
+                self.activity_decay_max = 1.0 - delta;
+            }
+        }
+
+        #[cfg(not(feature = "use_core"))]
+        {
+            if num_conflict % VRD_INTERVAL == 0 {
+                let k = match state.strategy.0 {
+                    SearchStrategy::LowDecisions => VRD_DEC_HIGH,
+                    SearchStrategy::HighSuccesive => VRD_DEC_STRICT,
+                    _ => VRD_DEC_STD,
+                };
+                let delta = 0.1 * k;
                 self.activity_decay_max = 1.0 - delta;
             }
         }
