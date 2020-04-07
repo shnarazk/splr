@@ -439,6 +439,7 @@ fn handle_conflict(
     vdb: &mut VarDB,
     ci: ClauseId,
 ) -> MaybeInconsistent {
+    const ELIMINATABLE: usize = 4;
     // we need a catch here for handling the possibility of level zero conflict
     // at higher level due to the incoherence between the current level and conflicting
     // level in chronoBT. This leads to UNSAT solution. No need to update misc stats.
@@ -627,8 +628,14 @@ fn handle_conflict(
         );
         let lbd = cdb[cid].rank;
         rst.update(RestarterModule::LBD, lbd);
-        if learnt_len < 8 {
-            state.to_eliminate += std::f64::consts::E.powf(-(learnt_len as f64));
+        if learnt_len <= ELIMINATABLE {
+            // state.to_eliminate += std::f64::consts::E.powi(-(learnt_len as i32));
+            state.to_eliminate += match learnt_len {
+                2 => 1.0,
+                3 => 0.001,
+                4 => 0.000_01,
+                _ => 0.000_000_1,
+            };
         }
     }
     cdb.scale_activity();
