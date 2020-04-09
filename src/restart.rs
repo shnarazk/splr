@@ -397,9 +397,10 @@ impl EmaIF for GeometricStabilizer {
     fn update(&mut self, now: usize) {
         if self.enable && self.next_trigger <= now {
             self.active = !self.active;
-            // self.next_trigger = ((self.next_trigger as f64) * self.restart_inc) as usize;
-            //self.next_trigger += 1000 + (self.next_trigger as f64).sqrt() as usize;
             self.step = ((self.step as f64) * self.restart_inc) as usize;
+            if 100_000_000 < self.step {
+                self.step = 1000;
+            }
             self.next_trigger += self.step;
         }
     }
