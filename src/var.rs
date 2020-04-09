@@ -543,7 +543,7 @@ impl VarRewardIF for VarDB {
     }
     #[cfg(not(feature = "EVSIDS"))]
     fn reward_update(&mut self) {
-        const VRD_STEP: f64 = 0.000_01;
+        const VRD_STEP: f64 = 0.000_000_1;
         self.ordinal += 1;
         self.activity_decay = self.activity_decay_max.min(self.activity_decay + VRD_STEP);
     }
