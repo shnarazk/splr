@@ -410,14 +410,7 @@ fn search(
         if !asgs.remains() {
             let vi = asgs.select_var(vdb);
             let p = match state.phase_select {
-                PhaseMode::BestRnd => {
-                    let num_propagation = asgs.exports().1;
-                    match num_propagation % 8 {
-                        0 => num_propagation % 16 == 1,
-                        4 => vdb[vi].is(Flag::PHASE),
-                        _ => vdb[vi].is(Flag::BEST_PHASE),
-                    }
-                }
+                PhaseMode::BestRnd => vdb[vi].is(Flag::BEST_PHASE),
                 PhaseMode::Invert => !vdb[vi].is(Flag::PHASE),
                 PhaseMode::Latest => vdb[vi].is(Flag::PHASE),
             };
