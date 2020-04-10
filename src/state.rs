@@ -56,6 +56,8 @@ pub trait StateIF {
 /// Phase saving modes.
 #[derive(Debug, Eq, PartialEq)]
 pub enum PhaseMode {
+    /// Use best values.
+    Best,
     /// Mixing best and random values.
     BestRnd,
     /// Use the inverted value.
@@ -70,6 +72,7 @@ impl fmt::Display for PhaseMode {
             formatter,
             "{}",
             match self {
+                PhaseMode::Best => "best assign phasing",
                 PhaseMode::BestRnd => "best and random phasing",
                 PhaseMode::Invert => "inverted last",
                 PhaseMode::Latest => "latest saving",
@@ -175,6 +178,7 @@ pub struct State {
     pub num_vars: usize,
     pub num_solved_vars: usize,
     pub num_eliminated_vars: usize,
+    pub num_best_assigned: usize,
     pub config: Config,
     pub phase_select: PhaseMode,
     pub stats: [usize; Stat::EndOfStatIndex as usize], // statistics
@@ -204,6 +208,7 @@ impl Default for State {
             num_vars: 0,
             num_solved_vars: 0,
             num_eliminated_vars: 0,
+            num_best_assigned: 0,
             config: Config::default(),
             phase_select: PhaseMode::Latest,
             stats: [0; Stat::EndOfStatIndex as usize],

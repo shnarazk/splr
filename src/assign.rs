@@ -93,6 +93,8 @@ pub trait AssignIF: Index<usize, Output = Lit> + LBDIF {
     /// return `true` if subsequential propagations emit the same conflict.
     fn recurrent_conflicts(&self) -> bool;
     fn level_ref(&self) -> &[DecisionLevel];
+    fn best_assigned(&mut self) -> usize;
+    fn reset_best_assigned(&mut self);
 }
 
 /// API for var selection.
@@ -157,6 +159,7 @@ pub struct AssignStack {
     //
     //## Statistics
     //
+    best_assign: bool,
     num_best_assign: usize,
     num_conflict: usize,
     num_propagation: usize,
@@ -176,6 +179,7 @@ impl Default for AssignStack {
             conflicts: (0, 0),
             var_order: VarIdHeap::default(),
             lbd_temp: Vec::new(),
+            best_assign: false,
             num_best_assign: 0,
             num_conflict: 0,
             num_propagation: 0,
@@ -548,6 +552,7 @@ impl AssignIF for AssignStack {
             }
         }
         if self.num_best_assign < self.trail.len() {
+            self.best_assign = true;
             self.num_best_assign = self.trail.len();
             vdb.save_best_phase(self);
         }
@@ -558,6 +563,16 @@ impl AssignIF for AssignStack {
     }
     fn level_ref(&self) -> &[DecisionLevel] {
         &self.level
+    }
+    fn best_assigned(&mut self) -> usize {
+        if self.best_assign {
+            self.best_assign = false;
+            return self.num_best_assign;
+        }
+        0
+    }
+    fn reset_best_assigned(&mut self) {
+        self.num_best_assign = 0;
     }
 }
 
