@@ -122,7 +122,7 @@ pub struct Config {
     pub rst_lbd_thr: f64, // Glucose's K
 
     /// Stabilizer scaling
-    #[structopt(skip)] // long = "rss", default_value = "2.0"
+    #[structopt(long = "rss", default_value = "2.0")]
     pub rst_stb_scl: f64,
 
     /// Disable geometric restart blocker
