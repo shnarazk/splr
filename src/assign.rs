@@ -93,8 +93,8 @@ pub trait AssignIF: Index<usize, Output = Lit> + LBDIF {
     /// return `true` if subsequential propagations emit the same conflict.
     fn recurrent_conflicts(&self) -> bool;
     fn level_ref(&self) -> &[DecisionLevel];
-    fn best_assigned(&mut self) -> usize;
-    fn reset_best_assigned(&mut self);
+    fn best_assigned(&mut self, flag: Flag) -> usize;
+    fn reset_assign_record(&mut self, flag: Flag);
 }
 
 /// API for var selection.
@@ -161,6 +161,8 @@ pub struct AssignStack {
     //
     best_assign: bool,
     num_best_assign: usize,
+    target_assign: bool,
+    num_target_assign: usize,
     num_conflict: usize,
     num_propagation: usize,
     num_restart: usize,
@@ -181,6 +183,8 @@ impl Default for AssignStack {
             lbd_temp: Vec::new(),
             best_assign: false,
             num_best_assign: 0,
+            target_assign: false,
+            num_target_assign: 0,
             num_conflict: 0,
             num_propagation: 0,
             num_restart: 0,
@@ -551,10 +555,15 @@ impl AssignIF for AssignStack {
                 }
             }
         }
+        if self.num_target_assign < self.trail.len() {
+            self.target_assign = true;
+            self.num_target_assign = self.trail.len();
+            vdb.save_phase(self, Flag::TARGET_PHASE);
+        }
         if self.num_best_assign < self.trail.len() {
             self.best_assign = true;
             self.num_best_assign = self.trail.len();
-            vdb.save_best_phase(self);
+            vdb.save_phase(self, Flag::BEST_PHASE);
         }
         ClauseId::default()
     }
@@ -564,15 +573,30 @@ impl AssignIF for AssignStack {
     fn level_ref(&self) -> &[DecisionLevel] {
         &self.level
     }
-    fn best_assigned(&mut self) -> usize {
-        if self.best_assign {
-            self.best_assign = false;
-            return self.num_best_assign;
+    fn best_assigned(&mut self, flag: Flag) -> usize {
+        match flag {
+            Flag::BEST_PHASE => {
+                if self.best_assign {
+                    self.best_assign = false;
+                    return self.num_best_assign;
+                }
+            }
+            Flag::TARGET_PHASE => {
+                if self.target_assign {
+                    self.target_assign = false;
+                    return self.num_target_assign;
+                }
+            }
+            _ => panic!("invalid flag for reset_assign_record"),
         }
         0
     }
-    fn reset_best_assigned(&mut self) {
-        self.num_best_assign = 0;
+    fn reset_assign_record(&mut self, flag: Flag) {
+        match flag {
+            Flag::BEST_PHASE => self.num_best_assign = 0,
+            Flag::TARGET_PHASE => self.num_target_assign = 0,
+            _ => panic!("invalid flag for reset_assign_record"),
+        }
     }
 }
 

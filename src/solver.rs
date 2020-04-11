@@ -4,7 +4,7 @@ use {
         assign::{AssignIF, AssignStack, VarSelectionIF},
         clause::{ClauseDB, ClauseDBIF},
         eliminate::{EliminateIF, Eliminator},
-        restart::{RestartIF, Restarter, RestarterModule},
+        restart::{RestartIF, RestartMode, Restarter, RestarterModule},
         state::{PhaseMode, Stat, State, StateIF},
         types::*,
         var::{VarDB, VarDBIF, VarRewardIF},
@@ -362,6 +362,12 @@ fn search(
     vdb: &mut VarDB,
 ) -> Result<bool, SolverError> {
     let mut a_decision_was_made = false;
+    let mut num_assignd = 0;
+    let mut stabilizing = if rst.exports().0 == RestartMode::Stabilize {
+        Flag::TARGET_PHASE
+    } else {
+        Flag::BEST_PHASE
+    };
     rst.update(RestarterModule::Luby, 0);
     loop {
         vdb.reward_update();
@@ -378,6 +384,20 @@ fn search(
             if rst.force_restart() {
                 asgs.cancel_until(vdb, state.root_level);
             }
+            //
+            //## set phase mode
+            //
+            let mut na = asgs.best_assigned(stabilizing);
+            if 0 < na {
+                na += state.num_eliminated_vars;
+                if num_assignd < na {
+                    num_assignd = na;
+                    state.flush("");
+                    state.flush(format!("find best assigns: {}", na));
+                    state.phase_select = PhaseMode::Best;
+                }
+            }
+        //
         } else {
             if a_decision_was_made {
                 a_decision_was_made = false;
@@ -389,6 +409,14 @@ fn search(
                 return Ok(false);
             }
             handle_conflict(asgs, cdb, elim, rst, state, vdb, ci)?;
+            stabilizing = if rst.exports().0 == RestartMode::Stabilize {
+                Flag::TARGET_PHASE
+            } else {
+                if stabilizing == Flag::TARGET_PHASE {
+                    asgs.reset_assign_record(Flag::TARGET_PHASE);
+                }
+                Flag::BEST_PHASE
+            };
         }
         // Simplification has been postponed because chronoBT was used.
         if asgs.level() == state.root_level {
@@ -409,8 +437,14 @@ fn search(
         }
         if !asgs.remains() {
             let vi = asgs.select_var(vdb);
+            let num_prop = asgs.exports().1;
             let p = match state.phase_select {
-                PhaseMode::BestRnd => vdb[vi].is(Flag::BEST_PHASE),
+                PhaseMode::Best => vdb[vi].is(stabilizing),
+                PhaseMode::BestRnd => match num_prop % 8 {
+                    0 => num_prop % 16 == 0,
+                    4 => vdb[vi].is(Flag::PHASE),
+                    _ => vdb[vi].is(stabilizing),
+                },
                 PhaseMode::Invert => !vdb[vi].is(Flag::PHASE),
                 PhaseMode::Latest => vdb[vi].is(Flag::PHASE),
             };
@@ -682,10 +716,24 @@ fn adapt_modules(
     cdb.adapt_to(state, asgs_num_conflict);
     rst.adapt_to(state, asgs_num_conflict);
     vdb.adapt_to(state, asgs_num_conflict);
-    state.phase_select = match (asgs_num_conflict / state.reflection_interval) % 2 {
-        0 => PhaseMode::BestRnd,
-        _ => PhaseMode::Latest,
+    let stabilizing = if rst.exports().0 != RestartMode::Stabilize {
+        Flag::BEST_PHASE
+    } else {
+        Flag::TARGET_PHASE
     };
+    let na = asgs.best_assigned(stabilizing);
+    // Don't add `state.num_assignd`; there are included in `na` already.
+    if 0 < na && state.num_best_assigned < na + state.num_eliminated_vars {
+        state.num_best_assigned = na + state.num_eliminated_vars;
+        state.flush("");
+        state.flush(format!("find best assigns: {}", na));
+        state.phase_select = PhaseMode::Best;
+    } else {
+        state.phase_select = match (asgs_num_conflict / state.reflection_interval) % 8 {
+            0 => PhaseMode::BestRnd,
+            _ => PhaseMode::Latest,
+        };
+    }
     Ok(())
 }
 

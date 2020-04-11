@@ -62,9 +62,10 @@ pub trait VarRewardIF {
 
 /// API for phase saving.
 pub trait VarPhaseIF {
-    fn save_best_phase<A>(&mut self, asgn: &A)
+    fn save_phase<A>(&mut self, asgn: &A, flag: Flag)
     where
         A: AssignIF;
+    fn reset_phase(&mut self, flag: Flag);
 }
 
 /// Object representing a variable.
@@ -464,12 +465,17 @@ impl VarDBIF for VarDB {
 }
 
 impl VarPhaseIF for VarDB {
-    fn save_best_phase<A>(&mut self, asgs: &A)
+    fn save_phase<A>(&mut self, asgs: &A, flag: Flag)
     where
         A: AssignIF,
     {
         for l in asgs.iter() {
-            self.var[l.vi()].set(Flag::BEST_PHASE, bool::from(*l));
+            self.var[l.vi()].set(flag, bool::from(*l));
+        }
+    }
+    fn reset_phase(&mut self, flag: Flag) {
+        for v in &mut self.var[1..] {
+            v.turn_off(flag);
         }
     }
 }
