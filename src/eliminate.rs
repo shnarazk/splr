@@ -384,13 +384,15 @@ impl EliminateIF for Eliminator {
         C: ClauseDBIF,
         V: VarDBIF + VarRewardIF,
     {
-        debug_assert_eq!(asgs.level(), 0);
+        debug_assert_eq!(asgs.decision_level(), 0);
         // we can reset all the reasons because decision level is zero.
-        for v in vdb.iter_mut().skip(1) {
-            if v.reason != AssignReason::None {
-                #[cfg(feature = "boundary_check")]
-                assert_eq!(asgs.level_ref()[v.index], state.root_level);
-                v.reason = AssignReason::None;
+        #[cfg(feature = "boundary_check")]
+        {
+            for v in vdb.iter().skip(1) {
+                if asgs.reason(v.index) != AssignReason::None {
+                    assert_eq!(asgs.level(v.index), state.root_level);
+                    // asgs.reason(v.index) = AssignReason::None;
+                }
             }
         }
         if self.is_waiting() {
@@ -528,7 +530,7 @@ impl Eliminator {
         C: ClauseDBIF,
         V: VarDBIF + VarRewardIF,
     {
-        debug_assert_eq!(asgs.level(), 0);
+        debug_assert_eq!(asgs.decision_level(), 0);
         while !self.clause_queue.is_empty() || self.bwdsub_assigns < asgs.len() {
             // Check top-level assignments by creating a dummy clause and placing it in the queue:
             if self.clause_queue.is_empty() && self.bwdsub_assigns < asgs.len() {
@@ -652,7 +654,7 @@ impl Eliminator {
         /// Since it is measured in millisecond, 1000 means executing elimination
         /// until timed out. 100 means this function can consume 10% of a given time.
         const TIMESLOT_FOR_ELIMINATION: u64 = 10;
-        debug_assert!(asgs.level() == 0);
+        debug_assert!(asgs.decision_level() == 0);
         if self.mode == EliminatorMode::Deactive {
             return Ok(());
         }

@@ -44,12 +44,16 @@ pub trait AssignIF:
     fn len_upto(&self, n: DecisionLevel) -> usize;
     /// return `true` if there's no assignment.
     fn is_empty(&self) -> bool;
+    /// return the assign level of var.
+    fn level(&self, vi: VarId) -> DecisionLevel;
+    /// return the reason of assignment.
+    fn reason(&self, vi: VarId) -> AssignReason;
     /// return *the value* of a literal.
     fn assigned(&self, l: Lit) -> Option<bool>;
     /// return an iterator over assignment stack.
     fn iter(&self) -> Iter<'_, Lit>;
     /// return the current decision level.
-    fn level(&self) -> DecisionLevel;
+    fn decision_level(&self) -> DecisionLevel;
     ///return the decision var's id at that level.
     fn decision_vi(&self, lv: DecisionLevel) -> VarId;
     /// return `true` if the current decision level is zero.
@@ -163,6 +167,8 @@ pub struct AssignStack {
     assign: Vec<Option<bool>>,
     /// levels of vars
     level: Vec<DecisionLevel>,
+    /// reason of assignment
+    reason: Vec<AssignReason>,
     /// record of assignment
     trail: Vec<Lit>,
     trail_lim: Vec<usize>,
@@ -195,6 +201,7 @@ impl Default for AssignStack {
         AssignStack {
             assign: Vec::new(),
             level: Vec::new(),
+            reason: Vec::new(),
             trail: Vec::new(),
             trail_lim: Vec::new(),
             q_head: 0,
@@ -312,6 +319,7 @@ impl Instantiate for AssignStack {
         AssignStack {
             assign: vec![None; 1 + nv],
             level: vec![DecisionLevel::default(); nv + 1],
+            reason: vec![AssignReason::default(); 1 + nv],
             trail: Vec::with_capacity(nv),
             var_order: VarIdHeap::new(nv, nv),
             lbd_temp: vec![0; nv + 1],
@@ -360,10 +368,16 @@ impl AssignIF for AssignStack {
     fn is_empty(&self) -> bool {
         self.trail.is_empty()
     }
+    fn level(&self, vi: VarId) -> DecisionLevel {
+        unsafe { *self.level.get_unchecked(vi) }
+    }
+    fn reason(&self, vi: VarId) -> AssignReason {
+        unsafe { *self.reason.get_unchecked(vi) }
+    }
     fn iter(&self) -> Iter<'_, Lit> {
         self.trail.iter()
     }
-    fn level(&self) -> DecisionLevel {
+    fn decision_level(&self) -> DecisionLevel {
         self.trail_lim.len() as DecisionLevel
     }
     fn decision_vi(&self, lv: DecisionLevel) -> VarId {
@@ -385,11 +399,11 @@ impl AssignIF for AssignStack {
         self.level[vi] = 0;
         let v = &mut vdb[vi];
         debug_assert!(!v.is(Flag::ELIMINATED));
-        debug_assert_eq!(0, self.level());
+        debug_assert_eq!(self.root_level, self.decision_level());
         match var_assign!(self, v.index) {
             None => {
                 set_assign!(self, l);
-                v.reason = AssignReason::None;
+                self.reason[vi] = AssignReason::None;
                 debug_assert!(!self.trail.contains(&!l));
                 self.trail.push(l);
                 Ok(())
@@ -419,7 +433,7 @@ impl AssignIF for AssignStack {
             var_assign!(self, vi) == Some(bool::from(l)) || var_assign!(self, vi).is_none()
         );
         set_assign!(self, l);
-        v.reason = reason;
+        self.reason[vi] = reason;
         vdb.reward_at_assign(vi);
         debug_assert!(!self.trail.contains(&l));
         debug_assert!(!self.trail.contains(&!l));
@@ -440,7 +454,7 @@ impl AssignIF for AssignStack {
         debug_assert!(!v.is(Flag::ELIMINATED));
         // debug_assert!(self.assign[vi] == l.lbool() || self.assign[vi] == BOTTOM);
         set_assign!(self, l);
-        v.reason = AssignReason::default();
+        self.reason[vi] = AssignReason::default();
         vdb.reward_at_assign(vi);
         debug_assert!(!self.trail.contains(&!l));
         self.trail.push(l);
@@ -453,9 +467,8 @@ impl AssignIF for AssignStack {
         debug_assert!(self.trail.iter().all(|k| k.vi() != l.vi()));
         let vi = l.vi();
         self.level[vi] = 0;
-        let v = &mut vdb[l];
         set_assign!(self, l);
-        v.reason = AssignReason::default();
+        self.reason[vi] = AssignReason::default();
         vdb.clear_reward(l.vi());
         debug_assert!(!self.trail.contains(&!l));
         self.trail.push(l);
@@ -480,7 +493,7 @@ impl AssignIF for AssignStack {
             let v = &mut vdb[vi];
             v.set(Flag::PHASE, var_assign!(self, vi).unwrap());
             unset_assign!(self, vi);
-            v.reason = AssignReason::default();
+            self.reason[vi] = AssignReason::default();
             vdb.reward_at_unassign(vi);
             self.var_order.insert(vdb, vi);
         }
@@ -906,7 +919,7 @@ impl VarOrderIF for VarIdHeap {
 impl fmt::Display for AssignStack {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let v = self.trail.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
-        let len = self.level();
+        let len = self.decision_level();
         let c = |i| {
             let a = self.len_upto(i);
             match i {
@@ -1104,32 +1117,32 @@ mod tests {
 
         // [1, 2] + -1 => ABORT & [1, 2]
         assert!(asgs.assign_at_rootlevel(vdb, lit(-1)).is_err());
-        assert_eq!(asgs.level(), 0);
+        assert_eq!(asgs.decision_level(), 0);
         assert_eq!(asgs.len(), 2);
 
         // [1, 2] + 3 => [1, 2, 3]
         asgs.assign_by_decision(vdb, lit(3));
         assert_eq!(asgs.trail, vec![lit(1), lit(2), lit(3)]);
-        assert_eq!(asgs.level(), 1);
+        assert_eq!(asgs.decision_level(), 1);
         assert_eq!(asgs.len(), 3);
         assert_eq!(asgs.len_upto(0), 2);
 
         // [1, 2, 3] + 4 => [1, 2, 3, 4]
         asgs.assign_by_decision(vdb, lit(4));
         assert_eq!(asgs.trail, vec![lit(1), lit(2), lit(3), lit(4)]);
-        assert_eq!(asgs.level(), 2);
+        assert_eq!(asgs.decision_level(), 2);
         assert_eq!(asgs.len(), 4);
         assert_eq!(asgs.len_upto(1), 3);
 
         // [1, 2, 3] => [1, 2]
         asgs.cancel_until(vdb, 1);
         assert_eq!(asgs.trail, vec![lit(1), lit(2), lit(3)]);
-        assert_eq!(asgs.level(), 1);
+        assert_eq!(asgs.decision_level(), 1);
         assert_eq!(asgs.len(), 3);
         assert_eq!(asgs.trail_lim, vec![2]);
-        assert_eq!(vdb.assigned(lit(1)), Some(true));
-        assert_eq!(vdb.assigned(lit(-1)), Some(false));
-        assert_eq!(vdb.assigned(lit(4)), None);
+        assert_eq!(asgs.assigned(lit(1)), Some(true));
+        assert_eq!(asgs.assigned(lit(-1)), Some(false));
+        assert_eq!(asgs.assigned(lit(4)), None);
 
         // [1, 2, 3] => [1, 2, 3, 4]
         asgs.assign_by_decision(vdb, lit(4));
@@ -1140,10 +1153,10 @@ mod tests {
         // [1, 2, 3, 4] => [1, 2, -4]
         asgs.assign_by_unitclause(vdb, Lit::from(-4i32));
         assert_eq!(asgs.trail, vec![lit(1), lit(2), lit(-4)]);
-        assert_eq!(asgs.level(), 0);
+        assert_eq!(asgs.decision_level(), 0);
         assert_eq!(asgs.len(), 3);
 
-        assert_eq!(vdb.assigned(lit(-4)), Some(true));
-        assert_eq!(vdb.assigned(lit(-3)), None);
+        assert_eq!(asgs.assigned(lit(-4)), Some(true));
+        assert_eq!(asgs.assigned(lit(-3)), None);
     }
 }

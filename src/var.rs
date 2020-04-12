@@ -62,12 +62,6 @@ pub trait VarPhaseIF {
 pub struct Var {
     /// reverse conversion to index. Note `VarId` must be `usize`.
     pub index: VarId,
-    //    /// the current value.
-    //    pub assign: Option<bool>,
-    /// the propagating clause
-    pub reason: AssignReason,
-    //    /// decision level at which this variables is assigned.
-    //    pub level: DecisionLevel,
     /// the number of participation in conflict analysis
     participated: u32,
     /// a dynamic evaluation criterion like VSIDS or ACID.
@@ -82,8 +76,6 @@ impl Default for Var {
     fn default() -> Var {
         Var {
             index: 0,
-            //            assign: None,
-            reason: AssignReason::default(),
             reward: 0.0,
             timestamp: 0,
             flags: Flag::empty(),
@@ -97,9 +89,8 @@ impl fmt::Display for Var {
         let st = |flag, mes| if self.is(flag) { mes } else { "" };
         write!(
             f,
-            "V{{{}, reason:{}, {}{}}}",
+            "V{{{} {}{}}}",
             self.index,
-            self.reason,
             st(Flag::TOUCHED, ", touched"),
             st(Flag::ELIMINATED, ", eliminated"),
         )
@@ -384,7 +375,7 @@ impl VarDBIF for VarDB {
         debug_assert!(1 < lits.len());
         let l0 = lits[0];
         asgs.assigned(l0) == Some(true)
-            && matches!(self[l0.vi()].reason, AssignReason::Implication(x, _) if x == cid)
+            && matches!(asgs.reason(l0.vi()), AssignReason::Implication(x, _) if x == cid)
     }
 }
 
@@ -513,7 +504,7 @@ impl VarDB {
                 let next_vi = p.vi();
                 if self.var[next_vi].is(Flag::VR_SEEN) {
                     self.var[next_vi].turn_off(Flag::VR_SEEN);
-                    if let AssignReason::Implication(c, _) = self.var[next_vi].reason {
+                    if let AssignReason::Implication(c, _) = asgs.reason(next_vi) {
                         cid = c;
                         break;
                     }
@@ -553,7 +544,7 @@ impl VarDB {
                 let next_vi = p.vi();
                 if self.var[next_vi].is(Flag::VR_SEEN) {
                     self.var[next_vi].turn_off(Flag::VR_SEEN);
-                    if let AssignReason::Implication(c, _) = self.var[next_vi].reason {
+                    if let AssignReason::Implication(c, _) = asgs.reason(next_vi) {
                         cid = c;
                         break;
                     }
