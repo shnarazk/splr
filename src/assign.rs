@@ -3,16 +3,15 @@
 use {
     crate::{
         clause::{ClauseDBIF, WatchDBIF},
-        state::State,
+        state::{SearchStrategy, State},
         types::*,
-        var::{VarDBIF, VarRewardIF},
     },
     std::{
         fmt,
         fs::File,
         io::{BufWriter, Write},
-        ops::{Index, IndexMut, Range},
-        slice::Iter,
+        ops::Range,
+        slice::{Iter, IterMut},
     },
 };
 
@@ -27,15 +26,13 @@ pub trait LBDIF {
 }
 
 /// API for assignment like `propagate`, `enqueue`, `cancel_until`, and so on.
-pub trait AssignIF:
-    LBDIF + Index<VarId, Output = Option<bool>> + IndexMut<VarId, Output = Option<bool>>
-{
+pub trait AssignIF: LBDIF + VarRewardIF {
     /// return a literal in the stack.
     fn stack(&self, i: usize) -> Lit;
     /// return literals in the range of stack.
     fn stack_range(&self, r: Range<usize>) -> &[Lit];
     /// return the number of assignments.
-    fn len(&self) -> usize;
+    fn stack_len(&self) -> usize;
     /// return the number of assignments at a given decision level `u`.
     ///
     /// ## Caveat
@@ -43,15 +40,27 @@ pub trait AssignIF:
     /// - it emits a panic if the level is 0.
     fn len_upto(&self, n: DecisionLevel) -> usize;
     /// return `true` if there's no assignment.
-    fn is_empty(&self) -> bool;
+    fn stack_is_empty(&self) -> bool;
+    // erturn the assignment of var.
+    fn assign(&self, vi: VarId) -> Option<bool>;
     /// return the assign level of var.
     fn level(&self, vi: VarId) -> DecisionLevel;
     /// return the reason of assignment.
     fn reason(&self, vi: VarId) -> AssignReason;
+    /// return the var.
+    fn var(&self, vi: VarId) -> &Var;
+    /// return the var.
+    fn var_mut(&mut self, vi: VarId) -> &mut Var;
     /// return *the value* of a literal.
     fn assigned(&self, l: Lit) -> Option<bool>;
+    /// return an iterator over Vars.
+    fn var_iter(&self) -> Iter<'_, Var>;
+    /// return an mutable iterator over Vars.
+    fn var_iter_mut(&mut self) -> IterMut<'_, Var>;
+    /// return the number of real var + a dummy var.
+    fn var_len(&self) -> usize;
     /// return an iterator over assignment stack.
-    fn iter(&self) -> Iter<'_, Lit>;
+    fn stack_iter(&self) -> Iter<'_, Lit>;
     /// return the current decision level.
     fn decision_level(&self) -> DecisionLevel;
     ///return the decision var's id at that level.
@@ -65,43 +74,27 @@ pub trait AssignIF:
     /// # Errors
     ///
     /// emit `SolverError::Inconsistent` exception if solver becomes inconsistent.
-    fn assign_at_rootlevel<V>(&mut self, vdb: &mut V, l: Lit) -> MaybeInconsistent
-    where
-        V: VarDBIF + VarRewardIF;
+    fn assign_at_rootlevel(&mut self, l: Lit) -> MaybeInconsistent;
     /// unsafe enqueue (assign by implication); doesn't emit an exception.
     ///
     /// ## Warning
     /// Caller must assure the consistency after this assignment
-    fn assign_by_implication<V>(
-        &mut self,
-        vdb: &mut V,
-        l: Lit,
-        reason: AssignReason,
-        lv: DecisionLevel,
-    ) where
-        V: VarDBIF + VarRewardIF;
+    fn assign_by_implication(&mut self, l: Lit, reason: AssignReason, lv: DecisionLevel);
     /// unsafe assume (assign by decision); doesn't emit an exception.
     /// ## Caveat
     /// Callers have to assure the consistency after this assignment.
-    fn assign_by_decision<V>(&mut self, vdb: &mut V, l: Lit)
-    where
-        V: VarDBIF + VarRewardIF;
+    fn assign_by_decision(&mut self, l: Lit);
     /// fix a var's assignment by a unit learnt clause.
     /// ## Caveat
     /// - Callers have to assure the consistency after this assignment.
     /// - No need to restart; but execute `propagate` just afterward.
-    fn assign_by_unitclause<V>(&mut self, vdb: &mut V, l: Lit)
-    where
-        V: VarDBIF + VarRewardIF;
+    fn assign_by_unitclause(&mut self, l: Lit);
     /// execute *backjump*.
-    fn cancel_until<V>(&mut self, vdb: &mut V, lv: DecisionLevel)
-    where
-        V: VarDBIF + VarRewardIF;
+    fn cancel_until(&mut self, lv: DecisionLevel);
     /// execute *boolean constraint propagation* or *unit propagation*.
-    fn propagate<C, V>(&mut self, cdb: &mut C, vdb: &mut V) -> ClauseId
+    fn propagate<C>(&mut self, cdb: &mut C) -> ClauseId
     where
-        C: ClauseDBIF,
-        V: VarDBIF + VarRewardIF;
+        C: ClauseDBIF;
     /// return `true` if subsequential propagations emit the same conflict.
     fn recurrent_conflicts(&self) -> bool;
     fn level_ref(&self) -> &[DecisionLevel];
@@ -120,22 +113,138 @@ pub trait AssignIF:
     fn minimize_with_biclauses<C>(&mut self, cdb: &C, vec: &mut Vec<Lit>)
     where
         C: ClauseDBIF;
+    /// inject assignments for eliminated vars.
+    fn extend_model(&mut self, lits: &[Lit]);
 }
 
 /// API for var selection.
 pub trait VarSelectionIF {
     /// select a new decision variable.
-    fn select_var<V>(&mut self, vdb: &mut V) -> VarId
-    where
-        V: VarDBIF + VarRewardIF;
+    fn select_var(&mut self) -> VarId;
     /// update the internal heap on var order.
-    fn update_order<V>(&mut self, vdb: &mut V, v: VarId)
-    where
-        V: VarDBIF + VarRewardIF;
+    fn update_order(&mut self, v: VarId);
     /// rebuild the internal var_order
-    fn rebuild_order<V>(&mut self, vdb: &mut V)
-    where
-        V: VarDBIF + VarRewardIF;
+    fn rebuild_order(&mut self);
+}
+
+/*
+/// API for var DB like `assigned`, `locked`, and so on.
+pub trait VarDBIF:
+    IndexMut<VarId, Output = Var> + IndexMut<Lit, Output = Var> + VarPhaseIF
+{
+    /// return the number of vars.
+    fn len(&self) -> usize;
+    /// return true if it's empty.
+    fn is_empty(&self) -> bool;
+    /// return an iterator over vars.
+    fn iter(&self) -> Iter<'_, Var>;
+    /// return an iterator over vars.
+    fn iter_mut(&mut self) -> IterMut<'_, Var>;
+}
+*/
+
+/// API for var rewarding.
+pub trait VarRewardIF {
+    /// return var's activity.
+    fn activity(&mut self, vi: VarId) -> f64;
+    /// initialize rewards based on an order of vars.
+    fn initialize_reward(&mut self, iterator: Iter<'_, usize>);
+    /// clear var's activity
+    fn clear_reward(&mut self, vi: VarId);
+    /// modify var's activity at conflict analysis in `analyze`.
+    fn reward_at_analysis(&mut self, vi: VarId);
+    /// modify var's activity at value assignment in `uncheck_{assume, enquue, fix}`.
+    fn reward_at_assign(&mut self, vi: VarId);
+    /// modify var's activity at value unassigment in `cancel_until`.
+    fn reward_at_unassign(&mut self, vi: VarId);
+    /// update internal counter.
+    fn reward_update(&mut self);
+}
+
+/// API for phase saving.
+pub trait VarPhaseIF {
+    fn save_phase(&mut self, flag: Flag);
+    fn reset_phase(&mut self, flag: Flag);
+}
+
+/// Object representing a variable.
+#[derive(Debug)]
+pub struct Var {
+    /// reverse conversion to index. Note `VarId` must be `usize`.
+    pub index: VarId,
+    /// the number of participation in conflict analysis
+    pub participated: u32,
+    /// a dynamic evaluation criterion like VSIDS or ACID.
+    pub reward: f64,
+    /// the number of conflicts at which this var was assigned lastly.
+    pub timestamp: usize,
+    /// the `Flag`s
+    pub flags: Flag,
+}
+
+impl Default for Var {
+    fn default() -> Var {
+        Var {
+            index: 0,
+            reward: 0.0,
+            timestamp: 0,
+            flags: Flag::empty(),
+            participated: 0,
+        }
+    }
+}
+
+impl fmt::Display for Var {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let st = |flag, mes| if self.is(flag) { mes } else { "" };
+        write!(
+            f,
+            "V{{{} {}{}}}",
+            self.index,
+            st(Flag::TOUCHED, ", touched"),
+            st(Flag::ELIMINATED, ", eliminated"),
+        )
+    }
+}
+
+impl From<usize> for Var {
+    #[inline]
+    fn from(i: usize) -> Self {
+        Var {
+            index: i,
+            ..Var::default()
+        }
+    }
+}
+
+impl Var {
+    /// return a new vector of $n$ `Var`s.
+    pub fn new_vars(n: usize) -> Vec<Var> {
+        let mut vec = Vec::with_capacity(n + 1);
+        for i in 0..=n {
+            vec.push(Var::from(i));
+        }
+        vec
+    }
+}
+
+impl FlagIF for Var {
+    #[inline]
+    fn is(&self, flag: Flag) -> bool {
+        self.flags.contains(flag)
+    }
+    #[inline]
+    fn set(&mut self, f: Flag, b: bool) {
+        self.flags.set(f, b);
+    }
+    #[inline]
+    fn turn_off(&mut self, flag: Flag) {
+        self.flags.remove(flag);
+    }
+    #[inline]
+    fn turn_on(&mut self, flag: Flag) {
+        self.flags.insert(flag);
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -196,10 +305,30 @@ pub struct AssignStack {
     num_propagation: usize,
     num_restart: usize,
     num_lbd_update: usize,
+
+    //
+    //## Var DB
+    //
+    /// var activity decay
+    activity_decay: f64,
+    /// maximum var activity decay
+    activity_decay_max: f64,
+    /// an index for counting elapsed time
+    ordinal: usize,
+    /// vars
+    var: Vec<Var>,
+    /// estimated number of hot variable
+    core_size: Ema,
+    /// ONLY used in feature EVSIDS
+    reward_step: f64,
 }
+
+const CORE_HISOTRY_LEN: usize = 10;
 
 impl Default for AssignStack {
     fn default() -> AssignStack {
+        const VRD_MAX: f64 = 0.96;
+        const VRD_START: f64 = 0.9;
         AssignStack {
             assign: Vec::new(),
             level: Vec::new(),
@@ -219,6 +348,12 @@ impl Default for AssignStack {
             num_propagation: 0,
             num_restart: 0,
             num_lbd_update: 0,
+            activity_decay: VRD_START,
+            activity_decay_max: VRD_MAX,
+            ordinal: 0,
+            var: Vec::new(),
+            core_size: Ema::new(CORE_HISOTRY_LEN),
+            reward_step: 0.000_000_1,
         }
     }
 }
@@ -266,6 +401,7 @@ macro_rules! unset_assign {
     };
 }
 
+/*
 impl Index<VarId> for AssignStack {
     type Output = Option<bool>;
     #[inline]
@@ -280,6 +416,7 @@ impl IndexMut<VarId> for AssignStack {
         unsafe { self.assign.get_unchecked_mut(i) }
     }
 }
+ */
 
 /*
 impl Index<Range<usize>> for AssignStack {
@@ -325,16 +462,72 @@ impl Instantiate for AssignStack {
             trail: Vec::with_capacity(nv),
             var_order: VarIdHeap::new(nv, nv),
             lbd_temp: vec![0; nv + 1],
+            var: Var::new_vars(nv),
             ..AssignStack::default()
+        }
+    }
+    #[allow(unused_variables)]
+    fn adapt_to(&mut self, state: &State, num_conflict: usize) {
+        const VRD_DEC_STRICT: f64 = 0.001;
+        const VRD_DEC_STD: f64 = 0.003;
+        const VRD_DEC_HIGH: f64 = 0.008;
+        const VRD_INTERVAL: usize = 20_000;
+
+        #[cfg(feature = "use_core")]
+        {
+            const VRD_FILTER: f64 = 0.5;
+            const VRD_MAX_START: f64 = 0.2;
+            const VRD_OFFSET: f64 = 10.0;
+
+            if 0 == num_conflict {
+                self.core_size
+                    .update(((CORE_HISOTRY_LEN * self.var.len()) as f64).ln());
+                return;
+            }
+
+            let msr: (f64, f64) = self.var[1..]
+                .iter()
+                .map(|v| v.reward)
+                .fold((VRD_MAX_START, 0.0), |(m, s), x| (m.max(x), s + x));
+            let ar = msr.1 / self.var.len() as f64;
+            let thr = msr.0 * VRD_FILTER + ar * (1.0 - VRD_FILTER);
+            let core = self.var[1..].iter().filter(|v| thr <= v.reward).count();
+            self.core_size.update(core as f64);
+
+            if num_conflict % VRD_INTERVAL == 0 {
+                let k = match state.strategy.0 {
+                    SearchStrategy::LowDecisions => VRD_DEC_HIGH,
+                    SearchStrategy::HighSuccesive => VRD_DEC_STRICT,
+                    _ => VRD_DEC_STD,
+                };
+                let c = (self.core_size.get() - VRD_OFFSET).max(1.0);
+                let delta = 0.05 * k * (c.sqrt() * c.ln());
+                self.activity_decay_max = 1.0 - delta;
+            }
+        }
+
+        #[cfg(not(feature = "use_core"))]
+        {
+            if num_conflict % VRD_INTERVAL == 0 {
+                let k = match state.strategy.0 {
+                    SearchStrategy::LowDecisions => VRD_DEC_HIGH,
+                    SearchStrategy::HighSuccesive => VRD_DEC_STRICT,
+                    _ => VRD_DEC_STD,
+                };
+                let delta = 0.1 * k;
+                self.activity_decay_max = 1.0 - delta;
+            }
         }
     }
 }
 
-impl Export<(usize, usize, usize)> for AssignStack {
+impl Export<(usize, usize, usize, f64, f64)> for AssignStack {
     /// exports:
     ///  1. the number of conflicts
     ///  1. the number of propagations
     ///  1. the number of restarts
+    ///  1. `core_sise.get()`
+    ///  1. `activity_decay`
     ///
     ///```
     /// use crate::{splr::config::Config, splr::types::*};
@@ -343,8 +536,14 @@ impl Export<(usize, usize, usize)> for AssignStack {
     /// let (asg_num_conflict, asg_num_propagation, asg_num_restart) = asg.exports();
     ///```
     #[inline]
-    fn exports(&self) -> (usize, usize, usize) {
-        (self.num_conflict, self.num_propagation, self.num_restart)
+    fn exports(&self) -> (usize, usize, usize, f64, f64) {
+        (
+            self.num_conflict,
+            self.num_propagation,
+            self.num_restart,
+            self.core_size.get(),
+            self.activity_decay,
+        )
     }
 }
 
@@ -355,7 +554,7 @@ impl AssignIF for AssignStack {
     fn stack_range(&self, r: Range<usize>) -> &[Lit] {
         &self.trail[r]
     }
-    fn len(&self) -> usize {
+    fn stack_len(&self) -> usize {
         self.trail.len()
     }
     fn len_upto(&self, n: DecisionLevel) -> usize {
@@ -367,16 +566,39 @@ impl AssignIF for AssignStack {
             x => *x,
         }
     }
-    fn is_empty(&self) -> bool {
+    fn stack_is_empty(&self) -> bool {
         self.trail.is_empty()
     }
+    #[inline]
+    fn assign(&self, vi: VarId) -> Option<bool> {
+        unsafe { *self.assign.get_unchecked(vi) }
+    }
+    #[inline]
     fn level(&self, vi: VarId) -> DecisionLevel {
         unsafe { *self.level.get_unchecked(vi) }
     }
+    #[inline]
     fn reason(&self, vi: VarId) -> AssignReason {
         unsafe { *self.reason.get_unchecked(vi) }
     }
-    fn iter(&self) -> Iter<'_, Lit> {
+    #[inline]
+    fn var(&self, vi: VarId) -> &Var {
+        unsafe { self.var.get_unchecked(vi) }
+    }
+    #[inline]
+    fn var_mut(&mut self, vi: VarId) -> &mut Var {
+        unsafe { self.var.get_unchecked_mut(vi) }
+    }
+    fn var_iter(&self) -> Iter<'_, Var> {
+        self.var.iter()
+    }
+    fn var_iter_mut(&mut self) -> IterMut<'_, Var> {
+        self.var.iter_mut()
+    }
+    fn var_len(&self) -> usize {
+        self.var.len()
+    }
+    fn stack_iter(&self) -> Iter<'_, Lit> {
         self.trail.iter()
     }
     fn decision_level(&self) -> DecisionLevel {
@@ -392,17 +614,13 @@ impl AssignIF for AssignStack {
     fn remains(&self) -> bool {
         self.q_head < self.trail.len()
     }
-    fn assign_at_rootlevel<V>(&mut self, vdb: &mut V, l: Lit) -> MaybeInconsistent
-    where
-        V: VarDBIF + VarRewardIF,
-    {
+    fn assign_at_rootlevel(&mut self, l: Lit) -> MaybeInconsistent {
         let vi = l.vi();
-        debug_assert!(vi < vdb.len());
+        debug_assert!(vi < self.var.len());
         self.level[vi] = 0;
-        let v = &mut vdb[vi];
-        debug_assert!(!v.is(Flag::ELIMINATED));
+        debug_assert!(!self.var[vi].is(Flag::ELIMINATED));
         debug_assert_eq!(self.root_level, self.decision_level());
-        match var_assign!(self, v.index) {
+        match var_assign!(self, vi) {
             None => {
                 set_assign!(self, l);
                 self.reason[vi] = AssignReason::None;
@@ -414,71 +632,54 @@ impl AssignIF for AssignStack {
             _ => Err(SolverError::Inconsistent),
         }
     }
-    fn assign_by_implication<V>(
-        &mut self,
-        vdb: &mut V,
-        l: Lit,
-        reason: AssignReason,
-        lv: DecisionLevel,
-    ) where
-        V: VarDBIF + VarRewardIF,
-    {
+    fn assign_by_implication(&mut self, l: Lit, reason: AssignReason, lv: DecisionLevel) {
         debug_assert!(usize::from(l) != 0, "Null literal is about to be equeued");
-        debug_assert!(l.vi() < vdb.len());
+        debug_assert!(l.vi() < self.var.len());
         // The following doesn't hold anymore by using chronoBT.
         // assert!(self.trail_lim.is_empty() || cid != ClauseId::default());
         let vi = l.vi();
         self.level[vi] = lv;
-        let v = &mut vdb[vi];
+        let v = &mut self.var[vi];
         debug_assert!(!v.is(Flag::ELIMINATED));
         debug_assert!(
             var_assign!(self, vi) == Some(bool::from(l)) || var_assign!(self, vi).is_none()
         );
         set_assign!(self, l);
         self.reason[vi] = reason;
-        vdb.reward_at_assign(vi);
+        self.reward_at_assign(vi);
         debug_assert!(!self.trail.contains(&l));
         debug_assert!(!self.trail.contains(&!l));
         self.trail.push(l);
     }
-    fn assign_by_decision<V>(&mut self, vdb: &mut V, l: Lit)
-    where
-        V: VarDBIF + VarRewardIF,
-    {
-        debug_assert!(l.vi() < vdb.len());
+    fn assign_by_decision(&mut self, l: Lit) {
+        debug_assert!(l.vi() < self.var.len());
         debug_assert!(!self.trail.contains(&l));
         debug_assert!(!self.trail.contains(&!l), format!("{:?}", l));
         self.level_up();
         let dl = self.trail_lim.len() as DecisionLevel;
         let vi = l.vi();
         self.level[vi] = dl;
-        let v = &mut vdb[vi];
+        let v = &mut self.var[vi];
         debug_assert!(!v.is(Flag::ELIMINATED));
         // debug_assert!(self.assign[vi] == l.lbool() || self.assign[vi] == BOTTOM);
         set_assign!(self, l);
         self.reason[vi] = AssignReason::default();
-        vdb.reward_at_assign(vi);
+        self.reward_at_assign(vi);
         debug_assert!(!self.trail.contains(&!l));
         self.trail.push(l);
     }
-    fn assign_by_unitclause<V>(&mut self, vdb: &mut V, l: Lit)
-    where
-        V: VarDBIF + VarRewardIF,
-    {
-        self.cancel_until(vdb, self.root_level);
+    fn assign_by_unitclause(&mut self, l: Lit) {
+        self.cancel_until(self.root_level);
         debug_assert!(self.trail.iter().all(|k| k.vi() != l.vi()));
         let vi = l.vi();
         self.level[vi] = 0;
         set_assign!(self, l);
         self.reason[vi] = AssignReason::default();
-        vdb.clear_reward(l.vi());
+        self.clear_reward(l.vi());
         debug_assert!(!self.trail.contains(&!l));
         self.trail.push(l);
     }
-    fn cancel_until<V>(&mut self, vdb: &mut V, lv: DecisionLevel)
-    where
-        V: VarDBIF + VarRewardIF,
-    {
+    fn cancel_until(&mut self, lv: DecisionLevel) {
         if self.trail_lim.len() as u32 <= lv {
             return;
         }
@@ -492,12 +693,12 @@ impl AssignIF for AssignStack {
                 shift += 1;
                 continue;
             }
-            let v = &mut vdb[vi];
+            let v = &mut self.var[vi];
             v.set(Flag::PHASE, var_assign!(self, vi).unwrap());
             unset_assign!(self, vi);
             self.reason[vi] = AssignReason::default();
-            vdb.reward_at_unassign(vi);
-            self.var_order.insert(vdb, vi);
+            self.reward_at_unassign(vi);
+            self.insert_heap(vi);
         }
         self.trail.truncate(shift);
         debug_assert!(self
@@ -519,10 +720,9 @@ impl AssignIF for AssignStack {
     ///    So Eliminator should call `garbage_collect` before me.
     ///  - The order of literals in binary clauses will be modified to hold
     ///    propagatation order.
-    fn propagate<C, V>(&mut self, cdb: &mut C, vdb: &mut V) -> ClauseId
+    fn propagate<C>(&mut self, cdb: &mut C) -> ClauseId
     where
         C: ClauseDBIF,
-        V: VarDBIF + VarRewardIF,
     {
         let watcher = cdb.watcher_lists_mut() as *mut [Vec<Watch>];
         let check_index = self.num_conflict + self.num_restart;
@@ -548,7 +748,6 @@ impl AssignIF for AssignStack {
                             return w.c;
                         }
                         self.assign_by_implication(
-                            vdb,
                             w.blocker,
                             AssignReason::Implication(w.c, false_lit),
                             self.level[false_lit.vi()],
@@ -603,24 +802,19 @@ impl AssignIF for AssignStack {
                         .map(|l| self.level[l.vi()])
                         .max()
                         .unwrap_or(0);
-                    self.assign_by_implication(
-                        vdb,
-                        first,
-                        AssignReason::Implication(w.c, NULL_LIT),
-                        lv,
-                    );
+                    self.assign_by_implication(first, AssignReason::Implication(w.c, NULL_LIT), lv);
                 }
             }
         }
         if self.num_target_assign < self.trail.len() {
             self.target_assign = true;
             self.num_target_assign = self.trail.len();
-            vdb.save_phase(self, Flag::TARGET_PHASE);
+            self.save_phase(Flag::TARGET_PHASE);
         }
         if self.num_best_assign < self.trail.len() {
             self.best_assign = true;
             self.num_best_assign = self.trail.len();
-            vdb.save_phase(self, Flag::BEST_PHASE);
+            self.save_phase(Flag::BEST_PHASE);
         }
         ClauseId::default()
     }
@@ -713,6 +907,49 @@ impl AssignIF for AssignStack {
             vec.retain(|l| self.lbd_temp[l.vi()] == key);
         }
     }
+    fn extend_model(&mut self, lits: &[Lit]) {
+        if lits.is_empty() {
+            return;
+        }
+        let mut i = lits.len() - 1;
+        let mut width;
+        'next: loop {
+            width = usize::from(lits[i]);
+            if width == 0 && i == 0 {
+                break;
+            }
+            i -= 1;
+            loop {
+                if width <= 1 {
+                    break;
+                }
+                let l = lits[i];
+                // let model_value = match model[l.vi() - 1] {
+                //     x if x == l.to_i32() => Some(true),
+                //     x if -x == l.to_i32() => Some(false),
+                //     _ => None,
+                // };
+                // if model_value != Some(false) {
+                if self.assign(l.vi()) != Some(bool::from(l)) {
+                    if i < width {
+                        break 'next;
+                    }
+                    i -= width;
+                    continue 'next;
+                }
+                width -= 1;
+                i -= 1;
+            }
+            debug_assert!(width == 1);
+            let l = lits[i];
+            // debug_assert!(model[l.vi() - 1] != l.negate().int());
+            self.assign[l.vi()] = Some(bool::from(l));
+            if i < width {
+                break;
+            }
+            i -= width;
+        }
+    }
 }
 
 impl LBDIF for AssignStack {
@@ -764,32 +1001,111 @@ impl LBDIF for AssignStack {
     }
 }
 
+impl VarPhaseIF for AssignStack {
+    fn save_phase(&mut self, flag: Flag) {
+        for l in self.trail.iter() {
+            self.var[l.vi()].set(flag, bool::from(*l));
+        }
+    }
+    fn reset_phase(&mut self, flag: Flag) {
+        for v in &mut self.var[1..] {
+            v.turn_off(flag);
+        }
+    }
+}
+
+impl VarRewardIF for AssignStack {
+    #[inline]
+    fn activity(&mut self, vi: VarId) -> f64 {
+        self.var[vi].reward
+    }
+    fn initialize_reward(&mut self, _iterator: Iter<'_, usize>) {}
+    fn clear_reward(&mut self, vi: VarId) {
+        self.var[vi].reward = 0.0;
+    }
+
+    //
+    // EVSIDS
+    //
+    #[cfg(feature = "EVSIDS")]
+    fn reward_at_analysis(&mut self, vi: VarId) {
+        let s = self.reward_step;
+        let t = self.ordinal;
+        let v = &mut self.var[vi];
+        if v.timestamp == t {
+            return;
+        }
+        v.timestamp = t;
+        v.reward += s;
+        const SCALE: f64 = 1e-30;
+        const SCALE_MAX: f64 = 1e240;
+        if SCALE_MAX < v.reward {
+            for v in &mut self.var[1..] {
+                v.reward *= SCALE;
+            }
+            self.reward_step *= SCALE;
+        }
+    }
+    #[cfg(feature = "EVSIDS")]
+    fn reward_at_assign(&mut self, _: VarId) {}
+    #[cfg(feature = "EVSIDS")]
+    fn reward_at_unassign(&mut self, _: VarId) {}
+    #[cfg(feature = "EVSIDS")]
+    fn reward_update(&mut self) {
+        self.ordinal += 1;
+        const INC_SCALE: f64 = 1.01;
+        self.reward_step *= INC_SCALE;
+    }
+
+    //
+    // Learning Rate
+    //
+    #[cfg(not(feature = "EVSIDS"))]
+    fn reward_at_analysis(&mut self, vi: VarId) {
+        let v = &mut self[vi];
+        v.participated += 1;
+    }
+    #[cfg(not(feature = "EVSIDS"))]
+    fn reward_at_assign(&mut self, vi: VarId) {
+        let t = self.ordinal;
+        let v = &mut self.var[vi];
+        v.timestamp = t;
+    }
+    #[cfg(not(feature = "EVSIDS"))]
+    fn reward_at_unassign(&mut self, vi: VarId) {
+        let v = &mut self.var[vi];
+        let duration = (self.ordinal + 1 - v.timestamp) as f64;
+        let decay = self.activity_decay;
+        let rate = v.participated as f64 / duration;
+        v.reward *= decay;
+        v.reward += (1.0 - decay) * rate;
+        v.participated = 0;
+    }
+    #[cfg(not(feature = "EVSIDS"))]
+    fn reward_update(&mut self) {
+        const VRD_STEP: f64 = 0.000_01;
+        self.ordinal += 1;
+        self.activity_decay = self.activity_decay_max.min(self.activity_decay + VRD_STEP);
+    }
+}
+
 impl VarSelectionIF for AssignStack {
-    fn select_var<V>(&mut self, vdb: &mut V) -> VarId
-    where
-        V: VarDBIF + VarRewardIF,
-    {
+    fn select_var(&mut self) -> VarId {
         loop {
-            let vi = self.var_order.get_root(vdb);
-            if var_assign!(self, vi).is_none() && !vdb[vi].is(Flag::ELIMINATED) {
+            let vi = self.get_heap_root();
+            if var_assign!(self, vi).is_none() && !self.var[vi].is(Flag::ELIMINATED) {
                 return vi;
             }
         }
     }
-    fn update_order<V>(&mut self, vdb: &mut V, v: VarId)
-    where
-        V: VarDBIF + VarRewardIF,
-    {
-        self.var_order.update(vdb, v)
+    fn update_order(&mut self, v: VarId) {
+        self.update_heap(v);
     }
-    fn rebuild_order<V>(&mut self, vdb: &mut V)
-    where
-        V: VarDBIF + VarRewardIF,
-    {
+    fn rebuild_order(&mut self) {
         self.var_order.reset();
-        for vi in 1..vdb.len() {
-            if var_assign!(self, vi).is_none() && !vdb[vi].is(Flag::ELIMINATED) {
-                self.var_order.insert(vdb, vi);
+        for vi in 1..self.var.len() {
+            if var_assign!(self, vi).is_none() && !self.var[vi].is(Flag::ELIMINATED) {
+                self.insert_heap(vi);
             }
         }
     }
@@ -801,21 +1117,16 @@ impl AssignStack {
     }
     /// dump all active clauses and fixed assignments as a CNF file.
     #[allow(dead_code)]
-    fn dump_cnf<C, V>(&mut self, cdb: &C, state: &State, vdb: &V, fname: &str)
+    fn dump_cnf<C, V>(&mut self, cdb: &C, state: &State, fname: &str)
     where
         C: ClauseDBIF,
-        V: VarDBIF,
     {
-        for v in vdb.iter().skip(1) {
-            if v.is(Flag::ELIMINATED) {
-                if var_assign!(self, v.index).is_some() {
-                    panic!(
-                        "conflicting var {} {:?}",
-                        v.index,
-                        var_assign!(self, v.index)
-                    );
+        for vi in 1..self.var.len() {
+            if self.var(vi).is(Flag::ELIMINATED) {
+                if var_assign!(self, vi).is_some() {
+                    panic!("conflicting var {} {:?}", vi, var_assign!(self, vi));
                 } else {
-                    println!("eliminate var {}", v.index);
+                    println!("eliminate var {}", vi);
                 }
             }
         }
@@ -848,8 +1159,10 @@ impl AssignStack {
 //   `indx` is positions. So the unused field 0 can hold the last position as a special case.
 #[derive(Debug)]
 pub struct VarIdHeap {
-    heap: Vec<VarId>, // order : usize -> VarId
-    idxs: Vec<usize>, // VarId : -> order : usize
+    // order : usize -> VarId, -- Which var is the n-th best?
+    heap: Vec<VarId>,
+    // VarId : -> order : usize -- How good is the var?
+    idxs: Vec<usize>,
 }
 
 impl Default for VarIdHeap {
@@ -863,12 +1176,6 @@ impl Default for VarIdHeap {
 
 trait VarOrderIF {
     fn new(n: usize, init: usize) -> VarIdHeap;
-    fn update<V>(&mut self, vdb: &mut V, v: VarId)
-    where
-        V: VarRewardIF;
-    fn insert<V>(&mut self, vdb: &mut V, vi: VarId)
-    where
-        V: VarRewardIF;
     fn clear(&mut self);
     fn len(&self) -> usize;
     fn is_empty(&self) -> bool;
@@ -886,33 +1193,6 @@ impl VarOrderIF for VarIdHeap {
         }
         idxs[0] = init;
         VarIdHeap { heap, idxs }
-    }
-    fn update<V>(&mut self, vdb: &mut V, v: VarId)
-    where
-        V: VarRewardIF,
-    {
-        debug_assert!(v != 0, "Invalid VarId");
-        let start = self.idxs[v];
-        if self.contains(v) {
-            self.percolate_up(vdb, start)
-        }
-    }
-    fn insert<V>(&mut self, vdb: &mut V, vi: VarId)
-    where
-        V: VarRewardIF,
-    {
-        if self.contains(vi) {
-            let i = self.idxs[vi];
-            self.percolate_up(vdb, i);
-            return;
-        }
-        let i = self.idxs[vi];
-        let n = self.idxs[0] + 1;
-        let vn = self.heap[n];
-        self.heap.swap(i, n);
-        self.idxs.swap(vi, vn);
-        self.idxs[0] = n;
-        self.percolate_up(vdb, n);
     }
     fn clear(&mut self) {
         self.reset()
@@ -945,6 +1225,134 @@ impl fmt::Display for AssignStack {
     }
 }
 
+trait VarHeapIF {
+    fn update_heap(&mut self, v: VarId);
+    fn insert_heap(&mut self, vi: VarId);
+    fn get_heap_root(&mut self) -> VarId;
+    fn percolate_up(&mut self, start: usize);
+    fn percolate_down(&mut self, start: usize);
+    fn remove(&mut self, vs: VarId);
+}
+
+impl VarHeapIF for AssignStack {
+    fn update_heap(&mut self, v: VarId) {
+        debug_assert!(v != 0, "Invalid VarId");
+        let start = self.var_order.idxs[v];
+        if self.var_order.contains(v) {
+            self.percolate_up(start);
+        }
+    }
+    fn insert_heap(&mut self, vi: VarId) {
+        if self.var_order.contains(vi) {
+            let i = self.var_order.idxs[vi];
+            self.percolate_up(i);
+            return;
+        }
+        let i = self.var_order.idxs[vi];
+        let n = self.var_order.idxs[0] + 1;
+        let vn = self.var_order.heap[n];
+        self.var_order.heap.swap(i, n);
+        self.var_order.idxs.swap(vi, vn);
+        self.var_order.idxs[0] = n;
+        self.percolate_up(n);
+    }
+    fn get_heap_root(&mut self) -> VarId {
+        let s = 1;
+        let vs = self.var_order.heap[s];
+        let n = self.var_order.idxs[0];
+        let vn = self.var_order.heap[n];
+        debug_assert!(vn != 0, "Invalid VarId for heap");
+        debug_assert!(vs != 0, "Invalid VarId for heap");
+        self.var_order.heap.swap(n, s);
+        self.var_order.idxs.swap(vn, vs);
+        self.var_order.idxs[0] -= 1;
+        if 1 < self.var_order.idxs[0] {
+            self.percolate_down(1);
+        }
+        vs
+    }
+    fn percolate_up(&mut self, start: usize) {
+        let mut q = start;
+        let vq = self.var_order.heap[q];
+        debug_assert!(0 < vq, "size of heap is too small");
+        let aq = self.activity(vq);
+        loop {
+            let p = q / 2;
+            if p == 0 {
+                self.var_order.heap[q] = vq;
+                debug_assert!(vq != 0, "Invalid index in percolate_up");
+                self.var_order.idxs[vq] = q;
+                return;
+            } else {
+                let vp = self.var_order.heap[p];
+                let ap = self.activity(vp);
+                if ap < aq {
+                    // move down the current parent, and make it empty
+                    self.var_order.heap[q] = vp;
+                    debug_assert!(vq != 0, "Invalid index in percolate_up");
+                    self.var_order.idxs[vp] = q;
+                    q = p;
+                } else {
+                    self.var_order.heap[q] = vq;
+                    debug_assert!(vq != 0, "Invalid index in percolate_up");
+                    self.var_order.idxs[vq] = q;
+                    return;
+                }
+            }
+        }
+    }
+    fn percolate_down(&mut self, start: usize) {
+        let n = self.var_order.len();
+        let mut i = start;
+        let vi = self.var_order.heap[i];
+        let ai = self.activity(vi);
+        loop {
+            let l = 2 * i; // left
+            if l < n {
+                let vl = self.var_order.heap[l];
+                let al = self.activity(vl);
+                let r = l + 1; // right
+                let (target, vc, ac) = if r < n && al < self.activity(self.var_order.heap[r]) {
+                    let vr = self.var_order.heap[r];
+                    (r, vr, self.activity(vr))
+                } else {
+                    (l, vl, al)
+                };
+                if ai < ac {
+                    self.var_order.heap[i] = vc;
+                    self.var_order.idxs[vc] = i;
+                    i = target;
+                } else {
+                    self.var_order.heap[i] = vi;
+                    debug_assert!(vi != 0, "invalid index");
+                    self.var_order.idxs[vi] = i;
+                    return;
+                }
+            } else {
+                self.var_order.heap[i] = vi;
+                debug_assert!(vi != 0, "invalid index");
+                self.var_order.idxs[vi] = i;
+                return;
+            }
+        }
+    }
+    #[allow(dead_code)]
+    fn remove(&mut self, vs: VarId) {
+        let s = self.var_order.idxs[vs];
+        let n = self.var_order.idxs[0];
+        if n < s {
+            return;
+        }
+        let vn = self.var_order.heap[n];
+        self.var_order.heap.swap(n, s);
+        self.var_order.idxs.swap(vn, vs);
+        self.var_order.idxs[0] -= 1;
+        if 1 < self.var_order.idxs[0] {
+            self.percolate_down(1);
+        }
+    }
+}
+
 impl VarIdHeap {
     fn contains(&self, v: VarId) -> bool {
         self.idxs[v] <= self.idxs[0]
@@ -955,116 +1363,9 @@ impl VarIdHeap {
             self.heap[i] = i;
         }
     }
-    fn get_root<V>(&mut self, vdb: &mut V) -> VarId
-    where
-        V: VarRewardIF,
-    {
-        let s = 1;
-        let vs = self.heap[s];
-        let n = self.idxs[0];
-        let vn = self.heap[n];
-        debug_assert!(vn != 0, "Invalid VarId for heap");
-        debug_assert!(vs != 0, "Invalid VarId for heap");
-        self.heap.swap(n, s);
-        self.idxs.swap(vn, vs);
-        self.idxs[0] -= 1;
-        if 1 < self.idxs[0] {
-            self.percolate_down(vdb, 1);
-        }
-        vs
-    }
-    fn percolate_up<V>(&mut self, vdb: &mut V, start: usize)
-    where
-        V: VarRewardIF,
-    {
-        let mut q = start;
-        let vq = self.heap[q];
-        debug_assert!(0 < vq, "size of heap is too small");
-        let aq = vdb.activity(vq);
-        loop {
-            let p = q / 2;
-            if p == 0 {
-                self.heap[q] = vq;
-                debug_assert!(vq != 0, "Invalid index in percolate_up");
-                self.idxs[vq] = q;
-                return;
-            } else {
-                let vp = self.heap[p];
-                let ap = vdb.activity(vp);
-                if ap < aq {
-                    // move down the current parent, and make it empty
-                    self.heap[q] = vp;
-                    debug_assert!(vq != 0, "Invalid index in percolate_up");
-                    self.idxs[vp] = q;
-                    q = p;
-                } else {
-                    self.heap[q] = vq;
-                    debug_assert!(vq != 0, "Invalid index in percolate_up");
-                    self.idxs[vq] = q;
-                    return;
-                }
-            }
-        }
-    }
-    fn percolate_down<V>(&mut self, vdb: &mut V, start: usize)
-    where
-        V: VarRewardIF,
-    {
-        let n = self.len();
-        let mut i = start;
-        let vi = self.heap[i];
-        let ai = vdb.activity(vi);
-        loop {
-            let l = 2 * i; // left
-            if l < n {
-                let vl = self.heap[l];
-                let al = vdb.activity(vl);
-                let r = l + 1; // right
-                let (target, vc, ac) = if r < n && al < vdb.activity(self.heap[r]) {
-                    let vr = self.heap[r];
-                    (r, vr, vdb.activity(vr))
-                } else {
-                    (l, vl, al)
-                };
-                if ai < ac {
-                    self.heap[i] = vc;
-                    self.idxs[vc] = i;
-                    i = target;
-                } else {
-                    self.heap[i] = vi;
-                    debug_assert!(vi != 0, "invalid index");
-                    self.idxs[vi] = i;
-                    return;
-                }
-            } else {
-                self.heap[i] = vi;
-                debug_assert!(vi != 0, "invalid index");
-                self.idxs[vi] = i;
-                return;
-            }
-        }
-    }
     #[allow(dead_code)]
     fn peek(&self) -> VarId {
         self.heap[1]
-    }
-    #[allow(dead_code)]
-    fn remove<V>(&mut self, vdb: &mut V, vs: VarId)
-    where
-        V: VarRewardIF,
-    {
-        let s = self.idxs[vs];
-        let n = self.idxs[0];
-        if n < s {
-            return;
-        }
-        let vn = self.heap[n];
-        self.heap.swap(n, s);
-        self.idxs.swap(vn, vs);
-        self.idxs[0] -= 1;
-        if 1 < self.idxs[0] {
-            self.percolate_down(vdb, 1);
-        }
     }
     #[allow(dead_code)]
     fn check(&self, s: &str) {

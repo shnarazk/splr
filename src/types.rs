@@ -4,7 +4,6 @@ pub use crate::{
     assign::AssignReason,
     clause::{Clause, ClauseIF, ClauseId, ClauseIdIF, Watch},
     config::Config,
-    var::Var,
 };
 use {
     crate::state::State,

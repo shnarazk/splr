@@ -5,7 +5,6 @@ use {
         clause::ClauseDBIF,
         state::{State, StateIF},
         types::*,
-        var::{VarDBIF, VarRewardIF},
     },
     std::{
         fmt,
@@ -38,22 +37,21 @@ pub trait EliminateIF {
     /// set eliminator's mode to **ready**.
     fn activate(&mut self);
     /// set eliminator's mode to **dormant**.
-    fn stop<C, V>(&mut self, cdb: &mut C, vdb: &mut V)
+    fn stop<A, C>(&mut self, asg: &mut A, cdb: &mut C)
     where
-        C: ClauseDBIF,
-        V: VarDBIF;
+        A: AssignIF,
+        C: ClauseDBIF;
     /// check if the eliminator is running.
     fn is_running(&self) -> bool;
     /// rebuild occur lists.
-    fn prepare<A, C, V>(&mut self, asg: &A, cdb: &mut C, vdb: &mut V, force: bool)
+    fn prepare<A, C>(&mut self, asg: &mut A, cdb: &mut C, force: bool)
     where
         A: AssignIF,
-        C: ClauseDBIF,
-        V: VarDBIF;
+        C: ClauseDBIF;
     /// enqueue a var into eliminator's var queue.
-    fn enqueue_var<V>(&mut self, vdb: &mut V, vi: VarId, upword: bool)
+    fn enqueue_var<A>(&mut self, asg: &mut A, vi: VarId, upword: bool)
     where
-        V: VarDBIF;
+        A: AssignIF;
     /// simplify database by:
     /// * removing satisfiable clauses
     /// * calling exhaustive simplifier that tries **clause subsumption** and **variable elimination**.
@@ -61,34 +59,24 @@ pub trait EliminateIF {
     /// # Errors
     ///
     /// if solver becomes inconsistent.
-    fn simplify<A, C, V>(
-        &mut self,
-        asg: &mut A,
-        cdb: &mut C,
-        state: &mut State,
-        vdb: &mut V,
-    ) -> MaybeInconsistent
+    fn simplify<A, C>(&mut self, asg: &mut A, cdb: &mut C, state: &mut State) -> MaybeInconsistent
     where
-        A: AssignIF + Export<(usize, usize, usize)>,
-        C: ClauseDBIF,
-        V: VarDBIF + VarRewardIF;
-    /// inject assignments for eliminated vars.
-    fn extend_model<A>(&mut self, asg: &mut A)
+        A: AssignIF + Export<(usize, usize, usize, f64, f64)>,
+        C: ClauseDBIF;
+    /// register a clause id to all corresponding occur lists.
+    fn add_cid_occur<A>(&mut self, asg: &mut A, cid: ClauseId, c: &mut Clause, enqueue: bool)
     where
         A: AssignIF;
-    /// register a clause id to all corresponding occur lists.
-    fn add_cid_occur<V>(&mut self, vdb: &mut V, cid: ClauseId, c: &mut Clause, enqueue: bool)
-    where
-        V: VarDBIF;
     /// remove a clause id from all corresponding occur lists.
-    fn remove_cid_occur<A, V>(&mut self, asg: &A, vdb: &mut V, cid: ClauseId, c: &mut Clause)
+    fn remove_cid_occur<A>(&mut self, asg: &mut A, cid: ClauseId, c: &mut Clause)
     where
-        A: AssignIF,
-        V: VarDBIF;
+        A: AssignIF;
     /// return the order of vars based on their occurrences
     fn sorted_iterator(&self) -> Iter<'_, usize>;
     /// return vi's stats
     fn stats(&self, vi: VarId) -> (usize, usize);
+    /// return eliminated literals.
+    fn eliminated_lits(&self) -> &[Lit];
 }
 
 /// API for getting stats about Eliminator's internal data.
@@ -159,7 +147,7 @@ pub struct Eliminator {
     clause_queue: Vec<ClauseId>,
     var_queue: VarOccHeap,
     bwdsub_assigns: usize,
-    elim_clauses: Vec<Lit>,
+    elim_lits: Vec<Lit>,
     /// 0 for no limit
     /// Stop elimination if a generated resolvent is larger than this
     /// 0 means no limit.
@@ -184,7 +172,7 @@ impl Default for Eliminator {
             var_queue: VarOccHeap::new(0, 0),
             clause_queue: Vec::new(),
             bwdsub_assigns: 0,
-            elim_clauses: Vec::new(),
+            elim_lits: Vec::new(),
             eliminate_combination_limit: 80,
             eliminate_grow_limit: 0, // 64
             eliminate_occurrence_limit: 800,
@@ -311,14 +299,14 @@ impl EliminateIF for Eliminator {
     // Due to a potential bug of killing clauses and difficulty about
     // synchronization between 'garbage_collect' and clearing occur lists,
     // 'stop' should purge all occur lists to purge any dead clauses for now.
-    fn stop<C, V>(&mut self, cdb: &mut C, vdb: &mut V)
+    fn stop<A, C>(&mut self, asg: &mut A, cdb: &mut C)
     where
+        A: AssignIF,
         C: ClauseDBIF,
-        V: VarDBIF,
     {
         let force: bool = true;
         self.clear_clause_queue(cdb);
-        self.clear_var_queue(vdb);
+        self.clear_var_queue(asg);
         if force {
             for c in &mut cdb.iter_mut().skip(1) {
                 c.turn_off(Flag::OCCUR_LINKED);
@@ -329,11 +317,10 @@ impl EliminateIF for Eliminator {
         }
         self.mode = EliminatorMode::Deactive;
     }
-    fn prepare<A, C, V>(&mut self, asg: &A, cdb: &mut C, vdb: &mut V, force: bool)
+    fn prepare<A, C>(&mut self, asg: &mut A, cdb: &mut C, force: bool)
     where
         A: AssignIF,
         C: ClauseDBIF,
-        V: VarDBIF,
     {
         if self.mode != EliminatorMode::Waiting {
             return;
@@ -346,49 +333,40 @@ impl EliminateIF for Eliminator {
             if c.is(Flag::DEAD) || c.is(Flag::OCCUR_LINKED) {
                 continue;
             }
-            self.add_cid_occur(vdb, ClauseId::from(cid), c, false);
+            self.add_cid_occur(asg, ClauseId::from(cid), c, false);
         }
         if force {
-            for vi in 1..vdb.len() {
-                let v = &vdb[vi];
-                if v.is(Flag::ELIMINATED) || asg[vi].is_some() {
+            for vi in 1..asg.var_len() {
+                if asg.var(vi).is(Flag::ELIMINATED) || asg.assign(vi).is_some() {
                     continue;
                 }
-                self.enqueue_var(vdb, vi, true);
+                self.enqueue_var(asg, vi, true);
             }
         }
     }
-    fn enqueue_var<V>(&mut self, vdb: &mut V, vi: VarId, upward: bool)
+    fn enqueue_var<A>(&mut self, asg: &mut A, vi: VarId, upward: bool)
     where
-        V: VarDBIF,
+        A: AssignIF,
     {
         if self.mode != EliminatorMode::Running {
             return;
         }
-        let v = &mut vdb[vi];
         let w = &mut self[vi];
-        if !v.is(Flag::ENQUEUED) && w.activity() < self.eliminate_occurrence_limit {
-            v.turn_on(Flag::ENQUEUED);
+        if !asg.var(vi).is(Flag::ENQUEUED) && w.activity() < self.eliminate_occurrence_limit {
+            asg.var_mut(vi).turn_on(Flag::ENQUEUED);
             self.var_queue.insert(&self.var, vi, upward);
         }
     }
-    fn simplify<A, C, V>(
-        &mut self,
-        asg: &mut A,
-        cdb: &mut C,
-        state: &mut State,
-        vdb: &mut V,
-    ) -> MaybeInconsistent
+    fn simplify<A, C>(&mut self, asg: &mut A, cdb: &mut C, state: &mut State) -> MaybeInconsistent
     where
-        A: AssignIF + Export<(usize, usize, usize)>,
+        A: AssignIF + Export<(usize, usize, usize, f64, f64)>,
         C: ClauseDBIF,
-        V: VarDBIF + VarRewardIF,
     {
         debug_assert_eq!(asg.decision_level(), 0);
         // we can reset all the reasons because decision level is zero.
         #[cfg(feature = "boundary_check")]
         {
-            for v in vdb.iter().skip(1) {
+            for v in asg.var_iter().skip(1) {
                 if asg.reason(v.index) != AssignReason::None {
                     assert_eq!(asg.level(v.index), state.root_level);
                     // asg.reason(v.index) = AssignReason::None;
@@ -396,71 +374,25 @@ impl EliminateIF for Eliminator {
             }
         }
         if self.is_waiting() {
-            self.prepare(asg, cdb, vdb, true);
+            self.prepare(asg, cdb, true);
         }
-        self.eliminate(asg, cdb, state, vdb)?;
+        self.eliminate(asg, cdb, state)?;
         self.num_sat_elimination += 1;
         if self.is_running() {
             self.num_full_elimination += 1;
-            self.stop(cdb, vdb);
+            self.stop(asg, cdb);
         }
         cdb.check_size().map(|_| ())
     }
-    fn extend_model<A>(&mut self, asg: &mut A)
+    fn add_cid_occur<A>(&mut self, asg: &mut A, cid: ClauseId, c: &mut Clause, enqueue: bool)
     where
         A: AssignIF,
-    {
-        if self.elim_clauses.is_empty() {
-            return;
-        }
-        let mut i = self.elim_clauses.len() - 1;
-        let mut width;
-        'next: loop {
-            width = usize::from(self.elim_clauses[i]);
-            if width == 0 && i == 0 {
-                break;
-            }
-            i -= 1;
-            loop {
-                if width <= 1 {
-                    break;
-                }
-                let l = self.elim_clauses[i];
-                // let model_value = match model[l.vi() - 1] {
-                //     x if x == l.to_i32() => Some(true),
-                //     x if -x == l.to_i32() => Some(false),
-                //     _ => None,
-                // };
-                // if model_value != Some(false) {
-                if asg[l.vi()] != Some(bool::from(l)) {
-                    if i < width {
-                        break 'next;
-                    }
-                    i -= width;
-                    continue 'next;
-                }
-                width -= 1;
-                i -= 1;
-            }
-            debug_assert!(width == 1);
-            let l = self.elim_clauses[i];
-            // debug_assert!(model[l.vi() - 1] != l.negate().int());
-            asg[l.vi()] = Some(bool::from(l));
-            if i < width {
-                break;
-            }
-            i -= width;
-        }
-    }
-    fn add_cid_occur<V>(&mut self, vdb: &mut V, cid: ClauseId, c: &mut Clause, enqueue: bool)
-    where
-        V: VarDBIF,
     {
         if self.mode != EliminatorMode::Running || c.is(Flag::OCCUR_LINKED) {
             return;
         }
         for l in &c.lits {
-            let v = &mut vdb[l.vi()];
+            let v = &mut asg.var_mut(l.vi());
             let w = &mut self[l.vi()];
             v.turn_on(Flag::TOUCHED);
             if !v.is(Flag::ELIMINATED) {
@@ -477,7 +409,7 @@ impl EliminateIF for Eliminator {
                     );
                     w.neg_occurs.push(cid);
                 }
-                self.enqueue_var(vdb, l.vi(), false);
+                self.enqueue_var(asg, l.vi(), false);
             }
         }
         c.turn_on(Flag::OCCUR_LINKED);
@@ -485,19 +417,18 @@ impl EliminateIF for Eliminator {
             self.enqueue_clause(cid, c);
         }
     }
-    fn remove_cid_occur<A, V>(&mut self, asg: &A, vdb: &mut V, cid: ClauseId, c: &mut Clause)
+    fn remove_cid_occur<A>(&mut self, asg: &mut A, cid: ClauseId, c: &mut Clause)
     where
         A: AssignIF,
-        V: VarDBIF,
     {
         debug_assert!(self.mode == EliminatorMode::Running);
         debug_assert!(!cid.is_lifted_lit());
         c.turn_off(Flag::OCCUR_LINKED);
         debug_assert!(c.is(Flag::DEAD));
         for l in &c.lits {
-            if asg[l.vi()].is_none() {
-                self.remove_lit_occur(vdb, *l, cid);
-                self.enqueue_var(vdb, l.vi(), true);
+            if asg.assign(l.vi()).is_none() {
+                self.remove_lit_occur(asg, *l, cid);
+                self.enqueue_var(asg, l.vi(), true);
             }
         }
     }
@@ -507,6 +438,9 @@ impl EliminateIF for Eliminator {
     fn stats(&self, vi: VarId) -> (usize, usize) {
         let w = &self[vi];
         (w.pos_occurs.len(), w.neg_occurs.len())
+    }
+    fn eliminated_lits(&self) -> &[Lit] {
+        &self.elim_lits
     }
 }
 
@@ -518,17 +452,15 @@ impl Eliminator {
 
     /// returns false if solver is inconsistent
     /// - calls `clause_queue.pop`
-    fn backward_subsumption_check<A, C, V>(
+    fn backward_subsumption_check<A, C>(
         &mut self,
         asg: &mut A,
         cdb: &mut C,
-        vdb: &mut V,
         timedout: &Arc<AtomicBool>,
     ) -> MaybeInconsistent
     where
         A: AssignIF,
         C: ClauseDBIF,
-        V: VarDBIF + VarRewardIF,
     {
         debug_assert_eq!(asg.decision_level(), 0);
         while !self.clause_queue.is_empty() || self.bwdsub_assigns < asg.len() {
@@ -545,7 +477,7 @@ impl Eliminator {
             // assert_ne!(cid, 0);
             if timedout.load(Ordering::Acquire) {
                 self.clear_clause_queue(cdb);
-                self.clear_var_queue(vdb);
+                self.clear_var_queue(asg);
                 continue;
             }
             let best = if cid.is_lifted_lit() {
@@ -562,9 +494,9 @@ impl Eliminator {
                 // so searching the shortest occurs is most efficient.
                 let mut b = 0;
                 for l in lits {
-                    let v = &vdb[l.vi()];
+                    let v = &asg.var(l.vi());
                     let w = &self[l.vi()];
-                    if asg[l.vi()].is_some() {
+                    if asg.assign(l.vi()).is_some() {
                         continue;
                     }
                     let nsum = if bool::from(*l) {
@@ -579,7 +511,7 @@ impl Eliminator {
                 }
                 b
             };
-            if best == 0 || vdb[best].is(Flag::ELIMINATED) {
+            if best == 0 || asg.var(best).is(Flag::ELIMINATED) {
                 continue;
             }
             unsafe {
@@ -593,7 +525,7 @@ impl Eliminator {
                         }
                         let db = &cdb[*did];
                         if !db.is(Flag::DEAD) && db.len() <= self.subsume_literal_limit {
-                            try_subsume(asg, cdb, self, vdb, cid, *did)?;
+                            try_subsume(asg, cdb, self, cid, *did)?;
                         }
                     }
                 }
@@ -606,23 +538,16 @@ impl Eliminator {
     /// # Errors
     ///
     /// if solver becomes inconsistent.
-    fn eliminate<A, C, V>(
-        &mut self,
-        asg: &mut A,
-        cdb: &mut C,
-        state: &mut State,
-        vdb: &mut V,
-    ) -> MaybeInconsistent
+    fn eliminate<A, C>(&mut self, asg: &mut A, cdb: &mut C, state: &mut State) -> MaybeInconsistent
     where
-        A: AssignIF + Export<(usize, usize, usize)>,
+        A: AssignIF + Export<(usize, usize, usize, f64, f64)>,
         C: ClauseDBIF,
-        V: VarDBIF + VarRewardIF,
     {
         let start = state.elapsed().unwrap_or(0.0);
         loop {
             let na = asg.len();
-            self.eliminate_main(asg, cdb, state, vdb)?;
-            cdb.eliminate_satisfied_clauses(asg, self, vdb, true);
+            self.eliminate_main(asg, cdb, state)?;
+            cdb.eliminate_satisfied_clauses(asg, self, true);
             if na == asg.len()
                 && (!self.is_running()
                     || (0 == self.clause_queue_len() && 0 == self.var_queue_len()))
@@ -631,24 +556,22 @@ impl Eliminator {
             }
             if 0.1 <= state.elapsed().unwrap_or(1.0) - start {
                 self.clear_clause_queue(cdb);
-                self.clear_var_queue(vdb);
+                self.clear_var_queue(asg);
                 break;
             }
         }
         Ok(())
     }
     /// do the elimination task
-    fn eliminate_main<A, C, V>(
+    fn eliminate_main<A, C>(
         &mut self,
         asg: &mut A,
         cdb: &mut C,
         state: &mut State,
-        vdb: &mut V,
     ) -> MaybeInconsistent
     where
-        A: AssignIF + Export<(usize, usize, usize)>,
+        A: AssignIF + Export<(usize, usize, usize, f64, f64)>,
         C: ClauseDBIF,
-        V: VarDBIF + VarRewardIF,
     {
         /// The ratio of time slot for single elimination step.
         /// Since it is measured in millisecond, 1000 means executing elimination
@@ -674,34 +597,34 @@ impl Eliminator {
             || !self.clause_queue.is_empty()
         {
             if !self.clause_queue.is_empty() || self.bwdsub_assigns < asg.len() {
-                self.backward_subsumption_check(asg, cdb, vdb, &timedout)?;
+                self.backward_subsumption_check(asg, cdb, &timedout)?;
             }
-            while let Some(vi) = self.var_queue.select_var(&self.var, vdb) {
+            while let Some(vi) = self.var_queue.select_var(&self.var, asg) {
                 // timedout = cvar.wait(timedout).unwrap();
-                let v = &mut vdb[vi];
+                let v = asg.var_mut(vi);
                 v.turn_off(Flag::ENQUEUED);
-                if !v.is(Flag::ELIMINATED) && asg[vi].is_none() {
-                    eliminate_var(asg, cdb, self, state, vdb, vi, &timedout)?;
+                if !v.is(Flag::ELIMINATED) && asg.assign(vi).is_none() {
+                    eliminate_var(asg, cdb, self, state, vi, &timedout)?;
                 }
             }
-            self.backward_subsumption_check(asg, cdb, vdb, &timedout)?;
+            self.backward_subsumption_check(asg, cdb, &timedout)?;
             debug_assert!(self.clause_queue.is_empty());
             cdb.garbage_collect();
-            if asg.propagate(cdb, vdb) != ClauseId::default() {
+            if asg.propagate(cdb) != ClauseId::default() {
                 return Err(SolverError::Inconsistent);
             }
-            cdb.eliminate_satisfied_clauses(asg, self, vdb, true);
+            cdb.eliminate_satisfied_clauses(asg, self, true);
             if timedout.load(Ordering::Acquire) {
                 self.clear_clause_queue(cdb);
-                self.clear_var_queue(vdb);
+                self.clear_var_queue(asg);
             }
         }
         Ok(())
     }
     /// remove a clause id from literal's occur list.
-    fn remove_lit_occur<V>(&mut self, vdb: &mut V, l: Lit, cid: ClauseId)
+    fn remove_lit_occur<A>(&mut self, asg: &mut A, l: Lit, cid: ClauseId)
     where
-        V: VarDBIF,
+        A: AssignIF,
     {
         let w = &mut self[l.vi()];
         if bool::from(l) {
@@ -713,7 +636,7 @@ impl Eliminator {
             w.neg_occurs.delete_unstable(|&c| c == cid);
             debug_assert!(!w.neg_occurs.contains(&cid));
         }
-        self.enqueue_var(vdb, l.vi(), true);
+        self.enqueue_var(asg, l.vi(), true);
     }
 
     ///
@@ -748,11 +671,11 @@ impl Eliminator {
     ///
 
     /// clear eliminator's var queue
-    fn clear_var_queue<V>(&mut self, vdb: &mut V)
+    fn clear_var_queue<A>(&mut self, asg: &mut A)
     where
-        V: VarDBIF,
+        A: AssignIF,
     {
-        self.var_queue.clear(vdb);
+        self.var_queue.clear(asg);
     }
     /// return the length of eliminator's var queue.
     fn var_queue_len(&self) -> usize {
@@ -760,18 +683,16 @@ impl Eliminator {
     }
 }
 
-fn try_subsume<A, C, V>(
+fn try_subsume<A, C>(
     asg: &mut A,
     cdb: &mut C,
     elim: &mut Eliminator,
-    vdb: &mut V,
     cid: ClauseId,
     did: ClauseId,
 ) -> MaybeInconsistent
 where
     A: AssignIF,
     C: ClauseDBIF,
-    V: VarDBIF + VarRewardIF,
 {
     match subsume(cdb, cid, did) {
         Some(NULL_LIT) => {
@@ -781,7 +702,7 @@ where
                 did, cdb[did], cid, cdb[cid],
             );
             cdb.detach(did);
-            elim.remove_cid_occur(asg, vdb, did, &mut cdb[did]);
+            elim.remove_cid_occur(asg, did, &mut cdb[did]);
             if !cdb[did].is(Flag::LEARNT) {
                 cdb[cid].turn_off(Flag::LEARNT);
             }
@@ -789,8 +710,8 @@ where
         Some(l) => {
             #[cfg(feature = "trace_elimination")]
             println!("BackSubC subsumes {} from {} and {}", l, cid, did,);
-            strengthen_clause(asg, cdb, elim, vdb, did, !l)?;
-            elim.enqueue_var(vdb, l.vi(), true);
+            strengthen_clause(asg, cdb, elim, did, !l)?;
+            elim.enqueue_var(asg, l.vi(), true);
         }
         None => {}
     }
@@ -835,10 +756,10 @@ where
 /// Returns:
 /// - `(false, -)` if one of the clauses is always satisfied.
 /// - `(true, n)` if they are mergeable to a n-literal clause.
-fn check_to_merge<C, V>(cdb: &C, vdb: &V, cp: ClauseId, cq: ClauseId, v: VarId) -> (bool, usize)
+fn check_to_merge<A, C>(asg: &A, cdb: &C, cp: ClauseId, cq: ClauseId, v: VarId) -> (bool, usize)
 where
+    A: AssignIF,
     C: ClauseDBIF,
-    V: VarDBIF,
 {
     let pqb = &cdb[cp];
     let qpb = &cdb[cq];
@@ -846,12 +767,12 @@ where
     let (pb, qb) = if ps_smallest { (pqb, qpb) } else { (qpb, pqb) };
     let mut size = pb.lits.len() + 1;
     'next_literal: for l in &qb.lits {
-        if vdb[l.vi()].is(Flag::ELIMINATED) {
+        if asg.var(l.vi()).is(Flag::ELIMINATED) {
             continue;
         }
         if l.vi() != v {
             for j in &pb.lits {
-                if vdb[j.vi()].is(Flag::ELIMINATED) {
+                if asg.var(j.vi()).is(Flag::ELIMINATED) {
                     continue;
                 }
                 if j.vi() == l.vi() {
@@ -869,7 +790,7 @@ where
 }
 
 #[allow(dead_code)]
-fn check_eliminator<C>(cdb: &C, elim: &Eliminator, _vdb: &[Var]) -> bool
+fn check_eliminator<C>(cdb: &C, elim: &Eliminator) -> bool
 where
     C: ClauseDBIF,
 {
@@ -953,18 +874,16 @@ where
 /// removes `l` from clause `cid`
 /// - calls `enqueue_clause`
 /// - calls `enqueue_var`
-fn strengthen_clause<A, C, V>(
+fn strengthen_clause<A, C>(
     asg: &mut A,
     cdb: &mut C,
     elim: &mut Eliminator,
-    vdb: &mut V,
     cid: ClauseId,
     l: Lit,
 ) -> MaybeInconsistent
 where
     A: AssignIF,
     C: ClauseDBIF,
-    V: VarDBIF + VarRewardIF,
 {
     debug_assert!(!cdb[cid].is(Flag::DEAD));
     debug_assert!(1 < cdb[cid].len());
@@ -981,15 +900,15 @@ where
             cid, cdb[cid], c0,
         );
         cdb.detach(cid);
-        elim.remove_cid_occur(asg, vdb, cid, &mut cdb[cid]);
-        asg.assign_at_rootlevel(vdb, c0)
+        elim.remove_cid_occur(asg, cid, &mut cdb[cid]);
+        asg.assign_at_rootlevel(c0)
     } else {
         #[cfg(feature = "trace_elimination")]
         println!("cid {} drops literal {}", cid, l);
         #[cfg(feature = "boundary_check")]
         assert!(1 < cdb[cid].len());
         elim.enqueue_clause(cid, &mut cdb[cid]);
-        elim.remove_lit_occur(vdb, l, cid);
+        elim.remove_lit_occur(asg, l, cid);
         unsafe {
             let vec = &cdb[cid].lits[..] as *const [Lit];
             cdb.certificate_add(&*vec);
@@ -1029,23 +948,21 @@ where
     cdb.touch_var(vi);
 }
 
-fn eliminate_var<A, C, V>(
+fn eliminate_var<A, C>(
     asg: &mut A,
     cdb: &mut C,
     elim: &mut Eliminator,
     state: &mut State,
-    vdb: &mut V,
     vi: VarId,
     timedout: &Arc<AtomicBool>,
 ) -> MaybeInconsistent
 where
     A: AssignIF,
     C: ClauseDBIF,
-    V: VarDBIF + VarRewardIF,
 {
-    let v = &mut vdb[vi];
+    let v = &mut asg.var(vi);
     let w = &mut elim[vi];
-    if asg[vi].is_some() {
+    if asg.assign(vi).is_some() {
         return Ok(());
     }
     debug_assert!(!v.is(Flag::ELIMINATED));
@@ -1055,7 +972,7 @@ where
     let pos = &w.pos_occurs as *const Vec<ClauseId>;
     let neg = &w.neg_occurs as *const Vec<ClauseId>;
     unsafe {
-        if skip_var_elimination(cdb, elim, vdb, &*pos, &*neg, vi) {
+        if skip_var_elimination(asg, cdb, elim, &*pos, &*neg, vi) {
             return Ok(());
         }
         // OK, eliminate the literal and build constraints on it.
@@ -1085,15 +1002,16 @@ where
                         );
                         let lit = (*vec)[0];
                         cdb.certificate_add(&*vec);
-                        asg.assign_at_rootlevel(vdb, lit)?;
+                        asg.assign_at_rootlevel(lit)?;
                     }
                     _ => {
-                        let cid = if cdb[*p].is(Flag::LEARNT) && cdb[*n].is(Flag::LEARNT) {
-                            cdb.new_clause(asg, &mut *vec, Some(vdb))
-                        } else {
-                            cdb.new_clause(asg, &mut *vec, None::<&mut V>)
-                        };
-                        elim.add_cid_occur(vdb, cid, &mut cdb[cid], true);
+                        let cid = cdb.new_clause(
+                            asg,
+                            &mut *vec,
+                            cdb[*p].is(Flag::LEARNT) && cdb[*n].is(Flag::LEARNT),
+                            true,
+                        );
+                        elim.add_cid_occur(asg, cid, &mut cdb[cid], true);
                     }
                 }
             }
@@ -1104,32 +1022,32 @@ where
         for cid in &*pos {
             debug_assert!(!asg.locked(&cdb[*cid], *cid));
             cdb.detach(*cid);
-            elim.remove_cid_occur(asg, vdb, *cid, &mut cdb[*cid]);
+            elim.remove_cid_occur(asg, *cid, &mut cdb[*cid]);
         }
         for cid in &*neg {
             debug_assert!(!asg.locked(&cdb[*cid], *cid));
             cdb.detach(*cid);
-            elim.remove_cid_occur(asg, vdb, *cid, &mut cdb[*cid]);
+            elim.remove_cid_occur(asg, *cid, &mut cdb[*cid]);
         }
         elim[vi].clear();
-        vdb[vi].turn_on(Flag::ELIMINATED);
-        vdb.clear_reward(vi);
-        elim.backward_subsumption_check(asg, cdb, vdb, timedout)
+        asg.var_mut(vi).turn_on(Flag::ELIMINATED);
+        asg.clear_reward(vi);
+        elim.backward_subsumption_check(asg, cdb, timedout)
     }
 }
 
 /// returns `true` if elimination is impossible.
-fn skip_var_elimination<C, V>(
+fn skip_var_elimination<A, C>(
+    asg: &A,
     cdb: &C,
     elim: &mut Eliminator,
-    vdb: &V,
     pos: &[ClauseId],
     neg: &[ClauseId],
     v: VarId,
 ) -> bool
 where
+    A: AssignIF,
     C: ClauseDBIF,
-    V: VarDBIF,
 {
     // avoid thrashing
     let limit = match cdb.check_size() {
@@ -1141,7 +1059,7 @@ where
     let mut cnt = 0;
     for c_pos in pos {
         for c_neg in neg {
-            let (res, clause_size) = check_to_merge(cdb, vdb, *c_pos, *c_neg, v);
+            let (res, clause_size) = check_to_merge(asg, cdb, *c_pos, *c_neg, v);
             if res {
                 cnt += 1;
                 if clslen + limit < cnt
@@ -1165,7 +1083,7 @@ fn make_eliminated_clauses<C>(
 ) where
     C: ClauseDBIF,
 {
-    let tmp = &mut elim.elim_clauses;
+    let tmp = &mut elim.elim_lits;
     if neg.len() < pos.len() {
         for cid in neg {
             debug_assert!(!cdb[*cid].is(Flag::DEAD));
@@ -1201,18 +1119,17 @@ pub struct VarOccHeap {
 trait VarOrderIF {
     fn new(n: usize, init: usize) -> VarOccHeap;
     fn insert(&mut self, occur: &[LitOccurs], vi: VarId, upword: bool);
-    fn clear<V>(&mut self, vdb: &mut V)
+    fn clear<A>(&mut self, asg: &mut A)
     where
-        V: VarDBIF;
+        A: AssignIF;
     fn len(&self) -> usize;
     fn is_empty(&self) -> bool;
-    fn select_var<V>(&mut self, occur: &[LitOccurs], vdb: &V) -> Option<VarId>
+    fn select_var<A>(&mut self, occur: &[LitOccurs], asg: &A) -> Option<VarId>
     where
-        V: Index<VarId, Output = Var>;
-    fn rebuild<A, V>(&mut self, asg: &A, occur: &[LitOccurs], vdb: &V)
+        A: AssignIF;
+    fn rebuild<A>(&mut self, asg: &A, occur: &[LitOccurs])
     where
-        A: AssignIF,
-        V: VarDBIF;
+        A: AssignIF;
 }
 
 impl VarOrderIF for VarOccHeap {
@@ -1248,12 +1165,12 @@ impl VarOrderIF for VarOccHeap {
         self.idxs[0] = n;
         self.percolate_up(occur, n);
     }
-    fn clear<V>(&mut self, vdb: &mut V)
+    fn clear<A>(&mut self, asg: &mut A)
     where
-        V: VarDBIF,
+        A: AssignIF,
     {
         for v in &mut self.heap[0..self.idxs[0]] {
-            vdb[*v].turn_off(Flag::ENQUEUED);
+            asg.var_mut(*v).turn_off(Flag::ENQUEUED);
         }
         self.reset()
     }
@@ -1263,28 +1180,27 @@ impl VarOrderIF for VarOccHeap {
     fn is_empty(&self) -> bool {
         self.idxs[0] == 0
     }
-    fn select_var<V>(&mut self, occur: &[LitOccurs], vdb: &V) -> Option<VarId>
+    fn select_var<A>(&mut self, occur: &[LitOccurs], asg: &A) -> Option<VarId>
     where
-        V: Index<VarId, Output = Var>,
+        A: AssignIF,
     {
         loop {
             let vi = self.get_root(occur);
             if vi == 0 {
                 return None;
             }
-            if !vdb[vi].is(Flag::ELIMINATED) {
+            if !asg.var(vi).is(Flag::ELIMINATED) {
                 return Some(vi);
             }
         }
     }
-    fn rebuild<A, V>(&mut self, asg: &A, occur: &[LitOccurs], vdb: &V)
+    fn rebuild<A>(&mut self, asg: &A, occur: &[LitOccurs])
     where
         A: AssignIF,
-        V: VarDBIF,
     {
         self.reset();
-        for (vi, v) in vdb.iter().enumerate().skip(1) {
-            if asg[vi].is_none() && !v.is(Flag::ELIMINATED) {
+        for (vi, v) in asg.var_iter().enumerate().skip(1) {
+            if asg.assign(vi).is_none() && !v.is(Flag::ELIMINATED) {
                 self.insert(occur, v.index, true);
             }
         }

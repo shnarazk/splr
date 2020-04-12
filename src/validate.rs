@@ -41,7 +41,7 @@ impl ValidatorIF for Solver {
             return Err(SolverError::Inconsistent);
         }
         for i in vec {
-            self.asg.assign_at_rootlevel(&mut self.vdb, Lit::from(*i))?;
+            self.asg.assign_at_rootlevel(Lit::from(*i))?;
         }
         Ok(())
     }

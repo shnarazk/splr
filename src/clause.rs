@@ -5,7 +5,6 @@ use {
         eliminate::EliminateIF,
         state::{SearchStrategy, State},
         types::*,
-        var::VarDBIF,
     },
     std::{
         cmp::Ordering,
@@ -59,15 +58,15 @@ pub trait ClauseDBIF: IndexMut<ClauseId, Output = Clause> {
     /// allocate a new clause and return its id.
     /// * If 2nd arg is `Some(vdb)`, register `v` as a learnt after sorting based on assign level.
     /// * Otherwise, register `v` as a permanent clause, which rank is zero.
-    fn new_clause<A, V>(
+    fn new_clause<A>(
         &mut self,
         asg: &mut A,
         v: &mut [Lit],
-        level_sort: Option<&mut V>,
+        learnt: bool,
+        level_sort: bool,
     ) -> ClauseId
     where
-        A: AssignIF,
-        V: VarDBIF;
+        A: AssignIF;
     /// check and convert a learnt clause to permanent if needed.
     fn convert_to_permanent<A>(&mut self, asg: &mut A, cid: ClauseId) -> bool
     where
@@ -81,16 +80,10 @@ pub trait ClauseDBIF: IndexMut<ClauseId, Output = Clause> {
     /// record a deleted clause to unsat certification.
     fn certificate_delete(&mut self, vec: &[Lit]);
     /// delete satisfied clauses at decision level zero.
-    fn eliminate_satisfied_clauses<A, E, V>(
-        &mut self,
-        asg: &A,
-        elim: &mut E,
-        vdb: &mut V,
-        occur: bool,
-    ) where
+    fn eliminate_satisfied_clauses<A, E>(&mut self, asg: &mut A, elim: &mut E, occur: bool)
+    where
         A: AssignIF,
-        E: EliminateIF,
-        V: VarDBIF;
+        E: EliminateIF;
     /// flag positive and negative literals of a var as dirty
     fn touch_var(&mut self, vi: VarId);
     /// check the number of clauses
@@ -762,18 +755,18 @@ impl ClauseDBIF for ClauseDB {
         self.num_active = self.clause.len() - recycled.len();
         // debug_assert!(self.check_liveness2());
     }
-    fn new_clause<A, V>(
+    fn new_clause<A>(
         &mut self,
         asg: &mut A,
         vec: &mut [Lit],
-        level_sort: Option<&mut V>,
+        mut learnt: bool,
+        level_sort: bool,
     ) -> ClauseId
     where
         A: AssignIF,
-        V: VarDBIF,
     {
         let reward = self.activity_inc;
-        let (rank, learnt) = if level_sort.is_some() {
+        let rank = if level_sort {
             if !self.certified.is_empty() {
                 let temp = vec.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
                 self.certified.push((CertifiedRecord::ADD, temp));
@@ -787,24 +780,26 @@ impl ClauseDBIF for ClauseDB {
             for (i, l) in vec.iter().enumerate() {
                 let vi = l.vi();
                 let lv = level[vi];
-                if asg[vi].is_some() && lv_max < lv {
+                if asg.assign(vi).is_some() && lv_max < lv {
                     i_max = i;
                     lv_max = lv;
                 }
             }
             vec.swap(1, i_max);
             if vec.len() <= 2 {
-                (0, false)
+                learnt = false;
+                0
             } else {
                 let lbd = asg.compute_lbd(vec);
                 if self.use_chan_seok && lbd <= self.co_lbd_bound {
-                    (0, false)
+                    learnt = false;
+                    0
                 } else {
-                    (lbd, true)
+                    lbd
                 }
             }
         } else {
-            (0, false)
+            0
         };
         let cid;
         let l0 = vec[0];
@@ -964,26 +959,20 @@ impl ClauseDBIF for ClauseDB {
             self.certified.push((CertifiedRecord::DELETE, temp));
         }
     }
-    fn eliminate_satisfied_clauses<A, E, V>(
-        &mut self,
-        asg: &A,
-        elim: &mut E,
-        vdb: &mut V,
-        update_occur: bool,
-    ) where
+    fn eliminate_satisfied_clauses<A, E>(&mut self, asg: &mut A, elim: &mut E, update_occur: bool)
+    where
         A: AssignIF,
         E: EliminateIF,
-        V: VarDBIF,
     {
         for (cid, c) in &mut self.clause.iter_mut().enumerate().skip(1) {
             if !c.is(Flag::DEAD) && asg.satisfies(&c.lits) {
                 c.kill(&mut self.touched);
                 if elim.is_running() {
                     if update_occur {
-                        elim.remove_cid_occur(asg, vdb, ClauseId::from(cid), c);
+                        elim.remove_cid_occur(asg, ClauseId::from(cid), c);
                     }
                     for l in &c.lits {
-                        elim.enqueue_var(vdb, l.vi(), true);
+                        elim.enqueue_var(asg, l.vi(), true);
                     }
                 }
             }
@@ -1139,7 +1128,6 @@ mod tests {
     use super::*;
     use crate::assign::{AssignIF, AssignStack};
     use crate::clause::ClauseDB;
-    use crate::var::VarDB;
 
     fn lit(i: i32) -> Lit {
         Lit::from(i)

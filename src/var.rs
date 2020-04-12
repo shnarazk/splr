@@ -8,14 +8,13 @@ use {
     },
     std::{
         fmt,
-        ops::{Index, IndexMut, Range, RangeFrom},
+        ops::{IndexMut, Range, RangeFrom},
         slice::{Iter, IterMut},
     },
 };
 
 /// API for var DB like `assigned`, `locked`, and so on.
-pub trait VarDBIF:
-    IndexMut<VarId, Output = Var> + IndexMut<Lit, Output = Var> + VarPhaseIF
+pub trait VarDBIF: VarPhaseIF
 {
     /// return the number of vars.
     fn len(&self) -> usize;
@@ -25,129 +24,6 @@ pub trait VarDBIF:
     fn iter(&self) -> Iter<'_, Var>;
     /// return an iterator over vars.
     fn iter_mut(&mut self) -> IterMut<'_, Var>;
-}
-
-/// API for var rewarding.
-pub trait VarRewardIF {
-    /// return var's activity.
-    fn activity(&mut self, vi: VarId) -> f64;
-    /// initialize rewards based on an order of vars.
-    fn initialize_reward(&mut self, iterator: Iter<'_, usize>);
-    /// clear var's activity
-    fn clear_reward(&mut self, vi: VarId);
-    /// modify var's activity at conflict analysis in `analyze`.
-    fn reward_at_analysis(&mut self, vi: VarId);
-    /// modify var's activity at value assignment in `uncheck_{assume, enquue, fix}`.
-    fn reward_at_assign(&mut self, vi: VarId);
-    /// modify var's activity at value unassigment in `cancel_until`.
-    fn reward_at_unassign(&mut self, vi: VarId);
-    /// update internal counter.
-    fn reward_update(&mut self);
-}
-
-/// API for phase saving.
-pub trait VarPhaseIF {
-    fn save_phase<A>(&mut self, asgn: &A, flag: Flag)
-    where
-        A: AssignIF;
-    fn reset_phase(&mut self, flag: Flag);
-}
-
-/// Object representing a variable.
-#[derive(Debug)]
-pub struct Var {
-    /// reverse conversion to index. Note `VarId` must be `usize`.
-    pub index: VarId,
-    /// the number of participation in conflict analysis
-    participated: u32,
-    /// a dynamic evaluation criterion like VSIDS or ACID.
-    reward: f64,
-    /// the number of conflicts at which this var was assigned lastly.
-    timestamp: usize,
-    /// the `Flag`s
-    flags: Flag,
-}
-
-impl Default for Var {
-    fn default() -> Var {
-        Var {
-            index: 0,
-            reward: 0.0,
-            timestamp: 0,
-            flags: Flag::empty(),
-            participated: 0,
-        }
-    }
-}
-
-impl fmt::Display for Var {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let st = |flag, mes| if self.is(flag) { mes } else { "" };
-        write!(
-            f,
-            "V{{{} {}{}}}",
-            self.index,
-            st(Flag::TOUCHED, ", touched"),
-            st(Flag::ELIMINATED, ", eliminated"),
-        )
-    }
-}
-
-impl From<usize> for Var {
-    #[inline]
-    fn from(i: usize) -> Self {
-        Var {
-            index: i,
-            ..Var::default()
-        }
-    }
-}
-
-impl Var {
-    /// return a new vector of $n$ `Var`s.
-    fn new_vars(n: usize) -> Vec<Var> {
-        let mut vec = Vec::with_capacity(n + 1);
-        for i in 0..=n {
-            vec.push(Var::from(i));
-        }
-        vec
-    }
-}
-
-impl FlagIF for Var {
-    #[inline]
-    fn is(&self, flag: Flag) -> bool {
-        self.flags.contains(flag)
-    }
-    #[inline]
-    fn set(&mut self, f: Flag, b: bool) {
-        self.flags.set(f, b);
-    }
-    #[inline]
-    fn turn_off(&mut self, flag: Flag) {
-        self.flags.remove(flag);
-    }
-    #[inline]
-    fn turn_on(&mut self, flag: Flag) {
-        self.flags.insert(flag);
-    }
-}
-
-/// A container of variables.
-#[derive(Debug)]
-pub struct VarDB {
-    /// var activity decay
-    activity_decay: f64,
-    /// maximum var activity decay
-    activity_decay_max: f64,
-    /// an index for counting elapsed time
-    ordinal: usize,
-    /// vars
-    var: Vec<Var>,
-    /// estimated number of hot variable
-    core_size: Ema,
-    #[cfg(feature = "EVSIDS")]
-    reward_step: f64,
 }
 
 const CORE_HISOTRY_LEN: usize = 10;
@@ -161,8 +37,9 @@ impl Default for VarDB {
             activity_decay: VRD_START,
             activity_decay_max: VRD_MAX,
             ordinal: 0,
-            var: Vec::new(),
+//            var: Vec::new(),
             core_size: Ema::new(CORE_HISOTRY_LEN),
+            num_var: 0,
         }
     }
     #[cfg(feature = "EVSIDS")]
@@ -173,13 +50,15 @@ impl Default for VarDB {
             activity_decay: VRD_START,
             activity_decay_max: VRD_MAX,
             ordinal: 0,
-            var: Vec::new(),
+//            var: Vec::new(),
             core_size: Ema::new(CORE_HISOTRY_LEN),
             reward_step: 0.000_000_1,
+            num_var: 0,
         }
     }
 }
 
+/*
 impl Index<VarId> for VarDB {
     type Output = Var;
     #[inline]
@@ -269,6 +148,7 @@ impl IndexMut<RangeFrom<usize>> for VarDB {
         &mut self.var[r]
     }
 }
+*/
 
 impl Export<(f64, f64)> for VarDB {
     /// exports:
@@ -291,65 +171,14 @@ impl Instantiate for VarDB {
     fn instantiate(_: &Config, cnf: &CNFDescription) -> Self {
         let nv = cnf.num_of_variables;
         VarDB {
-            var: Var::new_vars(nv),
+            // var: Var::new_vars(nv),
+            num_var: nv,
             ..VarDB::default()
-        }
-    }
-    #[allow(unused_variables)]
-    fn adapt_to(&mut self, state: &State, num_conflict: usize) {
-        const VRD_DEC_STRICT: f64 = 0.001;
-        const VRD_DEC_STD: f64 = 0.003;
-        const VRD_DEC_HIGH: f64 = 0.008;
-        const VRD_INTERVAL: usize = 20_000;
-
-        #[cfg(feature = "use_core")]
-        {
-            const VRD_FILTER: f64 = 0.5;
-            const VRD_MAX_START: f64 = 0.2;
-            const VRD_OFFSET: f64 = 10.0;
-
-            if 0 == num_conflict {
-                let nv = self.var.len();
-                self.core_size.update(((CORE_HISOTRY_LEN * nv) as f64).ln());
-                return;
-            }
-
-            let msr: (f64, f64) = self.var[1..]
-                .iter()
-                .map(|v| v.reward)
-                .fold((VRD_MAX_START, 0.0), |(m, s), x| (m.max(x), s + x));
-            let ar = msr.1 / self.var.len() as f64;
-            let thr = msr.0 * VRD_FILTER + ar * (1.0 - VRD_FILTER);
-            let core = self.var[1..].iter().filter(|v| thr <= v.reward).count();
-            self.core_size.update(core as f64);
-
-            if num_conflict % VRD_INTERVAL == 0 {
-                let k = match state.strategy.0 {
-                    SearchStrategy::LowDecisions => VRD_DEC_HIGH,
-                    SearchStrategy::HighSuccesive => VRD_DEC_STRICT,
-                    _ => VRD_DEC_STD,
-                };
-                let c = (self.core_size.get() - VRD_OFFSET).max(1.0);
-                let delta = 0.05 * k * (c.sqrt() * c.ln());
-                self.activity_decay_max = 1.0 - delta;
-            }
-        }
-
-        #[cfg(not(feature = "use_core"))]
-        {
-            if num_conflict % VRD_INTERVAL == 0 {
-                let k = match state.strategy.0 {
-                    SearchStrategy::LowDecisions => VRD_DEC_HIGH,
-                    SearchStrategy::HighSuccesive => VRD_DEC_STRICT,
-                    _ => VRD_DEC_STD,
-                };
-                let delta = 0.1 * k;
-                self.activity_decay_max = 1.0 - delta;
-            }
         }
     }
 }
 
+/*
 impl VarDBIF for VarDB {
     fn len(&self) -> usize {
         self.var.len()
@@ -364,7 +193,9 @@ impl VarDBIF for VarDB {
         self.var.iter_mut()
     }
 }
+*/
 
+/*
 impl VarPhaseIF for VarDB {
     fn save_phase<A>(&mut self, asg: &A, flag: Flag)
     where
@@ -380,7 +211,9 @@ impl VarPhaseIF for VarDB {
         }
     }
 }
+ */
 
+/*
 impl VarRewardIF for VarDB {
     #[inline]
     fn activity(&mut self, vi: VarId) -> f64 {
@@ -455,7 +288,9 @@ impl VarRewardIF for VarDB {
         self.activity_decay = self.activity_decay_max.min(self.activity_decay + VRD_STEP);
     }
 }
+ */
 
+/*
 impl VarDB {
     // This function is for Reason-Side Rewarding which must traverse the assign stack
     // beyond first UIDs and bump all vars on the traversed tree.
@@ -539,3 +374,4 @@ impl VarDB {
         }
     }
 }
+*/
