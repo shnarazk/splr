@@ -191,7 +191,7 @@ impl Default for VarDB {
     #[cfg(not(feature = "EVSIDS"))]
     fn default() -> VarDB {
         const VRD_MAX: f64 = 0.96;
-        const VRD_START: f64 = 0.8;
+        const VRD_START: f64 = 0.9;
         VarDB {
             activity_decay: VRD_START,
             activity_decay_max: VRD_MAX,
@@ -365,7 +365,7 @@ impl Instantiate for VarDB {
                     _ => VRD_DEC_STD,
                 };
                 let c = (self.core_size.get() - VRD_OFFSET).max(1.0);
-                let delta = 0.1 * k * (c.sqrt() * c.ln());
+                let delta = 0.05 * k * (c.sqrt() * c.ln());
                 self.activity_decay_max = 1.0 - delta;
             }
         }
@@ -549,7 +549,7 @@ impl VarRewardIF for VarDB {
     }
     #[cfg(not(feature = "EVSIDS"))]
     fn reward_update(&mut self) {
-        const VRD_STEP: f64 = 0.000_000_1;
+        const VRD_STEP: f64 = 0.000_01;
         self.ordinal += 1;
         self.activity_decay = self.activity_decay_max.min(self.activity_decay + VRD_STEP);
     }
