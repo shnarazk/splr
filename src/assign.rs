@@ -140,10 +140,12 @@ impl fmt::Display for AssignReason {
 /// A record of assignment. It's called 'trail' in Glucose.
 #[derive(Debug)]
 pub struct AssignStack {
+    /// assigns of vars
+    assign: Vec<Option<bool>>,
     /// levels of vars
-    pub level: Vec<DecisionLevel>,
-    pub trail: Vec<Lit>,
-    asgvec: Vec<Option<bool>>,
+    level: Vec<DecisionLevel>,
+    /// record of assignment
+    trail: Vec<Lit>,
     trail_lim: Vec<usize>,
     q_head: usize,
     root_level: DecisionLevel,
@@ -172,9 +174,9 @@ pub struct AssignStack {
 impl Default for AssignStack {
     fn default() -> AssignStack {
         AssignStack {
+            assign: Vec::new(),
             level: Vec::new(),
             trail: Vec::new(),
-            asgvec: Vec::new(),
             trail_lim: Vec::new(),
             q_head: 0,
             root_level: 0,
@@ -198,7 +200,7 @@ impl Default for AssignStack {
 /// ```
 macro_rules! var_assign {
     ($asg: expr, $var: expr) => {
-        unsafe { *$asg.asgvec.get_unchecked($var) }
+        unsafe { *$asg.assign.get_unchecked($var) }
     };
 }
 
@@ -208,7 +210,7 @@ macro_rules! lit_assign {
             l => {
                 #[allow(unused_unsafe)]
                 // unsafe { *$asg.asgvec.get_unchecked(l.vi()) ^ (l as u8 & 1) }
-                match unsafe { *$asg.asgvec.get_unchecked(l.vi()) } {
+                match unsafe { *$asg.assign.get_unchecked(l.vi()) } {
                     Some(x) if !bool::from(l) => Some(!x),
                     x => x,
                 }
@@ -221,7 +223,7 @@ macro_rules! set_assign {
     ($asg: expr, $lit: expr) => {
         match $lit {
             l => unsafe {
-                *$asg.asgvec.get_unchecked_mut(l.vi()) = Some(bool::from(l));
+                *$asg.assign.get_unchecked_mut(l.vi()) = Some(bool::from(l));
             },
         }
     };
@@ -231,7 +233,7 @@ macro_rules! set_assign {
 macro_rules! unset_assign {
     ($asg: expr, $var: expr) => {
         unsafe {
-            *$asg.asgvec.get_unchecked_mut($var) = None;
+            *$asg.assign.get_unchecked_mut($var) = None;
         }
     };
 }
@@ -278,9 +280,9 @@ impl Instantiate for AssignStack {
     fn instantiate(_cfg: &Config, cnf: &CNFDescription) -> AssignStack {
         let nv = cnf.num_of_variables;
         AssignStack {
+            assign: vec![None; 1 + nv],
             level: vec![DecisionLevel::default(); nv + 1],
             trail: Vec::with_capacity(nv),
-            asgvec: vec![None; 1 + nv],
             var_order: VarIdHeap::new(nv, nv),
             lbd_temp: vec![0; nv + 1],
             ..AssignStack::default()
