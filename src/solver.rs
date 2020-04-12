@@ -865,7 +865,7 @@ fn conflict_analyze(
         */
         // set the index of the next literal to ti
         while {
-            let vi = asgs[ti].vi();
+            let vi = asgs.stack(ti).vi();
             #[cfg(feature = "boundary_check")]
             assert!(
                 vi < asgs.level_ref().len(),
@@ -891,7 +891,7 @@ fn conflict_analyze(
             );
             ti -= 1;
         }
-        p = asgs[ti];
+        p = asgs.stack(ti);
         #[cfg(feature = "trace_analysis")]
         println!(
             "- move to flagged {}, which reason is {}; num path: {}",
@@ -1088,7 +1088,7 @@ fn analyze_final(asgs: &AssignStack, state: &mut State, vdb: &mut VarDB, c: &Cla
     } else {
         asgs.len_upto(state.root_level)
     };
-    for l in &asgs[asgs.len_upto(0)..end] {
+    for l in asgs.stack_range(asgs.len_upto(0)..end) {
         let vi = l.vi();
         if seen[vi] {
             if vdb[vi].reason == AssignReason::default() {

@@ -11,7 +11,7 @@ use {
         fmt,
         fs::File,
         io::{BufWriter, Write},
-        ops::{Index, Range, RangeFrom},
+        ops::{Index, Range},
         slice::Iter,
     },
 };
@@ -27,7 +27,11 @@ pub trait LBDIF {
 }
 
 /// API for assignment like `propagate`, `enqueue`, `cancel_until`, and so on.
-pub trait AssignIF: Index<usize, Output = Lit> + LBDIF {
+pub trait AssignIF: LBDIF {
+    /// return a literal in the stack.
+    fn stack(&self, i: usize) -> Lit;
+    /// return literals in the range of stack.
+    fn stack_range(&self, r: Range<usize>) -> &[Lit];
     /// return the number of assignments.
     fn len(&self) -> usize;
     /// return the number of assignments at a given decision level `u`.
@@ -238,14 +242,17 @@ macro_rules! unset_assign {
     };
 }
 
+/*
 impl Index<usize> for AssignStack {
     type Output = Lit;
     #[inline]
     fn index(&self, i: usize) -> &Lit {
-        unsafe { self.trail.get_unchecked(i) }
+        unsafe { self.assign.get_unchecked(i) }
     }
 }
+*/
 
+/*
 impl Index<Range<usize>> for AssignStack {
     type Output = [Lit];
     #[inline]
@@ -253,7 +260,9 @@ impl Index<Range<usize>> for AssignStack {
         &self.trail[r]
     }
 }
+*/
 
+/*
 impl Index<RangeFrom<usize>> for AssignStack {
     type Output = [Lit];
     #[inline]
@@ -261,6 +270,7 @@ impl Index<RangeFrom<usize>> for AssignStack {
         unsafe { self.trail.get_unchecked(r) }
     }
 }
+ */
 
 impl<'a> IntoIterator for &'a mut AssignStack {
     type Item = &'a Lit;
@@ -309,6 +319,12 @@ impl Export<(usize, usize, usize)> for AssignStack {
 }
 
 impl AssignIF for AssignStack {
+    fn stack(&self, i: usize) -> Lit {
+        self.trail[i]
+    }
+    fn stack_range(&self, r: Range<usize>) -> &[Lit] {
+        &self.trail[r]
+    }
     fn len(&self) -> usize {
         self.trail.len()
     }
@@ -440,15 +456,18 @@ impl AssignIF for AssignStack {
                 continue;
             }
             let v = &mut vdb[vi];
+            v.set(Flag::PHASE, var_assign!(self, vi).unwrap());
             unset_assign!(self, vi);
-            v.set(Flag::PHASE, v.assign.unwrap());
             v.assign = None;
             v.reason = AssignReason::default();
             vdb.reward_at_unassign(vi);
             self.var_order.insert(vdb, vi);
         }
         self.trail.truncate(shift);
-        debug_assert!(self.trail.iter().all(|l| vdb[*l].assign.is_some()));
+        debug_assert!(self
+            .trail
+            .iter()
+            .all(|l| var_assign!(self, l.vi()).is_some()));
         debug_assert!(self.trail.iter().all(|k| !self.trail.contains(&!*k)));
         self.trail_lim.truncate(lv as usize);
         // assert!(lim < self.q_head) dosen't hold sometimes in chronoBT.
@@ -656,7 +675,12 @@ impl VarSelectionIF for AssignStack {
     where
         V: VarDBIF + VarRewardIF,
     {
-        self.var_order.select_var(vdb)
+        loop {
+            let vi = self.var_order.get_root(vdb);
+            if var_assign!(self, vi).is_none() && !vdb[vi].is(Flag::ELIMINATED) {
+                return vi;
+            }
+        }
     }
     fn update_order<V>(&mut self, vdb: &mut V, v: VarId)
     where
@@ -668,7 +692,12 @@ impl VarSelectionIF for AssignStack {
     where
         V: VarDBIF + VarRewardIF,
     {
-        self.var_order.rebuild(vdb);
+        self.var_order.reset();
+        for vi in 1..vdb.len() {
+            if var_assign!(self, vi).is_none() && !vdb[vi].is(Flag::ELIMINATED) {
+                self.var_order.insert(vdb, vi);
+            }
+        }
     }
 }
 
@@ -749,12 +778,6 @@ trait VarOrderIF {
     fn clear(&mut self);
     fn len(&self) -> usize;
     fn is_empty(&self) -> bool;
-    fn select_var<V>(&mut self, vdb: &mut V) -> VarId
-    where
-        V: VarDBIF + VarRewardIF;
-    fn rebuild<V>(&mut self, vdb: &mut V)
-    where
-        V: VarDBIF + VarRewardIF;
 }
 
 impl VarOrderIF for VarIdHeap {
@@ -805,28 +828,6 @@ impl VarOrderIF for VarIdHeap {
     }
     fn is_empty(&self) -> bool {
         self.idxs[0] == 0
-    }
-    fn select_var<V>(&mut self, vdb: &mut V) -> VarId
-    where
-        V: VarDBIF + VarRewardIF,
-    {
-        loop {
-            let vi = self.get_root(vdb);
-            if vdb[vi].assign.is_none() && !vdb[vi].is(Flag::ELIMINATED) {
-                return vi;
-            }
-        }
-    }
-    fn rebuild<V>(&mut self, vdb: &mut V)
-    where
-        V: VarDBIF + VarRewardIF,
-    {
-        self.reset();
-        for vi in 1..vdb.len() {
-            if vdb[vi].assign.is_none() && !vdb[vi].is(Flag::ELIMINATED) {
-                self.insert(vdb, vi);
-            }
-        }
     }
 }
 
