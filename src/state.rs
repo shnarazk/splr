@@ -549,7 +549,10 @@ impl StateIF for State {
         if let Some(m) = mes {
             println!("\x1B[2K    Strategy|mode: {}", m);
         } else {
-            println!("\x1B[2K    Strategy|mode: {:#}", self.strategy.0);
+            println!(
+                "\x1B[2K    Strategy|mode: {:#}, {}",
+                self.strategy.0, self.phase_select
+            );
         }
         self.flush("\x1B[2K");
     }
