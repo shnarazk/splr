@@ -98,6 +98,9 @@ pub trait ClauseDBIF: IndexMut<ClauseId, Output = Clause> {
     fn validate<V>(&self, vdb: &V, strict: bool) -> Option<ClauseId>
     where
         V: VarDBIF;
+    /// removes Lit `p` from Clause *self*. This is an O(n) function!
+    /// returns true if the clause became a unit clause.
+    /// Called only from strengthen_clause
     fn strengthen(&mut self, cid: ClauseId, p: Lit) -> bool;
 }
 
@@ -1002,10 +1005,6 @@ impl ClauseDBIF for ClauseDB {
         }
         None
     }
-
-    /// removes Lit `p` from Clause *self*. This is an O(n) function!
-    /// returns true if the clause became a unit clause.
-    /// Called only from strengthen_clause
     fn strengthen(&mut self, cid: ClauseId, p: Lit) -> bool {
         debug_assert!(!self[cid].is(Flag::DEAD));
         debug_assert!(1 < self[cid].len());
