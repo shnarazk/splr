@@ -724,7 +724,7 @@ fn adapt_modules(
     cdb.adapt_to(state, asgs_num_conflict);
     rst.adapt_to(state, asgs_num_conflict);
     vdb.adapt_to(state, asgs_num_conflict);
-    state.phase_select = match (asgs_num_conflict / state.reflection_interval) % 2 {
+    state.phase_select = match (asgs_num_conflict / state.reflection_interval) % 8 {
         _ if rst.exports().0 == RestartMode::Stabilize => PhaseMode::Best,
         0 if state.phase_select == PhaseMode::Latest => PhaseMode::Best,
         _ => PhaseMode::Latest,

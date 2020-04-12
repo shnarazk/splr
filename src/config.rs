@@ -71,7 +71,7 @@ pub struct Config {
     pub elim_lit_lim: usize,
 
     /// Threshold to elimination
-    #[structopt(long = "et", default_value = "128")]
+    #[structopt(long = "et", default_value = "256")]
     pub elim_trigger: usize,
 
     /// Disables exhaustive simplification
