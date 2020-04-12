@@ -362,7 +362,8 @@ fn search(
     vdb: &mut VarDB,
 ) -> Result<bool, SolverError> {
     let mut a_decision_was_made = false;
-    let mut num_assignd = 0;
+    let mut num_assigned = (0, 0); // (best, target)
+    let mut nap = &mut num_assigned.0;
     let mut stabilizing = if rst.exports().0 == RestartMode::Stabilize {
         Flag::TARGET_PHASE
     } else {
@@ -383,15 +384,29 @@ fn search(
             state.last_asg = asgs.len();
             if rst.force_restart() {
                 asgs.cancel_until(vdb, state.root_level);
+            } else {
+                //
+                //## set phase mode
+                //
+                stabilizing = if rst.exports().0 == RestartMode::Stabilize {
+                    if stabilizing != Flag::TARGET_PHASE {
+                        asgs.reset_assign_record(Flag::TARGET_PHASE);
+                    }
+                    nap = &mut num_assigned.1;
+                    Flag::TARGET_PHASE
+                } else {
+                    if num_assigned.0 < num_assigned.1 {
+                        num_assigned.0 = num_assigned.1;
+                    }
+                    nap = &mut num_assigned.0;
+                    Flag::BEST_PHASE
+                };
             }
-            //
-            //## set phase mode
-            //
             let mut na = asgs.best_assigned(stabilizing);
             if 0 < na {
                 na += state.num_eliminated_vars;
-                if num_assignd < na {
-                    num_assignd = na;
+                if *nap < na {
+                    *nap = na;
                     state.flush("");
                     state.flush(format!("find best assigns: {}", na));
                     state.phase_select = PhaseMode::Best;
@@ -409,14 +424,6 @@ fn search(
                 return Ok(false);
             }
             handle_conflict(asgs, cdb, elim, rst, state, vdb, ci)?;
-            stabilizing = if rst.exports().0 == RestartMode::Stabilize {
-                Flag::TARGET_PHASE
-            } else {
-                if stabilizing == Flag::TARGET_PHASE {
-                    asgs.reset_assign_record(Flag::TARGET_PHASE);
-                }
-                Flag::BEST_PHASE
-            };
         }
         // Simplification has been postponed because chronoBT was used.
         if asgs.level() == state.root_level {
@@ -716,24 +723,11 @@ fn adapt_modules(
     cdb.adapt_to(state, asgs_num_conflict);
     rst.adapt_to(state, asgs_num_conflict);
     vdb.adapt_to(state, asgs_num_conflict);
-    let stabilizing = if rst.exports().0 != RestartMode::Stabilize {
-        Flag::BEST_PHASE
-    } else {
-        Flag::TARGET_PHASE
+    state.phase_select = match (asgs_num_conflict / state.reflection_interval) % 2 {
+        _ if rst.exports().0 == RestartMode::Stabilize => PhaseMode::Best,
+        0 if state.phase_select == PhaseMode::Latest => PhaseMode::Best,
+        _ => PhaseMode::Latest,
     };
-    let na = asgs.best_assigned(stabilizing);
-    // Don't add `state.num_assignd`; there are included in `na` already.
-    if 0 < na && state.num_best_assigned < na + state.num_eliminated_vars {
-        state.num_best_assigned = na + state.num_eliminated_vars;
-        state.flush("");
-        state.flush(format!("find best assigns: {}", na));
-        state.phase_select = PhaseMode::Best;
-    } else {
-        state.phase_select = match (asgs_num_conflict / state.reflection_interval) % 8 {
-            0 => PhaseMode::BestRnd,
-            _ => PhaseMode::Latest,
-        };
-    }
     Ok(())
 }
 
