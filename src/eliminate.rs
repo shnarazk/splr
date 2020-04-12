@@ -45,8 +45,9 @@ pub trait EliminateIF {
     /// check if the eliminator is running.
     fn is_running(&self) -> bool;
     /// rebuild occur lists.
-    fn prepare<C, V>(&mut self, cdb: &mut C, vdb: &mut V, force: bool)
+    fn prepare<A, C, V>(&mut self, asgs: &A, cdb: &mut C, vdb: &mut V, force: bool)
     where
+        A: AssignIF,
         C: ClauseDBIF,
         V: VarDBIF;
     /// enqueue a var into eliminator's var queue.
@@ -72,16 +73,17 @@ pub trait EliminateIF {
         C: ClauseDBIF,
         V: VarDBIF + VarRewardIF;
     /// inject assignments for eliminated vars.
-    fn extend_model<V>(&mut self, vdb: &mut V)
+    fn extend_model<A>(&mut self, asgs: &mut A)
     where
-        V: VarDBIF;
+        A: AssignIF;
     /// register a clause id to all corresponding occur lists.
     fn add_cid_occur<V>(&mut self, vdb: &mut V, cid: ClauseId, c: &mut Clause, enqueue: bool)
     where
         V: VarDBIF;
     /// remove a clause id from all corresponding occur lists.
-    fn remove_cid_occur<V>(&mut self, vdb: &mut V, cid: ClauseId, c: &mut Clause)
+    fn remove_cid_occur<A, V>(&mut self, asgs: &A, vdb: &mut V, cid: ClauseId, c: &mut Clause)
     where
+        A: AssignIF,
         V: VarDBIF;
     /// return the order of vars based on their occurrences
     fn sorted_iterator(&self) -> Iter<'_, usize>;
@@ -327,8 +329,9 @@ impl EliminateIF for Eliminator {
         }
         self.mode = EliminatorMode::Deactive;
     }
-    fn prepare<C, V>(&mut self, cdb: &mut C, vdb: &mut V, force: bool)
+    fn prepare<A, C, V>(&mut self, asgs: &A, cdb: &mut C, vdb: &mut V, force: bool)
     where
+        A: AssignIF,
         C: ClauseDBIF,
         V: VarDBIF,
     {
@@ -348,7 +351,7 @@ impl EliminateIF for Eliminator {
         if force {
             for vi in 1..vdb.len() {
                 let v = &vdb[vi];
-                if v.is(Flag::ELIMINATED) || v.assign.is_some() {
+                if v.is(Flag::ELIMINATED) || asgs[vi].is_some() {
                     continue;
                 }
                 self.enqueue_var(vdb, vi, true);
@@ -391,7 +394,7 @@ impl EliminateIF for Eliminator {
             }
         }
         if self.is_waiting() {
-            self.prepare(cdb, vdb, true);
+            self.prepare(asgs, cdb, vdb, true);
         }
         self.eliminate(asgs, cdb, state, vdb)?;
         self.num_sat_elimination += 1;
@@ -401,9 +404,9 @@ impl EliminateIF for Eliminator {
         }
         cdb.check_size().map(|_| ())
     }
-    fn extend_model<V>(&mut self, vdb: &mut V)
+    fn extend_model<A>(&mut self, asgs: &mut A)
     where
-        V: VarDBIF,
+        A: AssignIF,
     {
         if self.elim_clauses.is_empty() {
             return;
@@ -427,7 +430,7 @@ impl EliminateIF for Eliminator {
                 //     _ => None,
                 // };
                 // if model_value != Some(false) {
-                if !Lit::from(&vdb[l]) != l {
+                if asgs[l.vi()] != Some(bool::from(l)) {
                     if i < width {
                         break 'next;
                     }
@@ -440,7 +443,7 @@ impl EliminateIF for Eliminator {
             debug_assert!(width == 1);
             let l = self.elim_clauses[i];
             // debug_assert!(model[l.vi() - 1] != l.negate().int());
-            vdb[l].assign = Some(bool::from(l));
+            asgs[l.vi()] = Some(bool::from(l));
             if i < width {
                 break;
             }
@@ -480,8 +483,9 @@ impl EliminateIF for Eliminator {
             self.enqueue_clause(cid, c);
         }
     }
-    fn remove_cid_occur<V>(&mut self, vdb: &mut V, cid: ClauseId, c: &mut Clause)
+    fn remove_cid_occur<A, V>(&mut self, asgs: &A, vdb: &mut V, cid: ClauseId, c: &mut Clause)
     where
+        A: AssignIF,
         V: VarDBIF,
     {
         debug_assert!(self.mode == EliminatorMode::Running);
@@ -489,7 +493,7 @@ impl EliminateIF for Eliminator {
         c.turn_off(Flag::OCCUR_LINKED);
         debug_assert!(c.is(Flag::DEAD));
         for l in &c.lits {
-            if vdb[l.vi()].assign.is_none() {
+            if asgs[l.vi()].is_none() {
                 self.remove_lit_occur(vdb, *l, cid);
                 self.enqueue_var(vdb, l.vi(), true);
             }
@@ -558,7 +562,7 @@ impl Eliminator {
                 for l in lits {
                     let v = &vdb[l.vi()];
                     let w = &self[l.vi()];
-                    if v.assign.is_some() {
+                    if asgs[l.vi()].is_some() {
                         continue;
                     }
                     let nsum = if bool::from(*l) {
@@ -616,7 +620,7 @@ impl Eliminator {
         loop {
             let na = asgs.len();
             self.eliminate_main(asgs, cdb, state, vdb)?;
-            cdb.eliminate_satisfied_clauses(self, vdb, true);
+            cdb.eliminate_satisfied_clauses(asgs, self, vdb, true);
             if na == asgs.len()
                 && (!self.is_running()
                     || (0 == self.clause_queue_len() && 0 == self.var_queue_len()))
@@ -674,7 +678,7 @@ impl Eliminator {
                 // timedout = cvar.wait(timedout).unwrap();
                 let v = &mut vdb[vi];
                 v.turn_off(Flag::ENQUEUED);
-                if !v.is(Flag::ELIMINATED) && v.assign.is_none() {
+                if !v.is(Flag::ELIMINATED) && asgs[vi].is_none() {
                     eliminate_var(asgs, cdb, self, state, vdb, vi, &timedout)?;
                 }
             }
@@ -684,7 +688,7 @@ impl Eliminator {
             if asgs.propagate(cdb, vdb) != ClauseId::default() {
                 return Err(SolverError::Inconsistent);
             }
-            cdb.eliminate_satisfied_clauses(self, vdb, true);
+            cdb.eliminate_satisfied_clauses(asgs, self, vdb, true);
             if timedout.load(Ordering::Acquire) {
                 self.clear_clause_queue(cdb);
                 self.clear_var_queue(vdb);
@@ -775,7 +779,7 @@ where
                 did, cdb[did], cid, cdb[cid],
             );
             cdb.detach(did);
-            elim.remove_cid_occur(vdb, did, &mut cdb[did]);
+            elim.remove_cid_occur(asgs, vdb, did, &mut cdb[did]);
             if !cdb[did].is(Flag::LEARNT) {
                 cdb[cid].turn_off(Flag::LEARNT);
             }
@@ -975,7 +979,7 @@ where
             cid, cdb[cid], c0,
         );
         cdb.detach(cid);
-        elim.remove_cid_occur(vdb, cid, &mut cdb[cid]);
+        elim.remove_cid_occur(asgs, vdb, cid, &mut cdb[cid]);
         asgs.assign_at_rootlevel(vdb, c0)
     } else {
         #[cfg(feature = "trace_elimination")]
@@ -1039,7 +1043,7 @@ where
 {
     let v = &mut vdb[vi];
     let w = &mut elim[vi];
-    if v.assign.is_some() {
+    if asgs[vi].is_some() {
         return Ok(());
     }
     debug_assert!(!v.is(Flag::ELIMINATED));
@@ -1096,14 +1100,14 @@ where
         //## VAR ELIMINATION
         //
         for cid in &*pos {
-            debug_assert!(!vdb.locked(&cdb[*cid], *cid));
+            debug_assert!(!vdb.locked(asgs, &cdb[*cid], *cid));
             cdb.detach(*cid);
-            elim.remove_cid_occur(vdb, *cid, &mut cdb[*cid]);
+            elim.remove_cid_occur(asgs, vdb, *cid, &mut cdb[*cid]);
         }
         for cid in &*neg {
-            debug_assert!(!vdb.locked(&cdb[*cid], *cid));
+            debug_assert!(!vdb.locked(asgs, &cdb[*cid], *cid));
             cdb.detach(*cid);
-            elim.remove_cid_occur(vdb, *cid, &mut cdb[*cid]);
+            elim.remove_cid_occur(asgs, vdb, *cid, &mut cdb[*cid]);
         }
         elim[vi].clear();
         vdb[vi].turn_on(Flag::ELIMINATED);
@@ -1203,8 +1207,9 @@ trait VarOrderIF {
     fn select_var<V>(&mut self, occur: &[LitOccurs], vdb: &V) -> Option<VarId>
     where
         V: Index<VarId, Output = Var>;
-    fn rebuild<V>(&mut self, occur: &[LitOccurs], vdb: &V)
+    fn rebuild<A, V>(&mut self, asgs: &A, occur: &[LitOccurs], vdb: &V)
     where
+        A: AssignIF,
         V: VarDBIF;
 }
 
@@ -1270,13 +1275,14 @@ impl VarOrderIF for VarOccHeap {
             }
         }
     }
-    fn rebuild<V>(&mut self, occur: &[LitOccurs], vdb: &V)
+    fn rebuild<A, V>(&mut self, asgs: &A, occur: &[LitOccurs], vdb: &V)
     where
+        A: AssignIF,
         V: VarDBIF,
     {
         self.reset();
-        for v in vdb.iter().skip(1) {
-            if v.assign.is_none() && !v.is(Flag::ELIMINATED) {
+        for (vi, v) in vdb.iter().enumerate().skip(1) {
+            if asgs[vi].is_none() && !v.is(Flag::ELIMINATED) {
                 self.insert(occur, v.index, true);
             }
         }

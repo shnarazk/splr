@@ -66,7 +66,7 @@ impl ValidatorIF for Solver {
     ///
     fn validate(&self) -> Option<Vec<i32>> {
         self.cdb
-            .validate(&self.vdb, true)
+            .validate(&self.asgs, true)
             .map(|cid| Vec::<i32>::from(&self.cdb[cid]))
     }
 }

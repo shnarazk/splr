@@ -47,8 +47,9 @@ pub trait ClauseDBIF: IndexMut<ClauseId, Output = Clause> {
     ///
     /// # CAVEAT
     /// *precondition*: decision level == 0.
-    fn check_and_reduce<V>(&mut self, vdb: &mut V, nc: usize) -> bool
+    fn check_and_reduce<A, V>(&mut self, asgs: &A, vdb: &mut V, nc: usize) -> bool
     where
+        A: AssignIF,
         V: VarDBIF;
     fn reset(&mut self);
     /// delete *dead* clauses from database, which are made by:
@@ -81,8 +82,14 @@ pub trait ClauseDBIF: IndexMut<ClauseId, Output = Clause> {
     /// record a deleted clause to unsat certification.
     fn certificate_delete(&mut self, vec: &[Lit]);
     /// delete satisfied clauses at decision level zero.
-    fn eliminate_satisfied_clauses<E, V>(&mut self, elim: &mut E, vdb: &mut V, occur: bool)
-    where
+    fn eliminate_satisfied_clauses<A, E, V>(
+        &mut self,
+        asgs: &A,
+        elim: &mut E,
+        vdb: &mut V,
+        occur: bool,
+    ) where
+        A: AssignIF,
         E: EliminateIF,
         V: VarDBIF;
     /// flag positive and negative literals of a var as dirty
@@ -95,9 +102,9 @@ pub trait ClauseDBIF: IndexMut<ClauseId, Output = Clause> {
     /// returns None if the given assignment is a model of a problem.
     /// Otherwise returns a clause which is not satisfiable under a given assignment.
     /// Clauses with an unassigned literal are treated as falsified in `strict` mode.
-    fn validate<V>(&self, vdb: &V, strict: bool) -> Option<ClauseId>
+    fn validate<A>(&self, asgs: &A, strict: bool) -> Option<ClauseId>
     where
-        V: VarDBIF;
+        A: AssignIF;
     /// removes Lit `p` from Clause *self*. This is an O(n) function!
     /// returns true if the clause became a unit clause.
     /// Called only from strengthen_clause
@@ -767,7 +774,7 @@ impl ClauseDBIF for ClauseDB {
         V: VarDBIF,
     {
         let reward = self.activity_inc;
-        let (rank, learnt) = if let Some(vdb) = level_sort {
+        let (rank, learnt) = if level_sort.is_some() {
             if !self.certified.is_empty() {
                 let temp = vec.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
                 self.certified.push((CertifiedRecord::ADD, temp));
@@ -781,7 +788,7 @@ impl ClauseDBIF for ClauseDB {
             for (i, l) in vec.iter().enumerate() {
                 let vi = l.vi();
                 let lv = level[vi];
-                if vdb[vi].assign.is_some() && lv_max < lv {
+                if asgs[vi].is_some() && lv_max < lv {
                     i_max = i;
                     lv_max = lv;
                 }
@@ -918,8 +925,9 @@ impl ClauseDBIF for ClauseDB {
         debug_assert!(1 < c.lits.len());
         c.kill(&mut self.touched);
     }
-    fn check_and_reduce<V>(&mut self, vdb: &mut V, nc: usize) -> bool
+    fn check_and_reduce<A, V>(&mut self, asgs: &A, vdb: &mut V, nc: usize) -> bool
     where
+        A: AssignIF,
         V: VarDBIF,
     {
         if !self.reducable || 0 == self.num_learnt {
@@ -932,7 +940,7 @@ impl ClauseDBIF for ClauseDB {
         };
         if go {
             self.reduction_coeff = ((nc as f64) / (self.next_reduction as f64)) as usize + 1;
-            self.reduce(vdb);
+            self.reduce(asgs, vdb);
             self.num_reduction += 1;
         }
         go
@@ -958,17 +966,23 @@ impl ClauseDBIF for ClauseDB {
             self.certified.push((CertifiedRecord::DELETE, temp));
         }
     }
-    fn eliminate_satisfied_clauses<E, V>(&mut self, elim: &mut E, vdb: &mut V, update_occur: bool)
-    where
+    fn eliminate_satisfied_clauses<A, E, V>(
+        &mut self,
+        asgs: &A,
+        elim: &mut E,
+        vdb: &mut V,
+        update_occur: bool,
+    ) where
+        A: AssignIF,
         E: EliminateIF,
         V: VarDBIF,
     {
         for (cid, c) in &mut self.clause.iter_mut().enumerate().skip(1) {
-            if !c.is(Flag::DEAD) && vdb.satisfies(&c.lits) {
+            if !c.is(Flag::DEAD) && asgs.satisfies(&c.lits) {
                 c.kill(&mut self.touched);
                 if elim.is_running() {
                     if update_occur {
-                        elim.remove_cid_occur(vdb, ClauseId::from(cid), c);
+                        elim.remove_cid_occur(asgs, vdb, ClauseId::from(cid), c);
                     }
                     for l in &c.lits {
                         elim.enqueue_var(vdb, l.vi(), true);
@@ -989,15 +1003,15 @@ impl ClauseDBIF for ClauseDB {
             Err(SolverError::OutOfMemory)
         }
     }
-    fn validate<V>(&self, vdb: &V, strict: bool) -> Option<ClauseId>
+    fn validate<A>(&self, asgs: &A, strict: bool) -> Option<ClauseId>
     where
-        V: VarDBIF,
+        A: AssignIF,
     {
         for (i, c) in self.clause.iter().enumerate().skip(1) {
             if c.is(Flag::DEAD) || (strict && c.is(Flag::LEARNT)) {
                 continue;
             }
-            match vdb.status(&c.lits) {
+            match asgs.status(&c.lits) {
                 Some(false) => return Some(ClauseId::from(i)),
                 None if strict => return Some(ClauseId::from(i)),
                 _ => (),
@@ -1058,8 +1072,9 @@ impl ClauseDBIF for ClauseDB {
 
 impl ClauseDB {
     /// halve the number of 'learnt' or *removable* clauses.
-    fn reduce<V>(&mut self, vdb: &mut V)
+    fn reduce<A, V>(&mut self, asgs: &A, vdb: &mut V)
     where
+        A: AssignIF,
         V: VarDBIF,
     {
         let ClauseDB {
@@ -1071,7 +1086,10 @@ impl ClauseDB {
         let mut perm = Vec::with_capacity(clause.len());
         for (i, c) in clause.iter_mut().enumerate().skip(1) {
             let used = c.is(Flag::JUST_USED);
-            if c.is(Flag::LEARNT) && !c.is(Flag::DEAD) && !vdb.locked(c, ClauseId::from(i)) && !used
+            if c.is(Flag::LEARNT)
+                && !c.is(Flag::DEAD)
+                && !vdb.locked(asgs, c, ClauseId::from(i))
+                && !used
             {
                 perm.push(i);
             }

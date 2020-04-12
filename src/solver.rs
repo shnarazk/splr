@@ -189,12 +189,12 @@ impl SatSolverIF for Solver {
         // Otherwise all literals are assigned wrongly.
         state.flush("phasing...");
         elim.activate();
-        elim.prepare(cdb, vdb, true);
+        elim.prepare(asgs, cdb, vdb, true);
         for vi in 1..vdb.len() {
-            let v = &mut vdb[vi];
-            if v.assign.is_some() {
+            if asgs[vi].is_some() {
                 continue;
             }
+            let v = &mut vdb[vi];
             match elim.stats(vi) {
                 (_, 0) => {
                     let l = Lit::from_assign(vi, true);
@@ -236,8 +236,8 @@ impl SatSolverIF for Solver {
                 }
                 return Ok(Certificate::UNSAT);
             }
-            for v in &mut vdb[1..] {
-                if v.assign.is_some() || v.is(Flag::ELIMINATED) {
+            for (vi, v) in &mut vdb.iter_mut().enumerate().skip(1) {
+                if asgs[vi].is_some() || v.is(Flag::ELIMINATED) {
                     continue;
                 }
                 match elim.stats(v.index) {
@@ -260,7 +260,7 @@ impl SatSolverIF for Solver {
         final_report!(asgs, cdb, elim, rst, state, vdb);
         match answer {
             Ok(true) => {
-                elim.extend_model(vdb);
+                elim.extend_model(asgs);
                 #[cfg(debug)]
                 {
                     if let Some(cid) = cdb.validate(vdb, true) {
@@ -273,12 +273,12 @@ impl SatSolverIF for Solver {
                         );
                     }
                 }
-                if cdb.validate(vdb, true).is_some() {
+                if cdb.validate(asgs, true).is_some() {
                     return Err(SolverError::SolverBug);
                 }
                 let vals = vdb[1..]
                     .iter()
-                    .map(|v| i32::from(Lit::from(v)))
+                    .map(|v| i32::from(Lit::from((v.index, asgs[v.index]))))
                     .collect::<Vec<i32>>();
                 asgs.cancel_until(vdb, 0);
                 Ok(Certificate::SAT(vals))
@@ -319,7 +319,7 @@ impl SatSolverIF for Solver {
             return None;
         }
         debug_assert!(asgs.level() == 0);
-        if lits.iter().any(|l| vdb.assigned(*l).is_some()) {
+        if lits.iter().any(|l| asgs.assigned(*l).is_some()) {
             cdb.certificate_add(lits);
         }
         lits.sort_unstable();
@@ -327,7 +327,7 @@ impl SatSolverIF for Solver {
         let mut l_ = NULL_LIT; // last literal; [x, x.negate()] means tautology.
         for i in 0..lits.len() {
             let li = lits[i];
-            let sat = vdb.assigned(li);
+            let sat = asgs.assigned(li);
             if sat == Some(true) || !li == l_ {
                 return Some(ClauseId::default());
             } else if sat != Some(false) && li != l_ {
@@ -686,7 +686,7 @@ fn handle_conflict(
             rst_lbd_trend.min(10.0),
         ));
     }
-    cdb.check_and_reduce(vdb, ncnfl);
+    cdb.check_and_reduce(asgs, vdb, ncnfl);
     if ncnfl % state.reflection_interval == 0 {
         adapt_modules(asgs, cdb, elim, rst, state, vdb)?;
         if let Some(p) = state.elapsed() {
@@ -768,7 +768,7 @@ fn conflict_analyze(
                         continue;
                     }
                     debug_assert!(!v.is(Flag::ELIMINATED));
-                    debug_assert!(v.assign.is_some());
+                    debug_assert!(asgs[vi].is_some());
                     v.turn_on(Flag::CA_SEEN);
                     if dl <= lvl {
                         path_cnt += 1;
@@ -824,7 +824,7 @@ fn conflict_analyze(
                             continue;
                         }
                         debug_assert!(!v.is(Flag::ELIMINATED));
-                        debug_assert!(v.assign.is_some());
+                        debug_assert!(asgs[vi].is_some());
                         v.turn_on(Flag::CA_SEEN);
                         if dl <= lvl {
                             // println!("- flag for {} which level is {}", q.int(), lvl);
@@ -957,7 +957,7 @@ impl Solver {
 impl State {
     fn minimize_learnt(
         &mut self,
-        asgs: &AssignStack,
+        asgs: &mut AssignStack,
         cdb: &ClauseDB,
         vdb: &mut VarDB,
     ) -> DecisionLevel {
@@ -977,7 +977,7 @@ impl State {
         new_learnt.retain(|l| *l == l0 || !l.is_redundant(asgs, cdb, vdb, &mut to_clear, &levels));
         let len = new_learnt.len();
         if 2 < len && len < 30 {
-            vdb.minimize_with_biclauses(cdb, new_learnt);
+            asgs.minimize_with_biclauses(cdb, new_learnt);
         }
         // find correct backtrack level from remaining literals
         let mut level_to_return = 0;
@@ -1125,7 +1125,7 @@ impl VarDB {
                     i32::from(l),
                     lvl,
                     v.reason == AssignReason::default(),
-                    v.assign,
+                    asgs[l.vi()],
                 )
             })
             .collect::<Vec<(i32, DecisionLevel, bool, Option<bool>)>>()

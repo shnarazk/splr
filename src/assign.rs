@@ -11,7 +11,7 @@ use {
         fmt,
         fs::File,
         io::{BufWriter, Write},
-        ops::{Index, Range},
+        ops::{Index, IndexMut, Range},
         slice::Iter,
     },
 };
@@ -27,7 +27,9 @@ pub trait LBDIF {
 }
 
 /// API for assignment like `propagate`, `enqueue`, `cancel_until`, and so on.
-pub trait AssignIF: LBDIF {
+pub trait AssignIF:
+    LBDIF + Index<VarId, Output = Option<bool>> + IndexMut<VarId, Output = Option<bool>>
+{
     /// return a literal in the stack.
     fn stack(&self, i: usize) -> Lit;
     /// return literals in the range of stack.
@@ -42,6 +44,8 @@ pub trait AssignIF: LBDIF {
     fn len_upto(&self, n: DecisionLevel) -> usize;
     /// return `true` if there's no assignment.
     fn is_empty(&self) -> bool;
+    /// return *the value* of a literal.
+    fn assigned(&self, l: Lit) -> Option<bool>;
     /// return an iterator over assignment stack.
     fn iter(&self) -> Iter<'_, Lit>;
     /// return the current decision level.
@@ -99,6 +103,17 @@ pub trait AssignIF: LBDIF {
     fn level_ref(&self) -> &[DecisionLevel];
     fn best_assigned(&mut self, flag: Flag) -> usize;
     fn reset_assign_record(&mut self, flag: Flag);
+    /// return `true` if the set of literals is satisfiable under the current assignment.
+    fn satisfies(&self, c: &[Lit]) -> bool;
+    /// return Option<bool>
+    /// - Some(true) -- the literals is satisfied by a literal
+    /// - Some(false) -- the literals is unsatisfied; no unassigned literal
+    /// - None -- the literals contains an unassigned literal
+    fn status(&self, c: &[Lit]) -> Option<bool>;
+    /// minimize a clause.
+    fn minimize_with_biclauses<C>(&mut self, cdb: &C, vec: &mut Vec<Lit>)
+    where
+        C: ClauseDBIF;
 }
 
 /// API for var selection.
@@ -250,6 +265,13 @@ impl Index<VarId> for AssignStack {
     }
 }
 
+impl IndexMut<VarId> for AssignStack {
+    #[inline]
+    fn index_mut(&mut self, i: VarId) -> &mut Self::Output {
+        unsafe { self.assign.get_unchecked_mut(i) }
+    }
+}
+
 /*
 impl Index<Range<usize>> for AssignStack {
     type Output = [Lit];
@@ -329,6 +351,12 @@ impl AssignIF for AssignStack {
     fn len_upto(&self, n: DecisionLevel) -> usize {
         self.trail_lim[n as usize]
     }
+    fn assigned(&self, l: Lit) -> Option<bool> {
+        match unsafe { self.assign.get_unchecked(l.vi()) } {
+            Some(x) if !bool::from(l) => Some(!x),
+            x => *x,
+        }
+    }
     fn is_empty(&self) -> bool {
         self.trail.is_empty()
     }
@@ -361,7 +389,6 @@ impl AssignIF for AssignStack {
         match var_assign!(self, v.index) {
             None => {
                 set_assign!(self, l);
-                v.assign = Some(bool::from(l));
                 v.reason = AssignReason::None;
                 debug_assert!(!self.trail.contains(&!l));
                 self.trail.push(l);
@@ -392,7 +419,6 @@ impl AssignIF for AssignStack {
             var_assign!(self, vi) == Some(bool::from(l)) || var_assign!(self, vi).is_none()
         );
         set_assign!(self, l);
-        v.assign = Some(bool::from(l));
         v.reason = reason;
         vdb.reward_at_assign(vi);
         debug_assert!(!self.trail.contains(&l));
@@ -414,7 +440,6 @@ impl AssignIF for AssignStack {
         debug_assert!(!v.is(Flag::ELIMINATED));
         // debug_assert!(self.assign[vi] == l.lbool() || self.assign[vi] == BOTTOM);
         set_assign!(self, l);
-        v.assign = Some(bool::from(l));
         v.reason = AssignReason::default();
         vdb.reward_at_assign(vi);
         debug_assert!(!self.trail.contains(&!l));
@@ -430,7 +455,6 @@ impl AssignIF for AssignStack {
         self.level[vi] = 0;
         let v = &mut vdb[l];
         set_assign!(self, l);
-        v.assign = Some(bool::from(l));
         v.reason = AssignReason::default();
         vdb.clear_reward(l.vi());
         debug_assert!(!self.trail.contains(&!l));
@@ -456,7 +480,6 @@ impl AssignIF for AssignStack {
             let v = &mut vdb[vi];
             v.set(Flag::PHASE, var_assign!(self, vi).unwrap());
             unset_assign!(self, vi);
-            v.assign = None;
             v.reason = AssignReason::default();
             vdb.reward_at_unassign(vi);
             self.var_order.insert(vdb, vi);
@@ -615,6 +638,57 @@ impl AssignIF for AssignStack {
             Flag::BEST_PHASE => self.num_best_assign = 0,
             Flag::TARGET_PHASE => self.num_target_assign = 0,
             _ => panic!("invalid flag for reset_assign_record"),
+        }
+    }
+    fn satisfies(&self, vec: &[Lit]) -> bool {
+        for l in vec {
+            if self.assigned(*l) == Some(true) {
+                return true;
+            }
+        }
+        false
+    }
+    fn status(&self, vec: &[Lit]) -> Option<bool> {
+        let mut falsified = Some(false);
+        for l in vec {
+            match self.assigned(*l) {
+                Some(true) => return Some(true),
+                None => falsified = None,
+                _ => (),
+            }
+        }
+        falsified
+    }
+    fn minimize_with_biclauses<C>(&mut self, cdb: &C, vec: &mut Vec<Lit>)
+    where
+        C: ClauseDBIF,
+    {
+        if vec.len() <= 1 {
+            return;
+        }
+        self.lbd_temp[0] += 1;
+        let key = self.lbd_temp[0];
+        for l in &vec[1..] {
+            self.lbd_temp[l.vi() as usize] = key;
+        }
+        let l0 = vec[0];
+        let mut nsat = 0;
+        for w in cdb.watcher_list(!l0) {
+            let c = &cdb[w.c];
+            if c.len() != 2 {
+                continue;
+            }
+            debug_assert!(c[0] == l0 || c[1] == l0);
+            let other = c[(c[0] == l0) as usize];
+            let vi = other.vi();
+            if self.lbd_temp[vi] == key && self.assigned(other) == Some(true) {
+                nsat += 1;
+                self.lbd_temp[vi] = key - 1;
+            }
+        }
+        if 0 < nsat {
+            self.lbd_temp[l0.vi()] = key;
+            vec.retain(|l| self.lbd_temp[l.vi()] == key);
         }
     }
 }

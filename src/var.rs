@@ -25,21 +25,10 @@ pub trait VarDBIF:
     fn iter(&self) -> Iter<'_, Var>;
     /// return an iterator over vars.
     fn iter_mut(&mut self) -> IterMut<'_, Var>;
-    /// return the 'value' of a given literal.
-    fn assigned(&self, l: Lit) -> Option<bool>;
     /// return `true` is the clause is the reason of the assignment.
-    fn locked(&self, c: &Clause, cid: ClauseId) -> bool;
-    /// return `true` if the set of literals is satisfiable under the current assignment.
-    fn satisfies(&self, c: &[Lit]) -> bool;
-    /// return Option<bool>
-    /// - Some(true) -- the literals is satisfied by a literal
-    /// - Some(false) -- the literals is unsatisfied; no unassigned literal
-    /// - None -- the literals contains an unassigned literal
-    fn status(&self, c: &[Lit]) -> Option<bool>;
-    /// minimize a clause.
-    fn minimize_with_biclauses<C>(&mut self, cdb: &C, vec: &mut Vec<Lit>)
+    fn locked<A>(&self, asgs: &A, c: &Clause, cid: ClauseId) -> bool
     where
-        C: ClauseDBIF;
+        A: AssignIF;
 }
 
 /// API for var rewarding.
@@ -73,8 +62,8 @@ pub trait VarPhaseIF {
 pub struct Var {
     /// reverse conversion to index. Note `VarId` must be `usize`.
     pub index: VarId,
-    /// the current value.
-    pub assign: Option<bool>,
+    //    /// the current value.
+    //    pub assign: Option<bool>,
     /// the propagating clause
     pub reason: AssignReason,
     //    /// decision level at which this variables is assigned.
@@ -93,7 +82,7 @@ impl Default for Var {
     fn default() -> Var {
         Var {
             index: 0,
-            assign: None,
+            //            assign: None,
             reason: AssignReason::default(),
             reward: 0.0,
             timestamp: 0,
@@ -108,13 +97,8 @@ impl fmt::Display for Var {
         let st = |flag, mes| if self.is(flag) { mes } else { "" };
         write!(
             f,
-            "V{{{},{} by {} {}{}}}",
+            "V{{{}, reason:{}, {}{}}}",
             self.index,
-            match self.assign {
-                Some(true) => "T",
-                Some(false) => "F",
-                None => "_",
-            },
             self.reason,
             st(Flag::TOUCHED, ", touched"),
             st(Flag::ELIMINATED, ", eliminated"),
@@ -140,12 +124,6 @@ impl Var {
             vec.push(Var::from(i));
         }
         vec
-    }
-    fn assigned(&self, l: Lit) -> Option<bool> {
-        match self.assign {
-            Some(x) if !bool::from(l) => Some(!x),
-            x => x,
-        }
     }
 }
 
@@ -398,69 +376,15 @@ impl VarDBIF for VarDB {
     fn iter_mut(&mut self) -> IterMut<'_, Var> {
         self.var.iter_mut()
     }
-    fn assigned(&self, l: Lit) -> Option<bool> {
-        match unsafe { self.var.get_unchecked(l.vi()).assign } {
-            Some(x) if !bool::from(l) => Some(!x),
-            x => x,
-        }
-    }
-    fn locked(&self, c: &Clause, cid: ClauseId) -> bool {
+    fn locked<A>(&self, asgs: &A, c: &Clause, cid: ClauseId) -> bool
+    where
+        A: AssignIF,
+    {
         let lits = &c.lits;
         debug_assert!(1 < lits.len());
         let l0 = lits[0];
-        self.assigned(l0) == Some(true)
+        asgs.assigned(l0) == Some(true)
             && matches!(self[l0.vi()].reason, AssignReason::Implication(x, _) if x == cid)
-    }
-    fn satisfies(&self, vec: &[Lit]) -> bool {
-        for l in vec {
-            if self.assigned(*l) == Some(true) {
-                return true;
-            }
-        }
-        false
-    }
-    fn status(&self, vec: &[Lit]) -> Option<bool> {
-        let mut falsified = Some(false);
-        for l in vec {
-            match self.assigned(*l) {
-                Some(true) => return Some(true),
-                None => falsified = None,
-                _ => (),
-            }
-        }
-        falsified
-    }
-    fn minimize_with_biclauses<C>(&mut self, cdb: &C, vec: &mut Vec<Lit>)
-    where
-        C: ClauseDBIF,
-    {
-        if vec.len() <= 1 {
-            return;
-        }
-        let mut lbd_temp = vec![false; self.len()];
-        let VarDB { var, .. } = self;
-        for l in &vec[1..] {
-            lbd_temp[l.vi() as usize] = true;
-        }
-        let l0 = vec[0];
-        let mut nsat = 0;
-        for w in cdb.watcher_list(!l0) {
-            let c = &cdb[w.c];
-            if c.len() != 2 {
-                continue;
-            }
-            debug_assert!(c[0] == l0 || c[1] == l0);
-            let other = c[(c[0] == l0) as usize];
-            let vi = other.vi();
-            if lbd_temp[vi] && var[vi].assigned(other) == Some(true) {
-                nsat += 1;
-                lbd_temp[vi] = false;
-            }
-        }
-        if 0 < nsat {
-            lbd_temp[l0.vi()] = true;
-            vec.retain(|l| lbd_temp[l.vi()]);
-        }
     }
 }
 
