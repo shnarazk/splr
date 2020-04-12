@@ -1,5 +1,6 @@
 ## 0.3.3, 2020-12-31
 
+- merge assign.rs and var.rs
 - change a lot of options' meanings and mnemonics
 - better modularity via traits
 - add some features for development
