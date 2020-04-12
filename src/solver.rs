@@ -617,6 +617,7 @@ fn handle_conflict(
         }
         state.last_solved = ncnfl;
         state.num_solved_vars += 1;
+        state.to_eliminate *= 0.25;
         rst.update(RestarterModule::Reset, 0);
     } else {
         {
