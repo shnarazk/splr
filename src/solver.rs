@@ -168,7 +168,7 @@ impl SatSolverIF for Solver {
         }
         // NOTE: splr doesn't deal with assumptions.
         // s.root_level = 0;
-        state.num_solved_vars = asg.len();
+        state.num_solved_vars = asg.stack_len();
         state.progress_header();
         state.progress(asg, cdb, elim, rst, Some("initialization phase"));
         state.flush("loading...");
@@ -366,14 +366,14 @@ fn search(
         asg.reward_update();
         let ci = asg.propagate(cdb);
         if ci == ClauseId::default() {
-            if state.num_vars <= asg.len() + state.num_eliminated_vars {
+            if state.num_vars <= asg.stack_len() + state.num_eliminated_vars {
                 return Ok(true);
             }
 
             //
             //## DYNAMIC FORCING RESTART based on LBD values, updated by conflict
             //
-            state.last_asg = asg.len();
+            state.last_asg = asg.stack_len();
             if rst.force_restart() {
                 asg.cancel_until(state.root_level);
             } else {
@@ -429,9 +429,9 @@ fn search(
                 elim.simplify(asg, cdb, state)?;
             }
             // By simplification, we may get further solutions.
-            if state.num_solved_vars < asg.len() {
+            if state.num_solved_vars < asg.stack_len() {
                 rst.update(RestarterModule::Reset, 0);
-                state.num_solved_vars = asg.len();
+                state.num_solved_vars = asg.stack_len();
             }
         }
         if !asg.remains() {
@@ -485,7 +485,7 @@ fn handle_conflict(
     rst.update(RestarterModule::Counter, ncnfl);
 
     if 0 < state.last_asg {
-        rst.update(RestarterModule::ASG, asg.len());
+        rst.update(RestarterModule::ASG, asg.stack_len());
         state.last_asg = 0;
     }
 
@@ -738,7 +738,7 @@ fn conflict_analyze(
     learnt.push(NULL_LIT);
     let dl = asg.decision_level();
     let mut p = NULL_LIT;
-    let mut ti = asg.len() - 1; // trail index
+    let mut ti = asg.stack_len() - 1; // trail index
     let mut path_cnt = 0;
     loop {
         let reason = if p == NULL_LIT {
@@ -857,7 +857,7 @@ fn conflict_analyze(
             #[cfg(feature = "boundary_check")]
             assert!(
                 vi < asg.level_ref().len(),
-                format!("ti:{}, lit:{}, len:{}", ti, asg.stack(ti), asg.len(),)
+                format!("ti:{}, lit:{}, len:{}", ti, asg.stack(ti), asg.stack_len())
             );
             let lvl = asg.level(vi);
             let v = asg.var(vi);
@@ -1063,7 +1063,7 @@ fn analyze_final(asg: &mut AssignStack, state: &mut State, c: &Clause) {
         }
     }
     let end = if asg.decision_level() <= state.root_level {
-        asg.len()
+        asg.stack_len()
     } else {
         asg.len_upto(state.root_level)
     };

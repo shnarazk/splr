@@ -31,7 +31,7 @@ use {
 /// elim.activate();
 /// // At this point, the `elim` is in `ready` mode, not `running`.
 /// assert_eq!(elim.is_running(), false);
-/// assert_eq!(elim.simplify(&mut s.asg, &mut s.cdb, &mut s.state, &mut s.vdb), Ok(()));
+/// assert_eq!(elim.simplify(&mut s.asg, &mut s.cdb, &mut s.state), Ok(()));
 ///```
 pub trait EliminateIF {
     /// set eliminator's mode to **ready**.
@@ -463,9 +463,9 @@ impl Eliminator {
         C: ClauseDBIF,
     {
         debug_assert_eq!(asg.decision_level(), 0);
-        while !self.clause_queue.is_empty() || self.bwdsub_assigns < asg.len() {
+        while !self.clause_queue.is_empty() || self.bwdsub_assigns < asg.stack_len() {
             // Check top-level assignments by creating a dummy clause and placing it in the queue:
-            if self.clause_queue.is_empty() && self.bwdsub_assigns < asg.len() {
+            if self.clause_queue.is_empty() && self.bwdsub_assigns < asg.stack_len() {
                 let c = ClauseId::from(asg.stack(self.bwdsub_assigns));
                 self.clause_queue.push(c);
                 self.bwdsub_assigns += 1;
@@ -545,10 +545,10 @@ impl Eliminator {
     {
         let start = state.elapsed().unwrap_or(0.0);
         loop {
-            let na = asg.len();
+            let na = asg.stack_len();
             self.eliminate_main(asg, cdb, state)?;
             cdb.eliminate_satisfied_clauses(asg, self, true);
-            if na == asg.len()
+            if na == asg.stack_len()
                 && (!self.is_running()
                     || (0 == self.clause_queue_len() && 0 == self.var_queue_len()))
             {
@@ -592,11 +592,11 @@ impl Eliminator {
             thread::sleep(Duration::from_millis(time));
             timedout2.store(true, Ordering::Release);
         });
-        while self.bwdsub_assigns < asg.len()
+        while self.bwdsub_assigns < asg.stack_len()
             || !self.var_queue.is_empty()
             || !self.clause_queue.is_empty()
         {
-            if !self.clause_queue.is_empty() || self.bwdsub_assigns < asg.len() {
+            if !self.clause_queue.is_empty() || self.bwdsub_assigns < asg.stack_len() {
                 self.backward_subsumption_check(asg, cdb, &timedout)?;
             }
             while let Some(vi) = self.var_queue.select_var(&self.var, asg) {
@@ -1354,7 +1354,7 @@ mod tests {
     #![allow(unused_variables)]
     #![allow(dead_code)]
     use super::*;
-    use crate::{clause::ClauseDB, solver::Solver, var::VarDB};
+    use crate::{clause::ClauseDB, solver::Solver};
 
     macro_rules! mkv {
         ($($x:expr),*) => {
@@ -1376,16 +1376,16 @@ mod tests {
 
         let c1 = s
             .cdb
-            .new_clause(&mut s.asg, &mut mkv![1, 2, 3], None::<&mut VarDB>);
+            .new_clause(&mut s.asg, &mut mkv![1, 2, 3], false, false);
         let c2 = s
             .cdb
-            .new_clause(&mut s.asg, &mut mkv![-2, 3, 4], None::<&mut VarDB>);
+            .new_clause(&mut s.asg, &mut mkv![-2, 3, 4], false, false);
         let c3 = s
             .cdb
-            .new_clause(&mut s.asg, &mut mkv![-2, -3], None::<&mut VarDB>);
+            .new_clause(&mut s.asg, &mut mkv![-2, -3], false, false);
         let c4 = s
             .cdb
-            .new_clause(&mut s.asg, &mut mkv![1, 2, -3, 9], None::<&mut VarDB>);
+            .new_clause(&mut s.asg, &mut mkv![1, 2, -3, 9], false, false);
         //    {
         //        let vec = [&c2, &c3]; // [&c1, &c2, &c3, &c4];
         //        for x in &vec {

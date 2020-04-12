@@ -533,7 +533,7 @@ impl Export<(usize, usize, usize, f64, f64)> for AssignStack {
     /// use crate::{splr::config::Config, splr::types::*};
     /// use crate::splr::assign::AssignStack;
     /// let asg = AssignStack::instantiate(&Config::default(), &CNFDescription::default());
-    /// let (asg_num_conflict, asg_num_propagation, asg_num_restart) = asg.exports();
+    /// let (asg_num_conflict, asg_num_propagation, asg_num_restart, asg_core, asg_activity_decay) = asg.exports();
     ///```
     #[inline]
     fn exports(&self) -> (usize, usize, usize, f64, f64) {
@@ -1132,7 +1132,7 @@ impl AssignStack {
         }
         if let Ok(out) = File::create(&fname) {
             let mut buf = BufWriter::new(out);
-            let nv = self.len();
+            let nv = self.var_len() - 1;
             let nc: usize = cdb.len() - 1;
             buf.write_all(format!("p cnf {} {}\n", state.num_vars, nc + nv).as_bytes())
                 .unwrap();
@@ -1398,7 +1398,6 @@ impl fmt::Display for VarIdHeap {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::var::VarDB;
 
     fn lit(i: i32) -> Lit {
         Lit::from(i)
@@ -1410,61 +1409,59 @@ mod tests {
             num_of_variables: 4,
             ..CNFDescription::default()
         };
-        let mut vardb = VarDB::instantiate(&config, &cnf);
-        let vdb = &mut vardb;
         let mut asg = AssignStack::instantiate(&config, &cnf);
         // [] + 1 => [1]
-        assert!(asg.assign_at_rootlevel(vdb, lit(1)).is_ok());
+        assert!(asg.assign_at_rootlevel(lit(1)).is_ok());
         assert_eq!(asg.trail, vec![lit(1)]);
 
         // [1] + 1 => [1]
-        assert!(asg.assign_at_rootlevel(vdb, lit(1)).is_ok());
+        assert!(asg.assign_at_rootlevel(lit(1)).is_ok());
         assert_eq!(asg.trail, vec![lit(1)]);
 
         // [1] + 2 => [1, 2]
-        assert!(asg.assign_at_rootlevel(vdb, lit(2)).is_ok());
+        assert!(asg.assign_at_rootlevel(lit(2)).is_ok());
         assert_eq!(asg.trail, vec![lit(1), lit(2)]);
 
         // [1, 2] + -1 => ABORT & [1, 2]
-        assert!(asg.assign_at_rootlevel(vdb, lit(-1)).is_err());
+        assert!(asg.assign_at_rootlevel(lit(-1)).is_err());
         assert_eq!(asg.decision_level(), 0);
-        assert_eq!(asg.len(), 2);
+        assert_eq!(asg.stack_len(), 2);
 
         // [1, 2] + 3 => [1, 2, 3]
-        asg.assign_by_decision(vdb, lit(3));
+        asg.assign_by_decision(lit(3));
         assert_eq!(asg.trail, vec![lit(1), lit(2), lit(3)]);
         assert_eq!(asg.decision_level(), 1);
-        assert_eq!(asg.len(), 3);
+        assert_eq!(asg.stack_len(), 3);
         assert_eq!(asg.len_upto(0), 2);
 
         // [1, 2, 3] + 4 => [1, 2, 3, 4]
-        asg.assign_by_decision(vdb, lit(4));
+        asg.assign_by_decision(lit(4));
         assert_eq!(asg.trail, vec![lit(1), lit(2), lit(3), lit(4)]);
         assert_eq!(asg.decision_level(), 2);
-        assert_eq!(asg.len(), 4);
+        assert_eq!(asg.stack_len(), 4);
         assert_eq!(asg.len_upto(1), 3);
 
         // [1, 2, 3] => [1, 2]
-        asg.cancel_until(vdb, 1);
+        asg.cancel_until(1);
         assert_eq!(asg.trail, vec![lit(1), lit(2), lit(3)]);
         assert_eq!(asg.decision_level(), 1);
-        assert_eq!(asg.len(), 3);
+        assert_eq!(asg.stack_len(), 3);
         assert_eq!(asg.trail_lim, vec![2]);
         assert_eq!(asg.assigned(lit(1)), Some(true));
         assert_eq!(asg.assigned(lit(-1)), Some(false));
         assert_eq!(asg.assigned(lit(4)), None);
 
         // [1, 2, 3] => [1, 2, 3, 4]
-        asg.assign_by_decision(vdb, lit(4));
+        asg.assign_by_decision(lit(4));
         assert_eq!(asg.trail, vec![lit(1), lit(2), lit(3), lit(4)]);
         assert_eq!(asg.level[lit(4).vi()], 2);
         assert_eq!(asg.trail_lim, vec![2, 3]);
 
         // [1, 2, 3, 4] => [1, 2, -4]
-        asg.assign_by_unitclause(vdb, Lit::from(-4i32));
+        asg.assign_by_unitclause(Lit::from(-4i32));
         assert_eq!(asg.trail, vec![lit(1), lit(2), lit(-4)]);
         assert_eq!(asg.decision_level(), 0);
-        assert_eq!(asg.len(), 3);
+        assert_eq!(asg.stack_len(), 3);
 
         assert_eq!(asg.assigned(lit(-4)), Some(true));
         assert_eq!(asg.assigned(lit(-3)), None);
