@@ -242,15 +242,13 @@ macro_rules! unset_assign {
     };
 }
 
-/*
-impl Index<usize> for AssignStack {
-    type Output = Lit;
+impl Index<VarId> for AssignStack {
+    type Output = Option<bool>;
     #[inline]
-    fn index(&self, i: usize) -> &Lit {
+    fn index(&self, i: VarId) -> &Self::Output {
         unsafe { self.assign.get_unchecked(i) }
     }
 }
-*/
 
 /*
 impl Index<Range<usize>> for AssignStack {
