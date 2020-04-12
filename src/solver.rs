@@ -274,15 +274,15 @@ impl SatSolverIF for Solver {
                     .skip(1)
                     .map(|v| i32::from(Lit::from((v.index, asg.assign(v.index)))))
                     .collect::<Vec<i32>>();
-                asg.cancel_until(0);
+                asg.cancel_until(state.root_level);
                 Ok(Certificate::SAT(vals))
             }
             Ok(false) | Err(SolverError::NullLearnt) => {
-                asg.cancel_until(0);
+                asg.cancel_until(state.root_level);
                 Ok(Certificate::UNSAT)
             }
             Err(e) => {
-                asg.cancel_until(0);
+                asg.cancel_until(state.root_level);
                 Err(e)
             }
         }
