@@ -47,10 +47,9 @@ pub trait ClauseDBIF: IndexMut<ClauseId, Output = Clause> {
     ///
     /// # CAVEAT
     /// *precondition*: decision level == 0.
-    fn check_and_reduce<A, V>(&mut self, asgs: &A, vdb: &mut V, nc: usize) -> bool
+    fn check_and_reduce<A>(&mut self, asg: &A, nc: usize) -> bool
     where
-        A: AssignIF,
-        V: VarDBIF;
+        A: AssignIF;
     fn reset(&mut self);
     /// delete *dead* clauses from database, which are made by:
     /// * `reduce`
@@ -62,7 +61,7 @@ pub trait ClauseDBIF: IndexMut<ClauseId, Output = Clause> {
     /// * Otherwise, register `v` as a permanent clause, which rank is zero.
     fn new_clause<A, V>(
         &mut self,
-        asgs: &mut A,
+        asg: &mut A,
         v: &mut [Lit],
         level_sort: Option<&mut V>,
     ) -> ClauseId
@@ -70,7 +69,7 @@ pub trait ClauseDBIF: IndexMut<ClauseId, Output = Clause> {
         A: AssignIF,
         V: VarDBIF;
     /// check and convert a learnt clause to permanent if needed.
-    fn convert_to_permanent<A>(&mut self, asgs: &mut A, cid: ClauseId) -> bool
+    fn convert_to_permanent<A>(&mut self, asg: &mut A, cid: ClauseId) -> bool
     where
         A: AssignIF;
     /// return the number of alive clauses in the database. Or return the database size if `active` is `false`.
@@ -84,7 +83,7 @@ pub trait ClauseDBIF: IndexMut<ClauseId, Output = Clause> {
     /// delete satisfied clauses at decision level zero.
     fn eliminate_satisfied_clauses<A, E, V>(
         &mut self,
-        asgs: &A,
+        asg: &A,
         elim: &mut E,
         vdb: &mut V,
         occur: bool,
@@ -102,7 +101,7 @@ pub trait ClauseDBIF: IndexMut<ClauseId, Output = Clause> {
     /// returns None if the given assignment is a model of a problem.
     /// Otherwise returns a clause which is not satisfiable under a given assignment.
     /// Clauses with an unassigned literal are treated as falsified in `strict` mode.
-    fn validate<A>(&self, asgs: &A, strict: bool) -> Option<ClauseId>
+    fn validate<A>(&self, asg: &A, strict: bool) -> Option<ClauseId>
     where
         A: AssignIF;
     /// removes Lit `p` from Clause *self*. This is an O(n) function!
@@ -765,7 +764,7 @@ impl ClauseDBIF for ClauseDB {
     }
     fn new_clause<A, V>(
         &mut self,
-        asgs: &mut A,
+        asg: &mut A,
         vec: &mut [Lit],
         level_sort: Option<&mut V>,
     ) -> ClauseId
@@ -784,11 +783,11 @@ impl ClauseDBIF for ClauseDB {
             let mut i_max = 1;
             let mut lv_max = 0;
             // seek a literal with max level
-            let level = asgs.level_ref();
+            let level = asg.level_ref();
             for (i, l) in vec.iter().enumerate() {
                 let vi = l.vi();
                 let lv = level[vi];
-                if asgs[vi].is_some() && lv_max < lv {
+                if asg[vi].is_some() && lv_max < lv {
                     i_max = i;
                     lv_max = lv;
                 }
@@ -797,7 +796,7 @@ impl ClauseDBIF for ClauseDB {
             if vec.len() <= 2 {
                 (0, false)
             } else {
-                let lbd = asgs.compute_lbd(vec);
+                let lbd = asg.compute_lbd(vec);
                 if self.use_chan_seok && lbd <= self.co_lbd_bound {
                     (0, false)
                 } else {
@@ -871,7 +870,7 @@ impl ClauseDBIF for ClauseDB {
         self.num_active += 1;
         cid
     }
-    fn convert_to_permanent<A>(&mut self, asgs: &mut A, cid: ClauseId) -> bool
+    fn convert_to_permanent<A>(&mut self, asg: &mut A, cid: ClauseId) -> bool
     where
         A: AssignIF,
     {
@@ -887,7 +886,7 @@ impl ClauseDBIF for ClauseDB {
         debug_assert!(!c.is(Flag::DEAD), format!("found {} is dead: {}", cid, c));
         if 2 < c.rank {
             c.turn_on(Flag::JUST_USED);
-            let nlevels = asgs.compute_lbd(&c.lits);
+            let nlevels = asg.compute_lbd(&c.lits);
             if nlevels + 1 < c.rank {
                 // chan_seok_condition is zero if !use_chan_seok
                 if nlevels < chan_seok_condition {
@@ -925,10 +924,9 @@ impl ClauseDBIF for ClauseDB {
         debug_assert!(1 < c.lits.len());
         c.kill(&mut self.touched);
     }
-    fn check_and_reduce<A, V>(&mut self, asgs: &A, vdb: &mut V, nc: usize) -> bool
+    fn check_and_reduce<A>(&mut self, asg: &A, nc: usize) -> bool
     where
         A: AssignIF,
-        V: VarDBIF,
     {
         if !self.reducable || 0 == self.num_learnt {
             return false;
@@ -940,7 +938,7 @@ impl ClauseDBIF for ClauseDB {
         };
         if go {
             self.reduction_coeff = ((nc as f64) / (self.next_reduction as f64)) as usize + 1;
-            self.reduce(asgs, vdb);
+            self.reduce(asg);
             self.num_reduction += 1;
         }
         go
@@ -968,7 +966,7 @@ impl ClauseDBIF for ClauseDB {
     }
     fn eliminate_satisfied_clauses<A, E, V>(
         &mut self,
-        asgs: &A,
+        asg: &A,
         elim: &mut E,
         vdb: &mut V,
         update_occur: bool,
@@ -978,11 +976,11 @@ impl ClauseDBIF for ClauseDB {
         V: VarDBIF,
     {
         for (cid, c) in &mut self.clause.iter_mut().enumerate().skip(1) {
-            if !c.is(Flag::DEAD) && asgs.satisfies(&c.lits) {
+            if !c.is(Flag::DEAD) && asg.satisfies(&c.lits) {
                 c.kill(&mut self.touched);
                 if elim.is_running() {
                     if update_occur {
-                        elim.remove_cid_occur(asgs, vdb, ClauseId::from(cid), c);
+                        elim.remove_cid_occur(asg, vdb, ClauseId::from(cid), c);
                     }
                     for l in &c.lits {
                         elim.enqueue_var(vdb, l.vi(), true);
@@ -1003,7 +1001,7 @@ impl ClauseDBIF for ClauseDB {
             Err(SolverError::OutOfMemory)
         }
     }
-    fn validate<A>(&self, asgs: &A, strict: bool) -> Option<ClauseId>
+    fn validate<A>(&self, asg: &A, strict: bool) -> Option<ClauseId>
     where
         A: AssignIF,
     {
@@ -1011,7 +1009,7 @@ impl ClauseDBIF for ClauseDB {
             if c.is(Flag::DEAD) || (strict && c.is(Flag::LEARNT)) {
                 continue;
             }
-            match asgs.status(&c.lits) {
+            match asg.status(&c.lits) {
                 Some(false) => return Some(ClauseId::from(i)),
                 None if strict => return Some(ClauseId::from(i)),
                 _ => (),
@@ -1072,10 +1070,9 @@ impl ClauseDBIF for ClauseDB {
 
 impl ClauseDB {
     /// halve the number of 'learnt' or *removable* clauses.
-    fn reduce<A, V>(&mut self, asgs: &A, vdb: &mut V)
+    fn reduce<A>(&mut self, asg: &A)
     where
         A: AssignIF,
-        V: VarDBIF,
     {
         let ClauseDB {
             ref mut clause,
@@ -1086,10 +1083,7 @@ impl ClauseDB {
         let mut perm = Vec::with_capacity(clause.len());
         for (i, c) in clause.iter_mut().enumerate().skip(1) {
             let used = c.is(Flag::JUST_USED);
-            if c.is(Flag::LEARNT)
-                && !c.is(Flag::DEAD)
-                && !vdb.locked(asgs, c, ClauseId::from(i))
-                && !used
+            if c.is(Flag::LEARNT) && !c.is(Flag::DEAD) && !asg.locked(c, ClauseId::from(i)) && !used
             {
                 perm.push(i);
             }
@@ -1172,20 +1166,20 @@ mod tests {
             num_of_variables: 4,
             ..CNFDescription::default()
         };
-        let mut asgs = AssignStack::instantiate(&config, &cnf);
+        let mut asg = AssignStack::instantiate(&config, &cnf);
         let mut cdb = ClauseDB::instantiate(&config, &cnf);
         let mut vdb = VarDB::instantiate(&config, &cnf);
-        asgs.assign_by_decision(&mut vdb, lit(1));
-        asgs.assign_by_decision(&mut vdb, lit(-2));
+        asg.assign_by_decision(&mut vdb, lit(1));
+        asg.assign_by_decision(&mut vdb, lit(-2));
 
-        let c1 = cdb.new_clause(&mut asgs, &mut [lit(1), lit(2), lit(3)], None::<&mut VarDB>);
+        let c1 = cdb.new_clause(&mut asg, &mut [lit(1), lit(2), lit(3)], None::<&mut VarDB>);
         let c = &cdb[c1];
         assert_eq!(c.rank, 0);
         assert!(!c.is(Flag::DEAD));
         assert!(!c.is(Flag::LEARNT));
         assert!(!c.is(Flag::JUST_USED));
 
-        let c2 = cdb.new_clause(&mut asgs, &mut [lit(-1), lit(2), lit(3)], Some(&mut vdb));
+        let c2 = cdb.new_clause(&mut asg, &mut [lit(-1), lit(2), lit(3)], Some(&mut vdb));
         let c = &cdb[c2];
         assert_eq!(c.rank, 2);
         assert!(!c.is(Flag::DEAD));
@@ -1199,10 +1193,10 @@ mod tests {
             num_of_variables: 4,
             ..CNFDescription::default()
         };
-        let mut asgs = AssignStack::instantiate(&config, &cnf);
+        let mut asg = AssignStack::instantiate(&config, &cnf);
         let mut cdb = ClauseDB::instantiate(&config, &cnf);
-        let c1 = cdb.new_clause(&mut asgs, &mut [lit(1), lit(2), lit(3)], None::<&mut VarDB>);
-        let c2 = cdb.new_clause(&mut asgs, &mut [lit(-1), lit(4)], None::<&mut VarDB>);
+        let c1 = cdb.new_clause(&mut asg, &mut [lit(1), lit(2), lit(3)], None::<&mut VarDB>);
+        let c2 = cdb.new_clause(&mut asg, &mut [lit(-1), lit(4)], None::<&mut VarDB>);
         cdb[c2].reward = 2.4;
         assert_eq!(c1, c1);
         assert_eq!(c1 == c1, true);
@@ -1217,9 +1211,9 @@ mod tests {
             num_of_variables: 4,
             ..CNFDescription::default()
         };
-        let mut asgs = AssignStack::instantiate(&config, &cnf);
+        let mut asg = AssignStack::instantiate(&config, &cnf);
         let mut cdb = ClauseDB::instantiate(&config, &cnf);
-        let c1 = cdb.new_clause(&mut asgs, &mut [lit(1), lit(2), lit(3)], None::<&mut VarDB>);
+        let c1 = cdb.new_clause(&mut asg, &mut [lit(1), lit(2), lit(3)], None::<&mut VarDB>);
         assert_eq!(cdb[c1][0..].iter().map(|l| i32::from(*l)).sum::<i32>(), 6);
         let mut iter = cdb[c1][0..].into_iter();
         assert_eq!(iter.next(), Some(&lit(1)));

@@ -41,8 +41,7 @@ impl ValidatorIF for Solver {
             return Err(SolverError::Inconsistent);
         }
         for i in vec {
-            self.asgs
-                .assign_at_rootlevel(&mut self.vdb, Lit::from(*i))?;
+            self.asg.assign_at_rootlevel(&mut self.vdb, Lit::from(*i))?;
         }
         Ok(())
     }
@@ -66,7 +65,7 @@ impl ValidatorIF for Solver {
     ///
     fn validate(&self) -> Option<Vec<i32>> {
         self.cdb
-            .validate(&self.asgs, true)
+            .validate(&self.asg, true)
             .map(|cid| Vec::<i32>::from(&self.cdb[cid]))
     }
 }

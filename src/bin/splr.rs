@@ -262,7 +262,7 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
             time.tv_sec as f64 + time.tv_nsec as f64 / 1_000_000_000.0f64
         }
     };
-    let (asgs_num_conflict, _num_propagation, asgs_num_restart) = s.asgs.exports();
+    let (asg_num_conflict, _num_propagation, asg_num_restart) = s.asg.exports();
     let (_, vdb_activity_decay) = s.vdb.exports();
     let (rst_mode, _num_block, _asg_trend, _lbd_get, _lbd_trend) = s.rst.exports();
     out.write_all(
@@ -327,7 +327,7 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
             format!("{:>9.2}", state[LogF64Id::BLevel]),
             format!(
                 "{:>9.4}",
-                100.0 * asgs_num_restart as f64 / asgs_num_conflict as f64
+                100.0 * asg_num_restart as f64 / asg_num_conflict as f64
             ),
         )
         .as_bytes(),

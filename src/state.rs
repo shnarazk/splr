@@ -28,7 +28,7 @@ pub trait StateIF {
     /// return None if something is wrong.
     fn elapsed(&self) -> Option<f64>;
     /// change heuristics based on stat data.
-    fn select_strategy<A, C>(&mut self, asgs: &A, cdb: &C)
+    fn select_strategy<A, C>(&mut self, asg: &A, cdb: &C)
     where
         A: Export<(usize, usize, usize)> + AssignIF,
         C: Export<(usize, usize, usize, usize, usize, usize)> + ClauseDBIF;
@@ -37,7 +37,7 @@ pub trait StateIF {
     /// write stat data to stdio.
     fn progress<A, C, E, R, V>(
         &mut self,
-        asgs: &A,
+        asg: &A,
         cdb: &C,
         elim: &E,
         rst: &R,
@@ -372,7 +372,7 @@ impl StateIF for State {
             Err(_) => None,
         }
     }
-    fn select_strategy<A, C>(&mut self, asgs: &A, cdb: &C)
+    fn select_strategy<A, C>(&mut self, asg: &A, cdb: &C)
     where
         A: Export<(usize, usize, usize)> + AssignIF,
         C: Export<(usize, usize, usize, usize, usize, usize)> + ClauseDBIF,
@@ -380,20 +380,20 @@ impl StateIF for State {
         if self.config.without_adaptive_strategy {
             return;
         }
-        let (asgs_num_conflict, _num_propagation, _num_restart) = asgs.exports();
+        let (asg_num_conflict, _num_propagation, _num_restart) = asg.exports();
         let (_active, _bi_clause, cdb_num_bi_learnt, cdb_num_lbd2, _learnt, _reduction) =
             cdb.exports();
         debug_assert_eq!(self.strategy.0, SearchStrategy::Initial);
         self.strategy.0 = match () {
             _ if cdb_num_bi_learnt + 20_000 < cdb_num_lbd2 => SearchStrategy::ManyGlues,
-            _ if self[Stat::Decision] as f64 <= 1.2 * asgs_num_conflict as f64 => {
+            _ if self[Stat::Decision] as f64 <= 1.2 * asg_num_conflict as f64 => {
                 SearchStrategy::LowDecisions
             }
             _ if self[Stat::NoDecisionConflict] < 30_000 => SearchStrategy::LowSuccesive,
             _ if 54_400 < self[Stat::NoDecisionConflict] => SearchStrategy::HighSuccesive,
             _ => SearchStrategy::Generic,
         };
-        self.strategy.1 = asgs_num_conflict;
+        self.strategy.1 = asg_num_conflict;
     }
     fn progress_header(&self) {
         if self.config.quiet_mode {
@@ -423,7 +423,7 @@ impl StateIF for State {
     #[allow(clippy::cognitive_complexity)]
     fn progress<A, C, E, R, V>(
         &mut self,
-        asgs: &A,
+        asg: &A,
         cdb: &C,
         elim: &E,
         rst: &R,
@@ -440,7 +440,7 @@ impl StateIF for State {
         //## Gather stats from all modules
         //
 
-        let (asgs_num_conflict, asgs_num_propagation, asgs_num_restart) = asgs.exports();
+        let (asg_num_conflict, asg_num_propagation, asg_num_restart) = asg.exports();
 
         let (
             cdb_num_active,
@@ -461,7 +461,7 @@ impl StateIF for State {
             return;
         }
         if self.config.use_log {
-            self.dump(asgs, cdb, rst, vdb);
+            self.dump(asg, cdb, rst, vdb);
             return;
         }
         let nv = self.target.num_of_variables;
@@ -473,9 +473,9 @@ impl StateIF for State {
         println!("\x1B[2K{}", self);
         println!(
             "\x1B[2K #conflict:{}, #decision:{}, #propagate:{} ",
-            i!("{:>11}", self, LogUsizeId::Conflict, asgs_num_conflict),
+            i!("{:>11}", self, LogUsizeId::Conflict, asg_num_conflict),
             i!("{:>13}", self, LogUsizeId::Decision, self[Stat::Decision]),
-            i!("{:>15}", self, LogUsizeId::Propagate, asgs_num_propagation),
+            i!("{:>15}", self, LogUsizeId::Propagate, asg_num_propagation),
         );
         println!(
             "\x1B[2K  Assignment|#rem:{}, #fix:{}, #elm:{}, prg%:{} ",
@@ -523,7 +523,7 @@ impl StateIF for State {
                 // RestartMode::Bucket => "     \x1B[001m\x1B[032mBucket\x1B[000m",
             },
             im!("{:>9}", self, LogUsizeId::RestartBlock, rst_num_block),
-            im!("{:>9}", self, LogUsizeId::Restart, asgs_num_restart),
+            im!("{:>9}", self, LogUsizeId::Restart, asg_num_restart),
             fm!("{:>9.4}", self, LogF64Id::EmaAsg, rst_asg_trend),
             fm!("{:>9.4}", self, LogF64Id::EmaLBD, rst_lbd_trend),
         );
@@ -536,7 +536,7 @@ impl StateIF for State {
                 "{:>9.4}",
                 self,
                 LogF64Id::End,
-                100.0 * asgs_num_restart as f64 / asgs_num_conflict as f64
+                100.0 * asg_num_restart as f64 / asg_num_conflict as f64
             )
         );
         println!(
@@ -728,7 +728,7 @@ impl State {
              c ========================================================================================================="
         );
     }
-    fn dump<A, C, R, V>(&mut self, asgs: &A, cdb: &C, rst: &R, _vdb: &V)
+    fn dump<A, C, R, V>(&mut self, asg: &A, cdb: &C, rst: &R, _vdb: &V)
     where
         A: Export<(usize, usize, usize)>,
         C: Export<(usize, usize, usize, usize, usize, usize)> + ClauseDBIF,
@@ -739,7 +739,7 @@ impl State {
         let nv = self.target.num_of_variables;
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
-        let (asgs_num_conflict, _num_propagation, asgs_num_restart) = asgs.exports();
+        let (asg_num_conflict, _num_propagation, asg_num_restart) = asg.exports();
         let (
             cdb_num_active,
             _num_bi_clause,
@@ -751,23 +751,23 @@ impl State {
         let (_mode, rst_num_block, _asg_trend, _lbd_get, _lbd_trend) = rst.exports();
         println!(
             "c | {:>8}  {:>8} {:>8} | {:>7} {:>8} {:>8} |  {:>4}  {:>8} {:>7} {:>8} | {:>6.3} % |",
-            asgs_num_restart,                            // restart
-            rst_num_block,                               // blocked
-            asgs_num_conflict / asgs_num_restart.max(1), // average cfc (Conflict / Restart)
-            nv - fixed - self.num_eliminated_vars,       // alive vars
-            cdb_num_active - cdb_num_learnt,             // given clauses
-            0,                                           // alive literals
-            cdb_num_reduction,                           // clause reduction
-            cdb_num_learnt,                              // alive learnts
-            cdb_num_lbd2,                                // learnts with LBD = 2
-            asgs_num_conflict - cdb_num_learnt,          // removed learnts
-            (sum as f32) / (nv as f32) * 100.0,          // progress
+            asg_num_restart,                           // restart
+            rst_num_block,                             // blocked
+            asg_num_conflict / asg_num_restart.max(1), // average cfc (Conflict / Restart)
+            nv - fixed - self.num_eliminated_vars,     // alive vars
+            cdb_num_active - cdb_num_learnt,           // given clauses
+            0,                                         // alive literals
+            cdb_num_reduction,                         // clause reduction
+            cdb_num_learnt,                            // alive learnts
+            cdb_num_lbd2,                              // learnts with LBD = 2
+            asg_num_conflict - cdb_num_learnt,         // removed learnts
+            (sum as f32) / (nv as f32) * 100.0,        // progress
         );
     }
     #[allow(dead_code)]
     fn dump_details<A, C, E, R, V>(
         &mut self,
-        asgs: &A,
+        asg: &A,
         cdb: &C,
         _: &E,
         rst: &R,
@@ -788,7 +788,7 @@ impl State {
         let nv = vdb.len() - 1;
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
-        let (_num_conflict, _num_propagation, asgs_num_restart) = asgs.exports();
+        let (_num_conflict, _num_propagation, asg_num_restart) = asg.exports();
         let (
             cdb_num_active,
             _num_bi_clause,
@@ -812,7 +812,7 @@ impl State {
             cdb_num_active,
             0,
             rst_num_block,
-            asgs_num_restart,
+            asg_num_restart,
             rst_asg_trend,
             rst_lbd_get,
             rst_lbd_trend,

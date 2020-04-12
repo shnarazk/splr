@@ -32,7 +32,7 @@ use {
 /// elim.activate();
 /// // At this point, the `elim` is in `ready` mode, not `running`.
 /// assert_eq!(elim.is_running(), false);
-/// assert_eq!(elim.simplify(&mut s.asgs, &mut s.cdb, &mut s.state, &mut s.vdb), Ok(()));
+/// assert_eq!(elim.simplify(&mut s.asg, &mut s.cdb, &mut s.state, &mut s.vdb), Ok(()));
 ///```
 pub trait EliminateIF {
     /// set eliminator's mode to **ready**.
@@ -45,7 +45,7 @@ pub trait EliminateIF {
     /// check if the eliminator is running.
     fn is_running(&self) -> bool;
     /// rebuild occur lists.
-    fn prepare<A, C, V>(&mut self, asgs: &A, cdb: &mut C, vdb: &mut V, force: bool)
+    fn prepare<A, C, V>(&mut self, asg: &A, cdb: &mut C, vdb: &mut V, force: bool)
     where
         A: AssignIF,
         C: ClauseDBIF,
@@ -63,7 +63,7 @@ pub trait EliminateIF {
     /// if solver becomes inconsistent.
     fn simplify<A, C, V>(
         &mut self,
-        asgs: &mut A,
+        asg: &mut A,
         cdb: &mut C,
         state: &mut State,
         vdb: &mut V,
@@ -73,7 +73,7 @@ pub trait EliminateIF {
         C: ClauseDBIF,
         V: VarDBIF + VarRewardIF;
     /// inject assignments for eliminated vars.
-    fn extend_model<A>(&mut self, asgs: &mut A)
+    fn extend_model<A>(&mut self, asg: &mut A)
     where
         A: AssignIF;
     /// register a clause id to all corresponding occur lists.
@@ -81,7 +81,7 @@ pub trait EliminateIF {
     where
         V: VarDBIF;
     /// remove a clause id from all corresponding occur lists.
-    fn remove_cid_occur<A, V>(&mut self, asgs: &A, vdb: &mut V, cid: ClauseId, c: &mut Clause)
+    fn remove_cid_occur<A, V>(&mut self, asg: &A, vdb: &mut V, cid: ClauseId, c: &mut Clause)
     where
         A: AssignIF,
         V: VarDBIF;
@@ -329,7 +329,7 @@ impl EliminateIF for Eliminator {
         }
         self.mode = EliminatorMode::Deactive;
     }
-    fn prepare<A, C, V>(&mut self, asgs: &A, cdb: &mut C, vdb: &mut V, force: bool)
+    fn prepare<A, C, V>(&mut self, asg: &A, cdb: &mut C, vdb: &mut V, force: bool)
     where
         A: AssignIF,
         C: ClauseDBIF,
@@ -351,7 +351,7 @@ impl EliminateIF for Eliminator {
         if force {
             for vi in 1..vdb.len() {
                 let v = &vdb[vi];
-                if v.is(Flag::ELIMINATED) || asgs[vi].is_some() {
+                if v.is(Flag::ELIMINATED) || asg[vi].is_some() {
                     continue;
                 }
                 self.enqueue_var(vdb, vi, true);
@@ -374,7 +374,7 @@ impl EliminateIF for Eliminator {
     }
     fn simplify<A, C, V>(
         &mut self,
-        asgs: &mut A,
+        asg: &mut A,
         cdb: &mut C,
         state: &mut State,
         vdb: &mut V,
@@ -384,21 +384,21 @@ impl EliminateIF for Eliminator {
         C: ClauseDBIF,
         V: VarDBIF + VarRewardIF,
     {
-        debug_assert_eq!(asgs.decision_level(), 0);
+        debug_assert_eq!(asg.decision_level(), 0);
         // we can reset all the reasons because decision level is zero.
         #[cfg(feature = "boundary_check")]
         {
             for v in vdb.iter().skip(1) {
-                if asgs.reason(v.index) != AssignReason::None {
-                    assert_eq!(asgs.level(v.index), state.root_level);
-                    // asgs.reason(v.index) = AssignReason::None;
+                if asg.reason(v.index) != AssignReason::None {
+                    assert_eq!(asg.level(v.index), state.root_level);
+                    // asg.reason(v.index) = AssignReason::None;
                 }
             }
         }
         if self.is_waiting() {
-            self.prepare(asgs, cdb, vdb, true);
+            self.prepare(asg, cdb, vdb, true);
         }
-        self.eliminate(asgs, cdb, state, vdb)?;
+        self.eliminate(asg, cdb, state, vdb)?;
         self.num_sat_elimination += 1;
         if self.is_running() {
             self.num_full_elimination += 1;
@@ -406,7 +406,7 @@ impl EliminateIF for Eliminator {
         }
         cdb.check_size().map(|_| ())
     }
-    fn extend_model<A>(&mut self, asgs: &mut A)
+    fn extend_model<A>(&mut self, asg: &mut A)
     where
         A: AssignIF,
     {
@@ -432,7 +432,7 @@ impl EliminateIF for Eliminator {
                 //     _ => None,
                 // };
                 // if model_value != Some(false) {
-                if asgs[l.vi()] != Some(bool::from(l)) {
+                if asg[l.vi()] != Some(bool::from(l)) {
                     if i < width {
                         break 'next;
                     }
@@ -445,7 +445,7 @@ impl EliminateIF for Eliminator {
             debug_assert!(width == 1);
             let l = self.elim_clauses[i];
             // debug_assert!(model[l.vi() - 1] != l.negate().int());
-            asgs[l.vi()] = Some(bool::from(l));
+            asg[l.vi()] = Some(bool::from(l));
             if i < width {
                 break;
             }
@@ -485,7 +485,7 @@ impl EliminateIF for Eliminator {
             self.enqueue_clause(cid, c);
         }
     }
-    fn remove_cid_occur<A, V>(&mut self, asgs: &A, vdb: &mut V, cid: ClauseId, c: &mut Clause)
+    fn remove_cid_occur<A, V>(&mut self, asg: &A, vdb: &mut V, cid: ClauseId, c: &mut Clause)
     where
         A: AssignIF,
         V: VarDBIF,
@@ -495,7 +495,7 @@ impl EliminateIF for Eliminator {
         c.turn_off(Flag::OCCUR_LINKED);
         debug_assert!(c.is(Flag::DEAD));
         for l in &c.lits {
-            if asgs[l.vi()].is_none() {
+            if asg[l.vi()].is_none() {
                 self.remove_lit_occur(vdb, *l, cid);
                 self.enqueue_var(vdb, l.vi(), true);
             }
@@ -520,7 +520,7 @@ impl Eliminator {
     /// - calls `clause_queue.pop`
     fn backward_subsumption_check<A, C, V>(
         &mut self,
-        asgs: &mut A,
+        asg: &mut A,
         cdb: &mut C,
         vdb: &mut V,
         timedout: &Arc<AtomicBool>,
@@ -530,11 +530,11 @@ impl Eliminator {
         C: ClauseDBIF,
         V: VarDBIF + VarRewardIF,
     {
-        debug_assert_eq!(asgs.decision_level(), 0);
-        while !self.clause_queue.is_empty() || self.bwdsub_assigns < asgs.len() {
+        debug_assert_eq!(asg.decision_level(), 0);
+        while !self.clause_queue.is_empty() || self.bwdsub_assigns < asg.len() {
             // Check top-level assignments by creating a dummy clause and placing it in the queue:
-            if self.clause_queue.is_empty() && self.bwdsub_assigns < asgs.len() {
-                let c = ClauseId::from(asgs.stack(self.bwdsub_assigns));
+            if self.clause_queue.is_empty() && self.bwdsub_assigns < asg.len() {
+                let c = ClauseId::from(asg.stack(self.bwdsub_assigns));
                 self.clause_queue.push(c);
                 self.bwdsub_assigns += 1;
             }
@@ -564,7 +564,7 @@ impl Eliminator {
                 for l in lits {
                     let v = &vdb[l.vi()];
                     let w = &self[l.vi()];
-                    if asgs[l.vi()].is_some() {
+                    if asg[l.vi()].is_some() {
                         continue;
                     }
                     let nsum = if bool::from(*l) {
@@ -593,7 +593,7 @@ impl Eliminator {
                         }
                         let db = &cdb[*did];
                         if !db.is(Flag::DEAD) && db.len() <= self.subsume_literal_limit {
-                            try_subsume(asgs, cdb, self, vdb, cid, *did)?;
+                            try_subsume(asg, cdb, self, vdb, cid, *did)?;
                         }
                     }
                 }
@@ -608,7 +608,7 @@ impl Eliminator {
     /// if solver becomes inconsistent.
     fn eliminate<A, C, V>(
         &mut self,
-        asgs: &mut A,
+        asg: &mut A,
         cdb: &mut C,
         state: &mut State,
         vdb: &mut V,
@@ -620,10 +620,10 @@ impl Eliminator {
     {
         let start = state.elapsed().unwrap_or(0.0);
         loop {
-            let na = asgs.len();
-            self.eliminate_main(asgs, cdb, state, vdb)?;
-            cdb.eliminate_satisfied_clauses(asgs, self, vdb, true);
-            if na == asgs.len()
+            let na = asg.len();
+            self.eliminate_main(asg, cdb, state, vdb)?;
+            cdb.eliminate_satisfied_clauses(asg, self, vdb, true);
+            if na == asg.len()
                 && (!self.is_running()
                     || (0 == self.clause_queue_len() && 0 == self.var_queue_len()))
             {
@@ -640,7 +640,7 @@ impl Eliminator {
     /// do the elimination task
     fn eliminate_main<A, C, V>(
         &mut self,
-        asgs: &mut A,
+        asg: &mut A,
         cdb: &mut C,
         state: &mut State,
         vdb: &mut V,
@@ -654,13 +654,13 @@ impl Eliminator {
         /// Since it is measured in millisecond, 1000 means executing elimination
         /// until timed out. 100 means this function can consume 10% of a given time.
         const TIMESLOT_FOR_ELIMINATION: u64 = 10;
-        debug_assert!(asgs.decision_level() == 0);
+        debug_assert!(asg.decision_level() == 0);
         if self.mode == EliminatorMode::Deactive {
             return Ok(());
         }
         let timedout = Arc::new(AtomicBool::new(false));
         let timedout2 = timedout.clone();
-        let time = if asgs.exports().1 == 0 {
+        let time = if asg.exports().1 == 0 {
             100 * TIMESLOT_FOR_ELIMINATION * state.config.timeout as u64
         } else {
             TIMESLOT_FOR_ELIMINATION * state.config.timeout as u64
@@ -669,28 +669,28 @@ impl Eliminator {
             thread::sleep(Duration::from_millis(time));
             timedout2.store(true, Ordering::Release);
         });
-        while self.bwdsub_assigns < asgs.len()
+        while self.bwdsub_assigns < asg.len()
             || !self.var_queue.is_empty()
             || !self.clause_queue.is_empty()
         {
-            if !self.clause_queue.is_empty() || self.bwdsub_assigns < asgs.len() {
-                self.backward_subsumption_check(asgs, cdb, vdb, &timedout)?;
+            if !self.clause_queue.is_empty() || self.bwdsub_assigns < asg.len() {
+                self.backward_subsumption_check(asg, cdb, vdb, &timedout)?;
             }
             while let Some(vi) = self.var_queue.select_var(&self.var, vdb) {
                 // timedout = cvar.wait(timedout).unwrap();
                 let v = &mut vdb[vi];
                 v.turn_off(Flag::ENQUEUED);
-                if !v.is(Flag::ELIMINATED) && asgs[vi].is_none() {
-                    eliminate_var(asgs, cdb, self, state, vdb, vi, &timedout)?;
+                if !v.is(Flag::ELIMINATED) && asg[vi].is_none() {
+                    eliminate_var(asg, cdb, self, state, vdb, vi, &timedout)?;
                 }
             }
-            self.backward_subsumption_check(asgs, cdb, vdb, &timedout)?;
+            self.backward_subsumption_check(asg, cdb, vdb, &timedout)?;
             debug_assert!(self.clause_queue.is_empty());
             cdb.garbage_collect();
-            if asgs.propagate(cdb, vdb) != ClauseId::default() {
+            if asg.propagate(cdb, vdb) != ClauseId::default() {
                 return Err(SolverError::Inconsistent);
             }
-            cdb.eliminate_satisfied_clauses(asgs, self, vdb, true);
+            cdb.eliminate_satisfied_clauses(asg, self, vdb, true);
             if timedout.load(Ordering::Acquire) {
                 self.clear_clause_queue(cdb);
                 self.clear_var_queue(vdb);
@@ -761,7 +761,7 @@ impl Eliminator {
 }
 
 fn try_subsume<A, C, V>(
-    asgs: &mut A,
+    asg: &mut A,
     cdb: &mut C,
     elim: &mut Eliminator,
     vdb: &mut V,
@@ -781,7 +781,7 @@ where
                 did, cdb[did], cid, cdb[cid],
             );
             cdb.detach(did);
-            elim.remove_cid_occur(asgs, vdb, did, &mut cdb[did]);
+            elim.remove_cid_occur(asg, vdb, did, &mut cdb[did]);
             if !cdb[did].is(Flag::LEARNT) {
                 cdb[cid].turn_off(Flag::LEARNT);
             }
@@ -789,7 +789,7 @@ where
         Some(l) => {
             #[cfg(feature = "trace_elimination")]
             println!("BackSubC subsumes {} from {} and {}", l, cid, did,);
-            strengthen_clause(asgs, cdb, elim, vdb, did, !l)?;
+            strengthen_clause(asg, cdb, elim, vdb, did, !l)?;
             elim.enqueue_var(vdb, l.vi(), true);
         }
         None => {}
@@ -954,7 +954,7 @@ where
 /// - calls `enqueue_clause`
 /// - calls `enqueue_var`
 fn strengthen_clause<A, C, V>(
-    asgs: &mut A,
+    asg: &mut A,
     cdb: &mut C,
     elim: &mut Eliminator,
     vdb: &mut V,
@@ -981,8 +981,8 @@ where
             cid, cdb[cid], c0,
         );
         cdb.detach(cid);
-        elim.remove_cid_occur(asgs, vdb, cid, &mut cdb[cid]);
-        asgs.assign_at_rootlevel(vdb, c0)
+        elim.remove_cid_occur(asg, vdb, cid, &mut cdb[cid]);
+        asg.assign_at_rootlevel(vdb, c0)
     } else {
         #[cfg(feature = "trace_elimination")]
         println!("cid {} drops literal {}", cid, l);
@@ -1030,7 +1030,7 @@ where
 }
 
 fn eliminate_var<A, C, V>(
-    asgs: &mut A,
+    asg: &mut A,
     cdb: &mut C,
     elim: &mut Eliminator,
     state: &mut State,
@@ -1045,7 +1045,7 @@ where
 {
     let v = &mut vdb[vi];
     let w = &mut elim[vi];
-    if asgs[vi].is_some() {
+    if asg[vi].is_some() {
         return Ok(());
     }
     debug_assert!(!v.is(Flag::ELIMINATED));
@@ -1085,13 +1085,13 @@ where
                         );
                         let lit = (*vec)[0];
                         cdb.certificate_add(&*vec);
-                        asgs.assign_at_rootlevel(vdb, lit)?;
+                        asg.assign_at_rootlevel(vdb, lit)?;
                     }
                     _ => {
                         let cid = if cdb[*p].is(Flag::LEARNT) && cdb[*n].is(Flag::LEARNT) {
-                            cdb.new_clause(asgs, &mut *vec, Some(vdb))
+                            cdb.new_clause(asg, &mut *vec, Some(vdb))
                         } else {
-                            cdb.new_clause(asgs, &mut *vec, None::<&mut V>)
+                            cdb.new_clause(asg, &mut *vec, None::<&mut V>)
                         };
                         elim.add_cid_occur(vdb, cid, &mut cdb[cid], true);
                     }
@@ -1102,19 +1102,19 @@ where
         //## VAR ELIMINATION
         //
         for cid in &*pos {
-            debug_assert!(!vdb.locked(asgs, &cdb[*cid], *cid));
+            debug_assert!(!asg.locked(&cdb[*cid], *cid));
             cdb.detach(*cid);
-            elim.remove_cid_occur(asgs, vdb, *cid, &mut cdb[*cid]);
+            elim.remove_cid_occur(asg, vdb, *cid, &mut cdb[*cid]);
         }
         for cid in &*neg {
-            debug_assert!(!vdb.locked(asgs, &cdb[*cid], *cid));
+            debug_assert!(!asg.locked(&cdb[*cid], *cid));
             cdb.detach(*cid);
-            elim.remove_cid_occur(asgs, vdb, *cid, &mut cdb[*cid]);
+            elim.remove_cid_occur(asg, vdb, *cid, &mut cdb[*cid]);
         }
         elim[vi].clear();
         vdb[vi].turn_on(Flag::ELIMINATED);
         vdb.clear_reward(vi);
-        elim.backward_subsumption_check(asgs, cdb, vdb, timedout)
+        elim.backward_subsumption_check(asg, cdb, vdb, timedout)
     }
 }
 
@@ -1209,7 +1209,7 @@ trait VarOrderIF {
     fn select_var<V>(&mut self, occur: &[LitOccurs], vdb: &V) -> Option<VarId>
     where
         V: Index<VarId, Output = Var>;
-    fn rebuild<A, V>(&mut self, asgs: &A, occur: &[LitOccurs], vdb: &V)
+    fn rebuild<A, V>(&mut self, asg: &A, occur: &[LitOccurs], vdb: &V)
     where
         A: AssignIF,
         V: VarDBIF;
@@ -1277,14 +1277,14 @@ impl VarOrderIF for VarOccHeap {
             }
         }
     }
-    fn rebuild<A, V>(&mut self, asgs: &A, occur: &[LitOccurs], vdb: &V)
+    fn rebuild<A, V>(&mut self, asg: &A, occur: &[LitOccurs], vdb: &V)
     where
         A: AssignIF,
         V: VarDBIF,
     {
         self.reset();
         for (vi, v) in vdb.iter().enumerate().skip(1) {
-            if asgs[vi].is_none() && !v.is(Flag::ELIMINATED) {
+            if asg[vi].is_none() && !v.is(Flag::ELIMINATED) {
                 self.insert(occur, v.index, true);
             }
         }
@@ -1460,16 +1460,16 @@ mod tests {
 
         let c1 = s
             .cdb
-            .new_clause(&mut s.asgs, &mut mkv![1, 2, 3], None::<&mut VarDB>);
+            .new_clause(&mut s.asg, &mut mkv![1, 2, 3], None::<&mut VarDB>);
         let c2 = s
             .cdb
-            .new_clause(&mut s.asgs, &mut mkv![-2, 3, 4], None::<&mut VarDB>);
+            .new_clause(&mut s.asg, &mut mkv![-2, 3, 4], None::<&mut VarDB>);
         let c3 = s
             .cdb
-            .new_clause(&mut s.asgs, &mut mkv![-2, -3], None::<&mut VarDB>);
+            .new_clause(&mut s.asg, &mut mkv![-2, -3], None::<&mut VarDB>);
         let c4 = s
             .cdb
-            .new_clause(&mut s.asgs, &mut mkv![1, 2, -3, 9], None::<&mut VarDB>);
+            .new_clause(&mut s.asg, &mut mkv![1, 2, -3, 9], None::<&mut VarDB>);
         //    {
         //        let vec = [&c2, &c3]; // [&c1, &c2, &c3, &c4];
         //        for x in &vec {

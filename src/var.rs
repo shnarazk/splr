@@ -25,10 +25,6 @@ pub trait VarDBIF:
     fn iter(&self) -> Iter<'_, Var>;
     /// return an iterator over vars.
     fn iter_mut(&mut self) -> IterMut<'_, Var>;
-    /// return `true` is the clause is the reason of the assignment.
-    fn locked<A>(&self, asgs: &A, c: &Clause, cid: ClauseId) -> bool
-    where
-        A: AssignIF;
 }
 
 /// API for var rewarding.
@@ -367,24 +363,14 @@ impl VarDBIF for VarDB {
     fn iter_mut(&mut self) -> IterMut<'_, Var> {
         self.var.iter_mut()
     }
-    fn locked<A>(&self, asgs: &A, c: &Clause, cid: ClauseId) -> bool
-    where
-        A: AssignIF,
-    {
-        let lits = &c.lits;
-        debug_assert!(1 < lits.len());
-        let l0 = lits[0];
-        asgs.assigned(l0) == Some(true)
-            && matches!(asgs.reason(l0.vi()), AssignReason::Implication(x, _) if x == cid)
-    }
 }
 
 impl VarPhaseIF for VarDB {
-    fn save_phase<A>(&mut self, asgs: &A, flag: Flag)
+    fn save_phase<A>(&mut self, asg: &A, flag: Flag)
     where
         A: AssignIF,
     {
-        for l in asgs.iter() {
+        for l in asg.iter() {
             self.var[l.vi()].set(flag, bool::from(*l));
         }
     }
@@ -475,7 +461,7 @@ impl VarDB {
     // beyond first UIDs and bump all vars on the traversed tree.
     // If you'd like to use this, you should stop bumping activities in `analyze`.
     #[allow(dead_code)]
-    fn bump_vars<A, C>(&mut self, asgs: &A, cdb: &C, confl: ClauseId)
+    fn bump_vars<A, C>(&mut self, asg: &A, cdb: &C, confl: ClauseId)
     where
         A: AssignIF,
         C: ClauseDBIF,
@@ -483,7 +469,7 @@ impl VarDB {
         debug_assert_ne!(confl, ClauseId::default());
         let mut cid = confl;
         let mut p = NULL_LIT;
-        let mut ti = asgs.len(); // trail index
+        let mut ti = asg.len(); // trail index
         debug_assert!(self.iter().skip(1).all(|v| !v.is(Flag::VR_SEEN)));
         loop {
             for q in &cdb[cid].lits[(p != NULL_LIT) as usize..] {
@@ -495,16 +481,16 @@ impl VarDB {
             }
             loop {
                 if 0 == ti {
-                    self.var[asgs.stack(ti).vi()].turn_off(Flag::VR_SEEN);
+                    self.var[asg.stack(ti).vi()].turn_off(Flag::VR_SEEN);
                     debug_assert!(self.iter().skip(1).all(|v| !v.is(Flag::VR_SEEN)));
                     return;
                 }
                 ti -= 1;
-                p = asgs.stack(ti);
+                p = asg.stack(ti);
                 let next_vi = p.vi();
                 if self.var[next_vi].is(Flag::VR_SEEN) {
                     self.var[next_vi].turn_off(Flag::VR_SEEN);
-                    if let AssignReason::Implication(c, _) = asgs.reason(next_vi) {
+                    if let AssignReason::Implication(c, _) = asg.reason(next_vi) {
                         cid = c;
                         break;
                     }
@@ -513,7 +499,7 @@ impl VarDB {
         }
     }
     #[allow(dead_code)]
-    fn dump_dependency<A, C>(&mut self, asgs: &A, cdb: &C, confl: ClauseId)
+    fn dump_dependency<A, C>(&mut self, asg: &A, cdb: &C, confl: ClauseId)
     where
         A: AssignIF,
         C: ClauseDBIF,
@@ -521,7 +507,7 @@ impl VarDB {
         debug_assert_ne!(confl, ClauseId::default());
         let mut cid = confl;
         let mut p = NULL_LIT;
-        let mut ti = asgs.len(); // trail index
+        let mut ti = asg.len(); // trail index
         debug_assert!(self.iter().skip(1).all(|v| !v.is(Flag::VR_SEEN)));
         println!();
         loop {
@@ -534,17 +520,17 @@ impl VarDB {
             }
             loop {
                 if 0 == ti {
-                    self.var[asgs.stack(ti).vi()].turn_off(Flag::VR_SEEN);
+                    self.var[asg.stack(ti).vi()].turn_off(Flag::VR_SEEN);
                     debug_assert!(self.iter().skip(1).all(|v| !v.is(Flag::VR_SEEN)));
                     println!();
                     return;
                 }
                 ti -= 1;
-                p = asgs.stack(ti);
+                p = asg.stack(ti);
                 let next_vi = p.vi();
                 if self.var[next_vi].is(Flag::VR_SEEN) {
                     self.var[next_vi].turn_off(Flag::VR_SEEN);
-                    if let AssignReason::Implication(c, _) = asgs.reason(next_vi) {
+                    if let AssignReason::Implication(c, _) = asg.reason(next_vi) {
                         cid = c;
                         break;
                     }

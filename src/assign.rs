@@ -114,6 +114,8 @@ pub trait AssignIF:
     /// - Some(false) -- the literals is unsatisfied; no unassigned literal
     /// - None -- the literals contains an unassigned literal
     fn status(&self, c: &[Lit]) -> Option<bool>;
+    /// return `true` is the clause is the reason of the assignment.
+    fn locked(&self, c: &Clause, cid: ClauseId) -> bool;
     /// minimize a clause.
     fn minimize_with_biclauses<C>(&mut self, cdb: &C, vec: &mut Vec<Lit>)
     where
@@ -308,8 +310,8 @@ impl<'a> IntoIterator for &'a mut AssignStack {
 }
 
 impl From<&mut AssignStack> for Vec<i32> {
-    fn from(asgs: &mut AssignStack) -> Vec<i32> {
-        asgs.trail.iter().map(|l| i32::from(*l)).collect::<Vec<_>>()
+    fn from(asg: &mut AssignStack) -> Vec<i32> {
+        asg.trail.iter().map(|l| i32::from(*l)).collect::<Vec<_>>()
     }
 }
 
@@ -337,8 +339,8 @@ impl Export<(usize, usize, usize)> for AssignStack {
     ///```
     /// use crate::{splr::config::Config, splr::types::*};
     /// use crate::splr::assign::AssignStack;
-    /// let asgs = AssignStack::instantiate(&Config::default(), &CNFDescription::default());
-    /// let (asgs_num_conflict, asgs_num_propagation, asgs_num_restart) = asgs.exports();
+    /// let asg = AssignStack::instantiate(&Config::default(), &CNFDescription::default());
+    /// let (asg_num_conflict, asg_num_propagation, asg_num_restart) = asg.exports();
     ///```
     #[inline]
     fn exports(&self) -> (usize, usize, usize) {
@@ -671,6 +673,13 @@ impl AssignIF for AssignStack {
             }
         }
         falsified
+    }
+    fn locked(&self, c: &Clause, cid: ClauseId) -> bool {
+        let lits = &c.lits;
+        debug_assert!(1 < lits.len());
+        let l0 = lits[0];
+        self.assigned(l0) == Some(true)
+            && matches!(self.reason(l0.vi()), AssignReason::Implication(x, _) if x == cid)
     }
     fn minimize_with_biclauses<C>(&mut self, cdb: &C, vec: &mut Vec<Lit>)
     where
@@ -1102,61 +1111,61 @@ mod tests {
         };
         let mut vardb = VarDB::instantiate(&config, &cnf);
         let vdb = &mut vardb;
-        let mut asgs = AssignStack::instantiate(&config, &cnf);
+        let mut asg = AssignStack::instantiate(&config, &cnf);
         // [] + 1 => [1]
-        assert!(asgs.assign_at_rootlevel(vdb, lit(1)).is_ok());
-        assert_eq!(asgs.trail, vec![lit(1)]);
+        assert!(asg.assign_at_rootlevel(vdb, lit(1)).is_ok());
+        assert_eq!(asg.trail, vec![lit(1)]);
 
         // [1] + 1 => [1]
-        assert!(asgs.assign_at_rootlevel(vdb, lit(1)).is_ok());
-        assert_eq!(asgs.trail, vec![lit(1)]);
+        assert!(asg.assign_at_rootlevel(vdb, lit(1)).is_ok());
+        assert_eq!(asg.trail, vec![lit(1)]);
 
         // [1] + 2 => [1, 2]
-        assert!(asgs.assign_at_rootlevel(vdb, lit(2)).is_ok());
-        assert_eq!(asgs.trail, vec![lit(1), lit(2)]);
+        assert!(asg.assign_at_rootlevel(vdb, lit(2)).is_ok());
+        assert_eq!(asg.trail, vec![lit(1), lit(2)]);
 
         // [1, 2] + -1 => ABORT & [1, 2]
-        assert!(asgs.assign_at_rootlevel(vdb, lit(-1)).is_err());
-        assert_eq!(asgs.decision_level(), 0);
-        assert_eq!(asgs.len(), 2);
+        assert!(asg.assign_at_rootlevel(vdb, lit(-1)).is_err());
+        assert_eq!(asg.decision_level(), 0);
+        assert_eq!(asg.len(), 2);
 
         // [1, 2] + 3 => [1, 2, 3]
-        asgs.assign_by_decision(vdb, lit(3));
-        assert_eq!(asgs.trail, vec![lit(1), lit(2), lit(3)]);
-        assert_eq!(asgs.decision_level(), 1);
-        assert_eq!(asgs.len(), 3);
-        assert_eq!(asgs.len_upto(0), 2);
+        asg.assign_by_decision(vdb, lit(3));
+        assert_eq!(asg.trail, vec![lit(1), lit(2), lit(3)]);
+        assert_eq!(asg.decision_level(), 1);
+        assert_eq!(asg.len(), 3);
+        assert_eq!(asg.len_upto(0), 2);
 
         // [1, 2, 3] + 4 => [1, 2, 3, 4]
-        asgs.assign_by_decision(vdb, lit(4));
-        assert_eq!(asgs.trail, vec![lit(1), lit(2), lit(3), lit(4)]);
-        assert_eq!(asgs.decision_level(), 2);
-        assert_eq!(asgs.len(), 4);
-        assert_eq!(asgs.len_upto(1), 3);
+        asg.assign_by_decision(vdb, lit(4));
+        assert_eq!(asg.trail, vec![lit(1), lit(2), lit(3), lit(4)]);
+        assert_eq!(asg.decision_level(), 2);
+        assert_eq!(asg.len(), 4);
+        assert_eq!(asg.len_upto(1), 3);
 
         // [1, 2, 3] => [1, 2]
-        asgs.cancel_until(vdb, 1);
-        assert_eq!(asgs.trail, vec![lit(1), lit(2), lit(3)]);
-        assert_eq!(asgs.decision_level(), 1);
-        assert_eq!(asgs.len(), 3);
-        assert_eq!(asgs.trail_lim, vec![2]);
-        assert_eq!(asgs.assigned(lit(1)), Some(true));
-        assert_eq!(asgs.assigned(lit(-1)), Some(false));
-        assert_eq!(asgs.assigned(lit(4)), None);
+        asg.cancel_until(vdb, 1);
+        assert_eq!(asg.trail, vec![lit(1), lit(2), lit(3)]);
+        assert_eq!(asg.decision_level(), 1);
+        assert_eq!(asg.len(), 3);
+        assert_eq!(asg.trail_lim, vec![2]);
+        assert_eq!(asg.assigned(lit(1)), Some(true));
+        assert_eq!(asg.assigned(lit(-1)), Some(false));
+        assert_eq!(asg.assigned(lit(4)), None);
 
         // [1, 2, 3] => [1, 2, 3, 4]
-        asgs.assign_by_decision(vdb, lit(4));
-        assert_eq!(asgs.trail, vec![lit(1), lit(2), lit(3), lit(4)]);
-        assert_eq!(asgs.level[lit(4).vi()], 2);
-        assert_eq!(asgs.trail_lim, vec![2, 3]);
+        asg.assign_by_decision(vdb, lit(4));
+        assert_eq!(asg.trail, vec![lit(1), lit(2), lit(3), lit(4)]);
+        assert_eq!(asg.level[lit(4).vi()], 2);
+        assert_eq!(asg.trail_lim, vec![2, 3]);
 
         // [1, 2, 3, 4] => [1, 2, -4]
-        asgs.assign_by_unitclause(vdb, Lit::from(-4i32));
-        assert_eq!(asgs.trail, vec![lit(1), lit(2), lit(-4)]);
-        assert_eq!(asgs.decision_level(), 0);
-        assert_eq!(asgs.len(), 3);
+        asg.assign_by_unitclause(vdb, Lit::from(-4i32));
+        assert_eq!(asg.trail, vec![lit(1), lit(2), lit(-4)]);
+        assert_eq!(asg.decision_level(), 0);
+        assert_eq!(asg.len(), 3);
 
-        assert_eq!(asgs.assigned(lit(-4)), Some(true));
-        assert_eq!(asgs.assigned(lit(-3)), None);
+        assert_eq!(asg.assigned(lit(-4)), Some(true));
+        assert_eq!(asg.assigned(lit(-3)), None);
     }
 }
