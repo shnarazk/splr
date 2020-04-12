@@ -68,7 +68,7 @@ pub trait EliminateIF {
         vdb: &mut V,
     ) -> MaybeInconsistent
     where
-        A: AssignIF,
+        A: AssignIF + Export<(usize, usize, usize)>,
         C: ClauseDBIF,
         V: VarDBIF + VarRewardIF;
     /// inject assignments for eliminated vars.
@@ -377,7 +377,7 @@ impl EliminateIF for Eliminator {
         vdb: &mut V,
     ) -> MaybeInconsistent
     where
-        A: AssignIF,
+        A: AssignIF + Export<(usize, usize, usize)>,
         C: ClauseDBIF,
         V: VarDBIF + VarRewardIF,
     {
@@ -608,7 +608,7 @@ impl Eliminator {
         vdb: &mut V,
     ) -> MaybeInconsistent
     where
-        A: AssignIF,
+        A: AssignIF + Export<(usize, usize, usize)>,
         C: ClauseDBIF,
         V: VarDBIF + VarRewardIF,
     {
@@ -640,21 +640,25 @@ impl Eliminator {
         vdb: &mut V,
     ) -> MaybeInconsistent
     where
-        A: AssignIF,
+        A: AssignIF + Export<(usize, usize, usize)>,
         C: ClauseDBIF,
         V: VarDBIF + VarRewardIF,
     {
         /// The ratio of time slot for single elimination step.
         /// Since it is measured in millisecond, 1000 means executing elimination
         /// until timed out. 100 means this function can consume 10% of a given time.
-        const TIMESLOT_FOR_ELIMINATION: u64 = 50;
+        const TIMESLOT_FOR_ELIMINATION: u64 = 10;
         debug_assert!(asgs.level() == 0);
         if self.mode == EliminatorMode::Deactive {
             return Ok(());
         }
         let timedout = Arc::new(AtomicBool::new(false));
         let timedout2 = timedout.clone();
-        let time = TIMESLOT_FOR_ELIMINATION * state.config.timeout as u64;
+        let time = if asgs.exports().1 == 0 {
+            100 * TIMESLOT_FOR_ELIMINATION * state.config.timeout as u64
+        } else {
+            TIMESLOT_FOR_ELIMINATION * state.config.timeout as u64
+        };
         thread::spawn(move || {
             thread::sleep(Duration::from_millis(time));
             timedout2.store(true, Ordering::Release);
