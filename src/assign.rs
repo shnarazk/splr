@@ -1062,7 +1062,7 @@ impl VarRewardIF for AssignStack {
     //
     #[cfg(not(feature = "EVSIDS"))]
     fn reward_at_analysis(&mut self, vi: VarId) {
-        let v = &mut self[vi];
+        let v = &mut self.var[vi];
         v.participated += 1;
     }
     #[cfg(not(feature = "EVSIDS"))]
