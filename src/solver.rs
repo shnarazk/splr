@@ -356,6 +356,8 @@ fn search(
     let mut a_decision_was_made = false;
     let mut num_assigned = (0, 0); // (best, target)
     let mut nap = &mut num_assigned.0;
+    let phasing_duration = state.reflection_interval / 5;
+    let mut select_phase: usize = phasing_duration;
     let mut stabilizing = if rst.exports().0 == RestartMode::Stabilize {
         Flag::TARGET_PHASE
     } else {
@@ -417,6 +419,31 @@ fn search(
                 return Ok(false);
             }
             handle_conflict(asg, cdb, elim, rst, state, ci)?;
+
+            let asg_num_conflict = asg.exports().0;
+            if select_phase == 0 {
+                select_phase = phasing_duration;
+                state.phase_select = if rst.exports().0 == RestartMode::Stabilize {
+                    match asg_num_conflict % 3 {
+                        // _ if rst.exports().0 == RestartMode::Stabilize => PhaseMode::BestRnd,
+                        // 0 if state.phase_select == PhaseMode::Latest => PhaseMode::Best,
+                        // 0 => PhaseMode::Best,
+                        1 => PhaseMode::Best,
+                        // 2 => PhaseMode::Random,
+                        _ => PhaseMode::Target,
+                    }
+                } else {
+                    match asg_num_conflict % 8 {
+                        // 0 => PhaseMode::Best,
+                        3 => PhaseMode::Invert,
+                        // 6 => PhaseMode::Target,
+                        // 6 => PhaseMode::Random,
+                        _ => PhaseMode::Latest,
+                    }
+                };
+            } else {
+                select_phase -= 1;
+            }
         }
         // Simplification has been postponed because chronoBT was used.
         if asg.decision_level() == state.root_level {
@@ -718,11 +745,6 @@ fn adapt_modules(
     asg.adapt_to(state, asg_num_conflict);
     cdb.adapt_to(state, asg_num_conflict);
     rst.adapt_to(state, asg_num_conflict);
-    state.phase_select = match (asg_num_conflict / state.reflection_interval) % 8 {
-        _ if rst.exports().0 == RestartMode::Stabilize => PhaseMode::Best,
-        0 if state.phase_select == PhaseMode::Latest => PhaseMode::Best,
-        _ => PhaseMode::Latest,
-    };
     Ok(())
 }
 
