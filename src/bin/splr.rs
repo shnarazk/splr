@@ -11,9 +11,12 @@ use {
     },
     std::{
         borrow::Cow,
+        env,
         fs::File,
         io::{BufWriter, Write},
         path::PathBuf,
+        thread,
+        time::Duration,
     },
     structopt::StructOpt,
 };
@@ -60,6 +63,21 @@ fn main() {
     if config.proof_file.to_string_lossy() != "proof.out" && !config.use_certification {
         println!("Abort: You set a proof filename with '--proof' explicitly, but didn't set '--certify'. It doesn't look good.");
         return;
+    }
+    if let Ok(val) = env::var("SPLR_TIMEOUT") {
+        if let Ok(timeout) = val.parse::<u64>() {
+            let input = cnf_file.as_ref().to_string();
+            let quiet_mode = config.quiet_mode;
+            thread::spawn(move || {
+                thread::sleep(Duration::from_millis(timeout * 1000));
+                println!(
+                    "{}: {}",
+                    colored(Err(&SolverError::TimeOut), quiet_mode),
+                    input
+                );
+                std::process::exit(0);
+            });
+        }
     }
     let mut s = Solver::build(&config).expect("failed to load");
     let res = s.solve();

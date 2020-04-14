@@ -141,7 +141,7 @@ pub struct Config {
     pub without_adaptive_strategy: bool,
 
     /// CPU time limit in sec.
-    #[structopt(long = "timeout", short = "t", default_value = "10000.0")]
+    #[structopt(long = "timeout", short = "t", default_value = "5000.0")]
     pub timeout: f64,
 
     /// Writes a DRAT UNSAT certification file
