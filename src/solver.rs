@@ -439,7 +439,7 @@ fn search(
             let vi = asg.select_var();
             let num_prop = asg.exports().1;
             let p = match state.phase_select {
-                PhaseMode::Best => asg.var(vi).is(stabilizing),
+                PhaseMode::Best => asg.var(vi).is(Flag::BEST_PHASE),
                 PhaseMode::BestRnd => match num_prop % 8 {
                     0 => num_prop % 16 == 0,
                     4 => asg.var(vi).is(Flag::PHASE),
@@ -447,6 +447,8 @@ fn search(
                 },
                 PhaseMode::Invert => !asg.var(vi).is(Flag::PHASE),
                 PhaseMode::Latest => asg.var(vi).is(Flag::PHASE),
+                PhaseMode::Random => num_prop % 2 == 0,
+                PhaseMode::Target => asg.var(vi).is(Flag::TARGET_PHASE),
             };
             asg.assign_by_decision(Lit::from_assign(vi, p));
             state[Stat::Decision] += 1;

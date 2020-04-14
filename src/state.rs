@@ -55,6 +55,10 @@ pub enum PhaseMode {
     Invert,
     /// the orignal saving mode.
     Latest,
+    /// random value
+    Random,
+    /// use the best value in the current segment
+    Target,
 }
 
 impl fmt::Display for PhaseMode {
@@ -63,10 +67,12 @@ impl fmt::Display for PhaseMode {
             formatter,
             "{}",
             match self {
-                PhaseMode::Best => "best assign phasing",
-                PhaseMode::BestRnd => "best and random phasing",
+                PhaseMode::Best => "best assign saved",
+                PhaseMode::BestRnd => "best and random",
                 PhaseMode::Invert => "inverted last",
-                PhaseMode::Latest => "latest saving",
+                PhaseMode::Latest => "latest saved",
+                PhaseMode::Random => "random assign",
+                PhaseMode::Target => "target assign",
             }
         )
     }
