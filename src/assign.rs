@@ -99,7 +99,7 @@ pub trait AssignIF: LBDIF + VarRewardIF {
     fn recurrent_conflicts(&self) -> bool;
     fn level_ref(&self) -> &[DecisionLevel];
     fn best_assigned(&mut self, flag: Flag) -> usize;
-    fn reset_assign_record(&mut self, flag: Flag);
+    fn reset_assign_record(&mut self, flag: Flag, from: Option<Flag>);
     /// return `true` if the set of literals is satisfiable under the current assignment.
     fn satisfies(&self, c: &[Lit]) -> bool;
     /// return Option<bool>
@@ -842,10 +842,25 @@ impl AssignIF for AssignStack {
         }
         0
     }
-    fn reset_assign_record(&mut self, flag: Flag) {
+    fn reset_assign_record(&mut self, flag: Flag, from: Option<Flag>) {
         match flag {
-            Flag::BEST_PHASE => self.num_best_assign = 0,
-            Flag::TARGET_PHASE => self.num_target_assign = 0,
+            Flag::BEST_PHASE => {
+                if let Some(source) = from {
+                    for v in self.var.iter_mut().skip(1) {
+                        v.set(flag, v.is(source));
+                    }
+                } else {
+                    self.num_best_assign = 0;
+                }
+            }
+            Flag::TARGET_PHASE => {
+                self.num_target_assign = 0;
+                if let Some(source) = from {
+                    for v in self.var.iter_mut().skip(1) {
+                        v.set(flag, v.is(source));
+                    }
+                }
+            }
             _ => panic!("invalid flag for reset_assign_record"),
         }
     }

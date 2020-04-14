@@ -382,13 +382,14 @@ fn search(
                 //
                 stabilizing = if rst.exports().0 == RestartMode::Stabilize {
                     if stabilizing != Flag::TARGET_PHASE {
-                        asg.reset_assign_record(Flag::TARGET_PHASE);
+                        asg.reset_assign_record(Flag::TARGET_PHASE, Some(Flag::BEST_PHASE));
                     }
                     nap = &mut num_assigned.1;
                     Flag::TARGET_PHASE
                 } else {
                     if num_assigned.0 < num_assigned.1 {
                         num_assigned.0 = num_assigned.1;
+                        asg.reset_assign_record(Flag::BEST_PHASE, Some(Flag::TARGET_PHASE));
                     }
                     nap = &mut num_assigned.0;
                     Flag::BEST_PHASE
