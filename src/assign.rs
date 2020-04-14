@@ -501,7 +501,7 @@ impl Instantiate for AssignStack {
                     _ => VRD_DEC_STD,
                 };
                 let c = (self.core_size.get() - VRD_OFFSET).max(1.0);
-                let delta = 0.05 * k * (c.sqrt() * c.ln());
+                let delta = 0.1 * k * (c.sqrt() * c.ln());
                 self.activity_decay_max = 1.0 - delta;
             }
         }
