@@ -645,7 +645,10 @@ impl Eliminator {
 
     /// enqueue a clause into eliminator's clause queue.
     fn enqueue_clause(&mut self, cid: ClauseId, c: &mut Clause) {
-        if self.mode != EliminatorMode::Running || c.is(Flag::ENQUEUED) {
+        if self.mode != EliminatorMode::Running
+            || c.is(Flag::ENQUEUED)
+            || self.subsume_literal_limit < c.lits.len()
+        {
             return;
         }
         self.clause_queue.push(cid);
