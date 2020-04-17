@@ -354,16 +354,10 @@ fn search(
     rst: &mut Restarter,
     state: &mut State,
 ) -> Result<bool, SolverError> {
+    let mut after_restart = true;
     let mut a_decision_was_made = false;
-    let mut num_assigned = (0, 0); // (best, target)
-    let mut nap = &mut num_assigned.0;
-    let phasing_duration = state.reflection_interval / 10;
-    let mut select_phase: usize = phasing_duration;
-    let mut stabilizing = if rst.exports().0 == RestartMode::Stabilize {
-        Flag::TARGET_PHASE
-    } else {
-        Flag::BEST_PHASE
-    };
+    let mut num_assigned = 0;
+    // let mut flip_phase = false;
     rst.update(RestarterModule::Luby, 0);
     loop {
         asg.reward_update();
@@ -379,36 +373,8 @@ fn search(
             state.last_asg = asg.stack_len();
             if rst.force_restart() {
                 asg.cancel_until(state.root_level);
-            } else {
-                //
-                //## set phase mode
-                //
-                stabilizing = if rst.exports().0 == RestartMode::Stabilize {
-                    if stabilizing != Flag::TARGET_PHASE {
-                        asg.reset_assign_record(Flag::TARGET_PHASE, Some(Flag::BEST_PHASE));
-                    }
-                    nap = &mut num_assigned.1;
-                    Flag::TARGET_PHASE
-                } else {
-                    if num_assigned.0 < num_assigned.1 {
-                        num_assigned.0 = num_assigned.1;
-                        asg.reset_assign_record(Flag::BEST_PHASE, Some(Flag::TARGET_PHASE));
-                    }
-                    nap = &mut num_assigned.0;
-                    Flag::BEST_PHASE
-                };
+                after_restart = true;
             }
-            let mut na = asg.best_assigned(stabilizing);
-            if 0 < na {
-                na += state.num_eliminated_vars;
-                if *nap < na {
-                    *nap = na;
-                    state.flush("");
-                    state.flush(format!("find best assigns: {}", na));
-                    state.phase_select = PhaseMode::Best;
-                }
-            }
-        //
         } else {
             if a_decision_was_made {
                 a_decision_was_made = false;
@@ -420,25 +386,8 @@ fn search(
                 return Ok(false);
             }
             handle_conflict(asg, cdb, elim, rst, state, ci)?;
-
-            let asg_num_conflict = asg.exports().0;
-            if select_phase == 0 {
-                select_phase = phasing_duration;
-                state.phase_select = if rst.exports().0 == RestartMode::Stabilize {
-                    match asg_num_conflict % 4 {
-                        2 => PhaseMode::Target,
-                        _ => PhaseMode::Latest,
-                    }
-                } else {
-                    match asg_num_conflict % 8 {
-                        0 => PhaseMode::Best,
-                        4 => PhaseMode::Invert,
-                        _ => PhaseMode::Latest,
-                    }
-                };
-            } else {
-                select_phase -= 1;
-            }
+            after_restart = true;
+            // flip_phase = false;
         }
         // Simplification has been postponed because chronoBT was used.
         if asg.decision_level() == state.root_level {
@@ -456,16 +405,42 @@ fn search(
                 rst.update(RestarterModule::Reset, 0);
                 state.num_solved_vars = asg.stack_len();
             }
+            if state.stabilize {
+                // asg.reset_assign_record(Flag::PHASE, Some(Flag::BEST_PHASE));
+            }
         }
         if !asg.remains() {
-            let vi = asg.select_var();
+            //
+            //## set phase mode
+            //
+            state.stabilize = rst.exports().0 == RestartMode::Stabilize;
+            let mut na = asg.best_assigned(Flag::BEST_PHASE);
+            if 0 < na {
+                na += state.num_eliminated_vars;
+                if num_assigned < na {
+                    // flip_phase = true;
+                    num_assigned = na;
+                    state.flush("");
+                    state.flush(format!("find best assigns: {}", na));
+                }
+            }
+            // if state.stabilize /* ^ flip_phase */ {
+            //     state.phase_select = PhaseMode::BestRnd;
+            // } else {
+            //     state.phase_select = PhaseMode::Latest;
+            // }
+            if after_restart && state.stabilize {
+                state.phase_select = PhaseMode::Best;
+            } else {
+                state.phase_select = PhaseMode::Latest;
+            }
             let num_prop = asg.exports().1;
+            let vi = asg.select_var();
             let p = match state.phase_select {
                 PhaseMode::Best => asg.var(vi).is(Flag::BEST_PHASE),
-                PhaseMode::BestRnd => match num_prop % 8 {
-                    0 => num_prop % 16 == 0,
-                    4 => asg.var(vi).is(Flag::PHASE),
-                    _ => asg.var(vi).is(stabilizing),
+                PhaseMode::BestRnd => match num_prop % 4 {
+                    0 => asg.var(vi).is(Flag::BEST_PHASE),
+                    _ => asg.var(vi).is(Flag::PHASE),
                 },
                 PhaseMode::Invert => !asg.var(vi).is(Flag::PHASE),
                 PhaseMode::Latest => asg.var(vi).is(Flag::PHASE),
