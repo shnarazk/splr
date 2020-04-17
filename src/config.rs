@@ -63,7 +63,7 @@ pub struct Config {
     //## eliminator
     //
     /// max #caluses containing a var
-    #[structopt(long = "evo", default_value = "20000")]
+    #[structopt(long = "evo", default_value = "10000")]
     pub elim_var_occ: usize,
 
     /// Grow limit of #clauses by v-elim

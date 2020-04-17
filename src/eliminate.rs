@@ -405,7 +405,7 @@ impl EliminateIF for Eliminator {
             v.turn_on(Flag::TOUCHED);
             if evo < w.pos_occurs.len() + w.neg_occurs.len() {
                 w.aborted = true;
-                return;
+                continue;
             }
             if !v.is(Flag::ELIMINATED) {
                 if bool::from(*l) {
@@ -643,6 +643,9 @@ impl Eliminator {
         A: AssignIF,
     {
         let w = &mut self[l.vi()];
+        if w.aborted {
+            return;
+        }
         if bool::from(l) {
             debug_assert_eq!(w.pos_occurs.iter().filter(|&c| *c == cid).count(), 1);
             w.pos_occurs.delete_unstable(|&c| c == cid);
@@ -981,10 +984,7 @@ where
 {
     let v = &mut asg.var(vi);
     let w = &mut elim[vi];
-    if asg.assign(vi).is_some() {
-        return Ok(());
-    }
-    if w.aborted {
+    if asg.assign(vi).is_some() || w.aborted {
         return Ok(());
     }
     debug_assert!(!v.is(Flag::ELIMINATED));
@@ -1123,7 +1123,11 @@ fn make_eliminated_clauses<C>(
 
 impl LitOccurs {
     fn activity(&self) -> usize {
-        self.pos_occurs.len().min(self.neg_occurs.len())
+        if self.aborted {
+            std::usize::MAX
+        } else {
+            self.pos_occurs.len().min(self.neg_occurs.len())
+        }
     }
 }
 
