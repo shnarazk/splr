@@ -180,6 +180,7 @@ pub struct State {
     pub phase_select: PhaseMode,
     pub stats: [usize; Stat::EndOfStatIndex as usize], // statistics
     /// Tuple of current strategy and the number of conflicts at which the strategy is selected.
+    pub stabilize: bool,
     pub strategy: (SearchStrategy, usize),
     pub target: CNFDescription,
     pub reflection_interval: usize,
@@ -209,6 +210,7 @@ impl Default for State {
             config: Config::default(),
             phase_select: PhaseMode::Latest,
             stats: [0; Stat::EndOfStatIndex as usize],
+            stabilize: false,
             strategy: (SearchStrategy::Initial, 0),
             target: CNFDescription::default(),
             reflection_interval: 10_000,
