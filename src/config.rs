@@ -158,9 +158,8 @@ where
     PathBuf: From<T>,
 {
     fn from(path: T) -> Config {
-        let mut config = Config::default();
-        config.cnf_file = PathBuf::from(path);
-        config
+        let f = PathBuf::from(path).into_os_string();
+        Config::from_iter([std::ffi::OsString::from("splr"), f].iter())
     }
 }
 
