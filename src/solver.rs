@@ -189,22 +189,23 @@ impl SatSolverIF for Solver {
                 continue;
             }
             match elim.stats(vi) {
-                (_, 0) => {
+                Some((_, 0)) => {
                     let l = Lit::from_assign(vi, true);
                     if asg.assign_at_rootlevel(l).is_err() {
                         return Ok(Certificate::UNSAT);
                     }
                 }
-                (0, _) => {
+                Some((0, _)) => {
                     let l = Lit::from_assign(vi, false);
                     if asg.assign_at_rootlevel(l).is_err() {
                         return Ok(Certificate::UNSAT);
                     }
                 }
-                (p, m) => {
+                Some((p, m)) => {
                     asg.var_mut(vi).set(Flag::PHASE, m < p);
                     elim.enqueue_var(asg, vi, false);
                 }
+                None => (),
             }
         }
         //
@@ -234,10 +235,10 @@ impl SatSolverIF for Solver {
                     continue;
                 }
                 match elim.stats(vi) {
-                    (_, 0) => (),
-                    (0, _) => (),
-                    (p, m) if m * 10 < p => asg.var_mut(vi).turn_on(Flag::PHASE),
-                    (p, m) if p * 10 < m => asg.var_mut(vi).turn_off(Flag::PHASE),
+                    Some((_, 0)) => (),
+                    Some((0, _)) => (),
+                    Some((p, m)) if m * 10 < p => asg.var_mut(vi).turn_on(Flag::PHASE),
+                    Some((p, m)) if p * 10 < m => asg.var_mut(vi).turn_off(Flag::PHASE),
                     _ => (),
                 }
             }
