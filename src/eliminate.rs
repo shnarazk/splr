@@ -74,7 +74,7 @@ pub trait EliminateIF {
     /// return the order of vars based on their occurrences
     fn sorted_iterator(&self) -> Iter<'_, usize>;
     /// return vi's stats
-    fn stats(&self, vi: VarId) -> (usize, usize);
+    fn stats(&self, vi: VarId) -> Option<(usize, usize)>;
     /// return eliminated literals.
     fn eliminated_lits(&self) -> &[Lit];
 }
@@ -94,6 +94,7 @@ enum EliminatorMode {
 /// Mapping from Literal to Clauses.
 #[derive(Debug)]
 pub struct LitOccurs {
+    aborted: bool,
     pos_occurs: Vec<ClauseId>,
     neg_occurs: Vec<ClauseId>,
 }
@@ -101,6 +102,7 @@ pub struct LitOccurs {
 impl Default for LitOccurs {
     fn default() -> LitOccurs {
         LitOccurs {
+            aborted: false,
             pos_occurs: Vec::new(),
             neg_occurs: Vec::new(),
         }
@@ -134,6 +136,7 @@ impl LitOccurs {
         vec
     }
     fn clear(&mut self) {
+        self.aborted = false;
         self.pos_occurs.clear();
         self.neg_occurs.clear();
     }
@@ -148,6 +151,8 @@ pub struct Eliminator {
     var_queue: VarOccHeap,
     bwdsub_assigns: usize,
     elim_lits: Vec<Lit>,
+    /// Maximum number of caluses to try to eliminate a var
+    pub eliminate_var_occurrence_limit: usize,
     /// 0 for no limit
     /// Stop elimination if a generated resolvent is larger than this
     /// 0 means no limit.
@@ -173,6 +178,7 @@ impl Default for Eliminator {
             clause_queue: Vec::new(),
             bwdsub_assigns: 0,
             elim_lits: Vec::new(),
+            eliminate_var_occurrence_limit: 10_000,
             eliminate_combination_limit: 80,
             eliminate_grow_limit: 0, // 64
             eliminate_occurrence_limit: 800,
@@ -280,6 +286,7 @@ impl Instantiate for Eliminator {
         Eliminator {
             enable: !config.without_elim,
             var_queue: VarOccHeap::new(nv, 0),
+            eliminate_var_occurrence_limit: config.elim_var_occ,
             eliminate_grow_limit: config.elim_grw_lim,
             subsume_literal_limit: config.elim_lit_lim,
             var: LitOccurs::new(nv + 1),
@@ -391,10 +398,15 @@ impl EliminateIF for Eliminator {
         if self.mode != EliminatorMode::Running || c.is(Flag::OCCUR_LINKED) {
             return;
         }
+        let evo = self.eliminate_var_occurrence_limit;
         for l in &c.lits {
             let v = &mut asg.var_mut(l.vi());
             let w = &mut self[l.vi()];
             v.turn_on(Flag::TOUCHED);
+            if evo < w.pos_occurs.len() + w.neg_occurs.len() {
+                w.aborted = true;
+                return;
+            }
             if !v.is(Flag::ELIMINATED) {
                 if bool::from(*l) {
                     debug_assert!(
@@ -435,9 +447,13 @@ impl EliminateIF for Eliminator {
     fn sorted_iterator(&self) -> Iter<'_, usize> {
         self.var_queue.heap[1..].iter()
     }
-    fn stats(&self, vi: VarId) -> (usize, usize) {
+    fn stats(&self, vi: VarId) -> Option<(usize, usize)> {
         let w = &self[vi];
-        (w.pos_occurs.len(), w.neg_occurs.len())
+        if w.aborted {
+            None
+        } else {
+            Some((w.pos_occurs.len(), w.neg_occurs.len()))
+        }
     }
     fn eliminated_lits(&self) -> &[Lit] {
         &self.elim_lits
@@ -496,7 +512,7 @@ impl Eliminator {
                 for l in lits {
                     let v = &asg.var(l.vi());
                     let w = &self[l.vi()];
-                    if asg.assign(l.vi()).is_some() {
+                    if asg.assign(l.vi()).is_some() || w.aborted {
                         continue;
                     }
                     let nsum = if bool::from(*l) {
@@ -966,6 +982,9 @@ where
     let v = &mut asg.var(vi);
     let w = &mut elim[vi];
     if asg.assign(vi).is_some() {
+        return Ok(());
+    }
+    if w.aborted {
         return Ok(());
     }
     debug_assert!(!v.is(Flag::ELIMINATED));

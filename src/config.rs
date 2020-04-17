@@ -62,12 +62,16 @@ pub struct Config {
     //
     //## eliminator
     //
+    /// max #caluses containing a var
+    #[structopt(long = "evo", default_value = "20000")]
+    pub elim_var_occ: usize,
+
     /// Grow limit of #clauses by v-elim
-    #[structopt(long = "evg", default_value = "0")]
+    #[structopt(long = "evl", default_value = "0")]
     pub elim_grw_lim: usize,
 
     /// #literals in a clause by v-elim
-    #[structopt(long = "evl", default_value = "100")]
+    #[structopt(long = "ell", default_value = "100")]
     pub elim_lit_lim: usize,
 
     /// Threshold to elimination
