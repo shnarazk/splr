@@ -844,6 +844,13 @@ impl AssignIF for AssignStack {
     }
     fn reset_assign_record(&mut self, flag: Flag, from: Option<Flag>) {
         match flag {
+            Flag::PHASE => {
+                if let Some(source) = from {
+                    for v in self.var.iter_mut().skip(1) {
+                        v.set(flag, v.is(source));
+                    }
+                }
+            }
             Flag::BEST_PHASE => {
                 if let Some(source) = from {
                     for v in self.var.iter_mut().skip(1) {
