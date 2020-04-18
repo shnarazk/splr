@@ -346,7 +346,6 @@ impl SatSolverIF for Solver {
 }
 
 /// main loop; returns `Ok(true)` for SAT, `Ok(false)` for UNSAT.
-#[inline]
 fn search(
     asg: &mut AssignStack,
     cdb: &mut ClauseDB,
@@ -354,7 +353,7 @@ fn search(
     rst: &mut Restarter,
     state: &mut State,
 ) -> Result<bool, SolverError> {
-    let mut got_progress = false;
+    let mut replay_best = false;
     let mut a_decision_was_made = false;
     let mut num_assigned = state.num_solved_vars;
     rst.update(RestarterModule::Luby, 0);
@@ -372,15 +371,16 @@ fn search(
             state.last_asg = asg.stack_len();
             if rst.force_restart() {
                 asg.cancel_until(state.root_level);
-                got_progress = true;
             }
         } else {
             if asg.decision_level() == state.root_level {
                 analyze_final(asg, state, &cdb[ci]);
                 return Ok(false);
             }
+            if num_assigned < asg.stack_len() + state.num_eliminated_vars {
+                replay_best = false;
+            }
             handle_conflict(asg, cdb, elim, rst, state, ci)?;
-            got_progress = true;
             if a_decision_was_made {
                 a_decision_was_made = false;
             } else {
@@ -389,6 +389,7 @@ fn search(
         }
         // Simplification has been postponed because chronoBT was used.
         if asg.decision_level() == state.root_level {
+            replay_best = true;
             // `elim.to_eliminate` is increased much in particular when vars are solved or
             // learnts are small. We don't need to count the number of solved vars.
             if state.config.elim_trigger < state.to_eliminate as usize {
@@ -412,11 +413,11 @@ fn search(
             let na = asg.best_assigned(Flag::BEST_PHASE);
             if 0 < na && num_assigned < na + state.num_eliminated_vars {
                 num_assigned = na + state.num_eliminated_vars;
-                got_progress = true;
+                // back_to_zero = false;
                 state.flush("");
-                state.flush(format!("find best assigns: {}", na));
+                state.flush(format!("unreachable: {}", state.num_vars - num_assigned));
             }
-            state.phase_select = if got_progress && state.stabilize {
+            state.phase_select = if replay_best && state.stabilize {
                 PhaseMode::Best
             } else {
                 PhaseMode::Latest
@@ -441,7 +442,6 @@ fn search(
 }
 
 #[allow(clippy::cognitive_complexity)]
-#[inline]
 fn handle_conflict(
     asg: &mut AssignStack,
     cdb: &mut ClauseDB,
