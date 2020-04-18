@@ -354,10 +354,9 @@ fn search(
     rst: &mut Restarter,
     state: &mut State,
 ) -> Result<bool, SolverError> {
-    let mut after_restart = true;
+    let mut got_progress = false;
     let mut a_decision_was_made = false;
-    let mut num_assigned = 0;
-    // let mut flip_phase = false;
+    let mut num_assigned = state.num_solved_vars;
     rst.update(RestarterModule::Luby, 0);
     loop {
         asg.reward_update();
@@ -373,21 +372,20 @@ fn search(
             state.last_asg = asg.stack_len();
             if rst.force_restart() {
                 asg.cancel_until(state.root_level);
-                after_restart = true;
+                got_progress = true;
             }
         } else {
-            if a_decision_was_made {
-                a_decision_was_made = false;
-            } else {
-                state[Stat::NoDecisionConflict] += 1;
-            }
             if asg.decision_level() == state.root_level {
                 analyze_final(asg, state, &cdb[ci]);
                 return Ok(false);
             }
             handle_conflict(asg, cdb, elim, rst, state, ci)?;
-            after_restart = true;
-            // flip_phase = false;
+            got_progress = true;
+            if a_decision_was_made {
+                a_decision_was_made = false;
+            } else {
+                state[Stat::NoDecisionConflict] += 1;
+            }
         }
         // Simplification has been postponed because chronoBT was used.
         if asg.decision_level() == state.root_level {
@@ -405,46 +403,34 @@ fn search(
                 rst.update(RestarterModule::Reset, 0);
                 state.num_solved_vars = asg.stack_len();
             }
-            if state.stabilize {
-                // asg.reset_assign_record(Flag::PHASE, Some(Flag::BEST_PHASE));
-            }
         }
         if !asg.remains() {
             //
             //## set phase mode
             //
             state.stabilize = rst.exports().0 == RestartMode::Stabilize;
-            let mut na = asg.best_assigned(Flag::BEST_PHASE);
-            if 0 < na {
-                na += state.num_eliminated_vars;
-                if num_assigned < na {
-                    // flip_phase = true;
-                    num_assigned = na;
-                    state.flush("");
-                    state.flush(format!("find best assigns: {}", na));
-                }
+            let na = asg.best_assigned(Flag::BEST_PHASE);
+            if 0 < na && num_assigned < na + state.num_eliminated_vars {
+                num_assigned = na + state.num_eliminated_vars;
+                got_progress = true;
+                state.flush("");
+                state.flush(format!("find best assigns: {}", na));
             }
-            // if state.stabilize /* ^ flip_phase */ {
-            //     state.phase_select = PhaseMode::BestRnd;
-            // } else {
-            //     state.phase_select = PhaseMode::Latest;
-            // }
-            if after_restart && state.stabilize {
-                state.phase_select = PhaseMode::Best;
+            state.phase_select = if got_progress && state.stabilize {
+                PhaseMode::Best
             } else {
-                state.phase_select = PhaseMode::Latest;
-            }
-            let num_prop = asg.exports().1;
+                PhaseMode::Latest
+            };
             let vi = asg.select_var();
             let p = match state.phase_select {
                 PhaseMode::Best => asg.var(vi).is(Flag::BEST_PHASE),
-                PhaseMode::BestRnd => match num_prop % 4 {
+                PhaseMode::BestRnd => match ((asg.activity(vi) * 10000.0) as usize) % 4 {
                     0 => asg.var(vi).is(Flag::BEST_PHASE),
                     _ => asg.var(vi).is(Flag::PHASE),
                 },
                 PhaseMode::Invert => !asg.var(vi).is(Flag::PHASE),
                 PhaseMode::Latest => asg.var(vi).is(Flag::PHASE),
-                PhaseMode::Random => num_prop % 2 == 0,
+                PhaseMode::Random => ((asg.activity(vi) * 10000.0) as usize) % 2 == 0,
                 PhaseMode::Target => asg.var(vi).is(Flag::TARGET_PHASE),
             };
             asg.assign_by_decision(Lit::from_assign(vi, p));
