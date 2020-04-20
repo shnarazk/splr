@@ -398,6 +398,7 @@ fn search(
                     elim.activate();
                 }
                 elim.simplify(asg, cdb, state)?;
+                asg.num_eliminated_vars = state.num_eliminated_vars;
             }
             // By simplification, we may get further solutions.
             if state.num_solved_vars < asg.stack_len() {
@@ -411,8 +412,8 @@ fn search(
             //
             state.stabilize = state.config.stabilize && rst.stabilizing();
             let na = asg.best_assigned(Flag::BEST_PHASE);
-            if 0 < na && num_assigned < na + state.num_eliminated_vars {
-                num_assigned = na + state.num_eliminated_vars;
+            if num_assigned < na {
+                num_assigned = na;
                 // back_to_zero = false;
                 state.flush("");
                 state.flush(format!("unreachable: {}", state.num_vars - num_assigned));

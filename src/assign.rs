@@ -302,6 +302,7 @@ pub struct AssignStack {
     target_assign: bool,
     num_target_assign: usize,
     num_conflict: usize,
+    pub num_eliminated_vars: usize,
     num_propagation: usize,
     num_restart: usize,
     num_lbd_update: usize,
@@ -345,6 +346,7 @@ impl Default for AssignStack {
             target_assign: false,
             num_target_assign: 0,
             num_conflict: 0,
+            num_eliminated_vars: 0,
             num_propagation: 0,
             num_restart: 0,
             num_lbd_update: 0,
@@ -807,14 +809,15 @@ impl AssignIF for AssignStack {
                 }
             }
         }
-        if self.num_target_assign < self.trail.len() {
+        let na = self.trail.len() + self.num_eliminated_vars;
+        if self.num_target_assign < na {
             self.target_assign = true;
-            self.num_target_assign = self.trail.len();
+            self.num_target_assign = na;
             self.save_phase(Flag::TARGET_PHASE);
         }
-        if self.num_best_assign < self.trail.len() {
+        if self.num_best_assign < na {
             self.best_assign = true;
-            self.num_best_assign = self.trail.len();
+            self.num_best_assign = na;
             self.save_phase(Flag::BEST_PHASE);
         }
         ClauseId::default()
@@ -862,7 +865,7 @@ impl AssignIF for AssignStack {
                 }
             }
             Flag::TARGET_PHASE => {
-                self.num_target_assign = 0;
+                self.num_target_assign = self.num_eliminated_vars;
                 if let Some(source) = from {
                     for v in self.var.iter_mut().skip(1) {
                         v.set(flag, v.is(source));
