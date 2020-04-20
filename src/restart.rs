@@ -41,6 +41,8 @@ pub enum RestartMode {
 
 /// API for restart like `block_restart`, `force_restart` and so on.
 pub trait RestartIF {
+    /// return `true` if stabilizer is active.
+    fn stabilizing(&self) -> bool;
     /// block restart if needed.
     fn block_restart(&mut self) -> bool;
     /// force restart if needed.
@@ -155,9 +157,7 @@ impl EmaIF for ProgressLBD {
 
 impl ProgressEvaluator for ProgressLBD {
     fn is_active(&self) -> bool {
-        self.enable
-        // && (self.sum as f64) < self.ema.get() * (self.num as f64) * self.threshold
-            && self.threshold < self.ema.trend()
+        self.enable && self.threshold < self.ema.trend()
     }
     fn shift(&mut self) {}
 }
@@ -399,9 +399,10 @@ impl EmaIF for GeometricStabilizer {
     fn update(&mut self, now: usize) {
         if self.enable && self.next_trigger <= now {
             self.active = !self.active;
-            // self.next_trigger = ((self.next_trigger as f64) * self.restart_inc) as usize;
-            //self.next_trigger += 1000 + (self.next_trigger as f64).sqrt() as usize;
             self.step = ((self.step as f64) * self.restart_inc) as usize;
+            if 100_000_000 < self.step {
+                self.step = 1000;
+            }
             self.next_trigger += self.step;
         }
     }
@@ -577,16 +578,19 @@ impl Instantiate for Restarter {
 macro_rules! reset {
     ($executor: expr) => {
         $executor.after_restart = 0;
-        if $executor.stb.is_active() {
-            $executor.num_block += 1;
-            $executor.num_stabilize += 1;
-            return false;
-        }
+        // if $executor.stb.is_active() {
+        //     $executor.num_block += 1;
+        //     $executor.num_stabilize += 1;
+        //     return false;
+        // }
         return true;
     };
 }
 
 impl RestartIF for Restarter {
+    fn stabilizing(&self) -> bool {
+        self.stb.is_active()
+    }
     fn block_restart(&mut self) -> bool {
         // || self.bkt.enable
         if self.after_restart < self.restart_step || self.luby.enable {
@@ -646,7 +650,7 @@ impl Export<(RestartMode, usize, f64, f64, f64)> for Restarter {
     ///
     ///```
     /// use crate::{splr::config::Config, splr::types::*};
-    /// use crate::splr::restarter::Restarter;
+    /// use crate::splr::restart::Restarter;
     /// let rst = Restarter::instantiate(&Config::default(), &CNFDescription::default());
     /// let (_mode, _num_block, _asg_trend, _lbd_get, _lbd_trend) = rst.exports();
     ///```

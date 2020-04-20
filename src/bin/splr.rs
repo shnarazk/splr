@@ -4,16 +4,19 @@ use {
     splr::{
         clause::CertifiedRecord,
         config::{Config, VERSION},
-        restarter::RestartMode,
+        restart::RestartMode,
         solver::{Certificate, SatSolverIF, Solver, SolverResult},
         state::*,
         types::{Export, SolverError},
     },
     std::{
         borrow::Cow,
+        env,
         fs::File,
         io::{BufWriter, Write},
         path::PathBuf,
+        thread,
+        time::Duration,
     },
     structopt::StructOpt,
 };
@@ -60,6 +63,21 @@ fn main() {
     if config.proof_file.to_string_lossy() != "proof.out" && !config.use_certification {
         println!("Abort: You set a proof filename with '--proof' explicitly, but didn't set '--certify'. It doesn't look good.");
         return;
+    }
+    if let Ok(val) = env::var("SPLR_TIMEOUT") {
+        if let Ok(timeout) = val.parse::<u64>() {
+            let input = cnf_file.as_ref().to_string();
+            let quiet_mode = config.quiet_mode;
+            thread::spawn(move || {
+                thread::sleep(Duration::from_millis(timeout * 1000));
+                println!(
+                    "{}: {}",
+                    colored(Err(&SolverError::TimeOut), quiet_mode),
+                    input
+                );
+                std::process::exit(0);
+            });
+        }
     }
     let mut s = Solver::build(&config).expect("failed to load");
     let res = s.solve();
@@ -262,8 +280,8 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
             time.tv_sec as f64 + time.tv_nsec as f64 / 1_000_000_000.0f64
         }
     };
-    let (asgs_num_conflict, _num_propagation, asgs_num_restart) = s.asgs.exports();
-    let (_, vdb_activity_decay) = s.vdb.exports();
+    let (asg_num_conflict, _num_propagation, asg_num_restart, _core, vdb_activity_decay) =
+        s.asg.exports();
     let (rst_mode, _num_block, _asg_trend, _lbd_get, _lbd_trend) = s.rst.exports();
     out.write_all(
         format!(
@@ -327,7 +345,7 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
             format!("{:>9.2}", state[LogF64Id::BLevel]),
             format!(
                 "{:>9.4}",
-                100.0 * asgs_num_restart as f64 / asgs_num_conflict as f64
+                100.0 * asg_num_restart as f64 / asg_num_conflict as f64
             ),
         )
         .as_bytes(),

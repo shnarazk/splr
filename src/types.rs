@@ -1,9 +1,9 @@
 /// Crate `types' provides various building blocks, including
 /// some common traits.
 pub use crate::{
+    assign::AssignReason,
     clause::{Clause, ClauseIF, ClauseId, ClauseIdIF, Watch},
     config::Config,
-    var::Var,
 };
 use {
     crate::state::State,
@@ -115,6 +115,22 @@ impl fmt::Display for Lit {
     }
 }
 
+impl From<(VarId, bool)> for Lit {
+    #[inline]
+    fn from((vi, b): (VarId, bool)) -> Self {
+        Lit {
+            ordinal: ((vi as u32) * 2) + (b as u32),
+        }
+    }
+}
+
+impl From<(VarId, Option<bool>)> for Lit {
+    #[inline]
+    fn from((vi, b): (VarId, Option<bool>)) -> Self {
+        Lit::from((vi, b.unwrap_or(false)))
+    }
+}
+
 impl From<usize> for Lit {
     #[inline]
     fn from(l: usize) -> Self {
@@ -140,6 +156,7 @@ impl From<ClauseId> for Lit {
     }
 }
 
+/*
 /// While Lit::oridinal is private, Var::{index, assign} are public.
 /// So we define the following here.
 /// # CAVEAT
@@ -168,6 +185,7 @@ impl From<&mut Var> for Lit {
         }
     }
 }
+*/
 
 impl From<Lit> for bool {
     /// - positive Lit (= even u32) => Some(true)
@@ -601,14 +619,19 @@ bitflags! {
         //
         //## For Var
         //
-        /// the previous assigned value of a Var.
-        const PHASE        = 0b0000_0001_0000_0000;
         /// a var is eliminated and managed by eliminator.
-        const ELIMINATED   = 0b0000_0010_0000_0000;
+        const ELIMINATED   = 0b0000_0001_0000_0000;
         /// a var is checked during in the current conflict analysis.
-        const CA_SEEN      = 0b0000_0100_0000_0000;
+        const CA_SEEN      = 0b0000_0010_0000_0000;
+        /// the previous assigned value of a Var.
+        const PHASE        = 0b0000_0100_0000_0000;
+        /// the value of a Var in the best trail.
+        const BEST_PHASE   = 0b0000_1000_0000_0000;
+        /// the value of a Var in the best trail during a stabilized period.
+        const TARGET_PHASE = 0b0001_0000_0000_0000;
+
         /// NOT IN USE: a var is checked during in var rewarding.
-        const VR_SEEN      = 0b0000_1000_0000_0000;
+        const VR_SEEN      = 0b1000_0000_0000_0000;
     }
 }
 

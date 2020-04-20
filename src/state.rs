@@ -1,12 +1,11 @@
 /// Crate `state` is a collection of internal data.
 use {
     crate::{
+        assign::AssignIF,
         clause::ClauseDBIF,
-        eliminator::EliminatorIF,
-        propagator::PropagatorIF,
-        restarter::{RestartIF, RestartMode},
+        eliminate::EliminateIF,
+        restart::{RestartIF, RestartMode},
         types::*,
-        var::VarDBIF,
     },
     libc::{clock_gettime, timespec, CLOCK_PROCESS_CPUTIME_ID},
     std::{
@@ -28,29 +27,55 @@ pub trait StateIF {
     /// return None if something is wrong.
     fn elapsed(&self) -> Option<f64>;
     /// change heuristics based on stat data.
-    fn select_strategy<A, C>(&mut self, asgs: &A, cdb: &C)
+    fn select_strategy<A, C>(&mut self, asg: &A, cdb: &C)
     where
-        A: Export<(usize, usize, usize)> + PropagatorIF,
+        A: Export<(usize, usize, usize, f64, f64)> + AssignIF,
         C: Export<(usize, usize, usize, usize, usize, usize)> + ClauseDBIF;
     /// write a header of stat data to stdio.
     fn progress_header(&self);
     /// write stat data to stdio.
-    fn progress<A, C, E, R, V>(
-        &mut self,
-        asgs: &A,
-        cdb: &C,
-        elim: &E,
-        rst: &R,
-        vdb: &V,
-        mes: Option<&str>,
-    ) where
-        A: Export<(usize, usize, usize)> + PropagatorIF,
+    fn progress<A, C, E, R>(&mut self, asg: &A, cdb: &C, elim: &E, rst: &R, mes: Option<&str>)
+    where
+        A: Export<(usize, usize, usize, f64, f64)> + AssignIF,
         C: Export<(usize, usize, usize, usize, usize, usize)> + ClauseDBIF,
-        E: Export<(usize, usize)> + EliminatorIF,
-        R: Export<(RestartMode, usize, f64, f64, f64)> + RestartIF,
-        V: Export<(f64, f64)> + VarDBIF;
+        E: Export<(usize, usize)> + EliminateIF,
+        R: Export<(RestartMode, usize, f64, f64, f64)> + RestartIF;
     /// write a short message to stdout.
     fn flush<S: AsRef<str>>(&self, mes: S);
+}
+
+/// Phase saving modes.
+#[derive(Debug, Eq, PartialEq)]
+pub enum PhaseMode {
+    /// Use best values.
+    Best,
+    /// Mixing best and random values.
+    BestRnd,
+    /// Use the inverted value.
+    Invert,
+    /// the orignal saving mode.
+    Latest,
+    /// random value
+    Random,
+    /// use the best value in the current segment
+    Target,
+}
+
+impl fmt::Display for PhaseMode {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            formatter,
+            "{}",
+            match self {
+                PhaseMode::Best => "best assign saved",
+                PhaseMode::BestRnd => "best and random",
+                PhaseMode::Invert => "inverted last",
+                PhaseMode::Latest => "latest saved",
+                PhaseMode::Random => "random assign",
+                PhaseMode::Target => "target assign",
+            }
+        )
+    }
 }
 
 /// A collection of named search heuristics.
@@ -150,9 +175,12 @@ pub struct State {
     pub num_vars: usize,
     pub num_solved_vars: usize,
     pub num_eliminated_vars: usize,
+    pub num_best_assigned: usize,
     pub config: Config,
+    pub phase_select: PhaseMode,
     pub stats: [usize; Stat::EndOfStatIndex as usize], // statistics
     /// Tuple of current strategy and the number of conflicts at which the strategy is selected.
+    pub stabilize: bool,
     pub strategy: (SearchStrategy, usize),
     pub target: CNFDescription,
     pub reflection_interval: usize,
@@ -178,8 +206,11 @@ impl Default for State {
             num_vars: 0,
             num_solved_vars: 0,
             num_eliminated_vars: 0,
+            num_best_assigned: 0,
             config: Config::default(),
+            phase_select: PhaseMode::Latest,
             stats: [0; Stat::EndOfStatIndex as usize],
+            stabilize: false,
             strategy: (SearchStrategy::Initial, 0),
             target: CNFDescription::default(),
             reflection_interval: 10_000,
@@ -340,28 +371,28 @@ impl StateIF for State {
             Err(_) => None,
         }
     }
-    fn select_strategy<A, C>(&mut self, asgs: &A, cdb: &C)
+    fn select_strategy<A, C>(&mut self, asg: &A, cdb: &C)
     where
-        A: Export<(usize, usize, usize)> + PropagatorIF,
+        A: Export<(usize, usize, usize, f64, f64)> + AssignIF,
         C: Export<(usize, usize, usize, usize, usize, usize)> + ClauseDBIF,
     {
         if self.config.without_adaptive_strategy {
             return;
         }
-        let (asgs_num_conflict, _num_propagation, _num_restart) = asgs.exports();
+        let (asg_num_conflict, _num_propagation, _num_restart, _, _) = asg.exports();
         let (_active, _bi_clause, cdb_num_bi_learnt, cdb_num_lbd2, _learnt, _reduction) =
             cdb.exports();
         debug_assert_eq!(self.strategy.0, SearchStrategy::Initial);
         self.strategy.0 = match () {
             _ if cdb_num_bi_learnt + 20_000 < cdb_num_lbd2 => SearchStrategy::ManyGlues,
-            _ if self[Stat::Decision] as f64 <= 1.2 * asgs_num_conflict as f64 => {
+            _ if self[Stat::Decision] as f64 <= 1.2 * asg_num_conflict as f64 => {
                 SearchStrategy::LowDecisions
             }
             _ if self[Stat::NoDecisionConflict] < 30_000 => SearchStrategy::LowSuccesive,
             _ if 54_400 < self[Stat::NoDecisionConflict] => SearchStrategy::HighSuccesive,
             _ => SearchStrategy::Generic,
         };
-        self.strategy.1 = asgs_num_conflict;
+        self.strategy.1 = asg_num_conflict;
     }
     fn progress_header(&self) {
         if self.config.quiet_mode {
@@ -389,26 +420,24 @@ impl StateIF for State {
     }
     /// `mes` should be shorter than or equal to 9, or 8 + a delimiter.
     #[allow(clippy::cognitive_complexity)]
-    fn progress<A, C, E, R, V>(
-        &mut self,
-        asgs: &A,
-        cdb: &C,
-        elim: &E,
-        rst: &R,
-        vdb: &V,
-        mes: Option<&str>,
-    ) where
-        A: Export<(usize, usize, usize)> + PropagatorIF,
+    fn progress<A, C, E, R>(&mut self, asg: &A, cdb: &C, elim: &E, rst: &R, mes: Option<&str>)
+    where
+        A: Export<(usize, usize, usize, f64, f64)> + AssignIF,
         C: Export<(usize, usize, usize, usize, usize, usize)> + ClauseDBIF,
-        E: Export<(usize, usize)> + EliminatorIF,
+        E: Export<(usize, usize)> + EliminateIF,
         R: Export<(RestartMode, usize, f64, f64, f64)> + RestartIF,
-        V: Export<(f64, f64)> + VarDBIF,
     {
         //
         //## Gather stats from all modules
         //
 
-        let (asgs_num_conflict, asgs_num_propagation, asgs_num_restart) = asgs.exports();
+        let (
+            asg_num_conflict,
+            asg_num_propagation,
+            asg_num_restart,
+            vdb_core_size,
+            vdb_activity_decay,
+        ) = asg.exports();
 
         let (
             cdb_num_active,
@@ -423,13 +452,11 @@ impl StateIF for State {
 
         let (rst_mode, rst_num_block, rst_asg_trend, rst_lbd_get, rst_lbd_trend) = rst.exports();
 
-        let (vdb_core_size, vdb_activity_decay) = vdb.exports();
-
         if self.config.quiet_mode {
             return;
         }
         if self.config.use_log {
-            self.dump(asgs, cdb, rst, vdb);
+            self.dump(asg, cdb, rst);
             return;
         }
         let nv = self.target.num_of_variables;
@@ -441,9 +468,9 @@ impl StateIF for State {
         println!("\x1B[2K{}", self);
         println!(
             "\x1B[2K #conflict:{}, #decision:{}, #propagate:{} ",
-            i!("{:>11}", self, LogUsizeId::Conflict, asgs_num_conflict),
+            i!("{:>11}", self, LogUsizeId::Conflict, asg_num_conflict),
             i!("{:>13}", self, LogUsizeId::Decision, self[Stat::Decision]),
-            i!("{:>15}", self, LogUsizeId::Propagate, asgs_num_propagation),
+            i!("{:>15}", self, LogUsizeId::Propagate, asg_num_propagation),
         );
         println!(
             "\x1B[2K  Assignment|#rem:{}, #fix:{}, #elm:{}, prg%:{} ",
@@ -491,7 +518,7 @@ impl StateIF for State {
                 // RestartMode::Bucket => "     \x1B[001m\x1B[032mBucket\x1B[000m",
             },
             im!("{:>9}", self, LogUsizeId::RestartBlock, rst_num_block),
-            im!("{:>9}", self, LogUsizeId::Restart, asgs_num_restart),
+            im!("{:>9}", self, LogUsizeId::Restart, asg_num_restart),
             fm!("{:>9.4}", self, LogF64Id::EmaAsg, rst_asg_trend),
             fm!("{:>9.4}", self, LogF64Id::EmaLBD, rst_lbd_trend),
         );
@@ -504,7 +531,7 @@ impl StateIF for State {
                 "{:>9.4}",
                 self,
                 LogF64Id::End,
-                100.0 * asgs_num_restart as f64 / asgs_num_conflict as f64
+                100.0 * asg_num_restart as f64 / asg_num_conflict as f64
             )
         );
         println!(
@@ -517,7 +544,10 @@ impl StateIF for State {
         if let Some(m) = mes {
             println!("\x1B[2K    Strategy|mode: {}", m);
         } else {
-            println!("\x1B[2K    Strategy|mode: {:#}", self.strategy.0);
+            println!(
+                "\x1B[2K    Strategy|mode: {:#}, {}",
+                self.strategy.0, self.phase_select
+            );
         }
         self.flush("\x1B[2K");
     }
@@ -693,18 +723,17 @@ impl State {
              c ========================================================================================================="
         );
     }
-    fn dump<A, C, R, V>(&mut self, asgs: &A, cdb: &C, rst: &R, _vdb: &V)
+    fn dump<A, C, R>(&mut self, asg: &A, cdb: &C, rst: &R)
     where
-        A: Export<(usize, usize, usize)>,
+        A: Export<(usize, usize, usize, f64, f64)>,
         C: Export<(usize, usize, usize, usize, usize, usize)> + ClauseDBIF,
         R: Export<(RestartMode, usize, f64, f64, f64)> + RestartIF,
-        V: Export<(f64, f64)>,
     {
         self.progress_cnt += 1;
         let nv = self.target.num_of_variables;
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
-        let (asgs_num_conflict, _num_propagation, asgs_num_restart) = asgs.exports();
+        let (asg_num_conflict, _num_propagation, asg_num_restart, _, _) = asg.exports();
         let (
             cdb_num_active,
             _num_bi_clause,
@@ -716,44 +745,36 @@ impl State {
         let (_mode, rst_num_block, _asg_trend, _lbd_get, _lbd_trend) = rst.exports();
         println!(
             "c | {:>8}  {:>8} {:>8} | {:>7} {:>8} {:>8} |  {:>4}  {:>8} {:>7} {:>8} | {:>6.3} % |",
-            asgs_num_restart,                            // restart
-            rst_num_block,                               // blocked
-            asgs_num_conflict / asgs_num_restart.max(1), // average cfc (Conflict / Restart)
-            nv - fixed - self.num_eliminated_vars,       // alive vars
-            cdb_num_active - cdb_num_learnt,             // given clauses
-            0,                                           // alive literals
-            cdb_num_reduction,                           // clause reduction
-            cdb_num_learnt,                              // alive learnts
-            cdb_num_lbd2,                                // learnts with LBD = 2
-            asgs_num_conflict - cdb_num_learnt,          // removed learnts
-            (sum as f32) / (nv as f32) * 100.0,          // progress
+            asg_num_restart,                           // restart
+            rst_num_block,                             // blocked
+            asg_num_conflict / asg_num_restart.max(1), // average cfc (Conflict / Restart)
+            nv - fixed - self.num_eliminated_vars,     // alive vars
+            cdb_num_active - cdb_num_learnt,           // given clauses
+            0,                                         // alive literals
+            cdb_num_reduction,                         // clause reduction
+            cdb_num_learnt,                            // alive learnts
+            cdb_num_lbd2,                              // learnts with LBD = 2
+            asg_num_conflict - cdb_num_learnt,         // removed learnts
+            (sum as f32) / (nv as f32) * 100.0,        // progress
         );
     }
     #[allow(dead_code)]
-    fn dump_details<A, C, E, R, V>(
-        &mut self,
-        asgs: &A,
-        cdb: &C,
-        _: &E,
-        rst: &R,
-        vdb: &V,
-        mes: Option<&str>,
-    ) where
-        A: Export<(usize, usize, usize)> + PropagatorIF,
+    fn dump_details<A, C, E, R, V>(&mut self, asg: &A, cdb: &C, _: &E, rst: &R, mes: Option<&str>)
+    where
+        A: Export<(usize, usize, usize)> + AssignIF,
         C: Export<(usize, usize, usize, usize, usize, usize)> + ClauseDBIF,
-        E: Export<(usize, usize, usize)> + EliminatorIF,
+        E: Export<(usize, usize, usize)> + EliminateIF,
         R: Export<(RestartMode, usize, f64, f64, f64)> + RestartIF,
-        V: Export<(f64, f64)> + VarDBIF,
     {
         self.progress_cnt += 1;
         let msg = match mes {
             None => self.strategy.0.to_str(),
             Some(x) => x,
         };
-        let nv = vdb.len() - 1;
+        let nv = asg.var_len() - 1;
         let fixed = self.num_solved_vars;
         let sum = fixed + self.num_eliminated_vars;
-        let (_num_conflict, _num_propagation, asgs_num_restart) = asgs.exports();
+        let (_num_conflict, _num_propagation, asg_num_restart) = asg.exports();
         let (
             cdb_num_active,
             _num_bi_clause,
@@ -777,7 +798,7 @@ impl State {
             cdb_num_active,
             0,
             rst_num_block,
-            asgs_num_restart,
+            asg_num_restart,
             rst_asg_trend,
             rst_lbd_get,
             rst_lbd_trend,

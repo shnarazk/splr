@@ -62,16 +62,20 @@ pub struct Config {
     //
     //## eliminator
     //
-    /// Grow limit of #clauses by v-elim
-    #[structopt(long = "evg", default_value = "0")]
+    /// Max #lit for clause subsume
+    #[structopt(long = "ecl", default_value = "100")]
+    pub elim_cls_lim: usize,
+
+    /// Max #cls for var elimination
+    #[structopt(long = "evo", default_value = "10000")]
+    pub elim_var_occ: usize,
+
+    /// Grow limit of #cls in var elim.
+    #[structopt(long = "evl", default_value = "0")]
     pub elim_grw_lim: usize,
 
-    /// #literals in a clause by v-elim
-    #[structopt(long = "evl", default_value = "100")]
-    pub elim_lit_lim: usize,
-
-    /// Threshold to elimination
-    #[structopt(long = "et", default_value = "128")]
+    /// #cls to start simplification
+    #[structopt(long = "et", default_value = "256")]
     pub elim_trigger: usize,
 
     /// Disables exhaustive simplification
@@ -122,7 +126,7 @@ pub struct Config {
     pub rst_lbd_thr: f64, // Glucose's K
 
     /// Stabilizer scaling
-    #[structopt(skip)] // long = "rss", default_value = "2.0"
+    #[structopt(long = "rss", default_value = "2.0")]
     pub rst_stb_scl: f64,
 
     /// Disable geometric restart blocker
@@ -136,12 +140,16 @@ pub struct Config {
     #[structopt(long = "cbt", default_value = "100")]
     pub cbt_thr: DecisionLevel,
 
+    /// Enable stabilizing phase
+    #[structopt(skip)]
+    pub stabilize: bool,
+
     /// Disables dynamic strategy adaptation
     #[structopt(long = "no-adapt", short = "A")]
     pub without_adaptive_strategy: bool,
 
     /// CPU time limit in sec.
-    #[structopt(long = "timeout", short = "t", default_value = "10000.0")]
+    #[structopt(long = "timeout", short = "t", default_value = "5000.0")]
     pub timeout: f64,
 
     /// Writes a DRAT UNSAT certification file
@@ -154,15 +162,16 @@ where
     PathBuf: From<T>,
 {
     fn from(path: T) -> Config {
-        let mut config = Config::default();
-        config.cnf_file = PathBuf::from(path);
-        config
+        let f = PathBuf::from(path).into_os_string();
+        Config::from_iter([std::ffi::OsString::from("splr"), f].iter())
     }
 }
 
 impl Config {
     #[allow(unused_mut)]
     pub fn override_args(mut self) -> Config {
+        // self.without_adaptive_strategy = true;
+        // self.stabilize = true;
         self
     }
 }

@@ -1,7 +1,7 @@
 /// Crate `validator` implements a model checker.
 use crate::{
+    assign::AssignIF,
     clause::ClauseDBIF,
-    propagator::PropagatorIF,
     solver::Solver,
     types::{Lit, MaybeInconsistent, SolverError},
 };
@@ -26,7 +26,7 @@ impl ValidatorIF for Solver {
     ///
     /// ```
     /// use crate::{splr::config::Config, splr::types::*};
-    /// use splr::{solver::Solver, validator::ValidatorIF};
+    /// use splr::{solver::Solver, validate::ValidatorIF};
     ///
     /// let cnf = CNFDescription {
     ///         num_of_variables: 4,
@@ -41,8 +41,7 @@ impl ValidatorIF for Solver {
             return Err(SolverError::Inconsistent);
         }
         for i in vec {
-            self.asgs
-                .assign_at_rootlevel(&mut self.vdb, Lit::from(*i))?;
+            self.asg.assign_at_rootlevel(Lit::from(*i))?;
         }
         Ok(())
     }
@@ -53,7 +52,7 @@ impl ValidatorIF for Solver {
     ///
     /// ```
     /// use crate::{splr::config::Config, splr::types::*};
-    /// use splr::{solver::Solver, validator::ValidatorIF};
+    /// use splr::{solver::Solver, validate::ValidatorIF};
     ///
     /// let cnf = CNFDescription {
     ///         num_of_variables: 4,
@@ -66,7 +65,7 @@ impl ValidatorIF for Solver {
     ///
     fn validate(&self) -> Option<Vec<i32>> {
         self.cdb
-            .validate(&self.vdb, true)
+            .validate(&self.asg, true)
             .map(|cid| Vec::<i32>::from(&self.cdb[cid]))
     }
 }
