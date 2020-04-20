@@ -353,7 +353,7 @@ impl Default for AssignStack {
             ordinal: 0,
             var: Vec::new(),
             core_size: Ema::new(CORE_HISOTRY_LEN),
-            reward_step: 0.000_000_1,
+            reward_step: 0.1,
         }
     }
 }
@@ -514,7 +514,7 @@ impl Instantiate for AssignStack {
                     SearchStrategy::HighSuccesive => VRD_DEC_STRICT,
                     _ => VRD_DEC_STD,
                 };
-                let delta = 0.1 * k;
+                let delta = k;
                 self.activity_decay_max = 1.0 - delta;
             }
         }
@@ -1059,8 +1059,8 @@ impl VarRewardIF for AssignStack {
         }
         v.timestamp = t;
         v.reward += s;
-        const SCALE: f64 = 1e-30;
-        const SCALE_MAX: f64 = 1e240;
+        const SCALE: f64 = 1e-100;
+        const SCALE_MAX: f64 = 1e100;
         if SCALE_MAX < v.reward {
             for v in &mut self.var[1..] {
                 v.reward *= SCALE;
