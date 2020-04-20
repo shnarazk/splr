@@ -3,11 +3,11 @@
 - merge assign.rs and var.rs
 - change a lot of options' meanings and mnemonics
 - better modularity via traits
-- add some features for development
+- add some features for development: boundary_check, use_core, EVSIDS, trace_analysis
 - activate `JUST_USED` for clause reduction
 - change the activation timings of simplification
 - add and refactor restart module: GeometricStabilizer, ProgressLBD
-- stats data are stored in each module.
+- stats data are stored in each module
 - remove code about `deep search` completely
 - remove `ClauseDB::attach`
 
