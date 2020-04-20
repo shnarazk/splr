@@ -41,6 +41,8 @@ pub enum RestartMode {
 
 /// API for restart like `block_restart`, `force_restart` and so on.
 pub trait RestartIF {
+    /// return `true` if stabilizer is active.
+    fn stabilizing(&self) -> bool;
     /// block restart if needed.
     fn block_restart(&mut self) -> bool;
     /// force restart if needed.
@@ -576,16 +578,19 @@ impl Instantiate for Restarter {
 macro_rules! reset {
     ($executor: expr) => {
         $executor.after_restart = 0;
-        if $executor.stb.is_active() {
-            $executor.num_block += 1;
-            $executor.num_stabilize += 1;
-            return false;
-        }
+        // if $executor.stb.is_active() {
+        //     $executor.num_block += 1;
+        //     $executor.num_stabilize += 1;
+        //     return false;
+        // }
         return true;
     };
 }
 
 impl RestartIF for Restarter {
+    fn stabilizing(&self) -> bool {
+        self.stb.is_active()
+    }
     fn block_restart(&mut self) -> bool {
         // || self.bkt.enable
         if self.after_restart < self.restart_step || self.luby.enable {

@@ -4,7 +4,7 @@ use {
         assign::{AssignIF, AssignStack, VarRewardIF, VarSelectionIF},
         clause::{ClauseDB, ClauseDBIF},
         eliminate::{EliminateIF, Eliminator},
-        restart::{RestartIF, RestartMode, Restarter, RestarterModule},
+        restart::{RestartIF, Restarter, RestarterModule},
         state::{PhaseMode, Stat, State, StateIF},
         types::*,
     },
@@ -409,7 +409,7 @@ fn search(
             //
             //## set phase mode
             //
-            state.stabilize = rst.exports().0 == RestartMode::Stabilize;
+            state.stabilize = state.config.stabilize && rst.stabilizing();
             let na = asg.best_assigned(Flag::BEST_PHASE);
             if 0 < na && num_assigned < na + state.num_eliminated_vars {
                 num_assigned = na + state.num_eliminated_vars;

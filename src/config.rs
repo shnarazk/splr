@@ -140,6 +140,10 @@ pub struct Config {
     #[structopt(long = "cbt", default_value = "100")]
     pub cbt_thr: DecisionLevel,
 
+    /// Enable stabilizing phase
+    #[structopt(skip)]
+    pub stabilize: bool,
+
     /// Disables dynamic strategy adaptation
     #[structopt(long = "no-adapt", short = "A")]
     pub without_adaptive_strategy: bool,
@@ -167,6 +171,7 @@ impl Config {
     #[allow(unused_mut)]
     pub fn override_args(mut self) -> Config {
         // self.without_adaptive_strategy = true;
+        // self.stabilize = true;
         self
     }
 }
