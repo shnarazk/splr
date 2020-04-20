@@ -232,8 +232,6 @@ pub struct Clause {
     pub lits: Vec<Lit>,
     /// A static clause evaluation criterion like LBD, NDD, or something.
     pub rank: usize,
-    /// the ordinal of conflict at which this clause is checked.
-    pub checked_at: usize,
     /// the index from which `propagate` starts seaching an unfalsified literal.
     pub search_from: usize,
     /// A dynamic clause evaluation criterion based on the number of references.
@@ -247,8 +245,7 @@ impl Default for Clause {
         Clause {
             lits: vec![],
             rank: 0,
-            checked_at: 0,
-            search_from: 2,
+            search_from: 1,
             reward: 0.0,
             flags: Flag::empty(),
         }
@@ -825,13 +822,9 @@ impl ClauseDBIF for ClauseDB {
             }
             c.rank = rank;
             c.reward = reward;
-            c.checked_at = 0;
-            c.search_from = 2;
+            c.search_from = 1;
         } else {
-            let mut lits = Vec::with_capacity(vec.len());
-            for l in vec {
-                lits.push(*l);
-            }
+            let lits = Vec::from(vec);
             cid = ClauseId::from(self.clause.len());
             let c = Clause {
                 flags: Flag::empty(),
@@ -1017,6 +1010,7 @@ impl ClauseDBIF for ClauseDB {
         }
         (*c).turn_on(Flag::JUST_USED);
         debug_assert!(1 < usize::from(!p));
+        (*c).search_from = 1;
         let lits = &mut (*c).lits;
         debug_assert!(1 < lits.len());
         if lits.len() == 2 {

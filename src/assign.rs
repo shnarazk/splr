@@ -725,7 +725,6 @@ impl AssignIF for AssignStack {
         C: ClauseDBIF,
     {
         let watcher = cdb.watcher_lists_mut() as *mut [Vec<Watch>];
-        let check_index = self.num_conflict + self.num_restart;
         unsafe {
             self.num_propagation += 1;
             while let Some(p) = self.trail.get(self.q_head) {
@@ -757,7 +756,6 @@ impl AssignIF for AssignStack {
                     // debug_assert!(!cdb[w.c].is(Flag::DEAD));
                     let Clause {
                         ref mut lits,
-                        ref mut checked_at,
                         ref mut search_from,
                         ..
                     } = cdb[w.c];
@@ -773,24 +771,27 @@ impl AssignIF for AssignStack {
                         continue 'next_clause;
                     }
                     //
-                    //## Skip checked falsified literals
+                    //## Search an un-falsified literal
                     //
-                    if *checked_at < check_index {
-                        *checked_at = check_index;
-                        *search_from = 2;
-                    }
-                    for (k, lk) in lits.iter().enumerate().skip(*search_from) {
-                        if lit_assign!(self, *lk) != Some(false) {
-                            (*watcher)
-                                .get_unchecked_mut(usize::from(!*lk))
-                                .register(first, w.c, false);
-                            n -= 1;
-                            source.detach(n);
-                            lits.swap(1, k);
-                            *search_from = k + 1;
-                            continue 'next_clause;
+                    #[cfg(feature = "boundary_check")]
+                    assert!(*search_from < lits.len());
+                    for (start, end) in &[(*search_from + 1, lits.len()), (2, *search_from + 1)] {
+                        for k in *start..*end {
+                            let lk = &lits[k];
+                            if lit_assign!(self, *lk) != Some(false) {
+                                (*watcher)
+                                    .get_unchecked_mut(usize::from(!*lk))
+                                    .register(first, w.c, false);
+                                n -= 1;
+                                source.detach(n);
+                                lits.swap(1, k);
+                                // *search_from = k + 1;
+                                *search_from = k;
+                                continue 'next_clause;
+                            }
                         }
                     }
+
                     if first_value == Some(false) {
                         self.conflicts.1 = self.conflicts.0;
                         self.conflicts.0 = false_lit.vi();
