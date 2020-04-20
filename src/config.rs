@@ -62,19 +62,19 @@ pub struct Config {
     //
     //## eliminator
     //
-    /// #literals in a clause by v-elim
+    /// Max #lit for clause subsume
     #[structopt(long = "ecl", default_value = "100")]
     pub elim_cls_lim: usize,
 
-    /// max #caluses containing a var
+    /// Max #cls for var elimination
     #[structopt(long = "evo", default_value = "10000")]
     pub elim_var_occ: usize,
 
-    /// Grow limit of #clauses by v-elim
+    /// Grow limit of #cls in var elim.
     #[structopt(long = "evl", default_value = "0")]
     pub elim_grw_lim: usize,
 
-    /// Threshold to elimination
+    /// #cls to start simplification
     #[structopt(long = "et", default_value = "256")]
     pub elim_trigger: usize,
 
