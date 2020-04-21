@@ -171,7 +171,7 @@ pub trait VarRewardIF {
 
 /// API for phase saving.
 pub trait VarPhaseIF {
-    fn save_phase(&mut self, flag: Flag);
+    fn save_phase(&mut self, flag: Flag, incremental: bool);
     fn reset_phase(&mut self, flag: Flag);
 }
 
@@ -303,16 +303,22 @@ pub struct AssignStack {
     lbd_temp: Vec<usize>,
 
     //
+    //## Phase handling
+    //
+    best_assign: bool,
+    build_best_at: usize,
+    num_best_assign: usize,
+
+    target_assign: bool,
+    build_target_at: usize,
+    num_target_assign: usize,
+
+    //
     //## Statistics
     //
     pub num_vars: usize,
     pub num_solved_vars: usize,
     pub num_eliminated_vars: usize,
-
-    best_assign: bool,
-    num_best_assign: usize,
-    target_assign: bool,
-    num_target_assign: usize,
     num_conflict: usize,
     num_propagation: usize,
     num_restart: usize,
@@ -356,8 +362,10 @@ impl Default for AssignStack {
             num_solved_vars: 0,
             num_eliminated_vars: 0,
             best_assign: false,
+            build_best_at: 0,
             num_best_assign: 0,
             target_assign: false,
+            build_target_at: 0,
             num_target_assign: 0,
             num_conflict: 0,
             num_propagation: 0,
@@ -368,7 +376,7 @@ impl Default for AssignStack {
             ordinal: 0,
             var: Vec::new(),
             core_size: Ema::new(CORE_HISOTRY_LEN),
-            reward_step: 0.1,
+            reward_step: 1.0,
         }
     }
 }
@@ -824,15 +832,20 @@ impl AssignIF for AssignStack {
             }
         }
         let na = self.trail.len() + self.num_eliminated_vars;
-        if self.num_target_assign < na {
-            self.target_assign = true;
-            self.num_target_assign = na;
-            self.save_phase(Flag::TARGET_PHASE);
-        }
+        // if self.num_target_assign < na {
+        //     self.target_assign = true;
+        //     self.num_target_assign = na;
+        //     self.save_phase(Flag::TARGET_PHASE, self.build_target_at + 1 == self.num_propagation);
+        //     self.build_target_at = self.num_propagation;
+        // }
         if self.num_best_assign < na {
             self.best_assign = true;
             self.num_best_assign = na;
-            self.save_phase(Flag::BEST_PHASE);
+            self.save_phase(
+                Flag::BEST_PHASE,
+                self.build_best_at + 1 == self.num_propagation,
+            );
+            self.build_best_at = self.num_propagation;
         }
         ClauseId::default()
     }
@@ -850,12 +863,12 @@ impl AssignIF for AssignStack {
                     return self.num_best_assign;
                 }
             }
-            Flag::TARGET_PHASE => {
-                if self.target_assign {
-                    self.target_assign = false;
-                    return self.num_target_assign;
-                }
-            }
+            // Flag::TARGET_PHASE => {
+            //     if self.target_assign {
+            //         self.target_assign = false;
+            //         return self.num_target_assign;
+            //     }
+            // }
             _ => panic!("invalid flag for reset_assign_record"),
         }
         0
@@ -874,6 +887,7 @@ impl AssignIF for AssignStack {
                     for v in self.var.iter_mut().skip(1) {
                         v.set(flag, v.is(source));
                     }
+                    self.build_best_at = self.num_propagation;
                 } else {
                     self.num_best_assign = 0;
                 }
@@ -1058,9 +1072,16 @@ impl LBDIF for AssignStack {
 }
 
 impl VarPhaseIF for AssignStack {
-    fn save_phase(&mut self, flag: Flag) {
-        for l in self.trail.iter() {
-            self.var[l.vi()].set(flag, bool::from(*l));
+    fn save_phase(&mut self, flag: Flag, incremental: bool) {
+        if incremental && 0 < self.decision_level() {
+            let start = self.len_upto(self.decision_level() - 1);
+            for l in self.trail.iter().skip(start) {
+                self.var[l.vi()].set(flag, bool::from(*l));
+            }
+        } else {
+            for l in self.trail.iter() {
+                self.var[l.vi()].set(flag, bool::from(*l));
+            }
         }
     }
     fn reset_phase(&mut self, flag: Flag) {
