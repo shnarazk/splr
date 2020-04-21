@@ -1073,15 +1073,13 @@ impl LBDIF for AssignStack {
 
 impl VarPhaseIF for AssignStack {
     fn save_phase(&mut self, flag: Flag, incremental: bool) {
-        if incremental && 0 < self.decision_level() {
-            let start = self.len_upto(self.decision_level() - 1);
-            for l in self.trail.iter().skip(start) {
-                self.var[l.vi()].set(flag, bool::from(*l));
-            }
+        let to = if incremental && 0 < self.decision_level() {
+            self.len_upto(self.decision_level() - 1)
         } else {
-            for l in self.trail.iter() {
-                self.var[l.vi()].set(flag, bool::from(*l));
-            }
+            0
+        };
+        for l in self.trail.iter().skip(to) {
+            self.var[l.vi()].set(flag, bool::from(*l));
         }
     }
     fn reset_phase(&mut self, flag: Flag) {
