@@ -1,7 +1,10 @@
 /// Crate 'solver' provides the top-level API as a SAT solver.
 use {
     crate::{
-        assign::{AssignIF, AssignStack, VarRewardIF, VarSelectionIF},
+        assign::{
+            AssignIF, AssignStack, ClauseManipulationIF, VarManipulationIF, VarRewardIF,
+            VarSelectionIF,
+        },
         clause::{ClauseDB, ClauseDBIF},
         eliminate::{EliminateIF, Eliminator},
         restart::{RestartIF, Restarter, RestarterModule},
@@ -51,7 +54,7 @@ pub type SolverResult = Result<Certificate, SolverError>;
 /// The SAT solver object consisting of 6 sub modules.
 /// ```
 /// use std::convert::TryFrom;
-/// use crate::splr::{assign::AssignIF, state::{State, StateIF}, types::*};
+/// use crate::splr::{assign::{AssignIF, VarManipulationIF}, state::{State, StateIF}, types::*};
 /// use crate::splr::solver::{SatSolverIF, Solver, Certificate::*};
 ///
 /// let mut s = Solver::try_from("tests/sample.cnf").expect("can't load");
@@ -914,7 +917,7 @@ impl Solver {
                 Err(e) => panic!("{}", e),
             }
         }
-        debug_assert_eq!(self.asg.var_len() - 1, self.state.target.num_of_variables);
+        debug_assert_eq!(self.asg.num_vars, self.state.target.num_of_variables);
         // s.state[Stat::NumBin] = s.cdb.iter().skip(1).filter(|c| c.len() == 2).count();
         self.asg.adapt_to(&self.state, 0);
         self.rst.adapt_to(&self.state, 0);

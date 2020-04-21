@@ -345,7 +345,7 @@ impl EliminateIF for Eliminator {
             self.add_cid_occur(asg, ClauseId::from(cid), c, false);
         }
         if force {
-            for vi in 1..asg.var_len() {
+            for vi in 1..=asg.var_stats().0 {
                 if asg.var(vi).is(Flag::ELIMINATED) || asg.assign(vi).is_some() {
                     continue;
                 }

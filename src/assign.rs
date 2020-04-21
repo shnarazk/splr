@@ -26,7 +26,7 @@ pub trait LBDIF {
 }
 
 /// API for assignment like `propagate`, `enqueue`, `cancel_until`, and so on.
-pub trait AssignIF: LBDIF + VarRewardIF {
+pub trait AssignIF: ClauseManipulationIF + LBDIF + VarManipulationIF + VarRewardIF {
     /// return a literal in the stack.
     fn stack(&self, i: usize) -> Lit;
     /// return literals in the range of stack.
@@ -41,32 +41,12 @@ pub trait AssignIF: LBDIF + VarRewardIF {
     fn len_upto(&self, n: DecisionLevel) -> usize;
     /// return `true` if there's no assignment.
     fn stack_is_empty(&self) -> bool;
-    // erturn the assignment of var.
-    fn assign(&self, vi: VarId) -> Option<bool>;
-    /// return the assign level of var.
-    fn level(&self, vi: VarId) -> DecisionLevel;
-    /// return the reason of assignment.
-    fn reason(&self, vi: VarId) -> AssignReason;
-    /// return the var.
-    fn var(&self, vi: VarId) -> &Var;
-    /// return the var.
-    fn var_mut(&mut self, vi: VarId) -> &mut Var;
-    /// return *the value* of a literal.
-    fn assigned(&self, l: Lit) -> Option<bool>;
-    /// return an iterator over Vars.
-    fn var_iter(&self) -> Iter<'_, Var>;
-    /// return an mutable iterator over Vars.
-    fn var_iter_mut(&mut self) -> IterMut<'_, Var>;
-    /// return the number of real var + a dummy var.
-    fn var_len(&self) -> usize;
     /// return an iterator over assignment stack.
     fn stack_iter(&self) -> Iter<'_, Lit>;
     /// return the current decision level.
     fn decision_level(&self) -> DecisionLevel;
     ///return the decision var's id at that level.
     fn decision_vi(&self, lv: DecisionLevel) -> VarId;
-    /// return `true` if the current decision level is zero.
-    fn is_zero(&self) -> bool;
     /// return `true` if there are unpropagated assignments.
     fn remains(&self) -> bool;
     /// add an assignment at level 0 as a precondition.
@@ -99,7 +79,12 @@ pub trait AssignIF: LBDIF + VarRewardIF {
     fn recurrent_conflicts(&self) -> bool;
     fn level_ref(&self) -> &[DecisionLevel];
     fn best_assigned(&mut self, flag: Flag) -> usize;
-    fn reset_assign_record(&mut self, flag: Flag, from: Option<Flag>);
+    /// inject assignments for eliminated vars.
+    fn extend_model(&mut self, lits: &[Lit]);
+}
+
+/// API for var manipulation
+pub trait ClauseManipulationIF {
     /// return `true` if the set of literals is satisfiable under the current assignment.
     fn satisfies(&self, c: &[Lit]) -> bool;
     /// return Option<bool>
@@ -113,8 +98,25 @@ pub trait AssignIF: LBDIF + VarRewardIF {
     fn minimize_with_biclauses<C>(&mut self, cdb: &C, vec: &mut Vec<Lit>)
     where
         C: ClauseDBIF;
-    /// inject assignments for eliminated vars.
-    fn extend_model(&mut self, lits: &[Lit]);
+}
+
+pub trait VarManipulationIF {
+    /// return the assignment of var.
+    fn assign(&self, vi: VarId) -> Option<bool>;
+    /// return *the value* of a literal.
+    fn assigned(&self, l: Lit) -> Option<bool>;
+    /// return the assign level of var.
+    fn level(&self, vi: VarId) -> DecisionLevel;
+    /// return the reason of assignment.
+    fn reason(&self, vi: VarId) -> AssignReason;
+    /// return the var.
+    fn var(&self, vi: VarId) -> &Var;
+    /// return the var.
+    fn var_mut(&mut self, vi: VarId) -> &mut Var;
+    /// return an iterator over Vars.
+    fn var_iter(&self) -> Iter<'_, Var>;
+    /// return an mutable iterator over Vars.
+    fn var_iter_mut(&mut self) -> IterMut<'_, Var>;
     /// eliminate a var.
     fn set_eliminated(&mut self, vi: VarId);
     /// return the following data:
@@ -134,22 +136,6 @@ pub trait VarSelectionIF {
     /// rebuild the internal var_order
     fn rebuild_order(&mut self);
 }
-
-/*
-/// API for var DB like `assigned`, `locked`, and so on.
-pub trait VarDBIF:
-    IndexMut<VarId, Output = Var> + IndexMut<Lit, Output = Var> + VarPhaseIF
-{
-    /// return the number of vars.
-    fn len(&self) -> usize;
-    /// return true if it's empty.
-    fn is_empty(&self) -> bool;
-    /// return an iterator over vars.
-    fn iter(&self) -> Iter<'_, Var>;
-    /// return an iterator over vars.
-    fn iter_mut(&mut self) -> IterMut<'_, Var>;
-}
-*/
 
 /// API for var rewarding.
 pub trait VarRewardIF {
@@ -171,8 +157,8 @@ pub trait VarRewardIF {
 
 /// API for phase saving.
 pub trait VarPhaseIF {
-    fn save_phase(&mut self, flag: Flag, incremental: bool);
-    fn reset_phase(&mut self, flag: Flag);
+    /// reset or copy phase data.
+    fn reset_assign_record(&mut self, flag: Flag, from: Option<Flag>);
 }
 
 /// Object representing a variable.
@@ -181,13 +167,13 @@ pub struct Var {
     /// reverse conversion to index. Note `VarId` must be `usize`.
     pub index: VarId,
     /// the number of participation in conflict analysis
-    pub participated: u32,
+    participated: u32,
     /// a dynamic evaluation criterion like VSIDS or ACID.
-    pub reward: f64,
+    reward: f64,
     /// the number of conflicts at which this var was assigned lastly.
-    pub timestamp: usize,
+    timestamp: usize,
     /// the `Flag`s
-    pub flags: Flag,
+    flags: Flag,
 }
 
 impl Default for Var {
@@ -316,8 +302,11 @@ pub struct AssignStack {
     //
     //## Statistics
     //
+    /// the number of vars.
     pub num_vars: usize,
+    /// the number of solved vars.
     pub num_solved_vars: usize,
+    /// the number of eliminated vars.
     pub num_eliminated_vars: usize,
     num_conflict: usize,
     num_propagation: usize,
@@ -584,43 +573,8 @@ impl AssignIF for AssignStack {
     fn len_upto(&self, n: DecisionLevel) -> usize {
         self.trail_lim[n as usize]
     }
-    fn assigned(&self, l: Lit) -> Option<bool> {
-        match unsafe { self.assign.get_unchecked(l.vi()) } {
-            Some(x) if !bool::from(l) => Some(!x),
-            x => *x,
-        }
-    }
     fn stack_is_empty(&self) -> bool {
         self.trail.is_empty()
-    }
-    #[inline]
-    fn assign(&self, vi: VarId) -> Option<bool> {
-        unsafe { *self.assign.get_unchecked(vi) }
-    }
-    #[inline]
-    fn level(&self, vi: VarId) -> DecisionLevel {
-        unsafe { *self.level.get_unchecked(vi) }
-    }
-    #[inline]
-    fn reason(&self, vi: VarId) -> AssignReason {
-        unsafe { *self.reason.get_unchecked(vi) }
-    }
-    #[inline]
-    fn var(&self, vi: VarId) -> &Var {
-        unsafe { self.var.get_unchecked(vi) }
-    }
-    #[inline]
-    fn var_mut(&mut self, vi: VarId) -> &mut Var {
-        unsafe { self.var.get_unchecked_mut(vi) }
-    }
-    fn var_iter(&self) -> Iter<'_, Var> {
-        self.var.iter()
-    }
-    fn var_iter_mut(&mut self) -> IterMut<'_, Var> {
-        self.var.iter_mut()
-    }
-    fn var_len(&self) -> usize {
-        self.var.len()
     }
     fn stack_iter(&self) -> Iter<'_, Lit> {
         self.trail.iter()
@@ -631,9 +585,6 @@ impl AssignIF for AssignStack {
     fn decision_vi(&self, lv: DecisionLevel) -> VarId {
         debug_assert!(0 < lv);
         self.trail[self.trail_lim[lv as usize - 1]].vi()
-    }
-    fn is_zero(&self) -> bool {
-        self.trail_lim.is_empty()
     }
     fn remains(&self) -> bool {
         self.q_head < self.trail.len()
@@ -873,94 +824,6 @@ impl AssignIF for AssignStack {
         }
         0
     }
-    fn reset_assign_record(&mut self, flag: Flag, from: Option<Flag>) {
-        match flag {
-            Flag::PHASE => {
-                if let Some(source) = from {
-                    for v in self.var.iter_mut().skip(1) {
-                        v.set(flag, v.is(source));
-                    }
-                }
-            }
-            Flag::BEST_PHASE => {
-                if let Some(source) = from {
-                    for v in self.var.iter_mut().skip(1) {
-                        v.set(flag, v.is(source));
-                    }
-                    self.build_best_at = self.num_propagation;
-                } else {
-                    self.num_best_assign = 0;
-                }
-            }
-            Flag::TARGET_PHASE => {
-                self.num_target_assign = self.num_eliminated_vars;
-                if let Some(source) = from {
-                    for v in self.var.iter_mut().skip(1) {
-                        v.set(flag, v.is(source));
-                    }
-                }
-            }
-            _ => panic!("invalid flag for reset_assign_record"),
-        }
-    }
-    fn satisfies(&self, vec: &[Lit]) -> bool {
-        for l in vec {
-            if self.assigned(*l) == Some(true) {
-                return true;
-            }
-        }
-        false
-    }
-    fn status(&self, vec: &[Lit]) -> Option<bool> {
-        let mut falsified = Some(false);
-        for l in vec {
-            match self.assigned(*l) {
-                Some(true) => return Some(true),
-                None => falsified = None,
-                _ => (),
-            }
-        }
-        falsified
-    }
-    fn locked(&self, c: &Clause, cid: ClauseId) -> bool {
-        let lits = &c.lits;
-        debug_assert!(1 < lits.len());
-        let l0 = lits[0];
-        self.assigned(l0) == Some(true)
-            && matches!(self.reason(l0.vi()), AssignReason::Implication(x, _) if x == cid)
-    }
-    fn minimize_with_biclauses<C>(&mut self, cdb: &C, vec: &mut Vec<Lit>)
-    where
-        C: ClauseDBIF,
-    {
-        if vec.len() <= 1 {
-            return;
-        }
-        self.lbd_temp[0] += 1;
-        let key = self.lbd_temp[0];
-        for l in &vec[1..] {
-            self.lbd_temp[l.vi() as usize] = key;
-        }
-        let l0 = vec[0];
-        let mut nsat = 0;
-        for w in cdb.watcher_list(!l0) {
-            let c = &cdb[w.c];
-            if c.len() != 2 {
-                continue;
-            }
-            debug_assert!(c[0] == l0 || c[1] == l0);
-            let other = c[(c[0] == l0) as usize];
-            let vi = other.vi();
-            if self.lbd_temp[vi] == key && self.assigned(other) == Some(true) {
-                nsat += 1;
-                self.lbd_temp[vi] = key - 1;
-            }
-        }
-        if 0 < nsat {
-            self.lbd_temp[l0.vi()] = key;
-            vec.retain(|l| self.lbd_temp[l.vi()] == key);
-        }
-    }
     fn extend_model(&mut self, lits: &[Lit]) {
         if lits.is_empty() {
             return;
@@ -978,12 +841,6 @@ impl AssignIF for AssignStack {
                     break;
                 }
                 let l = lits[i];
-                // let model_value = match model[l.vi() - 1] {
-                //     x if x == l.to_i32() => Some(true),
-                //     x if -x == l.to_i32() => Some(false),
-                //     _ => None,
-                // };
-                // if model_value != Some(false) {
                 if self.assign(l.vi()) != Some(bool::from(l)) {
                     if i < width {
                         break 'next;
@@ -1003,22 +860,6 @@ impl AssignIF for AssignStack {
             }
             i -= width;
         }
-    }
-    fn set_eliminated(&mut self, vi: VarId) {
-        if !self.var[vi].is(Flag::ELIMINATED) {
-            self.var[vi].turn_on(Flag::ELIMINATED);
-            self.clear_reward(vi);
-            self.num_eliminated_vars += 1;
-        }
-    }
-    #[inline]
-    fn var_stats(&self) -> (usize, usize, usize, usize) {
-        (
-            self.num_vars,
-            self.num_solved_vars,
-            self.num_eliminated_vars,
-            self.num_vars - self.num_solved_vars - self.num_eliminated_vars,
-        )
     }
 }
 
@@ -1072,19 +913,34 @@ impl LBDIF for AssignStack {
 }
 
 impl VarPhaseIF for AssignStack {
-    fn save_phase(&mut self, flag: Flag, incremental: bool) {
-        let to = if incremental && 0 < self.decision_level() {
-            self.len_upto(self.decision_level() - 1)
-        } else {
-            0
-        };
-        for l in self.trail.iter().skip(to) {
-            self.var[l.vi()].set(flag, bool::from(*l));
-        }
-    }
-    fn reset_phase(&mut self, flag: Flag) {
-        for v in &mut self.var[1..] {
-            v.turn_off(flag);
+    fn reset_assign_record(&mut self, flag: Flag, from: Option<Flag>) {
+        match flag {
+            Flag::PHASE => {
+                if let Some(source) = from {
+                    for v in self.var.iter_mut().skip(1) {
+                        v.set(flag, v.is(source));
+                    }
+                }
+            }
+            Flag::BEST_PHASE => {
+                if let Some(source) = from {
+                    for v in self.var.iter_mut().skip(1) {
+                        v.set(flag, v.is(source));
+                    }
+                    self.build_best_at = self.num_propagation;
+                } else {
+                    self.num_best_assign = 0;
+                }
+            }
+            Flag::TARGET_PHASE => {
+                self.num_target_assign = self.num_eliminated_vars;
+                if let Some(source) = from {
+                    for v in self.var.iter_mut().skip(1) {
+                        v.set(flag, v.is(source));
+                    }
+                }
+            }
+            _ => panic!("invalid flag for reset_assign_record"),
         }
     }
 }
@@ -1164,6 +1020,118 @@ impl VarRewardIF for AssignStack {
     }
 }
 
+impl ClauseManipulationIF for AssignStack {
+    fn satisfies(&self, vec: &[Lit]) -> bool {
+        for l in vec {
+            if self.assigned(*l) == Some(true) {
+                return true;
+            }
+        }
+        false
+    }
+    fn status(&self, vec: &[Lit]) -> Option<bool> {
+        let mut falsified = Some(false);
+        for l in vec {
+            match self.assigned(*l) {
+                Some(true) => return Some(true),
+                None => falsified = None,
+                _ => (),
+            }
+        }
+        falsified
+    }
+    fn locked(&self, c: &Clause, cid: ClauseId) -> bool {
+        let lits = &c.lits;
+        debug_assert!(1 < lits.len());
+        let l0 = lits[0];
+        self.assigned(l0) == Some(true)
+            && matches!(self.reason(l0.vi()), AssignReason::Implication(x, _) if x == cid)
+    }
+    fn minimize_with_biclauses<C>(&mut self, cdb: &C, vec: &mut Vec<Lit>)
+    where
+        C: ClauseDBIF,
+    {
+        if vec.len() <= 1 {
+            return;
+        }
+        self.lbd_temp[0] += 1;
+        let key = self.lbd_temp[0];
+        for l in &vec[1..] {
+            self.lbd_temp[l.vi() as usize] = key;
+        }
+        let l0 = vec[0];
+        let mut nsat = 0;
+        for w in cdb.watcher_list(!l0) {
+            let c = &cdb[w.c];
+            if c.len() != 2 {
+                continue;
+            }
+            debug_assert!(c[0] == l0 || c[1] == l0);
+            let other = c[(c[0] == l0) as usize];
+            let vi = other.vi();
+            if self.lbd_temp[vi] == key && self.assigned(other) == Some(true) {
+                nsat += 1;
+                self.lbd_temp[vi] = key - 1;
+            }
+        }
+        if 0 < nsat {
+            self.lbd_temp[l0.vi()] = key;
+            vec.retain(|l| self.lbd_temp[l.vi()] == key);
+        }
+    }
+}
+
+impl VarManipulationIF for AssignStack {
+    fn assigned(&self, l: Lit) -> Option<bool> {
+        match unsafe { self.assign.get_unchecked(l.vi()) } {
+            Some(x) if !bool::from(l) => Some(!x),
+            x => *x,
+        }
+    }
+    #[inline]
+    fn assign(&self, vi: VarId) -> Option<bool> {
+        unsafe { *self.assign.get_unchecked(vi) }
+    }
+    #[inline]
+    fn level(&self, vi: VarId) -> DecisionLevel {
+        unsafe { *self.level.get_unchecked(vi) }
+    }
+    #[inline]
+    fn reason(&self, vi: VarId) -> AssignReason {
+        unsafe { *self.reason.get_unchecked(vi) }
+    }
+    #[inline]
+    fn var(&self, vi: VarId) -> &Var {
+        unsafe { self.var.get_unchecked(vi) }
+    }
+    #[inline]
+    fn var_mut(&mut self, vi: VarId) -> &mut Var {
+        unsafe { self.var.get_unchecked_mut(vi) }
+    }
+    fn var_iter(&self) -> Iter<'_, Var> {
+        self.var.iter()
+    }
+    fn var_iter_mut(&mut self) -> IterMut<'_, Var> {
+        self.var.iter_mut()
+    }
+    fn set_eliminated(&mut self, vi: VarId) {
+        if !self.var[vi].is(Flag::ELIMINATED) {
+            self.var[vi].turn_on(Flag::ELIMINATED);
+            self.clear_reward(vi);
+            self.num_eliminated_vars += 1;
+        }
+    }
+    #[inline]
+    fn var_stats(&self) -> (usize, usize, usize, usize) {
+        (
+            self.num_vars,
+            self.num_solved_vars,
+            self.num_eliminated_vars,
+            self.num_vars - self.num_solved_vars - self.num_eliminated_vars,
+        )
+    }
+}
+
 impl VarSelectionIF for AssignStack {
     fn select_var(&mut self) -> VarId {
         loop {
@@ -1207,7 +1175,7 @@ impl AssignStack {
         }
         if let Ok(out) = File::create(&fname) {
             let mut buf = BufWriter::new(out);
-            let nv = self.var_len() - 1;
+            let nv = self.num_vars;
             let nc: usize = cdb.len() - 1;
             buf.write_all(format!("p cnf {} {}\n", self.num_vars, nc + nv).as_bytes())
                 .unwrap();
@@ -1225,6 +1193,16 @@ impl AssignStack {
             }
         }
     }
+    fn save_phase(&mut self, flag: Flag, incremental: bool) {
+        let to = if incremental && 0 < self.decision_level() {
+            self.len_upto(self.decision_level() - 1)
+        } else {
+            0
+        };
+        for l in self.trail.iter().skip(to) {
+            self.var[l.vi()].set(flag, bool::from(*l));
+        }
+    }
 }
 
 /// Heap of VarId, based on var activity.
@@ -1233,10 +1211,10 @@ impl AssignStack {
 // - `idxs[0]` contains the number of alive elements
 //   `indx` is positions. So the unused field 0 can hold the last position as a special case.
 #[derive(Debug)]
-pub struct VarIdHeap {
-    // order : usize -> VarId, -- Which var is the n-th best?
+struct VarIdHeap {
+    /// order : usize -> VarId, -- Which var is the n-th best?
     heap: Vec<VarId>,
-    // VarId : -> order : usize -- How good is the var?
+    /// VarId : -> order : usize -- How good is the var?
     idxs: Vec<usize>,
 }
 
