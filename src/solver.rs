@@ -1,10 +1,7 @@
 /// Crate 'solver' provides the top-level API as a SAT solver.
 use {
     crate::{
-        assign::{
-            AssignIF, AssignStack, ClauseManipulationIF, VarManipulationIF, VarRewardIF,
-            VarSelectionIF,
-        },
+        assign::{AssignIF, AssignStack, VarManipulationIF, VarRewardIF, VarSelectionIF},
         clause::{ClauseDB, ClauseDBIF},
         eliminate::{EliminateIF, Eliminator},
         restart::{RestartIF, Restarter, RestarterModule},
@@ -926,7 +923,7 @@ impl Solver {
 }
 
 impl State {
-    fn minimize_learnt(&mut self, asg: &mut AssignStack, cdb: &ClauseDB) -> DecisionLevel {
+    fn minimize_learnt(&mut self, asg: &mut AssignStack, cdb: &mut ClauseDB) -> DecisionLevel {
         let State {
             ref mut new_learnt, ..
         } = self;
@@ -943,7 +940,7 @@ impl State {
         new_learnt.retain(|l| *l == l0 || !l.is_redundant(asg, cdb, &mut to_clear, &levels));
         let len = new_learnt.len();
         if 2 < len && len < 30 {
-            asg.minimize_with_biclauses(cdb, new_learnt);
+            cdb.minimize_with_biclauses(asg, new_learnt);
         }
         // find correct backtrack level from remaining literals
         let mut level_to_return = 0;

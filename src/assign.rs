@@ -15,18 +15,8 @@ use {
     },
 };
 
-/// API to calculate LBD.
-pub trait LBDIF {
-    /// return the LBD value for a set of literals.
-    fn compute_lbd(&mut self, vec: &[Lit]) -> usize;
-    /// re-calculate the LBD values of all (learnt) clauses.
-    fn reset_lbd<C>(&mut self, cdb: &mut C, all: bool)
-    where
-        C: ClauseDBIF;
-}
-
 /// API for assignment like `propagate`, `enqueue`, `cancel_until`, and so on.
-pub trait AssignIF: ClauseManipulationIF + LBDIF + VarManipulationIF + VarRewardIF {
+pub trait AssignIF: ClauseManipulationIF + VarManipulationIF + VarRewardIF {
     /// return a literal in the stack.
     fn stack(&self, i: usize) -> Lit;
     /// return literals in the range of stack.
@@ -94,10 +84,6 @@ pub trait ClauseManipulationIF {
     fn status(&self, c: &[Lit]) -> Option<bool>;
     /// return `true` is the clause is the reason of the assignment.
     fn locked(&self, c: &Clause, cid: ClauseId) -> bool;
-    /// minimize a clause.
-    fn minimize_with_biclauses<C>(&mut self, cdb: &C, vec: &mut Vec<Lit>)
-    where
-        C: ClauseDBIF;
 }
 
 pub trait VarManipulationIF {
@@ -283,12 +269,6 @@ pub struct AssignStack {
     var_order: VarIdHeap, // Variable Order
 
     //
-    //## LBD
-    //
-    /// a working buffer for LBD calculation
-    lbd_temp: Vec<usize>,
-
-    //
     //## Phase handling
     //
     best_assign: bool,
@@ -311,7 +291,6 @@ pub struct AssignStack {
     num_conflict: usize,
     num_propagation: usize,
     num_restart: usize,
-    num_lbd_update: usize,
 
     //
     //## Var DB
@@ -346,7 +325,6 @@ impl Default for AssignStack {
             root_level: 0,
             conflicts: (0, 0),
             var_order: VarIdHeap::default(),
-            lbd_temp: Vec::new(),
             num_vars: 0,
             num_solved_vars: 0,
             num_eliminated_vars: 0,
@@ -359,7 +337,6 @@ impl Default for AssignStack {
             num_conflict: 0,
             num_propagation: 0,
             num_restart: 0,
-            num_lbd_update: 0,
             activity_decay: VRD_START,
             activity_decay_max: VRD_MAX,
             ordinal: 0,
@@ -413,43 +390,6 @@ macro_rules! unset_assign {
     };
 }
 
-/*
-impl Index<VarId> for AssignStack {
-    type Output = Option<bool>;
-    #[inline]
-    fn index(&self, i: VarId) -> &Self::Output {
-        unsafe { self.assign.get_unchecked(i) }
-    }
-}
-
-impl IndexMut<VarId> for AssignStack {
-    #[inline]
-    fn index_mut(&mut self, i: VarId) -> &mut Self::Output {
-        unsafe { self.assign.get_unchecked_mut(i) }
-    }
-}
- */
-
-/*
-impl Index<Range<usize>> for AssignStack {
-    type Output = [Lit];
-    #[inline]
-    fn index(&self, r: Range<usize>) -> &[Lit] {
-        &self.trail[r]
-    }
-}
-*/
-
-/*
-impl Index<RangeFrom<usize>> for AssignStack {
-    type Output = [Lit];
-    #[inline]
-    fn index(&self, r: RangeFrom<usize>) -> &[Lit] {
-        unsafe { self.trail.get_unchecked(r) }
-    }
-}
- */
-
 impl<'a> IntoIterator for &'a mut AssignStack {
     type Item = &'a Lit;
     type IntoIter = Iter<'a, Lit>;
@@ -473,7 +413,6 @@ impl Instantiate for AssignStack {
             reason: vec![AssignReason::default(); 1 + nv],
             trail: Vec::with_capacity(nv),
             var_order: VarIdHeap::new(nv, nv),
-            lbd_temp: vec![0; nv + 1],
             num_vars: cnf.num_of_variables,
             var: Var::new_vars(nv),
             ..AssignStack::default()
@@ -863,55 +802,6 @@ impl AssignIF for AssignStack {
     }
 }
 
-impl LBDIF for AssignStack {
-    fn compute_lbd(&mut self, vec: &[Lit]) -> usize {
-        let AssignStack {
-            lbd_temp, level, ..
-        } = self;
-        unsafe {
-            let key: usize = lbd_temp.get_unchecked(0) + 1;
-            *lbd_temp.get_unchecked_mut(0) = key;
-            let mut cnt = 0;
-            for l in vec {
-                let lv = level[l.vi()];
-                let p = lbd_temp.get_unchecked_mut(lv as usize);
-                if *p != key {
-                    *p = key;
-                    cnt += 1;
-                }
-            }
-            cnt
-        }
-    }
-    fn reset_lbd<C>(&mut self, cdb: &mut C, all: bool)
-    where
-        C: ClauseDBIF,
-    {
-        let AssignStack { lbd_temp, .. } = self;
-        let mut key = lbd_temp[0];
-        for c in &mut cdb.iter_mut().skip(1) {
-            if c.is(Flag::DEAD) || !c.is(Flag::LEARNT) || (!all && !c.is(Flag::JUST_USED)) {
-                continue;
-            }
-            key += 1;
-            let mut cnt = 0;
-            for l in &c.lits {
-                let lv = self.level[l.vi()];
-                if lv != 0 {
-                    let p = unsafe { lbd_temp.get_unchecked_mut(lv as usize) };
-                    if *p != key {
-                        *p = key;
-                        cnt += 1;
-                    }
-                }
-            }
-            c.rank = cnt;
-        }
-        lbd_temp[0] = key;
-        self.num_lbd_update += 1;
-    }
-}
-
 impl VarPhaseIF for AssignStack {
     fn reset_assign_record(&mut self, flag: Flag, from: Option<Flag>) {
         match flag {
@@ -1046,38 +936,6 @@ impl ClauseManipulationIF for AssignStack {
         let l0 = lits[0];
         self.assigned(l0) == Some(true)
             && matches!(self.reason(l0.vi()), AssignReason::Implication(x, _) if x == cid)
-    }
-    fn minimize_with_biclauses<C>(&mut self, cdb: &C, vec: &mut Vec<Lit>)
-    where
-        C: ClauseDBIF,
-    {
-        if vec.len() <= 1 {
-            return;
-        }
-        self.lbd_temp[0] += 1;
-        let key = self.lbd_temp[0];
-        for l in &vec[1..] {
-            self.lbd_temp[l.vi() as usize] = key;
-        }
-        let l0 = vec[0];
-        let mut nsat = 0;
-        for w in cdb.watcher_list(!l0) {
-            let c = &cdb[w.c];
-            if c.len() != 2 {
-                continue;
-            }
-            debug_assert!(c[0] == l0 || c[1] == l0);
-            let other = c[(c[0] == l0) as usize];
-            let vi = other.vi();
-            if self.lbd_temp[vi] == key && self.assigned(other) == Some(true) {
-                nsat += 1;
-                self.lbd_temp[vi] = key - 1;
-            }
-        }
-        if 0 < nsat {
-            self.lbd_temp[l0.vi()] = key;
-            vec.retain(|l| self.lbd_temp[l.vi()] == key);
-        }
     }
 }
 
