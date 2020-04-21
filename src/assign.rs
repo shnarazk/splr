@@ -115,6 +115,14 @@ pub trait AssignIF: LBDIF + VarRewardIF {
         C: ClauseDBIF;
     /// inject assignments for eliminated vars.
     fn extend_model(&mut self, lits: &[Lit]);
+    /// eliminate a var.
+    fn set_eliminated(&mut self, vi: VarId);
+    /// return the following data:
+    /// * the number of vars
+    /// * the number of solved vars
+    /// * the number of eliminated vars
+    /// * the number of unsolved vars
+    fn var_stats(&self) -> (usize, usize, usize, usize);
 }
 
 /// API for var selection.
@@ -284,7 +292,7 @@ pub struct AssignStack {
     trail: Vec<Lit>,
     trail_lim: Vec<usize>,
     q_head: usize,
-    root_level: DecisionLevel,
+    pub root_level: DecisionLevel,
     conflicts: (VarId, VarId),
     var_order: VarIdHeap, // Variable Order
 
@@ -297,12 +305,15 @@ pub struct AssignStack {
     //
     //## Statistics
     //
+    pub num_vars: usize,
+    pub num_solved_vars: usize,
+    pub num_eliminated_vars: usize,
+
     best_assign: bool,
     num_best_assign: usize,
     target_assign: bool,
     num_target_assign: usize,
     num_conflict: usize,
-    pub num_eliminated_vars: usize,
     num_propagation: usize,
     num_restart: usize,
     num_lbd_update: usize,
@@ -341,12 +352,14 @@ impl Default for AssignStack {
             conflicts: (0, 0),
             var_order: VarIdHeap::default(),
             lbd_temp: Vec::new(),
+            num_vars: 0,
+            num_solved_vars: 0,
+            num_eliminated_vars: 0,
             best_assign: false,
             num_best_assign: 0,
             target_assign: false,
             num_target_assign: 0,
             num_conflict: 0,
-            num_eliminated_vars: 0,
             num_propagation: 0,
             num_restart: 0,
             num_lbd_update: 0,
@@ -464,6 +477,7 @@ impl Instantiate for AssignStack {
             trail: Vec::with_capacity(nv),
             var_order: VarIdHeap::new(nv, nv),
             lbd_temp: vec![0; nv + 1],
+            num_vars: cnf.num_of_variables,
             var: Var::new_vars(nv),
             ..AssignStack::default()
         }
@@ -976,6 +990,22 @@ impl AssignIF for AssignStack {
             i -= width;
         }
     }
+    fn set_eliminated(&mut self, vi: VarId) {
+        if !self.var[vi].is(Flag::ELIMINATED) {
+            self.var[vi].turn_on(Flag::ELIMINATED);
+            self.clear_reward(vi);
+            self.num_eliminated_vars += 1;
+        }
+    }
+    #[inline]
+    fn var_stats(&self) -> (usize, usize, usize, usize) {
+        (
+            self.num_vars,
+            self.num_solved_vars,
+            self.num_eliminated_vars,
+            self.num_vars - self.num_solved_vars - self.num_eliminated_vars,
+        )
+    }
 }
 
 impl LBDIF for AssignStack {
@@ -1143,7 +1173,7 @@ impl AssignStack {
     }
     /// dump all active clauses and fixed assignments as a CNF file.
     #[allow(dead_code)]
-    fn dump_cnf<C, V>(&mut self, cdb: &C, state: &State, fname: &str)
+    fn dump_cnf<C, V>(&mut self, cdb: &C, fname: &str)
     where
         C: ClauseDBIF,
     {
@@ -1160,7 +1190,7 @@ impl AssignStack {
             let mut buf = BufWriter::new(out);
             let nv = self.var_len() - 1;
             let nc: usize = cdb.len() - 1;
-            buf.write_all(format!("p cnf {} {}\n", state.num_vars, nc + nv).as_bytes())
+            buf.write_all(format!("p cnf {} {}\n", self.num_vars, nc + nv).as_bytes())
                 .unwrap();
             for c in cdb.iter().skip(1) {
                 for l in &c.lits {

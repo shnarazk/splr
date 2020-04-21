@@ -19,8 +19,6 @@ use {
 
 /// API for state/statistics management, providing `progress`.
 pub trait StateIF {
-    /// return the number of unsolved vars.
-    fn num_unsolved_vars(&self) -> usize;
     /// return `true` if it is timed out.
     fn is_timeout(&self) -> bool;
     /// return elapsed time as a fraction.
@@ -171,11 +169,6 @@ impl IndexMut<Stat> for [usize] {
 /// Data storage for `Solver`.
 #[derive(Debug)]
 pub struct State {
-    pub root_level: DecisionLevel,
-    pub num_vars: usize,
-    pub num_solved_vars: usize,
-    pub num_eliminated_vars: usize,
-    pub num_best_assigned: usize,
     pub config: Config,
     pub phase_select: PhaseMode,
     pub stats: [usize; Stat::EndOfStatIndex as usize], // statistics
@@ -190,7 +183,6 @@ pub struct State {
     pub conflicts: Vec<Lit>,
     pub last_asg: usize,
     pub last_solved: usize,
-    pub to_eliminate: f64,
     pub new_learnt: Vec<Lit>,
     pub progress_cnt: usize,
     pub record: ProgressRecord,
@@ -202,11 +194,6 @@ pub struct State {
 impl Default for State {
     fn default() -> State {
         State {
-            root_level: 0,
-            num_vars: 0,
-            num_solved_vars: 0,
-            num_eliminated_vars: 0,
-            num_best_assigned: 0,
             config: Config::default(),
             phase_select: PhaseMode::Latest,
             stats: [0; Stat::EndOfStatIndex as usize],
@@ -219,7 +206,6 @@ impl Default for State {
             conflicts: Vec::new(),
             last_asg: 0,
             last_solved: 0,
-            to_eliminate: 0.0,
             new_learnt: Vec::new(),
             progress_cnt: 0,
             record: ProgressRecord::default(),
@@ -248,7 +234,6 @@ impl IndexMut<Stat> for State {
 impl Instantiate for State {
     fn instantiate(config: &Config, cnf: &CNFDescription) -> State {
         State {
-            num_vars: cnf.num_of_variables,
             config: config.clone(),
             strategy: if config.without_adaptive_strategy {
                 (SearchStrategy::Generic, 0)
@@ -350,9 +335,6 @@ macro_rules! f {
 }
 
 impl StateIF for State {
-    fn num_unsolved_vars(&self) -> usize {
-        self.num_vars - self.num_solved_vars - self.num_eliminated_vars
-    }
     fn is_timeout(&self) -> bool {
         if self.time_limit == 0.0 {
             return false;
@@ -430,7 +412,9 @@ impl StateIF for State {
         //
         //## Gather stats from all modules
         //
-
+        let (asg_num_vars, asg_num_solved_vars, asg_num_eliminated_vars, asg_num_unsolved_vars) =
+            asg.var_stats();
+        let rate = (asg_num_solved_vars + asg_num_eliminated_vars) as f64 / asg_num_vars as f64;
         let (
             asg_num_conflict,
             asg_num_propagation,
@@ -459,10 +443,6 @@ impl StateIF for State {
             self.dump(asg, cdb, rst);
             return;
         }
-        let nv = self.target.num_of_variables;
-        let fixed = self.num_solved_vars;
-        let sum = fixed + self.num_eliminated_vars;
-
         self.progress_cnt += 1;
         print!("\x1B[8A\x1B[1G");
         println!("\x1B[2K{}", self);
@@ -474,20 +454,15 @@ impl StateIF for State {
         );
         println!(
             "\x1B[2K  Assignment|#rem:{}, #fix:{}, #elm:{}, prg%:{} ",
-            im!("{:>9}", self, LogUsizeId::Remain, nv - sum),
-            im!("{:>9}", self, LogUsizeId::Fixed, fixed),
+            im!("{:>9}", self, LogUsizeId::Remain, asg_num_unsolved_vars),
+            im!("{:>9}", self, LogUsizeId::Fixed, asg_num_solved_vars),
             im!(
                 "{:>9}",
                 self,
                 LogUsizeId::Eliminated,
-                self.num_eliminated_vars
+                asg_num_eliminated_vars
             ),
-            fm!(
-                "{:>9.4}",
-                self,
-                LogF64Id::Progress,
-                (sum as f64) / (nv as f64) * 100.0
-            ),
+            fm!("{:>9.4}", self, LogF64Id::Progress, rate * 100.0),
         );
         println!(
             "\x1B[2K      Clause|Remv:{}, LBD2:{}, Binc:{}, Perm:{} ",
@@ -725,14 +700,14 @@ impl State {
     }
     fn dump<A, C, R>(&mut self, asg: &A, cdb: &C, rst: &R)
     where
-        A: Export<(usize, usize, usize, f64, f64)>,
+        A: AssignIF + Export<(usize, usize, usize, f64, f64)>,
         C: Export<(usize, usize, usize, usize, usize, usize)> + ClauseDBIF,
         R: Export<(RestartMode, usize, f64, f64, f64)> + RestartIF,
     {
         self.progress_cnt += 1;
-        let nv = self.target.num_of_variables;
-        let fixed = self.num_solved_vars;
-        let sum = fixed + self.num_eliminated_vars;
+        let (asg_num_vars, asg_num_solved_vars, asg_num_eliminated_vars, asg_num_unsolved_vars) =
+            asg.var_stats();
+        let rate = (asg_num_solved_vars + asg_num_eliminated_vars) as f64 / asg_num_vars as f64;
         let (asg_num_conflict, _num_propagation, asg_num_restart, _, _) = asg.exports();
         let (
             cdb_num_active,
@@ -748,14 +723,14 @@ impl State {
             asg_num_restart,                           // restart
             rst_num_block,                             // blocked
             asg_num_conflict / asg_num_restart.max(1), // average cfc (Conflict / Restart)
-            nv - fixed - self.num_eliminated_vars,     // alive vars
+            asg_num_unsolved_vars,                     // alive vars
             cdb_num_active - cdb_num_learnt,           // given clauses
             0,                                         // alive literals
             cdb_num_reduction,                         // clause reduction
             cdb_num_learnt,                            // alive learnts
             cdb_num_lbd2,                              // learnts with LBD = 2
             asg_num_conflict - cdb_num_learnt,         // removed learnts
-            (sum as f32) / (nv as f32) * 100.0,        // progress
+            rate * 100.0,                              // progress
         );
     }
     #[allow(dead_code)]
@@ -771,9 +746,9 @@ impl State {
             None => self.strategy.0.to_str(),
             Some(x) => x,
         };
-        let nv = asg.var_len() - 1;
-        let fixed = self.num_solved_vars;
-        let sum = fixed + self.num_eliminated_vars;
+        let (asg_num_vars, asg_num_solved_vars, asg_num_eliminated_vars, asg_num_unsolved_vars) =
+            asg.var_stats();
+        let rate = (asg_num_solved_vars + asg_num_eliminated_vars) as f64 / asg_num_vars as f64;
         let (_num_conflict, _num_propagation, asg_num_restart) = asg.exports();
         let (
             cdb_num_active,
@@ -790,10 +765,10 @@ impl State {
              {:>6},{:>6}",
             self.progress_cnt,
             msg,
-            nv - sum,
-            fixed,
-            self.num_eliminated_vars,
-            (sum as f32) / (nv as f32) * 100.0,
+            asg_num_unsolved_vars,
+            asg_num_solved_vars,
+            asg_num_eliminated_vars,
+            rate * 100.0,
             cdb_num_learnt,
             cdb_num_active,
             0,
