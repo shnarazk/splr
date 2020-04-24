@@ -8,7 +8,7 @@ use {
 };
 
 /// API for assignment like `propagate`, `enqueue`, `cancel_until`, and so on.
-pub trait PropagationIF {
+pub trait PropagateIF {
     /// add an assignment at level 0 as a precondition.
     ///
     /// # Errors
@@ -78,7 +78,7 @@ macro_rules! unset_assign {
     };
 }
 
-impl PropagationIF for AssignStack {
+impl PropagateIF for AssignStack {
     fn assign_at_rootlevel(&mut self, l: Lit) -> MaybeInconsistent {
         let vi = l.vi();
         debug_assert!(vi < self.var.len());

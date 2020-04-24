@@ -1,6 +1,6 @@
 /// Var struct and Database management
 use {
-    super::{AssignStack, ClauseManipulationIF, Var, VarRewardIF},
+    super::{AssignStack, ClauseManipulateIF, Var, VarRewardIF},
     crate::types::*,
     std::{
         fmt,
@@ -73,7 +73,7 @@ impl FlagIF for Var {
     }
 }
 
-pub trait VarManipulationIF {
+pub trait VarManipulateIF {
     /// return the assignment of var.
     fn assign(&self, vi: VarId) -> Option<bool>;
     /// return *the value* of a literal.
@@ -100,7 +100,7 @@ pub trait VarManipulationIF {
     fn var_stats(&self) -> (usize, usize, usize, usize);
 }
 
-impl VarManipulationIF for AssignStack {
+impl VarManipulateIF for AssignStack {
     fn assigned(&self, l: Lit) -> Option<bool> {
         match unsafe { self.assign.get_unchecked(l.vi()) } {
             Some(x) if !bool::from(l) => Some(!x),
@@ -151,7 +151,7 @@ impl VarManipulationIF for AssignStack {
     }
 }
 
-impl ClauseManipulationIF for AssignStack {
+impl ClauseManipulateIF for AssignStack {
     fn satisfies(&self, vec: &[Lit]) -> bool {
         for l in vec {
             if self.assigned(*l) == Some(true) {

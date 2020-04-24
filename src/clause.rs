@@ -1252,7 +1252,7 @@ impl ClauseDB {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::assign::{AssignIF, AssignStack};
+    use crate::assign::{AssignStack, PropagateIF};
     use crate::clause::ClauseDB;
 
     fn lit(i: i32) -> Lit {

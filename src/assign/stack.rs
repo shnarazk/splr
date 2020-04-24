@@ -2,7 +2,7 @@
 /// This version can handle Chronological and Non Chronological Backtrack.
 use {
     super::{
-        AssignIF, AssignStack, RewardStep, Var, VarIdHeap, VarManipulationIF, VarOrderIF, REWARDS,
+        AssignIF, AssignStack, RewardStep, Var, VarIdHeap, VarManipulateIF, VarOrderIF, REWARDS,
     },
     crate::{clause::ClauseDBIF, state::State, types::*},
     std::{
@@ -24,7 +24,7 @@ macro_rules! var_assign {
 }
 
 /// API for var manipulation
-pub trait ClauseManipulationIF {
+pub trait ClauseManipulateIF {
     /// return `true` if the set of literals is satisfiable under the current assignment.
     fn satisfies(&self, c: &[Lit]) -> bool;
     /// return Option<bool>
@@ -364,6 +364,7 @@ impl fmt::Display for AssignStack {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::assign::PropagateIF;
 
     fn lit(i: i32) -> Lit {
         Lit::from(i)

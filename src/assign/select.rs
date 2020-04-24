@@ -16,7 +16,7 @@ macro_rules! var_assign {
 }
 
 /// API for var selection.
-pub trait VarSelectionIF {
+pub trait VarSelectIF {
     /// select a new decision variable.
     fn select_var(&mut self) -> VarId;
     /// update the internal heap on var order.
@@ -25,7 +25,7 @@ pub trait VarSelectionIF {
     fn rebuild_order(&mut self);
 }
 
-impl VarSelectionIF for AssignStack {
+impl VarSelectIF for AssignStack {
     fn select_var(&mut self) -> VarId {
         loop {
             let vi = self.get_heap_root();

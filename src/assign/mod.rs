@@ -8,11 +8,11 @@ pub mod stack;
 pub mod var;
 
 pub use self::{
-    propagate::PropagationIF,
+    propagate::PropagateIF,
     reward::{VarRewardIF, REWARDS, VRD_MAX},
-    select::VarSelectionIF,
-    stack::ClauseManipulationIF,
-    var::VarManipulationIF,
+    select::VarSelectIF,
+    stack::ClauseManipulateIF,
+    var::VarManipulateIF,
 };
 
 use {
@@ -22,7 +22,7 @@ use {
 };
 
 /// API for assignment like `propagate`, `enqueue`, `cancel_until`, and so on.
-pub trait AssignIF: ClauseManipulationIF + PropagationIF + VarManipulationIF + VarRewardIF {
+pub trait AssignIF: ClauseManipulateIF + PropagateIF + VarManipulateIF + VarRewardIF {
     /// return a literal in the stack.
     fn stack(&self, i: usize) -> Lit;
     /// return literals in the range of stack.

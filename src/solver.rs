@@ -1,9 +1,7 @@
 /// Crate 'solver' provides the top-level API as a SAT solver.
 use {
     crate::{
-        assign::{
-            AssignIF, AssignStack, PropagationIF, VarManipulationIF, VarRewardIF, VarSelectionIF,
-        },
+        assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarRewardIF, VarSelectIF},
         clause::{ClauseDB, ClauseDBIF},
         eliminate::{EliminateIF, Eliminator},
         restart::{RestartIF, Restarter, RestarterModule},
@@ -53,7 +51,7 @@ pub type SolverResult = Result<Certificate, SolverError>;
 /// The SAT solver object consisting of 6 sub modules.
 /// ```
 /// use std::convert::TryFrom;
-/// use crate::splr::{assign::{AssignIF, VarManipulationIF}, state::{State, StateIF}, types::*};
+/// use crate::splr::{assign::{AssignIF, VarManipulateIF}, state::{State, StateIF}, types::*};
 /// use crate::splr::solver::{SatSolverIF, Solver, Certificate::*};
 ///
 /// let mut s = Solver::try_from("tests/sample.cnf").expect("can't load");
