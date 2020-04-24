@@ -3,9 +3,10 @@
 - merge assign.rs and var.rs into a module
 - change a lot of options' meanings and mnemonics
 - better modularity via traits
+- add and refactor restart module: GeometricStabilizer, ProgressLBD
 - add some features for development: boundary_check, use_core, EVSIDS, trace_analysis
 - activate `JUST_USED` for clause reduction
-- add and refactor restart module: GeometricStabilizer, ProgressLBD
+- `propagate` skips up to the last position
 - stop *too* dynamic var decay control
 - change the activation timings of simplification
 - stats data are stored in each module
