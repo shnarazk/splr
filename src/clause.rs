@@ -101,6 +101,10 @@ pub trait ClauseDBIF: IndexMut<ClauseId, Output = Clause> {
     /// returns true if the clause became a unit clause.
     /// Called only from strengthen_clause
     fn strengthen(&mut self, cid: ClauseId, p: Lit) -> bool;
+    /// minimize a clause.
+    fn minimize_with_biclauses<A>(&mut self, asg: &A, vec: &mut Vec<Lit>)
+    where
+        A: AssignIF;
 }
 
 /// API for Clause Id.
@@ -232,8 +236,6 @@ pub struct Clause {
     pub lits: Vec<Lit>,
     /// A static clause evaluation criterion like LBD, NDD, or something.
     pub rank: usize,
-    /// the ordinal of conflict at which this clause is checked.
-    pub checked_at: usize,
     /// the index from which `propagate` starts seaching an unfalsified literal.
     pub search_from: usize,
     /// A dynamic clause evaluation criterion based on the number of references.
@@ -247,8 +249,7 @@ impl Default for Clause {
         Clause {
             lits: vec![],
             rank: 0,
-            checked_at: 0,
-            search_from: 2,
+            search_from: 1,
             reward: 0.0,
             flags: Flag::empty(),
         }
@@ -459,6 +460,13 @@ pub struct ClauseDB {
     touched: Vec<bool>,
 
     //
+    //## LBD
+    //
+    /// a working buffer for LBD calculation
+    lbd_temp: Vec<usize>,
+    num_lbd_update: usize,
+
+    //
     //## reduction
     //
     /// increment step of reduction threshold
@@ -501,6 +509,8 @@ impl Default for ClauseDB {
             activity_inc: 1.0,
             activity_decay: 0.999,
             touched: Vec::new(),
+            lbd_temp: Vec::new(),
+            num_lbd_update: 0,
             inc_step: 300,
             extra_inc: 1000,
             first_reduction: 1000,
@@ -621,6 +631,7 @@ impl Instantiate for ClauseDB {
         ClauseDB {
             clause,
             touched,
+            lbd_temp: vec![0; nv + 1],
             watcher,
             certified,
             reducable: !config.without_reduce,
@@ -790,7 +801,7 @@ impl ClauseDBIF for ClauseDB {
                 learnt = false;
                 0
             } else {
-                let lbd = asg.compute_lbd(vec);
+                let lbd = self.compute_lbd(asg, vec);
                 if self.use_chan_seok && lbd <= self.co_lbd_bound {
                     learnt = false;
                     0
@@ -825,13 +836,9 @@ impl ClauseDBIF for ClauseDB {
             }
             c.rank = rank;
             c.reward = reward;
-            c.checked_at = 0;
-            c.search_from = 2;
+            c.search_from = 1;
         } else {
-            let mut lits = Vec::with_capacity(vec.len());
-            for l in vec {
-                lits.push(*l);
-            }
+            let lits = Vec::from(vec);
             cid = ClauseId::from(self.clause.len());
             let c = Clause {
                 flags: Flag::empty(),
@@ -874,6 +881,7 @@ impl ClauseDBIF for ClauseDB {
         } else {
             0
         };
+        let nlevels = self.compute_lbd_of(asg, cid);
         let c = &mut self[cid];
         if c.is(Flag::JUST_USED) {
             return false;
@@ -881,7 +889,6 @@ impl ClauseDBIF for ClauseDB {
         debug_assert!(!c.is(Flag::DEAD), format!("found {} is dead: {}", cid, c));
         if 2 < c.rank {
             c.turn_on(Flag::JUST_USED);
-            let nlevels = asg.compute_lbd(&c.lits);
             if nlevels + 1 < c.rank {
                 // chan_seok_condition is zero if !use_chan_seok
                 if nlevels < chan_seok_condition {
@@ -1017,6 +1024,7 @@ impl ClauseDBIF for ClauseDB {
         }
         (*c).turn_on(Flag::JUST_USED);
         debug_assert!(1 < usize::from(!p));
+        (*c).search_from = 1;
         let lits = &mut (*c).lits;
         debug_assert!(1 < lits.len());
         if lits.len() == 2 {
@@ -1054,6 +1062,124 @@ impl ClauseDBIF for ClauseDB {
             }
         }
         false
+    }
+    fn minimize_with_biclauses<A>(&mut self, asg: &A, vec: &mut Vec<Lit>)
+    where
+        A: AssignIF,
+    {
+        if vec.len() <= 1 {
+            return;
+        }
+        self.lbd_temp[0] += 1;
+        let key = self.lbd_temp[0];
+        for l in &vec[1..] {
+            self.lbd_temp[l.vi() as usize] = key;
+        }
+        let l0 = vec[0];
+        let mut nsat = 0;
+        for w in &self.watcher[!l0] {
+            let c = &self.clause[w.c.ordinal as usize];
+            if c.len() != 2 {
+                continue;
+            }
+            debug_assert!(c[0] == l0 || c[1] == l0);
+            let other = c[(c[0] == l0) as usize];
+            let vi = other.vi();
+            if self.lbd_temp[vi] == key && asg.assigned(other) == Some(true) {
+                nsat += 1;
+                self.lbd_temp[vi] = key - 1;
+            }
+        }
+        if 0 < nsat {
+            self.lbd_temp[l0.vi()] = key;
+            vec.retain(|l| self.lbd_temp[l.vi()] == key);
+        }
+    }
+}
+
+/// API to calculate LBD.
+trait LBDIF {
+    /// return the LBD value for a set of literals.
+    fn compute_lbd<A>(&mut self, asg: &A, vec: &[Lit]) -> usize
+    where
+        A: AssignIF;
+    /// return the LBD value of clause `cid`.
+    fn compute_lbd_of<A>(&mut self, asg: &A, cid: ClauseId) -> usize
+    where
+        A: AssignIF;
+    /// re-calculate the LBD values of all (learnt) clauses.
+    fn reset_lbd<A>(&mut self, asg: &A, all: bool)
+    where
+        A: AssignIF;
+}
+
+impl LBDIF for ClauseDB {
+    fn compute_lbd<A>(&mut self, asg: &A, vec: &[Lit]) -> usize
+    where
+        A: AssignIF,
+    {
+        let level = asg.level_ref();
+        unsafe {
+            let key: usize = self.lbd_temp.get_unchecked(0) + 1;
+            *self.lbd_temp.get_unchecked_mut(0) = key;
+            let mut cnt = 0;
+            for l in vec {
+                let lv = level[l.vi()];
+                let p = self.lbd_temp.get_unchecked_mut(lv as usize);
+                if *p != key {
+                    *p = key;
+                    cnt += 1;
+                }
+            }
+            cnt
+        }
+    }
+    fn compute_lbd_of<A>(&mut self, asg: &A, cid: ClauseId) -> usize
+    where
+        A: AssignIF,
+    {
+        let level = asg.level_ref();
+        unsafe {
+            let key: usize = self.lbd_temp.get_unchecked(0) + 1;
+            *self.lbd_temp.get_unchecked_mut(0) = key;
+            let mut cnt = 0;
+            for l in &self.clause[cid.ordinal as usize].lits {
+                let lv = level[l.vi()];
+                let p = self.lbd_temp.get_unchecked_mut(lv as usize);
+                if *p != key {
+                    *p = key;
+                    cnt += 1;
+                }
+            }
+            cnt
+        }
+    }
+    fn reset_lbd<A>(&mut self, asg: &A, all: bool)
+    where
+        A: AssignIF,
+    {
+        let level = asg.level_ref();
+        let mut key = self.lbd_temp[0];
+        for c in &mut self.clause.iter_mut().skip(1) {
+            if c.is(Flag::DEAD) || !c.is(Flag::LEARNT) || (!all && !c.is(Flag::JUST_USED)) {
+                continue;
+            }
+            key += 1;
+            let mut cnt = 0;
+            for l in &c.lits {
+                let lv = level[l.vi()];
+                if lv != 0 {
+                    let p = unsafe { self.lbd_temp.get_unchecked_mut(lv as usize) };
+                    if *p != key {
+                        *p = key;
+                        cnt += 1;
+                    }
+                }
+            }
+            c.rank = cnt;
+        }
+        self.lbd_temp[0] = key;
+        self.num_lbd_update += 1;
     }
 }
 
@@ -1126,7 +1252,7 @@ impl ClauseDB {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::assign::{AssignIF, AssignStack};
+    use crate::assign::{AssignStack, PropagateIF};
     use crate::clause::ClauseDB;
 
     fn lit(i: i32) -> Lit {

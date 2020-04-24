@@ -1,15 +1,17 @@
-A fast (but please don't compare with Cadical) SAT Solver for Propositional Logic in Rust
+A fast SAT Solver for Propositional Logic in Rust
 ----
 
 Splr is a pure [Rust](https://www.rust-lang.org)ic fast SAT solver, based on [Glucose 4.1](https://www.labri.fr/perso/lsimon/glucose/).
 It adopts various research results on SAT solvers:
 
 - *CDCL*, *watch literals*, *LBD* and so on from Glucose, [Minisat](http://minisat.se) and the ancestors
-- Glucose-like dynamic blocking/forcing restarts based on [EMAs](https://arxiv.org/abs/1506.08905)
+- Glucose-like dynamic blocking/forcing restarts based on [EMAs](https://arxiv.org/abs/1506.08905) and [CaDiCaL](https://github.com/arminbiere/cadical)-like stabilization
 - pre/in-process simplification based on clause subsumption and variable elimination
-- a variant of **Learning Rate Based Branching** with **Reason Side Rewarding**
+- compile-time selection of a variant of **Learning Rate Based Branching** with **Reason Side
+  Rewarding** and EVSIDS
 - **chronological backtrack** aka **chronoBT**
 - Glucose-like heuristics adaptation
+- CaDiCaL-like extended phase saving
 
 Please check [ChangeLog](ChangeLog.md) about recent updates.
 

@@ -146,6 +146,7 @@ impl LitOccurs {
 #[derive(Debug)]
 pub struct Eliminator {
     pub enable: bool,
+    pub to_eliminate: f64,
     mode: EliminatorMode,
     clause_queue: Vec<ClauseId>,
     var_queue: VarOccHeap,
@@ -173,6 +174,7 @@ impl Default for Eliminator {
     fn default() -> Eliminator {
         Eliminator {
             enable: true,
+            to_eliminate: 0.0,
             mode: EliminatorMode::Deactive,
             var_queue: VarOccHeap::new(0, 0),
             clause_queue: Vec::new(),
@@ -343,7 +345,7 @@ impl EliminateIF for Eliminator {
             self.add_cid_occur(asg, ClauseId::from(cid), c, false);
         }
         if force {
-            for vi in 1..asg.var_len() {
+            for vi in 1..=asg.var_stats().0 {
                 if asg.var(vi).is(Flag::ELIMINATED) || asg.assign(vi).is_some() {
                     continue;
                 }
@@ -375,7 +377,7 @@ impl EliminateIF for Eliminator {
         {
             for v in asg.var_iter().skip(1) {
                 if asg.reason(v.index) != AssignReason::None {
-                    assert_eq!(asg.level(v.index), state.root_level);
+                    assert_eq!(asg.level(v.index), 0);
                     // asg.reason(v.index) = AssignReason::None;
                 }
             }
@@ -998,7 +1000,6 @@ where
             return Ok(());
         }
         // OK, eliminate the literal and build constraints on it.
-        state.num_eliminated_vars += 1;
         make_eliminated_clauses(cdb, elim, vi, &*pos, &*neg);
         let vec = &mut state.new_learnt as *mut Vec<Lit>;
         // Produce clauses in cross product:
@@ -1052,8 +1053,7 @@ where
             elim.remove_cid_occur(asg, *cid, &mut cdb[*cid]);
         }
         elim[vi].clear();
-        asg.var_mut(vi).turn_on(Flag::ELIMINATED);
-        asg.clear_reward(vi);
+        asg.set_eliminated(vi);
         elim.backward_subsumption_check(asg, cdb, timedout)
     }
 }
