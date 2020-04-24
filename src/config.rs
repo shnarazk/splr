@@ -75,7 +75,7 @@ pub struct Config {
     pub elim_grw_lim: usize,
 
     /// #cls to start simplification
-    #[structopt(long = "et", default_value = "256")]
+    #[structopt(long = "et", default_value = "8192")]
     pub elim_trigger: usize,
 
     /// Disables exhaustive simplification
@@ -129,16 +129,16 @@ pub struct Config {
     #[structopt(long = "rss", default_value = "2.0")]
     pub rst_stb_scl: f64,
 
-    /// Disable geometric restart blocker
-    #[structopt(skip)] // long = "no-stabilizer", short = "S"
-    pub without_stab: bool,
-
     //
     //## solver configuration
     //
     /// Level threshold to use chronoBT
     #[structopt(long = "cbt", default_value = "100")]
     pub cbt_thr: DecisionLevel,
+
+    /// Enable Reason-Side Rewarding
+    #[structopt(skip)]
+    pub rsr: bool,
 
     /// Enable stabilizing phase
     #[structopt(skip)]
@@ -171,7 +171,7 @@ impl Config {
     #[allow(unused_mut)]
     pub fn override_args(mut self) -> Config {
         // self.without_adaptive_strategy = true;
-        // self.stabilize = true;
+        self.stabilize = true;
         self
     }
 }

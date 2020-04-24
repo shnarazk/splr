@@ -513,7 +513,7 @@ impl StateIF for State {
             "\x1B[2K        misc|#rdc:{}, #elm:{}, core:{}, vdcy:{} ",
             im!("{:>9}", self, LogUsizeId::Reduction, cdb_num_reduction),
             im!("{:>9}", self, LogUsizeId::Elimination, elim_num_full),
-            fm!("{:>9.0}", self, LogF64Id::CoreSize, vdb_core_size),
+            fm!("{:>9.4}", self, LogF64Id::CoreSize, vdb_core_size),
             format!("{:>9.4}", vdb_activity_decay),
         );
         if let Some(m) = mes {

@@ -1,7 +1,9 @@
 /// Crate 'solver' provides the top-level API as a SAT solver.
 use {
     crate::{
-        assign::{AssignIF, AssignStack, VarManipulationIF, VarRewardIF, VarSelectionIF},
+        assign::{
+            AssignIF, AssignStack, PropagationIF, VarManipulationIF, VarRewardIF, VarSelectionIF,
+        },
         clause::{ClauseDB, ClauseDBIF},
         eliminate::{EliminateIF, Eliminator},
         restart::{RestartIF, Restarter, RestarterModule},
@@ -450,6 +452,7 @@ fn handle_conflict(
     ci: ClauseId,
 ) -> MaybeInconsistent {
     const ELIMINATABLE: usize = 4;
+    let original_dl = asg.decision_level();
     // we need a catch here for handling the possibility of level zero conflict
     // at higher level due to the incoherence between the current level and conflicting
     // level in chronoBT. This leads to UNSAT solution. No need to update misc stats.
@@ -478,19 +481,18 @@ fn handle_conflict(
     //## DYNAMIC BLOCKING RESTART based on ASG, updated on conflict path
     //
     rst.block_restart();
-    let cl = asg.decision_level();
     let mut use_chronobt = switch_chronobt.unwrap_or(0 < state.config.cbt_thr);
     if use_chronobt {
         let level = asg.level_ref();
         let c = &cdb[ci];
-        let lcnt = c.iter().filter(|l| level[l.vi()] == cl).count();
+        let lcnt = c.iter().filter(|l| level[l.vi()] == original_dl).count();
         if 1 == lcnt {
-            debug_assert!(c.iter().any(|l| level[l.vi()] == cl));
-            let decision = *c.iter().find(|l| level[l.vi()] == cl).unwrap();
+            debug_assert!(c.iter().any(|l| level[l.vi()] == original_dl));
+            let decision = *c.iter().find(|l| level[l.vi()] == original_dl).unwrap();
             let snd_l = c
                 .iter()
                 .map(|l| level[l.vi()])
-                .filter(|l| *l != cl)
+                .filter(|l| *l != original_dl)
                 .max()
                 .unwrap_or(0);
             if 0 < snd_l {
@@ -501,7 +503,7 @@ fn handle_conflict(
                 asg.cancel_until(snd_l - 1);
                 debug_assert!(
                     asg.stack_iter().all(|l| l.vi() != decision.vi()),
-                    format!("lcnt == 1: level {}, snd level {}", cl, snd_l)
+                    format!("lcnt == 1: level {}, snd level {}", original_dl, snd_l)
                 );
                 asg.assign_by_decision(decision);
                 return Ok(());
@@ -594,7 +596,7 @@ fn handle_conflict(
             asg.assign_by_unitclause(l0);
         }
         asg.num_solved_vars += 1;
-        elim.to_eliminate *= 0.25;
+        elim.to_eliminate *= 0.9;
         rst.update(RestarterModule::Reset, 0);
         state.last_solved = ncnfl;
     } else {
@@ -607,6 +609,9 @@ fn handle_conflict(
                 //## Learnt Literal Rewarding
                 //
                 asg.reward_at_analysis(lit.vi());
+                if !state.stabilize {
+                    continue;
+                }
                 if let AssignReason::Implication(r, _) = asg.reason(lit.vi()) {
                     for l in &cdb[r].lits {
                         let vi = l.vi();
@@ -639,15 +644,18 @@ fn handle_conflict(
             al,
         );
         let lbd = cdb[cid].rank;
+        asg.core_size.update(lbd as f64);
         rst.update(RestarterModule::LBD, lbd);
         if learnt_len <= ELIMINATABLE {
             // state.to_eliminate += std::f64::consts::E.powi(-(learnt_len as i32));
             elim.to_eliminate += match learnt_len {
                 2 => 1.0,
-                3 => 0.001,
-                4 => 0.000_01,
-                _ => 0.000_000_1,
+                3 => 0.1,
+                4 => 0.001,
+                _ => 0.0,
             };
+        } else if lbd == 2 {
+            elim.to_eliminate += 0.000_1;
         }
     }
     cdb.scale_activity();
@@ -690,6 +698,11 @@ fn adapt_modules(
         // Need to call it before `cdb.adapt_to`
         // 'decision_level == 0' is required by `cdb.adapt_to`.
         asg.cancel_until(asg.root_level);
+        if elim.enable && elim.exports().0 < 3 {
+            elim.to_eliminate = 0.0;
+            elim.activate();
+            elim.simplify(asg, cdb, state)?;
+        }
         state.select_strategy(asg, cdb);
         // if state.strategy.0 == SearchStrategy::HighSuccesive {
         //     state.config.cbt_thr = 0;

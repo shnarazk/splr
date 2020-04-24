@@ -18,7 +18,7 @@ libc = "0.2"
 structopt = "0.3"
 
 [features]
-default = ["use_core", "EVSIDS"]
+default = []
 EVSIDS = []
 ema_calibration = []
 boundary_check = []
