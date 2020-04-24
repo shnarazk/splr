@@ -1,16 +1,16 @@
 ## 0.4.0, 2020-12-31
 
 - merge assign.rs and var.rs into a module
+- better modularity and abstraction via traits
+- add and refactor restart module: `GeometricStabilizer`, `ProgressLBD`
 - change a lot of options' meanings and mnemonics
-- better modularity via traits
-- add and refactor restart module: GeometricStabilizer, ProgressLBD
 - add some features for development: boundary_check, use_core, EVSIDS, trace_analysis
-- activate `JUST_USED` for clause reduction
 - `propagate` skips up to the last position
+- remove code about 'deep search' completely, superseded with stabilizing mode
 - stop *too* dynamic var decay control
 - change the activation timings of simplification
 - stats data are stored in each module
-- remove code about `deep search` completely
+- activate `JUST_USED` for clause reduction
 
 ## 0.3.2, 2020-03-20
 
