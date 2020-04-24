@@ -24,7 +24,6 @@ ema_calibration = []
 boundary_check = []
 trace_analysis = []
 trace_elimination = []
-use_core = []
 
 [profile.release]
 lto = "fat"

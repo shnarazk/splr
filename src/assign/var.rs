@@ -1,4 +1,4 @@
-/// Var struct and Database management
+/// Var struct and Database management API
 use {
     super::{AssignStack, ClauseManipulateIF, Var, VarRewardIF},
     crate::types::*,
@@ -73,6 +73,7 @@ impl FlagIF for Var {
     }
 }
 
+/// Var manipulation
 pub trait VarManipulateIF {
     /// return the assignment of var.
     fn assign(&self, vi: VarId) -> Option<bool>;

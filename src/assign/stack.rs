@@ -1,8 +1,7 @@
-/// Crate `propagator` implements Boolean Constraint Propagation and decision var selection.
-/// This version can handle Chronological and Non Chronological Backtrack.
+/// main struct AssignStack
 use {
     super::{
-        AssignIF, AssignStack, RewardStep, Var, VarIdHeap, VarManipulateIF, VarOrderIF, REWARDS,
+        AssignIF, AssignStack, Var, VarIdHeap, VarManipulateIF, VarOrderIF, REWARD_DECAY_RANGE,
     },
     crate::{clause::ClauseDBIF, state::State, types::*},
     std::{
@@ -13,9 +12,6 @@ use {
         slice::Iter,
     },
 };
-
-#[cfg(feature = "use_core")]
-use crate::state::SearchStrategy;
 
 macro_rules! var_assign {
     ($asg: expr, $var: expr) => {
@@ -56,14 +52,11 @@ const CORE_HISOTRY_LEN: usize = 4000;
 
 impl Default for AssignStack {
     fn default() -> AssignStack {
-        // const VRD_START: f64 = 0.9;
-        let reward = REWARDS[0];
-
         #[cfg(feature = "EVSIDS")]
         let reward_step = 1.0;
 
         #[cfg(not(feature = "EVSIDS"))]
-        let reward_step = (reward.2 - reward.1) / 10_000.0;
+        let reward_step = (REWARD_DECAY_RANGE.1 - REWARD_DECAY_RANGE.0) / 10_000.0;
 
         AssignStack {
             assign: Vec::new(),
@@ -89,10 +82,9 @@ impl Default for AssignStack {
             num_restart: 0,
             ordinal: 0,
             var: Vec::new(),
-            activity_decay: reward.1,
-            activity_decay_max: reward.2,
+            activity_decay: REWARD_DECAY_RANGE.0,
+            activity_decay_max: REWARD_DECAY_RANGE.1,
             core_size: Ema::new(CORE_HISOTRY_LEN),
-            reward_mode: RewardStep::HeatUp,
             reward_step,
         }
     }
@@ -127,62 +119,7 @@ impl Instantiate for AssignStack {
         }
     }
     #[allow(unused_variables)]
-    fn adapt_to(&mut self, state: &State, num_conflict: usize) {
-        #[cfg(feature = "use_core")]
-        {
-            const VRD_DEC_STRICT: f64 = 0.002;
-            const VRD_DEC_STD: f64 = 0.002;
-            const VRD_DEC_HIGH: f64 = 0.008;
-            const VRD_INTERVAL: usize = 20_000;
-            const VRD_FILTER: f64 = 0.5;
-            const VRD_MAX_START: f64 = 0.2;
-            const VRD_OFFSET: f64 = 10.0;
-
-            if 0 == num_conflict {
-                self.core_size
-                    .update(((CORE_HISOTRY_LEN * self.var.len()) as f64).ln());
-                return;
-            }
-
-            let msr: (f64, f64) = self.var[1..]
-                .iter()
-                .map(|v| v.reward)
-                .fold((VRD_MAX_START, 0.0), |(m, s), x| (m.max(x), s + x));
-            let ar = msr.1 / self.var.len() as f64;
-            let thr = msr.0 * VRD_FILTER + ar * (1.0 - VRD_FILTER);
-            let core = self.var[1..].iter().filter(|v| thr <= v.reward).count();
-            // self.core_size.update(core as f64);
-
-            if num_conflict % VRD_INTERVAL == 0 {
-                let k = match state.strategy.0 {
-                    SearchStrategy::LowDecisions => VRD_DEC_HIGH,
-                    SearchStrategy::HighSuccesive => VRD_DEC_STRICT,
-                    _ => VRD_DEC_STD,
-                };
-                let c = (self.core_size.get() - VRD_OFFSET).max(1.0);
-                let delta = 0.1 * k * (c.sqrt() * c.ln());
-                self.activity_decay_max = 1.0 - delta;
-
-                const MB: f64 = 16.0;
-                if self.reward_mode == RewardStep::Final {
-                    self.activity_decay_max = VRD_MAX + k - 0.1 * self.core_size.get().min(MB) / MB;
-                }
-            }
-        }
-
-        #[cfg(not(feature = "use_core"))]
-        {
-            // if num_conflict % VRD_INTERVAL == 0 {
-            //     let k = match state.strategy.0 {
-            //         SearchStrategy::LowDecisions => VRD_DEC_HIGH,
-            //         SearchStrategy::HighSuccesive => VRD_DEC_STRICT,
-            //         _ => VRD_DEC_STD,
-            //     };
-            //     let delta = 10.0 * k;
-            //     self.activity_decay_max = 1.0 - delta;
-            // }
-        }
-    }
+    fn adapt_to(&mut self, state: &State, num_conflict: usize) {}
 }
 
 impl Export<(usize, usize, usize, f64, f64)> for AssignStack {

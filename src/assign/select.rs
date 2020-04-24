@@ -1,10 +1,8 @@
-/// Var selection
-use super::{AssignStack, VarHeapIF, VarOrderIF};
-#[cfg(feature = "use_core")]
-use crate::state::SearchStrategy;
-/// Crate `propagator` implements Boolean Constraint Propagation and decision var selection.
-/// This version can handle Chronological and Non Chronological Backtrack.
-use crate::types::*;
+/// Decision var selection
+use {
+    super::{AssignStack, VarHeapIF, VarOrderIF},
+    crate::types::*,
+};
 
 /// ```
 /// let x: Lbool = var_assign!(self, lit.vi());
@@ -15,7 +13,7 @@ macro_rules! var_assign {
     };
 }
 
-/// API for var selection.
+/// API for var selection, depending on an internal heap.
 pub trait VarSelectIF {
     /// select a new decision variable.
     fn select_var(&mut self) -> VarId;

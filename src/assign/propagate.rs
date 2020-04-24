@@ -1,4 +1,5 @@
 /// implement boolean constraint propagation, backjump
+/// This version can handle Chronological and Non Chronological Backtrack.
 use {
     super::{AssignIF, AssignStack, VarHeapIF, VarRewardIF},
     crate::{

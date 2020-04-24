@@ -9,7 +9,7 @@ pub mod var;
 
 pub use self::{
     propagate::PropagateIF,
-    reward::{VarRewardIF, REWARDS, VRD_MAX},
+    reward::{VarRewardIF, REWARD_DECAY_RANGE},
     select::VarSelectIF,
     stack::ClauseManipulateIF,
     var::VarManipulateIF,
@@ -134,17 +134,8 @@ pub struct AssignStack {
     activity_decay_max: f64,
     /// estimated number of hot variable
     pub core_size: Ema,
-    /// mode
-    reward_mode: RewardStep,
     /// ONLY used in feature EVSIDS
     reward_step: f64,
-}
-
-#[derive(Clone, Copy, Eq, Debug, PartialEq)]
-pub enum RewardStep {
-    HeatUp = 0,
-    Annealing,
-    Final,
 }
 
 /// Heap of VarId, based on var activity.

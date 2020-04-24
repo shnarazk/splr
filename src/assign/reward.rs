@@ -1,25 +1,7 @@
 /// Var Rewarding
-use {
-    super::{AssignStack, RewardStep},
-    crate::types::*,
-    std::slice::Iter,
-};
+use {super::AssignStack, crate::types::*, std::slice::Iter};
 
-#[cfg(feature = "use_core")]
-use crate::state::SearchStrategy;
-
-pub const VRD_MAX: f64 = 0.97;
-
-/// a reward table used in VarDB::shift_reward_mode
-///  - id: RewardStep
-///  - start: lower bound of the range
-///  - end: upper bound of the range
-///  - scale: scaling coefficient for activity decay
-pub const REWARDS: [(RewardStep, f64, f64, f64); 3] = [
-    (RewardStep::HeatUp, 0.80, VRD_MAX, 0.0), // the last is dummy
-    (RewardStep::Annealing, 0.96, VRD_MAX, 0.5),
-    (RewardStep::Final, VRD_MAX, VRD_MAX, 0.5),
-];
+pub const REWARD_DECAY_RANGE: (f64, f64) = (0.80, 0.97);
 
 /// API for var rewarding.
 pub trait VarRewardIF {
@@ -58,8 +40,9 @@ impl VarRewardIF for AssignStack {
     fn clear_reward(&mut self, vi: VarId) {
         self.var[vi].reward = 0.0;
     }
+
     //
-    // EVSIDS
+    //## EVSIDS
     //
     #[cfg(feature = "EVSIDS")]
     fn reward_at_analysis(&mut self, vi: VarId) {
@@ -92,7 +75,7 @@ impl VarRewardIF for AssignStack {
     }
 
     //
-    // Learning Rate
+    //## Learning Rate
     //
     #[cfg(not(feature = "EVSIDS"))]
     fn reward_at_analysis(&mut self, vi: VarId) {
@@ -116,22 +99,8 @@ impl VarRewardIF for AssignStack {
         v.participated = 0;
     }
     #[cfg(not(feature = "EVSIDS"))]
-    // fn reward_update(&mut self) {
-    //     const VRD_STEP: f64 = 0.000_01;
-    //     self.ordinal += 1;
-    //     self.activity_decay = self.activity_decay_max.min(self.activity_decay + VRD_STEP);
-    // }
     fn reward_update(&mut self) {
         self.ordinal += 1;
-        if self.activity_decay < self.activity_decay_max {
-            self.activity_decay += self.reward_step;
-            //} else if self.reward_mode != RewardStep::Final {
-            //    let reward = &REWARDS[self.reward_mode as usize + 1];
-            //    self.reward_mode = reward.0;
-            //    self.activity_decay_max = reward.2;
-            //    self.reward_step *= reward.3;
-            //} else {
-            //    self.activity_decay = self.activity_decay_max;
-        }
+        self.activity_decay = self.activity_decay_max.min(self.activity_decay + VRD_STEP);
     }
 }

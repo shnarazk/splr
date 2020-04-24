@@ -4,7 +4,7 @@
 - better modularity and abstraction via traits
 - add and refactor restart module: `GeometricStabilizer`, `ProgressLBD`
 - change a lot of options' meanings and mnemonics
-- add some features for development: boundary_check, use_core, EVSIDS, trace_analysis
+- add some features for development: boundary_check, EVSIDS, trace_analysis
 - `propagate` skips up to the last position
 - remove code about 'deep search' completely, superseded with stabilizing mode
 - stop *too* dynamic var decay control

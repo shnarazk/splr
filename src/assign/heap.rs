@@ -24,6 +24,7 @@ impl fmt::Display for VarIdHeap {
     }
 }
 
+/// Internal heap manipulation API
 pub trait VarHeapIF {
     fn update_heap(&mut self, v: VarId);
     fn insert_heap(&mut self, vi: VarId);
