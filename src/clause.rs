@@ -415,8 +415,9 @@ impl fmt::Display for Clause {
         let st = |flag, mes| if self.is(flag) { mes } else { "" };
         write!(
             f,
-            "{{{:?}{}{}}}",
+            "{{{:?}{}{}{}}}",
             vec2int(&self.lits),
+            st(Flag::LEARNT, ", learnt"),
             st(Flag::DEAD, ", dead"),
             st(Flag::ENQUEUED, ", enqueued"),
         )
