@@ -101,6 +101,8 @@ impl VarRewardIF for AssignStack {
     #[cfg(not(feature = "EVSIDS"))]
     fn reward_update(&mut self) {
         self.ordinal += 1;
-        self.activity_decay = self.activity_decay_max.min(self.activity_decay + VRD_STEP);
+        self.activity_decay = self
+            .activity_decay_max
+            .min(self.activity_decay + self.reward_step);
     }
 }
