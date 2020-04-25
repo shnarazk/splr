@@ -256,17 +256,17 @@ impl SatSolverIF for Solver {
                 asg.extend_model(elim.eliminated_lits());
                 #[cfg(debug)]
                 {
-                    if let Some(cid) = cdb.validate(vdb, true) {
+                    if let Some(cid) = cdb.validate(asg, true) {
                         panic!(
                             "Level {} generated assignment({:?}) falsifies {}:{:?}",
-                            asg.level(),
-                            cdb.validate(vdb, false).is_none(),
+                            asg.decision_level(),
+                            cdb.validate(asg, false).is_none(),
                             cid,
-                            vdb.dump(asg, &cdb[cid]),
+                            asg.dump(&cdb[cid]),
                         );
                     }
                 }
-                if cdb.validate(asg, true).is_some() {
+                if cdb.validate(asg, false).is_some() {
                     return Err(SolverError::SolverBug);
                 }
                 let vals = asg

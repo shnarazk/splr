@@ -126,8 +126,11 @@ impl From<(VarId, bool)> for Lit {
 
 impl From<(VarId, Option<bool>)> for Lit {
     #[inline]
-    fn from((vi, b): (VarId, Option<bool>)) -> Self {
-        Lit::from((vi, b.unwrap_or(false)))
+    fn from((vi, ob): (VarId, Option<bool>)) -> Self {
+        match ob {
+            None => NULL_LIT,
+            Some(b) => Lit::from((vi, b)),
+        }
     }
 }
 

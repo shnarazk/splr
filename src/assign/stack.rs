@@ -218,7 +218,7 @@ impl AssignIF for AssignStack {
                     break;
                 }
                 let l = lits[i];
-                if self.assign(l.vi()) != Some(bool::from(l)) {
+                if self.assign(l.vi()) != Some(!bool::from(l)) {
                     if i < width {
                         break 'next;
                     }

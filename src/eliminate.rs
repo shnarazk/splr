@@ -853,7 +853,8 @@ where
     true
 }
 
-/// Returns **false** if one of the clauses is always satisfied. (merge_vec should not be used.)
+/// Return the real length of the generated clause by merging two clauses.
+/// Return **zero** if one of the clauses is always satisfied. (merge_vec should not be used.)
 fn merge<C>(cdb: &mut C, cip: ClauseId, ciq: ClauseId, v: VarId, vec: &mut Vec<Lit>) -> usize
 where
     C: ClauseDBIF,
@@ -1002,28 +1003,25 @@ where
         // OK, eliminate the literal and build constraints on it.
         make_eliminated_clauses(cdb, elim, vi, &*pos, &*neg);
         let vec = &mut state.new_learnt as *mut Vec<Lit>;
+        // println!("eliminate_var {}: |p|: {} and |n|: {}", vi, (*pos).len(), (*neg).len());
         // Produce clauses in cross product:
         for p in &*pos {
             for n in &*neg {
-                #[cfg(feature = "trace_elimination")]
-                println!(
-                    "eliminator replaces {} with a cross product {:?}",
-                    p,
-                    vec2int(&*vec)
-                );
                 match merge(cdb, *p, *n, vi, &mut *vec) {
-                    0 => (),
-                    1 => {
+                    0 => {
                         #[cfg(feature = "trace_elimination")]
                         println!(
-                            "eliminate_var: grounds {} from {}{:?} and {}{:?}",
-                            (*vec)[0],
-                            p,
-                            cdb[*p],
-                            n,
-                            cdb[*n],
+                            "eliminate_var {}: fusion {}{} and {}{}",
+                            vi, p, cdb[*p], n, cdb[*n],
                         );
+                    }
+                    1 => {
                         let lit = (*vec)[0];
+                        #[cfg(feature = "trace_elimination")]
+                        println!(
+                            "eliminate_var {}: found assign {} from {}{} and {}{}",
+                            vi, lit, p, cdb[*p], n, cdb[*n],
+                        );
                         cdb.certificate_add(&*vec);
                         asg.assign_at_rootlevel(lit)?;
                     }
@@ -1035,6 +1033,11 @@ where
                             true,
                         );
                         elim.add_cid_occur(asg, cid, &mut cdb[cid], true);
+                        #[cfg(feature = "trace_elimination")]
+                        println!(
+                            "eliminate_var {}: X {} from {} and {}",
+                            vi, cdb[cid], cdb[*p], cdb[*n],
+                        );
                     }
                 }
             }

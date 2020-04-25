@@ -139,6 +139,9 @@ impl VarManipulateIF for AssignStack {
             self.var[vi].turn_on(Flag::ELIMINATED);
             self.clear_reward(vi);
             self.num_eliminated_vars += 1;
+        } else {
+            #[cfg(feature = "boundary_check")]
+            panic!("double elimination");
         }
     }
     #[inline]
