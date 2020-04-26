@@ -113,5 +113,5 @@
 
 - `Solver` were divided into 6 sub modules
 - resolved a performance regression
-- switched to VSIDS instead of ACID
+- switched to EVSIDS instead of ACID
 - Glucose-style Watch structure

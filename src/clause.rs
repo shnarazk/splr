@@ -32,7 +32,7 @@ pub trait ClauseDBIF: IndexMut<ClauseId, Output = Clause> {
     fn is_empty(&self) -> bool;
     /// return an iterator.
     fn iter(&self) -> Iter<'_, Clause>;
-    /// return an mutable iterator.
+    /// return a mutable iterator.
     fn iter_mut(&mut self) -> IterMut<'_, Clause>;
     /// return a watcher list
     fn watcher_list(&self, l: Lit) -> &[Watch];
@@ -41,7 +41,7 @@ pub trait ClauseDBIF: IndexMut<ClauseId, Output = Clause> {
     /// unregister a clause `cid` from clause database and make the clause dead.
     fn detach(&mut self, cid: ClauseId);
     /// check a condition to reduce.
-    /// * return `true` if ruduction is done.
+    /// * return `true` if reduction is done.
     /// * Otherwise return `false`.
     ///
     /// # CAVEAT
@@ -98,8 +98,8 @@ pub trait ClauseDBIF: IndexMut<ClauseId, Output = Clause> {
     where
         A: AssignIF;
     /// removes Lit `p` from Clause *self*. This is an O(n) function!
-    /// returns true if the clause became a unit clause.
-    /// Called only from strengthen_clause
+    /// This returns `true` if the clause became a unit clause.
+    /// And this is called only from `Eliminator::strengthen_clause`.
     fn strengthen(&mut self, cid: ClauseId, p: Lit) -> bool;
     /// minimize a clause.
     fn minimize_with_biclauses<A>(&mut self, asg: &A, vec: &mut Vec<Lit>)
@@ -175,7 +175,7 @@ impl fmt::Display for ClauseId {
 }
 
 impl ClauseIdIF for ClauseId {
-    /// return true if the clause is genereted from a literal by Eliminater.
+    /// return `true` if the clause is generated from a literal by Eliminater.
     fn is_lifted_lit(self) -> bool {
         0 != 0x8000_0000 & self.ordinal
     }
@@ -217,7 +217,7 @@ impl WatchDBIF for Vec<Watch> {
             }
         }
     }
-    /// This O(n) functon is used only in Eliminator. So the cost can be ignored.
+    /// This O(n) function is used only in Eliminator. So the cost can be ignored.
     fn update_blocker(&mut self, cid: ClauseId, l: Lit, binary: bool) {
         for w in &mut self[..] {
             if w.c == cid {
@@ -236,7 +236,7 @@ pub struct Clause {
     pub lits: Vec<Lit>,
     /// A static clause evaluation criterion like LBD, NDD, or something.
     pub rank: usize,
-    /// the index from which `propagate` starts seaching an unfalsified literal.
+    /// the index from which `propagate` starts searching an unfalsified literal.
     pub search_from: usize,
     /// A dynamic clause evaluation criterion based on the number of references.
     reward: f64,

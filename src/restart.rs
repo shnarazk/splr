@@ -196,7 +196,7 @@ impl ProgressEvaluator for ProgressLVL {
     fn shift(&mut self) {}
 }
 
-/// An EMA of reccuring conflict complexity (unused now).
+/// An EMA of recurring conflict complexity (unused now).
 #[derive(Debug)]
 struct ProgressRCC {
     heat: Ema2,
@@ -347,10 +347,10 @@ impl LubySeries {
 }
 
 /// An implementation of Cadical-style blocker.
-/// This is a stealth blocker between the other evalutars and solver;
+/// This is a stealth blocker between the other evaluators and solver;
 /// the other evaluators work as if this blocker doesn't exist.
 /// When an evaluator becomes active, we accept and shift it. But this blocker
-/// absorbs not only the forcing signal but also blocking singal.
+/// absorbs not only the forcing signal but also blocking signal.
 /// This exists in macro `reset`.
 #[derive(Debug)]
 struct GeometricStabilizer {

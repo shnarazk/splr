@@ -14,7 +14,7 @@ pub trait VarRewardIF {
     fn clear_reward(&mut self, vi: VarId);
     /// modify var's activity at conflict analysis in `analyze`.
     fn reward_at_analysis(&mut self, vi: VarId);
-    /// modify var's activity at value assignment in `uncheck_{assume, enquue, fix}`.
+    /// modify var's activity at value assignment in `uncheck_{assume, enqueue, fix}`.
     fn reward_at_assign(&mut self, vi: VarId);
     /// modify var's activity at value unassigment in `cancel_until`.
     fn reward_at_unassign(&mut self, vi: VarId);

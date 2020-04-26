@@ -74,7 +74,7 @@ pub struct Var {
     pub index: VarId,
     /// the number of participation in conflict analysis
     participated: u32,
-    /// a dynamic evaluation criterion like VSIDS or ACID.
+    /// a dynamic evaluation criterion like EVSIDS or ACID.
     reward: f64,
     /// the number of conflicts at which this var was assigned lastly.
     timestamp: usize,

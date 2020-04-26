@@ -45,17 +45,17 @@ pub trait StateIF {
 /// Phase saving modes.
 #[derive(Debug, Eq, PartialEq)]
 pub enum PhaseMode {
-    /// Use best values.
+    /// use the best phase so far.
     Best,
-    /// Mixing best and random values.
+    /// mixing best and random values.
     BestRnd,
-    /// Use the inverted value.
+    /// use the inverted phases.
     Invert,
-    /// the orignal saving mode.
+    /// the original saving mode.
     Latest,
-    /// random value
+    /// use random values.
     Random,
-    /// use the best value in the current segment
+    /// use the best phases in the current segment.
     Target,
 }
 
@@ -79,7 +79,7 @@ impl fmt::Display for PhaseMode {
 /// A collection of named search heuristics.
 #[derive(Debug, Eq, PartialEq)]
 pub enum SearchStrategy {
-    /// the initial search phase to determine a main strategy
+    /// The initial search phase to determine a main strategy
     Initial,
     /// Non-Specific-Instance using a generic setting
     Generic,
@@ -147,7 +147,7 @@ pub enum Stat {
     NoDecisionConflict,
     /// the last number of solved variables
     SolvedRecord,
-    /// Don't use this dummy (setinel at the tail).
+    /// don't use this dummy (sentinel at the tail).
     EndOfStatIndex,
 }
 
@@ -169,25 +169,44 @@ impl IndexMut<Stat> for [usize] {
 /// Data storage for `Solver`.
 #[derive(Debug)]
 pub struct State {
+    /// solver configuration
     pub config: Config,
+    /// phase saving selector
     pub phase_select: PhaseMode,
-    pub stats: [usize; Stat::EndOfStatIndex as usize], // statistics
-    /// Tuple of current strategy and the number of conflicts at which the strategy is selected.
+    /// collection of statistics data
+    pub stats: [usize; Stat::EndOfStatIndex as usize],
+    /// stabilization mode
     pub stabilize: bool,
+    /// tuple of current strategy and the number of conflicts at which the strategy is selected.
     pub strategy: (SearchStrategy, usize),
+    /// problem description
     pub target: CNFDescription,
+    /// adjustment interval in conflict
     pub reflection_interval: usize,
-    /// MISC
+    //
+    //## MISC
+    //
+    /// EMA of backjump levels
     pub b_lvl: Ema,
+    /// EMA of conflicting levels
     pub c_lvl: Ema,
+    /// hold conflicting literals for UNSAT problems
     pub conflicts: Vec<Lit>,
+    /// hold the previous number of non-conflicting assignment
     pub last_asg: usize,
+    /// hold the previous number of solved vars
     pub last_solved: usize,
+    /// working place to build learnt clauses
     pub new_learnt: Vec<Lit>,
+    /// `progress` invocation counter
     pub progress_cnt: usize,
+    /// keep the previous statistics values
     pub record: ProgressRecord,
+    /// start clock for timeout handling
     pub start: SystemTime,
+    /// upper limit for timeout handling
     pub time_limit: f64,
+    /// for dumping debugging information for developers
     pub development: Vec<(usize, f64, f64, f64, f64, f64)>,
 }
 

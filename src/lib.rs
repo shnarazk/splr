@@ -180,7 +180,7 @@ pub mod assign;
 pub mod clause;
 /// Crate `config` provides solver's configuration and CLI.
 pub mod config;
-/// Crate `eliminator` implments clause subsumption and var elimination.
+/// Crate `eliminator` implements clause subsumption and var elimination.
 pub mod eliminate;
 /// Crate `restarter` provides restart heuristics.
 pub mod restart;

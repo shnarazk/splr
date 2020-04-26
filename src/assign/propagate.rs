@@ -19,7 +19,7 @@ pub trait PropagateIF {
     /// unsafe enqueue (assign by implication); doesn't emit an exception.
     ///
     /// ## Warning
-    /// Caller must assure the consistency after this assignment
+    /// Callers must assure the consistency after this assignment.
     fn assign_by_implication(&mut self, l: Lit, reason: AssignReason, lv: DecisionLevel);
     /// unsafe assume (assign by decision); doesn't emit an exception.
     /// ## Caveat
@@ -185,7 +185,7 @@ impl PropagateIF for AssignStack {
     ///  - This function assumes there's no dead clause.
     ///    So Eliminator should call `garbage_collect` before me.
     ///  - The order of literals in binary clauses will be modified to hold
-    ///    propagatation order.
+    ///    propagation order.
     fn propagate<C>(&mut self, cdb: &mut C) -> ClauseId
     where
         C: ClauseDBIF,

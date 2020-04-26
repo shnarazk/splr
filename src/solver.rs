@@ -59,7 +59,7 @@ pub type SolverResult = Result<Certificate, SolverError>;
 /// if let Ok(SAT(v)) = s.solve() {
 ///     assert_eq!(v.len(), 250);
 ///     // But don't expect `s.asg.var_stats().3 == 0` at this point.
-///     // It returns the nubmer of vars which were assigned at decision level 0.
+///     // It returns the number of vars which were assigned at decision level 0.
 /// } else {
 ///     panic!("It should be satisfied!");
 /// }
@@ -110,7 +110,7 @@ impl Instantiate for Solver {
 
 impl TryFrom<&str> for Solver {
     type Error = SolverError;
-    /// return a new solver bulid for a CNF file.
+    /// return a new solver build for a CNF file.
     ///
     /// # Example
     /// ```

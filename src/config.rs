@@ -15,7 +15,7 @@ pub struct Config {
     #[structopt(parse(from_os_str))]
     pub cnf_file: PathBuf,
 
-    /// Interval for dumpping stat data
+    /// Interval for dumping stat data
     #[structopt(long = "stat", default_value = "0")]
     pub dump_int: usize,
 

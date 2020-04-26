@@ -1,4 +1,4 @@
-/// Crate `eliminator` implments clause subsumption and var elimination.
+/// Crate `eliminator` implements clause subsumption and var elimination.
 use {
     crate::{
         assign::AssignIF,
@@ -152,7 +152,7 @@ pub struct Eliminator {
     var_queue: VarOccHeap,
     bwdsub_assigns: usize,
     elim_lits: Vec<Lit>,
-    /// Maximum number of caluses to try to eliminate a var
+    /// Maximum number of clauses to try to eliminate a var
     pub eliminate_var_occurrence_limit: usize,
     /// 0 for no limit
     /// Stop elimination if a generated resolvent is larger than this

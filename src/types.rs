@@ -19,7 +19,7 @@ use {
 
 /// API for accessing internal data in a module.
 /// For example, `State::progress` needs to access misc parameters and statistics,
-/// which should be uned locally in modules.
+/// which, however, should be used locally in the defining modules.
 /// To avoid to make them public, we define a generic accessor or exporter here.
 /// `T` is the list of exporting values.
 pub trait Export<T> {
@@ -77,7 +77,7 @@ pub trait Delete<T> {
 
 /// 'Variable' identifier or 'variable' index, starting with one.
 /// Implementation note: NonZeroUsize can be used but requires a lot of changes.
-/// The current abstraction is imcomplete.
+/// The current abstraction is incomplete.
 pub type VarId = usize;
 
 /// Decision Level Representation.
@@ -322,7 +322,7 @@ impl LitIF for Lit {
 
 /// API for Exponential Moving Average, EMA, like `get`, `reset`, `update` and so on.
 pub trait EmaIF {
-    /// the type of the argment of `update`.
+    /// the type of the argument of `update`.
     type Input;
     /// return the current value.
     fn get(&self) -> f64;
