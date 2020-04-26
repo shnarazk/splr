@@ -5,17 +5,16 @@ Splr is a pure [Rust](https://www.rust-lang.org)ic fast SAT solver, based on [Gl
 It adopts various research results on SAT solvers:
 
 - *CDCL*, *watch literals*, *LBD* and so on from Glucose, [Minisat](http://minisat.se) and the ancestors
-- Glucose-like dynamic blocking/forcing restarts based on [EMAs](https://arxiv.org/abs/1506.08905) and [CaDiCaL](https://github.com/arminbiere/cadical)-like stabilization
+- Glucose-like *dynamic blocking/forcing restarts* based on [EMAs](https://arxiv.org/abs/1506.08905) and [CaDiCaL](https://github.com/arminbiere/cadical)-like *stabilization*
 - pre/in-process simplification based on clause subsumption and variable elimination
-- compile-time selection of a variant of **Learning Rate Based Branching** with **Reason Side
-  Rewarding** and EVSIDS
-- **chronological backtrack** aka **chronoBT**
+- compile-time selection of a variant of *Learning Rate Based Branching* with *Reason Side Rewarding* and EVSIDS
+- *chronological backtrack* aka *chronoBT*
 - Glucose-like heuristics adaptation
 - CaDiCaL-like extended phase saving
 
-Please check [ChangeLog](ChangeLog.md) about recent updates.
-
 *Many thanks to SAT researchers.*
+
+Please check [ChangeLog](ChangeLog.md) about recent updates.
 
 ## Install
 
@@ -67,17 +66,16 @@ Though Splr comes with **ABSOLUTELY NO WARRANTY**, I'd like to show some results
 
 #### Version 0.4.0 (splr-0.4.0)
 
-* [SAT Race 2019](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks](http://satcompetition.org/sr2019benchmarks.zip),  splr-0.4.0 solved with a 300 sec timeout:
+* [SAT Race 2019](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks](http://satcompetition.org/sr2019benchmarks.zip),  splr-0.4.0 solved with a 300 sec (soft) timeout:
   * 41 satisfiable problems: all the solutions were correct.
-  * 5 unsatisfiable problems:
-    * all were verified with [grad](https://www21.in.tum.de/~lammich/grat/).
+  * 5 unsatisfiable problems: all were verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
 
 #### Version 0.3.1 (splr-0.3.1)
 
-* [SAT Race 2019](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks](http://satcompetition.org/sr2019benchmarks.zip),  splr-0.3.1 solved with a 200 sec timeout:
+* [SAT Race 2019](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks](http://satcompetition.org/sr2019benchmarks.zip),  splr-0.3.1 solved with a 200 sec (soft) timeout:
   * 35 satisfiable problems: all the solutions were correct.
   * 4 unsatisfiable problems:
-    * 3 were verified with [grad](https://www21.in.tum.de/~lammich/grat/).
+    * 3 were verified with Grad.
 	* Verifying gto_p60c238-sc2018.cnf was timed out due to the size of the drat file (1.3 GB).
 
 ![](https://user-images.githubusercontent.com/997855/75087001-2f897800-557e-11ea-99fd-83d891f8350b.png)
