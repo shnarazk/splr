@@ -593,7 +593,6 @@ fn handle_conflict(
             asg.assign_by_unitclause(l0);
         }
         asg.num_solved_vars += 1;
-        elim.to_eliminate *= 0.9;
         rst.update(RestarterModule::Reset, 0);
         state.last_solved = ncnfl;
     } else {
