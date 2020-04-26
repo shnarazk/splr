@@ -169,8 +169,7 @@ impl SatSolverIF for Solver {
         // s.root_level = 0;
         asg.num_solved_vars = asg.stack_len();
         state.progress_header();
-        state.progress(asg, cdb, elim, rst, Some("initialization phase"));
-        state.flush("loading...");
+        state.progress(asg, cdb, elim, rst, Some("preprocessing phase"));
         const USE_PRE_PROCESSING_ELIMINATOR: bool = true;
 
         //
@@ -902,6 +901,15 @@ fn conflict_analyze(
 
 impl Solver {
     fn inject(mut self, mut reader: BufReader<File>) -> Result<Solver, SolverError> {
+        self.state.progress_header();
+        self.state.progress(
+            &self.asg,
+            &self.cdb,
+            &self.elim,
+            &self.rst,
+            Some("initialization phase"),
+        );
+        self.state.flush("loading...");
         let mut buf = String::new();
         loop {
             buf.clear();

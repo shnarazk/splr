@@ -30,7 +30,7 @@ pub trait StateIF {
         A: Export<(usize, usize, usize, f64, f64)> + AssignIF,
         C: Export<(usize, usize, usize, usize, usize, usize)> + ClauseDBIF;
     /// write a header of stat data to stdio.
-    fn progress_header(&self);
+    fn progress_header(&mut self);
     /// write stat data to stdio.
     fn progress<A, C, E, R>(&mut self, asg: &A, cdb: &C, elim: &E, rst: &R, mes: Option<&str>)
     where
@@ -376,7 +376,7 @@ impl StateIF for State {
         };
         self.strategy.1 = asg_num_conflict;
     }
-    fn progress_header(&self) {
+    fn progress_header(&mut self) {
         if self.config.quiet_mode {
             return;
         }
@@ -384,10 +384,13 @@ impl StateIF for State {
             self.dump_header();
             return;
         }
-        println!("{}", self);
-        let repeat = 7;
-        for _i in 0..repeat {
-            println!("                                                  ");
+        if 0 == self.progress_cnt {
+            self.progress_cnt = 1;
+            println!("{}", self);
+            let repeat = 7;
+            for _i in 0..repeat {
+                println!("                                                  ");
+            }
         }
     }
     fn flush<S: AsRef<str>>(&self, mes: S) {
