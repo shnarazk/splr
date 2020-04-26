@@ -1,10 +1,15 @@
 /// Crate `assign` implements Boolean Constraint Propagation and decision var selection.
 /// This version can handle Chronological and Non Chronological Backtrack.
 mod heap;
+/// Boolean constraint propagation
 pub mod propagate;
+/// Var rewarding
 pub mod reward;
+/// Decision var selection
 pub mod select;
+/// assignment management
 pub mod stack;
+/// var struct and its methods
 pub mod var;
 
 pub use self::{
@@ -53,6 +58,7 @@ pub trait AssignIF: ClauseManipulateIF + PropagateIF + VarManipulateIF + VarRewa
     fn extend_model(&mut self, lits: &[Lit]);
 }
 
+/// reason of assignment, two kinds
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum AssignReason {
     /// One of not assigned, assigned by decision, or solved.

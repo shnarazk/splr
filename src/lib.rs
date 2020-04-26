@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/splr/0.3.2")]
+#![doc(html_root_url = "https://docs.rs/splr/0.4.0")]
 /*!
 # A modern CDCL SAT solver in Rust
 
@@ -95,45 +95,67 @@ Please check help message.
 
 ```plain
 $ splr --help
-splr 0.3.0
+splr 0.4.0
 Narazaki Shuji <shujinarazaki@protonmail.com>
-A pure rustic CDCL SAT solver based on Glucose
+A modern CDCL SAT solver in Rust
 
 USAGE:
-    splr [FLAGS] [OPTIONS] <cnf-filename>
+    splr [FLAGS] [OPTIONS] <cnf-file>
 
 FLAGS:
-    -h, --help                    Prints help information
-    -q, --quiet                   Disable any progress message
-    -c, --certify                 Writes a DRAT UNSAT certification file
-    -l, --log                     Uses Glucose-like progress report
-    -V, --version                 Prints version information
-    -S, --no-adaptive-strategy    Disables dynamic strategy adaptation
-    -E, --without-elim            Disables exhaustive simplification
+    -h, --help        Prints help information
+    -C, --no-color    Disable coloring
+    -q, --quiet       Disable any progress message
+    -c, --certify     Writes a DRAT UNSAT certification file
+    -l, --log         Uses Glucose-like progress report
+    -V, --version     Prints version information
+    -A, --no-adapt    Disables dynamic strategy adaptation
+    -E, --no-elim     Disables exhaustive simplification
 
 OPTIONS:
-    -C, --chronoBT <chronobt>         threshold to use chronoBT [default: 100]
-        --cl <clause-limit>           soft limit of #clauses (6MC/GB) [default: 0]
-        --stat <dump-interval>        interval for dumpping stat data [default: 0]
-        --eg <elim-grow-limit>        grow limit of #clauses by v-elim [default: 0]
-        --el <elim-lit-limit>         #literals in a clause by v-elim [default: 100]
-    -o, --dir <output-dirname>        output directory [default: .]
-    -p, --proof <proof-filename>      filename for DRAT cert [default: proof.out]
-        --ra <restart-asg-len>        length for assignment average [default: 3500]
-        --rb <restart-blocking>       blocking restart threshold [default: 1.40]
-        --rl <restart-lbd-len>        length for LBD average [default: 50]
-        --rs <restart-step>           #conflicts between restarts [default: 50]
-        --rt <restart-threshold>      forcing restart threshold [default: 0.70]
-    -r, --result <result-filename>    result filename/stdout [default: ]
-        --to <timeout>                CPU time limit in sec [default: 10000.0]
+        --cbt <cbt-thr>           Level threshold to use chronoBT [default: 100]
+        --cl <clause-limit>       Soft limit of #clauses (6MC/GB) [default: 0]
+        --stat <dump-int>         Interval for dumpping stat data [default: 0]
+        --ecl <elim-cls-lim>      Max #lit for clause subsume [default: 100]
+        --evl <elim-grw-lim>      Grow limit of #cls in var elim [default: 0]
+        --et <elim-trigger>       #cls to start simplification [default: 8192]
+        --evo <elim-var-occ>      Max #cls for var elimination [default: 10000]
+    -o, --dir <output-dir>        Output directory [default: .]
+    -p, --proof <proof-file>      Cert. file in DRAT format [default: proof.out]
+    -r, --result <result-file>    Result filename/stdout [default: ]
+        --ral <rst-asg-len>       Length for assignment average [default: 3500]
+        --rab <rst-asg-thr>       Blocking restart threshold [default: 1.40]
+        --rll <rst-lbd-len>       Length of LBD fast EMA [default: 50]
+        --rls <rst-lbd-slw>       Length of LBD slow EMA [default: 10000]
+        --rlt <rst-lbd-thr>       Forcing restart threshold [default: 0.70]
+        --rss <rst-stb-scl>       Stabilizer scaling [default: 2.0]
+        --rs <rst-step>           #conflicts between restarts [default: 50]
+    -t, --timeout <timeout>       CPU time limit in sec [default: 5000.0]
 
 ARGS:
-    <cnf-filename>    a DIMACS format CNF file
+    <cnf-file>    CNF file in DIMACS format
 ```
 
 ## Correctness
 
-While Splr comes with **ABSOLUTELY NO WARRANTY**, Splr version 0.1.0 (splr-0.1.0) was verified with the following problems:
+While Splr comes with **ABSOLUTELY NO WARRANTY**, some Splr versions were verified with the following problems:
+
+### Version 0.4.0
+
+* [SAT Race 2019](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks](http://satcompetition.org/sr2019benchmarks.zip),  splr-0.4.0 solved with a 300 sec timeout:
+  * 41 satisfiable problems: all the solutions were correct.
+  * 5 unsatisfiable problems:
+    * all were verified with [grad](https://www21.in.tum.de/~lammich/grat/).
+
+#### Version 0.3.1
+
+* [SAT Race 2019](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks](http://satcompetition.org/sr2019benchmarks.zip),  splr-0.3.1 solved with a 200 sec timeout:
+  * 35 satisfiable problems: all the solutions were correct.
+  * 4 unsatisfiable problems:
+    * 3 were verified with [grad](https://www21.in.tum.de/~lammich/grat/).
+        * Verifying gto_p60c238-sc2018.cnf was timed out due to the size of the drat file (1.3 GB).
+
+#### Version 0.1.0
 
 * The first 100 problems from
   [SATLIB](https://www.cs.ubc.ca/~hoos/SATLIB/benchm.html),

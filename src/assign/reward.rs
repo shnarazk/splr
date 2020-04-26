@@ -1,6 +1,7 @@
 /// Var Rewarding
 use {super::AssignStack, crate::types::*, std::slice::Iter};
 
+/// a pair of the start value and upper bound of var decay rate.
 pub const REWARD_DECAY_RANGE: (f64, f64) = (0.80, 0.97);
 
 /// API for var rewarding.
