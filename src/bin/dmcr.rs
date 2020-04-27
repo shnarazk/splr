@@ -128,11 +128,11 @@ fn read_assignment(rs: &mut dyn BufRead, cnf: &str, assign: &Option<PathBuf>) ->
         match rs.read_line(&mut buf) {
             Ok(0) => return Some(Vec::new()),
             Ok(_) => {
-                if buf.starts_with('c') {
+                if buf.starts_with("c ") {
                     buf.clear();
                     continue;
                 }
-                if buf.starts_with('s') {
+                if buf.starts_with("s ") {
                     if buf.starts_with("s SATISFIABLE") {
                         buf.clear();
                         continue;
@@ -144,15 +144,17 @@ fn read_assignment(rs: &mut dyn BufRead, cnf: &str, assign: &Option<PathBuf>) ->
                         return None;
                     }
                 }
-                let mut v: Vec<i32> = Vec::new();
-                for s in buf.split_whitespace() {
-                    match s.parse::<i32>() {
-                        Ok(0) => break,
-                        Ok(x) => v.push(x),
-                        Err(e) => panic!("{} by {}", e, s),
+                if buf.starts_with("v ") {
+                    let mut v: Vec<i32> = Vec::new();
+                    for s in buf[2..].split_whitespace() {
+                        match s.parse::<i32>() {
+                            Ok(0) => break,
+                            Ok(x) => v.push(x),
+                            Err(e) => panic!("{} by {}", e, s),
+                        }
                     }
+                    return Some(v);
                 }
-                return Some(v);
             }
             Err(e) => panic!("{}", e),
         }

@@ -29,13 +29,13 @@ fn colored(v: Result<bool, &SolverError>, quiet: bool) -> Cow<'static, str> {
         match v {
             Ok(false) => Cow::Borrowed("s UNSATISFIABLE"),
             Ok(true) => Cow::Borrowed("s SATISFIABLE"),
-            Err(e) => Cow::from(format!("c UNKNOWN ({})", e)),
+            Err(e) => Cow::from(format!("s UNKNOWN ({})", e)),
         }
     } else {
         match v {
             Ok(false) => Cow::from(format!("{}s UNSATISFIABLE{}", GREEN, RESET)),
             Ok(true) => Cow::from(format!("{}s SATISFIABLE{}", BLUE, RESET)),
-            Err(e) => Cow::from(format!("{}c UNKNOWN ({}){}", RED, e, RESET)),
+            Err(e) => Cow::from(format!("{}s UNKNOWN ({}){}", RED, e, RESET)),
         }
     }
 }
@@ -150,7 +150,7 @@ fn save_result<S: AsRef<str> + std::fmt::Display>(
                     .as_bytes(),
                 )?;
                 report(s, buf)?;
-                buf.write_all(b"s SATISFIABLE\n")?;
+                buf.write_all(b"s SATISFIABLE\nv ")?;
                 for x in v {
                     buf.write_all(format!("{} ", x).as_bytes())?;
                 }
