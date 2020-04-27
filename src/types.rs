@@ -2,7 +2,7 @@
 /// some common traits.
 pub use crate::{
     assign::AssignReason,
-    clause::{Clause, ClauseIF, ClauseId, ClauseIdIF, Watch},
+    cdb::{Clause, ClauseIF, ClauseId, ClauseIdIF, Watch},
     config::Config,
 };
 use {
@@ -54,7 +54,7 @@ pub trait ActivityIF {
 ///
 /// ```
 /// use crate::{splr::config::Config, splr::types::*};
-/// use splr::{clause::ClauseDB, solver::Solver};
+/// use splr::{cdb::ClauseDB, solver::Solver};
 /// let _ = ClauseDB::instantiate(&Config::default(), &CNFDescription::default());
 /// let _ = Solver::instantiate(&Config::default(), &CNFDescription::default());
 ///```
@@ -277,15 +277,15 @@ impl IndexMut<Lit> for Vec<bool> {
     }
 }
 
-impl Index<Lit> for Vec<Vec<crate::clause::Watch>> {
-    type Output = Vec<crate::clause::Watch>;
+impl Index<Lit> for Vec<Vec<Watch>> {
+    type Output = Vec<Watch>;
     #[inline]
     fn index(&self, l: Lit) -> &Self::Output {
         unsafe { self.get_unchecked(usize::from(l)) }
     }
 }
 
-impl IndexMut<Lit> for Vec<Vec<crate::clause::Watch>> {
+impl IndexMut<Lit> for Vec<Vec<Watch>> {
     #[inline]
     fn index_mut(&mut self, l: Lit) -> &mut Self::Output {
         unsafe { self.get_unchecked_mut(usize::from(l)) }

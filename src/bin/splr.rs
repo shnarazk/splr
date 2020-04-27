@@ -2,7 +2,7 @@
 use {
     libc::{clock_gettime, timespec, CLOCK_PROCESS_CPUTIME_ID},
     splr::{
-        clause::CertifiedRecord,
+        cdb::CertifiedRecord,
         config::{Config, VERSION},
         restart::RestartMode,
         solver::{Certificate, SatSolverIF, Solver, SolverResult},

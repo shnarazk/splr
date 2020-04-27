@@ -3,7 +3,7 @@
 use {
     super::{AssignIF, AssignStack, VarHeapIF, VarRewardIF},
     crate::{
-        clause::{ClauseDBIF, WatchDBIF},
+        cdb::{ClauseDBIF, WatchDBIF},
         types::*,
     },
 };

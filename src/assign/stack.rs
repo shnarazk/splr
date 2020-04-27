@@ -3,7 +3,7 @@ use {
     super::{
         AssignIF, AssignStack, Var, VarIdHeap, VarManipulateIF, VarOrderIF, REWARD_DECAY_RANGE,
     },
-    crate::{clause::ClauseDBIF, state::State, types::*},
+    crate::{cdb::ClauseDBIF, state::State, types::*},
     std::{
         fmt,
         fs::File,

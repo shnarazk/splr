@@ -2,7 +2,7 @@
 use {
     crate::{
         assign::AssignIF,
-        clause::ClauseDBIF,
+        cdb::ClauseDBIF,
         eliminate::EliminateIF,
         restart::{RestartIF, RestartMode},
         types::*,

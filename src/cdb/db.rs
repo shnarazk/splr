@@ -1,5 +1,5 @@
-/// Crate `clause` provides `clause` object and its manager `ClauseDB`
 use {
+    super::{CertifiedRecord, Clause, ClauseDB, ClauseId, WatchDBIF, LBDIF},
     crate::{
         assign::AssignIF,
         eliminate::EliminateIF,
@@ -8,24 +8,17 @@ use {
     },
     std::{
         cmp::Ordering,
-        fmt,
         ops::{Index, IndexMut, Range, RangeFrom},
         slice::{Iter, IterMut},
     },
 };
 
-/// API for Clause, providing literal accessors.
-pub trait ClauseIF {
-    /// return true if it contains no literals; a clause after unit propagation.
-    fn is_empty(&self) -> bool;
-    /// return an iterator over its literals.
-    fn iter(&self) -> Iter<'_, Lit>;
-    /// return the number of literals.
-    fn len(&self) -> usize;
-}
+const ACTIVITY_MAX: f64 = 1e308;
 
 /// API for clause management like `reduce`, `simplify`, `new_clause`, and so on.
-pub trait ClauseDBIF: IndexMut<ClauseId, Output = Clause> {
+pub trait ClauseDBIF:
+    IndexMut<ClauseId, Output = Clause> + Export<(usize, usize, usize, usize, usize, usize)>
+{
     /// return the length of `clause`.
     fn len(&self) -> usize;
     /// return true if it's empty.
@@ -56,7 +49,7 @@ pub trait ClauseDBIF: IndexMut<ClauseId, Output = Clause> {
     /// * `kill`
     fn garbage_collect(&mut self);
     /// allocate a new clause and return its id.
-    /// * If 2nd arg is `Some(vdb)`, register `v` as a learnt after sorting based on assign level.
+    /// * If `level_sort` is on, register `v` as a learnt after sorting based on assign level.
     /// * Otherwise, register `v` as a permanent clause, which rank is zero.
     fn new_clause<A>(
         &mut self,
@@ -105,396 +98,6 @@ pub trait ClauseDBIF: IndexMut<ClauseId, Output = Clause> {
     fn minimize_with_biclauses<A>(&mut self, asg: &A, vec: &mut Vec<Lit>)
     where
         A: AssignIF;
-}
-
-/// API for Clause Id.
-pub trait ClauseIdIF {
-    /// return `true` if a given clause id is made from a `Lit`.
-    fn is_lifted_lit(self) -> bool;
-}
-
-/// API for 'watcher list' like `attach`, `detach`, `detach_with` and so on.
-pub trait WatchDBIF {
-    /// make a new 'watch', and add it to this watcher list.
-    fn register(&mut self, blocker: Lit, c: ClauseId, binary: bool);
-    /// remove *n*-th clause from the watcher list. *O(1)* operation.
-    fn detach(&mut self, n: usize);
-    /// remove a clause which id is `cid` from the watcher list. *O(n)* operation.
-    fn detach_with(&mut self, cid: ClauseId);
-    /// update blocker of cid.
-    fn update_blocker(&mut self, cid: ClauseId, l: Lit, binary: bool);
-}
-
-/// Record of clause operations to build DRAT certifications.
-#[derive(Debug, Eq, PartialEq)]
-pub enum CertifiedRecord {
-    /// placed at the end.
-    SENTINEL,
-    /// added a (learnt) clause.
-    ADD,
-    /// deleted a clause.
-    DELETE,
-}
-
-type DRAT = Vec<(CertifiedRecord, Vec<i32>)>;
-
-/// 'Clause' Identifier, or 'clause' index, starting with one.
-/// Note: ids are re-used after 'garbage collection'.
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub struct ClauseId {
-    /// a sequence number.
-    pub ordinal: u32,
-}
-
-const ACTIVITY_MAX: f64 = 1e308;
-const NULL_CLAUSE: ClauseId = ClauseId { ordinal: 0 };
-
-impl Default for ClauseId {
-    #[inline]
-    /// return the default empty clause, used in a reason slot or no conflict path.
-    fn default() -> Self {
-        NULL_CLAUSE
-    }
-}
-
-impl From<usize> for ClauseId {
-    #[inline]
-    fn from(u: usize) -> ClauseId {
-        ClauseId { ordinal: u as u32 }
-    }
-}
-
-impl fmt::Display for ClauseId {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if *self == ClauseId::default() {
-            write!(f, "NullClause")
-        } else {
-            write!(f, "{}C", self.ordinal)
-        }
-    }
-}
-
-impl ClauseIdIF for ClauseId {
-    /// return `true` if the clause is generated from a literal by Eliminater.
-    fn is_lifted_lit(self) -> bool {
-        0 != 0x8000_0000 & self.ordinal
-    }
-}
-
-/// 'watch literal' structure
-#[derive(Clone, Debug)]
-pub struct Watch {
-    /// a cache of a literal in the clause
-    pub blocker: Lit,
-    /// ClauseId
-    pub c: ClauseId,
-    /// whether clause is binary.
-    pub binary: bool,
-}
-
-impl Default for Watch {
-    fn default() -> Watch {
-        Watch {
-            blocker: NULL_LIT,
-            c: ClauseId::default(),
-            binary: false,
-        }
-    }
-}
-
-impl WatchDBIF for Vec<Watch> {
-    fn register(&mut self, blocker: Lit, c: ClauseId, binary: bool) {
-        self.push(Watch { blocker, c, binary });
-    }
-    fn detach(&mut self, n: usize) {
-        self.swap_remove(n);
-    }
-    fn detach_with(&mut self, cid: ClauseId) {
-        for (n, w) in self.iter().enumerate() {
-            if w.c == cid {
-                self.swap_remove(n);
-                return;
-            }
-        }
-    }
-    /// This O(n) function is used only in Eliminator. So the cost can be ignored.
-    fn update_blocker(&mut self, cid: ClauseId, l: Lit, binary: bool) {
-        for w in &mut self[..] {
-            if w.c == cid {
-                w.blocker = l;
-                w.binary = binary;
-                return;
-            }
-        }
-    }
-}
-
-/// A representation of 'clause'
-#[derive(Debug)]
-pub struct Clause {
-    /// The literals in a clause.
-    pub lits: Vec<Lit>,
-    /// A static clause evaluation criterion like LBD, NDD, or something.
-    pub rank: usize,
-    /// the index from which `propagate` starts searching an unfalsified literal.
-    pub search_from: usize,
-    /// A dynamic clause evaluation criterion based on the number of references.
-    reward: f64,
-    /// Flags
-    flags: Flag,
-}
-
-impl Default for Clause {
-    fn default() -> Clause {
-        Clause {
-            lits: vec![],
-            rank: 0,
-            search_from: 1,
-            reward: 0.0,
-            flags: Flag::empty(),
-        }
-    }
-}
-
-impl Index<usize> for Clause {
-    type Output = Lit;
-    #[inline]
-    fn index(&self, i: usize) -> &Lit {
-        unsafe { self.lits.get_unchecked(i) }
-    }
-}
-
-impl IndexMut<usize> for Clause {
-    #[inline]
-    fn index_mut(&mut self, i: usize) -> &mut Lit {
-        unsafe { self.lits.get_unchecked_mut(i) }
-    }
-}
-
-impl Index<Range<usize>> for Clause {
-    type Output = [Lit];
-    #[inline]
-    fn index(&self, r: Range<usize>) -> &[Lit] {
-        &self.lits[r]
-    }
-}
-
-impl Index<RangeFrom<usize>> for Clause {
-    type Output = [Lit];
-    #[inline]
-    fn index(&self, r: RangeFrom<usize>) -> &[Lit] {
-        &self.lits[r]
-    }
-}
-
-impl IndexMut<Range<usize>> for Clause {
-    #[inline]
-    fn index_mut(&mut self, r: Range<usize>) -> &mut [Lit] {
-        &mut self.lits[r]
-    }
-}
-
-impl IndexMut<RangeFrom<usize>> for Clause {
-    #[inline]
-    fn index_mut(&mut self, r: RangeFrom<usize>) -> &mut [Lit] {
-        &mut self.lits[r]
-    }
-}
-
-impl<'a> IntoIterator for &'a Clause {
-    type Item = &'a Lit;
-    type IntoIter = Iter<'a, Lit>;
-    fn into_iter(self) -> Self::IntoIter {
-        self.lits.iter()
-    }
-}
-
-impl<'a> IntoIterator for &'a mut Clause {
-    type Item = &'a Lit;
-    type IntoIter = Iter<'a, Lit>;
-    fn into_iter(self) -> Self::IntoIter {
-        self.lits.iter()
-    }
-}
-
-impl From<&Clause> for Vec<i32> {
-    fn from(c: &Clause) -> Vec<i32> {
-        c.lits.iter().map(|l| i32::from(*l)).collect::<Vec<i32>>()
-    }
-}
-
-impl ClauseIF for Clause {
-    fn is_empty(&self) -> bool {
-        self.lits.is_empty()
-    }
-    fn iter(&self) -> Iter<'_, Lit> {
-        self.lits.iter()
-    }
-    fn len(&self) -> usize {
-        self.lits.len()
-    }
-}
-
-impl FlagIF for Clause {
-    fn is(&self, flag: Flag) -> bool {
-        self.flags.contains(flag)
-    }
-    fn set(&mut self, f: Flag, b: bool) {
-        self.flags.set(f, b);
-    }
-    fn turn_off(&mut self, flag: Flag) {
-        self.flags.remove(flag);
-    }
-    fn turn_on(&mut self, flag: Flag) {
-        self.flags.insert(flag);
-    }
-}
-
-impl PartialEq for Clause {
-    fn eq(&self, other: &Clause) -> bool {
-        self == other
-    }
-}
-
-impl Eq for Clause {}
-
-impl PartialOrd for Clause {
-    fn partial_cmp(&self, other: &Clause) -> Option<Ordering> {
-        if self.rank < other.rank {
-            Some(Ordering::Less)
-        } else if other.rank < self.rank {
-            Some(Ordering::Greater)
-        } else if self.reward > other.reward {
-            Some(Ordering::Less)
-        } else if other.reward > self.reward {
-            Some(Ordering::Greater)
-        } else {
-            Some(Ordering::Equal)
-        }
-    }
-}
-
-impl Ord for Clause {
-    fn cmp(&self, other: &Clause) -> Ordering {
-        if self.rank < other.rank {
-            Ordering::Less
-        } else if other.rank > self.rank {
-            Ordering::Greater
-        } else if self.reward > other.reward {
-            Ordering::Less
-        } else if other.reward > self.reward {
-            Ordering::Greater
-        } else {
-            Ordering::Equal
-        }
-    }
-}
-
-impl Clause {
-    #[allow(clippy::comparison_chain)]
-    fn cmp_activity(&self, other: &Clause) -> Ordering {
-        if self.reward > other.reward {
-            Ordering::Less
-        } else if other.reward > self.reward {
-            Ordering::Greater
-        } else {
-            Ordering::Equal
-        }
-    }
-    /// make a clause *dead*; the clause still exists in clause database as a garbage.
-    fn kill(&mut self, touched: &mut [bool]) {
-        self.turn_on(Flag::DEAD);
-        debug_assert!(1 < usize::from(self.lits[0]) && 1 < usize::from(self.lits[1]));
-        touched[!self.lits[0]] = true;
-        touched[!self.lits[1]] = true;
-    }
-}
-
-impl fmt::Display for Clause {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let st = |flag, mes| if self.is(flag) { mes } else { "" };
-        write!(
-            f,
-            "{{{:?}{}{}{}}}",
-            vec2int(&self.lits),
-            st(Flag::LEARNT, ", learnt"),
-            st(Flag::DEAD, ", dead"),
-            st(Flag::ENQUEUED, ", enqueued"),
-        )
-    }
-}
-
-/// Clause database
-///
-///```
-/// use crate::{splr::config::Config, splr::types::*};
-/// use crate::splr::clause::ClauseDB;
-/// let cdb = ClauseDB::instantiate(&Config::default(), &CNFDescription::default());
-///```
-#[derive(Debug)]
-pub struct ClauseDB {
-    /// container of clauses
-    clause: Vec<Clause>,
-    /// container of watch literals
-    pub watcher: Vec<Vec<Watch>>,
-    /// clause history to make certification
-    pub certified: DRAT,
-    /// a number of clauses to emit out-of-memory exception
-    soft_limit: usize,
-    /// flag for Chan Seok heuristics
-    use_chan_seok: bool,
-    /// 'small' clause threshold
-    co_lbd_bound: usize,
-    // not in use
-    // lbd_frozen_clause: usize,
-
-    //
-    //## clause rewarding
-    //
-    activity_inc: f64,
-    activity_decay: f64,
-
-    //
-    //## Elimination
-    //
-    /// dirty literals
-    touched: Vec<bool>,
-
-    //
-    //## LBD
-    //
-    /// a working buffer for LBD calculation
-    lbd_temp: Vec<usize>,
-    num_lbd_update: usize,
-
-    //
-    //## reduction
-    //
-    /// increment step of reduction threshold
-    inc_step: usize,
-    /// bonus step of reduction threshold used in good progress
-    extra_inc: usize,
-    first_reduction: usize,
-    next_reduction: usize, // renamed from `nbclausesbeforereduce`
-    reducable: bool,
-    /// an expansion coefficient for restart
-    reduction_coeff: usize,
-
-    //
-    //## statistics
-    //
-    /// the number of active (not DEAD) clauses.
-    num_active: usize,
-    /// the number of binary clauses.
-    num_bi_clause: usize,
-    /// the number of binary learnt clauses.
-    num_bi_learnt: usize,
-    /// the number of clauses which LBDs are 2.
-    num_lbd2: usize,
-    /// the present number of learnt clauses.
-    num_learnt: usize,
-    /// the number of reductions.
-    num_reduction: usize,
 }
 
 impl Default for ClauseDB {
@@ -682,7 +285,7 @@ impl Export<(usize, usize, usize, usize, usize, usize)> for ClauseDB {
     ///
     ///```
     /// use crate::{splr::config::Config, splr::types::*};
-    /// use crate::splr::clause::ClauseDB;
+    /// use crate::splr::cdb::ClauseDB;
     /// let cdb = ClauseDB::instantiate(&Config::default(), &CNFDescription::default());
     /// let (_active, _bi_clause, _bi_learnt, _lbd2, _learnt, _reduction) = cdb.exports();
     ///```
@@ -1098,92 +701,6 @@ impl ClauseDBIF for ClauseDB {
     }
 }
 
-/// API to calculate LBD.
-trait LBDIF {
-    /// return the LBD value for a set of literals.
-    fn compute_lbd<A>(&mut self, asg: &A, vec: &[Lit]) -> usize
-    where
-        A: AssignIF;
-    /// return the LBD value of clause `cid`.
-    fn compute_lbd_of<A>(&mut self, asg: &A, cid: ClauseId) -> usize
-    where
-        A: AssignIF;
-    /// re-calculate the LBD values of all (learnt) clauses.
-    fn reset_lbd<A>(&mut self, asg: &A, all: bool)
-    where
-        A: AssignIF;
-}
-
-impl LBDIF for ClauseDB {
-    fn compute_lbd<A>(&mut self, asg: &A, vec: &[Lit]) -> usize
-    where
-        A: AssignIF,
-    {
-        let level = asg.level_ref();
-        unsafe {
-            let key: usize = self.lbd_temp.get_unchecked(0) + 1;
-            *self.lbd_temp.get_unchecked_mut(0) = key;
-            let mut cnt = 0;
-            for l in vec {
-                let lv = level[l.vi()];
-                let p = self.lbd_temp.get_unchecked_mut(lv as usize);
-                if *p != key {
-                    *p = key;
-                    cnt += 1;
-                }
-            }
-            cnt
-        }
-    }
-    fn compute_lbd_of<A>(&mut self, asg: &A, cid: ClauseId) -> usize
-    where
-        A: AssignIF,
-    {
-        let level = asg.level_ref();
-        unsafe {
-            let key: usize = self.lbd_temp.get_unchecked(0) + 1;
-            *self.lbd_temp.get_unchecked_mut(0) = key;
-            let mut cnt = 0;
-            for l in &self.clause[cid.ordinal as usize].lits {
-                let lv = level[l.vi()];
-                let p = self.lbd_temp.get_unchecked_mut(lv as usize);
-                if *p != key {
-                    *p = key;
-                    cnt += 1;
-                }
-            }
-            cnt
-        }
-    }
-    fn reset_lbd<A>(&mut self, asg: &A, all: bool)
-    where
-        A: AssignIF,
-    {
-        let level = asg.level_ref();
-        let mut key = self.lbd_temp[0];
-        for c in &mut self.clause.iter_mut().skip(1) {
-            if c.is(Flag::DEAD) || !c.is(Flag::LEARNT) || (!all && !c.is(Flag::JUST_USED)) {
-                continue;
-            }
-            key += 1;
-            let mut cnt = 0;
-            for l in &c.lits {
-                let lv = level[l.vi()];
-                if lv != 0 {
-                    let p = unsafe { self.lbd_temp.get_unchecked_mut(lv as usize) };
-                    if *p != key {
-                        *p = key;
-                        cnt += 1;
-                    }
-                }
-            }
-            c.rank = cnt;
-        }
-        self.lbd_temp[0] = key;
-        self.num_lbd_update += 1;
-    }
-}
-
 impl ClauseDB {
     /// halve the number of 'learnt' or *removable* clauses.
     fn reduce<A>(&mut self, asg: &A)
@@ -1250,89 +767,22 @@ impl ClauseDB {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::assign::{AssignStack, PropagateIF};
-    use crate::clause::ClauseDB;
-
-    fn lit(i: i32) -> Lit {
-        Lit::from(i)
-    }
-
-    #[allow(dead_code)]
-    fn check_watches(cdb: &ClauseDB, cid: ClauseId) {
-        let c = &cdb.clause[cid.ordinal as usize];
-        if c.lits.is_empty() {
-            println!("skip checking watches of an empty clause");
-            return;
+impl Clause {
+    #[allow(clippy::comparison_chain)]
+    fn cmp_activity(&self, other: &Clause) -> Ordering {
+        if self.reward > other.reward {
+            Ordering::Less
+        } else if other.reward > self.reward {
+            Ordering::Greater
+        } else {
+            Ordering::Equal
         }
-        for l in &c.lits[0..=1] {
-            let ws = &cdb.watcher[!*l];
-            assert!(ws.iter().any(|w| w.c == cid));
-        }
-        println!("pass to check watches");
     }
-
-    #[test]
-    fn test_clause_instanciation() -> () {
-        let config = Config::default();
-        let cnf = CNFDescription {
-            num_of_variables: 4,
-            ..CNFDescription::default()
-        };
-        let mut asg = AssignStack::instantiate(&config, &cnf);
-        let mut cdb = ClauseDB::instantiate(&config, &cnf);
-        asg.assign_by_decision(lit(1));
-        asg.assign_by_decision(lit(-2));
-
-        let c1 = cdb.new_clause(&mut asg, &mut [lit(1), lit(2), lit(3)], false, false);
-        let c = &cdb[c1];
-        assert_eq!(c.rank, 0);
-        assert!(!c.is(Flag::DEAD));
-        assert!(!c.is(Flag::LEARNT));
-        assert!(!c.is(Flag::JUST_USED));
-
-        let c2 = cdb.new_clause(&mut asg, &mut [lit(-1), lit(2), lit(3)], true, true);
-        let c = &cdb[c2];
-        assert_eq!(c.rank, 2);
-        assert!(!c.is(Flag::DEAD));
-        assert!(c.is(Flag::LEARNT));
-        assert!(c.is(Flag::JUST_USED));
-    }
-    #[test]
-    fn test_clause_equality() -> () {
-        let config = Config::default();
-        let cnf = CNFDescription {
-            num_of_variables: 4,
-            ..CNFDescription::default()
-        };
-        let mut asg = AssignStack::instantiate(&config, &cnf);
-        let mut cdb = ClauseDB::instantiate(&config, &cnf);
-        let c1 = cdb.new_clause(&mut asg, &mut [lit(1), lit(2), lit(3)], false, false);
-        let c2 = cdb.new_clause(&mut asg, &mut [lit(-1), lit(4)], false, false);
-        cdb[c2].reward = 2.4;
-        assert_eq!(c1, c1);
-        assert_eq!(c1 == c1, true);
-        assert_ne!(c1, c2);
-        assert_eq!(cdb.activity(c2), 2.4);
-    }
-
-    #[test]
-    fn test_clause_iterator() -> () {
-        let config = Config::default();
-        let cnf = CNFDescription {
-            num_of_variables: 4,
-            ..CNFDescription::default()
-        };
-        let mut asg = AssignStack::instantiate(&config, &cnf);
-        let mut cdb = ClauseDB::instantiate(&config, &cnf);
-        let c1 = cdb.new_clause(&mut asg, &mut [lit(1), lit(2), lit(3)], false, false);
-        assert_eq!(cdb[c1][0..].iter().map(|l| i32::from(*l)).sum::<i32>(), 6);
-        let mut iter = cdb[c1][0..].into_iter();
-        assert_eq!(iter.next(), Some(&lit(1)));
-        assert_eq!(iter.next(), Some(&lit(2)));
-        assert_eq!(iter.next(), Some(&lit(3)));
-        assert_eq!(iter.next(), None);
+    /// make a clause *dead*; the clause still exists in clause database as a garbage.
+    fn kill(&mut self, touched: &mut [bool]) {
+        self.turn_on(Flag::DEAD);
+        debug_assert!(1 < usize::from(self.lits[0]) && 1 < usize::from(self.lits[1]));
+        touched[!self.lits[0]] = true;
+        touched[!self.lits[1]] = true;
     }
 }

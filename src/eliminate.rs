@@ -2,7 +2,7 @@
 use {
     crate::{
         assign::AssignIF,
-        clause::ClauseDBIF,
+        cdb::ClauseDBIF,
         state::{State, StateIF},
         types::*,
     },
@@ -1383,7 +1383,7 @@ mod tests {
     #![allow(unused_variables)]
     #![allow(dead_code)]
     use super::*;
-    use crate::{clause::ClauseDB, solver::Solver};
+    use crate::{cdb::ClauseDB, solver::Solver};
 
     macro_rules! mkv {
         ($($x:expr),*) => {

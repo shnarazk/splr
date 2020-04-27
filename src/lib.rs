@@ -176,8 +176,8 @@ While Splr comes with **ABSOLUTELY NO WARRANTY**, some Splr versions were verifi
 // /// Subsumption-based clause/var elimination
 /// Crate `assigner` implements Boolean Constraint Propagation and decision var selection.
 pub mod assign;
-/// Crate `clause` provides `clause` object and its manager `ClauseDB`
-pub mod clause;
+/// Crate `cdb` provides `clause` object and its manager `ClauseDB`
+pub mod cdb;
 /// Crate `config` provides solver's configuration and CLI.
 pub mod config;
 /// Crate `eliminator` implements clause subsumption and var elimination.
