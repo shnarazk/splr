@@ -449,9 +449,9 @@ fn handle_conflict(
                 //## Learnt Literal Rewarding
                 //
                 asg.reward_at_analysis(lit.vi());
-                // if !state.stabilize {
-                //     continue;
-                // }
+                if !state.stabilize {
+                    continue;
+                }
                 if let AssignReason::Implication(r, _) = asg.reason(lit.vi()) {
                     for l in &cdb[r].lits {
                         let vi = l.vi();
