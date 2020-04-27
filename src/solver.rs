@@ -448,7 +448,6 @@ fn handle_conflict(
     state: &mut State,
     ci: ClauseId,
 ) -> MaybeInconsistent {
-    const ELIMINATABLE: usize = 4;
     let original_dl = asg.decision_level();
     // we need a catch here for handling the possibility of level zero conflict
     // at higher level due to the incoherence between the current level and conflicting
@@ -641,16 +640,8 @@ fn handle_conflict(
         );
         let lbd = cdb[cid].rank;
         rst.update(RestarterModule::LBD, lbd);
-        if learnt_len <= ELIMINATABLE {
-            // state.to_eliminate += std::f64::consts::E.powi(-(learnt_len as i32));
-            elim.to_eliminate += match learnt_len {
-                2 => 1.0,
-                3 => 0.1,
-                4 => 0.001,
-                _ => 0.0,
-            };
-        } else if lbd == 2 {
-            elim.to_eliminate += 0.000_1;
+        if 1 < learnt_len && learnt_len <= state.config.elim_cls_lim / 2 {
+            elim.to_eliminate += 1.0 / (learnt_len - 1) as f64;
         }
     }
     cdb.scale_activity();

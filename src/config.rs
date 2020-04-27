@@ -75,7 +75,7 @@ pub struct Config {
     pub elim_grw_lim: usize,
 
     /// #cls to start simplification
-    #[structopt(long = "et", default_value = "8192")]
+    #[structopt(long = "et", default_value = "40000")]
     pub elim_trigger: usize,
 
     /// Disables exhaustive simplification
