@@ -6,7 +6,7 @@ mod search;
 use self::{build::SatSolverBuildIF, search::SatSolverSearchIF};
 
 use crate::{
-    assign::AssignStack, cdb::ClauseDB, eliminate::Eliminator, restart::Restarter, state::State,
+    assign::AssignStack, cdb::ClauseDB, processor::Eliminator, restart::Restarter, state::State,
     types::*,
 };
 
@@ -88,6 +88,7 @@ pub struct Solver {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::assign::VarManipulateIF;
     #[test]
     fn test_solver() {
         let config = Config::from("tests/sample.cnf");

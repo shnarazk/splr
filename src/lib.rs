@@ -181,7 +181,7 @@ pub mod cdb;
 /// Crate `config` provides solver's configuration and CLI.
 pub mod config;
 /// Crate `eliminator` implements clause subsumption and var elimination.
-pub mod eliminate;
+pub mod processor;
 /// Crate `restarter` provides restart heuristics.
 pub mod restart;
 /// Crate `solver` provides the top-level API as a SAT solver.

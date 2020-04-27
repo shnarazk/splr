@@ -3,7 +3,7 @@ use {
     crate::{
         assign::AssignIF,
         cdb::ClauseDBIF,
-        eliminate::EliminateIF,
+        processor::EliminateIF,
         restart::{RestartIF, RestartMode},
         types::*,
     },

@@ -7,7 +7,7 @@ use {
     crate::{
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarRewardIF, VarSelectIF},
         cdb::{ClauseDB, ClauseDBIF},
-        eliminate::{EliminateIF, Eliminator},
+        processor::{EliminateIF, Eliminator},
         restart::{RestartIF, Restarter, RestarterModule},
         state::{PhaseMode, Stat, State, StateIF},
         types::*,

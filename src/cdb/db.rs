@@ -2,7 +2,7 @@ use {
     super::{CertifiedRecord, Clause, ClauseDB, ClauseId, WatchDBIF, LBDIF},
     crate::{
         assign::AssignIF,
-        eliminate::EliminateIF,
+        processor::EliminateIF,
         state::{SearchStrategy, State},
         types::*,
     },
