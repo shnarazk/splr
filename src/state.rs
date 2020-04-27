@@ -527,11 +527,16 @@ impl StateIF for State {
             )
         );
         println!(
-            "\x1B[2K        misc|#rdc:{}, #elm:{}, core:{}, vdcy:{} ",
+            "\x1B[2K        misc|#rdc:{}, #elm:{}, 2elm:{}, vdcy:{} ",
             im!("{:>9}", self, LogUsizeId::Reduction, cdb_num_reduction),
             im!("{:>9}", self, LogUsizeId::Elimination, elim_num_full),
-            fm!("{:>9.4}", self, LogF64Id::CoreSize, vdb_core_size),
-            format!("{:>9.4}", vdb_activity_decay),
+            fm!(
+                "{:>9.2}",
+                self,
+                LogF64Id::ElimToGo,
+                self.config.elim_trigger as f64 - elim_to_eliminate
+            ),
+            format!("{:>9.4}", asg_activity_decay),
         );
         if let Some(m) = mes {
             println!("\x1B[2K    Strategy|mode: {}", m);
@@ -644,7 +649,7 @@ pub enum LogF64Id {
     AveLBD,       //  3: ave_lbd: f64,
     BLevel,       //  4: backjump_level: f64,
     CLevel,       //  5: conflict_level: f64,
-    CoreSize,     //  6: vdb.core_size.get: f64,
+    ElimToGo,     //  6: asg.core_size.get: f64,
     End,
 }
 

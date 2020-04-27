@@ -48,8 +48,6 @@ impl fmt::Display for AssignReason {
     }
 }
 
-const CORE_HISOTRY_LEN: usize = 4000;
-
 impl Default for AssignStack {
     fn default() -> AssignStack {
         #[cfg(feature = "EVSIDS")]
@@ -84,7 +82,6 @@ impl Default for AssignStack {
             var: Vec::new(),
             activity_decay: REWARD_DECAY_RANGE.0,
             activity_decay_max: REWARD_DECAY_RANGE.1,
-            core_size: Ema::new(CORE_HISOTRY_LEN),
             reward_step,
         }
     }

@@ -144,8 +144,6 @@ pub struct AssignStack {
     activity_decay: f64,
     /// maximum var activity decay
     activity_decay_max: f64,
-    /// estimated number of hot variable
-    pub core_size: Ema,
     /// ONLY used in feature EVSIDS
     reward_step: f64,
 }

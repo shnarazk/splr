@@ -354,8 +354,8 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
             "c         misc|#rdc:{}, #elm:{}, core:{}, vdcy:{} \n",
             format!("{:>9}", state[LogUsizeId::Reduction]),
             format!("{:>9}", state[LogUsizeId::Elimination]),
-            format!("{:>9.0}", state[LogF64Id::CoreSize]),
-            format!("{:>9.4}", vdb_activity_decay),
+            format!("{:>9.0}", state[LogF64Id::ElimToGo]),
+            format!("{:>9.4}", asg_activity_decay),
         )
         .as_bytes(),
     )?;

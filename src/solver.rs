@@ -640,7 +640,6 @@ fn handle_conflict(
             al,
         );
         let lbd = cdb[cid].rank;
-        asg.core_size.update(lbd as f64);
         rst.update(RestarterModule::LBD, lbd);
         if learnt_len <= ELIMINATABLE {
             // state.to_eliminate += std::f64::consts::E.powi(-(learnt_len as i32));
