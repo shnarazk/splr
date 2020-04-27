@@ -118,7 +118,7 @@ impl Export<(usize, usize, f64)> for Eliminator {
     /// use crate::{splr::config::Config, splr::types::*};
     /// use crate::splr::eliminate::Eliminator;
     /// let elim = Eliminator::instantiate(&Config::default(), &CNFDescription::default());
-    /// let (elim_num_full_elimination, elim_num_sat_elimination) = elim.exports();
+    /// let (elim_num_full_elimination, elim_num_sat_elimination, elim_to_eliminate) = elim.exports();
     ///```
     #[inline]
     fn exports(&self) -> (usize, usize, f64) {
