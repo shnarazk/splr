@@ -8,7 +8,7 @@ use {
     crate::{
         assign::AssignIF,
         cdb::ClauseDBIF,
-        solver::{State, StateIF},
+        state::{State, StateIF},
         types::*,
     },
     std::{

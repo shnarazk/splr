@@ -184,6 +184,8 @@ pub mod config;
 pub mod processor;
 /// Crate `solver` provides the top-level API as a SAT solver.
 pub mod solver;
+/// Crate `state` is a collection of internal data.
+pub mod state;
 /// Crate `types` provides various building blocks, including
 /// some common traits.
 pub mod types;

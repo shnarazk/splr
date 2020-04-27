@@ -1,7 +1,7 @@
 /// Crate `eliminator` implements clause subsumption and var elimination.
 use {
     super::{EliminateIF, Eliminator},
-    crate::{assign::AssignIF, cdb::ClauseDBIF, solver::State, types::*},
+    crate::{assign::AssignIF, cdb::ClauseDBIF, state::State, types::*},
     std::sync::{atomic::AtomicBool, Arc},
 };
 

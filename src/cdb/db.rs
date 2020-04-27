@@ -3,7 +3,7 @@ use {
     crate::{
         assign::AssignIF,
         processor::EliminateIF,
-        solver::{SearchStrategy, State},
+        state::{SearchStrategy, State},
         types::*,
     },
     std::{

@@ -3,13 +3,13 @@ use {
     super::{
         analyze::{analyze_final, conflict_analyze},
         restart::{RestartIF, Restarter, RestarterModule},
-        state::{PhaseMode, Stat, State, StateIF},
         Certificate, Solver, SolverResult,
     },
     crate::{
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarRewardIF, VarSelectIF},
         cdb::{ClauseDB, ClauseDBIF},
         processor::{EliminateIF, Eliminator},
+        state::{PhaseMode, Stat, State, StateIF},
         types::*,
     },
     std::slice::Iter,

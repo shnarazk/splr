@@ -4,17 +4,19 @@ mod analyze;
 mod build;
 /// Crate `restart` provides restart heuristics.
 mod restart;
+/// CDCL search engine
 mod search;
-/// Crate `state` is a collection of internal data.
-mod state;
 /// Crate `validate` implements a model checker.
 mod validate;
 
-pub use self::{restart::RestartMode, state::*, validate::ValidateIF};
+pub use self::{
+    restart::{RestartIF, RestartMode},
+    validate::ValidateIF,
+};
 
 use {
     self::{build::SatSolverBuildIF, restart::Restarter, search::SatSolverSearchIF},
-    crate::{assign::AssignStack, cdb::ClauseDB, processor::Eliminator, types::*},
+    crate::{assign::AssignStack, cdb::ClauseDB, processor::Eliminator, state::*, types::*},
 };
 
 /// API for SAT solver like `build`, `solve` and so on.

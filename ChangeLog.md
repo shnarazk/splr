@@ -1,5 +1,6 @@
 ## 0.4.0, 2020-12-31
 
+- adapt to the output format defined in chapter 5 of [SAT competition 2011 rules](http://www.satcompetition.org/2011/rules.pdf)
 - merge assign.rs and var.rs into a module
 - better modularity and abstraction via traits
 - add and refactor restart module: `GeometricStabilizer`, `ProgressLBD`

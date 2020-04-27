@@ -5,6 +5,7 @@ use {
         cdb::CertifiedRecord,
         config::{Config, VERSION},
         solver::*,
+        state::{LogF64Id, LogUsizeId},
         types::{Export, SolverError},
     },
     std::{
