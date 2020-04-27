@@ -122,27 +122,25 @@ impl Instantiate for AssignStack {
     fn adapt_to(&mut self, state: &State, num_conflict: usize) {}
 }
 
-impl Export<(usize, usize, usize, f64, f64)> for AssignStack {
+impl Export<(usize, usize, usize, f64)> for AssignStack {
     /// exports:
     ///  1. the number of conflicts
     ///  1. the number of propagations
     ///  1. the number of restarts
-    ///  1. `core_sise.get()`
     ///  1. `activity_decay`
     ///
     ///```
     /// use crate::{splr::config::Config, splr::types::*};
     /// use crate::splr::assign::AssignStack;
     /// let asg = AssignStack::instantiate(&Config::default(), &CNFDescription::default());
-    /// let (asg_num_conflict, asg_num_propagation, asg_num_restart, asg_core, asg_activity_decay) = asg.exports();
+    /// let (asg_num_conflict, asg_num_propagation, asg_num_restart, asg_activity_decay) = asg.exports();
     ///```
     #[inline]
-    fn exports(&self) -> (usize, usize, usize, f64, f64) {
+    fn exports(&self) -> (usize, usize, usize, f64) {
         (
             self.num_conflict,
             self.num_propagation,
             self.num_restart,
-            self.core_size.get(),
             self.activity_decay,
         )
     }

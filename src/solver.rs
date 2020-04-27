@@ -460,7 +460,7 @@ fn handle_conflict(
         }
     }
 
-    let (ncnfl, _num_propagation, asg_num_restart, _, _) = asg.exports();
+    let (ncnfl, _num_propagation, asg_num_restart, _) = asg.exports();
     // If we can settle this conflict w/o restart, solver will get a big progress.
     let switch_chronobt = if ncnfl < 1000 || asg.recurrent_conflicts() {
         Some(false)
@@ -689,13 +689,12 @@ fn adapt_modules(
     state: &mut State,
 ) -> MaybeInconsistent {
     state.progress(asg, cdb, elim, rst, None);
-    let (asg_num_conflict, _num_propagation, _num_restart, _, _) = asg.exports();
+    let (asg_num_conflict, _num_propagation, _num_restart, _) = asg.exports();
     if 10 * state.reflection_interval == asg_num_conflict {
         // Need to call it before `cdb.adapt_to`
         // 'decision_level == 0' is required by `cdb.adapt_to`.
         asg.cancel_until(asg.root_level);
         if elim.enable && elim.exports().0 < 3 {
-            elim.to_eliminate = 0.0;
             elim.activate();
             elim.simplify(asg, cdb, state)?;
         }

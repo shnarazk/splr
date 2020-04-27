@@ -280,8 +280,7 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
             time.tv_sec as f64 + time.tv_nsec as f64 / 1_000_000_000.0f64
         }
     };
-    let (asg_num_conflict, _num_propagation, asg_num_restart, _core, vdb_activity_decay) =
-        s.asg.exports();
+    let (asg_num_conflict, _num_propagation, asg_num_restart, asg_activity_decay) = s.asg.exports();
     let (rst_mode, _num_block, _asg_trend, _lbd_get, _lbd_trend) = s.rst.exports();
     out.write_all(
         format!(

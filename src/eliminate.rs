@@ -33,7 +33,7 @@ use {
 /// assert_eq!(elim.is_running(), false);
 /// assert_eq!(elim.simplify(&mut s.asg, &mut s.cdb, &mut s.state), Ok(()));
 ///```
-pub trait EliminateIF {
+pub trait EliminateIF: Export<(usize, usize, f64)> {
     /// set eliminator's mode to **ready**.
     fn activate(&mut self);
     /// set eliminator's mode to **dormant**.
@@ -61,7 +61,7 @@ pub trait EliminateIF {
     /// if solver becomes inconsistent.
     fn simplify<A, C>(&mut self, asg: &mut A, cdb: &mut C, state: &mut State) -> MaybeInconsistent
     where
-        A: AssignIF + Export<(usize, usize, usize, f64, f64)>,
+        A: AssignIF,
         C: ClauseDBIF;
     /// register a clause id to all corresponding occur lists.
     fn add_cid_occur<A>(&mut self, asg: &mut A, cid: ClauseId, c: &mut Clause, enqueue: bool)
@@ -109,7 +109,7 @@ impl Default for LitOccurs {
     }
 }
 
-impl Export<(usize, usize)> for Eliminator {
+impl Export<(usize, usize, f64)> for Eliminator {
     /// exports:
     ///  1. the number of full eliminations
     ///  1. the number of satisfied clause eliminations
@@ -121,8 +121,12 @@ impl Export<(usize, usize)> for Eliminator {
     /// let (elim_num_full_elimination, elim_num_sat_elimination) = elim.exports();
     ///```
     #[inline]
-    fn exports(&self) -> (usize, usize) {
-        (self.num_full_elimination, self.num_sat_elimination)
+    fn exports(&self) -> (usize, usize, f64) {
+        (
+            self.num_full_elimination,
+            self.num_sat_elimination,
+            self.to_eliminate,
+        )
     }
 }
 
@@ -368,7 +372,7 @@ impl EliminateIF for Eliminator {
     }
     fn simplify<A, C>(&mut self, asg: &mut A, cdb: &mut C, state: &mut State) -> MaybeInconsistent
     where
-        A: AssignIF + Export<(usize, usize, usize, f64, f64)>,
+        A: AssignIF,
         C: ClauseDBIF,
     {
         debug_assert_eq!(asg.decision_level(), 0);
@@ -558,7 +562,7 @@ impl Eliminator {
     /// if solver becomes inconsistent.
     fn eliminate<A, C>(&mut self, asg: &mut A, cdb: &mut C, state: &mut State) -> MaybeInconsistent
     where
-        A: AssignIF + Export<(usize, usize, usize, f64, f64)>,
+        A: AssignIF,
         C: ClauseDBIF,
     {
         let start = state.elapsed().unwrap_or(0.0);
@@ -588,7 +592,7 @@ impl Eliminator {
         state: &mut State,
     ) -> MaybeInconsistent
     where
-        A: AssignIF + Export<(usize, usize, usize, f64, f64)>,
+        A: AssignIF,
         C: ClauseDBIF,
     {
         /// The ratio of time slot for single elimination step.

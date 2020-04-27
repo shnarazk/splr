@@ -40,7 +40,7 @@ pub enum RestartMode {
 }
 
 /// API for restart like `block_restart`, `force_restart` and so on.
-pub trait RestartIF {
+pub trait RestartIF: Export<(RestartMode, usize, f64, f64, f64)> {
     /// return `true` if stabilizer is active.
     fn stabilizing(&self) -> bool;
     /// block restart if needed.
