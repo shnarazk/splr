@@ -542,12 +542,12 @@ fn handle_conflict(
                 "empty learnt at {}({}) by {:?}",
                 cl,
                 asg.reason(asg.decision_vi(cl)) == ClauseId::default(),
-                vdb.dump(asg, &cdb[ci]),
+                asg.dump(asg, &cdb[ci]),
             );
         }
         return Err(SolverError::NullLearnt);
     }
-    // vdb.bump_vars(asg, cdb, ci);
+    // asg.bump_vars(asg, cdb, ci);
     let new_learnt = &mut state.new_learnt;
     let l0 = new_learnt[0];
     // assert: 0 < cl, which was checked already by new_learnt.is_empty().
@@ -727,7 +727,7 @@ fn conflict_analyze(
         match reason {
             AssignReason::None => panic!("here"),
             AssignReason::Implication(_, l) if l != NULL_LIT => {
-                // cid = vdb[p.vi()].reason;
+                // cid = asg.reason(p.vi());
                 let vi = l.vi();
                 if !asg.var(vi).is(Flag::CA_SEEN) {
                     let lvl = asg.level(vi);
@@ -784,7 +784,7 @@ fn conflict_analyze(
                 for q in &c[(p != NULL_LIT) as usize..] {
                     let vi = q.vi();
                     if !asg.var(vi).is(Flag::CA_SEEN) {
-                        // vdb.reward_at_analysis(vi);
+                        // asg.reward_at_analysis(vi);
                         let lvl = asg.level(vi);
                         if 0 == lvl {
                             continue;

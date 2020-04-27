@@ -824,7 +824,7 @@ where
 {
     // clause_queue should be clear.
     // all elements in occur_lists exist.
-    // for v in vdb {
+    // for v in asg {
     //     for ci in &v.pos_occurs {
     //         let c = clause!(cp, ci);
     //         if c[0] < 2 || c[1] < 2 {
