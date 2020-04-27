@@ -1,12 +1,10 @@
 /// Solver Builder
 use {
-    super::{SatSolverIF, Solver},
+    super::{restart::Restarter, SatSolverIF, Solver, State, StateIF},
     crate::{
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
         cdb::{ClauseDB, ClauseDBIF},
         processor::{EliminateIF, Eliminator},
-        restart::Restarter,
-        state::{State, StateIF},
         types::*,
     },
     std::{

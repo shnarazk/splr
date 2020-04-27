@@ -2,14 +2,14 @@
 use {
     super::{
         analyze::{analyze_final, conflict_analyze},
+        restart::{RestartIF, Restarter, RestarterModule},
+        state::{PhaseMode, Stat, State, StateIF},
         Certificate, Solver, SolverResult,
     },
     crate::{
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarRewardIF, VarSelectIF},
         cdb::{ClauseDB, ClauseDBIF},
         processor::{EliminateIF, Eliminator},
-        restart::{RestartIF, Restarter, RestarterModule},
-        state::{PhaseMode, Stat, State, StateIF},
         types::*,
     },
     std::slice::Iter,
@@ -449,9 +449,9 @@ fn handle_conflict(
                 //## Learnt Literal Rewarding
                 //
                 asg.reward_at_analysis(lit.vi());
-                if !state.stabilize {
-                    continue;
-                }
+                // if !state.stabilize {
+                //     continue;
+                // }
                 if let AssignReason::Implication(r, _) = asg.reason(lit.vi()) {
                     for l in &cdb[r].lits {
                         let vi = l.vi();

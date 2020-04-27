@@ -1,13 +1,20 @@
 /// Crate 'solver' provides the top-level API as a SAT solver.
 mod analyze;
+/// API to instantiate
 mod build;
+/// Crate `restart` provides restart heuristics.
+mod restart;
 mod search;
+/// Crate `state` is a collection of internal data.
+mod state;
+/// Crate `validate` implements a model checker.
+mod validate;
 
-use self::{build::SatSolverBuildIF, search::SatSolverSearchIF};
+pub use self::{restart::RestartMode, state::*, validate::ValidateIF};
 
-use crate::{
-    assign::AssignStack, cdb::ClauseDB, processor::Eliminator, restart::Restarter, state::State,
-    types::*,
+use {
+    self::{build::SatSolverBuildIF, restart::Restarter, search::SatSolverSearchIF},
+    crate::{assign::AssignStack, cdb::ClauseDB, processor::Eliminator, types::*},
 };
 
 /// API for SAT solver like `build`, `solve` and so on.
@@ -57,7 +64,7 @@ pub type SolverResult = Result<Certificate, SolverError>;
 /// The SAT solver object consisting of 6 sub modules.
 /// ```
 /// use std::convert::TryFrom;
-/// use crate::splr::{assign::{AssignIF, VarManipulateIF}, state::{State, StateIF}, types::*};
+/// use crate::splr::{assign::{AssignIF, VarManipulateIF}, solver::{State, StateIF}, types::*};
 /// use crate::splr::solver::{SatSolverIF, Solver, Certificate::*};
 ///
 /// let mut s = Solver::try_from("tests/sample.cnf").expect("can't load");

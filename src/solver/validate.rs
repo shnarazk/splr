@@ -7,7 +7,7 @@ use crate::{
 };
 
 /// API for SAT validator like `inject_assignment`, `validate` and so on.
-pub trait ValidatorIF {
+pub trait ValidateIF {
     /// load a assignment set into solver.
     ///
     /// # Errors
@@ -18,7 +18,7 @@ pub trait ValidatorIF {
     fn validate(&self) -> Option<Vec<i32>>;
 }
 
-impl ValidatorIF for Solver {
+impl ValidateIF for Solver {
     /// inject an assignment set into solver.
     /// An assignment set is represented by a list of `i32`.
     ///
@@ -26,7 +26,7 @@ impl ValidatorIF for Solver {
     ///
     /// ```
     /// use crate::{splr::config::Config, splr::types::*};
-    /// use splr::{solver::Solver, validate::ValidatorIF};
+    /// use splr::solver::{Solver, ValidateIF};
     ///
     /// let cnf = CNFDescription {
     ///         num_of_variables: 4,
@@ -52,7 +52,7 @@ impl ValidatorIF for Solver {
     ///
     /// ```
     /// use crate::{splr::config::Config, splr::types::*};
-    /// use splr::{solver::Solver, validate::ValidatorIF};
+    /// use splr::solver::{Solver, ValidateIF};
     ///
     /// let cnf = CNFDescription {
     ///         num_of_variables: 4,

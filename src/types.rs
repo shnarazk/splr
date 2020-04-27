@@ -6,7 +6,7 @@ pub use crate::{
     config::Config,
 };
 use {
-    crate::state::State,
+    crate::solver::State,
     std::{
         convert::TryFrom,
         fmt,

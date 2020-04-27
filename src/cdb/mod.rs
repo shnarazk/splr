@@ -1,13 +1,13 @@
 /// methods on `ClauseId`
-pub mod cid;
+mod cid;
 /// methods on `Clause`
-pub mod clause;
+mod clause;
 /// methods on `ClauseDB`
-pub mod db;
+mod db;
 /// methods about Literal Block Distance, or LBD
-pub mod lbd;
+mod lbd;
 /// methods on `Watch` and `WatchDB`
-pub mod watch;
+mod watch;
 
 pub use self::{
     cid::ClauseIdIF,

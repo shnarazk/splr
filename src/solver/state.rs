@@ -1,12 +1,7 @@
 /// Crate `state` is a collection of internal data.
 use {
-    crate::{
-        assign::AssignIF,
-        cdb::ClauseDBIF,
-        processor::EliminateIF,
-        restart::{RestartIF, RestartMode},
-        types::*,
-    },
+    super::restart::{RestartIF, RestartMode},
+    crate::{assign::AssignIF, cdb::ClauseDBIF, processor::EliminateIF, types::*},
     libc::{clock_gettime, timespec, CLOCK_PROCESS_CPUTIME_ID},
     std::{
         cmp::Ordering,

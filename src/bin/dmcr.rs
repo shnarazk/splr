@@ -3,8 +3,7 @@
 use {
     splr::{
         config::Config,
-        solver::{SatSolverIF, Solver},
-        validate::ValidatorIF,
+        solver::{SatSolverIF, Solver, ValidateIF},
     },
     std::{
         env,

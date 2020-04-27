@@ -1,9 +1,11 @@
 /// Conflict Analysis
-use crate::{
-    assign::{AssignIF, AssignStack, VarManipulateIF, VarRewardIF},
-    cdb::{ClauseDB, ClauseDBIF},
-    state::State,
-    types::*,
+use {
+    super::State,
+    crate::{
+        assign::{AssignIF, AssignStack, VarManipulateIF, VarRewardIF},
+        cdb::{ClauseDB, ClauseDBIF},
+        types::*,
+    },
 };
 
 ///

@@ -182,17 +182,11 @@ pub mod cdb;
 pub mod config;
 /// Crate `eliminator` implements clause subsumption and var elimination.
 pub mod processor;
-/// Crate `restarter` provides restart heuristics.
-pub mod restart;
 /// Crate `solver` provides the top-level API as a SAT solver.
 pub mod solver;
-/// Crate `state` is a collection of internal data.
-pub mod state;
 /// Crate `types` provides various building blocks, including
 /// some common traits.
 pub mod types;
-/// Crate `validator` implements a model checker.
-pub mod validate;
 
 #[macro_use]
 extern crate bitflags;

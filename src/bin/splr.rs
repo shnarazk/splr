@@ -4,9 +4,7 @@ use {
     splr::{
         cdb::CertifiedRecord,
         config::{Config, VERSION},
-        restart::RestartMode,
-        solver::{Certificate, SatSolverIF, Solver, SolverResult},
-        state::*,
+        solver::*,
         types::{Export, SolverError},
     },
     std::{
@@ -281,7 +279,6 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
         }
     };
     let (asg_num_conflict, _num_propagation, asg_num_restart, asg_activity_decay) = s.asg.exports();
-    let (rst_mode, _num_block, _asg_trend, _lbd_get, _lbd_trend) = s.rst.exports();
     out.write_all(
         format!(
             "c {:<43}, #var:{:9}, #cls:{:9}\n",
@@ -321,7 +318,7 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     out.write_all(
         format!(
             "c  {}|#BLK:{}, #RST:{}, eASG:{}, eLBD:{} \n",
-            if rst_mode == RestartMode::Luby {
+            if s.rst.exports().0 == RestartMode::Luby {
                 "LubyRestart"
             } else {
                 "    Restart"
@@ -351,7 +348,7 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c         misc|#rdc:{}, #elm:{}, core:{}, vdcy:{} \n",
+            "c         misc|#rdc:{}, #elm:{}, 2elm:{}, vdcy:{} \n",
             format!("{:>9}", state[LogUsizeId::Reduction]),
             format!("{:>9}", state[LogUsizeId::Elimination]),
             format!("{:>9.0}", state[LogF64Id::ElimToGo]),

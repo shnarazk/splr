@@ -2,15 +2,15 @@
 /// This version can handle Chronological and Non Chronological Backtrack.
 mod heap;
 /// Boolean constraint propagation
-pub mod propagate;
+mod propagate;
 /// Var rewarding
-pub mod reward;
+mod reward;
 /// Decision var selection
-pub mod select;
+mod select;
 /// assignment management
-pub mod stack;
+mod stack;
 /// var struct and its methods
-pub mod var;
+mod var;
 
 pub use self::{
     propagate::PropagateIF,

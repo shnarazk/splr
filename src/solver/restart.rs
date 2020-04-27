@@ -1,7 +1,7 @@
 /// Crate `restart` provides restart heuristics.
 use {
     crate::{
-        state::{SearchStrategy, State},
+        solver::{SearchStrategy, State},
         types::*,
     },
     std::fmt,
@@ -651,7 +651,7 @@ impl Export<(RestartMode, usize, f64, f64, f64)> for Restarter {
     ///
     ///```
     /// use crate::{splr::config::Config, splr::types::*};
-    /// use crate::splr::restart::Restarter;
+    /// use crate::splr::solver::Restarter;
     /// let rst = Restarter::instantiate(&Config::default(), &CNFDescription::default());
     /// let (_mode, _num_block, _asg_trend, _lbd_get, _lbd_trend) = rst.exports();
     ///```
