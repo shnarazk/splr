@@ -1,10 +1,13 @@
+/// Var rewarding
+#[cfg(feature = "EVSIDS")]
+mod evsids;
 /// Crate `assign` implements Boolean Constraint Propagation and decision var selection.
 /// This version can handle Chronological and Non Chronological Backtrack.
 mod heap;
+#[cfg(not(feature = "EVSIDS"))]
+mod learning_rate;
 /// Boolean constraint propagation
 mod propagate;
-/// Var rewarding
-mod reward;
 /// Decision var selection
 mod select;
 /// assignment management
@@ -13,12 +16,13 @@ mod stack;
 mod var;
 
 pub use self::{
-    propagate::PropagateIF,
-    reward::{VarRewardIF, REWARD_DECAY_RANGE},
-    select::VarSelectIF,
-    stack::ClauseManipulateIF,
-    var::VarManipulateIF,
+    propagate::PropagateIF, select::VarSelectIF, stack::ClauseManipulateIF, var::VarManipulateIF,
 };
+
+#[cfg(feature = "EVSIDS")]
+pub use self::evsids::VarRewardIF;
+#[cfg(not(feature = "EVSIDS"))]
+pub use self::learning_rate::VarRewardIF;
 
 use {
     self::heap::{VarHeapIF, VarOrderIF},

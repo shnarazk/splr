@@ -1,4 +1,4 @@
-/// Var Rewarding
+/// Var Rewarding based on Learning Rate Rewardin gand Reason Side Rewarding
 use {super::AssignStack, crate::types::*, std::slice::Iter};
 
 /// a pair of the start value and upper bound of var decay rate.
@@ -28,68 +28,28 @@ impl VarRewardIF for AssignStack {
         self.var[vi].reward
     }
     fn initialize_reward(&mut self, iterator: Iter<'_, usize>) {
-        #[cfg(not(feature = "EVSIDS"))]
-        {
-            // big bang initialization
-            let mut v = 0.5;
-            for vi in iterator {
-                self.var[*vi].reward = v;
-                v *= 0.9;
-            }
+        self.activity_decay = REWARD_DECAY_RANGE.0;
+        self.activity_decay_max = REWARD_DECAY_RANGE.1;
+        self.reward_step = (REWARD_DECAY_RANGE.1 - REWARD_DECAY_RANGE.0) / 10_000.0;
+        // big bang initialization
+        let mut v = 0.5;
+        for vi in iterator {
+            self.var[*vi].reward = v;
+            v *= 0.9;
         }
     }
     fn clear_reward(&mut self, vi: VarId) {
         self.var[vi].reward = 0.0;
     }
-
-    //
-    //## EVSIDS
-    //
-    #[cfg(feature = "EVSIDS")]
-    fn reward_at_analysis(&mut self, vi: VarId) {
-        let s = self.reward_step;
-        let t = self.ordinal;
-        let v = &mut self.var[vi];
-        if v.timestamp == t {
-            return;
-        }
-        v.timestamp = t;
-        v.reward += s;
-        const SCALE: f64 = 1e-100;
-        const SCALE_MAX: f64 = 1e100;
-        if SCALE_MAX < v.reward {
-            for v in &mut self.var[1..] {
-                v.reward *= SCALE;
-            }
-            self.reward_step *= SCALE;
-        }
-    }
-    #[cfg(feature = "EVSIDS")]
-    fn reward_at_assign(&mut self, _: VarId) {}
-    #[cfg(feature = "EVSIDS")]
-    fn reward_at_unassign(&mut self, _: VarId) {}
-    #[cfg(feature = "EVSIDS")]
-    fn reward_update(&mut self) {
-        self.ordinal += 1;
-        const INC_SCALE: f64 = 1.01;
-        self.reward_step *= INC_SCALE;
-    }
-
-    //
-    //## Learning Rate
-    //
-    #[cfg(not(feature = "EVSIDS"))]
     fn reward_at_analysis(&mut self, vi: VarId) {
         let v = &mut self.var[vi];
         v.participated += 1;
     }
-    #[cfg(not(feature = "EVSIDS"))]
     fn reward_at_assign(&mut self, vi: VarId) {
         let t = self.ordinal;
         let v = &mut self.var[vi];
         v.timestamp = t;
     }
-    #[cfg(not(feature = "EVSIDS"))]
     fn reward_at_unassign(&mut self, vi: VarId) {
         let v = &mut self.var[vi];
         let duration = (self.ordinal + 1 - v.timestamp) as f64;
@@ -99,7 +59,6 @@ impl VarRewardIF for AssignStack {
         v.reward += (1.0 - decay) * rate;
         v.participated = 0;
     }
-    #[cfg(not(feature = "EVSIDS"))]
     fn reward_update(&mut self) {
         self.ordinal += 1;
         self.activity_decay = self

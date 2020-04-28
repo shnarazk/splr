@@ -10,12 +10,12 @@ mod search;
 mod validate;
 
 pub use self::{
-    restart::{RestartIF, RestartMode},
+    restart::{RestartIF, RestartMode, Restarter},
     validate::ValidateIF,
 };
 
 use {
-    self::{build::SatSolverBuildIF, restart::Restarter, search::SatSolverSearchIF},
+    self::{build::SatSolverBuildIF, search::SatSolverSearchIF},
     crate::{assign::AssignStack, cdb::ClauseDB, processor::Eliminator, state::*, types::*},
 };
 
@@ -66,7 +66,7 @@ pub type SolverResult = Result<Certificate, SolverError>;
 /// The SAT solver object consisting of 6 sub modules.
 /// ```
 /// use std::convert::TryFrom;
-/// use crate::splr::{assign::{AssignIF, VarManipulateIF}, solver::{State, StateIF}, types::*};
+/// use crate::splr::{assign::{AssignIF, VarManipulateIF}, state::{State, StateIF}, types::*};
 /// use crate::splr::solver::{SatSolverIF, Solver, Certificate::*};
 ///
 /// let mut s = Solver::try_from("tests/sample.cnf").expect("can't load");

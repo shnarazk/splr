@@ -1,8 +1,6 @@
 /// main struct AssignStack
 use {
-    super::{
-        AssignIF, AssignStack, Var, VarIdHeap, VarManipulateIF, VarOrderIF, REWARD_DECAY_RANGE,
-    },
+    super::{AssignIF, AssignStack, Var, VarIdHeap, VarManipulateIF, VarOrderIF},
     crate::{cdb::ClauseDBIF, state::State, types::*},
     std::{
         fmt,
@@ -50,12 +48,6 @@ impl fmt::Display for AssignReason {
 
 impl Default for AssignStack {
     fn default() -> AssignStack {
-        #[cfg(feature = "EVSIDS")]
-        let reward_step = 1.0;
-
-        #[cfg(not(feature = "EVSIDS"))]
-        let reward_step = (REWARD_DECAY_RANGE.1 - REWARD_DECAY_RANGE.0) / 10_000.0;
-
         AssignStack {
             assign: Vec::new(),
             level: Vec::new(),
@@ -80,9 +72,9 @@ impl Default for AssignStack {
             num_restart: 0,
             ordinal: 0,
             var: Vec::new(),
-            activity_decay: REWARD_DECAY_RANGE.0,
-            activity_decay_max: REWARD_DECAY_RANGE.1,
-            reward_step,
+            activity_decay: 0.0,
+            activity_decay_max: 0.0,
+            reward_step: 0.0,
         }
     }
 }
