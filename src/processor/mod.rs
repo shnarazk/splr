@@ -1,5 +1,5 @@
+/// Crate `processor` implements a simplifier: clause subsumption and var elimination.
 mod eliminate;
-/// Crate `eliminator` implements clause subsumption and var elimination.
 mod heap;
 mod subsume;
 
@@ -104,14 +104,14 @@ impl Export<(usize, usize, f64)> for Eliminator {
     /// use crate::{splr::config::Config, splr::types::*};
     /// use crate::splr::processor::Eliminator;
     /// let elim = Eliminator::instantiate(&Config::default(), &CNFDescription::default());
-    /// let (elim_num_full_elimination, elim_num_sat_elimination, elim_to_eliminate) = elim.exports();
+    /// let (elim_num_full_elimination, elim_num_sat_elimination, elim_to_simplify) = elim.exports();
     ///```
     #[inline]
     fn exports(&self) -> (usize, usize, f64) {
         (
             self.num_full_elimination,
             self.num_sat_elimination,
-            self.to_eliminate,
+            self.to_simplify,
         )
     }
 }
@@ -171,7 +171,7 @@ pub struct VarOccHeap {
 #[derive(Debug)]
 pub struct Eliminator {
     pub enable: bool,
-    pub to_eliminate: f64,
+    pub to_simplify: f64,
     mode: EliminatorMode,
     clause_queue: Vec<ClauseId>,
     var_queue: VarOccHeap,
@@ -199,7 +199,7 @@ impl Default for Eliminator {
     fn default() -> Eliminator {
         Eliminator {
             enable: true,
-            to_eliminate: 0.0,
+            to_simplify: 0.0,
             mode: EliminatorMode::Deactive,
             var_queue: VarOccHeap::new(0, 0),
             clause_queue: Vec::new(),

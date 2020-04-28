@@ -349,10 +349,10 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c         misc|#rdc:{}, #elm:{}, 2elm:{}, vdcy:{} \n",
+            "c         misc|#rdc:{}, #smp:{}, 2smp:{}, vdcy:{} \n",
             format!("{:>9}", state[LogUsizeId::Reduction]),
-            format!("{:>9}", state[LogUsizeId::Elimination]),
-            format!("{:>9.0}", state[LogF64Id::ElimToGo]),
+            format!("{:>9}", state[LogUsizeId::Simplify]),
+            format!("{:>9.0}", state[LogF64Id::SimpToGo]),
             format!("{:>9.4}", asg_activity_decay),
         )
         .as_bytes(),

@@ -449,7 +449,7 @@ impl StateIF for State {
             cdb_num_reduction,
         ) = cdb.exports();
 
-        let (elim_num_full, _num_sat, elim_to_eliminate) = elim.exports();
+        let (elim_num_full, _num_sat, elim_to_simplify) = elim.exports();
 
         let (rst_mode, rst_num_block, rst_asg_trend, rst_lbd_get, rst_lbd_trend) = rst.exports();
 
@@ -527,14 +527,14 @@ impl StateIF for State {
             )
         );
         println!(
-            "\x1B[2K        misc|#rdc:{}, #elm:{}, 2elm:{}, vdcy:{} ",
+            "\x1B[2K        misc|#rdc:{}, #smp:{}, 2smp:{}, vdcy:{} ",
             im!("{:>9}", self, LogUsizeId::Reduction, cdb_num_reduction),
-            im!("{:>9}", self, LogUsizeId::Elimination, elim_num_full),
+            im!("{:>9}", self, LogUsizeId::Simplify, elim_num_full),
             fm!(
                 "{:>9.2}",
                 self,
-                LogF64Id::ElimToGo,
-                self.config.elim_trigger as f64 - elim_to_eliminate
+                LogF64Id::SimpToGo,
+                self.config.elim_trigger as f64 - elim_to_simplify
             ),
             format!("{:>9.4}", asg_activity_decay),
         );
@@ -637,7 +637,7 @@ pub enum LogUsizeId {
     RestartBlock,  // 10: restart_block: usize,
     Restart,       // 11: restart_count: usize,
     Reduction,     // 12: reduction: usize,
-    Elimination,   // 13: full-featured elimination: usize,
+    Simplify,      // 13: full-featured elimination: usize,
     End,
 }
 
@@ -649,7 +649,7 @@ pub enum LogF64Id {
     AveLBD,       //  3: ave_lbd: f64,
     BLevel,       //  4: backjump_level: f64,
     CLevel,       //  5: conflict_level: f64,
-    ElimToGo,     //  6: asg.core_size.get: f64,
+    SimpToGo,     //  6: asg.core_size.get: f64,
     End,
 }
 
