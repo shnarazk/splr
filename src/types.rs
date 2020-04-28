@@ -103,6 +103,7 @@ pub type DecisionLevel = u32;
 /// ```
 #[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
 pub struct Lit {
+    /// literal encoded into folded u32
     ordinal: u32,
 }
 
