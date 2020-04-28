@@ -307,7 +307,7 @@ fn adapt_modules(
         // Need to call it before `cdb.adapt_to`
         // 'decision_level == 0' is required by `cdb.adapt_to`.
         asg.cancel_until(asg.root_level);
-        if elim.enable && elim.exports().0 < 3 {
+        if elim.enable && elim.exports().0 < 2 {
             elim.activate();
             elim.simplify(asg, cdb, state)?;
         }
