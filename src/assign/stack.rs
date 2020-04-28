@@ -170,6 +170,7 @@ impl AssignIF for AssignStack {
     fn level_ref(&self) -> &[DecisionLevel] {
         &self.level
     }
+    #[allow(clippy::single_match)]
     fn best_assigned(&mut self, flag: Flag) -> usize {
         match flag {
             Flag::BEST_PHASE => {
@@ -184,7 +185,10 @@ impl AssignIF for AssignStack {
             //         return self.num_target_assign;
             //     }
             // }
-            _ => panic!("invalid flag for reset_assign_record"),
+            _ => {
+                #[cfg(features = "boundary_check")]
+                panic!("invalid flag for reset_assign_record");
+            }
         }
         0
     }

@@ -318,7 +318,10 @@ impl PropagateIF for AssignStack {
                     }
                 }
             }
-            _ => panic!("invalid flag for reset_assign_record"),
+            _ => {
+                #[cfg(features = "boundary_check")]
+                panic!("invalid flag for reset_assign_record");
+            }
         }
     }
 }

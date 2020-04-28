@@ -350,7 +350,7 @@ fn conflict_analyze(
             }
             AssignReason::None => {
                 #[cfg(feature = "boundary_check")]
-                panic!("here");
+                panic!("conflict_analyze: faced AssignReason::None.");
             }
         }
         // The following case was subsumed into `search`.
