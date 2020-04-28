@@ -1,18 +1,244 @@
 /// Conflict Analysis
 use {
-    super::State,
+    super::{
+        restart::{RestartIF, Restarter, RestarterModule},
+        State,
+    },
     crate::{
-        assign::{AssignIF, AssignStack, VarManipulateIF, VarRewardIF},
+        assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarRewardIF},
         cdb::{ClauseDB, ClauseDBIF},
+        processor::{EliminateIF, Eliminator},
         types::*,
     },
 };
+
+#[allow(clippy::cognitive_complexity)]
+pub fn handle_conflict(
+    asg: &mut AssignStack,
+    cdb: &mut ClauseDB,
+    elim: &mut Eliminator,
+    rst: &mut Restarter,
+    state: &mut State,
+    ci: ClauseId,
+) -> MaybeInconsistent {
+    let original_dl = asg.decision_level();
+    // we need a catch here for handling the possibility of level zero conflict
+    // at higher level due to the incoherence between the current level and conflicting
+    // level in chronoBT. This leads to UNSAT solution. No need to update misc stats.
+    {
+        let level = asg.level_ref();
+        if cdb[ci].iter().all(|l| level[l.vi()] == 0) {
+            return Err(SolverError::NullLearnt);
+        }
+    }
+
+    let (ncnfl, _num_propagation, asg_num_restart, _) = asg.exports();
+    // If we can settle this conflict w/o restart, solver will get a big progress.
+    let switch_chronobt = if ncnfl < 1000 || asg.recurrent_conflicts() {
+        Some(false)
+    } else {
+        None
+    };
+    rst.update(RestarterModule::Counter, ncnfl);
+
+    if 0 < state.last_asg {
+        rst.update(RestarterModule::ASG, asg.stack_len());
+        state.last_asg = 0;
+    }
+
+    //
+    //## DYNAMIC BLOCKING RESTART based on ASG, updated on conflict path
+    //
+    rst.block_restart();
+    let mut use_chronobt = switch_chronobt.unwrap_or(0 < state.config.cbt_thr);
+    if use_chronobt {
+        let level = asg.level_ref();
+        let c = &cdb[ci];
+        let lcnt = c.iter().filter(|l| level[l.vi()] == original_dl).count();
+        if 1 == lcnt {
+            debug_assert!(c.iter().any(|l| level[l.vi()] == original_dl));
+            let decision = *c.iter().find(|l| level[l.vi()] == original_dl).unwrap();
+            let snd_l = c
+                .iter()
+                .map(|l| level[l.vi()])
+                .filter(|l| *l != original_dl)
+                .max()
+                .unwrap_or(0);
+            if 0 < snd_l {
+                // If the conflicting clause contains one literallfrom the maximal
+                // decision level, we let BCP propagating that literal at the second
+                // highest decision level in conflicting cls.
+                // PREMISE: 0 < snd_l
+                asg.cancel_until(snd_l - 1);
+                debug_assert!(
+                    asg.stack_iter().all(|l| l.vi() != decision.vi()),
+                    format!("lcnt == 1: level {}, snd level {}", original_dl, snd_l)
+                );
+                asg.assign_by_decision(decision);
+                return Ok(());
+            }
+        }
+    }
+    // conflicting level
+    // By mixing two restart modes, we must assume a conflicting level is under the current decision level,
+    // even if `use_chronobt` is off, because `use_chronobt` is a flag for future behavior.
+    let cl = {
+        let cl = asg.decision_level();
+        let c = &cdb[ci];
+        let level = asg.level_ref();
+        let lv = c.iter().map(|l| level[l.vi()]).max().unwrap_or(0);
+        if lv < cl {
+            asg.cancel_until(lv);
+            lv
+        } else {
+            cl
+        }
+    };
+    debug_assert!(
+        cdb[ci].iter().any(|l| asg.level(l.vi()) == cl),
+        format!(
+            "use_{}: {:?}, {:?}",
+            use_chronobt,
+            cl,
+            cdb[ci]
+                .iter()
+                .map(|l| (i32::from(*l), asg.level(l.vi())))
+                .collect::<Vec<_>>(),
+        )
+    );
+    // backtrack level by analyze
+    let bl_a = conflict_analyze(asg, cdb, state, ci).max(asg.root_level);
+    if state.new_learnt.is_empty() {
+        #[cfg(debug)]
+        {
+            println!(
+                "empty learnt at {}({}) by {:?}",
+                cl,
+                asg.reason(asg.decision_vi(cl)) == ClauseId::default(),
+                asg.dump(asg, &cdb[ci]),
+            );
+        }
+        return Err(SolverError::NullLearnt);
+    }
+    // asg.bump_vars(asg, cdb, ci);
+    let new_learnt = &mut state.new_learnt;
+    let l0 = new_learnt[0];
+    // assert: 0 < cl, which was checked already by new_learnt.is_empty().
+
+    // NCB places firstUIP on level bl, while CB does it on level cl.
+    // Therefore the condition to use CB is: activity(firstUIP) < activity(v(bl)).
+    // PREMISE: 0 < bl, because asg.decision_vi accepts only non-zero values.
+    use_chronobt &= switch_chronobt.unwrap_or(
+        bl_a == 0
+            || state.config.cbt_thr + bl_a <= cl
+            || asg.activity(l0.vi()) < asg.activity(asg.decision_vi(bl_a)),
+    );
+
+    // (assign level, backtrack level)
+    let (al, bl) = if use_chronobt {
+        (
+            {
+                let level = asg.level_ref();
+                new_learnt[1..]
+                    .iter()
+                    .map(|l| level[l.vi()])
+                    .max()
+                    .unwrap_or(0)
+            },
+            cl - 1,
+        )
+    } else {
+        (bl_a, bl_a)
+    };
+    let learnt_len = new_learnt.len();
+    if learnt_len == 1 {
+        //
+        //## PARTIAL FIXED SOLUTION by UNIT LEARNT CLAUSE GENERATION
+        //
+        // dump to certified even if it's a literal.
+        cdb.certificate_add(new_learnt);
+        if use_chronobt {
+            asg.cancel_until(bl);
+            debug_assert!(asg.stack_iter().all(|l| l.vi() != l0.vi()));
+            asg.assign_by_implication(l0, AssignReason::default(), 0);
+        } else {
+            asg.assign_by_unitclause(l0);
+        }
+        asg.num_solved_vars += 1;
+        rst.update(RestarterModule::Reset, 0);
+        state.last_solved = ncnfl;
+    } else {
+        {
+            // At the present time, some reason clauses can contain first UIP or its negation.
+            // So we have to filter vars instead of literals to avoid double counting.
+            let mut bumped = new_learnt.iter().map(|l| l.vi()).collect::<Vec<VarId>>();
+            for lit in new_learnt.iter() {
+                //
+                //## Learnt Literal Rewarding
+                //
+                asg.reward_at_analysis(lit.vi());
+                if !state.stabilize {
+                    continue;
+                }
+                if let AssignReason::Implication(r, _) = asg.reason(lit.vi()) {
+                    for l in &cdb[r].lits {
+                        let vi = l.vi();
+                        if !bumped.contains(&vi) {
+                            //
+                            //## Reason-Side Rewarding
+                            //
+                            asg.reward_at_analysis(vi);
+                            bumped.push(vi);
+                        }
+                    }
+                }
+            }
+        }
+        asg.cancel_until(bl);
+        let cid = cdb.new_clause(asg, new_learnt, true, true);
+        elim.add_cid_occur(asg, cid, &mut cdb[cid], true);
+        state.c_lvl.update(cl as f64);
+        state.b_lvl.update(bl as f64);
+        asg.assign_by_implication(
+            l0,
+            AssignReason::Implication(
+                cid,
+                if learnt_len == 2 {
+                    new_learnt[1]
+                } else {
+                    NULL_LIT
+                },
+            ),
+            al,
+        );
+        let lbd = cdb[cid].rank;
+        rst.update(RestarterModule::LBD, lbd);
+        if 1 < learnt_len && learnt_len <= state.config.elim_cls_lim / 2 {
+            elim.to_simplify += 1.0 / (learnt_len - 1) as f64;
+        }
+    }
+    cdb.scale_activity();
+    if 0 < state.config.dump_int && ncnfl % state.config.dump_int == 0 {
+        let (_mode, rst_num_block, rst_asg_trend, _lbd_get, rst_lbd_trend) = rst.exports();
+        state.development.push((
+            ncnfl,
+            (asg.num_solved_vars + asg.num_eliminated_vars) as f64
+                / state.target.num_of_variables as f64,
+            asg_num_restart as f64,
+            rst_num_block as f64,
+            rst_asg_trend.min(10.0),
+            rst_lbd_trend.min(10.0),
+        ));
+    }
+    cdb.check_and_reduce(asg, ncnfl);
+    Ok(())
+}
 
 ///
 /// ## Conflict Analysis
 ///
 #[allow(clippy::cognitive_complexity)]
-pub fn conflict_analyze(
+fn conflict_analyze(
     asg: &mut AssignStack,
     cdb: &mut ClauseDB,
     state: &mut State,
@@ -299,41 +525,5 @@ impl Lit {
             }
         }
         true
-    }
-}
-
-pub fn analyze_final(asg: &mut AssignStack, state: &mut State, c: &Clause) {
-    let mut seen = vec![false; asg.num_vars + 1];
-    state.conflicts.clear();
-    if asg.decision_level() == 0 {
-        return;
-    }
-    for l in &c.lits {
-        let vi = l.vi();
-        if 0 < asg.level(vi) {
-            asg.var_mut(vi).turn_on(Flag::CA_SEEN);
-        }
-    }
-    let end = if asg.decision_level() <= asg.root_level {
-        asg.stack_len()
-    } else {
-        asg.len_upto(asg.root_level)
-    };
-    for l in asg.stack_range(asg.len_upto(0)..end) {
-        let vi = l.vi();
-        if seen[vi] {
-            if asg.reason(vi) == AssignReason::default() {
-                state.conflicts.push(!*l);
-            } else {
-                let level = asg.level_ref();
-                for l in &c[(c.len() != 2) as usize..] {
-                    let vj = l.vi();
-                    if 0 < level[vj] {
-                        seen[vj] = true;
-                    }
-                }
-            }
-        }
-        seen[vi] = false;
     }
 }

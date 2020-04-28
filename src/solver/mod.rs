@@ -1,7 +1,8 @@
-/// Crate 'solver' provides the top-level API as a SAT solver.
-mod analyze;
+// Crate 'solver' provides the top-level API as a SAT solver.
 /// API to instantiate
 mod build;
+/// Crate 'conflict' handles conflicts.
+mod conflict;
 /// Crate `restart` provides restart heuristics.
 mod restart;
 /// CDCL search engine
