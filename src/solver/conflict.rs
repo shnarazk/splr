@@ -258,7 +258,6 @@ fn conflict_analyze(
             asg.reason(p.vi())
         };
         match reason {
-            AssignReason::None => panic!("here"),
             AssignReason::Implication(_, l) if l != NULL_LIT => {
                 // cid = asg.reason(p.vi());
                 let vi = l.vi();
@@ -348,6 +347,10 @@ fn conflict_analyze(
                         }
                     }
                 }
+            }
+            AssignReason::None => {
+                #[cfg(feature = "boundary_check")]
+                panic!("here");
             }
         }
         // The following case was subsumed into `search`.
