@@ -60,6 +60,86 @@ $ dmcr tests/sample.cnf
 A valid assignment set for tests/sample.cnf is found in .ans_sample.cnf.
 ```
 
+### Mnemonics used in the progress message
+
+| mnemonic  | meaning |
+| --------- |------- |
+| `v`  | the number of variables used in the given CNF file |
+| `c`  | the number of clauses used in the given CNF file |
+| `time`  | elapsed CPU time in seconds (or wall-clock time if CPU time is not available) |
+| `#conflict` | the number of conflicts |
+| `#decision` | the number of decisions |
+| `#propagate` | the number of propagates (its unit is literal) |
+| `#rem` | the number of remaining variables |
+| `#fix` | the number of solved variables (which has been assigned a value at decision level zero) |
+| `#elm` | the number of eliminated variables |
+| `prg%` | the percentage of `remaining variables / total variables` |
+| `Remv` | the number of learnt clauses which are not biclauses |
+| `LBD2` | the number of learnt clauses which LBDs are 2 |
+| `Binc` | the number of binary learnt clauses |
+| `Perm` | the number of given clauses and binary learnt clauses |
+| `#BLK` | the number of blocking restart |
+| `#RST` | the number of restart |
+| `tASG` | the trend rate of the number of assigned variables |
+| `tLBD` | the trend rate of learn clause's LBD |
+| `eLBD` | the EMA, Exponential Moving Average, of learn clauses' LBDs |
+| `cnfl` | the EMA of decision levels to which backjumps go |
+| `bjmp` | the EMA of decision levels at which conflicts occur |
+| `rpc%` | a percentage of restart per conflict |
+| `#rdc` | the number of `clause reduction` invocations |
+| `#smp` | the number of `clause and var simplification` invocations |
+| `2smp` | the number of literals to invoke the simplifier again |
+| `vdcy` | var activity decay rate |
+| `mode` | Selected strategy's id |
+| `time` | the elapsed CPU time in seconds |
+
+## Command line options
+
+Please check help message.
+
+```plain
+$ splr --help
+splr 0.4.0
+Narazaki Shuji <shujinarazaki@protonmail.com>
+A modern CDCL SAT solver in Rust
+
+USAGE:
+    splr [FLAGS] [OPTIONS] <cnf-file>
+
+FLAGS:
+    -h, --help        Prints help information
+    -C, --no-color    Disable coloring
+    -q, --quiet       Disable any progress message
+    -c, --certify     Writes a DRAT UNSAT certification file
+    -l, --log         Uses Glucose-like progress report
+    -V, --version     Prints version information
+    -A, --no-adapt    Disables dynamic strategy adaptation
+    -E, --no-elim     Disables exhaustive simplification
+
+OPTIONS:
+        --cbt <cbt-thr>           Level threshold to use chronoBT [default: 100]
+        --cl <clause-limit>       Soft limit of #clauses (6MC/GB) [default: 0]
+        --stat <dump-int>         Interval for dumpping stat data [default: 0]
+        --ecl <elim-cls-lim>      Max #lit for clause subsume [default: 100]
+        --evl <elim-grw-lim>      Grow limit of #cls in var elim [default: 0]
+        --et <elim-trigger>       #cls to start simplification [default: 8192]
+        --evo <elim-var-occ>      Max #cls for var elimination [default: 10000]
+    -o, --dir <output-dir>        Output directory [default: .]
+    -p, --proof <proof-file>      Cert. file in DRAT format [default: proof.out]
+    -r, --result <result-file>    Result filename/stdout [default: ]
+        --ral <rst-asg-len>       Length for assignment average [default: 3500]
+        --rab <rst-asg-thr>       Blocking restart threshold [default: 1.40]
+        --rll <rst-lbd-len>       Length of LBD fast EMA [default: 50]
+        --rls <rst-lbd-slw>       Length of LBD slow EMA [default: 10000]
+        --rlt <rst-lbd-thr>       Forcing restart threshold [default: 0.70]
+        --rss <rst-stb-scl>       Stabilizer scaling [default: 2.0]
+        --rs <rst-step>           #conflicts between restarts [default: 50]
+    -t, --timeout <timeout>       CPU time limit in sec [default: 5000.0]
+
+ARGS:
+    <cnf-file>    CNF file in DIMACS format
+```
+
 ## Correctness
 
 Though Splr comes with **ABSOLUTELY NO WARRANTY**, I'd like to show some results.
