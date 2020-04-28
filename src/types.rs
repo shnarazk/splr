@@ -471,7 +471,7 @@ impl fmt::Display for SolverError {
 /// A Return type used by solver functions.
 pub type MaybeInconsistent = Result<(), SolverError>;
 
-/// data about a problem.
+/// Data storage about a problem.
 #[derive(Clone, Debug)]
 pub struct CNFDescription {
     pub num_of_variables: usize,
@@ -564,11 +564,6 @@ impl TryFrom<&PathBuf> for CNFReader {
         };
         Ok(CNFReader { cnf, reader })
     }
-}
-
-/// convert `[Lit]` to `[i32]` (for debug).
-pub fn vec2int(v: &[Lit]) -> Vec<i32> {
-    v.iter().map(|l| i32::from(*l)).collect::<Vec<_>>()
 }
 
 impl<T> Delete<T> for Vec<T> {

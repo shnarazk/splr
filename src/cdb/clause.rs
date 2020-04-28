@@ -177,3 +177,8 @@ impl fmt::Display for Clause {
         )
     }
 }
+
+/// convert `[Lit]` to `[i32]` (for debug).
+fn vec2int(v: &[Lit]) -> Vec<i32> {
+    v.iter().map(|l| i32::from(*l)).collect::<Vec<_>>()
+}

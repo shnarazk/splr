@@ -12,7 +12,7 @@ pub trait WatchDBIF {
     fn update_blocker(&mut self, cid: ClauseId, l: Lit, binary: bool);
 }
 
-/// 'watch literal' structure
+/// 'Watch literal' structure
 #[derive(Clone, Debug)]
 pub struct Watch {
     /// a cache of a literal in the clause

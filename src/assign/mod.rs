@@ -68,7 +68,7 @@ pub trait AssignIF:
     fn extend_model(&mut self, lits: &[Lit]);
 }
 
-/// reason of assignment, two kinds
+/// Reasons of assignments, two kinds
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum AssignReason {
     /// One of not assigned, assigned by decision, or solved.
