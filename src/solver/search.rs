@@ -26,21 +26,18 @@ pub trait SatSolverSearchIF {
 }
 
 macro_rules! final_report {
-    ($asg: expr, $cdb: expr, $elim: expr, $rst: expr, $state: expr) => {
-        #[cfg(not(features = "no_IO"))]
-        {
-            let c = $state.config.no_color;
-            let q = $state.config.quiet_mode;
-            $state.config.no_color = true;
-            $state.config.quiet_mode = false;
-            if q {
-                $state.progress_header();
-            }
-            $state.progress($asg, $cdb, $elim, $rst, None);
-            $state.config.no_color = c;
-            $state.config.quiet_mode = q;
+    ($asg: expr, $cdb: expr, $elim: expr, $rst: expr, $state: expr) => {{
+        let c = $state.config.no_color;
+        let q = $state.config.quiet_mode;
+        $state.config.no_color = true;
+        $state.config.quiet_mode = false;
+        if q {
+            $state.progress_header();
         }
-    };
+        $state.progress($asg, $cdb, $elim, $rst, None);
+        $state.config.no_color = c;
+        $state.config.quiet_mode = q;
+    }};
 }
 
 impl SatSolverSearchIF for Solver {
@@ -125,6 +122,7 @@ impl SatSolverSearchIF for Solver {
             if elim.simplify(asg, cdb, state).is_err() {
                 // Why inconsistent? Because the CNF contains a conflict, not an error!
                 // Or out of memory.
+                #[cfg(not(features = "no_IO"))]
                 final_report!(asg, cdb, elim, rst, state);
                 if cdb.check_size().is_err() {
                     return Err(SolverError::OutOfMemory);
@@ -152,6 +150,7 @@ impl SatSolverSearchIF for Solver {
         //## Search
         //
         let answer = search(asg, cdb, elim, rst, state);
+        #[cfg(not(features = "no_IO"))]
         final_report!(asg, cdb, elim, rst, state);
         match answer {
             Ok(true) => {
