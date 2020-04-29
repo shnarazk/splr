@@ -60,6 +60,29 @@ $ dmcr tests/sample.cnf
 A valid assignment set for tests/sample.cnf is found in .ans_sample.cnf.
 ```
 
+Since 0.4.0, you can use Splr in your programs.
+
+```
+use {
+    splr::{
+        solver::{Certificate, SatSolverIF, Solver},
+        Config,
+    },
+    std::convert::TryFrom,
+};
+
+fn main() {
+	let v: Vec<Vec<i32>> = vec![vec![1i32, 2], vec![-1, 3], vec![1, -3], vec![-1, 2]];
+	let mut s = Solver::try_from((Config::default(), v.as_ref())).expect("It's UNSAT.");
+	match s.solve() {
+	    Ok(Certificate::SAT(ans)) => println!("s SATISFIABLE: {:?}", ans),
+		Ok(Cetrificate::UNSAT) => println!("s UNSATISFIABLE"),
+	    Err(e) => panic!("{}", e),
+    }
+}
+```
+
+
 ### Mnemonics used in the progress message
 
 | mnemonic  | meaning |
