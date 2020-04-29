@@ -2,13 +2,13 @@
 use {
     super::{AssignIF, AssignStack, Var, VarIdHeap, VarManipulateIF, VarOrderIF},
     crate::{cdb::ClauseDBIF, state::State, types::*},
-    std::{
-        fmt,
-        fs::File,
-        io::{BufWriter, Write},
-        ops::Range,
-        slice::Iter,
-    },
+    std::{fmt, ops::Range, slice::Iter},
+};
+
+#[cfg(not(features = "no_IO"))]
+use std::{
+    fs::File,
+    io::{BufWriter, Write},
 };
 
 macro_rules! var_assign {
@@ -233,6 +233,7 @@ impl AssignIF for AssignStack {
 
 impl AssignStack {
     /// dump all active clauses and fixed assignments as a CNF file.
+    #[cfg(not(features = "no_IO"))]
     #[allow(dead_code)]
     fn dump_cnf<C, V>(&mut self, cdb: &C, fname: &str)
     where

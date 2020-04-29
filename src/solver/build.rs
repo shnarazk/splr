@@ -7,20 +7,26 @@ use {
         processor::{EliminateIF, Eliminator},
         types::*,
     },
-    std::{
-        convert::TryFrom,
-        fs::File,
-        io::{BufRead, BufReader},
-    },
+};
+
+#[cfg(not(features = "no_IO"))]
+use std::{
+    convert::TryFrom,
+    fs::File,
+    io::{BufRead, BufReader},
 };
 
 /// API for SAT solver like `build`, `solve` and so on.
 pub trait SatSolverBuildIF {
+    /// make a solver from a vec representation of a CNF.
+    #[cfg(features = "no_IO")]
+    fn solver_build(config: Config, vec: Vec<Vec<i32>>) -> Solver;
     /// make a solver and load a CNF into it.
     ///
     /// # Errors
     ///
     /// IO error by failing to load a CNF file.
+    #[cfg(not(features = "no_IO"))]
     fn solver_build(config: &Config) -> Result<Solver, SolverError>;
     /// search an assignment.
     ///
@@ -86,6 +92,11 @@ impl SatSolverBuildIF for Solver {
     /// let config = Config::from("tests/sample.cnf");
     /// assert!(Solver::build(&config).is_ok());
     ///```
+    #[cfg(features = "no_IO")]
+    fn solver_build(config: Config, vec: Vec<Vec<i32>>) -> Solver {
+        Solver::default()
+    }
+    #[cfg(not(features = "no_IO"))]
     fn solver_build(config: &Config) -> Result<Solver, SolverError> {
         let CNFReader { cnf, reader } = CNFReader::try_from(&config.cnf_file)?;
         Solver::instantiate(config, &cnf).inject(reader)

@@ -18,7 +18,10 @@ pub mod assign;
 /// Crate `cdb` provides `clause` object and its manager `ClauseDB`
 pub mod cdb;
 /// Crate `config` provides solver's configuration and CLI.
+#[cfg(not(feature = "no_IO"))]
 pub mod config;
+#[cfg(feature = "no_IO")]
+pub mod config_no_io;
 /// Crate `processor` implements a simplifier: clause subsumption and var elimination.
 pub mod processor;
 /// Crate `solver` provides the top-level API as a SAT solver.
@@ -27,6 +30,13 @@ pub mod solver;
 pub mod state;
 /// Crate `types` provides various building blocks, including some common traits.
 pub mod types;
+
+/// Crate `config` provides solver's configuration and CLI.
+#[cfg(not(feature = "no_IO"))]
+pub use self::config::Config;
+/// Crate `config` provides solver's configuration and CLI.
+#[cfg(feature = "no_IO")]
+pub use self::config_no_io::Config;
 
 #[macro_use]
 extern crate bitflags;
