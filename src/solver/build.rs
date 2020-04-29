@@ -86,7 +86,7 @@ where
     type Error = SolverResult;
     fn try_from((config, vec): (Config, &[V])) -> Result<Self, Self::Error> {
         let cnf = CNFDescription::from(vec);
-        match Solver::instantiate(&config, &cnf).inject_from_vec(vec) {
+        match Solver::instantiate(&config, &cnf).inject_from_vec(vec.as_ref()) {
             Err(SolverError::Inconsistent) => Err(Ok(Certificate::UNSAT)),
             Err(e) => Err(Err(e)),
             Ok(s) => Ok(s),
