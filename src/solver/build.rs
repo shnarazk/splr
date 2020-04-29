@@ -28,6 +28,8 @@ pub trait SatSolverBuildIF {
     /// IO error by failing to load a CNF file.
     #[cfg(not(features = "no_IO"))]
     fn solver_build(config: &Config) -> Result<Solver, SolverError>;
+    /// build a solver for solving a vec-represented CNF.
+    fn solver_from_vec(config: Config, vec: Vec<Vec<i32>>) -> Solver;
     /// search an assignment.
     ///
     /// # Errors
@@ -84,6 +86,10 @@ impl TryFrom<&str> for Solver {
 }
 
 impl SatSolverBuildIF for Solver {
+    fn solver_from_vec(config: Config, vec: Vec<Vec<i32>>) -> Solver {
+        let cnf = CNFDescription::from(vec);
+        Solver::instantiate(&config, &cnf)
+    }
     /// # Examples
     ///
     /// ```
@@ -93,10 +99,6 @@ impl SatSolverBuildIF for Solver {
     /// let config = Config::from("tests/sample.cnf");
     /// assert!(Solver::build(&config).is_ok());
     ///```
-    #[cfg(features = "no_IO")]
-    fn solver_build(config: Config, vec: Vec<Vec<i32>>) -> Solver {
-        Solver::default()
-    }
     #[cfg(not(features = "no_IO"))]
     fn solver_build(config: &Config) -> Result<Solver, SolverError> {
         let CNFReader { cnf, reader } = CNFReader::try_from(&config.cnf_file)?;

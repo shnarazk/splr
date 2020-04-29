@@ -30,6 +30,8 @@ pub trait SatSolverIF: SatSolverBuildIF + SatSolverSearchIF {
     ///
     /// IO error by failing to load a CNF file.
     fn build(config: &Config) -> Result<Solver, SolverError>;
+    /// build a solver for solving a vec-represented CNF.
+    fn from_vec(config: Config, vec: Vec<Vec<i32>>) -> Solver;
     /// search an assignment.
     ///
     /// # Errors
@@ -44,6 +46,9 @@ impl SatSolverIF for Solver {
     }
     fn build(config: &Config) -> Result<Solver, SolverError> {
         <Solver as SatSolverBuildIF>::solver_build(config)
+    }
+    fn from_vec(config: Config, vec: Vec<Vec<i32>>) -> Solver {
+        <Solver as SatSolverBuildIF>::solver_from_vec(config, vec)
     }
     fn solve(&mut self) -> SolverResult {
         <Solver as SatSolverSearchIF>::solve(self)
