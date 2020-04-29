@@ -31,10 +31,13 @@ pub mod state;
 pub mod types;
 
 pub use {
-    config::{Config, VERSION},
+    config::Config,
     solver::{Certificate, SatSolverIF, Solver, ValidateIF},
     types::SolverError,
 };
+
+/// Splr version number.
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[macro_use]
 extern crate bitflags;
