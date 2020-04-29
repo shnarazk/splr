@@ -67,7 +67,7 @@ use splr::{Certificate, Config, SatSolverIF, Solver};
 use std::convert::TryFrom;
 
 fn main() {
-	let v: Vec<Vec<i32>> = vec![vec![1i32, 2], vec![-1, 3], vec![1, -3], vec![-1, 2]];
+	let v: Vec<Vec<i32>> = vec![vec![1, 2], vec![-1, 3], vec![1, -3], vec![-1, 2]];
 	let mut s = Solver::try_from((Config::default(), v.as_ref())).expect("It's UNSAT.");
 	match s.solve() {
 	    Ok(Certificate::SAT(ans)) => println!("s SATISFIABLE: {:?}", ans),
