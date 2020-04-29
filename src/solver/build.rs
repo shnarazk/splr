@@ -20,7 +20,7 @@ use std::{
 pub trait SatSolverBuildIF {
     /// make a solver from a vec representation of a CNF.
     #[cfg(features = "no_IO")]
-    fn solver_build(config: Config, vec: Vec<Vec<i32>>) -> Solver;
+    fn solver_build(config: Config, vec: Vec<Vec<i32>>) -> Result<Solver, SolverError>;
     /// make a solver and load a CNF into it.
     ///
     /// # Errors
@@ -29,7 +29,7 @@ pub trait SatSolverBuildIF {
     #[cfg(not(features = "no_IO"))]
     fn solver_build(config: &Config) -> Result<Solver, SolverError>;
     /// build a solver for solving a vec-represented CNF.
-    fn solver_from_vec(config: Config, vec: Vec<Vec<i32>>) -> Solver;
+    fn solver_from_vec(config: Config, vec: Vec<Vec<i32>>) -> Result<Solver, SolverError>;
     /// search an assignment.
     ///
     /// # Errors
@@ -86,9 +86,9 @@ impl TryFrom<&str> for Solver {
 }
 
 impl SatSolverBuildIF for Solver {
-    fn solver_from_vec(config: Config, vec: Vec<Vec<i32>>) -> Solver {
+    fn solver_from_vec(config: Config, vec: Vec<Vec<i32>>) -> Result<Solver, SolverError> {
         let cnf = CNFDescription::from(vec);
-        Solver::instantiate(&config, &cnf)
+        Solver::instantiate(&config, &cnf).inject_from_vec()
     }
     /// # Examples
     ///
@@ -180,6 +180,33 @@ impl Solver {
                     }
                 }
                 Err(e) => panic!("{}", e),
+            }
+        }
+        debug_assert_eq!(self.asg.num_vars, self.state.target.num_of_variables);
+        // s.state[Stat::NumBin] = s.cdb.iter().skip(1).filter(|c| c.len() == 2).count();
+        self.asg.adapt_to(&self.state, 0);
+        self.rst.adapt_to(&self.state, 0);
+        Ok(self)
+    }
+    fn inject_from_vec(mut self) -> Result<Solver, SolverError> {
+        self.state.progress_header();
+        self.state.progress(
+            &self.asg,
+            &self.cdb,
+            &self.elim,
+            &self.rst,
+            Some("initialization phase"),
+        );
+        self.state.flush("injecting...");
+        if let CNFIndicator::LitVec(ref v) = self.state.target.pathname {
+            let clauses = v
+                .iter()
+                .map(|c| c.iter().map(|i| Lit::from(*i)).collect::<Vec<Lit>>())
+                .collect::<Vec<_>>();
+            for mut c in clauses {
+                if self.add_unchecked_clause(&mut c).is_none() {
+                    return Err(SolverError::Inconsistent);
+                }
             }
         }
         debug_assert_eq!(self.asg.num_vars, self.state.target.num_of_variables);

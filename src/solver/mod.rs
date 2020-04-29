@@ -18,6 +18,7 @@ pub use self::{
 use {
     self::{build::SatSolverBuildIF, search::SatSolverSearchIF},
     crate::{assign::AssignStack, cdb::ClauseDB, processor::Eliminator, state::*, types::*},
+    std::convert::TryFrom,
 };
 
 /// API for SAT solver like `build`, `solve` and so on.
@@ -30,8 +31,6 @@ pub trait SatSolverIF: SatSolverBuildIF + SatSolverSearchIF {
     ///
     /// IO error by failing to load a CNF file.
     fn build(config: &Config) -> Result<Solver, SolverError>;
-    /// build a solver for solving a vec-represented CNF.
-    fn from_vec(config: Config, vec: Vec<Vec<i32>>) -> Solver;
     /// search an assignment.
     ///
     /// # Errors
@@ -40,15 +39,19 @@ pub trait SatSolverIF: SatSolverBuildIF + SatSolverSearchIF {
     fn solve(&mut self) -> SolverResult;
 }
 
+impl TryFrom<(Config, Vec<Vec<i32>>)> for Solver {
+    type Error = SolverError;
+    fn try_from((config, vec): (Config, Vec<Vec<i32>>)) -> Result<Self, Self::Error> {
+        <Solver as SatSolverBuildIF>::solver_from_vec(config, vec)
+    }
+}
+
 impl SatSolverIF for Solver {
     fn add_unchecked_clause(&mut self, v: &mut Vec<Lit>) -> Option<ClauseId> {
         self.solver_add_unchecked_clause(v)
     }
     fn build(config: &Config) -> Result<Solver, SolverError> {
         <Solver as SatSolverBuildIF>::solver_build(config)
-    }
-    fn from_vec(config: Config, vec: Vec<Vec<i32>>) -> Solver {
-        <Solver as SatSolverBuildIF>::solver_from_vec(config, vec)
     }
     fn solve(&mut self) -> SolverResult {
         <Solver as SatSolverSearchIF>::solve(self)
