@@ -779,37 +779,24 @@ mod tests {
     #![allow(dead_code)]
     use super::*;
     use crate::{cdb::ClauseDB, solver::Solver};
-
-    macro_rules! mkv {
-        ($($x:expr),*) => {
-            match &[$($x),*] {
-                v => v.iter().map(|x| Lit::from(*x as i32)).collect::<Vec<Lit>>(),
-            }
-        };
-    }
+    use std::convert::TryFrom;
 
     #[test]
     fn check_occurs() {
-        let cfg: Config = Default::default();
-        let cnf: CNFDescription = CNFDescription {
-            num_of_variables: 10,
-            num_of_clauses: 10,
-            pathname: "".to_string(),
-        };
-        let mut s = Solver::instantiate(&cfg, &cnf);
-
-        let c1 = s
-            .cdb
-            .new_clause(&mut s.asg, &mut mkv![1, 2, 3], false, false);
-        let c2 = s
-            .cdb
-            .new_clause(&mut s.asg, &mut mkv![-2, 3, 4], false, false);
-        let c3 = s
-            .cdb
-            .new_clause(&mut s.asg, &mut mkv![-2, -3], false, false);
-        let c4 = s
-            .cdb
-            .new_clause(&mut s.asg, &mut mkv![1, 2, -3, 9], false, false);
+        let cs = vec![
+            vec![1, 2, 3],
+            vec![-2, 3, 4],
+            vec![-2, -3],
+            vec![1, 2, -3, 9],
+        ];
+        let s = Solver::try_from((Config::default(), cs.as_ref()));
+        //    macro_rules! mkv {
+        //        ($($x:expr),*) => {
+        //            match &[$($x),*] {
+        //                v => v.iter().map(|x| Lit::from(*x as i32)).collect::<Vec<Lit>>(),
+        //            }
+        //        };
+        //    }
         //    {
         //        let vec = [&c2, &c3]; // [&c1, &c2, &c3, &c4];
         //        for x in &vec {
