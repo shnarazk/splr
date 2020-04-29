@@ -395,7 +395,12 @@ impl StateIF for State {
         };
         self.strategy.1 = asg_num_conflict;
     }
+    #[allow(unreachable_code, unused_variables)]
     fn progress_header(&mut self) {
+        #[cfg(features = "no_IO")]
+        {
+            return;
+        }
         if self.config.quiet_mode {
             return;
         }
@@ -423,7 +428,7 @@ impl StateIF for State {
         }
     }
     /// `mes` should be shorter than or equal to 9, or 8 + a delimiter.
-    #[allow(clippy::cognitive_complexity)]
+    #[allow(clippy::cognitive_complexity, unreachable_code, unused_variables)]
     fn progress<A, C, E, R>(&mut self, asg: &A, cdb: &C, elim: &E, rst: &R, mes: Option<&str>)
     where
         A: AssignIF,
@@ -431,6 +436,10 @@ impl StateIF for State {
         E: EliminateIF,
         R: RestartIF,
     {
+        #[cfg(features = "no_IO")]
+        {
+            return;
+        }
         //
         //## Gather stats from all modules
         //
