@@ -2,7 +2,7 @@
 use {crate::types::DecisionLevel, std::path::PathBuf};
 
 /// Configuration built from command line options
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct Config {
     //
     //## I/O configuration
@@ -114,6 +114,45 @@ pub struct Config {
 
     /// Writes a DRAT UNSAT certification file
     pub use_certification: bool,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Config {
+            cnf_file: PathBuf::new(),
+            dump_int: 0,
+            no_color: true,
+            output_dir: PathBuf::new(),
+            proof_file: PathBuf::new(),
+            quiet_mode: true,
+            result_file: PathBuf::new(),
+            use_log: false,
+            clause_limit: 0,
+            without_reduce: false,
+            elim_cls_lim: 100,
+            elim_var_occ: 10_000,
+            elim_grw_lim: 0,
+            elim_trigger: 40000,
+            without_elim: false,
+            rst_step: 50,
+            rst_bkt_inc: 1.0,
+            rst_bkt_pwr: 1.5,
+            rst_bkt_scl: 0.001,
+            rst_bkt_thr: 2000,
+            rst_asg_len: 3500,
+            rst_asg_thr: 1.4,
+            rst_lbd_len: 50,
+            rst_lbd_slw: 10000,
+            rst_lbd_thr: 0.7,
+            rst_stb_scl: 2.0,
+            cbt_thr: 100,
+            rsr: true,
+            stabilize: true,
+            without_adaptive_strategy: false,
+            timeout: 5000.0,
+            use_certification: false,
+        }
+    }
 }
 
 impl<T> From<T> for Config
