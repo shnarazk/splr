@@ -223,7 +223,7 @@ impl Solver {
             Some("initialization phase"),
         );
         self.state.flush("injecting...");
-        for ints in v {
+        for ints in v.iter() {
             let mut lits = ints
                 .as_ref()
                 .iter()
