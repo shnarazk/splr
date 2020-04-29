@@ -30,5 +30,10 @@ pub mod state;
 /// Crate `types` provides various building blocks, including some common traits.
 pub mod types;
 
+pub use {
+    config::Config,
+    solver::{Certificate, SatSolverIF, Solver, ValidateIF},
+};
+
 #[macro_use]
 extern crate bitflags;
