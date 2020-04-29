@@ -62,23 +62,6 @@ impl Instantiate for Solver {
     }
 }
 
-/*
-impl<V> TryFrom<(Config, &Vec<V>)> for Solver
-where
-    V: AsRef<[i32]>,
-{
-    type Error = SolverResult;
-    fn try_from((config, vec): (Config, &Vec<V>)) -> Result<Self, Self::Error> {
-        let cnf = CNFDescription::from(vec);
-        match Solver::instantiate(&config, &cnf).inject_from_vec(vec) {
-            Err(SolverError::Inconsistent) => Err(Ok(Certificate::UNSAT)),
-            Err(e) => Err(Err(e)),
-            Ok(s) => Ok(s),
-        }
-    }
-}
- */
-
 impl<V> TryFrom<(Config, &[V])> for Solver
 where
     V: AsRef<[i32]>,
@@ -86,7 +69,7 @@ where
     type Error = SolverResult;
     fn try_from((config, vec): (Config, &[V])) -> Result<Self, Self::Error> {
         let cnf = CNFDescription::from(vec);
-        match Solver::instantiate(&config, &cnf).inject_from_vec(vec.as_ref()) {
+        match Solver::instantiate(&config, &cnf).inject_from_vec(vec) {
             Err(SolverError::Inconsistent) => Err(Ok(Certificate::UNSAT)),
             Err(e) => Err(Err(e)),
             Ok(s) => Ok(s),

@@ -537,24 +537,6 @@ impl fmt::Display for CNFDescription {
     }
 }
 
-impl<V> From<&Vec<V>> for CNFDescription
-where
-    V: AsRef<[i32]>,
-{
-    fn from(vec: &Vec<V>) -> Self {
-        let num_of_variables = vec
-            .iter()
-            .map(|clause| clause.as_ref().iter().map(|l| l.abs()).max().unwrap_or(0))
-            .max()
-            .unwrap_or(0) as usize;
-        CNFDescription {
-            num_of_variables,
-            num_of_clauses: vec.len(),
-            pathname: CNFIndicator::LitVec(vec.len()),
-        }
-    }
-}
-
 impl<V> From<&[V]> for CNFDescription
 where
     V: AsRef<[i32]>,
