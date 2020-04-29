@@ -18,9 +18,7 @@ pub mod assign;
 /// Crate `cdb` provides `clause` object and its manager `ClauseDB`
 pub mod cdb;
 /// Crate `config` provides solver's configuration and CLI.
-#[cfg(not(feature = "no_IO"))]
 pub mod config;
-#[cfg(feature = "no_IO")]
 pub mod config_no_io;
 /// Crate `processor` implements a simplifier: clause subsumption and var elimination.
 pub mod processor;

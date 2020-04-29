@@ -1,9 +1,6 @@
 /// Crate `config_no_io` provides solver's configuration without CLI.
 use {crate::types::DecisionLevel, std::path::PathBuf};
 
-/// Splr version number.
-pub const VERSION: &str = env!("CARGO_PKG_VERSION");
-
 /// Configuration built from command line options
 #[derive(Clone, Debug, Default)]
 pub struct Config {
@@ -117,4 +114,13 @@ pub struct Config {
 
     /// Writes a DRAT UNSAT certification file
     pub use_certification: bool,
+}
+
+impl<T> From<T> for Config
+where
+    PathBuf: From<T>,
+{
+    fn from(_: T) -> Config {
+        Config::default()
+    }
 }

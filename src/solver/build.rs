@@ -65,6 +65,7 @@ impl Instantiate for Solver {
     }
 }
 
+#[cfg(not(features = "no_IO"))]
 impl TryFrom<&str> for Solver {
     type Error = SolverError;
     /// return a new solver build for a CNF file.
