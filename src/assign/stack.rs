@@ -5,7 +5,7 @@ use {
     std::{fmt, ops::Range, slice::Iter},
 };
 
-#[cfg(not(features = "no_IO"))]
+#[cfg(not(feature = "no_IO"))]
 use {
     crate::cdb::ClauseDBIF,
     std::{
@@ -183,7 +183,7 @@ impl AssignIF for AssignStack {
             //     }
             // }
             _ => {
-                #[cfg(features = "boundary_check")]
+                #[cfg(feature = "boundary_check")]
                 panic!("invalid flag for reset_assign_record");
             }
         }
@@ -230,7 +230,7 @@ impl AssignIF for AssignStack {
 
 impl AssignStack {
     /// dump all active clauses and fixed assignments as a CNF file.
-    #[cfg(not(features = "no_IO"))]
+    #[cfg(not(feature = "no_IO"))]
     #[allow(dead_code)]
     fn dump_cnf<C, V>(&mut self, cdb: &C, fname: &str)
     where

@@ -29,6 +29,7 @@ pub trait SatSolverIF: SatSolverBuildIF + SatSolverSearchIF {
     /// # Errors
     ///
     /// IO error by failing to load a CNF file.
+    #[cfg(not(feature = "no_IO"))]
     fn build(config: &Config) -> Result<Solver, SolverError>;
     /// search an assignment.
     ///
@@ -42,6 +43,7 @@ impl SatSolverIF for Solver {
     fn add_unchecked_clause(&mut self, v: &mut Vec<Lit>) -> Option<ClauseId> {
         self.solver_add_unchecked_clause(v)
     }
+    #[cfg(not(feature = "no_IO"))]
     fn build(config: &Config) -> Result<Solver, SolverError> {
         <Solver as SatSolverBuildIF>::solver_build(config)
     }

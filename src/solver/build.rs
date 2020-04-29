@@ -10,7 +10,7 @@ use {
     std::convert::TryFrom,
 };
 
-#[cfg(not(features = "no_IO"))]
+#[cfg(not(feature = "no_IO"))]
 use std::{
     fs::File,
     io::{BufRead, BufReader},
@@ -23,6 +23,7 @@ pub trait SatSolverBuildIF {
     /// # Errors
     ///
     /// IO error by failing to load a CNF file.
+    #[cfg(not(feature = "no_IO"))]
     fn solver_build(config: &Config) -> Result<Solver, SolverError>;
     /// build a solver for solving a vec-represented CNF.
     fn solver_from_vec(config: Config, vec: Vec<Vec<i32>>) -> Result<Solver, SolverError>;
@@ -70,7 +71,7 @@ impl TryFrom<(Config, Vec<Vec<i32>>)> for Solver {
     }
 }
 
-#[cfg(not(features = "no_IO"))]
+#[cfg(not(feature = "no_IO"))]
 impl TryFrom<&str> for Solver {
     type Error = SolverError;
     /// return a new solver build for a CNF file.
@@ -102,7 +103,7 @@ impl SatSolverBuildIF for Solver {
     /// let config = Config::from("tests/sample.cnf");
     /// assert!(Solver::build(&config).is_ok());
     ///```
-    #[cfg(not(features = "no_IO"))]
+    #[cfg(not(feature = "no_IO"))]
     fn solver_build(config: &Config) -> Result<Solver, SolverError> {
         let CNFReader { cnf, reader } = CNFReader::try_from(&config.cnf_file)?;
         Solver::instantiate(config, &cnf).inject(reader)
@@ -152,7 +153,7 @@ impl SatSolverBuildIF for Solver {
 }
 
 impl Solver {
-    #[cfg(not(features = "no_IO"))]
+    #[cfg(not(feature = "no_IO"))]
     fn inject(mut self, mut reader: BufReader<File>) -> Result<Solver, SolverError> {
         self.state.progress_header();
         self.state.progress(
