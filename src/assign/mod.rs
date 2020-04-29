@@ -1,13 +1,12 @@
-/// Var rewarding
-#[cfg(feature = "EVSIDS")]
-mod evsids;
 /// Crate `assign` implements Boolean Constraint Propagation and decision var selection.
 /// This version can handle Chronological and Non Chronological Backtrack.
 mod heap;
-#[cfg(not(feature = "EVSIDS"))]
-mod learning_rate;
 /// Boolean constraint propagation
 mod propagate;
+/// Var rewarding
+#[cfg_attr(feature = "EVSIDS", path = "evsids.rs")]
+#[cfg_attr(not(feature = "EVSIDS"), path = "learning_rate.rs")]
+mod reward;
 /// Decision var selection
 mod select;
 /// assignment management
@@ -19,16 +18,29 @@ pub use self::{
     propagate::PropagateIF, select::VarSelectIF, stack::ClauseManipulateIF, var::VarManipulateIF,
 };
 
-#[cfg(feature = "EVSIDS")]
-pub use self::evsids::VarRewardIF;
-#[cfg(not(feature = "EVSIDS"))]
-pub use self::learning_rate::VarRewardIF;
-
 use {
     self::heap::{VarHeapIF, VarOrderIF},
     super::types::*,
     std::{ops::Range, slice::Iter},
 };
+
+/// API for var rewarding.
+pub trait VarRewardIF {
+    /// return var's activity.
+    fn activity(&mut self, vi: VarId) -> f64;
+    /// initialize rewards based on an order of vars.
+    fn initialize_reward(&mut self, iterator: Iter<'_, usize>);
+    /// clear var's activity
+    fn clear_reward(&mut self, vi: VarId);
+    /// modify var's activity at conflict analysis in `analyze`.
+    fn reward_at_analysis(&mut self, vi: VarId);
+    /// modify var's activity at value assignment in `uncheck_{assume, enqueue, fix}`.
+    fn reward_at_assign(&mut self, vi: VarId);
+    /// modify var's activity at value unassigment in `cancel_until`.
+    fn reward_at_unassign(&mut self, vi: VarId);
+    /// update internal counter.
+    fn reward_update(&mut self);
+}
 
 /// API for assignment like `propagate`, `enqueue`, `cancel_until`, and so on.
 pub trait AssignIF:

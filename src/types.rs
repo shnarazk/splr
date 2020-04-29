@@ -3,7 +3,7 @@
 pub use crate::{
     assign::AssignReason,
     cdb::{Clause, ClauseIF, ClauseId, ClauseIdIF, Watch},
-    Config,
+    config::Config,
 };
 use {
     crate::state::State,
