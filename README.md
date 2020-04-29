@@ -63,13 +63,8 @@ A valid assignment set for tests/sample.cnf is found in .ans_sample.cnf.
 Since 0.4.0, you can use Splr in your programs.
 
 ```
-use {
-    splr::{
-        solver::{Certificate, SatSolverIF, Solver},
-        Config,
-    },
-    std::convert::TryFrom,
-};
+use splr::{Certificate, Config, SatSolverIF, Solver};
+use std::convert::TryFrom;
 
 fn main() {
 	let v: Vec<Vec<i32>> = vec![vec![1i32, 2], vec![-1, 3], vec![1, -3], vec![-1, 2]];
