@@ -1,6 +1,6 @@
 /// Solver Builder
 use {
-    super::{restart::Restarter, SatSolverIF, Solver, State, StateIF},
+    super::{restart::Restarter, Certificate, SatSolverIF, Solver, SolverResult, State, StateIF},
     crate::{
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
         cdb::{ClauseDB, ClauseDBIF},
@@ -25,8 +25,6 @@ pub trait SatSolverBuildIF {
     /// IO error by failing to load a CNF file.
     #[cfg(not(feature = "no_IO"))]
     fn solver_build(config: &Config) -> Result<Solver, SolverError>;
-    /// build a solver for solving a vec-represented CNF.
-    fn solver_from_vec(config: Config, vec: Vec<Vec<i32>>) -> Result<Solver, SolverError>;
     /// search an assignment.
     ///
     /// # Errors
@@ -65,9 +63,14 @@ impl Instantiate for Solver {
 }
 
 impl TryFrom<(Config, Vec<Vec<i32>>)> for Solver {
-    type Error = SolverError;
+    type Error = SolverResult;
     fn try_from((config, vec): (Config, Vec<Vec<i32>>)) -> Result<Self, Self::Error> {
-        <Solver as SatSolverBuildIF>::solver_from_vec(config, vec)
+        let cnf = CNFDescription::from(vec);
+        match Solver::instantiate(&config, &cnf).inject_from_vec() {
+            Err(SolverError::Inconsistent) => Err(Ok(Certificate::UNSAT)),
+            Err(e) => Err(Err(e)),
+            Ok(s) => Ok(s),
+        }
     }
 }
 
@@ -90,10 +93,6 @@ impl TryFrom<&str> for Solver {
 }
 
 impl SatSolverBuildIF for Solver {
-    fn solver_from_vec(config: Config, vec: Vec<Vec<i32>>) -> Result<Solver, SolverError> {
-        let cnf = CNFDescription::from(vec);
-        Solver::instantiate(&config, &cnf).inject_from_vec()
-    }
     /// # Examples
     ///
     /// ```
