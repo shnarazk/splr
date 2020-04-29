@@ -31,8 +31,9 @@ pub mod state;
 pub mod types;
 
 pub use {
-    config::Config,
+    config::{Config, VERSION},
     solver::{Certificate, SatSolverIF, Solver, ValidateIF},
+    types::SolverError,
 };
 
 #[macro_use]
