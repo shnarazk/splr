@@ -18,7 +18,6 @@ pub use self::{
 use {
     self::{build::SatSolverBuildIF, search::SatSolverSearchIF},
     crate::{assign::AssignStack, cdb::ClauseDB, processor::Eliminator, state::*, types::*},
-    std::convert::TryFrom,
 };
 
 /// API for SAT solver like `build`, `solve` and so on.
@@ -37,13 +36,6 @@ pub trait SatSolverIF: SatSolverBuildIF + SatSolverSearchIF {
     ///
     /// if solver becomes inconsistent by an internal error.
     fn solve(&mut self) -> SolverResult;
-}
-
-impl TryFrom<(Config, Vec<Vec<i32>>)> for Solver {
-    type Error = SolverError;
-    fn try_from((config, vec): (Config, Vec<Vec<i32>>)) -> Result<Self, Self::Error> {
-        <Solver as SatSolverBuildIF>::solver_from_vec(config, vec)
-    }
 }
 
 impl SatSolverIF for Solver {

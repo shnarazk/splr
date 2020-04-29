@@ -1,21 +1,18 @@
 /// main struct AssignStack
 use {
     super::{AssignIF, AssignStack, Var, VarIdHeap, VarManipulateIF, VarOrderIF},
-    crate::{cdb::ClauseDBIF, state::State, types::*},
+    crate::{state::State, types::*},
     std::{fmt, ops::Range, slice::Iter},
 };
 
 #[cfg(not(features = "no_IO"))]
-use std::{
-    fs::File,
-    io::{BufWriter, Write},
+use {
+    crate::cdb::ClauseDBIF,
+    std::{
+        fs::File,
+        io::{BufWriter, Write},
+    },
 };
-
-macro_rules! var_assign {
-    ($asg: expr, $var: expr) => {
-        unsafe { *$asg.assign.get_unchecked($var) }
-    };
-}
 
 /// API for var manipulation
 pub trait ClauseManipulateIF {
@@ -241,8 +238,8 @@ impl AssignStack {
     {
         for vi in 1..self.var.len() {
             if self.var(vi).is(Flag::ELIMINATED) {
-                if var_assign!(self, vi).is_some() {
-                    panic!("conflicting var {} {:?}", vi, var_assign!(self, vi));
+                if self.assign.get(vi).is_some() {
+                    panic!("conflicting var {} {:?}", vi, self.assign.get(vi));
                 } else {
                     println!("eliminate var {}", vi);
                 }
