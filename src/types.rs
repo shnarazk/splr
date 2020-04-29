@@ -479,7 +479,7 @@ pub enum CNFIndicator {
     /// from a file
     File(String),
     /// embedded directly
-    LitVec(Vec<Vec<i32>>),
+    LitVec(usize),
 }
 
 impl Default for CNFIndicator {
@@ -493,7 +493,7 @@ impl fmt::Display for CNFIndicator {
         match self {
             CNFIndicator::Void => write!(f, "No CNF specified)"),
             CNFIndicator::File(file) => write!(f, "CNF file({})", file),
-            CNFIndicator::LitVec(v) => write!(f, "A vec({} clauses)", v.len()),
+            CNFIndicator::LitVec(n) => write!(f, "A vec({} clauses)", n),
         }
     }
 }
@@ -537,18 +537,38 @@ impl fmt::Display for CNFDescription {
     }
 }
 
-impl From<Vec<Vec<i32>>> for CNFDescription {
-    fn from(vec: Vec<Vec<i32>>) -> Self {
+impl<V> From<&Vec<V>> for CNFDescription
+where
+    V: AsRef<[i32]>,
+{
+    fn from(vec: &Vec<V>) -> Self {
         let num_of_variables = vec
             .iter()
-            .map(|clause| clause.iter().map(|l| l.abs()).max().unwrap_or(0))
+            .map(|clause| clause.as_ref().iter().map(|l| l.abs()).max().unwrap_or(0))
             .max()
             .unwrap_or(0) as usize;
-        // .unwrap_or(0) as usize;
         CNFDescription {
             num_of_variables,
             num_of_clauses: vec.len(),
-            pathname: CNFIndicator::LitVec(vec),
+            pathname: CNFIndicator::LitVec(vec.len()),
+        }
+    }
+}
+
+impl<V> From<&[V]> for CNFDescription
+where
+    V: AsRef<[i32]>,
+{
+    fn from(vec: &[V]) -> Self {
+        let num_of_variables = vec
+            .iter()
+            .map(|clause| clause.as_ref().iter().map(|l| l.abs()).max().unwrap_or(0))
+            .max()
+            .unwrap_or(0) as usize;
+        CNFDescription {
+            num_of_variables,
+            num_of_clauses: vec.len(),
+            pathname: CNFIndicator::LitVec(vec.len()),
         }
     }
 }

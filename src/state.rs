@@ -575,7 +575,7 @@ impl fmt::Display for State {
         let mut fname = match &self.target.pathname {
             CNFIndicator::Void => "(no cnf)".to_string(),
             CNFIndicator::File(f) => f.to_string(),
-            CNFIndicator::LitVec(v) => format!("(embedded {} element vector)", v.len()),
+            CNFIndicator::LitVec(n) => format!("(embedded {} element vector)", n),
         };
         if width <= fname.len() {
             fname.truncate(58 - vclen);

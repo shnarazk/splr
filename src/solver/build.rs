@@ -62,11 +62,29 @@ impl Instantiate for Solver {
     }
 }
 
-impl TryFrom<(Config, Vec<Vec<i32>>)> for Solver {
+impl<V> TryFrom<(Config, Vec<V>)> for Solver
+where
+    V: AsRef<[i32]>,
+{
     type Error = SolverResult;
-    fn try_from((config, vec): (Config, Vec<Vec<i32>>)) -> Result<Self, Self::Error> {
+    fn try_from((config, vec): (Config, Vec<V>)) -> Result<Self, Self::Error> {
+        let cnf = CNFDescription::from(&vec);
+        match Solver::instantiate(&config, &cnf).inject_from_vec(&vec) {
+            Err(SolverError::Inconsistent) => Err(Ok(Certificate::UNSAT)),
+            Err(e) => Err(Err(e)),
+            Ok(s) => Ok(s),
+        }
+    }
+}
+
+impl<V> TryFrom<(Config, &[V])> for Solver
+where
+    V: AsRef<[i32]>,
+{
+    type Error = SolverResult;
+    fn try_from((config, vec): (Config, &[V])) -> Result<Self, Self::Error> {
         let cnf = CNFDescription::from(vec);
-        match Solver::instantiate(&config, &cnf).inject_from_vec() {
+        match Solver::instantiate(&config, &cnf).inject_from_vec(vec) {
             Err(SolverError::Inconsistent) => Err(Ok(Certificate::UNSAT)),
             Err(e) => Err(Err(e)),
             Ok(s) => Ok(s),
@@ -192,7 +210,10 @@ impl Solver {
         self.rst.adapt_to(&self.state, 0);
         Ok(self)
     }
-    fn inject_from_vec(mut self) -> Result<Solver, SolverError> {
+    fn inject_from_vec<V>(mut self, v: &[V]) -> Result<Solver, SolverError>
+    where
+        V: AsRef<[i32]>,
+    {
         self.state.progress_header();
         self.state.progress(
             &self.asg,
@@ -202,15 +223,14 @@ impl Solver {
             Some("initialization phase"),
         );
         self.state.flush("injecting...");
-        if let CNFIndicator::LitVec(ref v) = self.state.target.pathname {
-            let clauses = v
+        for ints in v {
+            let mut lits = ints
+                .as_ref()
                 .iter()
-                .map(|c| c.iter().map(|i| Lit::from(*i)).collect::<Vec<Lit>>())
-                .collect::<Vec<_>>();
-            for mut c in clauses {
-                if self.add_unchecked_clause(&mut c).is_none() {
-                    return Err(SolverError::Inconsistent);
-                }
+                .map(|i| Lit::from(*i))
+                .collect::<Vec<Lit>>();
+            if self.add_unchecked_clause(&mut lits).is_none() {
+                return Err(SolverError::Inconsistent);
             }
         }
         debug_assert_eq!(self.asg.num_vars, self.state.target.num_of_variables);
