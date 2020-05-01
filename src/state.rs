@@ -65,12 +65,12 @@ impl fmt::Display for PhaseMode {
             formatter,
             "{}",
             match self {
-                PhaseMode::Best => "best assign saved",
-                PhaseMode::BestRnd => "best and random",
-                PhaseMode::Invert => "inverted last",
-                PhaseMode::Latest => "latest saved",
-                PhaseMode::Random => "random assign",
-                PhaseMode::Target => "target assign",
+                PhaseMode::Best => "ps_Best",
+                PhaseMode::BestRnd => "ps_BestRnd",
+                PhaseMode::Invert => "ps_Invert",
+                PhaseMode::Latest => "ps_Lastest",
+                PhaseMode::Random => "ps_Random",
+                PhaseMode::Target => "ps_Target",
             }
         )
     }
@@ -531,7 +531,7 @@ impl StateIF for State {
             im!("{:>9}", self, LogUsizeId::Reduction, cdb_num_reduction),
             im!("{:>9}", self, LogUsizeId::Simplify, elim_num_full),
             fm!(
-                "{:>9.2}",
+                "{:>9.0}",
                 self,
                 LogF64Id::SimpToGo,
                 self.config.elim_trigger as f64 - elim_to_simplify
@@ -541,10 +541,7 @@ impl StateIF for State {
         if let Some(m) = mes {
             println!("\x1B[2K    Strategy|mode: {}", m);
         } else {
-            println!(
-                "\x1B[2K    Strategy|mode: {:#}, {}",
-                self.strategy.0, self.phase_select
-            );
+            println!("\x1B[2K    Strategy|mode: {:#}", self.strategy.0);
         }
         self.flush("\x1B[2K");
     }
