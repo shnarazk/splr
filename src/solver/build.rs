@@ -1,4 +1,4 @@
-/// Solver Builder
+//! Solver Builder
 use {
     super::{restart::Restarter, Certificate, SatSolverIF, Solver, SolverResult, State, StateIF},
     crate::{

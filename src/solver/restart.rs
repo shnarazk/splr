@@ -1,4 +1,4 @@
-/// Crate `restart` provides restart heuristics.
+//! Crate `restart` provides restart heuristics.
 use {
     crate::{
         solver::{SearchStrategy, State},

@@ -1,4 +1,4 @@
-/// Conflict-Driven Clause Learning Search engine
+//! Conflict-Driven Clause Learning Search engine
 use {
     super::{
         conflict::handle_conflict,

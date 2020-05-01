@@ -1,4 +1,4 @@
-/// Conflict Analysis
+//! Conflict Analysis
 use {
     super::{
         restart::{RestartIF, Restarter, RestarterModule},
