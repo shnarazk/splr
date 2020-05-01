@@ -572,7 +572,11 @@ impl fmt::Display for State {
         );
         let vclen = vc.len();
         let width = 59;
-        let mut fname = self.target.pathname.to_string();
+        let mut fname = match &self.target.pathname {
+            CNFIndicator::Void => "(no cnf)".to_string(),
+            CNFIndicator::File(f) => f.to_string(),
+            CNFIndicator::LitVec(n) => format!("(embedded {} element vector)", n),
+        };
         if width <= fname.len() {
             fname.truncate(58 - vclen);
         }
@@ -619,83 +623,6 @@ impl IndexMut<LogF64Id> for State {
     #[inline]
     fn index_mut(&mut self, i: LogF64Id) -> &mut Self::Output {
         &mut self.record[i]
-    }
-}
-
-/// Index for `Usize` data, used in `ProgressRecord`.
-pub enum LogUsizeId {
-    Propagate = 0, //  0: propagate: usize,
-    Decision,      //  1: decision: usize,
-    Conflict,      //  2: conflict: usize,
-    Remain,        //  3: remain: usize,
-    Fixed,         //  4: fixed: usize,
-    Eliminated,    //  5: elim: usize,
-    Removable,     //  6: removable: usize,
-    LBD2,          //  7: lbd2: usize,
-    Binclause,     //  8: binclause: usize,
-    Permanent,     //  9: permanent: usize,
-    RestartBlock,  // 10: restart_block: usize,
-    Restart,       // 11: restart_count: usize,
-    Reduction,     // 12: reduction: usize,
-    Simplify,      // 13: full-featured elimination: usize,
-    End,
-}
-
-/// Index for `f64` data, used in `ProgressRecord`.
-pub enum LogF64Id {
-    Progress = 0, //  0: progress: f64,
-    EmaAsg,       //  1: ema_asg: f64,
-    EmaLBD,       //  2: ema_lbd: f64,
-    AveLBD,       //  3: ave_lbd: f64,
-    BLevel,       //  4: backjump_level: f64,
-    CLevel,       //  5: conflict_level: f64,
-    SimpToGo,     //  6: asg.core_size.get: f64,
-    End,
-}
-
-/// Record of old stats.
-#[derive(Debug)]
-pub struct ProgressRecord {
-    pub vali: [usize; LogUsizeId::End as usize],
-    pub valf: [f64; LogF64Id::End as usize],
-}
-
-impl Default for ProgressRecord {
-    fn default() -> ProgressRecord {
-        ProgressRecord {
-            vali: [0; LogUsizeId::End as usize],
-            valf: [0.0; LogF64Id::End as usize],
-        }
-    }
-}
-
-impl Index<LogUsizeId> for ProgressRecord {
-    type Output = usize;
-    #[inline]
-    fn index(&self, i: LogUsizeId) -> &usize {
-        &self.vali[i as usize]
-    }
-}
-
-impl IndexMut<LogUsizeId> for ProgressRecord {
-    #[inline]
-    fn index_mut(&mut self, i: LogUsizeId) -> &mut usize {
-        &mut self.vali[i as usize]
-    }
-}
-
-impl Index<LogF64Id> for ProgressRecord {
-    type Output = f64;
-    #[inline]
-    fn index(&self, i: LogF64Id) -> &f64 {
-        &self.valf[i as usize]
-    }
-}
-
-impl IndexMut<LogF64Id> for ProgressRecord {
-    #[inline]
-    fn index_mut(&mut self, i: LogF64Id) -> &mut f64 {
-        &mut self.valf[i as usize]
     }
 }
 
@@ -803,5 +730,82 @@ impl State {
             0, // elim.clause_queue_len(),
             0, // elim.var_queue_len(),
         );
+    }
+}
+
+/// Index for `Usize` data, used in `ProgressRecord`.
+pub enum LogUsizeId {
+    Propagate = 0, //  0: propagate: usize,
+    Decision,      //  1: decision: usize,
+    Conflict,      //  2: conflict: usize,
+    Remain,        //  3: remain: usize,
+    Fixed,         //  4: fixed: usize,
+    Eliminated,    //  5: elim: usize,
+    Removable,     //  6: removable: usize,
+    LBD2,          //  7: lbd2: usize,
+    Binclause,     //  8: binclause: usize,
+    Permanent,     //  9: permanent: usize,
+    RestartBlock,  // 10: restart_block: usize,
+    Restart,       // 11: restart_count: usize,
+    Reduction,     // 12: reduction: usize,
+    Simplify,      // 13: full-featured elimination: usize,
+    End,
+}
+
+/// Index for `f64` data, used in `ProgressRecord`.
+pub enum LogF64Id {
+    Progress = 0, //  0: progress: f64,
+    EmaAsg,       //  1: ema_asg: f64,
+    EmaLBD,       //  2: ema_lbd: f64,
+    AveLBD,       //  3: ave_lbd: f64,
+    BLevel,       //  4: backjump_level: f64,
+    CLevel,       //  5: conflict_level: f64,
+    SimpToGo,     //  6: asg.core_size.get: f64,
+    End,
+}
+
+/// Record of old stats.
+#[derive(Debug)]
+pub struct ProgressRecord {
+    pub vali: [usize; LogUsizeId::End as usize],
+    pub valf: [f64; LogF64Id::End as usize],
+}
+
+impl Default for ProgressRecord {
+    fn default() -> ProgressRecord {
+        ProgressRecord {
+            vali: [0; LogUsizeId::End as usize],
+            valf: [0.0; LogF64Id::End as usize],
+        }
+    }
+}
+
+impl Index<LogUsizeId> for ProgressRecord {
+    type Output = usize;
+    #[inline]
+    fn index(&self, i: LogUsizeId) -> &usize {
+        &self.vali[i as usize]
+    }
+}
+
+impl IndexMut<LogUsizeId> for ProgressRecord {
+    #[inline]
+    fn index_mut(&mut self, i: LogUsizeId) -> &mut usize {
+        &mut self.vali[i as usize]
+    }
+}
+
+impl Index<LogF64Id> for ProgressRecord {
+    type Output = f64;
+    #[inline]
+    fn index(&self, i: LogF64Id) -> &f64 {
+        &self.valf[i as usize]
+    }
+}
+
+impl IndexMut<LogF64Id> for ProgressRecord {
+    #[inline]
+    fn index_mut(&mut self, i: LogF64Id) -> &mut f64 {
+        &mut self.valf[i as usize]
     }
 }

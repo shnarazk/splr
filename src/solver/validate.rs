@@ -1,4 +1,4 @@
-/// Crate `validator` implements a model checker.
+//! Crate `validator` implements a model checker.
 use crate::{
     assign::PropagateIF,
     cdb::ClauseDBIF,

@@ -19,9 +19,10 @@ structopt = "0.3"
 
 [features]
 default = []
+boundary_check = []
 EVSIDS = []
 ema_calibration = []
-boundary_check = []
+no_IO = []
 trace_analysis = []
 trace_elimination = []
 

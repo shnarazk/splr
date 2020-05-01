@@ -1,17 +1,19 @@
-/// Solver Builder
+//! Solver Builder
 use {
-    super::{restart::Restarter, SatSolverIF, Solver, State, StateIF},
+    super::{restart::Restarter, Certificate, SatSolverIF, Solver, SolverResult, State, StateIF},
     crate::{
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
         cdb::{ClauseDB, ClauseDBIF},
         processor::{EliminateIF, Eliminator},
         types::*,
     },
-    std::{
-        convert::TryFrom,
-        fs::File,
-        io::{BufRead, BufReader},
-    },
+    std::convert::TryFrom,
+};
+
+#[cfg(not(feature = "no_IO"))]
+use std::{
+    fs::File,
+    io::{BufRead, BufReader},
 };
 
 /// API for SAT solver like `build`, `solve` and so on.
@@ -21,6 +23,7 @@ pub trait SatSolverBuildIF {
     /// # Errors
     ///
     /// IO error by failing to load a CNF file.
+    #[cfg(not(feature = "no_IO"))]
     fn solver_build(config: &Config) -> Result<Solver, SolverError>;
     /// search an assignment.
     ///
@@ -59,6 +62,22 @@ impl Instantiate for Solver {
     }
 }
 
+impl<V> TryFrom<(Config, &[V])> for Solver
+where
+    V: AsRef<[i32]>,
+{
+    type Error = SolverResult;
+    fn try_from((config, vec): (Config, &[V])) -> Result<Self, Self::Error> {
+        let cnf = CNFDescription::from(vec);
+        match Solver::instantiate(&config, &cnf).inject_from_vec(vec) {
+            Err(SolverError::Inconsistent) => Err(Ok(Certificate::UNSAT)),
+            Err(e) => Err(Err(e)),
+            Ok(s) => Ok(s),
+        }
+    }
+}
+
+#[cfg(not(feature = "no_IO"))]
 impl TryFrom<&str> for Solver {
     type Error = SolverError;
     /// return a new solver build for a CNF file.
@@ -86,6 +105,7 @@ impl SatSolverBuildIF for Solver {
     /// let config = Config::from("tests/sample.cnf");
     /// assert!(Solver::build(&config).is_ok());
     ///```
+    #[cfg(not(feature = "no_IO"))]
     fn solver_build(config: &Config) -> Result<Solver, SolverError> {
         let CNFReader { cnf, reader } = CNFReader::try_from(&config.cnf_file)?;
         Solver::instantiate(config, &cnf).inject(reader)
@@ -135,6 +155,7 @@ impl SatSolverBuildIF for Solver {
 }
 
 impl Solver {
+    #[cfg(not(feature = "no_IO"))]
     fn inject(mut self, mut reader: BufReader<File>) -> Result<Solver, SolverError> {
         self.state.progress_header();
         self.state.progress(
@@ -166,6 +187,35 @@ impl Solver {
                     }
                 }
                 Err(e) => panic!("{}", e),
+            }
+        }
+        debug_assert_eq!(self.asg.num_vars, self.state.target.num_of_variables);
+        // s.state[Stat::NumBin] = s.cdb.iter().skip(1).filter(|c| c.len() == 2).count();
+        self.asg.adapt_to(&self.state, 0);
+        self.rst.adapt_to(&self.state, 0);
+        Ok(self)
+    }
+    fn inject_from_vec<V>(mut self, v: &[V]) -> Result<Solver, SolverError>
+    where
+        V: AsRef<[i32]>,
+    {
+        self.state.progress_header();
+        self.state.progress(
+            &self.asg,
+            &self.cdb,
+            &self.elim,
+            &self.rst,
+            Some("initialization phase"),
+        );
+        self.state.flush("injecting...");
+        for ints in v.iter() {
+            let mut lits = ints
+                .as_ref()
+                .iter()
+                .map(|i| Lit::from(*i))
+                .collect::<Vec<Lit>>();
+            if self.add_unchecked_clause(&mut lits).is_none() {
+                return Err(SolverError::Inconsistent);
             }
         }
         debug_assert_eq!(self.asg.num_vars, self.state.target.num_of_variables);

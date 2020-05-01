@@ -1,10 +1,7 @@
 // DIMACS Model Checker in Rust
 #![allow(unused_imports)]
 use {
-    splr::{
-        config::Config,
-        solver::{SatSolverIF, Solver, ValidateIF},
-    },
+    splr::{Config, SatSolverIF, Solver, ValidateIF},
     std::{
         env,
         fs::File,

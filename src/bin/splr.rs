@@ -3,10 +3,10 @@ use {
     libc::{clock_gettime, timespec, CLOCK_PROCESS_CPUTIME_ID},
     splr::{
         cdb::CertifiedRecord,
-        config::{Config, VERSION},
         solver::*,
         state::{LogF64Id, LogUsizeId},
-        types::{Export, SolverError},
+        types::Export,
+        Config, SolverError, VERSION,
     },
     std::{
         borrow::Cow,

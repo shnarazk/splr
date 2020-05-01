@@ -18,6 +18,8 @@ pub mod assign;
 /// Crate `cdb` provides `clause` object and its manager `ClauseDB`
 pub mod cdb;
 /// Crate `config` provides solver's configuration and CLI.
+#[cfg_attr(not(feature = "no_IO"), path = "config.rs")]
+#[cfg_attr(feature = "no_IO", path = "config_no_io.rs")]
 pub mod config;
 /// Crate `processor` implements a simplifier: clause subsumption and var elimination.
 pub mod processor;
@@ -27,6 +29,15 @@ pub mod solver;
 pub mod state;
 /// Crate `types` provides various building blocks, including some common traits.
 pub mod types;
+
+pub use {
+    config::Config,
+    solver::{Certificate, SatSolverIF, Solver, ValidateIF},
+    types::SolverError,
+};
+
+/// Splr version number.
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[macro_use]
 extern crate bitflags;

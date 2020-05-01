@@ -1,21 +1,18 @@
 /// main struct AssignStack
 use {
     super::{AssignIF, AssignStack, Var, VarIdHeap, VarManipulateIF, VarOrderIF},
-    crate::{cdb::ClauseDBIF, state::State, types::*},
-    std::{
-        fmt,
-        fs::File,
-        io::{BufWriter, Write},
-        ops::Range,
-        slice::Iter,
-    },
+    crate::{state::State, types::*},
+    std::{fmt, ops::Range, slice::Iter},
 };
 
-macro_rules! var_assign {
-    ($asg: expr, $var: expr) => {
-        unsafe { *$asg.assign.get_unchecked($var) }
-    };
-}
+#[cfg(not(feature = "no_IO"))]
+use {
+    crate::cdb::ClauseDBIF,
+    std::{
+        fs::File,
+        io::{BufWriter, Write},
+    },
+};
 
 /// API for var manipulation
 pub trait ClauseManipulateIF {
@@ -99,7 +96,7 @@ impl Instantiate for AssignStack {
         AssignStack {
             assign: vec![None; 1 + nv],
             level: vec![DecisionLevel::default(); nv + 1],
-            reason: vec![AssignReason::default(); 1 + nv],
+            reason: vec![AssignReason::default(); nv + 1],
             trail: Vec::with_capacity(nv),
             var_order: VarIdHeap::new(nv, nv),
             num_vars: cnf.num_of_variables,
@@ -186,7 +183,7 @@ impl AssignIF for AssignStack {
             //     }
             // }
             _ => {
-                #[cfg(features = "boundary_check")]
+                #[cfg(feature = "boundary_check")]
                 panic!("invalid flag for reset_assign_record");
             }
         }
@@ -233,6 +230,7 @@ impl AssignIF for AssignStack {
 
 impl AssignStack {
     /// dump all active clauses and fixed assignments as a CNF file.
+    #[cfg(not(feature = "no_IO"))]
     #[allow(dead_code)]
     fn dump_cnf<C, V>(&mut self, cdb: &C, fname: &str)
     where
@@ -240,8 +238,8 @@ impl AssignStack {
     {
         for vi in 1..self.var.len() {
             if self.var(vi).is(Flag::ELIMINATED) {
-                if var_assign!(self, vi).is_some() {
-                    panic!("conflicting var {} {:?}", vi, var_assign!(self, vi));
+                if self.assign.get(vi).is_some() {
+                    panic!("conflicting var {} {:?}", vi, self.assign.get(vi));
                 } else {
                     println!("eliminate var {}", vi);
                 }

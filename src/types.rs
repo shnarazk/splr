@@ -471,12 +471,49 @@ impl fmt::Display for SolverError {
 /// A Return type used by solver functions.
 pub type MaybeInconsistent = Result<(), SolverError>;
 
+/// CNF locator
+#[derive(Clone, Debug)]
+pub enum CNFIndicator {
+    /// not specified
+    Void,
+    /// from a file
+    File(String),
+    /// embedded directly
+    LitVec(usize),
+}
+
+impl Default for CNFIndicator {
+    fn default() -> Self {
+        CNFIndicator::Void
+    }
+}
+
+impl fmt::Display for CNFIndicator {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            CNFIndicator::Void => write!(f, "No CNF specified)"),
+            CNFIndicator::File(file) => write!(f, "CNF file({})", file),
+            CNFIndicator::LitVec(n) => write!(f, "A vec({} clauses)", n),
+        }
+    }
+}
+
+// impl CNFIndicator {
+//     pub fn to_string(&self) -> String {
+//         match self {
+//             CNFIndicator::Void => "(no cnf)".to_string(),
+//             CNFIndicator::File(f) => f.to_string(),
+//             CNFIndicator::LitVec(v) => format!("(embedded {} element vector)", v.len()).to_string(),
+//         }
+//     }
+// }
+
 /// Data storage about a problem.
 #[derive(Clone, Debug)]
 pub struct CNFDescription {
     pub num_of_variables: usize,
     pub num_of_clauses: usize,
-    pub pathname: String,
+    pub pathname: CNFIndicator,
 }
 
 impl Default for CNFDescription {
@@ -484,7 +521,7 @@ impl Default for CNFDescription {
         CNFDescription {
             num_of_variables: 0,
             num_of_clauses: 0,
-            pathname: "".to_string(),
+            pathname: CNFIndicator::Void,
         }
     }
 }
@@ -497,6 +534,24 @@ impl fmt::Display for CNFDescription {
             pathname: path,
         } = &self;
         write!(f, "CNF({}, {}, {})", nv, nc, path)
+    }
+}
+
+impl<V> From<&[V]> for CNFDescription
+where
+    V: AsRef<[i32]>,
+{
+    fn from(vec: &[V]) -> Self {
+        let num_of_variables = vec
+            .iter()
+            .map(|clause| clause.as_ref().iter().map(|l| l.abs()).max().unwrap_or(0))
+            .max()
+            .unwrap_or(0) as usize;
+        CNFDescription {
+            num_of_variables,
+            num_of_clauses: vec.len(),
+            pathname: CNFIndicator::LitVec(vec.len()),
+        }
     }
 }
 
@@ -560,7 +615,7 @@ impl TryFrom<&PathBuf> for CNFReader {
         let cnf = CNFDescription {
             num_of_variables: nv,
             num_of_clauses: nc,
-            pathname,
+            pathname: CNFIndicator::File(pathname),
         };
         Ok(CNFReader { cnf, reader })
     }

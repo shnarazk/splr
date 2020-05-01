@@ -1,4 +1,4 @@
-/// Conflict-Driven Clause Learning Search engine
+//! Conflict-Driven Clause Learning Search engine
 use {
     super::{
         conflict::handle_conflict,
@@ -27,16 +27,19 @@ pub trait SatSolverSearchIF {
 
 macro_rules! final_report {
     ($asg: expr, $cdb: expr, $elim: expr, $rst: expr, $state: expr) => {
-        let c = $state.config.no_color;
-        let q = $state.config.quiet_mode;
-        $state.config.no_color = true;
-        $state.config.quiet_mode = false;
-        if q {
-            $state.progress_header();
+        #[cfg(not(feature = "no_IO"))]
+        {
+            let c = $state.config.no_color;
+            let q = $state.config.quiet_mode;
+            $state.config.no_color = true;
+            $state.config.quiet_mode = false;
+            if q {
+                $state.progress_header();
+            }
+            $state.progress($asg, $cdb, $elim, $rst, None);
+            $state.config.no_color = c;
+            $state.config.quiet_mode = q;
         }
-        $state.progress($asg, $cdb, $elim, $rst, None);
-        $state.config.no_color = c;
-        $state.config.quiet_mode = q;
     };
 }
 
