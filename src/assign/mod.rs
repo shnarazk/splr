@@ -20,7 +20,7 @@ pub use self::{
 
 use {
     self::heap::{VarHeapIF, VarOrderIF},
-    super::types::*,
+    super::{state::State, types::*},
     std::{ops::Range, slice::Iter},
 };
 
@@ -37,9 +37,11 @@ pub trait VarRewardIF {
     /// modify var's activity at value assignment in `uncheck_{assume, enqueue, fix}`.
     fn reward_at_assign(&mut self, vi: VarId);
     /// modify var's activity at value unassigment in `cancel_until`.
-    fn reward_at_unassign(&mut self, vi: VarId);
+    fn reward_at_unassign(&mut self, vi: VarId, l: DecisionLevel);
     /// update internal counter.
     fn reward_update(&mut self);
+    /// update reward setting as a part of module adoptation.
+    fn adjust_reward(&mut self, state: &State);
 }
 
 /// API for assignment like `propagate`, `enqueue`, `cancel_until`, and so on.
@@ -120,17 +122,22 @@ pub struct AssignStack {
     pub root_level: DecisionLevel,
     conflicts: (VarId, VarId),
     var_order: VarIdHeap, // Variable Order
+    temp_order: Vec<VarId>,
 
     //
     //## Phase handling
     //
-    best_assign: bool,
+    best_assign: Vec<Lit>,
     build_best_at: usize,
     num_best_assign: usize,
 
     target_assign: bool,
     build_target_at: usize,
     num_target_assign: usize,
+
+    unsat_assign: Vec<Lit>,
+    build_unsat_at: usize,
+    pub lowest_unsat: DecisionLevel,
 
     //
     //## Statistics

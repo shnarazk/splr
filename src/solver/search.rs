@@ -109,6 +109,7 @@ impl SatSolverSearchIF for Solver {
                 None => (),
             }
         }
+        asg.force_select(Some(elim.sorted_iterator()));
         //
         //## Run eliminator
         //
@@ -202,6 +203,7 @@ fn search(
     let mut replay_best = false;
     let mut a_decision_was_made = false;
     let mut num_assigned = asg.num_solved_vars;
+    let mut num_stabilization = 0;
     rst.update(RestarterModule::Luby, 0);
     loop {
         asg.reward_update();
@@ -261,27 +263,32 @@ fn search(
                 asg.num_solved_vars = asg.stack_len();
             }
         }
+        let na = asg.best_assigned(Flag::BEST_PHASE);
+        if num_assigned < na {
+            num_assigned = na;
+            state.flush("");
+            state.flush(format!("unreachable: {}", asg.num_vars - num_assigned));
+        }
         if !asg.remains() {
             //
             //## set phase mode
             //
-            state.stabilize = state.config.stabilize && rst.stabilizing();
-            let na = asg.best_assigned(Flag::BEST_PHASE);
-            if num_assigned < na {
-                num_assigned = na;
-                // back_to_zero = false;
-                state.flush("");
-                state.flush(format!("unreachable: {}", asg.num_vars - num_assigned));
+            let stabilizing = state.config.stabilize && rst.stabilizing();
+            if state.stabilize != stabilizing {
+                if stabilizing {
+                    num_stabilization += 1;
+                }
+                state.stabilize = stabilizing;
             }
-            state.phase_select = if replay_best && state.stabilize {
+            state.phase_select = if replay_best && stabilizing {
                 PhaseMode::Best
             } else {
-                PhaseMode::Latest
+                PhaseMode::Worst // PhaseMode::Latest
             };
             let vi = asg.select_var();
             let p = match state.phase_select {
                 PhaseMode::Best => asg.var(vi).is(Flag::BEST_PHASE),
-                PhaseMode::BestRnd => match ((asg.activity(vi) * 10000.0) as usize) % 4 {
+                PhaseMode::BestRnd => match ((asg.activity(vi) * 10000.0) as usize) % 8 {
                     0 => asg.var(vi).is(Flag::BEST_PHASE),
                     _ => asg.var(vi).is(Flag::PHASE),
                 },

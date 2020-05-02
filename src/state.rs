@@ -57,6 +57,8 @@ pub enum PhaseMode {
     Random,
     /// use the best phases in the current segment.
     Target,
+    ///
+    Worst,
 }
 
 impl fmt::Display for PhaseMode {
@@ -71,6 +73,7 @@ impl fmt::Display for PhaseMode {
                 PhaseMode::Latest => "ps_Lastest",
                 PhaseMode::Random => "ps_Random",
                 PhaseMode::Target => "ps_Target",
+                PhaseMode::Target => "ps_Worst",
             }
         )
     }

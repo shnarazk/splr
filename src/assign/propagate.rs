@@ -210,6 +210,17 @@ impl PropagateIF for AssignStack {
                             self.conflicts.1 = self.conflicts.0;
                             self.conflicts.0 = false_lit.vi();
                             self.num_conflict += 1;
+
+                            {
+                                let dl = self.decision_level();
+                                if dl < self.lowest_unsat {
+                                    self.unsat_assign = true;
+                                    self.lowest_unsat = dl;
+                                    self.save_phase(Flag::UNSAT_PHASE, false);
+                                    self.build_unsat_at = self.num_propagation;
+                                }
+                            }
+
                             return w.c;
                         }
                         self.assign_by_implication(

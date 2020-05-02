@@ -2,6 +2,7 @@
 use {
     super::{AssignStack, VarHeapIF, VarOrderIF},
     crate::types::*,
+    std::slice::Iter,
 };
 
 /// ```
@@ -15,6 +16,8 @@ macro_rules! var_assign {
 
 /// API for var selection, depending on an internal heap.
 pub trait VarSelectIF {
+    /// force assignments
+    fn force_select(&mut self, iterator: Iter<'_, usize>);
     /// select a new decision variable.
     fn select_var(&mut self) -> VarId;
     /// update the internal heap on var order.
@@ -24,7 +27,17 @@ pub trait VarSelectIF {
 }
 
 impl VarSelectIF for AssignStack {
+    fn force_select(&mut self, iterator: Iter<'_, usize>) {
+        for vi in iterator.rev() {
+            self.temp_order.push(*vi);
+        }
+    }
     fn select_var(&mut self) -> VarId {
+        while let Some(vi) = self.temp_order.pop() {
+            if self.assign[vi].is_none() && !self.var[vi].is(Flag::ELIMINATED) {
+                return vi;
+            }
+        }
         loop {
             let vi = self.get_heap_root();
             if var_assign!(self, vi).is_none() && !self.var[vi].is(Flag::ELIMINATED) {
