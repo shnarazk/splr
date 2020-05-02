@@ -37,7 +37,7 @@ pub trait PropagateIF {
     where
         C: ClauseDBIF;
     /// reset or copy phase data.
-    fn reset_assign_record(&mut self, flag: Flag, from: Option<Flag>);
+    fn rebuild_unsat_core(&mut self);
 }
 
 macro_rules! var_assign {
@@ -210,17 +210,6 @@ impl PropagateIF for AssignStack {
                             self.conflicts.1 = self.conflicts.0;
                             self.conflicts.0 = false_lit.vi();
                             self.num_conflict += 1;
-
-                            {
-                                let dl = self.decision_level();
-                                if dl < self.lowest_unsat {
-                                    self.unsat_assign = true;
-                                    self.lowest_unsat = dl;
-                                    self.save_phase(Flag::UNSAT_PHASE, false);
-                                    self.build_unsat_at = self.num_propagation;
-                                }
-                            }
-
                             return w.c;
                         }
                         self.assign_by_implication(
@@ -285,70 +274,40 @@ impl PropagateIF for AssignStack {
             }
         }
         let na = self.trail.len() + self.num_eliminated_vars;
-        // if self.num_target_assign < na {
-        //     self.target_assign = true;
-        //     self.num_target_assign = na;
-        //     self.save_phase(Flag::TARGET_PHASE, self.build_target_at + 1 == self.num_propagation);
-        //     self.build_target_at = self.num_propagation;
-        // }
-        if self.num_best_assign < na {
+        if 0 < self.decision_level() && self.num_best_assign < na {
             self.best_assign = true;
+            self.best_trail.clear();
+            for l in &self.trail[self.len_upto(0)..] {
+                self.best_trail.push(*l);
+            }
             self.num_best_assign = na;
-            self.save_phase(
-                Flag::BEST_PHASE,
-                self.build_best_at + 1 == self.num_propagation,
-            );
             self.build_best_at = self.num_propagation;
         }
         ClauseId::default()
     }
-    fn reset_assign_record(&mut self, flag: Flag, from: Option<Flag>) {
-        match flag {
-            Flag::PHASE => {
-                if let Some(source) = from {
-                    for v in self.var.iter_mut().skip(1) {
-                        v.set(flag, v.is(source));
-                    }
+    fn rebuild_unsat_core(&mut self) {
+        /*
+        if self.build_unsat_at < self.build_best_at {
+            for l in &self.best_trail {
+                self.var[l.vi()].turn_on(Flag::BEST_ASSIGNED);
+            }
+            for i in 1..=self.var_order.idxs[0] {
+                let vi = self.var_order.heap[i];
+                if !self.var[vi].is(Flag::BEST_ASSIGNED) {
+                    self.unsat_trail.push(Lit::from_assign(vi, self.var[vi].is(Flag::PHASE)));
                 }
             }
-            Flag::BEST_PHASE => {
-                if let Some(source) = from {
-                    for v in self.var.iter_mut().skip(1) {
-                        v.set(flag, v.is(source));
-                    }
-                    self.build_best_at = self.num_propagation;
-                } else {
-                    self.num_best_assign = 0;
-                }
+            for v in self.var.iter_mut().skip(1) {
+                v.turn_off(Flag::BEST_ASSIGNED);
             }
-            Flag::TARGET_PHASE => {
-                self.num_target_assign = self.num_eliminated_vars;
-                if let Some(source) = from {
-                    for v in self.var.iter_mut().skip(1) {
-                        v.set(flag, v.is(source));
-                    }
-                }
-            }
-            _ => {
-                #[cfg(feature = "boundary_check")]
-                panic!("invalid flag for reset_assign_record");
-            }
+            self.build_unsat_at = self.build_best_at;
         }
+        */
     }
 }
 
 impl AssignStack {
     fn level_up(&mut self) {
         self.trail_lim.push(self.trail.len());
-    }
-    fn save_phase(&mut self, flag: Flag, incremental: bool) {
-        let to = if incremental && 0 < self.decision_level() {
-            self.len_upto(self.decision_level() - 1)
-        } else {
-            0
-        };
-        for l in self.trail.iter().skip(to) {
-            self.var[l.vi()].set(flag, bool::from(*l));
-        }
     }
 }

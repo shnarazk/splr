@@ -37,7 +37,7 @@ pub trait VarRewardIF {
     /// modify var's activity at value assignment in `uncheck_{assume, enqueue, fix}`.
     fn reward_at_assign(&mut self, vi: VarId);
     /// modify var's activity at value unassigment in `cancel_until`.
-    fn reward_at_unassign(&mut self, vi: VarId, l: DecisionLevel);
+    fn reward_at_unassign(&mut self, vi: VarId);
     /// update internal counter.
     fn reward_update(&mut self);
     /// update reward setting as a part of module adoptation.
@@ -122,22 +122,15 @@ pub struct AssignStack {
     pub root_level: DecisionLevel,
     conflicts: (VarId, VarId),
     var_order: VarIdHeap, // Variable Order
-    temp_order: Vec<VarId>,
+    temp_order: Vec<Lit>,
 
     //
     //## Phase handling
     //
-    best_assign: Vec<Lit>,
+    best_assign: bool,
+    best_trail: Vec<Lit>,
     build_best_at: usize,
     num_best_assign: usize,
-
-    target_assign: bool,
-    build_target_at: usize,
-    num_target_assign: usize,
-
-    unsat_assign: Vec<Lit>,
-    build_unsat_at: usize,
-    pub lowest_unsat: DecisionLevel,
 
     //
     //## Statistics
@@ -181,5 +174,6 @@ pub struct VarIdHeap {
     /// order : usize -> VarId, -- Which var is the n-th best?
     heap: Vec<VarId>,
     /// VarId : -> order : usize -- How good is the var?
+    /// idxs[0] contais the number of alive elements
     idxs: Vec<usize>,
 }

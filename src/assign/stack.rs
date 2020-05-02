@@ -60,14 +60,9 @@ impl Default for AssignStack {
             num_solved_vars: 0,
             num_eliminated_vars: 0,
             best_assign: false,
+            best_trail: Vec::new(),
             build_best_at: 0,
             num_best_assign: 0,
-            target_assign: false,
-            build_target_at: 0,
-            num_target_assign: 0,
-            unsat_assign: false,
-            build_unsat_at: 0,
-            lowest_unsat: 0,
             num_conflict: 0,
             num_propagation: 0,
             num_restart: 0,
@@ -174,12 +169,18 @@ impl AssignIF for AssignStack {
     #[allow(clippy::single_match)]
     fn best_assigned(&mut self, flag: Flag) -> usize {
         match flag {
-            Flag::BEST_PHASE => {
+            Flag::PHASE => {
                 if self.best_assign {
                     self.best_assign = false;
                     return self.num_best_assign;
                 }
             }
+            // Flag::BEST_PHASE => {
+            //     if self.best_assign {
+            //         self.best_assign = false;
+            //         return self.num_best_assign;
+            //     }
+            // }
             // Flag::TARGET_PHASE => {
             //     if self.target_assign {
             //         self.target_assign = false;

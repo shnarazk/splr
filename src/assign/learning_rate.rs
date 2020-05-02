@@ -39,7 +39,7 @@ impl VarRewardIF for AssignStack {
         let v = &mut self.var[vi];
         v.timestamp = t;
     }
-    fn reward_at_unassign(&mut self, vi: VarId, _d: DecisionLevel) {
+    fn reward_at_unassign(&mut self, vi: VarId) {
         let v = &mut self.var[vi];
         let duration = (self.ordinal + 1 - v.timestamp) as f64;
         let decay = self.activity_decay;

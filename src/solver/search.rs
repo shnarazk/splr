@@ -109,7 +109,7 @@ impl SatSolverSearchIF for Solver {
                 None => (),
             }
         }
-        asg.force_select(Some(elim.sorted_iterator()));
+        asg.force_select_iter(elim.sorted_iterator());
         //
         //## Run eliminator
         //
@@ -203,7 +203,6 @@ fn search(
     let mut replay_best = false;
     let mut a_decision_was_made = false;
     let mut num_assigned = asg.num_solved_vars;
-    let mut num_stabilization = 0;
     rst.update(RestarterModule::Luby, 0);
     loop {
         asg.reward_update();
@@ -244,9 +243,15 @@ fn search(
                     return Err(SolverError::UndescribedError);
                 }
             }
+            if !state.stabilize {
+                asg.rebuild_unsat_core();
+            }
         }
         // Simplification has been postponed because chronoBT was used.
         if asg.decision_level() == asg.root_level {
+            if state.stabilize {
+                asg.force_select_from_phase(&state.phase_select);
+            }
             replay_best = true;
             // `elim.to_simplify` is increased much in particular when vars are solved or
             // learnts are small. We don't need to count the number of solved vars.
@@ -263,7 +268,7 @@ fn search(
                 asg.num_solved_vars = asg.stack_len();
             }
         }
-        let na = asg.best_assigned(Flag::BEST_PHASE);
+        let na = asg.best_assigned(Flag::PHASE);
         if num_assigned < na {
             num_assigned = na;
             state.flush("");
@@ -275,29 +280,20 @@ fn search(
             //
             let stabilizing = state.config.stabilize && rst.stabilizing();
             if state.stabilize != stabilizing {
-                if stabilizing {
-                    num_stabilization += 1;
+                if !stabilizing {
+                    asg.rebuild_unsat_core();
                 }
                 state.stabilize = stabilizing;
+                state.phase_select = if !replay_best {
+                    PhaseMode::Latest
+                } else if stabilizing {
+                    PhaseMode::Best
+                } else {
+                    PhaseMode::Worst
+                };
             }
-            state.phase_select = if replay_best && stabilizing {
-                PhaseMode::Best
-            } else {
-                PhaseMode::Worst // PhaseMode::Latest
-            };
-            let vi = asg.select_var();
-            let p = match state.phase_select {
-                PhaseMode::Best => asg.var(vi).is(Flag::BEST_PHASE),
-                PhaseMode::BestRnd => match ((asg.activity(vi) * 10000.0) as usize) % 8 {
-                    0 => asg.var(vi).is(Flag::BEST_PHASE),
-                    _ => asg.var(vi).is(Flag::PHASE),
-                },
-                PhaseMode::Invert => !asg.var(vi).is(Flag::PHASE),
-                PhaseMode::Latest => asg.var(vi).is(Flag::PHASE),
-                PhaseMode::Random => ((asg.activity(vi) * 10000.0) as usize) % 2 == 0,
-                PhaseMode::Target => asg.var(vi).is(Flag::TARGET_PHASE),
-            };
-            asg.assign_by_decision(Lit::from_assign(vi, p));
+            let lit = asg.select_decision_literal(&state.phase_select);
+            asg.assign_by_decision(lit);
             state[Stat::Decision] += 1;
             a_decision_was_made = true;
         }

@@ -73,7 +73,7 @@ impl fmt::Display for PhaseMode {
                 PhaseMode::Latest => "ps_Lastest",
                 PhaseMode::Random => "ps_Random",
                 PhaseMode::Target => "ps_Target",
-                PhaseMode::Target => "ps_Worst",
+                PhaseMode::Worst => "ps_Worst",
             }
         )
     }

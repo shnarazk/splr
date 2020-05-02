@@ -679,6 +679,8 @@ bitflags! {
         const CA_SEEN      = 0b0000_0010_0000_0000;
         /// the previous assigned value of a Var.
         const PHASE        = 0b0000_0100_0000_0000;
+        /// the previous assigned value of a Var.
+        const BEST_ASSIGNED = 0b0000_1000_0000_0000;
     }
 }
 
