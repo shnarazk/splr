@@ -207,6 +207,7 @@ pub struct Clause {
     reward: f64,
     /// Flags
     flags: Flag,
+    pub search_from: usize,
 }
 
 impl Default for Clause {
@@ -216,6 +217,7 @@ impl Default for Clause {
             rank: 0,
             reward: 0.0,
             flags: Flag::empty(),
+            search_from: 1,
         }
     }
 }
@@ -620,6 +622,7 @@ impl ClauseDBIF for ClauseDB {
             }
             c.rank = rank;
             c.reward = 0.0;
+            c.search_from = 1;
         } else {
             let mut lits = Vec::with_capacity(v.len());
             for l in v {
@@ -631,6 +634,7 @@ impl ClauseDBIF for ClauseDB {
                 lits,
                 rank,
                 reward: 0.0,
+                search_from: 1,
             };
             self.clause.push(c);
         };

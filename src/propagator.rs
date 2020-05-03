@@ -2,7 +2,7 @@
 /// This version can handle Chronological and Non Chronological Backtrack.
 use {
     crate::{
-        clause::{ClauseDB, ClauseDBIF, ClauseId, Watch, WatchDBIF},
+        clause::{Clause, ClauseDB, ClauseDBIF, ClauseId, Watch, WatchDBIF},
         config::Config,
         state::State,
         types::*,
@@ -330,7 +330,11 @@ impl PropagatorIF for AssignStack {
                     if blocker_value == Some(true) {
                         continue 'next_clause;
                     }
-                    let lits = &mut cdb[w.c].lits;
+                    let Clause {
+                        ref mut lits,
+                        ref mut search_from,
+                        ..
+                    } = cdb[w.c];
                     if lits.len() == 2 {
                         if blocker_value == Some(false) {
                             // state.rst.rcc.update(vdb[p.vi()].record_conflict(ncnfl));
@@ -354,17 +358,40 @@ impl PropagatorIF for AssignStack {
                         w.blocker = first;
                         continue 'next_clause;
                     }
-                    for (k, lk) in lits.iter().enumerate().skip(2) {
-                        if lit_assign!(self, *lk) != Some(false) {
-                            (*watcher)
-                                .get_unchecked_mut(usize::from(!*lk))
-                                .register(first, w.c);
-                            n -= 1;
-                            source.detach(n);
-                            lits.swap(1, k);
-                            continue 'next_clause;
+
+                    // for (k, lk) in lits.iter().enumerate().skip(2) {
+                    //     if lit_assign!(self, *lk) != Some(false) {
+                    //         (*watcher)
+                    //             .get_unchecked_mut(usize::from(!*lk))
+                    //             .register(first, w.c);
+                    //         n -= 1;
+                    //         source.detach(n);
+                    //         lits.swap(1, k);
+                    //         continue 'next_clause;
+                    //     }
+                    // }
+
+                    //
+                    //## Search an un-falsified literal
+                    //
+                    #[cfg(feature = "boundary_check")]
+                    assert!(*search_from < lits.len());
+                    for (start, end) in &[(*search_from + 1, lits.len()), (2, *search_from + 1)] {
+                        for k in *start..*end {
+                            let lk = &lits[k];
+                            if lit_assign!(self, *lk) != Some(false) {
+                                (*watcher)
+                                    .get_unchecked_mut(usize::from(!*lk))
+                                    .register(first, w.c);
+                                n -= 1;
+                                source.detach(n);
+                                lits.swap(1, k);
+                                *search_from = k;
+                                continue 'next_clause;
+                            }
                         }
                     }
+
                     if first_value == Some(false) {
                         // state.rst.rcc.update(vdb[p.vi()].record_conflict(ncnfl));
                         return w.c;

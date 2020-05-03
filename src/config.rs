@@ -8,6 +8,10 @@ pub const VERSION: &str = "0.3.1";
 #[derive(Clone, Debug, StructOpt)]
 #[structopt(name = "splr", about, author)]
 pub struct Config {
+    /// Disable any progress message
+    #[structopt(long = "quiet", short = "q")]
+    pub quiet_mode: bool,
+
     /// threshold to use chronoBT
     #[structopt(long = "chronoBT", short = "C", default_value = "100")]
     pub chronobt: usize,
@@ -40,10 +44,10 @@ pub struct Config {
     pub cnf_filename: PathBuf,
     /// output directory
     #[structopt(long = "dir", short = "o", default_value = ".", parse(from_os_str))]
-    pub output_dirname: PathBuf,
+    pub output_dir: PathBuf,
     /// result filename/stdout
     #[structopt(long = "result", short = "r", default_value = "", parse(from_os_str))]
-    pub result_filename: PathBuf,
+    pub result_file: PathBuf,
     /// filename for DRAT cert.
     #[structopt(
         long = "proof",
@@ -51,7 +55,7 @@ pub struct Config {
         short = "p",
         parse(from_os_str)
     )]
-    pub proof_filename: PathBuf,
+    pub proof_file: PathBuf,
     /// Uses Glucose-like progress report
     #[structopt(long = "log", short = "l")]
     pub use_log: bool,
@@ -68,7 +72,7 @@ pub struct Config {
     #[structopt(long = "certify", short = "c")]
     pub use_certification: bool,
     /// CPU time limit in sec.
-    #[structopt(long = "to", default_value = "10000.0")]
+    #[structopt(long = "timeout", short = "t", default_value = "10000.0")]
     pub timeout: f64,
     /// interval for dumpping stat data
     #[structopt(long = "stat", default_value = "0")]
@@ -78,6 +82,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Config {
         Config {
+            quiet_mode: false,
             chronobt: 100,
             clause_limit: 0,
             elim_grow_limit: 0,
@@ -88,9 +93,9 @@ impl Default for Config {
             restart_blocking: 1.40,
             restart_step: 50,
             cnf_filename: PathBuf::new(),
-            output_dirname: PathBuf::from("."),
-            result_filename: PathBuf::new(),
-            proof_filename: PathBuf::from("proof.out"),
+            output_dir: PathBuf::from("."),
+            result_file: PathBuf::new(),
+            proof_file: PathBuf::from("proof.out"),
             use_log: false,
             without_elim: false,
             without_adaptive_strategy: false,

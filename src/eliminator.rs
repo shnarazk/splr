@@ -663,6 +663,7 @@ fn strengthen(cdb: &mut ClauseDB, cid: ClauseId, p: Lit) -> bool {
         return false;
     }
     debug_assert!(1 < usize::from(!p));
+    (*c).search_from = 1;
     let lits = &mut (*c).lits;
     debug_assert!(1 < lits.len());
     if lits.len() == 2 {

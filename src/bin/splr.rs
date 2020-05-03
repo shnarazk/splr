@@ -6,14 +6,40 @@ use {
         config::{Config, VERSION},
         solver::{Certificate, SatSolverIF, Solver, SolverResult},
         state::*,
+        types::SolverError,
     },
     std::{
+        borrow::Cow,
+        env,
         fs::File,
         io::{BufWriter, Write},
         path::PathBuf,
+        thread,
+        time::Duration,
     },
     structopt::StructOpt,
 };
+
+const RED: &str = "\x1B[001m\x1B[031m";
+const GREEN: &str = "\x1B[001m\x1B[032m";
+const BLUE: &str = "\x1B[001m\x1B[034m";
+const RESET: &str = "\x1B[000m";
+
+fn colored(v: Result<bool, &SolverError>, quiet: bool) -> Cow<'static, str> {
+    if quiet {
+        match v {
+            Ok(false) => Cow::Borrowed("s UNSATISFIABLE"),
+            Ok(true) => Cow::Borrowed("s SATISFIABLE"),
+            Err(e) => Cow::from(format!("s UNKNOWN ({:?})", e)),
+        }
+    } else {
+        match v {
+            Ok(false) => Cow::from(format!("{}s UNSATISFIABLE{}", GREEN, RESET)),
+            Ok(true) => Cow::from(format!("{}s SATISFIABLE{}", BLUE, RESET)),
+            Err(e) => Cow::from(format!("{}s UNKNOWN ({:?}){}", RED, e, RESET)),
+        }
+    }
+}
 
 fn main() {
     let config = Config::from_args();
@@ -25,18 +51,34 @@ fn main() {
         return;
     }
     let cnf_file = config.cnf_filename.to_string_lossy();
-    let ans_file: Option<PathBuf> = match config.result_filename.to_string_lossy().as_ref() {
+    let ans_file: Option<PathBuf> = match config.result_file.to_string_lossy().as_ref() {
         "-" => None,
-        "" => Some(config.output_dirname.join(PathBuf::from(format!(
+        "" => Some(config.output_dir.join(PathBuf::from(format!(
             ".ans_{}",
             config.cnf_filename.file_name().unwrap().to_string_lossy(),
         )))),
-        _ => Some(config.output_dirname.join(&config.result_filename)),
+        _ => Some(config.output_dir.join(&config.result_file)),
     };
-    if config.proof_filename.to_string_lossy() != "proof.out" && !config.use_certification {
+    if config.proof_file.to_string_lossy() != "proof.out" && !config.use_certification {
         println!("Abort: You set a proof filename with '--proof' explicitly, but didn't set '--certify'. It doesn't look good.");
         return;
     }
+    if let Ok(val) = env::var("SPLR_TIMEOUT") {
+        if let Ok(timeout) = val.parse::<u64>() {
+            let input = cnf_file.as_ref().to_string();
+            let quiet_mode = config.quiet_mode;
+            thread::spawn(move || {
+                thread::sleep(Duration::from_millis(timeout * 1000));
+                println!(
+                    "{}: {}",
+                    colored(Err(&SolverError::TimeOut), quiet_mode),
+                    input
+                );
+                std::process::exit(0);
+            });
+        }
+    }
+
     let mut s = Solver::build(&config).expect("failed to load");
     let res = s.solve();
     match &res {
@@ -59,6 +101,11 @@ fn main() {
             }
         }
     }
+    std::process::exit(match res {
+        Ok(Certificate::SAT(_)) => 10,
+        Ok(Certificate::UNSAT) => 20,
+        Err(_) => 0,
+    });
 }
 
 #[allow(dead_code)]
@@ -86,17 +133,17 @@ fn save_result(s: &Solver, res: &SolverResult, input: &str, output: Option<PathB
         Ok(Certificate::SAT(v)) => {
             match output {
                 Some(ref f) if redirect => println!(
-                    "      Result|dump: to STDOUT instead of {} due to an IO error.\nSATISFIABLE: {}",
+                    "      Result|dump: to STDOUT instead of {} due to an IO error.",
                     f.to_string_lossy(),
-                    input,
-                    ),
-                Some(ref f) => println!(
-                    "      Result|file: {}\nSATISFIABLE: {}",
-                    f.to_str().unwrap(),
-                    input,
                 ),
-                _ => println!("SATISFIABLE: {}", input),
+                Some(ref f) => println!("      Result|file: {}", f.to_str().unwrap(),),
+                _ => (),
             }
+            println!(
+                "{}: {}",
+                colored(Ok(true), s.state.config.quiet_mode),
+                input
+            );
             if let Err(why) = (|| {
                 buf.write_all(
                     format!(
@@ -125,18 +172,19 @@ fn save_result(s: &Solver, res: &SolverResult, input: &str, output: Option<PathB
                 _ => (),
             }
             if s.state.config.use_certification {
-                let proof_file: PathBuf = s
-                    .state
-                    .config
-                    .output_dirname
-                    .join(&s.state.config.proof_filename);
+                let proof_file: PathBuf =
+                    s.state.config.output_dir.join(&s.state.config.proof_file);
                 save_proof(&s, &input, &proof_file);
                 println!(
                     " Certificate|file: {}",
-                    s.state.config.proof_filename.to_string_lossy()
+                    s.state.config.proof_file.to_string_lossy()
                 );
             }
-            println!("UNSAT: {}", input);
+            println!(
+                "{}: {}",
+                colored(Ok(false), s.state.config.quiet_mode),
+                input
+            );
             if let Err(why) = (|| {
                 buf.write_all(
                     format!(
@@ -152,7 +200,31 @@ fn save_result(s: &Solver, res: &SolverResult, input: &str, output: Option<PathB
                 println!("Abort: failed to save by {}!", why);
             }
         }
-        Err(e) => println!("Failed to solve by {:?}.", e),
+        Err(e) => {
+            match output {
+                Some(ref f) if redirect => println!(
+                    "      Result|dump: to STDOUT instead of {} due to an IO error.",
+                    f.to_string_lossy(),
+                ),
+                Some(ref f) => println!("      Result|file: {}", f.to_str().unwrap(),),
+                _ => (),
+            }
+            println!("{}: {}", colored(Err(e), s.state.config.quiet_mode), input);
+            if let Err(why) = (|| {
+                buf.write_all(
+                    format!(
+                        "c An assignment set generated by splr-{} for {}\nc\n",
+                        VERSION, input,
+                    )
+                    .as_bytes(),
+                )?;
+                report(&s.state, buf)?;
+                buf.write_all(format!("c {:?}\n", e).as_bytes())?;
+                buf.write(b"0\n")
+            })() {
+                println!("Abort: failed to save by {}!", why);
+            }
+        }
     }
 }
 
