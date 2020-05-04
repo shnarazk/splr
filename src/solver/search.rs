@@ -9,14 +9,14 @@ use {
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarRewardIF, VarSelectIF},
         cdb::{ClauseDB, ClauseDBIF},
         processor::{EliminateIF, Eliminator},
-        state::{PhaseMode, Stat, State, StateIF},
+        state::{Stat, State, StateIF},
         types::*,
     },
     std::slice::Iter,
 };
 
 /// API for SAT solver like `build`, `solve` and so on.
-pub trait SatSolverSearchIF {
+pub trait SolveIF {
     /// search an assignment.
     ///
     /// # Errors
@@ -43,7 +43,7 @@ macro_rules! final_report {
     };
 }
 
-impl SatSolverSearchIF for Solver {
+impl SolveIF for Solver {
     /// # Examples
     ///
     /// ```

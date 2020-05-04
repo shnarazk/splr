@@ -32,7 +32,7 @@ pub mod types;
 
 pub use {
     config::Config,
-    solver::{Certificate, SatSolverIF, Solver, ValidateIF},
+    solver::{Certificate, SatSolverIF, SolveIF, Solver, ValidateIF},
     types::SolverError,
 };
 

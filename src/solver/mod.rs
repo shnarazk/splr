@@ -11,46 +11,16 @@ mod search;
 mod validate;
 
 pub use self::{
+    build::SatSolverIF,
     restart::{RestartIF, RestartMode, Restarter},
+    search::SolveIF,
     validate::ValidateIF,
 };
 
 use {
-    self::{build::SatSolverBuildIF, search::SatSolverSearchIF},
     crate::{assign::AssignStack, cdb::ClauseDB, processor::Eliminator, state::*, types::*},
+    std::convert::TryFrom,
 };
-
-/// API for SAT solver like `build`, `solve` and so on.
-pub trait SatSolverIF: SatSolverBuildIF + SatSolverSearchIF {
-    /// add a vector of `Lit` as a clause to the solver.
-    fn add_unchecked_clause(&mut self, v: &mut Vec<Lit>) -> Option<ClauseId>;
-    /// make a solver and load a CNF into it.
-    ///
-    /// # Errors
-    ///
-    /// IO error by failing to load a CNF file.
-    #[cfg(not(feature = "no_IO"))]
-    fn build(config: &Config) -> Result<Solver, SolverError>;
-    /// search an assignment.
-    ///
-    /// # Errors
-    ///
-    /// if solver becomes inconsistent by an internal error.
-    fn solve(&mut self) -> SolverResult;
-}
-
-impl SatSolverIF for Solver {
-    fn add_unchecked_clause(&mut self, v: &mut Vec<Lit>) -> Option<ClauseId> {
-        self.solver_add_unchecked_clause(v)
-    }
-    #[cfg(not(feature = "no_IO"))]
-    fn build(config: &Config) -> Result<Solver, SolverError> {
-        <Solver as SatSolverBuildIF>::solver_build(config)
-    }
-    fn solve(&mut self) -> SolverResult {
-        <Solver as SatSolverSearchIF>::solve(self)
-    }
-}
 
 /// Normal results returned by Solver.
 #[derive(Debug, PartialEq)]
@@ -95,6 +65,14 @@ pub struct Solver {
     pub rst: Restarter,
     /// misc data holder
     pub state: State,
+}
+
+impl TryFrom<Vec<Vec<i32>>> for Certificate {
+    type Error = SolverError;
+    fn try_from(vec: Vec<Vec<i32>>) -> Result<Certificate, Self::Error> {
+        let s = Solver::try_from((Config::default(), vec.as_ref()));
+        s.map_or_else(|e| e, |mut solver| solver.solve())
+    }
 }
 
 #[cfg(test)]
