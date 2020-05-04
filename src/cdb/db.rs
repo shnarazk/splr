@@ -238,7 +238,7 @@ impl Instantiate for ClauseDB {
             lbd_temp: vec![0; nv + 1],
             watcher,
             certified,
-            reducable: !config.without_reduce,
+            reducable: config.use_reduce(),
             soft_limit: config.clause_limit,
             ..ClauseDB::default()
         }

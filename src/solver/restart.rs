@@ -376,7 +376,7 @@ impl Default for GeometricStabilizer {
 impl Instantiate for GeometricStabilizer {
     fn instantiate(config: &Config, _: &CNFDescription) -> Self {
         GeometricStabilizer {
-            enable: config.stabilize,
+            enable: config.use_stabilize(),
             restart_inc: config.rst_stb_scl,
             ..GeometricStabilizer::default()
         }

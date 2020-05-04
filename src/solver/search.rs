@@ -265,7 +265,7 @@ fn search(
             let rs = rst.stabilizing();
             if rst_stabilize != rs {
                 rst_stabilize = rs;
-                state.stabilize = state.config.stabilize && rs;
+                state.stabilize = state.config.use_stabilize() && rs;
             }
             let lit = asg.select_decision_literal(&state.phase_select);
             asg.assign_by_decision(lit);

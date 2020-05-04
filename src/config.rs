@@ -52,9 +52,9 @@ pub struct Config {
     #[structopt(long = "cl", default_value = "0")]
     pub clause_limit: usize,
 
-    /// Disable clause reduction
-    #[structopt(skip)] //  long = "no-reduce", short = "R"
-    pub without_reduce: bool,
+    /// Clause reduction switch
+    #[structopt(long = "RDC", default_value = "1")]
+    reduce: i32,
 
     //
     //## eliminator
@@ -75,9 +75,9 @@ pub struct Config {
     #[structopt(long = "et", default_value = "40000")]
     pub elim_trigger: usize,
 
-    /// Disables exhaustive simplification
-    #[structopt(long = "no-elim", short = "E")]
-    pub without_elim: bool,
+    /// Pre/in-processor switch
+    #[structopt(long = "PRO", default_value = "1")]
+    elim: i32,
 
     //
     //## restarter
@@ -133,17 +133,17 @@ pub struct Config {
     #[structopt(long = "cbt", default_value = "100")]
     pub cbt_thr: DecisionLevel,
 
-    /// Enable Reason-Side Rewarding
-    #[structopt(skip)]
-    pub rsr: bool,
+    /// Reason-Side Rewarding switch
+    #[structopt(long = "RSR", default_value = "1")]
+    rsr: i32,
 
-    /// Enable stabilizing phase
-    #[structopt(skip)]
-    pub stabilize: bool,
+    /// Stabilization switch
+    #[structopt(long = "STB", default_value = "1")]
+    stabilize: i32,
 
-    /// Disables dynamic strategy adaptation
-    #[structopt(long = "no-adapt", short = "A")]
-    pub without_adaptive_strategy: bool,
+    /// Strategy adaptation switch
+    #[structopt(long = "ADP", default_value = "1")]
+    adaptive: i32,
 
     /// CPU time limit in sec.
     #[structopt(long = "timeout", short = "t", default_value = "5000.0")]
@@ -164,11 +164,39 @@ where
     }
 }
 
+macro_rules! dispatch {
+    ($field: expr) => {
+        0 < $field
+    };
+    ($field: expr, $default: expr) => {
+        match $field {
+            0 => $default,
+            x => 0 < x,
+        }
+    };
+}
+
 impl Config {
     #[allow(unused_mut)]
     pub fn override_args(mut self) -> Config {
         // self.without_adaptive_strategy = true;
-        self.stabilize = true;
+        // self.stabilize = true;
         self
+    }
+    pub fn use_reduce(&self) -> bool {
+        dispatch!(self.reduce)
+    }
+    pub fn use_elim(&self) -> bool {
+        dispatch!(self.elim)
+    }
+    pub fn use_reason_side_rewarding(&self) -> bool {
+        dispatch!(self.rsr)
+    }
+
+    pub fn use_stabilize(&self) -> bool {
+        dispatch!(self.stabilize)
+    }
+    pub fn use_adaptive(&self) -> bool {
+        dispatch!(self.adaptive)
     }
 }

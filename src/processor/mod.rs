@@ -311,7 +311,7 @@ impl Instantiate for Eliminator {
     fn instantiate(config: &Config, cnf: &CNFDescription) -> Eliminator {
         let nv = cnf.num_of_variables;
         Eliminator {
-            enable: !config.without_elim,
+            enable: config.use_elim(),
             var_queue: VarOccHeap::new(nv, 0),
             eliminate_var_occurrence_limit: config.elim_var_occ,
             eliminate_grow_limit: config.elim_grw_lim,

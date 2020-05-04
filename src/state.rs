@@ -254,10 +254,10 @@ impl Instantiate for State {
     fn instantiate(config: &Config, cnf: &CNFDescription) -> State {
         State {
             config: config.clone(),
-            strategy: if config.without_adaptive_strategy {
-                (SearchStrategy::Generic, 0)
-            } else {
+            strategy: if config.use_adaptive() {
                 (SearchStrategy::Initial, 0)
+            } else {
+                (SearchStrategy::Generic, 0)
             },
             target: cnf.clone(),
             time_limit: config.timeout,
@@ -377,7 +377,7 @@ impl StateIF for State {
         A: AssignIF,
         C: ClauseDBIF,
     {
-        if self.config.without_adaptive_strategy {
+        if !self.config.use_adaptive() {
             return;
         }
         let (asg_num_conflict, _num_propagation, _num_restart, _) = asg.exports();
