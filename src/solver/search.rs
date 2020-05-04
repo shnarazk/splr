@@ -118,11 +118,6 @@ impl SolveIF for Solver {
         }
         if USE_PRE_PROCESSING_ELIMINATOR && elim.enable {
             state.flush("simplifying...");
-            // if 20_000_000 < state.target.num_of_clauses {
-            //     state.elim_eliminate_grow_limit = 0;
-            //     state.elim_eliminate_loop_limit = 1_000_000;
-            //     state.elim_subsume_loop_limit = 2_000_000;
-            // }
             if elim.simplify(asg, cdb, state).is_err() {
                 // Why inconsistent? Because the CNF contains a conflict, not an error!
                 // Or out of memory.
@@ -299,9 +294,6 @@ fn adapt_modules(
             elim.simplify(asg, cdb, state)?;
         }
         state.select_strategy(asg, cdb);
-        // if state.strategy.0 == SearchStrategy::HighSuccesive {
-        //     state.config.cbt_thr = 0;
-        // }
     }
     #[cfg(feature = "boundary_check")]
     assert!(state.strategy.1 != asg_num_conflict || 0 == asg.decision_level());

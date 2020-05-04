@@ -197,8 +197,6 @@ pub struct State {
     pub conflicts: Vec<Lit>,
     /// hold the previous number of non-conflicting assignment
     pub last_asg: usize,
-    /// hold the previous number of solved vars
-    pub last_solved: usize,
     /// working place to build learnt clauses
     pub new_learnt: Vec<Lit>,
     /// `progress` invocation counter
@@ -227,7 +225,6 @@ impl Default for State {
             c_lvl: Ema::new(5_000),
             conflicts: Vec::new(),
             last_asg: 0,
-            last_solved: 0,
             new_learnt: Vec::new(),
             progress_cnt: 0,
             record: ProgressRecord::default(),
