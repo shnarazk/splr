@@ -68,18 +68,7 @@ use std::convert::TryFrom;
 
 fn main() {
     let v: Vec<Vec<i32>> = vec![vec![1, 2], vec![-1, 3], vec![1, -3], vec![-1, 2]];
-    let s = Solver::try_from((Config::default(), v.as_ref()));
-    match s.map_or_else(|e| e, |mut solver| solver.solve()) {
-        Ok(Certificate::SAT(ans)) => println!("s SATISFIABLE: {:?}", ans),
-        Ok(Cetrificate::UNSAT) => println!("s UNSATISFIABLE"),
-        Err(e) => panic!("{}", e),
-    }
-}
-
-// another IF.
-fn main() {
-    let v: Vec<Vec<i32>> = vec![vec![1, 2], vec![-1, 3], vec![1, -3], vec![-1, 2]];
-    match <Certificate as TryFrom>::try_from(v.as_ref()) {
+    match Certificate::try_from(v) {
         Ok(Certificate::SAT(ans)) => println!("s SATISFIABLE: {:?}", ans),
         Ok(Cetrificate::UNSAT) => println!("s UNSATISFIABLE"),
         Err(e) => panic!("{}", e),

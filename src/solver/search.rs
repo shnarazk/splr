@@ -47,8 +47,7 @@ impl SolveIF for Solver {
     /// # Examples
     ///
     /// ```
-    /// use splr::config::Config;
-    /// use splr::solver::{Certificate, SatSolverIF, Solver};
+    /// use splr::*;
     ///
     /// let config = Config::from("tests/sample.cnf");
     /// if let Ok(mut s) = Solver::build(&config) {
