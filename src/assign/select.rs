@@ -19,9 +19,11 @@ pub trait VarSelectIF {
     /// force assignments
     fn force_select_iter(&mut self, iterator: Iter<'_, usize>);
     /// force assignments
-    fn force_select_from_phase(&mut self, phase: &PhaseMode);
+    fn force_rephase(&mut self);
     /// select a new decision variable.
     fn select_decision_literal(&mut self, phase: &PhaseMode) -> Lit;
+    /// save the current assignments to BEST_PHASE
+    fn save_phases(&mut self);
     /// update the internal heap on var order.
     fn update_order(&mut self, v: VarId);
     /// rebuild the internal var_order
@@ -35,15 +37,10 @@ impl VarSelectIF for AssignStack {
                 .push(Lit::from_assign(*vi, self.var[*vi].is(Flag::PHASE)));
         }
     }
-    fn force_select_from_phase(&mut self, phase: &PhaseMode) {
-        if self.temp_order.is_empty() && *phase == PhaseMode::Best {
-            // PhaseMode::Worst => {
-            //     for l in &self.unsat_trail {
-            //         self.temp_order.push(*l);
-            //     }
-            // }
-            for l in &self.best_trail {
-                self.temp_order.push(*l);
+    fn force_rephase(&mut self) {
+        for v in self.var.iter_mut() {
+            if v.is(Flag::REPHASE) {
+                v.set(Flag::PHASE, v.is(Flag::BEST_PHASE));
             }
         }
     }
@@ -69,6 +66,19 @@ impl VarSelectIF for AssignStack {
             _ => self.var[vi].is(Flag::PHASE),
         };
         Lit::from_assign(vi, p)
+    }
+    fn save_phases(&mut self) {
+        for (vi, v) in self.var.iter_mut().enumerate().skip(1) {
+            if !v.is(Flag::ELIMINATED) {
+                if let Some(b) = self.assign[vi] {
+                    v.turn_on(Flag::REPHASE);
+                    v.set(Flag::BEST_PHASE, b);
+                } else {
+                    v.turn_off(Flag::REPHASE);
+                }
+            }
+        }
+        self.build_best_at = self.num_propagation;
     }
     fn update_order(&mut self, v: VarId) {
         self.update_heap(v);

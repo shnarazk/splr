@@ -1,7 +1,7 @@
 /// implement boolean constraint propagation, backjump
 /// This version can handle Chronological and Non Chronological Backtrack.
 use {
-    super::{AssignIF, AssignStack, VarHeapIF, VarRewardIF},
+    super::{AssignIF, AssignStack, VarHeapIF, VarRewardIF, VarSelectIF},
     crate::{
         cdb::{ClauseDBIF, WatchDBIF},
         types::*,
@@ -36,8 +36,6 @@ pub trait PropagateIF {
     fn propagate<C>(&mut self, cdb: &mut C) -> ClauseId
     where
         C: ClauseDBIF;
-    /// reset or copy phase data.
-    fn rebuild_unsat_core(&mut self);
 }
 
 macro_rules! var_assign {
@@ -148,6 +146,10 @@ impl PropagateIF for AssignStack {
     fn cancel_until(&mut self, lv: DecisionLevel) {
         if self.trail_lim.len() as u32 <= lv {
             return;
+        }
+        if self.best_assign {
+            self.save_phases();
+            self.best_assign = false;
         }
         let lim = self.trail_lim[lv as usize];
         let mut shift = lim;
@@ -276,33 +278,9 @@ impl PropagateIF for AssignStack {
         let na = self.trail.len() + self.num_eliminated_vars;
         if 0 < self.decision_level() && self.num_best_assign < na {
             self.best_assign = true;
-            self.best_trail.clear();
-            for l in &self.trail[self.len_upto(0)..] {
-                self.best_trail.push(*l);
-            }
             self.num_best_assign = na;
-            self.build_best_at = self.num_propagation;
         }
         ClauseId::default()
-    }
-    fn rebuild_unsat_core(&mut self) {
-        /*
-        if self.build_unsat_at < self.build_best_at {
-            for l in &self.best_trail {
-                self.var[l.vi()].turn_on(Flag::BEST_ASSIGNED);
-            }
-            for i in 1..=self.var_order.idxs[0] {
-                let vi = self.var_order.heap[i];
-                if !self.var[vi].is(Flag::BEST_ASSIGNED) {
-                    self.unsat_trail.push(Lit::from_assign(vi, self.var[vi].is(Flag::PHASE)));
-                }
-            }
-            for v in self.var.iter_mut().skip(1) {
-                v.turn_off(Flag::BEST_ASSIGNED);
-            }
-            self.build_unsat_at = self.build_best_at;
-        }
-        */
     }
 }
 

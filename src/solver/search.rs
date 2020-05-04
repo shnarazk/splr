@@ -200,7 +200,7 @@ fn search(
     rst: &mut Restarter,
     state: &mut State,
 ) -> Result<bool, SolverError> {
-    let mut replay_best = false;
+    let mut rst_stabilize = false;
     let mut a_decision_was_made = false;
     let mut num_assigned = asg.num_solved_vars;
     rst.update(RestarterModule::Luby, 0);
@@ -224,9 +224,6 @@ fn search(
                 analyze_final(asg, state, &cdb[ci]);
                 return Ok(false);
             }
-            if num_assigned < asg.stack_len() + asg.num_eliminated_vars {
-                replay_best = false;
-            }
             handle_conflict(asg, cdb, elim, rst, state, ci)?;
             if a_decision_was_made {
                 a_decision_was_made = false;
@@ -243,16 +240,12 @@ fn search(
                     return Err(SolverError::UndescribedError);
                 }
             }
-            if !state.stabilize {
-                asg.rebuild_unsat_core();
-            }
         }
         // Simplification has been postponed because chronoBT was used.
         if asg.decision_level() == asg.root_level {
             if state.stabilize {
-                asg.force_select_from_phase(&state.phase_select);
+                asg.force_rephase();
             }
-            replay_best = true;
             // `elim.to_simplify` is increased much in particular when vars are solved or
             // learnts are small. We don't need to count the number of solved vars.
             if state.config.elim_trigger < elim.to_simplify as usize {
@@ -275,22 +268,10 @@ fn search(
             state.flush(format!("unreachable: {}", asg.num_vars - num_assigned));
         }
         if !asg.remains() {
-            //
-            //## set phase mode
-            //
-            let stabilizing = state.config.stabilize && rst.stabilizing();
-            if state.stabilize != stabilizing {
-                if !stabilizing {
-                    asg.rebuild_unsat_core();
-                }
-                state.stabilize = stabilizing;
-                state.phase_select = if !replay_best {
-                    PhaseMode::Latest
-                } else if stabilizing {
-                    PhaseMode::Best
-                } else {
-                    PhaseMode::Worst
-                };
+            let rs = rst.stabilizing();
+            if rst_stabilize != rs {
+                rst_stabilize = rs;
+                state.stabilize = state.config.stabilize && rs;
             }
             let lit = asg.select_decision_literal(&state.phase_select);
             asg.assign_by_decision(lit);

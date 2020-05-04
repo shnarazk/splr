@@ -60,7 +60,6 @@ impl Default for AssignStack {
             num_solved_vars: 0,
             num_eliminated_vars: 0,
             best_assign: false,
-            best_trail: Vec::new(),
             build_best_at: 0,
             num_best_assign: 0,
             num_conflict: 0,
@@ -170,8 +169,7 @@ impl AssignIF for AssignStack {
     fn best_assigned(&mut self, flag: Flag) -> usize {
         match flag {
             Flag::PHASE => {
-                if self.best_assign {
-                    self.best_assign = false;
+                if self.build_best_at == self.num_propagation {
                     return self.num_best_assign;
                 }
             }

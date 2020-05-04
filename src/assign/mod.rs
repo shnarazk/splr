@@ -128,7 +128,6 @@ pub struct AssignStack {
     //## Phase handling
     //
     best_assign: bool,
-    best_trail: Vec<Lit>,
     build_best_at: usize,
     num_best_assign: usize,
 
