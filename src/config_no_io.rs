@@ -37,8 +37,8 @@ pub struct Config {
     /// Soft limit of #clauses (6MC/GB)
     pub clause_limit: usize,
 
-    /// Disable clause reduction
-    pub without_reduce: bool,
+    /// Clause reduction switch
+    reduce: i32,
 
     //
     //## eliminator
@@ -55,8 +55,8 @@ pub struct Config {
     /// #cls to start simplification
     pub elim_trigger: usize,
 
-    /// Disables exhaustive simplification
-    pub without_elim: bool,
+    /// Pre/in-processor switch
+    elim: i32,
 
     //
     //## restarter
@@ -100,14 +100,14 @@ pub struct Config {
     /// Level threshold to use chronoBT
     pub cbt_thr: DecisionLevel,
 
-    /// Enable Reason-Side Rewarding
-    pub rsr: bool,
+    /// Reason-Side Rewarding switch
+    rsr: i32,
 
-    /// Enable stabilizing phase
-    pub stabilize: bool,
+    /// Stabilization switch
+    stabilize: i32,
 
-    /// Disables dynamic strategy adaptation
-    pub without_adaptive_strategy: bool,
+    /// Strategy adaptation switch
+    adaptive: i32,
 
     /// CPU time limit in sec.
     pub timeout: f64,
@@ -128,12 +128,12 @@ impl Default for Config {
             result_file: PathBuf::new(),
             use_log: false,
             clause_limit: 0,
-            without_reduce: false,
+            reduce: 1,
             elim_cls_lim: 100,
             elim_var_occ: 10_000,
             elim_grw_lim: 0,
             elim_trigger: 40000,
-            without_elim: false,
+            elim: 1,
             rst_step: 50,
             rst_bkt_inc: 1.0,
             rst_bkt_pwr: 1.5,
@@ -146,9 +146,9 @@ impl Default for Config {
             rst_lbd_thr: 0.7,
             rst_stb_scl: 2.0,
             cbt_thr: 100,
-            rsr: true,
-            stabilize: true,
-            without_adaptive_strategy: false,
+            rsr: 1,
+            stabilize: 1,
+            adaptive: 1,
             timeout: 5000.0,
             use_certification: false,
         }
@@ -161,5 +161,39 @@ where
 {
     fn from(_: T) -> Config {
         Config::default()
+    }
+}
+
+macro_rules! dispatch {
+    ($field: expr) => {
+        0 < $field
+    };
+    ($field: expr, $default: expr) => {
+        match $field {
+            0 => $default,
+            x => 0 < x,
+        }
+    };
+}
+
+impl Config {
+    #[allow(unused_mut)]
+    pub fn override_args(mut self) -> Config {
+        self
+    }
+    pub fn use_reduce(&self) -> bool {
+        dispatch!(self.reduce)
+    }
+    pub fn use_elim(&self) -> bool {
+        dispatch!(self.elim)
+    }
+    pub fn use_reason_side_rewarding(&self) -> bool {
+        dispatch!(self.rsr)
+    }
+    pub fn use_stabilize(&self) -> bool {
+        dispatch!(self.stabilize)
+    }
+    pub fn use_adaptive(&self) -> bool {
+        dispatch!(self.adaptive)
     }
 }

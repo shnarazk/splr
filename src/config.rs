@@ -179,8 +179,6 @@ macro_rules! dispatch {
 impl Config {
     #[allow(unused_mut)]
     pub fn override_args(mut self) -> Config {
-        // self.without_adaptive_strategy = true;
-        // self.stabilize = true;
         self
     }
     pub fn use_reduce(&self) -> bool {
@@ -192,7 +190,6 @@ impl Config {
     pub fn use_reason_side_rewarding(&self) -> bool {
         dispatch!(self.rsr)
     }
-
     pub fn use_stabilize(&self) -> bool {
         dispatch!(self.stabilize)
     }
