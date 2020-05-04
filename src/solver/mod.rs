@@ -67,9 +67,12 @@ pub struct Solver {
     pub state: State,
 }
 
-impl TryFrom<Vec<Vec<i32>>> for Certificate {
+impl<V> TryFrom<&[V]> for Certificate
+where
+    V: AsRef<[i32]>,
+{
     type Error = SolverError;
-    fn try_from(vec: Vec<Vec<i32>>) -> Result<Certificate, Self::Error> {
+    fn try_from(vec: &[V]) -> Result<Certificate, Self::Error> {
         let s = Solver::try_from((Config::default(), vec.as_ref()));
         s.map_or_else(|e| e, |mut solver| solver.solve())
     }
