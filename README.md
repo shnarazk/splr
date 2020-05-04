@@ -71,11 +71,10 @@ fn main() {
     match Certificate::try_from(v) {
         Ok(Certificate::SAT(ans)) => println!("s SATISFIABLE: {:?}", ans),
         Ok(Cetrificate::UNSAT) => println!("s UNSATISFIABLE"),
-        Err(e) => panic!("{}", e),
+        Err(e) => panic!("s UNKNOWN; {}", e),
     }
 }
 ```
-
 
 ### Mnemonics used in the progress message
 
