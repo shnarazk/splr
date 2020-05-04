@@ -37,7 +37,9 @@ pub trait LitIF {
 
 /// API for clause and var rewarding.
 pub trait ActivityIF {
+    /// type for index
     type Ix;
+    /// an extra parameter for bumping
     type Inc;
     /// return the current activity of an element.
     fn activity(&mut self, vi: Self::Ix) -> f64;
