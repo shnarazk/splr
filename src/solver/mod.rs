@@ -1,4 +1,4 @@
-//! Crate 'solver' provides the top-level API as a SAT solver.
+/// Crate `solver` provides the top-level API as a SAT solver.
 /// API to instantiate
 mod build;
 /// Crate 'conflict' handles conflicts.

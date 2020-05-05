@@ -158,6 +158,8 @@ OPTIONS:
         --rs <rst-step>           #conflicts between restarts [default: 50]
         --STB <stabilize>         Stabilization switch [default: 1]
     -t, --timeout <timeout>       CPU time limit in sec [default: 5000.0]
+        --vri <vrw-dcy-beg>       Initial var reward decay [default: 0.75]
+        --vrm <vrw-dcy-end>       Maximum var reward decay [default: 0.98]
 
 ARGS:
     <cnf-file>    CNF file in DIMACS format

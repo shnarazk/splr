@@ -12,14 +12,40 @@ It adopts various research results on SAT solvers:
 - Learning Rate Based Branching and Reason Side Rewarding
 
 *Many thanks to SAT researchers.*
+
+# Examples
+
+## Build a solver from a configuration based on a CNF file, then solve it.
+
+```
+use splr::*;
+
+let config = Config::from("tests/sample.cnf");
+if let Ok(mut s) = Solver::build(&config) {
+    if let Ok(ans) = s.solve() {
+        println!("{:?}", ans);
+    }
+}
+```
+
+## On-memory direct conversion from a vec to a solution
+
+```
+use {splr::*, std::convert::TryFrom};
+
+let v: Vec<Vec<i32>> = vec![vec![1, 2], vec![-1, 3], vec![1, -3], vec![-1, 2]];
+match Certificate::try_from(v).expect("panic!") {
+    Certificate::UNSAT => 0,
+    Certificate::SAT(vec) => vec.len(),
+};
+```
+
 */
 /// Crate `assign` implements Boolean Constraint Propagation and decision var selection.
 pub mod assign;
 /// Crate `cdb` provides `Clause` object and its manager `ClauseDB`
 pub mod cdb;
 /// Crate `config` provides solver's configuration and CLI.
-#[cfg_attr(not(feature = "no_IO"), path = "config.rs")]
-#[cfg_attr(feature = "no_IO", path = "config_no_io.rs")]
 pub mod config;
 /// Crate `processor` implements a simplifier: clause subsumption and var elimination.
 pub mod processor;
