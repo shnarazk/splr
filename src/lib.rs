@@ -9,7 +9,10 @@ It adopts various research results on SAT solvers:
 - Glucose-like dynamic blocking/forcing restarts based on [EMAs](https://arxiv.org/abs/1506.08905)
 - heuristics adaptation
 - pre/in-process simplification based on clause subsumption and variable elimination
+- Chronological backtrack and non-chronological backjump
 - Learning Rate Based Branching and Reason Side Rewarding
+- Rephase
+- Search stabilization
 
 *Many thanks to SAT researchers.*
 
