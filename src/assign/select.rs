@@ -38,9 +38,11 @@ impl VarSelectIF for AssignStack {
         }
     }
     fn force_rephase(&mut self) {
-        for v in self.var.iter_mut() {
-            if v.is(Flag::REPHASE) {
-                v.set(Flag::PHASE, v.is(Flag::BEST_PHASE));
+        if self.use_rephase {
+            for v in self.var.iter_mut() {
+                if v.is(Flag::REPHASE) {
+                    v.set(Flag::PHASE, v.is(Flag::BEST_PHASE));
+                }
             }
         }
     }

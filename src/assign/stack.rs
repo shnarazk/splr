@@ -59,6 +59,7 @@ impl Default for AssignStack {
             num_vars: 0,
             num_solved_vars: 0,
             num_eliminated_vars: 0,
+            use_rephase: true,
             best_assign: false,
             build_best_at: 0,
             num_best_assign: 0,
@@ -89,7 +90,7 @@ impl From<&mut AssignStack> for Vec<i32> {
 }
 
 impl Instantiate for AssignStack {
-    fn instantiate(_cfg: &Config, cnf: &CNFDescription) -> AssignStack {
+    fn instantiate(config: &Config, cnf: &CNFDescription) -> AssignStack {
         let nv = cnf.num_of_variables;
         AssignStack {
             assign: vec![None; 1 + nv],
@@ -98,6 +99,7 @@ impl Instantiate for AssignStack {
             trail: Vec::with_capacity(nv),
             var_order: VarIdHeap::new(nv, nv),
             num_vars: cnf.num_of_variables,
+            use_rephase: config.use_rephase(),
             var: Var::new_vars(nv),
             ..AssignStack::default()
         }

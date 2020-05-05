@@ -100,6 +100,9 @@ pub struct Config {
     /// Level threshold to use chronoBT
     pub cbt_thr: DecisionLevel,
 
+    /// Rephase switch
+    rephase: i32,
+
     /// Reason-Side Rewarding switch
     rsr: i32,
 
@@ -146,6 +149,7 @@ impl Default for Config {
             rst_lbd_thr: 0.7,
             rst_stb_scl: 2.0,
             cbt_thr: 100,
+            rephase: 1,
             rsr: 1,
             stabilize: 1,
             adaptive: 1,
@@ -165,9 +169,11 @@ where
 }
 
 macro_rules! dispatch {
+    // from `0` and `1`
     ($field: expr) => {
-        0 < $field
+        0 != $field
     };
+    // from -1, 0, 1
     ($field: expr, $default: expr) => {
         match $field {
             0 => $default,
@@ -186,6 +192,9 @@ impl Config {
     }
     pub fn use_elim(&self) -> bool {
         dispatch!(self.elim)
+    }
+    pub fn use_rephase(&self) -> bool {
+        dispatch!(self.rephase)
     }
     pub fn use_reason_side_rewarding(&self) -> bool {
         dispatch!(self.rsr)

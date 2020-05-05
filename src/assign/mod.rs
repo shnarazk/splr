@@ -127,6 +127,7 @@ pub struct AssignStack {
     //
     //## Phase handling
     //
+    use_rephase: bool,
     best_assign: bool,
     build_best_at: usize,
     num_best_assign: usize,

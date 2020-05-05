@@ -133,6 +133,10 @@ pub struct Config {
     #[structopt(long = "cbt", default_value = "100")]
     pub cbt_thr: DecisionLevel,
 
+    /// Rephase switch
+    #[structopt(long = "RPH", default_value = "1")]
+    rephase: i32,
+
     /// Reason-Side Rewarding switch
     #[structopt(long = "RSR", default_value = "1")]
     rsr: i32,
@@ -184,6 +188,7 @@ impl Default for Config {
             rst_lbd_thr: 0.7,
             rst_stb_scl: 2.0,
             cbt_thr: 100,
+            rephase: 1,
             rsr: 1,
             stabilize: 1,
             adaptive: 1,
@@ -227,6 +232,9 @@ impl Config {
     }
     pub fn use_elim(&self) -> bool {
         dispatch!(self.elim)
+    }
+    pub fn use_rephase(&self) -> bool {
+        dispatch!(self.rephase)
     }
     pub fn use_reason_side_rewarding(&self) -> bool {
         dispatch!(self.rsr)
