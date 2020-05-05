@@ -32,7 +32,7 @@ pub enum CertifiedRecord {
 
 type DRAT = Vec<(CertifiedRecord, Vec<i32>)>;
 
-/// 'Clause' Identifier, or 'clause' index, starting with one.
+/// Clause identifier, or clause index, starting with one.
 /// Note: ids are re-used after 'garbage collection'.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct ClauseId {

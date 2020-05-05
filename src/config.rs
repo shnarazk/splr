@@ -204,9 +204,11 @@ where
 }
 
 macro_rules! dispatch {
+    // from `0` and `1`
     ($field: expr) => {
-        0 < $field
+        0 != $field
     };
+    // from -1, 0, 1
     ($field: expr, $default: expr) => {
         match $field {
             0 => $default,

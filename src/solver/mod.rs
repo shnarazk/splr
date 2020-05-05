@@ -154,10 +154,10 @@ mod tests {
         //     Ok(Certificate::UNSAT) => println!("s UNSATISFIABLE"),
         //     Err(e) => panic!("{}", e),
         // }
-        let mut v: Vec<Vec<i32>> = Vec::new();
-        sat!(v);
-        v.push(Vec::new());
-        sat!(v);
+        let v0: Vec<Vec<i32>> = Vec::new();
+        sat!(v0);
+        let v1: Vec<Vec<i32>> = Vec::from(Vec::new());
+        sat!(v1);
         sat!(vec![vec![1i32]]);
         sat!(vec![vec![1i32], vec![-1]]);
         sat!(vec![vec![1i32, 2], vec![-1, 3], vec![1, -3], vec![-1, 2]]);

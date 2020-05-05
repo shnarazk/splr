@@ -227,7 +227,7 @@ where
     #[cfg(feature = "trace_elimination")]
     println!(
         "merge generated {:?} from {} and {} to eliminate {}",
-        vec2int(&vec),
+        vec.iter().map(|l| i32::from(*l)).collect::<Vec<_>>(),
         pb,
         qb,
         v

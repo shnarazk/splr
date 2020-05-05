@@ -15,7 +15,7 @@ It adopts various research results on SAT solvers:
 */
 /// Crate `assign` implements Boolean Constraint Propagation and decision var selection.
 pub mod assign;
-/// Crate `cdb` provides `clause` object and its manager `ClauseDB`
+/// Crate `cdb` provides `Clause` object and its manager `ClauseDB`
 pub mod cdb;
 /// Crate `config` provides solver's configuration and CLI.
 #[cfg_attr(not(feature = "no_IO"), path = "config.rs")]

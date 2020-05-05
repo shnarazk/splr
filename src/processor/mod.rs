@@ -1,4 +1,26 @@
-/// Crate `processor` implements a simplifier: clause subsumption and var elimination.
+//!
+//! * private module `eliminate` provides var elimination
+//! * private module `subsume` provides clause subsumption
+//!
+//!# Example
+//!
+//!```
+//!  use splr::{processor::EliminateIF, solver::Solver, types::Export};
+//!  use std::convert::TryFrom;
+//!  let mut s = Solver::try_from("tests/sample.cnf").expect("failed to load");
+//!  let Solver {
+//!      ref mut asg,
+//!      ref mut cdb,
+//!      ref mut elim,
+//!      ref mut state,
+//!      ..
+//!  } = s;
+//!  elim.activate();
+//!  elim.simplify(asg, cdb, state).expect("panic");
+//!  assert_eq!(elim.exports().0, 1);
+//!  assert!(0 < asg.num_eliminated_vars);
+//!```
+
 mod eliminate;
 mod heap;
 mod subsume;
@@ -79,7 +101,7 @@ pub trait EliminateIF: Export<(usize, usize, f64)> {
     fn sorted_iterator(&self) -> Iter<'_, usize>;
     /// return vi's stats
     fn stats(&self, vi: VarId) -> Option<(usize, usize)>;
-    /// return eliminated literals.
+    /// return the constraints on eliminated literals.
     fn eliminated_lits(&self) -> &[Lit];
 }
 
@@ -155,6 +177,12 @@ impl LitOccurs {
             self.pos_occurs.len().min(self.neg_occurs.len())
         }
     }
+    pub fn is_empty(&self) -> bool {
+        self.pos_occurs.is_empty() && self.neg_occurs.is_empty()
+    }
+    pub fn len(&self) -> usize {
+        self.pos_occurs.len() + self.neg_occurs.len()
+    }
 }
 /// Var heap structure based on the number of occurrences
 /// # Note
@@ -176,6 +204,7 @@ pub struct Eliminator {
     clause_queue: Vec<ClauseId>,
     var_queue: VarOccHeap,
     bwdsub_assigns: usize,
+    /// constraints on eliminated var. It is used by `extend_model`.
     elim_lits: Vec<Lit>,
     /// Maximum number of clauses to try to eliminate a var
     pub eliminate_var_occurrence_limit: usize,
@@ -324,11 +353,13 @@ impl Instantiate for Eliminator {
 
 impl EliminateIF for Eliminator {
     fn activate(&mut self) {
-        debug_assert!(self.mode != EliminatorMode::Running);
-        self.mode = EliminatorMode::Waiting;
+        if self.enable {
+            debug_assert!(self.mode != EliminatorMode::Running);
+            self.mode = EliminatorMode::Waiting;
+        }
     }
     fn is_running(&self) -> bool {
-        self.mode == EliminatorMode::Running
+        self.enable && self.mode == EliminatorMode::Running
     }
     // Due to a potential bug of killing clauses and difficulty about
     // synchronization between 'garbage_collect' and clearing occur lists,
@@ -566,8 +597,8 @@ impl Eliminator {
                         if *did == cid {
                             continue;
                         }
-                        let db = &cdb[*did];
-                        if !db.is(Flag::DEAD) && db.len() <= self.subsume_literal_limit {
+                        let d = &cdb[*did];
+                        if !d.is(Flag::DEAD) && d.len() <= self.subsume_literal_limit {
                             try_subsume(asg, cdb, self, cid, *did)?;
                         }
                     }
@@ -774,57 +805,47 @@ where
 
 #[cfg(test)]
 mod tests {
-    #![allow(unused_imports)]
-    #![allow(unused_variables)]
-    #![allow(dead_code)]
     use super::*;
-    use crate::{cdb::ClauseDB, solver::Solver};
+    use crate::{assign::VarManipulateIF, processor::EliminateIF, solver::Solver};
     use std::convert::TryFrom;
 
     #[test]
-    fn check_occurs() {
-        let cs = vec![
-            vec![1, 2, 3],
-            vec![-2, 3, 4],
-            vec![-2, -3],
-            vec![1, 2, -3, 9],
-        ];
-        let s = Solver::try_from((Config::default(), cs.as_ref()));
-        //    macro_rules! mkv {
-        //        ($($x:expr),*) => {
-        //            match &[$($x),*] {
-        //                v => v.iter().map(|x| Lit::from(*x as i32)).collect::<Vec<Lit>>(),
-        //            }
-        //        };
-        //    }
-        //    {
-        //        let vec = [&c2, &c3]; // [&c1, &c2, &c3, &c4];
-        //        for x in &vec {
-        //            for y in &vec {
-        //                println!(
-        //                    "{}\tsubsumes\t{}\t=>\t{:?}",
-        //                    x,
-        //                    y,
-        //                    x.subsumes(&y).map(|l| l.int())
-        //                );
-        //            }
-        //        }
-        //    }
-        //    // s.attach_clause(c1);
-        //    s.attach_clause(c2);
-        //    s.attach_clause(c3);
-        //    // s.attach_clause(c4);
-        //    // s.vars.dump("##added");
-        //    println!("{:?}", s.eliminator);
-        //    s.eliminate();
-        //    // s.vars.dump("##eliminated");
-        //    println!("{:?}", s.eliminator);
-        //    println!("::done");
+    fn check_elimination() {
+        let mut config = Config::default();
+        config.quiet_mode = true;
+        let mut s = Solver::try_from("tests/sample.cnf").expect("failed to load");
+        let Solver {
+            ref mut asg,
+            ref mut cdb,
+            ref mut elim,
+            ref mut state,
+            ..
+        } = s;
+        assert!(elim.enable);
+        // elim.eliminate_combination_limit = 2;
+        // elim.eliminate_occurrence_limit = 1;
+        // elim.subsume_literal_limit = 1;
+        elim.activate();
+        elim.simplify(asg, cdb, state).expect("");
+        assert_eq!(elim.num_full_elimination, 1);
+        assert!(!asg.var_iter().skip(1).all(|v| v.is(Flag::ELIMINATED)));
+        assert!(0 < asg.num_eliminated_vars);
+        assert_eq!(
+            asg.num_eliminated_vars,
+            asg.var_iter().filter(|v| v.is(Flag::ELIMINATED)).count()
+        );
+        let elims = asg
+            .var_iter()
+            .filter(|v| v.is(Flag::ELIMINATED))
+            .map(|v| v.index)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            0,
+            cdb.iter()
+                .skip(1)
+                .filter(|c| !c.is(Flag::DEAD))
+                .filter(|c| c.lits.iter().any(|l| elims.contains(&l.vi())))
+                .count()
+        );
     }
-
-    // fn mk_c(s: &mut Solver, i: usize, v: Vec<i32>) -> ClauseId {
-    //     let mut vec = v.iter().map(|i| Lit::from(*i)).collect::<Vec<Lit>>();
-    //     let cid = s.cdb.new_clause(&mut vec, None::<&mut VarDB>);
-    //     cid
-    // }
 }
