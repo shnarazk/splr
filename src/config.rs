@@ -127,6 +127,17 @@ pub struct Config {
     pub rst_stb_scl: f64,
 
     //
+    //## var rewarding
+    //
+    /// Initial var reward decay
+    #[structopt(long = "vri", default_value = "0.10")]
+    pub vrw_dcy_beg: f64,
+
+    /// Maximum var reward decay
+    #[structopt(long = "vrm", default_value = "0.97")]
+    pub vrw_dcy_end: f64,
+
+    //
     //## solver configuration
     //
     /// Level threshold to use chronoBT
@@ -187,6 +198,8 @@ impl Default for Config {
             rst_lbd_slw: 10000,
             rst_lbd_thr: 0.7,
             rst_stb_scl: 2.0,
+            vrw_dcy_beg: 0.10,
+            vrw_dcy_end: 0.97,
             cbt_thr: 100,
             rephase: 1,
             rsr: 1,

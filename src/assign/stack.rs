@@ -101,6 +101,8 @@ impl Instantiate for AssignStack {
             num_vars: cnf.num_of_variables,
             use_rephase: config.use_rephase(),
             var: Var::new_vars(nv),
+            activity_decay: config.vrw_dcy_beg,
+            activity_decay_max: config.vrw_dcy_end.max(config.vrw_dcy_beg),
             ..AssignStack::default()
         }
     }

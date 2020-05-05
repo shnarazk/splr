@@ -8,18 +8,13 @@ use {
     std::slice::Iter,
 };
 
-/// a pair of the start value and upper bound of var decay rate.
-pub const REWARD_DECAY_RANGE: (f64, f64) = (0.10, 0.97);
-
 impl VarRewardIF for AssignStack {
     #[inline]
     fn activity(&mut self, vi: VarId) -> f64 {
         self.var[vi].reward
     }
     fn initialize_reward(&mut self, iterator: Iter<'_, usize>) {
-        self.activity_decay = REWARD_DECAY_RANGE.0;
-        self.activity_decay_max = REWARD_DECAY_RANGE.1;
-        self.reward_step = (REWARD_DECAY_RANGE.1 - REWARD_DECAY_RANGE.0).abs() / 10_000.0;
+        self.reward_step = (self.activity_decay_max - self.activity_decay).abs() / 10_000.0;
         // big bang initialization
         let mut v = 0.25;
         for vi in iterator {
@@ -60,10 +55,10 @@ impl VarRewardIF for AssignStack {
         if state.strategy.1 == self.num_conflict {
             match state.strategy.0 {
                 SearchStrategy::LowDecisions => {
-                    self.activity_decay_max = REWARD_DECAY_RANGE.1 - 0.02;
+                    self.activity_decay_max -= 0.02;
                 }
                 SearchStrategy::HighSuccesive => {
-                    self.activity_decay_max = REWARD_DECAY_RANGE.1 + 0.005;
+                    self.activity_decay_max = (self.activity_decay_max + 0.005).min(0.999);
                 }
                 _ => (),
             };
