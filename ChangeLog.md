@@ -1,3 +1,20 @@
+## 0.4.0, 2020-12-31
+
+- adapt to the output format defined in chapter 5 of [SAT competition 2011 rules](http://www.satcompetition.org/2011/rules.pdf)
+- merge assign.rs and var.rs into a module
+- better modularity and abstraction via traits
+- add and refactor restart module: `GeometricStabilizer`, `ProgressLBD`
+- change a lot of options' meanings and mnemonics
+- add some features for development: boundary_check, EVSIDS, trace_analysis
+- `propagate` skips up to the last position
+- remove code about 'deep search' completely, superseded with stabilizing mode
+- stop *too* dynamic var decay control
+- change the activation timings of simplification
+- stats data are stored in each module
+- activate `JUST_USED` for clause reduction
+- implement a simple re-phase mechanism
+- implement `TryFrom<Vec<Vec<i32>>> for {Certificate, Solver}` for on-memory solving
+
 ## 0.3.2, 2020-03-20
 
 - control var activity decay rate based on the number of hot vars
@@ -99,5 +116,5 @@
 
 - `Solver` were divided into 6 sub modules
 - resolved a performance regression
-- switched to VSIDS instead of ACID
+- switched to EVSIDS instead of ACID
 - Glucose-style Watch structure

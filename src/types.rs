@@ -1,7 +1,12 @@
 /// Crate `types' provides various building blocks, including
 /// some common traits.
+pub use crate::{
+    assign::AssignReason,
+    cdb::{Clause, ClauseIF, ClauseId, ClauseIdIF, Watch},
+    config::Config,
+};
 use {
-    crate::{clause::ClauseId, config::Config, state::State, var::Var},
+    crate::state::State,
     std::{
         convert::TryFrom,
         fmt,
@@ -12,6 +17,15 @@ use {
     },
 };
 
+/// API for accessing internal data in a module.
+/// For example, `State::progress` needs to access misc parameters and statistics,
+/// which, however, should be used locally in the defining modules.
+/// To avoid to make them public, we define a generic accessor or exporter here.
+/// `T` is the list of exporting values.
+pub trait Export<T> {
+    fn exports(&self) -> T;
+}
+
 /// API for Literal like `from_int`, `from_assign`, `to_cid` and so on.
 pub trait LitIF {
     /// convert [VarId](../type.VarId.html) to [Lit](../type.Lit.html).
@@ -21,9 +35,11 @@ pub trait LitIF {
     fn vi(self) -> VarId;
 }
 
-/// API for clause and var rewarding
+/// API for clause and var rewarding.
 pub trait ActivityIF {
+    /// type for index
     type Ix;
+    /// an extra parameter for bumping
     type Inc;
     /// return the current activity of an element.
     fn activity(&mut self, vi: Self::Ix) -> f64;
@@ -33,12 +49,24 @@ pub trait ActivityIF {
     fn scale_activity(&mut self);
 }
 
-/// API for object instantiation based on `Configuration` and `CNFDescription`
-/// and adaptation.
+/// API for object instantiation based on `Configuration` and `CNFDescription`.
+/// This is implemented by *all the Splr modules* except `Configuration` and `CNFDescription`.
+///
+/// # Example
+///
+/// ```
+/// use crate::{splr::config::Config, splr::types::*};
+/// use splr::{cdb::ClauseDB, solver::Solver};
+/// let _ = ClauseDB::instantiate(&Config::default(), &CNFDescription::default());
+/// let _ = Solver::instantiate(&Config::default(), &CNFDescription::default());
+///```
 pub trait Instantiate {
+    /// make and return an object from `Config` and `CNFDescription`.
     fn instantiate(conf: &Config, cnf: &CNFDescription) -> Self;
     /// set up internal parameters.
-    fn adapt_to(&mut self, _state: &State) {}
+    /// # CAVEAT
+    /// some implementation might have a special premise to call: decision_level == 0.
+    fn adapt_to(&mut self, _state: &State, _num_conflict: usize) {}
 }
 
 /// API for O(n) deletion from a list, providing `delete_unstable`.
@@ -51,7 +79,7 @@ pub trait Delete<T> {
 
 /// 'Variable' identifier or 'variable' index, starting with one.
 /// Implementation note: NonZeroUsize can be used but requires a lot of changes.
-/// The current abstraction is imcomplete.
+/// The current abstraction is incomplete.
 pub type VarId = usize;
 
 /// Decision Level Representation.
@@ -77,11 +105,37 @@ pub type DecisionLevel = u32;
 /// ```
 #[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
 pub struct Lit {
+    /// literal encoded into folded u32
     ordinal: u32,
 }
 
 /// a dummy literal.
 pub const NULL_LIT: Lit = Lit { ordinal: 0 };
+
+impl fmt::Display for Lit {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}L", i32::from(self))
+    }
+}
+
+impl From<(VarId, bool)> for Lit {
+    #[inline]
+    fn from((vi, b): (VarId, bool)) -> Self {
+        Lit {
+            ordinal: ((vi as u32) * 2) + (b as u32),
+        }
+    }
+}
+
+impl From<(VarId, Option<bool>)> for Lit {
+    #[inline]
+    fn from((vi, ob): (VarId, Option<bool>)) -> Self {
+        match ob {
+            None => NULL_LIT,
+            Some(b) => Lit::from((vi, b)),
+        }
+    }
+}
 
 impl From<usize> for Lit {
     #[inline]
@@ -108,9 +162,11 @@ impl From<ClauseId> for Lit {
     }
 }
 
+/*
 /// While Lit::oridinal is private, Var::{index, assign} are public.
 /// So we define the following here.
-/// CAVEAT: Unassigned vars are converted to the null literal.
+/// # CAVEAT
+/// Unassigned vars are converted to the null literal.
 impl From<&Var> for Lit {
     fn from(v: &Var) -> Self {
         match v.assign {
@@ -135,6 +191,7 @@ impl From<&mut Var> for Lit {
         }
     }
 }
+*/
 
 impl From<Lit> for bool {
     /// - positive Lit (= even u32) => Some(true)
@@ -223,15 +280,15 @@ impl IndexMut<Lit> for Vec<bool> {
     }
 }
 
-impl Index<Lit> for Vec<Vec<crate::clause::Watch>> {
-    type Output = Vec<crate::clause::Watch>;
+impl Index<Lit> for Vec<Vec<Watch>> {
+    type Output = Vec<Watch>;
     #[inline]
     fn index(&self, l: Lit) -> &Self::Output {
         unsafe { self.get_unchecked(usize::from(l)) }
     }
 }
 
-impl IndexMut<Lit> for Vec<Vec<crate::clause::Watch>> {
+impl IndexMut<Lit> for Vec<Vec<Watch>> {
     #[inline]
     fn index_mut(&mut self, l: Lit) -> &mut Self::Output {
         unsafe { self.get_unchecked_mut(usize::from(l)) }
@@ -268,7 +325,7 @@ impl LitIF for Lit {
 
 /// API for Exponential Moving Average, EMA, like `get`, `reset`, `update` and so on.
 pub trait EmaIF {
-    /// the type of the argment of `update`.
+    /// the type of the argument of `update`.
     type Input;
     /// return the current value.
     fn get(&self) -> f64;
@@ -282,22 +339,33 @@ pub trait EmaIF {
     }
 }
 
-/// Exponential Moving Average w/ a calibrator
+/// Exponential Moving Average, with a calibrator if feature `ema_calibration` is on.
 #[derive(Debug)]
 pub struct Ema {
     val: f64,
-    // cal: f64,
+    #[cfg(feature = "ema_calibration")]
+    cal: f64,
     sca: f64,
 }
 
 impl EmaIF for Ema {
     type Input = f64;
+    #[cfg(not(feature = "ema_calibration"))]
     fn update(&mut self, x: Self::Input) {
         self.val = self.sca * x + (1.0 - self.sca) * self.val;
-        // self.cal = self.sca + (1.0 - self.sca) * self.cal;
     }
+    #[cfg(feature = "ema_calibration")]
+    fn update(&mut self, x: Self::Input) {
+        self.val = self.sca * x + (1.0 - self.sca) * self.val;
+        self.cal = self.sca + (1.0 - self.sca) * self.cal;
+    }
+    #[cfg(feature = "ema_calibration")]
     fn get(&self) -> f64 {
-        self.val // / self.cal
+        self.val / self.cal
+    }
+    #[cfg(not(feature = "ema_calibration"))]
+    fn get(&self) -> f64 {
+        self.val
     }
 }
 
@@ -305,19 +373,22 @@ impl Ema {
     pub fn new(s: usize) -> Ema {
         Ema {
             val: 0.0,
-            // cal: 0.0,
+            #[cfg(feature = "ema_calibration")]
+            cal: 0.0,
             sca: 1.0 / (s as f64),
         }
     }
 }
 
-/// Exponential Moving Average pair
+/// Exponential Moving Average pair, with a calibrator if feature `ema_calibration` is on.
 #[derive(Debug)]
 pub struct Ema2 {
     fast: f64,
     slow: f64,
-    // calf: f64,
-    // cals: f64,
+    #[cfg(feature = "ema_calibration")]
+    calf: f64,
+    #[cfg(feature = "ema_calibration")]
+    cals: f64,
     fe: f64,
     se: f64,
 }
@@ -327,18 +398,34 @@ impl EmaIF for Ema2 {
     fn get(&self) -> f64 {
         self.fast // / self.calf
     }
+    #[cfg(not(feature = "ema_calibration"))]
     fn update(&mut self, x: Self::Input) {
         self.fast = self.fe * x + (1.0 - self.fe) * self.fast;
         self.slow = self.se * x + (1.0 - self.se) * self.slow;
-        // self.calf = self.fe + (1.0 - self.fe) * self.calf;
-        // self.cals = self.se + (1.0 - self.se) * self.cals;
     }
+    #[cfg(feature = "ema_calibration")]
+    fn update(&mut self, x: Self::Input) {
+        self.fast = self.fe * x + (1.0 - self.fe) * self.fast;
+        self.slow = self.se * x + (1.0 - self.se) * self.slow;
+        self.calf = self.fe + (1.0 - self.fe) * self.calf;
+        self.cals = self.se + (1.0 - self.se) * self.cals;
+    }
+    #[cfg(not(feature = "ema_calibration"))]
     fn reset(&mut self) {
         self.slow = self.fast;
-        // self.cals = self.calf;
     }
+    #[cfg(feature = "ema_calibration")]
+    fn reset(&mut self) {
+        self.slow = self.fast;
+        self.cals = self.calf;
+    }
+    #[cfg(not(feature = "ema_calibration"))]
     fn trend(&self) -> f64 {
-        self.fast / self.slow // * (self.cals / self.calf)
+        self.fast / self.slow
+    }
+    #[cfg(feature = "ema_calibration")]
+    fn trend(&self) -> f64 {
+        self.fast / self.slow * (self.cals / self.calf)
     }
 }
 
@@ -347,8 +434,10 @@ impl Ema2 {
         Ema2 {
             fast: 0.0,
             slow: 0.0,
-            // calf: 0.0,
-            // cals: 0.0,
+            #[cfg(feature = "ema_calibration")]
+            calf: 0.0,
+            #[cfg(feature = "ema_calibration")]
+            cals: 0.0,
             fe: 1.0 / (f as f64),
             se: 1.0 / (f as f64),
         }
@@ -360,9 +449,9 @@ impl Ema2 {
     }
 }
 
-/// Internal errors
+/// Internal errors.
 /// Note: returning `Result<(), a-singleton>` is identical to returning `bool`.
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum SolverError {
     // StateUNSAT = 0,
     // StateSAT,
@@ -381,15 +470,52 @@ impl fmt::Display for SolverError {
     }
 }
 
-/// A Return type used by solver functions
+/// A Return type used by solver functions.
 pub type MaybeInconsistent = Result<(), SolverError>;
 
-/// data about a problem.
+/// CNF locator
+#[derive(Clone, Debug)]
+pub enum CNFIndicator {
+    /// not specified
+    Void,
+    /// from a file
+    File(String),
+    /// embedded directly
+    LitVec(usize),
+}
+
+impl Default for CNFIndicator {
+    fn default() -> Self {
+        CNFIndicator::Void
+    }
+}
+
+impl fmt::Display for CNFIndicator {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            CNFIndicator::Void => write!(f, "No CNF specified)"),
+            CNFIndicator::File(file) => write!(f, "CNF file({})", file),
+            CNFIndicator::LitVec(n) => write!(f, "A vec({} clauses)", n),
+        }
+    }
+}
+
+// impl CNFIndicator {
+//     pub fn to_string(&self) -> String {
+//         match self {
+//             CNFIndicator::Void => "(no cnf)".to_string(),
+//             CNFIndicator::File(f) => f.to_string(),
+//             CNFIndicator::LitVec(v) => format!("(embedded {} element vector)", v.len()).to_string(),
+//         }
+//     }
+// }
+
+/// Data storage about a problem.
 #[derive(Clone, Debug)]
 pub struct CNFDescription {
     pub num_of_variables: usize,
     pub num_of_clauses: usize,
-    pub pathname: String,
+    pub pathname: CNFIndicator,
 }
 
 impl Default for CNFDescription {
@@ -397,7 +523,7 @@ impl Default for CNFDescription {
         CNFDescription {
             num_of_variables: 0,
             num_of_clauses: 0,
-            pathname: "".to_string(),
+            pathname: CNFIndicator::Void,
         }
     }
 }
@@ -410,6 +536,24 @@ impl fmt::Display for CNFDescription {
             pathname: path,
         } = &self;
         write!(f, "CNF({}, {}, {})", nv, nc, path)
+    }
+}
+
+impl<V> From<&[V]> for CNFDescription
+where
+    V: AsRef<[i32]>,
+{
+    fn from(vec: &[V]) -> Self {
+        let num_of_variables = vec
+            .iter()
+            .map(|clause| clause.as_ref().iter().map(|l| l.abs()).max().unwrap_or(0))
+            .max()
+            .unwrap_or(0) as usize;
+        CNFDescription {
+            num_of_variables,
+            num_of_clauses: vec.len(),
+            pathname: CNFIndicator::LitVec(vec.len()),
+        }
     }
 }
 
@@ -473,15 +617,10 @@ impl TryFrom<&PathBuf> for CNFReader {
         let cnf = CNFDescription {
             num_of_variables: nv,
             num_of_clauses: nc,
-            pathname,
+            pathname: CNFIndicator::File(pathname),
         };
         Ok(CNFReader { cnf, reader })
     }
-}
-
-/// convert `[Lit]` to `[i32]` (for debug)
-pub fn vec2int(v: &[Lit]) -> Vec<i32> {
-    v.iter().map(|l| i32::from(*l)).collect::<Vec<_>>()
 }
 
 impl<T> Delete<T> for Vec<T> {
@@ -514,9 +653,12 @@ pub trait FlagIF {
 }
 
 bitflags! {
+    /// Misc flags used by `Clause` and `Var`.
     pub struct Flag: u16 {
 
-        /// For clause
+        //
+        //## For Clause
+        //
         /// a clause is stored in DB, but is a garbage now.
         const DEAD         = 0b0000_0000_0000_0001;
         /// a clause is a generated clause by conflict analysis and is removable.
@@ -530,15 +672,19 @@ bitflags! {
         /// mark to run garbage collector on the corresponding watcher lists
         const TOUCHED      = 0b0000_0000_0010_0000;
 
-        /// For var
-        /// the previous assigned value of a Var.
-        const PHASE        = 0b0000_0001_0000_0000;
+        //
+        //## For Var
+        //
         /// a var is eliminated and managed by eliminator.
-        const ELIMINATED   = 0b0000_0010_0000_0000;
+        const ELIMINATED   = 0b0000_0001_0000_0000;
         /// a var is checked during in the current conflict analysis.
-        const CA_SEEN      = 0b0000_0100_0000_0000;
-        /// NOT IN USE: a var is checked during in var rewarding.
-        const VR_SEEN      = 0b0000_1000_0000_0000;
+        const CA_SEEN      = 0b0000_0010_0000_0000;
+        /// the previous assigned value of a Var.
+        const PHASE        = 0b0000_0100_0000_0000;
+        /// the previous assigned value of a Var.
+        const BEST_PHASE   = 0b0000_1000_0000_0000;
+        /// the previous assigned value of a Var.
+        const REPHASE      = 0b0001_0000_0000_0000;
     }
 }
 

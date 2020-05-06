@@ -1,19 +1,20 @@
-A fast (but please don't compare with Cadical) SAT Solver for Propositional Logic in Rust
+A modern SAT Solver for Propositional Logic in Rust
 ----
 
-Splr is a pure [Rust](https://www.rust-lang.org)ic fast SAT solver, based on [Glucose 4.1](https://www.labri.fr/perso/lsimon/glucose/).
+Splr is a pure [Rust](https://www.rust-lang.org)ic modern SAT solver, based on [Glucose 4.1](https://www.labri.fr/perso/lsimon/glucose/).
 It adopts various research results on SAT solvers:
 
 - *CDCL*, *watch literals*, *LBD* and so on from Glucose, [Minisat](http://minisat.se) and the ancestors
-- Glucose-like dynamic blocking/forcing restarts based on [EMAs](https://arxiv.org/abs/1506.08905)
+- Glucose-like *dynamic blocking/forcing restarts* based on [EMAs](https://arxiv.org/abs/1506.08905) and [CaDiCaL](https://github.com/arminbiere/cadical)-like *stabilization*
 - pre/in-process simplification based on clause subsumption and variable elimination
-- a variant of **Learning Rate Based Branching** with **Reason Side Rewarding**
-- **chronological backtrack** aka **chronoBT**
+- compile-time selection of a variant of *Learning Rate Based Branching* with *Reason Side Rewarding* and EVSIDS
+- *chronological backtrack* aka *chronoBT*
 - Glucose-like heuristics adaptation
-
-Please check [ChangeLog](ChangeLog.md) about recent updates.
+- CaDiCaL-like extended phase saving
 
 *Many thanks to SAT researchers.*
+
+Please check [ChangeLog](ChangeLog.md) about recent updates.
 
 ## Install
 
@@ -59,25 +60,132 @@ $ dmcr tests/sample.cnf
 A valid assignment set for tests/sample.cnf is found in .ans_sample.cnf.
 ```
 
+Since 0.4.0, you can use Splr in your programs.
+
+```
+use splr::*;
+use std::convert::TryFrom;
+
+fn main() {
+    let v: Vec<Vec<i32>> = vec![vec![1, 2], vec![-1, 3], vec![1, -3], vec![-1, 2]];
+    match Certificate::try_from(v) {
+        Ok(Certificate::SAT(ans)) => println!("s SATISFIABLE: {:?}", ans),
+        Ok(Cetrificate::UNSAT) => println!("s UNSATISFIABLE"),
+        Err(e) => panic!("s UNKNOWN; {}", e),
+    }
+}
+```
+
+### Mnemonics used in the progress message
+
+| mnemonic  | meaning |
+| --------- |------- |
+| `v`  | the number of variables used in the given CNF file |
+| `c`  | the number of clauses used in the given CNF file |
+| `time`  | elapsed CPU time in seconds (or wall-clock time if CPU time is not available) |
+| `#conflict` | the number of conflicts |
+| `#decision` | the number of decisions |
+| `#propagate` | the number of propagates (its unit is literal) |
+| `#rem` | the number of remaining variables |
+| `#fix` | the number of solved variables (which has been assigned a value at decision level zero) |
+| `#elm` | the number of eliminated variables |
+| `prg%` | the percentage of `remaining variables / total variables` |
+| `Remv` | the number of learnt clauses which are not biclauses |
+| `LBD2` | the number of learnt clauses which LBDs are 2 |
+| `Binc` | the number of binary learnt clauses |
+| `Perm` | the number of given clauses and binary learnt clauses |
+| `#BLK` | the number of blocking restart |
+| `#RST` | the number of restart |
+| `tASG` | the trend rate of the number of assigned variables |
+| `tLBD` | the trend rate of learn clause's LBD |
+| `eLBD` | the EMA, Exponential Moving Average, of learn clauses' LBDs |
+| `cnfl` | the EMA of decision levels to which backjumps go |
+| `bjmp` | the EMA of decision levels at which conflicts occur |
+| `rpc%` | a percentage of restart per conflict |
+| `#rdc` | the number of `clause reduction` invocations |
+| `#smp` | the number of `clause and var simplification` invocations |
+| `2smp` | the number of literals to invoke the simplifier again |
+| `vdcy` | var activity decay rate |
+| `mode` | Selected strategy's id |
+| `time` | the elapsed CPU time in seconds |
+
+## Command line options
+
+Please check help message.
+
+* The 'switch' in help message below is either '1' or '0' to or not to use a module.
+* Splr can't handle compressed CNF files so far.
+
+```plain
+$ splr --help
+splr 0.4.0
+Narazaki Shuji <shujinarazaki@protonmail.com>
+A modern CDCL SAT solver in Rust
+
+USAGE:
+    splr [FLAGS] [OPTIONS] <cnf-file>
+
+FLAGS:
+    -h, --help        Prints help information
+    -C, --no-color    Disable coloring
+    -q, --quiet       Disable any progress message
+    -c, --certify     Writes a DRAT UNSAT certification file
+    -l, --log         Uses Glucose-like progress report
+    -V, --version     Prints version information
+
+OPTIONS:
+        --ADP <adaptive>          Strategy adaptation switch [default: 1]
+        --cbt <cbt-thr>           Level threshold to use chronoBT [default: 100]
+        --cl <clause-limit>       Soft limit of #clauses (6MC/GB) [default: 0]
+        --stat <dump-int>         Interval for dumping stat data [default: 0]
+        --PRO <elim>              Pre/in-processor switch [default: 1]
+        --ecl <elim-cls-lim>      Max #lit for clause subsume [default: 100]
+        --evl <elim-grw-lim>      Grow limit of #cls in var elim [default: 0]
+        --et <elim-trigger>       #cls to start simplification [default: 40000]
+        --evo <elim-var-occ>      Max #cls for var elimination [default: 10000]
+    -o, --dir <output-dir>        Output directory [default: .]
+    -p, --proof <proof-file>      Cert. file in DRAT format [default: proof.out]
+        --RDC <reduce>            Clause reduction switch [default: 1]
+        --RPH <rephase>           Rephase switch [default: 1]
+    -r, --result <result-file>    Result filename/stdout [default: ]
+        --RSR <rsr>               Reason-Side Rewarding switch [default: 1]
+        --ral <rst-asg-len>       Length for assignment average [default: 3500]
+        --rab <rst-asg-thr>       Blocking restart threshold [default: 1.40]
+        --rll <rst-lbd-len>       Length of LBD fast EMA [default: 50]
+        --rls <rst-lbd-slw>       Length of LBD slow EMA [default: 10000]
+        --rlt <rst-lbd-thr>       Forcing restart threshold [default: 0.70]
+        --rss <rst-stb-scl>       Stabilizer scaling [default: 2.0]
+        --rs <rst-step>           #conflicts between restarts [default: 50]
+        --STB <stabilize>         Stabilization switch [default: 1]
+    -t, --timeout <timeout>       CPU time limit in sec [default: 5000.0]
+        --vri <vrw-dcy-beg>       Initial var reward decay [default: 0.75]
+        --vrm <vrw-dcy-end>       Maximum var reward decay [default: 0.98]
+
+ARGS:
+    <cnf-file>    CNF file in DIMACS format
+```
+
 ## Correctness
 
 Though Splr comes with **ABSOLUTELY NO WARRANTY**, I'd like to show some results.
 
-#### Version 0.3.1
+#### Version 0.4.0 (splr-0.4.0)
 
-Splr version 0.3.1 (splr-0.3.1) was checked with the following problems:
+* [SAT Race 2019](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks](http://satcompetition.org/sr2019benchmarks.zip),  splr-0.4.0 solved with a 300 sec (soft) timeout:
+  * 41 satisfiable problems: all the solutions were correct.
+  * 5 unsatisfiable problems: all were verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
 
-* [SAT Race 2019](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks](http://satcompetition.org/sr2019benchmarks.zip),  splr-0.3.1 solved with a 200 sec timeout:
+#### Version 0.3.1 (splr-0.3.1)
+
+* [SAT Race 2019](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks](http://satcompetition.org/sr2019benchmarks.zip),  splr-0.3.1 solved with a 200 sec (soft) timeout:
   * 35 satisfiable problems: all the solutions were correct.
   * 4 unsatisfiable problems:
-    * 3 were verified with [grad](https://www21.in.tum.de/~lammich/grat/).
+    * 3 were verified with Grad.
 	* Verifying gto_p60c238-sc2018.cnf was timed out due to the size of the drat file (1.3 GB).
 
 ![](https://user-images.githubusercontent.com/997855/75087001-2f897800-557e-11ea-99fd-83d891f8350b.png)
 
-#### Version 0.1.0
-
-Splr version 0.1.0 (splr-0.1.0) was checked with the following problems:
+#### Version 0.1.0 (splr-0.1.0)
 
 * The first 100 problems from
   [SATLIB](https://www.cs.ubc.ca/~hoos/SATLIB/benchm.html),
