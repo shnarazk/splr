@@ -1,19 +1,18 @@
-## 0.4.0, 2020-12-31
+## 0.4.0, 2020-05-06
 
-- adapt to the output format defined in chapter 5 of [SAT competition 2011 rules](http://www.satcompetition.org/2011/rules.pdf)
-- merge assign.rs and var.rs into a module
-- better modularity and abstraction via traits
-- add and refactor restart module: `GeometricStabilizer`, `ProgressLBD`
 - change a lot of options' meanings and mnemonics
-- add some features for development: boundary_check, EVSIDS, trace_analysis
-- `propagate` skips up to the last position
+- adapt to the output format defined in chapter 5 of [SAT competition 2011 rules](http://www.satcompetition.org/2011/rules.pdf)
 - remove code about 'deep search' completely, superseded with stabilizing mode
-- stop *too* dynamic var decay control
-- change the activation timings of simplification
-- stats data are stored in each module
-- activate `JUST_USED` for clause reduction
 - implement a simple re-phase mechanism
 - implement `TryFrom<Vec<Vec<i32>>> for {Certificate, Solver}` for on-memory solving
+- add features for development: boundary_check, EVSIDS, trace_analysis, no_IO
+- better modularity and abstraction via traits and sub-modules
+- catch a rare crash case in `conflict_analyze`
+- `propagate` skips up to the last position; `propagate` skips up to the last position
+- change the activation timings of simplification
+- stop *too* dynamic var decay control
+- activate `JUST_USED` for clause reduction
+- stats data are stored in each module
 
 ## 0.3.2, 2020-03-20
 
