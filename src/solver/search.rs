@@ -9,14 +9,14 @@ use {
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarRewardIF, VarSelectIF},
         cdb::{ClauseDB, ClauseDBIF},
         processor::{EliminateIF, Eliminator},
-        state::{PhaseMode, Stat, State, StateIF},
+        state::{Stat, State, StateIF},
         types::*,
     },
     std::slice::Iter,
 };
 
 /// API for SAT solver like `build`, `solve` and so on.
-pub trait SatSolverSearchIF {
+pub trait SolveIF {
     /// search an assignment.
     ///
     /// # Errors
@@ -43,12 +43,11 @@ macro_rules! final_report {
     };
 }
 
-impl SatSolverSearchIF for Solver {
+impl SolveIF for Solver {
     /// # Examples
     ///
     /// ```
-    /// use splr::config::Config;
-    /// use splr::solver::{Certificate, SatSolverIF, Solver};
+    /// use splr::*;
     ///
     /// let config = Config::from("tests/sample.cnf");
     /// if let Ok(mut s) = Solver::build(&config) {
@@ -109,6 +108,7 @@ impl SatSolverSearchIF for Solver {
                 None => (),
             }
         }
+        asg.force_select_iter(elim.sorted_iterator());
         //
         //## Run eliminator
         //
@@ -117,11 +117,6 @@ impl SatSolverSearchIF for Solver {
         }
         if USE_PRE_PROCESSING_ELIMINATOR && elim.enable {
             state.flush("simplifying...");
-            // if 20_000_000 < state.target.num_of_clauses {
-            //     state.elim_eliminate_grow_limit = 0;
-            //     state.elim_eliminate_loop_limit = 1_000_000;
-            //     state.elim_subsume_loop_limit = 2_000_000;
-            // }
             if elim.simplify(asg, cdb, state).is_err() {
                 // Why inconsistent? Because the CNF contains a conflict, not an error!
                 // Or out of memory.
@@ -199,7 +194,7 @@ fn search(
     rst: &mut Restarter,
     state: &mut State,
 ) -> Result<bool, SolverError> {
-    let mut replay_best = false;
+    let mut rst_stabilize = false;
     let mut a_decision_was_made = false;
     let mut num_assigned = asg.num_solved_vars;
     rst.update(RestarterModule::Luby, 0);
@@ -223,9 +218,6 @@ fn search(
                 analyze_final(asg, state, &cdb[ci]);
                 return Ok(false);
             }
-            if num_assigned < asg.stack_len() + asg.num_eliminated_vars {
-                replay_best = false;
-            }
             handle_conflict(asg, cdb, elim, rst, state, ci)?;
             if a_decision_was_made {
                 a_decision_was_made = false;
@@ -245,7 +237,9 @@ fn search(
         }
         // Simplification has been postponed because chronoBT was used.
         if asg.decision_level() == asg.root_level {
-            replay_best = true;
+            if state.stabilize {
+                asg.force_rephase();
+            }
             // `elim.to_simplify` is increased much in particular when vars are solved or
             // learnts are small. We don't need to count the number of solved vars.
             if state.config.elim_trigger < elim.to_simplify as usize {
@@ -261,36 +255,20 @@ fn search(
                 asg.num_solved_vars = asg.stack_len();
             }
         }
+        let na = asg.best_assigned(Flag::PHASE);
+        if num_assigned < na {
+            num_assigned = na;
+            state.flush("");
+            state.flush(format!("unreachable: {}", asg.num_vars - num_assigned));
+        }
         if !asg.remains() {
-            //
-            //## set phase mode
-            //
-            state.stabilize = state.config.stabilize && rst.stabilizing();
-            let na = asg.best_assigned(Flag::BEST_PHASE);
-            if num_assigned < na {
-                num_assigned = na;
-                // back_to_zero = false;
-                state.flush("");
-                state.flush(format!("unreachable: {}", asg.num_vars - num_assigned));
+            let rs = rst.stabilizing();
+            if rst_stabilize != rs {
+                rst_stabilize = rs;
+                state.stabilize = state.config.use_stabilize() && rs;
             }
-            state.phase_select = if replay_best && state.stabilize {
-                PhaseMode::Best
-            } else {
-                PhaseMode::Latest
-            };
-            let vi = asg.select_var();
-            let p = match state.phase_select {
-                PhaseMode::Best => asg.var(vi).is(Flag::BEST_PHASE),
-                PhaseMode::BestRnd => match ((asg.activity(vi) * 10000.0) as usize) % 4 {
-                    0 => asg.var(vi).is(Flag::BEST_PHASE),
-                    _ => asg.var(vi).is(Flag::PHASE),
-                },
-                PhaseMode::Invert => !asg.var(vi).is(Flag::PHASE),
-                PhaseMode::Latest => asg.var(vi).is(Flag::PHASE),
-                PhaseMode::Random => ((asg.activity(vi) * 10000.0) as usize) % 2 == 0,
-                PhaseMode::Target => asg.var(vi).is(Flag::TARGET_PHASE),
-            };
-            asg.assign_by_decision(Lit::from_assign(vi, p));
+            let lit = asg.select_decision_literal(&state.phase_select);
+            asg.assign_by_decision(lit);
             state[Stat::Decision] += 1;
             a_decision_was_made = true;
         }
@@ -315,9 +293,6 @@ fn adapt_modules(
             elim.simplify(asg, cdb, state)?;
         }
         state.select_strategy(asg, cdb);
-        // if state.strategy.0 == SearchStrategy::HighSuccesive {
-        //     state.config.cbt_thr = 0;
-        // }
     }
     #[cfg(feature = "boundary_check")]
     assert!(state.strategy.1 != asg_num_conflict || 0 == asg.decision_level());

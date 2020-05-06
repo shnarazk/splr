@@ -1,6 +1,6 @@
 //! Solver Builder
 use {
-    super::{restart::Restarter, Certificate, SatSolverIF, Solver, SolverResult, State, StateIF},
+    super::{restart::Restarter, Certificate, Solver, SolverResult, State, StateIF},
     crate::{
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
         cdb::{ClauseDB, ClauseDBIF},
@@ -17,20 +17,16 @@ use std::{
 };
 
 /// API for SAT solver like `build`, `solve` and so on.
-pub trait SatSolverBuildIF {
+pub trait SatSolverIF {
+    /// add a clause to Solver.
+    fn add_unchecked_clause(&mut self, lits: &mut Vec<Lit>) -> Option<ClauseId>;
     /// make a solver and load a CNF into it.
     ///
     /// # Errors
     ///
     /// IO error by failing to load a CNF file.
     #[cfg(not(feature = "no_IO"))]
-    fn solver_build(config: &Config) -> Result<Solver, SolverError>;
-    /// search an assignment.
-    ///
-    /// # Errors
-    ///
-    /// if solver becomes inconsistent by an internal error.
-    fn solver_add_unchecked_clause(&mut self, v: &mut Vec<Lit>) -> Option<ClauseId>;
+    fn build(config: &Config) -> Result<Solver, SolverError>;
 }
 
 impl Default for Solver {
@@ -95,23 +91,9 @@ impl TryFrom<&str> for Solver {
     }
 }
 
-impl SatSolverBuildIF for Solver {
-    /// # Examples
-    ///
-    /// ```
-    /// use splr::config::Config;
-    /// use splr::solver::{SatSolverIF, Solver};
-    ///
-    /// let config = Config::from("tests/sample.cnf");
-    /// assert!(Solver::build(&config).is_ok());
-    ///```
-    #[cfg(not(feature = "no_IO"))]
-    fn solver_build(config: &Config) -> Result<Solver, SolverError> {
-        let CNFReader { cnf, reader } = CNFReader::try_from(&config.cnf_file)?;
-        Solver::instantiate(config, &cnf).inject(reader)
-    }
+impl SatSolverIF for Solver {
     // renamed from clause_new
-    fn solver_add_unchecked_clause(&mut self, lits: &mut Vec<Lit>) -> Option<ClauseId> {
+    fn add_unchecked_clause(&mut self, lits: &mut Vec<Lit>) -> Option<ClauseId> {
         let Solver {
             ref mut asg,
             ref mut cdb,
@@ -151,6 +133,20 @@ impl SatSolverBuildIF for Solver {
                 Some(cid)
             }
         }
+    }
+    /// # Examples
+    ///
+    /// ```
+    /// use splr::config::Config;
+    /// use splr::solver::{SatSolverIF, Solver};
+    ///
+    /// let config = Config::from("tests/sample.cnf");
+    /// assert!(Solver::build(&config).is_ok());
+    ///```
+    #[cfg(not(feature = "no_IO"))]
+    fn build(config: &Config) -> Result<Solver, SolverError> {
+        let CNFReader { cnf, reader } = CNFReader::try_from(&config.cnf_file)?;
+        Solver::instantiate(config, &cnf).inject(reader)
     }
 }
 

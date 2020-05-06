@@ -1,7 +1,7 @@
-A fast SAT Solver for Propositional Logic in Rust
+A modern SAT Solver for Propositional Logic in Rust
 ----
 
-Splr is a pure [Rust](https://www.rust-lang.org)ic fast SAT solver, based on [Glucose 4.1](https://www.labri.fr/perso/lsimon/glucose/).
+Splr is a pure [Rust](https://www.rust-lang.org)ic modern SAT solver, based on [Glucose 4.1](https://www.labri.fr/perso/lsimon/glucose/).
 It adopts various research results on SAT solvers:
 
 - *CDCL*, *watch literals*, *LBD* and so on from Glucose, [Minisat](http://minisat.se) and the ancestors
@@ -63,20 +63,18 @@ A valid assignment set for tests/sample.cnf is found in .ans_sample.cnf.
 Since 0.4.0, you can use Splr in your programs.
 
 ```
-use splr::{Certificate, Config, SatSolverIF, Solver};
+use splr::*;
 use std::convert::TryFrom;
 
 fn main() {
     let v: Vec<Vec<i32>> = vec![vec![1, 2], vec![-1, 3], vec![1, -3], vec![-1, 2]];
-    let s = Solver::try_from((Config::default(), v.as_ref()));
-    match s.map_or_else(|e| e, |mut solver| solver.solve()) {
+    match Certificate::try_from(v) {
         Ok(Certificate::SAT(ans)) => println!("s SATISFIABLE: {:?}", ans),
         Ok(Cetrificate::UNSAT) => println!("s UNSATISFIABLE"),
-        Err(e) => panic!("{}", e),
+        Err(e) => panic!("s UNKNOWN; {}", e),
     }
 }
 ```
-
 
 ### Mnemonics used in the progress message
 
@@ -115,6 +113,9 @@ fn main() {
 
 Please check help message.
 
+* The 'switch' in help message below is either '1' or '0' to or not to use a module.
+* Splr can't handle compressed CNF files so far.
+
 ```plain
 $ splr --help
 splr 0.4.0
@@ -131,20 +132,23 @@ FLAGS:
     -c, --certify     Writes a DRAT UNSAT certification file
     -l, --log         Uses Glucose-like progress report
     -V, --version     Prints version information
-    -A, --no-adapt    Disables dynamic strategy adaptation
-    -E, --no-elim     Disables exhaustive simplification
 
 OPTIONS:
+        --ADP <adaptive>          Strategy adaptation switch [default: 1]
         --cbt <cbt-thr>           Level threshold to use chronoBT [default: 100]
         --cl <clause-limit>       Soft limit of #clauses (6MC/GB) [default: 0]
-        --stat <dump-int>         Interval for dumpping stat data [default: 0]
+        --stat <dump-int>         Interval for dumping stat data [default: 0]
+        --PRO <elim>              Pre/in-processor switch [default: 1]
         --ecl <elim-cls-lim>      Max #lit for clause subsume [default: 100]
         --evl <elim-grw-lim>      Grow limit of #cls in var elim [default: 0]
-        --et <elim-trigger>       #cls to start simplification [default: 8192]
+        --et <elim-trigger>       #cls to start simplification [default: 40000]
         --evo <elim-var-occ>      Max #cls for var elimination [default: 10000]
     -o, --dir <output-dir>        Output directory [default: .]
     -p, --proof <proof-file>      Cert. file in DRAT format [default: proof.out]
+        --RDC <reduce>            Clause reduction switch [default: 1]
+        --RPH <rephase>           Rephase switch [default: 1]
     -r, --result <result-file>    Result filename/stdout [default: ]
+        --RSR <rsr>               Reason-Side Rewarding switch [default: 1]
         --ral <rst-asg-len>       Length for assignment average [default: 3500]
         --rab <rst-asg-thr>       Blocking restart threshold [default: 1.40]
         --rll <rst-lbd-len>       Length of LBD fast EMA [default: 50]
@@ -152,7 +156,10 @@ OPTIONS:
         --rlt <rst-lbd-thr>       Forcing restart threshold [default: 0.70]
         --rss <rst-stb-scl>       Stabilizer scaling [default: 2.0]
         --rs <rst-step>           #conflicts between restarts [default: 50]
+        --STB <stabilize>         Stabilization switch [default: 1]
     -t, --timeout <timeout>       CPU time limit in sec [default: 5000.0]
+        --vri <vrw-dcy-beg>       Initial var reward decay [default: 0.75]
+        --vrm <vrw-dcy-end>       Maximum var reward decay [default: 0.98]
 
 ARGS:
     <cnf-file>    CNF file in DIMACS format

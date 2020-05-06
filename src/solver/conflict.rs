@@ -166,7 +166,6 @@ pub fn handle_conflict(
         }
         asg.num_solved_vars += 1;
         rst.update(RestarterModule::Reset, 0);
-        state.last_solved = ncnfl;
     } else {
         {
             // At the present time, some reason clauses can contain first UIP or its negation.

@@ -57,6 +57,8 @@ pub enum PhaseMode {
     Random,
     /// use the best phases in the current segment.
     Target,
+    ///
+    Worst,
 }
 
 impl fmt::Display for PhaseMode {
@@ -71,6 +73,7 @@ impl fmt::Display for PhaseMode {
                 PhaseMode::Latest => "ps_Lastest",
                 PhaseMode::Random => "ps_Random",
                 PhaseMode::Target => "ps_Target",
+                PhaseMode::Worst => "ps_Worst",
             }
         )
     }
@@ -194,8 +197,6 @@ pub struct State {
     pub conflicts: Vec<Lit>,
     /// hold the previous number of non-conflicting assignment
     pub last_asg: usize,
-    /// hold the previous number of solved vars
-    pub last_solved: usize,
     /// working place to build learnt clauses
     pub new_learnt: Vec<Lit>,
     /// `progress` invocation counter
@@ -224,7 +225,6 @@ impl Default for State {
             c_lvl: Ema::new(5_000),
             conflicts: Vec::new(),
             last_asg: 0,
-            last_solved: 0,
             new_learnt: Vec::new(),
             progress_cnt: 0,
             record: ProgressRecord::default(),
@@ -254,10 +254,10 @@ impl Instantiate for State {
     fn instantiate(config: &Config, cnf: &CNFDescription) -> State {
         State {
             config: config.clone(),
-            strategy: if config.without_adaptive_strategy {
-                (SearchStrategy::Generic, 0)
-            } else {
+            strategy: if config.use_adaptive() {
                 (SearchStrategy::Initial, 0)
+            } else {
+                (SearchStrategy::Generic, 0)
             },
             target: cnf.clone(),
             time_limit: config.timeout,
@@ -377,7 +377,7 @@ impl StateIF for State {
         A: AssignIF,
         C: ClauseDBIF,
     {
-        if self.config.without_adaptive_strategy {
+        if !self.config.use_adaptive() {
             return;
         }
         let (asg_num_conflict, _num_propagation, _num_restart, _) = asg.exports();

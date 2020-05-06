@@ -20,7 +20,7 @@ pub use self::{
 
 use {
     self::heap::{VarHeapIF, VarOrderIF},
-    super::types::*,
+    super::{state::State, types::*},
     std::{ops::Range, slice::Iter},
 };
 
@@ -40,6 +40,8 @@ pub trait VarRewardIF {
     fn reward_at_unassign(&mut self, vi: VarId);
     /// update internal counter.
     fn reward_update(&mut self);
+    /// update reward setting as a part of module adoptation.
+    fn adjust_reward(&mut self, state: &State);
 }
 
 /// API for assignment like `propagate`, `enqueue`, `cancel_until`, and so on.
@@ -120,17 +122,15 @@ pub struct AssignStack {
     pub root_level: DecisionLevel,
     conflicts: (VarId, VarId),
     var_order: VarIdHeap, // Variable Order
+    temp_order: Vec<Lit>,
 
     //
     //## Phase handling
     //
+    use_rephase: bool,
     best_assign: bool,
     build_best_at: usize,
     num_best_assign: usize,
-
-    target_assign: bool,
-    build_target_at: usize,
-    num_target_assign: usize,
 
     //
     //## Statistics
@@ -174,5 +174,6 @@ pub struct VarIdHeap {
     /// order : usize -> VarId, -- Which var is the n-th best?
     heap: Vec<VarId>,
     /// VarId : -> order : usize -- How good is the var?
+    /// idxs[0] contais the number of alive elements
     idxs: Vec<usize>,
 }

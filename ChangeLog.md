@@ -12,7 +12,8 @@
 - change the activation timings of simplification
 - stats data are stored in each module
 - activate `JUST_USED` for clause reduction
-- implement `TryFrom<(Config: Vec<Vec<i32>>)> for Solver` for on-memory solving
+- implement a simple re-phase mechanism
+- implement `TryFrom<Vec<Vec<i32>>> for {Certificate, Solver}` for on-memory solving
 
 ## 0.3.2, 2020-03-20
 

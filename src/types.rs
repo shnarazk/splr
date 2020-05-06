@@ -37,7 +37,9 @@ pub trait LitIF {
 
 /// API for clause and var rewarding.
 pub trait ActivityIF {
+    /// type for index
     type Ix;
+    /// an extra parameter for bumping
     type Inc;
     /// return the current activity of an element.
     fn activity(&mut self, vi: Self::Ix) -> f64;
@@ -679,13 +681,10 @@ bitflags! {
         const CA_SEEN      = 0b0000_0010_0000_0000;
         /// the previous assigned value of a Var.
         const PHASE        = 0b0000_0100_0000_0000;
-        /// the value of a Var in the best trail.
+        /// the previous assigned value of a Var.
         const BEST_PHASE   = 0b0000_1000_0000_0000;
-        /// the value of a Var in the best trail during a stabilized period.
-        const TARGET_PHASE = 0b0001_0000_0000_0000;
-
-        /// NOT IN USE: a var is checked during in var rewarding.
-        const VR_SEEN      = 0b1000_0000_0000_0000;
+        /// the previous assigned value of a Var.
+        const REPHASE      = 0b0001_0000_0000_0000;
     }
 }
 

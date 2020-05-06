@@ -9,17 +9,46 @@ It adopts various research results on SAT solvers:
 - Glucose-like dynamic blocking/forcing restarts based on [EMAs](https://arxiv.org/abs/1506.08905)
 - heuristics adaptation
 - pre/in-process simplification based on clause subsumption and variable elimination
+- Chronological backtrack and non-chronological backjump
 - Learning Rate Based Branching and Reason Side Rewarding
+- Rephase
+- Search stabilization
 
 *Many thanks to SAT researchers.*
+
+# Examples
+
+## Build a solver from a configuration based on a CNF file, then solve it.
+
+```
+use splr::*;
+
+let config = Config::from("tests/sample.cnf");
+if let Ok(mut s) = Solver::build(&config) {
+    if let Ok(ans) = s.solve() {
+        println!("{:?}", ans);
+    }
+}
+```
+
+## On-memory direct conversion from a vec to a solution
+
+```
+use {splr::*, std::convert::TryFrom};
+
+let v: Vec<Vec<i32>> = vec![vec![1, 2], vec![-1, 3], vec![1, -3], vec![-1, 2]];
+match Certificate::try_from(v).expect("panic!") {
+    Certificate::UNSAT => 0,
+    Certificate::SAT(vec) => vec.len(),
+};
+```
+
 */
 /// Crate `assign` implements Boolean Constraint Propagation and decision var selection.
 pub mod assign;
-/// Crate `cdb` provides `clause` object and its manager `ClauseDB`
+/// Crate `cdb` provides `Clause` object and its manager `ClauseDB`
 pub mod cdb;
 /// Crate `config` provides solver's configuration and CLI.
-#[cfg_attr(not(feature = "no_IO"), path = "config.rs")]
-#[cfg_attr(feature = "no_IO", path = "config_no_io.rs")]
 pub mod config;
 /// Crate `processor` implements a simplifier: clause subsumption and var elimination.
 pub mod processor;
@@ -32,7 +61,7 @@ pub mod types;
 
 pub use {
     config::Config,
-    solver::{Certificate, SatSolverIF, Solver, ValidateIF},
+    solver::{Certificate, SatSolverIF, SolveIF, Solver, ValidateIF},
     types::SolverError,
 };
 

@@ -41,6 +41,7 @@ fn main() {
         .unwrap_or_else(|| panic!("{} does not exist.", args.problem.to_str().unwrap()));
     let mut config = Config::default();
     config.cnf_file = args.problem.clone();
+    config.quiet_mode = true;
     let (red, green, blue) = if args.no_color {
         (RESET, RESET, RESET)
     } else {
@@ -139,6 +140,8 @@ fn read_assignment(rs: &mut dyn BufRead, cnf: &str, assign: &Option<PathBuf>) ->
                     } else if let Some(asg) = assign {
                         println!("{} seems an illegal format file.", asg.to_str().unwrap(),);
                         return None;
+                    } else {
+                        buf.clear();
                     }
                 }
                 if buf.starts_with("v ") {
@@ -152,6 +155,7 @@ fn read_assignment(rs: &mut dyn BufRead, cnf: &str, assign: &Option<PathBuf>) ->
                     }
                     return Some(v);
                 }
+                panic!("Failed to parse here: {}", buf);
             }
             Err(e) => panic!("{}", e),
         }

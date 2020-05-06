@@ -55,15 +55,14 @@ impl Default for AssignStack {
             root_level: 0,
             conflicts: (0, 0),
             var_order: VarIdHeap::default(),
+            temp_order: Vec::new(),
             num_vars: 0,
             num_solved_vars: 0,
             num_eliminated_vars: 0,
+            use_rephase: true,
             best_assign: false,
             build_best_at: 0,
             num_best_assign: 0,
-            target_assign: false,
-            build_target_at: 0,
-            num_target_assign: 0,
             num_conflict: 0,
             num_propagation: 0,
             num_restart: 0,
@@ -91,7 +90,7 @@ impl From<&mut AssignStack> for Vec<i32> {
 }
 
 impl Instantiate for AssignStack {
-    fn instantiate(_cfg: &Config, cnf: &CNFDescription) -> AssignStack {
+    fn instantiate(config: &Config, cnf: &CNFDescription) -> AssignStack {
         let nv = cnf.num_of_variables;
         AssignStack {
             assign: vec![None; 1 + nv],
@@ -100,7 +99,10 @@ impl Instantiate for AssignStack {
             trail: Vec::with_capacity(nv),
             var_order: VarIdHeap::new(nv, nv),
             num_vars: cnf.num_of_variables,
+            use_rephase: config.use_rephase(),
             var: Var::new_vars(nv),
+            activity_decay: config.vrw_dcy_beg,
+            activity_decay_max: config.vrw_dcy_end.max(config.vrw_dcy_beg),
             ..AssignStack::default()
         }
     }
@@ -170,12 +172,17 @@ impl AssignIF for AssignStack {
     #[allow(clippy::single_match)]
     fn best_assigned(&mut self, flag: Flag) -> usize {
         match flag {
-            Flag::BEST_PHASE => {
-                if self.best_assign {
-                    self.best_assign = false;
+            Flag::PHASE => {
+                if self.build_best_at == self.num_propagation {
                     return self.num_best_assign;
                 }
             }
+            // Flag::BEST_PHASE => {
+            //     if self.best_assign {
+            //         self.best_assign = false;
+            //         return self.num_best_assign;
+            //     }
+            // }
             // Flag::TARGET_PHASE => {
             //     if self.target_assign {
             //         self.target_assign = false;
