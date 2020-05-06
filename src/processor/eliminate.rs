@@ -97,7 +97,7 @@ where
 fn skip_var_elimination<A, C>(
     asg: &A,
     cdb: &C,
-    elim: &mut Eliminator,
+    elim: &Eliminator,
     pos: &[ClauseId],
     neg: &[ClauseId],
     v: VarId,
