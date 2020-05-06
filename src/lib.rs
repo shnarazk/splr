@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/splr/0.4.0")]
+#![doc(html_root_url = "https://docs.rs/splr/0.4.1")]
 /*!
 # A modern CDCL SAT solver in Rust
 
@@ -42,6 +42,11 @@ match Certificate::try_from(v).expect("panic!") {
     Certificate::SAT(vec) => vec.len(),
 };
 ```
+
+## Incremental solver
+
+Splr provides 'incremental solver mode' if you built it with feature 'incremental_solver'.
+This document covers extra functions only if you built it with `cargo doc --features incremental_sorver`.
 
 */
 /// Crate `assign` implements Boolean Constraint Propagation and decision var selection.

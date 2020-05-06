@@ -1,7 +1,7 @@
 /// main struct AssignStack
 use {
-    super::{AssignIF, AssignStack, Var, VarIdHeap, VarManipulateIF, VarOrderIF},
-    crate::{state::State, types::*},
+    super::{AssignIF, AssignStack, Var, VarIdHeap, VarManipulateIF, VarOrderIF, VarSelectIF},
+    crate::{solver::SolverEvent, types::*},
     std::{fmt, ops::Range, slice::Iter},
 };
 
@@ -18,11 +18,6 @@ use {
 pub trait ClauseManipulateIF {
     /// return `true` if the set of literals is satisfiable under the current assignment.
     fn satisfies(&self, c: &[Lit]) -> bool;
-    /// return Option<bool>
-    /// - Some(true) -- the literals is satisfied by a literal
-    /// - Some(false) -- the literals is unsatisfied; no unassigned literal
-    /// - None -- the literals contains an unassigned literal
-    fn status(&self, c: &[Lit]) -> Option<bool>;
     /// return `true` is the clause is the reason of the assignment.
     fn locked(&self, c: &Clause, cid: ClauseId) -> bool;
 }
@@ -106,8 +101,38 @@ impl Instantiate for AssignStack {
             ..AssignStack::default()
         }
     }
-    #[allow(unused_variables)]
-    fn adapt_to(&mut self, state: &State, num_conflict: usize) {}
+    fn handle(&mut self, e: SolverEvent) {
+        match e {
+            SolverEvent::Adapt(_, _) => (),
+            SolverEvent::Conflict => {}
+            SolverEvent::Fixed => {
+                self.num_solved_vars += 1;
+            }
+            SolverEvent::NewVar => {
+                self.assign.push(None);
+                self.level.push(DecisionLevel::default());
+                self.reason.push(AssignReason::default());
+                self.var_order.heap.push(0);
+                self.var_order.idxs.push(0);
+                self.var_order.clear();
+                self.num_vars += 1;
+                self.var.push(Var::from(self.num_vars));
+            }
+            SolverEvent::Reinitialize => {
+                assert_eq!(self.decision_level(), self.root_level);
+                self.q_head = 0;
+                self.num_eliminated_vars =
+                    self.var.iter().filter(|v| v.is(Flag::ELIMINATED)).count();
+                self.num_solved_vars = if self.trail.is_empty() {
+                    0
+                } else {
+                    self.trail.len()
+                };
+                self.rebuild_order();
+            }
+            _ => (),
+        }
+    }
 }
 
 impl Export<(usize, usize, usize, f64)> for AssignStack {
@@ -166,6 +191,9 @@ impl AssignIF for AssignStack {
     fn recurrent_conflicts(&self) -> bool {
         self.conflicts.0 == self.conflicts.1
     }
+    fn assign_ref(&self) -> &[Option<bool>] {
+        &self.assign
+    }
     fn level_ref(&self) -> &[DecisionLevel] {
         &self.level
     }
@@ -196,9 +224,29 @@ impl AssignIF for AssignStack {
         }
         0
     }
-    fn extend_model(&mut self, lits: &[Lit]) {
+    #[allow(unused_variables)]
+    fn extend_model<C>(&mut self, cdb: &mut C, lits: &[Lit]) -> Vec<Option<bool>>
+    where
+        C: ClauseDBIF,
+    {
+        #[cfg(feature = "trace_elimination")]
+        println!(
+            "# extend_model\n - as i32: {:?}\n - as raw: {:?}",
+            i32s(lits),
+            lits.iter()
+                .map(|l| {
+                    let i = i32::from(l);
+                    if i < 0 {
+                        -2 * i
+                    } else {
+                        2 * i + 1
+                    }
+                })
+                .collect::<Vec<_>>(),
+        );
+        let mut extended_model: Vec<Option<bool>> = self.assign.clone();
         if lits.is_empty() {
-            return;
+            return extended_model;
         }
         let mut i = lits.len() - 1;
         let mut width;
@@ -208,14 +256,46 @@ impl AssignIF for AssignStack {
                 break;
             }
             i -= 1;
+            #[cfg(feature = "incremental_solver")]
+            let mut phantom_clause = Vec::new();
             loop {
                 if width <= 1 {
                     break;
                 }
                 let l = lits[i];
-                if self.assign(l.vi()) != Some(!bool::from(l)) {
+                #[cfg(feature = "incremental_solver")]
+                {
+                    phantom_clause.push(l);
+                }
+                if extended_model[l.vi()] != Some(!bool::from(l)) {
                     if i < width {
+                        #[cfg(feature = "incremental_solver")]
+                        {
+                            for l in &lits[..i] {
+                                phantom_clause.push(*l);
+                            }
+                            assert!(1 < phantom_clause.len());
+                            #[cfg(feature = "trace_elimination")]
+                            println!(
+                                "- pull back clause E {:?}",
+                                phantom_clause.iter().map(i32::from).collect::<Vec<_>>()
+                            );
+                            cdb.new_clause(self, &mut phantom_clause, false, false);
+                        }
                         break 'next;
+                    }
+                    #[cfg(feature = "incremental_solver")]
+                    {
+                        for l in &lits[i - width + 1..i] {
+                            phantom_clause.push(*l);
+                        }
+                        assert!(1 < phantom_clause.len());
+                        #[cfg(feature = "trace_elimination")]
+                        println!(
+                            "- pull back clause C {:?}",
+                            phantom_clause.iter().map(i32::from).collect::<Vec<_>>()
+                        );
+                        cdb.new_clause(self, &mut phantom_clause, false, false);
                     }
                     i -= width;
                     continue 'next;
@@ -225,17 +305,37 @@ impl AssignIF for AssignStack {
             }
             debug_assert!(width == 1);
             let l = lits[i];
-            // debug_assert!(model[l.vi() - 1] != l.negate().int());
-            self.assign[l.vi()] = Some(bool::from(l));
+            debug_assert_ne!(Some(bool::from(l)), self.assigned(l));
+            #[cfg(feature = "trace_elimination")]
+            println!(" - extend {}", l);
+            extended_model[l.vi()] = Some(bool::from(l));
             if i < width {
                 break;
             }
             i -= width;
         }
+        extended_model
     }
 }
 
 impl AssignStack {
+    #[cfg(feature = "boundary_check")]
+    pub fn dump<'a, V: IntoIterator<Item = &'a Lit, IntoIter = Iter<'a, Lit>>>(
+        &mut self,
+        v: V,
+    ) -> Vec<(i32, DecisionLevel, bool, Option<bool>)> {
+        v.into_iter()
+            .map(|l| {
+                (
+                    i32::from(l),
+                    self.level(l.vi()),
+                    self.reason(l.vi()) == AssignReason::default(),
+                    self.assign(l.vi()),
+                )
+            })
+            .collect::<Vec<(i32, DecisionLevel, bool, Option<bool>)>>()
+    }
+
     /// dump all active clauses and fixed assignments as a CNF file.
     #[cfg(not(feature = "no_IO"))]
     #[allow(dead_code)]
@@ -277,19 +377,41 @@ impl AssignStack {
 impl fmt::Display for AssignStack {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let v = self.trail.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
-        let len = self.decision_level();
-        let c = |i| {
-            let a = self.len_upto(i);
-            match i {
-                0 => (0, &v[0..a]),
-                x if x == len - 1 => (i + 1, &v[a..]),
-                x => (x + 1, &v[a..self.len_upto(x + 1)]),
+        let levels = self.decision_level();
+        let c = |i| match i {
+            0 => {
+                let a = self.len_upto(i);
+                (0, &v[0..a])
+            }
+            x if x == levels => {
+                let a = self.len_upto(levels - 1);
+                (levels, &v[a..])
+            }
+            x => {
+                let a = self.len_upto(x - 1);
+                (x, &v[a..self.len_upto(x)])
             }
         };
-        if 0 < len {
-            write!(f, "{:?}", (0..len).map(c).collect::<Vec<_>>())
+        if 0 < levels {
+            write!(
+                f,
+                "ASG:: trail({}):{:?}\n      solved: level: {}, solved: {}, elimed: {}",
+                self.trail.len(),
+                (0..=levels).map(c).collect::<Vec<_>>(),
+                levels,
+                self.num_solved_vars,
+                self.num_eliminated_vars,
+            )
         } else {
-            write!(f, "# - trail[  0]  [0{:?}]", &v)
+            write!(
+                f,
+                "ASG:: trail({}):[(0, {:?})]\n      level: {}, solved: {}, elimed: {}",
+                self.trail.len(),
+                &v,
+                levels,
+                self.num_solved_vars,
+                self.num_eliminated_vars,
+            )
         }
     }
 }

@@ -8,6 +8,7 @@ use {
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarRewardIF},
         cdb::{ClauseDB, ClauseDBIF},
         processor::{EliminateIF, Eliminator},
+        solver::SolverEvent,
         types::*,
     },
 };
@@ -32,14 +33,14 @@ pub fn handle_conflict(
         }
     }
 
-    let (ncnfl, _num_propagation, asg_num_restart, _) = asg.exports();
+    let (num_conflict, _num_propagation, asg_num_restart, _) = asg.exports();
     // If we can settle this conflict w/o restart, solver will get a big progress.
-    let switch_chronobt = if ncnfl < 1000 || asg.recurrent_conflicts() {
+    let switch_chronobt = if num_conflict < 1000 || asg.recurrent_conflicts() {
         Some(false)
     } else {
         None
     };
-    rst.update(RestarterModule::Counter, ncnfl);
+    rst.update(RestarterModule::Counter, num_conflict);
 
     if 0 < state.last_asg {
         rst.update(RestarterModule::ASG, asg.stack_len());
@@ -54,8 +55,8 @@ pub fn handle_conflict(
     if use_chronobt {
         let level = asg.level_ref();
         let c = &cdb[ci];
-        let lcnt = c.iter().filter(|l| level[l.vi()] == original_dl).count();
-        if 1 == lcnt {
+        let lit_count = c.iter().filter(|l| level[l.vi()] == original_dl).count();
+        if 1 == lit_count {
             debug_assert!(c.iter().any(|l| level[l.vi()] == original_dl));
             let decision = *c.iter().find(|l| level[l.vi()] == original_dl).unwrap();
             let snd_l = c
@@ -65,14 +66,17 @@ pub fn handle_conflict(
                 .max()
                 .unwrap_or(0);
             if 0 < snd_l {
-                // If the conflicting clause contains one literallfrom the maximal
+                // If the conflicting clause contains one literal from the maximal
                 // decision level, we let BCP propagating that literal at the second
                 // highest decision level in conflicting cls.
                 // PREMISE: 0 < snd_l
                 asg.cancel_until(snd_l - 1);
                 debug_assert!(
                     asg.stack_iter().all(|l| l.vi() != decision.vi()),
-                    format!("lcnt == 1: level {}, snd level {}", original_dl, snd_l)
+                    format!(
+                        "assign stack contains a strange lit: level {}, stack level {}",
+                        original_dl, snd_l
+                    )
                 );
                 asg.assign_by_decision(decision);
                 return Ok(());
@@ -164,7 +168,7 @@ pub fn handle_conflict(
         } else {
             asg.assign_by_unitclause(l0);
         }
-        asg.num_solved_vars += 1;
+        asg.handle(SolverEvent::Fixed);
         rst.update(RestarterModule::Reset, 0);
     } else {
         {
@@ -217,10 +221,10 @@ pub fn handle_conflict(
         }
     }
     cdb.scale_activity();
-    if 0 < state.config.dump_int && ncnfl % state.config.dump_int == 0 {
+    if 0 < state.config.dump_int && num_conflict % state.config.dump_int == 0 {
         let (_mode, rst_num_block, rst_asg_trend, _lbd_get, rst_lbd_trend) = rst.exports();
         state.development.push((
-            ncnfl,
+            num_conflict,
             (asg.num_solved_vars + asg.num_eliminated_vars) as f64
                 / state.target.num_of_variables as f64,
             asg_num_restart as f64,
@@ -229,7 +233,7 @@ pub fn handle_conflict(
             rst_lbd_trend.min(10.0),
         ));
     }
-    cdb.check_and_reduce(asg, ncnfl);
+    cdb.check_and_reduce(asg, num_conflict);
     Ok(())
 }
 
@@ -241,7 +245,7 @@ fn conflict_analyze(
     asg: &mut AssignStack,
     cdb: &mut ClauseDB,
     state: &mut State,
-    confl: ClauseId,
+    conflicting_clause: ClauseId,
 ) -> DecisionLevel {
     let learnt = &mut state.new_learnt;
     learnt.clear();
@@ -252,7 +256,7 @@ fn conflict_analyze(
     let mut path_cnt = 0;
     loop {
         let reason = if p == NULL_LIT {
-            AssignReason::Implication(confl, NULL_LIT)
+            AssignReason::Implication(conflicting_clause, NULL_LIT)
         } else {
             asg.reason(p.vi())
         };
@@ -273,23 +277,23 @@ fn conflict_analyze(
                         asg.reward_at_analysis(vi);
                     } else {
                         #[cfg(feature = "trace_analysis")]
-                        println!("- push {} to learnt, which level is {}", q.int(), lvl);
+                        println!("- push {} to learnt, which level is {}", l, lvl);
                         // learnt.push(l);
                     }
                 } else {
                     #[cfg(feature = "trace_analysis")]
                     {
                         if !asg.var(vi).is(Flag::CA_SEEN) {
-                            println!("- ignore {} because it was flagged", q.int());
+                            println!("- ignore {} because it was flagged", l);
                         } else {
-                            println!("- ignore {} because its level is {}", q.int(), lvl);
+                            println!("- ignore {} because its level is {}", l, asg.level(vi));
                         }
                     }
                 }
             }
             AssignReason::Implication(cid, _) => {
                 #[cfg(feature = "trace_analysis")]
-                println!("analyze {}", p.int());
+                println!("analyze {}", p);
                 debug_assert_ne!(cid, ClauseId::default());
                 if cdb[cid].is(Flag::LEARNT) {
                     if !cdb[cid].is(Flag::JUST_USED) && !cdb.convert_to_permanent(asg, cid) {
@@ -311,7 +315,7 @@ fn conflict_analyze(
                     )
                 );
                 #[cfg(feature = "trace_analysis")]
-                println!("- handle {}", cid.fmt());
+                println!("- handle {}", cid);
                 for q in &c[(p != NULL_LIT) as usize..] {
                     let vi = q.vi();
                     if !asg.var(vi).is(Flag::CA_SEEN) {
@@ -332,16 +336,16 @@ fn conflict_analyze(
                             asg.reward_at_analysis(vi);
                         } else {
                             #[cfg(feature = "trace_analysis")]
-                            println!("- push {} to learnt, which level is {}", q.int(), lvl);
+                            println!("- push {} to learnt, which level is {}", q, lvl);
                             learnt.push(*q);
                         }
                     } else {
                         #[cfg(feature = "trace_analysis")]
                         {
                             if !asg.var(vi).is(Flag::CA_SEEN) {
-                                println!("- ignore {} because it was flagged", q.int());
+                                println!("- ignore {} because it was flagged", q);
                             } else {
-                                println!("- ignore {} because its level is {}", q.int(), lvl);
+                                println!("- ignore {} because its level is {}", q, asg.level(vi));
                             }
                         }
                     }
@@ -356,7 +360,7 @@ fn conflict_analyze(
         /*
         // In an unsat problem, a conflict can occur at decision level zero
         // by a clause which literals' levels are zero.
-        // So we have the posibility getting the following situation.
+        // So we have the possibility getting the following situation.
         if p == NULL_LIT && path_cnt == 0 {
             #[cfg(feature = "boundary_check")]
             println!("Empty learnt at lvl:{}", asg.level());
@@ -377,7 +381,7 @@ fn conflict_analyze(
             !v.is(Flag::CA_SEEN) || lvl != dl
         } {
             #[cfg(feature = "trace_analysis")]
-            println!("- skip {} because it isn't flagged", asg[ti].int());
+            println!("- skip {} because it isn't flagged", asg.stack(ti));
             #[cfg(feature = "boundary_check")]
             assert!(
                 0 < ti,
@@ -387,22 +391,17 @@ fn conflict_analyze(
                     path_cnt,
                     dl,
                     asg.dump(&*learnt),
-                    asg.dump(&cdb[confl].lits),
+                    asg.dump(&cdb[conflicting_clause].lits),
                 ),
             );
             ti -= 1;
         }
         p = asg.stack(ti);
         #[cfg(feature = "trace_analysis")]
-        println!(
-            "- move to flagged {}, which reason is {}; num path: {}",
-            p.vi(),
-            path_cnt - 1,
-            cid.fmt()
-        );
+        println!("- move to flagged {}; num path: {}", p.vi(), path_cnt - 1,);
         asg.var_mut(p.vi()).turn_off(Flag::CA_SEEN);
         // since the trail can contain a literal which level is under `dl` after
-        // the `dl`-th thdecision var, we must skip it.
+        // the `dl`-th decision var, we must skip it.
         path_cnt -= 1;
         if path_cnt == 0 {
             break;
@@ -414,11 +413,7 @@ fn conflict_analyze(
     debug_assert_eq!(asg.level(p.vi()), dl);
     learnt[0] = !p;
     #[cfg(feature = "trace_analysis")]
-    println!(
-        "- appending {}, the result is {:?}",
-        learnt[0].int(),
-        vec2int(learnt)
-    );
+    println!("- appending {}, the result is {:?}", learnt[0], learnt);
     state.minimize_learnt(asg, cdb)
 }
 

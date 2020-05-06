@@ -25,7 +25,9 @@ use {
 /// Normal results returned by Solver.
 #[derive(Debug, PartialEq)]
 pub enum Certificate {
+    /// It is satisifable; `vec` is such an assigment sorted by var order.
     SAT(Vec<i32>),
+    /// It is unsatisfiable.
     UNSAT,
 }
 
@@ -35,6 +37,26 @@ pub enum Certificate {
 /// * `Certificate::UNSAT` -- proved that it's an unsatisfiable problem, and
 /// * `SolverException::*` -- caused by a bug
 pub type SolverResult = Result<Certificate, SolverError>;
+
+/// define submodules' responsibilities
+#[derive(Clone, Copy, Debug)]
+pub enum SolverEvent {
+    /// set up internal parameters.
+    /// # CAVEAT
+    /// some implementation might have a special premise to call: decision_level == 0.
+    Adapt((SearchStrategy, usize), usize),
+    Conflict,
+    Fixed,
+    /// Not in use
+    Instantiate,
+    /// increment the number of vars.
+    NewVar,
+    Restart,
+    /// reinitialization for incremental solving.
+    Reinitialize,
+    /// stabilization
+    Stabilize(bool),
+}
 
 /// The SAT solver object consisting of 6 sub modules.
 /// ```
@@ -72,9 +94,61 @@ where
     V: AsRef<[i32]>,
 {
     type Error = SolverError;
-    fn try_from(vec: Vec<V>) -> Result<Certificate, Self::Error> {
+    fn try_from(vec: Vec<V>) -> SolverResult {
         let s = Solver::try_from((Config::default(), vec.as_ref()));
         s.map_or_else(|e| e, |mut solver| solver.solve())
+    }
+}
+
+/// Iterator for Solver
+/// * takes `&mut Solver`
+/// * returns `Option<Vec<i32>>`
+///    * `Some(Vec<i32>)` -- satisfiable assignment
+///    * `None` -- unsatisfiable anymore
+/// * Some internal error causes panic.
+#[cfg(feature = "incremental_solver")]
+pub struct SolverIter<'a> {
+    solver: &'a mut Solver,
+    refute: Option<Vec<i32>>,
+}
+
+#[cfg(feature = "incremental_solver")]
+impl Solver {
+    /// return an iterator on Solver. **Requires 'incremenal_solver' feature**
+    ///```
+    ///for v in Solver::try_from("tests/sample.cnf").expect("panic").iter() {
+    ///    println!(" - answer: {:?}", v);
+    ///}
+    ///```
+    pub fn iter(&mut self) -> SolverIter {
+        SolverIter {
+            solver: self,
+            refute: None,
+        }
+    }
+}
+
+#[cfg(feature = "incremental_solver")]
+impl<'a> Iterator for SolverIter<'a> {
+    type Item = Vec<i32>;
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(ref v) = self.refute {
+            match self.solver.add_clause(v) {
+                Err(SolverError::Inconsistent) => return None,
+                Err(e) => panic!("s UNKNOWN: {:?}", e),
+                Ok(_) => self.solver.reset(),
+            }
+            self.refute = None;
+        }
+        match self.solver.solve() {
+            Ok(Certificate::SAT(ans)) => {
+                let rft: Vec<i32> = ans.iter().map(|i| -i).collect::<Vec<i32>>();
+                self.refute = Some(rft);
+                Some(ans)
+            }
+            Ok(Certificate::UNSAT) => None,
+            e => panic!("s UNKNOWN: {:?}", e),
+        }
     }
 }
 

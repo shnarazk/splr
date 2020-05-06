@@ -25,11 +25,14 @@ mod eliminate;
 mod heap;
 mod subsume;
 
+#[cfg(feature = "libc")]
+use std::{thread, time::Duration};
 use {
     self::{eliminate::eliminate_var, heap::VarOrderIF, subsume::try_subsume},
     crate::{
         assign::AssignIF,
         cdb::ClauseDBIF,
+        solver::SolverEvent,
         state::{State, StateIF},
         types::*,
     },
@@ -40,8 +43,6 @@ use {
             atomic::{AtomicBool, Ordering},
             Arc,
         },
-        thread,
-        time::Duration,
     },
 };
 
@@ -75,7 +76,7 @@ pub trait EliminateIF: Export<(usize, usize, f64)> {
         A: AssignIF,
         C: ClauseDBIF;
     /// enqueue a var into eliminator's var queue.
-    fn enqueue_var<A>(&mut self, asg: &mut A, vi: VarId, upword: bool)
+    fn enqueue_var<A>(&mut self, asg: &mut A, vi: VarId, upward: bool)
     where
         A: AssignIF;
     /// simplify database by:
@@ -349,6 +350,21 @@ impl Instantiate for Eliminator {
             ..Eliminator::default()
         }
     }
+    fn handle(&mut self, e: SolverEvent) {
+        match e {
+            SolverEvent::NewVar => {
+                let len = self.var_queue.heap.len();
+                self.var.push(LitOccurs::default());
+                self.var_queue.heap.push(len);
+                self.var_queue.idxs.push(len);
+                self.var_queue.idxs[0] = len;
+            }
+            SolverEvent::Reinitialize => {
+                self.elim_lits.clear();
+            }
+            _ => (),
+        }
+    }
 }
 
 impl EliminateIF for Eliminator {
@@ -387,6 +403,7 @@ impl EliminateIF for Eliminator {
         A: AssignIF,
         C: ClauseDBIF,
     {
+        assert!(self.enable);
         if self.mode != EliminatorMode::Waiting {
             return;
         }
@@ -649,25 +666,29 @@ impl Eliminator {
         A: AssignIF,
         C: ClauseDBIF,
     {
-        /// The ratio of time slot for single elimination step.
-        /// Since it is measured in millisecond, 1000 means executing elimination
-        /// until timed out. 100 means this function can consume 10% of a given time.
-        const TIMESLOT_FOR_ELIMINATION: u64 = 10;
         debug_assert!(asg.decision_level() == 0);
         if self.mode == EliminatorMode::Deactive {
             return Ok(());
         }
         let timedout = Arc::new(AtomicBool::new(false));
-        let timedout2 = timedout.clone();
-        let time = if asg.exports().1 == 0 {
-            100 * TIMESLOT_FOR_ELIMINATION * state.config.timeout as u64
-        } else {
-            TIMESLOT_FOR_ELIMINATION * state.config.timeout as u64
-        };
-        thread::spawn(move || {
-            thread::sleep(Duration::from_millis(time));
-            timedout2.store(true, Ordering::Release);
-        });
+        #[cfg(feature = "libc")]
+        {
+            /// The ratio of time slot for single elimination step.
+            /// Since it is measured in millisecond, 1000 means executing elimination
+            /// until timed out. 100 means this function can consume 10% of a given time.
+            const TIMESLOT_FOR_ELIMINATION: u64 = 10;
+
+            let timedout2 = timedout.clone();
+            let time = if asg.exports().1 == 0 {
+                100 * TIMESLOT_FOR_ELIMINATION * state.config.timeout as u64
+            } else {
+                TIMESLOT_FOR_ELIMINATION * state.config.timeout as u64
+            };
+            thread::spawn(move || {
+                thread::sleep(Duration::from_millis(time));
+                timedout2.store(true, Ordering::Release);
+            });
+        }
         while self.bwdsub_assigns < asg.stack_len()
             || !self.var_queue.is_empty()
             || !self.clause_queue.is_empty()
@@ -676,7 +697,6 @@ impl Eliminator {
                 self.backward_subsumption_check(asg, cdb, &timedout)?;
             }
             while let Some(vi) = self.var_queue.select_var(&self.var, asg) {
-                // timedout = cvar.wait(timedout).unwrap();
                 let v = asg.var_mut(vi);
                 v.turn_off(Flag::ENQUEUED);
                 if !v.is(Flag::ELIMINATED) && asg.assign(vi).is_none() {
@@ -836,7 +856,7 @@ mod tests {
             asg.num_eliminated_vars,
             asg.var_iter().filter(|v| v.is(Flag::ELIMINATED)).count()
         );
-        let elims = asg
+        let elim_vars = asg
             .var_iter()
             .filter(|v| v.is(Flag::ELIMINATED))
             .map(|v| v.index)
@@ -846,7 +866,7 @@ mod tests {
             cdb.iter()
                 .skip(1)
                 .filter(|c| !c.is(Flag::DEAD))
-                .filter(|c| c.lits.iter().any(|l| elims.contains(&l.vi())))
+                .filter(|c| c.lits.iter().any(|l| elim_vars.contains(&l.vi())))
                 .count()
         );
     }

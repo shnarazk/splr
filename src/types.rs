@@ -6,7 +6,7 @@ pub use crate::{
     config::Config,
 };
 use {
-    crate::state::State,
+    crate::solver::SolverEvent,
     std::{
         convert::TryFrom,
         fmt,
@@ -63,10 +63,8 @@ pub trait ActivityIF {
 pub trait Instantiate {
     /// make and return an object from `Config` and `CNFDescription`.
     fn instantiate(conf: &Config, cnf: &CNFDescription) -> Self;
-    /// set up internal parameters.
-    /// # CAVEAT
-    /// some implementation might have a special premise to call: decision_level == 0.
-    fn adapt_to(&mut self, _state: &State, _num_conflict: usize) {}
+    /// update by a solver event.
+    fn handle(&mut self, _e: SolverEvent) {}
 }
 
 /// API for O(n) deletion from a list, providing `delete_unstable`.
@@ -118,6 +116,11 @@ impl fmt::Display for Lit {
     }
 }
 
+/// convert literals to `[i32]` (for debug).
+pub fn i32s(v: &[Lit]) -> Vec<i32> {
+    v.iter().map(|l| i32::from(*l)).collect::<Vec<_>>()
+}
+
 impl From<(VarId, bool)> for Lit {
     #[inline]
     fn from((vi, b): (VarId, bool)) -> Self {
@@ -163,7 +166,7 @@ impl From<ClauseId> for Lit {
 }
 
 /*
-/// While Lit::oridinal is private, Var::{index, assign} are public.
+/// While Lit::ordinal is private, Var::{index, assign} are public.
 /// So we define the following here.
 /// # CAVEAT
 /// Unassigned vars are converted to the null literal.
@@ -442,7 +445,7 @@ impl Ema2 {
             se: 1.0 / (f as f64),
         }
     }
-    // set secondary Ema's parameter
+    // set secondary EMA's parameter
     pub fn with_slow(mut self, s: usize) -> Ema2 {
         self.se = 1.0 / (s as f64);
         self
@@ -459,6 +462,7 @@ pub enum SolverError {
     Inconsistent,
     NullLearnt,
     OutOfMemory,
+    OutOfRange,
     TimeOut,
     SolverBug,
     UndescribedError,
@@ -693,9 +697,9 @@ mod tests {
     use super::*;
     #[test]
     fn test_cnf() {
-        if let Ok(cnfs) = CNFReader::try_from("tests/sample.cnf") {
-            assert_eq!(cnfs.cnf.num_of_variables, 250);
-            assert_eq!(cnfs.cnf.num_of_clauses, 1065);
+        if let Ok(reader) = CNFReader::try_from("tests/sample.cnf") {
+            assert_eq!(reader.cnf.num_of_variables, 250);
+            assert_eq!(reader.cnf.num_of_clauses, 1065);
         } else {
             panic!("failed to load tests/sample.cnf");
         }

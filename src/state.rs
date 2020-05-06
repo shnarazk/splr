@@ -4,17 +4,20 @@ use {
         assign::AssignIF,
         cdb::ClauseDBIF,
         processor::EliminateIF,
-        solver::{RestartIF, RestartMode},
+        solver::{RestartIF, RestartMode, SolverEvent},
         types::*,
     },
-    libc::{clock_gettime, timespec, CLOCK_PROCESS_CPUTIME_ID},
     std::{
         cmp::Ordering,
         fmt,
         io::{stdout, Write},
         ops::{Index, IndexMut},
-        time::SystemTime,
     },
+};
+#[cfg(feature = "libc")]
+use {
+    libc::{clock_gettime, timespec, CLOCK_PROCESS_CPUTIME_ID},
+    std::time::SystemTime,
 };
 
 /// API for state/statistics management, providing `progress`.
@@ -80,7 +83,7 @@ impl fmt::Display for PhaseMode {
 }
 
 /// A collection of named search heuristics.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SearchStrategy {
     /// The initial search phase to determine a main strategy
     Initial,
@@ -123,7 +126,7 @@ impl fmt::Display for SearchStrategy {
 }
 
 impl SearchStrategy {
-    pub fn to_str(&self) -> &'static str {
+    pub fn to_str(self) -> &'static str {
         match self {
             // in the initial search phase to determine a main strategy
             SearchStrategy::Initial => "Initial search phase before a main strategy",
@@ -150,6 +153,8 @@ pub enum Stat {
     NoDecisionConflict,
     /// the last number of solved variables
     SolvedRecord,
+    /// the number of stabilization flips
+    Stabilization,
     /// don't use this dummy (sentinel at the tail).
     EndOfStatIndex,
 }
@@ -204,6 +209,7 @@ pub struct State {
     /// keep the previous statistics values
     pub record: ProgressRecord,
     /// start clock for timeout handling
+    #[cfg(feature = "libc")]
     pub start: SystemTime,
     /// upper limit for timeout handling
     pub time_limit: f64,
@@ -228,6 +234,7 @@ impl Default for State {
             new_learnt: Vec::new(),
             progress_cnt: 0,
             record: ProgressRecord::default(),
+            #[cfg(feature = "libc")]
             start: SystemTime::now(),
             time_limit: 0.0,
             development: Vec::new(),
@@ -262,6 +269,11 @@ impl Instantiate for State {
             target: cnf.clone(),
             time_limit: config.timeout,
             ..State::default()
+        }
+    }
+    fn handle(&mut self, e: SolverEvent) {
+        if let SolverEvent::NewVar = e {
+            self.target.num_of_variables += 1;
         }
     }
 }
@@ -355,22 +367,32 @@ macro_rules! f {
 
 impl StateIF for State {
     fn is_timeout(&self) -> bool {
-        if self.time_limit == 0.0 {
-            return false;
+        #[cfg(feature = "libc")]
+        {
+            if self.time_limit == 0.0 {
+                return false;
+            }
+            match self.start.elapsed() {
+                Ok(e) => self.time_limit <= e.as_secs() as f64,
+                Err(_) => false,
+            }
         }
-        match self.start.elapsed() {
-            Ok(e) => self.time_limit <= e.as_secs() as f64,
-            Err(_) => false,
-        }
+        #[cfg(not(feature = "libc"))]
+        false
     }
     fn elapsed(&self) -> Option<f64> {
-        if self.time_limit == 0.0 {
-            return Some(0.0);
+        #[cfg(feature = "libc")]
+        {
+            if self.time_limit == 0.0 {
+                return Some(0.0);
+            }
+            match self.start.elapsed() {
+                Ok(e) => Some(e.as_secs() as f64 / self.time_limit),
+                Err(_) => None,
+            }
         }
-        match self.start.elapsed() {
-            Ok(e) => Some(e.as_secs() as f64 / self.time_limit),
-            Err(_) => None,
-        }
+        #[cfg(not(feature = "libc"))]
+        Some(0.0)
     }
     fn select_strategy<A, C>(&mut self, asg: &A, cdb: &C)
     where
@@ -396,7 +418,7 @@ impl StateIF for State {
         self.strategy.1 = asg_num_conflict;
     }
     fn progress_header(&mut self) {
-        if self.config.quiet_mode {
+        if !self.config.splr_interface || self.config.quiet_mode {
             return;
         }
         if self.config.use_log {
@@ -413,7 +435,7 @@ impl StateIF for State {
         }
     }
     fn flush<S: AsRef<str>>(&self, mes: S) {
-        if !self.config.quiet_mode && !self.config.use_log {
+        if self.config.splr_interface && !self.config.quiet_mode && !self.config.use_log {
             if mes.as_ref().is_empty() {
                 print!("\x1B[1G\x1B[K")
             } else {
@@ -431,6 +453,10 @@ impl StateIF for State {
         E: EliminateIF,
         R: RestartIF,
     {
+        if !self.config.splr_interface || self.config.quiet_mode {
+            return;
+        }
+
         //
         //## Gather stats from all modules
         //
@@ -446,16 +472,13 @@ impl StateIF for State {
             _num_bi_learnt,
             cdb_num_lbd2,
             cdb_num_learnt,
-            cdb_num_reduction,
+            _cdb_num_reduction,
         ) = cdb.exports();
 
         let (elim_num_full, _num_sat, elim_to_simplify) = elim.exports();
 
         let (rst_mode, rst_num_block, rst_asg_trend, rst_lbd_get, rst_lbd_trend) = rst.exports();
 
-        if self.config.quiet_mode {
-            return;
-        }
         if self.config.use_log {
             self.dump(asg, cdb, rst);
             return;
@@ -527,8 +550,13 @@ impl StateIF for State {
             )
         );
         println!(
-            "\x1B[2K        misc|#rdc:{}, #smp:{}, 2smp:{}, vdcy:{} ",
-            im!("{:>9}", self, LogUsizeId::Reduction, cdb_num_reduction),
+            "\x1B[2K        misc|#stb:{}, #smp:{}, 2smp:{}, vdcy:{} ",
+            im!(
+                "{:>9}",
+                self,
+                LogUsizeId::Stabilization,
+                self[Stat::Stabilization]
+            ),
             im!("{:>9}", self, LogUsizeId::Simplify, elim_num_full),
             fm!(
                 "{:>9.0}",
@@ -548,6 +576,7 @@ impl StateIF for State {
 }
 
 impl fmt::Display for State {
+    #[cfg(feature = "libc")]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let tm = {
             let mut time = timespec {
@@ -589,6 +618,29 @@ impl fmt::Display for State {
                 tm,
                 w = width - fnlen,
             )
+        }
+    }
+    #[cfg(not(feature = "libc"))]
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let vc = format!(
+            "{},{}",
+            self.target.num_of_variables, self.target.num_of_clauses,
+        );
+        let vclen = vc.len();
+        let width = 59 + 16;
+        let mut fname = match &self.target.pathname {
+            CNFIndicator::Void => "(no cnf)".to_string(),
+            CNFIndicator::File(f) => f.to_string(),
+            CNFIndicator::LitVec(n) => format!("(embedded {} element vector)", n),
+        };
+        if width <= fname.len() {
+            fname.truncate(width - vclen - 1);
+        }
+        let fnlen = fname.len();
+        if width < vclen + fnlen + 1 {
+            write!(f, "{:<w$}", fname, w = width)
+        } else {
+            write!(f, "{}{:>w$}", fname, &vc, w = width - fnlen,)
         }
     }
 }
@@ -744,8 +796,8 @@ pub enum LogUsizeId {
     Permanent,     //  9: permanent: usize,
     RestartBlock,  // 10: restart_block: usize,
     Restart,       // 11: restart_count: usize,
-    Reduction,     // 12: reduction: usize,
-    Simplify,      // 13: full-featured elimination: usize,
+    Simplify,      // 12: full-featured elimination: usize,
+    Stabilization, // 13: stabilization: usize
     End,
 }
 

@@ -164,17 +164,6 @@ impl ClauseManipulateIF for AssignStack {
         }
         false
     }
-    fn status(&self, vec: &[Lit]) -> Option<bool> {
-        let mut falsified = Some(false);
-        for l in vec {
-            match self.assigned(*l) {
-                Some(true) => return Some(true),
-                None => falsified = None,
-                _ => (),
-            }
-        }
-        falsified
-    }
     fn locked(&self, c: &Clause, cid: ClauseId) -> bool {
         let lits = &c.lits;
         debug_assert!(1 < lits.len());

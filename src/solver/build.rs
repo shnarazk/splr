@@ -1,6 +1,6 @@
 //! Solver Builder
 use {
-    super::{restart::Restarter, Certificate, Solver, SolverResult, State, StateIF},
+    super::{restart::Restarter, Certificate, Solver, SolverEvent, SolverResult, State, StateIF},
     crate::{
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
         cdb::{ClauseDB, ClauseDBIF},
@@ -16,17 +16,95 @@ use std::{
     io::{BufRead, BufReader},
 };
 
-/// API for SAT solver like `build`, `solve` and so on.
+/// API for SAT solver creation and modification.
 pub trait SatSolverIF {
+    /// add an assignment to Solver.
+    ///
+    /// # Errors
+    ///
+    /// * `SolverError::Inconsistent` if it conflicts with existing assignments.
+    /// * `SolverError::OutOfRange` if it is out of range for var index.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use crate::splr::*;
+    /// use std::convert::TryFrom;
+    /// use crate::splr::assign::VarManipulateIF;    // for s.asg.assign()
+    ///
+    /// let mut s = Solver::try_from("tests/uf8.cnf").expect("can't load");
+    /// assert!(s.add_assignment(1).is_ok());
+    /// assert_eq!(s.asg.assign(1), Some(true));
+    /// assert!(s.add_assignment(2).is_ok());
+    /// assert!(s.add_assignment(3).is_ok());
+    /// assert!(s.add_assignment(4).is_ok());
+    /// assert!(s.add_assignment(5).is_ok());
+    /// assert!(s.add_assignment(8).is_ok());
+    /// assert!(matches!(s.add_assignment(-1), Err(SolverError::Inconsistent)));
+    /// assert!(matches!(s.add_assignment(10), Err(SolverError::OutOfRange)));
+    /// assert!(matches!(s.add_assignment(0), Err(SolverError::OutOfRange)));
+    /// assert_eq!(s.solve(), Ok(Certificate::SAT(vec![1, 2, 3, 4, 5, -6, 7, 8])));
+    /// ```
+    fn add_assignment(&mut self, val: i32) -> Result<&mut Solver, SolverError>;
     /// add a clause to Solver.
-    fn add_unchecked_clause(&mut self, lits: &mut Vec<Lit>) -> Option<ClauseId>;
+    ///
+    /// # Errors
+    ///
+    /// * `SolverError::Inconsistent` if a given clause is unit and conflicts with existing assignments.
+    /// * `SolverError::OutOfRange` if a literal in it is out of range for var index.
+    ///
+    /// # Example
+    ///```
+    /// use crate::splr::*;
+    /// use std::convert::TryFrom;
+    ///
+    /// let mut s = Solver::try_from("tests/uf8.cnf").expect("can't load");
+    /// assert!(s.add_clause(vec![1, -2]).is_ok());
+    /// assert!(s.add_clause(vec![2, -3]).is_ok());
+    /// assert!(s.add_clause(vec![3, 4]).is_ok());
+    /// assert!(s.add_clause(vec![-2, 4]).is_ok());
+    /// assert!(s.add_clause(vec![-4, 5]).is_ok());
+    /// assert!(s.add_clause(vec![-5, 6]).is_ok());
+    /// assert!(s.add_clause(vec![-7, 8]).is_ok());
+    /// assert!(matches!(s.add_clause(vec![10, 11]), Err(SolverError::OutOfRange)));
+    /// assert!(matches!(s.add_clause(vec![0, 8]), Err(SolverError::OutOfRange)));
+    /// assert_eq!(s.solve(), Ok(Certificate::UNSAT));
+    ///```
+    fn add_clause<V>(&mut self, vec: V) -> Result<&mut Solver, SolverError>
+    where
+        V: AsRef<[i32]>;
+    /// add a var to solver and return the number of vars.
+    ///
+    /// # Example
+    /// ```
+    /// use crate::splr::*;
+    /// use std::convert::TryFrom;
+    ///
+    /// let mut s = Solver::try_from("tests/uf8.cnf").expect("can't load");
+    /// assert_eq!(s.asg.num_vars, 8);
+    /// assert!(matches!(s.add_assignment(9), Err(SolverError::OutOfRange)));
+    /// s.add_assignment(1).expect("panic");
+    /// s.add_assignment(2).expect("panic");
+    /// s.add_assignment(3).expect("panic");
+    /// s.add_assignment(4).expect("panic");
+    /// s.add_assignment(5).expect("panic");
+    /// s.add_assignment(8).expect("panic");
+    /// assert_eq!(s.add_var(), 9);
+    /// assert!(s.add_assignment(-9).is_ok());
+    /// assert_eq!(s.solve(), Ok(Certificate::SAT(vec![1, 2, 3, 4, 5, -6, 7, 8, -9])));
+    /// ```
+    fn add_var(&mut self) -> usize;
     /// make a solver and load a CNF into it.
     ///
     /// # Errors
     ///
-    /// IO error by failing to load a CNF file.
+    /// * `SolverError::IOError` if it failed to load a CNF file.
+    /// * `SolverError::Inconsistent` if the CNF is conflicting.
+    /// * `SolverError::OutOfRange` if any literal used in the CNF is out of range for var index.
     #[cfg(not(feature = "no_IO"))]
     fn build(config: &Config) -> Result<Solver, SolverError>;
+    /// reinitialize a solver for incremental solving. **Requires 'incremenal_solver' feature**
+    fn reset(&mut self);
 }
 
 impl Default for Solver {
@@ -92,6 +170,84 @@ impl TryFrom<&str> for Solver {
 }
 
 impl SatSolverIF for Solver {
+    fn add_assignment(&mut self, val: i32) -> Result<&mut Solver, SolverError> {
+        if val == 0 || self.asg.num_vars < val.abs() as usize {
+            return Err(SolverError::OutOfRange);
+        }
+        self.asg.assign_at_rootlevel(Lit::from(val)).map(|_| self)
+    }
+    fn add_clause<V>(&mut self, vec: V) -> Result<&mut Solver, SolverError>
+    where
+        V: AsRef<[i32]>,
+    {
+        for i in vec.as_ref().iter() {
+            if *i == 0 || self.asg.num_vars < i.abs() as usize {
+                return Err(SolverError::OutOfRange);
+            }
+        }
+        let mut clause = vec
+            .as_ref()
+            .iter()
+            .map(|i| Lit::from(*i))
+            .collect::<Vec<Lit>>();
+        if self.add_unchecked_clause(&mut clause).is_none() {
+            return Err(SolverError::Inconsistent);
+        }
+        Ok(self)
+    }
+    fn add_var(&mut self) -> usize {
+        let Solver {
+            ref mut asg,
+            ref mut cdb,
+            ref mut elim,
+            ref mut state,
+            ..
+        } = self;
+        asg.handle(SolverEvent::NewVar);
+        cdb.handle(SolverEvent::NewVar);
+        elim.handle(SolverEvent::NewVar);
+        state.handle(SolverEvent::NewVar);
+        asg.num_vars
+    }
+    /// # Examples
+    ///
+    /// ```
+    /// use splr::config::Config;
+    /// use splr::solver::{SatSolverIF, Solver};
+    ///
+    /// let config = Config::from("tests/sample.cnf");
+    /// assert!(Solver::build(&config).is_ok());
+    ///```
+    #[cfg(not(feature = "no_IO"))]
+    fn build(config: &Config) -> Result<Solver, SolverError> {
+        let CNFReader { cnf, reader } = CNFReader::try_from(&config.cnf_file)?;
+        Solver::instantiate(config, &cnf).inject(reader)
+    }
+    fn reset(&mut self) {
+        let Solver {
+            ref mut asg,
+            ref mut cdb,
+            ref mut elim,
+            ref mut rst,
+            ref mut state,
+        } = self;
+        asg.handle(SolverEvent::Reinitialize);
+        cdb.handle(SolverEvent::Reinitialize);
+        elim.handle(SolverEvent::Reinitialize);
+        rst.handle(SolverEvent::Reinitialize);
+        state.handle(SolverEvent::Reinitialize);
+
+        let mut tmp = Vec::new();
+        std::mem::swap(&mut tmp, &mut cdb.eliminated_permanent);
+        while let Some(mut vec) = tmp.pop() {
+            cdb.new_clause(asg, &mut vec, false, false);
+        }
+    }
+}
+
+impl Solver {
+    /// FIXME: this should return Result<ClauseId, SolverErrror>
+    /// fn add_unchecked_clause(&mut self, lits: &mut Vec<Lit>) -> Option<ClauseId>
     // renamed from clause_new
     fn add_unchecked_clause(&mut self, lits: &mut Vec<Lit>) -> Option<ClauseId> {
         let Solver {
@@ -134,23 +290,6 @@ impl SatSolverIF for Solver {
             }
         }
     }
-    /// # Examples
-    ///
-    /// ```
-    /// use splr::config::Config;
-    /// use splr::solver::{SatSolverIF, Solver};
-    ///
-    /// let config = Config::from("tests/sample.cnf");
-    /// assert!(Solver::build(&config).is_ok());
-    ///```
-    #[cfg(not(feature = "no_IO"))]
-    fn build(config: &Config) -> Result<Solver, SolverError> {
-        let CNFReader { cnf, reader } = CNFReader::try_from(&config.cnf_file)?;
-        Solver::instantiate(config, &cnf).inject(reader)
-    }
-}
-
-impl Solver {
     #[cfg(not(feature = "no_IO"))]
     fn inject(mut self, mut reader: BufReader<File>) -> Result<Solver, SolverError> {
         self.state.progress_header();
@@ -187,8 +326,8 @@ impl Solver {
         }
         debug_assert_eq!(self.asg.num_vars, self.state.target.num_of_variables);
         // s.state[Stat::NumBin] = s.cdb.iter().skip(1).filter(|c| c.len() == 2).count();
-        self.asg.adapt_to(&self.state, 0);
-        self.rst.adapt_to(&self.state, 0);
+        self.asg.handle(SolverEvent::Adapt(self.state.strategy, 0));
+        self.rst.handle(SolverEvent::Adapt(self.state.strategy, 0));
         Ok(self)
     }
     fn inject_from_vec<V>(mut self, v: &[V]) -> Result<Solver, SolverError>
@@ -205,6 +344,11 @@ impl Solver {
         );
         self.state.flush("injecting...");
         for ints in v.iter() {
+            for i in ints.as_ref().iter() {
+                if *i == 0 || self.asg.num_vars < i.abs() as usize {
+                    return Err(SolverError::OutOfRange);
+                }
+            }
             let mut lits = ints
                 .as_ref()
                 .iter()
@@ -216,8 +360,35 @@ impl Solver {
         }
         debug_assert_eq!(self.asg.num_vars, self.state.target.num_of_variables);
         // s.state[Stat::NumBin] = s.cdb.iter().skip(1).filter(|c| c.len() == 2).count();
-        self.asg.adapt_to(&self.state, 0);
-        self.rst.adapt_to(&self.state, 0);
+        self.asg.handle(SolverEvent::Adapt(self.state.strategy, 0));
+        self.rst.handle(SolverEvent::Adapt(self.state.strategy, 0));
         Ok(self)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    // use super::*;
+    use crate::*;
+    use std::convert::TryFrom;
+
+    #[test]
+    fn test_add_var() {
+        let mut s = Solver::try_from("tests/uf8.cnf").expect("can't load");
+        assert_eq!(s.asg.num_vars, 8);
+        assert!(matches!(s.add_assignment(9), Err(SolverError::OutOfRange)));
+        s.add_assignment(1).expect("panic");
+        s.add_assignment(2).expect("panic");
+        s.add_assignment(3).expect("panic");
+        s.add_assignment(4).expect("panic");
+        s.add_assignment(5).expect("panic");
+        s.add_assignment(8).expect("panic");
+        assert_eq!(s.add_var(), 9);
+        // assert!(s.add_assignment(-9).is_ok());
+        s.add_clause([-1, -8, -9]).expect("panic");
+        assert_eq!(
+            s.solve(),
+            Ok(Certificate::SAT(vec![1, 2, 3, 4, 5, -6, 7, 8, -9]))
+        );
     }
 }

@@ -1,6 +1,6 @@
 //! Crate `validator` implements a model checker.
 use crate::{
-    assign::PropagateIF,
+    assign::{AssignIF, PropagateIF},
     cdb::ClauseDBIF,
     solver::Solver,
     types::{Lit, MaybeInconsistent, SolverError},
@@ -65,7 +65,7 @@ impl ValidateIF for Solver {
     ///
     fn validate(&self) -> Option<Vec<i32>> {
         self.cdb
-            .validate(&self.asg, true)
+            .validate(self.asg.assign_ref(), true)
             .map(|cid| Vec::<i32>::from(&self.cdb[cid]))
     }
 }

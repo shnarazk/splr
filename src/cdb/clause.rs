@@ -170,15 +170,10 @@ impl fmt::Display for Clause {
         write!(
             f,
             "{{{:?}{}{}{}}}",
-            vec2int(&self.lits),
+            i32s(&self.lits),
             st(Flag::LEARNT, ", learnt"),
             st(Flag::DEAD, ", dead"),
             st(Flag::ENQUEUED, ", enqueued"),
         )
     }
-}
-
-/// convert `[Lit]` to `[i32]` (for debug).
-fn vec2int(v: &[Lit]) -> Vec<i32> {
-    v.iter().map(|l| i32::from(*l)).collect::<Vec<_>>()
 }
