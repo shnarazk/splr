@@ -461,7 +461,9 @@ impl EliminateIF for Eliminator {
             let v = &mut asg.var_mut(l.vi());
             let w = &mut self[l.vi()];
             v.turn_on(Flag::TOUCHED);
-            if evo < w.pos_occurs.len() + w.neg_occurs.len() {
+            let pl = w.pos_occurs.len();
+            let nl = w.neg_occurs.len();
+            if 2 <= pl.min(nl) && evo < pl + nl {
                 w.aborted = true;
                 continue;
             }
