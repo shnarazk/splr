@@ -265,3 +265,60 @@ where
     println!("make_eliminated_clause: eliminate({}) clause {:?}", vi, c);
     cdb.touch_var(vi);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        assign::VarManipulateIF,
+        cdb::{Clause, ClauseDB},
+        processor::EliminateIF,
+        solver::Solver,
+    };
+    use std::convert::TryFrom;
+
+    impl Clause {
+        #[allow(dead_code)]
+        fn as_vec(&self) -> Vec<i32> {
+            self.lits.iter().map(|l| i32::from(*l)).collect::<Vec<_>>()
+        }
+    }
+    impl ClauseDB {
+        #[allow(dead_code)]
+        fn as_vec(&self) -> Vec<Vec<i32>> {
+            self.iter()
+                .skip(1)
+                .filter(|c| !c.is(Flag::DEAD))
+                .map(|c| c.as_vec())
+                .collect::<Vec<_>>()
+        }
+    }
+    #[test]
+    fn test_eliminate_var() {
+        let Solver {
+            ref mut asg,
+            ref mut cdb,
+            ref mut elim,
+            ref mut state,
+            ..
+        } = Solver::try_from("tests/uf8.cnf").expect("failed to load");
+        let timedout = Arc::new(AtomicBool::new(false));
+        let vi = 4;
+
+        elim.activate();
+        elim.prepare(asg, cdb, true);
+        eliminate_var(asg, cdb, elim, state, vi, &timedout).expect("panic");
+        cdb.garbage_collect();
+        assert!(asg.var(vi).is(Flag::ELIMINATED));
+        assert!(cdb
+            .iter()
+            .skip(1)
+            .filter(|c| c.is(Flag::DEAD))
+            .all(|c| c.is_empty()));
+        assert!(cdb
+            .iter()
+            .skip(1)
+            .all(|c| !c.lits.contains(&Lit::from_assign(vi, false))
+                && !c.lits.contains(&Lit::from_assign(vi, false))));
+    }
+}
