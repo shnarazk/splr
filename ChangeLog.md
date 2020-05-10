@@ -1,3 +1,8 @@
+## 0.4.1, 2020-05-XX
+
+- fix typos
+- quiet_mode stops progress report completely
+
 ## 0.4.0, 2020-05-06
 
 - change a lot of options' meanings and mnemonics
