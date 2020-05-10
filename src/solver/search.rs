@@ -120,7 +120,9 @@ impl SolveIF for Solver {
             if elim.simplify(asg, cdb, state).is_err() {
                 // Why inconsistent? Because the CNF contains a conflict, not an error!
                 // Or out of memory.
-                final_report!(asg, cdb, elim, rst, state);
+                if !state.config.quiet_mode {
+                    final_report!(asg, cdb, elim, rst, state);
+                }
                 if cdb.check_size().is_err() {
                     return Err(SolverError::OutOfMemory);
                 }
@@ -147,7 +149,9 @@ impl SolveIF for Solver {
         //## Search
         //
         let answer = search(asg, cdb, elim, rst, state);
-        final_report!(asg, cdb, elim, rst, state);
+        if !state.config.quiet_mode {
+            final_report!(asg, cdb, elim, rst, state);
+        }
         match answer {
             Ok(true) => {
                 asg.extend_model(elim.eliminated_lits());
