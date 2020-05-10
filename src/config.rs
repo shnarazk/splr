@@ -191,7 +191,7 @@ pub struct Config {
     rsr: i32,
 
     /// Stabilization switch
-    #[cfg_attr(not(feature = "no_IO"), structopt(long = "STB", default_value = "1"))]
+    #[cfg_attr(not(feature = "no_IO"), structopt(long = "STB", default_value = "0"))]
     stabilize: i32,
 
     /// Strategy adaptation switch

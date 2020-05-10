@@ -108,7 +108,7 @@ impl SolveIF for Solver {
                 None => (),
             }
         }
-        asg.force_select_iter(elim.sorted_iterator());
+        asg.force_select_iter(Some(elim.sorted_iterator()));
         //
         //## Run eliminator
         //
@@ -210,15 +210,27 @@ fn search(
             //## DYNAMIC FORCING RESTART based on LBD values, updated by conflict
             //
             state.last_asg = asg.stack_len();
-            if rst.force_restart() {
-                asg.cancel_until(asg.root_level);
-            }
+        // if rst.force_restart() /* && !rst_stabilize */ {
+        //     asg.cancel_until(asg.root_level);
+        //     if asg.exports().2 % 1000 == 0 {
+        //         asg.force_select_iter(None);
+        //     }
+        // }
         } else {
             if asg.decision_level() == asg.root_level {
                 analyze_final(asg, state, &cdb[ci]);
                 return Ok(false);
             }
             handle_conflict(asg, cdb, elim, rst, state, ci)?;
+
+            // stabilizing mode is changed only by conflict analyze
+            if rst_stabilize != rst.stabilizing() {
+                rst_stabilize = !rst_stabilize;
+                let new_mode = state.config.use_stabilize() && rst_stabilize;
+                asg.stabilize = new_mode;
+                state.stabilize = new_mode;
+            }
+
             if a_decision_was_made {
                 a_decision_was_made = false;
             } else {
@@ -237,8 +249,11 @@ fn search(
         }
         // Simplification has been postponed because chronoBT was used.
         if asg.decision_level() == asg.root_level {
-            if state.stabilize {
-                asg.force_rephase();
+            #[cfg(feature = "EVSIDS")]
+            {
+                if state.stabilize {
+                    asg.force_rephase();
+                }
             }
             // `elim.to_simplify` is increased much in particular when vars are solved or
             // learnts are small. We don't need to count the number of solved vars.
@@ -262,11 +277,6 @@ fn search(
             state.flush(format!("unreachable: {}", asg.num_vars - num_assigned));
         }
         if !asg.remains() {
-            let rs = rst.stabilizing();
-            if rst_stabilize != rs {
-                rst_stabilize = rs;
-                state.stabilize = state.config.use_stabilize() && rs;
-            }
             let lit = asg.select_decision_literal(&state.phase_select);
             asg.assign_by_decision(lit);
             state[Stat::Decision] += 1;

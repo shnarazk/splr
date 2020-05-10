@@ -359,6 +359,7 @@ struct GeometricStabilizer {
     next_trigger: usize,
     restart_inc: f64,
     step: usize,
+    suspend: bool,
 }
 
 impl Default for GeometricStabilizer {
@@ -369,6 +370,7 @@ impl Default for GeometricStabilizer {
             next_trigger: 1000,
             restart_inc: 2.0,
             step: 1000,
+            suspend: false,
         }
     }
 }
@@ -399,12 +401,16 @@ impl EmaIF for GeometricStabilizer {
     type Input = usize;
     fn update(&mut self, now: usize) {
         if self.enable && self.next_trigger <= now {
-            self.active = !self.active;
+            if self.suspend {
+                self.step = 1000;
+            }
+            self.active = !self.active && !self.suspend;
+            self.suspend = false;
             self.step = ((self.step as f64) * self.restart_inc) as usize;
             if 100_000_000 < self.step {
                 self.step = 1000;
             }
-            self.next_trigger += self.step;
+            self.next_trigger = now + self.step;
         }
     }
     fn get(&self) -> f64 {
@@ -419,7 +425,8 @@ impl ProgressEvaluator for GeometricStabilizer {
     fn reset_progress(&mut self) {
         if self.enable {
             self.active = false;
-            self.step = 1000;
+            self.suspend = true;
+            // self.step = 1000;
         }
     }
     fn shift(&mut self) {}
@@ -589,6 +596,8 @@ macro_rules! reset {
 }
 
 impl RestartIF for Restarter {
+    // true  => reset
+    // false => flip
     fn stabilizing(&self) -> bool {
         self.stb.is_active()
     }
@@ -636,7 +645,9 @@ impl RestartIF for Restarter {
                 self.lbd.update(val);
             }
             RestarterModule::Luby => self.luby.update(0),
-            RestarterModule::Reset => (),
+            RestarterModule::Reset => {
+                self.stb.reset_progress();
+            }
         }
     }
 }

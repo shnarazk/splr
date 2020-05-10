@@ -209,9 +209,8 @@ impl PropagateIF for AssignStack {
                     }
                     if w.binary {
                         if blocker_value == Some(false) {
-                            self.conflicts.1 = self.conflicts.0;
-                            self.conflicts.0 = false_lit.vi();
                             self.num_conflict += 1;
+                            self.var[false_lit.vi()].num_conflict += 1;
                             return w.c;
                         }
                         self.assign_by_implication(
@@ -261,9 +260,8 @@ impl PropagateIF for AssignStack {
                     }
 
                     if first_value == Some(false) {
-                        self.conflicts.1 = self.conflicts.0;
-                        self.conflicts.0 = false_lit.vi();
                         self.num_conflict += 1;
+                        self.var[false_lit.vi()].num_conflict += 1;
                         return w.c;
                     }
                     let lv = lits[1..]

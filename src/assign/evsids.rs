@@ -35,7 +35,7 @@ impl VarRewardIF for AssignStack {
         }
     }
     fn reward_at_assign(&mut self, _: VarId) {}
-    fn reward_at_unassign(&mut self, _: VarId, _: DecisionLevel) {}
+    fn reward_at_unassign(&mut self, _: VarId) {}
     fn reward_update(&mut self) {
         self.ordinal += 1;
         const INC_SCALE: f64 = 1.01;

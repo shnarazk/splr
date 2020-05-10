@@ -17,7 +17,7 @@ macro_rules! var_assign {
 /// API for var selection, depending on an internal heap.
 pub trait VarSelectIF {
     /// force assignments
-    fn force_select_iter(&mut self, iterator: Iter<'_, usize>);
+    fn force_select_iter(&mut self, iterator: Option<Iter<'_, usize>>);
     /// force assignments
     fn force_rephase(&mut self);
     /// select a new decision variable.
@@ -31,10 +31,19 @@ pub trait VarSelectIF {
 }
 
 impl VarSelectIF for AssignStack {
-    fn force_select_iter(&mut self, iterator: Iter<'_, usize>) {
-        for vi in iterator.rev() {
-            self.temp_order
-                .push(Lit::from_assign(*vi, self.var[*vi].is(Flag::PHASE)));
+    fn force_select_iter(&mut self, iterator: Option<Iter<'_, usize>>) {
+        if let Some(iter) = iterator {
+            for vi in iter.rev() {
+                self.temp_order
+                    .push(Lit::from_assign(*vi, self.var[*vi].is(Flag::PHASE)));
+            }
+        } else {
+            let mut vec = (1..self.num_vars).collect::<Vec<usize>>();
+            vec.sort_by_key(|vi| self.var[*vi].timestamp);
+            for vi in vec.iter() {
+                self.temp_order
+                    .push(Lit::from_assign(*vi, self.var[*vi].is(Flag::PHASE)));
+            }
         }
     }
     fn force_rephase(&mut self) {

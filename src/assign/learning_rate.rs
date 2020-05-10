@@ -16,7 +16,7 @@ impl VarRewardIF for AssignStack {
     fn initialize_reward(&mut self, iterator: Iter<'_, usize>) {
         self.reward_step = (self.activity_decay_max - self.activity_decay).abs() / 10_000.0;
         // big bang initialization
-        let mut v = 0.25;
+        let mut v = 0.0;
         for vi in iterator {
             self.var[*vi].reward = v;
             v *= 0.99;
@@ -26,22 +26,24 @@ impl VarRewardIF for AssignStack {
         self.var[vi].reward = 0.0;
     }
     fn reward_at_analysis(&mut self, vi: VarId) {
-        let v = &mut self.var[vi];
-        v.participated += 1;
+        self.var[vi].participated += 1;
     }
     fn reward_at_assign(&mut self, vi: VarId) {
         let t = self.ordinal;
         let v = &mut self.var[vi];
-        v.timestamp = t;
+
+        if v.participated == 0 {
+            self.var[vi].timestamp = t;
+        }
     }
     fn reward_at_unassign(&mut self, vi: VarId) {
         let v = &mut self.var[vi];
         let duration = (self.ordinal + 1 - v.timestamp) as f64;
         let decay = self.activity_decay;
-        let _decay = (1.0 - duration.ln() * (1.0 - self.activity_decay)).max(0.0);
+        // let decay = (1.0 - (1.0 + duration.ln()) * (1.0 - self.activity_decay)).max(0.0);
         let rate = v.participated as f64 / duration;
         v.reward *= decay;
-        v.reward += (1.0 - decay) * rate.sqrt();
+        v.reward += (1.0 - decay) * rate;
         v.participated = 0;
     }
     fn reward_update(&mut self) {

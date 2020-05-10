@@ -74,8 +74,6 @@ pub trait AssignIF:
     fn decision_vi(&self, lv: DecisionLevel) -> VarId;
     /// return `true` if there are unpropagated assignments.
     fn remains(&self) -> bool;
-    /// return `true` if subsequential propagations emit the same conflict.
-    fn recurrent_conflicts(&self) -> bool;
     fn level_ref(&self) -> &[DecisionLevel];
     fn best_assigned(&mut self, flag: Flag) -> usize;
     /// inject assignments for eliminated vars.
@@ -104,6 +102,7 @@ pub struct Var {
     timestamp: usize,
     /// the `Flag`s
     flags: Flag,
+    num_conflict: usize,
 }
 
 /// A record of assignment. It's called 'trail' in Glucose.
@@ -120,9 +119,9 @@ pub struct AssignStack {
     trail_lim: Vec<usize>,
     q_head: usize,
     pub root_level: DecisionLevel,
-    conflicts: (VarId, VarId),
     var_order: VarIdHeap, // Variable Order
     temp_order: Vec<Lit>,
+    pub stabilize: bool,
 
     //
     //## Phase handling

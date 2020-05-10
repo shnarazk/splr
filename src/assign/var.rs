@@ -16,6 +16,7 @@ impl Default for Var {
             timestamp: 0,
             flags: Flag::empty(),
             participated: 0,
+            num_conflict: 0,
         }
     }
 }
