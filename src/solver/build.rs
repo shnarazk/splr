@@ -20,7 +20,7 @@ use std::{
 pub trait SatSolverIF {
     /// add an assignment to Solver.
     ///
-    /// # Erros
+    /// # Errors
     ///
     /// * `SolverError::Inconsistent` if it conflicts with existing assignments.
     /// * `SolverError::OutOfRange` if it is out of range for var index.
@@ -40,13 +40,14 @@ pub trait SatSolverIF {
     /// assert!(s.add_assignment(4).is_ok());
     /// assert!(s.add_assignment(5).is_ok());
     /// assert!(s.add_assignment(8).is_ok());
-    /// assert!(s.add_assignment(-1).is_err());
+    /// assert!(matches!(s.add_assignment(-1), Err(SolverError::Inconsistent)));
+    /// assert!(matches!(s.add_assignment(0), Err(SolverError::OutOfRange)));
     /// assert_eq!(s.solve(), Ok(Certificate::SAT(vec![1, 2, 3, 4, 5, -6, 7, 8])));
     /// ```
     fn add_assignment(&mut self, val: i32) -> Result<&mut Solver, SolverError>;
     /// add a clause to Solver.
     ///
-    /// # Erros
+    /// # Errors
     ///
     /// * `SolverError::Inconsistent` if a given clause is unit and conflicts with existing assignments.
     /// * `SolverError::OutOfRange` if a literal in it is out of range for var index.
@@ -64,6 +65,8 @@ pub trait SatSolverIF {
     /// assert!(s.add_clause(vec![-4, 5]).is_ok());
     /// assert!(s.add_clause(vec![-5, 6]).is_ok());
     /// assert!(s.add_clause(vec![-7, 8]).is_ok());
+    /// assert!(matches!(s.add_clause(vec![10, 11]), Err(SolverError::OutOfRange)));
+    /// assert!(matches!(s.add_clause(vec![0, 8]), Err(SolverError::OutOfRange)));
     /// assert_eq!(s.solve(), Ok(Certificate::UNSAT));
     ///```
     fn add_clause<V>(&mut self, vec: V) -> Result<&mut Solver, SolverError>
