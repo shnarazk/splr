@@ -11,6 +11,10 @@ pub struct Config {
     //
     //## I/O configuration
     //
+    /// Build Splr interface
+    #[cfg_attr(not(feature = "no_IO"), structopt(skip))]
+    pub splr_interface: bool,
+
     /// CNF file in DIMACS format
     #[cfg_attr(not(feature = "no_IO"), structopt(parse(from_os_str)))]
     pub cnf_file: PathBuf,
@@ -213,6 +217,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Config {
+            splr_interface: false,
             cnf_file: PathBuf::new(),
             dump_int: 0,
             no_color: true,

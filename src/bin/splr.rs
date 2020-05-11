@@ -42,7 +42,8 @@ fn colored(v: Result<bool, &SolverError>, quiet: bool) -> Cow<'static, str> {
 }
 
 fn main() {
-    let config = Config::from_args().override_args();
+    let mut config = Config::from_args().override_args();
+    config.splr_interface = true;
     if !config.cnf_file.exists() {
         println!(
             "{} does not exist.",

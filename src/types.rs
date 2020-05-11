@@ -459,6 +459,7 @@ pub enum SolverError {
     Inconsistent,
     NullLearnt,
     OutOfMemory,
+    OutOfRange,
     TimeOut,
     SolverBug,
     UndescribedError,

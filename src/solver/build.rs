@@ -16,15 +16,66 @@ use std::{
     io::{BufRead, BufReader},
 };
 
-/// API for SAT solver like `build`, `solve` and so on.
+/// API for SAT solver creation and modification.
 pub trait SatSolverIF {
+    /// add an assignment to Solver.
+    ///
+    /// # Erros
+    ///
+    /// * `SolverError::Inconsistent` if it conflicts with existing assignments.
+    /// * `SolverError::OutOfRange` if it is out of range for var index.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use crate::splr::*;
+    /// use std::convert::TryFrom;
+    /// use crate::splr::assign::VarManipulateIF;
+    ///
+    /// let mut s = Solver::try_from("tests/uf8.cnf").expect("can't load");
+    /// assert!(s.add_assignment(1).is_ok());
+    /// assert_eq!(s.asg.assign(1), Some(true));
+    /// assert!(s.add_assignment(2).is_ok());
+    /// assert!(s.add_assignment(3).is_ok());
+    /// assert!(s.add_assignment(4).is_ok());
+    /// assert!(s.add_assignment(5).is_ok());
+    /// assert!(s.add_assignment(8).is_ok());
+    /// assert!(s.add_assignment(-1).is_err());
+    /// assert_eq!(s.solve(), Ok(Certificate::SAT(vec![1, 2, 3, 4, 5, -6, 7, 8])));
+    /// ```
+    fn add_assignment(&mut self, val: i32) -> Result<&mut Solver, SolverError>;
     /// add a clause to Solver.
-    fn add_unchecked_clause(&mut self, lits: &mut Vec<Lit>) -> Option<ClauseId>;
+    ///
+    /// # Erros
+    ///
+    /// * `SolverError::Inconsistent` if a given clause is unit and conflicts with existing assignments.
+    /// * `SolverError::OutOfRange` if a literal in it is out of range for var index.
+    ///
+    /// # Example
+    ///```
+    /// use crate::splr::*;
+    /// use std::convert::TryFrom;
+    ///
+    /// let mut s = Solver::try_from("tests/uf8.cnf").expect("can't load");
+    /// assert!(s.add_clause(vec![1, -2]).is_ok());
+    /// assert!(s.add_clause(vec![2, -3]).is_ok());
+    /// assert!(s.add_clause(vec![3, 4]).is_ok());
+    /// assert!(s.add_clause(vec![-2, 4]).is_ok());
+    /// assert!(s.add_clause(vec![-4, 5]).is_ok());
+    /// assert!(s.add_clause(vec![-5, 6]).is_ok());
+    /// assert!(s.add_clause(vec![-7, 8]).is_ok());
+    /// assert_eq!(s.solve(), Ok(Certificate::UNSAT));
+    ///```
+    fn add_clause<V>(&mut self, vec: V) -> Result<&mut Solver, SolverError>
+    where
+        V: AsRef<[i32]>;
     /// make a solver and load a CNF into it.
     ///
     /// # Errors
     ///
-    /// IO error by failing to load a CNF file.
+    /// * `SolverError::IOError` if it failed to load a CNF file.
+    /// * `SolverError::Inconsistent` if the CNF is conflicting.
+    /// * `SolverError::OutOfRange` if any literal used in the CNF is out of range for var index.
     #[cfg(not(feature = "no_IO"))]
     fn build(config: &Config) -> Result<Solver, SolverError>;
 }
@@ -92,6 +143,50 @@ impl TryFrom<&str> for Solver {
 }
 
 impl SatSolverIF for Solver {
+    fn add_assignment(&mut self, val: i32) -> Result<&mut Solver, SolverError> {
+        if val == 0 || self.asg.num_vars < val.abs() as usize {
+            return Err(SolverError::OutOfRange);
+        }
+        self.asg.assign_at_rootlevel(Lit::from(val)).map(|_| self)
+    }
+    fn add_clause<V>(&mut self, vec: V) -> Result<&mut Solver, SolverError>
+    where
+        V: AsRef<[i32]>,
+    {
+        for i in vec.as_ref().iter() {
+            if *i == 0 || self.asg.num_vars < i.abs() as usize {
+                return Err(SolverError::OutOfRange);
+            }
+        }
+        let mut clause = vec
+            .as_ref()
+            .iter()
+            .map(|i| Lit::from(*i))
+            .collect::<Vec<Lit>>();
+        if self.add_unchecked_clause(&mut clause).is_none() {
+            return Err(SolverError::Inconsistent);
+        }
+        Ok(self)
+    }
+    /// # Examples
+    ///
+    /// ```
+    /// use splr::config::Config;
+    /// use splr::solver::{SatSolverIF, Solver};
+    ///
+    /// let config = Config::from("tests/sample.cnf");
+    /// assert!(Solver::build(&config).is_ok());
+    ///```
+    #[cfg(not(feature = "no_IO"))]
+    fn build(config: &Config) -> Result<Solver, SolverError> {
+        let CNFReader { cnf, reader } = CNFReader::try_from(&config.cnf_file)?;
+        Solver::instantiate(config, &cnf).inject(reader)
+    }
+}
+
+impl Solver {
+    /// FIXME: this should return Result<ClauseId, SolverErrror>
+    /// fn add_unchecked_clause(&mut self, lits: &mut Vec<Lit>) -> Option<ClauseId>
     // renamed from clause_new
     fn add_unchecked_clause(&mut self, lits: &mut Vec<Lit>) -> Option<ClauseId> {
         let Solver {
@@ -134,23 +229,6 @@ impl SatSolverIF for Solver {
             }
         }
     }
-    /// # Examples
-    ///
-    /// ```
-    /// use splr::config::Config;
-    /// use splr::solver::{SatSolverIF, Solver};
-    ///
-    /// let config = Config::from("tests/sample.cnf");
-    /// assert!(Solver::build(&config).is_ok());
-    ///```
-    #[cfg(not(feature = "no_IO"))]
-    fn build(config: &Config) -> Result<Solver, SolverError> {
-        let CNFReader { cnf, reader } = CNFReader::try_from(&config.cnf_file)?;
-        Solver::instantiate(config, &cnf).inject(reader)
-    }
-}
-
-impl Solver {
     #[cfg(not(feature = "no_IO"))]
     fn inject(mut self, mut reader: BufReader<File>) -> Result<Solver, SolverError> {
         self.state.progress_header();
@@ -205,6 +283,11 @@ impl Solver {
         );
         self.state.flush("injecting...");
         for ints in v.iter() {
+            for i in ints.as_ref().iter() {
+                if *i == 0 || self.asg.num_vars < i.abs() as usize {
+                    return Err(SolverError::OutOfRange);
+                }
+            }
             let mut lits = ints
                 .as_ref()
                 .iter()

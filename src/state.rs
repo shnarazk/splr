@@ -396,7 +396,7 @@ impl StateIF for State {
         self.strategy.1 = asg_num_conflict;
     }
     fn progress_header(&mut self) {
-        if self.config.quiet_mode {
+        if !self.config.splr_interface || self.config.quiet_mode {
             return;
         }
         if self.config.use_log {
@@ -413,7 +413,7 @@ impl StateIF for State {
         }
     }
     fn flush<S: AsRef<str>>(&self, mes: S) {
-        if !self.config.quiet_mode && !self.config.use_log {
+        if self.config.splr_interface && !self.config.quiet_mode && !self.config.use_log {
             if mes.as_ref().is_empty() {
                 print!("\x1B[1G\x1B[K")
             } else {
@@ -431,6 +431,10 @@ impl StateIF for State {
         E: EliminateIF,
         R: RestartIF,
     {
+        if !self.config.splr_interface || self.config.quiet_mode {
+            return;
+        }
+
         //
         //## Gather stats from all modules
         //
@@ -453,9 +457,6 @@ impl StateIF for State {
 
         let (rst_mode, rst_num_block, rst_asg_trend, rst_lbd_get, rst_lbd_trend) = rst.exports();
 
-        if self.config.quiet_mode {
-            return;
-        }
         if self.config.use_log {
             self.dump(asg, cdb, rst);
             return;
