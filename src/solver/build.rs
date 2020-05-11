@@ -41,6 +41,7 @@ pub trait SatSolverIF {
     /// assert!(s.add_assignment(5).is_ok());
     /// assert!(s.add_assignment(8).is_ok());
     /// assert!(matches!(s.add_assignment(-1), Err(SolverError::Inconsistent)));
+    /// assert!(matches!(s.add_assignment(10), Err(SolverError::OutOfRange)));
     /// assert!(matches!(s.add_assignment(0), Err(SolverError::OutOfRange)));
     /// assert_eq!(s.solve(), Ok(Certificate::SAT(vec![1, 2, 3, 4, 5, -6, 7, 8])));
     /// ```
