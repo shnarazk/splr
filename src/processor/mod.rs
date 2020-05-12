@@ -75,7 +75,7 @@ pub trait EliminateIF: Export<(usize, usize, f64)> {
         A: AssignIF,
         C: ClauseDBIF;
     /// enqueue a var into eliminator's var queue.
-    fn enqueue_var<A>(&mut self, asg: &mut A, vi: VarId, upword: bool)
+    fn enqueue_var<A>(&mut self, asg: &mut A, vi: VarId, upward: bool)
     where
         A: AssignIF;
     /// simplify database by:
@@ -676,7 +676,6 @@ impl Eliminator {
                 self.backward_subsumption_check(asg, cdb, &timedout)?;
             }
             while let Some(vi) = self.var_queue.select_var(&self.var, asg) {
-                // timedout = cvar.wait(timedout).unwrap();
                 let v = asg.var_mut(vi);
                 v.turn_off(Flag::ENQUEUED);
                 if !v.is(Flag::ELIMINATED) && asg.assign(vi).is_none() {
@@ -836,7 +835,7 @@ mod tests {
             asg.num_eliminated_vars,
             asg.var_iter().filter(|v| v.is(Flag::ELIMINATED)).count()
         );
-        let elims = asg
+        let elim_vars = asg
             .var_iter()
             .filter(|v| v.is(Flag::ELIMINATED))
             .map(|v| v.index)
@@ -846,7 +845,7 @@ mod tests {
             cdb.iter()
                 .skip(1)
                 .filter(|c| !c.is(Flag::DEAD))
-                .filter(|c| c.lits.iter().any(|l| elims.contains(&l.vi())))
+                .filter(|c| c.lits.iter().any(|l| elim_vars.contains(&l.vi())))
                 .count()
         );
     }

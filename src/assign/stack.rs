@@ -113,7 +113,7 @@ impl Instantiate for AssignStack {
 impl Export<(usize, usize, usize, f64)> for AssignStack {
     /// exports:
     ///  1. the number of conflicts
-    ///  1. the number of propagations
+    ///  1. the number of propagation
     ///  1. the number of restarts
     ///  1. `activity_decay`
     ///
@@ -236,6 +236,23 @@ impl AssignIF for AssignStack {
 }
 
 impl AssignStack {
+    #[cfg(feature = "boundary_check")]
+    pub fn dump<'a, V: IntoIterator<Item = &'a Lit, IntoIter = Iter<'a, Lit>>>(
+        &mut self,
+        v: V,
+    ) -> Vec<(i32, DecisionLevel, bool, Option<bool>)> {
+        v.into_iter()
+            .map(|l| {
+                (
+                    i32::from(l),
+                    self.level(l.vi()),
+                    self.reason(l.vi()) == AssignReason::default(),
+                    self.assign(l.vi()),
+                )
+            })
+            .collect::<Vec<(i32, DecisionLevel, bool, Option<bool>)>>()
+    }
+
     /// dump all active clauses and fixed assignments as a CNF file.
     #[cfg(not(feature = "no_IO"))]
     #[allow(dead_code)]
