@@ -71,75 +71,79 @@ impl SolveIF for Solver {
         asg.num_solved_vars = asg.stack_len();
         state.progress_header();
         state.progress(asg, cdb, elim, rst, Some("preprocessing phase"));
-        const USE_PRE_PROCESSING_ELIMINATOR: bool = true;
+        if elim.enable {
+            const USE_PRE_PROCESSING_ELIMINATOR: bool = true;
 
-        //
-        //## Propagate all trivial literals (an essential step)
-        //
-        // Set appropriate phases and push all the unit clauses to assign stack.
-        // To do so, we use eliminator's occur list.
-        // Thus we have to call `activate` and `prepare` firstly, to build occur lists.
-        // Otherwise all literals are assigned wrongly.
-        state.flush("phasing...");
-        elim.activate();
-        elim.prepare(asg, cdb, true);
-        for vi in 1..=asg.num_vars {
-            if asg.assign(vi).is_some() {
-                continue;
-            }
-            match elim.stats(vi) {
-                Some((_, 0)) => {
-                    let l = Lit::from_assign(vi, true);
-                    if asg.assign_at_rootlevel(l).is_err() {
-                        return Ok(Certificate::UNSAT);
-                    }
-                }
-                Some((0, _)) => {
-                    let l = Lit::from_assign(vi, false);
-                    if asg.assign_at_rootlevel(l).is_err() {
-                        return Ok(Certificate::UNSAT);
-                    }
-                }
-                Some((p, m)) => {
-                    asg.var_mut(vi).set(Flag::PHASE, m < p);
-                    elim.enqueue_var(asg, vi, false);
-                }
-                None => (),
-            }
-        }
-        asg.force_select_iter(elim.sorted_iterator());
-        //
-        //## Run eliminator
-        //
-        if !USE_PRE_PROCESSING_ELIMINATOR || !elim.enable {
-            elim.stop(asg, cdb);
-        }
-        if USE_PRE_PROCESSING_ELIMINATOR && elim.enable {
-            state.flush("simplifying...");
-            if elim.simplify(asg, cdb, state).is_err() {
-                // Why inconsistent? Because the CNF contains a conflict, not an error!
-                // Or out of memory.
-                final_report!(asg, cdb, elim, rst, state);
-                if cdb.check_size().is_err() {
-                    return Err(SolverError::OutOfMemory);
-                }
-                return Ok(Certificate::UNSAT);
-            }
+            //
+            //## Propagate all trivial literals (an essential step)
+            //
+            // Set appropriate phases and push all the unit clauses to assign stack.
+            // To do so, we use eliminator's occur list.
+            // Thus we have to call `activate` and `prepare` firstly, to build occur lists.
+            // Otherwise all literals are assigned wrongly.
+            state.flush("phasing...");
+            elim.activate();
+            elim.prepare(asg, cdb, true);
             for vi in 1..=asg.num_vars {
-                if asg.assign(vi).is_some() || asg.var(vi).is(Flag::ELIMINATED) {
+                if asg.assign(vi).is_some() {
                     continue;
                 }
                 match elim.stats(vi) {
-                    Some((_, 0)) => (),
-                    Some((0, _)) => (),
-                    Some((p, m)) if m * 10 < p => asg.var_mut(vi).turn_on(Flag::PHASE),
-                    Some((p, m)) if p * 10 < m => asg.var_mut(vi).turn_off(Flag::PHASE),
-                    _ => (),
+                    Some((_, 0)) => {
+                        let l = Lit::from_assign(vi, true);
+                        println!("bind {}", vi);
+                        if asg.assign_at_rootlevel(l).is_err() {
+                            return Ok(Certificate::UNSAT);
+                        }
+                    }
+                    Some((0, _)) => {
+                        let l = Lit::from_assign(vi, false);
+                        println!("bind {}", vi);
+                        if asg.assign_at_rootlevel(l).is_err() {
+                            return Ok(Certificate::UNSAT);
+                        }
+                    }
+                    Some((p, m)) => {
+                        asg.var_mut(vi).set(Flag::PHASE, m < p);
+                        elim.enqueue_var(asg, vi, false);
+                    }
+                    None => (),
                 }
             }
-            asg.initialize_reward(elim.sorted_iterator());
+            asg.force_select_iter(elim.sorted_iterator());
+            //
+            //## Run eliminator
+            //
+            if !USE_PRE_PROCESSING_ELIMINATOR {
+                elim.stop(asg, cdb);
+            }
+            if USE_PRE_PROCESSING_ELIMINATOR {
+                state.flush("simplifying...");
+                if elim.simplify(asg, cdb, state).is_err() {
+                    // Why inconsistent? Because the CNF contains a conflict, not an error!
+                    // Or out of memory.
+                    final_report!(asg, cdb, elim, rst, state);
+                    if cdb.check_size().is_err() {
+                        return Err(SolverError::OutOfMemory);
+                    }
+                    return Ok(Certificate::UNSAT);
+                }
+                for vi in 1..=asg.num_vars {
+                    if asg.assign(vi).is_some() || asg.var(vi).is(Flag::ELIMINATED) {
+                        continue;
+                    }
+                    match elim.stats(vi) {
+                        Some((_, 0)) => (),
+                        Some((0, _)) => (),
+                        Some((p, m)) if m * 10 < p => asg.var_mut(vi).turn_on(Flag::PHASE),
+                        Some((p, m)) if p * 10 < m => asg.var_mut(vi).turn_off(Flag::PHASE),
+                        _ => (),
+                    }
+                }
+                asg.initialize_reward(elim.sorted_iterator());
+            }
+            asg.rebuild_order();
         }
-        asg.rebuild_order();
         state.progress(asg, cdb, elim, rst, None);
 
         //
