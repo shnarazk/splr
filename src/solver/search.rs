@@ -12,7 +12,6 @@ use {
         state::{Stat, State, StateIF},
         types::*,
     },
-    std::slice::Iter,
 };
 
 /// API for SAT solver like `build`, `solve` and so on.
@@ -78,7 +77,7 @@ impl SolveIF for Solver {
         //## Propagate all trivial literals (an essential step)
         //
         // Set appropriate phases and push all the unit clauses to assign stack.
-        // To do so, we use eliminator's ocuur list.
+        // To do so, we use eliminator's occur list.
         // Thus we have to call `activate` and `prepare` firstly, to build occur lists.
         // Otherwise all literals are assigned wrongly.
         state.flush("phasing...");
@@ -335,24 +334,5 @@ fn analyze_final(asg: &mut AssignStack, state: &mut State, c: &Clause) {
             }
         }
         seen[vi] = false;
-    }
-}
-
-#[allow(dead_code)]
-impl AssignStack {
-    fn dump<'a, V: IntoIterator<Item = &'a Lit, IntoIter = Iter<'a, Lit>>>(
-        &mut self,
-        v: V,
-    ) -> Vec<(i32, DecisionLevel, bool, Option<bool>)> {
-        v.into_iter()
-            .map(|l| {
-                (
-                    i32::from(l),
-                    self.level(l.vi()),
-                    self.reason(l.vi()) == AssignReason::default(),
-                    self.assign(l.vi()),
-                )
-            })
-            .collect::<Vec<(i32, DecisionLevel, bool, Option<bool>)>>()
     }
 }

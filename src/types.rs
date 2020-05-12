@@ -163,7 +163,7 @@ impl From<ClauseId> for Lit {
 }
 
 /*
-/// While Lit::oridinal is private, Var::{index, assign} are public.
+/// While Lit::ordinal is private, Var::{index, assign} are public.
 /// So we define the following here.
 /// # CAVEAT
 /// Unassigned vars are converted to the null literal.
@@ -442,7 +442,7 @@ impl Ema2 {
             se: 1.0 / (f as f64),
         }
     }
-    // set secondary Ema's parameter
+    // set secondary EMA's parameter
     pub fn with_slow(mut self, s: usize) -> Ema2 {
         self.se = 1.0 / (s as f64);
         self
@@ -694,9 +694,9 @@ mod tests {
     use super::*;
     #[test]
     fn test_cnf() {
-        if let Ok(cnfs) = CNFReader::try_from("tests/sample.cnf") {
-            assert_eq!(cnfs.cnf.num_of_variables, 250);
-            assert_eq!(cnfs.cnf.num_of_clauses, 1065);
+        if let Ok(reader) = CNFReader::try_from("tests/sample.cnf") {
+            assert_eq!(reader.cnf.num_of_variables, 250);
+            assert_eq!(reader.cnf.num_of_clauses, 1065);
         } else {
             panic!("failed to load tests/sample.cnf");
         }
