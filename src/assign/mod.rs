@@ -76,6 +76,7 @@ pub trait AssignIF:
     fn remains(&self) -> bool;
     /// return `true` if subsequential propagations emit the same conflict.
     fn recurrent_conflicts(&self) -> bool;
+    /// return a reference to `level`.
     fn level_ref(&self) -> &[DecisionLevel];
     fn best_assigned(&mut self, flag: Flag) -> usize;
     /// inject assignments for eliminated vars.
