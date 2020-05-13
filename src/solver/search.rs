@@ -187,25 +187,9 @@ impl SolveIF for Solver {
                     }
                 }
                 asg.cancel_until(asg.root_level);
-                // dbg!(asg);
                 Ok(Certificate::SAT(vals))
             }
-            Ok(false) => {
-                println!("level: {}", asg.decision_level());
-                println!(
-                    "assign: {:?}",
-                    asg.stack_iter().map(|l| i32::from(*l)).collect::<Vec<_>>()
-                );
-                println!(
-                    "len: {}, solved: {}, elim: {}",
-                    asg.stack_len(),
-                    asg.num_solved_vars,
-                    asg.num_eliminated_vars
-                );
-                asg.cancel_until(asg.root_level);
-                Ok(Certificate::UNSAT)
-            }
-            Err(SolverError::NullLearnt) => {
+            Ok(false) | Err(SolverError::NullLearnt) => {
                 asg.cancel_until(asg.root_level);
                 Ok(Certificate::UNSAT)
             }
