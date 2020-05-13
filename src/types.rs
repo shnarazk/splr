@@ -63,6 +63,8 @@ pub trait ActivityIF {
 pub trait Instantiate {
     /// make and return an object from `Config` and `CNFDescription`.
     fn instantiate(conf: &Config, cnf: &CNFDescription) -> Self;
+    /// reinitialization function, used for resoloving
+    fn reinitialize(&mut self) {}
     /// set up internal parameters.
     /// # CAVEAT
     /// some implementation might have a special premise to call: decision_level == 0.

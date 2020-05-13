@@ -82,6 +82,8 @@ pub trait SatSolverIF {
     /// * `SolverError::OutOfRange` if any literal used in the CNF is out of range for var index.
     #[cfg(not(feature = "no_IO"))]
     fn build(config: &Config) -> Result<Solver, SolverError>;
+    /// reinitialize
+    fn reset(&mut self);
 }
 
 impl Default for Solver {
@@ -109,6 +111,26 @@ impl Instantiate for Solver {
             elim: Eliminator::instantiate(config, cnf),
             rst: Restarter::instantiate(config, &cnf),
             state: State::instantiate(config, cnf),
+        }
+    }
+    fn reinitialize(&mut self) {
+        let Solver {
+            ref mut asg,
+            ref mut cdb,
+            ref mut elim,
+            ref mut rst,
+            ref mut state,
+        } = self;
+        asg.reinitialize();
+        cdb.reinitialize();
+        elim.reinitialize();
+        rst.reinitialize();
+        state.reinitialize();
+
+        let mut tmp = Vec::new();
+        std::mem::swap(&mut tmp, &mut cdb.eliminated_permanent);
+        while let Some(mut vec) = tmp.pop() {
+            cdb.new_clause(asg, &mut vec, false, false);
         }
     }
 }
@@ -186,6 +208,9 @@ impl SatSolverIF for Solver {
         let CNFReader { cnf, reader } = CNFReader::try_from(&config.cnf_file)?;
         Solver::instantiate(config, &cnf).inject(reader)
     }
+    fn reset(&mut self) {
+        self.reinitialize();
+    }
 }
 
 impl Solver {
@@ -221,6 +246,7 @@ impl Solver {
             }
         }
         lits.truncate(j);
+        // println!("add {:?}", lits.iter().map(|l| i32::from(*l)).collect::<Vec<_>>());
         match lits.len() {
             0 => None, // Empty clause is UNSAT.
             1 => asg

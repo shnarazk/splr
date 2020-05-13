@@ -349,6 +349,9 @@ impl Instantiate for Eliminator {
             ..Eliminator::default()
         }
     }
+    fn reinitialize(&mut self) {
+        self.elim_lits.clear();
+    }
 }
 
 impl EliminateIF for Eliminator {

@@ -126,6 +126,8 @@ pub struct ClauseDB {
     num_learnt: usize,
     /// the number of reductions.
     num_reduction: usize,
+
+    pub eliminated_permanent: Vec<Vec<Lit>>,
 }
 
 #[cfg(test)]

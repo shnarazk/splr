@@ -89,20 +89,18 @@ impl SolveIF for Solver {
                     continue;
                 }
                 match elim.stats(vi) {
-                    Some((_, 0)) => {
-                        let l = Lit::from_assign(vi, true);
-                        println!("bind {}", vi);
-                        if asg.assign_at_rootlevel(l).is_err() {
-                            return Ok(Certificate::UNSAT);
-                        }
-                    }
-                    Some((0, _)) => {
-                        let l = Lit::from_assign(vi, false);
-                        println!("bind {}", vi);
-                        if asg.assign_at_rootlevel(l).is_err() {
-                            return Ok(Certificate::UNSAT);
-                        }
-                    }
+                    // Some((_, 0)) => {
+                    //     let l = Lit::from_assign(vi, true);
+                    //     if asg.assign_at_rootlevel(l).is_err() {
+                    //         return Ok(Certificate::UNSAT);
+                    //     }
+                    // }
+                    // Some((0, _)) => {
+                    //     let l = Lit::from_assign(vi, false);
+                    //     if asg.assign_at_rootlevel(l).is_err() {
+                    //         return Ok(Certificate::UNSAT);
+                    //     }
+                    // }
                     Some((p, m)) => {
                         asg.var_mut(vi).set(Flag::PHASE, m < p);
                         elim.enqueue_var(asg, vi, false);
@@ -153,33 +151,67 @@ impl SolveIF for Solver {
         final_report!(asg, cdb, elim, rst, state);
         match answer {
             Ok(true) => {
-                asg.extend_model(elim.eliminated_lits());
+                let model = asg.extend_model(cdb, elim.eliminated_lits());
                 #[cfg(debug)]
                 {
-                    if let Some(cid) = cdb.validate(asg, true) {
+                    if let Some(cid) = cdb.validate(&model, true) {
                         panic!(
                             "Level {} generated assignment({:?}) falsifies {}:{:?}",
                             asg.decision_level(),
-                            cdb.validate(asg, false).is_none(),
+                            cdb.validate(&model, false).is_none(),
                             cid,
-                            asg.dump(&cdb[cid]),
+                            "asg.dump(&cdb[cid])",
                         );
                     }
                 }
-                if cdb.validate(asg, false).is_some() {
+                if cdb.validate(&model, false).is_some() {
                     return Err(SolverError::SolverBug);
                 }
                 let vals = asg
                     .var_iter()
                     .skip(1)
-                    .map(|v| i32::from(Lit::from((v.index, asg.assign(v.index)))))
+                    // .map(|v| i32::from(Lit::from((v.index, asg.assign(v.index)))))
+                    .map(|v| i32::from(Lit::from((v.index, model[v.index]))))
                     .collect::<Vec<i32>>();
+                // let mut first = true;
+                for (vi, val) in model.iter().enumerate().skip(1) {
+                    if asg.var(vi).is(Flag::ELIMINATED) {
+                        asg.var_mut(vi).turn_off(Flag::ELIMINATED);
+                        if asg.level(vi) == 0 {
+                            let l = Lit::from((vi, *val));
+                            // asg.assign_at_rootlevel(l).unwrap();
+                            println!("level zero eliminated {}", l);
+                        }
+                    }
+                }
                 asg.cancel_until(asg.root_level);
+                println!(
+                    "elim: {}, zero assign: {:?}, len: {}",
+                    asg.num_eliminated_vars,
+                    asg.stack_iter().map(|l| i32::from(*l)).collect::<Vec<_>>(),
+                    asg.stack_len(),
+                );
+                // println!("exten model: {:?}", vals);
                 Ok(Certificate::SAT(vals))
             }
-            Ok(false) | Err(SolverError::NullLearnt) => {
+            Ok(false) => {
+                println!("level: {}", asg.decision_level());
+                println!(
+                    "assign: {:?}",
+                    asg.stack_iter().map(|l| i32::from(*l)).collect::<Vec<_>>()
+                );
+                println!(
+                    "len: {}, solved: {}, elim: {}",
+                    asg.stack_len(),
+                    asg.num_solved_vars,
+                    asg.num_eliminated_vars
+                );
                 asg.cancel_until(asg.root_level);
-                Ok(Certificate::UNSAT)
+                dbg!(Ok(Certificate::UNSAT))
+            }
+            Err(SolverError::NullLearnt) => {
+                asg.cancel_until(asg.root_level);
+                dbg!(Ok(Certificate::UNSAT))
             }
             Err(e) => {
                 asg.cancel_until(asg.root_level);
@@ -206,6 +238,12 @@ fn search(
         let ci = asg.propagate(cdb);
         if ci == ClauseId::default() {
             if asg.num_vars <= asg.stack_len() + asg.num_eliminated_vars {
+                println!(
+                    "reached! num_var: {}, stack_len: {}, elim: {}",
+                    asg.num_vars,
+                    asg.stack_len(),
+                    asg.num_eliminated_vars,
+                );
                 return Ok(true);
             }
 
