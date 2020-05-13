@@ -216,7 +216,6 @@ impl AssignIF for AssignStack {
         }
         let mut i = lits.len() - 1;
         let mut width;
-        let mut lvl = self.decision_level();
         'next: loop {
             width = usize::from(lits[i]);
             if width == 0 && i == 0 {
@@ -233,9 +232,6 @@ impl AssignIF for AssignStack {
                 #[cfg(feature = "incremental_solver")]
                 {
                     phantom_clause.push(!l);
-                }
-                if !self.var[l.vi()].is(Flag::ELIMINATED) {
-                    lvl = lvl.max(self.level[l.vi()]);
                 }
                 if self.assign(l.vi()) != Some(!bool::from(l)) {
                     if i < width {
