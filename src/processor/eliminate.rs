@@ -79,16 +79,22 @@ where
         //
         for cid in &*pos {
             debug_assert!(!asg.locked(&cdb[*cid], *cid));
-            if !cdb[*cid].is(Flag::LEARNT) {
-                cdb.stock(*cid);
+            #[cfg(features = "incremental_solver")]
+            {
+                if !cdb[*cid].is(Flag::LEARNT) {
+                    cdb.make_permanent_immortal(*cid);
+                }
             }
             cdb.detach(*cid);
             elim.remove_cid_occur(asg, *cid, &mut cdb[*cid]);
         }
         for cid in &*neg {
             debug_assert!(!asg.locked(&cdb[*cid], *cid));
-            if !cdb[*cid].is(Flag::LEARNT) {
-                cdb.stock(*cid);
+            #[cfg(features = "incremental_solver")]
+            {
+                if !cdb[*cid].is(Flag::LEARNT) {
+                    cdb.make_permanent_immortal(*cid);
+                }
             }
             cdb.detach(*cid);
             elim.remove_cid_occur(asg, *cid, &mut cdb[*cid]);
@@ -242,7 +248,6 @@ fn make_eliminated_clauses<C>(
 }
 
 fn make_eliminating_unit_clause(vec: &mut Vec<Lit>, x: Lit) {
-    println!("EU: [{}]", i32::from(x));
     vec.push(x);
     vec.push(Lit::from(1usize));
 }
@@ -255,10 +260,6 @@ where
     // Copy clause to the vector. Remember the position where the variable 'v' occurs:
     let c = &cdb[cid];
     debug_assert!(!c.is_empty());
-    println!(
-        "EC: {:?}",
-        c.lits.iter().map(|l| i32::from(*l)).collect::<Vec<i32>>()
-    );
     for l in &c.lits {
         vec.push(*l as Lit);
         if l.vi() == vi {
@@ -271,7 +272,6 @@ where
     }
     // Store the length of the clause last:
     debug_assert_eq!(vec[first].vi(), vi);
-    // println!("Elen: {}", c.len());
     vec.push(Lit::from(c.len()));
     #[cfg(feature = "trace_elimination")]
     println!("make_eliminated_clause: eliminate({}) clause {:?}", vi, c);

@@ -160,7 +160,6 @@ pub fn handle_conflict(
         //
         // dump to certified even if it's a literal.
         cdb.certificate_add(new_learnt);
-        println!("- found unit clause: {}", l0);
         if use_chronobt {
             asg.cancel_until(bl);
             debug_assert!(asg.stack_iter().all(|l| l.vi() != l0.vi()));

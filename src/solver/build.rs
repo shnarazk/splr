@@ -246,7 +246,6 @@ impl Solver {
             }
         }
         lits.truncate(j);
-        // println!("add {:?}", lits.iter().map(|l| i32::from(*l)).collect::<Vec<_>>());
         match lits.len() {
             0 => None, // Empty clause is UNSAT.
             1 => asg

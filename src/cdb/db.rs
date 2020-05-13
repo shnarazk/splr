@@ -96,7 +96,9 @@ pub trait ClauseDBIF:
     fn minimize_with_biclauses<A>(&mut self, asg: &A, vec: &mut Vec<Lit>)
     where
         A: AssignIF;
-    fn stock(&mut self, cid: ClauseId);
+    /// save an eliminated permanent clause to an extra space for incremental solving.
+    #[cfg(features = "incremental_solver")]
+    fn make_permanent_immortal(&mut self, cid: ClauseId);
 }
 
 impl Default for ClauseDB {
@@ -607,7 +609,7 @@ impl ClauseDBIF for ClauseDB {
             if c.is(Flag::DEAD) || (strict && c.is(Flag::LEARNT)) {
                 continue;
             }
-            match c.valuate(model) {
+            match c.evaluate(model) {
                 Some(false) => return Some(ClauseId::from(i)),
                 None if strict => return Some(ClauseId::from(i)),
                 _ => (),
@@ -697,7 +699,8 @@ impl ClauseDBIF for ClauseDB {
             vec.retain(|l| self.lbd_temp[l.vi()] == key);
         }
     }
-    fn stock(&mut self, cid: ClauseId) {
+    #[cfg(features = "incremental_solver")]
+    fn make_permanent_immortal(&mut self, cid: ClauseId) {
         self.eliminated_permanent
             .push(self.clause[cid.ordinal as usize].lits.clone());
     }
@@ -787,7 +790,11 @@ impl Clause {
         touched[!self.lits[0]] = true;
         touched[!self.lits[1]] = true;
     }
-    fn valuate(&self, model: &[Option<bool>]) -> Option<bool> {
+    /// evaluate a clause and return Option<bool>.
+    /// - `Some(true)` -- the literals is satisfied by a literal
+    /// - `Some(false)` -- the literals is unsatisfied; no unassigned literal
+    /// - `None` -- the literals contains an unassigned literal
+    fn evaluate(&self, model: &[Option<bool>]) -> Option<bool> {
         let mut falsified = Some(false);
         for l in self.lits.iter() {
             match model[l.vi()] {

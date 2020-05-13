@@ -63,7 +63,7 @@ pub trait ActivityIF {
 pub trait Instantiate {
     /// make and return an object from `Config` and `CNFDescription`.
     fn instantiate(conf: &Config, cnf: &CNFDescription) -> Self;
-    /// reinitialization function, used for resoloving
+    /// reinitialization function, used for incremental solving.
     fn reinitialize(&mut self) {}
     /// set up internal parameters.
     /// # CAVEAT

@@ -1,9 +1,6 @@
 /// main struct AssignStack
 use {
-    super::{
-        AssignIF, AssignStack, PropagateIF, Var, VarIdHeap, VarManipulateIF, VarOrderIF,
-        VarSelectIF,
-    },
+    super::{AssignIF, AssignStack, Var, VarIdHeap, VarManipulateIF, VarOrderIF, VarSelectIF},
     crate::{state::State, types::*},
     std::{fmt, ops::Range, slice::Iter},
 };
@@ -21,11 +18,6 @@ use {
 pub trait ClauseManipulateIF {
     /// return `true` if the set of literals is satisfiable under the current assignment.
     fn satisfies(&self, c: &[Lit]) -> bool;
-    /// return Option<bool>
-    /// - Some(true) -- the literals is satisfied by a literal
-    /// - Some(false) -- the literals is unsatisfied; no unassigned literal
-    /// - None -- the literals contains an unassigned literal
-    fn status(&self, c: &[Lit]) -> Option<bool>;
     /// return `true` is the clause is the reason of the assignment.
     fn locked(&self, c: &Clause, cid: ClauseId) -> bool;
 }
@@ -213,58 +205,57 @@ impl AssignIF for AssignStack {
         }
         0
     }
+    #[allow(unused_variables)]
     fn extend_model<C>(&mut self, cdb: &mut C, lits: &[Lit]) -> Vec<Option<bool>>
     where
         C: ClauseDBIF,
     {
-        println!("Current decision level is {}.", self.decision_level());
-        println!("{}", self);
         let mut extended_model: Vec<Option<bool>> = self.assign.clone();
         if lits.is_empty() {
             return extended_model;
         }
-        // println!("EV: {:?}", lits.iter().map(|l| i32::from(*l)).collect::<Vec<_>>());
         let mut i = lits.len() - 1;
         let mut width;
         let mut lvl = self.decision_level();
-        let mut last_lit = NULL_LIT;
         'next: loop {
             width = usize::from(lits[i]);
             if width == 0 && i == 0 {
                 break;
-            } else if width == 1 && 0 < last_lit.vi() {
-                // self.level[last_lit.vi()] = lvl;
-                // if lvl == 0 {
-                //      self.assign_at_rootlevel(last_lit).unwrap();
-                // }
-                println!("PULL UNIT [{}] @ {}", last_lit, lvl);
             }
             i -= 1;
+            #[cfg(feature = "incremental_solver")]
             let mut phantom_clause = Vec::new();
             loop {
                 if width <= 1 {
                     break;
                 }
                 let l = lits[i];
-                phantom_clause.push(!l);
+                #[cfg(feature = "incremental_solver")]
+                {
+                    phantom_clause.push(!l);
+                }
                 if !self.var[l.vi()].is(Flag::ELIMINATED) {
                     lvl = lvl.max(self.level[l.vi()]);
                 }
                 if self.assign(l.vi()) != Some(!bool::from(l)) {
                     if i < width {
-                        for l in &lits[..i] {
-                            phantom_clause.push(!*l);
+                        #[cfg(feature = "incremental_solver")]
+                        {
+                            for l in &lits[..i] {
+                                phantom_clause.push(!*l);
+                            }
+                            cdb.new_clause(self, &mut phantom_clause, false, false);
                         }
-                        let cid = cdb.new_clause(self, &mut phantom_clause, false, false);
-                        println!("Instantiate {}", &cdb[cid]);
                         break 'next;
                     }
-                    for l in &lits[i - width + 1..i] {
-                        phantom_clause.push(!*l);
-                    }
                     i -= width;
-                    let cid = cdb.new_clause(self, &mut phantom_clause, false, false);
-                    println!("Instantiate {}", &cdb[cid]);
+                    #[cfg(feature = "incremental_solver")]
+                    {
+                        for l in &lits[i - width + 1..i] {
+                            phantom_clause.push(!*l);
+                        }
+                        cdb.new_clause(self, &mut phantom_clause, false, false);
+                    }
                     continue 'next;
                 }
                 width -= 1;
@@ -272,14 +263,8 @@ impl AssignIF for AssignStack {
             }
             debug_assert!(width == 1);
             let l = lits[i];
-            last_lit = l;
-            // debug_assert!(model[l.vi() - 1] != l.negate().int());
-            assert_ne!(Some(bool::from(l)), self.assigned(l));
-            // self.assign[l.vi()] = Some(bool::from(l));
-            // self.level[last_vi] = lvl;
+            debug_assert_ne!(Some(bool::from(l)), self.assigned(l));
             extended_model[l.vi()] = Some(bool::from(l));
-
-            // self.var[l.vi()].turn_off(Flag::ELIMINATED);
             if i < width {
                 break;
             }
