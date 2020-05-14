@@ -114,6 +114,16 @@ impl Instantiate for AssignStack {
     }
     #[allow(unused_variables)]
     fn adapt_to(&mut self, state: &State, num_conflict: usize) {}
+    fn append_new_var(&mut self) {
+        self.assign.push(None);
+        self.level.push(DecisionLevel::default());
+        self.reason.push(AssignReason::default());
+        self.var_order.heap.push(0);
+        self.var_order.idxs.push(0);
+        self.var_order.clear();
+        self.num_vars += 1;
+        self.var.push(Var::from(self.num_vars));
+    }
 }
 
 impl Export<(usize, usize, usize, f64)> for AssignStack {

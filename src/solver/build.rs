@@ -73,6 +73,27 @@ pub trait SatSolverIF {
     fn add_clause<V>(&mut self, vec: V) -> Result<&mut Solver, SolverError>
     where
         V: AsRef<[i32]>;
+    /// add a var to solver and return the number of vars.
+    ///
+    /// # Example
+    /// ```
+    /// use crate::splr::*;
+    /// use std::convert::TryFrom;
+    ///
+    /// let mut s = Solver::try_from("tests/uf8.cnf").expect("can't load");
+    /// assert_eq!(s.asg.num_vars, 8);
+    /// assert!(matches!(s.add_assignment(9), Err(SolverError::OutOfRange)));
+    /// s.add_assignment(1).expect("panic");
+    /// s.add_assignment(2).expect("panic");
+    /// s.add_assignment(3).expect("panic");
+    /// s.add_assignment(4).expect("panic");
+    /// s.add_assignment(5).expect("panic");
+    /// s.add_assignment(8).expect("panic");
+    /// assert_eq!(s.add_var(), 9);
+    /// assert!(s.add_assignment(-9).is_ok());
+    /// assert_eq!(s.solve(), Ok(Certificate::SAT(vec![1, 2, 3, 4, 5, -6, 7, 8, -9])));
+    /// ```
+    fn add_var(&mut self) -> usize;
     /// make a solver and load a CNF into it.
     ///
     /// # Errors
@@ -193,6 +214,21 @@ impl SatSolverIF for Solver {
             return Err(SolverError::Inconsistent);
         }
         Ok(self)
+    }
+    fn add_var(&mut self) -> usize {
+        let Solver {
+            ref mut asg,
+            ref mut cdb,
+            ref mut elim,
+            ref mut state,
+            ..
+        } = self;
+        asg.append_new_var();
+        cdb.append_new_var();
+        elim.append_new_var();
+        state.append_new_var();
+        state.target.num_of_variables += 1;
+        asg.num_vars
     }
     /// # Examples
     ///
@@ -331,5 +367,31 @@ impl Solver {
         self.asg.adapt_to(&self.state, 0);
         self.rst.adapt_to(&self.state, 0);
         Ok(self)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    // use super::*;
+    use crate::*;
+    use std::convert::TryFrom;
+
+    #[test]
+    fn test_add_var() {
+        let mut s = Solver::try_from("tests/uf8.cnf").expect("can't load");
+        assert_eq!(s.asg.num_vars, 8);
+        assert!(matches!(s.add_assignment(9), Err(SolverError::OutOfRange)));
+        s.add_assignment(1).expect("panic");
+        s.add_assignment(2).expect("panic");
+        s.add_assignment(3).expect("panic");
+        s.add_assignment(4).expect("panic");
+        s.add_assignment(5).expect("panic");
+        s.add_assignment(8).expect("panic");
+        assert_eq!(s.add_var(), 9);
+        assert!(s.add_assignment(-9).is_ok());
+        assert_eq!(
+            s.solve(),
+            Ok(Certificate::SAT(vec![1, 2, 3, 4, 5, -6, 7, 8, -9]))
+        );
     }
 }

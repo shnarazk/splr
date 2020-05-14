@@ -352,6 +352,13 @@ impl Instantiate for Eliminator {
     fn reinitialize(&mut self) {
         self.elim_lits.clear();
     }
+    fn append_new_var(&mut self) {
+        let len = self.var_queue.heap.len();
+        self.var.push(LitOccurs::default());
+        self.var_queue.heap.push(len);
+        self.var_queue.idxs.push(len);
+        self.var_queue.idxs[0] = len;
+    }
 }
 
 impl EliminateIF for Eliminator {

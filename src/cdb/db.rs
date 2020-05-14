@@ -275,6 +275,17 @@ impl Instantiate for ClauseDB {
         }
     }
     fn reinitialize(&mut self) {}
+    fn append_new_var(&mut self) {
+        // for negated literal
+        self.watcher.push(Vec::new());
+        // for positive literal
+        self.watcher.push(Vec::new());
+        // for negated literal
+        self.touched.push(false);
+        // for positive literal
+        self.touched.push(false);
+        self.lbd_temp.push(0);
+    }
 }
 
 impl Export<(usize, usize, usize, usize, usize, usize)> for ClauseDB {
