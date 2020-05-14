@@ -71,6 +71,9 @@ impl SolveIF for Solver {
         asg.num_solved_vars = asg.stack_len();
         state.progress_header();
         state.progress(asg, cdb, elim, rst, Some("preprocessing phase"));
+        if 0 < asg.stack_len() {
+            cdb.eliminate_satisfied_clauses(asg, elim, false);
+        }
         if elim.enable {
             const USE_PRE_PROCESSING_ELIMINATOR: bool = true;
 
@@ -141,9 +144,6 @@ impl SolveIF for Solver {
                 asg.rebuild_order();
             }
             elim.stop(asg, cdb);
-        }
-        if 0 < asg.stack_len() {
-            cdb.eliminate_satisfied_clauses(asg, elim, false);
         }
         state.progress(asg, cdb, elim, rst, None);
 
