@@ -30,7 +30,7 @@ pub trait SatSolverIF {
     /// ```
     /// use crate::splr::*;
     /// use std::convert::TryFrom;
-    /// use crate::splr::assign::VarManipulateIF;
+    /// use crate::splr::assign::VarManipulateIF;    // for s.asg.assign()
     ///
     /// let mut s = Solver::try_from("tests/uf8.cnf").expect("can't load");
     /// assert!(s.add_assignment(1).is_ok());
@@ -388,7 +388,8 @@ mod tests {
         s.add_assignment(5).expect("panic");
         s.add_assignment(8).expect("panic");
         assert_eq!(s.add_var(), 9);
-        assert!(s.add_assignment(-9).is_ok());
+        // assert!(s.add_assignment(-9).is_ok());
+        s.add_clause([-1, -8, -9]).expect("panic");
         assert_eq!(
             s.solve(),
             Ok(Certificate::SAT(vec![1, 2, 3, 4, 5, -6, 7, 8, -9]))
