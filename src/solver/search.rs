@@ -142,6 +142,9 @@ impl SolveIF for Solver {
             }
             elim.stop(asg, cdb);
         }
+        if 0 < asg.stack_len() {
+            cdb.eliminate_satisfied_clauses(asg, elim, false);
+        }
         state.progress(asg, cdb, elim, rst, None);
 
         //
