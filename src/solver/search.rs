@@ -95,7 +95,7 @@ impl SolveIF for Solver {
                     // We can't call `asg.assign_at_rootlevel(l)` even if p or m == 0.
                     // This means we can't pick `!l`.
                     // This becomes a problem in the case of incremental solving.
-                    #[cfg(not(features = "incremental_solver"))]
+                    #[cfg(not(feature = "incremental_solver"))]
                     {
                         if m == 0 {
                             let l = Lit::from_assign(vi, true);

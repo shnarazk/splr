@@ -97,7 +97,7 @@ pub trait ClauseDBIF:
     where
         A: AssignIF;
     /// save an eliminated permanent clause to an extra space for incremental solving.
-    #[cfg(features = "incremental_solver")]
+    #[cfg(feature = "incremental_solver")]
     fn make_permanent_immortal(&mut self, cid: ClauseId);
 }
 
@@ -699,7 +699,7 @@ impl ClauseDBIF for ClauseDB {
             vec.retain(|l| self.lbd_temp[l.vi()] == key);
         }
     }
-    #[cfg(features = "incremental_solver")]
+    #[cfg(feature = "incremental_solver")]
     fn make_permanent_immortal(&mut self, cid: ClauseId) {
         self.eliminated_permanent
             .push(self.clause[cid.ordinal as usize].lits.clone());

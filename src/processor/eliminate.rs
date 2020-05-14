@@ -79,7 +79,7 @@ where
         //
         for cid in &*pos {
             debug_assert!(!asg.locked(&cdb[*cid], *cid));
-            #[cfg(features = "incremental_solver")]
+            #[cfg(feature = "incremental_solver")]
             {
                 if !cdb[*cid].is(Flag::LEARNT) {
                     cdb.make_permanent_immortal(*cid);
@@ -90,7 +90,7 @@ where
         }
         for cid in &*neg {
             debug_assert!(!asg.locked(&cdb[*cid], *cid));
-            #[cfg(features = "incremental_solver")]
+            #[cfg(feature = "incremental_solver")]
             {
                 if !cdb[*cid].is(Flag::LEARNT) {
                     cdb.make_permanent_immortal(*cid);
