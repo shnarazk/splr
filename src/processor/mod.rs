@@ -349,6 +349,16 @@ impl Instantiate for Eliminator {
             ..Eliminator::default()
         }
     }
+    fn reinitialize(&mut self) {
+        self.elim_lits.clear();
+    }
+    fn append_new_var(&mut self) {
+        let len = self.var_queue.heap.len();
+        self.var.push(LitOccurs::default());
+        self.var_queue.heap.push(len);
+        self.var_queue.idxs.push(len);
+        self.var_queue.idxs[0] = len;
+    }
 }
 
 impl EliminateIF for Eliminator {
@@ -387,6 +397,7 @@ impl EliminateIF for Eliminator {
         A: AssignIF,
         C: ClauseDBIF,
     {
+        assert!(self.enable);
         if self.mode != EliminatorMode::Waiting {
             return;
         }

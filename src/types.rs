@@ -63,10 +63,14 @@ pub trait ActivityIF {
 pub trait Instantiate {
     /// make and return an object from `Config` and `CNFDescription`.
     fn instantiate(conf: &Config, cnf: &CNFDescription) -> Self;
+    /// reinitialization function, used for incremental solving.
+    fn reinitialize(&mut self) {}
     /// set up internal parameters.
     /// # CAVEAT
     /// some implementation might have a special premise to call: decision_level == 0.
     fn adapt_to(&mut self, _state: &State, _num_conflict: usize) {}
+    /// increment the number of vars.
+    fn append_new_var(&mut self) {}
 }
 
 /// API for O(n) deletion from a list, providing `delete_unstable`.
