@@ -1,5 +1,6 @@
 ## 0.4.1, 2020-05-XX
 
+- add feature "incremental_solver" providing `SatSolverIF::{add_assign, add_var, reset}`
 - fix typos
 - quiet_mode stops progress report completely
 
