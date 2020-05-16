@@ -12,7 +12,8 @@ impl Default for Var {
     fn default() -> Var {
         Var {
             index: 0,
-            reward: 0.0,
+            reward_evsids: 0.0,
+            reward_lr: 0.0,
             timestamp: 0,
             flags: Flag::empty(),
             participated: 0,

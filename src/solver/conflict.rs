@@ -34,7 +34,7 @@ pub fn handle_conflict(
 
     let (num_conflict, _num_propagation, asg_num_restart, _) = asg.exports();
     // If we can settle this conflict w/o restart, solver will get a big progress.
-    let switch_chronobt = if num_conflict < 1000 || asg.recurrent_conflicts() {
+    let switch_chronobt = if num_conflict < 1000 {
         Some(false)
     } else {
         None
@@ -218,6 +218,16 @@ pub fn handle_conflict(
         if 1 < learnt_len && learnt_len <= state.config.elim_cls_lim / 2 {
             elim.to_simplify += 1.0 / (learnt_len - 1) as f64;
         }
+        // if !state.stabilize && rst.force_restart() {
+        //     let mut level = 1;
+        //     while level < asg.decision_level() {
+        //         if 2.0 * asg.activity(asg.decision_vi(level)) < asg.activity(l0.vi()) {
+        //             asg.cancel_until(level - 1);
+        //             break;
+        //         }
+        //         level += 1;
+        //     }
+        // }
     }
     cdb.scale_activity();
     if 0 < state.config.dump_int && num_conflict % state.config.dump_int == 0 {

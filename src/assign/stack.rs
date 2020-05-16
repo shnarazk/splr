@@ -54,6 +54,7 @@ impl Default for AssignStack {
             num_vars: 0,
             num_solved_vars: 0,
             num_eliminated_vars: 0,
+            stabilize: false,
             use_rephase: true,
             best_assign: false,
             build_best_at: 0,
@@ -63,9 +64,10 @@ impl Default for AssignStack {
             num_restart: 0,
             ordinal: 0,
             var: Vec::new(),
+            evsids_reward_step: 1.0,
             activity_decay: 0.0,
             activity_decay_max: 0.0,
-            reward_step: 0.0,
+            lr_decay_step: 0.0,
         }
     }
 }

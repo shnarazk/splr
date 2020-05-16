@@ -1,12 +1,10 @@
+/// Var rewarding
+mod bi_reward;
 /// Crate `assign` implements Boolean Constraint Propagation and decision var selection.
 /// This version can handle Chronological and Non Chronological Backtrack.
 mod heap;
 /// Boolean constraint propagation
 mod propagate;
-/// Var rewarding
-#[cfg_attr(feature = "EVSIDS", path = "evsids.rs")]
-#[cfg_attr(not(feature = "EVSIDS"), path = "learning_rate.rs")]
-mod reward;
 /// Decision var selection
 mod select;
 /// assignment management
@@ -103,8 +101,10 @@ pub struct Var {
     pub index: VarId,
     /// the number of participation in conflict analysis
     participated: u32,
-    /// a dynamic evaluation criterion like EVSIDS or ACID.
-    reward: f64,
+    /// EVSIDS dynamic evaluation criterion
+    reward_evsids: f64,
+    /// ACID dynamic evaluation criterion
+    reward_lr: f64,
     /// the number of conflicts at which this var was assigned lastly.
     timestamp: usize,
     /// the `Flag`s
@@ -132,6 +132,7 @@ pub struct AssignStack {
     //
     //## Phase handling
     //
+    pub stabilize: bool,
     use_rephase: bool,
     best_assign: bool,
     build_best_at: usize,
@@ -159,14 +160,20 @@ pub struct AssignStack {
     var: Vec<Var>,
 
     //
-    //## Var Rewarding
+    //## EVSIDS Rewarding
+    //
+    /// increment value
+    evsids_reward_step: f64,
+
+    //
+    //## LR Rewarding
     //
     /// var activity decay
     activity_decay: f64,
     /// maximum var activity decay
     activity_decay_max: f64,
-    /// ONLY used in feature EVSIDS
-    reward_step: f64,
+    /// increment step
+    lr_decay_step: f64,
 }
 
 /// Heap of VarId, based on var activity.

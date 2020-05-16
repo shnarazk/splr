@@ -229,7 +229,11 @@ fn search(
             //
             state.last_asg = asg.stack_len();
             if rst.force_restart() {
-                asg.cancel_until(asg.root_level);
+                // asg.cancel_until(asg.root_level);
+                if rst_stabilize {
+                    // asg.cancel_until(asg.root_level);
+                    // asg.force_rephase();
+                }
             }
         } else {
             if asg.decision_level() == asg.root_level {
@@ -237,6 +241,24 @@ fn search(
                 return Ok(false);
             }
             handle_conflict(asg, cdb, elim, rst, state, ci)?;
+
+            //
+            //## Check stabilization
+            //
+            if rst_stabilize != rst.stabilizing() {
+                rst_stabilize = !rst_stabilize;
+                let new_mode = state.config.use_stabilize() && rst_stabilize;
+                asg.stabilize = new_mode;
+                state.stabilize = new_mode;
+                // To explore the world to seek better nest of conflicts,
+                // we sometimes stop expoiting. Mode toggling is a good timing.
+                if new_mode {
+                    asg.force_rephase();
+                } else {
+                    asg.cancel_until(asg.root_level);
+                }
+            }
+
             if a_decision_was_made {
                 a_decision_was_made = false;
             } else {
@@ -255,9 +277,10 @@ fn search(
         }
         // Simplification has been postponed because chronoBT was used.
         if asg.decision_level() == asg.root_level {
-            if state.stabilize {
-                asg.force_rephase();
-            }
+            // if state.stabilize {
+            //     asg.force_rephase();
+            // }
+
             // `elim.to_simplify` is increased much in particular when vars are solved or
             // learnts are small. We don't need to count the number of solved vars.
             if state.config.elim_trigger < elim.to_simplify as usize {
@@ -280,11 +303,6 @@ fn search(
             state.flush(format!("unreachable: {}", asg.num_vars - num_assigned));
         }
         if !asg.remains() {
-            let rs = rst.stabilizing();
-            if rst_stabilize != rs {
-                rst_stabilize = rs;
-                state.stabilize = state.config.use_stabilize() && rs;
-            }
             let lit = asg.select_decision_literal(&state.phase_select);
             asg.assign_by_decision(lit);
             state[Stat::Decision] += 1;
