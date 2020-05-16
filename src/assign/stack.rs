@@ -295,37 +295,39 @@ impl fmt::Display for AssignStack {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let v = self.trail.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
         let levels = self.decision_level();
-        let c = |i| {
-            match i {
-                0 => {
-                    let a = self.len_upto(i);
-                    (0, &v[0..a])
-                }
-                x if x == levels => {
-                    let a = self.len_upto(levels - 1);
-                    (levels, &v[a..])
-                },
-                x => {
-                    let a = self.len_upto(x - 1);
-                    (x, &v[a..self.len_upto(x)])
-                }
+        let c = |i| match i {
+            0 => {
+                let a = self.len_upto(i);
+                (0, &v[0..a])
+            }
+            x if x == levels => {
+                let a = self.len_upto(levels - 1);
+                (levels, &v[a..])
+            }
+            x => {
+                let a = self.len_upto(x - 1);
+                (x, &v[a..self.len_upto(x)])
             }
         };
         if 0 < levels {
-            write!(f, "ASG:: trail({}):{:?}\n      solved: level: {}, solved: {}, elimed: {}",
-                   self.trail.len(),
-                   (0..=levels).map(c).collect::<Vec<_>>(),
-                   levels,
-                   self.num_solved_vars,
-                   self.num_eliminated_vars,
+            write!(
+                f,
+                "ASG:: trail({}):{:?}\n      solved: level: {}, solved: {}, elimed: {}",
+                self.trail.len(),
+                (0..=levels).map(c).collect::<Vec<_>>(),
+                levels,
+                self.num_solved_vars,
+                self.num_eliminated_vars,
             )
         } else {
-            write!(f, "ASG:: trail({}):[(0, {:?})]\n      level: {}, solved: {}, elimed: {}",
-                   self.trail.len(),
-                   &v,
-                   levels,
-                   self.num_solved_vars,
-                   self.num_eliminated_vars,
+            write!(
+                f,
+                "ASG:: trail({}):[(0, {:?})]\n      level: {}, solved: {}, elimed: {}",
+                self.trail.len(),
+                &v,
+                levels,
+                self.num_solved_vars,
+                self.num_eliminated_vars,
             )
         }
     }

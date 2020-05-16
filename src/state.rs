@@ -1,3 +1,5 @@
+#[cfg(not(feature = "no_libc"))]
+use libc::{clock_gettime, timespec, CLOCK_PROCESS_CPUTIME_ID};
 /// Crate `state` is a collection of internal data.
 use {
     crate::{
@@ -7,7 +9,6 @@ use {
         solver::{RestartIF, RestartMode},
         types::*,
     },
-    libc::{clock_gettime, timespec, CLOCK_PROCESS_CPUTIME_ID},
     std::{
         cmp::Ordering,
         fmt,
@@ -549,6 +550,7 @@ impl StateIF for State {
 }
 
 impl fmt::Display for State {
+    #[cfg(not(feature = "no_libc"))]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let tm = {
             let mut time = timespec {
@@ -590,6 +592,29 @@ impl fmt::Display for State {
                 tm,
                 w = width - fnlen,
             )
+        }
+    }
+    #[cfg(feature = "no_libc")]
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let vc = format!(
+            "{},{}",
+            self.target.num_of_variables, self.target.num_of_clauses,
+        );
+        let vclen = vc.len();
+        let width = 59 + 11;
+        let mut fname = match &self.target.pathname {
+            CNFIndicator::Void => "(no cnf)".to_string(),
+            CNFIndicator::File(f) => f.to_string(),
+            CNFIndicator::LitVec(n) => format!("(embedded {} element vector)", n),
+        };
+        if width <= fname.len() {
+            fname.truncate(width - vclen - 1);
+        }
+        let fnlen = fname.len();
+        if width < vclen + fnlen + 1 {
+            write!(f, "{:<w$}", fname, w = width)
+        } else {
+            write!(f, "{}{:>w$}", fname, &vc, w = width - fnlen,)
         }
     }
 }

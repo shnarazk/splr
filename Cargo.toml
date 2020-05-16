@@ -18,13 +18,15 @@ libc = "0.2"
 structopt = "0.3"
 
 [features]
-default = []
+default = ["no_libc"]
 boundary_check = []
 EVSIDS = []
 ema_calibration = []
 no_IO = []
+no_libc = []
 trace_analysis = []
 trace_elimination = []
+WASM = ["no_IO", "no_libc"]
 
 [profile.release]
 lto = "fat"
