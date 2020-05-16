@@ -79,11 +79,23 @@ where
         //
         for cid in &*pos {
             debug_assert!(!asg.locked(&cdb[*cid], *cid));
+            #[cfg(feature = "incremental_solver")]
+            {
+                if !cdb[*cid].is(Flag::LEARNT) {
+                    cdb.make_permanent_immortal(*cid);
+                }
+            }
             cdb.detach(*cid);
             elim.remove_cid_occur(asg, *cid, &mut cdb[*cid]);
         }
         for cid in &*neg {
             debug_assert!(!asg.locked(&cdb[*cid], *cid));
+            #[cfg(feature = "incremental_solver")]
+            {
+                if !cdb[*cid].is(Flag::LEARNT) {
+                    cdb.make_permanent_immortal(*cid);
+                }
+            }
             cdb.detach(*cid);
             elim.remove_cid_occur(asg, *cid, &mut cdb[*cid]);
         }
@@ -129,31 +141,6 @@ where
         }
     }
     false
-}
-
-fn make_eliminated_clauses<C>(
-    cdb: &mut C,
-    elim: &mut Eliminator,
-    v: VarId,
-    pos: &[ClauseId],
-    neg: &[ClauseId],
-) where
-    C: ClauseDBIF,
-{
-    let tmp = &mut elim.elim_lits;
-    if neg.len() < pos.len() {
-        for cid in neg {
-            debug_assert!(!cdb[*cid].is(Flag::DEAD));
-            make_eliminated_clause(cdb, tmp, v, *cid);
-        }
-        make_eliminating_unit_clause(tmp, Lit::from_assign(v, true));
-    } else {
-        for cid in pos {
-            debug_assert!(!cdb[*cid].is(Flag::DEAD));
-            make_eliminated_clause(cdb, tmp, v, *cid);
-        }
-        make_eliminating_unit_clause(tmp, Lit::from_assign(v, false));
-    }
 }
 
 /// Returns:
@@ -233,6 +220,31 @@ where
         v
     );
     vec.len()
+}
+
+fn make_eliminated_clauses<C>(
+    cdb: &mut C,
+    elim: &mut Eliminator,
+    v: VarId,
+    pos: &[ClauseId],
+    neg: &[ClauseId],
+) where
+    C: ClauseDBIF,
+{
+    let tmp = &mut elim.elim_lits;
+    if neg.len() < pos.len() {
+        for cid in neg {
+            debug_assert!(!cdb[*cid].is(Flag::DEAD));
+            make_eliminated_clause(cdb, tmp, v, *cid);
+        }
+        make_eliminating_unit_clause(tmp, Lit::from_assign(v, true));
+    } else {
+        for cid in pos {
+            debug_assert!(!cdb[*cid].is(Flag::DEAD));
+            make_eliminated_clause(cdb, tmp, v, *cid);
+        }
+        make_eliminating_unit_clause(tmp, Lit::from_assign(v, false));
+    }
 }
 
 fn make_eliminating_unit_clause(vec: &mut Vec<Lit>, x: Lit) {

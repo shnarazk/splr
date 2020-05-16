@@ -71,6 +71,9 @@ impl SolveIF for Solver {
         asg.num_solved_vars = asg.stack_len();
         state.progress_header();
         state.progress(asg, cdb, elim, rst, Some("preprocessing phase"));
+        if 0 < asg.stack_len() {
+            cdb.eliminate_satisfied_clauses(asg, elim, false);
+        }
         if elim.enable {
             const USE_PRE_PROCESSING_ELIMINATOR: bool = true;
 
@@ -88,35 +91,32 @@ impl SolveIF for Solver {
                 if asg.assign(vi).is_some() {
                     continue;
                 }
-                match elim.stats(vi) {
-                    Some((_, 0)) => {
-                        let l = Lit::from_assign(vi, true);
-                        println!("bind {}", vi);
-                        if asg.assign_at_rootlevel(l).is_err() {
-                            return Ok(Certificate::UNSAT);
+                if let Some((p, m)) = elim.stats(vi) {
+                    // We can't call `asg.assign_at_rootlevel(l)` even if p or m == 0.
+                    // This means we can't pick `!l`.
+                    // This becomes a problem in the case of incremental solving.
+                    #[cfg(not(feature = "incremental_solver"))]
+                    {
+                        if m == 0 {
+                            let l = Lit::from_assign(vi, true);
+                            if asg.assign_at_rootlevel(l).is_err() {
+                                return Ok(Certificate::UNSAT);
+                            }
+                        } else if p == 0 {
+                            let l = Lit::from_assign(vi, false);
+                            if asg.assign_at_rootlevel(l).is_err() {
+                                return Ok(Certificate::UNSAT);
+                            }
                         }
                     }
-                    Some((0, _)) => {
-                        let l = Lit::from_assign(vi, false);
-                        println!("bind {}", vi);
-                        if asg.assign_at_rootlevel(l).is_err() {
-                            return Ok(Certificate::UNSAT);
-                        }
-                    }
-                    Some((p, m)) => {
-                        asg.var_mut(vi).set(Flag::PHASE, m < p);
-                        elim.enqueue_var(asg, vi, false);
-                    }
-                    None => (),
+                    asg.var_mut(vi).set(Flag::PHASE, m < p);
+                    elim.enqueue_var(asg, vi, false);
                 }
             }
             asg.force_select_iter(elim.sorted_iterator());
             //
             //## Run eliminator
             //
-            if !USE_PRE_PROCESSING_ELIMINATOR {
-                elim.stop(asg, cdb);
-            }
             if USE_PRE_PROCESSING_ELIMINATOR {
                 state.flush("simplifying...");
                 if elim.simplify(asg, cdb, state).is_err() {
@@ -141,8 +141,9 @@ impl SolveIF for Solver {
                     }
                 }
                 asg.initialize_reward(elim.sorted_iterator());
+                asg.rebuild_order();
             }
-            asg.rebuild_order();
+            elim.stop(asg, cdb);
         }
         state.progress(asg, cdb, elim, rst, None);
 
@@ -153,27 +154,41 @@ impl SolveIF for Solver {
         final_report!(asg, cdb, elim, rst, state);
         match answer {
             Ok(true) => {
-                asg.extend_model(elim.eliminated_lits());
+                // As a preparation for incremental solving, we need to backtrack to the
+                // root level. So all assgingments, including assignments to eliminated vars,
+                // are stored in an extra storage. It has the same type of `AssignStack::assign`.
+                let model = asg.extend_model(cdb, elim.eliminated_lits());
                 #[cfg(debug)]
                 {
-                    if let Some(cid) = cdb.validate(asg, true) {
+                    if let Some(cid) = cdb.validate(&model, true) {
                         panic!(
                             "Level {} generated assignment({:?}) falsifies {}:{:?}",
                             asg.decision_level(),
-                            cdb.validate(asg, false).is_none(),
+                            cdb.validate(&model, false).is_none(),
                             cid,
-                            asg.dump(&cdb[cid]),
+                            "asg.dump(&cdb[cid])",
                         );
                     }
                 }
-                if cdb.validate(asg, false).is_some() {
+
+                // Run valitator on the extended model.
+                if cdb.validate(&model, false).is_some() {
                     return Err(SolverError::SolverBug);
                 }
+
+                // map `Option<bool>` to `i32`, and remove the dummy var at the head.
                 let vals = asg
                     .var_iter()
                     .skip(1)
-                    .map(|v| i32::from(Lit::from((v.index, asg.assign(v.index)))))
+                    .map(|v| i32::from(Lit::from((v.index, model[v.index]))))
                     .collect::<Vec<i32>>();
+
+                // As a preparation for incremental solving, turn flags off.
+                for v in asg.var_iter_mut().skip(1) {
+                    if v.is(Flag::ELIMINATED) {
+                        v.turn_off(Flag::ELIMINATED);
+                    }
+                }
                 asg.cancel_until(asg.root_level);
                 Ok(Certificate::SAT(vals))
             }

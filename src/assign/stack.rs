@@ -1,6 +1,6 @@
 /// main struct AssignStack
 use {
-    super::{AssignIF, AssignStack, Var, VarIdHeap, VarManipulateIF, VarOrderIF},
+    super::{AssignIF, AssignStack, Var, VarIdHeap, VarManipulateIF, VarOrderIF, VarSelectIF},
     crate::{state::State, types::*},
     std::{fmt, ops::Range, slice::Iter},
 };
@@ -18,11 +18,6 @@ use {
 pub trait ClauseManipulateIF {
     /// return `true` if the set of literals is satisfiable under the current assignment.
     fn satisfies(&self, c: &[Lit]) -> bool;
-    /// return Option<bool>
-    /// - Some(true) -- the literals is satisfied by a literal
-    /// - Some(false) -- the literals is unsatisfied; no unassigned literal
-    /// - None -- the literals contains an unassigned literal
-    fn status(&self, c: &[Lit]) -> Option<bool>;
     /// return `true` is the clause is the reason of the assignment.
     fn locked(&self, c: &Clause, cid: ClauseId) -> bool;
 }
@@ -106,8 +101,29 @@ impl Instantiate for AssignStack {
             ..AssignStack::default()
         }
     }
+    fn reinitialize(&mut self) {
+        assert_eq!(self.decision_level(), self.root_level);
+        self.q_head = 0;
+        self.num_eliminated_vars = self.var.iter().filter(|v| v.is(Flag::ELIMINATED)).count();
+        self.num_solved_vars = if self.trail.is_empty() {
+            0
+        } else {
+            self.trail.len()
+        };
+        self.rebuild_order();
+    }
     #[allow(unused_variables)]
     fn adapt_to(&mut self, state: &State, num_conflict: usize) {}
+    fn append_new_var(&mut self) {
+        self.assign.push(None);
+        self.level.push(DecisionLevel::default());
+        self.reason.push(AssignReason::default());
+        self.var_order.heap.push(0);
+        self.var_order.idxs.push(0);
+        self.var_order.clear();
+        self.num_vars += 1;
+        self.var.push(Var::from(self.num_vars));
+    }
 }
 
 impl Export<(usize, usize, usize, f64)> for AssignStack {
@@ -166,6 +182,9 @@ impl AssignIF for AssignStack {
     fn recurrent_conflicts(&self) -> bool {
         self.conflicts.0 == self.conflicts.1
     }
+    fn assign_ref(&self) -> &[Option<bool>] {
+        &self.assign
+    }
     fn level_ref(&self) -> &[DecisionLevel] {
         &self.level
     }
@@ -196,9 +215,14 @@ impl AssignIF for AssignStack {
         }
         0
     }
-    fn extend_model(&mut self, lits: &[Lit]) {
+    #[allow(unused_variables)]
+    fn extend_model<C>(&mut self, cdb: &mut C, lits: &[Lit]) -> Vec<Option<bool>>
+    where
+        C: ClauseDBIF,
+    {
+        let mut extended_model: Vec<Option<bool>> = self.assign.clone();
         if lits.is_empty() {
-            return;
+            return extended_model;
         }
         let mut i = lits.len() - 1;
         let mut width;
@@ -208,16 +232,36 @@ impl AssignIF for AssignStack {
                 break;
             }
             i -= 1;
+            #[cfg(feature = "incremental_solver")]
+            let mut phantom_clause = Vec::new();
             loop {
                 if width <= 1 {
                     break;
                 }
                 let l = lits[i];
+                #[cfg(feature = "incremental_solver")]
+                {
+                    phantom_clause.push(!l);
+                }
                 if self.assign(l.vi()) != Some(!bool::from(l)) {
                     if i < width {
+                        #[cfg(feature = "incremental_solver")]
+                        {
+                            for l in &lits[..i] {
+                                phantom_clause.push(!*l);
+                            }
+                            cdb.new_clause(self, &mut phantom_clause, false, false);
+                        }
                         break 'next;
                     }
                     i -= width;
+                    #[cfg(feature = "incremental_solver")]
+                    {
+                        for l in &lits[i - width + 1..i] {
+                            phantom_clause.push(!*l);
+                        }
+                        cdb.new_clause(self, &mut phantom_clause, false, false);
+                    }
                     continue 'next;
                 }
                 width -= 1;
@@ -225,13 +269,14 @@ impl AssignIF for AssignStack {
             }
             debug_assert!(width == 1);
             let l = lits[i];
-            // debug_assert!(model[l.vi() - 1] != l.negate().int());
-            self.assign[l.vi()] = Some(bool::from(l));
+            debug_assert_ne!(Some(bool::from(l)), self.assigned(l));
+            extended_model[l.vi()] = Some(bool::from(l));
             if i < width {
                 break;
             }
             i -= width;
         }
+        extended_model
     }
 }
 

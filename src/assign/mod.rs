@@ -20,7 +20,7 @@ pub use self::{
 
 use {
     self::heap::{VarHeapIF, VarOrderIF},
-    super::{state::State, types::*},
+    super::{cdb::ClauseDBIF, state::State, types::*},
     std::{ops::Range, slice::Iter},
 };
 
@@ -76,11 +76,15 @@ pub trait AssignIF:
     fn remains(&self) -> bool;
     /// return `true` if subsequential propagations emit the same conflict.
     fn recurrent_conflicts(&self) -> bool;
+    /// return a reference to `aasign`.
+    fn assign_ref(&self) -> &[Option<bool>];
     /// return a reference to `level`.
     fn level_ref(&self) -> &[DecisionLevel];
     fn best_assigned(&mut self, flag: Flag) -> usize;
     /// inject assignments for eliminated vars.
-    fn extend_model(&mut self, lits: &[Lit]);
+    fn extend_model<C>(&mut self, c: &mut C, lits: &[Lit]) -> Vec<Option<bool>>
+    where
+        C: ClauseDBIF;
 }
 
 /// Reasons of assignments, two kinds

@@ -87,9 +87,7 @@ pub trait ClauseDBIF:
     /// returns None if the given assignment is a model of a problem.
     /// Otherwise returns a clause which is not satisfiable under a given assignment.
     /// Clauses with an unassigned literal are treated as falsified in `strict` mode.
-    fn validate<A>(&self, asg: &A, strict: bool) -> Option<ClauseId>
-    where
-        A: AssignIF;
+    fn validate(&self, model: &[Option<bool>], strict: bool) -> Option<ClauseId>;
     /// removes Lit `p` from Clause *self*. This is an O(n) function!
     /// This returns `true` if the clause became a unit clause.
     /// And this is called only from `Eliminator::strengthen_clause`.
@@ -98,6 +96,9 @@ pub trait ClauseDBIF:
     fn minimize_with_biclauses<A>(&mut self, asg: &A, vec: &mut Vec<Lit>)
     where
         A: AssignIF;
+    /// save an eliminated permanent clause to an extra space for incremental solving.
+    #[cfg(feature = "incremental_solver")]
+    fn make_permanent_immortal(&mut self, cid: ClauseId);
 }
 
 impl Default for ClauseDB {
@@ -127,6 +128,7 @@ impl Default for ClauseDB {
             num_lbd2: 0,
             num_learnt: 0,
             num_reduction: 0,
+            eliminated_permanent: Vec::new(),
         }
     }
 }
@@ -271,6 +273,18 @@ impl Instantiate for ClauseDB {
             (SearchStrategy::LowSuccesive, _) => (),
             (SearchStrategy::ManyGlues, _) => (),
         }
+    }
+    fn reinitialize(&mut self) {}
+    fn append_new_var(&mut self) {
+        // for negated literal
+        self.watcher.push(Vec::new());
+        // for positive literal
+        self.watcher.push(Vec::new());
+        // for negated literal
+        self.touched.push(false);
+        // for positive literal
+        self.touched.push(false);
+        self.lbd_temp.push(0);
     }
 }
 
@@ -601,15 +615,12 @@ impl ClauseDBIF for ClauseDB {
             Err(SolverError::OutOfMemory)
         }
     }
-    fn validate<A>(&self, asg: &A, strict: bool) -> Option<ClauseId>
-    where
-        A: AssignIF,
-    {
+    fn validate(&self, model: &[Option<bool>], strict: bool) -> Option<ClauseId> {
         for (i, c) in self.clause.iter().enumerate().skip(1) {
             if c.is(Flag::DEAD) || (strict && c.is(Flag::LEARNT)) {
                 continue;
             }
-            match asg.status(&c.lits) {
+            match c.evaluate(model) {
                 Some(false) => return Some(ClauseId::from(i)),
                 None if strict => return Some(ClauseId::from(i)),
                 _ => (),
@@ -699,6 +710,11 @@ impl ClauseDBIF for ClauseDB {
             vec.retain(|l| self.lbd_temp[l.vi()] == key);
         }
     }
+    #[cfg(feature = "incremental_solver")]
+    fn make_permanent_immortal(&mut self, cid: ClauseId) {
+        self.eliminated_permanent
+            .push(self.clause[cid.ordinal as usize].lits.clone());
+    }
 }
 
 impl ClauseDB {
@@ -784,5 +800,20 @@ impl Clause {
         debug_assert!(1 < usize::from(self.lits[0]) && 1 < usize::from(self.lits[1]));
         touched[!self.lits[0]] = true;
         touched[!self.lits[1]] = true;
+    }
+    /// evaluate a clause and return Option<bool>.
+    /// - `Some(true)` -- the literals is satisfied by a literal
+    /// - `Some(false)` -- the literals is unsatisfied; no unassigned literal
+    /// - `None` -- the literals contains an unassigned literal
+    fn evaluate(&self, model: &[Option<bool>]) -> Option<bool> {
+        let mut falsified = Some(false);
+        for l in self.lits.iter() {
+            match model[l.vi()] {
+                Some(x) if x == bool::from(*l) => return Some(true),
+                Some(_) => (),
+                None => falsified = None,
+            }
+        }
+        falsified
     }
 }

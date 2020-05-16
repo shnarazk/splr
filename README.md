@@ -34,7 +34,7 @@ Though Splr comes with **ABSOLUTELY NO WARRANTY**, I'd like to show some results
   * 35 satisfiable problems: all the solutions were correct.
   * 4 unsatisfiable problems:
     * 3 were verified with Grad.
-	* Verifying gto_p60c238-sc2018.cnf was timed out due to the size of the drat file (1.3 GB).
+    * Verifying gto_p60c238-sc2018.cnf was timed out due to the size of the drat file (1.3 GB).
 
 #### Version 0.1.0
 
@@ -111,6 +111,57 @@ fn main() {
         Ok(Certificate::UNSAT) => println!("s UNSATISFIABLE"),
         Err(e) => panic!("s UNKNOWN; {}", e),
     }
+}
+```
+
+### All solutions SAT solver
+
+```rust
+use splr::*;
+use std::{convert::TryFrom, env::args};
+
+fn main() {
+    let cnf = args().nth(1).expect("takes a arg");
+    let assigns: Vec<i32> = Vec::new();
+    println!("#solutions: {}", run(&cnf, &assigns));
+}
+
+#[cfg(feature = "incremental_solver")]
+fn run(cnf: &str, assigns: &[i32]) -> usize {
+    let mut solver = Solver::try_from(cnf).expect("panic at loading a CNF");
+    for n in assigns.iter() {
+        solver.add_assignment(*n).expect("panic at fixed assigns");
+    }
+    let mut count = 0;
+    loop {
+        match solver.solve() {
+            Ok(Certificate::SAT(ans)) => {
+                count += 1;
+                println!("s SATISFIABLE({}): {:?}", count, ans);
+                let ans = ans.iter().map(|i| -i).collect::<Vec<i32>>();
+                match solver.add_clause(ans) {
+                    Err(SolverError::Inconsistent) => {
+                        println!("c no answer due to level zero conflict");
+                        break;
+                    }
+                    Err(e) => {
+                        println!("s UNKNOWN; {:?}", e);
+                        break;
+                    }
+                    Ok(_) => solver.reset(),
+                }
+            }
+            Ok(Certificate::UNSAT) => {
+                println!("s UNSATISFIABLE");
+                break;
+            }
+            Err(e) => {
+                println!("s UNKNOWN; {}", e);
+                break;
+            }
+        }
+    }
+    count
 }
 ```
 
