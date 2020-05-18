@@ -175,7 +175,7 @@ pub struct Config {
     /// Maximum var reward decay
     #[cfg_attr(
         not(feature = "no_IO"),
-        structopt(long = "vrm", default_value = "0.98")
+        structopt(long = "vrm", default_value = "0.96")
     )]
     pub vrw_dcy_end: f64,
 

@@ -151,6 +151,8 @@ pub enum Stat {
     NoDecisionConflict,
     /// the last number of solved variables
     SolvedRecord,
+    /// the number of stabilization mode
+    Stabilization,
     /// don't use this dummy (sentinel at the tail).
     EndOfStatIndex,
 }

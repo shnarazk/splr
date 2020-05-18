@@ -228,7 +228,7 @@ fn search(
             //## DYNAMIC FORCING RESTART based on LBD values, updated by conflict
             //
             state.last_asg = asg.stack_len();
-            if rst.force_restart() {
+            if rst.force_restart() && !rst_stabilize {
                 asg.cancel_until(asg.root_level);
             }
         } else {
@@ -255,7 +255,7 @@ fn search(
         }
         // Simplification has been postponed because chronoBT was used.
         if asg.decision_level() == asg.root_level {
-            if state.stabilize {
+            if rst_stabilize {
                 asg.force_rephase();
             }
             // `elim.to_simplify` is increased much in particular when vars are solved or
@@ -279,12 +279,11 @@ fn search(
             state.flush("");
             state.flush(format!("unreachable: {}", asg.num_vars - num_assigned));
         }
+        if state.config.use_stabilize() && rst_stabilize != rst.stabilizing() {
+            rst_stabilize = !rst_stabilize;
+            state[Stat::Stabilization] += 1;
+        }
         if !asg.remains() {
-            let rs = rst.stabilizing();
-            if rst_stabilize != rs {
-                rst_stabilize = rs;
-                state.stabilize = state.config.use_stabilize() && rs;
-            }
             let lit = asg.select_decision_literal(&state.phase_select);
             asg.assign_by_decision(lit);
             state[Stat::Decision] += 1;
