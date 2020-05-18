@@ -601,7 +601,7 @@ impl fmt::Display for State {
             self.target.num_of_variables, self.target.num_of_clauses,
         );
         let vclen = vc.len();
-        let width = 59 + 11;
+        let width = 59 + 16;
         let mut fname = match &self.target.pathname {
             CNFIndicator::Void => "(no cnf)".to_string(),
             CNFIndicator::File(f) => f.to_string(),
