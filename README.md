@@ -121,7 +121,7 @@ use splr::*;
 use std::{convert::TryFrom, env::args};
 
 fn main() {
-    let cnf = args().nth(1).expect("takes a arg");
+    let cnf = args().nth(1).expect("takes an arg");
     let assigns: Vec<i32> = Vec::new();
     println!("#solutions: {}", run(&cnf, &assigns));
 }

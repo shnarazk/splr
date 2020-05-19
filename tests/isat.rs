@@ -6,7 +6,7 @@ use std::{convert::TryFrom, env::args};
 #[cfg(feature = "incremental_solver")]
 #[test]
 fn main() {
-    let cnf = "tests/uf8.cnf"; // args().nth(1).expect("takes a arg");
+    let cnf = "tests/uf8.cnf"; // args().nth(1).expect("takes an arg");
     let v: Vec<i32> = vec![8, 7, -6, 5, 4];
     let ns1 = run(cnf, &v, false);
     let ns2 = run(cnf, &v, true);
