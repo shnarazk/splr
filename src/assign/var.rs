@@ -14,6 +14,7 @@ impl Default for Var {
             index: 0,
             reward_evsids: 0.0,
             reward_lr: 0.0,
+            reward_rl: 0.0,
             timestamp: 0,
             flags: Flag::empty(),
             participated: 0,

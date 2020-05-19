@@ -1,8 +1,8 @@
 /// Decision var selection
 use {
-    super::{AssignStack, VarHeapIF, VarOrderIF, VarRewardIF},
+    super::{AssignStack, Var, VarHeapIF, VarOrderIF, VarRewardIF},
     crate::{state::PhaseMode, types::*},
-    std::slice::Iter,
+    std::{collections::BinaryHeap, slice::Iter},
 };
 
 /// ```
@@ -57,6 +57,9 @@ impl VarSelectIF for AssignStack {
             let remains = self.num_vars - self.num_solved_vars - self.num_eliminated_vars;
             let size = remains.count_ones() as usize;
             for v in self.var.iter().skip(1) {
+                if self.assign[v.index].is_some() {
+                    continue;
+                }
                 if let Some(top) = heap.peek() {
                     if v.timestamp < top.timestamp {
                         heap.push(VarTimestamp::from(v));

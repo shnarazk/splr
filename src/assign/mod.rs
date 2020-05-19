@@ -103,8 +103,10 @@ pub struct Var {
     participated: u32,
     /// EVSIDS dynamic evaluation criterion
     reward_evsids: f64,
-    /// ACID dynamic evaluation criterion
+    /// Learning Rate dynamic evaluation criterion
     reward_lr: f64,
+    /// Recent Learning Rate
+    reward_rl: f64,
     /// the number of conflicts at which this var was assigned lastly.
     timestamp: usize,
     /// the `Flag`s

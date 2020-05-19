@@ -13,6 +13,7 @@ impl VarRewardIF for AssignStack {
     fn activity(&mut self, vi: VarId) -> f64 {
         if self.stabilize {
             self.var[vi].reward_evsids
+        // self.var[vi].reward_rl
         } else {
             self.var[vi].reward_lr
         }
@@ -24,12 +25,14 @@ impl VarRewardIF for AssignStack {
         for vi in iterator {
             self.var[*vi].reward_evsids = v;
             self.var[*vi].reward_lr = v;
+            self.var[*vi].reward_rl = v;
             // v *= 0.99;
         }
     }
     fn clear_reward(&mut self, vi: VarId) {
         self.var[vi].reward_evsids = 0.0;
         self.var[vi].reward_lr = 0.0;
+        self.var[vi].reward_rl = 0.0;
     }
     fn reward_at_analysis(&mut self, vi: VarId) {
         //
@@ -64,11 +67,22 @@ impl VarRewardIF for AssignStack {
         //
         let v = &mut self.var[vi];
         let duration = (self.ordinal + 1 - v.timestamp) as f64;
-        let decay = self.activity_decay;
-        let _decay = (1.0 - duration.ln() * (1.0 - self.activity_decay)).max(0.0);
+        // let decay = self.activity_decay;
+        let decay = (1.0 - duration.ln() * (1.0 - self.activity_decay)).max(0.0);
         let rate = v.participated as f64 / duration;
-        v.reward_lr *= decay;
-        v.reward_lr += (1.0 - decay) * rate;
+
+        if true
+        /* self.stabilize */
+        {
+            v.reward_lr *= decay;
+            v.reward_lr += (1.0 - decay) * rate;
+        }
+        if true
+        /* !self.stabilize */
+        {
+            v.reward_rl *= 0.6;
+            v.reward_rl += 0.4 * rate;
+        }
         v.participated = 0;
     }
     fn reward_update(&mut self) {

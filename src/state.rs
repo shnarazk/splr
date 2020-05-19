@@ -151,6 +151,8 @@ pub enum Stat {
     NoDecisionConflict,
     /// the last number of solved variables
     SolvedRecord,
+    /// the number of stabilization
+    Stabilization,
     /// don't use this dummy (sentinel at the tail).
     EndOfStatIndex,
 }
@@ -456,7 +458,13 @@ impl StateIF for State {
 
         let (elim_num_full, _num_sat, elim_to_simplify) = elim.exports();
 
-        let (rst_mode, rst_num_block, rst_asg_trend, rst_lbd_get, rst_lbd_trend) = rst.exports();
+        let (rst_rst_mode, rst_num_block, rst_asg_trend, rst_lbd_get, rst_lbd_trend) =
+            rst.exports();
+        let rst_mode = if self.stabilize {
+            RestartMode::Stabilize
+        } else {
+            rst_rst_mode
+        };
 
         if self.config.use_log {
             self.dump(asg, cdb, rst);

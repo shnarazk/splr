@@ -213,8 +213,8 @@ fn search(
     state: &mut State,
 ) -> Result<bool, SolverError> {
     let mut rst_stabilize = false;
-    let switch_step = 1000;
-    let mut next_switch = switch_step;
+    let switch_step = 10000;
+    let next_switch = switch_step;
     let mut a_decision_was_made = false;
     let mut num_assigned = asg.num_solved_vars;
     rst.update(RestarterModule::Luby, 0);
@@ -231,7 +231,17 @@ fn search(
             //
             state.last_asg = asg.stack_len();
             if rst.force_restart() {
+                if !rst_stabilize {
+                    state[Stat::Stabilization] += 1;
+                    rst_stabilize = true;
+                    asg.stabilize = true;
+                    state.stabilize = true;
+                }
                 asg.cancel_until(asg.root_level);
+                asg.force_select_iter(None);
+                // if rst_stabilize {
+                //     asg.force_rephase();
+                // }
             }
         } else {
             if asg.decision_level() == asg.root_level {
@@ -254,6 +264,8 @@ fn search(
                 rst_stabilize = !rst_stabilize;
                 asg.stabilize = rst_stabilize;
                 state.stabilize = rst_stabilize;
+                asg.force_select_iter(None);
+                // asg.cancel_until(asg.root_level);
                 // next_switch = switch_step * 2;
             }
             if asg_num_conflict % state.reflection_interval == 0 {
@@ -276,11 +288,11 @@ fn search(
                     elim.activate();
                 }
                 elim.simplify(asg, cdb, state)?;
-            }
-            // By simplification, we may get further solutions.
-            if asg.num_solved_vars < asg.stack_len() {
-                rst.update(RestarterModule::Reset, 0);
-                asg.num_solved_vars = asg.stack_len();
+                // By simplification, we may get further solutions.
+                if asg.num_solved_vars < asg.stack_len() {
+                    rst.update(RestarterModule::Reset, 0);
+                    asg.num_solved_vars = asg.stack_len();
+                }
             }
             let na = asg.best_assigned(Flag::PHASE);
             if num_assigned < na {

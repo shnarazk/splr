@@ -424,7 +424,7 @@ impl ProgressEvaluator for GeometricStabilizer {
     }
     fn reset_progress(&mut self) {
         if self.enable {
-            self.active = false;
+            // self.active = false;
             // self.suspend = true;
             // self.step = 1000;
         }
