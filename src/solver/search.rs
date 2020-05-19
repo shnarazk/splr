@@ -113,7 +113,7 @@ impl SolveIF for Solver {
                     elim.enqueue_var(asg, vi, false);
                 }
             }
-            asg.force_select_iter(elim.sorted_iterator());
+            asg.force_select_iter(Some(elim.sorted_iterator()));
             //
             //## Run eliminator
             //
@@ -213,6 +213,8 @@ fn search(
     state: &mut State,
 ) -> Result<bool, SolverError> {
     let mut rst_stabilize = false;
+    let switch_step = 1000;
+    let mut next_switch = switch_step;
     let mut a_decision_was_made = false;
     let mut num_assigned = asg.num_solved_vars;
     rst.update(RestarterModule::Luby, 0);
@@ -229,11 +231,7 @@ fn search(
             //
             state.last_asg = asg.stack_len();
             if rst.force_restart() {
-                // asg.cancel_until(asg.root_level);
-                if rst_stabilize {
-                    // asg.cancel_until(asg.root_level);
-                    // asg.force_rephase();
-                }
+                asg.cancel_until(asg.root_level);
             }
         } else {
             if asg.decision_level() == asg.root_level {
@@ -242,29 +240,23 @@ fn search(
             }
             handle_conflict(asg, cdb, elim, rst, state, ci)?;
 
-            //
-            //## Check stabilization
-            //
-            if rst_stabilize != rst.stabilizing() {
-                rst_stabilize = !rst_stabilize;
-                let new_mode = state.config.use_stabilize() && rst_stabilize;
-                asg.stabilize = new_mode;
-                state.stabilize = new_mode;
-                // To explore the world to seek better nest of conflicts,
-                // we sometimes stop expoiting. Mode toggling is a good timing.
-                if new_mode {
-                    asg.force_rephase();
-                } else {
-                    asg.cancel_until(asg.root_level);
-                }
-            }
-
             if a_decision_was_made {
                 a_decision_was_made = false;
             } else {
                 state[Stat::NoDecisionConflict] += 1;
             }
-            if asg.exports().0 % state.reflection_interval == 0 {
+            //
+            //## Check stabilization
+            //
+            let asg_num_conflict = asg.exports().0;
+            if asg_num_conflict % next_switch == 0 {
+                state[Stat::Stabilization] += 1;
+                rst_stabilize = !rst_stabilize;
+                asg.stabilize = rst_stabilize;
+                state.stabilize = rst_stabilize;
+                // next_switch = switch_step * 2;
+            }
+            if asg_num_conflict % state.reflection_interval == 0 {
                 adapt_modules(asg, cdb, elim, rst, state)?;
                 if let Some(p) = state.elapsed() {
                     if 1.0 <= p {
@@ -274,16 +266,11 @@ fn search(
                     return Err(SolverError::UndescribedError);
                 }
             }
-        }
-        // Simplification has been postponed because chronoBT was used.
-        if asg.decision_level() == asg.root_level {
-            // if state.stabilize {
-            //     asg.force_rephase();
-            // }
-
+            // Simplification has been postponed because chronoBT was used.
             // `elim.to_simplify` is increased much in particular when vars are solved or
             // learnts are small. We don't need to count the number of solved vars.
             if state.config.elim_trigger < elim.to_simplify as usize {
+                asg.cancel_until(asg.root_level);
                 elim.to_simplify = 0.0;
                 if elim.enable {
                     elim.activate();
@@ -295,12 +282,12 @@ fn search(
                 rst.update(RestarterModule::Reset, 0);
                 asg.num_solved_vars = asg.stack_len();
             }
-        }
-        let na = asg.best_assigned(Flag::PHASE);
-        if num_assigned < na {
-            num_assigned = na;
-            state.flush("");
-            state.flush(format!("unreachable: {}", asg.num_vars - num_assigned));
+            let na = asg.best_assigned(Flag::PHASE);
+            if num_assigned < na {
+                num_assigned = na;
+                state.flush("");
+                state.flush(format!("unreachable: {}", asg.num_vars - num_assigned));
+            }
         }
         if !asg.remains() {
             let lit = asg.select_decision_literal(&state.phase_select);

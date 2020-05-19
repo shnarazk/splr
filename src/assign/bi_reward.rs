@@ -36,7 +36,6 @@ impl VarRewardIF for AssignStack {
         //## EVSIDS
         //
         let s = self.evsids_reward_step;
-        let t = self.ordinal;
         let v = &mut self.var[vi];
         v.reward_evsids += s;
         const SCALE: f64 = 1e-100;
@@ -51,7 +50,6 @@ impl VarRewardIF for AssignStack {
         //
         //## LR
         //
-        let v = &mut self.var[vi];
         self.var[vi].participated += 1;
     }
     fn reward_at_assign(&mut self, vi: VarId) {
