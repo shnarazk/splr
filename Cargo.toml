@@ -14,20 +14,20 @@ categories = ["mathematics", "science"]
 [dependencies]
 bitflags = "1.2"
 copyless = "0.1"
-libc = "0.2"
-structopt = "0.3"
+libc = { version = "0.2", optional = true }
+structopt = { version = "0.3", optional = true }
+
+[lib]
+required-features = []
 
 [features]
-default = []
+default = ["libc", "structopt"]
 boundary_check = []
 EVSIDS = []
 ema_calibration = []
 incremental_solver = []
-no_IO = []
-no_libc = []
 trace_analysis = []
 trace_elimination = []
-WASM = ["no_IO", "no_libc"]
 
 [profile.release]
 lto = "fat"

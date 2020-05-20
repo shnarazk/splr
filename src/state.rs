@@ -1,4 +1,4 @@
-#[cfg(not(feature = "no_libc"))]
+#[cfg(feature = "libc")]
 use libc::{clock_gettime, timespec, CLOCK_PROCESS_CPUTIME_ID};
 /// Crate `state` is a collection of internal data.
 use {
@@ -550,7 +550,7 @@ impl StateIF for State {
 }
 
 impl fmt::Display for State {
-    #[cfg(not(feature = "no_libc"))]
+    #[cfg(feature = "libc")]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let tm = {
             let mut time = timespec {
@@ -594,7 +594,7 @@ impl fmt::Display for State {
             )
         }
     }
-    #[cfg(feature = "no_libc")]
+    #[cfg(not(feature = "libc"))]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let vc = format!(
             "{},{}",

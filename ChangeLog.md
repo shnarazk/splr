@@ -1,8 +1,7 @@
 ## 0.4.1, 2020-05-XX
 
 - add feature "incremental_solver" providing `SatSolverIF::{add_assign, add_var, reset}`
-- add feature "no_libc" for WASM
-- fix typos
+- `cargo build --lib` doesn't require 'libc' and structopt' anymore; delete some features
 - quiet_mode stops progress report completely
 
 ## 0.4.0, 2020-05-06
