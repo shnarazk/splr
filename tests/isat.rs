@@ -1,4 +1,7 @@
 /// WARNING: this test requires feature "incremental_solver".
+///```ignore
+/// cargo test --test isat --features incremental_solver -- --nocapture
+///```
 use splr::*;
 #[allow(unused_imports)]
 use std::{convert::TryFrom, env::args};
