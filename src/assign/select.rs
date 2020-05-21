@@ -1,8 +1,8 @@
 /// Decision var selection
 use {
-    super::{AssignStack, VarHeapIF, VarOrderIF, VarRewardIF},
+    super::{AssignStack, Var, VarHeapIF, VarOrderIF, VarRewardIF},
     crate::{state::PhaseMode, types::*},
-    std::slice::Iter,
+    std::{collections::BinaryHeap, slice::Iter},
 };
 
 /// ```
@@ -17,7 +17,7 @@ macro_rules! var_assign {
 /// API for var selection, depending on an internal heap.
 pub trait VarSelectIF {
     /// force assignments
-    fn force_select_iter(&mut self, iterator: Iter<'_, usize>);
+    fn force_select_iter(&mut self, iterator: Option<Iter<'_, usize>>);
     /// force assignments
     fn force_rephase(&mut self);
     /// select a new decision variable.
@@ -30,11 +30,49 @@ pub trait VarSelectIF {
     fn rebuild_order(&mut self);
 }
 
+#[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
+struct VarTimestamp {
+    timestamp: usize,
+    vi: VarId,
+}
+
+impl From<&Var> for VarTimestamp {
+    fn from(v: &Var) -> Self {
+        VarTimestamp {
+            timestamp: v.timestamp,
+            vi: v.index,
+        }
+    }
+}
+
 impl VarSelectIF for AssignStack {
-    fn force_select_iter(&mut self, iterator: Iter<'_, usize>) {
-        for vi in iterator.rev() {
-            self.temp_order
-                .push(Lit::from_assign(*vi, self.var[*vi].is(Flag::PHASE)));
+    fn force_select_iter(&mut self, iterator: Option<Iter<'_, usize>>) {
+        if let Some(iter) = iterator {
+            for vi in iter.rev() {
+                let lit = Lit::from_assign(*vi, self.var[*vi].is(Flag::PHASE));
+                self.temp_order.push(lit);
+            }
+        } else {
+            let mut heap: BinaryHeap<VarTimestamp> = BinaryHeap::new();
+            let remains = self.num_vars - self.num_solved_vars - self.num_eliminated_vars;
+            let size = (remains as f64).sqrt() as usize; //remains.count_ones() as usize;
+            for v in self.var.iter().skip(1) {
+                if self.assign[v.index].is_some() {
+                    continue;
+                }
+                if let Some(top) = heap.peek() {
+                    if v.timestamp < top.timestamp {
+                        heap.push(VarTimestamp::from(v));
+                        if size < heap.len() {
+                            heap.pop();
+                        }
+                    }
+                }
+            }
+            for v in heap.iter() {
+                let lit = Lit::from_assign(v.vi, self.var[v.vi].is(Flag::PHASE));
+                self.temp_order.push(lit);
+            }
         }
     }
     fn force_rephase(&mut self) {

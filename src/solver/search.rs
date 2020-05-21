@@ -113,7 +113,7 @@ impl SolveIF for Solver {
                     elim.enqueue_var(asg, vi, false);
                 }
             }
-            asg.force_select_iter(elim.sorted_iterator());
+            asg.force_select_iter(Some(elim.sorted_iterator()));
             //
             //## Run eliminator
             //
