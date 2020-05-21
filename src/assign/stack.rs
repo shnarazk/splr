@@ -220,6 +220,21 @@ impl AssignIF for AssignStack {
     where
         C: ClauseDBIF,
     {
+        #[cfg(feature = "trace_elimination")]
+        println!(
+            "# extend_model\n - as i32: {:?}\n - as raw: {:?}",
+            i32s(lits),
+            lits.iter()
+                .map(|l| {
+                    let i = i32::from(l);
+                    if i < 0 {
+                        -2 * i
+                    } else {
+                        2 * i + 1
+                    }
+                })
+                .collect::<Vec<_>>(),
+        );
         let mut extended_model: Vec<Option<bool>> = self.assign.clone();
         if lits.is_empty() {
             return extended_model;
@@ -241,27 +256,45 @@ impl AssignIF for AssignStack {
                 let l = lits[i];
                 #[cfg(feature = "incremental_solver")]
                 {
-                    phantom_clause.push(!l);
+                    phantom_clause.push(l);
                 }
-                if self.assign(l.vi()) != Some(!bool::from(l)) {
+                if extended_model[l.vi()] != Some(!bool::from(l)) {
                     if i < width {
                         #[cfg(feature = "incremental_solver")]
                         {
                             for l in &lits[..i] {
-                                phantom_clause.push(!*l);
+                                phantom_clause.push(*l);
                             }
+                            assert!(1 < phantom_clause.len());
+                            #[cfg(feature = "trace_elimination")]
+                            println!(
+                                "- pull back clause E {:?}",
+                                phantom_clause
+                                    .iter()
+                                    .map(|l| i32::from(l))
+                                    .collect::<Vec<_>>()
+                            );
                             cdb.new_clause(self, &mut phantom_clause, false, false);
                         }
                         break 'next;
                     }
-                    i -= width;
                     #[cfg(feature = "incremental_solver")]
                     {
                         for l in &lits[i - width + 1..i] {
-                            phantom_clause.push(!*l);
+                            phantom_clause.push(*l);
                         }
+                        assert!(1 < phantom_clause.len());
+                        #[cfg(feature = "trace_elimination")]
+                        println!(
+                            "- pull back clause C {:?}",
+                            phantom_clause
+                                .iter()
+                                .map(|l| i32::from(l))
+                                .collect::<Vec<_>>()
+                        );
                         cdb.new_clause(self, &mut phantom_clause, false, false);
                     }
+                    i -= width;
                     continue 'next;
                 }
                 width -= 1;
@@ -270,6 +303,8 @@ impl AssignIF for AssignStack {
             debug_assert!(width == 1);
             let l = lits[i];
             debug_assert_ne!(Some(bool::from(l)), self.assigned(l));
+            #[cfg(feature = "trace_elimination")]
+            println!(" - extend {}", l);
             extended_model[l.vi()] = Some(bool::from(l));
             if i < width {
                 break;
