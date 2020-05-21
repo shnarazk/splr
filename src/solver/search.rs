@@ -31,7 +31,7 @@ macro_rules! final_report {
             let c = $state.config.no_color;
             let q = $state.config.quiet_mode;
             $state.config.no_color = true;
-            $state.config.quiet_mode = false;
+            // $state.config.quiet_mode = false;
             if q {
                 $state.progress_header();
             }
