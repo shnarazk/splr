@@ -122,6 +122,11 @@ impl fmt::Display for Lit {
     }
 }
 
+/// convert literals to `[i32]` (for debug).
+pub fn i32s(v: &[Lit]) -> Vec<i32> {
+    v.iter().map(|l| i32::from(*l)).collect::<Vec<_>>()
+}
+
 impl From<(VarId, bool)> for Lit {
     #[inline]
     fn from((vi, b): (VarId, bool)) -> Self {

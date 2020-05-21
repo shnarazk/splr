@@ -32,6 +32,8 @@ where
         if skip_var_elimination(asg, cdb, elim, &*pos, &*neg, vi) {
             return Ok(());
         }
+        #[cfg(feature = "trace_elimination")]
+        println!("# eliminate_var {}", vi);
         // OK, eliminate the literal and build constraints on it.
         make_eliminated_clauses(cdb, elim, vi, &*pos, &*neg);
         let vec = &mut state.new_learnt as *mut Vec<Lit>;
@@ -43,7 +45,7 @@ where
                     0 => {
                         #[cfg(feature = "trace_elimination")]
                         println!(
-                            "eliminate_var {}: fusion {}{} and {}{}",
+                            " - eliminate_var {}: fusion {}{} and {}{}",
                             vi, p, cdb[*p], n, cdb[*n],
                         );
                     }
@@ -51,7 +53,7 @@ where
                         let lit = (*vec)[0];
                         #[cfg(feature = "trace_elimination")]
                         println!(
-                            "eliminate_var {}: found assign {} from {}{} and {}{}",
+                            " - eliminate_var {}: found assign {} from {}{} and {}{}",
                             vi, lit, p, cdb[*p], n, cdb[*n],
                         );
                         cdb.certificate_add(&*vec);
@@ -67,7 +69,7 @@ where
                         elim.add_cid_occur(asg, cid, &mut cdb[cid], true);
                         #[cfg(feature = "trace_elimination")]
                         println!(
-                            "eliminate_var {}: X {} from {} and {}",
+                            " - eliminate_var {}: X {} from {} and {}",
                             vi, cdb[cid], cdb[*p], cdb[*n],
                         );
                     }
@@ -191,7 +193,7 @@ where
     let ps_smallest = pqb.len() < qpb.len();
     let (pb, qb) = if ps_smallest { (pqb, qpb) } else { (qpb, pqb) };
     #[cfg(feature = "trace_elimination")]
-    println!(" -  {:?} & {:?}", pb, qb);
+    println!("# merge {} & {}", pb, qb);
     'next_literal: for l in &qb.lits {
         if l.vi() != v {
             for j in &pb.lits {
@@ -213,7 +215,7 @@ where
     }
     #[cfg(feature = "trace_elimination")]
     println!(
-        "merge generated {:?} from {} and {} to eliminate {}",
+        " - merge generated {:?} from {} and {} to eliminate {}",
         vec.iter().map(|l| i32::from(*l)).collect::<Vec<_>>(),
         pb,
         qb,
@@ -248,6 +250,8 @@ fn make_eliminated_clauses<C>(
 }
 
 fn make_eliminating_unit_clause(vec: &mut Vec<Lit>, x: Lit) {
+    #[cfg(feature = "trace_elimination")]
+    println!(" - eliminator save {}", x);
     vec.push(x);
     vec.push(Lit::from(1usize));
 }
@@ -261,7 +265,7 @@ where
     let c = &cdb[cid];
     debug_assert!(!c.is_empty());
     for l in &c.lits {
-        vec.push(*l as Lit);
+        vec.push(*l);
         if l.vi() == vi {
             let index = vec.len() - 1;
             debug_assert_eq!(vec[index], *l);
@@ -274,7 +278,7 @@ where
     debug_assert_eq!(vec[first].vi(), vi);
     vec.push(Lit::from(c.len()));
     #[cfg(feature = "trace_elimination")]
-    println!("make_eliminated_clause: eliminate({}) clause {:?}", vi, c);
+    println!("# make_eliminated_clause: eliminate({}) clause {}", vi, c);
     cdb.touch_var(vi);
 }
 
