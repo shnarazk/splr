@@ -1,23 +1,44 @@
 /// WARNING: this test requires feature "incremental_solver".
 ///```ignore
-/// cargo test --test isat --features incremental_solver -- --nocapture
+/// cargo test --test isat --features incremental_solver --release -- --nocapture --test-threads=1
 ///```
 use splr::*;
-#[allow(unused_imports)]
 use std::{convert::TryFrom, env::args};
 
-#[cfg(feature = "incremental_solver")]
-#[test]
 fn main() {
-    let cnf = "tests/uf8.cnf"; // args().nth(1).expect("takes an arg");
-    let v: Vec<i32> = vec![8, 7, -6, 5, 4];
-    let ns1 = run(cnf, &v, false);
-    let ns2 = run(cnf, &v, true);
+    let cnf = args().nth(1).expect("takes an arg");
+    let assumptions = Vec::new();
+    let ns1 = run(&cnf, &assumptions, false);
+    let ns2 = run(&cnf, &assumptions, true);
     println!("#solution: {} w/o elim; {} w/ elim", ns1, ns2);
-    assert_eq!(ns1, ns2);
 }
 
-#[allow(dead_code)]
+#[cfg_attr(feature = "incremental_solver", test)]
+fn all_solutions_of_uf8() {
+    drive("tests/uf8.cnf", vec![4, 5, -6, 7, 8]);
+}
+
+#[cfg_attr(feature = "incremental_solver", test)]
+fn all_solutions_of_uf20() {
+    drive("tests/uf20-01.cnf", vec![-4, 5, 6, 7, 8]);
+}
+
+/// cargo test --test isat --features incremental_solver --release
+/// #[cfg_attr(feature = "incremental_solver", test)]
+fn all_solutions_of_uf100() {
+    drive("tests/uf100-010.cnf", vec![]);
+}
+
+fn drive(cnf: &str, mother: Vec<i32>) {
+    for i in 0..=mother.len() {
+        let assumptions = &mother[0..i];
+        let ns1 = run(&cnf, &assumptions, false);
+        let ns2 = run(&cnf, &assumptions, true);
+        println!("#solution: {} w/o elim; {} w/ elim", ns1, ns2);
+        assert_eq!(ns1, ns2);
+    }
+}
+
 fn run(cnf: &str, assigns: &[i32], switch: bool) -> usize {
     println!("-------------------- {:?}, {}", assigns, switch);
     let mut solver = Solver::try_from(cnf).expect("panic");
@@ -31,6 +52,20 @@ fn run(cnf: &str, assigns: &[i32], switch: bool) -> usize {
             Ok(Certificate::SAT(mut ans)) => {
                 count += 1;
                 println!("s SATISFIABLE({}): {:?}", count, ans);
+
+                //
+                // Run an external validator
+                //
+                {
+                    let mut validator = Solver::try_from(cnf).expect("panic");
+                    validator
+                        .inject_assignment(&ans)
+                        .expect("It's completely broken!");
+                    if let Some(v) = validator.validate() {
+                        panic!("It's an invalid assignment against clause {:?}.", v);
+                    }
+                }
+
                 for i in ans.iter_mut() {
                     *i *= -1;
                 }
