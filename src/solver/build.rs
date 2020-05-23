@@ -1,6 +1,6 @@
 //! Solver Builder
 use {
-    super::{restart::Restarter, Certificate, Solver, SolverResult, State, StateIF},
+    super::{restart::Restarter, Certificate, Solver, SolverEvent, SolverResult, State, StateIF},
     crate::{
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
         cdb::{ClauseDB, ClauseDBIF},
@@ -134,26 +134,6 @@ impl Instantiate for Solver {
             state: State::instantiate(config, cnf),
         }
     }
-    fn reinitialize(&mut self) {
-        let Solver {
-            ref mut asg,
-            ref mut cdb,
-            ref mut elim,
-            ref mut rst,
-            ref mut state,
-        } = self;
-        asg.reinitialize();
-        cdb.reinitialize();
-        elim.reinitialize();
-        rst.reinitialize();
-        state.reinitialize();
-
-        let mut tmp = Vec::new();
-        std::mem::swap(&mut tmp, &mut cdb.eliminated_permanent);
-        while let Some(mut vec) = tmp.pop() {
-            cdb.new_clause(asg, &mut vec, false, false);
-        }
-    }
 }
 
 impl<V> TryFrom<(Config, &[V])> for Solver
@@ -223,11 +203,10 @@ impl SatSolverIF for Solver {
             ref mut state,
             ..
         } = self;
-        asg.append_new_var();
-        cdb.append_new_var();
-        elim.append_new_var();
-        state.append_new_var();
-        state.target.num_of_variables += 1;
+        asg.handle(SolverEvent::NewVar);
+        cdb.handle(SolverEvent::NewVar);
+        elim.handle(SolverEvent::NewVar);
+        state.handle(SolverEvent::NewVar);
         asg.num_vars
     }
     /// # Examples
@@ -245,7 +224,24 @@ impl SatSolverIF for Solver {
         Solver::instantiate(config, &cnf).inject(reader)
     }
     fn reset(&mut self) {
-        self.reinitialize();
+        let Solver {
+            ref mut asg,
+            ref mut cdb,
+            ref mut elim,
+            ref mut rst,
+            ref mut state,
+        } = self;
+        asg.handle(SolverEvent::Reinitialize);
+        cdb.handle(SolverEvent::Reinitialize);
+        elim.handle(SolverEvent::Reinitialize);
+        rst.handle(SolverEvent::Reinitialize);
+        state.handle(SolverEvent::Reinitialize);
+
+        let mut tmp = Vec::new();
+        std::mem::swap(&mut tmp, &mut cdb.eliminated_permanent);
+        while let Some(mut vec) = tmp.pop() {
+            cdb.new_clause(asg, &mut vec, false, false);
+        }
     }
 }
 
@@ -330,8 +326,8 @@ impl Solver {
         }
         debug_assert_eq!(self.asg.num_vars, self.state.target.num_of_variables);
         // s.state[Stat::NumBin] = s.cdb.iter().skip(1).filter(|c| c.len() == 2).count();
-        self.asg.adapt_to(&self.state, 0);
-        self.rst.adapt_to(&self.state, 0);
+        self.asg.handle(SolverEvent::Adapt(self.state.strategy, 0));
+        self.rst.handle(SolverEvent::Adapt(self.state.strategy, 0));
         Ok(self)
     }
     fn inject_from_vec<V>(mut self, v: &[V]) -> Result<Solver, SolverError>
@@ -364,8 +360,8 @@ impl Solver {
         }
         debug_assert_eq!(self.asg.num_vars, self.state.target.num_of_variables);
         // s.state[Stat::NumBin] = s.cdb.iter().skip(1).filter(|c| c.len() == 2).count();
-        self.asg.adapt_to(&self.state, 0);
-        self.rst.adapt_to(&self.state, 0);
+        self.asg.handle(SolverEvent::Adapt(self.state.strategy, 0));
+        self.rst.handle(SolverEvent::Adapt(self.state.strategy, 0));
         Ok(self)
     }
 }

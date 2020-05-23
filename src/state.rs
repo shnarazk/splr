@@ -6,7 +6,7 @@ use {
         assign::AssignIF,
         cdb::ClauseDBIF,
         processor::EliminateIF,
-        solver::{RestartIF, RestartMode},
+        solver::{RestartIF, RestartMode, SolverEvent},
         types::*,
     },
     std::{
@@ -81,7 +81,7 @@ impl fmt::Display for PhaseMode {
 }
 
 /// A collection of named search heuristics.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SearchStrategy {
     /// The initial search phase to determine a main strategy
     Initial,
@@ -124,7 +124,7 @@ impl fmt::Display for SearchStrategy {
 }
 
 impl SearchStrategy {
-    pub fn to_str(&self) -> &'static str {
+    pub fn to_str(self) -> &'static str {
         match self {
             // in the initial search phase to determine a main strategy
             SearchStrategy::Initial => "Initial search phase before a main strategy",
@@ -263,6 +263,11 @@ impl Instantiate for State {
             target: cnf.clone(),
             time_limit: config.timeout,
             ..State::default()
+        }
+    }
+    fn handle(&mut self, e: SolverEvent) {
+        if let SolverEvent::NewVar = e {
+            self.target.num_of_variables += 1;
         }
     }
 }

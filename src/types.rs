@@ -6,7 +6,7 @@ pub use crate::{
     config::Config,
 };
 use {
-    crate::state::State,
+    crate::solver::SolverEvent,
     std::{
         convert::TryFrom,
         fmt,
@@ -63,14 +63,8 @@ pub trait ActivityIF {
 pub trait Instantiate {
     /// make and return an object from `Config` and `CNFDescription`.
     fn instantiate(conf: &Config, cnf: &CNFDescription) -> Self;
-    /// reinitialization function, used for incremental solving.
-    fn reinitialize(&mut self) {}
-    /// set up internal parameters.
-    /// # CAVEAT
-    /// some implementation might have a special premise to call: decision_level == 0.
-    fn adapt_to(&mut self, _state: &State, _num_conflict: usize) {}
-    /// increment the number of vars.
-    fn append_new_var(&mut self) {}
+    /// update by a solver event.
+    fn handle(&mut self, _e: SolverEvent) {}
 }
 
 /// API for O(n) deletion from a list, providing `delete_unstable`.

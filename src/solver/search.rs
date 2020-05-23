@@ -3,7 +3,7 @@ use {
     super::{
         conflict::handle_conflict,
         restart::{RestartIF, Restarter, RestarterModule},
-        Certificate, Solver, SolverResult,
+        Certificate, Solver, SolverEvent, SolverResult,
     },
     crate::{
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarRewardIF, VarSelectIF},
@@ -317,9 +317,9 @@ fn adapt_modules(
     }
     #[cfg(feature = "boundary_check")]
     assert!(state.strategy.1 != asg_num_conflict || 0 == asg.decision_level());
-    asg.adapt_to(state, asg_num_conflict);
-    cdb.adapt_to(state, asg_num_conflict);
-    rst.adapt_to(state, asg_num_conflict);
+    asg.handle(SolverEvent::Adapt(state.strategy, asg_num_conflict));
+    cdb.handle(SolverEvent::Adapt(state.strategy, asg_num_conflict));
+    rst.handle(SolverEvent::Adapt(state.strategy, asg_num_conflict));
     Ok(())
 }
 

@@ -2,7 +2,7 @@
 use {
     super::{
         restart::{RestartIF, Restarter, RestarterModule},
-        State,
+        SolverEvent, State,
     },
     crate::{
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarRewardIF},
