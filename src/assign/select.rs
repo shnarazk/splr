@@ -1,8 +1,10 @@
+#[cfg(feature = "temp_order")]
+use std::collections::BinaryHeap;
 /// Decision var selection
 use {
     super::{AssignStack, Var, VarHeapIF, VarOrderIF, VarRewardIF},
     crate::{state::PhaseMode, types::*},
-    std::{collections::BinaryHeap, slice::Iter},
+    std::slice::Iter,
 };
 
 /// ```
@@ -46,8 +48,9 @@ impl From<&Var> for VarTimestamp {
 }
 
 impl VarSelectIF for AssignStack {
+    #[allow(unused_variables)]
     fn force_select_iter(&mut self, iterator: Option<Iter<'_, usize>>) {
-        #[cfg(temp_order)]
+        #[cfg(feature = "temp_order")]
         {
             if let Some(iter) = iterator {
                 for vi in iter.rev() {
@@ -88,7 +91,7 @@ impl VarSelectIF for AssignStack {
         }
     }
     fn select_decision_literal(&mut self, phase: &PhaseMode) -> Lit {
-        #[cfg(temp_order)]
+        #[cfg(feature = "temp_order")]
         {
             while let Some(lit) = self.temp_order.pop() {
                 if self.assign[lit.vi()].is_none() && !self.var[lit.vi()].is(Flag::ELIMINATED) {

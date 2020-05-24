@@ -113,7 +113,7 @@ impl SolveIF for Solver {
                     elim.enqueue_var(asg, vi, false);
                 }
             }
-            #[cfg(temp_order)]
+            #[cfg(feature = "temp_order")]
             asg.force_select_iter(Some(elim.sorted_iterator()));
             //
             //## Run eliminator
@@ -231,7 +231,7 @@ fn search(
             state.last_asg = asg.stack_len();
             if rst.force_restart() {
                 asg.cancel_until(asg.root_level);
-                #[cfg(temp_order)]
+                #[cfg(feature = "temp_order")]
                 asg.force_select_iter(None);
             }
         } else {
