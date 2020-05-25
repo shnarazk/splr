@@ -24,24 +24,6 @@ pub trait SolveIF {
     fn solve(&mut self) -> SolverResult;
 }
 
-macro_rules! final_report {
-    ($asg: expr, $cdb: expr, $elim: expr, $rst: expr, $state: expr) => {
-        #[cfg(not(feature = "no_IO"))]
-        {
-            let c = $state.config.no_color;
-            let q = $state.config.quiet_mode;
-            $state.config.no_color = true;
-            // $state.config.quiet_mode = false;
-            if q {
-                $state.progress_header();
-            }
-            $state.progress($asg, $cdb, $elim, $rst, None);
-            $state.config.no_color = c;
-            $state.config.quiet_mode = q;
-        }
-    };
-}
-
 impl SolveIF for Solver {
     /// # Examples
     ///
@@ -123,7 +105,7 @@ impl SolveIF for Solver {
                 if elim.simplify(asg, cdb, state).is_err() {
                     // Why inconsistent? Because the CNF contains a conflict, not an error!
                     // Or out of memory.
-                    final_report!(asg, cdb, elim, rst, state);
+                    state.progress(asg, cdb, elim, rst, None);
                     if cdb.check_size().is_err() {
                         return Err(SolverError::OutOfMemory);
                     }
@@ -152,7 +134,7 @@ impl SolveIF for Solver {
         //## Search
         //
         let answer = search(asg, cdb, elim, rst, state);
-        final_report!(asg, cdb, elim, rst, state);
+        state.progress(asg, cdb, elim, rst, None);
         match answer {
             Ok(true) => {
                 // As a preparation for incremental solving, we need to backtrack to the
