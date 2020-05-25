@@ -36,7 +36,7 @@ fn colored(v: Result<bool, &SolverError>, quiet: bool) -> Cow<'static, str> {
         match v {
             Ok(false) => Cow::from(format!("{}s UNSATISFIABLE{}", GREEN, RESET)),
             Ok(true) => Cow::from(format!("{}s SATISFIABLE{}", BLUE, RESET)),
-            Err() => Cow::from(format!("{}s UNKNOWN{}", RED, RESET)),
+            Err(_) => Cow::from(format!("{}s UNKNOWN{}", RED, RESET)),
         }
     }
 }
@@ -355,8 +355,8 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c         misc|#rdc:{}, #smp:{}, 2smp:{}, vdcy:{} \n",
-            format!("{:>9}", state[LogUsizeId::Reduction]),
+            "c         misc|#stb:{}, #smp:{}, 2smp:{}, vdcy:{} \n",
+            format!("{:>9}", state[LogUsizeId::Stabilization]),
             format!("{:>9}", state[LogUsizeId::Simplify]),
             format!("{:>9.0}", state[LogF64Id::SimpToGo]),
             format!("{:>9.4}", asg_activity_decay),
