@@ -8,6 +8,7 @@ use {
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarRewardIF},
         cdb::{ClauseDB, ClauseDBIF},
         processor::{EliminateIF, Eliminator},
+        solver::SolverEvent,
         types::*,
     },
 };
@@ -167,7 +168,7 @@ pub fn handle_conflict(
         } else {
             asg.assign_by_unitclause(l0);
         }
-        asg.num_solved_vars += 1;
+        asg.handle(SolverEvent::Fixed);
         rst.update(RestarterModule::Reset, 0);
     } else {
         {
