@@ -1,8 +1,10 @@
+#[cfg(feature = "temp_order")]
+use std::collections::BinaryHeap;
 /// Decision var selection
 use {
     super::{AssignStack, Var, VarHeapIF, VarOrderIF, VarRewardIF},
     crate::{state::PhaseMode, types::*},
-    std::{collections::BinaryHeap, slice::Iter},
+    std::slice::Iter,
 };
 
 /// ```
@@ -46,32 +48,36 @@ impl From<&Var> for VarTimestamp {
 }
 
 impl VarSelectIF for AssignStack {
+    #[allow(unused_variables)]
     fn force_select_iter(&mut self, iterator: Option<Iter<'_, usize>>) {
-        if let Some(iter) = iterator {
-            for vi in iter.rev() {
-                let lit = Lit::from_assign(*vi, self.var[*vi].is(Flag::PHASE));
-                self.temp_order.push(lit);
-            }
-        } else {
-            let mut heap: BinaryHeap<VarTimestamp> = BinaryHeap::new();
-            let remains = self.num_vars - self.num_solved_vars - self.num_eliminated_vars;
-            let size = (remains as f64).sqrt() as usize; //remains.count_ones() as usize;
-            for v in self.var.iter().skip(1) {
-                if self.assign[v.index].is_some() {
-                    continue;
+        #[cfg(feature = "temp_order")]
+        {
+            if let Some(iter) = iterator {
+                for vi in iter.rev() {
+                    let lit = Lit::from_assign(*vi, self.var[*vi].is(Flag::PHASE));
+                    self.temp_order.push(lit);
                 }
-                if let Some(top) = heap.peek() {
-                    if v.timestamp < top.timestamp {
-                        heap.push(VarTimestamp::from(v));
-                        if size < heap.len() {
-                            heap.pop();
+            } else {
+                let mut heap: BinaryHeap<VarTimestamp> = BinaryHeap::new();
+                let remains = self.num_vars - self.num_solved_vars - self.num_eliminated_vars;
+                let size = (remains as f64).sqrt() as usize; //remains.count_ones() as usize;
+                for v in self.var.iter().skip(1) {
+                    if self.assign[v.index].is_some() {
+                        continue;
+                    }
+                    if let Some(top) = heap.peek() {
+                        if v.timestamp < top.timestamp {
+                            heap.push(VarTimestamp::from(v));
+                            if size < heap.len() {
+                                heap.pop();
+                            }
                         }
                     }
                 }
-            }
-            for v in heap.iter() {
-                let lit = Lit::from_assign(v.vi, self.var[v.vi].is(Flag::PHASE));
-                self.temp_order.push(lit);
+                for v in heap.iter() {
+                    let lit = Lit::from_assign(v.vi, self.var[v.vi].is(Flag::PHASE));
+                    self.temp_order.push(lit);
+                }
             }
         }
     }
@@ -85,7 +91,8 @@ impl VarSelectIF for AssignStack {
         }
     }
     fn select_decision_literal(&mut self, phase: &PhaseMode) -> Lit {
-        if *phase != PhaseMode::Latest {
+        #[cfg(feature = "temp_order")]
+        {
             while let Some(lit) = self.temp_order.pop() {
                 if self.assign[lit.vi()].is_none() && !self.var[lit.vi()].is(Flag::ELIMINATED) {
                     return lit;

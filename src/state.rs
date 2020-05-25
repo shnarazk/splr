@@ -6,7 +6,7 @@ use {
         assign::AssignIF,
         cdb::ClauseDBIF,
         processor::EliminateIF,
-        solver::{RestartIF, RestartMode},
+        solver::{RestartIF, RestartMode, SolverEvent},
         types::*,
     },
     std::{
@@ -81,7 +81,7 @@ impl fmt::Display for PhaseMode {
 }
 
 /// A collection of named search heuristics.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SearchStrategy {
     /// The initial search phase to determine a main strategy
     Initial,
@@ -124,7 +124,7 @@ impl fmt::Display for SearchStrategy {
 }
 
 impl SearchStrategy {
-    pub fn to_str(&self) -> &'static str {
+    pub fn to_str(self) -> &'static str {
         match self {
             // in the initial search phase to determine a main strategy
             SearchStrategy::Initial => "Initial search phase before a main strategy",
@@ -151,6 +151,8 @@ pub enum Stat {
     NoDecisionConflict,
     /// the last number of solved variables
     SolvedRecord,
+    /// the number of stabilization flips
+    Stabilization,
     /// don't use this dummy (sentinel at the tail).
     EndOfStatIndex,
 }
@@ -263,6 +265,11 @@ impl Instantiate for State {
             target: cnf.clone(),
             time_limit: config.timeout,
             ..State::default()
+        }
+    }
+    fn handle(&mut self, e: SolverEvent) {
+        if let SolverEvent::NewVar = e {
+            self.target.num_of_variables += 1;
         }
     }
 }
@@ -451,7 +458,7 @@ impl StateIF for State {
             _num_bi_learnt,
             cdb_num_lbd2,
             cdb_num_learnt,
-            cdb_num_reduction,
+            _cdb_num_reduction,
         ) = cdb.exports();
 
         let (elim_num_full, _num_sat, elim_to_simplify) = elim.exports();
@@ -529,8 +536,13 @@ impl StateIF for State {
             )
         );
         println!(
-            "\x1B[2K        misc|#rdc:{}, #smp:{}, 2smp:{}, vdcy:{} ",
-            im!("{:>9}", self, LogUsizeId::Reduction, cdb_num_reduction),
+            "\x1B[2K        misc|#stb:{}, #smp:{}, 2smp:{}, vdcy:{} ",
+            im!(
+                "{:>9}",
+                self,
+                LogUsizeId::Stabilization,
+                self[Stat::Stabilization]
+            ),
             im!("{:>9}", self, LogUsizeId::Simplify, elim_num_full),
             fm!(
                 "{:>9.0}",
@@ -770,8 +782,8 @@ pub enum LogUsizeId {
     Permanent,     //  9: permanent: usize,
     RestartBlock,  // 10: restart_block: usize,
     Restart,       // 11: restart_count: usize,
-    Reduction,     // 12: reduction: usize,
-    Simplify,      // 13: full-featured elimination: usize,
+    Simplify,      // 12: full-featured elimination: usize,
+    Stabilization, // 13: stabilization: usize
     End,
 }
 

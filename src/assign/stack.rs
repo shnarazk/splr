@@ -1,7 +1,7 @@
 /// main struct AssignStack
 use {
     super::{AssignIF, AssignStack, Var, VarIdHeap, VarManipulateIF, VarOrderIF, VarSelectIF},
-    crate::{state::State, types::*},
+    crate::{solver::SolverEvent, types::*},
     std::{fmt, ops::Range, slice::Iter},
 };
 
@@ -101,28 +101,37 @@ impl Instantiate for AssignStack {
             ..AssignStack::default()
         }
     }
-    fn reinitialize(&mut self) {
-        assert_eq!(self.decision_level(), self.root_level);
-        self.q_head = 0;
-        self.num_eliminated_vars = self.var.iter().filter(|v| v.is(Flag::ELIMINATED)).count();
-        self.num_solved_vars = if self.trail.is_empty() {
-            0
-        } else {
-            self.trail.len()
-        };
-        self.rebuild_order();
-    }
-    #[allow(unused_variables)]
-    fn adapt_to(&mut self, state: &State, num_conflict: usize) {}
-    fn append_new_var(&mut self) {
-        self.assign.push(None);
-        self.level.push(DecisionLevel::default());
-        self.reason.push(AssignReason::default());
-        self.var_order.heap.push(0);
-        self.var_order.idxs.push(0);
-        self.var_order.clear();
-        self.num_vars += 1;
-        self.var.push(Var::from(self.num_vars));
+    fn handle(&mut self, e: SolverEvent) {
+        match e {
+            SolverEvent::Adapt(_, _) => (),
+            SolverEvent::Conflict => {}
+            SolverEvent::Fixed => {
+                self.num_solved_vars += 1;
+            }
+            SolverEvent::NewVar => {
+                self.assign.push(None);
+                self.level.push(DecisionLevel::default());
+                self.reason.push(AssignReason::default());
+                self.var_order.heap.push(0);
+                self.var_order.idxs.push(0);
+                self.var_order.clear();
+                self.num_vars += 1;
+                self.var.push(Var::from(self.num_vars));
+            }
+            SolverEvent::Reinitialize => {
+                assert_eq!(self.decision_level(), self.root_level);
+                self.q_head = 0;
+                self.num_eliminated_vars =
+                    self.var.iter().filter(|v| v.is(Flag::ELIMINATED)).count();
+                self.num_solved_vars = if self.trail.is_empty() {
+                    0
+                } else {
+                    self.trail.len()
+                };
+                self.rebuild_order();
+            }
+            _ => (),
+        }
     }
 }
 

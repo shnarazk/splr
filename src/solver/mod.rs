@@ -36,6 +36,26 @@ pub enum Certificate {
 /// * `SolverException::*` -- caused by a bug
 pub type SolverResult = Result<Certificate, SolverError>;
 
+/// define submodules' responsibilities
+#[derive(Clone, Copy, Debug)]
+pub enum SolverEvent {
+    /// set up internal parameters.
+    /// # CAVEAT
+    /// some implementation might have a special premise to call: decision_level == 0.
+    Adapt((SearchStrategy, usize), usize),
+    Conflict,
+    Fixed,
+    /// Not in use
+    Instantiate,
+    /// increment the number of vars.
+    NewVar,
+    Restart,
+    /// reinitialization for incremental solving.
+    Reinitialize,
+    /// stabilization
+    Stabilize(bool),
+}
+
 /// The SAT solver object consisting of 6 sub modules.
 /// ```
 /// use std::convert::TryFrom;

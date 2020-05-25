@@ -1,7 +1,7 @@
 //! Crate `restart` provides restart heuristics.
 use {
     crate::{
-        solver::{SearchStrategy, State},
+        solver::{SearchStrategy, SolverEvent},
         types::*,
     },
     std::fmt,
@@ -561,17 +561,15 @@ impl Instantiate for Restarter {
             ..Restarter::default()
         }
     }
-    fn adapt_to(&mut self, state: &State, num_conflict: usize) {
-        match state.strategy {
-            (SearchStrategy::Initial, 0) => {
-                // self.int.enable = true;
+    fn handle(&mut self, e: SolverEvent) {
+        if let SolverEvent::Adapt(strategy, num_conflict) = e {
+            match strategy {
+                (SearchStrategy::Initial, 0) => {
+                    // self.int.enable = true;
+                }
+                (SearchStrategy::LowSuccesive, n) if n == num_conflict => self.luby.enable = true,
+                _ => (),
             }
-            (SearchStrategy::LowSuccesive, n) if n == num_conflict => self.luby.enable = true,
-            // SearchStrategy::HighSuccesive => (),
-            // SearchStrategy::LowSuccesiveM => (),
-            // SearchStrategy::ManyGlues => (),
-            // SearchStrategy::Generic => (),
-            _ => (),
         }
     }
 }
