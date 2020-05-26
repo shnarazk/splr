@@ -25,7 +25,9 @@ use {
 /// Normal results returned by Solver.
 #[derive(Debug, PartialEq)]
 pub enum Certificate {
+    /// It is satisifable; `vec` is such an assigment sorted by var order.
     SAT(Vec<i32>),
+    /// It is unsatisfiable.
     UNSAT,
 }
 
@@ -98,6 +100,12 @@ where
     }
 }
 
+/// Iterator for Solver
+/// * takes `&mut Solver`
+/// * returns `Option<Vec<i32>>`
+///    * `Some(Vec<i32>)` -- satisfiable assignment
+///    * `None` -- unsatisfiable anymore
+/// * Some internal error causes panic.
 #[cfg(feature = "incremental_solver")]
 pub struct SolverIter<'a> {
     solver: &'a mut Solver,
@@ -106,6 +114,12 @@ pub struct SolverIter<'a> {
 
 #[cfg(feature = "incremental_solver")]
 impl Solver {
+    /// return an iterator on Solver. **Requires 'incremenal_solver' feature**
+    ///```
+    ///for v in Solver::try_from("tests/sample.cnf").expect("panic").iter() {
+    ///    println!(" - answer: {:?}", v);
+    ///}
+    ///```
     pub fn iter(&mut self) -> SolverIter {
         SolverIter {
             solver: self,

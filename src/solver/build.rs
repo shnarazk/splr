@@ -103,7 +103,7 @@ pub trait SatSolverIF {
     /// * `SolverError::OutOfRange` if any literal used in the CNF is out of range for var index.
     #[cfg(not(feature = "no_IO"))]
     fn build(config: &Config) -> Result<Solver, SolverError>;
-    /// reinitialize
+    /// reinitialize a solver for incremental solving. **Requires 'incremenal_solver' feature**
     fn reset(&mut self);
 }
 

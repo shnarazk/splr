@@ -1,7 +1,7 @@
 ## 0.4.1, 2020-05-XX
 
 - the installation command is changed to `cargo install splr --features cli`
-- add feature "incremental_solver" providing `SatSolverIF::{add_assign, add_var, reset}`
+- add feature "incremental_solver" providing `SatSolverIF::{add_assign, add_var, reset}` and `Solver::iter`
 - `cargo build --lib` doesn't depend on 'libc' and structopt' anymore; delete some features
 - quiet_mode stops progress report completely
 - a tiny modification on var selection heuristics
