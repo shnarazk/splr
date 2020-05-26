@@ -80,9 +80,10 @@ A valid assignment set for tests/sample.cnf is found in .ans_sample.cnf.
 
 If you want to certificate unsatisfiability, use `splr --certificate` and recommend to use [Grid](https://www21.in.tum.de/~lammich/grat/).
 
+1. Run splr with certificate option.
+
 ```plain
 $ splr -c tests/unsat.cnf
-splr -c tests/unsat.cnf splrtests/unsat.cnf
 unsat.cnf                                            83,570 |time:     0.00
  #conflict:          0, #decision:            0, #propagate:              0
   Assignment|#rem:       19, #fix:       64, #elm:        0, prg%:  77.1084
@@ -96,9 +97,13 @@ unsat.cnf                                            83,570 |time:     0.00
 s UNSATISFIABLE: tests/unsat.cnf
 ```
 
+2. Trim comments from the output
+
 ```plain
 $ egrep -v '^[cs]' < proof.out > proof.drat
 ```
+
+3. Convert the drat file to a grat file.
 
 ```plain
 $ gratgen tests/unsat.cnf proof.drat -o proof.grat
@@ -135,6 +140,8 @@ c Clause DB size:  25372
 c Item list:       15696
 c Pivots store:    4096
 ```
+
+4. Verify it with `gratchk`
 
 ```plain
 $ gratchk unsat tests/unsat.cnf proof.grat
