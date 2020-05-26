@@ -144,7 +144,7 @@ fn run(cnf: &str, assigns: &[i32]) -> usize {
 }
 ```
 
-Since 0.4.1, `Solver` has `iter()`. So you can iterate on satisfiable `solutions: Vec<i32>` as:
+Since 0.4.1, `Solver` has `iter()`. So you can iterate on satisfiable '`solution: Vec<i32>`'s as:
 
 ```rust
 #[cfg(feature = "incremental_solver")]
