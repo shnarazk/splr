@@ -78,7 +78,7 @@ $ dmcr tests/sample.cnf
 A valid assignment set for tests/sample.cnf is found in .ans_sample.cnf.
 ```
 
-If you want to certificate unsatisfiability, use `splr --certificate` and recommend to use Grid.
+If you want to certificate unsatisfiability, use `splr --certificate` and recommend to use [Grid](https://www21.in.tum.de/~lammich/grat/).
 
 ```plain
 $ splr -c tests/unsat.cnf
