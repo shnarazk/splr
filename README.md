@@ -144,6 +144,16 @@ fn run(cnf: &str, assigns: &[i32]) -> usize {
 }
 ```
 
+Since 0.4.1, `Solver` has `iter()`. So you can iterate on satisfiable `solutions: Vec<i32>` as:
+
+```rust
+#[cfg(feature = "incremental_solver")]
+for (i, v) in Solver::try_from(cnf).expect("panic").iter().enumerate() {
+    println!("{}-th answer: {:?}", i, v);
+}
+```
+
+
 ### Mnemonics used in the progress message
 
 | mnemonic  | meaning |

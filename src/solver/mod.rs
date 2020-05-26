@@ -92,9 +92,49 @@ where
     V: AsRef<[i32]>,
 {
     type Error = SolverError;
-    fn try_from(vec: Vec<V>) -> Result<Certificate, Self::Error> {
+    fn try_from(vec: Vec<V>) -> SolverResult {
         let s = Solver::try_from((Config::default(), vec.as_ref()));
         s.map_or_else(|e| e, |mut solver| solver.solve())
+    }
+}
+
+#[cfg(feature = "incremental_solver")]
+pub struct SolverIter<'a> {
+    solver: &'a mut Solver,
+    refute: Option<Vec<i32>>,
+}
+
+#[cfg(feature = "incremental_solver")]
+impl Solver {
+    pub fn iter(&mut self) -> SolverIter {
+        SolverIter {
+            solver: self,
+            refute: None,
+        }
+    }
+}
+
+#[cfg(feature = "incremental_solver")]
+impl<'a> Iterator for SolverIter<'a> {
+    type Item = Vec<i32>;
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(ref v) = self.refute {
+            match self.solver.add_clause(v) {
+                Err(SolverError::Inconsistent) => return None,
+                Err(e) => panic!("s UNKNOWN: {:?}", e),
+                Ok(_) => self.solver.reset(),
+            }
+            self.refute = None;
+        }
+        match self.solver.solve() {
+            Ok(Certificate::SAT(ans)) => {
+                let rft: Vec<i32> = ans.iter().map(|i| -i).collect::<Vec<i32>>();
+                self.refute = Some(rft);
+                Some(ans)
+            }
+            Ok(Certificate::UNSAT) => None,
+            e => panic!("s UNKNOWN: {:?}", e),
+        }
     }
 }
 
