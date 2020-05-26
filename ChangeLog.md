@@ -1,4 +1,4 @@
-## 0.4.1, 2020-05-XX
+## 0.4.1, 2020-05-27
 
 - the installation command is changed to `cargo install splr --features cli`
 - add feature "incremental_solver" providing `SatSolverIF::{add_assign, add_var, reset}` and `Solver::iter`
