@@ -138,7 +138,7 @@ impl Instantiate for AssignStack {
 impl Export<(usize, usize, usize, f64)> for AssignStack {
     /// exports:
     ///  1. the number of conflicts
-    ///  1. the number of propagation
+    ///  1. the number of propagations
     ///  1. the number of restarts
     ///  1. `activity_decay`
     ///
@@ -278,10 +278,7 @@ impl AssignIF for AssignStack {
                             #[cfg(feature = "trace_elimination")]
                             println!(
                                 "- pull back clause E {:?}",
-                                phantom_clause
-                                    .iter()
-                                    .map(|l| i32::from(l))
-                                    .collect::<Vec<_>>()
+                                phantom_clause.iter().map(i32::from).collect::<Vec<_>>()
                             );
                             cdb.new_clause(self, &mut phantom_clause, false, false);
                         }
@@ -296,10 +293,7 @@ impl AssignIF for AssignStack {
                         #[cfg(feature = "trace_elimination")]
                         println!(
                             "- pull back clause C {:?}",
-                            phantom_clause
-                                .iter()
-                                .map(|l| i32::from(l))
-                                .collect::<Vec<_>>()
+                            phantom_clause.iter().map(i32::from).collect::<Vec<_>>()
                         );
                         cdb.new_clause(self, &mut phantom_clause, false, false);
                     }
