@@ -10,7 +10,7 @@ It adopts various research results on SAT solvers:
 - compile-time selection of a variant of *Learning Rate Based Branching* with *Reason Side Rewarding* and EVSIDS
 - *chronological backtrack* aka *chronoBT*
 - Glucose-like heuristics adaptation
-- CaDiCaL-like extended phase saving
+- CaDiCaL-like extended phase saving (not activated by default)
 
 *Many thanks to SAT researchers.*
 
@@ -153,7 +153,6 @@ for (i, v) in Solver::try_from(cnf).expect("panic").iter().enumerate() {
 }
 ```
 
-
 ### Mnemonics used in the progress message
 
 | mnemonic  | meaning |
@@ -189,7 +188,7 @@ for (i, v) in Solver::try_from(cnf).expect("panic").iter().enumerate() {
 
 ## Command line options
 
-Please check help message.
+Please check the help message.
 
 * The 'switch' in help message below is either '1' or '0' to or not to use a module.
 * Splr can't handle compressed CNF files so far.
