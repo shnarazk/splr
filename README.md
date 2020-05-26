@@ -5,12 +5,13 @@ Splr is a pure [Rust](https://www.rust-lang.org)ic modern SAT solver, based on [
 It adopts various research results on SAT solvers:
 
 - *CDCL*, *watch literals*, *LBD* and so on from Glucose, [Minisat](http://minisat.se) and the ancestors
-- Glucose-like *dynamic blocking/forcing restarts* based on [EMAs](https://arxiv.org/abs/1506.08905) and [CaDiCaL](https://github.com/arminbiere/cadical)-like *stabilization*
+- Glucose-like *dynamic blocking/forcing restarts* based on [EMAs](https://arxiv.org/abs/1506.08905)
 - pre/in-process simplification based on clause subsumption and variable elimination
 - compile-time selection of a variant of *Learning Rate Based Branching* with *Reason Side Rewarding* and EVSIDS
 - *chronological backtrack* aka *chronoBT*
 - Glucose-like heuristics adaptation
-- CaDiCaL-like extended phase saving (not activated by default)
+- [CaDiCaL](https://github.com/arminbiere/cadical)-like extended phase saving
+- CaDiCaL-like search stabilization (not activated by default)
 
 *Many thanks to SAT researchers.*
 

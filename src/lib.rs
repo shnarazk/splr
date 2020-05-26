@@ -45,7 +45,7 @@ match Certificate::try_from(v).expect("panic!") {
 
 ## Incremental solver
 
-Splr provides 'incremental solver mode' if you install with feature 'incremental_solver'.
+Splr provides 'incremental solver mode' if you built it with feature 'incremental_solver'.
 This document covers extra functions only if you built it with `cargo doc --features incremental_sorver`.
 
 */
