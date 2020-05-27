@@ -1,5 +1,3 @@
-#[cfg(feature = "libc")]
-use libc::{clock_gettime, timespec, CLOCK_PROCESS_CPUTIME_ID};
 /// Crate `state` is a collection of internal data.
 use {
     crate::{
@@ -14,8 +12,12 @@ use {
         fmt,
         io::{stdout, Write},
         ops::{Index, IndexMut},
-        time::SystemTime,
     },
+};
+#[cfg(feature = "libc")]
+use {
+    libc::{clock_gettime, timespec, CLOCK_PROCESS_CPUTIME_ID},
+    std::time::SystemTime,
 };
 
 /// API for state/statistics management, providing `progress`.
@@ -207,6 +209,7 @@ pub struct State {
     /// keep the previous statistics values
     pub record: ProgressRecord,
     /// start clock for timeout handling
+    #[cfg(feature = "libc")]
     pub start: SystemTime,
     /// upper limit for timeout handling
     pub time_limit: f64,
@@ -231,6 +234,7 @@ impl Default for State {
             new_learnt: Vec::new(),
             progress_cnt: 0,
             record: ProgressRecord::default(),
+            #[cfg(feature = "libc")]
             start: SystemTime::now(),
             time_limit: 0.0,
             development: Vec::new(),
@@ -363,22 +367,32 @@ macro_rules! f {
 
 impl StateIF for State {
     fn is_timeout(&self) -> bool {
-        if self.time_limit == 0.0 {
-            return false;
+        #[cfg(feature = "libc")]
+        {
+            if self.time_limit == 0.0 {
+                return false;
+            }
+            match self.start.elapsed() {
+                Ok(e) => self.time_limit <= e.as_secs() as f64,
+                Err(_) => false,
+            }
         }
-        match self.start.elapsed() {
-            Ok(e) => self.time_limit <= e.as_secs() as f64,
-            Err(_) => false,
-        }
+        #[cfg(not(feature = "libc"))]
+        false
     }
     fn elapsed(&self) -> Option<f64> {
-        if self.time_limit == 0.0 {
-            return Some(0.0);
+        #[cfg(feature = "libc")]
+        {
+            if self.time_limit == 0.0 {
+                return Some(0.0);
+            }
+            match self.start.elapsed() {
+                Ok(e) => Some(e.as_secs() as f64 / self.time_limit),
+                Err(_) => None,
+            }
         }
-        match self.start.elapsed() {
-            Ok(e) => Some(e.as_secs() as f64 / self.time_limit),
-            Err(_) => None,
-        }
+        #[cfg(not(feature = "libc"))]
+        Some(0.0)
     }
     fn select_strategy<A, C>(&mut self, asg: &A, cdb: &C)
     where
