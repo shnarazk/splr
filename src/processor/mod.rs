@@ -25,6 +25,8 @@ mod eliminate;
 mod heap;
 mod subsume;
 
+#[cfg(feature = "libc")]
+use std::{thread, time::Duration};
 use {
     self::{eliminate::eliminate_var, heap::VarOrderIF, subsume::try_subsume},
     crate::{
@@ -41,8 +43,6 @@ use {
             atomic::{AtomicBool, Ordering},
             Arc,
         },
-        thread,
-        time::Duration,
     },
 };
 
@@ -666,25 +666,29 @@ impl Eliminator {
         A: AssignIF,
         C: ClauseDBIF,
     {
-        /// The ratio of time slot for single elimination step.
-        /// Since it is measured in millisecond, 1000 means executing elimination
-        /// until timed out. 100 means this function can consume 10% of a given time.
-        const TIMESLOT_FOR_ELIMINATION: u64 = 10;
         debug_assert!(asg.decision_level() == 0);
         if self.mode == EliminatorMode::Deactive {
             return Ok(());
         }
         let timedout = Arc::new(AtomicBool::new(false));
-        let timedout2 = timedout.clone();
-        let time = if asg.exports().1 == 0 {
-            100 * TIMESLOT_FOR_ELIMINATION * state.config.timeout as u64
-        } else {
-            TIMESLOT_FOR_ELIMINATION * state.config.timeout as u64
-        };
-        thread::spawn(move || {
-            thread::sleep(Duration::from_millis(time));
-            timedout2.store(true, Ordering::Release);
-        });
+        #[cfg(feature = "libc")]
+        {
+            /// The ratio of time slot for single elimination step.
+            /// Since it is measured in millisecond, 1000 means executing elimination
+            /// until timed out. 100 means this function can consume 10% of a given time.
+            const TIMESLOT_FOR_ELIMINATION: u64 = 10;
+
+            let timedout2 = timedout.clone();
+            let time = if asg.exports().1 == 0 {
+                100 * TIMESLOT_FOR_ELIMINATION * state.config.timeout as u64
+            } else {
+                TIMESLOT_FOR_ELIMINATION * state.config.timeout as u64
+            };
+            thread::spawn(move || {
+                thread::sleep(Duration::from_millis(time));
+                timedout2.store(true, Ordering::Release);
+            });
+        }
         while self.bwdsub_assigns < asg.stack_len()
             || !self.var_queue.is_empty()
             || !self.clause_queue.is_empty()
