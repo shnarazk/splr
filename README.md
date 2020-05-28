@@ -274,7 +274,7 @@ Please check the help message.
 
 ```plain
 $ splr --help
-splr 0.4.0
+splr 0.4.1
 Narazaki Shuji <shujinarazaki@protonmail.com>
 A modern CDCL SAT solver in Rust
 
