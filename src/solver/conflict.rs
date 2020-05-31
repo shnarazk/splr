@@ -35,7 +35,7 @@ pub fn handle_conflict(
 
     let (num_conflict, _num_propagation, asg_num_restart, _) = asg.exports();
     // If we can settle this conflict w/o restart, solver will get a big progress.
-    let switch_chronobt = if num_conflict < 1000 || asg.recurrent_conflicts() {
+    let switch_chronobt = if num_conflict < 1000 {
         Some(false)
     } else {
         None

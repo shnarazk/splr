@@ -237,6 +237,9 @@ fn search(
                     return Err(SolverError::UndescribedError);
                 }
             }
+            //if asg.decision_level() == asg.root_level {
+            //    cdb.eliminate_satisfied_clauses(asg, elim, false);
+            //}
         }
         // Simplification has been postponed because chronoBT was used.
         if asg.decision_level() == asg.root_level {

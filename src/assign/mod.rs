@@ -74,8 +74,6 @@ pub trait AssignIF:
     fn decision_vi(&self, lv: DecisionLevel) -> VarId;
     /// return `true` if there are unpropagated assignments.
     fn remains(&self) -> bool;
-    /// return `true` if subsequential propagations emit the same conflict.
-    fn recurrent_conflicts(&self) -> bool;
     /// return a reference to `aasign`.
     fn assign_ref(&self) -> &[Option<bool>];
     /// return a reference to `level`.
@@ -125,7 +123,6 @@ pub struct AssignStack {
     trail_lim: Vec<usize>,
     q_head: usize,
     pub root_level: DecisionLevel,
-    conflicts: (VarId, VarId),
     var_order: VarIdHeap, // Variable Order
     temp_order: Vec<Lit>,
 
