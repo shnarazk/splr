@@ -456,7 +456,7 @@ impl ClauseDBIF for ClauseDB {
             }
             c.rank = rank;
             c.reward = reward;
-            c.search_from = 1;
+            c.search_from = 2;
         } else {
             let lits = Vec::from(vec);
             cid = ClauseId::from(self.clause.len());
@@ -641,7 +641,7 @@ impl ClauseDBIF for ClauseDB {
         }
         (*c).turn_on(Flag::JUST_USED);
         debug_assert!(1 < usize::from(!p));
-        (*c).search_from = 1;
+        (*c).search_from = 2;
         let lits = &mut (*c).lits;
         debug_assert!(1 < lits.len());
         if lits.len() == 2 {
