@@ -243,20 +243,21 @@ impl PropagateIF for AssignStack {
                     //
                     #[cfg(feature = "boundary_check")]
                     assert!(*search_from < lits.len());
-                    for (start, end) in &[(*search_from + 1, lits.len()), (2, *search_from + 1)] {
-                        for k in *start..*end {
-                            let lk = &lits[k];
-                            if lit_assign!(self, *lk) != Some(false) {
-                                (*watcher)
-                                    .get_unchecked_mut(usize::from(!*lk))
-                                    .register(first, w.c, false);
-                                n -= 1;
-                                source.detach(n);
-                                lits.swap(1, k);
-                                // *search_from = k + 1;
-                                *search_from = k;
-                                continue 'next_clause;
+                    let len = lits.len();
+                    for k in (*search_from..len).chain(2..*search_from) {
+                        let lk = &lits[k];
+                        if lit_assign!(self, *lk) != Some(false) {
+                            (*watcher)
+                                .get_unchecked_mut(usize::from(!*lk))
+                                .register(first, w.c, false);
+                            n -= 1;
+                            source.detach(n);
+                            lits.swap(1, k);
+                            *search_from = k + 1;
+                            if *search_from == len {
+                                *search_from = 2;
                             }
+                            continue 'next_clause;
                         }
                     }
 
@@ -275,8 +276,8 @@ impl PropagateIF for AssignStack {
                 }
             }
         }
-        let na = self.trail.len() + self.num_eliminated_vars;
-        if 0 < self.decision_level() && self.num_best_assign < na {
+        let na = self.q_head + self.num_eliminated_vars;
+        if self.num_best_assign < na && 0 < self.decision_level() {
             self.best_assign = true;
             self.num_best_assign = na;
         }
