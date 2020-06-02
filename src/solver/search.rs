@@ -138,7 +138,7 @@ impl SolveIF for Solver {
         match answer {
             Ok(true) => {
                 // As a preparation for incremental solving, we need to backtrack to the
-                // root level. So all assigngments, including assignments to eliminated vars,
+                // root level. So all assignments, including assignments to eliminated vars,
                 // are stored in an extra storage. It has the same type of `AssignStack::assign`.
                 let model = asg.extend_model(cdb, elim.eliminated_lits());
                 #[cfg(debug)]
