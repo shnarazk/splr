@@ -25,7 +25,7 @@ name = "splr"
 required-features = ["libc", "structopt"]
 
 [features]
-default = []
+default = ["cli"]
 cli = ["libc", "structopt"]
 boundary_check = []
 ema_calibration = []
