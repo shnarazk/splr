@@ -66,6 +66,8 @@ pub struct Clause {
 pub struct ClauseDB {
     /// container of clauses
     clause: Vec<Clause>,
+    /// container of watch literals for binary clauses
+    pub bin_watcher: Vec<Vec<Watch>>,
     /// container of watch literals
     pub watcher: Vec<Vec<Watch>>,
     /// clause history to make certification

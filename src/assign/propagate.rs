@@ -192,33 +192,47 @@ impl PropagateIF for AssignStack {
     where
         C: ClauseDBIF,
     {
+        let bin_watcher = cdb.bin_watcher_lists() as *const [Vec<Watch>];
         let watcher = cdb.watcher_lists_mut() as *mut [Vec<Watch>];
         unsafe {
             self.num_propagation += 1;
             while let Some(p) = self.trail.get(self.q_head) {
                 self.q_head += 1;
                 let false_lit = !*p;
+                // we have to drop `p` here to use self as a mutable reference again later.
+                let bin_source = (*bin_watcher).get_unchecked(usize::from(*p));
                 let source = (*watcher).get_unchecked_mut(usize::from(*p));
+                // binary loop
+                for w in bin_source.iter() {
+                    assert!(!cdb[w.c].is(Flag::DEAD));
+                    assert!(!self.var[w.blocker.vi()].is(Flag::ELIMINATED));
+                    assert_ne!(w.blocker, false_lit);
+                    #[cfg(feature = "boundary_check")]
+                    assert_eq!(cdb[w.c].lits.len(), 2);
+                    match lit_assign!(self, w.blocker) {
+                        Some(true) => (),
+                        Some(false) => {
+                            self.conflicts.1 = self.conflicts.0;
+                            self.conflicts.0 = false_lit.vi();
+                            self.num_conflict += 1;
+                            return w.c;
+                        }
+                        None => {
+                            self.assign_by_implication(
+                                w.blocker,
+                                AssignReason::Implication(w.c, false_lit),
+                                self.level[false_lit.vi()],
+                            );
+                        }
+                    }
+                }
+                // normal clause loop
                 let mut n = 0;
                 'next_clause: while n < source.len() {
                     let w = source.get_unchecked_mut(n);
                     n += 1;
                     let blocker_value = lit_assign!(self, w.blocker);
                     if blocker_value == Some(true) {
-                        continue 'next_clause;
-                    }
-                    if w.binary {
-                        if blocker_value == Some(false) {
-                            self.conflicts.1 = self.conflicts.0;
-                            self.conflicts.0 = false_lit.vi();
-                            self.num_conflict += 1;
-                            return w.c;
-                        }
-                        self.assign_by_implication(
-                            w.blocker,
-                            AssignReason::Implication(w.c, false_lit),
-                            self.level[false_lit.vi()],
-                        );
                         continue 'next_clause;
                     }
                     // debug_assert!(!cdb[w.c].is(Flag::DEAD));
@@ -249,7 +263,7 @@ impl PropagateIF for AssignStack {
                         if lit_assign!(self, *lk) != Some(false) {
                             (*watcher)
                                 .get_unchecked_mut(usize::from(!*lk))
-                                .register(first, w.c, false);
+                                .register(first, w.c);
                             n -= 1;
                             source.detach(n);
                             lits.swap(1, k);
