@@ -166,9 +166,9 @@ impl ClauseManipulateIF for AssignStack {
     }
     fn locked(&self, c: &Clause, cid: ClauseId) -> bool {
         let lits = &c.lits;
-        debug_assert!(1 < lits.len());
+        debug_assert!(2 < lits.len());
         let l0 = lits[0];
         self.assigned(l0) == Some(true)
-            && matches!(self.reason(l0.vi()), AssignReason::Implication(x, _) if x == cid)
+            && matches!(self.reason(l0.vi()), AssignReason::Implication(x) if x == cid)
     }
 }

@@ -92,8 +92,10 @@ pub trait AssignIF:
 pub enum AssignReason {
     /// One of not assigned, assigned by decision, or solved.
     None,
+    /// Assigned by a binary clause
+    Propagation(Lit),
     /// Assigned by a clause. If it is binary, the reason literal is stored in the 2nd.
-    Implication(ClauseId, Lit),
+    Implication(ClauseId),
 }
 
 /// Object representing a variable.

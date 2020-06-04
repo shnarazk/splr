@@ -32,8 +32,8 @@ impl fmt::Display for AssignReason {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             AssignReason::None => write!(f, "reason:none"),
-            AssignReason::Implication(c, NULL_LIT) => write!(f, "reason:{}", c),
-            AssignReason::Implication(c, _) => write!(f, "reason:biclause{}", c),
+            AssignReason::Propagation(l) => write!(f, "propagatedBy {}", l),
+            AssignReason::Implication(c) => write!(f, "reason:{}", c),
         }
     }
 }

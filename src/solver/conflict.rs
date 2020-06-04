@@ -183,17 +183,27 @@ pub fn handle_conflict(
                 if !state.stabilize {
                     continue;
                 }
-                if let AssignReason::Implication(r, _) = asg.reason(lit.vi()) {
-                    for l in &cdb[r].lits {
+                //
+                //## Reason-Side Rewarding
+                //
+                match asg.reason(lit.vi()) {
+                    AssignReason::Implication(r) => {
+                        for l in &cdb[r].lits {
+                            let vi = l.vi();
+                            if !bumped.contains(&vi) {
+                                asg.reward_at_analysis(vi);
+                                bumped.push(vi);
+                            }
+                        }
+                    }
+                    AssignReason::Propagation(l) => {
                         let vi = l.vi();
                         if !bumped.contains(&vi) {
-                            //
-                            //## Reason-Side Rewarding
-                            //
                             asg.reward_at_analysis(vi);
                             bumped.push(vi);
                         }
                     }
+                    _ => (),
                 }
             }
         }
@@ -204,14 +214,11 @@ pub fn handle_conflict(
         state.b_lvl.update(bl as f64);
         asg.assign_by_implication(
             l0,
-            AssignReason::Implication(
-                cid,
-                if learnt_len == 2 {
-                    new_learnt[1]
-                } else {
-                    NULL_LIT
-                },
-            ),
+            if learnt_len == 2 {
+                AssignReason::Propagation(new_learnt[1])
+            } else {
+                AssignReason::Implication(cid)
+            },
             al,
         );
         let lbd = cdb[cid].rank;
@@ -256,12 +263,12 @@ fn conflict_analyze(
     let mut path_cnt = 0;
     loop {
         let reason = if p == NULL_LIT {
-            AssignReason::Implication(conflicting_clause, NULL_LIT)
+            AssignReason::Implication(conflicting_clause)
         } else {
             asg.reason(p.vi())
         };
         match reason {
-            AssignReason::Implication(_, l) if l != NULL_LIT => {
+            AssignReason::Propagation(l) => {
                 // cid = asg.reason(p.vi());
                 let vi = l.vi();
                 if !asg.var(vi).is(Flag::CA_SEEN) {
@@ -291,7 +298,7 @@ fn conflict_analyze(
                     }
                 }
             }
-            AssignReason::Implication(cid, _) => {
+            AssignReason::Implication(cid) => {
                 #[cfg(feature = "trace_analysis")]
                 println!("analyze {}", p);
                 debug_assert_ne!(cid, ClauseId::default());
@@ -478,7 +485,7 @@ impl Lit {
         while let Some(sl) = stack.pop() {
             match asg.reason(sl.vi()) {
                 AssignReason::None => panic!("no idea"),
-                AssignReason::Implication(_, l) if l != NULL_LIT => {
+                AssignReason::Propagation(l) => {
                     let vi = l.vi();
                     let lv = asg.level(vi);
                     if 0 < lv && !asg.var(vi).is(Flag::CA_SEEN) {
@@ -496,7 +503,7 @@ impl Lit {
                         }
                     }
                 }
-                AssignReason::Implication(cid, _) => {
+                AssignReason::Implication(cid) => {
                     let c = &cdb[cid];
                     #[cfg(feature = "boundary_check")]
                     assert!(0 < c.len());

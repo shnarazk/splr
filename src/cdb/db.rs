@@ -787,7 +787,11 @@ impl ClauseDB {
         let mut perm = Vec::with_capacity(clause.len());
         for (i, c) in clause.iter_mut().enumerate().skip(1) {
             let used = c.is(Flag::JUST_USED);
-            if c.is(Flag::LEARNT) && !c.is(Flag::DEAD) && !asg.locked(c, ClauseId::from(i)) && !used
+            if c.is(Flag::LEARNT)
+                && !c.is(Flag::DEAD)
+                && 2 < c.lits.len()
+                && !asg.locked(c, ClauseId::from(i))
+                && !used
             {
                 perm.push(i);
             }
