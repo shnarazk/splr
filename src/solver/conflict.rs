@@ -198,22 +198,16 @@ pub fn handle_conflict(
             }
         }
         asg.cancel_until(bl);
+        let reason = if learnt_len == 2 {
+            new_learnt[1]
+        } else {
+            NULL_LIT
+        };
         let cid = cdb.new_clause(asg, new_learnt, true, true);
         elim.add_cid_occur(asg, cid, &mut cdb[cid], true);
         state.c_lvl.update(cl as f64);
         state.b_lvl.update(bl as f64);
-        asg.assign_by_implication(
-            l0,
-            AssignReason::Implication(
-                cid,
-                if learnt_len == 2 {
-                    new_learnt[1]
-                } else {
-                    NULL_LIT
-                },
-            ),
-            al,
-        );
+        asg.assign_by_implication(l0, AssignReason::Implication(cid, reason), al);
         let lbd = cdb[cid].rank;
         rst.update(RestarterModule::LBD, lbd);
         if 1 < learnt_len && learnt_len <= state.config.elim_cls_lim / 2 {

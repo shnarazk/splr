@@ -54,7 +54,7 @@ pub trait ClauseDBIF:
     fn new_clause<A>(
         &mut self,
         asg: &mut A,
-        v: &mut [Lit],
+        v: &mut Vec<Lit>,
         learnt: bool,
         level_sort: bool,
     ) -> ClauseId
@@ -439,7 +439,7 @@ impl ClauseDBIF for ClauseDB {
     fn new_clause<A>(
         &mut self,
         asg: &mut A,
-        vec: &mut [Lit],
+        vec: &mut Vec<Lit>,
         mut learnt: bool,
         level_sort: bool,
     ) -> ClauseId
@@ -500,23 +500,20 @@ impl ClauseDBIF for ClauseDB {
             // }
             debug_assert!(c.is(Flag::DEAD));
             c.flags = Flag::empty();
-            c.lits.clear();
-            for l in vec {
-                c.lits.push(*l);
-            }
+            debug_assert!(c.lits.is_empty()); // c.lits.clear();
+            std::mem::swap(&mut c.lits, vec);
             c.rank = rank;
             c.reward = reward;
             c.search_from = 2;
         } else {
-            let lits = Vec::from(vec);
             cid = ClauseId::from(self.clause.len());
-            let c = Clause {
+            let mut c = Clause {
                 flags: Flag::empty(),
-                lits,
                 rank,
                 reward,
                 ..Clause::default()
             };
+            std::mem::swap(&mut c.lits, vec);
             self.clause.push(c);
         };
         let c = &mut self[cid];
