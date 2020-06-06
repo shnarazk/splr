@@ -30,9 +30,11 @@ impl VarRewardIF for AssignStack {
         v.participated += 1;
     }
     fn reward_at_assign(&mut self, vi: VarId) {
-        let t = self.ordinal;
+        self.reward_at_analysis(vi)
+    }
+    fn reward_at_conflict(&mut self, vi: VarId) {
         let v = &mut self.var[vi];
-        v.timestamp = t;
+        v.participated += 1;
     }
     fn reward_at_unassign(&mut self, vi: VarId) {
         let v = &mut self.var[vi];

@@ -13,6 +13,18 @@ use {
     },
 };
 
+/*
+macro_rules! lit_iter {
+    ($ar: expr, $cdb: expr) => {
+        match $ar {
+            AssignReason::Conflicting(p, q) => [p, q].iter(),
+            AssignReason::Implication(ci) => $cdb[ci].lits.iter(),
+            _ => [].iter(),
+        }
+    }
+}
+ */
+
 #[allow(clippy::cognitive_complexity)]
 pub fn handle_conflict(
     asg: &mut AssignStack,
@@ -20,7 +32,7 @@ pub fn handle_conflict(
     elim: &mut Eliminator,
     rst: &mut Restarter,
     state: &mut State,
-    ci: ClauseId,
+    cr: AssignReason,
 ) -> MaybeInconsistent {
     let original_dl = asg.decision_level();
     // we need a catch here for handling the possibility of level zero conflict
@@ -28,8 +40,21 @@ pub fn handle_conflict(
     // level in chronoBT. This leads to UNSAT solution. No need to update misc stats.
     {
         let level = asg.level_ref();
-        if cdb[ci].iter().all(|l| level[l.vi()] == 0) {
-            return Err(SolverError::NullLearnt);
+        // if lit_iter!(cr, cdb).all(|l| level[l.vi()] == asg.root_level) {
+        //     return Err(SolverError::NullLearnt);
+        // }
+        match cr {
+            AssignReason::Implication(ci) => {
+                if cdb[ci].iter().all(|l| level[l.vi()] == asg.root_level) {
+                    return Err(SolverError::NullLearnt);
+                }
+            }
+            AssignReason::Conflicting(p, q) => {
+                if level[p.vi()] == asg.root_level && level[q.vi()] == asg.root_level {
+                    return Err(SolverError::NullLearnt);
+                }
+            }
+            _ => panic!("impossible path"),
         }
     }
 
@@ -54,33 +79,57 @@ pub fn handle_conflict(
     let mut use_chronobt = switch_chronobt.unwrap_or(0 < state.config.cbt_thr);
     if use_chronobt {
         let level = asg.level_ref();
-        let c = &cdb[ci];
-        let lit_count = c.iter().filter(|l| level[l.vi()] == original_dl).count();
-        if 1 == lit_count {
-            debug_assert!(c.iter().any(|l| level[l.vi()] == original_dl));
-            let decision = *c.iter().find(|l| level[l.vi()] == original_dl).unwrap();
-            let snd_l = c
-                .iter()
-                .map(|l| level[l.vi()])
-                .filter(|l| *l != original_dl)
-                .max()
-                .unwrap_or(0);
-            if 0 < snd_l {
-                // If the conflicting clause contains one literal from the maximal
-                // decision level, we let BCP propagating that literal at the second
-                // highest decision level in conflicting cls.
-                // PREMISE: 0 < snd_l
-                asg.cancel_until(snd_l - 1);
-                debug_assert!(
-                    asg.stack_iter().all(|l| l.vi() != decision.vi()),
-                    format!(
-                        "assign stack contains a strange lit: level {}, stack level {}",
-                        original_dl, snd_l
-                    )
-                );
-                asg.assign_by_decision(decision);
-                return Ok(());
+        match cr {
+            AssignReason::Implication(ci) => {
+                let c = &cdb[ci];
+                let lit_count = c.iter().filter(|l| level[l.vi()] == original_dl).count();
+                if 1 == lit_count {
+                    debug_assert!(c.iter().any(|l| level[l.vi()] == original_dl));
+                    let decision = *c.iter().find(|l| level[l.vi()] == original_dl).unwrap();
+                    let snd_l = c
+                        .iter()
+                        .map(|l| level[l.vi()])
+                        .filter(|l| *l != original_dl)
+                        .max()
+                        .unwrap_or(0);
+                    if 0 < snd_l {
+                        // If the conflicting clause contains one literal from the maximal
+                        // decision level, we let BCP propagating that literal at the second
+                        // highest decision level in conflicting cls.
+                        // PREMISE: 0 < snd_l
+                        asg.cancel_until(snd_l - 1);
+                        debug_assert!(
+                            asg.stack_iter().all(|l| l.vi() != decision.vi()),
+                            format!(
+                                "assign stack contains a strange lit: level {}, stack level {}",
+                                original_dl, snd_l
+                            )
+                        );
+                        asg.assign_by_decision(decision);
+                        return Ok(());
+                    }
+                }
             }
+            AssignReason::Conflicting(p, q) => {
+                let c = &[p, q];
+                let lit_count = c.iter().filter(|l| level[l.vi()] == original_dl).count();
+                if 1 == lit_count {
+                    debug_assert!(c.iter().any(|l| level[l.vi()] == original_dl));
+                    let decision = *c.iter().find(|l| level[l.vi()] == original_dl).unwrap();
+                    let snd_l = c
+                        .iter()
+                        .map(|l| level[l.vi()])
+                        .filter(|l| *l != original_dl)
+                        .max()
+                        .unwrap_or(0);
+                    if 0 < snd_l {
+                        asg.cancel_until(snd_l - 1);
+                        asg.assign_by_decision(decision);
+                        return Ok(());
+                    }
+                }
+            }
+            _ => panic!("impossible"),
         }
     }
     // conflicting level
@@ -88,9 +137,15 @@ pub fn handle_conflict(
     // even if `use_chronobt` is off, because `use_chronobt` is a flag for future behavior.
     let cl = {
         let cl = asg.decision_level();
-        let c = &cdb[ci];
         let level = asg.level_ref();
-        let lv = c.iter().map(|l| level[l.vi()]).max().unwrap_or(0);
+        let lv = match cr {
+            AssignReason::Implication(ci) => {
+                let c = &cdb[ci];
+                c.iter().map(|l| level[l.vi()]).max().unwrap_or(0)
+            }
+            AssignReason::Conflicting(p, q) => level[p.vi()].max(level[q.vi()]),
+            _ => panic!("impossible"),
+        };
         if lv < cl {
             asg.cancel_until(lv);
             lv
@@ -98,20 +153,22 @@ pub fn handle_conflict(
             cl
         }
     };
-    debug_assert!(
-        cdb[ci].iter().any(|l| asg.level(l.vi()) == cl),
-        format!(
-            "use_{}: {:?}, {:?}",
-            use_chronobt,
-            cl,
-            cdb[ci]
-                .iter()
-                .map(|l| (i32::from(*l), asg.level(l.vi())))
-                .collect::<Vec<_>>(),
-        )
-    );
+    if let AssignReason::Implication(ci) = cr {
+        debug_assert!(
+            cdb[ci].iter().any(|l| asg.level(l.vi()) == cl),
+            format!(
+                "use_{}: {:?}, {:?}",
+                use_chronobt,
+                cl,
+                cdb[ci]
+                    .iter()
+                    .map(|l| (i32::from(*l), asg.level(l.vi())))
+                    .collect::<Vec<_>>(),
+            )
+        );
+    }
     // backtrack level by analyze
-    let bl_a = conflict_analyze(asg, cdb, state, ci).max(asg.root_level);
+    let bl_a = conflict_analyze(asg, cdb, state, cr).max(asg.root_level);
     if state.new_learnt.is_empty() {
         #[cfg(debug)]
         {
@@ -252,7 +309,8 @@ fn conflict_analyze(
     asg: &mut AssignStack,
     cdb: &mut ClauseDB,
     state: &mut State,
-    conflicting_clause: ClauseId,
+    // conflicting_clause: ClauseId,
+    conflicting_reason: AssignReason,
 ) -> DecisionLevel {
     let learnt = &mut state.new_learnt;
     learnt.clear();
@@ -261,19 +319,54 @@ fn conflict_analyze(
     let mut p = NULL_LIT;
     let mut ti = asg.stack_len() - 1; // trail index
     let mut path_cnt = 0;
+    let mut reason = conflicting_reason;
     loop {
-        let reason = if p == NULL_LIT {
-            AssignReason::Implication(conflicting_clause)
-        } else {
-            asg.reason(p.vi())
-        };
         match reason {
+            AssignReason::Conflicting(p, q) => {
+                for l in &[p, q] {
+                    let vi = l.vi();
+                    if !asg.var(vi).is(Flag::CA_SEEN) {
+                        let lvl = asg.level(vi);
+                        if asg.root_level == lvl {
+                            continue;
+                        }
+                        debug_assert!(!asg.var(vi).is(Flag::ELIMINATED));
+                        debug_assert!(asg.assign(vi).is_some());
+                        asg.var_mut(vi).turn_on(Flag::CA_SEEN);
+                        if dl <= lvl {
+                            path_cnt += 1;
+                            asg.reward_at_analysis(vi);
+                        } else {
+                            #[cfg(feature = "trace_analysis")]
+                            println!("-(bi) push {} to learnt, which level is {}", l, lvl);
+                            learnt.push(*l);
+                            // panic!("literals in a binary clause should have the same level. {}, {}, {}",
+                            //        dl,
+                            //        asg.level(p.vi()),
+                            //        asg.level(q.vi()),
+                            // );
+                        }
+                    } else {
+                        #[cfg(feature = "trace_analysis")]
+                        {
+                            if !asg.var(vi).is(Flag::CA_SEEN) {
+                                println!("-(bi) ignore {} because it was flagged", l);
+                            } else {
+                                println!(
+                                    "-(bi) ignore {} because its level is {}",
+                                    l,
+                                    asg.level(vi)
+                                );
+                            }
+                        }
+                    }
+                }
+            }
             AssignReason::Propagation(l) => {
-                // cid = asg.reason(p.vi());
                 let vi = l.vi();
                 if !asg.var(vi).is(Flag::CA_SEEN) {
                     let lvl = asg.level(vi);
-                    if 0 == lvl {
+                    if asg.root_level == lvl {
                         continue;
                     }
                     debug_assert!(!asg.var(vi).is(Flag::ELIMINATED));
@@ -284,16 +377,17 @@ fn conflict_analyze(
                         asg.reward_at_analysis(vi);
                     } else {
                         #[cfg(feature = "trace_analysis")]
-                        println!("- push {} to learnt, which level is {}", l, lvl);
+                        println!("-(bi) push {} to learnt, which level is {}", l, lvl);
                         // learnt.push(l);
+                        panic!("literals in a binary clause should have the same level.");
                     }
                 } else {
                     #[cfg(feature = "trace_analysis")]
                     {
                         if !asg.var(vi).is(Flag::CA_SEEN) {
-                            println!("- ignore {} because it was flagged", l);
+                            println!("-(bi) ignore {} because it was flagged", l);
                         } else {
-                            println!("- ignore {} because its level is {}", l, asg.level(vi));
+                            println!("-(bi) ignore {} because its level is {}", l, asg.level(vi));
                         }
                     }
                 }
@@ -398,7 +492,11 @@ fn conflict_analyze(
                     path_cnt,
                     dl,
                     asg.dump(&*learnt),
-                    asg.dump(&cdb[conflicting_clause].lits),
+                    match conflicting_reason {
+                        AssignReason::Implication(ci) => asg.dump(&cdb[ci].lits),
+                        AssignReason::Propagation(l) => asg.dump(&[l]),
+                        _ => panic!("impossible"),
+                    },
                 ),
             );
             ti -= 1;
@@ -415,12 +513,17 @@ fn conflict_analyze(
         }
         debug_assert!(0 < ti);
         ti -= 1;
+        reason = asg.reason(p.vi());
     }
     debug_assert!(learnt.iter().all(|l| *l != !p));
     debug_assert_eq!(asg.level(p.vi()), dl);
     learnt[0] = !p;
     #[cfg(feature = "trace_analysis")]
-    println!("- appending {}, the result is {:?}", learnt[0], learnt);
+    println!(
+        "- appending {}, the result is {:?}",
+        learnt[0],
+        i32s(learnt)
+    );
     state.minimize_learnt(asg, cdb)
 }
 
@@ -526,6 +629,7 @@ impl Lit {
                         }
                     }
                 }
+                AssignReason::Conflicting(_, _) => panic!("impossible"),
             }
         }
         true

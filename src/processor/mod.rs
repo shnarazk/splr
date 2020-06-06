@@ -464,6 +464,7 @@ impl EliminateIF for Eliminator {
             self.num_full_elimination += 1;
             self.stop(asg, cdb);
         }
+        cdb.remove_dead_bin_watchers(asg);
         cdb.check_size().map(|_| ())
     }
     fn add_cid_occur<A>(&mut self, asg: &mut A, cid: ClauseId, c: &mut Clause, enqueue: bool)
@@ -705,8 +706,9 @@ impl Eliminator {
             }
             self.backward_subsumption_check(asg, cdb, &timedout)?;
             debug_assert!(self.clause_queue.is_empty());
+            cdb.remove_dead_bin_watchers(asg);
             cdb.garbage_collect();
-            if asg.propagate(cdb) != ClauseId::default() {
+            if asg.propagate(cdb) != AssignReason::None {
                 return Err(SolverError::Inconsistent);
             }
             cdb.eliminate_satisfied_clauses(asg, self, true);

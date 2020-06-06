@@ -35,6 +35,7 @@ no_IO = []
 temp_order = []
 trace_analysis = []
 trace_elimination = []
+trace_propagation = []
 
 [profile.release]
 lto = "fat"

@@ -33,7 +33,7 @@ pub trait PropagateIF {
     /// execute *backjump*.
     fn cancel_until(&mut self, lv: DecisionLevel);
     /// execute *boolean constraint propagation* or *unit propagation*.
-    fn propagate<C>(&mut self, cdb: &mut C) -> ClauseId
+    fn propagate<C>(&mut self, cdb: &mut C) -> AssignReason
     where
         C: ClauseDBIF;
 }
@@ -188,11 +188,11 @@ impl PropagateIF for AssignStack {
     ///    So Eliminator should call `garbage_collect` before me.
     ///  - The order of literals in binary clauses will be modified to hold
     ///    propagation order.
-    fn propagate<C>(&mut self, cdb: &mut C) -> ClauseId
+    fn propagate<C>(&mut self, cdb: &mut C) -> AssignReason
     where
         C: ClauseDBIF,
     {
-        let bin_watcher = cdb.bin_watcher_lists() as *const [Vec<Watch>];
+        let bin_watcher = cdb.bin_watcher_lists() as *const [Vec<Lit>];
         let watcher = cdb.watcher_lists_mut() as *mut [Vec<Watch>];
         unsafe {
             self.num_propagation += 1;
@@ -203,23 +203,24 @@ impl PropagateIF for AssignStack {
                 let bin_source = (*bin_watcher).get_unchecked(usize::from(*p));
                 let source = (*watcher).get_unchecked_mut(usize::from(*p));
                 // binary loop
-                for w in bin_source.iter() {
-                    assert!(!cdb[w.c].is(Flag::DEAD));
-                    assert!(!self.var[w.blocker.vi()].is(Flag::ELIMINATED));
-                    assert_ne!(w.blocker, false_lit);
-                    #[cfg(feature = "boundary_check")]
-                    assert_eq!(cdb[w.c].lits.len(), 2);
-                    match lit_assign!(self, w.blocker) {
+                for lit in bin_source.iter() {
+                    assert!(!self.var[lit.vi()].is(Flag::ELIMINATED));
+                    assert_ne!(*lit, false_lit);
+                    match lit_assign!(self, *lit) {
                         Some(true) => (),
                         Some(false) => {
                             self.conflicts.1 = self.conflicts.0;
                             self.conflicts.0 = false_lit.vi();
                             self.num_conflict += 1;
-                            return w.c;
+                            return AssignReason::Conflicting(false_lit, *lit);
                         }
                         None => {
+                            #[cfg(feature = "trace_propagation")]
+                            {
+                                println!("{} by Propagation({})", *lit, false_lit);
+                            }
                             self.assign_by_implication(
-                                w.blocker,
+                                *lit,
                                 AssignReason::Propagation(false_lit),
                                 self.level[false_lit.vi()],
                             );
@@ -279,7 +280,7 @@ impl PropagateIF for AssignStack {
                         self.conflicts.1 = self.conflicts.0;
                         self.conflicts.0 = false_lit.vi();
                         self.num_conflict += 1;
-                        return w.c;
+                        return AssignReason::Implication(w.c);
                     }
                     let lv = lits[1..]
                         .iter()
@@ -295,7 +296,7 @@ impl PropagateIF for AssignStack {
             self.best_assign = true;
             self.num_best_assign = na;
         }
-        ClauseId::default()
+        AssignReason::None
     }
 }
 

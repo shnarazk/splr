@@ -82,11 +82,19 @@ impl SolveIF for Solver {
                         if m == 0 {
                             let l = Lit::from_assign(vi, true);
                             if asg.assign_at_rootlevel(l).is_err() {
+                                #[cfg(feature = "boundary_check")]
+                                {
+                                    println!("root level double bind");
+                                }
                                 return Ok(Certificate::UNSAT);
                             }
                         } else if p == 0 {
                             let l = Lit::from_assign(vi, false);
                             if asg.assign_at_rootlevel(l).is_err() {
+                                #[cfg(feature = "boundary_check")]
+                                {
+                                    println!("root level double bind");
+                                }
                                 return Ok(Certificate::UNSAT);
                             }
                         }
@@ -108,6 +116,10 @@ impl SolveIF for Solver {
                     state.progress(asg, cdb, elim, rst, None);
                     if cdb.check_size().is_err() {
                         return Err(SolverError::OutOfMemory);
+                    }
+                    #[cfg(feature = "boundary_check")]
+                    {
+                        println!("root level double bind at initialization step");
                     }
                     return Ok(Certificate::UNSAT);
                 }
@@ -177,6 +189,14 @@ impl SolveIF for Solver {
             }
             Ok(false) | Err(SolverError::NullLearnt) => {
                 asg.cancel_until(asg.root_level);
+                #[cfg(feature = "boundary_check")]
+                {
+                    if let Ok(false) = answer {
+                        println!("search returns Ok(false)");
+                    } else {
+                        println!("NULL Learnt");
+                    }
+                }
                 Ok(Certificate::UNSAT)
             }
             Err(e) => {
@@ -201,8 +221,8 @@ fn search(
     rst.update(RestarterModule::Luby, 0);
     loop {
         asg.reward_update();
-        let ci = asg.propagate(cdb);
-        if ci == ClauseId::default() {
+        let cr = asg.propagate(cdb);
+        if cr == AssignReason::None {
             if asg.num_vars <= asg.stack_len() + asg.num_eliminated_vars {
                 return Ok(true);
             }
@@ -218,10 +238,12 @@ fn search(
             }
         } else {
             if asg.decision_level() == asg.root_level {
-                analyze_final(asg, state, &cdb[ci]);
+                if let AssignReason::Implication(ci) = cr {
+                    analyze_final(asg, state, &cdb[ci]);
+                }
                 return Ok(false);
             }
-            handle_conflict(asg, cdb, elim, rst, state, ci)?;
+            handle_conflict(asg, cdb, elim, rst, state, cr)?;
             if a_decision_was_made {
                 a_decision_was_made = false;
             } else {

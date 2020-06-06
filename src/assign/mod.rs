@@ -36,6 +36,8 @@ pub trait VarRewardIF {
     fn reward_at_analysis(&mut self, vi: VarId);
     /// modify var's activity at value assignment in `uncheck_{assume, enqueue, fix}`.
     fn reward_at_assign(&mut self, vi: VarId);
+    /// modify conflicting var's activity
+    fn reward_at_conflict(&mut self, vi: VarId);
     /// modify var's activity at value unassigment in `cancel_until`.
     fn reward_at_unassign(&mut self, vi: VarId);
     /// update internal counter.
@@ -92,6 +94,8 @@ pub trait AssignIF:
 pub enum AssignReason {
     /// One of not assigned, assigned by decision, or solved.
     None,
+    /// Conflicting pair used only for biclause conflicts
+    Conflicting(Lit, Lit),
     /// Assigned by a binary clause
     Propagation(Lit),
     /// Assigned by a clause. If it is binary, the reason literal is stored in the 2nd.

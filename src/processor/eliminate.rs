@@ -80,7 +80,7 @@ where
         //## VAR ELIMINATION
         //
         for cid in &*pos {
-            debug_assert!(!asg.locked(&cdb[*cid], *cid));
+            debug_assert!(cdb[*cid].lits.len() == 2 || !asg.locked(&cdb[*cid], *cid));
             #[cfg(feature = "incremental_solver")]
             {
                 if !cdb[*cid].is(Flag::LEARNT) {
@@ -91,7 +91,7 @@ where
             elim.remove_cid_occur(asg, *cid, &mut cdb[*cid]);
         }
         for cid in &*neg {
-            debug_assert!(!asg.locked(&cdb[*cid], *cid));
+            debug_assert!(cdb[*cid].lits.len() == 2 || !asg.locked(&cdb[*cid], *cid));
             #[cfg(feature = "incremental_solver")]
             {
                 if !cdb[*cid].is(Flag::LEARNT) {

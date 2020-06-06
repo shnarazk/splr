@@ -32,6 +32,7 @@ impl fmt::Display for AssignReason {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             AssignReason::None => write!(f, "reason:none"),
+            AssignReason::Conflicting(p, q) => write!(f, "conflict ({}, {})", p, q),
             AssignReason::Propagation(l) => write!(f, "propagatedBy {}", l),
             AssignReason::Implication(c) => write!(f, "reason:{}", c),
         }

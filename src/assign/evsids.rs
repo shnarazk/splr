@@ -35,6 +35,9 @@ impl VarRewardIF for AssignStack {
         }
     }
     fn reward_at_assign(&mut self, _: VarId) {}
+    fn reward_at_assign(&mut self, vi: VarId) {
+        self.reward_at_analysis(vi)
+    }
     fn reward_at_unassign(&mut self, _: VarId) {}
     fn reward_update(&mut self) {
         self.ordinal += 1;
