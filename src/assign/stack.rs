@@ -116,7 +116,7 @@ impl Instantiate for AssignStack {
                 self.var.push(Var::from(self.num_vars));
             }
             SolverEvent::Reinitialize => {
-                assert_eq!(self.decision_level(), self.root_level);
+                debug_assert_eq!(self.decision_level(), self.root_level);
                 self.q_head = 0;
                 self.num_eliminated_vars =
                     self.var.iter().filter(|v| v.is(Flag::ELIMINATED)).count();
@@ -271,7 +271,7 @@ impl AssignIF for AssignStack {
                             for l in &lits[..i] {
                                 phantom_clause.push(*l);
                             }
-                            assert!(1 < phantom_clause.len());
+                            debug_assert!(1 < phantom_clause.len());
                             #[cfg(feature = "trace_elimination")]
                             println!(
                                 "- pull back clause E {:?}",
@@ -286,7 +286,7 @@ impl AssignIF for AssignStack {
                         for l in &lits[i - width + 1..i] {
                             phantom_clause.push(*l);
                         }
-                        assert!(1 < phantom_clause.len());
+                        debug_assert!(1 < phantom_clause.len());
                         #[cfg(feature = "trace_elimination")]
                         println!(
                             "- pull back clause C {:?}",

@@ -204,9 +204,9 @@ impl PropagateIF for AssignStack {
                 let source = (*watcher).get_unchecked_mut(usize::from(*p));
                 // binary loop
                 for w in bin_source.iter() {
-                    assert!(!cdb[w.c].is(Flag::DEAD));
-                    assert!(!self.var[w.blocker.vi()].is(Flag::ELIMINATED));
-                    assert_ne!(w.blocker, false_lit);
+                    debug_assert!(!cdb[w.c].is(Flag::DEAD));
+                    debug_assert!(!self.var[w.blocker.vi()].is(Flag::ELIMINATED));
+                    debug_assert_ne!(w.blocker, false_lit);
                     #[cfg(feature = "boundary_check")]
                     assert_eq!(cdb[w.c].lits.len(), 2);
                     match lit_assign!(self, w.blocker) {
