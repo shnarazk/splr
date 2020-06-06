@@ -1,17 +1,14 @@
 /// main struct AssignStack
 use {
     super::{AssignIF, AssignStack, Var, VarIdHeap, VarManipulateIF, VarOrderIF, VarSelectIF},
-    crate::{solver::SolverEvent, types::*},
+    crate::{cdb::ClauseDBIF, solver::SolverEvent, types::*},
     std::{fmt, ops::Range, slice::Iter},
 };
 
 #[cfg(not(feature = "no_IO"))]
-use {
-    crate::cdb::ClauseDBIF,
-    std::{
-        fs::File,
-        io::{BufWriter, Write},
-    },
+use std::{
+    fs::File,
+    io::{BufWriter, Write},
 };
 
 /// API for var manipulation
