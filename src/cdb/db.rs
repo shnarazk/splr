@@ -454,19 +454,20 @@ impl ClauseDBIF for ClauseDB {
             }
             #[cfg(feature = "boundary_check")]
             debug_assert!(1 < vec.len());
-            let mut i_max = 1;
-            let mut lv_max = 0;
-            // seek a literal with max level
-            let level = asg.level_ref();
-            for (i, l) in vec.iter().enumerate() {
-                let vi = l.vi();
-                let lv = level[vi];
-                if asg.assign(vi).is_some() && lv_max < lv {
-                    i_max = i;
-                    lv_max = lv;
-                }
-            }
-            vec.swap(1, i_max);
+            // sort literals
+            // let mut i_max = 1;
+            // let mut lv_max = 0;
+            // // seek a literal with max level
+            // let level = asg.level_ref();
+            // for (i, l) in vec.iter().enumerate() {
+            //     let vi = l.vi();
+            //     let lv = level[vi];
+            //     if asg.assign(vi).is_some() && lv_max < lv {
+            //         i_max = i;
+            //         lv_max = lv;
+            //     }
+            // }
+            // vec.swap(1, i_max);
             if vec.len() <= 2 {
                 learnt = false;
                 0
