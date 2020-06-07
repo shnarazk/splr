@@ -245,15 +245,30 @@ fn conflict_analyze(
     learnt.clear();
     learnt.push(NULL_LIT);
     let dl = asg.decision_level();
-    let mut p = NULL_LIT;
-    let mut ti = asg.stack_len() - 1; // trail index
+    let mut p = cdb[conflicting_clause].lits[0];
+    #[cfg(feature = "trace_analysis")]
+    println!("- analyze conflicting literal {}", p);
     let mut path_cnt = 0;
-    loop {
-        let reason = if p == NULL_LIT {
-            AssignReason::Implication(conflicting_clause, NULL_LIT)
+    let vi = p.vi();
+    if !asg.var(vi).is(Flag::CA_SEEN) && 0 < asg.level(vi) {
+        let lvl = asg.level(vi);
+        debug_assert!(!asg.var(vi).is(Flag::ELIMINATED));
+        asg.var_mut(vi).turn_on(Flag::CA_SEEN);
+        if dl <= lvl {
+            path_cnt = 1;
+            //
+            //## Conflict-Side Rewarding
+            //
+            asg.reward_at_analysis(vi);
         } else {
-            asg.reason(p.vi())
-        };
+            #[cfg(feature = "trace_analysis")]
+            println!("- push {} to learnt, which level is {}", p, lvl);
+            learnt.push(p);
+        }
+    }
+    let mut reason = AssignReason::Implication(conflicting_clause, NULL_LIT);
+    let mut ti = asg.stack_len() - 1; // trail index
+    loop {
         match reason {
             AssignReason::Implication(_, l) if l != NULL_LIT => {
                 // cid = asg.reason(p.vi());
@@ -270,18 +285,8 @@ fn conflict_analyze(
                         path_cnt += 1;
                         asg.reward_at_analysis(vi);
                     } else {
-                        #[cfg(feature = "trace_analysis")]
-                        println!("- push {} to learnt, which level is {}", l, lvl);
-                        // learnt.push(l);
-                    }
-                } else {
-                    #[cfg(feature = "trace_analysis")]
-                    {
-                        if !asg.var(vi).is(Flag::CA_SEEN) {
-                            println!("- ignore {} because it was flagged", l);
-                        } else {
-                            println!("- ignore {} because its level is {}", l, asg.level(vi));
-                        }
+                        #[cfg(feature = "boundary_check")]
+                        panic!("strange level binary clause");
                     }
                 }
             }
@@ -310,7 +315,7 @@ fn conflict_analyze(
                 );
                 #[cfg(feature = "trace_analysis")]
                 println!("- handle {}", cid);
-                for q in &c[(p != NULL_LIT) as usize..] {
+                for q in &c[1..] {
                     let vi = q.vi();
                     if !asg.var(vi).is(Flag::CA_SEEN) {
                         // asg.reward_at_analysis(vi);
@@ -402,6 +407,7 @@ fn conflict_analyze(
         }
         debug_assert!(0 < ti);
         ti -= 1;
+        reason = asg.reason(p.vi());
     }
     debug_assert!(learnt.iter().all(|l| *l != !p));
     debug_assert_eq!(asg.level(p.vi()), dl);
