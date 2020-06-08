@@ -390,7 +390,7 @@ impl ClauseDBIF for ClauseDB {
                     }
                     if !certified.is_empty() {
                         let temp = c.lits.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
-                        certified.push((CertifiedRecord::ADD, temp));
+                        certified.push((CertifiedRecord::DELETE, temp));
                     }
                     c.lits.clear();
                 }
@@ -426,7 +426,7 @@ impl ClauseDBIF for ClauseDB {
                     }
                     if !certified.is_empty() {
                         let temp = c.lits.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
-                        certified.push((CertifiedRecord::ADD, temp));
+                        certified.push((CertifiedRecord::DELETE, temp));
                     }
                     c.lits.clear();
                 }
