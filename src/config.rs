@@ -1,43 +1,43 @@
-#[cfg(feature = "structopt")]
-use structopt::StructOpt;
+#[cfg(feature = "clap")]
+use clap::Clap;
 /// Crate `config` provides solver's configuration and CLI.
 use {crate::types::DecisionLevel, std::path::PathBuf};
 
 /// Configuration built from command line options
 #[derive(Clone, Debug)]
-#[cfg_attr(feature = "structopt", derive(StructOpt))]
-#[cfg_attr(feature = "structopt", structopt(name = "splr", about, author))]
+#[cfg_attr(feature = "clap", derive(Clap))]
+#[cfg_attr(feature = "clap", clap(name = "splr", about, author))]
 pub struct Config {
     //
     //## I/O configuration
     //
     /// Build Splr interface
-    #[cfg_attr(feature = "structopt", structopt(skip))]
+    #[cfg_attr(feature = "clap", clap(skip))]
     pub splr_interface: bool,
 
     /// CNF file in DIMACS format
-    #[cfg_attr(feature = "structopt", structopt(parse(from_os_str)))]
+    #[cfg_attr(feature = "clap", clap(parse(from_os_str)))]
     pub cnf_file: PathBuf,
 
     /// Interval for dumping stat data
-    #[cfg_attr(feature = "structopt", structopt(long = "stat", default_value = "0"))]
+    #[cfg_attr(feature = "clap", clap(long = "stat", default_value = "0"))]
     pub dump_int: usize,
 
     /// Disable coloring
-    #[cfg_attr(feature = "structopt", structopt(long = "no-color", short = "C"))]
+    #[cfg_attr(feature = "clap", clap(long = "no-color", short = "C"))]
     pub no_color: bool,
 
     /// Output directory
     #[cfg_attr(
-        feature = "structopt",
-        structopt(long = "dir", short = "o", default_value = ".", parse(from_os_str))
+        feature = "clap",
+        clap(long = "dir", short = "o", default_value = ".", parse(from_os_str))
     )]
     pub output_dir: PathBuf,
 
     /// Cert. file in DRAT format
     #[cfg_attr(
-        feature = "structopt",
-        structopt(
+        feature = "clap",
+        clap(
             long = "proof",
             default_value = "proof.out",
             short = "p",
@@ -47,152 +47,143 @@ pub struct Config {
     pub proof_file: PathBuf,
 
     /// Disable any progress message
-    #[cfg_attr(feature = "structopt", structopt(long = "quiet", short = "q"))]
+    #[cfg_attr(feature = "clap", clap(long = "quiet", short = "q"))]
     pub quiet_mode: bool,
 
     /// Result filename/stdout
-    #[cfg_attr(
-        feature = "structopt",
-        structopt(long = "result", short = "r", default_value = "", parse(from_os_str))
-    )]
-    pub result_file: PathBuf,
+    #[cfg_attr(feature = "clap", clap(long = "result", short = "r"))]
+    pub result_file: Option<PathBuf>,
 
     /// Uses Glucose-like progress report
-    #[cfg_attr(feature = "structopt", structopt(long = "log", short = "l"))]
+    #[cfg_attr(feature = "clap", clap(long = "log", short = "l"))]
     pub use_log: bool,
 
     //
     //## clause DB
     //
     /// Soft limit of #clauses (6MC/GB)
-    #[cfg_attr(feature = "structopt", structopt(long = "cl", default_value = "0"))]
+    #[cfg_attr(feature = "clap", clap(long = "cl", default_value = "0"))]
     pub clause_limit: usize,
 
     /// Clause reduction switch
-    #[cfg_attr(feature = "structopt", structopt(long = "RDC", default_value = "1"))]
+    #[cfg_attr(feature = "clap", clap(long = "RDC", default_value = "1"))]
     reduce: i32,
 
     //
     //## eliminator
     //
     /// Max #lit for clause subsume
-    #[cfg_attr(feature = "structopt", structopt(long = "ecl", default_value = "100"))]
+    #[cfg_attr(feature = "clap", clap(long = "ecl", default_value = "100"))]
     pub elim_cls_lim: usize,
 
     /// Max #cls for var elimination
-    #[cfg_attr(
-        feature = "structopt",
-        structopt(long = "evo", default_value = "10000")
-    )]
+    #[cfg_attr(feature = "clap", clap(long = "evo", default_value = "10000"))]
     pub elim_var_occ: usize,
 
     /// Grow limit of #cls in var elim.
-    #[cfg_attr(feature = "structopt", structopt(long = "evl", default_value = "0"))]
+    #[cfg_attr(feature = "clap", clap(long = "evl", default_value = "0"))]
     pub elim_grw_lim: usize,
 
     /// #cls to start simplification
-    #[cfg_attr(feature = "structopt", structopt(long = "et", default_value = "40000"))]
+    #[cfg_attr(feature = "clap", clap(long = "et", default_value = "40000"))]
     pub elim_trigger: usize,
 
     /// Pre/in-processor switch
-    #[cfg_attr(feature = "structopt", structopt(long = "PRO", default_value = "1"))]
+    #[cfg_attr(feature = "clap", clap(long = "PRO", default_value = "1"))]
     elim: i32,
 
     //
     //## restarter
     //
     /// #conflicts between restarts
-    #[cfg_attr(feature = "structopt", structopt(long = "rs", default_value = "50"))]
+    #[cfg_attr(feature = "clap", clap(long = "rs", default_value = "50"))]
     pub rst_step: usize,
 
     /// Bucket increment step
-    #[cfg_attr(feature = "structopt", structopt(skip))] // long = "rbi", default_value = "1.0"
+    #[cfg_attr(feature = "clap", clap(skip))] // long = "rbi", default_value = "1.0"
     pub rst_bkt_inc: f64,
 
     /// Bucket power factor
-    #[cfg_attr(feature = "structopt", structopt(skip))] // long = "rbp", default_value = "1.5"
+    #[cfg_attr(feature = "clap", clap(skip))] // long = "rbp", default_value = "1.5"
     pub rst_bkt_pwr: f64,
 
     /// Bucket time scale
-    #[cfg_attr(feature = "structopt", structopt(skip))]
+    #[cfg_attr(feature = "clap", clap(skip))]
     // long = "rbs", default_value = "0.001"
     pub rst_bkt_scl: f64,
 
     /// Bucket threshold
-    #[cfg_attr(feature = "structopt", structopt(skip))]
+    #[cfg_attr(feature = "clap", clap(skip))]
     // long = "rbt", default_value = "2000"
     pub rst_bkt_thr: usize,
 
     /// Length for assignment average
-    #[cfg_attr(feature = "structopt", structopt(long = "ral", default_value = "3500"))]
+    #[cfg_attr(feature = "clap", clap(long = "ral", default_value = "3500"))]
     pub rst_asg_len: usize,
 
     /// Blocking restart threshold
-    #[cfg_attr(feature = "structopt", structopt(long = "rab", default_value = "1.40"))]
+    #[cfg_attr(feature = "clap", clap(long = "rab", default_value = "1.40"))]
     pub rst_asg_thr: f64, // Glucose's R
 
     /// Length of LBD fast EMA
-    #[cfg_attr(feature = "structopt", structopt(long = "rll", default_value = "50"))]
+    #[cfg_attr(feature = "clap", clap(long = "rll", default_value = "50"))]
     pub rst_lbd_len: usize,
 
     /// Length of LBD slow EMA
-    #[cfg_attr(
-        feature = "structopt",
-        structopt(long = "rls", default_value = "10000")
-    )]
+    #[cfg_attr(feature = "clap", clap(long = "rls", default_value = "10000"))]
     pub rst_lbd_slw: usize,
 
     /// Forcing restart threshold
-    #[cfg_attr(feature = "structopt", structopt(long = "rlt", default_value = "1.15"))]
+    #[cfg_attr(feature = "clap", clap(long = "rlt", default_value = "1.15"))]
     pub rst_lbd_thr: f64, // Glucose's K
 
     /// Stabilizer scaling
-    #[cfg_attr(feature = "structopt", structopt(long = "rss", default_value = "2.0"))]
+    #[cfg_attr(feature = "clap", clap(long = "rss", default_value = "2.0"))]
     pub rst_stb_scl: f64,
 
     //
     //## var rewarding
     //
     /// Initial var reward decay
-    #[cfg_attr(feature = "structopt", structopt(long = "vri", default_value = "0.75"))]
+    #[cfg_attr(feature = "clap", clap(long = "vri", default_value = "0.75"))]
     pub vrw_dcy_beg: f64,
 
     /// Maximum var reward decay
-    #[cfg_attr(feature = "structopt", structopt(long = "vrm", default_value = "0.98"))]
+    #[cfg_attr(feature = "clap", clap(long = "vrm", default_value = "0.98"))]
     pub vrw_dcy_end: f64,
 
     //
     //## solver configuration
     //
     /// Level threshold to use chronoBT
-    #[cfg_attr(feature = "structopt", structopt(long = "cbt", default_value = "100"))]
+    #[cfg_attr(feature = "clap", clap(long = "cbt", default_value = "100"))]
     pub cbt_thr: DecisionLevel,
 
     /// Rephase switch
-    #[cfg_attr(feature = "structopt", structopt(long = "RPH", default_value = "1"))]
+    #[cfg_attr(feature = "clap", clap(long = "RPH", default_value = "1"))]
     rephase: i32,
 
     /// Reason-Side Rewarding switch
-    #[cfg_attr(feature = "structopt", structopt(long = "RSR", default_value = "1"))]
+    #[cfg_attr(feature = "clap", clap(long = "RSR", default_value = "1"))]
     rsr: i32,
 
     /// Stabilization switch
-    #[cfg_attr(feature = "structopt", structopt(long = "STB", default_value = "1"))]
+    #[cfg_attr(feature = "clap", clap(long = "STB", default_value = "1"))]
     stabilize: i32,
 
     /// Strategy adaptation switch
-    #[cfg_attr(feature = "structopt", structopt(long = "ADP", default_value = "1"))]
+    #[cfg_attr(feature = "clap", clap(long = "ADP", default_value = "1"))]
     adaptive: i32,
 
     /// CPU time limit in sec.
     #[cfg_attr(
-        feature = "structopt",
-        structopt(long = "timeout", short = "t", default_value = "5000.0")
+        feature = "clap",
+        clap(long = "timeout", short = "t", default_value = "5000.0")
     )]
     pub timeout: f64,
 
     /// Writes a DRAT UNSAT certification file
-    #[cfg_attr(feature = "structopt", structopt(long = "certify", short = "c"))]
+    #[cfg_attr(feature = "clap", clap(long = "certify", short = "c"))]
     pub use_certification: bool,
 }
 
@@ -206,7 +197,7 @@ impl Default for Config {
             output_dir: PathBuf::new(),
             proof_file: PathBuf::new(),
             quiet_mode: true,
-            result_file: PathBuf::new(),
+            result_file: None, // PathBuf::new(),
             use_log: false,
             clause_limit: 0,
             reduce: 1,
@@ -243,17 +234,18 @@ impl<T> From<T> for Config
 where
     PathBuf: From<T>,
 {
-    #[cfg(not(feature = "structopt"))]
+    #[cfg(not(feature = "clap"))]
     fn from(path: T) -> Config {
         Config {
             cnf_file: PathBuf::from(path),
             ..Config::default()
         }
     }
-    #[cfg(feature = "structopt")]
+    #[cfg(feature = "clap")]
     fn from(path: T) -> Config {
         let f = PathBuf::from(path).into_os_string();
-        Config::from_iter([std::ffi::OsString::from("splr"), f].iter())
+        // Config::from_iter([std::ffi::OsString::from("splr"), f].iter())
+        Config::parse_from([std::ffi::OsString::from("splr"), f].iter())
     }
 }
 

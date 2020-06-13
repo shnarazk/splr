@@ -1,5 +1,6 @@
 // SAT solver for Propositional Logic in Rust
 use {
+    clap::Clap,
     libc::{clock_gettime, timespec, CLOCK_PROCESS_CPUTIME_ID},
     splr::{
         cdb::CertifiedRecord,
@@ -17,7 +18,6 @@ use {
         thread,
         time::Duration,
     },
-    structopt::StructOpt,
 };
 
 const RED: &str = "\x1B[001m\x1B[031m";
@@ -42,7 +42,7 @@ fn colored(v: Result<bool, &SolverError>, quiet: bool) -> Cow<'static, str> {
 }
 
 fn main() {
-    let mut config = Config::from_args().override_args();
+    let mut config = Config::parse().override_args();
     config.splr_interface = true;
     if !config.cnf_file.exists() {
         println!(
@@ -52,13 +52,26 @@ fn main() {
         return;
     }
     let cnf_file = config.cnf_file.to_string_lossy();
-    let ans_file: Option<PathBuf> = match config.result_file.to_string_lossy().as_ref() {
-        "-" => None,
-        "" => Some(config.output_dir.join(PathBuf::from(format!(
+    /*
+        let ans_file: Option<PathBuf> = match config.result_file.to_string_lossy().as_ref() {
+            "-" => None,
+            "" => Some(config.output_dir.join(PathBuf::from(format!(
+                ".ans_{}",
+                config.cnf_file.file_name().unwrap().to_string_lossy(),
+            )))),
+            _ => Some(config.output_dir.join(&config.result_file)),
+        };
+    */
+    let ans_file: Option<PathBuf> = if let Some(ref f) = config.result_file {
+        match f.to_string_lossy().as_ref() {
+            "-" => None,
+            _ => Some(config.output_dir.join(f)),
+        }
+    } else {
+        Some(config.output_dir.join(PathBuf::from(format!(
             ".ans_{}",
-            config.cnf_file.file_name().unwrap().to_string_lossy(),
-        )))),
-        _ => Some(config.output_dir.join(&config.result_file)),
+            config.cnf_file.file_name().unwrap().to_string_lossy()
+        ))))
     };
     if config.proof_file.to_string_lossy() != "proof.out" && !config.use_certification {
         println!("Abort: You set a proof filename with '--proof' explicitly, but didn't set '--certify'. It doesn't look good.");
