@@ -105,7 +105,7 @@ dependencies = [
 
 [[package]]
 name = "splr"
-version = "0.4.2-dev.0"
+version = "0.4.2-dev.1"
 dependencies = [
  "bitflags 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.71 (registry+https://github.com/rust-lang/crates.io-index)",

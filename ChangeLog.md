@@ -1,3 +1,10 @@
+## 0.4.2, 2020-07-XX
+
+- substitute copying literals with `std::mem::swap` in `ClauseDB::new_clause`
+- stop sorting literals in `ClauseDB::new_clause`
+- fix the certification symbol used by removing clauses
+- fix a wrong initial value for `Config::rst_lbd_thr` which should be larger than 1.0
+
 ## 0.4.1, 2020-05-28
 
 - the installation command is changed to `cargo install splr --features cli`
