@@ -25,6 +25,8 @@ pub trait ClauseDBIF:
     fn iter(&self) -> Iter<'_, Clause>;
     /// return a mutable iterator.
     fn iter_mut(&mut self) -> IterMut<'_, Clause>;
+    /// return the list of bin_watch lists
+    fn bin_watcher_lists(&self) -> &[Vec<Watch>];
     /// return a watcher list
     fn watcher_list(&self, l: Lit) -> &[Watch];
     /// return the list of watch lists
@@ -52,7 +54,7 @@ pub trait ClauseDBIF:
     fn new_clause<A>(
         &mut self,
         asg: &mut A,
-        v: &mut [Lit],
+        v: &mut Vec<Lit>,
         learnt: bool,
         level_sort: bool,
     ) -> ClauseId
@@ -103,6 +105,7 @@ impl Default for ClauseDB {
     fn default() -> ClauseDB {
         ClauseDB {
             clause: Vec::new(),
+            bin_watcher: Vec::new(),
             watcher: Vec::new(),
             certified: Vec::new(),
             soft_limit: 0, // 248_000_000
@@ -222,9 +225,11 @@ impl Instantiate for ClauseDB {
         let nc = cnf.num_of_clauses;
         let mut clause = Vec::with_capacity(1 + nc);
         clause.push(Clause::default());
+        let mut bin_watcher = Vec::with_capacity(2 * (nv + 1));
         let mut watcher = Vec::with_capacity(2 * (nv + 1));
         let mut touched = Vec::with_capacity(2 * (nv + 1));
         for _ in 0..2 * (nv + 1) {
+            bin_watcher.push(Vec::new());
             watcher.push(Vec::new());
             touched.push(false);
         }
@@ -236,6 +241,7 @@ impl Instantiate for ClauseDB {
             clause,
             touched,
             lbd_temp: vec![0; nv + 1],
+            bin_watcher,
             watcher,
             certified,
             reducable: config.use_reduce(),
@@ -276,8 +282,10 @@ impl Instantiate for ClauseDB {
             }
             SolverEvent::NewVar => {
                 // for negated literal
+                self.bin_watcher.push(Vec::new());
                 self.watcher.push(Vec::new());
                 // for positive literal
+                self.bin_watcher.push(Vec::new());
                 self.watcher.push(Vec::new());
                 // for negated literal
                 self.touched.push(false);
@@ -336,12 +344,17 @@ impl ClauseDBIF for ClauseDB {
         &self.watcher[l]
     }
     #[inline]
+    fn bin_watcher_lists(&self) -> &[Vec<Watch>] {
+        &self.bin_watcher
+    }
+    #[inline]
     fn watcher_lists_mut(&mut self) -> &mut [Vec<Watch>] {
         &mut self.watcher
     }
     fn garbage_collect(&mut self) {
         // debug_assert!(self.check_liveness1());
         let ClauseDB {
+            ref mut bin_watcher,
             ref mut watcher,
             ref mut clause,
             ref mut touched,
@@ -349,6 +362,44 @@ impl ClauseDBIF for ClauseDB {
             ..
         } = self;
         debug_assert_eq!(usize::from(!NULL_LIT), 1);
+        //
+        //## binary clauses
+        //
+        let (recycles, wss) = bin_watcher.split_at_mut(2);
+        let recycled = &mut recycles[1];
+        for (i, ws) in &mut wss.iter_mut().enumerate() {
+            if !touched[i + 2] {
+                continue;
+            }
+            let mut n = 0;
+            while n < ws.len() {
+                let cid = ws[n].c;
+                let c = &mut clause[cid.ordinal as usize];
+                if !c.is(Flag::DEAD) {
+                    n += 1;
+                    continue;
+                }
+                if !c.lits.is_empty() {
+                    debug_assert!(c.is(Flag::DEAD));
+                    recycled.push(Watch {
+                        blocker: NULL_LIT,
+                        c: cid,
+                    });
+                    if c.is(Flag::LEARNT) {
+                        self.num_learnt -= 1;
+                    }
+                    if !certified.is_empty() {
+                        let temp = c.lits.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
+                        certified.push((CertifiedRecord::DELETE, temp));
+                    }
+                    c.lits.clear();
+                }
+                ws.detach(n);
+            }
+        }
+        //
+        //## normal clauses
+        //
         let (recycles, wss) = watcher.split_at_mut(2);
         let recycled = &mut recycles[1];
         for (i, ws) in &mut wss.iter_mut().enumerate() {
@@ -369,14 +420,13 @@ impl ClauseDBIF for ClauseDB {
                     recycled.push(Watch {
                         blocker: NULL_LIT,
                         c: cid,
-                        binary: c.lits.len() == 2,
                     });
                     if c.is(Flag::LEARNT) {
                         self.num_learnt -= 1;
                     }
                     if !certified.is_empty() {
                         let temp = c.lits.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
-                        certified.push((CertifiedRecord::ADD, temp));
+                        certified.push((CertifiedRecord::DELETE, temp));
                     }
                     c.lits.clear();
                 }
@@ -389,7 +439,7 @@ impl ClauseDBIF for ClauseDB {
     fn new_clause<A>(
         &mut self,
         asg: &mut A,
-        vec: &mut [Lit],
+        vec: &mut Vec<Lit>,
         mut learnt: bool,
         level_sort: bool,
     ) -> ClauseId
@@ -404,19 +454,20 @@ impl ClauseDBIF for ClauseDB {
             }
             #[cfg(feature = "boundary_check")]
             debug_assert!(1 < vec.len());
-            let mut i_max = 1;
-            let mut lv_max = 0;
-            // seek a literal with max level
-            let level = asg.level_ref();
-            for (i, l) in vec.iter().enumerate() {
-                let vi = l.vi();
-                let lv = level[vi];
-                if asg.assign(vi).is_some() && lv_max < lv {
-                    i_max = i;
-                    lv_max = lv;
-                }
-            }
-            vec.swap(1, i_max);
+            // sort literals
+            // let mut i_max = 1;
+            // let mut lv_max = 0;
+            // // seek a literal with max level
+            // let level = asg.level_ref();
+            // for (i, l) in vec.iter().enumerate() {
+            //     let vi = l.vi();
+            //     let lv = level[vi];
+            //     if asg.assign(vi).is_some() && lv_max < lv {
+            //         i_max = i;
+            //         lv_max = lv;
+            //     }
+            // }
+            // vec.swap(1, i_max);
             if vec.len() <= 2 {
                 learnt = false;
                 0
@@ -450,23 +501,20 @@ impl ClauseDBIF for ClauseDB {
             // }
             debug_assert!(c.is(Flag::DEAD));
             c.flags = Flag::empty();
-            c.lits.clear();
-            for l in vec {
-                c.lits.push(*l);
-            }
+            debug_assert!(c.lits.is_empty()); // c.lits.clear();
+            std::mem::swap(&mut c.lits, vec);
             c.rank = rank;
             c.reward = reward;
             c.search_from = 2;
         } else {
-            let lits = Vec::from(vec);
             cid = ClauseId::from(self.clause.len());
-            let c = Clause {
+            let mut c = Clause {
                 flags: Flag::empty(),
-                lits,
                 rank,
                 reward,
                 ..Clause::default()
             };
+            std::mem::swap(&mut c.lits, vec);
             self.clause.push(c);
         };
         let c = &mut self[cid];
@@ -486,9 +534,12 @@ impl ClauseDBIF for ClauseDB {
         }
         if len2 {
             self.num_bi_clause += 1;
+            self.bin_watcher[!l0].register(l1, cid);
+            self.bin_watcher[!l1].register(l0, cid);
+        } else {
+            self.watcher[!l0].register(l1, cid);
+            self.watcher[!l1].register(l0, cid);
         }
-        self.watcher[!l0].register(l1, cid, len2);
-        self.watcher[!l1].register(l0, cid, len2);
         self.num_active += 1;
         cid
     }
@@ -660,22 +711,25 @@ impl ClauseDBIF for ClauseDB {
                 (lits[1], lits[0])
             };
             debug_assert!(1 < usize::from(!p));
-            let len = lits.len();
-            let bin = len == 2;
-            self.watcher[!p].detach_with(cid);
-            self.watcher[!q].register(r, cid, bin);
-            if bin {
-                // update another bocker
-                self.watcher[!r].update_blocker(cid, q, true);
+            if 2 == lits.len() {
+                self.watcher[!p].detach_with(cid);
+                self.watcher[!r].detach_with(cid);
+                self.bin_watcher[!q].register(r, cid);
+                self.bin_watcher[!r].register(q, cid);
+            } else {
+                self.watcher[!p].detach_with(cid);
+                self.watcher[!q].register(r, cid);
+                self.watcher[!r].update_blocker(cid, q);
             }
         } else {
             lits.delete_unstable(|&x| x == p);
-            if lits.len() == 2 {
-                // update another bocker
+            if 2 == lits.len() {
                 let q = lits[0];
                 let r = lits[1];
-                self.watcher[!q].update_blocker(cid, r, true);
-                self.watcher[!r].update_blocker(cid, q, true);
+                self.watcher[!q].detach_with(cid);
+                self.watcher[!r].detach_with(cid);
+                self.bin_watcher[!q].register(r, cid);
+                self.bin_watcher[!r].register(q, cid);
             }
         }
         false
@@ -694,11 +748,8 @@ impl ClauseDBIF for ClauseDB {
         }
         let l0 = vec[0];
         let mut nsat = 0;
-        for w in &self.watcher[!l0] {
+        for w in &self.bin_watcher[!l0] {
             let c = &self.clause[w.c.ordinal as usize];
-            if c.len() != 2 {
-                continue;
-            }
             debug_assert!(c[0] == l0 || c[1] == l0);
             let other = c[(c[0] == l0) as usize];
             let vi = other.vi();

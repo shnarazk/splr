@@ -403,7 +403,7 @@ impl EliminateIF for Eliminator {
         A: AssignIF,
         C: ClauseDBIF,
     {
-        assert!(self.enable);
+        debug_assert!(self.enable);
         if self.mode != EliminatorMode::Waiting {
             return;
         }

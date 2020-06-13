@@ -1,3 +1,4 @@
+#![cfg(feature = "incremental_solver")]
 /// WARNING: this test requires feature "incremental_solver".
 ///```ignore
 /// cargo test --test isat --features incremental_solver --release -- --nocapture --test-threads=1
@@ -13,26 +14,22 @@ fn main() {
     println!("#solution: {} w/o elim; {} w/ elim", ns1, ns2);
 }
 
-#[allow(dead_code)]
-#[cfg_attr(feature = "incremental_solver", test)]
+#[test]
 fn all_solutions_of_uf8() {
     drive("tests/uf8.cnf", vec![4, 5, -6, 7, 8]);
 }
 
-#[allow(dead_code)]
-#[cfg_attr(feature = "incremental_solver", test)]
+#[test]
 fn all_solutions_of_uf20() {
     drive("tests/uf20-01.cnf", vec![-4, 5, 6, 7, 8]);
 }
 
 #[allow(dead_code)]
 /// cargo test --test isat --features incremental_solver --release
-/// #[cfg_attr(feature = "incremental_solver", test)]
 fn all_solutions_of_uf100() {
     drive("tests/uf100-010.cnf", vec![]);
 }
 
-#[allow(dead_code)]
 fn drive(cnf: &str, mother: Vec<i32>) {
     for i in 0..=mother.len() {
         let assumptions = &mother[0..i];

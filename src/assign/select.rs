@@ -120,9 +120,9 @@ impl VarSelectIF for AssignStack {
                 if let Some(b) = self.assign[vi] {
                     v.turn_on(Flag::REPHASE);
                     v.set(Flag::BEST_PHASE, b);
-                } else {
-                    v.turn_off(Flag::REPHASE);
+                    continue;
                 }
+                v.turn_off(Flag::REPHASE);
             }
         }
         self.build_best_at = self.num_propagation;
