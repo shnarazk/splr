@@ -1,5 +1,8 @@
 ## 0.4.2, 2020-07-XX
 
+- add `ClauseDB::bin_watcher`
+- delete `Watch::binary`
+- `ClauseDB::new_clause` takes `&mut Vec<Lit>` instead of `&mut [Lit]`
 - substitute copying literals with `std::mem::swap` in `ClauseDB::new_clause`
 - stop sorting literals in `ClauseDB::new_clause`
 - fix the certification symbol used by removing clauses
