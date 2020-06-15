@@ -195,10 +195,10 @@ fn search(
     rst: &mut Restarter,
     state: &mut State,
 ) -> Result<bool, SolverError> {
-    let mut rst_stabilize = false;
     let mut a_decision_was_made = false;
     let mut num_assigned = asg.num_solved_vars;
     rst.update(RestarterModule::Luby, 0);
+    state.stabilize = false;
     loop {
         asg.reward_update();
         let ci = asg.propagate(cdb);
@@ -211,7 +211,9 @@ fn search(
             //## DYNAMIC FORCING RESTART based on LBD values, updated by conflict
             //
             state.last_asg = asg.stack_len();
-            if rst.force_restart() {
+            if rst.force_restart()
+                && (!state.stabilize || asg.exports().1 % (state[Stat::Stabilization] + 1) == 0)
+            {
                 asg.cancel_until(asg.root_level);
                 #[cfg(feature = "temp_order")]
                 asg.force_select_iter(None);
@@ -265,9 +267,8 @@ fn search(
             state.flush(format!("unreachable: {}", asg.num_vars - num_assigned));
         }
         if !asg.remains() {
-            if state.config.use_stabilize() && rst_stabilize != rst.stabilizing() {
-                rst_stabilize = !rst_stabilize;
-                state.stabilize = rst_stabilize;
+            if state.config.use_stabilize() && state.stabilize != rst.stabilizing() {
+                state.stabilize = !state.stabilize;
                 state[Stat::Stabilization] += 1;
             }
             let lit = asg.select_decision_literal(&state.phase_select);
