@@ -48,8 +48,6 @@ impl SolveIF for Solver {
         if cdb.check_size().is_err() {
             return Err(SolverError::OutOfMemory);
         }
-        // NOTE: splr doesn't deal with assumptions.
-        // s.root_level = 0;
         asg.num_solved_vars = asg.stack_len();
         state.progress_header();
         state.progress(asg, cdb, elim, rst, Some("preprocessing phase"));
