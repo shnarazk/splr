@@ -517,7 +517,7 @@ pub struct Restarter {
     stb: GeometricStabilizer,
     after_restart: usize,
     next_restart: usize,
-    restart_step: usize,
+    pub restart_step: usize,
 
     //
     //## statistics
