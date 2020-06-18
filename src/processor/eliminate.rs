@@ -309,6 +309,7 @@ mod tests {
                 .collect::<Vec<_>>()
         }
     }
+    #[cfg(not(feature = "no_IO"))]
     #[test]
     fn test_eliminate_var() {
         let Solver {

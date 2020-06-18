@@ -831,6 +831,7 @@ mod tests {
     use crate::{assign::VarManipulateIF, processor::EliminateIF, solver::Solver};
     use std::convert::TryFrom;
 
+    #[cfg(not(feature = "no_IO"))]
     #[test]
     fn check_elimination() {
         let mut config = Config::default();

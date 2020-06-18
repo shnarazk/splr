@@ -372,6 +372,7 @@ mod tests {
     use crate::*;
     use std::convert::TryFrom;
 
+    #[cfg(not(feature = "no_IO"))]
     #[test]
     fn test_add_var() {
         let mut s = Solver::try_from("tests/uf8.cnf").expect("can't load");
