@@ -291,7 +291,7 @@ impl PropagateIF for AssignStack {
             }
         }
         let na = self.q_head + self.num_eliminated_vars;
-        if self.num_best_assign < na && 0 < self.decision_level() {
+        if self.num_best_assign <= na && 0 < self.decision_level() {
             self.best_assign = true;
             self.num_best_assign = na;
         }
