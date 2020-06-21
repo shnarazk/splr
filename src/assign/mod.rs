@@ -50,7 +50,7 @@ pub trait AssignIF:
     + PropagateIF
     + VarManipulateIF
     + VarRewardIF
-    + Export<(usize, usize, usize, f64)>
+    + Export<(usize, usize, usize, f64), ()>
 {
     /// return a literal in the stack.
     fn stack(&self, i: usize) -> Lit;

@@ -15,7 +15,7 @@ const ACTIVITY_MAX: f64 = 1e308;
 
 /// API for clause management like `reduce`, `simplify`, `new_clause`, and so on.
 pub trait ClauseDBIF:
-    IndexMut<ClauseId, Output = Clause> + Export<(usize, usize, usize, usize, usize, usize)>
+    IndexMut<ClauseId, Output = Clause> + Export<(usize, usize, usize, usize, usize, usize), ()>
 {
     /// return the length of `clause`.
     fn len(&self) -> usize;
@@ -298,7 +298,7 @@ impl Instantiate for ClauseDB {
     }
 }
 
-impl Export<(usize, usize, usize, usize, usize, usize)> for ClauseDB {
+impl Export<(usize, usize, usize, usize, usize, usize), ()> for ClauseDB {
     /// exports:
     ///  1. the number of active clauses
     ///  1. the number of binary clauses
@@ -324,6 +324,7 @@ impl Export<(usize, usize, usize, usize, usize, usize)> for ClauseDB {
             self.num_reduction,
         )
     }
+    fn active_mode(&self) {}
 }
 
 impl ClauseDBIF for ClauseDB {

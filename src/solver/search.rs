@@ -265,12 +265,7 @@ fn search(
         if !asg.remains() {
             if state.config.use_stabilize() && state.stabilize != rst.stabilizing() {
                 state.stabilize = !state.stabilize;
-                if state.stabilize {
-                    state[Stat::Stabilization] += 1;
-                    rst.restart_step += state.config.rst_step * state[Stat::Stabilization];
-                } else {
-                    rst.restart_step += state.config.rst_step;
-                }
+                rst.handle(SolverEvent::Stabilize(state.stabilize));
             }
             let lit = asg.select_decision_literal(&state.phase_select);
             asg.assign_by_decision(lit);

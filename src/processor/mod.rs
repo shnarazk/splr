@@ -60,7 +60,7 @@ use {
 /// assert_eq!(elim.is_running(), false);
 /// assert_eq!(elim.simplify(&mut s.asg, &mut s.cdb, &mut s.state), Ok(()));
 ///```
-pub trait EliminateIF: Export<(usize, usize, f64)> {
+pub trait EliminateIF: Export<(usize, usize, f64), ()> {
     /// set eliminator's mode to **ready**.
     fn activate(&mut self);
     /// set eliminator's mode to **dormant**.
@@ -111,14 +111,14 @@ pub trait EliminatorStatIF {
     fn stats(&self) -> (usize, usize);
 }
 
-#[derive(Eq, Debug, PartialEq)]
+#[derive(Copy, Clone, Eq, Debug, PartialEq)]
 enum EliminatorMode {
     Deactive,
     Waiting,
     Running,
 }
 
-impl Export<(usize, usize, f64)> for Eliminator {
+impl Export<(usize, usize, f64), ()> for Eliminator {
     /// exports:
     ///  1. the number of full eliminations
     ///  1. the number of satisfied clause eliminations
@@ -137,6 +137,7 @@ impl Export<(usize, usize, f64)> for Eliminator {
             self.to_simplify,
         )
     }
+    fn active_mode(&self) {}
 }
 
 /// Mapping from Literal to Clauses.

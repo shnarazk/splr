@@ -153,8 +153,6 @@ pub enum Stat {
     NoDecisionConflict,
     /// the last number of solved variables
     SolvedRecord,
-    /// the number of stabilization flips
-    Stabilization,
     /// don't use this dummy (sentinel at the tail).
     EndOfStatIndex,
 }
@@ -477,7 +475,8 @@ impl StateIF for State {
 
         let (elim_num_full, _num_sat, elim_to_simplify) = elim.exports();
 
-        let (rst_mode, rst_num_block, rst_asg_trend, rst_lbd_get, rst_lbd_trend) = rst.exports();
+        let rst_mode = rst.active_mode();
+        let (rst_num_block, rst_asg_trend, rst_lbd_get, rst_lbd_trend, rst_num_stb) = rst.exports();
 
         if self.config.use_log {
             self.dump(asg, cdb, rst);
@@ -551,12 +550,7 @@ impl StateIF for State {
         );
         println!(
             "\x1B[2K        misc|#stb:{}, #smp:{}, 2smp:{}, vdcy:{} ",
-            im!(
-                "{:>9}",
-                self,
-                LogUsizeId::Stabilization,
-                self[Stat::Stabilization]
-            ),
+            im!("{:>9}", self, LogUsizeId::Stabilization, rst_num_stb),
             im!("{:>9}", self, LogUsizeId::Simplify, elim_num_full),
             fm!(
                 "{:>9.0}",
@@ -715,7 +709,7 @@ impl State {
             cdb_num_learnt,
             cdb_num_reduction,
         ) = cdb.exports();
-        let (_mode, rst_num_block, _asg_trend, _lbd_get, _lbd_trend) = rst.exports();
+        let (rst_num_block, _asg_trend, _lbd_get, _lbd_trend, _) = rst.exports();
         println!(
             "c | {:>8}  {:>8} {:>8} | {:>7} {:>8} {:>8} |  {:>4}  {:>8} {:>7} {:>8} | {:>6.3} % |",
             asg_num_restart,                           // restart
@@ -755,7 +749,7 @@ impl State {
             cdb_num_learnt,
             _num_reduction,
         ) = cdb.exports();
-        let (_mode, rst_num_block, rst_asg_trend, rst_lbd_get, rst_lbd_trend) = rst.exports();
+        let (rst_num_block, rst_asg_trend, rst_lbd_get, rst_lbd_trend, _) = rst.exports();
         println!(
             "{:>3}#{:>8},{:>7},{:>7},{:>7},{:>6.3},,{:>7},{:>7},\
              {:>7},,{:>5},{:>5},{:>6.2},{:>6.2},,{:>7.2},{:>8.2},{:>8.2},,\

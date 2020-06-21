@@ -22,8 +22,9 @@ use {
 /// which, however, should be used locally in the defining modules.
 /// To avoid to make them public, we define a generic accessor or exporter here.
 /// `T` is the list of exporting values.
-pub trait Export<T> {
+pub trait Export<T, Mode> {
     fn exports(&self) -> T;
+    fn active_mode(&self) -> Mode;
 }
 
 /// API for Literal like `from_int`, `from_assign`, `to_cid` and so on.

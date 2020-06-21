@@ -40,7 +40,7 @@ pub enum RestartMode {
 }
 
 /// API for restart like `block_restart`, `force_restart` and so on.
-pub trait RestartIF: Export<(RestartMode, usize, f64, f64, f64)> {
+pub trait RestartIF: Export<(usize, f64, f64, f64, usize), RestartMode> {
     /// return `true` if stabilizer is active.
     fn stabilizing(&self) -> bool;
     /// block restart if needed.
@@ -356,6 +356,7 @@ impl LubySeries {
 struct GeometricStabilizer {
     enable: bool,
     active: bool,
+    num_active: usize,
     next_trigger: usize,
     restart_inc: f64,
     step: usize,
@@ -366,6 +367,7 @@ impl Default for GeometricStabilizer {
         GeometricStabilizer {
             enable: true,
             active: false,
+            num_active: 0,
             next_trigger: 1000,
             restart_inc: 2.0,
             step: 1000,
@@ -400,6 +402,9 @@ impl EmaIF for GeometricStabilizer {
     fn update(&mut self, now: usize) {
         if self.enable && self.next_trigger <= now {
             self.active = !self.active;
+            if self.active {
+                self.num_active += 1;
+            }
             self.step = ((self.step as f64) * self.restart_inc) as usize;
             if 100_000_000 < self.step {
                 self.step = 1000;
@@ -517,13 +522,13 @@ pub struct Restarter {
     stb: GeometricStabilizer,
     after_restart: usize,
     next_restart: usize,
-    pub restart_step: usize,
+    restart_step: usize,
+    initial_restart_step: usize,
 
     //
     //## statistics
     //
     num_block: usize,
-    num_stabilize: usize,
 }
 
 impl Default for Restarter {
@@ -540,8 +545,8 @@ impl Default for Restarter {
             after_restart: 0,
             next_restart: 100,
             restart_step: 0,
+            initial_restart_step: 0,
             num_block: 0,
-            num_stabilize: 0,
         }
     }
 }
@@ -558,18 +563,21 @@ impl Instantiate for Restarter {
             luby: LubySeries::instantiate(config, cnf),
             stb: GeometricStabilizer::instantiate(config, cnf),
             restart_step: config.rst_step,
+            initial_restart_step: config.rst_step,
             ..Restarter::default()
         }
     }
     fn handle(&mut self, e: SolverEvent) {
-        if let SolverEvent::Adapt(strategy, num_conflict) = e {
-            match strategy {
-                (SearchStrategy::Initial, 0) => {
-                    // self.int.enable = true;
-                }
-                (SearchStrategy::LowSuccesive, n) if n == num_conflict => self.luby.enable = true,
-                _ => (),
+        match e {
+            SolverEvent::Adapt((SearchStrategy::Initial, 0), _) => {
+                // self.int.enable = true;
             }
+            SolverEvent::Adapt((SearchStrategy::LowSuccesive, n), m) if n == m => {
+                self.luby.enable = true;
+            }
+            SolverEvent::Stabilize(true) => (),
+            SolverEvent::Stabilize(false) => (),
+            _ => (),
         }
     }
 }
@@ -639,36 +647,39 @@ impl RestartIF for Restarter {
     }
 }
 
-impl Export<(RestartMode, usize, f64, f64, f64)> for Restarter {
+impl Export<(usize, f64, f64, f64, usize), RestartMode> for Restarter {
     /// exports:
-    ///  1. current restart mode
     ///  1. the number of blocking restarts
     ///  1. `asg.trend()`
     ///  1. `lbd.get()`
     ///  1. `lbd.trend()`
+    ///  1. the number of stabilization
     ///
     ///```
     /// use crate::splr::{config::Config, solver::Restarter, types::*};
     /// let rst = Restarter::instantiate(&Config::default(), &CNFDescription::default());
-    /// let (_mode, _num_block, _asg_trend, _lbd_get, _lbd_trend) = rst.exports();
+    /// let (_num_block, _asg_trend, _lbd_get, _lbd_trend) = rst.exports();
     ///```
     #[inline]
-    fn exports(&self) -> (RestartMode, usize, f64, f64, f64) {
+    fn exports(&self) -> (usize, f64, f64, f64, usize) {
         (
-            if self.stb.is_active() {
-                RestartMode::Stabilize
-            // } else if self.bkt.enable {
-            //     RestartMode::Bucket
-            } else if self.luby.enable {
-                RestartMode::Luby
-            } else {
-                RestartMode::Dynamic
-            },
             self.num_block,
             self.asg.trend(),
             self.lbd.get(),
             self.lbd.trend(),
+            self.stb.num_active,
         )
+    }
+    fn active_mode(&self) -> RestartMode {
+        if self.stb.is_active() {
+            RestartMode::Stabilize
+        // } else if self.bkt.enable {
+        //     RestartMode::Bucket
+        } else if self.luby.enable {
+            RestartMode::Luby
+        } else {
+            RestartMode::Dynamic
+        }
     }
 }
 

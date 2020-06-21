@@ -132,7 +132,7 @@ impl Instantiate for AssignStack {
     }
 }
 
-impl Export<(usize, usize, usize, f64)> for AssignStack {
+impl Export<(usize, usize, usize, f64), ()> for AssignStack {
     /// exports:
     ///  1. the number of conflicts
     ///  1. the number of propagations
@@ -154,6 +154,7 @@ impl Export<(usize, usize, usize, f64)> for AssignStack {
             self.activity_decay,
         )
     }
+    fn active_mode(&self) {}
 }
 
 impl AssignIF for AssignStack {

@@ -325,7 +325,7 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     out.write_all(
         format!(
             "c  {}|#BLK:{}, #RST:{}, eASG:{}, eLBD:{} \n",
-            if s.rst.exports().0 == RestartMode::Luby {
+            if s.rst.active_mode() == RestartMode::Luby {
                 "LubyRestart"
             } else {
                 "    Restart"
