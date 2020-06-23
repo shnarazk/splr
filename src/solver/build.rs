@@ -46,7 +46,7 @@ pub trait SatSolverIF {
     /// assert_eq!(s.solve(), Ok(Certificate::SAT(vec![1, 2, 3, 4, 5, -6, 7, 8])));
     /// ```
     fn add_assignment(&mut self, val: i32) -> Result<&mut Solver, SolverError>;
-    /// add a clause to Solver.
+    /// add a literal to Solver.
     ///
     /// # Errors
     ///
