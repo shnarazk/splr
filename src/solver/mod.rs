@@ -9,6 +9,8 @@ mod restart;
 mod search;
 /// Crate `validate` implements a model checker.
 mod validate;
+/// Implement vivification preprocessor
+mod vivify;
 
 pub use self::{
     build::SatSolverIF,

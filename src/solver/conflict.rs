@@ -235,7 +235,7 @@ pub fn handle_conflict(
 /// ## Conflict Analysis
 ///
 #[allow(clippy::cognitive_complexity)]
-fn conflict_analyze(
+pub fn conflict_analyze(
     asg: &mut AssignStack,
     cdb: &mut ClauseDB,
     state: &mut State,

@@ -3,6 +3,7 @@ use {
     super::{
         conflict::handle_conflict,
         restart::{RestartIF, Restarter, RestarterModule},
+        vivify::vivify,
         Certificate, Solver, SolverEvent, SolverResult,
     },
     crate::{
@@ -197,6 +198,12 @@ fn search(
     let mut num_assigned = asg.num_solved_vars;
     rst.update(RestarterModule::Luby, 0);
     state.stabilize = false;
+
+    //
+    // test vivification
+    //
+    vivify(asg, cdb, elim, state);
+
     loop {
         asg.reward_update();
         let ci = asg.propagate(cdb);
@@ -249,6 +256,7 @@ fn search(
                     elim.activate();
                 }
                 elim.simplify(asg, cdb, state)?;
+                vivify(asg, cdb, elim, state);
             }
             // By simplification, we may get further solutions.
             if asg.num_solved_vars < asg.stack_len() {
