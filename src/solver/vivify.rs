@@ -59,10 +59,30 @@ pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, elim: &mut Eliminator, 
         // cdb.garbage_collect();
         change = false;
         let mut i: usize = 1; // skip NULL_CLAUSE
-        let num_c = cdb.len();
-        // println!("loop start:: num_c: {}, asg: {}", num_c, asg);
-        while i < num_c {
-            let ci = ClauseId::from(i);
+                              // let num_c = cdb.len();
+                              // println!("loop start:: num_c: {}, asg: {}", num_c, asg);
+
+        let mut lmax = 0;
+        let mut nw = 0;
+        for (l, watchers) in cdb.watcher_lists_mut().iter().enumerate().skip(2) {
+            if nw < watchers.len() && asg.assign(VarId::from(Lit::from(l))).is_none() {
+                lmax = l;
+                nw = watchers.len();
+            }
+        }
+        let clauses: Vec<ClauseId> = cdb
+            .watcher_list(Lit::from(lmax))
+            .iter()
+            .map(|w| w.c)
+            .collect::<Vec<_>>();
+        //
+        // let mut vt = (1..=asg.num_vars).map(|vi| ((asg.activity(vi) * 1000.0) as isize, vi)).collect::<Vec<_>>();
+        // vt.sort_unstable();
+        // let vi = vt.last().map_or(0, |p| p.1);
+        // let clauses = cdb.watcher_list(Lit::from_assign(vi, true)).iter().map(|w| w.c).collect::<Vec<_>>();let clauses = cdb.watcher_list(Lit::from_assign(vi, true)).iter().map(|w| w.c).collect::<Vec<_>>();
+
+        // while i < num_c {
+        for ci in &clauses {
             i += 1;
             if i % 10 == 0 {
                 state.flush("");
@@ -70,13 +90,15 @@ pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, elim: &mut Eliminator, 
             }
             let c: &Clause = &cdb[ci];
             let c_len = c.lits.len();
-            if c.is(Flag::DEAD) || c_len < 4 || c.is(Flag::LEARNT) {
+            if c.is(Flag::DEAD) || c.is(Flag::LEARNT)
+            /* || c_len < 4 */
+            {
                 continue;
             }
             // println!("{}:{}", ci, c);
             let c_lits = c.lits.clone();
             assert!(!cdb[ci].is(Flag::DEAD));
-            cdb.detach(ci);
+            cdb.detach(*ci);
             cdb.eliminate_satisfied_clauses(asg, elim, false);
             cdb.garbage_collect();
             // let mut cb: Vec<Lit> = Vec::new();
@@ -84,7 +106,7 @@ pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, elim: &mut Eliminator, 
             let mut i = 0;
             let mut clauses: Vec<Vec<Lit>> = Vec::new();
             assert!(1 < c_len && 1 < c_lits.len() && c_len == c_lits.len());
-            while !shortened && i < c_len
+            while !shortened && i < c_len.min(1)
             /* c != cb */
             {
                 // let cx = c_lits.remove_items(cb);
