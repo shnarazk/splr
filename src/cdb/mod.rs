@@ -34,7 +34,7 @@ type DRAT = Vec<(CertifiedRecord, Vec<i32>)>;
 
 /// Clause identifier, or clause index, starting with one.
 /// Note: ids are re-used after 'garbage collection'.
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct ClauseId {
     /// a sequence number.
     pub ordinal: u32,

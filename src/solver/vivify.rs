@@ -1,4 +1,5 @@
 //! Vivification
+#![allow(dead_code)]
 use {
     super::{conflict::conflict_analyze, State},
     crate::{
@@ -8,7 +9,46 @@ use {
         state::StateIF,
         types::*,
     },
+    std::{
+        collections::HashSet,
+        ops::{Index, IndexMut},
+    },
 };
+
+/// map a Lit to a pair of dirty bit and depending clauses.
+type ConflictDepEntry = (bool, HashSet<ClauseId>);
+
+struct ConflictDep {
+    body: Vec<ConflictDepEntry>,
+}
+
+impl Index<Lit> for Vec<ConflictDepEntry> {
+    type Output = ConflictDepEntry;
+    #[inline]
+    fn index(&self, l: Lit) -> &Self::Output {
+        unsafe { self.get_unchecked(usize::from(l)) }
+    }
+}
+
+impl IndexMut<Lit> for Vec<ConflictDepEntry> {
+    #[inline]
+    fn index_mut(&mut self, l: Lit) -> &mut Self::Output {
+        unsafe { self.get_unchecked_mut(usize::from(l)) }
+    }
+}
+
+impl ConflictDep {
+    fn put(&mut self, l: Lit, cid: ClauseId) {
+        let e = &mut self.body[l];
+        e.0 = true;
+        e.1.insert(cid);
+    }
+    fn purge(&mut self, l: Lit) {
+        let e = &mut self.body[l];
+        e.0 = false;
+        e.1.clear();
+    }
+}
 
 pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, elim: &mut Eliminator, state: &mut State) {
     state.flush("vivifying...");
