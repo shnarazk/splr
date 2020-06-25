@@ -1,211 +1,254 @@
 //! Vivification
 #![allow(dead_code)]
 use {
-    super::{conflict::conflict_analyze, State},
+    super::{conflict::conflict_analyze, SolverEvent, State},
     crate::{
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
         cdb::{ClauseDB, ClauseDBIF},
-        processor::Eliminator,
         state::StateIF,
         types::*,
     },
-    std::{
-        collections::HashSet,
-        ops::{Index, IndexMut},
-    },
+    std::collections::{HashMap, HashSet},
 };
 
 /// map a Lit to a pair of dirty bit and depending clauses.
-type ConflictDepEntry = (bool, HashSet<ClauseId>);
+type ConflictDepEntry = (bool, HashSet<ClauseId>, Vec<Lit>);
 
 struct ConflictDep {
-    body: Vec<ConflictDepEntry>,
-}
-
-impl Index<Lit> for Vec<ConflictDepEntry> {
-    type Output = ConflictDepEntry;
-    #[inline]
-    fn index(&self, l: Lit) -> &Self::Output {
-        unsafe { self.get_unchecked(usize::from(l)) }
-    }
-}
-
-impl IndexMut<Lit> for Vec<ConflictDepEntry> {
-    #[inline]
-    fn index_mut(&mut self, l: Lit) -> &mut Self::Output {
-        unsafe { self.get_unchecked_mut(usize::from(l)) }
-    }
+    body: HashMap<Lit, ConflictDepEntry>,
 }
 
 impl ConflictDep {
-    fn put(&mut self, l: Lit, cid: ClauseId) {
-        let e = &mut self.body[l];
-        e.0 = true;
-        e.1.insert(cid);
+    fn new() -> Self {
+        ConflictDep {
+            body: HashMap::new(),
+        }
+    }
+    fn get(&self, l: Lit) -> Option<&ConflictDepEntry> {
+        self.body.get(&l)
+    }
+    fn put(&mut self, l: Lit, cid: ClauseId, c: &Clause) {
+        if let Some(e) = &mut self.body.get_mut(&l) {
+            e.0 = true;
+            e.1.insert(cid);
+            e.2 = c.lits.clone();
+        } else {
+            let mut h = HashSet::new();
+            h.insert(cid);
+            self.body.insert(l, (true, h, c.lits.clone()));
+        }
     }
     fn purge(&mut self, l: Lit) {
-        let e = &mut self.body[l];
-        e.0 = false;
-        e.1.clear();
+        if let Some(e) = &mut self.body.get_mut(&l) {
+            e.0 = false;
+            e.1.clear();
+            e.2.clear();
+        }
     }
 }
 
-pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, elim: &mut Eliminator, state: &mut State) {
+pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State, nseek_max: usize) {
     state.flush("vivifying...");
+    asg.handle(SolverEvent::Vivify(true));
+    let mut cache: HashSet<Lit> = HashSet::new();
+    const NSHRINK: usize = 4_000;
+    let mut nseek: usize = 0;
+    let mut nshrink = 0;
+    let mut nassign = 0;
     let mut change: bool = true;
     assert_eq!(asg.decision_level(), asg.root_level);
     while change {
-        // assert!(asg.propagate(cdb) == ClauseId::default());
-        // cdb.garbage_collect();
         change = false;
-        let mut i: usize = 1; // skip NULL_CLAUSE
-                              // let num_c = cdb.len();
-                              // println!("loop start:: num_c: {}, asg: {}", num_c, asg);
-
-        let mut lmax = 0;
-        let mut nw = 0;
-        for (l, watchers) in cdb.watcher_lists_mut().iter().enumerate().skip(2) {
-            if nw < watchers.len() && asg.assign(VarId::from(Lit::from(l))).is_none() {
-                lmax = l;
-                nw = watchers.len();
+        let mut clauses: Vec<ClauseId> = Vec::new();
+        for (i, c) in cdb.iter_mut().enumerate().skip(1) {
+            if !c.is(Flag::DEAD) && 2 < c.len() {
+                clauses.push(ClauseId::from(i));
             }
         }
-        let clauses: Vec<ClauseId> = cdb
-            .watcher_list(Lit::from(lmax))
-            .iter()
-            .map(|w| w.c)
-            .collect::<Vec<_>>();
-        //
-        // let mut vt = (1..=asg.num_vars).map(|vi| ((asg.activity(vi) * 1000.0) as isize, vi)).collect::<Vec<_>>();
-        // vt.sort_unstable();
-        // let vi = vt.last().map_or(0, |p| p.1);
-        // let clauses = cdb.watcher_list(Lit::from_assign(vi, true)).iter().map(|w| w.c).collect::<Vec<_>>();let clauses = cdb.watcher_list(Lit::from_assign(vi, true)).iter().map(|w| w.c).collect::<Vec<_>>();
+        // clauses.sort_by_cached_key(|c| 1 - cdb[c].len() as i32);
+        clauses.sort_by_cached_key(|c| cdb.activity(*c) as isize);
 
-        // while i < num_c {
-        for ci in &clauses {
-            i += 1;
-            if i % 10 == 0 {
-                state.flush("");
-                state.flush(format!("vivifying: {}...", i));
-            }
+        for ci in clauses.iter().rev() {
             let c: &Clause = &cdb[ci];
-            let c_len = c.lits.len();
-            if c.is(Flag::DEAD) || c.is(Flag::LEARNT)
-            /* || c_len < 4 */
-            {
+            if c.is(Flag::DEAD) {
                 continue;
             }
-            // println!("{}:{}", ci, c);
-            let c_lits = c.lits.clone();
-            assert!(!cdb[ci].is(Flag::DEAD));
+            let is_learnt = c.is(Flag::LEARNT);
+            let clits = c.lits.clone();
+            let c_len = clits.len();
             cdb.detach(*ci);
-            cdb.eliminate_satisfied_clauses(asg, elim, false);
             cdb.garbage_collect();
-            // let mut cb: Vec<Lit> = Vec::new();
             let mut shortened = false;
             let mut i = 0;
-            let mut clauses: Vec<Vec<Lit>> = Vec::new();
-            assert!(1 < c_len && 1 < c_lits.len() && c_len == c_lits.len());
-            while !shortened && i < c_len.min(1)
-            /* c != cb */
-            {
-                // let cx = c_lits.remove_items(cb);
-                // let l: Lit = select_a_literal(cx);
-                let l = &c_lits[i];
+            let mut new_clauses: Vec<Vec<Lit>> = Vec::new();
+            while !shortened && i < c_len {
+                let l = &clits[i]; // select_a_literal(cx);
                 i += 1;
-                // cb.push(*l); // cb = cb ∪ {l};
+                if i % 20 == 0 {
+                    state.flush("");
+                    state.flush(format!("vivifying({}, {}, {})...", nassign, nshrink, nseek));
+                }
                 if asg.assigned(*l).is_some() {
                     continue;
                 }
                 asg.assign_by_decision(!*l); // Σb ← (Σb ∪ {¬l})
-                                             // asg.assign_by_implication(!*l, AssignReason::Implication(ci, !*l), asg.root_level);
-                                             // println!("assign {} on {}", !*l, asg);
-                let confl = asg.propagate(cdb);
+                let nassign_before_propagation = asg.stack_len();
+                let confl = if cache.contains(&!*l) {
+                    ClauseId::default()
+                } else {
+                    asg.propagate(cdb)
+                };
+                nseek += 1;
                 if confl != ClauseId::default() {
                     // ⊥ ∈ UP(Σb)
                     conflict_analyze(asg, cdb, state, confl); // returns a learnt clause
                     let learnt = &state.new_learnt;
-                    if learnt.iter().all(|l| c_lits.contains(l)) {
+                    if learnt.iter().all(|l| clits.contains(l)) {
                         // cl ⊂ c
-                        assert!(0 < learnt.clone().len());
-                        clauses.push(learnt.clone()); // MODIFIED: Σ ← Σ ∪ {cl}
+                        new_clauses.push(learnt.clone()); // MODIFIED: Σ ← Σ ∪ {cl}
                         shortened = true;
+                        nshrink += 1;
                     } else {
-                        if learnt.len() == c_len {
-                            assert!(1 < learnt.clone().len());
-                            clauses.push(learnt.clone()); // MODIFIED: Σ ← Σ ∪ {cl}
+                        if learnt.len() < c_len {
+                            new_clauses.push(learnt.clone()); // MODIFIED: Σ ← Σ ∪ {cl}
                             i = c_len; // a trick to exit the loop
-                                       // cb.clear();
-                                       // for l in &c_lits {
-                                       //     cb.push(*l);
-                                       // }
                         }
                         // assert_eq!(i, cb.len());
                         if c_len != i {
-                            let temp = c_lits[..i].to_vec();
-                            //std::mem::swap(&mut temp, &mut cb);
+                            let temp = clits[..i].to_vec();
                             assert!(1 < temp.len());
-                            clauses.push(temp); // MODIFIED: Σ ← Σ ∪ {cb}
+                            new_clauses.push(temp); // MODIFIED: Σ ← Σ ∪ {cb}
                             shortened = true;
+                            nshrink += 1;
                         }
                     }
+                } else if asg.stack_len() == nassign_before_propagation {
+                    cache.insert(!*l);
                 } else {
                     // `i` was incremented.
-                    if let Some(ls) = /* cx */
-                        c_lits[i..].iter().find(|l| asg.assigned(**l) == Some(true))
-                    {
+                    if let Some(ls) = clits[i..].iter().find(|l| asg.assigned(**l) == Some(true)) {
                         // ∃(ls ∈ (c\cb))
-                        if 1 < c_len - i
-                        /* cx.len() */
-                        {
+                        if 1 < c_len - i {
                             // (c\cb) /= {ls}
-                            // assert!(1 <= cb.len());
-                            // cb.push(*ls);
-                            let mut temp = c_lits[..i].to_vec();
+                            let mut temp = clits[..i].to_vec();
                             temp.push(*ls);
-                            // std::mem::swap(&mut temp, &mut cb);
                             assert!(1 < temp.len());
-                            clauses.push(temp); // MODIFIED: Σ ← Σ ∪ {cb ∪ {ls}} ;
+                            new_clauses.push(temp); // MODIFIED: Σ ← Σ ∪ {cb ∪ {ls}} ;
                             shortened = true;
+                            nshrink += 1;
                         }
                     }
-                    if let Some(ls) = /* cx */ c_lits[i..]
-                        .iter()
-                        .find(|l| asg.assigned(!**l) == Some(true))
-                    {
+                    if let Some(ls) = clits[i..].iter().find(|l| asg.assigned(!**l) == Some(true)) {
                         // ∃(¬Ls ∈ (c\cb))
-                        let temp: Vec<Lit> = c_lits
+                        let temp: Vec<Lit> = clits
                             .iter()
                             .map(|l| *l)
                             .filter(|l| l != ls)
                             .collect::<Vec<_>>();
                         assert!(1 < temp.len());
-                        clauses.push(temp); // MODIFIED: Σ ← Σ ∪ {c\{ls}}
+                        new_clauses.push(temp); // MODIFIED: Σ ← Σ ∪ {c\{ls}}
                         shortened = true;
+                        nshrink += 1;
                     }
                 }
-                // println!("loop end:: i: {}, c_len: {}, lits: {:?}", i, c_len, c_lits);
                 if !shortened {
-                    assert!(1 < c_lits.len());
-                    cdb.new_clause(asg, &mut c_lits.clone(), false, false);
-                // println!("push back");
+                    let mut cls = clits.clone();
+                    cdb.new_clause(asg, &mut cls, false, false);
                 } else {
                     change = true;
                 }
                 asg.cancel_until(asg.root_level);
-                assert!(asg.assigned(*l).is_none());
-                cdb.eliminate_satisfied_clauses(asg, elim, false);
+                debug_assert!(asg.assigned(*l).is_none());
+                // cdb.eliminate_satisfied_clauses(asg, elim, false);
             }
-            for c in &mut clauses {
+            for c in &mut new_clauses {
                 if c.len() == 1 {
+                    nassign += 1;
                     asg.assign_at_rootlevel(c[0]).expect("impossible");
+                    asg.handle(SolverEvent::Fixed);
                 } else {
-                    assert!(1 < c.len(), format!("c's length is {}", c.len()));
-                    cdb.new_clause(asg, c, false, false);
+                    cdb.new_clause(asg, c, is_learnt, false);
                 }
             }
+            if !new_clauses.is_empty() {
+                cache.clear();
+            }
+            if NSHRINK < nshrink || nseek_max < nseek {
+                break;
+            }
         }
-        // println!("loop end:: ci: {}, cdb: {}, changed: {}", ci, num_c, change);
-        change = false;
+        if NSHRINK < nshrink || nseek_max < nseek {
+            change = false;
+        }
     }
+    asg.handle(SolverEvent::Vivify(false));
+    state.flush("");
+    state.flush(format!("vivified({}, {})", nassign, nshrink));
+}
+
+fn conflict_analyze_2(
+    asg: &mut AssignStack,
+    cdb: &mut ClauseDB,
+    conflicting_clause: ClauseId,
+) -> HashSet<ClauseId> {
+    let mut seen: HashSet<VarId> = HashSet::new();
+    let mut set: HashSet<ClauseId> = HashSet::new();
+    let dl = asg.decision_level();
+    let mut p = cdb[conflicting_clause].lits[0];
+    let vi = p.vi();
+    if !seen.contains(&vi) && 0 < asg.level(vi) {
+        seen.insert(vi);
+    }
+    let mut reason = AssignReason::Implication(conflicting_clause, NULL_LIT);
+    let mut ti = asg.stack_len() - 1; // trail index
+    loop {
+        match reason {
+            AssignReason::Implication(_, l) if l != NULL_LIT => {
+                let vi = l.vi();
+                if !seen.contains(&vi) {
+                    let lvl = asg.level(vi);
+                    if 0 == lvl {
+                        continue;
+                    }
+                    seen.insert(vi);
+                }
+            }
+            AssignReason::Implication(cid, _) => {
+                set.insert(cid);
+                let c = &cdb[cid];
+                for q in &c[1..] {
+                    let vi = q.vi();
+                    if !seen.contains(&vi) {
+                        let lvl = asg.level(vi);
+                        if 0 == lvl {
+                            continue;
+                        }
+                        seen.insert(vi);
+                    }
+                }
+            }
+            _ => (),
+        }
+        if ti == 0 {
+            break;
+        }
+        while {
+            let vi = asg.stack(ti).vi();
+            let lvl = asg.level(vi);
+            !seen.contains(&vi) || lvl != dl
+        } {
+            ti -= 1;
+            if ti == 0 {
+                break;
+            }
+        }
+        p = asg.stack(ti);
+        seen.remove(&p.vi());
+        if ti == 0 {
+            break;
+        }
+        ti -= 1;
+        reason = asg.reason(p.vi());
+    }
+    set
 }

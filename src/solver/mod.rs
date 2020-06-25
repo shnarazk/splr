@@ -58,6 +58,8 @@ pub enum SolverEvent {
     Reinitialize,
     /// stabilization
     Stabilize(bool),
+    /// Vivification: `true` for start, `false` for end.
+    Vivify(bool),
 }
 
 /// The SAT solver object consisting of 6 sub modules.

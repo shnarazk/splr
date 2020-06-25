@@ -51,7 +51,7 @@ impl SolveIF for Solver {
         }
         asg.num_solved_vars = asg.stack_len();
         state.progress_header();
-        state.progress(asg, cdb, elim, rst, Some("preprocessing phase"));
+        state.progress(asg, cdb, elim, rst, Some("preprocessing stage"));
         if 0 < asg.stack_len() {
             cdb.eliminate_satisfied_clauses(asg, elim, false);
         }
@@ -127,11 +127,17 @@ impl SolveIF for Solver {
             }
             elim.stop(asg, cdb);
         }
-        state.progress(asg, cdb, elim, rst, None);
+
+        //
+        //## vivification
+        //
+        state.progress(asg, cdb, elim, rst, Some("preprocessing stage 2"));
+        vivify(asg, cdb, state, 100_000);
 
         //
         //## Search
         //
+        state.progress(asg, cdb, elim, rst, None);
         let answer = search(asg, cdb, elim, rst, state);
         state.progress(asg, cdb, elim, rst, None);
         match answer {
@@ -199,11 +205,6 @@ fn search(
     rst.update(RestarterModule::Luby, 0);
     state.stabilize = false;
 
-    //
-    // test vivification
-    //
-    vivify(asg, cdb, elim, state);
-
     loop {
         asg.reward_update();
         let ci = asg.propagate(cdb);
@@ -256,7 +257,7 @@ fn search(
                     elim.activate();
                 }
                 elim.simplify(asg, cdb, state)?;
-                vivify(asg, cdb, elim, state);
+                vivify(asg, cdb, state, 100_000);
             }
             // By simplification, we may get further solutions.
             if asg.num_solved_vars < asg.stack_len() {

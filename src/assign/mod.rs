@@ -167,6 +167,11 @@ pub struct AssignStack {
     activity_decay_max: f64,
     /// ONLY used in feature EVSIDS
     reward_step: f64,
+
+    //
+    //## Vivification
+    //
+    vivify_restart: usize,
 }
 
 /// Heap of VarId, based on var activity.

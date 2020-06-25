@@ -63,6 +63,7 @@ impl Default for AssignStack {
             activity_decay: 0.0,
             activity_decay_max: 0.0,
             reward_step: 0.0,
+            vivify_restart: 0,
         }
     }
 }
@@ -126,6 +127,13 @@ impl Instantiate for AssignStack {
                     self.trail.len()
                 };
                 self.rebuild_order();
+            }
+            SolverEvent::Vivify(start) => {
+                if start {
+                    self.vivify_restart = self.num_restart;
+                } else {
+                    self.num_restart = self.vivify_restart;
+                }
             }
             _ => (),
         }
