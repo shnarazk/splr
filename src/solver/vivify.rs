@@ -81,14 +81,24 @@ pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State, nsee
             let mut shortened = false;
             let mut i = 0;
             let mut new_clauses: Vec<Vec<Lit>> = Vec::new();
+            let mut reverted = false;
             while !shortened && i < c_len {
                 let l = &clits[i]; // select_a_literal(cx);
                 i += 1;
+                nseek += 1;
                 if i % 20 == 0 {
                     state.flush("");
                     state.flush(format!("vivifying({}, {}, {})...", nassign, nshrink, nseek));
                 }
                 if asg.assigned(*l).is_some() {
+                    continue;
+                }
+                if cache.contains(&!*l) {
+                    if !reverted {
+                        let mut cls = clits.clone();
+                        cdb.new_clause(asg, &mut cls, false, false);
+                        reverted = true;
+                    }
                     continue;
                 }
                 asg.assign_by_decision(!*l); // Σb ← (Σb ∪ {¬l})
@@ -98,7 +108,6 @@ pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State, nsee
                 } else {
                     asg.propagate(cdb)
                 };
-                nseek += 1;
                 if confl != ClauseId::default() {
                     // ⊥ ∈ UP(Σb)
                     conflict_analyze(asg, cdb, state, confl); // returns a learnt clause
@@ -142,7 +151,7 @@ pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State, nsee
                         // ∃(¬Ls ∈ (c\cb))
                         let temp: Vec<Lit> = clits
                             .iter()
-                            .map(|l| *l)
+                            .copied()
                             .filter(|l| l != ls)
                             .collect::<Vec<_>>();
                         assert!(1 < temp.len());
@@ -151,9 +160,10 @@ pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State, nsee
                         nshrink += 1;
                     }
                 }
-                if !shortened {
+                if !shortened && !reverted {
                     let mut cls = clits.clone();
                     cdb.new_clause(asg, &mut cls, false, false);
+                    reverted = true;
                 } else {
                     change = true;
                 }
