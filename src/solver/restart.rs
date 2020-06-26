@@ -658,7 +658,7 @@ impl Export<(usize, f64, f64, f64, usize), RestartMode> for Restarter {
     ///```
     /// use crate::splr::{config::Config, solver::Restarter, types::*};
     /// let rst = Restarter::instantiate(&Config::default(), &CNFDescription::default());
-    /// let (_num_block, _asg_trend, _lbd_get, _lbd_trend) = rst.exports();
+    /// let (_num_block, _asg_trend, _lbd_get, _lbd_trend, _lbd_stab) = rst.exports();
     ///```
     #[inline]
     fn exports(&self) -> (usize, f64, f64, f64, usize) {

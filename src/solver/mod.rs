@@ -162,8 +162,7 @@ mod tests {
     use crate::assign::VarManipulateIF;
     use std::convert::{From, TryFrom};
 
-    #[cfg(not(feature = "no_IO"))]
-    #[test]
+    #[cfg_attr(not(feature = "no_IO"), test)]
     fn test_solver() {
         let config = Config::from("tests/sample.cnf");
         if let Ok(s) = Solver::build(&config) {

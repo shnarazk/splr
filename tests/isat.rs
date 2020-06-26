@@ -40,6 +40,7 @@ fn drive(cnf: &str, mother: Vec<i32>) {
     }
 }
 
+#[cfg(not(feature = "no_IO"))]
 fn run(cnf: &str, assigns: &[i32], switch: bool) -> usize {
     println!("-------------------- {:?}, {}", assigns, switch);
     let mut solver = Solver::try_from(cnf).expect("panic");

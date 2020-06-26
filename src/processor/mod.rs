@@ -826,13 +826,14 @@ where
     true
 }
 
+#[cfg(not(feature = "no_IO"))]
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{assign::VarManipulateIF, processor::EliminateIF, solver::Solver};
     use std::convert::TryFrom;
 
-    #[cfg(not(feature = "no_IO"))]
+    // #[cfg(not(feature = "no_IO"))]
     #[test]
     fn check_elimination() {
         let mut config = Config::default();
