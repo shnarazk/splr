@@ -63,7 +63,7 @@ impl Default for AssignStack {
             activity_decay: 0.0,
             activity_decay_max: 0.0,
             reward_step: 0.0,
-            vivify_restart: 0,
+            vivify_sandbox: (0, 0, 0),
         }
     }
 }
@@ -130,9 +130,12 @@ impl Instantiate for AssignStack {
             }
             SolverEvent::Vivify(start) => {
                 if start {
-                    self.vivify_restart = self.num_restart;
+                    self.vivify_sandbox =
+                        (self.num_conflict, self.num_propagation, self.num_restart);
                 } else {
-                    self.num_restart = self.vivify_restart;
+                    self.num_conflict = self.vivify_sandbox.0;
+                    // self.num_propagation = self.vivify_sandbox.1;
+                    self.num_restart = self.vivify_sandbox.2;
                 }
             }
             _ => (),

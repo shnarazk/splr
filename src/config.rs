@@ -90,13 +90,17 @@ pub struct Config {
     #[cfg_attr(feature = "structopt", structopt(long = "evl", default_value = "0"))]
     pub elim_grw_lim: usize,
 
-    /// #cls to start simplification
-    #[cfg_attr(feature = "structopt", structopt(long = "et", default_value = "40000"))]
-    pub elim_trigger: usize,
+    /// #cls to start in-processor
+    #[cfg_attr(feature = "structopt", structopt(long = "ii", default_value = "20000"))]
+    pub ip_interval: usize,
 
-    /// Pre/in-processor switch
-    #[cfg_attr(feature = "structopt", structopt(long = "PRO", default_value = "1"))]
+    /// Eliminator switch
+    #[cfg_attr(feature = "structopt", structopt(long = "ELI", default_value = "1"))]
     elim: i32,
+
+    /// Vivification switch
+    #[cfg_attr(feature = "structopt", structopt(long = "VIV", default_value = "1"))]
+    vivify: i32,
 
     //
     //## restarter
@@ -213,8 +217,9 @@ impl Default for Config {
             elim_cls_lim: 100,
             elim_var_occ: 10_000,
             elim_grw_lim: 0,
-            elim_trigger: 40000,
+            ip_interval: 20000,
             elim: 1,
+            vivify: 1,
             rst_step: 50,
             rst_bkt_inc: 1.0,
             rst_bkt_pwr: 1.5,
@@ -281,6 +286,9 @@ impl Config {
     }
     pub fn use_elim(&self) -> bool {
         dispatch!(self.elim)
+    }
+    pub fn use_vivify(&self) -> bool {
+        dispatch!(self.vivify)
     }
     pub fn use_rephase(&self) -> bool {
         dispatch!(self.rephase)

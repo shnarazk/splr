@@ -1,7 +1,7 @@
 //! Vivification
 #![allow(dead_code)]
 use {
-    super::{conflict::conflict_analyze, SolverEvent, State},
+    super::{conflict::conflict_analyze_sandbox, SolverEvent, Stat, State},
     crate::{
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
         cdb::{ClauseDB, ClauseDBIF},
@@ -47,18 +47,22 @@ impl ConflictDep {
     }
 }
 
-pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State, nseek_max: usize) {
-    state.flush("vivifying...");
+pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State) {
     asg.handle(SolverEvent::Vivify(true));
+    state[Stat::Vivification] += 1;
+    let nseek_max = 100_000_000_000 / cdb.len();
+    let display_step: usize = 10_000;
     let mut cache: HashSet<Lit> = HashSet::new();
-    const NSHRINK: usize = 4_000;
-    let mut nseek: usize = 0;
+    let mut nseek = 0;
+    let mut ncheck = 0;
     let mut nshrink = 0;
     let mut nassign = 0;
+    let mut to_display = display_step;
     let mut change: bool = true;
-    assert_eq!(asg.decision_level(), asg.root_level);
+    debug_assert_eq!(asg.decision_level(), asg.root_level);
     while change {
         change = false;
+        cache.clear();
         let mut clauses: Vec<ClauseId> = Vec::new();
         for (i, c) in cdb.iter_mut().enumerate().skip(1) {
             if !c.is(Flag::DEAD) && 2 < c.len() {
@@ -70,6 +74,7 @@ pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State, nsee
 
         for ci in clauses.iter().rev() {
             let c: &Clause = &cdb[ci];
+            // Since GC can make `clauses` out of date, we need to check its aliveness here.
             if c.is(Flag::DEAD) {
                 continue;
             }
@@ -86,10 +91,6 @@ pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State, nsee
                 let l = &clits[i]; // select_a_literal(cx);
                 i += 1;
                 nseek += 1;
-                if i % 20 == 0 {
-                    state.flush("");
-                    state.flush(format!("vivifying({}, {}, {})...", nassign, nshrink, nseek));
-                }
                 if asg.assigned(*l).is_some() {
                     continue;
                 }
@@ -101,34 +102,40 @@ pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State, nsee
                     }
                     continue;
                 }
+                ncheck += 1;
+                if to_display <= nseek {
+                    state.flush("");
+                    state.flush(format!(
+                        "vivified(fix:{}, strengthen:{}, try:{}, seek:{}, limit:{})...",
+                        nassign, nshrink, ncheck, nseek, nseek_max,
+                    ));
+                    to_display = nseek + display_step;
+                }
                 asg.assign_by_decision(!*l); // Σb ← (Σb ∪ {¬l})
                 let nassign_before_propagation = asg.stack_len();
-                let confl = if cache.contains(&!*l) {
-                    ClauseId::default()
-                } else {
-                    asg.propagate(cdb)
-                };
+                let confl = asg.propagate(cdb);
                 if confl != ClauseId::default() {
                     // ⊥ ∈ UP(Σb)
-                    conflict_analyze(asg, cdb, state, confl); // returns a learnt clause
+                    conflict_analyze_sandbox(asg, cdb, state, confl);
                     let learnt = &state.new_learnt;
                     if learnt.iter().all(|l| clits.contains(l)) {
                         // cl ⊂ c
                         new_clauses.push(learnt.clone()); // MODIFIED: Σ ← Σ ∪ {cl}
                         shortened = true;
                         nshrink += 1;
+                        cache.insert(!*l);
                     } else {
                         if learnt.len() < c_len {
                             new_clauses.push(learnt.clone()); // MODIFIED: Σ ← Σ ∪ {cl}
                             i = c_len; // a trick to exit the loop
                         }
-                        // assert_eq!(i, cb.len());
                         if c_len != i {
                             let temp = clits[..i].to_vec();
-                            assert!(1 < temp.len());
+                            debug_assert!(1 < temp.len());
                             new_clauses.push(temp); // MODIFIED: Σ ← Σ ∪ {cb}
                             shortened = true;
                             nshrink += 1;
+                            cache.insert(!*l);
                         }
                     }
                 } else if asg.stack_len() == nassign_before_propagation {
@@ -141,7 +148,7 @@ pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State, nsee
                             // (c\cb) /= {ls}
                             let mut temp = clits[..i].to_vec();
                             temp.push(*ls);
-                            assert!(1 < temp.len());
+                            debug_assert!(1 < temp.len());
                             new_clauses.push(temp); // MODIFIED: Σ ← Σ ∪ {cb ∪ {ls}} ;
                             shortened = true;
                             nshrink += 1;
@@ -154,7 +161,7 @@ pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State, nsee
                             .copied()
                             .filter(|l| l != ls)
                             .collect::<Vec<_>>();
-                        assert!(1 < temp.len());
+                        debug_assert!(1 < temp.len());
                         new_clauses.push(temp); // MODIFIED: Σ ← Σ ∪ {c\{ls}}
                         shortened = true;
                         nshrink += 1;
@@ -169,7 +176,6 @@ pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State, nsee
                 }
                 asg.cancel_until(asg.root_level);
                 debug_assert!(asg.assigned(*l).is_none());
-                // cdb.eliminate_satisfied_clauses(asg, elim, false);
             }
             for c in &mut new_clauses {
                 if c.len() == 1 {
@@ -183,82 +189,18 @@ pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State, nsee
             if !new_clauses.is_empty() {
                 cache.clear();
             }
-            if NSHRINK < nshrink || nseek_max < nseek {
+            if nseek_max < nseek {
                 break;
             }
         }
-        if NSHRINK < nshrink || nseek_max < nseek {
+        if nseek_max < nseek {
             change = false;
         }
     }
-    asg.handle(SolverEvent::Vivify(false));
     state.flush("");
-    state.flush(format!("vivified({}, {})", nassign, nshrink));
-}
-
-fn conflict_analyze_2(
-    asg: &mut AssignStack,
-    cdb: &mut ClauseDB,
-    conflicting_clause: ClauseId,
-) -> HashSet<ClauseId> {
-    let mut seen: HashSet<VarId> = HashSet::new();
-    let mut set: HashSet<ClauseId> = HashSet::new();
-    let dl = asg.decision_level();
-    let mut p = cdb[conflicting_clause].lits[0];
-    let vi = p.vi();
-    if !seen.contains(&vi) && 0 < asg.level(vi) {
-        seen.insert(vi);
-    }
-    let mut reason = AssignReason::Implication(conflicting_clause, NULL_LIT);
-    let mut ti = asg.stack_len() - 1; // trail index
-    loop {
-        match reason {
-            AssignReason::Implication(_, l) if l != NULL_LIT => {
-                let vi = l.vi();
-                if !seen.contains(&vi) {
-                    let lvl = asg.level(vi);
-                    if 0 == lvl {
-                        continue;
-                    }
-                    seen.insert(vi);
-                }
-            }
-            AssignReason::Implication(cid, _) => {
-                set.insert(cid);
-                let c = &cdb[cid];
-                for q in &c[1..] {
-                    let vi = q.vi();
-                    if !seen.contains(&vi) {
-                        let lvl = asg.level(vi);
-                        if 0 == lvl {
-                            continue;
-                        }
-                        seen.insert(vi);
-                    }
-                }
-            }
-            _ => (),
-        }
-        if ti == 0 {
-            break;
-        }
-        while {
-            let vi = asg.stack(ti).vi();
-            let lvl = asg.level(vi);
-            !seen.contains(&vi) || lvl != dl
-        } {
-            ti -= 1;
-            if ti == 0 {
-                break;
-            }
-        }
-        p = asg.stack(ti);
-        seen.remove(&p.vi());
-        if ti == 0 {
-            break;
-        }
-        ti -= 1;
-        reason = asg.reason(p.vi());
-    }
-    set
+    state.flush(format!(
+        "vivified(fix:{}, strengthen:{}, try:{}, seek:{})...",
+        nassign, nshrink, ncheck, nseek,
+    ));
+    asg.handle(SolverEvent::Vivify(false));
 }

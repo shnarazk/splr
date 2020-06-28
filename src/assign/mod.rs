@@ -171,7 +171,8 @@ pub struct AssignStack {
     //
     //## Vivification
     //
-    vivify_restart: usize,
+    /// save old num_conflict, num_propagation, num_restart
+    vivify_sandbox: (usize, usize, usize),
 }
 
 /// Heap of VarId, based on var activity.

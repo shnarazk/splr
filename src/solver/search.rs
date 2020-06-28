@@ -129,12 +129,6 @@ impl SolveIF for Solver {
         }
 
         //
-        //## vivification
-        //
-        state.progress(asg, cdb, elim, rst, Some("preprocessing stage 2"));
-        vivify(asg, cdb, state, 100_000);
-
-        //
         //## Search
         //
         state.progress(asg, cdb, elim, rst, None);
@@ -251,13 +245,18 @@ fn search(
             }
             // `elim.to_simplify` is increased much in particular when vars are solved or
             // learnts are small. We don't need to count the number of solved vars.
-            if state.config.elim_trigger < elim.to_simplify as usize {
+            if state.config.ip_interval < elim.to_simplify as usize {
                 elim.to_simplify = 0.0;
-                if elim.enable {
-                    elim.activate();
+                if (state[Stat::Vivification] + elim.exports().0) % 5 == 0
+                    && rst.exports().2 < 100.0
+                {
+                    if elim.enable {
+                        elim.activate();
+                    }
+                    elim.simplify(asg, cdb, state)?;
+                } else if state.config.use_vivify() {
+                    vivify(asg, cdb, state);
                 }
-                elim.simplify(asg, cdb, state)?;
-                vivify(asg, cdb, state, 100_000);
             }
             // By simplification, we may get further solutions.
             if asg.num_solved_vars < asg.stack_len() {
@@ -297,10 +296,6 @@ fn adapt_modules(
         // Need to call it before `cdb.adapt_to`
         // 'decision_level == 0' is required by `cdb.adapt_to`.
         asg.cancel_until(asg.root_level);
-        if elim.enable && elim.exports().0 < 2 {
-            elim.activate();
-            elim.simplify(asg, cdb, state)?;
-        }
         state.select_strategy(asg, cdb);
     }
     #[cfg(feature = "boundary_check")]

@@ -153,6 +153,8 @@ pub enum Stat {
     NoDecisionConflict,
     /// the last number of solved variables
     SolvedRecord,
+    /// the number of vivification
+    Vivification,
     /// don't use this dummy (sentinel at the tail).
     EndOfStatIndex,
 }
@@ -461,17 +463,10 @@ impl StateIF for State {
         let (asg_num_vars, asg_num_solved_vars, asg_num_eliminated_vars, asg_num_unsolved_vars) =
             asg.var_stats();
         let rate = (asg_num_solved_vars + asg_num_eliminated_vars) as f64 / asg_num_vars as f64;
-        let (asg_num_conflict, asg_num_propagation, asg_num_restart, asg_activity_decay) =
-            asg.exports();
+        let (asg_num_conflict, asg_num_propagation, asg_num_restart, _asg_act_dcy) = asg.exports();
 
-        let (
-            cdb_num_active,
-            cdb_num_bi_clause,
-            _num_bi_learnt,
-            cdb_num_lbd2,
-            cdb_num_learnt,
-            _cdb_num_reduction,
-        ) = cdb.exports();
+        let (cdb_num_active, cdb_num_biclause, _num_bl, cdb_num_lbd2, cdb_num_learnt, _cdb_nr) =
+            cdb.exports();
 
         let (elim_num_full, _num_sat, elim_to_simplify) = elim.exports();
 
@@ -511,7 +506,7 @@ impl StateIF for State {
                 "{:>9}",
                 self,
                 LogUsizeId::Binclause,
-                cdb_num_bi_clause // cdb_num_bi_learnt
+                cdb_num_biclause // cdb_num_bi_learnt
             ),
             im!(
                 "{:>9}",
@@ -549,16 +544,16 @@ impl StateIF for State {
             )
         );
         println!(
-            "\x1B[2K        misc|#stb:{}, #smp:{}, 2smp:{}, vdcy:{} ",
-            im!("{:>9}", self, LogUsizeId::Stabilization, rst_num_stb),
+            "\x1B[2K        misc|#stb:{}, #viv:{}, #smp:{}, 2inp:{} ",
+            im!("{:>9}", self, LogUsizeId::Stabilize, rst_num_stb),
+            im!("{:>9}", self, LogUsizeId::Vivify, self[Stat::Vivification]),
             im!("{:>9}", self, LogUsizeId::Simplify, elim_num_full),
             fm!(
                 "{:>9.0}",
                 self,
                 LogF64Id::SimpToGo,
-                self.config.elim_trigger as f64 - elim_to_simplify
+                self.config.ip_interval as f64 - elim_to_simplify
             ),
-            format!("{:>9.4}", asg_activity_decay),
         );
         if let Some(m) = mes {
             println!("\x1B[2K    Strategy|mode: {}", m);
@@ -791,7 +786,8 @@ pub enum LogUsizeId {
     RestartBlock,  // 10: restart_block: usize,
     Restart,       // 11: restart_count: usize,
     Simplify,      // 12: full-featured elimination: usize,
-    Stabilization, // 13: stabilization: usize
+    Stabilize,     // 13: stabilization: usize
+    Vivify,        // 14: vivification: usize
     End,
 }
 

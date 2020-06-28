@@ -235,7 +235,7 @@ pub fn handle_conflict(
 /// ## Conflict Analysis
 ///
 #[allow(clippy::cognitive_complexity)]
-pub fn conflict_analyze(
+fn conflict_analyze(
     asg: &mut AssignStack,
     cdb: &mut ClauseDB,
     state: &mut State,
@@ -414,6 +414,93 @@ pub fn conflict_analyze(
     learnt[0] = !p;
     #[cfg(feature = "trace_analysis")]
     println!("- appending {}, the result is {:?}", learnt[0], learnt);
+    state.minimize_learnt(asg, cdb)
+}
+
+#[allow(clippy::cognitive_complexity)]
+pub fn conflict_analyze_sandbox(
+    asg: &mut AssignStack,
+    cdb: &mut ClauseDB,
+    state: &mut State,
+    conflicting_clause: ClauseId,
+) -> DecisionLevel {
+    let learnt = &mut state.new_learnt;
+    learnt.clear();
+    learnt.push(NULL_LIT);
+    let dl = asg.decision_level();
+    let mut p = cdb[conflicting_clause].lits[0];
+    let mut path_cnt = 0;
+    let vi = p.vi();
+    if !asg.var(vi).is(Flag::CA_SEEN) && 0 < asg.level(vi) {
+        let lvl = asg.level(vi);
+        asg.var_mut(vi).turn_on(Flag::CA_SEEN);
+        if dl <= lvl {
+            path_cnt = 1;
+        } else {
+            learnt.push(p);
+        }
+    }
+    let mut reason = AssignReason::Implication(conflicting_clause, NULL_LIT);
+    let mut ti = asg.stack_len() - 1;
+    loop {
+        match reason {
+            AssignReason::Implication(_, l) if l != NULL_LIT => {
+                let vi = l.vi();
+                if !asg.var(vi).is(Flag::CA_SEEN) {
+                    let lvl = asg.level(vi);
+                    if 0 == lvl {
+                        continue;
+                    }
+                    asg.var_mut(vi).turn_on(Flag::CA_SEEN);
+                    if dl <= lvl {
+                        path_cnt += 1;
+                    }
+                }
+            }
+            AssignReason::Implication(cid, _) => {
+                if cdb[cid].is(Flag::LEARNT)
+                    && !cdb[cid].is(Flag::JUST_USED)
+                    && !cdb.convert_to_permanent(asg, cid)
+                {
+                    cdb[cid].turn_on(Flag::JUST_USED);
+                }
+                let c = &cdb[cid];
+                for q in &c[1..] {
+                    let vi = q.vi();
+                    if !asg.var(vi).is(Flag::CA_SEEN) {
+                        let lvl = asg.level(vi);
+                        if 0 == lvl {
+                            continue;
+                        }
+                        asg.var_mut(vi).turn_on(Flag::CA_SEEN);
+                        if dl <= lvl {
+                            path_cnt += 1;
+                        } else {
+                            learnt.push(*q);
+                        }
+                    }
+                }
+            }
+            AssignReason::None => (),
+        }
+        while {
+            let vi = asg.stack(ti).vi();
+            let lvl = asg.level(vi);
+            let v = asg.var(vi);
+            !v.is(Flag::CA_SEEN) || lvl != dl
+        } {
+            ti -= 1;
+        }
+        p = asg.stack(ti);
+        asg.var_mut(p.vi()).turn_off(Flag::CA_SEEN);
+        path_cnt -= 1;
+        if path_cnt == 0 {
+            break;
+        }
+        ti -= 1;
+        reason = asg.reason(p.vi());
+    }
+    learnt[0] = !p;
     state.minimize_learnt(asg, cdb)
 }
 
