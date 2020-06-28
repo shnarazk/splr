@@ -8,49 +8,13 @@ use {
         state::StateIF,
         types::*,
     },
-    std::collections::{HashMap, HashSet},
+    std::collections::HashSet,
 };
-
-/// map a Lit to a pair of dirty bit and depending clauses.
-type ConflictDepEntry = (bool, HashSet<ClauseId>, Vec<Lit>);
-
-struct ConflictDep {
-    body: HashMap<Lit, ConflictDepEntry>,
-}
-
-impl ConflictDep {
-    fn new() -> Self {
-        ConflictDep {
-            body: HashMap::new(),
-        }
-    }
-    fn get(&self, l: Lit) -> Option<&ConflictDepEntry> {
-        self.body.get(&l)
-    }
-    fn put(&mut self, l: Lit, cid: ClauseId, c: &Clause) {
-        if let Some(e) = &mut self.body.get_mut(&l) {
-            e.0 = true;
-            e.1.insert(cid);
-            e.2 = c.lits.clone();
-        } else {
-            let mut h = HashSet::new();
-            h.insert(cid);
-            self.body.insert(l, (true, h, c.lits.clone()));
-        }
-    }
-    fn purge(&mut self, l: Lit) {
-        if let Some(e) = &mut self.body.get_mut(&l) {
-            e.0 = false;
-            e.1.clear();
-            e.2.clear();
-        }
-    }
-}
 
 pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State) {
     asg.handle(SolverEvent::Vivify(true));
     state[Stat::Vivification] += 1;
-    let nseek_max = 100_000_000_000 / cdb.len();
+    let ncheck_max = 10.0_f64.powf(state.config.vivify_thr) as usize / cdb.count();
     let display_step: usize = 10_000;
     let mut cache: HashSet<Lit> = HashSet::new();
     let mut nseek = 0;
