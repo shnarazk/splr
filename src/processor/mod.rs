@@ -577,7 +577,7 @@ impl Eliminator {
             let best = if cid.is_lifted_lit() {
                 Lit::from(cid).vi()
             } else {
-                let mut tmp = cdb.count(true);
+                let mut tmp = cdb.count();
                 let c = &mut cdb[cid];
                 c.turn_off(Flag::ENQUEUED);
                 let lits = &c.lits;

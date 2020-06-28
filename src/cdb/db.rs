@@ -64,8 +64,8 @@ pub trait ClauseDBIF:
     fn convert_to_permanent<A>(&mut self, asg: &mut A, cid: ClauseId) -> bool
     where
         A: AssignIF;
-    /// return the number of alive clauses in the database. Or return the database size if `active` is `false`.
-    fn count(&self, alive: bool) -> usize;
+    /// return the number of alive clauses in the database.
+    fn count(&self) -> usize;
     /// return the number of clauses which satisfy given flags and aren't DEAD.
     fn countf(&self, mask: Flag) -> usize;
     /// record a clause to unsat certification.
@@ -574,12 +574,8 @@ impl ClauseDBIF for ClauseDB {
         }
         false
     }
-    fn count(&self, alive: bool) -> usize {
-        if alive {
-            self.clause.len() - self.watcher[!NULL_LIT].len() - 1
-        } else {
-            self.clause.len() - 1
-        }
+    fn count(&self) -> usize {
+        self.clause.len() - self.watcher[!NULL_LIT].len() - 1
     }
     fn countf(&self, mask: Flag) -> usize {
         self.clause
@@ -663,8 +659,8 @@ impl ClauseDBIF for ClauseDB {
         self.touched[Lit::from_assign(vi, false)] = true;
     }
     fn check_size(&self) -> Result<bool, SolverError> {
-        if self.soft_limit == 0 || self.count(false) <= self.soft_limit {
-            Ok(0 == self.soft_limit || 4 * self.count(true) < 3 * self.soft_limit)
+        if self.soft_limit == 0 || self.len() <= self.soft_limit {
+            Ok(0 == self.soft_limit || 4 * self.count() < 3 * self.soft_limit)
         } else {
             Err(SolverError::OutOfMemory)
         }
