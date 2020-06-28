@@ -295,7 +295,7 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c  #conflict:{}, #decision:{}, #propagate:{} \n",
+            "c  #conflict:{}, #decision:{}, #propagate:{},\n",
             format!("{:>11}", state[LogUsizeId::Conflict]),
             format!("{:>13}", state[LogUsizeId::Decision]),
             format!("{:>15}", state[LogUsizeId::Propagate]),
@@ -304,7 +304,7 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c   Assignment|#rem:{}, #fix:{}, #elm:{}, prg%:{} \n",
+            "c   Assignment|#rem:{}, #fix:{}, #elm:{}, prg%:{},\n",
             format!("{:>9}", state[LogUsizeId::Remain]),
             format!("{:>9}", state[LogUsizeId::Fixed]),
             format!("{:>9}", state[LogUsizeId::Eliminated]),
@@ -314,7 +314,7 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c       Clause|Remv:{}, LBD2:{}, Binc:{}, Perm:{} \n",
+            "c       Clause|Remv:{}, LBD2:{}, Binc:{}, Perm:{},\n",
             format!("{:>9}", state[LogUsizeId::Removable]),
             format!("{:>9}", state[LogUsizeId::LBD2]),
             format!("{:>9}", state[LogUsizeId::Binclause]),
@@ -324,7 +324,7 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c  {}|#BLK:{}, #RST:{}, eASG:{}, eLBD:{} \n",
+            "c  {}|#BLK:{}, #RST:{}, eASG:{}, eLBD:{},\n",
             if s.rst.active_mode() == RestartMode::Luby {
                 "LubyRestart"
             } else {
@@ -342,7 +342,7 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c     Conflict|eLBD:{}, cnfl:{}, bjmp:{}, rpc%:{} \n",
+            "c     Conflict|eLBD:{}, cnfl:{}, bjmp:{}, rpc%:{},\n",
             format!("{:>9.2}", state[LogF64Id::AveLBD]),
             format!("{:>9.2}", state[LogF64Id::CLevel]),
             format!("{:>9.2}", state[LogF64Id::BLevel]),
@@ -355,17 +355,17 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c         misc|#stb:{}, #smp:{}, 2smp:{}, vdcy:{} \n",
-            format!("{:>9}", state[LogUsizeId::Stabilization]),
+            "c         misc|#stb:{}, #viv:{}, #smp{}, vdcy:{},\n",
+            format!("{:>9}", state[LogUsizeId::Stabilize]),
+            format!("{:>9}", state[LogUsizeId::Vivify]),
             format!("{:>9}", state[LogUsizeId::Simplify]),
-            format!("{:>9.0}", state[LogF64Id::SimpToGo]),
             format!("{:>9.4}", asg_activity_decay),
         )
         .as_bytes(),
     )?;
     out.write_all(
         format!(
-            "c     Strategy|mode:{:>15}, time:{:9.2}\n",
+            "c     Strategy|mode:{:>15}, time:{:9.2},\n",
             state.strategy.0, tm,
         )
         .as_bytes(),
