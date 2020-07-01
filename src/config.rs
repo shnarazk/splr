@@ -76,14 +76,11 @@ pub struct Config {
     //## eliminator
     //
     /// Max #lit for clause subsume
-    #[cfg_attr(feature = "structopt", structopt(long = "ecl", default_value = "100"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "ecl", default_value = "32"))]
     pub elim_cls_lim: usize,
 
     /// Max #cls for var elimination
-    #[cfg_attr(
-        feature = "structopt",
-        structopt(long = "evo", default_value = "10000")
-    )]
+    #[cfg_attr(feature = "structopt", structopt(long = "evo", default_value = "1000"))]
     pub elim_var_occ: usize,
 
     /// Grow limit of #cls in var elim.

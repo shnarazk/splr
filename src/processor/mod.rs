@@ -236,7 +236,7 @@ impl Default for Eliminator {
             clause_queue: Vec::new(),
             bwdsub_assigns: 0,
             elim_lits: Vec::new(),
-            eliminate_var_occurrence_limit: 10_000,
+            eliminate_var_occurrence_limit: 1_000,
             eliminate_combination_limit: 80,
             eliminate_grow_limit: 0, // 64
             eliminate_occurrence_limit: 800,
@@ -572,7 +572,7 @@ impl Eliminator {
             if timedout.load(Ordering::Acquire) {
                 self.clear_clause_queue(cdb);
                 self.clear_var_queue(asg);
-                continue;
+                return Ok(());
             }
             let best = if cid.is_lifted_lit() {
                 Lit::from(cid).vi()
@@ -680,11 +680,7 @@ impl Eliminator {
             const TIMESLOT_FOR_ELIMINATION: u64 = 10;
 
             let timedout2 = timedout.clone();
-            let time = if asg.exports().1 == 0 {
-                100 * TIMESLOT_FOR_ELIMINATION * state.config.timeout as u64
-            } else {
-                TIMESLOT_FOR_ELIMINATION * state.config.timeout as u64
-            };
+            let time = TIMESLOT_FOR_ELIMINATION * state.config.timeout as u64;
             thread::spawn(move || {
                 thread::sleep(Duration::from_millis(time));
                 timedout2.store(true, Ordering::Release);
