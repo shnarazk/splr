@@ -8,32 +8,28 @@ use {
         state::StateIF,
         types::*,
     },
-    std::collections::HashSet,
 };
 
 pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State) {
     asg.handle(SolverEvent::Vivify(true));
     state[Stat::Vivification] += 1;
-    let ncheck_max = 10.0_f64.powf(state.config.vivify_thr) as usize / cdb.count();
-    let display_step: usize = 10_000;
-    let mut cache: HashSet<Lit> = HashSet::new();
-    let mut nseek = 0;
+    // let ncheck_max = 10.0_f64.powf(state.config.vivify_thr) as usize / cdb.count();
+    let display_step: usize = 1_000;
+    let check_thr = state.config.vivify_thr as usize;
     let mut ncheck = 0;
+    let mut nclause = 0;
     let mut nshrink = 0;
     let mut nassign = 0;
     let mut to_display = display_step;
-    let mut change: bool = true;
     debug_assert_eq!(asg.decision_level(), asg.root_level);
-    while change {
-        change = false;
-        cache.clear();
+    'check_loop: loop {
+        let mut changed: bool = false;
         let mut clauses: Vec<ClauseId> = Vec::new();
         for (i, c) in cdb.iter_mut().enumerate().skip(1) {
-            if !c.is(Flag::DEAD) && 2 < c.len() {
+            if !c.is(Flag::DEAD) && state.config.vivify_len < c.len() {
                 clauses.push(ClauseId::from(i));
             }
         }
-        // clauses.sort_by_cached_key(|c| 1 - cdb[c].len() as i32);
         clauses.sort_by_cached_key(|c| cdb.activity(*c) as isize);
 
         for ci in clauses.iter().rev() {
@@ -42,129 +38,107 @@ pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State) {
             if c.is(Flag::DEAD) {
                 continue;
             }
+            nclause += 1;
             let is_learnt = c.is(Flag::LEARNT);
             let clits = c.lits.clone();
             let c_len = clits.len();
             cdb.detach(*ci);
             cdb.garbage_collect();
             let mut shortened = false;
-            let mut i = 0;
-            let mut new_clauses: Vec<Vec<Lit>> = Vec::new();
-            let mut reverted = false;
-            while !shortened && i < c_len {
-                let l = &clits[i]; // select_a_literal(cx);
-                i += 1;
-                nseek += 1;
+            let mut new_clause: Vec<Lit> = Vec::new();
+            for (i, l) in clits.iter().enumerate() {
                 if asg.assigned(*l).is_some() {
                     continue;
                 }
-                if cache.contains(&!*l) {
-                    if !reverted {
-                        let mut cls = clits.clone();
-                        cdb.new_clause(asg, &mut cls, false, false);
-                        reverted = true;
-                    }
-                    continue;
-                }
                 ncheck += 1;
-                if to_display <= nseek {
+                if to_display <= ncheck {
                     state.flush("");
                     state.flush(format!(
-                        "vivified(fix:{}, strengthen:{}, try:{}, seek:{}, limit:{})...",
-                        nassign, nshrink, ncheck, nseek, nseek_max,
+                        "vivifying(fix:{}, strengthen:{}/{}, check:{}/{})...",
+                        nassign, nshrink, nclause, ncheck, check_thr,
                     ));
-                    to_display = nseek + display_step;
+                    to_display = ncheck + display_step;
                 }
-                asg.assign_by_decision(!*l); // Σb ← (Σb ∪ {¬l})
-                let nassign_before_propagation = asg.stack_len();
+                asg.assign_by_decision(!*l);
                 let confl = asg.propagate(cdb);
                 if confl != ClauseId::default() {
-                    // ⊥ ∈ UP(Σb)
                     conflict_analyze_sandbox(asg, cdb, state, confl);
                     let learnt = &state.new_learnt;
                     if learnt.iter().all(|l| clits.contains(l)) {
-                        // cl ⊂ c
-                        new_clauses.push(learnt.clone()); // MODIFIED: Σ ← Σ ∪ {cl}
+                        new_clause = learnt.clone();
                         shortened = true;
-                        nshrink += 1;
-                        cache.insert(!*l);
                     } else {
                         if learnt.len() < c_len {
-                            new_clauses.push(learnt.clone()); // MODIFIED: Σ ← Σ ∪ {cl}
-                            i = c_len; // a trick to exit the loop
+                            asg.cancel_until(asg.root_level);
+                            break;
                         }
-                        if c_len != i {
-                            let temp = clits[..i].to_vec();
-                            debug_assert!(1 < temp.len());
-                            new_clauses.push(temp); // MODIFIED: Σ ← Σ ∪ {cb}
+                        if i < c_len - 1 {
+                            new_clause = clits[..=i].to_vec();
                             shortened = true;
-                            nshrink += 1;
-                            cache.insert(!*l);
                         }
                     }
-                } else if asg.stack_len() == nassign_before_propagation {
-                    cache.insert(!*l);
-                } else {
-                    // `i` was incremented.
-                    if let Some(ls) = clits[i..].iter().find(|l| asg.assigned(**l) == Some(true)) {
-                        // ∃(ls ∈ (c\cb))
-                        if 1 < c_len - i {
-                            // (c\cb) /= {ls}
-                            let mut temp = clits[..i].to_vec();
-                            temp.push(*ls);
-                            debug_assert!(1 < temp.len());
-                            new_clauses.push(temp); // MODIFIED: Σ ← Σ ∪ {cb ∪ {ls}} ;
-                            shortened = true;
-                            nshrink += 1;
-                        }
-                    }
-                    if let Some(ls) = clits[i..].iter().find(|l| asg.assigned(!**l) == Some(true)) {
-                        // ∃(¬Ls ∈ (c\cb))
-                        let temp: Vec<Lit> = clits
-                            .iter()
-                            .copied()
-                            .filter(|l| l != ls)
-                            .collect::<Vec<_>>();
-                        debug_assert!(1 < temp.len());
-                        new_clauses.push(temp); // MODIFIED: Σ ← Σ ∪ {c\{ls}}
+                } else if let Some(ls) = clits[i + 1..]
+                    .iter()
+                    .find(|l| asg.assigned(**l) == Some(true))
+                {
+                    if i < c_len - 1 {
+                        new_clause = clits[..=i].to_vec();
+                        new_clause.push(*ls);
                         shortened = true;
-                        nshrink += 1;
                     }
-                }
-                if !shortened && !reverted {
-                    let mut cls = clits.clone();
-                    cdb.new_clause(asg, &mut cls, false, false);
-                    reverted = true;
-                } else {
-                    change = true;
+                } else if let Some(ls) = clits[i + 1..]
+                    .iter()
+                    .find(|l| asg.assigned(!**l) == Some(true))
+                {
+                    new_clause = clits
+                        .iter()
+                        .copied()
+                        .filter(|l| l != ls)
+                        .collect::<Vec<_>>();
+                    shortened = true;
                 }
                 asg.cancel_until(asg.root_level);
                 debug_assert!(asg.assigned(*l).is_none());
-            }
-            for c in &mut new_clauses {
-                if c.len() == 1 {
-                    nassign += 1;
-                    asg.assign_at_rootlevel(c[0]).expect("impossible");
-                    asg.handle(SolverEvent::Fixed);
-                } else {
-                    cdb.new_clause(asg, c, is_learnt, false);
+                if shortened {
+                    break;
                 }
             }
-            if !new_clauses.is_empty() {
-                cache.clear();
+            if shortened {
+                if new_clause.len() == 1 {
+                    nassign += 1;
+                    asg.assign_at_rootlevel(new_clause[0]).expect("impossible");
+                    asg.handle(SolverEvent::Fixed);
+                } else {
+                    nshrink += 1;
+                    cdb.new_clause(asg, &mut new_clause, is_learnt, false);
+                }
+                changed = true;
+            } else {
+                let mut cls = clits.clone();
+                cdb.new_clause(asg, &mut cls, false, false);
             }
-            if nseek_max < nseek {
-                break;
+            if check_thr < ncheck {
+                break 'check_loop;
             }
         }
-        if nseek_max < nseek {
-            change = false;
+        if !changed {
+            break;
         }
     }
+    if 65536.0 <= state.config.vivify_thr {
+        state.config.vivify_thr = 4096.0;
+    } else {
+        state.config.vivify_thr *= 2.0;
+    }
+    // if nassign == 0 && state.config.vivify_thr < 20000.0 {
+    //     state.config.vivify_thr *= 1.2;
+    // } else if 6000.0 < state.config.vivify_thr {
+    //     state.config.vivify_thr *= 0.95;
+    // }
     state.flush("");
     state.flush(format!(
-        "vivified(fix:{}, strengthen:{}, try:{}, seek:{})...",
-        nassign, nshrink, ncheck, nseek,
+        "vivified(fix:{} & strengthen:{} of clauses:{})...",
+        nassign, nshrink, nclause,
     ));
     asg.handle(SolverEvent::Vivify(false));
 }

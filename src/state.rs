@@ -544,15 +544,20 @@ impl StateIF for State {
             )
         );
         println!(
-            "\x1B[2K        misc|#stb:{}, #viv:{}, #smp:{}, 2inp:{} ",
+            "\x1B[2K        misc|#stb:{}, #viv:{}, #eli:{}, {}:{} ",
             im!("{:>9}", self, LogUsizeId::Stabilize, rst_num_stb),
             im!("{:>9}", self, LogUsizeId::Vivify, self[Stat::Vivification]),
             im!("{:>9}", self, LogUsizeId::Simplify, elim_num_full),
+            if self.config.use_elim() && (self.stats[Stat::Vivification] + elim_num_full) % 4 == 0 {
+                "2eli"
+            } else {
+                "2viv"
+            },
             fm!(
                 "{:>9.0}",
                 self,
                 LogF64Id::SimpToGo,
-                self.config.ip_interval as f64 - elim_to_simplify
+                (self.config.ip_interval as f64 - elim_to_simplify).max(0.0)
             ),
         );
         if let Some(m) = mes {

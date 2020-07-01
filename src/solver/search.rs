@@ -128,6 +128,8 @@ impl SolveIF for Solver {
             elim.stop(asg, cdb);
         }
 
+        vivify(asg, cdb, state);
+
         //
         //## Search
         //
@@ -247,7 +249,8 @@ fn search(
             // learnts are small. We don't need to count the number of solved vars.
             if state.config.ip_interval < elim.to_simplify as usize {
                 elim.to_simplify = 0.0;
-                if (state[Stat::Vivification] + elim.exports().0) % 5 == 0
+                if state.config.use_elim()
+                    && (state[Stat::Vivification] + elim.exports().0) % 4 == 0
                     && rst.exports().2 < 100.0
                 {
                     if elim.enable {
