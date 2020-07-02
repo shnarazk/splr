@@ -88,23 +88,30 @@ pub struct Config {
     pub elim_grw_lim: usize,
 
     /// #cls to start in-processor
-    #[cfg_attr(feature = "structopt", structopt(long = "ii", default_value = "50000"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "ii", default_value = "8192"))]
     pub ip_interval: usize,
 
     /// Eliminator switch
     #[cfg_attr(feature = "structopt", structopt(long = "ELI", default_value = "1"))]
     elim: i32,
 
-    /// Vivification check limit
-    #[cfg_attr(feature = "structopt", structopt(long = "vl", default_value = "3"))]
-    pub vivify_len: usize,
+    /// modulo for elimination against vivification
+    #[cfg_attr(feature = "structopt", structopt(long = "vm", default_value = "3"))]
+    pub ve_modulo: usize,
 
-    /// Vivification check limit
+    /// lower bound of Vivification check loop
     #[cfg_attr(
         feature = "structopt",
-        structopt(long = "vt", default_value = "4096.0")
+        structopt(long = "vb", default_value = "8192.0")
     )]
-    pub vivify_thr: f64,
+    pub vivify_beg: f64,
+
+    /// upper bound of Vivification check loop
+    #[cfg_attr(
+        feature = "structopt",
+        structopt(long = "ve", default_value = "65536.0")
+    )]
+    pub vivify_end: f64,
 
     /// Vivification switch
     #[cfg_attr(feature = "structopt", structopt(long = "VIV", default_value = "1"))]
@@ -227,8 +234,9 @@ impl Default for Config {
             elim_grw_lim: 0,
             ip_interval: 50000,
             elim: 1,
-            vivify_len: 2,
-            vivify_thr: 6000.0,
+            ve_modulo: 3,
+            vivify_beg: 8192.0,
+            vivify_end: 65536.0,
             vivify: 1,
             rst_step: 50,
             rst_bkt_inc: 1.0,

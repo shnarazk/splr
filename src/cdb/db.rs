@@ -200,6 +200,9 @@ impl ActivityIF for ClauseDB {
     fn activity(&mut self, ci: Self::Ix) -> f64 {
         self[ci].reward
     }
+    fn set_activity(&mut self, ci: Self::Ix, val: f64) {
+        self[ci].reward = val;
+    }
     fn bump_activity(&mut self, cid: Self::Ix, _: Self::Inc) {
         let c = &mut self.clause[cid.ordinal as usize];
         let a = c.reward + self.activity_inc;

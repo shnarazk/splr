@@ -210,9 +210,7 @@ pub fn handle_conflict(
         asg.assign_by_implication(l0, AssignReason::Implication(cid, reason), al);
         let lbd = cdb[cid].rank;
         rst.update(RestarterModule::LBD, lbd);
-        if 1 < learnt_len {
-            elim.to_simplify += 1.0;
-        }
+        elim.to_simplify += 1.0;
     }
     cdb.scale_activity();
     if 0 < state.config.dump_int && num_conflict % state.config.dump_int == 0 {

@@ -32,6 +32,8 @@ pub trait PropagateIF {
     fn assign_by_unitclause(&mut self, l: Lit);
     /// execute *backjump*.
     fn cancel_until(&mut self, lv: DecisionLevel);
+    /// execute *backjump*.
+    fn cancel_until_sandbox(&mut self, lv: DecisionLevel);
     /// execute *boolean constraint propagation* or *unit propagation*.
     fn propagate<C>(&mut self, cdb: &mut C) -> ClauseId
     where
@@ -166,6 +168,43 @@ impl PropagateIF for AssignStack {
             unset_assign!(self, vi);
             self.reason[vi] = AssignReason::default();
             self.reward_at_unassign(vi);
+            self.insert_heap(vi);
+        }
+        self.trail.truncate(shift);
+        debug_assert!(self
+            .trail
+            .iter()
+            .all(|l| var_assign!(self, l.vi()).is_some()));
+        debug_assert!(self.trail.iter().all(|k| !self.trail.contains(&!*k)));
+        self.trail_lim.truncate(lv as usize);
+        // assert!(lim < self.q_head) dosen't hold sometimes in chronoBT.
+        self.q_head = self.q_head.min(lim);
+        if lv == self.root_level {
+            self.num_restart += 1;
+        }
+    }
+    fn cancel_until_sandbox(&mut self, lv: DecisionLevel) {
+        if self.trail_lim.len() as u32 <= lv {
+            return;
+        }
+        if self.best_assign {
+            self.save_phases();
+            self.best_assign = false;
+        }
+        let lim = self.trail_lim[lv as usize];
+        let mut shift = lim;
+        for i in lim..self.trail.len() {
+            let l = self.trail[i];
+            let vi = l.vi();
+            if self.level[vi] <= lv {
+                self.trail[shift] = l;
+                shift += 1;
+                continue;
+            }
+            let v = &mut self.var[vi];
+            v.set(Flag::PHASE, var_assign!(self, vi).unwrap());
+            unset_assign!(self, vi);
+            self.reason[vi] = AssignReason::default();
             self.insert_heap(vi);
         }
         self.trail.truncate(shift);
