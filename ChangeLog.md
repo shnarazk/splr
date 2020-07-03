@@ -1,5 +1,6 @@
 ## 0.4.2, 2020-07-XX
 
+- implement clause vivification
 - add `ClauseDB::bin_watcher`
 - delete `Watch::binary`
 - `ClauseDB::new_clause` takes `&mut Vec<Lit>` instead of `&mut [Lit]`
@@ -7,6 +8,7 @@
 - stop sorting literals in `ClauseDB::new_clause`
 - fix the certification symbol used by removing clauses
 - fix a wrong initial value for `Config::rst_lbd_thr` which should be larger than 1.0
+- revise the timeout for pre-processor
 
 ## 0.4.1, 2020-05-28
 
