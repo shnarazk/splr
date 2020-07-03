@@ -13,7 +13,6 @@ use {
 pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State) {
     asg.handle(SolverEvent::Vivify(true));
     state[Stat::Vivification] += 1;
-    // let ncheck_max = 10.0_f64.powf(state.config.vivify_thr) as usize / cdb.count();
     let display_step: usize = 1_000;
     let check_thr = state.vivify_thr as usize;
     let mut ncheck = 0;
@@ -37,8 +36,6 @@ pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State) {
                 .max()
                 .unwrap()
         });
-        // cdb.activity(*c) as isize);
-
         for ci in clauses.iter().rev() {
             let reward = cdb.activity(*ci);
             let c: &Clause = &cdb[ci];
