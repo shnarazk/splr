@@ -95,18 +95,18 @@ pub struct Config {
     #[cfg_attr(feature = "structopt", structopt(long = "ELI", default_value = "1"))]
     elim: i32,
 
-    /// modulo for elimination against vivification
-    #[cfg_attr(feature = "structopt", structopt(long = "vm", default_value = "3"))]
+    /// modulo for elim.-to-vivif.
+    #[cfg_attr(feature = "structopt", structopt(long = "vem", default_value = "3"))]
     pub ve_modulo: usize,
 
-    /// lower bound of Vivification check loop
+    /// lower bound of vivif. loop
     #[cfg_attr(
         feature = "structopt",
         structopt(long = "vb", default_value = "8192.0")
     )]
     pub vivify_beg: f64,
 
-    /// upper bound of Vivification check loop
+    /// upper bound of vivif. loop
     #[cfg_attr(
         feature = "structopt",
         structopt(long = "ve", default_value = "65536.0")
