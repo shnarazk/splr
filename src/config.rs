@@ -73,6 +73,17 @@ pub struct Config {
     reduce: i32,
 
     //
+    //## inprocessor
+    //
+    /// #cls to start in-processor
+    #[cfg_attr(feature = "structopt", structopt(long = "ii", default_value = "8192"))]
+    pub ip_interval: usize,
+
+    /// Modulo of in-process elim.
+    #[cfg_attr(feature = "structopt", structopt(long = "iem", default_value = "3"))]
+    pub ve_modulo: usize,
+
+    //
     //## eliminator
     //
     /// Max #lit for clause subsume
@@ -87,18 +98,13 @@ pub struct Config {
     #[cfg_attr(feature = "structopt", structopt(long = "evl", default_value = "0"))]
     pub elim_grw_lim: usize,
 
-    /// #cls to start in-processor
-    #[cfg_attr(feature = "structopt", structopt(long = "ii", default_value = "8192"))]
-    pub ip_interval: usize,
-
     /// Eliminator switch
     #[cfg_attr(feature = "structopt", structopt(long = "ELI", default_value = "1"))]
     elim: i32,
 
-    /// Modulo of in-process elim.
-    #[cfg_attr(feature = "structopt", structopt(long = "vem", default_value = "3"))]
-    pub ve_modulo: usize,
-
+    //
+    //## vivifier
+    //
     /// Lower bound of vivif. loop
     #[cfg_attr(feature = "structopt", structopt(long = "vb", default_value = "8192"))]
     pub vivify_beg: f64,
