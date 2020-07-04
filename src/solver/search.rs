@@ -249,7 +249,7 @@ fn search(
                 elim.to_simplify = 0.0;
                 state.config.ip_interval *= 2;
                 if state.config.use_elim()
-                    && (state[Stat::Vivification] + elim.exports().0) % state.config.ve_modulo == 0
+                    && (state[Stat::Vivification] + elim.exports().0) % state.config.ie_modulo == 0
                     && rst.exports().2 < 100.0
                 {
                     if elim.enable {

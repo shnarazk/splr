@@ -81,7 +81,7 @@ pub struct Config {
 
     /// Modulo of in-process elim.
     #[cfg_attr(feature = "structopt", structopt(long = "iem", default_value = "3"))]
-    pub ve_modulo: usize,
+    pub ie_modulo: usize,
 
     //
     //## eliminator
@@ -229,12 +229,12 @@ impl Default for Config {
             use_log: false,
             clause_limit: 0,
             reduce: 1,
+            ip_interval: 50000,
+            ie_modulo: 3,
             elim_cls_lim: 100,
             elim_var_occ: 10_000,
             elim_grw_lim: 0,
-            ip_interval: 50000,
             elim: 1,
-            ve_modulo: 3,
             vivify_beg: 8192.0,
             vivify_end: 65536.0,
             vivify: 1,

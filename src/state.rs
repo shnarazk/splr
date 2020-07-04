@@ -553,11 +553,13 @@ impl StateIF for State {
             im!("{:>9}", self, LogUsizeId::Vivify, self[Stat::Vivification]),
             im!("{:>9}", self, LogUsizeId::Simplify, elim_num_full),
             if self.config.use_elim()
-                && (self.stats[Stat::Vivification] + elim_num_full) % self.config.ve_modulo == 0
+                && (self.stats[Stat::Vivification] + elim_num_full) % self.config.ie_modulo == 0
             {
                 "2eli"
-            } else {
+            } else if self.config.use_vivify() {
                 "2viv"
+            } else {
+                "noop"
             },
             fm!(
                 "{:>9.0}",
