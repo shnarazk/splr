@@ -91,7 +91,7 @@ pub struct Config {
     pub elim_cls_lim: usize,
 
     /// Max #cls for var elimination
-    #[cfg_attr(feature = "structopt", structopt(long = "evo", default_value = "1000"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "evo", default_value = "8192"))]
     pub elim_var_occ: usize,
 
     /// Grow limit of #cls in var elim.
@@ -231,8 +231,8 @@ impl Default for Config {
             reduce: 1,
             ip_interval: 50000,
             ie_modulo: 3,
-            elim_cls_lim: 100,
-            elim_var_occ: 10_000,
+            elim_cls_lim: 32,
+            elim_var_occ: 8192,
             elim_grw_lim: 0,
             elim: 1,
             vivify_beg: 8192.0,
