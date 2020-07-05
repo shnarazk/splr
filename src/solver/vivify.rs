@@ -74,7 +74,9 @@ pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State) {
                         shortened = true;
                     } else {
                         if learnt.len() < c_len {
-                            asg.cancel_until_sandbox(asg.root_level);
+                            assert!(new_clause.is_empty());
+                            new_clause = learnt.clone();
+                            // asg.cancel_until_sandbox(asg.root_level);
                             break;
                         }
                         if i < c_len - 1 {
@@ -102,13 +104,14 @@ pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State) {
                         .collect::<Vec<_>>();
                     shortened = true;
                 }
-                asg.cancel_until_sandbox(asg.root_level);
-                debug_assert!(asg.assigned(*l).is_none());
+                // asg.cancel_until_sandbox(asg.root_level);
+                // debug_assert!(asg.assigned(*l).is_none());
                 if shortened {
                     break;
                 }
             }
-            if shortened {
+            asg.cancel_until_sandbox(asg.root_level);
+            if !new_clause.is_empty() {
                 if new_clause.len() == 1 {
                     nassign += 1;
                     asg.assign_at_rootlevel(new_clause[0]).expect("impossible");
@@ -117,6 +120,8 @@ pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State) {
                     nshrink += 1;
                     cdb.new_clause(asg, &mut new_clause, is_learnt, false);
                 }
+            }
+            if shortened {
                 changed = true;
             } else {
                 let mut cls = clits.clone();
