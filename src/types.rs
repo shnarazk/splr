@@ -678,7 +678,8 @@ bitflags! {
         const ENQUEUED     = 0b0000_0000_0001_0000;
         /// mark to run garbage collector on the corresponding watcher lists
         const TOUCHED      = 0b0000_0000_0010_0000;
-
+        /// for vivified clause
+        const VIVIFIED     = 0b0000_0000_0100_0000;
         //
         //## For Var
         //
