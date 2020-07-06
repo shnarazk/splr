@@ -8,7 +8,7 @@ use {
         state::StateIF,
         types::*,
     },
-    std::collections::HashSet,
+    std::{borrow::Cow, collections::HashSet},
 };
 
 pub fn vivify_old(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State) {
@@ -154,17 +154,18 @@ pub fn vivify_old(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State) 
 pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State) {
     asg.handle(SolverEvent::Vivify(true));
     state[Stat::Vivification] += 1;
-    let display_step: usize = 1_000;
+    let display_step: usize = 100;
     let check_thr = state.vivify_thr as usize;
     let mut ncheck = 0;
     let mut nclause = 0;
+    let mut npurge = 0;
     let mut nshrink = 0;
-    let mut nassign = 0;
+    let mut nassert = 0;
     let mut to_display = display_step;
     debug_assert_eq!(asg.decision_level(), asg.root_level);
-    if asg.propagate(cdb) != ClauseId::default() {
-        panic!("eabarmbrr");
-    }
+    // if asg.propagate(cdb) != ClauseId::default() {
+    //     panic!("eabarmbrr");
+    // }
     let mut clauses: Vec<ClauseId> = Vec::new();
     for (i, c) in cdb.iter_mut().enumerate().skip(1) {
         if !c.is(Flag::DEAD) && 2 < c.len() {
@@ -190,36 +191,53 @@ pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State) {
         let clits = c.lits.clone();
         let mut v: Vec<Lit> = Vec::new();
         let mut vivified: Vec<Lit> = Vec::new();
-        for (i, l) in clits.iter().enumerate() {
+        for l in clits.iter() {
             ncheck += 1;
             if to_display <= ncheck {
                 state.flush("");
                 state.flush(format!(
-                    "vivifying(fix:{}, strengthen:{}/{}, check:{}/{})...",
-                    nassign, nshrink, nclause, ncheck, check_thr,
+                    "vivifying(assert:{}, purge:{} strengthen:{}, check:{}/{})...",
+                    nassert, npurge, nshrink, ncheck, check_thr,
                 ));
                 to_display = ncheck + display_step;
             }
             match asg.assigned(*l) {
                 Some(true) => {
-                    let mut r: Vec<Lit> = match asg.reason(l.vi()) {
-                        AssignReason::None => continue 'next_clause,
+                    let r: Vec<Lit> = match asg.reason(l.vi()) {
+                        AssignReason::None => Vec::new(),
                         AssignReason::Implication(cid, _) => cdb[cid].lits.to_vec(),
                     };
-                    for lit in &mut r {
-                        if *lit == *l {
-                            *lit = !*l;
-                            break;
-                        }
+                    // for lit in &mut r {
+                    //     if *lit == *l {
+                    //        *lit = !*l;
+                    //        break;
+                    //     }
+                    // }
+                    v.push(*l);
+                    vivified = asg.minimize(cdb, &v, &r); // Rule 2
+                    #[cfg(debug)]
+                    {
+                        println!(
+                            "\nminimize subclause v:{:?} to {:?} under satisfied:{}; reason:{:?}",
+                            i32s(&v),
+                            i32s(&vivified),
+                            !*l,
+                            i32s(&r),
+                        );
                     }
-                    v.push(!*l);
-                    vivified = asg.remove_redundant(cdb, &v, &r); // Rule 2
-                    assert!(0 < vivified.len());
-                    continue 'next_clause;
+                    if vivified.is_empty() {
+                        npurge += 1;
+                        cdb.detach(*ci);
+                        cdb.garbage_collect();
+                        continue 'next_clause;
+                    }
                     break;
+                    // state.flush(".");
+                    //continue 'next_clause;
                 }
                 Some(false) => {
-                    v.push(!*l); // Rule 4, // continue
+                    continue;
+                    //v.push(!*l);                          // Rule 4
                 }
                 None => {
                     let cid: Option<ClauseId> = match v.len() {
@@ -228,45 +246,57 @@ pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State) {
                             asg.assign_by_decision(v[0]);
                             None
                         }
-                        _ => {
-                            let mut vv = v.clone();
-                            Some(cdb.new_clause(asg, &mut vv, false, false)) // L.12
-                        }
+                        _ => Some(cdb.new_clause(asg, &mut v.clone(), false, true)), // L.12
                     };
                     asg.assign_by_decision(!*l);
-                    let confl = asg.propagate(cdb);
-                    v.push(!*l);
-                    if confl == ClauseId::default() {
-                        if let Some(cj) = cid {
-                            cdb.detach(cj);
-                            cdb.garbage_collect();
+                    let cc = asg.propagate(cdb);
+                    if cc != ClauseId::default() {
+                        v.push(!*l);
+                        let mut r = cdb[cc].lits.clone();
+                        r.push(!*l);
+                        vivified = asg.minimize(cdb, &v, &r); // Rule 3
+                        for l in &mut vivified {
+                            *l = !*l;
                         }
-                        asg.cancel_until_sandbox(asg.root_level);
+                    /*
+                    assert!(avivified.iter().all(|l| v.contains(l)),
+                            format!("{:?} + {:?} => {:?}",
+                                    v,
+                                    cdb[cc].lits,
+                                    avivified,
+                                    ),
+                    );
+                    */
                     } else {
-                        let avivified = asg.remove_redundant(cdb, &v, &cdb[confl].lits); // Rule 3
-                        assert!(
-                            0 < avivified.len(),
-                            format!(
-                                "empty vivified, v.len: {}, nassign: {}",
-                                v.len(),
-                                asg.stack_len(),
-                            ),
-                        );
-                        if let Some(cj) = cid {
-                            cdb.detach(cj);
-                            cdb.garbage_collect();
+                        v.push(*l);
+                    }
+                    if let Some(cj) = cid {
+                        cdb.detach(cj);
+                        cdb.garbage_collect();
+                    }
+                    asg.cancel_until_sandbox(asg.root_level);
+                    if cc != ClauseId::default() {
+                        #[cfg(debug)]
+                        if vivified.len() <= 1 {
+                            println!(
+                                "\nAssign:{:?} from assumed v:{:?} propagating:{} @{}; conf:{}",
+                                i32s(&vivified),
+                                i32s(&v),
+                                !*l,
+                                i,
+                                &cdb[cc],
+                            );
                         }
-                        asg.cancel_until_sandbox(asg.root_level);
-                        // continue 'next_clause;
-                        break;
+                        break; // continue 'next_clause;
                     }
                 }
             }
         }
         if vivified.is_empty() {
-            for l in &mut v {
-                vivified.push(!*l);
-            }
+            // for l in &mut v {
+            //     *l = !*l;
+            // }
+            std::mem::swap(&mut vivified, &mut v);
         }
         match vivified.len() {
             0 => {
@@ -276,17 +306,19 @@ pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State) {
                 break 'next_clause;
             }
             1 => {
-                nassign += 1;
+                nassert += 1;
+                assert_eq!(asg.root_level, asg.decision_level());
                 asg.assign_at_rootlevel(vivified[0]).expect("impossible");
                 asg.handle(SolverEvent::Fixed);
-                let confl = asg.propagate(cdb);
-                if confl != ClauseId::default() {
-                    panic!("eabarmbrr");
-                }
+                // if asg.propagate(cdb) != ClauseId::default() {
+                //     panic!("## propagate emits a conflict.");
+                // }
             }
-            _ => {
-                nshrink += 1;
-                let cj = cdb.new_clause(asg, &mut vivified, is_learnt, false);
+            n => {
+                if n < clits.len() {
+                    nshrink += 1;
+                }
+                let cj = cdb.new_clause(asg, &mut vivified, is_learnt, true);
                 cdb.set_activity(cj, reward);
             }
         }
@@ -303,23 +335,23 @@ pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State) {
     }
     state.flush("");
     state.flush(format!(
-        "vivified(fix:{} & strengthen:{} of clauses:{})...",
-        nassign, nshrink, nclause,
+        "vivified(assert:{} of literals:{}; purge:{} strengthen:{} of clauses:{})...",
+        nassert, ncheck, npurge, nshrink, nclause,
     ));
     asg.handle(SolverEvent::Vivify(false));
 }
 
 impl AssignStack {
-    fn reason_literals<'a>(&self, cdb: &'a ClauseDB, l: Lit) -> &'a [Lit] {
+    fn reason_literals<'a>(&self, cdb: &'a ClauseDB, l: Lit) -> Cow<'a, Vec<Lit>> {
         match self.reason(l.vi()) {
-            AssignReason::Implication(cid, _) => &cdb[cid].lits,
-            AssignReason::None => &cdb[ClauseId::default()].lits,
+            AssignReason::Implication(cid, _) => Cow::Borrowed(&cdb[cid].lits),
+            AssignReason::None => Cow::Owned(vec![l]),
         }
     }
 
     /// inspect the complete implication graph to collect a disjunction of a subset of
-    /// negated literals of `clause`
-    fn remove_redundant(&mut self, cdb: &ClauseDB, clause: &[Lit], reason: &[Lit]) -> Vec<Lit> {
+    /// negated literals of `lits`
+    fn minimize(&mut self, cdb: &ClauseDB, lits: &[Lit], reason: &[Lit]) -> Vec<Lit> {
         let mut seen: HashSet<Lit> = HashSet::new();
         let mut res: Vec<Lit> = Vec::new();
         for l in reason {
@@ -330,12 +362,13 @@ impl AssignStack {
             if !seen.contains(&!*l) && !seen.contains(l) {
                 continue;
             }
-            if clause.contains(l) || clause.contains(&!*l) {
+            if lits.contains(l) || lits.contains(&!*l) {
                 res.push(*l);
                 continue;
             }
             for r in self.reason_literals(cdb, *l).iter() {
                 seen.insert(*r);
+                seen.insert(!*r);
             }
         }
         /*
