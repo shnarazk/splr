@@ -247,7 +247,8 @@ fn search(
             // learnts are small. We don't need to count the number of solved vars.
             if state.config.ip_interval < elim.to_simplify as usize {
                 elim.to_simplify = 0.0;
-                state.config.ip_interval *= 2;
+                state.config.ip_interval =
+                    ((state.config.ip_interval as f64) * state.config.ip_scale) as usize;
                 if state.config.use_elim()
                     && (state[Stat::Vivification] + elim.exports().0) % state.config.ie_modulo == 0
                     && rst.exports().2 < 100.0

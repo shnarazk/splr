@@ -292,12 +292,8 @@ fn conflict_analyze(
                 #[cfg(feature = "trace_analysis")]
                 println!("analyze {}", p);
                 debug_assert_ne!(cid, ClauseId::default());
-                if cdb[cid].is(Flag::LEARNT) {
-                    if !cdb[cid].is(Flag::JUST_USED) && !cdb.convert_to_permanent(asg, cid) {
-                        cdb[cid].turn_on(Flag::JUST_USED);
-                    }
-                    cdb.bump_activity(cid, ());
-                }
+                cdb.mark_clause_as_used(asg, cid);
+                cdb.bump_activity(cid, ());
                 let c = &cdb[cid];
                 #[cfg(feature = "boundary_check")]
                 assert!(
@@ -416,6 +412,7 @@ fn conflict_analyze(
 }
 
 #[allow(clippy::cognitive_complexity)]
+#[allow(dead_code)]
 pub fn conflict_analyze_sandbox(
     asg: &mut AssignStack,
     cdb: &mut ClauseDB,
@@ -456,12 +453,6 @@ pub fn conflict_analyze_sandbox(
                 }
             }
             AssignReason::Implication(cid, _) => {
-                if cdb[cid].is(Flag::LEARNT)
-                    && !cdb[cid].is(Flag::JUST_USED)
-                    && !cdb.convert_to_permanent(asg, cid)
-                {
-                    cdb[cid].turn_on(Flag::JUST_USED);
-                }
                 let c = &cdb[cid];
                 for q in &c[1..] {
                     let vi = q.vi();

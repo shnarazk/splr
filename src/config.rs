@@ -79,6 +79,10 @@ pub struct Config {
     #[cfg_attr(feature = "structopt", structopt(long = "ii", default_value = "8192"))]
     pub ip_interval: usize,
 
+    /// in-processer interval scaling
+    #[cfg_attr(feature = "structopt", structopt(long = "is", default_value = "2.0"))]
+    pub ip_scale: f64,
+
     /// Modulo of in-process elim.
     #[cfg_attr(feature = "structopt", structopt(long = "iem", default_value = "3"))]
     pub ie_modulo: usize,
@@ -230,6 +234,7 @@ impl Default for Config {
             clause_limit: 0,
             reduce: 1,
             ip_interval: 50000,
+            ip_scale: 2.0,
             ie_modulo: 3,
             elim_cls_lim: 32,
             elim_var_occ: 8192,

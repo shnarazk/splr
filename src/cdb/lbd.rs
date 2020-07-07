@@ -82,7 +82,9 @@ impl LBDIF for ClauseDB {
                     }
                 }
             }
-            c.rank = cnt;
+            if cnt < c.rank {
+                c.rank = cnt;
+            }
         }
         self.lbd_temp[0] = key;
         self.num_lbd_update += 1;

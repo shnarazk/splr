@@ -172,7 +172,7 @@ mod tests {
 
         let c1 = cdb.new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false, false);
         let c = &cdb[c1];
-        assert_eq!(c.rank, 0);
+        assert_eq!(c.rank, 3);
         assert!(!c.is(Flag::DEAD));
         assert!(!c.is(Flag::LEARNT));
         assert!(!c.is(Flag::JUST_USED));

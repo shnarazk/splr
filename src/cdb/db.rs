@@ -60,8 +60,8 @@ pub trait ClauseDBIF:
     ) -> ClauseId
     where
         A: AssignIF;
-    /// check and convert a learnt clause to permanent if needed.
-    fn convert_to_permanent<A>(&mut self, asg: &mut A, cid: ClauseId) -> bool
+    /// update LBD then convert a learnt clause to permanent if needed.
+    fn mark_clause_as_used<A>(&mut self, asg: &mut A, cid: ClauseId) -> bool
     where
         A: AssignIF;
     /// return the number of alive clauses in the database.
@@ -474,18 +474,20 @@ impl ClauseDBIF for ClauseDB {
             // vec.swap(1, i_max);
             if vec.len() <= 2 {
                 learnt = false;
-                0
+                1
             } else {
                 let lbd = self.compute_lbd(asg, vec);
-                if self.use_chan_seok && lbd <= self.co_lbd_bound {
-                    learnt = false;
-                    0
+                if lbd == 0 {
+                    vec.len()
                 } else {
+                    if self.use_chan_seok && lbd <= self.co_lbd_bound {
+                        learnt = false;
+                    }
                     lbd
                 }
             }
         } else {
-            0
+            vec.len()
         };
         let cid;
         let l0 = vec[0];
@@ -522,6 +524,7 @@ impl ClauseDBIF for ClauseDB {
             self.clause.push(c);
         };
         let c = &mut self[cid];
+        // assert!(0 < c.rank);
         let len2 = c.lits.len() == 2;
         if learnt {
             c.turn_on(Flag::LEARNT);
@@ -547,7 +550,7 @@ impl ClauseDBIF for ClauseDB {
         self.num_active += 1;
         cid
     }
-    fn convert_to_permanent<A>(&mut self, asg: &mut A, cid: ClauseId) -> bool
+    fn mark_clause_as_used<A>(&mut self, asg: &mut A, cid: ClauseId) -> bool
     where
         A: AssignIF,
     {
@@ -558,23 +561,33 @@ impl ClauseDBIF for ClauseDB {
         };
         let nlevels = self.compute_lbd_of(asg, cid);
         let c = &mut self[cid];
-        if c.is(Flag::JUST_USED) {
-            return false;
-        }
         debug_assert!(!c.is(Flag::DEAD), format!("found {} is dead: {}", cid, c));
-        if 2 < c.rank {
-            c.turn_on(Flag::JUST_USED);
-            if nlevels + 1 < c.rank {
+        if nlevels < c.rank {
+            match (c.is(Flag::VIVIFIED2), c.is(Flag::VIVIFIED)) {
+                _ if nlevels == 1 || nlevels + 1 < c.rank => {
+                    c.turn_on(Flag::VIVIFIED2);
+                    c.turn_off(Flag::VIVIFIED);
+                }
+                (false, false) => (),
+                (false, true) => {
+                    c.turn_on(Flag::VIVIFIED2);
+                    c.turn_off(Flag::VIVIFIED);
+                }
+                (true, false) => c.turn_on(Flag::VIVIFIED),
+                (true, true) => (),
+            }
+            if !c.is(Flag::JUST_USED) && c.is(Flag::LEARNT) {
+                c.turn_on(Flag::JUST_USED);
                 // chan_seok_condition is zero if !use_chan_seok
                 if nlevels < chan_seok_condition {
                     c.turn_off(Flag::LEARNT);
+                    c.rank = nlevels;
                     self.num_learnt -= 1;
                     return true;
-                } else {
-                    c.rank = nlevels;
                 }
             }
         }
+        c.rank = nlevels;
         false
     }
     fn count(&self) -> usize {
