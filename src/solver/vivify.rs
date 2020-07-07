@@ -42,7 +42,7 @@ pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State) {
     */
     // clauses.sort_by_cached_key(|ci| (cdb.activity(*ci).log(10.0) * -100_000.0) as isize);
     clauses.sort_by_key(|ci| cdb[*ci].rank);
-    'next_clause: for ci in clauses.iter() {
+    for ci in clauses.iter() {
         let c: &mut Clause = &mut cdb[ci];
         // Since GC can make `clauses` out of date, we need to check its aliveness here.
         if c.is(Flag::DEAD) {
@@ -53,7 +53,8 @@ pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State) {
         drop(c);
         nclause += 1;
         let mut copied: Vec<Lit> = Vec::new();
-        for l in clits.iter() {
+        let mut flipped = true;
+        'this_clause: for l in clits.iter() {
             ncheck += 1;
             if to_display <= ncheck {
                 state.flush("");
@@ -64,24 +65,14 @@ pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State) {
                 to_display = ncheck + display_step;
             }
             match asg.assigned(*l) {
-                Some(false) => continue, // Rule 1
+                Some(false) => continue 'this_clause, // Rule 1
                 Some(true) => {
-                    let r: Vec<Lit> = match asg.reason(l.vi()) {
-                        AssignReason::None => Vec::new(),
-                        AssignReason::Implication(cid, _) => cdb[cid].lits.to_vec(),
-                    };
-                    copied.push(*l);
+                    copied.push(!*l);
+                    let r = asg.reason_literals(cdb, *l);
                     copied = asg.minimize(cdb, &copied, &r, ncheck, &mut seen); // Rule 2
-                    #[cfg(debug)]
-                    {
-                        println!(
-                            "\nminimize subclause v:{:?} under satisfied:{}; reason:{:?}",
-                            i32s(&copied),
-                            !*l,
-                            i32s(&r),
-                        );
-                    }
-                    break;
+                    debug_assert_eq!(copied[0], *l);
+                    flipped = false;
+                    break 'this_clause;
                 }
                 None => {
                     let cid: Option<ClauseId> = match copied.len() {
@@ -94,16 +85,12 @@ pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State) {
                     };
                     asg.assign_by_decision(!*l);
                     let cc = asg.propagate(cdb);
+                    // debug_assert!(flipped);
+                    copied.push(!*l); // Rule 4
                     if cc != ClauseId::default() {
-                        copied.push(!*l); // Rule 3
-                        let mut r = cdb[cc].lits.clone();
-                        r.push(!*l);
+                        let r = cdb[cc].lits.clone(); // Rule 3
                         copied = asg.minimize(cdb, &copied, &r, ncheck, &mut seen);
-                        for l in &mut copied {
-                            *l = !*l;
-                        }
-                    } else {
-                        copied.push(*l); // Rule 4
+                        flipped = false;
                     }
                     asg.cancel_until_sandbox(asg.root_level);
                     if let Some(cj) = cid {
@@ -111,20 +98,13 @@ pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State) {
                         cdb.garbage_collect();
                     }
                     if cc != ClauseId::default() {
-                        #[cfg(debug)]
-                        if copied.len() <= 1 {
-                            println!(
-                                "\nAssign:{:?} by propagating:{} @{}; conf:{}",
-                                i32s(&copied),
-                                !*l,
-                                i,
-                                &cdb[cc],
-                            );
-                        }
-                        break;
+                        break 'this_clause;
                     }
                 }
             }
+        }
+        if flipped {
+            flip(&mut copied);
         }
         match copied.len() {
             0 => {
@@ -132,11 +112,10 @@ pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State) {
                 // This mean we find the CNF is unsatisfiable.
                 // So terminate vivification immediately and put the responsibility on solver!
                 npurge += 1;
-                break 'next_clause;
             }
             1 => {
                 nassert += 1;
-                debug_assert_eq!(asg.root_level, asg.decision_level());
+                // assert_eq!(asg.root_level, asg.decision_level());
                 asg.assign_at_rootlevel(copied[0]).expect("impossible");
                 asg.handle(SolverEvent::Fixed);
                 // if asg.propagate(cdb) != ClauseId::default() {
@@ -170,6 +149,13 @@ pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State) {
         nassert, ncheck, npurge, nshrink, nclause,
     ));
     asg.handle(SolverEvent::Vivify(false));
+}
+
+fn flip(vec: &mut [Lit]) -> &mut [Lit] {
+    for l in vec.iter_mut() {
+        *l = !*l;
+    }
+    vec
 }
 
 impl Clause {
@@ -214,11 +200,14 @@ impl AssignStack {
             seen[l.vi()] = id;
         }
         for l in self.stack_iter().rev() {
-            // l is a negated literal
             if seen[l.vi()] != id {
                 continue;
             }
-            if lits.contains(l) || lits.contains(&!*l) {
+            if lits.contains(l) {
+                res.push(!*l);
+                continue;
+            }
+            if lits.contains(&!*l) {
                 res.push(*l);
                 continue;
             }
