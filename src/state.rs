@@ -206,6 +206,8 @@ pub struct State {
     pub last_asg: usize,
     /// working place to build learnt clauses
     pub new_learnt: Vec<Lit>,
+    /// working place to store given clauses' ids which is used to derive a good learnt
+    pub derive20: Vec<ClauseId>,
     /// `progress` invocation counter
     pub progress_cnt: usize,
     /// keep the previous statistics values
@@ -235,6 +237,7 @@ impl Default for State {
             conflicts: Vec::new(),
             last_asg: 0,
             new_learnt: Vec::new(),
+            derive20: Vec::new(),
             progress_cnt: 0,
             record: ProgressRecord::default(),
             #[cfg(feature = "libc")]

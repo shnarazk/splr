@@ -682,11 +682,7 @@ bitflags! {
         const VIVIFIED     = 0b0000_0000_0100_0000;
         /// for a clause which decreases LBD twice after vivification
         const VIVIFIED2    = 0b0000_0000_1000_0000;
-
-        //
-        //## Vivification
-        //
-        /// for record of goodness of permanent clause
+        /// a given clause derived a learnt which LBD is smaller than 20.
         const DERIVE20     = 0b0010_0000_0000_0000;
 
         //

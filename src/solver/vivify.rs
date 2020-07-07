@@ -24,13 +24,12 @@ pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State) {
     let mut nassert = 0;
     let mut to_display = display_step;
     debug_assert_eq!(asg.decision_level(), asg.root_level);
-    let mut clauses: Vec<ClauseId> = cdb
-        .iter()
-        .enumerate()
-        .skip(1)
-        .filter(|(_, c)| !c.is(Flag::DEAD) && c.is(Flag::VIVIFIED) == c.is(Flag::VIVIFIED2))
-        .map(|(i, _)| ClauseId::from(i))
-        .collect();
+    let mut clauses: Vec<ClauseId> = Vec::new();
+    for (i, c) in cdb.iter_mut().enumerate().skip(1) {
+        if c.to_vivify() {
+            clauses.push(ClauseId::from(i));
+        }
+    }
     /*
     clauses.sort_by_cached_key(|c| {
         cdb[c]
@@ -48,8 +47,6 @@ pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State) {
         if c.is(Flag::DEAD) {
             continue;
         }
-        c.turn_on(Flag::VIVIFIED);
-        c.turn_off(Flag::VIVIFIED2);
         let is_learnt = c.is(Flag::LEARNT);
         let clits = c.lits.clone();
         drop(c);
@@ -172,6 +169,25 @@ pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State) {
         nassert, ncheck, npurge, nshrink, nclause,
     ));
     asg.handle(SolverEvent::Vivify(false));
+}
+
+impl Clause {
+    fn to_vivify(&mut self) -> bool {
+        if self.is(Flag::DEAD) {
+            return false;
+        }
+        if self.is(Flag::VIVIFIED) == self.is(Flag::VIVIFIED2) {
+            self.turn_on(Flag::VIVIFIED);
+            self.turn_off(Flag::VIVIFIED2);
+            if self.is(Flag::LEARNT) {
+                return true;
+            } else if self.is(Flag::DERIVE20) {
+                self.turn_off(Flag::DERIVE20);
+                return true;
+            }
+        }
+        false
+    }
 }
 
 impl AssignStack {

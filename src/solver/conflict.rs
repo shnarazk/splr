@@ -211,6 +211,11 @@ pub fn handle_conflict(
         let lbd = cdb[cid].rank;
         rst.update(RestarterModule::LBD, lbd);
         elim.to_simplify += 1.0;
+        if lbd <= 20 {
+            for cid in &state.derive20 {
+                cdb[cid].turn_on(Flag::DERIVE20);
+            }
+        }
     }
     cdb.scale_activity();
     if 0 < state.config.dump_int && num_conflict % state.config.dump_int == 0 {
@@ -239,6 +244,7 @@ fn conflict_analyze(
     state: &mut State,
     conflicting_clause: ClauseId,
 ) -> DecisionLevel {
+    state.derive20.clear();
     let learnt = &mut state.new_learnt;
     learnt.clear();
     learnt.push(NULL_LIT);
@@ -295,6 +301,9 @@ fn conflict_analyze(
                 cdb.mark_clause_as_used(asg, cid);
                 cdb.bump_activity(cid, ());
                 let c = &cdb[cid];
+                if !c.is(Flag::LEARNT) {
+                    state.derive20.push(cid);
+                }
                 #[cfg(feature = "boundary_check")]
                 assert!(
                     0 < c.len(),
