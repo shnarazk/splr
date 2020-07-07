@@ -8,13 +8,14 @@ use {
         state::StateIF,
         types::*,
     },
-    std::{borrow::Cow, collections::HashSet},
+    std::borrow::Cow,
 };
 
 /// vivify clauses in `cdb` under `asg`
 pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State) {
     asg.handle(SolverEvent::Vivify(true));
     state[Stat::Vivification] += 1;
+    let mut seen: Vec<usize> = vec![0; asg.num_vars + 1];
     let display_step: usize = 100;
     let check_thr = state.vivify_thr as usize;
     let mut ncheck = 0;
@@ -70,7 +71,7 @@ pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State) {
                         AssignReason::Implication(cid, _) => cdb[cid].lits.to_vec(),
                     };
                     copied.push(*l);
-                    copied = asg.minimize(cdb, &copied, &r); // Rule 2
+                    copied = asg.minimize(cdb, &copied, &r, ncheck, &mut seen); // Rule 2
                     #[cfg(debug)]
                     {
                         println!(
@@ -97,7 +98,7 @@ pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State) {
                         copied.push(!*l); // Rule 3
                         let mut r = cdb[cc].lits.clone();
                         r.push(!*l);
-                        copied = asg.minimize(cdb, &copied, &r);
+                        copied = asg.minimize(cdb, &copied, &r, ncheck, &mut seen);
                         for l in &mut copied {
                             *l = !*l;
                         }
@@ -200,15 +201,21 @@ impl AssignStack {
 
     /// inspect the complete implication graph to collect a disjunction of a subset of
     /// negated literals of `lits`
-    fn minimize(&mut self, cdb: &ClauseDB, lits: &[Lit], reason: &[Lit]) -> Vec<Lit> {
-        let mut seen: HashSet<Lit> = HashSet::new();
+    fn minimize(
+        &mut self,
+        cdb: &ClauseDB,
+        lits: &[Lit],
+        reason: &[Lit],
+        id: usize,
+        seen: &mut [usize],
+    ) -> Vec<Lit> {
         let mut res: Vec<Lit> = Vec::new();
         for l in reason {
-            seen.insert(*l);
+            seen[l.vi()] = id;
         }
         for l in self.stack_iter().rev() {
             // l is a negated literal
-            if !seen.contains(&!*l) && !seen.contains(l) {
+            if seen[l.vi()] != id {
                 continue;
             }
             if lits.contains(l) || lits.contains(&!*l) {
@@ -216,25 +223,9 @@ impl AssignStack {
                 continue;
             }
             for r in self.reason_literals(cdb, *l).iter() {
-                seen.insert(*r);
-                seen.insert(!*r);
+                seen[r.vi()] = id;
             }
         }
-        /*
-        if reason.len() == 2 {
-            println!(
-                "{:?} /\\ {} {:?} => {:?}",
-                clause,
-                if let Some(_) = self.assigned(clause[0]) {
-                    "assigned"
-                } else {
-                    "unassigned"
-                },
-                reason,
-                res
-            );
-        }
-        */
         res
     }
 }
