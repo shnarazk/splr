@@ -678,8 +678,17 @@ bitflags! {
         const ENQUEUED     = 0b0000_0000_0001_0000;
         /// mark to run garbage collector on the corresponding watcher lists
         const TOUCHED      = 0b0000_0000_0010_0000;
-        /// for vivified clause
+        /// for vivified clauses
         const VIVIFIED     = 0b0000_0000_0100_0000;
+        /// for a clause which decreases LBD twice after vivification
+        const VIVIFIED2    = 0b0000_0000_1000_0000;
+
+        //
+        //## Vivification
+        //
+        /// for record of goodness of permanent clause
+        const DERIVE20     = 0b0010_0000_0000_0000;
+
         //
         //## For Var
         //
