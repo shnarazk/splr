@@ -202,7 +202,7 @@ fn search(
     loop {
         asg.reward_update();
         let ci = asg.propagate(cdb);
-        if ci == ClauseId::default() {
+        if ci.is_none() {
             if asg.num_vars <= asg.stack_len() + asg.num_eliminated_vars {
                 return Ok(true);
             }

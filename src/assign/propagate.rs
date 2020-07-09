@@ -107,7 +107,7 @@ impl PropagateIF for AssignStack {
         debug_assert!(usize::from(l) != 0, "Null literal is about to be equeued");
         debug_assert!(l.vi() < self.var.len());
         // The following doesn't hold anymore by using chronoBT.
-        // assert!(self.trail_lim.is_empty() || cid != ClauseId::default());
+        // assert!(self.trail_lim.is_empty() || !cid.is_none());
         let vi = l.vi();
         self.level[vi] = lv;
         let v = &mut self.var[vi];

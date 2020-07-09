@@ -91,7 +91,7 @@ where
     debug_assert!(!cdb[cid].is(Flag::DEAD));
     debug_assert!(1 < cdb[cid].len());
     cdb.touch_var(l.vi());
-    debug_assert_ne!(cid, ClauseId::default());
+    debug_assert!(!cid.is_none());
     if cdb.strengthen(cid, l) {
         // Vaporize the binary clause
         debug_assert!(2 == cdb[cid].len());

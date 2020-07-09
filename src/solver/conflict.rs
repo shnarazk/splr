@@ -118,7 +118,7 @@ pub fn handle_conflict(
             println!(
                 "empty learnt at {}({}) by {:?}",
                 cl,
-                asg.reason(asg.decision_vi(cl)) == ClauseId::default(),
+                asg.reason(asg.decision_vi(cl)).is_none(),
                 asg.dump(asg, &cdb[ci]),
             );
         }
@@ -297,7 +297,7 @@ fn conflict_analyze(
             AssignReason::Implication(cid, _) => {
                 #[cfg(feature = "trace_analysis")]
                 println!("analyze {}", p);
-                debug_assert_ne!(cid, ClauseId::default());
+                debug_assert!(!cid.is_none());
                 cdb.mark_clause_as_used(asg, cid);
                 cdb.bump_activity(cid, ());
                 let c = &cdb[cid];

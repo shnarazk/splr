@@ -34,6 +34,8 @@ pub trait LitIF {
     fn from_assign(vi: VarId, p: bool) -> Self;
     /// convert to var index.
     fn vi(self) -> VarId;
+    /// return `true` if it is a valid literal, namely non-zero.
+    fn is_none(self) -> bool;
 }
 
 /// API for clause and var rewarding.
@@ -326,6 +328,10 @@ impl LitIF for Lit {
     #[inline]
     fn vi(self) -> VarId {
         (self.ordinal >> 1) as VarId
+    }
+    #[inline]
+    fn is_none(self) -> bool {
+        self.ordinal == 0
     }
 }
 

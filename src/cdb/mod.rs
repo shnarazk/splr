@@ -40,6 +40,13 @@ pub struct ClauseId {
     pub ordinal: u32,
 }
 
+impl ClauseId {
+    #[inline]
+    pub fn is_none(&self) -> bool {
+        self.ordinal == 0
+    }
+}
+
 /// A representation of 'clause'
 #[derive(Debug)]
 pub struct Clause {

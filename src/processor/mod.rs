@@ -703,7 +703,7 @@ impl Eliminator {
             self.backward_subsumption_check(asg, cdb, &timedout)?;
             debug_assert!(self.clause_queue.is_empty());
             cdb.garbage_collect();
-            if asg.propagate(cdb) != ClauseId::default() {
+            if !asg.propagate(cdb).is_none() {
                 return Err(SolverError::Inconsistent);
             }
             cdb.eliminate_satisfied_clauses(asg, self, true);
