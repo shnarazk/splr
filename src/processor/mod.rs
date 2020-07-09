@@ -677,7 +677,7 @@ impl Eliminator {
             /// The ratio of time slot for single elimination step.
             /// Since it is measured in millisecond, 1000 means executing elimination
             /// until timed out. 100 means this function can consume 10% of a given time.
-            const TIMESLOT_FOR_ELIMINATION: u64 = 10;
+            const TIMESLOT_FOR_ELIMINATION: u64 = 100;
 
             let timedout2 = timedout.clone();
             let time = TIMESLOT_FOR_ELIMINATION * state.config.timeout as u64;
