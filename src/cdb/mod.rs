@@ -82,7 +82,7 @@ pub struct ClauseDB {
     /// a number of clauses to emit out-of-memory exception
     soft_limit: usize,
     /// flag for Chan Seok heuristics
-    use_chan_seok: bool,
+    pub use_chan_seok: bool,
     /// 'small' clause threshold
     co_lbd_bound: usize,
     // not in use

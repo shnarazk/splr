@@ -210,7 +210,9 @@ pub fn handle_conflict(
         asg.assign_by_implication(l0, AssignReason::Implication(cid, reason), al);
         let lbd = cdb[cid].rank;
         rst.update(RestarterModule::LBD, lbd);
-        elim.to_simplify += 1.0;
+        if 1 < learnt_len && learnt_len <= state.config.elim_cls_lim / 2 {
+            elim.to_simplify += 1.0 / (learnt_len - 1) as f64;
+        }
         if lbd <= 20 {
             for cid in &state.derive20 {
                 cdb[cid].turn_on(Flag::DERIVE20);
@@ -230,7 +232,9 @@ pub fn handle_conflict(
             rst_lbd_trend.min(10.0),
         ));
     }
-    cdb.check_and_reduce(asg, num_conflict);
+    if cdb.check_and_reduce(asg, num_conflict) {
+        state.to_vivify += 1;
+    }
     Ok(())
 }
 

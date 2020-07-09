@@ -243,22 +243,25 @@ fn search(
             if state.stabilize {
                 asg.force_rephase();
             }
+            if state.config.viv_interval <= state.to_vivify && state.config.use_vivify() {
+                state.to_vivify = 0;
+                if !cdb.use_chan_seok && vivify(asg, cdb, state).is_err() {
+                    return Err(SolverError::UndescribedError);
+                }
+            }
             // `elim.to_simplify` is increased much in particular when vars are solved or
             // learnts are small. We don't need to count the number of solved vars.
-            if state.config.ip_interval < elim.to_simplify as usize {
+            if state.config.ip_interval <= elim.to_simplify as usize {
                 elim.to_simplify = 0.0;
-                state.config.ip_interval =
-                    ((state.config.ip_interval as f64) * state.config.ip_scale) as usize;
-                if state.config.use_elim()
-                    && (state[Stat::Vivification] + elim.exports().0) % state.config.ie_modulo == 0
-                    && rst.exports().2 < 100.0
-                {
-                    if elim.enable {
-                        elim.activate();
+                if elim.enable {
+                    elim.activate();
+                }
+                elim.simplify(asg, cdb, state)?;
+                if state.config.use_vivify() && cdb.use_chan_seok {
+                    state.to_vivify = 0;
+                    if vivify(asg, cdb, state).is_err() {
+                        return Err(SolverError::UndescribedError);
                     }
-                    elim.simplify(asg, cdb, state)?;
-                } else if state.config.use_vivify() {
-                    vivify(asg, cdb, state);
                 }
             }
             // By simplification, we may get further solutions.

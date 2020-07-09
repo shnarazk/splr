@@ -191,6 +191,8 @@ pub struct State {
     pub target: CNFDescription,
     /// adjustment interval in conflict
     pub reflection_interval: usize,
+    /// time to executevivification
+    pub to_vivify: usize,
     /// loop limit of vivification loop
     pub vivify_thr: f64,
     //
@@ -231,6 +233,7 @@ impl Default for State {
             strategy: (SearchStrategy::Initial, 0),
             target: CNFDescription::default(),
             reflection_interval: 10_000,
+            to_vivify: 0,
             vivify_thr: 0.0,
             b_lvl: Ema::new(5_000),
             c_lvl: Ema::new(5_000),
@@ -551,19 +554,10 @@ impl StateIF for State {
             )
         );
         println!(
-            "\x1B[2K        misc|#stb:{}, #viv:{}, #eli:{}, {}:{} ",
+            "\x1B[2K        misc|#stb:{}, #viv:{}, #eli:{}, 2eli:{} ",
             im!("{:>9}", self, LogUsizeId::Stabilize, rst_num_stb),
             im!("{:>9}", self, LogUsizeId::Vivify, self[Stat::Vivification]),
             im!("{:>9}", self, LogUsizeId::Simplify, elim_num_full),
-            if self.config.use_elim()
-                && (self.stats[Stat::Vivification] + elim_num_full) % self.config.ie_modulo == 0
-            {
-                "2eli"
-            } else if self.config.use_vivify() {
-                "2viv"
-            } else {
-                "noop"
-            },
             fm!(
                 "{:>9.0}",
                 self,
