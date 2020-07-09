@@ -7,6 +7,7 @@ use {
     crate::{
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
         cdb::{ClauseDB, ClauseDBIF},
+        processor::Eliminator,
         state::StateIF,
         types::*,
     },
@@ -20,7 +21,12 @@ use {
 };
 
 /// vivify clauses in `cdb` under `asg`
-pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State) -> MaybeInconsistent {
+pub fn vivify(
+    asg: &mut AssignStack,
+    cdb: &mut ClauseDB,
+    elim: &mut Eliminator,
+    state: &mut State,
+) -> MaybeInconsistent {
     asg.handle(SolverEvent::Vivify(true));
     state[Stat::Vivification] += 1;
     let dl = asg.decision_level();
@@ -51,7 +57,6 @@ pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State) -> M
     // }
     let display_step: usize = 250.max(check_thr / 5);
     let mut ncheck = 0;
-    let mut nclause = 0;
     let mut npurge = 0;
     let mut nshrink = 0;
     let mut nassert = 0;
@@ -86,7 +91,6 @@ pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State) -> M
             c.turn_off(Flag::DERIVE20);
         }
         let clits = c.lits.clone();
-        nclause += 1;
         let mut copied: Vec<Lit> = Vec::new();
         let mut flipped = true;
         'this_clause: for l in clits.iter() {
@@ -94,7 +98,7 @@ pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State) -> M
             if to_display <= ncheck {
                 state.flush("");
                 state.flush(format!(
-                    "vivifying(assert:{}, purge:{} strengthen:{}, check:{})...",
+                    "vivifying(assert:{}, purge:{} shorten:{}, check:{})...",
                     nassert, npurge, nshrink, ncheck,
                 ));
                 to_display = ncheck + display_step;
@@ -145,6 +149,7 @@ pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State) -> M
         match copied.len() {
             0 => {
                 npurge += 1;
+                elim.to_simplify += 2.0;
             }
             1 => {
                 nassert += 1;
@@ -155,10 +160,13 @@ pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State) -> M
             n if n == clits.len() => {
                 keep_original = true;
             }
-            _ => {
+            n => {
                 nshrink += 1;
                 let cj = cdb.new_clause(asg, &mut copied, is_learnt, true);
                 cdb[cj].turn_on(Flag::VIVIFIED);
+                if n <= state.config.elim_cls_lim / 2 {
+                    elim.to_simplify += 1.0 / (n - 1) as f64;
+                }
             }
         }
         if !keep_original {
@@ -183,8 +191,8 @@ pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State) -> M
     if 0 < nassert || 0 < npurge || 0 < nshrink {
         state.flush("");
         state.flush(format!(
-            "vivified({} asserts of {} literals; {} purges and {} shorten of {} clauses)...",
-            nassert, ncheck, npurge, nshrink, nclause,
+            "vivified({} asserts, {} purges and {} shorten)...",
+            nassert, npurge, nshrink,
         ));
     }
     asg.handle(SolverEvent::Vivify(false));

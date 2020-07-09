@@ -245,7 +245,7 @@ fn search(
             }
             if state.config.viv_interval <= state.to_vivify && state.config.use_vivify() {
                 state.to_vivify = 0;
-                if !cdb.use_chan_seok && vivify(asg, cdb, state).is_err() {
+                if !cdb.use_chan_seok && vivify(asg, cdb, elim, state).is_err() {
                     return Err(SolverError::UndescribedError);
                 }
             }
@@ -259,7 +259,7 @@ fn search(
                 elim.simplify(asg, cdb, state)?;
                 if state.config.use_vivify() && cdb.use_chan_seok {
                     state.to_vivify = 0;
-                    if vivify(asg, cdb, state).is_err() {
+                    if vivify(asg, cdb, elim, state).is_err() {
                         return Err(SolverError::UndescribedError);
                     }
                 }

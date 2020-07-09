@@ -102,11 +102,11 @@ pub struct Config {
     //## vivifier
     //
     /// Lower bound of vivif. loop
-    #[cfg_attr(feature = "structopt", structopt(long = "vib", default_value = "10.0"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "vib", default_value = "1.0"))]
     pub viv_beg: f64,
 
     /// Upper bound of vivif. loop
-    #[cfg_attr(feature = "structopt", structopt(long = "vie", default_value = "10.0"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "vie", default_value = "32.0"))]
     pub viv_end: f64,
 
     /// Vivif. interval
@@ -114,7 +114,7 @@ pub struct Config {
     pub viv_interval: usize,
 
     /// #reduction for next vivif.
-    #[cfg_attr(feature = "structopt", structopt(long = "vis", default_value = "1.6"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "vis", default_value = "2.0"))]
     pub viv_scale: f64,
 
     /// Vivification switch
@@ -238,10 +238,10 @@ impl Default for Config {
             elim_var_occ: 8192,
             elim_grw_lim: 0,
             elim: 1,
-            viv_beg: 10.0,
-            viv_end: 80.0,
+            viv_beg: 1.0,
+            viv_end: 32.0,
             viv_interval: 2,
-            viv_scale: 1.6,
+            viv_scale: 2.0,
             vivify: 1,
             rst_step: 50,
             rst_bkt_inc: 1.0,
