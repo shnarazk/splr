@@ -76,16 +76,8 @@ pub struct Config {
     //## inprocessor
     //
     /// #cls to start in-processor
-    #[cfg_attr(feature = "structopt", structopt(long = "ii", default_value = "8192"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "ii", default_value = "40000"))]
     pub ip_interval: usize,
-
-    /// in-processer interval scaling
-    #[cfg_attr(feature = "structopt", structopt(long = "is", default_value = "2.0"))]
-    pub ip_scale: f64,
-
-    /// Modulo of in-process elim.
-    #[cfg_attr(feature = "structopt", structopt(long = "iem", default_value = "3"))]
-    pub ie_modulo: usize,
 
     //
     //## eliminator
@@ -110,12 +102,20 @@ pub struct Config {
     //## vivifier
     //
     /// Lower bound of vivif. loop
-    #[cfg_attr(feature = "structopt", structopt(long = "vb", default_value = "8192"))]
-    pub vivify_beg: f64,
+    #[cfg_attr(feature = "structopt", structopt(long = "vib", default_value = "10.0"))]
+    pub viv_beg: f64,
 
     /// Upper bound of vivif. loop
-    #[cfg_attr(feature = "structopt", structopt(long = "ve", default_value = "65536"))]
-    pub vivify_end: f64,
+    #[cfg_attr(feature = "structopt", structopt(long = "vie", default_value = "10.0"))]
+    pub viv_end: f64,
+
+    /// Vivif. interval
+    #[cfg_attr(feature = "structopt", structopt(long = "vii", default_value = "2"))]
+    pub viv_interval: usize,
+
+    /// #reduction for next vivif.
+    #[cfg_attr(feature = "structopt", structopt(long = "vis", default_value = "1.6"))]
+    pub viv_scale: f64,
 
     /// Vivification switch
     #[cfg_attr(feature = "structopt", structopt(long = "VIV", default_value = "1"))]
@@ -233,15 +233,15 @@ impl Default for Config {
             use_log: false,
             clause_limit: 0,
             reduce: 1,
-            ip_interval: 50000,
-            ip_scale: 2.0,
-            ie_modulo: 3,
+            ip_interval: 40000,
             elim_cls_lim: 32,
             elim_var_occ: 8192,
             elim_grw_lim: 0,
             elim: 1,
-            vivify_beg: 8192.0,
-            vivify_end: 65536.0,
+            viv_beg: 10.0,
+            viv_end: 80.0,
+            viv_interval: 2,
+            viv_scale: 1.6,
             vivify: 1,
             rst_step: 50,
             rst_bkt_inc: 1.0,

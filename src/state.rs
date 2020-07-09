@@ -275,7 +275,7 @@ impl Instantiate for State {
             } else {
                 (SearchStrategy::Generic, 0)
             },
-            vivify_thr: config.vivify_beg,
+            vivify_thr: config.viv_beg,
             target: cnf.clone(),
             time_limit: config.timeout,
             ..State::default()

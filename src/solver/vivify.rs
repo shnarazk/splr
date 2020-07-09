@@ -1,5 +1,7 @@
 //! Vivification
 #![allow(dead_code)]
+#[cfg(feature = "libc")]
+use std::{thread, time::Duration};
 use {
     super::{SolverEvent, Stat, State},
     crate::{
@@ -8,23 +10,52 @@ use {
         state::StateIF,
         types::*,
     },
-    std::borrow::Cow,
+    std::{
+        borrow::Cow,
+        sync::{
+            atomic::{AtomicBool, Ordering},
+            Arc,
+        },
+    },
 };
 
 /// vivify clauses in `cdb` under `asg`
-pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State) {
+pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State) -> MaybeInconsistent {
     asg.handle(SolverEvent::Vivify(true));
     state[Stat::Vivification] += 1;
+    let dl = asg.decision_level();
+    assert_eq!(dl, 0);
     let mut seen: Vec<usize> = vec![0; asg.num_vars + 1];
-    let display_step: usize = 100;
-    let check_thr = state.vivify_thr as usize;
+    let check_thr = (state.vivify_thr * 10_000_000.0 / asg.var_stats().3 as f64) as usize;
+    let timedout = Arc::new(AtomicBool::new(false));
+    #[cfg(feature = "libc")]
+    {
+        // The ratio of time slot for single elimination step.
+        // Since it is measured in millisecond, 1000 means executing elimination
+        // until timed out. 100 means this function can consume 10% of a given time.
+        let timeslot_for_vivification: u64 = state.vivify_thr as u64;
+        let timedout2 = timedout.clone();
+        let time = timeslot_for_vivification * state.config.timeout as u64;
+        thread::spawn(move || {
+            thread::sleep(Duration::from_millis(time));
+            timedout2.store(true, Ordering::Release);
+        });
+    }
+    // {
+    // let k = state.config.timeout / (asg.var_stats().3 as f64).sqrt();
+    //     panic!("{}| check {:.1} - {:.1}",
+    //            (cdb.count() as f64).sqrt(),
+    //            state.config.vivify_beg * k,
+    //            state.config.vivify_end * k,
+    //     );
+    // }
+    let display_step: usize = 250.max(check_thr / 5);
     let mut ncheck = 0;
     let mut nclause = 0;
     let mut npurge = 0;
     let mut nshrink = 0;
     let mut nassert = 0;
     let mut to_display = display_step;
-    debug_assert_eq!(asg.decision_level(), asg.root_level);
     let mut clauses: Vec<ClauseId> = Vec::new();
     for (i, c) in cdb.iter_mut().enumerate().skip(1) {
         if c.to_vivify() {
@@ -42,13 +73,18 @@ pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State) {
     */
     // clauses.sort_by_cached_key(|ci| (cdb.activity(*ci).log(10.0) * -100_000.0) as isize);
     clauses.sort_by_key(|ci| cdb[*ci].rank);
-    for ci in clauses.iter() {
+    for ci in clauses.iter().take(clauses.len() / 2) {
         let c: &mut Clause = &mut cdb[ci];
         // Since GC can make `clauses` out of date, we need to check its aliveness here.
         if c.is(Flag::DEAD) {
             continue;
         }
+        c.turn_on(Flag::VIVIFIED);
+        c.turn_off(Flag::VIVIFIED2);
         let is_learnt = c.is(Flag::LEARNT);
+        if !is_learnt {
+            c.turn_off(Flag::DERIVE20);
+        }
         let clits = c.lits.clone();
         drop(c);
         nclause += 1;
@@ -59,8 +95,8 @@ pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State) {
             if to_display <= ncheck {
                 state.flush("");
                 state.flush(format!(
-                    "vivifying(assert:{}, purge:{} strengthen:{}, check:{}/{})...",
-                    nassert, npurge, nshrink, ncheck, check_thr,
+                    "vivifying(assert:{}, purge:{} strengthen:{}, check:{})...",
+                    nassert, npurge, nshrink, ncheck,
                 ));
                 to_display = ncheck + display_step;
             }
@@ -83,11 +119,11 @@ pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State) {
                         }
                         _ => Some(cdb.new_clause(asg, &mut copied.clone(), false, true)),
                     };
+                    debug_assert!(asg.propagate(cdb).is_none(), "# Conflict by vivify");
                     asg.assign_by_decision(!*l);
                     let cc = asg.propagate(cdb);
-                    // debug_assert!(flipped);
                     copied.push(!*l); // Rule 4
-                    if cc != ClauseId::default() {
+                    if !cc.is_none() {
                         let r = cdb[cc].lits.clone(); // Rule 3
                         copied = asg.minimize(cdb, &copied, &r, ncheck, &mut seen);
                         flipped = false;
@@ -97,7 +133,7 @@ pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State) {
                         cdb.detach(cj);
                         cdb.garbage_collect();
                     }
-                    if cc != ClauseId::default() {
+                    if !cc.is_none() {
                         break 'this_clause;
                     }
                 }
@@ -106,49 +142,54 @@ pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State) {
         if flipped {
             flip(&mut copied);
         }
+        let mut keep_original = false;
         match copied.len() {
             0 => {
-                // Is this possible? The only posibility is the clause is falsified.
-                // This mean we find the CNF is unsatisfiable.
-                // So terminate vivification immediately and put the responsibility on solver!
                 npurge += 1;
             }
             1 => {
                 nassert += 1;
-                // assert_eq!(asg.root_level, asg.decision_level());
-                asg.assign_at_rootlevel(copied[0]).expect("impossible");
+                assert!(asg.assigned(copied[0]) != Some(false));
+                asg.assign_at_rootlevel(copied[0])?;
                 asg.handle(SolverEvent::Fixed);
-                // if asg.propagate(cdb) != ClauseId::default() {
-                //     panic!("## propagate emits a conflict.");
-                // }
             }
-            n => {
+            n if n == clits.len() => {
+                keep_original = true;
+            }
+            _ => {
+                nshrink += 1;
                 let cj = cdb.new_clause(asg, &mut copied, is_learnt, true);
-                // cdb.set_activity(cj, reward);
-                if n < clits.len() {
-                    nshrink += 1;
-                } else {
-                    cdb[cj].turn_on(Flag::VIVIFIED);
-                }
+                cdb[cj].turn_on(Flag::VIVIFIED);
             }
         }
-        cdb.detach(*ci);
-        cdb.garbage_collect();
-        if check_thr <= ncheck {
+        if !keep_original {
+            cdb.detach(*ci);
+            cdb.garbage_collect();
+        }
+        if timedout.load(Ordering::Acquire) {
             break;
         }
+        #[cfg(not(feature = "libc"))]
+        {
+            if check_thr <= ncheck {
+                break;
+            }
+        }
     }
-    if state.config.vivify_end <= state.vivify_thr {
-        state.vivify_thr = state.config.vivify_beg;
+    if state.config.viv_end <= state.vivify_thr {
+        state.vivify_thr = state.config.viv_beg;
     } else {
-        state.vivify_thr *= 2.0;
+        state.vivify_thr *= state.config.viv_scale;
     }
-    state.flush("");
-    state.flush(format!(
-        "vivified(assert:{} of literals:{}; purge:{} strengthen:{} of clauses:{})...",
-        nassert, ncheck, npurge, nshrink, nclause,
-    ));
+    if 0 < nassert || 0 < npurge || 0 < nshrink {
+        state.flush("");
+        state.flush(format!(
+            "vivified({} asserts of {} literals; {} purges and {} shorten of {} clauses)...",
+            nassert, ncheck, npurge, nshrink, nclause,
+        ));
+    }
     asg.handle(SolverEvent::Vivify(false));
+    Ok(())
 }
 
 fn flip(vec: &mut [Lit]) -> &mut [Lit] {
@@ -159,17 +200,14 @@ fn flip(vec: &mut [Lit]) -> &mut [Lit] {
 }
 
 impl Clause {
-    fn to_vivify(&mut self) -> bool {
+    fn to_vivify(&self) -> bool {
         if self.is(Flag::DEAD) {
             return false;
         }
         if self.is(Flag::VIVIFIED) == self.is(Flag::VIVIFIED2) {
-            self.turn_on(Flag::VIVIFIED);
-            self.turn_off(Flag::VIVIFIED2);
             if self.is(Flag::LEARNT) {
                 return true;
             } else if self.is(Flag::DERIVE20) {
-                self.turn_off(Flag::DERIVE20);
                 return true;
             }
         }
