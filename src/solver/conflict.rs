@@ -170,6 +170,7 @@ pub fn handle_conflict(
         }
         asg.handle(SolverEvent::Fixed);
         rst.update(RestarterModule::Reset, 0);
+        elim.to_simplify += 2.0; // 1 for the positive lit, 1 for the negative.
     } else {
         {
             // At the present time, some reason clauses can contain first UIP or its negation.
@@ -210,7 +211,7 @@ pub fn handle_conflict(
         asg.assign_by_implication(l0, AssignReason::Implication(cid, reason), al);
         let lbd = cdb[cid].rank;
         rst.update(RestarterModule::LBD, lbd);
-        if 1 < learnt_len && learnt_len <= state.config.elim_cls_lim / 2 {
+        if learnt_len <= state.config.elim_cls_lim / 2 {
             elim.to_simplify += 1.0 / (learnt_len - 1) as f64;
         }
         if lbd <= 20 {
