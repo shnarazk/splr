@@ -86,7 +86,6 @@ pub fn vivify(asg: &mut AssignStack, cdb: &mut ClauseDB, state: &mut State) -> M
             c.turn_off(Flag::DERIVE20);
         }
         let clits = c.lits.clone();
-        drop(c);
         nclause += 1;
         let mut copied: Vec<Lit> = Vec::new();
         let mut flipped = true;
