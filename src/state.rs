@@ -191,6 +191,8 @@ pub struct State {
     pub target: CNFDescription,
     /// adjustment interval in conflict
     pub reflection_interval: usize,
+    /// restart
+    pub restart_absorption: usize,
     /// time to executevivification
     pub to_vivify: usize,
     /// loop limit of vivification loop
@@ -233,6 +235,7 @@ impl Default for State {
             strategy: (SearchStrategy::Initial, 0),
             target: CNFDescription::default(),
             reflection_interval: 10_000,
+            restart_absorption: 0,
             to_vivify: 0,
             vivify_thr: 0.0,
             b_lvl: Ema::new(5_000),
@@ -282,8 +285,14 @@ impl Instantiate for State {
         }
     }
     fn handle(&mut self, e: SolverEvent) {
-        if let SolverEvent::NewVar = e {
-            self.target.num_of_variables += 1;
+        match e {
+            SolverEvent::NewVar => {
+                self.target.num_of_variables += 1;
+            }
+            SolverEvent::Fixed => {
+                self.restart_absorption = 0;
+            }
+            _ => (),
         }
     }
 }

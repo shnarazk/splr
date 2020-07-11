@@ -196,8 +196,12 @@ fn search(
 ) -> Result<bool, SolverError> {
     let mut a_decision_was_made = false;
     let mut num_assigned = asg.num_solved_vars;
+    let mut nrestart = 0; // #restarts in the current mode
+    let mut restart_waiting = 0; // should be a function taking `nrestart`
+    let mut wait_peak = 0;
     rst.update(RestarterModule::Luby, 0);
     state.stabilize = false;
+    state.restart_absorption = 0;
 
     loop {
         asg.reward_update();
@@ -212,9 +216,36 @@ fn search(
             //
             state.last_asg = asg.stack_len();
             if rst.force_restart() {
-                asg.cancel_until(asg.root_level);
+                let na = asg.var_stats().1;
+
+                if num_assigned < na {
+                    num_assigned = na;
+                    // reset incremental deep search
+                    state.restart_absorption = 0;
+                    restart_waiting = 0;
+                }
+
+                restart_waiting += 1;
+                if state.restart_absorption <= restart_waiting {
+                    // time to restart and incrment parameters
+                    restart_waiting = 0;
+                    nrestart += 1;
+                    state.restart_absorption = if state.stabilize {
+                        rst.exports().4
+                    } else {
+                        int_floor(nrestart)
+                    };
+                }
+                if wait_peak < nrestart {
+                    wait_peak = nrestart;
+                }
+                if restart_waiting == 0 {
+                    asg.cancel_until(asg.root_level);
+                }
                 #[cfg(feature = "temp_order")]
                 asg.force_select_iter(None);
+            } else {
+                restart_waiting = 0;
             }
         } else {
             if asg.decision_level() == asg.root_level {
@@ -273,12 +304,19 @@ fn search(
         let na = asg.best_assigned(Flag::PHASE);
         if num_assigned < na {
             num_assigned = na;
+
+            // reset incremental deep search
+            nrestart = 0;
+            state.restart_absorption = 0;
+
             state.flush("");
             state.flush(format!("unreachable: {}", asg.num_vars - num_assigned));
         }
         if !asg.remains() {
             if state.config.use_stabilize() && state.stabilize != rst.stabilizing() {
                 state.stabilize = !state.stabilize;
+                nrestart = 0;
+                state.restart_absorption = 0;
                 rst.handle(SolverEvent::Stabilize(state.stabilize));
             }
             let lit = asg.select_decision_literal(&state.phase_select);
@@ -346,4 +384,33 @@ fn analyze_final(asg: &mut AssignStack, state: &mut State, c: &Clause) {
         }
         seen[vi] = false;
     }
+}
+
+const PRIMES: [usize; 168] = [
+    2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97,
+    101, 103, 107, 109, 113, 127, 131, 137, 139, 149, 151, 157, 163, 167, 173, 179, 181, 191, 193,
+    197, 199, 211, 223, 227, 229, 233, 239, 241, 251, 257, 263, 269, 271, 277, 281, 283, 293, 307,
+    311, 313, 317, 331, 337, 347, 349, 353, 359, 367, 373, 379, 383, 389, 397, 401, 409, 419, 421,
+    431, 433, 439, 443, 449, 457, 461, 463, 467, 479, 487, 491, 499, 503, 509, 521, 523, 541, 547,
+    557, 563, 569, 571, 577, 587, 593, 599, 601, 607, 613, 617, 619, 631, 641, 643, 647, 653, 659,
+    661, 673, 677, 683, 691, 701, 709, 719, 727, 733, 739, 743, 751, 757, 761, 769, 773, 787, 797,
+    809, 811, 821, 823, 827, 829, 839, 853, 857, 859, 863, 877, 881, 883, 887, 907, 911, 919, 929,
+    937, 941, 947, 953, 967, 971, 977, 983, 991, 997,
+];
+
+fn int_sqrt(n: usize) -> usize {
+    (n as f64).sqrt() as usize
+}
+
+// a very slow floor function mapping on int
+fn int_floor(n: usize) -> usize {
+    for i in PRIMES.iter() {
+        if n == *i {
+            return 0;
+        }
+        if n % i == 0 {
+            return int_sqrt(i - 2);
+        }
+    }
+    0
 }

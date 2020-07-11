@@ -156,6 +156,7 @@ pub fn vivify(
                 assert!(asg.assigned(copied[0]) != Some(false));
                 asg.assign_at_rootlevel(copied[0])?;
                 asg.handle(SolverEvent::Fixed);
+                state.handle(SolverEvent::Fixed);
             }
             n if n == clits.len() => {
                 keep_original = true;
@@ -212,9 +213,7 @@ impl Clause {
             return false;
         }
         if self.is(Flag::VIVIFIED) == self.is(Flag::VIVIFIED2) {
-            if self.is(Flag::LEARNT) {
-                return true;
-            } else if self.is(Flag::DERIVE20) {
+            if self.is(Flag::LEARNT) || self.is(Flag::DERIVE20) {
                 return true;
             }
         }
