@@ -191,7 +191,7 @@ pub fn vivify(
     if 0 < nassert || 0 < npurge || 0 < nshrink {
         state.flush("");
         state.flush(format!(
-            "vivified({} asserts, {} purges and {} shorten)...",
+            "vivified(assert:{}, purge:{}, shorten:{})...",
             nassert, npurge, nshrink,
         ));
     }
@@ -211,12 +211,8 @@ impl Clause {
         if self.is(Flag::DEAD) {
             return false;
         }
-        if self.is(Flag::VIVIFIED) == self.is(Flag::VIVIFIED2) {
-            if self.is(Flag::LEARNT) || self.is(Flag::DERIVE20) {
-                return true;
-            }
-        }
-        false
+        self.is(Flag::VIVIFIED) == self.is(Flag::VIVIFIED2)
+            && (self.is(Flag::LEARNT) || self.is(Flag::DERIVE20))
     }
 }
 
