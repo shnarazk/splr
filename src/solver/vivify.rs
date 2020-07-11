@@ -149,7 +149,7 @@ pub fn vivify(
         match copied.len() {
             0 => {
                 npurge += 1;
-                elim.to_simplify += 2.0;
+                elim.to_simplify += 1.0 / clits.len() as f64;
             }
             1 => {
                 nassert += 1;
@@ -157,6 +157,7 @@ pub fn vivify(
                 asg.assign_at_rootlevel(copied[0])?;
                 asg.handle(SolverEvent::Fixed);
                 state.handle(SolverEvent::Fixed);
+                elim.to_simplify += 2.0;
             }
             n if n == clits.len() => {
                 keep_original = true;
@@ -165,9 +166,7 @@ pub fn vivify(
                 nshrink += 1;
                 let cj = cdb.new_clause(asg, &mut copied, is_learnt, true);
                 cdb[cj].turn_on(Flag::VIVIFIED);
-                if n <= state.config.elim_cls_lim / 2 {
-                    elim.to_simplify += 1.0 / (n - 1) as f64;
-                }
+                elim.to_simplify += 1.0 / (n - 1) as f64;
             }
         }
         if !keep_original {

@@ -212,9 +212,7 @@ pub fn handle_conflict(
         asg.assign_by_implication(l0, AssignReason::Implication(cid, reason), al);
         let lbd = cdb[cid].rank;
         rst.update(RestarterModule::LBD, lbd);
-        if learnt_len <= state.config.elim_cls_lim / 2 {
-            elim.to_simplify += 1.0 / (learnt_len - 1) as f64;
-        }
+        elim.to_simplify += 1.0 / (learnt_len - 1) as f64;
         if lbd <= 20 {
             for cid in &state.derive20 {
                 cdb[cid].turn_on(Flag::DERIVE20);
