@@ -1,7 +1,7 @@
 ## 0.4.2, 2020-07-XX
 
 - compute LBD of permanent clauses collectly
-
+- restart stabilization controls restart condition
 - implement clause vivification
 - add `ClauseDB::bin_watcher`
 - delete `Watch::binary`
