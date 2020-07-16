@@ -572,8 +572,8 @@ impl Instantiate for Restarter {
             SolverEvent::Adapt((SearchStrategy::Initial, 0), _) => {
                 // self.int.enable = true;
             }
-            SolverEvent::Adapt((SearchStrategy::LowSuccesive, n), m) if n == m => {
-                self.luby.enable = true;
+            SolverEvent::Adapt((SearchStrategy::LowSuccessive, n), m) if n == m => {
+                // self.luby.enable = true;
             }
             SolverEvent::Stabilize(true) => (),
             SolverEvent::Stabilize(false) => (),

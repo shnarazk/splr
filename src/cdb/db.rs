@@ -272,14 +272,14 @@ impl Instantiate for ClauseDB {
                         // This call requires 'decision level == 0'.
                         self.make_permanent(true);
                     }
-                    (SearchStrategy::HighSuccesive, _) => {
+                    (SearchStrategy::HighSuccessive, _) => {
                         self.co_lbd_bound = 3;
                         self.first_reduction = 30000;
                         self.use_chan_seok = true;
                         // This call requires 'decision level == 0'.
                         self.make_permanent(false);
                     }
-                    (SearchStrategy::LowSuccesive, _) => (),
+                    (SearchStrategy::LowSuccessive, _) => (),
                     (SearchStrategy::ManyGlues, _) => (),
                 }
             }

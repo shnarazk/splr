@@ -57,7 +57,7 @@ impl VarRewardIF for AssignStack {
                 SearchStrategy::LowDecisions => {
                     self.activity_decay_max -= 0.02;
                 }
-                SearchStrategy::HighSuccesive => {
+                SearchStrategy::HighSuccessive => {
                     self.activity_decay_max = (self.activity_decay_max + 0.005).min(0.999);
                 }
                 _ => (),

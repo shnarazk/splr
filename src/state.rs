@@ -92,9 +92,9 @@ pub enum SearchStrategy {
     /// Many-Low-Level-Conflicts using Chan Seok heuristics
     LowDecisions,
     /// High-Successive-Conflicts using Chan Seok heuristics
-    HighSuccesive,
+    HighSuccessive,
     /// Low-Successive-Conflicts using Luby sequence
-    LowSuccesive,
+    LowSuccessive,
     /// Many-Glue-Clauses
     ManyGlues,
 }
@@ -108,8 +108,8 @@ impl fmt::Display for SearchStrategy {
                 SearchStrategy::Initial => "Initial",
                 SearchStrategy::Generic => "Generic",
                 SearchStrategy::LowDecisions => "LowDecs",
-                SearchStrategy::HighSuccesive => "HighSucc",
-                SearchStrategy::LowSuccesive => "LowSucc",
+                SearchStrategy::HighSuccessive => "HighSucc",
+                SearchStrategy::LowSuccessive => "LowSucc",
                 SearchStrategy::ManyGlues => "ManyGlue",
             };
             if let Some(w) = formatter.width() {
@@ -135,9 +135,9 @@ impl SearchStrategy {
             // Many-Low-Level-Conflicts using Chan Seok heuristics
             SearchStrategy::LowDecisions => "LowDecisions (many conflicts at low levels)",
             // High-Successive-Conflicts using Chan Seok heuristics
-            SearchStrategy::HighSuccesive => "HighSuccesiveConflict (long decision chains)",
+            SearchStrategy::HighSuccessive => "HighSuccessiveConflict (long decision chains)",
             // Low-Successive-Conflicts-Luby w/ Luby sequence
-            SearchStrategy::LowSuccesive => "LowSuccesive (successive conflicts)",
+            SearchStrategy::LowSuccessive => "LowSuccessive (successive conflicts)",
             // Many-Glue-Clauses
             SearchStrategy::ManyGlues => "ManyGlueClauses",
         }
@@ -427,11 +427,20 @@ impl StateIF for State {
         debug_assert_eq!(self.strategy.0, SearchStrategy::Initial);
         self.strategy.0 = match () {
             _ if cdb_num_bi_learnt + 20_000 < cdb_num_lbd2 => SearchStrategy::ManyGlues,
-            _ if self[Stat::Decision] as f64 <= 1.2 * asg_num_conflict as f64 => {
+            _ if self[Stat::Decision] as f64 <= 1.05 * asg_num_conflict as f64 => {
+                // panic!("LowDecisions: decision:{} <= 1.2 * conflict:{}",
+                //        self[Stat::Decision],
+                //        asg_num_conflict,
+                // );
                 SearchStrategy::LowDecisions
             }
-            _ if self[Stat::NoDecisionConflict] < 30_000 => SearchStrategy::LowSuccesive,
-            _ if 54_400 < self[Stat::NoDecisionConflict] => SearchStrategy::HighSuccesive,
+            _ if self[Stat::NoDecisionConflict] < 15_000 => {
+                // panic!("LowSuccessive: noDecisionConflict:{} <= 30_000",
+                //        self[Stat::NoDecisionConflict],
+                // );
+                SearchStrategy::LowSuccessive
+            }
+            _ if 54_400 < self[Stat::NoDecisionConflict] => SearchStrategy::HighSuccessive,
             _ => SearchStrategy::Generic,
         };
         self.strategy.1 = asg_num_conflict;
