@@ -232,71 +232,66 @@ fn search(
                 }
             }
             nconflict += 1;
-            if state.restart_span < nconflict && 0 < asg.decision_level() {
+            if state.rst_span < nconflict && 0 < asg.decision_level() {
                 let ext =
-                    (((asg.exports().1 - nprogress) as f64) / state.restart_span as f64).log(10.0);
+                    (((asg.exports().1 - nprogress) as f64) / state.rst_span as f64).log(10.0);
                 // 0.98 = (50 - 1) / 50. For about a hundred records of restart.
-                if state.restart_learning_rate < 0.92 {
-                    state.restart_learning_rate += 0.02;
-                } else if state.restart_learning_rate < 0.96 {
-                    state.restart_learning_rate += 0.002;
-                } else if state.restart_learning_rate < 0.99 {
-                    state.restart_learning_rate += 0.0002;
+                if state.rst_learning_rate < 0.92 {
+                    state.rst_learning_rate += 0.02;
+                } else if state.rst_learning_rate < 0.96 {
+                    state.rst_learning_rate += 0.002;
+                } else if state.rst_learning_rate < 0.99 {
+                    state.rst_learning_rate += 0.0002;
                 }
                 nconflict = 0;
                 nprogress = asg.exports().1;
-                let (ref mut dw, ref mut up) = state.restart_rewards;
-                if state.restart_increasing {
-                    up.0 *= 1.0 - state.restart_learning_rate;
-                    up.0 += state.restart_learning_rate * ext;
+                let (ref mut dw, ref mut up) = state.rst_rewards;
+                if state.rst_increasing {
+                    up.0 *= 1.0 - state.rst_learning_rate;
+                    up.0 += state.rst_learning_rate * ext;
                     up.1 += 1;
                 } else {
-                    dw.0 *= 1.0 - state.restart_learning_rate;
-                    dw.0 += state.restart_learning_rate * ext;
+                    dw.0 *= 1.0 - state.rst_learning_rate;
+                    dw.0 += state.rst_learning_rate * ext;
                     dw.1 += 1;
                 }
                 if (up.1).min(dw.1) < 4 {
-                    state.restart_increasing = up.1 < dw.1;
+                    state.rst_increasing = up.1 < dw.1;
                 } else if 4 <= restart_drift.abs() {
-                    state.restart_increasing = restart_drift < 0;
+                    state.rst_increasing = restart_drift < 0;
                     restart_drift = 0;
                 } else {
-                    state.restart_increasing = up.0 < dw.0;
+                    state.rst_increasing = up.0 < dw.0;
                 }
-                let mut df: f64 = 1.1 * 0.98 / state.restart_learning_rate;
-                if state.restart_increasing {
+                let mut df: f64 = 1.1 * 0.98 / state.rst_learning_rate;
+                if state.rst_increasing {
                     restart_drift += 1;
                 } else {
                     restart_drift -= 1;
                     df = 1.0 / df;
                 }
-                state.restart_span = (state.restart_span as f64 * df) as usize;
-                if state.restart_span < 10 {
-                    state.restart_learning_rate = 0.8;
-                    state.restart_span = 16;
+                state.rst_span = (state.rst_span as f64 * df) as usize;
+                if state.rst_span < 10 {
+                    state.rst_learning_rate = 0.8;
+                    state.rst_span = 16;
                     restart_drift = 0;
-                } else if 1_000_000 < state.restart_span {
-                    state.restart_learning_rate = 0.8;
-                    state.restart_span = 900_000;
+                } else if 1_000_000 < state.rst_span {
+                    state.rst_learning_rate = 0.8;
+                    state.rst_span = 900_000;
                     restart_drift = 0;
                 }
                 let _mes = format!(
                     "RESTART::{{span:{}, scale:{:5.3}, {}th-{}:{:9.5}, {}th-{}:{:9.5}}}",
-                    state.restart_span,
+                    state.rst_span,
                     if df < 1.0 { 1.0 / df } else { df },
                     dw.1,
-                    if state.restart_increasing {
-                        "down"
-                    } else {
-                        "DOWN"
-                    },
+                    if state.rst_increasing { "down" } else { "DOWN" },
                     dw.0,
                     up.1,
-                    if state.restart_increasing { "UP" } else { "up" },
+                    if state.rst_increasing { "UP" } else { "up" },
                     up.0,
                 );
                 asg.cancel_until(asg.root_level);
-                // rst.force_restart();
                 // state.flush("");
                 // state.flush(mes);
             }

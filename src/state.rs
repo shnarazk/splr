@@ -189,20 +189,20 @@ pub struct State {
     pub strategy: (SearchStrategy, usize),
     /// problem description
     pub target: CNFDescription,
-    /// adjustment interval in conflict
+    /// strategy adjustment interval in conflict
     pub reflection_interval: usize,
 
     //
     //## Restart
     //
     /// The last decision on restart adaptation
-    pub restart_increasing: bool,
+    pub rst_increasing: bool,
     /// stats on restart adaptation; (EMA of #conflicts, #activate)
-    pub restart_rewards: ((f64, usize), (f64, usize)),
+    pub rst_rewards: ((f64, usize), (f64, usize)),
     /// The number of conflicts between successive restarts
-    pub restart_span: usize,
+    pub rst_span: usize,
     /// The learning rate for restart adaptation
-    pub restart_learning_rate: f64,
+    pub rst_learning_rate: f64,
 
     /// time to executevivification
     pub to_vivify: usize,
@@ -246,10 +246,10 @@ impl Default for State {
             strategy: (SearchStrategy::Initial, 0),
             target: CNFDescription::default(),
             reflection_interval: 10_000,
-            restart_increasing: true,
-            restart_rewards: ((0.0, 0), (0.0, 0)),
-            restart_span: 10_000,
-            restart_learning_rate: 0.6,
+            rst_increasing: true,
+            rst_rewards: ((0.0, 0), (0.0, 0)),
+            rst_span: 10_000,
+            rst_learning_rate: 0.6,
             to_vivify: 0,
             vivify_thr: 0.0,
             b_lvl: Ema::new(5_000),
@@ -573,7 +573,7 @@ impl StateIF for State {
             },
             im!("{:>9}", self, LogUsizeId::Restart, asg_num_restart),
             // im!("{:>9}", self, LogUsizeId::RestartBlock, rst_num_block),
-            im!("{:>9}", self, LogUsizeId::RestartSpan, self.restart_span),
+            im!("{:>9}", self, LogUsizeId::RestartSpan, self.rst_span),
             fm!("{:>9.4}", self, LogF64Id::EmaAsg, rst_asg_trend),
             fm!("{:>9.4}", self, LogF64Id::EmaLBD, rst_lbd_trend),
         );
