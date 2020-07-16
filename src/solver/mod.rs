@@ -53,6 +53,7 @@ pub enum SolverEvent {
     Instantiate,
     /// increment the number of vars.
     NewVar,
+    /// restart
     Restart,
     /// reinitialization for incremental solving.
     Reinitialize,

@@ -196,56 +196,19 @@ fn search(
 ) -> Result<bool, SolverError> {
     let mut a_decision_was_made = false;
     let mut num_assigned = asg.num_solved_vars;
-    let mut nrestart = 0; // #restarts in the current mode
-    let mut restart_waiting = 0; // should be a function taking `nrestart`
-    let mut wait_peak = 0;
+    let mut nconflict: usize = 0;
+    let mut nprogress: usize = 0;
+    let mut restart_drift: isize = 0;
     rst.update(RestarterModule::Luby, 0);
     state.stabilize = false;
-    state.restart_absorption = 0;
 
     loop {
         asg.reward_update();
         let ci = asg.propagate(cdb);
         if ci.is_none() {
+            state.last_asg = asg.stack_len();
             if asg.num_vars <= asg.stack_len() + asg.num_eliminated_vars {
                 return Ok(true);
-            }
-
-            //
-            //## DYNAMIC FORCING RESTART based on LBD values, updated by conflict
-            //
-            state.last_asg = asg.stack_len();
-            if rst.force_restart() {
-                let na = asg.var_stats().1;
-
-                if num_assigned < na {
-                    num_assigned = na;
-                    // reset incremental deep search
-                    state.restart_absorption = 0;
-                    restart_waiting = 0;
-                }
-
-                restart_waiting += 1;
-                if state.restart_absorption <= restart_waiting {
-                    // time to restart and incrment parameters
-                    restart_waiting = 0;
-                    nrestart += 1;
-                    state.restart_absorption = if state.stabilize {
-                        int_floor(nrestart) // rst.exports().4
-                    } else {
-                        0 // int_floor(nrestart)
-                    };
-                }
-                if wait_peak < nrestart {
-                    wait_peak = nrestart;
-                }
-                if restart_waiting == 0 {
-                    asg.cancel_until(asg.root_level);
-                }
-                #[cfg(feature = "temp_order")]
-                asg.force_select_iter(None);
-            } else {
-                restart_waiting = 0;
             }
         } else {
             if asg.decision_level() == asg.root_level {
@@ -267,6 +230,75 @@ fn search(
                 } else {
                     return Err(SolverError::UndescribedError);
                 }
+            }
+            nconflict += 1;
+            if state.restart_span < nconflict && 0 < asg.decision_level() {
+                let ext =
+                    (((asg.exports().1 - nprogress) as f64) / state.restart_span as f64).log(10.0);
+                // 0.98 = (50 - 1) / 50. For about a hundred records of restart.
+                if state.restart_learning_rate < 0.92 {
+                    state.restart_learning_rate += 0.02;
+                } else if state.restart_learning_rate < 0.96 {
+                    state.restart_learning_rate += 0.002;
+                } else if state.restart_learning_rate < 0.99 {
+                    state.restart_learning_rate += 0.0002;
+                }
+                nconflict = 0;
+                nprogress = asg.exports().1;
+                let (ref mut dw, ref mut up) = state.restart_rewards;
+                if state.restart_increasing {
+                    up.0 *= 1.0 - state.restart_learning_rate;
+                    up.0 += state.restart_learning_rate * ext;
+                    up.1 += 1;
+                } else {
+                    dw.0 *= 1.0 - state.restart_learning_rate;
+                    dw.0 += state.restart_learning_rate * ext;
+                    dw.1 += 1;
+                }
+                if (up.1).min(dw.1) < 4 {
+                    state.restart_increasing = up.1 < dw.1;
+                } else if 4 <= restart_drift.abs() {
+                    state.restart_increasing = restart_drift < 0;
+                    restart_drift = 0;
+                } else {
+                    state.restart_increasing = up.0 < dw.0;
+                }
+                let mut df: f64 = 1.1 * 0.98 / state.restart_learning_rate;
+                if state.restart_increasing {
+                    restart_drift += 1;
+                } else {
+                    restart_drift -= 1;
+                    df = 1.0 / df;
+                }
+                state.restart_span = (state.restart_span as f64 * df) as usize;
+                if state.restart_span < 10 {
+                    state.restart_learning_rate = 0.8;
+                    state.restart_span = 16;
+                    restart_drift = 0;
+                } else if 1_000_000 < state.restart_span {
+                    state.restart_learning_rate = 0.8;
+                    state.restart_span = 900_000;
+                    restart_drift = 0;
+                }
+                let _mes = format!(
+                    "RESTART::{{span:{}, scale:{:5.3}, {}th-{}:{:9.5}, {}th-{}:{:9.5}}}",
+                    state.restart_span,
+                    if df < 1.0 { 1.0 / df } else { df },
+                    dw.1,
+                    if state.restart_increasing {
+                        "down"
+                    } else {
+                        "DOWN"
+                    },
+                    dw.0,
+                    up.1,
+                    if state.restart_increasing { "UP" } else { "up" },
+                    up.0,
+                );
+                asg.cancel_until(asg.root_level);
+                // rst.force_restart();
+                // state.flush("");
+                // state.flush(mes);
             }
         }
         // Simplification has been postponed because chronoBT was used.
@@ -304,19 +336,12 @@ fn search(
         let na = asg.best_assigned(Flag::PHASE);
         if num_assigned < na {
             num_assigned = na;
-
-            // reset incremental deep search
-            nrestart = 0;
-            state.restart_absorption = 0;
-
             state.flush("");
             state.flush(format!("unreachable: {}", asg.num_vars - num_assigned));
         }
         if !asg.remains() {
             if state.config.use_stabilize() && state.stabilize != rst.stabilizing() {
                 state.stabilize = !state.stabilize;
-                nrestart = 0;
-                state.restart_absorption = 0;
                 rst.handle(SolverEvent::Stabilize(state.stabilize));
             }
             let lit = asg.select_decision_literal(&state.phase_select);
@@ -341,9 +366,9 @@ fn adapt_modules(
         // 'decision_level == 0' is required by `cdb.adapt_to`.
         asg.cancel_until(asg.root_level);
         state.select_strategy(asg, cdb);
-        if elim.exports().0 < 2 {
-            state.config.ip_interval = state.config.ip_interval.min(elim.to_simplify as usize);
-        }
+        // if elim.exports().0 < 2 {
+        //     state.config.ip_interval = state.config.ip_interval.min(elim.to_simplify as usize);
+        // }
     }
     #[cfg(feature = "boundary_check")]
     assert!(state.strategy.1 != asg_num_conflict || 0 == asg.decision_level());
@@ -387,31 +412,4 @@ fn analyze_final(asg: &mut AssignStack, state: &mut State, c: &Clause) {
         }
         seen[vi] = false;
     }
-}
-
-// a very slow floor function mapping on int
-fn int_floor(n: usize) -> usize {
-    const PRIMES: [usize; 168] = [
-        2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89,
-        97, 101, 103, 107, 109, 113, 127, 131, 137, 139, 149, 151, 157, 163, 167, 173, 179, 181,
-        191, 193, 197, 199, 211, 223, 227, 229, 233, 239, 241, 251, 257, 263, 269, 271, 277, 281,
-        283, 293, 307, 311, 313, 317, 331, 337, 347, 349, 353, 359, 367, 373, 379, 383, 389, 397,
-        401, 409, 419, 421, 431, 433, 439, 443, 449, 457, 461, 463, 467, 479, 487, 491, 499, 503,
-        509, 521, 523, 541, 547, 557, 563, 569, 571, 577, 587, 593, 599, 601, 607, 613, 617, 619,
-        631, 641, 643, 647, 653, 659, 661, 673, 677, 683, 691, 701, 709, 719, 727, 733, 739, 743,
-        751, 757, 761, 769, 773, 787, 797, 809, 811, 821, 823, 827, 829, 839, 853, 857, 859, 863,
-        877, 881, 883, 887, 907, 911, 919, 929, 937, 941, 947, 953, 967, 971, 977, 983, 991, 997,
-    ];
-    fn int_sqrt(n: usize) -> usize {
-        (n as f64).sqrt() as usize
-    }
-    for i in PRIMES.iter() {
-        if n == *i {
-            return 0;
-        }
-        if n % i == 0 {
-            return int_sqrt(i - 2);
-        }
-    }
-    0
 }

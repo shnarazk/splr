@@ -188,13 +188,13 @@ pub fn vivify(
     } else {
         state.vivify_thr *= state.config.viv_scale;
     }
-    if 0 < nassert || 0 < npurge || 0 < nshrink {
-        state.flush("");
-        state.flush(format!(
-            "vivified(assert:{}, purge:{}, shorten:{})...",
-            nassert, npurge, nshrink,
-        ));
-    }
+    // if 0 < nassert || 0 < npurge || 0 < nshrink {
+    //     state.flush("");
+    //     state.flush(format!(
+    //         "vivified(assert:{}, purge:{}, shorten:{})...",
+    //         nassert, npurge, nshrink,
+    //     ));
+    // }
     asg.handle(SolverEvent::Vivify(false));
     Ok(())
 }

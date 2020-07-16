@@ -191,8 +191,19 @@ pub struct State {
     pub target: CNFDescription,
     /// adjustment interval in conflict
     pub reflection_interval: usize,
-    /// restart
-    pub restart_absorption: usize,
+
+    //
+    //## Restart
+    //
+    /// The last decision on restart adaptation
+    pub restart_increasing: bool,
+    /// stats on restart adaptation; (EMA of #conflicts, #activate)
+    pub restart_rewards: ((f64, usize), (f64, usize)),
+    /// The number of conflicts between successive restarts
+    pub restart_span: usize,
+    /// The learning rate for restart adaptation
+    pub restart_learning_rate: f64,
+
     /// time to executevivification
     pub to_vivify: usize,
     /// loop limit of vivification loop
@@ -235,7 +246,10 @@ impl Default for State {
             strategy: (SearchStrategy::Initial, 0),
             target: CNFDescription::default(),
             reflection_interval: 10_000,
-            restart_absorption: 0,
+            restart_increasing: true,
+            restart_rewards: ((0.0, 0), (0.0, 0)),
+            restart_span: 10_000,
+            restart_learning_rate: 0.6,
             to_vivify: 0,
             vivify_thr: 0.0,
             b_lvl: Ema::new(5_000),
@@ -289,10 +303,14 @@ impl Instantiate for State {
             SolverEvent::NewVar => {
                 self.target.num_of_variables += 1;
             }
-            SolverEvent::Fixed => {
-                self.restart_absorption = 0;
-            }
-            _ => (),
+            SolverEvent::Fixed => (),
+            SolverEvent::Adapt(_, _) => {}
+            SolverEvent::Conflict => {}
+            SolverEvent::Instantiate => {}
+            SolverEvent::Restart => {}
+            SolverEvent::Reinitialize => {}
+            SolverEvent::Stabilize(_) => {}
+            SolverEvent::Vivify(_) => {}
         }
     }
 }
@@ -496,10 +514,11 @@ impl StateIF for State {
         let (cdb_num_active, cdb_num_biclause, _num_bl, cdb_num_lbd2, cdb_num_learnt, _cdb_nr) =
             cdb.exports();
 
-        let (elim_num_full, _num_sat, elim_to_simplify) = elim.exports();
+        let (elim_num_full, _num_sat, _elim_to_simplify) = elim.exports();
 
         let rst_mode = rst.active_mode();
-        let (rst_num_block, rst_asg_trend, rst_lbd_get, rst_lbd_trend, rst_num_stb) = rst.exports();
+        let (_rst_num_block, rst_asg_trend, rst_lbd_get, rst_lbd_trend, rst_num_stb) =
+            rst.exports();
 
         if self.config.use_log {
             self.dump(asg, cdb, rst);
@@ -544,18 +563,17 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K {}|#BLK:{}, #RST:{}, tASG:{}, tLBD:{} ",
+            "\x1B[2K {}|#RST:{}, span:{}, tASG:{}, tLBD:{} ",
             match rst_mode {
                 RestartMode::Dynamic => "    Restart",
                 RestartMode::Luby if self.config.no_color => "LubyRestart",
                 RestartMode::Luby => "\x1B[001m\x1B[035mLubyRestart\x1B[000m",
                 RestartMode::Stabilize if self.config.no_color => "  Stabilize",
                 RestartMode::Stabilize => "  \x1B[001m\x1B[030mStabilize\x1B[000m",
-                // RestartMode::Bucket if self.config.no_color => "     Bucket",
-                // RestartMode::Bucket => "     \x1B[001m\x1B[032mBucket\x1B[000m",
             },
-            im!("{:>9}", self, LogUsizeId::RestartBlock, rst_num_block),
             im!("{:>9}", self, LogUsizeId::Restart, asg_num_restart),
+            // im!("{:>9}", self, LogUsizeId::RestartBlock, rst_num_block),
+            im!("{:>9}", self, LogUsizeId::RestartSpan, self.restart_span),
             fm!("{:>9.4}", self, LogF64Id::EmaAsg, rst_asg_trend),
             fm!("{:>9.4}", self, LogF64Id::EmaLBD, rst_lbd_trend),
         );
@@ -572,15 +590,21 @@ impl StateIF for State {
             )
         );
         println!(
-            "\x1B[2K        misc|#stb:{}, #viv:{}, #eli:{}, 2eli:{} ",
+            "\x1B[2K        misc|#stb:{}, #viv:{}, #eli:{}, ppc/:{} ",
             im!("{:>9}", self, LogUsizeId::Stabilize, rst_num_stb),
             im!("{:>9}", self, LogUsizeId::Vivify, self[Stat::Vivification]),
             im!("{:>9}", self, LogUsizeId::Simplify, elim_num_full),
+            // fm!(
+            //     "{:>9.0}",
+            //     self,
+            //     LogF64Id::SimpToGo,
+            //     (self.config.ip_interval as f64 - elim_to_simplify).max(0.0)
+            // ),
             fm!(
-                "{:>9.0}",
+                "{:>9.2}",
                 self,
-                LogF64Id::SimpToGo,
-                (self.config.ip_interval as f64 - elim_to_simplify).max(0.0)
+                LogF64Id::End,
+                asg_num_propagation as f64 / asg_num_conflict as f64
             ),
         );
         if let Some(m) = mes {
@@ -801,33 +825,35 @@ impl State {
 
 /// Index for `Usize` data, used in `ProgressRecord`.
 pub enum LogUsizeId {
-    Propagate = 0, //  0: propagate: usize,
-    Decision,      //  1: decision: usize,
-    Conflict,      //  2: conflict: usize,
-    Remain,        //  3: remain: usize,
-    Fixed,         //  4: fixed: usize,
-    Eliminated,    //  5: elim: usize,
-    Removable,     //  6: removable: usize,
-    LBD2,          //  7: lbd2: usize,
-    Binclause,     //  8: binclause: usize,
-    Permanent,     //  9: permanent: usize,
-    RestartBlock,  // 10: restart_block: usize,
-    Restart,       // 11: restart_count: usize,
-    Simplify,      // 12: full-featured elimination: usize,
-    Stabilize,     // 13: stabilization: usize
-    Vivify,        // 14: vivification: usize
+    Propagate = 0,
+    Decision,
+    Conflict,
+    Remain,
+    Fixed,
+    Eliminated,
+    Removable,
+    LBD2,
+    Binclause,
+    Permanent,
+    RestartBlock,
+    Restart,
+    RestartSpan,
+    Simplify,
+    Stabilize,
+    Vivify,
     End,
 }
 
 /// Index for `f64` data, used in `ProgressRecord`.
 pub enum LogF64Id {
-    Progress = 0, //  0: progress: f64,
-    EmaAsg,       //  1: ema_asg: f64,
-    EmaLBD,       //  2: ema_lbd: f64,
-    AveLBD,       //  3: ave_lbd: f64,
-    BLevel,       //  4: backjump_level: f64,
-    CLevel,       //  5: conflict_level: f64,
-    SimpToGo,     //  6: asg.core_size.get: f64,
+    Progress = 0,
+    EmaAsg,
+    EmaLBD,
+    AveLBD,
+    BLevel,
+    CLevel,
+    RestartAux,
+    SimpToGo,
     End,
 }
 
