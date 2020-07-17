@@ -131,7 +131,7 @@ pub fn vivify(
                         copied = asg.minimize(cdb, &copied, &r, ncheck, &mut seen);
                         flipped = false;
                     }
-                    asg.cancel_until_sandbox(asg.root_level);
+                    asg.cancel_until(asg.root_level);
                     if let Some(cj) = cid {
                         cdb.detach(cj);
                         cdb.garbage_collect();
