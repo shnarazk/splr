@@ -521,7 +521,6 @@ pub struct Restarter {
     luby: LubySeries,
     stb: GeometricStabilizer,
     after_restart: usize,
-    next_restart: usize,
     restart_step: usize,
     initial_restart_step: usize,
 
@@ -543,7 +542,6 @@ impl Default for Restarter {
             luby: LubySeries::default(),
             stb: GeometricStabilizer::default(),
             after_restart: 0,
-            next_restart: 100,
             restart_step: 0,
             initial_restart_step: 0,
             num_block: 0,
