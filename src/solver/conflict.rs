@@ -47,12 +47,6 @@ pub fn handle_conflict(
         state.last_asg = 0;
     }
 
-    //
-    //## DYNAMIC BLOCKING RESTART based on ASG, updated on conflict path
-    //
-    // if rst.block_restart() {
-    //     state.restart_span += state.config.rst_step;
-    // }
     let mut use_chronobt = switch_chronobt.unwrap_or(0 < state.config.cbt_thr);
     if use_chronobt {
         let level = asg.level_ref();
