@@ -134,7 +134,7 @@ impl Instantiate for AssignStack {
                         (self.num_conflict, self.num_propagation, self.num_restart);
                 } else {
                     self.num_conflict = self.vivify_sandbox.0;
-                    // self.num_propagation = self.vivify_sandbox.1;
+                    self.num_propagation = self.vivify_sandbox.1;
                     self.num_restart = self.vivify_sandbox.2;
                 }
             }
