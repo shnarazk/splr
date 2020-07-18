@@ -445,7 +445,7 @@ impl StateIF for State {
         debug_assert_eq!(self.strategy.0, SearchStrategy::Initial);
         self.strategy.0 = match () {
             _ if cdb_num_bi_learnt + 20_000 < cdb_num_lbd2 => SearchStrategy::ManyGlues,
-            _ if self[Stat::Decision] as f64 <= 1.05 * asg_num_conflict as f64 => {
+            _ if self[Stat::Decision] as f64 <= 1.2 * asg_num_conflict as f64 => {
                 // panic!("LowDecisions: decision:{} <= 1.2 * conflict:{}",
                 //        self[Stat::Decision],
                 //        asg_num_conflict,
