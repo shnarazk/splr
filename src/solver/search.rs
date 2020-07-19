@@ -197,8 +197,8 @@ fn search(
     let mut a_decision_was_made = false;
     let mut num_assigned = asg.num_solved_vars;
     let mut nconflict: usize = 0;
-    let mut nprogress: usize = 0;
-    let mut restart_drift: isize = 0;
+    // let mut nprogress: usize = 0;
+    // let mut restart_drift: isize = 0;
     rst.update(RestarterModule::Luby, 0);
     state.stabilize = false;
 
@@ -207,6 +207,8 @@ fn search(
         let ci = asg.propagate(cdb);
         if ci.is_none() {
             state.last_asg = asg.stack_len();
+            // rst.force_restart(); // to update lbd progress_evaluator
+            rst.block_restart(); // to update asg progress_evaluator
             if asg.num_vars <= asg.stack_len() + asg.num_eliminated_vars {
                 return Ok(true);
             }
@@ -231,76 +233,72 @@ fn search(
                     return Err(SolverError::UndescribedError);
                 }
             }
+
+            //
+            //## Dynamic restart control
+            //
             nconflict += 1;
-            if state.rst_span < nconflict && 0 < asg.decision_level() {
-                let ext =
-                    (((asg.exports().1 - nprogress) as f64) / state.rst_span as f64).log(10.0);
-                // 0.98 = (50 - 1) / 50. For about a hundred records of restart.
-                if state.rst_learning_rate < 0.92 {
-                    state.rst_learning_rate += 0.02;
-                } else if state.rst_learning_rate < 0.96 {
-                    state.rst_learning_rate += 0.002;
-                } else if state.rst_learning_rate < 0.99 {
-                    state.rst_learning_rate += 0.0002;
-                }
+            if rst.force_restart() {
+                rst.update(RestarterModule::MVA, nconflict);
                 nconflict = 0;
-                nprogress = asg.exports().1;
-                let (ref mut dw, ref mut up) = state.rst_rewards;
-                if state.rst_increasing {
-                    up.0 *= 1.0 - state.rst_learning_rate;
-                    up.0 += state.rst_learning_rate * ext;
-                    up.1 += 1;
-                } else {
-                    dw.0 *= 1.0 - state.rst_learning_rate;
-                    dw.0 += state.rst_learning_rate * ext;
-                    dw.1 += 1;
+                // nprogress = asg.exports().1;
+
+                match rst.stabilizing() {
+                    None => asg.cancel_until(asg.root_level),
+                    Some(true) => {
+                        // cancel restart if solver is in stabiling mode and the last learnt
+                        // has very releted to the current conflicting core.
+                        state.rst_cancel += 1;
+                    }
+                    Some(false) => {
+                        asg.cancel_until(asg.root_level);
+                        asg.force_rephase();
+                    }
                 }
-                if (up.1).min(dw.1) < 4 {
-                    state.rst_increasing = up.1 < dw.1;
-                } else if 4 <= restart_drift.abs() {
-                    state.rst_increasing = restart_drift < 0;
-                    restart_drift = 0;
-                } else {
-                    state.rst_increasing = up.0 < dw.0;
-                }
-                let mut df: f64 = 1.1 * 0.98 / state.rst_learning_rate;
-                if state.rst_increasing {
-                    restart_drift += 1;
-                } else {
-                    restart_drift -= 1;
-                    df = 1.0 / df;
-                }
-                state.rst_span = (state.rst_span as f64 * df) as usize;
-                if state.rst_span < 10 {
-                    state.rst_learning_rate = 0.8;
-                    state.rst_span = 16;
-                    restart_drift = 0;
-                } else if 1_000_000 < state.rst_span {
-                    state.rst_learning_rate = 0.8;
-                    state.rst_span = 900_000;
-                    restart_drift = 0;
-                }
-                let _mes = format!(
-                    "RESTART::{{span:{}, scale:{:5.3}, {}th-{}:{:9.5}, {}th-{}:{:9.5}}}",
-                    state.rst_span,
-                    if df < 1.0 { 1.0 / df } else { df },
-                    dw.1,
-                    if state.rst_increasing { "down" } else { "DOWN" },
-                    dw.0,
-                    up.1,
-                    if state.rst_increasing { "UP" } else { "up" },
-                    up.0,
-                );
-                asg.cancel_until(asg.root_level);
-                // state.flush("");
-                // state.flush(mes);
+                /*
+                        if state.rst_learning_rate < 0.92 {
+                            state.rst_learning_rate += 0.02;
+                        } else if state.rst_learning_rate < 0.94 {
+                            state.rst_learning_rate += 0.002;
+                        } else if state.rst_learning_rate < 0.975 {
+                            state.rst_learning_rate += 0.0002;
+                        }
+                        let (ref mut dw, ref mut up) = state.rst_rewards;
+                        if state.rst_increasing {
+                            up.0 *= 1.0 - state.rst_learning_rate;
+                            up.0 += state.rst_learning_rate * value;
+                            up.1 += 1;
+                        } else {
+                            dw.0 *= 1.0 - state.rst_learning_rate;
+                            dw.0 += state.rst_learning_rate * value;
+                            dw.1 += 1;
+                        }
+                        if (up.1).min(dw.1) < 2 {
+                            state.rst_increasing = up.1 < dw.1;
+                        } else if 4 <= restart_drift.abs() {
+                            state.rst_increasing = restart_drift < 0;
+                            restart_drift = 0;
+                        } else {
+                            state.rst_increasing = up.0 < dw.0;
+                        }
+                        let mut df: f64 = 1.1 * 0.98 / state.rst_learning_rate;
+                        if state.rst_increasing {
+                            restart_drift += 1;
+                    // state.rst_span = 10_000;
+                        } else {
+                            restart_drift -= 1;
+                            // df = 1.0 / df;
+                    // state.rst_span = 40;
+                        }
+                        // state.rst_span = (state.rst_span as f64 * df) as usize;
+                */
             }
         }
         // Simplification has been postponed because chronoBT was used.
         if asg.decision_level() == asg.root_level {
-            if state.stabilize {
-                asg.force_rephase();
-            }
+            // if state.rst_increasing /* state.stabilize */ {
+            //     asg.force_rephase();
+            // }
             if state.config.viv_interval <= state.to_vivify && state.config.use_vivify() {
                 state.to_vivify = 0;
                 if !cdb.use_chan_seok && vivify(asg, cdb, elim, state).is_err() {
@@ -335,7 +333,7 @@ fn search(
             state.flush(format!("unreachable: {}", asg.num_vars - num_assigned));
         }
         if !asg.remains() {
-            if state.config.use_stabilize() && state.stabilize != rst.stabilizing() {
+            if state.config.use_stabilize() && state.stabilize != rst.stabilizing().is_some() {
                 state.stabilize = !state.stabilize;
                 rst.handle(SolverEvent::Stabilize(state.stabilize));
             }

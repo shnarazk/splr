@@ -195,14 +195,12 @@ pub struct State {
     //
     //## Restart
     //
-    /// The last decision on restart adaptation
-    pub rst_increasing: bool,
     /// stats on restart adaptation; (EMA of #conflicts, #activate)
     pub rst_rewards: ((f64, usize), (f64, usize)),
-    /// The number of conflicts between successive restarts
-    pub rst_span: usize,
     /// The learning rate for restart adaptation
     pub rst_learning_rate: f64,
+    /// The number of cancelled restart by mva evaluation
+    pub rst_cancel: usize,
 
     /// time to executevivification
     pub to_vivify: usize,
@@ -246,10 +244,9 @@ impl Default for State {
             strategy: (SearchStrategy::Initial, 0),
             target: CNFDescription::default(),
             reflection_interval: 10_000,
-            rst_increasing: true,
             rst_rewards: ((0.0, 0), (0.0, 0)),
-            rst_span: 10_000,
             rst_learning_rate: 0.6,
+            rst_cancel: 0,
             to_vivify: 0,
             vivify_thr: 0.0,
             b_lvl: Ema::new(5_000),
@@ -563,7 +560,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K {}|#RST:{}, span:{}, tASG:{}, tLBD:{} ",
+            "\x1B[2K {}|#RST:{}, cncl:{}, tASG:{}, tLBD:{} ",
             match rst_mode {
                 RestartMode::Dynamic => "    Restart",
                 RestartMode::Luby if self.config.no_color => "LubyRestart",
@@ -573,7 +570,8 @@ impl StateIF for State {
             },
             im!("{:>9}", self, LogUsizeId::Restart, asg_num_restart),
             // im!("{:>9}", self, LogUsizeId::RestartBlock, rst_num_block),
-            im!("{:>9}", self, LogUsizeId::RestartSpan, self.rst_span),
+            im!("{:>9}", self, LogUsizeId::End, self.rst_cancel),
+            // fm!("{:>9.4}", self, LogF64Id::End, rst.get_mva()),
             fm!("{:>9.4}", self, LogF64Id::EmaAsg, rst_asg_trend),
             fm!("{:>9.4}", self, LogF64Id::EmaLBD, rst_lbd_trend),
         );

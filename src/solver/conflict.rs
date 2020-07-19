@@ -47,6 +47,7 @@ pub fn handle_conflict(
         state.last_asg = 0;
     }
 
+    // rst.block_restart(); // to update asg progress_evaluator
     let mut use_chronobt = switch_chronobt.unwrap_or(0 < state.config.cbt_thr);
     if use_chronobt {
         let level = asg.level_ref();
@@ -165,7 +166,6 @@ pub fn handle_conflict(
             asg.assign_by_unitclause(l0);
         }
         asg.handle(SolverEvent::Fixed);
-        state.handle(SolverEvent::Fixed);
         rst.update(RestarterModule::Reset, 0);
         elim.to_simplify += 2.0; // 1 for the positive lit, 1 for the negative.
     } else {
@@ -208,8 +208,18 @@ pub fn handle_conflict(
         asg.assign_by_implication(l0, AssignReason::Implication(cid, reason), al);
         let lbd = cdb[cid].rank;
         rst.update(RestarterModule::LBD, lbd);
-        elim.to_simplify += 1.0 / (learnt_len - 1) as f64;
+
+        let mut act: f64 = 0.0;
+        for li in cdb[cid].iter() {
+            let a = asg.activity(li.vi());
+            if act < a {
+                act = a;
+            }
+        }
+        rst.update_mva(act);
+
         if lbd <= 20 {
+            elim.to_simplify += 1.0 / (learnt_len - 1) as f64;
             for cid in &state.derive20 {
                 cdb[cid].turn_on(Flag::DERIVE20);
             }

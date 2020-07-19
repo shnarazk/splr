@@ -23,6 +23,7 @@ pub enum RestarterModule {
     Counter = 0,
     ASG,
     LBD,
+    MVA,
     Luby,
     Reset,
 }
@@ -42,13 +43,16 @@ pub enum RestartMode {
 /// API for restart like `block_restart`, `force_restart` and so on.
 pub trait RestartIF: Export<(usize, f64, f64, f64, usize), RestartMode> {
     /// return `true` if stabilizer is active.
-    fn stabilizing(&self) -> bool;
+    fn stabilizing(&self) -> Option<bool>;
     /// block restart if needed.
     fn block_restart(&mut self) -> bool;
     /// force restart if needed.
     fn force_restart(&mut self) -> bool;
     /// update specific submodule
     fn update(&mut self, kind: RestarterModule, val: usize);
+    /// for mva, which takes f64.
+    fn update_mva(&mut self, val: f64);
+    fn get_mva(&self) -> f64;
 }
 
 /// An assignment history used for blocking restart.
@@ -160,6 +164,80 @@ impl ProgressEvaluator for ProgressLBD {
         self.enable && self.threshold < self.ema.trend()
     }
     fn shift(&mut self) {}
+}
+
+/// An EMA of learnt clauses' max var activity, used for forcing restart.
+#[derive(Debug)]
+struct ProgressMVA {
+    enable: bool,
+    ema: Ema2,
+    num: usize,
+    sum: f64,
+    // increment by update
+    val: f64,
+    // increment by update
+    inc: usize,
+    // storing the last check result
+    correlation: f64,
+    /// For force restart based on average LBD of newly generated clauses: 0.80.
+    /// This is called `K` in Glucose
+    threshold: f64,
+}
+
+impl Default for ProgressMVA {
+    fn default() -> ProgressMVA {
+        ProgressMVA {
+            enable: true,
+            ema: Ema2::new(1),
+            num: 0,
+            sum: 0.0,
+            val: 0.0,
+            inc: 0,
+            correlation: 0.0,
+            threshold: 1.6,
+        }
+    }
+}
+
+impl Instantiate for ProgressMVA {
+    fn instantiate(config: &Config, _: &CNFDescription) -> Self {
+        ProgressMVA {
+            ema: Ema2::new(config.rst_lbd_len).with_slow(config.rst_lbd_slw),
+            threshold: config.rst_mva_thr,
+            ..ProgressMVA::default()
+        }
+    }
+}
+
+impl EmaIF for ProgressMVA {
+    type Input = f64;
+    fn update(&mut self, d: Self::Input) {
+        self.inc += 1;
+        self.val += d;
+    }
+    fn get(&self) -> f64 {
+        self.ema.get()
+    }
+    fn trend(&self) -> f64 {
+        self.ema.trend()
+    }
+}
+
+impl ProgressEvaluator for ProgressMVA {
+    // Smaller core, larger value
+    fn is_active(&self) -> bool {
+        self.enable && self.threshold < self.correlation
+    }
+    fn shift(&mut self) {
+        if 0 < self.inc {
+            self.num += 1;
+            self.sum += self.val;
+            self.correlation = self.val / (self.inc as f64);
+            self.ema.update(self.correlation);
+            self.val = 0.0;
+            self.inc = 0;
+        }
+    }
 }
 
 /// An EMA of decision level.
@@ -515,6 +593,7 @@ pub struct Restarter {
     asg: ProgressASG,
     // bkt: ProgressBucket,
     lbd: ProgressLBD,
+    mva: ProgressMVA,
     // pub rcc: ProgressRCC,
     // pub blvl: ProgressLVL,
     // pub clvl: ProgressLVL,
@@ -536,6 +615,7 @@ impl Default for Restarter {
             asg: ProgressASG::default(),
             // bkt: ProgressBucket::default(),
             lbd: ProgressLBD::default(),
+            mva: ProgressMVA::default(),
             // rcc: ProgressRCC::default(),
             // blvl: ProgressLVL::default(),
             // clvl: ProgressLVL::default(),
@@ -555,6 +635,7 @@ impl Instantiate for Restarter {
             asg: ProgressASG::instantiate(config, cnf),
             // bkt: ProgressBucket::instantiate(config, cnf),
             lbd: ProgressLBD::instantiate(config, cnf),
+            mva: ProgressMVA::instantiate(config, cnf),
             // rcc: ProgressRCC::instantiate(config, cnf),
             // blvl: ProgressLVL::instantiate(config, cnf),
             // clvl: ProgressLVL::instantiate(config, cnf),
@@ -593,8 +674,12 @@ macro_rules! reset {
 }
 
 impl RestartIF for Restarter {
-    fn stabilizing(&self) -> bool {
-        self.stb.is_active()
+    fn stabilizing(&self) -> Option<bool> {
+        if self.stb.is_active() {
+            Some(self.mva.is_active())
+        } else {
+            None
+        }
     }
     fn block_restart(&mut self) -> bool {
         // || self.bkt.enable
@@ -639,9 +724,18 @@ impl RestartIF for Restarter {
                 // self.bkt.update(val);
                 self.lbd.update(val);
             }
+            RestarterModule::MVA => {
+                self.mva.shift();
+            }
             RestarterModule::Luby => self.luby.update(0),
             RestarterModule::Reset => (),
         }
+    }
+    fn update_mva(&mut self, val: f64) {
+        self.mva.update(val);
+    }
+    fn get_mva(&self) -> f64 {
+        self.mva.get()
     }
 }
 
