@@ -106,11 +106,11 @@ pub struct Config {
     pub viv_beg: f64,
 
     /// Upper bound of vivif. loop
-    #[cfg_attr(feature = "structopt", structopt(long = "vie", default_value = "2.0"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "vie", default_value = "1.0"))]
     pub viv_end: f64,
 
     /// Vivif. interval
-    #[cfg_attr(feature = "structopt", structopt(long = "vii", default_value = "2"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "vii", default_value = "5"))]
     pub viv_interval: usize,
 
     /// #reduction for next vivif.
@@ -125,7 +125,7 @@ pub struct Config {
     //## restarter
     //
     /// #conflicts between restarts
-    #[cfg_attr(feature = "structopt", structopt(skip))] // long = "rs", default_value = "50"
+    #[cfg_attr(feature = "structopt", structopt(long = "rs", default_value = "50"))]
     pub rst_step: usize,
 
     /// Bucket increment step
@@ -147,29 +147,35 @@ pub struct Config {
     pub rst_bkt_thr: usize,
 
     /// Length for assignment average
-    #[cfg_attr(feature = "structopt", structopt(skip))] // long = "ral", default_value = "3500"
+    #[cfg_attr(feature = "structopt", structopt(long = "ral", default_value = "3500"))]
     pub rst_asg_len: usize,
 
     /// Blocking restart threshold
-    #[cfg_attr(feature = "structopt", structopt(skip))] // long = "rab", default_value = "1.40"
+    #[cfg_attr(feature = "structopt", structopt(long = "rab", default_value = "1.40"))]
     pub rst_asg_thr: f64, // Glucose's R
 
     /// Length of LBD fast EMA
-    #[cfg_attr(feature = "structopt", structopt(skip))] // long = "rll", default_value = "50"
+    #[cfg_attr(feature = "structopt", structopt(long = "rll", default_value = "50"))]
     pub rst_lbd_len: usize,
 
     /// Length of LBD slow EMA
-    #[cfg_attr(feature = "structopt", structopt(skip))]
-    // long = "rls", default_value = "10000"
+    #[cfg_attr(
+        feature = "structopt",
+        structopt(long = "rls", default_value = "10000")
+    )]
     pub rst_lbd_slw: usize,
 
     /// Forcing restart threshold
-    #[cfg_attr(feature = "structopt", structopt(skip))] // long = "rlt", default_value = "1.20"
+    #[cfg_attr(feature = "structopt", structopt(long = "rlt", default_value = "1.20"))]
     pub rst_lbd_thr: f64, // 1.0 / Glucose's K
 
     /// Stabilizer scaling
     #[cfg_attr(feature = "structopt", structopt(long = "rss", default_value = "2.0"))]
     pub rst_stb_scl: f64,
+
+    /// Max Var Activity
+    #[cfg_attr(feature = "structopt", structopt(long = "rmt", default_value = "0.72"))]
+    pub rst_mva_thr: f64,
 
     //
     //## var rewarding
@@ -238,7 +244,7 @@ impl Default for Config {
             elim: 1,
             viv_beg: 1.0,
             viv_end: 2.0,
-            viv_interval: 2,
+            viv_interval: 8,
             viv_scale: 2.0,
             vivify: 1,
             rst_step: 50,
@@ -252,6 +258,7 @@ impl Default for Config {
             rst_lbd_slw: 10000,
             rst_lbd_thr: 1.20,
             rst_stb_scl: 2.0,
+            rst_mva_thr: 0.7,
             vrw_dcy_beg: 0.10,
             vrw_dcy_end: 0.97,
             cbt_thr: 100,
