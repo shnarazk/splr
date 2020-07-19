@@ -196,9 +196,6 @@ fn search(
 ) -> Result<bool, SolverError> {
     let mut a_decision_was_made = false;
     let mut num_assigned = asg.num_solved_vars;
-    let mut nconflict: usize = 0;
-    // let mut nprogress: usize = 0;
-    // let mut restart_drift: isize = 0;
     rst.update(RestarterModule::Luby, 0);
     state.stabilize = false;
 
@@ -207,7 +204,6 @@ fn search(
         let ci = asg.propagate(cdb);
         if ci.is_none() {
             state.last_asg = asg.stack_len();
-            // rst.force_restart(); // to update lbd progress_evaluator
             rst.block_restart(); // to update asg progress_evaluator
             if asg.num_vars <= asg.stack_len() + asg.num_eliminated_vars {
                 return Ok(true);
@@ -218,6 +214,22 @@ fn search(
                 return Ok(false);
             }
             handle_conflict(asg, cdb, elim, rst, state, ci)?;
+            if rst.force_restart() {
+                rst.update(RestarterModule::MVA, 0);
+                match rst.stabilizing() {
+                    None => asg.cancel_until(asg.root_level),
+                    Some(true) => {
+                        // cancel restart if solver is in stabiling mode and the last learnt
+                        // has very releted to the current conflicting core.
+                        state[Stat::CancelRestart] += 1;
+                    }
+                    Some(false) => {
+                        asg.cancel_until(asg.root_level);
+                        asg.force_rephase();
+                    }
+                }
+            }
+
             if a_decision_was_made {
                 a_decision_was_made = false;
             } else {
@@ -233,72 +245,9 @@ fn search(
                     return Err(SolverError::UndescribedError);
                 }
             }
-
-            //
-            //## Dynamic restart control
-            //
-            nconflict += 1;
-            if rst.force_restart() {
-                rst.update(RestarterModule::MVA, nconflict);
-                nconflict = 0;
-                // nprogress = asg.exports().1;
-
-                match rst.stabilizing() {
-                    None => asg.cancel_until(asg.root_level),
-                    Some(true) => {
-                        // cancel restart if solver is in stabiling mode and the last learnt
-                        // has very releted to the current conflicting core.
-                        state.rst_cancel += 1;
-                    }
-                    Some(false) => {
-                        asg.cancel_until(asg.root_level);
-                        asg.force_rephase();
-                    }
-                }
-                /*
-                        if state.rst_learning_rate < 0.92 {
-                            state.rst_learning_rate += 0.02;
-                        } else if state.rst_learning_rate < 0.94 {
-                            state.rst_learning_rate += 0.002;
-                        } else if state.rst_learning_rate < 0.975 {
-                            state.rst_learning_rate += 0.0002;
-                        }
-                        let (ref mut dw, ref mut up) = state.rst_rewards;
-                        if state.rst_increasing {
-                            up.0 *= 1.0 - state.rst_learning_rate;
-                            up.0 += state.rst_learning_rate * value;
-                            up.1 += 1;
-                        } else {
-                            dw.0 *= 1.0 - state.rst_learning_rate;
-                            dw.0 += state.rst_learning_rate * value;
-                            dw.1 += 1;
-                        }
-                        if (up.1).min(dw.1) < 2 {
-                            state.rst_increasing = up.1 < dw.1;
-                        } else if 4 <= restart_drift.abs() {
-                            state.rst_increasing = restart_drift < 0;
-                            restart_drift = 0;
-                        } else {
-                            state.rst_increasing = up.0 < dw.0;
-                        }
-                        let mut df: f64 = 1.1 * 0.98 / state.rst_learning_rate;
-                        if state.rst_increasing {
-                            restart_drift += 1;
-                    // state.rst_span = 10_000;
-                        } else {
-                            restart_drift -= 1;
-                            // df = 1.0 / df;
-                    // state.rst_span = 40;
-                        }
-                        // state.rst_span = (state.rst_span as f64 * df) as usize;
-                */
-            }
         }
         // Simplification has been postponed because chronoBT was used.
         if asg.decision_level() == asg.root_level {
-            // if state.rst_increasing /* state.stabilize */ {
-            //     asg.force_rephase();
-            // }
             if state.config.viv_interval <= state.to_vivify && state.config.use_vivify() {
                 state.to_vivify = 0;
                 if !cdb.use_chan_seok && vivify(asg, cdb, elim, state).is_err() {
