@@ -45,13 +45,7 @@ pub trait VarRewardIF {
 }
 
 /// API for assignment like `propagate`, `enqueue`, `cancel_until`, and so on.
-pub trait AssignIF:
-    ClauseManipulateIF
-    + PropagateIF
-    + VarManipulateIF
-    + VarRewardIF
-    + Export<(usize, usize, usize, f64), ()>
-{
+pub trait AssignIF: ClauseManipulateIF + PropagateIF + VarManipulateIF + VarRewardIF {
     /// return a literal in the stack.
     fn stack(&self, i: usize) -> Lit;
     /// return literals in the range of stack.

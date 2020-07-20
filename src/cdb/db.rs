@@ -14,9 +14,7 @@ use {
 const ACTIVITY_MAX: f64 = 1e308;
 
 /// API for clause management like `reduce`, `simplify`, `new_clause`, and so on.
-pub trait ClauseDBIF:
-    IndexMut<ClauseId, Output = Clause> + Export<(usize, usize, usize, usize, usize, usize), ()>
-{
+pub trait ClauseDBIF: IndexMut<ClauseId, Output = Clause> {
     /// return the length of `clause`.
     fn len(&self) -> usize;
     /// return true if it's empty.

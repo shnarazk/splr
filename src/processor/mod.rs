@@ -60,7 +60,7 @@ use {
 /// assert_eq!(elim.is_running(), false);
 /// assert_eq!(elim.simplify(&mut s.asg, &mut s.cdb, &mut s.state), Ok(()));
 ///```
-pub trait EliminateIF: Export<(usize, usize, f64), ()> {
+pub trait EliminateIF {
     /// set eliminator's mode to **ready**.
     fn activate(&mut self);
     /// set eliminator's mode to **dormant**.

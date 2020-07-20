@@ -3,8 +3,7 @@ use {
     crate::{
         assign::AssignIF,
         cdb::ClauseDBIF,
-        processor::EliminateIF,
-        solver::{RestartIF, RestartMode, SolverEvent},
+        solver::{RestartMode, SolverEvent},
         types::*,
     },
     std::{
@@ -30,17 +29,17 @@ pub trait StateIF {
     /// change heuristics based on stat data.
     fn select_strategy<A, C>(&mut self, asg: &A, cdb: &C)
     where
-        A: AssignIF,
-        C: ClauseDBIF;
+        A: Export<(usize, usize, usize, f64), ()>,
+        C: ClauseDBIF + Export<(usize, usize, usize, usize, usize, usize), ()>;
     /// write a header of stat data to stdio.
     fn progress_header(&mut self);
     /// write stat data to stdio.
     fn progress<A, C, E, R>(&mut self, asg: &A, cdb: &C, elim: &E, rst: &R, mes: Option<&str>)
     where
-        A: AssignIF,
-        C: ClauseDBIF,
-        E: EliminateIF,
-        R: RestartIF;
+        A: AssignIF + Export<(usize, usize, usize, f64), ()>,
+        C: Export<(usize, usize, usize, usize, usize, usize), ()>,
+        E: Export<(usize, usize, f64), ()>,
+        R: Export<((usize, usize), (f64, f64), (f64, f64), (f64, f64)), RestartMode>;
     /// write a short message to stdout.
     fn flush<S: AsRef<str>>(&self, mes: S);
 }
@@ -420,8 +419,8 @@ impl StateIF for State {
     }
     fn select_strategy<A, C>(&mut self, asg: &A, cdb: &C)
     where
-        A: AssignIF,
-        C: ClauseDBIF,
+        A: Export<(usize, usize, usize, f64), ()>,
+        C: ClauseDBIF + Export<(usize, usize, usize, usize, usize, usize), ()>,
     {
         if !self.config.use_adaptive() {
             return;
@@ -481,10 +480,10 @@ impl StateIF for State {
     #[allow(clippy::cognitive_complexity)]
     fn progress<A, C, E, R>(&mut self, asg: &A, cdb: &C, elim: &E, rst: &R, mes: Option<&str>)
     where
-        A: AssignIF,
-        C: ClauseDBIF,
-        E: EliminateIF,
-        R: RestartIF,
+        A: AssignIF + Export<(usize, usize, usize, f64), ()>,
+        C: Export<(usize, usize, usize, usize, usize, usize), ()>,
+        E: Export<(usize, usize, f64), ()>,
+        R: Export<((usize, usize), (f64, f64), (f64, f64), (f64, f64)), RestartMode>,
     {
         if !self.config.splr_interface || self.config.quiet_mode {
             return;
@@ -741,9 +740,9 @@ impl State {
     }
     fn dump<A, C, R>(&mut self, asg: &A, cdb: &C, rst: &R)
     where
-        A: AssignIF,
-        C: ClauseDBIF,
-        R: RestartIF,
+        A: AssignIF + Export<(usize, usize, usize, f64), ()>,
+        C: Export<(usize, usize, usize, usize, usize, usize), ()>,
+        R: Export<((usize, usize), (f64, f64), (f64, f64), (f64, f64)), RestartMode>,
     {
         self.progress_cnt += 1;
         let (asg_num_vars, asg_num_solved_vars, asg_num_eliminated_vars, asg_num_unsolved_vars) =
@@ -777,9 +776,9 @@ impl State {
     #[allow(dead_code)]
     fn dump_details<A, C, E, R, V>(&mut self, asg: &A, cdb: &C, rst: &R, mes: Option<&str>)
     where
-        A: AssignIF,
-        C: ClauseDBIF,
-        R: RestartIF,
+        A: AssignIF + Export<(usize, usize, usize, f64), ()>,
+        C: Export<(usize, usize, usize, usize, usize, usize), ()>,
+        R: Export<((usize, usize), (f64, f64), (f64, f64), (f64, f64)), RestartMode>,
     {
         self.progress_cnt += 1;
         let msg = match mes {
