@@ -157,6 +157,8 @@ pub enum Stat {
     SolvedRecord,
     /// the number of vivification
     Vivification,
+    /// the number of vivified (asserted) vars
+    VivifiedVar,
     /// don't use this dummy (sentinel at the tail).
     EndOfStatIndex,
 }
@@ -502,15 +504,20 @@ impl StateIF for State {
         let (elim_num_full, _num_sat, _elim_to_simplify) = elim.exports();
 
         let rst_mode = rst.active_mode();
-        let (_rst_num_block, rst_asg_trend, rst_lbd_get, rst_lbd_trend, rst_num_stb) =
-            rst.exports();
+
+        let (
+            (rst_num_blk, rst_num_stb),
+            (rst_asg_ema, rst_asg_trend),
+            (rst_lbd_ema, rst_lbd_trend),
+            (rst_mva_ema, _),
+        ) = rst.exports();
 
         if self.config.use_log {
             self.dump(asg, cdb, rst);
             return;
         }
         self.progress_cnt += 1;
-        print!("\x1B[8A\x1B[1G");
+        print!("\x1B[9A\x1B[1G");
         println!("\x1B[2K{}", self);
         println!(
             "\x1B[2K #conflict:{}, #decision:{}, #propagate:{} ",
@@ -548,7 +555,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K {}|#RST:{}, cncl:{}, tASG:{}, tLBD:{} ",
+            "\x1B[2K {}|#RST:{}, #BLK:{}, #CNC:{}, #STB:{} ",
             match rst_mode {
                 RestartMode::Dynamic => "    Restart",
                 RestartMode::Luby if self.config.no_color => "LubyRestart",
@@ -557,41 +564,50 @@ impl StateIF for State {
                 RestartMode::Stabilize => "  \x1B[001m\x1B[030mStabilize\x1B[000m",
             },
             im!("{:>9}", self, LogUsizeId::Restart, asg_num_restart),
-            // im!("{:>9}", self, LogUsizeId::RestartBlock, rst_num_block),
-            im!("{:>9}", self, LogUsizeId::End, self[Stat::CancelRestart]),
-            // fm!("{:>9.4}", self, LogF64Id::End, rst.get_mva()),
-            fm!("{:>9.4}", self, LogF64Id::EmaAsg, rst_asg_trend),
-            fm!("{:>9.4}", self, LogF64Id::EmaLBD, rst_lbd_trend),
+            im!("{:>9}", self, LogUsizeId::RestartBlock, rst_num_blk),
+            im!(
+                "{:>9}",
+                self,
+                LogUsizeId::RestartCancel,
+                self[Stat::CancelRestart]
+            ),
+            im!("{:>9}", self, LogUsizeId::Stabilize, rst_num_stb),
         );
         println!(
-            "\x1B[2K    Conflict|eLBD:{}, cnfl:{}, bjmp:{}, rpc%:{} ",
-            fm!("{:>9.2}", self, LogF64Id::AveLBD, rst_lbd_get),
+            "\x1B[2K         EMA|tLBD:{}, tASG:{}, eRLT:{}, eASG:{} ",
+            fm!("{:>9.4}", self, LogF64Id::TrendLBD, rst_lbd_trend),
+            fm!("{:>9.4}", self, LogF64Id::TrendASG, rst_asg_trend),
+            fm!("{:>9.4}", self, LogF64Id::EmaMVA, rst_mva_ema),
+            fm!("{:>9.0}", self, LogF64Id::EmaASG, rst_asg_ema),
+        );
+        println!(
+            "\x1B[2K    Conflict|eLBD:{}, cnfl:{}, bjmp:{}, /ppc:{} ",
+            fm!("{:>9.2}", self, LogF64Id::EmaLBD, rst_lbd_ema),
             fm!("{:>9.2}", self, LogF64Id::CLevel, self.c_lvl.get()),
             fm!("{:>9.2}", self, LogF64Id::BLevel, self.b_lvl.get()),
             fm!(
-                "{:>9.4}",
+                "{:>9.2}",
                 self,
-                LogF64Id::End,
-                100.0 * asg_num_restart as f64 / asg_num_conflict as f64
-            )
+                LogF64Id::PropagationPerConflict,
+                asg_num_propagation as f64 / asg_num_conflict as f64
+            ),
         );
         println!(
-            "\x1B[2K        misc|#stb:{}, #viv:{}, #eli:{}, ppc/:{} ",
-            im!("{:>9}", self, LogUsizeId::Stabilize, rst_num_stb),
-            im!("{:>9}", self, LogUsizeId::Vivify, self[Stat::Vivification]),
+            "\x1B[2K        misc|#eli:{}, #viv:{}, #vbv:{}, /cpr:{} ",
             im!("{:>9}", self, LogUsizeId::Simplify, elim_num_full),
-            // fm!(
-            //     "{:>9.0}",
-            //     self,
-            //     LogF64Id::SimpToGo,
-            //     (self.config.ip_interval as f64 - elim_to_simplify).max(0.0)
-            // ),
+            im!("{:>9}", self, LogUsizeId::Vivify, self[Stat::Vivification]),
+            im!(
+                "{:>9}",
+                self,
+                LogUsizeId::VivifiedVar,
+                self[Stat::VivifiedVar]
+            ),
             fm!(
                 "{:>9.2}",
                 self,
-                LogF64Id::End,
-                asg_num_propagation as f64 / asg_num_conflict as f64
-            ),
+                LogF64Id::ConflictPerRestart,
+                asg_num_conflict as f64 / asg_num_restart as f64
+            )
         );
         if let Some(m) = mes {
             println!("\x1B[2K    Strategy|mode: {}", m);
@@ -742,7 +758,7 @@ impl State {
             cdb_num_learnt,
             cdb_num_reduction,
         ) = cdb.exports();
-        let (rst_num_block, _asg_trend, _lbd_get, _lbd_trend, _) = rst.exports();
+        let ((rst_num_block, _), _asg_, _lbd, _mva) = rst.exports();
         println!(
             "c | {:>8}  {:>8} {:>8} | {:>7} {:>8} {:>8} |  {:>4}  {:>8} {:>7} {:>8} | {:>6.3} % |",
             asg_num_restart,                           // restart
@@ -782,7 +798,8 @@ impl State {
             cdb_num_learnt,
             _num_reduction,
         ) = cdb.exports();
-        let (rst_num_block, rst_asg_trend, rst_lbd_get, rst_lbd_trend, _) = rst.exports();
+        let ((rst_num_block, _), (_asg_ema, rst_asg_trend), (rst_lbd_ema, rst_lbd_trend), _mva) =
+            rst.exports();
         println!(
             "{:>3}#{:>8},{:>7},{:>7},{:>7},{:>6.3},,{:>7},{:>7},\
              {:>7},,{:>5},{:>5},{:>6.2},{:>6.2},,{:>7.2},{:>8.2},{:>8.2},,\
@@ -799,7 +816,7 @@ impl State {
             rst_num_block,
             asg_num_restart,
             rst_asg_trend,
-            rst_lbd_get,
+            rst_lbd_ema,
             rst_lbd_trend,
             self.b_lvl.get(),
             self.c_lvl.get(),
@@ -821,25 +838,29 @@ pub enum LogUsizeId {
     LBD2,
     Binclause,
     Permanent,
-    RestartBlock,
     Restart,
-    RestartSpan,
+    RestartBlock,
+    RestartCancel,
     Simplify,
     Stabilize,
     Vivify,
+    VivifiedVar,
     End,
 }
 
 /// Index for `f64` data, used in `ProgressRecord`.
 pub enum LogF64Id {
     Progress = 0,
-    EmaAsg,
+    EmaASG,
     EmaLBD,
-    AveLBD,
+    EmaMVA,
+    TrendASG,
+    TrendLBD,
+    TrendMVA,
     BLevel,
     CLevel,
-    RestartAux,
-    SimpToGo,
+    ConflictPerRestart,
+    PropagationPerConflict,
     End,
 }
 

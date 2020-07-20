@@ -285,7 +285,6 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
             time.tv_sec as f64 + time.tv_nsec as f64 / 1_000_000_000.0f64
         }
     };
-    let (asg_num_conflict, _num_propagation, asg_num_restart, asg_activity_decay) = s.asg.exports();
     out.write_all(
         format!(
             "c {:<43}, #var:{:9}, #cls:{:9}\n",
@@ -324,42 +323,47 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c  {}|#BLK:{}, #RST:{}, eASG:{}, eLBD:{},\n",
+            "c  {}|#RST:{}, #BLK:{}, #CNC:{}, #STB:{},\n",
             if s.rst.active_mode() == RestartMode::Luby {
                 "LubyRestart"
             } else {
                 "    Restart"
             },
-            format!(
-                "{:>9}",
-                state.record.vali[LogUsizeId::RestartBlock as usize]
-            ),
             format!("{:>9}", state[LogUsizeId::Restart]),
-            format!("{:>9.4}", state[LogF64Id::EmaAsg]),
-            format!("{:>9.4}", state[LogF64Id::EmaLBD]),
+            format!("{:>9}", state[LogUsizeId::RestartBlock]),
+            format!("{:>9}", state[LogUsizeId::RestartCancel]),
+            format!("{:>9}", state[LogUsizeId::Stabilize]),
         )
         .as_bytes(),
     )?;
     out.write_all(
         format!(
-            "c     Conflict|eLBD:{}, cnfl:{}, bjmp:{}, rpc%:{},\n",
-            format!("{:>9.2}", state[LogF64Id::AveLBD]),
+            "c          EMA|tLBD:{}, tASG:{}, eRLT:{}, eASG:{},\n",
+            format!("{:>9.4}", state[LogF64Id::TrendLBD]),
+            format!("{:>9.4}", state[LogF64Id::TrendASG]),
+            format!("{:>9.4}", state[LogF64Id::EmaMVA]),
+            format!("{:>9.0}", state[LogF64Id::EmaASG]),
+        )
+        .as_bytes(),
+    )?;
+
+    out.write_all(
+        format!(
+            "c     Conflict|eLBD:{}, cnfl:{}, bjmp:{}, /ppc:{},\n",
+            format!("{:>9.2}", state[LogF64Id::EmaLBD]),
             format!("{:>9.2}", state[LogF64Id::CLevel]),
             format!("{:>9.2}", state[LogF64Id::BLevel]),
-            format!(
-                "{:>9.4}",
-                100.0 * asg_num_restart as f64 / asg_num_conflict as f64
-            ),
+            format!("{:>9.4}", state[LogF64Id::PropagationPerConflict]),
         )
         .as_bytes(),
     )?;
     out.write_all(
         format!(
-            "c         misc|#stb:{}, #viv:{}, #smp{}, vdcy:{},\n",
-            format!("{:>9}", state[LogUsizeId::Stabilize]),
-            format!("{:>9}", state[LogUsizeId::Vivify]),
+            "c         misc|#eli:{}, #viv:{}, #vbv{}, /cpr:{},\n",
             format!("{:>9}", state[LogUsizeId::Simplify]),
-            format!("{:>9.4}", asg_activity_decay),
+            format!("{:>9}", state[LogUsizeId::Vivify]),
+            format!("{:>9}", state[LogUsizeId::VivifiedVar]),
+            format!("{:>9.2}", state[LogF64Id::PropagationPerConflict]),
         )
         .as_bytes(),
     )?;

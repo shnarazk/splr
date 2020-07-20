@@ -157,6 +157,7 @@ pub fn vivify(
                 asg.assign_at_rootlevel(copied[0])?;
                 asg.handle(SolverEvent::Fixed);
                 state.handle(SolverEvent::Fixed);
+                state[Stat::VivifiedVar] += 1;
                 elim.to_simplify += 2.0;
             }
             n if n == clits.len() => {

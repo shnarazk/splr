@@ -41,7 +41,9 @@ pub enum RestartMode {
 }
 
 /// API for restart like `block_restart`, `force_restart` and so on.
-pub trait RestartIF: Export<(usize, f64, f64, f64, usize), RestartMode> {
+pub trait RestartIF:
+    Export<((usize, usize), (f64, f64), (f64, f64), (f64, f64)), RestartMode>
+{
     /// return `true` if stabilizer is active.
     fn stabilizing(&self) -> Option<bool>;
     /// block restart if needed.
@@ -739,27 +741,25 @@ impl RestartIF for Restarter {
     }
 }
 
-impl Export<(usize, f64, f64, f64, usize), RestartMode> for Restarter {
+impl Export<((usize, usize), (f64, f64), (f64, f64), (f64, f64)), RestartMode> for Restarter {
     /// exports:
-    ///  1. the number of blocking restarts
-    ///  1. `asg.trend()`
-    ///  1. `lbd.get()`
-    ///  1. `lbd.trend()`
-    ///  1. the number of stabilization
+    ///  1. (the number of blocking, the number of stabilzation)
+    ///  1. EMA of `asg`
+    ///  1. EMA of `lbd`
+    ///  1. EMA of `mtv`
     ///
     ///```
     /// use crate::splr::{config::Config, solver::Restarter, types::*};
     /// let rst = Restarter::instantiate(&Config::default(), &CNFDescription::default());
-    /// let (_num_block, _asg_trend, _lbd_get, _lbd_trend, _lbd_stab) = rst.exports();
+    /// let ((_num_block, _num_stab), _asg_ema, _lbd_ema, _mva_ema) = rst.exports();
     ///```
     #[inline]
-    fn exports(&self) -> (usize, f64, f64, f64, usize) {
+    fn exports(&self) -> ((usize, usize), (f64, f64), (f64, f64), (f64, f64)) {
         (
-            self.num_block,
-            self.asg.trend(),
-            self.lbd.get(),
-            self.lbd.trend(),
-            self.stb.num_active,
+            (self.num_block, self.stb.num_active),
+            (self.asg.get(), self.asg.trend()),
+            (self.lbd.ema.get(), self.lbd.ema.trend()),
+            (self.mva.ema.get(), self.mva.ema.trend()),
         )
     }
     fn active_mode(&self) -> RestartMode {
