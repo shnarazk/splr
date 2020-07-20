@@ -76,7 +76,7 @@ pub struct Config {
     //## inprocessor
     //
     /// #cls to start in-processor
-    #[cfg_attr(feature = "structopt", structopt(long = "ii", default_value = "40000"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "ii", default_value = "20000"))]
     pub ip_interval: usize,
 
     //
@@ -110,7 +110,7 @@ pub struct Config {
     pub viv_end: f64,
 
     /// Vivif. interval
-    #[cfg_attr(feature = "structopt", structopt(long = "vii", default_value = "5"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "vii", default_value = "4"))]
     pub viv_interval: usize,
 
     /// #reduction for next vivif.

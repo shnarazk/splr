@@ -461,7 +461,7 @@ impl StateIF for State {
         if 0 == self.progress_cnt {
             self.progress_cnt = 1;
             println!("{}", self);
-            let repeat = 7;
+            let repeat = 8;
             for _i in 0..repeat {
                 println!("                                                  ");
             }

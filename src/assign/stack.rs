@@ -54,7 +54,7 @@ impl Default for AssignStack {
             use_rephase: true,
             best_assign: false,
             build_best_at: 0,
-            num_best_assign: 0,
+            num_best_assign: 0.0,
             num_conflict: 0,
             num_propagation: 0,
             num_restart: 0,
@@ -102,7 +102,9 @@ impl Instantiate for AssignStack {
     fn handle(&mut self, e: SolverEvent) {
         match e {
             SolverEvent::Adapt(_, _) => (),
-            SolverEvent::Conflict => {}
+            SolverEvent::Conflict => {
+                self.num_best_assign *= 0.99999;
+            }
             SolverEvent::Fixed => {
                 self.num_solved_vars += 1;
             }
@@ -211,7 +213,7 @@ impl AssignIF for AssignStack {
         match flag {
             Flag::PHASE => {
                 if self.build_best_at == self.num_propagation {
-                    return self.num_best_assign;
+                    return self.num_best_assign as usize;
                 }
             }
             // Flag::BEST_PHASE => {

@@ -107,6 +107,7 @@ pub fn handle_conflict(
                 .collect::<Vec<_>>(),
         )
     );
+    asg.handle(SolverEvent::Conflict);
     // backtrack level by analyze
     let bl_a = conflict_analyze(asg, cdb, state, ci).max(asg.root_level);
     if state.new_learnt.is_empty() {
@@ -218,8 +219,8 @@ pub fn handle_conflict(
         }
         rst.update_mva(act);
 
+        elim.to_simplify += 1.0 / (learnt_len - 1) as f64;
         if lbd <= 20 {
-            elim.to_simplify += 1.0 / (learnt_len - 1) as f64;
             for cid in &state.derive20 {
                 cdb[cid].turn_on(Flag::DERIVE20);
             }
