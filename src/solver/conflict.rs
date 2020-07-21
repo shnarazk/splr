@@ -1,7 +1,7 @@
 //! Conflict Analysis
 use {
     super::{
-        restart::{RestartIF, Restarter, RestarterModule},
+        restart::{ProgressUpdate, RestartIF, Restarter},
         State,
     },
     crate::{
@@ -40,10 +40,10 @@ pub fn handle_conflict(
     } else {
         None
     };
-    rst.update(RestarterModule::Counter, num_conflict);
+    rst.update(ProgressUpdate::Counter(num_conflict));
 
     if 0 < state.last_asg {
-        rst.update(RestarterModule::ASG, asg.stack_len());
+        rst.update(ProgressUpdate::ASG(asg.stack_len()));
         state.last_asg = 0;
     }
 
@@ -167,7 +167,7 @@ pub fn handle_conflict(
             asg.assign_by_unitclause(l0);
         }
         asg.handle(SolverEvent::Fixed);
-        rst.update(RestarterModule::Reset, 0);
+        rst.update(ProgressUpdate::Reset);
         elim.to_simplify += 2.0; // 1 for the positive lit, 1 for the negative.
     } else {
         {
@@ -208,7 +208,7 @@ pub fn handle_conflict(
         state.b_lvl.update(bl as f64);
         asg.assign_by_implication(l0, AssignReason::Implication(cid, reason), al);
         let lbd = cdb[cid].rank;
-        rst.update(RestarterModule::LBD, lbd);
+        rst.update(ProgressUpdate::LBD(lbd));
 
         let mut act: f64 = 0.0;
         for li in cdb[cid].iter() {
@@ -217,7 +217,7 @@ pub fn handle_conflict(
                 act = a;
             }
         }
-        rst.update_mva(act);
+        rst.update(ProgressUpdate::MVA(act));
 
         elim.to_simplify += 1.0 / (learnt_len - 1) as f64;
         if lbd <= 20 {
@@ -228,15 +228,16 @@ pub fn handle_conflict(
     }
     cdb.scale_activity();
     if 0 < state.config.dump_int && num_conflict % state.config.dump_int == 0 {
-        let ((rst_num_block, _), (_, rst_asg_trend), (_, rst_lbd_trend), _) = rst.exports();
+        let (rst_num_block, _) = rst.exports();
+        let (rst_asg, rst_lbd, _rst_mva) = rst.ema_stats();
         state.development.push((
             num_conflict,
             (asg.num_solved_vars + asg.num_eliminated_vars) as f64
                 / state.target.num_of_variables as f64,
             asg_num_restart as f64,
             rst_num_block as f64,
-            rst_asg_trend.min(10.0),
-            rst_lbd_trend.min(10.0),
+            rst_asg.trend().min(10.0),
+            rst_lbd.trend().min(10.0),
         ));
     }
     if cdb.check_and_reduce(asg, num_conflict) {

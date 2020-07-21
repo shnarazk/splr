@@ -3,7 +3,7 @@ use {
     crate::{
         assign::AssignIF,
         cdb::ClauseDBIF,
-        solver::{RestartMode, SolverEvent},
+        solver::{RestartIF, RestartMode, SolverEvent},
         types::*,
     },
     std::{
@@ -39,7 +39,7 @@ pub trait StateIF {
         A: AssignIF + Export<(usize, usize, usize, f64), ()>,
         C: Export<(usize, usize, usize, usize, usize, usize), ()>,
         E: Export<(usize, usize, f64), ()>,
-        R: Export<((usize, usize), (f64, f64), (f64, f64), (f64, f64)), RestartMode>;
+        R: RestartIF + Export<(usize, usize), RestartMode>;
     /// write a short message to stdout.
     fn flush<S: AsRef<str>>(&self, mes: S);
 }
@@ -483,7 +483,7 @@ impl StateIF for State {
         A: AssignIF + Export<(usize, usize, usize, f64), ()>,
         C: Export<(usize, usize, usize, usize, usize, usize), ()>,
         E: Export<(usize, usize, f64), ()>,
-        R: Export<((usize, usize), (f64, f64), (f64, f64), (f64, f64)), RestartMode>,
+        R: RestartIF + Export<(usize, usize), RestartMode>,
     {
         if !self.config.splr_interface || self.config.quiet_mode {
             return;
@@ -504,12 +504,8 @@ impl StateIF for State {
 
         let rst_mode = rst.active_mode();
 
-        let (
-            (rst_num_blk, rst_num_stb),
-            (rst_asg_ema, rst_asg_trend),
-            (rst_lbd_ema, rst_lbd_trend),
-            (rst_mva_ema, _),
-        ) = rst.exports();
+        let (rst_num_blk, rst_num_stb) = rst.exports();
+        let (rst_asg, rst_lbd, rst_mva) = rst.ema_stats();
 
         if self.config.use_log {
             self.dump(asg, cdb, rst);
@@ -574,14 +570,14 @@ impl StateIF for State {
         );
         println!(
             "\x1B[2K         EMA|tLBD:{}, tASG:{}, eRLT:{}, eASG:{} ",
-            fm!("{:>9.4}", self, LogF64Id::TrendLBD, rst_lbd_trend),
-            fm!("{:>9.4}", self, LogF64Id::TrendASG, rst_asg_trend),
-            fm!("{:>9.4}", self, LogF64Id::EmaMVA, rst_mva_ema),
-            fm!("{:>9.0}", self, LogF64Id::EmaASG, rst_asg_ema),
+            fm!("{:>9.4}", self, LogF64Id::TrendLBD, rst_lbd.trend()),
+            fm!("{:>9.4}", self, LogF64Id::TrendASG, rst_asg.trend()),
+            fm!("{:>9.4}", self, LogF64Id::EmaMVA, rst_mva.get()),
+            fm!("{:>9.0}", self, LogF64Id::EmaASG, rst_asg.get()),
         );
         println!(
             "\x1B[2K    Conflict|eLBD:{}, cnfl:{}, bjmp:{}, /ppc:{} ",
-            fm!("{:>9.2}", self, LogF64Id::EmaLBD, rst_lbd_ema),
+            fm!("{:>9.2}", self, LogF64Id::EmaLBD, rst_lbd.get()),
             fm!("{:>9.2}", self, LogF64Id::CLevel, self.c_lvl.get()),
             fm!("{:>9.2}", self, LogF64Id::BLevel, self.b_lvl.get()),
             fm!(
@@ -742,7 +738,7 @@ impl State {
     where
         A: AssignIF + Export<(usize, usize, usize, f64), ()>,
         C: Export<(usize, usize, usize, usize, usize, usize), ()>,
-        R: Export<((usize, usize), (f64, f64), (f64, f64), (f64, f64)), RestartMode>,
+        R: Export<(usize, usize), RestartMode>,
     {
         self.progress_cnt += 1;
         let (asg_num_vars, asg_num_solved_vars, asg_num_eliminated_vars, asg_num_unsolved_vars) =
@@ -757,7 +753,7 @@ impl State {
             cdb_num_learnt,
             cdb_num_reduction,
         ) = cdb.exports();
-        let ((rst_num_block, _), _asg_, _lbd, _mva) = rst.exports();
+        let (rst_num_block, _) = rst.exports();
         println!(
             "c | {:>8}  {:>8} {:>8} | {:>7} {:>8} {:>8} |  {:>4}  {:>8} {:>7} {:>8} | {:>6.3} % |",
             asg_num_restart,                           // restart
@@ -778,7 +774,7 @@ impl State {
     where
         A: AssignIF + Export<(usize, usize, usize, f64), ()>,
         C: Export<(usize, usize, usize, usize, usize, usize), ()>,
-        R: Export<((usize, usize), (f64, f64), (f64, f64), (f64, f64)), RestartMode>,
+        R: RestartIF + Export<(usize, usize), RestartMode>,
     {
         self.progress_cnt += 1;
         let msg = match mes {
@@ -797,8 +793,8 @@ impl State {
             cdb_num_learnt,
             _num_reduction,
         ) = cdb.exports();
-        let ((rst_num_block, _), (_asg_ema, rst_asg_trend), (rst_lbd_ema, rst_lbd_trend), _mva) =
-            rst.exports();
+        let (rst_num_block, _) = rst.exports();
+        let (rst_asg, rst_lbd, _) = rst.ema_stats();
         println!(
             "{:>3}#{:>8},{:>7},{:>7},{:>7},{:>6.3},,{:>7},{:>7},\
              {:>7},,{:>5},{:>5},{:>6.2},{:>6.2},,{:>7.2},{:>8.2},{:>8.2},,\
@@ -814,9 +810,9 @@ impl State {
             0,
             rst_num_block,
             asg_num_restart,
-            rst_asg_trend,
-            rst_lbd_ema,
-            rst_lbd_trend,
+            rst_asg.trend(),
+            rst_lbd.get(),
+            rst_lbd.trend(),
             self.b_lvl.get(),
             self.c_lvl.get(),
             0, // elim.clause_queue_len(),

@@ -2,7 +2,7 @@
 use {
     super::{
         conflict::handle_conflict,
-        restart::{RestartIF, Restarter, RestarterModule},
+        restart::{ProgressUpdate, RestartIF, Restarter},
         vivify::vivify,
         Certificate, Solver, SolverEvent, SolverResult,
     },
@@ -196,7 +196,7 @@ fn search(
 ) -> Result<bool, SolverError> {
     let mut a_decision_was_made = false;
     let mut num_assigned = asg.num_solved_vars;
-    rst.update(RestarterModule::Luby, 0);
+    rst.update(ProgressUpdate::Luby);
     state.stabilize = false;
 
     loop {
@@ -204,7 +204,6 @@ fn search(
         let ci = asg.propagate(cdb);
         if ci.is_none() {
             state.last_asg = asg.stack_len();
-            rst.block_restart(); // to update asg progress_evaluator
             if asg.num_vars <= asg.stack_len() + asg.num_eliminated_vars {
                 return Ok(true);
             }
@@ -214,8 +213,7 @@ fn search(
                 return Ok(false);
             }
             handle_conflict(asg, cdb, elim, rst, state, ci)?;
-            if rst.force_restart() {
-                rst.update(RestarterModule::MVA, 0);
+            if let Some(true) = rst.restart() {
                 match rst.stabilizing() {
                     None => asg.cancel_until(asg.root_level),
                     Some(true) => {
@@ -271,7 +269,7 @@ fn search(
             }
             // By simplification, we may get further solutions.
             if asg.num_solved_vars < asg.stack_len() {
-                rst.update(RestarterModule::Reset, 0);
+                rst.update(ProgressUpdate::Reset);
                 asg.num_solved_vars = asg.stack_len();
             }
         }

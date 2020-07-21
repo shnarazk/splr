@@ -1,5 +1,6 @@
 ## 0.4.2, 2020-07-XX
 
+- massive changes on the default parameters about restart
 - compute LBD of permanent clauses correctly
 - restart condition was revised as a multi-armed bandid problem
 - implement clause vivification

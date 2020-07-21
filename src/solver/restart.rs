@@ -17,13 +17,13 @@ trait ProgressEvaluator {
     fn shift(&mut self);
 }
 
-/// Submodule index to access them indirectly.
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub enum RestarterModule {
-    Counter = 0,
-    ASG,
-    LBD,
-    MVA,
+/// Update progress observer submodules
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
+pub enum ProgressUpdate {
+    Counter(usize),
+    ASG(usize),
+    LBD(usize),
+    MVA(f64),
     Luby,
     Reset,
 }
@@ -44,15 +44,15 @@ pub enum RestartMode {
 pub trait RestartIF {
     /// return `true` if stabilizer is active.
     fn stabilizing(&self) -> Option<bool>;
-    /// block restart if needed.
-    fn block_restart(&mut self) -> bool;
-    /// force restart if needed.
-    fn force_restart(&mut self) -> bool;
+    /// check restart condition and return:
+    ///
+    /// * `Some(true)` -- should restart
+    /// * `Some(false)` -- should block restart
+    /// * `None` -- it's not a good timing
+    fn restart(&mut self) -> Option<bool>;
     /// update specific submodule
-    fn update(&mut self, kind: RestarterModule, val: usize);
-    /// for mva, which takes f64.
-    fn update_mva(&mut self, val: f64);
-    fn get_mva(&self) -> f64;
+    fn update(&mut self, kind: ProgressUpdate);
+    fn ema_stats(&self) -> (&Ema2, &Ema2, &Ema2);
 }
 
 /// An assignment history used for blocking restart.
@@ -60,7 +60,7 @@ pub trait RestartIF {
 struct ProgressASG {
     enable: bool,
     asg: usize,
-    ema: Ema,
+    ema: Ema2,
     /// For block restart based on average assignments: 1.40.
     /// This is called `R` in Glucose
     threshold: f64,
@@ -70,7 +70,7 @@ impl Default for ProgressASG {
     fn default() -> ProgressASG {
         ProgressASG {
             enable: true,
-            ema: Ema::new(1),
+            ema: Ema2::new(1),
             asg: 0,
             threshold: 1.4,
         }
@@ -80,7 +80,7 @@ impl Default for ProgressASG {
 impl Instantiate for ProgressASG {
     fn instantiate(config: &Config, _: &CNFDescription) -> Self {
         ProgressASG {
-            ema: Ema::new(config.rst_asg_len),
+            ema: Ema2::new(config.rst_asg_len).with_slow(config.rst_asg_slw),
             threshold: config.rst_asg_thr,
             ..ProgressASG::default()
         }
@@ -97,7 +97,8 @@ impl EmaIF for ProgressASG {
         self.ema.get()
     }
     fn trend(&self) -> f64 {
-        (self.asg as f64) / self.ema.get()
+        // (self.asg as f64) / self.ema.get()
+        self.ema.trend()
     }
 }
 
@@ -681,6 +682,36 @@ impl RestartIF for Restarter {
             None
         }
     }
+    fn restart(&mut self) -> Option<bool> {
+        self.mva.shift();
+        if self.block_restart() {
+            return Some(false);
+        } else if self.force_restart() {
+            return Some(true);
+        }
+        None
+    }
+    fn update(&mut self, kind: ProgressUpdate) {
+        match kind {
+            ProgressUpdate::Counter(val) => {
+                self.after_restart += 1;
+                self.stb.update(val);
+                self.luby.update(self.after_restart);
+            }
+            ProgressUpdate::ASG(val) => self.asg.update(val),
+            ProgressUpdate::LBD(val) => self.lbd.update(val), // self.bkt.update(val)
+            ProgressUpdate::MVA(fval) => self.mva.update(fval),
+            ProgressUpdate::Luby => self.luby.update(0),
+            ProgressUpdate::Reset => (),
+        }
+    }
+    fn ema_stats(&self) -> (&Ema2, &Ema2, &Ema2) {
+        (&self.asg.ema, &self.lbd.ema, &self.mva.ema)
+    }
+}
+
+impl Restarter {
+    /// block restart if needed.
     fn block_restart(&mut self) -> bool {
         // || self.bkt.enable
         if self.after_restart < self.restart_step || self.luby.enable {
@@ -692,6 +723,7 @@ impl RestartIF for Restarter {
         }
         false
     }
+    /// force restart if needed.
     fn force_restart(&mut self) -> bool {
         if self.luby.is_active() {
             self.luby.shift();
@@ -712,53 +744,21 @@ impl RestartIF for Restarter {
         }
         false
     }
-    fn update(&mut self, kind: RestarterModule, val: usize) {
-        match kind {
-            RestarterModule::Counter => {
-                self.after_restart += 1;
-                self.stb.update(val);
-                self.luby.update(self.after_restart);
-            }
-            RestarterModule::ASG => self.asg.update(val),
-            RestarterModule::LBD => {
-                // self.bkt.update(val);
-                self.lbd.update(val);
-            }
-            RestarterModule::MVA => {
-                self.mva.shift();
-            }
-            RestarterModule::Luby => self.luby.update(0),
-            RestarterModule::Reset => (),
-        }
-    }
-    fn update_mva(&mut self, val: f64) {
-        self.mva.update(val);
-    }
-    fn get_mva(&self) -> f64 {
-        self.mva.get()
-    }
 }
 
-impl Export<((usize, usize), (f64, f64), (f64, f64), (f64, f64)), RestartMode> for Restarter {
+impl Export<(usize, usize), RestartMode> for Restarter {
     /// exports:
-    ///  1. (the number of blocking, the number of stabilzation)
-    ///  1. EMA of `asg`
-    ///  1. EMA of `lbd`
-    ///  1. EMA of `mtv`
+    ///  1. the number of blocking
+    ///  1. , the number of stabilzation
     ///
     ///```
     /// use crate::splr::{config::Config, solver::Restarter, types::*};
     /// let rst = Restarter::instantiate(&Config::default(), &CNFDescription::default());
-    /// let ((_num_block, _num_stab), _asg_ema, _lbd_ema, _mva_ema) = rst.exports();
+    /// let ((num_block, num_stb), (asg_ema, asg_trend)) = rst.exports();
     ///```
     #[inline]
-    fn exports(&self) -> ((usize, usize), (f64, f64), (f64, f64), (f64, f64)) {
-        (
-            (self.num_block, self.stb.num_active),
-            (self.asg.get(), self.asg.trend()),
-            (self.lbd.ema.get(), self.lbd.ema.trend()),
-            (self.mva.ema.get(), self.mva.ema.trend()),
-        )
+    fn exports(&self) -> (usize, usize) {
+        (self.num_block, self.stb.num_active)
     }
     fn active_mode(&self) -> RestartMode {
         if self.stb.is_active() {
