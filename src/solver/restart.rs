@@ -509,6 +509,7 @@ impl ProgressEvaluator for GeometricStabilizer {
     fn shift(&mut self) {}
 }
 
+/*
 /// Restart when LBD's sum is over a limit.
 #[derive(Debug)]
 struct ProgressBucket {
@@ -587,6 +588,7 @@ impl ProgressEvaluator for ProgressBucket {
         }
     }
 }
+ */
 
 /// `Restarter` provides restart API and holds data about restart conditions.
 #[derive(Debug)]
