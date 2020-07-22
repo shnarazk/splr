@@ -128,30 +128,38 @@ pub struct Config {
     #[cfg_attr(feature = "structopt", structopt(long = "rs", default_value = "50"))]
     pub rst_step: usize,
 
-    /// Bucket increment step
-    #[cfg_attr(feature = "structopt", structopt(skip))] // long = "rbi", default_value = "1.0"
-    pub rst_bkt_inc: f64,
+    /*
+        /// Bucket increment step
+        #[cfg_attr(feature = "structopt", structopt(skip))] // long = "rbi", default_value = "1.0"
+        pub rst_bkt_inc: f64,
 
-    /// Bucket power factor
-    #[cfg_attr(feature = "structopt", structopt(skip))] // long = "rbp", default_value = "1.5"
-    pub rst_bkt_pwr: f64,
+        /// Bucket power factor
+        #[cfg_attr(feature = "structopt", structopt(skip))] // long = "rbp", default_value = "1.5"
+        pub rst_bkt_pwr: f64,
 
-    /// Bucket time scale
-    #[cfg_attr(feature = "structopt", structopt(skip))]
-    // long = "rbs", default_value = "0.001"
-    pub rst_bkt_scl: f64,
+        /// Bucket time scale
+        #[cfg_attr(feature = "structopt", structopt(skip))]
+        // long = "rbs", default_value = "0.001"
+        pub rst_bkt_scl: f64,
 
-    /// Bucket threshold
-    #[cfg_attr(feature = "structopt", structopt(skip))]
-    // long = "rbt", default_value = "2000"
-    pub rst_bkt_thr: usize,
-
-    /// Length for assignment average
-    #[cfg_attr(feature = "structopt", structopt(long = "ral", default_value = "3500"))]
+        /// Bucket threshold
+        #[cfg_attr(feature = "structopt", structopt(skip))]
+        // long = "rbt", default_value = "2000"
+        pub rst_bkt_thr: usize,
+    */
+    /// Length of assign. fast EMA
+    #[cfg_attr(feature = "structopt", structopt(long = "ral", default_value = "50"))]
     pub rst_asg_len: usize,
 
+    /// Length of assign. slow EMA
+    #[cfg_attr(
+        feature = "structopt",
+        structopt(long = "ras", default_value = "10000")
+    )]
+    pub rst_asg_slw: usize,
+
     /// Blocking restart threshold
-    #[cfg_attr(feature = "structopt", structopt(long = "rab", default_value = "1.40"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "rat", default_value = "1.65"))]
     pub rst_asg_thr: f64, // Glucose's R
 
     /// Length of LBD fast EMA
@@ -168,6 +176,10 @@ pub struct Config {
     /// Forcing restart threshold
     #[cfg_attr(feature = "structopt", structopt(long = "rlt", default_value = "1.20"))]
     pub rst_lbd_thr: f64, // 1.0 / Glucose's K
+
+    /// LUC threshold
+    #[cfg_attr(feature = "structopt", structopt(long = "rut", default_value = "1.10"))]
+    pub rst_luc_thr: f64, // 1.0 / Glucose's K
 
     /// Stabilizer scaling
     #[cfg_attr(feature = "structopt", structopt(long = "rss", default_value = "2.0"))]
@@ -247,16 +259,20 @@ impl Default for Config {
             viv_interval: 8,
             viv_scale: 2.0,
             vivify: 1,
-            rst_step: 50,
-            rst_bkt_inc: 1.0,
-            rst_bkt_pwr: 1.5,
-            rst_bkt_scl: 0.001,
-            rst_bkt_thr: 2000,
-            rst_asg_len: 3500,
-            rst_asg_thr: 1.4,
+            rst_step: 32,
+            /*
+                        rst_bkt_inc: 1.0,
+                        rst_bkt_pwr: 1.5,
+                        rst_bkt_scl: 0.001,
+                        rst_bkt_thr: 2000,
+            */
+            rst_asg_len: 50,
+            rst_asg_slw: 10000,
+            rst_asg_thr: 1.65,
             rst_lbd_len: 50,
             rst_lbd_slw: 10000,
             rst_lbd_thr: 1.20,
+            rst_luc_thr: 1.10,
             rst_stb_scl: 2.0,
             rst_mva_thr: 0.7,
             vrw_dcy_beg: 0.10,

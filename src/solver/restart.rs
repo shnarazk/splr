@@ -23,6 +23,7 @@ pub enum ProgressUpdate {
     Counter(usize),
     ASG(usize),
     LBD(usize),
+    LUC(usize),
     MVA(f64),
     Luby,
     Reset,
@@ -52,7 +53,7 @@ pub trait RestartIF {
     fn restart(&mut self) -> Option<bool>;
     /// update specific submodule
     fn update(&mut self, kind: ProgressUpdate);
-    fn ema_stats(&self) -> (&Ema2, &Ema2, &Ema2);
+    fn ema_stats(&self) -> (&Ema2, &Ema2, &Ema2, &Ema2);
 }
 
 /// An assignment history used for blocking restart.
@@ -161,6 +162,60 @@ impl EmaIF for ProgressLBD {
 }
 
 impl ProgressEvaluator for ProgressLBD {
+    fn is_active(&self) -> bool {
+        self.enable && self.threshold < self.ema.trend()
+    }
+    fn shift(&mut self) {}
+}
+
+/// An EMA of largest clauses' LBD, used in conflict analyze
+#[derive(Debug)]
+struct ProgressLUC {
+    enable: bool,
+    ema: Ema2,
+    num: usize,
+    sum: usize,
+    threshold: f64,
+}
+
+impl Default for ProgressLUC {
+    fn default() -> ProgressLUC {
+        ProgressLUC {
+            enable: true,
+            ema: Ema2::new(1),
+            num: 0,
+            sum: 0,
+            threshold: 1.4,
+        }
+    }
+}
+
+impl Instantiate for ProgressLUC {
+    fn instantiate(config: &Config, _: &CNFDescription) -> Self {
+        ProgressLUC {
+            ema: Ema2::new(10 * config.rst_lbd_len).with_slow(config.rst_lbd_slw),
+            threshold: config.rst_luc_thr,
+            ..ProgressLUC::default()
+        }
+    }
+}
+
+impl EmaIF for ProgressLUC {
+    type Input = usize;
+    fn update(&mut self, d: usize) {
+        self.num += 1;
+        self.sum += d;
+        self.ema.update(d as f64);
+    }
+    fn get(&self) -> f64 {
+        self.ema.get()
+    }
+    fn trend(&self) -> f64 {
+        self.ema.trend()
+    }
+}
+
+impl ProgressEvaluator for ProgressLUC {
     fn is_active(&self) -> bool {
         self.enable && self.threshold < self.ema.trend()
     }
@@ -596,6 +651,7 @@ pub struct Restarter {
     asg: ProgressASG,
     // bkt: ProgressBucket,
     lbd: ProgressLBD,
+    luc: ProgressLUC,
     mva: ProgressMVA,
     // pub rcc: ProgressRCC,
     // pub blvl: ProgressLVL,
@@ -618,6 +674,7 @@ impl Default for Restarter {
             asg: ProgressASG::default(),
             // bkt: ProgressBucket::default(),
             lbd: ProgressLBD::default(),
+            luc: ProgressLUC::default(),
             mva: ProgressMVA::default(),
             // rcc: ProgressRCC::default(),
             // blvl: ProgressLVL::default(),
@@ -638,6 +695,7 @@ impl Instantiate for Restarter {
             asg: ProgressASG::instantiate(config, cnf),
             // bkt: ProgressBucket::instantiate(config, cnf),
             lbd: ProgressLBD::instantiate(config, cnf),
+            luc: ProgressLUC::instantiate(config, cnf),
             mva: ProgressMVA::instantiate(config, cnf),
             // rcc: ProgressRCC::instantiate(config, cnf),
             // blvl: ProgressLVL::instantiate(config, cnf),
@@ -702,13 +760,14 @@ impl RestartIF for Restarter {
             }
             ProgressUpdate::ASG(val) => self.asg.update(val),
             ProgressUpdate::LBD(val) => self.lbd.update(val), // self.bkt.update(val)
+            ProgressUpdate::LUC(val) => self.luc.update(val), // self.bkt.update(val)
             ProgressUpdate::MVA(fval) => self.mva.update(fval),
             ProgressUpdate::Luby => self.luby.update(0),
             ProgressUpdate::Reset => (),
         }
     }
-    fn ema_stats(&self) -> (&Ema2, &Ema2, &Ema2) {
-        (&self.asg.ema, &self.lbd.ema, &self.mva.ema)
+    fn ema_stats(&self) -> (&Ema2, &Ema2, &Ema2, &Ema2) {
+        (&self.asg.ema, &self.lbd.ema, &self.luc.ema, &self.mva.ema)
     }
 }
 
@@ -740,8 +799,13 @@ impl Restarter {
         if self.after_restart < self.restart_step {
             return false;
         }
-        if self.lbd.is_active() {
-            self.lbd.shift();
+        /*
+           if self.lbd.is_active() {
+               self.lbd.shift();
+               reset!(self);
+           }
+        */
+        if self.luc.threshold * self.luc.get() < self.lbd.get() {
             reset!(self);
         }
         false

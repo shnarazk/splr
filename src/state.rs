@@ -505,7 +505,7 @@ impl StateIF for State {
         let rst_mode = rst.active_mode();
 
         let (rst_num_blk, rst_num_stb) = rst.exports();
-        let (rst_asg, rst_lbd, rst_mva) = rst.ema_stats();
+        let (rst_asg, rst_lbd, rst_luc, rst_mva) = rst.ema_stats();
 
         if self.config.use_log {
             self.dump(asg, cdb, rst);
@@ -569,10 +569,10 @@ impl StateIF for State {
             im!("{:>9}", self, LogUsizeId::Stabilize, rst_num_stb),
         );
         println!(
-            "\x1B[2K         EMA|tLBD:{}, tASG:{}, eRLT:{}, eASG:{} ",
+            "\x1B[2K         EMA|tLBD:{}, tASG:{}, eLUC:{}, eASG:{} ",
             fm!("{:>9.4}", self, LogF64Id::TrendLBD, rst_lbd.trend()),
             fm!("{:>9.4}", self, LogF64Id::TrendASG, rst_asg.trend()),
-            fm!("{:>9.4}", self, LogF64Id::EmaMVA, rst_mva.get()),
+            fm!("{:>9.4}", self, LogF64Id::EmaMVA, rst_luc.get()),
             fm!("{:>9.0}", self, LogF64Id::EmaASG, rst_asg.get()),
         );
         println!(
@@ -794,7 +794,7 @@ impl State {
             _num_reduction,
         ) = cdb.exports();
         let (rst_num_block, _) = rst.exports();
-        let (rst_asg, rst_lbd, _) = rst.ema_stats();
+        let (rst_asg, rst_lbd, _, _) = rst.ema_stats();
         println!(
             "{:>3}#{:>8},{:>7},{:>7},{:>7},{:>6.3},,{:>7},{:>7},\
              {:>7},,{:>5},{:>5},{:>6.2},{:>6.2},,{:>7.2},{:>8.2},{:>8.2},,\
