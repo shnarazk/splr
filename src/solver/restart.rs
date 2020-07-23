@@ -259,7 +259,7 @@ impl Instantiate for ProgressMVA {
     fn instantiate(config: &Config, _: &CNFDescription) -> Self {
         ProgressMVA {
             ema: Ema2::new(config.rst_lbd_len).with_slow(config.rst_lbd_slw),
-            threshold: config.rst_mva_thr,
+            threshold: config.rst_cva_thr,
             ..ProgressMVA::default()
         }
     }
@@ -821,7 +821,7 @@ impl Export<(usize, usize), RestartMode> for Restarter {
     ///```
     /// use crate::splr::{config::Config, solver::Restarter, types::*};
     /// let rst = Restarter::instantiate(&Config::default(), &CNFDescription::default());
-    /// let ((num_block, num_stb), (asg_ema, asg_trend)) = rst.exports();
+    /// let (num_block, num_stb) = rst.exports();
     ///```
     #[inline]
     fn exports(&self) -> (usize, usize) {

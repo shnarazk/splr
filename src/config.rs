@@ -162,6 +162,10 @@ pub struct Config {
     #[cfg_attr(feature = "structopt", structopt(long = "rat", default_value = "1.40"))]
     pub rst_asg_thr: f64, // Glucose's R
 
+    /// Correlation to cancel restart
+    #[cfg_attr(feature = "structopt", structopt(long = "rct", default_value = "0.50"))]
+    pub rst_cva_thr: f64,
+
     /// Length of LBD fast EMA
     #[cfg_attr(feature = "structopt", structopt(long = "rll", default_value = "50"))]
     pub rst_lbd_len: usize,
@@ -177,17 +181,13 @@ pub struct Config {
     #[cfg_attr(feature = "structopt", structopt(long = "rlt", default_value = "1.20"))]
     pub rst_lbd_thr: f64,
 
-    /// Max LBD in DG threshold
-    #[cfg_attr(feature = "structopt", structopt(long = "rmt", default_value = "4.20"))]
+    /// Usability to restart
+    #[cfg_attr(feature = "structopt", structopt(long = "rut", default_value = "4.20"))]
     pub rst_mld_thr: f64,
 
     /// Stabilizer scaling
     #[cfg_attr(feature = "structopt", structopt(long = "rss", default_value = "2.0"))]
     pub rst_stb_scl: f64,
-
-    /// Max Var Activity
-    #[cfg_attr(feature = "structopt", structopt(long = "rmt", default_value = "0.50"))]
-    pub rst_mva_thr: f64,
 
     //
     //## var rewarding
@@ -269,12 +269,12 @@ impl Default for Config {
             rst_asg_len: 50,
             rst_asg_slw: 10000,
             rst_asg_thr: 1.65,
+            rst_cva_thr: 0.78,
             rst_lbd_len: 50,
             rst_lbd_slw: 10000,
             rst_lbd_thr: 1.20,
             rst_mld_thr: 2.00,
             rst_stb_scl: 2.0,
-            rst_mva_thr: 0.78,
             vrw_dcy_beg: 0.10,
             vrw_dcy_end: 0.97,
             cbt_thr: 100,
