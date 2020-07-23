@@ -76,7 +76,7 @@ pub struct Config {
     //## inprocessor
     //
     /// #cls to start in-processor
-    #[cfg_attr(feature = "structopt", structopt(long = "ii", default_value = "20000"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "ii", default_value = "25000"))]
     pub ip_interval: usize,
 
     //
@@ -106,7 +106,7 @@ pub struct Config {
     pub viv_beg: f64,
 
     /// Upper bound of vivif. loop
-    #[cfg_attr(feature = "structopt", structopt(long = "vie", default_value = "1.0"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "vie", default_value = "2.0"))]
     pub viv_end: f64,
 
     /// Vivif. interval
@@ -159,7 +159,7 @@ pub struct Config {
     pub rst_asg_slw: usize,
 
     /// Blocking restart threshold
-    #[cfg_attr(feature = "structopt", structopt(long = "rat", default_value = "1.65"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "rat", default_value = "1.40"))]
     pub rst_asg_thr: f64, // Glucose's R
 
     /// Length of LBD fast EMA
@@ -175,18 +175,18 @@ pub struct Config {
 
     /// Forcing restart threshold
     #[cfg_attr(feature = "structopt", structopt(long = "rlt", default_value = "1.20"))]
-    pub rst_lbd_thr: f64, // 1.0 / Glucose's K
+    pub rst_lbd_thr: f64,
 
-    /// LUC threshold
-    #[cfg_attr(feature = "structopt", structopt(long = "rut", default_value = "1.10"))]
-    pub rst_luc_thr: f64, // 1.0 / Glucose's K
+    /// Max LBD in DG threshold
+    #[cfg_attr(feature = "structopt", structopt(long = "rmt", default_value = "4.20"))]
+    pub rst_mld_thr: f64,
 
     /// Stabilizer scaling
     #[cfg_attr(feature = "structopt", structopt(long = "rss", default_value = "2.0"))]
     pub rst_stb_scl: f64,
 
     /// Max Var Activity
-    #[cfg_attr(feature = "structopt", structopt(long = "rmt", default_value = "0.72"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "rmt", default_value = "0.50"))]
     pub rst_mva_thr: f64,
 
     //
@@ -272,9 +272,9 @@ impl Default for Config {
             rst_lbd_len: 50,
             rst_lbd_slw: 10000,
             rst_lbd_thr: 1.20,
-            rst_luc_thr: 1.10,
+            rst_mld_thr: 2.00,
             rst_stb_scl: 2.0,
-            rst_mva_thr: 0.7,
+            rst_mva_thr: 0.78,
             vrw_dcy_beg: 0.10,
             vrw_dcy_end: 0.97,
             cbt_thr: 100,

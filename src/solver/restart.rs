@@ -22,8 +22,8 @@ trait ProgressEvaluator {
 pub enum ProgressUpdate {
     Counter(usize),
     ASG(usize),
-    LBD(usize),
-    LUC(usize),
+    LBD(u16),
+    MLD(u16),
     MVA(f64),
     Luby,
     Reset,
@@ -170,7 +170,7 @@ impl ProgressEvaluator for ProgressLBD {
 
 /// An EMA of largest clauses' LBD, used in conflict analyze
 #[derive(Debug)]
-struct ProgressLUC {
+struct ProgressMLD {
     enable: bool,
     ema: Ema2,
     num: usize,
@@ -178,9 +178,9 @@ struct ProgressLUC {
     threshold: f64,
 }
 
-impl Default for ProgressLUC {
-    fn default() -> ProgressLUC {
-        ProgressLUC {
+impl Default for ProgressMLD {
+    fn default() -> ProgressMLD {
+        ProgressMLD {
             enable: true,
             ema: Ema2::new(1),
             num: 0,
@@ -190,17 +190,17 @@ impl Default for ProgressLUC {
     }
 }
 
-impl Instantiate for ProgressLUC {
+impl Instantiate for ProgressMLD {
     fn instantiate(config: &Config, _: &CNFDescription) -> Self {
-        ProgressLUC {
+        ProgressMLD {
             ema: Ema2::new(10 * config.rst_lbd_len).with_slow(config.rst_lbd_slw),
-            threshold: config.rst_luc_thr,
-            ..ProgressLUC::default()
+            threshold: config.rst_mld_thr,
+            ..ProgressMLD::default()
         }
     }
 }
 
-impl EmaIF for ProgressLUC {
+impl EmaIF for ProgressMLD {
     type Input = usize;
     fn update(&mut self, d: usize) {
         self.num += 1;
@@ -215,7 +215,7 @@ impl EmaIF for ProgressLUC {
     }
 }
 
-impl ProgressEvaluator for ProgressLUC {
+impl ProgressEvaluator for ProgressMLD {
     fn is_active(&self) -> bool {
         self.enable && self.threshold < self.ema.trend()
     }
@@ -651,7 +651,7 @@ pub struct Restarter {
     asg: ProgressASG,
     // bkt: ProgressBucket,
     lbd: ProgressLBD,
-    luc: ProgressLUC,
+    mld: ProgressMLD,
     mva: ProgressMVA,
     // pub rcc: ProgressRCC,
     // pub blvl: ProgressLVL,
@@ -674,7 +674,7 @@ impl Default for Restarter {
             asg: ProgressASG::default(),
             // bkt: ProgressBucket::default(),
             lbd: ProgressLBD::default(),
-            luc: ProgressLUC::default(),
+            mld: ProgressMLD::default(),
             mva: ProgressMVA::default(),
             // rcc: ProgressRCC::default(),
             // blvl: ProgressLVL::default(),
@@ -695,7 +695,7 @@ impl Instantiate for Restarter {
             asg: ProgressASG::instantiate(config, cnf),
             // bkt: ProgressBucket::instantiate(config, cnf),
             lbd: ProgressLBD::instantiate(config, cnf),
-            luc: ProgressLUC::instantiate(config, cnf),
+            mld: ProgressMLD::instantiate(config, cnf),
             mva: ProgressMVA::instantiate(config, cnf),
             // rcc: ProgressRCC::instantiate(config, cnf),
             // blvl: ProgressLVL::instantiate(config, cnf),
@@ -759,15 +759,15 @@ impl RestartIF for Restarter {
                 self.luby.update(self.after_restart);
             }
             ProgressUpdate::ASG(val) => self.asg.update(val),
-            ProgressUpdate::LBD(val) => self.lbd.update(val), // self.bkt.update(val)
-            ProgressUpdate::LUC(val) => self.luc.update(val), // self.bkt.update(val)
+            ProgressUpdate::LBD(val) => self.lbd.update(val as usize),
+            ProgressUpdate::MLD(val) => self.mld.update(val as usize),
             ProgressUpdate::MVA(fval) => self.mva.update(fval),
             ProgressUpdate::Luby => self.luby.update(0),
             ProgressUpdate::Reset => (),
         }
     }
     fn ema_stats(&self) -> (&Ema2, &Ema2, &Ema2, &Ema2) {
-        (&self.asg.ema, &self.lbd.ema, &self.luc.ema, &self.mva.ema)
+        (&self.asg.ema, &self.lbd.ema, &self.mld.ema, &self.mva.ema)
     }
 }
 
@@ -800,14 +800,15 @@ impl Restarter {
             return false;
         }
         /*
-           if self.lbd.is_active() {
-               self.lbd.shift();
-               reset!(self);
-           }
+            if self.lbd.is_active() {
+                self.lbd.shift();
+                reset!(self);
+            }
         */
-        if self.luc.threshold * self.luc.get() < self.lbd.get() {
+        if self.mld.threshold + self.mld.get() < self.lbd.get() {
             reset!(self);
         }
+        // */
         false
     }
 }

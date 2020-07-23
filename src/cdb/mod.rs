@@ -53,7 +53,7 @@ pub struct Clause {
     /// The literals in a clause.
     pub lits: Vec<Lit>,
     /// A static clause evaluation criterion like LBD, NDD, or something.
-    pub rank: usize,
+    pub rank: u16,
     /// the index from which `propagate` starts searching an unfalsified literal.
     pub search_from: usize,
     /// A dynamic clause evaluation criterion based on the number of references.

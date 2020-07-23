@@ -459,6 +459,9 @@ impl Ema2 {
         self.se = 1.0 / (s as f64);
         self
     }
+    pub fn get_slow(&self) -> f64 {
+        self.slow // / self.calf
+    }
 }
 
 /// Internal errors.

@@ -507,14 +507,14 @@ impl ClauseDBIF for ClauseDB {
             c.flags = Flag::empty();
             debug_assert!(c.lits.is_empty()); // c.lits.clear();
             std::mem::swap(&mut c.lits, vec);
-            c.rank = rank;
+            c.rank = rank as u16;
             c.reward = reward;
             c.search_from = 2;
         } else {
             cid = ClauseId::from(self.clause.len());
             let mut c = Clause {
                 flags: Flag::empty(),
-                rank,
+                rank: rank as u16,
                 reward,
                 ..Clause::default()
             };
@@ -560,9 +560,9 @@ impl ClauseDBIF for ClauseDB {
         let nlevels = self.compute_lbd_of(asg, cid);
         let c = &mut self[cid];
         debug_assert!(!c.is(Flag::DEAD), format!("found {} is dead: {}", cid, c));
-        if nlevels < c.rank {
+        if nlevels < c.rank as usize {
             match (c.is(Flag::VIVIFIED2), c.is(Flag::VIVIFIED)) {
-                _ if nlevels == 1 || nlevels + 1 < c.rank => {
+                _ if nlevels == 1 || nlevels + 1 < c.rank as usize => {
                     c.turn_on(Flag::VIVIFIED2);
                     c.turn_off(Flag::VIVIFIED);
                 }
@@ -579,13 +579,13 @@ impl ClauseDBIF for ClauseDB {
                 // chan_seok_condition is zero if !use_chan_seok
                 if nlevels < chan_seok_condition {
                     c.turn_off(Flag::LEARNT);
-                    c.rank = nlevels;
+                    c.rank = nlevels as u16;
                     self.num_learnt -= 1;
                     return true;
                 }
             }
         }
-        c.rank = nlevels;
+        c.rank = nlevels as u16;
         false
     }
     fn count(&self) -> usize {
@@ -836,7 +836,7 @@ impl ClauseDB {
             if c.is(Flag::DEAD) || !c.is(Flag::LEARNT) {
                 continue;
             }
-            if c.rank <= self.co_lbd_bound {
+            if c.rank <= self.co_lbd_bound as u16 {
                 c.turn_off(Flag::LEARNT);
                 self.num_learnt -= 1;
             } else if reinit {
