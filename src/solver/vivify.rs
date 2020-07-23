@@ -174,14 +174,9 @@ pub fn vivify(
             2 => {
                 let l0 = copied[0];
                 let l1 = copied[1];
-                let mut registered = false;
-                for w in &cdb.bin_watcher_lists()[usize::from(!l0)] {
-                    if w.blocker == l1 {
-                        registered = true; // panic!(",ueae'abr");
-                        npurge += 1;
-                    }
-                }
-                if !registered {
+                if cdb.registered_bin_clause(l0, l1) {
+                    npurge += 1;
+                } else {
                     nshrink += 1;
                     let cj = cdb.new_clause(asg, &mut copied, is_learnt, true);
                     cdb[cj].turn_on(Flag::VIVIFIED);

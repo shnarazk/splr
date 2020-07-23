@@ -46,6 +46,8 @@ pub trait ClauseDBIF: IndexMut<ClauseId, Output = Clause> {
     /// * `simplify`
     /// * `kill`
     fn garbage_collect(&mut self);
+    /// return `true` if a literal pair `(l0, l1)` is registered.
+    fn registered_bin_clause(&self, l0: Lit, l1: Lit) -> bool;
     /// allocate a new clause and return its id.
     /// * If `level_sort` is on, register `v` as a learnt after sorting based on assign level.
     /// * Otherwise, register `v` as a permanent clause, which rank is zero.
@@ -437,6 +439,14 @@ impl ClauseDBIF for ClauseDB {
         }
         self.num_active = self.clause.len() - recycled.len();
         // debug_assert!(self.check_liveness2());
+    }
+    fn registered_bin_clause(&self, l0: Lit, l1: Lit) -> bool {
+        for w in &self.bin_watcher_lists()[usize::from(!l0)] {
+            if w.blocker == l1 {
+                return true;
+            }
+        }
+        false
     }
     fn new_clause<A>(
         &mut self,
