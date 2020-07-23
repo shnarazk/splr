@@ -117,26 +117,32 @@ pub fn vivify(
                     let cid: Option<ClauseId> = match copied.len() {
                         0 => None,
                         1 => {
+                            debug_assert!(flipped);
+                            debug_assert!(asg.assigned(copied[0]) != Some(false));
                             asg.assign_by_decision(copied[0]);
                             None
                         }
                         _ => Some(cdb.new_clause(asg, &mut copied.clone(), false, true)),
                     };
                     debug_assert!(asg.propagate(cdb).is_none(), "# Conflict by vivify");
-                    asg.assign_by_decision(!*l);
-                    let cc = asg.propagate(cdb);
+                    let falsified = asg.assigned(!*l) == Some(false);
+                    let mut cc: ClauseId = ClauseId::default();
                     copied.push(!*l); // Rule 4
-                    if !cc.is_none() {
-                        let r = cdb[cc].lits.clone(); // Rule 3
-                        copied = asg.minimize(cdb, &copied, &r, ncheck, &mut seen);
-                        flipped = false;
+                    if !falsified {
+                        asg.assign_by_decision(!*l);
+                        cc = asg.propagate(cdb);
+                        if !cc.is_none() {
+                            let r = cdb[cc].lits.clone(); // Rule 3
+                            copied = asg.minimize(cdb, &copied, &r, ncheck, &mut seen);
+                            flipped = false;
+                        }
                     }
                     asg.cancel_until(asg.root_level);
                     if let Some(cj) = cid {
                         cdb.detach(cj);
                         cdb.garbage_collect();
                     }
-                    if !cc.is_none() {
+                    if falsified || !cc.is_none() {
                         break 'this_clause;
                     }
                 }
@@ -152,16 +158,35 @@ pub fn vivify(
                 elim.to_simplify += 1.0 / clits.len() as f64;
             }
             1 => {
-                nassert += 1;
                 assert!(asg.assigned(copied[0]) != Some(false));
+                if asg.assigned(copied[0]) == None {
+                    nassert += 1;
+                    asg.handle(SolverEvent::Fixed);
+                }
                 asg.assign_at_rootlevel(copied[0])?;
-                asg.handle(SolverEvent::Fixed);
                 state.handle(SolverEvent::Fixed);
                 state[Stat::VivifiedVar] += 1;
                 elim.to_simplify += 2.0;
             }
             n if n == clits.len() => {
                 keep_original = true;
+            }
+            2 => {
+                let l0 = copied[0];
+                let l1 = copied[1];
+                let mut registered = false;
+                for w in &cdb.bin_watcher_lists()[usize::from(!l0)] {
+                    if w.blocker == l1 {
+                        registered = true; // panic!(",ueae'abr");
+                        npurge += 1;
+                    }
+                }
+                if !registered {
+                    nshrink += 1;
+                    let cj = cdb.new_clause(asg, &mut copied, is_learnt, true);
+                    cdb[cj].turn_on(Flag::VIVIFIED);
+                }
+                elim.to_simplify += 1.0;
             }
             n => {
                 nshrink += 1;
