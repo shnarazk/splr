@@ -163,7 +163,7 @@ pub struct Config {
     pub rst_asg_thr: f64, // Glucose's R
 
     /// Correlation to cancel restart
-    #[cfg_attr(feature = "structopt", structopt(long = "rct", default_value = "0.50"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "rct", default_value = "0.70"))]
     pub rst_cva_thr: f64,
 
     /// Length of LBD fast EMA
@@ -182,7 +182,7 @@ pub struct Config {
     pub rst_lbd_thr: f64,
 
     /// Usability to restart
-    #[cfg_attr(feature = "structopt", structopt(long = "rut", default_value = "4.20"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "rut", default_value = "4.00"))]
     pub rst_mld_thr: f64,
 
     /// Stabilizer scaling
@@ -216,7 +216,7 @@ pub struct Config {
     rsr: i32,
 
     /// Stabilization switch
-    #[cfg_attr(feature = "structopt", structopt(long = "STB", default_value = "1"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "STB", default_value = "0"))]
     stabilize: i32,
 
     /// Strategy adaptation switch
@@ -273,14 +273,14 @@ impl Default for Config {
             rst_lbd_len: 50,
             rst_lbd_slw: 10000,
             rst_lbd_thr: 1.20,
-            rst_mld_thr: 2.00,
+            rst_mld_thr: 4.00,
             rst_stb_scl: 2.0,
             vrw_dcy_beg: 0.10,
             vrw_dcy_end: 0.97,
             cbt_thr: 100,
             rephase: 1,
             rsr: 1,
-            stabilize: 1,
+            stabilize: 0,
             adaptive: 1,
             timeout: 5000.0,
             use_certification: false,
