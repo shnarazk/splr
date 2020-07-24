@@ -217,13 +217,12 @@ fn search(
                 match rst.stabilizing() {
                     None => asg.cancel_until(asg.root_level),
                     Some(true) => {
-                        // cancel restart if solver is in stabiling mode and the last learnt
-                        // has very releted to the current conflicting core.
-                        state[Stat::CancelRestart] += 1;
-                    }
-                    Some(false) => {
+                        // the case with a large correlation:
                         asg.cancel_until(asg.root_level);
                         asg.force_rephase();
+                    }
+                    Some(false) => {
+                        state[Stat::CancelRestart] += 1;
                     }
                 }
             }
