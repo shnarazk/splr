@@ -736,7 +736,7 @@ macro_rules! reset {
 
 impl RestartIF for Restarter {
     fn stabilizing(&self) -> Option<bool> {
-        if self.stb.is_active() {
+        if self.stb.enable && self.stb.is_active() {
             Some(self.mva.is_active())
         } else {
             None
