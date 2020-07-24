@@ -49,7 +49,7 @@ impl Default for AssignStack {
             var_order: VarIdHeap::default(),
             temp_order: Vec::new(),
             num_vars: 0,
-            num_solved_vars: 0,
+            num_asserted_vars: 0,
             num_eliminated_vars: 0,
             use_rephase: true,
             best_assign: false,
@@ -105,8 +105,8 @@ impl Instantiate for AssignStack {
             SolverEvent::Conflict => {
                 self.num_best_assign *= 0.99999;
             }
-            SolverEvent::Fixed => {
-                self.num_solved_vars += 1;
+            SolverEvent::Assert => {
+                self.num_asserted_vars += 1;
             }
             SolverEvent::NewVar => {
                 self.assign.push(None);
@@ -123,7 +123,7 @@ impl Instantiate for AssignStack {
                 self.q_head = 0;
                 self.num_eliminated_vars =
                     self.var.iter().filter(|v| v.is(Flag::ELIMINATED)).count();
-                self.num_solved_vars = if self.trail.is_empty() {
+                self.num_asserted_vars = if self.trail.is_empty() {
                     0
                 } else {
                     self.trail.len()
@@ -347,7 +347,7 @@ impl AssignStack {
             .collect::<Vec<(i32, DecisionLevel, bool, Option<bool>)>>()
     }
 
-    /// dump all active clauses and fixed assignments as a CNF file.
+    /// dump all active clauses and assertions as a CNF file.
     #[cfg(not(feature = "no_IO"))]
     #[allow(dead_code)]
     fn dump_cnf<C, V>(&mut self, cdb: &C, fname: &str)
@@ -406,21 +406,21 @@ impl fmt::Display for AssignStack {
         if 0 < levels {
             write!(
                 f,
-                "ASG:: trail({}):{:?}\n      solved: level: {}, solved: {}, elimed: {}",
+                "ASG:: trail({}):{:?}\n      stats: level: {}, asserted: {}, eliminated: {}",
                 self.trail.len(),
                 (0..=levels).map(c).collect::<Vec<_>>(),
                 levels,
-                self.num_solved_vars,
+                self.num_asserted_vars,
                 self.num_eliminated_vars,
             )
         } else {
             write!(
                 f,
-                "ASG:: trail({}):[(0, {:?})]\n      level: {}, solved: {}, elimed: {}",
+                "ASG:: trail({}):[(0, {:?})]\n      level: {}, asserted: {}, elimed: {}",
                 self.trail.len(),
                 &v,
                 levels,
-                self.num_solved_vars,
+                self.num_asserted_vars,
                 self.num_eliminated_vars,
             )
         }

@@ -188,7 +188,7 @@ fn main() {
 fn run(cnf: &str, assigns: &[i32]) -> usize {
     let mut solver = Solver::try_from(cnf).expect("panic at loading a CNF");
     for n in assigns.iter() {
-        solver.add_assignment(*n).expect("panic at fixed assigns");
+        solver.add_assignment(*n).expect("panic at assertion");
     }
     let mut count = 0;
     loop {

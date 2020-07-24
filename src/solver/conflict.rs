@@ -155,7 +155,7 @@ pub fn handle_conflict(
     let learnt_len = new_learnt.len();
     if learnt_len == 1 {
         //
-        //## PARTIAL FIXED SOLUTION by UNIT LEARNT CLAUSE GENERATION
+        //## A NEW ASSERTION by UNIT LEARNT CLAUSE GENERATION
         //
         // dump to certified even if it's a literal.
         cdb.certificate_add(new_learnt);
@@ -166,7 +166,7 @@ pub fn handle_conflict(
         } else {
             asg.assign_by_unitclause(l0);
         }
-        asg.handle(SolverEvent::Fixed);
+        asg.handle(SolverEvent::Assert);
         rst.update(ProgressUpdate::Reset);
         elim.to_simplify += 2.0; // 1 for the positive lit, 1 for the negative.
     } else {
@@ -232,7 +232,7 @@ pub fn handle_conflict(
         let (rst_asg, rst_lbd, _rst_mld, _rst_mva) = rst.ema_stats();
         state.development.push((
             num_conflict,
-            (asg.num_solved_vars + asg.num_eliminated_vars) as f64
+            (asg.num_asserted_vars + asg.num_eliminated_vars) as f64
                 / state.target.num_of_variables as f64,
             asg_num_restart as f64,
             rst_num_block as f64,
@@ -479,7 +479,7 @@ impl State {
 }
 
 /// return `true` if the `lit` is redundant, which is defined by
-/// any leaf of implication graph for it isn't a fixed var nor a decision var.
+/// any leaf of implication graph for it isn't an asserted var nor a decision var.
 impl Lit {
     fn is_redundant(
         self,

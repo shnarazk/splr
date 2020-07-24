@@ -49,7 +49,7 @@ impl SolveIF for Solver {
         if cdb.check_size().is_err() {
             return Err(SolverError::OutOfMemory);
         }
-        asg.num_solved_vars = asg.stack_len();
+        asg.num_asserted_vars = asg.stack_len();
         state.progress_header();
         state.progress(asg, cdb, elim, rst, Some("preprocessing stage"));
         if 0 < asg.stack_len() {
@@ -195,7 +195,7 @@ fn search(
     state: &mut State,
 ) -> Result<bool, SolverError> {
     let mut a_decision_was_made = false;
-    let mut num_assigned = asg.num_solved_vars;
+    let mut num_assigned = asg.num_asserted_vars;
     rst.update(ProgressUpdate::Luby);
     state.stabilize = false;
 
@@ -252,8 +252,8 @@ fn search(
                     return Err(SolverError::UndescribedError);
                 }
             }
-            // `elim.to_simplify` is increased much in particular when vars are solved or
-            // learnts are small. We don't need to count the number of solved vars.
+            // `elim.to_simplify` is increased much in particular when vars are asserted or
+            // learnts are small. We don't need to count the number of asserted vars.
             if state.config.ip_interval <= elim.to_simplify as usize {
                 elim.to_simplify = 0.0;
                 if elim.enable {
@@ -268,9 +268,9 @@ fn search(
                 }
             }
             // By simplification, we may get further solutions.
-            if asg.num_solved_vars < asg.stack_len() {
+            if asg.num_asserted_vars < asg.stack_len() {
                 rst.update(ProgressUpdate::Reset);
-                asg.num_solved_vars = asg.stack_len();
+                asg.num_asserted_vars = asg.stack_len();
             }
         }
         let na = asg.best_assigned(Flag::PHASE);

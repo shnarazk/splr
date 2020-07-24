@@ -161,10 +161,10 @@ pub fn vivify(
                 assert!(asg.assigned(copied[0]) != Some(false));
                 if asg.assigned(copied[0]) == None {
                     nassert += 1;
-                    asg.handle(SolverEvent::Fixed);
+                    asg.handle(SolverEvent::Assert);
                 }
                 asg.assign_at_rootlevel(copied[0])?;
-                state.handle(SolverEvent::Fixed);
+                state.handle(SolverEvent::Assert);
                 state[Stat::VivifiedVar] += 1;
                 elim.to_simplify += 2.0;
             }

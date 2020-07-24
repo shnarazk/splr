@@ -152,8 +152,6 @@ pub enum Stat {
     Decision,
     /// the number of 'no decision conflict'
     NoDecisionConflict,
-    /// the last number of solved variables
-    SolvedRecord,
     /// the number of vivification
     Vivification,
     /// the number of vivified (asserted) vars
@@ -289,7 +287,7 @@ impl Instantiate for State {
             SolverEvent::NewVar => {
                 self.target.num_of_variables += 1;
             }
-            SolverEvent::Fixed => (),
+            SolverEvent::Assert => (),
             SolverEvent::Adapt(_, _) => {}
             SolverEvent::Conflict => {}
             SolverEvent::Instantiate => {}
@@ -492,9 +490,9 @@ impl StateIF for State {
         //
         //## Gather stats from all modules
         //
-        let (asg_num_vars, asg_num_solved_vars, asg_num_eliminated_vars, asg_num_unsolved_vars) =
+        let (asg_num_vars, asg_num_asserted_vars, asg_num_eliminated_vars, asg_num_unasserted_vars) =
             asg.var_stats();
-        let rate = (asg_num_solved_vars + asg_num_eliminated_vars) as f64 / asg_num_vars as f64;
+        let rate = (asg_num_asserted_vars + asg_num_eliminated_vars) as f64 / asg_num_vars as f64;
         let (asg_num_conflict, asg_num_propagation, asg_num_restart, _asg_act_dcy) = asg.exports();
 
         let (cdb_num_active, cdb_num_biclause, _num_bl, cdb_num_lbd2, cdb_num_learnt, _cdb_nr) =
@@ -522,8 +520,8 @@ impl StateIF for State {
         );
         println!(
             "\x1B[2K  Assignment|#rem:{}, #fix:{}, #elm:{}, prg%:{} ",
-            im!("{:>9}", self, LogUsizeId::Remain, asg_num_unsolved_vars),
-            im!("{:>9}", self, LogUsizeId::Fixed, asg_num_solved_vars),
+            im!("{:>9}", self, LogUsizeId::Remain, asg_num_unasserted_vars),
+            im!("{:>9}", self, LogUsizeId::Assert, asg_num_asserted_vars),
             im!(
                 "{:>9}",
                 self,
@@ -722,7 +720,7 @@ impl State {
              Misc Progress Parameters,,   Eliminator"
         );
         println!(
-            "   #init,    #remain,#solved,  #elim,total%,,#learnt,  \
+            "   #init,    #remain,#asserted,#elim,total%,,#learnt,  \
              #perm,#binary,,block,force, #asgn,  lbd/,,    lbd, \
              back lv, conf lv,,clause,   var"
         );
@@ -741,9 +739,9 @@ impl State {
         R: Export<(usize, usize), RestartMode>,
     {
         self.progress_cnt += 1;
-        let (asg_num_vars, asg_num_solved_vars, asg_num_eliminated_vars, asg_num_unsolved_vars) =
+        let (asg_num_vars, asg_num_asserted_vars, asg_num_eliminated_vars, asg_num_unasserted_vars) =
             asg.var_stats();
-        let rate = (asg_num_solved_vars + asg_num_eliminated_vars) as f64 / asg_num_vars as f64;
+        let rate = (asg_num_asserted_vars + asg_num_eliminated_vars) as f64 / asg_num_vars as f64;
         let (asg_num_conflict, _num_propagation, asg_num_restart, _) = asg.exports();
         let (
             cdb_num_active,
@@ -759,7 +757,7 @@ impl State {
             asg_num_restart,                           // restart
             rst_num_block,                             // blocked
             asg_num_conflict / asg_num_restart.max(1), // average cfc (Conflict / Restart)
-            asg_num_unsolved_vars,                     // alive vars
+            asg_num_unasserted_vars,                   // alive vars
             cdb_num_active - cdb_num_learnt,           // given clauses
             0,                                         // alive literals
             cdb_num_reduction,                         // clause reduction
@@ -781,9 +779,9 @@ impl State {
             None => self.strategy.0.to_str(),
             Some(x) => x,
         };
-        let (asg_num_vars, asg_num_solved_vars, asg_num_eliminated_vars, asg_num_unsolved_vars) =
+        let (asg_num_vars, asg_num_asserted_vars, asg_num_eliminated_vars, asg_num_unasserted_vars) =
             asg.var_stats();
-        let rate = (asg_num_solved_vars + asg_num_eliminated_vars) as f64 / asg_num_vars as f64;
+        let rate = (asg_num_asserted_vars + asg_num_eliminated_vars) as f64 / asg_num_vars as f64;
         let (_num_conflict, _num_propagation, asg_num_restart, _) = asg.exports();
         let (
             cdb_num_active,
@@ -801,8 +799,8 @@ impl State {
              {:>6},{:>6}",
             self.progress_cnt,
             msg,
-            asg_num_unsolved_vars,
-            asg_num_solved_vars,
+            asg_num_unasserted_vars,
+            asg_num_asserted_vars,
             asg_num_eliminated_vars,
             rate * 100.0,
             cdb_num_learnt,
@@ -827,7 +825,7 @@ pub enum LogUsizeId {
     Decision,
     Conflict,
     Remain,
-    Fixed,
+    Assert,
     Eliminated,
     Removable,
     LBD2,

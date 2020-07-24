@@ -84,7 +84,7 @@ pub trait AssignIF: ClauseManipulateIF + PropagateIF + VarManipulateIF + VarRewa
 /// Reasons of assignments, two kinds
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum AssignReason {
-    /// One of not assigned, assigned by decision, or solved.
+    /// One of not assigned, assigned by decision, or asserted.
     None,
     /// Assigned by a clause. If it is binary, the reason literal is stored in the 2nd.
     Implication(ClauseId, Lit),
@@ -136,8 +136,8 @@ pub struct AssignStack {
     //
     /// the number of vars.
     pub num_vars: usize,
-    /// the number of solved vars.
-    pub num_solved_vars: usize,
+    /// the number of asserted vars.
+    pub num_asserted_vars: usize,
     /// the number of eliminated vars.
     pub num_eliminated_vars: usize,
     num_conflict: usize,

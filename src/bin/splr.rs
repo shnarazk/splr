@@ -86,7 +86,7 @@ fn main() {
         let dump = config.cnf_file.file_stem().unwrap().to_str().unwrap();
         if let Ok(f) = File::create(format!("stat_{}.csv", dump)) {
             let mut buf = BufWriter::new(f);
-            buf.write_all(b"conflict,solved,restart,block,ASG,LBD\n")
+            buf.write_all(b"conflict,asserted,restart,block,ASG,LBD\n")
                 .unwrap();
             for (n, a, b, c, d, e) in s.state.development.iter() {
                 buf.write_all(
@@ -305,7 +305,7 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
         format!(
             "c   Assignment|#rem:{}, #fix:{}, #elm:{}, prg%:{},\n",
             format!("{:>9}", state[LogUsizeId::Remain]),
-            format!("{:>9}", state[LogUsizeId::Fixed]),
+            format!("{:>9}", state[LogUsizeId::Assert]),
             format!("{:>9}", state[LogUsizeId::Eliminated]),
             format!("{:>9.4}", state[LogF64Id::Progress]),
         )

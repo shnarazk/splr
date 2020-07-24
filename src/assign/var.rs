@@ -95,9 +95,9 @@ pub trait VarManipulateIF {
     fn set_eliminated(&mut self, vi: VarId);
     /// return the following data:
     /// * the number of vars
-    /// * the number of solved vars
+    /// * the number of asserted vars
     /// * the number of eliminated vars
-    /// * the number of unsolved vars
+    /// * the number of unasserted vars
     fn var_stats(&self) -> (usize, usize, usize, usize);
 }
 
@@ -148,9 +148,9 @@ impl VarManipulateIF for AssignStack {
     fn var_stats(&self) -> (usize, usize, usize, usize) {
         (
             self.num_vars,
-            self.num_solved_vars,
+            self.num_asserted_vars,
             self.num_eliminated_vars,
-            self.num_vars - self.num_solved_vars - self.num_eliminated_vars,
+            self.num_vars - self.num_asserted_vars - self.num_eliminated_vars,
         )
     }
 }

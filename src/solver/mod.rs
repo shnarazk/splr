@@ -48,7 +48,7 @@ pub enum SolverEvent {
     /// some implementation might have a special premise to call: decision_level == 0.
     Adapt((SearchStrategy, usize), usize),
     Conflict,
-    Fixed,
+    Assert,
     /// Not in use
     Instantiate,
     /// increment the number of vars.
