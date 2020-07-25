@@ -723,11 +723,11 @@ impl Instantiate for Restarter {
 }
 
 pub enum RestartReason {
-    GoodClauses,    // blocking
-    HighlyRelevant, // blocking
-    Stabilizing,    // restart for divergent clauses during stabilizing
-    UselessClauses, // the reason to restart
-    LubyRestart,    // Oh there's another reason
+    DontForGoodClauses,    // blocking
+    DontForHighlyRelevant, // blocking
+    GoForUselessClauses,   // the reason to restart
+    GoForLubyRestart,      // another reason to restart
+    GoWithStabilization,   // restart for divergent clauses during stabilizing
 }
 
 impl RestartIF for Restarter {
@@ -739,7 +739,7 @@ impl RestartIF for Restarter {
         if self.luby.is_active() {
             self.luby.shift();
             self.after_restart = 0;
-            return Some(RestartReason::LubyRestart);
+            return Some(RestartReason::GoForLubyRestart);
         }
         if self.after_restart < self.restart_step {
             return None;
@@ -748,20 +748,20 @@ impl RestartIF for Restarter {
             let margin = self.stb.num_active as f64 + self.mld.threshold;
             if self.mva.is_active() && self.lbd.get() < margin + self.mld.get() {
                 self.after_restart = 0;
-                return Some(RestartReason::HighlyRelevant);
+                return Some(RestartReason::DontForHighlyRelevant);
             } else {
                 self.after_restart = 0;
-                return Some(RestartReason::Stabilizing);
+                return Some(RestartReason::GoWithStabilization);
             }
         } else if self.asg.is_active() {
             self.num_block += 1;
             self.after_restart = 0;
-            return Some(RestartReason::GoodClauses);
+            return Some(RestartReason::DontForGoodClauses);
         }
         let margin = self.stb.num_active as f64 * 0.25 + self.mld.threshold;
         if margin + self.mld.threshold + self.mld.get() < self.lbd.get() {
             self.after_restart = 0;
-            return Some(RestartReason::UselessClauses);
+            return Some(RestartReason::GoForUselessClauses);
         }
         None
     }

@@ -215,14 +215,14 @@ fn search(
             handle_conflict(asg, cdb, elim, rst, state, ci)?;
             if let Some(decision) = rst.restart() {
                 match decision {
-                    RestartReason::GoodClauses => (),
-                    RestartReason::LubyRestart | RestartReason::UselessClauses => {
+                    RestartReason::DontForGoodClauses => (),
+                    RestartReason::GoForLubyRestart | RestartReason::GoForUselessClauses => {
                         asg.cancel_until(asg.root_level);
                     }
-                    RestartReason::HighlyRelevant => {
+                    RestartReason::DontForHighlyRelevant => {
                         state[Stat::CancelRestart] += 1;
                     }
-                    RestartReason::Stabilizing => {
+                    RestartReason::GoWithStabilization => {
                         asg.cancel_until(asg.root_level);
                         asg.force_rephase();
                     }
