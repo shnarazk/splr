@@ -519,7 +519,7 @@ impl StateIF for State {
             i!("{:>15}", self, LogUsizeId::Propagate, asg_num_propagation),
         );
         println!(
-            "\x1B[2K  Assignment|#rem:{}, #fix:{}, #elm:{}, prg%:{} ",
+            "\x1B[2K  Assignment|#rem:{}, #ass:{}, #elm:{}, prg%:{} ",
             im!("{:>9}", self, LogUsizeId::Remain, asg_num_unasserted_vars),
             im!("{:>9}", self, LogUsizeId::Assert, asg_num_asserted_vars),
             im!(

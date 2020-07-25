@@ -44,13 +44,13 @@ pub enum RestartMode {
 /// API for restart like `block_restart`, `force_restart` and so on.
 pub trait RestartIF {
     /// return `true` if stabilizer is active.
-    fn stabilizing(&self) -> Option<bool>;
+    fn stabilizing(&self) -> bool;
     /// check restart condition and return:
     ///
     /// * `Some(true)` -- should restart
     /// * `Some(false)` -- should block restart
     /// * `None` -- it's not a good timing
-    fn restart(&mut self) -> Option<bool>;
+    fn restart(&mut self) -> Option<RestartReason>;
     /// update specific submodule
     fn update(&mut self, kind: ProgressUpdate);
     fn ema_stats(&self) -> (&Ema2, &Ema2, &Ema2, &Ema2);
@@ -722,32 +722,46 @@ impl Instantiate for Restarter {
     }
 }
 
-macro_rules! reset {
-    ($executor: expr) => {
-        $executor.after_restart = 0;
-        // if $executor.stb.is_active() {
-        //     $executor.num_block += 1;
-        //     $executor.num_stabilize += 1;
-        //     return false;
-        // }
-        return true;
-    };
+pub enum RestartReason {
+    GoodClauses,    // blocking
+    HighlyRelevant, // blocking
+    Stabilizing,    // restart for divergent clauses during stabilizing
+    UselessClauses, // the reason to restart
+    LubyRestart,    // Oh there's another reason
 }
 
 impl RestartIF for Restarter {
-    fn stabilizing(&self) -> Option<bool> {
-        if self.stb.enable && self.stb.is_active() {
-            Some(self.mva.is_active())
-        } else {
-            None
-        }
+    fn stabilizing(&self) -> bool {
+        self.stb.is_active()
     }
-    fn restart(&mut self) -> Option<bool> {
+    fn restart(&mut self) -> Option<RestartReason> {
         self.mva.shift();
-        if self.block_restart() {
-            return Some(false);
-        } else if self.force_restart() {
-            return Some(true);
+        if self.luby.is_active() {
+            self.luby.shift();
+            self.after_restart = 0;
+            return Some(RestartReason::LubyRestart);
+        }
+        if self.after_restart < self.restart_step {
+            return None;
+        }
+        if self.stb.is_active() {
+            let margin = self.stb.num_active as f64 + self.mld.threshold;
+            if self.mva.is_active() && self.lbd.get() < margin + self.mld.get() {
+                self.after_restart = 0;
+                return Some(RestartReason::HighlyRelevant);
+            } else {
+                self.after_restart = 0;
+                return Some(RestartReason::Stabilizing);
+            }
+        } else if self.asg.is_active() {
+            self.num_block += 1;
+            self.after_restart = 0;
+            return Some(RestartReason::GoodClauses);
+        }
+        let margin = self.stb.num_active as f64 * 0.25 + self.mld.threshold;
+        if margin + self.mld.threshold + self.mld.get() < self.lbd.get() {
+            self.after_restart = 0;
+            return Some(RestartReason::UselessClauses);
         }
         None
     }
@@ -768,48 +782,6 @@ impl RestartIF for Restarter {
     }
     fn ema_stats(&self) -> (&Ema2, &Ema2, &Ema2, &Ema2) {
         (&self.asg.ema, &self.lbd.ema, &self.mld.ema, &self.mva.ema)
-    }
-}
-
-impl Restarter {
-    /// block restart if needed.
-    fn block_restart(&mut self) -> bool {
-        // || self.bkt.enable
-        if self.after_restart < self.restart_step || self.luby.enable {
-            return false;
-        }
-        if self.asg.is_active() {
-            self.num_block += 1;
-            reset!(self);
-        }
-        false
-    }
-    /// force restart if needed.
-    fn force_restart(&mut self) -> bool {
-        if self.luby.is_active() {
-            self.luby.shift();
-            reset!(self);
-        }
-        /*
-        if self.bkt.is_active() {
-            self.bkt.shift();
-            reset!(self);
-        }
-        */
-        if self.after_restart < self.restart_step {
-            return false;
-        }
-        /*
-            if self.lbd.is_active() {
-                self.lbd.shift();
-                reset!(self);
-            }
-        */
-        if self.mld.threshold + self.mld.get() < self.lbd.get() {
-            reset!(self);
-        }
-        // */
-        false
     }
 }
 

@@ -2,7 +2,7 @@
 use {
     super::{
         conflict::handle_conflict,
-        restart::{ProgressUpdate, RestartIF, Restarter},
+        restart::{ProgressUpdate, RestartIF, RestartReason, Restarter},
         vivify::vivify,
         Certificate, Solver, SolverEvent, SolverResult,
     },
@@ -213,20 +213,21 @@ fn search(
                 return Ok(false);
             }
             handle_conflict(asg, cdb, elim, rst, state, ci)?;
-            if let Some(true) = rst.restart() {
-                match rst.stabilizing() {
-                    None => asg.cancel_until(asg.root_level),
-                    Some(true) => {
-                        // the case with a large correlation:
+            if let Some(decision) = rst.restart() {
+                match decision {
+                    RestartReason::GoodClauses => (),
+                    RestartReason::LubyRestart | RestartReason::UselessClauses => {
+                        asg.cancel_until(asg.root_level);
+                    }
+                    RestartReason::HighlyRelevant => {
+                        state[Stat::CancelRestart] += 1;
+                    }
+                    RestartReason::Stabilizing => {
                         asg.cancel_until(asg.root_level);
                         asg.force_rephase();
                     }
-                    Some(false) => {
-                        state[Stat::CancelRestart] += 1;
-                    }
                 }
             }
-
             if a_decision_was_made {
                 a_decision_was_made = false;
             } else {
@@ -279,7 +280,7 @@ fn search(
             state.flush(format!("unreachable: {}", asg.num_vars - num_assigned));
         }
         if !asg.remains() {
-            if state.config.use_stabilize() && state.stabilize != rst.stabilizing().is_some() {
+            if state.config.use_stabilize() && state.stabilize != rst.stabilizing() {
                 state.stabilize = !state.stabilize;
                 rst.handle(SolverEvent::Stabilize(state.stabilize));
             }
