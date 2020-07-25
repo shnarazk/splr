@@ -725,8 +725,8 @@ impl Instantiate for Restarter {
 pub enum RestartReason {
     DontForGoodClauses,    // blocking
     DontForHighlyRelevant, // blocking
-    GoForUselessClauses,   // the reason to restart
-    GoForLubyRestart,      // another reason to restart
+    GoForLubyRestart,      // the reason to restart
+    GoForUselessClauses,   // another reason to restart
     GoWithStabilization,   // restart for divergent clauses during stabilizing
 }
 
