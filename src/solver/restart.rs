@@ -145,10 +145,10 @@ impl Instantiate for ProgressLBD {
 }
 
 impl EmaIF for ProgressLBD {
-    type Input = usize;
-    fn update(&mut self, d: usize) {
+    type Input = u16;
+    fn update(&mut self, d: Self::Input) {
         self.num += 1;
-        self.sum += d;
+        self.sum += d as usize;
         self.ema.update(d as f64);
     }
     fn get(&self) -> f64 {
@@ -201,10 +201,10 @@ impl Instantiate for ProgressMLD {
 }
 
 impl EmaIF for ProgressMLD {
-    type Input = usize;
-    fn update(&mut self, d: usize) {
+    type Input = u16;
+    fn update(&mut self, d: Self::Input) {
         self.num += 1;
-        self.sum += d;
+        self.sum += d as usize;
         self.ema.update(d as f64);
     }
     fn get(&self) -> f64 {
@@ -780,8 +780,8 @@ impl RestartIF for Restarter {
                 self.luby.update(self.after_restart);
             }
             ProgressUpdate::ASG(val) => self.asg.update(val),
-            ProgressUpdate::LBD(val) => self.lbd.update(val as usize),
-            ProgressUpdate::MLD(val) => self.mld.update(val as usize),
+            ProgressUpdate::LBD(val) => self.lbd.update(val),
+            ProgressUpdate::MLD(val) => self.mld.update(val),
             ProgressUpdate::MVA(fval) => self.mva.update(fval),
             ProgressUpdate::Luby => self.luby.update(0),
             ProgressUpdate::Reset => (),
