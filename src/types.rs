@@ -27,6 +27,10 @@ pub trait Export<T, Mode> {
     fn active_mode(&self) -> Mode;
 }
 
+pub trait ExportBox<'a, T> {
+    fn exports_box(&'a self) -> Box<T>;
+}
+
 /// API for Literal like `from_int`, `from_assign`, `to_cid` and so on.
 pub trait LitIF {
     /// convert [VarId](../type.VarId.html) to [Lit](../type.Lit.html).

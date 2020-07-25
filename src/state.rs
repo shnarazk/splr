@@ -34,12 +34,20 @@ pub trait StateIF {
     /// write a header of stat data to stdio.
     fn progress_header(&mut self);
     /// write stat data to stdio.
-    fn progress<A, C, E, R>(&mut self, asg: &A, cdb: &C, elim: &E, rst: &R, mes: Option<&str>)
-    where
+    fn progress<'r, A, C, E, R>(
+        &mut self,
+        asg: &A,
+        cdb: &C,
+        elim: &E,
+        rst: &'r R,
+        mes: Option<&str>,
+    ) where
         A: AssignIF + Export<(usize, usize, usize, f64), ()>,
         C: Export<(usize, usize, usize, usize, usize, usize), ()>,
         E: Export<(usize, usize, f64), ()>,
-        R: RestartIF + Export<(usize, usize), RestartMode>;
+        R: RestartIF
+            + Export<(usize, usize), RestartMode>
+            + ExportBox<'r, (&'r Ema2, &'r Ema2, &'r Ema2, &'r Ema2)>;
     /// write a short message to stdout.
     fn flush<S: AsRef<str>>(&self, mes: S);
 }
@@ -476,12 +484,20 @@ impl StateIF for State {
     }
     /// `mes` should be shorter than or equal to 9, or 8 + a delimiter.
     #[allow(clippy::cognitive_complexity)]
-    fn progress<A, C, E, R>(&mut self, asg: &A, cdb: &C, elim: &E, rst: &R, mes: Option<&str>)
-    where
+    fn progress<'r, A, C, E, R>(
+        &mut self,
+        asg: &A,
+        cdb: &C,
+        elim: &E,
+        rst: &'r R,
+        mes: Option<&str>,
+    ) where
         A: AssignIF + Export<(usize, usize, usize, f64), ()>,
         C: Export<(usize, usize, usize, usize, usize, usize), ()>,
         E: Export<(usize, usize, f64), ()>,
-        R: RestartIF + Export<(usize, usize), RestartMode>,
+        R: RestartIF
+            + Export<(usize, usize), RestartMode>
+            + ExportBox<'r, (&'r Ema2, &'r Ema2, &'r Ema2, &'r Ema2)>,
     {
         if !self.config.splr_interface || self.config.quiet_mode {
             return;
@@ -503,7 +519,7 @@ impl StateIF for State {
         let rst_mode = rst.active_mode();
 
         let (rst_num_blk, rst_num_stb) = rst.exports();
-        let (rst_asg, rst_lbd, rst_mld, rst_mva) = rst.ema_stats();
+        let (rst_asg, rst_lbd, rst_mld, rst_mva) = *rst.exports_box();
 
         if self.config.use_log {
             self.dump(asg, cdb, rst);
@@ -768,11 +784,13 @@ impl State {
         );
     }
     #[allow(dead_code)]
-    fn dump_details<A, C, E, R, V>(&mut self, asg: &A, cdb: &C, rst: &R, mes: Option<&str>)
+    fn dump_details<'r, A, C, E, R, V>(&mut self, asg: &A, cdb: &C, rst: &'r R, mes: Option<&str>)
     where
         A: AssignIF + Export<(usize, usize, usize, f64), ()>,
         C: Export<(usize, usize, usize, usize, usize, usize), ()>,
-        R: RestartIF + Export<(usize, usize), RestartMode>,
+        R: RestartIF
+            + Export<(usize, usize), RestartMode>
+            + ExportBox<'r, (&'r Ema2, &'r Ema2, &'r Ema2, &'r Ema2)>,
     {
         self.progress_cnt += 1;
         let msg = match mes {
@@ -792,7 +810,7 @@ impl State {
             _num_reduction,
         ) = cdb.exports();
         let (rst_num_block, _) = rst.exports();
-        let (rst_asg, rst_lbd, _, _) = rst.ema_stats();
+        let (rst_asg, rst_lbd, _, _) = *rst.exports_box();
         println!(
             "{:>3}#{:>8},{:>7},{:>7},{:>7},{:>6.3},,{:>7},{:>7},\
              {:>7},,{:>5},{:>5},{:>6.2},{:>6.2},,{:>7.2},{:>8.2},{:>8.2},,\

@@ -53,7 +53,6 @@ pub trait RestartIF {
     fn restart(&mut self) -> Option<RestartReason>;
     /// update specific submodule
     fn update(&mut self, kind: ProgressUpdate);
-    fn ema_stats(&self) -> (&Ema2, &Ema2, &Ema2, &Ema2);
 }
 
 /// An assignment history used for blocking restart.
@@ -787,9 +786,6 @@ impl RestartIF for Restarter {
             ProgressUpdate::Reset => (),
         }
     }
-    fn ema_stats(&self) -> (&Ema2, &Ema2, &Ema2, &Ema2) {
-        (&self.asg.ema, &self.lbd.ema, &self.mld.ema, &self.mva.ema)
-    }
 }
 
 impl Export<(usize, usize), RestartMode> for Restarter {
@@ -816,6 +812,12 @@ impl Export<(usize, usize), RestartMode> for Restarter {
         } else {
             RestartMode::Dynamic
         }
+    }
+}
+
+impl<'a> ExportBox<'a, (&'a Ema2, &'a Ema2, &'a Ema2, &'a Ema2)> for Restarter {
+    fn exports_box(&'a self) -> Box<(&'a Ema2, &'a Ema2, &'a Ema2, &'a Ema2)> {
+        Box::from((&self.asg.ema, &self.lbd.ema, &self.mld.ema, &self.mva.ema))
     }
 }
 
