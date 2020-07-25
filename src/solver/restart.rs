@@ -722,12 +722,18 @@ impl Instantiate for Restarter {
     }
 }
 
+/// Type for the Result of `restart`.
 pub enum RestartReason {
-    DontForGoodClauses,    // blocking
-    DontForHighlyRelevant, // blocking
-    GoForLubyRestart,      // the reason to restart
-    GoForUselessClauses,   // another reason to restart
-    GoWithStabilization,   // restart for divergent clauses during stabilizing
+    /// We should block restart because we are on a good path which has generated small learnt clauses.
+    DontForGoodClauses,
+    /// We should block restart because we are facing a strongly related conflicting core.
+    DontForHighlyRelevant,
+    /// We should restart now because we use Luby.
+    GoForLubyRestart,
+    /// We should restart now because recent learnt clauses have hardly possibilities to be used.
+    GoForUselessClauses,
+    /// We should restart now and then stabilize due to 'divergent' learnt clauses
+    GoWithStabilization,
 }
 
 impl RestartIF for Restarter {
@@ -735,7 +741,6 @@ impl RestartIF for Restarter {
         self.stb.is_active()
     }
     fn restart(&mut self) -> Option<RestartReason> {
-        self.mva.shift();
         if self.luby.is_active() {
             self.luby.shift();
             self.after_restart = 0;
@@ -744,9 +749,12 @@ impl RestartIF for Restarter {
         if self.after_restart < self.restart_step {
             return None;
         }
+        self.mva.shift();
+        let k = if self.stb.is_active() { 1.0 } else { 0.25 };
+        let margin = self.stb.num_active as f64 * k + self.mld.threshold;
+        let good_path = self.lbd.get() < self.mld.get() + margin;
         if self.stb.is_active() {
-            let margin = self.stb.num_active as f64 + self.mld.threshold;
-            if self.mva.is_active() && self.lbd.get() < margin + self.mld.get() {
+            if self.mva.is_active() && good_path {
                 self.after_restart = 0;
                 return Some(RestartReason::DontForHighlyRelevant);
             } else {
@@ -757,9 +765,8 @@ impl RestartIF for Restarter {
             self.num_block += 1;
             self.after_restart = 0;
             return Some(RestartReason::DontForGoodClauses);
-        }
-        let margin = self.stb.num_active as f64 * 0.25 + self.mld.threshold;
-        if margin + self.mld.threshold + self.mld.get() < self.lbd.get() {
+        };
+        if !good_path {
             self.after_restart = 0;
             return Some(RestartReason::GoForUselessClauses);
         }
