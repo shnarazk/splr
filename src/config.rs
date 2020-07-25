@@ -216,7 +216,7 @@ pub struct Config {
     rsr: i32,
 
     /// Stabilization switch
-    #[cfg_attr(feature = "structopt", structopt(long = "STB", default_value = "0"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "STB", default_value = "1"))]
     stabilize: i32,
 
     /// Strategy adaptation switch
@@ -280,7 +280,7 @@ impl Default for Config {
             cbt_thr: 100,
             rephase: 1,
             rsr: 1,
-            stabilize: 0,
+            stabilize: 1,
             adaptive: 1,
             timeout: 5000.0,
             use_certification: false,
