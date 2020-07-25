@@ -233,6 +233,12 @@ fn search(
             } else {
                 state[Stat::NoDecisionConflict] += 1;
             }
+            let na = asg.best_assigned(Flag::PHASE);
+            if num_assigned < na {
+                num_assigned = na;
+                state.flush("");
+                state.flush(format!("unreachable: {}", asg.num_vars - num_assigned));
+            }
             if asg.exports().0 % state.reflection_interval == 0 {
                 adapt_modules(asg, cdb, elim, rst, state)?;
                 if let Some(p) = state.elapsed() {
@@ -273,16 +279,12 @@ fn search(
                 asg.num_asserted_vars = asg.stack_len();
             }
         }
-        let na = asg.best_assigned(Flag::PHASE);
-        if num_assigned < na {
-            num_assigned = na;
-            state.flush("");
-            state.flush(format!("unreachable: {}", asg.num_vars - num_assigned));
-        }
         if !asg.remains() {
             if state.config.use_stabilize() && state.stabilize != rst.stabilizing() {
                 state.stabilize = !state.stabilize;
                 rst.handle(SolverEvent::Stabilize(state.stabilize));
+                // update `num_assigned` periodically, which isn't a monotonous increasing var.
+                num_assigned = asg.best_assigned(Flag::PHASE);
             }
             let lit = asg.select_decision_literal(&state.phase_select);
             asg.assign_by_decision(lit);
