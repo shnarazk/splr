@@ -722,7 +722,7 @@ impl Instantiate for Restarter {
     }
 }
 
-/// Type for the Result of `restart`.
+/// Type for the result of `restart`.
 pub enum RestartReason {
     /// We should block restart because we are on a good path which has generated small learnt clauses.
     DontForGoodClauses,
