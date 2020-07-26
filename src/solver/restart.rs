@@ -818,6 +818,8 @@ impl Export<(usize, usize), RestartMode> for Restarter {
 impl<'a> ExportBox<'a, (&'a Ema2, &'a Ema2, &'a Ema2, &'a Ema2)> for Restarter {
     fn exports_box(&'a self) -> Box<(&'a Ema2, &'a Ema2, &'a Ema2, &'a Ema2)> {
         Box::from((&self.asg.ema, &self.lbd.ema, &self.mld.ema, &self.mva.ema))
+        // Note: `Box` is not required to export them. You can use a tuple as well.
+        // (&self.asg.ema, &self.lbd.ema, &self.mld.ema, &self.mva.ema)
     }
 }
 
