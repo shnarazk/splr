@@ -2,7 +2,7 @@
 
 - massive changes on the default parameters about restart
 - compute LBD of permanent clauses correctly
-- restart condition was revised as a multi-armed bandid problem
+- restart condition was revised based on both of the expected usability and relevancy of recent learnt clauses
 - implement clause vivification
 - add `ClauseDB::bin_watcher`
 - delete `Watch::binary`
