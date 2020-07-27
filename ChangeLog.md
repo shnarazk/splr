@@ -4,6 +4,7 @@
 - compute LBD of permanent clauses correctly
 - restart condition was revised based on both of the expected usability and relevancy of recent learnt clauses
 - implement clause vivification
+- check the identical binary clause before register a new bin-clause
 - add `ClauseDB::bin_watcher`
 - delete `Watch::binary`
 - `ClauseDB::new_clause` takes `&mut Vec<Lit>` instead of `&mut [Lit]`
