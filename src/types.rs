@@ -110,7 +110,7 @@ pub type DecisionLevel = u32;
 /// assert_eq!( 2i32, Lit::from( 2i32).into());
 /// assert_eq!(-2i32, Lit::from(-2i32).into());
 /// ```
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
 pub struct Lit {
     /// literal encoded into folded u32
     ordinal: u32,
