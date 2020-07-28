@@ -740,6 +740,8 @@ impl RestartIF for Restarter {
         self.stb.is_active()
     }
     fn restart(&mut self) -> Option<RestartReason> {
+        const LBD_TORELANCE: f64 = 0.4;
+        const STABILIZATION_BOOST: f64 = 2.0;
         if self.luby.is_active() {
             self.luby.shift();
             self.after_restart = 0;
@@ -749,7 +751,11 @@ impl RestartIF for Restarter {
             return None;
         }
         self.mva.shift();
-        let k = if self.stb.is_active() { 1.0 } else { 0.6 }; // best 0.5, bad 0.4, 0.8
+        let k = if self.stb.is_active() {
+            STABILIZATION_BOOST * LBD_TORELANCE
+        } else {
+            LBD_TORELANCE
+        };
         let margin = self.stb.num_active as f64 * k + self.mld.threshold;
         let good_path = self.lbd.get() < self.mld.get() + margin;
         if self.stb.is_active() {
