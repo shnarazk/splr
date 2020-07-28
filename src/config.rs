@@ -200,8 +200,8 @@ pub struct Config {
     #[cfg_attr(feature = "structopt", structopt(long = "rlt", default_value = "1.20"))]
     pub rst_lbd_thr: f64,
 
-    /// clause usability step
-    #[cfg_attr(feature = "structopt", structopt(long = "rus", default_value = "0.50"))]
+    /// Used Max LBD expand step
+    #[cfg_attr(feature = "structopt", structopt(long = "rus", default_value = "0.60"))]
     pub rst_mld_stp: f64,
 
     /// Used Max LBD thresholda
