@@ -97,14 +97,14 @@ pub struct Config {
     //
     /// Soft limit of #clauses (6MC/GB)
     #[cfg_attr(feature = "structopt", structopt(long = "cl", default_value = "0"))]
-    pub clause_limit: usize,
+    pub meta_cls_lim: usize,
 
     //
     //## inprocessor
     //
     /// #cls to start in-processor
     #[cfg_attr(feature = "structopt", structopt(long = "ii", default_value = "25000"))]
-    pub ip_interval: usize,
+    pub meta_ip_int: usize,
 
     //
     //## eliminator
@@ -134,7 +134,7 @@ pub struct Config {
 
     /// Vivif. interval
     #[cfg_attr(feature = "structopt", structopt(long = "vii", default_value = "4"))]
-    pub viv_interval: usize,
+    pub viv_int: usize,
 
     /// #reduction for next vivif.
     #[cfg_attr(feature = "structopt", structopt(long = "vis", default_value = "2.0"))]
@@ -204,22 +204,22 @@ pub struct Config {
     #[cfg_attr(feature = "structopt", structopt(long = "rus", default_value = "0.50"))]
     pub rst_mld_stp: f64,
 
-    /// Usability to restart
+    /// Used Max LBD thresholda
     #[cfg_attr(feature = "structopt", structopt(long = "rut", default_value = "4.00"))]
     pub rst_mld_thr: f64,
 
     /// Stabilizer scaling
-    #[cfg_attr(feature = "structopt", structopt(long = "rss", default_value = "2.0"))]
-    pub rst_stb_scl: f64,
+    #[cfg_attr(feature = "structopt", structopt(long = "ss", default_value = "2.0"))]
+    pub meta_stb_scl: f64,
 
     //
     //## var rewarding
     //
-    /// Initial var reward decay
+    /// Var reward initial decay
     #[cfg_attr(feature = "structopt", structopt(long = "vri", default_value = "0.75"))]
     pub vrw_dcy_beg: f64,
 
-    /// Maximum var reward decay
+    /// Var reward maximum decay
     #[cfg_attr(feature = "structopt", structopt(long = "vrm", default_value = "0.98"))]
     pub vrw_dcy_end: f64,
 
@@ -227,8 +227,8 @@ pub struct Config {
     //## solver configuration
     //
     /// Dec. lvl to use chronoBT
-    #[cfg_attr(feature = "structopt", structopt(long = "cbt", default_value = "100"))]
-    pub cbt_thr: DecisionLevel,
+    #[cfg_attr(feature = "structopt", structopt(long = "ct", default_value = "100"))]
+    pub meta_cbt_thr: DecisionLevel,
 
     /// CPU time limit in sec.
     #[cfg_attr(
@@ -261,16 +261,16 @@ impl Default for Config {
             no_color: true,
             quiet_mode: true,
             use_log: false,
-            clause_limit: 0,
+            meta_cls_lim: 0,
 
-            ip_interval: 40000,
+            meta_ip_int: 40000,
             elim_cls_lim: 32,
             elim_var_occ: 8192,
             elim_grw_lim: 0,
 
             viv_beg: 1.0,
             viv_end: 2.0,
-            viv_interval: 8,
+            viv_int: 8,
             viv_scale: 2.0,
 
             rst_step: 32,
@@ -289,10 +289,10 @@ impl Default for Config {
             rst_lbd_thr: 1.20,
             rst_mld_stp: 0.50,
             rst_mld_thr: 4.00,
-            rst_stb_scl: 2.0,
+            meta_stb_scl: 2.0,
             vrw_dcy_beg: 0.10,
             vrw_dcy_end: 0.97,
-            cbt_thr: 100,
+            meta_cbt_thr: 100,
             io_tout: 5000.0,
             use_certification: false,
         }
