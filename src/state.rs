@@ -286,7 +286,7 @@ impl Instantiate for State {
             },
             vivify_thr: config.viv_beg,
             target: cnf.clone(),
-            time_limit: config.timeout,
+            time_limit: config.io_tout,
             ..State::default()
         }
     }
@@ -438,18 +438,9 @@ impl StateIF for State {
         self.strategy.0 = match () {
             _ if cdb_num_bi_learnt + 20_000 < cdb_num_lbd2 => SearchStrategy::ManyGlues,
             _ if self[Stat::Decision] as f64 <= 1.2 * asg_num_conflict as f64 => {
-                // panic!("LowDecisions: decision:{} <= 1.2 * conflict:{}",
-                //        self[Stat::Decision],
-                //        asg_num_conflict,
-                // );
                 SearchStrategy::LowDecisions
             }
-            _ if self[Stat::NoDecisionConflict] < 15_000 => {
-                // panic!("LowSuccessive: noDecisionConflict:{} <= 30_000",
-                //        self[Stat::NoDecisionConflict],
-                // );
-                SearchStrategy::LowSuccessive
-            }
+            _ if self[Stat::NoDecisionConflict] < 15_000 => SearchStrategy::LowSuccessive,
             _ if 54_400 < self[Stat::NoDecisionConflict] => SearchStrategy::HighSuccessive,
             _ => SearchStrategy::Generic,
         };

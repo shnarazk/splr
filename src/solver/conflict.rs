@@ -227,7 +227,7 @@ pub fn handle_conflict(
         }
     }
     cdb.scale_activity();
-    if 0 < state.config.dump_int && num_conflict % state.config.dump_int == 0 {
+    if 0 < state.config.io_stat_dmp && num_conflict % state.config.io_stat_dmp == 0 {
         let (rst_num_block, _) = rst.exports();
         let (rst_asg, rst_lbd, _rst_mld, _rst_mva) = *rst.exports_box();
         state.development.push((

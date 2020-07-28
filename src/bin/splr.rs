@@ -52,15 +52,15 @@ fn main() {
         return;
     }
     let cnf_file = config.cnf_file.to_string_lossy();
-    let ans_file: Option<PathBuf> = match config.result_file.to_string_lossy().as_ref() {
+    let ans_file: Option<PathBuf> = match config.io_rfile.to_string_lossy().as_ref() {
         "-" => None,
-        "" => Some(config.output_dir.join(PathBuf::from(format!(
+        "" => Some(config.io_odir.join(PathBuf::from(format!(
             ".ans_{}",
             config.cnf_file.file_name().unwrap().to_string_lossy(),
         )))),
-        _ => Some(config.output_dir.join(&config.result_file)),
+        _ => Some(config.io_odir.join(&config.io_rfile)),
     };
-    if config.proof_file.to_string_lossy() != "proof.out" && !config.use_certification {
+    if config.io_pfile.to_string_lossy() != "proof.out" && !config.use_certification {
         println!("Abort: You set a proof filename with '--proof' explicitly, but didn't set '--certify'. It doesn't look good.");
         return;
     }
@@ -82,7 +82,7 @@ fn main() {
     let mut s = Solver::build(&config).expect("failed to load");
     let res = s.solve();
     save_result(&s, &res, &cnf_file, ans_file);
-    if 0 < s.state.config.dump_int && !s.state.development.is_empty() {
+    if 0 < s.state.config.io_stat_dmp && !s.state.development.is_empty() {
         let dump = config.cnf_file.file_stem().unwrap().to_str().unwrap();
         if let Ok(f) = File::create(format!("stat_{}.csv", dump)) {
             let mut buf = BufWriter::new(f);
@@ -171,12 +171,11 @@ fn save_result<S: AsRef<str> + std::fmt::Display>(
                 _ => (),
             }
             if s.state.config.use_certification {
-                let proof_file: PathBuf =
-                    s.state.config.output_dir.join(&s.state.config.proof_file);
+                let proof_file: PathBuf = s.state.config.io_odir.join(&s.state.config.io_pfile);
                 save_proof(&s, &input, &proof_file);
                 println!(
                     " Certificate|file: {}",
-                    s.state.config.proof_file.to_string_lossy()
+                    s.state.config.io_pfile.to_string_lossy()
                 );
             }
             println!(

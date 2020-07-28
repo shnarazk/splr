@@ -658,6 +658,7 @@ pub struct Restarter {
     luby: LubySeries,
     stb: GeometricStabilizer,
     after_restart: usize,
+    mld_step: f64,
     restart_step: usize,
     initial_restart_step: usize,
 
@@ -681,6 +682,7 @@ impl Default for Restarter {
             luby: LubySeries::default(),
             stb: GeometricStabilizer::default(),
             after_restart: 0,
+            mld_step: 0.0,
             restart_step: 0,
             initial_restart_step: 0,
             num_block: 0,
@@ -701,6 +703,7 @@ impl Instantiate for Restarter {
             // clvl: ProgressLVL::instantiate(config, cnf),
             luby: LubySeries::instantiate(config, cnf),
             stb: GeometricStabilizer::instantiate(config, cnf),
+            mld_step: config.rst_mld_stp,
             restart_step: config.rst_step,
             initial_restart_step: config.rst_step,
             ..Restarter::default()
@@ -740,40 +743,43 @@ impl RestartIF for Restarter {
         self.stb.is_active()
     }
     fn restart(&mut self) -> Option<RestartReason> {
-        const LBD_TORELANCE: f64 = 0.4;
+        macro_rules! ret {
+            ($val: expr) => {
+                self.after_restart = 0;
+                return $val;
+            };
+            () => {
+                return None;
+            };
+        }
         const STABILIZATION_BOOST: f64 = 2.0;
         if self.luby.is_active() {
             self.luby.shift();
-            self.after_restart = 0;
-            return Some(RestartReason::GoForLubyRestart);
+            ret!(Some(RestartReason::GoForLubyRestart));
         }
         if self.after_restart < self.restart_step {
-            return None;
+            ret!();
         }
         self.mva.shift();
         let k = if self.stb.is_active() {
-            STABILIZATION_BOOST * LBD_TORELANCE
+            STABILIZATION_BOOST * self.mld_step
         } else {
-            LBD_TORELANCE
+            self.mld_step
         };
         let margin = self.stb.num_active as f64 * k + self.mld.threshold;
         let good_path = self.lbd.get() < self.mld.get() + margin;
         if self.stb.is_active() {
             if self.mva.is_active() && good_path {
-                self.after_restart = 0;
-                return Some(RestartReason::DontForHighlyRelevant);
+                ret!(Some(RestartReason::DontForHighlyRelevant));
             } else {
-                self.after_restart = 0;
-                return Some(RestartReason::GoWithStabilization);
+                ret!(Some(RestartReason::GoWithStabilization));
             }
         } else if self.asg.is_active() {
             self.num_block += 1;
-            self.after_restart = 0;
-            return Some(RestartReason::DontForGoodClauses);
+            ret!(Some(RestartReason::DontForGoodClauses));
         };
         if !good_path {
-            self.after_restart = 0;
-            return Some(RestartReason::GoForUselessClauses);
+            ret!(Some(RestartReason::GoForUselessClauses));
         }
         None
     }
