@@ -259,7 +259,7 @@ impl Instantiate for ProgressCMR {
     fn instantiate(config: &Config, _: &CNFDescription) -> Self {
         ProgressCMR {
             ema: Ema2::new(config.rst_lbd_len).with_slow(config.rst_lbd_slw),
-            threshold: config.rst_cva_thr,
+            threshold: config.rst_cmr_thr,
             ..ProgressCMR::default()
         }
     }

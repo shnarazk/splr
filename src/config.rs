@@ -183,7 +183,7 @@ pub struct Config {
 
     /// Correlation to cancel restart
     #[cfg_attr(feature = "structopt", structopt(long = "rct", default_value = "0.70"))]
-    pub rst_cva_thr: f64,
+    pub rst_cmr_thr: f64,
 
     /// Length of LBD fast EMA
     #[cfg_attr(feature = "structopt", structopt(long = "rll", default_value = "50"))]
@@ -204,11 +204,11 @@ pub struct Config {
     #[cfg_attr(feature = "structopt", structopt(long = "ss", default_value = "2.0"))]
     pub meta_stb_scl: f64,
 
-    /// Used Max LBD expand step
-    #[cfg_attr(feature = "structopt", structopt(long = "rus", default_value = "0.60"))]
+    /// Max Used LBD expand step
+    #[cfg_attr(feature = "structopt", structopt(long = "rus", default_value = "0.52"))]
     pub rst_mul_stp: f64,
 
-    /// Used Max LBD threshold
+    /// Max Used LBD threshold
     #[cfg_attr(feature = "structopt", structopt(long = "rut", default_value = "4.00"))]
     pub rst_mul_thr: f64,
 
@@ -283,7 +283,7 @@ impl Default for Config {
             rst_asg_len: 50,
             rst_asg_slw: 10000,
             rst_asg_thr: 1.65,
-            rst_cva_thr: 0.78,
+            rst_cmr_thr: 0.78,
             rst_lbd_len: 50,
             rst_lbd_slw: 10000,
             rst_lbd_thr: 1.20,
