@@ -217,7 +217,7 @@ pub fn handle_conflict(
                 act = a;
             }
         }
-        rst.update(ProgressUpdate::MVA(act));
+        rst.update(ProgressUpdate::CMR(act));
 
         elim.to_simplify += 1.0 / (learnt_len - 1) as f64;
         if lbd <= 20 {
@@ -229,7 +229,7 @@ pub fn handle_conflict(
     cdb.scale_activity();
     if 0 < state.config.io_stat_dmp && num_conflict % state.config.io_stat_dmp == 0 {
         let (rst_num_block, _) = rst.exports();
-        let (rst_asg, rst_lbd, _rst_mld, _rst_mva) = *rst.exports_box();
+        let (rst_asg, _rst_cmr, rst_lbd, _rst_mld) = *rst.exports_box();
         state.development.push((
             num_conflict,
             (asg.num_asserted_vars + asg.num_eliminated_vars) as f64
@@ -430,7 +430,7 @@ fn conflict_analyze(
     debug_assert!(learnt.iter().all(|l| *l != !p));
     debug_assert_eq!(asg.level(p.vi()), dl);
     learnt[0] = !p;
-    rst.update(ProgressUpdate::MLD(largest_clause));
+    rst.update(ProgressUpdate::MUL(largest_clause));
     #[cfg(feature = "trace_analysis")]
     println!("- appending {}, the result is {:?}", learnt[0], learnt);
     state.minimize_learnt(asg, cdb)

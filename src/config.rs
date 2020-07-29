@@ -200,17 +200,17 @@ pub struct Config {
     #[cfg_attr(feature = "structopt", structopt(long = "rlt", default_value = "1.20"))]
     pub rst_lbd_thr: f64,
 
-    /// Used Max LBD expand step
-    #[cfg_attr(feature = "structopt", structopt(long = "rus", default_value = "0.60"))]
-    pub rst_mld_stp: f64,
-
-    /// Used Max LBD thresholda
-    #[cfg_attr(feature = "structopt", structopt(long = "rut", default_value = "4.00"))]
-    pub rst_mld_thr: f64,
-
     /// Stabilizer scaling
     #[cfg_attr(feature = "structopt", structopt(long = "ss", default_value = "2.0"))]
     pub meta_stb_scl: f64,
+
+    /// Used Max LBD expand step
+    #[cfg_attr(feature = "structopt", structopt(long = "rus", default_value = "0.60"))]
+    pub rst_mul_stp: f64,
+
+    /// Used Max LBD threshold
+    #[cfg_attr(feature = "structopt", structopt(long = "rut", default_value = "4.00"))]
+    pub rst_mul_thr: f64,
 
     //
     //## var rewarding
@@ -287,8 +287,8 @@ impl Default for Config {
             rst_lbd_len: 50,
             rst_lbd_slw: 10000,
             rst_lbd_thr: 1.20,
-            rst_mld_stp: 0.50,
-            rst_mld_thr: 4.00,
+            rst_mul_stp: 0.50,
+            rst_mul_thr: 4.00,
             meta_stb_scl: 2.0,
             vrw_dcy_beg: 0.10,
             vrw_dcy_end: 0.97,

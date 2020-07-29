@@ -510,7 +510,7 @@ impl StateIF for State {
         let rst_mode = rst.active_mode();
 
         let (rst_num_blk, rst_num_stb) = rst.exports();
-        let (rst_asg, rst_lbd, rst_mld, rst_mva) = *rst.exports_box();
+        let (rst_asg, rst_cmr, rst_lbd, rst_mul) = *rst.exports_box();
 
         if self.config.use_log {
             self.dump(asg, cdb, rst);
@@ -574,11 +574,11 @@ impl StateIF for State {
             im!("{:>9}", self, LogUsizeId::Stabilize, rst_num_stb),
         );
         println!(
-            "\x1B[2K         EMA|tLBD:{}, tASG:{}, eMLD:{}, eMVA:{} ",
+            "\x1B[2K         EMA|tLBD:{}, tASG:{}, eMUL:{}, eCMR:{} ",
             fm!("{:>9.4}", self, LogF64Id::TrendLBD, rst_lbd.trend()),
             fm!("{:>9.4}", self, LogF64Id::TrendASG, rst_asg.trend()),
-            fm!("{:>9.4}", self, LogF64Id::EmaMLD, rst_mld.get()),
-            fm!("{:>9.4}", self, LogF64Id::EmaMVA, rst_mva.get()),
+            fm!("{:>9.4}", self, LogF64Id::EmaMUL, rst_mul.get()),
+            fm!("{:>9.4}", self, LogF64Id::EmaCMR, rst_cmr.get()),
         );
         println!(
             "\x1B[2K    Conflict|eLBD:{}, cnfl:{}, bjmp:{}, /ppc:{} ",
@@ -801,7 +801,7 @@ impl State {
             _num_reduction,
         ) = cdb.exports();
         let (rst_num_block, _) = rst.exports();
-        let (rst_asg, rst_lbd, _, _) = *rst.exports_box();
+        let (rst_asg, _, rst_lbd, _) = *rst.exports_box();
         println!(
             "{:>3}#{:>8},{:>7},{:>7},{:>7},{:>6.3},,{:>7},{:>7},\
              {:>7},,{:>5},{:>5},{:>6.2},{:>6.2},,{:>7.2},{:>8.2},{:>8.2},,\
@@ -854,13 +854,13 @@ pub enum LogUsizeId {
 pub enum LogF64Id {
     Progress = 0,
     EmaASG,
+    EmaCMR,
     EmaLBD,
-    EmaMLD,
-    EmaMVA,
+    EmaMUL,
     TrendASG,
+    TrendCMR,
     TrendLBD,
-    TrendMLD,
-    TrendMVA,
+    TrendMUL,
     BLevel,
     CLevel,
     ConflictPerRestart,
