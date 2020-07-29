@@ -205,15 +205,15 @@ pub struct Config {
     pub meta_stb_scl: f64,
 
     /// MUL stabilization boost
-    #[cfg_attr(feature = "structopt", structopt(long = "rus", default_value = "2.00"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "rmb", default_value = "2.00"))]
     pub rst_mul_sb: f64,
 
     /// Max Used LBD expand step
-    #[cfg_attr(feature = "structopt", structopt(long = "rus", default_value = "0.50"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "rms", default_value = "0.50"))]
     pub rst_mul_stp: f64,
 
     /// Max Used LBD threshold
-    #[cfg_attr(feature = "structopt", structopt(long = "rut", default_value = "4.00"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "rmt", default_value = "4.00"))]
     pub rst_mul_thr: f64,
 
     //
