@@ -661,6 +661,7 @@ pub struct Restarter {
     after_restart: usize,
     initial_restart_step: usize,
     restart_step: usize,
+    mul_stb_bst: f64,
     mul_step: f64,
 
     //
@@ -685,6 +686,7 @@ impl Default for Restarter {
             after_restart: 0,
             initial_restart_step: 0,
             restart_step: 0,
+            mul_stb_bst: 2.0,
             mul_step: 0.0,
             num_block: 0,
         }
@@ -706,6 +708,7 @@ impl Instantiate for Restarter {
             stb: GeometricStabilizer::instantiate(config, cnf),
             initial_restart_step: config.rst_step,
             restart_step: config.rst_step,
+            mul_stb_bst: config.rst_mul_sb,
             mul_step: config.rst_mul_stp,
             ..Restarter::default()
         }
@@ -753,7 +756,6 @@ impl RestartIF for Restarter {
                 return None;
             };
         }
-        const STABILIZATION_BOOST: f64 = 2.0;
         if self.luby.is_active() {
             self.luby.shift();
             ret!(Some(RestartReason::GoForLubyRestart));
@@ -763,7 +765,7 @@ impl RestartIF for Restarter {
         }
         self.cmr.shift();
         let k = if self.stb.is_active() {
-            STABILIZATION_BOOST * self.mul_step
+            self.mul_stb_bst * self.mul_step
         } else {
             self.mul_step
         };
