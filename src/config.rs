@@ -11,53 +11,53 @@ pub struct Config {
     //
     //## Activation switches
     //
-    /// Strategy adaptation switch ....
+    /// Strategy adaptation switch     .
     #[cfg_attr(feature = "structopt", structopt(long = "ADP", default_value = "1"))]
     a_adaptive: i32,
 
-    /// Eliminator switch .............
+    /// Eliminator switch              .
     #[cfg_attr(feature = "structopt", structopt(long = "ELI", default_value = "1"))]
     a_elim: i32,
 
-    /// Clause reduction switch .......
+    /// Clause reduction switch        .
     #[cfg_attr(feature = "structopt", structopt(long = "RDC", default_value = "1"))]
     a_reduce: i32,
 
-    /// Rephase switch ................
+    /// Rephase switch                 .
     #[cfg_attr(feature = "structopt", structopt(long = "RPH", default_value = "1"))]
     a_rephase: i32,
 
-    /// Reason-Side Rewarding switch ..
+    /// Reason-Side Rewarding switch   .
     #[cfg_attr(feature = "structopt", structopt(long = "RSR", default_value = "1"))]
     a_rsr: i32,
 
-    /// Stabilization switch ..........
+    /// Stabilization switch           .
     #[cfg_attr(feature = "structopt", structopt(long = "STB", default_value = "1"))]
     a_stabilize: i32,
 
-    /// Vivification switch ...........
+    /// Vivification switch            .
     #[cfg_attr(feature = "structopt", structopt(long = "VIV", default_value = "1"))]
     a_vivify: i32,
 
     //
     //## I/O configuration
     //
-    /// Build Splr interface ..........
+    /// Build Splr interface          .
     #[cfg_attr(feature = "structopt", structopt(skip))]
     pub splr_interface: bool,
 
-    /// DIMACS CNF filename ...........
+    /// DIMACS CNF filename           .
     #[cfg_attr(feature = "structopt", structopt(parse(from_os_str)))]
     pub cnf_file: PathBuf,
 
-    /// Output directory ..............
+    /// Output directory               .
     #[cfg_attr(
         feature = "structopt",
         structopt(long = "dir", short = "o", default_value = ".", parse(from_os_str))
     )]
     pub io_odir: PathBuf,
 
-    /// DRAT Cert. filename ...
+    /// DRAT Cert. filename    .
     #[cfg_attr(
         feature = "structopt",
         structopt(
@@ -69,7 +69,7 @@ pub struct Config {
     )]
     pub io_pfile: PathBuf,
 
-    /// Result filename/stdout .........
+    /// Result filename/stdout          .
     #[cfg_attr(
         feature = "structopt",
         structopt(long = "result", short = "r", default_value = "", parse(from_os_str))
@@ -80,11 +80,11 @@ pub struct Config {
     #[cfg_attr(feature = "structopt", structopt(long = "stat", default_value = "0"))]
     pub io_stat_dmp: usize,
 
-    /// Disable coloring ..............
+    /// Disable coloring              .
     #[cfg_attr(feature = "structopt", structopt(long = "no-color", short = "C"))]
     pub no_color: bool,
 
-    /// Disable any progress message ..
+    /// Disable any progress message  .
     #[cfg_attr(feature = "structopt", structopt(long = "quiet", short = "q"))]
     pub quiet_mode: bool,
 
@@ -109,22 +109,22 @@ pub struct Config {
     //
     //## eliminator
     //
-    /// Max #lit for clause subsume ..
+    /// Max #lit for clause subsume   .
     #[cfg_attr(feature = "structopt", structopt(long = "ecl", default_value = "32"))]
     pub elim_cls_lim: usize,
-
-    /// Max #cls for var elimination
-    #[cfg_attr(feature = "structopt", structopt(long = "evo", default_value = "8192"))]
-    pub elim_var_occ: usize,
 
     /// Grow limit of #cls in var elim .
     #[cfg_attr(feature = "structopt", structopt(long = "evl", default_value = "0"))]
     pub elim_grw_lim: usize,
 
+    /// Max #cls for var elimination
+    #[cfg_attr(feature = "structopt", structopt(long = "evo", default_value = "8192"))]
+    pub elim_var_occ: usize,
+
     //
     //## restarter
     //
-    /// #conflicts between restarts ..
+    /// #conflicts between restarts   .
     #[cfg_attr(feature = "structopt", structopt(long = "rs", default_value = "50"))]
     pub rst_step: usize,
 
@@ -147,7 +147,7 @@ pub struct Config {
         // long = "rbt", default_value = "2000"
         pub rst_bkt_thr: usize,
     */
-    /// Length of assign. fast EMA ...
+    /// Length of assign. fast EMA    .
     #[cfg_attr(feature = "structopt", structopt(long = "ral", default_value = "50"))]
     pub rst_asg_len: usize,
 
@@ -158,7 +158,7 @@ pub struct Config {
     )]
     pub rst_asg_slw: usize,
 
-    /// Blocking restart threshold ..
+    /// Blocking restart threshold   .
     #[cfg_attr(feature = "structopt", structopt(long = "rat", default_value = "1.4"))]
     pub rst_asg_thr: f64, // Glucose's R
 
@@ -166,11 +166,11 @@ pub struct Config {
     #[cfg_attr(feature = "structopt", structopt(long = "rct", default_value = "0.7"))]
     pub rst_cmr_thr: f64,
 
-    /// Length of LBD fast EMA .......
+    /// Length of LBD fast EMA        .
     #[cfg_attr(feature = "structopt", structopt(long = "rll", default_value = "50"))]
     pub rst_lbd_len: usize,
 
-    /// Length of LBD slow EMA ....
+    /// Length of LBD slow EMA     .
     #[cfg_attr(
         feature = "structopt",
         structopt(long = "rls", default_value = "10000")
@@ -181,63 +181,63 @@ pub struct Config {
     #[cfg_attr(feature = "structopt", structopt(skip))] // long = "rlt", default_value = "1.2"
     pub rst_lbd_thr: f64,
 
-    /// MUL stabilization boost .....
+    /// MUL stabilization boost      .
     #[cfg_attr(feature = "structopt", structopt(long = "rmb", default_value = "2.0"))]
     pub rst_mul_sb: f64,
 
-    /// Max Used LBD expand step ....
+    /// Max Used LBD expand step     .
     #[cfg_attr(feature = "structopt", structopt(long = "rms", default_value = "0.5"))]
     pub rst_mul_stp: f64,
 
-    /// Max Used LBD threshold ......
+    /// Max Used LBD threshold       .
     #[cfg_attr(feature = "structopt", structopt(long = "rmt", default_value = "4.0"))]
     pub rst_mul_thr: f64,
 
-    /// Stabilizer scaling ..........
+    /// Stabilizer scaling           .
     #[cfg_attr(feature = "structopt", structopt(long = "ss", default_value = "2.0"))]
     pub meta_stb_scl: f64,
 
     //
     //## vivifier
     //
-    /// Lower bound of vivif. loop ..
+    /// Lower bound of vivif. loop   .
     #[cfg_attr(feature = "structopt", structopt(long = "vib", default_value = "1.0"))]
     pub viv_beg: f64,
 
-    /// Upper bound of vivif. loop ..
+    /// Upper bound of vivif. loop   .
     #[cfg_attr(feature = "structopt", structopt(long = "vie", default_value = "2.0"))]
     pub viv_end: f64,
 
-    /// Vivif. interval ...............
+    /// Vivif. interval                .
     #[cfg_attr(feature = "structopt", structopt(long = "vii", default_value = "4"))]
     pub viv_int: usize,
 
-    /// #reduction for next vivif. ..
+    /// #reduction for next vivif.   .
     #[cfg_attr(feature = "structopt", structopt(long = "vis", default_value = "2.0"))]
     pub viv_scale: f64,
 
     //
     //## var rewarding
     //
-    /// Var reward initial decay ...
+    /// Var reward initial decay    .
     #[cfg_attr(feature = "structopt", structopt(long = "vri", default_value = "0.75"))]
     pub vrw_dcy_beg: f64,
 
-    /// Var reward maximum decay ...
+    /// Var reward maximum decay    .
     #[cfg_attr(feature = "structopt", structopt(long = "vrm", default_value = "0.98"))]
     pub vrw_dcy_end: f64,
 
     //
     //## solver configuration
     //
-    /// Dec. lvl to use chronoBT ....
+    /// Dec. lvl to use chronoBT     .
     #[cfg_attr(feature = "structopt", structopt(long = "ct", default_value = "100"))]
     pub meta_cbt_thr: DecisionLevel,
 
-    /// CPU time limit in sec. ...
+    /// CPU time limit in sec.      .
     #[cfg_attr(
         feature = "structopt",
-        structopt(long = "timeout", short = "t", default_value = "5000.0")
+        structopt(long = "timeout", short = "t", default_value = "5000")
     )]
     pub io_tout: f64,
 
