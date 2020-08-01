@@ -186,11 +186,11 @@ pub struct Config {
     pub rst_mul_sb: f64,
 
     /// Max Used LBD expand step    .
-    #[cfg_attr(feature = "structopt", structopt(long = "rms", default_value = "0.25"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "rms", default_value = "0.5"))]
     pub rst_mul_stp: f64,
 
     /// Max Used LBD threshold       .
-    #[cfg_attr(feature = "structopt", structopt(long = "rmt", default_value = "4.0"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "rmt", default_value = "2.5"))]
     pub rst_mul_thr: f64,
 
     /// Stabilizer scaling           .

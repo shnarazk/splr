@@ -668,6 +668,8 @@ pub struct Restarter {
     //## statistics
     //
     num_block: usize,
+    num_block_in_stabilizing: usize,
+    num_restart_in_stabilizing: usize,
 }
 
 impl Default for Restarter {
@@ -689,6 +691,8 @@ impl Default for Restarter {
             mul_stb_bst: 2.0,
             mul_step: 0.0,
             num_block: 0,
+            num_block_in_stabilizing: 0,
+            num_restart_in_stabilizing: 0,
         }
     }
 }
@@ -750,7 +754,7 @@ impl RestartIF for Restarter {
         macro_rules! ret {
             ($val: expr) => {
                 self.after_restart = 0;
-                return $val;
+                return Some($val);
             };
             () => {
                 return None;
@@ -758,7 +762,7 @@ impl RestartIF for Restarter {
         }
         if self.luby.is_active() {
             self.luby.shift();
-            ret!(Some(RestartReason::GoForLubyRestart));
+            ret!(RestartReason::GoForLubyRestart);
         }
         if self.after_restart < self.restart_step {
             ret!();
@@ -772,18 +776,44 @@ impl RestartIF for Restarter {
         let margin = self.stb.num_active as f64 * k + self.mul.threshold;
         let good_path = self.lbd.get() < self.mul.get() + margin;
         if self.stb.is_active() {
-            if self.cmr.is_active() && good_path {
-                ret!(Some(RestartReason::DontForHighlyRelevant));
-            } else {
-                ret!(Some(RestartReason::GoWithStabilization));
+            if self.cmr.is_active()
+            /* && good_path */
+            {
+                self.num_block += 1;
+                self.num_block_in_stabilizing += 1;
+                ret!(RestartReason::DontForHighlyRelevant);
+            } else if !good_path
+                && self.lbd.get() > self.mul.get().max(self.mul.ema.get_slow()) + margin
+            {
+                self.num_restart_in_stabilizing += 1;
+                ret!(RestartReason::GoWithStabilization);
             }
-        } else if self.asg.is_active() {
+        } else if
+        /* self.asg.is_active() || */
+        self.cmr.is_active() && good_path {
             self.num_block += 1;
-            ret!(Some(RestartReason::DontForGoodClauses));
+            ret!(RestartReason::DontForGoodClauses);
         };
         if !good_path {
-            ret!(Some(RestartReason::GoForUselessClauses));
+            if self.stb.is_active() {
+                // ret!(RestartReason::GoWithStabilization);
+            } else {
+                ret!(RestartReason::GoForUselessClauses);
+            }
         }
+        //        if self.stb.is_active() {
+        //            if self.cmr.is_active() && good_path {
+        //                ret!(RestartReason::DontForHighlyRelevant);
+        //            } else {
+        //                ret!(RestartReason::GoWithStabilization);
+        //            }
+        //        } else if self.asg.is_active() {
+        //            self.num_block += 1;
+        //            ret!(RestartReason::DontForGoodClauses);
+        //        };
+        //        if !good_path {
+        //            ret!(RestartReason::GoForUselessClauses);
+        //        }
         None
     }
     fn update(&mut self, kind: ProgressUpdate) {
@@ -803,10 +833,12 @@ impl RestartIF for Restarter {
     }
 }
 
-impl Export<(usize, usize), RestartMode> for Restarter {
+impl Export<(usize, usize, usize, usize), RestartMode> for Restarter {
     /// exports:
     ///  1. the number of blocking
-    ///  1. , the number of stabilzation
+    ///  1. the number of stabilzation
+    ///  1. the number of restarts in stabilzation mode
+    ///  1. the number of blocked restarts in stabilzation mode
     ///
     ///```
     /// use crate::splr::{config::Config, solver::Restarter, types::*};
@@ -814,8 +846,13 @@ impl Export<(usize, usize), RestartMode> for Restarter {
     /// let (num_block, num_stb) = rst.exports();
     ///```
     #[inline]
-    fn exports(&self) -> (usize, usize) {
-        (self.num_block, self.stb.num_active)
+    fn exports(&self) -> (usize, usize, usize, usize) {
+        (
+            self.num_block,
+            self.stb.num_active,
+            self.num_restart_in_stabilizing,
+            self.num_block_in_stabilizing,
+        )
     }
     fn active_mode(&self) -> RestartMode {
         if self.stb.is_active() {

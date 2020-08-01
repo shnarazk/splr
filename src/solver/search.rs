@@ -219,9 +219,7 @@ fn search(
                     RestartReason::GoForLubyRestart | RestartReason::GoForUselessClauses => {
                         asg.cancel_until(asg.root_level);
                     }
-                    RestartReason::DontForHighlyRelevant => {
-                        state[Stat::CancelRestart] += 1;
-                    }
+                    RestartReason::DontForHighlyRelevant => (),
                     RestartReason::GoWithStabilization => {
                         asg.cancel_until(asg.root_level);
                         asg.force_rephase();
