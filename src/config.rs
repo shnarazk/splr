@@ -182,7 +182,7 @@ pub struct Config {
     pub rst_lbd_thr: f64,
 
     /// MUL stabilization boost      .
-    #[cfg_attr(feature = "structopt", structopt(long = "rmb", default_value = "4.0"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "rmb", default_value = "2.0"))]
     pub rst_mul_sb: f64,
 
     /// Max Used LBD expand step    .
