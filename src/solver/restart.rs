@@ -669,6 +669,7 @@ pub struct Restarter {
     //
     num_block: usize,
     num_block_in_stabilizing: usize,
+    num_restart: usize,
     num_restart_in_stabilizing: usize,
 }
 
@@ -692,6 +693,7 @@ impl Default for Restarter {
             mul_step: 0.0,
             num_block: 0,
             num_block_in_stabilizing: 0,
+            num_restart: 0,
             num_restart_in_stabilizing: 0,
         }
     }
@@ -752,7 +754,7 @@ impl RestartIF for Restarter {
     }
     fn restart(&mut self) -> Option<RestartReason> {
         macro_rules! ret {
-            ($val: expr) => {
+            ($val: path) => {
                 self.after_restart = 0;
                 return Some($val);
             };
@@ -762,6 +764,7 @@ impl RestartIF for Restarter {
         }
         if self.luby.is_active() {
             self.luby.shift();
+            self.num_restart += 1;
             ret!(RestartReason::GoForLubyRestart);
         }
         if self.after_restart < self.restart_step {
@@ -773,47 +776,54 @@ impl RestartIF for Restarter {
         } else {
             self.mul_step
         };
+        let k_ = if self.stb.is_active() { 2.0 } else { 4.0 };
         let margin = self.stb.num_active as f64 * k + self.mul.threshold;
+        let margi_ = (self.num_restart as f64).log(4.0) * k + self.mul.threshold;
+        let marg__ = (self.num_restart as f64).log(k_) * self.mul.threshold;
         let good_path = self.lbd.get() < self.mul.get() + margin;
+        // if self.stb.is_active() {
+        //     if self.cmr.is_active()
+        //     /* && good_path */
+        //     {
+        //         self.num_block += 1;
+        //         self.num_block_in_stabilizing += 1;
+        //         ret!(RestartReason::DontForHighlyRelevant);
+        //     } else if !good_path
+        //         && self.lbd.get() > self.mul.get().max(self.mul.ema.get_slow()) + margin
+        //     {
+        //         self.num_restart_in_stabilizing += 1;
+        //         ret!(RestartReason::GoWithStabilization);
+        //     }
+        // } else if
+        // /* self.asg.is_active() || */
+        // self.cmr.is_active() && good_path {
+        //     self.num_block += 1;
+        //     ret!(RestartReason::DontForGoodClauses);
+        // };
+        // if !good_path {
+        //     if self.stb.is_active() {
+        //         // ret!(RestartReason::GoWithStabilization);
+        //     } else {
+        //         ret!(RestartReason::GoForUselessClauses);
+        //     }
+        // }
         if self.stb.is_active() {
-            if self.cmr.is_active()
-            /* && good_path */
-            {
+            if self.cmr.is_active() && good_path {
                 self.num_block += 1;
                 self.num_block_in_stabilizing += 1;
                 ret!(RestartReason::DontForHighlyRelevant);
-            } else if !good_path
-                && self.lbd.get() > self.mul.get().max(self.mul.ema.get_slow()) + margin
-            {
-                self.num_restart_in_stabilizing += 1;
+            } else {
+                self.num_restart += 1;
                 ret!(RestartReason::GoWithStabilization);
             }
-        } else if
-        /* self.asg.is_active() || */
-        self.cmr.is_active() && good_path {
+        } else if self.asg.is_active() {
             self.num_block += 1;
             ret!(RestartReason::DontForGoodClauses);
         };
         if !good_path {
-            if self.stb.is_active() {
-                // ret!(RestartReason::GoWithStabilization);
-            } else {
-                ret!(RestartReason::GoForUselessClauses);
-            }
+            self.num_restart += 1;
+            ret!(RestartReason::GoForUselessClauses);
         }
-        //        if self.stb.is_active() {
-        //            if self.cmr.is_active() && good_path {
-        //                ret!(RestartReason::DontForHighlyRelevant);
-        //            } else {
-        //                ret!(RestartReason::GoWithStabilization);
-        //            }
-        //        } else if self.asg.is_active() {
-        //            self.num_block += 1;
-        //            ret!(RestartReason::DontForGoodClauses);
-        //        };
-        //        if !good_path {
-        //            ret!(RestartReason::GoForUselessClauses);
-        //        }
         None
     }
     fn update(&mut self, kind: ProgressUpdate) {
