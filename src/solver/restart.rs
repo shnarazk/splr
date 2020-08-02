@@ -50,7 +50,7 @@ pub trait RestartIF {
     /// * `Some(true)` -- should restart
     /// * `Some(false)` -- should block restart
     /// * `None` -- it's not a good timing
-    fn restart(&mut self) -> Option<RestartReason>;
+    fn restart(&mut self) -> Option<RestartDecision>;
     /// update specific submodule
     fn update(&mut self, kind: ProgressUpdate);
 }
@@ -192,7 +192,7 @@ impl Default for ProgressMUL {
 impl Instantiate for ProgressMUL {
     fn instantiate(config: &Config, _: &CNFDescription) -> Self {
         ProgressMUL {
-            ema: Ema2::new(10 * config.rst_lbd_len).with_slow(config.rst_lbd_slw),
+            ema: Ema2::new(config.rst_lbd_len).with_slow(config.rst_lbd_slw),
             threshold: config.rst_mul_thr,
             ..ProgressMUL::default()
         }
@@ -282,7 +282,10 @@ impl EmaIF for ProgressCMR {
 impl ProgressEvaluator for ProgressCMR {
     // Smaller core, larger value
     fn is_active(&self) -> bool {
-        self.enable && self.threshold < self.correlation
+        self.enable // && self.threshold < self.correlation
+            // && self.threshold < self.ema.trend()
+            && self.ema.get_slow() + self.threshold < self.correlation
+        //            && self.ema.get_slow() < self.correlation
     }
     fn shift(&mut self) {
         if 0 < self.inc {
@@ -735,96 +738,118 @@ impl Instantiate for Restarter {
 }
 
 /// Type for the result of `restart`.
-pub enum RestartReason {
+pub enum RestartDecision {
     /// We should block restart because we are on a good path which has generated small learnt clauses.
-    DontForGoodClauses,
+    BlockForGoodClauses,
     /// We should block restart because we are facing a strongly related conflicting core.
-    DontForHighlyRelevant,
+    BlockForHighlyRelevant,
     /// We should restart now because we use Luby.
-    GoForLubyRestart,
+    ForceForLubyRestart,
     /// We should restart now because recent learnt clauses have hardly possibilities to be used.
-    GoForUselessClauses,
+    ForceForUselessClauses,
     /// We should restart now and then stabilize due to 'divergent' learnt clauses
-    GoWithStabilization,
+    ForceWithStabilization,
 }
 
 impl RestartIF for Restarter {
     fn stabilizing(&self) -> bool {
         self.stb.is_active()
     }
-    fn restart(&mut self) -> Option<RestartReason> {
+    fn restart(&mut self) -> Option<RestartDecision> {
         macro_rules! ret {
-            ($val: path) => {
+            (RestartDecision::BlockForGoodClauses) => {
                 self.after_restart = 0;
-                return Some($val);
+                self.num_block += 1;
+                return Some(RestartDecision::BlockForGoodClauses);
+            };
+            (RestartDecision::BlockForHighlyRelevant) => {
+                self.after_restart = 0;
+                self.num_block += 1;
+                self.num_block_in_stabilizing += 1;
+                return Some(RestartDecision::BlockForHighlyRelevant);
+            };
+            (RestartDecision::ForceForLubyRestart) => {
+                self.luby.shift();
+                self.num_restart += 1;
+                return Some(RestartDecision::ForceForLubyRestart);
+            };
+            (RestartDecision::ForceForUselessClauses) => {
+                self.after_restart = 0;
+                self.num_restart += 1;
+                return Some(RestartDecision::ForceForUselessClauses);
+            };
+            (RestartDecision::ForceWithStabilization) => {
+                self.after_restart = 0;
+                self.num_restart += 1;
+                self.num_restart_in_stabilizing += 1;
+                return Some(RestartDecision::ForceWithStabilization);
             };
             () => {
                 return None;
             };
         }
         if self.luby.is_active() {
-            self.luby.shift();
-            self.num_restart += 1;
-            ret!(RestartReason::GoForLubyRestart);
+            ret!(RestartDecision::ForceForLubyRestart);
         }
         if self.after_restart < self.restart_step {
             ret!();
         }
         self.cmr.shift();
-        let k = if self.stb.is_active() {
-            self.mul_stb_bst * self.mul_step
-        } else {
-            self.mul_step
-        };
-        let k_ = if self.stb.is_active() { 2.0 } else { 4.0 };
-        let margin = self.stb.num_active as f64 * k + self.mul.threshold;
-        let margi_ = (self.num_restart as f64).log(4.0) * k + self.mul.threshold;
-        let marg__ = (self.num_restart as f64).log(k_) * self.mul.threshold;
-        let good_path = self.lbd.get() < self.mul.get() + margin;
+        // let _k = if self.stb.is_active() {
+        //     self.mul_stb_bst * self.mul_step
+        // } else {
+        //     self.mul_step
+        // };
+        // let _k = if self.stb.is_active() { 2.0 } else { 4.0 };
+        // let used_s = self.mul.ema.get_slow();
+        // let recent = self.lbd.get();
+        // let _argin = self.stb.num_active as f64 * k + self.mul.threshold;
+        // let margin = self.mul.threshold * self.cmr.get();
+        // let _good_path = recent + margin < used_s;
+        let (mul_f, mul_s) = (self.mul.ema.get(), self.mul.ema.get_slow());
+        let recent = self.lbd.get() - self.mul.threshold;
+        if self.stb.is_active() && false {
+            // if self.cmr.is_active() /* && self.asg.is_active() */ {
+            // ret!(RestartDecision::BlockForHighlyRelevant);
+            // }
+            if mul_f.max(mul_s) < recent {
+                ret!(RestartDecision::ForceWithStabilization);
+            }
+            // if self.cmr.get() < 0.2 { // !self.cmr.is_active() && bad_path {
+            //     ret!(RestartDecision::ForceWithStabilization);
+            // }
+        }
+        if self.cmr.is_active() {
+            ret!(RestartDecision::BlockForGoodClauses);
+        }
+        if
+        /* !self.cmr.is_active() && */
+        mul_f.min(mul_s) < recent {
+            ret!(RestartDecision::ForceForUselessClauses);
+        }
+        None
         // if self.stb.is_active() {
         //     if self.cmr.is_active()
         //     /* && good_path */
         //     {
-        //         self.num_block += 1;
-        //         self.num_block_in_stabilizing += 1;
-        //         ret!(RestartReason::DontForHighlyRelevant);
+        //         ret!(RestartDecision::DontForHighlyRelevant);
         //     } else if !good_path
         //         && self.lbd.get() > self.mul.get().max(self.mul.ema.get_slow()) + margin
         //     {
-        //         self.num_restart_in_stabilizing += 1;
-        //         ret!(RestartReason::GoWithStabilization);
+        //         ret!(RestartDecision::ForceWithStabilization);
         //     }
         // } else if
         // /* self.asg.is_active() || */
         // self.cmr.is_active() && good_path {
-        //     self.num_block += 1;
-        //     ret!(RestartReason::DontForGoodClauses);
+        //     ret!(RestartDecision::DontForForceodClauses);
         // };
         // if !good_path {
         //     if self.stb.is_active() {
-        //         // ret!(RestartReason::GoWithStabilization);
+        //         // ret!(RestartDecision::ForceWithStabilization);
         //     } else {
-        //         ret!(RestartReason::GoForUselessClauses);
+        //         ret!(RestartDecision::ForceForUselessClauses);
         //     }
         // }
-        if self.stb.is_active() {
-            if self.cmr.is_active() && good_path {
-                self.num_block += 1;
-                self.num_block_in_stabilizing += 1;
-                ret!(RestartReason::DontForHighlyRelevant);
-            } else {
-                self.num_restart += 1;
-                ret!(RestartReason::GoWithStabilization);
-            }
-        } else if self.asg.is_active() {
-            self.num_block += 1;
-            ret!(RestartReason::DontForGoodClauses);
-        };
-        if !good_path {
-            self.num_restart += 1;
-            ret!(RestartReason::GoForUselessClauses);
-        }
-        None
     }
     fn update(&mut self, kind: ProgressUpdate) {
         match kind {

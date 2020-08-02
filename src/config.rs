@@ -125,7 +125,7 @@ pub struct Config {
     //## restarter
     //
     /// #conflicts between restarts   .
-    #[cfg_attr(feature = "structopt", structopt(long = "rs", default_value = "50"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "rs", default_value = "32"))]
     pub rst_step: usize,
 
     /*
@@ -148,7 +148,7 @@ pub struct Config {
         pub rst_bkt_thr: usize,
     */
     /// Length of assign. fast EMA    .
-    #[cfg_attr(feature = "structopt", structopt(long = "ral", default_value = "50"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "ral", default_value = "32"))]
     pub rst_asg_len: usize,
 
     /// Length of assign. slow EMA .
@@ -162,12 +162,12 @@ pub struct Config {
     #[cfg_attr(feature = "structopt", structopt(long = "rat", default_value = "1.4"))]
     pub rst_asg_thr: f64, // Glucose's R
 
-    /// Correlation to cancel restart
-    #[cfg_attr(feature = "structopt", structopt(long = "rct", default_value = "0.7"))]
+    /// Correlation to block restart .
+    #[cfg_attr(feature = "structopt", structopt(long = "rct", default_value = "0.2"))]
     pub rst_cmr_thr: f64,
 
     /// Length of LBD fast EMA        .
-    #[cfg_attr(feature = "structopt", structopt(long = "rll", default_value = "50"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "rll", default_value = "32"))]
     pub rst_lbd_len: usize,
 
     /// Length of LBD slow EMA     .
@@ -185,12 +185,12 @@ pub struct Config {
     #[cfg_attr(feature = "structopt", structopt(long = "rmb", default_value = "2.0"))]
     pub rst_mul_sb: f64,
 
-    /// Max Used LBD expand step    .
+    /// Max Used LBD expand step     .
     #[cfg_attr(feature = "structopt", structopt(long = "rms", default_value = "0.5"))]
     pub rst_mul_stp: f64,
 
     /// Max Used LBD threshold       .
-    #[cfg_attr(feature = "structopt", structopt(long = "rmt", default_value = "2.5"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "rmt", default_value = "2.0"))]
     pub rst_mul_thr: f64,
 
     /// Stabilizer scaling           .
