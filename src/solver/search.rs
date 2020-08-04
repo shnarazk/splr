@@ -215,17 +215,29 @@ fn search(
             handle_conflict(asg, cdb, elim, rst, state, ci)?;
             if let Some(decision) = rst.restart() {
                 match decision {
-                    RestartDecision::BlockForGoodClauses => (),
-                    RestartDecision::ForceForLubyRestart
-                    | RestartDecision::ForceForUselessClauses => {
+                    RestartDecision::Block | RestartDecision::BlockWithStabilization => (),
+                    RestartDecision::ForceByLuby | RestartDecision::Force => {
                         asg.cancel_until(asg.root_level);
                     }
-                    RestartDecision::BlockForHighlyRelevant => (),
+                    RestartDecision::ForceExplore => {
+                        asg.save_phases(true);
+                        asg.cancel_until(asg.root_level);
+                        asg.force_rephase();
+                    }
+                    RestartDecision::ForceExploit => {
+                        asg.save_phases(false);
+                        asg.cancel_until(asg.root_level);
+                        asg.force_rephase();
+                    }
                     RestartDecision::ForceWithStabilization => {
                         asg.cancel_until(asg.root_level);
                         asg.force_rephase();
                     }
                 }
+            } else if state.config.viv_int <= state.to_vivify
+                && state.config.meta_ip_int <= elim.to_simplify as usize
+            {
+                asg.cancel_until(asg.root_level);
             }
             if a_decision_was_made {
                 a_decision_was_made = false;

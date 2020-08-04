@@ -163,7 +163,7 @@ pub struct Config {
     pub rst_asg_thr: f64, // Glucose's R
 
     /// Correlation to block restart .
-    #[cfg_attr(feature = "structopt", structopt(long = "rct", default_value = "0.2"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "rct", default_value = "0.75"))]
     pub rst_cmr_thr: f64,
 
     /// Length of LBD fast EMA        .
@@ -190,7 +190,7 @@ pub struct Config {
     pub rst_mul_stp: f64,
 
     /// Max Used LBD threshold       .
-    #[cfg_attr(feature = "structopt", structopt(long = "rmt", default_value = "2.0"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "rmt", default_value = "1.25"))]
     pub rst_mul_thr: f64,
 
     /// Stabilizer scaling           .

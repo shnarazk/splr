@@ -24,8 +24,8 @@ pub trait VarSelectIF {
     fn force_rephase(&mut self);
     /// select a new decision variable.
     fn select_decision_literal(&mut self, phase: &PhaseMode) -> Lit;
-    /// save the current assignments to BEST_PHASE
-    fn save_phases(&mut self);
+    /// save the current assignments or their reverses to BEST_PHASE
+    fn save_phases(&mut self, flip: bool);
     /// update the internal heap on var order.
     fn update_order(&mut self, v: VarId);
     /// rebuild the internal var_order
@@ -114,12 +114,12 @@ impl VarSelectIF for AssignStack {
         };
         Lit::from_assign(vi, p)
     }
-    fn save_phases(&mut self) {
+    fn save_phases(&mut self, flip: bool) {
         for (vi, v) in self.var.iter_mut().enumerate().skip(1) {
             if !v.is(Flag::ELIMINATED) {
                 if let Some(b) = self.assign[vi] {
                     v.turn_on(Flag::REPHASE);
-                    v.set(Flag::BEST_PHASE, b);
+                    v.set(Flag::BEST_PHASE, b ^ flip);
                     continue;
                 }
                 v.turn_off(Flag::REPHASE);
