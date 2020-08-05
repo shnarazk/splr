@@ -213,20 +213,6 @@ fn search(
                 return Ok(false);
             }
             handle_conflict(asg, cdb, elim, rst, state, ci)?;
-            if let Some(decision) = rst.restart() {
-                match decision {
-                    RestartDecision::BlockForGoodClauses => (),
-                    RestartDecision::ForceForLubyRestart
-                    | RestartDecision::ForceForUselessClauses => {
-                        asg.cancel_until(asg.root_level);
-                    }
-                    RestartDecision::BlockForHighlyRelevant => (),
-                    RestartDecision::ForceWithStabilization => {
-                        asg.cancel_until(asg.root_level);
-                        asg.force_rephase();
-                    }
-                }
-            }
             if a_decision_was_made {
                 a_decision_was_made = false;
             } else {
@@ -248,6 +234,14 @@ fn search(
                     return Err(SolverError::UndescribedError);
                 }
             }
+        }
+        if let Some(RestartDecision::Force) = rst.restart() {
+            asg.cancel_until(asg.root_level);
+            if rst.stabilizing() {
+                asg.force_rephase();
+            }
+            #[cfg(feature = "temp_order")]
+            asg.force_select_iter(None);
         }
         // Simplification has been postponed because chronoBT was used.
         if asg.decision_level() == asg.root_level {

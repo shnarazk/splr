@@ -162,10 +162,9 @@ pub struct Config {
     #[cfg_attr(feature = "structopt", structopt(long = "rat", default_value = "1.4"))]
     pub rst_asg_thr: f64, // Glucose's R
 
-    /// Correlation to block restart .
-    #[cfg_attr(feature = "structopt", structopt(long = "rct", default_value = "0.2"))]
-    pub rst_cmr_thr: f64,
-
+    //    /// Correlation to block restart .
+    //    #[cfg_attr(feature = "structopt", structopt(long = "rct", default_value = "0.2"))]
+    //    pub rst_cmr_thr: f64,
     /// Length of LBD fast EMA        .
     #[cfg_attr(feature = "structopt", structopt(long = "rll", default_value = "32"))]
     pub rst_lbd_len: usize,
@@ -178,21 +177,20 @@ pub struct Config {
     pub rst_lbd_slw: usize,
 
     /// Forcing restart threshold
-    #[cfg_attr(feature = "structopt", structopt(skip))] // long = "rlt", default_value = "1.2"
+    #[cfg_attr(feature = "structopt", structopt(long = "rlt", default_value = "1.2"))]
     pub rst_lbd_thr: f64,
 
-    /// MUL stabilization boost      .
-    #[cfg_attr(feature = "structopt", structopt(long = "rmb", default_value = "2.0"))]
-    pub rst_mul_sb: f64,
-
-    /// Max Used LBD expand step     .
-    #[cfg_attr(feature = "structopt", structopt(long = "rms", default_value = "0.5"))]
-    pub rst_mul_stp: f64,
-
-    /// Max Used LBD threshold       .
-    #[cfg_attr(feature = "structopt", structopt(long = "rmt", default_value = "2.0"))]
-    pub rst_mul_thr: f64,
-
+    //    /// MUL stabilization boost      .
+    //    #[cfg_attr(feature = "structopt", structopt(long = "rmb", default_value = "2.0"))]
+    //    pub rst_mul_sb: f64,
+    //
+    //    /// Max Used LBD expand step     .
+    //    #[cfg_attr(feature = "structopt", structopt(long = "rms", default_value = "0.5"))]
+    //    pub rst_mul_stp: f64,
+    //
+    //    /// Max Used LBD threshold       .
+    //    #[cfg_attr(feature = "structopt", structopt(long = "rmt", default_value = "2.0"))]
+    //    pub rst_mul_thr: f64,
     /// Stabilizer scaling           .
     #[cfg_attr(feature = "structopt", structopt(long = "ss", default_value = "2.0"))]
     pub meta_stb_scl: f64,
@@ -287,13 +285,13 @@ impl Default for Config {
             rst_asg_len: 50,
             rst_asg_slw: 10000,
             rst_asg_thr: 1.65,
-            rst_cmr_thr: 0.78,
+            // rst_cmr_thr: 0.78,
             rst_lbd_len: 50,
             rst_lbd_slw: 10000,
             rst_lbd_thr: 1.20,
-            rst_mul_sb: 2.00,
-            rst_mul_stp: 0.50,
-            rst_mul_thr: 4.00,
+            // rst_mul_sb: 2.00,
+            // rst_mul_stp: 0.50,
+            // rst_mul_thr: 4.00,
             meta_stb_scl: 2.0,
             vrw_dcy_beg: 0.10,
             vrw_dcy_end: 0.97,
