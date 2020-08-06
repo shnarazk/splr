@@ -46,7 +46,7 @@ pub trait StateIF {
         C: Export<(usize, usize, usize, usize, usize, usize), ()>,
         E: Export<(usize, usize, f64), ()>,
         R: RestartIF
-            + Export<(usize, usize), RestartMode>
+            + Export<(usize, usize, usize, usize), RestartMode>
             + ExportBox<'r, (&'r Ema2, &'r Ema2, &'r Ema2, &'r Ema2)>;
     /// write a short message to stdout.
     fn flush<S: AsRef<str>>(&self, mes: S);
@@ -496,7 +496,7 @@ impl StateIF for State {
         C: Export<(usize, usize, usize, usize, usize, usize), ()>,
         E: Export<(usize, usize, f64), ()>,
         R: RestartIF
-            + Export<(usize, usize), RestartMode>
+            + Export<(usize, usize, usize, usize), RestartMode>
             + ExportBox<'r, (&'r Ema2, &'r Ema2, &'r Ema2, &'r Ema2)>,
     {
         if !self.config.splr_interface || self.config.quiet_mode {
@@ -518,7 +518,7 @@ impl StateIF for State {
 
         let rst_mode = rst.active_mode();
 
-        let (rst_num_blk, rst_num_stb) = rst.exports();
+        let (rst_num_blk, rst_num_stb, _, _) = rst.exports();
         let (rst_asg, rst_lbd, rst_mld, rst_mva) = *rst.exports_box();
 
         if self.config.use_log {
@@ -752,7 +752,7 @@ impl State {
     where
         A: AssignIF + Export<(usize, usize, usize, f64), ()>,
         C: Export<(usize, usize, usize, usize, usize, usize), ()>,
-        R: Export<(usize, usize), RestartMode>,
+        R: Export<(usize, usize, usize, usize), RestartMode>,
     {
         self.progress_cnt += 1;
         let (asg_num_vars, asg_num_asserted_vars, asg_num_eliminated_vars, asg_num_unasserted_vars) =
@@ -767,7 +767,7 @@ impl State {
             cdb_num_learnt,
             cdb_num_reduction,
         ) = cdb.exports();
-        let (rst_num_block, _) = rst.exports();
+        let rst_num_block = rst.exports().0;
         println!(
             "c | {:>8}  {:>8} {:>8} | {:>7} {:>8} {:>8} |  {:>4}  {:>8} {:>7} {:>8} | {:>6.3} % |",
             asg_num_restart,                           // restart
@@ -789,7 +789,7 @@ impl State {
         A: AssignIF + Export<(usize, usize, usize, f64), ()>,
         C: Export<(usize, usize, usize, usize, usize, usize), ()>,
         R: RestartIF
-            + Export<(usize, usize), RestartMode>
+            + Export<(usize, usize, usize, usize), RestartMode>
             + ExportBox<'r, (&'r Ema2, &'r Ema2, &'r Ema2, &'r Ema2)>,
     {
         self.progress_cnt += 1;
@@ -809,7 +809,7 @@ impl State {
             cdb_num_learnt,
             _num_reduction,
         ) = cdb.exports();
-        let (rst_num_block, _) = rst.exports();
+        let rst_num_block = rst.exports().0;
         let (rst_asg, rst_lbd, _, _) = *rst.exports_box();
         println!(
             "{:>3}#{:>8},{:>7},{:>7},{:>7},{:>6.3},,{:>7},{:>7},\

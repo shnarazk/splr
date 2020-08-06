@@ -181,6 +181,14 @@ pub struct Config {
     #[cfg_attr(feature = "structopt", structopt(long = "rlt", default_value = "1.20"))]
     pub rst_lbd_thr: f64,
 
+    /// MUL stabilization boost      .
+    #[cfg_attr(feature = "structopt", structopt(long = "rmb", default_value = "2.0"))]
+    pub rst_mul_sb: f64,
+
+    /// Max Used LBD expand step     .
+    #[cfg_attr(feature = "structopt", structopt(long = "rms", default_value = "0.5"))]
+    pub rst_mul_stp: f64,
+
     /// Usability to restart
     #[cfg_attr(feature = "structopt", structopt(long = "rut", default_value = "4.00"))]
     pub rst_mul_thr: f64,
@@ -273,6 +281,8 @@ impl Default for Config {
             rst_lbd_len: 50,
             rst_lbd_slw: 10000,
             rst_lbd_thr: 1.20,
+            rst_mul_sb: 2.0,
+            rst_mul_stp: 0.5,
             rst_mul_thr: 4.00,
             meta_stb_scl: 2.0,
             vrw_dcy_beg: 0.10,

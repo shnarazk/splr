@@ -735,16 +735,14 @@ impl Instantiate for Restarter {
 
 /// Type for the result of `restart`.
 pub enum RestartDecision {
-    /// We should block restart because we are on a good path which has generated small learnt clauses.
-    DontForGoodClauses,
-    /// We should block restart because we are facing a strongly related conflicting core.
-    DontForHighlyRelevant,
-    /// We should restart now because we use Luby.
-    GoForLubyRestart,
-    /// We should restart now because recent learnt clauses have hardly possibilities to be used.
-    GoForUselessClauses,
-    /// We should restart now and then stabilize due to 'divergent' learnt clauses
-    GoWithStabilization,
+    /// We should block restart
+    Block,
+    /// We should restart now
+    Force,
+    /// We should block in stablization mode
+    Cancel,
+    /// We should restart in stablization mode
+    Stabilize,
 }
 
 impl RestartIF for Restarter {
@@ -760,7 +758,7 @@ impl RestartIF for Restarter {
         }
         if self.luby.is_active() {
             self.luby.shift();
-            ret!(RestartDecision::GoForLubyRestart);
+            ret!(RestartDecision::Force);
         }
         if self.after_restart < self.restart_step {
             return None;
@@ -771,16 +769,21 @@ impl RestartIF for Restarter {
         let good_path = self.lbd.get() < self.mul.get() + margin;
         if self.stb.is_active() {
             if self.cmr.is_active() && good_path {
-                ret!(RestartDecision::DontForHighlyRelevant);
+                self.num_block += 1;
+                self.num_block_in_stabilizing += 1;
+                ret!(RestartDecision::Cancel);
             } else {
-                ret!(RestartDecision::GoWithStabilization);
+                self.num_restart += 1;
+                self.num_restart_in_stabilizing += 1;
+                ret!(RestartDecision::Stabilize);
             }
         } else if self.asg.is_active() {
             self.num_block += 1;
-            ret!(RestartDecision::DontForGoodClauses);
+            ret!(RestartDecision::Block);
         };
         if !good_path {
-            ret!(RestartDecision::GoForUselessClauses);
+            self.num_restart += 1;
+            ret!(RestartDecision::Force);
         }
         None
     }
@@ -838,6 +841,8 @@ impl Export<(usize, usize, usize, usize), RestartMode> for Restarter {
 impl<'a> ExportBox<'a, (&'a Ema2, &'a Ema2, &'a Ema2, &'a Ema2)> for Restarter {
     fn exports_box(&'a self) -> Box<(&'a Ema2, &'a Ema2, &'a Ema2, &'a Ema2)> {
         Box::from((&self.asg.ema, &self.lbd.ema, &self.mul.ema, &self.cmr.ema))
+        // Note: `Box` is not required to export them. You can use a tuple as well.
+        // (&self.asg.ema, &self.cmr.ema, &self.lbd.ema, &self.mul.ema)
     }
 }
 
