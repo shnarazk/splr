@@ -235,14 +235,27 @@ fn search(
                 }
             }
         }
-        if let Some(RestartDecision::Force) = rst.restart() {
-            asg.cancel_until(asg.root_level);
-            if rst.stabilizing() {
-                asg.force_rephase();
+        if let Some(decision) = rst.restart() {
+            match decision {
+                RestartDecision::Block => {}
+                RestartDecision::Cancel => {}
+                RestartDecision::Force => {
+                    asg.cancel_until(asg.root_level);
+                }
+                RestartDecision::Stabilize => {
+                    asg.cancel_until(asg.root_level);
+                    asg.force_rephase();
+                }
             }
-            #[cfg(feature = "temp_order")]
-            asg.force_select_iter(None);
         }
+        //        if let Some(RestartDecision::Force) = rst.restart() {
+        //            asg.cancel_until(asg.root_level);
+        //            if rst.stabilizing() {
+        //                asg.force_rephase();
+        //            }
+        //            #[cfg(feature = "temp_order")]
+        //            asg.force_select_iter(None);
+        //        }
         // Simplification has been postponed because chronoBT was used.
         if asg.decision_level() == asg.root_level {
             if state.config.viv_int <= state.to_vivify && state.config.use_vivify() {

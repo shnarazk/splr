@@ -22,10 +22,10 @@ trait ProgressEvaluator {
 pub enum ProgressUpdate {
     Counter(usize),
     ASG(usize),
-    // CMR(f64),
+    CMR(f64),
     LBD(u16),
     Luby,
-    // MUL(u16),
+    MUL(u16),
     Reset,
 }
 
@@ -167,7 +167,6 @@ impl ProgressEvaluator for ProgressLBD {
     fn shift(&mut self) {}
 }
 
-/*
 /// An EMA of Maximum Used LBD, used in conflict analyze
 #[derive(Debug)]
 struct ProgressMUL {
@@ -193,7 +192,7 @@ impl Default for ProgressMUL {
 impl Instantiate for ProgressMUL {
     fn instantiate(config: &Config, _: &CNFDescription) -> Self {
         ProgressMUL {
-            ema: Ema2::new(config.rst_lbd_len).with_slow(config.rst_lbd_slw),
+            ema: Ema2::new(10 * config.rst_lbd_len).with_slow(config.rst_lbd_slw),
             threshold: config.rst_mul_thr,
             ..ProgressMUL::default()
         }
@@ -221,9 +220,7 @@ impl ProgressEvaluator for ProgressMUL {
     }
     fn shift(&mut self) {}
 }
-*/
 
-/*
 /// An EMA of clause mutual relevancy CMR, used for forcing restart.
 #[derive(Debug)]
 struct ProgressCMR {
@@ -284,10 +281,7 @@ impl EmaIF for ProgressCMR {
 impl ProgressEvaluator for ProgressCMR {
     // Smaller core, larger value
     fn is_active(&self) -> bool {
-        self.enable // && self.threshold < self.correlation
-            // && self.threshold < self.ema.trend()
-            && self.ema.get_slow() + self.threshold < self.correlation
-        //            && self.ema.get_slow() < self.correlation
+        self.enable && self.threshold < self.correlation
     }
     fn shift(&mut self) {
         if 0 < self.inc {
@@ -300,7 +294,6 @@ impl ProgressEvaluator for ProgressCMR {
         }
     }
 }
- */
 
 /// An EMA of decision level.
 #[derive(Debug)]
@@ -657,8 +650,8 @@ pub struct Restarter {
     asg: ProgressASG,
     // bkt: ProgressBucket,
     lbd: ProgressLBD,
-    // cmr: ProgressCMR,
-    // mul: ProgressMUL,
+    cmr: ProgressCMR,
+    mul: ProgressMUL,
     // pub rcc: ProgressRCC,
     // pub blvl: ProgressLVL,
     // pub clvl: ProgressLVL,
@@ -667,8 +660,8 @@ pub struct Restarter {
     after_restart: usize,
     initial_restart_step: usize,
     restart_step: usize,
-    // mul_stb_bst: f64,
-    // mul_step: f64,
+    mul_stb_bst: f64,
+    mul_step: f64,
 
     //
     //## statistics
@@ -685,8 +678,8 @@ impl Default for Restarter {
             asg: ProgressASG::default(),
             // bkt: ProgressBucket::default(),
             lbd: ProgressLBD::default(),
-            // cmr: ProgressCMR::default(),
-            // mul: ProgressMUL::default(),
+            cmr: ProgressCMR::default(),
+            mul: ProgressMUL::default(),
             // rcc: ProgressRCC::default(),
             // blvl: ProgressLVL::default(),
             // clvl: ProgressLVL::default(),
@@ -695,8 +688,8 @@ impl Default for Restarter {
             after_restart: 0,
             initial_restart_step: 0,
             restart_step: 0,
-            // mul_stb_bst: 2.0,
-            // mul_step: 0.0,
+            mul_stb_bst: 2.0,
+            mul_step: 0.5,
             num_block: 0,
             num_block_in_stabilizing: 0,
             num_restart: 0,
@@ -711,8 +704,8 @@ impl Instantiate for Restarter {
             asg: ProgressASG::instantiate(config, cnf),
             // bkt: ProgressBucket::instantiate(config, cnf),
             lbd: ProgressLBD::instantiate(config, cnf),
-            // cmr: ProgressCMR::instantiate(config, cnf),
-            // mul: ProgressMUL::instantiate(config, cnf),
+            cmr: ProgressCMR::instantiate(config, cnf),
+            mul: ProgressMUL::instantiate(config, cnf),
             // rcc: ProgressRCC::instantiate(config, cnf),
             // blvl: ProgressLVL::instantiate(config, cnf),
             // clvl: ProgressLVL::instantiate(config, cnf),
@@ -720,8 +713,8 @@ impl Instantiate for Restarter {
             stb: GeometricStabilizer::instantiate(config, cnf),
             initial_restart_step: config.rst_step,
             restart_step: config.rst_step,
-            // mul_stb_bst: config.rst_mul_sb,
-            // mul_step: config.rst_mul_stp,
+            mul_stb_bst: config.rst_mul_sb,
+            mul_step: config.rst_mul_stp,
             ..Restarter::default()
         }
     }
@@ -746,33 +739,68 @@ pub enum RestartDecision {
     Block,
     /// We should restart now
     Force,
-}
-
-macro_rules! reset {
-    ($executor: expr) => {
-        $executor.after_restart = 0;
-        // if $executor.stb.is_active() {
-        //     $executor.num_block += 1;
-        //     $executor.num_stabilize += 1;
-        //     return false;
-        // }
-        return true;
-    };
+    /// We should block in stablization mode
+    Cancel,
+    /// We should restart in stablization mode
+    Stabilize,
 }
 
 impl RestartIF for Restarter {
     fn stabilizing(&self) -> bool {
         self.stb.is_active()
     }
+
     fn restart(&mut self) -> Option<RestartDecision> {
-        if self.block_restart() {
-            return Some(RestartDecision::Block);
+        macro_rules! ret {
+            ($decision: path) => {
+                self.after_restart = 0;
+                return Some($decision);
+            };
         }
-        if self.force_restart() {
-            return Some(RestartDecision::Force);
+        if self.luby.is_active() {
+            self.luby.shift();
+            ret!(RestartDecision::Force);
+        }
+        if self.after_restart < self.restart_step {
+            return None;
+        }
+        self.cmr.shift();
+        let k = if self.stb.is_active() {
+            self.mul_stb_bst * self.mul_step
+        } else {
+            self.mul_step
+        };
+        let margin = self.stb.num_active as f64 * k + self.mul.threshold;
+        let good_path = self.lbd.get() < self.mul.get() + margin;
+        if self.stb.is_active() {
+            if self.cmr.is_active() && good_path {
+                self.num_block += 1;
+                self.num_block_in_stabilizing += 1;
+                ret!(RestartDecision::Cancel);
+            } else {
+                self.num_restart += 1;
+                self.num_restart_in_stabilizing += 1;
+                ret!(RestartDecision::Stabilize);
+            }
+        } else if self.asg.is_active() {
+            self.num_block += 1;
+            ret!(RestartDecision::Block);
+        };
+        if !good_path {
+            self.num_restart += 1;
+            ret!(RestartDecision::Force);
         }
         None
     }
+    //    fn restart(&mut self) -> Option<RestartDecision> {
+    //        if self.block_restart() {
+    //            return Some(RestartDecision::Block);
+    //        }
+    //        if self.force_restart() {
+    //            return Some(RestartDecision::Force);
+    //        }
+    //        None
+    //    }
     fn update(&mut self, kind: ProgressUpdate) {
         match kind {
             ProgressUpdate::Counter(val) => {
@@ -783,48 +811,48 @@ impl RestartIF for Restarter {
             ProgressUpdate::ASG(val) => self.asg.update(val),
             ProgressUpdate::LBD(val) => self.lbd.update(val),
             ProgressUpdate::Luby => self.luby.update(0),
-            // ProgressUpdate::CMR(fval) => self.cmr.update(fval),
-            // ProgressUpdate::MUL(val) => self.mul.update(val),
+            ProgressUpdate::CMR(fval) => self.cmr.update(fval),
+            ProgressUpdate::MUL(val) => self.mul.update(val),
             ProgressUpdate::Reset => (),
         }
     }
 }
 
-impl Restarter {
-    /// return `true` if if blocking restart is needed.
-    fn block_restart(&mut self) -> bool {
-        // || self.bkt.enable
-        if self.after_restart < self.restart_step || self.luby.enable {
-            return false;
-        }
-        if self.asg.is_active() {
-            self.num_block += 1;
-            reset!(self);
-        }
-        false
-    }
-    /// return `true` if forcing restart is needed.
-    fn force_restart(&mut self) -> bool {
-        if self.luby.is_active() {
-            self.luby.shift();
-            reset!(self);
-        }
-        /*
-        if self.bkt.is_active() {
-            self.bkt.shift();
-            reset!(self);
-        }
-        */
-        if self.after_restart < self.restart_step {
-            return false;
-        }
-        if self.lbd.is_active() {
-            self.lbd.shift();
-            reset!(self);
-        }
-        false
-    }
-}
+//impl Restarter {
+//    /// return `true` if if blocking restart is needed.
+//    fn block_restart(&mut self) -> bool {
+//        // || self.bkt.enable
+//        if self.after_restart < self.restart_step || self.luby.enable {
+//            return false;
+//        }
+//        if self.asg.is_active() {
+//            self.num_block += 1;
+//            reset!(self);
+//        }
+//        false
+//    }
+//    /// return `true` if forcing restart is needed.
+//    fn force_restart(&mut self) -> bool {
+//        if self.luby.is_active() {
+//            self.luby.shift();
+//            reset!(self);
+//        }
+//        /*
+//        if self.bkt.is_active() {
+//            self.bkt.shift();
+//            reset!(self);
+//        }
+//        */
+//        if self.after_restart < self.restart_step {
+//            return false;
+//        }
+//        if self.lbd.is_active() {
+//            self.lbd.shift();
+//            reset!(self);
+//        }
+//        false
+//    }
+//}
 
 impl Export<(usize, usize, usize, usize), RestartMode> for Restarter {
     /// exports:

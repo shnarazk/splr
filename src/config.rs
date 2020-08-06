@@ -125,7 +125,7 @@ pub struct Config {
     //## restarter
     //
     /// #conflicts between restarts   .
-    #[cfg_attr(feature = "structopt", structopt(long = "rs", default_value = "32"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "rs", default_value = "50"))]
     pub rst_step: usize,
 
     /*
@@ -148,7 +148,7 @@ pub struct Config {
         pub rst_bkt_thr: usize,
     */
     /// Length of assign. fast EMA    .
-    #[cfg_attr(feature = "structopt", structopt(long = "ral", default_value = "32"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "ral", default_value = "50"))]
     pub rst_asg_len: usize,
 
     /// Length of assign. slow EMA .
@@ -162,11 +162,12 @@ pub struct Config {
     #[cfg_attr(feature = "structopt", structopt(long = "rat", default_value = "1.4"))]
     pub rst_asg_thr: f64, // Glucose's R
 
-    //    /// Correlation to block restart .
-    //    #[cfg_attr(feature = "structopt", structopt(long = "rct", default_value = "0.2"))]
-    //    pub rst_cmr_thr: f64,
+    /// Correlation to block restart .
+    #[cfg_attr(feature = "structopt", structopt(long = "rct", default_value = "0.7"))]
+    pub rst_cmr_thr: f64,
+
     /// Length of LBD fast EMA        .
-    #[cfg_attr(feature = "structopt", structopt(long = "rll", default_value = "32"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "rll", default_value = "50"))]
     pub rst_lbd_len: usize,
 
     /// Length of LBD slow EMA     .
@@ -176,21 +177,22 @@ pub struct Config {
     )]
     pub rst_lbd_slw: usize,
 
-    /// Forcing restart threshold
+    /// Forcing restart threshold    .
     #[cfg_attr(feature = "structopt", structopt(long = "rlt", default_value = "1.2"))]
     pub rst_lbd_thr: f64,
 
-    //    /// MUL stabilization boost      .
-    //    #[cfg_attr(feature = "structopt", structopt(long = "rmb", default_value = "2.0"))]
-    //    pub rst_mul_sb: f64,
-    //
-    //    /// Max Used LBD expand step     .
-    //    #[cfg_attr(feature = "structopt", structopt(long = "rms", default_value = "0.5"))]
-    //    pub rst_mul_stp: f64,
-    //
-    //    /// Max Used LBD threshold       .
-    //    #[cfg_attr(feature = "structopt", structopt(long = "rmt", default_value = "2.0"))]
-    //    pub rst_mul_thr: f64,
+    /// MUL stabilization boost      .
+    #[cfg_attr(feature = "structopt", structopt(long = "rmb", default_value = "2.0"))]
+    pub rst_mul_sb: f64,
+
+    /// Max Used LBD expand step     .
+    #[cfg_attr(feature = "structopt", structopt(long = "rms", default_value = "0.5"))]
+    pub rst_mul_stp: f64,
+
+    /// Max Used LBD threshold       .
+    #[cfg_attr(feature = "structopt", structopt(long = "rmt", default_value = "4.0"))]
+    pub rst_mul_thr: f64,
+
     /// Stabilizer scaling           .
     #[cfg_attr(feature = "structopt", structopt(long = "ss", default_value = "2.0"))]
     pub meta_stb_scl: f64,
@@ -265,36 +267,37 @@ impl Default for Config {
             use_log: false,
             meta_cls_lim: 0,
 
-            meta_ip_int: 40000,
+            meta_ip_int: 25000,
             elim_cls_lim: 32,
-            elim_var_occ: 8192,
             elim_grw_lim: 0,
+            elim_var_occ: 8192,
 
-            viv_beg: 1.0,
-            viv_end: 2.0,
-            viv_int: 8,
-            viv_scale: 2.0,
-
-            rst_step: 32,
+            rst_step: 50,
             /*
-                        rst_bkt_inc: 1.0,
-                        rst_bkt_pwr: 1.5,
-                        rst_bkt_scl: 0.001,
-                        rst_bkt_thr: 2000,
+            rst_bkt_inc: 1.0,
+            rst_bkt_pwr: 1.5,
+            rst_bkt_scl: 0.001,
+            rst_bkt_thr: 2000,
             */
             rst_asg_len: 50,
             rst_asg_slw: 10000,
-            rst_asg_thr: 1.65,
-            // rst_cmr_thr: 0.78,
+            rst_asg_thr: 1.40,
+            rst_cmr_thr: 0.70,
             rst_lbd_len: 50,
             rst_lbd_slw: 10000,
             rst_lbd_thr: 1.20,
-            // rst_mul_sb: 2.00,
-            // rst_mul_stp: 0.50,
-            // rst_mul_thr: 4.00,
+            rst_mul_sb: 2.00,
+            rst_mul_stp: 0.50,
+            rst_mul_thr: 4.00,
             meta_stb_scl: 2.0,
+
+            viv_beg: 1.0,
+            viv_end: 2.0,
+            viv_int: 4,
+            viv_scale: 2.0,
             vrw_dcy_beg: 0.10,
             vrw_dcy_end: 0.97,
+
             meta_cbt_thr: 100,
             io_tout: 5000.0,
             use_certification: false,
