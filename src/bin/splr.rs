@@ -82,7 +82,7 @@ fn main() {
     let mut s = Solver::build(&config).expect("failed to load");
     let res = s.solve();
     save_result(&s, &res, &cnf_file, ans_file);
-    if 0 < s.state.config.dump_int && !s.state.development.is_empty() {
+    if 0 < s.state.config.io_stat_dmp && !s.state.development.is_empty() {
         let dump = config.cnf_file.file_stem().unwrap().to_str().unwrap();
         if let Ok(f) = File::create(format!("stat_{}.csv", dump)) {
             let mut buf = BufWriter::new(f);

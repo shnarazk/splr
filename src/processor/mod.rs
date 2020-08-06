@@ -680,7 +680,7 @@ impl Eliminator {
             const TIMESLOT_FOR_ELIMINATION: u64 = 100;
 
             let timedout2 = timedout.clone();
-            let time = TIMESLOT_FOR_ELIMINATION * state.config.timeout as u64;
+            let time = TIMESLOT_FOR_ELIMINATION * state.config.io_tout as u64;
             thread::spawn(move || {
                 thread::sleep(Duration::from_millis(time));
                 timedout2.store(true, Ordering::Release);

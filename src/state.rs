@@ -286,7 +286,7 @@ impl Instantiate for State {
             },
             vivify_thr: config.viv_beg,
             target: cnf.clone(),
-            time_limit: config.timeout,
+            time_limit: config.io_tout,
             ..State::default()
         }
     }

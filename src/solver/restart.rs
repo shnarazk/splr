@@ -22,10 +22,10 @@ trait ProgressEvaluator {
 pub enum ProgressUpdate {
     Counter(usize),
     ASG(usize),
+    CMR(f64),
     LBD(u16),
-    MLD(u16),
-    MVA(f64),
     Luby,
+    MUL(u16),
     Reset,
 }
 
@@ -50,7 +50,7 @@ pub trait RestartIF {
     /// * `Some(true)` -- should restart
     /// * `Some(false)` -- should block restart
     /// * `None` -- it's not a good timing
-    fn restart(&mut self) -> Option<RestartReason>;
+    fn restart(&mut self) -> Option<RestartDecision>;
     /// update specific submodule
     fn update(&mut self, kind: ProgressUpdate);
 }
@@ -167,9 +167,9 @@ impl ProgressEvaluator for ProgressLBD {
     fn shift(&mut self) {}
 }
 
-/// An EMA of largest clauses' LBD, used in conflict analyze
+/// An EMA of Maximum Used LBD, used in conflict analyze
 #[derive(Debug)]
-struct ProgressMLD {
+struct ProgressMUL {
     enable: bool,
     ema: Ema2,
     num: usize,
@@ -177,9 +177,9 @@ struct ProgressMLD {
     threshold: f64,
 }
 
-impl Default for ProgressMLD {
-    fn default() -> ProgressMLD {
-        ProgressMLD {
+impl Default for ProgressMUL {
+    fn default() -> ProgressMUL {
+        ProgressMUL {
             enable: true,
             ema: Ema2::new(1),
             num: 0,
@@ -189,17 +189,17 @@ impl Default for ProgressMLD {
     }
 }
 
-impl Instantiate for ProgressMLD {
+impl Instantiate for ProgressMUL {
     fn instantiate(config: &Config, _: &CNFDescription) -> Self {
-        ProgressMLD {
+        ProgressMUL {
             ema: Ema2::new(10 * config.rst_lbd_len).with_slow(config.rst_lbd_slw),
-            threshold: config.rst_mld_thr,
-            ..ProgressMLD::default()
+            threshold: config.rst_mul_thr,
+            ..ProgressMUL::default()
         }
     }
 }
 
-impl EmaIF for ProgressMLD {
+impl EmaIF for ProgressMUL {
     type Input = u16;
     fn update(&mut self, d: Self::Input) {
         self.num += 1;
@@ -214,16 +214,16 @@ impl EmaIF for ProgressMLD {
     }
 }
 
-impl ProgressEvaluator for ProgressMLD {
+impl ProgressEvaluator for ProgressMUL {
     fn is_active(&self) -> bool {
         self.enable && self.threshold < self.ema.trend()
     }
     fn shift(&mut self) {}
 }
 
-/// An EMA of learnt clauses' max var activity, used for forcing restart.
+/// An EMA of clause mutual relevancy CMR, used for forcing restart.
 #[derive(Debug)]
-struct ProgressMVA {
+struct ProgressCMR {
     enable: bool,
     ema: Ema2,
     num: usize,
@@ -239,9 +239,9 @@ struct ProgressMVA {
     threshold: f64,
 }
 
-impl Default for ProgressMVA {
-    fn default() -> ProgressMVA {
-        ProgressMVA {
+impl Default for ProgressCMR {
+    fn default() -> ProgressCMR {
+        ProgressCMR {
             enable: true,
             ema: Ema2::new(1),
             num: 0,
@@ -254,17 +254,17 @@ impl Default for ProgressMVA {
     }
 }
 
-impl Instantiate for ProgressMVA {
+impl Instantiate for ProgressCMR {
     fn instantiate(config: &Config, _: &CNFDescription) -> Self {
-        ProgressMVA {
+        ProgressCMR {
             ema: Ema2::new(config.rst_lbd_len).with_slow(config.rst_lbd_slw),
-            threshold: config.rst_cva_thr,
-            ..ProgressMVA::default()
+            threshold: config.rst_cmr_thr,
+            ..ProgressCMR::default()
         }
     }
 }
 
-impl EmaIF for ProgressMVA {
+impl EmaIF for ProgressCMR {
     type Input = f64;
     fn update(&mut self, d: Self::Input) {
         self.inc += 1;
@@ -278,7 +278,7 @@ impl EmaIF for ProgressMVA {
     }
 }
 
-impl ProgressEvaluator for ProgressMVA {
+impl ProgressEvaluator for ProgressCMR {
     // Smaller core, larger value
     fn is_active(&self) -> bool {
         self.enable && self.threshold < self.correlation
@@ -512,7 +512,7 @@ impl Instantiate for GeometricStabilizer {
     fn instantiate(config: &Config, _: &CNFDescription) -> Self {
         GeometricStabilizer {
             enable: config.use_stabilize(),
-            restart_inc: config.rst_stb_scl,
+            restart_inc: config.meta_stb_scl,
             ..GeometricStabilizer::default()
         }
     }
@@ -650,21 +650,26 @@ pub struct Restarter {
     asg: ProgressASG,
     // bkt: ProgressBucket,
     lbd: ProgressLBD,
-    mld: ProgressMLD,
-    mva: ProgressMVA,
+    cmr: ProgressCMR,
+    mul: ProgressMUL,
     // pub rcc: ProgressRCC,
     // pub blvl: ProgressLVL,
     // pub clvl: ProgressLVL,
     luby: LubySeries,
     stb: GeometricStabilizer,
     after_restart: usize,
-    restart_step: usize,
     initial_restart_step: usize,
+    restart_step: usize,
+    mul_stb_bst: f64,
+    mul_step: f64,
 
     //
     //## statistics
     //
     num_block: usize,
+    num_block_in_stabilizing: usize,
+    num_restart: usize,
+    num_restart_in_stabilizing: usize,
 }
 
 impl Default for Restarter {
@@ -673,17 +678,22 @@ impl Default for Restarter {
             asg: ProgressASG::default(),
             // bkt: ProgressBucket::default(),
             lbd: ProgressLBD::default(),
-            mld: ProgressMLD::default(),
-            mva: ProgressMVA::default(),
+            cmr: ProgressCMR::default(),
+            mul: ProgressMUL::default(),
             // rcc: ProgressRCC::default(),
             // blvl: ProgressLVL::default(),
             // clvl: ProgressLVL::default(),
             luby: LubySeries::default(),
             stb: GeometricStabilizer::default(),
             after_restart: 0,
-            restart_step: 0,
             initial_restart_step: 0,
+            restart_step: 0,
+            mul_stb_bst: 2.0,
+            mul_step: 0.5,
             num_block: 0,
+            num_block_in_stabilizing: 0,
+            num_restart: 0,
+            num_restart_in_stabilizing: 0,
         }
     }
 }
@@ -694,15 +704,17 @@ impl Instantiate for Restarter {
             asg: ProgressASG::instantiate(config, cnf),
             // bkt: ProgressBucket::instantiate(config, cnf),
             lbd: ProgressLBD::instantiate(config, cnf),
-            mld: ProgressMLD::instantiate(config, cnf),
-            mva: ProgressMVA::instantiate(config, cnf),
+            cmr: ProgressCMR::instantiate(config, cnf),
+            mul: ProgressMUL::instantiate(config, cnf),
             // rcc: ProgressRCC::instantiate(config, cnf),
             // blvl: ProgressLVL::instantiate(config, cnf),
             // clvl: ProgressLVL::instantiate(config, cnf),
             luby: LubySeries::instantiate(config, cnf),
             stb: GeometricStabilizer::instantiate(config, cnf),
-            restart_step: config.rst_step,
             initial_restart_step: config.rst_step,
+            restart_step: config.rst_step,
+            mul_stb_bst: config.rst_mul_sb,
+            mul_step: config.rst_mul_stp,
             ..Restarter::default()
         }
     }
@@ -722,7 +734,7 @@ impl Instantiate for Restarter {
 }
 
 /// Type for the result of `restart`.
-pub enum RestartReason {
+pub enum RestartDecision {
     /// We should block restart because we are on a good path which has generated small learnt clauses.
     DontForGoodClauses,
     /// We should block restart because we are facing a strongly related conflicting core.
@@ -739,35 +751,36 @@ impl RestartIF for Restarter {
     fn stabilizing(&self) -> bool {
         self.stb.is_active()
     }
-    fn restart(&mut self) -> Option<RestartReason> {
+    fn restart(&mut self) -> Option<RestartDecision> {
+        macro_rules! ret {
+            ($decision: path) => {
+                self.after_restart = 0;
+                return Some($decision);
+            };
+        }
         if self.luby.is_active() {
             self.luby.shift();
-            self.after_restart = 0;
-            return Some(RestartReason::GoForLubyRestart);
+            ret!(RestartDecision::GoForLubyRestart);
         }
         if self.after_restart < self.restart_step {
             return None;
         }
-        self.mva.shift();
+        self.cmr.shift();
         let k = if self.stb.is_active() { 1.0 } else { 0.5 };
-        let margin = self.stb.num_active as f64 * k + self.mld.threshold;
-        let good_path = self.lbd.get() < self.mld.get() + margin;
+        let margin = self.stb.num_active as f64 * k + self.mul.threshold;
+        let good_path = self.lbd.get() < self.mul.get() + margin;
         if self.stb.is_active() {
-            if self.mva.is_active() && good_path {
-                self.after_restart = 0;
-                return Some(RestartReason::DontForHighlyRelevant);
+            if self.cmr.is_active() && good_path {
+                ret!(RestartDecision::DontForHighlyRelevant);
             } else {
-                self.after_restart = 0;
-                return Some(RestartReason::GoWithStabilization);
+                ret!(RestartDecision::GoWithStabilization);
             }
         } else if self.asg.is_active() {
             self.num_block += 1;
-            self.after_restart = 0;
-            return Some(RestartReason::DontForGoodClauses);
+            ret!(RestartDecision::DontForGoodClauses);
         };
         if !good_path {
-            self.after_restart = 0;
-            return Some(RestartReason::GoForUselessClauses);
+            ret!(RestartDecision::GoForUselessClauses);
         }
         None
     }
@@ -779,19 +792,21 @@ impl RestartIF for Restarter {
                 self.luby.update(self.after_restart);
             }
             ProgressUpdate::ASG(val) => self.asg.update(val),
+            ProgressUpdate::CMR(fval) => self.cmr.update(fval),
             ProgressUpdate::LBD(val) => self.lbd.update(val),
-            ProgressUpdate::MLD(val) => self.mld.update(val),
-            ProgressUpdate::MVA(fval) => self.mva.update(fval),
             ProgressUpdate::Luby => self.luby.update(0),
+            ProgressUpdate::MUL(val) => self.mul.update(val),
             ProgressUpdate::Reset => (),
         }
     }
 }
 
-impl Export<(usize, usize), RestartMode> for Restarter {
+impl Export<(usize, usize, usize, usize), RestartMode> for Restarter {
     /// exports:
     ///  1. the number of blocking
-    ///  1. , the number of stabilzation
+    ///  1. the number of stabilzation
+    ///  1. the number of restarts in stabilzation mode
+    ///  1. the number of blocked restarts in stabilzation mode
     ///
     ///```
     /// use crate::splr::{config::Config, solver::Restarter, types::*};
@@ -799,8 +814,13 @@ impl Export<(usize, usize), RestartMode> for Restarter {
     /// let (num_block, num_stb) = rst.exports();
     ///```
     #[inline]
-    fn exports(&self) -> (usize, usize) {
-        (self.num_block, self.stb.num_active)
+    fn exports(&self) -> (usize, usize, usize, usize) {
+        (
+            self.num_block,
+            self.stb.num_active,
+            self.num_restart_in_stabilizing,
+            self.num_block_in_stabilizing,
+        )
     }
     fn active_mode(&self) -> RestartMode {
         if self.stb.is_active() {
@@ -817,7 +837,7 @@ impl Export<(usize, usize), RestartMode> for Restarter {
 
 impl<'a> ExportBox<'a, (&'a Ema2, &'a Ema2, &'a Ema2, &'a Ema2)> for Restarter {
     fn exports_box(&'a self) -> Box<(&'a Ema2, &'a Ema2, &'a Ema2, &'a Ema2)> {
-        Box::from((&self.asg.ema, &self.lbd.ema, &self.mld.ema, &self.mva.ema))
+        Box::from((&self.asg.ema, &self.lbd.ema, &self.mul.ema, &self.cmr.ema))
     }
 }
 
