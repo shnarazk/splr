@@ -154,8 +154,6 @@ impl SearchStrategy {
 /// stat index.
 #[derive(Clone, Eq, PartialEq)]
 pub enum Stat {
-    /// the number of cancelled restart
-    CancelRestart = 0,
     /// the number of decision
     Decision,
     /// the number of 'no decision conflict'
@@ -518,8 +516,8 @@ impl StateIF for State {
 
         let rst_mode = rst.active_mode();
 
-        let (rst_num_blk, rst_num_stb, _, _) = rst.exports();
-        let (rst_asg, rst_lbd, rst_mld, rst_mva) = *rst.exports_box();
+        let (rst_num_blk, rst_num_stb, rst_num_srst, rst_num_sblk) = rst.exports();
+        let (rst_asg, rst_lbd, rst_mul, _) = *rst.exports_box();
 
         if self.config.use_log {
             self.dump(asg, cdb, rst);
@@ -574,20 +572,23 @@ impl StateIF for State {
             },
             im!("{:>9}", self, LogUsizeId::Restart, asg_num_restart),
             im!("{:>9}", self, LogUsizeId::RestartBlock, rst_num_blk),
+            //im!( "{:>9}", self, LogUsizeId::RestartCancel, self[Stat::CancelRestart]),
+            im!("{:>9}", self, LogUsizeId::RestartStabilizing, rst_num_srst),
             im!(
                 "{:>9}",
                 self,
-                LogUsizeId::RestartCancel,
-                self[Stat::CancelRestart]
+                LogUsizeId::RestartBlockStabilizing,
+                rst_num_sblk
             ),
-            im!("{:>9}", self, LogUsizeId::Stabilize, rst_num_stb),
+            // im!("{:>9}", self, LogUsizeId::Stabilize, rst_num_stb),
         );
         println!(
-            "\x1B[2K         EMA|tLBD:{}, tASG:{}, eMLD:{}, eMVA:{} ",
+            "\x1B[2K         EMA|tLBD:{}, tASG:{}, eMUL:{}, #STB:{} ",
             fm!("{:>9.4}", self, LogF64Id::TrendLBD, rst_lbd.trend()),
             fm!("{:>9.4}", self, LogF64Id::TrendASG, rst_asg.trend()),
-            fm!("{:>9.4}", self, LogF64Id::EmaMLD, rst_mld.get()),
-            fm!("{:>9.4}", self, LogF64Id::EmaMVA, rst_mva.get()),
+            fm!("{:>9.4}", self, LogF64Id::EmaMLD, rst_mul.get()),
+            // fm!("{:>9.4}", self, LogF64Id::EmaCMR, rst_mva.get()),
+            im!("{:>9}", self, LogUsizeId::Stabilize, rst_num_stb),
         );
         println!(
             "\x1B[2K    Conflict|eLBD:{}, cnfl:{}, bjmp:{}, /ppc:{} ",
@@ -850,8 +851,9 @@ pub enum LogUsizeId {
     Binclause,
     Permanent,
     Restart,
+    RestartStabilizing,
     RestartBlock,
-    RestartCancel,
+    RestartBlockStabilizing,
     Simplify,
     Stabilize,
     Vivify,
