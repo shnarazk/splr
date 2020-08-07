@@ -436,18 +436,9 @@ impl StateIF for State {
         self.strategy.0 = match () {
             _ if cdb_num_bi_learnt + 20_000 < cdb_num_lbd2 => SearchStrategy::ManyGlues,
             _ if self[Stat::Decision] as f64 <= 1.2 * asg_num_conflict as f64 => {
-                // panic!("LowDecisions: decision:{} <= 1.2 * conflict:{}",
-                //        self[Stat::Decision],
-                //        asg_num_conflict,
-                // );
                 SearchStrategy::LowDecisions
             }
-            _ if self[Stat::NoDecisionConflict] < 15_000 => {
-                // panic!("LowSuccessive: noDecisionConflict:{} <= 30_000",
-                //        self[Stat::NoDecisionConflict],
-                // );
-                SearchStrategy::LowSuccessive
-            }
+            _ if self[Stat::NoDecisionConflict] < 15_000 => SearchStrategy::LowSuccessive,
             _ if 54_400 < self[Stat::NoDecisionConflict] => SearchStrategy::HighSuccessive,
             _ => SearchStrategy::Generic,
         };
@@ -562,7 +553,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K {}|#RST:{}, #BLK:{}, #CNC:{}, #STB:{} ",
+            "\x1B[2K {}|#RST:{}, #BLK:{}, #RSs:{}, #BLs:{} ",
             match rst_mode {
                 RestartMode::Dynamic => "    Restart",
                 RestartMode::Luby if self.config.no_color => "LubyRestart",
@@ -572,7 +563,6 @@ impl StateIF for State {
             },
             im!("{:>9}", self, LogUsizeId::Restart, asg_num_restart),
             im!("{:>9}", self, LogUsizeId::RestartBlock, rst_num_blk),
-            //im!( "{:>9}", self, LogUsizeId::RestartCancel, self[Stat::CancelRestart]),
             im!("{:>9}", self, LogUsizeId::RestartStabilizing, rst_num_srst),
             im!(
                 "{:>9}",
@@ -586,8 +576,8 @@ impl StateIF for State {
             "\x1B[2K         EMA|tLBD:{}, tASG:{}, eMUL:{}, #STB:{} ",
             fm!("{:>9.4}", self, LogF64Id::TrendLBD, rst_lbd.trend()),
             fm!("{:>9.4}", self, LogF64Id::TrendASG, rst_asg.trend()),
-            fm!("{:>9.4}", self, LogF64Id::EmaMLD, rst_mul.get()),
-            // fm!("{:>9.4}", self, LogF64Id::EmaCMR, rst_mva.get()),
+            fm!("{:>9.4}", self, LogF64Id::EmaMUL, rst_mul.get()),
+            // fm!("{:>9.0}", self, LogF64Id::EmaCMR, rst_cmr.get()),
             im!("{:>9}", self, LogUsizeId::Stabilize, rst_num_stb),
         );
         println!(
@@ -865,13 +855,13 @@ pub enum LogUsizeId {
 pub enum LogF64Id {
     Progress = 0,
     EmaASG,
+    EmaCMR,
     EmaLBD,
-    EmaMLD,
-    EmaMVA,
+    EmaMUL,
     TrendASG,
+    TrendCMR,
     TrendLBD,
-    TrendMLD,
-    TrendMVA,
+    TrendMUL,
     BLevel,
     CLevel,
     ConflictPerRestart,

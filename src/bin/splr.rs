@@ -340,7 +340,7 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
             "c          EMA|tLBD:{}, tASG:{}, eRLT:{}, eASG:{},\n",
             format!("{:>9.4}", state[LogF64Id::TrendLBD]),
             format!("{:>9.4}", state[LogF64Id::TrendASG]),
-            format!("{:>9.4}", state[LogF64Id::EmaMVA]),
+            format!("{:>9.4}", state[LogF64Id::EmaMUL]),
             format!("{:>9.0}", state[LogF64Id::EmaASG]),
         )
         .as_bytes(),
