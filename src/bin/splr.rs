@@ -330,7 +330,7 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
             },
             format!("{:>9}", state[LogUsizeId::Restart]),
             format!("{:>9}", state[LogUsizeId::RestartBlock]),
-            format!("{:>9}", state[LogUsizeId::RestartCancel]),
+            format!("{:>9}", state[LogUsizeId::RestartBlockStabilizing]),
             format!("{:>9}", state[LogUsizeId::Stabilize]),
         )
         .as_bytes(),

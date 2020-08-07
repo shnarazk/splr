@@ -93,20 +93,6 @@ pub struct Config {
     pub use_log: bool,
 
     //
-    //## clause DB
-    //
-    /// Soft limit of #clauses (6MC/GB)
-    #[cfg_attr(feature = "structopt", structopt(long = "cl", default_value = "0"))]
-    pub meta_cls_lim: usize,
-
-    //
-    //## inprocessor
-    //
-    /// #cls to start in-processor .
-    #[cfg_attr(feature = "structopt", structopt(long = "ii", default_value = "25000"))]
-    pub meta_ip_int: usize,
-
-    //
     //## eliminator
     //
     /// Max #lit for clause subsume   .
@@ -128,25 +114,6 @@ pub struct Config {
     #[cfg_attr(feature = "structopt", structopt(long = "rs", default_value = "50"))]
     pub rst_step: usize,
 
-    /*
-        /// Bucket increment step
-        #[cfg_attr(feature = "structopt", structopt(skip))] // long = "rbi", default_value = "1.0"
-        pub rst_bkt_inc: f64,
-
-        /// Bucket power factor
-        #[cfg_attr(feature = "structopt", structopt(skip))] // long = "rbp", default_value = "1.5"
-        pub rst_bkt_pwr: f64,
-
-        /// Bucket time scale
-        #[cfg_attr(feature = "structopt", structopt(skip))]
-        // long = "rbs", default_value = "0.001"
-        pub rst_bkt_scl: f64,
-
-        /// Bucket threshold
-        #[cfg_attr(feature = "structopt", structopt(skip))]
-        // long = "rbt", default_value = "2000"
-        pub rst_bkt_thr: usize,
-    */
     /// Length of assign. fast EMA    .
     #[cfg_attr(feature = "structopt", structopt(long = "ral", default_value = "50"))]
     pub rst_asg_len: usize,
@@ -190,12 +157,8 @@ pub struct Config {
     pub rst_mul_stp: f64,
 
     /// Max Used LBD threshold       .
-    #[cfg_attr(feature = "structopt", structopt(long = "rmt", default_value = "4.0"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "rmt", default_value = "2.0"))]
     pub rst_mul_thr: f64,
-
-    /// Stabilizer scaling           .
-    #[cfg_attr(feature = "structopt", structopt(long = "ss", default_value = "2.0"))]
-    pub meta_stb_scl: f64,
 
     //
     //## vivifier
@@ -234,6 +197,18 @@ pub struct Config {
     #[cfg_attr(feature = "structopt", structopt(long = "ct", default_value = "100"))]
     pub meta_cbt_thr: DecisionLevel,
 
+    /// Soft limit of #clauses (6MC/GB)
+    #[cfg_attr(feature = "structopt", structopt(long = "cl", default_value = "0"))]
+    pub meta_cls_lim: usize,
+
+    /// #cls to start in-processor .
+    #[cfg_attr(feature = "structopt", structopt(long = "ii", default_value = "25000"))]
+    pub meta_ip_int: usize,
+
+    /// Stabilizer scaling           .
+    #[cfg_attr(feature = "structopt", structopt(long = "ss", default_value = "2.0"))]
+    pub meta_stb_scl: f64,
+
     /// CPU time limit in sec.      .
     #[cfg_attr(
         feature = "structopt",
@@ -256,6 +231,7 @@ impl Default for Config {
             a_rsr: 1,
             a_stabilize: 1,
             a_vivify: 1,
+
             splr_interface: false,
             cnf_file: PathBuf::new(),
             io_odir: PathBuf::new(),
@@ -265,40 +241,35 @@ impl Default for Config {
             no_color: true,
             quiet_mode: true,
             use_log: false,
-            meta_cls_lim: 0,
 
-            meta_ip_int: 25000,
             elim_cls_lim: 32,
             elim_grw_lim: 0,
             elim_var_occ: 8192,
 
             rst_step: 50,
-            /*
-            rst_bkt_inc: 1.0,
-            rst_bkt_pwr: 1.5,
-            rst_bkt_scl: 0.001,
-            rst_bkt_thr: 2000,
-            */
             rst_asg_len: 50,
             rst_asg_slw: 10000,
-            rst_asg_thr: 1.40,
-            rst_cmr_thr: 0.70,
+            rst_asg_thr: 1.4,
+            rst_cmr_thr: 0.7,
             rst_lbd_len: 50,
             rst_lbd_slw: 10000,
-            rst_lbd_thr: 1.20,
-            rst_mul_sb: 2.00,
-            rst_mul_stp: 0.50,
-            rst_mul_thr: 4.00,
-            meta_stb_scl: 2.0,
+            rst_lbd_thr: 1.2,
+            rst_mul_sb: 2.0,
+            rst_mul_stp: 0.5,
+            rst_mul_thr: 4.0,
 
             viv_beg: 1.0,
             viv_end: 2.0,
             viv_int: 4,
             viv_scale: 2.0,
+
             vrw_dcy_beg: 0.10,
             vrw_dcy_end: 0.97,
 
             meta_cbt_thr: 100,
+            meta_cls_lim: 0,
+            meta_ip_int: 25000,
+            meta_stb_scl: 2.0,
             io_tout: 5000.0,
             use_certification: false,
         }

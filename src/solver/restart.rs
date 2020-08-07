@@ -749,7 +749,6 @@ impl RestartIF for Restarter {
     fn stabilizing(&self) -> bool {
         self.stb.is_active()
     }
-
     fn restart(&mut self) -> Option<RestartDecision> {
         macro_rules! ret {
             ($decision: path) => {
@@ -809,9 +808,9 @@ impl RestartIF for Restarter {
                 self.luby.update(self.after_restart);
             }
             ProgressUpdate::ASG(val) => self.asg.update(val),
+            ProgressUpdate::CMR(fval) => self.cmr.update(fval),
             ProgressUpdate::LBD(val) => self.lbd.update(val),
             ProgressUpdate::Luby => self.luby.update(0),
-            ProgressUpdate::CMR(fval) => self.cmr.update(fval),
             ProgressUpdate::MUL(val) => self.mul.update(val),
             ProgressUpdate::Reset => (),
         }
@@ -888,9 +887,9 @@ impl Export<(usize, usize, usize, usize), RestartMode> for Restarter {
     }
 }
 
-impl<'a> ExportBox<'a, (&'a Ema2, &'a Ema2)> for Restarter {
-    fn exports_box(&'a self) -> Box<(&'a Ema2, &'a Ema2)> {
-        Box::from((&self.asg.ema, &self.lbd.ema))
+impl<'a> ExportBox<'a, (&'a Ema2, &'a Ema2, &'a Ema2, &'a Ema2)> for Restarter {
+    fn exports_box(&'a self) -> Box<(&'a Ema2, &'a Ema2, &'a Ema2, &'a Ema2)> {
+        Box::from((&self.asg.ema, &self.lbd.ema, &self.mul.ema, &self.cmr.ema))
         // Note: `Box` is not required to export them. You can use a tuple as well.
         // (&self.asg.ema, &self.cmr.ema, &self.lbd.ema, &self.mul.ema)
     }
