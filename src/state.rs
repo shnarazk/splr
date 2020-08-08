@@ -213,6 +213,7 @@ pub struct State {
     pub conflicts: Vec<Lit>,
     /// hold the previous number of non-conflicting assignment
     pub last_asg: usize,
+    pub last_conflict: usize,
     /// working place to build learnt clauses
     pub new_learnt: Vec<Lit>,
     /// working place to store given clauses' ids which is used to derive a good learnt
@@ -246,6 +247,7 @@ impl Default for State {
             c_lvl: Ema::new(5_000),
             conflicts: Vec::new(),
             last_asg: 0,
+            last_conflict: 0,
             new_learnt: Vec::new(),
             derive20: Vec::new(),
             progress_cnt: 0,

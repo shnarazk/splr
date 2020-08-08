@@ -209,6 +209,9 @@ pub fn handle_conflict(
         asg.assign_by_implication(l0, AssignReason::Implication(cid, reason), al);
         let lbd = cdb[cid].rank;
         rst.update(ProgressUpdate::LBD(lbd));
+        let wl = (lbd as f64) * ((num_conflict - state.last_conflict + 1) as f64).log(2.0);
+        state.last_conflict = num_conflict;
+        rst.update(ProgressUpdate::WLBD(wl));
 
         let mut act: f64 = 0.0;
         for li in cdb[cid].iter() {

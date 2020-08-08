@@ -24,6 +24,7 @@ pub enum ProgressUpdate {
     ASG(usize),
     CMR(f64),
     LBD(u16),
+    WLBD(f64),
     Luby,
     MUL(u16),
     Reset,
@@ -161,6 +162,62 @@ impl EmaIF for ProgressLBD {
 }
 
 impl ProgressEvaluator for ProgressLBD {
+    fn is_active(&self) -> bool {
+        self.enable && self.threshold < self.ema.trend()
+    }
+    fn shift(&mut self) {}
+}
+
+/// An EMA of Weighted LBD, used for forcing restart.
+#[derive(Debug)]
+struct ProgressWLBD {
+    enable: bool,
+    ema: Ema2,
+    num: usize,
+    sum: f64,
+    threshold: f64,
+}
+
+impl Default for ProgressWLBD {
+    fn default() -> ProgressWLBD {
+        ProgressWLBD {
+            enable: true,
+            ema: Ema2::new(1),
+            num: 0,
+            sum: 0.0,
+            threshold: 1.4,
+        }
+    }
+}
+
+impl Instantiate for ProgressWLBD {
+    fn instantiate(config: &Config, _: &CNFDescription) -> Self {
+        ProgressWLBD {
+            ema: Ema2::new(config.rst_lbd_len).with_slow(config.rst_lbd_slw),
+            threshold: config.rst_lbd_thr,
+            ..ProgressWLBD::default()
+        }
+    }
+}
+
+impl EmaIF for ProgressWLBD {
+    type Input = f64;
+    fn update(&mut self, d: Self::Input) {
+        self.num += 1;
+        self.sum += d;
+        self.ema.update(d);
+    }
+    fn get(&self) -> f64 {
+        self.ema.get()
+    }
+    fn trend(&self) -> f64 {
+        self.ema
+            .trend()
+            .max(self.ema.get() * (self.num as f64) / self.sum)
+    }
+}
+
+impl ProgressEvaluator for ProgressWLBD {
     fn is_active(&self) -> bool {
         self.enable && self.threshold < self.ema.trend()
     }
@@ -650,6 +707,7 @@ pub struct Restarter {
     asg: ProgressASG,
     // bkt: ProgressBucket,
     lbd: ProgressLBD,
+    wlbd: ProgressWLBD,
     cmr: ProgressCMR,
     mul: ProgressMUL,
     // pub rcc: ProgressRCC,
@@ -678,6 +736,7 @@ impl Default for Restarter {
             asg: ProgressASG::default(),
             // bkt: ProgressBucket::default(),
             lbd: ProgressLBD::default(),
+            wlbd: ProgressWLBD::default(),
             cmr: ProgressCMR::default(),
             mul: ProgressMUL::default(),
             // rcc: ProgressRCC::default(),
@@ -704,6 +763,7 @@ impl Instantiate for Restarter {
             asg: ProgressASG::instantiate(config, cnf),
             // bkt: ProgressBucket::instantiate(config, cnf),
             lbd: ProgressLBD::instantiate(config, cnf),
+            wlbd: ProgressWLBD::instantiate(config, cnf),
             cmr: ProgressCMR::instantiate(config, cnf),
             mul: ProgressMUL::instantiate(config, cnf),
             // rcc: ProgressRCC::instantiate(config, cnf),
@@ -771,12 +831,13 @@ impl RestartIF for Restarter {
         };
         let margin = self.stb.num_active as f64 * k + self.mul.threshold;
         let good_path = self.lbd.get() < self.mul.get() + margin;
+        let good_path2 = self.wlbd.get() < self.mul.get() + margin;
         if self.stb.is_active() {
-            if self.cmr.is_active() && good_path {
+            if self.asg.is_active() {
                 self.num_block += 1;
                 self.num_block_in_stabilizing += 1;
                 ret!(RestartDecision::Cancel);
-            } else {
+            } else if !good_path2 {
                 self.num_restart += 1;
                 self.num_restart_in_stabilizing += 1;
                 ret!(RestartDecision::Stabilize);
@@ -784,8 +845,7 @@ impl RestartIF for Restarter {
         } else if self.asg.is_active() {
             self.num_block += 1;
             ret!(RestartDecision::Block);
-        };
-        if !good_path {
+        } else if !good_path {
             self.num_restart += 1;
             ret!(RestartDecision::Force);
         }
@@ -810,6 +870,7 @@ impl RestartIF for Restarter {
             ProgressUpdate::ASG(val) => self.asg.update(val),
             ProgressUpdate::CMR(fval) => self.cmr.update(fval),
             ProgressUpdate::LBD(val) => self.lbd.update(val),
+            ProgressUpdate::WLBD(val) => self.wlbd.update(val),
             ProgressUpdate::Luby => self.luby.update(0),
             ProgressUpdate::MUL(val) => self.mul.update(val),
             ProgressUpdate::Reset => (),
