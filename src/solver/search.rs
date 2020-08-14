@@ -234,16 +234,16 @@ fn search(
                     return Err(SolverError::UndescribedError);
                 }
             }
-        }
-        if let Some(decision) = rst.restart() {
-            match decision {
-                RestartDecision::Block | RestartDecision::Cancel => {}
-                RestartDecision::Force => {
-                    asg.cancel_until(asg.root_level);
-                }
-                RestartDecision::Stabilize => {
-                    asg.cancel_until(asg.root_level);
-                    asg.force_rephase();
+            if let Some(decision) = rst.restart() {
+                match decision {
+                    RestartDecision::Block | RestartDecision::Cancel => {}
+                    RestartDecision::Force => {
+                        asg.cancel_until(asg.root_level);
+                    }
+                    RestartDecision::Stabilize => {
+                        asg.cancel_until(asg.root_level);
+                        asg.force_rephase();
+                    }
                 }
             }
         }

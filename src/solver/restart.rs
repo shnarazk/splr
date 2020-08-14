@@ -830,36 +830,31 @@ impl RestartIF for Restarter {
             self.mul_step
         };
         let margin = self.stb.num_active as f64 * k + self.mul.threshold;
-        let good_path = self.lbd.get() < self.mul.get() + margin;
-        let good_path2 = self.wlbd.get() < self.mul.get() + margin;
+        let bad_path = self.mul.get() + margin < self.wlbd.get();
         if self.stb.is_active() {
             if self.asg.is_active() {
                 self.num_block += 1;
                 self.num_block_in_stabilizing += 1;
                 ret!(RestartDecision::Cancel);
-            } else if !good_path2 {
+            }
+            if bad_path {
                 self.num_restart += 1;
                 self.num_restart_in_stabilizing += 1;
                 ret!(RestartDecision::Stabilize);
             }
-        } else if self.asg.is_active() {
-            self.num_block += 1;
-            ret!(RestartDecision::Block);
-        } else if !good_path {
-            self.num_restart += 1;
-            ret!(RestartDecision::Force);
+            return None;
+        } else {
+            if self.asg.is_active() {
+                self.num_block += 1;
+                ret!(RestartDecision::Block);
+            }
+            if self.lbd.is_active() {
+                self.num_restart += 1;
+                ret!(RestartDecision::Force);
+            }
+            return None;
         }
-        None
     }
-    //    fn restart(&mut self) -> Option<RestartDecision> {
-    //        if self.block_restart() {
-    //            return Some(RestartDecision::Block);
-    //        }
-    //        if self.force_restart() {
-    //            return Some(RestartDecision::Force);
-    //        }
-    //        None
-    //    }
     fn update(&mut self, kind: ProgressUpdate) {
         match kind {
             ProgressUpdate::Counter(val) => {
