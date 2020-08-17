@@ -749,7 +749,7 @@ impl RestartIF for Restarter {
             return None;
         }
         self.mva.shift();
-        let k = if self.stb.is_active() { 1.0 } else { 0.25 };
+        let k = if self.stb.is_active() { 1.0 } else { 0.5 };
         let margin = self.stb.num_active as f64 * k + self.mld.threshold;
         let good_path = self.lbd.get() < self.mld.get() + margin;
         if self.stb.is_active() {
