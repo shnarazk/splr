@@ -217,7 +217,7 @@ pub fn handle_conflict(
                 act = a;
             }
         }
-        rst.update(ProgressUpdate::MVA(act));
+        rst.update(ProgressUpdate::ACC(act));
 
         elim.to_simplify += 1.0 / (learnt_len - 1) as f64;
         if lbd <= 20 {
