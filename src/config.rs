@@ -157,7 +157,7 @@ pub struct Config {
     pub rst_mul_stp: f64,
 
     /// Max Used LBD threshold       .
-    #[cfg_attr(feature = "structopt", structopt(long = "rmt", default_value = "2.0"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "rmt", default_value = "4.0"))]
     pub rst_mul_thr: f64,
 
     //
