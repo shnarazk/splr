@@ -258,7 +258,7 @@ impl Instantiate for ProgressACC {
     fn instantiate(config: &Config, _: &CNFDescription) -> Self {
         ProgressACC {
             ema: Ema2::new(config.rst_lbd_len).with_slow(config.rst_lbd_slw),
-            threshold: config.rst_cva_thr,
+            threshold: config.rst_acc_thr,
             ..ProgressACC::default()
         }
     }

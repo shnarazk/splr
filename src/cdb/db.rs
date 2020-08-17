@@ -248,7 +248,7 @@ impl Instantiate for ClauseDB {
             watcher,
             certified,
             reducable: config.use_reduce(),
-            soft_limit: config.clause_limit,
+            soft_limit: config.meta_cls_lim,
             ..ClauseDB::default()
         }
     }

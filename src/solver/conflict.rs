@@ -48,7 +48,7 @@ pub fn handle_conflict(
     }
 
     // rst.block_restart(); // to update asg progress_evaluator
-    let mut use_chronobt = switch_chronobt.unwrap_or(0 < state.config.cbt_thr);
+    let mut use_chronobt = switch_chronobt.unwrap_or(0 < state.config.meta_cbt);
     if use_chronobt {
         let level = asg.level_ref();
         let c = &cdb[ci];
@@ -132,7 +132,7 @@ pub fn handle_conflict(
     // PREMISE: 0 < bl, because asg.decision_vi accepts only non-zero values.
     use_chronobt &= switch_chronobt.unwrap_or(
         bl_a == 0
-            || state.config.cbt_thr + bl_a <= cl
+            || state.config.meta_cbt + bl_a <= cl
             || asg.activity(l0.vi()) < asg.activity(asg.decision_vi(bl_a)),
     );
 
@@ -227,7 +227,7 @@ pub fn handle_conflict(
         }
     }
     cdb.scale_activity();
-    if 0 < state.config.dump_int && num_conflict % state.config.dump_int == 0 {
+    if 0 < state.config.io_dump && num_conflict % state.config.io_dump == 0 {
         let (rst_num_block, _) = rst.exports();
         let (rst_asg, rst_lbd, _rst_mld, _rst_mva) = *rst.exports_box();
         state.development.push((
