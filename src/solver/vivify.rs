@@ -158,19 +158,20 @@ pub fn vivify(
                 elim.to_simplify += 1.0 / clits.len() as f64;
             }
             1 => {
-                assert!(asg.assigned(copied[0]) != Some(false));
-                if asg.assigned(copied[0]) == None {
+                let l0 = copied[0];
+                debug_assert!(asg.assigned(l0) != Some(false));
+                if asg.assigned(l0) == None {
                     nassert += 1;
                     asg.handle(SolverEvent::Assert);
+                    asg.assign_at_rootlevel(l0)?;
+                    if !asg.propagate(cdb).is_none() {
+                        // panic!("Vivification found an uncatchable inconsistency.");
+                        return Err(SolverError::Inconsistent);
+                    }
+                    state.handle(SolverEvent::Assert);
+                    state[Stat::VivifiedVar] += 1;
+                    elim.to_simplify += 2.0;
                 }
-                asg.assign_at_rootlevel(copied[0])?;
-                if !asg.propagate(cdb).is_none() {
-                    // panic!("Vivification found an uncatchable inconsistency.");
-                    return Err(SolverError::Inconsistent);
-                }
-                state.handle(SolverEvent::Assert);
-                state[Stat::VivifiedVar] += 1;
-                elim.to_simplify += 2.0;
             }
             n if n == clits.len() => {
                 keep_original = true;
