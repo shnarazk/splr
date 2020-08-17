@@ -2,7 +2,7 @@
 use {
     super::{
         conflict::handle_conflict,
-        restart::{ProgressUpdate, RestartIF, RestartReason, Restarter},
+        restart::{ProgressUpdate, RestartDecision, RestartIF, Restarter},
         vivify::vivify,
         Certificate, Solver, SolverEvent, SolverResult,
     },
@@ -215,14 +215,14 @@ fn search(
             handle_conflict(asg, cdb, elim, rst, state, ci)?;
             if let Some(decision) = rst.restart() {
                 match decision {
-                    RestartReason::DontForGoodClauses => (),
-                    RestartReason::GoForLubyRestart | RestartReason::GoForUselessClauses => {
+                    RestartDecision::Block => (),
+                    RestartDecision::Force => {
                         asg.cancel_until(asg.root_level);
                     }
-                    RestartReason::DontForHighlyRelevant => {
+                    RestartDecision::Cancel => {
                         state[Stat::CancelRestart] += 1;
                     }
-                    RestartReason::GoWithStabilization => {
+                    RestartDecision::Stabilize => {
                         asg.cancel_until(asg.root_level);
                         asg.force_rephase();
                     }

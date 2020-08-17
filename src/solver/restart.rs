@@ -50,7 +50,7 @@ pub trait RestartIF {
     /// * `Some(true)` -- should restart
     /// * `Some(false)` -- should block restart
     /// * `None` -- it's not a good timing
-    fn restart(&mut self) -> Option<RestartReason>;
+    fn restart(&mut self) -> Option<RestartDecision>;
     /// update specific submodule
     fn update(&mut self, kind: ProgressUpdate);
 }
@@ -722,28 +722,26 @@ impl Instantiate for Restarter {
 }
 
 /// Type for the result of `restart`.
-pub enum RestartReason {
-    /// We should block restart because we are on a good path which has generated small learnt clauses.
-    DontForGoodClauses,
-    /// We should block restart because we are facing a strongly related conflicting core.
-    DontForHighlyRelevant,
-    /// We should restart now because we use Luby.
-    GoForLubyRestart,
-    /// We should restart now because recent learnt clauses have hardly possibilities to be used.
-    GoForUselessClauses,
-    /// We should restart now and then stabilize due to 'divergent' learnt clauses
-    GoWithStabilization,
+pub enum RestartDecision {
+    /// We should block restart
+    Block,
+    /// We should block restart in stabilization mode
+    Cancel,
+    /// We should restart now
+    Force,
+    /// We should restart now in stabilization mode
+    Stabilize,
 }
 
 impl RestartIF for Restarter {
     fn stabilizing(&self) -> bool {
         self.stb.is_active()
     }
-    fn restart(&mut self) -> Option<RestartReason> {
+    fn restart(&mut self) -> Option<RestartDecision> {
         if self.luby.is_active() {
             self.luby.shift();
             self.after_restart = 0;
-            return Some(RestartReason::GoForLubyRestart);
+            return Some(RestartDecision::Force);
         }
         if self.after_restart < self.restart_step {
             return None;
@@ -755,19 +753,19 @@ impl RestartIF for Restarter {
         if self.stb.is_active() {
             if self.acc.is_active() && good_path {
                 self.after_restart = 0;
-                return Some(RestartReason::DontForHighlyRelevant);
+                return Some(RestartDecision::Cancel);
             } else {
                 self.after_restart = 0;
-                return Some(RestartReason::GoWithStabilization);
+                return Some(RestartDecision::Stabilize);
             }
         } else if self.asg.is_active() {
             self.num_block += 1;
             self.after_restart = 0;
-            return Some(RestartReason::DontForGoodClauses);
+            return Some(RestartDecision::Block);
         };
         if !good_path {
             self.after_restart = 0;
-            return Some(RestartReason::GoForUselessClauses);
+            return Some(RestartDecision::Force);
         }
         None
     }
