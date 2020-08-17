@@ -25,7 +25,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "clap"
-version = "2.33.2"
+version = "2.33.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "ansi_term 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -120,7 +120,7 @@ name = "structopt"
 version = "0.3.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "clap 2.33.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "clap 2.33.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "structopt-derive 0.4.9 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -203,7 +203,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum ansi_term 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ee49baf6cb617b853aa8d93bf420db2383fab46d314482ca2803b40d5fde979b"
 "checksum atty 0.2.14 (registry+https://github.com/rust-lang/crates.io-index)" = "d9b39be18770d11421cdb1b9947a45dd3f37e93092cbf377614828a319d5fee8"
 "checksum bitflags 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "cf1de2fe8c75bc145a2f577add951f8134889b4795d47466a54a5c846d691693"
-"checksum clap 2.33.2 (registry+https://github.com/rust-lang/crates.io-index)" = "10040cdf04294b565d9e0319955430099ec3813a64c952b86a41200ad714ae48"
+"checksum clap 2.33.3 (registry+https://github.com/rust-lang/crates.io-index)" = "37e58ac78573c40708d45522f0d80fa2f01cc4f9b4e2bf749807255454312002"
 "checksum heck 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "20564e78d53d2bb135c343b3f47714a56af2061f1c928fdb541dc7b9fdd94205"
 "checksum hermit-abi 0.1.15 (registry+https://github.com/rust-lang/crates.io-index)" = "3deed196b6e7f9e44a2ae8d94225d80302d81208b1bb673fd21fe634645c85a9"
 "checksum lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
