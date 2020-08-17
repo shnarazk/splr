@@ -22,9 +22,9 @@ trait ProgressEvaluator {
 pub enum ProgressUpdate {
     Counter(usize),
     ASG(usize),
+    CFD(DecisionLevel),
     CMR(f64),
     LBD(u16),
-    WLBD(f64),
     Luby,
     MUL(u16),
     Reset,
@@ -39,7 +39,6 @@ pub enum RestartMode {
     Luby,
     /// Controlled by CaDiCal-like Geometric Stabilizer
     Stabilize,
-    // Bucket,
 }
 
 /// API for restart like `block_restart`, `force_restart` and so on.
@@ -168,9 +167,9 @@ impl ProgressEvaluator for ProgressLBD {
     fn shift(&mut self) {}
 }
 
-/// An EMA of Weighted LBD, used for forcing restart.
+/// An EMA of ConFlict Distance, used for forcing restart.
 #[derive(Debug)]
-struct ProgressWLBD {
+struct ProgressCFD {
     enable: bool,
     ema: Ema2,
     num: usize,
@@ -178,9 +177,9 @@ struct ProgressWLBD {
     threshold: f64,
 }
 
-impl Default for ProgressWLBD {
-    fn default() -> ProgressWLBD {
-        ProgressWLBD {
+impl Default for ProgressCFD {
+    fn default() -> ProgressCFD {
+        ProgressCFD {
             enable: true,
             ema: Ema2::new(1),
             num: 0,
@@ -190,22 +189,22 @@ impl Default for ProgressWLBD {
     }
 }
 
-impl Instantiate for ProgressWLBD {
+impl Instantiate for ProgressCFD {
     fn instantiate(config: &Config, _: &CNFDescription) -> Self {
-        ProgressWLBD {
+        ProgressCFD {
             ema: Ema2::new(config.rst_lbd_len).with_slow(config.rst_lbd_slw),
             threshold: config.rst_lbd_thr,
-            ..ProgressWLBD::default()
+            ..ProgressCFD::default()
         }
     }
 }
 
-impl EmaIF for ProgressWLBD {
-    type Input = f64;
+impl EmaIF for ProgressCFD {
+    type Input = DecisionLevel;
     fn update(&mut self, d: Self::Input) {
         self.num += 1;
-        self.sum += d;
-        self.ema.update(d);
+        self.sum += d as f64;
+        self.ema.update(d as f64);
     }
     fn get(&self) -> f64 {
         self.ema.get()
@@ -217,7 +216,7 @@ impl EmaIF for ProgressWLBD {
     }
 }
 
-impl ProgressEvaluator for ProgressWLBD {
+impl ProgressEvaluator for ProgressCFD {
     fn is_active(&self) -> bool {
         self.enable && self.threshold < self.ema.trend()
     }
@@ -306,7 +305,7 @@ impl Default for ProgressCMR {
             val: 0.0,
             inc: 0,
             correlation: 0.0,
-            threshold: 1.6,
+            threshold: 0.7,
         }
     }
 }
@@ -707,7 +706,7 @@ pub struct Restarter {
     asg: ProgressASG,
     // bkt: ProgressBucket,
     lbd: ProgressLBD,
-    wlbd: ProgressWLBD,
+    cfd: ProgressCFD,
     cmr: ProgressCMR,
     mul: ProgressMUL,
     // pub rcc: ProgressRCC,
@@ -736,7 +735,7 @@ impl Default for Restarter {
             asg: ProgressASG::default(),
             // bkt: ProgressBucket::default(),
             lbd: ProgressLBD::default(),
-            wlbd: ProgressWLBD::default(),
+            cfd: ProgressCFD::default(),
             cmr: ProgressCMR::default(),
             mul: ProgressMUL::default(),
             // rcc: ProgressRCC::default(),
@@ -763,7 +762,7 @@ impl Instantiate for Restarter {
             asg: ProgressASG::instantiate(config, cnf),
             // bkt: ProgressBucket::instantiate(config, cnf),
             lbd: ProgressLBD::instantiate(config, cnf),
-            wlbd: ProgressWLBD::instantiate(config, cnf),
+            cfd: ProgressCFD::instantiate(config, cnf),
             cmr: ProgressCMR::instantiate(config, cnf),
             mul: ProgressMUL::instantiate(config, cnf),
             // rcc: ProgressRCC::instantiate(config, cnf),
@@ -809,6 +808,42 @@ impl RestartIF for Restarter {
     fn stabilizing(&self) -> bool {
         self.stb.is_active()
     }
+    #[allow(unreachable_code)]
+    /*
+        fn restart(&mut self) -> Option<RestartDecision> {
+            if self.luby.is_active() {
+                self.luby.shift();
+                self.after_restart = 0;
+                return Some(RestartDecision::Force);
+            }
+            if self.after_restart < self.restart_step {
+                return None;
+            }
+            self.cmr.shift();
+            let k = if self.stb.is_active() { 1.0 } else { 0.25 };
+            let margin = self.stb.num_active as f64 * k + self.mul.threshold;
+            let good_path = self.lbd.get() < self.mul.get() + margin;
+            if self.stb.is_active() {
+                if self.cmr.is_active() && good_path {
+                    self.after_restart = 0;
+                    return Some(RestartDecision::Cancel);
+                } else {
+                    self.after_restart = 0;
+                    return Some(RestartDecision::Stabilize);
+                }
+            }
+            if self.asg.is_active() {
+                self.num_block += 1;
+                self.after_restart = 0;
+                return Some(RestartDecision::Block);
+            }
+            if !good_path {
+                self.after_restart = 0;
+                return Some(RestartDecision::Force);
+            }
+            None
+        }
+    */
     fn restart(&mut self) -> Option<RestartDecision> {
         macro_rules! ret {
             ($decision: path) => {
@@ -824,37 +859,42 @@ impl RestartIF for Restarter {
             return None;
         }
         self.cmr.shift();
-        let k = if self.stb.is_active() {
-            self.mul_stb_bst * self.mul_step
-        } else {
-            self.mul_step
-        };
-        let margin = self.stb.num_active as f64 * k + self.mul.threshold;
-        let bad_path = self.mul.get() + margin < self.wlbd.get();
-        if self.stb.is_active() {
-            if self.asg.is_active() {
+        let Restarter {
+            ref asg,
+            ref cfd,
+            ref lbd,
+            ref mul,
+            ref stb,
+            ..
+        } = self;
+        if stb.is_active() {
+            if asg.is_active() || cfd.trend() < 0.8 {
                 self.num_block += 1;
                 self.num_block_in_stabilizing += 1;
                 ret!(RestartDecision::Cancel);
             }
-            if bad_path {
+            let margin = self.stb.num_active as f64 * self.mul_step + 0.1;
+            if
+            /* lbd.is_active() || */
+            mul.get() + margin < lbd.get() {
                 self.num_restart += 1;
                 self.num_restart_in_stabilizing += 1;
                 ret!(RestartDecision::Stabilize);
             }
-            return None;
+            None
         } else {
-            if self.asg.is_active() {
-                self.num_block += 1;
-                ret!(RestartDecision::Block);
-            }
-            if self.lbd.is_active() {
+            if lbd.is_active() {
                 self.num_restart += 1;
                 ret!(RestartDecision::Force);
             }
-            return None;
+            if asg.is_active() {
+                self.num_block += 1;
+                ret!(RestartDecision::Block);
+            }
+            None
         }
     }
+    // */
     fn update(&mut self, kind: ProgressUpdate) {
         match kind {
             ProgressUpdate::Counter(val) => {
@@ -865,7 +905,7 @@ impl RestartIF for Restarter {
             ProgressUpdate::ASG(val) => self.asg.update(val),
             ProgressUpdate::CMR(fval) => self.cmr.update(fval),
             ProgressUpdate::LBD(val) => self.lbd.update(val),
-            ProgressUpdate::WLBD(val) => self.wlbd.update(val),
+            ProgressUpdate::CFD(val) => self.cfd.update(val),
             ProgressUpdate::Luby => self.luby.update(0),
             ProgressUpdate::MUL(val) => self.mul.update(val),
             ProgressUpdate::Reset => (),
@@ -873,43 +913,7 @@ impl RestartIF for Restarter {
     }
 }
 
-//impl Restarter {
-//    /// return `true` if if blocking restart is needed.
-//    fn block_restart(&mut self) -> bool {
-//        // || self.bkt.enable
-//        if self.after_restart < self.restart_step || self.luby.enable {
-//            return false;
-//        }
-//        if self.asg.is_active() {
-//            self.num_block += 1;
-//            reset!(self);
-//        }
-//        false
-//    }
-//    /// return `true` if forcing restart is needed.
-//    fn force_restart(&mut self) -> bool {
-//        if self.luby.is_active() {
-//            self.luby.shift();
-//            reset!(self);
-//        }
-//        /*
-//        if self.bkt.is_active() {
-//            self.bkt.shift();
-//            reset!(self);
-//        }
-//        */
-//        if self.after_restart < self.restart_step {
-//            return false;
-//        }
-//        if self.lbd.is_active() {
-//            self.lbd.shift();
-//            reset!(self);
-//        }
-//        false
-//    }
-//}
-
-impl Export<(usize, usize, usize, usize), RestartMode> for Restarter {
+impl Export<(usize, usize, usize, usize, usize), RestartMode> for Restarter {
     /// exports:
     ///  1. the number of blocking
     ///  1. the number of stabilzation
@@ -919,13 +923,14 @@ impl Export<(usize, usize, usize, usize), RestartMode> for Restarter {
     ///```
     /// use crate::splr::{config::Config, solver::Restarter, types::*};
     /// let rst = Restarter::instantiate(&Config::default(), &CNFDescription::default());
-    /// let (num_block, num_stb) = rst.exports();
+    /// let (num_stb, num_restart, num_block, num_rs, num_bs) = rst.exports();
     ///```
     #[inline]
-    fn exports(&self) -> (usize, usize, usize, usize) {
+    fn exports(&self) -> (usize, usize, usize, usize, usize) {
         (
-            self.num_block,
             self.stb.num_active,
+            self.num_restart,
+            self.num_block,
             self.num_restart_in_stabilizing,
             self.num_block_in_stabilizing,
         )
@@ -946,8 +951,6 @@ impl Export<(usize, usize, usize, usize), RestartMode> for Restarter {
 impl<'a> ExportBox<'a, (&'a Ema2, &'a Ema2, &'a Ema2, &'a Ema2)> for Restarter {
     fn exports_box(&'a self) -> Box<(&'a Ema2, &'a Ema2, &'a Ema2, &'a Ema2)> {
         Box::from((&self.asg.ema, &self.lbd.ema, &self.mul.ema, &self.cmr.ema))
-        // Note: `Box` is not required to export them. You can use a tuple as well.
-        // (&self.asg.ema, &self.cmr.ema, &self.lbd.ema, &self.mul.ema)
     }
 }
 
