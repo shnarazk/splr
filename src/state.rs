@@ -46,7 +46,7 @@ pub trait StateIF {
         C: Export<(usize, usize, usize, usize, usize, usize), ()>,
         E: Export<(usize, usize, f64), ()>,
         R: RestartIF
-            + Export<(usize, usize, usize, usize), RestartMode>
+            + Export<(usize, usize, usize, usize, usize), RestartMode>
             + ExportBox<'r, (&'r Ema2, &'r Ema2, &'r Ema2, &'r Ema2)>;
     /// write a short message to stdout.
     fn flush<S: AsRef<str>>(&self, mes: S);
@@ -487,7 +487,7 @@ impl StateIF for State {
         C: Export<(usize, usize, usize, usize, usize, usize), ()>,
         E: Export<(usize, usize, f64), ()>,
         R: RestartIF
-            + Export<(usize, usize, usize, usize), RestartMode>
+            + Export<(usize, usize, usize, usize, usize), RestartMode>
             + ExportBox<'r, (&'r Ema2, &'r Ema2, &'r Ema2, &'r Ema2)>,
     {
         if !self.config.splr_interface || self.config.quiet_mode {
@@ -509,7 +509,7 @@ impl StateIF for State {
 
         let rst_mode = rst.active_mode();
 
-        let (rst_num_blk, rst_num_stb, rst_num_srst, rst_num_sblk) = rst.exports();
+        let (rst_num_stb, _num_rst, rst_num_blk, rst_num_srst, rst_num_sblk) = rst.exports();
         let (rst_asg, rst_lbd, rst_mul, _) = *rst.exports_box();
 
         if self.config.use_log {
@@ -745,7 +745,7 @@ impl State {
     where
         A: AssignIF + Export<(usize, usize, usize, f64), ()>,
         C: Export<(usize, usize, usize, usize, usize, usize), ()>,
-        R: Export<(usize, usize, usize, usize), RestartMode>,
+        R: Export<(usize, usize, usize, usize, usize), RestartMode>,
     {
         self.progress_cnt += 1;
         let (asg_num_vars, asg_num_asserted_vars, asg_num_eliminated_vars, asg_num_unasserted_vars) =
@@ -782,7 +782,7 @@ impl State {
         A: AssignIF + Export<(usize, usize, usize, f64), ()>,
         C: Export<(usize, usize, usize, usize, usize, usize), ()>,
         R: RestartIF
-            + Export<(usize, usize, usize, usize), RestartMode>
+            + Export<(usize, usize, usize, usize, usize), RestartMode>
             + ExportBox<'r, (&'r Ema2, &'r Ema2, &'r Ema2, &'r Ema2)>,
     {
         self.progress_cnt += 1;
