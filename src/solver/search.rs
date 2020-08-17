@@ -252,7 +252,7 @@ fn search(
         }
         // Simplification has been postponed because chronoBT was used.
         if asg.decision_level() == asg.root_level {
-            if state.config.viv_interval <= state.to_vivify && state.config.use_vivify() {
+            if state.config.viv_int <= state.to_vivify && state.config.use_vivify() {
                 state.to_vivify = 0;
                 if !cdb.use_chan_seok && vivify(asg, cdb, elim, state).is_err() {
                     return Err(SolverError::UndescribedError);
@@ -260,7 +260,7 @@ fn search(
             }
             // `elim.to_simplify` is increased much in particular when vars are asserted or
             // learnts are small. We don't need to count the number of asserted vars.
-            if state.config.ip_interval <= elim.to_simplify as usize {
+            if state.config.meta_ip_int <= elim.to_simplify as usize {
                 elim.to_simplify = 0.0;
                 if elim.enable {
                     elim.activate();

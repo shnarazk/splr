@@ -77,7 +77,7 @@ pub struct Config {
     //
     /// #cls to start in-processor
     #[cfg_attr(feature = "structopt", structopt(long = "ii", default_value = "25000"))]
-    pub ip_interval: usize,
+    pub meta_ip_int: usize,
 
     //
     //## eliminator
@@ -111,7 +111,7 @@ pub struct Config {
 
     /// Vivif. interval
     #[cfg_attr(feature = "structopt", structopt(long = "vii", default_value = "4"))]
-    pub viv_interval: usize,
+    pub viv_int: usize,
 
     /// #reduction for next vivif.
     #[cfg_attr(feature = "structopt", structopt(long = "vis", default_value = "2.0"))]
@@ -249,14 +249,14 @@ impl Default for Config {
             use_log: false,
             clause_limit: 0,
             reduce: 1,
-            ip_interval: 40000,
+            meta_ip_int: 40000,
             elim_cls_lim: 32,
             elim_var_occ: 8192,
             elim_grw_lim: 0,
             elim: 1,
             viv_beg: 1.0,
             viv_end: 2.0,
-            viv_interval: 8,
+            viv_int: 8,
             viv_scale: 2.0,
             vivify: 1,
             rst_step: 32,
