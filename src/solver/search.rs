@@ -251,8 +251,16 @@ fn search(
         if asg.decision_level() == asg.root_level {
             if state.config.viv_int <= state.to_vivify && state.config.use_vivify() {
                 state.to_vivify = 0;
-                if !cdb.use_chan_seok && vivify(asg, cdb, elim, state).is_err() {
-                    return Err(SolverError::UndescribedError);
+                if !cdb.use_chan_seok {
+                    match vivify(asg, cdb, elim, state) {
+                        Ok(()) => (),
+                        Err(SolverError::Inconsistent) => {
+                            assert_eq!(asg.decision_level(), 0);
+                            analyze_final(asg, state, &cdb[ci]);
+                            return Ok(false);
+                        }
+                        Err(_) => return Err(SolverError::UndescribedError),
+                    }
                 }
             }
             // `elim.to_simplify` is increased much in particular when vars are asserted or

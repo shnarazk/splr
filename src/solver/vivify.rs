@@ -165,7 +165,8 @@ pub fn vivify(
                 }
                 asg.assign_at_rootlevel(copied[0])?;
                 if !asg.propagate(cdb).is_none() {
-                    panic!("Vivification found an uncatchable inconsistency.");
+                    // panic!("Vivification found an uncatchable inconsistency.");
+                    return Err(SolverError::Inconsistent);
                 }
                 state.handle(SolverEvent::Assert);
                 state[Stat::VivifiedVar] += 1;
