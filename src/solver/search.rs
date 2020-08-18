@@ -260,7 +260,7 @@ fn search(
             }
             // `elim.to_simplify` is increased much in particular when vars are asserted or
             // learnts are small. We don't need to count the number of asserted vars.
-            if state.config.meta_ip_int <= elim.to_simplify as usize {
+            if state.config.c_ip_int <= elim.to_simplify as usize {
                 elim.to_simplify = 0.0;
                 if elim.enable {
                     elim.activate();

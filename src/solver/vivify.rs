@@ -41,7 +41,7 @@ pub fn vivify(
         // until timed out. 100 means this function can consume 10% of a given time.
         let timeslot_for_vivification: u64 = state.vivify_thr as u64;
         let timedout2 = timedout.clone();
-        let time = timeslot_for_vivification * state.config.meta_tout as u64;
+        let time = timeslot_for_vivification * state.config.c_tout as u64;
         thread::spawn(move || {
             thread::sleep(Duration::from_millis(time));
             timedout2.store(true, Ordering::Release);

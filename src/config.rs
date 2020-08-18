@@ -40,6 +40,28 @@ pub struct Config {
     a_vivify: i32,
 
     //
+    //## solver configuration
+    //
+    /// Dec. lvl to use chronoBT      .
+    #[cfg_attr(feature = "structopt", structopt(long = "cbt", default_value = "100"))]
+    pub c_cbt_thr: DecisionLevel,
+
+    /// Soft limit of #clauses (6MC/GB) .
+    #[cfg_attr(feature = "structopt", structopt(long = "cl", default_value = "0"))]
+    pub c_cls_lim: usize,
+
+    /// #cls to start in-processor  .
+    #[cfg_attr(feature = "structopt", structopt(long = "ii", default_value = "25000"))]
+    pub c_ip_int: usize,
+
+    /// CPU time limit in sec.     .
+    #[cfg_attr(
+        feature = "structopt",
+        structopt(long = "timeout", short = "t", default_value = "5000.0")
+    )]
+    pub c_tout: f64,
+
+    //
     //## I/O configuration
     //
     /// Build Splr interface            .
@@ -97,28 +119,6 @@ pub struct Config {
     pub use_log: bool,
 
     //
-    //## solver configuration
-    //
-    /// Dec. lvl to use chronoBT      .
-    #[cfg_attr(feature = "structopt", structopt(long = "cbt", default_value = "100"))]
-    pub meta_cbt: DecisionLevel,
-
-    /// Soft limit of #clauses (6MC/GB) .
-    #[cfg_attr(feature = "structopt", structopt(long = "cl", default_value = "0"))]
-    pub meta_cls_lim: usize,
-
-    /// #cls to start in-processor  .
-    #[cfg_attr(feature = "structopt", structopt(long = "ii", default_value = "25000"))]
-    pub meta_ip_int: usize,
-
-    /// CPU time limit in sec.     .
-    #[cfg_attr(
-        feature = "structopt",
-        structopt(long = "timeout", short = "t", default_value = "5000.0")
-    )]
-    pub meta_tout: f64,
-
-    //
     //## eliminator
     //
     /// Max #lit for clause subsume    .
@@ -140,10 +140,6 @@ pub struct Config {
     #[cfg_attr(feature = "structopt", structopt(long = "rs", default_value = "50"))]
     pub rst_step: usize,
 
-    /// Correlation to cancel restart .
-    #[cfg_attr(feature = "structopt", structopt(long = "rct", default_value = "0.7"))]
-    pub rst_acc_thr: f64,
-
     /// Length of assign. fast EMA     .
     #[cfg_attr(feature = "structopt", structopt(long = "ral", default_value = "50"))]
     pub rst_asg_len: usize,
@@ -158,6 +154,10 @@ pub struct Config {
     /// Blocking restart threshold    .
     #[cfg_attr(feature = "structopt", structopt(long = "rat", default_value = "1.4"))]
     pub rst_asg_thr: f64, // Glucose's R
+
+    /// Conflict Correlation threshold
+    #[cfg_attr(feature = "structopt", structopt(long = "rct", default_value = "0.7"))]
+    pub rst_ccc_thr: f64,
 
     /// Length of LBD fast EMA         .
     #[cfg_attr(feature = "structopt", structopt(long = "rll", default_value = "50"))]
@@ -224,6 +224,11 @@ impl Default for Config {
             a_stabilize: 1,
             a_vivify: 1,
 
+            c_cbt_thr: 100,
+            c_cls_lim: 0,
+            c_ip_int: 25000,
+            c_tout: 5000.0,
+
             splr_interface: false,
             cnf_file: PathBuf::new(),
             io_dump: 0,
@@ -235,20 +240,15 @@ impl Default for Config {
             use_certification: false,
             use_log: false,
 
-            meta_cbt: 100,
-            meta_cls_lim: 0,
-            meta_ip_int: 25000,
-            meta_tout: 5000.0,
-
             elim_cls_lim: 32,
             elim_grw_lim: 0,
             elim_var_occ: 8192,
 
             rst_step: 50,
-            rst_acc_thr: 0.70,
             rst_asg_len: 50,
             rst_asg_slw: 10000,
             rst_asg_thr: 1.40,
+            rst_ccc_thr: 0.70,
             rst_lbd_len: 50,
             rst_lbd_slw: 10000,
             rst_lbd_thr: 1.20,
