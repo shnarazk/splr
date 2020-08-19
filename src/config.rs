@@ -137,11 +137,11 @@ pub struct Config {
     //## restarter
     //
     /// #conflicts between restarts    .
-    #[cfg_attr(feature = "structopt", structopt(long = "rs", default_value = "50"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "rs", default_value = "40"))]
     pub rst_step: usize,
 
     /// Length of assign. fast EMA     .
-    #[cfg_attr(feature = "structopt", structopt(long = "ral", default_value = "50"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "ral", default_value = "30"))]
     pub rst_asg_len: usize,
 
     /// Length of assign. slow EMA  .
@@ -160,7 +160,7 @@ pub struct Config {
     pub rst_ccc_thr: f64,
 
     /// Length of LBD fast EMA         .
-    #[cfg_attr(feature = "structopt", structopt(long = "rll", default_value = "50"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "rll", default_value = "30"))]
     pub rst_lbd_len: usize,
 
     /// Length of LBD slow EMA      .
@@ -244,12 +244,12 @@ impl Default for Config {
             elim_grw_lim: 0,
             elim_var_occ: 8192,
 
-            rst_step: 50,
-            rst_asg_len: 50,
+            rst_step: 40,
+            rst_asg_len: 30,
             rst_asg_slw: 10000,
             rst_asg_thr: 1.40,
             rst_ccc_thr: 0.70,
-            rst_lbd_len: 50,
+            rst_lbd_len: 30,
             rst_lbd_slw: 10000,
             rst_lbd_thr: 1.20,
             rst_mld_thr: 4.00,
