@@ -151,10 +151,9 @@ pub fn vivify(
                         copied.push(!*l);
                         let r = cdb[cc].lits.clone(); // Rule 3
                         copied = asg.analyze(cdb, &copied, &r, &mut seen);
-                        if copied.is_empty() {
-                            break 'this_clause;
+                        if !copied.is_empty() {
+                            flipped = false;
                         }
-                        flipped = false;
                     }
                     asg.cancel_until(asg.root_level);
                     if let Some(cj) = cid {
