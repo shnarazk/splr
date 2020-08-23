@@ -251,11 +251,13 @@ fn search(
             }
         }
         // Simplification has been postponed because chronoBT was used.
-        if asg.decision_level() == asg.root_level {
+        if asg.decision_level() == asg.root_level && !asg.remains() {
             if state.config.viv_int <= state.to_vivify && state.config.use_vivify() {
                 state.to_vivify = 0;
                 if !cdb.use_chan_seok && vivify(asg, cdb, elim, state).is_err() {
-                    return Err(SolverError::UndescribedError);
+                    // return Err(SolverError::UndescribedError);
+                    analyze_final(asg, state, &cdb[ci]);
+                    return Ok(false);
                 }
             }
             // `elim.to_simplify` is increased much in particular when vars are asserted or

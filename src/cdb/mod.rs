@@ -137,6 +137,11 @@ pub struct ClauseDB {
     num_reduction: usize,
 
     //
+    //## vivification
+    //
+    pub during_vivification: bool,
+
+    //
     //## incremental solving
     //
     pub eliminated_permanent: Vec<Vec<Lit>>,

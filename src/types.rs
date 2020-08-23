@@ -697,6 +697,8 @@ bitflags! {
         const VIVIFIED2    = 0b0000_0000_1000_0000;
         /// a given clause derived a learnt which LBD is smaller than 20.
         const DERIVE20     = 0b0010_0000_0000_0000;
+        /// a temporal clause during vivification
+        const VIV_ASSUMP   = 0b0100_0000_0000_0000;
 
         //
         //## For Var

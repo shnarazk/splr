@@ -81,7 +81,7 @@ pub fn vivify(
     clauses.sort_by_key(|ci| cdb[*ci].rank);
     clauses.resize(clauses.len() / 2, ClauseId::default());
     assert!(!asg.remains());
-    'next_clause: while let Some(ci) = clauses.pop() {
+    while let Some(ci) = clauses.pop() {
         let c: &mut Clause = &mut cdb[ci];
         // Since GC can make `clauses` out of date, we need to check its aliveness here.
         if c.is(Flag::DEAD) {
@@ -97,7 +97,6 @@ pub fn vivify(
         let mut copied: Vec<Lit> = Vec::new();
         let mut flipped = true;
         // cdb.eliminate_satisfied_clauses(asg, elim, false);
-        cdb.garbage_collect();
         'this_clause: for l in clits.iter() {
             debug_assert_eq!(0, asg.decision_level());
             ncheck += 1;
@@ -113,16 +112,16 @@ pub fn vivify(
             match asg.assigned(*l) {
                 Some(false) => continue 'this_clause, // Rule 1
                 Some(true) => {
-                    assert_eq!(asg.decision_level(), 0);
+                    //
+                    // This path is optimized for the case the decision level is zero.
+                    //
                     // copied.push(!*l);
                     // let r = asg.reason_literals(cdb, *l);
                     // copied = asg.minimize(cdb, &copied, &r, &mut seen); // Rule 2
-                    state.viv_pathes[8 + copied.len().min(2)] = true;
                     // if copied.len() == 1 {
                     //     assert_eq!(copied[0], *l);
                     //     copied.clear();
                     // }
-                    //                    continue 'this_clause;
                     copied.clear();
                     flipped = false;
                     break 'this_clause;
@@ -131,40 +130,30 @@ pub fn vivify(
                     let cid: Option<ClauseId> = match copied.len() {
                         0 => None,
                         1 => {
-                            assert!(flipped);
-                            assert_eq!(asg.assigned(copied[0]), None);
-                            assert_eq!(0, asg.decision_level());
+                            debug_assert!(flipped);
+                            debug_assert_eq!(asg.assigned(copied[0]), None);
+                            debug_assert_eq!(0, asg.decision_level());
                             asg.assign_by_decision(copied[0]);
                             None
                         }
                         _ => {
-                            // continue 'next_clause;
                             cdb.handle(SolverEvent::Vivify(true));
-                            assert!(cdb.during_vivification);
+                            debug_assert!(cdb.during_vivification);
                             let cid = cdb.new_clause(asg, &mut copied.clone(), true, false);
                             cdb.handle(SolverEvent::Vivify(false));
                             Some(cid)
                         }
                     };
-                    assert_eq!(asg.assigned(!*l), None);
+                    debug_assert_eq!(asg.assigned(!*l), None);
                     asg.assign_by_decision(!*l);
                     let cc: ClauseId = asg.propagate(cdb);
                     if !cc.is_none() {
                         copied.push(!*l);
                         let r = cdb[cc].lits.clone(); // Rule 3
-                        let result = asg.analyze(cdb, &copied, &r, &mut seen);
-                        if result.is_empty() {
+                        copied = asg.analyze(cdb, &copied, &r, &mut seen);
+                        if copied.is_empty() {
                             break 'this_clause;
                         }
-                        assert!(result.contains(l));
-                        copied.clear();
-                        copied.push(*l);
-                        for lit in &result {
-                            if *lit != *l {
-                                copied.push(*lit);
-                            }
-                        }
-                        // copied = result;
                         flipped = false;
                     }
                     asg.cancel_until(asg.root_level);
@@ -187,13 +176,11 @@ pub fn vivify(
         }
         match copied.len() {
             0 if flipped => {
-                state.viv_pathes[0] = true;
                 cdb.certificate_add(&clits[0..1]);
                 assert!(asg.stack_iter().all(|l| asg.assigned(*l).is_some()));
                 return Err(SolverError::Inconsistent);
             }
             0 => {
-                state.viv_pathes[1] = true;
                 if !cdb[ci].is(Flag::DEAD) {
                     cdb.detach(ci);
                     cdb.garbage_collect();
@@ -203,39 +190,31 @@ pub fn vivify(
             }
             1 => {
                 let l0 = copied[0];
-                assert_ne!(asg.assigned(l0), Some(false));
-                assert_eq!(asg.decision_level(), asg.root_level);
+                debug_assert_ne!(asg.assigned(l0), Some(false));
+                debug_assert_eq!(asg.decision_level(), asg.root_level);
                 if asg.assigned(l0) == None {
                     nassert += 1;
                     cdb.certificate_add(&copied);
                     // cdb.certificate_delete(&copied);
                     asg.assign_at_rootlevel(l0)?;
                     if !asg.propagate(cdb).is_none() {
-                        state.viv_pathes[2] = true;
                         // panic!("Vivification found an inconsistency. len: {}", clits.len());
                         return Err(SolverError::Inconsistent);
                     }
                     asg.handle(SolverEvent::Assert);
                     elim.to_simplify += 2.0;
                     state[Stat::VivifiedVar] += 1;
-                    state.viv_pathes[3] = true;
-                } else {
-                    state.viv_pathes[4] = true;
                 }
                 assert!(!cdb[ci].is(Flag::DEAD));
                 cdb.detach(ci);
                 cdb.garbage_collect();
             }
-            n if n == clits.len() => {
-                state.viv_pathes[5] = true;
-            }
+            n if n == clits.len() => (),
             n => {
                 if n == 2 && cdb.registered_bin_clause(copied[0], copied[1]) {
-                    state.viv_pathes[6] = true;
                     npurge += 1;
                     elim.to_simplify += 1.0;
                 } else {
-                    state.viv_pathes[7] = true;
                     nshrink += 1;
                     cdb.certificate_add(&copied);
                     cdb.handle(SolverEvent::Vivify(true));
@@ -313,6 +292,11 @@ impl AssignStack {
         let mut res: Vec<Lit> = Vec::new();
         for l in reason {
             seen[l.vi()] = key;
+        }
+        // make sure the decision var is at the top of list
+        if let Some(l) = lits.last().filter(|l| reason.contains(l)) {
+            res.push(*l);
+            seen[l.vi()] = 0;
         }
         for l in self.stack_iter().rev() {
             if seen[l.vi()] != key {

@@ -129,6 +129,7 @@ impl Default for ClauseDB {
             num_lbd2: 0,
             num_learnt: 0,
             num_reduction: 0,
+            during_vivification: false,
             eliminated_permanent: Vec::new(),
         }
     }
@@ -296,6 +297,9 @@ impl Instantiate for ClauseDB {
                 self.touched.push(false);
                 self.lbd_temp.push(0);
             }
+            SolverEvent::Vivify(on) => {
+                self.during_vivification = on;
+            }
             _ => (),
         }
     }
@@ -392,8 +396,9 @@ impl ClauseDBIF for ClauseDB {
                     if c.is(Flag::LEARNT) {
                         self.num_learnt -= 1;
                     }
-                    if !certified.is_empty() {
+                    if !certified.is_empty() && !c.is(Flag::VIV_ASSUMP) {
                         let temp = c.lits.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
+                        debug_assert!(!temp.is_empty());
                         certified.push((CertifiedRecord::DELETE, temp));
                     }
                     c.lits.clear();
@@ -428,8 +433,9 @@ impl ClauseDBIF for ClauseDB {
                     if c.is(Flag::LEARNT) {
                         self.num_learnt -= 1;
                     }
-                    if !certified.is_empty() {
+                    if !certified.is_empty() && !c.is(Flag::VIV_ASSUMP) {
                         let temp = c.lits.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
+                        debug_assert!(!temp.is_empty());
                         certified.push((CertifiedRecord::DELETE, temp));
                     }
                     c.lits.clear();
@@ -460,10 +466,6 @@ impl ClauseDBIF for ClauseDB {
     {
         let reward = self.activity_inc;
         let rank = if level_sort {
-            if !self.certified.is_empty() {
-                let temp = vec.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
-                self.certified.push((CertifiedRecord::ADD, temp));
-            }
             #[cfg(feature = "boundary_check")]
             debug_assert!(1 < vec.len());
             // sort literals
@@ -497,6 +499,11 @@ impl ClauseDBIF for ClauseDB {
         } else {
             vec.len()
         };
+        if !self.certified.is_empty() && !self.during_vivification {
+            let temp = vec.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
+            debug_assert!(!temp.is_empty());
+            self.certified.push((CertifiedRecord::ADD, temp));
+        }
         let cid;
         let l0 = vec[0];
         let l1 = vec[1];
@@ -531,6 +538,9 @@ impl ClauseDBIF for ClauseDB {
             std::mem::swap(&mut c.lits, vec);
             self.clause.push(c);
         };
+        if self.during_vivification {
+            self[cid].turn_on(Flag::VIV_ASSUMP);
+        }
         let c = &mut self[cid];
         // assert!(0 < c.rank);
         let len2 = c.lits.len() == 2;
@@ -647,13 +657,14 @@ impl ClauseDBIF for ClauseDB {
         self.garbage_collect();
     }
     fn certificate_add(&mut self, vec: &[Lit]) {
-        if !self.certified.is_empty() {
+        if !self.certified.is_empty() && !self.during_vivification {
             let temp = vec.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
+            debug_assert!(!temp.is_empty());
             self.certified.push((CertifiedRecord::ADD, temp));
         }
     }
     fn certificate_delete(&mut self, vec: &[Lit]) {
-        if !self.certified.is_empty() {
+        if !self.certified.is_empty() && !self.during_vivification {
             let temp = vec.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
             self.certified.push((CertifiedRecord::DELETE, temp));
         }
