@@ -11,7 +11,7 @@ It adopts various research results on SAT solvers:
 - *chronological backtrack* aka *chronoBT*
 - Glucose-like heuristics adaptation
 - [CaDiCaL](https://github.com/arminbiere/cadical)-like extended phase saving
-- CaDiCaL-like search stabilization (not activated by default)
+- a variant of CaDiCaL-like search stabilization
 - clause vivification by {pre,in}-processor
 
 *Many thanks to SAT researchers.*

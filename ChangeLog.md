@@ -1,8 +1,9 @@
 ## 0.4.2, 2020-07-XX
 
 - massive changes on the default parameters about restart
+  - restart condition was revised as a multi-armed bandid problem
+  - add some new criteria which are not documented yet
 - compute LBD of permanent clauses correctly
-- restart condition was revised as a multi-armed bandid problem
 - implement clause vivification
 - add `ClauseDB::bin_watcher`
 - delete `Watch::binary`
