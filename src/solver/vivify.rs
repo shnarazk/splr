@@ -249,35 +249,31 @@ impl AssignStack {
             AssignReason::None => Cow::Owned(vec![l]),
         }
     }
-
     /// inspect the complete implication graph to collect a disjunction of a subset of
     /// negated literals of `lits`
-    fn minimize(
-        &mut self,
+    fn analyze(
+        &self,
         cdb: &ClauseDB,
         lits: &[Lit],
         reason: &[Lit],
-        id: usize,
         seen: &mut [usize],
     ) -> Vec<Lit> {
+        let key = seen[0];
         let mut res: Vec<Lit> = Vec::new();
         for l in reason {
-            seen[l.vi()] = id;
+            seen[l.vi()] = key;
         }
         for l in self.stack_iter().rev() {
-            if seen[l.vi()] != id {
+            if seen[l.vi()] != key {
                 continue;
             }
             if lits.contains(l) {
                 res.push(!*l);
-                continue;
-            }
-            if lits.contains(&!*l) {
+            } else if lits.contains(&!*l) {
                 res.push(*l);
-                continue;
             }
             for r in self.reason_literals(cdb, *l).iter() {
-                seen[r.vi()] = id;
+                seen[r.vi()] = key;
             }
         }
         res
