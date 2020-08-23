@@ -110,14 +110,16 @@ pub fn vivify(
                 to_display = ncheck + display_step;
             }
             match asg.assigned(*l) {
-                Some(false) => continue 'this_clause, // Rule 1
+                // Rule 1
+                Some(false) => continue 'this_clause,
+                // Rule 2
                 Some(true) => {
                     //
                     // This path is optimized for the case the decision level is zero.
                     //
                     // copied.push(!*l);
                     // let r = asg.reason_literals(cdb, *l);
-                    // copied = asg.minimize(cdb, &copied, &r, &mut seen); // Rule 2
+                    // copied = asg.minimize(cdb, &copied, &r, &mut seen);
                     // if copied.len() == 1 {
                     //     assert_eq!(copied[0], *l);
                     //     copied.clear();
@@ -147,10 +149,10 @@ pub fn vivify(
                     debug_assert_eq!(asg.assigned(!*l), None);
                     asg.assign_by_decision(!*l);
                     let cc: ClauseId = asg.propagate(cdb);
+                    // Rule 3
                     if !cc.is_none() {
                         copied.push(!*l);
-                        let r = cdb[cc].lits.clone(); // Rule 3
-                        copied = asg.analyze(cdb, &copied, &r, &mut seen);
+                        copied = asg.analyze(cdb, &copied, &cdb[cc].lits, &mut seen);
                         if !copied.is_empty() {
                             flipped = false;
                         }
@@ -166,7 +168,8 @@ pub fn vivify(
                     if !cc.is_none() {
                         break 'this_clause;
                     }
-                    copied.push(!*l); // Rule 4
+                    // Rule 4
+                    copied.push(!*l);
                 }
             }
         }
@@ -194,10 +197,9 @@ pub fn vivify(
                 if asg.assigned(l0) == None {
                     nassert += 1;
                     cdb.certificate_add(&copied);
-                    // cdb.certificate_delete(&copied);
                     asg.assign_at_rootlevel(l0)?;
                     if !asg.propagate(cdb).is_none() {
-                        // panic!("Vivification found an inconsistency. len: {}", clits.len());
+                        // panic!("Vivification found an inconsistency.");
                         return Err(SolverError::Inconsistent);
                     }
                     asg.handle(SolverEvent::Assert);
