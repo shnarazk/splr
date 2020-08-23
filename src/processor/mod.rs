@@ -344,9 +344,9 @@ impl Instantiate for Eliminator {
         Eliminator {
             enable: config.use_elim(),
             var_queue: VarOccHeap::new(nv, 0),
-            eliminate_var_occurrence_limit: config.elim_var_occ,
-            eliminate_grow_limit: config.elim_grw_lim,
-            subsume_literal_limit: config.elim_cls_lim,
+            eliminate_var_occurrence_limit: config.elm_var_occ,
+            eliminate_grow_limit: config.elm_grw_lim,
+            subsume_literal_limit: config.elm_cls_lim,
             var: LitOccurs::new(nv + 1),
             ..Eliminator::default()
         }

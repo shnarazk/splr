@@ -123,15 +123,15 @@ pub struct Config {
     //
     /// Max #lit for clause subsume    .
     #[cfg_attr(feature = "structopt", structopt(long = "ecl", default_value = "32"))]
-    pub elim_cls_lim: usize,
+    pub elm_cls_lim: usize,
 
     /// Grow limit of #cls in var elim. .
     #[cfg_attr(feature = "structopt", structopt(long = "evl", default_value = "0"))]
-    pub elim_grw_lim: usize,
+    pub elm_grw_lim: usize,
 
     /// Max #cls for var elimination .
     #[cfg_attr(feature = "structopt", structopt(long = "evo", default_value = "8192"))]
-    pub elim_var_occ: usize,
+    pub elm_var_occ: usize,
 
     //
     //## restarter
@@ -240,9 +240,9 @@ impl Default for Config {
             use_certification: false,
             use_log: false,
 
-            elim_cls_lim: 32,
-            elim_grw_lim: 0,
-            elim_var_occ: 8192,
+            elm_cls_lim: 32,
+            elm_grw_lim: 0,
+            elm_var_occ: 8192,
 
             rst_step: 40,
             rst_asg_len: 30,
