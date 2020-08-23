@@ -30,7 +30,7 @@ pub fn vivify(
     asg.handle(SolverEvent::Vivify(true));
     state[Stat::Vivification] += 1;
     let dl = asg.decision_level();
-    assert_eq!(dl, 0);
+    debug_assert_eq!(dl, 0);
     // This is a reusable vector to reduce memory consumption, the key is the number of invocation
     let mut seen: Vec<usize> = vec![0; asg.num_vars + 1];
     let check_thr = (state.vivify_thr * 10_000_000.0 / asg.var_stats().3 as f64) as usize;
@@ -80,7 +80,7 @@ pub fn vivify(
     // clauses.sort_by_cached_key(|ci| (cdb.activity(*ci).log(10.0) * -100_000.0) as isize);
     clauses.sort_by_key(|ci| cdb[*ci].rank);
     clauses.resize(clauses.len() / 2, ClauseId::default());
-    assert!(!asg.remains());
+    debug_assert!(!asg.remains());
     while let Some(ci) = clauses.pop() {
         let c: &mut Clause = &mut cdb[ci];
         // Since GC can make `clauses` out of date, we need to check its aliveness here.
@@ -177,7 +177,7 @@ pub fn vivify(
         match copied.len() {
             0 if flipped => {
                 cdb.certificate_add(&clits[0..1]);
-                assert!(asg.stack_iter().all(|l| asg.assigned(*l).is_some()));
+                debug_assert!(asg.stack_iter().all(|l| asg.assigned(*l).is_some()));
                 return Err(SolverError::Inconsistent);
             }
             0 => {
@@ -205,7 +205,7 @@ pub fn vivify(
                     elim.to_simplify += 2.0;
                     state[Stat::VivifiedVar] += 1;
                 }
-                assert!(!cdb[ci].is(Flag::DEAD));
+                debug_assert!(!cdb[ci].is(Flag::DEAD));
                 cdb.detach(ci);
                 cdb.garbage_collect();
             }
@@ -222,7 +222,7 @@ pub fn vivify(
                     cdb.handle(SolverEvent::Vivify(false));
                     cdb[cj].turn_on(Flag::VIVIFIED);
                     elim.to_simplify += 1.0 / (n - 1) as f64;
-                    assert!(!cdb[ci].is(Flag::DEAD));
+                    debug_assert!(!cdb[ci].is(Flag::DEAD));
                     cdb.detach(ci);
                     cdb.garbage_collect();
                 }
