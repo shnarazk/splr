@@ -12,7 +12,7 @@ It adopts various research results on SAT solvers:
 - Glucose-like heuristics adaptation
 - [CaDiCaL](https://github.com/arminbiere/cadical)-like extended phase saving
 - a variant of CaDiCaL-like search stabilization
-- clause vivification by {pre,in}-processor
+- *clause vivification* by {pre,in}-processor
 
 *Many thanks to SAT researchers.*
 
