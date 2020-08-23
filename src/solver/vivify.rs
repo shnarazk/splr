@@ -5,7 +5,7 @@ use std::{thread, time::Duration};
 use {
     super::{SolverEvent, Stat, State},
     crate::{
-        assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF},
+        assign::{AssignIF, AssignStack, ClauseManipulateIF, PropagateIF, VarManipulateIF},
         cdb::{ClauseDB, ClauseDBIF},
         processor::Eliminator,
         state::StateIF,
@@ -31,6 +31,7 @@ pub fn vivify(
     state[Stat::Vivification] += 1;
     let dl = asg.decision_level();
     assert_eq!(dl, 0);
+    // This is a reusable vector to reduce memory consumption, the key is the number of invocation
     let mut seen: Vec<usize> = vec![0; asg.num_vars + 1];
     let check_thr = (state.vivify_thr * 10_000_000.0 / asg.var_stats().3 as f64) as usize;
     let timedout = Arc::new(AtomicBool::new(false));
@@ -78,7 +79,9 @@ pub fn vivify(
     */
     // clauses.sort_by_cached_key(|ci| (cdb.activity(*ci).log(10.0) * -100_000.0) as isize);
     clauses.sort_by_key(|ci| cdb[*ci].rank);
-    for ci in clauses.iter().take(clauses.len() / 2) {
+    clauses.resize(clauses.len() / 2, ClauseId::default());
+    assert!(!asg.remains());
+    'next_clause: while let Some(ci) = clauses.pop() {
         let c: &mut Clause = &mut cdb[ci];
         // Since GC can make `clauses` out of date, we need to check its aliveness here.
         if c.is(Flag::DEAD) {
@@ -93,8 +96,12 @@ pub fn vivify(
         let clits = c.lits.clone();
         let mut copied: Vec<Lit> = Vec::new();
         let mut flipped = true;
+        // cdb.eliminate_satisfied_clauses(asg, elim, false);
+        cdb.garbage_collect();
         'this_clause: for l in clits.iter() {
+            debug_assert_eq!(0, asg.decision_level());
             ncheck += 1;
+            seen[0] = ncheck;
             if to_display <= ncheck {
                 state.flush("");
                 state.flush(format!(
@@ -106,10 +113,17 @@ pub fn vivify(
             match asg.assigned(*l) {
                 Some(false) => continue 'this_clause, // Rule 1
                 Some(true) => {
-                    copied.push(!*l);
-                    let r = asg.reason_literals(cdb, *l);
-                    copied = asg.minimize(cdb, &copied, &r, ncheck, &mut seen); // Rule 2
-                    debug_assert_eq!(copied[0], *l);
+                    assert_eq!(asg.decision_level(), 0);
+                    // copied.push(!*l);
+                    // let r = asg.reason_literals(cdb, *l);
+                    // copied = asg.minimize(cdb, &copied, &r, &mut seen); // Rule 2
+                    state.viv_pathes[8 + copied.len().min(2)] = true;
+                    // if copied.len() == 1 {
+                    //     assert_eq!(copied[0], *l);
+                    //     copied.clear();
+                    // }
+                    //                    continue 'this_clause;
+                    copied.clear();
                     flipped = false;
                     break 'this_clause;
                 }
@@ -117,87 +131,123 @@ pub fn vivify(
                     let cid: Option<ClauseId> = match copied.len() {
                         0 => None,
                         1 => {
-                            debug_assert!(flipped);
-                            debug_assert!(asg.assigned(copied[0]) != Some(false));
+                            assert!(flipped);
+                            assert_eq!(asg.assigned(copied[0]), None);
+                            assert_eq!(0, asg.decision_level());
                             asg.assign_by_decision(copied[0]);
                             None
                         }
-                        _ => Some(cdb.new_clause(asg, &mut copied.clone(), false, true)),
-                    };
-                    debug_assert!(asg.propagate(cdb).is_none(), "# Conflict by vivify");
-                    let falsified = asg.assigned(!*l) == Some(false);
-                    let mut cc: ClauseId = ClauseId::default();
-                    copied.push(!*l); // Rule 4
-                    if !falsified {
-                        asg.assign_by_decision(!*l);
-                        cc = asg.propagate(cdb);
-                        if !cc.is_none() {
-                            let r = cdb[cc].lits.clone(); // Rule 3
-                            copied = asg.minimize(cdb, &copied, &r, ncheck, &mut seen);
-                            flipped = false;
+                        _ => {
+                            // continue 'next_clause;
+                            cdb.handle(SolverEvent::Vivify(true));
+                            assert!(cdb.during_vivification);
+                            let cid = cdb.new_clause(asg, &mut copied.clone(), true, false);
+                            cdb.handle(SolverEvent::Vivify(false));
+                            Some(cid)
                         }
+                    };
+                    assert_eq!(asg.assigned(!*l), None);
+                    asg.assign_by_decision(!*l);
+                    let cc: ClauseId = asg.propagate(cdb);
+                    if !cc.is_none() {
+                        copied.push(!*l);
+                        let r = cdb[cc].lits.clone(); // Rule 3
+                        let result = asg.analyze(cdb, &copied, &r, &mut seen);
+                        if result.is_empty() {
+                            break 'this_clause;
+                        }
+                        assert!(result.contains(l));
+                        copied.clear();
+                        copied.push(*l);
+                        for lit in &result {
+                            if *lit != *l {
+                                copied.push(*lit);
+                            }
+                        }
+                        // copied = result;
+                        flipped = false;
                     }
                     asg.cancel_until(asg.root_level);
                     if let Some(cj) = cid {
+                        debug_assert!(cdb[cj].is(Flag::VIV_ASSUMP));
                         cdb.detach(cj);
+                        debug_assert!(!asg.locked(&cdb[cj], cj));
                         cdb.garbage_collect();
+                        debug_assert!(cdb[cj].is(Flag::DEAD));
                     }
-                    if falsified || !cc.is_none() {
+                    if !cc.is_none() {
                         break 'this_clause;
                     }
+                    copied.push(!*l); // Rule 4
                 }
             }
         }
         if flipped {
             flip(&mut copied);
         }
-        let mut keep_original = false;
         match copied.len() {
+            0 if flipped => {
+                state.viv_pathes[0] = true;
+                cdb.certificate_add(&clits[0..1]);
+                assert!(asg.stack_iter().all(|l| asg.assigned(*l).is_some()));
+                return Err(SolverError::Inconsistent);
+            }
             0 => {
-                npurge += 1;
-                elim.to_simplify += 1.0 / clits.len() as f64;
+                state.viv_pathes[1] = true;
+                if !cdb[ci].is(Flag::DEAD) {
+                    cdb.detach(ci);
+                    cdb.garbage_collect();
+                    npurge += 1;
+                    elim.to_simplify += 1.0;
+                }
             }
             1 => {
                 let l0 = copied[0];
-                debug_assert!(asg.assigned(l0) != Some(false));
+                assert_ne!(asg.assigned(l0), Some(false));
+                assert_eq!(asg.decision_level(), asg.root_level);
                 if asg.assigned(l0) == None {
                     nassert += 1;
-                    asg.handle(SolverEvent::Assert);
+                    cdb.certificate_add(&copied);
+                    // cdb.certificate_delete(&copied);
                     asg.assign_at_rootlevel(l0)?;
                     if !asg.propagate(cdb).is_none() {
-                        // panic!("Vivification found an uncatchable inconsistency.");
+                        state.viv_pathes[2] = true;
+                        // panic!("Vivification found an inconsistency. len: {}", clits.len());
                         return Err(SolverError::Inconsistent);
                     }
-                    state.handle(SolverEvent::Assert);
-                    state[Stat::VivifiedVar] += 1;
+                    asg.handle(SolverEvent::Assert);
                     elim.to_simplify += 2.0;
+                    state[Stat::VivifiedVar] += 1;
+                    state.viv_pathes[3] = true;
+                } else {
+                    state.viv_pathes[4] = true;
                 }
+                assert!(!cdb[ci].is(Flag::DEAD));
+                cdb.detach(ci);
+                cdb.garbage_collect();
             }
             n if n == clits.len() => {
-                keep_original = true;
-            }
-            2 => {
-                let l0 = copied[0];
-                let l1 = copied[1];
-                if cdb.registered_bin_clause(l0, l1) {
-                    npurge += 1;
-                } else {
-                    nshrink += 1;
-                    let cj = cdb.new_clause(asg, &mut copied, is_learnt, true);
-                    cdb[cj].turn_on(Flag::VIVIFIED);
-                }
-                elim.to_simplify += 1.0;
+                state.viv_pathes[5] = true;
             }
             n => {
-                nshrink += 1;
-                let cj = cdb.new_clause(asg, &mut copied, is_learnt, true);
-                cdb[cj].turn_on(Flag::VIVIFIED);
-                elim.to_simplify += 1.0 / (n - 1) as f64;
+                if n == 2 && cdb.registered_bin_clause(copied[0], copied[1]) {
+                    state.viv_pathes[6] = true;
+                    npurge += 1;
+                    elim.to_simplify += 1.0;
+                } else {
+                    state.viv_pathes[7] = true;
+                    nshrink += 1;
+                    cdb.certificate_add(&copied);
+                    cdb.handle(SolverEvent::Vivify(true));
+                    let cj = cdb.new_clause(asg, &mut copied, is_learnt, true);
+                    cdb.handle(SolverEvent::Vivify(false));
+                    cdb[cj].turn_on(Flag::VIVIFIED);
+                    elim.to_simplify += 1.0 / (n - 1) as f64;
+                    assert!(!cdb[ci].is(Flag::DEAD));
+                    cdb.detach(ci);
+                    cdb.garbage_collect();
+                }
             }
-        }
-        if !keep_original {
-            cdb.detach(*ci);
-            cdb.garbage_collect();
         }
         if timedout.load(Ordering::Acquire) {
             break;
@@ -208,6 +258,7 @@ pub fn vivify(
                 break;
             }
         }
+        clauses.retain(|ci| !cdb[ci].is(Flag::DEAD));
     }
     if state.config.viv_end <= state.vivify_thr {
         state.vivify_thr = state.config.viv_beg;
