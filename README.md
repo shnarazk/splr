@@ -24,13 +24,12 @@ Though Splr comes with **ABSOLUTELY NO WARRANTY**, I'd like to show some results
 
 #### Version 0.4.2
 
+* all the certifications of [UUF250](https://github.com/shnarazk/SAT-bench/tree/master/3-SAT/UUF250) were correct and verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
 * [SAT Race 2019](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks](http://satcompetition.org/sr2019benchmarks.zip),  splr-0.4.2(6fb241e) solved with a 500 sec (soft) timeout:
-  * 69 satisfiable problems: all the solutions are correct.
-  * 8 unsatisfiable problems: all the certifications are verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
+  * 69 satisfiable problems: all the solutions were correct.
+  * 8 unsatisfiable problems: all the certifications were verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
 
 ![](https://user-images.githubusercontent.com/997855/91011692-b992c600-e61f-11ea-9cae-135246cc8390.png)
-
-* all the certifications of [UUF250](https://github.com/shnarazk/SAT-bench/tree/master/3-SAT/UUF250) are correct and verified with Grad.
 
 #### Version 0.4.1
 
