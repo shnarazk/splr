@@ -25,10 +25,12 @@ Though Splr comes with **ABSOLUTELY NO WARRANTY**, I'd like to show some results
 #### Version 0.4.2
 
 * [SAT Race 2019](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks](http://satcompetition.org/sr2019benchmarks.zip),  splr-0.4.2(6fb241e) solved with a 500 sec (soft) timeout:
-  * 69 satisfiable problems: all the solutions were correct.
-  * 8 unsatisfiable problems: all the certifications were verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
+  * 69 satisfiable problems: all the solutions are correct.
+  * 8 unsatisfiable problems: all the certifications are verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
 
 ![](https://user-images.githubusercontent.com/997855/91011692-b992c600-e61f-11ea-9cae-135246cc8390.png)
+
+* all the certification of [UUF250](https://github.com/shnarazk/SAT-bench/tree/master/3-SAT/UUF250) are correct and verified with Grad.
 
 #### Version 0.4.1
 
@@ -283,7 +285,7 @@ Please check the help message.
 
 ```plain
 $ splr --help
-splr 0.4.1
+splr 0.4.2
 Narazaki Shuji <shujinarazaki@protonmail.com>
 A modern CDCL SAT solver in Rust
 
@@ -299,35 +301,43 @@ FLAGS:
     -V, --version     Prints version information
 
 OPTIONS:
-        --ADP <adaptive>          Strategy adaptation switch [default: 1]
-        --cbt <cbt-thr>           Level threshold to use chronoBT [default: 100]
-        --cl <clause-limit>       Soft limit of #clauses (6MC/GB) [default: 0]
-        --stat <dump-int>         Interval for dumping stat data [default: 0]
-        --PRO <elim>              Pre/in-processor switch [default: 1]
-        --ecl <elim-cls-lim>      Max #lit for clause subsume [default: 100]
-        --evl <elim-grw-lim>      Grow limit of #cls in var elim [default: 0]
-        --et <elim-trigger>       #cls to start simplification [default: 40000]
-        --evo <elim-var-occ>      Max #cls for var elimination [default: 10000]
-    -o, --dir <output-dir>        Output directory [default: .]
-    -p, --proof <proof-file>      Cert. file in DRAT format [default: proof.out]
-        --RDC <reduce>            Clause reduction switch [default: 1]
-        --RPH <rephase>           Rephase switch [default: 1]
-    -r, --result <result-file>    Result filename/stdout [default: ]
-        --RSR <rsr>               Reason-Side Rewarding switch [default: 1]
-        --ral <rst-asg-len>       Length for assignment average [default: 3500]
-        --rab <rst-asg-thr>       Blocking restart threshold [default: 1.40]
-        --rll <rst-lbd-len>       Length of LBD fast EMA [default: 50]
-        --rls <rst-lbd-slw>       Length of LBD slow EMA [default: 10000]
-        --rlt <rst-lbd-thr>       Forcing restart threshold [default: 0.70]
-        --rss <rst-stb-scl>       Stabilizer scaling [default: 2.0]
-        --rs <rst-step>           #conflicts between restarts [default: 50]
-        --STB <stabilize>         Stabilization switch [default: 1]
-    -t, --timeout <timeout>       CPU time limit in sec [default: 5000.0]
-        --vri <vrw-dcy-beg>       Initial var reward decay [default: 0.75]
-        --vrm <vrw-dcy-end>       Maximum var reward decay [default: 0.98]
+        --ADP <a-adaptive>      Strategy adaptation switch       [default: 1]
+        --ELI <a-elim>          Eliminator switch                [default: 1]
+        --RDC <a-reduce>        Clause reduction switch          [default: 1]
+        --RPH <a-rephase>       Rephase switch                   [default: 1]
+        --RSR <a-rsr>           Reason-Side Rewarding switch     [default: 1]
+        --STB <a-stabilize>     Stabilization switch             [default: 1]
+        --VIV <a-vivify>        Vivification switch              [default: 1]
+        --cbt <c-cbt-thr>       Dec. lvl to use chronoBT       [default: 100]
+        --cl <c-cls-lim>        Soft limit of #clauses (6MC/GB)  [default: 0]
+        --ii <c-ip-int>         #cls to start in-processor   [default: 25000]
+    -t, --timeout <c-tout>      CPU time limit in sec.      [default: 5000.0]
+        --ecl <elim-cls-lim>    Max #lit for clause subsume     [default: 32]
+        --evl <elim-grw-lim>    Grow limit of #cls in var elim.  [default: 0]
+        --evo <elim-var-occ>    Max #cls for var elimination  [default: 8192]
+        --stat <io-dump>        Interval for dumping stat data   [default: 0]
+    -o, --dir <io-odir>         Output directory                 [default: .]
+    -p, --proof <io-pfile>      DRAT Cert. filename      [default: proof.out]
+    -r, --result <io-rfile>     Result filename/stdout            [default: ]
+        --ral <rst-asg-len>     Length of assign. fast EMA      [default: 30]
+        --ras <rst-asg-slw>     Length of assign. slow EMA   [default: 10000]
+        --rat <rst-asg-thr>     Blocking restart threshold     [default: 1.4]
+        --rct <rst-ccc-thr>     Conflict Correlation threshold [default: 0.7]
+        --rll <rst-lbd-len>     Length of LBD fast EMA          [default: 30]
+        --rls <rst-lbd-slw>     Length of LBD slow EMA       [default: 10000]
+        --rlt <rst-lbd-thr>     Forcing restart threshold      [default: 1.2]
+        --rut <rst-mld-thr>     Usability to restart           [default: 4.0]
+        --rss <rst-stb-scl>     Stabilizer scaling             [default: 2.0]
+        --rs <rst-step>         #conflicts between restarts     [default: 40]
+        --vib <viv-beg>         Lower bound of vivif. loop     [default: 1.0]
+        --vie <viv-end>         Upper bound of vivif. loop     [default: 2.0]
+        --vii <viv-int>         Vivification interval            [default: 4]
+        --vis <viv-scale>       #reduction for next vivif.     [default: 2.0]
+        --vri <vrw-dcy-beg>     Initial var reward decay      [default: 0.75]
+        --vrm <vrw-dcy-end>     Maximum var reward decay      [default: 0.98]
 
 ARGS:
-    <cnf-file>    CNF file in DIMACS format
+    <cnf-file>    DIMACS CNF file                 
 ```
 
 ## License
