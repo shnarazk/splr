@@ -22,6 +22,14 @@ Please check [ChangeLog](ChangeLog.md) about recent updates.
 
 Though Splr comes with **ABSOLUTELY NO WARRANTY**, I'd like to show some results.
 
+#### Version 0.4.2
+
+* [SAT Race 2019](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks](http://satcompetition.org/sr2019benchmarks.zip),  splr-0.4.2(6fb241e) solved with a 500 sec (soft) timeout:
+  * 69 satisfiable problems: all the solutions were correct.
+  * 8 unsatisfiable problems: all were verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
+
+![](https://user-images.githubusercontent.com/997855/90635148-c8662b00-e263-11ea-812e-0a5a7df7ae23.png)
+
 #### Version 0.4.1
 
 * [SAT Race 2019](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks](http://satcompetition.org/sr2019benchmarks.zip),  splr-0.4.1(be30d17, 7064c9) solved with a 400 sec (soft) timeout:
