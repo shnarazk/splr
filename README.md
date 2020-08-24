@@ -28,7 +28,7 @@ Though Splr comes with **ABSOLUTELY NO WARRANTY**, I'd like to show some results
   * 69 satisfiable problems: all the solutions were correct.
   * 8 unsatisfiable problems: all were verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
 
-![](https://user-images.githubusercontent.com/997855/90635148-c8662b00-e263-11ea-812e-0a5a7df7ae23.png)
+![](https://user-images.githubusercontent.com/997855/91011692-b992c600-e61f-11ea-9cae-135246cc8390.png)
 
 #### Version 0.4.1
 
