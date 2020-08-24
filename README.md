@@ -30,7 +30,7 @@ Though Splr comes with **ABSOLUTELY NO WARRANTY**, I'd like to show some results
 
 ![](https://user-images.githubusercontent.com/997855/91011692-b992c600-e61f-11ea-9cae-135246cc8390.png)
 
-* all the certification of [UUF250](https://github.com/shnarazk/SAT-bench/tree/master/3-SAT/UUF250) are correct and verified with Grad.
+* all the certifications of [UUF250](https://github.com/shnarazk/SAT-bench/tree/master/3-SAT/UUF250) are correct and verified with Grad.
 
 #### Version 0.4.1
 
