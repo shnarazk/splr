@@ -59,7 +59,7 @@ impl VarSelectIF for AssignStack {
                 }
             } else {
                 let mut heap: BinaryHeap<VarTimestamp> = BinaryHeap::new();
-                let remains = self.num_vars - self.num_solved_vars - self.num_eliminated_vars;
+                let remains = self.num_vars - self.num_asserted_vars - self.num_eliminated_vars;
                 let size = (remains as f64).sqrt() as usize; //remains.count_ones() as usize;
                 for v in self.var.iter().skip(1) {
                     if self.assign[v.index].is_some() {

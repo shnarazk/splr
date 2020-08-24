@@ -52,15 +52,15 @@ fn main() {
         return;
     }
     let cnf_file = config.cnf_file.to_string_lossy();
-    let ans_file: Option<PathBuf> = match config.result_file.to_string_lossy().as_ref() {
+    let ans_file: Option<PathBuf> = match config.io_rfile.to_string_lossy().as_ref() {
         "-" => None,
-        "" => Some(config.output_dir.join(PathBuf::from(format!(
+        "" => Some(config.io_odir.join(PathBuf::from(format!(
             ".ans_{}",
             config.cnf_file.file_name().unwrap().to_string_lossy(),
         )))),
-        _ => Some(config.output_dir.join(&config.result_file)),
+        _ => Some(config.io_odir.join(&config.io_rfile)),
     };
-    if config.proof_file.to_string_lossy() != "proof.out" && !config.use_certification {
+    if config.io_pfile.to_string_lossy() != "proof.out" && !config.use_certification {
         println!("Abort: You set a proof filename with '--proof' explicitly, but didn't set '--certify'. It doesn't look good.");
         return;
     }
@@ -82,11 +82,11 @@ fn main() {
     let mut s = Solver::build(&config).expect("failed to load");
     let res = s.solve();
     save_result(&s, &res, &cnf_file, ans_file);
-    if 0 < s.state.config.dump_int && !s.state.development.is_empty() {
+    if 0 < s.state.config.io_dump && !s.state.development.is_empty() {
         let dump = config.cnf_file.file_stem().unwrap().to_str().unwrap();
         if let Ok(f) = File::create(format!("stat_{}.csv", dump)) {
             let mut buf = BufWriter::new(f);
-            buf.write_all(b"conflict,solved,restart,block,ASG,LBD\n")
+            buf.write_all(b"conflict,asserted,restart,block,ASG,LBD\n")
                 .unwrap();
             for (n, a, b, c, d, e) in s.state.development.iter() {
                 buf.write_all(
@@ -171,12 +171,11 @@ fn save_result<S: AsRef<str> + std::fmt::Display>(
                 _ => (),
             }
             if s.state.config.use_certification {
-                let proof_file: PathBuf =
-                    s.state.config.output_dir.join(&s.state.config.proof_file);
+                let proof_file: PathBuf = s.state.config.io_odir.join(&s.state.config.io_pfile);
                 save_proof(&s, &input, &proof_file);
                 println!(
                     " Certificate|file: {}",
-                    s.state.config.proof_file.to_string_lossy()
+                    s.state.config.io_pfile.to_string_lossy()
                 );
             }
             println!(
@@ -285,7 +284,6 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
             time.tv_sec as f64 + time.tv_nsec as f64 / 1_000_000_000.0f64
         }
     };
-    let (asg_num_conflict, _num_propagation, asg_num_restart, asg_activity_decay) = s.asg.exports();
     out.write_all(
         format!(
             "c {:<43}, #var:{:9}, #cls:{:9}\n",
@@ -295,7 +293,7 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c  #conflict:{}, #decision:{}, #propagate:{} \n",
+            "c  #conflict:{}, #decision:{}, #propagate:{},\n",
             format!("{:>11}", state[LogUsizeId::Conflict]),
             format!("{:>13}", state[LogUsizeId::Decision]),
             format!("{:>15}", state[LogUsizeId::Propagate]),
@@ -304,9 +302,9 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c   Assignment|#rem:{}, #fix:{}, #elm:{}, prg%:{} \n",
+            "c   Assignment|#rem:{}, #fix:{}, #elm:{}, prg%:{},\n",
             format!("{:>9}", state[LogUsizeId::Remain]),
-            format!("{:>9}", state[LogUsizeId::Fixed]),
+            format!("{:>9}", state[LogUsizeId::Assert]),
             format!("{:>9}", state[LogUsizeId::Eliminated]),
             format!("{:>9.4}", state[LogF64Id::Progress]),
         )
@@ -314,7 +312,7 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c       Clause|Remv:{}, LBD2:{}, Binc:{}, Perm:{} \n",
+            "c       Clause|Remv:{}, LBD2:{}, Binc:{}, Perm:{},\n",
             format!("{:>9}", state[LogUsizeId::Removable]),
             format!("{:>9}", state[LogUsizeId::LBD2]),
             format!("{:>9}", state[LogUsizeId::Binclause]),
@@ -324,48 +322,53 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c  {}|#BLK:{}, #RST:{}, eASG:{}, eLBD:{} \n",
+            "c  {}|#RST:{}, #BLK:{}, #CNC:{}, #STB:{},\n",
             if s.rst.active_mode() == RestartMode::Luby {
                 "LubyRestart"
             } else {
                 "    Restart"
             },
-            format!(
-                "{:>9}",
-                state.record.vali[LogUsizeId::RestartBlock as usize]
-            ),
             format!("{:>9}", state[LogUsizeId::Restart]),
-            format!("{:>9.4}", state[LogF64Id::EmaAsg]),
-            format!("{:>9.4}", state[LogF64Id::EmaLBD]),
+            format!("{:>9}", state[LogUsizeId::RestartBlock]),
+            format!("{:>9}", state[LogUsizeId::RestartCancel]),
+            format!("{:>9}", state[LogUsizeId::Stabilize]),
         )
         .as_bytes(),
     )?;
     out.write_all(
         format!(
-            "c     Conflict|eLBD:{}, cnfl:{}, bjmp:{}, rpc%:{} \n",
-            format!("{:>9.2}", state[LogF64Id::AveLBD]),
+            "c          EMA|tLBD:{}, tASG:{}, eRLT:{}, eASG:{},\n",
+            format!("{:>9.4}", state[LogF64Id::TrendLBD]),
+            format!("{:>9.4}", state[LogF64Id::TrendASG]),
+            format!("{:>9.4}", state[LogF64Id::EmaMVA]),
+            format!("{:>9.0}", state[LogF64Id::EmaASG]),
+        )
+        .as_bytes(),
+    )?;
+
+    out.write_all(
+        format!(
+            "c     Conflict|eLBD:{}, cnfl:{}, bjmp:{}, /ppc:{},\n",
+            format!("{:>9.2}", state[LogF64Id::EmaLBD]),
             format!("{:>9.2}", state[LogF64Id::CLevel]),
             format!("{:>9.2}", state[LogF64Id::BLevel]),
-            format!(
-                "{:>9.4}",
-                100.0 * asg_num_restart as f64 / asg_num_conflict as f64
-            ),
+            format!("{:>9.4}", state[LogF64Id::PropagationPerConflict]),
         )
         .as_bytes(),
     )?;
     out.write_all(
         format!(
-            "c         misc|#stb:{}, #smp:{}, 2smp:{}, vdcy:{} \n",
-            format!("{:>9}", state[LogUsizeId::Stabilization]),
+            "c         misc|#eli:{}, #viv:{}, #vbv{}, /cpr:{},\n",
             format!("{:>9}", state[LogUsizeId::Simplify]),
-            format!("{:>9.0}", state[LogF64Id::SimpToGo]),
-            format!("{:>9.4}", asg_activity_decay),
+            format!("{:>9}", state[LogUsizeId::Vivify]),
+            format!("{:>9}", state[LogUsizeId::VivifiedVar]),
+            format!("{:>9.2}", state[LogF64Id::PropagationPerConflict]),
         )
         .as_bytes(),
     )?;
     out.write_all(
         format!(
-            "c     Strategy|mode:{:>15}, time:{:9.2}\n",
+            "c     Strategy|mode:{:>15}, time:{:9.2},\n",
             state.strategy.0, tm,
         )
         .as_bytes(),

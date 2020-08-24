@@ -11,7 +11,8 @@ It adopts various research results on SAT solvers:
 - *chronological backtrack* aka *chronoBT*
 - Glucose-like heuristics adaptation
 - [CaDiCaL](https://github.com/arminbiere/cadical)-like extended phase saving
-- CaDiCaL-like search stabilization (not activated by default)
+- a variant of CaDiCaL-like search stabilization
+- *clause vivification* by {pre,in}-processor
 
 *Many thanks to SAT researchers.*
 
@@ -20,6 +21,14 @@ Please check [ChangeLog](ChangeLog.md) about recent updates.
 ## Correctness
 
 Though Splr comes with **ABSOLUTELY NO WARRANTY**, I'd like to show some results.
+
+#### Version 0.4.2
+
+* [SAT Race 2019](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks](http://satcompetition.org/sr2019benchmarks.zip),  splr-0.4.2(6fb241e) solved with a 500 sec (soft) timeout:
+  * 69 satisfiable problems: all the solutions were correct.
+  * 8 unsatisfiable problems: all the certifications were verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
+
+![](https://user-images.githubusercontent.com/997855/91011692-b992c600-e61f-11ea-9cae-135246cc8390.png)
 
 #### Version 0.4.1
 
@@ -188,7 +197,7 @@ fn main() {
 fn run(cnf: &str, assigns: &[i32]) -> usize {
     let mut solver = Solver::try_from(cnf).expect("panic at loading a CNF");
     for n in assigns.iter() {
-        solver.add_assignment(*n).expect("panic at fixed assigns");
+        solver.add_assignment(*n).expect("panic at assertion");
     }
     let mut count = 0;
     loop {

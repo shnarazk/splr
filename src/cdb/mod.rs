@@ -40,13 +40,20 @@ pub struct ClauseId {
     pub ordinal: u32,
 }
 
+impl ClauseId {
+    #[inline]
+    pub fn is_none(&self) -> bool {
+        self.ordinal == 0
+    }
+}
+
 /// A representation of 'clause'
 #[derive(Debug)]
 pub struct Clause {
     /// The literals in a clause.
     pub lits: Vec<Lit>,
     /// A static clause evaluation criterion like LBD, NDD, or something.
-    pub rank: usize,
+    pub rank: u16,
     /// the index from which `propagate` starts searching an unfalsified literal.
     pub search_from: usize,
     /// A dynamic clause evaluation criterion based on the number of references.
@@ -75,7 +82,7 @@ pub struct ClauseDB {
     /// a number of clauses to emit out-of-memory exception
     soft_limit: usize,
     /// flag for Chan Seok heuristics
-    use_chan_seok: bool,
+    pub use_chan_seok: bool,
     /// 'small' clause threshold
     co_lbd_bound: usize,
     // not in use
@@ -130,6 +137,11 @@ pub struct ClauseDB {
     num_reduction: usize,
 
     //
+    //## vivification
+    //
+    pub during_vivification: bool,
+
+    //
     //## incremental solving
     //
     pub eliminated_permanent: Vec<Vec<Lit>>,
@@ -172,7 +184,7 @@ mod tests {
 
         let c1 = cdb.new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false, false);
         let c = &cdb[c1];
-        assert_eq!(c.rank, 0);
+        assert_eq!(c.rank, 3);
         assert!(!c.is(Flag::DEAD));
         assert!(!c.is(Flag::LEARNT));
         assert!(!c.is(Flag::JUST_USED));

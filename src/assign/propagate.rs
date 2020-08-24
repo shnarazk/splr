@@ -92,7 +92,12 @@ impl PropagateIF for AssignStack {
                 self.trail.push(l);
                 Ok(())
             }
-            Some(x) if x == bool::from(l) => Ok(()),
+            Some(x) if x == bool::from(l) => {
+                // Vivification tries to assign a var by propagation then can assert it.
+                // To make sure the var is asserted, we need to nullfy its reason.
+                self.reason[vi] = AssignReason::None;
+                Ok(())
+            }
             _ => Err(SolverError::Inconsistent),
         }
     }
@@ -100,7 +105,7 @@ impl PropagateIF for AssignStack {
         debug_assert!(usize::from(l) != 0, "Null literal is about to be equeued");
         debug_assert!(l.vi() < self.var.len());
         // The following doesn't hold anymore by using chronoBT.
-        // assert!(self.trail_lim.is_empty() || cid != ClauseId::default());
+        // assert!(self.trail_lim.is_empty() || !cid.is_none());
         let vi = l.vi();
         self.level[vi] = lv;
         let v = &mut self.var[vi];
@@ -291,9 +296,9 @@ impl PropagateIF for AssignStack {
             }
         }
         let na = self.q_head + self.num_eliminated_vars;
-        if self.num_best_assign <= na && 0 < self.decision_level() {
+        if self.num_best_assign as usize <= na && 0 < self.decision_level() {
             self.best_assign = true;
-            self.num_best_assign = na;
+            self.num_best_assign = na as f64;
         }
         ClauseId::default()
     }

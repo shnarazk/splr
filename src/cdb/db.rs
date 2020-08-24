@@ -14,9 +14,7 @@ use {
 const ACTIVITY_MAX: f64 = 1e308;
 
 /// API for clause management like `reduce`, `simplify`, `new_clause`, and so on.
-pub trait ClauseDBIF:
-    IndexMut<ClauseId, Output = Clause> + Export<(usize, usize, usize, usize, usize, usize), ()>
-{
+pub trait ClauseDBIF: IndexMut<ClauseId, Output = Clause> {
     /// return the length of `clause`.
     fn len(&self) -> usize;
     /// return true if it's empty.
@@ -48,6 +46,8 @@ pub trait ClauseDBIF:
     /// * `simplify`
     /// * `kill`
     fn garbage_collect(&mut self);
+    /// return `true` if a literal pair `(l0, l1)` is registered.
+    fn registered_bin_clause(&self, l0: Lit, l1: Lit) -> bool;
     /// allocate a new clause and return its id.
     /// * If `level_sort` is on, register `v` as a learnt after sorting based on assign level.
     /// * Otherwise, register `v` as a permanent clause, which rank is zero.
@@ -60,12 +60,12 @@ pub trait ClauseDBIF:
     ) -> ClauseId
     where
         A: AssignIF;
-    /// check and convert a learnt clause to permanent if needed.
-    fn convert_to_permanent<A>(&mut self, asg: &mut A, cid: ClauseId) -> bool
+    /// update LBD then convert a learnt clause to permanent if needed.
+    fn mark_clause_as_used<A>(&mut self, asg: &mut A, cid: ClauseId) -> bool
     where
         A: AssignIF;
-    /// return the number of alive clauses in the database. Or return the database size if `active` is `false`.
-    fn count(&self, alive: bool) -> usize;
+    /// return the number of alive clauses in the database.
+    fn count(&self) -> usize;
     /// return the number of clauses which satisfy given flags and aren't DEAD.
     fn countf(&self, mask: Flag) -> usize;
     /// record a clause to unsat certification.
@@ -129,6 +129,7 @@ impl Default for ClauseDB {
             num_lbd2: 0,
             num_learnt: 0,
             num_reduction: 0,
+            during_vivification: false,
             eliminated_permanent: Vec::new(),
         }
     }
@@ -200,6 +201,9 @@ impl ActivityIF for ClauseDB {
     fn activity(&mut self, ci: Self::Ix) -> f64 {
         self[ci].reward
     }
+    fn set_activity(&mut self, ci: Self::Ix, val: f64) {
+        self[ci].reward = val;
+    }
     fn bump_activity(&mut self, cid: Self::Ix, _: Self::Inc) {
         let c = &mut self.clause[cid.ordinal as usize];
         let a = c.reward + self.activity_inc;
@@ -245,7 +249,7 @@ impl Instantiate for ClauseDB {
             watcher,
             certified,
             reducable: config.use_reduce(),
-            soft_limit: config.clause_limit,
+            soft_limit: config.c_cls_lim,
             ..ClauseDB::default()
         }
     }
@@ -269,14 +273,14 @@ impl Instantiate for ClauseDB {
                         // This call requires 'decision level == 0'.
                         self.make_permanent(true);
                     }
-                    (SearchStrategy::HighSuccesive, _) => {
+                    (SearchStrategy::HighSuccessive, _) => {
                         self.co_lbd_bound = 3;
                         self.first_reduction = 30000;
                         self.use_chan_seok = true;
                         // This call requires 'decision level == 0'.
                         self.make_permanent(false);
                     }
-                    (SearchStrategy::LowSuccesive, _) => (),
+                    (SearchStrategy::LowSuccessive, _) => (),
                     (SearchStrategy::ManyGlues, _) => (),
                 }
             }
@@ -292,6 +296,9 @@ impl Instantiate for ClauseDB {
                 // for positive literal
                 self.touched.push(false);
                 self.lbd_temp.push(0);
+            }
+            SolverEvent::Vivify(on) => {
+                self.during_vivification = on;
             }
             _ => (),
         }
@@ -389,8 +396,9 @@ impl ClauseDBIF for ClauseDB {
                     if c.is(Flag::LEARNT) {
                         self.num_learnt -= 1;
                     }
-                    if !certified.is_empty() {
+                    if !certified.is_empty() && !c.is(Flag::VIV_ASSUMP) {
                         let temp = c.lits.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
+                        debug_assert!(!temp.is_empty());
                         certified.push((CertifiedRecord::DELETE, temp));
                     }
                     c.lits.clear();
@@ -425,8 +433,9 @@ impl ClauseDBIF for ClauseDB {
                     if c.is(Flag::LEARNT) {
                         self.num_learnt -= 1;
                     }
-                    if !certified.is_empty() {
+                    if !certified.is_empty() && !c.is(Flag::VIV_ASSUMP) {
                         let temp = c.lits.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
+                        debug_assert!(!temp.is_empty());
                         certified.push((CertifiedRecord::DELETE, temp));
                     }
                     c.lits.clear();
@@ -436,6 +445,14 @@ impl ClauseDBIF for ClauseDB {
         }
         self.num_active = self.clause.len() - recycled.len();
         // debug_assert!(self.check_liveness2());
+    }
+    fn registered_bin_clause(&self, l0: Lit, l1: Lit) -> bool {
+        for w in &self.bin_watcher_lists()[usize::from(!l0)] {
+            if w.blocker == l1 {
+                return true;
+            }
+        }
+        false
     }
     fn new_clause<A>(
         &mut self,
@@ -449,10 +466,6 @@ impl ClauseDBIF for ClauseDB {
     {
         let reward = self.activity_inc;
         let rank = if level_sort {
-            if !self.certified.is_empty() {
-                let temp = vec.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
-                self.certified.push((CertifiedRecord::ADD, temp));
-            }
             #[cfg(feature = "boundary_check")]
             debug_assert!(1 < vec.len());
             // sort literals
@@ -471,19 +484,26 @@ impl ClauseDBIF for ClauseDB {
             // vec.swap(1, i_max);
             if vec.len() <= 2 {
                 learnt = false;
-                0
+                1
             } else {
                 let lbd = self.compute_lbd(asg, vec);
-                if self.use_chan_seok && lbd <= self.co_lbd_bound {
-                    learnt = false;
-                    0
+                if lbd == 0 {
+                    vec.len()
                 } else {
+                    if self.use_chan_seok && lbd <= self.co_lbd_bound {
+                        learnt = false;
+                    }
                     lbd
                 }
             }
         } else {
-            0
+            vec.len()
         };
+        if !self.certified.is_empty() && !self.during_vivification {
+            let temp = vec.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
+            debug_assert!(!temp.is_empty());
+            self.certified.push((CertifiedRecord::ADD, temp));
+        }
         let cid;
         let l0 = vec[0];
         let l1 = vec[1];
@@ -504,21 +524,25 @@ impl ClauseDBIF for ClauseDB {
             c.flags = Flag::empty();
             debug_assert!(c.lits.is_empty()); // c.lits.clear();
             std::mem::swap(&mut c.lits, vec);
-            c.rank = rank;
+            c.rank = rank as u16;
             c.reward = reward;
             c.search_from = 2;
         } else {
             cid = ClauseId::from(self.clause.len());
             let mut c = Clause {
                 flags: Flag::empty(),
-                rank,
+                rank: rank as u16,
                 reward,
                 ..Clause::default()
             };
             std::mem::swap(&mut c.lits, vec);
             self.clause.push(c);
         };
+        if self.during_vivification {
+            self[cid].turn_on(Flag::VIV_ASSUMP);
+        }
         let c = &mut self[cid];
+        // assert!(0 < c.rank);
         let len2 = c.lits.len() == 2;
         if learnt {
             c.turn_on(Flag::LEARNT);
@@ -544,7 +568,7 @@ impl ClauseDBIF for ClauseDB {
         self.num_active += 1;
         cid
     }
-    fn convert_to_permanent<A>(&mut self, asg: &mut A, cid: ClauseId) -> bool
+    fn mark_clause_as_used<A>(&mut self, asg: &mut A, cid: ClauseId) -> bool
     where
         A: AssignIF,
     {
@@ -555,31 +579,37 @@ impl ClauseDBIF for ClauseDB {
         };
         let nlevels = self.compute_lbd_of(asg, cid);
         let c = &mut self[cid];
-        if c.is(Flag::JUST_USED) {
-            return false;
-        }
         debug_assert!(!c.is(Flag::DEAD), format!("found {} is dead: {}", cid, c));
-        if 2 < c.rank {
-            c.turn_on(Flag::JUST_USED);
-            if nlevels + 1 < c.rank {
+        if nlevels < c.rank as usize {
+            match (c.is(Flag::VIVIFIED2), c.is(Flag::VIVIFIED)) {
+                _ if nlevels == 1 || nlevels + 1 < c.rank as usize => {
+                    c.turn_on(Flag::VIVIFIED2);
+                    c.turn_off(Flag::VIVIFIED);
+                }
+                (false, false) => (),
+                (false, true) => {
+                    c.turn_on(Flag::VIVIFIED2);
+                    c.turn_off(Flag::VIVIFIED);
+                }
+                (true, false) => c.turn_on(Flag::VIVIFIED),
+                (true, true) => (),
+            }
+            if !c.is(Flag::JUST_USED) && c.is(Flag::LEARNT) {
+                c.turn_on(Flag::JUST_USED);
                 // chan_seok_condition is zero if !use_chan_seok
                 if nlevels < chan_seok_condition {
                     c.turn_off(Flag::LEARNT);
+                    c.rank = nlevels as u16;
                     self.num_learnt -= 1;
                     return true;
-                } else {
-                    c.rank = nlevels;
                 }
             }
         }
+        c.rank = nlevels as u16;
         false
     }
-    fn count(&self, alive: bool) -> usize {
-        if alive {
-            self.clause.len() - self.watcher[!NULL_LIT].len() - 1
-        } else {
-            self.clause.len() - 1
-        }
+    fn count(&self) -> usize {
+        self.clause.len() - self.watcher[!NULL_LIT].len() - 1
     }
     fn countf(&self, mask: Flag) -> usize {
         self.clause
@@ -627,13 +657,14 @@ impl ClauseDBIF for ClauseDB {
         self.garbage_collect();
     }
     fn certificate_add(&mut self, vec: &[Lit]) {
-        if !self.certified.is_empty() {
+        if !self.certified.is_empty() && !self.during_vivification {
             let temp = vec.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
+            debug_assert!(!temp.is_empty());
             self.certified.push((CertifiedRecord::ADD, temp));
         }
     }
     fn certificate_delete(&mut self, vec: &[Lit]) {
-        if !self.certified.is_empty() {
+        if !self.certified.is_empty() && !self.during_vivification {
             let temp = vec.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
             self.certified.push((CertifiedRecord::DELETE, temp));
         }
@@ -663,8 +694,8 @@ impl ClauseDBIF for ClauseDB {
         self.touched[Lit::from_assign(vi, false)] = true;
     }
     fn check_size(&self) -> Result<bool, SolverError> {
-        if self.soft_limit == 0 || self.count(false) <= self.soft_limit {
-            Ok(0 == self.soft_limit || 4 * self.count(true) < 3 * self.soft_limit)
+        if self.soft_limit == 0 || self.len() <= self.soft_limit {
+            Ok(0 == self.soft_limit || 4 * self.count() < 3 * self.soft_limit)
         } else {
             Err(SolverError::OutOfMemory)
         }
@@ -826,7 +857,7 @@ impl ClauseDB {
             if c.is(Flag::DEAD) || !c.is(Flag::LEARNT) {
                 continue;
             }
-            if c.rank <= self.co_lbd_bound {
+            if c.rank <= self.co_lbd_bound as u16 {
                 c.turn_off(Flag::LEARNT);
                 self.num_learnt -= 1;
             } else if reinit {
