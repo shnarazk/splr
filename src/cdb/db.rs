@@ -305,7 +305,7 @@ impl Instantiate for ClauseDB {
     }
 }
 
-impl Export<(usize, usize, usize, usize, usize, usize), ()> for ClauseDB {
+impl Export<(usize, usize, usize, usize, usize, usize), bool> for ClauseDB {
     /// exports:
     ///  1. the number of active clauses
     ///  1. the number of binary clauses
@@ -331,7 +331,10 @@ impl Export<(usize, usize, usize, usize, usize, usize), ()> for ClauseDB {
             self.num_reduction,
         )
     }
-    fn active_mode(&self) {}
+    /// return the value of `use_chan_seok`
+    fn active_mode(&self) -> bool {
+        self.use_chan_seok
+    }
 }
 
 impl ClauseDBIF for ClauseDB {

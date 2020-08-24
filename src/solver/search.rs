@@ -254,7 +254,7 @@ fn search(
         if asg.decision_level() == asg.root_level && !asg.remains() {
             if state.config.viv_int <= state.to_vivify && state.config.use_vivify() {
                 state.to_vivify = 0;
-                if !cdb.use_chan_seok && vivify(asg, cdb, elim, state).is_err() {
+                if !cdb.active_mode() && vivify(asg, cdb, elim, state).is_err() {
                     // return Err(SolverError::UndescribedError);
                     analyze_final(asg, state, &cdb[ci]);
                     return Ok(false);
@@ -268,7 +268,7 @@ fn search(
                     elim.activate();
                 }
                 elim.simplify(asg, cdb, state)?;
-                if state.config.use_vivify() && cdb.use_chan_seok {
+                if state.config.use_vivify() && cdb.active_mode() {
                     state.to_vivify = 0;
                     if vivify(asg, cdb, elim, state).is_err() {
                         return Err(SolverError::UndescribedError);
