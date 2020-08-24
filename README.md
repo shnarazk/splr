@@ -31,14 +31,6 @@ Though Splr comes with **ABSOLUTELY NO WARRANTY**, I'd like to show some results
 
 ![](https://user-images.githubusercontent.com/997855/91011692-b992c600-e61f-11ea-9cae-135246cc8390.png)
 
-#### Version 0.4.1
-
-* [SAT Race 2019](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks](http://satcompetition.org/sr2019benchmarks.zip),  splr-0.4.1(be30d17, 7064c9) solved with a 400 sec (soft) timeout:
-  * 48 satisfiable problems: all the solutions were correct.
-  * 7 unsatisfiable problems: all were verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
-
-![](https://user-images.githubusercontent.com/997855/82614843-c14b6480-9c03-11ea-9fe9-1a4d367d7290.png)
-
 ## Install
 
 Just run `cargo install splr --features cli` after installing the latest [cargo](https://www.rust-lang.org/tools/install).
