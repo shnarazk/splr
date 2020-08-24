@@ -310,9 +310,6 @@ fn adapt_modules(
         // 'decision_level == 0' is required by `cdb.adapt_to`.
         asg.cancel_until(asg.root_level);
         state.select_strategy(asg, cdb);
-        // if elim.exports().0 < 2 {
-        //     state.config.ip_interval = state.config.ip_interval.min(elim.to_simplify as usize);
-        // }
     }
     #[cfg(feature = "boundary_check")]
     assert!(state.strategy.1 != asg_num_conflict || 0 == asg.decision_level());
