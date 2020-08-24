@@ -22,10 +22,10 @@ Please check [ChangeLog](ChangeLog.md) about recent updates.
 
 Though Splr comes with **ABSOLUTELY NO WARRANTY**, I'd like to show some results.
 
-#### Version 0.4.2
+#### Version 0.5.0
 
 * all the certifications of [UUF250](https://github.com/shnarazk/SAT-bench/tree/master/3-SAT/UUF250) were correct and verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
-* [SAT Race 2019](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks](http://satcompetition.org/sr2019benchmarks.zip),  splr-0.4.2(6fb241e) solved with a 500 sec (soft) timeout:
+* [SAT Race 2019](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks](http://satcompetition.org/sr2019benchmarks.zip),  splr-0.5.0(6fb241e) solved with a 500 sec (soft) timeout:
   * 69 satisfiable problems: all the solutions were correct.
   * 8 unsatisfiable problems: all the certifications were verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
 
@@ -276,7 +276,7 @@ Please check the help message.
 
 ```plain
 $ splr --help
-splr 0.4.2
+splr 0.5.0
 Narazaki Shuji <shujinarazaki@protonmail.com>
 A modern CDCL SAT solver in Rust
 
