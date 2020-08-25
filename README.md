@@ -53,7 +53,7 @@ sample.cnf                                         250,1065 |time:     0.14
    Stabilize|#RST:       24, #BLK:      138, #STB:        2, #CNC:       86 
          EMA|tLBD:   1.6450, tASG:   2.9712, eMLD:   6.6816, eCCC:   0.7302 
     Conflict|eLBD:     8.70, cnfl:    10.67, bjmp:     9.84, /ppc:     2.14 
-        misc|#elm:        1, #viv:        0, #vbv:        0, /cpr:   353.38 
+        misc|elim:        1, cviv:        0, #vbv:        0, /cpr:   353.38 
     Strategy|mode: Initial search phase before a main strategy
       Result|file: ./.ans_sample.cnf
 s SATISFIABLE: tests/sample.cnf
@@ -70,7 +70,7 @@ c       Clause|Remv:     6952, LBD2:       42, Binc:        0, Perm:     1056,
 c      Restart|#RST:       24, #BLK:      138, #STB:        2, #CNC:       86,
 c          EMA|tLBD:   1.6450, tASG:   2.9712, eMLD:   6.6816, eCCC:        1,
 c     Conflict|eLBD:     8.70, cnfl:    10.67, bjmp:     9.84, /ppc:   2.1396,
-c         misc|#elm:        1, #viv:        0, #vbv:        0, /cpr:     2.14,
+c         misc|elim:        1, cviv:        0, #vbv:        0, /cpr:   353.38,
 c     Strategy|mode:        Initial, time:     0.14,
 c 
 s SATISFIABLE
@@ -95,7 +95,7 @@ unsat.cnf                                            83,570 |time:     0.00
      Restart|#RST:        0, #BLK:        0, #STB:        0, #CNC:        0 
          EMA|tLBD:      NaN, tASG:      NaN, eMLD:   0.0000, eCCC:   0.0000 
     Conflict|eLBD:     0.00, cnfl:     0.00, bjmp:     0.00, /ppc:      NaN 
-        misc|#elm:        0, #viv:        0, #vbv:        0, /cpr:      NaN 
+        misc|elim:        0, cviv:        0, #vbv:        0, /cpr:      NaN 
     Strategy|mode: Initial search phase before a main strategy
       Result|file: ./.ans_unsat.cnf
  Certificate|file: proof.out
@@ -241,8 +241,8 @@ for (i, v) in Solver::try_from(cnf).expect("panic").iter().enumerate() {
 
 | mnemonic  | meaning |
 | --------- |------- |
-| `v`  | the number of variables used in the given CNF file |
-| `c`  | the number of clauses used in the given CNF file |
+| `#var`  | the number of variables used in the given CNF file |
+| `#cls`  | the number of clauses used in the given CNF file |
 | `time`  | elapsed CPU time in seconds (or wall-clock time if CPU time is not available) |
 | `#conflict` | the number of conflicts |
 | `#decision` | the number of decisions |
@@ -268,8 +268,8 @@ for (i, v) in Solver::try_from(cnf).expect("panic").iter().enumerate() {
 | `cnfl` | the EMA of decision levels at which conflicts occur |
 | `bjmp` | the EMA of decision levels to which backjumps go |
 | `/ppc` | the number of propagations per conflict |
-| `#elm` | the number of applying clause/var elimination |
-| `#viv` | the number of applying clause vivification |
+| `elim` | the number of applying clause/var elimination |
+| `cviv` | the number of applying clause vivification |
 | `#vbv` | the number of vars which were asserted by clause vivification |
 | `/cpr` | the number of conflicts per restart |
 | `mode` | Selected strategy's id |

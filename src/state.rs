@@ -594,7 +594,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K        misc|#elm:{}, #viv:{}, #vbv:{}, /cpr:{} ",
+            "\x1B[2K        misc|elim:{}, cviv:{}, #vbv:{}, /cpr:{} ",
             im!("{:>9}", self, LogUsizeId::Simplify, elim_num_full),
             im!("{:>9}", self, LogUsizeId::Vivify, self[Stat::Vivification]),
             im!(

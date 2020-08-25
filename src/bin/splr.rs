@@ -358,11 +358,11 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c         misc|#elm:{}, #viv:{}, #vbv:{}, /cpr:{},\n",
+            "c         misc|elim:{}, cviv:{}, #vbv:{}, /cpr:{},\n",
             format!("{:>9}", state[LogUsizeId::Simplify]),
             format!("{:>9}", state[LogUsizeId::Vivify]),
             format!("{:>9}", state[LogUsizeId::VivifiedVar]),
-            format!("{:>9.2}", state[LogF64Id::PropagationPerConflict]),
+            format!("{:>9.2}", state[LogF64Id::ConflictPerRestart]),
         )
         .as_bytes(),
     )?;
