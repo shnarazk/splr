@@ -268,8 +268,8 @@ for (i, v) in Solver::try_from(cnf).expect("panic").iter().enumerate() {
 | `cnfl` | the EMA of decision levels at which conflicts occur |
 | `bjmp` | the EMA of decision levels to which backjumps go |
 | `/ppc` | the number of propagations per conflict |
-| `elim` | the number of applying clause/var elimination |
-| `cviv` | the number of applying clause vivification |
+| `elim` | the number of invocations of clause/var elimination |
+| `cviv` | the number of invocations of clause vivification |
 | `#vbv` | the number of vars which were asserted by clause vivification |
 | `/cpr` | the number of conflicts per restart |
 | `mode` | Selected strategy's id |
