@@ -322,26 +322,26 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c  {}|#RST:{}, #BLK:{}, #CNC:{}, #STB:{},\n",
-            if s.rst.active_mode() == RestartMode::Luby {
+            "c  {}|#RST:{}, #BLK:{}, #STB:{}, #CNC:{},\n",
+            if s.rst.active_mode().0 == RestartMode::Luby {
                 "LubyRestart"
             } else {
                 "    Restart"
             },
             format!("{:>9}", state[LogUsizeId::Restart]),
             format!("{:>9}", state[LogUsizeId::RestartBlock]),
-            format!("{:>9}", state[LogUsizeId::RestartCancel]),
             format!("{:>9}", state[LogUsizeId::Stabilize]),
+            format!("{:>9}", state[LogUsizeId::RestartCancel]),
         )
         .as_bytes(),
     )?;
     out.write_all(
         format!(
-            "c          EMA|tLBD:{}, tASG:{}, eRLT:{}, eASG:{},\n",
+            "c          EMA|tLBD:{}, tASG:{}, eMLD:{}, eCCC:{},\n",
             format!("{:>9.4}", state[LogF64Id::TrendLBD]),
             format!("{:>9.4}", state[LogF64Id::TrendASG]),
-            format!("{:>9.4}", state[LogF64Id::EmaMVA]),
-            format!("{:>9.0}", state[LogF64Id::EmaASG]),
+            format!("{:>9.4}", state[LogF64Id::EmaMLD]),
+            format!("{:>9.0}", state[LogF64Id::EmaCCC]),
         )
         .as_bytes(),
     )?;
@@ -358,7 +358,7 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     )?;
     out.write_all(
         format!(
-            "c         misc|#eli:{}, #viv:{}, #vbv{}, /cpr:{},\n",
+            "c         misc|#elm:{}, #viv:{}, #vbv:{}, /cpr:{},\n",
             format!("{:>9}", state[LogUsizeId::Simplify]),
             format!("{:>9}", state[LogUsizeId::Vivify]),
             format!("{:>9}", state[LogUsizeId::VivifiedVar]),

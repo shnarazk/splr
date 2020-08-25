@@ -228,8 +228,8 @@ pub fn handle_conflict(
     }
     cdb.scale_activity();
     if 0 < state.config.io_dump && num_conflict % state.config.io_dump == 0 {
-        let (rst_num_block, _) = rst.exports();
-        let (rst_asg, rst_lbd, _rst_mld, _rst_mva) = *rst.exports_box();
+        let rst_num_block = rst.exports().0;
+        let (_rst_acc, rst_asg, rst_lbd, _rst_mld) = *rst.exports_box();
         state.development.push((
             num_conflict,
             (asg.num_asserted_vars + asg.num_eliminated_vars) as f64

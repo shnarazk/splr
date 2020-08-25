@@ -46,7 +46,7 @@ pub trait StateIF {
         C: Export<(usize, usize, usize, usize, usize, usize), bool>,
         E: Export<(usize, usize, f64), ()>,
         R: RestartIF
-            + Export<(usize, usize), RestartMode>
+            + Export<(usize, usize, usize, usize), (RestartMode, usize)>
             + ExportBox<'r, (&'r Ema2, &'r Ema2, &'r Ema2, &'r Ema2)>;
     /// write a short message to stdout.
     fn flush<S: AsRef<str>>(&self, mes: S);
@@ -487,7 +487,7 @@ impl StateIF for State {
         C: Export<(usize, usize, usize, usize, usize, usize), bool>,
         E: Export<(usize, usize, f64), ()>,
         R: RestartIF
-            + Export<(usize, usize), RestartMode>
+            + Export<(usize, usize, usize, usize), (RestartMode, usize)>
             + ExportBox<'r, (&'r Ema2, &'r Ema2, &'r Ema2, &'r Ema2)>,
     {
         if !self.config.splr_interface || self.config.quiet_mode {
@@ -507,10 +507,11 @@ impl StateIF for State {
 
         let (elim_num_full, _num_sat, _elim_to_simplify) = elim.exports();
 
-        let rst_mode = rst.active_mode();
+        let rst_mode = rst.active_mode().0;
 
-        let (rst_num_blk, rst_num_stb) = rst.exports();
-        let (rst_asg, rst_lbd, rst_mld, rst_mva) = *rst.exports_box();
+        let (rst_num_blk, _num_rst, _num_blk_stb, _num_rst_stb) = rst.exports();
+        let rst_num_stb = rst.active_mode().1;
+        let (rst_acc, rst_asg, rst_lbd, rst_mld) = *rst.exports_box();
 
         if self.config.use_log {
             self.dump(asg, cdb, rst);
@@ -555,7 +556,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K {}|#RST:{}, #BLK:{}, #CNC:{}, #STB:{} ",
+            "\x1B[2K {}|#RST:{}, #BLK:{}, #STB:{}, #CNC:{} ",
             match rst_mode {
                 RestartMode::Dynamic => "    Restart",
                 RestartMode::Luby if self.config.no_color => "LubyRestart",
@@ -565,20 +566,20 @@ impl StateIF for State {
             },
             im!("{:>9}", self, LogUsizeId::Restart, asg_num_restart),
             im!("{:>9}", self, LogUsizeId::RestartBlock, rst_num_blk),
+            im!("{:>9}", self, LogUsizeId::Stabilize, rst_num_stb),
             im!(
                 "{:>9}",
                 self,
                 LogUsizeId::RestartCancel,
                 self[Stat::CancelRestart]
             ),
-            im!("{:>9}", self, LogUsizeId::Stabilize, rst_num_stb),
         );
         println!(
-            "\x1B[2K         EMA|tLBD:{}, tASG:{}, eMLD:{}, eMVA:{} ",
+            "\x1B[2K         EMA|tLBD:{}, tASG:{}, eMLD:{}, eCCC:{} ",
             fm!("{:>9.4}", self, LogF64Id::TrendLBD, rst_lbd.trend()),
             fm!("{:>9.4}", self, LogF64Id::TrendASG, rst_asg.trend()),
             fm!("{:>9.4}", self, LogF64Id::EmaMLD, rst_mld.get()),
-            fm!("{:>9.4}", self, LogF64Id::EmaMVA, rst_mva.get()),
+            fm!("{:>9.4}", self, LogF64Id::EmaCCC, rst_acc.get()),
         );
         println!(
             "\x1B[2K    Conflict|eLBD:{}, cnfl:{}, bjmp:{}, /ppc:{} ",
@@ -593,7 +594,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K        misc|#eli:{}, #viv:{}, #vbv:{}, /cpr:{} ",
+            "\x1B[2K        misc|#elm:{}, #viv:{}, #vbv:{}, /cpr:{} ",
             im!("{:>9}", self, LogUsizeId::Simplify, elim_num_full),
             im!("{:>9}", self, LogUsizeId::Vivify, self[Stat::Vivification]),
             im!(
@@ -743,7 +744,7 @@ impl State {
     where
         A: AssignIF + Export<(usize, usize, usize, f64), ()>,
         C: Export<(usize, usize, usize, usize, usize, usize), bool>,
-        R: Export<(usize, usize), RestartMode>,
+        R: Export<(usize, usize, usize, usize), (RestartMode, usize)>,
     {
         self.progress_cnt += 1;
         let (asg_num_vars, asg_num_asserted_vars, asg_num_eliminated_vars, asg_num_unasserted_vars) =
@@ -758,7 +759,7 @@ impl State {
             cdb_num_learnt,
             cdb_num_reduction,
         ) = cdb.exports();
-        let (rst_num_block, _) = rst.exports();
+        let rst_num_block = rst.exports().0;
         println!(
             "c | {:>8}  {:>8} {:>8} | {:>7} {:>8} {:>8} |  {:>4}  {:>8} {:>7} {:>8} | {:>6.3} % |",
             asg_num_restart,                           // restart
@@ -780,7 +781,7 @@ impl State {
         A: AssignIF + Export<(usize, usize, usize, f64), ()>,
         C: Export<(usize, usize, usize, usize, usize, usize), bool>,
         R: RestartIF
-            + Export<(usize, usize), RestartMode>
+            + Export<(usize, usize, usize, usize), (RestartMode, usize)>
             + ExportBox<'r, (&'r Ema2, &'r Ema2, &'r Ema2, &'r Ema2)>,
     {
         self.progress_cnt += 1;
@@ -800,8 +801,8 @@ impl State {
             cdb_num_learnt,
             _num_reduction,
         ) = cdb.exports();
-        let (rst_num_block, _) = rst.exports();
-        let (rst_asg, rst_lbd, _, _) = *rst.exports_box();
+        let rst_num_block = rst.exports().0;
+        let (_, rst_asg, rst_lbd, _) = *rst.exports_box();
         println!(
             "{:>3}#{:>8},{:>7},{:>7},{:>7},{:>6.3},,{:>7},{:>7},\
              {:>7},,{:>5},{:>5},{:>6.2},{:>6.2},,{:>7.2},{:>8.2},{:>8.2},,\
@@ -854,9 +855,9 @@ pub enum LogUsizeId {
 pub enum LogF64Id {
     Progress = 0,
     EmaASG,
+    EmaCCC,
     EmaLBD,
     EmaMLD,
-    EmaMVA,
     TrendASG,
     TrendLBD,
     TrendMLD,

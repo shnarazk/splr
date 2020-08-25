@@ -665,6 +665,9 @@ pub struct Restarter {
     //## statistics
     //
     num_block: usize,
+    num_restart: usize,
+    num_block_stabilized: usize,
+    num_restart_stabilized: usize,
 }
 
 impl Default for Restarter {
@@ -684,6 +687,9 @@ impl Default for Restarter {
             restart_step: 0,
             initial_restart_step: 0,
             num_block: 0,
+            num_restart: 0,
+            num_block_stabilized: 0,
+            num_restart_stabilized: 0,
         }
     }
 }
@@ -753,18 +759,23 @@ impl RestartIF for Restarter {
         if self.stb.is_active() {
             if self.acc.is_active() && good_path {
                 self.after_restart = 0;
+                self.num_block += 1;
+                self.num_block_stabilized += 1;
                 return Some(RestartDecision::Cancel);
             } else {
                 self.after_restart = 0;
+                self.num_restart += 1;
+                self.num_restart_stabilized += 1;
                 return Some(RestartDecision::Stabilize);
             }
         } else if self.asg.is_active() {
-            self.num_block += 1;
             self.after_restart = 0;
+            self.num_block += 1;
             return Some(RestartDecision::Block);
         };
         if !good_path {
             self.after_restart = 0;
+            self.num_restart += 1;
             return Some(RestartDecision::Force);
         }
         None
@@ -786,7 +797,7 @@ impl RestartIF for Restarter {
     }
 }
 
-impl Export<(usize, usize), RestartMode> for Restarter {
+impl Export<(usize, usize, usize, usize), (RestartMode, usize)> for Restarter {
     /// exports:
     ///  1. the number of blocking
     ///  1. , the number of stabilzation
@@ -794,28 +805,32 @@ impl Export<(usize, usize), RestartMode> for Restarter {
     ///```
     /// use crate::splr::{config::Config, solver::Restarter, types::*};
     /// let rst = Restarter::instantiate(&Config::default(), &CNFDescription::default());
-    /// let (num_block, num_stb) = rst.exports();
+    /// let (num_block, num_stb, num_stb_block, num_stb_rst) = rst.exports();
+    /// let (rst_mode, num_stb) = rst.active_mode();
     ///```
     #[inline]
-    fn exports(&self) -> (usize, usize) {
-        (self.num_block, self.stb.num_active)
+    fn exports(&self) -> (usize, usize, usize, usize) {
+        (
+            self.num_block,
+            self.num_restart,
+            self.num_block_stabilized,
+            self.num_restart_stabilized,
+        )
     }
-    fn active_mode(&self) -> RestartMode {
+    fn active_mode(&self) -> (RestartMode, usize) {
         if self.stb.is_active() {
-            RestartMode::Stabilize
-        // } else if self.bkt.enable {
-        //     RestartMode::Bucket
+            (RestartMode::Stabilize, self.stb.num_active)
         } else if self.luby.enable {
-            RestartMode::Luby
+            (RestartMode::Luby, self.stb.num_active)
         } else {
-            RestartMode::Dynamic
+            (RestartMode::Dynamic, self.stb.num_active)
         }
     }
 }
 
 impl<'a> ExportBox<'a, (&'a Ema2, &'a Ema2, &'a Ema2, &'a Ema2)> for Restarter {
     fn exports_box(&'a self) -> Box<(&'a Ema2, &'a Ema2, &'a Ema2, &'a Ema2)> {
-        Box::from((&self.asg.ema, &self.lbd.ema, &self.mld.ema, &self.acc.ema))
+        Box::from((&self.acc.ema, &self.asg.ema, &self.lbd.ema, &self.mld.ema))
     }
 }
 
