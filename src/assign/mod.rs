@@ -140,7 +140,7 @@ pub struct AssignStack {
     pub num_asserted_vars: usize,
     /// the number of eliminated vars.
     pub num_eliminated_vars: usize,
-    num_conflict: usize,
+    pub num_conflict: usize,
     num_propagation: usize,
     num_restart: usize,
 
