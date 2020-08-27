@@ -30,7 +30,7 @@ pub trait StateIF {
     fn select_strategy<A, C>(&mut self, asg: &A, cdb: &C)
     where
         A: Export<(usize, usize, usize, f64), ()>,
-        C: ClauseDBIF + Export<(usize, usize, usize, usize, usize, usize), bool>;
+        C: ClauseDBIF + Export<(usize, usize, usize, usize, usize, usize), ()>;
     /// write a header of stat data to stdio.
     fn progress_header(&mut self);
     /// write stat data to stdio.
@@ -43,7 +43,7 @@ pub trait StateIF {
         mes: Option<&str>,
     ) where
         A: AssignIF + Export<(usize, usize, usize, f64), ()>,
-        C: Export<(usize, usize, usize, usize, usize, usize), bool>,
+        C: Export<(usize, usize, usize, usize, usize, usize), ()>,
         E: Export<(usize, usize, f64), ()>,
         R: RestartIF
             + Export<(usize, usize, usize, usize), (RestartMode, usize)>
@@ -426,7 +426,7 @@ impl StateIF for State {
     fn select_strategy<A, C>(&mut self, asg: &A, cdb: &C)
     where
         A: Export<(usize, usize, usize, f64), ()>,
-        C: ClauseDBIF + Export<(usize, usize, usize, usize, usize, usize), bool>,
+        C: ClauseDBIF + Export<(usize, usize, usize, usize, usize, usize), ()>,
     {
         if !self.config.use_adaptive() {
             return;
@@ -484,7 +484,7 @@ impl StateIF for State {
         mes: Option<&str>,
     ) where
         A: AssignIF + Export<(usize, usize, usize, f64), ()>,
-        C: Export<(usize, usize, usize, usize, usize, usize), bool>,
+        C: Export<(usize, usize, usize, usize, usize, usize), ()>,
         E: Export<(usize, usize, f64), ()>,
         R: RestartIF
             + Export<(usize, usize, usize, usize), (RestartMode, usize)>
@@ -743,7 +743,7 @@ impl State {
     fn dump<A, C, R>(&mut self, asg: &A, cdb: &C, rst: &R)
     where
         A: AssignIF + Export<(usize, usize, usize, f64), ()>,
-        C: Export<(usize, usize, usize, usize, usize, usize), bool>,
+        C: Export<(usize, usize, usize, usize, usize, usize), ()>,
         R: Export<(usize, usize, usize, usize), (RestartMode, usize)>,
     {
         self.progress_cnt += 1;
@@ -779,7 +779,7 @@ impl State {
     fn dump_details<'r, A, C, E, R, V>(&mut self, asg: &A, cdb: &C, rst: &'r R, mes: Option<&str>)
     where
         A: AssignIF + Export<(usize, usize, usize, f64), ()>,
-        C: Export<(usize, usize, usize, usize, usize, usize), bool>,
+        C: Export<(usize, usize, usize, usize, usize, usize), ()>,
         R: RestartIF
             + Export<(usize, usize, usize, usize), (RestartMode, usize)>
             + ExportBox<'r, (&'r Ema2, &'r Ema2, &'r Ema2, &'r Ema2)>,

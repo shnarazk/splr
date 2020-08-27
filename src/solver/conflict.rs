@@ -33,7 +33,7 @@ pub fn handle_conflict(
         }
     }
 
-    let (num_conflict, _num_propagation, asg_num_restart, _) = asg.exports();
+    let num_conflict = asg.num_conflict;
     // If we can settle this conflict w/o restart, solver will get a big progress.
     let switch_chronobt = if num_conflict < 1000 || asg.recurrent_conflicts() {
         Some(false)
@@ -228,13 +228,13 @@ pub fn handle_conflict(
     }
     cdb.scale_activity();
     if 0 < state.config.io_dump && num_conflict % state.config.io_dump == 0 {
-        let rst_num_block = rst.exports().0;
+        let (rst_num_block, rst_num_restart, _, _) = rst.exports();
         let (_rst_acc, rst_asg, rst_lbd, _rst_mld) = *rst.exports_box();
         state.development.push((
             num_conflict,
             (asg.num_asserted_vars + asg.num_eliminated_vars) as f64
                 / state.target.num_of_variables as f64,
-            asg_num_restart as f64,
+            rst_num_restart as f64,
             rst_num_block as f64,
             rst_asg.trend().min(10.0),
             rst_lbd.trend().min(10.0),

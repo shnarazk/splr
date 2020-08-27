@@ -196,6 +196,8 @@ fn search(
 ) -> Result<bool, SolverError> {
     let mut a_decision_was_made = false;
     let mut num_assigned = asg.num_asserted_vars;
+    let use_stabilize = state.config.use_stabilize();
+    let use_vivify = state.config.use_vivify();
     rst.update(ProgressUpdate::Luby);
     state.stabilize = false;
 
@@ -239,7 +241,7 @@ fn search(
                 state.flush("");
                 state.flush(format!("unreachable: {}", asg.num_vars - num_assigned));
             }
-            if asg.exports().0 % state.reflection_interval == 0 {
+            if asg.num_conflict % state.reflection_interval == 0 {
                 adapt_modules(asg, cdb, elim, rst, state)?;
                 if let Some(p) = state.elapsed() {
                     if 1.0 <= p {
@@ -282,7 +284,7 @@ fn search(
             }
         }
         if !asg.remains() {
-            if state.config.use_stabilize() && state.stabilize != rst.stabilizing() {
+            if use_stabilize && state.stabilize != rst.stabilizing() {
                 state.stabilize = !state.stabilize;
                 rst.handle(SolverEvent::Stabilize(state.stabilize));
                 // update `num_assigned` periodically, which isn't a monotonous increasing var.
@@ -304,7 +306,7 @@ fn adapt_modules(
     state: &mut State,
 ) -> MaybeInconsistent {
     state.progress(asg, cdb, elim, rst, None);
-    let (asg_num_conflict, _num_propagation, _num_restart, _) = asg.exports();
+    let asg_num_conflict = asg.num_conflict;
     if 10 * state.reflection_interval == asg_num_conflict {
         // Need to call it before `cdb.adapt_to`
         // 'decision_level == 0' is required by `cdb.adapt_to`.
