@@ -186,19 +186,19 @@ pub struct Config {
     //## vivifier
     //
     /// Lower bound of vivif. loop    .
-    #[cfg_attr(feature = "structopt", structopt(long = "vib", default_value = "1.0"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "vib", default_value = "0.5"))]
     pub viv_beg: f64,
 
     /// Upper bound of vivif. loop    .
-    #[cfg_attr(feature = "structopt", structopt(long = "vie", default_value = "2.0"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "vie", default_value = "1.5"))]
     pub viv_end: f64,
 
     /// Vivification interval           .
-    #[cfg_attr(feature = "structopt", structopt(long = "vii", default_value = "4"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "vii", default_value = "2"))]
     pub viv_int: usize,
 
     /// #reduction for next vivif.    .
-    #[cfg_attr(feature = "structopt", structopt(long = "vis", default_value = "2.0"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "vis", default_value = "1.2"))]
     pub viv_scale: f64,
 
     //
