@@ -153,9 +153,13 @@ pub fn vivify(
                     if !cc.is_none() {
                         copied.push(!*l);
                         copied = asg.analyze(cdb, &copied, &cdb[cc].lits, &mut seen);
-                        if !copied.is_empty() {
-                            flipped = false;
+                        // this reverts dda678e
+                        // Here we found an inconsistency.
+                        // So we can abort this function without rolling back to level zoro.
+                        if copied.is_empty() {
+                            break 'this_clause;
                         }
+                        flipped = false;
                     }
                     asg.cancel_until(asg.root_level);
                     if let Some(cj) = cid {
