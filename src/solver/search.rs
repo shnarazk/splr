@@ -253,10 +253,10 @@ fn search(
             }
         }
         // Simplification has been postponed because chronoBT was used.
-        if asg.decision_level() == asg.root_level && !asg.remains() {
-            if state.config.viv_int <= state.to_vivify && state.config.use_vivify() {
+        if asg.decision_level() == asg.root_level {
+            if use_vivify && state.config.viv_int <= state.to_vivify {
                 state.to_vivify = 0;
-                if !cdb.active_mode() && vivify(asg, cdb, elim, state).is_err() {
+                if vivify(asg, cdb, elim, state).is_err() {
                     // return Err(SolverError::UndescribedError);
                     analyze_final(asg, state, &cdb[ci]);
                     return Ok(false);
@@ -270,12 +270,6 @@ fn search(
                     elim.activate();
                 }
                 elim.simplify(asg, cdb, state)?;
-                if state.config.use_vivify() && cdb.active_mode() {
-                    state.to_vivify = 0;
-                    if vivify(asg, cdb, elim, state).is_err() {
-                        return Err(SolverError::UndescribedError);
-                    }
-                }
             }
             // By simplification, we may get further solutions.
             if asg.num_asserted_vars < asg.stack_len() {
