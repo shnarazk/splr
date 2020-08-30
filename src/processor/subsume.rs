@@ -104,7 +104,7 @@ where
         );
         cdb.detach(cid);
         elim.remove_cid_occur(asg, cid, &mut cdb[cid]);
-        cdb.certificate_add(&vec![c0]);
+        cdb.certificate_add(&[c0]);
         asg.assign_at_rootlevel(c0)
     } else {
         #[cfg(feature = "trace_elimination")]
