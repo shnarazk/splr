@@ -1,7 +1,7 @@
 //! Conflict Analysis
 use {
     super::{
-        restart::{RestartIF, Restarter, RestarterModule},
+        restart::{ProgressUpdate, RestartIF, Restarter},
         State,
     },
     crate::{
@@ -33,25 +33,22 @@ pub fn handle_conflict(
         }
     }
 
-    let (num_conflict, _num_propagation, asg_num_restart, _) = asg.exports();
+    let num_conflict = asg.num_conflict;
     // If we can settle this conflict w/o restart, solver will get a big progress.
     let switch_chronobt = if num_conflict < 1000 || asg.recurrent_conflicts() {
         Some(false)
     } else {
         None
     };
-    rst.update(RestarterModule::Counter, num_conflict);
+    rst.update(ProgressUpdate::Counter(num_conflict));
 
     if 0 < state.last_asg {
-        rst.update(RestarterModule::ASG, asg.stack_len());
+        rst.update(ProgressUpdate::ASG(asg.stack_len()));
         state.last_asg = 0;
     }
 
-    //
-    //## DYNAMIC BLOCKING RESTART based on ASG, updated on conflict path
-    //
-    rst.block_restart();
-    let mut use_chronobt = switch_chronobt.unwrap_or(0 < state.config.cbt_thr);
+    // rst.block_restart(); // to update asg progress_evaluator
+    let mut use_chronobt = switch_chronobt.unwrap_or(0 < state.config.c_cbt_thr);
     if use_chronobt {
         let level = asg.level_ref();
         let c = &cdb[ci];
@@ -110,15 +107,16 @@ pub fn handle_conflict(
                 .collect::<Vec<_>>(),
         )
     );
+    asg.handle(SolverEvent::Conflict);
     // backtrack level by analyze
-    let bl_a = conflict_analyze(asg, cdb, state, ci).max(asg.root_level);
+    let bl_a = conflict_analyze(asg, cdb, rst, state, ci).max(asg.root_level);
     if state.new_learnt.is_empty() {
         #[cfg(debug)]
         {
             println!(
                 "empty learnt at {}({}) by {:?}",
                 cl,
-                asg.reason(asg.decision_vi(cl)) == ClauseId::default(),
+                asg.reason(asg.decision_vi(cl)).is_none(),
                 asg.dump(asg, &cdb[ci]),
             );
         }
@@ -134,7 +132,7 @@ pub fn handle_conflict(
     // PREMISE: 0 < bl, because asg.decision_vi accepts only non-zero values.
     use_chronobt &= switch_chronobt.unwrap_or(
         bl_a == 0
-            || state.config.cbt_thr + bl_a <= cl
+            || state.config.c_cbt_thr + bl_a <= cl
             || asg.activity(l0.vi()) < asg.activity(asg.decision_vi(bl_a)),
     );
 
@@ -157,7 +155,7 @@ pub fn handle_conflict(
     let learnt_len = new_learnt.len();
     if learnt_len == 1 {
         //
-        //## PARTIAL FIXED SOLUTION by UNIT LEARNT CLAUSE GENERATION
+        //## A NEW ASSERTION by UNIT LEARNT CLAUSE GENERATION
         //
         // dump to certified even if it's a literal.
         cdb.certificate_add(new_learnt);
@@ -168,8 +166,9 @@ pub fn handle_conflict(
         } else {
             asg.assign_by_unitclause(l0);
         }
-        asg.handle(SolverEvent::Fixed);
-        rst.update(RestarterModule::Reset, 0);
+        asg.handle(SolverEvent::Assert);
+        rst.update(ProgressUpdate::Reset);
+        elim.to_simplify += 2.0; // 1 for the positive lit, 1 for the negative.
     } else {
         {
             // At the present time, some reason clauses can contain first UIP or its negation.
@@ -198,42 +197,52 @@ pub fn handle_conflict(
             }
         }
         asg.cancel_until(bl);
+        let reason = if learnt_len == 2 {
+            new_learnt[1]
+        } else {
+            NULL_LIT
+        };
         let cid = cdb.new_clause(asg, new_learnt, true, true);
         elim.add_cid_occur(asg, cid, &mut cdb[cid], true);
         state.c_lvl.update(cl as f64);
         state.b_lvl.update(bl as f64);
-        asg.assign_by_implication(
-            l0,
-            AssignReason::Implication(
-                cid,
-                if learnt_len == 2 {
-                    new_learnt[1]
-                } else {
-                    NULL_LIT
-                },
-            ),
-            al,
-        );
+        asg.assign_by_implication(l0, AssignReason::Implication(cid, reason), al);
         let lbd = cdb[cid].rank;
-        rst.update(RestarterModule::LBD, lbd);
-        if 1 < learnt_len && learnt_len <= state.config.elim_cls_lim / 2 {
-            elim.to_simplify += 1.0 / (learnt_len - 1) as f64;
+        rst.update(ProgressUpdate::LBD(lbd));
+
+        let mut act: f64 = 0.0;
+        for li in cdb[cid].iter() {
+            let a = asg.activity(li.vi());
+            if act < a {
+                act = a;
+            }
+        }
+        rst.update(ProgressUpdate::ACC(act));
+
+        elim.to_simplify += 1.0 / (learnt_len - 1) as f64;
+        if lbd <= 20 {
+            for cid in &state.derive20 {
+                cdb[cid].turn_on(Flag::DERIVE20);
+            }
         }
     }
     cdb.scale_activity();
-    if 0 < state.config.dump_int && num_conflict % state.config.dump_int == 0 {
-        let (_mode, rst_num_block, rst_asg_trend, _lbd_get, rst_lbd_trend) = rst.exports();
+    if 0 < state.config.io_dump && num_conflict % state.config.io_dump == 0 {
+        let (rst_num_block, rst_num_restart, _, _) = rst.exports();
+        let (_rst_acc, rst_asg, rst_lbd, _rst_mld) = *rst.exports_box();
         state.development.push((
             num_conflict,
-            (asg.num_solved_vars + asg.num_eliminated_vars) as f64
+            (asg.num_asserted_vars + asg.num_eliminated_vars) as f64
                 / state.target.num_of_variables as f64,
-            asg_num_restart as f64,
+            rst_num_restart as f64,
             rst_num_block as f64,
-            rst_asg_trend.min(10.0),
-            rst_lbd_trend.min(10.0),
+            rst_asg.trend().min(10.0),
+            rst_lbd.trend().min(10.0),
         ));
     }
-    cdb.check_and_reduce(asg, num_conflict);
+    if cdb.check_and_reduce(asg, num_conflict) {
+        state.to_vivify += 1;
+    }
     Ok(())
 }
 
@@ -244,22 +253,40 @@ pub fn handle_conflict(
 fn conflict_analyze(
     asg: &mut AssignStack,
     cdb: &mut ClauseDB,
+    rst: &mut Restarter,
     state: &mut State,
     conflicting_clause: ClauseId,
 ) -> DecisionLevel {
+    state.derive20.clear();
     let learnt = &mut state.new_learnt;
     learnt.clear();
     learnt.push(NULL_LIT);
     let dl = asg.decision_level();
-    let mut p = NULL_LIT;
-    let mut ti = asg.stack_len() - 1; // trail index
+    let mut p = cdb[conflicting_clause].lits[0];
+    #[cfg(feature = "trace_analysis")]
+    println!("- analyze conflicting literal {}", p);
     let mut path_cnt = 0;
-    loop {
-        let reason = if p == NULL_LIT {
-            AssignReason::Implication(conflicting_clause, NULL_LIT)
+    let mut largest_clause: u16 = 2;
+    let vi = p.vi();
+    if !asg.var(vi).is(Flag::CA_SEEN) && 0 < asg.level(vi) {
+        let lvl = asg.level(vi);
+        debug_assert!(!asg.var(vi).is(Flag::ELIMINATED));
+        asg.var_mut(vi).turn_on(Flag::CA_SEEN);
+        if dl <= lvl {
+            path_cnt = 1;
+            //
+            //## Conflict-Side Rewarding
+            //
+            asg.reward_at_analysis(vi);
         } else {
-            asg.reason(p.vi())
-        };
+            #[cfg(feature = "trace_analysis")]
+            println!("- push {} to learnt, which level is {}", p, lvl);
+            learnt.push(p);
+        }
+    }
+    let mut reason = AssignReason::Implication(conflicting_clause, NULL_LIT);
+    let mut ti = asg.stack_len() - 1; // trail index
+    loop {
         match reason {
             AssignReason::Implication(_, l) if l != NULL_LIT => {
                 // cid = asg.reason(p.vi());
@@ -276,32 +303,22 @@ fn conflict_analyze(
                         path_cnt += 1;
                         asg.reward_at_analysis(vi);
                     } else {
-                        #[cfg(feature = "trace_analysis")]
-                        println!("- push {} to learnt, which level is {}", l, lvl);
-                        // learnt.push(l);
-                    }
-                } else {
-                    #[cfg(feature = "trace_analysis")]
-                    {
-                        if !asg.var(vi).is(Flag::CA_SEEN) {
-                            println!("- ignore {} because it was flagged", l);
-                        } else {
-                            println!("- ignore {} because its level is {}", l, asg.level(vi));
-                        }
+                        #[cfg(feature = "boundary_check")]
+                        panic!("strange level binary clause");
                     }
                 }
             }
             AssignReason::Implication(cid, _) => {
                 #[cfg(feature = "trace_analysis")]
                 println!("analyze {}", p);
-                debug_assert_ne!(cid, ClauseId::default());
-                if cdb[cid].is(Flag::LEARNT) {
-                    if !cdb[cid].is(Flag::JUST_USED) && !cdb.convert_to_permanent(asg, cid) {
-                        cdb[cid].turn_on(Flag::JUST_USED);
-                    }
-                    cdb.bump_activity(cid, ());
-                }
+                debug_assert!(!cid.is_none());
+                cdb.mark_clause_as_used(asg, cid);
+                cdb.bump_activity(cid, ());
                 let c = &cdb[cid];
+                if !c.is(Flag::LEARNT) {
+                    state.derive20.push(cid);
+                }
+                largest_clause = largest_clause.max(c.rank);
                 #[cfg(feature = "boundary_check")]
                 assert!(
                     0 < c.len(),
@@ -316,7 +333,7 @@ fn conflict_analyze(
                 );
                 #[cfg(feature = "trace_analysis")]
                 println!("- handle {}", cid);
-                for q in &c[(p != NULL_LIT) as usize..] {
+                for q in &c[1..] {
                     let vi = q.vi();
                     if !asg.var(vi).is(Flag::CA_SEEN) {
                         // asg.reward_at_analysis(vi);
@@ -408,10 +425,12 @@ fn conflict_analyze(
         }
         debug_assert!(0 < ti);
         ti -= 1;
+        reason = asg.reason(p.vi());
     }
     debug_assert!(learnt.iter().all(|l| *l != !p));
     debug_assert_eq!(asg.level(p.vi()), dl);
     learnt[0] = !p;
+    rst.update(ProgressUpdate::MLD(largest_clause));
     #[cfg(feature = "trace_analysis")]
     println!("- appending {}, the result is {:?}", learnt[0], learnt);
     state.minimize_learnt(asg, cdb)
@@ -460,7 +479,7 @@ impl State {
 }
 
 /// return `true` if the `lit` is redundant, which is defined by
-/// any leaf of implication graph for it isn't a fixed var nor a decision var.
+/// any leaf of implication graph for it isn't an asserted var nor a decision var.
 impl Lit {
     fn is_redundant(
         self,

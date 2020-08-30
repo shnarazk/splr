@@ -1,3 +1,19 @@
+## 0.5.0, 2020-08-2X
+
+- massive changes on the default parameters about restart
+  - restart condition was revised as a multi-armed bandid problem
+  - add some new criteria which are not documented yet
+- compute LBD of permanent clauses correctly
+- implement clause vivification
+- add `ClauseDB::bin_watcher`
+- delete `Watch::binary`
+- `ClauseDB::new_clause` takes `&mut Vec<Lit>` instead of `&mut [Lit]`
+- substitute copying literals with `std::mem::swap` in `ClauseDB::new_clause`
+- stop sorting literals in `ClauseDB::new_clause`
+- fix the certification symbol used by removing clauses
+- fix a wrong initial value for `Config::rst_lbd_thr` which should be larger than 1.0
+- revise the timeout for pre-processor
+
 ## 0.4.1, 2020-05-28
 
 - the installation command is changed to `cargo install splr --features cli`
@@ -6,6 +22,14 @@
 - `--quiet` option stops progress report completely
 - a tiny modification on var selection heuristics
 - squash git history on the master branch
+
+#### Verification
+
+* [SAT Race 2019](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks](http://satcompetition.org/sr2019benchmarks.zip),  splr-0.4.1(be30d17, 7064c9) solved with a 400 sec (soft) timeout:
+  * 48 satisfiable problems: all the solutions were correct.
+  * 7 unsatisfiable problems: all were verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
+
+![](https://user-images.githubusercontent.com/997855/82614843-c14b6480-9c03-11ea-9fe9-1a4d367d7290.png)
 
 ## 0.4.0, 2020-05-06
 

@@ -60,7 +60,7 @@ use {
 /// assert_eq!(elim.is_running(), false);
 /// assert_eq!(elim.simplify(&mut s.asg, &mut s.cdb, &mut s.state), Ok(()));
 ///```
-pub trait EliminateIF: Export<(usize, usize, f64)> {
+pub trait EliminateIF {
     /// set eliminator's mode to **ready**.
     fn activate(&mut self);
     /// set eliminator's mode to **dormant**.
@@ -111,14 +111,14 @@ pub trait EliminatorStatIF {
     fn stats(&self) -> (usize, usize);
 }
 
-#[derive(Eq, Debug, PartialEq)]
+#[derive(Copy, Clone, Eq, Debug, PartialEq)]
 enum EliminatorMode {
     Deactive,
     Waiting,
     Running,
 }
 
-impl Export<(usize, usize, f64)> for Eliminator {
+impl Export<(usize, usize, f64), ()> for Eliminator {
     /// exports:
     ///  1. the number of full eliminations
     ///  1. the number of satisfied clause eliminations
@@ -137,6 +137,7 @@ impl Export<(usize, usize, f64)> for Eliminator {
             self.to_simplify,
         )
     }
+    fn active_mode(&self) {}
 }
 
 /// Mapping from Literal to Clauses.
@@ -235,7 +236,7 @@ impl Default for Eliminator {
             clause_queue: Vec::new(),
             bwdsub_assigns: 0,
             elim_lits: Vec::new(),
-            eliminate_var_occurrence_limit: 10_000,
+            eliminate_var_occurrence_limit: 1_000,
             eliminate_combination_limit: 80,
             eliminate_grow_limit: 0, // 64
             eliminate_occurrence_limit: 800,
@@ -343,9 +344,9 @@ impl Instantiate for Eliminator {
         Eliminator {
             enable: config.use_elim(),
             var_queue: VarOccHeap::new(nv, 0),
-            eliminate_var_occurrence_limit: config.elim_var_occ,
-            eliminate_grow_limit: config.elim_grw_lim,
-            subsume_literal_limit: config.elim_cls_lim,
+            eliminate_var_occurrence_limit: config.elm_var_occ,
+            eliminate_grow_limit: config.elm_grw_lim,
+            subsume_literal_limit: config.elm_cls_lim,
             var: LitOccurs::new(nv + 1),
             ..Eliminator::default()
         }
@@ -403,7 +404,7 @@ impl EliminateIF for Eliminator {
         A: AssignIF,
         C: ClauseDBIF,
     {
-        assert!(self.enable);
+        debug_assert!(self.enable);
         if self.mode != EliminatorMode::Waiting {
             return;
         }
@@ -480,7 +481,7 @@ impl EliminateIF for Eliminator {
             v.turn_on(Flag::TOUCHED);
             let pl = w.pos_occurs.len();
             let nl = w.neg_occurs.len();
-            if 2 <= pl.min(nl) && evo < pl + nl {
+            if evo < pl * nl {
                 w.aborted = true;
                 continue;
             }
@@ -571,12 +572,12 @@ impl Eliminator {
             if timedout.load(Ordering::Acquire) {
                 self.clear_clause_queue(cdb);
                 self.clear_var_queue(asg);
-                continue;
+                return Ok(());
             }
             let best = if cid.is_lifted_lit() {
                 Lit::from(cid).vi()
             } else {
-                let mut tmp = cdb.count(true);
+                let mut tmp = cdb.count();
                 let c = &mut cdb[cid];
                 c.turn_off(Flag::ENQUEUED);
                 let lits = &c.lits;
@@ -676,14 +677,10 @@ impl Eliminator {
             /// The ratio of time slot for single elimination step.
             /// Since it is measured in millisecond, 1000 means executing elimination
             /// until timed out. 100 means this function can consume 10% of a given time.
-            const TIMESLOT_FOR_ELIMINATION: u64 = 10;
+            const TIMESLOT_FOR_ELIMINATION: u64 = 100;
 
             let timedout2 = timedout.clone();
-            let time = if asg.exports().1 == 0 {
-                100 * TIMESLOT_FOR_ELIMINATION * state.config.timeout as u64
-            } else {
-                TIMESLOT_FOR_ELIMINATION * state.config.timeout as u64
-            };
+            let time = TIMESLOT_FOR_ELIMINATION * state.config.c_tout as u64;
             thread::spawn(move || {
                 thread::sleep(Duration::from_millis(time));
                 timedout2.store(true, Ordering::Release);
@@ -706,7 +703,7 @@ impl Eliminator {
             self.backward_subsumption_check(asg, cdb, &timedout)?;
             debug_assert!(self.clause_queue.is_empty());
             cdb.garbage_collect();
-            if asg.propagate(cdb) != ClauseId::default() {
+            if !asg.propagate(cdb).is_none() {
                 return Err(SolverError::Inconsistent);
             }
             cdb.eliminate_satisfied_clauses(asg, self, true);
@@ -825,6 +822,7 @@ where
     true
 }
 
+#[cfg(not(feature = "no_IO"))]
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -9,6 +9,8 @@ mod restart;
 mod search;
 /// Crate `validate` implements a model checker.
 mod validate;
+/// Implement vivification preprocessor
+mod vivify;
 
 pub use self::{
     build::SatSolverIF,
@@ -45,17 +47,22 @@ pub enum SolverEvent {
     /// # CAVEAT
     /// some implementation might have a special premise to call: decision_level == 0.
     Adapt((SearchStrategy, usize), usize),
+    /// asserting a var
+    Assert,
+    /// conflict by unit propagation
     Conflict,
-    Fixed,
     /// Not in use
     Instantiate,
     /// increment the number of vars.
     NewVar,
-    Restart,
     /// reinitialization for incremental solving.
     Reinitialize,
+    /// restart
+    Restart,
     /// stabilization
     Stabilize(bool),
+    /// Vivification: `true` for start, `false` for end.
+    Vivify(bool),
 }
 
 /// The SAT solver object consisting of 6 sub modules.
@@ -156,9 +163,9 @@ impl<'a> Iterator for SolverIter<'a> {
 mod tests {
     use super::*;
     use crate::assign::VarManipulateIF;
-    use std::convert::TryFrom;
+    use std::convert::{From, TryFrom};
 
-    #[test]
+    #[cfg_attr(not(feature = "no_IO"), test)]
     fn test_solver() {
         let config = Config::from("tests/sample.cnf");
         if let Ok(s) = Solver::build(&config) {

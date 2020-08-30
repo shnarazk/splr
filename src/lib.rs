@@ -13,6 +13,7 @@ It adopts various research results on SAT solvers:
 - Learning Rate Based Branching and Reason Side Rewarding
 - Rephase
 - Search stabilization
+- clause vivification
 
 *Many thanks to SAT researchers.*
 

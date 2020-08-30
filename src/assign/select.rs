@@ -59,7 +59,7 @@ impl VarSelectIF for AssignStack {
                 }
             } else {
                 let mut heap: BinaryHeap<VarTimestamp> = BinaryHeap::new();
-                let remains = self.num_vars - self.num_solved_vars - self.num_eliminated_vars;
+                let remains = self.num_vars - self.num_asserted_vars - self.num_eliminated_vars;
                 let size = (remains as f64).sqrt() as usize; //remains.count_ones() as usize;
                 for v in self.var.iter().skip(1) {
                     if self.assign[v.index].is_some() {
@@ -120,9 +120,9 @@ impl VarSelectIF for AssignStack {
                 if let Some(b) = self.assign[vi] {
                     v.turn_on(Flag::REPHASE);
                     v.set(Flag::BEST_PHASE, b);
-                } else {
-                    v.turn_off(Flag::REPHASE);
+                    continue;
                 }
+                v.turn_off(Flag::REPHASE);
             }
         }
         self.build_best_at = self.num_propagation;

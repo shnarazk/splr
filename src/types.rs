@@ -22,8 +22,13 @@ use {
 /// which, however, should be used locally in the defining modules.
 /// To avoid to make them public, we define a generic accessor or exporter here.
 /// `T` is the list of exporting values.
-pub trait Export<T> {
+pub trait Export<T, Mode> {
     fn exports(&self) -> T;
+    fn active_mode(&self) -> Mode;
+}
+
+pub trait ExportBox<'a, T> {
+    fn exports_box(&'a self) -> Box<T>;
 }
 
 /// API for Literal like `from_int`, `from_assign`, `to_cid` and so on.
@@ -33,6 +38,8 @@ pub trait LitIF {
     fn from_assign(vi: VarId, p: bool) -> Self;
     /// convert to var index.
     fn vi(self) -> VarId;
+    /// return `true` if it is a valid literal, namely non-zero.
+    fn is_none(self) -> bool;
 }
 
 /// API for clause and var rewarding.
@@ -42,7 +49,9 @@ pub trait ActivityIF {
     /// an extra parameter for bumping
     type Inc;
     /// return the current activity of an element.
-    fn activity(&mut self, vi: Self::Ix) -> f64;
+    fn activity(&mut self, ix: Self::Ix) -> f64;
+    /// set activity forcely.
+    fn set_activity(&mut self, ix: Self::Ix, val: f64);
     /// update an element's activity.
     fn bump_activity(&mut self, ix: Self::Ix, dl: Self::Inc);
     /// increment activity step.
@@ -101,7 +110,7 @@ pub type DecisionLevel = u32;
 /// assert_eq!( 2i32, Lit::from( 2i32).into());
 /// assert_eq!(-2i32, Lit::from(-2i32).into());
 /// ```
-#[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Lit {
     /// literal encoded into folded u32
     ordinal: u32,
@@ -324,6 +333,10 @@ impl LitIF for Lit {
     fn vi(self) -> VarId {
         (self.ordinal >> 1) as VarId
     }
+    #[inline]
+    fn is_none(self) -> bool {
+        self.ordinal == 0
+    }
 }
 
 /// API for Exponential Moving Average, EMA, like `get`, `reset`, `update` and so on.
@@ -449,6 +462,9 @@ impl Ema2 {
     pub fn with_slow(mut self, s: usize) -> Ema2 {
         self.se = 1.0 / (s as f64);
         self
+    }
+    pub fn get_slow(&self) -> f64 {
+        self.slow // / self.calf
     }
 }
 
@@ -675,6 +691,14 @@ bitflags! {
         const ENQUEUED     = 0b0000_0000_0001_0000;
         /// mark to run garbage collector on the corresponding watcher lists
         const TOUCHED      = 0b0000_0000_0010_0000;
+        /// for vivified clauses
+        const VIVIFIED     = 0b0000_0000_0100_0000;
+        /// for a clause which decreases LBD twice after vivification
+        const VIVIFIED2    = 0b0000_0000_1000_0000;
+        /// a given clause derived a learnt which LBD is smaller than 20.
+        const DERIVE20     = 0b0010_0000_0000_0000;
+        /// a temporal clause during vivification
+        const VIV_ASSUMP   = 0b0100_0000_0000_0000;
 
         //
         //## For Var

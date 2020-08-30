@@ -1,17 +1,14 @@
 /// main struct AssignStack
 use {
     super::{AssignIF, AssignStack, Var, VarIdHeap, VarManipulateIF, VarOrderIF, VarSelectIF},
-    crate::{solver::SolverEvent, types::*},
+    crate::{cdb::ClauseDBIF, solver::SolverEvent, types::*},
     std::{fmt, ops::Range, slice::Iter},
 };
 
 #[cfg(not(feature = "no_IO"))]
-use {
-    crate::cdb::ClauseDBIF,
-    std::{
-        fs::File,
-        io::{BufWriter, Write},
-    },
+use std::{
+    fs::File,
+    io::{BufWriter, Write},
 };
 
 /// API for var manipulation
@@ -52,12 +49,12 @@ impl Default for AssignStack {
             var_order: VarIdHeap::default(),
             temp_order: Vec::new(),
             num_vars: 0,
-            num_solved_vars: 0,
+            num_asserted_vars: 0,
             num_eliminated_vars: 0,
             use_rephase: true,
             best_assign: false,
             build_best_at: 0,
-            num_best_assign: 0,
+            num_best_assign: 0.0,
             num_conflict: 0,
             num_propagation: 0,
             num_restart: 0,
@@ -66,6 +63,7 @@ impl Default for AssignStack {
             activity_decay: 0.0,
             activity_decay_max: 0.0,
             reward_step: 0.0,
+            vivify_sandbox: (0, 0, 0),
         }
     }
 }
@@ -104,9 +102,11 @@ impl Instantiate for AssignStack {
     fn handle(&mut self, e: SolverEvent) {
         match e {
             SolverEvent::Adapt(_, _) => (),
-            SolverEvent::Conflict => {}
-            SolverEvent::Fixed => {
-                self.num_solved_vars += 1;
+            SolverEvent::Conflict => {
+                self.num_best_assign *= 0.99999;
+            }
+            SolverEvent::Assert => {
+                self.num_asserted_vars += 1;
             }
             SolverEvent::NewVar => {
                 self.assign.push(None);
@@ -119,23 +119,33 @@ impl Instantiate for AssignStack {
                 self.var.push(Var::from(self.num_vars));
             }
             SolverEvent::Reinitialize => {
-                assert_eq!(self.decision_level(), self.root_level);
+                debug_assert_eq!(self.decision_level(), self.root_level);
                 self.q_head = 0;
                 self.num_eliminated_vars =
                     self.var.iter().filter(|v| v.is(Flag::ELIMINATED)).count();
-                self.num_solved_vars = if self.trail.is_empty() {
+                self.num_asserted_vars = if self.trail.is_empty() {
                     0
                 } else {
                     self.trail.len()
                 };
                 self.rebuild_order();
             }
+            SolverEvent::Vivify(start) => {
+                if start {
+                    self.vivify_sandbox =
+                        (self.num_conflict, self.num_propagation, self.num_restart);
+                } else {
+                    self.num_conflict = self.vivify_sandbox.0;
+                    self.num_propagation = self.vivify_sandbox.1;
+                    self.num_restart = self.vivify_sandbox.2;
+                }
+            }
             _ => (),
         }
     }
 }
 
-impl Export<(usize, usize, usize, f64)> for AssignStack {
+impl Export<(usize, usize, usize, f64), ()> for AssignStack {
     /// exports:
     ///  1. the number of conflicts
     ///  1. the number of propagations
@@ -157,6 +167,7 @@ impl Export<(usize, usize, usize, f64)> for AssignStack {
             self.activity_decay,
         )
     }
+    fn active_mode(&self) {}
 }
 
 impl AssignIF for AssignStack {
@@ -202,7 +213,7 @@ impl AssignIF for AssignStack {
         match flag {
             Flag::PHASE => {
                 if self.build_best_at == self.num_propagation {
-                    return self.num_best_assign;
+                    return self.num_best_assign as usize;
                 }
             }
             // Flag::BEST_PHASE => {
@@ -274,7 +285,7 @@ impl AssignIF for AssignStack {
                             for l in &lits[..i] {
                                 phantom_clause.push(*l);
                             }
-                            assert!(1 < phantom_clause.len());
+                            debug_assert!(1 < phantom_clause.len());
                             #[cfg(feature = "trace_elimination")]
                             println!(
                                 "- pull back clause E {:?}",
@@ -289,7 +300,7 @@ impl AssignIF for AssignStack {
                         for l in &lits[i - width + 1..i] {
                             phantom_clause.push(*l);
                         }
-                        assert!(1 < phantom_clause.len());
+                        debug_assert!(1 < phantom_clause.len());
                         #[cfg(feature = "trace_elimination")]
                         println!(
                             "- pull back clause C {:?}",
@@ -336,7 +347,7 @@ impl AssignStack {
             .collect::<Vec<(i32, DecisionLevel, bool, Option<bool>)>>()
     }
 
-    /// dump all active clauses and fixed assignments as a CNF file.
+    /// dump all active clauses and assertions as a CNF file.
     #[cfg(not(feature = "no_IO"))]
     #[allow(dead_code)]
     fn dump_cnf<C, V>(&mut self, cdb: &C, fname: &str)
@@ -395,21 +406,21 @@ impl fmt::Display for AssignStack {
         if 0 < levels {
             write!(
                 f,
-                "ASG:: trail({}):{:?}\n      solved: level: {}, solved: {}, elimed: {}",
+                "ASG:: trail({}):{:?}\n      stats: level: {}, asserted: {}, eliminated: {}",
                 self.trail.len(),
                 (0..=levels).map(c).collect::<Vec<_>>(),
                 levels,
-                self.num_solved_vars,
+                self.num_asserted_vars,
                 self.num_eliminated_vars,
             )
         } else {
             write!(
                 f,
-                "ASG:: trail({}):[(0, {:?})]\n      level: {}, solved: {}, elimed: {}",
+                "ASG:: trail({}):[(0, {:?})]\n      level: {}, asserted: {}, elimed: {}",
                 self.trail.len(),
                 &v,
                 levels,
-                self.num_solved_vars,
+                self.num_asserted_vars,
                 self.num_eliminated_vars,
             )
         }

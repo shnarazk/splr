@@ -1,6 +1,6 @@
 [package]
 name = "splr"
-version = "0.4.1"
+version = "0.5.0"
 authors = ["Narazaki Shuji <shujinarazaki@protonmail.com>"]
 description = "A modern CDCL SAT solver in Rust"
 edition = "2018"
@@ -25,7 +25,7 @@ name = "splr"
 required-features = ["libc", "structopt"]
 
 [features]
-default = []
+default = ["cli"]
 cli = ["libc", "structopt"]
 boundary_check = []
 ema_calibration = []
@@ -40,3 +40,4 @@ trace_elimination = []
 lto = "fat"
 codegen-units = 1
 opt-level = 3
+panic = "abort"

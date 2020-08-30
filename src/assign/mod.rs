@@ -45,13 +45,7 @@ pub trait VarRewardIF {
 }
 
 /// API for assignment like `propagate`, `enqueue`, `cancel_until`, and so on.
-pub trait AssignIF:
-    ClauseManipulateIF
-    + PropagateIF
-    + VarManipulateIF
-    + VarRewardIF
-    + Export<(usize, usize, usize, f64)>
-{
+pub trait AssignIF: ClauseManipulateIF + PropagateIF + VarManipulateIF + VarRewardIF {
     /// return a literal in the stack.
     fn stack(&self, i: usize) -> Lit;
     /// return literals in the range of stack.
@@ -90,7 +84,7 @@ pub trait AssignIF:
 /// Reasons of assignments, two kinds
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum AssignReason {
-    /// One of not assigned, assigned by decision, or solved.
+    /// One of not assigned, assigned by decision, or asserted.
     None,
     /// Assigned by a clause. If it is binary, the reason literal is stored in the 2nd.
     Implication(ClauseId, Lit),
@@ -135,18 +129,18 @@ pub struct AssignStack {
     use_rephase: bool,
     best_assign: bool,
     build_best_at: usize,
-    num_best_assign: usize,
+    num_best_assign: f64,
 
     //
     //## Statistics
     //
     /// the number of vars.
     pub num_vars: usize,
-    /// the number of solved vars.
-    pub num_solved_vars: usize,
+    /// the number of asserted vars.
+    pub num_asserted_vars: usize,
     /// the number of eliminated vars.
     pub num_eliminated_vars: usize,
-    num_conflict: usize,
+    pub num_conflict: usize,
     num_propagation: usize,
     num_restart: usize,
 
@@ -167,6 +161,12 @@ pub struct AssignStack {
     activity_decay_max: f64,
     /// ONLY used in feature EVSIDS
     reward_step: f64,
+
+    //
+    //## Vivification
+    //
+    /// save old num_conflict, num_propagation, num_restart
+    vivify_sandbox: (usize, usize, usize),
 }
 
 /// Heap of VarId, based on var activity.

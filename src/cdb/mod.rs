@@ -40,13 +40,20 @@ pub struct ClauseId {
     pub ordinal: u32,
 }
 
+impl ClauseId {
+    #[inline]
+    pub fn is_none(&self) -> bool {
+        self.ordinal == 0
+    }
+}
+
 /// A representation of 'clause'
 #[derive(Debug)]
 pub struct Clause {
     /// The literals in a clause.
     pub lits: Vec<Lit>,
     /// A static clause evaluation criterion like LBD, NDD, or something.
-    pub rank: usize,
+    pub rank: u16,
     /// the index from which `propagate` starts searching an unfalsified literal.
     pub search_from: usize,
     /// A dynamic clause evaluation criterion based on the number of references.
@@ -66,13 +73,15 @@ pub struct Clause {
 pub struct ClauseDB {
     /// container of clauses
     clause: Vec<Clause>,
+    /// container of watch literals for binary clauses
+    pub bin_watcher: Vec<Vec<Watch>>,
     /// container of watch literals
     pub watcher: Vec<Vec<Watch>>,
     /// clause history to make certification
     pub certified: DRAT,
     /// a number of clauses to emit out-of-memory exception
     soft_limit: usize,
-    /// flag for Chan Seok heuristics
+    /// flag for Chan Seok heuristics; this value is exported with `Export:active_mode`
     use_chan_seok: bool,
     /// 'small' clause threshold
     co_lbd_bound: usize,
@@ -128,6 +137,11 @@ pub struct ClauseDB {
     num_reduction: usize,
 
     //
+    //## vivification
+    //
+    pub during_vivification: bool,
+
+    //
     //## incremental solving
     //
     pub eliminated_permanent: Vec<Vec<Lit>>,
@@ -168,14 +182,14 @@ mod tests {
         asg.assign_by_decision(lit(1));
         asg.assign_by_decision(lit(-2));
 
-        let c1 = cdb.new_clause(&mut asg, &mut [lit(1), lit(2), lit(3)], false, false);
+        let c1 = cdb.new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false, false);
         let c = &cdb[c1];
-        assert_eq!(c.rank, 0);
+        assert_eq!(c.rank, 3);
         assert!(!c.is(Flag::DEAD));
         assert!(!c.is(Flag::LEARNT));
         assert!(!c.is(Flag::JUST_USED));
 
-        let c2 = cdb.new_clause(&mut asg, &mut [lit(-1), lit(2), lit(3)], true, true);
+        let c2 = cdb.new_clause(&mut asg, &mut vec![lit(-1), lit(2), lit(3)], true, true);
         let c = &cdb[c2];
         assert_eq!(c.rank, 2);
         assert!(!c.is(Flag::DEAD));
@@ -191,8 +205,8 @@ mod tests {
         };
         let mut asg = AssignStack::instantiate(&config, &cnf);
         let mut cdb = ClauseDB::instantiate(&config, &cnf);
-        let c1 = cdb.new_clause(&mut asg, &mut [lit(1), lit(2), lit(3)], false, false);
-        let c2 = cdb.new_clause(&mut asg, &mut [lit(-1), lit(4)], false, false);
+        let c1 = cdb.new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false, false);
+        let c2 = cdb.new_clause(&mut asg, &mut vec![lit(-1), lit(4)], false, false);
         cdb[c2].reward = 2.4;
         assert_eq!(c1, c1);
         assert_eq!(c1 == c1, true);
@@ -209,7 +223,7 @@ mod tests {
         };
         let mut asg = AssignStack::instantiate(&config, &cnf);
         let mut cdb = ClauseDB::instantiate(&config, &cnf);
-        let c1 = cdb.new_clause(&mut asg, &mut [lit(1), lit(2), lit(3)], false, false);
+        let c1 = cdb.new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false, false);
         assert_eq!(cdb[c1][0..].iter().map(|l| i32::from(*l)).sum::<i32>(), 6);
         let mut iter = cdb[c1][0..].into_iter();
         assert_eq!(iter.next(), Some(&lit(1)));

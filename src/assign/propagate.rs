@@ -92,7 +92,12 @@ impl PropagateIF for AssignStack {
                 self.trail.push(l);
                 Ok(())
             }
-            Some(x) if x == bool::from(l) => Ok(()),
+            Some(x) if x == bool::from(l) => {
+                // Vivification tries to assign a var by propagation then can assert it.
+                // To make sure the var is asserted, we need to nullfy its reason.
+                self.reason[vi] = AssignReason::None;
+                Ok(())
+            }
             _ => Err(SolverError::Inconsistent),
         }
     }
@@ -100,7 +105,7 @@ impl PropagateIF for AssignStack {
         debug_assert!(usize::from(l) != 0, "Null literal is about to be equeued");
         debug_assert!(l.vi() < self.var.len());
         // The following doesn't hold anymore by using chronoBT.
-        // assert!(self.trail_lim.is_empty() || cid != ClauseId::default());
+        // assert!(self.trail_lim.is_empty() || !cid.is_none());
         let vi = l.vi();
         self.level[vi] = lv;
         let v = &mut self.var[vi];
@@ -192,33 +197,47 @@ impl PropagateIF for AssignStack {
     where
         C: ClauseDBIF,
     {
+        let bin_watcher = cdb.bin_watcher_lists() as *const [Vec<Watch>];
         let watcher = cdb.watcher_lists_mut() as *mut [Vec<Watch>];
         unsafe {
             self.num_propagation += 1;
             while let Some(p) = self.trail.get(self.q_head) {
                 self.q_head += 1;
                 let false_lit = !*p;
+                // we have to drop `p` here to use self as a mutable reference again later.
+                let bin_source = (*bin_watcher).get_unchecked(usize::from(*p));
                 let source = (*watcher).get_unchecked_mut(usize::from(*p));
+                // binary loop
+                for w in bin_source.iter() {
+                    debug_assert!(!cdb[w.c].is(Flag::DEAD));
+                    debug_assert!(!self.var[w.blocker.vi()].is(Flag::ELIMINATED));
+                    debug_assert_ne!(w.blocker, false_lit);
+                    #[cfg(feature = "boundary_check")]
+                    assert_eq!(cdb[w.c].lits.len(), 2);
+                    match lit_assign!(self, w.blocker) {
+                        Some(true) => (),
+                        Some(false) => {
+                            self.conflicts.1 = self.conflicts.0;
+                            self.conflicts.0 = false_lit.vi();
+                            self.num_conflict += 1;
+                            return w.c;
+                        }
+                        None => {
+                            self.assign_by_implication(
+                                w.blocker,
+                                AssignReason::Implication(w.c, false_lit),
+                                self.level[false_lit.vi()],
+                            );
+                        }
+                    }
+                }
+                // normal clause loop
                 let mut n = 0;
                 'next_clause: while n < source.len() {
                     let w = source.get_unchecked_mut(n);
                     n += 1;
                     let blocker_value = lit_assign!(self, w.blocker);
                     if blocker_value == Some(true) {
-                        continue 'next_clause;
-                    }
-                    if w.binary {
-                        if blocker_value == Some(false) {
-                            self.conflicts.1 = self.conflicts.0;
-                            self.conflicts.0 = false_lit.vi();
-                            self.num_conflict += 1;
-                            return w.c;
-                        }
-                        self.assign_by_implication(
-                            w.blocker,
-                            AssignReason::Implication(w.c, false_lit),
-                            self.level[false_lit.vi()],
-                        );
                         continue 'next_clause;
                     }
                     // debug_assert!(!cdb[w.c].is(Flag::DEAD));
@@ -243,20 +262,21 @@ impl PropagateIF for AssignStack {
                     //
                     #[cfg(feature = "boundary_check")]
                     assert!(*search_from < lits.len());
-                    for (start, end) in &[(*search_from + 1, lits.len()), (2, *search_from + 1)] {
-                        for k in *start..*end {
-                            let lk = &lits[k];
-                            if lit_assign!(self, *lk) != Some(false) {
-                                (*watcher)
-                                    .get_unchecked_mut(usize::from(!*lk))
-                                    .register(first, w.c, false);
-                                n -= 1;
-                                source.detach(n);
-                                lits.swap(1, k);
-                                // *search_from = k + 1;
-                                *search_from = k;
-                                continue 'next_clause;
+                    let len = lits.len();
+                    for k in (*search_from..len).chain(2..*search_from) {
+                        let lk = &lits[k];
+                        if lit_assign!(self, *lk) != Some(false) {
+                            (*watcher)
+                                .get_unchecked_mut(usize::from(!*lk))
+                                .register(first, w.c);
+                            n -= 1;
+                            source.detach(n);
+                            lits.swap(1, k);
+                            *search_from = k + 1;
+                            if *search_from == len {
+                                *search_from = 2;
                             }
+                            continue 'next_clause;
                         }
                     }
 
@@ -275,10 +295,10 @@ impl PropagateIF for AssignStack {
                 }
             }
         }
-        let na = self.trail.len() + self.num_eliminated_vars;
-        if 0 < self.decision_level() && self.num_best_assign < na {
+        let na = self.q_head + self.num_eliminated_vars;
+        if self.num_best_assign as usize <= na && 0 < self.decision_level() {
             self.best_assign = true;
-            self.num_best_assign = na;
+            self.num_best_assign = na as f64;
         }
         ClauseId::default()
     }
