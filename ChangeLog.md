@@ -1,4 +1,4 @@
-## 0.5.0, 2020-08-2X
+## 0.5.0, 2020-08-30
 
 - massive changes on the default parameters about restart
   - restart condition was revised as a multi-armed bandid problem
