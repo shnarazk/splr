@@ -804,7 +804,9 @@ impl RestartIF for Restarter {
 impl Export<(usize, usize, usize, usize), (RestartMode, usize)> for Restarter {
     /// exports:
     ///  1. the number of blocking
-    ///  1. , the number of stabilzation
+    ///  1. the number of forcing restart
+    ///  1. the number of blocking in stabilzation
+    ///  1. the number of forcing in stabilzation
     ///
     ///```
     /// use crate::splr::{config::Config, solver::Restarter, types::*};

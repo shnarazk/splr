@@ -154,8 +154,6 @@ impl SearchStrategy {
 /// stat index.
 #[derive(Clone, Eq, PartialEq)]
 pub enum Stat {
-    /// the number of cancelled restart
-    CancelRestart = 0,
     /// the number of decision
     Decision,
     /// the number of 'no decision conflict'
@@ -509,8 +507,8 @@ impl StateIF for State {
 
         let rst_mode = rst.active_mode().0;
 
-        let (rst_num_blk, _num_rst, _num_blk_stb, _num_rst_stb) = rst.exports();
-        let rst_num_stb = rst.active_mode().1;
+        let (rst_num_blk, rst_num_rst, rst_num_sblk, rst_num_srst) = rst.exports();
+        // let rst_num_stb = rst.active_mode().1;
         let (rst_acc, rst_asg, rst_lbd, rst_mld) = *rst.exports_box();
 
         if self.config.use_log {
@@ -564,15 +562,10 @@ impl StateIF for State {
                 RestartMode::Stabilize if self.config.no_color => "  Stabilize",
                 RestartMode::Stabilize => "  \x1B[001m\x1B[030mStabilize\x1B[000m",
             },
-            im!("{:>9}", self, LogUsizeId::Restart, asg_num_restart),
+            im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
             im!("{:>9}", self, LogUsizeId::RestartBlock, rst_num_blk),
-            im!("{:>9}", self, LogUsizeId::Stabilize, rst_num_stb),
-            im!(
-                "{:>9}",
-                self,
-                LogUsizeId::RestartCancel,
-                self[Stat::CancelRestart]
-            ),
+            im!("{:>9}", self, LogUsizeId::RestartStabilize, rst_num_srst),
+            im!("{:>9}", self, LogUsizeId::RestartCancel, rst_num_sblk),
         );
         println!(
             "\x1B[2K         EMA|tLBD:{}, tASG:{}, eMLD:{}, eCCC:{} ",
@@ -844,6 +837,7 @@ pub enum LogUsizeId {
     Restart,
     RestartBlock,
     RestartCancel,
+    RestartStabilize,
     Simplify,
     Stabilize,
     Vivify,
