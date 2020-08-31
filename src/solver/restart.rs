@@ -753,13 +753,12 @@ impl RestartIF for Restarter {
             return None;
         }
         self.acc.shift();
-        // let k = if self.stb.is_active() { 1.0 } else { 0.5 };
-        //let margin = self.stb.num_active as f64 * k + self.mld.threshold;
-        let margin = if self.stb.is_active() {
-            self.stb.num_active as f64
+        let (c0, c1) = if self.stb.is_active() {
+            (2.0, 0.01)
         } else {
-            (self.stb.num_active as f64).log(2.0)
-        } * self.mld.threshold;
+            (0.05, 0.01)
+        };
+        let margin = (self.stb.num_active as f64 * c1 + c0) + self.mld.threshold;
         let good_path = self.lbd.get() < self.mld.get() + margin;
         if self.stb.is_active() {
             if self.acc.is_active() && good_path {
