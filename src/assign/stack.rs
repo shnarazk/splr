@@ -102,12 +102,10 @@ impl Instantiate for AssignStack {
     fn handle(&mut self, e: SolverEvent) {
         match e {
             SolverEvent::Adapt(_, _) => (),
-            SolverEvent::Conflict => {
-                self.num_best_assign *= 0.99999;
-            }
             SolverEvent::Assert => {
                 self.num_asserted_vars += 1;
             }
+            SolverEvent::Conflict => (),
             SolverEvent::NewVar => {
                 self.assign.push(None);
                 self.level.push(DecisionLevel::default());
@@ -129,6 +127,9 @@ impl Instantiate for AssignStack {
                     self.trail.len()
                 };
                 self.rebuild_order();
+            }
+            SolverEvent::Stabilize(_) => {
+                self.num_best_assign *= 0.9;
             }
             SolverEvent::Vivify(start) => {
                 if start {
