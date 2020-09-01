@@ -277,6 +277,7 @@ fn search(
         if !asg.remains() {
             if use_stabilize && state.stabilize != rst.stabilizing() {
                 state.stabilize = !state.stabilize;
+                asg.handle(SolverEvent::Stabilize(state.stabilize));
                 rst.handle(SolverEvent::Stabilize(state.stabilize));
                 // update `num_assigned` periodically, which isn't a monotonous increasing var.
                 num_assigned = asg.best_assigned(Flag::PHASE);
