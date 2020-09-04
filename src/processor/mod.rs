@@ -460,9 +460,7 @@ impl EliminateIF for Eliminator {
             self.prepare(asg, cdb, true);
         }
         self.eliminate(asg, cdb, state)?;
-        self.num_sat_elimination += 1;
         if self.is_running() {
-            self.num_full_elimination += 1;
             self.stop(asg, cdb);
         }
         cdb.check_size().map(|_| ())
@@ -641,6 +639,7 @@ impl Eliminator {
         loop {
             let na = asg.stack_len();
             self.eliminate_main(asg, cdb, state)?;
+            self.num_sat_elimination += 1;
             cdb.eliminate_satisfied_clauses(asg, self, true);
             if na == asg.stack_len()
                 && (!self.is_running()
@@ -671,18 +670,29 @@ impl Eliminator {
         if self.mode == EliminatorMode::Deactive {
             return Ok(());
         }
+        self.num_full_elimination += 1;
         let timedout = Arc::new(AtomicBool::new(false));
         #[cfg(feature = "libc")]
         {
             /// The ratio of time slot for single elimination step.
             /// Since it is measured in millisecond, 1000 means executing elimination
             /// until timed out. 100 means this function can consume 10% of a given time.
-            const TIMESLOT_FOR_ELIMINATION: u64 = 100;
-
+            macro_rules! as_milli {
+                ($arg: expr) => {
+                    ($arg as u64) * 1000
+                };
+            }
             let timedout2 = timedout.clone();
-            let time = TIMESLOT_FOR_ELIMINATION * state.config.c_tout as u64;
+            let time = //asg.var_stats().0.min(state.config.c_tout as usize * 100) as u64;
+                // (asg.var_stats().3 as f64 / cdb.len() as f64) * 1000.0;
+            {
+                let nv = asg.var_stats().3 as f64;
+                let nc = cdb.len() as f64;
+                let k = 1.0;
+                k * nv.powf(1.5) / nc
+            };
             thread::spawn(move || {
-                thread::sleep(Duration::from_millis(time));
+                thread::sleep(Duration::from_millis(as_milli!(time)));
                 timedout2.store(true, Ordering::Release);
             });
         }
