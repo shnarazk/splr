@@ -25,8 +25,6 @@ mod eliminate;
 mod heap;
 mod subsume;
 
-#[cfg(feature = "libc")]
-use std::{thread, time::Duration};
 use {
     self::{eliminate::eliminate_var, heap::VarOrderIF, subsume::try_subsume},
     crate::{
@@ -39,10 +37,6 @@ use {
     std::{
         ops::{Index, IndexMut, Range, RangeFrom},
         slice::Iter,
-        sync::{
-            atomic::{AtomicBool, Ordering},
-            Arc,
-        },
     },
 };
 
@@ -548,7 +542,7 @@ impl Eliminator {
         &mut self,
         asg: &mut A,
         cdb: &mut C,
-        timedout: &Arc<AtomicBool>,
+        timedout: &mut usize,
     ) -> MaybeInconsistent
     where
         A: AssignIF,
@@ -567,7 +561,7 @@ impl Eliminator {
                 None => ClauseId::default(),
             };
             // assert_ne!(cid, 0);
-            if timedout.load(Ordering::Acquire) {
+            if *timedout == 0 {
                 self.clear_clause_queue(cdb);
                 self.clear_var_queue(asg);
                 return Ok(());
@@ -616,6 +610,12 @@ impl Eliminator {
                             continue;
                         }
                         let d = &cdb[*did];
+                        if d.len() <= *timedout {
+                            *timedout -= d.len();
+                        } else {
+                            *timedout = 0;
+                            return Ok(());
+                        }
                         if !d.is(Flag::DEAD) && d.len() <= self.subsume_literal_limit {
                             try_subsume(asg, cdb, self, cid, *did)?;
                         }
@@ -671,55 +671,38 @@ impl Eliminator {
             return Ok(());
         }
         self.num_full_elimination += 1;
-        let timedout = Arc::new(AtomicBool::new(false));
-        #[cfg(feature = "libc")]
+        let mut timedout: usize = // 1_000_000;
         {
-            /// The ratio of time slot for single elimination step.
-            /// Since it is measured in millisecond, 1000 means executing elimination
-            /// until timed out. 100 means this function can consume 10% of a given time.
-            macro_rules! as_milli {
-                ($arg: expr) => {
-                    ($arg as u64) * 1000
-                };
-            }
-            let timedout2 = timedout.clone();
-            let time = //asg.var_stats().0.min(state.config.c_tout as usize * 100) as u64;
-                // (asg.var_stats().3 as f64 / cdb.len() as f64) * 1000.0;
-            {
-                let nv = asg.var_stats().3 as f64;
-                let nc = cdb.len() as f64;
-                let k = 1.0;
-                k * nv.powf(1.5) / nc
-            };
-            thread::spawn(move || {
-                thread::sleep(Duration::from_millis(as_milli!(time)));
-                timedout2.store(true, Ordering::Release);
-            });
-        }
+            let nv = asg.var_stats().3 as f64; // unasserte vars
+            let nc = cdb.len() as f64;
+            (nv.powf(1.0) * nc.powf(0.8)) as usize
+        };
         while self.bwdsub_assigns < asg.stack_len()
             || !self.var_queue.is_empty()
             || !self.clause_queue.is_empty()
         {
             if !self.clause_queue.is_empty() || self.bwdsub_assigns < asg.stack_len() {
-                self.backward_subsumption_check(asg, cdb, &timedout)?;
+                self.backward_subsumption_check(asg, cdb, &mut timedout)?;
             }
             while let Some(vi) = self.var_queue.select_var(&self.var, asg) {
                 let v = asg.var_mut(vi);
                 v.turn_off(Flag::ENQUEUED);
                 if !v.is(Flag::ELIMINATED) && asg.assign(vi).is_none() {
-                    eliminate_var(asg, cdb, self, state, vi, &timedout)?;
+                    eliminate_var(asg, cdb, self, state, vi, &mut timedout)?;
                 }
             }
-            self.backward_subsumption_check(asg, cdb, &timedout)?;
+            self.backward_subsumption_check(asg, cdb, &mut timedout)?;
             debug_assert!(self.clause_queue.is_empty());
             cdb.garbage_collect();
             if !asg.propagate(cdb).is_none() {
                 return Err(SolverError::Inconsistent);
             }
             cdb.eliminate_satisfied_clauses(asg, self, true);
-            if timedout.load(Ordering::Acquire) {
+            if timedout == 0 {
                 self.clear_clause_queue(cdb);
                 self.clear_var_queue(asg);
+            } else {
+                timedout -= 1;
             }
         }
         Ok(())
