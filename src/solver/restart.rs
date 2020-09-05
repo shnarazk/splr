@@ -754,7 +754,7 @@ impl RestartIF for Restarter {
         }
         self.acc.shift();
         let (c0, c1) = if self.stb.is_active() {
-            (2.0, 0.01)
+            (2.0, 0.00)
         } else {
             (0.05, 0.01)
         };
