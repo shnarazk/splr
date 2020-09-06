@@ -51,7 +51,7 @@ pub struct Config {
     pub c_cls_lim: usize,
 
     /// #cls to start in-processor  .
-    #[cfg_attr(feature = "structopt", structopt(long = "ii", default_value = "25000"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "ii", default_value = "12000"))]
     pub c_ip_int: usize,
 
     /// CPU time limit in sec.     .
@@ -152,7 +152,7 @@ pub struct Config {
     pub rst_asg_slw: usize,
 
     /// Blocking restart threshold    .
-    #[cfg_attr(feature = "structopt", structopt(long = "rat", default_value = "1.4"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "rat", default_value = "1.2"))]
     pub rst_asg_thr: f64, // Glucose's R
 
     /// Conflict Correlation threshold
@@ -226,7 +226,7 @@ impl Default for Config {
 
             c_cbt_thr: 100,
             c_cls_lim: 0,
-            c_ip_int: 25000,
+            c_ip_int: 12000,
             c_tout: 5000.0,
 
             splr_interface: false,
@@ -247,7 +247,7 @@ impl Default for Config {
             rst_step: 40,
             rst_asg_len: 30,
             rst_asg_slw: 10000,
-            rst_asg_thr: 1.40,
+            rst_asg_thr: 1.20,
             rst_ccc_thr: 0.70,
             rst_lbd_len: 30,
             rst_lbd_slw: 10000,
