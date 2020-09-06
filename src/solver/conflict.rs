@@ -168,7 +168,7 @@ pub fn handle_conflict(
         }
         asg.handle(SolverEvent::Assert);
         rst.update(ProgressUpdate::Reset);
-        elim.to_simplify += 2.0; // 1 for the positive lit, 1 for the negative.
+    // elim.to_simplify += 1.0; // 1 for the positive lit, 1 for the negative.
     } else {
         {
             // At the present time, some reason clauses can contain first UIP or its negation.
@@ -219,7 +219,7 @@ pub fn handle_conflict(
         }
         rst.update(ProgressUpdate::ACC(act));
 
-        elim.to_simplify += 1.0 / (learnt_len - 1) as f64;
+        elim.to_simplify += 1.0 / ((learnt_len - 1) as f64).powf(1.6);
         if lbd <= 20 {
             for cid in &state.derive20 {
                 cdb[cid].turn_on(Flag::DERIVE20);
