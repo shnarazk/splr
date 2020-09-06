@@ -639,8 +639,7 @@ impl Eliminator {
         loop {
             let na = asg.stack_len();
             self.eliminate_main(asg, cdb, state)?;
-            self.num_sat_elimination += 1;
-            cdb.eliminate_satisfied_clauses(asg, self, true);
+            self.eliminate_satisfied_clauses(asg, cdb, true);
             if na == asg.stack_len()
                 && (!self.is_running()
                     || (0 == self.clause_queue_len() && 0 == self.var_queue_len()))
@@ -697,7 +696,7 @@ impl Eliminator {
             if !asg.propagate(cdb).is_none() {
                 return Err(SolverError::Inconsistent);
             }
-            cdb.eliminate_satisfied_clauses(asg, self, true);
+            self.eliminate_satisfied_clauses(asg, cdb, true);
             if timedout == 0 {
                 self.clear_clause_queue(cdb);
                 self.clear_var_queue(asg);
@@ -706,6 +705,35 @@ impl Eliminator {
             }
         }
         Ok(())
+    }
+    /// delete satisfied clauses at decision level zero.
+    pub fn eliminate_satisfied_clauses<A, C>(
+        &mut self,
+        asg: &mut A,
+        cdb: &mut C,
+        update_occur: bool,
+    ) where
+        A: AssignIF,
+        C: ClauseDBIF,
+    {
+        debug_assert_eq!(asg.decision_level(), 0);
+        self.num_sat_elimination += 1;
+        for ci in 1..cdb.len() {
+            let cid = ClauseId::from(ci);
+            if !cdb[cid].is(Flag::DEAD) && asg.satisfies(&cdb[cid].lits) {
+                cdb.detach(cid);
+                let c = &mut cdb[cid];
+                if self.is_running() {
+                    if update_occur {
+                        self.remove_cid_occur(asg, cid, c);
+                    }
+                    for l in &c.lits {
+                        self.enqueue_var(asg, l.vi(), true);
+                    }
+                }
+            }
+        }
+        cdb.garbage_collect();
     }
     /// remove a clause id from literal's occur list.
     fn remove_lit_occur<A>(&mut self, asg: &mut A, l: Lit, cid: ClauseId)
