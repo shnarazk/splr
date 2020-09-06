@@ -670,11 +670,10 @@ impl Eliminator {
             return Ok(());
         }
         self.num_full_elimination += 1;
-        let mut timedout: usize = // 1_000_000;
-        {
-            let nv = asg.var_stats().3 as f64; // unasserte vars
-            let nc = cdb.len() as f64;
-            (nv.powf(1.0) * nc.powf(0.8)) as usize
+        let mut timedout: usize = {
+            let nv = asg.var_stats().3 as f64; // unasserted vars
+            let nc = cdb.count() as f64;
+            (4.0 * nv.log(2.0) * nc) as usize
         };
         while self.bwdsub_assigns < asg.stack_len()
             || !self.var_queue.is_empty()

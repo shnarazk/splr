@@ -264,6 +264,7 @@ fn search(
             if state.config.c_ip_int <= elim.to_simplify as usize {
                 elim.to_simplify = 0.0;
                 if elim.enable {
+                    elim.subsume_literal_limit = (rst.exports_box().3.get_slow() * 2.0) as usize;
                     elim.activate();
                 }
                 elim.simplify(asg, cdb, state)?;
