@@ -1,6 +1,6 @@
 /// Var struct and Database management API
 use {
-    super::{AssignStack, ClauseManipulateIF, Var, VarRewardIF},
+    super::{AssignStack, ClauseManipulateIF, Var, VarHeapIF, VarRewardIF},
     crate::types::*,
     std::{
         fmt,

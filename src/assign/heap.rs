@@ -31,7 +31,7 @@ pub trait VarHeapIF {
     fn get_heap_root(&mut self) -> VarId;
     fn percolate_up(&mut self, start: usize);
     fn percolate_down(&mut self, start: usize);
-    fn remove(&mut self, vs: VarId);
+    fn remove_from_heap(&mut self, vi: VarId);
 }
 
 impl VarHeapIF for AssignStack {
@@ -136,9 +136,9 @@ impl VarHeapIF for AssignStack {
             }
         }
     }
-    #[allow(dead_code)]
-    fn remove(&mut self, vs: VarId) {
-        let s = self.var_order.idxs[vs];
+    fn remove_from_heap(&mut self, vi: VarId) {
+        let i = self.var_order.idxs[vi];
+        assert_ne!(i, 0);
         let n = self.var_order.idxs[0];
         if n < s {
             return;
