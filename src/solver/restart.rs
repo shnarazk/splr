@@ -754,9 +754,9 @@ impl RestartIF for Restarter {
         }
         self.acc.shift();
         let (c0, c1) = if self.stb.is_active() {
-            (2.0, 0.00)
+            (1.5, 0.01)
         } else {
-            (0.05, 0.01)
+            (-1.0, 0.02)
         };
         let margin = (self.stb.num_active as f64 * c1 + c0) + self.mld.threshold;
         let good_path = self.lbd.get() < self.mld.get() + margin;
@@ -766,13 +766,13 @@ impl RestartIF for Restarter {
                 self.num_block += 1;
                 self.num_block_stabilized += 1;
                 return Some(RestartDecision::Cancel);
-            } else {
+            } else if !good_path {
                 self.after_restart = 0;
                 self.num_restart += 1;
                 self.num_restart_stabilized += 1;
                 return Some(RestartDecision::Stabilize);
             }
-        } else if self.asg.is_active() {
+        } else if good_path && self.asg.is_active() {
             self.after_restart = 0;
             self.num_block += 1;
             return Some(RestartDecision::Block);

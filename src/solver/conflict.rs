@@ -241,7 +241,7 @@ pub fn handle_conflict(
         ));
     }
     if cdb.check_and_reduce(asg, num_conflict) {
-        state.to_vivify += 1;
+        state.to_vivify += if cdb.mode() { 0.005 } else { 1.0 };
     }
     Ok(())
 }

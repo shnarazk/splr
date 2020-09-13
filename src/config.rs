@@ -51,7 +51,7 @@ pub struct Config {
     pub c_cls_lim: usize,
 
     /// #cls to start in-processor  .
-    #[cfg_attr(feature = "structopt", structopt(long = "ii", default_value = "12000"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "ii", default_value = "10000"))]
     pub c_ip_int: usize,
 
     /// CPU time limit in sec.     .
@@ -190,11 +190,11 @@ pub struct Config {
     pub viv_beg: f64,
 
     /// Upper bound of vivif. loop    .
-    #[cfg_attr(feature = "structopt", structopt(long = "vie", default_value = "1.5"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "vie", default_value = "2.0"))]
     pub viv_end: f64,
 
     /// Vivification interval           .
-    #[cfg_attr(feature = "structopt", structopt(long = "vii", default_value = "2"))]
+    #[cfg_attr(feature = "structopt", structopt(long = "vii", default_value = "1"))]
     pub viv_int: usize,
 
     /// #reduction for next vivif.    .
@@ -226,7 +226,7 @@ impl Default for Config {
 
             c_cbt_thr: 100,
             c_cls_lim: 0,
-            c_ip_int: 12000,
+            c_ip_int: 10000,
             c_tout: 5000.0,
 
             splr_interface: false,
@@ -255,9 +255,9 @@ impl Default for Config {
             rst_mld_thr: 4.00,
             rst_stb_scl: 2.0,
 
-            viv_beg: 1.0,
+            viv_beg: 0.5,
             viv_end: 2.0,
-            viv_int: 4,
+            viv_int: 1,
             viv_scale: 2.0,
 
             vrw_dcy_beg: 0.75,
