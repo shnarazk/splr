@@ -176,7 +176,7 @@ impl Export<(usize, usize, usize, f64), ()> for AssignStack {
             self.activity_decay,
         )
     }
-    fn active_mode(&self) {}
+    fn mode(&self) {}
 }
 
 impl AssignIF for AssignStack {

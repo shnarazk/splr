@@ -323,7 +323,7 @@ fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     out.write_all(
         format!(
             "c  {}|#RST:{}, #BLK:{}, #STB:{}, #CNC:{},\n",
-            if s.rst.active_mode().0 == RestartMode::Luby {
+            if s.rst.mode().0 == RestartMode::Luby {
                 "LubyRestart"
             } else {
                 "    Restart"

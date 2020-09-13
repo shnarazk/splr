@@ -24,7 +24,7 @@ use {
 /// `T` is the list of exporting values.
 pub trait Export<T, Mode> {
     fn exports(&self) -> T;
-    fn active_mode(&self) -> Mode;
+    fn mode(&self) -> Mode;
 }
 
 pub trait ExportBox<'a, T> {
