@@ -140,15 +140,15 @@ impl VarHeapIF for AssignStack {
         let i = self.var_order.idxs[vi];
         assert_ne!(i, 0);
         let n = self.var_order.idxs[0];
-        if n < s {
+        if n < i {
             return;
         }
         let vn = self.var_order.heap[n];
-        self.var_order.heap.swap(n, s);
-        self.var_order.idxs.swap(vn, vs);
+        self.var_order.heap.swap(n, i);
+        self.var_order.idxs.swap(vn, vi);
         self.var_order.idxs[0] -= 1;
         if 1 < self.var_order.idxs[0] {
-            self.percolate_down(1);
+            self.percolate_down(i);
         }
     }
 }
