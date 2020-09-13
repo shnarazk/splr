@@ -133,6 +133,9 @@ impl Instantiate for AssignStack {
                 };
                 self.rebuild_order();
             }
+            SolverEvent::Restart => {
+                self.cancel_until(self.root_level);
+            }
             SolverEvent::Stabilize(_) => {
                 self.num_best_assign *= 0.9;
             }

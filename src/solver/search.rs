@@ -219,10 +219,10 @@ fn search(
                 match decision {
                     RestartDecision::Block | RestartDecision::Cancel => (),
                     RestartDecision::Force => {
-                        asg.cancel_until(asg.root_level);
+                        asg.handle(SolverEvent::Restart);
                     }
                     RestartDecision::Stabilize => {
-                        asg.cancel_until(asg.root_level);
+                        asg.handle(SolverEvent::Restart);
                         asg.force_rephase();
                     }
                 }
