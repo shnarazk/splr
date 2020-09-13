@@ -293,9 +293,10 @@ impl Instantiate for State {
             SolverEvent::NewVar => {
                 self.target.num_of_variables += 1;
             }
-            SolverEvent::Assert => (),
+            SolverEvent::Assert(_) => (),
             SolverEvent::Adapt(_, _) => (),
             SolverEvent::Conflict => (),
+            SolverEvent::Eliminate(_) => (),
             SolverEvent::Instantiate => (),
             SolverEvent::Reinitialize => (),
             SolverEvent::Restart => (),

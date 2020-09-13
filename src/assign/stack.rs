@@ -102,7 +102,7 @@ impl Instantiate for AssignStack {
     fn handle(&mut self, e: SolverEvent) {
         match e {
             SolverEvent::Adapt(_, _) => (),
-            SolverEvent::Assert => {
+            SolverEvent::Assert(vi) => {
                 self.num_asserted_vars += 1;
             }
             SolverEvent::Conflict => (),
