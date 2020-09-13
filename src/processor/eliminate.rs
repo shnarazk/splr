@@ -338,7 +338,7 @@ mod tests {
             ref mut state,
             ..
         } = Solver::try_from("tests/uf8.cnf").expect("failed to load");
-        let timedout = 10_000;
+        let mut timedout = 10_000;
         let vi = 4;
 
         elim.activate();
