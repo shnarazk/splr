@@ -318,6 +318,7 @@ fn adapt_modules(
     asg.handle(SolverEvent::Adapt(state.strategy, asg_num_conflict));
     cdb.handle(SolverEvent::Adapt(state.strategy, asg_num_conflict));
     rst.handle(SolverEvent::Adapt(state.strategy, asg_num_conflict));
+    rst.update(ProgressUpdate::ACT(asg.exports_box().get_slow()));
     Ok(())
 }
 

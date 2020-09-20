@@ -1,8 +1,8 @@
 /// main struct AssignStack
 use {
     super::{
-        AssignIF, AssignStack, PropagateIF, Var, VarHeapIF, VarIdHeap, VarManipulateIF, VarOrderIF,
-        VarRewardIF, VarSelectIF,
+        AssignIF, AssignStack, ProgressACT, PropagateIF, Var, VarHeapIF, VarIdHeap,
+        VarManipulateIF, VarOrderIF, VarRewardIF, VarSelectIF,
     },
     crate::{cdb::ClauseDBIF, solver::SolverEvent, types::*},
     std::{fmt, ops::Range, slice::Iter},
@@ -66,6 +66,7 @@ impl Default for AssignStack {
             activity_decay: 0.0,
             activity_decay_max: 0.0,
             reward_step: 0.0,
+            activity_ema: ProgressACT::default(),
             vivify_sandbox: (0, 0, 0),
         }
     }
@@ -99,6 +100,7 @@ impl Instantiate for AssignStack {
             var: Var::new_vars(nv),
             activity_decay: config.vrw_dcy_beg,
             activity_decay_max: config.vrw_dcy_end.max(config.vrw_dcy_beg),
+            activity_ema: ProgressACT::instantiate(config, cnf),
             ..AssignStack::default()
         }
     }

@@ -171,8 +171,10 @@ impl PropagateIF for AssignStack {
             unset_assign!(self, vi);
             self.reason[vi] = AssignReason::default();
             self.reward_at_unassign(vi);
+            self.activity_ema.update(self.var[vi].reward);
             self.insert_heap(vi);
         }
+        self.activity_ema.shift();
         self.trail.truncate(shift);
         debug_assert!(self
             .trail

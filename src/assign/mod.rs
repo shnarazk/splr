@@ -1,6 +1,8 @@
 /// Crate `assign` implements Boolean Constraint Propagation and decision var selection.
 /// This version can handle Chronological and Non Chronological Backtrack.
 mod heap;
+/// EMA of activity
+mod progress;
 /// Boolean constraint propagation
 mod propagate;
 /// Var rewarding
@@ -15,7 +17,8 @@ mod stack;
 mod var;
 
 pub use self::{
-    propagate::PropagateIF, select::VarSelectIF, stack::ClauseManipulateIF, var::VarManipulateIF,
+    progress::ProgressACT, propagate::PropagateIF, select::VarSelectIF, stack::ClauseManipulateIF,
+    var::VarManipulateIF,
 };
 
 use {
@@ -161,6 +164,8 @@ pub struct AssignStack {
     activity_decay_max: f64,
     /// ONLY used in feature EVSIDS
     reward_step: f64,
+    /// Ema of activities
+    activity_ema: ProgressACT,
 
     //
     //## Vivification
