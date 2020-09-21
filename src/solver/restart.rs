@@ -668,6 +668,7 @@ pub struct Restarter {
     after_restart: usize,
     restart_step: usize,
     initial_restart_step: usize,
+    pub average_cpr: usize,
 
     //
     //## statistics
@@ -694,6 +695,7 @@ impl Default for Restarter {
             after_restart: 0,
             restart_step: 0,
             initial_restart_step: 0,
+            average_cpr: 0,
             num_block_non_stabilized: 0,
             num_restart_non_stabilized: 0,
             num_block_stabilized: 0,
@@ -774,33 +776,40 @@ impl RestartIF for Restarter {
         // };
         let phases = (self.stb.num_active - self.stb.reset_at + 1) as f64;
         let ave = self.acc.average_activity;
-        if self.stb.is_active()&& false {
-            let (broad_space, compact_space) = {
+        if self.stb.is_active() {
+            let (cancel, stabilize) = {
                 let _ave = 0.5 * (self.acc.ema.get_slow() + 0.5);
                 let acc = self.acc.get();
+                let shift = phases * 0.1;
+                let thr = 0.5 + 0.5 * ave;
                 // (acc <  ave - 0.1, ave + 0.2 < acc)
                 // (acc < 0.35, 0.8 < acc)
-                (acc < ave, 0.5 + 0.5 * ave < acc)
+                (
+                    // ave * 1.5 < acc,
+                    thr < acc,
+                    acc < 0.75 * thr || shift as usize * self.average_cpr < self.after_restart,
+                )
             };
-            if compact_space {
+            if cancel {
                 self.after_restart = 0;
                 self.num_block_stabilized += 1;
                 return Some(RestartDecision::Cancel);
             }
-            if broad_space {
+            if stabilize {
                 self.after_restart = 0;
                 self.num_restart_stabilized += 1;
                 return Some(RestartDecision::Stabilize);
             }
             return None;
         }
-        let (good_lbd, poor_lbd) = {
+        let (block, force) = {
             let lbd = self.lbd.get();
             let mld = self.mld.get();
             let shift = phases * 0.25;
-            let _d = 0.5 * (mld - self.lbd.get()).abs();
-            let _thr = (0.0, 0.5);
-            (lbd < mld * 0.25, mld * (1.4 + shift) < lbd)
+            (
+                lbd < mld * 0.8, // * 0.25,
+                mld * (1.4 + shift) < lbd || 2 * self.average_cpr < self.after_restart,
+            )
             // let margin = 0.15 * d + self.mld.threshold;
             // let margin = /* self.mld.threshold */ 2.5 / d;
             // (lbd < 0.7 * mld, mld + 1.5 * margin < lbd)
@@ -808,12 +817,12 @@ impl RestartIF for Restarter {
             // (lbd + margin < mld, mld + margin < lbd)
             // (lbd + 4.0 < mld, mld + 4.0 < lbd)
         };
-        if good_lbd {
+        if block {
             self.after_restart = 0;
             self.num_block_non_stabilized += 1;
             return Some(RestartDecision::Block);
         }
-        if poor_lbd {
+        if force {
             self.after_restart = 0;
             self.num_restart_non_stabilized += 1;
             return Some(RestartDecision::Force);

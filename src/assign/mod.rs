@@ -17,7 +17,10 @@ mod stack;
 mod var;
 
 pub use self::{
-    progress::ProgressACT, propagate::PropagateIF, select::VarSelectIF, stack::ClauseManipulateIF,
+    progress::{ProgressACT, ProgressCPR},
+    propagate::PropagateIF,
+    select::VarSelectIF,
+    stack::ClauseManipulateIF,
     var::VarManipulateIF,
 };
 
@@ -146,6 +149,7 @@ pub struct AssignStack {
     pub num_conflict: usize,
     num_propagation: usize,
     num_restart: usize,
+    cpr: ProgressCPR,
 
     //
     //## Var DB

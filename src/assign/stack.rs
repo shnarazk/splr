@@ -1,7 +1,7 @@
 /// main struct AssignStack
 use {
     super::{
-        AssignIF, AssignStack, ProgressACT, PropagateIF, Var, VarHeapIF, VarIdHeap,
+        AssignIF, AssignStack, ProgressACT, ProgressCPR, PropagateIF, Var, VarHeapIF, VarIdHeap,
         VarManipulateIF, VarOrderIF, VarRewardIF, VarSelectIF,
     },
     crate::{cdb::ClauseDBIF, solver::SolverEvent, types::*},
@@ -61,6 +61,7 @@ impl Default for AssignStack {
             num_conflict: 0,
             num_propagation: 0,
             num_restart: 0,
+            cpr: ProgressCPR::default(),
             ordinal: 0,
             var: Vec::new(),
             activity_decay: 0.0,
@@ -136,6 +137,7 @@ impl Instantiate for AssignStack {
                 self.rebuild_order();
             }
             SolverEvent::Restart => {
+                self.cpr.update(self.num_conflict);
                 self.cancel_until(self.root_level);
             }
             SolverEvent::Stabilize(_) => {
@@ -179,6 +181,12 @@ impl Export<(usize, usize, usize, f64), ()> for AssignStack {
         )
     }
     fn mode(&self) {}
+}
+
+impl<'a> ExportBox<'a, (&'a Ema2, &'a Ema2)> for AssignStack {
+    fn exports_box(&'a self) -> Box<(&'a Ema2, &'a Ema2)> {
+        Box::from((&self.activity_ema.ema, &self.cpr.ema))
+    }
 }
 
 impl AssignIF for AssignStack {

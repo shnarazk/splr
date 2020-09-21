@@ -36,13 +36,13 @@ pub trait StateIF {
     /// write stat data to stdio.
     fn progress<'r, A, C, E, R>(
         &mut self,
-        asg: &A,
+        asg: &'r A,
         cdb: &C,
         elim: &E,
         rst: &'r R,
         mes: Option<&str>,
     ) where
-        A: AssignIF + Export<(usize, usize, usize, f64), ()>,
+        A: AssignIF + Export<(usize, usize, usize, f64), ()> + ExportBox<'r, (&'r Ema2, &'r Ema2)>,
         C: Export<(usize, usize, usize, usize, usize, usize), bool>,
         E: Export<(usize, usize, f64), ()>,
         R: RestartIF
@@ -476,13 +476,13 @@ impl StateIF for State {
     #[allow(clippy::cognitive_complexity)]
     fn progress<'r, A, C, E, R>(
         &mut self,
-        asg: &A,
+        asg: &'r A,
         cdb: &C,
         elim: &E,
         rst: &'r R,
         mes: Option<&str>,
     ) where
-        A: AssignIF + Export<(usize, usize, usize, f64), ()>,
+        A: AssignIF + Export<(usize, usize, usize, f64), ()> + ExportBox<'r, (&'r Ema2, &'r Ema2)>,
         C: Export<(usize, usize, usize, usize, usize, usize), bool>,
         E: Export<(usize, usize, f64), ()>,
         R: RestartIF
@@ -500,6 +500,7 @@ impl StateIF for State {
             asg.var_stats();
         let rate = (asg_num_asserted_vars + asg_num_eliminated_vars) as f64 / asg_num_vars as f64;
         let (asg_num_conflict, asg_num_propagation, asg_num_restart, _asg_act_dcy) = asg.exports();
+        let (asg_act_ema, _cpr_ema) = *asg.exports_box();
 
         let (cdb_num_active, cdb_num_biclause, _num_bl, cdb_num_lbd2, cdb_num_learnt, _cdb_nr) =
             cdb.exports();

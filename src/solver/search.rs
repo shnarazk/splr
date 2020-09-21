@@ -281,6 +281,12 @@ fn search(
         if !asg.remains() {
             if use_stabilize && state.stabilize != rst.stabilizing() {
                 state.stabilize = !state.stabilize;
+                let (asg_num_conflict, _, asg_num_restart, _) = asg.exports();
+                if asg_num_restart == 0 {
+                    rst.average_cpr = asg_num_conflict;
+                } else {
+                    rst.average_cpr = asg.exports_box().1.get() as usize;
+                }
                 asg.handle(SolverEvent::Stabilize(state.stabilize));
                 rst.handle(SolverEvent::Stabilize(state.stabilize));
                 // update `num_assigned` periodically, which isn't a monotonous increasing var.
@@ -318,7 +324,7 @@ fn adapt_modules(
     asg.handle(SolverEvent::Adapt(state.strategy, asg_num_conflict));
     cdb.handle(SolverEvent::Adapt(state.strategy, asg_num_conflict));
     rst.handle(SolverEvent::Adapt(state.strategy, asg_num_conflict));
-    rst.update(ProgressUpdate::ACT(asg.exports_box().get_slow()));
+    rst.update(ProgressUpdate::ACT(asg.exports_box().0.get_slow()));
     Ok(())
 }
 

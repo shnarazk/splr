@@ -156,12 +156,6 @@ impl VarManipulateIF for AssignStack {
     }
 }
 
-impl<'a> ExportBox<'a, &'a Ema2> for AssignStack {
-    fn exports_box(&'a self) -> Box<&'a Ema2> {
-        Box::from(&self.activity_ema.ema)
-    }
-}
-
 impl ClauseManipulateIF for AssignStack {
     fn satisfies(&self, vec: &[Lit]) -> bool {
         for l in vec {
