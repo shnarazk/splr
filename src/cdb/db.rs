@@ -460,9 +460,27 @@ impl ClauseDBIF for ClauseDB {
         A: AssignIF,
     {
         let reward = self.activity_inc;
-        let rank = if level_sort {
+
+        // sort literals
+        if level_sort {
             #[cfg(feature = "boundary_check")]
             debug_assert!(1 < vec.len());
+            let mut i_max = 1;
+            let mut lv_max = 0;
+            // seek a literal with max level
+            let level = asg.level_ref();
+            for (i, l) in vec.iter().enumerate() {
+                let vi = l.vi();
+                let lv = level[vi];
+                if asg.assign(vi).is_some() && lv_max < lv {
+                    i_max = i;
+                    lv_max = lv;
+                }
+            }
+            vec.swap(1, i_max);
+        }
+        let rank = {
+            // if level_sort {
             // sort literals
             // let mut i_max = 1;
             // let mut lv_max = 0;
