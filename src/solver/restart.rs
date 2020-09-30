@@ -766,30 +766,22 @@ impl RestartIF for Restarter {
             return None;
         }
         self.acc.shift();
-        // let margin = {
-        //     let (c0, c1) = if self.stb.is_active() {
-        //         (2.0, 0.2)
-        //     } else {
-        //         (0.0, 0.15) // (-1.0, 0.02)
-        //     };
-        //     ((self.stb.num_active - self.stb.reset_at + 1) as f64 * c1 + c0) + self.mld.threshold
-        // };
         let phases = (self.stb.num_active - self.stb.reset_at + 1) as f64;
-        let ave = self.acc.average_activity;
+        let _phases = self.stb.num_active as f64;
+        let step_limit = self.average_cpr as f64 * phases;
+        let beyond = step_limit < self.after_restart as f64;
+        let ratio = self.after_restart as f64 / self.average_cpr as f64;
         if self.stb.is_active() {
-            let (cancel, stabilize) = {
-                let _ave = 0.5 * (self.acc.ema.get_slow() + 0.5);
-                let acc = self.acc.get();
-                let shift = phases * 0.1;
-                let thr = 0.5 + 0.5 * ave;
-                // (acc <  ave - 0.1, ave + 0.2 < acc)
-                // (acc < 0.35, 0.8 < acc)
-                (
-                    // ave * 1.5 < acc,
-                    thr < acc,
-                    acc < 0.75 * thr || shift as usize * self.average_cpr < self.after_restart,
-                )
-            };
+            let acc = self.acc.get();
+            let _ave = self.acc.average_activity;
+            let ave = 0.7;
+            let (cancel, stabilize) = (
+                // (0.75 * ratio).min(1.0) < acc && !beyond, // on a good path
+                // (ratio * ave).sqrt() < acc && !beyond,
+                self.lbd.get() < 0.75 * self.mld.get() && beyond,
+                // acc < 0.4 * ratio // try another path immediately.
+                acc < 0.25 * (ratio * ave) && beyond,
+            );
             if cancel {
                 self.after_restart = 0;
                 self.num_block_stabilized += 1;
@@ -802,21 +794,10 @@ impl RestartIF for Restarter {
             }
             return None;
         }
-        let (block, force) = {
-            let lbd = self.lbd.get();
-            let mld = self.mld.get();
-            let shift = phases * 0.25;
-            (
-                lbd < mld * 0.8, // * 0.25,
-                mld * (1.4 + shift) < lbd || 2 * self.average_cpr < self.after_restart,
-            )
-            // let margin = 0.15 * d + self.mld.threshold;
-            // let margin = /* self.mld.threshold */ 2.5 / d;
-            // (lbd < 0.7 * mld, mld + 1.5 * margin < lbd)
-            // (lbd + 4.0 < mld, mld + 4.0 < lbd)
-            // (lbd + margin < mld, mld + margin < lbd)
-            // (lbd + 4.0 < mld, mld + 4.0 < lbd)
-        };
+        let (block, force) = (
+            self.asg.is_active(),
+            self.lbd.is_active(), //  || self.average_cpr < self.after_restart,
+        );
         if block {
             self.after_restart = 0;
             self.num_block_non_stabilized += 1;
