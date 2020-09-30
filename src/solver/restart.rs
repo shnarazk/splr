@@ -563,7 +563,7 @@ impl ProgressEvaluator for GeometricStabilizer {
         if self.enable && 10_000 < self.step {
             // Mainly this function is called by asserting a new assignment.
             // This may be a chance to switch to sticky search
-            self.active = true;
+            // self.active = true;
             self.step = 1000;
             self.reset_at = self.num_active;
         }

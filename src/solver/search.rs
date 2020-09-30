@@ -293,7 +293,7 @@ fn search(
                 {
                     let ma = max_assigned as f64;
                     let nv = asg.num_vars as f64;
-                    max_assigned = (ma * 0.9).max(1.1 * ma - 0.1 * nv) as usize;
+                    max_assigned = (ma * 0.99).max(1.01 * ma - 0.01 * nv) as usize;
                 }
             }
             let lit = asg.select_decision_literal(&state.phase_select);

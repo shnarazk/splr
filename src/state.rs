@@ -581,12 +581,13 @@ impl StateIF for State {
             fm!("{:>9.2}", self, LogF64Id::EmaLBD, rst_lbd.get()),
             fm!("{:>9.2}", self, LogF64Id::CLevel, self.c_lvl.get()),
             fm!("{:>9.2}", self, LogF64Id::BLevel, self.b_lvl.get()),
-            fm!(
-                "{:>9.2}",
-                self,
-                LogF64Id::PropagationPerConflict,
-                asg_num_propagation as f64 / asg_num_conflict as f64
-            ),
+            // fm!(
+            //     "{:>9.2}",
+            //     self,
+            //     LogF64Id::PropagationPerConflict,
+            //     asg_num_propagation as f64 / asg_num_conflict as f64
+            // ),
+            fm!("{:>9.4}", self, LogF64Id::End, asg_act_ema.get()),
         );
         println!(
             "\x1B[2K        misc|elim:{}, cviv:{}, #vbv:{}, /cpr:{} ",
