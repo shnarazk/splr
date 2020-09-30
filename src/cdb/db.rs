@@ -509,8 +509,8 @@ impl ClauseDBIF for ClauseDB {
                     lbd
                 }
             }
-        } else {
-            vec.len()
+            // } else {
+            //    vec.len()
         };
         if !self.certified.is_empty() && !self.during_vivification {
             let temp = vec.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
