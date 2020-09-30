@@ -8,7 +8,7 @@ use {
     },
 };
 
-const ACTIVITY_MAX: f64 = 1e308;
+const DECAY_RATE: f64 = 0.999;
 
 /// API for clause management like `reduce`, `simplify`, `new_clause`, and so on.
 pub trait ClauseDBIF: IndexMut<ClauseId, Output = Clause> {
@@ -104,8 +104,6 @@ impl Default for ClauseDB {
             use_chan_seok: false,
             co_lbd_bound: 5,
             // lbd_frozen_clause: 30,
-            activity_inc: 1.0,
-            activity_decay: 0.999,
             touched: Vec::new(),
             lbd_temp: Vec::new(),
             num_lbd_update: 0,
@@ -189,30 +187,22 @@ impl IndexMut<RangeFrom<usize>> for ClauseDB {
 
 impl ActivityIF for ClauseDB {
     type Ix = ClauseId;
-    type Inc = ();
-    fn activity(&mut self, ci: Self::Ix) -> f64 {
-        self[ci].reward
+    type Inc = usize;
+    fn activity(&mut self, cid: Self::Ix) -> f64 {
+        self[cid].reward
     }
-    fn set_activity(&mut self, ci: Self::Ix, val: f64) {
-        self[ci].reward = val;
+    fn set_activity(&mut self, cid: Self::Ix, now: Self::Inc) {
+        self.clause[cid.ordinal as usize].set_activity(now);
     }
-    fn bump_activity(&mut self, cid: Self::Ix, _: Self::Inc) {
+    fn bump_activity(&mut self, cid: Self::Ix, now: Self::Inc) {
         let c = &mut self.clause[cid.ordinal as usize];
-        let a = c.reward + self.activity_inc;
-        c.reward = a;
-        if ACTIVITY_MAX < a {
-            let scale = 1.0 / self.activity_inc;
-            for c in &mut self.clause[1..] {
-                if c.is(Flag::LEARNT) {
-                    c.reward *= scale;
-                }
-            }
-            self.activity_inc *= scale;
+        if c.last_used < now {
+            let elapsed = c.last_used - now;
+            c.reward = DECAY_RATE.powi(elapsed as i32) * c.reward + (1.0 - DECAY_RATE);
+            c.last_used = now;
         }
     }
-    fn scale_activity(&mut self) {
-        self.activity_inc /= self.activity_decay;
-    }
+    fn scale_activity(&mut self) {}
 }
 
 impl Instantiate for ClauseDB {
@@ -459,7 +449,7 @@ impl ClauseDBIF for ClauseDB {
     where
         A: AssignIF,
     {
-        let reward = self.activity_inc;
+        let reward = 0.0;
 
         // sort literals
         if level_sort {
@@ -808,10 +798,12 @@ impl ClauseDB {
         } = self;
         self.next_reduction += self.inc_step;
         let mut perm = Vec::with_capacity(clause.len());
+        let num_conflict = asg.exports().0;
         for (i, c) in clause.iter_mut().enumerate().skip(1) {
             let used = c.is(Flag::JUST_USED);
             if c.is(Flag::LEARNT) && !c.is(Flag::DEAD) && !asg.locked(c, ClauseId::from(i)) && !used
             {
+                c.set_activity(num_conflict);
                 perm.push(i);
             }
             if used {
@@ -892,6 +884,13 @@ impl ClauseDB {
 }
 
 impl Clause {
+    fn set_activity(&mut self, now: usize) {
+        if self.last_used < now {
+            let elapsed = self.last_used - now;
+            self.reward *= DECAY_RATE.powi(elapsed as i32);
+            self.last_used = now;
+        }
+    }
     #[allow(clippy::comparison_chain)]
     fn cmp_activity(&self, other: &Clause) -> Ordering {
         if self.reward > other.reward {

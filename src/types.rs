@@ -51,7 +51,7 @@ pub trait ActivityIF {
     /// return the current activity of an element.
     fn activity(&mut self, ix: Self::Ix) -> f64;
     /// set activity forcely.
-    fn set_activity(&mut self, ix: Self::Ix, val: f64);
+    fn set_activity(&mut self, ix: Self::Ix, val: Self::Inc);
     /// update an element's activity.
     fn bump_activity(&mut self, ix: Self::Ix, dl: Self::Inc);
     /// increment activity step.

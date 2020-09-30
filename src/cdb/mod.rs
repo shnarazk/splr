@@ -56,6 +56,8 @@ pub struct Clause {
     pub rank: u16,
     /// the index from which `propagate` starts searching an unfalsified literal.
     pub search_from: usize,
+    /// the last conflict at which this clause is used in conflict analysis.
+    last_used: usize,
     /// A dynamic clause evaluation criterion based on the number of references.
     reward: f64,
     /// Flags
@@ -87,12 +89,6 @@ pub struct ClauseDB {
     co_lbd_bound: usize,
     // not in use
     // lbd_frozen_clause: usize,
-
-    //
-    //## clause rewarding
-    //
-    activity_inc: f64,
-    activity_decay: f64,
 
     //
     //## Elimination
@@ -207,11 +203,11 @@ mod tests {
         let mut cdb = ClauseDB::instantiate(&config, &cnf);
         let c1 = cdb.new_clause(&mut asg, &mut vec![lit(1), lit(2), lit(3)], false, false);
         let c2 = cdb.new_clause(&mut asg, &mut vec![lit(-1), lit(4)], false, false);
-        cdb[c2].reward = 2.4;
+        cdb[c2].reward = 0.0;
         assert_eq!(c1, c1);
         assert_eq!(c1 == c1, true);
         assert_ne!(c1, c2);
-        assert_eq!(cdb.activity(c2), 2.4);
+        assert_eq!(cdb.activity(c2), 0.0);
     }
 
     #[test]
