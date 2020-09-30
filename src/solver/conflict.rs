@@ -240,7 +240,8 @@ pub fn handle_conflict(
             rst_lbd.trend().min(10.0),
         ));
     }
-    if cdb.check_and_reduce(asg, num_conflict) {
+    let mld = rst.exports_box().3;
+    if cdb.check_and_reduce(asg, num_conflict, 0.5 * (mld.get() + mld.get_slow())) {
         state.to_vivify += if cdb.mode() { 0.005 } else { 1.0 };
     }
     Ok(())

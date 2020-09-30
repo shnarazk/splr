@@ -150,6 +150,22 @@ impl PartialOrd for Clause {
 
 impl Ord for Clause {
     fn cmp(&self, other: &Clause) -> Ordering {
+        let scale = 40.0;
+        let sel = self.reward + scale / (self.rank as f64);
+        let oth = other.reward + scale / (other.reward as f64);
+        if oth < sel {
+            Ordering::Less
+        } else if sel < oth {
+            Ordering::Greater
+        } else {
+            Ordering::Equal
+        }
+    }
+}
+
+/*
+impl Ord for Clause {
+    fn cmp(&self, other: &Clause) -> Ordering {
         if self.rank < other.rank {
             Ordering::Less
         } else if other.rank > self.rank {
@@ -163,6 +179,7 @@ impl Ord for Clause {
         }
     }
 }
+ */
 
 impl fmt::Display for Clause {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

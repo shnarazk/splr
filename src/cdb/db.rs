@@ -34,7 +34,7 @@ pub trait ClauseDBIF: IndexMut<ClauseId, Output = Clause> {
     ///
     /// # CAVEAT
     /// *precondition*: decision level == 0.
-    fn check_and_reduce<A>(&mut self, asg: &A, nc: usize) -> bool
+    fn check_and_reduce<A>(&mut self, asg: &A, nc: usize, average: f64) -> bool
     where
         A: AssignIF;
     fn reset(&mut self);
@@ -641,7 +641,7 @@ impl ClauseDBIF for ClauseDB {
         debug_assert!(1 < c.lits.len());
         c.kill(&mut self.touched);
     }
-    fn check_and_reduce<A>(&mut self, asg: &A, nc: usize) -> bool
+    fn check_and_reduce<A>(&mut self, asg: &A, nc: usize, average: f64) -> bool
     where
         A: AssignIF,
     {
@@ -655,7 +655,7 @@ impl ClauseDBIF for ClauseDB {
         };
         if go {
             self.reduction_coeff = ((nc as f64) / (self.next_reduction as f64)) as usize + 1;
-            self.reduce(asg);
+            self.reduce(asg, average as u16);
             self.num_reduction += 1;
         }
         go
@@ -797,7 +797,7 @@ impl ClauseDBIF for ClauseDB {
 
 impl ClauseDB {
     /// halve the number of 'learnt' or *removable* clauses.
-    fn reduce<A>(&mut self, asg: &A)
+    fn reduce<A>(&mut self, asg: &A, average: u16)
     where
         A: AssignIF,
     {
@@ -833,6 +833,36 @@ impl ClauseDB {
                 self.next_reduction += self.extra_inc;
             };
         }
+        perm.retain(|i| {
+            let c = &mut clause[*i];
+            let result = c.rank < average;
+            if !result {
+                c.kill(touched);
+            }
+            result
+        });
+        let len = perm.len();
+        let keep = len / 2;
+        // if keep < len {
+        //     for i in (0..len).rev() {
+        //         let c = &mut clause[perm[i]];
+        //         if 2 < c.rank {
+        //             c.kill(touched);
+        //             if keep == len {
+        //                 break;
+        //             }
+        //             len -= 1;
+        //         }
+        //     }
+        // }
+        /*
+        for i in &perm[0..keep] {
+            let c = &mut clause[*i];
+            if average < c.rank {
+                c.kill(touched);
+            }
+        }
+         */
         for i in &perm[keep..] {
             let c = &mut clause[*i];
             if 2 < c.rank {
