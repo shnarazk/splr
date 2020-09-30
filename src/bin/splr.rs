@@ -42,6 +42,279 @@ fn colored(v: Result<bool, &SolverError>, quiet: bool) -> Cow<'static, str> {
 }
 
 fn main() {
+    /*
+    let args = &[
+        Argument::new(
+            &[''],
+            &["ADP"],
+            Some("Strategy adaptation switch"),
+            DataType::Text,
+        ).unwrap(),
+        Argument::new(
+            &[],
+            &["ELI"],
+            Some("Eliminator switch"),
+            DataType::Text,
+        ).unwrap(),
+        Argument::new(
+            &[],
+            &["RPH"],
+            Some("Eliminator switch"),
+            DataType::Text,
+        ).unwrap(),
+        Argument::new(
+            &[],
+            &["RSR"],
+            Some("Reason-Side Rewarding switch"),
+            DataType::Text,
+        ).unwrap(),
+        Argument::new(
+            &[],
+            &["STB"],
+            Some("Stabilization switch"),
+            DataType::Text,
+        ).unwrap(),
+        Argument::new(
+            &[],
+            &["RDR"],
+            Some("Clause reduction switch"),
+            DataType::Text,
+        ).unwrap(),
+        Argument::new(
+            &[],
+            &["VIV"],
+            Some("Vivification switch"),
+            DataType::Text,
+        ).unwrap(),
+
+        //
+        //## solver configuration
+        //
+        Argument::new(
+            &[],
+            &["cbt"],
+            Some("Dec. lvl to use chronoBT"),
+            DataType::Text,
+        ).unwrap(),
+
+        Argument::new(
+            &[],
+            &["cl"],
+            Some("Soft limit of #clauses (6MC/GB)"),
+            DataType::Text,
+        ).unwrap(),
+        Argument::new(
+            &[],
+            &["ii"],
+            Some("#cls to start in-processor"),
+            DataType::Text,
+        ).unwrap(),
+        Argument::new(
+            &[],
+            &[""],
+            Some(""),
+            DataType::Text,
+        ).unwrap(),
+        Argument::new(
+            &['t'],
+            &["timeout"],
+            Some("CPU time limit in sec."),
+            DataType::Text,
+        ).unwrap(),
+
+        //
+        //## I/O configuration
+        //
+        Argument::new(
+            &[],
+            &["stat"],
+            Some("Interval for dumping stat data"),
+            DataType::Text,
+        ).unwrap(),
+        Argument::new(
+            &['o'],
+            &["dir"],
+            Some("Output directory"),
+            DataType::Files,
+        ).unwrap(),
+        Argument::new(
+            &[],
+            &[""],
+            Some(""),
+            DataType::Text,
+        ).unwrap(),
+        Argument::new(
+            &[],
+            &["proof"],
+            Some("DRAT Cert. filename"),
+            DataType::Text,
+        ).unwrap(),
+        Argument::new(
+            &['r'],
+            &["result"],
+            Some("Result filename/stdout"),
+            DataType::Text,
+        ).unwrap(),
+        Argument::new(
+            &['C'],
+            &["no-color"],
+            Some("Disable coloring"),
+            DataType::Text,
+        ).unwrap(),
+        Argument::new(
+            &['q'],
+            &["quiet"],
+            Some("Disable any progress message"),
+            DataType::Text,
+        ).unwrap(),
+        Argument::new(
+            &[],
+            &[""],
+            Some(""),
+            DataType::Text,
+        ).unwrap(),
+        Argument::new(
+            &['c'],
+            &["certify"],
+            Some("Writes a DRAT UNSAT certification file"),
+            DataType::Text,
+        ).unwrap(),
+        Argument::new(
+            &['l'],
+            &["log"],
+            Some("Uses Glucose-like progress report"),
+            DataType::Text,
+        ).unwrap(),
+
+        //
+        //## eliminator
+        //
+        Argument::new(
+            &[],
+            &["ecl"],
+            Some("Max #lit for clause subsume"),
+            DataType::Text,
+        ).unwrap(),
+        Argument::new(
+            &[],
+            &["evl"],
+            Some("Grow limit of #cls in var elim."),
+            DataType::Text,
+        ).unwrap(),
+        Argument::new(
+            &[],
+            &["evo"],
+            Some("Max #cls for var elimination"),
+            DataType::Text,
+        ).unwrap(),
+
+        //
+        //## restarter
+        //
+        Argument::new(
+            &[],
+            &["rs"],
+            Some("#conflicts between restarts"),
+            DataType::Text,
+        ).unwrap(),
+        Argument::new(
+            &[],
+            &["ral"],
+            Some("Length of assign. fast EMA"),
+            DataType::Text,
+        ).unwrap(),
+        Argument::new(
+            &[],
+            &["ras"],
+            Some("Length of assign. slow EMA"),
+            DataType::Text,
+        ).unwrap(),
+        Argument::new(
+            &[],
+            &["rat"],
+            Some("Blocking restart threshold"),
+            DataType::Text,
+        ).unwrap(),
+        Argument::new(
+            &[],
+            &["rct"],
+            Some("Conflict Correlation threshold"),
+            DataType::Text,
+        ).unwrap(),
+        Argument::new(
+            &[],
+            &["rll"],
+            Some("Length of LBD fast EMA"),
+            DataType::Text,
+        ).unwrap(),
+        Argument::new(
+            &[],
+            &["rls"],
+            Some("Length of LBD slow EMA"),
+            DataType::Text,
+        ).unwrap(),
+        Argument::new(
+            &[],
+            &["rlt"],
+            Some("Forcing restart threshold"),
+            DataType::Text,
+        ).unwrap(),
+        Argument::new(
+            &[],
+            &["rut"],
+            Some("Usability to restart"),
+            DataType::Text,
+        ).unwrap(),
+        Argument::new(
+            &[],
+            &["rss"],
+            Some("Stabilizer scaling"),
+            DataType::Text,
+        ).unwrap(),
+        Argument::new(
+            &[],
+            &["vib"],
+            Some("Lower bound of vivif. loop"),
+            DataType::Text,
+        ).unwrap(),
+        Argument::new(
+            &[],
+            &["vie"],
+            Some("Upper bound of vivif. loop"),
+            DataType::Text,
+        ).unwrap(),
+        Argument::new(
+            &[],
+            &["vii"],
+            Some("Vivification interval"),
+            DataType::Text,
+        ).unwrap(),
+        Argument::new(
+            &[],
+            &["vis"],
+            Some("#reduction for next vivif."),
+            DataType::Text,
+        ).unwrap(),
+        Argument::new(
+            &[],
+            &["vri"],
+            Some("Initial var reward decay"),
+            DataType::Text,
+        ).unwrap(),
+        Argument::new(
+            &[],
+            &[""],
+            Some(""),
+            DataType::Text,
+        ).unwrap(),
+        Argument::new(
+            &[],
+            &["vrm"],
+            Some("Maximum var reward decay"),
+            DataType::Text,
+        ).unwrap(),
+    ];
+    */
     let mut config = Config::from_args().override_args();
     config.splr_interface = true;
     if !config.cnf_file.exists() {
