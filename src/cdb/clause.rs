@@ -135,13 +135,12 @@ impl Eq for Clause {}
 
 impl PartialOrd for Clause {
     fn partial_cmp(&self, other: &Clause) -> Option<Ordering> {
-        if self.rank < other.rank {
+        let scale = 20.0;
+        let sel = self.reward + scale / (self.rank as f64);
+        let oth = other.reward + scale / (other.reward as f64);
+        if oth < sel {
             Some(Ordering::Less)
-        } else if other.rank < self.rank {
-            Some(Ordering::Greater)
-        } else if self.reward > other.reward {
-            Some(Ordering::Less)
-        } else if other.reward > self.reward {
+        } else if sel < oth {
             Some(Ordering::Greater)
         } else {
             Some(Ordering::Equal)
@@ -151,7 +150,7 @@ impl PartialOrd for Clause {
 
 impl Ord for Clause {
     fn cmp(&self, other: &Clause) -> Ordering {
-        let scale = 40.0;
+        let scale = 20.0;
         let sel = self.reward + scale / (self.rank as f64);
         let oth = other.reward + scale / (other.reward as f64);
         if oth < sel {
