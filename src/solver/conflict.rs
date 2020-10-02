@@ -241,7 +241,7 @@ pub fn handle_conflict(
         ));
     }
     let mld = rst.exports_box().3;
-    if cdb.check_and_reduce(asg, num_conflict, 0.5 * (mld.get() + mld.get_slow())) {
+    if cdb.check_and_reduce(asg, num_conflict, mld.get().max(mld.get_slow())) {
         state.to_vivify += if cdb.mode() { 0.005 } else { 1.0 };
     }
     Ok(())

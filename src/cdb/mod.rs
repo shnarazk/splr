@@ -57,7 +57,7 @@ pub struct Clause {
     /// the index from which `propagate` starts searching an unfalsified literal.
     pub search_from: usize,
     /// the last conflict at which this clause is used in conflict analysis.
-    last_used: usize,
+    num_used: usize,
     /// A dynamic clause evaluation criterion based on the number of references.
     reward: f64,
     /// Flags
@@ -111,6 +111,7 @@ pub struct ClauseDB {
     /// bonus step of reduction threshold used in good progress
     extra_inc: usize,
     first_reduction: usize,
+    last_reduction: usize,
     next_reduction: usize, // renamed from `nbclausesbeforereduce`
     reducable: bool,
     /// an expansion coefficient for restart

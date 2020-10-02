@@ -8,10 +8,12 @@ use {
     },
 };
 
-const DECAY_RATE: f64 = 0.999;
+const DECAY_RATE: f64 = 0.75;
 
 /// API for clause management like `reduce`, `simplify`, `new_clause`, and so on.
-pub trait ClauseDBIF: IndexMut<ClauseId, Output = Clause> {
+pub trait ClauseDBIF:
+    IndexMut<ClauseId, Output = Clause> + ActivityIF<Ix = ClauseId, Inc = usize>
+{
     /// return the length of `clause`.
     fn len(&self) -> usize;
     /// return true if it's empty.
@@ -110,6 +112,7 @@ impl Default for ClauseDB {
             inc_step: 300,
             extra_inc: 1000,
             first_reduction: 1000,
+            last_reduction: 0,
             next_reduction: 1000,
             reducable: true,
             reduction_coeff: 1,
@@ -191,16 +194,12 @@ impl ActivityIF for ClauseDB {
     fn activity(&mut self, cid: Self::Ix) -> f64 {
         self[cid].reward
     }
-    fn set_activity(&mut self, cid: Self::Ix, now: Self::Inc) {
-        self.clause[cid.ordinal as usize].set_activity(now);
+    fn set_activity(&mut self, cid: Self::Ix, steps: Self::Inc) {
+        self.clause[cid.ordinal as usize].set_activity(steps);
     }
-    fn bump_activity(&mut self, cid: Self::Ix, now: Self::Inc) {
+    fn bump_activity(&mut self, cid: Self::Ix, _: Self::Inc) {
         let c = &mut self.clause[cid.ordinal as usize];
-        if c.last_used < now {
-            let elapsed = c.last_used - now;
-            c.reward = DECAY_RATE.powi(elapsed as i32) * c.reward + (1.0 - DECAY_RATE);
-            c.last_used = now;
-        }
+        c.num_used += 1;
     }
     fn scale_activity(&mut self) {}
 }
@@ -787,7 +786,7 @@ impl ClauseDBIF for ClauseDB {
 
 impl ClauseDB {
     /// halve the number of 'learnt' or *removable* clauses.
-    fn reduce<A>(&mut self, asg: &A, average: u16)
+    fn reduce<A>(&mut self, asg: &A, _average: u16)
     where
         A: AssignIF,
     {
@@ -797,34 +796,41 @@ impl ClauseDB {
             ..
         } = self;
         self.next_reduction += self.inc_step;
+        let steps = asg.exports().0 - self.last_reduction;
+        self.last_reduction += steps;
         let mut perm = Vec::with_capacity(clause.len());
-        let num_conflict = asg.exports().0;
+        let mut to_remove = 0;
         for (i, c) in clause.iter_mut().enumerate().skip(1) {
+            if c.is(Flag::LEARNT) {
+                to_remove += 1;
+            } else {
+                continue;
+            }
             let used = c.is(Flag::JUST_USED);
-            if c.is(Flag::LEARNT) && !c.is(Flag::DEAD) && !asg.locked(c, ClauseId::from(i)) && !used
-            {
-                c.set_activity(num_conflict);
+            if !c.is(Flag::DEAD) && !asg.locked(c, ClauseId::from(i)) && !used {
+                c.set_activity(steps);
                 perm.push(i);
             }
             if used {
                 c.turn_off(Flag::JUST_USED)
             }
         }
-        if perm.is_empty() {
+        to_remove /= 2;
+        if perm.is_empty() || perm.len() <= to_remove.max(self.inc_step) {
             return;
         }
-        let keep = perm.len() / 2;
         if self.use_chan_seok {
             perm.sort_by(|&a, &b| clause[a].cmp_activity(&clause[b]));
         } else {
             perm.sort_by(|&a, &b| clause[a].cmp(&clause[b]));
-            if clause[perm[keep]].rank <= 3 {
+            if clause[perm[perm.len() / 2]].rank <= 3 {
                 self.next_reduction += self.extra_inc;
             }
             if clause[perm[0]].rank <= 5 {
                 self.next_reduction += self.extra_inc;
             };
         }
+        /*
         perm.retain(|i| {
             let c = &mut clause[*i];
             let result = c.rank < average;
@@ -833,35 +839,42 @@ impl ClauseDB {
             }
             result
         });
-        let len = perm.len();
-        let keep = len / 2;
-        // if keep < len {
-        //     for i in (0..len).rev() {
-        //         let c = &mut clause[perm[i]];
-        //         if 2 < c.rank {
-        //             c.kill(touched);
-        //             if keep == len {
-        //                 break;
-        //             }
-        //             len -= 1;
-        //         }
+        */
+        // let mut len = perm.len();
+        //if keep < len {
+        //    for i in (0..len).rev() {
+        //        let c = &mut clause[perm[i]];
+        //        if 2 < c.rank {
+        //            c.kill(touched);
+        //            if keep == len {
+        //                break;
+        //            }
+        //            len -= 1;
+        //        }
+        //    }
+        //}
+        // for i in &perm[keep..] {
+        //     let c = &mut clause[*i];
+        //     if 2 < c.rank {
+        //         c.kill(touched);
         //     }
         // }
+        let target = perm.len() - to_remove;
         /*
-        for i in &perm[0..keep] {
+        for i in &perm[0..target] {
             let c = &mut clause[*i];
             if average < c.rank {
                 c.kill(touched);
             }
         }
-         */
-        for i in &perm[keep..] {
+        */
+        for i in &perm[target..] {
             let c = &mut clause[*i];
             if 2 < c.rank {
                 c.kill(touched);
             }
         }
-        debug_assert!(perm[0..keep].iter().all(|cid| !clause[*cid].is(Flag::DEAD)));
+        // debug_assert!(perm[0..target].iter().all(|cid| !clause[*cid].is(Flag::DEAD)));
         self.garbage_collect();
     }
     /// change good learnt clauses to permanent one.
@@ -884,12 +897,10 @@ impl ClauseDB {
 }
 
 impl Clause {
-    fn set_activity(&mut self, now: usize) {
-        if self.last_used < now {
-            let elapsed = self.last_used - now;
-            self.reward *= DECAY_RATE.powi(elapsed as i32);
-            self.last_used = now;
-        }
+    fn set_activity(&mut self, steps: usize) {
+        let rate = self.num_used as f64 / steps as f64;
+        self.reward = DECAY_RATE * self.reward + (1.0 - DECAY_RATE) * rate;
+        self.num_used = 0;
     }
     #[allow(clippy::comparison_chain)]
     fn cmp_activity(&self, other: &Clause) -> Ordering {

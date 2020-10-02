@@ -544,10 +544,10 @@ impl EmaIF for GeometricStabilizer {
                 self.num_active += 1;
             }
             self.step = ((self.step as f64) * self.restart_inc) as usize;
-            if 100_000_000 < self.step {
+            if 10_000_000 < self.step {
                 self.step = 1000;
             }
-            self.next_trigger += self.step;
+            self.next_trigger = now + self.step;
         }
     }
     fn get(&self) -> f64 {
@@ -565,6 +565,7 @@ impl ProgressEvaluator for GeometricStabilizer {
             // This may be a chance to switch to sticky search
             // self.active = true;
             self.step = 1000;
+            self.next_trigger = 1000;
             self.reset_at = self.num_active;
         }
     }
@@ -769,7 +770,7 @@ impl RestartIF for Restarter {
         let phases = (self.stb.num_active - self.stb.reset_at + 1) as f64;
         let _phases = self.stb.num_active as f64;
         let step_limit = self.average_cpr as f64 * phases;
-        let beyond = step_limit < self.after_restart as f64;
+        let beyond = phases * step_limit < self.after_restart as f64;
         let ratio = self.after_restart as f64 / self.average_cpr as f64;
         if self.stb.is_active() {
             let acc = self.acc.get();

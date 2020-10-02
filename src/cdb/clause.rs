@@ -24,7 +24,7 @@ impl Default for Clause {
             lits: vec![],
             rank: 0,
             search_from: 2,
-            last_used: 0,
+            num_used: 0,
             reward: 0.0,
             flags: Flag::empty(),
         }
