@@ -768,7 +768,6 @@ impl RestartIF for Restarter {
         }
         self.acc.shift();
         let phases = (self.stb.num_active - self.stb.reset_at + 1) as f64;
-        let _phases = self.stb.num_active as f64;
         let step_limit = self.average_cpr as f64 * phases;
         let beyond = phases * step_limit < self.after_restart as f64;
         let ratio = self.after_restart as f64 / self.average_cpr as f64;
@@ -779,9 +778,9 @@ impl RestartIF for Restarter {
             let (cancel, stabilize) = (
                 // (0.75 * ratio).min(1.0) < acc && !beyond, // on a good path
                 // (ratio * ave).sqrt() < acc && !beyond,
-                self.lbd.get() < 0.75 * self.mld.get() && beyond,
+                beyond && self.lbd.get() < 0.75 * self.mld.get(),
                 // acc < 0.4 * ratio // try another path immediately.
-                acc < 0.25 * (ratio * ave) && beyond,
+                beyond && acc < 0.25 * (ratio * ave),
             );
             if cancel {
                 self.after_restart = 0;

@@ -195,7 +195,7 @@ fn search(
     state: &mut State,
 ) -> Result<bool, SolverError> {
     let mut a_decision_was_made = false;
-    let mut max_assigned = {
+    state.max_assigned = {
         let vars = asg.var_stats();
         vars.1 + vars.2
     };
@@ -236,10 +236,13 @@ fn search(
                 state[Stat::NoDecisionConflict] += 1;
             }
             let na = asg.best_assigned(Flag::PHASE);
-            if max_assigned < na {
-                max_assigned = na;
+            if state.max_assigned < na {
+                state.max_assigned = na;
                 state.flush("");
-                state.flush(format!("unreachable: {}", asg.num_vars - max_assigned));
+                state.flush(format!(
+                    "unreachable: {}",
+                    asg.num_vars - state.max_assigned
+                ));
             }
             if asg.num_conflict % state.reflection_interval == 0 {
                 adapt_modules(asg, cdb, elim, rst, state)?;
@@ -270,7 +273,13 @@ fn search(
                     elim.subsume_literal_limit = (rst.exports_box().3.get_slow() * 2.0) as usize;
                     elim.activate();
                 }
+                let ne = asg.var_stats().2;
                 elim.simplify(asg, cdb, state)?;
+                // We can't catch the case where the number of asserted vars was increased
+                // due to `strengthen_clause`. I decided to ignore.
+                if ne < asg.var_stats().2 {
+                    state.max_assigned = 0;
+                }
             }
             // By simplification, we may get further solutions.
             if asg.num_asserted_vars < asg.stack_len() {
@@ -289,12 +298,6 @@ fn search(
                 }
                 asg.handle(SolverEvent::Stabilize(state.stabilize));
                 rst.handle(SolverEvent::Stabilize(state.stabilize));
-                // update `num_assigned` periodically, which isn't a monotonous increasing var.
-                {
-                    let ma = max_assigned as f64;
-                    let nv = asg.num_vars as f64;
-                    max_assigned = (ma * 0.99).max(1.01 * ma - 0.01 * nv) as usize;
-                }
             }
             let lit = asg.select_decision_literal(&state.phase_select);
             asg.assign_by_decision(lit);

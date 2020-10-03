@@ -293,7 +293,6 @@ impl PropagateIF for AssignStack {
                         .map(|l| self.level[l.vi()])
                         .max()
                         .unwrap_or(0);
-                    cdb.bump_activity(w.c, self.num_conflict);
                     self.assign_by_implication(first, AssignReason::Implication(w.c, NULL_LIT), lv);
                 }
             }

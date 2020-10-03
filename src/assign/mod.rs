@@ -56,6 +56,7 @@ pub trait AssignIF:
     + PropagateIF
     + VarManipulateIF
     + VarRewardIF
+    + VarSelectIF
     + Export<(usize, usize, usize, f64), ()>
 {
     /// return a literal in the stack.

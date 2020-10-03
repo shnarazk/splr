@@ -2,17 +2,14 @@ use {
     super::{CertifiedRecord, Clause, ClauseDB, ClauseId, WatchDBIF, LBDIF},
     crate::{assign::AssignIF, solver::SolverEvent, state::SearchStrategy, types::*},
     std::{
-        cmp::Ordering,
         ops::{Index, IndexMut, Range, RangeFrom},
         slice::{Iter, IterMut},
     },
 };
 
-const DECAY_RATE: f64 = 0.75;
-
 /// API for clause management like `reduce`, `simplify`, `new_clause`, and so on.
 pub trait ClauseDBIF:
-    IndexMut<ClauseId, Output = Clause> + ActivityIF<Ix = ClauseId, Inc = usize>
+    ActivityIF<Ix = ClauseId, Inc = ()> + IndexMut<ClauseId, Output = Clause>
 {
     /// return the length of `clause`.
     fn len(&self) -> usize;
@@ -36,7 +33,7 @@ pub trait ClauseDBIF:
     ///
     /// # CAVEAT
     /// *precondition*: decision level == 0.
-    fn check_and_reduce<A>(&mut self, asg: &A, nc: usize, average: f64) -> bool
+    fn check_and_reduce<A>(&mut self, asg: &mut A, nc: usize, average: f64) -> bool
     where
         A: AssignIF;
     fn reset(&mut self);
@@ -190,16 +187,18 @@ impl IndexMut<RangeFrom<usize>> for ClauseDB {
 
 impl ActivityIF for ClauseDB {
     type Ix = ClauseId;
-    type Inc = usize;
+    type Inc = ();
     fn activity(&mut self, cid: Self::Ix) -> f64 {
-        self[cid].reward
+        self.clause[cid.ordinal as usize].num_used as f64
     }
-    fn set_activity(&mut self, cid: Self::Ix, steps: Self::Inc) {
-        self.clause[cid.ordinal as usize].set_activity(steps);
+    fn set_activity(&mut self, _cid: Self::Ix, _steps: Self::Inc) {
+        // self.clause[cid.ordinal as usize].set_activity(steps);
     }
     fn bump_activity(&mut self, cid: Self::Ix, _: Self::Inc) {
         let c = &mut self.clause[cid.ordinal as usize];
-        c.num_used += 1;
+        if c.is(Flag::LEARNT) {
+            c.num_used += 1;
+        }
     }
     fn scale_activity(&mut self) {}
 }
@@ -448,8 +447,6 @@ impl ClauseDBIF for ClauseDB {
     where
         A: AssignIF,
     {
-        let reward = 0.0;
-
         // sort literals
         if level_sort {
             #[cfg(feature = "boundary_check")]
@@ -527,14 +524,12 @@ impl ClauseDBIF for ClauseDB {
             debug_assert!(c.lits.is_empty()); // c.lits.clear();
             std::mem::swap(&mut c.lits, vec);
             c.rank = rank as u16;
-            c.reward = reward;
             c.search_from = 2;
         } else {
             cid = ClauseId::from(self.clause.len());
             let mut c = Clause {
                 flags: Flag::empty(),
                 rank: rank as u16,
-                reward,
                 ..Clause::default()
             };
             std::mem::swap(&mut c.lits, vec);
@@ -630,7 +625,7 @@ impl ClauseDBIF for ClauseDB {
         debug_assert!(1 < c.lits.len());
         c.kill(&mut self.touched);
     }
-    fn check_and_reduce<A>(&mut self, asg: &A, nc: usize, average: f64) -> bool
+    fn check_and_reduce<A>(&mut self, asg: &mut A, nc: usize, average: f64) -> bool
     where
         A: AssignIF,
     {
@@ -786,10 +781,14 @@ impl ClauseDBIF for ClauseDB {
 
 impl ClauseDB {
     /// halve the number of 'learnt' or *removable* clauses.
-    fn reduce<A>(&mut self, asg: &A, _average: u16)
+    fn reduce<A>(&mut self, asg: &mut A, _average: u16)
     where
         A: AssignIF,
     {
+        struct Record {
+            val: i64,
+            cid: usize,
+        }
         let ClauseDB {
             ref mut clause,
             ref mut touched,
@@ -798,35 +797,57 @@ impl ClauseDB {
         self.next_reduction += self.inc_step;
         let steps = asg.exports().0 - self.last_reduction;
         self.last_reduction += steps;
+        let delta = (steps as f64).log(2.0);
         let mut perm = Vec::with_capacity(clause.len());
         let mut to_remove = 0;
+        let mut _ema_lbd = Ema::new(2000);
+        let mut _ema_mva = Ema::new(2000);
+        let mut _ema_occ = Ema::new(2000);
+        let scale = 0.1; //  if self.use_chan_seok { 0.0 } else { 1.8 };
         for (i, c) in clause.iter_mut().enumerate().skip(1) {
             if c.is(Flag::LEARNT) {
                 to_remove += 1;
-            } else {
-                continue;
-            }
-            let used = c.is(Flag::JUST_USED);
-            if !c.is(Flag::DEAD) && !asg.locked(c, ClauseId::from(i)) && !used {
-                c.set_activity(steps);
-                perm.push(i);
-            }
-            if used {
-                c.turn_off(Flag::JUST_USED)
+                let used = c.is(Flag::JUST_USED);
+                let cid = ClauseId::from(i);
+                if !c.is(Flag::DEAD) && !asg.locked(c, cid) && !used {
+                    let mva = c.max_var_activity(asg).sqrt();
+                    let occ = c.num_used as f64 / delta;
+                    /*
+                    ema_mva.update(mva);
+                    ema_lbd.update(c.rank as f64);
+                    ema_occ.update(occ);
+                    */
+                    perm.push(Record {
+                        val: (-268_435_456.0 * (mva * occ + scale / (c.rank as f64))) as i64,
+                        cid: i,
+                    });
+                }
+                if used {
+                    c.turn_off(Flag::JUST_USED)
+                }
+                c.num_used = 0;
             }
         }
+        /*
+        println!("N {:>8}: lbd {:>8.5} => index {:8.5}, mva {:>8.5} * occ {:>8.5} = {:8.5}",
+                 to_remove,
+                 ema_lbd.get(),
+                 scale / ema_lbd.get() - 1.0 / (ema_lbd.get() + 1.0),
+                 ema_mva.get(),
+                 ema_occ.get(),
+                 ema_mva.get() * ema_occ.get(),
+        );
+        */
         to_remove /= 2;
         if perm.is_empty() || perm.len() <= to_remove.max(self.inc_step) {
             return;
         }
-        if self.use_chan_seok {
-            perm.sort_by(|&a, &b| clause[a].cmp_activity(&clause[b]));
-        } else {
-            perm.sort_by(|&a, &b| clause[a].cmp(&clause[b]));
-            if clause[perm[perm.len() / 2]].rank <= 3 {
+        perm.sort_by_key(|r| r.val);
+        if !self.use_chan_seok {
+            if clause[perm[perm.len() / 2].cid].rank <= 3 {
                 self.next_reduction += self.extra_inc;
             }
-            if clause[perm[0]].rank <= 5 {
+            if clause[perm[0].cid].rank <= 5 {
                 self.next_reduction += self.extra_inc;
             };
         }
@@ -869,7 +890,7 @@ impl ClauseDB {
         }
         */
         for i in &perm[target..] {
-            let c = &mut clause[*i];
+            let c = &mut clause[i.cid];
             if 2 < c.rank {
                 c.kill(touched);
             }
@@ -897,20 +918,18 @@ impl ClauseDB {
 }
 
 impl Clause {
-    fn set_activity(&mut self, steps: usize) {
-        let rate = self.num_used as f64 / steps as f64;
-        self.reward = DECAY_RATE * self.reward + (1.0 - DECAY_RATE) * rate;
-        self.num_used = 0;
-    }
-    #[allow(clippy::comparison_chain)]
-    fn cmp_activity(&self, other: &Clause) -> Ordering {
-        if self.reward > other.reward {
-            Ordering::Less
-        } else if other.reward > self.reward {
-            Ordering::Greater
-        } else {
-            Ordering::Equal
+    pub fn max_var_activity<A>(&mut self, asg: &mut A) -> f64
+    where
+        A: AssignIF,
+    {
+        let mut act: f64 = 0.0;
+        for l in self.lits.iter() {
+            let tmp = asg.activity(l.vi());
+            if act < tmp {
+                act = tmp;
+            }
         }
+        act
     }
     /// make a clause *dead*; the clause still exists in clause database as a garbage.
     fn kill(&mut self, touched: &mut [bool]) {

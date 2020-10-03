@@ -1,7 +1,6 @@
 use {
     crate::types::*,
     std::{
-        cmp::Ordering,
         fmt,
         ops::{Index, IndexMut, Range, RangeFrom},
         slice::Iter,
@@ -25,7 +24,6 @@ impl Default for Clause {
             rank: 0,
             search_from: 2,
             num_used: 0,
-            reward: 0.0,
             flags: Flag::empty(),
         }
     }
@@ -132,36 +130,6 @@ impl PartialEq for Clause {
 }
 
 impl Eq for Clause {}
-
-impl PartialOrd for Clause {
-    fn partial_cmp(&self, other: &Clause) -> Option<Ordering> {
-        let scale = 20.0;
-        let sel = self.reward + scale / (self.rank as f64);
-        let oth = other.reward + scale / (other.reward as f64);
-        if oth < sel {
-            Some(Ordering::Less)
-        } else if sel < oth {
-            Some(Ordering::Greater)
-        } else {
-            Some(Ordering::Equal)
-        }
-    }
-}
-
-impl Ord for Clause {
-    fn cmp(&self, other: &Clause) -> Ordering {
-        let scale = 20.0;
-        let sel = self.reward + scale / (self.rank as f64);
-        let oth = other.reward + scale / (other.reward as f64);
-        if oth < sel {
-            Ordering::Less
-        } else if sel < oth {
-            Ordering::Greater
-        } else {
-            Ordering::Equal
-        }
-    }
-}
 
 /*
 impl Ord for Clause {

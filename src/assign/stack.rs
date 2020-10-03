@@ -140,9 +140,6 @@ impl Instantiate for AssignStack {
                 self.cpr.update(self.num_conflict);
                 self.cancel_until(self.root_level);
             }
-            SolverEvent::Stabilize(_) => {
-                self.num_best_assign *= 0.9;
-            }
             SolverEvent::Vivify(start) => {
                 if start {
                     self.vivify_sandbox =

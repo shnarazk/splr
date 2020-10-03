@@ -5,7 +5,7 @@ use {
         State,
     },
     crate::{
-        assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarRewardIF},
+        assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarRewardIF, VarSelectIF},
         cdb::{ClauseDB, ClauseDBIF},
         processor::{EliminateIF, Eliminator},
         solver::SolverEvent,
@@ -159,6 +159,9 @@ pub fn handle_conflict(
         //
         // dump to certified even if it's a literal.
         cdb.certificate_add(new_learnt);
+        if asg.reset_best_phases(l0) {
+            state.max_assigned = 0;
+        }
         if use_chronobt {
             asg.cancel_until(bl);
             debug_assert!(asg.stack_iter().all(|l| l.vi() != l0.vi()));
@@ -226,7 +229,6 @@ pub fn handle_conflict(
             }
         }
     }
-    cdb.scale_activity();
     if 0 < state.config.io_dump && num_conflict % state.config.io_dump == 0 {
         let (rst_num_ns_block, rst_num_restart, rst_num_st_block, _) = rst.exports();
         let (_rst_acc, rst_asg, rst_lbd, _rst_mld) = *rst.exports_box();
@@ -262,7 +264,6 @@ fn conflict_analyze(
     let learnt = &mut state.new_learnt;
     learnt.clear();
     learnt.push(NULL_LIT);
-    let num_conflict = asg.num_conflict;
     let dl = asg.decision_level();
     let mut p = cdb[conflicting_clause].lits[0];
     #[cfg(feature = "trace_analysis")]
@@ -315,7 +316,7 @@ fn conflict_analyze(
                 println!("analyze {}", p);
                 debug_assert!(!cid.is_none());
                 cdb.mark_clause_as_used(asg, cid);
-                cdb.bump_activity(cid, num_conflict);
+                cdb.bump_activity(cid, ());
                 let c = &cdb[cid];
                 if !c.is(Flag::LEARNT) {
                     state.derive20.push(cid);
