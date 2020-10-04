@@ -325,7 +325,7 @@ OPTIONS:
         --rll <rst-lbd-len>     Length of LBD fast EMA          [default: 30]
         --rls <rst-lbd-slw>     Length of LBD slow EMA       [default: 10000]
         --rlt <rst-lbd-thr>     Forcing restart threshold      [default: 1.2]
-        --rut <rst-mld-thr>     Usability to restart           [default: 4.0]
+        --rmt <rst-mld-thr>     Usability to restart           [default: 4.0]
         --rss <rst-stb-scl>     Stabilizer scaling             [default: 2.0]
         --rs <rst-step>         #conflicts between restarts     [default: 40]
         --vib <viv-beg>         Lower bound of vivif. loop     [default: 0.5]
