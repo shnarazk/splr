@@ -18,15 +18,15 @@ structopt = { version = "0.3", optional = true }
 
 [[bin]]
 name = "dmcr"
-required-features = ["libc", "structopt"]
+required-features = ["libc"]
 
 [[bin]]
 name = "splr"
-required-features = ["libc", "structopt"]
+required-features = ["libc"]
 
 [features]
 default = ["cli"]
-cli = ["libc", "structopt"]
+cli = ["libc"]
 boundary_check = []
 ema_calibration = []
 EVSIDS = []
