@@ -23,7 +23,6 @@ impl Default for Clause {
             lits: vec![],
             rank: 0,
             search_from: 2,
-            num_used: 0,
             flags: Flag::empty(),
         }
     }

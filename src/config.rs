@@ -135,8 +135,8 @@ impl Default for Config {
             io_odir: PathBuf::from("."),
             io_pfile: PathBuf::from("proof.out"),
             io_rfile: PathBuf::new(),
-            no_color: true,
-            quiet_mode: true,
+            no_color: false,
+            quiet_mode: false,
             use_certification: false,
             use_log: false,
 
@@ -321,7 +321,6 @@ impl Config {
                         } else if options_f64.contains(&name) {
                             if let Some(str) = iter.next() {
                                 if let Ok(val) = str.parse::<f64>() {
-                                    println!("long float options: {:?} = {}", &name, val);
                                     match name {
                                         "timeout" => self.c_tout = val,
                                         "rat" => self.rst_asg_thr = val,
@@ -344,7 +343,6 @@ impl Config {
                             }
                         } else if options_path.contains(&name) {
                             if let Some(val) = iter.next() {
-                                println!("long options: {:?} = {:?}", &name, val);
                                 match name {
                                     "dir" => self.io_odir = PathBuf::from(val),
                                     "proof" => self.io_pfile = PathBuf::from(val),
@@ -393,7 +391,7 @@ impl Config {
             }
         }
         if help {
-            println!("{}\n{}", env!("CARGO_PKG_DESCRIPTION"), HELP_MESSAGE);
+            println!("{}\n{}", env!("CARGO_PKG_DESCRIPTION"), help_string());
             std::process::exit(0);
         }
         if version {
@@ -403,54 +401,93 @@ impl Config {
     }
 }
 
-const HELP_MESSAGE: &str = "
+fn help_string() -> String {
+    let config = Config::default();
+    format!(
+        "
 USAGE:
-    splr [FLAGS] [OPTIONS] <cnf-file>
+  splr [FLAGS] [OPTIONS] <cnf-file>
 
 FLAGS:
-    -h, --help        Prints help information
-    -C, --no-color    Disable coloring
-    -q, --quiet       Disable any progress message
-    -c, --certify     Writes a DRAT UNSAT certification file
-    -l, --log         Uses Glucose-like progress report
-    -V, --version     Prints version information
+  -h, --help               Prints help information
+  -C, --no-color           Disable coloring
+  -q, --quiet              Disable any progress message
+  -c, --certify            Writes a DRAT UNSAT certification file
+  -l, --log                Uses Glucose-like progress report
+  -V, --version            Prints version information
 
 OPTIONS:
-        --ADP <a-adaptive>      Strategy adaptation switch       [default: 1]
-        --ELI <a-elim>          Eliminator switch                [default: 1]
-        --RDC <a-reduce>        Clause reduction switch          [default: 1]
-        --RPH <a-rephase>       Rephase switch                   [default: 1]
-        --RSR <a-rsr>           Reason-Side Rewarding switch     [default: 1]
-        --STB <a-stabilize>     Stabilization switch             [default: 1]
-        --VIV <a-vivify>        Vivification switch              [default: 1]
-        --cbt <c-cbt-thr>       Dec. lvl to use chronoBT       [default: 100]
-        --cl <c-cls-lim>        Soft limit of #clauses (6MC/GB)  [default: 0]
-        --ii <c-ip-int>         #cls to start in-processor   [default: 25000]
-    -t, --timeout <c-tout>      CPU time limit in sec.      [default: 5000.0]
-        --ecl <elim-cls-lim>    Max #lit for clause subsume     [default: 32]
-        --evl <elim-grw-lim>    Grow limit of #cls in var elim.  [default: 0]
-        --evo <elim-var-occ>    Max #cls for var elimination  [default: 8192]
-        --stat <io-dump>        Interval for dumping stat data   [default: 0]
-    -o, --dir <io-odir>         Output directory                 [default: .]
-    -p, --proof <io-pfile>      DRAT Cert. filename      [default: proof.out]
-    -r, --result <io-rfile>     Result filename/stdout            [default: ]
-        --ral <rst-asg-len>     Length of assign. fast EMA      [default: 30]
-        --ras <rst-asg-slw>     Length of assign. slow EMA   [default: 10000]
-        --rat <rst-asg-thr>     Blocking restart threshold     [default: 1.4]
-        --rct <rst-ccc-thr>     Conflict Correlation threshold [default: 0.7]
-        --rll <rst-lbd-len>     Length of LBD fast EMA          [default: 30]
-        --rls <rst-lbd-slw>     Length of LBD slow EMA       [default: 10000]
-        --rlt <rst-lbd-thr>     Forcing restart threshold      [default: 1.2]
-        --rmt <rst-mld-thr>     Usability to restart           [default: 4.0]
-        --rss <rst-stb-scl>     Stabilizer scaling             [default: 2.0]
-        --rs <rst-step>         #conflicts between restarts     [default: 40]
-        --vib <viv-beg>         Lower bound of vivif. loop     [default: 0.5]
-        --vie <viv-end>         Upper bound of vivif. loop     [default: 1.5]
-        --vii <viv-int>         Vivification interval            [default: 2]
-        --vis <viv-scale>       #reduction for next vivif.     [default: 1.2]
-        --vri <vrw-dcy-beg>     Initial var reward decay      [default: 0.75]
-        --vrm <vrw-dcy-end>     Maximum var reward decay      [default: 0.98]
+      --ADP <a-adaptive>   Strategy adaptation switch      {:>10}
+      --ELI <a-elim>       Eliminator switch               {:>10}
+      --RDC <a-reduce>     Clause reduction switch         {:>10}
+      --RPH <a-rephase>    Rephase switch                  {:>10}
+      --RSR <a-rsr>        Reason-Side Rewarding switch    {:>10}
+      --STB <a-stabilize>  Stabilization switch            {:>10}
+      --VIV <a-vivify>     Vivification switch             {:>10}
+      --cbt <c-cbt-thr>    Dec. lvl to use chronoBT        {:>10}
+      --cl <c-cls-lim>     Soft limit of #clauses (6MC/GB) {:>10}
+      --ii <c-ip-int>      #cls to start in-processor      {:>10}
+  -t, --timeout <c-tout>   CPU time limit in sec.          {:>10}
+      --ecl <elim-cls-lim> Max #lit for clause subsume     {:>10}
+      --evl <elim-grw-lim> Grow limit of #cls in var elim. {:>10}
+      --evo <elim-var-occ> Max #cls for var elimination    {:>10}
+      --stat <io-dump>     Interval for dumping stat data  {:>10}
+  -o, --dir <io-odir>      Output directory                {:>10}
+  -p, --proof <io-pfile>   DRAT Cert. filename             {:>10}
+  -r, --result <io-rfile>  Result filename/stdout          {:>10}
+      --ral <rst-asg-len>  Length of assign. fast EMA      {:>10}
+      --ras <rst-asg-slw>  Length of assign. slow EMA      {:>10}
+      --rat <rst-asg-thr>  Blocking restart threshold      {:>10}
+      --rct <rst-ccc-thr>  Conflict Correlation threshold  {:>10}
+      --rll <rst-lbd-len>  Length of LBD fast EMA          {:>10}
+      --rls <rst-lbd-slw>  Length of LBD slow EMA          {:>10}
+      --rlt <rst-lbd-thr>  Forcing restart threshold       {:>10}
+      --rmt <rst-mld-thr>  Usability to restart            {:>10}
+      --rss <rst-stb-scl>  Stabilizer scaling              {:>10}
+      --rs <rst-step>      #conflicts between restarts     {:>10}
+      --vib <viv-beg>      Lower bound of vivif. loop      {:>10}
+      --vie <viv-end>      Upper bound of vivif. loop      {:>10}
+      --vii <viv-int>      Vivification interval           {:>10}
+      --vis <viv-scale>    #reduction for next vivif.      {:>10}
+      --vri <vrw-dcy-beg>  Initial var reward decay        {:>10}
+      --vrm <vrw-dcy-end>  Maximum var reward decay        {:>10}
 
 ARGS:
-    <cnf-file>    DIMACS CNF file                 
-";
+  <cnf-file>    DIMACS CNF file                 
+",
+        config.a_adaptive,
+        config.a_elim,
+        config.a_reduce,
+        config.a_rephase,
+        config.a_rsr,
+        config.a_stabilize,
+        config.a_vivify,
+        config.c_cbt_thr,
+        config.c_cls_lim,
+        config.c_ip_int,
+        config.c_tout,
+        config.elm_cls_lim,
+        config.elm_grw_lim,
+        config.elm_var_occ,
+        config.io_dump,
+        config.io_odir.to_string_lossy(),
+        config.io_pfile.to_string_lossy(),
+        config.io_rfile.to_string_lossy(),
+        config.rst_asg_len,
+        config.rst_asg_slw,
+        config.rst_asg_thr,
+        config.rst_ccc_thr,
+        config.rst_lbd_len,
+        config.rst_lbd_slw,
+        config.rst_lbd_thr,
+        config.rst_mld_thr,
+        config.rst_stb_scl,
+        config.rst_step,
+        config.viv_beg,
+        config.viv_end,
+        config.viv_int,
+        config.viv_scale,
+        config.vrw_dcy_beg,
+        config.vrw_dcy_end,
+    )
+}

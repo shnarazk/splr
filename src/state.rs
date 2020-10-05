@@ -302,7 +302,7 @@ impl Instantiate for State {
             SolverEvent::Eliminate(_) => (),
             SolverEvent::Instantiate => (),
             SolverEvent::Reinitialize => (),
-            SolverEvent::Restart => (),
+            SolverEvent::Restart(_, _) => (),
             SolverEvent::Stabilize(_) => (),
             SolverEvent::Vivify(_) => (),
         }
@@ -503,7 +503,7 @@ impl StateIF for State {
             asg.var_stats();
         let rate = (asg_num_asserted_vars + asg_num_eliminated_vars) as f64 / asg_num_vars as f64;
         let (asg_num_conflict, asg_num_propagation, asg_num_restart, _asg_act_dcy) = asg.exports();
-        let (asg_act_ema, _cpr_ema) = *asg.exports_box();
+        let (_act_ema, _cpr_ema) = *asg.exports_box();
 
         let (cdb_num_active, cdb_num_biclause, _num_bl, cdb_num_lbd2, cdb_num_learnt, _cdb_nr) =
             cdb.exports();
@@ -584,13 +584,12 @@ impl StateIF for State {
             fm!("{:>9.2}", self, LogF64Id::EmaLBD, rst_lbd.get()),
             fm!("{:>9.2}", self, LogF64Id::CLevel, self.c_lvl.get()),
             fm!("{:>9.2}", self, LogF64Id::BLevel, self.b_lvl.get()),
-            // fm!(
-            //     "{:>9.2}",
-            //     self,
-            //     LogF64Id::PropagationPerConflict,
-            //     asg_num_propagation as f64 / asg_num_conflict as f64
-            // ),
-            fm!("{:>9.4}", self, LogF64Id::End, asg_act_ema.get()),
+            fm!(
+                "{:>9.2}",
+                self,
+                LogF64Id::PropagationPerConflict,
+                asg_num_propagation as f64 / asg_num_conflict as f64
+            ),
         );
         println!(
             "\x1B[2K        misc|elim:{}, cviv:{}, #vbv:{}, /cpr:{} ",

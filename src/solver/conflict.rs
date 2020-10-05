@@ -5,7 +5,7 @@ use {
         State,
     },
     crate::{
-        assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarRewardIF, VarSelectIF},
+        assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarRewardIF},
         cdb::{ClauseDB, ClauseDBIF},
         processor::{EliminateIF, Eliminator},
         solver::SolverEvent,
@@ -159,9 +159,6 @@ pub fn handle_conflict(
         //
         // dump to certified even if it's a literal.
         cdb.certificate_add(new_learnt);
-        if asg.reset_best_phases(l0) {
-            state.max_assigned = 0;
-        }
         if use_chronobt {
             asg.cancel_until(bl);
             debug_assert!(asg.stack_iter().all(|l| l.vi() != l0.vi()));
@@ -316,7 +313,7 @@ fn conflict_analyze(
                 println!("analyze {}", p);
                 debug_assert!(!cid.is_none());
                 cdb.mark_clause_as_used(asg, cid);
-                cdb.bump_activity(cid, ());
+                // cdb.bump_activity(cid, ());
                 let c = &cdb[cid];
                 if !c.is(Flag::LEARNT) {
                     state.derive20.push(cid);

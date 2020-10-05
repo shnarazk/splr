@@ -56,8 +56,6 @@ pub struct Clause {
     pub rank: u16,
     /// the index from which `propagate` starts searching an unfalsified literal.
     pub search_from: usize,
-    /// the last conflict at which this clause is used in conflict analysis.
-    num_used: usize,
     /// Flags
     flags: Flag,
 }

@@ -3,9 +3,7 @@
 use {
     super::{SolverEvent, Stat, State},
     crate::{
-        assign::{
-            AssignIF, AssignStack, ClauseManipulateIF, PropagateIF, VarManipulateIF, VarSelectIF,
-        },
+        assign::{AssignIF, AssignStack, ClauseManipulateIF, PropagateIF, VarManipulateIF},
         cdb::{ClauseDB, ClauseDBIF},
         processor::Eliminator,
         state::StateIF,
@@ -178,9 +176,6 @@ pub fn vivify(
                 if asg.assigned(l0) == None {
                     nassert += 1;
                     cdb.certificate_add(&copied);
-                    if asg.reset_best_phases(l0) {
-                        state.max_assigned = 0;
-                    }
                     asg.assign_at_rootlevel(l0)?;
                     if !asg.propagate(cdb).is_none() {
                         // panic!("Vivification found an inconsistency.");

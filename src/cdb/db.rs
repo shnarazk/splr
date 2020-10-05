@@ -188,18 +188,11 @@ impl IndexMut<RangeFrom<usize>> for ClauseDB {
 impl ActivityIF for ClauseDB {
     type Ix = ClauseId;
     type Inc = ();
-    fn activity(&mut self, cid: Self::Ix) -> f64 {
-        self.clause[cid.ordinal as usize].num_used as f64
+    fn activity(&mut self, _cid: Self::Ix) -> f64 {
+        0.0
     }
-    fn set_activity(&mut self, _cid: Self::Ix, _steps: Self::Inc) {
-        // self.clause[cid.ordinal as usize].set_activity(steps);
-    }
-    fn bump_activity(&mut self, cid: Self::Ix, _: Self::Inc) {
-        let c = &mut self.clause[cid.ordinal as usize];
-        if c.is(Flag::LEARNT) {
-            c.num_used += 1;
-        }
-    }
+    fn set_activity(&mut self, _cid: Self::Ix, _steps: Self::Inc) {}
+    fn bump_activity(&mut self, _cid: Self::Ix, _: Self::Inc) {}
     fn scale_activity(&mut self) {}
 }
 
@@ -797,45 +790,38 @@ impl ClauseDB {
         self.next_reduction += self.inc_step;
         let steps = asg.exports().0 - self.last_reduction;
         self.last_reduction += steps;
-        let delta = (steps as f64).log(2.0);
         let mut perm = Vec::with_capacity(clause.len());
         let mut to_remove = 0;
         let mut _ema_lbd = Ema::new(2000);
         let mut _ema_mva = Ema::new(2000);
-        let mut _ema_occ = Ema::new(2000);
-        let scale = 0.1; //  if self.use_chan_seok { 0.0 } else { 1.8 };
+        let scale = 64.0; //  if self.use_chan_seok { 0.0 } else { 1.8 };
         for (i, c) in clause.iter_mut().enumerate().skip(1) {
             if c.is(Flag::LEARNT) {
                 to_remove += 1;
                 let used = c.is(Flag::JUST_USED);
                 let cid = ClauseId::from(i);
                 if !c.is(Flag::DEAD) && !asg.locked(c, cid) && !used {
-                    let mva = c.max_var_activity(asg).sqrt();
-                    let occ = c.num_used as f64 / delta;
-                    /*
-                    ema_mva.update(mva);
-                    ema_lbd.update(c.rank as f64);
-                    ema_occ.update(occ);
-                    */
+                    let mva = c.max_var_activity(asg); // .sqrt();
+
+                    // ema_mva.update(mva);
+                    // ema_lbd.update(c.rank as f64);
+
                     perm.push(Record {
-                        val: (-268_435_456.0 * (mva * occ + scale / (c.rank as f64))) as i64,
+                        val: (-268_435_456.0 * (mva + scale / (c.rank as f64))) as i64,
                         cid: i,
                     });
                 }
                 if used {
                     c.turn_off(Flag::JUST_USED)
                 }
-                c.num_used = 0;
             }
         }
         /*
-        println!("N {:>8}: lbd {:>8.5} => index {:8.5}, mva {:>8.5} * occ {:>8.5} = {:8.5}",
+        println!("N {:>8}: lbd {:>8.5} => index {:8.5}, mva {:>8.5}",
                  to_remove,
                  ema_lbd.get(),
                  scale / ema_lbd.get() - 1.0 / (ema_lbd.get() + 1.0),
                  ema_mva.get(),
-                 ema_occ.get(),
-                 ema_mva.get() * ema_occ.get(),
         );
         */
         to_remove /= 2;

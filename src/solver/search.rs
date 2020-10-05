@@ -195,6 +195,7 @@ fn search(
     state: &mut State,
 ) -> Result<bool, SolverError> {
     let mut a_decision_was_made = false;
+    let mut last_restart = 0;
     state.max_assigned = {
         let vars = asg.var_stats();
         vars.1 + vars.2
@@ -222,10 +223,14 @@ fn search(
                 match decision {
                     RestartDecision::Block | RestartDecision::Cancel => (),
                     RestartDecision::Force => {
-                        asg.handle(SolverEvent::Restart);
+                        let nr = asg.num_conflict;
+                        asg.handle(SolverEvent::Restart(state.stabilize, nr - last_restart));
+                        last_restart = nr;
                     }
                     RestartDecision::Stabilize => {
-                        asg.handle(SolverEvent::Restart);
+                        let nr = asg.num_conflict;
+                        asg.handle(SolverEvent::Restart(state.stabilize, last_restart));
+                        last_restart = nr;
                         asg.force_rephase();
                     }
                 }
@@ -288,8 +293,9 @@ fn search(
             }
         }
         if !asg.remains() {
-            if use_stabilize && state.stabilize != rst.stabilizing() {
-                state.stabilize = !state.stabilize;
+            let st = rst.stabilizing();
+            if use_stabilize && state.stabilize != st {
+                state.stabilize = st;
                 let (asg_num_conflict, _, asg_num_restart, _) = asg.exports();
                 if asg_num_restart == 0 {
                     rst.average_cpr = asg_num_conflict;
@@ -327,7 +333,7 @@ fn adapt_modules(
     asg.handle(SolverEvent::Adapt(state.strategy, asg_num_conflict));
     cdb.handle(SolverEvent::Adapt(state.strategy, asg_num_conflict));
     rst.handle(SolverEvent::Adapt(state.strategy, asg_num_conflict));
-    rst.update(ProgressUpdate::ACT(asg.exports_box().0.get_slow()));
+    // rst.update(ProgressUpdate::ACT(asg.exports_box().0.get_slow()));
     Ok(())
 }
 

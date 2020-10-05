@@ -136,8 +136,10 @@ impl Instantiate for AssignStack {
                 };
                 self.rebuild_order();
             }
-            SolverEvent::Restart => {
-                self.cpr.update(self.num_conflict);
+            SolverEvent::Restart(stabilizing, n) => {
+                if !stabilizing {
+                    self.cpr.update(n);
+                }
                 self.cancel_until(self.root_level);
             }
             SolverEvent::Vivify(start) => {

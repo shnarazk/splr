@@ -238,7 +238,6 @@ struct ProgressACC {
     /// For force restart based on average LBD of newly generated clauses: 0.80.
     /// This is called `K` in Glucose
     threshold: f64,
-    average_activity: f64,
 }
 
 impl Default for ProgressACC {
@@ -252,7 +251,6 @@ impl Default for ProgressACC {
             inc: 0,
             correlation: 0.0,
             threshold: 1.6,
-            average_activity: 0.5,
         }
     }
 }
@@ -773,7 +771,7 @@ impl RestartIF for Restarter {
         let ratio = self.after_restart as f64 / self.average_cpr as f64;
         if self.stb.is_active() {
             let acc = self.acc.get();
-            let _ave = self.acc.average_activity;
+            // let _ave = self.acc.average_activity;
             let ave = 0.7;
             let (cancel, stabilize) = (
                 // (0.75 * ratio).min(1.0) < acc && !beyond, // on a good path
@@ -818,7 +816,7 @@ impl RestartIF for Restarter {
                 self.luby.update(self.after_restart);
             }
             ProgressUpdate::ACC(fval) => self.acc.update(fval),
-            ProgressUpdate::ACT(fval) => self.acc.average_activity = fval,
+            ProgressUpdate::ACT(_) => (),
             ProgressUpdate::ASG(val) => self.asg.update(val),
             ProgressUpdate::LBD(val) => self.lbd.update(val),
             ProgressUpdate::Luby => self.luby.update(0),

@@ -60,7 +60,7 @@ pub enum SolverEvent {
     /// reinitialization for incremental solving.
     Reinitialize,
     /// restart
-    Restart,
+    Restart(bool, usize),
     /// stabilization
     Stabilize(bool),
     /// Vivification: `true` for start, `false` for end.
