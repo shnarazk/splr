@@ -58,6 +58,7 @@ impl Default for AssignStack {
             best_assign: false,
             build_best_at: 0,
             num_best_assign: 0.0,
+            stabilize: false,
             num_conflict: 0,
             num_propagation: 0,
             num_restart: 0,
@@ -141,6 +142,9 @@ impl Instantiate for AssignStack {
                     self.cpr.update(n);
                 }
                 self.cancel_until(self.root_level);
+            }
+            SolverEvent::Stabilize(on) => {
+                self.stabilize = on;
             }
             SolverEvent::Vivify(start) => {
                 if start {
