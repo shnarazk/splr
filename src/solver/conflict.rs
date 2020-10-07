@@ -313,10 +313,14 @@ fn conflict_analyze(
                 println!("analyze {}", p);
                 debug_assert!(!cid.is_none());
                 cdb.mark_clause_as_used(asg, cid);
+                let ac = cdb[cid].max_var_activity(asg);
+                cdb.set_activity(cid, ac);
                 // cdb.bump_activity(cid, ());
-                let c = &cdb[cid];
+                let c = &mut cdb[cid];
                 if !c.is(Flag::LEARNT) {
                     state.derive20.push(cid);
+                    let a = c.max_var_activity(asg);
+                    c.set_activity(a);
                 }
                 largest_clause = largest_clause.max(c.rank);
                 #[cfg(feature = "boundary_check")]

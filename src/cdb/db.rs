@@ -1,16 +1,17 @@
 use {
-    super::{CertifiedRecord, Clause, ClauseDB, ClauseId, WatchDBIF, LBDIF},
+    super::{CertifiedRecord, Clause, ClauseDB, ClauseId, WatchDBIF, WatchList, LBDIF},
     crate::{assign::AssignIF, solver::SolverEvent, state::SearchStrategy, types::*},
     std::{
+        collections::BinaryHeap,
         ops::{Index, IndexMut, Range, RangeFrom},
         slice::{Iter, IterMut},
     },
 };
 
+const ACTIVITY_SCALE: f64 = 10_000_000.0;
+
 /// API for clause management like `reduce`, `simplify`, `new_clause`, and so on.
-pub trait ClauseDBIF:
-    ActivityIF<Ix = ClauseId, Inc = ()> + IndexMut<ClauseId, Output = Clause>
-{
+pub trait ClauseDBIF: IndexMut<ClauseId, Output = Clause> {
     /// return the length of `clause`.
     fn len(&self) -> usize;
     /// return true if it's empty.
@@ -22,9 +23,9 @@ pub trait ClauseDBIF:
     /// return the list of bin_watch lists
     fn bin_watcher_lists(&self) -> &[Vec<Watch>];
     /// return a watcher list
-    fn watcher_list(&self, l: Lit) -> &[Watch];
+    fn watcher_list(&self, l: Lit) -> &WatchList;
     /// return the list of watch lists
-    fn watcher_lists_mut(&mut self) -> &mut [Vec<Watch>];
+    fn watcher_lists_mut(&mut self) -> &mut [WatchList];
     /// unregister a clause `cid` from clause database and make the clause dead.
     fn detach(&mut self, cid: ClauseId);
     /// check a condition to reduce.
@@ -187,11 +188,13 @@ impl IndexMut<RangeFrom<usize>> for ClauseDB {
 
 impl ActivityIF for ClauseDB {
     type Ix = ClauseId;
-    type Inc = ();
-    fn activity(&mut self, _cid: Self::Ix) -> f64 {
-        0.0
+    type Inc = f64;
+    fn activity(&mut self, cid: Self::Ix) -> f64 {
+        (self.clause[cid.ordinal as usize].reward as f64) / ACTIVITY_SCALE
     }
-    fn set_activity(&mut self, _cid: Self::Ix, _steps: Self::Inc) {}
+    fn set_activity(&mut self, cid: Self::Ix, val: Self::Inc) {
+        self.clause[cid.ordinal as usize].reward = (val * ACTIVITY_SCALE) as usize;
+    }
     fn bump_activity(&mut self, _cid: Self::Ix, _: Self::Inc) {}
     fn scale_activity(&mut self) {}
 }
@@ -207,7 +210,7 @@ impl Instantiate for ClauseDB {
         let mut touched = Vec::with_capacity(2 * (nv + 1));
         for _ in 0..2 * (nv + 1) {
             bin_watcher.push(Vec::new());
-            watcher.push(Vec::new());
+            watcher.push(BinaryHeap::<Watch>::new());
             touched.push(false);
         }
         let mut certified = Vec::new();
@@ -260,10 +263,10 @@ impl Instantiate for ClauseDB {
             SolverEvent::NewVar => {
                 // for negated literal
                 self.bin_watcher.push(Vec::new());
-                self.watcher.push(Vec::new());
+                self.watcher.push(self.watcher[0].empty_copy());
                 // for positive literal
                 self.bin_watcher.push(Vec::new());
-                self.watcher.push(Vec::new());
+                self.watcher.push(self.watcher[0].empty_copy());
                 // for negated literal
                 self.touched.push(false);
                 // for positive literal
@@ -324,7 +327,7 @@ impl ClauseDBIF for ClauseDB {
         self.clause.iter_mut()
     }
     #[inline]
-    fn watcher_list(&self, l: Lit) -> &[Watch] {
+    fn watcher_list(&self, l: Lit) -> &WatchList {
         &self.watcher[l]
     }
     #[inline]
@@ -332,7 +335,7 @@ impl ClauseDBIF for ClauseDB {
         &self.bin_watcher
     }
     #[inline]
-    fn watcher_lists_mut(&mut self) -> &mut [Vec<Watch>] {
+    fn watcher_lists_mut(&mut self) -> &mut [WatchList] {
         &mut self.watcher
     }
     fn garbage_collect(&mut self) {
@@ -366,6 +369,7 @@ impl ClauseDBIF for ClauseDB {
                 if !c.lits.is_empty() {
                     debug_assert!(c.is(Flag::DEAD));
                     recycled.push(Watch {
+                        activity: c.reward,
                         blocker: NULL_LIT,
                         c: cid,
                     });
@@ -392,6 +396,7 @@ impl ClauseDBIF for ClauseDB {
                 continue;
             }
             touched[i + 2] = false;
+            /*
             let mut n = 0;
             while n < ws.len() {
                 let cid = ws[n].c;
@@ -403,6 +408,7 @@ impl ClauseDBIF for ClauseDB {
                 if !c.lits.is_empty() {
                     debug_assert!(c.is(Flag::DEAD));
                     recycled.push(Watch {
+                        activity: c.reward as usize,
                         blocker: NULL_LIT,
                         c: cid,
                     });
@@ -418,6 +424,34 @@ impl ClauseDBIF for ClauseDB {
                 }
                 ws.detach(n);
             }
+             */
+            let mut remain = ws.empty_copy();
+            for w in ws.drain() {
+                let cid = w.c;
+                let c = &mut clause[cid.ordinal as usize];
+                if !c.is(Flag::DEAD) {
+                    remain.push(w);
+                    continue;
+                }
+                if !c.lits.is_empty() {
+                    debug_assert!(c.is(Flag::DEAD));
+                    recycled.push(Watch {
+                        activity: c.reward,
+                        blocker: NULL_LIT,
+                        c: cid,
+                    });
+                    if c.is(Flag::LEARNT) {
+                        self.num_learnt -= 1;
+                    }
+                    if !certified.is_empty() && !c.is(Flag::VIV_ASSUMP) {
+                        let temp = c.lits.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
+                        debug_assert!(!temp.is_empty());
+                        certified.push((CertifiedRecord::DELETE, temp));
+                    }
+                    c.lits.clear();
+                }
+            }
+            std::mem::swap(ws, &mut remain);
         }
         self.num_active = self.clause.len() - recycled.len();
         // debug_assert!(self.check_liveness2());
@@ -532,6 +566,9 @@ impl ClauseDBIF for ClauseDB {
             self[cid].turn_on(Flag::VIV_ASSUMP);
         }
         let c = &mut self[cid];
+        let initial_activity = (0.5 * ACTIVITY_SCALE) as usize;
+        c.reward = initial_activity;
+
         // assert!(0 < c.rank);
         let len2 = c.lits.len() == 2;
         if learnt {
@@ -549,11 +586,11 @@ impl ClauseDBIF for ClauseDB {
         }
         if len2 {
             self.num_bi_clause += 1;
-            self.bin_watcher[!l0].register(l1, cid);
-            self.bin_watcher[!l1].register(l0, cid);
+            self.bin_watcher[!l0].register(initial_activity, l1, cid);
+            self.bin_watcher[!l1].register(initial_activity, l0, cid);
         } else {
-            self.watcher[!l0].register(l1, cid);
-            self.watcher[!l1].register(l0, cid);
+            self.watcher[!l0].register(initial_activity, l1, cid);
+            self.watcher[!l1].register(initial_activity, l0, cid);
         }
         self.num_active += 1;
         cid
@@ -716,11 +753,11 @@ impl ClauseDBIF for ClauseDB {
             if 2 == lits.len() {
                 self.watcher[!p].detach_with(cid);
                 self.watcher[!r].detach_with(cid);
-                self.bin_watcher[!q].register(r, cid);
-                self.bin_watcher[!r].register(q, cid);
+                self.bin_watcher[!q].register(0, r, cid);
+                self.bin_watcher[!r].register(0, q, cid);
             } else {
                 self.watcher[!p].detach_with(cid);
-                self.watcher[!q].register(r, cid);
+                self.watcher[!q].register(0, r, cid);
                 self.watcher[!r].update_blocker(cid, q);
             }
         } else {
@@ -730,8 +767,8 @@ impl ClauseDBIF for ClauseDB {
                 let r = lits[1];
                 self.watcher[!q].detach_with(cid);
                 self.watcher[!r].detach_with(cid);
-                self.bin_watcher[!q].register(r, cid);
-                self.bin_watcher[!r].register(q, cid);
+                self.bin_watcher[!q].register(0, r, cid);
+                self.bin_watcher[!r].register(0, q, cid);
             }
         }
         false
@@ -802,7 +839,7 @@ impl ClauseDB {
                 let cid = ClauseId::from(i);
                 if !c.is(Flag::DEAD) && !asg.locked(c, cid) && !used {
                     let mva = c.max_var_activity(asg); // .sqrt();
-
+                    c.set_activity(mva);
                     // ema_mva.update(mva);
                     // ema_lbd.update(c.rank as f64);
 
@@ -904,6 +941,12 @@ impl ClauseDB {
 }
 
 impl Clause {
+    pub fn activity(&mut self) -> f64 {
+        (self.reward as f64) / ACTIVITY_SCALE
+    }
+    pub fn set_activity(&mut self, val: f64) {
+        self.reward = (val * ACTIVITY_SCALE) as usize;
+    }
     pub fn max_var_activity<A>(&mut self, asg: &mut A) -> f64
     where
         A: AssignIF,

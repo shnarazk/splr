@@ -668,6 +668,7 @@ pub struct Restarter {
     restart_step: usize,
     initial_restart_step: usize,
     pub average_cpr: usize,
+    pub not_eliminated: usize,
 
     //
     //## statistics
@@ -695,6 +696,7 @@ impl Default for Restarter {
             restart_step: 0,
             initial_restart_step: 0,
             average_cpr: 0,
+            not_eliminated: 0,
             num_block_non_stabilized: 0,
             num_restart_non_stabilized: 0,
             num_block_stabilized: 0,
@@ -718,6 +720,7 @@ impl Instantiate for Restarter {
             stb: GeometricStabilizer::instantiate(config, cnf),
             restart_step: config.rst_step,
             initial_restart_step: config.rst_step,
+            not_eliminated: cnf.num_of_variables,
             ..Restarter::default()
         }
     }
@@ -769,7 +772,7 @@ impl RestartIF for Restarter {
         let step_limit = self.average_cpr as f64 * phases;
         let beyond = phases * step_limit < self.after_restart as f64;
         let ratio = self.after_restart as f64 / self.average_cpr as f64;
-        if self.stb.is_active() {
+        if self.stb.is_active() && false {
             let acc = self.acc.get();
             // let _ave = self.acc.average_activity;
             let ave = 0.7;
@@ -792,9 +795,15 @@ impl RestartIF for Restarter {
             }
             return None;
         }
+        let asg_is_active = {
+            let r = self.not_eliminated as f64;
+            let (f, s) = (self.asg.ema.get(), self.asg.ema.get_slow());
+            // (r - f).max(1.0) / (r - s).max(1.0) < 0.5
+            false
+        };
         let (block, force) = (
-            self.asg.is_active(),
-            self.lbd.is_active(), //  || self.average_cpr < self.after_restart,
+            self.asg.is_active(), // self.asg.is_active(),
+            self.lbd.is_active(), // || self.average_cpr < self.after_restart,
         );
         if block {
             self.after_restart = 0;

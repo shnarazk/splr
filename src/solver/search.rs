@@ -229,9 +229,9 @@ fn search(
                     }
                     RestartDecision::Stabilize => {
                         let nr = asg.num_conflict;
-                        asg.handle(SolverEvent::Restart(state.stabilize, last_restart));
+                        asg.handle(SolverEvent::Restart(state.stabilize, nr - last_restart));
                         last_restart = nr;
-                        asg.force_rephase();
+                        // asg.force_rephase();
                     }
                 }
             }
@@ -284,6 +284,8 @@ fn search(
                 // due to `strengthen_clause`. I decided to ignore.
                 if ne < asg.var_stats().2 {
                     state.max_assigned = 0;
+                    let stats = asg.var_stats();
+                    rst.not_eliminated = stats.0 - stats.2;
                 }
             }
             // By simplification, we may get further solutions.

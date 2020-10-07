@@ -14,7 +14,7 @@ pub use self::{
     clause::ClauseIF,
     db::ClauseDBIF,
     lbd::LBDIF,
-    watch::{Watch, WatchDBIF},
+    watch::{Watch, WatchDBIF, WatchList},
 };
 
 use crate::types::*;
@@ -56,6 +56,8 @@ pub struct Clause {
     pub rank: u16,
     /// the index from which `propagate` starts searching an unfalsified literal.
     pub search_from: usize,
+    /// reward
+    pub reward: usize,
     /// Flags
     flags: Flag,
 }
@@ -74,7 +76,7 @@ pub struct ClauseDB {
     /// container of watch literals for binary clauses
     pub bin_watcher: Vec<Vec<Watch>>,
     /// container of watch literals
-    pub watcher: Vec<Vec<Watch>>,
+    pub watcher: Vec<WatchList>,
     /// clause history to make certification
     pub certified: DRAT,
     /// a number of clauses to emit out-of-memory exception
