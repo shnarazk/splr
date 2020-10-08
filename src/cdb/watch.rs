@@ -10,6 +10,8 @@ pub trait WatchDBIF {
     fn detach_with(&mut self, cid: ClauseId);
     /// update blocker of cid.
     fn update_blocker(&mut self, cid: ClauseId, l: Lit);
+    /// return an empty db which has the same type of self.
+    fn empty_copy(&self) -> Self;
 }
 
 /// 'Watch literal' structure
@@ -55,5 +57,8 @@ impl WatchDBIF for Vec<Watch> {
                 return;
             }
         }
+    }
+    fn empty_copy(&self) -> Self {
+        Vec::new()
     }
 }

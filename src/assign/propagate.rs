@@ -234,12 +234,11 @@ impl PropagateIF for AssignStack {
                     }
                 }
                 // normal clause loop
-                let mut n = 0;
-                'next_clause: while n < source.len() {
-                    let w = source.get_unchecked_mut(n);
-                    n += 1;
+                let mut remain = source.empty_copy();
+                'next_clause: while let Some(mut w) = source.pop() {
                     let blocker_value = lit_assign!(self, w.blocker);
                     if blocker_value == Some(true) {
+                        remain.push(w);
                         continue 'next_clause;
                     }
                     // debug_assert!(!cdb[w.c].is(Flag::DEAD));
@@ -257,6 +256,7 @@ impl PropagateIF for AssignStack {
                     let first_value = lit_assign!(self, first);
                     if first != w.blocker && first_value == Some(true) {
                         w.blocker = first;
+                        remain.push(w);
                         continue 'next_clause;
                     }
                     //
@@ -271,8 +271,6 @@ impl PropagateIF for AssignStack {
                             (*watcher)
                                 .get_unchecked_mut(usize::from(!*lk))
                                 .register(first, w.c);
-                            n -= 1;
-                            source.detach(n);
                             lits.swap(1, k);
                             *search_from = k + 1;
                             if *search_from == len {
@@ -286,7 +284,10 @@ impl PropagateIF for AssignStack {
                         self.conflicts.1 = self.conflicts.0;
                         self.conflicts.0 = false_lit.vi();
                         self.num_conflict += 1;
-                        return w.c;
+                        let conflicting = w.c;
+                        remain.push(w);
+                        source.append(&mut remain);
+                        return conflicting;
                     }
                     let lv = lits[1..]
                         .iter()
@@ -294,7 +295,9 @@ impl PropagateIF for AssignStack {
                         .max()
                         .unwrap_or(0);
                     self.assign_by_implication(first, AssignReason::Implication(w.c, NULL_LIT), lv);
+                    remain.push(w);
                 }
+                source.append(&mut remain);
             }
         }
         let na = self.q_head + self.num_eliminated_vars;
