@@ -202,6 +202,10 @@ fn search(
     };
     let use_stabilize = state.config.use_stabilize();
     let use_vivify = state.config.use_vivify();
+    rst.num_remains = {
+        let s = asg.var_stats();
+        s.0 - s.2
+    };
     rst.update(ProgressUpdate::Luby);
     state.stabilize = false;
 
@@ -285,6 +289,10 @@ fn search(
                 if ne < asg.var_stats().2 {
                     state.max_assigned = 0;
                 }
+                rst.num_remains = {
+                    let s = asg.var_stats();
+                    s.0 - s.2
+                };
             }
             // By simplification, we may get further solutions.
             if asg.num_asserted_vars < asg.stack_len() {

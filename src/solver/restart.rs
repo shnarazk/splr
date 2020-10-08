@@ -668,6 +668,7 @@ pub struct Restarter {
     restart_step: usize,
     initial_restart_step: usize,
     pub average_cpr: usize,
+    pub num_remains: usize,
 
     //
     //## statistics
@@ -695,6 +696,7 @@ impl Default for Restarter {
             restart_step: 0,
             initial_restart_step: 0,
             average_cpr: 0,
+            num_remains: 0,
             num_block_non_stabilized: 0,
             num_restart_non_stabilized: 0,
             num_block_stabilized: 0,
@@ -792,8 +794,18 @@ impl RestartIF for Restarter {
             }
             return None;
         }
+        let asg_is_active = {
+            let asg = &self.asg.ema;
+            let thr = self.asg.threshold;
+            let r = self.num_remains as f64;
+            let f = asg.get();
+            let s = asg.get_slow();
+            // assert!(f < r);
+            // assert!(s < r);
+            thr * (r - f) < (r - s)
+        };
         let (block, force) = (
-            self.asg.is_active(),
+            asg_is_active,        // self.asg.is_active(),
             self.lbd.is_active(), //  || self.average_cpr < self.after_restart,
         );
         if block {
