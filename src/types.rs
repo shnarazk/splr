@@ -6,8 +6,9 @@ pub use crate::{
     config::Config,
 };
 use {
-    crate::solver::SolverEvent,
+    crate::{cdb::WatchList, solver::SolverEvent},
     std::{
+        collections::VecDeque,
         convert::TryFrom,
         fmt,
         fs::File,
@@ -304,6 +305,21 @@ impl IndexMut<Lit> for Vec<Vec<Watch>> {
     #[inline]
     fn index_mut(&mut self, l: Lit) -> &mut Self::Output {
         unsafe { self.get_unchecked_mut(usize::from(l)) }
+    }
+}
+
+impl Index<Lit> for Vec<WatchList> {
+    type Output = VecDeque<Watch>;
+    #[inline]
+    fn index(&self, l: Lit) -> &Self::Output {
+        self.get(usize::from(l)).unwrap()
+    }
+}
+
+impl IndexMut<Lit> for Vec<WatchList> {
+    #[inline]
+    fn index_mut(&mut self, l: Lit) -> &mut Self::Output {
+        self.get_mut(usize::from(l)).unwrap()
     }
 }
 

@@ -233,7 +233,7 @@ fn search(
                     }
                     RestartDecision::Stabilize => {
                         let nr = asg.num_conflict;
-                        asg.handle(SolverEvent::Restart(state.stabilize, last_restart));
+                        asg.handle(SolverEvent::Restart(state.stabilize, nr - last_restart));
                         last_restart = nr;
                         asg.force_rephase();
                     }

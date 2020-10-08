@@ -143,6 +143,7 @@ pub struct AssignStack {
     best_assign: bool,
     build_best_at: usize,
     num_best_assign: f64,
+    stabilize: bool,
 
     //
     //## Statistics

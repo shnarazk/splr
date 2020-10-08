@@ -3,7 +3,7 @@
 use {
     super::{AssignIF, AssignStack, VarHeapIF, VarRewardIF, VarSelectIF},
     crate::{
-        cdb::{ClauseDBIF, WatchDBIF},
+        cdb::{ClauseDBIF, WatchDBIF, WatchList},
         types::*,
     },
 };
@@ -199,11 +199,13 @@ impl PropagateIF for AssignStack {
     where
         C: ClauseDBIF,
     {
+        let average_activity = self.activity_ema.get();
         let bin_watcher = cdb.bin_watcher_lists() as *const [Vec<Watch>];
-        let watcher = cdb.watcher_lists_mut() as *mut [Vec<Watch>];
+        let watcher = cdb.watcher_lists_mut() as *mut [WatchList];
         unsafe {
             self.num_propagation += 1;
             while let Some(p) = self.trail.get(self.q_head) {
+                let is_active = self.stabilize && average_activity < self.var[p.vi()].reward;
                 self.q_head += 1;
                 let false_lit = !*p;
                 // we have to drop `p` here to use self as a mutable reference again later.
@@ -236,7 +238,7 @@ impl PropagateIF for AssignStack {
                 // normal clause loop
                 let mut n = 0;
                 'next_clause: while n < source.len() {
-                    let w = source.get_unchecked_mut(n);
+                    let w = source.get_mut(n).unwrap();
                     n += 1;
                     let blocker_value = lit_assign!(self, w.blocker);
                     if blocker_value == Some(true) {
@@ -270,7 +272,7 @@ impl PropagateIF for AssignStack {
                         if lit_assign!(self, *lk) != Some(false) {
                             (*watcher)
                                 .get_unchecked_mut(usize::from(!*lk))
-                                .register(first, w.c);
+                                .register(first, w.c, is_active);
                             n -= 1;
                             source.detach(n);
                             lits.swap(1, k);

@@ -9,12 +9,15 @@ mod lbd;
 /// methods on `Watch` and `WatchDB`
 mod watch;
 
-pub use self::{
-    cid::ClauseIdIF,
-    clause::ClauseIF,
-    db::ClauseDBIF,
-    lbd::LBDIF,
-    watch::{Watch, WatchDBIF},
+pub use {
+    self::{
+        cid::ClauseIdIF,
+        clause::ClauseIF,
+        db::ClauseDBIF,
+        lbd::LBDIF,
+        watch::{Watch, WatchDBIF, WatchList},
+    },
+    std::collections::VecDeque,
 };
 
 use crate::types::*;
@@ -74,7 +77,7 @@ pub struct ClauseDB {
     /// container of watch literals for binary clauses
     pub bin_watcher: Vec<Vec<Watch>>,
     /// container of watch literals
-    pub watcher: Vec<Vec<Watch>>,
+    pub watcher: Vec<WatchList>,
     /// clause history to make certification
     pub certified: DRAT,
     /// a number of clauses to emit out-of-memory exception
