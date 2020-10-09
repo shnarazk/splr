@@ -6,7 +6,7 @@ use {
     },
     crate::{
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarRewardIF},
-        cdb::{ClauseDB, ClauseDBIF},
+        cdb::{ClauseDB, ClauseDBIF, WatchDBIF},
         processor::{EliminateIF, Eliminator},
         solver::SolverEvent,
         types::*,
@@ -51,11 +51,10 @@ pub fn handle_conflict(
     let mut use_chronobt = switch_chronobt.unwrap_or(0 < state.config.c_cbt_thr);
     if use_chronobt {
         let level = asg.level_ref();
-        let c = &cdb[ci];
+        let c = &mut cdb[ci];
         let lit_count = c.iter().filter(|l| level[l.vi()] == original_dl).count();
         if 1 == lit_count {
             debug_assert!(c.iter().any(|l| level[l.vi()] == original_dl));
-            let decision = *c.iter().find(|l| level[l.vi()] == original_dl).unwrap();
             let snd_l = c
                 .iter()
                 .map(|l| level[l.vi()])
@@ -67,7 +66,8 @@ pub fn handle_conflict(
                 // decision level, we let BCP propagating that literal at the second
                 // highest decision level in conflicting cls.
                 // PREMISE: 0 < snd_l
-                asg.cancel_until(snd_l - 1);
+                let decision = *c.iter().find(|l| level[l.vi()] == original_dl).unwrap();
+                asg.cancel_until(snd_l);
                 debug_assert!(
                     asg.stack_iter().all(|l| l.vi() != decision.vi()),
                     format!(
@@ -75,7 +75,55 @@ pub fn handle_conflict(
                         original_dl, snd_l
                     )
                 );
-                asg.assign_by_decision(decision);
+                debug_assert!(asg.assign(decision.vi()).is_none());
+                debug_assert!(
+                    c.iter()
+                        .all(|l| *l != decision || asg.assigned(*l).is_none()),
+                    format!(
+                        "{} maps to {:?} {:?}: decision {}",
+                        c,
+                        c.iter().map(|l| asg.assigned(*l)).collect::<Vec<_>>(),
+                        c.iter().map(|l| asg.assign(l.vi())).collect::<Vec<_>>(),
+                        decision,
+                    )
+                );
+                let l0 = c.lits[0];
+                let l1 = c.lits[1];
+                if c.lits.len() == 2 {
+                    if decision == l0 {
+                        asg.assign_by_implication(
+                            decision,
+                            AssignReason::Implication(ci, l1),
+                            snd_l,
+                        );
+                    } else {
+                        asg.assign_by_implication(
+                            decision,
+                            AssignReason::Implication(ci, l0),
+                            snd_l,
+                        );
+                    }
+                } else {
+                    if l0 == decision {
+                    } else if l1 == decision {
+                        c.lits.swap(0, 1);
+                    } else {
+                        for i in 2..c.lits.len() {
+                            let l = c.lits[i];
+                            if l == decision {
+                                c.lits.swap(0, i);
+                                cdb.watcher_lists_mut()[usize::from(!l0)].detach_with(ci);
+                                cdb.watcher_lists_mut()[usize::from(!decision)].register(l0, ci);
+                                break;
+                            }
+                        }
+                    }
+                    asg.assign_by_implication(
+                        decision,
+                        AssignReason::Implication(ci, NULL_LIT),
+                        snd_l,
+                    );
+                }
                 return Ok(());
             }
         }
