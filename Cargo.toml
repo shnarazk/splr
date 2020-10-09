@@ -14,19 +14,18 @@ categories = ["mathematics", "science"]
 [dependencies]
 bitflags = "1.2"
 libc = { version = "0.2", optional = true }
-structopt = { version = "0.3", optional = true }
 
 [[bin]]
 name = "dmcr"
-required-features = ["libc", "structopt"]
+required-features = ["libc"]
 
 [[bin]]
 name = "splr"
-required-features = ["libc", "structopt"]
+required-features = ["libc"]
 
 [features]
 default = ["cli"]
-cli = ["libc", "structopt"]
+cli = ["libc"]
 boundary_check = []
 ema_calibration = []
 EVSIDS = []

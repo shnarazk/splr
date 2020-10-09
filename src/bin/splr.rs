@@ -17,7 +17,6 @@ use {
         thread,
         time::Duration,
     },
-    structopt::StructOpt,
 };
 
 const RED: &str = "\x1B[001m\x1B[031m";
@@ -42,7 +41,8 @@ fn colored(v: Result<bool, &SolverError>, quiet: bool) -> Cow<'static, str> {
 }
 
 fn main() {
-    let mut config = Config::from_args().override_args();
+    let mut config = Config::default();
+    config.inject_from_args();
     config.splr_interface = true;
     if !config.cnf_file.exists() {
         println!(
@@ -61,7 +61,8 @@ fn main() {
         _ => Some(config.io_odir.join(&config.io_rfile)),
     };
     if config.io_pfile.to_string_lossy() != "proof.out" && !config.use_certification {
-        println!("Abort: You set a proof filename with '--proof' explicitly, but didn't set '--certify'. It doesn't look good.");
+        println!("Abort: You set a proof filename {} with '--proof' explicitly, but didn't set '--certify'. It doesn't look good.",
+                 config.io_pfile.to_string_lossy());
         return;
     }
     if let Ok(val) = env::var("SPLR_TIMEOUT") {
