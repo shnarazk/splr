@@ -53,7 +53,7 @@ impl SolveIF for Solver {
         state.progress_header();
         state.progress(asg, cdb, elim, rst, Some("preprocessing stage"));
         if 0 < asg.stack_len() {
-            cdb.eliminate_satisfied_clauses(asg, elim, false);
+            elim.eliminate_satisfied_clauses(asg, cdb, false);
         }
         if elim.enable {
             const USE_PRE_PROCESSING_ELIMINATOR: bool = true;

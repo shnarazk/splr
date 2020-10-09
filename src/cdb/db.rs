@@ -1,9 +1,6 @@
 use {
     super::{CertifiedRecord, Clause, ClauseDB, ClauseId, WatchDBIF, LBDIF},
-    crate::{
-        assign::AssignIF, processor::EliminateIF, solver::SolverEvent, state::SearchStrategy,
-        types::*,
-    },
+    crate::{assign::AssignIF, solver::SolverEvent, state::SearchStrategy, types::*},
     std::{
         cmp::Ordering,
         ops::{Index, IndexMut, Range, RangeFrom},
@@ -72,11 +69,6 @@ pub trait ClauseDBIF: IndexMut<ClauseId, Output = Clause> {
     fn certificate_add(&mut self, vec: &[Lit]);
     /// record a deleted clause to unsat certification.
     fn certificate_delete(&mut self, vec: &[Lit]);
-    /// delete satisfied clauses at decision level zero.
-    fn eliminate_satisfied_clauses<A, E>(&mut self, asg: &mut A, elim: &mut E, occur: bool)
-    where
-        A: AssignIF,
-        E: EliminateIF;
     /// flag positive and negative literals of a var as dirty
     fn touch_var(&mut self, vi: VarId);
     /// check the number of clauses
@@ -669,26 +661,6 @@ impl ClauseDBIF for ClauseDB {
             let temp = vec.iter().map(|l| i32::from(*l)).collect::<Vec<_>>();
             self.certified.push((CertifiedRecord::DELETE, temp));
         }
-    }
-    fn eliminate_satisfied_clauses<A, E>(&mut self, asg: &mut A, elim: &mut E, update_occur: bool)
-    where
-        A: AssignIF,
-        E: EliminateIF,
-    {
-        for (cid, c) in &mut self.clause.iter_mut().enumerate().skip(1) {
-            if !c.is(Flag::DEAD) && asg.satisfies(&c.lits) {
-                c.kill(&mut self.touched);
-                if elim.is_running() {
-                    if update_occur {
-                        elim.remove_cid_occur(asg, ClauseId::from(cid), c);
-                    }
-                    for l in &c.lits {
-                        elim.enqueue_var(asg, l.vi(), true);
-                    }
-                }
-            }
-        }
-        self.garbage_collect();
     }
     fn touch_var(&mut self, vi: VarId) {
         self.touched[Lit::from_assign(vi, true)] = true;

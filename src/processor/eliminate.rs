@@ -2,7 +2,6 @@
 use {
     super::{EliminateIF, Eliminator},
     crate::{assign::AssignIF, cdb::ClauseDBIF, state::State, types::*},
-    std::sync::{atomic::AtomicBool, Arc},
 };
 
 pub fn eliminate_var<A, C>(
@@ -11,7 +10,7 @@ pub fn eliminate_var<A, C>(
     elim: &mut Eliminator,
     state: &mut State,
     vi: VarId,
-    timedout: &Arc<AtomicBool>,
+    timedout: &mut usize,
 ) -> MaybeInconsistent
 where
     A: AssignIF,
@@ -32,6 +31,7 @@ where
         if skip_var_elimination(asg, cdb, elim, &*pos, &*neg, vi) {
             return Ok(());
         }
+        *timedout -= (*timedout).min((*pos).len() * (*neg).len());
         #[cfg(feature = "trace_elimination")]
         println!("# eliminate_var {}", vi);
         // OK, eliminate the literal and build constraints on it.
@@ -335,12 +335,12 @@ mod tests {
             ref mut state,
             ..
         } = Solver::try_from("tests/uf8.cnf").expect("failed to load");
-        let timedout = Arc::new(AtomicBool::new(false));
+        let mut timedout = 10_000;
         let vi = 4;
 
         elim.activate();
         elim.prepare(asg, cdb, true);
-        eliminate_var(asg, cdb, elim, state, vi, &timedout).expect("panic");
+        eliminate_var(asg, cdb, elim, state, vi, &mut timedout).expect("panic");
         cdb.garbage_collect();
         assert!(asg.var(vi).is(Flag::ELIMINATED));
         assert!(cdb
