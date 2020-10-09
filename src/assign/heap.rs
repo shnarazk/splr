@@ -201,7 +201,7 @@ impl VarIdHeap {
         let h = &mut self.heap.clone()[1..];
         let d = &mut self.idxs.clone()[1..];
         h.sort_unstable();
-        d.sort();
+        d.sort_unstable();
         for i in 0..h.len() {
             if h[i] != i + 1 {
                 panic!("heap {} {} {:?}", i, h[i], h);
