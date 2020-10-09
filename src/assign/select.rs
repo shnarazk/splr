@@ -24,7 +24,7 @@ pub trait VarSelectIF {
     fn force_rephase(&mut self);
     /// select a new decision variable.
     fn select_decision_literal(&mut self, phase: &PhaseMode) -> Lit;
-    /// save the current assignments to BEST_PHASE
+    /// save the current assignments to BEST_PHASE.
     fn save_phases(&mut self);
     /// update the internal heap on var order.
     fn update_order(&mut self, v: VarId);

@@ -823,7 +823,7 @@ impl Export<(usize, usize, usize, usize), (RestartMode, usize)> for Restarter {
             self.num_restart_stabilized,
         )
     }
-    fn active_mode(&self) -> (RestartMode, usize) {
+    fn mode(&self) -> (RestartMode, usize) {
         if self.stb.is_active() {
             (RestartMode::Stabilize, self.stb.num_active)
         } else if self.luby.enable {
