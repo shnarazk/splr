@@ -54,7 +54,7 @@ impl Default for AssignStack {
             use_rephase: true,
             best_assign: false,
             build_best_at: 0,
-            num_best_assign: 0.0,
+            num_best_assign: 0,
             num_conflict: 0,
             num_propagation: 0,
             num_restart: 0,
@@ -128,9 +128,7 @@ impl Instantiate for AssignStack {
                 };
                 self.rebuild_order();
             }
-            SolverEvent::Stabilize(_) => {
-                self.num_best_assign *= 0.9;
-            }
+            SolverEvent::Stabilize(_) => (),
             SolverEvent::Vivify(start) => {
                 if start {
                     self.vivify_sandbox =
