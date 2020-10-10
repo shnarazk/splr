@@ -26,7 +26,6 @@ pub enum ProgressUpdate {
     LBD(u16),
     Luby,
     MLD(u16),
-    Reset,
 }
 
 /// Restart modes
@@ -796,7 +795,6 @@ impl RestartIF for Restarter {
             ProgressUpdate::LBD(val) => self.lbd.update(val),
             ProgressUpdate::Luby => self.luby.update(0),
             ProgressUpdate::MLD(val) => self.mld.update(val),
-            ProgressUpdate::Reset => (),
         }
     }
 }

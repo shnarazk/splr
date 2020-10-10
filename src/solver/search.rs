@@ -270,7 +270,6 @@ fn search(
             }
             // By simplification, we may get further solutions.
             if asg.num_asserted_vars < asg.stack_len() {
-                rst.update(ProgressUpdate::Reset);
                 asg.num_asserted_vars = asg.stack_len();
             }
         }
