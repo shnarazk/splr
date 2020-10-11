@@ -104,6 +104,8 @@ impl SolveIF for Solver {
                 if elim.simplify(asg, cdb, state).is_err() {
                     // Why inconsistent? Because the CNF contains a conflict, not an error!
                     // Or out of memory.
+                    let sv = asg.var_stats();
+                    rst.handle(SolverEvent::Eliminate(sv.0 - sv.2));
                     state.progress(asg, cdb, elim, rst, None);
                     if cdb.check_size().is_err() {
                         return Err(SolverError::OutOfMemory);
@@ -200,12 +202,15 @@ fn search(
     let use_vivify = state.config.use_vivify();
     rst.update(ProgressUpdate::Luby);
     state.stabilize = false;
+    let sv = asg.var_stats();
+    rst.handle(SolverEvent::Eliminate(sv.0 - sv.2));
 
     loop {
         asg.reward_update();
         let ci = asg.propagate(cdb);
         if ci.is_none() {
             state.last_asg = asg.stack_len();
+            rst.update(ProgressUpdate::ASG(asg.stack_len()));
             if asg.num_vars <= asg.stack_len() + asg.num_eliminated_vars {
                 return Ok(true);
             }

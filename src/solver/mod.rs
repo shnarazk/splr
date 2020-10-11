@@ -51,6 +51,8 @@ pub enum SolverEvent {
     Assert,
     /// conflict by unit propagation
     Conflict,
+    /// after elimination, given the number of the remaining variables (including asserted vars).
+    Eliminate(usize),
     /// Not in use
     Instantiate,
     /// increment the number of vars.

@@ -41,9 +41,9 @@ pub fn handle_conflict(
         None
     };
     rst.update(ProgressUpdate::Counter(num_conflict));
+    rst.update(ProgressUpdate::ASG(asg.stack_len()));
 
     if 0 < state.last_asg {
-        rst.update(ProgressUpdate::ASG(asg.stack_len()));
         state.last_asg = 0;
     }
 

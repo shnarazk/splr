@@ -20,11 +20,17 @@ trait ProgressEvaluator {
 /// Update progress observer submodules
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub enum ProgressUpdate {
+    ///
     Counter(usize),
+    /// Conflict number after getting a new conflict
     ACC(f64),
+    /// The number of assigned vars after non-conflict propagation
     ASG(usize),
+    /// LBD of a new learnt clause
     LBD(u16),
+    /// Signal before each propagation
     Luby,
+    /// Maximum LBD used in conflict analysis
     MLD(u16),
 }
 
@@ -49,7 +55,7 @@ pub trait RestartIF {
     /// * `Some(true)` -- should restart
     /// * `Some(false)` -- should block restart
     /// * `None` -- it's not a good timing
-    fn restart(&mut self) -> Option<RestartDecision>;
+    fn restart(&mut self, after_restart: bool) -> Option<RestartDecision>;
     /// update specific submodule
     fn update(&mut self, kind: ProgressUpdate);
 }
@@ -58,7 +64,10 @@ pub trait RestartIF {
 #[derive(Debug)]
 struct ProgressASG {
     enable: bool,
-    asg: usize,
+    /// the latest number of assigned variables
+    asg: f64,
+    /// the number of alive variables.
+    delta: f64,
     ema: Ema2,
     /// For block restart based on average assignments: 1.40.
     /// This is called `R` in Glucose
@@ -69,16 +78,18 @@ impl Default for ProgressASG {
     fn default() -> ProgressASG {
         ProgressASG {
             enable: true,
+            asg: 0.0,
+            delta: 0.0,
             ema: Ema2::new(1),
-            asg: 0,
             threshold: 1.4,
         }
     }
 }
 
 impl Instantiate for ProgressASG {
-    fn instantiate(config: &Config, _: &CNFDescription) -> Self {
+    fn instantiate(config: &Config, cnf: &CNFDescription) -> Self {
         ProgressASG {
+            delta: cnf.num_of_variables as f64,
             ema: Ema2::new(config.rst_asg_len).with_slow(config.rst_asg_slw),
             threshold: config.rst_asg_thr,
             ..ProgressASG::default()
@@ -89,23 +100,28 @@ impl Instantiate for ProgressASG {
 impl EmaIF for ProgressASG {
     type Input = usize;
     fn update(&mut self, n: usize) {
-        self.asg = n;
-        self.ema.update(n as f64);
+        self.asg = n as f64;
     }
     fn get(&self) -> f64 {
         self.ema.get()
     }
     fn trend(&self) -> f64 {
-        // (self.asg as f64) / self.ema.get()
+        // self.asg / self.ema.get()
         self.ema.trend()
     }
 }
 
 impl ProgressEvaluator for ProgressASG {
     fn is_active(&self) -> bool {
-        self.enable && self.threshold * self.ema.get() < (self.asg as f64)
+        self.enable && self.threshold * (self.delta - self.asg) < (self.delta - self.ema.get())
+        // && (self.delta.sqrt() + self.ema.get()) * self.threshold < self.asg
+        // && self.threshold * (self.delta - self.asg) < (self.delta - self.ema.get())
+        // && self.threshold * self.ema.get() < (self.asg)
     }
-    fn shift(&mut self) {}
+    fn shift(&mut self) {
+        self.ema.update(self.asg);
+        self.asg = 0.0;
+    }
 }
 
 /// An EMA of learnt clauses' LBD, used for forcing restart.
@@ -491,6 +507,7 @@ struct GeometricStabilizer {
     num_active: usize,
     next_trigger: usize,
     restart_inc: f64,
+    reset_at: usize,
     step: usize,
 }
 
@@ -502,6 +519,7 @@ impl Default for GeometricStabilizer {
             num_active: 0,
             next_trigger: 1000,
             restart_inc: 2.0,
+            reset_at: 0,
             step: 1000,
         }
     }
@@ -538,10 +556,10 @@ impl EmaIF for GeometricStabilizer {
                 self.num_active += 1;
             }
             self.step = ((self.step as f64) * self.restart_inc) as usize;
-            if 100_000_000 < self.step {
+            if 10_000_000 < self.step {
                 self.step = 1000;
             }
-            self.next_trigger += self.step;
+            self.next_trigger = now + self.step;
         }
     }
     fn get(&self) -> f64 {
@@ -554,9 +572,11 @@ impl ProgressEvaluator for GeometricStabilizer {
         self.enable && self.active
     }
     fn reset_progress(&mut self) {
-        if self.enable {
+        if self.enable && 10_000 < self.step {
             self.active = false;
             self.step = 1000;
+            self.next_trigger = self.step;
+            self.reset_at = self.num_active;
         }
     }
     fn shift(&mut self) {}
@@ -719,6 +739,12 @@ impl Instantiate for Restarter {
             SolverEvent::Adapt((SearchStrategy::LowSuccessive, n), m) if n == m => {
                 // self.luby.enable = true;
             }
+            SolverEvent::Assert => {
+                self.stb.reset_progress();
+            }
+            SolverEvent::Eliminate(n) => {
+                self.asg.delta = n as f64;
+            }
             SolverEvent::Stabilize(true) => (),
             SolverEvent::Stabilize(false) => (),
             _ => (),
@@ -742,46 +768,58 @@ impl RestartIF for Restarter {
     fn stabilizing(&self) -> bool {
         self.stb.is_active()
     }
-    fn restart(&mut self) -> Option<RestartDecision> {
-        if self.luby.is_active() {
-            self.luby.shift();
-            self.after_restart = 0;
-            return Some(RestartDecision::Force);
-        }
-        if self.after_restart < self.restart_step {
+    fn restart(&mut self, after_conflict: bool) -> Option<RestartDecision> {
+        if after_conflict {
+            if self.luby.is_active() {
+                self.luby.shift();
+                self.after_restart = 0;
+                return Some(RestartDecision::Force);
+            }
+            if self.after_restart < self.restart_step {
+                return None;
+            }
+            self.acc.shift();
+
+            if self.stb.is_active() {
+                let phase = (self.stb.num_active - self.stb.reset_at + 1) as f64;
+                let ratio = self.after_restart as f64 / (phase * 100.0); // / self.average_cpr as f64;
+                let beyond = phase * 100.0 < self.after_restart as f64;
+                if beyond && self.acc.get() < 0.25 * ratio * 0.7 {
+                    self.after_restart = 0;
+                    self.num_restart += 1;
+                    self.num_restart_stabilized += 1;
+                    return Some(RestartDecision::Stabilize);
+                }
+            } else {
+                if self.lbd.is_active() {
+                    self.after_restart = 0;
+                    self.num_restart += 1;
+                    return Some(RestartDecision::Force);
+                }
+            }
+            return None;
+        } else {
+            if self.after_restart < self.restart_step {
+                return None;
+            }
+
+            if self.stb.is_active() {
+                let good_path = self.lbd.get() < self.mld.get() + 1.0;
+                if !good_path || !self.acc.is_active() {
+                    self.after_restart = 0;
+                    self.num_block += 1;
+                    self.num_block_stabilized += 1;
+                    return Some(RestartDecision::Cancel);
+                }
+            } else {
+                if self.asg.is_active() {
+                    self.after_restart = 0;
+                    self.num_block += 1;
+                    return Some(RestartDecision::Block);
+                }
+            }
             return None;
         }
-        self.acc.shift();
-        let (c0, c1) = if self.stb.is_active() {
-            (2.0, 0.00)
-        } else {
-            (0.05, 0.01)
-        };
-        let margin = (self.stb.num_active as f64 * c1 + c0) + self.mld.threshold;
-        let good_path = self.lbd.get() < self.mld.get() + margin;
-        if self.stb.is_active() {
-            if self.acc.is_active() && good_path {
-                self.after_restart = 0;
-                self.num_block += 1;
-                self.num_block_stabilized += 1;
-                return Some(RestartDecision::Cancel);
-            } else {
-                self.after_restart = 0;
-                self.num_restart += 1;
-                self.num_restart_stabilized += 1;
-                return Some(RestartDecision::Stabilize);
-            }
-        } else if self.asg.is_active() {
-            self.after_restart = 0;
-            self.num_block += 1;
-            return Some(RestartDecision::Block);
-        };
-        if !good_path {
-            self.after_restart = 0;
-            self.num_restart += 1;
-            return Some(RestartDecision::Force);
-        }
-        None
     }
     fn update(&mut self, kind: ProgressUpdate) {
         match kind {
@@ -792,7 +830,10 @@ impl RestartIF for Restarter {
             }
             ProgressUpdate::ACC(fval) => self.acc.update(fval),
             ProgressUpdate::ASG(val) => self.asg.update(val),
-            ProgressUpdate::LBD(val) => self.lbd.update(val),
+            ProgressUpdate::LBD(val) => {
+                self.lbd.update(val);
+                self.asg.shift();
+            }
             ProgressUpdate::Luby => self.luby.update(0),
             ProgressUpdate::MLD(val) => self.mld.update(val),
         }
@@ -810,7 +851,7 @@ impl Export<(usize, usize, usize, usize), (RestartMode, usize)> for Restarter {
     /// use crate::splr::{config::Config, solver::Restarter, types::*};
     /// let rst = Restarter::instantiate(&Config::default(), &CNFDescription::default());
     /// let (num_block, num_stb, num_stb_block, num_stb_rst) = rst.exports();
-    /// let (rst_mode, num_stb) = rst.active_mode();
+    /// let (rst_mode, num_stb) = rst.mode();
     ///```
     #[inline]
     fn exports(&self) -> (usize, usize, usize, usize) {

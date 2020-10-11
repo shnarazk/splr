@@ -180,7 +180,7 @@ impl Default for Config {
             rst_step: 40,
             rst_asg_len: 30,
             rst_asg_slw: 10000,
-            rst_asg_thr: 1.40,
+            rst_asg_thr: 1.35,
             rst_ccc_thr: 0.70,
             rst_lbd_len: 30,
             rst_lbd_slw: 10000,

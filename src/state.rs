@@ -290,6 +290,7 @@ impl Instantiate for State {
             SolverEvent::Assert => (),
             SolverEvent::Adapt(_, _) => (),
             SolverEvent::Conflict => (),
+            SolverEvent::Eliminate(_) => (),
             SolverEvent::Instantiate => (),
             SolverEvent::Reinitialize => (),
             SolverEvent::Restart => (),
