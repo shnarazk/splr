@@ -220,18 +220,6 @@ fn search(
                 return Ok(false);
             }
             handle_conflict(asg, cdb, elim, rst, state, ci)?;
-            if let Some(decision) = rst.restart() {
-                match decision {
-                    RestartDecision::Block | RestartDecision::Cancel => (),
-                    RestartDecision::Force => {
-                        asg.cancel_until(asg.root_level);
-                    }
-                    RestartDecision::Stabilize => {
-                        asg.cancel_until(asg.root_level);
-                        asg.force_rephase();
-                    }
-                }
-            }
             if a_decision_was_made {
                 a_decision_was_made = false;
             } else {
@@ -254,13 +242,27 @@ fn search(
                 }
             }
         }
+        match rst.restart(!ci.is_none()) {
+            Some(RestartDecision::Force) => {
+                asg.cancel_until(asg.root_level);
+            }
+            Some(RestartDecision::Stabilize) => {
+                asg.cancel_until(asg.root_level);
+                asg.force_rephase();
+            }
+            _ => (), // Some(RestartDecision::Block) | Some(RestartDecision::Cancel) | None
+        }
         // Simplification has been postponed because chronoBT was used.
         if asg.decision_level() == asg.root_level {
             if use_vivify && state.config.viv_int <= state.to_vivify {
                 state.to_vivify = 0;
+                let nv = asg.var_stats().1;
                 if vivify(asg, cdb, elim, state).is_err() {
                     // return Err(SolverError::UndescribedError);
                     analyze_final(asg, state, &cdb[ci]);
+                    if nv < asg.var_stats().1 {
+                        rst.handle(SolverEvent::Assert);
+                    }
                     return Ok(false);
                 }
             }
@@ -272,6 +274,8 @@ fn search(
                     elim.activate();
                 }
                 elim.simplify(asg, cdb, state)?;
+                let sv = asg.var_stats();
+                rst.handle(SolverEvent::Eliminate(sv.0 - sv.2));
             }
             // By simplification, we may get further solutions.
             if asg.num_asserted_vars < asg.stack_len() {
