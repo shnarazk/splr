@@ -221,6 +221,7 @@ pub struct State {
     pub start: Instant,
     /// upper limit for timeout handling
     pub time_limit: f64,
+    #[cfg(dump)]
     /// for dumping debugging information for developers
     pub development: Vec<(usize, f64, f64, f64, f64, f64)>,
 }
@@ -247,6 +248,7 @@ impl Default for State {
             record: ProgressRecord::default(),
             start: Instant::now(),
             time_limit: 0.0,
+            #[cfg(dump)]
             development: Vec::new(),
         }
     }

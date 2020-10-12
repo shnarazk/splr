@@ -275,18 +275,21 @@ pub fn handle_conflict(
         }
     }
     cdb.scale_activity();
-    if 0 < state.config.io_dump && num_conflict % state.config.io_dump == 0 {
-        let (rst_num_block, rst_num_restart, _, _) = rst.exports();
-        let (_rst_acc, rst_asg, rst_lbd, _rst_mld) = *rst.exports_box();
-        state.development.push((
-            num_conflict,
-            (asg.num_asserted_vars + asg.num_eliminated_vars) as f64
-                / state.target.num_of_variables as f64,
-            rst_num_restart as f64,
-            rst_num_block as f64,
-            rst_asg.trend().min(10.0),
-            rst_lbd.trend().min(10.0),
-        ));
+    #[cfg(dump)]
+    {
+        if 0 < state.config.io_dump && num_conflict % state.config.io_dump == 0 {
+            let (rst_num_blk, rst_num_rst, rst_stb_blk, rst_stb_rst) = rst.exports();
+            let (rst_asg, rst_lbd) = *rst.exports_box();
+            state.development.push((
+                num_conflict,
+                (asg.num_asserted_vars + asg.num_eliminated_vars) as f64
+                    / state.target.num_of_variables as f64,
+                (rst_num_rst + rst_stb_rst) as f64,
+                (rst_num_blk + rst_stb_blk) as f64,
+                rst_asg.trend().min(10.0),
+                rst_lbd.trend().min(10.0),
+            ));
+        }
     }
     if cdb.check_and_reduce(asg, num_conflict) {
         state.to_vivify += 1;

@@ -52,6 +52,7 @@ pub struct Config {
     /// DIMACS CNF file
     pub cnf_file: PathBuf,
 
+    #[cfg(dump)]
     /// Interval for dumping stat data
     pub io_dump: usize,
 
@@ -164,6 +165,7 @@ impl Default for Config {
 
             splr_interface: false,
             cnf_file: PathBuf::new(),
+            #[cfg(dump)]
             io_dump: 0,
             io_odir: PathBuf::from("."),
             io_pfile: PathBuf::from("proof.out"),
@@ -273,6 +275,7 @@ impl Config {
                                     match name {
                                         "cl" => self.c_cls_lim = val,
                                         "ii" => self.c_ip_int = val,
+                                        #[cfg(dump)]
                                         "stat" => self.io_dump = val,
                                         "ecl" => self.elm_cls_lim = val,
                                         "evl" => self.elm_grw_lim = val,
@@ -404,7 +407,6 @@ OPTIONS:
       --ecl <elim-cls-lim> Max #lit for clause subsume     {:>10}
       --evl <elim-grw-lim> Grow limit of #cls in var elim. {:>10}
       --evo <elim-var-occ> Max #cls for var elimination    {:>10}
-      --stat <io-dump>     Interval for dumping stat data  {:>10}
   -o, --dir <io-odir>      Output directory                {:>10}
   -p, --proof <io-pfile>   DRAT Cert. filename             {:>10}
   -r, --result <io-rfile>  Result filename/stdout          {:>10}
@@ -442,7 +444,6 @@ ARGS:
         config.elm_cls_lim,
         config.elm_grw_lim,
         config.elm_var_occ,
-        config.io_dump,
         config.io_odir.to_string_lossy(),
         config.io_pfile.to_string_lossy(),
         config.io_rfile.to_string_lossy(),
