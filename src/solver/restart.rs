@@ -688,11 +688,11 @@ impl ProgressEvaluator for ProgressBucket {
 /// `Restarter` provides restart API and holds data about restart conditions.
 #[derive(Debug)]
 pub struct Restarter {
-    acc: ProgressACC,
+    // acc: ProgressACC,
     asg: ProgressASG,
     // bkt: ProgressBucket,
     lbd: ProgressLBD,
-    mld: ProgressMLD,
+    // mld: ProgressMLD,
     // pub rcc: ProgressRCC,
     // pub blvl: ProgressLVL,
     // pub clvl: ProgressLVL,
@@ -714,11 +714,11 @@ pub struct Restarter {
 impl Default for Restarter {
     fn default() -> Restarter {
         Restarter {
-            acc: ProgressACC::default(),
+            // acc: ProgressACC::default(),
             asg: ProgressASG::default(),
             // bkt: ProgressBucket::default(),
             lbd: ProgressLBD::default(),
-            mld: ProgressMLD::default(),
+            // mld: ProgressMLD::default(),
             // rcc: ProgressRCC::default(),
             // blvl: ProgressLVL::default(),
             // clvl: ProgressLVL::default(),
@@ -738,11 +738,11 @@ impl Default for Restarter {
 impl Instantiate for Restarter {
     fn instantiate(config: &Config, cnf: &CNFDescription) -> Self {
         Restarter {
-            acc: ProgressACC::instantiate(config, cnf),
+            // acc: ProgressACC::instantiate(config, cnf),
             asg: ProgressASG::instantiate(config, cnf),
             // bkt: ProgressBucket::instantiate(config, cnf),
             lbd: ProgressLBD::instantiate(config, cnf),
-            mld: ProgressMLD::instantiate(config, cnf),
+            // mld: ProgressMLD::instantiate(config, cnf),
             // rcc: ProgressRCC::instantiate(config, cnf),
             // blvl: ProgressLVL::instantiate(config, cnf),
             // clvl: ProgressLVL::instantiate(config, cnf),
@@ -800,12 +800,11 @@ impl RestartIF for Restarter {
             if self.after_restart < self.restart_step {
                 return None;
             }
-            self.acc.shift();
+            // self.acc.shift();
 
             if self.stb.is_active() {
                 if self.lbd.slow_is_active() {
                     self.after_restart = 0;
-                    self.num_restart += 1;
                     self.num_restart_stabilized += 1;
                     return Some(RestartDecision::Stabilize);
                 }
@@ -825,7 +824,6 @@ impl RestartIF for Restarter {
             if self.stb.is_active() {
                 if self.asg.is_active() {
                     self.after_restart = 0;
-                    self.num_block += 1;
                     self.num_block_stabilized += 1;
                     return Some(RestartDecision::Cancel);
                 }
@@ -846,29 +844,29 @@ impl RestartIF for Restarter {
                 self.stb.update(val);
                 self.luby.update(self.after_restart);
             }
-            ProgressUpdate::ACC(fval) => self.acc.update(fval),
+            ProgressUpdate::ACC(_fval) => (), // self.acc.update(fval),
             ProgressUpdate::ASG(val) => self.asg.update(val),
             ProgressUpdate::LBD(val) => {
                 self.lbd.update(val);
                 self.asg.shift();
             }
             ProgressUpdate::Luby => self.luby.update(0),
-            ProgressUpdate::MLD(val) => self.mld.update(val),
+            ProgressUpdate::MLD(_val) => (), // self.mld.update(val),
         }
     }
 }
 
 impl Export<(usize, usize, usize, usize), (RestartMode, usize)> for Restarter {
     /// exports:
-    ///  1. the number of blocking
-    ///  1. the number of forcing restart
+    ///  1. the number of blocking not in stabilization
+    ///  1. the number of forcing restart not in stabilization
     ///  1. the number of blocking in stabilzation
     ///  1. the number of forcing in stabilzation
     ///
     ///```
     /// use crate::splr::{config::Config, solver::Restarter, types::*};
     /// let rst = Restarter::instantiate(&Config::default(), &CNFDescription::default());
-    /// let (num_block, num_stb, num_stb_block, num_stb_rst) = rst.exports();
+    /// let (num_blk, num_rst, num_stb_blk, num_stb_rst) = rst.exports();
     /// let (rst_mode, num_stb) = rst.mode();
     ///```
     #[inline]
@@ -891,9 +889,10 @@ impl Export<(usize, usize, usize, usize), (RestartMode, usize)> for Restarter {
     }
 }
 
-impl<'a> ExportBox<'a, (&'a Ema2, &'a Ema2, &'a Ema2, &'a Ema2)> for Restarter {
-    fn exports_box(&'a self) -> Box<(&'a Ema2, &'a Ema2, &'a Ema2, &'a Ema2)> {
-        Box::from((&self.acc.ema, &self.asg.ema, &self.lbd.ema, &self.mld.ema))
+impl<'a> ExportBox<'a, (&'a Ema2, &'a Ema2)> for Restarter {
+    fn exports_box(&'a self) -> Box<(&'a Ema2, &'a Ema2)> {
+        // Box::from((&self.acc.ema, &self.asg.ema, &self.lbd.ema, &self.mld.ema))
+        Box::from((&self.asg.ema, &self.lbd.ema))
     }
 }
 

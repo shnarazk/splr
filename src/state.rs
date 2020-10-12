@@ -43,7 +43,7 @@ pub trait StateIF {
         E: Export<(usize, usize, f64), ()>,
         R: RestartIF
             + Export<(usize, usize, usize, usize), (RestartMode, usize)>
-            + ExportBox<'r, (&'r Ema2, &'r Ema2, &'r Ema2, &'r Ema2)>;
+            + ExportBox<'r, (&'r Ema2, &'r Ema2)>;
     /// write a short message to stdout.
     fn flush<S: AsRef<str>>(&self, mes: S);
 }
@@ -464,7 +464,7 @@ impl StateIF for State {
         E: Export<(usize, usize, f64), ()>,
         R: RestartIF
             + Export<(usize, usize, usize, usize), (RestartMode, usize)>
-            + ExportBox<'r, (&'r Ema2, &'r Ema2, &'r Ema2, &'r Ema2)>,
+            + ExportBox<'r, (&'r Ema2, &'r Ema2)>,
     {
         if !self.config.splr_interface || self.config.quiet_mode {
             return;
@@ -487,7 +487,7 @@ impl StateIF for State {
 
         let (rst_num_blk, rst_num_rst, rst_num_sblk, rst_num_srst) = rst.exports();
         // let rst_num_stb = rst.active_mode().1;
-        let (rst_acc, rst_asg, rst_lbd, rst_mld) = *rst.exports_box();
+        let (rst_asg, rst_lbd) = *rst.exports_box();
 
         if self.config.use_log {
             self.dump(asg, cdb, rst);
@@ -549,8 +549,8 @@ impl StateIF for State {
             "\x1B[2K         EMA|tLBD:{}, tASG:{}, eMLD:{}, eCCC:{} ",
             fm!("{:>9.4}", self, LogF64Id::TrendLBD, rst_lbd.trend()),
             fm!("{:>9.4}", self, LogF64Id::TrendASG, rst_asg.trend()),
-            fm!("{:>9.4}", self, LogF64Id::EmaMLD, rst_mld.get()),
-            fm!("{:>9.4}", self, LogF64Id::EmaCCC, rst_acc.get()),
+            fm!("{:>9.4}", self, LogF64Id::EmaMLD, 0.0), // rst_mld.get()),
+            fm!("{:>9.4}", self, LogF64Id::EmaCCC, 0.0), // rst_acc.get()),
         );
         println!(
             "\x1B[2K    Conflict|eLBD:{}, cnfl:{}, bjmp:{}, /ppc:{} ",
@@ -694,7 +694,10 @@ impl State {
             cdb_num_learnt,
             cdb_num_reduction,
         ) = cdb.exports();
-        let rst_num_block = rst.exports().0;
+        let rst_num_block = {
+            let n = rst.exports();
+            n.0 + n.2
+        };
         println!(
             "c | {:>8}  {:>8} {:>8} | {:>7} {:>8} {:>8} |  {:>4}  {:>8} {:>7} {:>8} | {:>6.3} % |",
             asg_num_restart,                           // restart
@@ -717,7 +720,7 @@ impl State {
         C: Export<(usize, usize, usize, usize, usize, usize), ()>,
         R: RestartIF
             + Export<(usize, usize, usize, usize), (RestartMode, usize)>
-            + ExportBox<'r, (&'r Ema2, &'r Ema2, &'r Ema2, &'r Ema2)>,
+            + ExportBox<'r, (&'r Ema2, &'r Ema2)>,
     {
         self.progress_cnt += 1;
         let msg = match mes {
@@ -736,8 +739,11 @@ impl State {
             cdb_num_learnt,
             _num_reduction,
         ) = cdb.exports();
-        let rst_num_block = rst.exports().0;
-        let (_, rst_asg, rst_lbd, _) = *rst.exports_box();
+        let rst_num_block = {
+            let n = rst.exports();
+            n.0 + n.2
+        };
+        let (rst_asg, rst_lbd) = *rst.exports_box();
         println!(
             "{:>3}#{:>8},{:>7},{:>7},{:>7},{:>6.3},,{:>7},{:>7},\
              {:>7},,{:>5},{:>5},{:>6.2},{:>6.2},,{:>7.2},{:>8.2},{:>8.2},,\
