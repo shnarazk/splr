@@ -24,16 +24,16 @@ trait ProgressEvaluator {
 pub enum ProgressUpdate {
     ///
     Counter(usize),
-    /// Conflict number after getting a new conflict
-    ACC(f64),
+    // /// Conflict number after getting a new conflict
+    // ACC(f64),
     /// The number of assigned vars after non-conflict propagation
     ASG(usize),
     /// LBD of a new learnt clause
     LBD(u16),
     /// Signal before each propagation
     Luby,
-    /// Maximum LBD used in conflict analysis
-    MLD(u16),
+    // /// Maximum LBD used in conflict analysis
+    // MLD(u16),
 }
 
 /// Restart modes
@@ -844,14 +844,14 @@ impl RestartIF for Restarter {
                 self.stb.update(val);
                 self.luby.update(self.after_restart);
             }
-            ProgressUpdate::ACC(_fval) => (), // self.acc.update(fval),
+            // ProgressUpdate::ACC(_fval) => (), // self.acc.update(fval),
             ProgressUpdate::ASG(val) => self.asg.update(val),
             ProgressUpdate::LBD(val) => {
                 self.lbd.update(val);
                 self.asg.shift();
             }
             ProgressUpdate::Luby => self.luby.update(0),
-            ProgressUpdate::MLD(_val) => (), // self.mld.update(val),
+            // ProgressUpdate::MLD(_val) => (), // self.mld.update(val),
         }
     }
 }

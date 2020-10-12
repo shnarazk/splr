@@ -157,7 +157,7 @@ pub fn handle_conflict(
     );
     asg.handle(SolverEvent::Conflict);
     // backtrack level by analyze
-    let bl_a = conflict_analyze(asg, cdb, rst, state, ci).max(asg.root_level);
+    let bl_a = conflict_analyze(asg, cdb, state, ci).max(asg.root_level);
     if state.new_learnt.is_empty() {
         #[cfg(debug)]
         {
@@ -265,7 +265,7 @@ pub fn handle_conflict(
                 act = a;
             }
         }
-        rst.update(ProgressUpdate::ACC(act));
+        // rst.update(ProgressUpdate::ACC(act));
 
         elim.to_simplify += 1.0 / (learnt_len - 1) as f64;
         if lbd <= 20 {
@@ -304,7 +304,7 @@ pub fn handle_conflict(
 fn conflict_analyze(
     asg: &mut AssignStack,
     cdb: &mut ClauseDB,
-    rst: &mut Restarter,
+    // rst: &mut Restarter,
     state: &mut State,
     conflicting_clause: ClauseId,
 ) -> DecisionLevel {
@@ -481,7 +481,7 @@ fn conflict_analyze(
     debug_assert!(learnt.iter().all(|l| *l != !p));
     debug_assert_eq!(asg.level(p.vi()), dl);
     learnt[0] = !p;
-    rst.update(ProgressUpdate::MLD(largest_clause));
+    // rst.update(ProgressUpdate::MLD(largest_clause));
     #[cfg(feature = "trace_analysis")]
     println!("- appending {}, the result is {:?}", learnt[0], learnt);
     state.minimize_learnt(asg, cdb)
