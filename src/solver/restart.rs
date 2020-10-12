@@ -11,6 +11,8 @@ use {
 trait ProgressEvaluator {
     /// map the value into a bool for forcing/blocking restart.
     fn is_active(&self) -> bool;
+    /// another map for stabilization.
+    fn slow_is_active(&self) -> bool;
     /// reset internal state to the initial one.
     fn reset_progress(&mut self) {}
     /// calculate and set up the next condition.
@@ -118,6 +120,9 @@ impl ProgressEvaluator for ProgressASG {
         // && self.threshold * (self.delta - self.asg) < (self.delta - self.ema.get())
         // && self.threshold * self.ema.get() < (self.asg)
     }
+    fn slow_is_active(&self) -> bool {
+        self.enable && self.threshold * (self.delta - self.asg) < (self.delta - self.ema.get())
+    }
     fn shift(&mut self) {
         self.ema.update(self.asg);
         self.asg = 0.0;
@@ -179,6 +184,9 @@ impl ProgressEvaluator for ProgressLBD {
     fn is_active(&self) -> bool {
         self.enable && self.threshold < self.ema.trend()
     }
+    fn slow_is_active(&self) -> bool {
+        self.enable && self.threshold.powi(2) < self.ema.trend()
+    }
     fn shift(&mut self) {}
 }
 
@@ -231,6 +239,9 @@ impl EmaIF for ProgressMLD {
 
 impl ProgressEvaluator for ProgressMLD {
     fn is_active(&self) -> bool {
+        self.enable && self.threshold < self.ema.trend()
+    }
+    fn slow_is_active(&self) -> bool {
         self.enable && self.threshold < self.ema.trend()
     }
     fn shift(&mut self) {}
@@ -298,6 +309,9 @@ impl ProgressEvaluator for ProgressACC {
     fn is_active(&self) -> bool {
         self.enable && self.threshold < self.correlation
     }
+    fn slow_is_active(&self) -> bool {
+        self.enable && self.threshold < self.correlation
+    }
     fn shift(&mut self) {
         if 0 < self.inc {
             self.num += 1;
@@ -339,6 +353,9 @@ impl EmaIF for ProgressLVL {
 
 impl ProgressEvaluator for ProgressLVL {
     fn is_active(&self) -> bool {
+        todo!()
+    }
+    fn slow_is_active(&self) -> bool {
         todo!()
     }
     fn shift(&mut self) {}
@@ -393,6 +410,9 @@ impl EmaIF for ProgressRCC {
 impl ProgressEvaluator for ProgressRCC {
     fn is_active(&self) -> bool {
         self.threshold < self.heat.get()
+    }
+    fn slow_is_active(&self) -> bool {
+        self.threshold < self.heat.get_slow()
     }
     fn shift(&mut self) {}
 }
@@ -463,6 +483,9 @@ impl EmaIF for LubySeries {
 impl ProgressEvaluator for LubySeries {
     fn is_active(&self) -> bool {
         self.enable && self.active
+    }
+    fn slow_is_active(&self) -> bool {
+        todo!()
     }
     fn shift(&mut self) {
         self.active = false;
@@ -571,6 +594,9 @@ impl ProgressEvaluator for GeometricStabilizer {
     fn is_active(&self) -> bool {
         self.enable && self.active
     }
+    fn slow_is_active(&self) -> bool {
+        todo!()
+    }
     fn reset_progress(&mut self) {
         if self.enable && 10_000 < self.step {
             self.active = false;
@@ -629,12 +655,8 @@ impl EmaIF for ProgressBucket {
     fn update(&mut self, d: usize) {
         self.sum += (d as f64).powf(self.power);
     }
-    fn get(&self) -> f64 {
-        todo!()
-    }
-    fn trend(&self) -> f64 {
-        todo!()
-    }
+    fn get(&self) -> f64 { todo!() }
+    fn trend(&self) -> f64 { todo!() }
 }
 
 impl ProgressEvaluator for ProgressBucket {
@@ -781,10 +803,7 @@ impl RestartIF for Restarter {
             self.acc.shift();
 
             if self.stb.is_active() {
-                let phase = (self.stb.num_active - self.stb.reset_at + 1) as f64;
-                let ratio = self.after_restart as f64 / (phase * 100.0); // / self.average_cpr as f64;
-                let beyond = phase * 100.0 < self.after_restart as f64;
-                if beyond && self.acc.get() < 0.25 * ratio * 0.7 {
+                if self.lbd.slow_is_active() {
                     self.after_restart = 0;
                     self.num_restart += 1;
                     self.num_restart_stabilized += 1;
@@ -804,8 +823,7 @@ impl RestartIF for Restarter {
             }
 
             if self.stb.is_active() {
-                let good_path = self.lbd.get() < self.mld.get() + 1.0;
-                if !good_path || !self.acc.is_active() {
+                if self.asg.is_active() {
                     self.after_restart = 0;
                     self.num_block += 1;
                     self.num_block_stabilized += 1;

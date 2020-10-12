@@ -13,7 +13,7 @@ pub struct Config {
     /// Eliminator switch
     a_elim: i32,
 
-    /// Rephase switch
+    /// Re-phase switch
     a_rephase: i32,
 
     /// Reason-Side Rewarding switch
@@ -124,10 +124,10 @@ pub struct Config {
     //
     //## vivifier
     //
-    /// Lower bound of vivif. loop
+    /// Lower bound of vivification loop
     pub viv_beg: f64,
 
-    /// Upper bound of vivif. loop
+    /// Upper bound of vivification loop
     pub viv_end: f64,
 
     /// Vivification interval
@@ -393,7 +393,7 @@ OPTIONS:
       --ADP <a-adaptive>   Strategy adaptation switch      {:>10}
       --ELI <a-elim>       Eliminator switch               {:>10}
       --RDC <a-reduce>     Clause reduction switch         {:>10}
-      --RPH <a-rephase>    Rephase switch                  {:>10}
+      --RPH <a-rephase>    Re-phase switch                 {:>10}
       --RSR <a-rsr>        Reason-Side Rewarding switch    {:>10}
       --STB <a-stabilize>  Stabilization switch            {:>10}
       --VIV <a-vivify>     Vivification switch             {:>10}
@@ -418,10 +418,10 @@ OPTIONS:
       --rmt <rst-mld-thr>  Usability to restart            {:>10}
       --rss <rst-stb-scl>  Stabilizer scaling              {:>10}
       --rs <rst-step>      #conflicts between restarts     {:>10}
-      --vib <viv-beg>      Lower bound of vivif. loop      {:>10}
-      --vie <viv-end>      Upper bound of vivif. loop      {:>10}
+      --vib <viv-beg>      Lower bound of vivify loop      {:>10}
+      --vie <viv-end>      Upper bound of vivify loop      {:>10}
       --vii <viv-int>      Vivification interval           {:>10}
-      --vis <viv-scale>    #reduction for next vivif.      {:>10}
+      --vis <viv-scale>    #reduction to vivify            {:>10}
       --vri <vrw-dcy-beg>  Initial var reward decay        {:>10}
       --vrm <vrw-dcy-end>  Maximum var reward decay        {:>10}
 

@@ -27,7 +27,7 @@ use {
 /// Normal results returned by Solver.
 #[derive(Debug, PartialEq)]
 pub enum Certificate {
-    /// It is satisifable; `vec` is such an assigment sorted by var order.
+    /// It is satisfiable; `vec` is such an assignment sorted by var order.
     SAT(Vec<i32>),
     /// It is unsatisfiable.
     UNSAT,
@@ -40,7 +40,7 @@ pub enum Certificate {
 /// * `SolverException::*` -- caused by a bug
 pub type SolverResult = Result<Certificate, SolverError>;
 
-/// define submodules' responsibilities
+/// define sub-modules' responsibilities
 #[derive(Clone, Copy, Debug)]
 pub enum SolverEvent {
     /// set up internal parameters.
@@ -57,7 +57,7 @@ pub enum SolverEvent {
     Instantiate,
     /// increment the number of vars.
     NewVar,
-    /// reinitialization for incremental solving.
+    /// re-initialization for incremental solving.
     Reinitialize,
     /// restart
     Restart,
@@ -123,7 +123,7 @@ pub struct SolverIter<'a> {
 
 #[cfg(feature = "incremental_solver")]
 impl Solver {
-    /// return an iterator on Solver. **Requires 'incremenal_solver' feature**
+    /// return an iterator on Solver. **Requires 'incremental_solver' feature**
     ///```
     ///for v in Solver::try_from("tests/sample.cnf").expect("panic").iter() {
     ///    println!(" - answer: {:?}", v);
