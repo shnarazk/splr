@@ -10,7 +10,7 @@ use {
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarRewardIF, VarSelectIF},
         cdb::{ClauseDB, ClauseDBIF},
         processor::{EliminateIF, Eliminator},
-        state::{Stat, State, StateIF},
+        state::{RephaseMode, Stat, State, StateIF},
         types::*,
     },
 };
@@ -243,14 +243,34 @@ fn search(
             }
         }
         match rst.restart(!ci.is_none()) {
+            Some(RestartDecision::Block) => match asg.num_conflict % 50 {
+                9 => asg.force_rephase(&RephaseMode::Force(true)),
+                19 => asg.force_rephase(&RephaseMode::Best),
+                29 => asg.force_rephase(&RephaseMode::Force(false)),
+                39 => asg.force_rephase(&RephaseMode::Invert),
+                49 => asg.force_rephase(&RephaseMode::Random),
+                _ => (),
+            },
+            Some(RestartDecision::Cancel) => (),
             Some(RestartDecision::Force) => {
                 asg.cancel_until(asg.root_level);
+                // match asg.num_conflict % 50 {
+                //     9 => asg.force_rephase(&RephaseMode::Force(true)),
+                //     19 => asg.force_rephase(&RephaseMode::Best),
+                //     29 => asg.force_rephase(&RephaseMode::Force(false)),
+                //     39 => asg.force_rephase(&RephaseMode::Invert),
+                //     49 => asg.force_rephase(&RephaseMode::Random),
+                //     _ => (),
+                // }
             }
             Some(RestartDecision::Stabilize) => {
                 asg.cancel_until(asg.root_level);
-                asg.force_rephase();
+                match asg.num_conflict % 10 {
+                    9 => asg.force_rephase(&RephaseMode::Best),
+                    _ => (),
+                }
             }
-            _ => (), // Some(RestartDecision::Block) | Some(RestartDecision::Cancel) | None
+            None => (),
         }
         // Simplification has been postponed because chronoBT was used.
         if asg.decision_level() == asg.root_level {
@@ -290,7 +310,7 @@ fn search(
                 // update `num_assigned` periodically, which isn't a monotonous increasing var.
                 num_assigned = asg.best_assigned(Flag::PHASE);
             }
-            let lit = asg.select_decision_literal(&state.phase_select);
+            let lit = asg.select_decision_literal();
             asg.assign_by_decision(lit);
             state[Stat::Decision] += 1;
             a_decision_was_made = true;

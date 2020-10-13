@@ -50,36 +50,28 @@ pub trait StateIF {
 
 /// Phase saving modes.
 #[derive(Debug, Eq, PartialEq)]
-pub enum PhaseMode {
+pub enum RephaseMode {
     /// use the best phase so far.
     Best,
-    /// mixing best and random values.
-    BestRnd,
+    /// force an assignment.
+    Force(bool),
     /// use the inverted phases.
     Invert,
-    /// the original saving mode.
-    Latest,
     /// use random values.
     Random,
-    /// use the best phases in the current segment.
-    Target,
-    ///
-    Worst,
 }
 
-impl fmt::Display for PhaseMode {
+impl fmt::Display for RephaseMode {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(
             formatter,
             "{}",
             match self {
-                PhaseMode::Best => "ps_Best",
-                PhaseMode::BestRnd => "ps_BestRnd",
-                PhaseMode::Invert => "ps_Invert",
-                PhaseMode::Latest => "ps_Lastest",
-                PhaseMode::Random => "ps_Random",
-                PhaseMode::Target => "ps_Target",
-                PhaseMode::Worst => "ps_Worst",
+                RephaseMode::Best => "ps_Best",
+                RephaseMode::Force(false) => "ps_ForceFalse",
+                RephaseMode::Force(true) => "ps_ForceOn",
+                RephaseMode::Invert => "ps_Invert",
+                RephaseMode::Random => "ps_Random",
             }
         )
     }
@@ -182,8 +174,6 @@ impl IndexMut<Stat> for [usize] {
 pub struct State {
     /// solver configuration
     pub config: Config,
-    /// phase saving selector
-    pub phase_select: PhaseMode,
     /// collection of statistics data
     pub stats: [usize; Stat::EndOfStatIndex as usize],
     /// stabilization mode
@@ -230,7 +220,6 @@ impl Default for State {
     fn default() -> State {
         State {
             config: Config::default(),
-            phase_select: PhaseMode::Latest,
             stats: [0; Stat::EndOfStatIndex as usize],
             stabilize: false,
             strategy: (SearchStrategy::Initial, 0),

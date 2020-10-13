@@ -115,7 +115,8 @@ impl EmaIF for ProgressASG {
 
 impl ProgressEvaluator for ProgressASG {
     fn is_active(&self) -> bool {
-        self.enable && self.threshold * (self.delta - self.asg) < (self.delta - self.ema.get())
+        self.enable // && self.threshold * (self.delta - self.asg) < (self.delta - self.ema.get())
+        && self.delta.sqrt() * self.threshold + self.ema.get() < self.asg
         // && (self.delta.sqrt() + self.ema.get()) * self.threshold < self.asg
         // && self.threshold * (self.delta - self.asg) < (self.delta - self.ema.get())
         // && self.threshold * self.ema.get() < (self.asg)
@@ -790,6 +791,8 @@ impl RestartIF for Restarter {
     fn stabilizing(&self) -> bool {
         self.stb.is_active()
     }
+    #[allow(clippy::collapsible_if)]
+    #[allow(clippy::needless_return)]
     fn restart(&mut self, after_conflict: bool) -> Option<RestartDecision> {
         if after_conflict {
             if self.luby.is_active() {

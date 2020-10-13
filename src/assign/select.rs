@@ -2,8 +2,8 @@
 use std::collections::BinaryHeap;
 /// Decision var selection
 use {
-    super::{AssignStack, Var, VarHeapIF, VarOrderIF, VarRewardIF},
-    crate::{state::PhaseMode, types::*},
+    super::{AssignStack, Var, VarHeapIF, VarOrderIF},
+    crate::{state::RephaseMode, types::*},
     std::slice::Iter,
 };
 
@@ -21,9 +21,9 @@ pub trait VarSelectIF {
     /// force assignments
     fn force_select_iter(&mut self, iterator: Option<Iter<'_, usize>>);
     /// force assignments
-    fn force_rephase(&mut self);
+    fn force_rephase(&mut self, phase: &RephaseMode);
     /// select a new decision variable.
-    fn select_decision_literal(&mut self, phase: &PhaseMode) -> Lit;
+    fn select_decision_literal(&mut self) -> Lit;
     /// save the current assignments to BEST_PHASE.
     fn save_phases(&mut self);
     /// update the internal heap on var order.
@@ -81,16 +81,40 @@ impl VarSelectIF for AssignStack {
             }
         }
     }
-    fn force_rephase(&mut self) {
-        if self.use_rephase {
-            for v in self.var.iter_mut() {
-                if v.is(Flag::REPHASE) {
-                    v.set(Flag::PHASE, v.is(Flag::BEST_PHASE));
+    fn force_rephase(&mut self, phase: &RephaseMode) {
+        if !self.use_rephase {
+            return;
+        }
+        let range = 1..(self.num_conflict / self.num_restart).min(self.var_order.len());
+        match phase {
+            RephaseMode::Best => {
+                for vi in range {
+                    let v = &mut self.var[vi];
+                    if v.is(Flag::REPHASE) {
+                        v.set(Flag::PHASE, v.is(Flag::BEST_PHASE));
+                    }
+                }
+            }
+            RephaseMode::Force(on) => {
+                for vi in range {
+                    self.var[vi].set(Flag::PHASE, *on);
+                }
+            }
+            RephaseMode::Invert => {
+                for vi in range {
+                    let b = !self.var[vi].is(Flag::PHASE);
+                    self.var[vi].set(Flag::PHASE, b);
+                }
+            }
+            RephaseMode::Random => {
+                for vi in range {
+                    let b = self.var[vi].timestamp % 2 == 0;
+                    self.var[vi].set(Flag::PHASE, b);
                 }
             }
         }
     }
-    fn select_decision_literal(&mut self, phase: &PhaseMode) -> Lit {
+    fn select_decision_literal(&mut self) -> Lit {
         #[cfg(feature = "temp_order")]
         {
             while let Some(lit) = self.temp_order.pop() {
@@ -100,18 +124,7 @@ impl VarSelectIF for AssignStack {
             }
         }
         let vi = self.select_var();
-        let p = match *phase {
-            // PhaseMode::Best => asg.var(vi).is(Flag::BEST_PHASE),
-            // PhaseMode::BestRnd => match ((asg.activity(vi) * 10000.0) as usize) % 8 {
-            //     0 => asg.var(vi).is(Flag::BEST_PHASE),
-            //     _ => asg.var(vi).is(Flag::PHASE),
-            // },
-            PhaseMode::Invert => !self.var[vi].is(Flag::PHASE),
-            PhaseMode::Latest => self.var[vi].is(Flag::PHASE),
-            PhaseMode::Random => ((self.activity(vi) * 10000.0) as usize) % 2 == 0,
-            // PhaseMode::Target => self.var[vi].is(Flag::TARGET_PHASE),
-            _ => self.var[vi].is(Flag::PHASE),
-        };
+        let p = self.var[vi].is(Flag::PHASE);
         Lit::from_assign(vi, p)
     }
     fn save_phases(&mut self) {
