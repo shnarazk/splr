@@ -785,6 +785,8 @@ pub enum RestartDecision {
     Force,
     /// We should restart now in stabilization mode
     Stabilize,
+    /// We don't have progress.
+    Stagnate(usize),
 }
 
 impl RestartIF for Restarter {
@@ -816,6 +818,11 @@ impl RestartIF for Restarter {
                     self.after_restart = 0;
                     self.num_restart += 1;
                     return Some(RestartDecision::Force);
+                }
+                if self.lbd.slow_is_active() && self.stb.reset_at + 3 < self.stb.num_active {
+                    return Some(RestartDecision::Stagnate(
+                        self.stb.num_active - self.stb.reset_at,
+                    ));
                 }
             }
             return None;

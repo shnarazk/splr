@@ -198,6 +198,7 @@ fn search(
 ) -> Result<bool, SolverError> {
     let mut a_decision_was_made = false;
     let mut num_assigned = asg.num_asserted_vars;
+    let mut seq = 0;
     let use_stabilize = state.config.use_stabilize();
     let use_vivify = state.config.use_vivify();
     rst.update(ProgressUpdate::Luby);
@@ -242,34 +243,32 @@ fn search(
                 }
             }
         }
-        match rst.restart(!ci.is_none()) {
-            Some(RestartDecision::Block) => match asg.num_conflict % 50 {
-                9 => asg.force_rephase(&RephaseMode::Force(true)),
-                19 => asg.force_rephase(&RephaseMode::Best),
-                29 => asg.force_rephase(&RephaseMode::Force(false)),
-                39 => asg.force_rephase(&RephaseMode::Invert),
-                49 => asg.force_rephase(&RephaseMode::Random),
-                _ => (),
-            },
-            Some(RestartDecision::Cancel) => (),
-            Some(RestartDecision::Force) => {
-                asg.cancel_until(asg.root_level);
-                // match asg.num_conflict % 50 {
-                //     9 => asg.force_rephase(&RephaseMode::Force(true)),
-                //     19 => asg.force_rephase(&RephaseMode::Best),
-                //     29 => asg.force_rephase(&RephaseMode::Force(false)),
-                //     39 => asg.force_rephase(&RephaseMode::Invert),
-                //     49 => asg.force_rephase(&RephaseMode::Random),
-                //     _ => (),
-                // }
+        let mut rephasing = |modulo: usize| {
+            if asg.num_conflict % modulo == 0 {
+                match seq % 5 {
+                    1 => asg.force_rephase(&RephaseMode::Force(true)),
+                    2 => asg.force_rephase(&RephaseMode::Force(false)),
+                    3 => asg.force_rephase(&RephaseMode::Invert),
+                    4 => asg.force_rephase(&RephaseMode::Random),
+                    _ => asg.force_rephase(&RephaseMode::Best),
+                }
+                if 4 <= seq {
+                    seq = 0;
+                } else {
+                    seq += 1;
+                }
+                state[Stat::ForcePhase] += 1;
             }
+        };
+        match rst.restart(!ci.is_none()) {
+            Some(RestartDecision::Block) => rephasing(10),
+            Some(RestartDecision::Cancel) => rephasing(100),
+            Some(RestartDecision::Force) => asg.cancel_until(asg.root_level),
             Some(RestartDecision::Stabilize) => {
                 asg.cancel_until(asg.root_level);
-                match asg.num_conflict % 10 {
-                    9 => asg.force_rephase(&RephaseMode::Best),
-                    _ => (),
-                }
+                asg.force_rephase(&RephaseMode::Best);
             }
+            Some(RestartDecision::Stagnate(k)) => rephasing(100 / k),
             None => (),
         }
         // Simplification has been postponed because chronoBT was used.

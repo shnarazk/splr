@@ -144,6 +144,8 @@ impl SearchStrategy {
 pub enum Stat {
     /// the number of decision
     Decision,
+    /// the number of forcing phases
+    ForcePhase,
     /// the number of 'no decision conflict'
     NoDecisionConflict,
     /// the number of vivification
@@ -535,11 +537,12 @@ impl StateIF for State {
             im!("{:>9}", self, LogUsizeId::RestartCancel, rst_num_sblk),
         );
         println!(
-            "\x1B[2K         EMA|tLBD:{}, tASG:{}, eMLD:{}, eCCC:{} ",
+            "\x1B[2K         EMA|tLBD:{}, tASG:{}, eMLD:{}, frPh:{} ",
             fm!("{:>9.4}", self, LogF64Id::TrendLBD, rst_lbd.trend()),
             fm!("{:>9.4}", self, LogF64Id::TrendASG, rst_asg.trend()),
             fm!("{:>9.4}", self, LogF64Id::EmaMLD, 0.0), // rst_mld.get()),
-            fm!("{:>9.4}", self, LogF64Id::EmaCCC, 0.0), // rst_acc.get()),
+            // fm!("{:>9.4}", self, LogF64Id::EmaCCC, 0.0), // rst_acc.get()),
+            im!("{:>9}", self, LogUsizeId::End, self[Stat::ForcePhase]), // rst_acc.get()),
         );
         println!(
             "\x1B[2K    Conflict|eLBD:{}, cnfl:{}, bjmp:{}, /ppc:{} ",
