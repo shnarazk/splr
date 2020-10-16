@@ -243,32 +243,37 @@ fn search(
                 }
             }
         }
-        let mut rephasing = |modulo: usize| {
+        /* let mut rephasing = |modulo: usize| {
             if asg.num_conflict % modulo == 0 {
-                match seq % 5 {
-                    1 => asg.force_rephase(&RephaseMode::Force(true)),
-                    2 => asg.force_rephase(&RephaseMode::Force(false)),
-                    3 => asg.force_rephase(&RephaseMode::Invert),
-                    4 => asg.force_rephase(&RephaseMode::Random),
-                    _ => asg.force_rephase(&RephaseMode::Best),
+                let n = seq % 10000;
+                if n < 5 {
+                    state[Stat::ForcePhase] += 1;
+                    match n {
+                        0 => asg.force_rephase(&RephaseMode::Force(true)),
+                        1 => asg.force_rephase(&RephaseMode::Force(false)),
+                        2 => asg.force_rephase(&RephaseMode::Invert),
+                        3 => asg.force_rephase(&RephaseMode::Random),
+                        4 => asg.force_rephase(&RephaseMode::Best),
+                        _ => (),
+                    }
                 }
-                if 4 <= seq {
+                if 9999 <= seq {
                     seq = 0;
                 } else {
                     seq += 1;
                 }
-                state[Stat::ForcePhase] += 1;
+
             }
-        };
+        }; */
         match rst.restart(!ci.is_none()) {
-            Some(RestartDecision::Block) => rephasing(10),
-            Some(RestartDecision::Cancel) => rephasing(100),
+            Some(RestartDecision::Block) => (),  // rephasing(10),
+            Some(RestartDecision::Cancel) => (), // rephasing(100),
             Some(RestartDecision::Force) => asg.cancel_until(asg.root_level),
             Some(RestartDecision::Stabilize) => {
                 asg.cancel_until(asg.root_level);
                 asg.force_rephase(&RephaseMode::Best);
             }
-            Some(RestartDecision::Stagnate(k)) => rephasing(100 / k),
+            Some(RestartDecision::Stagnate(_)) => (),
             None => (),
         }
         // Simplification has been postponed because chronoBT was used.
