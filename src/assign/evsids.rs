@@ -7,7 +7,7 @@ use {
 
 impl VarRewardIF for AssignStack {
     #[inline]
-    fn activity(&mut self, vi: VarId) -> f64 {
+    fn activity(&self, vi: VarId) -> f64 {
         self.var[vi].reward
     }
     fn initialize_reward(&mut self, _iterator: Iter<'_, usize>) {
