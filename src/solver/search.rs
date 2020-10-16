@@ -198,7 +198,7 @@ fn search(
 ) -> Result<bool, SolverError> {
     let mut a_decision_was_made = false;
     let mut num_assigned = asg.num_asserted_vars;
-    let mut seq = 0;
+    // let mut seq = 0;
     let use_stabilize = state.config.use_stabilize();
     let use_vivify = state.config.use_vivify();
     rst.update(ProgressUpdate::Luby);
