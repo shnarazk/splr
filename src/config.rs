@@ -338,7 +338,7 @@ impl Config {
                 }
             } else if arg.starts_with('-') {
                 let flags = ["C", "q", "c", "l", "h", "V"];
-                let options_path = ["o", "p", "r"];
+                let options_path = ["o", "p", "r", "t"];
                 let name = &arg[1..];
                 if flags.contains(&name) {
                     match name {
@@ -356,6 +356,7 @@ impl Config {
                             "o" => self.io_odir = PathBuf::from(val),
                             "p" => self.io_pfile = PathBuf::from(val),
                             "r" => self.io_rfile = PathBuf::from(val),
+                            "t" => self.c_tout = val.parse::<f64>().expect("-t requires a number"),
                             _ => panic!("invalid option: {}", name),
                         }
                     } else {
