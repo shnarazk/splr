@@ -16,7 +16,7 @@ use {
         thread,
         time::Duration,
     },
-    // clap::{App, Arg, Clap},
+    clap::{App, Arg},
 };
 
 const RED: &str = "\x1B[001m\x1B[031m";
@@ -41,15 +41,15 @@ fn colored(v: Result<bool, &SolverError>, quiet: bool) -> Cow<'static, str> {
 }
 
 fn main() {
-    // let matches = App::new("Splr")
-    //     .arg(Arg::new("ADP")
-    //          .long("ADP")
-    //          .value_name("ADP")
-    //          .default_value("1")
-    //          .about("Strategy adaptation switch"));
-    // let parsed = matches.get_matches();
-    // let adp: usize = parsed.value_of("ADP").unwrap().parse::<usize>().unwrap();
-    let mut config = Config::parse();
+    let matches = App::new("Splr")
+        .arg(Arg::new("ADP")
+             .long("ADP")
+             .value_name("ADP")
+             .default_value("1")
+             .about("Strategy adaptation switch"));
+    let parsed = matches.get_matches();
+    let adp: usize = parsed.value_of("ADP").unwrap().parse::<usize>().unwrap();
+    let mut config = Config::default();
     // config.inject_from_args();
     config.splr_interface = true;
     if !config.cnf_file.exists() {
