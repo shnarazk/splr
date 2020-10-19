@@ -80,6 +80,11 @@ impl VarSelectIF for AssignStack {
                 }
             }
         }
+        for i in 1..self.var_order.len() {
+            let vi = self.var_order.heap[i];
+            self.temp_order
+                .push(Lit::from_assign(vi, self.var[vi].is(Flag::PHASE)));
+        }
     }
     fn force_rephase(&mut self, phase: &RephaseMode) {
         if !self.use_rephase {
@@ -115,7 +120,7 @@ impl VarSelectIF for AssignStack {
         }
     }
     fn select_decision_literal(&mut self) -> Lit {
-        #[cfg(feature = "temp_order")]
+        // #[cfg(feature = "temp_order")]
         {
             while let Some(lit) = self.temp_order.pop() {
                 if self.assign[lit.vi()].is_none() && !self.var[lit.vi()].is(Flag::ELIMINATED) {

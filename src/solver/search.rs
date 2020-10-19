@@ -204,6 +204,7 @@ fn search(
     rst.update(ProgressUpdate::Luby);
     state.stabilize = false;
     let sv = asg.var_stats();
+    let mut mega_flip = 2_000_000;
     rst.handle(SolverEvent::Eliminate(sv.0 - sv.2));
 
     loop {
@@ -305,6 +306,10 @@ fn search(
             // By simplification, we may get further solutions.
             if asg.num_asserted_vars < asg.stack_len() {
                 asg.num_asserted_vars = asg.stack_len();
+            }
+            if !state.stabilize && mega_flip < asg.num_conflict {
+                mega_flip += 2_000_000;
+                asg.force_select_iter(None);
             }
         }
         if !asg.remains() {
