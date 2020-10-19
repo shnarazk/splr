@@ -1,16 +1,18 @@
 /// Crate `config` provides solver's configuration and CLI.
-use {crate::types::DecisionLevel, std::path::PathBuf};
+use {crate::types::DecisionLevel, std::path::PathBuf, clap::Clap};
 
 /// Configuration built from command line options
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Clap)]
 pub struct Config {
     //
     // Switches
     //
     /// Strategy adaptation switch
+    #[clap(long = "ADP", default_value = "1")]
     a_adaptive: i32,
 
     /// Eliminator switch
+    #[clap(skip)]
     a_elim: i32,
 
     /// Re-phase switch
@@ -47,6 +49,7 @@ pub struct Config {
     //## I/O configuration
     //
     /// Build Splr interface
+    #[clap(skip)]
     pub splr_interface: bool,
 
     /// DIMACS CNF file
@@ -66,15 +69,19 @@ pub struct Config {
     pub io_rfile: PathBuf,
 
     /// Disable coloring
+    #[clap(skip)]
     pub no_color: bool,
 
     /// Disable any progress message
+    #[clap(skip)]
     pub quiet_mode: bool,
 
     /// Writes a DRAT UNSAT certification file
+    #[clap(skip)]
     pub use_certification: bool,
 
     /// Uses Glucose-like progress report
+    #[clap(skip)]
     pub use_log: bool,
 
     //
