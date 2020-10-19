@@ -16,6 +16,7 @@ use {
         thread,
         time::Duration,
     },
+    structopt::StructOpt,
 };
 
 const RED: &str = "\x1B[001m\x1B[031m";
@@ -40,7 +41,7 @@ fn colored(v: Result<bool, &SolverError>, quiet: bool) -> Cow<'static, str> {
 }
 
 fn main() {
-    let mut config = Config::default();
+    let mut config = Config::from_args();
     config.inject_from_args();
     config.splr_interface = true;
     if !config.cnf_file.exists() {
