@@ -229,6 +229,7 @@ fn search(
             let na = asg.best_assigned(Flag::PHASE);
             if num_assigned < na {
                 num_assigned = na;
+                state.unreachable = asg.num_vars - num_assigned;
                 state.flush("");
                 state.flush(format!("unreachable: {}", asg.num_vars - num_assigned));
             }

@@ -213,6 +213,8 @@ pub struct State {
     pub start: Instant,
     /// upper limit for timeout handling
     pub time_limit: f64,
+    /// the size of unreachable core
+    pub unreachable: usize,
     #[cfg(dump)]
     /// for dumping debugging information for developers
     pub development: Vec<(usize, f64, f64, f64, f64, f64)>,
@@ -239,6 +241,7 @@ impl Default for State {
             record: ProgressRecord::default(),
             start: Instant::now(),
             time_limit: 0.0,
+            unreachable: 0,
             #[cfg(dump)]
             development: Vec::new(),
         }
@@ -537,12 +540,18 @@ impl StateIF for State {
             im!("{:>9}", self, LogUsizeId::RestartCancel, rst_num_sblk),
         );
         println!(
-            "\x1B[2K         EMA|tLBD:{}, tASG:{}, eMLD:{}, frPh:{} ",
+            "\x1B[2K         EMA|tLBD:{}, tASG:{}, sASG:{}, core:{} ",
             fm!("{:>9.4}", self, LogF64Id::TrendLBD, rst_lbd.trend()),
             fm!("{:>9.4}", self, LogF64Id::TrendASG, rst_asg.trend()),
-            fm!("{:>9.4}", self, LogF64Id::EmaMLD, 0.0), // rst_mld.get()),
+            //fm!("{:>9.4}", self, LogF64Id::EmaMLD, 0.0), // rst_mld.get()),
+            im!(
+                "{:>9}",
+                self,
+                LogUsizeId::End,
+                asg_num_vars - asg_num_eliminated_vars - rst_asg.get_slow() as usize
+            ), // rst_mld.get()),
             // fm!("{:>9.4}", self, LogF64Id::EmaCCC, 0.0), // rst_acc.get()),
-            im!("{:>9}", self, LogUsizeId::End, self[Stat::ForcePhase]), // rst_acc.get()),
+            im!("{:>9}", self, LogUsizeId::End, self.unreachable), // rst_acc.get()),
         );
         println!(
             "\x1B[2K    Conflict|eLBD:{}, cnfl:{}, bjmp:{}, /ppc:{} ",

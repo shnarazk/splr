@@ -2,16 +2,15 @@ use {
     super::{CertifiedRecord, Clause, ClauseDB, ClauseId, WatchDBIF, LBDIF},
     crate::{assign::AssignIF, solver::SolverEvent, state::SearchStrategy, types::*},
     std::{
-        cmp::Ordering,
         ops::{Index, IndexMut, Range, RangeFrom},
         slice::{Iter, IterMut},
     },
 };
 
-const ACTIVITY_MAX: f64 = 1e308;
-
 /// API for clause management like `reduce`, `simplify`, `new_clause`, and so on.
-pub trait ClauseDBIF: IndexMut<ClauseId, Output = Clause> {
+pub trait ClauseDBIF:
+    ActivityIF<Ix = ClauseId, Inc = usize> + IndexMut<ClauseId, Output = Clause>
+{
     /// return the length of `clause`.
     fn len(&self) -> usize;
     /// return true if it's empty.
@@ -189,30 +188,17 @@ impl IndexMut<RangeFrom<usize>> for ClauseDB {
 
 impl ActivityIF for ClauseDB {
     type Ix = ClauseId;
-    type Inc = ();
+    type Inc = usize;
     fn activity(&mut self, ci: Self::Ix) -> f64 {
         self[ci].reward
     }
     fn set_activity(&mut self, ci: Self::Ix, val: f64) {
         self[ci].reward = val;
     }
-    fn bump_activity(&mut self, cid: Self::Ix, _: Self::Inc) {
-        let c = &mut self.clause[cid.ordinal as usize];
-        let a = c.reward + self.activity_inc;
-        c.reward = a;
-        if ACTIVITY_MAX < a {
-            let scale = 1.0 / self.activity_inc;
-            for c in &mut self.clause[1..] {
-                if c.is(Flag::LEARNT) {
-                    c.reward *= scale;
-                }
-            }
-            self.activity_inc *= scale;
-        }
+    fn bump_activity(&mut self, cid: Self::Ix, now: Self::Inc) {
+        self.clause[cid.ordinal as usize].bump_activity(now);
     }
-    fn scale_activity(&mut self) {
-        self.activity_inc /= self.activity_decay;
-    }
+    fn scale_activity(&mut self) {}
 }
 
 impl Instantiate for ClauseDB {
@@ -518,12 +504,11 @@ impl ClauseDBIF for ClauseDB {
             debug_assert!(c.lits.is_empty()); // c.lits.clear();
             std::mem::swap(&mut c.lits, vec);
             c.rank = rank as u16;
-            c.reward = reward;
             c.search_from = 2;
+            c.reward = reward;
         } else {
             cid = ClauseId::from(self.clause.len());
             let mut c = Clause {
-                flags: Flag::empty(),
                 rank: rank as u16,
                 reward,
                 ..Clause::default()
@@ -787,11 +772,15 @@ impl ClauseDB {
             ..
         } = self;
         self.next_reduction += self.inc_step;
-        let mut perm = Vec::with_capacity(clause.len());
+        let mut perm: Vec<usize> = Vec::with_capacity(clause.len());
+        let now = asg.exports().0;
         for (i, c) in clause.iter_mut().enumerate().skip(1) {
             let used = c.is(Flag::JUST_USED);
             if c.is(Flag::LEARNT) && !c.is(Flag::DEAD) && !asg.locked(c, ClauseId::from(i)) && !used
             {
+                if c.timestamp < now {
+                    c.decay_activity(now)
+                }
                 perm.push(i);
             }
             if used {
@@ -802,24 +791,20 @@ impl ClauseDB {
             return;
         }
         let keep = perm.len() / 2;
-        if self.use_chan_seok {
-            perm.sort_by(|&a, &b| clause[a].cmp_activity(&clause[b]));
-        } else {
-            perm.sort_by(|&a, &b| clause[a].cmp(&clause[b]));
-            if clause[perm[keep]].rank <= 3 {
-                self.next_reduction += self.extra_inc;
-            }
-            if clause[perm[0]].rank <= 5 {
-                self.next_reduction += self.extra_inc;
-            };
+        perm.sort_unstable();
+        if clause[perm[keep]].rank <= 3 {
+            self.next_reduction += self.extra_inc;
         }
+        if clause[perm[0]].rank <= 5 {
+            self.next_reduction += self.extra_inc;
+        };
         for i in &perm[keep..] {
             let c = &mut clause[*i];
-            if 2 < c.rank {
+            if 3 < c.rank {
                 c.kill(touched);
             }
         }
-        debug_assert!(perm[0..keep].iter().all(|cid| !clause[*cid].is(Flag::DEAD)));
+        debug_assert!(perm[0..keep].iter().all(|i| !clause[*i].is(Flag::DEAD)));
         self.garbage_collect();
     }
     /// change good learnt clauses to permanent one.
@@ -842,16 +827,6 @@ impl ClauseDB {
 }
 
 impl Clause {
-    #[allow(clippy::comparison_chain)]
-    fn cmp_activity(&self, other: &Clause) -> Ordering {
-        if self.reward > other.reward {
-            Ordering::Less
-        } else if other.reward > self.reward {
-            Ordering::Greater
-        } else {
-            Ordering::Equal
-        }
-    }
     /// make a clause *dead*; the clause still exists in clause database as a garbage.
     fn kill(&mut self, touched: &mut [bool]) {
         self.turn_on(Flag::DEAD);

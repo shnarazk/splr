@@ -312,6 +312,7 @@ fn conflict_analyze(
     let learnt = &mut state.new_learnt;
     learnt.clear();
     learnt.push(NULL_LIT);
+    let now = asg.exports().0;
     let dl = asg.decision_level();
     let mut p = cdb[conflicting_clause].lits[0];
     #[cfg(feature = "trace_analysis")]
@@ -364,7 +365,7 @@ fn conflict_analyze(
                 println!("analyze {}", p);
                 debug_assert!(!cid.is_none());
                 cdb.mark_clause_as_used(asg, cid);
-                cdb.bump_activity(cid, ());
+                cdb.bump_activity(cid, now);
                 let c = &cdb[cid];
                 if !c.is(Flag::LEARNT) {
                     state.derive20.push(cid);

@@ -270,12 +270,12 @@ impl PropagateIF for AssignStack {
                                 .get_unchecked_mut(usize::from(!*lk))
                                 .register(first, w.c);
                             n -= 1;
-                            source.detach(n);
                             lits.swap(1, k);
                             *search_from = k + 1;
                             if *search_from == len {
                                 *search_from = 2;
                             }
+                            source.detach(n);
                             continue 'next_clause;
                         }
                     }

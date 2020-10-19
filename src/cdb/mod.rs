@@ -58,6 +58,8 @@ pub struct Clause {
     pub search_from: usize,
     /// A dynamic clause evaluation criterion based on the number of references.
     reward: f64,
+    /// the conflict at which the clause used in conflict analysis
+    timestamp: usize,
     /// Flags
     flags: Flag,
 }

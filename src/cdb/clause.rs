@@ -25,6 +25,7 @@ impl Default for Clause {
             rank: 0,
             search_from: 2,
             reward: 0.0,
+            timestamp: 0,
             flags: Flag::empty(),
         }
     }
@@ -175,5 +176,19 @@ impl fmt::Display for Clause {
             st(Flag::DEAD, ", dead"),
             st(Flag::ENQUEUED, ", enqueued"),
         )
+    }
+}
+
+const DECAY: f64 = 0.995;
+
+impl Clause {
+    pub fn bump_activity(&mut self, now: usize) {
+        self.decay_activity(now);
+        self.reward += 1.0 - DECAY
+    }
+    pub fn decay_activity(&mut self, now: usize) {
+        let duration = now - self.timestamp + 1;
+        self.reward *= DECAY.powf(duration as f64);
+        self.timestamp = now;
     }
 }
