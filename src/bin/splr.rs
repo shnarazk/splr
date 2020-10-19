@@ -16,6 +16,7 @@ use {
         thread,
         time::Duration,
     },
+    clap::{Arg, App},
 };
 
 const RED: &str = "\x1B[001m\x1B[031m";
@@ -40,6 +41,13 @@ fn colored(v: Result<bool, &SolverError>, quiet: bool) -> Cow<'static, str> {
 }
 
 fn main() {
+    let parser = App::new("Splr")
+        .arg(Arg::with_name("a_adaptive")
+             .long("ADP")
+             .default_value("1")
+             .help("Strategy adaptation switch"))
+        ;
+    let matches = parser.get_matches();
     let mut config = Config::default();
     config.inject_from_args();
     config.splr_interface = true;

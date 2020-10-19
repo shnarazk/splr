@@ -13,6 +13,7 @@ categories = ["mathematics", "science"]
 
 [dependencies]
 bitflags = "1.2"
+clap = "2.33.3"
 
 [features]
 boundary_check = []
