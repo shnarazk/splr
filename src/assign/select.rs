@@ -120,7 +120,7 @@ impl VarSelectIF for AssignStack {
         }
     }
     fn select_decision_literal(&mut self) -> Lit {
-        // #[cfg(feature = "temp_order")]
+        #[cfg(feature = "temp_order")]
         {
             while let Some(lit) = self.temp_order.pop() {
                 if self.assign[lit.vi()].is_none() && !self.var[lit.vi()].is(Flag::ELIMINATED) {
