@@ -16,7 +16,7 @@ use {
         thread,
         time::Duration,
     },
-    // clap::{App, Arg, Clap},
+    clap::Clap,
 };
 
 const RED: &str = "\x1B[001m\x1B[031m";
