@@ -187,7 +187,7 @@ impl Clause {
         self.reward += 1.0 - DECAY
     }
     pub fn decay_activity(&mut self, now: usize) {
-        let duration = now - self.timestamp + 1;
+        let duration = now - self.timestamp;
         self.reward *= DECAY.powf(duration as f64);
         self.timestamp = now;
     }

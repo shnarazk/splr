@@ -38,9 +38,10 @@ impl VarRewardIF for AssignStack {
         let v = &mut self.var[vi];
         let duration = (self.ordinal + 1 - v.timestamp) as f64;
         let decay = self.activity_decay;
-        let rate = v.participated as f64 / duration;
+        // assert!((v.participated as f64) <= duration, format!("{}, {}", v.participated, duration));
+        let rate = ((v.participated + 1) as f64).log(2.0) / (1.0 + duration).log(2.0);
         v.reward *= decay;
-        v.reward += (1.0 - decay) * rate.powf(0.4);
+        v.reward += (1.0 - decay) * rate.min(1.0);
         v.participated = 0;
     }
     fn reward_update(&mut self) {
