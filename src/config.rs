@@ -168,8 +168,8 @@ impl Default for Config {
             io_odir: PathBuf::from("."),
             io_pfile: PathBuf::from("proof.out"),
             io_rfile: PathBuf::new(),
-            no_color: true,
-            quiet_mode: true,
+            no_color: false,
+            quiet_mode: false,
             use_certification: false,
             use_log: false,
 
