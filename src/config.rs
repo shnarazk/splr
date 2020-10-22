@@ -165,8 +165,8 @@ impl Default for Config {
 
             splr_interface: false,
             cnf_file: PathBuf::new(),
-            io_odir: PathBuf::new(),
-            io_pfile: PathBuf::new(),
+            io_odir: PathBuf::from("."),
+            io_pfile: PathBuf::from("proof.out"),
             io_rfile: PathBuf::new(),
             no_color: true,
             quiet_mode: true,
