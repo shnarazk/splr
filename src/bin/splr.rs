@@ -1,6 +1,5 @@
 // SAT solver for Propositional Logic in Rust
 use {
-    libc::{clock_gettime, timespec, CLOCK_PROCESS_CPUTIME_ID},
     splr::{
         cdb::CertifiedRecord,
         solver::*,
@@ -17,7 +16,6 @@ use {
         thread,
         time::Duration,
     },
-    structopt::StructOpt,
 };
 
 const RED: &str = "\x1B[001m\x1B[031m";
@@ -42,7 +40,8 @@ fn colored(v: Result<bool, &SolverError>, quiet: bool) -> Cow<'static, str> {
 }
 
 fn main() {
-    let mut config = Config::from_args().override_args();
+    let mut config = Config::default();
+    config.inject_from_args();
     config.splr_interface = true;
     if !config.cnf_file.exists() {
         println!(
@@ -82,7 +81,7 @@ fn main() {
     let mut s = Solver::build(&config).expect("failed to load");
     let res = s.solve();
     save_result(&s, &res, &cnf_file, ans_file);
-    if 0 < s.state.config.io_dump && !s.state.development.is_empty() {
+    /* if 0 < s.state.config.io_dump && !s.state.development.is_empty() {
         let dump = config.cnf_file.file_stem().unwrap().to_str().unwrap();
         if let Ok(f) = File::create(format!("stat_{}.csv", dump)) {
             let mut buf = BufWriter::new(f);
@@ -95,7 +94,7 @@ fn main() {
                 .unwrap();
             }
         }
-    }
+    } */
     std::process::exit(match res {
         Ok(Certificate::SAT(_)) => 10,
         Ok(Certificate::UNSAT) => 20,
@@ -270,20 +269,8 @@ fn save_proof<S: AsRef<str> + std::fmt::Display>(s: &Solver, input: S, output: &
 
 fn report(s: &Solver, out: &mut dyn Write) -> std::io::Result<()> {
     let state = &s.state;
-    let tm = {
-        let mut time = timespec {
-            tv_sec: 0,
-            tv_nsec: 0,
-        };
-        if unsafe { clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &mut time) } == -1 {
-            match state.start.elapsed() {
-                Ok(e) => e.as_secs() as f64 + f64::from(e.subsec_millis()) / 1000.0f64,
-                Err(_) => 0.0f64,
-            }
-        } else {
-            time.tv_sec as f64 + time.tv_nsec as f64 / 1_000_000_000.0f64
-        }
-    };
+    let elapsed: Duration = s.state.start.elapsed();
+    let tm: f64 = elapsed.as_millis() as f64 / 1_000.0;
     out.write_all(
         format!(
             "c {:<43}, #var:{:9}, #cls:{:9}\n",

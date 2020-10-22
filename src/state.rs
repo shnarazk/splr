@@ -11,12 +11,8 @@ use {
         fmt,
         io::{stdout, Write},
         ops::{Index, IndexMut},
+        time::{Duration, Instant},
     },
-};
-#[cfg(feature = "libc")]
-use {
-    libc::{clock_gettime, timespec, CLOCK_PROCESS_CPUTIME_ID},
-    std::time::SystemTime,
 };
 
 /// API for state/statistics management, providing `progress`.
@@ -222,8 +218,7 @@ pub struct State {
     /// keep the previous statistics values
     pub record: ProgressRecord,
     /// start clock for timeout handling
-    #[cfg(feature = "libc")]
-    pub start: SystemTime,
+    pub start: Instant,
     /// upper limit for timeout handling
     pub time_limit: f64,
     /// for dumping debugging information for developers
@@ -250,8 +245,7 @@ impl Default for State {
             derive20: Vec::new(),
             progress_cnt: 0,
             record: ProgressRecord::default(),
-            #[cfg(feature = "libc")]
-            start: SystemTime::now(),
+            start: Instant::now(),
             time_limit: 0.0,
             development: Vec::new(),
         }
@@ -394,32 +388,13 @@ macro_rules! f {
 
 impl StateIF for State {
     fn is_timeout(&self) -> bool {
-        #[cfg(feature = "libc")]
-        {
-            if self.time_limit == 0.0 {
-                return false;
-            }
-            match self.start.elapsed() {
-                Ok(e) => self.time_limit <= e.as_secs() as f64,
-                Err(_) => false,
-            }
-        }
-        #[cfg(not(feature = "libc"))]
-        false
+        Duration::from_secs(self.config.c_tout as u64) < self.start.elapsed()
     }
     fn elapsed(&self) -> Option<f64> {
-        #[cfg(feature = "libc")]
-        {
-            if self.time_limit == 0.0 {
-                return Some(0.0);
-            }
-            match self.start.elapsed() {
-                Ok(e) => Some(e.as_secs() as f64 / self.time_limit),
-                Err(_) => None,
-            }
-        }
-        #[cfg(not(feature = "libc"))]
-        Some(0.0)
+        Some(
+            self.start.elapsed().as_secs_f64()
+                / Duration::from_secs(self.config.c_tout as u64).as_secs_f64(),
+        )
     }
     fn select_strategy<A, C>(&mut self, asg: &A, cdb: &C)
     where
@@ -613,22 +588,8 @@ impl StateIF for State {
 }
 
 impl fmt::Display for State {
-    #[cfg(feature = "libc")]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let tm = {
-            let mut time = timespec {
-                tv_sec: 0,
-                tv_nsec: 0,
-            };
-            if unsafe { clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &mut time) } == -1 {
-                match self.start.elapsed() {
-                    Ok(e) => e.as_secs() as f64 + f64::from(e.subsec_millis()) / 1000.0f64,
-                    Err(_) => 0.0f64,
-                }
-            } else {
-                time.tv_sec as f64 + time.tv_nsec as f64 / 1_000_000_000.0f64
-            }
-        };
+        let tm: f64 = (self.start.elapsed().as_millis() as f64) / 1_000.0;
         let vc = format!(
             "{},{}",
             self.target.num_of_variables, self.target.num_of_clauses,
@@ -655,29 +616,6 @@ impl fmt::Display for State {
                 tm,
                 w = width - fnlen,
             )
-        }
-    }
-    #[cfg(not(feature = "libc"))]
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let vc = format!(
-            "{},{}",
-            self.target.num_of_variables, self.target.num_of_clauses,
-        );
-        let vclen = vc.len();
-        let width = 59 + 16;
-        let mut fname = match &self.target.pathname {
-            CNFIndicator::Void => "(no cnf)".to_string(),
-            CNFIndicator::File(f) => f.to_string(),
-            CNFIndicator::LitVec(n) => format!("(embedded {} element vector)", n),
-        };
-        if width <= fname.len() {
-            fname.truncate(width - vclen - 1);
-        }
-        let fnlen = fname.len();
-        if width < vclen + fnlen + 1 {
-            write!(f, "{:<w$}", fname, w = width)
-        } else {
-            write!(f, "{}{:>w$}", fname, &vc, w = width - fnlen,)
         }
     }
 }
