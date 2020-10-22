@@ -227,7 +227,7 @@ pub fn handle_conflict(
         }
     }
     cdb.scale_activity();
-    if 0 < state.config.io_dump && num_conflict % state.config.io_dump == 0 {
+    /* if 0 < state.config.io_dump && num_conflict % state.config.io_dump == 0 {
         let (rst_num_block, rst_num_restart, _, _) = rst.exports();
         let (_rst_acc, rst_asg, rst_lbd, _rst_mld) = *rst.exports_box();
         state.development.push((
@@ -239,7 +239,7 @@ pub fn handle_conflict(
             rst_asg.trend().min(10.0),
             rst_lbd.trend().min(10.0),
         ));
-    }
+    } */
     if cdb.check_and_reduce(asg, num_conflict) {
         state.to_vivify += if cdb.active_mode() { 0.005 } else { 1.0 };
     }
