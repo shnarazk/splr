@@ -166,7 +166,7 @@ pub fn handle_conflict(
         } else {
             asg.assign_by_unitclause(l0);
         }
-        asg.handle(SolverEvent::Assert);
+        asg.handle(SolverEvent::Assert(l0.vi()));
         rst.update(ProgressUpdate::Reset);
     // elim.to_simplify += 1.0; // 1 for the positive lit, 1 for the negative.
     } else {
@@ -241,7 +241,7 @@ pub fn handle_conflict(
         ));
     }
     if cdb.check_and_reduce(asg, num_conflict) {
-        state.to_vivify += 1;
+        state.to_vivify += if cdb.active_mode() { 0.005 } else { 1.0 };
     }
     Ok(())
 }

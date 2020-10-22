@@ -1,6 +1,9 @@
 /// main struct AssignStack
 use {
-    super::{AssignIF, AssignStack, Var, VarIdHeap, VarManipulateIF, VarOrderIF, VarSelectIF},
+    super::{
+        AssignIF, AssignStack, Var, VarHeapIF, VarIdHeap, VarManipulateIF, VarOrderIF, VarRewardIF,
+        VarSelectIF,
+    },
     crate::{cdb::ClauseDBIF, solver::SolverEvent, types::*},
     std::{fmt, ops::Range, slice::Iter},
 };
@@ -102,8 +105,10 @@ impl Instantiate for AssignStack {
     fn handle(&mut self, e: SolverEvent) {
         match e {
             SolverEvent::Adapt(_, _) => (),
-            SolverEvent::Assert => {
+            SolverEvent::Assert(vi) => {
                 self.num_asserted_vars += 1;
+                self.clear_reward(vi);
+                self.remove_from_heap(vi);
             }
             SolverEvent::Conflict => (),
             SolverEvent::NewVar => {

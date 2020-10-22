@@ -30,7 +30,7 @@ pub trait StateIF {
     fn select_strategy<A, C>(&mut self, asg: &A, cdb: &C)
     where
         A: Export<(usize, usize, usize, f64), ()>,
-        C: ClauseDBIF + Export<(usize, usize, usize, usize, usize, usize), ()>;
+        C: ClauseDBIF + Export<(usize, usize, usize, usize, usize, usize), bool>;
     /// write a header of stat data to stdio.
     fn progress_header(&mut self);
     /// write stat data to stdio.
@@ -43,7 +43,7 @@ pub trait StateIF {
         mes: Option<&str>,
     ) where
         A: AssignIF + Export<(usize, usize, usize, f64), ()>,
-        C: Export<(usize, usize, usize, usize, usize, usize), ()>,
+        C: Export<(usize, usize, usize, usize, usize, usize), bool>,
         E: Export<(usize, usize, f64), ()>,
         R: RestartIF
             + Export<(usize, usize, usize, usize), (RestartMode, usize)>
@@ -199,7 +199,7 @@ pub struct State {
     /// strategy adjustment interval in conflict
     pub reflection_interval: usize,
     /// time to executevivification
-    pub to_vivify: usize,
+    pub to_vivify: f64,
     /// loop limit of vivification loop
     pub vivify_thr: f64,
     //
@@ -240,7 +240,7 @@ impl Default for State {
             strategy: (SearchStrategy::Initial, 0),
             target: CNFDescription::default(),
             reflection_interval: 10_000,
-            to_vivify: 0,
+            to_vivify: 0.0,
             vivify_thr: 0.0,
             b_lvl: Ema::new(5_000),
             c_lvl: Ema::new(5_000),
@@ -282,7 +282,7 @@ impl Instantiate for State {
             } else {
                 (SearchStrategy::Generic, 0)
             },
-            vivify_thr: config.viv_beg,
+            vivify_thr: 10.0 * config.viv_beg, // starting with a big value
             target: cnf.clone(),
             time_limit: config.c_tout,
             ..State::default()
@@ -293,12 +293,12 @@ impl Instantiate for State {
             SolverEvent::NewVar => {
                 self.target.num_of_variables += 1;
             }
-            SolverEvent::Assert => (),
+            SolverEvent::Assert(_) => (),
             SolverEvent::Adapt(_, _) => (),
             SolverEvent::Conflict => (),
+            SolverEvent::Eliminate(_) => (),
             SolverEvent::Instantiate => (),
             SolverEvent::Reinitialize => (),
-            SolverEvent::Restart => (),
             SolverEvent::Stabilize(_) => (),
             SolverEvent::Vivify(_) => (),
         }
@@ -424,7 +424,7 @@ impl StateIF for State {
     fn select_strategy<A, C>(&mut self, asg: &A, cdb: &C)
     where
         A: Export<(usize, usize, usize, f64), ()>,
-        C: ClauseDBIF + Export<(usize, usize, usize, usize, usize, usize), ()>,
+        C: ClauseDBIF + Export<(usize, usize, usize, usize, usize, usize), bool>,
     {
         if !self.config.use_adaptive() {
             return;
@@ -482,7 +482,7 @@ impl StateIF for State {
         mes: Option<&str>,
     ) where
         A: AssignIF + Export<(usize, usize, usize, f64), ()>,
-        C: Export<(usize, usize, usize, usize, usize, usize), ()>,
+        C: Export<(usize, usize, usize, usize, usize, usize), bool>,
         E: Export<(usize, usize, f64), ()>,
         R: RestartIF
             + Export<(usize, usize, usize, usize), (RestartMode, usize)>
@@ -736,7 +736,7 @@ impl State {
     fn dump<A, C, R>(&mut self, asg: &A, cdb: &C, rst: &R)
     where
         A: AssignIF + Export<(usize, usize, usize, f64), ()>,
-        C: Export<(usize, usize, usize, usize, usize, usize), ()>,
+        C: Export<(usize, usize, usize, usize, usize, usize), bool>,
         R: Export<(usize, usize, usize, usize), (RestartMode, usize)>,
     {
         self.progress_cnt += 1;
@@ -772,7 +772,7 @@ impl State {
     fn dump_details<'r, A, C, E, R, V>(&mut self, asg: &A, cdb: &C, rst: &'r R, mes: Option<&str>)
     where
         A: AssignIF + Export<(usize, usize, usize, f64), ()>,
-        C: Export<(usize, usize, usize, usize, usize, usize), ()>,
+        C: Export<(usize, usize, usize, usize, usize, usize), bool>,
         R: RestartIF
             + Export<(usize, usize, usize, usize), (RestartMode, usize)>
             + ExportBox<'r, (&'r Ema2, &'r Ema2, &'r Ema2, &'r Ema2)>,
