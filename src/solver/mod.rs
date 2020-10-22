@@ -47,18 +47,20 @@ pub enum SolverEvent {
     /// # CAVEAT
     /// some implementation might have a special premise to call: decision_level == 0.
     Adapt((SearchStrategy, usize), usize),
-    /// asserting a var
-    Assert,
-    /// conflict by unit propagation
+    /// asserting a var.
+    Assert(VarId),
+    /// conflict by unit propagation.
     Conflict,
+    /// eliminating a var.
+    Eliminate(VarId),
     /// Not in use
     Instantiate,
     /// increment the number of vars.
     NewVar,
     /// reinitialization for incremental solving.
     Reinitialize,
-    /// restart
-    Restart,
+    //    /// restart
+    //    Restart,
     /// stabilization
     Stabilize(bool),
     /// Vivification: `true` for start, `false` for end.

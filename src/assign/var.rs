@@ -1,6 +1,6 @@
 /// Var struct and Database management API
 use {
-    super::{AssignStack, ClauseManipulateIF, Var, VarRewardIF},
+    super::{AssignStack, ClauseManipulateIF, Var, VarHeapIF, VarRewardIF},
     crate::types::*,
     std::{
         fmt,
@@ -138,6 +138,7 @@ impl VarManipulateIF for AssignStack {
         if !self.var[vi].is(Flag::ELIMINATED) {
             self.var[vi].turn_on(Flag::ELIMINATED);
             self.clear_reward(vi);
+            self.remove_from_heap(vi);
             self.num_eliminated_vars += 1;
         } else {
             #[cfg(feature = "boundary_check")]
