@@ -390,39 +390,39 @@ FLAGS:
   -l, --log                Uses Glucose-like progress report
   -V, --version            Prints version information
 OPTIONS:
-      --ADP <a-adaptive>   Strategy adaptation switch      {:>10}
-      --ELI <a-elim>       Eliminator switch               {:>10}
-      --RDC <a-reduce>     Clause reduction switch         {:>10}
-      --RPH <a-rephase>    Re-phase switch                 {:>10}
-      --RSR <a-rsr>        Reason-Side Rewarding switch    {:>10}
-      --STB <a-stabilize>  Stabilization switch            {:>10}
-      --VIV <a-vivify>     Vivification switch             {:>10}
-      --cbt <c-cbt-thr>    Dec. lvl to use chronoBT        {:>10}
-      --cl <c-cls-lim>     Soft limit of #clauses (6MC/GB) {:>10}
-      --ii <c-ip-int>      #cls to start in-processor      {:>10}
-  -t, --timeout <c-tout>   CPU time limit in sec.          {:>10}
-      --ecl <elim-cls-lim> Max #lit for clause subsume     {:>10}
-      --evl <elim-grw-lim> Grow limit of #cls in var elim. {:>10}
-      --evo <elim-var-occ> Max #cls for var elimination    {:>10}
+      --ADP <a-adaptive>   Strategy adaptation switch     {:>10}
+      --ELI <a-elim>       Eliminator switch              {:>10}
+      --RDC <a-reduce>     Clause reduction switch        {:>10}
+      --RPH <a-rephase>    Re-phase switch                {:>10}
+      --RSR <a-rsr>        Reason-Side Rewarding switch   {:>10}
+      --STB <a-stabilize>  Stabilization switch           {:>10}
+      --VIV <a-vivify>     Vivification switch            {:>10}
+      --cbt <c-cbt-thr>    Dec. lvl to use chronoBT       {:>10}
+      --cl <c-cls-lim>     Soft limit of #clauses (6MC/GB){:>10}
+      --ii <c-ip-int>      #cls to start in-processor     {:>10}
+  -t, --timeout <c-tout>   CPU time limit in sec.         {:>10}
+      --ecl <elim-cls-lim> Max #lit for clause subsume    {:>10}
+      --evl <elim-grw-lim> Grow limit of #cls in var elim.{:>10}
+      --evo <elim-var-occ> Max #cls for var elimination   {:>10}
   -o, --dir <io-odir>      Output directory                {:>10}
-  -p, --proof <io-pfile>   DRAT Cert. filename             {:>10}
-  -r, --result <io-rfile>  Result filename/stdout          {:>10}
-      --ral <rst-asg-len>  Length of assign. fast EMA      {:>10}
-      --ras <rst-asg-slw>  Length of assign. slow EMA      {:>10}
-      --rat <rst-asg-thr>  Blocking restart threshold      {:>10}
-      --rct <rst-ccc-thr>  Conflict Correlation threshold  {:>10}
-      --rll <rst-lbd-len>  Length of LBD fast EMA          {:>10}
-      --rls <rst-lbd-slw>  Length of LBD slow EMA          {:>10}
-      --rlt <rst-lbd-thr>  Forcing restart threshold       {:>10}
-      --rmt <rst-mld-thr>  Usability to restart            {:>10}
-      --rss <rst-stb-scl>  Stabilizer scaling              {:>10}
-      --rs <rst-step>      #conflicts between restarts     {:>10}
-      --vib <viv-beg>      Lower bound of vivify loop      {:>10}
-      --vie <viv-end>      Upper bound of vivify loop      {:>10}
-      --vii <viv-int>      Vivification interval           {:>10}
-      --vis <viv-scale>    #reduction to vivify            {:>10}
-      --vri <vrw-dcy-beg>  Initial var reward decay        {:>10}
-      --vrm <vrw-dcy-end>  Maximum var reward decay        {:>10}
+  -p, --proof <io-pfile>   DRAT Cert. filename                {:>10}
+  -r, --result <io-rfile>  Result filename/stdout             {:>10}
+      --ral <rst-asg-len>  Length of assign. fast EMA     {:>10}
+      --ras <rst-asg-slw>  Length of assign. slow EMA     {:>10}
+      --rat <rst-asg-thr>  Blocking restart threshold        {:>10.2}
+      --rct <rst-ccc-thr>  Conflict Correlation threshold    {:>10.2}
+      --rll <rst-lbd-len>  Length of LBD fast EMA         {:>10}
+      --rls <rst-lbd-slw>  Length of LBD slow EMA         {:>10}
+      --rlt <rst-lbd-thr>  Forcing restart threshold         {:>10.2}
+      --rmt <rst-mld-thr>  Usability to restart           {:>10}
+      --rss <rst-stb-scl>  Stabilizer scaling                {:>10.2}
+      --rs <rst-step>      #conflicts between restarts    {:>10}
+      --vib <viv-beg>      Lower bound of vivify loop        {:>10.2}
+      --vie <viv-end>      Upper bound of vivify loop        {:>10.2}
+      --vii <viv-int>      Vivification interval          {:>10}
+      --vis <viv-scale>    #reduction to vivify              {:>10.2}
+      --vri <vrw-dcy-beg>  Initial var reward decay          {:>10.2}
+      --vrm <vrw-dcy-end>  Maximum var reward decay          {:>10.2}
 ARGS:
   <cnf-file>    DIMACS CNF file                 
 ",
