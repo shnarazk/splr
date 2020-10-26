@@ -40,7 +40,7 @@ impl VarRewardIF for AssignStack {
         let decay = self.activity_decay;
         let rate = v.participated as f64 / duration;
         v.reward *= decay;
-        v.reward += (1.0 - decay) * rate.powf(0.5);
+        v.reward += (1.0 - decay) * rate.powf(self.occurrence_compression_rate);
         v.participated = 0;
     }
     fn reward_update(&mut self) {

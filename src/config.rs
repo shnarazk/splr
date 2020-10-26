@@ -145,6 +145,9 @@ pub struct Config {
 
     /// Maximum var reward decay
     pub vrw_dcy_end: f64,
+
+    /// Occurrence compression rate in LR rewarding
+    pub vrw_occ_cmp: f64,
 }
 
 impl Default for Config {
@@ -195,6 +198,7 @@ impl Default for Config {
 
             vrw_dcy_beg: 0.75,
             vrw_dcy_end: 0.98,
+            vrw_occ_cmp: 0.50,
         }
     }
 }
@@ -218,7 +222,8 @@ impl Config {
                     "vii",
                 ];
                 let options_f64 = [
-                    "timeout", "rat", "rct", "rlt", "rmt", "rss", "vib", "vie", "vis", "vri", "vrm",
+                    "timeout", "rat", "rct", "rlt", "rmt", "rss", "vib", "vie", "vis", "vri",
+                    "vrm", "vro",
                 ];
                 let options_path = ["dir", "proof", "result"];
                 let seg: Vec<&str> = arg[2..].split('=').collect();
@@ -307,6 +312,7 @@ impl Config {
                                         "vis" => self.viv_scale = val,
                                         "vri" => self.vrw_dcy_beg = val,
                                         "vrm" => self.vrw_dcy_end = val,
+                                        "vro" => self.vrw_occ_cmp = val,
                                         _ => panic!("invalid option: {}", name),
                                     }
                                 } else {
@@ -423,6 +429,7 @@ OPTIONS:
       --vis <viv-scale>    #reduction to vivify              {:>10.2}
       --vri <vrw-dcy-beg>  Initial var reward decay          {:>10.2}
       --vrm <vrw-dcy-end>  Maximum var reward decay          {:>10.2}
+      --vro <vrw-occ-cmp>  Occ. compression rate in LR       {:>10.2}
 ARGS:
   <cnf-file>    DIMACS CNF file                 
 ",
@@ -459,6 +466,7 @@ ARGS:
         config.viv_scale,
         config.vrw_dcy_beg,
         config.vrw_dcy_end,
+        config.vrw_occ_cmp,
     )
 }
 

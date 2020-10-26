@@ -161,6 +161,8 @@ pub struct AssignStack {
     activity_decay_max: f64,
     /// ONLY used in feature EVSIDS
     reward_step: f64,
+    /// for LR
+    occurrence_compression_rate: f64,
 
     //
     //## Vivification
