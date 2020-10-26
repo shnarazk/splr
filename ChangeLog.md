@@ -1,3 +1,8 @@
+## 0.5.1, 2020-10-27
+
+- delete dependencies on 'libc' and 'structopt'
+- make Splr `monotonous`, by removing timer based decision makers
+
 ## 0.5.0, 2020-08-30
 
 - massive changes on the default parameters about restart

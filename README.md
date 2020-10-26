@@ -22,6 +22,15 @@ Please check [ChangeLog](ChangeLog.md) about recent updates.
 
 Though Splr comes with **ABSOLUTELY NO WARRANTY**, I'd like to show some results.
 
+#### Version 0.5.1
+
+* all the certifications of [UUF250](https://github.com/shnarazk/SAT-bench/tree/master/3-SAT/UUF250) were correct and verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
+* [SAT Race 2019](http://sat-race-2019.ciirc.cvut.cz), [Benchmarks](http://satcompetition.org/sr2019benchmarks.zip) -- splr-0.5.1(FIXME) solved with a 500 sec (soft) timeout:
+  * FIXME satisfiable problems: all the solutions were correct.
+  * FIXME unsatisfiable problems: all the certifications were verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
+
+figure FIXME
+
 #### Version 0.5.0
 
 * all the certifications of [UUF250](https://github.com/shnarazk/SAT-bench/tree/master/3-SAT/UUF250) were correct and verified with [Grad](https://www21.in.tum.de/~lammich/grat/).
