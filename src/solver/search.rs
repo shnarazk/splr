@@ -314,7 +314,7 @@ fn adapt_modules(
         state.select_strategy(asg, cdb);
     }
     #[cfg(feature = "boundary_check")]
-    assert!(state.strategy.1 != asg_num_conflict || 0 == asg.decision_level());
+    debug_assert!(state.strategy.1 != asg_num_conflict || 0 == asg.decision_level());
     asg.handle(SolverEvent::Adapt(state.strategy, asg_num_conflict));
     cdb.handle(SolverEvent::Adapt(state.strategy, asg_num_conflict));
     rst.handle(SolverEvent::Adapt(state.strategy, asg_num_conflict));

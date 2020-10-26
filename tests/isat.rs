@@ -36,7 +36,7 @@ fn drive(cnf: &str, mother: Vec<i32>) {
         let ns1 = run(&cnf, &assumptions, false);
         let ns2 = run(&cnf, &assumptions, true);
         println!("#solution: {} w/o elim; {} w/ elim", ns1, ns2);
-        assert_eq!(ns1, ns2);
+        debug_assert_eq!(ns1, ns2);
     }
 }
 
