@@ -27,7 +27,7 @@ use {
 /// API for var rewarding.
 pub trait VarRewardIF {
     /// return var's activity.
-    fn activity(&mut self, vi: VarId) -> f64;
+    fn activity(&self, vi: VarId) -> f64;
     /// initialize rewards based on an order of vars.
     fn initialize_reward(&mut self, iterator: Iter<'_, usize>);
     /// clear var's activity
