@@ -45,12 +45,10 @@ pub enum RestartMode {
 pub trait RestartIF {
     /// return `true` if stabilizer is active.
     fn stabilizing(&self) -> bool;
-    /// check restart condition and return:
-    ///
-    /// * `Some(true)` -- should restart
-    /// * `Some(false)` -- should block restart
-    /// * `None` -- it's not a good timing
-    fn restart(&mut self) -> Option<RestartDecision>;
+    /// check restart blocking condition.
+    fn block_restart(&mut self) -> Option<RestartDecision>;
+    /// check restart forcing condition and return a RestartDecision.
+    fn force_restart(&mut self) -> Option<RestartDecision>;
     /// update specific submodule
     fn update(&mut self, kind: ProgressUpdate);
 }
@@ -743,7 +741,39 @@ impl RestartIF for Restarter {
     fn stabilizing(&self) -> bool {
         self.stb.is_active()
     }
-    fn restart(&mut self) -> Option<RestartDecision> {
+    // on non-conflicting path
+    fn block_restart(&mut self) -> Option<RestartDecision> {
+        if self.after_restart < self.restart_step {
+            return None;
+        }
+        let (c0, c1) = if self.stb.is_active() {
+            (1.5, 0.01)
+        } else {
+            (-1.0, 0.02)
+        };
+        // Branching by sizes of learnt clauses comparing with the average of
+        // maximum LBDs used in conflict analyzsis.
+        let margin = (self.stb.num_active as f64 * c1 + c0) + self.mld.threshold;
+        let good_path = self.lbd.get() < self.mld.get() + margin;
+        if good_path {
+            if self.stb.is_active() {
+                if self.acc.is_active() {
+                    self.after_restart = 0;
+                    self.num_block_stabilized += 1;
+                    return Some(RestartDecision::Cancel);
+                }
+            } else {
+                if self.asg.is_active() {
+                    self.after_restart = 0;
+                    self.num_block_non_stabilized += 1;
+                    return Some(RestartDecision::Block);
+                }
+            }
+        }
+        None
+    }
+    // on non-conflicting path
+    fn force_restart(&mut self) -> Option<RestartDecision> {
         if self.luby.is_active() {
             self.luby.shift();
             self.after_restart = 0;
@@ -762,23 +792,12 @@ impl RestartIF for Restarter {
         // maximum LBDs used in conflict analyzsis.
         let margin = (self.stb.num_active as f64 * c1 + c0) + self.mld.threshold;
         let good_path = self.lbd.get() < self.mld.get() + margin;
-        if self.stb.is_active() {
-            if good_path && self.acc.is_active() {
-                self.after_restart = 0;
-                self.num_block_stabilized += 1;
-                return Some(RestartDecision::Cancel);
-            } else if !good_path {
-                self.after_restart = 0;
+        if !good_path {
+            self.after_restart = 0;
+            if self.stb.is_active() {
                 self.num_restart_stabilized += 1;
                 return Some(RestartDecision::Stabilize);
-            }
-        } else {
-            if good_path && self.asg.is_active() {
-                self.after_restart = 0;
-                self.num_block_non_stabilized += 1;
-                return Some(RestartDecision::Block);
-            } else if !good_path {
-                self.after_restart = 0;
+            } else {
                 self.num_restart_non_stabilized += 1;
                 return Some(RestartDecision::Force);
             }

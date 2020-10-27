@@ -212,13 +212,14 @@ fn search(
             if asg.num_vars <= asg.stack_len() + asg.num_eliminated_vars {
                 return Ok(true);
             }
+            rst.block_restart();
         } else {
             if asg.decision_level() == asg.root_level {
                 analyze_final(asg, state, &cdb[ci]);
                 return Ok(false);
             }
             handle_conflict(asg, cdb, elim, rst, state, ci)?;
-            if let Some(decision) = rst.restart() {
+            if let Some(decision) = rst.force_restart() {
                 match decision {
                     RestartDecision::Block | RestartDecision::Cancel => (),
                     RestartDecision::Force => {
