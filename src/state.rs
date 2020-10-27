@@ -690,7 +690,10 @@ impl State {
             cdb_num_learnt,
             cdb_num_reduction,
         ) = cdb.exports();
-        let rst_num_block = rst.exports().0;
+        let rst_num_block = {
+            let e = rst.exports();
+            e.0 + e.2
+        };
         println!(
             "c | {:>8}  {:>8} {:>8} | {:>7} {:>8} {:>8} |  {:>4}  {:>8} {:>7} {:>8} | {:>6.3} % |",
             asg_num_restart,                           // restart
@@ -732,7 +735,10 @@ impl State {
             cdb_num_learnt,
             _num_reduction,
         ) = cdb.exports();
-        let rst_num_block = rst.exports().0;
+        let rst_num_block = {
+            let e = rst.exports();
+            e.0 + e.2
+        };
         let (_, rst_asg, rst_lbd, _) = *rst.exports_box();
         println!(
             "{:>3}#{:>8},{:>7},{:>7},{:>7},{:>6.3},,{:>7},{:>7},\

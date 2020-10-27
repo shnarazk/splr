@@ -664,8 +664,8 @@ pub struct Restarter {
     //
     //## statistics
     //
-    num_block: usize,
-    num_restart: usize,
+    num_block_non_stabilized: usize,
+    num_restart_non_stabilized: usize,
     num_block_stabilized: usize,
     num_restart_stabilized: usize,
 }
@@ -686,8 +686,8 @@ impl Default for Restarter {
             after_restart: 0,
             restart_step: 0,
             initial_restart_step: 0,
-            num_block: 0,
-            num_restart: 0,
+            num_block_non_stabilized: 0,
+            num_restart_non_stabilized: 0,
             num_block_stabilized: 0,
             num_restart_stabilized: 0,
         }
@@ -758,29 +758,30 @@ impl RestartIF for Restarter {
         } else {
             (-1.0, 0.02)
         };
+        // Branching by sizes of learnt clauses comparing with the average of
+        // maximum LBDs used in conflict analyzsis.
         let margin = (self.stb.num_active as f64 * c1 + c0) + self.mld.threshold;
         let good_path = self.lbd.get() < self.mld.get() + margin;
         if self.stb.is_active() {
-            if self.acc.is_active() && good_path {
+            if good_path && self.acc.is_active() {
                 self.after_restart = 0;
-                self.num_block += 1;
                 self.num_block_stabilized += 1;
                 return Some(RestartDecision::Cancel);
             } else if !good_path {
                 self.after_restart = 0;
-                self.num_restart += 1;
                 self.num_restart_stabilized += 1;
                 return Some(RestartDecision::Stabilize);
             }
-        } else if good_path && self.asg.is_active() {
-            self.after_restart = 0;
-            self.num_block += 1;
-            return Some(RestartDecision::Block);
-        };
-        if !good_path {
-            self.after_restart = 0;
-            self.num_restart += 1;
-            return Some(RestartDecision::Force);
+        } else {
+            if good_path && self.asg.is_active() {
+                self.after_restart = 0;
+                self.num_block_non_stabilized += 1;
+                return Some(RestartDecision::Block);
+            } else if !good_path {
+                self.after_restart = 0;
+                self.num_restart_non_stabilized += 1;
+                return Some(RestartDecision::Force);
+            }
         }
         None
     }
@@ -803,22 +804,22 @@ impl RestartIF for Restarter {
 
 impl Export<(usize, usize, usize, usize), (RestartMode, usize)> for Restarter {
     /// exports:
-    ///  1. the number of blocking
-    ///  1. the number of forcing restart
+    ///  1. the number of blocking in non-stabilization
+    ///  1. the number of forcing restart non-stabilization
     ///  1. the number of blocking in stabilzation
     ///  1. the number of forcing in stabilzation
     ///
     ///```
     /// use crate::splr::{config::Config, solver::Restarter, types::*};
     /// let rst = Restarter::instantiate(&Config::default(), &CNFDescription::default());
-    /// let (num_block, num_stb, num_stb_block, num_stb_rst) = rst.exports();
+    /// let (num_blk_non, num_stb_non, num_blk_stb, num_rst_stb) = rst.exports();
     /// let (rst_mode, num_stb) = rst.active_mode();
     ///```
     #[inline]
     fn exports(&self) -> (usize, usize, usize, usize) {
         (
-            self.num_block,
-            self.num_restart,
+            self.num_block_non_stabilized,
+            self.num_restart_non_stabilized,
             self.num_block_stabilized,
             self.num_restart_stabilized,
         )

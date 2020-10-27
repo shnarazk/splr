@@ -116,7 +116,7 @@ pub struct Config {
     /// Forcing restart threshold
     pub rst_lbd_thr: f64,
 
-    /// Usability to restart
+    /// Maximum LBD of a Dependent graph to block restart
     pub rst_mld_thr: f64,
 
     /// Stabilizer scaling
@@ -420,7 +420,7 @@ OPTIONS:
       --rll <rst-lbd-len>  Length of LBD fast EMA         {:>10}
       --rls <rst-lbd-slw>  Length of LBD slow EMA         {:>10}
       --rlt <rst-lbd-thr>  Forcing restart threshold         {:>10.2}
-      --rmt <rst-mld-thr>  Usability to restart           {:>10}
+      --rmt <rst-mld-thr>  Max LBD of dep. graph          {:>10}
       --rss <rst-stb-scl>  Stabilizer scaling                {:>10.2}
       --rs <rst-step>      #conflicts between restarts    {:>10}
       --vib <viv-beg>      Lower bound of vivify loop        {:>10.2}
