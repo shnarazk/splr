@@ -480,10 +480,10 @@ impl StateIF for State {
 
         let (elim_num_full, _num_sat, _elim_to_simplify) = elim.exports();
 
-        let rst_mode = rst.active_mode().0;
+        let rst_mode = rst.mode().0;
 
         let (rst_num_blk, rst_num_rst, rst_num_sblk, rst_num_srst) = rst.exports();
-        // let rst_num_stb = rst.active_mode().1;
+        // let rst_num_stb = rst.mode().1;
         let (rst_acc, rst_asg, rst_lbd, rst_mld) = *rst.exports_box();
 
         if self.config.use_log {

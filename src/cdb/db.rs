@@ -324,7 +324,7 @@ impl Export<(usize, usize, usize, usize, usize, usize), bool> for ClauseDB {
         )
     }
     /// return the value of `use_chan_seok`
-    fn active_mode(&self) -> bool {
+    fn mode(&self) -> bool {
         self.use_chan_seok
     }
 }

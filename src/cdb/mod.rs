@@ -81,7 +81,7 @@ pub struct ClauseDB {
     pub certified: DRAT,
     /// a number of clauses to emit out-of-memory exception
     soft_limit: usize,
-    /// flag for Chan Seok heuristics; this value is exported with `Export:active_mode`
+    /// flag for Chan Seok heuristics; this value is exported with `Export:mode`
     use_chan_seok: bool,
     /// 'small' clause threshold
     co_lbd_bound: usize,

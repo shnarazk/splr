@@ -131,7 +131,7 @@ impl Export<(usize, usize, f64), ()> for Eliminator {
             self.to_simplify,
         )
     }
-    fn active_mode(&self) {}
+    fn mode(&self) {}
 }
 
 /// Mapping from Literal to Clauses.

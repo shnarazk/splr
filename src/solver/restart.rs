@@ -833,7 +833,7 @@ impl Export<(usize, usize, usize, usize), (RestartMode, usize)> for Restarter {
     /// use crate::splr::{config::Config, solver::Restarter, types::*};
     /// let rst = Restarter::instantiate(&Config::default(), &CNFDescription::default());
     /// let (num_blk_non, num_stb_non, num_blk_stb, num_rst_stb) = rst.exports();
-    /// let (rst_mode, num_stb) = rst.active_mode();
+    /// let (rst_mode, num_stb) = rst.mode();
     ///```
     #[inline]
     fn exports(&self) -> (usize, usize, usize, usize) {
@@ -844,7 +844,7 @@ impl Export<(usize, usize, usize, usize), (RestartMode, usize)> for Restarter {
             self.num_restart_stabilized,
         )
     }
-    fn active_mode(&self) -> (RestartMode, usize) {
+    fn mode(&self) -> (RestartMode, usize) {
         if self.stb.is_active() {
             (RestartMode::Stabilize, self.stb.num_active)
         } else if self.luby.enable {
