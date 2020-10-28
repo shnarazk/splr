@@ -743,6 +743,7 @@ impl RestartIF for Restarter {
         self.stb.is_active()
     }
     // on non-conflicting path
+    #[allow(clippy::collapsible_if)]
     fn block_restart(&mut self) -> Option<RestartDecision> {
         if self.after_restart < self.restart_step {
             return None;
@@ -774,6 +775,7 @@ impl RestartIF for Restarter {
         None
     }
     // on non-conflicting path
+    #[allow(clippy::collapsible_if)]
     fn force_restart(&mut self) -> Option<RestartDecision> {
         if self.luby.is_active() {
             self.luby.shift();
