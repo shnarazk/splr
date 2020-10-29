@@ -743,21 +743,13 @@ impl RestartIF for Restarter {
         self.stb.is_active()
     }
     // on non-conflicting path
+    #[inline]
     #[allow(clippy::collapsible_if)]
     fn block_restart(&mut self) -> Option<RestartDecision> {
-        if self.after_restart < self.restart_step {
+        /* if self.after_restart < self.restart_step {
             return None;
         }
-        let (c0, c1) = if self.stb.is_active() {
-            (1.5, 0.01)
-        } else {
-            (-1.0, 0.02)
-        };
-        // Branching by sizes of learnt clauses comparing with the average of
-        // maximum LBDs used in conflict analyzsis.
-        let margin = (self.stb.num_active as f64 * c1 + c0) + self.mld.threshold;
-        let good_path = self.lbd.get() < self.mld.get() + margin;
-        if good_path {
+        if self.on_good_path() {
             if self.stb.is_active() {
                 if self.acc.is_active() {
                     self.after_restart = 0;
@@ -771,7 +763,7 @@ impl RestartIF for Restarter {
                     return Some(RestartDecision::Block);
                 }
             }
-        }
+        } */
         None
     }
     // on non-conflicting path
@@ -786,21 +778,29 @@ impl RestartIF for Restarter {
             return None;
         }
         self.acc.shift();
-        let (c0, c1) = if self.stb.is_active() {
-            (1.5, 0.01)
-        } else {
-            (-1.0, 0.02)
-        };
-        // Branching by sizes of learnt clauses comparing with the average of
-        // maximum LBDs used in conflict analyzsis.
-        let margin = (self.stb.num_active as f64 * c1 + c0) + self.mld.threshold;
-        let good_path = self.lbd.get() < self.mld.get() + margin;
-        if !good_path {
-            self.after_restart = 0;
-            if self.stb.is_active() {
+
+        let good_path = self.on_good_path();
+        if self.stb.is_active() {
+            if good_path {
+                if self.acc.is_active() {
+                    self.after_restart = 0;
+                    self.num_block_stabilized += 1;
+                    return Some(RestartDecision::Cancel);
+                }
+            } else {
+                self.after_restart = 0;
                 self.num_restart_stabilized += 1;
                 return Some(RestartDecision::Stabilize);
+            }
+        } else {
+            if good_path {
+                if self.asg.is_active() {
+                    self.after_restart = 0;
+                    self.num_block_non_stabilized += 1;
+                    return Some(RestartDecision::Block);
+                }
             } else {
+                self.after_restart = 0;
                 self.num_restart_non_stabilized += 1;
                 return Some(RestartDecision::Force);
             }
@@ -821,6 +821,20 @@ impl RestartIF for Restarter {
             ProgressUpdate::MLD(val) => self.mld.update(val),
             ProgressUpdate::Reset => (),
         }
+    }
+}
+
+impl Restarter {
+    // Branching based on sizes of learnt clauses comparing with the average of
+    // maximum LBDs used in conflict analyzsis.
+    fn on_good_path(&self) -> bool {
+        let (c0, c1) = if self.stb.is_active() {
+            (-1.5, 0.02)
+        } else {
+            (-1.0, 0.02)
+        };
+        let margin = (self.stb.num_active as f64 * c1 + c0) + self.mld.threshold;
+        self.lbd.get() < self.mld.get() + margin
     }
 }
 
