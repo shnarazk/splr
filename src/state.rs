@@ -529,7 +529,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K {}|#RST:{}, #BLK:{}, #STB:{}, #CNC:{} ",
+            "\x1B[2K {}|#BLK:{}, #CNC:{}, #RST:{}, #STB:{} ",
             match rst_mode {
                 RestartMode::Dynamic => "    Restart",
                 RestartMode::Luby if self.config.no_color => "LubyRestart",
@@ -537,10 +537,10 @@ impl StateIF for State {
                 RestartMode::Stabilize if self.config.no_color => "  Stabilize",
                 RestartMode::Stabilize => "  \x1B[001m\x1B[030mStabilize\x1B[000m",
             },
-            im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
             im!("{:>9}", self, LogUsizeId::RestartBlock, rst_num_blk),
-            im!("{:>9}", self, LogUsizeId::RestartStabilize, rst_num_srst),
             im!("{:>9}", self, LogUsizeId::RestartCancel, rst_num_sblk),
+            im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
+            im!("{:>9}", self, LogUsizeId::RestartStabilize, rst_num_srst),
         );
         println!(
             "\x1B[2K         EMA|tLBD:{}, tASG:{}, eMLD:{}, eCCC:{} ",
