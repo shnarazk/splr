@@ -2,6 +2,7 @@
 
 - delete dependencies on 'libc' and 'structopt'
 - make Splr `monotonous`, by removing timer based decision makers
+- fix a bug in chronoBT, that occurred if a conflicting clause has just one literal at the conflicting level
 
 ## 0.5.0, 2020-08-30
 
