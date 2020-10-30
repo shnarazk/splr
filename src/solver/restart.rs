@@ -553,10 +553,10 @@ impl ProgressEvaluator for GeometricStabilizer {
         self.enable && self.active
     }
     fn reset_progress(&mut self) {
-        if self.enable && 10_000 < self.step {
-            // self.active = false;
+        // THIS implementation is strangely ultra good. Be careful if you want to revise.
+        if self.enable {
+            self.active = false;
             self.step = 1000;
-            self.next_trigger = 1000;
         }
     }
     fn shift(&mut self) {}
