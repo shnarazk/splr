@@ -829,7 +829,7 @@ impl Restarter {
     // maximum LBDs used in conflict analyzsis.
     fn on_good_path(&self) -> bool {
         let (c0, c1) = if self.stb.is_active() {
-            (-1.5, 0.02)
+            (1.5, 0.01)
         } else {
             (-1.0, 0.02)
         };
