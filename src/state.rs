@@ -221,6 +221,8 @@ pub struct State {
     pub start: Instant,
     /// upper limit for timeout handling
     pub time_limit: f64,
+    /// the number of newly asserted vars in the last search mode (stabilized or not).
+    pub num_asserted_at_last_mode: usize,
     /// for dumping debugging information for developers
     pub development: Vec<(usize, f64, f64, f64, f64, f64)>,
 }
@@ -247,6 +249,7 @@ impl Default for State {
             record: ProgressRecord::default(),
             start: Instant::now(),
             time_limit: 0.0,
+            num_asserted_at_last_mode: 0,
             development: Vec::new(),
         }
     }
