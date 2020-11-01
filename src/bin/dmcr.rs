@@ -66,8 +66,8 @@ impl TargetOpts {
                             panic!("no argument for {}", name);
                         }
                     }
-                } else {
-                    panic!("invalid argument: {}", name);
+                    // } else {
+                    //    panic!("invalid argument: {}", name);
                 }
             } else if arg.starts_with('-') {
                 let flags = ["C", "h", "V"];
