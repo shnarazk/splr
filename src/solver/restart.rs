@@ -212,7 +212,7 @@ impl EmaIF for ProgressMLD {
 
 impl ProgressEvaluator for ProgressMLD {
     fn is_active(&self) -> bool {
-        self.enable && self.threshold < self.ema.trend()
+        todo!();
     }
     fn shift(&mut self) {}
 }
