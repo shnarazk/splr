@@ -207,8 +207,11 @@ impl Config {
     pub fn inject_from_args(&mut self) {
         let mut help = false;
         let mut version = false;
-        if let Some(cnf) = std::env::args().last() {
-            self.cnf_file = PathBuf::from(cnf);
+        if let Some(ref cnf) = std::env::args().last() {
+            let path = PathBuf::from(cnf.clone());
+            if path.exists() {
+                self.cnf_file = path;
+            }
         }
         let args = std::env::args();
         let mut iter = args.skip(1);
@@ -369,6 +372,8 @@ impl Config {
                 } else {
                     panic!("unknown option name {}", name);
                 }
+            } else if !self.cnf_file.exists() || self.cnf_file.to_string_lossy() != arg {
+                panic!("invalid argument: {}", arg);
             }
         }
         if help {

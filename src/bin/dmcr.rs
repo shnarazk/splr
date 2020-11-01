@@ -40,7 +40,10 @@ impl TargetOpts {
         let mut help = false;
         let mut version = false;
         if let Some(ref cnf) = std::env::args().last() {
-            self.problem = PathBuf::from(cnf.clone());
+            let path = PathBuf::from(cnf.clone());
+            if path.exists() {
+                self.problem = path;
+            }
         }
         let mut iter = std::env::args().skip(1);
         while let Some(arg) = iter.next() {
@@ -65,9 +68,9 @@ impl TargetOpts {
                         } else {
                             panic!("no argument for {}", name);
                         }
+                    } else {
+                        panic!("invalid argument: {}", name);
                     }
-                    // } else {
-                    //    panic!("invalid argument: {}", name);
                 }
             } else if arg.starts_with('-') {
                 let flags = ["C", "h", "V"];
@@ -90,7 +93,7 @@ impl TargetOpts {
                         panic!("no argument for {}", name);
                     }
                 }
-            } else {
+            } else if !self.problem.exists() || self.problem.to_string_lossy() != arg {
                 panic!("invalid argument: {}", arg);
             }
         }

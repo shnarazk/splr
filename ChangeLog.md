@@ -1,8 +1,9 @@
-## 0.5.1, 2020-10-27
+## 0.5.1, 2020-11-05
 
 - delete dependencies on 'libc' and 'structopt'
 - make Splr `monotonous`, by removing timer based decision makers
 - fix a bug in chronoBT, that occurred if a conflicting clause has just one literal at the conflicting level
+- revise command option parser to handle the last option better
 
 ## 0.5.0, 2020-08-30
 
