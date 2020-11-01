@@ -27,6 +27,7 @@ pub enum ProgressUpdate {
     Luby,
     MLD(u16),
     Reset,
+    STB,
 }
 
 /// Restart modes
@@ -45,10 +46,8 @@ pub enum RestartMode {
 pub trait RestartIF {
     /// return `true` if stabilizer is active.
     fn stabilizing(&self) -> bool;
-    /// check restart blocking condition.
-    fn block_restart(&mut self) -> Option<RestartDecision>;
-    /// check restart forcing condition and return a RestartDecision.
-    fn force_restart(&mut self) -> Option<RestartDecision>;
+    /// check blocking and forcing restart condition.
+    fn restart(&mut self) -> Option<RestartDecision>;
     /// update specific submodule
     fn update(&mut self, kind: ProgressUpdate);
 }
@@ -57,7 +56,6 @@ pub trait RestartIF {
 #[derive(Debug)]
 struct ProgressASG {
     enable: bool,
-    asg: usize,
     ema: Ema2,
     /// For block restart based on average assignments: 1.40.
     /// This is called `R` in Glucose
@@ -69,7 +67,6 @@ impl Default for ProgressASG {
         ProgressASG {
             enable: true,
             ema: Ema2::new(1),
-            asg: 0,
             threshold: 1.4,
         }
     }
@@ -88,21 +85,19 @@ impl Instantiate for ProgressASG {
 impl EmaIF for ProgressASG {
     type Input = usize;
     fn update(&mut self, n: usize) {
-        self.asg = n;
         self.ema.update(n as f64);
     }
     fn get(&self) -> f64 {
         self.ema.get()
     }
     fn trend(&self) -> f64 {
-        // (self.asg as f64) / self.ema.get()
         self.ema.trend()
     }
 }
 
 impl ProgressEvaluator for ProgressASG {
     fn is_active(&self) -> bool {
-        self.enable && self.threshold * self.ema.get() < (self.asg as f64)
+        self.enable && self.threshold < self.ema.trend()
     }
     fn shift(&mut self) {}
 }
@@ -536,10 +531,6 @@ impl EmaIF for GeometricStabilizer {
             if self.active {
                 self.num_active += 1;
             }
-            self.step = ((self.step as f64) * self.restart_inc) as usize;
-            if 100_000_000 < self.step {
-                self.step = 1000;
-            }
             self.next_trigger += self.step;
         }
     }
@@ -559,7 +550,12 @@ impl ProgressEvaluator for GeometricStabilizer {
             self.step = 1000;
         }
     }
-    fn shift(&mut self) {}
+    fn shift(&mut self) {
+        self.step = ((self.step as f64) * self.restart_inc) as usize;
+        if 100_000_000 < self.step {
+            self.step = 1000;
+        }
+    }
 }
 
 /*
@@ -745,30 +741,7 @@ impl RestartIF for Restarter {
     // on non-conflicting path
     #[inline]
     #[allow(clippy::collapsible_if)]
-    fn block_restart(&mut self) -> Option<RestartDecision> {
-        /* if self.after_restart < self.restart_step {
-            return None;
-        }
-        if self.on_good_path() {
-            if self.stb.is_active() {
-                if self.acc.is_active() {
-                    self.after_restart = 0;
-                    self.num_block_stabilized += 1;
-                    return Some(RestartDecision::Cancel);
-                }
-            } else {
-                if self.asg.is_active() {
-                    self.after_restart = 0;
-                    self.num_block_non_stabilized += 1;
-                    return Some(RestartDecision::Block);
-                }
-            }
-        } */
-        None
-    }
-    // on non-conflicting path
-    #[allow(clippy::collapsible_if)]
-    fn force_restart(&mut self) -> Option<RestartDecision> {
+    fn restart(&mut self) -> Option<RestartDecision> {
         if self.luby.is_active() {
             self.luby.shift();
             self.after_restart = 0;
@@ -820,6 +793,7 @@ impl RestartIF for Restarter {
             ProgressUpdate::Luby => self.luby.update(0),
             ProgressUpdate::MLD(val) => self.mld.update(val),
             ProgressUpdate::Reset => (),
+            ProgressUpdate::STB => self.stb.shift(),
         }
     }
 }
@@ -831,7 +805,7 @@ impl Restarter {
         let (c0, c1) = if self.stb.is_active() {
             (1.5, 0.01)
         } else {
-            (-1.0, 0.02)
+            (0.0, 0.01)
         };
         let margin = (self.stb.num_active as f64 * c1 + c0) + self.mld.threshold;
         self.lbd.get() < self.mld.get() + margin

@@ -208,18 +208,21 @@ fn search(
         asg.reward_update();
         let ci = asg.propagate(cdb);
         if ci.is_none() {
-            state.last_asg = asg.stack_len();
-            if asg.num_vars <= asg.stack_len() + asg.num_eliminated_vars {
+            state.last_asg = state.last_asg.max(asg.stack_len());
+            if asg.num_vars <= state.last_asg + asg.num_eliminated_vars {
                 return Ok(true);
             }
-            rst.block_restart();
         } else {
+            if 0 < state.last_asg {
+                rst.update(ProgressUpdate::ASG(state.last_asg));
+                state.last_asg = 0;
+            }
             if asg.decision_level() == asg.root_level {
                 analyze_final(asg, state, &cdb[ci]);
                 return Ok(false);
             }
             handle_conflict(asg, cdb, elim, rst, state, ci)?;
-            if let Some(decision) = rst.force_restart() {
+            if let Some(decision) = rst.restart() {
                 match decision {
                     RestartDecision::Block | RestartDecision::Cancel => (),
                     RestartDecision::Force => {
@@ -291,6 +294,9 @@ fn search(
                     max_assigned = (ma * 0.9).max(1.1 * ma - 0.1 * nv) as usize;
                 }
                 if state.num_asserted_at_last_mode == asg.var_stats().1 {
+                    if state.stabilize {
+                        rst.update(ProgressUpdate::STB);
+                    }
                     asg.cancel_until(asg.root_level);
                     /* if use_vivify && vivify(asg, cdb, elim, state).is_err() {
                         analyze_final(asg, state, &cdb[ci]);

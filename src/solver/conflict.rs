@@ -41,12 +41,6 @@ pub fn handle_conflict(
         None
     };
     rst.update(ProgressUpdate::Counter(num_conflict));
-
-    if 0 < state.last_asg {
-        rst.update(ProgressUpdate::ASG(asg.stack_len()));
-        state.last_asg = 0;
-    }
-
     // rst.block_restart(); // to update asg progress_evaluator
     let mut use_chronobt = switch_chronobt.unwrap_or(0 < state.config.c_cbt_thr);
     if use_chronobt {
