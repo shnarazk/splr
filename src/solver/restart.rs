@@ -486,6 +486,7 @@ struct GeometricStabilizer {
     enable: bool,
     active: bool,
     num_active: usize,
+    num_shift: usize,
     next_trigger: usize,
     restart_inc: f64,
     step: usize,
@@ -497,6 +498,7 @@ impl Default for GeometricStabilizer {
             enable: true,
             active: false,
             num_active: 0,
+            num_shift: 0,
             next_trigger: 1000,
             restart_inc: 2.0,
             step: 1000,
@@ -558,6 +560,7 @@ impl ProgressEvaluator for GeometricStabilizer {
         if 100_000_000 < self.step {
             self.step = 1000;
         }
+        self.num_shift += 1;
     }
 }
 
