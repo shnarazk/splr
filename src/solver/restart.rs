@@ -167,7 +167,8 @@ struct ProgressMLD {
     ema: Ema2,
     num: usize,
     sum: usize,
-    threshold: f64,
+    threshold_exp: f64,
+    threshold_stb: f64,
 }
 
 impl Default for ProgressMLD {
@@ -177,7 +178,8 @@ impl Default for ProgressMLD {
             ema: Ema2::new(1),
             num: 0,
             sum: 0,
-            threshold: 1.4,
+            threshold_exp: 5.5,
+            threshold_stb: 4.0,
         }
     }
 }
@@ -186,7 +188,8 @@ impl Instantiate for ProgressMLD {
     fn instantiate(config: &Config, _: &CNFDescription) -> Self {
         ProgressMLD {
             ema: Ema2::new(10 * config.rst_lbd_len).with_slow(config.rst_lbd_slw),
-            threshold: config.rst_mld_thr,
+            threshold_exp: config.rst_mld_eth,
+            threshold_stb: config.rst_mld_sth,
             ..ProgressMLD::default()
         }
     }
@@ -802,12 +805,11 @@ impl Restarter {
     // Branching based on sizes of learnt clauses comparing with the average of
     // maximum LBDs used in conflict analyzsis.
     fn on_good_path(&self) -> bool {
-        let (c0, c1) = if self.stb.is_active() {
-            (1.5, 0.01)
+        let margin = if self.stb.is_active() {
+            self.mld.threshold_stb + self.stb.num_shift as f64 * 0.01
         } else {
-            (0.0, 0.01)
+            self.mld.threshold_exp + self.stb.num_shift as f64 * 0.01
         };
-        let margin = (self.stb.num_active as f64 * c1 + c0) + self.mld.threshold;
         self.lbd.get() < self.mld.get() + margin
     }
 }

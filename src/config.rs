@@ -116,8 +116,11 @@ pub struct Config {
     /// Forcing restart threshold
     pub rst_lbd_thr: f64,
 
-    /// Maximum LBD of a Dependent graph to block restart
-    pub rst_mld_thr: f64,
+    /// Maximum LBD of a Dep. graph in non stabilizing mode
+    pub rst_mld_eth: f64,
+
+    /// Maximum LBD of a Dep. graph in stabilizing mode
+    pub rst_mld_sth: f64,
 
     /// Stabilizer scaling
     pub rst_stb_scl: f64,
@@ -188,12 +191,13 @@ impl Default for Config {
             rst_lbd_len: 30,
             rst_lbd_slw: 10000,
             rst_lbd_thr: 1.20,
-            rst_mld_thr: 4.00,
+            rst_mld_eth: 4.00,
+            rst_mld_sth: 5.00,
             rst_stb_scl: 2.0,
 
             viv_beg: 0.5,
             viv_end: 2.0,
-            viv_int: 1,
+            viv_int: 2,
             viv_scale: 1.2,
 
             vrw_dcy_beg: 0.75,
@@ -225,8 +229,8 @@ impl Config {
                     "vii",
                 ];
                 let options_f64 = [
-                    "timeout", "rat", "rct", "rlt", "rmt", "rss", "vib", "vie", "vis", "vri",
-                    "vrm", "vro",
+                    "timeout", "rat", "rct", "rlt", "rme", "rms", "rss", "vib", "vie", "vis",
+                    "vri", "vrm", "vro",
                 ];
                 let options_path = ["dir", "proof", "result"];
                 let seg: Vec<&str> = arg[2..].split('=').collect();
@@ -308,7 +312,8 @@ impl Config {
                                         "rat" => self.rst_asg_thr = val,
                                         "rct" => self.rst_ccc_thr = val,
                                         "rlt" => self.rst_lbd_thr = val,
-                                        "rmt" => self.rst_mld_thr = val,
+                                        "rme" => self.rst_mld_eth = val,
+                                        "rms" => self.rst_mld_sth = val,
                                         "rss" => self.rst_stb_scl = val,
                                         "vib" => self.viv_beg = val,
                                         "vie" => self.viv_end = val,
@@ -425,7 +430,8 @@ OPTIONS:
       --rll <rst-lbd-len>  Length of LBD fast EMA         {:>10}
       --rls <rst-lbd-slw>  Length of LBD slow EMA         {:>10}
       --rlt <rst-lbd-thr>  Forcing restart threshold         {:>10.2}
-      --rmt <rst-mld-thr>  Max LBD of dep. graph          {:>10}
+      --rmt <rst-mld-eth>  Max LBD of Dep. (non stab mode)   {:>10.2}
+      --rmt <rst-mld-shr>  Max LBD of Dep. (stabilized mode) {:>10.2}
       --rss <rst-stb-scl>  Stabilizer scaling                {:>10.2}
       --rs <rst-step>      #conflicts between restarts    {:>10}
       --vib <viv-beg>      Lower bound of vivify loop        {:>10.2}
@@ -462,7 +468,8 @@ ARGS:
         config.rst_lbd_len,
         config.rst_lbd_slw,
         config.rst_lbd_thr,
-        config.rst_mld_thr,
+        config.rst_mld_eth,
+        config.rst_mld_sth,
         config.rst_stb_scl,
         config.rst_step,
         config.viv_beg,
