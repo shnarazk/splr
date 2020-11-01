@@ -287,12 +287,6 @@ fn search(
                 state.stabilize = !state.stabilize;
                 asg.handle(SolverEvent::Stabilize(state.stabilize));
                 rst.handle(SolverEvent::Stabilize(state.stabilize));
-                // update `num_assigned` periodically, which isn't a monotonous increasing var.
-                {
-                    let ma = max_assigned as f64;
-                    let nv = asg.num_vars as f64;
-                    max_assigned = (ma * 0.9).max(1.1 * ma - 0.1 * nv) as usize;
-                }
                 if state.num_asserted_at_last_mode == asg.var_stats().1 {
                     if state.stabilize {
                         rst.update(ProgressUpdate::STB);
