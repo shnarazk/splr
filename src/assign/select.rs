@@ -30,6 +30,8 @@ pub trait VarSelectIF {
     fn update_order(&mut self, v: VarId);
     /// rebuild the internal var_order
     fn rebuild_order(&mut self);
+    /// bump the reawrds of vars with some sepecial reason
+    fn boost(&mut self);
 }
 
 #[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -135,6 +137,16 @@ impl VarSelectIF for AssignStack {
         for vi in 1..self.var.len() {
             if var_assign!(self, vi).is_none() && !self.var[vi].is(Flag::ELIMINATED) {
                 self.insert_heap(vi);
+            }
+        }
+    }
+    fn boost(&mut self) {
+        for l in self.trail.iter() {
+            let vi = l.vi();
+            let mut v = &mut self.var[vi];
+            if self.reason[vi] == AssignReason::default() {
+                v.reward *= 0.999;
+                v.reward += 0.001;
             }
         }
     }
