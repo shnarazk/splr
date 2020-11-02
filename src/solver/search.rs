@@ -294,17 +294,17 @@ fn search(
                     if state.stabilize {
                         rst.update(ProgressUpdate::STB);
                     }
-                    asg.cancel_until(asg.root_level);
-                    /* if use_vivify && vivify(asg, cdb, elim, state).is_err() {
-                        analyze_final(asg, state, &cdb[ci]);
-                        return Ok(false);
-                    } */
-                    if elim.enable {
-                        elim.activate();
-                    }
-                    elim.simplify(asg, cdb, state)?;
-                    /* } else {
-                    state.num_asserted_at_last_mode = asg.var_stats().1; */
+                /* asg.cancel_until(asg.root_level);
+                if use_vivify && vivify(asg, cdb, elim, state).is_err() {
+                    analyze_final(asg, state, &cdb[ci]);
+                    return Ok(false);
+                }
+                if elim.enable {
+                    elim.activate();
+                }
+                elim.simplify(asg, cdb, state)?;  */
+                } else {
+                    state.num_asserted_at_last_mode = asg.var_stats().1;
                 }
             }
             let lit = asg.select_decision_literal(&state.phase_select);

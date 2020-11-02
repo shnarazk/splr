@@ -192,7 +192,7 @@ impl Default for Config {
             rst_lbd_slw: 10000,
             rst_lbd_thr: 1.20,
             rst_mld_eth: 4.00,
-            rst_mld_sth: 5.00,
+            rst_mld_sth: 5.50,
             rst_stb_scl: 2.0,
 
             viv_beg: 0.5,

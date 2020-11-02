@@ -557,7 +557,7 @@ impl ProgressEvaluator for GeometricStabilizer {
     }
     fn shift(&mut self) {
         self.step = ((self.step as f64) * self.restart_inc) as usize;
-        if 100_000_000 < self.step {
+        if 10_000_000 < self.step {
             self.step = 1000;
         }
         self.num_shift += 1;
