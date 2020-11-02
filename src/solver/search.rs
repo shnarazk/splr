@@ -224,9 +224,11 @@ fn search(
             handle_conflict(asg, cdb, elim, rst, state, ci)?;
             if let Some(decision) = rst.restart() {
                 match decision {
-                    RestartDecision::Block => (),
+                    RestartDecision::Block => {
+                        asg.boost_reward(false);
+                    }
                     RestartDecision::Cancel => {
-                        asg.boost();
+                        asg.boost_reward(true);
                     }
                     RestartDecision::Force => {
                         asg.cancel_until(asg.root_level);

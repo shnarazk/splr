@@ -31,7 +31,7 @@ pub trait VarSelectIF {
     /// rebuild the internal var_order
     fn rebuild_order(&mut self);
     /// bump the reawrds of vars with some sepecial reason
-    fn boost(&mut self);
+    fn boost_reward(&mut self, bunus: bool);
 }
 
 #[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -140,13 +140,15 @@ impl VarSelectIF for AssignStack {
             }
         }
     }
-    fn boost(&mut self) {
+    fn boost_reward(&mut self, bonus: bool) {
         for l in self.trail.iter() {
             let vi = l.vi();
             let mut v = &mut self.var[vi];
             if self.reason[vi] == AssignReason::default() {
                 v.reward *= 0.999;
-                v.reward += 0.001;
+                if bonus {
+                    v.reward += 0.001;
+                }
             }
         }
     }
