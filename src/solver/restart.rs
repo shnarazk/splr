@@ -557,7 +557,7 @@ impl ProgressEvaluator for GeometricStabilizer {
     }
     fn shift(&mut self) {
         self.step = ((self.step as f64) * self.restart_inc) as usize;
-        if 10_000_000 < self.step {
+        if 1_000 < self.step {
             self.step = 1000;
         }
         self.num_shift += 1;
@@ -766,7 +766,7 @@ impl RestartIF for Restarter {
                     self.num_block_stabilized += 1;
                     return Some(RestartDecision::Cancel);
                 }
-            } else {
+            } else if self.lbd.threshold.powf(2.0) < self.lbd.trend() {
                 self.after_restart = 0;
                 self.num_restart_stabilized += 1;
                 return Some(RestartDecision::Stabilize);
@@ -778,7 +778,7 @@ impl RestartIF for Restarter {
                     self.num_block_non_stabilized += 1;
                     return Some(RestartDecision::Block);
                 }
-            } else {
+            } else if self.lbd.threshold < self.lbd.trend() {
                 self.after_restart = 0;
                 self.num_restart_non_stabilized += 1;
                 return Some(RestartDecision::Force);
@@ -809,9 +809,9 @@ impl Restarter {
     // maximum LBDs used in conflict analyzsis.
     fn on_good_path(&self) -> bool {
         let margin = if self.stb.is_active() {
-            self.mld.threshold_stb + self.stb.num_shift as f64 * 0.01
+            self.mld.threshold_stb + self.stb.num_shift as f64 * 0.02
         } else {
-            self.mld.threshold_exp + self.stb.num_shift as f64 * 0.01
+            self.mld.threshold_exp + self.stb.num_shift as f64 * 0.02
         };
         self.lbd.get() < self.mld.get() + margin
     }

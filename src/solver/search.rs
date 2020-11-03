@@ -228,14 +228,14 @@ fn search(
                         asg.boost_reward(false);
                     }
                     RestartDecision::Cancel => {
-                        asg.boost_reward(true);
+                        // asg.boost_reward(true);
                     }
                     RestartDecision::Force => {
                         asg.cancel_until(asg.root_level);
                     }
                     RestartDecision::Stabilize => {
                         asg.cancel_until(asg.root_level);
-                        asg.force_rephase();
+                        // asg.force_rephase();
                     }
                 }
             }
