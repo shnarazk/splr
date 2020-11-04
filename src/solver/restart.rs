@@ -769,12 +769,12 @@ impl RestartIF for Restarter {
                 return Some(RestartDecision::Stabilize);
             }
         } else {
-            if self.asg.is_active() {
+            if self.asg.is_active() && self.on_good_path() {
                 self.after_restart = 0;
                 self.num_block_non_stabilized += 1;
                 return Some(RestartDecision::Block);
             }
-            if self.lbd.threshold < self.lbd.trend() {
+            if self.lbd.threshold < self.lbd.trend() && !self.on_good_path() {
                 self.after_restart = 0;
                 self.num_restart_non_stabilized += 1;
                 return Some(RestartDecision::Force);
@@ -834,9 +834,9 @@ impl Restarter {
     fn on_good_path(&self) -> bool {
         let span: f64 = (self.stb.num_active - self.stb.num_shift) as f64;
         let margin = if self.stb.is_active() {
-            self.mld.threshold_stb + span * 0.01
+            self.mld.threshold_stb + span * 0.20
         } else {
-            self.mld.threshold_exp + span * 0.01
+            self.mld.threshold_exp + span * 0.20
         };
         self.lbd.get() < self.mld.get() + margin
     }
