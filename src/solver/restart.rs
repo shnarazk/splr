@@ -661,6 +661,7 @@ pub struct Restarter {
     after_restart: usize,
     restart_step: usize,
     initial_restart_step: usize,
+    restart_at_last_phase: bool,
 
     //
     //## statistics
@@ -687,6 +688,7 @@ impl Default for Restarter {
             after_restart: 0,
             restart_step: 0,
             initial_restart_step: 0,
+            restart_at_last_phase: true,
             num_block_non_stabilized: 0,
             num_restart_non_stabilized: 0,
             num_block_stabilized: 0,
@@ -766,6 +768,7 @@ impl RestartIF for Restarter {
             if self.lbd.threshold < self.lbd.trend() {
                 self.after_restart = 0;
                 self.num_restart_stabilized += 1;
+                self.restart_at_last_phase = true;
                 return Some(RestartDecision::Stabilize);
             }
         } else {
@@ -777,6 +780,7 @@ impl RestartIF for Restarter {
             if self.lbd.threshold < self.lbd.trend() && !self.on_good_path() {
                 self.after_restart = 0;
                 self.num_restart_non_stabilized += 1;
+                self.restart_at_last_phase = true;
                 return Some(RestartDecision::Force);
             }
         }
@@ -823,7 +827,10 @@ impl RestartIF for Restarter {
             ProgressUpdate::Luby => self.luby.update(0),
             ProgressUpdate::MLD(val) => self.mld.update(val),
             ProgressUpdate::Reset => (),
-            ProgressUpdate::STB => self.stb.shift(),
+            ProgressUpdate::STB => {
+                self.stb.shift();
+                self.restart_at_last_phase = false;
+            }
         }
     }
 }
@@ -833,7 +840,7 @@ impl Restarter {
     // maximum LBDs used in conflict analyzsis.
     fn on_good_path(&self) -> bool {
         let span: f64 = (self.stb.num_active - self.stb.num_shift) as f64;
-        let margin = if self.stb.is_active() {
+        let margin = if self.stb.is_active() && self.restart_at_last_phase {
             self.mld.threshold_stb + span * 0.20
         } else {
             self.mld.threshold_exp + span * 0.20
