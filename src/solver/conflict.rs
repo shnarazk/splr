@@ -213,6 +213,7 @@ pub fn handle_conflict(
         }
         asg.handle(SolverEvent::Assert(l0.vi()));
         rst.update(ProgressUpdate::Reset);
+        state.asserted_in_this_mode = true;
     // elim.to_simplify += 1.0; // 1 for the positive lit, 1 for the negative.
     } else {
         {

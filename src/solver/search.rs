@@ -225,7 +225,7 @@ fn search(
             if let Some(decision) = rst.restart() {
                 match decision {
                     RestartDecision::Block => {
-                        asg.boost_reward(false);
+                        // asg.boost_reward(false);
                     }
                     RestartDecision::Cancel => {
                         // asg.boost_reward(true);
@@ -233,10 +233,34 @@ fn search(
                     RestartDecision::Force => {
                         asg.cancel_until(asg.root_level);
                     }
-                    RestartDecision::Stabilize => {
+                    RestartDecision::Stabilize if state.asserted_in_this_mode => {
                         asg.cancel_until(asg.root_level);
                         // asg.force_rephase();
                     }
+                    RestartDecision::Stabilize => {
+                        // asg.boost_reward(false);
+                    }
+                }
+                if use_stabilize && state.stabilize != rst.stabilizing() {
+                    state.stabilize = !state.stabilize;
+                    asg.handle(SolverEvent::Stabilize(state.stabilize));
+                    rst.handle(SolverEvent::Stabilize(state.stabilize));
+                    if !state.asserted_in_this_mode {
+                        if state.stabilize {
+                            rst.update(ProgressUpdate::STB);
+                            // } else {
+                            //    asg.cancel_until(asg.root_level);
+                        }
+                        /* if use_vivify && vivify(asg, cdb, elim, state).is_err() {
+                            analyze_final(asg, state, &cdb[ci]);
+                            return Ok(false);
+                        }
+                        if elim.enable {
+                            elim.activate();
+                        }
+                        elim.simplify(asg, cdb, state)?; */
+                    }
+                    state.asserted_in_this_mode = false;
                 }
             }
             if a_decision_was_made {
@@ -288,27 +312,6 @@ fn search(
             }
         }
         if !asg.remains() {
-            if use_stabilize && state.stabilize != rst.stabilizing() {
-                state.stabilize = !state.stabilize;
-                asg.handle(SolverEvent::Stabilize(state.stabilize));
-                rst.handle(SolverEvent::Stabilize(state.stabilize));
-                if state.num_asserted_at_last_mode == asg.var_stats().1 {
-                    if state.stabilize {
-                        rst.update(ProgressUpdate::STB);
-                    }
-                /* asg.cancel_until(asg.root_level);
-                if use_vivify && vivify(asg, cdb, elim, state).is_err() {
-                    analyze_final(asg, state, &cdb[ci]);
-                    return Ok(false);
-                }
-                if elim.enable {
-                    elim.activate();
-                }
-                elim.simplify(asg, cdb, state)?;  */
-                } else {
-                    state.num_asserted_at_last_mode = asg.var_stats().1;
-                }
-            }
             let lit = asg.select_decision_literal(&state.phase_select);
             asg.assign_by_decision(lit);
             state[Stat::Decision] += 1;

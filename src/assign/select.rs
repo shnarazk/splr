@@ -141,15 +141,19 @@ impl VarSelectIF for AssignStack {
         }
     }
     fn boost_reward(&mut self, bonus: bool) {
+        // let mut pre: f64 = 0.0;
         for l in self.trail.iter() {
             let vi = l.vi();
             let mut v = &mut self.var[vi];
-            if self.reason[vi] == AssignReason::default() {
+            if self.reason[vi] == AssignReason::default()
+            /* && pre < v.reward */
+            {
                 v.reward *= 0.999;
                 if bonus {
                     v.reward += 0.001;
                 }
             }
+            // pre = v.reward;
         }
     }
 }

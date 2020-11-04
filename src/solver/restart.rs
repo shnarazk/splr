@@ -550,14 +550,14 @@ impl ProgressEvaluator for GeometricStabilizer {
     }
     fn reset_progress(&mut self) {
         // THIS implementation is strangely ultra good. Be careful if you want to revise.
-        if self.enable {
+        if self.enable && 1000 < self.step {
             self.active = false;
             self.step = 1000;
         }
     }
     fn shift(&mut self) {
         self.step = ((self.step as f64) * self.restart_inc) as usize;
-        if 1_000 < self.step {
+        if 100_000 < self.step {
             self.step = 1000;
         }
         self.num_shift += 1;
@@ -744,7 +744,6 @@ impl RestartIF for Restarter {
     fn stabilizing(&self) -> bool {
         self.stb.is_active()
     }
-    // on non-conflicting path
     #[inline]
     #[allow(clippy::collapsible_if)]
     fn restart(&mut self) -> Option<RestartDecision> {
@@ -758,6 +757,30 @@ impl RestartIF for Restarter {
         }
         self.acc.shift();
 
+        if self.stb.is_active() {
+            if self.asg.is_active() {
+                self.after_restart = 0;
+                self.num_block_stabilized += 1;
+                return Some(RestartDecision::Cancel);
+            }
+            if self.lbd.threshold < self.lbd.trend() {
+                self.after_restart = 0;
+                self.num_restart_stabilized += 1;
+                return Some(RestartDecision::Stabilize);
+            }
+        } else {
+            if self.asg.is_active() {
+                self.after_restart = 0;
+                self.num_block_non_stabilized += 1;
+                return Some(RestartDecision::Block);
+            }
+            if self.lbd.threshold < self.lbd.trend() {
+                self.after_restart = 0;
+                self.num_restart_non_stabilized += 1;
+                return Some(RestartDecision::Force);
+            }
+        }
+        /*
         let good_path = self.on_good_path();
         if self.stb.is_active() {
             if good_path {
@@ -784,6 +807,7 @@ impl RestartIF for Restarter {
                 return Some(RestartDecision::Force);
             }
         }
+        */
         None
     }
     fn update(&mut self, kind: ProgressUpdate) {
@@ -808,10 +832,11 @@ impl Restarter {
     // Branching based on sizes of learnt clauses comparing with the average of
     // maximum LBDs used in conflict analyzsis.
     fn on_good_path(&self) -> bool {
+        let span: f64 = (self.stb.num_active - self.stb.num_shift) as f64;
         let margin = if self.stb.is_active() {
-            self.mld.threshold_stb + self.stb.num_shift as f64 * 0.02
+            self.mld.threshold_stb + span * 0.01
         } else {
-            self.mld.threshold_exp + self.stb.num_shift as f64 * 0.02
+            self.mld.threshold_exp + span * 0.01
         };
         self.lbd.get() < self.mld.get() + margin
     }
