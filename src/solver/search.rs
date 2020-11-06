@@ -245,21 +245,7 @@ fn search(
                     state.stabilize = !state.stabilize;
                     asg.handle(SolverEvent::Stabilize(state.stabilize));
                     rst.handle(SolverEvent::Stabilize(state.stabilize));
-                    if !state.asserted_in_this_mode {
-                        if state.stabilize {
-                            rst.update(ProgressUpdate::STB);
-                            // } else {
-                            //    asg.cancel_until(asg.root_level);
-                        }
-                        /* if use_vivify && vivify(asg, cdb, elim, state).is_err() {
-                            analyze_final(asg, state, &cdb[ci]);
-                            return Ok(false);
-                        }
-                        if elim.enable {
-                            elim.activate();
-                        }
-                        elim.simplify(asg, cdb, state)?; */
-                    }
+                    rst.update(ProgressUpdate::STB(!state.asserted_in_this_mode));
                     state.asserted_in_this_mode = false;
                 }
             }
