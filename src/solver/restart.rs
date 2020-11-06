@@ -786,34 +786,6 @@ impl RestartIF for Restarter {
                 return Some(RestartDecision::Force);
             }
         }
-        /*
-        let good_path = self.on_good_path();
-        if self.stb.is_active() {
-            if good_path {
-                if self.acc.is_active() {
-                    self.after_restart = 0;
-                    self.num_block_stabilized += 1;
-                    return Some(RestartDecision::Cancel);
-                }
-            } else if self.lbd.threshold.powf(2.0) < self.lbd.trend() {
-                self.after_restart = 0;
-                self.num_restart_stabilized += 1;
-                return Some(RestartDecision::Stabilize);
-            }
-        } else {
-            if good_path {
-                if self.asg.is_active() {
-                    self.after_restart = 0;
-                    self.num_block_non_stabilized += 1;
-                    return Some(RestartDecision::Block);
-                }
-            } else if self.lbd.threshold < self.lbd.trend() {
-                self.after_restart = 0;
-                self.num_restart_non_stabilized += 1;
-                return Some(RestartDecision::Force);
-            }
-        }
-        */
         None
     }
     fn update(&mut self, kind: ProgressUpdate) {
