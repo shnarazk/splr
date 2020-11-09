@@ -17,7 +17,7 @@ trait ProgressEvaluator {
     fn shift(&mut self);
 }
 
-/// Update progress observer submodules
+/// Update progress observer sub-modules
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub enum ProgressUpdate {
     Counter(usize),
@@ -48,7 +48,7 @@ pub trait RestartIF {
     fn stabilizing(&self) -> bool;
     /// check blocking and forcing restart condition.
     fn restart(&mut self) -> Option<RestartDecision>;
-    /// update specific submodule
+    /// update specific sub-module
     fn update(&mut self, kind: ProgressUpdate);
 }
 
@@ -476,7 +476,7 @@ impl LubySeries {
     }
 }
 
-/// An implementation of Cadical-style blocker.
+/// An implementation of CaDiCaL-style blocker.
 /// This is a stealth blocker between the other evaluators and solver;
 /// the other evaluators work as if this blocker doesn't exist.
 /// When an evaluator becomes active, we accept and shift it. But this blocker
@@ -831,8 +831,8 @@ impl Export<(usize, usize, usize, usize), (RestartMode, usize)> for Restarter {
     /// exports:
     ///  1. the number of blocking in non-stabilization
     ///  1. the number of forcing restart non-stabilization
-    ///  1. the number of blocking in stabilzation
-    ///  1. the number of forcing in stabilzation
+    ///  1. the number of blocking in stabilization
+    ///  1. the number of forcing in stabilization
     ///
     ///```
     /// use crate::splr::{config::Config, solver::Restarter, types::*};
