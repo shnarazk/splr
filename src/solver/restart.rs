@@ -406,6 +406,7 @@ impl Default for LubySeries {
 impl Instantiate for LubySeries {
     fn instantiate(config: &Config, _: &CNFDescription) -> Self {
         LubySeries {
+            enable: config.use_luby(),
             step: config.rst_step,
             ..LubySeries::default()
         }
@@ -417,7 +418,7 @@ impl fmt::Display for LubySeries {
         if self.enable {
             write!(f, "Luby[index:{}, step:{}]", self.index, self.next_restart,)
         } else {
-            write!(f, "Luby(deactive)")
+            write!(f, "Luby(deactivated)")
         }
     }
 }

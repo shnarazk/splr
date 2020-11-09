@@ -13,6 +13,9 @@ pub struct Config {
     /// Eliminator switch
     a_elim: i32,
 
+    /// Use Luby series forcely
+    a_luby: i32,
+
     /// Re-phase switch
     a_rephase: i32,
 
@@ -158,6 +161,7 @@ impl Default for Config {
         Config {
             a_adaptive: 1,
             a_elim: 1,
+            a_luby: 0,
             a_reduce: 1,
             a_rephase: 1,
             a_rsr: 1,
@@ -222,7 +226,7 @@ impl Config {
         while let Some(arg) = iter.next() {
             if arg.starts_with("--") {
                 let flags = ["no-color", "quiet", "certify", "log", "help", "version"];
-                let options_i32 = ["ADP", "ELI", "RDC", "RPH", "RSR", "STB", "VIV"];
+                let options_i32 = ["ADP", "ELI", "LBY", "RDC", "RPH", "RSR", "STB", "VIV"];
                 let options_u32 = ["cbt"];
                 let options_usize = [
                     "cl", "ii", "stat", "ecl", "evl", "evo", "rs", "ral", "ras", "rll", "rls",
@@ -253,6 +257,7 @@ impl Config {
                                     match name {
                                         "ADP" => self.a_adaptive = val,
                                         "ELI" => self.a_elim = val,
+                                        "LBY" => self.a_luby = val,
                                         "RDC" => self.a_reduce = val,
                                         "RPH" => self.a_rephase = val,
                                         "RSR" => self.a_rsr = val,
@@ -408,6 +413,7 @@ FLAGS:
 OPTIONS:
       --ADP <a-adaptive>   Strategy adaptation switch     {:>10}
       --ELI <a-elim>       Eliminator switch              {:>10}
+      --LBY <a-luby>       Use Luby series for restart    {:>10}
       --RDC <a-reduce>     Clause reduction switch        {:>10}
       --RPH <a-rephase>    Re-phase switch                {:>10}
       --RSR <a-rsr>        Reason-Side Rewarding switch   {:>10}
@@ -430,8 +436,8 @@ OPTIONS:
       --rll <rst-lbd-len>  Length of LBD fast EMA         {:>10}
       --rls <rst-lbd-slw>  Length of LBD slow EMA         {:>10}
       --rlt <rst-lbd-thr>  Forcing restart threshold         {:>10.2}
-      --rmt <rst-mld-eth>  Max LBD of Dep. (non stab mode)   {:>10.2}
-      --rmt <rst-mld-shr>  Max LBD of Dep. (stabilized mode) {:>10.2}
+      --rme <rst-mld-eth>  Max LBD of Dep. (non stab mode)   {:>10.2}
+      --rms <rst-mld-shr>  Max LBD of Dep. (stabilized mode) {:>10.2}
       --rss <rst-stb-scl>  Stabilizer scaling                {:>10.2}
       --rs <rst-step>      #conflicts between restarts    {:>10}
       --vib <viv-beg>      Lower bound of vivify loop        {:>10.2}
@@ -446,6 +452,7 @@ ARGS:
 ",
         config.a_adaptive,
         config.a_elim,
+        config.a_luby,
         config.a_reduce,
         config.a_rephase,
         config.a_rsr,
@@ -513,17 +520,20 @@ impl Config {
     pub fn override_args(mut self) -> Config {
         self
     }
-    pub fn use_reduce(&self) -> bool {
-        dispatch!(self.a_reduce)
-    }
     pub fn use_elim(&self) -> bool {
         dispatch!(self.a_elim)
     }
-    pub fn use_vivify(&self) -> bool {
-        dispatch!(self.a_vivify)
+    pub fn use_luby(&self) -> bool {
+        dispatch!(self.a_luby)
+    }
+    pub fn use_reduce(&self) -> bool {
+        dispatch!(self.a_reduce)
     }
     pub fn use_rephase(&self) -> bool {
         dispatch!(self.a_rephase)
+    }
+    pub fn use_vivify(&self) -> bool {
+        dispatch!(self.a_vivify)
     }
     pub fn use_reason_side_rewarding(&self) -> bool {
         dispatch!(self.a_rsr)
