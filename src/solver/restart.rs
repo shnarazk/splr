@@ -565,6 +565,12 @@ impl ProgressEvaluator for GeometricStabilizer {
     }
 }
 
+impl GeometricStabilizer {
+    fn span(&self) -> usize {
+        self.step / 1000
+    }
+}
+
 /*
 /// Restart when LBD's sum is over a limit.
 #[derive(Debug)]
@@ -817,7 +823,7 @@ impl Restarter {
     // Branching based on sizes of learnt clauses comparing with the average of
     // maximum LBDs used in conflict analyzsis.
     fn on_good_path(&self) -> bool {
-        let span: f64 = (self.stb.num_active - self.stb.num_shift) as f64;
+        let span = self.stb.span() as f64;
         let margin = if self.stb.is_active() && self.restarted_last_phase {
             self.mld.threshold_stb + span * 0.20
         } else {
