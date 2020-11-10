@@ -857,11 +857,11 @@ impl Export<(usize, usize, usize, usize), (RestartMode, usize)> for Restarter {
     }
     fn mode(&self) -> (RestartMode, usize) {
         if self.stb.is_active() {
-            (RestartMode::Stabilize, self.stb.num_active)
+            (RestartMode::Stabilize, self.stb.span())
         } else if self.luby.enable {
-            (RestartMode::Luby, self.stb.num_active)
+            (RestartMode::Luby, self.stb.span())
         } else {
-            (RestartMode::Dynamic, self.stb.num_active)
+            (RestartMode::Dynamic, self.stb.span())
         }
     }
 }
