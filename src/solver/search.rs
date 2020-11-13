@@ -240,6 +240,7 @@ fn search(
                     RestartDecision::Stabilize => {
                         // asg.boost_reward(false);
                     }
+                    RestartDecision::Postpone => (),
                 }
                 if use_stabilize && state.stabilize != rst.stabilizing() {
                     state.stabilize = !state.stabilize;

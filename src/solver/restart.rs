@@ -747,6 +747,8 @@ pub enum RestartDecision {
     Cancel,
     /// We should restart now
     Force,
+    /// TODO
+    Postpone,
     /// We should restart now in stabilization mode
     Stabilize,
 }
@@ -793,7 +795,7 @@ impl RestartIF for Restarter {
                 return Some(RestartDecision::Force);
             }
         }
-        None
+        return Some(RestartDecision::Postpone);
     }
     fn update(&mut self, kind: ProgressUpdate) {
         match kind {
