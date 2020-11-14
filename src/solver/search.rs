@@ -199,7 +199,6 @@ fn search(
         let vars = asg.var_stats();
         vars.1 + vars.2
     };
-    let use_stabilize = state.config.use_stabilize();
     let use_vivify = state.config.use_vivify();
     rst.update(ProgressUpdate::Luby);
     state.stabilize = false;
@@ -242,11 +241,9 @@ fn search(
                     }
                     RestartDecision::Postpone => (),
                 }
-                if use_stabilize && state.stabilize != rst.stabilizing() {
-                    state.stabilize = !state.stabilize;
+                if let Some(mode) = rst.stabilize(asg.num_conflict, state.asserted_in_this_mode) {
+                    state.stabilize = mode;
                     asg.handle(SolverEvent::Stabilize(state.stabilize));
-                    rst.handle(SolverEvent::Stabilize(state.stabilize));
-                    rst.update(ProgressUpdate::STB(!state.asserted_in_this_mode));
                     state.asserted_in_this_mode = false;
                 }
             }

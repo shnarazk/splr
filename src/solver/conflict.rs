@@ -40,7 +40,7 @@ pub fn handle_conflict(
     } else {
         None
     };
-    rst.update(ProgressUpdate::Counter(num_conflict));
+    rst.update(ProgressUpdate::Counter);
     // rst.block_restart(); // to update asg progress_evaluator
     let mut use_chronobt = switch_chronobt.unwrap_or(0 < state.config.c_cbt_thr);
     if use_chronobt {

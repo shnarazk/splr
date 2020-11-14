@@ -531,6 +531,39 @@ impl StateIF for State {
                 cdb_num_active - cdb_num_learnt
             ),
         );
+        if true {
+            let (span, nshift, _thr, _boost) = rst.stabilization_length();
+            println!(
+                "\x1B[2K {}|#BLK:{}, #RST:{}, span:{}, shft:{} ",
+                match rst_mode {
+                    RestartMode::Dynamic => "    Restart",
+                    RestartMode::Luby if self.config.no_color => "LubyRestart",
+                    RestartMode::Luby => "\x1B[001m\x1B[035mLubyRestart\x1B[000m",
+                    RestartMode::Stabilize if self.config.no_color => "  Stabilize",
+                    RestartMode::Stabilize => "  \x1B[001m\x1B[030mStabilize\x1B[000m",
+                },
+                im!("{:>9}", self, LogUsizeId::RestartBlock, rst_num_blk),
+                im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
+                im!("{:>9}", self, LogUsizeId::End, span),
+                im!("{:>9}", self, LogUsizeId::End, nshift),
+            );
+        } else {
+            println!(
+                "\x1B[2K {}|#BLK:{}, #CNC:{}, #RST:{}, #STB:{} ",
+                match rst_mode {
+                    RestartMode::Dynamic => "    Restart",
+                    RestartMode::Luby if self.config.no_color => "LubyRestart",
+                    RestartMode::Luby => "\x1B[001m\x1B[035mLubyRestart\x1B[000m",
+                    RestartMode::Stabilize if self.config.no_color => "  Stabilize",
+                    RestartMode::Stabilize => "  \x1B[001m\x1B[030mStabilize\x1B[000m",
+                },
+                im!("{:>9}", self, LogUsizeId::RestartBlock, rst_num_blk),
+                im!("{:>9}", self, LogUsizeId::RestartCancel, rst_num_sblk),
+                im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
+                im!("{:>9}", self, LogUsizeId::RestartStabilize, rst_num_srst),
+            );
+        }
+        /*
         println!(
             "\x1B[2K {}|#BLK:{}, #CNC:{}, #RST:{}, #STB:{} ",
             match rst_mode {
@@ -545,6 +578,7 @@ impl StateIF for State {
             im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
             im!("{:>9}", self, LogUsizeId::RestartStabilize, rst_num_srst),
         );
+         */
         println!(
             "\x1B[2K         EMA|tLBD:{}, tASG:{}, eMLD:{}, eCCC:{} ",
             fm!("{:>9.4}", self, LogF64Id::TrendLBD, rst_lbd.trend()),

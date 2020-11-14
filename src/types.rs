@@ -25,6 +25,9 @@ use {
 pub trait Export<T, Mode> {
     fn exports(&self) -> T;
     fn mode(&self) -> Mode;
+    fn stabilization_length(&self) -> (usize, usize, f64, f64) {
+        (0, 0, 0.0, 0.0)
+    }
 }
 
 pub trait ExportBox<'a, T> {

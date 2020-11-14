@@ -20,14 +20,13 @@ trait ProgressEvaluator {
 /// Update progress observer sub-modules
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub enum ProgressUpdate {
-    Counter(usize),
+    Counter,
     ACC(f64),
     ASG(usize),
     LBD(u16),
     Luby,
     MLD(u16),
     Reset,
-    STB(bool),
 }
 
 /// Restart modes
@@ -44,10 +43,10 @@ pub enum RestartMode {
 
 /// API for restart like `block_restart`, `force_restart` and so on.
 pub trait RestartIF {
-    /// return `true` if stabilizer is active.
-    fn stabilizing(&self) -> bool;
     /// check blocking and forcing restart condition.
     fn restart(&mut self) -> Option<RestartDecision>;
+    /// check stabilization mode.
+    fn stabilize(&mut self, now: usize, progress: bool) -> Option<bool>;
     /// update specific sub-module
     fn update(&mut self, kind: ProgressUpdate);
 }
@@ -167,8 +166,8 @@ struct ProgressMLD {
     ema: Ema2,
     num: usize,
     sum: usize,
-    threshold_exp: f64,
-    threshold_stb: f64,
+    scaling: f64,
+    threshold: f64,
 }
 
 impl Default for ProgressMLD {
@@ -178,8 +177,8 @@ impl Default for ProgressMLD {
             ema: Ema2::new(1),
             num: 0,
             sum: 0,
-            threshold_exp: 5.5,
-            threshold_stb: 4.0,
+            scaling: 0.20,
+            threshold: 2.0,
         }
     }
 }
@@ -188,8 +187,8 @@ impl Instantiate for ProgressMLD {
     fn instantiate(config: &Config, _: &CNFDescription) -> Self {
         ProgressMLD {
             ema: Ema2::new(10 * config.rst_lbd_len).with_slow(config.rst_lbd_slw),
-            threshold_exp: config.rst_mld_eth,
-            threshold_stb: config.rst_mld_sth,
+            scaling: config.rst_mld_scl,
+            threshold: config.rst_mld_thr,
             ..ProgressMLD::default()
         }
     }
@@ -453,6 +452,19 @@ impl ProgressEvaluator for LubySeries {
     }
 }
 
+impl LubySeries {
+    fn new(step: usize) -> Self {
+        LubySeries {
+            enable: true,
+            active: false,
+            index: 0,
+            next_restart: step,
+            restart_inc: 2.0,
+            step,
+        }
+    }
+}
+
 /// Find the finite subsequence that contains index 'x', and the
 /// size of that subsequence as: 1, 1, 2, 1, 1, 2, 4, 1, 1, 2, 1, 1, 2, 4, 8
 impl LubySeries {
@@ -491,6 +503,7 @@ struct GeometricStabilizer {
     next_trigger: usize,
     restart_inc: f64,
     step: usize,
+    luby: LubySeries,
 }
 
 impl Default for GeometricStabilizer {
@@ -503,6 +516,7 @@ impl Default for GeometricStabilizer {
             next_trigger: 1000,
             restart_inc: 2.0,
             step: 1000,
+            luby: LubySeries::new(1000),
         }
     }
 }
@@ -529,43 +543,22 @@ impl fmt::Display for GeometricStabilizer {
     }
 }
 
-impl EmaIF for GeometricStabilizer {
-    type Input = usize;
-    fn update(&mut self, now: usize) {
+impl GeometricStabilizer {
+    fn update(&mut self, now: usize) -> bool {
         if self.enable && self.next_trigger <= now {
             self.active = !self.active;
             if self.active {
                 self.num_active += 1;
             }
-            self.next_trigger += self.step;
+            self.luby.shift();
+            self.step = self.luby.next_restart;
+            self.next_trigger = now + self.step;
+            self.num_shift += 1;
+            true
+        } else {
+            false
         }
     }
-    fn get(&self) -> f64 {
-        todo!()
-    }
-}
-
-impl ProgressEvaluator for GeometricStabilizer {
-    fn is_active(&self) -> bool {
-        self.enable && self.active
-    }
-    fn reset_progress(&mut self) {
-        // THIS implementation is strangely ultra good. Be careful if you want to revise.
-        if self.enable && 1000 < self.step {
-            self.active = false;
-            self.step = 1000;
-        }
-    }
-    fn shift(&mut self) {
-        self.step = ((self.step as f64) * self.restart_inc) as usize;
-        if 100_000 < self.step {
-            self.step = 1000;
-        }
-        self.num_shift += 1;
-    }
-}
-
-impl GeometricStabilizer {
     fn span(&self) -> usize {
         self.step / 1000
     }
@@ -668,8 +661,8 @@ pub struct Restarter {
     after_restart: usize,
     restart_step: usize,
     initial_restart_step: usize,
-    restarted_this_phase: bool,
-    restarted_last_phase: bool,
+    progress_this_phase: bool,
+    progress_last_phase: bool,
 
     //
     //## statistics
@@ -696,8 +689,8 @@ impl Default for Restarter {
             after_restart: 0,
             restart_step: 0,
             initial_restart_step: 0,
-            restarted_this_phase: false,
-            restarted_last_phase: true,
+            progress_this_phase: false,
+            progress_last_phase: true,
             num_block_non_stabilized: 0,
             num_restart_non_stabilized: 0,
             num_block_stabilized: 0,
@@ -754,9 +747,6 @@ pub enum RestartDecision {
 }
 
 impl RestartIF for Restarter {
-    fn stabilizing(&self) -> bool {
-        self.stb.is_active()
-    }
     #[inline]
     #[allow(clippy::collapsible_if)]
     fn restart(&mut self) -> Option<RestartDecision> {
@@ -769,39 +759,47 @@ impl RestartIF for Restarter {
             return None;
         }
         self.acc.shift();
-
-        if self.stb.is_active() {
-            if self.asg.is_active() {
-                self.after_restart = 0;
-                self.num_block_stabilized += 1;
-                return Some(RestartDecision::Cancel);
-            }
-            if self.lbd.threshold < self.lbd.trend() {
-                self.after_restart = 0;
-                self.num_restart_stabilized += 1;
-                // self.restarted_this_phase = true;
-                return Some(RestartDecision::Stabilize);
-            }
-        } else {
-            if self.asg.is_active() && self.on_good_path() {
-                self.after_restart = 0;
-                self.num_block_non_stabilized += 1;
-                return Some(RestartDecision::Block);
-            }
-            if self.lbd.threshold < self.lbd.trend() && !self.on_good_path() {
-                self.after_restart = 0;
-                self.num_restart_non_stabilized += 1;
-                self.restarted_this_phase = true;
-                return Some(RestartDecision::Force);
-            }
+        if self.stb.active {
+            return Some(RestartDecision::Postpone);
         }
-        return Some(RestartDecision::Postpone);
+
+        // Branching based on sizes of learnt clauses comparing with the average of
+        // maximum LBDs used in conflict analyzsis.
+        let _good_path = self.progress_last_phase
+            && self.lbd.get()
+                < self.mld.get() + self.stb.span() as f64 * self.mld.scaling + self.mld.threshold;
+
+        if self.asg.is_active() /* && good_path */ {
+            self.after_restart = 0;
+            self.num_block_non_stabilized += 1;
+            return Some(RestartDecision::Block);
+        }
+        // if self.lbd.is_active() && !good_path {
+        let offset = 0.5 / (self.stb.span() as f64 + 1.0).log(2.0);
+        if self.lbd.threshold * (1.0 + offset) < self.lbd.trend() {
+            self.after_restart = 0;
+            self.num_restart_non_stabilized += 1;
+            self.progress_this_phase = true;
+            return Some(RestartDecision::Force);
+        }
+        Some(RestartDecision::Postpone)
+    }
+    fn stabilize(&mut self, now: usize, progress: bool) -> Option<bool> {
+        let toggle = self.stb.update(now);
+        if toggle && !self.stb.active {
+            self.progress_last_phase = self.progress_this_phase || progress || self.stb.span() < 10;
+            self.progress_this_phase = false;
+        }
+        if toggle {
+            Some(self.stb.active)
+        } else {
+            None
+        }
     }
     fn update(&mut self, kind: ProgressUpdate) {
         match kind {
-            ProgressUpdate::Counter(val) => {
+            ProgressUpdate::Counter => {
                 self.after_restart += 1;
-                self.stb.update(val);
                 self.luby.update(self.after_restart);
             }
             ProgressUpdate::ACC(fval) => self.acc.update(fval),
@@ -810,30 +808,11 @@ impl RestartIF for Restarter {
             ProgressUpdate::Luby => self.luby.update(0),
             ProgressUpdate::MLD(val) => self.mld.update(val),
             ProgressUpdate::Reset => (),
-            ProgressUpdate::STB(extend) => {
-                if extend && !self.stb.is_active() {
-                    self.stb.shift();
-                }
-                self.restarted_last_phase = self.restarted_this_phase;
-                self.restarted_this_phase = false;
-            }
         }
     }
 }
 
-impl Restarter {
-    // Branching based on sizes of learnt clauses comparing with the average of
-    // maximum LBDs used in conflict analyzsis.
-    fn on_good_path(&self) -> bool {
-        let span = self.stb.span() as f64;
-        let margin = if self.stb.is_active() && self.restarted_last_phase {
-            self.mld.threshold_stb + span * 0.20
-        } else {
-            self.mld.threshold_exp + span * 0.20
-        };
-        self.lbd.get() < self.mld.get() + margin
-    }
-}
+impl Restarter {}
 
 impl Export<(usize, usize, usize, usize), (RestartMode, usize)> for Restarter {
     /// exports:
@@ -858,13 +837,21 @@ impl Export<(usize, usize, usize, usize), (RestartMode, usize)> for Restarter {
         )
     }
     fn mode(&self) -> (RestartMode, usize) {
-        if self.stb.is_active() {
+        if self.stb.active {
             (RestartMode::Stabilize, self.stb.span())
         } else if self.luby.enable {
             (RestartMode::Luby, self.stb.span())
         } else {
             (RestartMode::Dynamic, self.stb.span())
         }
+    }
+    fn stabilization_length(&self) -> (usize, usize, f64, f64) {
+        (
+            self.stb.span(),
+            self.stb.num_shift,
+            self.mld.threshold,
+            self.mld.scaling,
+        )
     }
 }
 
