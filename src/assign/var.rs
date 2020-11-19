@@ -14,6 +14,7 @@ impl Default for Var {
             index: 0,
             reward: 0.0,
             timestamp: 0,
+            bundle_timestamp: 0,
             flags: Flag::empty(),
             participated: 0,
         }
@@ -98,7 +99,8 @@ pub trait VarManipulateIF {
     /// * the number of asserted vars
     /// * the number of eliminated vars
     /// * the number of unasserted vars
-    fn var_stats(&self) -> (usize, usize, usize, usize);
+    /// * the number of unreachable unassigned vars
+    fn var_stats(&self) -> (usize, usize, usize, usize, usize);
 }
 
 impl VarManipulateIF for AssignStack {
@@ -146,12 +148,13 @@ impl VarManipulateIF for AssignStack {
         }
     }
     #[inline]
-    fn var_stats(&self) -> (usize, usize, usize, usize) {
+    fn var_stats(&self) -> (usize, usize, usize, usize, usize) {
         (
             self.num_vars,
             self.num_asserted_vars,
             self.num_eliminated_vars,
             self.num_vars - self.num_asserted_vars - self.num_eliminated_vars,
+            self.num_vars - self.num_best_assign,
         )
     }
 }

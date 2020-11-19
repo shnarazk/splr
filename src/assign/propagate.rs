@@ -63,7 +63,9 @@ macro_rules! set_assign {
     ($asg: expr, $lit: expr) => {
         match $lit {
             l => unsafe {
-                *$asg.assign.get_unchecked_mut(l.vi()) = Some(bool::from(l));
+                let vi = l.vi();
+                *$asg.assign.get_unchecked_mut(vi) = Some(bool::from(l));
+                $asg.var.get_unchecked_mut(vi).bundle_timestamp = $asg.num_conflict;
             },
         }
     };
@@ -144,6 +146,13 @@ impl PropagateIF for AssignStack {
         self.level[vi] = 0;
         set_assign!(self, l);
         self.reason[vi] = AssignReason::default();
+        {
+            let v = &mut self.var[vi];
+            if v.is(Flag::REPHASE) && v.is(Flag::BEST_PHASE) != l.as_bool() {
+                self.num_best_assign = 0;
+                v.turn_off(Flag::REPHASE);
+            }
+        }
         self.clear_reward(l.vi());
         debug_assert!(!self.trail.contains(&!l));
         self.trail.push(l);

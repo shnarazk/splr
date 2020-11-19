@@ -10,7 +10,7 @@ use {
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarRewardIF, VarSelectIF},
         cdb::{ClauseDB, ClauseDBIF},
         processor::{EliminateIF, Eliminator},
-        state::{Stat, State, StateIF},
+        state::{RephaseMode, Stat, State, StateIF},
         types::*,
     },
 };
@@ -194,13 +194,11 @@ fn search(
     rst: &mut Restarter,
     state: &mut State,
 ) -> Result<bool, SolverError> {
+    let mut bundle_started = 0;
     let mut a_decision_was_made = false;
-    let mut max_assigned = {
-        let vars = asg.var_stats();
-        vars.1 + vars.2
-    };
     let use_vivify = state.config.use_vivify();
     rst.update(ProgressUpdate::Luby);
+    rst.update(ProgressUpdate::Remain(asg.num_vars - asg.num_asserted_vars));
 
     loop {
         asg.reward_update();
@@ -221,27 +219,33 @@ fn search(
             }
             handle_conflict(asg, cdb, elim, rst, state, ci)?;
             if let Some(decision) = rst.restart() {
+                rst.update(ProgressUpdate::Remain(asg.var_stats().3));
                 match decision {
-                    RestartDecision::Block => {
-                        // asg.boost_reward(false);
-                    }
-                    RestartDecision::Force => {
-                        asg.cancel_until(asg.root_level);
-                    }
+                    RestartDecision::Block => (),
+                    RestartDecision::Force => asg.cancel_until(asg.root_level),
                     RestartDecision::Postpone | RestartDecision::Stabilize => (),
                 }
-                rst.stabilize(asg.num_conflict);
+                if let Some((stabilize, new_cycle)) = rst.stabilize(asg.num_conflict) {
+                    let s = rst.exports();
+                    if new_cycle {
+                        asg.handle(SolverEvent::Stabilize((stabilize, new_cycle)));
+                        asg.initialize_reward(elim.sorted_iterator());
+                        // asg.force_rephase(RephaseMode::Reverse(s.3 % 2 == 0, bundle_started));
+                        bundle_started = asg.num_conflict;
+                    }
+                    if s.2 == 1 && stabilize {
+                        asg.force_rephase(RephaseMode::Best);
+                    }
+                }
             }
             if a_decision_was_made {
                 a_decision_was_made = false;
             } else {
                 state[Stat::NoDecisionConflict] += 1;
             }
-            let na = asg.best_assigned(Flag::PHASE);
-            if max_assigned < na {
-                max_assigned = na;
+            if let Some(na) = asg.best_assigned() {
                 state.flush("");
-                state.flush(format!("unreachable: {}", asg.num_vars - max_assigned));
+                state.flush(format!("unreachable: {}", na));
             }
             if asg.num_conflict % state.reflection_interval == 0 {
                 adapt_modules(asg, cdb, elim, rst, state)?;
@@ -281,7 +285,7 @@ fn search(
             }
         }
         if !asg.remains() {
-            let lit = asg.select_decision_literal(&state.phase_select);
+            let lit = asg.select_decision_literal();
             asg.assign_by_decision(lit);
             state[Stat::Decision] += 1;
             a_decision_was_made = true;

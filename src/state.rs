@@ -50,36 +50,32 @@ pub trait StateIF {
 
 /// Phase saving modes.
 #[derive(Debug, Eq, PartialEq)]
-pub enum PhaseMode {
+pub enum RephaseMode {
     /// use the best phase so far.
     Best,
-    /// mixing best and random values.
-    BestRnd,
-    /// use the inverted phases.
-    Invert,
-    /// the original saving mode.
-    Latest,
+    /// a dummy
+    Clear,
+    /// force an assignment
+    Force(bool),
     /// use random values.
     Random,
-    /// use the best phases in the current segment.
-    Target,
-    ///
-    Worst,
+    /// invert assigment priority.
+    Reverse(bool, usize),
 }
 
-impl fmt::Display for PhaseMode {
+impl fmt::Display for RephaseMode {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(
             formatter,
             "{}",
             match self {
-                PhaseMode::Best => "ps_Best",
-                PhaseMode::BestRnd => "ps_BestRnd",
-                PhaseMode::Invert => "ps_Invert",
-                PhaseMode::Latest => "ps_Latest",
-                PhaseMode::Random => "ps_Random",
-                PhaseMode::Target => "ps_Target",
-                PhaseMode::Worst => "ps_Worst",
+                RephaseMode::Best => "rPhBest",
+                RephaseMode::Clear => "rphClear",
+                RephaseMode::Force(false) => "rPhFalse",
+                RephaseMode::Force(true) => "rPhTrue",
+                RephaseMode::Random => "rPhRandom",
+                RephaseMode::Reverse(false, _) => "rPhReverse",
+                RephaseMode::Reverse(true, _) => "rPh!Reverse",
             }
         )
     }
@@ -182,8 +178,6 @@ impl IndexMut<Stat> for [usize] {
 pub struct State {
     /// solver configuration
     pub config: Config,
-    /// phase saving selector
-    pub phase_select: PhaseMode,
     /// collection of statistics data
     pub stats: [usize; Stat::EndOfStatIndex as usize],
     /// tuple of current strategy and the number of conflicts at which the strategy is selected.
@@ -227,7 +221,6 @@ impl Default for State {
     fn default() -> State {
         State {
             config: Config::default(),
-            phase_select: PhaseMode::Latest,
             stats: [0; Stat::EndOfStatIndex as usize],
             strategy: (SearchStrategy::Initial, 0),
             target: CNFDescription::default(),
@@ -290,6 +283,7 @@ impl Instantiate for State {
             SolverEvent::Eliminate(_) => (),
             SolverEvent::Instantiate => (),
             SolverEvent::Reinitialize => (),
+            SolverEvent::Stabilize((_, _)) => (),
             SolverEvent::Vivify(_) => (),
         }
     }
@@ -466,8 +460,13 @@ impl StateIF for State {
         //
         //## Gather stats from all modules
         //
-        let (asg_num_vars, asg_num_asserted_vars, asg_num_eliminated_vars, asg_num_unasserted_vars) =
-            asg.var_stats();
+        let (
+            asg_num_vars,
+            asg_num_asserted_vars,
+            asg_num_eliminated_vars,
+            asg_num_unasserted_vars,
+            asg_unreachables,
+        ) = asg.var_stats();
         let rate = (asg_num_asserted_vars + asg_num_eliminated_vars) as f64 / asg_num_vars as f64;
         let (asg_num_conflict, asg_num_propagation, asg_num_restart, _asg_act_dcy) = asg.exports();
 
@@ -480,7 +479,7 @@ impl StateIF for State {
 
         let (rst_num_blk, rst_num_rst, rst_num_span, rst_num_shift) = rst.exports();
         // let rst_num_stb = rst.mode().1;
-        let (rst_acc, rst_asg, rst_lbd, rst_mld) = *rst.exports_box();
+        let (_rst_acc, rst_asg, rst_lbd, _rst_mld) = *rst.exports_box();
 
         if self.config.use_log {
             self.dump(asg, cdb, rst);
@@ -555,11 +554,18 @@ impl StateIF for State {
         );
          */
         println!(
-            "\x1B[2K         EMA|tLBD:{}, tASG:{}, eMLD:{}, eCCC:{} ",
+            "\x1B[2K         EMA|tLBD:{}, tASG:{}, core:{}, /dpc:{} ",
             fm!("{:>9.4}", self, LogF64Id::TrendLBD, rst_lbd.trend()),
             fm!("{:>9.4}", self, LogF64Id::TrendASG, rst_asg.trend()),
-            fm!("{:>9.4}", self, LogF64Id::EmaMLD, rst_mld.get()),
-            fm!("{:>9.4}", self, LogF64Id::EmaCCC, rst_acc.get()),
+            // fm!("{:>9.4}", self, LogF64Id::EmaMLD, rst_mld.get()),
+            // fm!("{:>9.4}", self, LogF64Id::EmaCCC, rst_acc.get()),
+            im!("{:>9}", self, LogUsizeId::End, asg_unreachables),
+            fm!(
+                "{:>9.2}",
+                self,
+                LogF64Id::End,
+                self[Stat::Decision] as f64 / asg_num_conflict as f64
+            ),
         );
         println!(
             "\x1B[2K    Conflict|eLBD:{}, cnfl:{}, bjmp:{}, /ppc:{} ",
@@ -690,8 +696,13 @@ impl State {
         R: Export<(usize, usize, usize, usize), (RestartMode, usize)>,
     {
         self.progress_cnt += 1;
-        let (asg_num_vars, asg_num_asserted_vars, asg_num_eliminated_vars, asg_num_unasserted_vars) =
-            asg.var_stats();
+        let (
+            asg_num_vars,
+            asg_num_asserted_vars,
+            asg_num_eliminated_vars,
+            asg_num_unasserted_vars,
+            _,
+        ) = asg.var_stats();
         let rate = (asg_num_asserted_vars + asg_num_eliminated_vars) as f64 / asg_num_vars as f64;
         let (asg_num_conflict, _num_propagation, asg_num_restart, _) = asg.exports();
         let (
@@ -735,8 +746,13 @@ impl State {
             None => self.strategy.0.to_str(),
             Some(x) => x,
         };
-        let (asg_num_vars, asg_num_asserted_vars, asg_num_eliminated_vars, asg_num_unasserted_vars) =
-            asg.var_stats();
+        let (
+            asg_num_vars,
+            asg_num_asserted_vars,
+            asg_num_eliminated_vars,
+            asg_num_unasserted_vars,
+            _,
+        ) = asg.var_stats();
         let rate = (asg_num_asserted_vars + asg_num_eliminated_vars) as f64 / asg_num_vars as f64;
         let (_num_conflict, _num_propagation, asg_num_restart, _) = asg.exports();
         let (

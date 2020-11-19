@@ -21,6 +21,7 @@ impl VarRewardIF for AssignStack {
             self.var[*vi].reward = v;
             v *= 0.99;
         }
+        self.activity_decay *= 0.8;
     }
     fn clear_reward(&mut self, vi: VarId) {
         self.var[vi].reward = 0.0;

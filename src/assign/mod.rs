@@ -74,7 +74,7 @@ pub trait AssignIF: ClauseManipulateIF + PropagateIF + VarManipulateIF + VarRewa
     fn assign_ref(&self) -> &[Option<bool>];
     /// return a reference to `level`.
     fn level_ref(&self) -> &[DecisionLevel];
-    fn best_assigned(&mut self, flag: Flag) -> usize;
+    fn best_assigned(&mut self) -> Option<usize>;
     /// inject assignments for eliminated vars.
     fn extend_model<C>(&mut self, c: &mut C, lits: &[Lit]) -> Vec<Option<bool>>
     where
@@ -99,8 +99,10 @@ pub struct Var {
     participated: u32,
     /// a dynamic evaluation criterion like EVSIDS or ACID.
     reward: f64,
-    /// the number of conflicts at which this var was assigned lastly.
+    /// the number of conflicts at which this var was assigned an rewarded lastly.
     timestamp: usize,
+    /// the number of conflicts at which this var was assigend lastly
+    bundle_timestamp: usize,
     /// the `Flag`s
     flags: Flag,
 }

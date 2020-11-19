@@ -54,7 +54,6 @@ pub fn vivify(
     // clauses.sort_by_cached_key(|ci| (cdb.activity(*ci).log(10.0) * -100_000.0) as isize);
     clauses.sort_by_key(|ci| cdb[*ci].rank);
     clauses.resize(clauses.len() / 2, ClauseId::default());
-    debug_assert!(!asg.remains());
     while let Some(ci) = clauses.pop() {
         let c: &mut Clause = &mut cdb[ci];
         // Since GC can make `clauses` out of date, we need to check its aliveness here.

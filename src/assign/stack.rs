@@ -57,7 +57,7 @@ impl Default for AssignStack {
             use_rephase: true,
             best_assign: false,
             build_best_at: 0,
-            num_best_assign: 0.0,
+            num_best_assign: 0,
             num_conflict: 0,
             num_propagation: 0,
             num_restart: 0,
@@ -134,6 +134,9 @@ impl Instantiate for AssignStack {
                     self.trail.len()
                 };
                 self.rebuild_order();
+            }
+            SolverEvent::Stabilize((_, true)) => {
+                self.num_best_assign = 0;
             }
             SolverEvent::Vivify(start) => {
                 if start {
@@ -213,32 +216,11 @@ impl AssignIF for AssignStack {
     fn level_ref(&self) -> &[DecisionLevel] {
         &self.level
     }
-    #[allow(clippy::single_match)]
-    fn best_assigned(&mut self, flag: Flag) -> usize {
-        match flag {
-            Flag::PHASE => {
-                if self.build_best_at == self.num_propagation {
-                    return self.num_best_assign as usize;
-                }
-            }
-            // Flag::BEST_PHASE => {
-            //     if self.best_assign {
-            //         self.best_assign = false;
-            //         return self.num_best_assign;
-            //     }
-            // }
-            // Flag::TARGET_PHASE => {
-            //     if self.target_assign {
-            //         self.target_assign = false;
-            //         return self.num_target_assign;
-            //     }
-            // }
-            _ => {
-                #[cfg(feature = "boundary_check")]
-                panic!("invalid flag for reset_assign_record");
-            }
+    fn best_assigned(&mut self) -> Option<usize> {
+        if self.build_best_at == self.num_propagation {
+            return Some(self.num_vars - self.num_best_assign);
         }
-        0
+        None
     }
     #[allow(unused_variables)]
     fn extend_model<C>(&mut self, cdb: &mut C, lits: &[Lit]) -> Vec<Option<bool>>

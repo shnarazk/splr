@@ -33,6 +33,8 @@ pub trait ExportBox<'a, T> {
 
 /// API for Literal like `from_int`, `from_assign`, `to_cid` and so on.
 pub trait LitIF {
+    /// convert to bool
+    fn as_bool(self) -> bool;
     /// convert [VarId](../type.VarId.html) to [Lit](../type.Lit.html).
     /// It returns a positive literal if `p` is `TRUE` or `BOTTOM`.
     fn from_assign(vi: VarId, p: bool) -> Self;
@@ -323,6 +325,10 @@ impl IndexMut<Lit> for Vec<Vec<Watch>> {
 /// assert_eq!(Lit::from(-2i32), !Lit::from( 2i32));
 /// ```
 impl LitIF for Lit {
+    #[inline]
+    fn as_bool(self) -> bool {
+        self.ordinal & 1 == 1
+    }
     #[inline]
     fn from_assign(vi: VarId, p: bool) -> Lit {
         Lit {

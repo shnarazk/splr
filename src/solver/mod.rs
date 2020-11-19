@@ -59,6 +59,8 @@ pub enum SolverEvent {
     NewVar,
     /// re-initialization for incremental solving.
     Reinitialize,
+    /// stabilization update.
+    Stabilize((bool, bool)),
     /// Vivification: `true` for start, `false` for end.
     Vivify(bool),
 }
@@ -70,7 +72,7 @@ pub enum SolverEvent {
 /// use crate::splr::{assign::{AssignIF, VarManipulateIF}, state::{State, StateIF}, types::*};
 ///
 /// let mut s = Solver::try_from("tests/sample.cnf").expect("can't load");
-/// assert!(matches!(s.asg.var_stats(), (250,_, _, 250)));
+/// assert!(matches!(s.asg.var_stats(), (250,_, _, 250, _)));
 /// if let Ok(Certificate::SAT(v)) = s.solve() {
 ///     assert_eq!(v.len(), 250);
 ///     // But don't expect `s.asg.var_stats().3 == 0` at this point.
