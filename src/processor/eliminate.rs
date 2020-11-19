@@ -166,7 +166,7 @@ where
 
 /// Returns:
 /// - `(false, -)` if one of the clauses is always satisfied.
-/// - `(true, n)` if they are mergeable to a n-literal clause.
+/// - `(true, n)` if they are merge-able to a n-literal clause.
 fn check_to_merge<A, C>(asg: &A, cdb: &C, cp: ClauseId, cq: ClauseId, v: VarId) -> (bool, usize)
 where
     A: AssignIF,

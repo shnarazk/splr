@@ -7,7 +7,7 @@ use {
 
 pub trait VarOrderIF {
     fn new(n: usize, init: usize) -> VarOccHeap;
-    fn insert(&mut self, occur: &[LitOccurs], vi: VarId, upword: bool);
+    fn insert(&mut self, occur: &[LitOccurs], vi: VarId, upward: bool);
     fn clear<A>(&mut self, asg: &mut A)
     where
         A: AssignIF;

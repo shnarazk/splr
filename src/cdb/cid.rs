@@ -34,7 +34,7 @@ impl fmt::Display for ClauseId {
 }
 
 impl ClauseIdIF for ClauseId {
-    /// return `true` if the clause is generated from a literal by Eliminater.
+    /// return `true` if the clause is generated from a literal by Eliminator.
     fn is_lifted_lit(self) -> bool {
         0 != 0x8000_0000 & self.ordinal
     }

@@ -26,7 +26,7 @@ pub trait ClauseDBIF: IndexMut<ClauseId, Output = Clause> {
     fn watcher_list(&self, l: Lit) -> &[Watch];
     /// return the list of watch lists
     fn watcher_lists_mut(&mut self) -> &mut [Vec<Watch>];
-    /// unregister a clause `cid` from clause database and make the clause dead.
+    /// un-register a clause `cid` from clause database and make the clause dead.
     fn detach(&mut self, cid: ClauseId);
     /// check a condition to reduce.
     /// * return `true` if reduction is done.
@@ -113,7 +113,7 @@ impl Default for ClauseDB {
             extra_inc: 1000,
             first_reduction: 1000,
             next_reduction: 1000,
-            reducable: true,
+            reducible: true,
             reduction_coeff: 1,
             num_active: 0,
             num_bi_clause: 0,
@@ -240,7 +240,7 @@ impl Instantiate for ClauseDB {
             bin_watcher,
             watcher,
             certified,
-            reducable: config.use_reduce(),
+            reducible: config.use_reduce(),
             soft_limit: config.c_cls_lim,
             ..ClauseDB::default()
         }
@@ -627,7 +627,7 @@ impl ClauseDBIF for ClauseDB {
     where
         A: AssignIF,
     {
-        if !self.reducable || 0 == self.num_learnt {
+        if !self.reducible || 0 == self.num_learnt {
             return false;
         }
         let go = if self.use_chan_seok {

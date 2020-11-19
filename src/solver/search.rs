@@ -201,7 +201,6 @@ fn search(
     };
     let use_vivify = state.config.use_vivify();
     rst.update(ProgressUpdate::Luby);
-    state.stabilize = false;
 
     loop {
         asg.reward_update();
@@ -226,26 +225,12 @@ fn search(
                     RestartDecision::Block => {
                         // asg.boost_reward(false);
                     }
-                    RestartDecision::Cancel => {
-                        // asg.boost_reward(true);
-                    }
                     RestartDecision::Force => {
                         asg.cancel_until(asg.root_level);
                     }
-                    RestartDecision::Stabilize if state.asserted_in_this_mode => {
-                        asg.cancel_until(asg.root_level);
-                        // asg.force_rephase();
-                    }
-                    RestartDecision::Stabilize => {
-                        // asg.boost_reward(false);
-                    }
-                    RestartDecision::Postpone => (),
+                    RestartDecision::Postpone | RestartDecision::Stabilize => (),
                 }
-                if let Some(mode) = rst.stabilize(asg.num_conflict, state.asserted_in_this_mode) {
-                    state.stabilize = mode;
-                    asg.handle(SolverEvent::Stabilize(state.stabilize));
-                    state.asserted_in_this_mode = false;
-                }
+                rst.stabilize(asg.num_conflict);
             }
             if a_decision_was_made {
                 a_decision_was_made = false;

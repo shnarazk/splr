@@ -213,7 +213,6 @@ pub fn handle_conflict(
         }
         asg.handle(SolverEvent::Assert(l0.vi()));
         rst.update(ProgressUpdate::Reset);
-        state.asserted_in_this_mode = true;
     // elim.to_simplify += 1.0; // 1 for the positive lit, 1 for the negative.
     } else {
         {
@@ -225,9 +224,6 @@ pub fn handle_conflict(
                 //## Learnt Literal Rewarding
                 //
                 asg.reward_at_analysis(lit.vi());
-                if !state.stabilize {
-                    continue;
-                }
                 if let AssignReason::Implication(r, _) = asg.reason(lit.vi()) {
                     for l in &cdb[r].lits {
                         let vi = l.vi();

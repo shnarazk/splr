@@ -194,8 +194,8 @@ impl Default for Config {
             rst_ccc_thr: 0.70,
             rst_lbd_len: 30,
             rst_lbd_slw: 10000,
-            rst_lbd_thr: 1.20,
-            rst_mld_scl: 0.40,
+            rst_lbd_thr: 0.60,
+            rst_mld_scl: 0.10,
             rst_mld_thr: 1.00,
             rst_stb_scl: 2.0,
 

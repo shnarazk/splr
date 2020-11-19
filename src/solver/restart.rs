@@ -46,7 +46,7 @@ pub trait RestartIF {
     /// check blocking and forcing restart condition.
     fn restart(&mut self) -> Option<RestartDecision>;
     /// check stabilization mode.
-    fn stabilize(&mut self, now: usize, progress: bool) -> Option<bool>;
+    fn stabilize(&mut self, now: usize) -> Option<bool>;
     /// update specific sub-module
     fn update(&mut self, kind: ProgressUpdate);
 }
@@ -498,12 +498,11 @@ impl LubySeries {
 struct GeometricStabilizer {
     enable: bool,
     active: bool,
+    luby: LubySeries,
     num_active: usize,
     num_shift: usize,
     next_trigger: usize,
-    restart_inc: f64,
     step: usize,
-    luby: LubySeries,
 }
 
 impl Default for GeometricStabilizer {
@@ -511,12 +510,11 @@ impl Default for GeometricStabilizer {
         GeometricStabilizer {
             enable: true,
             active: false,
+            luby: LubySeries::new(1000),
             num_active: 0,
             num_shift: 0,
             next_trigger: 1000,
-            restart_inc: 2.0,
             step: 1000,
-            luby: LubySeries::new(1000),
         }
     }
 }
@@ -525,7 +523,6 @@ impl Instantiate for GeometricStabilizer {
     fn instantiate(config: &Config, _: &CNFDescription) -> Self {
         GeometricStabilizer {
             enable: config.use_stabilize(),
-            restart_inc: config.rst_stb_scl,
             ..GeometricStabilizer::default()
         }
     }
@@ -661,16 +658,12 @@ pub struct Restarter {
     after_restart: usize,
     restart_step: usize,
     initial_restart_step: usize,
-    progress_this_phase: bool,
-    progress_last_phase: bool,
 
     //
     //## statistics
     //
-    num_block_non_stabilized: usize,
-    num_restart_non_stabilized: usize,
-    num_block_stabilized: usize,
-    num_restart_stabilized: usize,
+    num_block: usize,
+    num_restart: usize,
 }
 
 impl Default for Restarter {
@@ -689,12 +682,8 @@ impl Default for Restarter {
             after_restart: 0,
             restart_step: 0,
             initial_restart_step: 0,
-            progress_this_phase: false,
-            progress_last_phase: true,
-            num_block_non_stabilized: 0,
-            num_restart_non_stabilized: 0,
-            num_block_stabilized: 0,
-            num_restart_stabilized: 0,
+            num_block: 0,
+            num_restart: 0,
         }
     }
 }
@@ -725,8 +714,6 @@ impl Instantiate for Restarter {
             SolverEvent::Adapt((SearchStrategy::LowSuccessive, n), m) if n == m => {
                 // self.luby.enable = true;
             }
-            SolverEvent::Stabilize(true) => (),
-            SolverEvent::Stabilize(false) => (),
             _ => (),
         }
     }
@@ -734,15 +721,13 @@ impl Instantiate for Restarter {
 
 /// Type for the result of `restart`.
 pub enum RestartDecision {
-    /// We should block restart
+    /// We should block restart.
     Block,
-    /// We should block restart in stabilization mode
-    Cancel,
-    /// We should restart now
+    /// We should restart now.
     Force,
     /// TODO
     Postpone,
-    /// We should restart now in stabilization mode
+    /// We are in stabilization mode.
     Stabilize,
 }
 
@@ -760,37 +745,30 @@ impl RestartIF for Restarter {
         }
         self.acc.shift();
         if self.stb.active {
-            return Some(RestartDecision::Postpone);
+            return Some(RestartDecision::Stabilize);
         }
 
         // Branching based on sizes of learnt clauses comparing with the average of
-        // maximum LBDs used in conflict analyzsis.
-        let _good_path = self.progress_last_phase
-            && self.lbd.get()
-                < self.mld.get() + self.stb.span() as f64 * self.mld.scaling + self.mld.threshold;
+        // maximum LBDs used in conflict analysis.
+        let good_path = self.lbd.get()
+            < self.mld.get() + (self.stb.span() as f64) * self.mld.scaling + self.mld.threshold;
 
-        if self.asg.is_active() /* && good_path */ {
+        if self.asg.is_active() && good_path {
             self.after_restart = 0;
-            self.num_block_non_stabilized += 1;
+            self.num_block += 1;
             return Some(RestartDecision::Block);
         }
-        // if self.lbd.is_active() && !good_path {
-        let offset = 0.5 / (self.stb.span() as f64 + 1.0).log(2.0);
-        if self.lbd.threshold * (1.0 + offset) < self.lbd.trend() {
+        if 1.0 + self.lbd.threshold / (self.stb.span() as f64 + 4.0).log(2.0) < self.lbd.trend()
+            && !good_path
+        {
             self.after_restart = 0;
-            self.num_restart_non_stabilized += 1;
-            self.progress_this_phase = true;
+            self.num_restart += 1;
             return Some(RestartDecision::Force);
         }
         Some(RestartDecision::Postpone)
     }
-    fn stabilize(&mut self, now: usize, progress: bool) -> Option<bool> {
-        let toggle = self.stb.update(now);
-        if toggle && !self.stb.active {
-            self.progress_last_phase = self.progress_this_phase || progress || self.stb.span() < 10;
-            self.progress_this_phase = false;
-        }
-        if toggle {
+    fn stabilize(&mut self, now: usize) -> Option<bool> {
+        if self.stb.update(now) {
             Some(self.stb.active)
         } else {
             None
@@ -830,10 +808,10 @@ impl Export<(usize, usize, usize, usize), (RestartMode, usize)> for Restarter {
     #[inline]
     fn exports(&self) -> (usize, usize, usize, usize) {
         (
-            self.num_block_non_stabilized,
-            self.num_restart_non_stabilized,
-            self.num_block_stabilized,
-            self.num_restart_stabilized,
+            self.num_block,
+            self.num_restart,
+            self.stb.span(),
+            self.stb.num_shift,
         )
     }
     fn mode(&self) -> (RestartMode, usize) {
@@ -844,14 +822,6 @@ impl Export<(usize, usize, usize, usize), (RestartMode, usize)> for Restarter {
         } else {
             (RestartMode::Dynamic, self.stb.span())
         }
-    }
-    fn stabilization_length(&self) -> (usize, usize, f64, f64) {
-        (
-            self.stb.span(),
-            self.stb.num_shift,
-            self.mld.threshold,
-            self.mld.scaling,
-        )
     }
 }
 

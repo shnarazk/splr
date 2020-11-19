@@ -135,9 +135,6 @@ impl Instantiate for AssignStack {
                 };
                 self.rebuild_order();
             }
-            SolverEvent::Stabilize(_) => {
-                self.num_best_assign *= 0.9;
-            }
             SolverEvent::Vivify(start) => {
                 if start {
                     self.vivify_sandbox =

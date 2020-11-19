@@ -76,7 +76,7 @@ impl fmt::Display for PhaseMode {
                 PhaseMode::Best => "ps_Best",
                 PhaseMode::BestRnd => "ps_BestRnd",
                 PhaseMode::Invert => "ps_Invert",
-                PhaseMode::Latest => "ps_Lastest",
+                PhaseMode::Latest => "ps_Latest",
                 PhaseMode::Random => "ps_Random",
                 PhaseMode::Target => "ps_Target",
                 PhaseMode::Worst => "ps_Worst",
@@ -186,15 +186,13 @@ pub struct State {
     pub phase_select: PhaseMode,
     /// collection of statistics data
     pub stats: [usize; Stat::EndOfStatIndex as usize],
-    /// stabilization mode
-    pub stabilize: bool,
     /// tuple of current strategy and the number of conflicts at which the strategy is selected.
     pub strategy: (SearchStrategy, usize),
     /// problem description
     pub target: CNFDescription,
     /// strategy adjustment interval in conflict
     pub reflection_interval: usize,
-    /// time to executevivification
+    /// time to execute vivification
     pub to_vivify: f64,
     /// loop limit of vivification loop
     pub vivify_thr: f64,
@@ -221,8 +219,6 @@ pub struct State {
     pub start: Instant,
     /// upper limit for timeout handling
     pub time_limit: f64,
-    /// to find newly asserted vars in the last search mode (stabilized or not).
-    pub asserted_in_this_mode: bool,
     /// for dumping debugging information for developers
     pub development: Vec<(usize, f64, f64, f64, f64, f64)>,
 }
@@ -233,7 +229,6 @@ impl Default for State {
             config: Config::default(),
             phase_select: PhaseMode::Latest,
             stats: [0; Stat::EndOfStatIndex as usize],
-            stabilize: false,
             strategy: (SearchStrategy::Initial, 0),
             target: CNFDescription::default(),
             reflection_interval: 10_000,
@@ -249,7 +244,6 @@ impl Default for State {
             record: ProgressRecord::default(),
             start: Instant::now(),
             time_limit: 0.0,
-            asserted_in_this_mode: false,
             development: Vec::new(),
         }
     }
@@ -296,7 +290,6 @@ impl Instantiate for State {
             SolverEvent::Eliminate(_) => (),
             SolverEvent::Instantiate => (),
             SolverEvent::Reinitialize => (),
-            SolverEvent::Stabilize(_) => (),
             SolverEvent::Vivify(_) => (),
         }
     }
@@ -485,7 +478,7 @@ impl StateIF for State {
 
         let rst_mode = rst.mode().0;
 
-        let (rst_num_blk, rst_num_rst, rst_num_sblk, rst_num_srst) = rst.exports();
+        let (rst_num_blk, rst_num_rst, rst_num_span, rst_num_shift) = rst.exports();
         // let rst_num_stb = rst.mode().1;
         let (rst_acc, rst_asg, rst_lbd, rst_mld) = *rst.exports_box();
 
@@ -531,38 +524,20 @@ impl StateIF for State {
                 cdb_num_active - cdb_num_learnt
             ),
         );
-        if true {
-            let (span, nshift, _thr, _boost) = rst.stabilization_length();
-            println!(
-                "\x1B[2K {}|#BLK:{}, #RST:{}, span:{}, shft:{} ",
-                match rst_mode {
-                    RestartMode::Dynamic => "    Restart",
-                    RestartMode::Luby if self.config.no_color => "LubyRestart",
-                    RestartMode::Luby => "\x1B[001m\x1B[035mLubyRestart\x1B[000m",
-                    RestartMode::Stabilize if self.config.no_color => "  Stabilize",
-                    RestartMode::Stabilize => "  \x1B[001m\x1B[030mStabilize\x1B[000m",
-                },
-                im!("{:>9}", self, LogUsizeId::RestartBlock, rst_num_blk),
-                im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
-                im!("{:>9}", self, LogUsizeId::End, span),
-                im!("{:>9}", self, LogUsizeId::End, nshift),
-            );
-        } else {
-            println!(
-                "\x1B[2K {}|#BLK:{}, #CNC:{}, #RST:{}, #STB:{} ",
-                match rst_mode {
-                    RestartMode::Dynamic => "    Restart",
-                    RestartMode::Luby if self.config.no_color => "LubyRestart",
-                    RestartMode::Luby => "\x1B[001m\x1B[035mLubyRestart\x1B[000m",
-                    RestartMode::Stabilize if self.config.no_color => "  Stabilize",
-                    RestartMode::Stabilize => "  \x1B[001m\x1B[030mStabilize\x1B[000m",
-                },
-                im!("{:>9}", self, LogUsizeId::RestartBlock, rst_num_blk),
-                im!("{:>9}", self, LogUsizeId::RestartCancel, rst_num_sblk),
-                im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
-                im!("{:>9}", self, LogUsizeId::RestartStabilize, rst_num_srst),
-            );
-        }
+        println!(
+            "\x1B[2K {}|#BLK:{}, #RST:{}, span:{}, shft:{} ",
+            match rst_mode {
+                RestartMode::Dynamic => "    Restart",
+                RestartMode::Luby if self.config.no_color => "LubyRestart",
+                RestartMode::Luby => "\x1B[001m\x1B[035mLubyRestart\x1B[000m",
+                RestartMode::Stabilize if self.config.no_color => "  Stabilize",
+                RestartMode::Stabilize => "  \x1B[001m\x1B[030mStabilize\x1B[000m",
+            },
+            im!("{:>9}", self, LogUsizeId::RestartBlock, rst_num_blk),
+            im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
+            im!("{:>9}", self, LogUsizeId::End, rst_num_span),
+            im!("{:>9}", self, LogUsizeId::End, rst_num_shift),
+        );
         /*
         println!(
             "\x1B[2K {}|#BLK:{}, #CNC:{}, #RST:{}, #STB:{} ",

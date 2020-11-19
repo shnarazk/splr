@@ -129,7 +129,7 @@ pub fn vivify(
                         copied = asg.analyze(cdb, &copied, &cdb[cc].lits, &mut seen);
                         // this reverts dda678e
                         // Here we found an inconsistency.
-                        // So we can abort this function without rolling back to level zoro.
+                        // So we can abort this function without rolling back to level zero.
                         if copied.is_empty() {
                             break 'this_clause;
                         }

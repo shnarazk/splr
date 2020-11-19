@@ -200,8 +200,8 @@ impl PropagateIF for AssignStack {
         let bin_watcher = cdb.bin_watcher_lists() as *const [Vec<Watch>];
         let watcher = cdb.watcher_lists_mut() as *mut [Vec<Watch>];
         unsafe {
-            self.num_propagation += 1;
             while let Some(p) = self.trail.get(self.q_head) {
+                self.num_propagation += 1;
                 self.q_head += 1;
                 let false_lit = !*p;
                 // we have to drop `p` here to use self as a mutable reference again later.
@@ -296,9 +296,9 @@ impl PropagateIF for AssignStack {
             }
         }
         let na = self.q_head + self.num_eliminated_vars;
-        if self.num_best_assign as usize <= na && 0 < self.decision_level() {
+        if self.num_best_assign <= na && 0 < self.decision_level() {
             self.best_assign = true;
-            self.num_best_assign = na as f64;
+            self.num_best_assign = na;
         }
         ClauseId::default()
     }
