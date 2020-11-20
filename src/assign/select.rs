@@ -115,7 +115,7 @@ impl VarSelectIF for AssignStack {
                 let start = if limit < end { end - limit } else { 1 };
                 for vi in self.var_order.heap[start..=end].iter() {
                     let v = &self.var[*vi];
-                    if since <= v.bundle_timestamp {
+                    if since <= v.assign_timestamp {
                         continue;
                     }
                     let b = if on {

@@ -46,6 +46,8 @@ pub trait StateIF {
             + ExportBox<'r, (&'r Ema2, &'r Ema2, &'r Ema2, &'r Ema2)>;
     /// write a short message to stdout.
     fn flush<S: AsRef<str>>(&self, mes: S);
+    /// write a one-line message as log.
+    fn log<S: AsRef<str>>(&mut self, tick: usize, mes: S);
 }
 
 /// Phase saving modes.
@@ -215,6 +217,8 @@ pub struct State {
     pub time_limit: f64,
     /// for dumping debugging information for developers
     pub development: Vec<(usize, f64, f64, f64, f64, f64)>,
+    /// logging facility.
+    log_messages: Vec<String>,
 }
 
 impl Default for State {
@@ -238,6 +242,7 @@ impl Default for State {
             start: Instant::now(),
             time_limit: 0.0,
             development: Vec::new(),
+            log_messages: Vec::new(),
         }
     }
 }
@@ -436,6 +441,12 @@ impl StateIF for State {
             stdout().flush().unwrap();
         }
     }
+    fn log<S: AsRef<str>>(&mut self, tick: usize, mes: S) {
+        if self.config.splr_interface && !self.config.quiet_mode && !self.config.use_log {
+            self.log_messages
+                .insert(0, format!("[{:>10}] {}", tick, mes.as_ref()));
+        }
+    }
     /// `mes` should be shorter than or equal to 9, or 8 + a delimiter.
     #[allow(clippy::cognitive_complexity)]
     fn progress<'r, A, C, E, R>(
@@ -487,6 +498,9 @@ impl StateIF for State {
         }
         self.progress_cnt += 1;
         print!("\x1B[9A\x1B[1G");
+        while let Some(m) = self.log_messages.pop() {
+            println!("\x1B[2K{}", m);
+        }
         println!("\x1B[2K{}", self);
         println!(
             "\x1B[2K #conflict:{}, #decision:{}, #propagate:{} ",
@@ -601,7 +615,7 @@ impl StateIF for State {
         } else {
             println!("\x1B[2K    Strategy|mode: {:#}", self.strategy.0);
         }
-        self.flush("\x1B[2K");
+        self.flush("");
     }
 }
 

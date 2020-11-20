@@ -155,7 +155,7 @@ impl VarHeapIF for AssignStack {
 }
 
 pub trait VarOrderIF {
-    fn new(n: usize, init: usize) -> VarIdHeap;
+    fn new(n: usize, init: usize) -> Self;
     fn clear(&mut self);
     fn contains(&self, v: VarId) -> bool;
     fn len(&self) -> usize;
@@ -163,7 +163,7 @@ pub trait VarOrderIF {
 }
 
 impl VarOrderIF for VarIdHeap {
-    fn new(n: usize, init: usize) -> VarIdHeap {
+    fn new(n: usize, init: usize) -> Self {
         let mut heap = Vec::with_capacity(n + 1);
         let mut idxs = Vec::with_capacity(n + 1);
         heap.push(0);

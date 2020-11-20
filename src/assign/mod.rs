@@ -102,7 +102,7 @@ pub struct Var {
     /// the number of conflicts at which this var was assigned an rewarded lastly.
     timestamp: usize,
     /// the number of conflicts at which this var was assigend lastly
-    bundle_timestamp: usize,
+    assign_timestamp: usize,
     /// the `Flag`s
     flags: Flag,
 }
@@ -161,6 +161,8 @@ pub struct AssignStack {
     activity_decay: f64,
     /// maximum var activity decay
     activity_decay_max: f64,
+    /// minimum var activity decay
+    activity_decay_min: f64,
     /// ONLY used in feature EVSIDS
     reward_step: f64,
     /// for LR

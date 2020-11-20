@@ -224,7 +224,7 @@ impl Config {
         let args = std::env::args();
         let mut iter = args.skip(1);
         while let Some(arg) = iter.next() {
-            if arg.starts_with("--") {
+            if let Some(stripped) = arg.strip_prefix("--") {
                 let flags = ["no-color", "quiet", "certify", "log", "help", "version"];
                 let options_i32 = ["ADP", "ELI", "LBY", "RDC", "RPH", "RSR", "STB", "VIV"];
                 let options_u32 = ["cbt"];
@@ -237,7 +237,7 @@ impl Config {
                     "vri", "vrm", "vro",
                 ];
                 let options_path = ["dir", "proof", "result"];
-                let seg: Vec<&str> = arg[2..].split('=').collect();
+                let seg: Vec<&str> = stripped.split('=').collect();
                 match seg.len() {
                     1 => {
                         let name = &arg[2..];
@@ -353,10 +353,9 @@ impl Config {
                         println!("connected long arg: {:?} = {:?}", seg[0], seg[1]);
                     }
                 }
-            } else if arg.starts_with('-') {
+            } else if let Some(name) = arg.strip_prefix('-') {
                 let flags = ["C", "q", "c", "l", "h", "V"];
                 let options_path = ["o", "p", "r", "t"];
-                let name = &arg[1..];
                 if flags.contains(&name) {
                     match name {
                         "C" => self.no_color = true,

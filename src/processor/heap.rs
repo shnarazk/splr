@@ -6,7 +6,7 @@ use {
 };
 
 pub trait VarOrderIF {
-    fn new(n: usize, init: usize) -> VarOccHeap;
+    fn new(n: usize, init: usize) -> Self;
     fn insert(&mut self, occur: &[LitOccurs], vi: VarId, upward: bool);
     fn clear<A>(&mut self, asg: &mut A)
     where
@@ -22,7 +22,7 @@ pub trait VarOrderIF {
 }
 
 impl VarOrderIF for VarOccHeap {
-    fn new(n: usize, init: usize) -> VarOccHeap {
+    fn new(n: usize, init: usize) -> Self {
         let mut heap = Vec::with_capacity(n + 1);
         let mut idxs = Vec::with_capacity(n + 1);
         heap.push(0);

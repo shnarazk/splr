@@ -65,6 +65,7 @@ impl Default for AssignStack {
             var: Vec::new(),
             activity_decay: 0.0,
             activity_decay_max: 0.0,
+            activity_decay_min: 0.0,
             reward_step: 0.0,
             occurrence_compression_rate: 0.5,
             vivify_sandbox: (0, 0, 0),
@@ -100,6 +101,7 @@ impl Instantiate for AssignStack {
             var: Var::new_vars(nv),
             activity_decay: config.vrw_dcy_beg,
             activity_decay_max: config.vrw_dcy_end.max(config.vrw_dcy_beg),
+            activity_decay_min: config.vrw_dcy_beg.min(config.vrw_dcy_end),
             occurrence_compression_rate: config.vrw_occ_cmp,
             ..AssignStack::default()
         }

@@ -47,10 +47,9 @@ impl TargetOpts {
         }
         let mut iter = std::env::args().skip(1);
         while let Some(arg) = iter.next() {
-            if arg.starts_with("--") {
+            if let Some(name) = arg.strip_prefix("--") {
                 let flags = ["no-color", "help", "version"];
                 let options_path = ["assign"];
-                let name = &arg[2..];
                 if flags.contains(&name) {
                     match name {
                         "no-color" => self.no_color = true,
@@ -72,10 +71,9 @@ impl TargetOpts {
                         panic!("invalid argument: {}", name);
                     }
                 }
-            } else if arg.starts_with('-') {
+            } else if let Some(name) = arg.strip_prefix('-') {
                 let flags = ["C", "h", "V"];
                 let options = ["a"];
-                let name = &arg[1..];
                 if flags.contains(&name) {
                     match name {
                         "C" => self.no_color = true,
@@ -235,9 +233,9 @@ fn read_assignment(rs: &mut dyn BufRead, cnf: &str, assign: &Option<PathBuf>) ->
                         buf.clear();
                     }
                 }
-                if buf.starts_with("v ") {
+                if let Some(stripped) = buf.strip_prefix("v ") {
                     let mut v: Vec<i32> = Vec::new();
-                    for s in buf[2..].split_whitespace() {
+                    for s in stripped.split_whitespace() {
                         match s.parse::<i32>() {
                             Ok(0) => break,
                             Ok(x) => v.push(x),
