@@ -29,7 +29,7 @@ pub trait VarRewardIF {
     /// return var's activity.
     fn activity(&self, vi: VarId) -> f64;
     /// initialize rewards based on an order of vars.
-    fn initialize_reward(&mut self, iterator: Iter<'_, usize>);
+    fn initialize_reward(&mut self, iterator: Iter<'_, usize>, stabilize: bool);
     /// clear var's activity
     fn clear_reward(&mut self, vi: VarId);
     /// modify var's activity at conflict analysis in `analyze`.
@@ -159,6 +159,8 @@ pub struct AssignStack {
     //
     /// var activity decay
     activity_decay: f64,
+    /// default value for non-stabilization mode and one for stabilization mode of activity_decay
+    activity_decay_config: (f64, f64),
     /// maximum var activity decay
     activity_decay_max: f64,
     /// minimum var activity decay

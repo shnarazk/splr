@@ -498,6 +498,7 @@ struct GeometricStabilizer {
     luby: LubySeries,
     num_shift: usize,
     next_trigger: usize,
+    reset_requested: bool,
     step: usize,
     scale: usize,
 }
@@ -511,6 +512,7 @@ impl Default for GeometricStabilizer {
             luby: LubySeries::default(),
             num_shift: 0,
             next_trigger: 1000,
+            reset_requested: false,
             step: 1,
             scale: 1000,
         }
@@ -551,22 +553,30 @@ impl GeometricStabilizer {
         if self.enable && self.next_trigger <= now {
             self.num_shift += 1;
             self.active = !self.active;
-            let step = self.luby.next().unwrap();
-            let new_bundle = self.longest_span == self.step;
-            if self.longest_span < step {
-                self.longest_span = step;
-            } else if new_bundle {
-                self.longest_span += 1;
+            let new_cycle: bool;
+            if self.reset_requested {
+                new_cycle = true;
+                self.luby.reset();
+                self.reset_requested = false;
+                self.step = self.luby.next().unwrap();
+            } else {
+                new_cycle = self.longest_span == self.step;
+                self.step = self.luby.next().unwrap();
+                if self.longest_span < self.step {
+                    self.longest_span = self.step;
+                }
             }
-            self.step = step;
             self.next_trigger = now + self.step * self.scale;
-            Some((self.active, new_bundle))
+            Some((self.active, new_cycle))
         } else {
             None
         }
     }
     fn span(&self) -> usize {
         self.step
+    }
+    fn reset_progress(&mut self) {
+        self.reset_requested = true;
     }
 }
 
@@ -791,7 +801,7 @@ impl RestartIF for Restarter {
             ProgressUpdate::LBD(val) => self.lbd.update(val),
             ProgressUpdate::Luby => self.luby.update(0),
             ProgressUpdate::MLD(val) => self.mld.update(val),
-            ProgressUpdate::Reset => (),
+            ProgressUpdate::Reset => self.stb.reset_progress(),
             ProgressUpdate::Remain(val) => {
                 self.asg.nvar = val;
             }
@@ -881,6 +891,11 @@ impl LubySeries {
             index %= size;
         }
         Some(2.0f64.powi(seq as i32) as usize)
+    }
+    fn reset(&mut self) {
+        self.index = 0;
+        self.seq = 0;
+        self.size = 1;
     }
 }
 

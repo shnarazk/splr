@@ -1,9 +1,6 @@
 /// main struct AssignStack
 use {
-    super::{
-        AssignIF, AssignStack, Var, VarHeapIF, VarIdHeap, VarManipulateIF, VarOrderIF, VarRewardIF,
-        VarSelectIF,
-    },
+    super::{AssignIF, AssignStack, Var, VarIdHeap, VarManipulateIF, VarOrderIF, VarSelectIF},
     crate::{cdb::ClauseDBIF, solver::SolverEvent, types::*},
     std::{fmt, ops::Range, slice::Iter},
 };
@@ -64,8 +61,9 @@ impl Default for AssignStack {
             ordinal: 0,
             var: Vec::new(),
             activity_decay: 0.0,
-            activity_decay_max: 0.0,
-            activity_decay_min: 0.0,
+            activity_decay_config: (0.9, 0.9),
+            activity_decay_max: 0.9,
+            activity_decay_min: 0.8,
             reward_step: 0.0,
             occurrence_compression_rate: 0.5,
             vivify_sandbox: (0, 0, 0),
@@ -100,19 +98,21 @@ impl Instantiate for AssignStack {
             use_rephase: config.use_rephase(),
             var: Var::new_vars(nv),
             activity_decay: config.vrw_dcy_beg,
-            activity_decay_max: config.vrw_dcy_end.max(config.vrw_dcy_beg),
-            activity_decay_min: config.vrw_dcy_beg.min(config.vrw_dcy_end),
+            activity_decay_config: (config.vrw_dcy_end, config.vrw_dcy_end.powi(2)),
+            activity_decay_max: config.vrw_dcy_end,
+            activity_decay_min: config.vrw_dcy_beg,
             occurrence_compression_rate: config.vrw_occ_cmp,
             ..AssignStack::default()
         }
     }
+    #[inline]
     fn handle(&mut self, e: SolverEvent) {
         match e {
             SolverEvent::Adapt(_, _) => (),
+            // called only by assertion on choroBT
+            // So execute everything of `assign_by_unitclause` but cancel_until(root_level)
             SolverEvent::Assert(vi) => {
-                self.num_asserted_vars += 1;
-                self.clear_reward(vi);
-                self.remove_from_heap(vi);
+                self.make_var_asserted(vi);
             }
             SolverEvent::Conflict => (),
             SolverEvent::NewVar => {
@@ -136,9 +136,6 @@ impl Instantiate for AssignStack {
                     self.trail.len()
                 };
                 self.rebuild_order();
-            }
-            SolverEvent::Stabilize((_, true)) => {
-                self.num_best_assign = 0;
             }
             SolverEvent::Vivify(start) => {
                 if start {

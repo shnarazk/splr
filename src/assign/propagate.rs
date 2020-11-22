@@ -146,16 +146,10 @@ impl PropagateIF for AssignStack {
         self.level[vi] = 0;
         set_assign!(self, l);
         self.reason[vi] = AssignReason::default();
-        {
-            let v = &mut self.var[vi];
-            if v.is(Flag::REPHASE) && v.is(Flag::BEST_PHASE) != l.as_bool() {
-                self.num_best_assign = 0;
-                v.turn_off(Flag::REPHASE);
-            }
-        }
-        self.clear_reward(l.vi());
         debug_assert!(!self.trail.contains(&!l));
         self.trail.push(l);
+        // NOTE: sychronize the following with handle(SolverEvent::Assert)
+        self.make_var_asserted(vi);
     }
     fn cancel_until(&mut self, lv: DecisionLevel) {
         if self.trail_lim.len() as u32 <= lv {

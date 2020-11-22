@@ -2,7 +2,7 @@
 use std::collections::BinaryHeap;
 /// Decision var selection
 use {
-    super::{AssignStack, Var, VarHeapIF, VarOrderIF},
+    super::{AssignStack, Var, VarHeapIF, VarOrderIF, VarRewardIF},
     crate::{state::RephaseMode, types::*},
     std::slice::Iter,
 };
@@ -32,6 +32,8 @@ pub trait VarSelectIF {
     fn rebuild_order(&mut self);
     /// bump the reawrds of vars with some sepecial reason
     fn boost_reward(&mut self, bunus: bool);
+    /// make a var asserted.
+    fn make_var_asserted(&mut self, vi: VarId);
 }
 
 #[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -113,11 +115,13 @@ impl VarSelectIF for AssignStack {
             RephaseMode::Reverse(on, since) => {
                 let end = self.var_order.idxs[0];
                 let start = if limit < end { end - limit } else { 1 };
+                let mut gathered = 0;
                 for vi in self.var_order.heap[start..=end].iter() {
                     let v = &self.var[*vi];
-                    if since <= v.assign_timestamp {
+                    if since <= v.assign_timestamp || limit < gathered {
                         continue;
                     }
+                    gathered += 1;
                     let b = if on {
                         !v.is(Flag::PHASE)
                     } else {
@@ -182,6 +186,12 @@ impl VarSelectIF for AssignStack {
             // pre = v.reward;
         }
     }
+    fn make_var_asserted(&mut self, vi: VarId) {
+        self.num_asserted_vars += 1;
+        self.clear_reward(vi);
+        self.remove_from_heap(vi);
+        self.check_best_phase(vi);
+    }
 }
 
 impl AssignStack {
@@ -192,5 +202,20 @@ impl AssignStack {
                 return vi;
             }
         }
+    }
+    /// check usability of the saved best phase
+    fn check_best_phase(&mut self, vi: VarId) -> bool {
+        if self.var[vi].is(Flag::ELIMINATED) {
+            return false;
+        }
+        if self.level[vi] == self.root_level && self.var[vi].is(Flag::REPHASE) {
+            if let Some(phase) = self.assign[vi] {
+                if phase != self.var[vi].is(Flag::BEST_PHASE) {
+                    self.num_best_assign = 0;
+                    return true;
+                }
+            }
+        }
+        false
     }
 }

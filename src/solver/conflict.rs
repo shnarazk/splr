@@ -208,10 +208,10 @@ pub fn handle_conflict(
             asg.cancel_until(bl);
             debug_assert!(asg.stack_iter().all(|l| l.vi() != l0.vi()));
             asg.assign_by_implication(l0, AssignReason::default(), 0);
+            asg.handle(SolverEvent::Assert(l0.vi()));
         } else {
             asg.assign_by_unitclause(l0);
         }
-        asg.handle(SolverEvent::Assert(l0.vi()));
         rst.update(ProgressUpdate::Reset);
     // elim.to_simplify += 1.0; // 1 for the positive lit, 1 for the negative.
     } else {

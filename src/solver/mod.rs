@@ -169,7 +169,7 @@ mod tests {
     fn test_solver() {
         let config = Config::from("tests/sample.cnf");
         if let Ok(s) = Solver::build(&config) {
-            assert!(matches!(s.asg.var_stats(), (250, _, _, 250)));
+            assert!(matches!(s.asg.var_stats(), (250, _, _, 250, 250)));
         } else {
             panic!("failed to build a solver for tests/sample.cnf");
         }

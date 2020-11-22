@@ -180,7 +180,6 @@ pub fn vivify(
                         // panic!("Vivification found an inconsistency.");
                         return Err(SolverError::Inconsistent);
                     }
-                    asg.handle(SolverEvent::Assert(l0.vi()));
                     // elim.to_simplify += 1.0 / (clits.len() as f64).powf(1.5);
                     // elim.to_simplify += 1.0;
                     state[Stat::VivifiedVar] += 1;

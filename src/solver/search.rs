@@ -122,7 +122,7 @@ impl SolveIF for Solver {
                         _ => (),
                     }
                 }
-                asg.initialize_reward(elim.sorted_iterator());
+                asg.initialize_reward(elim.sorted_iterator(), false);
                 asg.rebuild_order();
             }
             elim.stop(asg, cdb);
@@ -196,7 +196,6 @@ fn search(
 ) -> Result<bool, SolverError> {
     let mut bundle_started = 0;
     let mut a_decision_was_made = false;
-    let mut summit = asg.num_vars;
     let use_vivify = state.config.use_vivify();
     rst.update(ProgressUpdate::Luby);
     rst.update(ProgressUpdate::Remain(asg.num_vars - asg.num_asserted_vars));
@@ -238,8 +237,7 @@ fn search(
                                 asg.num_conflict as f64 / asg.exports().2 as f64,
                             ),
                         );
-                        asg.handle(SolverEvent::Stabilize((stabilize, new_cycle)));
-                        asg.initialize_reward(elim.sorted_iterator());
+                        asg.initialize_reward(elim.sorted_iterator(), stabilize);
                     }
                     asg.force_rephase(if stabilize {
                         RephaseMode::Best
@@ -255,9 +253,6 @@ fn search(
                 state[Stat::NoDecisionConflict] += 1;
             }
             if let Some(na) = asg.best_assigned() {
-                if na < summit {
-                    summit = na;
-                }
                 state.flush("");
                 state.flush(format!("unreachable: {}", na));
             }
