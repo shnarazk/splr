@@ -122,7 +122,7 @@ impl SolveIF for Solver {
                         _ => (),
                     }
                 }
-                asg.initialize_reward(elim.sorted_iterator(), false);
+                asg.initialize_reward(elim.sorted_iterator());
                 asg.rebuild_order();
             }
             elim.stop(asg, cdb);
@@ -194,7 +194,7 @@ fn search(
     rst: &mut Restarter,
     state: &mut State,
 ) -> Result<bool, SolverError> {
-    let mut bundle_started = 0;
+    let mut stage_started = 0;
     let mut a_decision_was_made = false;
     let use_vivify = state.config.use_vivify();
     rst.update(ProgressUpdate::Luby);
@@ -225,7 +225,7 @@ fn search(
                     RestartDecision::Force => asg.cancel_until(asg.root_level),
                     RestartDecision::Postpone | RestartDecision::Stabilize => (),
                 }
-                if let Some((stabilize, new_cycle)) = rst.stabilize(asg.num_conflict) {
+                if let Some((_stabilize, new_cycle)) = rst.stabilize(asg.num_conflict) {
                     let s = rst.exports();
                     if new_cycle {
                         state.log(
@@ -237,14 +237,45 @@ fn search(
                                 asg.num_conflict as f64 / asg.exports().2 as f64,
                             ),
                         );
-                        asg.initialize_reward(elim.sorted_iterator(), stabilize);
+
+                        // force to restart
+                        asg.cancel_until(asg.root_level);
+                        state.to_vivify = 0.0;
+                        if vivify(asg, cdb, elim, state).is_err() {
+                            analyze_final(asg, state, &cdb[ci]);
+                            return Ok(false);
+                        }
+                        if elim.enable {
+                            elim.to_simplify = 0.0;
+                            elim.subsume_literal_limit =
+                                (rst.exports_box().3.get_slow() * 2.0) as usize;
+                            elim.activate();
+                        }
+                        elim.simplify(asg, cdb, state)?;
+                        asg.initialize_reward(elim.sorted_iterator());
                     }
+                    asg.force_rephase(if s.3 % 2 == 0 {
+                        RephaseMode::Explore(stage_started)
+                    } else {
+                        RephaseMode::Best
+                    });
+                    /*
                     asg.force_rephase(if stabilize {
                         RephaseMode::Best
                     } else {
-                        RephaseMode::Reverse(s.3 % 2 == 0, bundle_started)
+                        match s.3 % 2 {
+                            0 => RephaseMode::Reverse(false, stage_started),
+                            // 1 => RephaseMode::Reverse(true, stage_started),
+                            _ => RephaseMode::Best,
+                            // 3 => RephaseMode::Force(false),
+                            // 4 => RephaseMode::Force(false),
+                            // 5 => RephaseMode::Random,
+                            // 6 => RephaseMode::Clear,
+                            // _ => RephaseMode::Clear,
+                        }
                     });
-                    bundle_started = asg.num_conflict;
+                     */
+                    stage_started = asg.num_conflict;
                 }
             }
             if a_decision_was_made {

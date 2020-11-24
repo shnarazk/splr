@@ -101,36 +101,29 @@ impl VarSelectIF for AssignStack {
                     }
                 }
             }
+            RephaseMode::Clear => (),
+            RephaseMode::Explore(since) => {
+                for vi in self.var_order.heap[1..=len].iter() {
+                    let v = &mut self.var[*vi];
+                    if v.assign_timestamp < since {
+                        self.temp_order
+                            .push(Lit::from_assign(*vi, v.timestamp % 2 == 0));
+                    }
+                }
+            }
             RephaseMode::Force(on) => {
                 for vi in self.var_order.heap[1..=len].iter().rev() {
-                    self.temp_order.push(Lit::from_assign(*vi, on));
+                    // self.temp_order.push(Lit::from_assign(*vi, on));
+                    self.var[*vi].set(Flag::PHASE, on);
                 }
             }
             RephaseMode::Random => {
                 for vi in self.var_order.heap[1..=len].iter().rev() {
                     let b = self.var[*vi].timestamp % 2 == 0;
-                    self.temp_order.push(Lit::from_assign(*vi, b));
+                    // self.temp_order.push(Lit::from_assign(*vi, b));
+                    self.var[*vi].set(Flag::PHASE, b);
                 }
             }
-            RephaseMode::Reverse(on, since) => {
-                let end = self.var_order.idxs[0];
-                let start = if limit < end { end - limit } else { 1 };
-                let mut gathered = 0;
-                for vi in self.var_order.heap[start..=end].iter() {
-                    let v = &self.var[*vi];
-                    if since <= v.assign_timestamp || limit < gathered {
-                        continue;
-                    }
-                    gathered += 1;
-                    let b = if on {
-                        !v.is(Flag::PHASE)
-                    } else {
-                        v.is(Flag::PHASE)
-                    };
-                    self.temp_order.push(Lit::from_assign(*vi, b));
-                }
-            }
-            RephaseMode::Clear => (),
         }
     }
     fn select_decision_literal(&mut self) -> Lit {

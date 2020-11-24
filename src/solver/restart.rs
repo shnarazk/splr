@@ -505,16 +505,17 @@ struct GeometricStabilizer {
 
 impl Default for GeometricStabilizer {
     fn default() -> Self {
+        const STEP: usize = 10000;
         GeometricStabilizer {
             enable: true,
             active: false,
             longest_span: 1,
             luby: LubySeries::default(),
             num_shift: 0,
-            next_trigger: 1000,
+            next_trigger: STEP,
             reset_requested: false,
             step: 1,
-            scale: 1000,
+            scale: STEP,
         }
     }
 }
@@ -778,9 +779,11 @@ impl RestartIF for Restarter {
             return Some(RestartDecision::Block);
         }
 
-        let forming_lbd = self.lbd.threshold / (self.stb.span() as f64 + 1.0).log(2.0);
-        let forming_mld = self.mld.threshold / (self.stb.span() as f64 + 1.0).log(2.0);
-        if 1.0 + forming_lbd < self.lbd.trend() || 1.0 + forming_mld < self.mld.trend() {
+        let forming_lbd = self.lbd.threshold / (self.stb.span() as f64 + 1.0);
+        // let _forming_mld = self.mld.threshold / (self.stb.span() as f64 + 1.0);
+        if 1.0 + forming_lbd < self.lbd.trend()
+        // || 1.0 + forming_mld < self.mld.trend()
+        {
             self.after_restart = 0;
             self.num_restart += 1;
             return Some(RestartDecision::Force);

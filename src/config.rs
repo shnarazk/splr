@@ -188,13 +188,13 @@ impl Default for Config {
             elm_var_occ: 8192,
 
             rst_step: 40,
-            rst_asg_len: 30,
+            rst_asg_len: 25,
             rst_asg_slw: 10000,
             rst_asg_thr: 0.20,
             rst_ccc_thr: 0.70,
-            rst_lbd_len: 30,
+            rst_lbd_len: 25,
             rst_lbd_slw: 10000,
-            rst_lbd_thr: 0.30,
+            rst_lbd_thr: 0.50,
             rst_mld_scl: 0.10,
             rst_mld_thr: 0.80,
             rst_stb_scl: 2.0,
@@ -204,7 +204,7 @@ impl Default for Config {
             viv_int: 4,
             viv_scale: 1.2,
 
-            vrw_dcy_beg: 0.75,
+            vrw_dcy_beg: 0.80,
             vrw_dcy_end: 0.95,
             vrw_occ_cmp: 0.50,
         }

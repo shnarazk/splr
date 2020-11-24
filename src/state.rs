@@ -57,12 +57,12 @@ pub enum RephaseMode {
     Best,
     /// a dummy
     Clear,
+    /// seek unchecked vars.
+    Explore(usize),
     /// force an assignment
     Force(bool),
     /// use random values.
     Random,
-    /// invert assigment priority.
-    Reverse(bool, usize),
 }
 
 impl fmt::Display for RephaseMode {
@@ -73,11 +73,10 @@ impl fmt::Display for RephaseMode {
             match self {
                 RephaseMode::Best => "rPhBest",
                 RephaseMode::Clear => "rphClear",
+                RephaseMode::Explore(_) => "rPhReverse",
                 RephaseMode::Force(false) => "rPhFalse",
                 RephaseMode::Force(true) => "rPhTrue",
                 RephaseMode::Random => "rPhRandom",
-                RephaseMode::Reverse(false, _) => "rPhReverse",
-                RephaseMode::Reverse(true, _) => "rPh!Reverse",
             }
         )
     }
