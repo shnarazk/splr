@@ -113,15 +113,15 @@ impl VarSelectIF for AssignStack {
             }
             RephaseMode::Force(on) => {
                 for vi in self.var_order.heap[1..=len].iter().rev() {
-                    // self.temp_order.push(Lit::from_assign(*vi, on));
-                    self.var[*vi].set(Flag::PHASE, on);
+                    self.temp_order.push(Lit::from_assign(*vi, on));
+                    // self.var[*vi].set(Flag::PHASE, on);
                 }
             }
             RephaseMode::Random => {
                 for vi in self.var_order.heap[1..=len].iter().rev() {
                     let b = self.var[*vi].timestamp % 2 == 0;
-                    // self.temp_order.push(Lit::from_assign(*vi, b));
-                    self.var[*vi].set(Flag::PHASE, b);
+                    self.temp_order.push(Lit::from_assign(*vi, b));
+                    // self.var[*vi].set(Flag::PHASE, b);
                 }
             }
         }

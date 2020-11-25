@@ -16,10 +16,10 @@ impl VarRewardIF for AssignStack {
     fn initialize_reward(&mut self, iterator: Iter<'_, usize>) {
         self.reward_step = (self.activity_decay_max - self.activity_decay).abs() / 10_000.0;
         // big bang initialization
-        let mut v = 0.5;
+        // let mut v = 0.5;
         for vi in iterator {
-            self.var[*vi].reward = v;
-            v *= 0.99;
+            self.var[*vi].reward = self.var[*vi].reward.sqrt();
+            // v *= 0.99;
         }
         self.activity_decay = self.activity_decay_min;
     }

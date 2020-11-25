@@ -225,8 +225,8 @@ fn search(
                     RestartDecision::Force => asg.cancel_until(asg.root_level),
                     RestartDecision::Postpone | RestartDecision::Stabilize => (),
                 }
-                if let Some((_stabilize, new_cycle)) = rst.stabilize(asg.num_conflict) {
-                    let s = rst.exports();
+                if let Some((stabilize, new_cycle)) = rst.stabilize(asg.num_conflict) {
+                    // let s = rst.exports();
                     if new_cycle {
                         state.log(
                             rst.exports().3,
@@ -252,29 +252,31 @@ fn search(
                             elim.activate();
                         }
                         elim.simplify(asg, cdb, state)?;
-                        asg.initialize_reward(elim.sorted_iterator());
+                        // asg.initialize_reward(elim.sorted_iterator());
                     }
-                    asg.force_rephase(if s.3 % 2 == 0 {
-                        RephaseMode::Explore(stage_started)
-                    } else {
-                        RephaseMode::Best
-                    });
-                    /*
-                    asg.force_rephase(if stabilize {
-                        RephaseMode::Best
-                    } else {
-                        match s.3 % 2 {
-                            0 => RephaseMode::Reverse(false, stage_started),
-                            // 1 => RephaseMode::Reverse(true, stage_started),
-                            _ => RephaseMode::Best,
-                            // 3 => RephaseMode::Force(false),
-                            // 4 => RephaseMode::Force(false),
-                            // 5 => RephaseMode::Random,
-                            // 6 => RephaseMode::Clear,
-                            // _ => RephaseMode::Clear,
-                        }
-                    });
-                     */
+                    asg.force_rephase(
+                        if stabilize
+                        /* .3 % 2 == 0 */
+                        {
+                            RephaseMode::Explore(stage_started)
+                        } else {
+                            RephaseMode::Best
+                        },
+                    );
+                    // /*
+                    //                    asg.force_rephase(if stabilize {
+                    //                        RephaseMode::Best
+                    //                    } else {
+                    //                        match s.3 % 6 {
+                    //                            1 => RephaseMode::Best,
+                    //                            // 2 => RephaseMode::Force(s.3 % 12 == 0),
+                    //                            // 3 => RephaseMode::Random,
+                    //                            4 => RephaseMode::Explore(stage_started),
+                    //                            // 5 => RephaseMode::Clear,
+                    //                            _ => RephaseMode::Clear,
+                    //                        }
+                    //                    });
+                    // */
                     stage_started = asg.num_conflict;
                 }
             }
