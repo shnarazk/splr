@@ -16,12 +16,22 @@ impl VarRewardIF for AssignStack {
     fn initialize_reward(&mut self, iterator: Iter<'_, usize>) {
         self.reward_step = (self.activity_decay_max - self.activity_decay).abs() / 10_000.0;
         // big bang initialization
-        // let mut v = 0.5;
+        let mut v = 0.5;
         for vi in iterator {
-            self.var[*vi].reward = self.var[*vi].reward.sqrt();
-            // v *= 0.99;
+            self.var[*vi].reward = v;
+            v *= 0.99;
         }
-        self.activity_decay = self.activity_decay_min;
+        self.activity_decay = self.activity_decay_max;
+    }
+    fn reset_reward(&mut self, fix: bool) {
+        const SCALE: f64 = 1.5;
+        let scale: f64 = if fix { 1.0 / SCALE } else { SCALE };
+        for vi in 1..self.var.len() {
+            let v = &mut self.var[vi];
+            if !v.is(Flag::ELIMINATED) {
+                v.reward = v.reward.powf(scale);
+            }
+        }
     }
     fn clear_reward(&mut self, vi: VarId) {
         self.var[vi].reward = 0.0;
@@ -46,9 +56,9 @@ impl VarRewardIF for AssignStack {
     }
     fn reward_update(&mut self) {
         self.ordinal += 1;
-        self.activity_decay = self
-            .activity_decay_max
-            .min(self.activity_decay + self.reward_step);
+        // self.activity_decay = self
+        //     .activity_decay_max
+        //     .min(self.activity_decay + self.reward_step);
         // self.activity_decay = 1.0 - 1.0 / (1.0 + 0.5 * (self.num_restart as f64)).sqrt();
     }
     fn adjust_reward(&mut self, state: &State) {

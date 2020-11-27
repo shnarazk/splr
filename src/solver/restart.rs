@@ -505,7 +505,7 @@ struct GeometricStabilizer {
 
 impl Default for GeometricStabilizer {
     fn default() -> Self {
-        const STEP: usize = 10000;
+        const STEP: usize = 1000;
         GeometricStabilizer {
             enable: true,
             active: false,
@@ -556,7 +556,7 @@ impl GeometricStabilizer {
             self.active = !self.active;
             let new_cycle: bool;
             if self.reset_requested {
-                new_cycle = true;
+                new_cycle = false; // reset doesn't start a new cycle; it's a redo.
                 self.luby.reset();
                 self.reset_requested = false;
                 self.step = self.luby.next().unwrap();
@@ -734,6 +734,9 @@ impl Instantiate for Restarter {
             SolverEvent::Adapt((SearchStrategy::LowSuccessive, n), m) if n == m => {
                 // self.luby.enable = true;
             }
+            SolverEvent::Restart => {
+                self.after_restart = 0;
+            }
             _ => (),
         }
     }
@@ -757,7 +760,6 @@ impl RestartIF for Restarter {
     fn restart(&mut self) -> Option<RestartDecision> {
         if self.luby.is_active() {
             self.luby.shift();
-            self.after_restart = 0;
             return Some(RestartDecision::Force);
         }
         if self.after_restart < self.restart_step {
@@ -774,17 +776,16 @@ impl RestartIF for Restarter {
             < self.mld.get() + (self.stb.span() as f64) * self.mld.scaling + self.mld.threshold;
 
         if self.asg.is_active() {
-            self.after_restart = 0;
             self.num_block += 1;
             return Some(RestartDecision::Block);
         }
 
-        let forming_lbd = self.lbd.threshold / (self.stb.span() as f64 + 1.0);
+        // let thr = self.lbd.threshold / (self.stb.span() as f64 + 1.0).log(2.0);
+        let thr = self.lbd.threshold;
         // let _forming_mld = self.mld.threshold / (self.stb.span() as f64 + 1.0);
-        if 1.0 + forming_lbd < self.lbd.trend()
+        if 1.0 + thr < self.lbd.trend()
         // || 1.0 + forming_mld < self.mld.trend()
         {
-            self.after_restart = 0;
             self.num_restart += 1;
             return Some(RestartDecision::Force);
         }

@@ -287,6 +287,7 @@ impl Instantiate for State {
             SolverEvent::Eliminate(_) => (),
             SolverEvent::Instantiate => (),
             SolverEvent::Reinitialize => (),
+            SolverEvent::Restart => (),
             SolverEvent::Stabilize((_, _)) => (),
             SolverEvent::Vivify(_) => (),
         }

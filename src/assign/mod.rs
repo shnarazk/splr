@@ -30,6 +30,8 @@ pub trait VarRewardIF {
     fn activity(&self, vi: VarId) -> f64;
     /// initialize rewards based on an order of vars.
     fn initialize_reward(&mut self, iterator: Iter<'_, usize>);
+    /// reset reward settings.
+    fn reset_reward(&mut self, fix: bool);
     /// clear var's activity
     fn clear_reward(&mut self, vi: VarId);
     /// modify var's activity at conflict analysis in `analyze`.

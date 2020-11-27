@@ -25,6 +25,13 @@ pub trait SolveIF {
     fn solve(&mut self) -> SolverResult;
 }
 
+macro_rules! RESTART {
+    ($asg: expr, $rst: expr) => {
+        $asg.cancel_until($asg.root_level);
+        $rst.handle(SolverEvent::Restart);
+    };
+}
+
 impl SolveIF for Solver {
     /// # Examples
     ///
@@ -171,15 +178,15 @@ impl SolveIF for Solver {
                         v.turn_off(Flag::ELIMINATED);
                     }
                 }
-                asg.cancel_until(asg.root_level);
+                RESTART!(asg, rst);
                 Ok(Certificate::SAT(vals))
             }
             Ok(false) | Err(SolverError::NullLearnt) => {
-                asg.cancel_until(asg.root_level);
+                RESTART!(asg, rst);
                 Ok(Certificate::UNSAT)
             }
             Err(e) => {
-                asg.cancel_until(asg.root_level);
+                RESTART!(asg, rst);
                 Err(e)
             }
         }
@@ -194,7 +201,7 @@ fn search(
     rst: &mut Restarter,
     state: &mut State,
 ) -> Result<bool, SolverError> {
-    let mut stage_started = 0;
+    // let mut stage_started = 0;
     let mut a_decision_was_made = false;
     let use_vivify = state.config.use_vivify();
     rst.update(ProgressUpdate::Luby);
@@ -222,7 +229,9 @@ fn search(
                 rst.update(ProgressUpdate::Remain(asg.var_stats().3));
                 match decision {
                     RestartDecision::Block => (),
-                    RestartDecision::Force => asg.cancel_until(asg.root_level),
+                    RestartDecision::Force => {
+                        RESTART!(asg, rst);
+                    }
                     RestartDecision::Postpone | RestartDecision::Stabilize => (),
                 }
                 if let Some((stabilize, new_cycle)) = rst.stabilize(asg.num_conflict) {
@@ -237,47 +246,15 @@ fn search(
                                 asg.num_conflict as f64 / asg.exports().2 as f64,
                             ),
                         );
-
-                        // force to restart
-                        asg.cancel_until(asg.root_level);
-                        state.to_vivify = 0.0;
-                        if vivify(asg, cdb, elim, state).is_err() {
-                            analyze_final(asg, state, &cdb[ci]);
-                            return Ok(false);
-                        }
-                        if elim.enable {
-                            elim.to_simplify = 0.0;
-                            elim.subsume_literal_limit =
-                                (rst.exports_box().3.get_slow() * 2.0) as usize;
-                            elim.activate();
-                        }
-                        elim.simplify(asg, cdb, state)?;
-                        // asg.initialize_reward(elim.sorted_iterator());
+                        // if stabilize {
+                        //     asg.force_rephase(RephaseMode::Best);
+                        // }
+                        asg.reset_reward(stabilize);
                     }
-                    asg.force_rephase(
-                        if stabilize
-                        /* .3 % 2 == 0 */
-                        {
-                            RephaseMode::Explore(stage_started)
-                        } else {
-                            RephaseMode::Best
-                        },
-                    );
-                    // /*
-                    //                    asg.force_rephase(if stabilize {
-                    //                        RephaseMode::Best
-                    //                    } else {
-                    //                        match s.3 % 6 {
-                    //                            1 => RephaseMode::Best,
-                    //                            // 2 => RephaseMode::Force(s.3 % 12 == 0),
-                    //                            // 3 => RephaseMode::Random,
-                    //                            4 => RephaseMode::Explore(stage_started),
-                    //                            // 5 => RephaseMode::Clear,
-                    //                            _ => RephaseMode::Clear,
-                    //                        }
-                    //                    });
-                    // */
-                    stage_started = asg.num_conflict;
+                    // if !stabilize {
+                    //     RESTART!(asg, rst);
+                    // }
+                    // stage_started = asg.num_conflict;
                 }
             }
             if a_decision_was_made {
@@ -347,7 +324,7 @@ fn adapt_modules(
     if 10 * state.reflection_interval == asg_num_conflict {
         // Need to call it before `cdb.adapt_to`
         // 'decision_level == 0' is required by `cdb.adapt_to`.
-        asg.cancel_until(asg.root_level);
+        RESTART!(asg, rst);
         state.select_strategy(asg, cdb);
     }
     #[cfg(feature = "boundary_check")]

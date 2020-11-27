@@ -59,6 +59,8 @@ pub enum SolverEvent {
     NewVar,
     /// re-initialization for incremental solving.
     Reinitialize,
+    /// restart
+    Restart,
     /// stabilization update.
     Stabilize((bool, bool)),
     /// Vivification: `true` for start, `false` for end.
