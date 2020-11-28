@@ -200,6 +200,8 @@ pub struct State {
     pub c_lvl: Ema,
     /// hold conflicting literals for UNSAT problems
     pub conflicts: Vec<Lit>,
+    // /// set treu if a new assertion found.
+    // pub found_assertion: bool,
     /// hold the previous number of non-conflicting assignment
     pub last_asg: usize,
     /// working place to build learnt clauses
@@ -233,6 +235,7 @@ impl Default for State {
             b_lvl: Ema::new(5_000),
             c_lvl: Ema::new(5_000),
             conflicts: Vec::new(),
+            // found_assertion: false,
             last_asg: 0,
             new_learnt: Vec::new(),
             derive20: Vec::new(),

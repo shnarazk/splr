@@ -246,13 +246,16 @@ fn search(
                                 asg.num_conflict as f64 / asg.exports().2 as f64,
                             ),
                         );
-                        // if stabilize {
+                        asg.reset_reward(stabilize);
+                        // if !state.found_assertion {
                         //     asg.force_rephase(RephaseMode::Best);
                         // }
-                        asg.reset_reward(stabilize);
+                        asg.force_rephase(RephaseMode::Best);
+                        //state.found_assertion = false;
                     }
-                    // if !stabilize {
-                    //     RESTART!(asg, rst);
+                    // if stagnated && stabilize {
+                    //     // RESTART!(asg, rst);
+                    //     asg.force_rephase(RephaseMode::Best);
                     // }
                     // stage_started = asg.num_conflict;
                 }

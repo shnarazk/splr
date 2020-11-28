@@ -213,6 +213,7 @@ pub fn handle_conflict(
             asg.assign_by_unitclause(l0);
         }
         rst.update(ProgressUpdate::Reset);
+    // state.found_assertion = true;
     // elim.to_simplify += 1.0; // 1 for the positive lit, 1 for the negative.
     } else {
         {
