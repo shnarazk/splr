@@ -55,10 +55,6 @@ pub struct Config {
     /// DIMACS CNF file
     pub cnf_file: PathBuf,
 
-    #[cfg(dump)]
-    /// Interval for dumping stat data
-    pub io_dump: usize,
-
     /// Output directory
     pub io_odir: PathBuf,
 
@@ -305,8 +301,6 @@ impl Config {
                                     match name {
                                         "cl" => self.c_cls_lim = val,
                                         "ii" => self.c_ip_int = val,
-                                        #[cfg(dump)]
-                                        "stat" => self.io_dump = val,
                                         "ecl" => self.elm_cls_lim = val,
                                         "evl" => self.elm_grw_lim = val,
                                         "evo" => self.elm_var_occ = val,
