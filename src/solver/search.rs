@@ -202,6 +202,7 @@ fn search(
     state: &mut State,
 ) -> Result<bool, SolverError> {
     let mut a_decision_was_made = false;
+    let mut stabilizing: bool = false;
     let use_vivify = state.config.use_vivify();
     rst.update(ProgressUpdate::Luby);
     rst.update(ProgressUpdate::Remain(asg.num_vars - asg.num_asserted_vars));
@@ -235,13 +236,15 @@ fn search(
                 }
                 if let Some((stabilize, new_cycle)) = rst.stabilize(asg.num_conflict) {
                     // let s = rst.exports();
+                    stabilizing = new_cycle;
                     if new_cycle {
+                        let v = asg.var_stats();
                         state.log(
                             rst.exports().3,
                             format!(
                                 "remain: {:>6}, unreachable: {:>6}, cpr: {:>8.2}",
-                                asg.var_stats().3,
-                                asg.var_stats().4,
+                                v.3,
+                                v.4,
                                 asg.num_conflict as f64 / asg.exports().2 as f64,
                             ),
                         );
@@ -301,7 +304,7 @@ fn search(
             }
         }
         if !asg.remains() {
-            let lit = asg.select_decision_literal();
+            let lit = asg.select_decision_literal(stabilizing);
             asg.assign_by_decision(lit);
             state[Stat::Decision] += 1;
             a_decision_was_made = true;

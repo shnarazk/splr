@@ -23,7 +23,7 @@ pub trait VarSelectIF {
     /// force assignments
     fn force_rephase(&mut self, phase: RephaseMode);
     /// select a new decision variable.
-    fn select_decision_literal(&mut self) -> Lit;
+    fn select_decision_literal(&mut self, select_best: bool) -> Lit;
     /// save the current assignments to BEST_PHASE
     fn save_phases(&mut self);
     /// update the internal heap on var order.
@@ -87,15 +87,16 @@ impl VarSelectIF for AssignStack {
         debug_assert!(self.use_rephase);
         let limit = 10000;
         let len = self.var_order.idxs[0].min(limit);
-        self.temp_order.clear();
+        #[cfg(temp_order)]
+        {
+            self.temp_order.clear();
+        }
         match phase {
             RephaseMode::Best => {
                 for vi in self.var_order.heap[1..=len].iter().rev() {
                     let v = &mut self.var[*vi];
                     if v.is(Flag::REPHASE) {
-                        // v.set(Flag::PHASE, v.is(Flag::BEST_PHASE));
-                        self.temp_order
-                            .push(Lit::from_assign(*vi, v.is(Flag::BEST_PHASE)));
+                        v.set(Flag::PHASE, v.is(Flag::BEST_PHASE));
                     }
                 }
             }
@@ -126,8 +127,8 @@ impl VarSelectIF for AssignStack {
             }
         }
     }
-    fn select_decision_literal(&mut self) -> Lit {
-        // #[cfg(feature = "temp_order")]
+    fn select_decision_literal(&mut self, select_best: bool) -> Lit {
+        #[cfg(feature = "temp_order")]
         {
             while let Some(lit) = self.temp_order.pop() {
                 if self.assign[lit.vi()].is_none() && !self.var[lit.vi()].is(Flag::ELIMINATED) {
@@ -136,7 +137,11 @@ impl VarSelectIF for AssignStack {
             }
         }
         let vi = self.select_var();
-        let p = self.var[vi].is(Flag::PHASE);
+        let p = self.var[vi].is(if select_best && self.var[vi].is(Flag::REPHASE) {
+            Flag::BEST_PHASE
+        } else {
+            Flag::PHASE
+        });
         Lit::from_assign(vi, p)
     }
     fn save_phases(&mut self) {
