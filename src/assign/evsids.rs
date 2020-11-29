@@ -10,7 +10,7 @@ impl VarRewardIF for AssignStack {
     fn activity(&self, vi: VarId) -> f64 {
         self.var[vi].reward
     }
-    fn initialize_reward(&mut self, _iterator: Iter<'_, usize>, stabilize: bool) {
+    fn initialize_reward(&mut self, _iterator: Iter<'_, usize>) {
         self.reward_step = 1.0;
     }
     fn clear_reward(&mut self, vi: VarId) {
