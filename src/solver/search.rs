@@ -201,7 +201,6 @@ fn search(
     rst: &mut Restarter,
     state: &mut State,
 ) -> Result<bool, SolverError> {
-    // let mut stage_started = 0;
     let mut a_decision_was_made = false;
     let use_vivify = state.config.use_vivify();
     rst.update(ProgressUpdate::Luby);
@@ -247,17 +246,12 @@ fn search(
                             ),
                         );
                         asg.expand_reward(stabilize);
-                        // if !state.found_assertion {
-                        //     asg.force_rephase(RephaseMode::Best);
-                        // }
                         asg.force_rephase(RephaseMode::Best);
-                        //state.found_assertion = false;
                     }
                     // if stagnated && stabilize {
                     //     // RESTART!(asg, rst);
                     //     asg.force_rephase(RephaseMode::Best);
                     // }
-                    // stage_started = asg.num_conflict;
                 }
             }
             if a_decision_was_made {
