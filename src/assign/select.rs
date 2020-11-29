@@ -102,6 +102,7 @@ impl VarSelectIF for AssignStack {
                 }
             }
             RephaseMode::Clear => (),
+            #[cfg(explore_timestamp)]
             RephaseMode::Explore(since) => {
                 for vi in self.var_order.heap[1..=len].iter() {
                     let v = &mut self.var[*vi];

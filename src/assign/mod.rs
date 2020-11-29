@@ -20,7 +20,7 @@ pub use self::{
 
 use {
     self::heap::{VarHeapIF, VarOrderIF},
-    super::{cdb::ClauseDBIF, state::State, types::*},
+    super::{cdb::ClauseDBIF, types::*},
     std::{ops::Range, slice::Iter},
 };
 
@@ -30,8 +30,8 @@ pub trait VarRewardIF {
     fn activity(&self, vi: VarId) -> f64;
     /// initialize rewards based on an order of vars.
     fn initialize_reward(&mut self, iterator: Iter<'_, usize>);
-    /// reset reward settings.
-    fn reset_reward(&mut self, fix: bool);
+    /// expand var rewards.
+    fn expand_reward(&mut self, contrant: bool);
     /// clear var's activity
     fn clear_reward(&mut self, vi: VarId);
     /// modify var's activity at conflict analysis in `analyze`.
@@ -42,6 +42,7 @@ pub trait VarRewardIF {
     fn reward_at_unassign(&mut self, vi: VarId);
     /// update internal counter.
     fn reward_update(&mut self);
+    #[cfg(moving_var_reward_rate)]
     /// update reward setting as a part of module adoptation.
     fn adjust_reward(&mut self, state: &State);
 }
@@ -103,6 +104,7 @@ pub struct Var {
     reward: f64,
     /// the number of conflicts at which this var was assigned an rewarded lastly.
     timestamp: usize,
+    #[cfg(explore_timestamp)]
     /// the number of conflicts at which this var was assigend lastly
     assign_timestamp: usize,
     /// the `Flag`s
@@ -161,12 +163,17 @@ pub struct AssignStack {
     //
     /// var activity decay
     activity_decay: f64,
+
+    #[cfg(moving_var_reward_rate)]
     /// maximum var activity decay
     activity_decay_max: f64,
+    #[cfg(moving_var_reward_rate)]
     /// minimum var activity decay
     activity_decay_min: f64,
+    #[cfg(moving_var_reward_rate)]
     /// ONLY used in feature EVSIDS
     reward_step: f64,
+
     /// for LR
     occurrence_compression_rate: f64,
 
@@ -187,6 +194,6 @@ pub struct VarIdHeap {
     /// order : usize -> VarId, -- Which var is the n-th best?
     heap: Vec<VarId>,
     /// VarId : -> order : usize -- How good is the var?
-    /// idxs[0] contais the number of alive elements
+    /// `idxs[0]` holds the number of alive elements
     idxs: Vec<usize>,
 }

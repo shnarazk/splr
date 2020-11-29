@@ -7,6 +7,7 @@
 - stabilization span is controlled with Luby sequence
 - make stabilization modes affect var rewards
 - make the learning rate of var rewarding an constant
+- add two configuration options: explore_timestamp, moving_var_reward_rate
 
 ## 0.5.0, 2020-08-30
 

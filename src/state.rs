@@ -57,6 +57,7 @@ pub enum RephaseMode {
     Best,
     /// a dummy
     Clear,
+    #[cfg(explore_timestamp)]
     /// seek unchecked vars.
     Explore(usize),
     /// force an assignment
@@ -73,6 +74,7 @@ impl fmt::Display for RephaseMode {
             match self {
                 RephaseMode::Best => "rPhBest",
                 RephaseMode::Clear => "rphClear",
+                #[cfg(explore_timestamp)]
                 RephaseMode::Explore(_) => "rPhReverse",
                 RephaseMode::Force(false) => "rPhFalse",
                 RephaseMode::Force(true) => "rPhTrue",

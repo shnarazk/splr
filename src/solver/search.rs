@@ -246,7 +246,7 @@ fn search(
                                 asg.num_conflict as f64 / asg.exports().2 as f64,
                             ),
                         );
-                        asg.reset_reward(stabilize);
+                        asg.expand_reward(stabilize);
                         // if !state.found_assertion {
                         //     asg.force_rephase(RephaseMode::Best);
                         // }

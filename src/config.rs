@@ -146,9 +146,14 @@ pub struct Config {
     //
     //## var rewarding
     //
+    #[cfg(not(moving_var_reward_rate))]
+    pub vrw_dcy_rat: f64,
+
+    #[cfg(moving_var_reward_rate)]
     /// Initial var reward decay
     pub vrw_dcy_beg: f64,
 
+    #[cfg(moving_var_reward_rate)]
     /// Maximum var reward decay
     pub vrw_dcy_end: f64,
 
@@ -204,7 +209,11 @@ impl Default for Config {
             viv_int: 4,
             viv_scale: 1.2,
 
+            #[cfg(not(moving_var_reward_rate))]
+            vrw_dcy_rat: 0.96,
+            #[cfg(moving_var_reward_rate)]
             vrw_dcy_beg: 0.90,
+            #[cfg(moving_var_reward_rate)]
             vrw_dcy_end: 0.96,
             vrw_occ_cmp: 0.50,
         }
@@ -232,6 +241,12 @@ impl Config {
                     "cl", "ii", "stat", "ecl", "evl", "evo", "rs", "ral", "ras", "rll", "rls",
                     "vii",
                 ];
+                #[cfg(not(moving_var_reward_rate))]
+                let options_f64 = [
+                    "timeout", "rat", "rct", "rlt", "rms", "rmt", "rss", "vib", "vie", "vis",
+                    "vrd", "vro",
+                ];
+                #[cfg(moving_var_reward_rate)]
                 let options_f64 = [
                     "timeout", "rat", "rct", "rlt", "rms", "rmt", "rss", "vib", "vie", "vis",
                     "vri", "vrm", "vro",
@@ -323,7 +338,11 @@ impl Config {
                                         "vib" => self.viv_beg = val,
                                         "vie" => self.viv_end = val,
                                         "vis" => self.viv_scale = val,
+                                        #[cfg(not(oving_var_reward_rate))]
+                                        "vdr" => self.vrw_dcy_rat = val,
+                                        #[cfg(moving_var_reward_rate)]
                                         "vri" => self.vrw_dcy_beg = val,
+                                        #[cfg(moving_var_reward_rate)]
                                         "vrm" => self.vrw_dcy_end = val,
                                         "vro" => self.vrw_occ_cmp = val,
                                         _ => panic!("invalid option: {}", name),
@@ -396,6 +415,97 @@ impl Config {
     }
 }
 
+#[cfg(not(moving_var_reward_rate))]
+fn help_string() -> String {
+    let config = Config::default();
+    format!(
+        "
+USAGE:
+  splr [FLAGS] [OPTIONS] <cnf-file>
+FLAGS:
+  -h, --help               Prints help information
+  -C, --no-color           Disable coloring
+  -q, --quiet              Disable any progress message
+  -c, --certify            Writes a DRAT UNSAT certification file
+  -l, --log                Uses Glucose-like progress report
+  -V, --version            Prints version information
+OPTIONS:
+      --ADP <a-adaptive>   Strategy adaptation switch     {:>10}
+      --ELI <a-elim>       Eliminator switch              {:>10}
+      --LBY <a-luby>       Use Luby series for restart    {:>10}
+      --RDC <a-reduce>     Clause reduction switch        {:>10}
+      --RPH <a-rephase>    Re-phase switch                {:>10}
+      --RSR <a-rsr>        Reason-Side Rewarding switch   {:>10}
+      --STB <a-stabilize>  Stabilization switch           {:>10}
+      --VIV <a-vivify>     Vivification switch            {:>10}
+      --cbt <c-cbt-thr>    Dec. lvl to use chronoBT       {:>10}
+      --cl <c-cls-lim>     Soft limit of #clauses (6MC/GB){:>10}
+      --ii <c-ip-int>      #cls to start in-processor     {:>10}
+  -t, --timeout <c-tout>   CPU time limit in sec.         {:>10}
+      --ecl <elim-cls-lim> Max #lit for clause subsume    {:>10}
+      --evl <elim-grw-lim> Grow limit of #cls in var elim.{:>10}
+      --evo <elim-var-occ> Max #cls for var elimination   {:>10}
+  -o, --dir <io-odir>      Output directory                {:>10}
+  -p, --proof <io-pfile>   DRAT Cert. filename                {:>10}
+  -r, --result <io-rfile>  Result filename/stdout             {:>10}
+      --ral <rst-asg-len>  Length of assign. fast EMA     {:>10}
+      --ras <rst-asg-slw>  Length of assign. slow EMA     {:>10}
+      --rat <rst-asg-thr>  Blocking restart threshold        {:>10.2}
+      --rct <rst-ccc-thr>  Conflict Correlation threshold    {:>10.2}
+      --rll <rst-lbd-len>  Length of LBD fast EMA         {:>10}
+      --rls <rst-lbd-slw>  Length of LBD slow EMA         {:>10}
+      --rlt <rst-lbd-thr>  Forcing restart threshold         {:>10.2}
+      --rms <rst-mld-scl>  Scaling for Max LBD of Dep.       {:>10.2}
+      --rmt <rst-mld-thr>  Threshold for Max LBD of Dep.     {:>10.2}
+      --rss <rst-stb-scl>  Stabilizer scaling                {:>10.2}
+      --rs <rst-step>      #conflicts between restarts    {:>10}
+      --vib <viv-beg>      Lower bound of vivify loop        {:>10.2}
+      --vie <viv-end>      Upper bound of vivify loop        {:>10.2}
+      --vii <viv-int>      Vivification interval          {:>10}
+      --vis <viv-scale>    #reduction to vivify              {:>10.2}
+      --vri <vrw-dcy-rat>  Var reward Decay Rate             {:>10.2}
+      --vro <vrw-occ-cmp>  Occ. compression rate in LR       {:>10.2}
+ARGS:
+  <cnf-file>    DIMACS CNF file                 
+",
+        config.a_adaptive,
+        config.a_elim,
+        config.a_luby,
+        config.a_reduce,
+        config.a_rephase,
+        config.a_rsr,
+        config.a_stabilize,
+        config.a_vivify,
+        config.c_cbt_thr,
+        config.c_cls_lim,
+        config.c_ip_int,
+        config.c_tout,
+        config.elm_cls_lim,
+        config.elm_grw_lim,
+        config.elm_var_occ,
+        config.io_odir.to_string_lossy(),
+        config.io_pfile.to_string_lossy(),
+        config.io_rfile.to_string_lossy(),
+        config.rst_asg_len,
+        config.rst_asg_slw,
+        config.rst_asg_thr,
+        config.rst_ccc_thr,
+        config.rst_lbd_len,
+        config.rst_lbd_slw,
+        config.rst_lbd_thr,
+        config.rst_mld_scl,
+        config.rst_mld_thr,
+        config.rst_stb_scl,
+        config.rst_step,
+        config.viv_beg,
+        config.viv_end,
+        config.viv_int,
+        config.viv_scale,
+        config.vrw_dcy_rat,
+        config.vrw_occ_cmp,
+    )
+}
+#[cfg(moving_var_reward_rate)]
 fn help_string() -> String {
     let config = Config::default();
     format!(

@@ -14,6 +14,7 @@ impl Default for Var {
             index: 0,
             reward: 0.0,
             timestamp: 0,
+            #[cfg(explore_timestamp)]
             assign_timestamp: 0,
             flags: Flag::empty(),
             participated: 0,
