@@ -58,11 +58,14 @@ pub enum RephaseMode {
     /// a dummy
     Clear,
     #[cfg(explore_timestamp)]
+    #[cfg(feature = "temp_order")]
     /// seek unchecked vars.
     Explore(usize),
     /// force an assignment
+    #[cfg(feature = "temp_order")]
     Force(bool),
     /// use random values.
+    #[cfg(feature = "temp_order")]
     Random,
 }
 
@@ -72,13 +75,17 @@ impl fmt::Display for RephaseMode {
             formatter,
             "{}",
             match self {
-                RephaseMode::Best => "rPhBest",
-                RephaseMode::Clear => "rphClear",
+                RephaseMode::Best => "RP_Best",
+                RephaseMode::Clear => "RP_Clear",
                 #[cfg(explore_timestamp)]
-                RephaseMode::Explore(_) => "rPhReverse",
-                RephaseMode::Force(false) => "rPhFalse",
-                RephaseMode::Force(true) => "rPhTrue",
-                RephaseMode::Random => "rPhRandom",
+                #[cfg(feature = "temp_order")]
+                RephaseMode::Explore(_) => "RP_Reverse",
+                #[cfg(feature = "temp_order")]
+                RephaseMode::Force(false) => "RP_False",
+                #[cfg(feature = "temp_order")]
+                RephaseMode::Force(true) => "RP_True",
+                #[cfg(feature = "temp_order")]
+                RephaseMode::Random => "RP_Random",
             }
         )
     }
