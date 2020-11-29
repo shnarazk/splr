@@ -188,6 +188,7 @@ pub fn vivify(
             n => {
                 if n == 2 && cdb.registered_bin_clause(copied[0], copied[1]) {
                     npurge += 1;
+                    elim.to_simplify += 1.0;
                 } else {
                     nshrink += 1;
                     cdb.certificate_add(&copied);
