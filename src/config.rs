@@ -244,7 +244,7 @@ impl Config {
                 #[cfg(not(moving_var_reward_rate))]
                 let options_f64 = [
                     "timeout", "rat", "rct", "rlt", "rms", "rmt", "rss", "vib", "vie", "vis",
-                    "vrd", "vro",
+                    "vdr", "vro",
                 ];
                 #[cfg(moving_var_reward_rate)]
                 let options_f64 = [
@@ -463,7 +463,7 @@ OPTIONS:
       --vie <viv-end>      Upper bound of vivify loop        {:>10.2}
       --vii <viv-int>      Vivification interval          {:>10}
       --vis <viv-scale>    #reduction to vivify              {:>10.2}
-      --vri <vrw-dcy-rat>  Var reward Decay Rate             {:>10.2}
+      --vdr <vrw-dcy-rat>  Var reward Decay Rate             {:>10.2}
       --vro <vrw-occ-cmp>  Occ. compression rate in LR       {:>10.2}
 ARGS:
   <cnf-file>    DIMACS CNF file                 
