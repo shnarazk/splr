@@ -2,6 +2,7 @@
 
 - delete dependencies on 'libc' and 'structopt'
 - make Splr *monotonous*, by removing timer based decision makers. Monotonous means that if a solver solves a problem within T timeout, it solves the problem within any timeout longer than T.
+- Solver::restart provides both of `restart` and `stabilize`
 - fix a bug in chronoBT, that occurred if a conflicting clause has just a single literal at the conflicting level.
 - revise command line option parser to handle the last option better
 - stabilization span is controlled with Luby sequence
