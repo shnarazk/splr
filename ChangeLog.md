@@ -1,9 +1,12 @@
-## 0.5.1, 2020-11-05
+## 0.6.0, 2020-12-01
 
 - delete dependencies on 'libc' and 'structopt'
-- make Splr `monotonous`, by removing timer based decision makers
-- fix a bug in chronoBT, that occurred if a conflicting clause has just one literal at the conflicting level
-- revise command option parser to handle the last option better
+- make Splr *monotonous*, by removing timer based decision makers. Monotonous means that if a solver solves a problem within T timeout, it solves the problem within any timeout longer than T.
+- fix a bug in chronoBT, that occurred if a conflicting clause has just a single literal at the conflicting level.
+- revise command line option parser to handle the last option better
+- stabilization span is controlled with Luby sequence
+- make stabilization modes affect var rewards
+- make the learning rate of var rewarding an constant
 
 ## 0.5.0, 2020-08-30
 
