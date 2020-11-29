@@ -164,8 +164,6 @@ pub fn vivify(
                     cdb.detach(ci);
                     cdb.garbage_collect();
                     npurge += 1;
-                    // elim.to_simplify += 1.0 / (clits.len() as f64).powf(1.5);
-                    // elim.to_simplify += 1.0;
                 }
             }
             1 => {
@@ -180,8 +178,6 @@ pub fn vivify(
                         // panic!("Vivification found an inconsistency.");
                         return Err(SolverError::Inconsistent);
                     }
-                    // elim.to_simplify += 1.0 / (clits.len() as f64).powf(1.5);
-                    // elim.to_simplify += 1.0;
                     state[Stat::VivifiedVar] += 1;
                 }
                 debug_assert!(!cdb[ci].is(Flag::DEAD));
@@ -192,8 +188,6 @@ pub fn vivify(
             n => {
                 if n == 2 && cdb.registered_bin_clause(copied[0], copied[1]) {
                     npurge += 1;
-                // elim.to_simplify += 1.0 / (clits.len() as f64).powf(1.5);
-                // elim.to_simplify += 1.0;
                 } else {
                     nshrink += 1;
                     cdb.certificate_add(&copied);
