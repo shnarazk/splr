@@ -54,7 +54,7 @@ pub struct Clause {
     pub lits: Vec<Lit>,
     /// A static clause evaluation criterion like LBD, NDD, or something.
     pub rank: u16,
-    /// the index from which `propagate` starts searching an unfalsified literal.
+    /// the index from which `propagate` starts searching an un-falsified literal.
     pub search_from: usize,
     /// A dynamic clause evaluation criterion based on the number of references.
     reward: f64,
@@ -81,7 +81,7 @@ pub struct ClauseDB {
     pub certified: DRAT,
     /// a number of clauses to emit out-of-memory exception
     soft_limit: usize,
-    /// flag for Chan Seok heuristics; this value is exported with `Export:active_mode`
+    /// flag for Chan Seok heuristics; this value is exported with `Export:mode`
     use_chan_seok: bool,
     /// 'small' clause threshold
     co_lbd_bound: usize,
@@ -116,7 +116,7 @@ pub struct ClauseDB {
     extra_inc: usize,
     first_reduction: usize,
     next_reduction: usize, // renamed from `nbclausesbeforereduce`
-    reducable: bool,
+    reducible: bool,
     /// an expansion coefficient for restart
     reduction_coeff: usize,
 
@@ -171,7 +171,7 @@ mod tests {
     }
 
     #[test]
-    fn test_clause_instanciation() -> () {
+    fn test_clause_instantiation() -> () {
         let config = Config::default();
         let cnf = CNFDescription {
             num_of_variables: 4,

@@ -1,4 +1,16 @@
-## 0.5.0, 2020-08-2X
+## 0.6.0, 2020-12-01
+
+- delete dependencies on 'libc' and 'structopt'
+- make Splr *monotonous*, by removing timer based decision makers. Monotonous means that if a solver solves a problem within T timeout, it solves the problem within any timeout longer than T.
+- Solver::restart provides both of `restart` and `stabilize`
+- fix a bug in chronoBT, that occurred if a conflicting clause has just a single literal at the conflicting level.
+- revise command line option parser to handle the last option better
+- stabilization span is controlled with Luby sequence
+- make stabilization modes affect var rewards
+- make the learning rate of var rewarding an constant
+- add two configuration options: explore_timestamp, moving_var_reward_rate
+
+## 0.5.0, 2020-08-30
 
 - massive changes on the default parameters about restart
   - restart condition was revised as a multi-armed bandid problem

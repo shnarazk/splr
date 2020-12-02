@@ -63,7 +63,12 @@ macro_rules! set_assign {
     ($asg: expr, $lit: expr) => {
         match $lit {
             l => unsafe {
-                *$asg.assign.get_unchecked_mut(l.vi()) = Some(bool::from(l));
+                let vi = l.vi();
+                *$asg.assign.get_unchecked_mut(vi) = Some(bool::from(l));
+                #[cfg(explore_timestamp)]
+                {
+                    $asg.var.get_unchecked_mut(vi).assign_timestamp = $asg.num_conflict;
+                }
             },
         }
     };
@@ -90,12 +95,14 @@ impl PropagateIF for AssignStack {
                 self.reason[vi] = AssignReason::None;
                 debug_assert!(!self.trail.contains(&!l));
                 self.trail.push(l);
+                //self.make_var_asserted(vi);
                 Ok(())
             }
             Some(x) if x == bool::from(l) => {
                 // Vivification tries to assign a var by propagation then can assert it.
                 // To make sure the var is asserted, we need to nullfy its reason.
                 self.reason[vi] = AssignReason::None;
+                //self.make_var_asserted(vi);
                 Ok(())
             }
             _ => Err(SolverError::Inconsistent),
@@ -144,9 +151,10 @@ impl PropagateIF for AssignStack {
         self.level[vi] = 0;
         set_assign!(self, l);
         self.reason[vi] = AssignReason::default();
-        self.clear_reward(l.vi());
         debug_assert!(!self.trail.contains(&!l));
         self.trail.push(l);
+        // NOTE: sychronize the following with handle(SolverEvent::Assert)
+        self.make_var_asserted(vi);
     }
     fn cancel_until(&mut self, lv: DecisionLevel) {
         if self.trail_lim.len() as u32 <= lv {
@@ -200,8 +208,8 @@ impl PropagateIF for AssignStack {
         let bin_watcher = cdb.bin_watcher_lists() as *const [Vec<Watch>];
         let watcher = cdb.watcher_lists_mut() as *mut [Vec<Watch>];
         unsafe {
-            self.num_propagation += 1;
             while let Some(p) = self.trail.get(self.q_head) {
+                self.num_propagation += 1;
                 self.q_head += 1;
                 let false_lit = !*p;
                 // we have to drop `p` here to use self as a mutable reference again later.
@@ -213,7 +221,7 @@ impl PropagateIF for AssignStack {
                     debug_assert!(!self.var[w.blocker.vi()].is(Flag::ELIMINATED));
                     debug_assert_ne!(w.blocker, false_lit);
                     #[cfg(feature = "boundary_check")]
-                    assert_eq!(cdb[w.c].lits.len(), 2);
+                    debug_assert_eq!(cdb[w.c].lits.len(), 2);
                     match lit_assign!(self, w.blocker) {
                         Some(true) => (),
                         Some(false) => {
@@ -296,9 +304,9 @@ impl PropagateIF for AssignStack {
             }
         }
         let na = self.q_head + self.num_eliminated_vars;
-        if self.num_best_assign as usize <= na && 0 < self.decision_level() {
+        if self.num_best_assign <= na && 0 < self.decision_level() {
             self.best_assign = true;
-            self.num_best_assign = na as f64;
+            self.num_best_assign = na;
         }
         ClauseId::default()
     }

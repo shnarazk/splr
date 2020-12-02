@@ -27,7 +27,7 @@ use {
 /// Normal results returned by Solver.
 #[derive(Debug, PartialEq)]
 pub enum Certificate {
-    /// It is satisifable; `vec` is such an assigment sorted by var order.
+    /// It is satisfiable; `vec` is such an assignment sorted by var order.
     SAT(Vec<i32>),
     /// It is unsatisfiable.
     UNSAT,
@@ -40,27 +40,29 @@ pub enum Certificate {
 /// * `SolverException::*` -- caused by a bug
 pub type SolverResult = Result<Certificate, SolverError>;
 
-/// define submodules' responsibilities
+/// define sub-modules' responsibilities
 #[derive(Clone, Copy, Debug)]
 pub enum SolverEvent {
     /// set up internal parameters.
     /// # CAVEAT
     /// some implementation might have a special premise to call: decision_level == 0.
     Adapt((SearchStrategy, usize), usize),
-    /// asserting a var
-    Assert,
-    /// conflict by unit propagation
+    /// asserting a var.
+    Assert(VarId),
+    /// conflict by unit propagation.
     Conflict,
+    /// eliminating a var.
+    Eliminate(VarId),
     /// Not in use
     Instantiate,
     /// increment the number of vars.
     NewVar,
-    /// reinitialization for incremental solving.
+    /// re-initialization for incremental solving.
     Reinitialize,
     /// restart
     Restart,
-    /// stabilization
-    Stabilize(bool),
+    /// stabilization update.
+    Stabilize((bool, bool)),
     /// Vivification: `true` for start, `false` for end.
     Vivify(bool),
 }
@@ -72,7 +74,7 @@ pub enum SolverEvent {
 /// use crate::splr::{assign::{AssignIF, VarManipulateIF}, state::{State, StateIF}, types::*};
 ///
 /// let mut s = Solver::try_from("tests/sample.cnf").expect("can't load");
-/// assert!(matches!(s.asg.var_stats(), (250,_, _, 250)));
+/// assert!(matches!(s.asg.var_stats(), (250,_, _, 250, _)));
 /// if let Ok(Certificate::SAT(v)) = s.solve() {
 ///     assert_eq!(v.len(), 250);
 ///     // But don't expect `s.asg.var_stats().3 == 0` at this point.
@@ -121,7 +123,7 @@ pub struct SolverIter<'a> {
 
 #[cfg(feature = "incremental_solver")]
 impl Solver {
-    /// return an iterator on Solver. **Requires 'incremenal_solver' feature**
+    /// return an iterator on Solver. **Requires 'incremental_solver' feature**
     ///```
     ///for v in Solver::try_from("tests/sample.cnf").expect("panic").iter() {
     ///    println!(" - answer: {:?}", v);
@@ -169,7 +171,7 @@ mod tests {
     fn test_solver() {
         let config = Config::from("tests/sample.cnf");
         if let Ok(s) = Solver::build(&config) {
-            assert!(matches!(s.asg.var_stats(), (250, _, _, 250)));
+            assert!(matches!(s.asg.var_stats(), (250, _, _, 250, 250)));
         } else {
             panic!("failed to build a solver for tests/sample.cnf");
         }

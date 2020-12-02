@@ -54,15 +54,20 @@ impl Default for AssignStack {
             use_rephase: true,
             best_assign: false,
             build_best_at: 0,
-            num_best_assign: 0.0,
+            num_best_assign: 0,
             num_conflict: 0,
             num_propagation: 0,
             num_restart: 0,
             ordinal: 0,
             var: Vec::new(),
             activity_decay: 0.0,
-            activity_decay_max: 0.0,
+            #[cfg(moving_var_reward_rate)]
+            activity_decay_max: 0.9,
+            #[cfg(moving_var_reward_rate)]
+            activity_decay_min: 0.8,
+            #[cfg(moving_var_reward_rate)]
             reward_step: 0.0,
+            occurrence_compression_rate: 0.5,
             vivify_sandbox: (0, 0, 0),
         }
     }
@@ -94,16 +99,26 @@ impl Instantiate for AssignStack {
             num_vars: cnf.num_of_variables,
             use_rephase: config.use_rephase(),
             var: Var::new_vars(nv),
+            #[cfg(not(moving_var_reward_rate))]
+            activity_decay: config.vrw_dcy_rat,
+            #[cfg(moving_var_reward_rate)]
             activity_decay: config.vrw_dcy_beg,
-            activity_decay_max: config.vrw_dcy_end.max(config.vrw_dcy_beg),
+            #[cfg(moving_var_reward_rate)]
+            activity_decay_max: config.vrw_dcy_end,
+            #[cfg(moving_var_reward_rate)]
+            activity_decay_min: config.vrw_dcy_beg,
+            occurrence_compression_rate: config.vrw_occ_cmp,
             ..AssignStack::default()
         }
     }
+    #[inline]
     fn handle(&mut self, e: SolverEvent) {
         match e {
             SolverEvent::Adapt(_, _) => (),
-            SolverEvent::Assert => {
-                self.num_asserted_vars += 1;
+            // called only by assertion on choroBT
+            // So execute everything of `assign_by_unitclause` but cancel_until(root_level)
+            SolverEvent::Assert(vi) => {
+                self.make_var_asserted(vi);
             }
             SolverEvent::Conflict => (),
             SolverEvent::NewVar => {
@@ -127,9 +142,6 @@ impl Instantiate for AssignStack {
                     self.trail.len()
                 };
                 self.rebuild_order();
-            }
-            SolverEvent::Stabilize(_) => {
-                self.num_best_assign *= 0.9;
             }
             SolverEvent::Vivify(start) => {
                 if start {
@@ -168,7 +180,7 @@ impl Export<(usize, usize, usize, f64), ()> for AssignStack {
             self.activity_decay,
         )
     }
-    fn active_mode(&self) {}
+    fn mode(&self) {}
 }
 
 impl AssignIF for AssignStack {
@@ -209,32 +221,11 @@ impl AssignIF for AssignStack {
     fn level_ref(&self) -> &[DecisionLevel] {
         &self.level
     }
-    #[allow(clippy::single_match)]
-    fn best_assigned(&mut self, flag: Flag) -> usize {
-        match flag {
-            Flag::PHASE => {
-                if self.build_best_at == self.num_propagation {
-                    return self.num_best_assign as usize;
-                }
-            }
-            // Flag::BEST_PHASE => {
-            //     if self.best_assign {
-            //         self.best_assign = false;
-            //         return self.num_best_assign;
-            //     }
-            // }
-            // Flag::TARGET_PHASE => {
-            //     if self.target_assign {
-            //         self.target_assign = false;
-            //         return self.num_target_assign;
-            //     }
-            // }
-            _ => {
-                #[cfg(feature = "boundary_check")]
-                panic!("invalid flag for reset_assign_record");
-            }
+    fn best_assigned(&mut self) -> Option<usize> {
+        if self.build_best_at == self.num_propagation {
+            return Some(self.num_vars - self.num_best_assign);
         }
-        0
+        None
     }
     #[allow(unused_variables)]
     fn extend_model<C>(&mut self, cdb: &mut C, lits: &[Lit]) -> Vec<Option<bool>>

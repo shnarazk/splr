@@ -11,12 +11,8 @@ use {
         fmt,
         io::{stdout, Write},
         ops::{Index, IndexMut},
+        time::{Duration, Instant},
     },
-};
-#[cfg(feature = "libc")]
-use {
-    libc::{clock_gettime, timespec, CLOCK_PROCESS_CPUTIME_ID},
-    std::time::SystemTime,
 };
 
 /// API for state/statistics management, providing `progress`.
@@ -30,7 +26,7 @@ pub trait StateIF {
     fn select_strategy<A, C>(&mut self, asg: &A, cdb: &C)
     where
         A: Export<(usize, usize, usize, f64), ()>,
-        C: ClauseDBIF + Export<(usize, usize, usize, usize, usize, usize), ()>;
+        C: ClauseDBIF + Export<(usize, usize, usize, usize, usize, usize), bool>;
     /// write a header of stat data to stdio.
     fn progress_header(&mut self);
     /// write stat data to stdio.
@@ -43,47 +39,53 @@ pub trait StateIF {
         mes: Option<&str>,
     ) where
         A: AssignIF + Export<(usize, usize, usize, f64), ()>,
-        C: Export<(usize, usize, usize, usize, usize, usize), ()>,
+        C: Export<(usize, usize, usize, usize, usize, usize), bool>,
         E: Export<(usize, usize, f64), ()>,
         R: RestartIF
             + Export<(usize, usize, usize, usize), (RestartMode, usize)>
             + ExportBox<'r, (&'r Ema2, &'r Ema2, &'r Ema2, &'r Ema2)>;
     /// write a short message to stdout.
     fn flush<S: AsRef<str>>(&self, mes: S);
+    /// write a one-line message as log.
+    fn log<S: AsRef<str>>(&mut self, tick: usize, mes: S);
 }
 
 /// Phase saving modes.
 #[derive(Debug, Eq, PartialEq)]
-pub enum PhaseMode {
+pub enum RephaseMode {
     /// use the best phase so far.
     Best,
-    /// mixing best and random values.
-    BestRnd,
-    /// use the inverted phases.
-    Invert,
-    /// the original saving mode.
-    Latest,
+    /// a dummy
+    Clear,
+    #[cfg(explore_timestamp)]
+    #[cfg(feature = "temp_order")]
+    /// seek unchecked vars.
+    Explore(usize),
+    /// force an assignment
+    #[cfg(feature = "temp_order")]
+    Force(bool),
     /// use random values.
+    #[cfg(feature = "temp_order")]
     Random,
-    /// use the best phases in the current segment.
-    Target,
-    ///
-    Worst,
 }
 
-impl fmt::Display for PhaseMode {
+impl fmt::Display for RephaseMode {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(
             formatter,
             "{}",
             match self {
-                PhaseMode::Best => "ps_Best",
-                PhaseMode::BestRnd => "ps_BestRnd",
-                PhaseMode::Invert => "ps_Invert",
-                PhaseMode::Latest => "ps_Lastest",
-                PhaseMode::Random => "ps_Random",
-                PhaseMode::Target => "ps_Target",
-                PhaseMode::Worst => "ps_Worst",
+                RephaseMode::Best => "RP_Best",
+                RephaseMode::Clear => "RP_Clear",
+                #[cfg(explore_timestamp)]
+                #[cfg(feature = "temp_order")]
+                RephaseMode::Explore(_) => "RP_Reverse",
+                #[cfg(feature = "temp_order")]
+                RephaseMode::Force(false) => "RP_False",
+                #[cfg(feature = "temp_order")]
+                RephaseMode::Force(true) => "RP_True",
+                #[cfg(feature = "temp_order")]
+                RephaseMode::Random => "RP_Random",
             }
         )
     }
@@ -186,20 +188,16 @@ impl IndexMut<Stat> for [usize] {
 pub struct State {
     /// solver configuration
     pub config: Config,
-    /// phase saving selector
-    pub phase_select: PhaseMode,
     /// collection of statistics data
     pub stats: [usize; Stat::EndOfStatIndex as usize],
-    /// stabilization mode
-    pub stabilize: bool,
     /// tuple of current strategy and the number of conflicts at which the strategy is selected.
     pub strategy: (SearchStrategy, usize),
     /// problem description
     pub target: CNFDescription,
     /// strategy adjustment interval in conflict
     pub reflection_interval: usize,
-    /// time to executevivification
-    pub to_vivify: usize,
+    /// time to execute vivification
+    pub to_vivify: f64,
     /// loop limit of vivification loop
     pub vivify_thr: f64,
     //
@@ -222,25 +220,22 @@ pub struct State {
     /// keep the previous statistics values
     pub record: ProgressRecord,
     /// start clock for timeout handling
-    #[cfg(feature = "libc")]
-    pub start: SystemTime,
+    pub start: Instant,
     /// upper limit for timeout handling
     pub time_limit: f64,
-    /// for dumping debugging information for developers
-    pub development: Vec<(usize, f64, f64, f64, f64, f64)>,
+    /// logging facility.
+    log_messages: Vec<String>,
 }
 
 impl Default for State {
     fn default() -> State {
         State {
             config: Config::default(),
-            phase_select: PhaseMode::Latest,
             stats: [0; Stat::EndOfStatIndex as usize],
-            stabilize: false,
             strategy: (SearchStrategy::Initial, 0),
             target: CNFDescription::default(),
             reflection_interval: 10_000,
-            to_vivify: 0,
+            to_vivify: 0.0,
             vivify_thr: 0.0,
             b_lvl: Ema::new(5_000),
             c_lvl: Ema::new(5_000),
@@ -250,10 +245,9 @@ impl Default for State {
             derive20: Vec::new(),
             progress_cnt: 0,
             record: ProgressRecord::default(),
-            #[cfg(feature = "libc")]
-            start: SystemTime::now(),
+            start: Instant::now(),
             time_limit: 0.0,
-            development: Vec::new(),
+            log_messages: Vec::new(),
         }
     }
 }
@@ -282,7 +276,7 @@ impl Instantiate for State {
             } else {
                 (SearchStrategy::Generic, 0)
             },
-            vivify_thr: config.viv_beg,
+            vivify_thr: config.viv_end, // starting with a big value
             target: cnf.clone(),
             time_limit: config.c_tout,
             ..State::default()
@@ -293,13 +287,14 @@ impl Instantiate for State {
             SolverEvent::NewVar => {
                 self.target.num_of_variables += 1;
             }
-            SolverEvent::Assert => (),
+            SolverEvent::Assert(_) => (),
             SolverEvent::Adapt(_, _) => (),
             SolverEvent::Conflict => (),
+            SolverEvent::Eliminate(_) => (),
             SolverEvent::Instantiate => (),
             SolverEvent::Reinitialize => (),
             SolverEvent::Restart => (),
-            SolverEvent::Stabilize(_) => (),
+            SolverEvent::Stabilize((_, _)) => (),
             SolverEvent::Vivify(_) => (),
         }
     }
@@ -394,37 +389,18 @@ macro_rules! f {
 
 impl StateIF for State {
     fn is_timeout(&self) -> bool {
-        #[cfg(feature = "libc")]
-        {
-            if self.time_limit == 0.0 {
-                return false;
-            }
-            match self.start.elapsed() {
-                Ok(e) => self.time_limit <= e.as_secs() as f64,
-                Err(_) => false,
-            }
-        }
-        #[cfg(not(feature = "libc"))]
-        false
+        Duration::from_secs(self.config.c_tout as u64) < self.start.elapsed()
     }
     fn elapsed(&self) -> Option<f64> {
-        #[cfg(feature = "libc")]
-        {
-            if self.time_limit == 0.0 {
-                return Some(0.0);
-            }
-            match self.start.elapsed() {
-                Ok(e) => Some(e.as_secs() as f64 / self.time_limit),
-                Err(_) => None,
-            }
-        }
-        #[cfg(not(feature = "libc"))]
-        Some(0.0)
+        Some(
+            self.start.elapsed().as_secs_f64()
+                / Duration::from_secs(self.config.c_tout as u64).as_secs_f64(),
+        )
     }
     fn select_strategy<A, C>(&mut self, asg: &A, cdb: &C)
     where
         A: Export<(usize, usize, usize, f64), ()>,
-        C: ClauseDBIF + Export<(usize, usize, usize, usize, usize, usize), ()>,
+        C: ClauseDBIF + Export<(usize, usize, usize, usize, usize, usize), bool>,
     {
         if !self.config.use_adaptive() {
             return;
@@ -471,6 +447,12 @@ impl StateIF for State {
             stdout().flush().unwrap();
         }
     }
+    fn log<S: AsRef<str>>(&mut self, tick: usize, mes: S) {
+        if self.config.splr_interface && !self.config.quiet_mode && !self.config.use_log {
+            self.log_messages
+                .insert(0, format!("[{:>10}] {}", tick, mes.as_ref()));
+        }
+    }
     /// `mes` should be shorter than or equal to 9, or 8 + a delimiter.
     #[allow(clippy::cognitive_complexity)]
     fn progress<'r, A, C, E, R>(
@@ -482,7 +464,7 @@ impl StateIF for State {
         mes: Option<&str>,
     ) where
         A: AssignIF + Export<(usize, usize, usize, f64), ()>,
-        C: Export<(usize, usize, usize, usize, usize, usize), ()>,
+        C: Export<(usize, usize, usize, usize, usize, usize), bool>,
         E: Export<(usize, usize, f64), ()>,
         R: RestartIF
             + Export<(usize, usize, usize, usize), (RestartMode, usize)>
@@ -495,8 +477,13 @@ impl StateIF for State {
         //
         //## Gather stats from all modules
         //
-        let (asg_num_vars, asg_num_asserted_vars, asg_num_eliminated_vars, asg_num_unasserted_vars) =
-            asg.var_stats();
+        let (
+            asg_num_vars,
+            asg_num_asserted_vars,
+            asg_num_eliminated_vars,
+            asg_num_unasserted_vars,
+            asg_unreachables,
+        ) = asg.var_stats();
         let rate = (asg_num_asserted_vars + asg_num_eliminated_vars) as f64 / asg_num_vars as f64;
         let (asg_num_conflict, asg_num_propagation, asg_num_restart, _asg_act_dcy) = asg.exports();
 
@@ -505,11 +492,11 @@ impl StateIF for State {
 
         let (elim_num_full, _num_sat, _elim_to_simplify) = elim.exports();
 
-        let rst_mode = rst.active_mode().0;
+        let rst_mode = rst.mode().0;
 
-        let (rst_num_blk, rst_num_rst, rst_num_sblk, rst_num_srst) = rst.exports();
-        // let rst_num_stb = rst.active_mode().1;
-        let (rst_acc, rst_asg, rst_lbd, rst_mld) = *rst.exports_box();
+        let (rst_num_blk, rst_num_rst, rst_num_span, rst_num_shift) = rst.exports();
+        // let rst_num_stb = rst.mode().1;
+        let (_rst_acc, rst_asg, rst_lbd, _rst_mld) = *rst.exports_box();
 
         if self.config.use_log {
             self.dump(asg, cdb, rst);
@@ -517,6 +504,9 @@ impl StateIF for State {
         }
         self.progress_cnt += 1;
         print!("\x1B[9A\x1B[1G");
+        while let Some(m) = self.log_messages.pop() {
+            println!("\x1B[2K{}", m);
+        }
         println!("\x1B[2K{}", self);
         println!(
             "\x1B[2K #conflict:{}, #decision:{}, #propagate:{} ",
@@ -554,7 +544,7 @@ impl StateIF for State {
             ),
         );
         println!(
-            "\x1B[2K {}|#RST:{}, #BLK:{}, #STB:{}, #CNC:{} ",
+            "\x1B[2K {}|#BLK:{}, #RST:{}, span:{}, shft:{} ",
             match rst_mode {
                 RestartMode::Dynamic => "    Restart",
                 RestartMode::Luby if self.config.no_color => "LubyRestart",
@@ -562,17 +552,40 @@ impl StateIF for State {
                 RestartMode::Stabilize if self.config.no_color => "  Stabilize",
                 RestartMode::Stabilize => "  \x1B[001m\x1B[030mStabilize\x1B[000m",
             },
-            im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
             im!("{:>9}", self, LogUsizeId::RestartBlock, rst_num_blk),
-            im!("{:>9}", self, LogUsizeId::RestartStabilize, rst_num_srst),
-            im!("{:>9}", self, LogUsizeId::RestartCancel, rst_num_sblk),
+            im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
+            im!("{:>9}", self, LogUsizeId::End, rst_num_span),
+            im!("{:>9}", self, LogUsizeId::End, rst_num_shift),
         );
+        /*
         println!(
-            "\x1B[2K         EMA|tLBD:{}, tASG:{}, eMLD:{}, eCCC:{} ",
+            "\x1B[2K {}|#BLK:{}, #CNC:{}, #RST:{}, #STB:{} ",
+            match rst_mode {
+                RestartMode::Dynamic => "    Restart",
+                RestartMode::Luby if self.config.no_color => "LubyRestart",
+                RestartMode::Luby => "\x1B[001m\x1B[035mLubyRestart\x1B[000m",
+                RestartMode::Stabilize if self.config.no_color => "  Stabilize",
+                RestartMode::Stabilize => "  \x1B[001m\x1B[030mStabilize\x1B[000m",
+            },
+            im!("{:>9}", self, LogUsizeId::RestartBlock, rst_num_blk),
+            im!("{:>9}", self, LogUsizeId::RestartCancel, rst_num_sblk),
+            im!("{:>9}", self, LogUsizeId::Restart, rst_num_rst),
+            im!("{:>9}", self, LogUsizeId::RestartStabilize, rst_num_srst),
+        );
+         */
+        println!(
+            "\x1B[2K         EMA|tLBD:{}, tASG:{}, core:{}, /dpc:{} ",
             fm!("{:>9.4}", self, LogF64Id::TrendLBD, rst_lbd.trend()),
             fm!("{:>9.4}", self, LogF64Id::TrendASG, rst_asg.trend()),
-            fm!("{:>9.4}", self, LogF64Id::EmaMLD, rst_mld.get()),
-            fm!("{:>9.4}", self, LogF64Id::EmaCCC, rst_acc.get()),
+            // fm!("{:>9.4}", self, LogF64Id::EmaMLD, rst_mld.get()),
+            // fm!("{:>9.4}", self, LogF64Id::EmaCCC, rst_acc.get()),
+            im!("{:>9}", self, LogUsizeId::End, asg_unreachables),
+            fm!(
+                "{:>9.2}",
+                self,
+                LogF64Id::End,
+                self[Stat::Decision] as f64 / asg_num_conflict as f64
+            ),
         );
         println!(
             "\x1B[2K    Conflict|eLBD:{}, cnfl:{}, bjmp:{}, /ppc:{} ",
@@ -608,27 +621,13 @@ impl StateIF for State {
         } else {
             println!("\x1B[2K    Strategy|mode: {:#}", self.strategy.0);
         }
-        self.flush("\x1B[2K");
+        self.flush("");
     }
 }
 
 impl fmt::Display for State {
-    #[cfg(feature = "libc")]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let tm = {
-            let mut time = timespec {
-                tv_sec: 0,
-                tv_nsec: 0,
-            };
-            if unsafe { clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &mut time) } == -1 {
-                match self.start.elapsed() {
-                    Ok(e) => e.as_secs() as f64 + f64::from(e.subsec_millis()) / 1000.0f64,
-                    Err(_) => 0.0f64,
-                }
-            } else {
-                time.tv_sec as f64 + time.tv_nsec as f64 / 1_000_000_000.0f64
-            }
-        };
+        let tm: f64 = (self.start.elapsed().as_millis() as f64) / 1_000.0;
         let vc = format!(
             "{},{}",
             self.target.num_of_variables, self.target.num_of_clauses,
@@ -655,29 +654,6 @@ impl fmt::Display for State {
                 tm,
                 w = width - fnlen,
             )
-        }
-    }
-    #[cfg(not(feature = "libc"))]
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let vc = format!(
-            "{},{}",
-            self.target.num_of_variables, self.target.num_of_clauses,
-        );
-        let vclen = vc.len();
-        let width = 59 + 16;
-        let mut fname = match &self.target.pathname {
-            CNFIndicator::Void => "(no cnf)".to_string(),
-            CNFIndicator::File(f) => f.to_string(),
-            CNFIndicator::LitVec(n) => format!("(embedded {} element vector)", n),
-        };
-        if width <= fname.len() {
-            fname.truncate(width - vclen - 1);
-        }
-        let fnlen = fname.len();
-        if width < vclen + fnlen + 1 {
-            write!(f, "{:<w$}", fname, w = width)
-        } else {
-            write!(f, "{}{:>w$}", fname, &vc, w = width - fnlen,)
         }
     }
 }
@@ -736,12 +712,17 @@ impl State {
     fn dump<A, C, R>(&mut self, asg: &A, cdb: &C, rst: &R)
     where
         A: AssignIF + Export<(usize, usize, usize, f64), ()>,
-        C: Export<(usize, usize, usize, usize, usize, usize), ()>,
+        C: Export<(usize, usize, usize, usize, usize, usize), bool>,
         R: Export<(usize, usize, usize, usize), (RestartMode, usize)>,
     {
         self.progress_cnt += 1;
-        let (asg_num_vars, asg_num_asserted_vars, asg_num_eliminated_vars, asg_num_unasserted_vars) =
-            asg.var_stats();
+        let (
+            asg_num_vars,
+            asg_num_asserted_vars,
+            asg_num_eliminated_vars,
+            asg_num_unasserted_vars,
+            _,
+        ) = asg.var_stats();
         let rate = (asg_num_asserted_vars + asg_num_eliminated_vars) as f64 / asg_num_vars as f64;
         let (asg_num_conflict, _num_propagation, asg_num_restart, _) = asg.exports();
         let (
@@ -752,7 +733,10 @@ impl State {
             cdb_num_learnt,
             cdb_num_reduction,
         ) = cdb.exports();
-        let rst_num_block = rst.exports().0;
+        let rst_num_block = {
+            let e = rst.exports();
+            e.0 + e.2
+        };
         println!(
             "c | {:>8}  {:>8} {:>8} | {:>7} {:>8} {:>8} |  {:>4}  {:>8} {:>7} {:>8} | {:>6.3} % |",
             asg_num_restart,                           // restart
@@ -772,7 +756,7 @@ impl State {
     fn dump_details<'r, A, C, E, R, V>(&mut self, asg: &A, cdb: &C, rst: &'r R, mes: Option<&str>)
     where
         A: AssignIF + Export<(usize, usize, usize, f64), ()>,
-        C: Export<(usize, usize, usize, usize, usize, usize), ()>,
+        C: Export<(usize, usize, usize, usize, usize, usize), bool>,
         R: RestartIF
             + Export<(usize, usize, usize, usize), (RestartMode, usize)>
             + ExportBox<'r, (&'r Ema2, &'r Ema2, &'r Ema2, &'r Ema2)>,
@@ -782,8 +766,13 @@ impl State {
             None => self.strategy.0.to_str(),
             Some(x) => x,
         };
-        let (asg_num_vars, asg_num_asserted_vars, asg_num_eliminated_vars, asg_num_unasserted_vars) =
-            asg.var_stats();
+        let (
+            asg_num_vars,
+            asg_num_asserted_vars,
+            asg_num_eliminated_vars,
+            asg_num_unasserted_vars,
+            _,
+        ) = asg.var_stats();
         let rate = (asg_num_asserted_vars + asg_num_eliminated_vars) as f64 / asg_num_vars as f64;
         let (_num_conflict, _num_propagation, asg_num_restart, _) = asg.exports();
         let (
@@ -794,7 +783,10 @@ impl State {
             cdb_num_learnt,
             _num_reduction,
         ) = cdb.exports();
-        let rst_num_block = rst.exports().0;
+        let rst_num_block = {
+            let e = rst.exports();
+            e.0 + e.2
+        };
         let (_, rst_asg, rst_lbd, _) = *rst.exports_box();
         println!(
             "{:>3}#{:>8},{:>7},{:>7},{:>7},{:>6.3},,{:>7},{:>7},\

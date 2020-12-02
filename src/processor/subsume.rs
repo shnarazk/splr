@@ -97,11 +97,13 @@ where
         debug_assert!(2 == cdb[cid].len());
         let c0 = cdb[cid][0];
         debug_assert_ne!(c0, l);
+
         #[cfg(feature = "trace_elimination")]
         println!(
             "{} {:?} is removed and its first literal {} is enqueued.",
             cid, cdb[cid], c0,
         );
+
         cdb.detach(cid);
         elim.remove_cid_occur(asg, cid, &mut cdb[cid]);
         cdb.certificate_add(&[c0]);
@@ -109,8 +111,10 @@ where
     } else {
         #[cfg(feature = "trace_elimination")]
         println!("cid {} drops literal {}", cid, l);
+
         #[cfg(feature = "boundary_check")]
         assert!(1 < cdb[cid].len());
+
         elim.enqueue_clause(cid, &mut cdb[cid]);
         elim.remove_lit_occur(asg, l, cid);
         unsafe {

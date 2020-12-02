@@ -1,7 +1,5 @@
 //! Vivification
 #![allow(dead_code)]
-#[cfg(feature = "libc")]
-use std::{thread, time::Duration};
 use {
     super::{SolverEvent, Stat, State},
     crate::{
@@ -11,13 +9,7 @@ use {
         state::StateIF,
         types::*,
     },
-    std::{
-        borrow::Cow,
-        sync::{
-            atomic::{AtomicBool, Ordering},
-            Arc,
-        },
-    },
+    std::borrow::Cow,
 };
 
 /// vivify clauses in `cdb` under `asg`
@@ -33,29 +25,11 @@ pub fn vivify(
     debug_assert_eq!(dl, 0);
     // This is a reusable vector to reduce memory consumption, the key is the number of invocation
     let mut seen: Vec<usize> = vec![0; asg.num_vars + 1];
-    let check_thr = (state.vivify_thr * 10_000_000.0 / asg.var_stats().3 as f64) as usize;
-    let timedout = Arc::new(AtomicBool::new(false));
-    #[cfg(feature = "libc")]
-    {
-        // The ratio of time slot for single elimination step.
-        // Since it is measured in millisecond, 1000 means executing elimination
-        // until timed out. 100 means this function can consume 10% of a given time.
-        let timeslot_for_vivification: u64 = state.vivify_thr as u64;
-        let timedout2 = timedout.clone();
-        let time = timeslot_for_vivification * state.config.c_tout as u64;
-        thread::spawn(move || {
-            thread::sleep(Duration::from_millis(time));
-            timedout2.store(true, Ordering::Release);
-        });
-    }
-    // {
-    // let k = state.config.timeout / (asg.var_stats().3 as f64).sqrt();
-    //     panic!("{}| check {:.1} - {:.1}",
-    //            (cdb.count() as f64).sqrt(),
-    //            state.config.vivify_beg * k,
-    //            state.config.vivify_end * k,
-    //     );
-    // }
+    let check_thr = {
+        let nv = asg.var_stats().3 as f64;
+        let nc = cdb.count() as f64;
+        (state.vivify_thr * (nv.powf(0.5) + nc.powf(0.3))) as usize
+    };
     let display_step: usize = 250.max(check_thr / 5);
     let mut ncheck = 0;
     let mut npurge = 0;
@@ -80,7 +54,6 @@ pub fn vivify(
     // clauses.sort_by_cached_key(|ci| (cdb.activity(*ci).log(10.0) * -100_000.0) as isize);
     clauses.sort_by_key(|ci| cdb[*ci].rank);
     clauses.resize(clauses.len() / 2, ClauseId::default());
-    debug_assert!(!asg.remains());
     while let Some(ci) = clauses.pop() {
         let c: &mut Clause = &mut cdb[ci];
         // Since GC can make `clauses` out of date, we need to check its aliveness here.
@@ -96,16 +69,16 @@ pub fn vivify(
         let clits = c.lits.clone();
         let mut copied: Vec<Lit> = Vec::new();
         let mut flipped = true;
-        // cdb.eliminate_satisfied_clauses(asg, elim, false);
+        // elim.eliminate_satisfied_clauses(asg, cdb, false);
+        ncheck += clits.len();
         'this_clause: for l in clits.iter() {
             debug_assert_eq!(0, asg.decision_level());
-            ncheck += 1;
             seen[0] = ncheck;
             if to_display <= ncheck {
                 state.flush("");
                 state.flush(format!(
-                    "vivifying(assert:{}, purge:{} shorten:{}, check:{})...",
-                    nassert, npurge, nshrink, ncheck,
+                    "vivifying(assert:{}, purge:{} shorten:{}, check:{}/{})...",
+                    nassert, npurge, nshrink, ncheck, check_thr,
                 ));
                 to_display = ncheck + display_step;
             }
@@ -155,7 +128,7 @@ pub fn vivify(
                         copied = asg.analyze(cdb, &copied, &cdb[cc].lits, &mut seen);
                         // this reverts dda678e
                         // Here we found an inconsistency.
-                        // So we can abort this function without rolling back to level zoro.
+                        // So we can abort this function without rolling back to level zero.
                         if copied.is_empty() {
                             break 'this_clause;
                         }
@@ -191,7 +164,6 @@ pub fn vivify(
                     cdb.detach(ci);
                     cdb.garbage_collect();
                     npurge += 1;
-                    elim.to_simplify += 1.0;
                 }
             }
             1 => {
@@ -206,8 +178,6 @@ pub fn vivify(
                         // panic!("Vivification found an inconsistency.");
                         return Err(SolverError::Inconsistent);
                     }
-                    asg.handle(SolverEvent::Assert);
-                    elim.to_simplify += 2.0;
                     state[Stat::VivifiedVar] += 1;
                 }
                 debug_assert!(!cdb[ci].is(Flag::DEAD));
@@ -226,21 +196,15 @@ pub fn vivify(
                     let cj = cdb.new_clause(asg, &mut copied, is_learnt, true);
                     cdb.handle(SolverEvent::Vivify(false));
                     cdb[cj].turn_on(Flag::VIVIFIED);
-                    elim.to_simplify += 1.0 / (n - 1) as f64;
+                    elim.to_simplify += 1.0 / ((n - 1) as f64).powf(1.6);
                     debug_assert!(!cdb[ci].is(Flag::DEAD));
                     cdb.detach(ci);
                     cdb.garbage_collect();
                 }
             }
         }
-        if timedout.load(Ordering::Acquire) {
+        if check_thr <= ncheck {
             break;
-        }
-        #[cfg(not(feature = "libc"))]
-        {
-            if check_thr <= ncheck {
-                break;
-            }
         }
         clauses.retain(|ci| !cdb[ci].is(Flag::DEAD));
     }
