@@ -193,7 +193,7 @@ impl Default for ProgressMLD {
 impl Instantiate for ProgressMLD {
     fn instantiate(config: &Config, _: &CNFDescription) -> Self {
         ProgressMLD {
-            ema: Ema2::new(10 * config.rst_lbd_len).with_slow(config.rst_lbd_slw),
+            ema: Ema2::new(config.rst_lbd_len).with_slow(config.rst_lbd_slw),
             scaling: config.rst_mld_scl,
             threshold: config.rst_mld_thr,
             ..ProgressMLD::default()

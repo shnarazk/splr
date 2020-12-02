@@ -276,7 +276,7 @@ impl Instantiate for State {
             } else {
                 (SearchStrategy::Generic, 0)
             },
-            vivify_thr: 10.0 * config.viv_beg, // starting with a big value
+            vivify_thr: config.viv_end, // starting with a big value
             target: cnf.clone(),
             time_limit: config.c_tout,
             ..State::default()
