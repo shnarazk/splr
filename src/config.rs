@@ -188,14 +188,14 @@ impl Default for Config {
             elm_grw_lim: 0,
             elm_var_occ: 8192,
 
-            rst_step: 40,
-            rst_asg_len: 25,
+            rst_step: 32,
+            rst_asg_len: 32,
             rst_asg_slw: 10000,
-            rst_asg_thr: 0.25,
+            rst_asg_thr: 0.40,
             rst_ccc_thr: 0.70,
-            rst_lbd_len: 25,
-            rst_lbd_slw: 10000,
-            rst_lbd_thr: 0.15,
+            rst_lbd_len: 16,
+            rst_lbd_slw: 8192,
+            rst_lbd_thr: 0.40,
             rst_mld_scl: 0.10,
             rst_mld_thr: 0.80,
             rst_stb_scl: 2.0,
@@ -460,7 +460,7 @@ OPTIONS:
       --vdr <vrw-dcy-rat>  Var reward Decay Rate             {:>10.2}
       --vro <vrw-occ-cmp>  Occ. compression rate in LR       {:>10.2}
 ARGS:
-  <cnf-file>    DIMACS CNF file                 
+  <cnf-file>    DIMACS CNF file
 ",
         config.a_adaptive,
         config.a_elim,
@@ -551,7 +551,7 @@ OPTIONS:
       --vrm <vrw-dcy-end>  Maximum var reward decay          {:>10.2}
       --vro <vrw-occ-cmp>  Occ. compression rate in LR       {:>10.2}
 ARGS:
-  <cnf-file>    DIMACS CNF file                 
+  <cnf-file>    DIMACS CNF file
 ",
         config.a_adaptive,
         config.a_elim,

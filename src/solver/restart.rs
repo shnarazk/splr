@@ -26,7 +26,6 @@ pub enum ProgressUpdate {
     LBD(u16),
     Luby,
     MLD(u16),
-    Reset,
     Remain(usize),
 }
 
@@ -136,7 +135,7 @@ impl Instantiate for ProgressLBD {
     fn instantiate(config: &Config, _: &CNFDescription) -> Self {
         ProgressLBD {
             ema: Ema2::new(config.rst_lbd_len).with_slow(config.rst_lbd_slw),
-            threshold: config.rst_lbd_thr,
+            threshold: 1.0 + config.rst_lbd_thr,
             ..ProgressLBD::default()
         }
     }
@@ -153,9 +152,7 @@ impl EmaIF for ProgressLBD {
         self.ema.get()
     }
     fn trend(&self) -> f64 {
-        self.ema
-            .trend()
-            .max(self.ema.get() * (self.num as f64) / (self.sum as f64))
+        self.ema.trend()
     }
 }
 
@@ -505,7 +502,7 @@ struct GeometricStabilizer {
 
 impl Default for GeometricStabilizer {
     fn default() -> Self {
-        const STEP: usize = 1000;
+        const STEP: usize = 64;
         GeometricStabilizer {
             enable: true,
             active: false,
@@ -554,19 +551,20 @@ impl GeometricStabilizer {
         if self.enable && self.next_trigger <= now {
             self.num_shift += 1;
             self.active = !self.active;
-            let new_cycle: bool;
+            let mut new_cycle: bool = false;
             if self.reset_requested {
-                new_cycle = false; // reset doesn't start a new cycle; it's a redo.
+                // reset doesn't start a new cycle; it's a kind of redo.
                 self.luby.reset();
                 self.reset_requested = false;
-                self.step = self.luby.next().unwrap();
-            } else {
-                new_cycle = self.longest_span == self.step;
-                self.step = self.luby.next().unwrap();
-                if self.longest_span < self.step {
-                    self.longest_span = self.step;
+            } else if self.longest_span < self.step {
+                new_cycle = true;
+                self.longest_span = self.step;
+                if self.reset_requested {
+                    self.reset_requested = false;
                 }
             }
+            self.step = self.luby.next().unwrap();
+            // assert!(!new_cycle || self.step == 1);
             self.next_trigger = now + self.step * self.scale;
             Some((self.active, new_cycle))
         } else {
@@ -734,6 +732,9 @@ impl Instantiate for Restarter {
             SolverEvent::Adapt((SearchStrategy::LowSuccessive, n), m) if n == m => {
                 // self.luby.enable = true;
             }
+            SolverEvent::Assert(_) => {
+                self.stb.reset_progress();
+            }
             SolverEvent::Restart => {
                 self.after_restart = 0;
             }
@@ -743,6 +744,7 @@ impl Instantiate for Restarter {
 }
 
 /// Type for the result of `restart`.
+#[derive(Debug, PartialEq)]
 pub enum RestartDecision {
     /// We should block restart.
     Block,
@@ -766,26 +768,23 @@ impl RestartIF for Restarter {
             return None;
         }
         // self.acc.shift();
+
+        // Branching based on sizes of learnt clauses comparing with the average of
+        // maximum LBDs used in conflict analysis.
+        // let _good_path = self.lbd.get()
+        //     < self.mld.get() + (self.stb.span() as f64) * self.mld.scaling + self.mld.threshold;
+
         if self.stb.active {
             return Some(RestartDecision::Stabilize);
         }
 
-        // Branching based on sizes of learnt clauses comparing with the average of
-        // maximum LBDs used in conflict analysis.
-        let _good_path = self.lbd.get()
-            < self.mld.get() + (self.stb.span() as f64) * self.mld.scaling + self.mld.threshold;
-
         if self.asg.is_active() {
             self.num_block += 1;
+            self.after_restart = 0;
             return Some(RestartDecision::Block);
         }
 
-        // let thr = self.lbd.threshold / (self.stb.span() as f64 + 1.0).log(2.0);
-        let thr = self.lbd.threshold;
-        // let _forming_mld = self.mld.threshold / (self.stb.span() as f64 + 1.0);
-        if 1.0 + thr < self.lbd.trend()
-        // || 1.0 + forming_mld < self.mld.trend()
-        {
+        if self.lbd.is_active() {
             self.num_restart += 1;
             return Some(RestartDecision::Force);
         }
@@ -805,7 +804,6 @@ impl RestartIF for Restarter {
             ProgressUpdate::LBD(val) => self.lbd.update(val),
             ProgressUpdate::Luby => self.luby.update(0),
             ProgressUpdate::MLD(val) => self.mld.update(val),
-            ProgressUpdate::Reset => self.stb.reset_progress(),
             ProgressUpdate::Remain(val) => {
                 self.asg.nvar = val;
             }

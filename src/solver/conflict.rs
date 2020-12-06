@@ -212,7 +212,7 @@ pub fn handle_conflict(
         } else {
             asg.assign_by_unitclause(l0);
         }
-        rst.update(ProgressUpdate::Reset);
+        rst.handle(SolverEvent::Assert(l0.vi()))
     } else {
         {
             // At the present time, some reason clauses can contain first UIP or its negation.

@@ -10,7 +10,7 @@ use {
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarRewardIF, VarSelectIF},
         cdb::{ClauseDB, ClauseDBIF},
         processor::{EliminateIF, Eliminator},
-        state::{RephaseMode, Stat, State, StateIF},
+        state::{Stat, State, StateIF},
         types::*,
     },
 };
@@ -227,16 +227,12 @@ fn search(
             handle_conflict(asg, cdb, elim, rst, state, ci)?;
             if let Some(decision) = rst.restart() {
                 rst.update(ProgressUpdate::Remain(asg.var_stats().3));
-                match decision {
-                    RestartDecision::Block => (),
-                    RestartDecision::Force => {
-                        RESTART!(asg, rst);
-                    }
-                    RestartDecision::Postpone | RestartDecision::Stabilize => (),
+                if decision == RestartDecision::Force {
+                    RESTART!(asg, rst);
                 }
-                if let Some((stabilize, new_cycle)) = rst.stabilize(asg.num_conflict) {
-                    // let s = rst.exports();
+                if let Some((_stabilize, new_cycle)) = rst.stabilize(asg.num_conflict) {
                     stabilizing = new_cycle;
+                    // let span = rst.exports().2;
                     if new_cycle {
                         let v = asg.var_stats();
                         state.log(
@@ -248,12 +244,17 @@ fn search(
                                 asg.num_conflict as f64 / asg.exports().2 as f64,
                             ),
                         );
-                        asg.expand_reward(stabilize);
-                        asg.force_rephase(RephaseMode::Best);
+                        // asg.expand_reward(stabilize || true);
+                        // if stabilize && span == 1 {
+                        //     asg.force_rephase(RephaseMode::Best)
+                        // }
                     }
-                    // if stagnated && stabilize {
-                    //     // RESTART!(asg, rst);
-                    //     asg.force_rephase(RephaseMode::Best);
+                    // if span == 1 {
+                    //     asg.expand_reward(false);
+                    //     if stabilize {
+                    //         asg.cancel_until(asg.root_level);
+                    //         asg.force_rephase(RephaseMode::Best);
+                    //     }
                     // }
                 }
             }
@@ -299,7 +300,6 @@ fn search(
             }
             // By simplification, we may get further solutions.
             if asg.num_asserted_vars < asg.stack_len() {
-                rst.update(ProgressUpdate::Reset);
                 asg.num_asserted_vars = asg.stack_len();
             }
         }
