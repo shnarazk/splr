@@ -135,7 +135,7 @@ impl Instantiate for ProgressLBD {
     fn instantiate(config: &Config, _: &CNFDescription) -> Self {
         ProgressLBD {
             ema: Ema2::new(config.rst_lbd_len).with_slow(config.rst_lbd_slw),
-            threshold: 1.0 + config.rst_lbd_thr,
+            threshold: config.rst_lbd_thr,
             ..ProgressLBD::default()
         }
     }
@@ -158,7 +158,7 @@ impl EmaIF for ProgressLBD {
 
 impl ProgressEvaluator for ProgressLBD {
     fn is_active(&self) -> bool {
-        self.enable && self.threshold < self.ema.trend()
+        self.enable && self.threshold < self.trend()
     }
     fn shift(&mut self) {}
 }
@@ -577,6 +577,19 @@ impl GeometricStabilizer {
     fn reset_progress(&mut self) {
         self.reset_requested = true;
     }
+    fn new(enable: bool, step: usize) -> Self {
+        GeometricStabilizer {
+            enable,
+            active: false,
+            longest_span: 1,
+            luby: LubySeries::default(),
+            num_shift: 0,
+            next_trigger: step,
+            reset_requested: false,
+            step,
+            scale: step,
+        }
+    }
 }
 
 /*
@@ -672,6 +685,7 @@ pub struct Restarter {
     // pub blvl: ProgressLVL,
     // pub clvl: ProgressLVL,
     luby: ProgressLuby,
+    luby_blocking: GeometricStabilizer,
     stb: GeometricStabilizer,
     after_restart: usize,
     restart_step: usize,
@@ -696,6 +710,7 @@ impl Default for Restarter {
             // blvl: ProgressLVL::default(),
             // clvl: ProgressLVL::default(),
             luby: ProgressLuby::default(),
+            luby_blocking: GeometricStabilizer::new(true, 0),
             stb: GeometricStabilizer::default(),
             after_restart: 0,
             restart_step: 0,
@@ -733,6 +748,7 @@ impl Instantiate for Restarter {
                 // self.luby.enable = true;
             }
             SolverEvent::Assert(_) => {
+                self.luby_blocking.reset_progress();
                 self.stb.reset_progress();
             }
             SolverEvent::Restart => {
@@ -781,11 +797,14 @@ impl RestartIF for Restarter {
         if self.asg.is_active() {
             self.num_block += 1;
             self.after_restart = 0;
+            self.luby_blocking.update(0);
+            self.restart_step = self.initial_restart_step * self.luby_blocking.span();
             return Some(RestartDecision::Block);
         }
 
         if self.lbd.is_active() {
             self.num_restart += 1;
+            self.restart_step = self.initial_restart_step;
             return Some(RestartDecision::Force);
         }
         Some(RestartDecision::Postpone)
