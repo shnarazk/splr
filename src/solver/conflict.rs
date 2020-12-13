@@ -1,4 +1,5 @@
 //! Conflict Analysis
+
 use {
     super::{
         restart::{ProgressUpdate, RestartIF, Restarter},
@@ -260,7 +261,7 @@ pub fn handle_conflict(
         }
         rst.update(ProgressUpdate::ACC(act));
 
-        elim.to_simplify += 1.0 / ((learnt_len - 1) as f64).powf(1.6);
+        elim.to_simplify += 1.0 / (learnt_len - 1) as f64;
         if lbd <= 20 {
             for cid in &state.derive20 {
                 cdb[cid].turn_on(Flag::DERIVE20);
@@ -269,7 +270,7 @@ pub fn handle_conflict(
     }
     cdb.scale_activity();
     if cdb.check_and_reduce(asg, num_conflict) {
-        state.to_vivify += if cdb.mode() { 0.005 } else { 1.0 };
+        state.to_vivify += 1.0;
     }
     Ok(())
 }

@@ -10,7 +10,7 @@ use {
         assign::{AssignIF, AssignStack, PropagateIF, VarManipulateIF, VarRewardIF, VarSelectIF},
         cdb::{ClauseDB, ClauseDBIF},
         processor::{EliminateIF, Eliminator},
-        state::{Stat, State, StateIF},
+        state::{RephaseMode, Stat, State, StateIF},
         types::*,
     },
 };
@@ -202,7 +202,6 @@ fn search(
     state: &mut State,
 ) -> Result<bool, SolverError> {
     let mut a_decision_was_made = false;
-    let mut stabilizing: bool = false;
     let use_vivify = state.config.use_vivify();
     rst.update(ProgressUpdate::Luby);
     rst.update(ProgressUpdate::Remain(asg.num_vars - asg.num_asserted_vars));
@@ -231,8 +230,6 @@ fn search(
                     RESTART!(asg, rst);
                 }
                 if let Some((_stabilize, new_cycle)) = rst.stabilize(asg.num_conflict) {
-                    stabilizing = new_cycle;
-                    // let span = rst.exports().2;
                     if new_cycle {
                         let v = asg.var_stats();
                         state.log(
@@ -244,17 +241,17 @@ fn search(
                                 asg.num_conflict as f64 / asg.exports().2 as f64,
                             ),
                         );
-                        // asg.expand_reward(stabilize || true);
-                        // if stabilize && span == 1 {
-                        //     asg.force_rephase(RephaseMode::Best)
-                        // }
+                        asg.force_rephase(RephaseMode::Best);
                     }
+                    if decision != RestartDecision::Force {
+                        RESTART!(asg, rst);
+                    }
+                    asg.expand_reward(false);
+                    // if stabilize /* && rst.exports().2 */ {
+                    //     asg.force_rephase(RephaseMode::Best)
+                    // }
                     // if span == 1 {
                     //     asg.expand_reward(false);
-                    //     if stabilize {
-                    //         asg.cancel_until(asg.root_level);
-                    //         asg.force_rephase(RephaseMode::Best);
-                    //     }
                     // }
                 }
             }
@@ -304,7 +301,7 @@ fn search(
             }
         }
         if !asg.remains() {
-            let lit = asg.select_decision_literal(stabilizing);
+            let lit = asg.select_decision_literal(false);
             asg.assign_by_decision(lit);
             state[Stat::Decision] += 1;
             a_decision_was_made = true;

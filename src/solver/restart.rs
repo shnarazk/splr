@@ -96,7 +96,9 @@ impl EmaIF for ProgressASG {
     }
     fn trend(&self) -> f64 {
         // self.ema.trend()
-        (self.ema.get() - self.ema.get_slow()) / (self.nvar as f64)
+        let nv = self.nvar as f64;
+        // (nv - self.ema.get_slow()) / (nv - self.ema.get())
+        (self.ema.get() - self.ema.get_slow()) / nv
     }
 }
 
@@ -215,7 +217,7 @@ impl EmaIF for ProgressMLD {
 
 impl ProgressEvaluator for ProgressMLD {
     fn is_active(&self) -> bool {
-        todo!();
+        self.enable && self.threshold < self.ema.trend()
     }
     fn shift(&mut self) {}
 }
@@ -753,6 +755,7 @@ impl Instantiate for Restarter {
             }
             SolverEvent::Restart => {
                 self.after_restart = 0;
+                self.num_restart += 1;
             }
             _ => (),
         }
@@ -797,13 +800,16 @@ impl RestartIF for Restarter {
         if self.asg.is_active() {
             self.num_block += 1;
             self.after_restart = 0;
-            self.luby_blocking.update(0);
-            self.restart_step = self.initial_restart_step * self.luby_blocking.span();
+            // self.luby_blocking.update(0);
+            self.restart_step = self.initial_restart_step * self.stb.span();
+            // self.restart_step = self.initial_restart_step;
             return Some(RestartDecision::Block);
         }
 
-        if self.lbd.is_active() {
-            self.num_restart += 1;
+        let threshold = self.lbd.threshold; // (1.0 + self.stb.span() as f64).log(2.0);
+        if threshold < self.lbd.trend()
+        /* .lbd.is_active() */
+        {
             self.restart_step = self.initial_restart_step;
             return Some(RestartDecision::Force);
         }

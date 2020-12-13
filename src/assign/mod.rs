@@ -31,7 +31,7 @@ pub trait VarRewardIF {
     /// initialize rewards based on an order of vars.
     fn initialize_reward(&mut self, iterator: Iter<'_, usize>);
     /// expand var rewards.
-    fn expand_reward(&mut self, contrant: bool);
+    fn expand_reward(&mut self, boost: bool);
     /// clear var's activity
     fn clear_reward(&mut self, vi: VarId);
     /// modify var's activity at conflict analysis in `analyze`.
@@ -102,6 +102,8 @@ pub struct Var {
     participated: u32,
     /// a dynamic evaluation criterion like EVSIDS or ACID.
     reward: f64,
+    /// a special reaward assigned to vars included in the best phase.
+    best_phase_reward: f64,
     /// the number of conflicts at which this var was assigned an rewarded lastly.
     timestamp: usize,
     #[cfg(explore_timestamp)]
@@ -163,6 +165,9 @@ pub struct AssignStack {
     //
     /// var activity decay
     activity_decay: f64,
+
+    /// Bonus value for vars involed in best phase
+    best_phase_reward_value: f64,
 
     #[cfg(moving_var_reward_rate)]
     /// maximum var activity decay

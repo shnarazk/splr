@@ -142,6 +142,8 @@ pub struct Config {
     //
     //## var rewarding
     //
+    pub vrw_bst_phs: f64,
+
     #[cfg(not(moving_var_reward_rate))]
     pub vrw_dcy_rat: f64,
 
@@ -191,11 +193,11 @@ impl Default for Config {
             rst_step: 20,
             rst_asg_len: 20,
             rst_asg_slw: 10000,
-            rst_asg_thr: 1.25,
+            rst_asg_thr: 0.25,
             rst_ccc_thr: 0.7,
             rst_lbd_len: 20,
             rst_lbd_slw: 8192,
-            rst_lbd_thr: 1.45,
+            rst_lbd_thr: 1.40,
             rst_mld_scl: 0.10,
             rst_mld_thr: 0.80,
             rst_stb_scl: 2.0,
@@ -204,6 +206,7 @@ impl Default for Config {
             viv_end: 8.0,
             viv_int: 4,
             viv_scale: 1.2,
+            vrw_bst_phs: 1.0,
 
             #[cfg(not(moving_var_reward_rate))]
             vrw_dcy_rat: 0.96,
@@ -240,7 +243,7 @@ impl Config {
                 #[cfg(not(moving_var_reward_rate))]
                 let options_f64 = [
                     "timeout", "rat", "rct", "rlt", "rms", "rmt", "rss", "vib", "vie", "vis",
-                    "vdr", "vro",
+                    "vdr", "vrb", "vro",
                 ];
                 #[cfg(moving_var_reward_rate)]
                 let options_f64 = [
@@ -332,6 +335,7 @@ impl Config {
                                         "vib" => self.viv_beg = val,
                                         "vie" => self.viv_end = val,
                                         "vis" => self.viv_scale = val,
+                                        "vrb" => self.vrw_bst_phs = val,
                                         #[cfg(not(oving_var_reward_rate))]
                                         "vdr" => self.vrw_dcy_rat = val,
                                         #[cfg(moving_var_reward_rate)]
@@ -457,6 +461,7 @@ OPTIONS:
       --vie <viv-end>      Upper bound of vivify loop        {:>10.2}
       --vii <viv-int>      Vivification interval          {:>10}
       --vis <viv-scale>    #reduction to vivify              {:>10.2}
+      --vrb <vrw-bst-phs>  Var reward for vars in best phase {:>10.2}
       --vdr <vrw-dcy-rat>  Var reward Decay Rate             {:>10.2}
       --vro <vrw-occ-cmp>  Occ. compression rate in LR       {:>10.2}
 ARGS:
@@ -495,6 +500,7 @@ ARGS:
         config.viv_end,
         config.viv_int,
         config.viv_scale,
+        config.vrw_bst_phs,
         config.vrw_dcy_rat,
         config.vrw_occ_cmp,
     )
@@ -547,6 +553,7 @@ OPTIONS:
       --vie <viv-end>      Upper bound of vivify loop        {:>10.2}
       --vii <viv-int>      Vivification interval          {:>10}
       --vis <viv-scale>    #reduction to vivify              {:>10.2}
+      --vrb <vrw-bst-phs>  Var reward for vars in best phase {:>10.2}
       --vri <vrw-dcy-beg>  Initial var reward decay          {:>10.2}
       --vrm <vrw-dcy-end>  Maximum var reward decay          {:>10.2}
       --vro <vrw-occ-cmp>  Occ. compression rate in LR       {:>10.2}
@@ -586,6 +593,7 @@ ARGS:
         config.viv_end,
         config.viv_int,
         config.viv_scale,
+        config.vrw_bst_phs,
         config.vrw_dcy_beg,
         config.vrw_dcy_end,
         config.vrw_occ_cmp,

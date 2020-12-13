@@ -85,18 +85,30 @@ impl VarSelectIF for AssignStack {
     }
     fn force_rephase(&mut self, phase: RephaseMode) {
         debug_assert!(self.use_rephase);
-        let limit = 10000;
-        let len = self.var_order.idxs[0].min(limit);
         #[cfg(temp_order)]
         {
             self.temp_order.clear();
         }
         match phase {
             RephaseMode::Best => {
-                for vi in self.var_order.heap[1..=len].iter().rev() {
+                for vi in self.var_order.heap[1..].iter().rev() {
                     let v = &mut self.var[*vi];
                     if v.is(Flag::REPHASE) {
-                        v.set(Flag::PHASE, v.is(Flag::BEST_PHASE));
+                        #[cfg(not(feature = "temp_order"))]
+                        {
+                            // v.set(Flag::PHASE, v.is(Flag::BEST_PHASE));
+                            v.best_phase_reward = self.best_phase_reward_value;
+                        }
+                        #[cfg(temp_order)]
+                        {
+                            self.temp_order
+                                .push(Lit::from_assign(v, v.is(Flag::BEST_PHASE)));
+                        }
+                    } else {
+                        #[cfg(not(feature = "temp_order"))]
+                        {
+                            v.best_phase_reward = 0.0;
+                        }
                     }
                 }
             }
@@ -104,7 +116,7 @@ impl VarSelectIF for AssignStack {
             #[cfg(explore_timestamp)]
             #[cfg(temp_order)]
             RephaseMode::Explore(since) => {
-                for vi in self.var_order.heap[1..=len].iter() {
+                for vi in self.var_order.heap[1..].iter() {
                     let v = &mut self.var[*vi];
                     if v.assign_timestamp < since {
                         self.temp_order
@@ -114,13 +126,15 @@ impl VarSelectIF for AssignStack {
             }
             #[cfg(feature = "temp_order")]
             RephaseMode::Force(on) => {
-                for vi in self.var_order.heap[1..=len].iter().rev() {
+                for vi in self.var_order.heap[1..].iter().rev() {
                     self.temp_order.push(Lit::from_assign(*vi, on));
                 }
             }
             #[cfg(feature = "temp_order")]
             RephaseMode::Random => {
-                for vi in self.var_order.heap[1..=len].iter().rev() {
+                let limit = 10000;
+                let len = self.var_order.idxs[0].min(limit);
+                for vi in self.var_order.heap[1..].iter().rev() {
                     let b = self.var[*vi].timestamp % 2 == 0;
                     self.temp_order.push(Lit::from_assign(*vi, b));
                 }
@@ -150,9 +164,11 @@ impl VarSelectIF for AssignStack {
                 if let Some(b) = self.assign[vi] {
                     v.turn_on(Flag::REPHASE);
                     v.set(Flag::BEST_PHASE, b);
+                    v.best_phase_reward = self.best_phase_reward_value;
                     continue;
                 }
                 v.turn_off(Flag::REPHASE);
+                v.best_phase_reward = 0.0;
             }
         }
         self.build_best_at = self.num_propagation;
@@ -194,6 +210,7 @@ impl AssignStack {
             if let Some(phase) = self.assign[vi] {
                 if phase != self.var[vi].is(Flag::BEST_PHASE) {
                     self.num_best_assign = 0;
+                    self.var[vi].best_phase_reward = 0.0;
                     return true;
                 }
             }

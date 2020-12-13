@@ -8,7 +8,8 @@ use {
 impl VarRewardIF for AssignStack {
     #[inline]
     fn activity(&self, vi: VarId) -> f64 {
-        self.var[vi].reward
+        let v = &self.var[vi];
+        v.reward + v.best_phase_reward
     }
     fn initialize_reward(&mut self, iterator: Iter<'_, usize>) {
         #[cfg(moving_var_reward_rate)]
@@ -26,13 +27,15 @@ impl VarRewardIF for AssignStack {
             self.activity_decay = self.activity_decay_max;
         }
     }
-    fn expand_reward(&mut self, contract: bool) {
-        const SCALE: f64 = 1.5;
-        let scale: f64 = if contract { 1.0 / SCALE } else { SCALE };
+    fn expand_reward(&mut self, _: bool) {
+        // const SCALE: f64 = 2.0;
+        // let scale: f64 = if boost { 1.0 / SCALE } else { SCALE };
         for vi in 1..self.var.len() {
             let v = &mut self.var[vi];
-            if !v.is(Flag::ELIMINATED) {
-                v.reward = v.reward.powf(scale);
+            if v.is(Flag::REPHASE) {
+                // v.reward = v.reward.powf(scale);
+                v.set(Flag::PHASE, v.is(Flag::BEST_PHASE));
+                v.best_phase_reward *= 0.9;
             }
         }
     }
